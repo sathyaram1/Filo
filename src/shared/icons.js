@@ -1,0 +1,209 @@
+// Libreria di icone SVG.
+// Parametri di famiglia (vedi src/styles/ICONS.md per la guida completa):
+//   - viewBox 24x24, disegno entro ~20x20
+//   - tratto 1.75, linecap/linejoin "round"
+//   - outline puro, fill="none", stroke="currentColor" (eredita il colore dal contesto)
+// Renderizza un <svg> come stringa: i consumer la iniettano via innerHTML.
+// Le icone NON contengono input utente, quindi innerHTML è sicuro.
+
+(function (global) {
+  'use strict';
+
+  function wrap(inner, opts = {}) {
+    const size = opts.size || 20;
+    return (
+      `<svg viewBox="0 0 24 24" width="${size}" height="${size}" ` +
+      `fill="none" stroke="currentColor" stroke-width="1.75" ` +
+      `stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">` +
+      `${inner}` +
+      `</svg>`
+    );
+  }
+
+  // --- Logo Filo: una "f" in corsivo, tratto unico con asola alta e coda
+  //     terminale verso sinistra, più traversa orizzontale. Pensata per
+  //     evocare un filo che si annoda.
+  const filoLogo =
+    `<path d="M14.6 5.4c-1.2-1-3-.6-3.6 1.3L7.4 18c-.5 1.7-1.9 2.2-2.9 1.4"/>` +
+    `<path d="M6.2 11.6h7.3"/>`;
+
+  // --- Zoom (espandi a tutto schermo): 4 frecce diagonali verso gli angoli
+  const zoom =
+    // angolo TL
+    `<path d="M9 4H4v5"/>` +
+    `<path d="M4 4l5 5"/>` +
+    // angolo TR
+    `<path d="M15 4h5v5"/>` +
+    `<path d="M20 4l-5 5"/>` +
+    // angolo BL
+    `<path d="M9 20H4v-5"/>` +
+    `<path d="M4 20l5-5"/>` +
+    // angolo BR
+    `<path d="M15 20h5v-5"/>` +
+    `<path d="M20 20l-5-5"/>`;
+
+  // --- Shrink (esci da schermo intero): 4 frecce diagonali verso il centro
+  const shrink =
+    // angolo TL
+    `<path d="M4 9h5V4"/>` +
+    `<path d="M9 9l-5-5"/>` +
+    // angolo TR
+    `<path d="M20 9h-5V4"/>` +
+    `<path d="M15 9l5-5"/>` +
+    // angolo BL
+    `<path d="M4 15h5v5"/>` +
+    `<path d="M9 15l-5 5"/>` +
+    // angolo BR
+    `<path d="M20 15h-5v5"/>` +
+    `<path d="M15 15l5 5"/>`;
+
+  // --- Screenshot: cerchio centrale circondato da 4 angoli (mirino)
+  const screenshot =
+    `<circle cx="12" cy="12" r="3.2"/>` +
+    `<path d="M4 8V6a2 2 0 0 1 2-2h2"/>` +
+    `<path d="M16 4h2a2 2 0 0 1 2 2v2"/>` +
+    `<path d="M20 16v2a2 2 0 0 1-2 2h-2"/>` +
+    `<path d="M8 20H6a2 2 0 0 1-2-2v-2"/>`;
+
+  // --- Screenshot parziale: stesso mirino ad angoli ma con un rettangolo
+  //     tratteggiato al centro a indicare "selezione di una regione".
+  const screenshotCrop =
+    `<path d="M4 8V6a2 2 0 0 1 2-2h2"/>` +
+    `<path d="M16 4h2a2 2 0 0 1 2 2v2"/>` +
+    `<path d="M20 16v2a2 2 0 0 1-2 2h-2"/>` +
+    `<path d="M8 20H6a2 2 0 0 1-2-2v-2"/>` +
+    `<rect x="8" y="9" width="8" height="6" rx="0.5" stroke-dasharray="1.4 1.4"/>`;
+
+  // --- Trascrivi: foglio con righe di testo + piccola "T" che evoca OCR.
+  //     Tre righe orizzontali (lunghezze decrescenti) dentro una pagina,
+  //     piegolino in alto a destra.
+  const transcribe =
+    `<path d="M6 3h8l4 4v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/>` +
+    `<path d="M14 3v4h4"/>` +
+    `<path d="M7.5 11h7"/>` +
+    `<path d="M7.5 14h7"/>` +
+    `<path d="M7.5 17h4.5"/>`;
+
+  // --- Immagine: cornice + sole in alto a sinistra + due montagne.
+  //     Le montagne sono un unico polyline che va da bordo a bordo della
+  //     cornice (niente segmenti scollegati). La montagna sotto il sole è
+  //     più piccola e non lo tocca.
+  const image =
+    `<rect x="3.5" y="5" width="17" height="14" rx="2"/>` +
+    `<circle cx="7" cy="9" r="1.3"/>` +
+    `<path d="M3.5 17L8 12.5L11 15.5L15 10L20.5 17"/>`;
+
+  // --- Salva per dopo (bookmark)
+  const saveForLater =
+    `<path d="M7 4h10a1 1 0 0 1 1 1v15.2l-6-3.8-6 3.8V5a1 1 0 0 1 1-1z"/>`;
+
+  // --- Condividi (aeroplanino di carta)
+  const share =
+    `<path d="M21 3L3 11l7 2.5L13 21l8-18z"/>` +
+    `<path d="M10 13.5L21 3"/>`;
+
+  // --- Traduzione: glifo "文" in alto a sinistra + "A" in basso a destra.
+  //     Niente freccia: la sola disposizione (uno alto, uno basso) comunica
+  //     la trasformazione. Entrambi disegnati come path (no <text>).
+  const translate =
+    // 文 (area x: 1-10, y: 2-12). I quattro tratti tradizionali:
+    // 1. puntino in alto, 2. tratto orizzontale, 3. pie (piede sx curvo),
+    // 4. na (piede dx dritto). Pie e na partono dallo stesso punto (5,7).
+    `<path d="M6 2.5l-1.5 1.7"/>` +
+    `<path d="M1 6h9"/>` +
+    `<path d="M5 7C4 8.7 2.7 10.3 1 11.5"/>` +
+    `<path d="M5 7L10 11.5"/>` +
+    // A (area x: 12-22, y: 12-21.5)
+    `<path d="M13 21.5l4.5-9.5 4.5 9.5"/>` +
+    `<path d="M14.7 18h5.6"/>`;
+
+  // Variante "mostra originale": A in alto a sinistra, 文 in basso a destra.
+  const showOriginal =
+    // A (area x: 1.5-11.5, y: 2.5-12)
+    `<path d="M1.5 12l4.5-9.5 4.5 9.5"/>` +
+    `<path d="M3.2 8.5h5.6"/>` +
+    // 文 (area x: 13-22, y: 12-21.5)
+    `<path d="M18 12.5l-1.5 1.7"/>` +
+    `<path d="M13 16h9"/>` +
+    `<path d="M17 17C16 18.7 14.7 20.3 13 21.5"/>` +
+    `<path d="M17 17L22 21.5"/>`;
+
+  // --- Navigazione: indietro, avanti, ricarica, chiudi
+  const back =
+    `<path d="M19 12H5"/>` +
+    `<path d="M11 6l-6 6 6 6"/>`;
+
+  const forward =
+    `<path d="M5 12h14"/>` +
+    `<path d="M13 6l6 6-6 6"/>`;
+
+  const reload =
+    // Singolo arco ~300° in senso orario; apertura in alto a destra con
+    // freccia che indica la direzione di rotazione.
+    `<path d="M20 8.5A8 8 0 1 0 20 15.5"/>` +
+    `<path d="M20 4v5h-5"/>`;
+
+  const close =
+    `<path d="M6 6l12 12"/>` +
+    `<path d="M18 6L6 18"/>`;
+
+  // --- Opzioni: ingranaggio a 6 denti + foro centrale.
+  //     Costruzione geometrica: denti su raggio 9 (tip) e 6.5 (base), con
+  //     half-angle 12.5° al tip e 17.5° alla base (profilo "trapezoidale"
+  //     che richiama l'involuta). Archi A r=6.5 fra un dente e il successivo.
+  const options =
+    `<path d="M18.20 13.96L20.79 13.95L20.79 10.05L18.20 10.04` +
+    `A6.5 6.5 0 0 0 16.79 7.61` +
+    `L18.08 5.36L14.71 3.42L13.41 5.65` +
+    `A6.5 6.5 0 0 0 10.59 5.65` +
+    `L9.29 3.42L5.92 5.36L7.21 7.61` +
+    `A6.5 6.5 0 0 0 5.80 10.04` +
+    `L3.21 10.05L3.21 13.95L5.80 13.96` +
+    `A6.5 6.5 0 0 0 7.21 16.39` +
+    `L5.92 18.64L9.29 20.58L10.59 18.35` +
+    `A6.5 6.5 0 0 0 13.41 18.35` +
+    `L14.71 20.58L18.08 18.64L16.79 16.39` +
+    `A6.5 6.5 0 0 0 18.20 13.96Z"/>` +
+    `<circle cx="12" cy="12" r="2.5"/>`;
+
+  // --- Color picker (pipetta): outline singolo. Cap rettangolare
+  //     perpendicolare all'asse + corpo diagonale fino al tip in basso-sinistra.
+  const colorPicker =
+    `<path d="M14 4l6 6l-3 3l-2-2l-9 9h-3v-3l9-9l-1-1z"/>`;
+
+  // --- Alias semantico: "Salvati per dopo" usa il logo di Filo
+  const openForLater = filoLogo;
+
+  // Esposizione: ciascuna icona è una FUNZIONE (size) => stringa SVG.
+  // Permette ai consumer di chiedere taglie diverse (es. 16 per la riga,
+  // 20 per la griglia overflow) senza ricreare manualmente il wrapper.
+  const ICONS = {
+    filoLogo:     (size) => wrap(filoLogo, { size }),
+    zoom:         (size) => wrap(zoom, { size }),
+    shrink:       (size) => wrap(shrink, { size }),
+    screenshot:   (size) => wrap(screenshot, { size }),
+    screenshotCrop: (size) => wrap(screenshotCrop, { size }),
+    transcribe:   (size) => wrap(transcribe, { size }),
+    image:        (size) => wrap(image, { size }),
+    saveForLater: (size) => wrap(saveForLater, { size }),
+    share:        (size) => wrap(share, { size }),
+    translate:    (size) => wrap(translate, { size }),
+    showOriginal: (size) => wrap(showOriginal, { size }),
+    back:         (size) => wrap(back, { size }),
+    forward:      (size) => wrap(forward, { size }),
+    reload:       (size) => wrap(reload, { size }),
+    close:        (size) => wrap(close, { size }),
+    options:      (size) => wrap(options, { size }),
+    colorPicker:  (size) => wrap(colorPicker, { size }),
+    openForLater: (size) => wrap(openForLater, { size }),
+  };
+
+  // Heuristica che il menu usa per capire se una stringa di "icona" è SVG
+  // o un glifo testuale (emoji/carattere).
+  function isSvgIcon(s) {
+    return typeof s === 'string' && s.charCodeAt(0) === 60 /* '<' */ && s.startsWith('<svg');
+  }
+
+  global.SN_ICONS = ICONS;
+  global.SN_ICONS_UTIL = { isSvgIcon, wrap };
+})(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="it" data-sn-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <title>Filo — Nuova scheda</title>
+  <link rel="icon" href="filo://asset/icons/icon-32.png" />
+  <link rel="stylesheet" href="filo://style/theme.css" />
+  <link rel="stylesheet" href="dashboard.css" />
+  <script src="filo://shared/pageBootstrap.js"></script>
+  <script src="filo://shared/constants.js"></script>
+  <script src="filo://shared/messages.js"></script>
+  <script src="filo://shared/i18n.js"></script>
+  <script src="filo://shared/storage.js"></script>
+  <script src="filo://shared/filoMemory.js"></script>
+  <script src="filo://shared/filoState.js"></script>
+</head>
+<body data-state="home">
+  <main class="dash" id="dash">
+    <!-- Top right: settings + home -->
+    <div class="dash-topbar">
+      <button class="dash-icon-btn dash-home-btn" id="homeBtn" title="Torna alla dashboard" hidden>
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 11.5 12 4l9 7.5"/>
+          <path d="M5 10v10h14V10"/>
+        </svg>
+      </button>
+      <button class="dash-icon-btn dash-settings-btn" id="settingsBtn" title="Impostazioni">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1A2 2 0 1 1 4.4 17l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9c0 .7.4 1.3 1 1.6.1 0 .2.1.4.1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Left column: suggested actions -->
+    <aside class="dash-left" id="left">
+      <ul class="dash-suggestions" id="suggestions"></ul>
+      <button class="dash-expand-btn" id="expandBtn" hidden>
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+        <span>Mostra tutti</span>
+      </button>
+    </aside>
+
+    <!-- Center: home message OR conversation -->
+    <section class="dash-center" id="center">
+      <!-- Home state -->
+      <div class="dash-home" id="homeView">
+        <p class="dash-home-msg" id="homeMessage">…</p>
+      </div>
+
+      <!-- Conversation state -->
+      <div class="dash-thread" id="threadView" hidden>
+        <div class="dash-bubbles" id="bubbles" role="log" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <!-- Right column: live state -->
+    <aside class="dash-right" id="right">
+      <div class="dash-live" id="live"></div>
+    </aside>
+
+    <!-- Input bar -->
+    <form class="dash-input-wrap" id="inputForm" autocomplete="off">
+      <input
+        class="dash-input"
+        id="input"
+        type="text"
+        placeholder="Chiedi qualsiasi cosa…"
+        autofocus
+        aria-label="Scrivi a Filo"
+      />
+      <button class="dash-send" id="sendBtn" type="submit" aria-label="Invia">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M5 12l14-7-4 14-3-6-7-1z"/>
+        </svg>
+      </button>
+    </form>
+  </main>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>

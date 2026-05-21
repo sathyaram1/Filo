@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <title>Filo</title>
+  <link rel="stylesheet" href="filo://shell/shell.css" />
+</head>
+<body>
+  <header class="shell">
+    <div class="tabs" id="tabs" role="tablist"></div>
+    <button class="tab-new" id="tab-new" title="Nuova scheda (Ctrl+T)">+</button>
+    <nav class="addr">
+      <button class="nav-btn" id="nav-back" title="Indietro" aria-label="Indietro">‹</button>
+      <button class="nav-btn" id="nav-forward" title="Avanti" aria-label="Avanti">›</button>
+      <button class="nav-btn" id="nav-reload" title="Ricarica" aria-label="Ricarica">⟳</button>
+      <input id="addr" type="text" spellcheck="false" placeholder="Cerca o inserisci un indirizzo" />
+      <button class="nav-btn" id="nav-home" title="Home (filo://newtab)" aria-label="Home">⌂</button>
+    </nav>
+  </header>
+  <script src="filo://shell/shell.js"></script>
+</body>
+</html>

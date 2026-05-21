@@ -1,0 +1,232 @@
+// Dashboard interna: triage dei feedback alpha.
+// Stato/note salvati su Firestore (via SN_FEEDBACK.updateStatus).
+
+(function () {
+  'use strict';
+
+  const listEl = document.getElementById('list');
+  const emptyEl = document.getElementById('empty');
+  const countEl = document.getElementById('count');
+  const searchEl = document.getElementById('search');
+  const refreshBtn = document.getElementById('refresh');
+  const lightbox = document.getElementById('lightbox');
+  const lightboxImg = document.getElementById('lightboxImg');
+  const tabsEl = document.getElementById('tabs');
+
+  // 'inbox' = ricevuti (status: new); 'draft' = bozze (richiedono decisioni di
+  // design); 'todo' = da risolvere; 'done' = risolti (in attesa di verifica);
+  // 'verified' = verificati dall'utente.
+  // I 'ignored' restano nascosti (raggiungibili solo riaprendoli via DB).
+  let all = [];
+  let currentTab = 'inbox';
+
+  function statusOf(f) {
+    const s = f.status || 'new';
+    if (s === 'new') return 'inbox';
+    if (s === 'draft') return 'draft';
+    if (s === 'todo') return 'todo';
+    if (s === 'done') return 'done';
+    if (s === 'verified') return 'verified';
+    if (s === 'ignored') return 'ignored';
+    return 'inbox';
+  }
+
+  function fmtTs(ts) {
+    if (!ts) return '';
+    try {
+      const d = new Date(ts);
+      return d.toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
+    } catch (_) { return String(ts); }
+  }
+
+  function escapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    })[c]);
+  }
+
+  async function patch(id, payload, optimistic) {
+    const item = all.find((f) => f._id === id);
+    if (!item) return;
+    const prev = { status: item.status, notes: item.notes };
+    Object.assign(item, optimistic);
+    applyFilter();
+    try {
+      await SN_FEEDBACK.updateStatus(id, payload);
+    } catch (e) {
+      Object.assign(item, prev);
+      applyFilter();
+      alert('Errore: ' + (e?.message || e));
+    }
+  }
+
+  function actionsFor(f) {
+    const tab = statusOf(f);
+    if (tab === 'inbox') {
+      return `
+        <button class="sn-btn fb-act" data-id="${escapeHtml(f._id)}" data-to="todo">→ Da risolvere</button>
+        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="draft">→ Bozze</button>
+        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="ignored">Ignora</button>
+      `;
+    }
+    if (tab === 'draft') {
+      return `
+        <button class="sn-btn fb-act" data-id="${escapeHtml(f._id)}" data-to="todo">→ Da risolvere</button>
+        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="new">← Ricevuti</button>
+      `;
+    }
+    if (tab === 'todo') {
+      return `
+        <button class="sn-btn fb-act" data-id="${escapeHtml(f._id)}" data-to="done">✓ Risolto</button>
+        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="draft">→ Bozze</button>
+        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="new">← Ricevuti</button>
+      `;
+    }
+    if (tab === 'done') {
+      return `
+        <button class="sn-btn fb-act" data-id="${escapeHtml(f._id)}" data-to="verified">✓ Verificato</button>
+        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="new">Riapri</button>
+      `;
+    }
+    if (tab === 'verified') {
+      return `<button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="done">← Risolti</button>`;
+    }
+    return '';
+  }
+
+  function render(items) {
+    countEl.textContent = items.length ? `${items.length} feedback` : '';
+    if (!items.length) {
+      listEl.innerHTML = '';
+      emptyEl.hidden = false;
+      emptyEl.textContent = {
+        inbox: 'Nessun feedback in arrivo.',
+        draft: 'Nessuna bozza in attesa di decisioni.',
+        todo: 'Nessun feedback da risolvere.',
+        done: 'Nessun feedback risolto.',
+        verified: 'Nessun feedback verificato.',
+      }[currentTab] || 'Nessun feedback.';
+      return;
+    }
+    emptyEl.hidden = true;
+    listEl.innerHTML = items.map((f) => {
+      const when = fmtTs(f.createdAt || f._createTime);
+      const url = f.url || '';
+      const ua = (f.userAgent || '').slice(0, 80);
+      const cid = (f.clientId || '').slice(0, 12);
+      const text = escapeHtml(f.text || '(senza testo)');
+      const imgs = Array.isArray(f.images) ? f.images : [];
+      const imgsHtml = imgs.length
+        ? `<div class="fb-imgs">${imgs.map((u) => `<img src="${escapeHtml(u)}" data-full="${escapeHtml(u)}">`).join('')}</div>`
+        : '';
+      const notesEditable = currentTab === 'todo' || currentTab === 'draft';
+      const notesBlock = notesEditable
+        ? `<label class="fb-notes-label">Note / decisioni di design:
+             <textarea class="fb-notes" data-id="${escapeHtml(f._id)}" rows="3" placeholder="Dettagli aggiuntivi, vincoli, scelte di design…">${escapeHtml(f.notes || '')}</textarea>
+           </label>`
+        : (f.notes ? `<div class="fb-notes-readonly">${escapeHtml(f.notes)}</div>` : '');
+      return `
+        <article class="fb-card fb-card--${statusOf(f)}">
+          <div class="fb-meta">
+            <span>${escapeHtml(when)}</span>
+            ${url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url).slice(0, 80)}</a>` : ''}
+            ${cid ? `<span>client: ${escapeHtml(cid)}</span>` : ''}
+            ${ua ? `<span title="${escapeHtml(ua)}">UA</span>` : ''}
+          </div>
+          <div class="fb-text">${text}</div>
+          ${imgsHtml}
+          ${notesBlock}
+          <div class="fb-actions">${actionsFor(f)}</div>
+        </article>
+      `;
+    }).join('');
+
+    listEl.querySelectorAll('.fb-imgs img').forEach((img) => {
+      img.addEventListener('click', () => {
+        lightboxImg.src = img.dataset.full;
+        lightbox.classList.add('open');
+      });
+    });
+
+    listEl.querySelectorAll('.fb-act').forEach((b) => {
+      b.addEventListener('click', () => {
+        const to = b.dataset.to; // 'todo' | 'done' | 'new' | 'ignored'
+        const id = b.dataset.id;
+        const payload = { status: to };
+        // Quando passo da inbox a "todo", porto con me eventuali note già digitate.
+        const ta = listEl.querySelector(`.fb-notes[data-id="${id}"]`);
+        if (ta) payload.notes = ta.value;
+        patch(id, payload, { status: to, notes: payload.notes });
+      });
+    });
+
+    // Salvataggio note: debounce su blur.
+    listEl.querySelectorAll('.fb-notes').forEach((ta) => {
+      let timer;
+      const flush = () => {
+        const id = ta.dataset.id;
+        const item = all.find((f) => f._id === id);
+        if (!item || item.notes === ta.value) return;
+        patch(id, { notes: ta.value }, { notes: ta.value });
+      };
+      ta.addEventListener('blur', flush);
+      ta.addEventListener('input', () => {
+        clearTimeout(timer);
+        timer = setTimeout(flush, 1500);
+      });
+    });
+  }
+
+  function applyFilter() {
+    const q = (searchEl.value || '').trim().toLowerCase();
+    const base = all.filter((f) => statusOf(f) === currentTab);
+    const filtered = q
+      ? base.filter((f) => [f.text, f.url, f.clientId, f.userAgent, f.notes].join(' ').toLowerCase().includes(q))
+      : base;
+    updateTabCounts();
+    render(filtered);
+  }
+
+  function updateTabCounts() {
+    const counts = { inbox: 0, draft: 0, todo: 0, done: 0, verified: 0 };
+    for (const f of all) {
+      const s = statusOf(f);
+      if (s in counts) counts[s]++;
+    }
+    for (const [tab, n] of Object.entries(counts)) {
+      const btn = tabsEl.querySelector(`[data-tab="${tab}"]`);
+      if (!btn) continue;
+      const label = { inbox: 'Ricevuti', draft: 'Bozze', todo: 'Da risolvere', done: 'Risolti', verified: 'Verificati' }[tab];
+      btn.textContent = `${label} (${n})`;
+    }
+  }
+
+  async function load() {
+    listEl.innerHTML = '<div class="fb-empty">Caricamento…</div>';
+    emptyEl.hidden = true;
+    try {
+      all = await SN_FEEDBACK.list({ pageSize: 500 });
+      applyFilter();
+    } catch (e) {
+      listEl.innerHTML = '';
+      emptyEl.hidden = false;
+      emptyEl.textContent = 'Errore caricamento: ' + (e?.message || e);
+    }
+  }
+
+  tabsEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-tab]');
+    if (!btn) return;
+    currentTab = btn.dataset.tab;
+    tabsEl.querySelectorAll('[data-tab]').forEach((b) => {
+      b.classList.toggle('fb-tab--active', b === btn);
+    });
+    applyFilter();
+  });
+
+  lightbox.addEventListener('click', () => lightbox.classList.remove('open'));
+  refreshBtn.addEventListener('click', load);
+  searchEl.addEventListener('input', applyFilter);
+
+  load();
+})();

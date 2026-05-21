@@ -1,0 +1,325 @@
+/* Sidebar Aiuto (Fase 2) — overlay laterale destro full-height. */
+
+.sn-sidebar {
+  /* Ancorata al bottom: la barra di input resta fissa lì sotto e la chat
+     "cresce" verso l'alto quando si espande. Al collasso scompare solo la
+     parte superiore (header + conv + meta), l'input non si sposta. */
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  width: 360px;
+  height: calc(100vh - 32px);
+  /* z-index gestito inline da sidebar.js via Popup.registerStack — partecipa
+     allo stacking condiviso con popup AI e modale feedback. */
+  z-index: 2147483600;
+  display: flex;
+  flex-direction: column;
+  background: var(--sn-overlay-bg);
+  color: var(--sn-fg);
+  font-family: var(--sn-font);
+  font-size: 13px;
+  border: 1px solid var(--sn-border);
+  border-radius: var(--sn-radius);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(6px);
+  animation: sn-sidebar-in 160ms ease-out;
+  overflow: hidden;
+}
+
+@keyframes sn-sidebar-in {
+  from { transform: translateX(8px); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+
+.sn-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--sn-border);
+  user-select: none;
+}
+
+.sn-sidebar-drag { cursor: move; }
+.sn-sidebar-drag button { cursor: pointer; }
+
+.sn-sidebar-title {
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--sn-muted);
+}
+
+.sn-sidebar-actions { display: flex; gap: 6px; }
+
+.sn-sidebar-actions button {
+  all: unset;
+  cursor: pointer;
+  padding: 0 8px;
+  color: var(--sn-muted);
+  font-size: 16px;
+  line-height: 1;
+}
+.sn-sidebar-actions button:hover { color: var(--sn-fg); }
+
+.sn-sidebar-conv {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sn-sidebar-msg {
+  max-width: 92%;
+  padding: 8px 10px;
+  border-radius: var(--sn-radius);
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+.sn-sidebar-msg-user {
+  align-self: flex-end;
+  background: var(--sn-accent);
+  color: #fff;
+}
+
+.sn-sidebar-msg-assistant {
+  align-self: flex-start;
+  background: var(--sn-hover);
+  color: var(--sn-fg);
+}
+
+.sn-sidebar-msg-loading { color: var(--sn-muted); font-style: italic; }
+.sn-sidebar-msg-error   { color: var(--sn-error); }
+
+/* Bottoni "choices" sotto al messaggio dell'assistente: percorsi alternativi
+   che l'utente può cliccare per indirizzare l'AI senza scrivere. */
+.sn-sidebar-choices {
+  align-self: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: 92%;
+  margin-top: -4px;
+}
+
+.sn-sidebar-choice {
+  all: unset;
+  cursor: pointer;
+  padding: 5px 10px;
+  background: var(--sn-bg);
+  color: var(--sn-fg);
+  border: 1px solid var(--sn-accent);
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1.2;
+  transition: background 120ms ease, color 120ms ease;
+}
+.sn-sidebar-choice:hover {
+  background: var(--sn-accent);
+  color: #fff;
+}
+.sn-sidebar-choice:disabled {
+  cursor: default;
+  opacity: 0.5;
+  background: var(--sn-bg);
+  color: var(--sn-muted);
+  border-color: var(--sn-border);
+}
+
+/* Log azioni utente: riga grigia compatta, un solo rigo */
+.sn-sidebar-log {
+  align-self: flex-start;
+  color: var(--sn-muted);
+  font-size: 11px;
+  padding: 0 4px;
+  opacity: 0.75;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* Stato collassato: visibile solo la barra di input. Il pannello si rimpicciolisce
+   verso l'alto (height:auto), restando ancorato al bottom: l'input resta dov'era. */
+.sn-sidebar.sn-sidebar-collapsed {
+  height: auto;
+}
+.sn-sidebar.sn-sidebar-collapsed .sn-sidebar-header,
+.sn-sidebar.sn-sidebar-collapsed .sn-sidebar-conv,
+.sn-sidebar.sn-sidebar-collapsed .sn-sidebar-meta {
+  display: none;
+}
+.sn-sidebar.sn-sidebar-collapsed .sn-sidebar-input {
+  border-top: 0;
+}
+
+.sn-sidebar-meta {
+  padding: 4px 12px;
+  font-size: 11px;
+  color: var(--sn-muted);
+  border-top: 1px solid var(--sn-border);
+  min-height: 16px;
+}
+
+.sn-sidebar-input {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px;
+  border-top: 1px solid var(--sn-border);
+}
+
+.sn-sidebar-input textarea {
+  flex: 1;
+  resize: none;
+  padding: 7px 14px;
+  height: 32px;
+  line-height: 18px;
+  background: var(--sn-bg);
+  color: var(--sn-fg);
+  border: 1px solid var(--sn-border);
+  border-radius: 18px;
+  font-family: inherit;
+  font-size: 13px;
+  outline: none !important;
+  box-shadow: none !important;
+  overflow: hidden;
+}
+
+.sn-sidebar-input textarea::placeholder { color: var(--sn-muted); opacity: 1; }
+
+/* vedi nota in popup.css: reset del focus ring ereditato dalla pagina ospite. */
+.sn-sidebar-input textarea:focus {
+  border-color: var(--sn-accent);
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.sn-sidebar-input button {
+  all: unset;
+  cursor: pointer;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--sn-fg);
+  color: var(--sn-bg);
+  border-radius: 50%;
+  font-size: 14px;
+  line-height: 1;
+  transition: transform 120ms ease, opacity 120ms ease;
+}
+.sn-sidebar-input button:hover { transform: translateY(-1px); }
+.sn-sidebar-input button:active { transform: translateY(0); opacity: 0.85; }
+
+/* Indicatore "sta pensando": 3 righe di reasoning che scorrono.
+   La riga top è quasi trasparente (sta uscendo), la bottom è piena (è entrata).
+   Le frasi cambiano ogni ~900ms con uno shift verso l'alto. */
+.sn-sidebar-thinking {
+  align-self: flex-start;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 6px;
+  font-size: 11px;
+  font-style: italic;
+  color: var(--sn-muted);
+  line-height: 1.35;
+  max-width: 92%;
+  overflow: hidden;
+}
+.sn-sidebar-thinking-line {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: opacity 350ms ease;
+}
+.sn-sidebar-thinking-line[data-slot="0"] { opacity: 0.25; }
+.sn-sidebar-thinking-line[data-slot="1"] { opacity: 0.55; }
+.sn-sidebar-thinking-line[data-slot="2"] { opacity: 0.95; }
+.sn-sidebar-thinking-line.sn-sidebar-thinking-enter {
+  animation: sn-thinking-enter 350ms ease-out;
+}
+@keyframes sn-thinking-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 0.95; transform: translateY(0); }
+}
+
+/* Popup feedback fine-task: appare in chat quando l'AI dichiara "done". */
+.sn-sidebar-feedback {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: var(--sn-hover);
+  border: 1px solid var(--sn-border);
+  border-radius: var(--sn-radius);
+  font-size: 12px;
+}
+
+.sn-sidebar-feedback-q {
+  color: var(--sn-fg);
+}
+
+.sn-sidebar-feedback-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.sn-sidebar-feedback-btn {
+  all: unset;
+  cursor: pointer;
+  padding: 5px 12px;
+  background: var(--sn-bg);
+  color: var(--sn-fg);
+  border: 1px solid var(--sn-border);
+  border-radius: 999px;
+  font-size: 12px;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.sn-sidebar-feedback-btn:hover {
+  background: var(--sn-accent);
+  color: #fff;
+  border-color: var(--sn-accent);
+}
+.sn-sidebar-feedback-btn:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.sn-sidebar-feedback-btn:disabled:hover {
+  background: var(--sn-bg);
+  color: var(--sn-fg);
+  border-color: var(--sn-border);
+}
+
+.sn-sidebar-feedback-skip {
+  all: unset;
+  cursor: pointer;
+  margin-left: auto;
+  padding: 0 6px;
+  color: var(--sn-muted);
+  font-size: 14px;
+  line-height: 1;
+}
+.sn-sidebar-feedback-skip:hover { color: var(--sn-fg); }
+.sn-sidebar-feedback-skip:disabled { opacity: 0.5; cursor: default; }
+
+.sn-sidebar-feedback-thanks {
+  font-size: 11px;
+  color: var(--sn-muted);
+  font-style: italic;
+}
+
+.sn-sidebar-feedback-dismissed {
+  opacity: 0.4;
+}
+

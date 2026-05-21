@@ -1,0 +1,239 @@
+// Stringhe utente (italiano). Centralizzate per facilitare future traduzioni.
+
+(function (global) {
+  'use strict';
+
+  const STRINGS = {
+    // Menu — base
+    menu_back: 'Indietro',
+    menu_forward: 'Avanti',
+    menu_reload: 'Ricarica',
+    menu_copy: 'Copia',
+    menu_paste: 'Incolla',
+    menu_cut: 'Taglia',
+    menu_select_all: 'Seleziona tutto',
+
+    // Menu — AI
+    menu_translate_selection: 'Traduci',
+    menu_show_original: 'Mostra originale',
+    menu_explain: 'Spiegazione',
+    menu_explain_deep: 'Approfondisci',
+    menu_paste_history: 'Cronologia incolla',
+    menu_explain_loading: 'Spiegazione…',
+
+    // Menu — pagina
+    menu_help: 'Aiuto',
+    menu_save_for_later: 'Salva per dopo',
+    menu_open_for_later: 'Aperti per dopo',
+    menu_translate_page: 'Traduci la pagina',
+    menu_fullscreen: 'Schermo intero',
+    menu_exit_fullscreen: 'Esci da schermo intero',
+
+    // Menu — link / immagine
+    menu_open_in_new_tab: 'Apri in nuova tab',
+    menu_copy_link: 'Copia URL',
+    menu_save_link_for_later: 'Salva link per dopo',
+    menu_copy_image: 'Copia immagine',
+    menu_save_image_as: 'Salva immagine come…',
+    menu_copy_image_link: 'Copia URL immagine',
+    menu_search_image: 'Cerca immagine',
+    menu_search_text: 'Cerca',
+    menu_share_link: 'Condividi link',
+    menu_explain_link: 'Spiega link',
+    menu_explain_image: 'Spiega immagine',
+    menu_edit_selection: 'Modifica',
+    menu_dictate: 'Detta',
+    menu_screenshot: 'Screenshot',
+    menu_screenshot_crop: 'Screenshot di una parte',
+    menu_transcribe: 'Trascrivi',
+    region_select_hint: 'Trascina per selezionare una regione · Esc per annullare',
+    toast_transcribing: 'Trascrivo il testo…',
+    toast_transcribed: 'Testo trascritto e copiato',
+    toast_transcribe_empty: 'Nessun testo trovato nella regione',
+    toast_region_cancelled: 'Selezione annullata',
+    menu_share: 'Condividi',
+    menu_overflow: 'Altro…',
+    menu_color_picker: 'Color picker',
+    menu_close_tab: 'Chiudi pagina',
+    menu_open_options: 'Opzioni Filo',
+    toast_color_copied: 'Colore copiato: ',
+    err_color_picker_unsupported: 'Color picker non supportato in questo browser',
+    menu_global_translate: 'Traduci',
+    menu_dictate_listening: 'Sto ascoltando… (clic per fermare)',
+    menu_dictate_model_select: 'Modello per dettatura',
+    menu_dictate_not_supported: 'Dettatura non supportata in questo browser',
+    menu_overflow_soon: 'Pannello completo in arrivo',
+    menu_link_loading: 'Analizzo il link…',
+    menu_link_suspicious: '⚠️ Link sospetto',
+
+    // Edit box
+    edit_box_title: 'Modifica testo',
+    edit_box_original: 'Originale',
+    edit_box_proposed: 'Proposta',
+    edit_box_instruction_placeholder: 'Istruzione (es. "rendi più formale", "tono amichevole"…)',
+    edit_box_shortcut_formal: 'Più formale',
+    edit_box_shortcut_casual: 'Più informale',
+    edit_box_shortcut_summarize: 'Riassumi',
+    edit_box_shortcut_translate: 'Traduci in inglese',
+    edit_box_shortcut_fix: 'Correggi errori',
+    edit_box_replace: 'Sostituisci',
+    edit_box_copy_new: 'Copia la nuova',
+    edit_box_cancel: 'Annulla',
+    edit_box_loading: 'Sto pensando…',
+    edit_box_error: 'Errore nella generazione',
+    edit_box_replaced: 'Testo sostituito',
+
+    // Coming soon
+    coming_soon: 'Prossimamente',
+    feature_off_help: 'Attiva "Aiuto" nelle Opzioni → Funzionalità sperimentali',
+
+    // Popup AI
+    popup_explain_title: 'Spiegazione',
+    popup_explain_deep_title: 'Approfondimento',
+    popup_translate_title: 'Traduzione',
+    popup_loading: 'Sto pensando…',
+    popup_no_explanation: 'Nessuna spiegazione necessaria.',
+    popup_close: 'Chiudi',
+    popup_model: 'Modello',
+    popup_estimated_cost: 'Costo stimato',
+    popup_calc_local: 'Calcolatrice locale (nessun costo)',
+    popup_calc_result: 'Risultato',
+    popup_followup_placeholder: 'Domanda di follow-up… (Invio per inviare, Shift+Invio nuova riga)',
+    popup_send: 'Invia',
+
+    // Errori
+    err_no_api_key: 'API key mancante. Vai nelle opzioni per configurarla.',
+    err_provider_failed: 'Il provider AI ha fallito. Controlla la connessione e la API key.',
+    err_limit_reached: 'Limite di spesa mensile raggiunto. Alza il limite nelle opzioni o aspetta il prossimo mese.',
+    err_blocked_domain: 'Estensione disabilitata su questo dominio.',
+    err_no_selection: 'Nessuna selezione di testo.',
+
+    // Toast
+    toast_saved: 'Salvata in: %s',
+    toast_link_saved: 'Link salvato',
+    toast_copied: 'Copiato negli appunti',
+    toast_translating_page: 'Traduzione pagina in corso…',
+    toast_page_translated: 'Pagina tradotta',
+    toast_original_restored: 'Originale ripristinato',
+    toast_clipboard_empty: 'Cronologia appunti vuota',
+    toast_pasted_image: 'Immagine incollata',
+    clipboard_image_pending: 'Descrizione…',
+
+    // Categorie default
+    category_default: 'Da vedere',
+
+    // Options page
+    options_title: 'Filo — Opzioni',
+    options_provider: 'Provider AI',
+    options_api_key: 'API key',
+    options_models: 'Modelli per azione',
+    options_costs: 'Costi e limiti',
+    options_shortcuts: 'Scorciatoie da tastiera',
+    options_blocklist: 'Domini esclusi',
+    options_categories: 'Categorie',
+    options_features: 'Funzionalità sperimentali (Fase 2)',
+    options_save: 'Salva',
+    options_saved: 'Salvato',
+    options_theme: 'Tema',
+    options_theme_system: 'Sistema',
+    options_theme_light: 'Chiaro',
+    options_theme_dark: 'Scuro',
+    options_monthly_limit: 'Limite mensile (€)',
+    options_current_spent: 'Speso questo mese',
+    options_action_explain: 'Spiega (inline)',
+    options_action_explain_deep: 'Approfondisci',
+    options_action_translate_sel: 'Traduci selezione',
+    options_action_translate_page: 'Traduci pagina',
+    options_action_help: 'Aiuto',
+    options_action_categorize: 'Categorizza',
+    options_action_describe_image: 'Descrizione immagini (cronologia incolla)',
+    options_action_transcribe_image: 'Trascrizione (OCR) di una regione dello schermo',
+    options_test_provider: 'Prova',
+    options_test_running: 'Test in corso…',
+    options_test_result: 'TTFT %s ms · %s tok/s',
+    options_test_failed: 'Test fallito: %s',
+    options_test_no_key: 'Manca la API key',
+    options_h_model_registry: 'Registry modelli',
+    options_model_registry_desc:
+      'Ogni modello ha un nickname e un id concreto per ogni provider. Le azioni qui sotto fanno riferimento al nickname: il provider concreto viene scelto a runtime in base alle chiavi disponibili e a "Gemini diretto".',
+    options_models_desc: 'Per ogni azione, scegli il nickname del modello da usare.',
+    options_model_nickname: 'nickname',
+    options_model_label: 'etichetta',
+    options_model_or_id: 'id su OpenRouter',
+    options_model_gemini_id: 'id su Gemini API',
+    options_model_add: 'Aggiungi modello',
+    options_model_remove: 'Rimuovi',
+    options_model_test_or: 'Prova OR',
+    options_model_test_gemini: 'Prova Gemini',
+    options_model_no_id_for_provider: 'Nessun id configurato per %s',
+    options_model_nickname_required: 'Il nickname è obbligatorio',
+    options_model_nickname_duplicate: 'Nickname duplicato: %s',
+    options_action_help_intent_guess: 'Aiuto — sintesi intento (anonimizzazione)',
+    options_action_help_intent_judge: 'Aiuto — giudice intento (anonimizzazione)',
+    options_open_chrome_shortcuts: 'Modifica le scorciatoie nella pagina Chrome',
+    options_feature_help: 'Aiuto (sidebar AI con visione)',
+    options_feature_categorize: 'Categorizzazione automatica',
+    options_categories_empty: 'Nessuna categoria. Salva qualche pagina con la categorizzazione attiva.',
+    options_category_rename: 'Rinomina',
+    options_category_delete: 'Elimina',
+    options_category_delete_confirm: 'Eliminare la categoria "%s"? Le schede diventeranno non categorizzate.',
+    options_category_pages: '%s schede',
+
+    // Home
+    home_title: 'Aperti per dopo',
+    home_search_placeholder: 'Cerca per titolo o URL…',
+    home_empty: 'Nessuna scheda salvata. Click destro su una pagina → "Salva per dopo".',
+    home_remove: 'Rimuovi',
+
+    // History
+    history_title: 'Cronologia AI',
+    history_search_placeholder: 'Cerca…',
+    history_filter_all: 'Tutte',
+    history_clear: 'Cancella tutto',
+    history_clear_confirm: 'Cancellare definitivamente tutta la cronologia AI?',
+    history_empty: 'Nessuna interazione AI registrata.',
+
+    // Spellcheck
+    spell_correct: 'Correggi',
+    spell_add_dict: 'Aggiungi al dizionario',
+    spell_autocorrect: 'Correggi automaticamente',
+    spell_manage: 'Gestisci correttore',
+    spell_resolve: 'Risolvi',
+    spell_semantic_issue: 'Possibile errore',
+    spell_loading: 'Cerco una correzione…',
+    spell_no_suggestion: 'Nessuna correzione disponibile.',
+    spell_action_semantic_label: 'Correttore contestuale (zigzag blu)',
+    spell_action_word_label: 'Suggerimento ortografico (zigzag rosso, on demand)',
+    spell_feature_label: 'Correttore AI (zigzag blu per errori contestuali)',
+
+    // Pagina Gestisci correttore
+    spell_page_title: 'Filo — Correttore',
+    spell_page_heading: 'Correttore',
+    spell_page_autocorrect_h: 'Correzioni automatiche',
+    spell_page_autocorrect_desc: 'Quando scrivi una di queste parole seguita da uno spazio, viene sostituita con la correzione.',
+    spell_page_autocorrect_empty: 'Nessuna correzione automatica.',
+    spell_page_dict_h: 'Dizionario personale',
+    spell_page_dict_desc: 'Parole aggiunte al dizionario: il correttore non le segnalerà più come errori.',
+    spell_page_dict_empty: 'Dizionario vuoto.',
+    spell_page_col_word: 'Parola scritta',
+    spell_page_col_correction: 'Correzione',
+    spell_page_col_actions: '',
+    spell_page_add: 'Aggiungi',
+    spell_page_remove: 'Rimuovi',
+    spell_page_placeholder_word: 'parola sbagliata',
+    spell_page_placeholder_correction: 'correzione',
+    spell_page_placeholder_dict_word: 'parola',
+    spell_page_back: '← Opzioni',
+    toast_added_to_dict: 'Aggiunta al dizionario',
+    toast_autocorrect_saved: 'Correzione automatica attiva',
+  };
+
+  function t(key, ...args) {
+    let s = STRINGS[key];
+    if (s === undefined) return key;
+    for (const a of args) s = s.replace('%s', String(a));
+    return s;
+  }
+
+  global.SN_I18N = { t, STRINGS };
+})(typeof globalThis !== 'undefined' ? globalThis : self);

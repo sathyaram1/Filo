@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <title>Filo — Opzioni</title>
+  <link rel="icon" href="filo://asset/icons/icon-32.png" />
+  <link rel="stylesheet" href="filo://style/theme.css" />
+  <link rel="stylesheet" href="filo://style/pages.css" />
+  <script src="filo://shared/pageBootstrap.js"></script>
+  <script src="filo://shared/constants.js"></script>
+  <script src="filo://shared/messages.js"></script>
+  <script src="filo://shared/i18n.js"></script>
+  <script src="filo://shared/storage.js"></script>
+</head>
+<body>
+  <main class="sn-page" id="page">
+    <h1 id="title"></h1>
+
+    <section>
+      <h2 id="h-provider"></h2>
+      <label for="provider"></label>
+      <select id="provider">
+        <option value="openrouter">OpenRouter</option>
+        <option value="gemini">Google Gemini API</option>
+      </select>
+
+      <label for="apiKey">OpenRouter API key</label>
+      <input type="password" id="apiKey" placeholder="sk-or-v1-..." />
+      <div class="sn-row" style="margin-top:6px;">
+        <button class="sn-btn sn-btn-secondary" id="testOpenrouter" type="button"></button>
+        <span id="testOpenrouterStatus" class="sn-muted"></span>
+      </div>
+      <p class="sn-muted">Provider a pagamento. Supporta tutti i modelli (Claude, GPT, Gemini, ecc.).</p>
+
+      <label for="apiKeyGemini" style="margin-top: 12px;">Google Gemini API key</label>
+      <input type="password" id="apiKeyGemini" placeholder="AIza..." />
+      <div class="sn-row" style="margin-top:6px;">
+        <button class="sn-btn sn-btn-secondary" id="testGemini" type="button"></button>
+        <span id="testGeminiStatus" class="sn-muted"></span>
+      </div>
+      <p class="sn-muted">
+        Provider gratuito (quota free generosa, solo modelli Gemini). Crea una chiave su
+        <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>.
+      </p>
+
+      <label style="margin-top: 8px;">
+        <input type="checkbox" id="geminiDirect" />
+        <span>Per i modelli Gemini usa prima la Gemini API gratuita, OpenRouter solo come fallback</span>
+      </label>
+
+      <label for="apiKeyTavily" style="margin-top: 12px;">Tavily API key (opzionale)</label>
+      <input type="password" id="apiKeyTavily" placeholder="tvly-..." />
+      <p class="sn-muted">
+        Provider di ricerca web usato dalla sidebar Aiuto. Senza chiave si ricade su DuckDuckGo
+        (gratis ma fragile). Crea una chiave su
+        <a href="https://app.tavily.com/" target="_blank" rel="noopener">app.tavily.com</a>.
+      </p>
+
+      <p class="sn-muted">Le chiavi sono memorizzate localmente in chiaro (chrome.storage.local).</p>
+
+      <div class="sn-row" style="margin-top: 12px;">
+        <button class="sn-btn sn-btn-secondary" id="loadModels">Aggiorna lista modelli</button>
+        <span id="modelsStatus" class="sn-muted"></span>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="h-model-registry">Registry modelli</h2>
+      <p class="sn-muted" id="model-registry-desc"></p>
+      <div id="modelRegistryList"></div>
+      <div class="sn-row" style="margin-top: 10px;">
+        <button class="sn-btn sn-btn-secondary" id="addModelRow" type="button"></button>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="h-models"></h2>
+      <p class="sn-muted" id="models-desc"></p>
+      <div class="sn-grid-2">
+        <div>
+          <label id="lbl-explain" for="model-explain"></label>
+          <input id="model-explain" type="text" list="nicknames-list" />
+        </div>
+        <div>
+          <label id="lbl-explain-deep" for="model-explain-deep"></label>
+          <input id="model-explain-deep" type="text" list="nicknames-list" />
+        </div>
+        <div>
+          <label id="lbl-tsel" for="model-translate-selection"></label>
+          <input id="model-translate-selection" type="text" list="nicknames-list" />
+        </div>
+        <div>
+          <label id="lbl-tpage" for="model-translate-page"></label>
+          <input id="model-translate-page" type="text" list="nicknames-list" />
+        </div>
+        <div>
+          <label id="lbl-help" for="model-help"></label>
+          <input id="model-help" type="text" list="nicknames-list" />
+        </div>
+        <div>
+          <label id="lbl-cat" for="model-categorize"></label>
+          <input id="model-categorize" type="text" list="nicknames-list" />
+        </div>
+        <div>
+          <label id="lbl-describe-image" for="model-describe-image"></label>
+          <input id="model-describe-image" type="text" list="nicknames-list" />
+        </div>
+        <div>
+          <label id="lbl-transcribe-image" for="model-transcribe-image"></label>
+          <input id="model-transcribe-image" type="text" list="nicknames-list" />
+        </div>
+        <div>
+          <label id="lbl-spellcheck-semantic" for="model-spellcheck-semantic"></label>
+          <input id="model-spellcheck-semantic" type="text" list="nicknames-list" />
+        </div>
+        <div>
+          <label id="lbl-spellcheck-word" for="model-spellcheck-word"></label>
+          <input id="model-spellcheck-word" type="text" list="nicknames-list" />
+        </div>
+        <div>
+          <label id="lbl-help-intent-guess" for="model-help-intent-guess"></label>
+          <input id="model-help-intent-guess" type="text" list="nicknames-list" />
+        </div>
+        <div>
+          <label id="lbl-help-intent-judge" for="model-help-intent-judge"></label>
+          <input id="model-help-intent-judge" type="text" list="nicknames-list" />
+        </div>
+      </div>
+      <datalist id="nicknames-list"></datalist>
+      <datalist id="models-list"></datalist>
+    </section>
+
+    <section>
+      <h2 id="h-costs"></h2>
+      <div class="sn-grid-2">
+        <div>
+          <label id="lbl-limit" for="monthlyLimit"></label>
+          <input type="number" id="monthlyLimit" min="0" step="0.5" />
+        </div>
+        <div>
+          <label id="lbl-spent"></label>
+          <div id="spentBox" class="sn-muted">—</div>
+        </div>
+      </div>
+      <p class="sn-muted">Stima locale. Il dato autoritativo è quello del provider.</p>
+    </section>
+
+    <section>
+      <h2 id="h-shortcuts"></h2>
+      <p class="sn-muted">
+        Le scorciatoie si modificano dalla pagina Chrome dedicata.
+        <a id="lnkShortcuts" href="#">Apri</a>
+      </p>
+      <ul id="shortcutsList" class="sn-muted" style="line-height:1.7"></ul>
+    </section>
+
+    <section>
+      <h2 id="h-blocklist"></h2>
+      <p class="sn-muted">Domini su cui l'estensione è disabilitata (uno per riga).</p>
+      <textarea id="blocklist"></textarea>
+    </section>
+
+    <section>
+      <h2 id="h-features"></h2>
+      <label><input type="checkbox" id="ff-help" /> <span id="ff-help-lbl"></span></label>
+      <label><input type="checkbox" id="ff-categorize" /> <span id="ff-categorize-lbl"></span></label>
+      <label><input type="checkbox" id="ff-spellcheck" /> <span id="ff-spellcheck-lbl"></span></label>
+    </section>
+
+    <section>
+      <h2 id="h-categories"></h2>
+      <p class="sn-muted">Le categorie create dall'AI quando salvi una scheda. Puoi rinominarle o eliminarle.</p>
+      <div id="categoriesList" class="sn-cat-list"></div>
+      <p id="categoriesEmpty" class="sn-muted" hidden></p>
+    </section>
+
+    <section>
+      <h2 id="h-theme"></h2>
+      <select id="theme">
+        <option value="system" id="theme-system"></option>
+        <option value="light" id="theme-light"></option>
+        <option value="dark" id="theme-dark"></option>
+      </select>
+    </section>
+
+    <div class="sn-toolbar" style="margin-top: 24px;">
+      <button class="sn-btn" id="save"></button>
+      <span id="savedHint" class="sn-saved-indicator"></span>
+      <button class="sn-btn sn-btn-secondary" id="openHome">Aperti per dopo</button>
+      <button class="sn-btn sn-btn-secondary" id="openHistory">Cronologia AI</button>
+      <button class="sn-btn sn-btn-secondary" id="openSpellcheck">Gestisci correttore</button>
+      <button class="sn-btn sn-btn-secondary" id="openFeedback">Feedback alpha</button>
+    </div>
+  </main>
+
+  <script src="options.js"></script>
+</body>
+</html>

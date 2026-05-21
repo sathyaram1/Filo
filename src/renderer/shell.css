@@ -1,0 +1,168 @@
+/* Shell del browser Filo: tab bar + barra indirizzi.
+   La altezza totale (88px) è in sync con SHELL_HEIGHT in src/main/window.js. */
+
+:root {
+  --bg: #fdf6ec;
+  --bg-deep: #f5ead7;
+  --fg: #2a221a;
+  --fg-soft: #7a6e60;
+  --accent: #c97f2a;
+  --tab-bg: #efe3cb;
+  --tab-active: #fdf6ec;
+  --border: #e2d3b5;
+  --radius: 10px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1d1a16;
+    --bg-deep: #14110e;
+    --fg: #f1e7d6;
+    --fg-soft: #aa9c84;
+    --tab-bg: #2a241d;
+    --tab-active: #1d1a16;
+    --border: #3b332a;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0; padding: 0;
+  background: var(--bg-deep);
+  color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-size: 14px;
+  height: 100%;
+  user-select: none;
+}
+
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 88px;
+}
+
+/* ── tab bar ──────────────────────────────────────────────────────────── */
+.tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 8px 4px 0 8px;
+  flex: 0 0 40px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  min-width: 90px;
+  max-width: 220px;
+  padding: 0 8px 0 10px;
+  background: var(--tab-bg);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+  font-size: 13px;
+  color: var(--fg-soft);
+  cursor: default;
+  transition: background 0.1s ease;
+}
+.tab:hover { background: color-mix(in srgb, var(--tab-bg) 85%, var(--bg)); }
+.tab.active {
+  background: var(--tab-active);
+  color: var(--fg);
+  border-bottom: 1px solid var(--tab-active);
+  margin-bottom: -1px;
+  z-index: 1;
+}
+.tab .title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tab .close {
+  flex: 0 0 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: var(--fg-soft);
+  cursor: pointer;
+  opacity: 0;
+}
+.tab:hover .close,
+.tab.active .close { opacity: 1; }
+.tab .close:hover { background: color-mix(in srgb, var(--border) 60%, transparent); color: var(--fg); }
+.tab .favicon {
+  width: 16px; height: 16px;
+  flex: 0 0 16px;
+  border-radius: 3px;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+.tab .spinner {
+  width: 12px; height: 12px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.tab-new {
+  flex: 0 0 28px;
+  height: 28px;
+  margin: 4px 6px 0 4px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--fg-soft);
+  cursor: default;
+}
+.tab-new:hover { background: var(--tab-bg); color: var(--fg); }
+
+/* ── barra indirizzi ──────────────────────────────────────────────────── */
+.addr {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px 8px 10px;
+  flex: 0 0 48px;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+}
+.nav-btn {
+  flex: 0 0 32px;
+  height: 32px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 18px;
+  color: var(--fg-soft);
+  cursor: default;
+}
+.nav-btn:hover:not(:disabled) { background: var(--tab-bg); color: var(--fg); }
+.nav-btn:disabled { opacity: 0.35; }
+
+#addr {
+  flex: 1 1 auto;
+  height: 32px;
+  padding: 0 12px;
+  background: var(--bg-deep);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--fg);
+  font-size: 13px;
+  outline: none;
+  user-select: text;
+}
+#addr:focus { border-color: var(--accent); }

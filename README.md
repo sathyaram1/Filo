@@ -1,0 +1,103 @@
+# Filo
+
+Browser AI-native cross-device. Layer di interazione sopra il linguaggio
+naturale: la UI è un'accelerazione della conversazione, non l'opposto.
+
+Filo è l'evoluzione dell'estensione Chrome `filo-extension` (archiviata in
+`../ROBA VECCHIA/extension-mv3/` quando il refactor è completo). Il modello
+extension era zoppo: niente vera new tab nativa, niente hotkey globali, niente
+intercettazione pre-navigazione, quote `chrome.storage` strette. Filo desktop
+risolve tutto questo costruendo sopra Electron.
+
+## Architettura
+
+```
+src/
+├── main/                       Processo main Electron (Node.js)
+│   ├── main.js                 Entry point, app lifecycle
+│   ├── window.js               BrowserWindow + shell
+│   ├── tabs.js                 TabManager (multi-WebContentsView)
+│   ├── protocol.js             Custom protocol filo://
+│   ├── ipc.js                  Routing IPC main↔renderer
+│   ├── shortcuts.js            Hotkey globali Alt+E/T/S/H
+│   ├── shim/
+│   │   ├── storage.js          chrome.storage.local → file JSON
+│   │   └── chrome-api.js       Namespace chrome.* per servizi portati
+│   └── services/
+│       ├── loader.js           Carica i moduli SN_* su globalThis
+│       ├── handlers.js         Handler centrale messaggi (ex background.js)
+│       ├── providers/          OpenRouter, Gemini, fallback chain
+│       ├── categorizer.js, savedPages.js, historyStore.js, ...
+│       └── (porting 1:1 dei file background dell'estensione)
+├── preload/
+│   ├── shell-preload.js        Espone window.filoShell alla shell renderer
+│   ├── internal-preload.js     Espone window.filo + shim chrome alle pagine filo://
+│   └── page-preload.js         Iniezione content script in pagine web (TBD)
+├── renderer/                   Shell del browser (tab bar + address bar)
+│   ├── shell.html / shell.css / shell.js
+├── pages/                      Pagine interne servite via filo://
+│   ├── dashboard/   → filo://newtab/
+│   ├── options/     → filo://options/
+│   ├── history/     → filo://history/
+│   ├── feedback/    → filo://feedback/
+│   └── spellcheck/  → filo://spellcheck/
+├── shared/                     Moduli condivisi main+renderer (IIFE → globalThis)
+└── styles/                     CSS condivisi (theme, pages, ecc.)
+assets/icons/                   Icone applicazione
+```
+
+## Quick start
+
+```bash
+npm install                     # installa Electron + Playwright
+npm start                       # avvia Filo
+```
+
+## Filosofia di porting
+
+Il codice dell'estensione era scritto in stile "no-build, IIFE su globalThis":
+
+```js
+(function (global) {
+  global.SN_MODULE = { ... };
+})(typeof globalThis !== 'undefined' ? globalThis : self);
+```
+
+Questo si è rivelato un dono: caricando ogni file con `require()` nel main
+process Electron, i moduli si auto-registrano su `globalThis` e gli altri li
+trovano lì — esattamente come succedeva nel service worker via `importScripts`.
+
+Le API `chrome.*` (storage, runtime, tabs, action, commands) sono shimmate
+in `src/main/shim/chrome-api.js`. Lo storage punta a un file JSON in
+`%APPDATA%/Filo/storage.json` invece che a `chrome.storage.local`.
+
+Le pagine interne (dashboard, options, ecc.) hanno il loro shim `chrome.*`
+nel preload `internal-preload.js`, che ridiriziona ogni chiamata via IPC al
+main. Così le pagine girano quasi invariate.
+
+## Stato del porting
+
+- [x] Browser shell (tab bar, address bar, nav buttons, hotkey browser-style)
+- [x] Multi-tab tramite `WebContentsView`
+- [x] Protocollo `filo://` per pagine interne e asset
+- [x] Storage su disco
+- [x] Servizi background (providers, savedPages, categorizer, costTracker, history, llmsTxt, paths, fxRates, aiCache, webSearch)
+- [x] IPC + streaming AI
+- [x] Hotkey globali (Alt+E/T/S/H)
+- [x] Pagine: dashboard, options, history, feedback, spellcheck (HTML/CSS/JS portati 1:1)
+- [ ] **Content script in pagine web** (menu tasto destro, popup, sidebar, highlight, spellcheck, feedback) — file copiati, iniezione via preload da finalizzare nella prossima sessione
+- [ ] Test Playwright adattati a `_electron.launch`
+- [ ] Auto-update (electron-builder)
+- [ ] Packaging Windows/Mac/Linux
+
+## Sviluppo
+
+I file `src/shared/*` e `src/main/services/*` sono **porting 1:1** dai
+corrispondenti dell'estensione. Le modifiche dovrebbero restare allineate
+finché l'estensione legacy esiste (ma vedi nota sopra: per ora è congelata).
+
+Quando aggiungi un nuovo messaggio IPC, ricordati di:
+1. Definirlo in `src/shared/messages.js` (costante `MSG.*`).
+2. Gestirlo in `src/main/services/handlers.js` (switch in `handleMessage`).
+3. Se è broadcast main→renderer, usa `broadcastToTabs` o
+   `broadcastLiveUpdate` (vedi handlers.js).

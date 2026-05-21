@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.feedback-images/
+tests/.report/
+tests/agent/.env
+.DS_Store
+*.log

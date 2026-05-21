@@ -1,0 +1,219 @@
+/* Popup risposta AI + toast. */
+
+.sn-popup {
+  position: fixed;
+  /* z-index gestito inline da popup.js per stacking deterministico */
+  z-index: 2147483600;
+  width: 380px;
+  max-height: 480px;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--sn-font);
+  font-size: 13px;
+  color: var(--sn-fg);
+  background: var(--sn-overlay-bg);
+  border: 1px solid var(--sn-border);
+  border-radius: var(--sn-radius);
+  box-shadow: var(--sn-shadow);
+  animation: sn-fade-in 100ms ease-out;
+  backdrop-filter: blur(4px);
+}
+
+.sn-popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--sn-border);
+  cursor: move;
+  user-select: none;
+}
+.sn-popup-header.sn-popup-dragging { cursor: grabbing; }
+
+.sn-popup-title {
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--sn-muted);
+  pointer-events: none; /* il drag funziona ovunque sull'header */
+}
+
+.sn-popup-close {
+  all: unset;
+  cursor: pointer;
+  padding: 0 6px;
+  color: var(--sn-muted);
+  font-size: 18px;
+  line-height: 1;
+}
+.sn-popup-close:hover { color: var(--sn-fg); }
+
+.sn-popup-body {
+  padding: 10px 12px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 60px;
+  max-height: 340px;
+  word-break: break-word;
+  line-height: 1.45;
+  /* la selezione del testo è permessa esplicitamente (header e composer no) */
+  user-select: text;
+}
+
+/* Bolle conversazione */
+.sn-msg {
+  margin: 0 0 10px 0;
+  display: flex;
+}
+.sn-msg:last-child { margin-bottom: 0; }
+.sn-msg-text {
+  border-radius: 8px;
+  padding: 6px 10px;
+  max-width: 100%;
+  word-wrap: break-word;
+}
+.sn-msg-assistant { justify-content: flex-start; }
+.sn-msg-assistant .sn-msg-text {
+  background: transparent;
+  color: var(--sn-fg);
+  padding-left: 0;
+  padding-right: 0;
+}
+.sn-msg-user { justify-content: flex-end; }
+.sn-msg-user .sn-msg-text {
+  background: var(--sn-hover);
+  color: var(--sn-fg);
+  max-width: 80%;
+}
+.sn-msg-loading { color: var(--sn-muted); font-style: italic; }
+.sn-msg-muted .sn-msg-text { color: var(--sn-muted); font-style: italic; }
+.sn-msg-error .sn-msg-text { color: var(--sn-error); }
+
+/* Markdown rendering nei messaggi e nel menu inline */
+.sn-msg-text p,
+.sn-menu-inline p { margin: 0 0 8px 0; }
+.sn-msg-text p:last-child,
+.sn-menu-inline p:last-child { margin-bottom: 0; }
+.sn-msg-text h3, .sn-msg-text h4, .sn-msg-text h5, .sn-msg-text h6,
+.sn-menu-inline h3, .sn-menu-inline h4, .sn-menu-inline h5, .sn-menu-inline h6 {
+  margin: 10px 0 4px 0;
+  font-weight: 600;
+  font-size: 1em;
+}
+.sn-msg-text strong, .sn-menu-inline strong { font-weight: 600; }
+.sn-msg-text em, .sn-menu-inline em { font-style: italic; }
+.sn-msg-text ul, .sn-msg-text ol,
+.sn-menu-inline ul, .sn-menu-inline ol {
+  margin: 4px 0 8px 0;
+  padding-left: 22px;
+}
+.sn-msg-text li, .sn-menu-inline li { margin: 2px 0; }
+.sn-msg-text code, .sn-menu-inline code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.92em;
+  background: var(--sn-hover);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+.sn-msg-text pre, .sn-menu-inline pre {
+  background: var(--sn-hover);
+  border-radius: 4px;
+  padding: 8px;
+  overflow-x: auto;
+  margin: 6px 0;
+}
+.sn-msg-text pre code, .sn-menu-inline pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.sn-popup-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-top: 1px solid var(--sn-border);
+  font-size: 11px;
+  color: var(--sn-muted);
+}
+
+.sn-popup-meta {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Composer per follow-up */
+.sn-popup-compose {
+  display: flex;
+  gap: 6px;
+  align-items: flex-end;
+  padding: 6px 8px 8px 8px;
+  border-top: 1px solid var(--sn-border);
+}
+.sn-popup-input {
+  flex: 1;
+  resize: none;
+  border: 1px solid var(--sn-border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-family: var(--sn-font);
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--sn-fg);
+  background: var(--sn-bg);
+  outline: none !important;
+  box-shadow: none !important;
+  max-height: 120px;
+  min-height: 30px;
+}
+.sn-popup-input::placeholder { color: var(--sn-muted); opacity: 1; }
+/* outline/box-shadow reset con !important: alcune pagine ospite (es. claude.ai)
+   applicano un focus ring blu agli elementi della pagina, e i nostri input,
+   essendo veri nodi del DOM ospite, lo ereditavano (feedback alpha). */
+.sn-popup-input:focus {
+  border-color: var(--sn-accent);
+  outline: none !important;
+  box-shadow: none !important;
+}
+.sn-popup-send {
+  all: unset;
+  cursor: pointer;
+  height: 30px;
+  width: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: var(--sn-accent);
+  color: white;
+  font-weight: 700;
+}
+.sn-popup-send:hover { filter: brightness(1.1); }
+
+/* Toast */
+.sn-toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 2147483647;
+  padding: 10px 14px;
+  background: var(--sn-overlay-bg);
+  color: var(--sn-fg);
+  font-family: var(--sn-font);
+  font-size: 13px;
+  border: 1px solid var(--sn-border);
+  border-radius: var(--sn-radius);
+  box-shadow: var(--sn-shadow);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 200ms ease, transform 200ms ease;
+  pointer-events: none;
+}
+
+.sn-toast.sn-toast-visible {
+  opacity: 1;
+  transform: translateY(0);
+}

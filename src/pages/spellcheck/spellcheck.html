@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <title>Filo — Correttore</title>
+  <link rel="icon" href="filo://asset/icons/icon-32.png" />
+  <link rel="stylesheet" href="filo://style/theme.css" />
+  <link rel="stylesheet" href="filo://style/pages.css" />
+  <script src="filo://shared/pageBootstrap.js"></script>
+  <script src="filo://shared/constants.js"></script>
+  <script src="filo://shared/messages.js"></script>
+  <script src="filo://shared/i18n.js"></script>
+  <script src="filo://shared/storage.js"></script>
+</head>
+<body>
+  <main class="sn-page">
+    <button class="sn-back-btn" id="back"></button>
+    <h1 id="title"></h1>
+
+    <section>
+      <h2 id="h-autocorrect"></h2>
+      <p class="sn-muted" id="desc-autocorrect"></p>
+
+      <div class="sn-spell-table" id="autocorrectList"></div>
+      <p class="sn-muted" id="autocorrectEmpty" hidden></p>
+
+      <div class="sn-spell-add-row">
+        <input type="text" id="newWord" />
+        <span class="sn-spell-arrow">→</span>
+        <input type="text" id="newCorrection" />
+        <button class="sn-btn" id="addAutocorrect"></button>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="h-dict"></h2>
+      <p class="sn-muted" id="desc-dict"></p>
+
+      <div class="sn-spell-table" id="dictList"></div>
+      <p class="sn-muted" id="dictEmpty" hidden></p>
+
+      <div class="sn-spell-add-row">
+        <input type="text" id="newDictWord" />
+        <button class="sn-btn" id="addDict"></button>
+      </div>
+    </section>
+  </main>
+
+  <script src="spellcheck.js"></script>
+</body>
+</html>

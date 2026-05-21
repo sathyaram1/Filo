@@ -1,0 +1,595 @@
+/* Menu contestuale custom. Tutti gli stili sono prefissati .sn- per non collidere col sito. */
+
+.sn-menu {
+  position: fixed;
+  z-index: 2147483646;
+  min-width: 220px;
+  max-width: 320px;
+  font-family: var(--sn-font);
+  font-size: 13px;
+  color: var(--sn-fg);
+  background: var(--sn-overlay-bg);
+  border: 1px solid var(--sn-border);
+  border-radius: var(--sn-radius);
+  box-shadow: var(--sn-shadow);
+  padding: 4px 0;
+  user-select: none;
+  animation: sn-fade-in 100ms ease-out;
+  backdrop-filter: blur(4px);
+}
+
+@keyframes sn-fade-in {
+  from { opacity: 0; transform: translateY(-2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.sn-menu-item {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  cursor: pointer;
+  color: var(--sn-fg);
+  font-family: var(--sn-font);
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.sn-menu-item:hover:not(.sn-disabled) {
+  background: var(--sn-hover);
+}
+
+.sn-menu-item.sn-disabled {
+  color: var(--sn-muted);
+  cursor: not-allowed;
+}
+
+.sn-menu-label {
+  flex: 1;
+}
+
+.sn-menu-shortcut {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: var(--sn-muted);
+}
+
+.sn-menu-tag {
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  color: var(--sn-accent);
+  border: 1px solid var(--sn-accent);
+  border-radius: 3px;
+  padding: 1px 4px;
+  margin-left: 4px;
+}
+
+.sn-menu-sep {
+  height: 1px;
+  background: var(--sn-border);
+  margin: 4px 0;
+}
+
+.sn-menu-row {
+  display: flex;
+  gap: 4px;
+  padding: 4px 8px;
+}
+
+.sn-menu-row-btn {
+  all: unset;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 6px 0;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--sn-fg);
+  font-family: var(--sn-font);
+  font-size: 14px;
+  min-height: 28px;
+}
+.sn-menu-row-btn svg,
+.sn-menu-icon-btn svg,
+.sn-menu-split-icon svg,
+.sn-menu-history-icon svg {
+  display: block;
+  flex: 0 0 auto;
+}
+
+.sn-menu-row-btn:hover:not(:disabled) {
+  background: var(--sn-hover);
+}
+
+.sn-menu-row-btn:disabled {
+  color: var(--sn-muted);
+  cursor: not-allowed;
+}
+
+/* Sezione inline (es. spiegazione AI direttamente nel menu) */
+.sn-menu-inline {
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--sn-fg);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-width: 320px;
+}
+/* Variante "explain" della sezione inline: testo a sinistra + freccetta a destra
+   che apre l'approfondimento. Il padding-right è ridotto per fare spazio. */
+.sn-menu-inline.sn-menu-inline-explain {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding-right: 4px;
+}
+.sn-menu-inline-body {
+  flex: 1;
+  min-width: 0;
+}
+.sn-menu-inline-arrow {
+  all: unset;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  align-self: stretch;
+  cursor: pointer;
+  color: var(--sn-muted);
+  font-size: 12px;
+  border-radius: 4px;
+}
+.sn-menu-inline-arrow:hover {
+  background: var(--sn-hover);
+  color: var(--sn-fg);
+}
+
+.sn-menu-inline.sn-menu-inline-loading,
+.sn-menu-inline.sn-menu-inline-muted {
+  color: var(--sn-muted);
+  font-style: italic;
+}
+.sn-menu-inline.sn-menu-inline-error {
+  color: var(--sn-error);
+}
+
+/* Item "Incolla" con freccetta dropdown a destra */
+.sn-menu-paste {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+}
+.sn-menu-paste-main {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  padding: 8px 8px 8px 12px;
+  cursor: pointer;
+  color: var(--sn-fg);
+  font-family: var(--sn-font);
+  font-size: 13px;
+  line-height: 1.2;
+}
+.sn-menu-paste-main:hover:not(:disabled) {
+  background: var(--sn-hover);
+}
+.sn-menu-paste-main:disabled {
+  color: var(--sn-muted);
+  cursor: not-allowed;
+}
+.sn-menu-paste-arrow {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  cursor: pointer;
+  color: var(--sn-muted);
+  border-left: 1px solid var(--sn-border);
+  font-size: 11px;
+}
+.sn-menu-paste-arrow:hover {
+  background: var(--sn-hover);
+  color: var(--sn-fg);
+}
+
+/* Item "Split" generico (main + freccetta che apre subItems). Usato per
+   Spiega ▸ approfondisci, Detta ▸ scegli modello, ecc. */
+.sn-menu-split {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+}
+.sn-menu-split-main {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  padding: 8px 8px 8px 12px;
+  cursor: pointer;
+  color: var(--sn-fg);
+  font-family: var(--sn-font);
+  font-size: 13px;
+  line-height: 1.2;
+}
+.sn-menu-split-main:hover:not(:disabled) {
+  background: var(--sn-hover);
+}
+.sn-menu-split-main:disabled {
+  color: var(--sn-muted);
+  cursor: not-allowed;
+}
+.sn-menu-split-icon {
+  width: 18px;
+  display: inline-block;
+  text-align: center;
+  font-size: 14px;
+}
+.sn-menu-split-arrow {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  cursor: pointer;
+  color: var(--sn-muted);
+  border-left: 1px solid var(--sn-border);
+  font-size: 11px;
+}
+.sn-menu-split-arrow:hover {
+  background: var(--sn-hover);
+  color: var(--sn-fg);
+}
+
+/* Riga icone globali (overflow button distinto) */
+.sn-menu-row-btn.sn-menu-row-overflow {
+  border-left: 1px solid var(--sn-border);
+  color: var(--sn-muted);
+}
+.sn-menu-row-btn.sn-menu-row-empty {
+  opacity: 0.25;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* Item "Correzione" (parola corretta + freccetta sotto-menu).
+   Stessa struttura visuale dell'item Incolla, con un accento sulla parola corretta. */
+.sn-menu-correction {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+}
+.sn-menu-correction-main {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  padding: 8px 8px 8px 12px;
+  cursor: pointer;
+  color: var(--sn-fg);
+  font-family: var(--sn-font);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.sn-menu-correction-main:hover:not(:disabled) {
+  background: var(--sn-hover);
+}
+.sn-menu-correction-main:disabled {
+  cursor: default;
+  font-weight: 400;
+  font-style: italic;
+  color: var(--sn-muted);
+}
+.sn-menu-correction-arrow {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  cursor: pointer;
+  color: var(--sn-muted);
+  border-left: 1px solid var(--sn-border);
+  font-size: 11px;
+}
+.sn-menu-correction-arrow:hover {
+  background: var(--sn-hover);
+  color: var(--sn-fg);
+}
+.sn-menu-correction-loading .sn-menu-correction-main {
+  font-weight: 400;
+  font-style: italic;
+  color: var(--sn-muted);
+}
+
+/* Sotto-menu cronologia */
+.sn-menu-sub {
+  min-width: 200px;
+  max-width: 320px;
+}
+.sn-menu-empty {
+  padding: 8px 12px;
+  color: var(--sn-muted);
+  font-style: italic;
+  font-size: 12px;
+}
+/* Riga informativa nei sotto-menu (es. spiegazione errore blu) */
+.sn-menu-info {
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--sn-fg);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-width: 280px;
+}
+
+/* Avviso link sospetto dentro l'inline "Spiega link" */
+.sn-menu-link-warn {
+  color: var(--sn-error, #b94a48);
+  font-weight: 600;
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+.sn-menu-link-body {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ===========================================================================
+   Box "Modifica" — overlay modale per editing testo con diff + conferma.
+   =========================================================================== */
+.sn-editbox-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: sn-fade-in 120ms ease-out;
+}
+.sn-editbox {
+  background: var(--sn-overlay-bg);
+  color: var(--sn-fg);
+  border: 1px solid var(--sn-border);
+  border-radius: var(--sn-radius);
+  box-shadow: var(--sn-shadow);
+  font-family: var(--sn-font);
+  font-size: 13px;
+  width: min(640px, 92vw);
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 14px;
+  gap: 8px;
+}
+.sn-editbox-header {
+  font-weight: 600;
+  font-size: 14px;
+}
+.sn-editbox-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.sn-editbox-shortcuts button {
+  all: unset;
+  cursor: pointer;
+  padding: 4px 8px;
+  border: 1px solid var(--sn-border);
+  border-radius: 12px;
+  font-size: 11px;
+  color: var(--sn-muted);
+}
+.sn-editbox-shortcuts button:hover {
+  background: var(--sn-hover);
+  color: var(--sn-fg);
+}
+.sn-editbox-instruction {
+  all: unset;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--sn-border);
+  border-radius: 6px;
+  font-family: var(--sn-font);
+  font-size: 13px;
+  color: var(--sn-fg);
+  background: transparent;
+}
+.sn-editbox-instruction:focus {
+  border-color: var(--sn-accent);
+}
+.sn-editbox-panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  min-height: 0;
+  overflow: hidden;
+}
+.sn-editbox-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.sn-editbox-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--sn-muted);
+  margin-bottom: 4px;
+}
+.sn-editbox-original,
+.sn-editbox-proposed {
+  flex: 1;
+  overflow: auto;
+  padding: 8px 10px;
+  border: 1px solid var(--sn-border);
+  border-radius: 6px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 13px;
+  line-height: 1.45;
+  min-height: 80px;
+  max-height: 40vh;
+}
+.sn-editbox-proposed.sn-editbox-empty {
+  color: var(--sn-muted);
+  font-style: italic;
+}
+.sn-editbox-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  padding-top: 4px;
+}
+.sn-editbox-footer button {
+  all: unset;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  border: 1px solid var(--sn-border);
+  color: var(--sn-fg);
+}
+.sn-editbox-footer button:hover:not(:disabled) {
+  background: var(--sn-hover);
+}
+.sn-editbox-footer button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.sn-editbox-replace {
+  background: var(--sn-accent);
+  color: var(--sn-on-accent, #fff);
+  border-color: var(--sn-accent);
+}
+.sn-editbox-replace:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+/* Diff inline (parola per parola) */
+.sn-diff-add {
+  background: rgba(56, 161, 105, 0.18);
+  color: var(--sn-fg);
+  border-radius: 2px;
+}
+.sn-diff-del {
+  background: rgba(229, 62, 62, 0.18);
+  color: var(--sn-muted);
+  text-decoration: line-through;
+  border-radius: 2px;
+}
+
+.sn-menu-history-item .sn-menu-history-icon {
+  font-size: 14px;
+  width: 18px;
+  display: inline-block;
+  text-align: center;
+}
+
+/* Griglia icone "Altro…" (overflow) come sotto-menu della riga icone */
+.sn-menu-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--sn-icon-cols, 4), 36px);
+  gap: 4px;
+  padding: 6px;
+  min-width: 0;
+  max-width: none;
+}
+.sn-menu-icon-btn {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--sn-fg);
+  font-size: 16px;
+  font-family: var(--sn-font);
+}
+.sn-menu-icon-btn:hover:not(:disabled) {
+  background: var(--sn-hover);
+}
+.sn-menu-icon-btn:disabled {
+  color: var(--sn-muted);
+  cursor: not-allowed;
+}
+
+/* Drag & drop (pointer-based) */
+.sn-menu-row-btn[data-sn-draggable="1"],
+.sn-menu-icon-btn[data-sn-draggable="1"] {
+  cursor: grab;
+  touch-action: none;
+}
+.sn-menu-row-btn[data-sn-draggable="1"]:active,
+.sn-menu-icon-btn[data-sn-draggable="1"]:active {
+  cursor: grabbing;
+}
+.sn-dragging { opacity: 0.3; }
+.sn-drop-hover {
+  outline: 2px dashed var(--sn-accent, #c45a3b);
+  outline-offset: -2px;
+  border-radius: 6px;
+}
+.sn-drag-preview {
+  position: fixed;
+  pointer-events: none;
+  z-index: 2147483647;
+  opacity: 0.92;
+  background: var(--sn-bg);
+  color: var(--sn-fg);
+  border: 1px solid var(--sn-border);
+  border-radius: 8px;
+  box-shadow: var(--sn-shadow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--sn-font);
+  font-size: 18px;
+  transform: scale(1.08);
+  transition: transform 80ms ease-out;
+}
+
+/* Tooltip custom, stile coerente con il menu */
+.sn-tooltip {
+  position: fixed;
+  z-index: 2147483647;
+  pointer-events: none;
+  background: var(--sn-overlay-bg);
+  color: var(--sn-fg);
+  border: 1px solid var(--sn-border);
+  border-radius: 6px;
+  box-shadow: var(--sn-shadow);
+  font-family: var(--sn-font);
+  font-size: 12px;
+  line-height: 1.2;
+  padding: 4px 8px;
+  white-space: nowrap;
+  max-width: 240px;
+  backdrop-filter: blur(4px);
+  animation: sn-fade-in 80ms ease-out;
+}

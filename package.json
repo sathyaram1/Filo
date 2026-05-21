@@ -1,0 +1,38 @@
+{
+  "name": "filo",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Filo — browser AI-native cross-device. Layer di interazione, non solo finestra.",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --enable-logging",
+    "test:smoke": "node tests/smoke.mjs",
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "test:explore": "node tests/agent/explore.mjs",
+    "test:daily": "node tests/agent/daily.mjs",
+    "build": "electron-builder"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "ai.filo.desktop",
+    "productName": "Filo",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "win": { "target": "nsis" },
+    "mac": { "target": "dmg" },
+    "linux": { "target": "AppImage" }
+  }
+}

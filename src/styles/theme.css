@@ -1,0 +1,31 @@
+/* Variabili tema. Vengono attivate via [data-sn-theme="light|dark"] su <html>. */
+
+:root {
+  --sn-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --sn-radius: 6px;
+  --sn-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+}
+
+[data-sn-theme="light"] {
+  --sn-bg: #f8f6f0;
+  --sn-fg: #1a1918;
+  --sn-muted: #6e6b63;
+  --sn-border: #e0dcd4;
+  --sn-hover: #ffffff;
+  --sn-accent: #c45a3b;
+  --sn-accent-rgb: 196, 90, 59;
+  --sn-error: #b91c1c;
+  --sn-overlay-bg: rgba(248, 246, 240, 0.98);
+}
+
+[data-sn-theme="dark"] {
+  --sn-bg: #1e1d1b;
+  --sn-fg: #e5e3dc;
+  --sn-muted: #8a8780;
+  --sn-border: #3a3835;
+  --sn-hover: #282725;
+  --sn-accent: #c45a3b;
+  --sn-accent-rgb: 196, 90, 59;
+  --sn-error: #ff6b6b;
+  --sn-overlay-bg: rgba(30, 29, 27, 0.98);
+}
