@@ -246,7 +246,20 @@
     applyFilter();
   });
 
-  lightbox.addEventListener('click', () => lightbox.classList.remove('open'));
+  function closeLightbox() {
+    if (!lightbox.classList.contains('open')) return;
+    lightbox.classList.remove('open');
+    // Sgancia la src così alla prossima apertura non si vede per un istante
+    // l'immagine precedente mentre quella nuova carica.
+    lightboxImg.removeAttribute('src');
+  }
+  lightbox.addEventListener('click', closeLightbox);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && lightbox.classList.contains('open')) {
+      e.stopPropagation();
+      closeLightbox();
+    }
+  });
   refreshBtn.addEventListener('click', load);
   searchEl.addEventListener('input', applyFilter);
 
