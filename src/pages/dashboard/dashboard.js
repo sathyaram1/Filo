@@ -122,7 +122,22 @@
       const icon = document.createElement('span');
       icon.className = 'dash-sug-icon';
       icon.dataset.icon = s.icon || '';
-      icon.textContent = iconLabel(s.icon);
+      // Per le azioni NAVIGA mostriamo la favicon del sito al posto della
+      // letterina generica: più riconoscibile a colpo d'occhio. Se la favicon
+      // non carica (404/rete) torniamo all'iniziale.
+      const navUrl = (String(s.action?.type || '').toUpperCase() === 'NAVIGA') ? s.action?.url : '';
+      const favUrl = faviconUrl(navUrl);
+      if (favUrl) {
+        const img = document.createElement('img');
+        img.className = 'dash-sug-favicon';
+        img.src = favUrl;
+        img.alt = '';
+        img.referrerPolicy = 'no-referrer';
+        img.onerror = () => { img.remove(); icon.textContent = iconLabel(s.icon); };
+        icon.appendChild(img);
+      } else {
+        icon.textContent = iconLabel(s.icon);
+      }
       const text = document.createElement('span');
       text.className = 'dash-sug-text';
       text.textContent = s.text || '';
