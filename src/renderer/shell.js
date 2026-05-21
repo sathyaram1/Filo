@@ -67,7 +67,8 @@
 
       const close = document.createElement('span');
       close.className = 'close';
-      close.textContent = '×';
+      if (typeof ICONS.close === 'function') close.innerHTML = ICONS.close(12);
+      else close.textContent = '×';
       close.addEventListener('click', (e) => {
         e.stopPropagation();
         api.tabs.close(t.id);
