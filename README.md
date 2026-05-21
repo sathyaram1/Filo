@@ -50,7 +50,15 @@ assets/icons/                   Icone applicazione
 
 ```bash
 npm install                     # installa Electron + Playwright
-npm start                       # avvia Filo
+npm start                       # avvia Filo (apre la finestra)
+npm run test:smoke              # smoke headless (verifica che la newtab carichi)
+```
+
+Il primo `npm install` scarica Electron (~150MB). Se non lo fa in automatico
+(succede su alcune configurazioni di npm), esegui manualmente:
+
+```bash
+node node_modules/electron/install.js
 ```
 
 ## Filosofia di porting
