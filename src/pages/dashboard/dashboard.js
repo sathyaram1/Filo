@@ -297,7 +297,19 @@
       btn.href = a.url || '#';
       btn.target = '_blank';
       btn.rel = 'noopener';
-      btn.textContent = a.label || 'Apri';
+      const favUrl = faviconUrl(a.url);
+      if (favUrl) {
+        const img = document.createElement('img');
+        img.className = 'dash-action-favicon';
+        img.src = favUrl;
+        img.alt = '';
+        img.referrerPolicy = 'no-referrer';
+        img.onerror = () => img.remove();
+        btn.appendChild(img);
+      }
+      const label = document.createElement('span');
+      label.textContent = a.label || 'Apri';
+      btn.appendChild(label);
       return btn;
     }
     if (type === 'APRI_FILE') {
