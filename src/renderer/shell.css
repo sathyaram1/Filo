@@ -190,7 +190,7 @@ html, body {
   padding: 6px 10px 8px 10px;
   flex: 0 0 48px;
   background: var(--bg);
-  border-top: 1px solid var(--border);
+  border-top: none;
 }
 .nav-btn {
   flex: 0 0 32px;
@@ -198,10 +198,14 @@ html, body {
   background: transparent;
   border: 1px solid transparent;
   border-radius: 6px;
-  font-size: 18px;
   color: var(--fg-soft);
   cursor: default;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
 }
+.nav-btn svg { display: block; }
 .nav-btn:hover:not(:disabled) { background: var(--tab-bg); color: var(--fg); }
 .nav-btn:disabled { opacity: 0.35; }
 
