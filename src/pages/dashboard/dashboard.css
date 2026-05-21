@@ -282,6 +282,14 @@ body[data-state="thread"] .dash-suggestion { justify-content: center; padding: 6
   font-family: inherit;
 }
 .dash-action-btn:hover { background: var(--dash-ink); color: var(--dash-paper); }
+.dash-action-favicon {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  object-fit: contain;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.9);
+}
 .dash-action-btn-primary {
   background: var(--dash-ink);
   color: var(--dash-paper);
