@@ -146,6 +146,16 @@ html, body {
   color: var(--dash-ink-mute);
   text-transform: uppercase;
 }
+/* Quando contiene la favicon di un sito, lo sfondo non serve. */
+.dash-sug-icon:has(.dash-sug-favicon) { background: transparent; border-color: transparent; padding: 0; }
+.dash-sug-favicon {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  display: block;
+  object-fit: contain;
+}
+
 /* Colorazione contestuale dell'icona per servizio. */
 .dash-sug-icon[data-icon="gmail"]      { background: #e9d8c4; color: #8a4a1f; }
 .dash-sug-icon[data-icon="calendar"]   { background: #dee2cf; color: #4a6238; }
