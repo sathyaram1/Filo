@@ -137,14 +137,16 @@ html, body {
   background: transparent;
   border: 1px solid transparent;
   border-radius: 6px;
-  font-size: 18px;
-  line-height: 1;
   color: var(--fg-soft);
   cursor: default;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   -webkit-app-region: no-drag;
   app-region: no-drag;
 }
 .tab-new:hover { background: var(--tab-bg); color: var(--fg); }
+.tab-new svg { display: block; }
 
 /* Riempie lo spazio tra il + e i controlli finestra. Resta draggabile
    così l'utente può afferrare lì la finestra in stile Chrome. */
