@@ -120,6 +120,23 @@ function registerIpcHandlers() {
     if (!win?._filoTabs) return { activeId: null, tabs: [] };
     return win._filoTabs.snapshot();
   });
+
+  // ─── controlli finestra (min / max / close) ──────────────────────────────
+  ipcMain.handle('window:minimize', (event) => {
+    const win = winFor(event); if (win) win.minimize();
+    return { ok: true };
+  });
+  ipcMain.handle('window:toggle-maximize', (event) => {
+    const win = winFor(event);
+    if (win) {
+      if (win.isMaximized()) win.unmaximize(); else win.maximize();
+    }
+    return { ok: true };
+  });
+  ipcMain.handle('window:close', (event) => {
+    const win = winFor(event); if (win) win.close();
+    return { ok: true };
+  });
 }
 
 async function openInternalPage(name) {
