@@ -76,8 +76,7 @@ html, body {
   max-width: 220px;
   padding: 0 8px 0 10px;
   background: var(--tab-bg);
-  border: 1px solid var(--border);
-  border-bottom: none;
+  border: none;
   border-radius: var(--radius) var(--radius) 0 0;
   font-size: 13px;
   color: var(--fg-soft);
@@ -90,8 +89,7 @@ html, body {
 .tab.active {
   background: var(--tab-active);
   color: var(--fg);
-  border-bottom: 1px solid var(--tab-active);
-  margin-bottom: -1px;
+  margin-bottom: 0;
   z-index: 1;
 }
 .tab .title {
