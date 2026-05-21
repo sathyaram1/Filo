@@ -172,15 +172,13 @@ html, body {
   background: transparent;
   border: none;
   color: var(--fg-soft);
-  font-family: "Segoe Fluent Icons", "Segoe MDL2 Assets", "Segoe UI Symbol", sans-serif;
-  font-size: 10px;
-  line-height: 1;
   cursor: default;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 0;
 }
+.win-btn svg { display: block; }
 .win-btn:hover { background: color-mix(in srgb, var(--fg) 10%, transparent); color: var(--fg); }
 .win-btn.win-close:hover { background: #e81123; color: #fff; }
 
