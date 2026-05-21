@@ -171,6 +171,29 @@
   const colorPicker =
     `<path d="M14 4l6 6l-3 3l-2-2l-9 9h-3v-3l9-9l-1-1z"/>`;
 
+  // --- Plus: croce simmetrica (usata per "nuova scheda" nella tab bar).
+  const plus =
+    `<path d="M12 5v14"/>` +
+    `<path d="M5 12h14"/>`;
+
+  // --- Minimize: una sola linea orizzontale in basso (Windows-like).
+  const minimize =
+    `<path d="M5 18h14"/>`;
+
+  // --- Maximize: quadrato vuoto (finestra non massimizzata).
+  const maximize =
+    `<rect x="5" y="5" width="14" height="14" rx="1"/>`;
+
+  // --- Restore: due quadrati sovrapposti (toggle quando già massimizzata).
+  const restore =
+    `<rect x="5" y="8" width="11" height="11" rx="1"/>` +
+    `<path d="M8 8V6a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-2"/>`;
+
+  // --- Home: tetto + corpo casa (per il bottone "nuova scheda" in addr bar).
+  const home =
+    `<path d="M4 11l8-7 8 7"/>` +
+    `<path d="M6 10v9a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-9"/>`;
+
   // --- Alias semantico: "Salvati per dopo" usa il logo di Filo
   const openForLater = filoLogo;
 
