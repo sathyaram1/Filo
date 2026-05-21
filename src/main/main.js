@@ -15,6 +15,12 @@ if (process.env.FILO_USER_DATA) {
   try { app.setPath('userData', process.env.FILO_USER_DATA); } catch (_) {}
 }
 
+// Su Windows serve un AppUserModelID esplicito perché la taskbar mostri
+// l'icona giusta (e non quella di Electron di default).
+if (process.platform === 'win32') {
+  try { app.setAppUserModelId('ai.filo.desktop'); } catch (_) {}
+}
+
 // Carica i moduli "shared/background" portati dall'estensione. Si registrano
 // tutti su `globalThis` (pattern IIFE preservato dal codice extension), così
 // gli altri moduli del main process li trovano via global.
