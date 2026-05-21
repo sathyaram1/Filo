@@ -44,12 +44,19 @@ html, body {
 }
 
 /* ── tab bar ──────────────────────────────────────────────────────────── */
-.tabs {
+.tab-row {
   display: flex;
   align-items: flex-end;
   gap: 2px;
   padding: 8px 4px 0 8px;
   flex: 0 0 40px;
+  overflow: hidden;
+}
+.tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  flex: 1 1 auto;
   overflow-x: auto;
   scrollbar-width: thin;
 }

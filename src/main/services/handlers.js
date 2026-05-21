@@ -421,18 +421,17 @@ async function executeFiloAction(action) {
 }
 
 function broadcastLiveUpdate() {
-  // Manda un broadcast renderer-side a tutte le finestre/tab — la dashboard
-  // ri-renderizzerà la colonna destra.
+  const msg = { type: MSG.FILO_LIVE_UPDATED };
   try {
     for (const win of BrowserWindow.getAllWindows()) {
-      try { win.webContents.send('filo:broadcast', { type: MSG.FILO_LIVE_UPDATED }); } catch (_) {}
+      try { win.webContents.send('filo:broadcast', msg); } catch (_) {}
       if (win._filoTabs) {
         for (const t of win._filoTabs.tabs) {
-          try { t.view.webContents.send('filo:broadcast', { type: MSG.FILO_LIVE_UPDATED }); } catch (_) {}
+          try { t.view.webContents.send('filo:broadcast', msg); } catch (_) {}
         }
       }
     }
-  } catch (e) { /* ignore */ }
+  } catch (_) {}
 }
 
 async function handleFiloChat({ userMessage, threadHistory }) {

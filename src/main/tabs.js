@@ -11,8 +11,9 @@ const PAGE_PRELOAD = path.join(__dirname, '..', 'preload', 'page-preload.js');
 const INTERNAL_PRELOAD = path.join(__dirname, '..', 'preload', 'internal-preload.js');
 
 class TabManager {
-  constructor(window, { shellHeight = 88 } = {}) {
+  constructor(window, shellView, { shellHeight = 88 } = {}) {
     this.win = window;
+    this.shellView = shellView; // WebContentsView della shell — per il broadcast tabs:updated
     this.shellHeight = shellHeight;
     this.tabs = []; // [{ id, view, title, url, favicon, loading, canBack, canFwd }]
     this.activeId = null;
@@ -53,8 +54,19 @@ class TabManager {
     this.win.contentView.addChildView(view);
     this.tabs.push(tab);
 
+    // IMPORTANTE: setBounds PRIMA di loadURL così la WebContentsView ha una
+    // dimensione valida quando il compositor alloca il display surface.
+    // Caricare con bounds 0x0 può far andare in fallimento le capturePage
+    // successive con "Current display surface not available".
+    if (activate) {
+      this.activeId = id;
+      this.layout();
+    }
     view.webContents.loadURL(url);
-    if (activate) this.activate(id);
+    if (activate) {
+      // Riaffermo la visibilità su tutti i tab dopo loadURL.
+      for (const t of this.tabs) t.view.setVisible?.(t.id === id);
+    }
     this._broadcast();
     return id;
   }
@@ -123,9 +135,12 @@ class TabManager {
     const [w, h] = this.win.getContentSize();
     for (const tab of this.tabs) {
       if (tab.id === this.activeId) {
-        tab.view.setBounds({ x: 0, y: this.shellHeight, width: w, height: Math.max(0, h - this.shellHeight) });
+        const b = { x: 0, y: this.shellHeight, width: w, height: Math.max(0, h - this.shellHeight) };
+        tab.view.setBounds(b);
+        if (process.env.FILO_SMOKE) {
+          console.log(`[layout] tab ${tab.id.slice(0, 6)} active bounds`, JSON.stringify(b), 'win', w, 'x', h);
+        }
       } else {
-        // Tab in background: bounds 0x0 per non interferire col rendering.
         tab.view.setBounds({ x: 0, y: 0, width: 0, height: 0 });
       }
     }
@@ -193,6 +208,7 @@ class TabManager {
   }
 
   _broadcast() {
+    // La shell è il primary webContents della BrowserWindow.
     try {
       this.win.webContents.send('tabs:updated', this.snapshot());
     } catch (_) { /* shell non ancora caricata */ }

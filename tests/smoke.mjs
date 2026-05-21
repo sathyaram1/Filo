@@ -7,14 +7,18 @@
 // custom di webPreferences. Il sentinel è deterministico e abbastanza.
 
 import { spawn } from 'node:child_process';
-import { readFileSync, unlinkSync, existsSync, mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
-const sentinel = path.join(mkdtempSync(path.join(tmpdir(), 'filo-smoke-')), 'sentinel.json');
+// Cartella di output stabile dentro tests/ così posso ispezionare gli
+// screenshot. Pulisce e ricrea ogni run.
+const outDir = path.join(__dirname, '.smoke');
+try { (await import('node:fs')).rmSync(outDir, { recursive: true, force: true }); } catch (_) {}
+(await import('node:fs')).mkdirSync(outDir, { recursive: true });
+const sentinel = path.join(outDir, 'sentinel.json');
 
 // Usa il binario nativo (no .cmd shim) per evitare problemi di quoting su
 // percorsi con spazi su Windows.
@@ -28,7 +32,9 @@ const proc = spawn(electronExe, ['.'], {
 });
 
 const stderrChunks = [];
+const stdoutChunks = [];
 proc.stderr.on('data', (d) => stderrChunks.push(d));
+proc.stdout.on('data', (d) => stdoutChunks.push(d));
 
 const startedAt = Date.now();
 const TIMEOUT = 20_000;
@@ -46,7 +52,6 @@ while (Date.now() - startedAt < TIMEOUT) {
 }
 
 try { proc.kill('SIGTERM'); } catch (_) {}
-try { unlinkSync(sentinel); } catch (_) {}
 
 if (!result) {
   console.error('[smoke] FAIL: sentinel non scritto entro', TIMEOUT, 'ms');
@@ -69,3 +74,17 @@ console.log('[smoke] OK ✓');
 console.log('  └─ tab url:', tabs.tabs[0].url);
 console.log('  └─ tab title:', tabs.tabs[0].title);
 console.log('  └─ favicon:', tabs.tabs[0].favicon);
+console.log('  └─ screenshots in:', outDir);
+const stdout = Buffer.concat(stdoutChunks).toString();
+// Dump tutto lo stdout in un file per ispezione e mostra le righe rilevanti.
+const logFile = path.join(outDir, 'main.log');
+const fs = await import('node:fs');
+fs.writeFileSync(logFile, stdout);
+console.log('  └─ main log:', logFile);
+const interesting = stdout.split('\n').filter((l) =>
+  /\[(smoke|layout|tab:|main|filo)\]/i.test(l) || /Error|Uncaught|fail/i.test(l)
+);
+if (interesting.length) {
+  console.log('--- main process log (filtered) ---');
+  for (const l of interesting) console.log('  ' + l);
+}

@@ -15,12 +15,10 @@ const { handleMessage, handleStream, broadcastToTabs } = require('./services/han
 const inFlightStreams = new Map(); // requestId → AbortController
 
 function senderInfo(event) {
-  // Risali alla finestra/tab che ha mandato il messaggio così possiamo passare
-  // un `sender` simile a quello di chrome.runtime al handler.
   const wc = event.sender;
   const win = BrowserWindow.fromWebContents(wc);
   let tab = null;
-  if (win && win._filoTabs) {
+  if (win?._filoTabs) {
     tab = win._filoTabs.tabs.find((t) => t.view.webContents === wc);
   }
   return {
@@ -73,45 +71,53 @@ function registerIpcHandlers() {
   });
 
   // ─── tab control dalla shell ─────────────────────────────────────────────
+  const winFor = (event) => {
+    const wc = event.sender;
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (w._filoShell?.webContents === wc) return w;
+      if (w._filoTabs?.tabs?.some((t) => t.view.webContents === wc)) return w;
+    }
+    return BrowserWindow.fromWebContents(wc) || BrowserWindow.getAllWindows()[0];
+  };
   ipcMain.handle('tabs:open', (event, { url } = {}) => {
-    const win = BrowserWindow.fromWebContents(event.sender);
+    const win = winFor(event);
     if (!win || !win._filoTabs) return { ok: false };
     const id = win._filoTabs.openTab(url || 'filo://newtab/');
     return { ok: true, id };
   });
   ipcMain.handle('tabs:close', (event, { id }) => {
-    const win = BrowserWindow.fromWebContents(event.sender);
-    if (win && win._filoTabs) win._filoTabs.closeTab(id);
+    const win = winFor(event);
+    if (win?._filoTabs) win._filoTabs.closeTab(id);
     return { ok: true };
   });
   ipcMain.handle('tabs:activate', (event, { id }) => {
-    const win = BrowserWindow.fromWebContents(event.sender);
-    if (win && win._filoTabs) win._filoTabs.activate(id);
+    const win = winFor(event);
+    if (win?._filoTabs) win._filoTabs.activate(id);
     return { ok: true };
   });
   ipcMain.handle('tabs:navigate', (event, { id, url }) => {
-    const win = BrowserWindow.fromWebContents(event.sender);
-    if (win && win._filoTabs) win._filoTabs.navigate(id, url);
+    const win = winFor(event);
+    if (win?._filoTabs) win._filoTabs.navigate(id, url);
     return { ok: true };
   });
   ipcMain.handle('tabs:back', (event, { id }) => {
-    const win = BrowserWindow.fromWebContents(event.sender);
-    if (win && win._filoTabs) win._filoTabs.goBack(id);
+    const win = winFor(event);
+    if (win?._filoTabs) win._filoTabs.goBack(id);
     return { ok: true };
   });
   ipcMain.handle('tabs:forward', (event, { id }) => {
-    const win = BrowserWindow.fromWebContents(event.sender);
-    if (win && win._filoTabs) win._filoTabs.goForward(id);
+    const win = winFor(event);
+    if (win?._filoTabs) win._filoTabs.goForward(id);
     return { ok: true };
   });
   ipcMain.handle('tabs:reload', (event, { id }) => {
-    const win = BrowserWindow.fromWebContents(event.sender);
-    if (win && win._filoTabs) win._filoTabs.reload(id);
+    const win = winFor(event);
+    if (win?._filoTabs) win._filoTabs.reload(id);
     return { ok: true };
   });
   ipcMain.handle('tabs:snapshot', (event) => {
-    const win = BrowserWindow.fromWebContents(event.sender);
-    if (!win || !win._filoTabs) return { activeId: null, tabs: [] };
+    const win = winFor(event);
+    if (!win?._filoTabs) return { activeId: null, tabs: [] };
     return win._filoTabs.snapshot();
   });
 }
