@@ -105,11 +105,11 @@ html, body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
   color: var(--fg-soft);
   cursor: pointer;
   opacity: 0;
 }
+.tab .close svg { display: block; }
 .tab:hover .close,
 .tab.active .close { opacity: 1; }
 .tab .close:hover { background: color-mix(in srgb, var(--border) 60%, transparent); color: var(--fg); }
