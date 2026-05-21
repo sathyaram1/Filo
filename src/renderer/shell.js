@@ -86,6 +86,12 @@
   reloadBtn.addEventListener('click', () => { const a = activeTab(); if (a) api.tabs.reload(a.id); });
   homeBtn.addEventListener('click', () => { const a = activeTab(); if (a) api.tabs.navigate(a.id, 'filo://newtab/'); });
 
+  if (api.window) {
+    winMinBtn?.addEventListener('click', () => api.window.minimize());
+    winMaxBtn?.addEventListener('click', () => api.window.toggleMaximize());
+    winCloseBtn?.addEventListener('click', () => api.window.close());
+  }
+
   addrEl.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       const a = activeTab();
