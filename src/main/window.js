@@ -18,6 +18,10 @@ function createMainWindow() {
     // non rende vediamo subito un'area di colore diverso (debugging visivo).
     backgroundColor: '#222222',
     title: 'Filo',
+    icon: path.join(__dirname, '..', '..', 'assets', 'icons', 'icon-128.png'),
+    // Chrome-like: la title bar nativa è rimossa, i controlli minimize/maximize/
+    // close vivono nella tab-row della shell (vedi src/renderer/shell.html).
+    frame: false,
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'shell-preload.js'),
       contextIsolation: true,
