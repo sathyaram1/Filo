@@ -124,12 +124,13 @@
     listEl.innerHTML = items.map((f) => {
       const when = fmtTs(f.createdAt || f._createTime);
       const url = f.url || '';
+      const safeUrl = safeHref(url);
       const ua = (f.userAgent || '').slice(0, 80);
       const cid = (f.clientId || '').slice(0, 12);
       const text = escapeHtml(f.text || '(senza testo)');
-      const imgs = Array.isArray(f.images) ? f.images : [];
+      const imgs = Array.isArray(f.images) ? f.images.filter((u) => typeof u === 'string' && u) : [];
       const imgsHtml = imgs.length
-        ? `<div class="fb-imgs">${imgs.map((u) => `<img src="${escapeHtml(u)}" data-full="${escapeHtml(u)}">`).join('')}</div>`
+        ? `<div class="fb-imgs">${imgs.map((u) => `<img src="${escapeHtml(u)}" data-full="${escapeHtml(u)}" loading="lazy" alt="">`).join('')}</div>`
         : '';
       const notesEditable = currentTab === 'todo' || currentTab === 'draft';
       const notesBlock = notesEditable
