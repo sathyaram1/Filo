@@ -142,6 +142,67 @@ const chromeShim = {
   contextMenus: { create: () => {}, onClicked: { addListener: () => {} } },
 };
 
+// Inietta i content script (menu, popup, sidebar, highlight, spellcheck,
+// feedback) anche su filo://newtab/ così il tasto destro Filo funziona sulla
+// dashboard. Skippiamo options/history/feedback/spellcheck dove i content
+// script sarebbero invasivi (form fields, layout dedicato).
+const path = require('node:path');
+const CS_BLOCKLIST = ['filo://options/', 'filo://history/', 'filo://feedback/', 'filo://spellcheck/'];
+const shouldInjectContentScripts = () => {
+  const url = location.href;
+  return !CS_BLOCKLIST.some((p) => url.startsWith(p));
+};
+function injectContentScriptStyles() {
+  const STYLES = ['theme.css', 'menu.css', 'popup.css', 'sidebar.css',
+    'highlight.css', 'spellcheck.css', 'feedback.css'];
+  for (const f of STYLES) {
+    if (document.querySelector(`link[href="filo://style/${f}"]`)) continue;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'filo://style/' + f;
+    document.head.appendChild(link);
+  }
+}
+function loadContentScripts() {
+  const SHARED = path.join(__dirname, '..', 'shared');
+  const CONTENT = path.join(__dirname, '..', 'content');
+  // i moduli SN_CONST/I18N/MSG/ICONS sono già caricati via <script> nelle
+  // pagine interne; require() li reseguirà ma è idempotente (riassegna gli
+  // stessi oggetti su globalThis).
+  const safe = (p) => { try { require(p); } catch (e) { console.error('[Filo CS]', p, e.message); } };
+  safe(path.join(SHARED, 'constants.js'));
+  safe(path.join(SHARED, 'i18n.js'));
+  safe(path.join(SHARED, 'messages.js'));
+  safe(path.join(SHARED, 'icons.js'));
+  safe(path.join(CONTENT, 'extractContext.js'));
+  safe(path.join(CONTENT, 'popup.js'));
+  safe(path.join(CONTENT, 'menu.js'));
+  safe(path.join(CONTENT, 'highlight.js'));
+  safe(path.join(CONTENT, 'sidebar.js'));
+  safe(path.join(CONTENT, 'spellcheck.js'));
+  safe(path.join(SHARED, 'feedback.js'));
+  safe(path.join(CONTENT, 'feedback.js'));
+  safe(path.join(CONTENT, 'content.js'));
+  try {
+    document.documentElement.dataset.filoReady = '1';
+    document.documentElement.dataset.filoContentScripts = '1';
+  } catch (_) {}
+}
+// Self è già aliasato a window/globalThis via il primo `globalThis.self = ...`
+// del shim chrome più sotto? No — non l'abbiamo fatto qui. I content script
+// usano `self.SN_*`. Con contextIsolation:false, `self` è già aliased a
+// window dal browser (è una proprietà standard del WindowOrWorkerGlobalScope).
+function bootContentScripts() {
+  if (!shouldInjectContentScripts()) return;
+  injectContentScriptStyles();
+  loadContentScripts();
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', bootContentScripts, { once: true });
+} else {
+  bootContentScripts();
+}
+
 // Sovrascrivi lo stub di Chromium. La proprietà è configurabile, quindi
 // l'assegnazione diretta funziona (a differenza di contextBridge che fallisce).
 try {

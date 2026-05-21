@@ -17,6 +17,20 @@ async function newtabPage(app) {
   return win;
 }
 
+test('tasto destro sulla dashboard apre il menu Filo', async ({ app, shell }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  // I content script vengono iniettati anche su filo://newtab/ via
+  // internal-preload, quindi il menu Filo deve apparire.
+  await page.waitForFunction(
+    () => document.documentElement.dataset.filoContentScripts === '1',
+    null,
+    { timeout: 8_000 },
+  );
+  await page.locator('#center').click({ button: 'right' });
+  await expect(page.locator('.sn-menu')).toBeVisible({ timeout: 5_000 });
+});
+
 test('la dashboard renderizza le tre zone + barra input', async ({ app, shell }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
