@@ -218,6 +218,11 @@
     close:        (size) => wrap(close, { size }),
     options:      (size) => wrap(options, { size }),
     colorPicker:  (size) => wrap(colorPicker, { size }),
+    plus:         (size) => wrap(plus, { size }),
+    minimize:     (size) => wrap(minimize, { size }),
+    maximize:     (size) => wrap(maximize, { size }),
+    restore:      (size) => wrap(restore, { size }),
+    home:         (size) => wrap(home, { size }),
     openForLater: (size) => wrap(openForLater, { size }),
   };
 
