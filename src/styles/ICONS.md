@@ -84,6 +84,11 @@ self.SN_ICONS_UTIL = { isSvgIcon, wrap };
 | `close` | Croce X centrata |
 | `options` | Ingranaggio a 8 denti con foro centrale |
 | `colorPicker` | Pipetta diagonale con ampolla in alto a destra |
+| `plus` | Croce simmetrica (nuova scheda) |
+| `minimize` | Singola linea orizzontale in basso (minimizza finestra) |
+| `maximize` | Quadrato vuoto (massimizza finestra) |
+| `restore` | Due quadrati sovrapposti (ripristina da massimizzata) |
+| `home` | Tetto a triangolo sopra corpo casa |
 | `openForLater` | Alias di `filoLogo` — "Salvati per dopo" mostra il logo |
 
 ## Note operative
