@@ -143,8 +143,46 @@ html, body {
   line-height: 1;
   color: var(--fg-soft);
   cursor: default;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
 }
 .tab-new:hover { background: var(--tab-bg); color: var(--fg); }
+
+/* Riempie lo spazio tra il + e i controlli finestra. Resta draggabile
+   così l'utente può afferrare lì la finestra in stile Chrome. */
+.tab-drag-spacer {
+  flex: 1 1 auto;
+  align-self: stretch;
+  min-width: 8px;
+}
+
+/* ── controlli finestra (min / max / close) ────────────────────────────── */
+.window-controls {
+  display: flex;
+  align-items: stretch;
+  flex: 0 0 auto;
+  align-self: stretch;
+  margin-top: -8px; /* compensa il padding-top della .tab-row */
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+.win-btn {
+  width: 46px;
+  height: 40px;
+  background: transparent;
+  border: none;
+  color: var(--fg-soft);
+  font-family: "Segoe Fluent Icons", "Segoe MDL2 Assets", "Segoe UI Symbol", sans-serif;
+  font-size: 10px;
+  line-height: 1;
+  cursor: default;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.win-btn:hover { background: color-mix(in srgb, var(--fg) 10%, transparent); color: var(--fg); }
+.win-btn.win-close:hover { background: #e81123; color: #fff; }
 
 /* ── barra indirizzi ──────────────────────────────────────────────────── */
 .addr {
