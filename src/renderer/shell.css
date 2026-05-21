@@ -48,24 +48,31 @@ html, body {
   display: flex;
   align-items: flex-end;
   gap: 2px;
-  padding: 8px 4px 0 8px;
+  padding: 8px 0 0 8px;
   flex: 0 0 40px;
   overflow: hidden;
+  /* L'intera tab-row è draggabile come una title bar nativa. I figli
+     interattivi (tab, +, controlli finestra) ripristinano `no-drag`. */
+  -webkit-app-region: drag;
+  app-region: drag;
 }
 .tabs {
   display: flex;
   align-items: flex-end;
   gap: 2px;
-  flex: 1 1 auto;
-  overflow-x: auto;
-  scrollbar-width: thin;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
 }
 .tab {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   height: 32px;
-  min-width: 90px;
+  flex: 1 1 0;
+  min-width: 40px;
   max-width: 220px;
   padding: 0 8px 0 10px;
   background: var(--tab-bg);
@@ -76,6 +83,8 @@ html, body {
   color: var(--fg-soft);
   cursor: default;
   transition: background 0.1s ease;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
 }
 .tab:hover { background: color-mix(in srgb, var(--tab-bg) 85%, var(--bg)); }
 .tab.active {
