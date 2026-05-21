@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Filo content-script test page</title>
+  <style>
+    body { font-family: system-ui; max-width: 600px; margin: 40px auto; padding: 20px; }
+    p { line-height: 1.6; }
+    .selectable { background: #fff3cd; padding: 4px 8px; border-radius: 3px; }
+    textarea { width: 100%; height: 80px; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <h1>Pagina di test per content script</h1>
+  <p>
+    Filo dovrebbe iniettare il menu tasto destro, popup, sidebar e spellcheck
+    in questa pagina. Seleziona questo <span class="selectable">testo</span>
+    e fai click destro per verificare.
+  </p>
+  <p>
+    Un esempio di parola con errore: <span>recieve</span>. Lo spellcheck
+    semantico dovrebbe segnalarla.
+  </p>
+  <textarea placeholder="Scrivi qui per testare lo spellcheck inline...">questa frasse contene un errore</textarea>
+</body>
+</html>

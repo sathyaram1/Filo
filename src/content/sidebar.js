@@ -1,0 +1,804 @@
+// Sidebar Aiuto (Fase 2). Agente vision multi-turn.
+//
+// Modalità UI:
+// - Espansa: pannello completo con header, conversazione, input.
+// - Collassata: solo una barra con input. Click fuori dal pannello la collassa.
+//   Focus/typing nell'input la riapre.
+// - L'AI controlla via `collapse` se collassare dopo la sua risposta.
+//
+// Log azioni utente: dopo un click sul target o l'accept di un fill, viene
+// mostrata una riga grigia compatta ("click su menu", "testo inserito"…),
+// non un finto messaggio utente. La cronologia inviata all'AI contiene
+// comunque un marcatore testuale così l'agente sa cosa è successo.
+
+(function (global) {
+  'use strict';
+
+  const { ACTIONS } = global.SN_CONST;
+  const { MSG } = global.SN_MSG;
+  const I18n = global.SN_I18N;
+  const Highlight = global.SN_HIGHLIGHT;
+  const Extract = global.SN_EXTRACT;
+  const Popup = global.SN_POPUP;
+
+  let root = null;
+  let stackEntry = null;
+  // history per l'AI: { role, content, kind } — kind ∈ 'real'|'action'|null
+  let history = [];
+  let collapsed = false;
+  // Se true, click fuori dal pannello NON lo collassa (es. AI ha richiesto chat aperta)
+  let aiPrefersOpen = false;
+  let docClickHandler = null;
+
+  // Telemetria sessione: viene inviata a fine task (status:"done" + 👍/👎) per
+  // arricchire il database globale dei percorsi (vedi pathsCollector.js).
+  // Tutto qui resta locale finché l'utente non clicca pollice su/giù.
+  // executedSteps contiene SOLO le azioni effettivamente eseguite dall'utente
+  // (o auto-action reveal/hover andate a buon fine), niente value di fill.
+  // rawUserMessages serve solo al "judge" lato server come riferimento.
+  let session = null;
+  function newSession() {
+    return {
+      initialUrl: '',
+      executedSteps: [],
+      rawUserMessages: [],
+      feedbackShown: false,
+      webSearchCount: 0,
+    };
+  }
+  // Cap difensivo: anche se il prompt dice "max 2", l'AI potrebbe insistere.
+  // Ignoriamo silenziosamente le ricerche oltre questo limite.
+  const MAX_WEB_SEARCHES_PER_SESSION = 2;
+
+  function isOpen() { return !!root; }
+
+  function close() {
+    if (!root) return;
+    Highlight.clear();
+    try { Highlight.clearForceHover?.(); } catch (_) {}
+    if (docClickHandler) {
+      document.removeEventListener('mousedown', docClickHandler, true);
+      docClickHandler = null;
+    }
+    try { stackEntry?.unregister?.(); } catch (_) {}
+    stackEntry = null;
+    root.remove();
+    root = null;
+    history = [];
+    collapsed = false;
+    aiPrefersOpen = false;
+    session = null;
+  }
+
+  function open() {
+    if (root) return;
+    history = [];
+    collapsed = false;
+    aiPrefersOpen = true;
+    session = newSession();
+    // L'URL "iniziale" è quello al momento dell'apertura della sidebar — anche
+    // se l'utente è arrivato qui da altre pagine, contano solo le azioni che
+    // farà DA QUI in avanti.
+    session.initialUrl = location.href;
+    root = document.createElement('div');
+    root.className = 'sn-sidebar';
+    root.innerHTML = `
+      <div class="sn-sidebar-header">
+        <span class="sn-sidebar-title">${I18n.t('menu_help')}</span>
+        <div class="sn-sidebar-actions">
+          <button class="sn-sidebar-collapse" type="button" title="Collassa">▾</button>
+          <button class="sn-sidebar-close" type="button" aria-label="${I18n.t('popup_close')}">×</button>
+        </div>
+      </div>
+      <div class="sn-sidebar-conv"></div>
+      <div class="sn-sidebar-meta"></div>
+      <form class="sn-sidebar-input" autocomplete="off">
+        <textarea rows="1" placeholder="Dimmi cosa vuoi fare sulla pagina…"></textarea>
+        <button type="submit">↵</button>
+      </form>
+    `;
+    document.documentElement.appendChild(root);
+    // Partecipa allo stacking dei popup: la sidebar appare sopra ai box aperti
+    // prima e sotto a quelli aperti dopo (es. modale feedback). In passato la
+    // sidebar usava uno z-index hardcoded altissimo e finiva sempre sopra a
+    // tutto, schiacciando il modale feedback aperto successivamente (feedback alpha).
+    stackEntry = Popup?.registerStack?.(root) || null;
+
+    root.querySelector('.sn-sidebar-close').addEventListener('click', close);
+    root.querySelector('.sn-sidebar-collapse').addEventListener('click', () => collapse({ ai: false }));
+    makeDraggable(root.querySelector('.sn-sidebar-header'));
+    const form = root.querySelector('.sn-sidebar-input');
+    const ta = form.querySelector('textarea');
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const text = ta.value.trim();
+      if (!text) return;
+      ta.value = '';
+      submit({ userMessage: text });
+    });
+    ta.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        form.requestSubmit();
+      }
+    });
+    // Focus o tasto sull'input → riapri la chat
+    ta.addEventListener('focus', () => expand({ ai: false }));
+    ta.addEventListener('input', () => { if (collapsed) expand({ ai: false }); });
+
+    // Click fuori dal pannello → collassa (se l'AI non ha richiesto chat aperta)
+    docClickHandler = (e) => {
+      if (!root || collapsed) return;
+      if (root.contains(e.target)) return;
+      if (aiPrefersOpen) return;
+      collapse({ ai: false });
+    };
+    document.addEventListener('mousedown', docClickHandler, true);
+
+    ta.focus();
+  }
+
+  // ---------- Espandi/collassa ----------
+
+  function expand({ ai = false } = {}) {
+    if (!root) return;
+    collapsed = false;
+    root.classList.remove('sn-sidebar-collapsed');
+    if (ai) aiPrefersOpen = true;
+  }
+
+  function collapse({ ai = false } = {}) {
+    if (!root) return;
+    collapsed = true;
+    root.classList.add('sn-sidebar-collapsed');
+    if (ai) aiPrefersOpen = false;
+  }
+
+  // ---------- Drag header ----------
+
+  // Drag dall'header. Mantiene l'ancoraggio al BOTTOM (la barra input resta
+  // dov'è quando il pannello si collassa, anche dopo un drag manuale).
+  function makeDraggable(handleEl) {
+    if (!handleEl || !root) return;
+    handleEl.classList.add('sn-sidebar-drag');
+    let dragging = false;
+    let startX = 0, startY = 0, startLeft = 0, startBottom = 0;
+    handleEl.addEventListener('mousedown', (e) => {
+      if (e.target.closest('button')) return;
+      const rect = root.getBoundingClientRect();
+      dragging = true;
+      startX = e.clientX; startY = e.clientY;
+      startLeft = rect.left;
+      startBottom = window.innerHeight - rect.bottom;
+      root.style.left = `${rect.left}px`;
+      root.style.bottom = `${startBottom}px`;
+      root.style.right = 'auto';
+      root.style.top = 'auto';
+      e.preventDefault();
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      const w = root.offsetWidth, h = root.offsetHeight;
+      const maxLeft = Math.max(0, window.innerWidth - w);
+      const maxBottom = Math.max(0, window.innerHeight - h);
+      const newLeft = Math.min(maxLeft, Math.max(0, startLeft + dx));
+      // muovendo il mouse in basso (dy > 0) il bottom deve diminuire.
+      const newBottom = Math.min(maxBottom, Math.max(0, startBottom - dy));
+      root.style.left = `${newLeft}px`;
+      root.style.bottom = `${newBottom}px`;
+    });
+    window.addEventListener('mouseup', () => { dragging = false; });
+  }
+
+  // Sposta la sidebar di lato se sta coprendo il rettangolo dato (di solito il
+  // target evidenziato). Mantiene l'ancoraggio al bottom; cambia solo l'asse X.
+  function ensureNotOverTarget(rect) {
+    if (!root || !rect) return;
+    const sr = root.getBoundingClientRect();
+    const intersects = !(rect.right <= sr.left || rect.left >= sr.right
+                       || rect.bottom <= sr.top || rect.top >= sr.bottom);
+    if (!intersects) return;
+
+    const w = root.offsetWidth;
+    const margin = 16;
+    const targetCenter = (rect.left + rect.right) / 2;
+    // Sposta la sidebar dalla parte opposta del target.
+    const newLeft = targetCenter > window.innerWidth / 2
+      ? margin
+      : Math.max(0, window.innerWidth - w - margin);
+
+    // Mantieni l'ancoraggio bottom: se è già fissato in stile inline lo lascio
+    // così com'è, altrimenti uso il default 16px.
+    const currentBottom = root.style.bottom && root.style.bottom !== 'auto'
+      ? root.style.bottom
+      : '16px';
+    root.style.left = `${newLeft}px`;
+    root.style.right = 'auto';
+    root.style.top = 'auto';
+    root.style.bottom = currentBottom;
+  }
+
+  // ---------- Rendering conv ----------
+
+  function convEl() { return root && root.querySelector('.sn-sidebar-conv'); }
+
+  function appendChatMessage(role, text) {
+    const conv = convEl();
+    if (!conv) return null;
+    const msg = document.createElement('div');
+    msg.className = `sn-sidebar-msg sn-sidebar-msg-${role}`;
+    msg.textContent = text;
+    conv.appendChild(msg);
+    conv.scrollTop = conv.scrollHeight;
+    return msg;
+  }
+
+  // Render dei bottoni "choices" sotto un messaggio dell'assistente.
+  // Click → invia il prompt come messaggio utente e disattiva tutti i bottoni
+  // (un solo percorso per turno).
+  function renderChoices(afterEl, choices) {
+    if (!afterEl || !choices || !choices.length) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'sn-sidebar-choices';
+    choices.forEach((c) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sn-sidebar-choice';
+      btn.textContent = c.label;
+      btn.addEventListener('click', () => {
+        if (wrap.classList.contains('sn-sidebar-choices-used')) return;
+        wrap.classList.add('sn-sidebar-choices-used');
+        // disabilita visivamente tutti i bottoni
+        wrap.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+        submit({ userMessage: c.prompt });
+      });
+      wrap.appendChild(btn);
+    });
+    afterEl.insertAdjacentElement('afterend', wrap);
+    const conv = convEl();
+    if (conv) conv.scrollTop = conv.scrollHeight;
+  }
+
+  // Indicatore "sta pensando": 3 righe di reasoning che scorrono e svaniscono.
+  // Le frasi non sono il reasoning vero (non disponibile), ma sono una prova di
+  // funzionamento — abbastanza varie e specifiche da non sembrare uno spinner.
+  const THINKING_PHRASES = [
+    'Leggo la pagina…',
+    'Analizzo lo screenshot…',
+    'Identifico gli elementi interattivi…',
+    'Confronto con la tua richiesta…',
+    'Cerco il menu giusto…',
+    'Valuto il prossimo passo…',
+    'Controllo la struttura del DOM…',
+    'Capisco il contesto…',
+    'Scelgo il target migliore…',
+    'Verifico che la pagina sia cambiata…',
+    'Compongo la risposta…',
+    'Riconosco i pattern noti…',
+    'Stimo cosa serve all\'utente…',
+  ];
+
+  function appendThinking() {
+    const conv = convEl();
+    if (!conv) return null;
+    const wrap = document.createElement('div');
+    wrap.className = 'sn-sidebar-thinking';
+    const lines = [];
+    for (let i = 0; i < 3; i++) {
+      const ln = document.createElement('div');
+      ln.className = 'sn-sidebar-thinking-line';
+      ln.dataset.slot = String(i); // 0=top fading out, 1=mid, 2=bottom fresh
+      wrap.appendChild(ln);
+      lines.push(ln);
+    }
+    conv.appendChild(wrap);
+    conv.scrollTop = conv.scrollHeight;
+
+    // Pool casuale senza ripetizioni ravvicinate
+    const pool = THINKING_PHRASES.slice();
+    let recent = [];
+    function nextPhrase() {
+      const candidates = pool.filter((p) => !recent.includes(p));
+      const src = candidates.length ? candidates : pool;
+      const phrase = src[Math.floor(Math.random() * src.length)];
+      recent.push(phrase);
+      if (recent.length > 4) recent.shift();
+      return phrase;
+    }
+
+    // Inizializza con 3 frasi diverse
+    lines[0].textContent = nextPhrase();
+    lines[1].textContent = nextPhrase();
+    lines[2].textContent = nextPhrase();
+
+    let stopped = false;
+    const tick = () => {
+      if (stopped || !wrap.isConnected) return;
+      // Shift: top esce, mid → top, bottom → mid, nuovo → bottom
+      lines[0].textContent = lines[1].textContent;
+      lines[1].textContent = lines[2].textContent;
+      lines[2].textContent = nextPhrase();
+      // Re-trigger animazione del bottom
+      lines[2].classList.remove('sn-sidebar-thinking-enter');
+      void lines[2].offsetWidth;
+      lines[2].classList.add('sn-sidebar-thinking-enter');
+    };
+    const interval = setInterval(tick, 900);
+    // Primo enter
+    lines[2].classList.add('sn-sidebar-thinking-enter');
+
+    return {
+      el: wrap,
+      stop() { stopped = true; clearInterval(interval); },
+    };
+  }
+
+  // Riga grigia compatta per i log delle azioni utente
+  function appendActionLog(text) {
+    const conv = convEl();
+    if (!conv) return null;
+    const log = document.createElement('div');
+    log.className = 'sn-sidebar-log';
+    log.textContent = '· ' + text;
+    conv.appendChild(log);
+    conv.scrollTop = conv.scrollHeight;
+    return log;
+  }
+
+  // ---------- Popup feedback fine-task ----------
+  //
+  // Render del riquadrino "Ha funzionato?" che appare in chat quando l'AI
+  // dichiara conclusa la sessione (status:"done") e l'utente ha eseguito
+  // almeno un'azione. Le risposte alimentano la collection `paths` su
+  // Firestore via SAVE_PATH (vedi pathsCollector.js per la pipeline di
+  // sanitizzazione 2-LLM).
+  function renderFeedbackPrompt() {
+    const conv = convEl();
+    if (!conv) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'sn-sidebar-feedback';
+    const q = document.createElement('div');
+    q.className = 'sn-sidebar-feedback-q';
+    q.textContent = 'Ha funzionato? Aiutami a migliorare:';
+    wrap.appendChild(q);
+    const row = document.createElement('div');
+    row.className = 'sn-sidebar-feedback-row';
+
+    const up = document.createElement('button');
+    up.type = 'button';
+    up.className = 'sn-sidebar-feedback-btn';
+    up.textContent = '👍 Sì';
+    const down = document.createElement('button');
+    down.type = 'button';
+    down.className = 'sn-sidebar-feedback-btn';
+    down.textContent = '👎 No';
+    const skip = document.createElement('button');
+    skip.type = 'button';
+    skip.className = 'sn-sidebar-feedback-skip';
+    skip.textContent = '✕';
+    skip.title = 'Salta';
+
+    function disableAll() {
+      up.disabled = true; down.disabled = true; skip.disabled = true;
+    }
+    function thanks() {
+      const t = document.createElement('div');
+      t.className = 'sn-sidebar-feedback-thanks';
+      t.textContent = 'Grazie!';
+      wrap.appendChild(t);
+    }
+
+    up.addEventListener('click', () => {
+      disableAll();
+      saveCurrentPath(true).catch(() => {});
+      thanks();
+    });
+    down.addEventListener('click', () => {
+      disableAll();
+      saveCurrentPath(false).catch(() => {});
+      thanks();
+    });
+    skip.addEventListener('click', () => {
+      // Niente save, solo dismiss visivo.
+      disableAll();
+      wrap.classList.add('sn-sidebar-feedback-dismissed');
+    });
+
+    row.appendChild(up);
+    row.appendChild(down);
+    row.appendChild(skip);
+    wrap.appendChild(row);
+    conv.appendChild(wrap);
+    conv.scrollTop = conv.scrollHeight;
+  }
+
+  async function saveCurrentPath(success) {
+    if (!session) return;
+    try {
+      await chrome.runtime.sendMessage({
+        type: MSG.SAVE_PATH,
+        payload: {
+          // Niente clientId per ora (anonimo). Se in futuro ne servisse uno
+          // stabile, lo si genera in pageBootstrap o storage.local.
+          clientId: '',
+          session: {
+            rawUrl: session.initialUrl,
+            rawSteps: session.executedSteps,
+            rawUserMessages: session.rawUserMessages,
+            success: !!success,
+          },
+        },
+      });
+    } catch (_) { /* fail silently — è telemetria best-effort */ }
+  }
+
+  // Etichetta breve (≤4 parole) per descrivere un'azione utente.
+  // Preferenza: testo dell'elemento → aria-label → tag.
+  function describeElementBriefly(el) {
+    if (!el) return '';
+    const raw = (
+      el.getAttribute?.('aria-label')
+      || (el.innerText || el.textContent || '').trim()
+      || el.getAttribute?.('alt')
+      || el.getAttribute?.('placeholder')
+      || el.value
+      || el.tagName.toLowerCase()
+    ).replace(/\s+/g, ' ').trim();
+    if (!raw) return el.tagName.toLowerCase();
+    const words = raw.split(' ');
+    return words.slice(0, 4).join(' ');
+  }
+
+  // ---------- Parsing risposta AI ----------
+
+  function parseAssistantOutput(text) {
+    const fallback = { display: (text || '').trim(), highlight: null, choices: [], status: 'done', collapse: false };
+    if (!text) return fallback;
+    const trimmed = text.trim();
+    const start = trimmed.indexOf('{');
+    const end = trimmed.lastIndexOf('}');
+    if (start < 0 || end <= start) return fallback;
+    try {
+      const obj = JSON.parse(trimmed.slice(start, end + 1));
+      if (!obj || typeof obj !== 'object') return fallback;
+      // Output speciale: richiesta di ricerca web. Bypass del flusso normale,
+      // viene processata in submit() prima di rendere la risposta in chat.
+      if (obj.action === 'web_search' && typeof obj.query === 'string' && obj.query.trim()) {
+        return { kind: 'web_search', query: obj.query.trim().slice(0, 300) };
+      }
+      const status = obj.status === 'continue' ? 'continue' : 'done';
+      const collapseFlag = typeof obj.collapse === 'boolean' ? obj.collapse : null;
+      let highlight = null;
+      if (obj.highlight && typeof obj.highlight.selector === 'string') {
+        const rawAction = obj.highlight.action;
+        const action = (rawAction === 'fill' || rawAction === 'reveal' || rawAction === 'hover')
+          ? rawAction : 'click';
+        highlight = {
+          selector: obj.highlight.selector,
+          action,
+          value: action === 'fill' ? (obj.highlight.value || '') : '',
+          note: typeof obj.highlight.note === 'string' ? obj.highlight.note.trim() : '',
+        };
+      }
+      // choices: filtra voci valide, max 5
+      let choices = [];
+      if (Array.isArray(obj.choices)) {
+        choices = obj.choices
+          .filter((c) => c && typeof c.label === 'string' && typeof c.prompt === 'string'
+            && c.label.trim() && c.prompt.trim())
+          .slice(0, 5)
+          .map((c) => ({ label: c.label.trim(), prompt: c.prompt.trim() }));
+      }
+      return {
+        display: typeof obj.text === 'string' ? obj.text : '',
+        highlight,
+        choices,
+        status,
+        collapse: collapseFlag,
+      };
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  // ---------- Submit / loop ----------
+
+  function buildPayload(userMessage, userAction) {
+    const screenshot = null; // riempito dopo
+    const outline = (() => { try { return Extract?.extractInteractiveOutline?.() || ''; } catch (_) { return ''; } })();
+    const viewport = (() => { try { return Extract?.viewportInfo?.() || null; } catch (_) { return null; } })();
+    // history per l'AI: solo {role, content}, niente metadati UI.
+    const aiHistory = history.map(({ role, content }) => ({ role, content }));
+    return {
+      url: location.href,
+      title: document.title,
+      userMessage: userMessage || undefined,
+      userAction: userAction || undefined,
+      history: aiHistory,
+      screenshot,
+      outline,
+      viewport,
+    };
+  }
+
+  async function captureScreenshot() {
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB });
+      if (r?.ok && r.dataUrl) return r.dataUrl;
+    } catch (_) {}
+    return null;
+  }
+
+  // Aspetta che la pagina si "stabilizzi" dopo un'azione utente: utile per
+  // SPA che cambiano contenuto/URL in modo asincrono. Esce quando l'URL
+  // cambia E il DOM smette di mutare per `quietMs`, oppure dopo `maxMs`.
+  function waitForPageSettle({ initialUrl, minMs = 250, quietMs = 350, maxMs = 2500 } = {}) {
+    return new Promise((resolve) => {
+      const start = Date.now();
+      let lastMutation = Date.now();
+      let urlChanged = !initialUrl || location.href !== initialUrl;
+
+      const observer = new MutationObserver(() => {
+        lastMutation = Date.now();
+        if (!urlChanged && location.href !== initialUrl) urlChanged = true;
+      });
+      try {
+        observer.observe(document.documentElement, {
+          childList: true, subtree: true, attributes: true, characterData: true,
+        });
+      } catch (_) {}
+
+      const tick = () => {
+        const now = Date.now();
+        const elapsed = now - start;
+        const sinceMutation = now - lastMutation;
+        const ready = document.readyState === 'complete';
+        // Condizione di uscita: minimo tempo trascorso, DOM quieto da quietMs,
+        // ready, e (URL cambiato oppure abbiamo aspettato almeno metà del max).
+        const longEnough = elapsed >= minMs;
+        const quiet = sinceMutation >= quietMs;
+        const enoughEvidence = urlChanged || elapsed >= maxMs / 2;
+        if ((longEnough && quiet && ready && enoughEvidence) || elapsed >= maxMs) {
+          observer.disconnect();
+          resolve();
+          return;
+        }
+        setTimeout(tick, 80);
+      };
+      tick();
+    });
+  }
+
+  // submit({ userMessage }) — invio iniziale o domanda dell'utente
+  // submit({ userAction }) — proseguimento automatico dopo un'azione utente
+  async function submit({ userMessage = '', userAction = '', preActionUrl = '' } = {}) {
+    if (!root) return;
+    const wasCollapsed = collapsed;
+    // Espandi solo se l'utente ha scritto qualcosa. Sui proseguimenti automatici
+    // (dopo un click sul target) mantieni lo stato attuale: evita che il box
+    // si riapra mentre il modello sta elaborando.
+    if (userMessage) expand({ ai: false });
+
+    if (userMessage) {
+      appendChatMessage('user', userMessage);
+      history.push({ role: 'user', content: userMessage, kind: 'real' });
+      // Salva il messaggio raw per il "judge" lato server (vedi pathsCollector).
+      // Niente userAction qui: quelli sono note di sistema, non input dell'utente.
+      if (session) session.rawUserMessages.push(userMessage);
+    }
+
+    const thinking = appendThinking();
+    let assistantEl = null;
+
+    // Per i proseguimenti automatici dopo un'azione utente, aspetta che la
+    // pagina si sia aggiornata prima di catturare lo screenshot (SPA, ecc.):
+    // senza questa attesa l'AI vede ancora la vecchia pagina e chiede di
+    // ripetere il click.
+    if (userAction) {
+      await waitForPageSettle({ initialUrl: preActionUrl || location.href });
+    }
+    const screenshot = await captureScreenshot();
+    const payload = buildPayload(userMessage, userAction);
+    payload.screenshot = screenshot || undefined;
+
+    try {
+      const res = await chrome.runtime.sendMessage({
+        type: MSG.AI_REQUEST,
+        action: ACTIONS.HELP,
+        payload,
+      });
+      if (!res?.ok) throw new Error(res?.error || I18n.t('err_provider_failed'));
+      const parsed = parseAssistantOutput(res.text);
+
+      // Caso speciale: l'AI ha chiesto una ricerca web. Esegui la ricerca,
+      // mostra il log in chat, poi rilancia un turno con i risultati come
+      // nota di sistema così l'AI può produrre il JSON normale.
+      if (parsed.kind === 'web_search') {
+        if (thinking) { thinking.stop(); thinking.el.remove(); }
+        if (session && session.webSearchCount >= MAX_WEB_SEARCHES_PER_SESSION) {
+          appendActionLog('ricerca web: limite raggiunto, ignorata');
+          setTimeout(() => submit({
+            userAction: 'limite di ricerche web raggiunto per questa sessione. Rispondi ora con il JSON normale usando solo ciò che già sai (pagina, llms.txt, percorsi noti).',
+            preActionUrl: location.href,
+          }), 50);
+          return;
+        }
+        if (session) session.webSearchCount += 1;
+        appendActionLog(`ricerca web: "${parsed.query}"`);
+        let resultsText = '';
+        let provider = '';
+        try {
+          const r = await chrome.runtime.sendMessage({ type: MSG.WEB_SEARCH, query: parsed.query });
+          if (r?.ok && Array.isArray(r.results) && r.results.length) {
+            provider = r.provider || '';
+            resultsText = r.results.map((x, i) =>
+              `${i + 1}. ${x.title}\n   ${x.url}\n   ${x.snippet || ''}`
+            ).join('\n');
+          } else {
+            resultsText = '(nessun risultato)';
+          }
+        } catch (_) {
+          resultsText = '(errore di rete durante la ricerca)';
+        }
+        const note = `risultati ricerca web (${provider || 'n/a'}) per "${parsed.query}":\n${resultsText}\n\nProcedi ora con il JSON normale (highlight / choices / text / status).`;
+        // Mostra anche un placeholder assistant così l'utente vede che è
+        // successo qualcosa (altrimenti la chat sembra "saltare un turno").
+        history.push({ role: 'assistant', content: `(ho richiesto una ricerca web: "${parsed.query}")` });
+        setTimeout(() => submit({ userAction: note, preActionUrl: location.href }), 50);
+        return;
+      }
+
+      if (thinking) { thinking.stop(); thinking.el.remove(); }
+      // Se il modello non ha messo testo ma c'è solo un highlight di routine,
+      // mostriamo comunque una riga discreta in chat (es. "→ passo successivo")
+      // così l'utente sa che la chat ha avuto una risposta, anche se silenziosa.
+      const displayText = parsed.display || (parsed.highlight ? '→ passo evidenziato sulla pagina' : '(risposta vuota)');
+      assistantEl = appendChatMessage('assistant', displayText);
+
+      // Aggiorna la storia AI
+      if (userAction && !userMessage) {
+        history.push({ role: 'user', content: `(Sistema: ${userAction}. Stato pagina aggiornato.)`, kind: 'action' });
+      }
+      history.push({ role: 'assistant', content: parsed.display || res.text });
+
+      // Choices: bottoni sotto al messaggio dell'assistente
+      if (parsed.choices && parsed.choices.length) {
+        renderChoices(assistantEl, parsed.choices);
+      }
+
+      // Highlight. Il tooltip on-page usa SOLO highlight.note (testo dedicato),
+      // non il "text" della chat: evita di duplicare il messaggio nel riquadrino.
+      // Per i "fill" il riquadro è comunque mostrato (contiene valore + bottone Accetta).
+      Highlight.clear();
+      if (parsed.highlight) {
+        const act = parsed.highlight.action;
+        if (act === 'reveal' || act === 'hover') {
+          // Auto-action: la eseguiamo noi senza coinvolgere l'utente.
+          // Validazione e whitelist sono dentro Highlight.autoAction.
+          const result = Highlight.autoAction(parsed.highlight.selector, act);
+          const targetLabel = result.target ? describeElementBriefly(result.target) : '';
+          if (result.ok) {
+            // Traccia lo step per la telemetria a fine sessione.
+            if (session) session.executedSteps.push({
+              selector: parsed.highlight.selector,
+              action: act,
+              retracted: false,
+            });
+            const msg = act === 'reveal'
+              ? (targetLabel ? `sezione aperta: ${targetLabel}` : 'sezione aperta')
+              : (targetLabel ? `menu aperto su ${targetLabel}` : 'menu aperto');
+            appendActionLog(msg);
+            if (parsed.status === 'continue') {
+              const aiNote = act === 'reveal'
+                ? `ho eseguito reveal su ${targetLabel || parsed.highlight.selector}: la sezione è ora aperta. Outline e screenshot sono aggiornati.`
+                : `ho eseguito hover su ${targetLabel || parsed.highlight.selector}: il menu è ora aperto. Outline e screenshot sono aggiornati.`;
+              setTimeout(() => submit({ userAction: aiNote, preActionUrl: location.href }), 150);
+            }
+          } else {
+            // Reveal rifiutato (whitelist) o target mancante: chiediamo
+            // all'AI di correggersi senza fare nulla sulla pagina.
+            const aiNote = act === 'reveal'
+              ? `reveal rifiutato (motivo: ${result.reason}). L'elemento non è un disclosure sicuro (details/aria-expanded+aria-controls non-link non-submit). Usa "click" con highlight per chiedere conferma all'utente, oppure scegli un altro target.`
+              : `hover non eseguibile (motivo: ${result.reason}). Selector non trovato o azione fallita.`;
+            appendActionLog(act === 'reveal' ? 'reveal rifiutato' : 'hover fallito');
+            if (parsed.status === 'continue') {
+              setTimeout(() => submit({ userAction: aiNote, preActionUrl: location.href }), 50);
+            }
+          }
+        } else {
+          const onAct = parsed.status === 'continue'
+            ? () => onUserAction(parsed.highlight)
+            : null;
+          Highlight.show(parsed.highlight.selector, {
+            note: parsed.highlight.note || '',
+            action: parsed.highlight.action,
+            value: parsed.highlight.value,
+            onAction: onAct,
+          });
+        }
+      }
+
+      // Decisione collapse: se l'AI ha specificato, usa il suo valore. Altrimenti:
+      //   - ci sono choices → tieni aperta (l'utente deve poter cliccare)
+      //   - c'è un highlight click silenzioso (no note, no choices) → collapse
+      //   - altrimenti resta aperta
+      const isAutoHighlight = !!(parsed.highlight
+        && (parsed.highlight.action === 'reveal' || parsed.highlight.action === 'hover'));
+      let shouldCollapse;
+      if (parsed.collapse !== null) shouldCollapse = parsed.collapse;
+      else if (parsed.choices && parsed.choices.length) shouldCollapse = false;
+      else if (isAutoHighlight) shouldCollapse = collapsed; // mantieni stato: il turno successivo decide
+      else shouldCollapse = !!parsed.highlight;
+
+      if (shouldCollapse) collapse({ ai: true });
+      else expand({ ai: true });
+
+      const meta = root.querySelector('.sn-sidebar-meta');
+      if (meta) {
+        const eur = res.costEur ? ` • €${res.costEur.toFixed(4)}` : '';
+        const prov = res.provider ? ` • ${res.provider}` : '';
+        meta.textContent = `${I18n.t('popup_model')}: ${res.model}${prov}${eur}`;
+      }
+
+      // Popup feedback 👍/👎 a fine task: solo se l'AI dice "done", c'è almeno
+      // un'azione realmente eseguita, e non l'abbiamo già mostrato nella sessione.
+      if (parsed.status === 'done'
+          && session && !session.feedbackShown
+          && session.executedSteps.length > 0) {
+        session.feedbackShown = true;
+        // Chat sempre aperta quando chiediamo feedback (l'utente deve vederlo).
+        expand({ ai: true });
+        renderFeedbackPrompt();
+      }
+    } catch (err) {
+      if (thinking) { thinking.stop(); thinking.el.remove(); }
+      const raw = err?.message || String(err);
+      const errText = /context invalidated/i.test(raw)
+        ? 'L\'estensione è stata ricaricata. Aggiorna la pagina (F5) per ricollegare la sidebar.'
+        : raw;
+      assistantEl = appendChatMessage('assistant', errText);
+      assistantEl.classList.add('sn-sidebar-msg-error');
+      // In caso d'errore, se l'utente aveva la chat collassata e questo è
+      // un proseguimento automatico, ripristina lo stato precedente.
+      if (wasCollapsed && !userMessage) collapse({ ai: false });
+    }
+  }
+
+  // L'utente ha eseguito l'azione che l'AI aveva indicato (click sul target
+  // o accept di un fill). Logghiamo l'azione e chiediamo il passo successivo.
+  function onUserAction(highlight) {
+    if (!root) return;
+    const el = (() => { try { return document.querySelector(highlight.selector); } catch (_) { return null; } })();
+    const label = describeElementBriefly(el);
+    let logText, aiNote;
+    if (highlight.action === 'fill') {
+      logText = label ? `testo inserito in ${label}` : 'testo inserito';
+      aiNote = `l'utente ha accettato il suggerimento di fill e il testo è stato inserito nel campo`;
+    } else {
+      logText = label ? `click su ${label}` : 'click eseguito';
+      aiNote = `l'utente ha cliccato sull'elemento che avevi indicato (${label || highlight.selector})`;
+    }
+    // Telemetria: traccia lo step eseguito. Niente value (anche se è un fill):
+    // i contenuti dei campi possono essere sensibili.
+    if (session) session.executedSteps.push({
+      selector: highlight.selector,
+      action: highlight.action,
+      retracted: false,
+    });
+    appendActionLog(logText);
+    Highlight.clear();
+    // Dopo un click utente "vero" il menu hover-forced non serve più: il
+    // browser gestirà gli hover successivi naturalmente.
+    try { Highlight.clearForceHover?.(); } catch (_) {}
+
+    // Cattura l'URL PRIMA del click così waitForPageSettle può rilevare un
+    // cambio di route (SPA o navigazione classica) e aspettare che la pagina
+    // sia effettivamente cambiata prima di fare lo screenshot.
+    const preActionUrl = location.href;
+    submit({ userAction: aiNote, preActionUrl });
+  }
+
+  global.SN_SIDEBAR = { open, close, isOpen, ensureNotOverTarget };
+})(typeof globalThis !== 'undefined' ? globalThis : self);

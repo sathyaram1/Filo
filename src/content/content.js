@@ -1,0 +1,2169 @@
+// Entry point content script. Intercetta contextmenu, costruisce le voci, gestisce shortcut.
+
+(function () {
+  'use strict';
+
+  const { ACTIONS, PAGES_WITHOUT_MENU_PREFIXES, STORAGE_KEYS } = self.SN_CONST;
+  const { MSG } = self.SN_MSG;
+  const I18n = self.SN_I18N;
+  const Menu = self.SN_MENU;
+  const Popup = self.SN_POPUP;
+  const Extract = self.SN_EXTRACT;
+  const Sidebar = self.SN_SIDEBAR;
+  const SpellCheck = self.SN_SPELLCHECK;
+
+  let settings = null;
+  let pageTranslating = false;
+  let pageHasTranslation = false;
+
+  // ------------------------------------------------------------
+  // Bootstrap
+  // ------------------------------------------------------------
+  async function init() {
+    settings = await fetchSettings();
+    applyTheme(settings.theme);
+
+    if (isBlocked()) return;
+
+    SpellCheck.init(settings);
+
+    // window + capture: fase più precoce possibile, così intercettiamo il
+    // contextmenu prima di eventuali handler della pagina ospite (alcune pagine
+    // — es. iframe artifact di claude.ai — gestiscono il tasto destro su certi
+    // SVG e lasciavano comparire il menu nativo del browser; feedback alpha).
+    window.addEventListener('contextmenu', onContextMenu, { capture: true });
+    // Prefetch "Spiega" appena l'utente seleziona del testo, così quando apre il
+    // menu il risultato è già in cache. Debounce + dedup gestiti dallo scheduler.
+    document.addEventListener('selectionchange', schedulePrefetchExplain);
+    chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+      onRuntimeMessage(msg, sender, sendResponse);
+      return true; // mantieni il canale aperto per sendResponse asincrono
+    });
+  }
+
+  function isBlocked() {
+    const url = location.href;
+    if (PAGES_WITHOUT_MENU_PREFIXES.some((p) => url.startsWith(p))) return true;
+    const host = location.hostname;
+    return (settings?.blocklist || []).some((d) => host === d || host.endsWith('.' + d));
+  }
+
+  async function fetchSettings() {
+    try {
+      const res = await chrome.runtime.sendMessage({ type: MSG.GET_SETTINGS });
+      return res?.settings || self.SN_CONST.DEFAULT_SETTINGS;
+    } catch (_) {
+      return self.SN_CONST.DEFAULT_SETTINGS;
+    }
+  }
+
+  function applyTheme(theme) {
+    let resolved = theme;
+    if (theme === 'system') {
+      resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    document.documentElement.dataset.snTheme = resolved;
+  }
+
+  // ------------------------------------------------------------
+  // Handler contextmenu
+  // ------------------------------------------------------------
+  async function onContextMenu(e) {
+    // Se l'utente tiene Shift premuto, lascia passare il menu nativo (escape hatch)
+    if (e.shiftKey) return;
+
+    // Sopprimi SUBITO il menu nativo: tutti i rami sotto aprono comunque un
+    // menu custom, e così un'eccezione nella detection (es. target SVG strani)
+    // non può più far trapelare il menu di base del browser (feedback alpha).
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Spellcheck: in un editabile supportato, prima cerchiamo un errore "blu"
+    // (sincrono); altrimenti partiamo con la richiesta on-demand all'LLM per la
+    // parola sotto il cursore (zigzag rosso del browser).
+    try {
+      if (settings?.featureFlags?.spellcheck !== false && SpellCheck) {
+        const editableEl = SpellCheck.findSupportedEditable(e.target);
+        if (editableEl) {
+          const blueIssue = SpellCheck.getSemanticIssueAt(editableEl, e.clientX, e.clientY);
+          if (blueIssue) {
+            await openSpellBlueMenu(editableEl, blueIssue, e);
+            return;
+          }
+          const wordCtx = SpellCheck.getWordAt(editableEl, e.clientX, e.clientY);
+          if (wordCtx && !SpellCheck.isInDictionary(wordCtx.word)) {
+            await openSpellWordMenu(editableEl, wordCtx, e);
+            return;
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[SN] spellcheck detection fallita, apro menu normale:', err);
+    }
+
+    await openNormalMenuAt(e);
+  }
+
+  async function openNormalMenuAt(e) {
+    const target = e.target;
+    let selInfo = Extract.getSelectionWithSentence();
+    // window.getSelection() non vede la selezione dentro <input>/<textarea>:
+    // recuperiamola dal nodo stesso così Taglia/Copia compaiono nel menu.
+    if (!selInfo) selInfo = getInputSelectionInfo(target);
+    const linkEl = target?.closest?.('a[href]');
+    const imgEl = target?.tagName === 'IMG' ? target : target?.closest?.('img');
+    const editable = isEditable(target);
+    if (editable) capturePasteContext(target);
+    else pasteContext = null;
+    const clipboardHistory = await getClipboardHistory();
+    const items = buildMenuItems({ selInfo, linkEl, imgEl, editable, clipboardHistory });
+    Menu.open({ x: e.clientX, y: e.clientY, items, keepOnScroll: !!selInfo });
+  }
+
+  // Salva il target editabile e la sua selezione/range al momento dell'apertura
+  // del menu, perché il click sul bottone del menu sposta il focus altrove.
+  let pasteContext = null;
+  function capturePasteContext(target) {
+    if (!target) { pasteContext = null; return; }
+    const inputEl = target.closest?.('input, textarea');
+    if (inputEl && inputEl.matches('input, textarea')) {
+      pasteContext = {
+        kind: 'input',
+        el: inputEl,
+        start: inputEl.selectionStart ?? inputEl.value.length,
+        end: inputEl.selectionEnd ?? inputEl.value.length,
+      };
+      return;
+    }
+    const ceEl = target.closest?.('[contenteditable=""], [contenteditable="true"]');
+    if (ceEl) {
+      const sel = window.getSelection();
+      let range = null;
+      if (sel && sel.rangeCount > 0) {
+        const r = sel.getRangeAt(0);
+        if (ceEl.contains(r.startContainer)) range = r.cloneRange();
+      }
+      pasteContext = { kind: 'ce', el: ceEl, range };
+      return;
+    }
+    pasteContext = null;
+  }
+
+  function restorePasteContext() {
+    if (!pasteContext) return false;
+    const { kind, el } = pasteContext;
+    if (!el || !el.isConnected) { pasteContext = null; return false; }
+    if (kind === 'input') {
+      el.focus();
+      try { el.setSelectionRange(pasteContext.start, pasteContext.end); } catch (_) {}
+      return true;
+    }
+    if (kind === 'ce') {
+      el.focus();
+      if (pasteContext.range) {
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(pasteContext.range);
+      }
+      return true;
+    }
+    return false;
+  }
+
+  function isEditable(el) {
+    if (!el) return false;
+    if (el.matches?.('input, textarea')) {
+      const t = (el.getAttribute('type') || '').toLowerCase();
+      // input non testuali (button, checkbox, ecc) non sono editabili nel senso che ci interessa
+      const nonText = ['button', 'submit', 'reset', 'checkbox', 'radio', 'file', 'image', 'color', 'range'];
+      if (el.tagName === 'INPUT' && nonText.includes(t)) return false;
+      return !el.disabled && !el.readOnly;
+    }
+    return !!el.closest?.('[contenteditable=""], [contenteditable="true"]');
+  }
+
+  // ------------------------------------------------------------
+  // Menu correzione: rosso (parola sotto cursore) e blu (errore contestuale).
+  // Stesso layout: menu normale (back/forward/copia/…) con in alto un item
+  // "correzione" cliccabile e freccetta che apre un sotto-menu di azioni.
+  // ------------------------------------------------------------
+
+  // Recupera la selezione corrente dentro un <input>/<textarea> e la converte
+  // nel formato {selection, sentence} usato altrove. Restituisce null se non
+  // c'è selezione utile.
+  function getInputSelectionInfo(target) {
+    const el = target?.closest?.('input, textarea');
+    if (!el || !el.matches?.('input, textarea')) return null;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    if (start == null || end == null || start === end) return null;
+    const value = el.value || '';
+    const selection = value.slice(start, end).trim();
+    if (!selection) return null;
+    return { selection, sentence: value.trim() || selection };
+  }
+
+  // Helper: costruisce gli item del menu normale per un determinato evento mouse.
+  async function buildBaseItemsAt(mouseEvent) {
+    const target = mouseEvent.target;
+    let selInfo = Extract.getSelectionWithSentence();
+    if (!selInfo) selInfo = getInputSelectionInfo(target);
+    const linkEl = target?.closest?.('a[href]');
+    const imgEl = target?.tagName === 'IMG' ? target : target?.closest?.('img');
+    const editable = isEditable(target);
+    const clipboardHistory = await getClipboardHistory();
+    return buildMenuItems({ selInfo, linkEl, imgEl, editable, clipboardHistory });
+  }
+
+  // Sub-menu per una correzione "rosso" (parola): aggiungi al dizionario,
+  // correggi automaticamente, gestisci correttore.
+  function buildRedSubItems(editableEl, wordCtx, correction) {
+    return [
+      {
+        label: I18n.t('spell_add_dict'),
+        onClick: () => {
+          SpellCheck.addToDictionary(wordCtx.word);
+          Popup.showToast(I18n.t('toast_added_to_dict'));
+        },
+      },
+      {
+        label: I18n.t('spell_autocorrect'),
+        onClick: async () => {
+          await SpellCheck.setAutocorrect(wordCtx.word, correction);
+          SpellCheck.applyFix(editableEl, { start: wordCtx.start, end: wordCtx.end }, correction);
+          Popup.showToast(I18n.t('toast_autocorrect_saved'));
+        },
+      },
+      {
+        label: I18n.t('spell_manage'),
+        onClick: () => {
+          chrome.runtime.sendMessage({ type: MSG.OPEN_SPELLCHECK_PAGE });
+        },
+      },
+    ];
+  }
+
+  // Sub-menu per una correzione "blu" (errore contestuale): mostra la spiegazione
+  // dell'errore come riga informativa, poi link a "Gestisci correttore".
+  function buildBlueSubItems(issue) {
+    return [
+      {
+        type: 'info',
+        label: issue.explanation || I18n.t('spell_semantic_issue'),
+      },
+      { type: 'separator' },
+      {
+        label: I18n.t('spell_manage'),
+        onClick: () => {
+          chrome.runtime.sendMessage({ type: MSG.OPEN_SPELLCHECK_PAGE });
+        },
+      },
+    ];
+  }
+
+  // Click destro su parola in editabile (errore "rosso", non coperta da issue blu).
+  // Mostriamo la riga "correzione" SOLO se la cache locale ha già una risposta che
+  // marca la parola come errata. La cache viene popolata in background mentre
+  // l'utente digita (prefetchJustCompletedWord) o dal prefetch sugli issue blu —
+  // così non appare più il flash "Cerco una correzione…" su parole corrette.
+  // Se il contesto (frase) è cambiato rispetto a quello usato in cache, mostriamo
+  // comunque subito la migliore correzione cached e in background rifiriamo la
+  // richiesta aggiornando la riga del menu.
+  async function openSpellWordMenu(editableEl, wordCtx, mouseEvent) {
+    const items = await buildBaseItemsAt(mouseEvent);
+
+    const cached = SpellCheck.getCachedSuggestion(editableEl, wordCtx.word);
+    const cachedUsable = cached && cached.misspelled && cached.correction && cached.correction !== wordCtx.word;
+
+    let updateCorrection = null;
+
+    if (cachedUsable) {
+      items.unshift(
+        {
+          type: 'correction',
+          label: cached.correction,
+          loading: false,
+          onClick: () => {
+            SpellCheck.applyFix(editableEl, { start: wordCtx.start, end: wordCtx.end }, cached.correction, {
+              expectedSegment: wordCtx.word,
+            });
+          },
+          subItems: buildRedSubItems(editableEl, wordCtx, cached.correction),
+          onMount: (_root, update) => { updateCorrection = update; },
+        },
+        { type: 'separator' },
+      );
+    } else if (!cached) {
+      // Nessuna voce in cache: il prefetch non ha (ancora) coperto questa
+      // parola (es. testo non digitato dall'utente, o editor che non emette
+      // gli input event attesi — claude design). Mostriamo una riga in stato
+      // loading e chiediamo on-demand; se la parola risulta corretta la riga
+      // viene rimossa (niente flash permanente, ma un suggerimento compare
+      // sempre quando serve — feedback alpha).
+      items.unshift(
+        {
+          type: 'correction',
+          label: I18n.t('spell_loading'),
+          loading: true,
+          onMount: (_root, update) => { updateCorrection = update; },
+        },
+        { type: 'separator' },
+      );
+    }
+
+    Menu.open({ x: mouseEvent.clientX, y: mouseEvent.clientY, items, keepOnScroll: true });
+
+    // Nessuna cache: richiesta on-demand. Riempie/rimuove la riga loading.
+    if (!cached) {
+      SpellCheck.requestWordSuggestion(wordCtx).then((res) => {
+        SpellCheck.setCachedSuggestion(editableEl, wordCtx.word, res
+          ? { ...res, sentence: wordCtx.sentence }
+          : { misspelled: false, correction: '', sentence: wordCtx.sentence });
+        if (!updateCorrection) return;
+        if (!res || !res.misspelled || !res.correction || res.correction === wordCtx.word) {
+          updateCorrection({ remove: true });
+          return;
+        }
+        updateCorrection({
+          label: res.correction,
+          loading: false,
+          onClick: () => {
+            SpellCheck.applyFix(editableEl, { start: wordCtx.start, end: wordCtx.end }, res.correction, {
+              expectedSegment: wordCtx.word,
+            });
+          },
+          subItems: buildRedSubItems(editableEl, wordCtx, res.correction),
+        });
+      });
+    }
+
+    // Re-query in background SOLO se il contesto è cambiato (la frase nuova
+    // potrebbe dare una correzione migliore). Se non c'era cache, niente
+    // richiesta: aspettiamo il prefetch innescato dall'input.
+    if (cached && cached.sentence !== wordCtx.sentence) {
+      SpellCheck.requestWordSuggestion(wordCtx).then((res) => {
+        SpellCheck.setCachedSuggestion(editableEl, wordCtx.word, res
+          ? { ...res, sentence: wordCtx.sentence }
+          : { misspelled: false, correction: '', sentence: wordCtx.sentence });
+        if (!updateCorrection) return;
+        if (!res || !res.misspelled || !res.correction || res.correction === wordCtx.word) {
+          updateCorrection({ remove: true });
+          return;
+        }
+        updateCorrection({
+          label: res.correction,
+          loading: false,
+          onClick: () => {
+            SpellCheck.applyFix(editableEl, { start: wordCtx.start, end: wordCtx.end }, res.correction, {
+              expectedSegment: wordCtx.word,
+            });
+          },
+          subItems: buildRedSubItems(editableEl, wordCtx, res.correction),
+        });
+      });
+    }
+  }
+
+  // Click destro su un range "blu" (issue contestuale già rilevata): la correzione
+  // (o l'esplicazione del problema) è già pronta, niente loading. Click sulla riga
+  // = applica; freccetta = box con la spiegazione completa.
+  async function openSpellBlueMenu(editableEl, issue, mouseEvent) {
+    const items = await buildBaseItemsAt(mouseEvent);
+
+    // Etichetta della riga: la correzione, se c'è; altrimenti una sintesi della spiegazione.
+    // Per le ripetizioni (correction === '') etichettiamo con un'azione esplicita.
+    let label;
+    if (issue.correction) {
+      label = issue.correction;
+    } else if (issue.type === 'repetition') {
+      label = I18n.t('spell_resolve');
+    } else {
+      label = (issue.explanation || I18n.t('spell_semantic_issue')).slice(0, 60);
+    }
+
+    items.unshift(
+      {
+        type: 'correction',
+        label,
+        loading: false,
+        onClick: () => {
+          SpellCheck.applyFix(editableEl, { start: issue.start, end: issue.end }, issue.correction || '', {
+            expectedSegment: issue.segment,
+          });
+        },
+        subItems: buildBlueSubItems(issue),
+      },
+      { type: 'separator' },
+    );
+    Menu.open({ x: mouseEvent.clientX, y: mouseEvent.clientY, items, keepOnScroll: true });
+  }
+
+  function buildFeedbackItem() {
+    return {
+      type: 'item',
+      label: '💬 Invia feedback (alpha)',
+      onClick: () => {
+        try { self.SN_FEEDBACK_UI?.open(); } catch (e) { console.error('[SN] feedback open', e); }
+      },
+    };
+  }
+
+  // ------------------------------------------------------------
+  // Composizione del menu (nuova struttura: globale + Aiuto + contestuale + Feedback)
+  // ------------------------------------------------------------
+  // Ordine verticale: riga icone globali → Aiuto → zona contestuale → Feedback.
+  // La riga globale è stabile (ancora), la zona contestuale varia in base al click.
+  function buildMenuItems({ selInfo, linkEl, imgEl, editable, clipboardHistory }) {
+    const items = [];
+
+    // 1. Riga icone globali (max 5 + overflow). Tutte mute, etichetta in tooltip.
+    items.push(buildGlobalIconRow());
+
+    // 2. Aiuto — voce sempre presente, etichettata.
+    items.push({ type: 'separator' });
+    items.push(buildHelpItem());
+
+    // 3. Zona contestuale — assente se non c'è contesto utile.
+    const contextItems = buildContextualItems({ selInfo, linkEl, imgEl, editable, clipboardHistory });
+    if (contextItems.length > 0) {
+      items.push({ type: 'separator' });
+      for (const it of contextItems) items.push(it);
+    }
+
+    // 4. Feedback (alpha)
+    items.push({ type: 'separator' });
+    items.push(buildFeedbackItem());
+
+    return items;
+  }
+
+  // Registro delle icone globali, con ID stabili per drag-and-drop + persistenza
+  // della disposizione utente. Le icone primarie occupano la riga in alto del
+  // menu; le secondarie vivono nel sotto-menu "Altro…" (griglia 4 colonne).
+  function buildIconRegistry() {
+    const Icons = self.SN_ICONS;
+    // Tutte le icone della riga primaria/griglia sono SVG renderizzate a 18px.
+    // Vedi src/shared/icons.js e src/styles/ICONS.md per la guida di stile.
+    const I = (name) => Icons[name](18);
+    const translateIcon = pageHasTranslation ? I('showOriginal') : I('translate');
+    const translateLabel = pageHasTranslation ? I18n.t('menu_show_original') : I18n.t('menu_global_translate');
+    return {
+      translate:     { id: 'translate',     icon: translateIcon,    label: translateLabel,                   onClick: () => (pageHasTranslation ? restoreOriginal() : translatePage()) },
+      screenshot:    { id: 'screenshot',    icon: I('screenshot'),  label: I18n.t('menu_screenshot'),        onClick: () => takeScreenshot() },
+      screenshotCrop:{ id: 'screenshotCrop',icon: I('screenshotCrop'),label: I18n.t('menu_screenshot_crop'), onClick: () => takePartialScreenshot() },
+      transcribe:    { id: 'transcribe',    icon: I('transcribe'),  label: I18n.t('menu_transcribe'),        onClick: () => transcribeRegion() },
+      share:         { id: 'share',         icon: I('share'),       label: I18n.t('menu_share'),             onClick: () => shareCurrentPage() },
+      saveForLater:  { id: 'saveForLater',  icon: I('saveForLater'),label: I18n.t('menu_save_for_later'),    onClick: () => savePage() },
+      openForLater:  { id: 'openForLater',  icon: I('openForLater'),label: I18n.t('menu_open_for_later'),    onClick: () => chrome.runtime.sendMessage({ type: MSG.OPEN_HOME }) },
+      fullscreen:    { id: 'fullscreen',    icon: document.fullscreenElement ? I('shrink') : I('zoom'), label: document.fullscreenElement ? I18n.t('menu_exit_fullscreen') : I18n.t('menu_fullscreen'), onClick: () => toggleFullscreen() },
+      back:          { id: 'back',          icon: I('back'),        label: I18n.t('menu_back'),              onClick: () => chrome.runtime.sendMessage({ type: MSG.NAV_BACK }) },
+      forward:       { id: 'forward',       icon: I('forward'),     label: I18n.t('menu_forward'),           onClick: () => chrome.runtime.sendMessage({ type: MSG.NAV_FORWARD }) },
+      reload:        { id: 'reload',        icon: I('reload'),      label: I18n.t('menu_reload'),            onClick: () => chrome.runtime.sendMessage({ type: MSG.NAV_RELOAD }) },
+      colorPicker:   { id: 'colorPicker',   icon: I('colorPicker'), label: I18n.t('menu_color_picker'),      onClick: () => pickColor() },
+      closeTab:      { id: 'closeTab',      icon: I('close'),       label: I18n.t('menu_close_tab'),         onClick: () => chrome.runtime.sendMessage({ type: MSG.CLOSE_TAB }) },
+      openOptions:   { id: 'openOptions',   icon: I('options'),     label: I18n.t('menu_open_options'),      onClick: () => chrome.runtime.sendMessage({ type: MSG.OPEN_OPTIONS }) },
+    };
+  }
+
+  // Color picker stile PowerToys: usa la EyeDropper API nativa di Chrome. Al
+  // click sull'icona il cursore cambia (gestito dal browser/SO) e la prossima
+  // pressione del tasto sinistro su un pixel qualsiasi della pagina copia il
+  // colore in formato hex nella clipboard. Esc annulla.
+  async function pickColor() {
+    if (typeof window.EyeDropper !== 'function') {
+      Popup.showToast(I18n.t('err_color_picker_unsupported'), { duration: 3000 });
+      return;
+    }
+    try {
+      const ep = new window.EyeDropper();
+      const result = await ep.open();
+      const hex = (result?.sRGBHex || '').toUpperCase();
+      if (!hex) return;
+      try {
+        await navigator.clipboard.writeText(hex);
+      } catch (_) {
+        // Fallback: textarea + execCommand se la clipboard API è bloccata.
+        const ta = document.createElement('textarea');
+        ta.value = hex;
+        ta.style.position = 'fixed'; ta.style.left = '-9999px';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); } catch (_) {}
+        ta.remove();
+      }
+      Popup.showToast(I18n.t('toast_color_copied') + hex, { duration: 2500 });
+    } catch (_) {
+      // L'utente ha annullato (Esc) — nessun toast.
+    }
+  }
+
+  // Layout di default: 5 icone primarie nella riga, le altre nella griglia.
+  const DEFAULT_ICON_LAYOUT = {
+    primary: ['translate', 'screenshot', 'share', 'saveForLater', 'openForLater'],
+    secondary: ['screenshotCrop', 'transcribe', 'colorPicker', 'closeTab', 'openOptions', 'fullscreen', 'back', 'forward', 'reload'],
+  };
+
+  // Vecchio default (prima del cambio a 5 slot): se trovo esattamente questo
+  // layout in storage, è il default che non è mai stato customizzato — migro.
+  const LEGACY_DEFAULT_LAYOUT = {
+    primary: ['translate', 'screenshot', 'share', 'saveForLater'],
+    secondary: ['openForLater', 'fullscreen', 'back', 'forward', 'reload'],
+  };
+
+  function arraysEqual(a, b) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+    return true;
+  }
+  function isLegacyDefault(v) {
+    return v && arraysEqual(v.primary, LEGACY_DEFAULT_LAYOUT.primary)
+            && arraysEqual(v.secondary, LEGACY_DEFAULT_LAYOUT.secondary);
+  }
+
+  let iconLayoutCache = null;
+  function loadIconLayout() {
+    try {
+      chrome.storage.local.get([STORAGE_KEYS.ICON_LAYOUT], (out) => {
+        let v = out?.[STORAGE_KEYS.ICON_LAYOUT];
+        if (v && Array.isArray(v.primary) && Array.isArray(v.secondary)) {
+          if (isLegacyDefault(v)) {
+            iconLayoutCache = DEFAULT_ICON_LAYOUT;
+            try { chrome.storage.local.set({ [STORAGE_KEYS.ICON_LAYOUT]: DEFAULT_ICON_LAYOUT }); } catch (_) {}
+          } else {
+            // Migrazione: aggiungi icone introdotte dopo che il layout era
+            // stato salvato, così l'utente non perde feature nuove.
+            const known = new Set([...(v.primary || []), ...(v.secondary || [])]);
+            const additions = ['colorPicker', 'closeTab', 'openOptions', 'screenshotCrop', 'transcribe'].filter((id) => !known.has(id));
+            if (additions.length) {
+              v = { ...v, secondary: [...additions, ...(v.secondary || [])] };
+              try { chrome.storage.local.set({ [STORAGE_KEYS.ICON_LAYOUT]: v }); } catch (_) {}
+            }
+            iconLayoutCache = v;
+          }
+        } else {
+          iconLayoutCache = DEFAULT_ICON_LAYOUT;
+        }
+      });
+    } catch (_) { iconLayoutCache = DEFAULT_ICON_LAYOUT; }
+  }
+  loadIconLayout();
+
+  function getIconLayout() {
+    return iconLayoutCache || DEFAULT_ICON_LAYOUT;
+  }
+
+  function saveIconLayout(layout) {
+    iconLayoutCache = layout;
+    try { chrome.storage.local.set({ [STORAGE_KEYS.ICON_LAYOUT]: layout }); } catch (_) {}
+  }
+
+  // Numero massimo di icone visibili nella riga primaria. Le eccedenti
+  // (es. dopo un drag) traboccano automaticamente nella griglia secondaria.
+  const MAX_PRIMARY_ICONS = 6;
+
+  // Gestisce il drop di un'icona fra zone (riga primaria ↔ griglia secondaria),
+  // reinserendola nell'ordine indicato (beforeId = ID dell'icona davanti alla
+  // quale inserire; null = in fondo). Se la primaria sfora il limite, l'ultima
+  // icona viene spinta in cima alla secondaria (swap di fatto).
+  function applyIconDrop({ id, source, target, beforeId }) {
+    if (!id) return;
+    const layout = { ...getIconLayout() };
+    layout.primary = (layout.primary || []).slice().filter((x) => x !== id);
+    layout.secondary = (layout.secondary || []).slice().filter((x) => x !== id);
+    if (target === 'primary') {
+      const idx = beforeId ? layout.primary.indexOf(beforeId) : -1;
+      if (idx >= 0) layout.primary.splice(idx, 0, id);
+      else layout.primary.push(id);
+      while (layout.primary.length > MAX_PRIMARY_ICONS) {
+        const popped = layout.primary.pop();
+        if (popped && !layout.secondary.includes(popped)) layout.secondary.unshift(popped);
+      }
+    } else {
+      const idx = beforeId ? layout.secondary.indexOf(beforeId) : -1;
+      if (idx >= 0) layout.secondary.splice(idx, 0, id);
+      else layout.secondary.push(id);
+    }
+    saveIconLayout(layout);
+  }
+
+  // Costruisce gli item della riga primaria (icone + bottone overflow).
+  function buildPrimaryRowItems() {
+    const registry = buildIconRegistry();
+    const layout = getIconLayout();
+    const primaryIds = (layout.primary || []).filter((id) => registry[id]);
+    const secondaryIds = (layout.secondary || []).filter((id) => registry[id]);
+    const items = primaryIds.map((id) => ({ ...registry[id], draggable: true }));
+    items.push({
+      kind: 'overflow',
+      icon: '▸',
+      label: I18n.t('menu_overflow'),
+      onClick: (anchorEl) => {
+        const gridItems = secondaryIds.map((id) => ({ ...registry[id], draggable: true }));
+        Menu.openIconGridSubmenu(anchorEl, gridItems, {
+          cols: 4,
+          dropTarget: 'secondary',
+          onDrop: (e) => { applyIconDrop(e); redrawIconRows(); },
+        });
+      },
+    });
+    return items;
+  }
+
+  function buildSecondaryGridItems() {
+    const registry = buildIconRegistry();
+    const layout = getIconLayout();
+    const secondaryIds = (layout.secondary || []).filter((id) => registry[id]);
+    return secondaryIds.map((id) => ({ ...registry[id], draggable: true }));
+  }
+
+  // Riga globale: prende le icone "primary" dal layout utente. L'overflow apre
+  // la griglia secondaria come sotto-menu ancorato (senza chiudere il primo).
+  function buildGlobalIconRow() {
+    return {
+      type: 'row',
+      dropTarget: 'primary',
+      onDrop: (e) => { applyIconDrop(e); redrawIconRows(); },
+      items: buildPrimaryRowItems(),
+    };
+  }
+
+  // Dopo un drop, rigenera in-place i bottoni delle due zone (riga primaria e
+  // griglia secondaria) senza chiudere il menu, così l'utente può continuare a
+  // riordinare. La griglia secondaria viene aggiornata solo se è aperta.
+  function redrawIconRows() {
+    try { Menu.refreshIconRow?.(buildPrimaryRowItems()); } catch (_) {}
+    try { Menu.refreshIconGrid?.(buildSecondaryGridItems()); } catch (_) {}
+  }
+
+  function buildHelpItem() {
+    const helpEnabled = !!settings?.featureFlags?.help;
+    return {
+      type: 'item',
+      label: I18n.t('menu_help'),
+      shortcut: 'Alt+H',
+      onClick: () => {
+        if (helpEnabled) {
+          openHelpSidebar();
+        } else {
+          Popup.showToast(I18n.t('feature_off_help'), { duration: 3500 });
+          chrome.runtime.sendMessage({ type: MSG.OPEN_OPTIONS });
+        }
+      },
+    };
+  }
+
+  // Costruisce gli item della zona contestuale in base a cosa è stato cliccato.
+  // Matrice: testo / testo+editabile / immagine / link / casella input / niente.
+  function buildContextualItems({ selInfo, linkEl, imgEl, editable, clipboardHistory }) {
+    const items = [];
+
+    if (selInfo && editable) {
+      // Testo selezionato dentro casella di input
+      items.push({ type: 'item', label: I18n.t('menu_cut'), onClick: () => cutSelection() });
+      items.push({ type: 'item', label: I18n.t('menu_copy'), onClick: () => copyToClipboard(selInfo.selection) });
+      items.push(buildPasteItem(clipboardHistory));
+      items.push(buildDictateItem());
+      items.push({ type: 'separator' });
+      items.push(buildInlineExplain(selInfo, { withDeepArrow: true }));
+      items.push({
+        type: 'item',
+        label: I18n.t('menu_edit_selection'),
+        onClick: () => openEditBox(selInfo.selection),
+      });
+      return items;
+    }
+
+    if (selInfo) {
+      // Testo selezionato nella pagina (non editabile)
+      items.push({ type: 'item', label: I18n.t('menu_copy'), onClick: () => copyToClipboard(selInfo.selection) });
+      items.push({
+        type: 'item',
+        label: I18n.t('menu_search_text'),
+        onClick: () => searchTextOnWeb(selInfo.selection),
+      });
+      items.push({ type: 'separator' });
+      items.push(buildInlineExplain(selInfo, { withDeepArrow: true }));
+      return items;
+    }
+
+    if (imgEl) {
+      items.push({ type: 'item', label: I18n.t('menu_copy_image'), onClick: () => copyImage(imgEl) });
+      items.push({ type: 'item', label: I18n.t('menu_save_image_as'), onClick: () => downloadImage(imgEl) });
+      items.push({
+        type: 'item',
+        label: I18n.t('menu_copy_image_link'),
+        onClick: () => copyToClipboard(imgEl.currentSrc || imgEl.src),
+      });
+      items.push({
+        type: 'item',
+        label: I18n.t('menu_search_image'),
+        onClick: () => searchImageOnWeb(imgEl),
+      });
+      items.push({ type: 'separator' });
+      items.push(buildInlineExplainImage(imgEl));
+      return items;
+    }
+
+    if (linkEl) {
+      items.push({
+        type: 'item',
+        label: I18n.t('menu_open_in_new_tab'),
+        onClick: () => window.open(linkEl.href, '_blank', 'noopener'),
+      });
+      items.push({
+        type: 'item',
+        label: I18n.t('menu_copy_link'),
+        onClick: () => copyToClipboard(linkEl.href),
+      });
+      items.push({
+        type: 'item',
+        label: I18n.t('menu_save_link_for_later'),
+        onClick: () => saveLink(linkEl),
+      });
+      items.push({
+        type: 'item',
+        label: I18n.t('menu_share_link'),
+        onClick: () => shareLink(linkEl),
+      });
+      items.push({ type: 'separator' });
+      items.push(buildInlineExplainLink(linkEl));
+      return items;
+    }
+
+    if (editable) {
+      // Casella input senza selezione: incolla + detta.
+      items.push(buildPasteItem(clipboardHistory));
+      items.push(buildDictateItem());
+      return items;
+    }
+
+    // Pagina generica senza contesto: nessuna zona contestuale.
+    return items;
+  }
+
+
+  // ------------------------------------------------------------
+  // Tracking ultimo evento mouse per posizionare popup
+  // ------------------------------------------------------------
+  let lastMouseEvent = { clientX: window.innerWidth / 2, clientY: window.innerHeight / 2 };
+  document.addEventListener('mousedown', (e) => {
+    lastMouseEvent = { clientX: e.clientX, clientY: e.clientY };
+  }, true);
+
+  // ------------------------------------------------------------
+  // Azioni
+  // ------------------------------------------------------------
+  function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(
+      () => {
+        Popup.showToast(I18n.t('toast_copied'));
+        pushClipboardEntry({ type: 'text', text });
+      },
+      () => {/* niente toast su errore — UX silenziosa */}
+    );
+  }
+
+  // Incolla dagli appunti: prova prima a leggere immagini, poi testo.
+  async function pasteFromClipboard() {
+    restorePasteContext();
+    // Tenta lettura strutturata (testo + immagini)
+    try {
+      if (navigator.clipboard.read) {
+        const items = await navigator.clipboard.read();
+        for (const it of items) {
+          // Cerca un'immagine
+          const imgType = it.types.find((t) => t.startsWith('image/'));
+          if (imgType) {
+            const blob = await it.getType(imgType);
+            const dataUrl = await blobToDataUrl(blob);
+            restorePasteContext();
+            const targetKind = pasteContext?.kind;
+            if (targetKind === 'input') {
+              // input/textarea non supportano immagini: ricadi sul testo se presente
+              const textType = it.types.find((t) => t === 'text/plain');
+              if (textType) {
+                const text = await (await it.getType(textType)).text();
+                insertTextAtSelection(text);
+                pushClipboardEntry({ type: 'text', text });
+              } else {
+                Popup.showToast(I18n.t('err_provider_failed'));
+              }
+              return;
+            }
+            if (targetKind !== 'ce') {
+              // Nessun target editabile valido: avvisa e non fare niente
+              Popup.showToast(I18n.t('err_provider_failed'));
+              return;
+            }
+            const ok = insertImageInEditable(blob, dataUrl);
+            if (!ok) {
+              Popup.showToast(I18n.t('err_provider_failed'));
+              return;
+            }
+            const description = await describeImage(blob);
+            pushClipboardEntry({ type: 'image', dataUrl, description });
+            Popup.showToast(I18n.t('toast_pasted_image'));
+            return;
+          }
+        }
+      }
+    } catch (_) {
+      // Permessi negati o API non disponibile: ricadi sul testo
+    }
+    // Fallback: solo testo
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text) return;
+      restorePasteContext();
+      insertTextAtSelection(text);
+      pushClipboardEntry({ type: 'text', text });
+    } catch (_) {}
+  }
+
+  function cutSelection() {
+    // window.getSelection() non vede la selezione dentro <input>/<textarea>:
+    // recuperiamo il testo direttamente dal nodo attivo se serve.
+    const sel = window.getSelection();
+    let text = sel?.toString() || '';
+    const activeEl = document.activeElement;
+    const inInput = activeEl?.matches?.('input, textarea');
+    if (!text && inInput) {
+      const start = activeEl.selectionStart ?? 0;
+      const end = activeEl.selectionEnd ?? 0;
+      if (start !== end) text = (activeEl.value || '').slice(start, end);
+    }
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(() => {
+      pushClipboardEntry({ type: 'text', text });
+      if (inInput) {
+        const start = activeEl.selectionStart ?? 0;
+        const end = activeEl.selectionEnd ?? 0;
+        activeEl.value = activeEl.value.slice(0, start) + activeEl.value.slice(end);
+        activeEl.setSelectionRange(start, start);
+        activeEl.dispatchEvent(new Event('input', { bubbles: true }));
+      } else {
+        document.execCommand('delete');
+      }
+    });
+  }
+
+  function blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.onerror = reject;
+      r.readAsDataURL(blob);
+    });
+  }
+
+  // Descrizione provvisoria per un'immagine prima che arrivi quella generata dall'AI.
+  async function describeImage(_blob) {
+    return I18n.t('clipboard_image_pending');
+  }
+
+  function triggerExplainOrTranslate(action, selInfo, anchorEvent) {
+    if (!selInfo) {
+      Popup.showToast(I18n.t('err_no_selection'));
+      return;
+    }
+    let title;
+    if (action === ACTIONS.EXPLAIN) title = I18n.t('popup_explain_title');
+    else if (action === ACTIONS.EXPLAIN_DEEP) title = I18n.t('popup_explain_deep_title');
+    else title = I18n.t('popup_translate_title');
+
+    Popup.openStreaming({
+      action,
+      payload: {
+        selection: selInfo.selection,
+        sentence: selInfo.sentence,
+      },
+      anchor: { x: anchorEvent.clientX, y: anchorEvent.clientY },
+      title,
+    });
+  }
+
+  function triggerExplainDeep(selInfo, anchorEvent) {
+    triggerExplainOrTranslate(ACTIONS.EXPLAIN_DEEP, selInfo, anchorEvent);
+  }
+
+  // Costruisce l'item del menu "Incolla" con freccetta cronologia.
+  function buildPasteItem(clipboardHistory) {
+    return {
+      type: 'paste',
+      label: I18n.t('menu_paste'),
+      shortcut: 'Ctrl+V',
+      history: clipboardHistory,
+      onClick: () => pasteFromClipboard(),
+      onPickHistory: (entry) => pasteHistoryEntry(entry),
+    };
+  }
+
+  // Sezione inline: avvia subito una richiesta EXPLAIN e mostra il risultato nel menu.
+  // Se la risposta è "NESSUNA SPIEGAZIONE" la sezione viene nascosta.
+  // ------------------------------------------------------------
+  // Prefetch "Spiega" su selezione di testo (riduce latenza del menu)
+  // ------------------------------------------------------------
+  // Quando l'utente seleziona del testo, lanciamo subito la richiesta EXPLAIN in
+  // background. Quando poi apre il menu (clic destro), il risultato è in cache:
+  // il box inline lo mostra istantaneamente invece di aspettare il provider.
+  // - Debounce 400ms (selectionchange spara molto durante il drag).
+  // - Dedup per chiave selezione (no re-fetch sulla stessa selezione).
+  // - No prefetch se tab nascosto, dominio bloccato, selezione troppo corta.
+  // - Una sola entry attiva: la selezione cambia velocemente, non serve cache larga.
+  let prefetchedExplain = null; // { key, sentence, promise<{text}|{error}> }
+  let prefetchTimer = null;
+
+  function explainKey(text) { return (text || '').trim().slice(0, 2000); }
+
+  function schedulePrefetchExplain() {
+    clearTimeout(prefetchTimer);
+    prefetchTimer = setTimeout(prefetchExplainNow, 400);
+  }
+
+  function prefetchExplainNow() {
+    if (isBlocked()) return;
+    if (document.hidden) return;
+    const sel = Extract.getSelectionWithSentence();
+    if (!sel) return;
+    const key = explainKey(sel.selection);
+    if (key.length < 3) return;
+    // Stessa selezione di prima: l'entry esistente sta già lavorando (o ha il risultato).
+    if (prefetchedExplain && prefetchedExplain.key === key) return;
+    prefetchedExplain = startExplainRequest(sel);
+  }
+
+  function startExplainRequest(selInfo) {
+    const key = explainKey(selInfo.selection);
+    const entry = { key, sentence: selInfo.sentence };
+    entry.promise = chrome.runtime.sendMessage({
+      type: MSG.AI_REQUEST,
+      action: ACTIONS.EXPLAIN,
+      payload: { selection: selInfo.selection, sentence: selInfo.sentence },
+    }).then(
+      (res) => (res?.ok && typeof res.text === 'string')
+        ? { text: res.text }
+        : { error: res?.error || I18n.t('err_provider_failed') },
+      (e) => ({ error: e?.message || I18n.t('err_provider_failed') }),
+    );
+    return entry;
+  }
+
+  // Restituisce la Promise per la spiegazione di questa selezione.
+  // Riusa il prefetch se è dello stesso testo; altrimenti parte ora.
+  function getExplainPromise(selInfo) {
+    const key = explainKey(selInfo.selection);
+    if (prefetchedExplain && prefetchedExplain.key === key) {
+      return prefetchedExplain.promise;
+    }
+    const entry = startExplainRequest(selInfo);
+    prefetchedExplain = entry;
+    return entry.promise;
+  }
+
+  function buildInlineExplain(selInfo, opts = {}) {
+    const withDeepArrow = !!opts.withDeepArrow;
+    return {
+      type: 'inline',
+      content: I18n.t('menu_explain_loading'),
+      onMount: (el) => {
+        el.classList.add('sn-menu-inline-loading', 'sn-menu-inline-explain');
+        const body = document.createElement('div');
+        body.className = 'sn-menu-inline-body';
+        body.textContent = I18n.t('menu_explain_loading');
+        el.textContent = '';
+        el.appendChild(body);
+
+        if (withDeepArrow) {
+          const arrow = document.createElement('button');
+          arrow.type = 'button';
+          arrow.className = 'sn-menu-inline-arrow';
+          arrow.title = I18n.t('menu_explain_deep') + ' (Alt+E)';
+          arrow.textContent = '▸';
+          arrow.addEventListener('click', (e) => {
+            e.stopPropagation();
+            try { self.SN_MENU?.close?.(); } catch (_) {}
+            triggerExplainDeep(selInfo, lastMouseEvent);
+          });
+          el.appendChild(arrow);
+        }
+
+        let cancelled = false;
+        getExplainPromise(selInfo).then((res) => {
+          if (cancelled) return;
+          el.classList.remove('sn-menu-inline-loading');
+          if (!res || res.error || !res.text) {
+            el.classList.add('sn-menu-inline-error');
+            body.textContent = (res && res.error) || I18n.t('err_provider_failed');
+            return;
+          }
+          const resolved = Popup.resolveCalcMarkers(res.text);
+          if (/NESSUNA SPIEGAZIONE/i.test(resolved.trim())) {
+            const prev = el.previousElementSibling;
+            if (prev && prev.classList.contains('sn-menu-sep')) prev.remove();
+            el.remove();
+            return;
+          }
+          body.innerHTML = Popup.renderMarkdown(resolved);
+        });
+        return () => { cancelled = true; };
+      },
+    };
+  }
+
+  async function getClipboardHistory() {
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.GET_CLIPBOARD_HISTORY });
+      return r?.items || [];
+    } catch (_) { return []; }
+  }
+
+  function pushClipboardEntry(entry) {
+    chrome.runtime.sendMessage({ type: MSG.PUSH_CLIPBOARD_ENTRY, entry }).catch(() => {});
+    // Per le immagini, chiedi all'AI una breve descrizione e aggiorna l'entry.
+    if (entry?.type === 'image' && entry.dataUrl) {
+      requestImageDescription(entry.dataUrl).catch(() => {});
+    }
+  }
+
+  async function requestImageDescription(dataUrl) {
+    // Modelli da provare in ordine: prima quello configurato, poi un fallback noto.
+    const FALLBACK_MODEL = 'google/gemini-2.0-flash-001';
+    const tryOnce = async (modelOverride) => {
+      try {
+        return await chrome.runtime.sendMessage({
+          type: MSG.AI_REQUEST,
+          action: ACTIONS.DESCRIBE_IMAGE,
+          payload: modelOverride ? { dataUrl, modelOverride } : { dataUrl },
+        });
+      } catch (e) {
+        return { ok: false, error: e.message || String(e) };
+      }
+    };
+
+    let res = await tryOnce();
+    if (!res?.ok) {
+      console.warn('[SN] descrizione immagine fallita col modello configurato:', res?.error || 'errore sconosciuto', '— provo con', FALLBACK_MODEL);
+      res = await tryOnce(FALLBACK_MODEL);
+    }
+    if (!res?.ok) {
+      console.warn('[SN] descrizione immagine fallita anche col fallback:', res?.error || 'errore sconosciuto');
+      return;
+    }
+    if (!res.text) {
+      console.warn('[SN] descrizione immagine: risposta vuota');
+      return;
+    }
+    const description = res.text.replace(/\s+/g, ' ').trim().slice(0, 80);
+    if (!description) return;
+    chrome.runtime.sendMessage({
+      type: MSG.UPDATE_CLIPBOARD_DESCRIPTION,
+      dataUrl,
+      description,
+    }).catch(() => {});
+  }
+
+  async function pasteHistoryEntry(entry) {
+    if (!entry) return;
+    // Riporta in cima alla cronologia: il background fa dedup e promuove.
+    // Non passiamo per pushClipboardEntry() per evitare di ri-richiedere
+    // all'AI la descrizione di un'immagine già descritta.
+    chrome.runtime.sendMessage({ type: MSG.PUSH_CLIPBOARD_ENTRY, entry }).catch(() => {});
+    restorePasteContext();
+    if (entry.type === 'image') {
+      // Inserisci come <img> in contenteditable, altrimenti niente (input/textarea non supportano immagini)
+      if (pasteContext?.kind !== 'ce') {
+        Popup.showToast(I18n.t('err_provider_failed'));
+        return;
+      }
+      // Ricostruisci un Blob a partire dal data URL per dispatcharlo come paste event.
+      let blob = null;
+      try { blob = await (await fetch(entry.dataUrl)).blob(); } catch (_) {}
+      const ok = insertImageInEditable(blob, entry.dataUrl);
+      if (ok) Popup.showToast(I18n.t('toast_pasted_image'));
+      else Popup.showToast(I18n.t('err_provider_failed'));
+      return;
+    }
+    // testo: incolla in input/textarea/contenteditable
+    insertTextAtSelection(entry.text || '');
+  }
+
+  // Inserisce un'immagine in un contenteditable provando tre strategie in
+  // sequenza: (1) paste event sintetico — necessario per editor moderni
+  // (Gmail, Slate, Lexical, ProseMirror) che hanno un handler paste e
+  // ignorerebbero execCommand o modifiche dirette al DOM; (2) execCommand
+  // 'insertImage'; (3) inserimento manuale via Range API.
+  function insertImageInEditable(blob, dataUrl) {
+    if (!pasteContext || pasteContext.kind !== 'ce') return false;
+    const el = pasteContext.el;
+    if (!el || !el.isConnected) return false;
+    el.focus();
+    const sel = window.getSelection();
+    if (pasteContext.range) {
+      try {
+        sel.removeAllRanges();
+        sel.addRange(pasteContext.range);
+      } catch (_) {}
+    }
+
+    // (1) Paste event sintetico con DataTransfer
+    if (blob) {
+      try {
+        const dt = new DataTransfer();
+        const file = new File([blob], 'image.png', { type: blob.type || 'image/png' });
+        dt.items.add(file);
+        const evt = new ClipboardEvent('paste', {
+          clipboardData: dt,
+          bubbles: true,
+          cancelable: true,
+        });
+        const notCancelled = el.dispatchEvent(evt);
+        // Se l'evento è stato cancellato (preventDefault), la pagina lo ha gestito.
+        if (!notCancelled) return true;
+      } catch (_) {}
+    }
+
+    // (2) execCommand classico
+    try {
+      if (document.execCommand('insertImage', false, dataUrl)) return true;
+    } catch (_) {}
+
+    // (3) Inserimento manuale via Range
+    try {
+      let range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+      if (!range || !el.contains(range.startContainer)) {
+        range = document.createRange();
+        range.selectNodeContents(el);
+        range.collapse(false);
+      }
+      const img = document.createElement('img');
+      img.src = dataUrl;
+      range.deleteContents();
+      range.insertNode(img);
+      range.setStartAfter(img);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      pasteContext.range = range.cloneRange();
+      el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertFromPaste' }));
+      return true;
+    } catch (_) {}
+
+    return false;
+  }
+
+  function insertTextAtSelection(text) {
+    if (!pasteContext) return;
+    const { kind, el } = pasteContext;
+    if (!el || !el.isConnected) return;
+    if (kind === 'input') {
+      const start = pasteContext.start ?? el.value.length;
+      const end = pasteContext.end ?? el.value.length;
+      el.value = el.value.slice(0, start) + text + el.value.slice(end);
+      const caret = start + text.length;
+      el.setSelectionRange(caret, caret);
+      pasteContext.start = caret;
+      pasteContext.end = caret;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    } else if (kind === 'ce') {
+      el.focus();
+      // Ripristina la selezione salvata all'apertura del menu PRIMA di inserire:
+      // il click sul bottone del menu sposta il focus, e su editor moderni
+      // (ProseMirror di claude.ai, Lexical, Slate) execCommand inseriva a fine
+      // testo invece che dove era il caret (feedback alpha).
+      const sel = window.getSelection();
+      if (pasteContext.range && el.contains(pasteContext.range.startContainer)) {
+        try {
+          sel.removeAllRanges();
+          sel.addRange(pasteContext.range);
+        } catch (_) {}
+      }
+      // (1) paste event sintetico: gli editor "controllati" leggono la loro
+      // selezione interna (mantenuta anche dopo il blur) e inseriscono nel
+      // punto giusto. execCommand su quegli editor finiva in coda.
+      let handled = false;
+      try {
+        const dt = new DataTransfer();
+        dt.setData('text/plain', text);
+        const evt = new ClipboardEvent('paste', {
+          clipboardData: dt,
+          bubbles: true,
+          cancelable: true,
+        });
+        handled = !el.dispatchEvent(evt);
+      } catch (_) {}
+      // (2) fallback: execCommand insertText (editor "non controllati").
+      if (!handled) {
+        try { document.execCommand('insertText', false, text); } catch (_) {}
+      }
+    }
+  }
+
+  function buildSavePayload() {
+    const meta = Extract.pageMeta();
+    return {
+      url: location.href,
+      title: document.title,
+      favicon: document.querySelector('link[rel~="icon"]')?.href || '',
+      description: meta.description || '',
+      excerpt: Extract.pageExcerpt(500),
+    };
+  }
+
+  async function savePage() {
+    try {
+      const cap = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB });
+      const thumbnail = cap?.dataUrl || '';
+      const base = buildSavePayload();
+      const res = await chrome.runtime.sendMessage({
+        type: MSG.SAVE_PAGE,
+        page: { ...base, thumbnail },
+      });
+      if (res?.ok) {
+        Popup.showToast(I18n.t('toast_saved', I18n.t('category_default')));
+        setTimeout(() => chrome.runtime.sendMessage({ type: MSG.CLOSE_TAB }), 600);
+      }
+    } catch (e) {
+      console.error('[SN] savePage', e);
+    }
+  }
+
+  async function saveLink(linkEl) {
+    const res = await chrome.runtime.sendMessage({
+      type: MSG.SAVE_LINK,
+      url: linkEl.href,
+      title: linkEl.textContent?.trim() || linkEl.href,
+    });
+    if (res?.ok) Popup.showToast(I18n.t('toast_link_saved'));
+  }
+
+  async function copyImage(imgEl) {
+    try {
+      const r = await fetch(imgEl.currentSrc || imgEl.src);
+      const blob = await r.blob();
+      let pngBlob = blob;
+      // Clipboard API supporta image/png; converte se serve
+      if (blob.type !== 'image/png') {
+        const url = URL.createObjectURL(blob);
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        pngBlob = await new Promise((res) => canvas.toBlob((b) => res(b), 'image/png'));
+        URL.revokeObjectURL(url);
+      }
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]);
+      const dataUrl = await blobToDataUrl(pngBlob);
+      const description = await describeImage(pngBlob);
+      pushClipboardEntry({ type: 'image', dataUrl, description });
+      Popup.showToast(I18n.t('toast_copied'));
+    } catch (_) {}
+  }
+
+  function downloadImage(imgEl) {
+    const a = document.createElement('a');
+    a.href = imgEl.currentSrc || imgEl.src;
+    const name = (a.href.split('/').pop() || 'image').split('?')[0] || 'image';
+    a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+
+  function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen?.().catch(() => {});
+    } else {
+      document.exitFullscreen?.().catch(() => {});
+    }
+  }
+
+  // ------------------------------------------------------------
+  // Traduci pagina
+  // ------------------------------------------------------------
+  async function translatePage() {
+    if (pageTranslating) {
+      Popup.showToast(I18n.t('toast_translating_page'));
+      return;
+    }
+    pageTranslating = true;
+    Popup.showToast(I18n.t('toast_translating_page'), { duration: 1800 });
+
+    const nodes = Extract.extractMainTextNodes();
+    if (!nodes.length) { pageTranslating = false; return; }
+
+    // Per ogni nodo: trasforma i figli (link, img, span, …) in placeholder [[Lk]],
+    // così l'AI traduce solo il testo e i link restano cliccabili.
+    for (const n of nodes) {
+      const { templated, refs } = templateizeBlock(n.el);
+      n.templated = templated;
+      n.refs = refs;
+    }
+
+    // Chunking: aggrega nodi fino a ~3000 caratteri per chunk.
+    const CHUNK_SIZE = 3000;
+    const chunks = [];
+    let cur = { nodes: [], length: 0 };
+    for (const n of nodes) {
+      const len = (n.templated || '').length + 2;
+      if (cur.length + len > CHUNK_SIZE && cur.nodes.length) {
+        chunks.push(cur);
+        cur = { nodes: [], length: 0 };
+      }
+      cur.nodes.push(n);
+      cur.length += len;
+    }
+    if (cur.nodes.length) chunks.push(cur);
+
+    const SEPARATOR = '\n@@@SN_SEP@@@\n';
+    let translatedAny = false;
+    try {
+      for (const c of chunks) {
+        const joined = c.nodes.map((n) => n.templated).join(SEPARATOR);
+        const res = await chrome.runtime.sendMessage({
+          type: MSG.AI_REQUEST,
+          action: ACTIONS.TRANSLATE_PAGE,
+          payload: { chunk: joined },
+        });
+        if (!res?.ok) {
+          Popup.showToast(res?.error || I18n.t('err_provider_failed'));
+          break;
+        }
+        const parts = (res.text || '').split(/\n?@@@SN_SEP@@@\n?/);
+        for (let i = 0; i < c.nodes.length; i++) {
+          const part = parts[i];
+          if (typeof part === 'string' && part.trim()) {
+            try {
+              const el = c.nodes[i].el;
+              if (el.dataset.snTranslated) continue;
+              const refs = c.nodes[i].refs || [];
+              el.dataset.snOriginalHtml = el.innerHTML;
+              el.dataset.snTranslated = '1';
+              // Escape del testo dell'AI (no XSS), poi reinserimento dei placeholder
+              // come HTML originale (gli outerHTML provengono dalla pagina stessa).
+              const safe = escapeHtmlForTranslation(part.trim());
+              const html = safe.replace(/\[\[L(\d+)\]\]/g, (_, k) => refs[Number(k)] || '');
+              el.innerHTML = html;
+              translatedAny = true;
+            } catch (_) {}
+          }
+        }
+      }
+      if (translatedAny) {
+        pageHasTranslation = true;
+        Popup.showToast(I18n.t('toast_page_translated'));
+      }
+    } finally {
+      pageTranslating = false;
+    }
+  }
+
+  // Trasforma i figli del blocco in segnaposto [[Lk]] preservandoli per il rimontaggio.
+  // Restituisce { templated: stringa con segnaposto, refs: array di outerHTML }.
+  function templateizeBlock(el) {
+    const refs = [];
+    let out = '';
+    for (const child of el.childNodes) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        out += child.nodeValue;
+      } else if (child.nodeType === Node.ELEMENT_NODE) {
+        const idx = refs.length;
+        refs.push(child.outerHTML);
+        out += `[[L${idx}]]`;
+      }
+    }
+    return { templated: out.replace(/\s+/g, ' ').trim(), refs };
+  }
+
+  function escapeHtmlForTranslation(s) {
+    return s.replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    })[c]);
+  }
+
+  // Ripristina il testo originale annullando la traduzione di pagina.
+  function restoreOriginal() {
+    document.querySelectorAll('[data-sn-translated="1"]').forEach((el) => {
+      if (el.dataset.snOriginalHtml !== undefined) {
+        el.innerHTML = el.dataset.snOriginalHtml;
+        delete el.dataset.snOriginalHtml;
+      } else if (el.dataset.snOriginal !== undefined) {
+        el.textContent = el.dataset.snOriginal;
+        delete el.dataset.snOriginal;
+      }
+      delete el.dataset.snTranslated;
+    });
+    // Rimuovi eventuali note di traduzione (vecchio formato, retrocompatibilità)
+    document.querySelectorAll('[data-sn-translation="1"]').forEach((n) => n.remove());
+    pageHasTranslation = false;
+    Popup.showToast(I18n.t('toast_original_restored'));
+  }
+
+  // ------------------------------------------------------------
+  // Sidebar Aiuto (Fase 2)
+  // ------------------------------------------------------------
+  function openHelpSidebar() {
+    Sidebar.open();
+  }
+
+  // ------------------------------------------------------------
+  // Messaggi runtime: shortcut, settings update
+  // ------------------------------------------------------------
+  function onRuntimeMessage(msg, sender, sendResponse) {
+    if (msg?.type === MSG.SETTINGS_UPDATED) {
+      settings = msg.settings;
+      applyTheme(settings.theme);
+      // SpellCheck.init registra listener globali; per non duplicarli su update
+      // usiamo updateSettings (definito apposta da spellcheck.js).
+      SpellCheck.updateSettings(isBlocked() ? { featureFlags: { spellcheck: false } } : settings);
+      return;
+    }
+    if (msg?.type === MSG.SHORTCUT_TRIGGERED) {
+      // Shortcut save-for-later: il SW chiede al content il payload.
+      if (msg.command === 'save-for-later') {
+        if (isBlocked()) { sendResponse({ savePayload: null }); return; }
+        sendResponse({ savePayload: buildSavePayload() });
+        return;
+      }
+      handleShortcut(msg.command);
+      sendResponse({ ok: true });
+    }
+  }
+
+  function selectionAnchor() {
+    try {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount) {
+        const r = sel.getRangeAt(0).getBoundingClientRect();
+        if (r.width || r.height) {
+          return { clientX: r.left + r.width / 2, clientY: r.bottom };
+        }
+      }
+    } catch (_) {}
+    return lastMouseEvent;
+  }
+
+  function handleShortcut(command) {
+    if (isBlocked()) return;
+    const selInfo = Extract.getSelectionWithSentence();
+    const anchor = selectionAnchor();
+    if (command === 'explain-selection') {
+      // La spiegazione breve ora è inline nel menu; lo shortcut apre direttamente l'approfondimento.
+      if (selInfo) triggerExplainOrTranslate(ACTIONS.EXPLAIN_DEEP, selInfo, anchor);
+      else Popup.showToast(I18n.t('err_no_selection'));
+    } else if (command === 'translate-selection') {
+      if (selInfo) triggerExplainOrTranslate(ACTIONS.TRANSLATE_SELECTION, selInfo, anchor);
+      else Popup.showToast(I18n.t('err_no_selection'));
+    } else if (command === 'open-help-sidebar') {
+      if (settings?.featureFlags?.help) {
+        openHelpSidebar();
+      } else {
+        Popup.showToast(I18n.t('feature_off_help'), { duration: 3500 });
+        chrome.runtime.sendMessage({ type: MSG.OPEN_OPTIONS });
+      }
+    }
+    // save-for-later è gestito direttamente nel background
+  }
+
+  // ------------------------------------------------------------
+  // Nuove azioni globali / contestuali (riga icone + matrice contesto)
+  // ------------------------------------------------------------
+
+  async function takeScreenshot() {
+    try {
+      const cap = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB });
+      if (!cap?.dataUrl) {
+        Popup.showToast(I18n.t('err_provider_failed'));
+        return;
+      }
+      // Aggiungi lo screenshot agli "elementi copiati" così che possa essere
+      // riusato dal sotto-menu Incolla / cronologia clipboard. Passiamo lo
+      // stesso placeholder usato dal flusso "incolla" così l'entry parte con
+      // "Descrizione…" e viene poi aggiornata dall'AI con la descrizione vera.
+      try {
+        pushClipboardEntry({ type: 'image', dataUrl: cap.dataUrl, description: I18n.t('clipboard_image_pending') });
+      } catch (_) {}
+      // Copia nello system clipboard (richiede image/png, non jpeg).
+      let copied = false;
+      try {
+        const pngBlob = await dataUrlToPngBlob(cap.dataUrl);
+        if (pngBlob && navigator.clipboard?.write) {
+          await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]);
+          copied = true;
+        }
+      } catch (_) {}
+      const a = document.createElement('a');
+      a.href = cap.dataUrl;
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      a.download = `screenshot-${stamp}.png`;
+      document.body.appendChild(a); a.click(); a.remove();
+      if (copied) Popup.showToast(I18n.t('toast_copied'));
+    } catch (_) {}
+  }
+
+  // Mostra un overlay fullscreen sopra la pagina e fa selezionare all'utente
+  // un rettangolo trascinando. Risolve con { dataUrl, rect } dove dataUrl è
+  // il ritaglio PNG della porzione di tab catturata, rect è in CSS pixel.
+  // Risolve con null se l'utente annulla (Esc / clic senza drag / rettangolo
+  // troppo piccolo). Non logga eccezioni: gli errori bubble-up come reject.
+  async function selectScreenRegion() {
+    const cap = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB });
+    if (!cap?.dataUrl) throw new Error('capture failed');
+
+    // L'immagine catturata è in pixel del device; l'overlay è in pixel CSS.
+    // Conserviamo la dimensione del viewport CSS qui per calcolare la scala
+    // dopo aver caricato l'immagine sorgente.
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    const img = await new Promise((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = reject;
+      i.src = cap.dataUrl;
+    });
+
+    return new Promise((resolve) => {
+      const overlay = document.createElement('div');
+      overlay.className = 'sn-region-overlay';
+      // Stili inline per evitare di dipendere da CSS esterni: l'overlay deve
+      // funzionare in qualsiasi pagina, anche con CSP/style restrittivo.
+      Object.assign(overlay.style, {
+        position: 'fixed', inset: '0', zIndex: '2147483647',
+        cursor: 'crosshair', userSelect: 'none', pointerEvents: 'auto',
+      });
+      overlay.setAttribute('data-sn-theme', document.documentElement.dataset.snTheme || '');
+
+      // 4 quadranti scuri intorno alla selezione (top/left/right/bottom).
+      // Si aggiornano via .style.top/left/width/height durante il drag.
+      const mask = ['t', 'r', 'b', 'l'].map(() => {
+        const d = document.createElement('div');
+        Object.assign(d.style, { position: 'absolute', background: 'rgba(0,0,0,0.45)' });
+        return d;
+      });
+      // All'inizio (nessun drag) tutto il viewport è coperto.
+      Object.assign(mask[0].style, { left: '0', top: '0', right: '0', bottom: '0' });
+      mask.forEach((d) => overlay.appendChild(d));
+
+      const rectBox = document.createElement('div');
+      Object.assign(rectBox.style, {
+        position: 'absolute', border: '1px solid #fff',
+        boxShadow: '0 0 0 1px rgba(0,0,0,0.5)',
+        display: 'none', pointerEvents: 'none',
+      });
+      overlay.appendChild(rectBox);
+
+      const hint = document.createElement('div');
+      hint.textContent = I18n.t('region_select_hint');
+      Object.assign(hint.style, {
+        position: 'absolute', left: '50%', top: '12px', transform: 'translateX(-50%)',
+        background: 'rgba(0,0,0,0.75)', color: '#fff', font: '12px/1.4 system-ui, sans-serif',
+        padding: '6px 10px', borderRadius: '6px', pointerEvents: 'none',
+      });
+      overlay.appendChild(hint);
+
+      let startX = 0, startY = 0, curX = 0, curY = 0, dragging = false;
+
+      function updateMask(x1, y1, x2, y2) {
+        const minX = Math.min(x1, x2), minY = Math.min(y1, y2);
+        const maxX = Math.max(x1, x2), maxY = Math.max(y1, y2);
+        rectBox.style.display = 'block';
+        rectBox.style.left = minX + 'px';
+        rectBox.style.top = minY + 'px';
+        rectBox.style.width = (maxX - minX) + 'px';
+        rectBox.style.height = (maxY - minY) + 'px';
+        // top
+        Object.assign(mask[0].style, { left: '0', top: '0', width: '100%', height: minY + 'px', right: 'auto', bottom: 'auto' });
+        // bottom
+        Object.assign(mask[2].style, { left: '0', top: maxY + 'px', width: '100%', bottom: '0', height: 'auto', right: 'auto' });
+        // left
+        Object.assign(mask[3].style, { left: '0', top: minY + 'px', width: minX + 'px', height: (maxY - minY) + 'px', right: 'auto', bottom: 'auto' });
+        // right
+        Object.assign(mask[1].style, { left: maxX + 'px', top: minY + 'px', right: '0', height: (maxY - minY) + 'px', width: 'auto', bottom: 'auto' });
+      }
+
+      function cleanup() {
+        overlay.remove();
+        document.removeEventListener('keydown', onKey, true);
+      }
+      function cancel() {
+        cleanup();
+        resolve(null);
+      }
+      function finish() {
+        const minX = Math.min(startX, curX), minY = Math.min(startY, curY);
+        const maxX = Math.max(startX, curX), maxY = Math.max(startY, curY);
+        const w = maxX - minX, h = maxY - minY;
+        cleanup();
+        if (w < 4 || h < 4) { resolve(null); return; }
+        // Scala da CSS px a pixel della cattura.
+        const sx = img.naturalWidth / vw;
+        const sy = img.naturalHeight / vh;
+        const cx = Math.round(minX * sx), cy = Math.round(minY * sy);
+        const cw = Math.round(w * sx), ch = Math.round(h * sy);
+        const canvas = document.createElement('canvas');
+        canvas.width = cw; canvas.height = ch;
+        canvas.getContext('2d').drawImage(img, cx, cy, cw, ch, 0, 0, cw, ch);
+        canvas.toBlob((blob) => {
+          if (!blob) { resolve(null); return; }
+          const r = new FileReader();
+          r.onload = () => resolve({ dataUrl: r.result, blob, rect: { x: minX, y: minY, w, h } });
+          r.onerror = () => resolve(null);
+          r.readAsDataURL(blob);
+        }, 'image/png');
+      }
+      function onKey(e) {
+        if (e.key === 'Escape') {
+          e.preventDefault(); e.stopPropagation();
+          cancel();
+        }
+      }
+
+      overlay.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        dragging = true;
+        startX = curX = e.clientX;
+        startY = curY = e.clientY;
+        updateMask(startX, startY, startX, startY);
+      });
+      overlay.addEventListener('mousemove', (e) => {
+        if (!dragging) return;
+        curX = e.clientX; curY = e.clientY;
+        updateMask(startX, startY, curX, curY);
+      });
+      overlay.addEventListener('mouseup', (e) => {
+        if (!dragging) return;
+        dragging = false;
+        curX = e.clientX; curY = e.clientY;
+        finish();
+      });
+      document.addEventListener('keydown', onKey, true);
+
+      document.documentElement.appendChild(overlay);
+    });
+  }
+
+  // Screenshot di una regione selezionata dall'utente. Stessi side-effect del
+  // takeScreenshot pieno (download + clipboard + history clipboard).
+  async function takePartialScreenshot() {
+    try {
+      const region = await selectScreenRegion();
+      if (!region) { Popup.showToast(I18n.t('toast_region_cancelled')); return; }
+      const { dataUrl, blob } = region;
+      try { pushClipboardEntry({ type: 'image', dataUrl, description: I18n.t('clipboard_image_pending') }); } catch (_) {}
+      let copied = false;
+      try {
+        if (blob && navigator.clipboard?.write) {
+          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+          copied = true;
+        }
+      } catch (_) {}
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      a.download = `screenshot-${stamp}.png`;
+      document.body.appendChild(a); a.click(); a.remove();
+      if (copied) Popup.showToast(I18n.t('toast_copied'));
+    } catch (_) {
+      Popup.showToast(I18n.t('err_provider_failed'));
+    }
+  }
+
+  // OCR: l'utente seleziona una regione dello schermo, il modello vision
+  // trascrive il testo letteralmente e finisce nella clipboard come testo.
+  async function transcribeRegion() {
+    try {
+      const region = await selectScreenRegion();
+      if (!region) { Popup.showToast(I18n.t('toast_region_cancelled')); return; }
+      Popup.showToast(I18n.t('toast_transcribing'), { duration: 2500 });
+      const res = await chrome.runtime.sendMessage({
+        type: MSG.AI_REQUEST,
+        action: ACTIONS.TRANSCRIBE_IMAGE,
+        payload: { dataUrl: region.dataUrl },
+      });
+      if (!res?.ok) { Popup.showToast(I18n.t('err_provider_failed')); return; }
+      const text = (res.text || '').trim();
+      if (!text) { Popup.showToast(I18n.t('toast_transcribe_empty')); return; }
+      try { await navigator.clipboard.writeText(text); } catch (_) {
+        // Fallback DOM se la Clipboard API è bloccata.
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed'; ta.style.left = '-9999px';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); } catch (_) {}
+        ta.remove();
+      }
+      try { pushClipboardEntry({ type: 'text', text }); } catch (_) {}
+      Popup.showToast(I18n.t('toast_transcribed'));
+    } catch (_) {
+      Popup.showToast(I18n.t('err_provider_failed'));
+    }
+  }
+
+  // Converte un data URL (di solito JPEG) in un Blob PNG via canvas: serve per
+  // la Clipboard API che accetta solo image/png.
+  function dataUrlToPngBlob(dataUrl) {
+    return new Promise((resolve) => {
+      try {
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const c = document.createElement('canvas');
+            c.width = img.naturalWidth;
+            c.height = img.naturalHeight;
+            c.getContext('2d').drawImage(img, 0, 0);
+            c.toBlob((b) => resolve(b), 'image/png');
+          } catch (_) { resolve(null); }
+        };
+        img.onerror = () => resolve(null);
+        img.src = dataUrl;
+      } catch (_) { resolve(null); }
+    });
+  }
+
+  async function shareCurrentPage() {
+    const data = { title: document.title, url: location.href };
+    if (navigator.share) {
+      try { await navigator.share(data); return; } catch (_) {}
+    }
+    copyToClipboard(location.href);
+  }
+
+  async function shareLink(linkEl) {
+    const data = { title: linkEl.textContent?.trim() || linkEl.href, url: linkEl.href };
+    if (navigator.share) {
+      try { await navigator.share(data); return; } catch (_) {}
+    }
+    copyToClipboard(linkEl.href);
+  }
+
+  function searchTextOnWeb(text) {
+    const q = encodeURIComponent((text || '').slice(0, 500));
+    window.open(`https://www.google.com/search?q=${q}`, '_blank', 'noopener');
+  }
+
+  function searchImageOnWeb(imgEl) {
+    const src = imgEl.currentSrc || imgEl.src;
+    if (!src) return;
+    const q = encodeURIComponent(src);
+    // Lens-style reverse search (più affidabile di searchbyimage)
+    window.open(`https://lens.google.com/uploadbyurl?url=${q}`, '_blank', 'noopener');
+  }
+
+  // Overflow panel: ora vive come griglia di icone (sotto-menu ancorato al
+  // bottone "▸"). Vedi buildGlobalIconRow + Menu.openIconGridSubmenu.
+
+  // Item "Detta": Web Speech API. La freccetta apre la scelta modello (placeholder).
+  function buildDictateItem() {
+    const supported = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
+    return {
+      type: 'split',
+      icon: '🎤',
+      label: I18n.t('menu_dictate'),
+      onClick: () => startDictation(),
+      disabled: !supported,
+      arrowTitle: I18n.t('menu_dictate_model_select'),
+      subItems: supported
+        ? [
+            { type: 'info', label: I18n.t('menu_dictate_model_select') },
+            { type: 'separator' },
+            // Placeholder: in attesa di integrazione con modelli audio.
+            { label: 'Browser (Web Speech)', onClick: () => startDictation() },
+          ]
+        : [
+            { type: 'info', label: I18n.t('menu_dictate_not_supported') },
+          ],
+    };
+  }
+
+  // Dettatura browser-native. Inserisce il testo riconosciuto nel campo editabile
+  // catturato all'apertura del menu.
+  function startDictation() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
+      Popup.showToast(I18n.t('menu_dictate_not_supported'));
+      return;
+    }
+    if (!restorePasteContext()) {
+      Popup.showToast(I18n.t('err_provider_failed'));
+      return;
+    }
+    const rec = new SR();
+    rec.lang = (navigator.language || 'it-IT');
+    rec.interimResults = false;
+    rec.continuous = false;
+    rec.onresult = (e) => {
+      const text = Array.from(e.results).map((r) => r[0]?.transcript || '').join(' ').trim();
+      if (text) insertTextAtSelection(text + ' ');
+    };
+    rec.onerror = () => Popup.showToast(I18n.t('err_provider_failed'));
+    try { rec.start(); } catch (_) {}
+    Popup.showToast(I18n.t('menu_dictate_listening'), { duration: 2500 });
+  }
+
+  // Sezione inline "Spiega immagine": stessa filosofia di buildInlineExplain ma con dataUrl.
+  function buildInlineExplainImage(imgEl) {
+    return {
+      type: 'inline',
+      content: I18n.t('menu_explain_loading'),
+      onMount: (el) => {
+        el.classList.add('sn-menu-inline-loading');
+        const src = imgEl.currentSrc || imgEl.src;
+        if (!src) {
+          el.textContent = I18n.t('err_provider_failed');
+          el.classList.remove('sn-menu-inline-loading');
+          el.classList.add('sn-menu-inline-error');
+          return () => {};
+        }
+        let cancelled = false;
+        (async () => {
+          try {
+            const r = await fetch(src);
+            const blob = await r.blob();
+            const dataUrl = await blobToDataUrl(blob);
+            if (cancelled) return;
+            const res = await chrome.runtime.sendMessage({
+              type: MSG.AI_REQUEST,
+              action: ACTIONS.DESCRIBE_IMAGE,
+              payload: { dataUrl },
+            });
+            if (cancelled) return;
+            el.classList.remove('sn-menu-inline-loading');
+            if (!res?.ok || !res.text) {
+              el.classList.add('sn-menu-inline-error');
+              el.textContent = res?.error || I18n.t('err_provider_failed');
+              return;
+            }
+            el.textContent = res.text;
+          } catch (e) {
+            if (cancelled) return;
+            el.classList.remove('sn-menu-inline-loading');
+            el.classList.add('sn-menu-inline-error');
+            el.textContent = I18n.t('err_provider_failed');
+          }
+        })();
+        return () => { cancelled = true; };
+      },
+    };
+  }
+
+  // Sezione inline "Spiega link": niente apertura del link, solo metadati OG e dominio.
+  function buildInlineExplainLink(linkEl) {
+    return {
+      type: 'inline',
+      content: I18n.t('menu_link_loading'),
+      onMount: (el) => {
+        el.classList.add('sn-menu-inline-loading');
+        let cancelled = false;
+        (async () => {
+          const url = linkEl.href;
+          const anchorText = (linkEl.textContent || '').trim().slice(0, 200);
+          const flags = analyzeLinkSuspicious(url);
+
+          // Fetch leggero dei metadati OG via background (CORS-safe). Saltato se url sospetto in modo grave.
+          let ogTitle = '', ogDescription = '';
+          if (!flags.includes('side_effect')) {
+            try {
+              const r = await chrome.runtime.sendMessage({ type: 'fetch_link_meta', url });
+              if (r?.ok) { ogTitle = r.ogTitle || ''; ogDescription = r.ogDescription || ''; }
+            } catch (_) {}
+          }
+          if (cancelled) return;
+
+          // Streaming spiegazione via AI
+          let port;
+          try {
+            port = chrome.runtime.connect({ name: self.SN_MSG.PORTS.AI_STREAM });
+          } catch (_) {
+            el.classList.remove('sn-menu-inline-loading');
+            el.classList.add('sn-menu-inline-error');
+            el.textContent = I18n.t('err_provider_failed');
+            return;
+          }
+          let buf = '';
+          let firstDelta = true;
+          let warned = false;
+          port.onMessage.addListener((m) => {
+            if (m.type === 'delta') {
+              if (firstDelta) {
+                el.classList.remove('sn-menu-inline-loading');
+                el.textContent = '';
+                if (flags.length && !warned) {
+                  const w = document.createElement('div');
+                  w.className = 'sn-menu-link-warn';
+                  w.textContent = I18n.t('menu_link_suspicious') + ': ' + flags.join(', ');
+                  el.appendChild(w);
+                  warned = true;
+                }
+                firstDelta = false;
+              }
+              buf += m.delta;
+              // Sicurezza: niente HTML, è testo.
+              const txt = document.createElement('div');
+              txt.textContent = buf;
+              el.querySelector('.sn-menu-link-body')?.remove();
+              txt.className = 'sn-menu-link-body';
+              el.appendChild(txt);
+            } else if (m.type === 'error') {
+              el.classList.remove('sn-menu-inline-loading');
+              el.classList.add('sn-menu-inline-error');
+              el.textContent = m.message || I18n.t('err_provider_failed');
+            }
+          });
+          port.postMessage({
+            type: 'start',
+            action: ACTIONS.EXPLAIN_LINK,
+            payload: { url, anchorText, ogTitle, ogDescription, suspiciousFlags: flags },
+            origin: location.href,
+          });
+        })();
+        return () => { cancelled = true; };
+      },
+    };
+  }
+
+  // Euristica sicurezza link: pattern noti pericolosi (unsubscribe/logout/delete/confirm/token)
+  // e typosquatting grossolano su domini popolari. Restituisce array di flag.
+  function analyzeLinkSuspicious(rawUrl) {
+    const flags = [];
+    let u;
+    try { u = new URL(rawUrl); } catch (_) { return ['url_invalido']; }
+    const path = (u.pathname + '?' + u.search).toLowerCase();
+    const sideEffectPatterns = /(^|[/?&=])(unsubscribe|optout|opt-out|logout|signout|sign-out|delete|remove|confirm|verify|reset|cancel)([/?&=]|$)/;
+    if (sideEffectPatterns.test(path)) flags.push('side_effect');
+    if (/[?&](token|key|sig|signature|hash|t)=/.test(path)) flags.push('token_in_url');
+
+    const POPULAR = ['google.com', 'amazon.com', 'amazon.it', 'apple.com', 'microsoft.com', 'facebook.com', 'youtube.com', 'paypal.com', 'netflix.com', 'instagram.com', 'twitter.com', 'x.com', 'linkedin.com', 'github.com'];
+    const host = u.hostname.toLowerCase().replace(/^www\./, '');
+    for (const p of POPULAR) {
+      if (host === p) break;
+      if (host.endsWith('.' + p)) break;
+      // typosquatting: distanza Levenshtein ≤ 2 sul dominio principale
+      if (levenshteinSmall(host, p, 2)) { flags.push('typosquatting:' + p); break; }
+    }
+    return flags;
+  }
+
+  // Levenshtein limitata a `max` (early-exit). True se distance ≤ max e ≥ 1.
+  function levenshteinSmall(a, b, max) {
+    if (a === b) return false;
+    if (Math.abs(a.length - b.length) > max) return false;
+    const m = a.length, n = b.length;
+    if (m === 0 || n === 0) return false;
+    const prev = new Array(n + 1);
+    const cur = new Array(n + 1);
+    for (let j = 0; j <= n; j++) prev[j] = j;
+    for (let i = 1; i <= m; i++) {
+      cur[0] = i;
+      let rowMin = cur[0];
+      for (let j = 1; j <= n; j++) {
+        const cost = a.charCodeAt(i - 1) === b.charCodeAt(j - 1) ? 0 : 1;
+        cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+        if (cur[j] < rowMin) rowMin = cur[j];
+      }
+      if (rowMin > max) return false;
+      for (let j = 0; j <= n; j++) prev[j] = cur[j];
+    }
+    const d = prev[n];
+    return d >= 1 && d <= max;
+  }
+
+  // ------------------------------------------------------------
+  // Box "Modifica" (preview + conferma, mai sovrascrittura cieca)
+  // ------------------------------------------------------------
+  // Apre un overlay modale (HTML), mostra originale + proposta con diff, e
+  // azioni esplicite [Sostituisci] / [Copia la nuova] / [Annulla]. Scorciatoie
+  // pronte (più formale / informale / riassumi / traduci / correggi) + campo
+  // libero per istruzioni arbitrarie.
+  function openEditBox(originalText) {
+    if (!pasteContext) {
+      // Rivalido al volo: senza editable il "Sostituisci" non avrebbe senso.
+      Popup.showToast(I18n.t('err_no_selection'));
+      return;
+    }
+    const savedCtx = pasteContext; // congelo il riferimento per il momento del replace
+
+    const root = document.createElement('div');
+    root.className = 'sn-editbox-overlay';
+    root.dataset.snTheme = document.documentElement.dataset.snTheme || '';
+    root.innerHTML = `
+      <div class="sn-editbox" role="dialog" aria-label="${I18n.t('edit_box_title')}">
+        <div class="sn-editbox-header">${I18n.t('edit_box_title')}</div>
+        <div class="sn-editbox-shortcuts">
+          <button type="button" data-sc="formal">${I18n.t('edit_box_shortcut_formal')}</button>
+          <button type="button" data-sc="casual">${I18n.t('edit_box_shortcut_casual')}</button>
+          <button type="button" data-sc="summarize">${I18n.t('edit_box_shortcut_summarize')}</button>
+          <button type="button" data-sc="translate">${I18n.t('edit_box_shortcut_translate')}</button>
+          <button type="button" data-sc="fix">${I18n.t('edit_box_shortcut_fix')}</button>
+        </div>
+        <input type="text" class="sn-editbox-instruction" placeholder="${I18n.t('edit_box_instruction_placeholder')}">
+        <div class="sn-editbox-panels">
+          <div class="sn-editbox-panel">
+            <div class="sn-editbox-label">${I18n.t('edit_box_original')}</div>
+            <div class="sn-editbox-original"></div>
+          </div>
+          <div class="sn-editbox-panel">
+            <div class="sn-editbox-label">${I18n.t('edit_box_proposed')}</div>
+            <div class="sn-editbox-proposed sn-editbox-empty">${I18n.t('edit_box_loading')}</div>
+          </div>
+        </div>
+        <div class="sn-editbox-footer">
+          <button type="button" class="sn-editbox-cancel">${I18n.t('edit_box_cancel')}</button>
+          <button type="button" class="sn-editbox-copy" disabled>${I18n.t('edit_box_copy_new')}</button>
+          <button type="button" class="sn-editbox-replace" disabled>${I18n.t('edit_box_replace')}</button>
+        </div>
+      </div>
+    `;
+    document.documentElement.appendChild(root);
+
+    const $orig = root.querySelector('.sn-editbox-original');
+    const $prop = root.querySelector('.sn-editbox-proposed');
+    const $instr = root.querySelector('.sn-editbox-instruction');
+    const $cancel = root.querySelector('.sn-editbox-cancel');
+    const $copy = root.querySelector('.sn-editbox-copy');
+    const $replace = root.querySelector('.sn-editbox-replace');
+
+    $orig.textContent = originalText;
+    $instr.focus();
+
+    const SHORTCUTS = {
+      formal: 'Rendi il testo più formale, mantenendo il significato.',
+      casual: 'Rendi il testo più informale e amichevole.',
+      summarize: 'Riassumi il testo mantenendo i punti principali.',
+      translate: 'Traduci il testo in inglese.',
+      fix: 'Correggi eventuali errori grammaticali e di ortografia, senza alterare il senso.',
+    };
+    root.querySelectorAll('.sn-editbox-shortcuts button').forEach((b) => {
+      b.addEventListener('click', () => {
+        const k = b.dataset.sc;
+        $instr.value = SHORTCUTS[k] || '';
+        runEdit();
+      });
+    });
+
+    let currentResult = '';
+    let inFlight = false;
+    async function runEdit() {
+      const instruction = $instr.value.trim();
+      if (!instruction || inFlight) return;
+      inFlight = true;
+      $prop.classList.add('sn-editbox-empty');
+      $prop.textContent = I18n.t('edit_box_loading');
+      $copy.disabled = true;
+      $replace.disabled = true;
+      try {
+        const res = await chrome.runtime.sendMessage({
+          type: MSG.AI_REQUEST,
+          action: ACTIONS.EDIT_TEXT,
+          payload: { original: originalText, instruction },
+        });
+        if (!res?.ok || !res.text) {
+          $prop.textContent = res?.error || I18n.t('edit_box_error');
+          return;
+        }
+        currentResult = res.text.trim();
+        $prop.classList.remove('sn-editbox-empty');
+        renderDiff($prop, originalText, currentResult);
+        $copy.disabled = false;
+        $replace.disabled = false;
+      } catch (_) {
+        $prop.textContent = I18n.t('edit_box_error');
+      } finally {
+        inFlight = false;
+      }
+    }
+
+    $instr.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        runEdit();
+      } else if (e.key === 'Escape') {
+        close();
+      }
+    });
+    $cancel.addEventListener('click', close);
+    $copy.addEventListener('click', () => {
+      navigator.clipboard.writeText(currentResult).then(() => {
+        Popup.showToast(I18n.t('toast_copied'));
+        close();
+      }, () => Popup.showToast(I18n.t('err_provider_failed')));
+    });
+    $replace.addEventListener('click', () => {
+      pasteContext = savedCtx;
+      restorePasteContext();
+      // In input/textarea sostituisco il range salvato; in contenteditable uso execCommand insertText
+      // dopo aver ripristinato la selezione originale, così Ctrl+Z funziona.
+      if (savedCtx.kind === 'input') {
+        const el = savedCtx.el;
+        const start = savedCtx.start, end = savedCtx.end;
+        el.value = el.value.slice(0, start) + currentResult + el.value.slice(end);
+        const caret = start + currentResult.length;
+        el.setSelectionRange(start, caret);
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      } else if (savedCtx.kind === 'ce') {
+        try { document.execCommand('insertText', false, currentResult); } catch (_) {}
+      }
+      Popup.showToast(I18n.t('edit_box_replaced'));
+      close();
+    });
+
+    function close() {
+      try { root.remove(); } catch (_) {}
+      document.removeEventListener('keydown', onDocKey, true);
+    }
+    const onDocKey = (e) => {
+      if (e.key === 'Escape') close();
+    };
+    document.addEventListener('keydown', onDocKey, true);
+    root.addEventListener('mousedown', (e) => {
+      if (e.target === root) close(); // click fuori dal box
+    });
+
+    // Avvia subito una proposta neutra (rifrasi), così l'utente vede già qualcosa.
+    $instr.value = '';
+    // No autorun — l'utente deve dare istruzione esplicita.
+    $prop.textContent = '—';
+  }
+
+  // Diff parola-per-parola: ricostruisce il testo proposto evidenziando aggiunte
+  // (verde) e rimozioni (rosso barrato). Algoritmo LCS semplice sulle parole.
+  function renderDiff(container, original, proposed) {
+    container.innerHTML = '';
+    const a = original.split(/(\s+)/);
+    const b = proposed.split(/(\s+)/);
+    const m = a.length, n = b.length;
+    const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+    for (let i = 1; i <= m; i++) {
+      for (let j = 1; j <= n; j++) {
+        if (a[i - 1] === b[j - 1]) dp[i][j] = dp[i - 1][j - 1] + 1;
+        else dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+      }
+    }
+    const ops = [];
+    let i = m, j = n;
+    while (i > 0 && j > 0) {
+      if (a[i - 1] === b[j - 1]) { ops.push({ op: 'eq', t: a[i - 1] }); i--; j--; }
+      else if (dp[i - 1][j] >= dp[i][j - 1]) { ops.push({ op: 'del', t: a[i - 1] }); i--; }
+      else { ops.push({ op: 'add', t: b[j - 1] }); j--; }
+    }
+    while (i > 0) { ops.push({ op: 'del', t: a[i - 1] }); i--; }
+    while (j > 0) { ops.push({ op: 'add', t: b[j - 1] }); j--; }
+    ops.reverse();
+    for (const o of ops) {
+      if (o.op === 'eq') {
+        container.appendChild(document.createTextNode(o.t));
+      } else if (o.op === 'add') {
+        const s = document.createElement('span');
+        s.className = 'sn-diff-add';
+        s.textContent = o.t;
+        container.appendChild(s);
+      } else {
+        const s = document.createElement('span');
+        s.className = 'sn-diff-del';
+        s.textContent = o.t;
+        container.appendChild(s);
+      }
+    }
+  }
+
+  // ------------------------------------------------------------
+  init();
+})();

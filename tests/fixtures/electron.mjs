@@ -1,0 +1,118 @@
+// Fixture Playwright per Filo Electron.
+//
+// Lancia l'app via _electron.launch e fornisce ai test:
+//   - app:        l'istanza ElectronApplication
+//   - shell:      Page object della shell (BrowserWindow primary)
+//   - openTab:    apre una URL come nuovo tab e ritorna la Page del WebContentsView
+//   - testServer: mini HTTP server locale per pagine di test (i content
+//                 script Filo si caricano via preload anche su http://127.0.0.1)
+//
+// Punti d'attenzione:
+//   - userData isolato: ogni test mette FILO_USER_DATA in env così non
+//     calpesta lo storage reale dell'utente
+//   - Playwright per Electron passa attraverso il debugger CDP; setAlwaysOnTop
+//     può interferire con altri test → lo lasciamo decidere ai test che
+//     vogliono il pixel-perfect.
+
+import { test as base, _electron as electron, expect } from '@playwright/test';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { createServer } from 'node:http';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const APP_ROOT = resolve(__dirname, '..', '..');
+
+export const test = base.extend({
+  app: async ({}, use) => {
+    const userData = mkdtempSync(join(tmpdir(), 'filo-test-'));
+    const app = await electron.launch({
+      args: ['.'],
+      cwd: APP_ROOT,
+      env: {
+        ...process.env,
+        FILO_USER_DATA: userData,
+        NODE_ENV: 'test',
+      },
+    });
+    await use(app);
+    try { await app.close(); } catch (_) {}
+    try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
+  },
+
+  // Pagina della shell del browser (tab bar + barra indirizzi). È la prima
+  // window che Filo apre.
+  shell: async ({ app }, use) => {
+    const win = await app.firstWindow();
+    await win.waitForLoadState('domcontentloaded');
+    await use(win);
+  },
+
+  // Apre un URL come tab e ritorna la Page corrispondente al WebContentsView.
+  // Polling sull'URL: app.waitForEvent('window') può risolvere con la
+  // newtab (già pendente al boot), non con il tab appena aperto. Per evitare
+  // race usiamo app.windows() filtrato per hostname della URL richiesta.
+  openTab: async ({ app, shell }, use) => {
+    const fn = async (url) => {
+      const target = new URL(url).hostname;
+      await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+      const deadline = Date.now() + 10_000;
+      let page = null;
+      while (Date.now() < deadline) {
+        page = app.windows().find((w) => {
+          try { return new URL(w.url()).hostname === target; }
+          catch (_) { return false; }
+        });
+        if (page) break;
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      if (!page) throw new Error(`openTab: nessuna window per ${url}`);
+      await page.waitForLoadState('domcontentloaded').catch(() => {});
+      return page;
+    };
+    await use(fn);
+  },
+
+  // Server HTTP locale: i content script di Filo si caricano via preload su
+  // QUALSIASI url (anche file://), ma per uniformità con la suite dell'estensione
+  // serviamo HTML su 127.0.0.1.
+  testServer: async ({}, use) => {
+    const pages = new Map();
+    let nextId = 0;
+    const server = createServer((req, res) => {
+      const id = req.url.replace(/^\//, '').split('?')[0];
+      const html = pages.get(id);
+      if (!html) { res.writeHead(404); res.end('not found'); return; }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(html);
+    });
+    await new Promise((r) => server.listen(0, '127.0.0.1', r));
+    const port = server.address().port;
+    const api = {
+      html(body) {
+        const id = String(++nextId);
+        pages.set(id, body);
+        return `http://127.0.0.1:${port}/${id}`;
+      },
+      origin: `http://127.0.0.1:${port}`,
+      // Naviga e aspetta che i content script si siano montati: il page-preload
+      // imposta data-filo-ready su <html> al termine di start().
+      async openReady(openTab, html, opts = {}) {
+        const url = this.html(html);
+        const page = await openTab(url);
+        await page.waitForFunction(
+          () => document.documentElement.dataset.filoReady === '1',
+          null,
+          { timeout: 8000 },
+        );
+        return page;
+      },
+    };
+    await use(api);
+    try { server.closeAllConnections?.(); } catch (_) {}
+    await new Promise((r) => server.close(r));
+  },
+});
+
+export { expect };

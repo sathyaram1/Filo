@@ -6,8 +6,14 @@
 //   - servizi (storage, providers AI, saved pages, ecc.)
 //   - shortcut globali
 
-const { app, BrowserWindow, desktopCapturer } = require('electron');
+const { app, BrowserWindow } = require('electron');
 const path = require('node:path');
+
+// In test mode, redirigi anche userData (cookies, cache, ecc.) sotto la
+// directory temp così l'isolamento è completo.
+if (process.env.FILO_USER_DATA) {
+  try { app.setPath('userData', process.env.FILO_USER_DATA); } catch (_) {}
+}
 
 // Carica i moduli "shared/background" portati dall'estensione. Si registrano
 // tutti su `globalThis` (pattern IIFE preservato dal codice extension), così
@@ -32,10 +38,9 @@ app.whenReady().then(async () => {
   mainWindow = createMainWindow();
   registerShortcuts(mainWindow);
 
-  // Smoke sentinel: in test mode scrivi un marker quando la prima tab è pronta
-  // così uno smoke script può verificare il boot senza GUI. Cattura anche
-  // uno screenshot dell'intera finestra (shell + tab attiva) e lo salva
-  // accanto al sentinel — utile per ispezione visiva.
+  // Smoke sentinel: in test mode apre la newtab E una pagina di test esterna,
+  // verifica che i content script si caricano in quest'ultima, cattura
+  // screenshot di entrambe, scrive un report e si chiude.
   if (process.env.FILO_SMOKE) {
     const fs = require('node:fs');
     const path = require('node:path');
@@ -81,58 +86,79 @@ app.whenReady().then(async () => {
       // Cattura: shell (= primary webContents), tab attiva (di solito fallisce
       // — vedi electron#24694), e composito via desktopCapturer.
       await dump('shell', mainWindow.webContents);
+      // captureUrl: apre URL in una BrowserWindow dedicata e cattura il
+      // primary. Workaround a electron#24694 (capturePage su WebContentsView
+      // restituisce empty image in molte configurazioni).
+      const captureUrl = async (label, url, preloadName) => {
+        try {
+          const captureWin = new BrowserWindow({
+            width: 1280, height: 800, show: true,
+            webPreferences: {
+              preload: path.join(__dirname, '..', 'preload', preloadName),
+              contextIsolation: preloadName !== 'internal-preload.js',
+              sandbox: false, nodeIntegration: false,
+            },
+          });
+          captureWin.loadURL(url);
+          await new Promise((res) => captureWin.webContents.once('did-stop-loading', res));
+          captureWin.show(); captureWin.moveTop(); captureWin.focus();
+          captureWin.setAlwaysOnTop(true);
+          await new Promise((r) => setTimeout(r, 900));
+          await dump(label, captureWin.webContents);
+          return captureWin;
+        } catch (e) { console.log(`[smoke] capture ${label} failed`, e.message); return null; }
+      };
+
       const active = tabs.tabs.find((t) => t.id === tabs.activeId);
       if (active) {
-        await dump('tab', active.view.webContents);
-        // Composito reale via OS-level capture.
-        // Per distinguere la nostra finestra dall'Explorer di Windows (che
-        // capita di chiamarsi pure "Filo" quando l'utente è in quella cartella),
-        // imposto un titolo univoco prima di chiamare desktopCapturer.
-        const MARKER = `Filo Smoke ${Date.now()}`;
-        mainWindow.setTitle(MARKER);
-        await new Promise((r) => setTimeout(r, 300));
+        const tabCaptureWin = await captureUrl('tab', active.url, 'internal-preload.js');
+        if (tabCaptureWin) tabCaptureWin.close();
+      }
+
+      // Test pagina esterna + content script: apri una pagina file:// che
+      // non è filo:// e verifica che i content script si carichino bene.
+      const testPageUrl = 'file:///' + path.join(__dirname, '..', '..', 'tests', 'fixtures', 'test-page.html').replace(/\\/g, '/');
+      const csWin = await captureUrl('test-page', testPageUrl, 'page-preload.js');
+      if (csWin) {
         try {
-          const sources = await desktopCapturer.getSources({
-            types: ['window'],
-            thumbnailSize: { width: 1280, height: 840 },
-          });
-          console.log('[smoke] desktopCapturer sources:', sources.map((s) => s.name));
-          const ours = sources.find((s) => s.name === MARKER);
-          if (ours) {
-            const png = ours.thumbnail.toPNG();
-            const file = path.join(outDir, 'screenshot-window.png');
-            fs.writeFileSync(file, png);
-            const sz = ours.thumbnail.getSize();
-            console.log(`[smoke] capture window: ${sz.width}x${sz.height}, ${png.length} bytes → ${file}`);
-          } else {
-            console.log('[smoke] desktopCapturer: marker window not found');
-          }
-        } catch (e) { console.log('[smoke] desktopCapturer failed', e.message); }
-        mainWindow.setTitle('Filo');
-        // Diagnostica: dump del DOM, computed dimensions, ed eventuali errori.
-        try {
-          const diag = await active.view.webContents.executeJavaScript(`(() => {
-            const out = {
-              url: location.href,
-              title: document.title,
-              bodyChildren: document.body?.children?.length || 0,
-              bodyHTML_len: (document.body?.outerHTML || '').length,
-              bodyHTML_head: (document.body?.outerHTML || '').slice(0, 400),
-              dashState: document.body?.dataset?.state,
-              hasInput: !!document.getElementById('input'),
-              hasSettings: !!document.getElementById('settingsBtn'),
-              hasHome: !!document.getElementById('homeMessage'),
-              homeMsgText: document.getElementById('homeMessage')?.textContent,
-              SN_CONST_loaded: typeof window.SN_CONST !== 'undefined',
-              SN_MSG_loaded: typeof window.SN_MSG !== 'undefined',
-              chrome_runtime: typeof window.chrome?.runtime !== 'undefined',
-              bodyBg: getComputedStyle(document.body).backgroundColor,
-              viewportSize: [window.innerWidth, window.innerHeight],
-            };
-            return out;
+          const csDiag = await csWin.webContents.executeJavaScript(
+            "({ href: location.href," +
+            " filoReady: document.documentElement.dataset.filoReady," +
+            " filoModules: document.documentElement.dataset.filoModules," +
+            " filoTheme: document.documentElement.dataset.snTheme," +
+            " filoStyleInjected: !!document.querySelector('link[href*=\"filo://style/\"]')," +
+            " linkCount: document.querySelectorAll('link[rel=stylesheet]').length })"
+          );
+          console.log('[smoke] content-script diag:', JSON.stringify(csDiag, null, 2));
+
+          // Simula selezione + right-click per verificare che il menu compaia.
+          await csWin.webContents.executeJavaScript(`(() => {
+            const span = document.querySelector('.selectable');
+            if (!span) return false;
+            const range = document.createRange();
+            range.selectNodeContents(span);
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+            const rect = span.getBoundingClientRect();
+            const evt = new MouseEvent('contextmenu', {
+              bubbles: true, cancelable: true, view: window,
+              clientX: rect.left + rect.width / 2,
+              clientY: rect.top + rect.height / 2,
+              button: 2,
+            });
+            return span.dispatchEvent(evt);
           })()`);
-          console.log('[smoke] dashboard diag:', JSON.stringify(diag, null, 2));
-        } catch (e) { console.log('[smoke] diag failed:', e?.message); }
+          await new Promise((r) => setTimeout(r, 500));
+          const menuDiag = await csWin.webContents.executeJavaScript(
+            "({ menu: !!document.querySelector('.sn-menu')," +
+            " menuItems: document.querySelectorAll('.sn-menu .sn-menu-item, .sn-menu button').length," +
+            " menuHtml: (document.querySelector('.sn-menu')?.outerHTML || '').slice(0,300) })"
+          );
+          console.log('[smoke] right-click menu diag:', JSON.stringify(menuDiag, null, 2));
+          await dump('menu', csWin.webContents);
+        } catch (e) { console.log('[smoke] content-script diag failed', e.message); }
+        csWin.close();
       }
       fs.writeFileSync(process.env.FILO_SMOKE, JSON.stringify({
         ts: new Date().toISOString(),

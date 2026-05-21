@@ -2,6 +2,8 @@ node_modules/
 dist/
 .feedback-images/
 tests/.report/
+tests/.smoke/
 tests/agent/.env
+test-results/
 .DS_Store
 *.log

@@ -23,7 +23,10 @@ const STATE = {
 
 function filePath() {
   if (!STATE.filePath) {
-    STATE.filePath = path.join(app.getPath('userData'), 'storage.json');
+    // FILO_USER_DATA override per i test: ogni run mette un tempdir isolato
+    // così non si tocca lo storage reale dell'utente.
+    const root = process.env.FILO_USER_DATA || app.getPath('userData');
+    STATE.filePath = path.join(root, 'storage.json');
   }
   return STATE.filePath;
 }

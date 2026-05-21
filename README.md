@@ -93,10 +93,22 @@ main. Così le pagine girano quasi invariate.
 - [x] IPC + streaming AI
 - [x] Hotkey globali (Alt+E/T/S/H)
 - [x] Pagine: dashboard, options, history, feedback, spellcheck (HTML/CSS/JS portati 1:1)
-- [ ] **Content script in pagine web** (menu tasto destro, popup, sidebar, highlight, spellcheck, feedback) — file copiati, iniezione via preload da finalizzare nella prossima sessione
-- [ ] Test Playwright adattati a `_electron.launch`
+- [x] **Content script** in pagine web (menu tasto destro, popup, sidebar, highlight, spellcheck, feedback) iniettati via `page-preload.js`
+- [x] Test Playwright adattati a `_electron.launch` (boot + context-menu + dashboard = 12 test)
 - [ ] Auto-update (electron-builder)
 - [ ] Packaging Windows/Mac/Linux
+
+## Test
+
+```bash
+npm run test:smoke     # smoke headless con screenshot (tests/.smoke/)
+npm test               # suite Playwright completa (12 test)
+```
+
+La suite copre:
+- **boot**: shell, newtab, opening filo://options/, filo://history/
+- **context-menu**: tasto destro apre `.sn-menu`, Shift+destro escape hatch, selezione + destro mostra sezione inline AI
+- **dashboard**: layout 3-zone, fallback senza API key, IPC `FILO_GET_STATE` / `FILO_ADD_TIMER` / `FILO_ADD_NOTE`
 
 ## Sviluppo
 
