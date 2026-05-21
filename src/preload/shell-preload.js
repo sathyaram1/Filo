@@ -19,5 +19,10 @@ contextBridge.exposeInMainWorld('filoShell', {
       return () => ipcRenderer.removeListener('tabs:updated', wrapped);
     },
   },
+  window: {
+    minimize: () => ipcRenderer.invoke('window:minimize'),
+    toggleMaximize: () => ipcRenderer.invoke('window:toggle-maximize'),
+    close: () => ipcRenderer.invoke('window:close'),
+  },
   message: (msg) => ipcRenderer.invoke('filo:message', msg),
 });
