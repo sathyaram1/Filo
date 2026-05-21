@@ -94,6 +94,18 @@
     return map[icon] || (icon ? icon[0].toUpperCase() : '·');
   }
 
+  // Favicon di un sito a partire dall'URL. Usa il servizio Google s2 —
+  // gratis, niente API key, regge i casi mancanti restituendo un'icona
+  // grigia generica. Ritorna '' per URL non http(s) (es. file://, mailto:).
+  function faviconUrl(rawUrl) {
+    if (!rawUrl) return '';
+    try {
+      const u = new URL(rawUrl);
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') return '';
+      return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(u.hostname)}&sz=64`;
+    } catch (_) { return ''; }
+  }
+
   function renderSuggestions() {
     // Default visibili: importance >= 3, max 5. Espanso: max 12.
     const sorted = [...suggestions].sort((a, b) => (b.importance || 0) - (a.importance || 0));
