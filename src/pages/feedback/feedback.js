@@ -45,6 +45,18 @@
     })[c]);
   }
 
+  // Filtra URL non sicuri (javascript:, data:, ecc.) prima di emetterli in href.
+  // I feedback arrivano da utenti reali — se per qualsiasi motivo un URL
+  // malevolo finisce in DB, evitiamo che diventi un vettore XSS al click.
+  function safeHref(rawUrl) {
+    if (!rawUrl) return '';
+    try {
+      const u = new URL(rawUrl);
+      if (u.protocol === 'http:' || u.protocol === 'https:') return u.href;
+    } catch (_) {}
+    return '';
+  }
+
   async function patch(id, payload, optimistic) {
     const item = all.find((f) => f._id === id);
     if (!item) return;
