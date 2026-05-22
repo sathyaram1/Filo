@@ -52,6 +52,12 @@
       if (it.type === 'separator') {
         const sep = document.createElement('div');
         sep.className = 'sn-menu-sep';
+        // `hidden` permette al chiamante di nascondere il separatore in tandem
+        // con una correction nascosta (vedi gestione 'correction' hidden).
+        if (it.hidden) {
+          sep.style.display = 'none';
+          sep.dataset.snHiddenSep = '1';
+        }
         root.appendChild(sep);
         continue;
       }
