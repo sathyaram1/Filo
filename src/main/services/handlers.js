@@ -788,6 +788,14 @@ async function handleMessage(msg, sender = {}) {
       } catch (e) {
         return { ok: false, error: e.message || String(e), results: [] };
       }
+    case MSG.SUBMIT_FEEDBACK: {
+      try {
+        const r = await globalThis.SN_FEEDBACK.submit(msg.payload || {});
+        return { ok: true, ...r };
+      } catch (e) {
+        return { ok: false, error: e?.message || String(e) };
+      }
+    }
     case MSG.SAVE_PATH:
       (async () => {
         try {
