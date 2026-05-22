@@ -434,6 +434,7 @@
       cell.style.gridRow = `${m.y + 1} / span ${m.h}`;
       renderModuleBody(cell, m);
       attachModuleDrag(cell, m);
+      if (!isFixed(m)) attachModuleResize(cell, m);
       cell.addEventListener('click', (e) => {
         // I moduli fissi gestiscono il click internamente (es. ingranaggio →
         // toggle modalità modifica); non aprono il pannello di configurazione.
