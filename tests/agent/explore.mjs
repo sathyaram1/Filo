@@ -63,10 +63,15 @@ const SCHEMA = {
 };
 
 function parseArgs(argv) {
-  const o = { model: 'gemini-3.1-flash-lite', steps: 12, start: 'filo://newtab/', area: '', task: '', out: '', feedback: true, minSeverity: 'low' };
+  // Primario: gemini-3.1-flash-lite ("il modello buono"). Fallback: gemma-4-31b-it
+  // (quota alta) quando il primario esaurisce i crediti (429) → si sfrutta prima
+  // il modello migliore, poi si continua col fallback.
+  const o = { model: 'gemini-3.1-flash-lite', fallback: 'gemma-4-31b-it', steps: 12, start: 'filo://newtab/', area: '', task: '', out: '', feedback: true, minSeverity: 'low' };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--model') o.model = argv[++i];
+    else if (a === '--fallback') o.fallback = argv[++i];
+    else if (a === '--no-fallback') o.fallback = '';
     else if (a === '--steps') o.steps = Number(argv[++i]);
     else if (a === '--start') o.start = argv[++i];
     else if (a === '--area') o.area = argv[++i];
