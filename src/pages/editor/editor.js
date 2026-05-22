@@ -410,7 +410,10 @@
   function fits(rect, z, ignoreId) {
     if (rect.x < 0 || rect.y < 0 || rect.x + rect.w > GRID_COLS || rect.y + rect.h > GRID_ROWS) return false;
     for (const m of doc.modules) {
-      if (m.z !== z || m.id === ignoreId) continue;
+      if (m.id === ignoreId) continue;
+      // I moduli fissi (es. impostazioni) sono appuntati su tutte le pagine:
+      // la loro cella va riservata su qualunque z.
+      if (m.z !== z && !isFixed(m)) continue;
       const overlap = rect.x < m.x + m.w && rect.x + rect.w > m.x && rect.y < m.y + m.h && rect.y + rect.h > m.y;
       if (overlap) return false;
     }
