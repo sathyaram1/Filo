@@ -6,7 +6,7 @@
 //   - servizi (storage, providers AI, saved pages, ecc.)
 //   - shortcut globali
 
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, nativeTheme } = require('electron');
 const path = require('node:path');
 
 // In test mode, redirigi anche userData (cookies, cache, ecc.) sotto la
