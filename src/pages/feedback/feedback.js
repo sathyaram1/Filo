@@ -20,14 +20,32 @@
   let all = [];
   let currentTab = 'inbox';
 
+  // Le issue trovate dagli agenti LLM arrivano con clientId "agent:<model>"
+  // (vedi tests/agent/feedback.mjs): categoria dedicata, niente schema extra.
+  function isAgent(f) {
+    return typeof f.clientId === 'string' && f.clientId.startsWith('agent:');
+  }
+  // Decodifica i metadati codificati nei campi consentiti dalle rules.
+  function agentMeta(f) {
+    const model = (f.clientId || '').slice('agent:'.length) || '?';
+    const parts = String(f.title || '').split('|');
+    const severity = parts.length >= 3 ? parts[0].trim() : '';
+    const area = parts.length >= 3 ? parts[1].trim() : '';
+    const title = parts.length >= 3 ? parts.slice(2).join('|').trim() : (f.title || '');
+    return { model, severity, area, title };
+  }
+
   function statusOf(f) {
     const s = f.status || 'new';
+    if (s === 'ignored') return 'ignored';
+    if (s === 'done') return 'done';
+    if (s === 'verified') return 'verified';
+    // Le issue d'agente non ancora chiuse vivono nella loro categoria, non in
+    // inbox/todo/draft, così non annegano i feedback degli utenti reali.
+    if (isAgent(f)) return 'agent';
     if (s === 'new') return 'inbox';
     if (s === 'draft') return 'draft';
     if (s === 'todo') return 'todo';
-    if (s === 'done') return 'done';
-    if (s === 'verified') return 'verified';
-    if (s === 'ignored') return 'ignored';
     return 'inbox';
   }
 
