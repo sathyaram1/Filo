@@ -211,6 +211,12 @@
     const linkEl = target?.closest?.('a[href]');
     const imgEl = target?.tagName === 'IMG' ? target : target?.closest?.('img');
     const editable = isEditable(target);
+    // Cattura il contesto di incolla (elemento + caret/selezione) anche per i
+    // menu di correzione: senza questo, l'item "Incolla" del menu spellcheck
+    // usava un pasteContext stale e incollava all'inizio del campo / falliva
+    // sulle immagini (feedback alpha).
+    if (editable) capturePasteContext(target);
+    else pasteContext = null;
     const clipboardHistory = await getClipboardHistory();
     return buildMenuItems({ selInfo, linkEl, imgEl, editable, clipboardHistory });
   }
