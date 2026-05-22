@@ -35,6 +35,10 @@
     // Aiuto: invio percorso completato a fine sessione (passa per la pipeline
     // di sanitizzazione 2-LLM in pathsCollector.js prima di toccare Firestore).
     SAVE_PATH: 'save_path',                        // { path: { domain, initialUrl, sanitizedSteps, rawUserMessages, success } }
+
+    // Invio feedback alpha → Firestore/Storage. Va instradato dal main process
+    // perché le CSP delle pagine ospiti bloccano fetch diretti dal preload.
+    SUBMIT_FEEDBACK: 'submit_feedback',           // { text, url, title, userAgent, clientId, images: [{dataUrl}] }
     WEB_SEARCH: 'web_search',                      // { query } → { ok, results: [{title,url,snippet}], provider }
 
     // Clipboard history (per il menu "Incolla")
