@@ -13,7 +13,7 @@ e shortcut globali OS.
 npm install                # Electron + Playwright (~150MB)
 npm start                  # avvia la app
 npm run test:smoke         # smoke headless con screenshot in tests/.smoke/
-npm test                   # suite Playwright (13 test)
+npm test                   # suite Playwright (17 test)
 ```
 
 Se `npm install` non scarica il binario Electron (succede su alcuni setup):
