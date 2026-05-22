@@ -194,6 +194,29 @@
     `<path d="M4 11l8-7 8 7"/>` +
     `<path d="M6 10v9a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-9"/>`;
 
+  // --- App launcher: griglia 3x3 di puntini/quadratini (stile "tutte le app").
+  const apps =
+    `<rect x="4" y="4" width="4" height="4" rx="1"/>` +
+    `<rect x="10" y="4" width="4" height="4" rx="1"/>` +
+    `<rect x="16" y="4" width="4" height="4" rx="1"/>` +
+    `<rect x="4" y="10" width="4" height="4" rx="1"/>` +
+    `<rect x="10" y="10" width="4" height="4" rx="1"/>` +
+    `<rect x="16" y="10" width="4" height="4" rx="1"/>` +
+    `<rect x="4" y="16" width="4" height="4" rx="1"/>` +
+    `<rect x="10" y="16" width="4" height="4" rx="1"/>` +
+    `<rect x="16" y="16" width="4" height="4" rx="1"/>`;
+
+  // --- Caret giù: piccola freccetta per i menu a tendina.
+  const caretDown =
+    `<path d="M6 9l6 6 6-6"/>`;
+
+  // --- Editor: foglio con penna che scrive (documento + pennino diagonale).
+  const editor =
+    `<path d="M5 4h7l5 5v3"/>` +
+    `<path d="M12 4v5h5"/>` +
+    `<path d="M8 13h4"/>` +
+    `<path d="M19.5 14.5l-6 6L11 21l.5-2.5 6-6a1.4 1.4 0 0 1 2 2z"/>`;
+
   // --- Alias semantico: "Salvati per dopo" usa il logo di Filo
   const openForLater = filoLogo;
 
