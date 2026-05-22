@@ -3,12 +3,41 @@
 // La shell parla con il main via IPC (tabs:* canali); il main risponde con
 // broadcast tabs:updated alla shell perché ridisegni la barra.
 
-const { WebContentsView } = require('electron');
+const { WebContentsView, Menu, MenuItem } = require('electron');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 
 const PAGE_PRELOAD = path.join(__dirname, '..', 'preload', 'page-preload.js');
 const INTERNAL_PRELOAD = path.join(__dirname, '..', 'preload', 'internal-preload.js');
+
+// Pagine interne su cui i content script (e quindi il menu Filo del tasto
+// destro) NON vengono iniettati — vedi CS_BLOCKLIST in internal-preload.js.
+// Qui forniamo un menu contestuale nativo così il tasto destro fa qualcosa
+// (taglia/copia/incolla) invece di restare inerte, es. nell'editor.
+const NATIVE_MENU_PAGES = [
+  'filo://options/', 'filo://history/', 'filo://feedback/',
+  'filo://spellcheck/', 'filo://editor/',
+];
+
+function buildNativeContextMenu(wc, params) {
+  const { editFlags = {}, isEditable, selectionText, misspelledWord, dictionarySuggestions } = params;
+  const menu = new Menu();
+  if (misspelledWord && Array.isArray(dictionarySuggestions) && dictionarySuggestions.length) {
+    for (const s of dictionarySuggestions.slice(0, 5)) {
+      menu.append(new MenuItem({ label: s, click: () => wc.replaceMisspelling(s) }));
+    }
+    menu.append(new MenuItem({ type: 'separator' }));
+  }
+  const hasSel = !!(selectionText && selectionText.trim());
+  if (isEditable) menu.append(new MenuItem({ label: 'Taglia', role: 'cut', enabled: !!editFlags.canCut }));
+  if (isEditable || hasSel) menu.append(new MenuItem({ label: 'Copia', role: 'copy', enabled: !!editFlags.canCopy }));
+  if (isEditable) menu.append(new MenuItem({ label: 'Incolla', role: 'paste', enabled: !!editFlags.canPaste }));
+  if (isEditable || hasSel) {
+    menu.append(new MenuItem({ type: 'separator' }));
+    menu.append(new MenuItem({ label: 'Seleziona tutto', role: 'selectAll' }));
+  }
+  return menu.items.length ? menu : null;
+}
 
 class TabManager {
   constructor(window, shellView, { shellHeight = 88 } = {}) {
