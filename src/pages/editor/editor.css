@@ -198,15 +198,6 @@ html, body {
   flex-direction: column;
   background: var(--sn-bg);
 }
-.ed-sidebar-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--sn-border);
-}
-.ed-page-name { font-weight: 600; font-size: 14px; }
-
 .ed-grid {
   flex: 1 1 auto;
   display: grid;
