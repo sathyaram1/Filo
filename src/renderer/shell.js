@@ -32,6 +32,7 @@
   setIcon(fwdBtn, 'forward', 18);
   setIcon(reloadBtn, 'reload', 18);
   setIcon(homeBtn, 'home', 18);
+  setIcon(settingsBtn, 'options', 16);
   setIcon(newBtn, 'plus', 16);
   setIcon(winMinBtn, 'minimize', 16);
   setIcon(winMaxBtn, 'maximize', 14);
