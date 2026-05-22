@@ -17,12 +17,9 @@
   const $ = (id) => document.getElementById(id);
   const root = $('root');
   const docEl = $('doc');
-  const titleEl = $('docTitle');
   const saveStateEl = $('saveState');
   const gridEl = $('grid');
-  const pageNameEl = $('pageName');
   const sidebarToggle = $('sidebarToggle');
-  const settingsToggle = $('settingsToggle');
   const settingsView = $('settingsView');
   const docWrap = $('docWrap');
   const paletteEl = $('palette');
