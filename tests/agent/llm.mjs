@@ -33,21 +33,40 @@ export function getApiKey() {
 
 const isGemma = (model) => /gemma/i.test(model);
 
-// Genera contenuto da testo (+ immagine PNG opzionale). Ritorna stringa.
-// Se `schema` è dato, vincola l'output con responseSchema (output strutturato):
-// funziona sia per Gemini sia per Gemma su AI Studio → JSON sempre valido.
-export async function generate({ model, system, user, imagePath, temperature = 0.4, apiKey, schema }) {
+// Costruisce una part immagine da un file PNG (per i `contents` multi-turn).
+export function imagePart(path) {
+  return { inline_data: { mime_type: 'image/png', data: readFileSync(path).toString('base64') } };
+}
+
+// Genera contenuto. Due modalità:
+//   - one-shot:    { user, imagePath }           → singolo turno utente
+//   - multi-turn:  { contents: [{role,parts}] }  → conversazione completa
+// `contents` ha precedenza. Se `schema` è dato, vincola l'output (responseSchema)
+// → JSON valido sia per Gemini sia per Gemma.
+export async function generate({ model, system, user, imagePath, contents, temperature = 0.4, apiKey, schema }) {
   apiKey = apiKey || getApiKey();
-  const parts = [];
-  // Gemma non supporta systemInstruction: lo fondiamo nel turno utente.
-  const userText = isGemma(model) && system ? `${system}\n\n---\n\n${user}` : user;
-  parts.push({ text: userText });
-  if (imagePath) {
-    const data = readFileSync(imagePath).toString('base64');
-    parts.push({ inline_data: { mime_type: 'image/png', data } });
+
+  let convo;
+  if (Array.isArray(contents) && contents.length) {
+    // clone per non mutare il chiamante
+    convo = contents.map((t) => ({ role: t.role, parts: t.parts.slice() }));
+  } else {
+    const parts = [{ text: user || '' }];
+    if (imagePath) parts.push(imagePart(imagePath));
+    convo = [{ role: 'user', parts }];
   }
+  // Gemma non supporta systemInstruction: fondiamo il system nel PRIMO turno utente.
+  if (isGemma(model) && system) {
+    const firstUser = convo.find((t) => t.role === 'user');
+    if (firstUser) {
+      const ti = firstUser.parts.findIndex((p) => typeof p.text === 'string');
+      if (ti >= 0) firstUser.parts[ti] = { text: `${system}\n\n---\n\n${firstUser.parts[ti].text}` };
+      else firstUser.parts.unshift({ text: system });
+    }
+  }
+
   const body = {
-    contents: [{ role: 'user', parts }],
+    contents: convo,
     // Cap moderato: i modelli piccoli a volte degenerano in ripetizioni dentro
     // una stringa; un cap basso fa fallire in fretta e il chiamante ritenta.
     generationConfig: { temperature, maxOutputTokens: 2048 },
