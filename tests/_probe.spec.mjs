@@ -18,6 +18,15 @@ test('probe: dashboard then navigate same tab to editor, capture errors', async 
   await dash.waitForTimeout(1800);
 
   console.log('SAME-TAB ERRORS:', JSON.stringify(errors, null, 2));
+  // ispeziona lo stato dell'editor dopo navigazione same-tab
+  const state = await dash.evaluate(() => ({
+    url: location.href,
+    hasDoc: !!document.getElementById('doc'),
+    docEditable: document.getElementById('doc')?.getAttribute('contenteditable'),
+    gridChildren: document.getElementById('grid')?.children.length,
+    bodyText: document.body.innerText.slice(0, 120),
+  })).catch((e) => ({ evalError: e.message }));
+  console.log('SAME-TAB EDITOR STATE:', JSON.stringify(state, null, 2));
 });
 
 test('probe: fresh editor tab, capture errors', async ({ app, openTab }) => {
