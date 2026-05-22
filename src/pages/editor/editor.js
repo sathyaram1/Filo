@@ -460,13 +460,16 @@
 
   // ── Drag & drop ──────────────────────────────────────────────────────
   function attachModuleDrag(cell, m) {
-    cell.setAttribute('draggable', 'true');
+    cell.addEventListener('mousedown', (e) => {
+      cell.draggable = !!e.target.closest('.ed-mod-drag');
+    });
     cell.addEventListener('dragstart', (e) => {
+      if (!e.target.closest('.ed-mod-drag')) { e.preventDefault(); return; }
       e.dataTransfer.setData('text/plain', JSON.stringify({ move: m.id }));
       e.dataTransfer.effectAllowed = 'move';
       cell.classList.add('dragging');
     });
-    cell.addEventListener('dragend', () => cell.classList.remove('dragging'));
+    cell.addEventListener('dragend', () => { cell.draggable = false; cell.classList.remove('dragging'); });
   }
   function attachCellDrop(empty, x, y, z) {
     empty.addEventListener('dragover', (e) => { e.preventDefault(); empty.classList.add('drop-target'); });
