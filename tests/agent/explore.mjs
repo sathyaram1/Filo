@@ -157,7 +157,7 @@ async function run() {
 
       let parsed = null;
       try {
-        const out = await generate({ model: o.model, system: SYSTEM, user, imagePath: shot, temperature: 0.5 });
+        const out = await generate({ model: o.model, system: SYSTEM, user, imagePath: shot, temperature: 0.5, schema: SCHEMA });
         parsed = extractJson(out);
         if (!parsed) { log(`  [step ${step}] JSON non parsabile, salto. Raw: ${out.slice(0, 160)}`); }
       } catch (e) {
