@@ -21,11 +21,49 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as d from './driver.mjs';
 import { generate, extractJson, getApiKey } from './llm.mjs';
+import { pushIssue } from './feedback.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// Schema strutturato (responseSchema): vincola l'output → JSON sempre valido,
+// anche con modelli poco disciplinati come Gemma.
+const SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    screen: { type: 'STRING' },
+    issues: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          severity: { type: 'STRING', enum: ['low', 'medium', 'high'] },
+          title: { type: 'STRING' },
+          detail: { type: 'STRING' },
+          area: { type: 'STRING' },
+        },
+        required: ['severity', 'title'],
+      },
+    },
+    action: {
+      type: 'OBJECT',
+      properties: {
+        kind: { type: 'STRING', enum: ['click_mark', 'type', 'key', 'scroll', 'navigate', 'open_tab', 'finish'] },
+        mark: { type: 'INTEGER' },
+        text: { type: 'STRING' },
+        key: { type: 'STRING' },
+        dy: { type: 'INTEGER' },
+        url: { type: 'STRING' },
+        reason: { type: 'STRING' },
+      },
+      required: ['kind'],
+    },
+    why: { type: 'STRING' },
+  },
+  required: ['screen', 'issues', 'action'],
+};
+
 function parseArgs(argv) {
-  const o = { model: 'gemini-3.1-flash-lite', steps: 12, start: 'filo://newtab/', area: '', out: '' };
+  const o = { model: 'gemini-3.1-flash-lite', steps: 12, start: 'filo://newtab/', area: '', out: '', feedback: true, minSeverity: 'low' };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--model') o.model = argv[++i];
@@ -33,6 +71,8 @@ function parseArgs(argv) {
     else if (a === '--start') o.start = argv[++i];
     else if (a === '--area') o.area = argv[++i];
     else if (a === '--out') o.out = resolve(argv[++i]);
+    else if (a === '--no-feedback') o.feedback = false;
+    else if (a === '--min-severity') o.minSeverity = argv[++i];
   }
   if (!o.out) {
     const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
