@@ -117,8 +117,10 @@
               if (Object.prototype.hasOwnProperty.call(newProps, 'hidden')) {
                 const hide = !!newProps.hidden;
                 wrap.style.display = hide ? 'none' : '';
+                // Solidale con il separatore successivo se è stato a sua volta
+                // inserito come hidden (data-sn-hidden-sep).
                 const sib = wrap.nextElementSibling;
-                if (sib?.dataset?.snCorrectionSep === '1') {
+                if (sib?.dataset?.snHiddenSep === '1') {
                   sib.style.display = hide ? 'none' : '';
                 }
               }
