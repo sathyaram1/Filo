@@ -225,7 +225,14 @@ async function run() {
       try {
         switch (act.kind) {
           case 'click_mark': await d.clickMark(app, shell, map, Number(act.mark)); break;
-          case 'type': await d.typeText(app, shell, act.text || ''); break;
+          case 'type':
+            // Se il modello indica anche un badge, ci clicchiamo prima per dare
+            // il focus al campo giusto subito prima di digitare (robusto).
+            if (act.mark != null && map.find((m) => m.i === Number(act.mark))) {
+              await d.clickMark(app, shell, map, Number(act.mark));
+            }
+            await d.typeText(app, shell, act.text || '');
+            break;
           case 'key': await d.pressKey(app, shell, act.key || 'Enter'); break;
           case 'scroll': await d.scrollBy(app, shell, Number(act.dy) || 300); break;
           case 'navigate': await d.navigate(app, shell, act.url); break;
