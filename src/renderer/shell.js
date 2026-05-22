@@ -88,15 +88,7 @@
     menuEl.hidden = false;
     btn.setAttribute('aria-expanded', 'true');
     openMenuEl = menuEl;
-    // La WebContentsView del tab attivo è composta SOPRA l'HTML della shell e
-    // coprirebbe il dropdown. Invece di nascondere la view (che lasciava un'area
-    // vuota), abbassiamo la view dello spazio occupato dal dropdown: così resta
-    // visibile sopra la view e il contenuto scorre solo di poco.
-    const rect = menuEl.getBoundingClientRect();
-    const reserve = Math.max(0, Math.ceil(rect.bottom - SHELL_HEIGHT + 8));
-    api.tabs.reserveTop(reserve);
-    // Riempie la striscia liberata con una mensola toolbar-colorata e ombrata.
-    if (shelfEl) { shelfEl.style.height = reserve + 'px'; shelfEl.hidden = false; }
+    api.tabs.setActiveVisible(false);
   }
   function closeMenus() {
     appsMenu.hidden = true;
@@ -104,8 +96,7 @@
     appsBtn.setAttribute('aria-expanded', 'false');
     settingsBtn.setAttribute('aria-expanded', 'false');
     openMenuEl = null;
-    api.tabs.reserveTop(0);
-    if (shelfEl) { shelfEl.hidden = true; shelfEl.style.height = '0px'; }
+    api.tabs.setActiveVisible(true);
   }
   function toggleMenu(menuEl, btn, titleText, entries) {
     if (openMenuEl === menuEl) closeMenus();
