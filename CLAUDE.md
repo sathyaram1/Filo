@@ -108,6 +108,43 @@ ritorna empty image in molte configurazioni. Il `smoke.mjs` aggira aprendo
 l'URL in una BrowserWindow primary dedicata e cattura quella. Replica il
 pattern se vuoi screenshot affidabili in nuovi test.
 
+## Controlli visivi / agentici dopo OGNI feature
+
+Gli unit test Playwright non vedono i bug **compositi** (shell + WebContentsView
+native) né le regressioni visive. Dopo aver implementato o modificato una feature,
+esegui SEMPRE un controllo visivo dell'area toccata. Strumenti in `tests/agent/`
+(cattura la finestra reale via Win32 `PrintWindow`, vedi `tests/agent/README.md`):
+
+1. **Controllo a vista (deterministico, gratis)** — `npm run test:shoot`:
+   ```bash
+   npm run test:shoot -- "nav:filo://editor/editor.html; click-view:#doc; type:ciao; shot:editor"
+   ```
+   Guarda gli screenshot in `tests/agent/.out/*.png` e verifica a occhio.
+
+2. **Esplorazione/compito guidato da LLM** — `npm run test:explore`:
+   ```bash
+   npm run test:explore -- --start filo://editor/editor.html --steps 10 \
+     --task "<usa la feature appena fatta, passo per passo>"
+   ```
+   Dai un `--task` che esercita la feature: il modello la usa con interazioni
+   reali e segnala i bug incontrati (finiscono nei feedback, tab "Agente").
+
+**Modelli (strategia):** usa **`gemini-3.1-flash-lite`** come primario (è "il
+modello buono" e ha quota generosa), con **`gemma-4-31b-it`** come **fallback**
+automatico quando il primario esaurisce i crediti/quota (429). Così si sfrutta
+prima il modello migliore. La chiave sta in `tests/agent/.env` (gitignorata).
+
+**Come reagire a ciò che emerge:**
+- **Bug ovvio** (qualcosa di palesemente rotto: area vuota, crash, funzione che
+  non risponde) → **correggilo subito** nello stesso worktree.
+- **Scelta di design discutibile / non-bug ovvio** (ridondanze, UX opinabile,
+  incoerenze minori) → **NON** cambiarla di tua iniziativa: **segnalala**
+  all'utente (o lasciala nel report/feedback) perché decida lui.
+- **Sospetto falso positivo** dell'harness (es. focus rubato, percezione errata
+  dello screenshot): prima di trattarlo come bug **riproducilo in modo
+  deterministico con `test:shoot`**. Se non si riproduce, è un artefatto: non
+  segnalarlo come bug reale.
+
 ## Feedback alpha tester
 
 I feedback arrivano da Firestore (progetto `filo-8b9cb`, collezione `feedback`).
