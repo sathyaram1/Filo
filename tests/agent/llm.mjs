@@ -48,7 +48,9 @@ export async function generate({ model, system, user, imagePath, temperature = 0
   }
   const body = {
     contents: [{ role: 'user', parts }],
-    generationConfig: { temperature, maxOutputTokens: 2048 },
+    // maxOutputTokens alto: i modelli Gemini 3.x consumano parte del budget in
+    // "thinking" (thoughtsTokenCount); con 2048 il JSON strutturato si troncava.
+    generationConfig: { temperature, maxOutputTokens: 8192 },
   };
   // systemInstruction solo su Gemini (Gemma lo riceve fuso nel testo).
   if (!isGemma(model) && system) body.systemInstruction = { parts: [{ text: system }] };
