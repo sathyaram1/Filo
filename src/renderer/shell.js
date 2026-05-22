@@ -35,7 +35,59 @@
   setIcon(reloadBtn, 'reload', 18);
   setIcon(homeBtn, 'home', 18);
   setIcon(settingsBtn, 'options', 16);
+  setIcon(appsBtn, 'apps', 16);
   setIcon(newBtn, 'plus', 16);
+
+  // Registro app del launcher. Per ora solo l'editor; aggiungerne altre qui.
+  const APPS = [
+    { id: 'editor', label: 'Editor', icon: 'editor', url: 'filo://editor/editor.html' },
+  ];
+
+  function buildAppsMenu() {
+    appsMenu.innerHTML = '';
+    const title = document.createElement('div');
+    title.className = 'apps-menu-title';
+    title.textContent = 'App';
+    appsMenu.appendChild(title);
+    for (const app of APPS) {
+      const item = document.createElement('button');
+      item.className = 'apps-item';
+      item.type = 'button';
+      item.setAttribute('role', 'menuitem');
+      const ico = document.createElement('span');
+      ico.className = 'apps-item-ico';
+      if (typeof ICONS[app.icon] === 'function') ico.innerHTML = ICONS[app.icon](18);
+      const label = document.createElement('span');
+      label.textContent = app.label;
+      item.appendChild(ico);
+      item.appendChild(label);
+      item.addEventListener('click', () => {
+        closeAppsMenu();
+        api.tabs.open(app.url);
+      });
+      appsMenu.appendChild(item);
+    }
+  }
+
+  function openAppsMenu() {
+    buildAppsMenu();
+    appsMenu.hidden = false;
+    appsBtn.setAttribute('aria-expanded', 'true');
+  }
+  function closeAppsMenu() {
+    appsMenu.hidden = true;
+    appsBtn.setAttribute('aria-expanded', 'false');
+  }
+  function toggleAppsMenu() {
+    if (appsMenu.hidden) openAppsMenu();
+    else closeAppsMenu();
+  }
+
+  appsBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleAppsMenu(); });
+  document.addEventListener('click', (e) => {
+    if (!appsMenu.hidden && !appsMenu.contains(e.target) && e.target !== appsBtn) closeAppsMenu();
+  });
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAppsMenu(); });
   setIcon(winMinBtn, 'minimize', 16);
   setIcon(winMaxBtn, 'maximize', 14);
   setIcon(winCloseBtn, 'close', 16);
