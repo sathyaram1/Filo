@@ -906,7 +906,6 @@
   function toggleSettingsMode(on) {
     settingsMode = on != null ? on : !settingsMode;
     root.classList.toggle('settings-mode', settingsMode);
-    settingsToggle.classList.toggle('active', settingsMode);
     settingsView.hidden = !settingsMode;
     docWrap.hidden = settingsMode;
     if (settingsMode) renderPalette();
