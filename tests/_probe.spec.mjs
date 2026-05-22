@@ -10,8 +10,12 @@ test('probe: dashboard then navigate same tab to editor, capture errors', async 
   await dash.waitForTimeout(500);
 
   // 2) naviga LO STESSO tab all'editor (come farebbe l'utente dalla barra/azione)
-  await shell.evaluate(() => window.filoShell.tabs.navigate('filo://editor/editor.html'));
-  await dash.waitForTimeout(1500);
+  await shell.evaluate(async () => {
+    const snap = await window.filoShell.tabs.snapshot();
+    const active = (snap.tabs || snap).find?.((t) => t.active) || (snap.tabs || [])[0];
+    await window.filoShell.tabs.navigate(active.id, 'filo://editor/editor.html');
+  });
+  await dash.waitForTimeout(1800);
 
   console.log('SAME-TAB ERRORS:', JSON.stringify(errors, null, 2));
 });
