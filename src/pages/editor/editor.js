@@ -36,7 +36,13 @@
     'search-replace': { label: 'Cerca e sostituisci', icon: 'reload', defaultW: 2, defaultH: 2, minW: 2, minH: 2, desc: 'Trova ed evidenzia, sostituisci nel testo.' },
     comment:          { label: 'Commenta', icon: 'share', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: 'Seleziona testo e aggiungi commenti.' },
     chat:             { label: 'Chat', icon: 'filoLogo', defaultW: 3, defaultH: 3, minW: 3, minH: 3, desc: 'Chat con LLM che vede il documento.' },
+    // `fixed`: modulo di sistema. Non eliminabile, non aggiungibile dalla palette
+    // e "appuntato" su tutte le pagine (visibile qualunque sia lo switch attivo).
+    settings:         { label: 'Impostazioni', icon: 'options', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: 'Apri/chiudi la modalità modifica moduli.', fixed: true },
   };
+
+  // Un modulo è "fisso" (di sistema) se il suo tipo è marcato fixed.
+  const isFixed = (m) => !!(m && MODULE_TYPES[m.type] && MODULE_TYPES[m.type].fixed);
 
   // Icone-preset per lo switch (estetiche, non vincolano i moduli).
   const SWITCH_PRESETS = {
