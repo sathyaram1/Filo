@@ -1,46 +1,52 @@
-import { test, expect } from './fixtures/electron.mjs';
+import { test, expect } from '@playwright/test';
+import { _electron as electron } from '@playwright/test';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-test('probe: click-everything in editor', async ({ openTab }) => {
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const APP_ROOT = resolve(__dirname, '..');
+
+test('probe PROD: open editor from dashboard, capture everything', async () => {
+  const userData = mkdtempSync(join(tmpdir(), 'filo-prod-'));
+  const env = { ...process.env, FILO_USER_DATA: userData };
+  delete env.NODE_ENV; // produzione-like
+  delete env.FILO_SMOKE;
+
+  const app = await electron.launch({ args: ['.'], cwd: APP_ROOT, env });
+  const mainLogs = [];
+  app.process().stdout?.on('data', (d) => mainLogs.push(d.toString()));
+  app.process().stderr?.on('data', (d) => mainLogs.push('[ERR] ' + d.toString()));
+
+  const shell = await app.firstWindow();
+  await shell.waitForLoadState('domcontentloaded');
+  await shell.waitForTimeout(800);
+
+  await shell.click('#nav-apps');
+  await shell.click('#apps-menu .apps-item');
+
+  const deadline = Date.now() + 8000;
+  let ed = null;
+  while (Date.now() < deadline) {
+    ed = app.windows().find((w) => { try { return new URL(w.url()).hostname === 'editor'; } catch { return false; } });
+    if (ed) break;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  expect(ed, 'editor window').toBeTruthy();
   const errors = [];
-  const ed = await openTab('filo://editor/editor.html');
   ed.on('pageerror', (e) => errors.push('[pageerror] ' + e.message));
   ed.on('console', (m) => { if (m.type() === 'error') errors.push('[console] ' + m.text()); });
-  await ed.waitForSelector('#doc');
+  await ed.waitForSelector('#doc', { timeout: 5000 });
+  await ed.waitForTimeout(600);
+  await ed.click('#doc');
+  await ed.keyboard.type('prova produzione');
+  await ed.waitForTimeout(300);
+  await ed.screenshot({ path: 'tests/.smoke/_prod-editor.png' }).catch(() => {});
 
-  const step = async (name, fn) => {
-    const before = errors.length;
-    try { await fn(); await ed.waitForTimeout(150); }
-    catch (e) { errors.push(`[step ${name} threw] ` + e.message); }
-    if (errors.length > before) console.log(`>> errore dopo step "${name}"`);
-  };
+  console.log('PROD ERRORS:', JSON.stringify(errors));
+  console.log('MAIN LOG TAIL:', mainLogs.join('').split('\n').filter(l => /error|fail|uncaught|exception/i.test(l)).join('\n'));
 
-  // pagina 0: word-count overlay
-  await step('click word-count', () => ed.locator('.ed-module[data-type="word-count"] .ed-mod-pad').click());
-  await step('close overlay', () => ed.locator('#overlay').click({ position: { x: 5, y: 5 } }));
-
-  // apri settings (gear) → palette
-  await step('open settings', () => ed.click('#settingsToggle'));
-  // clicca un modulo in settings → openModuleConfig
-  await step('config switch module', () => ed.locator('.ed-module[data-type="switch"]').click());
-  await step('cancel config', () => ed.locator('#cfgCancel').click().catch(()=>{}));
-  await step('close settings', () => ed.click('#settingsToggle'));
-
-  // switch grow / shrink
-  await step('grow switch', () => ed.locator('.ed-switch-arrow').nth(1).click());
-  await step('shrink switch', () => ed.locator('.ed-switch-arrow').nth(0).click());
-
-  // empty cell → add module menu
-  await step('open add-module', () => ed.locator('.ed-cell-empty').first().click());
-  await step('add word-count', () => ed.locator('[data-add="word-count"]').click().catch(()=>{}));
-
-  // pagina 1 → comment + chat
-  await step('go page 1', () => ed.locator('.ed-switch-icon').nth(1).click());
-  await step('click comment', () => ed.locator('.ed-module[data-type="comment"] .ed-mod-pad').click());
-  await step('close overlay 2', () => ed.locator('#overlay').click({ position: { x: 5, y: 5 } }).catch(()=>{}));
-
-  // sidebar toggle
-  await step('toggle sidebar', () => ed.click('#sidebarToggle'));
-  await step('toggle sidebar back', () => ed.click('#sidebarToggle'));
-
-  console.log('ALL ERRORS:', JSON.stringify(errors, null, 2));
+  await app.close();
+  rmSync(userData, { recursive: true, force: true });
 });
