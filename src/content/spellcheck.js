@@ -67,6 +67,19 @@
     window.addEventListener('scroll', queueSync, true);
     window.addEventListener('resize', queueSync, true);
 
+    // Riceve i suggerimenti del correttore nativo spinti dal main al click destro.
+    try {
+      chrome.runtime.onMessage.addListener((m) => {
+        if (m?.type !== '_spell:native') return;
+        lastNative = {
+          word: String(m.word || ''),
+          suggestions: Array.isArray(m.suggestions) ? m.suggestions : [],
+          ts: Date.now(),
+        };
+        for (const fn of [...nativeWaiters]) { try { fn(lastNative); } catch (_) {} }
+      });
+    } catch (_) {}
+
     // Aggiornamento live se la pagina del correttore cambia dizionario/autocorrect.
     try {
       chrome.storage.onChanged.addListener((changes, area) => {
