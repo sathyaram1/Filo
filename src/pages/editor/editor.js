@@ -1048,7 +1048,7 @@
   // Boot
   applySavedTheme();
   loadDoc();
-  titleEl.value = doc.meta.title === 'Documento senza titolo' ? '' : doc.meta.title;
+  ensureSettingsModule(); // garantisce l'ingranaggio anche su documenti pre-esistenti
   renderDocBody();
   renderGrid();
   updateWordCountModules();
