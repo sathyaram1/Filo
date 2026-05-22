@@ -168,11 +168,11 @@ async function run() {
     `- Modello: \`${o.model}\``,
     `- Passi: ${o.steps}`,
     `- Area: ${o.area || '(libera)'}`,
-    `- Issue trovate: **${allIssues.length}** (high: ${bySev('high').length}, medium: ${bySev('medium').length}, low: ${bySev('low').length})`,
+    `- Issue trovate: **${allIssuesRef.length}** (high: ${bySev('high').length}, medium: ${bySev('medium').length}, low: ${bySev('low').length})`,
     ``,
     `## Issue`,
-    allIssues.length ? '' : '_Nessuna anomalia segnalata._',
-    ...allIssues.map((i, n) => [
+    allIssuesRef.length ? '' : '_Nessuna anomalia segnalata._',
+    ...allIssuesRef.map((i, n) => [
       `### ${n + 1}. [${i.severity}] ${i.title}`,
       `- Area: ${i.area || '?'} · Passo: ${i.step}`,
       `- ${i.detail || ''}`,
@@ -181,7 +181,7 @@ async function run() {
     ].join('\n')),
   ].join('\n');
   writeFileSync(join(o.out, 'report.md'), md);
-  console.log(`\n✓ Report: ${join(o.out, 'report.md')}  (${allIssues.length} issue)`);
+  console.log(`\n✓ Report: ${join(o.out, 'report.md')}  (${allIssuesRef.length} issue)`);
 }
 
 run().catch((e) => { console.error(e); process.exit(1); });
