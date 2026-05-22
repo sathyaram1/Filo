@@ -61,17 +61,24 @@ export async function generate({ model, system, user, imagePath, temperature = 0
   }
 
   const url = `${ENDPOINT}/${model}:generateContent?key=${apiKey}`;
+  const MAX = 5;
   let lastErr;
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < MAX; attempt++) {
     try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      if (res.status === 429) { // rate limit
-        const wait = 4000 * (attempt + 1);
-        await new Promise((r) => setTimeout(r, wait));
+      // Timeout esplicito: meglio fallire e ritentare che restare appesi.
+      const ctrl = new AbortController();
+      const to = setTimeout(() => ctrl.abort(), 60_000);
+      let res;
+      try {
+        res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+          signal: ctrl.signal,
+        });
+      } finally { clearTimeout(to); }
+      if (res.status === 429 || res.status >= 500) { // rate limit / errore server → ritenta
+        await new Promise((r) => setTimeout(r, 3000 * (attempt + 1)));
         continue;
       }
       if (!res.ok) {
@@ -85,7 +92,8 @@ export async function generate({ model, system, user, imagePath, temperature = 0
       return text;
     } catch (e) {
       lastErr = e;
-      if (attempt < 2) await new Promise((r) => setTimeout(r, 1500));
+      // errori di rete ("fetch failed", abort, ecc.) → backoff e ritenta
+      if (attempt < MAX - 1) await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
     }
   }
   throw lastErr;
