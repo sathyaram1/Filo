@@ -93,10 +93,6 @@
     $('model-help-intent-judge').value = settings.models?.[ACTIONS.HELP_INTENT_JUDGE] || '';
     $('monthlyLimit').value = settings.monthlyLimitEur ?? 5;
     $('blocklist').value = (settings.blocklist || []).join('\n');
-    $('ff-help').checked = !!settings.featureFlags?.help;
-    $('ff-categorize').checked = !!settings.featureFlags?.categorize;
-    $('ff-spellcheck').checked = settings.featureFlags?.spellcheck !== false;
-    $('theme').value = settings.theme || 'system';
 
     // Costi
     try {
