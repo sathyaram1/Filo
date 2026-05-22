@@ -74,7 +74,6 @@
     body.dataset.state = 'thread';
     homeView.hidden = true;
     threadView.hidden = false;
-    homeBtn.hidden = false;
   }
 
   homeBtn.addEventListener('click', goHome);
