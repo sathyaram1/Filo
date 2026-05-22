@@ -223,6 +223,14 @@
       }
     });
 
+    // Accetta immagini incollate via tasto destro (custom event da content.js)
+    modal.addEventListener('filo:paste-image', async (e) => {
+      if (e.detail?.blob) {
+        e.preventDefault();
+        await addImageFromBlob(e.detail.blob);
+      }
+    });
+
     // Drag & drop
     ['dragenter', 'dragover'].forEach((ev) => dropEl.addEventListener(ev, (e) => {
       e.preventDefault(); dropEl.classList.add('sn-fb-drop-hover');
