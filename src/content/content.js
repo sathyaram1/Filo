@@ -315,8 +315,23 @@
 
     let updateCorrection = null;
 
-    // Crea l'item correction. Visibile sin da subito SOLO se abbiamo una cache
-    // usabile; altrimenti viene inserito hidden e rivelato dall'async se serve.
+    // Suggerimenti del correttore NATIVO (Electron) per questa parola: immediati
+    // e affidabili (sono quelli dietro lo zigzag rosso). Il main li spinge al
+    // click destro; di solito sono già in cache quando il menu si compone (c'è il
+    // round-trip della clipboard history prima), altrimenti li riveliamo appena
+    // arrivano. Sono la base che garantisce "qualcosa appare" anche senza LLM.
+    const nativeSugg = (SpellCheck.getNativeSuggestions?.(wordCtx.word)) || [];
+    const nativeTop = nativeSugg[0] || '';
+
+    const applyAt = (corr) => SpellCheck.applyFix(
+      editableEl, { start: wordCtx.start, end: wordCtx.end }, corr, { expectedSegment: wordCtx.word },
+    );
+
+    // Correzione mostrata inizialmente: la cache LLM se usabile, altrimenti il
+    // primo suggerimento nativo. `shown` traccia se una riga è visibile.
+    let visibleCorrection = cachedUsable ? cached.correction : nativeTop;
+    let shown = !!visibleCorrection;
+
     const buildCorrectionItem = (initialLabel, initialOnClick, initialSubItems, hidden) => ({
       type: 'correction',
       label: initialLabel,
@@ -327,14 +342,12 @@
       onMount: (_root, update) => { updateCorrection = update; },
     });
 
-    if (cachedUsable) {
+    if (shown) {
       items.unshift(
         buildCorrectionItem(
-          cached.correction,
-          () => SpellCheck.applyFix(editableEl, { start: wordCtx.start, end: wordCtx.end }, cached.correction, {
-            expectedSegment: wordCtx.word,
-          }),
-          buildRedSubItems(editableEl, wordCtx, cached.correction),
+          visibleCorrection,
+          () => applyAt(visibleCorrection),
+          buildRedSubItems(editableEl, wordCtx, visibleCorrection, nativeSugg),
           /* hidden */ false,
         ),
         { type: 'separator' },
@@ -349,8 +362,31 @@
 
     Menu.open({ x: mouseEvent.clientX, y: mouseEvent.clientY, items, keepOnScroll: true });
 
-    // Helper: applica la risposta al menu (rivela/aggiorna se misspelled,
-    // mantiene invisibile altrimenti).
+    // Rivela/aggiorna la riga di correzione con `corr` (e relative alternative).
+    const revealCorrection = (corr, alts) => {
+      if (!updateCorrection || !corr) return;
+      visibleCorrection = corr;
+      shown = true;
+      updateCorrection({
+        hidden: false,
+        label: corr,
+        loading: false,
+        onClick: () => applyAt(corr),
+        subItems: buildRedSubItems(editableEl, wordCtx, corr, alts || []),
+      });
+    };
+
+    // Se i suggerimenti nativi non erano ancora arrivati al momento dell'apertura,
+    // rivela appena arrivano (a meno che non si stia già mostrando qualcosa).
+    if (!shown) {
+      SpellCheck.onNativeSuggestions?.(wordCtx.word, (sugg) => {
+        if (shown || !sugg?.length) return;
+        revealCorrection(sugg[0], sugg);
+      });
+    }
+
+    // Helper: applica la risposta dell'LLM. Quando l'LLM declina ma esiste un
+    // suggerimento nativo, manteniamo comunque quest'ultimo visibile.
     const applyResponse = (res) => {
       SpellCheck.setCachedSuggestion(editableEl, wordCtx.word, res
         ? { ...res, sentence: wordCtx.sentence }
@@ -358,24 +394,18 @@
       if (!updateCorrection) return;
       const usable = res && res.misspelled && res.correction && res.correction !== wordCtx.word;
       if (!usable) {
-        // Se la riga era già visibile (cache usabile mostrata, contesto
-        // cambiato, nuova risposta negativa) la togliamo. Se era nascosta,
-        // resta nascosta.
-        if (cachedUsable) updateCorrection({ remove: true });
-        else updateCorrection({ hidden: true });
+        if (nativeTop) {
+          // Il correttore nativo ha comunque marcato la parola: mostra il nativo.
+          if (!shown || visibleCorrection !== nativeTop) revealCorrection(nativeTop, nativeSugg);
+        } else if (shown) {
+          updateCorrection({ remove: true });
+        } else {
+          updateCorrection({ hidden: true });
+        }
         return;
       }
-      updateCorrection({
-        hidden: false,
-        label: res.correction,
-        loading: false,
-        onClick: () => {
-          SpellCheck.applyFix(editableEl, { start: wordCtx.start, end: wordCtx.end }, res.correction, {
-            expectedSegment: wordCtx.word,
-          });
-        },
-        subItems: buildRedSubItems(editableEl, wordCtx, res.correction),
-      });
+      // Correzione LLM (contestuale): preferiscila, mantenendo i nativi come alternative.
+      revealCorrection(res.correction, nativeSugg);
     };
 
     if (refireInBackground) {
