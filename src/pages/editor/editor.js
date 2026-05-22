@@ -130,7 +130,8 @@
   }
 
   function serialize() {
-    doc.meta.title = titleEl.value || 'Documento senza titolo';
+    // Il titolo non è più editabile dall'UI: si conserva quello del modello.
+    if (!doc.meta.title) doc.meta.title = 'Documento senza titolo';
     doc.meta.modified = new Date().toISOString();
     doc.content = htmlToPM(docEl);
     return {
