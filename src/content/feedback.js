@@ -20,11 +20,12 @@
   async function getClientId() {
     if (clientIdCache) return clientIdCache;
     try {
-      const r = await new Promise((res) => chrome.storage.local.get(['sn_feedback_client_id'], res));
+      // Lo shim chrome.storage in Filo ritorna una Promise (no callback).
+      const r = await chrome.storage.local.get(['sn_feedback_client_id']);
       let id = r?.sn_feedback_client_id;
       if (!id) {
         id = (global.crypto?.randomUUID?.() || String(Date.now() + Math.random()));
-        await new Promise((res) => chrome.storage.local.set({ sn_feedback_client_id: id }, res));
+        await chrome.storage.local.set({ sn_feedback_client_id: id });
       }
       clientIdCache = id;
       return id;
