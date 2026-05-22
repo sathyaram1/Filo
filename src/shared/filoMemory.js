@@ -238,6 +238,10 @@
     });
     if (filtered.length !== list.length) {
       await setRaw(KEYS.FILO_TIMERS, filtered);
+      // Invalida la cache della dashboard: se il messaggio centro o un
+      // suggerimento parlava del timer ora scaduto, ri-generiamo per non
+      // continuare a mostrare "Il timer sta per suonare" stantio.
+      await setRaw(KEYS.FILO_DASHBOARD_CACHE, null);
     }
     return filtered;
   }
