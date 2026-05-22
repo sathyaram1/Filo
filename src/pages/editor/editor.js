@@ -987,7 +987,28 @@
 
   window.addEventListener('beforeunload', () => { if (dirty) save(false); });
 
+  // ── Tema ────────────────────────────────────────────────────────────
+  // pageBootstrap applica solo il tema di SISTEMA; come le altre pagine
+  // (dashboard/options/…), l'editor deve rispettare il tema SALVATO, altrimenti
+  // passando dalla dashboard all'editor il tema cambia in modo incoerente.
+  async function applySavedTheme() {
+    try {
+      const settings = await (window.SN_STORAGE?.getSettings?.());
+      if (!settings) return;
+      window.SN_PAGE_THEME = settings.theme || 'system';
+      let theme = settings.theme || 'system';
+      if (theme === 'system') theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.dataset.snTheme = theme;
+    } catch (_) {}
+  }
+  try {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (msg && msg.type === MSG.SETTINGS_UPDATED) applySavedTheme();
+    });
+  } catch (_) {}
+
   // Boot
+  applySavedTheme();
   loadDoc();
   titleEl.value = doc.meta.title === 'Documento senza titolo' ? '' : doc.meta.title;
   renderDocBody();
