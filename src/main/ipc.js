@@ -115,6 +115,11 @@ function registerIpcHandlers() {
     if (win?._filoTabs) win._filoTabs.reload(id);
     return { ok: true };
   });
+  ipcMain.handle('tabs:set-active-visible', (event, { visible } = {}) => {
+    const win = winFor(event);
+    if (win?._filoTabs) win._filoTabs.setActiveVisible(visible !== false);
+    return { ok: true };
+  });
   ipcMain.handle('tabs:snapshot', (event) => {
     const win = winFor(event);
     if (!win?._filoTabs) return { activeId: null, tabs: [] };
