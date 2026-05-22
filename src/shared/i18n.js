@@ -117,6 +117,7 @@
     toast_original_restored: 'Originale ripristinato',
     toast_clipboard_empty: 'Cronologia appunti vuota',
     toast_pasted_image: 'Immagine incollata',
+    toast_cannot_paste_image: 'Qui non si può incollare un\'immagine (campo di solo testo)',
     clipboard_image_pending: 'Descrizione…',
 
     // Categorie default
