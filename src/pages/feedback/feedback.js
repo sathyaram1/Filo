@@ -175,13 +175,14 @@
            </label>`
         : (f.notes ? `<div class="fb-notes-readonly">${escapeHtml(f.notes)}</div>` : '');
       return `
-        <article class="fb-card fb-card--${statusOf(f)}">
+        <article class="fb-card fb-card--${statusOf(f)}${agent ? ' fb-card--agent' : ''}">
           <div class="fb-meta">
             <span>${escapeHtml(when)}</span>
             ${safeUrl ? `<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener">${escapeHtml(url).slice(0, 80)}</a>` : (url ? `<span title="${escapeHtml(url)}">${escapeHtml(url).slice(0, 80)}</span>` : '')}
-            ${cid ? `<span>client: ${escapeHtml(cid)}</span>` : ''}
-            ${ua ? `<span title="${escapeHtml(ua)}">UA</span>` : ''}
+            ${!agent && cid ? `<span>client: ${escapeHtml(cid)}</span>` : ''}
+            ${!agent && ua ? `<span title="${escapeHtml(ua)}">UA</span>` : ''}
           </div>
+          ${agentHtml}
           <div class="fb-text">${text}</div>
           ${imgsHtml}
           ${notesBlock}
