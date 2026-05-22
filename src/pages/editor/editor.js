@@ -529,7 +529,18 @@
       case 'search-replace': return renderSearchReplace(cell, m);
       case 'comment': return renderCommentModule(cell, m);
       case 'chat': return renderChat(cell, m);
+      case 'settings': return renderSettingsModule(cell, m);
     }
+  }
+
+  // ── Modulo: impostazioni (ingranaggio, fisso) ──────────────────────────
+  function renderSettingsModule(cell, _m) {
+    cell.classList.add('ed-settings-mod');
+    cell.title = 'Impostazioni moduli';
+    cell.innerHTML = (ICONS.options ? ICONS.options(18) : '⚙');
+    // Click sull'ingranaggio: apre/chiude la modalità modifica moduli. Va in
+    // capture/stopPropagation così non scatta il click generico della cella.
+    cell.addEventListener('click', (e) => { e.stopPropagation(); toggleSettingsMode(); });
   }
 
   // ── Modulo: switch / workspace ─────────────────────────────────────────
