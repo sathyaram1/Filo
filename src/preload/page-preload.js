@@ -93,9 +93,14 @@ const chromeShim = {
   },
   storage: {
     local: {
-      async get(keys) {
-        const r = await filoMessage({ type: '_storage:get', keys });
-        return r?.value || {};
+      get(keys, callback) {
+        const p = filoMessage({ type: '_storage:get', keys }).then(r => r?.value || {});
+        if (typeof callback === 'function') {
+          p.then(v => { try { callback(v); } catch (_) {} })
+           .catch(() => { try { callback({}); } catch (_) {} });
+          return;
+        }
+        return p;
       },
       async set(obj) { await filoMessage({ type: '_storage:set', obj }); },
       async remove(keys) { await filoMessage({ type: '_storage:remove', keys }); },
