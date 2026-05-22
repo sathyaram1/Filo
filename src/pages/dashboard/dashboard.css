@@ -171,9 +171,9 @@ html, body {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 }
-/* Stato compresso (conversazione attiva): solo icone. */
+/* Stato compresso (conversazione attiva): solo icone, allineate a sinistra. */
 body[data-state="thread"] .dash-suggestion .dash-sug-text { display: none; }
-body[data-state="thread"] .dash-suggestion { justify-content: center; padding: 6px; }
+body[data-state="thread"] .dash-suggestion { justify-content: flex-start; padding: 6px; }
 
 .dash-expand-btn {
   display: inline-flex;
