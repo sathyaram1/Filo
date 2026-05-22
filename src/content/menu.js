@@ -87,6 +87,19 @@
         if (it.loading) wrap.classList.add('sn-menu-correction-loading');
         if (it.id) wrap.id = it.id;
 
+        // `hidden`: la riga viene inserita ma display:none. Permette al chiamante
+        // di "riservare" lo slot e rivelarlo via update() se/quando arriva una
+        // correzione asincrona. Usato per evitare il flash "Cerco una correzione…"
+        // quando ancora non sappiamo se la parola è davvero sbagliata.
+        // Anche il separatore successivo, se aggiunto, è solidale con questa riga.
+        const separator = document.createElement('div');
+        separator.className = 'sn-menu-sep';
+        separator.dataset.snCorrectionSep = '1';
+        if (it.hidden) {
+          wrap.style.display = 'none';
+          separator.style.display = 'none';
+        }
+
         renderCorrection(wrap, it);
 
         // Espone un updater al chiamante (per quando la correzione arriva async).
@@ -100,6 +113,14 @@
                 wrap.remove();
                 return;
               }
+              if (Object.prototype.hasOwnProperty.call(newProps, 'hidden')) {
+                const hide = !!newProps.hidden;
+                wrap.style.display = hide ? 'none' : '';
+                const sib = wrap.nextElementSibling;
+                if (sib?.dataset?.snCorrectionSep === '1') {
+                  sib.style.display = hide ? 'none' : '';
+                }
+              }
               renderCorrection(wrap, { ...it, ...newProps });
             };
             const cleanup = it.onMount(wrap, update);
@@ -108,6 +129,9 @@
         }
 
         root.appendChild(wrap);
+        // Il chiamante aggiunge un { type: 'separator' } dopo il correction;
+        // lo gestiamo qui sopra. NON aggiungiamo qui un separator automatico:
+        // l'uso esistente passa separator esplicito come item successivo.
         continue;
       }
       if (it.type === 'split') {
