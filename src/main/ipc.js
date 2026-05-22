@@ -100,6 +100,11 @@ function registerIpcHandlers() {
     if (win?._filoTabs) win._filoTabs.navigate(id, url);
     return { ok: true };
   });
+  ipcMain.handle('tabs:reserve-top', (event, { px }) => {
+    const win = winFor(event);
+    if (win?._filoTabs) win._filoTabs.setTopInset(px);
+    return { ok: true };
+  });
   ipcMain.handle('tabs:back', (event, { id }) => {
     const win = winFor(event);
     if (win?._filoTabs) win._filoTabs.goBack(id);
