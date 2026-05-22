@@ -108,14 +108,32 @@ ritorna empty image in molte configurazioni. Il `smoke.mjs` aggira aprendo
 l'URL in una BrowserWindow primary dedicata e cattura quella. Replica il
 pattern se vuoi screenshot affidabili in nuovi test.
 
+## Feedback alpha tester
+
+I feedback arrivano da Firestore (progetto `filo-8b9cb`, collezione `feedback`).
+Accesso via REST con API key in `src/shared/feedback.js`. Le Firestore rules
+stanno in `../extension/firestore.rules` e si deployano con:
+
+```bash
+cd ../extension && firebase deploy --only firestore:rules
+```
+
+**Workflow**: quando l'utente chiede di "risolvere i feedback", lavora
+**solo** sui feedback con status `todo` ("Da risolvere"). Ignora quelli
+in `new` (inbox), `draft` (bozze — richiedono decisioni di design dell'utente),
+`done` (già risolti, in attesa di verifica), `verified` e `ignored`.
+
+Per ogni feedback `todo`:
+1. Leggi testo + screenshot allegati per capire il problema
+2. Trova il codice coinvolto e implementa il fix
+3. Aggiorna lo status a `done` su Firestore (PATCH con `updateMask`)
+   e scrivi nelle `notes` una breve spiegazione causa/fix
+
 ## Cosa NON è in scope
 
 - L'estensione MV3 (`../extension/` o `../ROBA VECCHIA/extension-mv3/`) è
   congelata. Niente fix né nuove feature lì. Se l'utente dice "fai X anche
   sull'extension", **chiedi conferma** — di solito vuole solo Filo.
-- Il backend Firestore dei feedback alpha non è (ancora) ricollegato. Se
-  l'utente parla di "feedback degli alpha tester" assume che siano nel
-  vecchio dashboard dell'extension e chiede di leggerli da lì.
 
 ## Workflow worktree
 
