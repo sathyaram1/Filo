@@ -149,7 +149,7 @@ const chromeShim = {
 const path = require('node:path');
 // NB: l'editor NON è blocklistato: vogliamo i menu contestuali Filo e il
 // correttore (rosso on-demand + blu semantico) anche lì, come su ogni sito.
-const CS_BLOCKLIST = ['filo://options/', 'filo://history/', 'filo://feedback/', 'filo://spellcheck/'];
+const CS_BLOCKLIST = ['filo://options/', 'filo://preferences/', 'filo://history/', 'filo://feedback/', 'filo://spellcheck/'];
 const shouldInjectContentScripts = () => {
   const url = location.href;
   return !CS_BLOCKLIST.some((p) => url.startsWith(p));
