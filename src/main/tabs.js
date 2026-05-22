@@ -183,7 +183,8 @@ class TabManager {
     const [w, h] = this.win.getContentSize();
     for (const tab of this.tabs) {
       if (tab.id === this.activeId) {
-        const b = { x: 0, y: this.shellHeight, width: w, height: Math.max(0, h - this.shellHeight) };
+        const top = this.shellHeight + this.topInset;
+        const b = { x: 0, y: top, width: w, height: Math.max(0, h - top) };
         tab.view.setBounds(b);
         if (process.env.FILO_SMOKE) {
           console.log(`[layout] tab ${tab.id.slice(0, 6)} active bounds`, JSON.stringify(b), 'win', w, 'x', h);
