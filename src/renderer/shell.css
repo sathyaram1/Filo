@@ -265,7 +265,7 @@ html, body {
   cursor: default;
   width: 100%;
 }
-.apps-item:hover { background: var(--tab-bg); }
+.apps-item:hover { background: rgba(var(--sn-accent-rgb), 0.12); }
 .apps-item .apps-item-ico {
   flex: 0 0 18px;
   display: inline-flex;
