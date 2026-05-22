@@ -33,16 +33,7 @@ html, body {
   padding: 12px 20px;
   border-bottom: 1px solid var(--sn-border);
 }
-.ed-title {
-  flex: 1 1 auto;
-  border: none;
-  background: transparent;
-  color: var(--sn-fg);
-  font-size: 18px;
-  font-weight: 600;
-  outline: none;
-}
-.ed-title::placeholder { color: var(--sn-muted); }
+.ed-topbar-spacer { flex: 1 1 auto; }
 .ed-save-state {
   font-size: 12px;
   color: var(--sn-muted);
