@@ -41,14 +41,6 @@
 
     $('lnkShortcuts').textContent = I18n.t('options_open_chrome_shortcuts');
 
-    $('ff-help-lbl').textContent = I18n.t('options_feature_help');
-    $('ff-categorize-lbl').textContent = I18n.t('options_feature_categorize');
-    $('ff-spellcheck-lbl').textContent = I18n.t('spell_feature_label');
-
-    $('theme-system').textContent = I18n.t('options_theme_system');
-    $('theme-light').textContent = I18n.t('options_theme_light');
-    $('theme-dark').textContent = I18n.t('options_theme_dark');
-
     $('save').textContent = I18n.t('options_save');
     $('savedHint').textContent = I18n.t('options_saved');
 
