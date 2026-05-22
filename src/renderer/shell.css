@@ -209,6 +209,22 @@ html, body {
 .nav-btn:hover:not(:disabled) { background: var(--tab-bg); color: var(--fg); }
 .nav-btn:disabled { opacity: 0.35; }
 
+/* Mensola sotto la toolbar: riempie la striscia che la WebContentsView libera
+   quando viene spinta in basso dal dropdown App. Stesso colore della barra
+   indirizzi + ombra inferiore così legge come un'estensione della toolbar e
+   non come una barra staccata. Z-index sotto al dropdown (.apps-menu = 50). */
+.shell-shelf {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 88px; /* = SHELL_HEIGHT */
+  height: 0;
+  background: var(--bg);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.14);
+  z-index: 40;
+}
+.shell-shelf[hidden] { display: none; }
+
 /* ── app launcher (dropdown) ──────────────────────────────────────────── */
 .apps-wrap { position: relative; flex: 0 0 auto; display: inline-flex; }
 .nav-apps[aria-expanded="true"] { background: var(--tab-bg); color: var(--fg); }
