@@ -105,6 +105,7 @@
   fwdBtn.addEventListener('click', () => { const a = activeTab(); if (a) api.tabs.forward(a.id); });
   reloadBtn.addEventListener('click', () => { const a = activeTab(); if (a) api.tabs.reload(a.id); });
   homeBtn.addEventListener('click', () => { const a = activeTab(); if (a) api.tabs.navigate(a.id, 'filo://newtab/'); });
+  settingsBtn.addEventListener('click', () => api.tabs.open('filo://options/options.html'));
 
   if (api.window) {
     winMinBtn?.addEventListener('click', () => api.window.minimize());
