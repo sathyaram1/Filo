@@ -491,7 +491,7 @@
 
   function addModule(type, x, y, z) {
     const meta = MODULE_TYPES[type];
-    if (!meta) return;
+    if (!meta || meta.fixed) return;
     let w = meta.defaultW, h = meta.defaultH;
     // riduci se non entra
     while (w > meta.minW && !fits({ x, y, w, h }, z)) w--;
