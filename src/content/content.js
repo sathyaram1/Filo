@@ -262,7 +262,8 @@
           chrome.runtime.sendMessage({ type: MSG.OPEN_SPELLCHECK_PAGE });
         },
       },
-    ];
+    );
+    return items;
   }
 
   // Sub-menu per una correzione "blu" (errore contestuale): mostra la spiegazione
