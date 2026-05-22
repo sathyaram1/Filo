@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('filoShell', {
     forward: (id) => ipcRenderer.invoke('tabs:forward', { id }),
     reload: (id) => ipcRenderer.invoke('tabs:reload', { id }),
     snapshot: () => ipcRenderer.invoke('tabs:snapshot'),
+    setActiveVisible: (visible) => ipcRenderer.invoke('tabs:set-active-visible', { visible }),
     onUpdate: (fn) => {
       const wrapped = (_event, snapshot) => { try { fn(snapshot); } catch (_) {} };
       ipcRenderer.on('tabs:updated', wrapped);
