@@ -126,6 +126,23 @@ URL interni utili:
 filo://newtab/ (dashboard), filo://editor/editor.html, filo://history/history.html,
 filo://options/options.html.`;
 
+// Finestra di screenshot tenuti nel contesto. I modelli AI Studio sono tariffati
+// a chiamata (non a token), quindi possiamo permetterci molti screenshot; cappiamo
+// a 20 solo per non far crescere il payload all'infinito su run molto lunghi.
+const IMG_WINDOW = 20;
+
+// Mantiene le immagini solo negli ultimi IMG_WINDOW turni utente; quelli più
+// vecchi conservano il testo ma rilasciano l'immagine (sostituita da una nota).
+function pruneOldImages(convo, keep = IMG_WINDOW) {
+  const imgTurns = [];
+  for (let i = 0; i < convo.length; i++) {
+    if (convo[i].role === 'user' && convo[i].parts.some((p) => p.inline_data)) imgTurns.push(i);
+  }
+  for (const idx of imgTurns.slice(0, Math.max(0, imgTurns.length - keep))) {
+    convo[idx].parts = convo[idx].parts.map((p) => (p.inline_data ? { text: '[screenshot di un passo precedente — omesso]' } : p));
+  }
+}
+
 function marksToText(map) {
   return map.map((m) => `#${m.i} [${m.page}] ${m.tag}${m.label ? ' "' + m.label + '"' : ''} @${m.cx},${m.cy}`).join('\n');
 }
