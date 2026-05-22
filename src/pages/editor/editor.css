@@ -190,10 +190,30 @@ html, body {
 .ed-palette-item .pi-desc { color: var(--sn-muted); font-size: 12px; margin-top: 6px; }
 .ed-palette-item .pi-size { color: var(--sn-muted); font-size: 11px; margin-top: 4px; }
 
+/* ── Splitter verticale ─────────────────────────────────────────────── */
+.ed-splitter {
+  flex: 0 0 5px;
+  cursor: col-resize;
+  background: transparent;
+  position: relative;
+  z-index: 2;
+}
+.ed-splitter::after {
+  content: '';
+  position: absolute;
+  inset: 0 -3px;
+}
+.ed-splitter:hover, .ed-splitter.dragging {
+  background: var(--sn-accent);
+  opacity: 0.4;
+}
+.ed-root.sidebar-hidden .ed-splitter { display: none; }
+
 /* ── Sidebar / griglia ──────────────────────────────────────────────── */
 .ed-sidebar {
   flex: 0 0 40%;
-  max-width: 40%;
+  max-width: 60%;
+  min-width: 200px;
   display: flex;
   flex-direction: column;
   background: var(--sn-bg);
