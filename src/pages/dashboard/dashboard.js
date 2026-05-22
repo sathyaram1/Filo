@@ -366,15 +366,23 @@
 
   // ===== Invio messaggio =====
   async function submitMessage(text) {
-    if (!text || sending) return;
+    if ((!text && !pendingImage) || sending) return;
     sending = true;
     sendBtn.disabled = true;
+    const imageToSend = pendingImage;
+    removeImagePreview();
     // Prima query dalla home → entra in stato thread.
     if (body.dataset.state !== 'thread') goThread();
 
     // Bolla utente
-    threadHistory.push({ role: 'user', text });
-    const userBubble = makeBubble({ role: 'user', text });
+    threadHistory.push({ role: 'user', text: text || '(immagine)' });
+    const userBubble = makeBubble({ role: 'user', text: text || '' });
+    if (imageToSend) {
+      const img = document.createElement('img');
+      img.src = imageToSend;
+      img.className = 'dash-bubble-img';
+      userBubble.insertBefore(img, userBubble.firstChild);
+    }
     bubblesEl.appendChild(userBubble);
 
     // Bolla Filo pending
@@ -382,11 +390,13 @@
     bubblesEl.appendChild(pending);
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
 
-    const r = await send({
+    const msg = {
       type: MSG.FILO_CHAT,
-      userMessage: text,
-      threadHistory: threadHistory.slice(0, -1), // history senza l'ultimo (lo passiamo via userMessage)
-    });
+      userMessage: text || 'Descrivi questa immagine.',
+      threadHistory: threadHistory.slice(0, -1),
+    };
+    if (imageToSend) msg.image = imageToSend;
+    const r = await send(msg);
 
     pending.remove();
     if (!r?.ok) {
