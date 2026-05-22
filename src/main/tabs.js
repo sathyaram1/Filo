@@ -220,6 +220,14 @@ class TabManager {
     wc.on('did-navigate', (_e, url) => update({ url, canBack: canGoBack(wc), canFwd: canGoFwd(wc) }));
     wc.on('did-navigate-in-page', (_e, url) => update({ url, canBack: canGoBack(wc), canFwd: canGoFwd(wc) }));
 
+    // Menu contestuale nativo sulle pagine interne senza menu Filo.
+    wc.on('context-menu', (_e, params) => {
+      const url = wc.getURL();
+      if (!NATIVE_MENU_PAGES.some((p) => url.startsWith(p))) return;
+      const menu = buildNativeContextMenu(wc, params);
+      if (menu) menu.popup({ window: this.win });
+    });
+
     // Apertura nuove tab: tutto resta dentro Filo come nuovo tab.
     wc.setWindowOpenHandler(({ url }) => {
       this.openTab(url, { activate: true });
