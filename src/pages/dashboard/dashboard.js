@@ -409,10 +409,60 @@
     refreshLive().catch(() => {});
   }
 
+  // ===== Image paste / drop =====
+  function showImagePreview(dataUrl) {
+    removeImagePreview();
+    pendingImage = dataUrl;
+    const wrap = document.createElement('div');
+    wrap.className = 'dash-img-preview';
+    wrap.id = 'imgPreview';
+    const img = document.createElement('img');
+    img.src = dataUrl;
+    img.alt = 'Immagine incollata';
+    const rm = document.createElement('button');
+    rm.type = 'button';
+    rm.className = 'dash-img-remove';
+    rm.textContent = '×';
+    rm.setAttribute('aria-label', 'Rimuovi immagine');
+    rm.addEventListener('click', removeImagePreview);
+    wrap.appendChild(img);
+    wrap.appendChild(rm);
+    inputForm.insertBefore(wrap, inputEl);
+  }
+  function removeImagePreview() {
+    pendingImage = null;
+    const el = document.getElementById('imgPreview');
+    if (el) el.remove();
+  }
+  function handleImageFile(file) {
+    if (!file || !file.type.startsWith('image/')) return;
+    if (file.size > 4 * 1024 * 1024) return;
+    const reader = new FileReader();
+    reader.onload = () => showImagePreview(reader.result);
+    reader.readAsDataURL(file);
+  }
+  inputForm.addEventListener('paste', (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        handleImageFile(item.getAsFile());
+        return;
+      }
+    }
+  });
+  inputForm.addEventListener('dragover', (e) => { e.preventDefault(); });
+  inputForm.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const file = e.dataTransfer?.files?.[0];
+    if (file) handleImageFile(file);
+  });
+
   inputForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const text = inputEl.value.trim();
-    if (!text) return;
+    if (!text && !pendingImage) return;
     submitMessage(text);
   });
 
