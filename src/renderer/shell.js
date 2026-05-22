@@ -69,18 +69,25 @@
     }
   }
 
+  // Altezza della shell (toolbar) sopra la WebContentsView: deve combaciare con
+  // SHELL_HEIGHT in src/main/window.js.
+  const SHELL_HEIGHT = 88;
   function openAppsMenu() {
     buildAppsMenu();
     appsMenu.hidden = false;
     appsBtn.setAttribute('aria-expanded', 'true');
-    // La WebContentsView del tab attivo è composta sopra l'HTML della shell
-    // e coprirebbe il dropdown: la nascondiamo finché il menu resta aperto.
-    api.tabs.setActiveVisible(false);
+    // La WebContentsView del tab attivo è composta SOPRA l'HTML della shell e
+    // coprirebbe il dropdown. Invece di nascondere la view (che lasciava un'area
+    // vuota), abbassiamo la view dello spazio occupato dal dropdown: così resta
+    // visibile sopra la view e il contenuto scorre solo di poco.
+    const rect = appsMenu.getBoundingClientRect();
+    const reserve = Math.max(0, Math.ceil(rect.bottom - SHELL_HEIGHT + 8));
+    api.tabs.reserveTop(reserve);
   }
   function closeAppsMenu() {
     appsMenu.hidden = true;
     appsBtn.setAttribute('aria-expanded', 'false');
-    api.tabs.setActiveVisible(true);
+    api.tabs.reserveTop(0);
   }
   function toggleAppsMenu() {
     if (appsMenu.hidden) openAppsMenu();
