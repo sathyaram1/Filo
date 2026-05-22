@@ -201,9 +201,9 @@ async function run() {
           const out = await generate({ model: o.model, system: SYSTEM, contents: convo, temperature: 0.2, schema: useSchema });
           parsed = extractJson(out);
           if (parsed) modelTurnText = JSON.stringify(parsed);
-          else if (t === 1) {
+          else if (t === 2) {
             writeFileSync(join(o.out, `fail-step-${String(step).padStart(2, '0')}.txt`), out);
-            log(`  [step ${step}] JSON non parsabile (len=${out.length}) dopo 2 tentativi.`);
+            log(`  [step ${step}] JSON non parsabile (len=${out.length}) dopo 3 tentativi.`);
           }
         } catch (e) {
           log(`  [step ${step}] errore LLM (tentativo ${t + 1}): ${e.message.slice(0, 140)}`);
