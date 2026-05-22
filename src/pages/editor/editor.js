@@ -247,10 +247,31 @@
 
   function renderDocBody() {
     docEl.innerHTML = pmToHtml(doc.content);
-    if (!docEl.firstChild) docEl.innerHTML = '<p><br></p>';
+    // Documento vuoto → paragrafo con <br> così il caret ha dove posarsi.
+    if (!docEl.firstChild || !docEl.textContent.trim()) docEl.innerHTML = '<p><br></p>';
     refreshCollapseToggles();
     applyCommentHighlights();
   }
+
+  // Cliccare nello spazio vuoto del foglio (margini, area sotto il testo) deve
+  // dare il focus all'editor e posare il caret in fondo: senza questo l'area
+  // editabile coincide col solo testo e il "foglio" sembra non scrivibile.
+  function focusDocAtEnd() {
+    docEl.focus();
+    const sel = window.getSelection();
+    if (!sel) return;
+    const range = document.createRange();
+    range.selectNodeContents(docEl);
+    range.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+  docWrap.addEventListener('mousedown', (e) => {
+    if (e.target !== docWrap && e.target !== docEl) return;
+    if (e.target === docEl && docEl.textContent.trim()) return;
+    e.preventDefault();
+    focusDocAtEnd();
+  });
 
   // ── Formattazione ───────────────────────────────────────────────────
   function exec(cmd, val) {
