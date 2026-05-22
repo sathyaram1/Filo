@@ -97,13 +97,8 @@
         // di "riservare" lo slot e rivelarlo via update() se/quando arriva una
         // correzione asincrona. Usato per evitare il flash "Cerco una correzione…"
         // quando ancora non sappiamo se la parola è davvero sbagliata.
-        // Anche il separatore successivo, se aggiunto, è solidale con questa riga.
-        const separator = document.createElement('div');
-        separator.className = 'sn-menu-sep';
-        separator.dataset.snCorrectionSep = '1';
         if (it.hidden) {
           wrap.style.display = 'none';
-          separator.style.display = 'none';
         }
 
         renderCorrection(wrap, it);
