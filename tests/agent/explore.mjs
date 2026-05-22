@@ -133,11 +133,16 @@ async function run() {
   const shotsDir = join(o.out, 'shots');
   mkdirSync(shotsDir, { recursive: true });
   const allIssues = [];
-  const history = [];
+  // Conversazione multi-turn COMPLETA: ogni passo aggiunge il turno utente
+  // (testo + screenshot) e il turno del modello. Così il modello vede TUTTI gli
+  // stati precedenti (utile per riconoscere "c'era contenuto, ora è sparito").
+  // I modelli AI Studio sono tariffati a chiamata, non a token → contesto lungo
+  // non costa di più.
+  const convo = [];
   const logPath = join(o.out, 'log.txt');
   const log = (s) => { console.log(s); appendFileSync(logPath, s + '\n'); };
 
-  log(`Filo explore — model=${o.model} steps=${o.steps} area="${o.area || '(libera)'}" start=${o.start}`);
+  log(`Filo explore — model=${o.model} steps=${o.steps} ${o.task ? `task="${o.task}"` : `area="${o.area || '(libera)'}"`} start=${o.start}`);
   const { app, shell } = await d.launchFilo();
   try {
     if (o.start && o.start !== 'filo://newtab/') await d.openTab(app, shell, o.start);
@@ -148,23 +153,29 @@ async function run() {
       await d.captureComposite(app, shot);
       await d.clearMarks(app, shell);
 
-      const user = [
-        o.area ? `AREA DA TESTARE (priorità): ${o.area}` : 'Esplora liberamente tutta la app.',
-        `Passo ${step}/${o.steps}.`,
-        history.length ? `Ultime azioni:\n${history.slice(-5).map((h, i) => `  - ${h}`).join('\n')}` : 'Primo passo.',
-        `Elementi cliccabili (badge):\n${marksToText(map)}`,
-        'Analizza lo screenshot allegato e rispondi col JSON richiesto.',
+      const objective = o.task
+        ? `COMPITO DA SVOLGERE: ${o.task}\nEseguilo con interazioni reali (click sui badge, digitazione, navigazione). Segnala QUALSIASI bug incontrato lungo il percorso. Usa kind=finish solo quando il compito è completato o sei davvero bloccato.`
+        : (o.area ? `AREA DA TESTARE (priorità): ${o.area}` : 'Esplora liberamente tutta la app, provando aree e funzioni diverse.');
+      const stepText = [
+        objective,
+        `Passo ${step}/${o.steps}. Lo screenshot allegato è lo stato ATTUALE; i turni precedenti mostrano gli stati passati.`,
+        `Elementi cliccabili ORA (i badge nello screenshot):\n${marksToText(map)}`,
+        'Rispondi col JSON richiesto.',
       ].join('\n\n');
 
+      // Turno utente con screenshot corrente (resta nel contesto per i passi futuri).
+      convo.push({ role: 'user', parts: [{ text: stepText }, imagePart(shot)] });
+
       // Fino a 2 tentativi: un campione degenere (ramble ripetitiva → JSON
-      // troncato) è stocastico, un nuovo sample di solito risolve. Temperatura
-      // bassa per ridurre le ripetizioni.
+      // troncato) è stocastico, un nuovo sample di solito risolve.
       let parsed = null;
+      let modelTurnText = '(risposta non valida)';
       for (let t = 0; t < 2 && !parsed; t++) {
         try {
-          const out = await generate({ model: o.model, system: SYSTEM, user, imagePath: shot, temperature: 0.2, schema: SCHEMA });
+          const out = await generate({ model: o.model, system: SYSTEM, contents: convo, temperature: 0.2, schema: SCHEMA });
           parsed = extractJson(out);
-          if (!parsed && t === 1) {
+          if (parsed) modelTurnText = JSON.stringify(parsed);
+          else if (t === 1) {
             writeFileSync(join(o.out, `fail-step-${String(step).padStart(2, '0')}.txt`), out);
             log(`  [step ${step}] JSON non parsabile (len=${out.length}) dopo 2 tentativi.`);
           }
@@ -172,7 +183,9 @@ async function run() {
           log(`  [step ${step}] errore LLM (tentativo ${t + 1}): ${e.message.slice(0, 140)}`);
         }
       }
-      if (!parsed) { history.push(`(passo ${step}: risposta non valida)`); continue; }
+      // Mantieni l'alternanza user/model nel contesto (compatto, niente ramble).
+      convo.push({ role: 'model', parts: [{ text: modelTurnText }] });
+      if (!parsed) continue;
 
       log(`  [step ${step}] ${parsed.screen || ''}`);
       for (const iss of (parsed.issues || [])) {
@@ -182,20 +195,19 @@ async function run() {
       }
 
       const act = parsed.action || { kind: 'finish', reason: 'nessuna azione' };
+      log(`    → ${act.kind}${act.mark != null ? ' #' + act.mark : ''}${act.text ? ' "' + String(act.text).slice(0, 30) + '"' : ''}${act.url ? ' ' + act.url : ''}`);
       try {
         switch (act.kind) {
-          case 'click_mark': await d.clickMark(app, shell, map, Number(act.mark)); history.push(`click #${act.mark}`); break;
-          case 'type': await d.typeText(app, shell, act.text || ''); history.push(`type "${(act.text || '').slice(0, 30)}"`); break;
-          case 'key': await d.pressKey(app, shell, act.key || 'Enter'); history.push(`key ${act.key}`); break;
-          case 'scroll': await d.scrollBy(app, shell, Number(act.dy) || 300); history.push(`scroll ${act.dy}`); break;
-          case 'navigate': await d.navigate(app, shell, act.url); history.push(`navigate ${act.url}`); break;
-          case 'open_tab': await d.openTab(app, shell, act.url); history.push(`open_tab ${act.url}`); break;
+          case 'click_mark': await d.clickMark(app, shell, map, Number(act.mark)); break;
+          case 'type': await d.typeText(app, shell, act.text || ''); break;
+          case 'key': await d.pressKey(app, shell, act.key || 'Enter'); break;
+          case 'scroll': await d.scrollBy(app, shell, Number(act.dy) || 300); break;
+          case 'navigate': await d.navigate(app, shell, act.url); break;
+          case 'open_tab': await d.openTab(app, shell, act.url); break;
           case 'finish': log(`  [step ${step}] finish: ${act.reason || ''}`); step = o.steps; break;
-          default: history.push(`(azione ignota ${act.kind})`);
         }
       } catch (e) {
         log(`    azione fallita (${act.kind}): ${e.message.slice(0, 120)}`);
-        history.push(`(azione fallita: ${act.kind})`);
       }
     }
   } finally {
