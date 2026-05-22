@@ -389,6 +389,44 @@ body[data-state="thread"] .dash-suggestion { justify-content: flex-start; paddin
 .dash-send:hover { opacity: 0.85; }
 .dash-send[disabled] { opacity: 0.4; cursor: not-allowed; }
 
+/* Image paste preview */
+.dash-img-preview {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding-left: 8px;
+}
+.dash-img-preview img {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+.dash-img-remove {
+  position: absolute;
+  top: -4px;
+  left: 36px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: none;
+  background: var(--dash-ink);
+  color: var(--dash-paper);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dash-bubble-img {
+  max-width: 100%;
+  max-height: 200px;
+  border-radius: 10px;
+  margin-bottom: 6px;
+  display: block;
+}
+
 @media (max-width: 720px) {
   .dash-input-wrap { grid-column: 1; }
 }
