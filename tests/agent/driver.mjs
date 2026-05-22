@@ -88,7 +88,7 @@ export async function captureComposite(app, outPath) {
   const safePath = outPath.replace(/\\/g, '\\\\');
   const ps = `
 Add-Type -AssemblyName System.Drawing
-Add-Type @"
+Add-Type -ReferencedAssemblies System.Drawing -TypeDefinition @"
 using System;
 using System.Runtime.InteropServices;
 using System.Drawing;
