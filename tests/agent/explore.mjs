@@ -168,7 +168,8 @@ async function run() {
   const logPath = join(o.out, 'log.txt');
   const log = (s) => { console.log(s); appendFileSync(logPath, s + '\n'); };
 
-  log(`Filo explore — model=${o.model} steps=${o.steps} ${o.task ? `task="${o.task}"` : `area="${o.area || '(libera)'}"`} start=${o.start}`);
+  log(`Filo explore — model=${o.model}${o.fallback ? ` (fallback ${o.fallback})` : ''} steps=${o.steps} ${o.task ? `task="${o.task}"` : `area="${o.area || '(libera)'}"`} start=${o.start}`);
+  let activeModel = o.model; // può passare al fallback se il primario esaurisce la quota
   const { app, shell } = await d.launchFilo();
   try {
     if (o.start && o.start !== 'filo://newtab/') await d.openTab(app, shell, o.start);
