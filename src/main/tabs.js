@@ -15,7 +15,7 @@ const INTERNAL_PRELOAD = path.join(__dirname, '..', 'preload', 'internal-preload
 // Qui forniamo un menu contestuale nativo così il tasto destro fa qualcosa
 // (taglia/copia/incolla) invece di restare inerte, es. nell'editor.
 const NATIVE_MENU_PAGES = [
-  'filo://options/', 'filo://history/', 'filo://feedback/',
+  'filo://options/', 'filo://preferences/', 'filo://history/', 'filo://feedback/',
   'filo://spellcheck/', 'filo://editor/',
 ];
 
