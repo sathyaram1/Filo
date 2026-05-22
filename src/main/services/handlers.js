@@ -790,9 +790,20 @@ async function handleMessage(msg, sender = {}) {
       }
     case MSG.SUBMIT_FEEDBACK: {
       try {
-        const r = await globalThis.SN_FEEDBACK.submit(msg.payload || {});
+        if (!globalThis.SN_FEEDBACK?.submit) {
+          throw new Error('SN_FEEDBACK non caricato nel main process');
+        }
+        const payload = msg.payload || {};
+        console.log('[Filo feedback] submit start', {
+          textLen: (payload.text || '').length,
+          images: (payload.images || []).length,
+          url: payload.url,
+        });
+        const r = await globalThis.SN_FEEDBACK.submit(payload);
+        console.log('[Filo feedback] submit ok', r);
         return { ok: true, ...r };
       } catch (e) {
+        console.error('[Filo feedback] submit failed', e);
         return { ok: false, error: e?.message || String(e) };
       }
     }
