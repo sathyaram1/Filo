@@ -18,9 +18,7 @@
     $('h-costs').textContent = I18n.t('options_costs');
     $('h-shortcuts').textContent = I18n.t('options_shortcuts');
     $('h-blocklist').textContent = I18n.t('options_blocklist');
-    $('h-features').textContent = I18n.t('options_features');
     $('h-categories').textContent = I18n.t('options_categories');
-    $('h-theme').textContent = I18n.t('options_theme');
 
     document.querySelector('label[for="provider"]').textContent = I18n.t('options_provider');
     document.querySelector('label[for="apiKey"]').textContent = I18n.t('options_api_key');
