@@ -246,6 +246,9 @@
     maximize:     (size) => wrap(maximize, { size }),
     restore:      (size) => wrap(restore, { size }),
     home:         (size) => wrap(home, { size }),
+    apps:         (size) => wrap(apps, { size }),
+    caretDown:    (size) => wrap(caretDown, { size }),
+    editor:       (size) => wrap(editor, { size }),
     openForLater: (size) => wrap(openForLater, { size }),
   };
 
