@@ -67,25 +67,53 @@ export async function contentBounds(app) {
   });
 }
 
-// Cattura nativa della regione finestra in PNG. Ritorna il path.
+// HWND della finestra principale (stringa decimale dell'handle).
+export async function windowHandle(app) {
+  return app.evaluate(async ({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows()[0];
+    const buf = win.getNativeWindowHandle();
+    // little-endian; su 64-bit l'handle sta nei primi 8 byte.
+    let v = 0n;
+    for (let i = Math.min(buf.length, 8) - 1; i >= 0; i--) v = (v << 8n) | BigInt(buf[i]);
+    return v.toString();
+  });
+}
+
+// Cattura nativa in PNG via Win32 PrintWindow(PW_RENDERFULLCONTENT): cattura il
+// contenuto reale della finestra (shell + WebContentsView composite) anche se
+// non è in primo piano/occlusa. Niente dipendenza dal focus → robusto.
 export async function captureComposite(app, outPath) {
   await bringToFront(app);
-  const b = await contentBounds(app);
-  const x = Math.round(b.x * b.scale);
-  const y = Math.round(b.y * b.scale);
-  const w = Math.round(b.width * b.scale);
-  const h = Math.round(b.height * b.scale);
+  const hwnd = await windowHandle(app);
   const safePath = outPath.replace(/\\/g, '\\\\');
-  const ps = [
-    'Add-Type -AssemblyName System.Drawing,System.Windows.Forms',
-    'Add-Type @"\nusing System;\nusing System.Runtime.InteropServices;\npublic class DPI { [DllImport("user32.dll")] public static extern bool SetProcessDPIAware(); }\n"@',
-    '[DPI]::SetProcessDPIAware() | Out-Null',
-    `$bmp = New-Object System.Drawing.Bitmap(${w}, ${h})`,
-    '$g = [System.Drawing.Graphics]::FromImage($bmp)',
-    `$g.CopyFromScreen(${x}, ${y}, 0, 0, (New-Object System.Drawing.Size(${w}, ${h})))`,
-    `$bmp.Save('${safePath}', [System.Drawing.Imaging.ImageFormat]::Png)`,
-    '$g.Dispose(); $bmp.Dispose()',
-  ].join('\n');
+  const ps = `
+Add-Type -AssemblyName System.Drawing
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+using System.Drawing;
+public class WinCap {
+  [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
+  [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr h, IntPtr hdc, uint flags);
+  [DllImport("user32.dll")] public static extern bool GetClientRect(IntPtr h, out RECT r);
+  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
+  [StructLayout(LayoutKind.Sequential)] public struct RECT { public int L, T, R, B; }
+  public static void Shoot(IntPtr h, string path) {
+    SetProcessDPIAware();
+    RECT wr; GetWindowRect(h, out wr);
+    int w = wr.R - wr.L, ht = wr.B - wr.T;
+    Bitmap bmp = new Bitmap(w, ht);
+    Graphics g = Graphics.FromImage(bmp);
+    IntPtr hdc = g.GetHdc();
+    PrintWindow(h, hdc, 2); // PW_RENDERFULLCONTENT
+    g.ReleaseHdc(hdc); g.Dispose();
+    bmp.Save(path, System.Drawing.Imaging.ImageFormat.Png);
+    bmp.Dispose();
+  }
+}
+"@
+[WinCap]::Shoot([IntPtr]${hwnd}, '${safePath}')
+`;
   execFileSync('powershell.exe', ['-NoProfile', '-Command', ps], { stdio: 'pipe' });
   return outPath;
 }
