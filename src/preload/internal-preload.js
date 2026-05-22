@@ -148,17 +148,10 @@ const chromeShim = {
 };
 
 // Inietta i content script (menu, popup, sidebar, highlight, spellcheck,
-// feedback) anche su filo://newtab/ così il tasto destro Filo funziona sulla
-// dashboard. Skippiamo options/history/feedback/spellcheck dove i content
-// script sarebbero invasivi (form fields, layout dedicato).
+// feedback) su tutte le pagine filo:// — il tasto destro Filo deve funzionare
+// ovunque, come richiesto dall'utente.
 const path = require('node:path');
-// NB: l'editor NON è blocklistato: vogliamo i menu contestuali Filo e il
-// correttore (rosso on-demand + blu semantico) anche lì, come su ogni sito.
-const CS_BLOCKLIST = ['filo://options/', 'filo://preferences/', 'filo://history/', 'filo://feedback/', 'filo://spellcheck/'];
-const shouldInjectContentScripts = () => {
-  const url = location.href;
-  return !CS_BLOCKLIST.some((p) => url.startsWith(p));
-};
+const shouldInjectContentScripts = () => true;
 function injectContentScriptStyles() {
   const STYLES = ['theme.css', 'menu.css', 'popup.css', 'sidebar.css',
     'highlight.css', 'spellcheck.css', 'feedback.css'];
