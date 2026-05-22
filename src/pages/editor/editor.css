@@ -319,6 +319,19 @@ html, body {
   background: var(--sn-accent); color: #fff; cursor: pointer; font-size: 12px;
 }
 
+/* settings module (ingranaggio: apre/chiude la modalità modifica moduli) */
+.ed-settings-mod {
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--sn-muted);
+}
+.ed-settings-mod:hover { color: var(--sn-accent); }
+.ed-settings-mod svg { display: block; }
+.ed-root.settings-mode .ed-module[data-type="settings"] { color: var(--sn-accent); outline-color: var(--sn-accent); }
+/* L'ingranaggio non è eliminabile: niente maniglia di trascinamento ambigua;
+   resta comunque spostabile come gli altri (draggable sul cell). */
+
 /* comment module */
 .ed-comment-mod { align-items: center; justify-content: center; text-align: center; cursor: pointer; }
 .ed-comment-mod .cm-count { font-size: 22px; font-weight: 700; }
