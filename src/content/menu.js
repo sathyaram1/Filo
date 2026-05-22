@@ -132,9 +132,6 @@
         }
 
         root.appendChild(wrap);
-        // Il chiamante aggiunge un { type: 'separator' } dopo il correction;
-        // lo gestiamo qui sopra. NON aggiungiamo qui un separator automatico:
-        // l'uso esistente passa separator esplicito come item successivo.
         continue;
       }
       if (it.type === 'split') {
