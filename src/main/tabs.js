@@ -46,6 +46,16 @@ class TabManager {
     this.shellHeight = shellHeight;
     this.tabs = []; // [{ id, view, title, url, favicon, loading, canBack, canFwd }]
     this.activeId = null;
+    // Spazio extra riservato in alto (px): usato quando un dropdown della shell
+    // (es. menu App) deve restare visibile sopra la WebContentsView attiva. Si
+    // abbassa la view invece di nasconderla, evitando l'area vuota/bianca.
+    this.topInset = 0;
+  }
+
+  // Riserva (o libera, con px=0) spazio sopra la view attiva e rifà il layout.
+  setTopInset(px) {
+    this.topInset = Math.max(0, Math.round(Number(px) || 0));
+    this.layout();
   }
 
   // ─── lifecycle ──────────────────────────────────────────────────────────
