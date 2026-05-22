@@ -198,13 +198,12 @@ async function run() {
       // troncato) è stocastico, un nuovo sample di solito risolve.
       let parsed = null;
       let modelTurnText = '(risposta non valida)';
-      // responseSchema serve a Gemma (poco disciplinato); sui modelli Gemini
-      // tende invece a far degenerare l'output in ripetizioni → per Gemini usiamo
-      // il JSON mode semplice (responseMimeType), che è affidabile.
-      const useSchema = /gemma/i.test(o.model) ? SCHEMA : undefined;
       for (let t = 0; t < 3 && !parsed; t++) {
         try {
-          const out = await generate({ model: o.model, system: SYSTEM, contents: convo, temperature: 0.2, schema: useSchema });
+          // responseSchema serve a Gemma (poco disciplinato); sui modelli Gemini
+          // fa degenerare l'output in ripetizioni → per Gemini JSON mode semplice.
+          const useSchema = /gemma/i.test(activeModel) ? SCHEMA : undefined;
+          const out = await generate({ model: activeModel, system: SYSTEM, contents: convo, temperature: 0.2, schema: useSchema });
           parsed = extractJson(out);
           if (parsed) modelTurnText = JSON.stringify(parsed);
           else if (t === 2) {
@@ -212,6 +211,14 @@ async function run() {
             log(`  [step ${step}] JSON non parsabile (len=${out.length}) dopo 3 tentativi.`);
           }
         } catch (e) {
+          // Quota/crediti del primario esauriti → passa al fallback per il resto.
+          const quota = e?.status === 429 || /429|quota|exhaust/i.test(e?.message || '');
+          if (quota && o.fallback && activeModel !== o.fallback) {
+            log(`  [step ${step}] ${activeModel} ha esaurito la quota → passo al fallback ${o.fallback}`);
+            activeModel = o.fallback;
+            t--; // non consumare il tentativo: riprova subito col fallback
+            continue;
+          }
           log(`  [step ${step}] errore LLM (tentativo ${t + 1}): ${e.message.slice(0, 140)}`);
         }
       }
