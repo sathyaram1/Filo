@@ -1123,5 +1123,7 @@
     setAutocorrect,
     getCachedSuggestion,
     setCachedSuggestion,
+    getNativeSuggestions,
+    onNativeSuggestions,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
