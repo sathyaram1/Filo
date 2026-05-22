@@ -787,13 +787,15 @@
                 insertTextAtSelection(text);
                 pushClipboardEntry({ type: 'text', text });
               } else {
-                Popup.showToast(I18n.t('err_provider_failed'));
+                // Campo di solo testo + clipboard con sola immagine: non è un
+                // errore di provider/rete, è solo un campo che non accetta img.
+                Popup.showToast(I18n.t('toast_cannot_paste_image'));
               }
               return;
             }
             if (targetKind !== 'ce') {
-              // Nessun target editabile valido: avvisa e non fare niente
-              Popup.showToast(I18n.t('err_provider_failed'));
+              // Nessun target editabile valido per un'immagine.
+              Popup.showToast(I18n.t('toast_cannot_paste_image'));
               return;
             }
             const ok = insertImageInEditable(blob, dataUrl);
