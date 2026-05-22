@@ -228,7 +228,7 @@ async function run() {
 
       log(`  [step ${step}] ${parsed.screen || ''}`);
       for (const iss of (parsed.issues || [])) {
-        const rec = { step, shot: `shots/step-${String(step).padStart(2, '0')}.png`, ...iss };
+        const rec = { step, model: activeModel, shot: `shots/step-${String(step).padStart(2, '0')}.png`, ...iss };
         allIssues.push(rec);
         log(`    ⚠ [${iss.severity}] ${iss.title} — ${iss.detail || ''}`);
       }
