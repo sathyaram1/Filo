@@ -234,6 +234,19 @@ class TabManager {
     // Menu contestuale nativo sulle pagine interne senza menu Filo.
     wc.on('context-menu', (_e, params) => {
       const url = wc.getURL();
+      // Il correttore nativo di Electron è l'unico a conoscere i suggerimenti
+      // ortografici della parola sotto lo zigzag rosso. Sulle pagine col menu
+      // Filo (newtab, editor, siti esterni) il menu è custom e non li vedrebbe:
+      // li spingiamo al content script perché li mostri nel menu di correzione.
+      if (params.misspelledWord) {
+        try {
+          wc.send('filo:broadcast', {
+            type: '_spell:native',
+            word: params.misspelledWord,
+            suggestions: (params.dictionarySuggestions || []).slice(0, 5),
+          });
+        } catch (_) {}
+      }
       if (!NATIVE_MENU_PAGES.some((p) => url.startsWith(p))) return;
       const menu = buildNativeContextMenu(wc, params);
       if (menu) menu.popup({ window: this.win });
