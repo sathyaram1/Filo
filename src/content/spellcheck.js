@@ -1072,6 +1072,40 @@
   }
 
   // ============================================================================
+  // Suggerimenti correttore nativo (Electron)
+  // ============================================================================
+  // Ritorna i suggerimenti nativi per `word` se sono recenti e riferiti a quella
+  // parola; altrimenti []. Usato dal menu di correzione (content.js) come fonte
+  // immediata e affidabile, in parallelo al suggerimento contestuale dell'LLM.
+  function getNativeSuggestions(word) {
+    if (!word || !lastNative.word) return [];
+    if (lastNative.word.toLowerCase() !== String(word).toLowerCase()) return [];
+    if (Date.now() - lastNative.ts > 4000) return [];
+    return lastNative.suggestions.slice();
+  }
+
+  // Registra un callback chiamato (una volta) quando arrivano i suggerimenti
+  // nativi per `word`, se non sono già disponibili al momento dell'apertura del
+  // menu (il broadcast dal main può arrivare con qualche ms di ritardo). Ritorna
+  // una funzione per annullare l'attesa.
+  function onNativeSuggestions(word, cb, timeoutMs = 800) {
+    const have = getNativeSuggestions(word);
+    if (have.length) { setTimeout(() => cb(have), 0); return () => {}; }
+    let done = false;
+    const finish = () => { done = true; nativeWaiters.delete(waiter); clearTimeout(timer); };
+    const waiter = (n) => {
+      if (done || !word) return;
+      if (n.word && n.word.toLowerCase() === String(word).toLowerCase()) {
+        finish();
+        cb((n.suggestions || []).slice());
+      }
+    };
+    nativeWaiters.add(waiter);
+    const timer = setTimeout(finish, timeoutMs);
+    return finish;
+  }
+
+  // ============================================================================
   // API pubblica
   // ============================================================================
   global.SN_SPELLCHECK = {
