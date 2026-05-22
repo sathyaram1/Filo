@@ -186,6 +186,7 @@ async function run() {
 
       // Turno utente con screenshot corrente (resta nel contesto per i passi futuri).
       convo.push({ role: 'user', parts: [{ text: stepText }, imagePart(shot)] });
+      pruneOldImages(convo); // tieni al massimo IMG_WINDOW screenshot nel contesto
 
       // Fino a 2 tentativi: un campione degenere (ramble ripetitiva → JSON
       // troncato) è stocastico, un nuovo sample di solito risolve.
