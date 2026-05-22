@@ -65,33 +65,6 @@ html, body {
   .dash-left, .dash-right { display: none; }
 }
 
-/* Top right icons */
-.dash-topbar {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  display: flex;
-  gap: 8px;
-  z-index: 5;
-}
-.dash-icon-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: 1.5px solid var(--dash-ink-mute);
-  background: transparent;
-  color: var(--dash-ink-soft);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
-}
-.dash-icon-btn:hover {
-  border-color: var(--dash-ink);
-  color: var(--dash-ink);
-  background: var(--dash-card);
-}
 
 /* ===== Colonna sinistra: suggerimenti ===== */
 .dash-left {
