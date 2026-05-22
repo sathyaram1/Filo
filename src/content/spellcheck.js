@@ -43,6 +43,13 @@
   // event che rientrerebbe nel listener; questa flag salta una sola passata.
   let suppressAutocorrect = false;
 
+  // Suggerimenti del correttore NATIVO (Electron) per l'ultima parola su cui è
+  // stato richiesto il menu contestuale. Il main li spinge via broadcast
+  // `_spell:native` sull'evento context-menu (vedi tabs.js). Sono immediati e
+  // non dipendono dall'LLM: il menu di correzione li usa come base affidabile.
+  let lastNative = { word: '', suggestions: [], ts: 0 };
+  const nativeWaiters = new Set();
+
   // ============================================================================
   // Init
   // ============================================================================
