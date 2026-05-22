@@ -225,6 +225,29 @@ async function run() {
   ].join('\n');
   writeFileSync(join(o.out, 'report.md'), md);
   console.log(`\n✓ Report: ${join(o.out, 'report.md')}  (${allIssuesRef.length} issue)`);
+
+  // Push su Firestore feedback (categoria "agente"), con modello e screenshot.
+  if (o.feedback && allIssuesRef.length) {
+    const minRank = rank[o.minSeverity] || 1;
+    const toPush = allIssuesRef.filter((i) => (rank[i.severity] || 0) >= minRank);
+    console.log(`\nInvio ${toPush.length} issue ai feedback (modello ${o.model})…`);
+    for (const i of toPush) {
+      try {
+        const r = await pushIssue({
+          model: o.model,
+          severity: i.severity,
+          area: i.area || '?',
+          title: i.title,
+          detail: i.detail || '',
+          foundAt: o.start,
+          screenshotPath: join(o.out, i.shot),
+        });
+        console.log(`  ✓ feedback ${r.id} — ${i.title}`);
+      } catch (e) {
+        console.log(`  ✗ push fallito (${i.title}): ${e.message.slice(0, 140)}`);
+      }
+    }
+  }
 }
 
 run().catch((e) => { console.error(e); process.exit(1); });
