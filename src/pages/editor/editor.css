@@ -267,6 +267,42 @@ html, body {
 }
 .ed-module:hover .ed-mod-drag { opacity: 0.7; }
 
+/* resize handle per i moduli */
+.ed-mod-resize {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+  opacity: 0;
+  z-index: 2;
+}
+.ed-mod-resize::after {
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  right: 3px;
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid var(--sn-muted);
+  border-bottom: 2px solid var(--sn-muted);
+}
+.ed-module:hover .ed-mod-resize { opacity: 0.6; }
+.ed-mod-resize:hover { opacity: 1 !important; }
+.ed-mod-resize-h {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  top: 0;
+  width: 6px;
+  cursor: ew-resize;
+  opacity: 0;
+  z-index: 2;
+}
+.ed-module:hover .ed-mod-resize-h { opacity: 0.4; }
+.ed-mod-resize-h:hover { opacity: 1 !important; background: var(--sn-accent); border-radius: 0 6px 6px 0; }
+
 /* contenuti specifici dei moduli */
 .ed-mod-pad { padding: 10px; flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
 .ed-mod-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--sn-muted); }
