@@ -1006,11 +1006,8 @@
   function toggleSidebar() { root.classList.toggle('sidebar-hidden'); }
 
   sidebarToggle.addEventListener('click', toggleSidebar);
-  settingsToggle.addEventListener('click', () => toggleSettingsMode());
-  titleEl.addEventListener('input', markDirty);
 
   if (ICONS.apps) sidebarToggle.innerHTML = ICONS.apps(16);
-  if (ICONS.options) settingsToggle.innerHTML = ICONS.options(16);
 
   window.addEventListener('keydown', (e) => {
     const meta = e.ctrlKey || e.metaKey;
