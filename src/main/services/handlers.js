@@ -826,7 +826,7 @@ async function handleMessage(msg, sender = {}) {
       })();
       return { ok: true };
     case MSG.FILO_CHAT: {
-      const r = await handleFiloChat({ userMessage: msg.userMessage, threadHistory: msg.threadHistory });
+      const r = await handleFiloChat({ userMessage: msg.userMessage, threadHistory: msg.threadHistory, image: msg.image });
       return { ok: true, ...r };
     }
     case MSG.FILO_GET_STATE: {
