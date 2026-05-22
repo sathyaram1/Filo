@@ -799,7 +799,10 @@ async function handleMessage(msg, sender = {}) {
           images: (payload.images || []).length,
           url: payload.url,
         });
-        const r = await globalThis.SN_FEEDBACK.submit(payload);
+        const submitP = globalThis.SN_FEEDBACK.submit(payload);
+        const timeoutP = new Promise((_, rej) =>
+          setTimeout(() => rej(new Error('timeout (20s) — controlla la rete')), 20000));
+        const r = await Promise.race([submitP, timeoutP]);
         console.log('[Filo feedback] submit ok', r);
         return { ok: true, ...r };
       } catch (e) {
