@@ -9,13 +9,25 @@
 //   gemma-4-31b-it          alta quota (~1500/g)
 //   gemma-4-26b-a4b-it      alta quota (~1500/g)
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// Legge la chiave da env oppure da tests/agent/.env (gitignorato).
+// Formato .env: GEMINI_API_KEY=...
 export function getApiKey() {
-  const k = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY;
-  if (!k) throw new Error('Imposta GEMINI_API_KEY (o GOOGLE_AI_API_KEY) con la chiave AI Studio.');
+  let k = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY;
+  if (!k) {
+    const envPath = join(__dirname, '.env');
+    if (existsSync(envPath)) {
+      const m = readFileSync(envPath, 'utf8').match(/^\s*(?:GEMINI_API_KEY|GOOGLE_AI_API_KEY)\s*=\s*(.+)\s*$/m);
+      if (m) k = m[1].trim().replace(/^["']|["']$/g, '');
+    }
+  }
+  if (!k) throw new Error('Manca la chiave: imposta GEMINI_API_KEY o crea tests/agent/.env con GEMINI_API_KEY=...');
   return k;
 }
 
