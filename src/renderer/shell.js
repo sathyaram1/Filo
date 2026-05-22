@@ -15,6 +15,7 @@
   const fwdBtn = document.getElementById('nav-forward');
   const reloadBtn = document.getElementById('nav-reload');
   const homeBtn = document.getElementById('nav-home');
+  const settingsBtn = document.getElementById('nav-settings');
   const winMinBtn = document.getElementById('win-min');
   const winMaxBtn = document.getElementById('win-max');
   const winCloseBtn = document.getElementById('win-close');
