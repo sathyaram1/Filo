@@ -266,14 +266,19 @@
       statusEl.textContent = 'Invio in corso…';
       try {
         const clientId = await getClientId();
-        const res = await Feedback.submit({
+        // Routing via main process: la CSP della pagina ospite blocca fetch
+        // diretti verso firestore/firebasestorage dal preload. Il main usa
+        // undici (Node) e non è soggetto alla CSP della pagina.
+        const payload = {
           text,
           url: location.href,
           title: document.title,
           userAgent: navigator.userAgent,
           clientId,
           images,
-        });
+        };
+        const res = await chrome.runtime.sendMessage({ type: MSG.SUBMIT_FEEDBACK, payload });
+        if (!res?.ok) throw new Error(res?.error || 'invio fallito');
         statusEl.textContent = '';
         close();
         Popup?.showToast?.('Grazie! Feedback inviato.', { duration: 2500 });
