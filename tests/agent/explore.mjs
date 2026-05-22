@@ -235,7 +235,7 @@ async function run() {
     ``,
     `- Modello: \`${o.model}\``,
     `- Passi: ${o.steps}`,
-    `- Area: ${o.area || '(libera)'}`,
+    o.task ? `- Compito: ${o.task}` : `- Area: ${o.area || '(libera)'}`,
     `- Issue trovate: **${allIssuesRef.length}** (high: ${bySev('high').length}, medium: ${bySev('medium').length}, low: ${bySev('low').length})`,
     ``,
     `## Issue`,
