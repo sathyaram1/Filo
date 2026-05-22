@@ -132,26 +132,24 @@ html, body {
   color: var(--dash-ink);
 }
 .dash-suggestion .dash-sug-icon {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--dash-card);
-  border: 1px solid var(--dash-line);
-  font-size: 11px;
+  background: transparent;
+  border: none;
+  font-size: 16px;
   font-weight: 600;
   color: var(--dash-ink-mute);
   text-transform: uppercase;
 }
-/* Quando contiene la favicon di un sito, lo sfondo non serve. */
-.dash-sug-icon:has(.dash-sug-favicon) { background: transparent; border-color: transparent; padding: 0; }
 .dash-sug-favicon {
-  width: 18px;
-  height: 18px;
-  border-radius: 4px;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
   display: block;
   object-fit: contain;
 }
