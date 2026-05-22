@@ -33,6 +33,7 @@
   let threadHistory = []; // [{role: 'user'|'filo', text, actions?}]
   let sending = false;
   let liveTickHandle = null;
+  let pendingImage = null; // dataUrl dell'immagine incollata
 
   // ===== Helpers messaggi =====
   function send(msg) {
