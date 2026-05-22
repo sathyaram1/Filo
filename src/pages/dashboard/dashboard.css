@@ -40,8 +40,8 @@ html, body {
 }
 
 /* L'attributo HTML `hidden` viene normalmente reso `display: none` dalla UA
-   stylesheet, ma le nostre regole `display: inline-flex` su .dash-icon-btn
-   ecc. lo sovrascrivono. Riportiamo la priorità qui in modo esplicito. */
+   stylesheet, ma le nostre regole `display: inline-flex` lo sovrascrivono.
+   Riportiamo la priorità qui in modo esplicito. */
 [hidden] { display: none !important; }
 
 /* Layout principale a tre zone + input bar.
