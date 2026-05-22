@@ -34,7 +34,9 @@ export function getApiKey() {
 const isGemma = (model) => /gemma/i.test(model);
 
 // Genera contenuto da testo (+ immagine PNG opzionale). Ritorna stringa.
-export async function generate({ model, system, user, imagePath, temperature = 0.4, apiKey }) {
+// Se `schema` è dato, vincola l'output con responseSchema (output strutturato):
+// funziona sia per Gemini sia per Gemma su AI Studio → JSON sempre valido.
+export async function generate({ model, system, user, imagePath, temperature = 0.4, apiKey, schema }) {
   apiKey = apiKey || getApiKey();
   const parts = [];
   // Gemma non supporta systemInstruction: lo fondiamo nel turno utente.
@@ -48,8 +50,13 @@ export async function generate({ model, system, user, imagePath, temperature = 0
     contents: [{ role: 'user', parts }],
     generationConfig: { temperature, maxOutputTokens: 2048 },
   };
-  if (!isGemma(model)) {
-    if (system) body.systemInstruction = { parts: [{ text: system }] };
+  // systemInstruction solo su Gemini (Gemma lo riceve fuso nel testo).
+  if (!isGemma(model) && system) body.systemInstruction = { parts: [{ text: system }] };
+  // Output strutturato: lo schema vincola il decoder → niente prosa fuori formato.
+  if (schema) {
+    body.generationConfig.responseMimeType = 'application/json';
+    body.generationConfig.responseSchema = schema;
+  } else if (!isGemma(model)) {
     body.generationConfig.responseMimeType = 'application/json';
   }
 
