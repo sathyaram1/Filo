@@ -111,7 +111,7 @@ export async function activeView(app, shell) {
 }
 
 // Script eseguito in pagina: trova elementi interagibili visibili e ne ritorna i rect.
-const COLLECT_FN = `() => {
+function COLLECT_FN() {
   const sel = 'a[href], button, input, textarea, select, [role="button"], [role="menuitem"], [contenteditable="true"], [data-add], [data-sr], .ed-switch-icon, .ed-cell-empty, .dash-suggestion, .apps-item';
   const els = Array.from(document.querySelectorAll(sel));
   const out = [];
@@ -125,9 +125,9 @@ const COLLECT_FN = `() => {
     out.push({ x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height, tag: el.tagName.toLowerCase(), label });
   }
   return out;
-}`;
+}
 
-const DRAW_FN = `(marks) => {
+function DRAW_FN(marks) {
   let layer = document.getElementById('__filo_marks__');
   if (layer) layer.remove();
   layer = document.createElement('div');
@@ -135,17 +135,16 @@ const DRAW_FN = `(marks) => {
   layer.style.cssText = 'position:fixed;inset:0;z-index:2147483647;pointer-events:none;';
   for (const m of marks) {
     const b = document.createElement('div');
-    b.textContent = m.i;
-    b.style.cssText = 'position:fixed;left:' + (m.x - m.w/2) + 'px;top:' + (m.y - m.h/2) + 'px;width:' + m.w + 'px;height:' + m.h + 'px;border:1.5px solid #e34;box-sizing:border-box;';
+    b.style.cssText = 'position:fixed;left:' + (m.x - m.w / 2) + 'px;top:' + (m.y - m.h / 2) + 'px;width:' + m.w + 'px;height:' + m.h + 'px;border:1.5px solid #e34;box-sizing:border-box;';
     const tag = document.createElement('div');
     tag.textContent = m.i;
-    tag.style.cssText = 'position:fixed;left:' + (m.x - m.w/2) + 'px;top:' + (m.y - m.h/2 - 13) + 'px;background:#e34;color:#fff;font:bold 11px monospace;padding:0 3px;line-height:13px;';
+    tag.style.cssText = 'position:fixed;left:' + (m.x - m.w / 2) + 'px;top:' + (m.y - m.h / 2 - 13) + 'px;background:#e34;color:#fff;font:bold 11px monospace;padding:0 3px;line-height:13px;';
     layer.appendChild(b); layer.appendChild(tag);
   }
   document.documentElement.appendChild(layer);
-}`;
+}
 
-const CLEAR_FN = `() => { const l = document.getElementById('__filo_marks__'); if (l) l.remove(); }`;
+function CLEAR_FN() { const l = document.getElementById('__filo_marks__'); if (l) l.remove(); }
 
 // Disegna i badge numerati su shell+view e ritorna la mappa.
 // Ritorna [{ i, page:'shell'|'view', x, y, tag, label, cx, cy }] dove (cx,cy) sono
