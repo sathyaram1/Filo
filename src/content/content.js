@@ -223,8 +223,24 @@
 
   // Sub-menu per una correzione "rosso" (parola): aggiungi al dizionario,
   // correggi automaticamente, gestisci correttore.
-  function buildRedSubItems(editableEl, wordCtx, correction) {
-    return [
+  function buildRedSubItems(editableEl, wordCtx, correction, altSuggestions = []) {
+    const items = [];
+    // Suggerimenti alternativi (dal correttore nativo): righe "applica" sopra le
+    // azioni di gestione. Saltiamo quello già mostrato come correzione primaria.
+    const seen = new Set([String(correction || '').toLowerCase()]);
+    for (const s of altSuggestions) {
+      const v = String(s || '').trim();
+      if (!v || seen.has(v.toLowerCase())) continue;
+      seen.add(v.toLowerCase());
+      items.push({
+        label: v,
+        onClick: () => SpellCheck.applyFix(editableEl, { start: wordCtx.start, end: wordCtx.end }, v, {
+          expectedSegment: wordCtx.word,
+        }),
+      });
+    }
+    if (items.length) items.push({ type: 'separator' });
+    items.push(
       {
         label: I18n.t('spell_add_dict'),
         onClick: () => {
