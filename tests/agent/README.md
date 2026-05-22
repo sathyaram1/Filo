@@ -39,6 +39,11 @@ Un modello Gemini/Gemma riceve gli screenshot (con badge numerati), naviga come 
 utente e segnala comportamenti inattesi. Al termine scrive `report.md` +
 `issues.json` + gli screenshot di ogni passo in `tests/agent/reports/<timestamp>/`.
 
+Il modello riceve l'**intera cronologia** della sessione (tutti gli screenshot
+precedenti + le sue risposte), così riconosce cambiamenti inattesi (es. contenuto
+che prima c'era e ora è sparito). I modelli AI Studio sono tariffati a chiamata,
+non a token → contesto lungo non costa di più.
+
 ```bash
 # esplorazione libera
 npm run test:explore
@@ -46,11 +51,22 @@ npm run test:explore
 # mirata su un'area
 npm run test:explore -- --area "editor: scrittura e moduli" --start filo://editor/editor.html --steps 12
 
+# COMPITO concreto: forza un percorso utente reale e segnala i bug incontrati.
+# Utile dopo aver implementato una feature: dai un compito che la usa.
+npm run test:explore -- --start filo://editor/editor.html --steps 10 \
+  --task "Scrivi un titolo e un paragrafo, cambia pagina con lo switch, usa Cerca e sostituisci"
+
 # modello più capace (quota più bassa)
 npm run test:explore -- --model gemini-3.5-flash
 ```
 
-Opzioni: `--model`, `--steps`, `--start URL`, `--area "testo"`, `--out DIR`.
+Opzioni: `--model`, `--steps`, `--start URL`, `--area "testo"`, `--task "testo"`,
+`--out DIR`, `--no-feedback`, `--min-severity low|medium|high`.
+
+- `--area`: *dove* concentrarsi (esplorazione guidata).
+- `--task`: *cosa fare* (obiettivo concreto); il modello lo esegue con interazioni
+  reali e segnala ogni bug lungo il percorso. Preferiscilo per testare una feature
+  appena fatta.
 
 ### Giro completo
 
