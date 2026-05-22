@@ -159,7 +159,10 @@ async function run() {
       try {
         const out = await generate({ model: o.model, system: SYSTEM, user, imagePath: shot, temperature: 0.5, schema: SCHEMA });
         parsed = extractJson(out);
-        if (!parsed) { log(`  [step ${step}] JSON non parsabile, salto. Raw: ${out.slice(0, 160)}`); }
+        if (!parsed) {
+          writeFileSync(join(o.out, `fail-step-${String(step).padStart(2, '0')}.txt`), out);
+          log(`  [step ${step}] JSON non parsabile (len=${out.length}), salvato raw. Inizio: ${JSON.stringify(out.slice(0, 80))}`);
+        }
       } catch (e) {
         log(`  [step ${step}] errore LLM: ${e.message.slice(0, 160)}`);
       }
