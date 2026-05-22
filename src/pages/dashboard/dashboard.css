@@ -154,14 +154,14 @@ html, body {
   object-fit: contain;
 }
 
-/* Colorazione contestuale dell'icona per servizio. */
-.dash-sug-icon[data-icon="gmail"]      { background: #e9d8c4; color: #8a4a1f; }
-.dash-sug-icon[data-icon="calendar"]   { background: #dee2cf; color: #4a6238; }
+/* Colorazione contestuale dell'icona per servizio (solo colore testo). */
+.dash-sug-icon[data-icon="gmail"]      { color: #8a4a1f; }
+.dash-sug-icon[data-icon="calendar"]   { color: #4a6238; }
 .dash-sug-icon[data-icon="editor"],
-.dash-sug-icon[data-icon="file"]       { background: #e8dcc9; color: #6b5a3a; }
-.dash-sug-icon[data-icon="link"]       { background: #d8dee7; color: #3b556d; }
-.dash-sug-icon[data-icon="note"]       { background: #f0e0c8; color: #7a5a2a; }
-.dash-sug-icon[data-icon="web"]        { background: #d6e0d3; color: #3d5a30; }
+.dash-sug-icon[data-icon="file"]       { color: #6b5a3a; }
+.dash-sug-icon[data-icon="link"]       { color: #3b556d; }
+.dash-sug-icon[data-icon="note"]       { color: #7a5a2a; }
+.dash-sug-icon[data-icon="web"]        { color: #3d5a30; }
 
 .dash-suggestion .dash-sug-text {
   flex: 1;
