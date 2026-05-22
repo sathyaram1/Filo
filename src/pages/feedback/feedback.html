@@ -50,6 +50,17 @@
       border-bottom: 2px solid transparent; margin-bottom: -1px;
     }
     .fb-tab--active { color: var(--sn-text, inherit); border-bottom-color: currentColor; }
+    .fb-title { font-weight: 600; font-size: 14px; margin-bottom: 6px; }
+    .fb-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+    .fb-badge {
+      font-size: 11px; padding: 1px 7px; border-radius: 999px;
+      border: 1px solid var(--sn-border); color: var(--sn-muted);
+    }
+    .fb-badge--model { color: var(--sn-accent); border-color: var(--sn-accent); }
+    .fb-badge--high { background: #c0392b; color: #fff; border-color: #c0392b; }
+    .fb-badge--medium { background: #e08e0b; color: #fff; border-color: #e08e0b; }
+    .fb-badge--low { color: var(--sn-muted); }
+    .fb-card--agent { border-left: 3px solid var(--sn-accent); }
   </style>
 </head>
 <body>
