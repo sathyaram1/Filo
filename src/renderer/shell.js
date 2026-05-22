@@ -83,11 +83,14 @@
     const rect = appsMenu.getBoundingClientRect();
     const reserve = Math.max(0, Math.ceil(rect.bottom - SHELL_HEIGHT + 8));
     api.tabs.reserveTop(reserve);
+    // Riempie la striscia liberata con una mensola toolbar-colorata e ombrata.
+    if (shelfEl) { shelfEl.style.height = reserve + 'px'; shelfEl.hidden = false; }
   }
   function closeAppsMenu() {
     appsMenu.hidden = true;
     appsBtn.setAttribute('aria-expanded', 'false');
     api.tabs.reserveTop(0);
+    if (shelfEl) { shelfEl.hidden = true; shelfEl.style.height = '0px'; }
   }
   function toggleAppsMenu() {
     if (appsMenu.hidden) openAppsMenu();
