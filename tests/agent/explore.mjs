@@ -55,19 +55,22 @@ stati incoerenti dopo un'azione, ecc.
 Confronta lo screenshot con lo stato ATTESO data l'azione precedente. Se
 qualcosa è palesemente rotto, è una issue.
 
-Rispondi SEMPRE e SOLO con un oggetto JSON valido con questa forma:
+Rispondi SEMPRE e SOLO con un oggetto JSON con questa forma (lascia vuoti i campi
+di "action" non pertinenti al "kind" scelto):
 {
   "screen": "1 frase su cosa mostra lo schermo ORA",
   "issues": [
-    {"severity":"low|medium|high","title":"breve","detail":"cosa è sbagliato e perché","area":"editor|dashboard|shell|history|options|..."}
+    {"severity":"low|medium|high","title":"breve","detail":"cosa è sbagliato e perché","area":"editor|dashboard|shell|history|options"}
   ],
-  "action": {"kind":"click_mark","mark": <numero>}
-           | {"kind":"type","text":"<testo>"}
-           | {"kind":"key","key":"<es. Enter o Control+b>"}
-           | {"kind":"scroll","dy": <px, +giù/-su>}
-           | {"kind":"navigate","url":"filo://..."}
-           | {"kind":"open_tab","url":"filo://..."}
-           | {"kind":"finish","reason":"..."},
+  "action": {
+    "kind": "click_mark | type | key | scroll | navigate | open_tab | finish",
+    "mark": <numero badge se kind=click_mark>,
+    "text": "<testo se kind=type>",
+    "key": "<es. Enter o Control+b se kind=key>",
+    "dy": <px +giù/-su se kind=scroll>,
+    "url": "<filo://... se kind=navigate o open_tab>",
+    "reason": "<se kind=finish>"
+  },
   "why": "perché questa azione fa progredire l'esplorazione"
 }
 "issues" è [] se non vedi nulla di anomalo. Preferisci click_mark usando i numeri
