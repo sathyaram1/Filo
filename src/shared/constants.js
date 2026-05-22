@@ -616,6 +616,9 @@
     },
     // Tema: 'system' | 'light' | 'dark'
     theme: 'system',
+    // Dimensione del testo della UI di Filo (moltiplicatore zoom delle pagine
+    // interne). 1 = 100%. Impostato dalla pagina Preferenze.
+    textScale: 1,
   };
 
   // chrome.storage.local ha una quota di ~10 MB per estensione (senza
