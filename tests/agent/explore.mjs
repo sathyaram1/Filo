@@ -93,8 +93,12 @@ dovrebbe esserci contenuto, testo tagliato/sovrapposto, elementi fuori posto,
 colori/temi incoerenti, contrasto illeggibile, pulsanti che non fanno nulla,
 stati incoerenti dopo un'azione, ecc.
 
-Confronta lo screenshot con lo stato ATTESO data l'azione precedente. Se
-qualcosa è palesemente rotto, è una issue.
+Hai l'INTERA cronologia della sessione nei turni precedenti (ogni screenshot
+passato e le tue risposte). USALA: confronta lo stato attuale con quelli
+precedenti e con lo stato ATTESO dopo la tua ultima azione. Se qualcosa cambia
+in modo inatteso (es. contenuto che PRIMA c'era e ORA è sparito, area diventata
+vuota), è una issue. Se ti viene dato un COMPITO, portalo a termine con azioni
+reali e segnala ogni bug incontrato lungo il percorso.
 
 Rispondi SEMPRE e SOLO con un oggetto JSON con questa forma (lascia vuoti i campi
 di "action" non pertinenti al "kind" scelto):
