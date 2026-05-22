@@ -192,9 +192,13 @@ async function run() {
       // troncato) è stocastico, un nuovo sample di solito risolve.
       let parsed = null;
       let modelTurnText = '(risposta non valida)';
-      for (let t = 0; t < 2 && !parsed; t++) {
+      // responseSchema serve a Gemma (poco disciplinato); sui modelli Gemini
+      // tende invece a far degenerare l'output in ripetizioni → per Gemini usiamo
+      // il JSON mode semplice (responseMimeType), che è affidabile.
+      const useSchema = /gemma/i.test(o.model) ? SCHEMA : undefined;
+      for (let t = 0; t < 3 && !parsed; t++) {
         try {
-          const out = await generate({ model: o.model, system: SYSTEM, contents: convo, temperature: 0.2, schema: SCHEMA });
+          const out = await generate({ model: o.model, system: SYSTEM, contents: convo, temperature: 0.2, schema: useSchema });
           parsed = extractJson(out);
           if (parsed) modelTurnText = JSON.stringify(parsed);
           else if (t === 1) {
