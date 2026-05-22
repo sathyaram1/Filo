@@ -422,13 +422,11 @@
 
   function renderGrid() {
     const z = activePage();
-    const pages = getPages();
-    const page = pages.find((p) => p.z === z) || pages[0];
-    pageNameEl.textContent = page ? page.name : '';
     gridEl.innerHTML = '';
 
     const occupied = new Set();
-    const onPage = doc.modules.filter((m) => m.z === z);
+    // Moduli della pagina corrente + moduli fissi (appuntati su ogni pagina).
+    const onPage = doc.modules.filter((m) => (m.z === z && !isFixed(m)) || isFixed(m));
     for (const m of onPage) {
       const cell = document.createElement('div');
       cell.className = 'ed-module';
@@ -439,7 +437,9 @@
       renderModuleBody(cell, m);
       attachModuleDrag(cell, m);
       cell.addEventListener('click', (e) => {
-        if (settingsMode) { e.stopPropagation(); openModuleConfig(m); }
+        // I moduli fissi gestiscono il click internamente (es. ingranaggio →
+        // toggle modalità modifica); non aprono il pannello di configurazione.
+        if (settingsMode && !isFixed(m)) { e.stopPropagation(); openModuleConfig(m); }
       });
       gridEl.appendChild(cell);
       for (let dy = 0; dy < m.h; dy++) for (let dx = 0; dx < m.w; dx++) occupied.add(`${m.x + dx},${m.y + dy}`);
