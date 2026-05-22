@@ -158,7 +158,17 @@
       const imgsHtml = imgs.length
         ? `<div class="fb-imgs">${imgs.map((u) => `<img src="${escapeHtml(u)}" data-full="${escapeHtml(u)}" loading="lazy" alt="">`).join('')}</div>`
         : '';
-      const notesEditable = currentTab === 'todo' || currentTab === 'draft';
+      // Issue d'agente: badge col modello che l'ha trovata + severità/area + titolo.
+      const agent = isAgent(f);
+      const am = agent ? agentMeta(f) : null;
+      const agentHtml = agent ? `
+        <div class="fb-badges">
+          <span class="fb-badge fb-badge--model" title="Modello che ha trovato l'errore">🤖 ${escapeHtml(am.model)}</span>
+          ${am.severity ? `<span class="fb-badge fb-badge--${escapeHtml(am.severity)}">${escapeHtml(am.severity)}</span>` : ''}
+          ${am.area ? `<span class="fb-badge">${escapeHtml(am.area)}</span>` : ''}
+        </div>
+        ${am.title ? `<div class="fb-title">${escapeHtml(am.title)}</div>` : ''}` : '';
+      const notesEditable = currentTab === 'todo' || currentTab === 'draft' || currentTab === 'agent';
       const notesBlock = notesEditable
         ? `<label class="fb-notes-label">Note / decisioni di design:
              <textarea class="fb-notes" data-id="${escapeHtml(f._id)}" rows="3" placeholder="Dettagli aggiuntivi, vincoli, scelte di design…">${escapeHtml(f.notes || '')}</textarea>
