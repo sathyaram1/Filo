@@ -72,6 +72,50 @@ html, body {
   overflow-y: auto;
   padding: 32px 56px 120px;
 }
+
+/* Scrollbar Filo: sottile, colori del tema, senza frecce su/giù. */
+.ed-doc-wrap,
+.ed-settings-view,
+.ed-chat-log,
+.ed-overlay-box {
+  scrollbar-width: thin;
+  scrollbar-color: var(--sn-border) transparent;
+}
+.ed-doc-wrap::-webkit-scrollbar,
+.ed-settings-view::-webkit-scrollbar,
+.ed-chat-log::-webkit-scrollbar,
+.ed-overlay-box::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.ed-doc-wrap::-webkit-scrollbar-track,
+.ed-settings-view::-webkit-scrollbar-track,
+.ed-chat-log::-webkit-scrollbar-track,
+.ed-overlay-box::-webkit-scrollbar-track {
+  background: transparent;
+}
+.ed-doc-wrap::-webkit-scrollbar-thumb,
+.ed-settings-view::-webkit-scrollbar-thumb,
+.ed-chat-log::-webkit-scrollbar-thumb,
+.ed-overlay-box::-webkit-scrollbar-thumb {
+  background: var(--sn-border);
+  border-radius: 999px;
+}
+.ed-doc-wrap::-webkit-scrollbar-thumb:hover,
+.ed-settings-view::-webkit-scrollbar-thumb:hover,
+.ed-chat-log::-webkit-scrollbar-thumb:hover,
+.ed-overlay-box::-webkit-scrollbar-thumb:hover {
+  background: var(--sn-accent);
+}
+/* Niente frecce/bottoni agli estremi della scrollbar. */
+.ed-doc-wrap::-webkit-scrollbar-button,
+.ed-settings-view::-webkit-scrollbar-button,
+.ed-chat-log::-webkit-scrollbar-button,
+.ed-overlay-box::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
 .ed-doc {
   max-width: 720px;
   margin: 0 auto;
