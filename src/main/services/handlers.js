@@ -607,6 +607,11 @@ async function handleMessage(msg, sender = {}) {
     case MSG.UPDATE_SETTINGS: {
       const merged = await Storage.updateSettings(msg.settings);
       broadcastToTabs({ type: MSG.SETTINGS_UPDATED, settings: merged });
+      try {
+        const { nativeTheme } = require('electron');
+        const t = merged.theme;
+        nativeTheme.themeSource = t === 'dark' ? 'dark' : t === 'light' ? 'light' : 'system';
+      } catch (_) {}
       return { ok: true, settings: merged };
     }
     case MSG.SAVE_PAGE: {
