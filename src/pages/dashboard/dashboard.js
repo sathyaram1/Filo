@@ -64,7 +64,6 @@
     body.dataset.state = 'home';
     homeView.hidden = false;
     threadView.hidden = true;
-    homeBtn.hidden = true;
     threadHistory = [];
     bubblesEl.innerHTML = '';
     inputEl.value = '';
