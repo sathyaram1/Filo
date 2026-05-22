@@ -40,8 +40,7 @@ test('la dashboard renderizza le tre zone + barra input', async ({ app, shell })
   await expect(page.locator('#right')).toBeAttached();
   await expect(page.locator('#input')).toBeVisible();
   await expect(page.locator('#sendBtn')).toBeVisible();
-  await expect(page.locator('#settingsBtn')).toBeVisible();
-  await expect(page.locator('#homeBtn')).toBeHidden();
+  // Impostazioni/Home sono nella toolbar della shell, non nella dashboard.
   await expect(page.locator('body')).toHaveAttribute('data-state', 'home');
   await expect(page.locator('#threadView')).toBeHidden();
 });
