@@ -18,6 +18,7 @@ require(path.join(SHARED, 'storage.js'));
 require(path.join(SHARED, 'paths.js'));
 require(path.join(SHARED, 'filoMemory.js'));
 require(path.join(SHARED, 'filoState.js'));
+require(path.join(SHARED, 'feedback.js'));
 require(path.join(SVC, 'providers', 'openrouter.js'));
 require(path.join(SVC, 'providers', 'gemini.js'));
 require(path.join(SVC, 'providers', 'index.js'));
