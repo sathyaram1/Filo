@@ -82,8 +82,31 @@
         mkModule('search-replace', 0, 1, 2, 2, 1, {}),
         mkModule('comment', 2, 0, 1, 1, 1, {}),
         mkModule('chat', 0, 3, 3, 3, 1, {}),
+        // Ingranaggio impostazioni: modulo fisso, angolo in basso a destra.
+        mkModule('settings', GRID_COLS - 1, GRID_ROWS - 1, 1, 1, 0, {}),
       ],
     };
+  }
+
+  // Garantisce che esista sempre un (solo) modulo impostazioni fisso, anche per
+  // documenti salvati prima della sua introduzione. Lo colloca nella prima cella
+  // libera partendo dall'angolo in basso a destra.
+  function ensureSettingsModule() {
+    if (!doc || !Array.isArray(doc.modules)) return;
+    const existing = doc.modules.filter((m) => m.type === 'settings');
+    if (existing.length > 1) doc.modules = doc.modules.filter((m) => m.type !== 'settings').concat(existing[0]);
+    if (existing.length >= 1) return;
+    const z = activePage();
+    for (let y = GRID_ROWS - 1; y >= 0; y--) {
+      for (let x = GRID_COLS - 1; x >= 0; x--) {
+        if (fits({ x, y, w: 1, h: 1 }, z)) {
+          doc.modules.push(mkModule('settings', x, y, 1, 1, z, {}));
+          return;
+        }
+      }
+    }
+    // Nessuna cella libera: forza l'angolo (verrà comunque renderizzato sopra).
+    doc.modules.push(mkModule('settings', GRID_COLS - 1, GRID_ROWS - 1, 1, 1, z, {}));
   }
 
   function mkModule(type, x, y, w, h, z, data) {
