@@ -40,9 +40,10 @@
     if (s === 'ignored') return 'ignored';
     if (s === 'done') return 'done';
     if (s === 'verified') return 'verified';
-    // Le issue d'agente non ancora chiuse vivono nella loro categoria, non in
-    // inbox/todo/draft, così non annegano i feedback degli utenti reali.
-    if (isAgent(f)) return 'agent';
+    // Le issue d'agente NON triagiate (status new) vivono nella loro categoria,
+    // così non annegano i feedback degli utenti reali. Promuovendole a "todo"
+    // entrano nel flusso normale (restano marcate come agente dai badge).
+    if (isAgent(f) && s === 'new') return 'agent';
     if (s === 'new') return 'inbox';
     if (s === 'draft') return 'draft';
     if (s === 'todo') return 'todo';
