@@ -254,13 +254,21 @@ body[data-state="thread"] .dash-suggestion { justify-content: flex-start; paddin
 }
 .dash-action-btn:hover { background: var(--dash-ink); color: var(--dash-paper); }
 .dash-action-favicon {
-  width: 16px;
-  height: 16px;
-  border-radius: 3px;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
   object-fit: contain;
   flex-shrink: 0;
-  background: rgba(255, 255, 255, 0.9);
 }
+.dash-action-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  opacity: 0.85;
+  transition: opacity 0.12s;
+}
+.dash-action-link:hover { opacity: 1; }
 .dash-action-btn-primary {
   background: var(--dash-ink);
   color: var(--dash-paper);
