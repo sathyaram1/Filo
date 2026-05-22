@@ -21,7 +21,8 @@ test('la newtab apre filo://newtab/ con la dashboard montata', async ({ shell, a
   expect(tabPage).toBeTruthy();
   await tabPage.waitForLoadState('domcontentloaded');
   await expect(tabPage.locator('#input')).toBeVisible();
-  await expect(tabPage.locator('#settingsBtn')).toBeVisible();
+  // Nota: i pulsanti Impostazioni/Home stanno nella toolbar della shell, non
+  // nella pagina dashboard — qui non vanno cercati.
 });
 
 test('la pagina Options si apre via tab navigate', async ({ openTab }) => {
