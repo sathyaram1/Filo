@@ -1005,6 +1005,108 @@
   overlay.addEventListener('click', (e) => { if (e.target === overlay) closeOverlay(); });
 
   // ════════════════════════════════════════════════════════════════════
+  //  Resize moduli nella griglia
+  // ════════════════════════════════════════════════════════════════════
+  function attachModuleResize(cell, m) {
+    const meta = MODULE_TYPES[m.type];
+    if (!meta) return;
+    if (m.type === 'switch') {
+      const handle = document.createElement('div');
+      handle.className = 'ed-mod-resize-h';
+      handle.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const startX = e.clientX;
+        const startW = m.w;
+        const colWidth = gridEl.clientWidth / GRID_COLS;
+        const onMove = (ev) => {
+          const delta = Math.round((ev.clientX - startX) / colWidth);
+          const newW = Math.max(meta.minW, Math.min(GRID_COLS - m.x, startW + delta));
+          if (newW !== m.w && fits({ x: m.x, y: m.y, w: newW, h: m.h }, m.z, m.id)) {
+            m.w = newW;
+            cell.style.gridColumn = `${m.x + 1} / span ${m.w}`;
+          }
+        };
+        const onUp = () => {
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+          renderGrid();
+          markDirty();
+        };
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      });
+      cell.appendChild(handle);
+    } else {
+      const handle = document.createElement('div');
+      handle.className = 'ed-mod-resize';
+      handle.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const startW = m.w;
+        const startH = m.h;
+        const colWidth = gridEl.clientWidth / GRID_COLS;
+        const rowHeight = gridEl.clientHeight / GRID_ROWS;
+        const onMove = (ev) => {
+          const dw = Math.round((ev.clientX - startX) / colWidth);
+          const dh = Math.round((ev.clientY - startY) / rowHeight);
+          const newW = Math.max(meta.minW, Math.min(GRID_COLS - m.x, startW + dw));
+          const newH = Math.max(meta.minH, Math.min(GRID_ROWS - m.y, startH + dh));
+          if ((newW !== m.w || newH !== m.h) && fits({ x: m.x, y: m.y, w: newW, h: newH }, m.z, m.id)) {
+            m.w = newW;
+            m.h = newH;
+            cell.style.gridColumn = `${m.x + 1} / span ${m.w}`;
+            cell.style.gridRow = `${m.y + 1} / span ${m.h}`;
+          }
+        };
+        const onUp = () => {
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+          renderGrid();
+          markDirty();
+        };
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      });
+      cell.appendChild(handle);
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════════
+  //  Splitter text-pane ↔ sidebar
+  // ════════════════════════════════════════════════════════════════════
+  const splitterEl = $('splitter');
+  const sidebarEl = $('sidebar');
+  const textPaneEl = $('textPane');
+  if (splitterEl) {
+    splitterEl.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      splitterEl.classList.add('dragging');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      const onMove = (ev) => {
+        const rootRect = root.getBoundingClientRect();
+        const pct = ((rootRect.right - ev.clientX) / rootRect.width) * 100;
+        const clamped = Math.max(20, Math.min(60, pct));
+        sidebarEl.style.flex = `0 0 ${clamped}%`;
+        sidebarEl.style.maxWidth = `${clamped}%`;
+        textPaneEl.style.flex = `1 1 ${100 - clamped}%`;
+      };
+      const onUp = () => {
+        splitterEl.classList.remove('dragging');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  }
+
+  // ════════════════════════════════════════════════════════════════════
   //  Toggle sidebar, scorciatoie globali, bootstrap
   // ════════════════════════════════════════════════════════════════════
   function toggleSidebar() { root.classList.toggle('sidebar-hidden'); }
