@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <title>Filo — Preferenze</title>
+  <link rel="icon" href="filo://asset/icons/icon-32.png" />
+  <link rel="stylesheet" href="filo://style/theme.css" />
+  <link rel="stylesheet" href="filo://style/pages.css" />
+  <script src="filo://shared/pageBootstrap.js"></script>
+  <script src="filo://shared/constants.js"></script>
+  <script src="filo://shared/messages.js"></script>
+  <script src="filo://shared/i18n.js"></script>
+  <script src="filo://shared/storage.js"></script>
+</head>
+<body>
+  <main class="sn-page" id="page">
+    <h1>Preferenze</h1>
+
+    <section>
+      <h2>Tema</h2>
+      <p class="sn-muted">Aspetto chiaro o scuro dell'interfaccia di Filo.</p>
+      <select id="theme">
+        <option value="system">Come il sistema</option>
+        <option value="light">Chiaro</option>
+        <option value="dark">Scuro</option>
+      </select>
+    </section>
+
+    <section>
+      <h2>Dimensione del testo</h2>
+      <p class="sn-muted">Ingrandisce o riduce il testo delle pagine di Filo (dashboard, opzioni, editor, menu).</p>
+      <select id="textScale">
+        <option value="0.9">Piccolo (90%)</option>
+        <option value="1">Normale (100%)</option>
+        <option value="1.1">Grande (110%)</option>
+        <option value="1.25">Molto grande (125%)</option>
+        <option value="1.5">Enorme (150%)</option>
+      </select>
+    </section>
+
+    <div class="sn-toolbar" style="margin-top: 24px;">
+      <button class="sn-btn" id="save">Salva</button>
+      <span id="savedHint" class="sn-saved-indicator">Salvato</span>
+    </div>
+  </main>
+
+  <script src="preferences.js"></script>
+</body>
+</html>
