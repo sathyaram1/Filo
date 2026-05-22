@@ -100,7 +100,7 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding-top: 60px;
+  padding-top: 8px;
   min-width: 0;
 }
 .dash-suggestions {
