@@ -218,14 +218,23 @@
     return filtered;
   }
 
-  // Pulizia: rimuove i timer scaduti da oltre 5 minuti (li lasciamo lampeggiare
-  // un po' nella UI prima di sparire). La UI cliente filtra anche per "in corso".
+  // Pulizia: rimuove tutti i timer scaduti (endsAt <= now) e non in pausa.
+  //
+  // Storia: in passato lasciavamo un margine di 5 minuti per far "lampeggiare"
+  // i timer a 0:00 nella UI prima di sparire. Ma quando Filo viene chiuso
+  // mentre un timer è in corso e riaperto dopo la scadenza, non c'è stato
+  // nessun rendering né notifica: lasciare quel timer in lista significa
+  // farlo comparire come "processo attivo" / suggerimento ("Il timer sta per
+  // suonare") in modo permanente (bug riportato da alpha tester 2026-05).
+  // Meglio cancellarli silenziosamente: se il timer è scaduto in background
+  // l'utente lo scopre comunque dal raw_log o dalle notifiche, non da una
+  // card stantia.
   async function gcTimers() {
     const list = await listTimers();
     const now = Date.now();
     const filtered = list.filter((t) => {
       if (t.paused) return true;
-      return new Date(t.endsAt).getTime() > now - 5 * 60 * 1000;
+      return new Date(t.endsAt).getTime() > now;
     });
     if (filtered.length !== list.length) {
       await setRaw(KEYS.FILO_TIMERS, filtered);
