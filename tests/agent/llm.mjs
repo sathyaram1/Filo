@@ -99,6 +99,8 @@ export async function generate({ model, system, user, imagePath, contents, tempe
         });
       } finally { clearTimeout(to); }
       if (res.status === 429 || res.status >= 500) { // rate limit / errore server → ritenta
+        lastErr = new Error(`HTTP ${res.status} (quota/limite) su ${model}`);
+        lastErr.status = res.status;
         await new Promise((r) => setTimeout(r, 3000 * (attempt + 1)));
         continue;
       }
