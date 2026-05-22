@@ -40,18 +40,25 @@
   setIcon(appsBtn, 'apps', 16);
   setIcon(newBtn, 'plus', 16);
 
-  // Registro app del launcher. Per ora solo l'editor; aggiungerne altre qui.
+  // Registro app del launcher. Il Feedback vive qui fra le App.
   const APPS = [
-    { id: 'editor', label: 'Editor', icon: 'editor', url: 'filo://editor/editor.html' },
+    { label: 'Editor', icon: 'editor', url: 'filo://editor/editor.html' },
+    { label: 'Feedback', icon: '', url: 'filo://feedback/feedback.html' },
+  ];
+  // Voci del menu Impostazioni (ingranaggio): Modelli e Preferenze, due pagine
+  // interne dedicate.
+  const SETTINGS = [
+    { label: 'Modelli', icon: 'options', url: 'filo://options/options.html' },
+    { label: 'Preferenze', icon: 'colorPicker', url: 'filo://preferences/preferences.html' },
   ];
 
-  function buildAppsMenu() {
-    appsMenu.innerHTML = '';
+  function buildMenu(menuEl, titleText, entries) {
+    menuEl.innerHTML = '';
     const title = document.createElement('div');
     title.className = 'apps-menu-title';
-    title.textContent = 'App';
-    appsMenu.appendChild(title);
-    for (const app of APPS) {
+    title.textContent = titleText;
+    menuEl.appendChild(title);
+    for (const app of entries) {
       const item = document.createElement('button');
       item.className = 'apps-item';
       item.type = 'button';
@@ -64,46 +71,55 @@
       item.appendChild(ico);
       item.appendChild(label);
       item.addEventListener('click', () => {
-        closeAppsMenu();
+        closeMenus();
         api.tabs.open(app.url);
       });
-      appsMenu.appendChild(item);
+      menuEl.appendChild(item);
     }
   }
 
   // Altezza della shell (toolbar) sopra la WebContentsView: deve combaciare con
   // SHELL_HEIGHT in src/main/window.js.
   const SHELL_HEIGHT = 88;
-  function openAppsMenu() {
-    buildAppsMenu();
-    appsMenu.hidden = false;
-    appsBtn.setAttribute('aria-expanded', 'true');
+  let openMenuEl = null;
+  function openMenu(menuEl, btn, titleText, entries) {
+    closeMenus();
+    buildMenu(menuEl, titleText, entries);
+    menuEl.hidden = false;
+    btn.setAttribute('aria-expanded', 'true');
+    openMenuEl = menuEl;
     // La WebContentsView del tab attivo è composta SOPRA l'HTML della shell e
     // coprirebbe il dropdown. Invece di nascondere la view (che lasciava un'area
     // vuota), abbassiamo la view dello spazio occupato dal dropdown: così resta
     // visibile sopra la view e il contenuto scorre solo di poco.
-    const rect = appsMenu.getBoundingClientRect();
+    const rect = menuEl.getBoundingClientRect();
     const reserve = Math.max(0, Math.ceil(rect.bottom - SHELL_HEIGHT + 8));
     api.tabs.reserveTop(reserve);
     // Riempie la striscia liberata con una mensola toolbar-colorata e ombrata.
     if (shelfEl) { shelfEl.style.height = reserve + 'px'; shelfEl.hidden = false; }
   }
-  function closeAppsMenu() {
+  function closeMenus() {
     appsMenu.hidden = true;
+    settingsMenu.hidden = true;
     appsBtn.setAttribute('aria-expanded', 'false');
+    settingsBtn.setAttribute('aria-expanded', 'false');
+    openMenuEl = null;
     api.tabs.reserveTop(0);
     if (shelfEl) { shelfEl.hidden = true; shelfEl.style.height = '0px'; }
   }
-  function toggleAppsMenu() {
-    if (appsMenu.hidden) openAppsMenu();
-    else closeAppsMenu();
+  function toggleMenu(menuEl, btn, titleText, entries) {
+    if (openMenuEl === menuEl) closeMenus();
+    else openMenu(menuEl, btn, titleText, entries);
   }
 
-  appsBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleAppsMenu(); });
+  appsBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleMenu(appsMenu, appsBtn, 'App', APPS); });
+  settingsBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleMenu(settingsMenu, settingsBtn, 'Impostazioni', SETTINGS); });
   document.addEventListener('click', (e) => {
-    if (!appsMenu.hidden && !appsMenu.contains(e.target) && e.target !== appsBtn) closeAppsMenu();
+    if (!openMenuEl) return;
+    if (openMenuEl.contains(e.target) || appsBtn.contains(e.target) || settingsBtn.contains(e.target)) return;
+    closeMenus();
   });
-  window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAppsMenu(); });
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenus(); });
   setIcon(winMinBtn, 'minimize', 16);
   setIcon(winMaxBtn, 'maximize', 14);
   setIcon(winCloseBtn, 'close', 16);
