@@ -92,13 +92,20 @@
         session: sessionInfo,
       },
       tabs,
-      timers: timers.map((t) => ({
-        id: t.id,
-        label: t.label,
-        endsAt: t.endsAt,
-        paused: !!t.paused,
-        remainingSec: Math.max(0, Math.round((new Date(t.endsAt).getTime() - Date.now()) / 1000)),
-      })),
+      // Filtra i timer scaduti (non in pausa): se Filo era chiuso alla scadenza
+      // non c'è stata notifica, quindi mostrarli come "processi attivi" al boot
+      // confonde l'LLM ("Il timer sta per suonare" in modo permanente).
+      // gcTimers() li pulisce sul disco, qui ce ne assicuriamo come rete di
+      // sicurezza nel caso assemble() venga chiamato prima di gcTimers().
+      timers: timers
+        .map((t) => ({
+          id: t.id,
+          label: t.label,
+          endsAt: t.endsAt,
+          paused: !!t.paused,
+          remainingSec: Math.max(0, Math.round((new Date(t.endsAt).getTime() - Date.now()) / 1000)),
+        }))
+        .filter((t) => t.paused || t.remainingSec > 0),
       notifications: notifications.map((n) => ({
         id: n.id,
         ts: n.ts,
