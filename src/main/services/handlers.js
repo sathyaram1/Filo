@@ -434,7 +434,7 @@ function broadcastLiveUpdate() {
   } catch (_) {}
 }
 
-async function handleFiloChat({ userMessage, threadHistory }) {
+async function handleFiloChat({ userMessage, threadHistory, image }) {
   await FiloMem.touchSession();
   await FiloMem.appendRaw({ type: 'chat_user', summary: String(userMessage || '').slice(0, 200) });
   const memory = await FiloMem.getMemory();
@@ -446,7 +446,14 @@ async function handleFiloChat({ userMessage, threadHistory }) {
     role: m.role === 'filo' ? 'assistant' : 'user',
     content: String(m.text || ''),
   }));
-  threadMessages.push({ role: 'user', content: String(userMessage || '') });
+  if (image) {
+    const parts = [];
+    if (userMessage) parts.push({ type: 'text', text: String(userMessage) });
+    parts.push({ type: 'image_url', image_url: { url: image } });
+    threadMessages.push({ role: 'user', content: parts });
+  } else {
+    threadMessages.push({ role: 'user', content: String(userMessage || '') });
+  }
 
   const r = await handleAIRequest({
     action: ACTIONS.FILO_CHAT,
