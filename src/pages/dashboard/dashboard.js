@@ -285,23 +285,28 @@
     const type = String(a.type || '').toUpperCase();
     if (type === 'NAVIGA') {
       const btn = document.createElement('a');
-      btn.className = 'dash-action-btn dash-action-btn-primary';
       btn.href = a.url || '#';
       btn.target = '_blank';
       btn.rel = 'noopener';
+      btn.title = a.label || a.url || 'Apri';
       const favUrl = faviconUrl(a.url);
       if (favUrl) {
+        btn.className = 'dash-action-link';
         const img = document.createElement('img');
         img.className = 'dash-action-favicon';
         img.src = favUrl;
         img.alt = '';
         img.referrerPolicy = 'no-referrer';
-        img.onerror = () => img.remove();
+        img.onerror = () => {
+          btn.className = 'dash-action-btn dash-action-btn-primary';
+          img.remove();
+          btn.textContent = a.label || 'Apri';
+        };
         btn.appendChild(img);
+      } else {
+        btn.className = 'dash-action-btn dash-action-btn-primary';
+        btn.textContent = a.label || 'Apri';
       }
-      const label = document.createElement('span');
-      label.textContent = a.label || 'Apri';
-      btn.appendChild(label);
       return btn;
     }
     if (type === 'APRI_FILE') {
