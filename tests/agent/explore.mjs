@@ -63,13 +63,14 @@ const SCHEMA = {
 };
 
 function parseArgs(argv) {
-  const o = { model: 'gemini-3.1-flash-lite', steps: 12, start: 'filo://newtab/', area: '', out: '', feedback: true, minSeverity: 'low' };
+  const o = { model: 'gemini-3.1-flash-lite', steps: 12, start: 'filo://newtab/', area: '', task: '', out: '', feedback: true, minSeverity: 'low' };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--model') o.model = argv[++i];
     else if (a === '--steps') o.steps = Number(argv[++i]);
     else if (a === '--start') o.start = argv[++i];
     else if (a === '--area') o.area = argv[++i];
+    else if (a === '--task') o.task = argv[++i];
     else if (a === '--out') o.out = resolve(argv[++i]);
     else if (a === '--no-feedback') o.feedback = false;
     else if (a === '--min-severity') o.minSeverity = argv[++i];
