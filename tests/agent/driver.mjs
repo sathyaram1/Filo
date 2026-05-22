@@ -114,7 +114,11 @@ public class WinCap {
 "@
 [WinCap]::Shoot([IntPtr]${hwnd}, '${safePath}')
 `;
-  execFileSync('powershell.exe', ['-NoProfile', '-Command', ps], { stdio: 'pipe' });
+  try {
+    execFileSync('powershell.exe', ['-NoProfile', '-Command', ps], { stdio: 'pipe', encoding: 'utf8' });
+  } catch (e) {
+    throw new Error('captureComposite PS fallita: ' + (e.stderr || e.message));
+  }
   return outPath;
 }
 
