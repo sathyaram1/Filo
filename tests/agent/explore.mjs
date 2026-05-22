@@ -150,9 +150,18 @@ async function run() {
     await d.closeFilo(app);
   }
 
-  // Report
-  writeFileSync(join(o.out, 'issues.json'), JSON.stringify(allIssues, null, 2));
-  const bySev = (s) => allIssues.filter((i) => i.severity === s);
+  // Report — dedup per (title|area) tenendo la severità più alta.
+  const rank = { high: 3, medium: 2, low: 1 };
+  const dedup = new Map();
+  for (const i of allIssues) {
+    const key = `${(i.title || '').toLowerCase()}|${i.area || ''}`;
+    const prev = dedup.get(key);
+    if (!prev || (rank[i.severity] || 0) > (rank[prev.severity] || 0)) dedup.set(key, i);
+  }
+  const issues = [...dedup.values()].sort((a, b) => (rank[b.severity] || 0) - (rank[a.severity] || 0));
+  writeFileSync(join(o.out, 'issues.json'), JSON.stringify(issues, null, 2));
+  const allIssuesRef = issues;
+  const bySev = (s) => allIssuesRef.filter((i) => i.severity === s);
   const md = [
     `# Filo — report esplorazione`,
     ``,
