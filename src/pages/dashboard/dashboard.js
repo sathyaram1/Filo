@@ -76,10 +76,6 @@
     threadView.hidden = false;
   }
 
-  homeBtn.addEventListener('click', goHome);
-  settingsBtn.addEventListener('click', () => {
-    chrome.runtime.openOptionsPage?.();
-  });
 
   // ===== Suggerimenti (colonna sinistra) =====
   function iconLabel(icon) {
