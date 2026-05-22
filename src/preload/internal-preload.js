@@ -147,7 +147,7 @@ const chromeShim = {
 // dashboard. Skippiamo options/history/feedback/spellcheck dove i content
 // script sarebbero invasivi (form fields, layout dedicato).
 const path = require('node:path');
-const CS_BLOCKLIST = ['filo://options/', 'filo://history/', 'filo://feedback/', 'filo://spellcheck/'];
+const CS_BLOCKLIST = ['filo://options/', 'filo://history/', 'filo://feedback/', 'filo://spellcheck/', 'filo://editor/'];
 const shouldInjectContentScripts = () => {
   const url = location.href;
   return !CS_BLOCKLIST.some((p) => url.startsWith(p));
