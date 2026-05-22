@@ -468,6 +468,11 @@ async function handleFiloChat({ userMessage, threadHistory }) {
 }
 
 async function handleFiloGenerateDashboard({ force = false } = {}) {
+  // Pulisce i timer scaduti PRIMA di leggere la cache: gcTimers() invalida
+  // la cache dashboard quando rimuove qualcosa, così evitiamo di riservire
+  // un messaggio cached che parlava di un timer ormai scaduto (bug alpha
+  // tester: "Filo non dovrebbe menzionare il timer in alto a sinistra").
+  await FiloMem.gcTimers();
   const cached = await FiloMem.getDashboardCache();
   const now = Date.now();
   if (!force && cached?.ts) {
