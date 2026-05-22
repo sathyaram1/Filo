@@ -26,8 +26,6 @@
   const inputForm = $('inputForm');
   const inputEl = $('input');
   const sendBtn = $('sendBtn');
-  const homeBtn = $('homeBtn');
-  const settingsBtn = $('settingsBtn');
 
   // ===== Stato locale =====
   let suggestions = [];
