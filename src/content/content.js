@@ -262,105 +262,101 @@
   }
 
   // Click destro su parola in editabile (errore "rosso", non coperta da issue blu).
-  // Mostriamo la riga "correzione" SOLO se la cache locale ha già una risposta che
-  // marca la parola come errata. La cache viene popolata in background mentre
-  // l'utente digita (prefetchJustCompletedWord) o dal prefetch sugli issue blu —
-  // così non appare più il flash "Cerco una correzione…" su parole corrette.
-  // Se il contesto (frase) è cambiato rispetto a quello usato in cache, mostriamo
-  // comunque subito la migliore correzione cached e in background rifiriamo la
-  // richiesta aggiornando la riga del menu.
+  //
+  // Regole (feedback alpha):
+  // - Non mostriamo MAI il flash "Cerco una correzione…": la riga compare solo se
+  //   sappiamo che la parola è davvero sbagliata.
+  // - Se la cache locale ha già marcato la parola come errata, mostriamo subito
+  //   la correzione cached (anche quando il contesto è cambiato).
+  // - Se il contesto è cambiato dal calcolo originale, rilanciamo la richiesta in
+  //   background e aggiorniamo la riga quando arriva (eventualmente sostituendo
+  //   la correzione visibile).
+  // - Se non c'è cache, riserviamo uno slot nascosto e firiamo la richiesta in
+  //   background: lo slot si rivela SOLO se la risposta dice misspelled=true.
+  //   Niente cache ≈ niente prefetch coperto la parola (testo pre-esistente o
+  //   editor che non emette input event attesi): garantisce che il suggerimento
+  //   appaia comunque entro la latenza dell'LLM.
+  // La logica di prefetch proattivo (al completamento di una parola durante la
+  // digitazione e dopo gli scan blu) sta in spellcheck.js — qui ci limitiamo a
+  // consumare la cache e a coprire i casi non prefetchati.
   async function openSpellWordMenu(editableEl, wordCtx, mouseEvent) {
     const items = await buildBaseItemsAt(mouseEvent);
 
     const cached = SpellCheck.getCachedSuggestion(editableEl, wordCtx.word);
     const cachedUsable = cached && cached.misspelled && cached.correction && cached.correction !== wordCtx.word;
+    const contextChanged = cached && cached.sentence !== wordCtx.sentence;
+    // Rilanciamo in background quando: (a) non c'è cache, oppure (b) c'è cache ma
+    // il contesto è cambiato. In entrambi i casi potremmo finire per mostrare una
+    // correzione che inizialmente non era visibile.
+    const refireInBackground = !cached || contextChanged;
 
     let updateCorrection = null;
 
+    // Crea l'item correction. Visibile sin da subito SOLO se abbiamo una cache
+    // usabile; altrimenti viene inserito hidden e rivelato dall'async se serve.
+    const buildCorrectionItem = (initialLabel, initialOnClick, initialSubItems, hidden) => ({
+      type: 'correction',
+      label: initialLabel,
+      loading: false,
+      hidden,
+      onClick: initialOnClick,
+      subItems: initialSubItems,
+      onMount: (_root, update) => { updateCorrection = update; },
+    });
+
     if (cachedUsable) {
       items.unshift(
-        {
-          type: 'correction',
-          label: cached.correction,
-          loading: false,
-          onClick: () => {
-            SpellCheck.applyFix(editableEl, { start: wordCtx.start, end: wordCtx.end }, cached.correction, {
-              expectedSegment: wordCtx.word,
-            });
-          },
-          subItems: buildRedSubItems(editableEl, wordCtx, cached.correction),
-          onMount: (_root, update) => { updateCorrection = update; },
-        },
+        buildCorrectionItem(
+          cached.correction,
+          () => SpellCheck.applyFix(editableEl, { start: wordCtx.start, end: wordCtx.end }, cached.correction, {
+            expectedSegment: wordCtx.word,
+          }),
+          buildRedSubItems(editableEl, wordCtx, cached.correction),
+          /* hidden */ false,
+        ),
         { type: 'separator' },
       );
-    } else if (!cached) {
-      // Nessuna voce in cache: il prefetch non ha (ancora) coperto questa
-      // parola (es. testo non digitato dall'utente, o editor che non emette
-      // gli input event attesi — claude design). Mostriamo una riga in stato
-      // loading e chiediamo on-demand; se la parola risulta corretta la riga
-      // viene rimossa (niente flash permanente, ma un suggerimento compare
-      // sempre quando serve — feedback alpha).
+    } else if (refireInBackground) {
+      // Slot riservato, ma invisibile finché non sappiamo se la parola è errata.
       items.unshift(
-        {
-          type: 'correction',
-          label: I18n.t('spell_loading'),
-          loading: true,
-          onMount: (_root, update) => { updateCorrection = update; },
-        },
-        { type: 'separator' },
+        buildCorrectionItem('', null, [], /* hidden */ true),
+        { type: 'separator', hidden: true },
       );
     }
 
     Menu.open({ x: mouseEvent.clientX, y: mouseEvent.clientY, items, keepOnScroll: true });
 
-    // Nessuna cache: richiesta on-demand. Riempie/rimuove la riga loading.
-    if (!cached) {
-      SpellCheck.requestWordSuggestion(wordCtx).then((res) => {
-        SpellCheck.setCachedSuggestion(editableEl, wordCtx.word, res
-          ? { ...res, sentence: wordCtx.sentence }
-          : { misspelled: false, correction: '', sentence: wordCtx.sentence });
-        if (!updateCorrection) return;
-        if (!res || !res.misspelled || !res.correction || res.correction === wordCtx.word) {
-          updateCorrection({ remove: true });
-          return;
-        }
-        updateCorrection({
-          label: res.correction,
-          loading: false,
-          onClick: () => {
-            SpellCheck.applyFix(editableEl, { start: wordCtx.start, end: wordCtx.end }, res.correction, {
-              expectedSegment: wordCtx.word,
-            });
-          },
-          subItems: buildRedSubItems(editableEl, wordCtx, res.correction),
-        });
+    // Helper: applica la risposta al menu (rivela/aggiorna se misspelled,
+    // mantiene invisibile altrimenti).
+    const applyResponse = (res) => {
+      SpellCheck.setCachedSuggestion(editableEl, wordCtx.word, res
+        ? { ...res, sentence: wordCtx.sentence }
+        : { misspelled: false, correction: '', sentence: wordCtx.sentence });
+      if (!updateCorrection) return;
+      const usable = res && res.misspelled && res.correction && res.correction !== wordCtx.word;
+      if (!usable) {
+        // Se la riga era già visibile (cache usabile mostrata, contesto
+        // cambiato, nuova risposta negativa) la togliamo. Se era nascosta,
+        // resta nascosta.
+        if (cachedUsable) updateCorrection({ remove: true });
+        else updateCorrection({ hidden: true });
+        return;
+      }
+      updateCorrection({
+        hidden: false,
+        label: res.correction,
+        loading: false,
+        onClick: () => {
+          SpellCheck.applyFix(editableEl, { start: wordCtx.start, end: wordCtx.end }, res.correction, {
+            expectedSegment: wordCtx.word,
+          });
+        },
+        subItems: buildRedSubItems(editableEl, wordCtx, res.correction),
       });
-    }
+    };
 
-    // Re-query in background SOLO se il contesto è cambiato (la frase nuova
-    // potrebbe dare una correzione migliore). Se non c'era cache, niente
-    // richiesta: aspettiamo il prefetch innescato dall'input.
-    if (cached && cached.sentence !== wordCtx.sentence) {
-      SpellCheck.requestWordSuggestion(wordCtx).then((res) => {
-        SpellCheck.setCachedSuggestion(editableEl, wordCtx.word, res
-          ? { ...res, sentence: wordCtx.sentence }
-          : { misspelled: false, correction: '', sentence: wordCtx.sentence });
-        if (!updateCorrection) return;
-        if (!res || !res.misspelled || !res.correction || res.correction === wordCtx.word) {
-          updateCorrection({ remove: true });
-          return;
-        }
-        updateCorrection({
-          label: res.correction,
-          loading: false,
-          onClick: () => {
-            SpellCheck.applyFix(editableEl, { start: wordCtx.start, end: wordCtx.end }, res.correction, {
-              expectedSegment: wordCtx.word,
-            });
-          },
-          subItems: buildRedSubItems(editableEl, wordCtx, res.correction),
-        });
-      });
+    if (refireInBackground) {
+      SpellCheck.requestWordSuggestion(wordCtx).then(applyResponse).catch(() => {});
     }
   }
 
