@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="it" data-sn-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <title>Filo — Editor</title>
+  <link rel="icon" href="filo://asset/icons/icon-32.png" />
+  <link rel="stylesheet" href="filo://style/theme.css" />
+  <link rel="stylesheet" href="editor.css" />
+  <script src="filo://shared/pageBootstrap.js"></script>
+  <script src="filo://shared/constants.js"></script>
+  <script src="filo://shared/messages.js"></script>
+  <script src="filo://shared/i18n.js"></script>
+  <script src="filo://shared/icons.js"></script>
+  <script src="filo://shared/storage.js"></script>
+</head>
+<body>
+  <div class="ed-root" id="root">
+    <!-- ── Pannello testo ─────────────────────────────────────────── -->
+    <section class="ed-text-pane" id="textPane">
+      <header class="ed-topbar">
+        <input class="ed-title" id="docTitle" type="text" placeholder="Titolo del documento" spellcheck="false" />
+        <span class="ed-save-state" id="saveState" title="Stato salvataggio"></span>
+        <button class="ed-icon-btn" id="sidebarToggle" title="Mostra/nascondi sidebar (Ctrl+\)" aria-label="Toggle sidebar"></button>
+      </header>
+
+      <!-- Editor di testo ricco -->
+      <div class="ed-doc-wrap" id="docWrap">
+        <div class="ed-doc" id="doc" contenteditable="true" spellcheck="false"></div>
+      </div>
+
+      <!-- Vista impostazioni (sostituisce il doc quando attiva) -->
+      <div class="ed-settings-view" id="settingsView" hidden>
+        <h2>Moduli</h2>
+        <p class="ed-settings-hint">Trascina un modulo nella griglia per aggiungerlo. Clicca un modulo nella griglia per personalizzarlo.</p>
+        <div class="ed-palette" id="palette"></div>
+      </div>
+    </section>
+
+    <!-- ── Sidebar: griglia moduli ────────────────────────────────── -->
+    <aside class="ed-sidebar" id="sidebar">
+      <div class="ed-sidebar-head">
+        <span class="ed-page-name" id="pageName">Scrittura</span>
+        <button class="ed-icon-btn" id="settingsToggle" title="Impostazioni moduli" aria-label="Impostazioni"></button>
+      </div>
+      <div class="ed-grid" id="grid"></div>
+    </aside>
+  </div>
+
+  <!-- Overlay generico (conteggio parole, customizzazione modulo, ecc.) -->
+  <div class="ed-overlay" id="overlay" hidden>
+    <div class="ed-overlay-box" id="overlayBox"></div>
+  </div>
+
+  <script src="editor.js"></script>
+</body>
+</html>
