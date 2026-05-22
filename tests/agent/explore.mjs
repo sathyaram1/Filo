@@ -301,7 +301,7 @@ async function run() {
     for (const i of toPush) {
       try {
         const r = await pushIssue({
-          model: o.model,
+          model: i.model || o.model,
           severity: i.severity,
           area: i.area || '?',
           title: i.title,
