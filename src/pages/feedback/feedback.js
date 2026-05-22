@@ -248,7 +248,7 @@
   }
 
   function updateTabCounts() {
-    const counts = { inbox: 0, draft: 0, todo: 0, done: 0, verified: 0 };
+    const counts = { inbox: 0, agent: 0, draft: 0, todo: 0, done: 0, verified: 0 };
     for (const f of all) {
       const s = statusOf(f);
       if (s in counts) counts[s]++;
@@ -256,7 +256,7 @@
     for (const [tab, n] of Object.entries(counts)) {
       const btn = tabsEl.querySelector(`[data-tab="${tab}"]`);
       if (!btn) continue;
-      const label = { inbox: 'Ricevuti', draft: 'Bozze', todo: 'Da risolvere', done: 'Risolti', verified: 'Verificati' }[tab];
+      const label = { inbox: 'Ricevuti', agent: 'Agente', draft: 'Bozze', todo: 'Da risolvere', done: 'Risolti', verified: 'Verificati' }[tab];
       btn.textContent = `${label} (${n})`;
     }
   }
