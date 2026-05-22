@@ -6,8 +6,8 @@
 (() => {
   'use strict';
 
-  const GRID_COLS = 5;
-  const GRID_ROWS = 7;
+  const GRID_COLS = 6;
+  const GRID_ROWS = 8;
   const STORAGE_KEY = 'filo.editor.doc';
   const MSG = (window.SN_MSG && window.SN_MSG.MSG) || {};
   const ACTIONS = (window.SN_CONST && window.SN_CONST.ACTIONS) || {};
