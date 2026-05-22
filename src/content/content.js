@@ -827,15 +827,21 @@
             restorePasteContext();
             const targetKind = pasteContext?.kind;
             if (targetKind === 'input') {
-              // input/textarea non supportano immagini: ricadi sul testo se presente
+              // input/textarea non supportano immagini: prova a delegare ad
+              // un handler custom (es. il modal feedback) via evento bubbling.
+              const pasteEvt = new CustomEvent('filo:paste-image', {
+                bubbles: true, cancelable: true, detail: { blob },
+              });
+              if (pasteContext.el && pasteContext.el.dispatchEvent(pasteEvt) === false) {
+                return;
+              }
+              // Nessun handler ha accettato: ricadi sul testo se presente
               const textType = it.types.find((t) => t === 'text/plain');
               if (textType) {
                 const text = await (await it.getType(textType)).text();
                 insertTextAtSelection(text);
                 pushClipboardEntry({ type: 'text', text });
               } else {
-                // Campo di solo testo + clipboard con sola immagine: non è un
-                // errore di provider/rete, è solo un campo che non accetta img.
                 Popup.showToast(I18n.t('toast_cannot_paste_image'));
               }
               return;
