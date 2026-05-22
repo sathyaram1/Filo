@@ -71,7 +71,10 @@ Rispondi SEMPRE e SOLO con un oggetto JSON valido con questa forma:
   "why": "perché questa azione fa progredire l'esplorazione"
 }
 "issues" è [] se non vedi nulla di anomalo. Preferisci click_mark usando i numeri
-visibili. Esplora aree diverse; non ripetere la stessa azione. URL interni utili:
+visibili. Esplora aree diverse; NON ripetere la stessa azione due volte di fila.
+NOTA: il pulsante "App" è un TOGGLE — un click lo apre, un altro lo chiude; se hai
+appena cliccato App e il menu non c'è, l'hai semplicemente chiuso (non è un bug).
+URL interni utili:
 filo://newtab/ (dashboard), filo://editor/editor.html, filo://history/history.html,
 filo://options/options.html.`;
 
