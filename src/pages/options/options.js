@@ -422,21 +422,12 @@
       },
       monthlyLimitEur: parseFloat($('monthlyLimit').value) || 0,
       blocklist,
-      featureFlags: {
-        help: $('ff-help').checked,
-        categorize: $('ff-categorize').checked,
-        spellcheck: $('ff-spellcheck').checked,
-      },
-      theme: $('theme').value,
     };
 
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
 
     // Aggiorna la datalist dei nickname (per-action) col registry appena salvato.
     populateNicknames(registry);
-
-    window.SN_PAGE_THEME = partial.theme;
-    window.SN_PAGE_BOOTSTRAP.applyTheme(partial.theme);
 
     const hint = $('savedHint');
     hint.classList.add('sn-show');
