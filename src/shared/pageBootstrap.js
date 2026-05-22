@@ -1,5 +1,7 @@
-// Bootstrap comune per le pagine dell'estensione (options/home/history).
-// Imposta il tema su <html> prima del rendering, evita flash.
+// Bootstrap comune per le pagine interne di Filo (dashboard/options/history/…).
+// Imposta tema e dimensione del testo su <html> prima del rendering per evitare
+// flash. La dimensione testo è un moltiplicatore di zoom salvato nelle
+// impostazioni (vedi pagina Preferenze).
 
 (function () {
   'use strict';
@@ -12,8 +14,28 @@
     document.documentElement.dataset.snTheme = resolved;
   }
 
-  // Tema iniziale "best effort" prima che le impostazioni siano caricate.
+  // Scala la UI di Filo. Usiamo `zoom` (Chromium) perché ridimensiona testo e
+  // layout in modo uniforme indipendentemente dal fatto che i font siano in
+  // px o rem. `scale` è un moltiplicatore (1 = 100%), clampato a un range sano.
+  function applyTextScale(scale) {
+    const n = Number(scale);
+    const clamped = Number.isFinite(n) ? Math.min(2, Math.max(0.8, n)) : 1;
+    document.documentElement.style.zoom = clamped === 1 ? '' : String(clamped);
+  }
+
+  // Tema/scala iniziali "best effort" prima che le impostazioni siano caricate.
   applyTheme('system');
+
+  // Carica le impostazioni reali appena possibile (lo shim chrome.storage è già
+  // disponibile via preload) e applica tema + dimensione testo.
+  (async function loadAndApply() {
+    try {
+      const r = await chrome.storage.local.get('settings');
+      const s = (r && r.settings) || {};
+      if (s.theme) { window.SN_PAGE_THEME = s.theme; applyTheme(s.theme); }
+      applyTextScale(s.textScale);
+    } catch (_) {}
+  })();
 
   // Aggiorna su preferenza sistema cambiata
   if (window.matchMedia) {
@@ -24,5 +46,16 @@
     });
   }
 
-  window.SN_PAGE_BOOTSTRAP = { applyTheme };
+  // Riapplica live se le impostazioni cambiano (es. salvataggio dalla pagina
+  // Preferenze in un altro tab).
+  try {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== 'local' || !changes.settings) return;
+      const s = changes.settings.newValue || {};
+      if (s.theme) { window.SN_PAGE_THEME = s.theme; applyTheme(s.theme); }
+      applyTextScale(s.textScale);
+    });
+  } catch (_) {}
+
+  window.SN_PAGE_BOOTSTRAP = { applyTheme, applyTextScale };
 })();
