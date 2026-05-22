@@ -73,10 +73,14 @@
     buildAppsMenu();
     appsMenu.hidden = false;
     appsBtn.setAttribute('aria-expanded', 'true');
+    // La WebContentsView del tab attivo è composta sopra l'HTML della shell
+    // e coprirebbe il dropdown: la nascondiamo finché il menu resta aperto.
+    api.tabs.setActiveVisible(false);
   }
   function closeAppsMenu() {
     appsMenu.hidden = true;
     appsBtn.setAttribute('aria-expanded', 'false');
+    api.tabs.setActiveVisible(true);
   }
   function toggleAppsMenu() {
     if (appsMenu.hidden) openAppsMenu();
