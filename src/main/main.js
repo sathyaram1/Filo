@@ -38,9 +38,20 @@ require('./protocol').registerProtocolSchemes();
 
 let mainWindow = null;
 
+function syncNativeTheme(theme) {
+  nativeTheme.themeSource = theme === 'dark' ? 'dark' : theme === 'light' ? 'light' : 'system';
+}
+
 app.whenReady().then(async () => {
   await registerFiloProtocol();
   registerIpcHandlers();
+
+  const Storage = globalThis.SN_STORAGE;
+  try {
+    const s = await Storage.getSettings();
+    syncNativeTheme(s.theme);
+  } catch (_) {}
+
   mainWindow = createMainWindow();
   registerShortcuts(mainWindow);
 
