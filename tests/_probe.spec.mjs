@@ -1,40 +1,46 @@
 import { test, expect } from './fixtures/electron.mjs';
 
-test('probe: dashboard then navigate same tab to editor, capture errors', async ({ app, shell, openTab }) => {
+test('probe: real apps-menu path + heavy editor use', async ({ app, shell }) => {
   const errors = [];
+  shell.on('pageerror', (e) => errors.push('[shell pageerror] ' + e.message));
+  shell.on('console', (m) => { if (m.type() === 'error') errors.push('[shell console] ' + m.text()); });
 
-  // 1) apri la dashboard (newtab)
-  const dash = await openTab('filo://newtab/');
-  dash.on('pageerror', (e) => errors.push('[dash pageerror] ' + e.message));
-  dash.on('console', (m) => { if (m.type() === 'error') errors.push('[dash console] ' + m.text()); });
-  await dash.waitForTimeout(500);
+  // dashboard è già aperta al boot (newtab). Apri l'editor dal menu app.
+  await shell.click('#nav-apps');
+  await shell.click('#apps-menu .apps-item');
 
-  // 2) naviga LO STESSO tab all'editor (come farebbe l'utente dalla barra/azione)
-  await shell.evaluate(async () => {
-    const snap = await window.filoShell.tabs.snapshot();
-    const active = (snap.tabs || snap).find?.((t) => t.active) || (snap.tabs || [])[0];
-    await window.filoShell.tabs.navigate(active.id, 'filo://editor/editor.html');
-  });
-  await dash.waitForTimeout(1800);
+  // trova la page dell'editor
+  const deadline = Date.now() + 8000;
+  let ed = null;
+  while (Date.now() < deadline) {
+    ed = app.windows().find((w) => { try { return new URL(w.url()).hostname === 'editor'; } catch { return false; } });
+    if (ed) break;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  if (!ed) { console.log('NO EDITOR WINDOW. errors=', errors); throw new Error('no editor'); }
+  ed.on('pageerror', (e) => errors.push('[ed pageerror] ' + e.message));
+  ed.on('console', (m) => { if (m.type() === 'error') errors.push('[ed console] ' + m.text()); });
+  await ed.waitForSelector('#doc');
 
-  console.log('SAME-TAB ERRORS:', JSON.stringify(errors, null, 2));
-  // ispeziona lo stato dell'editor dopo navigazione same-tab
-  const state = await dash.evaluate(() => ({
-    url: location.href,
-    hasDoc: !!document.getElementById('doc'),
-    docEditable: document.getElementById('doc')?.getAttribute('contenteditable'),
-    gridChildren: document.getElementById('grid')?.children.length,
-    bodyText: document.body.innerText.slice(0, 120),
-  })).catch((e) => ({ evalError: e.message }));
-  console.log('SAME-TAB EDITOR STATE:', JSON.stringify(state, null, 2));
-});
+  // USA l'editor: scrivi, formatta, markdown, cambia pagina, cerca/sostituisci
+  await ed.click('#doc');
+  await ed.keyboard.type('Titolo del mio testo');
+  await ed.keyboard.press('Enter');
+  await ed.keyboard.type('# ');
+  await ed.keyboard.type('Sezione uno');
+  await ed.keyboard.press('Enter');
+  await ed.keyboard.type('Un paragrafo con parole varie da contare bene.');
+  await ed.keyboard.down('Control'); await ed.keyboard.press('a'); await ed.keyboard.up('Control');
+  await ed.keyboard.down('Control'); await ed.keyboard.press('b'); await ed.keyboard.up('Control');
+  await ed.waitForTimeout(300);
 
-test('probe: fresh editor tab, capture errors', async ({ app, openTab }) => {
-  const errors = [];
-  const page = await openTab('filo://editor/editor.html');
-  page.on('pageerror', (e) => errors.push('[ed pageerror] ' + e.message));
-  page.on('console', (m) => { if (m.type() === 'error') errors.push('[ed console] ' + m.text()); });
-  await page.waitForSelector('#doc');
-  await page.waitForTimeout(800);
-  console.log('FRESH ERRORS:', JSON.stringify(errors, null, 2));
+  // cambia pagina (switch) → page revisione, usa search-replace
+  await ed.locator('.ed-switch-icon').nth(1).click();
+  await ed.waitForTimeout(200);
+  const sr = ed.locator('.ed-module[data-type="search-replace"] [data-sr="find"]');
+  if (await sr.count()) { await sr.fill('parole'); await ed.waitForTimeout(200); }
+
+  await ed.waitForTimeout(300);
+  console.log('ALL ERRORS:', JSON.stringify(errors, null, 2));
+  expect(errors, 'no runtime errors using editor').toEqual([]);
 });
