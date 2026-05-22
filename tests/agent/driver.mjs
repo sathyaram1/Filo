@@ -82,8 +82,11 @@ export async function windowHandle(app) {
 // Cattura nativa in PNG via Win32 PrintWindow(PW_RENDERFULLCONTENT): cattura il
 // contenuto reale della finestra (shell + WebContentsView composite) anche se
 // non è in primo piano/occlusa. Niente dipendenza dal focus → robusto.
+// IMPORTANTE: NON portiamo la finestra in foreground qui. Farlo (win.focus())
+// ruberebbe il focus da tastiera alla WebContentsView attiva, rompendo la
+// digitazione tra uno step e l'altro (es. click su #doc in uno step, type nello
+// step successivo). PrintWindow non ne ha bisogno.
 export async function captureComposite(app, outPath) {
-  await bringToFront(app);
   const hwnd = await windowHandle(app);
   const safePath = outPath.replace(/\\/g, '\\\\');
   const ps = `
