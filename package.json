@@ -13,6 +13,7 @@
     "test:ui": "playwright test --ui",
     "test:explore": "node tests/agent/explore.mjs",
     "test:daily": "node tests/agent/daily.mjs",
+    "test:shoot": "node tests/agent/shoot.mjs",
     "build": "electron-builder"
   },
   "devDependencies": {
