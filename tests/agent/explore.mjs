@@ -155,16 +155,21 @@ async function run() {
         'Analizza lo screenshot allegato e rispondi col JSON richiesto.',
       ].join('\n\n');
 
+      // Fino a 2 tentativi: un campione degenere (ramble ripetitiva → JSON
+      // troncato) è stocastico, un nuovo sample di solito risolve. Temperatura
+      // bassa per ridurre le ripetizioni.
       let parsed = null;
-      try {
-        const out = await generate({ model: o.model, system: SYSTEM, user, imagePath: shot, temperature: 0.5, schema: SCHEMA });
-        parsed = extractJson(out);
-        if (!parsed) {
-          writeFileSync(join(o.out, `fail-step-${String(step).padStart(2, '0')}.txt`), out);
-          log(`  [step ${step}] JSON non parsabile (len=${out.length}), salvato raw. Inizio: ${JSON.stringify(out.slice(0, 80))}`);
+      for (let t = 0; t < 2 && !parsed; t++) {
+        try {
+          const out = await generate({ model: o.model, system: SYSTEM, user, imagePath: shot, temperature: 0.2, schema: SCHEMA });
+          parsed = extractJson(out);
+          if (!parsed && t === 1) {
+            writeFileSync(join(o.out, `fail-step-${String(step).padStart(2, '0')}.txt`), out);
+            log(`  [step ${step}] JSON non parsabile (len=${out.length}) dopo 2 tentativi.`);
+          }
+        } catch (e) {
+          log(`  [step ${step}] errore LLM (tentativo ${t + 1}): ${e.message.slice(0, 140)}`);
         }
-      } catch (e) {
-        log(`  [step ${step}] errore LLM: ${e.message.slice(0, 160)}`);
       }
       if (!parsed) { history.push(`(passo ${step}: risposta non valida)`); continue; }
 
