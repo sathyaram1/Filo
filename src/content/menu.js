@@ -21,6 +21,7 @@
 
   function close() {
     try { hideTooltip?.(); } catch (_) {}
+    clearSubCloseTimer();
     if (activeMenu) {
       activeMenu.root.remove();
       try { activeMenu.subRoot?.remove(); } catch (_) {}
