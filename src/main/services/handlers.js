@@ -773,6 +773,14 @@ async function handleMessage(msg, sender = {}) {
         win?._filoTabs?.closeTab(sender.tab.id);
       }
       return { ok: true };
+    case MSG.OPEN_URL: {
+      const win = BrowserWindow.getAllWindows()[0];
+      if (win?._filoTabs && msg.url) win._filoTabs.openTab(msg.url);
+      return { ok: true };
+    }
+    case MSG.QUIT_APP:
+      require('electron').app.quit();
+      return { ok: true };
     case MSG.NAV_BACK:
       if (sender?.tab?.id) {
         const win = BrowserWindow.getAllWindows()[0];
