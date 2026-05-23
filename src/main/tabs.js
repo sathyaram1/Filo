@@ -231,13 +231,10 @@ class TabManager {
     wc.on('did-navigate', (_e, url) => update({ url, canBack: canGoBack(wc), canFwd: canGoFwd(wc) }));
     wc.on('did-navigate-in-page', (_e, url) => update({ url, canBack: canGoBack(wc), canFwd: canGoFwd(wc) }));
 
-    // Menu contestuale nativo sulle pagine interne senza menu Filo.
+    // Spellcheck nativo: Electron è l'unico a conoscere i suggerimenti
+    // ortografici della parola sotto lo zigzag rosso. Li spingiamo al
+    // content script perché li mostri nel menu di correzione custom.
     wc.on('context-menu', (_e, params) => {
-      const url = wc.getURL();
-      // Il correttore nativo di Electron è l'unico a conoscere i suggerimenti
-      // ortografici della parola sotto lo zigzag rosso. Sulle pagine col menu
-      // Filo (newtab, editor, siti esterni) il menu è custom e non li vedrebbe:
-      // li spingiamo al content script perché li mostri nel menu di correzione.
       if (params.misspelledWord) {
         try {
           wc.send('filo:broadcast', {
@@ -247,9 +244,6 @@ class TabManager {
           });
         } catch (_) {}
       }
-      if (!NATIVE_MENU_PAGES.some((p) => url.startsWith(p))) return;
-      const menu = buildNativeContextMenu(wc, params);
-      if (menu) menu.popup({ window: this.win });
     });
 
     // Apertura nuove tab: tutto resta dentro Filo come nuovo tab.
