@@ -88,6 +88,7 @@
     menuEl.hidden = false;
     btn.setAttribute('aria-expanded', 'true');
     openMenuEl = menuEl;
+    shelfEl.hidden = false;
     api.tabs.setActiveVisible(false);
   }
   function closeMenus() {
@@ -96,6 +97,7 @@
     appsBtn.setAttribute('aria-expanded', 'false');
     settingsBtn.setAttribute('aria-expanded', 'false');
     openMenuEl = null;
+    shelfEl.hidden = true;
     api.tabs.setActiveVisible(true);
   }
   function toggleMenu(menuEl, btn, titleText, entries) {
