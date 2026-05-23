@@ -488,6 +488,7 @@
     if (top + h + 8 > vh) top = Math.max(8, vh - h - 8);
     sub.style.left = `${left}px`;
     sub.style.top = `${top}px`;
+    attachSubmenuHover(sub);
   }
 
   // ============================================================================
