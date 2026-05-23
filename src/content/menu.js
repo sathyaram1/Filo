@@ -364,7 +364,6 @@
     if (activeMenu.subRoot) {
       activeMenu.subRoot.remove();
       activeMenu.subRoot = null;
-      return;
     }
     const sub = document.createElement('div');
     sub.className = 'sn-menu sn-menu-sub';
