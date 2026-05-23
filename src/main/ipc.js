@@ -8,9 +8,10 @@
 //   ai-stream:abort  — send({ requestId })
 //   tabs:*           — controllo del TabManager dalla shell renderer.
 
-const { ipcMain, BrowserWindow, Menu, MenuItem } = require('electron');
+const { ipcMain, BrowserWindow } = require('electron');
 const path = require('node:path');
 const { handleMessage, handleStream, broadcastToTabs } = require('./services/handlers');
+const { showPopupMenu } = require('./popup-menu');
 
 const inFlightStreams = new Map(); // requestId → AbortController
 
