@@ -30,4 +30,15 @@
   --sn-accent-rgb: 196, 90, 59;
   --sn-error: #ff6b6b;
   --sn-overlay-bg: rgba(30, 29, 27, 0.98);
+  --sn-selection-bg: rgba(196, 90, 59, 0.35);
+  --sn-selection-fg: inherit;
+}
+
+[data-sn-theme] ::selection {
+  background: var(--sn-selection-bg);
+  color: var(--sn-selection-fg);
+}
+[data-sn-theme] ::-moz-selection {
+  background: var(--sn-selection-bg);
+  color: var(--sn-selection-fg);
 }
