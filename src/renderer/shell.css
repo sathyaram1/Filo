@@ -36,6 +36,7 @@ html, body {
   font-size: 14px;
   height: 100%;
   user-select: none;
+  overflow: hidden;
 }
 
 .shell {
