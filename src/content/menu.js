@@ -282,16 +282,10 @@
     };
     const onScroll = () => { if (!keepOnScroll) close(); };
 
-    // Ritarda la registrazione dei listener di chiusura: alcuni siti (YouTube,
-    // Reddit) emettono mousedown/scroll sintetici durante il ciclo dell'evento
-    // contextmenu e chiuderebbero il menu immediatamente.
-    setTimeout(() => {
-      if (!activeMenu || activeMenu.root !== root) return;
-      document.addEventListener('mousedown', onDocClick, true);
-      window.addEventListener('scroll', onScroll, true);
-      window.addEventListener('resize', onScroll, true);
-    }, 50);
+    document.addEventListener('mousedown', onDocClick, true);
     document.addEventListener('keydown', onKey, true);
+    window.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', onScroll, true);
 
     activeMenu = { root, onDocClick, onKey, onScroll, cleanupZoom, cleanups, subRoot: null };
   }
