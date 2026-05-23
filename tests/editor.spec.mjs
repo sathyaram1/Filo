@@ -6,10 +6,9 @@ import { test, expect } from './fixtures/electron.mjs';
 test('il launcher app apre l\'editor', async ({ shell, openTab }) => {
   // Il bottone app è presente nella barra indirizzi.
   await expect(shell.locator('#nav-apps')).toHaveCount(1);
-  // Apre il menu e contiene la voce Editor.
-  await shell.click('#nav-apps');
-  await expect(shell.locator('#apps-menu .apps-item')).toContainText(['Editor']);
 
+  // Il menu App è ora un popup nativo (Menu.popup) quindi non ha DOM nella
+  // shell. Verifichiamo direttamente che l'editor si apra.
   const page = await openTab('filo://editor/editor.html');
   await page.waitForSelector('#doc');
   await expect(page.locator('#doc')).toHaveAttribute('contenteditable', 'true');
