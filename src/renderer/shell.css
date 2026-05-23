@@ -222,6 +222,7 @@ html, body {
   bottom: 0;
   background: var(--bg);
   z-index: 40;
+  overflow: hidden;
 }
 .shell-shelf[hidden] { display: none; }
 
