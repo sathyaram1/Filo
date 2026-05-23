@@ -16,6 +16,8 @@
   --sn-accent-rgb: 196, 90, 59;
   --sn-error: #b91c1c;
   --sn-overlay-bg: rgba(248, 246, 240, 0.98);
+  --sn-selection-bg: rgba(196, 90, 59, 0.25);
+  --sn-selection-fg: inherit;
 }
 
 [data-sn-theme="dark"] {
