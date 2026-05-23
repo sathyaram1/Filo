@@ -220,7 +220,7 @@ html, body {
   left: 0;
   right: 0;
   top: 88px; /* = SHELL_HEIGHT */
-  bottom: 0;
+  height: 0;
   background: var(--bg);
   z-index: 40;
   overflow: hidden;
