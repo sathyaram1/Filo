@@ -1720,10 +1720,11 @@
           copied = true;
         }
       } catch (_) {}
+      const desc = await requestImageDescription(dataUrl).catch(() => null);
       const a = document.createElement('a');
       a.href = dataUrl;
       const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-      a.download = `screenshot-${stamp}.png`;
+      a.download = descriptionToFilename(desc) || `screenshot-${stamp}.png`;
       document.body.appendChild(a); a.click(); a.remove();
       if (copied) Popup.showToast(I18n.t('toast_copied'));
     } catch (_) {
