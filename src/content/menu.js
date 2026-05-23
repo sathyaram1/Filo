@@ -282,7 +282,13 @@
     };
     const onScroll = () => { if (!keepOnScroll) close(); };
 
-    document.addEventListener('mousedown', onDocClick, true);
+    // Ritarda la registrazione di mousedown di un frame: alcuni siti (YouTube,
+    // Reddit) emettono mousedown sintetici durante il ciclo dell'evento
+    // contextmenu e chiuderebbero il menu immediatamente.
+    requestAnimationFrame(() => {
+      if (!activeMenu || activeMenu.root !== root) return;
+      document.addEventListener('mousedown', onDocClick, true);
+    });
     document.addEventListener('keydown', onKey, true);
     window.addEventListener('scroll', onScroll, true);
     window.addEventListener('resize', onScroll, true);
