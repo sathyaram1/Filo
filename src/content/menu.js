@@ -353,10 +353,7 @@
       arrow.type = 'button';
       arrow.className = 'sn-menu-correction-arrow';
       arrow.textContent = '▸';
-      arrow.addEventListener('click', (e) => {
-        e.stopPropagation();
-        openGenericSubmenu(arrow, props.subItems || []);
-      });
+      setupArrowSubmenu(arrow, () => openGenericSubmenu(arrow, props.subItems || []), cleanups);
       wrap.appendChild(arrow);
     }
   }
