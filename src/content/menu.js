@@ -216,10 +216,7 @@
         arrow.className = 'sn-menu-split-arrow';
         arrow.title = it.arrowTitle || '';
         arrow.textContent = '▸';
-        arrow.addEventListener('click', (e) => {
-          e.stopPropagation();
-          openGenericSubmenu(arrow, it.subItems || []);
-        });
+        setupArrowSubmenu(arrow, () => openGenericSubmenu(arrow, it.subItems || []), cleanups);
 
         wrap.appendChild(main);
         wrap.appendChild(arrow);
