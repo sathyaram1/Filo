@@ -40,18 +40,19 @@
   // Registro app del launcher. Il Feedback vive qui fra le App.
   const APPS = [
     { label: 'Editor', icon: 'editor', url: 'filo://editor/editor.html' },
-    { label: 'Feedback', icon: '', url: 'filo://feedback/feedback.html' },
+    { type: 'separator' },
+    { label: 'Feedback', icon: 'feedback', url: 'filo://feedback/feedback.html' },
   ];
   // Voci del menu Impostazioni (ingranaggio): Modelli e Preferenze, due pagine
   // interne dedicate.
   const SETTINGS = [
     { label: 'Modelli', icon: 'options', url: 'filo://options/options.html' },
+    { type: 'separator' },
     { label: 'Preferenze', icon: 'colorPicker', url: 'filo://preferences/preferences.html' },
   ];
 
-  // Menu nativi: i dropdown HTML non possono apparire sopra una WebContentsView
-  // nativa. Usiamo Menu.popup() di Electron via IPC, che renderizza un menu OS
-  // sopra tutto senza toccare la view.
+  // Popup menu custom: BrowserWindow frameless che appare sopra le
+  // WebContentsView native, stilizzato come il menu tasto destro.
   function showNativeMenu(btn, entries) {
     const r = btn.getBoundingClientRect();
     api.popupMenu(entries, Math.round(r.left), Math.round(r.bottom + 4));
