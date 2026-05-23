@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('filoShell', {
       return () => ipcRenderer.removeListener('tabs:updated', wrapped);
     },
   },
+  popupMenu: (entries, x, y) => ipcRenderer.invoke('shell:popup-menu', { entries, x, y }),
   window: {
     minimize: () => ipcRenderer.invoke('window:minimize'),
     toggleMaximize: () => ipcRenderer.invoke('window:toggle-maximize'),
