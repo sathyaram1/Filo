@@ -224,3 +224,4 @@ html, body {
   user-select: text;
 }
 #addr:focus { border-color: var(--accent); }
+#addr::selection { background: rgba(var(--accent-rgb), 0.3); }
