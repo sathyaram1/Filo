@@ -217,3 +217,13 @@
   opacity: 1;
   transform: translateY(0);
 }
+
+.sn-popup-body {
+  scrollbar-width: thin;
+  scrollbar-color: var(--sn-border) transparent;
+}
+.sn-popup-body::-webkit-scrollbar { width: 8px; }
+.sn-popup-body::-webkit-scrollbar-track { background: transparent; }
+.sn-popup-body::-webkit-scrollbar-thumb { background: var(--sn-border); border-radius: 999px; }
+.sn-popup-body::-webkit-scrollbar-thumb:hover { background: var(--sn-accent); }
+.sn-popup-body::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
