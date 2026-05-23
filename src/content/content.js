@@ -72,11 +72,11 @@
     // Se l'utente tiene Shift premuto, lascia passare il menu nativo (escape hatch)
     if (e.shiftKey) return;
 
-    // Sopprimi SUBITO il menu nativo: tutti i rami sotto aprono comunque un
-    // menu custom, e così un'eccezione nella detection (es. target SVG strani)
-    // non può più far trapelare il menu di base del browser (feedback alpha).
+    // Sopprimi SUBITO il menu nativo E impedisci ad altri listener sullo stesso
+    // target (es. YouTube, Reddit) di gestire l'evento. stopImmediatePropagation
+    // blocca sia la propagazione sia gli handler successivi su window stesso.
     e.preventDefault();
-    e.stopPropagation();
+    e.stopImmediatePropagation();
 
     // Spellcheck: in un editabile supportato, prima cerchiamo un errore "blu"
     // (sincrono); altrimenti partiamo con la richiesta on-demand all'LLM per la
