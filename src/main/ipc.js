@@ -8,7 +8,7 @@
 //   ai-stream:abort  — send({ requestId })
 //   tabs:*           — controllo del TabManager dalla shell renderer.
 
-const { ipcMain, BrowserWindow } = require('electron');
+const { ipcMain, BrowserWindow, Menu, MenuItem } = require('electron');
 const path = require('node:path');
 const { handleMessage, handleStream, broadcastToTabs } = require('./services/handlers');
 
@@ -129,6 +129,25 @@ function registerIpcHandlers() {
     const win = winFor(event);
     if (!win?._filoTabs) return { activeId: null, tabs: [] };
     return win._filoTabs.snapshot();
+  });
+
+  // ─── popup menu nativo (sopra le WebContentsView) ────────────────────────
+  ipcMain.handle('shell:popup-menu', (event, { entries, x, y }) => {
+    const win = winFor(event);
+    if (!win?._filoTabs) return { ok: false };
+    const menu = new Menu();
+    for (const entry of entries) {
+      if (entry.type === 'separator') {
+        menu.append(new MenuItem({ type: 'separator' }));
+      } else {
+        menu.append(new MenuItem({
+          label: entry.label || '',
+          click: () => win._filoTabs.openTab(entry.url),
+        }));
+      }
+    }
+    menu.popup({ window: win, x: Math.round(x), y: Math.round(y) });
+    return { ok: true };
   });
 
   // ─── controlli finestra (min / max / close) ──────────────────────────────

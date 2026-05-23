@@ -16,10 +16,7 @@
   const reloadBtn = document.getElementById('nav-reload');
   const homeBtn = document.getElementById('nav-home');
   const settingsBtn = document.getElementById('nav-settings');
-  const settingsMenu = document.getElementById('settings-menu');
   const appsBtn = document.getElementById('nav-apps');
-  const appsMenu = document.getElementById('apps-menu');
-  const shelfEl = document.getElementById('shell-shelf');
   const winMinBtn = document.getElementById('win-min');
   const winMaxBtn = document.getElementById('win-max');
   const winCloseBtn = document.getElementById('win-close');
@@ -52,67 +49,16 @@
     { label: 'Preferenze', icon: 'colorPicker', url: 'filo://preferences/preferences.html' },
   ];
 
-  function buildMenu(menuEl, titleText, entries) {
-    menuEl.innerHTML = '';
-    const title = document.createElement('div');
-    title.className = 'apps-menu-title';
-    title.textContent = titleText;
-    menuEl.appendChild(title);
-    for (const app of entries) {
-      const item = document.createElement('button');
-      item.className = 'apps-item';
-      item.type = 'button';
-      item.setAttribute('role', 'menuitem');
-      const ico = document.createElement('span');
-      ico.className = 'apps-item-ico';
-      if (typeof ICONS[app.icon] === 'function') ico.innerHTML = ICONS[app.icon](18);
-      const label = document.createElement('span');
-      label.textContent = app.label;
-      item.appendChild(ico);
-      item.appendChild(label);
-      item.addEventListener('click', () => {
-        closeMenus();
-        api.tabs.open(app.url);
-      });
-      menuEl.appendChild(item);
-    }
+  // Menu nativi: i dropdown HTML non possono apparire sopra una WebContentsView
+  // nativa. Usiamo Menu.popup() di Electron via IPC, che renderizza un menu OS
+  // sopra tutto senza toccare la view.
+  function showNativeMenu(btn, entries) {
+    const r = btn.getBoundingClientRect();
+    api.popupMenu(entries, Math.round(r.left), Math.round(r.bottom + 4));
   }
 
-  // Altezza della shell (toolbar) sopra la WebContentsView: deve combaciare con
-  // SHELL_HEIGHT in src/main/window.js.
-  const SHELL_HEIGHT = 88;
-  let openMenuEl = null;
-  function openMenu(menuEl, btn, titleText, entries) {
-    closeMenus();
-    buildMenu(menuEl, titleText, entries);
-    menuEl.hidden = false;
-    btn.setAttribute('aria-expanded', 'true');
-    openMenuEl = menuEl;
-    const menuBottom = menuEl.getBoundingClientRect().bottom - SHELL_HEIGHT + 12;
-    const inset = Math.max(0, Math.ceil(menuBottom));
-    api.tabs.reserveTop(inset);
-  }
-  function closeMenus() {
-    appsMenu.hidden = true;
-    settingsMenu.hidden = true;
-    appsBtn.setAttribute('aria-expanded', 'false');
-    settingsBtn.setAttribute('aria-expanded', 'false');
-    openMenuEl = null;
-    api.tabs.reserveTop(0);
-  }
-  function toggleMenu(menuEl, btn, titleText, entries) {
-    if (openMenuEl === menuEl) closeMenus();
-    else openMenu(menuEl, btn, titleText, entries);
-  }
-
-  appsBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleMenu(appsMenu, appsBtn, 'App', APPS); });
-  settingsBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleMenu(settingsMenu, settingsBtn, 'Impostazioni', SETTINGS); });
-  document.addEventListener('click', (e) => {
-    if (!openMenuEl) return;
-    if (openMenuEl.contains(e.target) || appsBtn.contains(e.target) || settingsBtn.contains(e.target)) return;
-    closeMenus();
-  });
-  window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenus(); });
+  settingsBtn.addEventListener('click', () => showNativeMenu(settingsBtn, SETTINGS));
+  appsBtn.addEventListener('click', () => showNativeMenu(appsBtn, APPS));
   setIcon(winMinBtn, 'minimize', 16);
   setIcon(winMaxBtn, 'maximize', 14);
   setIcon(winCloseBtn, 'close', 16);
