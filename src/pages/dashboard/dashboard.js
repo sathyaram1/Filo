@@ -469,10 +469,47 @@
     if (file) handleImageFile(file);
   });
 
+  const SLASH_COMMANDS = {
+    '/home': () => { goHome(); },
+    '/clear': () => { goHome(); },
+    '/kill': () => { send({ type: MSG.QUIT_APP }); },
+    '/newtab': () => { send({ type: MSG.OPEN_URL, url: 'filo://newtab/' }); },
+    '/models': () => { send({ type: MSG.OPEN_OPTIONS }); },
+    '/modelli': () => { send({ type: MSG.OPEN_OPTIONS }); },
+    '/help': () => {
+      if (body.dataset.state !== 'thread') goThread();
+      const lines = [
+        '/home, /clear — ricarica la dashboard',
+        '/kill — chiudi Filo',
+        '/newtab — apri una nuova scheda',
+        '/models, /modelli — impostazioni modelli',
+        '/help — lista comandi',
+        '/https://... — apri un sito',
+      ];
+      const bubble = makeBubble({ role: 'filo', text: lines.join('\n') });
+      bubblesEl.appendChild(bubble);
+      bubblesEl.scrollTop = bubblesEl.scrollHeight;
+    },
+  };
+
+  function handleSlashCommand(text) {
+    if (!text.startsWith('/')) return false;
+    const handler = SLASH_COMMANDS[text];
+    if (handler) { handler(); inputEl.value = ''; return true; }
+    const linkMatch = text.match(/^\/((https?:\/\/).+)$/);
+    if (linkMatch) {
+      send({ type: MSG.OPEN_URL, url: linkMatch[1] });
+      inputEl.value = '';
+      return true;
+    }
+    return false;
+  }
+
   inputForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const text = inputEl.value.trim();
     if (!text && !pendingImage) return;
+    if (handleSlashCommand(text)) return;
     submitMessage(text);
   });
 
