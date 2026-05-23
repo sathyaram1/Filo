@@ -36,6 +36,48 @@
     dropZones.length = 0;
   }
 
+  function closeSubmenu() {
+    if (!activeMenu?.subRoot) return;
+    activeMenu.subRoot.remove();
+    activeMenu.subRoot = null;
+    activeMenu.subLocked = false;
+  }
+
+  let subCloseTimer = null;
+  function clearSubCloseTimer() { if (subCloseTimer) { clearTimeout(subCloseTimer); subCloseTimer = null; } }
+
+  function setupArrowSubmenu(arrow, openFn, cleanups) {
+    arrow.addEventListener('mouseenter', () => {
+      clearSubCloseTimer();
+      if (!activeMenu?.subRoot) openFn();
+    });
+    arrow.addEventListener('mouseleave', () => {
+      if (activeMenu?.subLocked) return;
+      clearSubCloseTimer();
+      subCloseTimer = setTimeout(() => closeSubmenu(), 500);
+    });
+    arrow.addEventListener('click', (e) => {
+      e.stopPropagation();
+      clearSubCloseTimer();
+      if (activeMenu?.subRoot) {
+        activeMenu.subLocked = true;
+      } else {
+        openFn();
+        if (activeMenu) activeMenu.subLocked = true;
+      }
+    });
+    cleanups.push(() => clearSubCloseTimer());
+  }
+
+  function attachSubmenuHover(sub) {
+    sub.addEventListener('mouseenter', () => clearSubCloseTimer());
+    sub.addEventListener('mouseleave', () => {
+      if (activeMenu?.subLocked) return;
+      clearSubCloseTimer();
+      subCloseTimer = setTimeout(() => closeSubmenu(), 500);
+    });
+  }
+
   // items: array di { type: 'item'|'separator'|'row'|'inline'|'paste', label, shortcut, disabled, onClick, items? }
   // - 'inline': sezione che mostra contenuto dinamico (es. spiegazione AI). { content?: string, onMount?: (el) => cleanup }
   // - 'paste': come 'item' ma con freccetta a destra che apre il sotto-menu della cronologia
