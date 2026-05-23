@@ -221,9 +221,12 @@ html, body {
   right: 0;
   top: 88px; /* = SHELL_HEIGHT */
   height: 0;
-  background: var(--bg);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.14);
+  background: #f2ece0;
   z-index: 40;
+  overflow: hidden;
+}
+@media (prefers-color-scheme: dark) {
+  .shell-shelf { background: #1c1916; }
 }
 .shell-shelf[hidden] { display: none; }
 
