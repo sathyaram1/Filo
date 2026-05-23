@@ -323,3 +323,13 @@
   opacity: 0.4;
 }
 
+.sn-sidebar-conv {
+  scrollbar-width: thin;
+  scrollbar-color: var(--sn-border) transparent;
+}
+.sn-sidebar-conv::-webkit-scrollbar { width: 8px; }
+.sn-sidebar-conv::-webkit-scrollbar-track { background: transparent; }
+.sn-sidebar-conv::-webkit-scrollbar-thumb { background: var(--sn-border); border-radius: 999px; }
+.sn-sidebar-conv::-webkit-scrollbar-thumb:hover { background: var(--sn-accent); }
+.sn-sidebar-conv::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+
