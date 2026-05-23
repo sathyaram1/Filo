@@ -484,7 +484,7 @@
         '/newtab — apri una nuova scheda',
         '/models, /modelli — impostazioni modelli',
         '/help — lista comandi',
-        '/https://... — apri un sito',
+        '/google.com — apri un sito',
       ];
       const bubble = makeBubble({ role: 'filo', text: lines.join('\n') });
       bubblesEl.appendChild(bubble);
