@@ -1176,7 +1176,7 @@
     if (blob) {
       try {
         const dt = new DataTransfer();
-        const file = new File([blob], 'image.png', { type: blob.type || 'image/png' });
+        const file = new File([blob], fileName || 'image.png', { type: blob.type || 'image/png' });
         dt.items.add(file);
         const evt = new ClipboardEvent('paste', {
           clipboardData: dt,
