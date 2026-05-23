@@ -28,6 +28,8 @@
     OPEN_OPTIONS: 'open_options',
     OPEN_SPELLCHECK_PAGE: 'open_spellcheck_page',
     CLOSE_TAB: 'close_tab',
+    OPEN_URL: 'open_url',                           // { url }
+    QUIT_APP: 'quit_app',
     NAV_BACK: 'nav_back',
     NAV_FORWARD: 'nav_forward',
     NAV_RELOAD: 'nav_reload',
