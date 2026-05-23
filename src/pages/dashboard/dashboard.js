@@ -496,9 +496,10 @@
     if (!text.startsWith('/')) return false;
     const handler = SLASH_COMMANDS[text];
     if (handler) { handler(); inputEl.value = ''; return true; }
-    const linkMatch = text.match(/^\/((https?:\/\/).+)$/);
-    if (linkMatch) {
-      send({ type: MSG.OPEN_URL, url: linkMatch[1] });
+    const raw = text.slice(1);
+    if (raw.includes('.') || raw.startsWith('http://') || raw.startsWith('https://')) {
+      const url = raw.match(/^https?:\/\//) ? raw : `https://${raw}`;
+      send({ type: MSG.OPEN_URL, url });
       inputEl.value = '';
       return true;
     }
