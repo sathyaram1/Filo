@@ -1082,7 +1082,6 @@
   }
 
   async function requestImageDescription(dataUrl) {
-    // Modelli da provare in ordine: prima quello configurato, poi un fallback noto.
     const FALLBACK_MODEL = 'google/gemini-2.0-flash-001';
     const tryOnce = async (modelOverride) => {
       try {
@@ -1103,19 +1102,31 @@
     }
     if (!res?.ok) {
       console.warn('[SN] descrizione immagine fallita anche col fallback:', res?.error || 'errore sconosciuto');
-      return;
+      return null;
     }
     if (!res.text) {
       console.warn('[SN] descrizione immagine: risposta vuota');
-      return;
+      return null;
     }
     const description = res.text.replace(/\s+/g, ' ').trim().slice(0, 80);
-    if (!description) return;
+    if (!description) return null;
     chrome.runtime.sendMessage({
       type: MSG.UPDATE_CLIPBOARD_DESCRIPTION,
       dataUrl,
       description,
     }).catch(() => {});
+    return description;
+  }
+
+  function descriptionToFilename(description, ext = 'png') {
+    if (!description) return null;
+    let name = description
+      .replace(/[<>:"/\\|?*\x00-\x1f]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 60);
+    if (!name) return null;
+    return `${name}.${ext}`;
   }
 
   async function pasteHistoryEntry(entry) {
