@@ -88,8 +88,11 @@
     menuEl.hidden = false;
     btn.setAttribute('aria-expanded', 'true');
     openMenuEl = menuEl;
+    const menuBottom = menuEl.getBoundingClientRect().bottom - SHELL_HEIGHT + 8;
+    const inset = Math.max(0, Math.ceil(menuBottom));
     shelfEl.hidden = false;
-    api.tabs.setActiveVisible(false);
+    shelfEl.style.height = inset + 'px';
+    api.tabs.reserveTop(inset);
   }
   function closeMenus() {
     appsMenu.hidden = true;
@@ -98,7 +101,8 @@
     settingsBtn.setAttribute('aria-expanded', 'false');
     openMenuEl = null;
     shelfEl.hidden = true;
-    api.tabs.setActiveVisible(true);
+    shelfEl.style.height = '0';
+    api.tabs.reserveTop(0);
   }
   function toggleMenu(menuEl, btn, titleText, entries) {
     if (openMenuEl === menuEl) closeMenus();
