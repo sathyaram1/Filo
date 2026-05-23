@@ -206,7 +206,6 @@ body[data-state="thread"] .dash-suggestion { justify-content: flex-start; paddin
   flex-direction: column;
   gap: 14px;
   padding: 40px 8px 8px;
-  scrollbar-width: thin;
 }
 
 .dash-bubble {
