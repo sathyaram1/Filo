@@ -1542,14 +1542,9 @@
         Popup.showToast(I18n.t('err_provider_failed'));
         return;
       }
-      // Aggiungi lo screenshot agli "elementi copiati" così che possa essere
-      // riusato dal sotto-menu Incolla / cronologia clipboard. Passiamo lo
-      // stesso placeholder usato dal flusso "incolla" così l'entry parte con
-      // "Descrizione…" e viene poi aggiornata dall'AI con la descrizione vera.
       try {
         pushClipboardEntry({ type: 'image', dataUrl: cap.dataUrl, description: I18n.t('clipboard_image_pending') });
       } catch (_) {}
-      // Copia nello system clipboard (richiede image/png, non jpeg).
       let copied = false;
       try {
         const pngBlob = await dataUrlToPngBlob(cap.dataUrl);
@@ -1558,10 +1553,11 @@
           copied = true;
         }
       } catch (_) {}
+      const desc = await requestImageDescription(cap.dataUrl).catch(() => null);
       const a = document.createElement('a');
       a.href = cap.dataUrl;
       const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-      a.download = `screenshot-${stamp}.png`;
+      a.download = descriptionToFilename(desc) || `screenshot-${stamp}.png`;
       document.body.appendChild(a); a.click(); a.remove();
       if (copied) Popup.showToast(I18n.t('toast_copied'));
     } catch (_) {}
