@@ -132,22 +132,13 @@ function registerIpcHandlers() {
     return win._filoTabs.snapshot();
   });
 
-  // ─── popup menu nativo (sopra le WebContentsView) ────────────────────────
+  // ─── popup menu custom (sopra le WebContentsView) ────────────────────────
   ipcMain.handle('shell:popup-menu', (event, { entries, x, y }) => {
     const win = winFor(event);
     if (!win?._filoTabs) return { ok: false };
-    const menu = new Menu();
-    for (const entry of entries) {
-      if (entry.type === 'separator') {
-        menu.append(new MenuItem({ type: 'separator' }));
-      } else {
-        menu.append(new MenuItem({
-          label: entry.label || '',
-          click: () => win._filoTabs.openTab(entry.url),
-        }));
-      }
-    }
-    menu.popup({ window: win, x: Math.round(x), y: Math.round(y) });
+    showPopupMenu(win, entries, x, y, (url) => {
+      win._filoTabs.openTab(url);
+    });
     return { ok: true };
   });
 
