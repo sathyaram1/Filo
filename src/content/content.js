@@ -1159,7 +1159,7 @@
   // (Gmail, Slate, Lexical, ProseMirror) che hanno un handler paste e
   // ignorerebbero execCommand o modifiche dirette al DOM; (2) execCommand
   // 'insertImage'; (3) inserimento manuale via Range API.
-  function insertImageInEditable(blob, dataUrl) {
+  function insertImageInEditable(blob, dataUrl, fileName) {
     if (!pasteContext || pasteContext.kind !== 'ce') return false;
     const el = pasteContext.el;
     if (!el || !el.isConnected) return false;
