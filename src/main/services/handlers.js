@@ -8,7 +8,7 @@
 //
 // I moduli SN_* sono stati caricati dal loader.js — qui assumiamo siano su global.
 
-const { BrowserWindow } = require('electron');
+const { app, BrowserWindow } = require('electron');
 
 const { SN_CONST, SN_MSG } = globalThis;
 const { ACTIONS, PROMPTS, DEFAULT_SETTINGS } = SN_CONST;
