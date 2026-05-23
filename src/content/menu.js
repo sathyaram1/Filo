@@ -422,6 +422,7 @@
     if (top + h + 8 > vh) top = Math.max(8, vh - h - 8);
     sub.style.left = `${left}px`;
     sub.style.top = `${top}px`;
+    attachSubmenuHover(sub);
   }
 
   // Sotto-menu cronologia incolla. Si ancora alla freccetta.
@@ -430,7 +431,6 @@
     if (activeMenu.subRoot) {
       activeMenu.subRoot.remove();
       activeMenu.subRoot = null;
-      return;
     }
     const sub = document.createElement('div');
     sub.className = 'sn-menu sn-menu-sub';
