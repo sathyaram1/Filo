@@ -1715,7 +1715,6 @@
       const region = await selectScreenRegion();
       if (!region) { Popup.showToast(I18n.t('toast_region_cancelled')); return; }
       const { dataUrl, blob } = region;
-      try { pushClipboardEntry({ type: 'image', dataUrl, description: I18n.t('clipboard_image_pending') }); } catch (_) {}
       let copied = false;
       try {
         if (blob && navigator.clipboard?.write) {
@@ -1724,6 +1723,12 @@
         }
       } catch (_) {}
       const desc = await requestImageDescription(dataUrl).catch(() => null);
+      try {
+        chrome.runtime.sendMessage({
+          type: MSG.PUSH_CLIPBOARD_ENTRY,
+          entry: { type: 'image', dataUrl, description: desc || I18n.t('clipboard_image_pending') },
+        }).catch(() => {});
+      } catch (_) {}
       const a = document.createElement('a');
       a.href = dataUrl;
       const stamp = new Date().toISOString().replace(/[:.]/g, '-');
