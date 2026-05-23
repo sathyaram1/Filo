@@ -1542,9 +1542,6 @@
         Popup.showToast(I18n.t('err_provider_failed'));
         return;
       }
-      try {
-        pushClipboardEntry({ type: 'image', dataUrl: cap.dataUrl, description: I18n.t('clipboard_image_pending') });
-      } catch (_) {}
       let copied = false;
       try {
         const pngBlob = await dataUrlToPngBlob(cap.dataUrl);
@@ -1554,6 +1551,12 @@
         }
       } catch (_) {}
       const desc = await requestImageDescription(cap.dataUrl).catch(() => null);
+      try {
+        chrome.runtime.sendMessage({
+          type: MSG.PUSH_CLIPBOARD_ENTRY,
+          entry: { type: 'image', dataUrl: cap.dataUrl, description: desc || I18n.t('clipboard_image_pending') },
+        }).catch(() => {});
+      } catch (_) {}
       const a = document.createElement('a');
       a.href = cap.dataUrl;
       const stamp = new Date().toISOString().replace(/[:.]/g, '-');
