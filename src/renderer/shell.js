@@ -88,7 +88,7 @@
     menuEl.hidden = false;
     btn.setAttribute('aria-expanded', 'true');
     openMenuEl = menuEl;
-    const menuBottom = menuEl.getBoundingClientRect().bottom - SHELL_HEIGHT + 8;
+    const menuBottom = menuEl.getBoundingClientRect().bottom - SHELL_HEIGHT + 12;
     const inset = Math.max(0, Math.ceil(menuBottom));
     shelfEl.hidden = false;
     shelfEl.style.height = inset + 'px';
