@@ -192,6 +192,20 @@ function loadContentScripts() {
 // del shim chrome più sotto? No — non l'abbiamo fatto qui. I content script
 // usano `self.SN_*`. Con contextIsolation:false, `self` è già aliased a
 // window dal browser (è una proprietà standard del WindowOrWorkerGlobalScope).
+// Sovrascrivi lo stub di Chromium PRIMA di caricare i content script, così
+// chrome.runtime.sendMessage è già il nostro shim IPC quando content.js fa
+// fetchSettings() durante init().
+try {
+  Object.defineProperty(window, 'chrome', {
+    value: chromeShim,
+    writable: true,
+    configurable: true,
+    enumerable: true,
+  });
+} catch (e) {
+  try { window.chrome = chromeShim; } catch (_) { console.warn('[Filo] impossibile sovrascrivere window.chrome', e); }
+}
+
 function bootContentScripts() {
   if (!shouldInjectContentScripts()) return;
   injectContentScriptStyles();
@@ -201,18 +215,4 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', bootContentScripts, { once: true });
 } else {
   bootContentScripts();
-}
-
-// Sovrascrivi lo stub di Chromium. La proprietà è configurabile, quindi
-// l'assegnazione diretta funziona (a differenza di contextBridge che fallisce).
-try {
-  Object.defineProperty(window, 'chrome', {
-    value: chromeShim,
-    writable: true,
-    configurable: true,
-    enumerable: true,
-  });
-} catch (e) {
-  // Fallback: prova l'assegnazione semplice.
-  try { window.chrome = chromeShim; } catch (_) { console.warn('[Filo] impossibile sovrascrivere window.chrome', e); }
 }
