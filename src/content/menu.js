@@ -255,10 +255,7 @@
         arrow.className = 'sn-menu-paste-arrow';
         arrow.title = I18n.t('menu_paste_history');
         arrow.textContent = '▾';
-        arrow.addEventListener('click', (e) => {
-          e.stopPropagation();
-          openSubmenu(arrow, it.history || [], it.onPickHistory);
-        });
+        setupArrowSubmenu(arrow, () => openSubmenu(arrow, it.history || [], it.onPickHistory), cleanups);
 
         wrap.appendChild(main);
         wrap.appendChild(arrow);
@@ -356,10 +353,7 @@
       arrow.type = 'button';
       arrow.className = 'sn-menu-correction-arrow';
       arrow.textContent = '▸';
-      arrow.addEventListener('click', (e) => {
-        e.stopPropagation();
-        openGenericSubmenu(arrow, props.subItems || []);
-      });
+      setupArrowSubmenu(arrow, () => openGenericSubmenu(arrow, props.subItems || []), cleanups);
       wrap.appendChild(arrow);
     }
   }
