@@ -1145,7 +1145,7 @@
       // Ricostruisci un Blob a partire dal data URL per dispatcharlo come paste event.
       let blob = null;
       try { blob = await (await fetch(entry.dataUrl)).blob(); } catch (_) {}
-      const ok = insertImageInEditable(blob, entry.dataUrl);
+      const ok = insertImageInEditable(blob, entry.dataUrl, descriptionToFilename(entry.description));
       if (ok) Popup.showToast(I18n.t('toast_pasted_image'));
       else Popup.showToast(I18n.t('err_provider_failed'));
       return;
