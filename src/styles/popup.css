@@ -218,6 +218,41 @@
   transform: translateY(0);
 }
 
+/* Pill cliccabile mostrato durante la dettatura audio. Si comporta come un
+   toast ma è interattivo: cliccandolo si ferma la registrazione. */
+.sn-dictate-pill {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 2147483647;
+  padding: 10px 16px;
+  background: var(--sn-overlay-bg);
+  color: var(--sn-fg);
+  font: inherit;
+  font-family: var(--sn-font);
+  font-size: 13px;
+  border: 1px solid var(--sn-border);
+  border-radius: 999px;
+  box-shadow: var(--sn-shadow);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.sn-dictate-pill::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #e02b2b;
+  animation: sn-dictate-pulse 1.2s ease-in-out infinite;
+}
+.sn-dictate-pill:hover { border-color: var(--sn-accent); }
+@keyframes sn-dictate-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.35; transform: scale(0.85); }
+}
+
 .sn-popup-body {
   scrollbar-width: thin;
   scrollbar-color: var(--sn-border) transparent;
