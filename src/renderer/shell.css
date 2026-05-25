@@ -244,7 +244,4 @@ html, body {
   white-space: nowrap;
   max-width: 240px;
   backdrop-filter: blur(4px);
-  opacity: 0;
-  animation: shell-tip-in 80ms ease-out forwards;
 }
-@keyframes shell-tip-in { to { opacity: 1; } }
