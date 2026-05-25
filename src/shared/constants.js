@@ -351,6 +351,14 @@
       `Se ci sono più colonne o paragrafi, restituiscili nell'ordine di lettura naturale. ` +
       `Se nell'immagine non c'è testo leggibile, rispondi con una stringa vuota.`,
 
+    transcribeAudio: ({ lang } = {}) =>
+      `Trascrivi ESATTAMENTE le parole pronunciate in questo audio. ` +
+      `Mantieni la lingua originale di chi parla` +
+      (lang ? ` (probabilmente ${lang})` : '') + `. ` +
+      `Non tradurre, non riformulare, non aggiungere commenti, preamboli, etichette o virgolette. ` +
+      `Inserisci la punteggiatura appropriata (virgole, punti, punti interrogativi) inferendola dall'intonazione. ` +
+      `Se l'audio è silenzioso, incomprensibile o vuoto, rispondi con una stringa vuota.`,
+
     categorize: ({ url, title, description, excerpt, existing }) =>
       `Categorizza la pagina seguente.\n` +
       `URL: ${url}\nTitolo: ${title}\nDescrizione: ${description || '-'}\n` +
