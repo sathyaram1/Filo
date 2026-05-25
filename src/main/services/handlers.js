@@ -132,6 +132,12 @@ async function buildMessages(action, payload) {
       { type: 'image_url', image_url: { url: payload.dataUrl } },
     ] }];
   }
+  if (action === ACTIONS.TRANSCRIBE_AUDIO) {
+    return [{ role: 'user', content: [
+      { type: 'text', text: PROMPTS.transcribeAudio({ lang: payload.lang }) },
+      { type: 'audio_url', audio_url: { url: payload.dataUrl } },
+    ] }];
+  }
   if (action === ACTIONS.SPELLCHECK_SEMANTIC) {
     return [{ role: 'user', content: PROMPTS.spellcheckSemantic({ text: payload.text, context: payload.context }) }];
   }
