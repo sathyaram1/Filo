@@ -112,6 +112,7 @@
     toast_saved: 'Salvata in: %s',
     toast_link_saved: 'Link salvato',
     toast_copied: 'Copiato negli appunti',
+    toast_copied_saving: 'Copiato negli appunti, salvataggio in corso…',
     toast_translating_page: 'Traduzione pagina in corso…',
     toast_page_translated: 'Pagina tradotta',
     toast_original_restored: 'Originale ripristinato',
