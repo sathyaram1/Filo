@@ -41,11 +41,12 @@ html,body{background:transparent;overflow:hidden;height:100%;
   ipcRenderer.on('set', (_e, { text, dark }) => {
     document.documentElement.classList.toggle('dark', !!dark);
     tip.textContent = text || '';
-    // Misura e segnala al main la dimensione reale
-    requestAnimationFrame(() => {
-      const r = tip.getBoundingClientRect();
-      ipcRenderer.send('size', { w: Math.ceil(r.width), h: Math.ceil(r.height) });
-    });
+    // Misura sincrona: requestAnimationFrame non scatta quando la BrowserWindow
+    // e' hidden (Electron sospende il rAF), e dopo il primo hide il tooltip
+    // restava bloccato. getBoundingClientRect forza un layout reflow sincrono
+    // anche con window nascosta, quindi le misure sono affidabili.
+    const r = tip.getBoundingClientRect();
+    ipcRenderer.send('size', { w: Math.ceil(r.width), h: Math.ceil(r.height) });
   });
 </script></body></html>`;
 }
