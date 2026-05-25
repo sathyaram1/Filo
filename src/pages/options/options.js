@@ -417,6 +417,7 @@
         [ACTIONS.CATEGORIZE]: $('model-categorize').value.trim(),
         [ACTIONS.DESCRIBE_IMAGE]: $('model-describe-image').value.trim(),
         [ACTIONS.TRANSCRIBE_IMAGE]: $('model-transcribe-image').value.trim(),
+        [ACTIONS.TRANSCRIBE_AUDIO]: $('model-transcribe-audio').value.trim(),
         [ACTIONS.SPELLCHECK_SEMANTIC]: $('model-spellcheck-semantic').value.trim(),
         [ACTIONS.SPELLCHECK_WORD]: $('model-spellcheck-word').value.trim(),
         [ACTIONS.HELP_INTENT_GUESS]: $('model-help-intent-guess').value.trim(),
