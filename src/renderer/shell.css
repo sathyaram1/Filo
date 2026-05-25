@@ -225,3 +225,26 @@ html, body {
 }
 #addr:focus { border-color: var(--accent); }
 #addr::selection { background: rgba(var(--accent-rgb), 0.3); }
+
+/* Tooltip custom della shell — stile coerente con il menu tasto destro
+   (.sn-tooltip in src/styles/menu.css), così l'hover su nav-btn/tab-new
+   mostra un riquadro Filo invece del tooltip nativo bianco e squadrato. */
+.shell-tooltip {
+  position: fixed;
+  z-index: 2147483647;
+  pointer-events: none;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  font-size: 12px;
+  line-height: 1.2;
+  padding: 4px 8px;
+  white-space: nowrap;
+  max-width: 240px;
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  animation: shell-tip-in 80ms ease-out forwards;
+}
+@keyframes shell-tip-in { to { opacity: 1; } }
