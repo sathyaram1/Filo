@@ -1,5 +1,18 @@
 # Istruzioni per Claude Code
 
+## PRIMA DI TUTTO: sync con `origin/main`
+
+Routine remote (su claude.ai) pushano commit su `origin/main` durante la
+giornata. Prima di iniziare **qualsiasi** task, sincronizza il repo locale:
+
+```bash
+git -C "C:/Users/agenti AI/Desktop/Filo/Filo" pull --rebase origin main
+```
+
+Questo allinea anche tutti i worktree (condividono lo stesso `.git`). Se il
+pull fallisce per conflitti, fermati e chiedi all'utente prima di procedere
+— non risolvere conflitti senza autorizzazione.
+
 Questo è **Filo desktop** — un browser AI-native costruito su Electron. È
 l'evoluzione dell'estensione Chrome `filo-extension` (archiviata, o in via di
 archiviazione, sotto `../ROBA VECCHIA/`). Tutto il valore dell'estensione
