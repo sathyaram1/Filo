@@ -1813,9 +1813,15 @@
   // Overflow panel: ora vive come griglia di icone (sotto-menu ancorato al
   // bottone "▸"). Vedi buildGlobalIconRow + Menu.openIconGridSubmenu.
 
-  // Item "Detta": Web Speech API. La freccetta apre la scelta modello (placeholder).
+  // Item "Detta": registrazione audio via MediaRecorder + trascrizione con un
+  // modello multimodale (default Gemini Flash). La freccetta apre la scelta
+  // modello, popolata dinamicamente dai modelli del registry che supportano
+  // input audio (per ora solo Gemini — Claude/OpenRouter chat non accettano
+  // audio inline).
   function buildDictateItem() {
-    const supported = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
+    const supported = typeof window !== 'undefined'
+      && typeof window.MediaRecorder !== 'undefined'
+      && navigator?.mediaDevices?.getUserMedia;
     return {
       type: 'split',
       icon: '🎤',
@@ -1827,8 +1833,7 @@
         ? [
             { type: 'info', label: I18n.t('menu_dictate_model_select') },
             { type: 'separator' },
-            // Placeholder: in attesa di integrazione con modelli audio.
-            { label: 'Browser (Web Speech)', onClick: () => startDictation() },
+            ...buildDictateModelSubItems(),
           ]
         : [
             { type: 'info', label: I18n.t('menu_dictate_not_supported') },
@@ -1836,11 +1841,46 @@
     };
   }
 
-  // Dettatura browser-native. Inserisce il testo riconosciuto nel campo editabile
-  // catturato all'apertura del menu.
-  function startDictation() {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) {
+  function buildDictateModelSubItems() {
+    const C = self.SN_CONST;
+    const registry = (settings && settings.modelRegistry) || C.DEFAULT_MODEL_REGISTRY;
+    const current = (settings && settings.models && settings.models[C.ACTIONS.TRANSCRIBE_AUDIO])
+      || C.DEFAULT_MODELS[C.ACTIONS.TRANSCRIBE_AUDIO];
+    const items = [];
+    for (const [nickname, entry] of Object.entries(registry)) {
+      // Solo modelli con un binding Gemini: per ora è l'unico provider che
+      // accetta audio inline tramite la stessa chat completion che usiamo.
+      if (!entry || !entry.gemini) continue;
+      const checked = nickname === current;
+      items.push({
+        label: (checked ? '✓ ' : '   ') + (entry.label || nickname),
+        onClick: () => pickDictateModel(nickname),
+      });
+    }
+    if (!items.length) {
+      items.push({ type: 'info', label: I18n.t('menu_dictate_not_supported') });
+    }
+    return items;
+  }
+
+  async function pickDictateModel(nickname) {
+    try {
+      await chrome.runtime.sendMessage({
+        type: MSG.UPDATE_SETTINGS,
+        settings: { models: { [ACTIONS.TRANSCRIBE_AUDIO]: nickname } },
+      });
+      Popup.showToast(I18n.t('menu_dictate_model_set'));
+    } catch (_) {
+      Popup.showToast(I18n.t('err_provider_failed'));
+    }
+  }
+
+  // Stato modulo per la registrazione in corso (al più una alla volta).
+  let _dictateState = null;
+
+  async function startDictation() {
+    if (_dictateState) { stopDictation(); return; }
+    if (typeof window.MediaRecorder === 'undefined' || !navigator?.mediaDevices?.getUserMedia) {
       Popup.showToast(I18n.t('menu_dictate_not_supported'));
       return;
     }
@@ -1848,17 +1888,76 @@
       Popup.showToast(I18n.t('err_provider_failed'));
       return;
     }
-    const rec = new SR();
-    rec.lang = (navigator.language || 'it-IT');
-    rec.interimResults = false;
-    rec.continuous = false;
-    rec.onresult = (e) => {
-      const text = Array.from(e.results).map((r) => r[0]?.transcript || '').join(' ').trim();
-      if (text) insertTextAtSelection(text + ' ');
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (_) {
+      Popup.showToast(I18n.t('menu_dictate_no_mic'));
+      return;
+    }
+    let mimeType = 'audio/webm;codecs=opus';
+    if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'audio/webm';
+    if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = '';
+    let rec;
+    try {
+      rec = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+    } catch (_) {
+      try { stream.getTracks().forEach((t) => t.stop()); } catch (_) {}
+      Popup.showToast(I18n.t('err_provider_failed'));
+      return;
+    }
+    const chunks = [];
+    rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+
+    // Pill cliccabile per fermare la registrazione (il toast non è cliccabile).
+    const pill = document.createElement('button');
+    pill.type = 'button';
+    pill.className = 'sn-dictate-pill';
+    pill.textContent = I18n.t('menu_dictate_listening');
+    document.documentElement.appendChild(pill);
+
+    const cleanup = () => {
+      try { stream.getTracks().forEach((t) => t.stop()); } catch (_) {}
+      if (pill.parentNode) pill.remove();
+      _dictateState = null;
     };
-    rec.onerror = () => Popup.showToast(I18n.t('err_provider_failed'));
-    try { rec.start(); } catch (_) {}
-    Popup.showToast(I18n.t('menu_dictate_listening'), { duration: 2500 });
+
+    rec.onstop = async () => {
+      try {
+        const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
+        if (!blob.size) { Popup.showToast(I18n.t('menu_dictate_empty')); cleanup(); return; }
+        if (pill.parentNode) pill.remove();
+        Popup.showToast(I18n.t('menu_dictate_transcribing'), { duration: 2500 });
+        const dataUrl = await blobToDataUrl(blob);
+        const res = await chrome.runtime.sendMessage({
+          type: MSG.AI_REQUEST,
+          action: ACTIONS.TRANSCRIBE_AUDIO,
+          payload: { dataUrl, lang: navigator.language || 'it-IT' },
+        });
+        cleanup();
+        if (!res?.ok) { Popup.showToast(I18n.t('err_provider_failed')); return; }
+        const text = (res.text || '').trim();
+        if (!text) { Popup.showToast(I18n.t('menu_dictate_empty')); return; }
+        restorePasteContext();
+        insertTextAtSelection(text + ' ');
+      } catch (_) {
+        Popup.showToast(I18n.t('err_provider_failed'));
+        cleanup();
+      }
+    };
+
+    pill.addEventListener('click', () => stopDictation());
+
+    _dictateState = { rec, stream, pill };
+    try { rec.start(); } catch (_) { cleanup(); Popup.showToast(I18n.t('err_provider_failed')); return; }
+    // Safety: stop forzato dopo 60s per non lasciare il mic aperto.
+    const t = rec;
+    setTimeout(() => { if (_dictateState && _dictateState.rec === t) stopDictation(); }, 60_000);
+  }
+
+  function stopDictation() {
+    if (!_dictateState) return;
+    try { _dictateState.rec.stop(); } catch (_) {}
   }
 
   // Sezione inline "Spiega immagine": stessa filosofia di buildInlineExplain ma con dataUrl.
