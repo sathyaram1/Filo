@@ -64,41 +64,20 @@
   setIcon(winMaxBtn, 'maximize', 14);
   setIcon(winCloseBtn, 'close', 16);
 
-  // Tooltip custom: legge `data-tip` su qualunque elemento della shell e mostra
-  // un riquadro Filo (vedi .shell-tooltip in shell.css) invece del title nativo
-  // bianco e squadrato del SO. Delegazione globale così funziona anche per i
-  // tab che vengono ricreati ad ogni render().
+  // Tooltip custom: legge `data-tip` su qualunque elemento della shell e chiede
+  // al main di mostrare un mini-BrowserWindow stile Filo (vedi popup-tooltip.js),
+  // invece del title nativo bianco squadrato. Serve una BrowserWindow secondaria
+  // perché la shell è alta solo 88px e gli elementi DOM non possono apparire
+  // sopra le WebContentsView delle tab. Delega globale così funziona anche per i
+  // tab ricreati ad ogni render().
   (() => {
-    let tipEl = null;
     let showTimer = null;
     let currentTarget = null;
     const SHOW_DELAY = 350;
 
-    function ensureTip() {
-      if (tipEl) return tipEl;
-      tipEl = document.createElement('div');
-      tipEl.className = 'shell-tooltip';
-      tipEl.style.display = 'none';
-      document.body.appendChild(tipEl);
-      return tipEl;
-    }
-    function place(target, text) {
-      const el = ensureTip();
-      el.textContent = text;
-      el.style.display = '';
-      const r = target.getBoundingClientRect();
-      const tw = el.offsetWidth, th = el.offsetHeight;
-      let left = r.left + r.width / 2 - tw / 2;
-      let top = r.bottom + 6;
-      if (top + th + 8 > window.innerHeight) top = r.top - th - 6;
-      if (left + tw + 4 > window.innerWidth) left = window.innerWidth - tw - 4;
-      if (left < 4) left = 4;
-      el.style.left = `${left}px`;
-      el.style.top = `${top}px`;
-    }
     function hide() {
       if (showTimer) { clearTimeout(showTimer); showTimer = null; }
-      if (tipEl) tipEl.style.display = 'none';
+      if (currentTarget) api.tooltipHide();
       currentTarget = null;
     }
     document.addEventListener('mouseover', (e) => {
@@ -108,7 +87,14 @@
       currentTarget = t;
       const text = t.dataset.tip;
       if (!text) return;
-      showTimer = setTimeout(() => place(t, text), SHOW_DELAY);
+      showTimer = setTimeout(() => {
+        const r = t.getBoundingClientRect();
+        // Punto di ancoraggio: sotto il bottone, centrato. Il main rifinisce la
+        // posizione una volta misurato il testo (e potrà flipparlo se necessario).
+        const x = Math.round(r.left + r.width / 2 - 60);
+        const y = Math.round(r.bottom + 6);
+        api.tooltipShow(text, x, y);
+      }, SHOW_DELAY);
     });
     document.addEventListener('mouseout', (e) => {
       const t = e.target.closest('[data-tip]');
