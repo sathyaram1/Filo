@@ -1723,6 +1723,8 @@
           copied = true;
         }
       } catch (_) {}
+      // Toast immediato: feedback istantaneo prima che il LLM generi il nome file
+      if (copied) Popup.showToast(I18n.t('toast_copied_saving'), { duration: 3000 });
       const desc = await requestImageDescription(dataUrl).catch(() => null);
       try {
         chrome.runtime.sendMessage({
@@ -1735,7 +1737,6 @@
       const stamp = new Date().toISOString().replace(/[:.]/g, '-');
       a.download = descriptionToFilename(desc) || `screenshot-${stamp}.png`;
       document.body.appendChild(a); a.click(); a.remove();
-      if (copied) Popup.showToast(I18n.t('toast_copied'));
     } catch (_) {
       Popup.showToast(I18n.t('err_provider_failed'));
     }
