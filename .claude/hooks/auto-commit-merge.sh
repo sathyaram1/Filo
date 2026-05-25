@@ -39,4 +39,24 @@ git worktree list --porcelain | awk '/^worktree /{print substr($0,10)}' | while 
   fi
 done
 
+# Auto-push main to origin if there are unpushed commits.
+# Non-blocking: failures are logged but don't break the hook (no network, rejected push, etc).
+if [ -n "$MAIN_WT" ] && [ -n "$MAIN_BRANCH" ]; then
+  cd "$MAIN_WT" || exit 0
+  if git remote get-url origin >/dev/null 2>&1; then
+    UPSTREAM=$(git rev-parse --abbrev-ref --symbolic-full-name "@{u}" 2>/dev/null)
+    if [ -n "$UPSTREAM" ]; then
+      AHEAD=$(git rev-list --count "$UPSTREAM..HEAD" 2>/dev/null)
+      if [ "${AHEAD:-0}" -gt 0 ]; then
+        PUSH_OUT=$(git push origin "$MAIN_BRANCH" 2>&1)
+        PUSH_RC=$?
+        if [ $PUSH_RC -ne 0 ]; then
+          echo "[auto-push] FAILED pushing '$MAIN_BRANCH' to origin — left for manual push" >&2
+          echo "$PUSH_OUT" >&2
+        fi
+      fi
+    fi
+  fi
+fi
+
 exit 0
