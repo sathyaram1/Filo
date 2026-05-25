@@ -1924,11 +1924,15 @@
 
     rec.onstop = async () => {
       try {
-        const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
-        if (!blob.size) { Popup.showToast(I18n.t('menu_dictate_empty')); cleanup(); return; }
+        const raw = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
+        if (!raw.size) { Popup.showToast(I18n.t('menu_dictate_empty')); cleanup(); return; }
         if (pill.parentNode) pill.remove();
         Popup.showToast(I18n.t('menu_dictate_transcribing'), { duration: 2500 });
-        const dataUrl = await blobToDataUrl(blob);
+        // Gemini accetta wav/mp3/ogg/flac/aac/aiff ma non webm: riencodiamo in
+        // WAV mono 16kHz (più che sufficiente per voce, file piccolo).
+        const wav = await audioBlobToWav(raw, 16000).catch(() => null);
+        if (!wav) { Popup.showToast(I18n.t('err_provider_failed')); cleanup(); return; }
+        const dataUrl = await blobToDataUrl(wav);
         const res = await chrome.runtime.sendMessage({
           type: MSG.AI_REQUEST,
           action: ACTIONS.TRANSCRIBE_AUDIO,
