@@ -70,7 +70,10 @@ export async function contentBounds(app) {
 // HWND della finestra principale (stringa decimale dell'handle).
 export async function windowHandle(app) {
   return app.evaluate(async ({ BrowserWindow }) => {
-    const win = BrowserWindow.getAllWindows()[0];
+    // Filtra la window principale (quella con _filoTabs) per evitare di
+    // prendere mini-window secondarie come il tooltip o il popup-menu.
+    const all = BrowserWindow.getAllWindows();
+    const win = all.find((w) => w._filoTabs) || all[0];
     const buf = win.getNativeWindowHandle();
     // little-endian; su 64-bit l'handle sta nei primi 8 byte.
     let v = 0n;
