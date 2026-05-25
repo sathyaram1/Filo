@@ -31,6 +31,7 @@
     $('lbl-cat').textContent = I18n.t('options_action_categorize');
     $('lbl-describe-image').textContent = I18n.t('options_action_describe_image');
     $('lbl-transcribe-image').textContent = I18n.t('options_action_transcribe_image');
+    $('lbl-transcribe-audio').textContent = I18n.t('options_action_transcribe_audio');
     $('lbl-spellcheck-semantic').textContent = I18n.t('spell_action_semantic_label');
     $('lbl-spellcheck-word').textContent = I18n.t('spell_action_word_label');
     $('lbl-help-intent-guess').textContent = I18n.t('options_action_help_intent_guess');
