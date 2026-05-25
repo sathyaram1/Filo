@@ -779,7 +779,7 @@ async function handleMessage(msg, sender = {}) {
       return { ok: true };
     }
     case MSG.QUIT_APP:
-      require('electron').app.quit();
+      app.quit();
       return { ok: true };
     case MSG.NAV_BACK:
       if (sender?.tab?.id) {
