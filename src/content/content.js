@@ -684,19 +684,11 @@
   }
 
   function buildHelpItem() {
-    const helpEnabled = !!settings?.featureFlags?.help;
     return {
       type: 'item',
       label: I18n.t('menu_help'),
       shortcut: 'Alt+H',
-      onClick: () => {
-        if (helpEnabled) {
-          openHelpSidebar();
-        } else {
-          Popup.showToast(I18n.t('feature_off_help'), { duration: 3500 });
-          chrome.runtime.sendMessage({ type: MSG.OPEN_OPTIONS });
-        }
-      },
+      onClick: () => openHelpSidebar(),
     };
   }
 
