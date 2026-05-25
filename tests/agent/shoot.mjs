@@ -73,6 +73,25 @@ async function run() {
           break;
         }
         case 'click-shell': await shell.click(arg).catch((e) => console.log('  click-shell err', e.message)); await d.sleep(400); break;
+        case 'hover-shell': await shell.hover(arg).catch((e) => console.log('  hover-shell err', e.message)); await d.sleep(400); break;
+        case 'eval-shell': {
+          const r = await shell.evaluate((s) => {
+            const el = document.querySelector(s);
+            if (!el) return { found: false };
+            const cs = getComputedStyle(el);
+            return {
+              found: true,
+              className: el.className,
+              tag: el.tagName,
+              bg: cs.backgroundColor,
+              border: cs.border,
+              borderRadius: cs.borderRadius,
+              accentRgb: getComputedStyle(document.documentElement).getPropertyValue('--accent-rgb'),
+            };
+          }, arg);
+          console.log('  eval-shell:', JSON.stringify(r));
+          break;
+        }
         case 'click-view': {
           const v = await d.activeView(app, shell);
           if (v) await v.click(arg).catch((e) => console.log('  click-view err', e.message));
