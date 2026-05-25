@@ -589,7 +589,9 @@
     if (sub.kind === 'overflow') b.classList.add('sn-menu-row-overflow');
     if (sub.kind === 'empty') b.classList.add('sn-menu-row-empty');
     if (sub.disabled) b.disabled = true;
-    if (sub.kind !== 'empty' && sub.label) attachTooltip(b, sub.label);
+    // L'overflow apre subito un sotto-menu su hover: non mostrare il tooltip
+    // "Altro…" che altrimenti coprirebbe/preannuncerebbe la stessa cosa.
+    if (sub.kind !== 'empty' && sub.kind !== 'overflow' && sub.label) attachTooltip(b, sub.label);
     setIconContent(b, sub.icon || sub.label);
     if (sub.id) b.dataset.snIconId = sub.id;
     if (sub.kind === 'overflow') {
