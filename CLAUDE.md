@@ -13,6 +13,23 @@ Questo allinea anche tutti i worktree (condividono lo stesso `.git`). Se il
 pull fallisce per conflitti, fermati e chiedi all'utente prima di procedere
 — non risolvere conflitti senza autorizzazione.
 
+## DOPO OGNI MODIFICA: push su `origin/main`
+
+Le routine remote partono dallo stato di `origin/main`, quindi se non pushi
+lavorano su codice vecchio e potrebbero rifare cose già fatte o introdurre
+conflitti. Dopo qualsiasi Edit/Write — una volta che l'auto-commit/merge
+hook ha già aggiornato `main` locale — pusha:
+
+```bash
+git -C "C:/Users/agenti AI/Desktop/Filo/Filo" push origin main
+```
+
+Fallo a fine task (non dopo ogni singolo Edit, sarebbe troppo rumoroso): è
+sufficiente un push prima di restituire il controllo all'utente. Se il push
+viene rifiutato per `non-fast-forward`, significa che `origin/main` ha
+commit nuovi (forse da una routine partita nel frattempo): fai prima
+`git pull --rebase origin main` e poi ripushha.
+
 Questo è **Filo desktop** — un browser AI-native costruito su Electron. È
 l'evoluzione dell'estensione Chrome `filo-extension` (archiviata, o in via di
 archiviazione, sotto `../ROBA VECCHIA/`). Tutto il valore dell'estensione
