@@ -34,6 +34,10 @@
   --sn-selection-fg: inherit;
 }
 
+[data-sn-theme] {
+  accent-color: var(--sn-accent);
+}
+
 [data-sn-theme] ::selection {
   background: var(--sn-selection-bg);
   color: var(--sn-selection-fg);
