@@ -1513,12 +1513,7 @@
       if (selInfo) triggerExplainOrTranslate(ACTIONS.TRANSLATE_SELECTION, selInfo, anchor);
       else Popup.showToast(I18n.t('err_no_selection'));
     } else if (command === 'open-help-sidebar') {
-      if (settings?.featureFlags?.help) {
-        openHelpSidebar();
-      } else {
-        Popup.showToast(I18n.t('feature_off_help'), { duration: 3500 });
-        chrome.runtime.sendMessage({ type: MSG.OPEN_OPTIONS });
-      }
+      openHelpSidebar();
     }
     // save-for-later è gestito direttamente nel background
   }
