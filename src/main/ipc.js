@@ -143,6 +143,14 @@ function registerIpcHandlers() {
     return { ok: true };
   });
 
+  // ─── tooltip custom (sopra le WebContentsView) ───────────────────────────
+  ipcMain.on('shell:tooltip-show', (event, { text, x, y }) => {
+    const win = winFor(event);
+    if (!win) return;
+    showTooltip(win, String(text || ''), Number(x) || 0, Number(y) || 0);
+  });
+  ipcMain.on('shell:tooltip-hide', () => hideTooltip());
+
   // ─── controlli finestra (min / max / close) ──────────────────────────────
   ipcMain.handle('window:minimize', (event) => {
     const win = winFor(event); if (win) win.minimize();
