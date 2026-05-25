@@ -597,10 +597,28 @@
       // ancorato, SENZA chiudere il menu principale (feedback alpha). Marcato
       // come hover-target durante drag per aprirsi automaticamente.
       b.dataset.snDragHoverOpen = '1';
-      b.addEventListener('click', (e) => {
-        e.stopPropagation();
+      const openOverflow = () => {
         if (sub.disabled) return;
         try { sub.onClick && sub.onClick(b); } catch (er) { console.error(er); }
+      };
+      b.addEventListener('mouseenter', () => {
+        clearSubCloseTimer();
+        if (!activeMenu?.subRoot) openOverflow();
+      });
+      b.addEventListener('mouseleave', () => {
+        if (activeMenu?.subLocked) return;
+        clearSubCloseTimer();
+        subCloseTimer = setTimeout(() => closeSubmenu(), 500);
+      });
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        clearSubCloseTimer();
+        if (activeMenu?.subRoot) {
+          activeMenu.subLocked = true;
+        } else {
+          openOverflow();
+          if (activeMenu) activeMenu.subLocked = true;
+        }
       });
     } else {
       b.addEventListener('click', () => {
