@@ -108,6 +108,9 @@
     // OCR: serve un modello vision capace di leggere testo anche piccolo.
     // Flash è ok; con la chiave Gemini la richiesta è gratis e veloce.
     [ACTIONS.TRANSCRIBE_IMAGE]: 'flash',
+    // Dettatura: serve un modello che capisca audio. Gemini 2.0 Flash è
+    // multimodale (audio/video/immagini) e gratis con la chiave Gemini.
+    [ACTIONS.TRANSCRIBE_AUDIO]: 'flash',
     [ACTIONS.SPELLCHECK_SEMANTIC]: 'flash',
     [ACTIONS.SPELLCHECK_WORD]: 'flash',
     [ACTIONS.EDIT_TEXT]: 'claude-haiku',
