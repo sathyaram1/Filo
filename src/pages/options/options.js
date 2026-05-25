@@ -88,6 +88,7 @@
     $('model-categorize').value = settings.models?.[ACTIONS.CATEGORIZE] || '';
     $('model-describe-image').value = settings.models?.[ACTIONS.DESCRIBE_IMAGE] || '';
     $('model-transcribe-image').value = settings.models?.[ACTIONS.TRANSCRIBE_IMAGE] || '';
+    $('model-transcribe-audio').value = settings.models?.[ACTIONS.TRANSCRIBE_AUDIO] || '';
     $('model-spellcheck-semantic').value = settings.models?.[ACTIONS.SPELLCHECK_SEMANTIC] || '';
     $('model-spellcheck-word').value = settings.models?.[ACTIONS.SPELLCHECK_WORD] || '';
     $('model-help-intent-guess').value = settings.models?.[ACTIONS.HELP_INTENT_GUESS] || '';
