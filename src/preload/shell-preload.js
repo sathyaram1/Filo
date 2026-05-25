@@ -22,6 +22,8 @@ contextBridge.exposeInMainWorld('filoShell', {
     },
   },
   popupMenu: (entries, x, y) => ipcRenderer.invoke('shell:popup-menu', { entries, x, y }),
+  tooltipShow: (text, x, y) => ipcRenderer.send('shell:tooltip-show', { text, x, y }),
+  tooltipHide: () => ipcRenderer.send('shell:tooltip-hide'),
   window: {
     minimize: () => ipcRenderer.invoke('window:minimize'),
     toggleMaximize: () => ipcRenderer.invoke('window:toggle-maximize'),
