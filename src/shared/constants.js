@@ -48,6 +48,9 @@
     CATEGORIZE: 'categorize',
     DESCRIBE_IMAGE: 'describe_image',
     TRANSCRIBE_IMAGE: 'transcribe_image',
+    // Trascrizione audio dal microfono (dettatura). L'input è un data URL
+    // audio (es. audio/webm;base64,...) mandato a un modello multimodale.
+    TRANSCRIBE_AUDIO: 'transcribe_audio',
     SPELLCHECK_SEMANTIC: 'spellcheck_semantic',
     SPELLCHECK_WORD: 'spellcheck_word',
     EDIT_TEXT: 'edit_text',
