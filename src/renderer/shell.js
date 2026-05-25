@@ -77,7 +77,7 @@
       const el = document.createElement('div');
       el.className = 'tab' + (t.id === state.activeId ? ' active' : '');
       el.dataset.id = t.id;
-      el.title = t.title || t.url;
+      el.dataset.tip = t.title || t.url;
 
       const ico = document.createElement('div');
       if (t.loading) {
