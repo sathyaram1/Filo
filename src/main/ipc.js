@@ -12,6 +12,7 @@ const { ipcMain, BrowserWindow } = require('electron');
 const path = require('node:path');
 const { handleMessage, handleStream, broadcastToTabs } = require('./services/handlers');
 const { showPopupMenu } = require('./popup-menu');
+const { showTooltip, hideTooltip } = require('./popup-tooltip');
 
 const inFlightStreams = new Map(); // requestId → AbortController
 
