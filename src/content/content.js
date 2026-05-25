@@ -1813,6 +1813,57 @@
   // Overflow panel: ora vive come griglia di icone (sotto-menu ancorato al
   // bottone "▸"). Vedi buildGlobalIconRow + Menu.openIconGridSubmenu.
 
+  // Decodifica un blob audio (qualunque formato che il browser sappia leggere
+  // — tipicamente webm/opus prodotto da MediaRecorder) e lo ri-encoda come WAV
+  // mono al sampleRate richiesto. Necessario perché la Gemini API accetta
+  // wav/mp3/ogg/flac/aac/aiff ma NON webm. WAV PCM 16-bit mono a 16kHz è
+  // abbondante per la voce e tiene il file piccolo (~32KB/s).
+  async function audioBlobToWav(blob, targetSampleRate = 16000) {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) throw new Error('AudioContext non disponibile');
+    const arrayBuffer = await blob.arrayBuffer();
+    const decoderCtx = new Ctx();
+    let decoded;
+    try {
+      decoded = await decoderCtx.decodeAudioData(arrayBuffer.slice(0));
+    } finally {
+      try { decoderCtx.close(); } catch (_) {}
+    }
+    const frameCount = Math.max(1, Math.ceil(decoded.duration * targetSampleRate));
+    const offline = new OfflineAudioContext(1, frameCount, targetSampleRate);
+    const src = offline.createBufferSource();
+    src.buffer = decoded;
+    src.connect(offline.destination);
+    src.start();
+    const rendered = await offline.startRendering();
+    const samples = rendered.getChannelData(0);
+    const buffer = new ArrayBuffer(44 + samples.length * 2);
+    const view = new DataView(buffer);
+    let off = 0;
+    const writeStr = (s) => { for (let i = 0; i < s.length; i++) view.setUint8(off++, s.charCodeAt(i)); };
+    const writeU32 = (v) => { view.setUint32(off, v, true); off += 4; };
+    const writeU16 = (v) => { view.setUint16(off, v, true); off += 2; };
+    writeStr('RIFF');
+    writeU32(36 + samples.length * 2);
+    writeStr('WAVE');
+    writeStr('fmt ');
+    writeU32(16);
+    writeU16(1);                     // PCM
+    writeU16(1);                     // mono
+    writeU32(targetSampleRate);
+    writeU32(targetSampleRate * 2);  // byte rate (sampleRate * channels * 2)
+    writeU16(2);                     // block align
+    writeU16(16);                    // bits per sample
+    writeStr('data');
+    writeU32(samples.length * 2);
+    for (let i = 0; i < samples.length; i++) {
+      const s = Math.max(-1, Math.min(1, samples[i]));
+      view.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+      off += 2;
+    }
+    return new Blob([buffer], { type: 'audio/wav' });
+  }
+
   // Item "Detta": registrazione audio via MediaRecorder + trascrizione con un
   // modello multimodale (default Gemini Flash). La freccetta apre la scelta
   // modello, popolata dinamicamente dai modelli del registry che supportano
