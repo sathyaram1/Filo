@@ -62,6 +62,13 @@
             }
             // URL remoti non supportati direttamente: ignora.
           }
+          else if (p.type === 'audio_url' && p.audio_url?.url) {
+            const url = p.audio_url.url;
+            const match = /^data:([^;]+);base64,(.*)$/.exec(url);
+            if (match) {
+              parts.push({ inline_data: { mime_type: match[1], data: match[2] } });
+            }
+          }
         }
       }
       if (parts.length) contents.push({ role, parts });
