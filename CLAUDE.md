@@ -195,6 +195,37 @@ prima il modello migliore. La chiave sta in `tests/agent/.env` (gitignorata).
   deterministico con `test:shoot`**. Se non si riproduce, è un artefatto: non
   segnalarlo come bug reale.
 
+### In routine cloud (Linux headless)
+
+`test:shoot` usa Win32 `PrintWindow` → **non funziona in Linux**, ignoralo.
+`test:explore` richiede la chiave Gemini in `tests/agent/.env` che è
+gitignorata → **probabilmente non è disponibile nel cloud**, ignoralo.
+
+Cosa puoi (e devi) usare invece:
+
+1. **`npm test`** — la suite Playwright (17 test) parte in Electron headless.
+   Eseguila SEMPRE prima di dichiarare un task done in cloud. Se rompi un
+   test esistente, è un regress: fixalo prima di chiudere.
+
+2. **Aggiungi un test Playwright per la feature che hai toccato**, in
+   `tests/`. Usa il fixture `tests/fixtures/electron.mjs`. Esempio per una
+   modifica alla dashboard feedback:
+   ```js
+   import { test, expect } from './fixtures/electron.mjs';
+   test('reopen feedback opens inline textarea', async ({ openTab }) => {
+     const page = await openTab('filo://feedback/feedback.html');
+     // ... click tab "done", click "Riapri", expect textarea visible
+   });
+   ```
+
+3. **`npm run test:smoke`** come sanity check rapido (avvia la app headless
+   e cattura screenshot di alcune pagine in `tests/.smoke/`).
+
+Se non riesci a scrivere un test affidabile per la feature (es. l'UI
+dipende da Firestore live), almeno verifica via `node -e "require('./src/...')"`
+che i moduli toccati si caricano senza errori, e dichiara nel report finale
+"non testato end-to-end perché X".
+
 ## Feedback alpha tester
 
 I feedback arrivano da Firestore (progetto `filo-8b9cb`, collezione `feedback`).
