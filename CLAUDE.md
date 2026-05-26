@@ -248,13 +248,39 @@ Per ogni feedback `todo`:
    - In cloud: `npm test` + se la feature ha UI nuova, aggiungi un test
      Playwright che la esercita.
    - In locale: `npm run test:shoot` con scenario mirato.
-   - Se per qualche motivo non puoi verificare end-to-end, **non chiudere
-     il feedback come `done`**: lascialo `todo` con una nota che spiega
-     cosa hai cambiato e perché serve verifica manuale, così l'utente lo
-     riprende.
 4. Solo se la verifica passa: aggiorna lo status a `done` su Firestore
    (PATCH con `updateMask`) e scrivi nelle `notes` una breve spiegazione
    causa/fix + cosa hai testato per confermare che funziona.
+
+**Insistere prima di mollare (vale soprattutto per routine cloud):**
+non abbandonare al primo intoppo. Se un test fallisce, capisci perché e
+ritenta con un approccio diverso. Se il fix che hai scelto non funziona,
+prova un altro. Se non trovi il codice giusto al primo colpo, cerca con
+pattern diversi. **L'unica ragione legittima per non chiudere un feedback
+è una di queste tre:**
+
+a) **Il feedback è ambiguo** — non riesci a capire cosa l'utente voglia
+   davvero, anche dopo aver letto testo + screenshot + codice circostante.
+b) **Richiede una decisione di design** — il fix esiste tecnicamente ma
+   ci sono N modi non equivalenti e non sai quale preferisca l'utente.
+c) **Mancano informazioni concrete** — il feedback fa riferimento a uno
+   stato o a un comportamento che non puoi riprodurre dai dati disponibili
+   (es. "il pulsante X non funziona" ma X non esiste nel codebase con quel
+   nome).
+
+In uno di questi casi: **sposta il feedback in stato `clarify`** (non
+`done`, non `todo`), e nelle `notes` scrivi:
+- cosa hai capito del feedback
+- cosa hai provato (se hai provato)
+- *cosa ti serve sapere* per procedere — domande specifiche, non vaghe
+
+L'utente le vede nel tab "Chiarimenti" della dashboard, risponde, e poi
+le rimette in `todo` per la prossima routine.
+
+**Non usare `clarify` come scappatoia.** "Non sono sicuro al 100%" non è
+ambiguità: prova la cosa più ragionevole, verificala, e se funziona chiudi.
+`clarify` è per feedback che ti bloccano davvero, non per quelli che ti
+fanno solo dubitare.
 
 ## Cosa NON è in scope
 
