@@ -26,6 +26,30 @@ un Edit qualsiasi farà ripartire il push automatico, oppure pusha a mano:
 git -C "C:/Users/agenti AI/Desktop/Filo/Filo" push origin main
 ```
 
+## REGOLA DURA: niente "fatto" senza verifica
+
+**Non dichiarare mai un task completato (né tornare il controllo all'utente,
+né chiudere un feedback come `done`) senza aver verificato che la feature
+funzioni davvero.** "Funziona davvero" significa **eseguire il codice** che
+hai toccato, non solo aver "verificato che compila" o "letto il diff".
+
+Il minimo accettabile dipende dall'ambiente:
+
+- **In sessione locale (Windows)**: `npm run test:shoot` con uno scenario che
+  esercita la modifica + ispezione visuale dello screenshot. Se la feature è
+  troppo dinamica per uno script, almeno `npm test` (Playwright headless) o
+  `npm run test:smoke`. Vedi sezione "Controlli visivi" più sotto.
+
+- **In routine cloud (Linux headless)**: `npm test` per assicurarti che la
+  suite Playwright passi, e — se la feature ha un comportamento UI nuovo —
+  **aggiungi un test Playwright** che lo eserciti (click + assert). `test:shoot`
+  e `test:explore` **non funzionano nel cloud** (vedi sezione dedicata).
+
+- **Se la verifica non è possibile** (es. richiede interazione hardware che
+  Playwright non simula): dichiaralo esplicitamente nel report finale —
+  "feature implementata ma non verificata perché X", così l'utente sa che
+  deve provarla a mano.
+
 Questo è **Filo desktop** — un browser AI-native costruito su Electron. È
 l'evoluzione dell'estensione Chrome `filo-extension` (archiviata, o in via di
 archiviazione, sotto `../ROBA VECCHIA/`). Tutto il valore dell'estensione
