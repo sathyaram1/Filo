@@ -42,6 +42,7 @@
     activeMenu.subRoot.remove();
     activeMenu.subRoot = null;
     activeMenu.subLocked = false;
+    activeMenu.subOwner = null;
   }
 
   let subCloseTimer = null;
