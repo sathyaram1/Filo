@@ -244,8 +244,17 @@ in `new` (inbox), `draft` (bozze — richiedono decisioni di design dell'utente)
 Per ogni feedback `todo`:
 1. Leggi testo + screenshot allegati per capire il problema
 2. Trova il codice coinvolto e implementa il fix
-3. Aggiorna lo status a `done` su Firestore (PATCH con `updateMask`)
-   e scrivi nelle `notes` una breve spiegazione causa/fix
+3. **Verifica che il fix funzioni** (vedi sezione "REGOLA DURA" in alto):
+   - In cloud: `npm test` + se la feature ha UI nuova, aggiungi un test
+     Playwright che la esercita.
+   - In locale: `npm run test:shoot` con scenario mirato.
+   - Se per qualche motivo non puoi verificare end-to-end, **non chiudere
+     il feedback come `done`**: lascialo `todo` con una nota che spiega
+     cosa hai cambiato e perché serve verifica manuale, così l'utente lo
+     riprende.
+4. Solo se la verifica passa: aggiorna lo status a `done` su Firestore
+   (PATCH con `updateMask`) e scrivi nelle `notes` una breve spiegazione
+   causa/fix + cosa hai testato per confermare che funziona.
 
 ## Cosa NON è in scope
 
