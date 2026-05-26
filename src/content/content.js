@@ -546,10 +546,17 @@
   }
 
   // Layout di default: 5 icone primarie nella riga, le altre nella griglia.
+  // `newTab` (logo Filo "f") al posto di `openForLater` e l'ingranaggio
+  // `openOptions` rimosso dalle azioni rapide (feedback alpha): le Opzioni
+  // restano accessibili dalla barra indirizzi (icona ingranaggio).
   const DEFAULT_ICON_LAYOUT = {
-    primary: ['translate', 'screenshot', 'share', 'saveForLater', 'openForLater'],
-    secondary: ['screenshotCrop', 'transcribe', 'colorPicker', 'closeTab', 'openOptions', 'fullscreen', 'back', 'forward', 'reload'],
+    primary: ['translate', 'screenshot', 'share', 'saveForLater', 'newTab'],
+    secondary: ['screenshotCrop', 'transcribe', 'colorPicker', 'closeTab', 'fullscreen', 'back', 'forward', 'reload'],
   };
+
+  // Icone ritirate dal registro: vanno purgate dal layout salvato per non
+  // generare bottoni "fantasma" (registry lookup miss).
+  const RETIRED_ICONS = new Set(['openOptions', 'openForLater']);
 
   // Vecchio default (prima del cambio a 5 slot): se trovo esattamente questo
   // layout in storage, è il default che non è mai stato customizzato — migro.
