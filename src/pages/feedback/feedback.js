@@ -181,7 +181,7 @@
           ${am.area ? `<span class="fb-badge">${escapeHtml(am.area)}</span>` : ''}
         </div>
         ${am.title ? `<div class="fb-title">${escapeHtml(am.title)}</div>` : ''}` : '';
-      const notesEditable = currentTab === 'todo' || currentTab === 'draft' || currentTab === 'agent';
+      const notesEditable = currentTab === 'todo' || currentTab === 'draft' || currentTab === 'agent' || currentTab === 'clarify';
       const notesBlock = notesEditable
         ? `<label class="fb-notes-label">Note / decisioni di design:
              <textarea class="fb-notes" data-id="${escapeHtml(f._id)}" rows="3" placeholder="Dettagli aggiuntivi, vincoli, scelte di design…">${escapeHtml(f.notes || '')}</textarea>
