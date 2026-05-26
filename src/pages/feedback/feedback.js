@@ -220,6 +220,57 @@
       });
     });
 
+    // "Riapri" non cambia subito lo status: apre un form inline dove l'utente
+    // può spiegare meglio cosa non funziona. La spiegazione viene appesa alle
+    // note esistenti (con separatore + timestamp), così il commento del primo
+    // agente che ha lavorato al feedback resta visibile anche dopo la riapertura.
+    listEl.querySelectorAll('.fb-reopen-start').forEach((b) => {
+      b.addEventListener('click', () => {
+        const id = b.dataset.id;
+        const card = b.closest('.fb-card');
+        const actionsDiv = card && card.querySelector('.fb-actions');
+        if (!actionsDiv) return;
+        actionsDiv.innerHTML = `
+          <div class="fb-reopen-form">
+            <label class="fb-notes-label">Cosa non va / cosa manca:
+              <textarea class="fb-reopen-text" rows="3" placeholder="Spiega meglio il problema, allega contesto, indica passi per riprodurre…"></textarea>
+            </label>
+            <div class="fb-reopen-buttons">
+              <button type="button" class="sn-btn sn-btn-secondary fb-reopen-cancel">Annulla</button>
+              <button type="button" class="sn-btn fb-reopen-confirm">Conferma riapertura</button>
+            </div>
+          </div>
+        `;
+        const ta = actionsDiv.querySelector('.fb-reopen-text');
+        ta.focus();
+        // Esc annulla, Ctrl/Cmd+Enter conferma — più comodo che cliccare.
+        ta.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') {
+            e.preventDefault();
+            applyFilter();
+          } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            actionsDiv.querySelector('.fb-reopen-confirm').click();
+          }
+        });
+        actionsDiv.querySelector('.fb-reopen-cancel').addEventListener('click', () => {
+          applyFilter(); // ridisegna la card con le azioni originali
+        });
+        actionsDiv.querySelector('.fb-reopen-confirm').addEventListener('click', () => {
+          const item = all.find((f) => f._id === id);
+          const oldNotes = (item && item.notes) || '';
+          const reason = ta.value.trim();
+          let newNotes = oldNotes;
+          if (reason) {
+            const ts = new Date().toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
+            const block = `--- Riaperto il ${ts} ---\n${reason}`;
+            newNotes = oldNotes ? `${oldNotes}\n\n${block}` : block;
+          }
+          patch(id, { status: 'new', notes: newNotes }, { status: 'new', notes: newNotes });
+        });
+      });
+    });
+
     // Salvataggio note: debounce su blur.
     listEl.querySelectorAll('.fb-notes').forEach((ta) => {
       let timer;
