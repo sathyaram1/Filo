@@ -10,8 +10,8 @@ let activePopup = null;
 // ── SVG icon paths (viewBox 0 0 24 24, stroke-based) ──────────────────────
 const ICON_PATHS = {
   editor:
-    '<path d="M5 4h7l5 5v3"/><path d="M12 4v5h5"/>' +
-    '<path d="M8 13h4"/>' +
+    '<path d="M5 4h7l5 5v11h-12z"/><path d="M12 4v5h5"/>' +
+    '<path d="M8 13h3"/>' +
     '<path d="M19.5 14.5l-6 6L11 21l.5-2.5 6-6a1.4 1.4 0 0 1 2 2z"/>',
 
   feedback:
