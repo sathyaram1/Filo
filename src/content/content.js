@@ -96,12 +96,35 @@
             return;
           }
         }
+        // Su `<input>` testuali (non "supportati" dal nostro overlay) ci
+        // affidiamo ai soli suggerimenti nativi di Electron: ricevuti via
+        // broadcast subito dopo il click destro (feedback alpha — la vecchia
+        // estensione mostrava il suggerimento in cima e la nuova app no).
+        const inputEl = e.target?.closest?.('input');
+        if (inputEl && isTextLikeInput(inputEl)) {
+          await openNormalMenuAt(e, { reserveInputCorrection: true });
+          return;
+        }
       }
     } catch (err) {
       console.error('[SN] spellcheck detection fallita, apro menu normale:', err);
     }
 
     await openNormalMenuAt(e);
+  }
+
+  // Input testuali in cui ha senso aspettarsi una correzione ortografica
+  // (esclude type=password, email, number, ecc. dove la spellcheck nativa è
+  // disabilitata o non significativa).
+  function isTextLikeInput(el) {
+    if (!el || el.tagName !== 'INPUT') return false;
+    if (el.disabled || el.readOnly) return false;
+    const t = (el.getAttribute('type') || 'text').toLowerCase();
+    if (!['text', 'search', ''].includes(t)) return false;
+    // Rispetta la disabilitazione esplicita.
+    const sc = el.getAttribute('spellcheck');
+    if (sc === 'false') return false;
+    return true;
   }
 
   async function openNormalMenuAt(e) {
