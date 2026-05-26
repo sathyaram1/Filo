@@ -127,7 +127,7 @@
     return true;
   }
 
-  async function openNormalMenuAt(e) {
+  async function openNormalMenuAt(e, opts = {}) {
     const target = e.target;
     let selInfo = Extract.getSelectionWithSentence();
     // window.getSelection() non vede la selezione dentro <input>/<textarea>:
@@ -140,7 +140,51 @@
     else pasteContext = null;
     const clipboardHistory = await getClipboardHistory();
     const items = buildMenuItems({ selInfo, linkEl, imgEl, editable, clipboardHistory });
+
+    // Slot riservato per la correzione ortografica nativa nei <input>: nascosto
+    // finché Electron non ci notifica via broadcast la parola misspelled e i
+    // suggerimenti. Posizionato in cima al menu come voce principale.
+    let revealInputCorrection = null;
+    if (opts.reserveInputCorrection) {
+      let updateCorrection = null;
+      items.unshift(
+        {
+          type: 'correction',
+          label: '',
+          loading: false,
+          hidden: true,
+          onClick: null,
+          subItems: [],
+          onMount: (_root, update) => { updateCorrection = update; },
+        },
+        { type: 'separator', hidden: true },
+      );
+      revealInputCorrection = (word, suggestions) => {
+        const sugg = (suggestions || []).filter((s) => s && s !== word);
+        if (!updateCorrection || !sugg.length) return;
+        const top = sugg[0];
+        const subItems = sugg.slice(1, 5).map((s) => ({
+          label: s,
+          onClick: () => chrome.runtime.sendMessage({ type: MSG.REPLACE_MISSPELLING, suggestion: s }),
+        }));
+        updateCorrection({
+          hidden: false,
+          label: top,
+          loading: false,
+          onClick: () => chrome.runtime.sendMessage({ type: MSG.REPLACE_MISSPELLING, suggestion: top }),
+          subItems,
+        });
+      };
+    }
+
     Menu.open({ x: e.clientX, y: e.clientY, items, keepOnScroll: !!selInfo });
+
+    if (revealInputCorrection) {
+      SpellCheck.onNextNativeSuggestion?.(({ word, suggestions }) => {
+        if (!suggestions?.length) return;
+        revealInputCorrection(word, suggestions);
+      });
+    }
   }
 
   // Salva il target editabile e la sua selezione/range al momento dell'apertura
