@@ -1142,5 +1142,6 @@
     setCachedSuggestion,
     getNativeSuggestions,
     onNativeSuggestions,
+    onNextNativeSuggestion,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
