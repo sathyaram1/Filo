@@ -128,6 +128,15 @@
         <button class="sn-btn sn-btn-secondary fb-reopen-start" data-id="${escapeHtml(f._id)}">Riapri</button>
       `;
     }
+    if (tab === 'clarify') {
+      // L'utente legge le domande della routine e o le risponde nelle note
+      // (poi → Da risolvere) o decide che è una scelta di design (→ Bozze).
+      return `
+        <button class="sn-btn fb-act" data-id="${escapeHtml(f._id)}" data-to="todo">→ Da risolvere</button>
+        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="draft">→ Bozze</button>
+        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="ignored">Ignora</button>
+      `;
+    }
     if (tab === 'verified') {
       return `<button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="done">← Risolti</button>`;
     }
