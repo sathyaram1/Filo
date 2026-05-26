@@ -48,9 +48,21 @@
   function clearSubCloseTimer() { if (subCloseTimer) { clearTimeout(subCloseTimer); subCloseTimer = null; } }
 
   function setupArrowSubmenu(arrow, openFn, cleanups) {
+    const openHere = () => {
+      openFn();
+      if (activeMenu) activeMenu.subOwner = arrow;
+    };
     arrow.addEventListener('mouseenter', () => {
       clearSubCloseTimer();
-      if (!activeMenu?.subRoot) openFn();
+      // Se è già aperto un sotto-menu di un altro item (anche se "pinnato"),
+      // chiudilo e apri quello di questa freccetta. L'hover su una nuova voce
+      // deve far cambiare il sotto-menu — altrimenti l'utente resta bloccato
+      // sul pinned senza poter esplorare gli altri (feedback alpha).
+      if (activeMenu?.subRoot && activeMenu.subOwner !== arrow) {
+        activeMenu.subLocked = false;
+        closeSubmenu();
+      }
+      if (!activeMenu?.subRoot) openHere();
     });
     arrow.addEventListener('mouseleave', () => {
       if (activeMenu?.subLocked) return;
@@ -60,10 +72,11 @@
     arrow.addEventListener('click', (e) => {
       e.stopPropagation();
       clearSubCloseTimer();
-      if (activeMenu?.subRoot) {
+      if (activeMenu?.subRoot && activeMenu.subOwner === arrow) {
         activeMenu.subLocked = true;
       } else {
-        openFn();
+        if (activeMenu?.subRoot) closeSubmenu();
+        openHere();
         if (activeMenu) activeMenu.subLocked = true;
       }
     });
