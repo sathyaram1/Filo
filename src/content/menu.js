@@ -615,9 +615,14 @@
       const openOverflow = () => {
         if (sub.disabled) return;
         try { sub.onClick && sub.onClick(b); } catch (er) { console.error(er); }
+        if (activeMenu) activeMenu.subOwner = b;
       };
       b.addEventListener('mouseenter', () => {
         clearSubCloseTimer();
+        if (activeMenu?.subRoot && activeMenu.subOwner !== b) {
+          activeMenu.subLocked = false;
+          closeSubmenu();
+        }
         if (!activeMenu?.subRoot) openOverflow();
       });
       b.addEventListener('mouseleave', () => {
@@ -628,9 +633,10 @@
       b.addEventListener('click', (e) => {
         e.stopPropagation();
         clearSubCloseTimer();
-        if (activeMenu?.subRoot) {
+        if (activeMenu?.subRoot && activeMenu.subOwner === b) {
           activeMenu.subLocked = true;
         } else {
+          if (activeMenu?.subRoot) closeSubmenu();
           openOverflow();
           if (activeMenu) activeMenu.subLocked = true;
         }
