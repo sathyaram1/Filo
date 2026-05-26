@@ -1329,11 +1329,9 @@
   }
 
   function toggleFullscreen() {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen?.().catch(() => {});
-    } else {
-      document.exitFullscreen?.().catch(() => {});
-    }
+    // Demanda al main: requestFullscreen() su una WebContentsView non porta
+    // la BrowserWindow in fullscreen OS, resta confinato al bounds della view.
+    chrome.runtime.sendMessage({ type: MSG.TOGGLE_FULLSCREEN });
   }
 
   // ------------------------------------------------------------
