@@ -14,8 +14,9 @@
   const tabsEl = document.getElementById('tabs');
 
   // 'inbox' = ricevuti (status: new); 'draft' = bozze (richiedono decisioni di
-  // design); 'todo' = da risolvere; 'done' = risolti (in attesa di verifica);
-  // 'verified' = verificati dall'utente.
+  // design); 'todo' = da risolvere; 'clarify' = bloccati su ambiguità/info
+  // mancanti (le routine cloud li spostano qui quando non possono procedere);
+  // 'done' = risolti (in attesa di verifica); 'verified' = verificati dall'utente.
   // I 'ignored' restano nascosti (raggiungibili solo riaprendoli via DB).
   let all = [];
   let currentTab = 'inbox';
