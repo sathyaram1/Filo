@@ -805,6 +805,36 @@ async function handleMessage(msg, sender = {}) {
         win?._filoTabs?.reload(sender.tab.id);
       }
       return { ok: true };
+    case MSG.TOGGLE_FULLSCREEN: {
+      // Il `document.requestFullscreen()` dal renderer di una WebContentsView
+      // non porta la BrowserWindow a tutto schermo: la WebContentsView resta
+      // confinata al suo bounds attuale. Per andare davvero in fullscreen OS
+      // dobbiamo agire sulla BrowserWindow (feedback alpha).
+      const win = BrowserWindow.getAllWindows()[0];
+      if (win) win.setFullScreen(!win.isFullScreen());
+      return { ok: true };
+    }
+    case MSG.OPEN_NEW_TAB: {
+      const win = BrowserWindow.getAllWindows()[0];
+      if (win?._filoTabs) win._filoTabs.openTab(msg.url || 'filo://newtab/');
+      return { ok: true };
+    }
+    case MSG.REPLACE_MISSPELLING: {
+      // Usa l'API nativa di Electron per sostituire la parola sotto il cursore
+      // del context-menu nativo (vedi `wc.on('context-menu', ...)` in tabs.js).
+      // Funziona uniformemente su input, textarea e contenteditable.
+      try {
+        const win = BrowserWindow.getAllWindows()[0];
+        const tab = sender?.tab?.id ? win?._filoTabs?.tabs?.find((t) => t.id === sender.tab.id) : null;
+        const wc = tab?.view?.webContents;
+        if (wc && typeof wc.replaceMisspelling === 'function' && msg.suggestion) {
+          wc.replaceMisspelling(String(msg.suggestion));
+        }
+      } catch (e) {
+        return { ok: false, error: e.message || String(e) };
+      }
+      return { ok: true };
+    }
     case MSG.WEB_SEARCH:
       try {
         const settings = await Storage.getSettings();
