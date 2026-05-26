@@ -153,6 +153,7 @@
         agent: 'Nessuna issue trovata dagli agenti.',
         draft: 'Nessuna bozza in attesa di decisioni.',
         todo: 'Nessun feedback da risolvere.',
+        clarify: 'Nessun feedback in attesa di chiarimenti.',
         done: 'Nessun feedback risolto.',
         verified: 'Nessun feedback verificato.',
       }[currentTab] || 'Nessun feedback.';
