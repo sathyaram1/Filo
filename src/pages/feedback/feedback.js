@@ -123,7 +123,7 @@
     if (tab === 'done') {
       return `
         <button class="sn-btn fb-act" data-id="${escapeHtml(f._id)}" data-to="verified">✓ Verificato</button>
-        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="new">Riapri</button>
+        <button class="sn-btn sn-btn-secondary fb-reopen-start" data-id="${escapeHtml(f._id)}">Riapri</button>
       `;
     }
     if (tab === 'verified') {
