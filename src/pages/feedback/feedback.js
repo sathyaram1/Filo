@@ -48,6 +48,7 @@
     if (s === 'new') return 'inbox';
     if (s === 'draft') return 'draft';
     if (s === 'todo') return 'todo';
+    if (s === 'clarify') return 'clarify';
     return 'inbox';
   }
 
