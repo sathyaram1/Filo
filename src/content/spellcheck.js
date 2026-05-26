@@ -1084,6 +1084,23 @@
     return lastNative.suggestions.slice();
   }
 
+  // Registra un callback chiamato (una volta) per la prossima notifica nativa
+  // di spellcheck, qualunque sia la parola. Utile su `<input>` dove non
+  // conosciamo a priori la parola sotto il cursore: aspettiamo che Electron
+  // ce la dica via `wc.on('context-menu')`. Ritorna una funzione per annullare.
+  function onNextNativeSuggestion(cb, timeoutMs = 600) {
+    let done = false;
+    const finish = () => { done = true; nativeWaiters.delete(waiter); clearTimeout(timer); };
+    const waiter = (n) => {
+      if (done) return;
+      finish();
+      cb({ word: n.word, suggestions: (n.suggestions || []).slice() });
+    };
+    nativeWaiters.add(waiter);
+    const timer = setTimeout(finish, timeoutMs);
+    return finish;
+  }
+
   // Registra un callback chiamato (una volta) quando arrivano i suggerimenti
   // nativi per `word`, se non sono già disponibili al momento dell'apertura del
   // menu (il broadcast dal main può arrivare con qualche ms di ritardo). Ritorna
@@ -1125,5 +1142,6 @@
     setCachedSuggestion,
     getNativeSuggestions,
     onNativeSuggestions,
+    onNextNativeSuggestion,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

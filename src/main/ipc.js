@@ -18,10 +18,21 @@ const inFlightStreams = new Map(); // requestId → AbortController
 
 function senderInfo(event) {
   const wc = event.sender;
-  const win = BrowserWindow.fromWebContents(wc);
+  // BrowserWindow.fromWebContents() può ritornare null per le WebContentsView
+  // figlie: in quel caso iteriamo tutte le finestre per trovare il TabManager
+  // che possiede questa wc. Senza il fallback, sender.tab restava null e i
+  // bottoni back/forward/reload/closeTab del menu (che leggono sender.tab.id)
+  // non facevano nulla (feedback alpha).
+  let win = BrowserWindow.fromWebContents(wc);
   let tab = null;
   if (win?._filoTabs) {
     tab = win._filoTabs.tabs.find((t) => t.view.webContents === wc);
+  }
+  if (!tab) {
+    for (const w of BrowserWindow.getAllWindows()) {
+      const t = w._filoTabs?.tabs?.find((tt) => tt.view.webContents === wc);
+      if (t) { tab = t; win = w; break; }
+    }
   }
   return {
     tab: tab ? { id: tab.id, url: tab.url, title: tab.title } : null,

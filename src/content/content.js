@@ -96,6 +96,15 @@
             return;
           }
         }
+        // Su `<input>` testuali (non "supportati" dal nostro overlay) ci
+        // affidiamo ai soli suggerimenti nativi di Electron: ricevuti via
+        // broadcast subito dopo il click destro (feedback alpha — la vecchia
+        // estensione mostrava il suggerimento in cima e la nuova app no).
+        const inputEl = e.target?.closest?.('input');
+        if (inputEl && isTextLikeInput(inputEl)) {
+          await openNormalMenuAt(e, { reserveInputCorrection: true });
+          return;
+        }
       }
     } catch (err) {
       console.error('[SN] spellcheck detection fallita, apro menu normale:', err);
@@ -104,7 +113,21 @@
     await openNormalMenuAt(e);
   }
 
-  async function openNormalMenuAt(e) {
+  // Input testuali in cui ha senso aspettarsi una correzione ortografica
+  // (esclude type=password, email, number, ecc. dove la spellcheck nativa è
+  // disabilitata o non significativa).
+  function isTextLikeInput(el) {
+    if (!el || el.tagName !== 'INPUT') return false;
+    if (el.disabled || el.readOnly) return false;
+    const t = (el.getAttribute('type') || 'text').toLowerCase();
+    if (!['text', 'search', ''].includes(t)) return false;
+    // Rispetta la disabilitazione esplicita.
+    const sc = el.getAttribute('spellcheck');
+    if (sc === 'false') return false;
+    return true;
+  }
+
+  async function openNormalMenuAt(e, opts = {}) {
     const target = e.target;
     let selInfo = Extract.getSelectionWithSentence();
     // window.getSelection() non vede la selezione dentro <input>/<textarea>:
@@ -117,7 +140,51 @@
     else pasteContext = null;
     const clipboardHistory = await getClipboardHistory();
     const items = buildMenuItems({ selInfo, linkEl, imgEl, editable, clipboardHistory });
+
+    // Slot riservato per la correzione ortografica nativa nei <input>: nascosto
+    // finché Electron non ci notifica via broadcast la parola misspelled e i
+    // suggerimenti. Posizionato in cima al menu come voce principale.
+    let revealInputCorrection = null;
+    if (opts.reserveInputCorrection) {
+      let updateCorrection = null;
+      items.unshift(
+        {
+          type: 'correction',
+          label: '',
+          loading: false,
+          hidden: true,
+          onClick: null,
+          subItems: [],
+          onMount: (_root, update) => { updateCorrection = update; },
+        },
+        { type: 'separator', hidden: true },
+      );
+      revealInputCorrection = (word, suggestions) => {
+        const sugg = (suggestions || []).filter((s) => s && s !== word);
+        if (!updateCorrection || !sugg.length) return;
+        const top = sugg[0];
+        const subItems = sugg.slice(1, 5).map((s) => ({
+          label: s,
+          onClick: () => chrome.runtime.sendMessage({ type: MSG.REPLACE_MISSPELLING, suggestion: s }),
+        }));
+        updateCorrection({
+          hidden: false,
+          label: top,
+          loading: false,
+          onClick: () => chrome.runtime.sendMessage({ type: MSG.REPLACE_MISSPELLING, suggestion: top }),
+          subItems,
+        });
+      };
+    }
+
     Menu.open({ x: e.clientX, y: e.clientY, items, keepOnScroll: !!selInfo });
+
+    if (revealInputCorrection) {
+      SpellCheck.onNextNativeSuggestion?.(({ word, suggestions }) => {
+        if (!suggestions?.length) return;
+        revealInputCorrection(word, suggestions);
+      });
+    }
   }
 
   // Salva il target editabile e la sua selezione/range al momento dell'apertura
@@ -510,7 +577,7 @@
       reload:        { id: 'reload',        icon: I('reload'),      label: I18n.t('menu_reload'),            onClick: () => chrome.runtime.sendMessage({ type: MSG.NAV_RELOAD }) },
       colorPicker:   { id: 'colorPicker',   icon: I('colorPicker'), label: I18n.t('menu_color_picker'),      onClick: () => pickColor() },
       closeTab:      { id: 'closeTab',      icon: I('close'),       label: I18n.t('menu_close_tab'),         onClick: () => chrome.runtime.sendMessage({ type: MSG.CLOSE_TAB }) },
-      openOptions:   { id: 'openOptions',   icon: I('options'),     label: I18n.t('menu_open_options'),      onClick: () => chrome.runtime.sendMessage({ type: MSG.OPEN_OPTIONS }) },
+      newTab:        { id: 'newTab',        icon: I('filoLogo'),    label: I18n.t('menu_new_tab'),           onClick: () => chrome.runtime.sendMessage({ type: MSG.OPEN_NEW_TAB }) },
     };
   }
 
@@ -546,10 +613,17 @@
   }
 
   // Layout di default: 5 icone primarie nella riga, le altre nella griglia.
+  // `newTab` (logo Filo "f") al posto di `openForLater` e l'ingranaggio
+  // `openOptions` rimosso dalle azioni rapide (feedback alpha): le Opzioni
+  // restano accessibili dalla barra indirizzi (icona ingranaggio).
   const DEFAULT_ICON_LAYOUT = {
-    primary: ['translate', 'screenshot', 'share', 'saveForLater', 'openForLater'],
-    secondary: ['screenshotCrop', 'transcribe', 'colorPicker', 'closeTab', 'openOptions', 'fullscreen', 'back', 'forward', 'reload'],
+    primary: ['translate', 'screenshot', 'share', 'saveForLater', 'newTab'],
+    secondary: ['screenshotCrop', 'transcribe', 'colorPicker', 'closeTab', 'fullscreen', 'back', 'forward', 'reload'],
   };
+
+  // Icone ritirate dal registro: vanno purgate dal layout salvato per non
+  // generare bottoni "fantasma" (registry lookup miss).
+  const RETIRED_ICONS = new Set(['openOptions', 'openForLater']);
 
   // Vecchio default (prima del cambio a 5 slot): se trovo esattamente questo
   // layout in storage, è il default che non è mai stato customizzato — migro.
@@ -578,12 +652,21 @@
             iconLayoutCache = DEFAULT_ICON_LAYOUT;
             try { chrome.storage.local.set({ [STORAGE_KEYS.ICON_LAYOUT]: DEFAULT_ICON_LAYOUT }); } catch (_) {}
           } else {
-            // Migrazione: aggiungi icone introdotte dopo che il layout era
-            // stato salvato, così l'utente non perde feature nuove.
-            const known = new Set([...(v.primary || []), ...(v.secondary || [])]);
-            const additions = ['colorPicker', 'closeTab', 'openOptions', 'screenshotCrop', 'transcribe'].filter((id) => !known.has(id));
+            // Migrazione (idempotente):
+            //  1) purga le icone ritirate (openOptions, openForLater)
+            //  2) aggiunge le icone introdotte dopo che il layout era stato
+            //     salvato, così l'utente non perde feature nuove
+            const filterRetired = (arr) => (arr || []).filter((id) => !RETIRED_ICONS.has(id));
+            const beforePrim = (v.primary || []).join('|');
+            const beforeSec = (v.secondary || []).join('|');
+            v = { ...v, primary: filterRetired(v.primary), secondary: filterRetired(v.secondary) };
+            const known = new Set([...v.primary, ...v.secondary]);
+            const additions = ['colorPicker', 'closeTab', 'screenshotCrop', 'transcribe', 'newTab'].filter((id) => !known.has(id));
             if (additions.length) {
-              v = { ...v, secondary: [...additions, ...(v.secondary || [])] };
+              v = { ...v, secondary: [...additions, ...v.secondary] };
+            }
+            const changed = beforePrim !== v.primary.join('|') || beforeSec !== v.secondary.join('|');
+            if (changed) {
               try { chrome.storage.local.set({ [STORAGE_KEYS.ICON_LAYOUT]: v }); } catch (_) {}
             }
             iconLayoutCache = v;
@@ -1329,11 +1412,9 @@
   }
 
   function toggleFullscreen() {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen?.().catch(() => {});
-    } else {
-      document.exitFullscreen?.().catch(() => {});
-    }
+    // Demanda al main: requestFullscreen() su una WebContentsView non porta
+    // la BrowserWindow in fullscreen OS, resta confinato al bounds della view.
+    chrome.runtime.sendMessage({ type: MSG.TOGGLE_FULLSCREEN });
   }
 
   // ------------------------------------------------------------

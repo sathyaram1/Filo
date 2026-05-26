@@ -56,6 +56,7 @@
     menu_color_picker: 'Color picker',
     menu_close_tab: 'Chiudi pagina',
     menu_open_options: 'Opzioni Filo',
+    menu_new_tab: 'Nuova scheda',
     toast_color_copied: 'Colore copiato: ',
     err_color_picker_unsupported: 'Color picker non supportato in questo browser',
     menu_global_translate: 'Traduci',
