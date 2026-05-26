@@ -33,6 +33,9 @@
     NAV_BACK: 'nav_back',
     NAV_FORWARD: 'nav_forward',
     NAV_RELOAD: 'nav_reload',
+    TOGGLE_FULLSCREEN: 'toggle_fullscreen',
+    OPEN_NEW_TAB: 'open_new_tab',
+    REPLACE_MISSPELLING: 'replace_misspelling',     // { suggestion }
 
     // Aiuto: invio percorso completato a fine sessione (passa per la pipeline
     // di sanitizzazione 2-LLM in pathsCollector.js prima di toccare Firestore).
