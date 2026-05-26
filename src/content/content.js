@@ -585,12 +585,21 @@
             iconLayoutCache = DEFAULT_ICON_LAYOUT;
             try { chrome.storage.local.set({ [STORAGE_KEYS.ICON_LAYOUT]: DEFAULT_ICON_LAYOUT }); } catch (_) {}
           } else {
-            // Migrazione: aggiungi icone introdotte dopo che il layout era
-            // stato salvato, così l'utente non perde feature nuove.
-            const known = new Set([...(v.primary || []), ...(v.secondary || [])]);
-            const additions = ['colorPicker', 'closeTab', 'openOptions', 'screenshotCrop', 'transcribe'].filter((id) => !known.has(id));
+            // Migrazione (idempotente):
+            //  1) purga le icone ritirate (openOptions, openForLater)
+            //  2) aggiunge le icone introdotte dopo che il layout era stato
+            //     salvato, così l'utente non perde feature nuove
+            const filterRetired = (arr) => (arr || []).filter((id) => !RETIRED_ICONS.has(id));
+            const beforePrim = (v.primary || []).join('|');
+            const beforeSec = (v.secondary || []).join('|');
+            v = { ...v, primary: filterRetired(v.primary), secondary: filterRetired(v.secondary) };
+            const known = new Set([...v.primary, ...v.secondary]);
+            const additions = ['colorPicker', 'closeTab', 'screenshotCrop', 'transcribe', 'newTab'].filter((id) => !known.has(id));
             if (additions.length) {
-              v = { ...v, secondary: [...additions, ...(v.secondary || [])] };
+              v = { ...v, secondary: [...additions, ...v.secondary] };
+            }
+            const changed = beforePrim !== v.primary.join('|') || beforeSec !== v.secondary.join('|');
+            if (changed) {
               try { chrome.storage.local.set({ [STORAGE_KEYS.ICON_LAYOUT]: v }); } catch (_) {}
             }
             iconLayoutCache = v;
