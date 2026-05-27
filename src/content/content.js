@@ -566,13 +566,17 @@
   // Registro delle icone globali, con ID stabili per drag-and-drop + persistenza
   // della disposizione utente. Le icone primarie occupano la riga in alto del
   // menu; le secondarie vivono nel sotto-menu "Altro…" (griglia 4 colonne).
-  function buildIconRegistry() {
+  function buildIconRegistry(navState) {
     const Icons = self.SN_ICONS;
     // Tutte le icone della riga primaria/griglia sono SVG renderizzate a 18px.
     // Vedi src/shared/icons.js e src/styles/ICONS.md per la guida di stile.
     const I = (name) => Icons[name](18);
     const translateIcon = pageHasTranslation ? I('showOriginal') : I('translate');
     const translateLabel = pageHasTranslation ? I18n.t('menu_show_original') : I18n.t('menu_global_translate');
+    // Quando navState non è disponibile (es. menu aperto da flussi che non lo
+    // calcolano), lascia abilitati: meglio rispetto al falso "disabilitato".
+    const canBack = navState ? !!navState.canBack : true;
+    const canFwd = navState ? !!navState.canFwd : true;
     return {
       translate:     { id: 'translate',     icon: translateIcon,    label: translateLabel,                   onClick: () => (pageHasTranslation ? restoreOriginal() : translatePage()) },
       screenshot:    { id: 'screenshot',    icon: I('screenshot'),  label: I18n.t('menu_screenshot'),        onClick: () => takeScreenshot() },
@@ -582,8 +586,8 @@
       saveForLater:  { id: 'saveForLater',  icon: I('saveForLater'),label: I18n.t('menu_save_for_later'),    onClick: () => savePage() },
       openForLater:  { id: 'openForLater',  icon: I('openForLater'),label: I18n.t('menu_open_for_later'),    onClick: () => chrome.runtime.sendMessage({ type: MSG.OPEN_HOME }) },
       fullscreen:    { id: 'fullscreen',    icon: document.fullscreenElement ? I('shrink') : I('zoom'), label: document.fullscreenElement ? I18n.t('menu_exit_fullscreen') : I18n.t('menu_fullscreen'), onClick: () => toggleFullscreen() },
-      back:          { id: 'back',          icon: I('back'),        label: I18n.t('menu_back'),              onClick: () => chrome.runtime.sendMessage({ type: MSG.NAV_BACK }) },
-      forward:       { id: 'forward',       icon: I('forward'),     label: I18n.t('menu_forward'),           onClick: () => chrome.runtime.sendMessage({ type: MSG.NAV_FORWARD }) },
+      back:          { id: 'back',          icon: I('back'),        label: I18n.t('menu_back'),              disabled: !canBack, onClick: () => chrome.runtime.sendMessage({ type: MSG.NAV_BACK }) },
+      forward:       { id: 'forward',       icon: I('forward'),     label: I18n.t('menu_forward'),           disabled: !canFwd, onClick: () => chrome.runtime.sendMessage({ type: MSG.NAV_FORWARD }) },
       reload:        { id: 'reload',        icon: I('reload'),      label: I18n.t('menu_reload'),            onClick: () => chrome.runtime.sendMessage({ type: MSG.NAV_RELOAD }) },
       colorPicker:   { id: 'colorPicker',   icon: I('colorPicker'), label: I18n.t('menu_color_picker'),      onClick: () => pickColor() },
       closeTab:      { id: 'closeTab',      icon: I('close'),       label: I18n.t('menu_close_tab'),         onClick: () => chrome.runtime.sendMessage({ type: MSG.CLOSE_TAB }) },
