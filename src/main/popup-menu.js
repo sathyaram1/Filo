@@ -23,6 +23,10 @@ const ICON_PATHS = {
 
   colorPicker:
     '<path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>',
+
+  lock:
+    '<rect x="5" y="11" width="14" height="9" rx="1.5"/>' +
+    '<path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
 };
 
 function iconSvg(name, size) {
