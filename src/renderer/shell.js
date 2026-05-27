@@ -210,4 +210,90 @@
     render();
   });
   api.tabs.snapshot().then((snap) => { state = snap; render(); });
+
+  // ─── Chip "popup bloccato" ─────────────────────────────────────────────
+  // Quando il main blocca un window.open() non richiesto invia
+  // 'tabs:popup-blocked' con { tabId, url, host }. Mostriamo una chip ancorata
+  // sotto la barra indirizzi: "Bloccato popup da <host>  [Apri] [×]".
+  // - Click "Apri": apre il popup come nuovo tab (bypass blocco).
+  // - Click "×" o auto-dismiss dopo 8s: chip svanisce.
+  // Riusiamo `reserveTop` (lo stesso meccanismo che già si usa per i menu
+  // dropdown) per evitare che la chip finisca sopra l'area WebContentsView
+  // di un'altra tab: la posizioniamo dentro la shell (DOM HTML), quindi non
+  // serve riservare spazio extra — è già sopra l'area pagina.
+  if (api.tabs.onPopupBlocked) {
+    const chipHost = document.createElement('div');
+    chipHost.id = 'popup-chips';
+    chipHost.style.position = 'fixed';
+    chipHost.style.top = '52px';
+    chipHost.style.right = '12px';
+    chipHost.style.zIndex = '1000';
+    chipHost.style.display = 'flex';
+    chipHost.style.flexDirection = 'column';
+    chipHost.style.gap = '6px';
+    chipHost.style.pointerEvents = 'auto';
+    document.body.appendChild(chipHost);
+
+    api.tabs.onPopupBlocked((info) => {
+      if (!info) return;
+      const { url, host } = info;
+      const chip = document.createElement('div');
+      chip.className = 'popup-chip';
+      chip.style.background = 'var(--sn-surface, #fff)';
+      chip.style.color = 'var(--sn-text, #222)';
+      chip.style.border = '1px solid var(--sn-border, #d0d0d0)';
+      chip.style.borderRadius = '999px';
+      chip.style.padding = '6px 10px';
+      chip.style.font = '12px system-ui, sans-serif';
+      chip.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+      chip.style.display = 'inline-flex';
+      chip.style.alignItems = 'center';
+      chip.style.gap = '8px';
+      chip.style.maxWidth = '360px';
+
+      const label = document.createElement('span');
+      label.textContent = `Bloccato popup da ${host || '?'}`;
+      label.style.whiteSpace = 'nowrap';
+      label.style.overflow = 'hidden';
+      label.style.textOverflow = 'ellipsis';
+      chip.appendChild(label);
+
+      const open = document.createElement('button');
+      open.type = 'button';
+      open.textContent = 'Apri';
+      open.style.cursor = 'pointer';
+      open.style.background = 'transparent';
+      open.style.border = '1px solid currentColor';
+      open.style.borderRadius = '999px';
+      open.style.padding = '2px 8px';
+      open.style.font = 'inherit';
+      open.style.color = 'inherit';
+      open.addEventListener('click', () => {
+        try { api.tabs.openBlockedPopup(url); } catch (_) {}
+        dismiss();
+      });
+      chip.appendChild(open);
+
+      const x = document.createElement('button');
+      x.type = 'button';
+      x.textContent = '×';
+      x.setAttribute('aria-label', 'Chiudi');
+      x.style.cursor = 'pointer';
+      x.style.background = 'transparent';
+      x.style.border = 'none';
+      x.style.font = '16px system-ui';
+      x.style.lineHeight = '1';
+      x.style.padding = '0 4px';
+      x.style.color = 'inherit';
+      x.addEventListener('click', () => dismiss());
+      chip.appendChild(x);
+
+      chipHost.appendChild(chip);
+      let timer = setTimeout(dismiss, 8000);
+      function dismiss() {
+        if (timer) { clearTimeout(timer); timer = null; }
+        try { chip.remove(); } catch (_) {}
+      }
+    });
+  }
 })();
