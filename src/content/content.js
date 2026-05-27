@@ -1158,6 +1158,16 @@
     } catch (_) { return []; }
   }
 
+  // Stato di navigazione (canBack/canFwd) del tab corrente: serve per
+  // mostrare le icone avanti/indietro del menu in grigio quando la cronologia
+  // non lo consente, come già accade per i tasti analoghi nella barra in alto.
+  async function getNavState() {
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.NAV_STATE });
+      return { canBack: !!r?.canBack, canFwd: !!r?.canFwd };
+    } catch (_) { return { canBack: true, canFwd: true }; }
+  }
+
   function pushClipboardEntry(entry) {
     chrome.runtime.sendMessage({ type: MSG.PUSH_CLIPBOARD_ENTRY, entry }).catch(() => {});
     // Per le immagini, chiedi all'AI una breve descrizione e aggiorna l'entry.
