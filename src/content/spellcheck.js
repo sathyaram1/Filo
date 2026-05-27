@@ -1088,16 +1088,32 @@
   // di spellcheck, qualunque sia la parola. Utile su `<input>` dove non
   // conosciamo a priori la parola sotto il cursore: aspettiamo che Electron
   // ce la dica via `wc.on('context-menu')`. Ritorna una funzione per annullare.
-  function onNextNativeSuggestion(cb, timeoutMs = 600) {
+  //
+  // `opts.since` (timestamp ms): se passato, e se `lastNative` è arrivato dopo
+  // quell'istante, serviamo subito il dato già in cache invece di aspettare un
+  // nuovo broadcast. Serve perché `openNormalMenuAt` ha un `await` su
+  // getClipboardHistory() PRIMA di registrare il waiter: il broadcast nativo
+  // può quindi arrivare in mezzo, e senza questa scorciatoia andava perso.
+  function onNextNativeSuggestion(cb, opts = {}) {
+    const timeoutMs = typeof opts === 'number' ? opts : (opts.timeoutMs || 600);
+    const since = (typeof opts === 'object' && opts.since) || 0;
     let done = false;
+    let timer = null;
     const finish = () => { done = true; nativeWaiters.delete(waiter); clearTimeout(timer); };
     const waiter = (n) => {
       if (done) return;
       finish();
       cb({ word: n.word, suggestions: (n.suggestions || []).slice() });
     };
+    if (since && lastNative.ts >= since && lastNative.word) {
+      // Già arrivato durante l'await: consegna sincrona al prossimo tick.
+      const snapshot = lastNative;
+      setTimeout(() => waiter(snapshot), 0);
+      timer = setTimeout(finish, timeoutMs);
+      return finish;
+    }
     nativeWaiters.add(waiter);
-    const timer = setTimeout(finish, timeoutMs);
+    timer = setTimeout(finish, timeoutMs);
     return finish;
   }
 

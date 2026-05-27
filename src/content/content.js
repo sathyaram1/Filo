@@ -128,6 +128,10 @@
   }
 
   async function openNormalMenuAt(e, opts = {}) {
+    // Timestamp del click destro: serve a onNextNativeSuggestion per decidere
+    // se il broadcast `_spell:native` arrivato durante l'await sotto è già
+    // pertinente a questa apertura del menu (altrimenti lo perdevamo).
+    const openedAt = Date.now();
     const target = e.target;
     let selInfo = Extract.getSelectionWithSentence();
     // window.getSelection() non vede la selezione dentro <input>/<textarea>:
@@ -180,10 +184,13 @@
     Menu.open({ x: e.clientX, y: e.clientY, items, keepOnScroll: !!selInfo });
 
     if (revealInputCorrection) {
+      // Passa il timestamp di apertura: se il broadcast nativo è già arrivato
+      // (vincoli di timing con l'await getClipboardHistory sopra), il modulo
+      // spellcheck ce lo consegna subito invece di lasciarci aspettare.
       SpellCheck.onNextNativeSuggestion?.(({ word, suggestions }) => {
         if (!suggestions?.length) return;
         revealInputCorrection(word, suggestions);
-      });
+      }, { since: openedAt });
     }
   }
 
@@ -928,7 +935,7 @@
             }
             const ok = insertImageInEditable(blob, dataUrl);
             if (!ok) {
-              Popup.showToast(I18n.t('err_provider_failed'));
+              Popup.showToast(I18n.t('toast_paste_failed'));
               return;
             }
             const description = await describeImage(blob);
@@ -1214,15 +1221,16 @@
     if (entry.type === 'image') {
       // Inserisci come <img> in contenteditable, altrimenti niente (input/textarea non supportano immagini)
       if (pasteContext?.kind !== 'ce') {
-        Popup.showToast(I18n.t('err_provider_failed'));
+        Popup.showToast(I18n.t('toast_cannot_paste_image'));
         return;
       }
       // Ricostruisci un Blob a partire dal data URL per dispatcharlo come paste event.
+      // Le immagini sono salvate offline (dataUrl in storage): niente chiamate al provider AI.
       let blob = null;
       try { blob = await (await fetch(entry.dataUrl)).blob(); } catch (_) {}
       const ok = insertImageInEditable(blob, entry.dataUrl, descriptionToFilename(entry.description));
       if (ok) Popup.showToast(I18n.t('toast_pasted_image'));
-      else Popup.showToast(I18n.t('err_provider_failed'));
+      else Popup.showToast(I18n.t('toast_paste_failed'));
       return;
     }
     // testo: incolla in input/textarea/contenteditable
