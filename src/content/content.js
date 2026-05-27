@@ -928,7 +928,7 @@
             }
             const ok = insertImageInEditable(blob, dataUrl);
             if (!ok) {
-              Popup.showToast(I18n.t('err_provider_failed'));
+              Popup.showToast(I18n.t('toast_paste_failed'));
               return;
             }
             const description = await describeImage(blob);
