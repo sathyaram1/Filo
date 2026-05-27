@@ -43,10 +43,11 @@
     { type: 'separator' },
     { label: 'Feedback', icon: 'feedback', url: 'filo://feedback/feedback.html' },
   ];
-  // Voci del menu Impostazioni (ingranaggio): Modelli e Preferenze, due pagine
-  // interne dedicate.
+  // Voci del menu Impostazioni (ingranaggio): Modelli, Sicurezza, Preferenze —
+  // tre pagine interne dedicate.
   const SETTINGS = [
     { label: 'Modelli', icon: 'options', url: 'filo://options/options.html' },
+    { label: 'Sicurezza', icon: 'lock', url: 'filo://security/security.html' },
     { type: 'separator' },
     { label: 'Preferenze', icon: 'colorPicker', url: 'filo://preferences/preferences.html' },
   ];
