@@ -142,8 +142,11 @@
     const editable = isEditable(target);
     if (editable) capturePasteContext(target);
     else pasteContext = null;
-    const clipboardHistory = await getClipboardHistory();
-    const items = buildMenuItems({ selInfo, linkEl, imgEl, editable, clipboardHistory });
+    const [clipboardHistory, navState] = await Promise.all([
+      getClipboardHistory(),
+      getNavState(),
+    ]);
+    const items = buildMenuItems({ selInfo, linkEl, imgEl, editable, clipboardHistory, navState });
 
     // Slot riservato per la correzione ortografica nativa nei <input>: nascosto
     // finché Electron non ci notifica via broadcast la parola misspelled e i
