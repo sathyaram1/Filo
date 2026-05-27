@@ -1098,6 +1098,7 @@
     const timeoutMs = typeof opts === 'number' ? opts : (opts.timeoutMs || 600);
     const since = (typeof opts === 'object' && opts.since) || 0;
     let done = false;
+    let timer = null;
     const finish = () => { done = true; nativeWaiters.delete(waiter); clearTimeout(timer); };
     const waiter = (n) => {
       if (done) return;
@@ -1106,12 +1107,13 @@
     };
     if (since && lastNative.ts >= since && lastNative.word) {
       // Già arrivato durante l'await: consegna sincrona al prossimo tick.
-      setTimeout(() => waiter(lastNative), 0);
-      const timer = setTimeout(finish, timeoutMs);
+      const snapshot = lastNative;
+      setTimeout(() => waiter(snapshot), 0);
+      timer = setTimeout(finish, timeoutMs);
       return finish;
     }
     nativeWaiters.add(waiter);
-    const timer = setTimeout(finish, timeoutMs);
+    timer = setTimeout(finish, timeoutMs);
     return finish;
   }
 
