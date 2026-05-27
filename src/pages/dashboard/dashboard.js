@@ -462,7 +462,15 @@
       }
     }
   });
-  // TEMP DISABLED for regression check
+  // Accetta immagini incollate da "Incolla → cronologia" del menu Filo
+  // (Ctrl+V passa dal listener 'paste' qui sopra; il menu invece dispatcha
+  // questo evento custom — vedi pasteHistoryEntry in content.js).
+  inputForm.addEventListener('filo:paste-image', (e) => {
+    if (e.detail?.blob) {
+      e.preventDefault();
+      handleImageFile(e.detail.blob);
+    }
+  });
   inputForm.addEventListener('dragover', (e) => { e.preventDefault(); });
   inputForm.addEventListener('drop', (e) => {
     e.preventDefault();
