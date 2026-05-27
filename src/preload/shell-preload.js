@@ -20,6 +20,12 @@ contextBridge.exposeInMainWorld('filoShell', {
       ipcRenderer.on('tabs:updated', wrapped);
       return () => ipcRenderer.removeListener('tabs:updated', wrapped);
     },
+    onPopupBlocked: (fn) => {
+      const wrapped = (_event, info) => { try { fn(info); } catch (_) {} };
+      ipcRenderer.on('tabs:popup-blocked', wrapped);
+      return () => ipcRenderer.removeListener('tabs:popup-blocked', wrapped);
+    },
+    openBlockedPopup: (url) => ipcRenderer.invoke('tabs:open-blocked-popup', { url }),
   },
   popupMenu: (entries, x, y) => ipcRenderer.invoke('shell:popup-menu', { entries, x, y }),
   tooltipShow: (text, x, y) => ipcRenderer.send('shell:tooltip-show', { text, x, y }),
