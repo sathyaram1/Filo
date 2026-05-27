@@ -128,6 +128,10 @@
   }
 
   async function openNormalMenuAt(e, opts = {}) {
+    // Timestamp del click destro: serve a onNextNativeSuggestion per decidere
+    // se il broadcast `_spell:native` arrivato durante l'await sotto è già
+    // pertinente a questa apertura del menu (altrimenti lo perdevamo).
+    const openedAt = Date.now();
     const target = e.target;
     let selInfo = Extract.getSelectionWithSentence();
     // window.getSelection() non vede la selezione dentro <input>/<textarea>:
