@@ -11,48 +11,67 @@
 // Fix: in entrambi i rami mostriamo un toast pertinente
 // (`toast_cannot_paste_image` o `toast_paste_failed`) — niente più
 // "provider ha fallito" associato all'incolla.
+//
+// Usiamo la newtab (filo://newtab/, dashboard) come terreno di test: ha un
+// `<input type="text">` (campo non-contenteditable, dove l'incolla immagine
+// dalla cronologia esercita esattamente il ramo del bug).
 
 import { test, expect } from './fixtures/electron.mjs';
 
-const PAGE_INPUT_ONLY = `<!doctype html><html><body>
-  <input id="i" type="text" />
-</body></html>`;
+async function newtabPage(app) {
+  const deadline = Date.now() + 10_000;
+  let win = null;
+  while (Date.now() < deadline) {
+    win = app.windows().find((w) => w.url().startsWith('filo://newtab'));
+    if (win) break;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  expect(win, 'newtab non trovata').toBeTruthy();
+  await win.waitForLoadState('domcontentloaded');
+  return win;
+}
 
-test('incollare immagine dalla cronologia in input testuale mostra messaggio chiaro (no provider failed)', async ({ openTab, testServer }) => {
-  const page = await testServer.openReady(openTab, PAGE_INPUT_ONLY);
+test('incolla immagine vecchia dalla cronologia in input testuale: toast NON menziona "provider"', async ({ app, shell }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await page.waitForFunction(
+    () => document.documentElement.dataset.filoContentScripts === '1',
+    null,
+    { timeout: 8_000 },
+  );
 
-  // Pre-popola la cronologia clipboard con un'immagine fittizia.
+  // Pre-popola la cronologia clipboard con un'immagine fittizia (1×1 PNG).
   const dataUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
-  await page.evaluate(async (du) => {
-    await chrome.runtime.sendMessage({
+  const ok = await page.evaluate(async (du) => {
+    const r = await chrome.runtime.sendMessage({
       type: 'push_clipboard_entry',
       entry: { type: 'image', dataUrl: du, description: 'test fixture' },
     });
+    return !!r?.ok;
   }, dataUrl);
+  expect(ok).toBeTruthy();
 
-  // Focus + tasto destro sull'input testuale.
-  await page.locator('#i').focus();
-  await page.locator('#i').click({ button: 'right' });
+  // Tasto destro sull'input testuale della dashboard.
+  await page.locator('#input').focus();
+  await page.locator('#input').click({ button: 'right' });
   await expect(page.locator('.sn-menu')).toBeVisible();
 
-  // Hover su "Incolla" per far apparire la freccetta cronologia.
-  const incolla = page.locator('.sn-menu .sn-menu-paste-main').first();
-  await incolla.hover();
-  // Clicca la freccetta per aprire il sotto-menu cronologia.
+  // Apri il sotto-menu cronologia (click sulla freccetta dell'item Incolla).
   const arrow = page.locator('.sn-menu .sn-menu-paste-arrow').first();
+  await expect(arrow).toBeVisible();
   await arrow.click();
 
-  // Clicca la prima entry del sotto-menu (immagine).
+  // Clicca l'entry immagine dalla cronologia.
   const histItem = page.locator('.sn-menu-sub .sn-menu-history-item').first();
-  await expect(histItem).toBeVisible();
+  await expect(histItem).toBeVisible({ timeout: 2000 });
   await histItem.click();
 
-  // Aspetta toast.
+  // Aspetta il toast.
   const toast = page.locator('.sn-toast').first();
   await expect(toast).toBeVisible({ timeout: 2000 });
-  const text = (await toast.textContent()) || '';
-  // Il messaggio NON deve menzionare "provider" o "API key": è fuorviante
-  // perché la cronologia immagini è 100% offline.
-  expect(text.toLowerCase()).not.toContain('provider');
-  expect(text.toLowerCase()).not.toContain('api key');
+  const text = ((await toast.textContent()) || '').toLowerCase();
+  // Il messaggio NON deve menzionare "provider" o "api key": è fuorviante
+  // perché la cronologia immagini è 100% offline (dataUrl in storage locale).
+  expect(text).not.toContain('provider');
+  expect(text).not.toContain('api key');
 });
