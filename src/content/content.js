@@ -142,8 +142,11 @@
     const editable = isEditable(target);
     if (editable) capturePasteContext(target);
     else pasteContext = null;
-    const clipboardHistory = await getClipboardHistory();
-    const items = buildMenuItems({ selInfo, linkEl, imgEl, editable, clipboardHistory });
+    const [clipboardHistory, navState] = await Promise.all([
+      getClipboardHistory(),
+      getNavState(),
+    ]);
+    const items = buildMenuItems({ selInfo, linkEl, imgEl, editable, clipboardHistory, navState });
 
     // Slot riservato per la correzione ortografica nativa nei <input>: nascosto
     // finché Electron non ci notifica via broadcast la parola misspelled e i
@@ -291,8 +294,11 @@
     // sulle immagini (feedback alpha).
     if (editable) capturePasteContext(target);
     else pasteContext = null;
-    const clipboardHistory = await getClipboardHistory();
-    return buildMenuItems({ selInfo, linkEl, imgEl, editable, clipboardHistory });
+    const [clipboardHistory, navState] = await Promise.all([
+      getClipboardHistory(),
+      getNavState(),
+    ]);
+    return buildMenuItems({ selInfo, linkEl, imgEl, editable, clipboardHistory, navState });
   }
 
   // Sub-menu per una correzione "rosso" (parola): aggiungi al dizionario,
@@ -536,11 +542,11 @@
   // ------------------------------------------------------------
   // Ordine verticale: riga icone globali → Aiuto → zona contestuale → Feedback.
   // La riga globale è stabile (ancora), la zona contestuale varia in base al click.
-  function buildMenuItems({ selInfo, linkEl, imgEl, editable, clipboardHistory }) {
+  function buildMenuItems({ selInfo, linkEl, imgEl, editable, clipboardHistory, navState }) {
     const items = [];
 
     // 1. Riga icone globali (max 5 + overflow). Tutte mute, etichetta in tooltip.
-    items.push(buildGlobalIconRow());
+    items.push(buildGlobalIconRow(navState));
 
     // 2. Aiuto — voce sempre presente, etichettata.
     items.push({ type: 'separator' });
@@ -563,13 +569,17 @@
   // Registro delle icone globali, con ID stabili per drag-and-drop + persistenza
   // della disposizione utente. Le icone primarie occupano la riga in alto del
   // menu; le secondarie vivono nel sotto-menu "Altro…" (griglia 4 colonne).
-  function buildIconRegistry() {
+  function buildIconRegistry(navState) {
     const Icons = self.SN_ICONS;
     // Tutte le icone della riga primaria/griglia sono SVG renderizzate a 18px.
     // Vedi src/shared/icons.js e src/styles/ICONS.md per la guida di stile.
     const I = (name) => Icons[name](18);
     const translateIcon = pageHasTranslation ? I('showOriginal') : I('translate');
     const translateLabel = pageHasTranslation ? I18n.t('menu_show_original') : I18n.t('menu_global_translate');
+    // Quando navState non è disponibile (es. menu aperto da flussi che non lo
+    // calcolano), lascia abilitati: meglio rispetto al falso "disabilitato".
+    const canBack = navState ? !!navState.canBack : true;
+    const canFwd = navState ? !!navState.canFwd : true;
     return {
       translate:     { id: 'translate',     icon: translateIcon,    label: translateLabel,                   onClick: () => (pageHasTranslation ? restoreOriginal() : translatePage()) },
       screenshot:    { id: 'screenshot',    icon: I('screenshot'),  label: I18n.t('menu_screenshot'),        onClick: () => takeScreenshot() },
@@ -579,8 +589,8 @@
       saveForLater:  { id: 'saveForLater',  icon: I('saveForLater'),label: I18n.t('menu_save_for_later'),    onClick: () => savePage() },
       openForLater:  { id: 'openForLater',  icon: I('openForLater'),label: I18n.t('menu_open_for_later'),    onClick: () => chrome.runtime.sendMessage({ type: MSG.OPEN_HOME }) },
       fullscreen:    { id: 'fullscreen',    icon: document.fullscreenElement ? I('shrink') : I('zoom'), label: document.fullscreenElement ? I18n.t('menu_exit_fullscreen') : I18n.t('menu_fullscreen'), onClick: () => toggleFullscreen() },
-      back:          { id: 'back',          icon: I('back'),        label: I18n.t('menu_back'),              onClick: () => chrome.runtime.sendMessage({ type: MSG.NAV_BACK }) },
-      forward:       { id: 'forward',       icon: I('forward'),     label: I18n.t('menu_forward'),           onClick: () => chrome.runtime.sendMessage({ type: MSG.NAV_FORWARD }) },
+      back:          { id: 'back',          icon: I('back'),        label: I18n.t('menu_back'),              disabled: !canBack, onClick: () => chrome.runtime.sendMessage({ type: MSG.NAV_BACK }) },
+      forward:       { id: 'forward',       icon: I('forward'),     label: I18n.t('menu_forward'),           disabled: !canFwd, onClick: () => chrome.runtime.sendMessage({ type: MSG.NAV_FORWARD }) },
       reload:        { id: 'reload',        icon: I('reload'),      label: I18n.t('menu_reload'),            onClick: () => chrome.runtime.sendMessage({ type: MSG.NAV_RELOAD }) },
       colorPicker:   { id: 'colorPicker',   icon: I('colorPicker'), label: I18n.t('menu_color_picker'),      onClick: () => pickColor() },
       closeTab:      { id: 'closeTab',      icon: I('close'),       label: I18n.t('menu_close_tab'),         onClick: () => chrome.runtime.sendMessage({ type: MSG.CLOSE_TAB }) },
@@ -725,8 +735,8 @@
   }
 
   // Costruisce gli item della riga primaria (icone + bottone overflow).
-  function buildPrimaryRowItems() {
-    const registry = buildIconRegistry();
+  function buildPrimaryRowItems(navState) {
+    const registry = buildIconRegistry(navState);
     const layout = getIconLayout();
     const primaryIds = (layout.primary || []).filter((id) => registry[id]);
     const secondaryIds = (layout.secondary || []).filter((id) => registry[id]);
@@ -747,8 +757,8 @@
     return items;
   }
 
-  function buildSecondaryGridItems() {
-    const registry = buildIconRegistry();
+  function buildSecondaryGridItems(navState) {
+    const registry = buildIconRegistry(navState);
     const layout = getIconLayout();
     const secondaryIds = (layout.secondary || []).filter((id) => registry[id]);
     return secondaryIds.map((id) => ({ ...registry[id], draggable: true }));
@@ -756,12 +766,12 @@
 
   // Riga globale: prende le icone "primary" dal layout utente. L'overflow apre
   // la griglia secondaria come sotto-menu ancorato (senza chiudere il primo).
-  function buildGlobalIconRow() {
+  function buildGlobalIconRow(navState) {
     return {
       type: 'row',
       dropTarget: 'primary',
       onDrop: (e) => { applyIconDrop(e); redrawIconRows(); },
-      items: buildPrimaryRowItems(),
+      items: buildPrimaryRowItems(navState),
     };
   }
 
@@ -1153,6 +1163,16 @@
       const r = await chrome.runtime.sendMessage({ type: MSG.GET_CLIPBOARD_HISTORY });
       return r?.items || [];
     } catch (_) { return []; }
+  }
+
+  // Stato di navigazione (canBack/canFwd) del tab corrente: serve per
+  // mostrare le icone avanti/indietro del menu in grigio quando la cronologia
+  // non lo consente, come già accade per i tasti analoghi nella barra in alto.
+  async function getNavState() {
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.NAV_STATE });
+      return { canBack: !!r?.canBack, canFwd: !!r?.canFwd };
+    } catch (_) { return { canBack: true, canFwd: true }; }
   }
 
   function pushClipboardEntry(entry) {
@@ -1681,21 +1701,38 @@
     });
 
     return new Promise((resolve) => {
+      // Cursore custom: il crosshair OS può risultare invisibile su sfondo
+      // scuro/chiaro variabile (feedback alpha). Disegnamo un crosshair SVG
+      // bianco con outline nero, abbastanza grande da essere sempre visibile
+      // sopra la maschera semitrasparente. Hotspot al centro (16,16).
+      const crosshairSvg =
+        `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">` +
+        `<line x1="16" y1="2" x2="16" y2="30" stroke="black" stroke-width="3"/>` +
+        `<line x1="2" y1="16" x2="30" y2="16" stroke="black" stroke-width="3"/>` +
+        `<line x1="16" y1="2" x2="16" y2="30" stroke="white" stroke-width="1.5"/>` +
+        `<line x1="2" y1="16" x2="30" y2="16" stroke="white" stroke-width="1.5"/>` +
+        `</svg>`;
+      const cursorRule = `url("data:image/svg+xml;utf8,${encodeURIComponent(crosshairSvg)}") 16 16, crosshair`;
+
       const overlay = document.createElement('div');
       overlay.className = 'sn-region-overlay';
       // Stili inline per evitare di dipendere da CSS esterni: l'overlay deve
       // funzionare in qualsiasi pagina, anche con CSP/style restrittivo.
       Object.assign(overlay.style, {
         position: 'fixed', inset: '0', zIndex: '2147483647',
-        cursor: 'crosshair', userSelect: 'none', pointerEvents: 'auto',
+        cursor: cursorRule, userSelect: 'none', pointerEvents: 'auto',
       });
       overlay.setAttribute('data-sn-theme', document.documentElement.dataset.snTheme || '');
 
       // 4 quadranti scuri intorno alla selezione (top/left/right/bottom).
       // Si aggiornano via .style.top/left/width/height durante il drag.
+      // Il cursore va impostato esplicitamente sui figli: la regola CSS
+      // `cursor` è ereditata, ma alcuni runtime Electron non la propagano in
+      // modo affidabile durante il drag, lasciando l'utente senza riferimento
+      // visivo (feedback alpha).
       const mask = ['t', 'r', 'b', 'l'].map(() => {
         const d = document.createElement('div');
-        Object.assign(d.style, { position: 'absolute', background: 'rgba(0,0,0,0.45)' });
+        Object.assign(d.style, { position: 'absolute', background: 'rgba(0,0,0,0.45)', cursor: cursorRule });
         return d;
       });
       // All'inizio (nessun drag) tutto il viewport è coperto.
@@ -1706,7 +1743,7 @@
       Object.assign(rectBox.style, {
         position: 'absolute', border: '1px solid #fff',
         boxShadow: '0 0 0 1px rgba(0,0,0,0.5)',
-        display: 'none', pointerEvents: 'none',
+        display: 'none', pointerEvents: 'none', cursor: cursorRule,
       });
       overlay.appendChild(rectBox);
 
@@ -1715,7 +1752,7 @@
       Object.assign(hint.style, {
         position: 'absolute', left: '50%', top: '12px', transform: 'translateX(-50%)',
         background: 'rgba(0,0,0,0.75)', color: '#fff', font: '12px/1.4 system-ui, sans-serif',
-        padding: '6px 10px', borderRadius: '6px', pointerEvents: 'none',
+        padding: '6px 10px', borderRadius: '6px', pointerEvents: 'none', cursor: cursorRule,
       });
       overlay.appendChild(hint);
 

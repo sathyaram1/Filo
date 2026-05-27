@@ -33,6 +33,7 @@
     NAV_BACK: 'nav_back',
     NAV_FORWARD: 'nav_forward',
     NAV_RELOAD: 'nav_reload',
+    NAV_STATE: 'nav_state',                         // → { ok, canBack, canFwd }
     TOGGLE_FULLSCREEN: 'toggle_fullscreen',
     OPEN_NEW_TAB: 'open_new_tab',
     REPLACE_MISSPELLING: 'replace_misspelling',     // { suggestion }

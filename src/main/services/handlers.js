@@ -805,6 +805,16 @@ async function handleMessage(msg, sender = {}) {
         win?._filoTabs?.reload(sender.tab.id);
       }
       return { ok: true };
+    case MSG.NAV_STATE: {
+      if (!sender?.tab?.id) return { ok: false, canBack: false, canFwd: false };
+      const win = BrowserWindow.getAllWindows()[0];
+      const tab = win?._filoTabs?.tabs?.find((t) => t.id === sender.tab.id);
+      const wc = tab?.view?.webContents;
+      if (!wc) return { ok: false, canBack: false, canFwd: false };
+      const canBack = wc.navigationHistory?.canGoBack?.() ?? wc.canGoBack?.() ?? false;
+      const canFwd = wc.navigationHistory?.canGoForward?.() ?? wc.canGoForward?.() ?? false;
+      return { ok: true, canBack: !!canBack, canFwd: !!canFwd };
+    }
     case MSG.TOGGLE_FULLSCREEN: {
       // Il `document.requestFullscreen()` dal renderer di una WebContentsView
       // non porta la BrowserWindow a tutto schermo: la WebContentsView resta
