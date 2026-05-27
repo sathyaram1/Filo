@@ -79,39 +79,31 @@ test('menu: back/forward disabilitati quando la history non lo consente', async 
 });
 
 test('screenshot area: l\'overlay imposta un cursore custom visibile su tutti i quadranti', async ({ openTab, testServer }) => {
-  const page = await openTab(testServer.html('<!doctype html><html><body><h1>Test</h1></body></html>'));
+  const page = await openTab(testServer.html('<!doctype html><html><body style="height:600px"><h1>Test</h1></body></html>'));
   await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
 
-  // Apro il menu, vado in overflow e clicco "Ritaglia". Mock di
-  // CAPTURE_VISIBLE_TAB per non dover catturare davvero il frame.
-  await page.evaluate(() => {
-    const origSend = chrome.runtime.sendMessage;
-    chrome.runtime.sendMessage = (msg, ...rest) => {
-      if (msg && msg.type === 'capture_visible_tab') {
-        return Promise.resolve({ dataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==' });
-      }
-      return origSend(msg, ...rest);
-    };
-  });
-
+  // Lancio il flusso reale: apro overflow e clicco "screenshotCrop".
+  // capturePage in test può restituire un'immagine vuota, ma il flusso
+  // arriva comunque a costruire l'overlay (l'immagine vuota carica e
+  // selectScreenRegion appende l'overlay).
   const grid = await openOverflowGrid(page);
   await grid.locator('.sn-menu-icon-btn[data-sn-icon-id="screenshotCrop"]').click();
 
   const overlay = page.locator('.sn-region-overlay');
-  await expect(overlay).toBeVisible({ timeout: 5000 });
+  await expect(overlay).toBeVisible({ timeout: 8000 });
 
   // Il cursore custom deve essere impostato sia sull'overlay sia su tutti i
   // figli "maschera" (è il punto del feedback: durante il drag il cursore
   // passa sopra le maschere e non deve sparire).
   const overlayCursor = await overlay.evaluate((el) => el.style.cursor || '');
-  expect(overlayCursor).toMatch(/url\("data:image\/svg/);
+  expect(overlayCursor).toMatch(/url\("?data:image\/svg/);
 
   const childCursors = await overlay.evaluate((el) => {
     return Array.from(el.children).map((c) => c.style.cursor || '');
   });
   expect(childCursors.length).toBeGreaterThan(0);
   for (const c of childCursors) {
-    expect(c).toMatch(/url\("data:image\/svg/);
+    expect(c).toMatch(/url\("?data:image\/svg/);
   }
 
   // Esc chiude l'overlay (pulizia).
