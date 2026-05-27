@@ -184,10 +184,13 @@
     Menu.open({ x: e.clientX, y: e.clientY, items, keepOnScroll: !!selInfo });
 
     if (revealInputCorrection) {
+      // Passa il timestamp di apertura: se il broadcast nativo è già arrivato
+      // (vincoli di timing con l'await getClipboardHistory sopra), il modulo
+      // spellcheck ce lo consegna subito invece di lasciarci aspettare.
       SpellCheck.onNextNativeSuggestion?.(({ word, suggestions }) => {
         if (!suggestions?.length) return;
         revealInputCorrection(word, suggestions);
-      });
+      }, { since: openedAt });
     }
   }
 
