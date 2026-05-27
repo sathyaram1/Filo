@@ -412,7 +412,6 @@
     }
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
 
-    inputEl.value = '';
     sending = false;
     sendBtn.disabled = false;
     inputEl.focus();
