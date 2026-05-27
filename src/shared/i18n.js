@@ -188,7 +188,8 @@
     options_category_delete_confirm: 'Eliminare la categoria "%s"? Le schede diventeranno non categorizzate.',
     options_category_pages: '%s schede',
 
-    // Sicurezza
+    // Sicurezza (pagina dedicata in filo://security/)
+    security_title: 'Sicurezza',
     options_h_security: 'Sicurezza',
     options_security_protect_ip: 'Proteggi l\'IP locale (WebRTC)',
     options_security_protect_ip_desc:
