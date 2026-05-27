@@ -39,7 +39,7 @@
 }
 
 .sn-menu-item:hover:not(.sn-disabled) {
-  background: rgba(var(--sn-accent-rgb), 0.12);
+  background: rgba(var(--sn-accent-rgb), 0.35);
 }
 
 .sn-menu-item.sn-disabled {
@@ -104,7 +104,7 @@
 }
 
 .sn-menu-row-btn:hover:not(:disabled) {
-  background: rgba(var(--sn-accent-rgb), 0.12);
+  background: rgba(var(--sn-accent-rgb), 0.35);
 }
 
 .sn-menu-row-btn:disabled {
@@ -149,7 +149,7 @@
   border-radius: 4px;
 }
 .sn-menu-inline-arrow:hover {
-  background: rgba(var(--sn-accent-rgb), 0.12);
+  background: rgba(var(--sn-accent-rgb), 0.35);
   color: var(--sn-fg);
 }
 
@@ -183,7 +183,7 @@
   line-height: 1.2;
 }
 .sn-menu-paste-main:hover:not(:disabled) {
-  background: rgba(var(--sn-accent-rgb), 0.12);
+  background: rgba(var(--sn-accent-rgb), 0.35);
 }
 .sn-menu-paste-main:disabled {
   color: var(--sn-muted);
@@ -203,7 +203,7 @@
   font-size: 11px;
 }
 .sn-menu-paste-arrow:hover {
-  background: rgba(var(--sn-accent-rgb), 0.12);
+  background: rgba(var(--sn-accent-rgb), 0.35);
   color: var(--sn-fg);
 }
 
@@ -229,7 +229,7 @@
   line-height: 1.2;
 }
 .sn-menu-split-main:hover:not(:disabled) {
-  background: rgba(var(--sn-accent-rgb), 0.12);
+  background: rgba(var(--sn-accent-rgb), 0.35);
 }
 .sn-menu-split-main:disabled {
   color: var(--sn-muted);
@@ -255,7 +255,7 @@
   font-size: 11px;
 }
 .sn-menu-split-arrow:hover {
-  background: rgba(var(--sn-accent-rgb), 0.12);
+  background: rgba(var(--sn-accent-rgb), 0.35);
   color: var(--sn-fg);
 }
 
@@ -293,7 +293,7 @@
   line-height: 1.2;
 }
 .sn-menu-correction-main:hover:not(:disabled) {
-  background: rgba(var(--sn-accent-rgb), 0.12);
+  background: rgba(var(--sn-accent-rgb), 0.35);
 }
 .sn-menu-correction-main:disabled {
   cursor: default;
@@ -315,7 +315,7 @@
   font-size: 11px;
 }
 .sn-menu-correction-arrow:hover {
-  background: rgba(var(--sn-accent-rgb), 0.12);
+  background: rgba(var(--sn-accent-rgb), 0.35);
   color: var(--sn-fg);
 }
 .sn-menu-correction-loading .sn-menu-correction-main {
@@ -405,7 +405,7 @@
   color: var(--sn-muted);
 }
 .sn-editbox-shortcuts button:hover {
-  background: rgba(var(--sn-accent-rgb), 0.12);
+  background: rgba(var(--sn-accent-rgb), 0.35);
   color: var(--sn-fg);
 }
 .sn-editbox-instruction {
@@ -476,7 +476,7 @@
   color: var(--sn-fg);
 }
 .sn-editbox-footer button:hover:not(:disabled) {
-  background: rgba(var(--sn-accent-rgb), 0.12);
+  background: rgba(var(--sn-accent-rgb), 0.35);
 }
 .sn-editbox-footer button:disabled {
   opacity: 0.4;
@@ -535,7 +535,7 @@
   font-family: var(--sn-font);
 }
 .sn-menu-icon-btn:hover:not(:disabled) {
-  background: rgba(var(--sn-accent-rgb), 0.12);
+  background: rgba(var(--sn-accent-rgb), 0.35);
 }
 .sn-menu-icon-btn:disabled {
   color: var(--sn-muted);
