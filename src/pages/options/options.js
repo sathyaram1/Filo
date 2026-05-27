@@ -19,6 +19,13 @@
     $('h-shortcuts').textContent = I18n.t('options_shortcuts');
     $('h-blocklist').textContent = I18n.t('options_blocklist');
     $('h-categories').textContent = I18n.t('options_categories');
+    $('h-security').textContent = I18n.t('options_h_security');
+    $('sec-protect-ip-label').textContent = I18n.t('options_security_protect_ip');
+    $('sec-protect-ip-desc').textContent = I18n.t('options_security_protect_ip_desc');
+    $('sec-block-popups-label').textContent = I18n.t('options_security_block_popups');
+    $('sec-block-popups-desc').textContent = I18n.t('options_security_block_popups_desc');
+    $('sec-p2p-box-title').textContent = I18n.t('options_security_p2p_box_title');
+    $('sec-p2p-box-body').textContent = I18n.t('options_security_p2p_box_body');
 
     document.querySelector('label[for="provider"]').textContent = I18n.t('options_provider');
     document.querySelector('label[for="apiKey"]').textContent = I18n.t('options_api_key');
