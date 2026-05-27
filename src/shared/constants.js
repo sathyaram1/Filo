@@ -627,6 +627,20 @@
     // Dimensione del testo della UI di Filo (moltiplicatore zoom delle pagine
     // interne). 1 = 100%. Impostato dalla pagina Preferenze.
     textScale: 1,
+    // Impostazioni di sicurezza/privacy per le pagine esterne (no filo://).
+    // - protectIpLeak: forza WebRTC a usare solo l'interfaccia di rete pubblica
+    //   (default_public_interface_only). Evita che siti possano leggere gli IP
+    //   locali della LAN/VPN via candidati ICE — è il vettore tipico di
+    //   fingerprinting "WebRTC leak". Tradeoff: alcuni servizi P2P locali
+    //   (Snapdrop & co.) non riescono a scoprire dispositivi sulla stessa LAN.
+    // - blockPopups: blocca window.open() che il sito esegue senza un gesto
+    //   utente esplicito (i classici popup pubblicitari). I link target="_blank"
+    //   cliccati continuano ad aprirsi normalmente. Quando un popup viene
+    //   bloccato compare una chip nella shell con "Apri comunque".
+    security: {
+      protectIpLeak: true,
+      blockPopups: true,
+    },
   };
 
   // chrome.storage.local ha una quota di ~10 MB per estensione (senza
