@@ -103,6 +103,12 @@
     $('monthlyLimit').value = settings.monthlyLimitEur ?? 5;
     $('blocklist').value = (settings.blocklist || []).join('\n');
 
+    // Sicurezza: default-on. Mostriamo lo stato corrente; il default vero
+    // (true/true) viene applicato dal merge con DEFAULT_SETTINGS.security.
+    const sec = settings.security || {};
+    $('sec-protect-ip').checked = sec.protectIpLeak !== false;
+    $('sec-block-popups').checked = sec.blockPopups !== false;
+
     // Costi
     try {
       const r = await chrome.runtime.sendMessage({ type: MSG.GET_COSTS });
