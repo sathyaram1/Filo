@@ -327,15 +327,26 @@ in `new` (inbox), `draft` (bozze — richiedono decisioni di design dell'utente)
 `done` (già risolti, in attesa di verifica), `verified` e `ignored`.
 
 Per ogni feedback `todo`:
-1. Leggi testo + screenshot allegati per capire il problema
-2. Trova il codice coinvolto e implementa il fix
-3. **Verifica che il fix funzioni** (vedi sezione "REGOLA DURA" in alto):
-   - In cloud: `npm test` + se la feature ha UI nuova, aggiungi un test
-     Playwright che la esercita.
-   - In locale: `npm run test:shoot` con scenario mirato.
-4. Solo se la verifica passa: aggiorna lo status a `done` su Firestore
-   (PATCH con `updateMask`) e scrivi nelle `notes` una breve spiegazione
-   causa/fix + cosa hai testato per confermare che funziona.
+1. Leggi testo + screenshot allegati. **Distingui sintomo da causa**: la
+   lamentela descrive ciò che l'utente vede, non necessariamente cos'è
+   rotto. Riformula in "l'utente voleva fare X, gli è fallito perché Y".
+2. Trova il codice coinvolto. Se due cammini fanno cose simili (es. Ctrl+V
+   e "Incolla" dal menu) leggili affiancati: le **simmetrie mancanti** sono
+   spesso la causa.
+3. Implementa il fix sul **comportamento**, non sul messaggio. Se ti trovi
+   a cambiare solo una stringa per un bug funzionale, fermati e ripensa.
+4. Considera le **invarianti UX ovvie** intorno al fix (vedi sezione
+   "Iniziativa" sopra) e applicale, elencandole nel report.
+5. **Verifica con un test che asserisce successo** (vedi sezione "Test che
+   servono davvero"):
+   - In cloud: `npm test` + un test Playwright che eserciti il flusso
+     dell'utente e asserisca che la feature fa la cosa giusta (non solo che
+     un messaggio è cambiato).
+   - In locale: `npm run test:shoot` con scenario mirato + ispezione visuale.
+6. Solo se la verifica passa: aggiorna lo status a `done` su Firestore
+   (PATCH con `updateMask`) e scrivi nelle `notes` un breve report (vedi
+   "Tono dei report e delle notes"): cosa vedrà l'utente di diverso, cosa
+   hai aggiunto oltre il chiesto, come l'hai testato.
 
 **Insistere prima di mollare (vale soprattutto per routine cloud):**
 non abbandonare al primo intoppo. Se un test fallisce, capisci perché e
