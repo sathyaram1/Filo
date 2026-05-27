@@ -759,12 +759,12 @@
 
   // Riga globale: prende le icone "primary" dal layout utente. L'overflow apre
   // la griglia secondaria come sotto-menu ancorato (senza chiudere il primo).
-  function buildGlobalIconRow() {
+  function buildGlobalIconRow(navState) {
     return {
       type: 'row',
       dropTarget: 'primary',
       onDrop: (e) => { applyIconDrop(e); redrawIconRows(); },
-      items: buildPrimaryRowItems(),
+      items: buildPrimaryRowItems(navState),
     };
   }
 
