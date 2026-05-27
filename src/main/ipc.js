@@ -143,6 +143,12 @@ function registerIpcHandlers() {
     if (!win?._filoTabs) return { activeId: null, tabs: [] };
     return win._filoTabs.snapshot();
   });
+  ipcMain.handle('tabs:open-blocked-popup', (event, { url } = {}) => {
+    const win = winFor(event);
+    if (!win?._filoTabs || !url) return { ok: false };
+    win._filoTabs.openBlockedPopup(url);
+    return { ok: true };
+  });
 
   // ─── popup menu custom (sopra le WebContentsView) ────────────────────────
   ipcMain.handle('shell:popup-menu', (event, { entries, x, y }) => {
