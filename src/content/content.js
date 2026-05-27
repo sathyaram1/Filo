@@ -728,8 +728,8 @@
   }
 
   // Costruisce gli item della riga primaria (icone + bottone overflow).
-  function buildPrimaryRowItems() {
-    const registry = buildIconRegistry();
+  function buildPrimaryRowItems(navState) {
+    const registry = buildIconRegistry(navState);
     const layout = getIconLayout();
     const primaryIds = (layout.primary || []).filter((id) => registry[id]);
     const secondaryIds = (layout.secondary || []).filter((id) => registry[id]);
@@ -750,8 +750,8 @@
     return items;
   }
 
-  function buildSecondaryGridItems() {
-    const registry = buildIconRegistry();
+  function buildSecondaryGridItems(navState) {
+    const registry = buildIconRegistry(navState);
     const layout = getIconLayout();
     const secondaryIds = (layout.secondary || []).filter((id) => registry[id]);
     return secondaryIds.map((id) => ({ ...registry[id], draggable: true }));
