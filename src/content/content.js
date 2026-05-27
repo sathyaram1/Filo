@@ -1701,21 +1701,38 @@
     });
 
     return new Promise((resolve) => {
+      // Cursore custom: il crosshair OS può risultare invisibile su sfondo
+      // scuro/chiaro variabile (feedback alpha). Disegnamo un crosshair SVG
+      // bianco con outline nero, abbastanza grande da essere sempre visibile
+      // sopra la maschera semitrasparente. Hotspot al centro (16,16).
+      const crosshairSvg =
+        `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">` +
+        `<line x1="16" y1="2" x2="16" y2="30" stroke="black" stroke-width="3"/>` +
+        `<line x1="2" y1="16" x2="30" y2="16" stroke="black" stroke-width="3"/>` +
+        `<line x1="16" y1="2" x2="16" y2="30" stroke="white" stroke-width="1.5"/>` +
+        `<line x1="2" y1="16" x2="30" y2="16" stroke="white" stroke-width="1.5"/>` +
+        `</svg>`;
+      const cursorRule = `url("data:image/svg+xml;utf8,${encodeURIComponent(crosshairSvg)}") 16 16, crosshair`;
+
       const overlay = document.createElement('div');
       overlay.className = 'sn-region-overlay';
       // Stili inline per evitare di dipendere da CSS esterni: l'overlay deve
       // funzionare in qualsiasi pagina, anche con CSP/style restrittivo.
       Object.assign(overlay.style, {
         position: 'fixed', inset: '0', zIndex: '2147483647',
-        cursor: 'crosshair', userSelect: 'none', pointerEvents: 'auto',
+        cursor: cursorRule, userSelect: 'none', pointerEvents: 'auto',
       });
       overlay.setAttribute('data-sn-theme', document.documentElement.dataset.snTheme || '');
 
       // 4 quadranti scuri intorno alla selezione (top/left/right/bottom).
       // Si aggiornano via .style.top/left/width/height durante il drag.
+      // Il cursore va impostato esplicitamente sui figli: la regola CSS
+      // `cursor` è ereditata, ma alcuni runtime Electron non la propagano in
+      // modo affidabile durante il drag, lasciando l'utente senza riferimento
+      // visivo (feedback alpha).
       const mask = ['t', 'r', 'b', 'l'].map(() => {
         const d = document.createElement('div');
-        Object.assign(d.style, { position: 'absolute', background: 'rgba(0,0,0,0.45)' });
+        Object.assign(d.style, { position: 'absolute', background: 'rgba(0,0,0,0.45)', cursor: cursorRule });
         return d;
       });
       // All'inizio (nessun drag) tutto il viewport è coperto.
@@ -1726,7 +1743,7 @@
       Object.assign(rectBox.style, {
         position: 'absolute', border: '1px solid #fff',
         boxShadow: '0 0 0 1px rgba(0,0,0,0.5)',
-        display: 'none', pointerEvents: 'none',
+        display: 'none', pointerEvents: 'none', cursor: cursorRule,
       });
       overlay.appendChild(rectBox);
 
@@ -1735,7 +1752,7 @@
       Object.assign(hint.style, {
         position: 'absolute', left: '50%', top: '12px', transform: 'translateX(-50%)',
         background: 'rgba(0,0,0,0.75)', color: '#fff', font: '12px/1.4 system-ui, sans-serif',
-        padding: '6px 10px', borderRadius: '6px', pointerEvents: 'none',
+        padding: '6px 10px', borderRadius: '6px', pointerEvents: 'none', cursor: cursorRule,
       });
       overlay.appendChild(hint);
 
