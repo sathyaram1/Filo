@@ -1219,15 +1219,30 @@
     chrome.runtime.sendMessage({ type: MSG.PUSH_CLIPBOARD_ENTRY, entry }).catch(() => {});
     restorePasteContext();
     if (entry.type === 'image') {
-      // Inserisci come <img> in contenteditable, altrimenti niente (input/textarea non supportano immagini)
+      // Ricostruisci un Blob a partire dal data URL: serve a tutti i rami sotto.
+      // Le immagini in cronologia sono offline (dataUrl in storage): niente provider.
+      let blob = null;
+      try { blob = await (await fetch(entry.dataUrl)).blob(); } catch (_) {}
+
+      // input/textarea non accettano <img> nativamente: come fa pasteFromClipboard
+      // delega via evento custom 'filo:paste-image' così handler dedicati (modal
+      // feedback, barra input dashboard, ecc.) possono allegarla. Senza questa
+      // delega l'Incolla→cronologia falliva ovunque Ctrl+V su immagine funziona.
+      if (pasteContext?.kind === 'input' && blob) {
+        const pasteEvt = new CustomEvent('filo:paste-image', {
+          bubbles: true, cancelable: true, detail: { blob },
+        });
+        if (pasteContext.el.dispatchEvent(pasteEvt) === false) {
+          Popup.showToast(I18n.t('toast_pasted_image'));
+          return;
+        }
+        Popup.showToast(I18n.t('toast_cannot_paste_image'));
+        return;
+      }
       if (pasteContext?.kind !== 'ce') {
         Popup.showToast(I18n.t('toast_cannot_paste_image'));
         return;
       }
-      // Ricostruisci un Blob a partire dal data URL per dispatcharlo come paste event.
-      // Le immagini sono salvate offline (dataUrl in storage): niente chiamate al provider AI.
-      let blob = null;
-      try { blob = await (await fetch(entry.dataUrl)).blob(); } catch (_) {}
       const ok = insertImageInEditable(blob, entry.dataUrl, descriptionToFilename(entry.description));
       if (ok) Popup.showToast(I18n.t('toast_pasted_image'));
       else Popup.showToast(I18n.t('toast_paste_failed'));
