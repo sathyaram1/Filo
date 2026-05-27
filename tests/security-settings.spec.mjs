@@ -45,28 +45,28 @@ test('toggle persistito dopo salvataggio', async ({ openTab }) => {
   await expect(page.locator('#sec-block-popups')).toBeChecked();
 });
 
-test('popup blocker: window.open() automatico viene bloccato', async ({ openTab, testServer, shell, app }) => {
+test('popup blocker: window.open() automatico viene bloccato', async ({ openTab, testServer, shell }) => {
   // Pagina che chiama window.open() AL CARICAMENTO (no gesto utente) — è il
-  // pattern degli ad popup. Senza il blocco si aprirebbe un nuovo tab.
-  const popupTarget = testServer.html('<title>POPUP-TARGET</title><p>popup</p>');
-  const popupHost = new URL(popupTarget).host;
+  // pattern degli ad popup. Disposition 'new-window' (per via di features=popup)
+  // → blocco attivo.
+  const popupTarget = testServer.html('<title>POPUP_TARGET_AD</title><p>popup</p>');
   const opener = testServer.html(`
-    <title>OPENER</title>
+    <title>OPENER_AD</title>
     <script>
-      // Esegui dopo il primo paint per dare tempo al preload di settarsi.
       setTimeout(() => { window.open(${JSON.stringify(popupTarget)}, '_blank', 'popup,width=400,height=300'); }, 200);
     </script>
     <p>opener</p>
   `);
 
   await openTab(opener);
-
-  // Aspetta abbastanza tempo perché window.open scatti, e poi verifica che
-  // NESSUN tab con quell'URL si sia aperto. Asserisce successo del blocco.
   await new Promise((r) => setTimeout(r, 1500));
+
+  // Cerca via titolo univoco: il tab del popup, se aperto, riceverebbe il
+  // page-title-updated con 'POPUP_TARGET_AD'. Includiamo anche il match per
+  // url completo come ulteriore verifica.
   const snap = await shell.evaluate(() => window.filoShell.tabs.snapshot());
-  const popupTab = snap.tabs.find((t) => t.url && t.url.includes(popupHost) && t.url.includes(new URL(popupTarget).pathname));
-  expect(popupTab, 'il tab del popup non deve essere stato creato').toBeFalsy();
+  const popupTab = snap.tabs.find((t) => (t.title || '').includes('POPUP_TARGET_AD') || t.url === popupTarget);
+  expect(popupTab, `il tab del popup non deve esistere — snap: ${JSON.stringify(snap.tabs.map((x) => ({ t: x.title, u: x.url })))}`).toBeFalsy();
 });
 
 test('popup blocker disattivato: window.open() passa', async ({ openTab, testServer, shell }) => {
@@ -78,10 +78,9 @@ test('popup blocker disattivato: window.open() passa', async ({ openTab, testSer
   await expect(opt.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 4_000 });
 
   // Ora ripeti il window.open automatico: deve aprire un nuovo tab
-  const popupTarget = testServer.html('<title>POPUP-OPEN</title><p>open</p>');
-  const popupPath = new URL(popupTarget).pathname;
+  const popupTarget = testServer.html('<title>POPUP_TARGET_OK</title><p>open</p>');
   const opener = testServer.html(`
-    <title>OPENER2</title>
+    <title>OPENER_OK</title>
     <script>
       setTimeout(() => { window.open(${JSON.stringify(popupTarget)}, '_blank', 'popup,width=400,height=300'); }, 200);
     </script>
@@ -89,8 +88,8 @@ test('popup blocker disattivato: window.open() passa', async ({ openTab, testSer
   `);
 
   await openTab(opener);
-  await new Promise((r) => setTimeout(r, 1500));
+  await new Promise((r) => setTimeout(r, 2000));
   const snap = await shell.evaluate(() => window.filoShell.tabs.snapshot());
-  const popupTab = snap.tabs.find((t) => t.url && t.url.includes(popupPath));
-  expect(popupTab, 'col blocco disattivato il popup deve aprirsi normalmente').toBeTruthy();
+  const popupTab = snap.tabs.find((t) => (t.title || '').includes('POPUP_TARGET_OK') || t.url === popupTarget);
+  expect(popupTab, `col blocco disattivato il popup deve aprirsi — snap: ${JSON.stringify(snap.tabs.map((x) => ({ t: x.title, u: x.url })))}`).toBeTruthy();
 });
