@@ -50,6 +50,91 @@ Il minimo accettabile dipende dall'ambiente:
   "feature implementata ma non verificata perché X", così l'utente sa che
   deve provarla a mano.
 
+## Test che servono davvero (asserire successo, non assenza di errore)
+
+Il test deve **fallire prima del fix e passare solo se la feature fa la cosa
+giusta**. Se può passare in entrambi gli stati cambiando solo un dettaglio
+cosmetico (es. il testo di un messaggio di errore), il test è inutile e
+maschera bug invece di scoprirli.
+
+Regole pratiche:
+
+- **Asserire il successo**, non l'assenza di un certo errore. Se la lamentela
+  è "non posso incollare un'immagine", il test giusto verifica che l'immagine
+  arrivi al destinatario (es. compare un `<img>`, un file viene aggiunto a
+  un attachment store, ecc.) — non che il toast d'errore non contenga
+  "provider".
+
+- **Pensa al comportamento, non al messaggio**. Lamentele tipo "appare errore
+  X" vanno tradotte in "la feature Y non funziona" prima di scrivere il fix.
+  Cambiare la stringa dell'errore è il fix sbagliato 9 volte su 10.
+
+- **Pre-condizione del test = stato in cui senza fix fallirebbe**. Quando
+  scrivi il test, immagina di rimuovere il fix appena fatto: il test deve
+  diventare rosso. Se non puoi articolare *quale assert* diventa rosso,
+  riscrivi gli assert.
+
+- **Se in cloud (Playwright headless)**: per UI che cambia visivamente, oltre
+  agli assert salva `page.screenshot()` in `tests/.shots/` come traccia
+  ispezionabile (non è il primary signal, ma cattura regressioni visive che
+  gli assert non vedono).
+
+## Sintomo vs causa: l'obiettivo è migliorare l'app, non chiudere il feedback
+
+Un feedback descrive il sintomo come lo vede l'utente. La tua prima domanda
+non è "come faccio sparire questo errore" ma **"cosa stava cercando di fare
+l'utente, e perché non gli è riuscito"**. Spesso la causa è in tutt'altra
+parte del codice rispetto a dove si manifesta l'errore.
+
+Segnali di "stai fissando il sintomo":
+
+- Stai per cambiare solo una stringa per chiudere un bug funzionale.
+- Stai facendo passare il test SBAGLIANDO meno (es. messaggio meno
+  fuorviante) invece di fare passare la feature.
+- Stai per chiudere senza poter rispondere alla domanda "se l'utente
+  riprova adesso il flusso, gli funziona?". Se la risposta è no, non hai
+  finito.
+
+Segnale che hai trovato la causa vera: spesso emergono **simmetrie mancanti**
+— due rami di codice che fanno cose simili divergono in modo sospetto, oppure
+un flusso A funziona ma un flusso B equivalente no perché manca un pezzo.
+Leggi i due flussi affiancati.
+
+## Iniziativa: completare l'invariante UX, segnalare sempre cosa hai aggiunto
+
+Quando risolvi un feedback puoi (anzi: dovresti) prendere iniziativa sulle
+**invarianti UX ovvie** che il feedback implica ma non chiede:
+
+- Se l'utente può aggiungere X, deve poter rimuovere X.
+- Se l'app salva N cose, l'utente deve poterle vedere tutte.
+- Se Ctrl+V fa Y, anche "Incolla" dal menu deve fare Y (parità tra cammini
+  equivalenti).
+
+Queste non sono scelte di design — sono completezza. Falle.
+
+**Limite**: quando ci sono più modi non equivalenti di fare la cosa (es.
+"vedere tutte le immagini" → grid, accordion, modal-galleria, lista a thumb),
+non scegliere tu. Proponi 2-3 opzioni nel report o lascialo come `clarify`.
+
+**Regola d'oro per evitare scope creep**: nel report finale **elenca
+esplicitamente cosa hai aggiunto oltre il chiesto**, in modo che l'utente
+veda subito cosa è "in più" e possa dirti "no, questo non lo voglio". Senza
+elenco esplicito è invisibile e si accumula nel codice.
+
+## Tono dei report e delle notes
+
+I report finali (chat) e le `notes` su Firestore vanno scritti **per
+l'utente**, non per un altro Claude. Quindi:
+
+- Niente nomi di variabili, funzioni, file con percorso assoluto. Spiega
+  cosa l'utente vedrà di diverso, non come l'hai codato.
+- Niente paragrafoni "Causa / Fix / Test" in stile diff review.
+- Una sintesi breve di **cosa hai fatto in pratica** (1-3 frasi), **cosa
+  hai aggiunto oltre il chiesto** (se qualcosa), e **come l'hai verificato**.
+- Se serve memoria tecnica per la prossima passata (es. il fix ha un
+  vincolo non ovvio che potrebbe rompersi), aggiungi una sezione
+  "Note tecniche" a fondo, separata. Se non serve, **non scriverla**.
+
 Questo è **Filo desktop** — un browser AI-native costruito su Electron. È
 l'evoluzione dell'estensione Chrome `filo-extension` (archiviata, o in via di
 archiviazione, sotto `../ROBA VECCHIA/`). Tutto il valore dell'estensione
@@ -242,15 +327,26 @@ in `new` (inbox), `draft` (bozze — richiedono decisioni di design dell'utente)
 `done` (già risolti, in attesa di verifica), `verified` e `ignored`.
 
 Per ogni feedback `todo`:
-1. Leggi testo + screenshot allegati per capire il problema
-2. Trova il codice coinvolto e implementa il fix
-3. **Verifica che il fix funzioni** (vedi sezione "REGOLA DURA" in alto):
-   - In cloud: `npm test` + se la feature ha UI nuova, aggiungi un test
-     Playwright che la esercita.
-   - In locale: `npm run test:shoot` con scenario mirato.
-4. Solo se la verifica passa: aggiorna lo status a `done` su Firestore
-   (PATCH con `updateMask`) e scrivi nelle `notes` una breve spiegazione
-   causa/fix + cosa hai testato per confermare che funziona.
+1. Leggi testo + screenshot allegati. **Distingui sintomo da causa**: la
+   lamentela descrive ciò che l'utente vede, non necessariamente cos'è
+   rotto. Riformula in "l'utente voleva fare X, gli è fallito perché Y".
+2. Trova il codice coinvolto. Se due cammini fanno cose simili (es. Ctrl+V
+   e "Incolla" dal menu) leggili affiancati: le **simmetrie mancanti** sono
+   spesso la causa.
+3. Implementa il fix sul **comportamento**, non sul messaggio. Se ti trovi
+   a cambiare solo una stringa per un bug funzionale, fermati e ripensa.
+4. Considera le **invarianti UX ovvie** intorno al fix (vedi sezione
+   "Iniziativa" sopra) e applicale, elencandole nel report.
+5. **Verifica con un test che asserisce successo** (vedi sezione "Test che
+   servono davvero"):
+   - In cloud: `npm test` + un test Playwright che eserciti il flusso
+     dell'utente e asserisca che la feature fa la cosa giusta (non solo che
+     un messaggio è cambiato).
+   - In locale: `npm run test:shoot` con scenario mirato + ispezione visuale.
+6. Solo se la verifica passa: aggiorna lo status a `done` su Firestore
+   (PATCH con `updateMask`) e scrivi nelle `notes` un breve report (vedi
+   "Tono dei report e delle notes"): cosa vedrà l'utente di diverso, cosa
+   hai aggiunto oltre il chiesto, come l'hai testato.
 
 **Insistere prima di mollare (vale soprattutto per routine cloud):**
 non abbandonare al primo intoppo. Se un test fallisce, capisci perché e
