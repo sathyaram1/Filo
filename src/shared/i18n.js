@@ -124,6 +124,7 @@
     toast_clipboard_empty: 'Cronologia appunti vuota',
     toast_pasted_image: 'Immagine incollata',
     toast_cannot_paste_image: 'Qui non si può incollare un\'immagine (campo di solo testo)',
+    toast_paste_failed: 'Non riesco a incollare qui (rifocalizza il campo e riprova)',
     clipboard_image_pending: 'Descrizione…',
 
     // Categorie default
