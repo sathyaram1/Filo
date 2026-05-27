@@ -188,6 +188,33 @@
     options_category_delete_confirm: 'Eliminare la categoria "%s"? Le schede diventeranno non categorizzate.',
     options_category_pages: '%s schede',
 
+    // Sicurezza
+    options_h_security: 'Sicurezza',
+    options_security_protect_ip: 'Proteggi l\'IP locale (WebRTC)',
+    options_security_protect_ip_desc:
+      'Impedisce ai siti di leggere via WebRTC l\'IP della tua rete locale (LAN, VPN, schede virtuali). ' +
+      'Riduce il fingerprinting pubblicitario e chiude un leak di IP reale quando usi una VPN. ' +
+      'Le videochiamate normali (Meet, Zoom, Teams) continuano a funzionare. ' +
+      'Effetto collaterale: alcuni servizi P2P che scoprono dispositivi sulla stessa rete locale ' +
+      '(es. Snapdrop) potrebbero non vedere gli altri dispositivi.',
+    options_security_block_popups: 'Blocca popup non richiesti',
+    options_security_block_popups_desc:
+      'Blocca le finestre che i siti aprono da soli (i classici popup pubblicitari). ' +
+      'I link che apri tu cliccando con il tasto centrale o tenendo Ctrl, o quelli con target="_blank", ' +
+      'restano normalmente aperti. Quando un popup viene bloccato, una piccola etichetta nella barra ' +
+      'in alto ti permette di aprirlo comunque se era legittimo.',
+    options_security_p2p_box_title: 'Cosa succede ai servizi P2P se attivi la protezione IP',
+    options_security_p2p_box_body:
+      'Servizi tipo Snapdrop, ToffeeShare, alcuni giochi browser e alcune feature di scoperta dispositivi ' +
+      'in rete locale usano l\'IP della tua LAN per trovare altri dispositivi connessi alla stessa rete WiFi. ' +
+      'Con la protezione attiva quei servizi continuano a caricarsi ma "non vedono" gli altri dispositivi della tua rete. ' +
+      'Le versioni che funzionano via Internet (server intermedio) restano operative. ' +
+      'Se ti serve usare uno di questi servizi, disattiva temporaneamente la protezione qui sopra, ' +
+      'usa il servizio, poi riattivala.',
+    options_security_popup_blocked: 'Popup bloccato da %s',
+    options_security_popup_open: 'Apri',
+    options_security_popup_dismiss: 'Chiudi',
+
     // Home
     home_title: 'Aperti per dopo',
     home_search_placeholder: 'Cerca per titolo o URL…',
