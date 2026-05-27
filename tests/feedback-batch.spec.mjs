@@ -19,8 +19,8 @@ async function newtabPage(app) {
   throw new Error('newtab non trovata');
 }
 
-async function openOverflowGrid(page) {
-  await page.locator('body').click({ button: 'right', position: { x: 50, y: 50 } });
+async function openOverflowGrid(page, selector = 'h1') {
+  await page.locator(selector).click({ button: 'right' });
   const menu = page.locator('.sn-menu').first();
   await expect(menu).toBeVisible();
   const overflow = menu.locator('.sn-menu-row-overflow').first();
