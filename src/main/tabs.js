@@ -274,11 +274,38 @@ class TabManager {
       }
     });
 
-    // Apertura nuove tab: tutto resta dentro Filo come nuovo tab.
-    wc.setWindowOpenHandler(({ url }) => {
+    // Apertura nuove tab: tutto resta dentro Filo come nuovo tab — a meno che
+    // il popup blocker sia attivo e l'apertura sembri un popup pubblicitario
+    // (cioè non un click su <a target="_blank">). Heuristic: il disposition
+    // 'new-window' corrisponde a window.open() esplicito con features (size,
+    // toolbar, ecc.), che è la firma classica degli ad popup. Disposition
+    // 'foreground-tab' e 'background-tab' sono link cliccati dall'utente.
+    wc.setWindowOpenHandler((details) => {
+      const { url, disposition } = details;
+      const isAdLikePopup = disposition === 'new-window';
+      if (tab.isInternal === false && this.security.blockPopups && isAdLikePopup) {
+        this._notifyPopupBlocked(tab.id, url);
+        return { action: 'deny' };
+      }
       this.openTab(url, { activate: true });
       return { action: 'deny' };
     });
+  }
+
+  // Notifica la shell che un popup è stato bloccato sul tab `tabId`. La shell
+  // mostra una chip "Bloccato popup da <host> — Apri" cliccabile per aprirlo.
+  _notifyPopupBlocked(tabId, url) {
+    try {
+      let host = '';
+      try { host = new URL(url).host; } catch (_) { host = url; }
+      this.win.webContents.send('tabs:popup-blocked', { tabId, url, host });
+    } catch (_) {}
+  }
+
+  // Chiamato da IPC quando l'utente clicca "Apri" sulla chip — il popup era
+  // legittimo (es. share dialog, OAuth) e va aperto bypassando il blocco.
+  openBlockedPopup(url) {
+    this.openTab(url, { activate: true });
   }
 
   // ─── snapshot stato per la shell ────────────────────────────────────────
