@@ -94,6 +94,41 @@ html, body {
 
 .sn-page .sn-muted { color: var(--sn-muted); font-size: 12px; }
 
+/* Box informativo (banner di spiegazione, tipo "cosa succede se..."): contorno
+   morbido + sfondo leggermente accentuato, usato nella sezione Sicurezza per
+   spiegare gli effetti collaterali dei toggle privacy. */
+.sn-page .sn-info-box {
+  border: 1px solid var(--sn-border);
+  background: var(--sn-hover);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-top: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.sn-page .sn-info-box-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+.sn-page .sn-toggle-row {
+  display: block;
+  margin-top: 14px;
+}
+.sn-page .sn-toggle-row > label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.sn-page .sn-toggle-row > .sn-muted {
+  display: block;
+  margin-top: 4px;
+  margin-left: 24px;
+  line-height: 1.5;
+}
+
 .sn-page .sn-saved-indicator {
   color: var(--sn-accent);
   font-size: 12px;
