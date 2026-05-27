@@ -171,6 +171,12 @@
   const colorPicker =
     `<path d="M14 4l6 6l-3 3l-2-2l-9 9h-3v-3l9-9l-1-1z"/>`;
 
+  // --- Lock (lucchetto): corpo rettangolare con archetto sopra. Usato per la
+  //     voce "Sicurezza" nel menu Impostazioni.
+  const lock =
+    `<rect x="5" y="11" width="14" height="9" rx="1.5"/>` +
+    `<path d="M8 11V8a4 4 0 0 1 8 0v3"/>`;
+
   // --- Plus: croce simmetrica (usata per "nuova scheda" nella tab bar).
   const plus =
     `<path d="M12 5v14"/>` +
