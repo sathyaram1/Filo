@@ -1,35 +1,52 @@
 // Sicurezza (security settings):
 //
 //   - default delle impostazioni applicato (protectIpLeak + blockPopups ON)
-//   - la sezione "Sicurezza" appare nella pagina Opzioni con i due toggle e
-//     il box informativo sui servizi P2P
+//   - la pagina filo://security/ esiste, ha titolo "Sicurezza" e mostra
+//     i due toggle + il box informativo sui servizi P2P
 //   - il toggle si persiste nello storage dopo "Salva"
 //   - il popup blocker DAVVERO blocca un window.open() automatico (apertura
-//     senza gesto utente) — l'asserzione del successo del blocco è "non viene
-//     aperto un nuovo tab per quell'URL"
+//     senza gesto utente) — asserzione del successo: nessun nuovo tab creato
 //   - quando il popup blocker è disattivato, lo stesso window.open() PASSA
 //     (controllo che il test non sia un falso positivo dovuto ad altro)
 
 import { test, expect } from './fixtures/electron.mjs';
 
 test('default settings: security.protectIpLeak e blockPopups sono ON', async ({ openTab }) => {
-  const page = await openTab('filo://options/');
+  const page = await openTab('filo://security/');
   await expect(page.locator('#sec-protect-ip')).toBeAttached({ timeout: 8_000 });
   await expect(page.locator('#sec-protect-ip')).toBeChecked();
   await expect(page.locator('#sec-block-popups')).toBeChecked();
 });
 
-test('Opzioni: sezione "Sicurezza" presente con due toggle + box P2P', async ({ openTab }) => {
-  const page = await openTab('filo://options/');
-  await expect(page.locator('#h-security')).toHaveText('Sicurezza', { timeout: 8_000 });
+test('pagina Sicurezza dedicata: titolo + due toggle + box P2P', async ({ openTab }) => {
+  const page = await openTab('filo://security/');
+  await expect(page).toHaveTitle(/Sicurezza/);
+  await expect(page.locator('#title')).toHaveText('Sicurezza', { timeout: 8_000 });
   await expect(page.locator('#sec-protect-ip-label')).toHaveText(/IP locale.*WebRTC/i);
   await expect(page.locator('#sec-block-popups-label')).toHaveText(/popup non richiesti/i);
   await expect(page.locator('#sec-p2p-box-title')).toContainText(/P2P/);
   await expect(page.locator('#sec-p2p-box-body')).toContainText(/Snapdrop/);
 });
 
+test('voce "Sicurezza" nel menu Impostazioni con icona lucchetto', async ({ shell, app }) => {
+  // Click sull'ingranaggio per aprire il dropdown. Il menu è una BrowserWindow
+  // separata (popup-menu.js) — aspettiamo che compaia tra le windows.
+  await shell.locator('#nav-settings').click();
+  // Aspetta che la window del popup appaia
+  const deadline = Date.now() + 4_000;
+  let menuWin = null;
+  while (Date.now() < deadline) {
+    menuWin = app.windows().find((w) => /popup-menu|popupMenu/.test(w.url()));
+    if (menuWin) break;
+    await new Promise((r) => setTimeout(r, 80));
+  }
+  expect(menuWin, 'il popup del menu Impostazioni deve aprirsi').toBeTruthy();
+  // Verifica che la voce "Sicurezza" sia presente
+  await expect(menuWin.locator('text=Sicurezza')).toBeVisible({ timeout: 3_000 });
+});
+
 test('toggle persistito dopo salvataggio', async ({ openTab }) => {
-  const page = await openTab('filo://options/');
+  const page = await openTab('filo://security/');
   await page.waitForSelector('#sec-protect-ip', { timeout: 8_000 });
 
   // Disabilita la protezione IP e salva
@@ -70,12 +87,12 @@ test('popup blocker: window.open() automatico viene bloccato', async ({ openTab,
 });
 
 test('popup blocker disattivato: window.open() passa', async ({ openTab, testServer, shell }) => {
-  // Prima disattiva il blocco da Opzioni
-  const opt = await openTab('filo://options/');
-  await opt.waitForSelector('#sec-block-popups', { timeout: 8_000 });
-  await opt.locator('#sec-block-popups').uncheck();
-  await opt.locator('#save').click();
-  await expect(opt.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 4_000 });
+  // Prima disattiva il blocco dalla pagina Sicurezza
+  const sec = await openTab('filo://security/');
+  await sec.waitForSelector('#sec-block-popups', { timeout: 8_000 });
+  await sec.locator('#sec-block-popups').uncheck();
+  await sec.locator('#save').click();
+  await expect(sec.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 4_000 });
 
   // Ora ripeti il window.open automatico: deve aprire un nuovo tab
   const popupTarget = testServer.html('<title>POPUP_TARGET_OK</title><p>open</p>');
