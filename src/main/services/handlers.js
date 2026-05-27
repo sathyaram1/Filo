@@ -805,6 +805,12 @@ async function handleMessage(msg, sender = {}) {
         win?._filoTabs?.reload(sender.tab.id);
       }
       return { ok: true };
+    case MSG.NAV_STATE: {
+      if (!sender?.tab?.id) return { ok: false, canBack: false, canFwd: false };
+      const win = BrowserWindow.getAllWindows()[0];
+      const tab = win?._filoTabs?.tabs?.find((t) => t.id === sender.tab.id);
+      return { ok: true, canBack: !!tab?.canBack, canFwd: !!tab?.canFwd };
+    }
     case MSG.TOGGLE_FULLSCREEN: {
       // Il `document.requestFullscreen()` dal renderer di una WebContentsView
       // non porta la BrowserWindow a tutto schermo: la WebContentsView resta
