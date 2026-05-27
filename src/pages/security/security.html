@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <title>Filo — Sicurezza</title>
+  <link rel="icon" href="filo://asset/icons/icon-32.png" />
+  <link rel="stylesheet" href="filo://style/theme.css" />
+  <link rel="stylesheet" href="filo://style/pages.css" />
+  <script src="filo://shared/pageBootstrap.js"></script>
+  <script src="filo://shared/constants.js"></script>
+  <script src="filo://shared/messages.js"></script>
+  <script src="filo://shared/i18n.js"></script>
+  <script src="filo://shared/storage.js"></script>
+</head>
+<body>
+  <main class="sn-page" id="page">
+    <h1 id="title"></h1>
+
+    <section id="sec-security">
+      <div class="sn-toggle-row">
+        <label>
+          <input type="checkbox" id="sec-protect-ip" />
+          <span id="sec-protect-ip-label"></span>
+        </label>
+        <span class="sn-muted" id="sec-protect-ip-desc"></span>
+      </div>
+
+      <div class="sn-toggle-row">
+        <label>
+          <input type="checkbox" id="sec-block-popups" />
+          <span id="sec-block-popups-label"></span>
+        </label>
+        <span class="sn-muted" id="sec-block-popups-desc"></span>
+      </div>
+
+      <div class="sn-info-box" id="sec-p2p-box">
+        <div class="sn-info-box-title" id="sec-p2p-box-title"></div>
+        <div id="sec-p2p-box-body"></div>
+      </div>
+    </section>
+
+    <div class="sn-toolbar" style="margin-top: 24px;">
+      <button class="sn-btn" id="save"></button>
+      <span id="savedHint" class="sn-saved-indicator"></span>
+    </div>
+  </main>
+
+  <script src="security.js"></script>
+</body>
+</html>
