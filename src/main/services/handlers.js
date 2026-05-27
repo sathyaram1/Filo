@@ -618,6 +618,16 @@ async function handleMessage(msg, sender = {}) {
         const t = merged.theme;
         nativeTheme.themeSource = t === 'dark' ? 'dark' : t === 'light' ? 'light' : 'system';
       } catch (_) {}
+      // Propaga le impostazioni di sicurezza al TabManager così la nuova
+      // policy WebRTC + popup blocker si applicano immediatamente, senza
+      // aspettare un reload dei tab.
+      try {
+        for (const w of BrowserWindow.getAllWindows()) {
+          if (w._filoTabs && typeof w._filoTabs.setSecurity === 'function') {
+            w._filoTabs.setSecurity(merged.security || {});
+          }
+        }
+      } catch (_) {}
       return { ok: true, settings: merged };
     }
     case MSG.SAVE_PAGE: {
