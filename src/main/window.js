@@ -36,6 +36,18 @@ function createMainWindow() {
   const tabs = new TabManager(win, null, { shellHeight: SHELL_HEIGHT });
   win._filoTabs = tabs;
 
+  // Carica le impostazioni di sicurezza correnti e applicale prima che si apra
+  // il primo tab — così la policy WebRTC è già attiva e il popup blocker
+  // funziona sul newtab e su qualunque pagina successiva.
+  try {
+    const Storage = globalThis.SN_STORAGE;
+    if (Storage && typeof Storage.getSettings === 'function') {
+      Storage.getSettings().then((s) => {
+        try { tabs.setSecurity(s?.security || {}); } catch (_) {}
+      }).catch(() => {});
+    }
+  } catch (_) {}
+
   win.on('resize', () => tabs.layout());
   win.on('enter-full-screen', () => tabs.layout());
   win.on('leave-full-screen', () => tabs.layout());
