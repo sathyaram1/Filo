@@ -50,6 +50,33 @@ class TabManager {
     // (es. menu App) deve restare visibile sopra la WebContentsView attiva. Si
     // abbassa la view invece di nasconderla, evitando l'area vuota/bianca.
     this.topInset = 0;
+    // Snapshot delle impostazioni di sicurezza, ripopolato da setSecurity() ogni
+    // volta che l'utente salva da Opzioni. I default qui rispecchiano quelli in
+    // DEFAULT_SETTINGS.security così se setSecurity non viene mai chiamato la
+    // protezione è comunque attiva.
+    this.security = { protectIpLeak: true, blockPopups: true };
+  }
+
+  // Aggiorna le impostazioni di sicurezza e le riapplica a tutti i tab esistenti.
+  // Chiamato dal main subito dopo che l'utente salva da Opzioni.
+  setSecurity(security) {
+    this.security = {
+      protectIpLeak: security?.protectIpLeak !== false,
+      blockPopups: security?.blockPopups !== false,
+    };
+    for (const tab of this.tabs) {
+      this._applySecurity(tab);
+    }
+  }
+
+  // Applica la policy WebRTC sulla webContents di un singolo tab. È sicuro
+  // chiamarla più volte: setWebRTCIPHandlingPolicy è idempotente.
+  _applySecurity(tab) {
+    if (tab.isInternal) return; // le pagine filo:// sono fidate, niente da limitare
+    try {
+      const policy = this.security.protectIpLeak ? 'default_public_interface_only' : 'default';
+      tab.view.webContents.setWebRTCIPHandlingPolicy(policy);
+    } catch (_) { /* policy non supportata in qualche build */ }
   }
 
   // Riserva (o libera, con px=0) spazio sopra la view attiva e rifà il layout.
