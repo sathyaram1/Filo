@@ -117,6 +117,7 @@ class TabManager {
     };
 
     this._wireEvents(tab);
+    this._applySecurity(tab);
     this.win.contentView.addChildView(view);
     this.tabs.push(tab);
 
