@@ -539,11 +539,11 @@
   // ------------------------------------------------------------
   // Ordine verticale: riga icone globali → Aiuto → zona contestuale → Feedback.
   // La riga globale è stabile (ancora), la zona contestuale varia in base al click.
-  function buildMenuItems({ selInfo, linkEl, imgEl, editable, clipboardHistory }) {
+  function buildMenuItems({ selInfo, linkEl, imgEl, editable, clipboardHistory, navState }) {
     const items = [];
 
     // 1. Riga icone globali (max 5 + overflow). Tutte mute, etichetta in tooltip.
-    items.push(buildGlobalIconRow());
+    items.push(buildGlobalIconRow(navState));
 
     // 2. Aiuto — voce sempre presente, etichettata.
     items.push({ type: 'separator' });
