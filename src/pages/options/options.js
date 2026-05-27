@@ -425,10 +425,6 @@
       },
       monthlyLimitEur: parseFloat($('monthlyLimit').value) || 0,
       blocklist,
-      security: {
-        protectIpLeak: !!$('sec-protect-ip').checked,
-        blockPopups: !!$('sec-block-popups').checked,
-      },
     };
 
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
