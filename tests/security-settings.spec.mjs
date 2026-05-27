@@ -30,18 +30,19 @@ test('pagina Sicurezza dedicata: titolo + due toggle + box P2P', async ({ openTa
 
 test('voce "Sicurezza" nel menu Impostazioni con icona lucchetto', async ({ shell, app }) => {
   // Click sull'ingranaggio per aprire il dropdown. Il menu è una BrowserWindow
-  // separata (popup-menu.js) — aspettiamo che compaia tra le windows.
+  // separata (popup-menu.js) che si carica via `data:text/html` URL.
+  const before = new Set(app.windows().map((w) => w.url()));
   await shell.locator('#nav-settings').click();
-  // Aspetta che la window del popup appaia
+  // Aspetta che compaia una nuova window con URL data:text/html (popup-menu)
   const deadline = Date.now() + 4_000;
   let menuWin = null;
   while (Date.now() < deadline) {
-    menuWin = app.windows().find((w) => /popup-menu|popupMenu/.test(w.url()));
+    menuWin = app.windows().find((w) => w.url().startsWith('data:text/html') && !before.has(w.url()));
     if (menuWin) break;
     await new Promise((r) => setTimeout(r, 80));
   }
   expect(menuWin, 'il popup del menu Impostazioni deve aprirsi').toBeTruthy();
-  // Verifica che la voce "Sicurezza" sia presente
+  // Verifica che la voce "Sicurezza" sia presente nel menu
   await expect(menuWin.locator('text=Sicurezza')).toBeVisible({ timeout: 3_000 });
 });
 
