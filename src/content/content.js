@@ -294,8 +294,11 @@
     // sulle immagini (feedback alpha).
     if (editable) capturePasteContext(target);
     else pasteContext = null;
-    const clipboardHistory = await getClipboardHistory();
-    return buildMenuItems({ selInfo, linkEl, imgEl, editable, clipboardHistory });
+    const [clipboardHistory, navState] = await Promise.all([
+      getClipboardHistory(),
+      getNavState(),
+    ]);
+    return buildMenuItems({ selInfo, linkEl, imgEl, editable, clipboardHistory, navState });
   }
 
   // Sub-menu per una correzione "rosso" (parola): aggiungi al dizionario,
