@@ -1,22 +1,23 @@
 import { test, expect } from './fixtures/electron.mjs';
-import { createServer } from 'node:http';
 import zlib from 'node:zlib';
 
 // Feedback: su tutti i siti il colore della selezione del testo deve essere
-// quello base di Filo (arancione/terracotta), non il blu di sistema.
+// quello base di Filo (arancione/terracotta), non il blu di sistema/sito.
 //
-// Causa: il <link filo://style/theme.css> iniettato dal content script viene
-// bloccato dalla Content-Security-Policy (header HTTP) di molti siti reali —
-// repubblica, reddit, youtube — quindi la regola ::selection del tema non
-// arriva mai e la selezione resta del blu di sistema.
+// Causa: alcuni siti (es. repubblica) impongono una propria regola ::selection
+// blu, con specificità alta o !important, che batte quella iniettata dal tema
+// Filo. La selezione esce quindi blu invece che arancione.
 //
-// Fix: il colore viene iniettato anche via webContents.insertCSS (a livello di
-// user-agent), che ignora la CSP della pagina.
+// Fix: il colore Filo viene iniettato via webContents.insertCSS con
+// cssOrigin 'user' + !important. Nel cascade CSS le dichiarazioni !important di
+// origine "user" battono qualsiasi regola d'autore della pagina, quindi
+// l'arancione Filo vince ovunque.
 //
 // Verifica robusta: getComputedStyle NON espone le regole ::selection d'autore,
-// quindi non è affidabile. Qui selezioniamo del testo nero su sfondo bianco,
-// catturiamo uno screenshot reale e ispezioniamo i pixel della banda di
-// selezione: devono essere "caldi" (terracotta: R nettamente > B), non blu.
+// quindi non è affidabile. Qui selezioniamo del testo nero su sfondo bianco in
+// una pagina che impone un ::selection blu !important, catturiamo uno
+// screenshot reale e ispezioniamo i pixel della banda di selezione: devono
+// essere "caldi" (terracotta: R nettamente > B), non blu.
 
 // Decoder PNG minimale (8-bit, colorType 2/6) — niente dipendenze esterne.
 function decodePng(buf) {
