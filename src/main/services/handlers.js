@@ -843,7 +843,14 @@ async function handleMessage(msg, sender = {}) {
       // confinata al suo bounds attuale. Per andare davvero in fullscreen OS
       // dobbiamo agire sulla BrowserWindow (feedback alpha).
       const win = filoWin();
-      if (win) win.setFullScreen(!win.isFullScreen());
+      if (win?._filoTabs) {
+        // Non basta il fullscreen OS: la view resta confinata sotto la barra
+        // (tab + indirizzo). Per nascondere davvero la barra la view attiva deve
+        // coprire l'intera finestra. Esc esce (gestito in tabs.js).
+        win._filoTabs.toggleContentFullscreen();
+      } else if (win) {
+        win.setFullScreen(!win.isFullScreen());
+      }
       return { ok: true };
     }
     case MSG.OPEN_NEW_TAB: {
