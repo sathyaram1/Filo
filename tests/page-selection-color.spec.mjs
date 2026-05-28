@@ -26,10 +26,18 @@ test('selection color is Filo orange on external pages even under CSP', async ({
     .catch(() => {});
   await page.waitForTimeout(300);
 
-  const bg = await page.evaluate(() => {
+  const probe = await page.evaluate(() => {
     const el = document.getElementById('t');
-    return getComputedStyle(el, '::selection').backgroundColor || '';
+    const link = [...document.querySelectorAll('link[rel=stylesheet]')]
+      .find((l) => /filo:\/\/style\/theme\.css/.test(l.href));
+    return {
+      bg: getComputedStyle(el, '::selection').backgroundColor || '',
+      // Una <link> bloccata dalla CSP non espone .sheet: se è null, il colore
+      // NON può venire da theme.css → deve venire dall'insertCSS del fix.
+      themeLinkBlocked: !!link && link.sheet == null,
+    };
   });
 
-  expect(bg).toMatch(FILO_SELECTION);
+  expect(probe.themeLinkBlocked).toBe(true);
+  expect(probe.bg).toMatch(FILO_SELECTION);
 });
