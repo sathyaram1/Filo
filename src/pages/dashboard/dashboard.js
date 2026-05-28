@@ -230,10 +230,18 @@
     return div;
   }
 
+  // Mostra/nasconde il commento centrale di Filo (Preferenze → "Commento nella
+  // home"). I suggerimenti nella colonna sinistra restano comunque visibili.
+  function applyHomeMessageVisibility() {
+    homeMessageEl.hidden = !showHomeMessage;
+  }
+
   // ===== Generazione dashboard (messaggio centro + suggerimenti) =====
   async function loadDashboard({ force = false } = {}) {
-    homeMessageEl.classList.add('dash-home-msg-loading');
-    homeMessageEl.textContent = '…';
+    if (showHomeMessage) {
+      homeMessageEl.classList.add('dash-home-msg-loading');
+      homeMessageEl.textContent = '…';
+    }
     const r = await send({ type: MSG.FILO_GENERATE_DASHBOARD, force });
     if (!r?.ok) {
       homeMessageEl.classList.remove('dash-home-msg-loading');
