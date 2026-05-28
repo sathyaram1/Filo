@@ -262,7 +262,7 @@ class TabManager {
     const [w, h] = this.win.getContentSize();
     for (const tab of this.tabs) {
       if (tab.id === this.activeId) {
-        const top = this.shellHeight + this.topInset;
+        const top = this.contentFullscreen ? 0 : (this.shellHeight + this.topInset);
         const b = { x: 0, y: top, width: w, height: Math.max(0, h - top) };
         tab.view.setBounds(b);
         if (process.env.FILO_SMOKE) {
