@@ -49,10 +49,14 @@
       </div>
     </section>
 
-    <div class="sn-toolbar" style="margin-top: 24px;">
-      <button class="sn-btn" id="save">Salva</button>
-      <span id="savedHint" class="sn-saved-indicator">Salvato</span>
-    </div>
+    <section>
+      <h2>Stile dell'agente</h2>
+      <p class="sn-muted">Come deve scrivere Filo quando ti risponde (chat, Aiuto, spiegazioni, chat dell'editor). Scegli uno stile già pronto oppure scrivine uno tuo.</p>
+      <select id="agentStylePreset"></select>
+      <textarea id="agentStyleText" rows="4" placeholder="Es. Rispondi sempre in italiano, con un tono pacato e qualche esempio pratico." style="width:100%;margin-top:10px;"></textarea>
+    </section>
+
+    <span id="savedHint" class="sn-saved-indicator">Salvato</span>
   </main>
 
   <script src="preferences.js"></script>
