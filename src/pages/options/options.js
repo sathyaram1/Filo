@@ -474,6 +474,8 @@
     $('addModelRow').addEventListener('click', () => {
       $('modelRegistryList').appendChild(makeModelRow('', {}));
     });
+    // L'input dentro le righe del registry (creato dinamicamente) fa bubbling
+    // dell'evento `change` fino a #page, quindi è già coperto dall'handler sopra.
     $('openHome').addEventListener('click', () => {
       chrome.tabs.create({ url: chrome.runtime.getURL('src/pages/home/home.html') });
     });
