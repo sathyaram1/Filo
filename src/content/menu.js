@@ -331,7 +331,20 @@
     const onKey = (e) => {
       if (e.key === 'Escape') close();
     };
-    const onScroll = () => { if (!keepOnScroll) close(); };
+    const onScroll = (e) => {
+      if (keepOnScroll) return;
+      // Lo scroll DENTRO il menu (es. la lista scorrevole della cronologia
+      // incolla) NON deve chiudere il menu: il listener è in capture su window,
+      // quindi intercetta anche gli scroll dei discendenti. Senza questa guardia
+      // girare la rotella sulla lista chiude il box invece di scorrere gli
+      // appunti più vecchi (feedback alpha).
+      const t = e && e.target;
+      if (t && t.nodeType === 1) {
+        if (root.contains(t)) return;
+        if (activeMenu?.subRoot && activeMenu.subRoot.contains(t)) return;
+      }
+      close();
+    };
 
     document.addEventListener('mousedown', onDocClick, true);
     document.addEventListener('keydown', onKey, true);
