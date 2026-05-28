@@ -11,6 +11,7 @@
     SAVE_LINK: 'save_link',                       // { url, title }
     GET_SETTINGS: 'get_settings',
     UPDATE_SETTINGS: 'update_settings',           // { settings }
+    EXPORT_DATA: 'export_data',                   // → salva tutti i dati come .zip
     GET_HISTORY: 'get_history',
     APPEND_HISTORY: 'append_history',             // { entry }
     CLEAR_HISTORY: 'clear_history',
