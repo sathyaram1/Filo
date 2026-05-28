@@ -456,9 +456,18 @@
     }
   }
 
+  let saveTimer = null;
+  function saveDebounced() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(save, 400);
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     load();
-    $('save').addEventListener('click', save);
+    // Niente pulsante "Salva": ogni modifica viene applicata e persistita
+    // subito. I controlli testuali salvano allo `change` (cioè al blur), gli
+    // altri (select/checkbox) immediatamente.
+    $('page').addEventListener('change', () => saveDebounced());
     $('loadModels').addEventListener('click', loadModelsFromProvider);
     $('testOpenrouter').addEventListener('click', () => testProvider('openrouter', $('testOpenrouterStatus'), $('testOpenrouter')));
     $('testGemini').addEventListener('click', () => testProvider('gemini', $('testGeminiStatus'), $('testGemini')));
