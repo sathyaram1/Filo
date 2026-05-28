@@ -35,6 +35,7 @@
     NAV_RELOAD: 'nav_reload',
     NAV_STATE: 'nav_state',                         // → { ok, canBack, canFwd }
     TOGGLE_FULLSCREEN: 'toggle_fullscreen',
+    FULLSCREEN_CHANGED: 'fullscreen_changed',       // broadcast → { fullscreen: bool }
     OPEN_NEW_TAB: 'open_new_tab',
     REPLACE_MISSPELLING: 'replace_misspelling',     // { suggestion }
 
