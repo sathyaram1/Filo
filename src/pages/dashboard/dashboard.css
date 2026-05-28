@@ -344,7 +344,7 @@ body[data-state="thread"] .dash-suggestion { justify-content: flex-start; paddin
   font-size: 14px;
   line-height: 1;
 }
-.dash-live-dismiss:hover { background: rgba(196, 90, 59, 0.15); color: var(--dash-ink); }
+.dash-live-dismiss:hover { background: var(--dash-line); color: var(--dash-ink); }
 
 /* ===== Barra input (footer) ===== */
 .dash-input-wrap {
