@@ -55,9 +55,10 @@ test('la pagina Preferenze espone il toggle e ne riflette lo stato (#5)', async 
   await expect(box).toBeVisible({ timeout: 8_000 });
   // Default: spuntato.
   await expect(box).toBeChecked();
-  // Togli la spunta e salva → ricaricando lo stato è persistito.
+  // Togli la spunta → niente pulsante Salva, l'auto-save persiste subito
+  // (il "Salvato" lampeggia come conferma). Ricaricando lo stato è persistito.
   await box.uncheck();
-  await page.locator('#save').click();
+  await expect(page.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 4_000 });
   await page.reload();
   await expect(page.locator('#showHomeMessage')).not.toBeChecked({ timeout: 8_000 });
 });
