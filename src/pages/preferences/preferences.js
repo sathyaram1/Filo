@@ -17,6 +17,8 @@
     const opt = [...$('textScale').options].find((o) => o.value === scale);
     $('textScale').value = opt ? scale : '1';
 
+    $('showHomeMessage').checked = settings.showHomeMessage !== false;
+
     Bootstrap.applyTheme(settings.theme);
     Bootstrap.applyTextScale(settings.textScale);
   }
@@ -24,9 +26,10 @@
   async function save() {
     const theme = $('theme').value;
     const textScale = parseFloat($('textScale').value) || 1;
+    const showHomeMessage = $('showHomeMessage').checked;
     await chrome.runtime.sendMessage({
       type: MSG.UPDATE_SETTINGS,
-      settings: { theme, textScale },
+      settings: { theme, textScale, showHomeMessage },
     });
 
     window.SN_PAGE_THEME = theme;
