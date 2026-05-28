@@ -265,7 +265,7 @@ class TabManager {
     // ignora la CSP della pagina (che invece blocca il <link filo://> del
     // content script). Reiniettiamo a ogni dom-ready perché lo stylesheet
     // utente non sopravvive alle navigazioni a documento intero.
-    if (!tab.isInternal && !process.env.FILO_NO_SEL_CSS) {
+    if (!tab.isInternal) {
       wc.on('dom-ready', () => {
         try { wc.insertCSS(PAGE_SELECTION_CSS); } catch (_) {}
       });
