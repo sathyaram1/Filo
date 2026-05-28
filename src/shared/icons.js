@@ -225,6 +225,17 @@
     `<path d="M8 13h3"/>` +
     `<path d="M19.5 14.5l-6 6L11 21l.5-2.5 6-6a1.4 1.4 0 0 1 2 2z"/>`;
 
+  // --- Modelli AI: tre nodi connessi (rete neurale stilizzata).
+  //     Un nodo in alto, due in basso, collegati a coppie. Da distinguere
+  //     visivamente dall'ingranaggio "Impostazioni".
+  const models =
+    `<circle cx="12" cy="5" r="2"/>` +
+    `<circle cx="5.5" cy="18" r="2"/>` +
+    `<circle cx="18.5" cy="18" r="2"/>` +
+    `<path d="M11 6.7L6.5 16.3"/>` +
+    `<path d="M13 6.7L17.5 16.3"/>` +
+    `<path d="M7.5 18L16.5 18"/>`;
+
   // --- Alias semantico: "Salvati per dopo" usa il logo di Filo
   const openForLater = filoLogo;
 
