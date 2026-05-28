@@ -42,7 +42,6 @@
 
     $('lnkShortcuts').textContent = I18n.t('options_open_chrome_shortcuts');
 
-    $('save').textContent = I18n.t('options_save');
     $('savedHint').textContent = I18n.t('options_saved');
 
     $('testOpenrouter').textContent = I18n.t('options_test_provider');
