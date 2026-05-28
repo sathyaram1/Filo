@@ -588,7 +588,7 @@
       share:         { id: 'share',         icon: I('share'),       label: I18n.t('menu_share'),             onClick: () => shareCurrentPage() },
       saveForLater:  { id: 'saveForLater',  icon: I('saveForLater'),label: I18n.t('menu_save_for_later'),    onClick: () => savePage() },
       openForLater:  { id: 'openForLater',  icon: I('openForLater'),label: I18n.t('menu_open_for_later'),    onClick: () => chrome.runtime.sendMessage({ type: MSG.OPEN_HOME }) },
-      fullscreen:    { id: 'fullscreen',    icon: document.fullscreenElement ? I('shrink') : I('zoom'), label: document.fullscreenElement ? I18n.t('menu_exit_fullscreen') : I18n.t('menu_fullscreen'), onClick: () => toggleFullscreen() },
+      fullscreen:    { id: 'fullscreen',    icon: (document.fullscreenElement || contentFullscreen) ? I('shrink') : I('zoom'), label: (document.fullscreenElement || contentFullscreen) ? I18n.t('menu_exit_fullscreen') : I18n.t('menu_fullscreen'), onClick: () => toggleFullscreen() },
       back:          { id: 'back',          icon: I('back'),        label: I18n.t('menu_back'),              disabled: !canBack, onClick: () => chrome.runtime.sendMessage({ type: MSG.NAV_BACK }) },
       forward:       { id: 'forward',       icon: I('forward'),     label: I18n.t('menu_forward'),           disabled: !canFwd, onClick: () => chrome.runtime.sendMessage({ type: MSG.NAV_FORWARD }) },
       reload:        { id: 'reload',        icon: I('reload'),      label: I18n.t('menu_reload'),            onClick: () => chrome.runtime.sendMessage({ type: MSG.NAV_RELOAD }) },
