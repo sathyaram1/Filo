@@ -50,7 +50,12 @@ function createMainWindow() {
 
   win.on('resize', () => tabs.layout());
   win.on('enter-full-screen', () => tabs.layout());
-  win.on('leave-full-screen', () => tabs.layout());
+  // Se l'utente esce dal fullscreen OS con un gesto/scorciatoia di sistema,
+  // ripristina anche la barra (esce dalla modalità contenuto a tutto schermo).
+  win.on('leave-full-screen', () => {
+    if (tabs.contentFullscreen) tabs.setContentFullscreen(false);
+    else tabs.layout();
+  });
 
   win.webContents.once('did-finish-load', async () => {
     // Riapre i tab della sessione precedente; se non c'è nulla da ripristinare
