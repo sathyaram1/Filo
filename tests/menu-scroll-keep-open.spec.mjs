@@ -76,7 +76,7 @@ test('rotella sulla cronologia incolla: scorre e NON chiude il menu', async ({ t
     await page.waitForTimeout(150);
 
     // Il menu è ANCORA aperto (prima del fix qui veniva chiuso).
-    await expect(page.locator('.sn-menu')).toBeVisible();
+    await expect(page.locator('.sn-menu:not(.sn-menu-sub)')).toBeVisible();
     await expect(sub).toBeVisible();
 
     // E lo scroll ha effettivamente spostato la lista verso le voci più vecchie.
