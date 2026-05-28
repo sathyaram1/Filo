@@ -638,35 +638,41 @@
 /* Scrollbar Filo nei componenti iniettati (menu, editbox, submenu) */
 .sn-editbox-original,
 .sn-editbox-proposed,
-.sn-menu-sub {
+.sn-menu-sub,
+.sn-menu-history-list {
   scrollbar-width: thin;
   scrollbar-color: var(--sn-border) transparent;
 }
 .sn-editbox-original::-webkit-scrollbar,
 .sn-editbox-proposed::-webkit-scrollbar,
-.sn-menu-sub::-webkit-scrollbar {
+.sn-menu-sub::-webkit-scrollbar,
+.sn-menu-history-list::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 .sn-editbox-original::-webkit-scrollbar-track,
 .sn-editbox-proposed::-webkit-scrollbar-track,
-.sn-menu-sub::-webkit-scrollbar-track {
+.sn-menu-sub::-webkit-scrollbar-track,
+.sn-menu-history-list::-webkit-scrollbar-track {
   background: transparent;
 }
 .sn-editbox-original::-webkit-scrollbar-thumb,
 .sn-editbox-proposed::-webkit-scrollbar-thumb,
-.sn-menu-sub::-webkit-scrollbar-thumb {
+.sn-menu-sub::-webkit-scrollbar-thumb,
+.sn-menu-history-list::-webkit-scrollbar-thumb {
   background: var(--sn-border);
   border-radius: 999px;
 }
 .sn-editbox-original::-webkit-scrollbar-thumb:hover,
 .sn-editbox-proposed::-webkit-scrollbar-thumb:hover,
-.sn-menu-sub::-webkit-scrollbar-thumb:hover {
+.sn-menu-sub::-webkit-scrollbar-thumb:hover,
+.sn-menu-history-list::-webkit-scrollbar-thumb:hover {
   background: var(--sn-accent);
 }
 .sn-editbox-original::-webkit-scrollbar-button,
 .sn-editbox-proposed::-webkit-scrollbar-button,
-.sn-menu-sub::-webkit-scrollbar-button {
+.sn-menu-sub::-webkit-scrollbar-button,
+.sn-menu-history-list::-webkit-scrollbar-button {
   display: none;
   width: 0;
   height: 0;
