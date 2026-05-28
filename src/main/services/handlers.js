@@ -289,7 +289,8 @@ async function handleAIRequest({ action, payload, origin }) {
 async function handleStream({ action, payload, origin, onDelta, onMeta, signal }) {
   const settings = await Storage.getSettings();
   const model = modelForAction(settings, action);
-  const messages = await buildMessages(action, payload);
+  let messages = await buildMessages(action, payload);
+  messages = SN_CONST.injectAgentStyle(messages, action, settings.agentStyle);
   if (onMeta) onMeta({ model, provider: settings.provider });
 
   const cached = await AICache.get({ provider: settings.provider, model, messages });
