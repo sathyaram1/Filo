@@ -29,6 +29,7 @@
 
   // ===== Stato locale =====
   let suggestions = [];
+  let showHomeMessage = true; // commento centrale (disattivabile da Preferenze)
   let expanded = false;
   let threadHistory = []; // [{role: 'user'|'filo', text, actions?}]
   let sending = false;
