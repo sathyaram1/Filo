@@ -20,7 +20,35 @@
     $('sec-block-popups-desc').textContent = I18n.t('options_security_block_popups_desc');
     $('sec-p2p-box-title').textContent = I18n.t('options_security_p2p_box_title');
     $('sec-p2p-box-body').textContent = I18n.t('options_security_p2p_box_body');
+    $('sec-export-btn').textContent = I18n.t('security_export_btn');
+    $('sec-export-desc').textContent = I18n.t('security_export_desc');
     $('savedHint').textContent = I18n.t('options_saved');
+  }
+
+  async function exportData() {
+    const btn = $('sec-export-btn');
+    const hint = $('sec-export-hint');
+    btn.disabled = true;
+    try {
+      const res = await chrome.runtime.sendMessage({ type: MSG.EXPORT_DATA });
+      if (res && res.ok) {
+        hint.textContent = I18n.t('security_export_done');
+        hint.classList.remove('sn-error');
+        hint.classList.add('sn-show');
+      } else if (res && res.canceled) {
+        // L'utente ha annullato il dialog: nessun messaggio.
+      } else {
+        hint.textContent = I18n.t('security_export_fail');
+        hint.classList.add('sn-show', 'sn-error');
+      }
+    } catch (_) {
+      hint.textContent = I18n.t('security_export_fail');
+      hint.classList.add('sn-show', 'sn-error');
+    } finally {
+      btn.disabled = false;
+      clearTimeout(exportData._t);
+      exportData._t = setTimeout(() => hint.classList.remove('sn-show'), 2500);
+    }
   }
 
   async function load() {
