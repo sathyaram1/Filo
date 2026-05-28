@@ -27,12 +27,12 @@ const NATIVE_MENU_PAGES = [
 // pagina, garantendo l'arancione Filo ovunque. Niente var() qui: i custom
 // properties non si risolvono in modo affidabile dentro ::selection.
 const PAGE_SELECTION_CSS = `
-::selection { background-color: rgba(196, 90, 59, 0.30); }
-::-moz-selection { background-color: rgba(196, 90, 59, 0.30); }
-[data-sn-theme="light"] ::selection { background-color: rgba(196, 90, 59, 0.25); }
-[data-sn-theme="light"] ::-moz-selection { background-color: rgba(196, 90, 59, 0.25); }
-[data-sn-theme="dark"] ::selection { background-color: rgba(196, 90, 59, 0.35); }
-[data-sn-theme="dark"] ::-moz-selection { background-color: rgba(196, 90, 59, 0.35); }
+::selection { background-color: rgba(196, 90, 59, 0.30) !important; }
+::-moz-selection { background-color: rgba(196, 90, 59, 0.30) !important; }
+[data-sn-theme="light"] ::selection { background-color: rgba(196, 90, 59, 0.25) !important; }
+[data-sn-theme="light"] ::-moz-selection { background-color: rgba(196, 90, 59, 0.25) !important; }
+[data-sn-theme="dark"] ::selection { background-color: rgba(196, 90, 59, 0.35) !important; }
+[data-sn-theme="dark"] ::-moz-selection { background-color: rgba(196, 90, 59, 0.35) !important; }
 `;
 
 function buildNativeContextMenu(wc, params) {
