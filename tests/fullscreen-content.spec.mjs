@@ -18,8 +18,11 @@ function readActiveView(app) {
   });
 }
 
-test('fullscreen: il contenuto copre la barra e Esc ripristina', async ({ app, testServer, openTab }) => {
-  const page = await testServer.openReady(openTab, '<h1>pagina</h1>');
+test('fullscreen: il contenuto copre la barra e Esc ripristina', async ({ app, openTab }) => {
+  // Pagina interna (chrome shim disponibile via internal-preload) e istanza
+  // unica, così la Page trovata è proprio il tab attivo.
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForFunction(() => !!(window.chrome && chrome.runtime && chrome.runtime.sendMessage), null, { timeout: 8000 });
 
   // Stato iniziale: la view sta SOTTO la barra della shell.
   const before = await readActiveView(app);
