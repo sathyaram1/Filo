@@ -362,6 +362,63 @@ class TabManager {
     try {
       this.win.webContents.send('tabs:updated', this.snapshot());
     } catch (_) { /* shell non ancora caricata */ }
+    this._persistSession();
+  }
+
+  // ─── persistenza sessione (riapri i tab alla riapertura di Filo) ──────────
+
+  // Stato minimale da salvare/ripristinare: gli URL dei tab e quale era attivo.
+  sessionState() {
+    const tabs = this.tabs
+      .map((t) => t.url)
+      .filter((u) => typeof u === 'string' && u && u !== 'about:blank');
+    let activeIndex = this.tabs.findIndex((t) => t.id === this.activeId);
+    if (activeIndex < 0) activeIndex = 0;
+    return { tabs, activeIndex };
+  }
+
+  _sessionKey() {
+    return globalThis.SN_CONST?.STORAGE_KEYS?.OPEN_TABS || 'sn_open_tabs';
+  }
+
+  // Salvataggio con debounce: _broadcast scatta spesso (load, titolo, favicon),
+  // collassiamo le scritture ravvicinate.
+  _persistSession() {
+    if (this._restoring) return; // non sovrascrivere mentre stiamo ripristinando
+    clearTimeout(this._sessionTimer);
+    this._sessionTimer = setTimeout(() => {
+      try {
+        globalThis.SN_STORAGE?.setRaw?.(this._sessionKey(), this.sessionState());
+      } catch (_) {}
+    }, 400);
+  }
+
+  // Riapre i tab della sessione precedente. Ritorna true se ha ripristinato
+  // qualcosa, false se non c'era nulla da ripristinare (il chiamante aprirà
+  // allora un newtab vuoto).
+  async restoreSession() {
+    let urls = [];
+    let activeIndex = 0;
+    try {
+      const saved = await globalThis.SN_STORAGE?.getRaw?.(this._sessionKey(), null);
+      if (saved && Array.isArray(saved.tabs)) {
+        urls = saved.tabs.filter((u) => typeof u === 'string' && u);
+        if (Number.isInteger(saved.activeIndex)) activeIndex = saved.activeIndex;
+      }
+    } catch (_) {}
+    if (!urls.length) return false;
+
+    this._restoring = true;
+    try {
+      for (const url of urls) this.openTab(url, { activate: false });
+      if (activeIndex < 0 || activeIndex >= this.tabs.length) activeIndex = this.tabs.length - 1;
+      const target = this.tabs[activeIndex];
+      if (target) this.activate(target.id);
+    } finally {
+      this._restoring = false;
+    }
+    this._persistSession();
+    return true;
   }
 }
 
