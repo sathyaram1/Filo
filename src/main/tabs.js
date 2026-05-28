@@ -267,7 +267,12 @@ class TabManager {
     // utente non sopravvive alle navigazioni a documento intero.
     if (!tab.isInternal && !process.env.FILO_NO_SEL_CSS) {
       wc.on('dom-ready', () => {
-        try { wc.insertCSS(PAGE_SELECTION_CSS); } catch (_) {}
+        // cssOrigin 'user' + !important: nel cascade CSS le dichiarazioni
+        // !important di origine "user" battono qualsiasi regola d'autore della
+        // pagina, anche con specificità alta o !important. Così l'arancione
+        // Filo vince anche sui siti (repubblica, ecc.) che impongono un
+        // ::selection blu tutto loro.
+        try { wc.insertCSS(PAGE_SELECTION_CSS, { cssOrigin: 'user' }); } catch (_) {}
       });
     }
 
