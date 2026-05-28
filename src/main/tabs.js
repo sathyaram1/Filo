@@ -66,6 +66,10 @@ class TabManager {
     // (es. menu App) deve restare visibile sopra la WebContentsView attiva. Si
     // abbassa la view invece di nasconderla, evitando l'area vuota/bianca.
     this.topInset = 0;
+    // Modalità "contenuto a tutto schermo": la WebContentsView attiva copre
+    // l'intera finestra, nascondendo la barra (tab + indirizzo) della shell.
+    // Attivata dal menu (voce "Schermo intero"); si esce con Esc.
+    this.contentFullscreen = false;
     // Snapshot delle impostazioni di sicurezza, ripopolato da setSecurity() ogni
     // volta che l'utente salva da Opzioni. I default qui rispecchiano quelli in
     // DEFAULT_SETTINGS.security così se setSecurity non viene mai chiamato la
