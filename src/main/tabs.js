@@ -282,6 +282,15 @@ class TabManager {
       Object.assign(tab, patch);
       this._broadcast();
     };
+    // In modalità "contenuto a tutto schermo" la pagina copre la barra, quindi
+    // Esc deve riportare la shell. Intercettiamo il tasto prima che la pagina lo
+    // gestisca (vale anche per i siti esterni, senza dipendere dai content script).
+    wc.on('before-input-event', (event, input) => {
+      if (this.contentFullscreen && input.type === 'keyDown' && input.key === 'Escape') {
+        event.preventDefault();
+        this.setContentFullscreen(false);
+      }
+    });
     // Debug helper: in dev relay i log della pagina al main.
     if (process.env.NODE_ENV !== 'production') {
       wc.on('console-message', (_e, level, message, line, source) => {
