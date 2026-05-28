@@ -55,7 +55,7 @@ test('rotella sulla cronologia incolla: scorre e NON chiude il menu', async ({ t
     await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
 
     await page.locator('#ta').click({ button: 'right' });
-    await expect(page.locator('.sn-menu')).toBeVisible();
+    await expect(page.locator('.sn-menu:not(.sn-menu-sub)')).toBeVisible();
     await page.locator('.sn-menu-paste-arrow').click();
 
     const sub = page.locator('.sn-menu-history-sub');
