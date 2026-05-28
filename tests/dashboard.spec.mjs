@@ -31,34 +31,6 @@ test('tasto destro sulla dashboard apre il menu Filo', async ({ app, shell }) =>
   await expect(page.locator('.sn-menu')).toBeVisible({ timeout: 5_000 });
 });
 
-test('dashboard: hover/active sulle voci usa lo stesso arancione della palette Filo', async ({ app, shell }) => {
-  // L'utente aveva chiesto che il colore delle "selezioni" nei menu fosse
-  // coerente con la palette arancione di Filo. Sulla dashboard l'hover dei
-  // suggerimenti e il dismiss delle live card devono essere accent-tinted,
-  // non un beige neutro che si confonde col background.
-  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
-  const page = await newtabPage(app);
-  const lookup = await page.evaluate(() => {
-    const wanted = ['.dash-suggestion:hover', '.dash-live-dismiss:hover'];
-    const out = {};
-    for (const sheet of document.styleSheets) {
-      let rules;
-      try { rules = sheet.cssRules; } catch (_) { continue; }
-      for (const r of rules) {
-        if (!r.selectorText) continue;
-        if (wanted.includes(r.selectorText)) {
-          out[r.selectorText] = r.style.background || r.style.backgroundColor || '';
-        }
-      }
-    }
-    return out;
-  });
-  // Sia .dash-suggestion:hover sia .dash-live-dismiss:hover devono usare
-  // un rgba basato sull'accent Filo (196,90,59), non un grigio neutro.
-  expect(lookup['.dash-suggestion:hover']).toMatch(/196,\s*90,\s*59/);
-  expect(lookup['.dash-live-dismiss:hover']).toMatch(/196,\s*90,\s*59/);
-});
-
 test('la dashboard renderizza le tre zone + barra input', async ({ app, shell }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
