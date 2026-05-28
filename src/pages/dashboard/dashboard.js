@@ -486,6 +486,10 @@
     '/newtab': () => { send({ type: MSG.OPEN_URL, url: 'filo://newtab/' }); },
     '/models': () => { send({ type: MSG.OPEN_OPTIONS }); },
     '/modelli': () => { send({ type: MSG.OPEN_OPTIONS }); },
+    '/sicurezza': () => { send({ type: MSG.OPEN_URL, url: 'filo://security/security.html' }); },
+    '/preferenze': () => { send({ type: MSG.OPEN_URL, url: 'filo://preferences/preferences.html' }); },
+    '/editor': () => { send({ type: MSG.OPEN_URL, url: 'filo://editor/editor.html' }); },
+    '/feedback': () => { send({ type: MSG.OPEN_URL, url: 'filo://feedback/feedback.html' }); },
     '/help': () => {
       if (body.dataset.state !== 'thread') goThread();
       const lines = [
@@ -493,6 +497,10 @@
         '/kill — chiudi Filo',
         '/newtab — apri una nuova scheda',
         '/models, /modelli — impostazioni modelli',
+        '/sicurezza — impostazioni sicurezza',
+        '/preferenze — preferenze',
+        '/editor — apri l\'editor',
+        '/feedback — apri i feedback',
         '/help — lista comandi',
         '/google.com — apri un sito',
       ];
