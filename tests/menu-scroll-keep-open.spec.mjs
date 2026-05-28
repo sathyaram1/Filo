@@ -60,6 +60,19 @@ test('rotella sulla cronologia incolla: scorre e NON chiude il menu', async ({ t
 
     const sub = page.locator('.sn-menu-history-sub');
     await expect(sub).toBeVisible();
+
+    // "compare separato dal box principale": la cronologia deve apparire
+    // ATTACCATA al menu, non come un riquadro fluttuante staccato. Il bordo
+    // sinistro del sotto-menu deve combaciare col bordo destro del menu padre.
+    const gap = await page.evaluate(() => {
+      const main = document.querySelector('.sn-menu:not(.sn-menu-sub)');
+      const histo = document.querySelector('.sn-menu-history-sub');
+      const m = main.getBoundingClientRect();
+      const s = histo.getBoundingClientRect();
+      return Math.abs(s.left - m.right);
+    });
+    expect(gap, 'il sotto-menu deve toccare il box principale').toBeLessThanOrEqual(6);
+
     const list = sub.locator('.sn-menu-history-list');
     await expect(list.locator('.sn-menu-history-item').first()).toBeVisible();
 
