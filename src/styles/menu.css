@@ -540,6 +540,7 @@
 }
 .sn-menu-icon-btn:disabled {
   color: var(--sn-muted);
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
