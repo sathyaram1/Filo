@@ -547,12 +547,21 @@
       refreshLive().catch(() => {});
     } else if (msg?.type === MSG.SETTINGS_UPDATED) {
       applySavedTheme().catch(() => {});
+      if (msg.settings && typeof msg.settings.showHomeMessage === 'boolean') {
+        showHomeMessage = msg.settings.showHomeMessage;
+        applyHomeMessageVisibility();
+      }
     }
   });
 
   // ===== Bootstrap =====
   (async function init() {
     await applySavedTheme();
+    try {
+      const settings = await self.SN_STORAGE?.getSettings?.();
+      showHomeMessage = settings?.showHomeMessage !== false;
+    } catch (_) {}
+    applyHomeMessageVisibility();
     // Carico in parallelo dashboard cache e live state per non sequenziare.
     await Promise.all([
       loadDashboard().catch((e) => console.warn('[Filo] dashboard load', e)),
