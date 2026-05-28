@@ -83,5 +83,6 @@
     // Niente pulsante "Salva": ogni toggle viene applicato e persistito subito.
     $('sec-protect-ip').addEventListener('change', save);
     $('sec-block-popups').addEventListener('change', save);
+    $('sec-export-btn').addEventListener('click', exportData);
   });
 })();
