@@ -46,11 +46,14 @@
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
     const hint = $('savedHint');
     hint.classList.add('sn-show');
-    setTimeout(() => hint.classList.remove('sn-show'), 1500);
+    clearTimeout(save._t);
+    save._t = setTimeout(() => hint.classList.remove('sn-show'), 1500);
   }
 
   document.addEventListener('DOMContentLoaded', () => {
     load();
-    $('save').addEventListener('click', save);
+    // Niente pulsante "Salva": ogni toggle viene applicato e persistito subito.
+    $('sec-protect-ip').addEventListener('change', save);
+    $('sec-block-popups').addEventListener('change', save);
   });
 })();
