@@ -27,6 +27,14 @@ const ICON_PATHS = {
   lock:
     '<rect x="5" y="11" width="14" height="9" rx="1.5"/>' +
     '<path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+
+  models:
+    '<circle cx="12" cy="5" r="2"/>' +
+    '<circle cx="5.5" cy="18" r="2"/>' +
+    '<circle cx="18.5" cy="18" r="2"/>' +
+    '<path d="M11 6.7L6.5 16.3"/>' +
+    '<path d="M13 6.7L17.5 16.3"/>' +
+    '<path d="M7.5 18L16.5 18"/>',
 };
 
 function iconSvg(name, size) {
