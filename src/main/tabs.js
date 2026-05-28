@@ -261,6 +261,16 @@ class TabManager {
         console.error(`[tab:${tab.id.slice(0, 6)}] did-fail-load`, code, desc, url);
       });
     }
+    // Colore selezione testo coerente con Filo sui siti esterni. insertCSS
+    // ignora la CSP della pagina (che invece blocca il <link filo://> del
+    // content script). Reiniettiamo a ogni dom-ready perché lo stylesheet
+    // utente non sopravvive alle navigazioni a documento intero.
+    if (!tab.isInternal) {
+      wc.on('dom-ready', () => {
+        try { wc.insertCSS(PAGE_SELECTION_CSS); } catch (_) {}
+      });
+    }
+
     wc.on('did-start-loading', () => update({ loading: true }));
     wc.on('did-stop-loading', () => {
       update({
