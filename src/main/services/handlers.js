@@ -853,6 +853,13 @@ async function handleMessage(msg, sender = {}) {
       }
       return { ok: true };
     }
+    case MSG.EXIT_FULLSCREEN: {
+      // Uscita idempotente dalla modalità contenuto a tutto schermo (Esc dalla
+      // pagina). Idempotente così convive col fallback before-input-event.
+      const win = filoWin();
+      if (win?._filoTabs) win._filoTabs.setContentFullscreen(false);
+      return { ok: true };
+    }
     case MSG.OPEN_NEW_TAB: {
       const win = filoWin();
       if (win?._filoTabs) win._filoTabs.openTab(msg.url || 'filo://newtab/');
