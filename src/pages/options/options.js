@@ -187,7 +187,7 @@
     del.type = 'button';
     del.className = 'sn-btn sn-btn-secondary';
     del.textContent = I18n.t('options_model_remove');
-    del.addEventListener('click', () => row.remove());
+    del.addEventListener('click', () => { row.remove(); save(); });
 
     row.appendChild(nickIn);
     row.appendChild(labelIn);
