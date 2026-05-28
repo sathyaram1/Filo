@@ -72,9 +72,9 @@ test('toggle persistito dopo salvataggio', async ({ openTab }) => {
   const page = await openTab('filo://security/');
   await page.waitForSelector('#sec-protect-ip', { timeout: 8_000 });
 
-  // Disabilita la protezione IP e salva
+  // Disabilita la protezione IP: niente pulsante Salva, il cambiamento si
+  // applica e persiste subito (il "Salvato" lampeggia come conferma).
   await page.locator('#sec-protect-ip').uncheck();
-  await page.locator('#save').click();
   await expect(page.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 4_000 });
 
   // Ricarica la pagina e verifica che il toggle sia rimasto disabilitato
