@@ -246,7 +246,8 @@ function buildAttemptChain(settings, modelRef) {
 async function handleAIRequest({ action, payload, origin }) {
   const settings = await Storage.getSettings();
   const model = modelForAction(settings, action, payload?.modelOverride);
-  const messages = await buildMessages(action, payload);
+  let messages = await buildMessages(action, payload);
+  messages = SN_CONST.injectAgentStyle(messages, action, settings.agentStyle);
 
   const cached = await AICache.get({ provider: settings.provider, model, messages });
   if (cached) {
