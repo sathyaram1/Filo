@@ -269,6 +269,7 @@
     apps:         (size) => wrap(apps, { size }),
     caretDown:    (size) => wrap(caretDown, { size }),
     editor:       (size) => wrap(editor, { size }),
+    models:       (size) => wrap(models, { size }),
     openForLater: (size) => wrap(openForLater, { size }),
   };
 
