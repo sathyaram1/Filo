@@ -33,6 +33,16 @@ const KNOWN_PATHS_BUDGET_CHARS = 20 * 1024;
 const DASHBOARD_REFRESH_COOLDOWN_MS = 5 * 60 * 1000;
 const FREE_PROVIDERS = new Set(['gemini']);
 
+// Finestra principale di Filo, quella che possiede il TabManager. NON usare
+// getAllWindows()[0]: le finestre figlie (tooltip, popup-menu — create con
+// parent:mainWindow) si inseriscono in testa all'array in Electron, quindi
+// dopo il primo hover su un tooltip [0] è la finestra del tooltip, senza
+// _filoTabs, e comandi come /newtab o /modelli smettono di funzionare.
+function filoWin() {
+  const wins = BrowserWindow.getAllWindows();
+  return wins.find((w) => w._filoTabs) || wins[0] || null;
+}
+
 // ─── helpers (identici al background.js originale) ──────────────────────────
 
 function clusterKey(p) {
