@@ -101,7 +101,7 @@ html, body {
   width: 100%;
 }
 .dash-suggestion:hover {
-  background: rgba(196, 90, 59, 0.15);
+  background: var(--dash-card);
   color: var(--dash-ink);
 }
 .dash-suggestion .dash-sug-icon {
