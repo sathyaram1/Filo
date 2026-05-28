@@ -622,6 +622,34 @@ async function handleMessage(msg, sender = {}) {
     }
     case MSG.GET_SETTINGS:
       return { ok: true, settings: await Storage.getSettings() };
+    case MSG.EXPORT_DATA: {
+      // Esporta TUTTI i dati di Filo in un unico .zip (data.json + immagini
+      // copiate estratte come file). L'utente sceglie dove salvarlo.
+      try {
+        const { dialog } = require('electron');
+        const fsp = require('node:fs/promises');
+        const DiskStorage = require('../shim/storage');
+        const { buildExportZip } = require('./exportData');
+
+        const allData = await DiskStorage.get(null);
+        const zip = buildExportZip(allData);
+
+        const win = filoWin();
+        const stamp = new Date().toISOString().slice(0, 10);
+        const defaultPath = `filo-export-${stamp}.zip`;
+        const res = await dialog.showSaveDialog(win || undefined, {
+          title: I18n.t('security_export_title'),
+          defaultPath,
+          filters: [{ name: 'ZIP', extensions: ['zip'] }],
+        });
+        if (res.canceled || !res.filePath) return { ok: false, canceled: true };
+        await fsp.writeFile(res.filePath, zip);
+        return { ok: true, path: res.filePath, bytes: zip.length };
+      } catch (e) {
+        console.error('[Filo export] fallito:', e);
+        return { ok: false, error: String(e?.message || e) };
+      }
+    }
     case MSG.UPDATE_SETTINGS: {
       const merged = await Storage.updateSettings(msg.settings);
       broadcastToTabs({ type: MSG.SETTINGS_UPDATED, settings: merged });
