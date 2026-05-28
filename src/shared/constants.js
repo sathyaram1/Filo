@@ -655,6 +655,63 @@
     },
   };
 
+  // Preset di stile per gli agenti rivolti all'utente. `key` è solo per l'UI;
+  // ciò che viene salvato e iniettato è `text`. `key: ''` = nessuno stile.
+  const AGENT_STYLE_PRESETS = [
+    { key: '', label: 'Nessuno (predefinito)', text: '' },
+    {
+      key: 'professionale',
+      label: 'Professionale',
+      text: 'Rispondi in modo professionale e formale: tono cortese e competente, frasi chiare e precise, niente gergo eccessivo né battute.',
+    },
+    {
+      key: 'amichevole',
+      label: 'Amichevole',
+      text: 'Rispondi in modo amichevole e caloroso, come faresti con un amico: tono informale, incoraggiante e positivo.',
+    },
+    {
+      key: 'conciso',
+      label: 'Conciso',
+      text: 'Rispondi nel modo più conciso possibile: vai dritto al punto, niente preamboli, ripetizioni o chiusure superflue.',
+    },
+    {
+      key: 'dettagliato',
+      label: 'Dettagliato',
+      text: 'Fornisci risposte complete e approfondite, con esempi e spiegazioni passo passo quando aiutano la comprensione.',
+    },
+  ];
+
+  // Azioni "conversazionali" rivolte all'utente: ricevono lo stile di scrittura
+  // scelto in Preferenze. Le azioni puramente funzionali (traduzione,
+  // categorizzazione, spellcheck, transcribe) NON lo ricevono, per non
+  // alterarne l'output strutturato.
+  const STYLE_AWARE_ACTIONS = [
+    ACTIONS.EXPLAIN,
+    ACTIONS.EXPLAIN_DEEP,
+    ACTIONS.EXPLAIN_LINK,
+    ACTIONS.HELP,
+    ACTIONS.FILO_CHAT,
+    ACTIONS.FILO_DASHBOARD,
+  ];
+
+  // Inietta lo stile di scrittura dell'utente nei messaggi di una richiesta AI.
+  // Funzione pura (testabile): se `action` è style-aware e `styleText` non è
+  // vuoto, aggiunge l'istruzione al primo messaggio di sistema (se presente e
+  // testuale), altrimenti la antepone come nuovo messaggio di sistema.
+  function injectAgentStyle(messages, action, styleText) {
+    const style = typeof styleText === 'string' ? styleText.trim() : '';
+    if (!Array.isArray(messages) || !style) return messages;
+    if (!STYLE_AWARE_ACTIONS.includes(action)) return messages;
+    const note = `Stile di scrittura richiesto dall'utente — applicalo a tutte le tue risposte:\n${style}`;
+    const idx = messages.findIndex((m) => m && m.role === 'system' && typeof m.content === 'string');
+    if (idx >= 0) {
+      const copy = messages.slice();
+      copy[idx] = { ...copy[idx], content: `${copy[idx].content}\n\n${note}` };
+      return copy;
+    }
+    return [{ role: 'system', content: note }, ...messages];
+  }
+
   // chrome.storage.local ha una quota di ~10 MB per estensione (senza
   // "unlimitedStorage" nel manifest), condivisa con aiCache/savedPages/costs.
   // Lasciamo abbondante margine per gli altri consumer.
