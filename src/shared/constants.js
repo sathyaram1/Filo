@@ -17,6 +17,9 @@
     PERSONAL_DICT: 'sn_personal_dict',
     AUTOCORRECT: 'sn_autocorrect',
     ICON_LAYOUT: 'sn_icon_layout',
+    // Sessione del browser: tab aperti (URL) + indice del tab attivo, per
+    // riaprirli alla riapertura di Filo. { tabs: string[], activeIndex: number }.
+    OPEN_TABS: 'sn_open_tabs',
     // === Filo dashboard / memoria ===
     // RAW_LOG: array di {ts, type, summary, extra?} — vedi filoMemory.appendRaw.
     FILO_RAW_LOG: 'filo_raw_log',
