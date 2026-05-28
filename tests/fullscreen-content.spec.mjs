@@ -38,8 +38,13 @@ test('fullscreen: il contenuto copre la barra e Esc ripristina', async ({ app, o
   // La view ora parte da y=0: copre la barra → barra nascosta.
   expect(during.y).toBe(0);
 
-  // Esc deve far uscire dalla modalità.
-  await page.locator('body').click().catch(() => {});
+  // Esc deve far uscire dalla modalità (gestito da before-input-event in main).
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    const tabs = win._filoTabs;
+    const active = tabs.tabs.find((t) => t.id === tabs.activeId);
+    try { active.view.webContents.focus(); } catch (_) {}
+  });
   await page.keyboard.press('Escape');
 
   await expect.poll(async () => (await readActiveView(app)).contentFullscreen, { timeout: 5000 }).toBe(false);
