@@ -47,6 +47,19 @@
   color: var(--sn-selection-fg);
 }
 
+/* Dropdown nativo <select>: l'opzione evidenziata/selezionata di default è blu
+   (highlight di sistema). Forziamo l'arancione della palette così è coerente
+   con il resto della UI Filo. Chromium applica questi stili agli <option> nel
+   popup nativo. */
+[data-sn-theme] option:checked,
+[data-sn-theme] option:hover {
+  background-color: var(--sn-accent);
+  color: #fff;
+}
+[data-sn-theme] select {
+  accent-color: var(--sn-accent);
+}
+
 /* Scrollbar globale — sottile, senza freccette, arrotondata */
 [data-sn-theme] {
   scrollbar-width: thin;
