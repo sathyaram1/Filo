@@ -20,7 +20,6 @@
     $('sec-block-popups-desc').textContent = I18n.t('options_security_block_popups_desc');
     $('sec-p2p-box-title').textContent = I18n.t('options_security_p2p_box_title');
     $('sec-p2p-box-body').textContent = I18n.t('options_security_p2p_box_body');
-    $('save').textContent = I18n.t('options_save');
     $('savedHint').textContent = I18n.t('options_saved');
   }
 
