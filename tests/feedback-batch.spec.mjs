@@ -78,6 +78,20 @@ test('menu: back/forward disabilitati quando la history non lo consente', async 
   await expect(grid.locator('.sn-menu-icon-btn[data-sn-icon-id="forward"]')).toBeDisabled();
 });
 
+test('menu: back/forward disabilitati sono visibilmente grigi (opacity ridotta)', async ({ openTab, testServer }) => {
+  // In parità con .nav-btn:disabled della shell, i bottoni back/forward del
+  // menu tasto-destro disabilitati devono apparire sbiaditi (opacity < 1),
+  // non solo testualmente "muted". Senza questa regola l'utente non capisce
+  // a colpo d'occhio che il bottone non è cliccabile.
+  const page = await openTab(testServer.html(HTML_A));
+  await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
+  const grid = await openOverflowGrid(page);
+  const back = grid.locator('.sn-menu-icon-btn[data-sn-icon-id="back"]');
+  await expect(back).toBeDisabled();
+  const opacity = await back.evaluate((el) => parseFloat(getComputedStyle(el).opacity));
+  expect(opacity).toBeLessThan(1);
+});
+
 test('screenshot area: l\'overlay imposta un cursore custom visibile su tutti i quadranti', async ({ openTab, testServer }) => {
   const page = await openTab(testServer.html('<!doctype html><html><body style="height:600px"><h1>Test</h1></body></html>'));
   await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
