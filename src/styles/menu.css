@@ -330,6 +330,42 @@
   min-width: 200px;
   max-width: 320px;
 }
+
+/* Cronologia incolla: lista scorrevole + barra di ricerca in basso */
+.sn-menu-history-sub {
+  display: flex;
+  flex-direction: column;
+  max-height: 360px;
+  overflow: hidden;
+}
+.sn-menu-history-list {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 0;
+}
+.sn-menu-history-search {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--sn-border);
+  padding: 6px;
+}
+.sn-menu-history-search-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--sn-border);
+  border-radius: var(--sn-radius);
+  background: var(--sn-bg);
+  color: var(--sn-fg);
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 8px;
+  outline: none;
+}
+.sn-menu-history-search-input::placeholder {
+  color: var(--sn-muted);
+}
+.sn-menu-history-search-input:focus {
+  border-color: var(--sn-accent);
+}
 .sn-menu-empty {
   padding: 8px 12px;
   color: var(--sn-muted);
