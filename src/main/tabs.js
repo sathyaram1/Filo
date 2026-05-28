@@ -19,6 +19,22 @@ const NATIVE_MENU_PAGES = [
   'filo://feedback/', 'filo://spellcheck/', 'filo://editor/',
 ];
 
+// Colore di selezione del testo coerente con la palette Filo, da iniettare sui
+// siti esterni. Il <link filo://style/theme.css> iniettato dal content script
+// viene bloccato dalla CSP di molti siti (repubblica, reddit, youtube…), quindi
+// la regola ::selection del tema non arriva mai e la selezione resta del blu di
+// sistema. insertCSS() inietta a livello di user-agent e ignora la CSL della
+// pagina, garantendo l'arancione Filo ovunque. Niente var() qui: i custom
+// properties non si risolvono in modo affidabile dentro ::selection.
+const PAGE_SELECTION_CSS = `
+::selection { background-color: rgba(196, 90, 59, 0.30); }
+::-moz-selection { background-color: rgba(196, 90, 59, 0.30); }
+[data-sn-theme="light"] ::selection { background-color: rgba(196, 90, 59, 0.25); }
+[data-sn-theme="light"] ::-moz-selection { background-color: rgba(196, 90, 59, 0.25); }
+[data-sn-theme="dark"] ::selection { background-color: rgba(196, 90, 59, 0.35); }
+[data-sn-theme="dark"] ::-moz-selection { background-color: rgba(196, 90, 59, 0.35); }
+`;
+
 function buildNativeContextMenu(wc, params) {
   const { editFlags = {}, isEditable, selectionText, misspelledWord, dictionarySuggestions } = params;
   const menu = new Menu();
