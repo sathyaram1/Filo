@@ -77,7 +77,7 @@ html, body {
   color: var(--sn-fg);
   border: 1px solid var(--sn-border);
 }
-.sn-page button.sn-btn-secondary:hover { background: rgba(var(--sn-accent-rgb), 0.15); }
+.sn-page button.sn-btn-secondary:hover { background: var(--sn-hover); }
 
 .sn-page .sn-row {
   display: flex;
