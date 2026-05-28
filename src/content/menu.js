@@ -457,6 +457,16 @@
       empty.textContent = I18n.t('toast_clipboard_empty');
       sub.appendChild(empty);
     } else {
+      sub.classList.add('sn-menu-history-sub');
+
+      // Lista scorrevole: tutto ciò che è stato incollato, con scroll.
+      const list = document.createElement('div');
+      list.className = 'sn-menu-history-list';
+
+      const searchTextOf = (entry) =>
+        (entry.type === 'image' ? (entry.description || 'Immagine') : (entry.text || ''))
+          .replace(/\s+/g, ' ').trim();
+
       entries.forEach((entry) => {
         const b = document.createElement('button');
         b.type = 'button';
@@ -479,12 +489,49 @@
           lbl.textContent = text.length > 40 ? text.slice(0, 40) + '…' : text;
           b.appendChild(lbl);
         }
+        b.dataset.snSearch = searchTextOf(entry).toLowerCase();
         b.addEventListener('click', () => {
           close();
           try { onPick && onPick(entry); } catch (e) { console.error(e); }
         });
-        sub.appendChild(b);
+        list.appendChild(b);
       });
+      sub.appendChild(list);
+
+      // Barra di ricerca in basso: filtra fra le cose incollate.
+      const noResults = document.createElement('div');
+      noResults.className = 'sn-menu-empty';
+      noResults.textContent = I18n.t('menu_paste_no_results');
+      noResults.style.display = 'none';
+      list.appendChild(noResults);
+
+      const searchWrap = document.createElement('div');
+      searchWrap.className = 'sn-menu-history-search';
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'sn-menu-history-search-input';
+      input.placeholder = I18n.t('menu_paste_search');
+      input.setAttribute('aria-label', input.placeholder);
+      // Mentre l'utente cerca, non far chiudere il sotto-menu (mouse fuori).
+      input.addEventListener('focus', () => {
+        if (activeMenu) activeMenu.subLocked = true;
+        clearSubCloseTimer();
+      });
+      input.addEventListener('blur', () => { if (activeMenu) activeMenu.subLocked = false; });
+      input.addEventListener('input', () => {
+        const q = input.value.trim().toLowerCase();
+        let visible = 0;
+        for (const b of list.querySelectorAll('.sn-menu-history-item')) {
+          const match = !q || (b.dataset.snSearch || '').includes(q);
+          b.style.display = match ? '' : 'none';
+          if (match) visible++;
+        }
+        noResults.style.display = visible === 0 ? '' : 'none';
+      });
+      searchWrap.appendChild(input);
+      sub.appendChild(searchWrap);
+      // Focus immediato così si può digitare subito.
+      setTimeout(() => { try { input.focus({ preventScroll: true }); } catch (_) {} }, 0);
     }
 
     document.documentElement.appendChild(sub);
