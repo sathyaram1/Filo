@@ -633,6 +633,12 @@
     // Mostra il commento proattivo di Filo al centro della home (newtab).
     // Disattivabile da Preferenze per chi preferisce una home più sobria.
     showHomeMessage: true,
+    // Stile di scrittura degli agenti rivolti all'utente (chat Filo, Aiuto,
+    // spiegazioni, chat dell'editor). Stringa libera scelta in Preferenze:
+    // può venire da un preset (professionale/amichevole/…) o essere scritta a
+    // mano. Viene iniettata come istruzione di sistema nelle azioni
+    // conversazionali (vedi injectAgentStyle).
+    agentStyle: '',
     // Impostazioni di sicurezza/privacy per le pagine esterne (no filo://).
     // - protectIpLeak: forza WebRTC a usare solo l'interfaccia di rete pubblica
     //   (default_public_interface_only). Evita che siti possano leggere gli IP
