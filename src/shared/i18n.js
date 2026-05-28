@@ -19,6 +19,8 @@
     menu_explain: 'Spiegazione',
     menu_explain_deep: 'Approfondisci',
     menu_paste_history: 'Cronologia incolla',
+    menu_paste_search: 'Cerca…',
+    menu_paste_no_results: 'Nessun risultato',
     menu_explain_loading: 'Spiegazione…',
 
     // Menu — pagina
