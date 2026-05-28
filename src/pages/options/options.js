@@ -392,15 +392,11 @@
     const apiKeyTavily = $('apiKeyTavily').value.trim();
     const blocklist = $('blocklist').value.split('\n').map((s) => s.trim()).filter(Boolean);
 
-    const { registry, dups, missingNick } = collectModelRegistry();
-    if (missingNick) {
-      alert(I18n.t('options_model_nickname_required'));
-      return;
-    }
-    if (dups.length) {
-      alert(I18n.t('options_model_nickname_duplicate', dups.join(', ')));
-      return;
-    }
+    // Auto-save: persistiamo solo le righe valide. Le righe incomplete
+    // (nickname mancante) o duplicate vengono semplicemente ignorate finché
+    // non sono complete — niente alert bloccanti che interromperebbero la
+    // digitazione, dato che non c'è più un pulsante "Salva" esplicito.
+    const { registry } = collectModelRegistry();
 
     const partial = {
       provider,
