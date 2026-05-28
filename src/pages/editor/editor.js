@@ -1,7 +1,7 @@
 // Editor di Filo — prototipo.
 // Pannello testo (contenteditable, serializzato in JSON compatibile ProseMirror)
-// + griglia moduli configurabile (5×7) con workspace/pagine, drag-and-drop,
-// salvataggio su localStorage nel formato di editor-spec.md.
+// + griglia moduli configurabile (7 colonne × 10 righe) con workspace/pagine,
+// drag-and-drop, salvataggio su localStorage nel formato di editor-spec.md.
 
 (() => {
   'use strict';
