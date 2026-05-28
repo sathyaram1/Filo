@@ -46,6 +46,28 @@ test('voce "Sicurezza" nel menu Impostazioni con icona lucchetto', async ({ shel
   await expect(menuWin.locator('text=Sicurezza')).toBeVisible({ timeout: 3_000 });
 });
 
+test('voce "Modelli" nel menu Impostazioni ha icona dedicata, diversa dall\'ingranaggio', async ({ shell, app }) => {
+  const before = new Set(app.windows().map((w) => w.url()));
+  await shell.locator('#nav-settings').click();
+  const deadline = Date.now() + 4_000;
+  let menuWin = null;
+  while (Date.now() < deadline) {
+    menuWin = app.windows().find((w) => w.url().startsWith('data:text/html') && !before.has(w.url()));
+    if (menuWin) break;
+    await new Promise((r) => setTimeout(r, 80));
+  }
+  expect(menuWin, 'il popup del menu Impostazioni deve aprirsi').toBeTruthy();
+  // La voce "Modelli" deve esistere con icona dedicata (rete neurale a 3 nodi),
+  // non più riusare l'ingranaggio "options" che si confonde con Impostazioni.
+  const modelliBtn = menuWin.locator('.item', { hasText: 'Modelli' });
+  await expect(modelliBtn).toBeVisible({ timeout: 3_000 });
+  const modelliSvg = await modelliBtn.locator('svg').innerHTML();
+  // I tre cerchi della nostra icona "models" sono il segno distintivo.
+  expect(modelliSvg).toMatch(/circle[^>]*cx="12"[^>]*cy="5"/);
+  expect(modelliSvg).toMatch(/circle[^>]*cx="5\.5"/);
+  expect(modelliSvg).toMatch(/circle[^>]*cx="18\.5"/);
+});
+
 test('toggle persistito dopo salvataggio', async ({ openTab }) => {
   const page = await openTab('filo://security/');
   await page.waitForSelector('#sec-protect-ip', { timeout: 8_000 });
