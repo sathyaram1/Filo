@@ -46,7 +46,7 @@
   // Voci del menu Impostazioni (ingranaggio): Modelli, Sicurezza, Preferenze —
   // tre pagine interne dedicate.
   const SETTINGS = [
-    { label: 'Modelli', icon: 'options', url: 'filo://options/options.html' },
+    { label: 'Modelli', icon: 'models', url: 'filo://options/options.html' },
     { label: 'Sicurezza', icon: 'lock', url: 'filo://security/security.html' },
     { type: 'separator' },
     { label: 'Preferenze', icon: 'colorPicker', url: 'filo://preferences/preferences.html' },
