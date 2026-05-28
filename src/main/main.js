@@ -193,6 +193,21 @@ app.whenReady().then(async () => {
   });
 });
 
+// Alla chiusura salva sincronicamente la sessione (tab aperti) così alla
+// prossima apertura vengono ripristinati anche se l'utente esce subito dopo
+// aver aperto/chiuso un tab (il salvataggio normale è con debounce).
+app.on('before-quit', () => {
+  try {
+    const tm = mainWindow?._filoTabs;
+    const Storage = require('./shim/storage');
+    if (tm && Storage?.setSync) {
+      const key = globalThis.SN_CONST?.STORAGE_KEYS?.OPEN_TABS || 'sn_open_tabs';
+      Storage.setSync({ [key]: tm.sessionState() });
+    }
+    Storage?.flushSync?.();
+  } catch (_) {}
+});
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
