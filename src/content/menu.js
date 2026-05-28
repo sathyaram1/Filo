@@ -553,13 +553,19 @@
     activeMenu.cleanups.push(cleanupZoom);
     activeMenu.subRoot = sub;
 
-    // Posizionamento: a destra dell'ancora, ricade se non c'è spazio
+    // Posizionamento: la cronologia incolla deve apparire ATTACCATA al box
+    // principale (feedback alpha: "il sotto menu compare separato dal box
+    // principale"). Ancoriamo quindi al bordo del menu padre con un leggero
+    // overlap (-2px) invece che alla freccetta con un gap di +4px, così le due
+    // superfici si toccano e si leggono come un unico menu. Verticale: allineata
+    // alla riga "Incolla", ricade verso l'alto se sfora in basso.
+    const mRect = (activeMenu?.root || anchorEl).getBoundingClientRect();
     const aRect = anchorEl.getBoundingClientRect();
     const w = sub.offsetWidth, h = sub.offsetHeight;
     const vw = window.innerWidth, vh = window.innerHeight;
-    let left = aRect.right + 4;
+    let left = mRect.right - 2;
     let top = aRect.top;
-    if (left + w + 8 > vw) left = Math.max(4, aRect.left - w - 4);
+    if (left + w + 8 > vw) left = Math.max(4, mRect.left - w + 2);
     if (top + h + 8 > vh) top = Math.max(8, vh - h - 8);
     sub.style.left = `${left}px`;
     sub.style.top = `${top}px`;
