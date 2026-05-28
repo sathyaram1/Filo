@@ -105,6 +105,37 @@ class TabManager {
     this.layout();
   }
 
+  // Entra/esce dalla modalità "contenuto a tutto schermo": la view attiva copre
+  // tutta la finestra (top=0), così la barra di tab+indirizzo della shell resta
+  // sotto e non è visibile. Porta anche la finestra in fullscreen OS per
+  // coerenza. Idempotente. Ritorna lo stato risultante.
+  setContentFullscreen(on) {
+    on = !!on;
+    if (this.contentFullscreen === on) return on;
+    this.contentFullscreen = on;
+    this.layout();
+    try {
+      if (typeof this.win.setFullScreen === 'function') this.win.setFullScreen(on);
+    } catch (_) {}
+    // Avvisa i content script così la voce di menu mostra "Esci da schermo
+    // intero" (icona shrink) mentre la modalità è attiva.
+    try {
+      const type = globalThis.SN_MSG?.MSG?.FULLSCREEN_CHANGED || 'fullscreen_changed';
+      this._broadcastToViews({ type, fullscreen: on });
+    } catch (_) {}
+    return on;
+  }
+
+  toggleContentFullscreen() {
+    return this.setContentFullscreen(!this.contentFullscreen);
+  }
+
+  _broadcastToViews(message) {
+    for (const t of this.tabs) {
+      try { t.view.webContents.send('filo:broadcast', message); } catch (_) {}
+    }
+  }
+
   // ─── lifecycle ──────────────────────────────────────────────────────────
 
   openTab(url = 'filo://newtab/', { activate = true } = {}) {
