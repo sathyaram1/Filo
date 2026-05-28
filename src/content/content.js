@@ -1592,6 +1592,10 @@
   // Messaggi runtime: shortcut, settings update
   // ------------------------------------------------------------
   function onRuntimeMessage(msg, sender, sendResponse) {
+    if (msg?.type === MSG.FULLSCREEN_CHANGED) {
+      contentFullscreen = !!msg.fullscreen;
+      return;
+    }
     if (msg?.type === MSG.SETTINGS_UPDATED) {
       settings = msg.settings;
       applyTheme(settings.theme);
