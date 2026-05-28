@@ -143,6 +143,18 @@ function flushSync() {
   } catch (e) { /* ignore */ }
 }
 
+// Scrittura sincrona best-effort: aggiorna lo stato in memoria e scrive subito
+// su disco. Usata sul path di chiusura (before-quit), dove non possiamo
+// aspettare il debounce né i microtask del set() async. Assume STATE già
+// caricato (vero a runtime, dopo il boot).
+function setSync(obj) {
+  try {
+    if (!STATE.loaded) return;
+    for (const k of Object.keys(obj)) STATE.data[k] = obj[k];
+    flushSync();
+  } catch (e) { /* ignore */ }
+}
+
 module.exports = {
   get,
   set,
@@ -150,4 +162,5 @@ module.exports = {
   clear,
   onChanged,
   flushSync,
+  setSync,
 };
