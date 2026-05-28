@@ -110,11 +110,10 @@ test('popup blocker: window.open() automatico viene bloccato', async ({ openTab,
 });
 
 test('popup blocker disattivato: window.open() passa', async ({ openTab, testServer, shell }) => {
-  // Prima disattiva il blocco dalla pagina Sicurezza
+  // Prima disattiva il blocco dalla pagina Sicurezza (auto-save al toggle)
   const sec = await openTab('filo://security/');
   await sec.waitForSelector('#sec-block-popups', { timeout: 8_000 });
   await sec.locator('#sec-block-popups').uncheck();
-  await sec.locator('#save').click();
   await expect(sec.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 4_000 });
 
   // Ora ripeti il window.open automatico: deve aprire un nuovo tab
