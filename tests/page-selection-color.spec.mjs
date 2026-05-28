@@ -73,64 +73,47 @@ function decodePng(buf) {
   };
 }
 
-test('text selection uses Filo terracotta on sites whose CSP blocks filo styles', async ({ openTab }) => {
-  // Server con un header CSP che vieta gli stylesheet filo:// (come i siti veri).
-  const html = `<!doctype html><html><head><title>csp page</title></head>
+test('text selection uses Filo terracotta even when the page forces a blue ::selection', async ({ openTab, testServer }) => {
+  // Pagina "ostile" come repubblica: impone un ::selection blu con !important e
+  // specificità alta, che batterebbe la regola del tema Filo.
+  const html = `<!doctype html><html><head><title>blue selection page</title>
+    <style>
+      ::selection { background: rgb(0,0,255) !important; }
+      ::-moz-selection { background: rgb(0,0,255) !important; }
+      body p#t::selection { background: rgb(0,0,255) !important; }
+    </style></head>
     <body style="background:#fff;margin:0">
     <p id="t" style="font-size:40px;padding:40px 40px 40px 50px;color:#000;margin:0">SELEZIONAMI ORA</p>
     </body></html>`;
-  const server = createServer((req, res) => {
-    res.writeHead(200, {
-      'Content-Type': 'text/html; charset=utf-8',
-      'Content-Security-Policy': "default-src 'self' 'unsafe-inline'",
-    });
-    res.end(html);
+
+  const page = await testServer.openReady(openTab, html);
+  await page.waitForTimeout(500);
+
+  await page.evaluate(() => {
+    const el = document.getElementById('t');
+    const r = document.createRange();
+    r.selectNodeContents(el);
+    const s = window.getSelection();
+    s.removeAllRanges();
+    s.addRange(r);
   });
-  await new Promise((r) => server.listen(0, '127.0.0.1', r));
-  const port = server.address().port;
+  await page.waitForTimeout(300);
 
-  try {
-    const page = await openTab(`http://127.0.0.1:${port}/`);
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(600);
+  const img = decodePng(await page.screenshot());
 
-    // Pre-condizione: la CSP ha davvero bloccato lo stylesheet filo://, quindi
-    // il colore NON può arrivare da theme.css. Se questo è false il test non
-    // sta esercitando lo scenario giusto.
-    const themeBlocked = await page.evaluate(() => {
-      const l = [...document.querySelectorAll('link[rel=stylesheet]')]
-        .find((x) => /filo:\/\/style\/theme\.css/.test(x.href));
-      return !!l && l.sheet == null;
-    });
-    expect(themeBlocked, 'la CSP deve bloccare theme.css per esercitare il fix').toBe(true);
-
-    await page.evaluate(() => {
-      const el = document.getElementById('t');
-      const r = document.createRange();
-      r.selectNodeContents(el);
-      const s = window.getSelection();
-      s.removeAllRanges();
-      s.addRange(r);
-    });
-    await page.waitForTimeout(300);
-
-    const img = decodePng(await page.screenshot());
-
-    let warm = 0, blue = 0;
-    for (let y = 85; y < 120; y++) {
-      for (let x = 55; x < 380; x++) {
-        const [r, g, b] = img.at(x, y);
-        if (r > 245 && g > 245 && b > 245) continue; // sfondo bianco
-        if (r < 70 && g < 70 && b < 70) continue;     // testo nero
-        if (r - b >= 15) warm++;
-        else if (b - r >= 15) blue++;
-      }
+  let warm = 0, blue = 0;
+  for (let y = 85; y < 120; y++) {
+    for (let x = 55; x < 380; x++) {
+      const [r, g, b] = img.at(x, y);
+      if (r > 245 && g > 245 && b > 245) continue; // sfondo bianco
+      if (r < 70 && g < 70 && b < 70) continue;     // testo nero
+      if (r - b >= 15) warm++;
+      else if (b - r >= 15) blue++;
     }
-
-    expect(warm, 'pixel di selezione caldi (terracotta) attesi').toBeGreaterThan(50);
-    expect(warm).toBeGreaterThan(blue * 5);
-  } finally {
-    server.closeAllConnections?.();
-    await new Promise((r) => server.close(r));
   }
+
+  // Senza il fix la banda di selezione sarebbe blu (blue >> warm). Col fix
+  // (insertCSS user-origin !important) deve essere terracotta.
+  expect(warm, 'pixel di selezione caldi (terracotta) attesi').toBeGreaterThan(50);
+  expect(warm).toBeGreaterThan(blue * 5);
 });
