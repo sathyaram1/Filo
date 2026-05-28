@@ -217,6 +217,16 @@
     options_security_popup_blocked: 'Popup bloccato da %s',
     options_security_popup_open: 'Apri',
     options_security_popup_dismiss: 'Chiudi',
+    security_export_title: 'Esporta dati Filo',
+    security_export_label: 'Esporta dati',
+    security_export_desc:
+      'Salva tutti i tuoi dati di Filo (memorie degli agenti, pagine salvate, ' +
+      'cronologia incolla, costi e impostazioni) in un file .zip che contiene un ' +
+      'data.json e le immagini copiate come file separati. Utile come backup o per ' +
+      'trasferire i dati su un altro computer.',
+    security_export_btn: 'Esporta dati (.zip)',
+    security_export_done: 'Dati esportati',
+    security_export_fail: 'Esportazione non riuscita',
 
     // Home
     home_title: 'Aperti per dopo',
