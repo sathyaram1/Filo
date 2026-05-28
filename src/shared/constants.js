@@ -627,6 +627,9 @@
     // Dimensione del testo della UI di Filo (moltiplicatore zoom delle pagine
     // interne). 1 = 100%. Impostato dalla pagina Preferenze.
     textScale: 1,
+    // Mostra il commento proattivo di Filo al centro della home (newtab).
+    // Disattivabile da Preferenze per chi preferisce una home più sobria.
+    showHomeMessage: true,
     // Impostazioni di sicurezza/privacy per le pagine esterne (no filo://).
     // - protectIpLeak: forza WebRTC a usare solo l'interfaccia di rete pubblica
     //   (default_public_interface_only). Evita che siti possano leggere gli IP
