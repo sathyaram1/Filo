@@ -26,6 +26,18 @@
     settings = await fetchSettings();
     applyTheme(settings.theme);
 
+    // Esc esce dalla modalità "contenuto a tutto schermo" (vedi tabs.js). Va
+    // registrato anche su pagine "bloccate" (senza menu) e in capture, così
+    // pre-empta gli handler Escape della pagina solo quando la modalità è attiva.
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && contentFullscreen) {
+        e.preventDefault();
+        e.stopPropagation();
+        contentFullscreen = false; // evita ripetizioni mentre il main esce
+        chrome.runtime.sendMessage({ type: MSG.EXIT_FULLSCREEN }).catch(() => {});
+      }
+    }, { capture: true });
+
     if (isBlocked()) return;
 
     SpellCheck.init(settings);
