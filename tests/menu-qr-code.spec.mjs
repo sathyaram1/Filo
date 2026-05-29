@@ -59,21 +59,29 @@ test('l\'azione "QR code" mostra un overlay con il QR e l\'URL della pagina', as
   await expect(overlay).toHaveCount(0);
 });
 
-test('il generatore QR produce una matrice quadrata non vuota con finder pattern', async ({ openTab, testServer }) => {
-  const page = await testServer.openReady(openTab, HTML);
-  // SN_QR gira nel mondo isolato del page-preload; eseguo la verifica lì.
-  const result = await page.evaluate(() => {
-    // eslint-disable-next-line no-undef
-    const m = (self.SN_QR || globalThis.SN_QR).toMatrix('https://filo.test/qr-check', { ecc: 'M' });
-    const n = m.length;
-    // finder pattern in alto a sinistra: bordo 7x7 con anello scuro
-    const corner = m[0][0] && m[0][6] && m[6][0] && m[6][6] && m[0][3] && m[3][0];
-    let dark = 0;
-    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (m[r][c]) dark++;
-    return { n, rows: m.every((row) => row.length === n), corner, dark };
-  });
-  expect(result.n).toBeGreaterThanOrEqual(21); // versione 1 = 21x21
-  expect(result.rows).toBe(true);
-  expect(result.corner).toBe(true);
-  expect(result.dark).toBeGreaterThan(30);
+test('il generatore QR produce una matrice valida con finder pattern', () => {
+  const m = SN_QR.toMatrix('https://filo.test/qr-check', { ecc: 'M' });
+  const n = m.length;
+  expect(n).toBeGreaterThanOrEqual(21); // versione 1 = 21x21
+  expect(m.every((row) => row.length === n)).toBe(true);
+  // finder pattern (anello scuro 7x7) nei tre angoli
+  const finderTL = m[0][0] && m[0][6] && m[6][0] && m[6][6] && m[0][3] && m[3][0];
+  const finderTR = m[0][n - 7] && m[0][n - 1] && m[6][n - 7] && m[6][n - 1];
+  const finderBL = m[n - 7][0] && m[n - 1][0] && m[n - 7][6] && m[n - 1][6];
+  expect(finderTL && finderTR && finderBL).toBe(true);
+});
+
+test('round-trip: la matrice si decodifica negli stessi byte UTF-8 dell\'input', () => {
+  const samples = [
+    'https://example.com',
+    'filo://newtab/',
+    'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    'https://github.com/sathyaram1/Filo',
+    'Ciao mondo àèì',
+    'A',
+  ];
+  for (const s of samples) {
+    const r = roundTrip(s, 'M');
+    expect(r.ok, `decode mismatch per "${s}": got=${r.got} exp=${r.exp}`).toBe(true);
+  }
 });
