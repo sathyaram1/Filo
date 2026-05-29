@@ -314,11 +314,15 @@ che i moduli toccati si caricano senza errori, e dichiara nel report finale
 ## Feedback alpha tester
 
 I feedback arrivano da Firestore (progetto `filo-8b9cb`, collezione `feedback`).
-Accesso via REST con API key in `src/shared/feedback.js`. Le Firestore rules
-stanno in `../extension/firestore.rules` e si deployano con:
+Accesso via REST con API key in `src/shared/feedback.js`. La config Firebase
+(`firebase.json`, `.firebaserc`, `firestore.rules`, `storage.rules`) vive nella
+**root del repo Filo** — non dipende più dalla vecchia cartella `extension/`.
+Le rules si deployano dalla root:
 
 ```bash
-cd ../extension && firebase deploy --only firestore:rules
+firebase deploy --only firestore:rules     # solo le regole Firestore
+firebase deploy --only storage              # solo le regole Storage
+firebase deploy                             # entrambe
 ```
 
 ### Scrittura feedback (autenticazione obbligatoria)
