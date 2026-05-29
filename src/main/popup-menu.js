@@ -134,7 +134,7 @@ function showPopupMenu(parentWin, entries, x, y, onSelect) {
 }
 
 // ── Genera l'HTML inline ──────────────────────────────────────────────────
-function buildHTML(entries, isDark) {
+function buildHTML(entries, isDark, margin = 26) {
   const c = isDark
     ? { bg: 'rgba(30,29,27,0.98)', fg: '#e5e3dc', muted: '#8a8780',
         border: '#3a3835', ar: '196,90,59' }
@@ -147,13 +147,19 @@ function buildHTML(entries, isDark) {
       items += '<div class="sep"></div>';
     } else {
       const ico = iconSvg(e.icon, 16);
+      // Mostra la colonna icona solo se l'icona esiste davvero: una colonna
+      // vuota spingeva il testo a destra e faceva sembrare le voci senza icona
+      // (es. l'email dell'account) "non centrate" (feedback alpha).
+      const icoSpan = ico ? `<span class="ico">${ico}</span>` : '';
       // Escape HTML nel label per sicurezza
       const label = (e.label || '').replace(/[<>&"]/g, (ch) =>
         ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[ch]);
       if (e.disabled) {
         // Voce informativa non cliccabile (es. l'email dell'account loggato).
-        items += `<div class="item disabled">` +
-          `<span class="ico">${ico}</span>` +
+        // Senza icona la centriamo nel suo campo per evitare l'indent fantasma.
+        const cls = ico ? 'item disabled' : 'item disabled centered';
+        items += `<div class="${cls}">` +
+          `${icoSpan}` +
           `<span class="lbl">${label}</span></div>`;
       } else {
         // Le voci possono trasportare un `url` (apre un tab) oppure una
@@ -162,7 +168,7 @@ function buildHTML(entries, isDark) {
         const value = e.action ? ('@action:' + e.action) : (e.url || '');
         const escVal = value.replace(/'/g, "\\'");
         items += `<button class="item" onclick="popupApi.select('${escVal}')">` +
-          `<span class="ico">${ico}</span>` +
+          `${icoSpan}` +
           `<span class="lbl">${label}</span></button>`;
       }
     }
@@ -172,11 +178,11 @@ function buildHTML(entries, isDark) {
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{background:transparent;overflow:hidden;height:100%}
 .menu{
-  margin:${16 / 2}px;
+  margin:${margin}px;
   background:${c.bg};
   border:1px solid ${c.border};
   border-radius:8px;
-  box-shadow:0 6px 24px rgba(0,0,0,0.22);
+  box-shadow:0 4px 20px rgba(0,0,0,0.20);
   padding:4px 0;
   font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
   font-size:13px;
@@ -198,14 +204,16 @@ html,body{background:transparent;overflow:hidden;height:100%}
 .item:hover{background:rgba(${c.ar},0.12)}
 .item.disabled{color:${c.muted};cursor:default;font-size:12px}
 .item.disabled:hover{background:transparent}
+.item.centered{justify-content:center;text-align:center}
 .ico{
   width:18px;height:18px;flex:0 0 18px;
   display:inline-flex;align-items:center;justify-content:center;
   color:rgba(${c.ar},0.85);
 }
-.lbl{flex:1}
+.lbl{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item.centered .lbl{flex:0 1 auto}
 .sep{height:1px;background:${c.border};margin:4px 8px}
 </style></head><body><div class="menu">${items}</div></body></html>`;
 }
 
-module.exports = { showPopupMenu };
+module.exports = { showPopupMenu, buildHTML };
