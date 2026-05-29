@@ -704,7 +704,7 @@
             const beforeSec = (v.secondary || []).join('|');
             v = { ...v, primary: filterRetired(v.primary), secondary: filterRetired(v.secondary) };
             const known = new Set([...v.primary, ...v.secondary]);
-            const additions = ['colorPicker', 'closeTab', 'screenshotCrop', 'transcribe', 'newTab'].filter((id) => !known.has(id));
+            const additions = ['qrCode', 'colorPicker', 'closeTab', 'screenshotCrop', 'transcribe', 'newTab'].filter((id) => !known.has(id));
             if (additions.length) {
               v = { ...v, secondary: [...additions, ...v.secondary] };
             }
