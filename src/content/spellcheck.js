@@ -424,7 +424,7 @@
   }
 
   function getEditableText(el) {
-    if (el.tagName === 'TEXTAREA') return el.value;
+    if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') return el.value;
     return el.textContent || '';
   }
 
