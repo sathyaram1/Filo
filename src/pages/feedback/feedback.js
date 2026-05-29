@@ -138,6 +138,8 @@
   }
 
   function actionsFor(f) {
+    // Non-admin: niente pulsanti d'azione (sola lettura).
+    if (!isAdmin) return '';
     const tab = statusOf(f);
     if (tab === 'agent') {
       return `
