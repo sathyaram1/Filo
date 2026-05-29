@@ -91,7 +91,7 @@ test('menu: back/forward disabilitati sono visibilmente grigi (opacity ridotta)'
   await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
   const grid = await openOverflowGrid(page);
   const back = grid.locator('.sn-menu-icon-btn[data-sn-icon-id="back"]');
-  await expect(back).toBeDisabled();
+  await expect(back).toHaveClass(/sn-menu-btn-disabled/);
   const opacity = await back.evaluate((el) => parseFloat(getComputedStyle(el).opacity));
   expect(opacity).toBeLessThan(1);
 });
