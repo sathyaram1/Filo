@@ -89,8 +89,15 @@
       accountBtn.setAttribute('aria-label', `Account: ${label}`);
       accountBtn.classList.add('signed-in');
       if (authProfile.picture) {
-        accountBtn.innerHTML =
-          `<img class="account-avatar" src="${authProfile.picture}" alt="" referrerpolicy="no-referrer" />`;
+        // Costruisco l'<img> via DOM così posso ripiegare sull'icona utente
+        // se la foto Google non si carica (CSP/rete).
+        const img = document.createElement('img');
+        img.className = 'account-avatar';
+        img.alt = '';
+        img.referrerPolicy = 'no-referrer';
+        img.onerror = () => setIcon(accountBtn, 'user', 16);
+        img.src = authProfile.picture;
+        accountBtn.replaceChildren(img);
       } else {
         setIcon(accountBtn, 'user', 16);
       }
