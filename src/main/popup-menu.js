@@ -141,10 +141,21 @@ function buildHTML(entries, isDark) {
       // Escape HTML nel label per sicurezza
       const label = (e.label || '').replace(/[<>&"]/g, (ch) =>
         ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[ch]);
-      const url = (e.url || '').replace(/'/g, "\\'");
-      items += `<button class="item" onclick="popupApi.select('${url}')">` +
-        `<span class="ico">${ico}</span>` +
-        `<span class="lbl">${label}</span></button>`;
+      if (e.disabled) {
+        // Voce informativa non cliccabile (es. l'email dell'account loggato).
+        items += `<div class="item disabled">` +
+          `<span class="ico">${ico}</span>` +
+          `<span class="lbl">${label}</span></div>`;
+      } else {
+        // Le voci possono trasportare un `url` (apre un tab) oppure una
+        // `action` custom (instradata al renderer chiamante). Codifichiamo
+        // l'action con un prefisso sentinella per non confonderla con un url.
+        const value = e.action ? ('@action:' + e.action) : (e.url || '');
+        const escVal = value.replace(/'/g, "\\'");
+        items += `<button class="item" onclick="popupApi.select('${escVal}')">` +
+          `<span class="ico">${ico}</span>` +
+          `<span class="lbl">${label}</span></button>`;
+      }
     }
   }
 
