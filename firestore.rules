@@ -1,0 +1,143 @@
+rules_version = '2';
+
+// Regole per l'alpha test di Filo.
+//
+// Modello di sicurezza (vedi Filo/SECURITY.md):
+// - Chiunque può CREARE un feedback (anonimo, nessun login).
+// - La LETTURA è pubblica (serve alla dashboard e alla futura pagina pubblica
+//   dei feedback). NB: per questo le `notes` sono leggibili da tutti — non
+//   metterci dentro segreti.
+// - Solo gli ADMIN (email nella collezione `admins`) possono fare triage
+//   (update di stato/note/priorità) o cancellare. L'identità admin è provata
+//   da un token Google verificato inviato come `Authorization: Bearer <idToken>`.
+//
+// Gli admin si gestiscono dalla console Firebase aggiungendo un documento in
+// `admins/` con l'email come ID. Le regole NON permettono di modificare
+// `admins` dal client (niente privilege escalation): si tocca solo da console.
+//
+// RUOLO "routines" (limitato). Le routine cloud (Claude su claude.ai) fanno
+// triage automatico ma NON sono admin pieni: possono solo spostare un feedback
+// tra `todo`, `done` e `clarify` e scriverne le `notes`/`resolvedAt`. NON
+// possono cancellare, marcare `verified`/`ignored`, toccare la `priority`, né
+// scrivere su altre collezioni. L'identità routine si prova come quella admin
+// (token Google verificato), ma l'allowlist sta nella collezione `routines`,
+// anch'essa gestita SOLO da console. Così, anche se il refresh token della
+// routine trapelasse (la piattaforma routine non ha un secret store sicuro),
+// il danno massimo è rimescolare gli stati di triage: nessuna distruzione di
+// dati né escalation di privilegi.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Un richiedente è admin se è loggato con email verificata ed esiste un
+    // documento `admins/<sua-email>`. exists() è una lettura privilegiata del
+    // motore di regole: non dipende dalle regole di read di `admins`.
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
+    }
+
+    // Un richiedente è una routine se è loggato con email verificata ed esiste
+    // un documento `routines/<sua-email>`. Ruolo deliberatamente debole.
+    function isRoutine() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && exists(/databases/$(database)/documents/routines/$(request.auth.token.email));
+    }
+
+    // Allowlist amministratori. Gestita SOLO da console Firebase.
+    match /admins/{email} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // Allowlist routine. Gestita SOLO da console Firebase.
+    match /routines/{email} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /feedback/{doc} {
+      allow read: if true;
+
+      allow create: if
+        request.resource.data.keys().hasOnly(
+          ['text', 'url', 'title', 'userAgent', 'clientId', 'images', 'createdAt']
+        )
+        && request.resource.data.text is string
+        && request.resource.data.text.size() <= 10000
+        && request.resource.data.get('url', '') is string
+        && request.resource.data.get('url', '').size() <= 2000
+        && request.resource.data.get('title', '') is string
+        && request.resource.data.get('title', '').size() <= 500
+        && request.resource.data.get('userAgent', '') is string
+        && request.resource.data.get('userAgent', '').size() <= 500
+        && request.resource.data.get('clientId', '') is string
+        && request.resource.data.get('clientId', '').size() <= 100
+        && request.resource.data.get('images', []) is list
+        && request.resource.data.get('images', []).size() <= 5;
+
+      // Triage admin (pieno): solo i campi di stato/note/priorità/timestamp.
+      // Tutto il resto del documento resta immutabile.
+      allow update: if
+        isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'notes', 'resolvedAt', 'verifiedAt', 'priority'])
+        && request.resource.data.get('status', 'new') in ['new', 'draft', 'todo', 'clarify', 'done', 'verified', 'ignored']
+        && request.resource.data.get('notes', '') is string
+        && request.resource.data.get('notes', '').size() <= 10000
+        && request.resource.data.get('priority', 0) is int
+        && request.resource.data.get('priority', 0) >= 0
+        && request.resource.data.get('priority', 0) <= 3;
+
+      // Triage routine (limitato): può solo spostare tra `todo`/`done`/`clarify`
+      // e scrivere `notes`/`resolvedAt`. NON tocca `priority`, NON marca
+      // `verified`/`ignored`, NON cancella. Più stretto del ramo admin di
+      // proposito: è il contenimento del blast radius del ruolo routine.
+      allow update: if
+        isRoutine()
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'notes', 'resolvedAt'])
+        && request.resource.data.get('status', 'new') in ['todo', 'done', 'clarify']
+        && request.resource.data.get('notes', '') is string
+        && request.resource.data.get('notes', '').size() <= 10000;
+
+      // Cancellazione: solo admin.
+      allow delete: if isAdmin();
+    }
+
+    // Percorsi di navigazione raccolti dalla sidebar "Aiuto" (Fase 2).
+    // Tupla anonima (sito, posizione iniziale, intento, azioni, esito) usata
+    // per insegnare globalmente all'AI come muoversi su un dominio.
+    // Lo schema è validato a monte dal client: la raccolta passa per due LLM
+    // distinti (intent guess + judge) che impediscono che dati raw dell'utente
+    // finiscano qui dentro. Le regole sotto fanno solo il check di forma.
+    match /paths/{doc} {
+      allow read: if true;
+
+      allow create: if
+        request.resource.data.keys().hasOnly(
+          ['domain', 'initialUrl', 'intent', 'steps', 'success',
+           'userAgent', 'clientId', 'createdAt']
+        )
+        && request.resource.data.domain is string
+        && request.resource.data.domain.size() > 0
+        && request.resource.data.domain.size() <= 253
+        && request.resource.data.initialUrl is string
+        && request.resource.data.initialUrl.size() <= 2000
+        && request.resource.data.intent is string
+        && request.resource.data.intent.size() <= 500
+        && request.resource.data.steps is list
+        && request.resource.data.steps.size() <= 30
+        && request.resource.data.success is bool
+        && request.resource.data.get('userAgent', '') is string
+        && request.resource.data.get('userAgent', '').size() <= 500
+        && request.resource.data.get('clientId', '') is string
+        && request.resource.data.get('clientId', '').size() <= 100;
+
+      allow update: if false;
+      allow delete: if false;
+    }
+  }
+}
