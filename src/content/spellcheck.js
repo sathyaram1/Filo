@@ -770,6 +770,50 @@
     return { word, start, end, sentence, prev: ctx.prev, next: ctx.next };
   }
 
+  // Variante per <input type=text/search> (single-line, non "supportati"
+  // dall'overlay blu ma che meritano comunque il suggerimento di correzione nel
+  // menu tasto destro — feedback alpha: la vecchia estensione lo mostrava anche
+  // qui, la nuova app no perché si affidava ai soli suggerimenti nativi che non
+  // sempre arrivano). Estrae la parola sotto il punto e ritorna lo stesso shape
+  // di getWordAt, così openSpellWordMenu la gestisce identica a textarea/CE.
+  function getInputWordAt(el, clientX) {
+    if (!el || el.tagName !== 'INPUT') return null;
+    const text = el.value || '';
+    if (!text) return null;
+    let pos = inputCharOffset(el, clientX);
+    if (pos < 0) return null;
+    const idx = Math.min(pos, text.length - 1);
+    const { start, end } = expandToWord(text, idx);
+    if (end <= start) return null;
+    const word = text.slice(start, end);
+    if (!/[\p{L}]/u.test(word)) return null;
+    const sentence = text.trim() || word;
+    const ctx = extractContext(el);
+    return { word, start, end, sentence, prev: ctx.prev, next: ctx.next };
+  }
+
+  // Offset di carattere nel valore di un <input> single-line a partire da una
+  // coordinata X viewport. Misura col canvas imitando il font dell'elemento.
+  function inputCharOffset(el, clientX) {
+    const text = el.value || '';
+    if (!text) return 0;
+    const cs = window.getComputedStyle(el);
+    const r = el.getBoundingClientRect();
+    const px = clientX - r.left + (el.scrollLeft || 0)
+      - parseFloat(cs.paddingLeft || 0) - parseFloat(cs.borderLeftWidth || 0);
+    const canvas = inputCharOffset._canvas || (inputCharOffset._canvas = document.createElement('canvas'));
+    const ctx = canvas.getContext('2d');
+    ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    let lo = 0, hi = text.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      const w = ctx.measureText(text.slice(0, mid)).width;
+      if (w < px) lo = mid + 1;
+      else hi = mid;
+    }
+    return Math.max(0, Math.min(text.length, lo));
+  }
+
   function expandToWord(text, idx) {
     const isWordChar = (c) => !!c && /[\p{L}\p{N}'’\-]/u.test(c);
     let s = idx, e = idx;
