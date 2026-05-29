@@ -388,12 +388,14 @@
     // Bolla utente
     threadHistory.push({ role: 'user', text: text || '(immagine)' });
     const userBubble = makeBubble({ role: 'user', text: text || '' });
-    if (imageToSend) {
+    // Mostra TUTTE le immagini inviate nella bolla, ognuna ingrandibile al click.
+    imagesToSend.forEach((src, i) => {
       const img = document.createElement('img');
-      img.src = imageToSend;
+      img.src = src;
       img.className = 'dash-bubble-img';
-      userBubble.insertBefore(img, userBubble.firstChild);
-    }
+      attachImageLightbox(img, src);
+      userBubble.insertBefore(img, userBubble.childNodes[i] || null);
+    });
     bubblesEl.appendChild(userBubble);
 
     // Bolla Filo pending
