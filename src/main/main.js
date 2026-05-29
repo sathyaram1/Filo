@@ -31,6 +31,7 @@ const { createMainWindow } = require('./window');
 const { registerFiloProtocol } = require('./protocol');
 const { registerIpcHandlers } = require('./ipc');
 const { registerShortcuts } = require('./shortcuts');
+const { initAutoUpdater } = require('./updater');
 
 // Permette al protocollo filo:// di caricarsi con privilegi standard (CORS
 // libero, fetch, ecc.) — deve essere chiamato PRIMA di app.whenReady.
