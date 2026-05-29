@@ -671,7 +671,11 @@
     b.className = 'sn-menu-row-btn';
     if (sub.kind === 'overflow') b.classList.add('sn-menu-row-overflow');
     if (sub.kind === 'empty') b.classList.add('sn-menu-row-empty');
-    if (sub.disabled) b.disabled = true;
+    // Disabilitazione "soft": classe invece dell'attributo nativo `disabled`,
+    // che azzera i pointer event e impedirebbe di trascinare l'icona per
+    // riordinarla (feedback alpha: avanti/indietro grigi non si potevano
+    // spostare). Il click resta neutralizzato dal guard più sotto.
+    if (sub.disabled) { b.classList.add('sn-menu-btn-disabled'); b.dataset.snDisabled = '1'; }
     // L'overflow apre subito un sotto-menu su hover: non mostrare il tooltip
     // "Altro…" che altrimenti coprirebbe/preannuncerebbe la stessa cosa.
     if (sub.kind !== 'empty' && sub.kind !== 'overflow' && sub.label) attachTooltip(b, sub.label);
