@@ -214,15 +214,22 @@ html, body {
 
 .ed-mod-drag {
   position: absolute;
-  top: 4px;
-  right: 6px;
-  font-size: 11px;
+  top: 2px;
+  right: 4px;
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 4px;
   color: var(--sn-muted);
   cursor: grab;
-  opacity: 0;
+  opacity: 0.3;
   user-select: none;
+  z-index: 3;
 }
-.ed-module:hover .ed-mod-drag { opacity: 0.7; }
+.ed-module:hover .ed-mod-drag { opacity: 0.85; }
+.ed-mod-drag:active { cursor: grabbing; }
+/* Durante il trascinamento di un modulo il cursore è una "mano che afferra"
+   ovunque (feedback alpha: "tenendo premuto il cursore deve cambiare in mano"). */
+body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 
 /* resize handle per i moduli */
 .ed-mod-resize {
