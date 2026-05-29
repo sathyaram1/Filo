@@ -375,11 +375,11 @@
 
   // ===== Invio messaggio =====
   async function submitMessage(text) {
-    if ((!text && !pendingImage) || sending) return;
+    if ((!text && pendingImages.length === 0) || sending) return;
     sending = true;
     sendBtn.disabled = true;
-    const imageToSend = pendingImage;
-    removeImagePreview();
+    const imagesToSend = pendingImages.slice();
+    clearImagePreviews();
     // Svuota subito la textarea: la bolla utente è già visibile, niente attesa.
     inputEl.value = '';
     // Prima query dalla home → entra in stato thread.
