@@ -443,6 +443,9 @@
     pendingImages.forEach((dataUrl, idx) => {
       const wrap = document.createElement('div');
       wrap.className = 'dash-img-preview';
+      // Retrocompatibilità: la prima anteprima conserva l'id storico #imgPreview
+      // (usato dall'implementazione mono-immagine precedente e dai test esistenti).
+      if (idx === 0) wrap.id = 'imgPreview';
       const img = document.createElement('img');
       img.src = dataUrl;
       img.alt = 'Immagine incollata';
