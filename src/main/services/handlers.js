@@ -942,6 +942,26 @@ async function handleMessage(msg, sender = {}) {
         return { ok: false, error: e?.message || String(e) };
       }
     }
+    // ── Account "Accedi con Google" ──────────────────────────────────────
+    // I token restano nel main process: qui torniamo solo il profilo pubblico.
+    case MSG.AUTH_STATUS:
+      return { ok: true, signedIn: auth.isSignedIn(), profile: auth.getProfile() };
+    case MSG.AUTH_SIGNIN:
+      try {
+        const profile = await auth.signIn();
+        broadcastToTabs({ type: MSG.AUTH_CHANGED, signedIn: auth.isSignedIn(), profile });
+        return { ok: true, profile };
+      } catch (e) {
+        return { ok: false, error: e?.message || String(e) };
+      }
+    case MSG.AUTH_SIGNOUT:
+      try {
+        auth.signOut();
+        broadcastToTabs({ type: MSG.AUTH_CHANGED, signedIn: false, profile: null });
+        return { ok: true };
+      } catch (e) {
+        return { ok: false, error: e?.message || String(e) };
+      }
     case MSG.SAVE_PATH:
       (async () => {
         try {
