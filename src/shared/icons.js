@@ -290,6 +290,7 @@
     editor:       (size) => wrap(editor, { size }),
     models:       (size) => wrap(models, { size }),
     openForLater: (size) => wrap(openForLater, { size }),
+    qrCode:       (size) => wrap(qrCode, { size }),
   };
 
   // Heuristica che il menu usa per capire se una stringa di "icona" è SVG
