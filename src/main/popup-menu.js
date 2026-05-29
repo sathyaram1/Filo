@@ -187,6 +187,8 @@ html,body{background:transparent;overflow:hidden;height:100%}
   font-family:inherit;font-size:13px;line-height:1.2;
 }
 .item:hover{background:rgba(${c.ar},0.12)}
+.item.disabled{color:${c.muted};cursor:default;font-size:12px}
+.item.disabled:hover{background:transparent}
 .ico{
   width:18px;height:18px;flex:0 0 18px;
   display:inline-flex;align-items:center;justify-content:center;
