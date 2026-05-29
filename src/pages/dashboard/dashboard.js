@@ -434,48 +434,60 @@
     refreshLive().catch(() => {});
   }
 
-  // ===== Image paste / drop =====
-  function showImagePreview(dataUrl) {
-    removeImagePreview();
-    pendingImage = dataUrl;
-    const wrap = document.createElement('div');
-    wrap.className = 'dash-img-preview';
-    wrap.id = 'imgPreview';
-    const img = document.createElement('img');
-    img.src = dataUrl;
-    img.alt = 'Immagine incollata';
-    const rm = document.createElement('button');
-    rm.type = 'button';
-    rm.className = 'dash-img-remove';
-    rm.textContent = '×';
-    rm.setAttribute('aria-label', 'Rimuovi immagine');
-    rm.addEventListener('click', removeImagePreview);
-    wrap.appendChild(img);
-    wrap.appendChild(rm);
-    inputForm.insertBefore(wrap, inputEl);
+  // ===== Image paste / drop (multi-immagine) =====
+  const imgPreviewsEl = $('imgPreviews');
+
+  function renderImagePreviews() {
+    imgPreviewsEl.innerHTML = '';
+    imgPreviewsEl.hidden = pendingImages.length === 0;
+    pendingImages.forEach((dataUrl, idx) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'dash-img-preview';
+      const img = document.createElement('img');
+      img.src = dataUrl;
+      img.alt = 'Immagine incollata';
+      attachImageLightbox(img, dataUrl);
+      const rm = document.createElement('button');
+      rm.type = 'button';
+      rm.className = 'dash-img-remove';
+      rm.textContent = '×';
+      rm.setAttribute('aria-label', 'Rimuovi immagine');
+      rm.addEventListener('click', () => {
+        pendingImages.splice(idx, 1);
+        renderImagePreviews();
+      });
+      wrap.appendChild(img);
+      wrap.appendChild(rm);
+      imgPreviewsEl.appendChild(wrap);
+    });
   }
-  function removeImagePreview() {
-    pendingImage = null;
-    const el = document.getElementById('imgPreview');
-    if (el) el.remove();
+  function addPendingImage(dataUrl) {
+    pendingImages.push(dataUrl);
+    renderImagePreviews();
+  }
+  function clearImagePreviews() {
+    pendingImages = [];
+    renderImagePreviews();
   }
   function handleImageFile(file) {
     if (!file || !file.type.startsWith('image/')) return;
     if (file.size > 4 * 1024 * 1024) return;
     const reader = new FileReader();
-    reader.onload = () => showImagePreview(reader.result);
+    reader.onload = () => addPendingImage(reader.result);
     reader.readAsDataURL(file);
   }
   inputForm.addEventListener('paste', (e) => {
     const items = e.clipboardData?.items;
     if (!items) return;
+    // Incolla TUTTE le immagini presenti negli appunti (non solo la prima).
+    let found = false;
     for (const item of items) {
       if (item.type.startsWith('image/')) {
-        e.preventDefault();
+        found = true;
         handleImageFile(item.getAsFile());
-        return;
       }
     }
+    if (found) e.preventDefault();
   });
   // Accetta immagini incollate da "Incolla → cronologia" del menu Filo
   // (Ctrl+V passa dal listener 'paste' qui sopra; il menu invece dispatcha
@@ -489,8 +501,47 @@
   inputForm.addEventListener('dragover', (e) => { e.preventDefault(); });
   inputForm.addEventListener('drop', (e) => {
     e.preventDefault();
-    const file = e.dataTransfer?.files?.[0];
-    if (file) handleImageFile(file);
+    const files = e.dataTransfer?.files;
+    if (files) for (const f of files) handleImageFile(f);
+  });
+
+  // ===== Lightbox: click su un'immagine per ingrandirla =====
+  let lightboxEl = null;
+  function ensureLightbox() {
+    if (lightboxEl) return lightboxEl;
+    lightboxEl = document.createElement('div');
+    lightboxEl.className = 'dash-lightbox';
+    lightboxEl.id = 'lightbox';
+    const big = document.createElement('img');
+    big.alt = '';
+    lightboxEl.appendChild(big);
+    lightboxEl.addEventListener('click', closeLightbox);
+    document.body.appendChild(lightboxEl);
+    return lightboxEl;
+  }
+  function openLightbox(src) {
+    const el = ensureLightbox();
+    el.querySelector('img').src = src;
+    el.classList.add('open');
+  }
+  function closeLightbox() {
+    if (!lightboxEl) return;
+    lightboxEl.classList.remove('open');
+    const img = lightboxEl.querySelector('img');
+    if (img) img.removeAttribute('src');
+  }
+  function attachImageLightbox(img, src) {
+    img.style.cursor = 'zoom-in';
+    img.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openLightbox(src);
+    });
+  }
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && lightboxEl?.classList.contains('open')) {
+      e.preventDefault();
+      closeLightbox();
+    }
   });
 
   const SLASH_COMMANDS = {
