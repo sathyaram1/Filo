@@ -66,17 +66,26 @@ function showPopupMenu(parentWin, entries, x, y, onSelect) {
   const SEP_H = 9;
   const PAD = 8;
   const WIDTH = 200;
-  const SHADOW = 16; // margine extra per l'ombra CSS
+  // Gutter trasparente attorno al menu, dimensionato per contenere INTERAMENTE
+  // l'ombra CSS (box-shadow:0 4px 20px → si estende ~24px in basso, ~20px ai
+  // lati, ~16px in alto). Con un gutter troppo stretto l'ombra veniva tagliata
+  // dal bordo della finestra e finiva "di colpo" (feedback alpha).
+  const MARGIN = 26;
   let contentH = PAD * 2;
   for (const e of entries) contentH += e.type === 'separator' ? SEP_H : ITEM_H;
 
-  // Posizione in coordinate schermo
+  const WIN_W = WIDTH + MARGIN * 2;
+  const WIN_H = contentH + MARGIN * 2;
+
+  // Posizione in coordinate schermo. Il menu visibile (dentro il gutter) deve
+  // restare ancorato vicino al pulsante: il suo bordo sinistro a `x`, il bordo
+  // superiore ~6px sotto `y`.
   const cb = parentWin.getContentBounds();
-  let popX = cb.x + x - SHADOW / 2;
-  let popY = cb.y + y - 2;
+  let popX = cb.x + x - MARGIN;
+  let popY = cb.y + y + 6 - MARGIN;
   // Non uscire dal bordo destro
-  if (popX + WIDTH + SHADOW > cb.x + cb.width) {
-    popX = cb.x + cb.width - WIDTH - SHADOW;
+  if (popX + WIN_W > cb.x + cb.width) {
+    popX = cb.x + cb.width - WIN_W;
   }
 
   const popup = new BrowserWindow({
@@ -91,8 +100,8 @@ function showPopupMenu(parentWin, entries, x, y, onSelect) {
     focusable: true,
     show: false,
     hasShadow: false,
-    width: WIDTH + SHADOW,
-    height: contentH + SHADOW,
+    width: WIN_W,
+    height: WIN_H,
     x: Math.round(popX),
     y: Math.round(popY),
     webPreferences: {
