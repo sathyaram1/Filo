@@ -12,6 +12,22 @@
   const lightbox = document.getElementById('lightbox');
   const lightboxImg = document.getElementById('lightboxImg');
   const tabsEl = document.getElementById('tabs');
+  const adminBanner = document.getElementById('adminBanner');
+  const adminBannerText = document.getElementById('adminBannerText');
+  const adminSignInBtn = document.getElementById('adminSignIn');
+
+  // Gestione feedback (sposta di stato, priorità, note) è riservata agli
+  // amministratori: senza account autorizzato la pagina resta in sola lettura.
+  // La garanzia forte è server-side (Firestore rules): qui è solo il gate UX,
+  // e ogni scrittura passa comunque dal main process che rifiuta i non-admin.
+  let isAdmin = false;
+
+  // Invia un messaggio al main process. Su pagine filo:// è sempre presente.
+  function sendToMain(msg) {
+    if (window.filo?.message) return window.filo.message(msg);
+    if (window.chrome?.runtime?.sendMessage) return window.chrome.runtime.sendMessage(msg);
+    return Promise.reject(new Error('canale main non disponibile'));
+  }
 
   // 'inbox' = ricevuti (status: new); 'draft' = bozze (richiedono decisioni di
   // design); 'todo' = da risolvere; 'clarify' = bloccati su ambiguità/info
