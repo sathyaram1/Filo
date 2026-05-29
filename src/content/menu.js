@@ -737,7 +737,8 @@
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'sn-menu-icon-btn';
-    if (it.disabled) b.disabled = true;
+    // Vedi makeRowButton: disabilitazione via classe per restare trascinabile.
+    if (it.disabled) { b.classList.add('sn-menu-btn-disabled'); b.dataset.snDisabled = '1'; }
     setIconContent(b, it.icon || it.label || '');
     if (it.id) b.dataset.snIconId = it.id;
     if (it.label) attachTooltip(b, it.label);
