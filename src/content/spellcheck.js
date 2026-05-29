@@ -1193,6 +1193,7 @@
     findSupportedEditable,
     getSemanticIssueAt,
     getWordAt,
+    getInputWordAt,
     requestWordSuggestion,
     applyFix,
     addToDictionary,
