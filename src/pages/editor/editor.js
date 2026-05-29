@@ -460,17 +460,57 @@
   }
 
   // ── Drag & drop ──────────────────────────────────────────────────────
+  // Trascinamento moduli: pointer-based (mousedown sull'handle ⠿). Più
+  // affidabile e scopribile del drag&drop nativo HTML5 (che non dava feedback di
+  // cursore e falliva silenziosamente), e mantiene selezionabile il testo dei
+  // moduli chat perché il drag parte SOLO dall'handle. Mentre trascini, il
+  // cursore diventa una "mano che afferra" (classe .ed-dragging in editor.css).
   function attachModuleDrag(cell, m) {
-    cell.addEventListener('mousedown', (e) => {
-      cell.draggable = !!e.target.closest('.ed-mod-drag');
+    const handle = cell.querySelector('.ed-mod-drag');
+    if (!handle) return; // moduli fissi senza handle (es. ingranaggio): non si spostano
+    handle.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      startModuleDrag(cell, m);
     });
-    cell.addEventListener('dragstart', (e) => {
-      if (!e.target.closest('.ed-mod-drag')) { e.preventDefault(); return; }
-      e.dataTransfer.setData('text/plain', JSON.stringify({ move: m.id }));
-      e.dataTransfer.effectAllowed = 'move';
-      cell.classList.add('dragging');
-    });
-    cell.addEventListener('dragend', () => { cell.draggable = false; cell.classList.remove('dragging'); });
+  }
+
+  function startModuleDrag(cell, m) {
+    const z = activePage();
+    cell.classList.add('dragging');
+    document.body.classList.add('ed-dragging');
+    let target = null;     // {x, y} cella valida sotto il puntatore
+    let targetEl = null;   // elemento .ed-cell-empty evidenziato
+    const clearHighlight = () => {
+      if (targetEl) { targetEl.classList.remove('drop-target'); targetEl = null; }
+    };
+    const onMove = (ev) => {
+      // La cella in drag ha pointer-events:none, così elementFromPoint vede la
+      // cella vuota sottostante.
+      const el = document.elementFromPoint(ev.clientX, ev.clientY);
+      const empty = el && el.closest ? el.closest('.ed-cell-empty') : null;
+      clearHighlight();
+      target = null;
+      if (empty && gridEl.contains(empty)) {
+        const x = parseInt(empty.style.gridColumnStart || empty.style.gridColumn, 10) - 1;
+        const y = parseInt(empty.style.gridRowStart || empty.style.gridRow, 10) - 1;
+        if (Number.isFinite(x) && Number.isFinite(y) && fits({ x, y, w: m.w, h: m.h }, z, m.id)) {
+          empty.classList.add('drop-target');
+          targetEl = empty;
+          target = { x, y };
+        }
+      }
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove, true);
+      document.removeEventListener('mouseup', onUp, true);
+      document.body.classList.remove('ed-dragging');
+      cell.classList.remove('dragging');
+      clearHighlight();
+      if (target) { m.x = target.x; m.y = target.y; m.z = z; renderGrid(); markDirty(); }
+    };
+    document.addEventListener('mousemove', onMove, true);
+    document.addEventListener('mouseup', onUp, true);
   }
   function attachCellDrop(empty, x, y, z) {
     empty.addEventListener('dragover', (e) => { e.preventDefault(); empty.classList.add('drop-target'); });
