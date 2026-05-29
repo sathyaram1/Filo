@@ -177,6 +177,11 @@
     `<rect x="5" y="11" width="14" height="9" rx="1.5"/>` +
     `<path d="M8 11V8a4 4 0 0 1 8 0v3"/>`;
 
+  // --- User: testa + spalle (avatar segnaposto per "Accedi"/account).
+  const user =
+    `<circle cx="12" cy="8" r="4"/>` +
+    `<path d="M5 20a7 7 0 0 1 14 0"/>`;
+
   // --- Plus: croce simmetrica (usata per "nuova scheda" nella tab bar).
   const plus =
     `<path d="M12 5v14"/>` +
