@@ -2,7 +2,7 @@
 //
 // PERCHÉ ESISTE
 //   Le routine cloud (Claude su claude.ai) devono autenticarsi a Firestore come
-//   membro del ruolo limitato `routines` (vedi extension/firestore.rules). Per
+//   membro del ruolo limitato `routines` (vedi firestore.rules nella root). Per
 //   farlo a runtime serve un refresh token Firebase di lunga durata che la
 //   routine scambia per un ID token (scripts/routine-feedback.mjs). Questo
 //   script esegue UNA VOLTA, in locale, il login interattivo Google→Firebase e
