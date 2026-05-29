@@ -111,12 +111,23 @@
             return;
           }
         }
-        // Su `<input>` testuali (non "supportati" dal nostro overlay) ci
-        // affidiamo ai soli suggerimenti nativi di Electron: ricevuti via
-        // broadcast subito dopo il click destro (feedback alpha — la vecchia
-        // estensione mostrava il suggerimento in cima e la nuova app no).
+        // Su `<input>` testuali (non "supportati" dal nostro overlay): la
+        // parola sotto il cursore va comunque corretta. La vecchia estensione
+        // mostrava il suggerimento in cima e la nuova app no, perché si
+        // affidava ai SOLI suggerimenti nativi di Electron (che non sempre
+        // arrivano — dipende dal dizionario della lingua attiva). Ora, come per
+        // textarea/contenteditable, estraiamo la parola e chiediamo la
+        // correzione all'LLM (affidabile a prescindere dal dizionario nativo),
+        // tenendo i suggerimenti nativi come base immediata quando ci sono.
         const inputEl = e.target?.closest?.('input');
         if (inputEl && isTextLikeInput(inputEl)) {
+          const wordCtx = SpellCheck.getInputWordAt?.(inputEl, e.clientX, e.clientY);
+          if (wordCtx && !SpellCheck.isInDictionary(wordCtx.word)) {
+            await openSpellWordMenu(inputEl, wordCtx, e);
+            return;
+          }
+          // Nessuna parola sotto il cursore (es. click su area vuota): menu
+          // normale, riservando comunque lo slot per il nativo se arriva.
           await openNormalMenuAt(e, { reserveInputCorrection: true });
           return;
         }
