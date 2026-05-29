@@ -36,6 +36,21 @@
     return { model, severity, area, title };
   }
 
+  // Priorità 1-3 (0 = nessuna). Più pallini pieni = priorità più alta: le
+  // routine di Claude affrontano prima i feedback con priorità maggiore.
+  function priorityOf(f) {
+    const p = Math.round(Number(f.priority) || 0);
+    return p >= 1 && p <= 3 ? p : 0;
+  }
+
+  function priorityDotsHtml(f) {
+    const p = priorityOf(f);
+    const dots = [1, 2, 3].map((n) =>
+      `<button type="button" class="fb-dot${n <= p ? ' fb-dot--on' : ''}" data-id="${escapeHtml(f._id)}" data-n="${n}" title="Priorità ${n}${p === n ? ' (clic per azzerare)' : ''}" aria-label="Priorità ${n}"></button>`
+    ).join('');
+    return `<div class="fb-priority" title="Priorità: ${p || '—'}">${dots}</div>`;
+  }
+
   function statusOf(f) {
     const s = f.status || 'new';
     if (s === 'ignored') return 'ignored';
