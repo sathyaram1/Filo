@@ -464,10 +464,11 @@ async function handleFiloChat({ userMessage, threadHistory, image, images }) {
     role: m.role === 'filo' ? 'assistant' : 'user',
     content: String(m.text || ''),
   }));
-  if (image) {
+  const imageList = (Array.isArray(images) && images.length) ? images : (image ? [image] : []);
+  if (imageList.length) {
     const parts = [];
     if (userMessage) parts.push({ type: 'text', text: String(userMessage) });
-    parts.push({ type: 'image_url', image_url: { url: image } });
+    for (const im of imageList) parts.push({ type: 'image_url', image_url: { url: im } });
     threadMessages.push({ role: 'user', content: parts });
   } else {
     threadMessages.push({ role: 'user', content: String(userMessage || '') });
