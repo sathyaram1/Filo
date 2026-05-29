@@ -335,6 +335,9 @@
     const filtered = q
       ? base.filter((f) => [f.text, f.url, f.clientId, f.userAgent, f.notes].join(' ').toLowerCase().includes(q))
       : base;
+    // Priorità più alta in cima. `all` è già ordinato per data DESC e il sort
+    // di JS è stabile, quindi a parità di priorità restano i più recenti prima.
+    filtered.sort((a, b) => priorityOf(b) - priorityOf(a));
     updateTabCounts();
     render(filtered);
   }
