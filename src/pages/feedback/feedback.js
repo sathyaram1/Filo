@@ -96,7 +96,7 @@
   async function patch(id, payload, optimistic) {
     const item = all.find((f) => f._id === id);
     if (!item) return;
-    const prev = { status: item.status, notes: item.notes };
+    const prev = { status: item.status, notes: item.notes, priority: item.priority };
     Object.assign(item, optimistic);
     applyFilter();
     try {
