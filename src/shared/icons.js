@@ -236,6 +236,25 @@
     `<path d="M13 6.7L17.5 16.3"/>` +
     `<path d="M7.5 18L16.5 18"/>`;
 
+  // --- QR code: i tre "occhi" (finder pattern) agli angoli + qualche modulo
+  //     centrale, per evocare un codice QR senza disegnarlo per intero.
+  const qrCode =
+    // occhio in alto a sinistra
+    `<rect x="3.5" y="3.5" width="6" height="6" rx="1"/>` +
+    `<rect x="5.75" y="5.75" width="1.5" height="1.5" fill="currentColor" stroke="none"/>` +
+    // occhio in alto a destra
+    `<rect x="14.5" y="3.5" width="6" height="6" rx="1"/>` +
+    `<rect x="16.75" y="5.75" width="1.5" height="1.5" fill="currentColor" stroke="none"/>` +
+    // occhio in basso a sinistra
+    `<rect x="3.5" y="14.5" width="6" height="6" rx="1"/>` +
+    `<rect x="5.75" y="16.75" width="1.5" height="1.5" fill="currentColor" stroke="none"/>` +
+    // moduli del quadrante in basso a destra
+    `<path d="M14.5 14.5h2"/>` +
+    `<path d="M20 14.5v2"/>` +
+    `<path d="M14.5 20h2.5"/>` +
+    `<path d="M20 19.5v.5"/>` +
+    `<path d="M17.5 17h0.01"/>`;
+
   // --- Alias semantico: "Salvati per dopo" usa il logo di Filo
   const openForLater = filoLogo;
 
