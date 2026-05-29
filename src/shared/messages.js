@@ -48,6 +48,10 @@
     // Invio feedback alpha → Firestore/Storage. Va instradato dal main process
     // perché le CSP delle pagine ospiti bloccano fetch diretti dal preload.
     SUBMIT_FEEDBACK: 'submit_feedback',           // { text, url, title, userAgent, clientId, images: [{dataUrl}] }
+    // Triage admin di un feedback (cambio stato/note/priorità). Instradato dal
+    // main, che allega il Firebase ID token come Bearer e RIFIUTA se l'utente
+    // loggato non è admin. → { ok } | { ok:false, error }
+    FEEDBACK_UPDATE: 'feedback_update',           // { id, status?, notes?, priority? }
     WEB_SEARCH: 'web_search',                      // { query } → { ok, results: [{title,url,snippet}], provider }
 
     // === Account "Accedi con Google" (vedi src/main/auth/) ===
