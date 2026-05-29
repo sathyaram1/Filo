@@ -914,7 +914,7 @@
         return;
       }
     }
-    if (el.tagName === 'TEXTAREA') {
+    if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') {
       const v = el.value;
       // Validazione: se il range è fuori bounds o l'inizio è >= fine, usciamo.
       // Senza questo, v.slice(range.end) con range.end > v.length restituisce ""
