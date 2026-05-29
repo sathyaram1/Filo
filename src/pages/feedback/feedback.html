@@ -72,6 +72,16 @@
     }
     .fb-dot:hover { border-color: var(--sn-accent); }
     .fb-dot--on { background: var(--sn-accent); border-color: var(--sn-accent); }
+    /* Pallini in sola lettura (utente non admin): nessun puntatore/hover. */
+    .fb-dot--readonly { cursor: default; }
+    .fb-dot--readonly:hover { border-color: var(--sn-muted); }
+    .fb-admin-banner {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 16px; padding: 10px 14px;
+      border: 1px solid var(--sn-border); border-radius: 8px;
+      background: var(--sn-overlay-bg); font-size: 13px; color: var(--sn-muted);
+    }
+    .fb-admin-banner button { margin-left: auto; }
   </style>
 </head>
 <body>
