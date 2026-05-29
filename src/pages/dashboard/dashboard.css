@@ -53,7 +53,7 @@ html, body {
    Griglia: left | center | right, con input fissa in basso. */
 .dash {
   position: relative;
-  min-height: 100vh;
+  min-height: calc(100vh / var(--sn-zoom, 1));
   display: grid;
   grid-template-columns: 260px 1fr 260px;
   grid-template-rows: 1fr auto;
