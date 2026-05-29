@@ -154,8 +154,14 @@ function registerIpcHandlers() {
   ipcMain.handle('shell:popup-menu', (event, { entries, x, y }) => {
     const win = winFor(event);
     if (!win?._filoTabs) return { ok: false };
-    showPopupMenu(win, entries, x, y, (url) => {
-      win._filoTabs.openTab(url);
+    showPopupMenu(win, entries, x, y, (value) => {
+      // Le voci con `action` custom tornano al renderer chiamante; quelle con
+      // `url` (default) aprono un nuovo tab.
+      if (typeof value === 'string' && value.startsWith('@action:')) {
+        try { event.sender.send('shell:menu-action', value.slice('@action:'.length)); } catch (_) {}
+      } else if (value) {
+        win._filoTabs.openTab(value);
+      }
     });
     return { ok: true };
   });
