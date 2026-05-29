@@ -718,6 +718,7 @@
     } else {
       b.addEventListener('click', () => {
         if (sub.kind === 'empty') return;
+        if (sub.disabled) return; // greyed: niente azione (ma resta trascinabile)
         close();
         try { sub.onClick && sub.onClick(); } catch (er) { console.error(er); }
       });
