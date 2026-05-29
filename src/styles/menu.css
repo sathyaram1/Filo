@@ -572,14 +572,15 @@
   font-size: 16px;
   font-family: var(--sn-font);
 }
-.sn-menu-icon-btn:hover:not(:disabled) {
+.sn-menu-icon-btn:hover:not(:disabled):not(.sn-menu-btn-disabled) {
   background: rgba(var(--sn-accent-rgb), 0.35);
 }
-.sn-menu-icon-btn:disabled {
+.sn-menu-icon-btn:disabled,
+.sn-menu-icon-btn.sn-menu-btn-disabled {
   color: var(--sn-muted);
   opacity: 0.4;
-  cursor: not-allowed;
 }
+.sn-menu-icon-btn:disabled { cursor: not-allowed; }
 
 /* Drag & drop (pointer-based) */
 .sn-menu-row-btn[data-sn-draggable="1"],
