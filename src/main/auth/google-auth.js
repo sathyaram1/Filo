@@ -206,6 +206,12 @@ function isSignedIn() {
   return Boolean(session?.refreshToken);
 }
 
+// True se l'utente loggato è nell'allowlist admin (gate UX; la garanzia forte
+// è nelle Firestore rules). Senza sessione → false.
+function isAdmin() {
+  return isSignedIn() && cfg.isAdminEmail(session?.email);
+}
+
 module.exports = {
   restore,
   signIn,
@@ -213,6 +219,7 @@ module.exports = {
   getIdToken,
   getProfile,
   isSignedIn,
+  isAdmin,
   // esportati per i test
   _internals: { decodeJwtPayload, startLoopback },
 };
