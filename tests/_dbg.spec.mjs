@@ -10,7 +10,8 @@ test('dbg', async ({ openTab }) => {
     const dashEl = document.getElementById('dash');
     const rect = (el) => { const r = el.getBoundingClientRect(); return { h: Math.round(r.height), top: Math.round(r.top), bottom: Math.round(r.bottom) }; };
     return {
-      innerH: window.innerHeight,
+      innerH: window.innerHeight, innerW: window.innerWidth,
+      scrollW: html.scrollWidth, clientW: html.clientWidth,
       htmlScroll: html.scrollHeight, htmlClient: html.clientHeight,
       htmlH: rect(html), bodyH: rect(body), dashH: rect(dashEl),
       htmlCss: getComputedStyle(html).height, htmlMinCss: getComputedStyle(html).minHeight,
