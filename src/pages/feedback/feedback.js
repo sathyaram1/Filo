@@ -61,9 +61,14 @@
 
   function priorityDotsHtml(f) {
     const p = priorityOf(f);
-    const dots = [1, 2, 3].map((n) =>
-      `<button type="button" class="fb-dot${n <= p ? ' fb-dot--on' : ''}" data-id="${escapeHtml(f._id)}" data-n="${n}" title="Priorità ${n}${p === n ? ' (clic per azzerare)' : ''}" aria-label="Priorità ${n}"></button>`
-    ).join('');
+    // Non-admin: pallini decorativi (sola lettura), nessun click.
+    const dots = [1, 2, 3].map((n) => {
+      const on = n <= p ? ' fb-dot--on' : '';
+      if (!isAdmin) {
+        return `<span class="fb-dot fb-dot--readonly${on}" aria-label="Priorità ${n}"></span>`;
+      }
+      return `<button type="button" class="fb-dot${on}" data-id="${escapeHtml(f._id)}" data-n="${n}" title="Priorità ${n}${p === n ? ' (clic per azzerare)' : ''}" aria-label="Priorità ${n}"></button>`;
+    }).join('');
     return `<div class="fb-priority" title="Priorità: ${p || '—'}">${dots}</div>`;
   }
 
