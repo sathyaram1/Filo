@@ -958,7 +958,6 @@ async function handleMessage(msg, sender = {}) {
     case MSG.AUTH_SIGNOUT:
       try {
         auth.signOut();
-<<<<<<< HEAD
         broadcastToTabs({ type: MSG.AUTH_CHANGED, signedIn: false, isAdmin: false, profile: null });
         return { ok: true };
       } catch (e) {
@@ -979,9 +978,6 @@ async function handleMessage(msg, sender = {}) {
         if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
         const { id, status, notes, priority } = msg;
         await globalThis.SN_FEEDBACK.updateStatus(id, { status, notes, priority }, { idToken });
-=======
-        broadcastToTabs({ type: MSG.AUTH_CHANGED, signedIn: false, profile: null });
->>>>>>> main
         return { ok: true };
       } catch (e) {
         return { ok: false, error: e?.message || String(e) };
