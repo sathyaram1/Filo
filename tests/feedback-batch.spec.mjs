@@ -59,12 +59,16 @@ test('menu: back/forward disabilitati quando la history non lo consente', async 
   const page = await openTab(testServer.html(HTML_A));
   await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
 
-  // Tab appena aperto: niente history → back e forward devono essere disabilitati.
+  // Tab appena aperto: niente history → back e forward devono essere "grigi".
+  // NB: la disabilitazione è via classe (sn-menu-btn-disabled), non attributo
+  // `disabled` nativo, così l'icona resta trascinabile per riordinarla
+  // (feedback yqgFIs). Lo stato grigio si verifica sulla classe, non su
+  // toBeDisabled().
   let grid = await openOverflowGrid(page);
   const back1 = grid.locator('.sn-menu-icon-btn[data-sn-icon-id="back"]');
   const fwd1 = grid.locator('.sn-menu-icon-btn[data-sn-icon-id="forward"]');
-  await expect(back1).toBeDisabled();
-  await expect(fwd1).toBeDisabled();
+  await expect(back1).toHaveClass(/sn-menu-btn-disabled/);
+  await expect(fwd1).toHaveClass(/sn-menu-btn-disabled/);
   // Chiudo il menu prima di navigare.
   await page.keyboard.press('Escape');
 
@@ -73,9 +77,9 @@ test('menu: back/forward disabilitati quando la history non lo consente', async 
   await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
 
   grid = await openOverflowGrid(page);
-  await expect(grid.locator('.sn-menu-icon-btn[data-sn-icon-id="back"]')).toBeEnabled();
+  await expect(grid.locator('.sn-menu-icon-btn[data-sn-icon-id="back"]')).not.toHaveClass(/sn-menu-btn-disabled/);
   // Da B non posso ancora andare avanti.
-  await expect(grid.locator('.sn-menu-icon-btn[data-sn-icon-id="forward"]')).toBeDisabled();
+  await expect(grid.locator('.sn-menu-icon-btn[data-sn-icon-id="forward"]')).toHaveClass(/sn-menu-btn-disabled/);
 });
 
 test('menu: back/forward disabilitati sono visibilmente grigi (opacity ridotta)', async ({ openTab, testServer }) => {
