@@ -112,7 +112,7 @@ function showPopupMenu(parentWin, entries, x, y, onSelect) {
 
   activePopup = popup;
 
-  const html = buildHTML(entries, isDark);
+  const html = buildHTML(entries, isDark, MARGIN);
   popup.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
 
   popup.once('ready-to-show', () => popup.show());
