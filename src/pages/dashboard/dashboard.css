@@ -42,6 +42,10 @@ html, body {
   min-height: calc(100vh / var(--sn-zoom, 1));
   height: 100%;
   font-size: 14px;
+  /* La home è una dashboard responsive (le colonne collassano sotto soglia):
+     non deve MAI mostrare uno scrollbar orizzontale, che con `zoom > 1`
+     rubava qualche px di altezza e innescava anche uno scroll verticale. */
+  overflow-x: hidden;
 }
 
 /* L'attributo HTML `hidden` viene normalmente reso `display: none` dalla UA
