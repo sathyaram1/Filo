@@ -47,13 +47,27 @@
   }
 
   // Riapplica live se le impostazioni cambiano (es. salvataggio dalla pagina
-  // Preferenze in un altro tab).
+  // Preferenze in un altro tab). Il canale affidabile cross-tab è il broadcast
+  // `settings_updated` (vedi handlers.js → broadcastToTabs): `chrome.storage.
+  // onChanged` NON viene propagato fra i WebContentsView, quindi da solo non
+  // aggiornava le tab già aperte (feedback alpha: il cambio dimensione testo
+  // non si applicava alle schede aperte).
+  function applyFromSettings(s) {
+    if (!s) return;
+    if (s.theme) { window.SN_PAGE_THEME = s.theme; applyTheme(s.theme); }
+    applyTextScale(s.textScale);
+  }
+  try {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (msg && msg.type === 'settings_updated') applyFromSettings(msg.settings);
+    });
+  } catch (_) {}
+  // Manteniamo anche il listener storage.onChanged per compatibilità con
+  // eventuali futuri bridge che lo propaghino: oggi è un no-op innocuo.
   try {
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== 'local' || !changes.settings) return;
-      const s = changes.settings.newValue || {};
-      if (s.theme) { window.SN_PAGE_THEME = s.theme; applyTheme(s.theme); }
-      applyTextScale(s.textScale);
+      applyFromSettings(changes.settings.newValue || {});
     });
   } catch (_) {}
 
