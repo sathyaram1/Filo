@@ -943,21 +943,41 @@ async function handleMessage(msg, sender = {}) {
       }
     }
     // ── Account "Accedi con Google" ──────────────────────────────────────
-    // I token restano nel main process: qui torniamo solo il profilo pubblico.
+    // I token restano nel main process: qui torniamo solo il profilo pubblico
+    // + se l'utente è admin (può triagiare i feedback).
     case MSG.AUTH_STATUS:
-      return { ok: true, signedIn: auth.isSignedIn(), profile: auth.getProfile() };
+      return { ok: true, signedIn: auth.isSignedIn(), isAdmin: auth.isAdmin(), profile: auth.getProfile() };
     case MSG.AUTH_SIGNIN:
       try {
         const profile = await auth.signIn();
-        broadcastToTabs({ type: MSG.AUTH_CHANGED, signedIn: auth.isSignedIn(), profile });
-        return { ok: true, profile };
+        broadcastToTabs({ type: MSG.AUTH_CHANGED, signedIn: auth.isSignedIn(), isAdmin: auth.isAdmin(), profile });
+        return { ok: true, profile, isAdmin: auth.isAdmin() };
       } catch (e) {
         return { ok: false, error: e?.message || String(e) };
       }
     case MSG.AUTH_SIGNOUT:
       try {
         auth.signOut();
-        broadcastToTabs({ type: MSG.AUTH_CHANGED, signedIn: false, profile: null });
+        broadcastToTabs({ type: MSG.AUTH_CHANGED, signedIn: false, isAdmin: false, profile: null });
+        return { ok: true };
+      } catch (e) {
+        return { ok: false, error: e?.message || String(e) };
+      }
+    // Triage admin di un feedback: solo admin loggati, con Firebase ID token
+    // come Bearer (il token non lascia mai il main). La garanzia forte è nelle
+    // Firestore rules; questo è il gate applicativo + il trasporto autenticato.
+    case MSG.FEEDBACK_UPDATE:
+      try {
+        if (!auth.isAdmin()) {
+          return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
+        }
+        if (!globalThis.SN_FEEDBACK?.updateStatus) {
+          throw new Error('SN_FEEDBACK non caricato nel main process');
+        }
+        const idToken = await auth.getIdToken();
+        if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
+        const { id, status, notes, priority } = msg;
+        await globalThis.SN_FEEDBACK.updateStatus(id, { status, notes, priority }, { idToken });
         return { ok: true };
       } catch (e) {
         return { ok: false, error: e?.message || String(e) };
