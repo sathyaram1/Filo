@@ -434,7 +434,32 @@ body[data-state="thread"] .dash-suggestion { justify-content: flex-start; paddin
   border-radius: 10px;
   margin-bottom: 6px;
   display: block;
+  cursor: zoom-in;
 }
+
+/* Strip anteprime multi-immagine sopra la barra di input. */
+.dash-img-previews {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 6px 10px 2px;
+}
+.dash-img-previews .dash-img-preview { position: relative; padding: 0; }
+.dash-img-previews .dash-img-preview img {
+  width: 48px; height: 48px; border-radius: 8px; object-fit: cover; cursor: zoom-in;
+}
+.dash-img-previews .dash-img-remove { top: -6px; right: -6px; left: auto; }
+
+/* Lightbox: immagine ingrandita a tutto schermo (click per chiudere o Esc). */
+.dash-lightbox {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: none; align-items: center; justify-content: center;
+  cursor: zoom-out; z-index: 1000;
+}
+.dash-lightbox.open { display: flex; }
+.dash-lightbox img { max-width: 95vw; max-height: 95vh; border-radius: 8px; }
 
 @media (max-width: 720px) {
   .dash-input-wrap { grid-column: 1; }
