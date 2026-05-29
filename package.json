@@ -38,12 +38,24 @@
     "win": {
       "target": "nsis"
     },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false
+    },
     "mac": {
       "target": "dmg"
     },
     "linux": {
       "target": "AppImage"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "sathyaram1",
+        "repo": "Filo"
+      }
+    ]
   },
   "dependencies": {
     "electron-updater": "^6.8.3"
