@@ -1,0 +1,23 @@
+rules_version = '2';
+
+// Storage rules per l'alpha test.
+// Le immagini dei feedback vivono in /feedback/*.
+// - Upload: chiunque, fino a 4 MB, solo image/*
+// - Read: aperto (la dashboard mostra le immagini via link diretto al bucket).
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    match /feedback/{file=**} {
+      allow read: if true;
+      allow write: if
+        request.resource.size < 4 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // Tutto il resto è chiuso.
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}
