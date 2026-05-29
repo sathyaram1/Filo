@@ -17,9 +17,13 @@ const FIREBASE_API_KEY = 'AIzaSyDN_fpshLW_K78QLV0MMiX1gd-OfO7x-CY'; // pubblica 
 const FIREBASE_PROJECT_ID = 'filo-8b9cb';
 
 module.exports = {
-  // OAuth client desktop (DA COMPILARE).
-  googleClientId: process.env.FILO_GOOGLE_CLIENT_ID || '',
-  googleClientSecret: process.env.FILO_GOOGLE_CLIENT_SECRET || '',
+  // OAuth client desktop. Per i client "installed"/desktop il secret NON è
+  // confidenziale (è pensato per stare nell'app, PKCE è la vera protezione):
+  // va bene committarlo, anche in un repo pubblico. Override via env per i build CI.
+  googleClientId: process.env.FILO_GOOGLE_CLIENT_ID
+    || '1022422699919-vluneltguf1sostcsbalq6us0iuctk81.apps.googleusercontent.com',
+  googleClientSecret: process.env.FILO_GOOGLE_CLIENT_SECRET
+    || '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',
 
   // Endpoint Google OAuth.
   authEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
