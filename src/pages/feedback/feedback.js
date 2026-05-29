@@ -427,5 +427,62 @@
   refreshBtn.addEventListener('click', load);
   searchEl.addEventListener('input', applyFilter);
 
-  load();
+  // ── Stato admin ──────────────────────────────────────────────────────────
+  function renderAuthState(profile) {
+    if (adminBanner) adminBanner.hidden = isAdmin;
+    if (!isAdmin && adminBannerText) {
+      // Distingui "non loggato" da "loggato ma non admin": il secondo non può
+      // diventare admin cliccando Accedi, quindi nascondiamo il pulsante.
+      if (profile?.email) {
+        adminBannerText.textContent = `Sei in sola lettura: l'account ${profile.email} non è un amministratore.`;
+        if (adminSignInBtn) adminSignInBtn.hidden = true;
+      } else {
+        adminBannerText.textContent = 'Sei in sola lettura. Accedi con un account amministratore per gestire i feedback (spostare di stato, priorità, note).';
+        if (adminSignInBtn) adminSignInBtn.hidden = false;
+      }
+    }
+  }
+
+  async function refreshAuth() {
+    try {
+      const r = await sendToMain({ type: 'auth_status' });
+      isAdmin = Boolean(r?.isAdmin);
+      renderAuthState(r?.profile);
+    } catch (_) {
+      isAdmin = false;
+      renderAuthState(null);
+    }
+  }
+
+  if (adminSignInBtn) {
+    adminSignInBtn.addEventListener('click', async () => {
+      adminSignInBtn.disabled = true;
+      try {
+        const r = await sendToMain({ type: 'auth_signin' });
+        isAdmin = Boolean(r?.isAdmin);
+        renderAuthState(r?.profile);
+        applyFilter(); // ridisegna con/senza controlli admin
+        if (r?.ok === false) alert('Accesso non riuscito: ' + (r.error || 'errore sconosciuto'));
+      } catch (e) {
+        alert('Accesso non riuscito: ' + (e?.message || e));
+      } finally {
+        adminSignInBtn.disabled = false;
+      }
+    });
+  }
+
+  // Reagisci al login/logout fatto altrove (es. dal pulsante account della shell).
+  if (window.filo?.onBroadcast) {
+    window.filo.onBroadcast((m) => {
+      if (m?.type === 'auth_changed') {
+        isAdmin = Boolean(m.isAdmin);
+        renderAuthState(m.profile);
+        applyFilter();
+      }
+    });
+  }
+
+  // Carica prima lo stato admin, poi i feedback: così il primo render già
+  // mostra (o nasconde) i controlli di gestione in modo coerente.
+  refreshAuth().finally(load);
 })();
