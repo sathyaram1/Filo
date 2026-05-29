@@ -321,6 +321,32 @@ stanno in `../extension/firestore.rules` e si deployano con:
 cd ../extension && firebase deploy --only firestore:rules
 ```
 
+### Scrittura feedback (autenticazione obbligatoria)
+
+Le rules sono **admin-only / routine-only**: una PATCH REST senza
+`Authorization: Bearer <idToken>` riceve **403**. NON tentare PATCH grezze con
+la sola API key pubblica: falliranno.
+
+- **In sessione locale / dashboard app**: le scritture passano dal main process
+  (`feedback_update`), che allega l'ID token Firebase dell'admin loggato.
+- **In routine cloud**: usa il ruolo limitato `routines`. Aggiorna i feedback
+  **solo** tramite l'helper, che scambia il refresh token dell'account robot
+  per un ID token e fa la PATCH autenticata:
+
+  ```bash
+  node scripts/routine-feedback.mjs <id> <status:todo|done|clarify> "testo note"
+  ```
+
+  Richiede la variabile d'ambiente `FILO_ROUTINE_REFRESH_TOKEN` (refresh token
+  Firebase dell'account robot). Il ruolo `routines` può **solo** spostare lo
+  status tra `todo`/`done`/`clarify` e scrivere `notes`/`resolvedAt`: niente
+  `priority`, niente `verified`/`ignored`, niente delete (qualsiasi altra cosa →
+  403). Per `verified`/`ignored`/delete serve un admin (owner), non la routine.
+
+  Setup una tantum del token: `node scripts/routine-login.mjs` (login Google con
+  l'account robot dedicato — NON l'owner), poi incolla l'email in `routines` su
+  console Firebase e il refresh token stampato in `FILO_ROUTINE_REFRESH_TOKEN`.
+
 **Workflow**: quando l'utente chiede di "risolvere i feedback", lavora
 **solo** sui feedback con status `todo` ("Da risolvere"). Ignora quelli
 in `new` (inbox), `draft` (bozze — richiedono decisioni di design dell'utente),
