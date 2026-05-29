@@ -50,6 +50,14 @@
     SUBMIT_FEEDBACK: 'submit_feedback',           // { text, url, title, userAgent, clientId, images: [{dataUrl}] }
     WEB_SEARCH: 'web_search',                      // { query } → { ok, results: [{title,url,snippet}], provider }
 
+    // === Account "Accedi con Google" (vedi src/main/auth/) ===
+    // Login/logout/stato. Tutto vive nel main process: i token non sono mai
+    // esposti alle pagine. La risposta porta solo il profilo pubblico.
+    AUTH_SIGNIN: 'auth_signin',                    // → { ok, profile: {email,name,picture} | null }
+    AUTH_SIGNOUT: 'auth_signout',                  // → { ok }
+    AUTH_STATUS: 'auth_status',                    // → { ok, signedIn, profile|null }
+    AUTH_CHANGED: 'auth_changed',                  // broadcast → { signedIn, profile|null }
+
     // Clipboard history (per il menu "Incolla")
     GET_CLIPBOARD_HISTORY: 'get_clipboard_history',
     PUSH_CLIPBOARD_ENTRY: 'push_clipboard_entry',     // { entry }
