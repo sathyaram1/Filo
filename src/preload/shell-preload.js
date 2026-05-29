@@ -36,4 +36,18 @@ contextBridge.exposeInMainWorld('filoShell', {
     close: () => ipcRenderer.invoke('window:close'),
   },
   message: (msg) => ipcRenderer.invoke('filo:message', msg),
+  // Account "Accedi con Google". I token vivono nel main process: qui
+  // arriva solo il profilo pubblico { email, name, picture }.
+  auth: {
+    status: () => ipcRenderer.invoke('filo:message', { type: 'auth_status' }),
+    signIn: () => ipcRenderer.invoke('filo:message', { type: 'auth_signin' }),
+    signOut: () => ipcRenderer.invoke('filo:message', { type: 'auth_signout' }),
+    onChanged: (fn) => {
+      const wrapped = (_event, message) => {
+        if (message?.type === 'auth_changed') { try { fn(message); } catch (_) {} }
+      };
+      ipcRenderer.on('filo:broadcast', wrapped);
+      return () => ipcRenderer.removeListener('filo:broadcast', wrapped);
+    },
+  },
 });
