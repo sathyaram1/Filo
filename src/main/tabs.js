@@ -26,6 +26,27 @@ const NATIVE_MENU_PAGES = [
 // sistema. insertCSS() inietta a livello di user-agent e ignora la CSL della
 // pagina, garantendo l'arancione Filo ovunque. Niente var() qui: i custom
 // properties non si risolvono in modo affidabile dentro ::selection.
+// CSS dei content script (menu tasto destro, popup, sidebar, ecc.). Sui siti
+// con CSP restrittiva (YouTube, Reddit, ...) il <link filo://style/...> iniettato
+// dal content script viene BLOCCATO dalla CSP della pagina: il menu Filo veniva
+// creato nel DOM ma senza stile (position:static, niente sfondo/z-index) →
+// invisibile, e l'utente percepiva "il tasto destro non funziona". Lo iniettiamo
+// quindi anche via wc.insertCSS dal main, che ignora la CSP (come già facciamo
+// per il colore della selezione). Stessa lista di page-preload.js.
+const fs = require('node:fs');
+const CONTENT_STYLE_FILES = ['theme.css', 'menu.css', 'popup.css', 'sidebar.css', 'highlight.css', 'spellcheck.css', 'feedback.css'];
+let CONTENT_SCRIPT_CSS = null;
+function getContentScriptCss() {
+  if (CONTENT_SCRIPT_CSS !== null) return CONTENT_SCRIPT_CSS;
+  const dir = path.join(__dirname, '..', 'styles');
+  const parts = [];
+  for (const f of CONTENT_STYLE_FILES) {
+    try { parts.push(fs.readFileSync(path.join(dir, f), 'utf8')); } catch (_) {}
+  }
+  CONTENT_SCRIPT_CSS = parts.join('\n');
+  return CONTENT_SCRIPT_CSS;
+}
+
 const PAGE_SELECTION_CSS = `
 ::selection { background-color: rgba(196, 90, 59, 0.30) !important; }
 ::-moz-selection { background-color: rgba(196, 90, 59, 0.30) !important; }
