@@ -682,6 +682,9 @@
   }
 
   let iconLayoutCache = null;
+  // Stato di navigazione (canBack/canFwd) dell'ultima apertura menu: riusato
+  // dai redraw post-drag per non perdere il grigio di avanti/indietro.
+  let lastNavState = null;
   function loadIconLayout() {
     try {
       chrome.storage.local.get([STORAGE_KEYS.ICON_LAYOUT], (out) => {
