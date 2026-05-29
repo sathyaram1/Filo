@@ -7,6 +7,7 @@
 // (src/shared/qr.js) produca una matrice valida e non vuota.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { roundTrip, SN_QR } from './helpers/qr-decode.mjs';
 
 const HTML = `<!doctype html><html><body style="padding:40px;font:16px sans-serif">
   <h1>Filo QR test</h1>
