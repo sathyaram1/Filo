@@ -801,8 +801,8 @@
   // griglia secondaria) senza chiudere il menu, così l'utente può continuare a
   // riordinare. La griglia secondaria viene aggiornata solo se è aperta.
   function redrawIconRows() {
-    try { Menu.refreshIconRow?.(buildPrimaryRowItems()); } catch (_) {}
-    try { Menu.refreshIconGrid?.(buildSecondaryGridItems()); } catch (_) {}
+    try { Menu.refreshIconRow?.(buildPrimaryRowItems(lastNavState)); } catch (_) {}
+    try { Menu.refreshIconGrid?.(buildSecondaryGridItems(lastNavState)); } catch (_) {}
   }
 
   function buildHelpItem() {
