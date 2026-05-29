@@ -26,6 +26,27 @@ const NATIVE_MENU_PAGES = [
 // sistema. insertCSS() inietta a livello di user-agent e ignora la CSL della
 // pagina, garantendo l'arancione Filo ovunque. Niente var() qui: i custom
 // properties non si risolvono in modo affidabile dentro ::selection.
+// CSS dei content script (menu tasto destro, popup, sidebar, ecc.). Sui siti
+// con CSP restrittiva (YouTube, Reddit, ...) il <link filo://style/...> iniettato
+// dal content script viene BLOCCATO dalla CSP della pagina: il menu Filo veniva
+// creato nel DOM ma senza stile (position:static, niente sfondo/z-index) →
+// invisibile, e l'utente percepiva "il tasto destro non funziona". Lo iniettiamo
+// quindi anche via wc.insertCSS dal main, che ignora la CSP (come già facciamo
+// per il colore della selezione). Stessa lista di page-preload.js.
+const fs = require('node:fs');
+const CONTENT_STYLE_FILES = ['theme.css', 'menu.css', 'popup.css', 'sidebar.css', 'highlight.css', 'spellcheck.css', 'feedback.css'];
+let CONTENT_SCRIPT_CSS = null;
+function getContentScriptCss() {
+  if (CONTENT_SCRIPT_CSS !== null) return CONTENT_SCRIPT_CSS;
+  const dir = path.join(__dirname, '..', 'styles');
+  const parts = [];
+  for (const f of CONTENT_STYLE_FILES) {
+    try { parts.push(fs.readFileSync(path.join(dir, f), 'utf8')); } catch (_) {}
+  }
+  CONTENT_SCRIPT_CSS = parts.join('\n');
+  return CONTENT_SCRIPT_CSS;
+}
+
 const PAGE_SELECTION_CSS = `
 ::selection { background-color: rgba(196, 90, 59, 0.30) !important; }
 ::-moz-selection { background-color: rgba(196, 90, 59, 0.30) !important; }
@@ -309,16 +330,23 @@ class TabManager {
     // ignora la CSP della pagina (che invece blocca il <link filo://> del
     // content script). Reiniettiamo a ogni dom-ready perché lo stylesheet
     // utente non sopravvive alle navigazioni a documento intero.
-    if (!tab.isInternal) {
-      wc.on('dom-ready', () => {
-        // cssOrigin 'user' + !important: nel cascade CSS le dichiarazioni
-        // !important di origine "user" battono qualsiasi regola d'autore della
-        // pagina, anche con specificità alta o !important. Così l'arancione
-        // Filo vince anche sui siti (repubblica, ecc.) che impongono un
-        // ::selection blu tutto loro.
-        try { wc.insertCSS(PAGE_SELECTION_CSS, { cssOrigin: 'user' }); } catch (_) {}
-      });
-    }
+    // Reiniettiamo a ogni dom-ready perché gli stylesheet inseriti non
+    // sopravvivono alle navigazioni a documento intero. Il guard è sull'URL
+    // CORRENTE (non su tab.isInternal, fissato alla creazione): così anche una
+    // newtab interna che naviga verso un sito esterno riceve gli stili.
+    wc.on('dom-ready', () => {
+      let current = '';
+      try { current = wc.getURL() || ''; } catch (_) {}
+      if (current.startsWith('filo://')) return; // pagine interne: CSS via <link>
+      // cssOrigin 'user' + !important: le dichiarazioni !important di origine
+      // "user" battono qualsiasi regola d'autore della pagina (così l'arancione
+      // Filo della selezione vince anche su repubblica, ecc.).
+      try { wc.insertCSS(PAGE_SELECTION_CSS, { cssOrigin: 'user' }); } catch (_) {}
+      // CSS dei content script (menu, popup, sidebar...) come stylesheet
+      // d'autore: equivale al <link filo://style/...> ma ignora la CSP della
+      // pagina, che altrimenti lo bloccherebbe (YouTube, Reddit, ...).
+      try { wc.insertCSS(getContentScriptCss()); } catch (_) {}
+    });
 
     wc.on('did-start-loading', () => update({ loading: true }));
     wc.on('did-stop-loading', () => {

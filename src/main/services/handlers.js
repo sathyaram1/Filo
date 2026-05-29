@@ -943,6 +943,7 @@ async function handleMessage(msg, sender = {}) {
       }
     }
     // ── Account "Accedi con Google" ──────────────────────────────────────
+<<<<<<< HEAD
     // I token restano nel main process: qui torniamo solo il profilo pubblico
     // + se l'utente è admin (può triagiare i feedback).
     case MSG.AUTH_STATUS:
@@ -952,12 +953,23 @@ async function handleMessage(msg, sender = {}) {
         const profile = await auth.signIn();
         broadcastToTabs({ type: MSG.AUTH_CHANGED, signedIn: auth.isSignedIn(), isAdmin: auth.isAdmin(), profile });
         return { ok: true, profile, isAdmin: auth.isAdmin() };
+=======
+    // I token restano nel main process: qui torniamo solo il profilo pubblico.
+    case MSG.AUTH_STATUS:
+      return { ok: true, signedIn: auth.isSignedIn(), profile: auth.getProfile() };
+    case MSG.AUTH_SIGNIN:
+      try {
+        const profile = await auth.signIn();
+        broadcastToTabs({ type: MSG.AUTH_CHANGED, signedIn: auth.isSignedIn(), profile });
+        return { ok: true, profile };
+>>>>>>> main
       } catch (e) {
         return { ok: false, error: e?.message || String(e) };
       }
     case MSG.AUTH_SIGNOUT:
       try {
         auth.signOut();
+<<<<<<< HEAD
         broadcastToTabs({ type: MSG.AUTH_CHANGED, signedIn: false, isAdmin: false, profile: null });
         return { ok: true };
       } catch (e) {
@@ -978,6 +990,9 @@ async function handleMessage(msg, sender = {}) {
         if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
         const { id, status, notes, priority } = msg;
         await globalThis.SN_FEEDBACK.updateStatus(id, { status, notes, priority }, { idToken });
+=======
+        broadcastToTabs({ type: MSG.AUTH_CHANGED, signedIn: false, profile: null });
+>>>>>>> main
         return { ok: true };
       } catch (e) {
         return { ok: false, error: e?.message || String(e) };

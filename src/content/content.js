@@ -617,6 +617,7 @@
       colorPicker:   { id: 'colorPicker',   icon: I('colorPicker'), label: I18n.t('menu_color_picker'),      onClick: () => pickColor() },
       closeTab:      { id: 'closeTab',      icon: I('close'),       label: I18n.t('menu_close_tab'),         onClick: () => chrome.runtime.sendMessage({ type: MSG.CLOSE_TAB }) },
       newTab:        { id: 'newTab',        icon: I('filoLogo'),    label: I18n.t('menu_new_tab'),           onClick: () => chrome.runtime.sendMessage({ type: MSG.OPEN_NEW_TAB }) },
+      qrCode:        { id: 'qrCode',        icon: I('qrCode'),      label: I18n.t('menu_qr_code'),           onClick: () => showPageQrCode() },
     };
   }
 
@@ -651,13 +652,187 @@
     }
   }
 
+  // Genera e mostra il QR code della pagina corrente in un overlay. La codifica
+  // è 100% locale (src/shared/qr.js): l'URL non viene mai inviato a servizi
+  // esterni. Il QR è sempre nero su bianco (a prescindere dal tema) per
+  // garantire il contrasto richiesto dagli scanner.
+  function showPageQrCode() {
+    const QR = self.SN_QR;
+    const url = String(location.href || '');
+    if (!QR || typeof QR.toMatrix !== 'function') {
+      Popup.showToast(I18n.t('qr_error'), { duration: 3000 });
+      return;
+    }
+    let matrix;
+    try {
+      matrix = QR.toMatrix(url, { ecc: 'M' });
+    } catch (e) {
+      Popup.showToast(I18n.t('qr_error'), { duration: 3500 });
+      return;
+    }
+
+    const n = matrix.length;
+    const quiet = 4;            // quiet zone (moduli) richiesta dallo standard
+    const total = n + quiet * 2;
+    const cell = 8;             // px per modulo nel PNG/SVG sorgente
+    const dim = total * cell;
+
+    // Costruisce l'SVG del QR (nero su bianco) con quiet zone.
+    const rects = [];
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) {
+        if (matrix[r][c]) {
+          const x = (c + quiet) * cell;
+          const y = (r + quiet) * cell;
+          rects.push(`<rect x="${x}" y="${y}" width="${cell}" height="${cell}"/>`);
+        }
+      }
+    }
+    const svg =
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${dim}" height="${dim}" viewBox="0 0 ${dim} ${dim}" shape-rendering="crispEdges">` +
+      `<rect width="${dim}" height="${dim}" fill="#ffffff"/>` +
+      `<g fill="#000000">${rects.join('')}</g>` +
+      `</svg>`;
+    const svgDataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+
+    // --- Overlay ---
+    const overlay = document.createElement('div');
+    overlay.className = 'sn-qr-overlay';
+    overlay.style.cssText = [
+      'position:fixed', 'inset:0', 'z-index:2147483646',
+      'display:flex', 'align-items:center', 'justify-content:center',
+      'background:rgba(0,0,0,.55)', 'backdrop-filter:blur(2px)',
+    ].join(';');
+
+    const card = document.createElement('div');
+    card.className = 'sn-qr-card';
+    card.style.cssText = [
+      'background:#fff', 'color:#111', 'border-radius:16px', 'padding:22px 22px 18px',
+      'box-shadow:0 12px 48px rgba(0,0,0,.4)', 'max-width:min(92vw,360px)',
+      'font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif', 'text-align:center',
+    ].join(';');
+    card.addEventListener('mousedown', (e) => e.stopPropagation());
+
+    const title = document.createElement('div');
+    title.textContent = I18n.t('qr_title');
+    title.style.cssText = 'font-size:17px;font-weight:600;margin-bottom:2px;';
+
+    const subtitle = document.createElement('div');
+    subtitle.textContent = I18n.t('qr_subtitle');
+    subtitle.style.cssText = 'font-size:12px;color:#666;margin-bottom:14px;';
+
+    const img = document.createElement('img');
+    img.src = svgDataUrl;
+    img.alt = 'QR code';
+    img.style.cssText = 'width:240px;height:240px;display:block;margin:0 auto;border-radius:8px;image-rendering:pixelated;';
+
+    const urlLine = document.createElement('div');
+    urlLine.textContent = url;
+    urlLine.title = url;
+    urlLine.style.cssText = 'font-size:11px;color:#888;margin:12px 4px 14px;word-break:break-all;max-height:3.2em;overflow:hidden;';
+
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;gap:8px;justify-content:center;';
+
+    const mkBtn = (label, primary) => {
+      const b = document.createElement('button');
+      b.textContent = label;
+      b.style.cssText = [
+        'flex:1', 'padding:9px 12px', 'border-radius:9px', 'font-size:13px',
+        'cursor:pointer', 'border:1px solid ' + (primary ? '#2563eb' : '#d0d0d0'),
+        'background:' + (primary ? '#2563eb' : '#f4f4f5'), 'color:' + (primary ? '#fff' : '#222'),
+      ].join(';');
+      return b;
+    };
+
+    const downloadBtn = mkBtn(I18n.t('qr_download'), true);
+    downloadBtn.addEventListener('click', () => downloadQrPng(matrix, quiet, url));
+
+    const copyBtn = mkBtn(I18n.t('qr_copy_link'), false);
+    copyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(url);
+      } catch (_) {
+        const ta = document.createElement('textarea');
+        ta.value = url; ta.style.position = 'fixed'; ta.style.left = '-9999px';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); } catch (_) {}
+        ta.remove();
+      }
+      Popup.showToast(I18n.t('qr_link_copied'), { duration: 1800 });
+    });
+
+    btnRow.appendChild(downloadBtn);
+    btnRow.appendChild(copyBtn);
+    card.appendChild(title);
+    card.appendChild(subtitle);
+    card.appendChild(img);
+    card.appendChild(urlLine);
+    card.appendChild(btnRow);
+    overlay.appendChild(card);
+
+    const closeOverlay = () => {
+      overlay.remove();
+      document.removeEventListener('keydown', onKey, true);
+    };
+    function onKey(e) { if (e.key === 'Escape') { e.stopPropagation(); closeOverlay(); } }
+    overlay.addEventListener('mousedown', closeOverlay);
+    document.addEventListener('keydown', onKey, true);
+
+    document.documentElement.appendChild(overlay);
+  }
+
+  // Converte la matrice QR in un PNG e lo scarica. Usa un canvas off-DOM:
+  // disegna i moduli neri su sfondo bianco con quiet zone.
+  function downloadQrPng(matrix, quiet, url) {
+    try {
+      const n = matrix.length;
+      const total = n + quiet * 2;
+      const scale = 10; // px per modulo nel PNG scaricato (alta risoluzione)
+      const dim = total * scale;
+      const canvas = document.createElement('canvas');
+      canvas.width = dim; canvas.height = dim;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, dim, dim);
+      ctx.fillStyle = '#000000';
+      for (let r = 0; r < n; r++) {
+        for (let c = 0; c < n; c++) {
+          if (matrix[r][c]) ctx.fillRect((c + quiet) * scale, (r + quiet) * scale, scale, scale);
+        }
+      }
+      const finish = (href) => {
+        const a = document.createElement('a');
+        a.href = href;
+        let host = 'pagina';
+        try { host = new URL(url).hostname || 'pagina'; } catch (_) {}
+        a.download = `qr-${host}.png`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      };
+      if (canvas.toBlob) {
+        canvas.toBlob((blob) => {
+          if (!blob) { finish(canvas.toDataURL('image/png')); return; }
+          const objUrl = URL.createObjectURL(blob);
+          finish(objUrl);
+          setTimeout(() => URL.revokeObjectURL(objUrl), 4000);
+        }, 'image/png');
+      } else {
+        finish(canvas.toDataURL('image/png'));
+      }
+    } catch (e) {
+      Popup.showToast(I18n.t('qr_error'), { duration: 2500 });
+    }
+  }
+
   // Layout di default: 5 icone primarie nella riga, le altre nella griglia.
   // `newTab` (logo Filo "f") al posto di `openForLater` e l'ingranaggio
   // `openOptions` rimosso dalle azioni rapide (feedback alpha): le Opzioni
   // restano accessibili dalla barra indirizzi (icona ingranaggio).
   const DEFAULT_ICON_LAYOUT = {
     primary: ['translate', 'screenshot', 'share', 'saveForLater', 'newTab'],
-    secondary: ['screenshotCrop', 'transcribe', 'colorPicker', 'closeTab', 'fullscreen', 'back', 'forward', 'reload'],
+    secondary: ['screenshotCrop', 'transcribe', 'qrCode', 'colorPicker', 'closeTab', 'fullscreen', 'back', 'forward', 'reload'],
   };
 
   // Icone ritirate dal registro: vanno purgate dal layout salvato per non
@@ -703,7 +878,7 @@
             const beforeSec = (v.secondary || []).join('|');
             v = { ...v, primary: filterRetired(v.primary), secondary: filterRetired(v.secondary) };
             const known = new Set([...v.primary, ...v.secondary]);
-            const additions = ['colorPicker', 'closeTab', 'screenshotCrop', 'transcribe', 'newTab'].filter((id) => !known.has(id));
+            const additions = ['qrCode', 'colorPicker', 'closeTab', 'screenshotCrop', 'transcribe', 'newTab'].filter((id) => !known.has(id));
             if (additions.length) {
               v = { ...v, secondary: [...additions, ...v.secondary] };
             }
