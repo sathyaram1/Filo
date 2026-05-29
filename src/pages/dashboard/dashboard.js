@@ -592,7 +592,7 @@
   inputForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const text = inputEl.value.trim();
-    if (!text && !pendingImage) return;
+    if (!text && pendingImages.length === 0) return;
     if (handleSlashCommand(text)) return;
     submitMessage(text);
   });
