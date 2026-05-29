@@ -266,6 +266,7 @@
     options:      (size) => wrap(options, { size }),
     colorPicker:  (size) => wrap(colorPicker, { size }),
     lock:         (size) => wrap(lock, { size }),
+    user:         (size) => wrap(user, { size }),
     plus:         (size) => wrap(plus, { size }),
     minimize:     (size) => wrap(minimize, { size }),
     maximize:     (size) => wrap(maximize, { size }),
