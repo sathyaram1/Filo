@@ -299,6 +299,19 @@
       });
     });
 
+    // Pallini priorità: clic sul pallino N imposta priorità = N; ri-clic sul
+    // pallino già attivo (== priorità corrente) la azzera.
+    listEl.querySelectorAll('.fb-dot').forEach((dot) => {
+      dot.addEventListener('click', () => {
+        const id = dot.dataset.id;
+        const n = Number(dot.dataset.n);
+        const item = all.find((f) => f._id === id);
+        const cur = item ? priorityOf(item) : 0;
+        const next = cur === n ? 0 : n;
+        patch(id, { priority: next }, { priority: next });
+      });
+    });
+
     // Salvataggio note: debounce su blur.
     listEl.querySelectorAll('.fb-notes').forEach((ta) => {
       let timer;
