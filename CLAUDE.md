@@ -326,6 +326,13 @@ cd ../extension && firebase deploy --only firestore:rules
 in `new` (inbox), `draft` (bozze — richiedono decisioni di design dell'utente),
 `done` (già risolti, in attesa di verifica), `verified` e `ignored`.
 
+**Ordine di lavorazione = priorità.** Ogni feedback ha un campo `priority`
+(intero 0-3, dove 3 = massima urgenza, 0/assente = nessuna priorità assegnata).
+Tra i feedback `todo`, **affronta sempre per primi quelli con `priority` più
+alta**; a parità di priorità, parti dai più recenti. Non azzerare né modificare
+la `priority` di un feedback (è un segnale dell'utente): toccala solo se
+l'utente te lo chiede esplicitamente.
+
 Per ogni feedback `todo`:
 1. Leggi testo + screenshot allegati. **Distingui sintomo da causa**: la
    lamentela descrive ciò che l'utente vede, non necessariamente cos'è
