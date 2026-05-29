@@ -103,15 +103,16 @@
   flex: 0 0 auto;
 }
 
-.sn-menu-row-btn:hover:not(:disabled) {
+.sn-menu-row-btn:hover:not(:disabled):not(.sn-menu-btn-disabled) {
   background: rgba(var(--sn-accent-rgb), 0.35);
 }
 
-.sn-menu-row-btn:disabled {
+.sn-menu-row-btn:disabled,
+.sn-menu-row-btn.sn-menu-btn-disabled {
   color: var(--sn-muted);
   opacity: 0.4;
-  cursor: not-allowed;
 }
+.sn-menu-row-btn:disabled { cursor: not-allowed; }
 
 /* Sezione inline (es. spiegazione AI direttamente nel menu) */
 .sn-menu-inline {
