@@ -53,6 +53,10 @@ app.whenReady().then(async () => {
     syncNativeTheme(s.theme);
   } catch (_) {}
 
+  // Ripristina la sessione "Accedi con Google" persistita (non fa rete: l'ID
+  // token si rinnova alla prima richiesta che lo serve). Vedi src/main/auth/.
+  try { require('./auth/google-auth').restore(); } catch (_) {}
+
   mainWindow = createMainWindow();
   registerShortcuts(mainWindow);
 
