@@ -3,29 +3,20 @@ import { test, expect } from './fixtures/electron.mjs';
 test('dbg', async ({ openTab }) => {
   const dash = await openTab('filo://newtab/');
   await dash.waitForSelector('#dash', { timeout: 8000 });
-  const info = await dash.evaluate(() => {
-    window.SN_PAGE_BOOTSTRAP.applyTextScale(1.5);
+  const measure = (scale) => dash.evaluate((s) => {
+    window.SN_PAGE_BOOTSTRAP.applyTextScale(s);
     const html = document.documentElement;
-    const body = document.body;
+    const right = document.querySelector('.dash-right');
     const dashEl = document.getElementById('dash');
-    const rect = (el) => { const r = el.getBoundingClientRect(); return { h: Math.round(r.height), top: Math.round(r.top), bottom: Math.round(r.bottom) }; };
-    const wide = [];
-    document.querySelectorAll('*').forEach((el) => {
-      const r = el.getBoundingClientRect();
-      if (r.right > window.innerWidth + 1 || r.left < -1) {
-        wide.push({ tag: el.tagName, cls: el.className, left: Math.round(r.left), right: Math.round(r.right), w: Math.round(r.width) });
-      }
-    });
     return {
-      wide,
-      innerH: window.innerHeight, innerW: window.innerWidth,
-      scrollW: html.scrollWidth, clientW: html.clientWidth,
-      htmlScroll: html.scrollHeight, htmlClient: html.clientHeight,
-      htmlH: rect(html), bodyH: rect(body), dashH: rect(dashEl),
-      htmlCss: getComputedStyle(html).height, htmlMinCss: getComputedStyle(html).minHeight,
-      bodyCss: getComputedStyle(body).height, bodyMinCss: getComputedStyle(body).minHeight,
-      dashMinCss: getComputedStyle(dashEl).minHeight,
+      scale: s,
+      innerW: window.innerWidth, innerH: window.innerHeight,
+      scrollW: html.scrollWidth, scrollH: html.scrollHeight, clientH: html.clientHeight,
+      gridCols: getComputedStyle(dashEl).gridTemplateColumns,
+      rightW: Math.round(right.getBoundingClientRect().width),
+      rightRight: Math.round(right.getBoundingClientRect().right),
     };
-  });
-  console.log(JSON.stringify(info, null, 2));
+  }, scale);
+  console.log('SCALE1', JSON.stringify(await measure(1)));
+  console.log('SCALE15', JSON.stringify(await measure(1.5)));
 });
