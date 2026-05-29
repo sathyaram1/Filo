@@ -21,6 +21,12 @@
     const n = Number(scale);
     const clamped = Number.isFinite(n) ? Math.min(2, Math.max(0.8, n)) : 1;
     document.documentElement.style.zoom = clamped === 1 ? '' : String(clamped);
+    // Esponiamo il fattore di zoom come variabile CSS così le pagine che
+    // riempiono la viewport (es. la home/newtab) possono compensare le altezze
+    // basate su `vh`: senza, `zoom > 1` magnifica un layout `100vh` oltre la
+    // viewport e fa comparire uno scrollbar che sposta gli elementi
+    // (feedback alpha). Vedi `calc(100vh / var(--sn-zoom))` in dashboard.css.
+    document.documentElement.style.setProperty('--sn-zoom', String(clamped));
   }
 
   // Tema/scala iniziali "best effort" prima che le impostazioni siano caricate.
