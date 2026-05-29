@@ -9,7 +9,15 @@ test('dbg', async ({ openTab }) => {
     const body = document.body;
     const dashEl = document.getElementById('dash');
     const rect = (el) => { const r = el.getBoundingClientRect(); return { h: Math.round(r.height), top: Math.round(r.top), bottom: Math.round(r.bottom) }; };
+    const wide = [];
+    document.querySelectorAll('*').forEach((el) => {
+      const r = el.getBoundingClientRect();
+      if (r.right > window.innerWidth + 1 || r.left < -1) {
+        wide.push({ tag: el.tagName, cls: el.className, left: Math.round(r.left), right: Math.round(r.right), w: Math.round(r.width) });
+      }
+    });
     return {
+      wide,
       innerH: window.innerHeight, innerW: window.innerWidth,
       scrollW: html.scrollWidth, clientW: html.clientWidth,
       htmlScroll: html.scrollHeight, htmlClient: html.clientHeight,
