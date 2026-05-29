@@ -34,7 +34,12 @@ html, body {
   background: var(--dash-paper);
   color: var(--dash-ink);
   font-family: var(--sn-font, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
-  min-height: 100vh;
+  /* `--sn-zoom` (impostata da pageBootstrap.applyTextScale) compensa il fatto
+     che `zoom` magnifica i `vh`: senza la divisione, ingrandire il testo faceva
+     traboccare la home oltre la viewport e comparire uno scroll (feedback
+     alpha). Con la compensazione la home riempie esattamente la viewport a
+     qualsiasi dimensione testo e gli elementi restano nella stessa posizione. */
+  min-height: calc(100vh / var(--sn-zoom, 1));
   height: 100%;
   font-size: 14px;
 }
