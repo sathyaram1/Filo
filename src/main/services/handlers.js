@@ -943,7 +943,6 @@ async function handleMessage(msg, sender = {}) {
       }
     }
     // ── Account "Accedi con Google" ──────────────────────────────────────
-<<<<<<< HEAD
     // I token restano nel main process: qui torniamo solo il profilo pubblico
     // + se l'utente è admin (può triagiare i feedback).
     case MSG.AUTH_STATUS:
@@ -953,16 +952,6 @@ async function handleMessage(msg, sender = {}) {
         const profile = await auth.signIn();
         broadcastToTabs({ type: MSG.AUTH_CHANGED, signedIn: auth.isSignedIn(), isAdmin: auth.isAdmin(), profile });
         return { ok: true, profile, isAdmin: auth.isAdmin() };
-=======
-    // I token restano nel main process: qui torniamo solo il profilo pubblico.
-    case MSG.AUTH_STATUS:
-      return { ok: true, signedIn: auth.isSignedIn(), profile: auth.getProfile() };
-    case MSG.AUTH_SIGNIN:
-      try {
-        const profile = await auth.signIn();
-        broadcastToTabs({ type: MSG.AUTH_CHANGED, signedIn: auth.isSignedIn(), profile });
-        return { ok: true, profile };
->>>>>>> main
       } catch (e) {
         return { ok: false, error: e?.message || String(e) };
       }
