@@ -219,10 +219,7 @@ module.exports = {
   getIdToken,
   getProfile,
   isSignedIn,
-<<<<<<< HEAD
   isAdmin,
-=======
->>>>>>> main
   // esportati per i test
   _internals: { decodeJwtPayload, startLoopback },
 };
