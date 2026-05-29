@@ -330,16 +330,23 @@ class TabManager {
     // ignora la CSP della pagina (che invece blocca il <link filo://> del
     // content script). Reiniettiamo a ogni dom-ready perché lo stylesheet
     // utente non sopravvive alle navigazioni a documento intero.
-    if (!tab.isInternal) {
-      wc.on('dom-ready', () => {
-        // cssOrigin 'user' + !important: nel cascade CSS le dichiarazioni
-        // !important di origine "user" battono qualsiasi regola d'autore della
-        // pagina, anche con specificità alta o !important. Così l'arancione
-        // Filo vince anche sui siti (repubblica, ecc.) che impongono un
-        // ::selection blu tutto loro.
-        try { wc.insertCSS(PAGE_SELECTION_CSS, { cssOrigin: 'user' }); } catch (_) {}
-      });
-    }
+    // Reiniettiamo a ogni dom-ready perché gli stylesheet inseriti non
+    // sopravvivono alle navigazioni a documento intero. Il guard è sull'URL
+    // CORRENTE (non su tab.isInternal, fissato alla creazione): così anche una
+    // newtab interna che naviga verso un sito esterno riceve gli stili.
+    wc.on('dom-ready', () => {
+      let current = '';
+      try { current = wc.getURL() || ''; } catch (_) {}
+      if (current.startsWith('filo://')) return; // pagine interne: CSS via <link>
+      // cssOrigin 'user' + !important: le dichiarazioni !important di origine
+      // "user" battono qualsiasi regola d'autore della pagina (così l'arancione
+      // Filo della selezione vince anche su repubblica, ecc.).
+      try { wc.insertCSS(PAGE_SELECTION_CSS, { cssOrigin: 'user' }); } catch (_) {}
+      // CSS dei content script (menu, popup, sidebar...) come stylesheet
+      // d'autore: equivale al <link filo://style/...> ma ignora la CSP della
+      // pagina, che altrimenti lo bloccherebbe (YouTube, Reddit, ...).
+      try { wc.insertCSS(getContentScriptCss()); } catch (_) {}
+    });
 
     wc.on('did-start-loading', () => update({ loading: true }));
     wc.on('did-stop-loading', () => {
