@@ -174,12 +174,18 @@
   }
 
   // Aggiorna stato/note di un feedback esistente. status ∈ new|todo|done|verified|ignored.
-  async function updateStatus(id, { status, notes }) {
+  async function updateStatus(id, { status, notes, priority }) {
     if (!id) throw new Error('id mancante');
     const fields = {};
     const mask = [];
     if (status !== undefined) { fields.status = toFsValue(status); mask.push('status'); }
     if (notes !== undefined) { fields.notes = toFsValue(notes); mask.push('notes'); }
+    if (priority !== undefined) {
+      // Priorità 1-3 (0 = nessuna). Le regole Firestore validano int 0..3.
+      const p = Math.max(0, Math.min(3, Math.round(Number(priority) || 0)));
+      fields.priority = { integerValue: String(p) };
+      mask.push('priority');
+    }
     if (status === 'done') {
       fields.resolvedAt = { timestampValue: new Date().toISOString() };
       mask.push('resolvedAt');
