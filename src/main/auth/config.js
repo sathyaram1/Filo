@@ -37,7 +37,22 @@ module.exports = {
   signInWithIdpEndpoint: 'https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp',
   secureTokenEndpoint: 'https://securetoken.googleapis.com/v1/token',
 
+  // Allowlist degli admin: chi può triagiare i feedback (spostare di stato,
+  // priorità, eliminare). È il gate lato client/main per l'UX; la garanzia
+  // forte è server-side nelle Firestore rules (collezione `admins`), da
+  // deployare quando il service account della routine è pronto. Tenere le due
+  // liste allineate. Override via env (CSV) per build/collaboratori.
+  adminEmails: (process.env.FILO_ADMIN_EMAILS
+    ? process.env.FILO_ADMIN_EMAILS.split(',')
+    : ['sathyarampontillo@gmail.com'])
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean),
+
   isConfigured() {
     return Boolean(this.googleClientId);
+  },
+
+  isAdminEmail(email) {
+    return Boolean(email) && this.adminEmails.includes(String(email).toLowerCase());
   },
 };
