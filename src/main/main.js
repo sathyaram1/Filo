@@ -56,6 +56,10 @@ app.whenReady().then(async () => {
   mainWindow = createMainWindow();
   registerShortcuts(mainWindow);
 
+  // Auto-update: controlla le GitHub Releases e applica la nuova versione
+  // al riavvio (no-op in dev/test — vedi updater.js).
+  initAutoUpdater();
+
   // Smoke sentinel: in test mode apre la newtab E una pagina di test esterna,
   // verifica che i content script si caricano in quest'ultima, cattura
   // screenshot di entrambe, scrive un report e si chiude.
