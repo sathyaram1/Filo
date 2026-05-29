@@ -208,7 +208,7 @@ html, body {
   position: relative;
   min-width: 0;
 }
-.ed-module.dragging { opacity: 0.4; }
+.ed-module.dragging { opacity: 0.4; pointer-events: none; }
 .ed-root.settings-mode .ed-module { cursor: pointer; outline: 1px dashed transparent; }
 .ed-root.settings-mode .ed-module:hover { outline-color: var(--sn-accent); }
 
