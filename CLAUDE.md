@@ -419,7 +419,9 @@ fanno solo dubitare.
 
 - L'estensione MV3 (`../extension/` o `../ROBA VECCHIA/extension-mv3/`) è
   congelata. Niente fix né nuove feature lì. Se l'utente dice "fai X anche
-  sull'extension", **chiedi conferma** — di solito vuole solo Filo.
+  sull'extension", **chiedi conferma** — di solito vuole solo Filo. La config
+  Firebase non vive più lì: è stata spostata nella root di Filo, quindi
+  `../extension/` può essere eliminata senza rompere il deploy delle rules.
 
 ## Workflow worktree
 
