@@ -408,7 +408,10 @@
       userMessage: text || 'Descrivi questa immagine.',
       threadHistory: threadHistory.slice(0, -1),
     };
-    if (imageToSend) msg.image = imageToSend;
+    if (imagesToSend.length) {
+      msg.image = imagesToSend[0]; // retrocompatibilità (provider mono-immagine)
+      msg.images = imagesToSend;
+    }
     const r = await send(msg);
 
     pending.remove();
