@@ -28,6 +28,12 @@ contextBridge.exposeInMainWorld('filoShell', {
     openBlockedPopup: (url) => ipcRenderer.invoke('tabs:open-blocked-popup', { url }),
   },
   popupMenu: (entries, x, y) => ipcRenderer.invoke('shell:popup-menu', { entries, x, y }),
+  // Scelta di una voce di menu con `action` custom (vedi popup-menu.js).
+  onMenuAction: (fn) => {
+    const wrapped = (_event, action) => { try { fn(action); } catch (_) {} };
+    ipcRenderer.on('shell:menu-action', wrapped);
+    return () => ipcRenderer.removeListener('shell:menu-action', wrapped);
+  },
   tooltipShow: (text, x, y) => ipcRenderer.send('shell:tooltip-show', { text, x, y }),
   tooltipHide: () => ipcRenderer.send('shell:tooltip-hide'),
   window: {
