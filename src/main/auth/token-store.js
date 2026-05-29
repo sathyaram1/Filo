@@ -30,8 +30,7 @@ function save(session) {
     return false;
   }
   try {
-    const plain = Buffer.from(JSON.stringify(session), 'utf8');
-    const enc = safeStorage.encryptString(plain.toString('utf8'));
+    const enc = safeStorage.encryptString(JSON.stringify(session));
     fs.writeFileSync(filePath(), enc, { mode: 0o600 });
     return true;
   } catch (e) {
