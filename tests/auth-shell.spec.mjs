@@ -30,25 +30,31 @@ test('click su "Accedi" da sloggato avvia il login (apre il browser di sistema)'
   // Stub di shell.openExternal nel MAIN process: il login apre il consenso
   // Google nel browser di sistema; qui lo intercettiamo per asserire che il
   // flusso parte (URL di authorization Google con i parametri PKCE) senza
-  // aprire nulla davvero né attendere il redirect.
-  const opened = await app.evaluate(async ({ shell: electronShell }) => {
-    return await new Promise((resolve) => {
-      const orig = electronShell.openExternal;
-      electronShell.openExternal = async (url) => {
-        electronShell.openExternal = orig; // ripristina
-        resolve(url);
-        return undefined;
-      };
-      // timeout di sicurezza se non viene mai chiamato
-      setTimeout(() => resolve(null), 8_000);
-    });
+  // aprire nulla davvero né attendere il redirect. L'URL catturato finisce su
+  // un global del main, che rileggiamo dopo il click (no deadlock).
+  await app.evaluate(({ shell: electronShell }) => {
+    globalThis.__filoTestOpenedUrl = null;
+    const orig = electronShell.openExternal;
+    electronShell.openExternal = async (url) => {
+      globalThis.__filoTestOpenedUrl = url;
+      electronShell.openExternal = orig; // ripristina
+      return undefined;
+    };
   });
 
   // Scatena il click sul pulsante (non await: signIn resta in attesa del
   // redirect che non arriverà — a noi basta che il browser sia stato aperto).
   await shell.locator('#nav-account').click();
 
-  const url = await opened;
+  // Attendi che il main abbia ricevuto la chiamata a openExternal.
+  let url = null;
+  const deadline = Date.now() + 8_000;
+  while (Date.now() < deadline) {
+    url = await app.evaluate(() => globalThis.__filoTestOpenedUrl || null);
+    if (url) break;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+
   expect(url, 'shell.openExternal deve essere chiamato con l\'URL di consenso Google').toBeTruthy();
   expect(url).toContain('accounts.google.com/o/oauth2/v2/auth');
   expect(url).toContain('code_challenge=');
