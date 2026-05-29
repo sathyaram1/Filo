@@ -16,7 +16,8 @@
     "test:explore": "node tests/agent/explore.mjs",
     "test:daily": "node tests/agent/daily.mjs",
     "test:shoot": "node tests/agent/shoot.mjs",
-    "build": "electron-builder"
+    "build": "electron-builder --win",
+    "release": "electron-builder --win --publish always"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",
