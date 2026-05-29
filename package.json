@@ -36,7 +36,8 @@
       "package.json"
     ],
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "artifactName": "Filo-Setup.${ext}"
     },
     "nsis": {
       "oneClick": true,
