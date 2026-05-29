@@ -36,6 +36,7 @@
   setIcon(homeBtn, 'home', 18);
   setIcon(settingsBtn, 'options', 16);
   setIcon(appsBtn, 'apps', 16);
+  setIcon(accountBtn, 'user', 16);
   setIcon(newBtn, 'plus', 16);
 
   // Registro app del launcher. Il Feedback vive qui fra le App.
