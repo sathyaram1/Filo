@@ -63,6 +63,98 @@
 
   settingsBtn.addEventListener('click', () => showNativeMenu(settingsBtn, SETTINGS));
   appsBtn.addEventListener('click', () => showNativeMenu(appsBtn, APPS));
+
+  // ── Account "Accedi con Google" ───────────────────────────────────────────
+  // Lo stato vive nel main; qui mostriamo solo il profilo pubblico. Quando
+  // loggato, l'icona diventa l'avatar (foto Google) e il click apre un menu
+  // con "Esci"; quando non loggato, il click avvia il login.
+  let authProfile = null;
+  let authBusy = false;
+
+  function shortName(p) {
+    if (!p) return '';
+    return p.name || (p.email || '').split('@')[0] || 'Account';
+  }
+
+  function renderAccount() {
+    if (!accountBtn) return;
+    if (authBusy) {
+      accountBtn.dataset.tip = 'Accesso in corso…';
+      accountBtn.setAttribute('aria-label', 'Accesso in corso');
+      return;
+    }
+    if (authProfile) {
+      const label = shortName(authProfile);
+      accountBtn.dataset.tip = authProfile.email ? `${label} — ${authProfile.email}` : label;
+      accountBtn.setAttribute('aria-label', `Account: ${label}`);
+      accountBtn.classList.add('signed-in');
+      if (authProfile.picture) {
+        accountBtn.innerHTML =
+          `<img class="account-avatar" src="${authProfile.picture}" alt="" referrerpolicy="no-referrer" />`;
+      } else {
+        setIcon(accountBtn, 'user', 16);
+      }
+    } else {
+      accountBtn.dataset.tip = 'Accedi';
+      accountBtn.setAttribute('aria-label', 'Accedi');
+      accountBtn.classList.remove('signed-in');
+      setIcon(accountBtn, 'user', 16);
+    }
+  }
+
+  async function refreshAuth() {
+    try {
+      const r = await api.auth.status();
+      authProfile = (r && r.ok && r.signedIn) ? r.profile : null;
+    } catch (_) {
+      authProfile = null;
+    }
+    renderAccount();
+  }
+
+  async function doSignIn() {
+    if (authBusy) return;
+    authBusy = true; renderAccount();
+    try {
+      const r = await api.auth.signIn();
+      if (r && r.ok) authProfile = r.profile;
+      else if (r && r.error) alert('Accesso non riuscito: ' + r.error);
+    } catch (e) {
+      alert('Accesso non riuscito: ' + (e?.message || e));
+    } finally {
+      authBusy = false; renderAccount();
+    }
+  }
+
+  async function doSignOut() {
+    try { await api.auth.signOut(); } catch (_) {}
+    authProfile = null; renderAccount();
+  }
+
+  if (accountBtn) {
+    accountBtn.addEventListener('click', () => {
+      if (authBusy) return;
+      if (authProfile) {
+        const label = shortName(authProfile);
+        showNativeMenu(accountBtn, [
+          { label: authProfile.email || label, disabled: true },
+          { type: 'separator' },
+          { label: 'Esci', icon: 'close', action: 'auth-signout' },
+        ]);
+      } else {
+        doSignIn();
+      }
+    });
+    // Il menu account usa azioni custom invece di url: ascolta la scelta.
+    if (api.onMenuAction) {
+      api.onMenuAction((action) => { if (action === 'auth-signout') doSignOut(); });
+    }
+    // Aggiorna l'icona quando il main segnala un cambio sessione.
+    if (api.auth && api.auth.onChanged) {
+      api.auth.onChanged((m) => { authProfile = m.profile || null; renderAccount(); });
+    }
+    refreshAuth();
+  }
   setIcon(winMinBtn, 'minimize', 16);
   setIcon(winMaxBtn, 'maximize', 14);
   setIcon(winCloseBtn, 'close', 16);
