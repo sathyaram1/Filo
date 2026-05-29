@@ -110,13 +110,21 @@
   }
 
   async function patch(id, payload, optimistic) {
+    if (!isAdmin) {
+      alert('Operazione riservata agli amministratori: accedi con un account autorizzato.');
+      return;
+    }
     const item = all.find((f) => f._id === id);
     if (!item) return;
     const prev = { status: item.status, notes: item.notes, priority: item.priority };
     Object.assign(item, optimistic);
     applyFilter();
     try {
-      await SN_FEEDBACK.updateStatus(id, payload);
+      // Instradata dal main process, che allega il Firebase ID token come
+      // Bearer e rifiuta se l'utente loggato non è admin (i token non sono mai
+      // esposti alle pagine — vedi SECURITY.md §3).
+      const r = await sendToMain({ type: 'feedback_update', id, ...payload });
+      if (!r || r.ok === false) throw new Error(r?.error || 'aggiornamento rifiutato');
     } catch (e) {
       Object.assign(item, prev);
       applyFilter();
