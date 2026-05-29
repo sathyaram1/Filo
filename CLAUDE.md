@@ -321,47 +321,6 @@ stanno in `../extension/firestore.rules` e si deployano con:
 cd ../extension && firebase deploy --only firestore:rules
 ```
 
-### Autenticazione: scrivere sui feedback richiede un'identità (dall'alpha)
-
-La **lettura** dei feedback è pubblica (la `list` con sola API key funziona).
-La **scrittura** (cambiare `status`/`notes`/`priority`) richiede invece un
-utente autenticato nell'allowlist `routines` o `admins` — vedi le rules. Una
-PATCH con la sola API key (senza `Authorization`) prende **403
-PERMISSION_DENIED**.
-
-**Per le routine cloud** l'identità è il "Gmail-robot" (utente Firebase Auth
-email/password nell'allowlist `routines`). Non può fare login interattivo,
-quindi custodisce un **refresh token** nella env-var
-`FILO_ROUTINE_REFRESH_TOKEN` e lo scambia per un id_token fresco a ogni run:
-
-```bash
-TOKEN=$(node scripts/routine-fs-auth.mjs)
-# poi ogni PATCH:
-curl -X PATCH "...&key=$API_KEY" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d '{"fields":{...}}'
-```
-
-Se `node scripts/routine-fs-auth.mjs` fallisce (exit ≠ 0), **non procedere
-col triage**: senza token ogni PATCH darà 403. Segnala il problema e fermati.
-
-**Setup una-tantum del refresh token** (lo fa l'utente, non la routine):
-1. Console Firebase → Authentication → Users → crea utente email/password
-   con l'email del Gmail-robot (dev'essere anche in `routines/<email>`).
-2. Minta il refresh token una volta:
-   ```bash
-   curl -s 'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=<API_KEY>' \
-     -H 'Content-Type: application/json' \
-     -d '{"email":"<gmail-robot>","password":"<pw>","returnSecureToken":true}'
-   ```
-   Copia `refreshToken` dalla risposta nella env-var `FILO_ROUTINE_REFRESH_TOKEN`
-   dell'ambiente cloud. La password NON va salvata da nessuna parte.
-
-**In sessione locale (tu/utente)** il triage dalla dashboard usa l'idToken
-dell'admin loggato (`SN_FEEDBACK.updateStatus(id, payload, { idToken })`):
-non serve il robot.
-
 **Workflow**: quando l'utente chiede di "risolvere i feedback", lavora
 **solo** sui feedback con status `todo` ("Da risolvere"). Ignora quelli
 in `new` (inbox), `draft` (bozze — richiedono decisioni di design dell'utente),
