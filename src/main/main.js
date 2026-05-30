@@ -57,6 +57,11 @@ app.whenReady().then(async () => {
   // token si rinnova alla prima richiesta che lo serve). Vedi src/main/auth/.
   try { require('./auth/google-auth').restore(); } catch (_) {}
 
+  // Carica in background la config "modelli predefiniti" condivisa da Firestore
+  // (modelli pubblici + eventuali chiavi ruotate dall'admin, se loggati). Non
+  // blocca l'avvio: finché non arriva si usano i default da costanti/build.
+  try { require('./services/defaultsStore').refresh().catch(() => {}); } catch (_) {}
+
   mainWindow = createMainWindow();
   registerShortcuts(mainWindow);
 
