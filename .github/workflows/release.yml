@@ -86,6 +86,21 @@ jobs:
         if: steps.check.outputs.should_release == 'true'
         run: npm ci
 
+      - name: Incastona le chiavi di default nel build (bake)
+        # Legge l'override admin più recente da Firestore (config/secrets, via
+        # account robot) oppure i secret FILO_DEFAULT_* del job, e scrive il file
+        # generato che finisce dentro l'eseguibile. Così la rotazione chiavi
+        # dell'admin si propaga a TUTTI gli utenti al prossimo build, anche senza
+        # login. Non stampa mai i valori (solo presente/assente) e non fallisce
+        # il build se le fonti mancano.
+        if: steps.check.outputs.should_release == 'true'
+        env:
+          FILO_ROUTINE_REFRESH_TOKEN: ${{ secrets.FILO_ROUTINE_REFRESH_TOKEN }}
+          FILO_DEFAULT_OPENROUTER_KEY: ${{ secrets.FILO_DEFAULT_OPENROUTER_KEY }}
+          FILO_DEFAULT_GEMINI_KEY: ${{ secrets.FILO_DEFAULT_GEMINI_KEY }}
+          FILO_DEFAULT_TAVILY_KEY: ${{ secrets.FILO_DEFAULT_TAVILY_KEY }}
+        run: node scripts/bake-default-config.mjs
+
       - name: Build e upload su GitHub Releases (come bozza)
         if: steps.check.outputs.should_release == 'true'
         env:
