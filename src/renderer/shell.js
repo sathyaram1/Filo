@@ -70,7 +70,7 @@
     api.popupMenu(entries, Math.round(r.left), Math.round(r.bottom + 4));
   }
 
-  settingsBtn.addEventListener('click', () => showNativeMenu(settingsBtn, SETTINGS));
+  settingsBtn.addEventListener('click', () => showNativeMenu(settingsBtn, buildSettings()));
   appsBtn.addEventListener('click', () => showNativeMenu(appsBtn, APPS));
 
   // ── Account "Accedi con Google" ───────────────────────────────────────────
