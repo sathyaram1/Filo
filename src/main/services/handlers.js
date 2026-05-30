@@ -197,6 +197,36 @@ async function buildMessages(action, payload) {
   throw new Error(`Action sconosciuta: ${action}`);
 }
 
+// Quando "usa modelli predefiniti" è attivo (default), la risoluzione di
+// modelli/registry/provider usa la config predefinita condivisa, e le chiavi
+// sono quelle di default (build env / override admin via Firestore), con
+// fallback alle eventuali chiavi personali dell'utente se i default mancano
+// (es. build locale senza chiavi iniettate). Quando è disattivo, l'utente
+// gestisce tutto dalle Opzioni e usiamo i suoi settings così come sono.
+function withDefaults(settings) {
+  if (settings.useDefaultModels === false) return settings;
+  const d = Defaults.get();
+  const userKeys = settings.apiKeys || {};
+  const apiKeys = {};
+  for (const k of ['openrouter', 'gemini', 'tavily']) {
+    apiKeys[k] = d.apiKeys[k] || userKeys[k] || '';
+  }
+  return {
+    ...settings,
+    provider: d.provider,
+    geminiDirect: d.geminiDirect,
+    models: d.models,
+    modelRegistry: d.modelRegistry,
+    apiKeys,
+  };
+}
+
+// Settings "effettivi" per servire una richiesta AI: come getSettings() ma con
+// i default condivisi applicati se useDefaultModels è attivo.
+async function getEffectiveSettings() {
+  return withDefaults(await Storage.getSettings());
+}
+
 function modelForAction(settings, action, override) {
   const raw = override || settings.models?.[action] || DEFAULT_SETTINGS.models[action];
   return SN_CONST.DEPRECATED_MODELS?.[raw] || raw;
