@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Nuova scheda</title>
+  <link rel="stylesheet" href="newtab.css">
+</head>
+<body>
+  <div id="newtab-root">
+    <div id="brand">
+      <h1>Filo</h1>
+      <p id="greeting">Nuova scheda</p>
+    </div>
+    <form id="searchform" autocomplete="off">
+      <input id="search" type="text" placeholder="Cerca o inserisci un indirizzo" autofocus>
+      <button id="searchgo" type="submit" title="Vai">&#x2192;</button>
+    </form>
+    <div id="shortcuts">
+      <a class="shortcut" href="https://www.google.com" data-host="google.com">
+        <span class="dot">G</span><span class="label">Google</span>
+      </a>
+      <a class="shortcut" href="https://www.youtube.com" data-host="youtube.com">
+        <span class="dot">Y</span><span class="label">YouTube</span>
+      </a>
+      <a class="shortcut" href="https://github.com" data-host="github.com">
+        <span class="dot">&#9676;</span><span class="label">GitHub</span>
+      </a>
+      <a class="shortcut" href="https://www.wikipedia.org" data-host="wikipedia.org">
+        <span class="dot">W</span><span class="label">Wikipedia</span>
+      </a>
+      <a class="shortcut" href="filo://dashboard/dashboard.html" data-host="dashboard">
+        <span class="dot">&#9728;</span><span class="label">Dashboard</span>
+      </a>
+    </div>
+  </div>
+  <script src="newtab.js"></script>
+</body>
+</html>
