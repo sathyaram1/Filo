@@ -443,8 +443,9 @@
     gridEl.innerHTML = '';
 
     const occupied = new Set();
-    // Moduli della pagina corrente + moduli fissi (appuntati su ogni pagina).
-    const onPage = doc.modules.filter((m) => (m.z === z && !isFixed(m)) || isFixed(m));
+    // Moduli della pagina corrente + moduli appuntati (impostazioni e switch,
+    // visibili su ogni pagina).
+    const onPage = doc.modules.filter((m) => (m.z === z && !isPinned(m)) || isPinned(m));
     for (const m of onPage) {
       const cell = document.createElement('div');
       cell.className = 'ed-module';
