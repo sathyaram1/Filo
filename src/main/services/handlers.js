@@ -944,7 +944,7 @@ async function handleMessage(msg, sender = {}) {
     }
     case MSG.WEB_SEARCH:
       try {
-        const settings = await Storage.getSettings();
+        const settings = await getEffectiveSettings();
         const tavilyKey = settings.apiKeys?.tavily || '';
         const r = await WebSearch.search({ query: msg.query, tavilyKey, maxResults: 5 });
         return { ok: true, ...r };
