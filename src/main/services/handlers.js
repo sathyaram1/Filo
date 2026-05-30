@@ -982,6 +982,9 @@ async function handleMessage(msg, sender = {}) {
       try {
         const profile = await auth.signIn();
         broadcastToTabs({ type: MSG.AUTH_CHANGED, signedIn: auth.isSignedIn(), isAdmin: auth.isAdmin(), profile });
+        // Da loggati possiamo leggere eventuali chiavi default ruotate
+        // dall'admin (doc Firestore config/secrets): rinfresca in background.
+        Defaults.refresh().catch(() => {});
         return { ok: true, profile, isAdmin: auth.isAdmin() };
       } catch (e) {
         return { ok: false, error: e?.message || String(e) };
