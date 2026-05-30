@@ -58,6 +58,27 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Config "modelli predefiniti" condivisa, propagata a tutte le installazioni.
+    // Scrittura riservata agli admin (l'editor in app passa dal main con il
+    // Firebase ID token come Bearer).
+    //
+    // config/models  → provider/geminiDirect/models/modelRegistry. NON è segreto
+    //   (sono solo nomi di modelli): lettura PUBBLICA, così anche un utente non
+    //   loggato riceve la config predefinita.
+    // config/secrets → apiKeys predefinite (openrouter/gemini/tavily). SONO
+    //   segrete: lettura solo per utenti loggati (consumate esclusivamente nel
+    //   main process, mai inviate alle pagine). Chi non è loggato ricade sulle
+    //   chiavi di build.
+    match /config/models {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /config/secrets {
+      allow read: if request.auth != null
+        && request.auth.token.email_verified == true;
+      allow write: if isAdmin();
+    }
+
     match /feedback/{doc} {
       allow read: if true;
 
