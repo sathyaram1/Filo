@@ -319,7 +319,7 @@ async function handleAIRequest({ action, payload, origin }) {
 // Il main side è in src/main/ipc.js, qui esponiamo handleStream.
 
 async function handleStream({ action, payload, origin, onDelta, onMeta, signal }) {
-  const settings = await Storage.getSettings();
+  const settings = await getEffectiveSettings();
   const model = modelForAction(settings, action);
   let messages = await buildMessages(action, payload);
   messages = SN_CONST.injectAgentStyle(messages, action, settings.agentStyle);
