@@ -16,7 +16,7 @@ const INTERNAL_PRELOAD = path.join(__dirname, '..', 'preload', 'internal-preload
 // (taglia/copia/incolla) invece di restare inerte, es. nell'editor.
 const NATIVE_MENU_PAGES = [
   'filo://options/', 'filo://preferences/', 'filo://security/', 'filo://history/',
-  'filo://feedback/', 'filo://spellcheck/', 'filo://editor/',
+  'filo://feedback/', 'filo://spellcheck/', 'filo://editor/', 'filo://admin-defaults/',
 ];
 
 // Colore di selezione del testo coerente con la palette Filo, da iniettare sui
