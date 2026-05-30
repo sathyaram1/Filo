@@ -126,8 +126,10 @@
     try {
       const r = await api.auth.status();
       authProfile = (r && r.ok && r.signedIn) ? r.profile : null;
+      isAdmin = !!(r && r.ok && r.signedIn && r.isAdmin);
     } catch (_) {
       authProfile = null;
+      isAdmin = false;
     }
     renderAccount();
   }
