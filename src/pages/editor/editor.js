@@ -545,7 +545,7 @@
         const m = doc.modules.find((mm) => mm.id === payload.move);
         if (!m) return;
         const target = { x, y, w: m.w, h: m.h };
-        if (fits(target, z, m.id)) { m.x = x; m.y = y; m.z = z; renderGrid(); markDirty(); }
+        if (fitsFor(m, target, z)) { m.x = x; m.y = y; m.z = z; renderGrid(); markDirty(); }
       } else if (payload.add) {
         addModule(payload.add, x, y, z);
       }
