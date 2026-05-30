@@ -355,7 +355,12 @@
   }
 
   // (Ri)disegna l'item 'correction' in-place.
-  function renderCorrection(wrap, props) {
+  // `cleanups` arriva da open(): renderCorrection è definita a livello di modulo
+  // (non chiude sullo scope di open), quindi va passato esplicitamente —
+  // altrimenti setupArrowSubmenu sotto solleva "cleanups is not defined" e
+  // l'intero menu di correzione fallisce, facendo ricadere sul menu normale
+  // senza alcun suggerimento (feedback alpha: "il suggerimento non compare").
+  function renderCorrection(wrap, props, cleanups = []) {
     wrap.innerHTML = '';
     wrap.classList.toggle('sn-menu-correction-loading', !!props.loading);
     wrap.classList.toggle('sn-disabled', !!props.disabled);
