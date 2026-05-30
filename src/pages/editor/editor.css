@@ -386,6 +386,25 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 }
 .ed-btn.primary { background: var(--sn-accent); color: #fff; border-color: var(--sn-accent); }
 .ed-btn.danger { color: var(--sn-error); border-color: var(--sn-error); background: transparent; }
+.ed-btn[disabled] { opacity: 0.45; cursor: not-allowed; }
+
+/* Toast discreto in basso a destra (fallimenti non bloccanti, es. switch che
+   non può allargarsi). Stile coerente con una notifica d'errore. */
+.ed-toast {
+  position: fixed; right: 18px; bottom: 18px;
+  max-width: 320px;
+  background: var(--sn-bg);
+  border: 1px solid var(--sn-border);
+  border-left: 3px solid var(--sn-error);
+  border-radius: 10px;
+  box-shadow: var(--sn-shadow);
+  padding: 12px 14px;
+  font-size: 13px; line-height: 1.4; color: var(--sn-fg);
+  opacity: 0; transform: translateY(8px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  pointer-events: none; z-index: 200;
+}
+.ed-toast.show { opacity: 1; transform: translateY(0); }
 .ed-check-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 13px; }
 .ed-check-row input { width: auto; }
 .ed-icon-choice { display: flex; gap: 8px; flex-wrap: wrap; }
