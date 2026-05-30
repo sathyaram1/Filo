@@ -539,7 +539,7 @@ async function handleFiloGenerateDashboard({ force = false } = {}) {
       return { message: cached.message, suggestions: cached.suggestions, cached: true, ts: cached.ts };
     }
   }
-  const settings = await Storage.getSettings();
+  const settings = await getEffectiveSettings();
   if (!settings.apiKeys?.[settings.provider] && !settings.apiKeys?.gemini) {
     const saved = await SavedPages.list();
     const suggestions = saved.slice(0, 5).map((p) => ({
