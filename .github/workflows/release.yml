@@ -1,0 +1,99 @@
+# Release automatica di Filo (Windows).
+#
+# COSA FA
+#   A intervalli regolari (cron) controlla se su `main` ci sono commit nuovi
+#   rispetto all'ultima release pubblicata. Se sì: alza la patch version,
+#   builda l'installer NSIS per Windows e lo pubblica come nuova GitHub Release.
+#   L'auto-update dentro Filo (electron-updater) la vede e aggiorna i tester.
+#   Se NON ci sono commit nuovi, non fa nulla (niente release inutili).
+#
+# AUTENTICAZIONE
+#   Usa il GITHUB_TOKEN effimero fornito da Actions a ogni run. NON serve
+#   nessun Personal Access Token salvato. Perché possa creare release e
+#   pushare il bump di versione, le "Workflow permissions" del repo devono
+#   essere su "Read and write" (Settings -> Actions -> General).
+#
+# AVVIO MANUALE
+#   Si puo' lanciare a mano dalla tab "Actions" del repo (Run workflow),
+#   utile per pubblicare subito senza aspettare il cron.
+
+name: Release Filo (Windows)
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'   # ogni 6 ore (UTC); modificabile
+  workflow_dispatch: {}      # pulsante "Run workflow" manuale
+
+permissions:
+  contents: write            # creare release + pushare il bump di versione su main
+
+concurrency:
+  group: filo-release
+  cancel-in-progress: false  # non interrompere un publish a meta'
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout main (con storia e tag completi)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: C'e' qualcosa di nuovo da rilasciare?
+        id: check
+        shell: bash
+        run: |
+          git fetch --tags --force
+          LAST_TAG=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || echo "")
+          if [ -z "$LAST_TAG" ]; then
+            echo "Nessun tag precedente -> si rilascia."
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+          else
+            AHEAD=$(git rev-list --count "${LAST_TAG}..HEAD")
+            echo "Commit dopo $LAST_TAG: $AHEAD"
+            if [ "$AHEAD" -gt 0 ]; then
+              echo "should_release=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "should_release=false" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+      - name: Bump patch version e push su main
+        if: steps.check.outputs.should_release == 'true'
+        id: bump
+        shell: bash
+        run: |
+          git config user.name "filo-release-bot"
+          git config user.email "release-bot@users.noreply.github.com"
+          npm version patch --no-git-tag-version
+          VERSION=v$(node -p "require('./package.json').version")
+          git commit -am "release: ${VERSION} [skip ci]"
+          # Atterra su main, rifacendo il rebase se nel frattempo la routine ha pushato.
+          for i in 1 2 3; do
+            if git push origin HEAD:main; then break; fi
+            git pull --rebase origin main || exit 1
+          done
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Install dipendenze
+        if: steps.check.outputs.should_release == 'true'
+        run: npm ci
+
+      - name: Build e publish su GitHub Releases
+        if: steps.check.outputs.should_release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"   # app non firmata: salta la ricerca certificati
+        run: npm run release
+
+      - name: Riepilogo
+        if: steps.check.outputs.should_release == 'true'
+        shell: bash
+        run: echo "Pubblicata ${{ steps.bump.outputs.version }}"
