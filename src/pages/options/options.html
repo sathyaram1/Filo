@@ -16,7 +16,15 @@
   <main class="sn-page" id="page">
     <h1 id="title"></h1>
 
-    <section>
+    <section id="sec-default-models">
+      <label class="sn-switch-row" style="display:flex;align-items:center;gap:10px;font-weight:600;">
+        <input type="checkbox" id="useDefaultModels" />
+        <span id="useDefaultModels-label"></span>
+      </label>
+      <p class="sn-muted" id="useDefaultModels-desc"></p>
+    </section>
+
+    <section class="sn-advanced-models" id="sec-provider">
       <h2 id="h-provider"></h2>
       <label for="provider"></label>
       <select id="provider">
