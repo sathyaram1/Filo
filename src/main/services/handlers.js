@@ -276,7 +276,7 @@ function buildAttemptChain(settings, modelRef) {
 }
 
 async function handleAIRequest({ action, payload, origin }) {
-  const settings = await Storage.getSettings();
+  const settings = await getEffectiveSettings();
   const model = modelForAction(settings, action, payload?.modelOverride);
   let messages = await buildMessages(action, payload);
   messages = SN_CONST.injectAgentStyle(messages, action, settings.agentStyle);
