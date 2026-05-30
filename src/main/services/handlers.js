@@ -597,7 +597,7 @@ async function handleFiloGenerateDashboard({ force = false } = {}) {
 }
 
 async function maybeCategorizeAsync(savedEntry, pageInput) {
-  const settings = await Storage.getSettings();
+  const settings = await getEffectiveSettings();
   if (!settings.featureFlags?.categorize) return;
   if (await Costs.isOverLimit(settings.monthlyLimitEur)) return;
   if (!settings.apiKeys?.[settings.provider]) return;
