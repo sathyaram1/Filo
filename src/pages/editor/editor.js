@@ -28,7 +28,7 @@
 
   // ── Metadati tipi di modulo ───────────────────────────────────────────
   const MODULE_TYPES = {
-    switch:           { label: 'Switch', icon: 'apps', defaultW: 3, defaultH: 1, minW: 2, minH: 1, desc: 'Cambia pagina/workspace della griglia.' },
+    switch:           { label: 'Switch', icon: 'apps', defaultW: 2, defaultH: 1, minW: 2, minH: 1, desc: 'Cambia pagina/workspace della griglia.' },
     'word-count':     { label: 'Conteggio parole', icon: 'transcribe', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: 'Numero di parole, aggiornato in tempo reale.' },
     'search-replace': { label: 'Cerca e sostituisci', icon: 'reload', defaultW: 2, defaultH: 2, minW: 2, minH: 2, desc: 'Trova ed evidenzia, sostituisci nel testo.' },
     comment:          { label: 'Commenta', icon: 'share', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: 'Seleziona testo e aggiungi commenti.' },
