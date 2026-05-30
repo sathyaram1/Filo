@@ -515,7 +515,7 @@
       if (empty && gridEl.contains(empty)) {
         const x = parseInt(empty.style.gridColumnStart || empty.style.gridColumn, 10) - 1;
         const y = parseInt(empty.style.gridRowStart || empty.style.gridRow, 10) - 1;
-        if (Number.isFinite(x) && Number.isFinite(y) && fits({ x, y, w: m.w, h: m.h }, z, m.id)) {
+        if (Number.isFinite(x) && Number.isFinite(y) && fitsFor(m, { x, y, w: m.w, h: m.h }, z)) {
           empty.classList.add('drop-target');
           targetEl = empty;
           target = { x, y };
