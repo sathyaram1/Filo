@@ -79,6 +79,10 @@
   // con "Esci"; quando non loggato, il click avvia il login.
   let authProfile = null;
   let authBusy = false;
+  // Gate UX della voce admin "Modelli predefiniti". La garanzia forte resta nel
+  // main (handler DEFAULTS_*) e nelle regole Firestore: qui decidiamo solo se
+  // mostrare la voce di menu.
+  let isAdmin = false;
 
   function shortName(p) {
     if (!p) return '';
