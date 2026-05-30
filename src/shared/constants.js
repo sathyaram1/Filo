@@ -592,6 +592,11 @@
 
   const DEFAULT_SETTINGS = {
     provider: DEFAULT_PROVIDER,
+    // "Usa modelli predefiniti": quando true (default), Filo funziona da subito
+    // con la config e le chiavi predefinite condivise, senza che l'utente debba
+    // impostare nulla. Le altre impostazioni modelli/chiavi restano nascoste
+    // finché l'utente non disattiva questo switch dalle Opzioni.
+    useDefaultModels: true,
     apiKeys: {
       openrouter: '',
       gemini: '',
