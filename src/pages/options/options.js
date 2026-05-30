@@ -413,6 +413,7 @@
     const { registry } = collectModelRegistry();
 
     const partial = {
+      useDefaultModels: $('useDefaultModels').checked,
       provider,
       apiKeys: { openrouter: apiKey, gemini: apiKeyGemini, tavily: apiKeyTavily },
       geminiDirect: $('geminiDirect').checked,
