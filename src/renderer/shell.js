@@ -46,13 +46,22 @@
     { label: 'Feedback', icon: 'feedback', url: 'filo://feedback/feedback.html' },
   ];
   // Voci del menu Impostazioni (ingranaggio): Modelli, Sicurezza, Preferenze —
-  // tre pagine interne dedicate.
-  const SETTINGS = [
-    { label: 'Modelli', icon: 'models', url: 'filo://options/options.html' },
-    { label: 'Sicurezza', icon: 'lock', url: 'filo://security/security.html' },
-    { type: 'separator' },
-    { label: 'Preferenze', icon: 'colorPicker', url: 'filo://preferences/preferences.html' },
-  ];
+  // tre pagine interne dedicate. La voce "Modelli predefiniti" appare SOLO agli
+  // admin (gli utenti comuni non la vedono affatto). `buildSettings()` ricostruisce
+  // la lista ad ogni apertura del menu, così riflette lo stato auth corrente.
+  function buildSettings() {
+    const entries = [
+      { label: 'Modelli', icon: 'models', url: 'filo://options/options.html' },
+      { label: 'Sicurezza', icon: 'lock', url: 'filo://security/security.html' },
+      { type: 'separator' },
+      { label: 'Preferenze', icon: 'colorPicker', url: 'filo://preferences/preferences.html' },
+    ];
+    if (isAdmin) {
+      entries.push({ type: 'separator' });
+      entries.push({ label: 'Modelli predefiniti', icon: 'models', url: 'filo://admin-defaults/admin-defaults.html' });
+    }
+    return entries;
+  }
 
   // Popup menu custom: BrowserWindow frameless che appare sopra le
   // WebContentsView native, stilizzato come il menu tasto destro.
