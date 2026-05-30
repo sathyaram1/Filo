@@ -415,13 +415,27 @@
     if (rect.x < 0 || rect.y < 0 || rect.x + rect.w > GRID_COLS || rect.y + rect.h > GRID_ROWS) return false;
     for (const m of doc.modules) {
       if (m.id === ignoreId) continue;
-      // I moduli fissi (es. impostazioni) sono appuntati su tutte le pagine:
+      // I moduli appuntati (impostazioni, switch) vivono su tutte le pagine:
       // la loro cella va riservata su qualunque z.
-      if (m.z !== z && !isFixed(m)) continue;
+      if (m.z !== z && !isPinned(m)) continue;
       const overlap = rect.x < m.x + m.w && rect.x + rect.w > m.x && rect.y < m.y + m.h && rect.y + rect.h > m.y;
       if (overlap) return false;
     }
     return true;
+  }
+  // Verifica che un rettangolo entri su TUTTE le pagine esistenti. Serve per i
+  // moduli appuntati (lo switch): per spostarli o allargarli deve esserci spazio
+  // su ogni pagina, non solo su quella attiva.
+  function fitsAllPages(rect, ignoreId) {
+    for (const p of getPages()) {
+      if (!fits(rect, p.z, ignoreId)) return false;
+    }
+    return true;
+  }
+  // Sceglie il controllo di collisione giusto per il modulo: i moduli appuntati
+  // devono entrare su tutte le pagine, gli altri solo sulla pagina indicata.
+  function fitsFor(m, rect, z) {
+    return isPinned(m) ? fitsAllPages(rect, m.id) : fits(rect, z, m.id);
   }
 
   function renderGrid() {
