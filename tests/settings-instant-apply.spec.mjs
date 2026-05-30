@@ -32,7 +32,11 @@ test('Sicurezza e Modelli: il pulsante Salva è stato rimosso', async ({ openTab
   await expect(sec.locator('#save')).toHaveCount(0);
 
   const opts = await openTab('filo://options/options.html');
-  await opts.waitForSelector('#provider', { timeout: 8_000 });
+  // La config provider/modelli è dietro lo switch "Usa modelli predefiniti"
+  // (ON di default): disattivalo per rivelare #provider.
+  await opts.waitForSelector('#useDefaultModels', { timeout: 8_000 });
+  await opts.uncheck('#useDefaultModels');
+  await opts.waitForSelector('#provider', { state: 'visible', timeout: 8_000 });
   await expect(opts.locator('#save')).toHaveCount(0);
 });
 
