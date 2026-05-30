@@ -52,6 +52,11 @@
     // main, che allega il Firebase ID token come Bearer e RIFIUTA se l'utente
     // loggato non è admin. → { ok } | { ok:false, error }
     FEEDBACK_UPDATE: 'feedback_update',           // { id, status?, notes?, priority? }
+    // Config "modelli predefiniti" condivisa (admin-only, propaga a tutti via
+    // Firestore). GET ritorna la config senza esporre le chiavi vere (solo se
+    // presenti); UPDATE scrive provider/geminiDirect/models/modelRegistry/apiKeys.
+    DEFAULTS_GET: 'defaults_get',                  // → { ok, config } | { ok:false, error }
+    DEFAULTS_UPDATE: 'defaults_update',            // { config } → { ok, config } | { ok:false, error }
     WEB_SEARCH: 'web_search',                      // { query } → { ok, results: [{title,url,snippet}], provider }
 
     // === Account "Accedi con Google" (vedi src/main/auth/) ===
