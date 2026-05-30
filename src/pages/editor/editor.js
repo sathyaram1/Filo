@@ -41,6 +41,12 @@
   // Un modulo è "fisso" (di sistema) se il suo tipo è marcato fixed.
   const isFixed = (m) => !!(m && MODULE_TYPES[m.type] && MODULE_TYPES[m.type].fixed);
 
+  // Un modulo è "appuntato" su tutte le pagine se è fisso (impostazioni) OPPURE
+  // se è lo switch: lo switch deve restare visibile e occupare la stessa cella su
+  // OGNI pagina, così l'utente può sempre cambiare pagina e — modificandolo da una
+  // qualunque vista — lo modifica per tutte (è un unico modulo condiviso).
+  const isPinned = (m) => isFixed(m) || (!!m && m.type === 'switch');
+
   // Icone-preset per lo switch (estetiche, non vincolano i moduli).
   const SWITCH_PRESETS = {
     pen:  ICONS.editor,
