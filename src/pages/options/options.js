@@ -483,6 +483,7 @@
     // subito. I controlli testuali salvano allo `change` (cioè al blur), gli
     // altri (select/checkbox) immediatamente.
     $('page').addEventListener('change', () => saveDebounced());
+    $('useDefaultModels').addEventListener('change', applyDefaultModelsVisibility);
     $('loadModels').addEventListener('click', loadModelsFromProvider);
     $('testOpenrouter').addEventListener('click', () => testProvider('openrouter', $('testOpenrouterStatus'), $('testOpenrouter')));
     $('testGemini').addEventListener('click', () => testProvider('gemini', $('testGeminiStatus'), $('testGemini')));
