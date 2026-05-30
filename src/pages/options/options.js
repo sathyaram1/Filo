@@ -69,6 +69,16 @@
     });
   }
 
+  // Quando "usa modelli predefiniti" è ON, nasconde le sezioni di config
+  // avanzata (provider/chiavi, registry, modelli per azione): l'utente usa i
+  // default condivisi senza dover toccare nulla. OFF = mostra tutto.
+  function applyDefaultModelsVisibility() {
+    const useDefault = $('useDefaultModels').checked;
+    for (const el of document.querySelectorAll('.sn-advanced-models')) {
+      el.hidden = useDefault;
+    }
+  }
+
   async function load() {
     fillStaticText();
 
