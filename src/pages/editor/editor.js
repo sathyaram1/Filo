@@ -642,29 +642,107 @@
     if (icon === 'serif') return '<span style="font-family:Georgia,serif;font-size:15px">A</span>';
     return escapeHtml(icon || String(idx + 1));
   }
+  const MAX_PAGES = 4;
+
+  // La larghezza dello switch (in colonne) È il numero di pagine: 2 colonne → 2
+  // pagine, 3 → 3, ecc. Allargare crea pagine, rimpicciolire ne elimina.
+
+  // Una pagina è "vuota" se non contiene moduli oltre a quelli appuntati (lo
+  // switch stesso e l'ingranaggio impostazioni, presenti su ogni pagina).
+  function pageHasModules(z, switchId) {
+    return doc.modules.some((mm) => mm.id !== switchId && !isPinned(mm) && mm.z === z);
+  }
+
+  // Aggiunge UNA pagina allargando lo switch di una colonna. Ritorna true se è
+  // riuscita; se non c'è spazio su tutte le pagine (o si è al massimo) mostra un
+  // toast discreto in basso a destra e ritorna false senza modificare nulla.
   function growSwitch(m) {
     const pages = m.data.pages;
-    if (pages.length >= 4) return;
-    const newW = Math.min(pages.length + 1, GRID_COLS);
-    if (!fits({ x: m.x, y: m.y, w: newW, h: m.h }, m.z, m.id)) { flashOverlayMsg('Spazio insufficiente per espandere lo switch.'); return; }
+    if (pages.length >= MAX_PAGES) {
+      showEditorToast(`Lo switch può avere al massimo ${MAX_PAGES} pagine.`);
+      return false;
+    }
+    const newW = pages.length + 1;
+    if (m.x + newW > GRID_COLS || !fitsAllPages({ x: m.x, y: m.y, w: newW, h: m.h }, m.id)) {
+      showEditorToast('Spazio insufficiente in tutte le pagine: lo switch non può allargarsi.');
+      return false;
+    }
     const usedZ = pages.map((p) => p.z);
     let z = 0; while (usedZ.includes(z)) z++;
     pages.push({ z, name: `Pagina ${pages.length + 1}`, icon: String(pages.length + 1) });
     m.w = newW;
     renderGrid();
     markDirty();
+    return true;
   }
+
+  // Rimpicciolire lo switch = eliminare una pagina. Apre un box che avverte e fa
+  // scegliere QUALE pagina eliminare (le pagine con moduli vanno svuotate prima).
   function shrinkSwitch(m) {
+    if (m.data.pages.length <= MODULE_TYPES.switch.minW) {
+      showEditorToast(`Lo switch deve avere almeno ${MODULE_TYPES.switch.minW} pagine.`);
+      return;
+    }
+    openDeletePageDialog(m);
+  }
+
+  // Elimina la pagina con z = `z` (se vuota) e accorcia lo switch di una colonna.
+  function deletePage(m, z) {
     const pages = m.data.pages;
-    if (pages.length <= MODULE_TYPES.switch.minW) return;
-    const last = pages[pages.length - 1];
-    const hasModules = doc.modules.some((mm) => mm.id !== m.id && mm.z === last.z);
-    if (hasModules) { flashOverlayMsg('La pagina contiene moduli: spostali o eliminali prima.'); return; }
-    pages.pop();
-    if ((m.data.activePage || 0) === last.z) m.data.activePage = pages[0].z;
+    if (pages.length <= MODULE_TYPES.switch.minW) return false;
+    const idx = pages.findIndex((p) => p.z === z);
+    if (idx < 0) return false;
+    if (pageHasModules(z, m.id)) {
+      showEditorToast('La pagina contiene moduli: spostali o eliminali prima.');
+      return false;
+    }
+    pages.splice(idx, 1);
+    if ((m.data.activePage || 0) === z) m.data.activePage = pages[0].z;
     m.w = Math.max(MODULE_TYPES.switch.minW, pages.length);
     renderGrid();
     markDirty();
+    return true;
+  }
+
+  function openDeletePageDialog(m) {
+    const pages = m.data.pages;
+    const rows = pages.map((p, idx) => {
+      const occupied = pageHasModules(p.z, m.id);
+      const name = escapeHtml(p.name || `Pagina ${idx + 1}`);
+      return `<div class="ed-stat-row">
+        <span>${name}${occupied ? ' <em style="color:var(--sn-muted);font-style:normal">· contiene moduli</em>' : ''}</span>
+        <button class="ed-btn danger" data-del-z="${p.z}"${occupied ? ' disabled title="Svuota la pagina prima"' : ''}>Elimina</button>
+      </div>`;
+    }).join('');
+    openOverlay(`<h3>Rimpicciolire lo switch elimina una pagina</h3>
+      <p style="font-size:13px;color:var(--sn-muted);margin:0 0 14px">Quale pagina vuoi eliminare? Le pagine che contengono moduli vanno svuotate prima.</p>
+      ${rows}
+      <div class="ed-overlay-actions"><button class="ed-btn" id="cancelDelPage">Annulla</button></div>`);
+    const cancel = overlayBox.querySelector('#cancelDelPage');
+    if (cancel) cancel.addEventListener('click', closeOverlay);
+    overlayBox.querySelectorAll('button[data-del-z]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const ok = deletePage(m, Number(btn.dataset.delZ));
+        if (ok) closeOverlay();
+      });
+    });
+  }
+
+  // Porta lo switch a `targetLen` pagine: allarga (crea) o rimpicciolisce
+  // (chiede quale eliminare). Usata dal ridimensionamento a trascinamento.
+  function reconcileSwitchPages(m, targetLen) {
+    const cur = m.data.pages.length;
+    if (targetLen > cur) {
+      while (m.data.pages.length < targetLen) {
+        if (!growSwitch(m)) break; // niente spazio / max raggiunto: toast già mostrato
+      }
+      renderGrid(); // ripristina la larghezza visiva se l'aggiunta è stata rifiutata
+    } else if (targetLen < cur) {
+      renderGrid();            // ripristina la larghezza reale prima di chiedere
+      openDeletePageDialog(m); // l'eliminazione effettiva avviene dopo la scelta
+    } else {
+      renderGrid();
+    }
   }
 
   // ── Modulo: conteggio parole ───────────────────────────────────────────
