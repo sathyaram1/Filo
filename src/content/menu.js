@@ -181,7 +181,7 @@
                   sib.style.display = hide ? 'none' : '';
                 }
               }
-              renderCorrection(wrap, { ...it, ...newProps });
+              renderCorrection(wrap, { ...it, ...newProps }, cleanups);
             };
             const cleanup = it.onMount(wrap, update);
             if (typeof cleanup === 'function') cleanups.push(cleanup);
