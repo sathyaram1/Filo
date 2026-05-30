@@ -1143,6 +1143,27 @@
   }
   overlay.addEventListener('click', (e) => { if (e.target === overlay) closeOverlay(); });
 
+  // Toast discreto in basso a destra per i fallimenti "non bloccanti" (es. uno
+  // switch che non si può allargare per mancanza di spazio). Stile coerente con
+  // le notifiche d'errore (bordo accent rosso), come il fallimento di un'azione.
+  let edToastTimer = null;
+  function showEditorToast(text) {
+    let el = document.getElementById('edToast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'edToast';
+      el.className = 'ed-toast';
+      el.setAttribute('role', 'status');
+      document.body.appendChild(el);
+    }
+    el.textContent = text;
+    // Forza un reflow così la transizione riparte anche se il toast è già visibile.
+    void el.offsetWidth;
+    el.classList.add('show');
+    clearTimeout(edToastTimer);
+    edToastTimer = setTimeout(() => el.classList.remove('show'), 3400);
+  }
+
   // ════════════════════════════════════════════════════════════════════
   //  Resize moduli nella griglia
   // ════════════════════════════════════════════════════════════════════
