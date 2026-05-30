@@ -408,7 +408,7 @@ async function maybeRunLessonAgent({ userMessage, filoReply, stateText }) {
 
 async function maybeRunCompactor() {
   try {
-    const settings = await Storage.getSettings();
+    const settings = await getEffectiveSettings();
     if (!settings.apiKeys?.[settings.provider] && !settings.apiKeys?.gemini) return;
     const memory = await FiloMem.getMemory();
     const moduliText = Object.entries(memory).map(([k, v]) => `${k}:\n${v || '(vuoto)'}`).join('\n\n');
