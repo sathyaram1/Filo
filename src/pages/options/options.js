@@ -76,6 +76,8 @@
     window.SN_PAGE_THEME = settings.theme;
     window.SN_PAGE_BOOTSTRAP.applyTheme(settings.theme);
 
+    $('useDefaultModels').checked = settings.useDefaultModels !== false;
+    applyDefaultModelsVisibility();
     $('provider').value = settings.provider || 'openrouter';
     $('apiKey').value = settings.apiKeys?.openrouter || '';
     $('apiKeyGemini').value = settings.apiKeys?.gemini || '';
