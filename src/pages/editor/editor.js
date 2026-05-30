@@ -1150,27 +1150,27 @@
     const meta = MODULE_TYPES[m.type];
     if (!meta) return;
     if (m.type === 'switch') {
+      // Ridimensionare lo switch = cambiare il numero di pagine (larghezza in
+      // colonne == numero di pagine). Durante il drag mostriamo solo un'anteprima
+      // della larghezza; al rilascio riconciliamo le pagine (crea/elimina).
       const handle = document.createElement('div');
       handle.className = 'ed-mod-resize-h';
       handle.addEventListener('mousedown', (e) => {
         e.preventDefault();
         e.stopPropagation();
         const startX = e.clientX;
-        const startW = m.w;
+        const startLen = m.data.pages.length;
         const colWidth = gridEl.clientWidth / GRID_COLS;
+        let targetLen = startLen;
         const onMove = (ev) => {
           const delta = Math.round((ev.clientX - startX) / colWidth);
-          const newW = Math.max(meta.minW, Math.min(GRID_COLS - m.x, startW + delta));
-          if (newW !== m.w && fits({ x: m.x, y: m.y, w: newW, h: m.h }, m.z, m.id)) {
-            m.w = newW;
-            cell.style.gridColumn = `${m.x + 1} / span ${m.w}`;
-          }
+          targetLen = Math.max(meta.minW, Math.min(MAX_PAGES, GRID_COLS - m.x, startLen + delta));
+          cell.style.gridColumn = `${m.x + 1} / span ${targetLen}`;
         };
         const onUp = () => {
           document.removeEventListener('mousemove', onMove);
           document.removeEventListener('mouseup', onUp);
-          renderGrid();
-          markDirty();
+          reconcileSwitchPages(m, targetLen);
         };
         document.addEventListener('mousemove', onMove);
         document.addEventListener('mouseup', onUp);
