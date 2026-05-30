@@ -139,7 +139,7 @@
     authBusy = true; renderAccount();
     try {
       const r = await api.auth.signIn();
-      if (r && r.ok) authProfile = r.profile;
+      if (r && r.ok) { authProfile = r.profile; isAdmin = !!r.isAdmin; }
       else if (r && r.error) alert('Accesso non riuscito: ' + r.error);
     } catch (e) {
       alert('Accesso non riuscito: ' + (e?.message || e));
