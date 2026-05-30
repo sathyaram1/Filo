@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <title>Filo — Modelli predefiniti</title>
+  <link rel="icon" href="filo://asset/icons/icon-32.png" />
+  <link rel="stylesheet" href="filo://style/theme.css" />
+  <link rel="stylesheet" href="filo://style/pages.css" />
+  <script src="filo://shared/pageBootstrap.js"></script>
+  <script src="filo://shared/constants.js"></script>
+  <script src="filo://shared/messages.js"></script>
+  <script src="filo://shared/i18n.js"></script>
+  <script src="filo://shared/storage.js"></script>
+</head>
+<body>
+  <main class="sn-page" id="page">
+    <h1 id="title"></h1>
+
+    <!-- Mostrato se l'utente non è admin (DEFAULTS_GET ritorna !ok). -->
+    <section id="sec-denied" hidden>
+      <p class="sn-muted" id="denied-msg"></p>
+    </section>
+
+    <div id="editor" hidden>
+      <p class="sn-muted" id="intro"></p>
+
+      <section id="sec-provider">
+        <h2 id="h-provider"></h2>
+        <label for="provider" id="lbl-provider"></label>
+        <select id="provider">
+          <option value="openrouter">OpenRouter</option>
+          <option value="gemini">Google Gemini API</option>
+        </select>
+
+        <label style="margin-top: 8px;">
+          <input type="checkbox" id="geminiDirect" />
+          <span id="geminiDirect-label"></span>
+        </label>
+      </section>
+
+      <section id="sec-keys">
+        <h2 id="h-keys"></h2>
+        <p class="sn-muted" id="keys-desc"></p>
+
+        <label for="apiKey">OpenRouter API key <span class="sn-muted" id="apiKey-state"></span></label>
+        <input type="password" id="apiKey" placeholder="sk-or-v1-..." autocomplete="off" />
+
+        <label for="apiKeyGemini" style="margin-top: 12px;">Google Gemini API key <span class="sn-muted" id="apiKeyGemini-state"></span></label>
+        <input type="password" id="apiKeyGemini" placeholder="AIza..." autocomplete="off" />
+
+        <label for="apiKeyTavily" style="margin-top: 12px;">Tavily API key <span class="sn-muted" id="apiKeyTavily-state"></span></label>
+        <input type="password" id="apiKeyTavily" placeholder="tvly-..." autocomplete="off" />
+      </section>
+
+      <section id="sec-model-registry">
+        <h2 id="h-model-registry"></h2>
+        <p class="sn-muted" id="model-registry-desc"></p>
+        <div id="modelRegistryList"></div>
+        <div class="sn-row" style="margin-top: 10px;">
+          <button class="sn-btn sn-btn-secondary" id="addModelRow" type="button"></button>
+        </div>
+      </section>
+
+      <section id="sec-models">
+        <h2 id="h-models"></h2>
+        <p class="sn-muted" id="models-desc"></p>
+        <div class="sn-grid-2" id="modelsGrid"></div>
+        <datalist id="nicknames-list"></datalist>
+      </section>
+
+      <div class="sn-toolbar" style="margin-top: 24px;">
+        <button class="sn-btn" id="saveBtn" type="button"></button>
+        <span id="saveStatus" class="sn-muted"></span>
+      </div>
+    </div>
+  </main>
+
+  <script src="admin-defaults.js"></script>
+</body>
+</html>
