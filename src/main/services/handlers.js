@@ -1016,7 +1016,7 @@ async function handleMessage(msg, sender = {}) {
     case MSG.SAVE_PATH:
       (async () => {
         try {
-          const settings = await Storage.getSettings();
+          const settings = await getEffectiveSettings();
           if (!settings.apiKeys?.[settings.provider] && !settings.apiKeys?.gemini) return;
           const ua = process.versions ? `Filo/${process.versions.electron || ''} Node/${process.version}` : '';
           const cid = msg.payload?.clientId || '';
