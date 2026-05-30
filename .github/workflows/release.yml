@@ -86,12 +86,23 @@ jobs:
         if: steps.check.outputs.should_release == 'true'
         run: npm ci
 
-      - name: Build e publish su GitHub Releases
+      - name: Build e upload su GitHub Releases (come bozza)
         if: steps.check.outputs.should_release == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: "false"   # app non firmata: salta la ricerca certificati
         run: npm run release
+
+      - name: Pubblica la release (da bozza a pubblicata)
+        # electron-builder crea la release come DRAFT. La rendiamo pubblica solo
+        # ORA, a build+upload finiti, cosi' l'auto-update non vede mai una
+        # release con asset incompleti. La marchiamo anche come "latest" perche'
+        # l'URL .../releases/latest/download/Filo-Setup.exe punti a questa.
+        if: steps.check.outputs.should_release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: gh release edit "${{ steps.bump.outputs.version }}" --draft=false --latest
 
       - name: Riepilogo
         if: steps.check.outputs.should_release == 'true'
