@@ -200,6 +200,22 @@
     options_category_delete_confirm: 'Eliminare la categoria "%s"? Le schede diventeranno non categorizzate.',
     options_category_pages: '%s schede',
 
+    // Pagina admin "Modelli predefiniti" (config condivisa via Firestore)
+    admin_defaults_title: 'Modelli predefiniti',
+    admin_defaults_intro:
+      'Questa configurazione è condivisa con TUTTI gli utenti di Filo: provider, modelli e chiavi predefiniti che vengono usati quando l\'utente lascia attivo "Usa modelli predefiniti". Le modifiche si propagano a tutte le installazioni.',
+    admin_defaults_denied: 'Sezione riservata agli amministratori. Accedi con un account autorizzato dall\'icona account in alto.',
+    admin_defaults_gemini_direct: 'Per i modelli Gemini usa prima la Gemini API gratuita, OpenRouter solo come fallback',
+    admin_defaults_keys: 'Chiavi API predefinite',
+    admin_defaults_keys_desc:
+      'Le chiavi restano sul server e non sono mai esposte alle pagine: qui vedi solo se ciascuna è configurata. Lascia un campo vuoto per non modificarlo.',
+    admin_defaults_key_present: 'configurata',
+    admin_defaults_key_absent: 'non configurata',
+    admin_defaults_save: 'Salva e propaga',
+    admin_defaults_saving: 'Salvataggio…',
+    admin_defaults_saved: 'Salvato e propagato a tutti gli utenti.',
+    admin_defaults_save_fail: 'Salvataggio fallito: %s',
+
     // Sicurezza (pagina dedicata in filo://security/)
     security_title: 'Sicurezza',
     options_h_security: 'Sicurezza',
