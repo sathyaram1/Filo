@@ -150,7 +150,7 @@
 
   async function doSignOut() {
     try { await api.auth.signOut(); } catch (_) {}
-    authProfile = null; renderAccount();
+    authProfile = null; isAdmin = false; renderAccount();
   }
 
   if (accountBtn) {
