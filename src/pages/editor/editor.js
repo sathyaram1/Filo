@@ -74,7 +74,7 @@
       content: { type: 'doc', content: [{ type: 'paragraph', content: [] }] },
       comments: [],
       modules: [
-        mkModule('switch', 0, 6, 3, 1, 0, {
+        mkModule('switch', 0, 6, 2, 1, 0, {
           activePage: 0,
           pages: [
             { z: 0, name: 'Scrittura', icon: 'pen' },
