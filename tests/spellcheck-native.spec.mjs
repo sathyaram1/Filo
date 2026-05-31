@@ -40,7 +40,7 @@ test('suggerimento nativo compare in cima al menu su parola errata', async ({ ap
 
   // Pre-popola i suggerimenti nativi per "wrlod" PRIMA del click (così sono già
   // freschi quando il menu si compone, senza dipendere da timing/LLM).
-  const sent = await sendNative(app.app, new URL(url).host, 'wrlod', ['world', 'word']);
+  const sent = await sendNative(app, new URL(url).host, 'wrlod', ['world', 'word']);
   expect(sent).toBe(true);
   await page.waitForTimeout(150);
 

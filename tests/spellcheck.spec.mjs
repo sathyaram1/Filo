@@ -38,7 +38,7 @@ async function expectCorrectionAtTop({ app, openTab, testServer }, html, selecto
     null, { timeout: 8000 },
   );
 
-  const sent = await sendNative(app.app, new URL(url).host, 'ciiao', ['ciao', 'chiao']);
+  const sent = await sendNative(app, new URL(url).host, 'ciiao', ['ciao', 'chiao']);
   expect(sent).toBe(true);
   await page.waitForTimeout(150);
 
