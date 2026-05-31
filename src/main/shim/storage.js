@@ -11,6 +11,7 @@ const { app } = require('electron');
 const fs = require('node:fs');
 const fsp = require('node:fs/promises');
 const path = require('node:path');
+const { AsyncLocalStorage } = require('node:async_hooks');
 
 const STATE = {
   loaded: false,
@@ -20,6 +21,67 @@ const STATE = {
   flushTimer: null,
   listeners: new Set(),
 };
+
+// === Modalità incognito ===========================================
+// Le finestre incognito non devono lasciare tracce su disco: né dati di
+// navigazione (cronologia AI, salvati, costi, cache, memoria dashboard, ...) né
+// poter LEGGERE quelli persistenti delle finestre normali. Implementiamo la
+// garanzia QUI, all'unico punto di strozzatura dove TUTTE le scritture/letture
+// del main passano (sia via chrome.storage.local sia via SN_STORAGE).
+//
+// Meccanismo: un contesto AsyncLocalStorage. Quando un messaggio IPC parte da
+// una finestra incognito, l'IPC avvolge l'handler in runIncognito(): tutte le
+// get/set/remove/clear che ne discendono (anche dopo await) vedono il flag e
+// vengono dirottate su un overlay in RAM.
+const als = new AsyncLocalStorage();
+
+// Overlay in memoria: ciò che l'incognito scrive vive solo qui, finché la
+// sessione incognito è aperta. resetIncognito() lo azzera alla chiusura
+// dell'ultima finestra incognito.
+const INCOGNITO = {
+  data: {},               // { key: value } scritti durante la sessione incognito
+  tombstones: new Set(),  // chiavi rimosse: mascherano l'eventuale valore su disco
+};
+
+// Allowlist FAIL-CLOSED: SOLO queste chiavi sono leggibili dal disco in
+// incognito (config/impostazioni che l'utente si aspetta di ereditare: modelli,
+// tema, blocklist, dizionario, autocorrezione, layout icone). QUALSIASI altra
+// chiave — comprese quelle aggiunte in futuro — è invisibile dal disco in
+// incognito: la finestra parte "vuota" e ciò che scrive resta in RAM.
+// Vedi STORAGE_KEYS in src/shared/constants.js.
+const INCOGNITO_READABLE = new Set([
+  'settings', 'blocklist', 'sn_personal_dict', 'sn_autocorrect', 'sn_icon_layout',
+]);
+
+function inIncognito() {
+  const s = als.getStore();
+  return !!(s && s.incognito);
+}
+
+// Esegue fn in un contesto incognito. Ritorna ciò che fn ritorna (anche una
+// Promise: AsyncLocalStorage propaga il contesto attraverso la catena async).
+function runIncognito(fn) {
+  return als.run({ incognito: true }, fn);
+}
+
+// Azzera l'overlay incognito. Chiamato dalla chiusura dell'ultima finestra
+// incognito: nulla di ciò che è stato navigato/scritto sopravvive.
+function resetIncognito() {
+  INCOGNITO.data = {};
+  INCOGNITO.tombstones = new Set();
+}
+
+// Risolve la lettura di UNA chiave nella vista incognito:
+//   1) scritta in questa sessione  → valore dall'overlay
+//   2) rimossa in questa sessione  → undefined (maschera il disco)
+//   3) chiave di config in allowlist → valore dal disco (ereditato)
+//   4) altrimenti (memoria/navigazione) → undefined (invisibile)
+function incognitoReadKey(k) {
+  if (k in INCOGNITO.data) return INCOGNITO.data[k];
+  if (INCOGNITO.tombstones.has(k)) return undefined;
+  if (INCOGNITO_READABLE.has(k)) return STATE.data[k];
+  return undefined;
+}
 
 function filePath() {
   if (!STATE.filePath) {
