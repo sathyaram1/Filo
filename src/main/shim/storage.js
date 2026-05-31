@@ -132,20 +132,33 @@ function emitChange(changes) {
 
 async function get(keysOrNull) {
   await loadIfNeeded();
-  if (keysOrNull == null) return { ...STATE.data };
+  const incog = inIncognito();
+  if (keysOrNull == null) {
+    if (!incog) return { ...STATE.data };
+    // Vista incognito di "tutto": solo le chiavi config dal disco (meno quelle
+    // tombstoned) + ciò che l'incognito ha scritto nell'overlay.
+    const out = {};
+    for (const k of Object.keys(STATE.data)) {
+      if (INCOGNITO_READABLE.has(k) && !INCOGNITO.tombstones.has(k)) out[k] = STATE.data[k];
+    }
+    for (const k of Object.keys(INCOGNITO.data)) out[k] = INCOGNITO.data[k];
+    return out;
+  }
+  const pick = (k) => (incog ? incognitoReadKey(k) : STATE.data[k]);
   if (typeof keysOrNull === 'string') {
-    return { [keysOrNull]: STATE.data[keysOrNull] };
+    return { [keysOrNull]: pick(keysOrNull) };
   }
   if (Array.isArray(keysOrNull)) {
     const out = {};
-    for (const k of keysOrNull) out[k] = STATE.data[k];
+    for (const k of keysOrNull) out[k] = pick(k);
     return out;
   }
   if (typeof keysOrNull === 'object') {
     // formato { key: default }
     const out = {};
     for (const k of Object.keys(keysOrNull)) {
-      out[k] = STATE.data[k] !== undefined ? STATE.data[k] : keysOrNull[k];
+      const v = pick(k);
+      out[k] = v !== undefined ? v : keysOrNull[k];
     }
     return out;
   }
