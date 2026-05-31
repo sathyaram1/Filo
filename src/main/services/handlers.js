@@ -937,6 +937,20 @@ async function handleMessage(msg, sender = {}) {
       if (win?._filoTabs) win._filoTabs.openTab(msg.url || 'filo://newtab/');
       return { ok: true };
     }
+    case MSG.OPEN_INCOGNITO: {
+      // Apre una NUOVA finestra incognito: sessione web effimera (cookie/cache
+      // in RAM) + storage filo:// instradato sull'overlay in memoria. Come in
+      // Chrome, apriamo sempre una finestra nuova anche se il mittente è già
+      // incognito. Lazy require di window.js per evitare cicli al boot.
+      try {
+        const { createIncognitoWindow } = require('../window');
+        createIncognitoWindow();
+        return { ok: true };
+      } catch (e) {
+        console.error('[Filo] open-incognito', e);
+        return { ok: false, error: e.message || String(e) };
+      }
+    }
     case MSG.REPLACE_MISSPELLING: {
       // Usa l'API nativa di Electron per sostituire la parola sotto il cursore
       // del context-menu nativo (vedi `wc.on('context-menu', ...)` in tabs.js).
