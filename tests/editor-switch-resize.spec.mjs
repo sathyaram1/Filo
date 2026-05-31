@@ -10,6 +10,8 @@ const shotsDir = path.join(__dirname, '.shots');
 // negative = shrink). Replicates a real mouse drag on .ed-mod-resize-h so the
 // production resize/reconcile code path runs end-to-end.
 async function dragSwitchResize(page, cols) {
+  const switchCell = page.locator('.ed-module[data-type="switch"]');
+  await switchCell.hover(); // rende visibile/affidabile la maniglia di resize
   const handle = page.locator('.ed-module[data-type="switch"] .ed-mod-resize-h');
   const box = await handle.boundingBox();
   const grid = await page.locator('#grid').boundingBox();
@@ -19,8 +21,8 @@ async function dragSwitchResize(page, cols) {
   await page.mouse.move(startX, startY);
   await page.mouse.down();
   // Move in a couple of steps so the live onMove handler updates targetLen.
-  await page.mouse.move(startX + colWidth * cols * 0.5, startY, { steps: 3 });
-  await page.mouse.move(startX + colWidth * cols, startY, { steps: 3 });
+  await page.mouse.move(startX + colWidth * cols * 0.5, startY, { steps: 4 });
+  await page.mouse.move(startX + colWidth * cols, startY, { steps: 4 });
   await page.mouse.up();
 }
 
