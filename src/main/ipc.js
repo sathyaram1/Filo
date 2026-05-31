@@ -49,8 +49,14 @@ function senderInfo(event) {
 
 function registerIpcHandlers() {
   ipcMain.handle('filo:message', async (event, msg) => {
+    const info = senderInfo(event);
+    // In incognito avvolgiamo l'handler in runIncognito(): ogni lettura/scrittura
+    // dello storage che ne discende (anche dopo await) finisce nell'overlay in
+    // RAM invece che su disco. Copre TUTTE le azioni di memoria senza dover
+    // gattare ogni singolo case.
+    const run = () => handleMessage(msg, info);
     try {
-      return await handleMessage(msg, senderInfo(event));
+      return info.isIncognito ? await DiskStorage.runIncognito(run) : await run();
     } catch (err) {
       console.error('[Filo IPC] handler error', msg?.type, err);
       return { ok: false, error: err.message || String(err), code: err.code || 'UNKNOWN' };
@@ -58,26 +64,33 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('ai-stream:start', async (event, { requestId, action, payload }) => {
+    const incognito = !!BrowserWindow.fromWebContents(event.sender)?._filoIncognito
+      || senderInfo(event).isIncognito;
     const ac = new AbortController();
     inFlightStreams.set(requestId, ac);
     const send = (suffix, data) => {
       try { event.sender.send(`ai-stream:${requestId}:${suffix}`, data); } catch (_) {}
     };
-    try {
-      const meta = {};
-      const result = await handleStream({
-        action, payload, origin: event.sender.getURL(),
-        signal: ac.signal,
-        onMeta: (m) => { Object.assign(meta, m); send('meta', m); },
-        onDelta: (delta) => send('delta', { delta }),
-      });
-      send('done', { ...result });
-    } catch (err) {
-      console.warn('[Filo IPC] stream error', requestId, err);
-      send('error', { message: err.message || String(err), code: err.code || 'UNKNOWN' });
-    } finally {
-      inFlightStreams.delete(requestId);
-    }
+    // ai-stream è un canale IPC SEPARATO da filo:message: va avvolto anch'esso
+    // in runIncognito così cache AI e tracciamento costi restano effimeri.
+    const work = async () => {
+      try {
+        const meta = {};
+        const result = await handleStream({
+          action, payload, origin: event.sender.getURL(),
+          signal: ac.signal,
+          onMeta: (m) => { Object.assign(meta, m); send('meta', m); },
+          onDelta: (delta) => send('delta', { delta }),
+        });
+        send('done', { ...result });
+      } catch (err) {
+        console.warn('[Filo IPC] stream error', requestId, err);
+        send('error', { message: err.message || String(err), code: err.code || 'UNKNOWN' });
+      } finally {
+        inFlightStreams.delete(requestId);
+      }
+    };
+    if (incognito) await DiskStorage.runIncognito(work); else await work();
     return { ok: true };
   });
 
