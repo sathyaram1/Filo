@@ -466,6 +466,7 @@ class TabManager {
   // Salvataggio con debounce: _broadcast scatta spesso (load, titolo, favicon),
   // collassiamo le scritture ravvicinate.
   _persistSession() {
+    if (this.incognito) return; // incognito: nessuna sessione salvata su disco
     if (this._restoring) return; // non sovrascrivere mentre stiamo ripristinando
     clearTimeout(this._sessionTimer);
     this._sessionTimer = setTimeout(() => {
