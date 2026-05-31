@@ -167,6 +167,15 @@ async function get(keysOrNull) {
 
 async function set(obj) {
   await loadIfNeeded();
+  if (inIncognito()) {
+    // Scrive solo nell'overlay in RAM: niente disco, niente flush e niente
+    // emitChange (così non contamina i listener delle finestre normali).
+    for (const k of Object.keys(obj)) {
+      INCOGNITO.data[k] = obj[k];
+      INCOGNITO.tombstones.delete(k);
+    }
+    return;
+  }
   const changes = {};
   for (const k of Object.keys(obj)) {
     const oldValue = STATE.data[k];
