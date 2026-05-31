@@ -1,56 +1,68 @@
 import { test, expect } from './fixtures/electron.mjs';
 
-// Regressione (feedback alpha): dopo il refactor da estensione ad app, il
-// suggerimento di correzione NON compariva più in cima al menu del tasto
-// destro su una parola errata. Causa: il wiring del broadcast `_spell:native`
-// (suggerimenti nativi di Electron) era stato perso, quindi getNativeSuggestions
-// restava sempre vuoto. Questo test guida il path NATIVO end-to-end e asserisce
-// che il suggerimento corretto compaia come PRIMA voce del menu.
+// Regressione (feedback alpha gRrZZ): dopo il refactor da estensione ad app, il
+// suggerimento di correzione NON compariva più in cima al menu del tasto destro
+// su una parola errata. Causa storica: il wiring del broadcast `_spell:native`
+// (suggerimenti nativi di Electron) era andato perso, quindi getNativeSuggestions
+// restava sempre vuoto. Questo test guida il path NATIVO end-to-end su una pagina
+// esterna e asserisce che il suggerimento corretto compaia come PRIMA voce.
 //
-// Determinismo: la parola "wrlod" non viene corretta dallo stub LLM (FILO_TEST),
-// quindi se la riga di correzione appare può provenire SOLO dai suggerimenti
-// nativi → il test fallisce senza il fix (slot resta nascosto) e passa con esso.
+// Determinismo: in test non c'è chiave LLM, quindi la riga di correzione può
+// provenire SOLO dai suggerimenti nativi inviati dal main (esattamente come fa
+// l'evento `context-menu` di Electron in produzione, via wc.send('filo:broadcast')).
+// Senza il wiring (slot nascosto) il test fallisce; con esso la correzione appare.
 
-test('suggerimento nativo compare in cima al menu su parola errata', async ({ app, openTab, testServer }) => {
-  const targetUrl = testServer.url('/spellnative.html');
-  const page = await openTab(targetUrl);
-  await page.waitForTimeout(600);
+const PAGE = `<!doctype html><html><body style="margin:0">
+  <div id="ce" contenteditable="true" spellcheck="true"
+       style="font:16px monospace;padding:8px;width:400px;height:120px">wrlod ciao</div>
+</body></html>`;
 
-  // Right-click esattamente sopra la parola "wrlod".
-  const box = await page.locator('#ce').boundingBox();
-  await page.mouse.click(box.x + 10, box.y + box.height / 2, { button: 'right' });
-
-  // Il menu custom deve essere comparso.
-  await expect(page.locator('.sn-menu')).toBeVisible();
-
-  // Simula il broadcast nativo del main (esattamente come fa l'evento
-  // `context-menu` di Electron in produzione): manda parola + suggerimenti
-  // dizionario al webContents della pagina, che il preload inoltra come
-  // messaggio runtime `_spell:native`.
-  const host = new URL(targetUrl).host;
-  const sent = await app.app.evaluate(async ({ webContents }, host) => {
+// Invia il broadcast nativo dal main al webContents della pagina, come fa
+// Electron quando l'utente clicca destro su una parola sotto lo zigzag rosso.
+async function sendNative(app, host, word, suggestions) {
+  return app.evaluate(async ({ webContents }, { host, word, suggestions }) => {
     const wc = webContents.getAllWebContents().find((w) => {
       try { return new URL(w.getURL()).host === host; } catch { return false; }
     });
     if (!wc) return false;
-    wc.send('_spell:native', { misspelledWord: 'wrlod', dictionarySuggestions: ['world', 'word', 'wrlds'] });
+    wc.send('filo:broadcast', { type: '_spell:native', word, suggestions });
     return true;
-  }, host);
-  expect(sent).toBe(true);
+  }, { host, word, suggestions });
+}
 
-  // La riga di correzione deve rivelarsi col suggerimento nativo "world" in cima.
+test('suggerimento nativo compare in cima al menu su parola errata', async ({ app, openTab, testServer }) => {
+  const url = testServer.html(PAGE);
+  const page = await openTab(url);
+  await page.waitForFunction(
+    () => document.documentElement.dataset.filoReady === '1',
+    null, { timeout: 8000 },
+  );
+
+  // Pre-popola i suggerimenti nativi per "wrlod" PRIMA del click (così sono già
+  // freschi quando il menu si compone, senza dipendere da timing/LLM).
+  const sent = await sendNative(app.app, new URL(url).host, 'wrlod', ['world', 'word']);
+  expect(sent).toBe(true);
+  await page.waitForTimeout(150);
+
+  // Right-click esattamente sopra la parola "wrlod" (inizio del contenteditable).
+  const box = await page.locator('#ce').boundingBox();
+  await page.mouse.click(box.x + 18, box.y + 16, { button: 'right' });
+
+  await expect(page.locator('.sn-menu')).toBeVisible();
+
+  // La riga di correzione deve mostrare il suggerimento nativo "world" in cima.
   const corr = page.locator('.sn-menu-correction:visible');
   await expect(corr.first()).toBeVisible({ timeout: 4000 });
   await expect(corr.first()).toContainText('world');
 
-  // E deve essere la PRIMA voce cliccabile del menu (in cima).
-  const firstLabel = await page.evaluate(() => {
+  // Ed è davvero la prima voce cliccabile del menu.
+  const firstIsCorrection = await page.evaluate(() => {
     const menu = document.querySelector('.sn-menu');
-    if (!menu) return null;
-    // prima riga di correzione visibile dentro il menu
-    const c = Array.from(menu.querySelectorAll('.sn-menu-correction'))
-      .find((el) => el.offsetParent !== null);
-    return c ? c.textContent.trim() : null;
+    if (!menu) return false;
+    const first = Array.from(menu.children).find(
+      (c) => !c.classList.contains('sn-menu-sep') && c.style.display !== 'none',
+    );
+    return !!first && first.classList.contains('sn-menu-correction');
   });
-  expect(firstLabel).toContain('world');
+  expect(firstIsCorrection).toBe(true);
 });
