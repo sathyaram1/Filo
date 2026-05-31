@@ -10,7 +10,7 @@
 //      finestra, così non viene tagliata di netto dal bordo.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { buildHTML } from '../src/main/popup-menu.js';
+import { buildHTML, computeMenuWidth } from '../src/main/popup-menu.js';
 
 const EMAIL = 'sathyarampontillo@gmail.com';
 const ENTRIES = [
