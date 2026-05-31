@@ -179,6 +179,10 @@ class TabManager {
         sandbox: false,
         nodeIntegration: false,
         webSecurity: true,
+        // Incognito: instrada la webContents nella sessione effimera dedicata,
+        // così cookie/cache/localStorage dei siti non toccano il disco e
+        // svaniscono alla chiusura della finestra.
+        ...(this.partition ? { partition: this.partition } : {}),
       },
     });
 
