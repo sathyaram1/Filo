@@ -43,6 +43,33 @@ function syncNativeTheme(theme) {
   nativeTheme.themeSource = theme === 'dark' ? 'dark' : theme === 'light' ? 'light' : 'system';
 }
 
+// Configura le lingue del correttore ortografico NATIVO (Hunspell) di Electron.
+// Senza questa chiamata Electron usa solo la lingua di sistema: su molte
+// configurazioni i suggerimenti dietro lo zigzag rosso non arrivano (il main
+// li inoltra al menu di correzione via `_spell:native`, vedi tabs.js). La
+// vecchia estensione Chrome aveva i dizionari pronti d'ufficio; qui li
+// attiviamo esplicitamente — locale di sistema + italiano + inglese — così la
+// correzione in cima al menu funziona anche senza chiave LLM. Su macOS la
+// chiamata è ignorata (Electron usa NSSpellChecker), nessun problema.
+function configureSpellchecker() {
+  try {
+    const ses = session.defaultSession;
+    if (!ses || typeof ses.setSpellCheckerLanguages !== 'function') return;
+    const available = ses.availableSpellCheckerLanguages || [];
+    if (!available.length) return; // macOS / nativo: nessuna lista Hunspell
+    const base = (s) => String(s || '').toLowerCase().split('-')[0];
+    const pick = (pref) =>
+      available.find((l) => l.toLowerCase() === String(pref).toLowerCase()) ||
+      available.find((l) => base(l) === base(pref));
+    const want = [];
+    for (const pref of [app.getLocale(), 'it', 'en-US', 'en']) {
+      const match = pick(pref);
+      if (match && !want.includes(match)) want.push(match);
+    }
+    if (want.length) ses.setSpellCheckerLanguages(want);
+  } catch (_) { /* best-effort: il correttore resta sul default di sistema */ }
+}
+
 app.whenReady().then(async () => {
   await registerFiloProtocol();
   registerIpcHandlers();
