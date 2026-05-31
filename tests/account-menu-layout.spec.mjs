@@ -46,7 +46,7 @@ test('menu account: email centrata e ombra non tagliata', async ({ app }) => {
     })()`);
     win.destroy();
     return res;
-  }, html);
+  }, { html, winW });
 
   // 1) Email non troncata: il testo ci sta tutto (niente ellissi).
   expect(measured.lblScrollW, 'email troncata: il campo è troppo stretto').toBeLessThanOrEqual(measured.lblClientW + 1);
