@@ -87,10 +87,21 @@
     // Se l'utente tiene Shift premuto, lascia passare il menu nativo (escape hatch)
     if (e.shiftKey) return;
 
-    // Sopprimi SUBITO il menu nativo E impedisci ad altri listener sullo stesso
-    // target (es. YouTube, Reddit) di gestire l'evento. stopImmediatePropagation
-    // blocca sia la propagazione sia gli handler successivi su window stesso.
-    e.preventDefault();
+    // Impedisci ad altri listener sullo stesso target (es. YouTube, Reddit) di
+    // gestire l'evento: stopImmediatePropagation blocca sia la propagazione sia
+    // gli handler successivi su window stesso.
+    //
+    // NB: NON chiamiamo e.preventDefault() qui. In Electron il menu contestuale
+    // nativo non viene MAI mostrato in automatico (è l'app a doverlo costruire e
+    // fare popup: noi non lo facciamo, quindi non appare nulla di nativo). Ma
+    // chiamare preventDefault sul DOM event impedisce a Chromium di inviare al
+    // main process l'evento `context-menu` del webContents — quello che porta
+    // `misspelledWord` + `dictionarySuggestions` del correttore nativo. Senza
+    // quell'evento il suggerimento ortografico in cima al menu (che la vecchia
+    // estensione mostrava sfruttando il menu nativo di Chrome) non arrivava mai
+    // in produzione: i `_spell:native` partivano solo nei test che li iniettano
+    // a mano. Lasciando passare il default action, l'evento del webContents
+    // scatta, tabs.js inoltra i suggerimenti nativi e la correzione ricompare.
     e.stopImmediatePropagation();
 
     // Spellcheck: in un editabile supportato, prima cerchiamo un errore "blu"
