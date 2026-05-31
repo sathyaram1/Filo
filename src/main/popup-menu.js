@@ -241,4 +241,4 @@ html,body{background:transparent;overflow:hidden;height:100%}
 </style></head><body><div class="menu">${items}</div></body></html>`;
 }
 
-module.exports = { showPopupMenu, buildHTML };
+module.exports = { showPopupMenu, buildHTML, computeMenuWidth };
