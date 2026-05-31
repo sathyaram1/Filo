@@ -115,6 +115,8 @@ test('growing the switch with no room in ALL pages is refused and shows a failur
   expect(blocked).toBe(true);
   await page.reload();
   await page.waitForLoadState('domcontentloaded');
+  // Attendi che la griglia si sia ri-renderizzata col doc seminato.
+  await page.locator('.ed-module[data-type="switch"] .ed-switch-icon').first().waitFor();
   await expect.poll(() => pageCount(page)).toBe(2);
 
   // Prova ad allargare: deve essere RIFIUTATO (resta a 2 pagine) e comparire il
