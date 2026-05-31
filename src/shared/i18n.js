@@ -59,6 +59,7 @@
     menu_close_tab: 'Chiudi pagina',
     menu_open_options: 'Opzioni Filo',
     menu_new_tab: 'Nuova scheda',
+    menu_incognito: 'Nuova finestra incognito',
     menu_qr_code: 'QR code della pagina',
     qr_title: 'QR code',
     qr_subtitle: 'Inquadra con il telefono per aprire questa pagina',
