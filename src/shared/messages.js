@@ -39,6 +39,7 @@
     EXIT_FULLSCREEN: 'exit_fullscreen',             // idempotente (Esc)
     FULLSCREEN_CHANGED: 'fullscreen_changed',       // broadcast → { fullscreen: bool }
     OPEN_NEW_TAB: 'open_new_tab',
+    OPEN_INCOGNITO: 'open_incognito',               // apre una nuova finestra incognito
     REPLACE_MISSPELLING: 'replace_misspelling',     // { suggestion }
 
     // Aiuto: invio percorso completato a fine sessione (passa per la pipeline
