@@ -80,8 +80,12 @@ test('shrinking the switch opens a dialog to choose which page to delete', async
   const delButtons = overlay.locator('button[data-del-z]');
   await expect.poll(() => delButtons.count()).toBe(3);
 
-  // Scegli di eliminare la prima pagina.
-  await delButtons.first().click();
+  // Scegli di eliminare una pagina eliminabile (la pagina 0 contiene il
+  // contenuto di default ed è disabilitata: "Svuota la pagina prima"). Le
+  // pagine appena create sono vuote → cliccabili.
+  const deletable = overlay.locator('button[data-del-z]:not([disabled])');
+  await expect.poll(() => deletable.count()).toBeGreaterThan(0);
+  await deletable.last().click();
   await expect(overlay).toBeHidden();
   await expect.poll(() => pageCount(page)).toBe(2);
 });
