@@ -60,6 +60,10 @@
       entries.push({ type: 'separator' });
       entries.push({ label: 'Modelli predefiniti', icon: 'models', url: 'filo://admin-defaults/admin-defaults.html' });
     }
+    // Uno dei due ingressi alla modalità incognito (l'altro è l'icona nel menu
+    // del tasto destro). Voce con `action`: instradata al main via onMenuAction.
+    entries.push({ type: 'separator' });
+    entries.push({ label: 'Nuova finestra incognito', icon: 'incognito', action: 'open-incognito' });
     return entries;
   }
 
