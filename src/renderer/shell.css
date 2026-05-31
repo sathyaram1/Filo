@@ -255,3 +255,37 @@ html, body {
   max-width: 240px;
   backdrop-filter: blur(4px);
 }
+
+/* ── modalità incognito ───────────────────────────────────────────────────
+   La finestra incognito carica shell.html?incognito=1 → <html data-incognito="1">.
+   Vira l'intera shell verso un viola scuro (distinta a colpo d'occhio dalla
+   finestra normale) e mostra il badge "Incognito" nella barra indirizzi. */
+.incognito-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(124, 92, 196, 0.18);
+  border: 1px solid rgba(124, 92, 196, 0.45);
+  color: var(--fg);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+.incognito-badge[hidden] { display: none; }
+.incognito-badge svg { display: block; }
+.incognito-label { line-height: 1; }
+
+html[data-incognito="1"] {
+  --bg: #2a2438;
+  --bg-deep: #1f1b2e;
+  --fg: #ece7f5;
+  --fg-soft: #a99fc0;
+  --tab-bg: #342c47;
+  --tab-active: #2a2438;
+  --border: #46395f;
+}
