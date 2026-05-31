@@ -77,6 +77,15 @@
   settingsBtn.addEventListener('click', () => showNativeMenu(settingsBtn, buildSettings()));
   appsBtn.addEventListener('click', () => showNativeMenu(appsBtn, APPS));
 
+  // Voce "Nuova finestra incognito" del menu Impostazioni → apre la finestra
+  // incognito nel main. Registrazione separata da quella dell'account così
+  // funziona anche se il bottone account non è presente.
+  if (api.onMenuAction) {
+    api.onMenuAction((action) => {
+      if (action === 'open-incognito' && api.openIncognito) api.openIncognito();
+    });
+  }
+
   // ── Account "Accedi con Google" ───────────────────────────────────────────
   // Lo stato vive nel main; qui mostriamo solo il profilo pubblico. Quando
   // loggato, l'icona diventa l'avatar (foto Google) e il click apre un menu
