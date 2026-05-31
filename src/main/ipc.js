@@ -209,6 +209,19 @@ function registerIpcHandlers() {
     const win = winFor(event); if (win) win.close();
     return { ok: true };
   });
+
+  // ─── apertura finestra incognito ─────────────────────────────────────────
+  // Lazy require di window.js per evitare un ciclo di import al boot.
+  ipcMain.handle('window:open-incognito', () => {
+    try {
+      const { createIncognitoWindow } = require('./window');
+      createIncognitoWindow();
+      return { ok: true };
+    } catch (err) {
+      console.error('[Filo IPC] open-incognito', err);
+      return { ok: false, error: err.message || String(err) };
+    }
+  });
 }
 
 async function openInternalPage(name) {
