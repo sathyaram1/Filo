@@ -90,7 +90,7 @@ function showPopupMenu(parentWin, entries, x, y, onSelect) {
   const ITEM_H = 36;
   const SEP_H = 9;
   const PAD = 8;
-  const WIDTH = 200;
+  const WIDTH = computeMenuWidth(entries);
   // Gutter trasparente attorno al menu, dimensionato per contenere INTERAMENTE
   // l'ombra CSS (box-shadow:0 4px 20px → si estende ~24px in basso, ~20px ai
   // lati, ~16px in alto). Con un gutter troppo stretto l'ombra veniva tagliata
