@@ -77,10 +77,16 @@ function buildNativeContextMenu(wc, params) {
 }
 
 class TabManager {
-  constructor(window, shellView, { shellHeight = 88 } = {}) {
+  constructor(window, shellView, { shellHeight = 88, incognito = false, partition = null } = {}) {
     this.win = window;
     this.shellView = shellView; // WebContentsView della shell — per il broadcast tabs:updated
     this.shellHeight = shellHeight;
+    // Incognito: i tab nascono in una sessione effimera (partition senza
+    // 'persist:') e la sessione del browser NON viene salvata/ripristinata su
+    // disco. La privacy dello storage filo:// è invece garantita a monte
+    // dall'overlay in RAM nello shim (vedi src/main/shim/storage.js).
+    this.incognito = !!incognito;
+    this.partition = partition || null;
     this.tabs = []; // [{ id, view, title, url, favicon, loading, canBack, canFwd }]
     this.activeId = null;
     // Spazio extra riservato in alto (px): usato quando un dropdown della shell
