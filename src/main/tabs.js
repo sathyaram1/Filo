@@ -480,6 +480,7 @@ class TabManager {
   // qualcosa, false se non c'era nulla da ripristinare (il chiamante aprirà
   // allora un newtab vuoto).
   async restoreSession() {
+    if (this.incognito) return false; // incognito: nessuna sessione da ripristinare
     let urls = [];
     let activeIndex = 0;
     try {
