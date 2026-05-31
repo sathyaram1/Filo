@@ -2,11 +2,38 @@
 // (tab bar + barra indirizzi + pulsanti) e una serie di WebContentsView,
 // una per ogni tab aperto.
 
-const { BrowserWindow } = require('electron');
+const { BrowserWindow, session } = require('electron');
 const path = require('node:path');
+const { randomUUID } = require('node:crypto');
 const { TabManager } = require('./tabs');
+const { registerFiloProtocolForSession } = require('./protocol');
 
 const SHELL_HEIGHT = 88;
+
+// Wiring comune a finestra normale e incognito: carica le impostazioni di
+// sicurezza e collega i listener di resize/fullscreen al layout dei tab.
+function wireWindowCommon(win, tabs) {
+  // Carica le impostazioni di sicurezza correnti e applicale prima che si apra
+  // il primo tab — così la policy WebRTC è già attiva e il popup blocker
+  // funziona sul newtab e su qualunque pagina successiva.
+  try {
+    const Storage = globalThis.SN_STORAGE;
+    if (Storage && typeof Storage.getSettings === 'function') {
+      Storage.getSettings().then((s) => {
+        try { tabs.setSecurity(s?.security || {}); } catch (_) {}
+      }).catch(() => {});
+    }
+  } catch (_) {}
+
+  win.on('resize', () => tabs.layout());
+  win.on('enter-full-screen', () => tabs.layout());
+  // Se l'utente esce dal fullscreen OS con un gesto/scorciatoia di sistema,
+  // ripristina anche la barra (esce dalla modalità contenuto a tutto schermo).
+  win.on('leave-full-screen', () => {
+    if (tabs.contentFullscreen) tabs.setContentFullscreen(false);
+    else tabs.layout();
+  });
+}
 
 function createMainWindow() {
   const win = new BrowserWindow({
@@ -36,26 +63,7 @@ function createMainWindow() {
   const tabs = new TabManager(win, null, { shellHeight: SHELL_HEIGHT });
   win._filoTabs = tabs;
 
-  // Carica le impostazioni di sicurezza correnti e applicale prima che si apra
-  // il primo tab — così la policy WebRTC è già attiva e il popup blocker
-  // funziona sul newtab e su qualunque pagina successiva.
-  try {
-    const Storage = globalThis.SN_STORAGE;
-    if (Storage && typeof Storage.getSettings === 'function') {
-      Storage.getSettings().then((s) => {
-        try { tabs.setSecurity(s?.security || {}); } catch (_) {}
-      }).catch(() => {});
-    }
-  } catch (_) {}
-
-  win.on('resize', () => tabs.layout());
-  win.on('enter-full-screen', () => tabs.layout());
-  // Se l'utente esce dal fullscreen OS con un gesto/scorciatoia di sistema,
-  // ripristina anche la barra (esce dalla modalità contenuto a tutto schermo).
-  win.on('leave-full-screen', () => {
-    if (tabs.contentFullscreen) tabs.setContentFullscreen(false);
-    else tabs.layout();
-  });
+  wireWindowCommon(win, tabs);
 
   win.webContents.once('did-finish-load', async () => {
     // Riapre i tab della sessione precedente; se non c'è nulla da ripristinare
@@ -77,4 +85,66 @@ function createMainWindow() {
   return win;
 }
 
-module.exports = { createMainWindow, SHELL_HEIGHT };
+// Finestra incognito: sessione web effimera (cookie/cache/localStorage in RAM,
+// svaniscono alla chiusura) + storage filo:// instradato sull'overlay in memoria
+// dello shim (vedi src/main/shim/storage.js). La finestra è marcata con
+// win._filoIncognito così l'IPC avvolge i suoi messaggi in runIncognito().
+function createIncognitoWindow() {
+  // Partizione unica e SENZA prefisso 'persist:' → sessione in memoria, isolata
+  // da quella normale e da eventuali altre finestre incognito.
+  const partition = 'filo-incognito-' + randomUUID();
+  const ses = session.fromPartition(partition);
+  // filo:// è registrato globalmente solo sulla sessione di default: i tab di
+  // questa partizione non lo vedrebbero. Registriamolo qui.
+  registerFiloProtocolForSession(ses);
+
+  const win = new BrowserWindow({
+    width: 1180,
+    height: 800,
+    minWidth: 720,
+    minHeight: 500,
+    // Sfondo viola scuro: distinzione visiva immediata dalla finestra normale.
+    backgroundColor: '#1f1b2e',
+    title: 'Filo — Incognito',
+    icon: path.join(__dirname, '..', '..', 'assets', 'icons', 'icon-128.png'),
+    frame: false,
+    webPreferences: {
+      preload: path.join(__dirname, '..', 'preload', 'shell-preload.js'),
+      contextIsolation: true,
+      sandbox: false,
+      nodeIntegration: false,
+    },
+    autoHideMenuBar: true,
+  });
+  win._filoIncognito = true;
+
+  // La shell legge ?incognito=1 e applica il badge + tema scuro dedicato.
+  win.loadURL('filo://shell/shell.html?incognito=1');
+
+  const tabs = new TabManager(win, null, { shellHeight: SHELL_HEIGHT, incognito: true, partition });
+  win._filoTabs = tabs;
+
+  wireWindowCommon(win, tabs);
+
+  win.webContents.once('did-finish-load', async () => {
+    tabs.openTab('filo://newtab/'); // niente restore in incognito
+    try {
+      win.show();
+      win.moveTop();
+      win.focus();
+    } catch (_) {}
+  });
+
+  // Alla chiusura dell'ULTIMA finestra incognito, azzera l'overlay in RAM: nulla
+  // di ciò che è stato scritto durante la sessione sopravvive.
+  win.on('closed', () => {
+    const stillOpen = BrowserWindow.getAllWindows().some((w) => w !== win && w._filoIncognito);
+    if (!stillOpen) {
+      try { require('./shim/storage').resetIncognito(); } catch (_) {}
+    }
+  });
+
+  return win;
+}
+
+module.exports = { createMainWindow, createIncognitoWindow, SHELL_HEIGHT };
