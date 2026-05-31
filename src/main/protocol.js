@@ -34,45 +34,64 @@ function registerProtocolSchemes() {
   ]);
 }
 
-async function registerFiloProtocol() {
-  protocol.handle('filo', async (request) => {
-    try {
-      const url = new URL(request.url);
-      const host = url.hostname; // shell | newtab | dashboard | history | ...
-      const rel = decodeURIComponent(url.pathname.replace(/^\/+/, ''));
+// Risolutore della richiesta filo:// → Response. Estratto come funzione pura
+// così possiamo registrarlo sia sulla sessione di default sia sulle sessioni
+// effimere delle finestre incognito (vedi registerFiloProtocolForSession).
+async function filoHandler(request) {
+  try {
+    const url = new URL(request.url);
+    const host = url.hostname; // shell | newtab | dashboard | history | ...
+    const rel = decodeURIComponent(url.pathname.replace(/^\/+/, ''));
 
-      let fsPath;
-      if (host === 'shell') {
-        fsPath = path.join(SRC, 'renderer', rel || 'shell.html');
-      } else if (host === 'newtab') {
-        fsPath = path.join(SRC, 'pages', 'dashboard', rel || 'dashboard.html');
-      } else if (host === 'asset') {
-        fsPath = path.join(ASSETS, rel);
-      } else if (host === 'style') {
-        fsPath = path.join(SRC, 'styles', rel);
-      } else if (host === 'shared') {
-        fsPath = path.join(SRC, 'shared', rel);
-      } else if (host === 'src') {
-        // Passthrough per i casi legacy in cui il codice estensione
-        // chiama chrome.runtime.getURL('src/pages/X/Y.html'): lo shim
-        // costruisce filo://src/pages/X/Y.html e atterriamo qui.
-        fsPath = path.join(SRC, rel);
-      } else {
-        // filo://<page>/<file?> → src/pages/<page>/<file or page.html>
-        fsPath = path.join(SRC, 'pages', host, rel || `${host}.html`);
-      }
-
-      // Sicurezza: non lasciare uscire dalla root del progetto.
-      const resolved = path.resolve(fsPath);
-      if (!resolved.startsWith(ROOT)) {
-        return new Response('Forbidden', { status: 403 });
-      }
-
-      return net.fetch(pathToFileURL(resolved).href);
-    } catch (err) {
-      return new Response('Filo protocol error: ' + (err.message || err), { status: 500 });
+    let fsPath;
+    if (host === 'shell') {
+      fsPath = path.join(SRC, 'renderer', rel || 'shell.html');
+    } else if (host === 'newtab') {
+      fsPath = path.join(SRC, 'pages', 'dashboard', rel || 'dashboard.html');
+    } else if (host === 'asset') {
+      fsPath = path.join(ASSETS, rel);
+    } else if (host === 'style') {
+      fsPath = path.join(SRC, 'styles', rel);
+    } else if (host === 'shared') {
+      fsPath = path.join(SRC, 'shared', rel);
+    } else if (host === 'src') {
+      // Passthrough per i casi legacy in cui il codice estensione
+      // chiama chrome.runtime.getURL('src/pages/X/Y.html'): lo shim
+      // costruisce filo://src/pages/X/Y.html e atterriamo qui.
+      fsPath = path.join(SRC, rel);
+    } else {
+      // filo://<page>/<file?> → src/pages/<page>/<file or page.html>
+      fsPath = path.join(SRC, 'pages', host, rel || `${host}.html`);
     }
-  });
+
+    // Sicurezza: non lasciare uscire dalla root del progetto.
+    const resolved = path.resolve(fsPath);
+    if (!resolved.startsWith(ROOT)) {
+      return new Response('Forbidden', { status: 403 });
+    }
+
+    return net.fetch(pathToFileURL(resolved).href);
+  } catch (err) {
+    return new Response('Filo protocol error: ' + (err.message || err), { status: 500 });
+  }
 }
 
-module.exports = { registerProtocolSchemes, registerFiloProtocol };
+async function registerFiloProtocol() {
+  protocol.handle('filo', filoHandler);
+}
+
+// Registra filo:// su una sessione specifica. protocol.handle() globale copre
+// solo la sessione di default; le finestre incognito usano una partizione
+// effimera propria (session.fromPartition senza 'persist:'), e senza questa
+// registrazione le pagine interne filo:// non caricherebbero lì.
+function registerFiloProtocolForSession(sess) {
+  try {
+    sess.protocol.handle('filo', filoHandler);
+  } catch (err) {
+    // handle() lancia se 'filo' è già registrato su quella sessione: ok,
+    // significa che è già servito (es. doppia init).
+    console.warn('[Filo protocol] per-session register:', err.message || err);
+  }
+}
+
+module.exports = { registerProtocolSchemes, registerFiloProtocol, registerFiloProtocolForSession };
