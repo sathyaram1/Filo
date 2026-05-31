@@ -73,6 +73,7 @@ function configureSpellchecker() {
 app.whenReady().then(async () => {
   await registerFiloProtocol();
   registerIpcHandlers();
+  configureSpellchecker();
 
   const Storage = globalThis.SN_STORAGE;
   try {
