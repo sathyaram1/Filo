@@ -51,6 +51,31 @@ function iconSvg(name, size) {
     `stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
 }
 
+// Larghezza del menu adattata al contenuto. Con una larghezza fissa (200px) le
+// voci lunghe — tipicamente l'email dell'account loggato — venivano troncate/
+// ellissate e sembravano "non centrate" e schiacciate contro il bordo (feedback
+// alpha). Stimiamo la larghezza del testo più lungo e allarghiamo il menu fino a
+// un massimo ragionevole, mantenendo un minimo così i menu corti restano uguali.
+const MENU_MIN_W = 200;
+const MENU_MAX_W = 340;
+function computeMenuWidth(entries) {
+  const H_PADDING = 28;   // padding orizzontale dell'item (14px * 2)
+  const ICON_COL = 28;    // icona (18px) + gap (10px) quando presente
+  let needed = MENU_MIN_W;
+  for (const e of entries || []) {
+    if (e.type === 'separator') continue;
+    const label = String(e.label || '');
+    // L'email (voce disabled senza icona) usa font 12px, le altre 13px. Stima
+    // generosa (~0.6 * font-size per carattere) per non troncare mai.
+    const fontPx = e.disabled ? 12 : 13;
+    const charW = fontPx * 0.6;
+    const hasIcon = !!e.icon && ICON_PATHS[e.icon];
+    const w = H_PADDING + (hasIcon ? ICON_COL : 0) + Math.ceil(label.length * charW);
+    if (w > needed) needed = w;
+  }
+  return Math.min(MENU_MAX_W, needed);
+}
+
 // ── Mostra il menu ────────────────────────────────────────────────────────
 function showPopupMenu(parentWin, entries, x, y, onSelect) {
   // Chiudi un eventuale popup precedente
