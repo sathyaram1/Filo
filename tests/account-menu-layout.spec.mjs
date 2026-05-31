@@ -20,9 +20,14 @@ const ENTRIES = [
 ];
 
 test('menu account: email centrata e ombra non tagliata', async ({ app }) => {
-  const html = buildHTML(ENTRIES, false, 26);
-  const measured = await app.evaluate(async ({ BrowserWindow }, html) => {
-    const win = new BrowserWindow({ show: false, width: 260, height: 200, webPreferences: {} });
+  const MARGIN = 26;
+  const width = computeMenuWidth(ENTRIES);
+  const html = buildHTML(ENTRIES, false, MARGIN);
+  // Finestra alla larghezza REALE che il main process userebbe in produzione
+  // (WIDTH + gutter su entrambi i lati), così misuriamo il layout vero.
+  const winW = width + MARGIN * 2;
+  const measured = await app.evaluate(async ({ BrowserWindow }, { html, winW }) => {
+    const win = new BrowserWindow({ show: false, width: winW, height: 200, webPreferences: {} });
     await win.webContents.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
     await new Promise((r) => setTimeout(r, 250));
     const res = await win.webContents.executeJavaScript(`(() => {
