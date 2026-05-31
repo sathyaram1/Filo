@@ -190,6 +190,15 @@ async function set(obj) {
 async function remove(keys) {
   await loadIfNeeded();
   const list = Array.isArray(keys) ? keys : [keys];
+  if (inIncognito()) {
+    // Rimuove dall'overlay e mette un tombstone: una lettura successiva torna
+    // undefined anche se la chiave esiste su disco (finestre normali intatte).
+    for (const k of list) {
+      delete INCOGNITO.data[k];
+      INCOGNITO.tombstones.add(k);
+    }
+    return;
+  }
   const changes = {};
   for (const k of list) {
     if (k in STATE.data) {
@@ -205,6 +214,12 @@ async function remove(keys) {
 
 async function clear() {
   await loadIfNeeded();
+  if (inIncognito()) {
+    // Svuota solo l'overlay: il disco delle finestre normali non si tocca.
+    INCOGNITO.data = {};
+    INCOGNITO.tombstones = new Set();
+    return;
+  }
   const changes = {};
   for (const k of Object.keys(STATE.data)) {
     changes[k] = { oldValue: STATE.data[k], newValue: undefined };
