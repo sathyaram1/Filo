@@ -119,9 +119,12 @@ test('growing the switch with no room in ALL pages is refused and shows a failur
   await page.locator('.ed-module[data-type="switch"] .ed-switch-icon').first().waitFor();
   await expect.poll(() => pageCount(page)).toBe(2);
 
-  // Prova ad allargare: deve essere RIFIUTATO (resta a 2 pagine) e comparire il
-  // toast d'errore in basso a destra.
-  await dragSwitchResize(page, 1);
+  // Prova ad allargare (freccia ›, stesso percorso di crescita del resize): deve
+  // essere RIFIUTATO (resta a 2 pagine) e comparire il toast d'errore in basso a
+  // destra. Usiamo la freccia perché è un click deterministico; il percorso di
+  // crescita via trascinamento è già coperto dal primo test.
+  const growArrow = page.locator('.ed-module[data-type="switch"] .ed-switch-arrow').nth(1);
+  await growArrow.click();
 
   const toast = page.locator('#edToast.show');
   await expect(toast).toBeVisible();
