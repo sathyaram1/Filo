@@ -177,6 +177,16 @@
     `<rect x="5" y="11" width="14" height="9" rx="1.5"/>` +
     `<path d="M8 11V8a4 4 0 0 1 8 0v3"/>`;
 
+  // --- Incognito: tesa del cappello (brim) + due lenti tonde da "spia" con
+  //     ponte centrale. Glifo classico della navigazione privata. Usato sia
+  //     nel menu Impostazioni sia nel menu secondario tasto destro.
+  const incognito =
+    `<path d="M3 13h18"/>` +
+    `<path d="M6 13l1.4-3.8A2.2 2.2 0 0 1 9.5 7.8h5a2.2 2.2 0 0 1 2.1 1.4L18 13"/>` +
+    `<circle cx="8" cy="16.2" r="2.3"/>` +
+    `<circle cx="16" cy="16.2" r="2.3"/>` +
+    `<path d="M10.3 16.2h3.4"/>`;
+
   // --- User: testa + spalle (avatar segnaposto per "Accedi"/account).
   const user =
     `<circle cx="12" cy="8" r="4"/>` +
