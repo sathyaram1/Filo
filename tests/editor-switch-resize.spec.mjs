@@ -18,11 +18,16 @@ async function dragSwitchResize(page, cols) {
   const colWidth = grid.width / 7;
   const startX = box.x + box.width / 2;
   const startY = box.y + box.height / 2;
+  // Overshoot leggermente (0.55 col extra nella direzione del drag) così il
+  // Math.round() lato app raggiunge in modo affidabile l'intero voluto: la
+  // larghezza-colonna stimata qui (bounding box, include gap/padding) non è
+  // identica a gridEl.clientWidth/7 usata dall'app.
+  const overshoot = colWidth * (cols + Math.sign(cols) * 0.55);
   await page.mouse.move(startX, startY);
   await page.mouse.down();
   // Move in a couple of steps so the live onMove handler updates targetLen.
-  await page.mouse.move(startX + colWidth * cols * 0.5, startY, { steps: 4 });
-  await page.mouse.move(startX + colWidth * cols, startY, { steps: 4 });
+  await page.mouse.move(startX + overshoot * 0.5, startY, { steps: 4 });
+  await page.mouse.move(startX + overshoot, startY, { steps: 4 });
   await page.mouse.up();
 }
 
@@ -36,7 +41,7 @@ test('growing the switch width adds a page and the switch spans the new width', 
   await expect(switchCell).toBeVisible();
 
   // Stato iniziale: 2 pagine (blankDoc), larghezza 2 colonne.
-  await expect(await pageCount(page)).toBe(2);
+  await expect.poll(() => pageCount(page)).toBe(2);
 
   // Trascina la maniglia destra dello switch per allargarlo di 1 colonna.
   await dragSwitchResize(page, 1);
@@ -54,7 +59,7 @@ test('growing the switch width adds a page and the switch spans the new width', 
   await icons.nth(2).click(); // attiva la terza (nuova) pagina
   await expect(icons.nth(2)).toHaveClass(/active/);
   await expect(switchCell).toBeVisible();
-  await expect(await pageCount(page)).toBe(3);
+  await expect.poll(() => pageCount(page)).toBe(3);
 
   fs.mkdirSync(shotsDir, { recursive: true });
   await page.screenshot({ path: path.join(shotsDir, 'switch-grown-3pages.png') });
@@ -62,7 +67,7 @@ test('growing the switch width adds a page and the switch spans the new width', 
 
 test('shrinking the switch opens a dialog to choose which page to delete', async ({ openTab }) => {
   const page = await openTab('filo://editor/editor.html');
-  await expect(await pageCount(page)).toBe(2);
+  await expect.poll(() => pageCount(page)).toBe(2);
 
   // Allarga a 3 così c'è qualcosa da rimpicciolire.
   await dragSwitchResize(page, 1);
@@ -85,7 +90,7 @@ test('shrinking the switch opens a dialog to choose which page to delete', async
 
 test('growing the switch with no room in ALL pages is refused and shows a failure toast', async ({ openTab }) => {
   const page = await openTab('filo://editor/editor.html');
-  await expect(await pageCount(page)).toBe(2);
+  await expect.poll(() => pageCount(page)).toBe(2);
 
   // Prepara uno stato dove la colonna immediatamente a destra dello switch è
   // occupata su una pagina diversa da quella attiva: lo switch è appuntato su
@@ -112,7 +117,7 @@ test('growing the switch with no room in ALL pages is refused and shows a failur
   expect(blocked).toBe(true);
   await page.reload();
   await page.waitForLoadState('domcontentloaded');
-  await expect(await pageCount(page)).toBe(2);
+  await expect.poll(() => pageCount(page)).toBe(2);
 
   // Prova ad allargare: deve essere RIFIUTATO (resta a 2 pagine) e comparire il
   // toast d'errore in basso a destra.
@@ -122,7 +127,7 @@ test('growing the switch with no room in ALL pages is refused and shows a failur
   await expect(toast).toBeVisible();
   await expect(toast).toContainText(/spazio insufficiente/i);
   // Nessuna pagina aggiunta: lo switch non si è ridimensionato.
-  await expect(await pageCount(page)).toBe(2);
+  await expect.poll(() => pageCount(page)).toBe(2);
 
   fs.mkdirSync(shotsDir, { recursive: true });
   await page.screenshot({ path: path.join(shotsDir, 'switch-grow-refused-toast.png') });
