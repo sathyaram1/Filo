@@ -41,6 +41,8 @@ contextBridge.exposeInMainWorld('filoShell', {
     toggleMaximize: () => ipcRenderer.invoke('window:toggle-maximize'),
     close: () => ipcRenderer.invoke('window:close'),
   },
+  // Apre una nuova finestra incognito (sessione effimera + storage in RAM).
+  openIncognito: () => ipcRenderer.invoke('window:open-incognito'),
   message: (msg) => ipcRenderer.invoke('filo:message', msg),
   // Account "Accedi con Google". I token vivono nel main process: qui
   // arriva solo il profilo pubblico { email, name, picture }.
