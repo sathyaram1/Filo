@@ -45,6 +45,17 @@ function filoWin() {
   return wins.find((w) => w._filoTabs) || wins[0] || null;
 }
 
+// Finestra che possiede il tab MITTENTE. In incognito è la finestra incognito,
+// così back/forward/chiudi/nuovo-tab agiscono su di essa (e i link aperti
+// restano effimeri lì dentro) invece di dirottare sulla finestra principale.
+// Senza questo, i comandi che leggono sender.tab.id non troverebbero il tab
+// (vive nel TabManager incognito, non in quello principale). Fallback a
+// filoWin() quando il mittente non ha una finestra (chiamate interne/shortcut).
+function winOf(sender) {
+  const w = sender && sender.win;
+  return (w && w._filoTabs) ? w : filoWin();
+}
+
 // ─── helpers (identici al background.js originale) ──────────────────────────
 
 function clusterKey(p) {
