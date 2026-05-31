@@ -262,4 +262,7 @@ module.exports = {
   onChanged,
   flushSync,
   setSync,
+  runIncognito,
+  resetIncognito,
+  inIncognito,
 };
