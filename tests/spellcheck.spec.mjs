@@ -51,10 +51,10 @@ async function expectCorrectionAtTop({ app, openTab, testServer }, html, selecto
   await expect(corr.first()).toContainText('ciao');
 }
 
-test('right-click su parola errata in textarea mostra correzione in cima', async (fx) => {
-  await expectCorrectionAtTop(fx, TA_PAGE, '#ta');
+test('right-click su parola errata in textarea mostra correzione in cima', async ({ app, openTab, testServer }) => {
+  await expectCorrectionAtTop({ app, openTab, testServer }, TA_PAGE, '#ta');
 });
 
-test('right-click su parola errata in contenteditable mostra correzione in cima', async (fx) => {
-  await expectCorrectionAtTop(fx, CE_PAGE, '#ce');
+test('right-click su parola errata in contenteditable mostra correzione in cima', async ({ app, openTab, testServer }) => {
+  await expectCorrectionAtTop({ app, openTab, testServer }, CE_PAGE, '#ce');
 });
