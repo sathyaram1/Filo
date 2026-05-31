@@ -14,20 +14,18 @@ async function dragSwitchResize(page, cols) {
   await switchCell.hover(); // rende visibile/affidabile la maniglia di resize
   const handle = page.locator('.ed-module[data-type="switch"] .ed-mod-resize-h');
   const box = await handle.boundingBox();
-  const grid = await page.locator('#grid').boundingBox();
-  const colWidth = grid.width / 7;
+  // Usa la STESSA larghezza-colonna dell'app (gridEl.clientWidth / 7): così il
+  // Math.round((ev.clientX - startX) / colWidth) lato app produce esattamente
+  // `cols`. Stimarla dal bounding box (che include gap/padding) sballa il round.
+  const colWidth = await page.evaluate(() => document.getElementById('grid').clientWidth / 7);
   const startX = box.x + box.width / 2;
   const startY = box.y + box.height / 2;
-  // Overshoot leggermente (0.55 col extra nella direzione del drag) così il
-  // Math.round() lato app raggiunge in modo affidabile l'intero voluto: la
-  // larghezza-colonna stimata qui (bounding box, include gap/padding) non è
-  // identica a gridEl.clientWidth/7 usata dall'app.
-  const overshoot = colWidth * (cols + Math.sign(cols) * 0.55);
+  const targetX = startX + colWidth * cols;
   await page.mouse.move(startX, startY);
   await page.mouse.down();
   // Move in a couple of steps so the live onMove handler updates targetLen.
-  await page.mouse.move(startX + overshoot * 0.5, startY, { steps: 4 });
-  await page.mouse.move(startX + overshoot, startY, { steps: 4 });
+  await page.mouse.move(startX + (targetX - startX) * 0.5, startY, { steps: 4 });
+  await page.mouse.move(targetX, startY, { steps: 4 });
   await page.mouse.up();
 }
 
