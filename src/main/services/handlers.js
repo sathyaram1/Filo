@@ -650,13 +650,13 @@ async function handleMessage(msg, sender = {}) {
       await globalThis.chrome.storage.local.clear();
       return { ok: true };
     case '_tabs:create': {
-      const win = filoWin();
+      const win = winOf(sender);
       if (!win || !win._filoTabs) return { ok: false };
       const id = win._filoTabs.openTab(msg.url || 'filo://newtab/');
       return { ok: true, id };
     }
     case '_tabs:remove': {
-      const win = filoWin();
+      const win = winOf(sender);
       if (win && win._filoTabs) win._filoTabs.closeTab(msg.id);
       return { ok: true };
     }
@@ -678,7 +678,7 @@ async function handleMessage(msg, sender = {}) {
         const allData = await DiskStorage.get(null);
         const zip = buildExportZip(allData);
 
-        const win = filoWin();
+        const win = winOf(sender);
         const stamp = new Date().toISOString().slice(0, 10);
         const defaultPath = `filo-export-${stamp}.zip`;
         const res = await dialog.showSaveDialog(win || undefined, {
@@ -808,7 +808,7 @@ async function handleMessage(msg, sender = {}) {
     case MSG.GET_COSTS:
       return { ok: true, monthly: await Costs.getMonthly(), state: await Costs.getState() };
     case MSG.CAPTURE_VISIBLE_TAB: {
-      const win = filoWin();
+      const win = winOf(sender);
       if (!win || !win._filoTabs) return { ok: false, error: 'no window' };
       const tab = win._filoTabs.tabs.find((t) => t.id === win._filoTabs.activeId);
       if (!tab) return { ok: false, error: 'no active tab' };
@@ -848,33 +848,33 @@ async function handleMessage(msg, sender = {}) {
       }
     }
     case MSG.OPEN_HOME: {
-      const win = filoWin();
+      const win = winOf(sender);
       if (win?._filoTabs) win._filoTabs.openTab('filo://home/home.html');
       return { ok: true };
     }
     case MSG.OPEN_HISTORY: {
-      const win = filoWin();
+      const win = winOf(sender);
       if (win?._filoTabs) win._filoTabs.openTab('filo://history/history.html');
       return { ok: true };
     }
     case MSG.OPEN_OPTIONS: {
-      const win = filoWin();
+      const win = winOf(sender);
       if (win?._filoTabs) win._filoTabs.openTab('filo://options/options.html');
       return { ok: true };
     }
     case MSG.OPEN_SPELLCHECK_PAGE: {
-      const win = filoWin();
+      const win = winOf(sender);
       if (win?._filoTabs) win._filoTabs.openTab('filo://spellcheck/spellcheck.html');
       return { ok: true };
     }
     case MSG.CLOSE_TAB:
       if (sender?.tab?.id) {
-        const win = filoWin();
+        const win = winOf(sender);
         win?._filoTabs?.closeTab(sender.tab.id);
       }
       return { ok: true };
     case MSG.OPEN_URL: {
-      const win = filoWin();
+      const win = winOf(sender);
       if (win?._filoTabs && msg.url) win._filoTabs.openTab(msg.url);
       return { ok: true };
     }
@@ -883,25 +883,25 @@ async function handleMessage(msg, sender = {}) {
       return { ok: true };
     case MSG.NAV_BACK:
       if (sender?.tab?.id) {
-        const win = filoWin();
+        const win = winOf(sender);
         win?._filoTabs?.goBack(sender.tab.id);
       }
       return { ok: true };
     case MSG.NAV_FORWARD:
       if (sender?.tab?.id) {
-        const win = filoWin();
+        const win = winOf(sender);
         win?._filoTabs?.goForward(sender.tab.id);
       }
       return { ok: true };
     case MSG.NAV_RELOAD:
       if (sender?.tab?.id) {
-        const win = filoWin();
+        const win = winOf(sender);
         win?._filoTabs?.reload(sender.tab.id);
       }
       return { ok: true };
     case MSG.NAV_STATE: {
       if (!sender?.tab?.id) return { ok: false, canBack: false, canFwd: false };
-      const win = filoWin();
+      const win = winOf(sender);
       const tab = win?._filoTabs?.tabs?.find((t) => t.id === sender.tab.id);
       const wc = tab?.view?.webContents;
       if (!wc) return { ok: false, canBack: false, canFwd: false };
@@ -914,7 +914,7 @@ async function handleMessage(msg, sender = {}) {
       // non porta la BrowserWindow a tutto schermo: la WebContentsView resta
       // confinata al suo bounds attuale. Per andare davvero in fullscreen OS
       // dobbiamo agire sulla BrowserWindow (feedback alpha).
-      const win = filoWin();
+      const win = winOf(sender);
       if (win?._filoTabs) {
         // Non basta il fullscreen OS: la view resta confinata sotto la barra
         // (tab + indirizzo). Per nascondere davvero la barra la view attiva deve
@@ -928,12 +928,12 @@ async function handleMessage(msg, sender = {}) {
     case MSG.EXIT_FULLSCREEN: {
       // Uscita idempotente dalla modalità contenuto a tutto schermo (Esc dalla
       // pagina). Idempotente così convive col fallback before-input-event.
-      const win = filoWin();
+      const win = winOf(sender);
       if (win?._filoTabs) win._filoTabs.setContentFullscreen(false);
       return { ok: true };
     }
     case MSG.OPEN_NEW_TAB: {
-      const win = filoWin();
+      const win = winOf(sender);
       if (win?._filoTabs) win._filoTabs.openTab(msg.url || 'filo://newtab/');
       return { ok: true };
     }
@@ -942,7 +942,7 @@ async function handleMessage(msg, sender = {}) {
       // del context-menu nativo (vedi `wc.on('context-menu', ...)` in tabs.js).
       // Funziona uniformemente su input, textarea e contenteditable.
       try {
-        const win = filoWin();
+        const win = winOf(sender);
         const tab = sender?.tab?.id ? win?._filoTabs?.tabs?.find((t) => t.id === sender.tab.id) : null;
         const wc = tab?.view?.webContents;
         if (wc && typeof wc.replaceMisspelling === 'function' && msg.suggestion) {
