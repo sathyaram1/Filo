@@ -765,6 +765,10 @@
     submitMessage(text);
   });
 
+  // Evidenziazione live mentre si scrive: arancione = comando Filo (o sito),
+  // azzurro = comando shell (solo in modalità terminale).
+  inputEl.addEventListener('input', updateInputClass);
+
   // ===== Bridge cambio stato live dal background =====
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg?.type === MSG.FILO_LIVE_UPDATED) {
