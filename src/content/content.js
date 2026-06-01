@@ -872,9 +872,15 @@
   // `openOptions` rimosso dalle azioni rapide (feedback alpha): le Opzioni
   // restano accessibili dalla barra indirizzi (icona ingranaggio).
   const DEFAULT_ICON_LAYOUT = {
-    primary: ['translate', 'screenshot', 'share', 'saveForLater', 'newTab'],
-    secondary: ['incognito', 'screenshotCrop', 'transcribe', 'qrCode', 'colorPicker', 'closeTab', 'fullscreen', 'back', 'forward', 'reload'],
+    primary: ['translate', 'screenshot', 'share', 'saveForLater', 'qrCode', 'newTab'],
+    secondary: ['incognito', 'screenshotCrop', 'transcribe', 'colorPicker', 'closeTab', 'fullscreen', 'back', 'forward', 'reload'],
   };
+
+  // Marker (storage) della promozione una-tantum di `qrCode` nella riga primaria.
+  // Feedback alpha: il QR doveva stare "fra le azioni rapide", non nascosto in
+  // "Altro…". Promuoviamo l'icona una sola volta per chi aveva già un layout
+  // salvato; dopo, l'utente resta libero di rispostarla dove vuole.
+  const QR_PRIMARY_MARKER = 'sn_qr_in_primary_migrated';
 
   // Icone ritirate dal registro: vanno purgate dal layout salvato per non
   // generare bottoni "fantasma" (registry lookup miss).
