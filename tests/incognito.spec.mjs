@@ -16,9 +16,10 @@ import { test, expect } from './fixtures/electron.mjs';
 //     "Incognito" con il tema dedicato.
 
 test('incognito storage: memoria in RAM, config passthrough, disco intatto', async ({ app }) => {
-  const out = await app.evaluate(async ({ app: electronApp }) => {
-    const path = require('path');
-    const DiskStorage = require(path.join(electronApp.getAppPath(), 'src', 'main', 'shim', 'storage.js'));
+  const out = await app.evaluate(async () => {
+    // app.evaluate gira nel main process ma senza `require` in scope: lo shim
+    // si auto-espone su globalThis quando NODE_ENV=test (vedi storage.js).
+    const DiskStorage = globalThis.__filoStorage;
 
     // Seed su DISCO (contesto normale): una chiave config + una chiave memoria.
     await DiskStorage.set({ settings: { theme: 'dark', _probe: 'disk-settings' } });
