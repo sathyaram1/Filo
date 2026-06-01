@@ -27,7 +27,7 @@ test('auth.status() risponde dal main: sloggato su userData pulito', async ({ sh
   expect(status.profile).toBeNull();
 });
 
-test('click su "Accedi" da sloggato avvia il login (apre il browser di sistema)', async ({ shell, app }) => {
+test('"Accedi con Google" dal menu account avvia il login (apre il browser di sistema)', async ({ shell, app }) => {
   // Stub di shell.openExternal nel MAIN process: il login apre il consenso
   // Google nel browser di sistema; qui lo intercettiamo per asserire che il
   // flusso parte (URL di authorization Google con i parametri PKCE) senza
