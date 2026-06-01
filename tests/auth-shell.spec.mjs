@@ -43,9 +43,27 @@ test('"Accedi con Google" dal menu account avvia il login (apre il browser di si
     };
   });
 
-  // Scatena il click sul pulsante (non await: signIn resta in attesa del
-  // redirect che non arriverà — a noi basta che il browser sia stato aperto).
+  // Da sloggato il pulsante account apre un menu nativo (BrowserWindow): la
+  // voce "Accedi con Google" avvia il login. Clicchiamo il bottone account, poi
+  // la voce nel popup (non await sul login: signIn resta in attesa del redirect
+  // che non arriverà — a noi basta che il browser sia stato aperto).
   await shell.locator('#nav-account').click();
+  let clicked = false;
+  const popupDeadline = Date.now() + 5_000;
+  while (Date.now() < popupDeadline && !clicked) {
+    const popup = app.windows().find((w) => w.url().startsWith('data:text/html'));
+    if (popup) {
+      const item = popup.locator('.item', { hasText: 'Accedi con Google' });
+      try {
+        await item.waitFor({ timeout: 1000 });
+        await item.click();
+        clicked = true;
+        break;
+      } catch (_) { /* popup non ancora pronto: ritenta */ }
+    }
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  expect(clicked, 'voce "Accedi con Google" non trovata nel menu account').toBe(true);
 
   // Attendi che il main abbia ricevuto la chiamata a openExternal.
   let url = null;
