@@ -347,6 +347,23 @@ la sola API key pubblica: falliranno.
   `priority`, niente `verified`/`ignored`, niente delete (qualsiasi altra cosa →
   403). Per `verified`/`ignored`/delete serve un admin (owner), non la routine.
 
+  **Sessioni locali (questa macchina)**: il refresh token è già salvato nel file
+  `tests/agent/.env` della **root del repo principale**
+  (`C:/Users/agenti AI/Desktop/Filo/Filo/tests/agent/.env`), accanto alla chiave
+  Gemini. È **gitignorato**: NON viene committato né pushato su GitHub. Attenzione:
+  ogni worktree ha un proprio `tests/agent/.env` (vuoto), quindi leggi sempre il
+  token dal file della root. Esempio per chiudere un feedback da una sessione
+  locale (bash):
+
+  ```bash
+  TOK=$(grep '^FILO_ROUTINE_REFRESH_TOKEN=' "C:/Users/agenti AI/Desktop/Filo/Filo/tests/agent/.env" | cut -d= -f2-)
+  FILO_ROUTINE_REFRESH_TOKEN="$TOK" node scripts/routine-feedback.mjs <id> done "testo note"
+  ```
+
+  Se il refresh risponde 401/403, il token è scaduto o revocato: rigeneralo con
+  `routine-login.mjs` e riscrivi quel file. NON incollare il token in CLAUDE.md
+  (verrebbe pushato su GitHub).
+
   Setup una tantum del token: `node scripts/routine-login.mjs` (login Google con
   l'account robot dedicato — NON l'owner), poi incolla l'email in `routines` su
   console Firebase e il refresh token stampato in `FILO_ROUTINE_REFRESH_TOKEN`.
