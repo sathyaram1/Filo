@@ -855,7 +855,7 @@
   // restano accessibili dalla barra indirizzi (icona ingranaggio).
   const DEFAULT_ICON_LAYOUT = {
     primary: ['translate', 'screenshot', 'share', 'saveForLater', 'newTab'],
-    secondary: ['screenshotCrop', 'transcribe', 'qrCode', 'colorPicker', 'closeTab', 'fullscreen', 'back', 'forward', 'reload'],
+    secondary: ['incognito', 'screenshotCrop', 'transcribe', 'qrCode', 'colorPicker', 'closeTab', 'fullscreen', 'back', 'forward', 'reload'],
   };
 
   // Icone ritirate dal registro: vanno purgate dal layout salvato per non
