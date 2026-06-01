@@ -658,6 +658,16 @@
       protectIpLeak: true,
       blockPopups: true,
     },
+    // Modalità terminale della dashboard: quando attiva, ogni comando con `/`
+    // che non è un comando interno di Filo viene eseguito da una shell di
+    // sistema invece di andare all'LLM (l'output appare in streaming). È OFF
+    // di default ed è opt-in esplicito perché esegue comandi arbitrari sulla
+    // macchina. `shell` sceglie l'interprete: 'powershell' | 'cmd' | 'bash'
+    // (bash = WSL su Windows).
+    terminal: {
+      enabled: false,
+      shell: 'powershell',
+    },
   };
 
   // Preset di stile per gli agenti rivolti all'utente. `key` è solo per l'UI;
