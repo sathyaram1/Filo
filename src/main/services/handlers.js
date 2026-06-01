@@ -1069,7 +1069,10 @@ async function handleMessage(msg, sender = {}) {
         await globalThis.SN_FEEDBACK.updateStatus(id, { status, notes, priority }, { idToken });
         return { ok: true };
       } catch (e) {
-        return { ok: false, error: feedbackUpdateError(e) };
+        const raw = e?.message || String(e);
+        let claims = null;
+        try { claims = auth.getTokenClaims(); } catch (_) {}
+        return { ok: false, error: permissionDeniedHelp(raw, claims) };
       }
     // Config "modelli predefiniti" condivisa. La lettura (per l'editor admin)
     // NON espone le chiavi vere, solo se sono configurate. La scrittura è
