@@ -95,11 +95,19 @@ test('incognito window: seconda finestra, TabManager effimero, badge visibile', 
   expect(info.partition).toMatch(/^filo-incognito-/);
 
   // La shell incognito (filo://shell/shell.html?incognito=1) applica il tema e
-  // mostra il badge.
-  const incogShell = app.windows().find((p) => {
-    try { return p.url().includes('incognito=1'); } catch (_) { return false; }
-  });
-  expect(incogShell, 'la Page della shell incognito deve esistere').toBeTruthy();
+  // mostra il badge. Playwright registra la Page in modo asincrono: come fa il
+  // fixture openTab, facciamo polling su app.windows() invece di uno snapshot.
+  const pageDeadline = Date.now() + 10000;
+  let incogShell = null;
+  while (Date.now() < pageDeadline) {
+    incogShell = app.windows().find((p) => {
+      try { return p.url().includes('incognito=1'); } catch (_) { return false; }
+    });
+    if (incogShell) break;
+    await new Promise((r) => setTimeout(r, 150));
+  }
+  const urls = app.windows().map((p) => { try { return p.url(); } catch (_) { return '?'; } });
+  expect(incogShell, `la Page della shell incognito deve esistere (viste: ${urls.join(' | ')})`).toBeTruthy();
   await incogShell.waitForLoadState('domcontentloaded').catch(() => {});
   await incogShell.waitForFunction(
     () => document.documentElement.dataset.incognito === '1',
