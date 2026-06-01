@@ -266,3 +266,12 @@ module.exports = {
   resetIncognito,
   inIncognito,
 };
+
+// Hook per i test (Playwright): app.evaluate gira nel main process ma in un
+// contesto dove `require` non è disponibile, quindi i test non possono caricare
+// questo modulo per pilotare runIncognito/resetIncognito. Sotto NODE_ENV=test
+// (impostato dal fixture) esponiamo l'API su globalThis. In produzione il ramo
+// non viene mai preso, quindi nessuna superficie extra.
+if (process.env.NODE_ENV === 'test') {
+  globalThis.__filoStorage = module.exports;
+}
