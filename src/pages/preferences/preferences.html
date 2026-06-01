@@ -56,6 +56,23 @@
       <textarea id="agentStyleText" rows="4" placeholder="Es. Rispondi sempre in italiano, con un tono pacato e qualche esempio pratico." style="width:100%;margin-top:10px;"></textarea>
     </section>
 
+    <section>
+      <h2>Modalità terminale</h2>
+      <p class="sn-muted">Quando è attiva, nella dashboard i comandi che iniziano con <code>/</code> (e che non sono comandi di Filo) vengono eseguiti da una shell di sistema, con l'output mostrato in tempo reale. Sopra la barra di scrittura compare la cartella in cui ti trovi. <strong>Esegue comandi reali sul tuo computer</strong>: attivala solo se sai cosa stai facendo.</p>
+      <div class="sn-toggle-row">
+        <label>
+          <input type="checkbox" id="terminalEnabled" />
+          <span>Attiva la modalità terminale nella dashboard</span>
+        </label>
+      </div>
+      <label for="terminalShell" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Shell da usare</label>
+      <select id="terminalShell">
+        <option value="powershell">PowerShell</option>
+        <option value="cmd">Prompt dei comandi (cmd)</option>
+        <option value="bash">Bash (WSL)</option>
+      </select>
+    </section>
+
     <span id="savedHint" class="sn-saved-indicator">Salvato</span>
   </main>
 
