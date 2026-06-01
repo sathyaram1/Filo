@@ -837,7 +837,7 @@
     btnRow.appendChild(copyBtn);
     card.appendChild(title);
     card.appendChild(subtitle);
-    card.appendChild(img);
+    card.appendChild(qrTile);
     card.appendChild(urlLine);
     card.appendChild(btnRow);
     overlay.appendChild(card);
