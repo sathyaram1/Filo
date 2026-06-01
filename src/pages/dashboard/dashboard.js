@@ -798,8 +798,12 @@
     try {
       const settings = await self.SN_STORAGE?.getSettings?.();
       showHomeMessage = settings?.showHomeMessage !== false;
+      terminalMode = !!settings?.terminal?.enabled;
+      terminalShell = settings?.terminal?.shell || 'powershell';
     } catch (_) {}
     applyHomeMessageVisibility();
+    if (terminalMode) await initCwd();
+    applyTerminalMode();
     // Carico in parallelo dashboard cache e live state per non sequenziare.
     await Promise.all([
       loadDashboard().catch((e) => console.warn('[Filo] dashboard load', e)),
