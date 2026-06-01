@@ -584,18 +584,177 @@
     },
   };
 
+  // Riconosce un singolo token "tipo sito" (es. google.com, github.com/x,
+  // http://localhost:3000). DEVE essere preciso: un comando di shell come
+  // `/git log v1.2` o `/cat file.txt` contiene un punto ma NON è un sito.
+  // Quindi: niente spazi, e o è un http(s):// esplicito o un dominio con TLD
+  // alfabetico. Esclude i path locali (./x, .\x) che la shell deve eseguire.
+  function isSiteToken(text) {
+    const raw = text.slice(1);
+    if (!raw || /\s/.test(raw)) return false;
+    if (/^https?:\/\//i.test(raw)) return true;
+    if (/^[.\\/~]/.test(raw)) return false; // ./script, .\script, ~/x, /usr
+    // label.label(.label)* con almeno un TLD alfabetico (.com, .io, ...)
+    return /^[\w-]+(\.[\w-]+)+(:\d+)?(\/\S*)?$/.test(raw) && /\.[a-z]{2,}(:|\/|$)/i.test(raw);
+  }
+
+  // Classifica l'input corrente per l'evidenziazione live:
+  //   'filo'  → comando interno di Filo (o navigazione a sito) → arancione
+  //   'shell' → andrà eseguito dalla shell (solo in modalità terminale) → azzurro
+  //   'none'  → testo normale (va all'LLM)
+  function classifyInput(value) {
+    const t = value.trim();
+    if (!t.startsWith('/')) return 'none';
+    const firstToken = t.split(/\s+/)[0];
+    if (SLASH_COMMANDS[t] || SLASH_COMMANDS[firstToken]) return 'filo';
+    if (isSiteToken(t)) return 'filo';
+    if (terminalMode) return 'shell';
+    return 'none';
+  }
+
+  function updateInputClass() {
+    const kind = classifyInput(inputEl.value);
+    inputEl.classList.toggle('is-cmd-filo', kind === 'filo');
+    inputEl.classList.toggle('is-cmd-shell', kind === 'shell');
+  }
+
   function handleSlashCommand(text) {
     if (!text.startsWith('/')) return false;
-    const handler = SLASH_COMMANDS[text];
-    if (handler) { handler(); inputEl.value = ''; return true; }
-    const raw = text.slice(1);
-    if (raw.includes('.') || raw.startsWith('http://') || raw.startsWith('https://')) {
-      const url = raw.match(/^https?:\/\//) ? raw : `https://${raw}`;
+    const firstToken = text.split(/\s+/)[0];
+    // 1) Comandi interni di Filo: vincono SEMPRE, anche in modalità terminale.
+    const handler = SLASH_COMMANDS[text] || SLASH_COMMANDS[firstToken];
+    if (handler) { handler(); inputEl.value = ''; updateInputClass(); return true; }
+    // 2) Navigazione diretta a un sito: solo se è un singolo token "tipo sito".
+    if (isSiteToken(text)) {
+      const raw = text.slice(1);
+      const url = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
       send({ type: MSG.OPEN_URL, url });
       inputEl.value = '';
+      updateInputClass();
       return true;
     }
+    // 3) Modalità terminale: tutto il resto con `/` viene eseguito dalla shell
+    //    (non passa mai all'LLM).
+    if (terminalMode) {
+      runShellCommand(text.slice(1).trim());
+      inputEl.value = '';
+      updateInputClass();
+      return true;
+    }
+    // 4) Modalità normale, comando `/` sconosciuto: lascialo all'LLM (storico).
     return false;
+  }
+
+  // ===== Esecuzione comandi shell (modalità terminale) =====
+  function updateDirLine() {
+    dashDir.textContent = currentCwd || '';
+  }
+
+  function applyTerminalMode() {
+    dashDir.hidden = !terminalMode || !currentCwd;
+    inputEl.placeholder = terminalMode
+      ? 'Chiedi qualsiasi cosa… o /comando per la shell'
+      : 'Chiedi qualsiasi cosa…';
+    updateInputClass();
+  }
+
+  async function initCwd() {
+    if (currentCwd) return;
+    try {
+      const r = await window.filo?.shellHome?.();
+      if (r?.cwd) currentCwd = r.cwd;
+    } catch (_) {}
+    updateDirLine();
+  }
+
+  function runShellCommand(command) {
+    if (!command) return;
+    if (body.dataset.state !== 'thread') goThread();
+
+    // Bolla "comando" (stile utente) con il prompt digitato.
+    const cmdBubble = makeBubble({ role: 'user', text: '' });
+    cmdBubble.classList.add('dash-term-cmd');
+    const promptLine = document.createElement('span');
+    promptLine.className = 'dash-term-prompt';
+    promptLine.textContent = '/ ';
+    cmdBubble.appendChild(promptLine);
+    cmdBubble.appendChild(document.createTextNode(command));
+    bubblesEl.appendChild(cmdBubble);
+
+    // Bolla output (monospace) con controlli.
+    const out = document.createElement('div');
+    out.className = 'dash-bubble dash-bubble-filo dash-term';
+    const pre = document.createElement('pre');
+    pre.className = 'dash-term-out';
+    out.appendChild(pre);
+
+    const controls = document.createElement('div');
+    controls.className = 'dash-term-controls';
+    const stdinInput = document.createElement('input');
+    stdinInput.type = 'text';
+    stdinInput.className = 'dash-term-stdin';
+    stdinInput.placeholder = 'Invio testo al comando…';
+    const stopBtn = document.createElement('button');
+    stopBtn.type = 'button';
+    stopBtn.className = 'dash-term-stop';
+    stopBtn.textContent = 'Stop';
+    controls.appendChild(stdinInput);
+    controls.appendChild(stopBtn);
+    out.appendChild(controls);
+    bubblesEl.appendChild(out);
+    bubblesEl.scrollTop = bubblesEl.scrollHeight;
+
+    const appendOut = (chunk, isErr) => {
+      const node = document.createElement('span');
+      if (isErr) node.className = 'dash-term-err';
+      node.textContent = chunk;
+      pre.appendChild(node);
+      const atBottom = bubblesEl.scrollHeight - bubblesEl.scrollTop - bubblesEl.clientHeight < 40;
+      if (atBottom) bubblesEl.scrollTop = bubblesEl.scrollHeight;
+    };
+
+    let finished = false;
+    const finish = (label) => {
+      if (finished) return;
+      finished = true;
+      controls.remove();
+      if (label) {
+        const tag = document.createElement('div');
+        tag.className = 'dash-term-exit';
+        tag.textContent = label;
+        out.appendChild(tag);
+      }
+      bubblesEl.scrollTop = bubblesEl.scrollHeight;
+    };
+
+    const handle = window.filo.shellExec({
+      command,
+      cwd: currentCwd,
+      shell: terminalShell,
+      onData: ({ chunk, stream }) => appendOut(chunk, stream === 'stderr'),
+      onExit: ({ code, cwd }) => {
+        if (cwd) { currentCwd = cwd; updateDirLine(); applyTerminalMode(); }
+        finish(code === 0 ? null : `(uscita con codice ${code})`);
+      },
+      onError: ({ message }) => {
+        appendOut(`\n${message || 'Errore di esecuzione.'}`, true);
+        finish('(comando non avviato)');
+      },
+    });
+
+    stopBtn.addEventListener('click', () => {
+      handle.abort();
+      finish('(interrotto)');
+    });
+    stdinInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handle.sendInput(stdinInput.value + '\n');
+        appendOut(stdinInput.value + '\n', false);
+        stdinInput.value = '';
+      }
+    });
+    stdinInput.focus();
   }
 
   inputForm.addEventListener('submit', (e) => {
