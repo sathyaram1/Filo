@@ -1039,7 +1039,7 @@ async function handleMessage(msg, sender = {}) {
         await globalThis.SN_FEEDBACK.updateStatus(id, { status, notes, priority }, { idToken });
         return { ok: true };
       } catch (e) {
-        return { ok: false, error: e?.message || String(e) };
+        return { ok: false, error: feedbackUpdateError(e) };
       }
     // Config "modelli predefiniti" condivisa. La lettura (per l'editor admin)
     // NON espone le chiavi vere, solo se sono configurate. La scrittura è
