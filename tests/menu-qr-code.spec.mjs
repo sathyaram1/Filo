@@ -11,7 +11,7 @@ import { roundTrip, SN_QR } from './helpers/qr-decode.mjs';
 
 const HTML = `<!doctype html><html><body style="padding:40px;font:16px sans-serif">
   <h1>Filo QR test</h1>
-  <p id="p">Click destro qui, poi apri "Altro…" e genera il QR code.</p>
+  <p id="p">Click destro qui per generare il QR code dalle azioni rapide.</p>
 </body></html>`;
 
 async function openMenu(page) {
