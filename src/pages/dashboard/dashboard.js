@@ -26,6 +26,7 @@
   const inputForm = $('inputForm');
   const inputEl = $('input');
   const sendBtn = $('sendBtn');
+  const dashDir = $('dashDir');
 
   // ===== Stato locale =====
   let suggestions = [];
@@ -35,6 +36,11 @@
   let sending = false;
   let liveTickHandle = null;
   let pendingImages = []; // dataUrl delle immagini incollate (multiple)
+
+  // ===== Modalità terminale =====
+  let terminalMode = false;          // attivabile da Preferenze
+  let terminalShell = 'powershell';  // 'powershell' | 'cmd' | 'bash'
+  let currentCwd = '';               // directory mostrata nella riga grigia
 
   // ===== Helpers messaggi =====
   function send(msg) {
