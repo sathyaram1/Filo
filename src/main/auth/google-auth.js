@@ -202,6 +202,19 @@ function getProfile() {
   return { email: session.email, name: session.name, picture: session.picture };
 }
 
+// Claim diagnostiche dell'ID token corrente: email e email_verified come le
+// vedono le regole Firestore (request.auth.token.*). Usate per spiegare un 403
+// "Missing or insufficient permissions" in termini azionabili. `email_verified`
+// è null se il token non è ancora stato emesso o non porta il claim.
+function getTokenClaims() {
+  const tok = session?.idToken;
+  const p = tok ? decodeJwtPayload(tok) : {};
+  return {
+    email: p.email || session?.email || '',
+    email_verified: typeof p.email_verified === 'boolean' ? p.email_verified : null,
+  };
+}
+
 function isSignedIn() {
   return Boolean(session?.refreshToken);
 }
