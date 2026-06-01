@@ -933,7 +933,6 @@
             // Promozione una-tantum di qrCode nella riga primaria (feedback
             // alpha: il QR è un'azione rapida, non va sepolto in "Altro…").
             // Solo se c'è spazio e l'utente non l'aveva già spostato in primaria.
-            let qrJustPromoted = false;
             if (!qrPromoted && !v.primary.includes('qrCode')
                 && v.secondary.includes('qrCode')
                 && v.primary.length < MAX_PRIMARY_ICONS) {
@@ -942,15 +941,13 @@
                 primary: [...v.primary, 'qrCode'],
                 secondary: v.secondary.filter((id) => id !== 'qrCode'),
               };
-              qrJustPromoted = true;
             }
             const changed = beforePrim !== v.primary.join('|') || beforeSec !== v.secondary.join('|');
-            if (changed || (!qrPromoted)) {
+            if (changed || !qrPromoted) {
               try {
                 chrome.storage.local.set({ [STORAGE_KEYS.ICON_LAYOUT]: v, [QR_PRIMARY_MARKER]: true });
               } catch (_) {}
             }
-            void qrJustPromoted;
             iconLayoutCache = v;
           }
         } else {
