@@ -38,6 +38,29 @@ const filoApi = {
       abort: () => { ipcRenderer.send('ai-stream:abort', { requestId }); cleanup(); },
     };
   },
+  // Esecuzione shell (modalità terminale della dashboard), gemella di aiStream.
+  // onData({chunk, stream}), onExit({code, cwd}), onError({message}).
+  // Ritorna { sendInput(text), abort() }.
+  shellExec: ({ command, cwd, shell, onData, onExit, onError }) => {
+    const execId = `sh${Date.now()}_${++streamCounter}`;
+    const offData = (_e, data) => onData && onData(data);
+    const offExit = (_e, data) => { cleanup(); onExit && onExit(data); };
+    const offError = (_e, data) => { cleanup(); onError && onError(data); };
+    const cleanup = () => {
+      ipcRenderer.removeListener(`shell:${execId}:data`, offData);
+      ipcRenderer.removeListener(`shell:${execId}:exit`, offExit);
+      ipcRenderer.removeListener(`shell:${execId}:error`, offError);
+    };
+    ipcRenderer.on(`shell:${execId}:data`, offData);
+    ipcRenderer.on(`shell:${execId}:exit`, offExit);
+    ipcRenderer.on(`shell:${execId}:error`, offError);
+    ipcRenderer.invoke('shell:start', { execId, command, cwd, shell });
+    return {
+      sendInput: (text) => ipcRenderer.send('shell:input', { execId, text }),
+      abort: () => { ipcRenderer.send('shell:abort', { execId }); cleanup(); },
+    };
+  },
+  shellHome: () => ipcRenderer.invoke('shell:home'),
 };
 
 window.filo = filoApi;
