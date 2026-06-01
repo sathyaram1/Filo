@@ -58,36 +58,6 @@ function winOf(sender) {
 
 // ─── helpers (identici al background.js originale) ──────────────────────────
 
-// Un 403/PERMISSION_DENIED su triage feedback NON è un guasto opaco: significa
-// che l'account loggato non è admin LATO SERVER (manca un documento
-// admins/<email> nelle Firestore rules), oppure l'email non è verificata, o le
-// regole non sono deployate. Il gate client (cfg.adminEmails) può dire "sei
-// admin" mentre il server dissente: le due allowlist sono distinte. Trasformiamo
-// il JSON grezzo di Firestore in istruzioni concrete, citando l'email reale dal
-// token così l'utente sa esattamente quale documento creare in console.
-function permissionDeniedHelp(rawError, claims) {
-  const raw = String(rawError || '');
-  if (!/\b403\b|PERMISSION_DENIED|insufficient permissions/i.test(raw)) return raw;
-  const email = (claims && claims.email) || '';
-  const who = email ? `"${email}"` : 'il tuo account';
-  const lines = [
-    `Firestore ha negato l'operazione (403): ${who} non risulta amministratore lato server.`,
-    '',
-    'Per abilitare il triage dei feedback, nella console Firebase (progetto',
-    'filo-8b9cb) → Firestore → collezione "admins" crea un documento con ID',
-    email ? `esattamente uguale alla tua email: ${email}` : 'uguale alla tua email',
-    '(i campi possono restare vuoti). Verifica anche che le regole Firestore',
-    'siano deployate (firebase deploy --only firestore:rules).',
-  ];
-  if (claims && claims.email_verified === false) {
-    lines.push('');
-    lines.push('Attenzione: questo account risulta con email NON verificata, ma le');
-    lines.push('regole richiedono email verificata. Accedi con un account la cui');
-    lines.push('email è verificata.');
-  }
-  return lines.join('\n');
-}
-
 function clusterKey(p) {
   const init = p.initialUrl || '';
   const steps = Array.isArray(p.steps) ? p.steps : [];
