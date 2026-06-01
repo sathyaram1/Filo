@@ -14,9 +14,10 @@ import { test, expect } from './fixtures/electron.mjs';
 
 // Esegue permissionDeniedHelp nel main process reale (modulo già caricato).
 async function callHelp(app, rawError, claims) {
-  return app.evaluate(({ app: electronApp }, { rawError, claims }) => {
-    const path = require('node:path');
-    const handlers = require(path.join(electronApp.getAppPath(), 'src', 'main', 'services', 'handlers.js'));
+  return app.evaluate((_electron, { rawError, claims }) => {
+    // `require` non è in scope dentro evaluate: usiamo quello di main.js
+    // (process.mainModule), che risolve i path relativi al main process.
+    const handlers = process.mainModule.require('./services/handlers.js');
     return handlers.permissionDeniedHelp(rawError, claims);
   }, { rawError, claims });
 }
