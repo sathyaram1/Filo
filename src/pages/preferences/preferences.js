@@ -89,6 +89,12 @@
     $('agentStyleText').value = settings.agentStyle || '';
     syncPresetSelect();
 
+    const terminal = settings.terminal || {};
+    $('terminalEnabled').checked = terminal.enabled === true;
+    const shell = terminal.shell || 'powershell';
+    const shellOpt = [...$('terminalShell').options].find((o) => o.value === shell);
+    $('terminalShell').value = shellOpt ? shell : 'powershell';
+
     Bootstrap.applyTheme(settings.theme);
     Bootstrap.applyTextScale(settings.textScale);
   }
