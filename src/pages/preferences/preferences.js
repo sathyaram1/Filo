@@ -109,6 +109,8 @@
       persist();
     });
     $('showHomeMessage').addEventListener('change', persist);
+    $('terminalEnabled').addEventListener('change', persist);
+    $('terminalShell').addEventListener('change', persist);
 
     // Stile agente: scegliere un preset riempie il textarea; scrivere a mano
     // riallinea la select su "Personalizzato".
