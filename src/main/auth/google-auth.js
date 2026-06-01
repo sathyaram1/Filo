@@ -231,6 +231,7 @@ module.exports = {
   signOut,
   getIdToken,
   getProfile,
+  getTokenClaims,
   isSignedIn,
   isAdmin,
   // esportati per i test
