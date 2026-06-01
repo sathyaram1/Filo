@@ -512,15 +512,26 @@
     // Helper: applica la risposta dell'LLM. Quando l'LLM declina ma esiste un
     // suggerimento nativo, manteniamo comunque quest'ultimo visibile.
     const applyResponse = (res) => {
-      SpellCheck.setCachedSuggestion(editableEl, wordCtx.word, res
-        ? { ...res, sentence: wordCtx.sentence }
-        : { misspelled: false, correction: '', sentence: wordCtx.sentence });
+      // Cache SOLO un verdetto definitivo dell'LLM. Se `res` è null la chiamata è
+      // FALLITA (nessuna chiave/errore provider, parse fallito): NON va cachata
+      // come "non errata", altrimenti il prossimo click destro sulla stessa parola
+      // non rilancerebbe più nulla e — peggio — soffocherebbe il suggerimento
+      // nativo. È esattamente lo scenario del feedback: senza chiave LLM la parola
+      // resta segnata in rosso dal nativo ma il menu non mostrava più la correzione.
+      if (res) {
+        SpellCheck.setCachedSuggestion(editableEl, wordCtx.word, { ...res, sentence: wordCtx.sentence });
+      }
       if (!updateCorrection) return;
       const usable = res && res.misspelled && res.correction && res.correction !== wordCtx.word;
       if (!usable) {
-        if (nativeTop) {
+        // Rileggi i suggerimenti nativi ADESSO: il broadcast `_spell:native` può
+        // essere arrivato dopo l'apertura del menu (lo snapshot in `nativeSugg`
+        // era vuoto). È la fonte affidabile quando l'LLM non risponde.
+        const freshNative = (SpellCheck.getNativeSuggestions?.(wordCtx.word)) || [];
+        const freshTop = freshNative[0] || '';
+        if (freshTop) {
           // Il correttore nativo ha comunque marcato la parola: mostra il nativo.
-          if (!shown || visibleCorrection !== nativeTop) revealCorrection(nativeTop, nativeSugg);
+          if (!shown || visibleCorrection !== freshTop) revealCorrection(freshTop, freshNative);
         } else if (shown) {
           updateCorrection({ remove: true });
         } else {
@@ -529,7 +540,7 @@
         return;
       }
       // Correzione LLM (contestuale): preferiscila, mantenendo i nativi come alternative.
-      revealCorrection(res.correction, nativeSugg);
+      revealCorrection(res.correction, (SpellCheck.getNativeSuggestions?.(wordCtx.word)) || nativeSugg);
     };
 
     if (refireInBackground) {
