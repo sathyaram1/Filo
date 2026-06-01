@@ -11,7 +11,7 @@ import { roundTrip, SN_QR } from './helpers/qr-decode.mjs';
 
 const HTML = `<!doctype html><html><body style="padding:40px;font:16px sans-serif">
   <h1>Filo QR test</h1>
-  <p id="p">Click destro qui, poi apri "Altro…" e genera il QR code.</p>
+  <p id="p">Click destro qui per generare il QR code dalle azioni rapide.</p>
 </body></html>`;
 
 async function openMenu(page) {
@@ -26,15 +26,15 @@ test('l\'azione "QR code" mostra un overlay con il QR e l\'URL della pagina', as
   const pageUrl = page.url();
   const menu = await openMenu(page);
 
-  // qrCode vive nella griglia secondaria → apri l'overflow "Altro…".
-  const overflow = menu.locator('.sn-menu-row-overflow').first();
-  await expect(overflow).toBeVisible();
-  await overflow.hover();
+  // Feedback alpha: il QR deve stare FRA LE AZIONI RAPIDE (riga icone primaria),
+  // non sepolto nell'overflow "Altro…". Lo cerchiamo direttamente nella riga,
+  // fuori dalla griglia secondaria.
   const grid = page.locator('.sn-menu-icon-grid');
-  await expect(grid).toBeVisible({ timeout: 2000 });
-
-  const qrBtn = grid.locator('[data-sn-icon-id="qrCode"]');
-  await expect(qrBtn).toBeVisible();
+  const qrBtn = menu.locator('.sn-menu-row [data-sn-icon-id="qrCode"]').first();
+  await expect(qrBtn, 'qrCode deve essere fra le azioni rapide, non in "Altro…"').toBeVisible();
+  // Sanity: l'overflow "Altro…" non è ancora aperto (la griglia secondaria non
+  // esiste finché non si fa hover su "Altro…") → l'icona è davvero nella riga.
+  await expect(grid).toHaveCount(0);
   await qrBtn.click();
 
   // L'overlay del QR deve comparire con un'immagine e l'URL corrente.

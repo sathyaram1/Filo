@@ -34,6 +34,13 @@ const ICON_PATHS = {
   user:
     '<circle cx="12" cy="8" r="4"/><path d="M5 20a7 7 0 0 1 14 0"/>',
 
+  incognito:
+    '<path d="M3 13h18"/>' +
+    '<path d="M6 13l1.4-3.8A2.2 2.2 0 0 1 9.5 7.8h5a2.2 2.2 0 0 1 2.1 1.4L18 13"/>' +
+    '<circle cx="8" cy="16.2" r="2.3"/>' +
+    '<circle cx="16" cy="16.2" r="2.3"/>' +
+    '<path d="M10.3 16.2h3.4"/>',
+
   models:
     '<circle cx="12" cy="5" r="2"/>' +
     '<circle cx="5.5" cy="18" r="2"/>' +

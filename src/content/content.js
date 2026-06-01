@@ -469,8 +469,15 @@
         ),
         { type: 'separator' },
       );
-    } else if (refireInBackground) {
+    } else {
       // Slot riservato, ma invisibile finché non sappiamo se la parola è errata.
+      // Lo riserviamo SEMPRE (non solo quando rilanciamo l'LLM): il correttore
+      // nativo può marcare la parola — e quindi avere suggerimenti — anche
+      // quando la cache LLM dice "non errata" o quando il broadcast `_spell:native`
+      // arriva con qualche ms di ritardo dopo l'apertura del menu. Senza uno slot
+      // montato, onNativeSuggestions non avrebbe dove rivelare la correzione e il
+      // suggerimento (es. "ciiao" → "ciao", quello dietro lo zigzag rosso) non
+      // comparirebbe mai — proprio il sintomo del feedback.
       items.unshift(
         buildCorrectionItem('', null, [], /* hidden */ true),
         { type: 'separator', hidden: true },
@@ -505,15 +512,26 @@
     // Helper: applica la risposta dell'LLM. Quando l'LLM declina ma esiste un
     // suggerimento nativo, manteniamo comunque quest'ultimo visibile.
     const applyResponse = (res) => {
-      SpellCheck.setCachedSuggestion(editableEl, wordCtx.word, res
-        ? { ...res, sentence: wordCtx.sentence }
-        : { misspelled: false, correction: '', sentence: wordCtx.sentence });
+      // Cache SOLO un verdetto definitivo dell'LLM. Se `res` è null la chiamata è
+      // FALLITA (nessuna chiave/errore provider, parse fallito): NON va cachata
+      // come "non errata", altrimenti il prossimo click destro sulla stessa parola
+      // non rilancerebbe più nulla e — peggio — soffocherebbe il suggerimento
+      // nativo. È esattamente lo scenario del feedback: senza chiave LLM la parola
+      // resta segnata in rosso dal nativo ma il menu non mostrava più la correzione.
+      if (res) {
+        SpellCheck.setCachedSuggestion(editableEl, wordCtx.word, { ...res, sentence: wordCtx.sentence });
+      }
       if (!updateCorrection) return;
       const usable = res && res.misspelled && res.correction && res.correction !== wordCtx.word;
       if (!usable) {
-        if (nativeTop) {
+        // Rileggi i suggerimenti nativi ADESSO: il broadcast `_spell:native` può
+        // essere arrivato dopo l'apertura del menu (lo snapshot in `nativeSugg`
+        // era vuoto). È la fonte affidabile quando l'LLM non risponde.
+        const freshNative = (SpellCheck.getNativeSuggestions?.(wordCtx.word)) || [];
+        const freshTop = freshNative[0] || '';
+        if (freshTop) {
           // Il correttore nativo ha comunque marcato la parola: mostra il nativo.
-          if (!shown || visibleCorrection !== nativeTop) revealCorrection(nativeTop, nativeSugg);
+          if (!shown || visibleCorrection !== freshTop) revealCorrection(freshTop, freshNative);
         } else if (shown) {
           updateCorrection({ remove: true });
         } else {
@@ -522,7 +540,7 @@
         return;
       }
       // Correzione LLM (contestuale): preferiscila, mantenendo i nativi come alternative.
-      revealCorrection(res.correction, nativeSugg);
+      revealCorrection(res.correction, (SpellCheck.getNativeSuggestions?.(wordCtx.word)) || nativeSugg);
     };
 
     if (refireInBackground) {
@@ -854,9 +872,15 @@
   // `openOptions` rimosso dalle azioni rapide (feedback alpha): le Opzioni
   // restano accessibili dalla barra indirizzi (icona ingranaggio).
   const DEFAULT_ICON_LAYOUT = {
-    primary: ['translate', 'screenshot', 'share', 'saveForLater', 'newTab'],
-    secondary: ['incognito', 'screenshotCrop', 'transcribe', 'qrCode', 'colorPicker', 'closeTab', 'fullscreen', 'back', 'forward', 'reload'],
+    primary: ['translate', 'screenshot', 'share', 'saveForLater', 'qrCode', 'newTab'],
+    secondary: ['incognito', 'screenshotCrop', 'transcribe', 'colorPicker', 'closeTab', 'fullscreen', 'back', 'forward', 'reload'],
   };
+
+  // Marker (storage) della promozione una-tantum di `qrCode` nella riga primaria.
+  // Feedback alpha: il QR doveva stare "fra le azioni rapide", non nascosto in
+  // "Altro…". Promuoviamo l'icona una sola volta per chi aveva già un layout
+  // salvato; dopo, l'utente resta libero di rispostarla dove vuole.
+  const QR_PRIMARY_MARKER = 'sn_qr_in_primary_migrated';
 
   // Icone ritirate dal registro: vanno purgate dal layout salvato per non
   // generare bottoni "fantasma" (registry lookup miss).
@@ -885,12 +909,13 @@
   let lastNavState = null;
   function loadIconLayout() {
     try {
-      chrome.storage.local.get([STORAGE_KEYS.ICON_LAYOUT], (out) => {
+      chrome.storage.local.get([STORAGE_KEYS.ICON_LAYOUT, QR_PRIMARY_MARKER], (out) => {
         let v = out?.[STORAGE_KEYS.ICON_LAYOUT];
+        const qrPromoted = !!out?.[QR_PRIMARY_MARKER];
         if (v && Array.isArray(v.primary) && Array.isArray(v.secondary)) {
           if (isLegacyDefault(v)) {
             iconLayoutCache = DEFAULT_ICON_LAYOUT;
-            try { chrome.storage.local.set({ [STORAGE_KEYS.ICON_LAYOUT]: DEFAULT_ICON_LAYOUT }); } catch (_) {}
+            try { chrome.storage.local.set({ [STORAGE_KEYS.ICON_LAYOUT]: DEFAULT_ICON_LAYOUT, [QR_PRIMARY_MARKER]: true }); } catch (_) {}
           } else {
             // Migrazione (idempotente):
             //  1) purga le icone ritirate (openOptions, openForLater)
@@ -905,14 +930,29 @@
             if (additions.length) {
               v = { ...v, secondary: [...additions, ...v.secondary] };
             }
+            // Promozione una-tantum di qrCode nella riga primaria (feedback
+            // alpha: il QR è un'azione rapida, non va sepolto in "Altro…").
+            // Solo se c'è spazio e l'utente non l'aveva già spostato in primaria.
+            if (!qrPromoted && !v.primary.includes('qrCode')
+                && v.secondary.includes('qrCode')
+                && v.primary.length < MAX_PRIMARY_ICONS) {
+              v = {
+                ...v,
+                primary: [...v.primary, 'qrCode'],
+                secondary: v.secondary.filter((id) => id !== 'qrCode'),
+              };
+            }
             const changed = beforePrim !== v.primary.join('|') || beforeSec !== v.secondary.join('|');
-            if (changed) {
-              try { chrome.storage.local.set({ [STORAGE_KEYS.ICON_LAYOUT]: v }); } catch (_) {}
+            if (changed || !qrPromoted) {
+              try {
+                chrome.storage.local.set({ [STORAGE_KEYS.ICON_LAYOUT]: v, [QR_PRIMARY_MARKER]: true });
+              } catch (_) {}
             }
             iconLayoutCache = v;
           }
         } else {
           iconLayoutCache = DEFAULT_ICON_LAYOUT;
+          try { chrome.storage.local.set({ [QR_PRIMARY_MARKER]: true }); } catch (_) {}
         }
       });
     } catch (_) { iconLayoutCache = DEFAULT_ICON_LAYOUT; }
