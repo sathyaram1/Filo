@@ -21,8 +21,7 @@ test('click destro reale su parola errata in textarea: correzione nativa in cima
   const url = testServer.html(PAGE);
   const page = await openTab(url);
   await page.waitForFunction(
-    () => document.documentElement.dataset.filoReady === '1' &&
-          typeof globalThis.SN_SPELLCHECK?.findSupportedEditable === 'function',
+    () => document.documentElement.dataset.filoReady === '1',
     null, { timeout: 8000 },
   );
 
