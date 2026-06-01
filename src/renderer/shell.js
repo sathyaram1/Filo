@@ -179,6 +179,10 @@
   }
 
   if (accountBtn) {
+    // Il menu dell'account apre SEMPRE (loggato o no) così la voce "Nuova
+    // finestra incognito" — spostata qui dal menu Impostazioni — è raggiungibile
+    // in entrambi gli stati. Da loggato mostra email + incognito + Esci; da
+    // sloggato mostra "Accedi con Google" + incognito.
     accountBtn.addEventListener('click', () => {
       if (authBusy) return;
       if (authProfile) {
@@ -186,15 +190,23 @@
         showNativeMenu(accountBtn, [
           { label: authProfile.email || label, disabled: true },
           { type: 'separator' },
+          { label: 'Nuova finestra incognito', icon: 'incognito', action: 'open-incognito' },
           { label: 'Esci', icon: 'close', action: 'auth-signout' },
         ]);
       } else {
-        doSignIn();
+        showNativeMenu(accountBtn, [
+          { label: 'Accedi con Google', icon: 'user', action: 'auth-signin' },
+          { type: 'separator' },
+          { label: 'Nuova finestra incognito', icon: 'incognito', action: 'open-incognito' },
+        ]);
       }
     });
     // Il menu account usa azioni custom invece di url: ascolta la scelta.
     if (api.onMenuAction) {
-      api.onMenuAction((action) => { if (action === 'auth-signout') doSignOut(); });
+      api.onMenuAction((action) => {
+        if (action === 'auth-signout') doSignOut();
+        else if (action === 'auth-signin') doSignIn();
+      });
     }
     // Aggiorna l'icona quando il main segnala un cambio sessione.
     if (api.auth && api.auth.onChanged) {
