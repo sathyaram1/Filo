@@ -41,10 +41,14 @@
     const textScale = parseFloat($('textScale').value) || 1;
     const showHomeMessage = $('showHomeMessage').checked;
     const agentStyle = currentStyleText().trim();
+    const terminal = {
+      enabled: $('terminalEnabled').checked,
+      shell: $('terminalShell').value,
+    };
 
     await chrome.runtime.sendMessage({
       type: MSG.UPDATE_SETTINGS,
-      settings: { theme, textScale, showHomeMessage, agentStyle },
+      settings: { theme, textScale, showHomeMessage, agentStyle, terminal },
     });
 
     window.SN_PAGE_THEME = theme;
