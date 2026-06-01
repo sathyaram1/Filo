@@ -465,6 +465,80 @@ body[data-state="thread"] .dash-suggestion { justify-content: flex-start; paddin
   .dash-input-wrap { grid-column: 1; }
 }
 
+/* ===== Modalità terminale ===== */
+/* Riga grigia con la directory corrente, sopra il testo, larga quanto la barra. */
+.dash-dir {
+  flex-basis: 100%;
+  padding: 2px 14px 0;
+  font-size: 11.5px;
+  color: var(--dash-ink-mute);
+  font-family: 'Cascadia Code', 'Consolas', 'SFMono-Regular', ui-monospace, monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Evidenziazione live dell'input: arancione = comando Filo (o sito),
+   azzurro = comando shell. Solo il colore del testo digitato cambia. */
+.dash-input.is-cmd-filo  { color: #d98324; font-weight: 600; }
+.dash-input.is-cmd-shell { color: #2f7fd1; font-weight: 600; }
+
+/* Bolla "comando" (echo del comando digitato). */
+.dash-bubble.dash-term-cmd {
+  font-family: 'Cascadia Code', 'Consolas', 'SFMono-Regular', ui-monospace, monospace;
+  font-size: 13px;
+}
+.dash-term-prompt { color: var(--dash-accent-2); font-weight: 700; }
+
+/* Bolla output: monospace, scrollabile, con i controlli sotto. */
+.dash-bubble.dash-term {
+  max-width: 92%;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.dash-term-out {
+  margin: 0;
+  max-height: 360px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: 'Cascadia Code', 'Consolas', 'SFMono-Regular', ui-monospace, monospace;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--dash-ink);
+}
+.dash-term-err { color: var(--dash-accent); }
+.dash-term-controls { display: flex; gap: 8px; align-items: center; }
+.dash-term-stdin {
+  flex: 1;
+  border: 1px solid var(--dash-line-strong);
+  border-radius: 8px;
+  background: var(--dash-paper);
+  color: var(--dash-ink);
+  padding: 6px 10px;
+  font-size: 12.5px;
+  font-family: 'Cascadia Code', 'Consolas', 'SFMono-Regular', ui-monospace, monospace;
+  outline: none;
+}
+.dash-term-stop {
+  border: 1px solid var(--dash-accent);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dash-accent);
+  padding: 6px 14px;
+  font-size: 12.5px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.dash-term-stop:hover { background: var(--dash-accent); color: var(--dash-paper); }
+.dash-term-exit {
+  font-size: 11.5px;
+  color: var(--dash-ink-mute);
+  font-style: italic;
+}
+
 /* Skeleton mentre carichiamo il messaggio centro. */
 .dash-skeleton {
   display: inline-block;
