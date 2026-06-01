@@ -909,12 +909,13 @@
   let lastNavState = null;
   function loadIconLayout() {
     try {
-      chrome.storage.local.get([STORAGE_KEYS.ICON_LAYOUT], (out) => {
+      chrome.storage.local.get([STORAGE_KEYS.ICON_LAYOUT, QR_PRIMARY_MARKER], (out) => {
         let v = out?.[STORAGE_KEYS.ICON_LAYOUT];
+        const qrPromoted = !!out?.[QR_PRIMARY_MARKER];
         if (v && Array.isArray(v.primary) && Array.isArray(v.secondary)) {
           if (isLegacyDefault(v)) {
             iconLayoutCache = DEFAULT_ICON_LAYOUT;
-            try { chrome.storage.local.set({ [STORAGE_KEYS.ICON_LAYOUT]: DEFAULT_ICON_LAYOUT }); } catch (_) {}
+            try { chrome.storage.local.set({ [STORAGE_KEYS.ICON_LAYOUT]: DEFAULT_ICON_LAYOUT, [QR_PRIMARY_MARKER]: true }); } catch (_) {}
           } else {
             // Migrazione (idempotente):
             //  1) purga le icone ritirate (openOptions, openForLater)
@@ -929,14 +930,32 @@
             if (additions.length) {
               v = { ...v, secondary: [...additions, ...v.secondary] };
             }
-            const changed = beforePrim !== v.primary.join('|') || beforeSec !== v.secondary.join('|');
-            if (changed) {
-              try { chrome.storage.local.set({ [STORAGE_KEYS.ICON_LAYOUT]: v }); } catch (_) {}
+            // Promozione una-tantum di qrCode nella riga primaria (feedback
+            // alpha: il QR è un'azione rapida, non va sepolto in "Altro…").
+            // Solo se c'è spazio e l'utente non l'aveva già spostato in primaria.
+            let qrJustPromoted = false;
+            if (!qrPromoted && !v.primary.includes('qrCode')
+                && v.secondary.includes('qrCode')
+                && v.primary.length < MAX_PRIMARY_ICONS) {
+              v = {
+                ...v,
+                primary: [...v.primary, 'qrCode'],
+                secondary: v.secondary.filter((id) => id !== 'qrCode'),
+              };
+              qrJustPromoted = true;
             }
+            const changed = beforePrim !== v.primary.join('|') || beforeSec !== v.secondary.join('|');
+            if (changed || (!qrPromoted)) {
+              try {
+                chrome.storage.local.set({ [STORAGE_KEYS.ICON_LAYOUT]: v, [QR_PRIMARY_MARKER]: true });
+              } catch (_) {}
+            }
+            void qrJustPromoted;
             iconLayoutCache = v;
           }
         } else {
           iconLayoutCache = DEFAULT_ICON_LAYOUT;
+          try { chrome.storage.local.set({ [QR_PRIMARY_MARKER]: true }); } catch (_) {}
         }
       });
     } catch (_) { iconLayoutCache = DEFAULT_ICON_LAYOUT; }
