@@ -737,40 +737,55 @@
     const svgDataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
 
     // --- Overlay ---
+    // L'overlay è figlio di documentElement, che porta data-sn-theme + le
+    // variabili della palette Filo (theme.css è iniettato anche sulle pagine
+    // esterne). Usiamo quindi le stesse variabili del resto della UI (sfondo,
+    // bordo, accento) con dei fallback hard-coded per i rari casi in cui il
+    // tema non fosse ancora applicato. Il QR in sé resta nero su bianco (vedi
+    // sotto): è l'unica parte che NON segue il tema, per restare scansionabile.
     const overlay = document.createElement('div');
     overlay.className = 'sn-qr-overlay';
     overlay.style.cssText = [
       'position:fixed', 'inset:0', 'z-index:2147483646',
       'display:flex', 'align-items:center', 'justify-content:center',
-      'background:rgba(0,0,0,.55)', 'backdrop-filter:blur(2px)',
+      'background:rgba(0,0,0,.45)', 'backdrop-filter:blur(2px)',
     ].join(';');
 
     const card = document.createElement('div');
     card.className = 'sn-qr-card';
     card.style.cssText = [
-      'background:#fff', 'color:#111', 'border-radius:16px', 'padding:22px 22px 18px',
-      'box-shadow:0 12px 48px rgba(0,0,0,.4)', 'max-width:min(92vw,360px)',
-      'font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif', 'text-align:center',
+      'background:var(--sn-overlay-bg,#f8f6f0)', 'color:var(--sn-fg,#1a1918)',
+      'border:1px solid var(--sn-border,#e0dcd4)', 'border-radius:14px',
+      'padding:22px 22px 18px', 'box-shadow:0 12px 48px rgba(0,0,0,.4)',
+      'max-width:min(92vw,360px)', 'font-family:var(--sn-font,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif)',
+      'text-align:center',
     ].join(';');
     card.addEventListener('mousedown', (e) => e.stopPropagation());
 
     const title = document.createElement('div');
     title.textContent = I18n.t('qr_title');
-    title.style.cssText = 'font-size:17px;font-weight:600;margin-bottom:2px;';
+    title.style.cssText = 'font-size:17px;font-weight:600;margin-bottom:2px;color:var(--sn-fg,#1a1918);';
 
     const subtitle = document.createElement('div');
     subtitle.textContent = I18n.t('qr_subtitle');
-    subtitle.style.cssText = 'font-size:12px;color:#666;margin-bottom:14px;';
+    subtitle.style.cssText = 'font-size:12px;color:var(--sn-muted,#6e6b63);margin-bottom:14px;';
+
+    // Tile bianca attorno al QR: in tema scuro lo stacca dallo sfondo e — cosa
+    // più importante — garantisce la quiet zone bianca che gli scanner si
+    // aspettano, a prescindere dal colore della card.
+    const qrTile = document.createElement('div');
+    qrTile.style.cssText = 'background:#fff;border-radius:10px;padding:10px;display:inline-block;margin:0 auto;box-shadow:0 1px 4px rgba(0,0,0,.12);';
 
     const img = document.createElement('img');
     img.src = svgDataUrl;
     img.alt = 'QR code';
-    img.style.cssText = 'width:240px;height:240px;display:block;margin:0 auto;border-radius:8px;image-rendering:pixelated;';
+    img.style.cssText = 'width:240px;height:240px;display:block;border-radius:4px;image-rendering:pixelated;';
+    qrTile.appendChild(img);
 
     const urlLine = document.createElement('div');
     urlLine.textContent = url;
     urlLine.title = url;
-    urlLine.style.cssText = 'font-size:11px;color:#888;margin:12px 4px 14px;word-break:break-all;max-height:3.2em;overflow:hidden;';
+    urlLine.style.cssText = 'font-size:11px;color:var(--sn-muted,#6e6b63);margin:12px 4px 14px;word-break:break-all;max-height:3.2em;overflow:hidden;';
 
     const btnRow = document.createElement('div');
     btnRow.style.cssText = 'display:flex;gap:8px;justify-content:center;';
@@ -778,11 +793,26 @@
     const mkBtn = (label, primary) => {
       const b = document.createElement('button');
       b.textContent = label;
-      b.style.cssText = [
-        'flex:1', 'padding:9px 12px', 'border-radius:9px', 'font-size:13px',
-        'cursor:pointer', 'border:1px solid ' + (primary ? '#2563eb' : '#d0d0d0'),
-        'background:' + (primary ? '#2563eb' : '#f4f4f5'), 'color:' + (primary ? '#fff' : '#222'),
-      ].join(';');
+      const base = [
+        'flex:1', 'padding:9px 12px', 'border-radius:8px', 'font-size:13px',
+        'font-family:inherit', 'cursor:pointer', 'transition:background .12s,border-color .12s',
+      ];
+      if (primary) {
+        base.push('border:1px solid var(--sn-accent,#c45a3b)', 'background:var(--sn-accent,#c45a3b)', 'color:#fff');
+      } else {
+        base.push('border:1px solid var(--sn-border,#e0dcd4)', 'background:transparent', 'color:var(--sn-fg,#1a1918)');
+      }
+      b.style.cssText = base.join(';');
+      // Hover coerente con il resto della UI Filo (l'accento sul bordo dei
+      // secondari, leggero scurimento sui primari).
+      b.addEventListener('mouseenter', () => {
+        if (primary) b.style.filter = 'brightness(1.08)';
+        else b.style.borderColor = 'var(--sn-accent,#c45a3b)';
+      });
+      b.addEventListener('mouseleave', () => {
+        if (primary) b.style.filter = '';
+        else b.style.borderColor = 'var(--sn-border,#e0dcd4)';
+      });
       return b;
     };
 
