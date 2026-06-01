@@ -11,6 +11,7 @@
 const { app, BrowserWindow } = require('electron');
 const auth = require('../auth/google-auth');
 const Defaults = require('./defaultsStore');
+const { permissionDeniedHelp } = require('./feedbackError');
 
 const { SN_CONST, SN_MSG } = globalThis;
 const { ACTIONS, PROMPTS, DEFAULT_SETTINGS } = SN_CONST;
