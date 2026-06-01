@@ -88,9 +88,10 @@
   settingsBtn.addEventListener('click', () => showNativeMenu(settingsBtn, buildSettings()));
   appsBtn.addEventListener('click', () => showNativeMenu(appsBtn, APPS));
 
-  // Voce "Nuova finestra incognito" del menu Impostazioni → apre la finestra
-  // incognito nel main. Registrazione separata da quella dell'account così
-  // funziona anche se il bottone account non è presente.
+  // "Nuova finestra incognito" vive ora nel menu dell'account (icona profilo),
+  // non più nel menu Impostazioni → apre la finestra incognito nel main.
+  // Registrazione separata così funziona anche se il bottone account non è
+  // presente. L'altro ingresso resta l'icona nel menu del tasto destro.
   if (api.onMenuAction) {
     api.onMenuAction((action) => {
       if (action === 'open-incognito' && api.openIncognito) api.openIncognito();
