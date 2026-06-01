@@ -30,10 +30,10 @@ test('l\'azione "QR code" mostra un overlay con il QR e l\'URL della pagina', as
   // non sepolto nell'overflow "Altro…". Lo cerchiamo direttamente nella riga,
   // fuori dalla griglia secondaria.
   const grid = page.locator('.sn-menu-icon-grid');
-  const qrBtn = menu.locator('.sn-menu-icon-row [data-sn-icon-id="qrCode"]').first();
+  const qrBtn = menu.locator('.sn-menu-row [data-sn-icon-id="qrCode"]').first();
   await expect(qrBtn, 'qrCode deve essere fra le azioni rapide, non in "Altro…"').toBeVisible();
-  // Sanity: non è dentro la griglia overflow (che di norma è nascosta finché non
-  // si apre "Altro…").
+  // Sanity: l'overflow "Altro…" non è ancora aperto (la griglia secondaria non
+  // esiste finché non si fa hover su "Altro…") → l'icona è davvero nella riga.
   await expect(grid).toHaveCount(0);
   await qrBtn.click();
 
