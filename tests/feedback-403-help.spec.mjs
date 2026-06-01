@@ -10,21 +10,15 @@
 // esisteva e l'handler ritornava la stringa grezza. Questi assert diventano
 // rossi se si rimuove l'helper (la guida "admins"/email sparisce).
 
-import { test, expect } from './fixtures/electron.mjs';
+import { test, expect } from '@playwright/test';
+import { createRequire } from 'node:module';
 
-// Esegue permissionDeniedHelp nel main process reale (modulo già caricato).
-async function callHelp(app, rawError, claims) {
-  return app.evaluate((_electron, { rawError, claims }) => {
-    // `require` non è in scope dentro evaluate: usiamo quello di main.js
-    // (process.mainModule), che risolve i path relativi al main process.
-    const handlers = process.mainModule.require('./services/handlers.js');
-    return handlers.permissionDeniedHelp(rawError, claims);
-  }, { rawError, claims });
-}
+const require = createRequire(import.meta.url);
+const { permissionDeniedHelp } = require('../src/main/services/feedbackError.js');
 
-test('403 Firestore → messaggio azionabile con email e collezione admins', async ({ app }) => {
+test('403 Firestore → messaggio azionabile con email e collezione admins', () => {
   const raw = '{ "error": { "code": 403, "message": "Missing or insufficient permissions.", "status": "PERMISSION_DENIED" } }';
-  const msg = await callHelp(app, raw, { email: 'tester@example.com', email_verified: true });
+  const msg = permissionDeniedHelp(raw, { email: 'tester@example.com', email_verified: true });
 
   // Deve citare l'email reale dell'utente e dirgli di crearla in admins.
   expect(msg).toContain('tester@example.com');
@@ -33,15 +27,15 @@ test('403 Firestore → messaggio azionabile con email e collezione admins', asy
   expect(msg).not.toContain('insufficient permissions');
 });
 
-test('403 con email non verificata → avvisa del requisito email verificata', async ({ app }) => {
+test('403 con email non verificata → avvisa del requisito email verificata', () => {
   const raw = 'firestore update fallito (403): PERMISSION_DENIED';
-  const msg = await callHelp(app, raw, { email: 'nv@example.com', email_verified: false });
+  const msg = permissionDeniedHelp(raw, { email: 'nv@example.com', email_verified: false });
   expect(msg).toContain('nv@example.com');
   expect(msg).toMatch(/verificat/i); // "email NON verificata"
 });
 
-test('errori non-403 passano invariati (nessun falso positivo)', async ({ app }) => {
+test('errori non-403 passano invariati (nessun falso positivo)', () => {
   const raw = 'Sessione scaduta: rifai l\'accesso.';
-  const msg = await callHelp(app, raw, { email: 'x@example.com', email_verified: true });
+  const msg = permissionDeniedHelp(raw, { email: 'x@example.com', email_verified: true });
   expect(msg).toBe(raw); // invariato
 });
