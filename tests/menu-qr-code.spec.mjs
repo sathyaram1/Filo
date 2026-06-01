@@ -54,6 +54,22 @@ test('l\'azione "QR code" mostra un overlay con il QR e l\'URL della pagina', as
   // L'URL della pagina è mostrato sotto il QR.
   await expect(overlay).toContainText(pageUrl.replace(/\/$/, '').slice(0, 30));
 
+  // Feedback (riapertura): il box dev'essere coerente con lo stile di Filo —
+  // sfondo della palette (NON più bianco fisso) e bottone primario con il
+  // colore accento terracotta (--sn-accent = #c45a3b = rgb(196,90,59)).
+  const card = overlay.locator('.sn-qr-card');
+  const cardBg = await card.evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(cardBg, 'la card non deve più essere bianca fissa').not.toBe('rgb(255, 255, 255)');
+  // Il primo bottone (download) è il primario → sfondo accento Filo.
+  const primaryBtnBg = await overlay.locator('button').first()
+    .evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(primaryBtnBg, 'il bottone primario deve usare il colore accento Filo')
+    .toBe('rgb(196, 90, 59)');
+  // Il QR in sé resta nero su bianco (scansionabilità): la tile che lo contiene
+  // è bianca a prescindere dal tema.
+  const tileBg = await img.evaluate((el) => getComputedStyle(el.parentElement).backgroundColor);
+  expect(tileBg, 'la tile del QR resta bianca').toBe('rgb(255, 255, 255)');
+
   // Esc chiude l'overlay.
   await page.keyboard.press('Escape');
   await expect(overlay).toHaveCount(0);
