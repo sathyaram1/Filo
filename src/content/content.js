@@ -469,8 +469,15 @@
         ),
         { type: 'separator' },
       );
-    } else if (refireInBackground) {
+    } else {
       // Slot riservato, ma invisibile finché non sappiamo se la parola è errata.
+      // Lo riserviamo SEMPRE (non solo quando rilanciamo l'LLM): il correttore
+      // nativo può marcare la parola — e quindi avere suggerimenti — anche
+      // quando la cache LLM dice "non errata" o quando il broadcast `_spell:native`
+      // arriva con qualche ms di ritardo dopo l'apertura del menu. Senza uno slot
+      // montato, onNativeSuggestions non avrebbe dove rivelare la correzione e il
+      // suggerimento (es. "ciiao" → "ciao", quello dietro lo zigzag rosso) non
+      // comparirebbe mai — proprio il sintomo del feedback.
       items.unshift(
         buildCorrectionItem('', null, [], /* hidden */ true),
         { type: 'separator', hidden: true },
