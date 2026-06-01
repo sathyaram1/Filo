@@ -13,9 +13,11 @@ const path = require('node:path');
 const { handleMessage, handleStream, broadcastToTabs } = require('./services/handlers');
 const { showPopupMenu } = require('./popup-menu');
 const { showTooltip, hideTooltip } = require('./popup-tooltip');
+const { runCommand, defaultCwd } = require('./services/shell');
 const DiskStorage = require('./shim/storage');
 
 const inFlightStreams = new Map(); // requestId → AbortController
+const shellSessions = new Map(); // execId → handle shell in esecuzione
 
 function senderInfo(event) {
   const wc = event.sender;
