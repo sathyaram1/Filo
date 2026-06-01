@@ -779,6 +779,16 @@
         showHomeMessage = msg.settings.showHomeMessage;
         applyHomeMessageVisibility();
       }
+      if (msg.settings && msg.settings.terminal) {
+        const t = msg.settings.terminal;
+        if (typeof t.enabled === 'boolean') terminalMode = t.enabled;
+        if (t.shell) terminalShell = t.shell;
+        if (terminalMode && !currentCwd) {
+          initCwd().then(applyTerminalMode);
+        } else {
+          applyTerminalMode();
+        }
+      }
     }
   });
 
