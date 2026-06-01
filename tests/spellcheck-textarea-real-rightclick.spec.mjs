@@ -1,58 +1,93 @@
 // Feedback alpha gRrZZ (riaperto): "in questo stesso box non mi corregge questa
 // parolla (non vedo suggerimenti quando clicco con il tasto destro su parolla)".
 //
-// "Questo box" = la textarea del form feedback (un <textarea>, editabile
-// "supportato" → percorso openSpellWordMenu, NON openNormalMenuAt). I test
-// esistenti coprivano gli <input> e iniettavano a mano il broadcast nativo.
-// Qui facciamo un VERO click destro su una <textarea> con una parola italiana
-// errata e ci affidiamo al correttore NATIVO reale di Electron: la correzione
-// deve comparire in cima al menu, come faceva la vecchia estensione. Niente
-// chiave LLM in test → l'unica fonte è il nativo, esattamente come per l'utente
-// senza provider configurato.
+// Lo screenshot mostra la parola sottolineata in ROSSO dal correttore NATIVO:
+// quindi sulla macchina dell'utente il nativo MARCA la parola (ha i suggerimenti)
+// ma la correzione non compariva in cima al menu. Due cause nel percorso di
+// openSpellWordMenu, indipendenti dalla disponibilità dei dizionari Hunspell
+// (che in CI headless non vengono scaricati, quindi non possiamo affidarci al
+// click destro "reale" per il segnale):
+//
+//   1) Senza chiave LLM, requestWordSuggestion() torna null (fallimento), ma il
+//      codice cachava comunque { misspelled:false } per quella parola. Al click
+//      destro SUCCESSIVO la cache "negativa" faceva saltare sia il rilancio sia
+//      la RISERVA dello slot di correzione → onNativeSuggestions non aveva dove
+//      rivelare il suggerimento nativo → niente correzione, per sempre.
+//   2) Lo snapshot dei suggerimenti nativi era preso all'apertura del menu: se
+//      il broadcast `_spell:native` arrivava dopo, la riserva/rivelazione usava
+//      lo snapshot vuoto.
+//
+// Questo test riproduce in modo DETERMINISTICO lo stato "cache dice non errata"
+// + arrivo del suggerimento nativo, e verifica che la correzione nativa compaia
+// comunque in cima. Prima del fix lo slot non veniva riservato → la correzione
+// non comparirebbe mai (rosso). Dopo il fix lo slot è sempre riservato e il
+// nativo viene riletto al volo → verde.
 
 import { test, expect } from './fixtures/electron.mjs';
 
-const PAGE = `<!doctype html><html><body style="margin:0">
-  <textarea id="ta" lang="it" spellcheck="true"
-    style="font:24px monospace;padding:10px;width:520px;height:140px"></textarea>
-</body></html>`;
+async function newtabPage(app) {
+  const deadline = Date.now() + 10_000;
+  let win = null;
+  while (Date.now() < deadline) {
+    win = app.windows().find((w) => w.url().startsWith('filo://newtab'));
+    if (win) break;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  expect(win, 'newtab non trovata').toBeTruthy();
+  await win.waitForLoadState('domcontentloaded');
+  return win;
+}
 
-test('click destro reale su parola errata in textarea: correzione nativa in cima', async ({ app, openTab, testServer }) => {
-  const url = testServer.html(PAGE);
-  const page = await openTab(url);
+test('parola errata già cachata come "non errata": il suggerimento nativo compare comunque in cima', async ({ app }) => {
+  const page = await newtabPage(app);
   await page.waitForFunction(
-    () => document.documentElement.dataset.filoReady === '1',
-    null, { timeout: 8000 },
+    () => document.documentElement.dataset.filoContentScripts === '1' &&
+          typeof globalThis.SN_SPELLCHECK?.getInputWordAt === 'function' &&
+          typeof globalThis.SN_SPELLCHECK?.setCachedSuggestion === 'function',
+    null, { timeout: 8_000 },
   );
 
-  // Salta se l'italiano non è disponibile nell'ambiente (CI senza dizionari):
-  // senza dizionario il nativo non marca la parola e il test non avrebbe segnale.
-  const itAvailable = await app.evaluate(({ session }) => {
-    const ses = session.defaultSession;
-    const avail = ses.availableSpellCheckerLanguages || [];
-    return avail.some((l) => l.toLowerCase().startsWith('it'));
+  // Prepara l'input con "ciiao come stai" e SIMULA lo stato che soffocava il
+  // suggerimento: una voce di cache "non errata" per "ciiao" (come quella che il
+  // vecchio codice scriveva su un fallimento LLM senza chiave).
+  const coords = await page.evaluate(() => {
+    const input = document.getElementById('input');
+    if (!input) return { error: 'input mancante' };
+    input.value = 'ciiao come stai';
+    input.focus();
+    // Cache "negativa" per la parola sotto il cursore (refireInBackground=false).
+    globalThis.SN_SPELLCHECK.setCachedSuggestion(input, 'ciiao', {
+      misspelled: false, correction: '', sentence: 'ciiao come stai',
+    });
+    const r = input.getBoundingClientRect();
+    const cs = getComputedStyle(input);
+    const x = r.left + parseFloat(cs.paddingLeft || 0) + parseFloat(cs.borderLeftWidth || 0) + 8;
+    const y = r.top + r.height / 2;
+    return { x, y };
   });
-  test.skip(!itAvailable, 'dizionario italiano non disponibile in questo ambiente');
+  expect(coords.error).toBeFalsy();
 
-  // Scrive una parola palesemente errata in italiano e mette il caret dentro.
+  // Click destro sulla parola: il menu si apre. NON iniettiamo ancora il nativo.
+  await page.evaluate(({ x, y }) => {
+    const input = document.getElementById('input');
+    input.dispatchEvent(new MouseEvent('contextmenu', {
+      bubbles: true, cancelable: true, clientX: x, clientY: y, button: 2,
+    }));
+  }, coords);
+
+  await expect(page.locator('.sn-menu')).toBeVisible({ timeout: 5_000 });
+
+  // Ora arriva (in ritardo) il suggerimento del correttore NATIVO — esattamente
+  // quello dietro lo zigzag rosso che l'utente vede.
   await page.evaluate(() => {
-    const ta = document.getElementById('ta');
-    ta.value = 'questa parolla';
-    ta.focus();
-    ta.setSelectionRange(ta.value.length, ta.value.length);
+    const listeners = globalThis.chrome.runtime.onMessage._listeners;
+    for (const fn of listeners) {
+      try { fn({ type: '_spell:native', word: 'ciiao', suggestions: ['ciao', 'chiao'] }); } catch (_) {}
+    }
   });
 
-  // Dà tempo al correttore nativo di marcare la parola dopo il focus/typing.
-  await page.waitForTimeout(600);
-
-  // Click destro REALE sopra "parolla" (verso la fine della stringa).
-  const box = await page.locator('#ta').boundingBox();
-  await page.mouse.click(box.x + 230, box.y + 26, { button: 'right' });
-
-  // Il menu Filo si apre.
-  await expect(page.locator('.sn-menu')).toBeVisible({ timeout: 4000 });
-
-  // E la correzione deve comparire in cima (alimentata dal nativo reale).
+  // La correzione nativa deve comparire in cima al menu.
   const correction = page.locator('.sn-menu .sn-menu-correction');
-  await expect(correction).toBeVisible({ timeout: 4000 });
+  await expect(correction).toBeVisible({ timeout: 5_000 });
+  await expect(correction.locator('.sn-menu-label').first()).toHaveText('ciao');
 });
