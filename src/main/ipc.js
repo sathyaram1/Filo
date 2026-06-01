@@ -104,6 +104,40 @@ function registerIpcHandlers() {
     }
   });
 
+  // ─── shell (modalità terminale della dashboard) ──────────────────────────
+  // Esegue un comando in streaming. SOLO per le pagine interne fidate
+  // (filo://): le pagine web esterne NON devono poter avviare una shell.
+  ipcMain.handle('shell:start', (event, { execId, command, cwd, shell } = {}) => {
+    const url = event.sender.getURL() || '';
+    if (!url.startsWith('filo://')) return { ok: false, error: 'forbidden' };
+    if (!execId || typeof command !== 'string') return { ok: false, error: 'bad-args' };
+    const send = (suffix, data) => {
+      try { event.sender.send(`shell:${execId}:${suffix}`, data); } catch (_) {}
+    };
+    const handle = runCommand({ shell, command, cwd }, {
+      onData: (d) => send('data', d),
+      onExit: (e) => { shellSessions.delete(execId); send('exit', e); },
+      onError: (e) => { shellSessions.delete(execId); send('error', e); },
+    });
+    shellSessions.set(execId, handle);
+    return { ok: true };
+  });
+
+  // Directory iniziale da mostrare nella riga grigia quando si attiva il terminale.
+  ipcMain.handle('shell:home', () => {
+    try { return { ok: true, cwd: defaultCwd() }; } catch (_) { return { ok: false }; }
+  });
+
+  ipcMain.on('shell:input', (_event, { execId, text } = {}) => {
+    const h = shellSessions.get(execId);
+    if (h) h.write(String(text == null ? '' : text));
+  });
+
+  ipcMain.on('shell:abort', (_event, { execId } = {}) => {
+    const h = shellSessions.get(execId);
+    if (h) { h.kill(); shellSessions.delete(execId); }
+  });
+
   // ─── tab control dalla shell ─────────────────────────────────────────────
   const winFor = (event) => {
     const wc = event.sender;
