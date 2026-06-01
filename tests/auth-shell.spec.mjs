@@ -7,9 +7,10 @@
 //     attesa { ok, signedIn:false, profile:null } su userData pulito (nessuna
 //     sessione persistita) — gira nel main process, i token non toccano il
 //     renderer;
-//   - cliccando il pulsante da sloggato parte il login (apre il browser di
-//     sistema): lo intercettiamo stubbando shell.openExternal nel main, così
-//     asseriamo che il flusso si avvia davvero senza aprire nulla per davvero.
+//   - cliccando il pulsante da sloggato si apre il menu account; da lì la voce
+//     "Accedi con Google" avvia il login (apre il browser di sistema): lo
+//     intercettiamo stubbando shell.openExternal nel main, così asseriamo che il
+//     flusso si avvia davvero senza aprire nulla per davvero.
 
 import { test, expect } from './fixtures/electron.mjs';
 
