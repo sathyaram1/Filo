@@ -1217,4 +1217,5 @@ module.exports = {
   broadcastToTabs,
   handleAIRequest,
   maybeCategorizeAsync,
+  permissionDeniedHelp,
 };
