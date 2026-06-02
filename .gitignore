@@ -4,7 +4,10 @@ dist/
 # non deve mai tornare nel repo pubblico. La scrive scripts/bake-default-config.mjs.
 src/main/config/default-keys.generated.json
 .feedback-images/
+# Screenshot/artefatti dei test: output rigenerato, MAI committare (i PNG
+# binari generano conflitti di rebase tra sessioni locali e routine cloud).
 tests/.report/
+tests/.shots/
 tests/.smoke/
 tests/agent/.env
 tests/agent/.out/
