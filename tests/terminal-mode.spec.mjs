@@ -86,6 +86,33 @@ test('attivando il terminale compare la riga directory e i comandi / vengono ese
   await expect(page.locator('.dash-bubble-pending')).toHaveCount(0);
 });
 
+test('la shell è PERSISTENTE per scheda: una variabile impostata sopravvive al comando successivo', async ({ app, shell }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible({ timeout: 8_000 });
+  await setTerminal(page, true);
+  await expect(page.locator('#dashDir')).toBeVisible({ timeout: 8_000 });
+
+  // Sintassi giusta per la shell che gira davvero: PowerShell su Windows,
+  // /bin/sh nel cloud Linux. (Il primario è scelto da shell.js in base alla
+  // piattaforma host, la stessa che vede questo file di test.)
+  const win = process.platform === 'win32';
+  const setCmd = win ? '/$env:FILO_PERSIST = "vivo-5566"' : '/export FILO_PERSIST=vivo-5566';
+  const readCmd = win ? '/echo persist=$env:FILO_PERSIST' : '/echo persist=$FILO_PERSIST';
+
+  // Primo comando: imposta la variabile in UN processo shell.
+  await submitInput(page, setCmd);
+  // Aspetta che il primo comando sia finito (i controlli Stop spariscono).
+  await expect(page.locator('.dash-term-controls')).toHaveCount(0, { timeout: 12_000 });
+
+  // Secondo comando (submit separato): legge la variabile. Col vecchio modello
+  // "un processo per comando" qui uscirebbe "persist=" (variabile persa); con la
+  // shell persistente esce "persist=vivo-5566".
+  await submitInput(page, readCmd);
+  await expect(page.locator('.dash-term-out').last())
+    .toContainText('persist=vivo-5566', { timeout: 12_000 });
+});
+
 test('evidenziazione live: arancione per i comandi Filo, azzurro per i comandi shell', async ({ app, shell }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
