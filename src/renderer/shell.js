@@ -374,16 +374,27 @@
   // con tab/indirizzo mentre si sta dando un feedback.
   if (api.onFeedbackDim) {
     let veil = null;
-    api.onFeedbackDim((on) => {
+    let veilTabId = null;
+    function setVeil(on) {
       if (on) {
-        if (veil) return;
-        veil = document.createElement('div');
-        veil.id = 'feedback-dim';
-        document.body.appendChild(veil);
+        if (!veil) {
+          veil = document.createElement('div');
+          veil.id = 'feedback-dim';
+          document.body.appendChild(veil);
+        }
+        veilTabId = state?.activeId ?? null;
       } else if (veil) {
         veil.remove();
         veil = null;
+        veilTabId = null;
       }
+    }
+    api.onFeedbackDim(setVeil);
+    // Rete di sicurezza: se l'utente cambia tab mentre il box è aperto, il
+    // content script di quella pagina non riceve più eventi e non potrà
+    // togliere il velo → lo togliamo qui appena la tab attiva cambia.
+    api.tabs.onUpdate((snap) => {
+      if (veil && snap && snap.activeId !== veilTabId) setVeil(false);
     });
   }
 
