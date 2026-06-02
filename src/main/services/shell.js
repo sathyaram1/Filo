@@ -1,153 +1,279 @@
-// Esecuzione di comandi shell per la modalità terminale della dashboard.
+// Sessione di shell PERSISTENTE per la modalità terminale della dashboard.
 //
-// Ogni comando è uno spawn indipendente della shell scelta, con streaming di
-// stdout/stderr verso il renderer. Per far "persistere" la directory tra un
-// comando e l'altro (così `cd` funziona come in un vero terminale) appendiamo
-// al comando dell'utente un sentinel che stampa la directory finale: il main
-// lo rimuove dall'output e lo restituisce al renderer, che lo passerà come
-// `cwd` del comando successivo. (Limite noto: le variabili d'ambiente NON
-// persistono tra un comando e l'altro, perché ogni comando è uno spawn nuovo.)
+// A differenza del modello "uno spawn per comando", qui ogni scheda ha UN
+// processo shell di lunga durata, pilotato via stdin. Così variabili d'ambiente,
+// `$env:`, alias e directory persistono tra un comando e l'altro — un vero
+// terminale. La sessione:
+//   - muore quando si chiude la scheda (il modo più intuitivo per uccidere un
+//     processo collegato) → vedi ipc.js, hook su 'destroyed';
+//   - NON è persistita su disco: alla riapertura di Filo si parte da una shell
+//     pulita (comportamento atteso da chi usa un terminale; persistere sarebbe
+//     complessità inutile e un rischio di sicurezza in più).
+//
+// PROTOCOLLO marcatori (validato empiricamente su powershell/cmd/sh):
+//   - FILO_RDY_<sid>            riga di "pronto" + prompt da rimuovere (cmd);
+//   - FILO_META_<sid>:<code>:<cwd>  fine comando, con exit code e directory.
+// I comandi vengono serializzati in coda: ne parte uno alla volta e l'output
+// in arrivo è instradato alle callback del comando corrente fino al suo META.
 //
 // SICUREZZA: esegue comandi arbitrari sulla macchina. È raggiungibile SOLO
-// dalle pagine interne filo:// (vedi ipc.js, che rifiuta i sender esterni) e
-// solo quando l'utente ha attivato la modalità terminale nelle Preferenze.
+// dalle pagine interne filo:// (vedi ipc.js, che rifiuta i sender esterni),
+// SOLO con la modalità terminale attiva e SOLO con comandi digitati a mano
+// dall'utente — mai output dell'LLM, mai contenuto di pagine web.
 
 const { spawn } = require('node:child_process');
 const os = require('node:os');
-
-// Marcatore poco probabile in output reale (SOH + tag). Lo usiamo per
-// estrarre la directory finale dallo stdout del comando.
-const SENTINEL = 'FILO_CWD:';
 
 function defaultCwd() {
   return os.homedir();
 }
 
-// Costruisce file+args+options per lo spawn in base alla shell scelta.
-// Appende al comando dell'utente un'istruzione che stampa la cwd finale,
-// preceduta dal SENTINEL.
-function buildInvocation(shell, command, cwd) {
-  // Fuori da Windows (es. routine cloud Linux, macOS) PowerShell/cmd non
-  // esistono: usiamo sempre /bin/sh così la feature e i test restano eseguibili.
+// Identificativo di sessione, improbabile in output reale. Entra nei marcatori.
+function randSid() {
+  return 'F' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-5);
+}
+
+// Config per shell: come avviare il processo persistente, la riga di "pronto"
+// da inviare all'avvio, e come "incartare" un comando utente perché stampi il
+// marcatore di fine (exit code + cwd) su una riga propria.
+function shellConfig(shell, sid, startCwd) {
+  // Fuori da Windows (routine cloud Linux, macOS): /bin/sh persistente. Letto
+  // da pipe è non-interattivo → nessun prompt da ripulire.
   if (process.platform !== 'win32') {
     return {
       file: '/bin/sh',
-      args: ['-c', `${command}\nprintf '%s%s\\n' '${SENTINEL}' "$PWD"`],
-      options: { cwd, windowsHide: true },
+      args: [],
+      options: { cwd: startCwd || undefined, windowsHide: true },
+      ready: `printf 'FILO_RDY_${sid}\\n'\n`,
+      wrap: (command) =>
+        `${command}\nprintf 'FILO_META_${sid}:%s:%s\\n' "$?" "$PWD"\n`,
     };
   }
   if (shell === 'cmd') {
+    // /q = niente echo dei comandi; /k = resta aperto leggendo da stdin.
+    // Cambiamo il prompt nel marcatore RDY ($_ = CRLF): così ogni prompt
+    // diventa una riga FILO_RDY_<sid> che rimuoviamo dall'output.
     return {
       file: process.env.ComSpec || 'cmd.exe',
-      // /d = niente AutoRun del registro; /s /c = esegui la stringa così com'è.
-      args: ['/d', '/s', '/c', `${command} & echo ${SENTINEL}%CD%`],
-      options: { cwd, windowsHide: true },
+      args: ['/q', '/k'],
+      options: { cwd: startCwd || undefined, windowsHide: true },
+      ready: `prompt FILO_RDY_${sid}$_\r\n`,
+      wrap: (command) =>
+        `${command}\r\necho FILO_META_${sid}:%errorlevel%:%cd%\r\n`,
     };
   }
   if (shell === 'bash') {
-    // WSL: `--cd` accetta sia path Windows sia Linux e imposta la dir iniziale,
-    // quindi NON usiamo l'opzione cwd di spawn (sarebbe un path Windows passato
-    // a un processo Linux). Il sentinel stampa $PWD (path Linux, es. /mnt/c/...),
-    // che torna come cwd del comando successivo (di nuovo via --cd).
-    const args = [];
-    if (cwd) args.push('--cd', cwd);
-    args.push('--', 'bash', '-lc', `${command}; printf '%s%s\\n' '${SENTINEL}' "$PWD"`);
-    return { file: 'wsl.exe', args, options: { windowsHide: true } };
+    // WSL bash persistente. `--cd` accetta sia path Windows sia Linux e imposta
+    // la dir iniziale; il resto va via stdin. Letto da pipe → niente prompt.
+    const args = ['--cd', startCwd || defaultCwd(), '--', 'bash'];
+    return {
+      file: 'wsl.exe',
+      args,
+      options: { windowsHide: true },
+      ready: `printf 'FILO_RDY_${sid}\\n'\n`,
+      wrap: (command) =>
+        `${command}\nprintf 'FILO_META_${sid}:%s:%s\\n' "$?" "$PWD"\n`,
+    };
   }
-  // PowerShell (default)
+  // PowerShell (default). `-Command -` legge ed esegue da stdin in modo
+  // incrementale, senza prompt. Azzeriamo $LASTEXITCODE prima di ogni comando
+  // così i cmdlet (che non lo toccano) riportano 0 invece dell'ultimo codice
+  // nativo rimasto appeso.
   return {
     file: 'powershell.exe',
-    args: [
-      '-NoLogo', '-NoProfile', '-Command',
-      `${command}; Write-Output ('${SENTINEL}' + (Get-Location).Path)`,
-    ],
-    options: { cwd, windowsHide: true },
+    args: ['-NoLogo', '-NoProfile', '-Command', '-'],
+    options: { cwd: startCwd || undefined, windowsHide: true },
+    ready: `"FILO_RDY_${sid}"\n`,
+    wrap: (command) =>
+      `$global:LASTEXITCODE=0\n${command}\n` +
+      `"FILO_META_${sid}:$($LASTEXITCODE):$((Get-Location).Path)"\n`,
   };
 }
 
-// Estrae la directory dal testo catturato dopo il SENTINEL (prima riga utile).
-function parseCwd(raw) {
-  if (!raw) return '';
-  const line = String(raw).split(/\r?\n/).find((l) => l.trim().length > 0);
-  return line ? line.trim() : '';
-}
-
-// Avvia un comando. Callback:
-//   onData({ chunk, stream })   stream: 'stdout' | 'stderr'
-//   onExit({ code, cwd })       cwd: directory dopo il comando (per il next)
-//   onError({ message })
-// Ritorna { write(text), kill() }.
-function runCommand({ shell, command, cwd } = {}, { onData, onExit, onError } = {}) {
+// Crea una sessione persistente. Ritorna un oggetto con:
+//   exec(command, { onData, onExit, onError })  accoda ed esegue un comando
+//   write(text)                                 invia testo grezzo allo stdin
+//   kill()                                      termina l'albero di processi
+//   shell, cwd, dead                            stato osservabile
+//
+// Le callback sono PER COMANDO: onData({chunk, stream}), onExit({code, cwd}),
+// onError({message}).
+function createSession({ shell, cwd } = {}) {
+  const sid = randSid();
+  const wantShell = process.platform !== 'win32' ? 'sh' : (shell || 'powershell');
   const startCwd = cwd || defaultCwd();
-  let child;
+  const cfg = shellConfig(wantShell, sid, startCwd);
+
+  const session = {
+    shell: shell || 'powershell',
+    sid,
+    cwd: startCwd,
+    dead: false,
+    ready: false,
+    proc: null,
+    queue: [],        // comandi in attesa: { command, cb }
+    current: null,    // comando in esecuzione: { cb }
+    _buf: '',         // buffer di linea per stdout
+    _pendingBlank: 0, // righe vuote in attesa (separatori prompt/marcatore)
+    exec, write, kill,
+  };
+
+  const META_PREFIX = `FILO_META_${sid}:`;
+  const RDY_LINE = `FILO_RDY_${sid}`;
+
+  let proc;
   try {
-    const inv = buildInvocation(shell || 'powershell', String(command || ''), startCwd);
-    child = spawn(inv.file, inv.args, inv.options);
+    proc = spawn(cfg.file, cfg.args, cfg.options);
   } catch (err) {
-    onError && onError({ message: err.message || String(err) });
-    return { write() {}, kill() {} };
+    session.dead = true;
+    session._spawnError = err.message || String(err);
+    return session;
+  }
+  session.proc = proc;
+  proc.stdout && proc.stdout.setEncoding('utf8');
+  proc.stderr && proc.stderr.setEncoding('utf8');
+
+  proc.stdout && proc.stdout.on('data', onStdout);
+  proc.stderr && proc.stderr.on('data', (chunk) => {
+    // stderr non passa dal protocollo a righe: lo inoltriamo grezzo al comando
+    // corrente (rosso nella bolla). Normalizziamo solo i \r\n.
+    if (session.current && session.current.cb.onData) {
+      session.current.cb.onData({ chunk: String(chunk).replace(/\r\n/g, '\n'), stream: 'stderr' });
+    }
+  });
+  proc.on('error', (err) => fatal(err.message || String(err)));
+  proc.on('close', () => {
+    session.dead = true;
+    const cur = session.current;
+    session.current = null;
+    if (cur && cur.cb.onExit) cur.cb.onExit({ code: 0, cwd: session.cwd });
+    drainQueueErr('shell terminata');
+  });
+
+  // Invia la riga di "pronto": quando la rivediamo in output, la sessione è
+  // operativa e svuotiamo la coda.
+  try { proc.stdin.write(cfg.ready); } catch (_) {}
+
+  // ── stdout: parsing a righe con soppressione delle righe vuote di prompt ──
+  function onStdout(chunk) {
+    session._buf += chunk;
+    let nl;
+    while ((nl = session._buf.indexOf('\n')) !== -1) {
+      let line = session._buf.slice(0, nl);
+      session._buf = session._buf.slice(nl + 1);
+      if (line.endsWith('\r')) line = line.slice(0, -1);
+      processLine(line);
+    }
+    // Una coda parziale senza newline (es. output con -NoNewline) resta in
+    // _buf: la mostriamo subito se NON contiene l'inizio di un marcatore, così
+    // i comandi che non terminano con a-capo restano reattivi.
+    if (session._buf && session._buf.indexOf(META_PREFIX) === -1 && session._buf !== RDY_LINE) {
+      // niente: la teniamo finché non arriva il newline, per non spezzare un
+      // eventuale marcatore a metà. (I comandi comuni terminano con newline.)
+    }
   }
 
-  // Estrazione del SENTINEL dallo stdout senza mostrarlo all'utente. Il
-  // sentinel compare una sola volta, in coda. Tratteniamo una piccola coda
-  // (lunghezza-1 del marker) per gestire un sentinel spezzato tra due chunk.
-  let buf = '';
-  let sawSentinel = false;
-  let cwdCapture = '';
-  const HOLD = SENTINEL.length - 1;
+  function emitOut(text) {
+    if (session.current && session.current.cb.onData) {
+      session.current.cb.onData({ chunk: text, stream: 'stdout' });
+    }
+  }
 
-  child.stdout && child.stdout.setEncoding('utf8');
-  child.stderr && child.stderr.setEncoding('utf8');
+  function flushBlanks() {
+    while (session._pendingBlank > 0) { session._pendingBlank--; emitOut('\n'); }
+  }
 
-  child.stdout && child.stdout.on('data', (chunk) => {
-    if (sawSentinel) { cwdCapture += chunk; return; }
-    buf += chunk;
-    const idx = buf.indexOf(SENTINEL);
-    if (idx !== -1) {
-      const before = buf.slice(0, idx);
-      if (before) onData && onData({ chunk: before, stream: 'stdout' });
-      cwdCapture = buf.slice(idx + SENTINEL.length);
-      buf = '';
-      sawSentinel = true;
+  function processLine(line) {
+    // Riga di "pronto"/prompt: segnale di sessione operativa + da rimuovere.
+    if (line === RDY_LINE) {
+      session._pendingBlank = 0; // la riga vuota che la precede era un separatore
+      if (!session.ready) { session.ready = true; pump(); }
       return;
     }
-    if (buf.length > HOLD) {
-      const emit = buf.slice(0, buf.length - HOLD);
-      buf = buf.slice(buf.length - HOLD);
-      if (emit) onData && onData({ chunk: emit, stream: 'stdout' });
+    if (!session.ready) return; // rumore pre-pronto (es. prompt iniziale di cmd)
+
+    // Marcatore di fine comando (può essere "incollato" a output senza newline).
+    const idx = line.indexOf(META_PREFIX);
+    if (idx !== -1) {
+      const before = line.slice(0, idx);
+      if (before) { flushBlanks(); emitOut(before); }
+      session._pendingBlank = 0;
+      const rest = line.slice(idx + META_PREFIX.length);
+      const sep = rest.indexOf(':');
+      const codeStr = sep === -1 ? '' : rest.slice(0, sep);
+      const cwdStr = sep === -1 ? rest : rest.slice(sep + 1);
+      const code = codeStr === '' ? 0 : (parseInt(codeStr, 10) || 0);
+      if (cwdStr) session.cwd = cwdStr;
+      const cur = session.current;
+      session.current = null;
+      if (cur && cur.cb.onExit) cur.cb.onExit({ code, cwd: session.cwd });
+      pump();
+      return;
     }
-  });
 
-  child.stderr && child.stderr.on('data', (chunk) => {
-    onData && onData({ chunk, stream: 'stderr' });
-  });
+    // Riga vuota: differita. Se segue un prompt/marcatore la scartiamo (è un
+    // separatore), altrimenti la emettiamo quando arriva la prossima riga vera.
+    if (line === '') { session._pendingBlank++; return; }
 
-  child.on('error', (err) => {
-    onError && onError({ message: err.message || String(err) });
-  });
+    flushBlanks();
+    emitOut(line + '\n');
+  }
 
-  child.on('close', (code) => {
-    if (!sawSentinel && buf) onData && onData({ chunk: buf, stream: 'stdout' });
-    const newCwd = parseCwd(cwdCapture) || startCwd;
-    onExit && onExit({ code: code == null ? 0 : code, cwd: newCwd });
-  });
+  // ── coda comandi ──────────────────────────────────────────────────────────
+  function pump() {
+    if (session.dead || session.current || !session.ready) return;
+    const next = session.queue.shift();
+    if (!next) return;
+    session.current = next;
+    session._pendingBlank = 0;
+    try { proc.stdin.write(cfg.wrap(next.command)); }
+    catch (err) {
+      session.current = null;
+      next.cb.onError && next.cb.onError({ message: err.message || String(err) });
+    }
+  }
 
-  return {
-    write(text) {
-      try { child.stdin && child.stdin.write(text); } catch (_) {}
-    },
-    kill() {
-      try {
-        if (process.platform === 'win32' && child.pid) {
-          // taskkill /T termina anche i processi figli (npm, build, ecc.),
-          // che `child.kill()` da solo lascerebbe orfani su Windows.
-          spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true });
-        } else {
-          child.kill('SIGTERM');
-        }
-      } catch (_) {}
-    },
-  };
+  function exec(command, cb = {}) {
+    if (session.dead) {
+      cb.onError && cb.onError({ message: session._spawnError || 'shell non disponibile' });
+      return;
+    }
+    session.queue.push({ command: String(command == null ? '' : command), cb });
+    pump();
+  }
+
+  function write(text) {
+    try { proc.stdin && proc.stdin.write(String(text == null ? '' : text)); } catch (_) {}
+  }
+
+  function kill() {
+    session.dead = true;
+    try {
+      if (process.platform === 'win32' && proc.pid) {
+        // /T termina anche i figli (npm, build, ecc.) che kill() lascerebbe orfani.
+        spawn('taskkill', ['/pid', String(proc.pid), '/T', '/F'], { windowsHide: true });
+      } else {
+        proc.kill('SIGTERM');
+      }
+    } catch (_) {}
+  }
+
+  function fatal(message) {
+    session.dead = true;
+    const cur = session.current;
+    session.current = null;
+    if (cur && cur.cb.onError) cur.cb.onError({ message });
+    drainQueueErr(message);
+  }
+
+  function drainQueueErr(message) {
+    while (session.queue.length) {
+      const q = session.queue.shift();
+      q.cb.onError && q.cb.onError({ message });
+    }
+  }
+
+  return session;
 }
 
-module.exports = { runCommand, defaultCwd };
+module.exports = { createSession, defaultCwd };
