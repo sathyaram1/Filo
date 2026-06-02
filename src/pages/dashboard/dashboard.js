@@ -742,11 +742,59 @@
     bubblesEl.appendChild(out);
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
 
-    const appendOut = (chunk, isErr) => {
+    // Stato di stile ANSI per QUESTA bolla (attraversa i chunk: un colore
+    // aperto in un chunk resta valido nei successivi finché non c'è un reset).
+    const ansi = { tail: '', fg: null, bg: null, bold: false, dim: false, underline: false };
+    const applySgr = (params) => {
+      const codes = (params === '' ? '0' : params).split(';').map((x) => parseInt(x || '0', 10) || 0);
+      for (let i = 0; i < codes.length; i++) {
+        const c = codes[i];
+        if (c === 0) { ansi.fg = ansi.bg = null; ansi.bold = ansi.dim = ansi.underline = false; }
+        else if (c === 1) ansi.bold = true;
+        else if (c === 2) ansi.dim = true;
+        else if (c === 4) ansi.underline = true;
+        else if (c === 22) { ansi.bold = false; ansi.dim = false; }
+        else if (c === 24) ansi.underline = false;
+        else if (c === 39) ansi.fg = null;
+        else if (c === 49) ansi.bg = null;
+        else if (c >= 30 && c <= 37) ansi.fg = ANSI_BASE[c - 30];
+        else if (c >= 90 && c <= 97) ansi.fg = ANSI_BASE[c - 90 + 8];
+        else if (c >= 40 && c <= 47) ansi.bg = ANSI_BASE[c - 40];
+        else if (c >= 100 && c <= 107) ansi.bg = ANSI_BASE[c - 100 + 8];
+        else if (c === 38 || c === 48) {
+          const tgt = c === 38 ? 'fg' : 'bg';
+          if (codes[i + 1] === 5) { ansi[tgt] = xterm256(codes[i + 2] || 0); i += 2; }
+          else if (codes[i + 1] === 2) { ansi[tgt] = `rgb(${codes[i + 2] || 0},${codes[i + 3] || 0},${codes[i + 4] || 0})`; i += 4; }
+        }
+      }
+    };
+    const styledSpan = (text, isErr) => {
       const node = document.createElement('span');
       if (isErr) node.className = 'dash-term-err';
-      node.textContent = chunk;
-      pre.appendChild(node);
+      if (ansi.fg) node.style.color = ansi.fg;
+      if (ansi.bg) node.style.background = ansi.bg;
+      if (ansi.bold) node.style.fontWeight = '700';
+      if (ansi.dim) node.style.opacity = '0.7';
+      if (ansi.underline) node.style.textDecoration = 'underline';
+      node.textContent = text;
+      return node;
+    };
+
+    const appendOut = (chunk, isErr) => {
+      const data = ansi.tail + chunk;
+      ansi.tail = '';
+      let i = 0, plain = '';
+      const flushPlain = () => { if (plain) { pre.appendChild(styledSpan(plain, isErr)); plain = ''; } };
+      while (i < data.length) {
+        const esc = data.indexOf('\x1b', i);
+        if (esc === -1) { plain += data.slice(i); break; }
+        plain += data.slice(i, esc);
+        const seq = parseEscape(data, esc);
+        if (seq === null) { ansi.tail = data.slice(esc); break; } // troncata: rimanda
+        if (seq.sgr !== null) { flushPlain(); applySgr(seq.sgr); }
+        i = seq.end;
+      }
+      flushPlain();
       const atBottom = bubblesEl.scrollHeight - bubblesEl.scrollTop - bubblesEl.clientHeight < 40;
       if (atBottom) bubblesEl.scrollTop = bubblesEl.scrollHeight;
     };
