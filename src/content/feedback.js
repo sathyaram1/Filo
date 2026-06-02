@@ -126,6 +126,12 @@
     `;
     document.documentElement.appendChild(root);
     activeRoot = root;
+    // Entra in modalità annotazione: oscura anche la barra in alto di Filo.
+    setShellDim(true);
+    // Se la pagina viene abbandonata (navigazione o chiusura tab) senza passare
+    // da close(), il content script muore ma il velo della shell resterebbe
+    // appeso: avvisiamo esplicitamente di toglierlo.
+    window.addEventListener('pagehide', () => setShellDim(false), { once: true });
     Popup?.attachZoomCompensation?.(root);
     // Partecipa allo stacking dei popup: sopra ai box aperti prima, sotto a
     // quelli aperti dopo. Il menu contestuale (right-click) ha un proprio
