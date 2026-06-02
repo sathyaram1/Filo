@@ -816,6 +816,14 @@ async function handleMessage(msg, sender = {}) {
       const img = await tab.view.webContents.capturePage();
       return { ok: true, dataUrl: img.toDataURL() };
     }
+    case MSG.FEEDBACK_ANNOTATE: {
+      // Il box feedback è appena entrato/uscito dalla modalità annotazione.
+      // Inoltriamo alla shell (barra in alto) così l'ombra copre TUTTO Filo,
+      // non solo l'area pagina dove vive il content script.
+      const win = winOf(sender);
+      try { win?.webContents?.send('shell:feedback-dim', { on: !!msg.on }); } catch (_) {}
+      return { ok: true };
+    }
     case MSG.TEST_PROVIDER: {
       try {
         const provider = msg.provider;
