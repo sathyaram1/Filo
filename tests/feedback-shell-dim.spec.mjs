@@ -56,11 +56,12 @@ test('cambiando tab mentre il box è aperto il velo della shell non resta appeso
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
 
+  const dimAttr = shell.locator('html[data-feedback-dim="1"]');
   await page.evaluate(() => window.SN_FEEDBACK_UI.open());
-  await expect(shell.locator('#feedback-dim')).toHaveCount(1, { timeout: 4_000 });
+  await expect(dimAttr).toHaveCount(1, { timeout: 4_000 });
 
   // Apre un secondo tab: la tab attiva cambia, il content script di prima non
-  // riceve più eventi → la shell deve togliere il velo da sola.
+  // riceve più eventi → la shell deve togliere la penombra da sola.
   await openTab('filo://newtab/');
-  await expect(shell.locator('#feedback-dim')).toHaveCount(0, { timeout: 4_000 });
+  await expect(dimAttr).toHaveCount(0, { timeout: 4_000 });
 });
