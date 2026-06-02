@@ -25,6 +25,13 @@
   let activeStack = null;
   let clientIdCache = null;
 
+  // Avvisa la shell (barra in alto di Filo) che si entra/esce dalla modalità
+  // annotazione, così l'ombra copre TUTTO Filo e non solo l'area pagina dove
+  // vive questo content script.
+  function setShellDim(on) {
+    try { chrome.runtime.sendMessage({ type: MSG.FEEDBACK_ANNOTATE, on: !!on }); } catch (_) {}
+  }
+
   async function getClientId() {
     if (clientIdCache) return clientIdCache;
     try {
