@@ -113,6 +113,30 @@ test('la shell è PERSISTENTE per scheda: una variabile impostata sopravvive al 
     .toContainText('persist=vivo-5566', { timeout: 12_000 });
 });
 
+test('i colori ANSI vengono resi (niente codici grezzi nel testo visibile)', async ({ app, shell }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible({ timeout: 8_000 });
+  await setTerminal(page, true);
+  await expect(page.locator('#dashDir')).toBeVisible({ timeout: 8_000 });
+
+  // Emette ESC[31m ROSSO ESC[0m -FINE con la sintassi giusta per la shell host.
+  const win = process.platform === 'win32';
+  const cmd = win
+    ? '/echo "$([char]27)[31mROSSO$([char]27)[0m-FINE"'
+    : "/printf '\\033[31mROSSO\\033[0m-FINE\\n'";
+  await submitInput(page, cmd);
+
+  const out = page.locator('.dash-term-out').last();
+  // Il testo visibile è "ROSSO-FINE" CONTIGUO: i codici ESC[..m sono stati
+  // rimossi. Se non fossero interpretati, tra ROSSO e -FINE ci sarebbe ESC[0m
+  // e questo assert fallirebbe (oltre a comparire "[31m" grezzo).
+  await expect(out).toContainText('ROSSO-FINE', { timeout: 12_000 });
+  await expect(out).not.toContainText('[31m');
+  // "ROSSO" è dentro uno span colorato (colore inline applicato dall'SGR).
+  await expect(out.locator('span[style*="color"]')).toContainText('ROSSO');
+});
+
 test('evidenziazione live: arancione per i comandi Filo, azzurro per i comandi shell', async ({ app, shell }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
