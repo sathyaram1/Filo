@@ -373,28 +373,24 @@
   // intercetta i click (cursore a mirino) per evitare interazioni accidentali
   // con tab/indirizzo mentre si sta dando un feedback.
   if (api.onFeedbackDim) {
-    let veil = null;
-    let veilTabId = null;
-    function setVeil(on) {
+    let dimTabId = null;
+    function setDim(on) {
       if (on) {
-        if (!veil) {
-          veil = document.createElement('div');
-          veil.id = 'feedback-dim';
-          document.body.appendChild(veil);
-        }
-        veilTabId = state?.activeId ?? null;
-      } else if (veil) {
-        veil.remove();
-        veil = null;
-        veilTabId = null;
+        document.documentElement.dataset.feedbackDim = '1';
+        dimTabId = state?.activeId ?? null;
+      } else {
+        delete document.documentElement.dataset.feedbackDim;
+        dimTabId = null;
       }
     }
-    api.onFeedbackDim(setVeil);
+    api.onFeedbackDim(setDim);
     // Rete di sicurezza: se l'utente cambia tab mentre il box è aperto, il
     // content script di quella pagina non riceve più eventi e non potrà
-    // togliere il velo → lo togliamo qui appena la tab attiva cambia.
+    // togliere la penombra → la togliamo qui appena la tab attiva cambia.
     api.tabs.onUpdate((snap) => {
-      if (veil && snap && snap.activeId !== veilTabId) setVeil(false);
+      if (document.documentElement.dataset.feedbackDim && snap && snap.activeId !== dimTabId) {
+        setDim(false);
+      }
     });
   }
 
