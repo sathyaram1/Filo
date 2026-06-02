@@ -26,6 +26,27 @@ un Edit qualsiasi farà ripartire il push automatico, oppure pusha a mano:
 git -C "C:/Users/agenti AI/Desktop/Filo/Filo" push origin main
 ```
 
+## MAI committare artefatti dei test (evita i conflitti di rebase)
+
+Gli screenshot dei test sono **output rigenerato**, non sorgente. Sia le
+sessioni locali sia le routine cloud li riscrivono di continuo, quindi se
+finiscono in git generano **conflitti binari** a ogni `pull --rebase` (git
+non sa fondere due PNG diversi). È esattamente la causa dei conflitti che
+bloccavano `npm start`.
+
+Per questo TUTTE le cartelle di artefatti dei test sono gitignorate:
+`tests/.shots/`, `tests/.smoke/`, `tests/.report/`, `tests/agent/.out/`,
+`tests/agent/reports/`, `test-results/`, `.feedback-images/`.
+
+Regole:
+
+- **Non committare mai** questi file e **non rimuoverli dal `.gitignore`**.
+- Gli screenshot servono come **traccia locale della singola run**
+  (ispezionali nella cartella subito dopo il test), non come file versionati.
+- Se per qualche motivo un PNG di screenshot risulta di nuovo tracciato
+  (`git ls-files tests/.shots/` ritorna qualcosa), è un errore da correggere:
+  `git rm --cached <file>` e lascialo gitignorato.
+
 ## REGOLA DURA: niente "fatto" senza verifica
 
 **Non dichiarare mai un task completato (né tornare il controllo all'utente,
