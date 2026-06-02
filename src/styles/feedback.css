@@ -8,13 +8,22 @@
      quelli aperti dopo). Il menu contestuale (2147483646) resta sempre
      visibile sopra il modale grazie al z dedicato. */
   z-index: 2147483600;
-  background: rgba(0, 0, 0, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  /* Ombra leggera su tutta la pagina: si vede ancora cosa c'è sotto, ma è
+     chiaro che si è in "modalità annotazione". Il cursore a mirino segnala
+     che si può disegnare. */
+  background: rgba(0, 0, 0, 0.18);
+  cursor: crosshair;
   font-family: var(--sn-font);
   color: var(--sn-fg);
   animation: sn-fade-in 100ms ease-out;
+}
+
+/* Tela di disegno a mano libera: copre tutta la pagina sotto al box. */
+.sn-fb-canvas {
+  position: absolute;
+  inset: 0;
+  cursor: crosshair;
+  touch-action: none;
 }
 
 /* Lightbox per ingrandire le anteprime degli screenshot allegati */
@@ -39,8 +48,12 @@
 .sn-fb-thumb img { cursor: zoom-in; }
 
 .sn-fb-modal {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
   width: min(540px, 92vw);
-  max-height: 88vh;
+  max-height: 72vh;
   display: flex;
   flex-direction: column;
   background: var(--sn-overlay-bg);
@@ -48,53 +61,45 @@
   border-radius: var(--sn-radius);
   box-shadow: var(--sn-shadow);
   overflow: hidden;
+  cursor: default;
+}
+.sn-fb-modal.sn-fb-drop-hover {
+  outline: 2px dashed var(--sn-accent, #888);
+  outline-offset: -4px;
 }
 
-.sn-fb-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--sn-border);
-}
-
-.sn-fb-title {
-  font-weight: 600;
-  font-size: 13px;
-  letter-spacing: 0.3px;
-  text-transform: uppercase;
-  color: var(--sn-muted);
-}
-
+/* Pulsante chiusura: piccola "×" SVG flottante in alto a destra (niente più
+   barra header con titolo). */
 .sn-fb-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
   all: unset;
   cursor: pointer;
-  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
   color: var(--sn-muted);
-  font-size: 20px;
-  line-height: 1;
+  z-index: 1;
 }
-.sn-fb-close:hover { color: var(--sn-fg); }
+.sn-fb-close:hover { color: var(--sn-fg); background: rgba(127, 127, 127, 0.12); }
 
 .sn-fb-body {
-  padding: 12px 14px;
+  padding: 16px 14px 12px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-.sn-fb-hint {
-  margin: 0;
-  font-size: 12px;
-  color: var(--sn-muted);
-}
-
 .sn-fb-text {
   width: 100%;
   box-sizing: border-box;
   resize: vertical;
-  min-height: 120px;
+  min-height: 88px;
   padding: 8px 10px;
   font: inherit;
   font-size: 13px;
@@ -118,18 +123,27 @@
   gap: 10px;
 }
 
-.sn-fb-drop {
-  border: 1px dashed var(--sn-border);
-  border-radius: 6px;
-  padding: 14px;
-  text-align: center;
+/* Pulsante "Annota e allega": fa da toggle. Selezionato → bordo/accento attivo. */
+.sn-fb-attach {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.sn-fb-attach svg { display: block; }
+.sn-fb-attach.sn-fb-attach-on {
+  background: var(--sn-accent, #2f6feb);
+  color: #fff;
+  border-color: var(--sn-accent, #2f6feb);
+}
+
+.sn-fb-clear {
+  all: unset;
+  cursor: pointer;
   font-size: 12px;
   color: var(--sn-muted);
-  transition: background 100ms;
+  text-decoration: underline;
 }
-.sn-fb-drop-hover {
-  background: rgba(127, 127, 127, 0.1);
-}
+.sn-fb-clear:hover { color: var(--sn-fg); }
 
 .sn-fb-thumbs {
   display: flex;
