@@ -49,6 +49,12 @@
     // Invio feedback alpha → Firestore/Storage. Va instradato dal main process
     // perché le CSP delle pagine ospiti bloccano fetch diretti dal preload.
     SUBMIT_FEEDBACK: 'submit_feedback',           // { text, url, title, userAgent, clientId, images: [{dataUrl}] }
+    // Entra/esce dalla "modalità annotazione" del box feedback: il box vive in
+    // un content script sulla pagina (WebContentsView) e da lì non può oscurare
+    // la barra in alto di Filo (renderizzata dalla shell). Questo messaggio fa
+    // da ponte: il main lo inoltra alla shell, che mostra/nasconde un velo
+    // d'ombra sopra la sua barra così TUTTO Filo entra in penombra. → { ok }
+    FEEDBACK_ANNOTATE: 'feedback_annotate',       // { on: boolean }
     // Triage admin di un feedback (cambio stato/note/priorità). Instradato dal
     // main, che allega il Firebase ID token come Bearer e RIFIUTA se l'utente
     // loggato non è admin. → { ok } | { ok:false, error }
