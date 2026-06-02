@@ -289,3 +289,20 @@ html[data-incognito="1"] {
   --tab-active: #2a2438;
   --border: #46395f;
 }
+
+/* ── Velo "modalità annotazione" del box feedback ──────────────────────────
+   Aggiunto/rimosso da shell.js su `shell:feedback-dim`. Copre l'intera shell
+   (visibilmente: la barra in alto, l'unica parte di shell non coperta dalla
+   WebContentsView) con la STESSA ombra che il box feedback applica all'area
+   pagina (rgba(0,0,0,0.18)): così tutto Filo va in penombra uniforme quando si
+   sta annotando. Intercetta i click col cursore a mirino per impedire
+   interazioni accidentali con tab/indirizzo durante il feedback. */
+#feedback-dim {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483600;
+  background: rgba(0, 0, 0, 0.18);
+  cursor: crosshair;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
