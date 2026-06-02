@@ -290,19 +290,16 @@ html[data-incognito="1"] {
   --border: #46395f;
 }
 
-/* ── Velo "modalità annotazione" del box feedback ──────────────────────────
-   Aggiunto/rimosso da shell.js su `shell:feedback-dim`. Copre l'intera shell
-   (visibilmente: la barra in alto, l'unica parte di shell non coperta dalla
-   WebContentsView) con la STESSA ombra che il box feedback applica all'area
-   pagina (rgba(0,0,0,0.18)): così tutto Filo va in penombra uniforme quando si
-   sta annotando. Intercetta i click col cursore a mirino per impedire
-   interazioni accidentali con tab/indirizzo durante il feedback. */
-#feedback-dim {
-  position: fixed;
-  inset: 0;
-  z-index: 2147483600;
-  background: rgba(0, 0, 0, 0.18);
-  cursor: crosshair;
-  -webkit-app-region: no-drag;
-  app-region: no-drag;
+/* ── Penombra "modalità annotazione" del box feedback ──────────────────────
+   shell.js mette/toglie data-feedback-dim sul <html> quando il box feedback
+   entra/esce dalla modalità annotazione (evento `shell:feedback-dim` dal main).
+   La barra in alto è l'unica parte di shell non coperta dalla WebContentsView,
+   ed è in gran parte una regione draggabile (-webkit-app-region: drag) che il
+   compositore disegna SOPRA qualsiasi overlay web: per oscurarla davvero non si
+   può sovrapporre un velo, va scurita alla fonte con un filtro brightness.
+   Così tutto Filo va in penombra leggera, in pendant con l'ombra che il box
+   applica all'area pagina. */
+html[data-feedback-dim="1"] .shell {
+  filter: brightness(0.82);
+  transition: filter 120ms ease-out;
 }
