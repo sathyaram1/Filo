@@ -97,8 +97,9 @@ Regole pratiche:
 
 - **Se in cloud (Playwright headless)**: per UI che cambia visivamente, oltre
   agli assert salva `page.screenshot()` in `tests/.shots/` come traccia
-  ispezionabile (non è il primary signal, ma cattura regressioni visive che
-  gli assert non vedono).
+  ispezionabile della run (la cartella è **gitignorata**: lo screenshot resta
+  locale all'esecuzione e non va committato). Non è il primary signal, ma
+  cattura regressioni visive che gli assert non vedono.
 
 ## Sintomo vs causa: l'obiettivo è migliorare l'app, non chiudere il feedback
 
