@@ -108,8 +108,9 @@ function registerIpcHandlers() {
   });
 
   // ─── shell (modalità terminale della dashboard) ──────────────────────────
-  // Esegue un comando in streaming. SOLO per le pagine interne fidate
-  // (filo://): le pagine web esterne NON devono poter avviare una shell.
+  // Esegue un comando in streaming su una shell PERSISTENTE per scheda. SOLO
+  // per le pagine interne fidate (filo://): le pagine web esterne NON devono
+  // poter avviare una shell.
   ipcMain.handle('shell:start', (event, { execId, command, cwd, shell } = {}) => {
     const url = event.sender.getURL() || '';
     if (!url.startsWith('filo://')) return { ok: false, error: 'forbidden' };
@@ -117,12 +118,28 @@ function registerIpcHandlers() {
     const send = (suffix, data) => {
       try { event.sender.send(`shell:${execId}:${suffix}`, data); } catch (_) {}
     };
-    const handle = runCommand({ shell, command, cwd }, {
+    const key = event.sender.id;
+    const wantShell = shell || 'powershell';
+    let session = shellSessions.get(key);
+    // (Ri)crea la sessione se manca, è morta o l'utente ha cambiato shell nelle
+    // Preferenze. La cwd passata serve solo allo spawn iniziale: per una
+    // sessione viva è la sessione stessa a tenere la directory (cd persiste).
+    if (!session || session.dead || session.shell !== wantShell) {
+      if (session) { try { session.kill(); } catch (_) {} }
+      session = createSession({ shell: wantShell, cwd });
+      shellSessions.set(key, session);
+      // La shell muore con la scheda: chiudere la scheda è il modo più
+      // intuitivo per uccidere un processo collegato.
+      event.sender.once('destroyed', () => {
+        const s = shellSessions.get(key);
+        if (s) { try { s.kill(); } catch (_) {} shellSessions.delete(key); }
+      });
+    }
+    session.exec(command, {
       onData: (d) => send('data', d),
-      onExit: (e) => { shellSessions.delete(execId); send('exit', e); },
-      onError: (e) => { shellSessions.delete(execId); send('error', e); },
+      onExit: (e) => send('exit', e),
+      onError: (e) => send('error', e),
     });
-    shellSessions.set(execId, handle);
     return { ok: true };
   });
 
@@ -131,14 +148,19 @@ function registerIpcHandlers() {
     try { return { ok: true, cwd: defaultCwd() }; } catch (_) { return { ok: false }; }
   });
 
-  ipcMain.on('shell:input', (_event, { execId, text } = {}) => {
-    const h = shellSessions.get(execId);
-    if (h) h.write(String(text == null ? '' : text));
+  // Testo grezzo verso lo stdin del comando interattivo in corso (casella stdin).
+  ipcMain.on('shell:input', (event, { text } = {}) => {
+    const s = shellSessions.get(event.sender.id);
+    if (s) s.write(String(text == null ? '' : text));
   });
 
-  ipcMain.on('shell:abort', (_event, { execId } = {}) => {
-    const h = shellSessions.get(execId);
-    if (h) { h.kill(); shellSessions.delete(execId); }
+  // Stop: uccide l'intera shell della scheda (e l'albero di processi). Il
+  // comando successivo ne ricrea una pulita; la cwd è preservata dalla
+  // dashboard (che la ripassa). Le variabili impostate prima dello Stop vanno
+  // perse: è il compromesso per un'interruzione affidabile su Windows.
+  ipcMain.on('shell:abort', (event) => {
+    const s = shellSessions.get(event.sender.id);
+    if (s) { try { s.kill(); } catch (_) {} shellSessions.delete(event.sender.id); }
   });
 
   // ─── tab control dalla shell ─────────────────────────────────────────────
