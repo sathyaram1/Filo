@@ -30,29 +30,26 @@ test('aprendo il box feedback la barra in alto di Filo va in penombra; chiudendo
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
 
-  // Prima dell'apertura: nessun velo sulla shell.
-  await expect(shell.locator('#feedback-dim')).toHaveCount(0);
+  const shellHeader = shell.locator('header.shell');
+  const isDimmed = () => shell.evaluate(() =>
+    document.documentElement.dataset.feedbackDim === '1'
+    && getComputedStyle(document.querySelector('header.shell')).filter.includes('brightness'));
+
+  // Prima dell'apertura: la barra in alto è a piena luminosità.
+  await expect(shellHeader).toHaveCount(1, { timeout: 8_000 });
+  expect(await isDimmed()).toBe(false);
 
   await page.evaluate(() => window.SN_FEEDBACK_UI.open());
   await expect(page.locator('.sn-fb-modal')).toBeVisible();
 
-  // La shell (barra in alto di Filo) ora è coperta dal velo d'ombra, che è
-  // semi-trasparente e mostra il cursore a mirino (modalità annotazione).
-  const veil = shell.locator('#feedback-dim');
-  await expect(veil).toHaveCount(1, { timeout: 4_000 });
-  const style = await veil.evaluate((el) => {
-    const cs = getComputedStyle(el);
-    return { cursor: cs.cursor, position: cs.position, bg: cs.backgroundColor };
-  });
-  expect(style.cursor).toBe('crosshair');
-  expect(style.position).toBe('fixed');
-  // Sfondo nero semi-trasparente: si vede ancora sotto.
-  expect(style.bg).toMatch(/rgba?\(0,\s*0,\s*0/);
+  // La barra in alto di Filo ora è in penombra (filtro brightness applicato),
+  // non solo l'area pagina: tutto Filo entra in modalità annotazione.
+  await expect.poll(isDimmed, { timeout: 4_000 }).toBe(true);
 
-  // Chiudendo il box il velo della shell sparisce: Filo torna luminoso.
+  // Chiudendo il box la penombra della shell sparisce: Filo torna luminoso.
   await page.evaluate(() => window.SN_FEEDBACK_UI.close());
   await expect(page.locator('.sn-fb-modal')).toHaveCount(0);
-  await expect(veil).toHaveCount(0, { timeout: 4_000 });
+  await expect.poll(isDimmed, { timeout: 4_000 }).toBe(false);
 });
 
 test('cambiando tab mentre il box è aperto il velo della shell non resta appeso', async ({ app, shell, openTab }) => {
