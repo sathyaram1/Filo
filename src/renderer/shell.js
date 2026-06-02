@@ -365,6 +365,28 @@
   });
   api.tabs.snapshot().then((snap) => { state = snap; render(); });
 
+  // ─── Velo d'ombra "modalità annotazione" feedback ──────────────────────────
+  // Il box feedback vive in un content script sulla pagina e da lì oscura solo
+  // l'area pagina. Quando si apre, il main ci avvisa via `shell:feedback-dim`
+  // così copriamo ANCHE la barra in alto di Filo con lo stesso velo: tutta la
+  // app entra in penombra, segnalando che si è in modalità annotazione. Il velo
+  // intercetta i click (cursore a mirino) per evitare interazioni accidentali
+  // con tab/indirizzo mentre si sta dando un feedback.
+  if (api.onFeedbackDim) {
+    let veil = null;
+    api.onFeedbackDim((on) => {
+      if (on) {
+        if (veil) return;
+        veil = document.createElement('div');
+        veil.id = 'feedback-dim';
+        document.body.appendChild(veil);
+      } else if (veil) {
+        veil.remove();
+        veil = null;
+      }
+    });
+  }
+
   // ─── Chip "popup bloccato" ─────────────────────────────────────────────
   // Quando il main blocca un window.open() non richiesto invia
   // 'tabs:popup-blocked' con { tabId, url, host }. Mostriamo una chip ancorata
