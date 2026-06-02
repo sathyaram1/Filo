@@ -56,6 +56,7 @@
     activeStack = null;
     activeRoot.remove();
     activeRoot = null;
+    setShellDim(false);
   }
 
   function blobToDataUrl(blob) {
