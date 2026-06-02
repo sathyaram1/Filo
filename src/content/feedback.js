@@ -1,17 +1,25 @@
 // Modale "Invia feedback" per l'alpha test.
 // Aperta dalla voce di menu omonima. Permette:
-//   - testo libero
-//   - allegare screenshot della tab corrente
-//   - incollare/trascinare immagini (Ctrl+V o drop)
+//   - testo libero (persistito tra aperture e riavvii)
+//   - annotare lo schermo a mano libera (disegno) e allegare lo screenshot
+//     annotato in un colpo solo (il pulsante "Annota e allega" fa da toggle)
+//   - incollare/trascinare immagini (Ctrl+V o drop ovunque dentro il box)
 // Invio → upload immagini su Firebase Storage + record su Firestore.
 
 (function (global) {
   'use strict';
 
   const { MSG } = global.SN_MSG;
-  const I18n = global.SN_I18N;
   const Popup = global.SN_POPUP;
   const Feedback = global.SN_FEEDBACK;
+  const Icons = global.SN_ICONS || {};
+
+  // Chiave storage per la bozza di testo: sopravvive a chiusura/riapertura del
+  // box e al riavvio di Filo (chrome.storage.local → storage.json).
+  const DRAFT_KEY = 'sn_feedback_draft_text';
+  // Colore/tratto del disegno di annotazione.
+  const STROKE_COLOR = '#ff3b30';
+  const STROKE_WIDTH = 3;
 
   let activeRoot = null;
   let activeStack = null;
@@ -78,25 +86,27 @@
     }
   }
 
+  function icon(name, size) {
+    try { return typeof Icons[name] === 'function' ? Icons[name](size) : ''; }
+    catch (_) { return ''; }
+  }
+
   function open() {
     if (activeRoot) return;
     const root = document.createElement('div');
     root.className = 'sn-fb-overlay';
     root.dataset.snTheme = document.documentElement.dataset.snTheme || '';
     root.innerHTML = `
-      <div class="sn-fb-modal" role="dialog" aria-modal="true">
-        <div class="sn-fb-header">
-          <span class="sn-fb-title">Invia feedback (alpha)</span>
-          <button type="button" class="sn-fb-close" aria-label="Chiudi">×</button>
-        </div>
+      <canvas class="sn-fb-canvas"></canvas>
+      <div class="sn-fb-modal" role="dialog" aria-modal="true" aria-label="Invia feedback">
+        <button type="button" class="sn-fb-close" aria-label="Chiudi">${icon('close', 18)}</button>
         <div class="sn-fb-body">
-          <p class="sn-fb-hint">Descrivi il problema o l'idea. Puoi incollare (Ctrl+V) o trascinare immagini qui sotto.</p>
-          <textarea class="sn-fb-text" rows="6" placeholder="Cosa è successo? Cosa ti aspettavi?"></textarea>
+          <textarea class="sn-fb-text" rows="4" placeholder="Cosa è successo? Cosa ti aspettavi?"></textarea>
           <div class="sn-fb-tools">
-            <button type="button" class="sn-fb-btn-secondary sn-fb-attach">📷 Allega screenshot</button>
+            <button type="button" class="sn-fb-btn-secondary sn-fb-attach" aria-pressed="false">${icon('screenshot', 16)}<span>Annota e allega</span></button>
+            <button type="button" class="sn-fb-clear" hidden>Cancella disegno</button>
             <span class="sn-fb-meta"></span>
           </div>
-          <div class="sn-fb-drop">Trascina o incolla immagini qui</div>
           <div class="sn-fb-thumbs"></div>
           <div class="sn-fb-status" aria-live="polite"></div>
         </div>
@@ -117,16 +127,117 @@
     const modal = root.querySelector('.sn-fb-modal');
     const textEl = root.querySelector('.sn-fb-text');
     const thumbsEl = root.querySelector('.sn-fb-thumbs');
-    const dropEl = root.querySelector('.sn-fb-drop');
     const statusEl = root.querySelector('.sn-fb-status');
     const sendBtn = root.querySelector('.sn-fb-send');
     const attachBtn = root.querySelector('.sn-fb-attach');
+    const clearBtn = root.querySelector('.sn-fb-clear');
     const closeBtn = root.querySelector('.sn-fb-close');
     const cancelBtn = root.querySelector('.sn-fb-cancel');
+    const canvas = root.querySelector('.sn-fb-canvas');
 
-    // stato locale: data URLs delle immagini selezionate
+    // stato locale: data URLs delle immagini incollate/trascinate
     const images = [];
     const MAX_IMAGES = 5;
+
+    // ---- bozza di testo persistente ----
+    let saveTimer = null;
+    function saveDraft() {
+      try { chrome.storage.local.set({ [DRAFT_KEY]: textEl.value }); } catch (_) {}
+    }
+    function clearDraft() {
+      try { chrome.storage.local.remove([DRAFT_KEY]); } catch (_) {}
+    }
+    textEl.addEventListener('input', () => {
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(saveDraft, 250);
+    });
+    // Ripristina l'eventuale bozza salvata (solo se l'utente non ha già scritto).
+    try {
+      chrome.storage.local.get([DRAFT_KEY]).then((r) => {
+        const saved = r?.[DRAFT_KEY];
+        if (saved && activeRoot === root && !textEl.value) textEl.value = saved;
+      }).catch(() => {});
+    } catch (_) {}
+
+    // ---- disegno (annotazione a mano libera sullo schermo) ----
+    const ctx = canvas.getContext('2d');
+    const strokes = []; // [{ color, width, points: [{x,y}] }] in coordinate viewport CSS
+    let drawing = false;
+    let curStroke = null;
+    let includeShot = false; // se true → all'invio allega lo screenshot annotato
+
+    function sizeCanvas() {
+      const dpr = window.devicePixelRatio || 1;
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      canvas.width = Math.max(1, Math.round(w * dpr));
+      canvas.height = Math.max(1, Math.round(h * dpr));
+      canvas.style.width = w + 'px';
+      canvas.style.height = h + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      redraw();
+    }
+    function redraw() {
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.restore();
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      for (const s of strokes) {
+        if (s.points.length < 1) continue;
+        ctx.strokeStyle = s.color;
+        ctx.lineWidth = s.width;
+        ctx.beginPath();
+        s.points.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+        // Un singolo punto: disegna un puntino.
+        if (s.points.length === 1) { ctx.lineTo(s.points[0].x + 0.1, s.points[0].y + 0.1); }
+        ctx.stroke();
+      }
+    }
+    function hasDrawing() { return strokes.some((s) => s.points.length > 0); }
+
+    function setInclude(on) {
+      includeShot = !!on;
+      attachBtn.classList.toggle('sn-fb-attach-on', includeShot);
+      attachBtn.setAttribute('aria-pressed', includeShot ? 'true' : 'false');
+    }
+    function refreshClear() {
+      clearBtn.hidden = !hasDrawing();
+    }
+
+    canvas.addEventListener('pointerdown', (e) => {
+      drawing = true;
+      curStroke = { color: STROKE_COLOR, width: STROKE_WIDTH, points: [{ x: e.clientX, y: e.clientY }] };
+      strokes.push(curStroke);
+      try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+      e.preventDefault();
+    });
+    canvas.addEventListener('pointermove', (e) => {
+      if (!drawing || !curStroke) return;
+      curStroke.points.push({ x: e.clientX, y: e.clientY });
+      redraw();
+    });
+    function endStroke() {
+      if (!drawing) return;
+      drawing = false;
+      curStroke = null;
+      // Appena si disegna qualcosa, il pulsante "Annota e allega" si seleziona
+      // da solo: allegheremo lo screenshot annotato all'invio.
+      if (hasDrawing()) setInclude(true);
+      refreshClear();
+    }
+    canvas.addEventListener('pointerup', endStroke);
+    canvas.addEventListener('pointercancel', endStroke);
+    window.addEventListener('resize', sizeCanvas);
+    sizeCanvas();
+
+    clearBtn.addEventListener('click', () => {
+      strokes.length = 0;
+      redraw();
+      refreshClear();
+      setInclude(false);
+    });
 
     function renderThumbs() {
       // Revoca eventuali object URL precedenti per evitare leak
@@ -170,14 +281,49 @@
       renderThumbs();
     }
 
+    // Compone lo screenshot della tab con sopra i tratti disegnati, in scala.
+    function composeAnnotated(shotDataUrl) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const w = img.naturalWidth || window.innerWidth;
+            const h = img.naturalHeight || window.innerHeight;
+            const c = document.createElement('canvas');
+            c.width = w; c.height = h;
+            const cx = c.getContext('2d');
+            cx.drawImage(img, 0, 0, w, h);
+            const sx = w / Math.max(1, window.innerWidth);
+            const sy = h / Math.max(1, window.innerHeight);
+            cx.lineCap = 'round';
+            cx.lineJoin = 'round';
+            for (const s of strokes) {
+              if (s.points.length < 1) continue;
+              cx.strokeStyle = s.color;
+              cx.lineWidth = s.width * Math.max(sx, sy);
+              cx.beginPath();
+              s.points.forEach((p, i) => (i ? cx.lineTo(p.x * sx, p.y * sy) : cx.moveTo(p.x * sx, p.y * sy)));
+              if (s.points.length === 1) cx.lineTo(s.points[0].x * sx + 0.1, s.points[0].y * sy + 0.1);
+              cx.stroke();
+            }
+            resolve(c.toDataURL('image/png'));
+          } catch (_) {
+            resolve(shotDataUrl);
+          }
+        };
+        img.onerror = () => resolve(shotDataUrl);
+        img.src = shotDataUrl;
+      });
+    }
+
     // Chiusura
     closeBtn.addEventListener('click', close);
     cancelBtn.addEventListener('click', close);
     // Niente chiusura su click backdrop: si chiude solo con × o Annulla
     // (Esc resta disponibile come scorciatoia).
     function closeLightbox(lb) {
-      const img = lb.querySelector('img');
-      if (img) { try { URL.revokeObjectURL(img.src); } catch (_) {} }
+      const im = lb.querySelector('img');
+      if (im) { try { URL.revokeObjectURL(im.src); } catch (_) {} }
       lb.remove();
     }
     function openLightbox(dataUrl) {
@@ -231,43 +377,28 @@
       }
     });
 
-    // Drag & drop
-    ['dragenter', 'dragover'].forEach((ev) => dropEl.addEventListener(ev, (e) => {
-      e.preventDefault(); dropEl.classList.add('sn-fb-drop-hover');
+    // Drag & drop: si può trascinare un'immagine OVUNQUE dentro il box (niente
+    // più riquadro dedicato).
+    ['dragenter', 'dragover'].forEach((ev) => modal.addEventListener(ev, (e) => {
+      e.preventDefault(); modal.classList.add('sn-fb-drop-hover');
     }));
-    ['dragleave', 'drop'].forEach((ev) => dropEl.addEventListener(ev, (e) => {
-      e.preventDefault(); dropEl.classList.remove('sn-fb-drop-hover');
+    ['dragleave', 'drop'].forEach((ev) => modal.addEventListener(ev, (e) => {
+      e.preventDefault(); modal.classList.remove('sn-fb-drop-hover');
     }));
-    dropEl.addEventListener('drop', async (e) => {
+    modal.addEventListener('drop', async (e) => {
       const files = e.dataTransfer?.files;
-      if (!files) return;
+      if (!files || !files.length) return;
       for (const f of files) await addImageFromBlob(f);
     });
 
-    // Screenshot
-    attachBtn.addEventListener('click', async () => {
-      attachBtn.disabled = true;
-      const prev = attachBtn.textContent;
-      attachBtn.textContent = '…';
-      // Nascondiamo l'intero overlay (modal + backdrop scuro) per non
-      // includere l'ombreggiatura nello screenshot.
-      root.style.visibility = 'hidden';
-      await new Promise((r) => setTimeout(r, 60));
-      const dataUrl = await captureScreenshot();
-      root.style.visibility = '';
-      attachBtn.textContent = prev;
-      attachBtn.disabled = false;
-      if (!dataUrl) { statusEl.textContent = 'Screenshot non disponibile su questa pagina.'; return; }
-      if (images.length >= MAX_IMAGES) { statusEl.textContent = `Massimo ${MAX_IMAGES} immagini.`; return; }
-      images.push({ dataUrl });
-      renderThumbs();
-    });
+    // "Annota e allega": toggle che decide se allegare lo screenshot annotato.
+    attachBtn.addEventListener('click', () => setInclude(!includeShot));
 
     // Invio
     sendBtn.addEventListener('click', async () => {
       const text = textEl.value.trim();
-      if (!text && images.length === 0) {
-        statusEl.textContent = 'Scrivi qualcosa o allega un\'immagine.';
+      if (!text && images.length === 0 && !includeShot) {
+        statusEl.textContent = 'Scrivi qualcosa, allega un\'immagine o annota lo schermo.';
         return;
       }
       sendBtn.disabled = true;
@@ -275,6 +406,22 @@
       statusEl.textContent = 'Invio in corso…';
       try {
         const clientId = await getClientId();
+        // Costruisce la lista immagini: incollate/trascinate + (se selezionato)
+        // lo screenshot della pagina con sopra il disegno.
+        const outImages = images.slice();
+        if (includeShot) {
+          // Nascondiamo l'overlay (box + ombra) per non includerlo nello scatto.
+          root.style.visibility = 'hidden';
+          await new Promise((r) => setTimeout(r, 60));
+          const shot = await captureScreenshot();
+          root.style.visibility = '';
+          if (shot) {
+            const annotated = await composeAnnotated(shot);
+            if (outImages.length < MAX_IMAGES) outImages.push({ dataUrl: annotated });
+          } else {
+            statusEl.textContent = 'Screenshot non disponibile su questa pagina.';
+          }
+        }
         // Routing via main process: la CSP della pagina ospite blocca fetch
         // diretti verso firestore/firebasestorage dal preload. Il main usa
         // undici (Node) e non è soggetto alla CSP della pagina.
@@ -284,11 +431,12 @@
           title: document.title,
           userAgent: navigator.userAgent,
           clientId,
-          images,
+          images: outImages,
         };
         const res = await chrome.runtime.sendMessage({ type: MSG.SUBMIT_FEEDBACK, payload });
         if (!res?.ok) throw new Error(res?.error || 'invio fallito');
         statusEl.textContent = '';
+        clearDraft();
         close();
         Popup?.showToast?.('Grazie! Feedback inviato.', { duration: 2500 });
       } catch (e) {
