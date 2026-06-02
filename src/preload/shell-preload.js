@@ -36,6 +36,13 @@ contextBridge.exposeInMainWorld('filoShell', {
   },
   tooltipShow: (text, x, y) => ipcRenderer.send('shell:tooltip-show', { text, x, y }),
   tooltipHide: () => ipcRenderer.send('shell:tooltip-hide'),
+  // Modalità annotazione del box feedback: la shell mette/toglie un velo
+  // d'ombra sopra la propria barra in alto così tutto Filo va in penombra.
+  onFeedbackDim: (fn) => {
+    const wrapped = (_event, info) => { try { fn(!!info?.on); } catch (_) {} };
+    ipcRenderer.on('shell:feedback-dim', wrapped);
+    return () => ipcRenderer.removeListener('shell:feedback-dim', wrapped);
+  },
   window: {
     minimize: () => ipcRenderer.invoke('window:minimize'),
     toggleMaximize: () => ipcRenderer.invoke('window:toggle-maximize'),
