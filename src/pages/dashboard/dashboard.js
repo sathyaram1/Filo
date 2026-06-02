@@ -667,6 +667,44 @@
     updateDirLine();
   }
 
+  // ===== Rendering colori ANSI (SGR) per l'output del terminale =====
+  // Niente emulazione TUI: interpretiamo solo le sequenze di colore/stile
+  // (ESC[…m) e SCARTIAMO il resto (movimenti cursore, OSC…), così i tool che
+  // colorano (git, ls --color, eslint…) si vedono giusti senza che i codici
+  // grezzi sporchino l'output. Le altre sequenze a schermo intero non servono.
+  const ANSI_BASE = ['#1e1e1e', '#cc4136', '#4e9a06', '#c4a000', '#3465a4',
+    '#a347ba', '#0e9aa7', '#d3d7cf', '#6e7170', '#ef5350', '#8ae234',
+    '#e6d44e', '#5a9ee6', '#c77fd6', '#34e2e2', '#fafafa'];
+  function xterm256(n) {
+    if (n < 16) return ANSI_BASE[n];
+    if (n >= 232) { const v = 8 + (n - 232) * 10; return `rgb(${v},${v},${v})`; }
+    const k = n - 16, L = [0, 95, 135, 175, 215, 255];
+    return `rgb(${L[Math.floor(k / 36) % 6]},${L[Math.floor(k / 6) % 6]},${L[k % 6]})`;
+  }
+  // Trova una sequenza ESC a partire da `pos` (dove s[pos] === ESC). Ritorna
+  // { end, sgr } oppure null se la sequenza è troncata a fine chunk (da
+  // ricomporre col chunk successivo).
+  function parseEscape(s, pos) {
+    if (pos + 1 >= s.length) return null;
+    const c = s[pos + 1];
+    if (c === '[') { // CSI
+      let j = pos + 2;
+      while (j < s.length && !(s.charCodeAt(j) >= 0x40 && s.charCodeAt(j) <= 0x7e)) j++;
+      if (j >= s.length) return null;
+      return { end: j + 1, sgr: s[j] === 'm' ? s.slice(pos + 2, j) : null };
+    }
+    if (c === ']') { // OSC: fino a BEL o ST (ESC \)
+      let j = pos + 2;
+      while (j < s.length) {
+        if (s[j] === '\x07') return { end: j + 1, sgr: null };
+        if (s[j] === '\x1b') { if (j + 1 >= s.length) return null; if (s[j + 1] === '\\') return { end: j + 2, sgr: null }; }
+        j++;
+      }
+      return null;
+    }
+    return { end: pos + 2, sgr: null }; // sequenza a due byte (ESC c, ESC 7…)
+  }
+
   function runShellCommand(command) {
     if (!command) return;
     if (body.dataset.state !== 'thread') goThread();
