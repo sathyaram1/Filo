@@ -8,16 +8,19 @@
 //   ai-stream:abort  — send({ requestId })
 //   tabs:*           — controllo del TabManager dalla shell renderer.
 
-const { ipcMain, BrowserWindow } = require('electron');
+const { ipcMain, BrowserWindow, app } = require('electron');
 const path = require('node:path');
 const { handleMessage, handleStream, broadcastToTabs } = require('./services/handlers');
 const { showPopupMenu } = require('./popup-menu');
 const { showTooltip, hideTooltip } = require('./popup-tooltip');
-const { runCommand, defaultCwd } = require('./services/shell');
+const { createSession, defaultCwd } = require('./services/shell');
 const DiskStorage = require('./shim/storage');
 
 const inFlightStreams = new Map(); // requestId → AbortController
-const shellSessions = new Map(); // execId → handle shell in esecuzione
+// Una shell PERSISTENTE per scheda, chiavata sull'id del WebContents che la
+// possiede: i comandi successivi della stessa scheda riusano lo stesso
+// processo (variabili, $env, cwd persistono). Muore alla chiusura della scheda.
+const shellSessions = new Map(); // webContents.id → sessione shell persistente
 
 function senderInfo(event) {
   const wc = event.sender;
