@@ -199,22 +199,36 @@
 
   const MARK_TAGS = { B: 'bold', STRONG: 'bold', I: 'italic', EM: 'italic', U: 'underline', S: 'strike', STRIKE: 'strike', DEL: 'strike' };
 
+  // Le marche sono oggetti { type, attrs? }: i tag (B/I/U/S) producono marche
+  // semplici; il font-size — applicato come stile inline su uno <span>/<font> —
+  // diventa una marca con attrs.size così sopravvive al round-trip.
   function inlineToPM(parent, marks) {
     const out = [];
     parent.childNodes.forEach((node) => {
       if (node.nodeType === Node.TEXT_NODE) {
-        if (node.nodeValue) out.push({ type: 'text', text: node.nodeValue, ...(marks.length ? { marks: marks.map((m) => ({ type: m })) } : {}) });
+        if (node.nodeValue) out.push({ type: 'text', text: node.nodeValue, ...(marks.length ? { marks: marks.map((m) => ({ type: m.type, ...(m.attrs ? { attrs: m.attrs } : {}) })) } : {}) });
         return;
       }
       if (node.nodeType !== Node.ELEMENT_NODE) return;
       const el = node;
       if (el.classList && el.classList.contains('ed-collapse-toggle')) return;
       if (el.tagName === 'BR') { out.push({ type: 'hardBreak' }); return; }
+      let next = marks;
       const extra = MARK_TAGS[el.tagName];
-      const nextMarks = extra && !marks.includes(extra) ? [...marks, extra] : marks;
-      out.push(...inlineToPM(el, nextMarks));
+      if (extra && !next.some((m) => m.type === extra)) next = [...next, { type: extra }];
+      const fs = el.style && el.style.fontSize;
+      if (fs) next = [...next.filter((m) => m.type !== 'fontSize'), { type: 'fontSize', attrs: { size: fs } }];
+      out.push(...inlineToPM(el, next));
     });
     return out;
+  }
+
+  // Allineamento di un blocco: legge lo stile inline text-align (o l'attributo
+  // align legacy). Ritorna '' se non impostato o non valido.
+  function blockAlign(el) {
+    let a = (el.style && el.style.textAlign) || (el.getAttribute && el.getAttribute('align')) || '';
+    a = String(a).toLowerCase();
+    return ['left', 'center', 'right', 'justify'].includes(a) ? a : '';
   }
 
   function htmlToPM(container) {
