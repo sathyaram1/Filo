@@ -182,6 +182,7 @@ const API = {
   evaluate: engine.evaluate,
   recordCert,
   setProviders,
+  configure,
   // cache (per test / invalidazione)
   _caches: { gsbCache, ageCache, certCache, sandboxCache, llmCache },
   // sotto-moduli (per test)
