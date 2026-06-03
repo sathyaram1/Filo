@@ -259,6 +259,11 @@
     // La shell ci dice se c'è (o non c'è più) un disegno sulla barra in alto,
     // così "Cancella disegno" compare anche quando si è disegnato SOLO lassù.
     function onBroadcast(message) {
+      // Auto-rimozione quando il box non è più questo (chiuso/riaperto).
+      if (activeRoot !== root) {
+        try { chrome.runtime.onMessage.removeListener(onBroadcast); } catch (_) {}
+        return;
+      }
       if (message?.type === MSG.FEEDBACK_DRAW_STATE) {
         topbarHasDrawing = !!message.topbar;
         refreshClear();
