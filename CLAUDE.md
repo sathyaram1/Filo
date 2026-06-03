@@ -446,8 +446,8 @@ Per ogni feedback `todo`:
    locale dopo aver applicato, vedi sopra. Nelle `notes` scrivi un breve report
    (vedi "Tono dei report e delle notes"): cosa vedrà l'utente di diverso, cosa
    hai aggiunto oltre il chiesto, come l'hai testato. La decisione finisce nella
-   coda `feedback-triage/` e diventa effettiva su Firestore quando l'owner esegue
-   `npm run feedback:apply`. Stesso meccanismo per `clarify`.
+   coda `feedback-triage/` e diventa effettiva su Firestore in automatico, via la
+   GitHub Action, entro ~1-2 minuti dal push. Stesso meccanismo per `clarify`.
 
 **Insistere prima di mollare (vale soprattutto per routine cloud):**
 non abbandonare al primo intoppo. Se un test fallisce, capisci perché e
