@@ -176,6 +176,7 @@ function getPublicForAdmin() {
       gemini: Boolean(eff.apiKeys.gemini),
       tavily: Boolean(eff.apiKeys.tavily),
     },
+    safeBrowsingKeyPresent: Boolean(eff.safeBrowsingKey),
   };
 }
 
