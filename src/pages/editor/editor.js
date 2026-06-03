@@ -305,7 +305,7 @@
           }).join('');
           return `<${tag}>${lis}</${tag}>`;
         }
-        default: return `<p>${inner}</p>`;
+        default: return `<p${alignStyle}>${inner}</p>`;
       }
     }).join('') || '<p></p>';
   }
