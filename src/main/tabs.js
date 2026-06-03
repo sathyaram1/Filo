@@ -413,8 +413,26 @@ class TabManager {
     });
     wc.on('page-title-updated', (_e, title) => update({ title: title || tab.title }));
     wc.on('page-favicon-updated', (_e, favicons) => update({ favicon: favicons?.[0] || '' }));
-    wc.on('did-navigate', (_e, url) => update({ url, canBack: canGoBack(wc), canFwd: canGoFwd(wc) }));
+    wc.on('did-navigate', (_e, url) => {
+      update({ url, canBack: canGoBack(wc), canFwd: canGoFwd(wc) });
+      // Rilevamento siti pericolosi: ricontrolla l'URL FINALE (dopo i redirect)
+      // appena il main-frame si è committato, prima che la pagina sia
+      // interattiva. Best-effort, non blocca mai (vedi _sbOnNavigate).
+      this._sbOnNavigate(tab, url);
+    });
     wc.on('did-navigate-in-page', (_e, url) => update({ url, canBack: canGoBack(wc), canFwd: canGoFwd(wc) }));
+
+    // Errore certificato: registra lo stato (scaduto, autofirmato, mismatch…)
+    // per arricchire il verdetto safebrowse. Manteniamo il comportamento sicuro
+    // di default (callback(false) = rifiuta la connessione non attendibile).
+    wc.on('certificate-error', (event, url, error, _cert, callback) => {
+      try {
+        const SB = globalThis.SN_SAFEBROWSE;
+        const norm = SB && SB.normalize(url);
+        if (norm && norm.registrable) SB.recordCert(norm.registrable, mapCertError(error));
+      } catch (_) {}
+      try { callback(false); } catch (_) {}
+    });
 
     // Spellcheck nativo: Electron è l'unico a conoscere i suggerimenti
     // ortografici della parola sotto lo zigzag rosso. Li spingiamo al
