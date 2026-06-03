@@ -14,7 +14,10 @@ function readActiveView(app) {
     const tabs = win._filoTabs;
     const active = tabs.tabs.find((t) => t.id === tabs.activeId);
     const b = active.view.getBounds();
-    return { y: b.y, x: b.x, contentFullscreen: tabs.contentFullscreen, shellHeight: tabs.shellHeight };
+    // Altezza di chrome "a riposo": fuori dalla home la barra indirizzi è
+    // nascosta (chrome compatto) e la view parte dalla sola fila di tab.
+    const restingTop = tabs.chromeCompact ? tabs.tabRowHeight : tabs.shellHeight;
+    return { y: b.y, x: b.x, contentFullscreen: tabs.contentFullscreen, restingTop };
   });
 }
 
