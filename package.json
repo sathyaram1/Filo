@@ -16,6 +16,9 @@
     "test:explore": "node tests/agent/explore.mjs",
     "test:daily": "node tests/agent/daily.mjs",
     "test:shoot": "node tests/agent/shoot.mjs",
+    "feedback:queue": "node scripts/queue-triage.mjs",
+    "feedback:apply": "node scripts/apply-triage.mjs",
+    "feedback:login": "node scripts/admin-login.mjs",
     "build": "electron-builder --win",
     "release": "electron-builder --win --publish always"
   },
