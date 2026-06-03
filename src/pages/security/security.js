@@ -100,7 +100,6 @@
           networkSignals: !!$('sec-safebrowse-network').checked,
           llmJudge: !!$('sec-safebrowse-llm').checked,
           sandbox: !!$('sec-safebrowse-sandbox').checked,
-          safeBrowsingKey: $('sec-safebrowse-key').value.trim(),
         },
       },
     };
