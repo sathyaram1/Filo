@@ -142,6 +142,15 @@ class TabManager {
     } catch (_) { /* policy non supportata in qualche build */ }
   }
 
+  // Altezza in CSS px della "barra in alto" di Filo (la parte di shell NON
+  // coperta dalla WebContentsView attiva): 0 a tutto schermo, solo la fila di
+  // tab in chrome compatto, altrimenti l'intera shell. Serve per ritagliare lo
+  // scatto della barra quando si annota tutta l'app col disegno.
+  topChromeHeight() {
+    if (this.contentFullscreen) return 0;
+    return this.chromeCompact ? this.tabRowHeight : this.shellHeight;
+  }
+
   // Riserva (o libera, con px=0) spazio sopra la view attiva e rifà il layout.
   setTopInset(px) {
     this.topInset = Math.max(0, Math.round(Number(px) || 0));
