@@ -99,12 +99,10 @@ test('chiave GSB condivisa: quando è impostata raggiunge il motore per TUTTI (s
   // sovrascrivendo Defaults.get nel main, poi lascia che la normale catena
   // (getEffectiveSettings → withDefaults → wireSafebrowse) la propaghi al motore.
   const active = await app.evaluate(async () => {
-    // Nello scope di evaluate `require` non è iniettato, ma i Node global sì:
-    // `process.mainModule` è l'entry (src/main/main.js) e il suo require risolve
-    // i moduli già caricati (stessa istanza singleton usata in produzione).
-    const mreq = process.mainModule.require.bind(process.mainModule);
-    const Defaults = mreq('./services/defaultsStore.js');
-    const handlers = mreq('./services/handlers.js');
+    // In test il main espone i singleton su globalThis (require non è iniettato
+    // nello scope di evaluate). Sono le STESSE istanze usate in produzione.
+    const Defaults = globalThis.__filoDefaults;
+    const handlers = globalThis.__filoHandlers;
     const SB = globalThis.SN_SAFEBROWSE;
     const origGet = Defaults.get;
     try {
