@@ -722,6 +722,13 @@
       case 'comment': return renderCommentModule(cell, m);
       case 'chat': return renderChat(cell, m);
       case 'settings': return renderSettingsModule(cell, m);
+      case 'bold':
+      case 'italic':
+      case 'underline':
+      case 'undo':
+      case 'redo': return renderSimpleFormat(cell, m);
+      case 'text-size': return renderTextSize(cell, m);
+      case 'align': return renderAlign(cell, m);
     }
   }
 
