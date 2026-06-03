@@ -205,6 +205,13 @@ function registerIpcHandlers() {
     if (win?._filoTabs) win._filoTabs.setTopInset(px);
     return { ok: true };
   });
+  // Chrome compatto: la shell nasconde la barra indirizzi fuori dalla home, e
+  // chiede al main di far risalire la WebContentsView a coprire quello spazio.
+  ipcMain.handle('tabs:set-chrome-compact', (event, { on } = {}) => {
+    const win = winFor(event);
+    if (win?._filoTabs) win._filoTabs.setChromeCompact(!!on);
+    return { ok: true };
+  });
   ipcMain.handle('tabs:back', (event, { id }) => {
     const win = winFor(event);
     if (win?._filoTabs) win._filoTabs.goBack(id);
