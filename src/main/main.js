@@ -27,6 +27,18 @@ if (process.platform === 'win32') {
 require('./shim/chrome-api');
 require('./services/loader');
 
+// Solo in test: esponi i singleton di handlers/defaults su globalThis così i
+// test Playwright (che girano nel main via app.evaluate, dove `require` non è
+// iniettato) possono esercitare la catena reale chiave-condivisa → motore. Va
+// fatto in modo SINCRONO qui (non dentro whenReady) perché i test che dipendono
+// solo dal fixture `app` possono valutare prima che il callback async finisca.
+if (process.env.NODE_ENV === 'test') {
+  try {
+    globalThis.__filoHandlers = require('./services/handlers');
+    globalThis.__filoDefaults = require('./services/defaultsStore');
+  } catch (_) {}
+}
+
 const { createMainWindow } = require('./window');
 const { registerFiloProtocol } = require('./protocol');
 const { registerIpcHandlers } = require('./ipc');
