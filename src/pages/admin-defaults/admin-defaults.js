@@ -234,6 +234,9 @@
       models: collectModels(),
     };
     if (Object.keys(apiKeys).length) config.apiKeys = apiKeys;
+    // La chiave Safe Browsing si invia solo se digitata (vuoto = "non toccare").
+    const gsb = $('apiKeySafebrowse').value.trim();
+    if (gsb) config.safeBrowsingKey = gsb;
 
     try {
       const res = await chrome.runtime.sendMessage({ type: MSG.DEFAULTS_UPDATE, config });
