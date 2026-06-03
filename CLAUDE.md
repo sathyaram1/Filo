@@ -425,10 +425,13 @@ Per ogni feedback `todo`:
      dell'utente e asserisca che la feature fa la cosa giusta (non solo che
      un messaggio è cambiato).
    - In locale: `npm run test:shoot` con scenario mirato + ispezione visuale.
-6. Solo se la verifica passa: aggiorna lo status a `done` su Firestore
-   (PATCH con `updateMask`) e scrivi nelle `notes` un breve report (vedi
-   "Tono dei report e delle notes"): cosa vedrà l'utente di diverso, cosa
-   hai aggiunto oltre il chiesto, come l'hai testato.
+6. Solo se la verifica passa: **accoda** lo status `done` con
+   `node scripts/queue-triage.mjs <id> done "testo note"` (in cloud) o, in
+   locale dopo aver applicato, vedi sopra. Nelle `notes` scrivi un breve report
+   (vedi "Tono dei report e delle notes"): cosa vedrà l'utente di diverso, cosa
+   hai aggiunto oltre il chiesto, come l'hai testato. La decisione finisce nella
+   coda `feedback-triage/` e diventa effettiva su Firestore quando l'owner esegue
+   `npm run feedback:apply`. Stesso meccanismo per `clarify`.
 
 **Insistere prima di mollare (vale soprattutto per routine cloud):**
 non abbandonare al primo intoppo. Se un test fallisce, capisci perché e
