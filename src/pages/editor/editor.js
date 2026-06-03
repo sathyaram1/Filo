@@ -234,6 +234,11 @@
       if (extra && !next.some((m) => m.type === extra)) next = [...next, { type: extra }];
       const fs = el.style && el.style.fontSize;
       if (fs) next = [...next.filter((m) => m.type !== 'fontSize'), { type: 'fontSize', attrs: { size: fs } }];
+      // Font: applicato come <span style="font-family:…"> (styleWithCSS) o, in
+      // alcune build, come <font face="…">. Entrambi diventano una marca
+      // fontFamily così sopravvivono al round-trip.
+      const ff = (el.style && el.style.fontFamily) || (el.tagName === 'FONT' ? el.getAttribute('face') : '');
+      if (ff) next = [...next.filter((m) => m.type !== 'fontFamily'), { type: 'fontFamily', attrs: { family: ff } }];
       out.push(...inlineToPM(el, next));
     });
     return out;
