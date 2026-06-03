@@ -179,7 +179,9 @@
     const strokes = []; // [{ color, width, points: [{x,y}] }] in coordinate viewport CSS
     let drawing = false;
     let curStroke = null;
-    let includeShot = false; // se true → all'invio allega lo screenshot annotato
+    // C'è un disegno sulla barra in alto di Filo (shell)? La barra vive in un
+    // altro processo: lo sappiamo via broadcast FEEDBACK_DRAW_STATE.
+    let topbarHasDrawing = false;
 
     function sizeCanvas() {
       const dpr = window.devicePixelRatio || 1;
