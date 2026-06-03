@@ -725,8 +725,9 @@ async function handleMessage(msg, sender = {}) {
         }
       } catch (_) {}
       // Riconfigura il rilevatore siti pericolosi (chiave GSB, LLM, rete, sandbox)
-      // così le modifiche valgono subito senza riavviare.
-      wireSafebrowse(merged).catch(() => {});
+      // così le modifiche valgono subito senza riavviare. La chiave GSB è
+      // condivisa (admin → Firestore): withDefaults la inietta nei settings.
+      wireSafebrowse(withDefaults(merged)).catch(() => {});
       return { ok: true, settings: merged };
     }
     case MSG.SAVE_PAGE: {
