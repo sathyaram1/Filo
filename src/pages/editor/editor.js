@@ -6,8 +6,12 @@
 (() => {
   'use strict';
 
-  const GRID_COLS = 7;
-  const GRID_ROWS = 10;
+  // La griglia è ridimensionabile dall'utente (impostazione nella vista moduli):
+  // per questo COLS/ROWS sono variabili, non costanti. Il default resta 7×10.
+  let GRID_COLS = 7;
+  let GRID_ROWS = 10;
+  const GRID_MIN_COLS = 3, GRID_MAX_COLS = 12;
+  const GRID_MIN_ROWS = 4, GRID_MAX_ROWS = 16;
   const STORAGE_KEY = 'filo.editor.doc';
   const MSG = (window.SN_MSG && window.SN_MSG.MSG) || {};
   const ACTIONS = (window.SN_CONST && window.SN_CONST.ACTIONS) || {};
