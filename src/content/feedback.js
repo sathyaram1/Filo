@@ -237,9 +237,8 @@
       if (!drawing) return;
       drawing = false;
       curStroke = null;
-      // Appena si disegna qualcosa, il pulsante "Annota e allega" si seleziona
-      // da solo: allegheremo lo screenshot annotato all'invio.
-      if (hasDrawing()) setInclude(true);
+      // Appena c'è un disegno, all'invio allegheremo automaticamente lo
+      // screenshot annotato (niente più toggle): basta che ci sia un tratto.
       refreshClear();
     }
     canvas.addEventListener('pointerup', endStroke);
