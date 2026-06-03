@@ -343,6 +343,28 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 /* L'ingranaggio non è eliminabile: niente maniglia di trascinamento ambigua;
    resta comunque spostabile come gli altri (draggable sul cell). */
 
+/* moduli di formattazione (grassetto, corsivo, allineamento, dimensione…) */
+.ed-fmt { padding: 6px; gap: 4px; }
+.ed-fmt-row { flex-direction: row; }
+.ed-fmt-btn {
+  flex: 1 1 0; min-width: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--sn-border); border-radius: 8px;
+  background: var(--sn-bg); color: var(--sn-fg);
+  cursor: pointer; font-size: 17px; line-height: 1; padding: 0;
+  font-family: inherit;
+}
+.ed-fmt-btn:hover { border-color: var(--sn-accent); color: var(--sn-accent); }
+.ed-fmt-btn:active { background: var(--sn-hover); }
+.ed-fmt-btn svg { display: block; }
+.ed-fmt-btn small { font-size: 0.75em; }
+.ed-fmt-btn big { font-size: 1.25em; }
+.ed-fmt-row .ed-fmt-btn { font-size: 14px; }
+.ed-align .ed-fmt-btn { color: var(--sn-muted); }
+.ed-align .ed-fmt-btn:hover { color: var(--sn-accent); }
+/* In modalità modifica i bottoni non devono "rubare" il click di configurazione. */
+.ed-root.settings-mode .ed-fmt-btn { pointer-events: none; }
+
 /* comment module */
 .ed-comment-mod { align-items: center; justify-content: center; text-align: center; cursor: pointer; }
 .ed-comment-mod .cm-count { font-size: 22px; font-weight: 700; }
