@@ -98,33 +98,39 @@
   box-shadow: none !important;
 }
 
-.sn-fb-tools {
+/* Riga azioni: i 4 bottoni (Allega, Chiudi, Invia e — solo se c'è un disegno —
+   Cancella disegno). Niente più header/titolo né footer separato. */
+.sn-fb-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--sn-border);
 }
+/* "Invia" è il bottone primario e sta a destra; "Allega"/"Chiudi" a sinistra. */
+.sn-fb-send { margin-left: auto; }
 
-/* Pulsante "Annota e allega": fa da toggle. Selezionato → bordo/accento attivo. */
 .sn-fb-attach {
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
 .sn-fb-attach svg { display: block; }
-.sn-fb-attach.sn-fb-attach-on {
-  background: var(--sn-accent, #2f6feb);
-  color: #fff;
-  border-color: var(--sn-accent, #2f6feb);
-}
 
+/* "Cancella disegno": disegnato come tratteggiato (è l'unico modo per cancellare
+   l'annotazione). Compare SOLO quando c'è un disegno da cancellare (hidden via
+   attributo dal content script). */
 .sn-fb-clear {
-  all: unset;
   cursor: pointer;
+  font: inherit;
   font-size: 12px;
-  color: var(--sn-muted);
-  text-decoration: underline;
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1px dashed var(--sn-accent, #888);
+  background: transparent;
+  color: var(--sn-fg);
 }
-.sn-fb-clear:hover { color: var(--sn-fg); }
+.sn-fb-clear:hover { background: rgba(127, 127, 127, 0.1); }
 
 .sn-fb-thumbs {
   display: flex;
