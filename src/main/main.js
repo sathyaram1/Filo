@@ -90,6 +90,10 @@ app.whenReady().then(async () => {
   // blocca l'avvio: finché non arriva si usano i default da costanti/build.
   try { require('./services/defaultsStore').refresh().catch(() => {}); } catch (_) {}
 
+  // Configura il rilevatore di siti pericolosi con chiave GSB/LLM/rete/sandbox
+  // dalle impostazioni. Non blocca: senza chiavi resta solo l'analisi locale.
+  try { require('./services/handlers').wireSafebrowse().catch(() => {}); } catch (_) {}
+
   mainWindow = createMainWindow();
   registerShortcuts(mainWindow);
 
