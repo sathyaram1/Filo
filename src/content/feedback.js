@@ -348,8 +348,7 @@
       });
     }
 
-    // Chiusura
-    closeBtn.addEventListener('click', close);
+    // Chiusura (il bottone "Chiudi" sostituisce la vecchia × e "Annulla")
     cancelBtn.addEventListener('click', close);
     // Niente chiusura su click backdrop: si chiude solo con × o Annulla
     // (Esc resta disponibile come scorciatoia).
