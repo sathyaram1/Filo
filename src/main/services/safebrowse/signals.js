@@ -50,9 +50,13 @@ function typoThreshold(tokenLen) {
 // Cerca la migliore corrispondenza di impersonazione fra i brand noti.
 // Ritorna { strict, broad } dove ciascuno è null o { brand, reason, ... }.
 function matchBrands(norm) {
-  const sld = (norm.sld || '').toLowerCase();
+  // Confronti SEMPRE sulla forma Unicode decodificata (un dominio camuffato in
+  // punycode, es. xn--80ak6aa92e, va confrontato per ciò che mostra: "аррӏе").
+  const sld = (norm.sldUnicode || norm.sld || '').toLowerCase();
   const sldSkel = skeleton(sld);
-  const subLabels = norm.labels.slice(0, Math.max(0, norm.labels.length - (norm.registrable ? norm.registrable.split('.').length : 1)));
+  const uLabels = (norm.hostUnicode || norm.host || '').split('.');
+  const regLabelCount = norm.registrable ? norm.registrable.split('.').length : 1;
+  const subLabels = uLabels.slice(0, Math.max(0, uLabels.length - regLabelCount));
 
   let strict = null;
   let broad = null;
