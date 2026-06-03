@@ -212,6 +212,10 @@
       'Le chiavi restano sul server e non sono mai esposte alle pagine: qui vedi solo se ciascuna è configurata. Lascia un campo vuoto per non modificarlo.',
     admin_defaults_key_present: 'configurata',
     admin_defaults_key_absent: 'non configurata',
+    admin_defaults_safebrowse_key_desc:
+      'Chiave gratuita di Google Safe Browsing per il rilevamento siti pericolosi: con questa chiave Filo ' +
+      'controlla la blacklist ufficiale di Google (phishing e malware) per TUTTI gli account. È condivisa: ' +
+      'la imposti una volta qui e vale per tutti. Senza chiave questo controllo viene saltato, gli altri restano attivi.',
     admin_defaults_save: 'Salva e propaga',
     admin_defaults_saving: 'Salvataggio…',
     admin_defaults_saved: 'Salvato e propagato a tutti gli utenti.',
