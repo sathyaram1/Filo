@@ -85,7 +85,7 @@
     const on = $('sec-safebrowse').checked;
     const sub = $('sec-safebrowse-sub');
     sub.style.opacity = on ? '1' : '0.45';
-    for (const id of ['sec-safebrowse-network', 'sec-safebrowse-llm', 'sec-safebrowse-sandbox', 'sec-safebrowse-key']) {
+    for (const id of ['sec-safebrowse-network', 'sec-safebrowse-llm', 'sec-safebrowse-sandbox']) {
       $(id).disabled = !on;
     }
   }
