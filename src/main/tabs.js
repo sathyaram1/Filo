@@ -10,6 +10,12 @@ const { randomUUID } = require('node:crypto');
 const PAGE_PRELOAD = path.join(__dirname, '..', 'preload', 'page-preload.js');
 const INTERNAL_PRELOAD = path.join(__dirname, '..', 'preload', 'internal-preload.js');
 
+// Altezza della sola fila di tab (tab + nuova scheda + controlli finestra),
+// senza la barra indirizzi. In sync con `.tab-row { flex: 0 0 40px }` in
+// src/renderer/shell.css. Quando la shell è in "chrome compatto" (fuori dalla
+// home) la WebContentsView attiva parte da qui invece che da SHELL_HEIGHT.
+const TAB_ROW_HEIGHT = 40;
+
 // Pagine interne su cui i content script (e quindi il menu Filo del tasto
 // destro) NON vengono iniettati — vedi CS_BLOCKLIST in internal-preload.js.
 // Qui forniamo un menu contestuale nativo così il tasto destro fa qualcosa
