@@ -767,6 +767,25 @@
     document.body.classList.add('ed-dragging');
     let target = null;     // {x, y} cella valida sotto il puntatore
     let targetEl = null;   // elemento .ed-cell-empty evidenziato
+    // Anteprima fantasma: un riquadro a opacità ridotta che occupa l'intera
+    // impronta (w×h) del modulo nella posizione dove finirà al rilascio, così
+    // l'utente vede dove atterrerà mentre trascina.
+    let ghost = null;
+    const meta = MODULE_TYPES[m.type] || {};
+    const ghostLabel = meta.glyph || (ICONS[meta.icon] ? ICONS[meta.icon](20) : escapeHtml(meta.label || ''));
+    const showGhost = (x, y) => {
+      if (!ghost) {
+        ghost = document.createElement('div');
+        ghost.className = 'ed-drag-ghost';
+        ghost.innerHTML = `<span>${ghostLabel}</span>`;
+        gridEl.appendChild(ghost);
+      }
+      ghost.style.gridColumn = `${x + 1} / span ${m.w}`;
+      ghost.style.gridRow = `${y + 1} / span ${m.h}`;
+      ghost.style.display = '';
+    };
+    const hideGhost = () => { if (ghost) ghost.style.display = 'none'; };
+    const removeGhost = () => { if (ghost) { ghost.remove(); ghost = null; } };
     const clearHighlight = () => {
       if (targetEl) { targetEl.classList.remove('drop-target'); targetEl = null; }
     };
@@ -784,7 +803,12 @@
           empty.classList.add('drop-target');
           targetEl = empty;
           target = { x, y };
+          showGhost(x, y);
+        } else {
+          hideGhost();
         }
+      } else {
+        hideGhost();
       }
     };
     const onUp = () => {
@@ -793,6 +817,7 @@
       document.body.classList.remove('ed-dragging');
       cell.classList.remove('dragging');
       clearHighlight();
+      removeGhost();
       if (target) { m.x = target.x; m.y = target.y; m.z = z; renderGrid(); markDirty(); }
     };
     document.addEventListener('mousemove', onMove, true);
