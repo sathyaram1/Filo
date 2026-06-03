@@ -810,6 +810,7 @@
       case 'redo': return renderSimpleFormat(cell, m);
       case 'text-size': return renderTextSize(cell, m);
       case 'align': return renderAlign(cell, m);
+      case 'font': return renderFont(cell, m);
     }
   }
 
