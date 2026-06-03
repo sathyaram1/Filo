@@ -422,8 +422,14 @@
       for (const f of files) await addImageFromBlob(f);
     });
 
-    // "Annota e allega": toggle che decide se allegare lo screenshot annotato.
-    attachBtn.addEventListener('click', () => setInclude(!includeShot));
+    // "Allega": apre il selettore file per allegare immagini (oltre a
+    // incolla/trascina). Parità tra i cammini equivalenti.
+    attachBtn.addEventListener('click', () => { try { fileInput.click(); } catch (_) {} });
+    fileInput.addEventListener('change', async () => {
+      const files = Array.from(fileInput.files || []);
+      for (const f of files) await addImageFromBlob(f);
+      fileInput.value = '';
+    });
 
     // Invio
     sendBtn.addEventListener('click', async () => {
