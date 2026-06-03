@@ -212,15 +212,13 @@
         ctx.stroke();
       }
     }
-    function hasDrawing() { return strokes.some((s) => s.points.length > 0); }
-
-    function setInclude(on) {
-      includeShot = !!on;
-      attachBtn.classList.toggle('sn-fb-attach-on', includeShot);
-      attachBtn.setAttribute('aria-pressed', includeShot ? 'true' : 'false');
-    }
+    function hasPageDrawing() { return strokes.some((s) => s.points.length > 0); }
+    // C'è un disegno da cancellare ovunque nell'app? (pagina O barra in alto)
+    function hasAnyDrawing() { return hasPageDrawing() || topbarHasDrawing; }
     function refreshClear() {
-      clearBtn.hidden = !hasDrawing();
+      // Il pulsante tratteggiato "Cancella disegno" compare SOLO se c'è davvero
+      // qualcosa da cancellare.
+      clearBtn.hidden = !hasAnyDrawing();
     }
 
     canvas.addEventListener('pointerdown', (e) => {
