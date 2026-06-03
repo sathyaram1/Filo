@@ -657,6 +657,23 @@
     security: {
       protectIpLeak: true,
       blockPopups: true,
+      // Rilevamento siti pericolosi (phishing/impersonazione/malware). Vedi
+      // src/main/services/safebrowse/. Tutti i controlli locali (omoglifi,
+      // typo, combosquat, trasporto) sono gratuiti e attivi di default. I
+      // controlli di rete sono best-effort e non bloccano mai la navigazione:
+      // - safeBrowsing: blacklist Google Safe Browsing. Richiede una API key
+      //   (gratuita su Google Cloud). Senza chiave lo stage viene saltato.
+      // - networkSignals: età dominio (RDAP) + età primo certificato (CT).
+      //   Keyless. Disattivabile da chi non vuole alcuna chiamata esterna.
+      // - llmJudge: giudizio LLM solo-metadati sui casi sospetti non conclusivi.
+      // - sandbox: detonation dei link sospetti in finestra isolata.
+      safeBrowse: {
+        enabled: true,
+        safeBrowsingKey: '',
+        networkSignals: true,
+        llmJudge: true,
+        sandbox: true,
+      },
     },
     // Modalità terminale della dashboard: quando attiva, ogni comando con `/`
     // che non è un comando interno di Filo viene eseguito da una shell di
