@@ -235,20 +235,15 @@ html[data-chrome-compact="1"] .addr {
   display: block;
 }
 
-#addr {
+/* Spaziatore flessibile al posto del vecchio campo URL: tiene i tasti di
+   navigazione (indietro/avanti/ricarica) a sinistra e le icone home/impostazioni/
+   app/account a destra. La barra dell'URL è stata rimossa: l'indirizzo si digita
+   dalla home di Filo (box "Chiedi qualsiasi cosa" con /sito.com). */
+.addr-spacer {
   flex: 1 1 auto;
-  height: 32px;
-  padding: 0 12px;
-  background: var(--bg-deep);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  color: var(--fg);
-  font-size: 13px;
-  outline: none;
-  user-select: text;
+  min-width: 8px;
+  align-self: stretch;
 }
-#addr:focus { border-color: var(--accent); }
-#addr::selection { background: rgba(var(--accent-rgb), 0.3); }
 
 /* Tooltip custom della shell — stile coerente con il menu tasto destro
    (.sn-tooltip in src/styles/menu.css), così l'hover su nav-btn/tab-new
