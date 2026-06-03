@@ -351,8 +351,9 @@ firebase deploy                             # entrambe
 
 ⚠️ **L'account robot delle routine è stato BLOCCATO da Google.** Le routine
 cloud NON possono più autenticarsi a Firestore: ogni PATCH come ruolo
-`routines` ora fallisce. `scripts/routine-feedback.mjs` e `routine-login.mjs`
-sono **morti** — non usarli.
+`routines` ora fallisce. I vecchi script `routine-feedback.mjs`,
+`routine-login.mjs` e `_verify-routine.mjs` sono stati **rimossi**: non
+esistono più, non cercarli.
 
 Al loro posto c'è una **coda su git** (`feedback-triage/`, vedi il README lì
 dentro). La routine non scrive lo stato su Firestore: deposita la decisione
