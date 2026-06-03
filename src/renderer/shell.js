@@ -313,12 +313,34 @@
     backBtn.disabled = !(a && a.canBack);
     fwdBtn.disabled = !(a && a.canFwd);
     reloadBtn.disabled = !a;
+
+    // Chrome compatto: la barra indirizzi (icone + URL) si vede SOLO sulla home
+    // di Filo. Sui siti resta solo la fila di tab + i controlli finestra.
+    applyChrome(isHomeUrl(a ? a.url : null));
   }
 
   function displayUrl(url) {
     if (!url) return '';
     if (url.startsWith('filo://newtab/')) return '';
     return url;
+  }
+
+  // La "home" di Filo è la newtab (mappata sulla dashboard). Senza tab attiva
+  // trattiamo lo stato come home così la barra resta accessibile.
+  function isHomeUrl(url) {
+    return !url || url.startsWith('filo://newtab/');
+  }
+
+  // Mostra/nasconde la barra indirizzi e avvisa il main di alzare/abbassare la
+  // WebContentsView. Idempotente: l'IPC parte solo quando lo stato cambia.
+  let chromeCompact = null;
+  function applyChrome(isHome) {
+    const compact = !isHome;
+    if (compact === chromeCompact) return;
+    chromeCompact = compact;
+    if (compact) document.documentElement.dataset.chromeCompact = '1';
+    else delete document.documentElement.dataset.chromeCompact;
+    try { api.tabs.setChromeCompact?.(compact); } catch (_) {}
   }
 
   newBtn.addEventListener('click', () => api.tabs.open('filo://newtab/'));
