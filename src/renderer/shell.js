@@ -304,11 +304,9 @@
       tabsEl.appendChild(el);
     }
 
-    // address bar
+    // Barra di navigazione (icone). Il campo URL è stato rimosso: l'indirizzo
+    // si digita dalla home di Filo. Qui aggiorniamo solo lo stato dei tasti.
     const a = activeTab();
-    if (a && document.activeElement !== addrEl) {
-      addrEl.value = displayUrl(a.url);
-    }
     backBtn.disabled = !(a && a.canBack);
     fwdBtn.disabled = !(a && a.canFwd);
     reloadBtn.disabled = !a;
