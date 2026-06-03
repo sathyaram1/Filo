@@ -268,6 +268,16 @@ function registerIpcHandlers() {
   });
   ipcMain.on('shell:tooltip-hide', () => hideTooltip());
 
+  // ─── disegno annotazione sulla barra in alto (shell) ─────────────────────
+  // La shell ci dice se c'è un disegno sulla sua barra: lo rilanciamo ai content
+  // script (box feedback) così "Cancella disegno" compare anche quando si è
+  // disegnato SOLO sulla barra e l'invio allega lo screenshot annotato.
+  const { MSG } = require('../shared/messages').SN_MSG
+    || (require('../shared/messages'), globalThis.SN_MSG);
+  ipcMain.on('shell:feedback-draw-state', (_event, { has } = {}) => {
+    try { broadcastToTabs({ type: MSG.FEEDBACK_DRAW_STATE, topbar: !!has }); } catch (_) {}
+  });
+
   // ─── controlli finestra (min / max / close) ──────────────────────────────
   ipcMain.handle('window:minimize', (event) => {
     const win = winFor(event); if (win) win.minimize();
