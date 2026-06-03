@@ -407,6 +407,16 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 .ed-fmt-row .ed-fmt-btn { font-size: 14px; }
 .ed-align .ed-fmt-btn { color: var(--sn-muted); }
 .ed-align .ed-fmt-btn:hover { color: var(--sn-accent); }
+/* Modulo font: il <select> riempie il modulo come i bottoni di formattazione. */
+.ed-font { padding: 6px; }
+.ed-font-select {
+  flex: 1 1 auto; width: 100%; min-width: 0;
+  border: 1px solid var(--sn-border); border-radius: 8px;
+  background: var(--sn-bg); color: var(--sn-fg);
+  cursor: pointer; font-size: 14px; line-height: 1; padding: 0 6px;
+  font-family: inherit;
+}
+.ed-font-select:hover { border-color: var(--sn-accent); }
 /* In modalità modifica i bottoni non devono "rubare" il click di configurazione. */
 .ed-root.settings-mode .ed-fmt-btn { pointer-events: none; }
 
