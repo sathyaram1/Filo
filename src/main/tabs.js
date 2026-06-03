@@ -173,6 +173,19 @@ class TabManager {
     return this.setContentFullscreen(!this.contentFullscreen);
   }
 
+  // Attiva/disattiva il "chrome compatto": quando true la barra indirizzi è
+  // nascosta dalla shell e la WebContentsView attiva risale a coprire anche il
+  // suo spazio (top = tabRowHeight invece di shellHeight). La shell lo richiama
+  // a ogni cambio di pagina attiva: compatto sui siti, esteso sulla home Filo.
+  // Idempotente.
+  setChromeCompact(on) {
+    on = !!on;
+    if (this.chromeCompact === on) return on;
+    this.chromeCompact = on;
+    this.layout();
+    return on;
+  }
+
   _broadcastToViews(message) {
     for (const t of this.tabs) {
       try { t.view.webContents.send('filo:broadcast', message); } catch (_) {}
