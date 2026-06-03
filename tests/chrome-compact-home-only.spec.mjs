@@ -71,7 +71,8 @@ test('le tab e i controlli finestra restano sempre visibili (anche sui siti)', a
   await expect(shell.locator('#win-max')).toBeVisible();
   await expect(shell.locator('#win-close')).toBeVisible();
   await expect(shell.locator('#tab-new')).toBeVisible();
-  // La barra indirizzi e le sue icone, invece, sono nascoste.
+  // La fila di icone di navigazione, invece, è nascosta sui siti.
   await expect(shell.locator('#nav-back')).toBeHidden();
-  await expect(shell.locator('#addr')).toBeHidden();
+  // La barra dell'URL non esiste più: è stata rimossa del tutto (anche sulla home).
+  await expect(shell.locator('#addr')).toHaveCount(0);
 });
