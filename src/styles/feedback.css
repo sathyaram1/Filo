@@ -175,14 +175,6 @@
   min-height: 16px;
 }
 
-.sn-fb-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 10px 14px;
-  border-top: 1px solid var(--sn-border);
-}
-
 .sn-fb-btn,
 .sn-fb-btn-secondary {
   cursor: pointer;
