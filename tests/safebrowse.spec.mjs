@@ -49,7 +49,7 @@ test('motore: impersonazioni → pericoloso, domini legittimi → safe', async (
   expect(verdicts.paypalTypo.hasMsg).toBe(true);
 });
 
-test('pagina Sicurezza: controlli rilevamento siti pericolosi, default ON e persistenza', async ({ openTab }) => {
+test('pagina Sicurezza: controlli personali default ON e persistenti; nessun campo chiave (è condivisa)', async ({ openTab }) => {
   const page = await openTab('filo://security/');
   await page.waitForSelector('#sec-safebrowse', { timeout: 8_000 });
 
@@ -59,18 +59,69 @@ test('pagina Sicurezza: controlli rilevamento siti pericolosi, default ON e pers
   await expect(page.locator('#sec-safebrowse-llm')).toBeChecked();
   await expect(page.locator('#sec-safebrowse-sandbox')).toBeChecked();
 
-  // Spegni il giudizio AI e salva la chiave; deve persistere dopo reload.
+  // La chiave NON è più un campo per-utente: il vecchio input è sparito e al suo
+  // posto c'è la nota che dice che è gestita centralmente in "Modelli predefiniti".
+  await expect(page.locator('#sec-safebrowse-key')).toHaveCount(0);
+  const note = page.locator('#sec-safebrowse-key-managed');
+  await expect(note).toBeVisible();
+  await expect(note).toContainText('Modelli predefiniti');
+
+  // I toggle personali restano e si persistono: spegni il giudizio AI, ricarica.
   await page.locator('#sec-safebrowse-llm').uncheck();
-  await expect(page.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 4_000 });
-  await page.locator('#sec-safebrowse-key').fill('TEST-GSB-KEY');
-  await page.locator('#sec-safebrowse-key').blur();
   await expect(page.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 4_000 });
 
   await page.reload();
   await page.waitForSelector('#sec-safebrowse', { timeout: 8_000 });
   await expect(page.locator('#sec-safebrowse-llm')).not.toBeChecked();
   await expect(page.locator('#sec-safebrowse')).toBeChecked();
-  await expect(page.locator('#sec-safebrowse-key')).toHaveValue('TEST-GSB-KEY');
+});
+
+test('chiave GSB condivisa: lo store la espone come "presente" senza mai rivelarne il valore', () => {
+  // defaultsStore è puro Node (niente Electron): lo carichiamo direttamente.
+  const Defaults = require('../src/main/services/defaultsStore.js');
+
+  // Senza override remoto la chiave è vuota (default), ma il CAMPO esiste nel
+  // contratto della config condivisa (prima del refactor non c'era affatto).
+  const eff = Defaults.get();
+  expect(typeof eff.safeBrowsingKey).toBe('string');
+
+  // La vista per l'admin espone SOLO un booleano "configurata/non", MAI il valore.
+  const pub = Defaults.getPublicForAdmin();
+  expect(pub).toHaveProperty('safeBrowsingKeyPresent');
+  expect(typeof pub.safeBrowsingKeyPresent).toBe('boolean');
+  expect(Object.prototype.hasOwnProperty.call(pub, 'safeBrowsingKey')).toBe(false);
+  // Nessun campo del payload admin contiene per sbaglio una chiave grezza.
+  expect(JSON.stringify(pub)).not.toContain('AIza');
+});
+
+test('chiave GSB condivisa: quando è impostata raggiunge il motore per TUTTI (stadio GSB acceso)', async ({ app }) => {
+  // Simula una chiave condivisa fissata dall'admin (config/secrets su Firestore)
+  // sovrascrivendo Defaults.get nel main, poi lascia che la normale catena
+  // (getEffectiveSettings → withDefaults → wireSafebrowse) la propaghi al motore.
+  const active = await app.evaluate(async () => {
+    const Defaults = require('./services/defaultsStore.js');
+    const handlers = require('./services/handlers.js');
+    const SB = globalThis.SN_SAFEBROWSE;
+    const origGet = Defaults.get;
+    try {
+      // 1) Senza chiave condivisa: lo stadio GSB resta spento.
+      Defaults.get = () => ({ ...origGet(), safeBrowsingKey: '' });
+      await handlers.wireSafebrowse();
+      const off = SB.activeProviders().gsb;
+
+      // 2) Con la chiave condivisa: si accende per tutti, senza tocco per-utente.
+      Defaults.get = () => ({ ...origGet(), safeBrowsingKey: 'TEST-SHARED-GSB-KEY' });
+      await handlers.wireSafebrowse();
+      const on = SB.activeProviders().gsb;
+      return { off, on };
+    } finally {
+      Defaults.get = origGet;
+      await handlers.wireSafebrowse().catch(() => {});
+    }
+  });
+
+  expect(active.off).toBe(false);
+  expect(active.on).toBe(true);
 });
 
 test('interstitial "pericoloso": copre la pagina e si toglie solo con "confermo" → Procedi', async ({ app, openTab, testServer }) => {
