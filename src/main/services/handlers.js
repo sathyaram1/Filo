@@ -216,8 +216,18 @@ async function buildMessages(action, payload) {
 // (es. build locale senza chiavi iniettate). Quando è disattivo, l'utente
 // gestisce tutto dalle Opzioni e usiamo i suoi settings così come sono.
 function withDefaults(settings) {
-  if (settings.useDefaultModels === false) return settings;
   const d = Defaults.get();
+  // La chiave Google Safe Browsing è SEMPRE condivisa (gestita dall'admin in
+  // "Modelli predefiniti" e propagata via Firestore): va iniettata anche quando
+  // l'utente usa i propri modelli, perché non esiste più un campo per-utente.
+  const sec = settings.security || {};
+  const security = d.safeBrowsingKey
+    ? { ...sec, safeBrowse: { ...(sec.safeBrowse || {}), safeBrowsingKey: d.safeBrowsingKey } }
+    : sec;
+
+  if (settings.useDefaultModels === false) {
+    return security === sec ? settings : { ...settings, security };
+  }
   const userKeys = settings.apiKeys || {};
   const apiKeys = {};
   for (const k of ['openrouter', 'gemini', 'tavily']) {
@@ -230,6 +240,7 @@ function withDefaults(settings) {
     models: d.models,
     modelRegistry: d.modelRegistry,
     apiKeys,
+    security,
   };
 }
 
