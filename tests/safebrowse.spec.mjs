@@ -98,11 +98,13 @@ test('chiave GSB condivisa: quando è impostata raggiunge il motore per TUTTI (s
   // Simula una chiave condivisa fissata dall'admin (config/secrets su Firestore)
   // sovrascrivendo Defaults.get nel main, poi lascia che la normale catena
   // (getEffectiveSettings → withDefaults → wireSafebrowse) la propaghi al motore.
-  const active = await app.evaluate(async ({ app: electronApp }) => {
-    const path = require('path');
-    const root = electronApp.getAppPath();
-    const Defaults = require(path.join(root, 'src/main/services/defaultsStore.js'));
-    const handlers = require(path.join(root, 'src/main/services/handlers.js'));
+  const active = await app.evaluate(async () => {
+    // Nello scope di evaluate `require` non è iniettato, ma i Node global sì:
+    // `process.mainModule` è l'entry (src/main/main.js) e il suo require risolve
+    // i moduli già caricati (stessa istanza singleton usata in produzione).
+    const mreq = process.mainModule.require.bind(process.mainModule);
+    const Defaults = mreq('./services/defaultsStore.js');
+    const handlers = mreq('./services/handlers.js');
     const SB = globalThis.SN_SAFEBROWSE;
     const origGet = Defaults.get;
     try {
