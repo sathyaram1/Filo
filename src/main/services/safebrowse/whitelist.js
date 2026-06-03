@@ -18,9 +18,16 @@ const EXTRA = [
   'bing.com', 'duckduckgo.com', 'wikipedia.org', 'wikimedia.org',
   'reddit.com', 'quora.com', 'medium.com', 'stackoverflow.com',
   'stackexchange.com',
-  // Google properties
+  // Google properties + infra/CDN (evitano falsi positivi combosquat:
+  // contengono "google" ma sono domini ufficiali)
   'youtube.com', 'youtu.be', 'google.co.uk', 'google.de', 'google.fr',
   'google.es', 'android.com', 'chromium.org', 'gstatic.com',
+  'googleusercontent.com', 'googleapis.com', 'googletagmanager.com',
+  'google-analytics.com', 'ggpht.com', 'doubleclick.net', 'withgoogle.com',
+  'goo.gl', 'recaptcha.net',
+  // CDN/infra di altri brand (contengono il token del brand ma sono ufficiali)
+  'fbcdn.net', 'cdninstagram.com', 'licdn.com', 'twimg.com',
+  'paypalobjects.com', 'icloud-content.com',
   // Microsoft / Apple ecosistema
   'bing.net', 'msn.com', 'skype.com', 'xbox.com', 'windows.com',
   'sharepoint.com', 'onedrive.com', 'azure.com', 'visualstudio.com',
