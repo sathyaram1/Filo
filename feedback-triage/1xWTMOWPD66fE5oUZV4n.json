@@ -1,0 +1,7 @@
+{
+  "id": "1xWTMOWPD66fE5oUZV4n",
+  "status": "done",
+  "notes": "Aggiunti all'editor i moduli di formattazione richiesti: Grassetto, Corsivo, Sottolineato, Indietro (annulla), Avanti (ripeti), Dimensione testo (A-/A+) e Allineamento (sinistra/centro/destra/giustificato). Li trovi nel menu 'Aggiungi modulo' (clic su una cella vuota della griglia, oppure trascinandoli dalla palette in modalita modifica). Cliccando un modulo si applica la formattazione al testo selezionato nell'editor; allineamento e dimensione del testo ora vengono anche salvati insieme al documento (sopravvivono alla riapertura). Verificato con la suite Playwright completa (151 test, tutti verdi) piu 6 nuovi test che asseriscono che il testo cambia davvero: grassetto/corsivo applicati, testo centrato e salvato, dimensione ingrandita e salvata, annulla/ripeti funzionanti.",
+  "queuedAt": "2026-06-03T09:49:41.205Z",
+  "queuedBy": "routine"
+}
