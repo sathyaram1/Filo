@@ -163,10 +163,20 @@
     };
   }
 
+  // Applica al modello la dimensione griglia salvata (clamp nei limiti). I doc
+  // privi di `meta.grid` restano al default 7×10.
+  function loadGridSize() {
+    const g = doc && doc.meta && doc.meta.grid;
+    if (g && Number.isFinite(g.cols) && Number.isFinite(g.rows)) {
+      GRID_COLS = Math.max(GRID_MIN_COLS, Math.min(GRID_MAX_COLS, g.cols));
+      GRID_ROWS = Math.max(GRID_MIN_ROWS, Math.min(GRID_MAX_ROWS, g.rows));
+    }
+  }
+
   function loadDoc() {
     let raw = null;
     try { raw = JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch (_) {}
-    if (!raw || !raw.meta) { doc = blankDoc(); return; }
+    if (!raw || !raw.meta) { doc = blankDoc(); loadGridSize(); return; }
     doc = {
       meta: raw.meta,
       content: raw.content || { type: 'doc', content: [] },
