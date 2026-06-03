@@ -1235,6 +1235,39 @@ function broadcastToTabs(message) {
   } catch (_) {}
 }
 
+// Configura il rilevatore di siti pericolosi (services/safebrowse) con chiavi e
+// provider derivati dalle impostazioni. Va richiamato al boot e a ogni
+// UPDATE_SETTINGS. Best-effort: se SN_SAFEBROWSE non c'è o la feature è spenta,
+// disinnesca tutti i provider di rete/LLM/sandbox (resta solo l'analisi locale
+// deterministica, che non costa nulla e non fa rete).
+async function wireSafebrowse(settingsArg) {
+  const SB = globalThis.SN_SAFEBROWSE;
+  if (!SB || typeof SB.configure !== 'function') return;
+  let settings = settingsArg;
+  if (!settings) {
+    try { settings = await getEffectiveSettings(); } catch (_) { settings = {}; }
+  }
+  const sb = (settings.security && settings.security.safeBrowse) || {};
+  if (sb.enabled === false) {
+    SB.configure({ gsbKey: '', runLlm: null, enableSandbox: false, enableNetwork: false });
+    return;
+  }
+  // Giudice LLM: riusa la catena di fallback dei provider con un modello
+  // economico. Solo METADATI (mai contenuto pagina) passano da llm.judge.
+  const runLlm = sb.llmJudge === false ? null : async (messages) => {
+    const s = await getEffectiveSettings();
+    const attempts = buildAttemptChain(s, 'flash-lite');
+    const r = await Providers.completeWithFallback({ attempts, messages });
+    return r.text;
+  };
+  SB.configure({
+    gsbKey: sb.safeBrowsingKey || '',
+    runLlm,
+    enableSandbox: sb.sandbox !== false,
+    enableNetwork: sb.networkSignals !== false,
+  });
+}
+
 module.exports = {
   handleMessage,
   handleStream,
@@ -1242,4 +1275,5 @@ module.exports = {
   broadcastToTabs,
   handleAIRequest,
   maybeCategorizeAsync,
+  wireSafebrowse,
 };
