@@ -146,11 +146,16 @@ function get() {
     }
   }
 
-  if (remoteSecrets && remoteSecrets.apiKeys && typeof remoteSecrets.apiKeys === 'object') {
-    // Solo i valori non vuoti sovrascrivono le chiavi di build.
-    for (const k of ['openrouter', 'gemini', 'tavily']) {
-      const v = remoteSecrets.apiKeys[k];
-      if (typeof v === 'string' && v.trim()) out.apiKeys[k] = v.trim();
+  if (remoteSecrets) {
+    if (remoteSecrets.apiKeys && typeof remoteSecrets.apiKeys === 'object') {
+      // Solo i valori non vuoti sovrascrivono le chiavi di build.
+      for (const k of ['openrouter', 'gemini', 'tavily']) {
+        const v = remoteSecrets.apiKeys[k];
+        if (typeof v === 'string' && v.trim()) out.apiKeys[k] = v.trim();
+      }
+    }
+    if (typeof remoteSecrets.safeBrowsingKey === 'string' && remoteSecrets.safeBrowsingKey.trim()) {
+      out.safeBrowsingKey = remoteSecrets.safeBrowsingKey.trim();
     }
   }
   return out;
