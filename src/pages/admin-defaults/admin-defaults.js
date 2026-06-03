@@ -183,6 +183,7 @@
     $('apiKey-state').textContent = `(${keyStateText(present.openrouter)})`;
     $('apiKeyGemini-state').textContent = `(${keyStateText(present.gemini)})`;
     $('apiKeyTavily-state').textContent = `(${keyStateText(present.tavily)})`;
+    $('apiKeySafebrowse-state').textContent = `(${keyStateText(cfg.safeBrowsingKeyPresent)})`;
     renderModelRegistry(cfg.modelRegistry || {});
     renderModelsGrid(cfg.models || {});
   }
