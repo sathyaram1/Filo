@@ -183,6 +183,17 @@ const API = {
   recordCert,
   setProviders,
   configure,
+  // Quali stadi di rilevamento sono attivi dopo l'ultima configure() (diagnostica
+  // e test): gsb=true significa che la chiave Google Safe Browsing è in uso.
+  activeProviders() {
+    return {
+      gsb: !!providers.gsb,
+      rdap: !!providers.rdap,
+      ct: !!providers.ct,
+      llm: !!providers.llm,
+      sandbox: !!providers.sandbox,
+    };
+  },
   // cache (per test / invalidazione)
   _caches: { gsbCache, ageCache, certCache, sandboxCache, llmCache },
   // sotto-moduli (per test)
