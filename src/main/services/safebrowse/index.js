@@ -194,6 +194,9 @@ const API = {
   confusables,
   psl,
   engine,
+  net,
+  llm,
+  sandbox,
 };
 
 globalThis.SN_SAFEBROWSE = API;
