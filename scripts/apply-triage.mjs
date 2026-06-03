@@ -236,9 +236,25 @@ async function main() {
       git(['add', '-A', '--', 'feedback-triage']);
       const staged = git(['diff', '--cached', '--name-only']);
       if (staged) {
-        git(['commit', '-m', `feedback: applica e svuota ${applied.length} triage dalla coda`]);
-        try { git(['push', 'origin', 'HEAD']); console.log('  ↑ coda svuotata e pushata.'); }
-        catch (e) { console.warn('  ! push fallito (fai `git pull --rebase origin main` e ripusha):', String(e.message).slice(0, 160)); }
+        // Identità inline: funziona anche in CI dove non c'è user.name globale.
+        // `[skip ci]` evita che questo stesso push ri-triggeri la GitHub Action
+        // (il path-filter su feedback-triage/ scatterebbe anche sulle rimozioni).
+        git([
+          '-c', 'user.email=filo-triage-bot@local', '-c', 'user.name=filo-triage-bot',
+          'commit', '-m', `feedback: applica e svuota ${applied.length} triage dalla coda [skip ci]`,
+        ]);
+        // Push best-effort con un paio di retry: se una routine ha pushato nel
+        // frattempo, rebase e ripeti (come fa il workflow di release).
+        let pushed = false;
+        for (let i = 0; i < 3 && !pushed; i++) {
+          try { git(['push', 'origin', `HEAD:${MAIN_BRANCH}`]); pushed = true; }
+          catch (e) {
+            if (i === 2) { console.warn('  ! push fallito dopo i retry:', String(e.message).slice(0, 160)); break; }
+            try { git(['pull', '--rebase', 'origin', MAIN_BRANCH]); }
+            catch (e2) { console.warn('  ! rebase fallito, lascio il commit locale:', String(e2.message).slice(0, 160)); break; }
+          }
+        }
+        if (pushed) console.log('  ↑ coda svuotata e pushata.');
       }
     } catch (e) {
       console.warn('  ! commit della coda svuotata fallito:', String(e.message).slice(0, 160));
