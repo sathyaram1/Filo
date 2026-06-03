@@ -244,6 +244,34 @@
     options_security_popup_blocked: 'Popup bloccato da %s',
     options_security_popup_open: 'Apri',
     options_security_popup_dismiss: 'Chiudi',
+    // Rilevamento siti pericolosi
+    options_security_safebrowse: 'Avvisa sui siti pericolosi',
+    options_security_safebrowse_desc:
+      'Riconosce i siti che fingono di essere un altro marchio (es. una finta pagina di login), ' +
+      'i domini appena creati e le connessioni non sicure, e ti avvisa prima che tu inserisca password ' +
+      'o dati di pagamento. I controlli di base sono gratuiti e attivi sempre; non bloccano mai la ' +
+      'navigazione, ti mostrano solo un avviso che puoi ignorare.',
+    options_security_safebrowse_network: 'Controlli di rete (età del dominio e del certificato)',
+    options_security_safebrowse_network_desc:
+      'Interroga servizi pubblici per sapere da quanto tempo esiste il dominio e il suo certificato: ' +
+      'un sito "di un marchio noto" creato pochi giorni fa è un forte segnale di truffa. Non richiede ' +
+      'alcuna chiave. Disattivalo se non vuoi che Filo faccia queste richieste esterne.',
+    options_security_safebrowse_llm: 'Giudizio AI sui casi sospetti',
+    options_security_safebrowse_llm_desc:
+      'Solo quando un sito resta dubbio, un modello AI valuta i soli indizi di identità del dominio ' +
+      '(mai il contenuto della pagina) per decidere se avvisarti. Usa i modelli e le chiavi che hai già ' +
+      'configurato.',
+    options_security_safebrowse_sandbox: 'Apri i link sospetti in una finestra isolata',
+    options_security_safebrowse_sandbox_desc:
+      'Per i link accorciati o con molti redirect, Filo li apre prima in una finestra nascosta e senza ' +
+      'i tuoi dati, segue dove portano davvero e blocca i download automatici, così può avvisarti sulla ' +
+      'destinazione reale.',
+    options_security_safebrowse_key_label: 'Chiave Google Safe Browsing (facoltativa)',
+    options_security_safebrowse_key_desc:
+      'Aggiungendo una chiave gratuita di Google Safe Browsing, Filo controlla anche la blacklist ufficiale ' +
+      'di Google dei siti di phishing e malware. Senza chiave questo controllo viene semplicemente saltato; ' +
+      'tutti gli altri restano attivi.',
+    options_security_safebrowse_key_placeholder: 'Incolla qui la chiave (lasciala vuota per saltarla)',
     security_export_title: 'Esporta dati Filo',
     security_export_label: 'Esporta dati',
     security_export_desc:
