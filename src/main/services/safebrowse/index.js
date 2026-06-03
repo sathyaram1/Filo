@@ -24,6 +24,9 @@ const brands = require('./brands');
 const whitelist = require('./whitelist');
 const confusables = require('./confusables');
 const psl = require('./psl');
+const net = require('./net');
+const llm = require('./llm');
+const sandbox = require('./sandbox');
 
 // ── Cache TTL semplice ──────────────────────────────────────────────────
 class TtlCache {
