@@ -713,6 +713,9 @@ async function handleMessage(msg, sender = {}) {
           }
         }
       } catch (_) {}
+      // Riconfigura il rilevatore siti pericolosi (chiave GSB, LLM, rete, sandbox)
+      // così le modifiche valgono subito senza riavviare.
+      wireSafebrowse(merged).catch(() => {});
       return { ok: true, settings: merged };
     }
     case MSG.SAVE_PAGE: {
