@@ -186,6 +186,7 @@
         return { id: m.id || newId('mod'), type: m.type, ...rect, data: m.data || {} };
       }),
     };
+    loadGridSize();
   }
 
   function save(flash) {
