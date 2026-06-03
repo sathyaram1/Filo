@@ -352,14 +352,6 @@
     winCloseBtn?.addEventListener('click', () => api.window.close());
   }
 
-  addrEl.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      const a = activeTab();
-      if (a) api.tabs.navigate(a.id, addrEl.value);
-    }
-  });
-  addrEl.addEventListener('focus', () => addrEl.select());
-
   // Scorciatoie globali a livello shell.
   window.addEventListener('keydown', (e) => {
     const meta = e.ctrlKey || e.metaKey;
@@ -370,8 +362,11 @@
       e.preventDefault();
       const a = activeTab(); if (a) api.tabs.close(a.id);
     } else if (meta && e.key.toLowerCase() === 'l') {
+      // L'indirizzo si digita dalla home: Ctrl+L apre la home di Filo.
       e.preventDefault();
-      addrEl.focus();
+      const a = activeTab();
+      if (a) api.tabs.navigate(a.id, 'filo://newtab/');
+      else api.tabs.open('filo://newtab/');
     } else if (meta && e.key.toLowerCase() === 'r') {
       e.preventDefault();
       const a = activeTab(); if (a) api.tabs.reload(a.id);
