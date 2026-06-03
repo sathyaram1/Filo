@@ -1324,7 +1324,7 @@
     root.classList.toggle('settings-mode', settingsMode);
     settingsView.hidden = !settingsMode;
     docWrap.hidden = settingsMode;
-    if (settingsMode) renderPalette();
+    if (settingsMode) { renderGridControls(); renderPalette(); }
   }
   function renderPalette() {
     paletteEl.innerHTML = '';
