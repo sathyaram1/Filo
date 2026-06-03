@@ -1009,6 +1009,28 @@ async function handleMessage(msg, sender = {}) {
       } catch (e) {
         return { ok: false, error: e.message || String(e), results: [] };
       }
+    // ── Rilevamento siti pericolosi ────────────────────────────────────
+    // Il verdetto vive nel TabManager (per tab: bypass/dismiss); qui inoltriamo
+    // alla finestra MITTENTE così l'overlay/banner agisce sul tab giusto.
+    case MSG.SAFEBROWSE_GET: {
+      const win = winOf(sender);
+      const tabId = sender?.tab?.id;
+      if (!win || !win._filoTabs || !tabId) return { ok: true, level: 'safe', message: null };
+      const ctx = { hasPassword: !!msg.hasPassword, hasPayment: !!msg.hasPayment };
+      return win._filoTabs.safebrowseGet(tabId, msg.url || origin, ctx);
+    }
+    case MSG.SAFEBROWSE_PROCEED: {
+      const win = winOf(sender);
+      const tabId = sender?.tab?.id;
+      if (!win || !win._filoTabs || !tabId) return { ok: false };
+      return win._filoTabs.safebrowseProceed(tabId, msg.url || origin);
+    }
+    case MSG.SAFEBROWSE_DISMISS: {
+      const win = winOf(sender);
+      const tabId = sender?.tab?.id;
+      if (!win || !win._filoTabs || !tabId) return { ok: false };
+      return win._filoTabs.safebrowseDismiss(tabId, msg.url || origin);
+    }
     case MSG.SUBMIT_FEEDBACK: {
       try {
         if (!globalThis.SN_FEEDBACK?.submit) {
