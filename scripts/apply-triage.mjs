@@ -212,19 +212,13 @@ async function main() {
     return;
   }
 
-  const rt = findAdminRefreshToken();
-  if (!rt) {
-    console.error('Manca FILO_ADMIN_REFRESH_TOKEN (env o tests/agent/.env della root).');
-    console.error('Ottienilo con: node scripts/admin-login.mjs');
-    process.exit(1);
-  }
-  const idToken = await mintIdToken(rt);
+  const bearer = await acquireBearer();
 
   const applied = [];
   let failures = 0;
   for (const it of items) {
     if (it.error) { console.warn(`  ✗ salto ${it.file}: ${it.error}`); failures++; continue; }
-    const r = await patchFeedback(it.entry, idToken);
+    const r = await patchFeedback(it.entry, bearer);
     if (r.ok) {
       console.log(`  ✓ ${it.entry.id} → ${it.entry.status}`);
       unlinkSync(it.file); applied.push(it.file);
