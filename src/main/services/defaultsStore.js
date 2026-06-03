@@ -214,16 +214,24 @@ async function update(partial, idToken) {
   if (partial.modelRegistry && typeof partial.modelRegistry === 'object') { modelFields.modelRegistry = toFsValue(partial.modelRegistry); modelMask.push('modelRegistry'); }
   if (modelMask.length) await patchDoc(MODELS_DOC, modelFields, modelMask, idToken);
 
-  // Doc segreti (chiavi). Scriviamo solo le chiavi presenti come stringa.
+  // Doc segreti (chiavi). Scriviamo solo i campi presenti come stringa.
+  const secretFields = {};
+  const secretMask = [];
   if (partial.apiKeys && typeof partial.apiKeys === 'object') {
     const ak = {};
     for (const k of ['openrouter', 'gemini', 'tavily']) {
       if (typeof partial.apiKeys[k] === 'string') ak[k] = partial.apiKeys[k].trim();
     }
     if (Object.keys(ak).length) {
-      await patchDoc(SECRETS_DOC, { apiKeys: toFsValue(ak) }, ['apiKeys'], idToken);
+      secretFields.apiKeys = toFsValue(ak);
+      secretMask.push('apiKeys');
     }
   }
+  if (typeof partial.safeBrowsingKey === 'string') {
+    secretFields.safeBrowsingKey = toFsValue(partial.safeBrowsingKey.trim());
+    secretMask.push('safeBrowsingKey');
+  }
+  if (secretMask.length) await patchDoc(SECRETS_DOC, secretFields, secretMask, idToken);
 
   await refresh();
   return getPublicForAdmin();
