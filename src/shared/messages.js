@@ -55,6 +55,19 @@
     // da ponte: il main lo inoltra alla shell, che mostra/nasconde un velo
     // d'ombra sopra la sua barra così TUTTO Filo entra in penombra. → { ok }
     FEEDBACK_ANNOTATE: 'feedback_annotate',       // { on: boolean }
+    // Disegno sull'intera app: la barra in alto di Filo vive nella shell, non
+    // nella pagina, quindi serve una tela di disegno anche lì. Questi messaggi
+    // sincronizzano il disegno della barra (shell) con il box feedback (pagina):
+    //   - FEEDBACK_CLEAR_DRAW: il box ha premuto "Cancella disegno" → il main
+    //     dice alla shell di cancellare anche i tratti sulla barra in alto.
+    //   - FEEDBACK_DRAW_STATE: broadcast main→pagina, { topbar: bool } → il box
+    //     sa se c'è un disegno sulla barra (per mostrare "Cancella disegno" e
+    //     allegare lo screenshot anche quando si è disegnato SOLO sulla barra).
+    //   - CAPTURE_FEEDBACK_TOPBAR: il box chiede lo scatto annotato della sola
+    //     barra in alto, da impilare sopra lo screenshot della pagina.
+    FEEDBACK_CLEAR_DRAW: 'feedback_clear_draw',   // { } → { ok }
+    FEEDBACK_DRAW_STATE: 'feedback_draw_state',   // broadcast → { topbar: bool }
+    CAPTURE_FEEDBACK_TOPBAR: 'capture_feedback_topbar', // → { ok, dataUrl?, barHeight? }
     // Triage admin di un feedback (cambio stato/note/priorità). Instradato dal
     // main, che allega il Firebase ID token come Bearer e RIFIUTA se l'utente
     // loggato non è admin. → { ok } | { ok:false, error }
