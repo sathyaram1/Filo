@@ -465,7 +465,10 @@
     // Invio
     sendBtn.addEventListener('click', async () => {
       const text = textEl.value.trim();
-      if (!text && images.length === 0 && !includeShot) {
+      // Allega automaticamente lo screenshot annotato quando c'è un disegno,
+      // ovunque sia (pagina o barra in alto): niente più toggle.
+      const wantShot = hasAnyDrawing();
+      if (!text && images.length === 0 && !wantShot) {
         statusEl.textContent = 'Scrivi qualcosa, allega un\'immagine o annota lo schermo.';
         return;
       }
@@ -474,18 +477,31 @@
       statusEl.textContent = 'Invio in corso…';
       try {
         const clientId = await getClientId();
-        // Costruisce la lista immagini: incollate/trascinate + (se selezionato)
-        // lo screenshot della pagina con sopra il disegno.
+        // Costruisce la lista immagini: incollate/trascinate/allegate + (se c'è
+        // un disegno) lo screenshot di tutta l'app con sopra l'annotazione.
         const outImages = images.slice();
-        if (includeShot) {
+        if (wantShot) {
           // Nascondiamo l'overlay (box + ombra) per non includerlo nello scatto.
           root.style.visibility = 'hidden';
           await new Promise((r) => setTimeout(r, 60));
           const shot = await captureScreenshot();
+          // Scatto annotato della barra in alto di Filo (vive nella shell): lo
+          // chiediamo solo se ci si ha disegnato sopra.
+          let topbarShot = null;
+          if (topbarHasDrawing) {
+            try {
+              const r = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_FEEDBACK_TOPBAR });
+              if (r?.ok && r.dataUrl) topbarShot = r.dataUrl;
+            } catch (_) {}
+          }
           root.style.visibility = '';
           if (shot) {
             const annotated = await composeAnnotated(shot);
-            if (outImages.length < MAX_IMAGES) outImages.push({ dataUrl: annotated });
+            const full = await stackTopbar(annotated, topbarShot);
+            if (outImages.length < MAX_IMAGES) outImages.push({ dataUrl: full });
+          } else if (topbarShot) {
+            // La pagina non si lascia catturare ma la barra sì: allega almeno quella.
+            if (outImages.length < MAX_IMAGES) outImages.push({ dataUrl: topbarShot });
           } else {
             statusEl.textContent = 'Screenshot non disponibile su questa pagina.';
           }
