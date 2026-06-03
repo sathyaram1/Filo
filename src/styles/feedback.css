@@ -68,25 +68,6 @@
   outline-offset: -4px;
 }
 
-/* Pulsante chiusura: piccola "×" SVG flottante in alto a destra (niente più
-   barra header con titolo). */
-.sn-fb-close {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  all: unset;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  color: var(--sn-muted);
-  z-index: 1;
-}
-.sn-fb-close:hover { color: var(--sn-fg); background: rgba(127, 127, 127, 0.12); }
-
 .sn-fb-body {
   padding: 16px 14px 12px;
   overflow-y: auto;
