@@ -167,7 +167,7 @@ function toFsValue(v) {
   throw new Error('tipo non supportato per Firestore value');
 }
 
-async function patchFeedback(entry, idToken) {
+async function patchFeedback(entry, bearer) {
   const fields = { status: toFsValue(entry.status) };
   const mask = ['status'];
   if (typeof entry.notes === 'string') { fields.notes = toFsValue(entry.notes); mask.push('notes'); }
@@ -176,7 +176,7 @@ async function patchFeedback(entry, idToken) {
   const url = `${FIRESTORE_BASE}/feedback/${encodeURIComponent(entry.id)}?${qs}`;
   const res = await fetch(url, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
     body: JSON.stringify({ fields }),
   });
   return { status: res.status, ok: res.ok, body: res.ok ? '' : (await res.text()).slice(0, 200) };
