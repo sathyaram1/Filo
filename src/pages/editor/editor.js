@@ -344,6 +344,103 @@
     document.execCommand(cmd, false, val);
     onDocInput();
   }
+  // Variante che forza l'output in CSS inline (styleWithCSS). Serve per i comandi
+  // che vogliamo serializzare in modo pulito: l'allineamento (style text-align sul
+  // blocco) e la dimensione del testo (<span style="font-size:…">). Riportiamo
+  // subito styleWithCSS a false così grassetto/corsivo continuano a usare i tag
+  // <b>/<i> (che il serializzatore già conosce).
+  function execCss(cmd, val) {
+    docEl.focus();
+    document.execCommand('styleWithCSS', false, true);
+    document.execCommand(cmd, false, val);
+    document.execCommand('styleWithCSS', false, false);
+    onDocInput();
+  }
+  // Dimensione testo: indice 1..7 (3 = normale). A+/A− muovono l'indice e
+  // applicano la dimensione corrispondente alla selezione corrente.
+  let fontSizeIdx = 3;
+  function stepFontSize(dir) {
+    fontSizeIdx = Math.max(1, Math.min(7, fontSizeIdx + dir));
+    execCss('fontSize', String(fontSizeIdx));
+  }
+  // SVG per le icone di allineamento: 4 righe la cui posizione comunica
+  // sinistra/centro/destra/giustificato.
+  function alignSvg(kind) {
+    const rows = [[3, 12], [6, 8], [9, 12], [12, 8]];
+    const lines = rows.map(([y, len]) => {
+      let w = len, x = 2;
+      if (kind === 'justify') { w = 12; x = 2; }
+      else if (kind === 'right') x = 14 - len;
+      else if (kind === 'center') x = (16 - len) / 2;
+      return `<rect x="${x}" y="${y}" width="${w}" height="1.6" rx="0.8" fill="currentColor"/>`;
+    }).join('');
+    return `<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">${lines}</svg>`;
+  }
+  // Bottone di un modulo di formattazione. Il mousedown con preventDefault è
+  // intenzionale: tenere il default farebbe perdere la selezione/focus
+  // dell'editor (cliccare un elemento esterno collassa la selezione), e il
+  // comando di formattazione non agirebbe sul testo voluto. In modalità modifica
+  // moduli lasciamo invece passare il click così si apre la configurazione.
+  function fmtButton(label, title, onAct) {
+    const b = document.createElement('button');
+    b.className = 'ed-fmt-btn';
+    b.type = 'button';
+    b.innerHTML = label;
+    b.title = title;
+    b.setAttribute('aria-label', title);
+    b.addEventListener('mousedown', (e) => {
+      if (settingsMode) return;
+      e.preventDefault();
+      e.stopPropagation();
+      onAct();
+    });
+    b.addEventListener('click', (e) => { if (!settingsMode) e.stopPropagation(); });
+    return b;
+  }
+  const SIMPLE_FORMATS = {
+    bold:      { glyph: '<b>B</b>', title: 'Grassetto (Ctrl+B)', act: () => exec('bold') },
+    italic:    { glyph: '<i>I</i>', title: 'Corsivo (Ctrl+I)', act: () => exec('italic') },
+    underline: { glyph: '<u>U</u>', title: 'Sottolineato (Ctrl+U)', act: () => exec('underline') },
+    undo:      { glyph: ICONS.back ? ICONS.back(16) : '↶', title: 'Indietro (annulla)', act: () => exec('undo') },
+    redo:      { glyph: ICONS.forward ? ICONS.forward(16) : '↷', title: 'Avanti (ripeti)', act: () => exec('redo') },
+  };
+  function renderSimpleFormat(cell, m) {
+    cell.classList.add('ed-fmt-mod');
+    const pad = document.createElement('div');
+    pad.className = 'ed-mod-pad ed-fmt';
+    const cfg = SIMPLE_FORMATS[m.type];
+    pad.appendChild(fmtButton(cfg.glyph, cfg.title, cfg.act));
+    cell.appendChild(pad);
+  }
+  function renderTextSize(cell, _m) {
+    cell.classList.add('ed-fmt-mod');
+    const pad = document.createElement('div');
+    pad.className = 'ed-mod-pad ed-fmt ed-fmt-row';
+    const minus = fmtButton('A<small>−</small>', 'Riduci dimensione testo', () => stepFontSize(-1));
+    const plus = fmtButton('A<big>+</big>', 'Aumenta dimensione testo', () => stepFontSize(1));
+    minus.dataset.size = 'down';
+    plus.dataset.size = 'up';
+    pad.appendChild(minus);
+    pad.appendChild(plus);
+    cell.appendChild(pad);
+  }
+  function renderAlign(cell, _m) {
+    cell.classList.add('ed-fmt-mod');
+    const pad = document.createElement('div');
+    pad.className = 'ed-mod-pad ed-fmt ed-fmt-row ed-align';
+    const defs = [
+      ['left', 'Allinea a sinistra', 'justifyLeft'],
+      ['center', 'Allinea al centro', 'justifyCenter'],
+      ['right', 'Allinea a destra', 'justifyRight'],
+      ['justify', 'Giustifica', 'justifyFull'],
+    ];
+    for (const [kind, title, cmd] of defs) {
+      const b = fmtButton(alignSvg(kind), title, () => execCss(cmd));
+      b.dataset.align = kind;
+      pad.appendChild(b);
+    }
+    cell.appendChild(pad);
+  }
 
   // ── Shortcut markdown a livello blocco ──────────────────────────────
   function handleMarkdownBlock() {
