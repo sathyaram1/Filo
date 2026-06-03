@@ -146,9 +146,9 @@
     const sendBtn = root.querySelector('.sn-fb-send');
     const attachBtn = root.querySelector('.sn-fb-attach');
     const clearBtn = root.querySelector('.sn-fb-clear');
-    const closeBtn = root.querySelector('.sn-fb-close');
     const cancelBtn = root.querySelector('.sn-fb-cancel');
     const canvas = root.querySelector('.sn-fb-canvas');
+    const fileInput = root.querySelector('.sn-fb-file');
 
     // stato locale: data URLs delle immagini incollate/trascinate
     const images = [];
