@@ -43,6 +43,7 @@
     $('geminiDirect-label').textContent = I18n.t('admin_defaults_gemini_direct');
     $('h-keys').textContent = I18n.t('admin_defaults_keys');
     $('keys-desc').textContent = I18n.t('admin_defaults_keys_desc');
+    $('apiKeySafebrowse-desc').textContent = I18n.t('admin_defaults_safebrowse_key_desc');
     $('h-model-registry').textContent = I18n.t('options_h_model_registry');
     $('model-registry-desc').textContent = I18n.t('options_model_registry_desc');
     $('h-models').textContent = I18n.t('options_models');
