@@ -45,6 +45,20 @@ html, body {
   height: 88px;
 }
 
+/* ── Chrome compatto (fuori dalla home di Filo) ─────────────────────────────
+   shell.js mette data-chrome-compact sul <html> quando la pagina attiva non è
+   la home: la barra indirizzi (icone di navigazione + campo URL) sparisce e
+   resta solo la fila di tab + i controlli finestra. La shell si riduce a 40px
+   (la sola tab-row) e il main fa risalire la WebContentsView a coprire lo
+   spazio liberato. Sulla home Filo il chrome torna esteso e tutte le icone
+   ricompaiono. */
+html[data-chrome-compact="1"] .shell {
+  height: 40px;
+}
+html[data-chrome-compact="1"] .addr {
+  display: none;
+}
+
 /* ── tab bar ──────────────────────────────────────────────────────────── */
 .tab-row {
   display: flex;
