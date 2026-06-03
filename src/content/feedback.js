@@ -104,24 +104,25 @@
     const root = document.createElement('div');
     root.className = 'sn-fb-overlay';
     root.dataset.snTheme = document.documentElement.dataset.snTheme || '';
+    // Layout richiesto dall'utente: solo il box per scrivere + 4 bottoni
+    // (Allega, Chiudi, Invia, e "Cancella disegno" che compare solo quando c'è
+    // qualcosa da cancellare). Si può trascinare/incollare/allegare immagini e
+    // disegnare a mano libera su TUTTA l'app (pagina + barra in alto).
     root.innerHTML = `
       <canvas class="sn-fb-canvas"></canvas>
       <div class="sn-fb-modal" role="dialog" aria-modal="true" aria-label="Invia feedback">
-        <button type="button" class="sn-fb-close" aria-label="Chiudi">${icon('close', 18)}</button>
         <div class="sn-fb-body">
-          <textarea class="sn-fb-text" rows="4" placeholder="Cosa è successo? Cosa ti aspettavi?"></textarea>
-          <div class="sn-fb-tools">
-            <button type="button" class="sn-fb-btn-secondary sn-fb-attach" aria-pressed="false">${icon('screenshot', 16)}<span>Annota e allega</span></button>
-            <button type="button" class="sn-fb-clear" hidden>Cancella disegno</button>
-            <span class="sn-fb-meta"></span>
-          </div>
+          <textarea class="sn-fb-text" rows="4" placeholder="Descrivi il bug o la feature che vorresti. Puoi trascinare qui documenti o immagini."></textarea>
           <div class="sn-fb-thumbs"></div>
           <div class="sn-fb-status" aria-live="polite"></div>
         </div>
-        <div class="sn-fb-footer">
-          <button type="button" class="sn-fb-btn-secondary sn-fb-cancel">Annulla</button>
+        <div class="sn-fb-actions">
+          <button type="button" class="sn-fb-btn-secondary sn-fb-attach">${icon('screenshot', 16)}<span>Allega</span></button>
+          <button type="button" class="sn-fb-btn-secondary sn-fb-cancel">Chiudi</button>
           <button type="button" class="sn-fb-btn sn-fb-send">Invia</button>
+          <button type="button" class="sn-fb-clear" hidden>Cancella disegno</button>
         </div>
+        <input type="file" class="sn-fb-file" accept="image/*" multiple hidden />
       </div>
     `;
     document.documentElement.appendChild(root);
