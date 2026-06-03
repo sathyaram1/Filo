@@ -1197,7 +1197,7 @@
       item.className = 'ed-palette-item';
       item.setAttribute('draggable', 'true');
       item.innerHTML = `
-        <div class="pi-title"><span class="pi-ico">${ICONS[meta.icon] ? ICONS[meta.icon](18) : ''}</span>${meta.label}</div>
+        <div class="pi-title"><span class="pi-ico">${meta.glyph || (ICONS[meta.icon] ? ICONS[meta.icon](18) : '')}</span>${meta.label}</div>
         <div class="pi-desc">${meta.desc}</div>
         <div class="pi-size">Dimensione ${meta.defaultW}×${meta.defaultH}</div>`;
       item.addEventListener('dragstart', (e) => {
