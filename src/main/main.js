@@ -94,16 +94,6 @@ app.whenReady().then(async () => {
   // dalle impostazioni. Non blocca: senza chiavi resta solo l'analisi locale.
   try { require('./services/handlers').wireSafebrowse().catch(() => {}); } catch (_) {}
 
-  // Solo in test: esponi i singleton di handlers/defaults così i test Playwright
-  // (che girano nel main via app.evaluate, dove `require` non è iniettato)
-  // possono esercitare la catena reale chiave-condivisa → motore.
-  if (process.env.NODE_ENV === 'test') {
-    try {
-      globalThis.__filoHandlers = require('./services/handlers');
-      globalThis.__filoDefaults = require('./services/defaultsStore');
-    } catch (_) {}
-  }
-
   mainWindow = createMainWindow();
   registerShortcuts(mainWindow);
 
