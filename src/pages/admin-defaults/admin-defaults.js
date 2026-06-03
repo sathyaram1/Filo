@@ -246,6 +246,7 @@
       $('apiKey').value = '';
       $('apiKeyGemini').value = '';
       $('apiKeyTavily').value = '';
+      $('apiKeySafebrowse').value = '';
       applyConfig(res.config || {});
       status.textContent = I18n.t('admin_defaults_saved');
     } catch (e) {
