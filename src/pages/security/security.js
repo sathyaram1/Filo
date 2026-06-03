@@ -119,8 +119,6 @@
     $('sec-safebrowse-network').addEventListener('change', save);
     $('sec-safebrowse-llm').addEventListener('change', save);
     $('sec-safebrowse-sandbox').addEventListener('change', save);
-    // La chiave si salva quando l'utente esce dal campo (no salvataggio a ogni tasto).
-    $('sec-safebrowse-key').addEventListener('change', save);
     $('sec-export-btn').addEventListener('click', exportData);
   });
 })();
