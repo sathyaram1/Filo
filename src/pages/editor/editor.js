@@ -286,8 +286,12 @@
     if (!content || !Array.isArray(content.content)) return '<p></p>';
     return content.content.map((b) => {
       const inner = inlineToHtml(b.content) || '';
+      const alignStyle = b.attrs?.align ? ` style="text-align:${b.attrs.align}"` : '';
       switch (b.type) {
-        case 'heading': return `<h${b.attrs?.level || 1}>${inner}</h${b.attrs?.level || 1}>`;
+        case 'heading': {
+          const lvl = b.attrs?.level || 1;
+          return `<h${lvl}${alignStyle}>${inner}</h${lvl}>`;
+        }
         case 'blockquote': {
           const para = b.content && b.content[0] ? inlineToHtml(b.content[0].content) : '';
           return `<blockquote>${para}</blockquote>`;
