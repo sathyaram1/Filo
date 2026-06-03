@@ -270,12 +270,10 @@
       'Per i link accorciati o con molti redirect, Filo li apre prima in una finestra nascosta e senza ' +
       'i tuoi dati, segue dove portano davvero e blocca i download automatici, così può avvisarti sulla ' +
       'destinazione reale.',
-    options_security_safebrowse_key_label: 'Chiave Google Safe Browsing (facoltativa)',
-    options_security_safebrowse_key_desc:
-      'Aggiungendo una chiave gratuita di Google Safe Browsing, Filo controlla anche la blacklist ufficiale ' +
-      'di Google dei siti di phishing e malware. Senza chiave questo controllo viene semplicemente saltato; ' +
-      'tutti gli altri restano attivi.',
-    options_security_safebrowse_key_placeholder: 'Incolla qui la chiave (lasciala vuota per saltarla)',
+    options_security_safebrowse_key_managed:
+      'Il controllo della blacklist ufficiale di Google (phishing e malware) usa una chiave condivisa, ' +
+      'gestita centralmente dall\'amministratore in "Modelli predefiniti": è già attiva per tutti gli ' +
+      'account, non devi configurare nulla qui.',
     security_export_title: 'Esporta dati Filo',
     security_export_label: 'Esporta dati',
     security_export_desc:
