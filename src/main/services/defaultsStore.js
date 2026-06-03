@@ -128,6 +128,9 @@ function get() {
     models: { ...(C.DEFAULT_MODELS || {}) },
     modelRegistry: { ...(C.DEFAULT_MODEL_REGISTRY || {}) },
     apiKeys: getBuildKeys(),
+    // Chiave Google Safe Browsing condivisa (rilevamento siti pericolosi).
+    // Non è una chiave di build: l'unica fonte è l'override admin via Firestore.
+    safeBrowsingKey: '',
   };
 
   if (remoteModels) {
