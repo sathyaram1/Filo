@@ -73,6 +73,24 @@
     // riflettere il default anche in casi limite (es. chiave esistente ma null).
     $('sec-protect-ip').checked = sec.protectIpLeak !== false;
     $('sec-block-popups').checked = sec.blockPopups !== false;
+    const sb = sec.safeBrowse || {};
+    $('sec-safebrowse').checked = sb.enabled !== false;
+    $('sec-safebrowse-network').checked = sb.networkSignals !== false;
+    $('sec-safebrowse-llm').checked = sb.llmJudge !== false;
+    $('sec-safebrowse-sandbox').checked = sb.sandbox !== false;
+    $('sec-safebrowse-key').value = sb.safeBrowsingKey || '';
+    syncSafebrowseEnabled();
+  }
+
+  // I sotto-controlli del rilevamento siti pericolosi sono attivi solo quando il
+  // controllo principale è acceso.
+  function syncSafebrowseEnabled() {
+    const on = $('sec-safebrowse').checked;
+    const sub = $('sec-safebrowse-sub');
+    sub.style.opacity = on ? '1' : '0.45';
+    for (const id of ['sec-safebrowse-network', 'sec-safebrowse-llm', 'sec-safebrowse-sandbox', 'sec-safebrowse-key']) {
+      $(id).disabled = !on;
+    }
   }
 
   async function save() {
@@ -80,6 +98,13 @@
       security: {
         protectIpLeak: !!$('sec-protect-ip').checked,
         blockPopups: !!$('sec-block-popups').checked,
+        safeBrowse: {
+          enabled: !!$('sec-safebrowse').checked,
+          networkSignals: !!$('sec-safebrowse-network').checked,
+          llmJudge: !!$('sec-safebrowse-llm').checked,
+          sandbox: !!$('sec-safebrowse-sandbox').checked,
+          safeBrowsingKey: $('sec-safebrowse-key').value.trim(),
+        },
       },
     };
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
@@ -94,6 +119,12 @@
     // Niente pulsante "Salva": ogni toggle viene applicato e persistito subito.
     $('sec-protect-ip').addEventListener('change', save);
     $('sec-block-popups').addEventListener('change', save);
+    $('sec-safebrowse').addEventListener('change', () => { syncSafebrowseEnabled(); save(); });
+    $('sec-safebrowse-network').addEventListener('change', save);
+    $('sec-safebrowse-llm').addEventListener('change', save);
+    $('sec-safebrowse-sandbox').addEventListener('change', save);
+    // La chiave si salva quando l'utente esce dal campo (no salvataggio a ogni tasto).
+    $('sec-safebrowse-key').addEventListener('change', save);
     $('sec-export-btn').addEventListener('click', exportData);
   });
 })();
