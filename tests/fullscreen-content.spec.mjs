@@ -27,10 +27,12 @@ test('fullscreen: il contenuto copre la barra e Esc ripristina', async ({ app, o
   const page = await openTab('filo://editor/editor.html');
   await page.waitForFunction(() => !!(window.chrome && chrome.runtime && chrome.runtime.sendMessage), null, { timeout: 8000 });
 
-  // Stato iniziale: la view sta SOTTO la barra della shell.
+  // Stato iniziale: la view sta SOTTO la barra della shell (qui l'editor non è
+  // la home, quindi chrome compatto → la barra indirizzi è già nascosta e la
+  // view parte dalla sola fila di tab).
   const before = await readActiveView(app);
   expect(before.contentFullscreen).toBe(false);
-  expect(before.y).toBe(before.shellHeight);
+  expect(before.y).toBe(before.restingTop);
   expect(before.y).toBeGreaterThan(0);
 
   // Attiva il fullscreen attraverso il vero percorso messaggio (come fa il menu).
