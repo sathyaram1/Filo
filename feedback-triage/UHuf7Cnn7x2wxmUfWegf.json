@@ -1,0 +1,7 @@
+{
+  "id": "UHuf7Cnn7x2wxmUfWegf",
+  "status": "done",
+  "notes": "Sull'editor ho lavorato sulla griglia dei moduli su più fronti: 1) quando trascini un modulo ora vedi un'anteprima a opacità ridotta nella cella di destinazione, così capisci subito dove finirà prima di rilasciare; 2) i '+' delle celle vuote sono ora pochissimo visibili (si accendono solo al passaggio del mouse o durante un trascinamento); 3) la dimensione della griglia è regolabile: nella vista moduli (ingranaggio), sopra l'elenco dei moduli, c'è un controllo 'Dimensione griglia' per aumentare/ridurre colonne e righe, e la scelta viene salvata col documento; 4) ho aggiunto il modulo 'Font' che cambia il tipo di carattere del testo selezionato (Georgia, Times, Arial, Verdana, Courier, Comic Sans). Il trascinamento dei moduli resta sempre disponibile afferrandoli dalla maniglia. Verificato con test automatici che controllano che la griglia cambi davvero dimensione e la scelta persista, che il font venga applicato al testo e sopravviva al salvataggio, e che l'anteprima fantasma compaia durante il drag e sparisca al rilascio.",
+  "queuedAt": "2026-06-03T14:39:35.420Z",
+  "queuedBy": "routine"
+}
