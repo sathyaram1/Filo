@@ -689,6 +689,17 @@ function canGoFwd(wc) {
   return false;
 }
 
+// Mappa il codice errore certificato di Chromium nello stato usato dal motore
+// safebrowse (vedi CERT_BAD in services/safebrowse/engine.js). I self-signed
+// arrivano come ERR_CERT_AUTHORITY_INVALID → 'untrusted'.
+function mapCertError(error) {
+  const e = String(error || '');
+  if (/ERR_CERT_DATE_INVALID/.test(e)) return 'expired';
+  if (/ERR_CERT_COMMON_NAME_INVALID/.test(e)) return 'mismatch';
+  if (/ERR_CERT_REVOKED/.test(e)) return 'revoked';
+  return 'untrusted';
+}
+
 // Trasforma input dell'utente in un URL navigabile:
 //   - se sembra URL (ha schema o "." al centro) → naviga
 //   - altrimenti → google search
