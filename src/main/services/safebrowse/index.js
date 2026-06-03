@@ -55,6 +55,22 @@ const llmCache = new TtlCache(HOUR);
 let providers = { gsb: null, rdap: null, ct: null, sandbox: null, llm: null };
 function setProviders(fns) { providers = { ...providers, ...(fns || {}) }; }
 
+// Configura i provider dai moduli reali, usando le impostazioni correnti.
+//   opts.gsbKey       chiave Google Safe Browsing (se assente → stage 1 saltato)
+//   opts.runLlm       funzione (messages) → testo, per il giudice LLM
+//   opts.enableSandbox  abilita la detonation (default true se Electron c'è)
+//   opts.enableNetwork  abilita RDAP/CT (default true)
+function configure(opts = {}) {
+  const { gsbKey, runLlm, enableSandbox = true, enableNetwork = true } = opts;
+  setProviders({
+    gsb: gsbKey ? ((rawUrl) => net.safeBrowsingLookup(rawUrl, gsbKey)) : null,
+    rdap: enableNetwork ? ((reg) => net.rdapAgeDays(reg)) : null,
+    ct: enableNetwork ? ((reg) => net.ctFirstSeenDays(reg)) : null,
+    llm: typeof runLlm === 'function' ? ((meta) => llm.judge(meta, runLlm)) : null,
+    sandbox: enableSandbox ? ((url) => sandbox.detonate(url, (finalUrl) => checkSync(finalUrl))) : null,
+  });
+}
+
 // Esito certificato osservato dalla webview reale (la fonte più affidabile).
 function recordCert(registrable, status) {
   if (registrable && status) certCache.set(registrable, { status });
