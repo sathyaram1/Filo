@@ -824,6 +824,30 @@ async function handleMessage(msg, sender = {}) {
       try { win?.webContents?.send('shell:feedback-dim', { on: !!msg.on }); } catch (_) {}
       return { ok: true };
     }
+    case MSG.FEEDBACK_CLEAR_DRAW: {
+      // "Cancella disegno" dal box (pagina): cancella anche i tratti sulla barra
+      // in alto, che vivono nella shell.
+      const win = winOf(sender);
+      try { win?.webContents?.send('shell:feedback-clear-draw'); } catch (_) {}
+      return { ok: true };
+    }
+    case MSG.CAPTURE_FEEDBACK_TOPBAR: {
+      // Scatto annotato della SOLA barra in alto di Filo (shell): il box lo
+      // impila sopra lo screenshot della pagina per ottenere un'immagine di
+      // tutta l'app col disegno. I tratti sono già parte del DOM della shell
+      // (canvas di disegno), quindi vengono catturati direttamente.
+      const win = winOf(sender);
+      if (!win || !win._filoTabs) return { ok: false, error: 'no window' };
+      try {
+        const barH = win._filoTabs.topChromeHeight();
+        if (barH <= 0) return { ok: false, error: 'no topbar' };
+        const [w] = win.getContentSize();
+        const img = await win.webContents.capturePage({ x: 0, y: 0, width: w, height: barH });
+        return { ok: true, dataUrl: img.toDataURL(), barHeight: barH };
+      } catch (e) {
+        return { ok: false, error: e?.message || String(e) };
+      }
+    }
     case MSG.TEST_PROVIDER: {
       try {
         const provider = msg.provider;
