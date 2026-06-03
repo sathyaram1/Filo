@@ -129,6 +129,32 @@ html, body {
 }
 .ed-settings-view h2 { margin: 0 0 6px; font-size: 20px; }
 .ed-settings-hint { color: var(--sn-muted); font-size: 13px; margin: 0 0 18px; }
+
+/* Controllo dimensione griglia (sopra l'elenco dei moduli) */
+.ed-grid-size {
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--sn-border);
+  border-radius: var(--sn-radius);
+  background: var(--sn-hover);
+}
+.ed-gs-title { font-weight: 600; font-size: 14px; margin-bottom: 10px; }
+.ed-gs-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ed-gs-cap { color: var(--sn-muted); font-size: 13px; }
+.ed-gs-sep { flex: 0 0 16px; }
+.ed-gs-val { min-width: 20px; text-align: center; font-variant-numeric: tabular-nums; font-weight: 600; }
+.ed-gs-btn {
+  width: 26px; height: 26px;
+  border: 1px solid var(--sn-border);
+  border-radius: 7px;
+  background: var(--sn-bg);
+  color: var(--sn-text);
+  cursor: pointer;
+  font-size: 16px; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.ed-gs-btn:hover { border-color: var(--sn-accent); color: var(--sn-accent); }
+
 .ed-palette {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
