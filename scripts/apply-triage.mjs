@@ -1,26 +1,36 @@
 // Applica a Firestore le decisioni di triage accodate nello spool su git, e
-// svuota la coda. È la metà locale del flusso descritto in queue-triage.mjs.
+// svuota la coda. È la metà "consumatore" del flusso descritto in queue-triage.mjs.
 //
 // COSA FA
 //   Legge tutti i file `feedback-triage/*.json` e per ciascuno fa la PATCH REST
-//   sul documento feedback con il token ADMIN dell'owner (Authorization:
-//   Bearer). A differenza del vecchio ruolo `routines` (account robot bloccato),
-//   qui l'identità è l'owner pieno, il cui account NON è bloccato. Dopo una PATCH
-//   riuscita cancella il file di spool (la coda si svuota) e committa+pusha la
-//   rimozione, così le routine cloud non rivedono operazioni già applicate.
+//   sul documento feedback. Dopo una PATCH riuscita cancella il file di spool
+//   (la coda si svuota) e committa+pusha la rimozione, così non si riapplica.
 //
-// AUTENTICAZIONE
-//   Serve un refresh token Firebase dell'account OWNER (admin) in
-//   `FILO_ADMIN_REFRESH_TOKEN`. Ottienilo UNA VOLTA con:
-//     node scripts/admin-login.mjs
-//   Lo script lo cerca prima in env, poi in `tests/agent/.env` della root del
-//   repo principale (gitignorato).
+// AUTENTICAZIONE — due modalità, scelte in automatico:
+//
+//   A) SERVICE ACCOUNT (usata dalla GitHub Action, vedi
+//      .github/workflows/apply-triage.yml). Se è presente la chiave di un
+//      service account — JSON inline in `FILO_SA_KEY` oppure percorso file in
+//      `GOOGLE_APPLICATION_CREDENTIALS` — firma un JWT con la chiave privata,
+//      ottiene un access token OAuth2 (scope datastore) e patcha via IAM. NON
+//      è un account Google personale: niente rischio-blocco come l'account
+//      robot. È il percorso primario, gira da solo a ogni push della routine.
+//
+//   B) REFRESH TOKEN ADMIN (fallback locale dell'owner). Se NON c'è un service
+//      account, usa il refresh token Firebase dell'owner in
+//      `FILO_ADMIN_REFRESH_TOKEN` (env o `tests/agent/.env` della root del repo
+//      principale, gitignorato). Ottienilo UNA VOLTA con:
+//        node scripts/admin-login.mjs
+//
+//   In entrambi i casi si finisce con un `Authorization: Bearer <token>` usato
+//   identicamente nella PATCH.
 //
 // USO:
 //   node scripts/apply-triage.mjs            applica e svuota la coda
 //   node scripts/apply-triage.mjs --dry-run  mostra cosa farebbe (no rete, no git)
 
 import { createRequire } from 'node:module';
+import { createSign } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, unlinkSync, existsSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
@@ -35,6 +45,7 @@ const cfg = require(resolve(ROOT, 'src', 'main', 'auth', 'config.js'));
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${cfg.firebaseProjectId}/databases/(default)/documents`;
 const ALLOWED = ['todo', 'done', 'clarify'];
 const DRY = process.argv.includes('--dry-run');
+const MAIN_BRANCH = process.env.FILO_MAIN_BRANCH || 'main';
 
 function git(args) {
   return execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' }).trim();
