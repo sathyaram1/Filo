@@ -79,6 +79,22 @@
     DEFAULTS_UPDATE: 'defaults_update',            // { config } → { ok, config } | { ok:false, error }
     WEB_SEARCH: 'web_search',                      // { query } → { ok, results: [{title,url,snippet}], provider }
 
+    // === Rilevamento siti pericolosi (src/main/services/safebrowse/) ===
+    // Il content script chiede il verdetto per la URL corrente (+ indizi di
+    // pagina: presenza campo password/pagamento). Il main risponde col livello
+    // e un messaggio specifico. → { ok, level:'safe'|'sospetto'|'pericoloso',
+    // message:{title,body}|null, registrable }
+    SAFEBROWSE_GET: 'safebrowse_get',              // { url, hasPassword?, hasPayment? }
+    // L'utente ha scritto "confermo" sull'interstitial "pericoloso": registra un
+    // bypass per (tab, dominio) così la pagina non viene più coperta. → { ok }
+    SAFEBROWSE_PROCEED: 'safebrowse_proceed',      // { url }
+    // L'utente ha chiuso con "ok" il banner "sospetto": non riproporlo per
+    // questo dominio nel tab. → { ok }
+    SAFEBROWSE_DISMISS: 'safebrowse_dismiss',      // { url }
+    // Broadcast main→content: il verdetto per la URL è cambiato (navigazione o
+    // arricchimento asincrono RDAP/GSB/sandbox). Il content (ri)disegna l'avviso.
+    SAFEBROWSE_UPDATE: 'safebrowse_update',         // → { url, level, message }
+
     // === Account "Accedi con Google" (vedi src/main/auth/) ===
     // Login/logout/stato. Tutto vive nel main process: i token non sono mai
     // esposti alle pagine. La risposta porta solo il profilo pubblico.
