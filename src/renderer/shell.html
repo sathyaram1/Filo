@@ -29,6 +29,10 @@
       <button class="nav-btn nav-account" id="nav-account" data-tip="Accedi" aria-label="Accedi"></button>
     </nav>
   </header>
+  <!-- Tela di disegno per annotare la barra in alto di Filo durante un feedback.
+       Sta FUORI da .shell così il filtro brightness della penombra non la tocca
+       (i tratti restano a piena luminosità). Nascosta finché non si annota. -->
+  <canvas id="feedback-draw" hidden></canvas>
   <script src="filo://shared/icons.js"></script>
   <script src="filo://shell/shell.js"></script>
 </body>
