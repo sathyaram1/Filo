@@ -465,6 +465,64 @@
     cell.appendChild(pad);
   }
 
+  // I controlli che aprono un menu nativo (es. il <select> del font) rubano il
+  // focus all'editor e collassano la selezione: senza un preventDefault il
+  // comando non saprebbe più su QUALE testo agire. Salviamo il range prima che
+  // il menu si apra e lo ripristiniamo prima di applicare il comando.
+  let savedDocRange = null;
+  function saveDocSelection() {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount && docEl.contains(sel.anchorNode)) savedDocRange = sel.getRangeAt(0).cloneRange();
+  }
+  function restoreDocSelection() {
+    if (!savedDocRange) return;
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(savedDocRange);
+  }
+  function renderFont(cell, m) {
+    cell.classList.add('ed-fmt-mod');
+    const pad = document.createElement('div');
+    pad.className = 'ed-mod-pad ed-fmt ed-font';
+    const sel = document.createElement('select');
+    sel.className = 'ed-font-select';
+    sel.title = 'Font del testo selezionato';
+    sel.setAttribute('aria-label', 'Font del testo selezionato');
+    const fonts = [
+      ['', 'Font…'],
+      ['Georgia, serif', 'Georgia'],
+      ['"Times New Roman", serif', 'Times New Roman'],
+      ['Arial, sans-serif', 'Arial'],
+      ['Verdana, sans-serif', 'Verdana'],
+      ['"Courier New", monospace', 'Courier New'],
+      ['"Comic Sans MS", cursive', 'Comic Sans'],
+    ];
+    for (const [val, label] of fonts) {
+      const o = document.createElement('option');
+      o.value = val; o.textContent = label;
+      o.style.fontFamily = val || '';
+      sel.appendChild(o);
+    }
+    // In modalità modifica moduli il click apre la configurazione (parità con gli
+    // altri moduli); altrimenti salva la selezione prima che il menu la perda.
+    sel.addEventListener('mousedown', (e) => {
+      if (settingsMode) { e.preventDefault(); e.stopPropagation(); openModuleConfig(m); return; }
+      saveDocSelection();
+    });
+    sel.addEventListener('click', (e) => { if (!settingsMode) e.stopPropagation(); });
+    sel.addEventListener('change', (e) => {
+      if (settingsMode) return;
+      e.stopPropagation();
+      const font = sel.value;
+      sel.selectedIndex = 0; // torna al placeholder "Font…"
+      if (!font) return;
+      restoreDocSelection();
+      execCss('fontName', font);
+    });
+    pad.appendChild(sel);
+    cell.appendChild(pad);
+  }
+
   // ── Shortcut markdown a livello blocco ──────────────────────────────
   function handleMarkdownBlock() {
     const sel = window.getSelection();
