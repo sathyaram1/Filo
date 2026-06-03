@@ -312,3 +312,19 @@ html[data-feedback-dim="1"] .shell {
   filter: brightness(0.82);
   transition: filter 120ms ease-out;
 }
+
+/* Tela di disegno sopra la barra in alto: durante l'annotazione si può
+   disegnare a mano libera anche su tab e barra indirizzi (non solo sulla
+   pagina). Copre solo la barra (il resto della finestra è la WebContentsView)
+   e intercetta i puntatori — incluso -webkit-app-region:no-drag, altrimenti la
+   regione draggabile della finestra mangerebbe gli eventi del mouse. */
+#feedback-draw {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 2147483646;
+  cursor: crosshair;
+  touch-action: none;
+  -webkit-app-region: no-drag;
+}
+#feedback-draw[hidden] { display: none; }
