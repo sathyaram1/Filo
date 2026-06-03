@@ -44,6 +44,14 @@ contextBridge.exposeInMainWorld('filoShell', {
     ipcRenderer.on('shell:feedback-dim', wrapped);
     return () => ipcRenderer.removeListener('shell:feedback-dim', wrapped);
   },
+  // Disegno annotazione sulla barra in alto: la shell segnala al main se ha
+  // tratti (per sincronizzare il box) e riceve l'ordine di cancellarli.
+  feedbackDrawState: (has) => ipcRenderer.send('shell:feedback-draw-state', { has: !!has }),
+  onFeedbackClearDraw: (fn) => {
+    const wrapped = () => { try { fn(); } catch (_) {} };
+    ipcRenderer.on('shell:feedback-clear-draw', wrapped);
+    return () => ipcRenderer.removeListener('shell:feedback-clear-draw', wrapped);
+  },
   window: {
     minimize: () => ipcRenderer.invoke('window:minimize'),
     toggleMaximize: () => ipcRenderer.invoke('window:toggle-maximize'),
