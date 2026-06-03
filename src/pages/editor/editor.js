@@ -648,8 +648,63 @@
     return isPinned(m) ? fitsAllPages(rect, m.id) : fits(rect, z, m.id);
   }
 
+  // La griglia CSS ha 7×10 come default nel CSS; quando l'utente cambia la
+  // dimensione applichiamo i template inline così la griglia segue il modello.
+  function applyGridTemplate() {
+    gridEl.style.gridTemplateColumns = `repeat(${GRID_COLS}, 1fr)`;
+    gridEl.style.gridTemplateRows = `repeat(${GRID_ROWS}, 1fr)`;
+  }
+
+  // Cambia la dimensione della griglia (clamp nei limiti). I moduli che
+  // finirebbero fuori dai nuovi confini vengono riportati dentro (clamp di
+  // posizione/dimensione) così non spariscono.
+  function setGridSize(cols, rows) {
+    cols = Math.max(GRID_MIN_COLS, Math.min(GRID_MAX_COLS, Math.round(cols)));
+    rows = Math.max(GRID_MIN_ROWS, Math.min(GRID_MAX_ROWS, Math.round(rows)));
+    if (cols === GRID_COLS && rows === GRID_ROWS) return;
+    GRID_COLS = cols;
+    GRID_ROWS = rows;
+    for (const m of doc.modules) {
+      if (m.w > GRID_COLS) m.w = GRID_COLS;
+      if (m.h > GRID_ROWS) m.h = GRID_ROWS;
+      if (m.x + m.w > GRID_COLS) m.x = Math.max(0, GRID_COLS - m.w);
+      if (m.y + m.h > GRID_ROWS) m.y = Math.max(0, GRID_ROWS - m.h);
+    }
+    if (!doc.meta) doc.meta = {};
+    doc.meta.grid = { cols: GRID_COLS, rows: GRID_ROWS };
+    applyGridTemplate();
+    renderGrid();
+    renderGridControls();
+    markDirty();
+  }
+
+  // Controllo "Dimensione griglia" mostrato nella vista moduli, sopra la palette.
+  function renderGridControls() {
+    const host = $('gridSize');
+    if (!host) return;
+    host.innerHTML = `
+      <div class="ed-gs-title">Dimensione griglia</div>
+      <div class="ed-gs-row">
+        <span class="ed-gs-cap">Colonne</span>
+        <button class="ed-gs-btn" data-gs="cols-" aria-label="Meno colonne">−</button>
+        <span class="ed-gs-val" id="gsCols">${GRID_COLS}</span>
+        <button class="ed-gs-btn" data-gs="cols+" aria-label="Più colonne">+</button>
+        <span class="ed-gs-sep"></span>
+        <span class="ed-gs-cap">Righe</span>
+        <button class="ed-gs-btn" data-gs="rows-" aria-label="Meno righe">−</button>
+        <span class="ed-gs-val" id="gsRows">${GRID_ROWS}</span>
+        <button class="ed-gs-btn" data-gs="rows+" aria-label="Più righe">+</button>
+      </div>`;
+    const on = (sel, fn) => { const b = host.querySelector(sel); if (b) b.addEventListener('click', fn); };
+    on('[data-gs="cols-"]', () => setGridSize(GRID_COLS - 1, GRID_ROWS));
+    on('[data-gs="cols+"]', () => setGridSize(GRID_COLS + 1, GRID_ROWS));
+    on('[data-gs="rows-"]', () => setGridSize(GRID_COLS, GRID_ROWS - 1));
+    on('[data-gs="rows+"]', () => setGridSize(GRID_COLS, GRID_ROWS + 1));
+  }
+
   function renderGrid() {
     const z = activePage();
+    applyGridTemplate();
     gridEl.innerHTML = '';
 
     const occupied = new Set();
