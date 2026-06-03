@@ -1,7 +1,7 @@
 {
   "id": "oMcZKylmWz7cKMPMPatK",
   "status": "done",
-  "notes": "Box feedback ridisegnato come da tuo schizzo: solo un riquadro per scrivere + 4 bottoni (Allega, Chiudi, Invia e 'Cancella disegno'). 'Cancella disegno' è tratteggiato e compare SOLO quando c'è davvero un disegno da cancellare. Ora puoi disegnare a mano libera su tutta l'app Filo, anche sulle tab e sulla barra in alto: lo screenshot che viene allegato impila il disegno della barra sopra quello della pagina, così l'annotazione copre tutto. Oltre al chiesto: (1) nuovo testo guida nel box ('Descrivi il bug o la feature che vorresti. Puoi trascinare qui documenti o immagini'); (2) il bottone 'Allega' ora apre anche un selettore file per scegliere un'immagine dal disco (prima si potevano solo incollare/trascinare); (3) tolto il vecchio toggle 'Annota e allega': se c'è un disegno, lo screenshot annotato viene allegato da solo. Verificato con la suite Playwright (145 test verdi) e nuovi test mirati su box e disegno sulla barra; ispezione visuale dello screenshot del box. Nota tecnica: lo screenshot composito pagina+barra non è verificabile pixel-per-pixel in cloud headless (la cattura delle viste native è inaffidabile lì), conviene un controllo a vista in locale.",
-  "queuedAt": "2026-06-03T09:03:59.142Z",
+  "notes": "Il box del feedback ora è essenziale: solo l'area di scrittura più quattro bottoni (Allega, Chiudi, Invia e — che compare solo quando c'è davvero un disegno da cancellare — il bottone tratteggiato 'Cancella disegno'). Inoltre ora puoi disegnare su tutta l'app Filo, comprese le tab e la barra in alto, non più solo sulla pagina. Verificato con test automatici (il bottone tratteggiato appare solo dopo aver disegnato e sparisce quando cancelli; la tela compare anche sulla barra in alto).",
+  "queuedAt": "2026-06-03T14:29:01.108Z",
   "queuedBy": "routine"
 }
