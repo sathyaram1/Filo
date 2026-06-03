@@ -700,7 +700,7 @@
   function openAddModule(x, y, z) {
     const items = Object.entries(MODULE_TYPES).filter(([, meta]) => !meta.fixed).map(([type, meta]) => `
       <button class="ed-btn" data-add="${type}" style="display:flex;justify-content:flex-start;gap:10px;width:100%;margin-bottom:6px">
-        <span style="color:var(--sn-accent);display:inline-flex">${ICONS[meta.icon] ? ICONS[meta.icon](18) : ''}</span>
+        <span style="color:var(--sn-accent);display:inline-flex">${meta.glyph || (ICONS[meta.icon] ? ICONS[meta.icon](18) : '')}</span>
         <span>${meta.label} <span style="color:var(--sn-muted);font-size:11px">${meta.defaultW}×${meta.defaultH}</span></span>
       </button>`).join('');
     openOverlay(`<h3>Aggiungi modulo</h3>${items}`);
