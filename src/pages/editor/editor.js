@@ -271,11 +271,14 @@
       if (n.type === 'hardBreak') return '<br>';
       if (n.type !== 'text') return '';
       let html = escapeHtml(n.text);
-      const marks = (n.marks || []).map((m) => m.type);
-      if (marks.includes('bold')) html = `<strong>${html}</strong>`;
-      if (marks.includes('italic')) html = `<em>${html}</em>`;
-      if (marks.includes('underline')) html = `<u>${html}</u>`;
-      if (marks.includes('strike')) html = `<s>${html}</s>`;
+      const marks = n.marks || [];
+      const has = (t) => marks.some((m) => m.type === t);
+      if (has('bold')) html = `<strong>${html}</strong>`;
+      if (has('italic')) html = `<em>${html}</em>`;
+      if (has('underline')) html = `<u>${html}</u>`;
+      if (has('strike')) html = `<s>${html}</s>`;
+      const fs = marks.find((m) => m.type === 'fontSize');
+      if (fs && fs.attrs && fs.attrs.size) html = `<span style="font-size:${escapeHtml(fs.attrs.size)}">${html}</span>`;
       return html;
     }).join('');
   }
