@@ -9,7 +9,6 @@
   }
 
   const tabsEl = document.getElementById('tabs');
-  const addrEl = document.getElementById('addr');
   const newBtn = document.getElementById('tab-new');
   const backBtn = document.getElementById('nav-back');
   const fwdBtn = document.getElementById('nav-forward');
