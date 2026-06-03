@@ -4,12 +4,20 @@
 //     impersonazioni note (omoglifi cirillici, typo) come "pericoloso" e i
 //     domini legittimi/infra come "safe" — asserisce il COMPORTAMENTO, non un
 //     messaggio: un dominio-truffa che chiede la password DEVE essere pericoloso.
-//   - la pagina Sicurezza espone i controlli e li persiste.
+//   - la pagina Sicurezza espone i controlli personali e li persiste; la chiave
+//     Google Safe Browsing NON è più un campo per-utente: è condivisa (gestita
+//     dall'admin in "Modelli predefiniti") e la pagina lo dichiara.
+//   - la chiave condivisa, quando presente, raggiunge DAVVERO il motore per tutti
+//     gli account (asserisce che lo stadio GSB si accende), senza mai trapelare
+//     il valore al renderer admin (solo un booleano "configurata").
 //   - l'interstitial "pericoloso" copre DAVVERO la pagina e si toglie solo dopo
 //     aver scritto "confermo" → Procedi (asserisce che l'overlay sparisce, cioè
 //     che il flusso di bypass funziona, non che un testo sia cambiato).
 
 import { test, expect } from './fixtures/electron.mjs';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
 
 test('motore: impersonazioni → pericoloso, domini legittimi → safe', async ({ app }) => {
   // Gira nel main process, dove SN_SAFEBROWSE è registrato su globalThis.
