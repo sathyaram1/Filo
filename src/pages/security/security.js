@@ -76,7 +76,6 @@
     $('sec-safebrowse-network').checked = sb.networkSignals !== false;
     $('sec-safebrowse-llm').checked = sb.llmJudge !== false;
     $('sec-safebrowse-sandbox').checked = sb.sandbox !== false;
-    $('sec-safebrowse-key').value = sb.safeBrowsingKey || '';
     syncSafebrowseEnabled();
   }
 
