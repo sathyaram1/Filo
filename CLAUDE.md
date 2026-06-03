@@ -379,26 +379,38 @@ quindi nessun elenco di ID diventa stantio quando un feedback viene riaperto.
   Niente token, niente rete: lo script scrive `feedback-triage/<id>.json` e lo
   **committa+pusha** lui stesso su `origin/main` (non dipende dall'hook). In
   alternativa puoi creare il file `feedback-triage/<id>.json` con l'editor: in
-  quel caso lo committa l'hook di auto-commit. La decisione resta in coda finché
-  l'owner non la applica. **Nel report finale di sessione, dì all'utente che le
-  decisioni sono in coda e che vanno applicate** con `npm run feedback:apply`.
+  quel caso lo committa l'hook di auto-commit. Una volta su `main`, la GitHub
+  Action la applica da sola entro ~1-2 minuti. **Nel report finale di sessione,
+  dì all'utente che le decisioni sono in coda e vengono applicate in automatico
+  dalla Action** (nessuna azione manuale richiesta).
 
-- **In locale (owner) — applica e svuota la coda**:
+- **Applicazione automatica (GitHub Action — primario)**: il workflow
+  `apply-triage.yml` esegue `scripts/apply-triage.mjs` autenticandosi col
+  service account il cui JSON sta nel secret di repo `FILO_SA_KEY`. Patcha i
+  feedback e committa la coda svuotata con `[skip ci]` (anti-loop). L'owner lo
+  configura una sola volta (creare il service account + incollare la chiave nei
+  Secrets) — vedi le istruzioni in `feedback-triage/README.md`. Da lì in poi è
+  zero-touch.
+
+- **Applicazione manuale (owner, in locale — fallback)**: se la Action è giù o
+  vuoi applicare subito:
 
   ```bash
   npm run feedback:apply              # applica a Firestore e svuota la coda
   npm run feedback:apply -- --dry-run # mostra cosa farebbe, senza scrivere
   ```
 
-  Richiede un refresh token Firebase dell'account **owner** in
-  `FILO_ADMIN_REFRESH_TOKEN`. Setup una tantum: `node scripts/admin-login.mjs`
-  (login Google con l'account owner, quello in `admins`/`adminEmails`), poi salva
-  il refresh token stampato come `FILO_ADMIN_REFRESH_TOKEN` nel file
-  `tests/agent/.env` della **root del repo principale**
-  (`C:/Users/agenti AI/Desktop/Filo/Filo/tests/agent/.env`), accanto alla chiave
-  Gemini. È **gitignorato**: NON viene committato. L'applier lo cerca prima in env,
-  poi in quel file. Il token admin resta SOLO su questa macchina: le routine cloud
-  non lo vedono mai. Se il refresh dà 401/403, rigeneralo con `admin-login.mjs`.
+  In locale usa un refresh token Firebase dell'account **owner** in
+  `FILO_ADMIN_REFRESH_TOKEN` (NON il service account). Setup una tantum:
+  `node scripts/admin-login.mjs` (login Google con l'account owner, quello in
+  `admins`/`adminEmails`), poi salva il refresh token stampato come
+  `FILO_ADMIN_REFRESH_TOKEN` nel file `tests/agent/.env` della **root del repo
+  principale** (`C:/Users/agenti AI/Desktop/Filo/Filo/tests/agent/.env`), accanto
+  alla chiave Gemini. È **gitignorato**: NON viene committato. L'applier sceglie
+  in automatico: service account se presente (`FILO_SA_KEY` /
+  `GOOGLE_APPLICATION_CREDENTIALS`), altrimenti il token admin. **Non mettere mai
+  `FILO_ADMIN_REFRESH_TOKEN` nel cloud**: resta SOLO su questa macchina. Se il
+  refresh dà 401/403, rigeneralo con `admin-login.mjs`.
 
 **Workflow**: quando l'utente chiede di "risolvere i feedback", lavora
 **solo** sui feedback con status `todo` ("Da risolvere"). Ignora quelli
