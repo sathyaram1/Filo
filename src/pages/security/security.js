@@ -20,6 +20,17 @@
     $('sec-block-popups-desc').textContent = I18n.t('options_security_block_popups_desc');
     $('sec-p2p-box-title').textContent = I18n.t('options_security_p2p_box_title');
     $('sec-p2p-box-body').textContent = I18n.t('options_security_p2p_box_body');
+    $('sec-safebrowse-label').textContent = I18n.t('options_security_safebrowse');
+    $('sec-safebrowse-desc').textContent = I18n.t('options_security_safebrowse_desc');
+    $('sec-safebrowse-network-label').textContent = I18n.t('options_security_safebrowse_network');
+    $('sec-safebrowse-network-desc').textContent = I18n.t('options_security_safebrowse_network_desc');
+    $('sec-safebrowse-llm-label').textContent = I18n.t('options_security_safebrowse_llm');
+    $('sec-safebrowse-llm-desc').textContent = I18n.t('options_security_safebrowse_llm_desc');
+    $('sec-safebrowse-sandbox-label').textContent = I18n.t('options_security_safebrowse_sandbox');
+    $('sec-safebrowse-sandbox-desc').textContent = I18n.t('options_security_safebrowse_sandbox_desc');
+    $('sec-safebrowse-key-label').textContent = I18n.t('options_security_safebrowse_key_label');
+    $('sec-safebrowse-key-desc').textContent = I18n.t('options_security_safebrowse_key_desc');
+    $('sec-safebrowse-key').placeholder = I18n.t('options_security_safebrowse_key_placeholder');
     $('sec-export-btn').textContent = I18n.t('security_export_btn');
     $('sec-export-desc').textContent = I18n.t('security_export_desc');
     $('savedHint').textContent = I18n.t('options_saved');
