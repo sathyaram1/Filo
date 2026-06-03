@@ -246,12 +246,25 @@
     window.addEventListener('resize', sizeCanvas);
     sizeCanvas();
 
+    // "Cancella disegno": pulisce i tratti sulla pagina E quelli sulla barra in
+    // alto di Filo (che vivono nella shell), così un solo bottone cancella tutto.
     clearBtn.addEventListener('click', () => {
       strokes.length = 0;
       redraw();
+      try { chrome.runtime.sendMessage({ type: MSG.FEEDBACK_CLEAR_DRAW }); } catch (_) {}
+      topbarHasDrawing = false;
       refreshClear();
-      setInclude(false);
     });
+
+    // La shell ci dice se c'è (o non c'è più) un disegno sulla barra in alto,
+    // così "Cancella disegno" compare anche quando si è disegnato SOLO lassù.
+    function onBroadcast(message) {
+      if (message?.type === MSG.FEEDBACK_DRAW_STATE) {
+        topbarHasDrawing = !!message.topbar;
+        refreshClear();
+      }
+    }
+    try { chrome.runtime.onMessage.addListener(onBroadcast); } catch (_) {}
 
     function renderThumbs() {
       // Revoca eventuali object URL precedenti per evitare leak
