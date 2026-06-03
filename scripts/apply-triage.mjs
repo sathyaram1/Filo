@@ -82,6 +82,82 @@ async function mintIdToken(refreshToken) {
   return (await res.json()).id_token;
 }
 
+// --- Modalità service account (CI) -----------------------------------------
+
+const b64url = (buf) => Buffer.from(buf).toString('base64')
+  .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+
+// Carica la chiave del service account: JSON inline in FILO_SA_KEY (GitHub
+// Secret) oppure percorso a file in GOOGLE_APPLICATION_CREDENTIALS. Null se
+// nessuna delle due è presente → si userà il fallback admin.
+function loadServiceAccount() {
+  const inline = process.env.FILO_SA_KEY;
+  if (inline && inline.trim()) {
+    try { return JSON.parse(inline); }
+    catch (e) { throw new Error(`FILO_SA_KEY non è JSON valido: ${e.message}`); }
+  }
+  const p = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  if (p && existsSync(p)) {
+    try { return JSON.parse(readFileSync(p, 'utf8')); }
+    catch (e) { throw new Error(`GOOGLE_APPLICATION_CREDENTIALS (${p}) non è JSON valido: ${e.message}`); }
+  }
+  return null;
+}
+
+// Firma un JWT con la chiave privata del service account e lo scambia con un
+// access token OAuth2 (scope datastore). Con questo bearer le PATCH passano per
+// l'IAM e bypassano le security rules — non serve essere nei doc `admins`.
+async function mintAccessTokenFromSA(sa) {
+  if (!sa.client_email || !sa.private_key) {
+    throw new Error('chiave service account incompleta (mancano client_email/private_key)');
+  }
+  const tokenUri = sa.token_uri || 'https://oauth2.googleapis.com/token';
+  const now = Math.floor(Date.now() / 1000);
+  const header = b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
+  const claims = b64url(JSON.stringify({
+    iss: sa.client_email,
+    scope: 'https://www.googleapis.com/auth/datastore',
+    aud: tokenUri,
+    iat: now,
+    exp: now + 3600,
+  }));
+  const signingInput = `${header}.${claims}`;
+  const signature = b64url(createSign('RSA-SHA256').update(signingInput).sign(sa.private_key));
+  const jwt = `${signingInput}.${signature}`;
+
+  const res = await fetch(tokenUri, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion: jwt,
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`token service account fallito (${res.status}): ${(await res.text()).slice(0, 200)}`);
+  }
+  return (await res.json()).access_token;
+}
+
+// Ritorna il bearer token da usare nelle PATCH, scegliendo la modalità:
+// service account se disponibile, altrimenti refresh token admin.
+async function acquireBearer() {
+  const sa = loadServiceAccount();
+  if (sa) {
+    console.log(`Auth: service account (${sa.client_email}).`);
+    return mintAccessTokenFromSA(sa);
+  }
+  const rt = findAdminRefreshToken();
+  if (!rt) {
+    console.error('Nessuna credenziale per scrivere su Firestore. Servono UNA delle due:');
+    console.error('  • service account: FILO_SA_KEY (JSON) o GOOGLE_APPLICATION_CREDENTIALS (percorso file)');
+    console.error('  • owner: FILO_ADMIN_REFRESH_TOKEN (env o tests/agent/.env della root) — node scripts/admin-login.mjs');
+    process.exit(1);
+  }
+  console.log('Auth: refresh token admin (owner).');
+  return mintIdToken(rt);
+}
+
 function toFsValue(v) {
   if (v === null || v === undefined) return { nullValue: null };
   if (typeof v === 'string') return { stringValue: v };
