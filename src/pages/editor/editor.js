@@ -241,8 +241,11 @@
       if (node.nodeType !== Node.ELEMENT_NODE) return;
       const el = node;
       const tag = el.tagName;
+      const align = blockAlign(el);
       if (/^H[1-3]$/.test(tag)) {
-        content.push({ type: 'heading', attrs: { level: Number(tag[1]) }, content: inlineToPM(el, []) });
+        const attrs = { level: Number(tag[1]) };
+        if (align) attrs.align = align;
+        content.push({ type: 'heading', attrs, content: inlineToPM(el, []) });
       } else if (tag === 'BLOCKQUOTE') {
         content.push({ type: 'blockquote', content: [{ type: 'paragraph', content: inlineToPM(el, []) }] });
       } else if (tag === 'UL' || tag === 'OL') {
@@ -252,7 +255,7 @@
         });
         content.push({ type: tag === 'UL' ? 'bulletList' : 'orderedList', content: items });
       } else if (tag === 'DIV' || tag === 'P') {
-        content.push({ type: 'paragraph', content: inlineToPM(el, []) });
+        content.push({ type: 'paragraph', ...(align ? { attrs: { align } } : {}), content: inlineToPM(el, []) });
       }
     });
     if (!content.length) content.push({ type: 'paragraph', content: [] });
