@@ -6,9 +6,8 @@ Questa cartella è una **coda** di decisioni di triage, non un registro.
 l'account Google robot usato per autenticarsi è stato bloccato. Quindi la
 routine non scrive lo stato del feedback direttamente — deposita la decisione
 qui come un file `<idFeedback>.json`, e l'hook di auto-commit lo pusha su
-`origin/main`. In locale l'owner esegue `npm run feedback:apply`, che applica
-le decisioni a Firestore con le credenziali admin (non bloccate) e **cancella**
-i file applicati.
+`origin/main`. Da lì una **GitHub Action** applica la decisione a Firestore e
+**cancella** il file. L'owner non deve fare nulla.
 
 Siccome ogni file viene rimosso appena applicato, non resta nessun elenco
 permanente di ID risolti che possa diventare stantio quando un feedback viene
@@ -35,14 +34,53 @@ node scripts/queue-triage.mjs <id> <status:todo|done|clarify> "testo note"
 oppure crea il file a mano con l'editor: in una sessione Claude l'hook di
 auto-commit lo committa e pusha.
 
-## Come si applica (owner, in locale)
+## Come si applica — automatico (GitHub Action, primario)
+
+Il workflow `.github/workflows/apply-triage.yml` si sveglia a **ogni push** che
+tocca `feedback-triage/*.json`, esegue `scripts/apply-triage.mjs` e svuota la
+coda. Si autentica come **service account** (non un account Google personale →
+nessun rischio di blocco come l'account robot). Latenza tipica: ~1-2 minuti dopo
+il push della routine. **L'owner non deve fare niente.**
+
+La chiave del service account vive nel secret di repo `FILO_SA_KEY` (vedi
+"Setup una tantum" sotto). Il commit che svuota la coda contiene `[skip ci]`,
+così non ri-triggera il workflow all'infinito.
+
+### Setup una tantum (lo fa l'owner, una sola volta)
+
+1. **Crea il service account** nella console Google Cloud del progetto
+   `filo-8b9cb`:
+   - vai su <https://console.cloud.google.com/iam-admin/serviceaccounts?project=filo-8b9cb>
+   - "Create service account" → nome es. `filo-triage` → Create and continue.
+2. **Dagli il permesso di scrivere su Firestore**: nel passo "Grant access"
+   (o poi da IAM) assegna il ruolo **Cloud Datastore User**
+   (`roles/datastore.user`) → Done.
+3. **Scarica la chiave JSON**: apri il service account → tab "Keys" → "Add key"
+   → "Create new key" → **JSON** → Create. Si scarica un file `.json`.
+4. **Incollalo nei GitHub Secrets** del repo `sathyaram1/Filo`:
+   - Settings → Secrets and variables → Actions → "New repository secret"
+   - Name: **`FILO_SA_KEY`** — Value: **tutto il contenuto del file JSON**
+     (incolla il file intero, comprese le graffe) → Add secret.
+5. Fatto. Da ora ogni decisione accodata dalle routine viene applicata da sola.
+   Per provarlo subito: tab **Actions** del repo → "Applica coda feedback" →
+   "Run workflow".
+
+⚠️ La chiave JSON del service account **non va mai committata** né incollata in
+file tracciati (incluso questo README e CLAUDE.md): sta SOLO nei GitHub Secrets.
+
+## Come si applica — manuale, in locale (fallback dell'owner)
+
+Se la GitHub Action è giù o vuoi applicare subito senza aspettare:
 
 ```bash
 npm run feedback:apply            # applica a Firestore e svuota la coda
 npm run feedback:apply -- --dry-run   # mostra cosa farebbe, senza scrivere
 ```
 
-Richiede `FILO_ADMIN_REFRESH_TOKEN` (vedi `scripts/admin-login.mjs`).
+In locale lo script usa il refresh token Firebase dell'account **owner**
+(`FILO_ADMIN_REFRESH_TOKEN`, vedi `scripts/admin-login.mjs`) — NON il service
+account. È un fallback: con la Action attiva di solito la coda è già vuota.
 
 I file `*.json` qui dentro **vanno committati** (sono il trasporto). Non
-gitignorarli: senza commit la decisione non arriva alla macchina locale.
+gitignorarli: senza commit la decisione non arriva né alla Action né alla
+macchina locale.
