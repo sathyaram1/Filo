@@ -388,13 +388,104 @@
   // con tab/indirizzo mentre si sta dando un feedback.
   if (api.onFeedbackDim) {
     let dimTabId = null;
+
+    // ── Disegno annotazione sulla barra in alto ──────────────────────────
+    // Permette di disegnare a mano libera su tab+barra indirizzi (la parte di
+    // Filo non coperta dalla WebContentsView), così l'annotazione copre TUTTA
+    // l'app. I tratti sono identici a quelli della pagina (rosso, spessore 3).
+    const drawCanvas = document.getElementById('feedback-draw');
+    const STROKE_COLOR = '#ff3b30';
+    const STROKE_WIDTH = 3;
+    const strokes = [];
+    let dctx = null;
+    let drawingNow = false;
+    let curStroke = null;
+
+    function barHeight() {
+      const header = document.querySelector('header.shell');
+      return header ? Math.max(1, Math.round(header.getBoundingClientRect().height)) : 1;
+    }
+    function sizeDrawCanvas() {
+      if (!drawCanvas) return;
+      const dpr = window.devicePixelRatio || 1;
+      const w = window.innerWidth;
+      const h = barHeight();
+      drawCanvas.width = Math.max(1, Math.round(w * dpr));
+      drawCanvas.height = Math.max(1, Math.round(h * dpr));
+      drawCanvas.style.width = w + 'px';
+      drawCanvas.style.height = h + 'px';
+      dctx = drawCanvas.getContext('2d');
+      dctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      redrawDraw();
+    }
+    function redrawDraw() {
+      if (!dctx) return;
+      dctx.save();
+      dctx.setTransform(1, 0, 0, 1, 0, 0);
+      dctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+      dctx.restore();
+      const dpr = window.devicePixelRatio || 1;
+      dctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      dctx.lineCap = 'round';
+      dctx.lineJoin = 'round';
+      for (const s of strokes) {
+        if (!s.points.length) continue;
+        dctx.strokeStyle = s.color;
+        dctx.lineWidth = s.width;
+        dctx.beginPath();
+        s.points.forEach((p, i) => (i ? dctx.lineTo(p.x, p.y) : dctx.moveTo(p.x, p.y)));
+        if (s.points.length === 1) dctx.lineTo(s.points[0].x + 0.1, s.points[0].y + 0.1);
+        dctx.stroke();
+      }
+    }
+    function hasDraw() { return strokes.some((s) => s.points.length > 0); }
+    function reportState() { try { api.feedbackDrawState?.(hasDraw()); } catch (_) {} }
+    function clearDraw() { strokes.length = 0; redrawDraw(); }
+
+    if (drawCanvas) {
+      drawCanvas.addEventListener('pointerdown', (e) => {
+        drawingNow = true;
+        curStroke = { color: STROKE_COLOR, width: STROKE_WIDTH, points: [{ x: e.clientX, y: e.clientY }] };
+        strokes.push(curStroke);
+        try { drawCanvas.setPointerCapture(e.pointerId); } catch (_) {}
+        e.preventDefault();
+      });
+      drawCanvas.addEventListener('pointermove', (e) => {
+        if (!drawingNow || !curStroke) return;
+        curStroke.points.push({ x: e.clientX, y: e.clientY });
+        redrawDraw();
+      });
+      const endStroke = () => {
+        if (!drawingNow) return;
+        drawingNow = false;
+        curStroke = null;
+        reportState();
+      };
+      drawCanvas.addEventListener('pointerup', endStroke);
+      drawCanvas.addEventListener('pointercancel', endStroke);
+      window.addEventListener('resize', () => { if (!drawCanvas.hidden) sizeDrawCanvas(); });
+      // Il box (pagina) ha premuto "Cancella disegno": ripuliamo anche la barra.
+      api.onFeedbackClearDraw?.(() => { clearDraw(); reportState(); });
+    }
+
     function setDim(on) {
       if (on) {
         document.documentElement.dataset.feedbackDim = '1';
         dimTabId = state?.activeId ?? null;
+        if (drawCanvas) {
+          clearDraw();
+          drawCanvas.hidden = false;
+          sizeDrawCanvas();
+          reportState();
+        }
       } else {
         delete document.documentElement.dataset.feedbackDim;
         dimTabId = null;
+        if (drawCanvas) {
+          clearDraw();
+          drawCanvas.hidden = true;
+          reportState();
+        }
       }
     }
     api.onFeedbackDim(setDim);
