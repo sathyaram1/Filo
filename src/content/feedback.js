@@ -348,6 +348,37 @@
       });
     }
 
+    // Impila lo scatto annotato della barra in alto (shell) SOPRA lo screenshot
+    // della pagina: il risultato è un'unica immagine di tutta l'app Filo con
+    // sopra i tratti disegnati sia sulla pagina sia sulla barra. Se manca lo
+    // scatto della barra, ritorna lo screenshot della sola pagina (fallback).
+    function stackTopbar(pageDataUrl, topbarDataUrl) {
+      return new Promise((resolve) => {
+        if (!topbarDataUrl) { resolve(pageDataUrl); return; }
+        const pageImg = new Image();
+        pageImg.onload = () => {
+          const barImg = new Image();
+          barImg.onload = () => {
+            try {
+              const w = pageImg.naturalWidth;
+              const barH = Math.round(barImg.naturalHeight * (w / Math.max(1, barImg.naturalWidth)));
+              const c = document.createElement('canvas');
+              c.width = w;
+              c.height = barH + pageImg.naturalHeight;
+              const cx = c.getContext('2d');
+              cx.drawImage(barImg, 0, 0, w, barH);
+              cx.drawImage(pageImg, 0, barH, w, pageImg.naturalHeight);
+              resolve(c.toDataURL('image/png'));
+            } catch (_) { resolve(pageDataUrl); }
+          };
+          barImg.onerror = () => resolve(pageDataUrl);
+          barImg.src = topbarDataUrl;
+        };
+        pageImg.onerror = () => resolve(pageDataUrl);
+        pageImg.src = pageDataUrl;
+      });
+    }
+
     // Chiusura (il bottone "Chiudi" sostituisce la vecchia × e "Annulla")
     cancelBtn.addEventListener('click', close);
     // Niente chiusura su click backdrop: si chiude solo con × o Annulla
