@@ -300,6 +300,8 @@
       if (has('strike')) html = `<s>${html}</s>`;
       const fs = marks.find((m) => m.type === 'fontSize');
       if (fs && fs.attrs && fs.attrs.size) html = `<span style="font-size:${escapeHtml(fs.attrs.size)}">${html}</span>`;
+      const ff = marks.find((m) => m.type === 'fontFamily');
+      if (ff && ff.attrs && ff.attrs.family) html = `<span style="font-family:${escapeHtml(ff.attrs.family)}">${html}</span>`;
       return html;
     }).join('');
   }
