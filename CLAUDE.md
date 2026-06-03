@@ -374,11 +374,12 @@ diventa stantio quando un feedback viene riaperto.
   node scripts/queue-triage.mjs <id> <status:todo|done|clarify> "testo note"
   ```
 
-  (oppure crea a mano il file `feedback-triage/<id>.json` con l'editor: l'hook lo
-  committa). Niente token, niente rete. La decisione arriva su `origin/main` e
-  resta in coda finché l'owner non la applica. **Nel report finale di sessione,
-  dì all'utente che le decisioni sono in coda e vanno applicate** con
-  `npm run feedback:apply`.
+  Niente token, niente rete: lo script scrive `feedback-triage/<id>.json` e lo
+  **committa+pusha** lui stesso su `origin/main` (non dipende dall'hook). In
+  alternativa puoi creare il file `feedback-triage/<id>.json` con l'editor: in
+  quel caso lo committa l'hook di auto-commit. La decisione resta in coda finché
+  l'owner non la applica. **Nel report finale di sessione, dì all'utente che le
+  decisioni sono in coda e che vanno applicate** con `npm run feedback:apply`.
 
 - **In locale (owner) — applica e svuota la coda**:
 
