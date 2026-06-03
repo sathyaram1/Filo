@@ -358,10 +358,12 @@ esistono più, non cercarli.
 Al loro posto c'è una **coda su git** (`feedback-triage/`, vedi il README lì
 dentro). La routine non scrive lo stato su Firestore: deposita la decisione
 come un file `feedback-triage/<id>.json`; l'hook di auto-commit lo pusha su
-`origin/main`. In locale l'owner applica la coda a Firestore con le proprie
-credenziali admin (account NON bloccato) e la svuota. È una **coda di comandi**,
-non un registro: ogni file sparisce appena applicato, quindi nessun elenco di ID
-diventa stantio quando un feedback viene riaperto.
+`origin/main`. Da lì una **GitHub Action** (`.github/workflows/apply-triage.yml`)
+si sveglia a ogni push, applica la decisione a Firestore come **service account**
+(non un account personale → nessun rischio di blocco) e svuota la coda. L'owner
+**non deve fare niente**: nessun `npm start`, nessun token personale nel cloud.
+È una **coda di comandi**, non un registro: ogni file sparisce appena applicato,
+quindi nessun elenco di ID diventa stantio quando un feedback viene riaperto.
 
 - **In sessione locale / dashboard app**: le scritture passano dal main process
   (`feedback_update`), che allega l'ID token Firebase dell'admin loggato. Questo
