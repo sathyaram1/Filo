@@ -30,7 +30,7 @@ const SECRETS_DOC = 'config/secrets';
 
 // Cache degli override remoti dall'ultimo refresh.
 let remoteModels = null;  // { provider?, geminiDirect?, models?, modelRegistry? }
-let remoteSecrets = null; // { apiKeys?: { openrouter?, gemini?, tavily? } }
+let remoteSecrets = null; // { apiKeys?: { openrouter?, gemini?, tavily? }, safeBrowsingKey? }
 let lastFetchTs = 0;
 
 // ── Firestore Value <-> JS ───────────────────────────────────────────────────
