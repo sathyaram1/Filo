@@ -1,7 +1,0 @@
-{
-  "id": "1xWTMOWPD66fE5oUZV4n",
-  "status": "done",
-  "notes": "I moduli di formattazione richiesti sono ora disponibili tra i moduli dell'editor: Grassetto, Corsivo, Sottolineato, Indietro e Avanti (annulla/ripeti), Dimensione testo (A−/A+) e Allineamento (sinistra/centro/destra/giustificato). Li aggiungi dall'ingranaggio trascinandoli nella griglia; agiscono sul testo selezionato nel foglio. Verificato con test automatici che controllano che la formattazione avvenga davvero (il testo diventa grassetto/corsivo, si centra, cambia dimensione, e undo/redo funzionano).",
-  "queuedAt": "2026-06-03T14:28:51.316Z",
-  "queuedBy": "routine"
-}

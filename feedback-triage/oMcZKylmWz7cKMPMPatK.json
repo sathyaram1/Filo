@@ -1,7 +1,0 @@
-{
-  "id": "oMcZKylmWz7cKMPMPatK",
-  "status": "done",
-  "notes": "Il box del feedback ora è essenziale: solo l'area di scrittura più quattro bottoni (Allega, Chiudi, Invia e — che compare solo quando c'è davvero un disegno da cancellare — il bottone tratteggiato 'Cancella disegno'). Inoltre ora puoi disegnare su tutta l'app Filo, comprese le tab e la barra in alto, non più solo sulla pagina. Verificato con test automatici (il bottone tratteggiato appare solo dopo aver disegnato e sparisce quando cancelli; la tela compare anche sulla barra in alto).",
-  "queuedAt": "2026-06-03T14:29:01.108Z",
-  "queuedBy": "routine"
-}
