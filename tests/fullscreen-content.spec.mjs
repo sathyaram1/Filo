@@ -54,5 +54,5 @@ test('fullscreen: il contenuto copre la barra e Esc ripristina', async ({ app, o
 
   await expect.poll(async () => (await readActiveView(app)).contentFullscreen, { timeout: 5000 }).toBe(false);
   const after = await readActiveView(app);
-  expect(after.y).toBe(after.shellHeight);
+  expect(after.y).toBe(after.restingTop);
 });
