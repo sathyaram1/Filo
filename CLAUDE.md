@@ -347,48 +347,54 @@ firebase deploy --only storage              # solo le regole Storage
 firebase deploy                             # entrambe
 ```
 
-### Scrittura feedback (autenticazione obbligatoria)
+### Scrittura feedback: coda su git (NON più PATCH diretta da cloud)
 
-Le rules sono **admin-only / routine-only**: una PATCH REST senza
-`Authorization: Bearer <idToken>` riceve **403**. NON tentare PATCH grezze con
-la sola API key pubblica: falliranno.
+⚠️ **L'account robot delle routine è stato BLOCCATO da Google.** Le routine
+cloud NON possono più autenticarsi a Firestore: ogni PATCH come ruolo
+`routines` ora fallisce. `scripts/routine-feedback.mjs` e `routine-login.mjs`
+sono **morti** — non usarli.
+
+Al loro posto c'è una **coda su git** (`feedback-triage/`, vedi il README lì
+dentro). La routine non scrive lo stato su Firestore: deposita la decisione
+come un file `feedback-triage/<id>.json`; l'hook di auto-commit lo pusha su
+`origin/main`. In locale l'owner applica la coda a Firestore con le proprie
+credenziali admin (account NON bloccato) e la svuota. È una **coda di comandi**,
+non un registro: ogni file sparisce appena applicato, quindi nessun elenco di ID
+diventa stantio quando un feedback viene riaperto.
 
 - **In sessione locale / dashboard app**: le scritture passano dal main process
-  (`feedback_update`), che allega l'ID token Firebase dell'admin loggato.
-- **In routine cloud**: usa il ruolo limitato `routines`. Aggiorna i feedback
-  **solo** tramite l'helper, che scambia il refresh token dell'account robot
-  per un ID token e fa la PATCH autenticata:
+  (`feedback_update`), che allega l'ID token Firebase dell'admin loggato. Questo
+  continua a funzionare (è l'owner, non l'account robot).
+
+- **In routine cloud — accoda, non scrivere**: per ogni decisione di triage
+  esegui
 
   ```bash
-  node scripts/routine-feedback.mjs <id> <status:todo|done|clarify> "testo note"
+  node scripts/queue-triage.mjs <id> <status:todo|done|clarify> "testo note"
   ```
 
-  Richiede la variabile d'ambiente `FILO_ROUTINE_REFRESH_TOKEN` (refresh token
-  Firebase dell'account robot). Il ruolo `routines` può **solo** spostare lo
-  status tra `todo`/`done`/`clarify` e scrivere `notes`/`resolvedAt`: niente
-  `priority`, niente `verified`/`ignored`, niente delete (qualsiasi altra cosa →
-  403). Per `verified`/`ignored`/delete serve un admin (owner), non la routine.
+  (oppure crea a mano il file `feedback-triage/<id>.json` con l'editor: l'hook lo
+  committa). Niente token, niente rete. La decisione arriva su `origin/main` e
+  resta in coda finché l'owner non la applica. **Nel report finale di sessione,
+  dì all'utente che le decisioni sono in coda e vanno applicate** con
+  `npm run feedback:apply`.
 
-  **Sessioni locali (questa macchina)**: il refresh token è già salvato nel file
+- **In locale (owner) — applica e svuota la coda**:
+
+  ```bash
+  npm run feedback:apply              # applica a Firestore e svuota la coda
+  npm run feedback:apply -- --dry-run # mostra cosa farebbe, senza scrivere
+  ```
+
+  Richiede un refresh token Firebase dell'account **owner** in
+  `FILO_ADMIN_REFRESH_TOKEN`. Setup una tantum: `node scripts/admin-login.mjs`
+  (login Google con l'account owner, quello in `admins`/`adminEmails`), poi salva
+  il refresh token stampato come `FILO_ADMIN_REFRESH_TOKEN` nel file
   `tests/agent/.env` della **root del repo principale**
   (`C:/Users/agenti AI/Desktop/Filo/Filo/tests/agent/.env`), accanto alla chiave
-  Gemini. È **gitignorato**: NON viene committato né pushato su GitHub. Attenzione:
-  ogni worktree ha un proprio `tests/agent/.env` (vuoto), quindi leggi sempre il
-  token dal file della root. Esempio per chiudere un feedback da una sessione
-  locale (bash):
-
-  ```bash
-  TOK=$(grep '^FILO_ROUTINE_REFRESH_TOKEN=' "C:/Users/agenti AI/Desktop/Filo/Filo/tests/agent/.env" | cut -d= -f2-)
-  FILO_ROUTINE_REFRESH_TOKEN="$TOK" node scripts/routine-feedback.mjs <id> done "testo note"
-  ```
-
-  Se il refresh risponde 401/403, il token è scaduto o revocato: rigeneralo con
-  `routine-login.mjs` e riscrivi quel file. NON incollare il token in CLAUDE.md
-  (verrebbe pushato su GitHub).
-
-  Setup una tantum del token: `node scripts/routine-login.mjs` (login Google con
-  l'account robot dedicato — NON l'owner), poi incolla l'email in `routines` su
-  console Firebase e il refresh token stampato in `FILO_ROUTINE_REFRESH_TOKEN`.
+  Gemini. È **gitignorato**: NON viene committato. L'applier lo cerca prima in env,
+  poi in quel file. Il token admin resta SOLO su questa macchina: le routine cloud
+  non lo vedono mai. Se il refresh dà 401/403, rigeneralo con `admin-login.mjs`.
 
 **Workflow**: quando l'utente chiede di "risolvere i feedback", lavora
 **solo** sui feedback con status `todo` ("Da risolvere"). Ignora quelli
