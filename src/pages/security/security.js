@@ -28,9 +28,7 @@
     $('sec-safebrowse-llm-desc').textContent = I18n.t('options_security_safebrowse_llm_desc');
     $('sec-safebrowse-sandbox-label').textContent = I18n.t('options_security_safebrowse_sandbox');
     $('sec-safebrowse-sandbox-desc').textContent = I18n.t('options_security_safebrowse_sandbox_desc');
-    $('sec-safebrowse-key-label').textContent = I18n.t('options_security_safebrowse_key_label');
-    $('sec-safebrowse-key-desc').textContent = I18n.t('options_security_safebrowse_key_desc');
-    $('sec-safebrowse-key').placeholder = I18n.t('options_security_safebrowse_key_placeholder');
+    $('sec-safebrowse-key-managed').textContent = I18n.t('options_security_safebrowse_key_managed');
     $('sec-export-btn').textContent = I18n.t('security_export_btn');
     $('sec-export-desc').textContent = I18n.t('security_export_desc');
     $('savedHint').textContent = I18n.t('options_saved');
