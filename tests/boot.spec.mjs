@@ -3,10 +3,14 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 
-test('la shell carica e mostra la barra indirizzi', async ({ shell }) => {
+test('la shell carica: niente barra URL, icone di navigazione visibili sulla home', async ({ shell }) => {
   await expect(shell.locator('.shell')).toBeVisible();
-  await expect(shell.locator('#addr')).toBeVisible();
   await expect(shell.locator('#tab-new')).toBeVisible();
+  // La barra dell'URL è stata rimossa del tutto.
+  await expect(shell.locator('#addr')).toHaveCount(0);
+  // Sulla home di Filo (newtab) la riga di navigazione con le icone resta visibile.
+  await expect(shell.locator('nav.addr')).toBeVisible();
+  await expect(shell.locator('#nav-home')).toBeVisible();
 });
 
 test('la newtab apre filo://newtab/ con la dashboard montata', async ({ shell, app }) => {
