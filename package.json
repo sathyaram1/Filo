@@ -5,7 +5,7 @@
   "description": "Filo — browser AI-native cross-device. Layer di interazione, non solo finestra.",
   "main": "src/main/main.js",
   "scripts": {
-    "prestart": "git -c user.email=claude@local -c user.name=claude-local pull --rebase --autostash origin main || git rebase --abort || echo \"[prestart] git pull saltato (offline o conflitto) — avvio con codice locale\"",
+    "prestart": "node scripts/prestart.mjs",
     "start": "electron .",
     "predev": "git -c user.email=claude@local -c user.name=claude-local pull --rebase --autostash origin main || git rebase --abort || echo \"[predev] git pull saltato\"",
     "dev": "electron . --enable-logging",
