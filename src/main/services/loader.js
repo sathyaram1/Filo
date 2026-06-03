@@ -31,6 +31,7 @@ require(path.join(SVC, 'pathsCollector.js'));
 require(path.join(SVC, 'llmsTxt.js'));
 require(path.join(SVC, 'webSearch.js'));
 require(path.join(SVC, 'fxRates.js'));
+require(path.join(SVC, 'safebrowse', 'index.js'));
 
 module.exports = {
   // Esponiamo gli oggetti popolati su globalThis per chi vuole un riferimento
