@@ -91,6 +91,14 @@ app.whenReady().then(async () => {
   try {
     const s = await Storage.getSettings();
     syncNativeTheme(s.theme);
+    // Gestione cookie: emetti GPC sulla sessione di default secondo la modalità.
+    const Cookies = require('./services/cookies');
+    Cookies.configureFromSettings(s);
+    // Backstop del wipe: se l'uscita precedente è stata interrotta (crash/kill)
+    // e dei cookie non-whitelisted sono rimasti su disco, ripuliscili PRIMA di
+    // aprire qualsiasi tab così nessun sito li vede. In privacy le sessioni sono
+    // effimere e non serve; in manual non tocchiamo nulla.
+    try { await Cookies.wipeNonWhitelisted(s); } catch (_) {}
   } catch (_) {}
 
   // Ripristina la sessione "Accedi con Google" persistita (non fa rete: l'ID
