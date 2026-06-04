@@ -724,6 +724,11 @@ async function handleMessage(msg, sender = {}) {
       // così le modifiche valgono subito senza riavviare. La chiave GSB è
       // condivisa (admin → Firestore): withDefaults la inietta nei settings.
       wireSafebrowse(withDefaults(merged)).catch(() => {});
+      // Riconfigura la gestione cookie: aggiorna GPC sulla sessione di default
+      // (e su quelle per-sito) secondo la nuova modalità, e aggiorna la cache
+      // usata dal wipe all'uscita. La modalità per-tab è già propagata via
+      // setSecurity qui sopra (TabManager legge security.cookies).
+      try { require('./cookies').configureFromSettings(merged); } catch (_) {}
       return { ok: true, settings: merged };
     }
     case MSG.SAVE_PAGE: {
