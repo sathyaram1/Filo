@@ -178,7 +178,7 @@
     options_h_model_registry: 'Registry modelli',
     options_model_registry_desc:
       'Ogni modello ha un nickname e un id concreto per ogni provider. Le azioni qui sotto fanno riferimento al nickname: il provider concreto viene scelto a runtime in base alle chiavi disponibili e a "Gemini diretto".',
-    options_models_desc: 'Per ogni azione, scegli il nickname del modello da usare.',
+    options_models_desc: 'Per ogni azione, scegli il nickname del modello da usare. Puoi indicarne anche più di uno separandoli con la virgola: il primo è il modello principale, gli altri vengono usati come fallback in ordine se quello prima fallisce.',
     options_model_nickname: 'nickname',
     options_model_label: 'etichetta',
     options_model_or_id: 'id su OpenRouter',
