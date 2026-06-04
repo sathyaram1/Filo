@@ -144,20 +144,26 @@
 }
 .sn-fb-attach svg { display: block; }
 
-/* "Cancella disegno": disegnato come tratteggiato (è l'unico modo per cancellare
-   l'annotazione). Compare SOLO quando c'è un disegno da cancellare (hidden via
-   attributo dal content script). */
+/* Bottone sempre presente: di default "Allega screenshot" (allega lo scatto
+   della pagina anche senza disegnare); quando c'è un disegno diventa "Cancella".
+   In entrambi gli stati "selezionati" usa lo stesso colore (accent). */
 .sn-fb-clear {
   cursor: pointer;
   font: inherit;
-  font-size: 12px;
-  padding: 5px 12px;
+  font-size: 13px;
+  padding: 6px 14px;
   border-radius: 6px;
-  border: 1px dashed var(--sn-accent, #888);
-  background: transparent;
+  border: 1px solid var(--sn-border);
+  background: var(--sn-bg);
   color: var(--sn-fg);
 }
-.sn-fb-clear:hover { background: rgba(127, 127, 127, 0.1); }
+.sn-fb-clear:hover:not(.sn-fb-clear--on) { background: rgba(127, 127, 127, 0.1); }
+.sn-fb-clear--on {
+  background: var(--sn-accent);
+  border-color: var(--sn-accent);
+  color: #fff;
+}
+.sn-fb-clear--on:hover { opacity: 0.9; }
 
 .sn-fb-thumbs {
   display: flex;
