@@ -728,7 +728,13 @@ async function handleMessage(msg, sender = {}) {
       // (e su quelle per-sito) secondo la nuova modalità, e aggiorna la cache
       // usata dal wipe all'uscita. La modalità per-tab è già propagata via
       // setSecurity qui sopra (TabManager legge security.cookies).
-      try { require('./cookies').configureFromSettings(merged); } catch (_) {}
+      try {
+        const Cookies = require('./cookies');
+        Cookies.configureFromSettings(merged);
+        // Avvisa i content script così rifiuto CMP / riscrittura embed si
+        // (dis)attivano senza bisogno di ricaricare la pagina.
+        broadcastToTabs({ type: MSG.COOKIES_CONFIG_UPDATE, mode: Cookies.getMode(merged) });
+      } catch (_) {}
       return { ok: true, settings: merged };
     }
     case MSG.SAVE_PAGE: {
