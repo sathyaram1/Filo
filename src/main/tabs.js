@@ -119,6 +119,11 @@ class TabManager {
     // DEFAULT_SETTINGS.security così se setSecurity non viene mai chiamato la
     // protezione è comunque attiva.
     this.security = { protectIpLeak: true, blockPopups: true };
+    // Modalità cookie corrente ('manual' | 'default' | 'privacy') + whitelist
+    // "resta connesso". Ripopolata da setSecurity quando l'utente salva. In
+    // 'privacy' ogni sito naviga in una partizione effimera dedicata.
+    this.cookieMode = Cookies.MODES.DEFAULT;
+    this.loginWhitelist = [];
   }
 
   // Aggiorna le impostazioni di sicurezza e le riapplica a tutti i tab esistenti.
@@ -128,6 +133,9 @@ class TabManager {
       protectIpLeak: security?.protectIpLeak !== false,
       blockPopups: security?.blockPopups !== false,
     };
+    const cookies = security?.cookies || {};
+    this.cookieMode = Cookies.getMode({ security: { cookies } });
+    this.loginWhitelist = Array.isArray(cookies.loginWhitelist) ? cookies.loginWhitelist : [];
     for (const tab of this.tabs) {
       this._applySecurity(tab);
     }
