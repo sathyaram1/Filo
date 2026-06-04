@@ -138,7 +138,13 @@ test('wipe all\'uscita (default): cancella i non-whitelisted, tiene i whiteliste
     }
     const settings = { security: { cookies: { mode: 'default', loginWhitelist: ['keep-login.com'] } } };
     const r = await Cookies.wipeNonWhitelisted(settings);
-    const after = (await ses.cookies.get({})).map((c) => String(c.domain || '').replace(/^\./, ''));
+    // Anche remove() committa in modo asincrono: aspetta che il tracker sparisca.
+    let after = [];
+    for (let i = 0; i < 40; i++) {
+      after = await domainsNow();
+      if (!after.includes('tracker-drop.com')) break;
+      await new Promise((r) => setTimeout(r, 50));
+    }
     return {
       skipped: !!r.skipped,
       removed: r.removed,
