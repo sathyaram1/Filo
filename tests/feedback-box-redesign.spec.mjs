@@ -56,8 +56,26 @@ test('il box feedback è solo un box + 4 bottoni (Allega/Chiudi/Invia/Cancella),
   // Icona SVG nel bottone "Allega".
   await expect(page.locator('.sn-fb-attach svg')).toHaveCount(1);
 
-  // Il 4° bottone ("Cancella disegno") esiste ma è nascosto finché non si disegna.
-  await expect(page.locator('.sn-fb-clear')).toBeHidden();
+  // Il bottone screenshot è SEMPRE presente: di default "Allega screenshot",
+  // non selezionato (niente più bottone nascosto finché non si disegna).
+  await expect(page.locator('.sn-fb-clear')).toBeVisible();
+  await expect(page.locator('.sn-fb-clear')).toHaveText(/Allega screenshot/);
+  await expect(page.locator('.sn-fb-clear')).not.toHaveClass(/sn-fb-clear--on/);
+
+  // Ordine richiesto: Chiudi (primo), Allega (secondo), Allega screenshot (terzo),
+  // Invia (ultimo).
+  const order = await page.evaluate(() =>
+    [...document.querySelectorAll('.sn-fb-actions button')].map((b) =>
+      b.className.match(/sn-fb-(cancel|attach|clear|send)/)?.[1]));
+  expect(order).toEqual(['cancel', 'attach', 'clear', 'send']);
+
+  // Maniglia per spostare il box.
+  await expect(page.locator('.sn-fb-drag')).toHaveCount(1);
+
+  // Niente translateX(-50%) sul box (era la causa del testo sfocato su HiDPI).
+  const transform = await page.evaluate(() =>
+    getComputedStyle(document.querySelector('.sn-fb-modal')).transform);
+  expect(transform === 'none' || /matrix\(1, 0, 0, 1, 0, 0\)/.test(transform)).toBeTruthy();
 
   // La tela di disegno copre la pagina.
   await expect(page.locator('.sn-fb-canvas')).toHaveCount(1);
@@ -78,7 +96,7 @@ test('il box feedback è solo un box + 4 bottoni (Allega/Chiudi/Invia/Cancella),
   await page.evaluate(() => window.SN_FEEDBACK_UI.close());
 });
 
-test('disegnare mostra il bottone tratteggiato "Cancella disegno"; cliccarlo cancella e lo rinasconde', async ({ app, shell }) => {
+test('disegnare fa diventare il bottone "Cancella" (selezionato); cliccarlo cancella e torna "Allega screenshot"', async ({ app, shell }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
 
@@ -86,7 +104,8 @@ test('disegnare mostra il bottone tratteggiato "Cancella disegno"; cliccarlo can
   await expect(page.locator('.sn-fb-modal')).toBeVisible();
 
   const clear = page.locator('.sn-fb-clear');
-  await expect(clear).toBeHidden();
+  await expect(clear).toHaveText(/Allega screenshot/);
+  await expect(clear).not.toHaveClass(/sn-fb-clear--on/);
 
   // Disegna un tratto nella zona alta (lontano dal box in basso).
   await page.mouse.move(120, 120);
@@ -95,14 +114,52 @@ test('disegnare mostra il bottone tratteggiato "Cancella disegno"; cliccarlo can
   await page.mouse.move(320, 140, { steps: 6 });
   await page.mouse.up();
 
-  // Compare il bottone per cancellare il disegno, disegnato come tratteggiato.
-  await expect(clear).toBeVisible();
-  const borderStyle = await clear.evaluate((el) => getComputedStyle(el).borderStyle);
-  expect(borderStyle).toContain('dashed');
+  // Ora il bottone è "Cancella" ed è selezionato (stesso colore dello stato armato).
+  await expect(clear).toHaveText(/Cancella/);
+  await expect(clear).toHaveClass(/sn-fb-clear--on/);
 
-  // "Cancella disegno" rimuove i tratti e si rinasconde.
+  // Cliccarlo rimuove i tratti e torna a "Allega screenshot" (sempre visibile).
   await clear.click();
-  await expect(clear).toBeHidden();
+  await expect(clear).toBeVisible();
+  await expect(clear).toHaveText(/Allega screenshot/);
+  await expect(clear).not.toHaveClass(/sn-fb-clear--on/);
+
+  await page.evaluate(() => window.SN_FEEDBACK_UI.close());
+});
+
+test('"Allega screenshot" premuto si seleziona; il box si può trascinare con la maniglia', async ({ app, shell }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+
+  await page.evaluate(() => window.SN_FEEDBACK_UI.open());
+  await expect(page.locator('.sn-fb-modal')).toBeVisible();
+
+  // Premere "Allega screenshot" senza disegnare lo arma (selezionato, stesso colore).
+  const clear = page.locator('.sn-fb-clear');
+  await clear.click();
+  await expect(clear).toHaveClass(/sn-fb-clear--on/);
+  await expect(clear).toHaveText(/Allega screenshot/);
+  // Ri-cliccarlo lo disarma.
+  await clear.click();
+  await expect(clear).not.toHaveClass(/sn-fb-clear--on/);
+
+  // Trascinare la maniglia sposta il box.
+  const before = await page.evaluate(() => {
+    const r = document.querySelector('.sn-fb-modal').getBoundingClientRect();
+    return { left: r.left, top: r.top };
+  });
+  const handle = page.locator('.sn-fb-drag');
+  const hb = await handle.boundingBox();
+  await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(hb.x + hb.width / 2 - 120, hb.y + hb.height / 2 - 80, { steps: 8 });
+  await page.mouse.up();
+  const after = await page.evaluate(() => {
+    const r = document.querySelector('.sn-fb-modal').getBoundingClientRect();
+    return { left: r.left, top: r.top };
+  });
+  expect(Math.abs(after.left - before.left)).toBeGreaterThan(40);
+  expect(Math.abs(after.top - before.top)).toBeGreaterThan(20);
 
   await page.evaluate(() => window.SN_FEEDBACK_UI.close());
 });
