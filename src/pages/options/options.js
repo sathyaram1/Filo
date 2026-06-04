@@ -234,6 +234,7 @@
     row.appendChild(testGm);
     row.appendChild(del);
     row.appendChild(status);
+    renderRowTest(row);
     return row;
   }
 
