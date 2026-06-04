@@ -807,6 +807,8 @@
     DEFAULT_MODELS,
     DEFAULT_MODEL_REGISTRY,
     resolveModel,
+    parseModelRefs,
+    buildModelAttempts,
     DEPRECATED_MODELS,
     DEFAULT_PROVIDER,
     DEFAULT_SETTINGS,
