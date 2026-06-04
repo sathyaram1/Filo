@@ -232,6 +232,13 @@
     $('sec-safebrowse-network').addEventListener('change', save);
     $('sec-safebrowse-llm').addEventListener('change', save);
     $('sec-safebrowse-sandbox').addEventListener('change', save);
+    for (const r of document.querySelectorAll('input[name="cookie-mode"]')) {
+      r.addEventListener('change', () => { syncCookieMode(); saveCookies(); });
+    }
+    $('cookie-wl-add-btn').addEventListener('click', addWhitelistDomain);
+    $('cookie-wl-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); addWhitelistDomain(); }
+    });
     $('sec-export-btn').addEventListener('click', exportData);
   });
 })();
