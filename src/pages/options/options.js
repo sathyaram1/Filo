@@ -151,10 +151,33 @@
     }
   }
 
+  // Formatta un risultato di test salvato (latenza + token/sec) per la riga.
+  function formatTestResult(t) {
+    if (!t) return '';
+    const ttft = t.ttftMs != null ? t.ttftMs : '—';
+    const tps = t.tokensPerSec != null ? t.tokensPerSec : '—';
+    return I18n.t('options_test_result', ttft, tps);
+  }
+
+  // Mostra nel div di stato della riga i risultati di test memorizzati per i
+  // due provider, così la latenza/velocità misurata resta visibile tra le
+  // sessioni (non solo durante il test).
+  function renderRowTest(row) {
+    const statusEl = row.querySelector('.sn-model-row-status');
+    if (!statusEl) return;
+    const test = row._test || {};
+    const parts = [];
+    if (test.openrouter) parts.push(`OpenRouter — ${formatTestResult(test.openrouter)}`);
+    if (test.gemini) parts.push(`Gemini — ${formatTestResult(test.gemini)}`);
+    statusEl.textContent = parts.join('   ·   ');
+  }
+
   function makeModelRow(nick, entry) {
     const row = document.createElement('div');
     row.className = 'sn-model-row';
     row.dataset.originalNick = nick || '';
+    // Risultati di test persistiti per provider: { openrouter:{ttftMs,tokensPerSec,at}, gemini:{...} }.
+    row._test = (entry && entry.test && typeof entry.test === 'object') ? { ...entry.test } : {};
 
     const nickIn = document.createElement('input');
     nickIn.type = 'text';
