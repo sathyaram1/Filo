@@ -920,6 +920,11 @@ async function handleMessage(msg, sender = {}) {
         win?._filoTabs?.closeTab(sender.tab.id);
       }
       return { ok: true };
+    case MSG.CLOSE_ALL_TABS: {
+      const win = winOf(sender);
+      win?._filoTabs?.closeAllTabs();
+      return { ok: true };
+    }
     case MSG.OPEN_URL: {
       const win = winOf(sender);
       if (win?._filoTabs && msg.url) win._filoTabs.openTab(msg.url);
