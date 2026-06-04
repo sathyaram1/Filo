@@ -549,6 +549,44 @@
       }
     });
 
+    // ---- posizione iniziale + trascinamento ----
+    // Centra orizzontalmente con `left` INTERO (niente translateX(-50%): su
+    // display HiDPI cadrebbe su un pixel frazionario → testo sfocato).
+    function centerModal() {
+      const w = modal.offsetWidth || 540;
+      modal.style.left = Math.max(8, Math.round((window.innerWidth - w) / 2)) + 'px';
+    }
+    centerModal();
+
+    let dragState = null;
+    dragHandle.addEventListener('pointerdown', (e) => {
+      const rect = modal.getBoundingClientRect();
+      dragState = { dx: e.clientX - rect.left, dy: e.clientY - rect.top, w: rect.width, h: rect.height };
+      // Passa da ancoraggio `bottom` a `top` per poter spostare liberamente.
+      modal.style.bottom = 'auto';
+      modal.style.top = Math.round(rect.top) + 'px';
+      modal.style.left = Math.round(rect.left) + 'px';
+      try { dragHandle.setPointerCapture(e.pointerId); } catch (_) {}
+      e.preventDefault();
+    });
+    dragHandle.addEventListener('pointermove', (e) => {
+      if (!dragState) return;
+      const maxL = Math.max(4, window.innerWidth - dragState.w - 4);
+      const maxT = Math.max(4, window.innerHeight - dragState.h - 4);
+      const left = Math.min(Math.max(4, Math.round(e.clientX - dragState.dx)), maxL);
+      const top = Math.min(Math.max(4, Math.round(e.clientY - dragState.dy)), maxT);
+      modal.style.left = left + 'px';
+      modal.style.top = top + 'px';
+    });
+    function endDrag(e) {
+      if (!dragState) return;
+      dragState = null;
+      try { dragHandle.releasePointerCapture(e.pointerId); } catch (_) {}
+    }
+    dragHandle.addEventListener('pointerup', endDrag);
+    dragHandle.addEventListener('pointercancel', endDrag);
+
+    updateClearBtn();
     textEl.focus();
   }
 
