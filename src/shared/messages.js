@@ -96,6 +96,14 @@
     // arricchimento asincrono RDAP/GSB/sandbox). Il content (ri)disegna l'avviso.
     SAFEBROWSE_UPDATE: 'safebrowse_update',         // → { url, level, message }
 
+    // === Gestione cookie / consenso (src/content/cookies.js) ===
+    // Il content script chiede la modalità corrente per decidere se rifiutare i
+    // banner CMP e riscrivere gli embed YouTube in nocookie. → { mode }
+    COOKIES_CONFIG: 'cookies_config',               // → { mode: 'manual'|'default'|'privacy' }
+    // Broadcast main→content quando la modalità cambia (UPDATE_SETTINGS): il
+    // content (dis)attiva il rifiuto CMP e la riscrittura embed senza reload.
+    COOKIES_CONFIG_UPDATE: 'cookies_config_update', // → { mode }
+
     // === Account "Accedi con Google" (vedi src/main/auth/) ===
     // Login/logout/stato. Tutto vive nel main process: i token non sono mai
     // esposti alle pagine. La risposta porta solo il profilo pubblico.
