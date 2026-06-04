@@ -276,20 +276,16 @@ async function applyLimitToChain(settings, attempts) {
 
 function buildAttemptChain(settings, modelRef) {
   const registry = settings.modelRegistry || SN_CONST.DEFAULT_MODEL_REGISTRY;
-  const out = [];
-  const seen = new Set();
-  const push = (provider) => {
-    if (seen.has(provider)) return;
-    const apiKey = settings.apiKeys?.[provider];
-    if (!apiKey) return;
-    const concrete = SN_CONST.resolveModel(modelRef, provider, registry);
-    if (!concrete) return;
-    seen.add(provider);
-    out.push({ provider, apiKey, model: concrete });
-  };
-  if (settings.geminiDirect) push('gemini');
-  push(settings.provider || 'openrouter');
-  push('openrouter');
+  // Il campo di un'azione può contenere più nickname separati da virgola: il
+  // primo è il primario, gli altri fallback in ordine. Per ciascuno proviamo i
+  // provider disponibili (Gemini diretto → provider scelto → OpenRouter).
+  const refs = SN_CONST.parseModelRefs(modelRef);
+  if (!refs.length && modelRef) refs.push(modelRef);
+  const providerOrder = [];
+  if (settings.geminiDirect) providerOrder.push('gemini');
+  providerOrder.push(settings.provider || 'openrouter');
+  providerOrder.push('openrouter');
+  const out = SN_CONST.buildModelAttempts(refs, registry, providerOrder, settings.apiKeys || {});
   if (!out.length) {
     const e = new Error(I18n.t('err_no_api_key'));
     e.code = 'NO_API_KEY';
