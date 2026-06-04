@@ -331,7 +331,54 @@ class TabManager {
   navigate(id, url) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
-    tab.view.webContents.loadURL(normalizeUrl(url));
+    const target = normalizeUrl(url);
+    // In privacy ogni sito ha la sua partizione: se l'URL di destinazione
+    // appartiene a un sito diverso da quello della view corrente, la partizione
+    // (fissata alla creazione della WebContentsView) non basta più → ricreiamo
+    // la view nella partizione giusta invece di un semplice loadURL.
+    if (this._needsRepartition(tab, target)) {
+      this._recreateView(tab, target);
+      return;
+    }
+    tab.view.webContents.loadURL(target);
+  }
+
+  // true se navigare `tab` verso `url` richiede una partizione diversa da quella
+  // con cui la view è stata creata (solo in modalità privacy, fra siti diversi).
+  _needsRepartition(tab, url) {
+    if (this.cookieMode !== Cookies.MODES.PRIVACY || this.incognito) return false;
+    const next = this._partitionFor(url);
+    return (next || null) !== (tab.partition || null);
+  }
+
+  // Ricrea la WebContentsView di `tab` nella partizione corretta per `url`,
+  // preservando id/posizione/stato attivo. Necessario in privacy ai cambi di
+  // sito: la partizione non è modificabile dopo la creazione della view.
+  // NOTA: la cronologia avanti/indietro è per-WebContents, quindi attraversare
+  // un confine di sito in privacy riparte con cronologia pulita (è il prezzo
+  // dell'isolamento per-sito; resta intatta entro lo stesso sito).
+  _recreateView(tab, url) {
+    const wasActive = tab.id === this.activeId;
+    const partition = this._partitionFor(url);
+    try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
+    try { tab.view.webContents.close(); } catch (_) {}
+    const view = this._makeView(url, partition);
+    tab.view = view;
+    tab.partition = partition;
+    tab.isInternal = url.startsWith('filo://');
+    tab.partitionSite = tab.isInternal ? null : Cookies.registrableOf(url);
+    this._wireEvents(tab);
+    this._applySecurity(tab);
+    this.win.contentView.addChildView(view);
+    if (wasActive) {
+      this.activeId = tab.id;
+      this.layout();
+    }
+    view.webContents.loadURL(url);
+    if (wasActive) {
+      for (const t of this.tabs) t.view.setVisible?.(t.id === tab.id);
+    }
+    this._broadcast();
   }
 
   goBack(id) {
