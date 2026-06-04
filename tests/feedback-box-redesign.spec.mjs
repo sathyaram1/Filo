@@ -1,7 +1,9 @@
-// Regression test per il box feedback ridisegnato (richiesta utente): SOLO un
-// box per scrivere + 4 bottoni (Allega, Chiudi, Invia, e "Cancella disegno"
-// tratteggiato che compare SOLO se c'è un disegno da cancellare). Niente più
-// titolo/hint/× in alto/footer separato; nuovo placeholder; allega da file.
+// Regression test per il box feedback ridisegnato (richiesta utente): box per
+// scrivere + 4 bottoni nell'ordine Chiudi, Allega, "Allega screenshot"/Cancella,
+// Invia. Il box è trascinabile (maniglia in alto) e non usa translateX(-50%)
+// (che sfocava il testo su HiDPI). Il bottone screenshot è SEMPRE presente: di
+// default "Allega screenshot" (premuto = selezionato → allega lo scatto anche
+// senza disegnare); appena si disegna diventa "Cancella" (stesso colore).
 //
 // Asserisce IL SUCCESSO della feature (gli elementi nuovi ci sono e si
 // comportano come richiesto), non l'assenza di un messaggio.
