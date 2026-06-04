@@ -90,6 +90,106 @@
     $('sec-safebrowse-llm').checked = sb.llmJudge !== false;
     $('sec-safebrowse-sandbox').checked = sb.sandbox !== false;
     syncSafebrowseEnabled();
+
+    const cookies = sec.cookies || {};
+    const mode = ['manual', 'default', 'privacy'].includes(cookies.mode) ? cookies.mode : 'default';
+    const radio = document.querySelector(`input[name="cookie-mode"][value="${mode}"]`);
+    if (radio) radio.checked = true;
+    cookieWhitelist = Array.isArray(cookies.loginWhitelist) ? cookies.loginWhitelist.slice() : [];
+    renderWhitelist();
+    syncCookieMode();
+  }
+
+  // ─── gestione cookie ──────────────────────────────────────────────────────
+
+  let cookieWhitelist = [];
+
+  function currentMode() {
+    const checked = document.querySelector('input[name="cookie-mode"]:checked');
+    return checked ? checked.value : 'default';
+  }
+
+  // In "Privacy massima" niente sopravvive alla sessione: la whitelist non ha
+  // effetto, quindi la disabilitiamo e mostriamo la nota esplicativa.
+  function syncCookieMode() {
+    const privacy = currentMode() === 'privacy';
+    $('sec-cookies-wl-privacy-note').style.display = privacy ? 'block' : 'none';
+    const wl = $('sec-cookies-whitelist');
+    wl.style.opacity = privacy ? '0.45' : '1';
+    $('cookie-wl-input').disabled = privacy;
+    $('cookie-wl-add-btn').disabled = privacy;
+    for (const btn of $('cookie-wl-list').querySelectorAll('button')) btn.disabled = privacy;
+  }
+
+  // Pulisce l'input utente in un dominio confrontabile: toglie schema, path,
+  // www. e porta, lascia il bare host minuscolo. "https://www.Gmail.com/x" →
+  // "gmail.com". Ritorna '' se non estraibile.
+  function cleanDomain(raw) {
+    let s = String(raw || '').trim().toLowerCase();
+    if (!s) return '';
+    try {
+      if (s.includes('://')) s = new URL(s).hostname;
+      else s = new URL('http://' + s).hostname;
+    } catch (_) {
+      s = s.split('/')[0].split('?')[0];
+    }
+    s = s.replace(/^www\./, '');
+    return /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(s) ? s : '';
+  }
+
+  function renderWhitelist() {
+    const list = $('cookie-wl-list');
+    list.innerHTML = '';
+    if (!cookieWhitelist.length) {
+      const li = document.createElement('li');
+      li.className = 'sn-muted';
+      li.style.border = 'none';
+      li.textContent = I18n.t('options_cookies_whitelist_empty');
+      list.appendChild(li);
+      return;
+    }
+    for (const domain of cookieWhitelist) {
+      const li = document.createElement('li');
+      const span = document.createElement('span');
+      span.textContent = domain;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sn-btn-secondary';
+      btn.textContent = I18n.t('options_cookies_whitelist_remove');
+      btn.addEventListener('click', () => {
+        cookieWhitelist = cookieWhitelist.filter((d) => d !== domain);
+        renderWhitelist();
+        saveCookies();
+      });
+      li.appendChild(span);
+      li.appendChild(btn);
+      list.appendChild(li);
+    }
+  }
+
+  function addWhitelistDomain() {
+    const domain = cleanDomain($('cookie-wl-input').value);
+    if (!domain) { $('cookie-wl-input').value = ''; return; }
+    if (!cookieWhitelist.includes(domain)) {
+      cookieWhitelist.push(domain);
+      cookieWhitelist.sort();
+      renderWhitelist();
+      saveCookies();
+    }
+    $('cookie-wl-input').value = '';
+  }
+
+  async function saveCookies() {
+    const partial = {
+      security: {
+        cookies: { mode: currentMode(), loginWhitelist: cookieWhitelist.slice() },
+      },
+    };
+    await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
+    const hint = $('savedHint');
+    hint.classList.add('sn-show');
+    clearTimeout(saveCookies._t);
+    saveCookies._t = setTimeout(() => hint.classList.remove('sn-show'), 1500);
   }
 
   // I sotto-controlli del rilevamento siti pericolosi sono attivi solo quando il
