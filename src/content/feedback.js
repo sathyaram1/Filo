@@ -141,6 +141,7 @@
     activeStack = Popup?.registerStack?.(root) || null;
 
     const modal = root.querySelector('.sn-fb-modal');
+    const dragHandle = root.querySelector('.sn-fb-drag');
     const textEl = root.querySelector('.sn-fb-text');
     const thumbsEl = root.querySelector('.sn-fb-thumbs');
     const statusEl = root.querySelector('.sn-fb-status');
