@@ -36,6 +36,7 @@ if (process.env.NODE_ENV === 'test') {
   try {
     globalThis.__filoHandlers = require('./services/handlers');
     globalThis.__filoDefaults = require('./services/defaultsStore');
+    globalThis.__filoCookies = require('./services/cookies');
   } catch (_) {}
 }
 
