@@ -130,10 +130,11 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 14px;
+  padding: 8px 10px;
   border-top: 1px solid var(--sn-border);
 }
-/* "Invia" è il bottone primario e sta a destra; "Allega"/"Chiudi" a sinistra. */
+/* Ordine richiesto: Chiudi (primo), Allega (secondo), Allega screenshot/Cancella,
+   Invia (ultimo, primario, a destra). */
 .sn-fb-send { margin-left: auto; }
 
 .sn-fb-attach {
