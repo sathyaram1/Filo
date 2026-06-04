@@ -1,0 +1,7 @@
+{
+  "id": "G0zeEM4zCwtmPiTTZtVg",
+  "status": "done",
+  "notes": "Riprogettato il box per inviare feedback. Ora: i bottoni sono nell'ordine che hai chiesto (Chiudi, Allega, Allega screenshot, Invia). Il box si puo spostare trascinandolo dalla maniglia in alto. Il bottone 'Cancella disegno' e diventato un bottone normale sempre presente: quando non hai disegnato niente recita 'Allega screenshot' e premendolo si colora (selezionato); appena disegni qualcosa diventa 'Cancella' con lo stesso colore selezionato. Ho tolto lo spazio vuoto non scrivibile sotto al testo (le anteprime e i messaggi compaiono solo quando servono) e ridotto il bordo del box. Il testo sfocato dovrebbe essere risolto: era causato dal modo in cui il box veniva centrato (translateX su mezzo pixel) sugli schermi ad alta densita, ora il box e posizionato su pixel interi. In piu (oltre al chiesto): premendo 'Allega screenshot' senza disegnare ora puoi allegare lo scatto della pagina, prima lo screenshot partiva solo se disegnavi. Verificato con test automatici (ordine bottoni, trascinamento, toggle del bottone, niente translateX). Se vedi ancora il testo sfocato fammelo sapere.",
+  "queuedAt": "2026-06-04T00:26:50.493Z",
+  "queuedBy": "routine"
+}
