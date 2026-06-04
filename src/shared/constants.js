@@ -713,6 +713,23 @@
         llmJudge: true,
         sandbox: true,
       },
+      // Gestione cookie / consenso. Un solo interruttore a 3 stati che l'utente
+      // vede davvero (vedi src/main/services/cookies.js):
+      // - 'manual'  → nessuna gestione automatica: i banner dei cookie si vedono
+      //   normalmente e l'utente decide a mano. Niente GPC, niente pulizia.
+      // - 'default' → (attiva per il ~99% degli utenti) zero attrito: emette il
+      //   segnale GPC, rifiuta in automatico i banner CMP, riscrive gli embed
+      //   YouTube su youtube-nocookie, e all'uscita dall'app cancella i cookie
+      //   (nessun profilo persistente) TRANNE i domini in loginWhitelist.
+      // - 'privacy' → massima riservatezza: ogni sito naviga in un cookie jar
+      //   isolato ed effimero (nessuna correlazione cross-site, nulla sopravvive
+      //   alla sessione, login compresi). GPC + rifiuto CMP + YouTube come sopra.
+      // loginWhitelist: domini (eTLD+1) marcati "resta loggato qui" → i loro
+      // cookie sono esenti dalla cancellazione in modalità 'default'.
+      cookies: {
+        mode: 'default',
+        loginWhitelist: [],
+      },
     },
     // Modalità terminale della dashboard: quando attiva, ogni comando con `/`
     // che non è un comando interno di Filo viene eseguito da una shell di
