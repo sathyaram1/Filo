@@ -483,9 +483,9 @@
     // Invio
     sendBtn.addEventListener('click', async () => {
       const text = textEl.value.trim();
-      // Allega automaticamente lo screenshot annotato quando c'è un disegno,
-      // ovunque sia (pagina o barra in alto): niente più toggle.
-      const wantShot = hasAnyDrawing();
+      // Allega lo screenshot quando c'è un disegno (annotato) OPPURE quando
+      // l'utente ha premuto "Allega screenshot" (scatto della pagina senza disegno).
+      const wantShot = shotArmed || hasAnyDrawing();
       if (!text && images.length === 0 && !wantShot) {
         statusEl.textContent = 'Scrivi qualcosa, allega un\'immagine o annota lo schermo.';
         return;
