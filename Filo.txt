@@ -1,0 +1,22 @@
+Filo è un nuovo layer, un nuovo modo di interagire con l'hardware.
+sarà un sistema condiviso fra telefono pc smart tv (più avanti).
+l’idea di fondo è creare un UX pensata da zero abbandonando le vecchie convenzioni date da limiti tecnologici e mantenute per inerzia.
+Filo ha l'obiettivo di restituire il miglior risultato possibile ad ogni azione, indovinare cosa l’utente vuole prima che lo esprima. un utente non deve imparare ad usare filo, è Filo che deve imparare a conoscere l’utente e cosa lui specificatamente vuole.
+Filo si basa sull’AI (sopratutto LLM).
+
+mindset per la creazione di Filo:
+-il software deve poter essere usato male: come un telefono è pensato per essere bagnato e cadere senza rompersi il softwere deve reggere abusi analoghi. non salvare mai, non ordinare mai nulla, non dare nomi appropriati ai file e non sapere come navigare un sito e fare un errore un typo ogni 3 parole non devono essere problemi.
+-abbiamo già L’AGI: se ci fosse un umano dentro al pc che decide cosa l'utente vorrebbe in questo istante dopo questa sua azione cosa gli consiglierebbe? in altre bisogna assumere di avere sempre un'intelligenza adeguata. prima di dichiarare una feature impossibile occorre provar. 
+-l’attrito è negativo: un qualsiasi attrito se teoricamente risolvibile deve essere risolto.
+-nulla è troppo: se qualcosa può essere fatta meglio va fatta meglio, poi se realmente era troppo ambiziosa si scoprirà poi dopo i primi fallimenti.
+
+decisioni di design ad alto livello:
+- tutto può essere fatto scrivendo cosa si vuole ottenere. la GUI è una shortcut rispetto a chiedere a filo (posso chiedere a filo di zoomare la pagina o farlo con un click, il click però è più veloce). 
+- la GUI è personalizzabile. tutto (circa) è un modulo, posso trascinarlo e sostituirlo a qualcos'altro con una forma analoga (per ora avviene sia nelle impostazioni rapide del tasto destro sia nel editor filo dove ogni opzione è spostabile)
+- il tasto destro è centrale. cambia contestualmente e rappresenta "voglio fare qualcosa qui". qualsiasi cosa l'utente potrebbe voler fare all'elemento lo dovrebbe poter fare. 
+
+
+
+estetica:
+Filo è high tech ma non vuole sembrarlo. ha colori caldi e richiama la fisicità quando possibile (es aeroplanino di carta per condividi). 
+
