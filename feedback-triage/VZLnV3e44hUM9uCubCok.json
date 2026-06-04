@@ -1,0 +1,7 @@
+{
+  "id": "VZLnV3e44hUM9uCubCok",
+  "status": "done",
+  "notes": "Aggiunto il comando /clear all nella dashboard: chiude tutte le schede aperte e ne lascia una nuova vuota (come Chrome quando chiudi l'ultima scheda). Lo trovi anche in /help. Verificato con un test automatico che apre piu schede e controlla che dopo /clear all ne resti una sola.",
+  "queuedAt": "2026-06-04T00:26:37.420Z",
+  "queuedBy": "routine"
+}
