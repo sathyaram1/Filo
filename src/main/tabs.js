@@ -212,10 +212,26 @@ class TabManager {
 
   // ─── lifecycle ──────────────────────────────────────────────────────────
 
-  openTab(url = 'filo://newtab/', { activate = true } = {}) {
-    const id = randomUUID();
+  // Partizione (sessione Electron) che una view per `url` deve usare:
+  //   - incognito → la partizione effimera della finestra (già isolata);
+  //   - privacy + pagina esterna → partizione effimera per-sito (eTLD+1),
+  //     così ogni sito ha un cookie jar isolato che non sopravvive alla sessione;
+  //   - altrimenti → null (sessione persistente di default della finestra).
+  // Le pagine filo:// usano sempre la sessione della finestra (serve a storage
+  // e protocollo), mai una partizione per-sito.
+  _partitionFor(url) {
+    if (this.incognito) return this.partition || null;
+    if (!url || url.startsWith('filo://')) return null;
+    if (this.cookieMode === Cookies.MODES.PRIVACY) {
+      const { partition } = Cookies.partitionForTab(url, { mode: this.cookieMode, incognito: false });
+      return partition || null;
+    }
+    return null;
+  }
+
+  _makeView(url, partition) {
     const isInternal = url.startsWith('filo://');
-    const view = new WebContentsView({
+    return new WebContentsView({
       webPreferences: {
         preload: isInternal ? INTERNAL_PRELOAD : PAGE_PRELOAD,
         // Per le pagine interne (filo://) usiamo contextIsolation:false così
@@ -226,12 +242,17 @@ class TabManager {
         sandbox: false,
         nodeIntegration: false,
         webSecurity: true,
-        // Incognito: instrada la webContents nella sessione effimera dedicata,
-        // così cookie/cache/localStorage dei siti non toccano il disco e
-        // svaniscono alla chiusura della finestra.
-        ...(this.partition ? { partition: this.partition } : {}),
+        // partition: incognito (effimera della finestra) o per-sito in privacy.
+        ...(partition ? { partition } : {}),
       },
     });
+  }
+
+  openTab(url = 'filo://newtab/', { activate = true } = {}) {
+    const id = randomUUID();
+    const isInternal = url.startsWith('filo://');
+    const partition = this._partitionFor(url);
+    const view = this._makeView(url, partition);
 
     const tab = {
       id,
@@ -243,6 +264,8 @@ class TabManager {
       canBack: false,
       canFwd: false,
       isInternal,
+      partition,
+      partitionSite: isInternal ? null : Cookies.registrableOf(url),
     };
 
     this._wireEvents(tab);
