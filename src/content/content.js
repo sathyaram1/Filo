@@ -2333,8 +2333,11 @@
   function buildDictateModelSubItems() {
     const C = self.SN_CONST;
     const registry = (settings && settings.modelRegistry) || C.DEFAULT_MODEL_REGISTRY;
-    const current = (settings && settings.models && settings.models[C.ACTIONS.TRANSCRIBE_AUDIO])
+    const currentRaw = (settings && settings.models && settings.models[C.ACTIONS.TRANSCRIBE_AUDIO])
       || C.DEFAULT_MODELS[C.ACTIONS.TRANSCRIBE_AUDIO];
+    // Il campo può contenere più nickname (fallback): il "corrente" mostrato
+    // come selezionato è il primario (il primo della lista).
+    const current = C.parseModelRefs ? (C.parseModelRefs(currentRaw)[0] || currentRaw) : currentRaw;
     const items = [];
     for (const [nickname, entry] of Object.entries(registry)) {
       // Solo modelli con un binding Gemini: per ora è l'unico provider che
