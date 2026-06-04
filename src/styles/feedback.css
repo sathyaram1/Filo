@@ -88,18 +88,25 @@
 }
 
 .sn-fb-body {
-  padding: 16px 14px 12px;
+  /* Bordo più sottile (richiesta utente) e niente spazio morto: i contenitori
+     vuoti (anteprime/stato) si nascondono via :empty, così l'area scrivibile
+     arriva fin sopra la riga dei bottoni. */
+  padding: 8px 10px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
+/* Niente spazio vuoto sotto al testo quando non ci sono anteprime o messaggi. */
+.sn-fb-thumbs:empty,
+.sn-fb-status:empty { display: none; }
 
 .sn-fb-text {
   width: 100%;
   box-sizing: border-box;
+  flex: 1 1 auto;
   resize: vertical;
-  min-height: 88px;
+  min-height: 96px;
   padding: 8px 10px;
   font: inherit;
   font-size: 13px;
