@@ -1052,6 +1052,13 @@ async function handleMessage(msg, sender = {}) {
       if (!win || !win._filoTabs || !tabId) return { ok: false };
       return win._filoTabs.safebrowseDismiss(tabId, msg.url || origin);
     }
+    case MSG.COOKIES_CONFIG: {
+      // Il content script chiede la modalità corrente per decidere se rifiutare
+      // i banner CMP e riscrivere gli embed YouTube. È una config globale, non
+      // per-tab (settings.security.cookies.mode).
+      const settings = await Storage.getSettings();
+      return { ok: true, mode: require('./cookies').getMode(settings) };
+    }
     case MSG.SUBMIT_FEEDBACK: {
       try {
         if (!globalThis.SN_FEEDBACK?.submit) {
