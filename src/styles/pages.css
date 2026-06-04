@@ -432,3 +432,47 @@ section:has(#dictList) .sn-spell-add-row {
   padding: 0 8px;
   margin-bottom: 2px;
 }
+
+/* Selettore modalità cookie: tre "card" radio impilate (Manuale/Automatico/
+   Privacy). La card selezionata si evidenzia con bordo accentato. */
+.sn-page .sn-cookie-modes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+.sn-page .sn-cookie-mode {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid var(--sn-border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  cursor: pointer;
+}
+.sn-page .sn-cookie-mode:hover { background: var(--sn-hover); }
+.sn-page .sn-cookie-mode:has(input:checked) {
+  border-color: var(--sn-accent);
+  box-shadow: 0 0 0 1px var(--sn-accent) inset;
+}
+.sn-page .sn-cookie-mode > input { margin-top: 3px; }
+.sn-page .sn-cookie-mode > span { display: block; }
+.sn-page .sn-cookie-mode-label { font-weight: 600; display: block; }
+.sn-page .sn-cookie-mode-desc { display: block; margin-top: 3px; line-height: 1.5; }
+
+.sn-page .sn-cookie-wl-add > input { flex: 1; }
+.sn-page #cookie-wl-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid var(--sn-border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+.sn-page #cookie-wl-list li button {
+  font-size: 12px;
+  padding: 2px 8px;
+}
