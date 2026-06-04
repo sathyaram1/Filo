@@ -274,6 +274,34 @@
       'Il controllo della blacklist ufficiale di Google (phishing e malware) usa una chiave condivisa, ' +
       'gestita centralmente dall\'amministratore in "Modelli predefiniti": è già attiva per tutti gli ' +
       'account, non devi configurare nulla qui.',
+    // Gestione cookie / consenso
+    options_cookies_title: 'Cookie e banner di consenso',
+    options_cookies_desc:
+      'Filo può occuparsi dei cookie e dei banner di consenso al posto tuo. Scegli quanto vuoi che sia ' +
+      'aggressivo: per quasi tutti va benissimo "Automatico".',
+    options_cookies_mode_manual: 'Manuale',
+    options_cookies_mode_manual_desc:
+      'Filo non tocca nulla: i banner dei cookie compaiono come su qualsiasi browser e decidi tu, banner per banner.',
+    options_cookies_mode_default: 'Automatico (consigliato)',
+    options_cookies_mode_default_desc:
+      'Filo rifiuta da solo i cookie di tracciamento sui banner che riconosce, dice ai siti che non vuoi essere ' +
+      'profilato e carica i video YouTube senza cookie. Quando chiudi Filo i cookie vengono cancellati (nessun ' +
+      'profilo che ti segue nel tempo), tranne i siti dove hai scelto di "restare connesso".',
+    options_cookies_mode_privacy: 'Privacy massima',
+    options_cookies_mode_privacy_desc:
+      'Come l\'Automatico, ma ogni sito vive in uno spazio separato e usa-e-getta: i siti non possono mettersi ' +
+      'd\'accordo per riconoscerti e niente sopravvive alla chiusura di Filo, nemmeno i tuoi accessi. Massima ' +
+      'riservatezza, ma dovrai rifare il login ogni volta.',
+    options_cookies_whitelist_title: 'Resta connesso su questi siti',
+    options_cookies_whitelist_desc:
+      'In modalità Automatico i cookie di questi siti NON vengono cancellati alla chiusura, così resti connesso. ' +
+      'Aggiungi il sito (es. gmail.com) e premi Invio.',
+    options_cookies_whitelist_placeholder: 'es. gmail.com',
+    options_cookies_whitelist_add: 'Aggiungi',
+    options_cookies_whitelist_remove: 'Rimuovi',
+    options_cookies_whitelist_empty: 'Nessun sito: alla chiusura di Filo verrai disconnesso da tutto.',
+    options_cookies_whitelist_disabled_privacy:
+      'In "Privacy massima" niente resta salvato, quindi questa lista non ha effetto.',
     security_export_title: 'Esporta dati Filo',
     security_export_label: 'Esporta dati',
     security_export_desc:
