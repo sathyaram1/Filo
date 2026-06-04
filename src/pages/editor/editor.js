@@ -1278,6 +1278,263 @@
     }));
   }
 
+  // ════════════════════════════════════════════════════════════════════
+  //  Formattazione guidata dalla chat (comandi tipo "scrivi in grassetto
+  //  tutti i titoli"). La chat può rispondere con un blocco JSON di "azioni"
+  //  che applichiamo direttamente al documento, oltre alla risposta testuale.
+  // ════════════════════════════════════════════════════════════════════
+
+  // Stile inline → tag canonico (per applicare) + tag equivalenti (da togliere).
+  const STYLE_TAGS = {
+    bold:      { wrap: 'strong', unwrap: ['strong', 'b'] },
+    italic:    { wrap: 'em', unwrap: ['em', 'i'] },
+    underline: { wrap: 'u', unwrap: ['u'] },
+    strike:    { wrap: 's', unwrap: ['s', 'strike', 'del'] },
+  };
+
+  // Normalizza il nome dello stile (accetta sinonimi italiani/inglesi che il
+  // modello potrebbe restituire).
+  function normalizeStyle(s) {
+    const k = String(s || '').toLowerCase().trim();
+    const map = {
+      bold: 'bold', grassetto: 'bold', bolded: 'bold', strong: 'bold',
+      italic: 'italic', corsivo: 'italic', italics: 'italic', em: 'italic',
+      underline: 'underline', sottolineato: 'underline', sottolineatura: 'underline', underlined: 'underline',
+      strike: 'strike', strikethrough: 'strike', barrato: 'strike', 'line-through': 'strike',
+      fontsize: 'fontSize', size: 'fontSize', dimensione: 'fontSize', 'font-size': 'fontSize',
+      fontfamily: 'fontFamily', font: 'fontFamily', carattere: 'fontFamily', 'font-family': 'fontFamily',
+    };
+    return map[k] || k;
+  }
+
+  // Normalizza il target (stringa o oggetto {contains}).
+  function normalizeTarget(t) {
+    if (t && typeof t === 'object') {
+      const sub = t.contains || t.text || t.match || t.value;
+      if (sub) return { contains: String(sub) };
+      return 'all';
+    }
+    const k = String(t == null ? 'all' : t).toLowerCase().trim();
+    if (['headings', 'heading', 'titoli', 'titolo', 'titles', 'title'].includes(k)) return 'headings';
+    if (['all', 'tutto', 'documento', 'document', 'everything', 'whole'].includes(k)) return 'all';
+    if (['paragraphs', 'paragraph', 'paragrafi', 'paragrafo'].includes(k)) return 'paragraphs';
+    if (['selection', 'selezione', 'selected', 'selezionato'].includes(k)) return 'selection';
+    if (['lists', 'list', 'elenchi', 'liste'].includes(k)) return 'lists';
+    if (/^h[1-6]$/.test(k)) return k.replace(/^h([4-6])$/, 'h3'); // h4-6 → h3 (max livello)
+    return k;
+  }
+
+  // Elementi-blocco di primo livello del documento.
+  function blockEls() {
+    return Array.from(docEl.children).filter((n) => n.nodeType === Node.ELEMENT_NODE && n.tagName !== 'BR');
+  }
+
+  // Risolve un target in lista di blocchi del documento.
+  function resolveTargets(target) {
+    const t = normalizeTarget(target);
+    const all = blockEls();
+    if (t === 'all') return all;
+    if (t === 'headings') return all.filter((el) => /^H[1-3]$/.test(el.tagName));
+    if (/^h[1-3]$/.test(t)) return all.filter((el) => el.tagName === t.toUpperCase());
+    if (t === 'paragraphs') return all.filter((el) => el.tagName === 'P' || el.tagName === 'DIV');
+    if (t === 'lists') return all.filter((el) => el.tagName === 'UL' || el.tagName === 'OL');
+    if (t === 'selection') {
+      const sel = window.getSelection();
+      let range = (sel && sel.rangeCount && !sel.isCollapsed && docEl.contains(sel.anchorNode)) ? sel.getRangeAt(0) : savedDocRange;
+      if (!range) return [];
+      return all.filter((el) => range.intersectsNode(el));
+    }
+    if (t && typeof t === 'object' && t.contains) {
+      const sub = t.contains.toLowerCase();
+      return all.filter((el) => (el.textContent || '').toLowerCase().includes(sub));
+    }
+    return [];
+  }
+
+  // Il contenitore "inline" di un blocco: per le liste è ogni <li>, altrimenti il
+  // blocco stesso (heading/paragrafo/citazione).
+  function inlineHosts(blockEl) {
+    if (blockEl.tagName === 'UL' || blockEl.tagName === 'OL') {
+      return Array.from(blockEl.querySelectorAll(':scope > li'));
+    }
+    return [blockEl];
+  }
+
+  // Avvolge i figli "di contenuto" di host (escluso il toggle di collasso) in un
+  // nuovo elemento creato da makeWrapper(). Ritorna il wrapper (o null se vuoto).
+  function wrapChildren(host, makeWrapper) {
+    const toggle = host.querySelector(':scope > .ed-collapse-toggle');
+    const kids = Array.from(host.childNodes).filter((n) => n !== toggle);
+    if (!kids.length) return null;
+    const wrapper = makeWrapper();
+    kids.forEach((k) => wrapper.appendChild(k));
+    if (toggle) host.insertBefore(wrapper, toggle.nextSibling);
+    else host.appendChild(wrapper);
+    return wrapper;
+  }
+
+  // Toglie (scarta) tutti gli elementi con quel tag dentro host, preservandone i
+  // figli. Serve sia per rimuovere uno stile sia per evitare wrapping duplicati.
+  function unwrapTag(host, tagName) {
+    host.querySelectorAll(tagName).forEach((el) => {
+      const parent = el.parentNode;
+      while (el.firstChild) parent.insertBefore(el.firstChild, el);
+      parent.removeChild(el);
+    });
+  }
+  // Rimuove gli <span>/<font> che portano una certa proprietà di stile inline.
+  function unwrapStyledSpans(host, prop) {
+    Array.from(host.querySelectorAll('span, font')).forEach((el) => {
+      if (el.style && el.style[prop]) {
+        el.style[prop] = '';
+        if (!el.getAttribute('style')) {
+          const parent = el.parentNode;
+          while (el.firstChild) parent.insertBefore(el.firstChild, el);
+          parent.removeChild(el);
+        }
+      }
+    });
+  }
+
+  function normalizeFontSize(value) {
+    const v = String(value == null ? '' : value).toLowerCase().trim();
+    if (!v || v === 'normal' || v === 'normale' || v === 'default') return '';
+    const kw = {
+      huge: '2em', enorme: '2em', xl: '1.7em',
+      large: '1.4em', grande: '1.4em', big: '1.4em', larger: '1.25em', 'più grande': '1.25em',
+      small: '0.85em', piccolo: '0.85em', smaller: '0.85em', 'più piccolo': '0.85em',
+      tiny: '0.7em', piccolissimo: '0.7em',
+    };
+    if (kw[v]) return kw[v];
+    if (/^\d+(\.\d+)?(px|pt|em|rem|%)$/.test(v)) return v;
+    if (/^\d+(\.\d+)?$/.test(v)) return `${v}px`;
+    return '';
+  }
+  function normalizeFontFamily(value) {
+    const v = String(value == null ? '' : value).trim();
+    if (!v) return '';
+    const k = v.toLowerCase();
+    const map = {
+      georgia: 'Georgia, serif',
+      times: '"Times New Roman", serif', 'times new roman': '"Times New Roman", serif',
+      arial: 'Arial, sans-serif',
+      verdana: 'Verdana, sans-serif',
+      courier: '"Courier New", monospace', 'courier new': '"Courier New", monospace', monospace: '"Courier New", monospace',
+      comic: '"Comic Sans MS", cursive', 'comic sans': '"Comic Sans MS", cursive',
+    };
+    return map[k] || v;
+  }
+
+  // Applica uno stile inline al contenuto di un host (heading/paragrafo/li).
+  function applyInlineStyle(host, style, value) {
+    const s = normalizeStyle(style);
+    const off = value === false || value === 'false' || value === 'off' || value === 'no' || value === 0;
+    if (STYLE_TAGS[s]) {
+      const cfg = STYLE_TAGS[s];
+      cfg.unwrap.forEach((t) => unwrapTag(host, t)); // sempre: evita duplicati / rimuove
+      if (!off) wrapChildren(host, () => document.createElement(cfg.wrap));
+      return true;
+    }
+    if (s === 'fontSize') {
+      unwrapStyledSpans(host, 'fontSize');
+      const css = off ? '' : normalizeFontSize(value);
+      if (css) { const span = wrapChildren(host, () => document.createElement('span')); if (span) span.style.fontSize = css; }
+      return true;
+    }
+    if (s === 'fontFamily') {
+      unwrapStyledSpans(host, 'fontFamily');
+      const fam = off ? '' : normalizeFontFamily(value);
+      if (fam) { const span = wrapChildren(host, () => document.createElement('span')); if (span) span.style.fontFamily = fam; }
+      return true;
+    }
+    return false;
+  }
+
+  function applyBlockAlign(blockEl, value) {
+    const v = String(value || '').toLowerCase().trim();
+    if (['left', 'center', 'right', 'justify'].includes(v)) { blockEl.style.textAlign = v; return true; }
+    if (['sinistra'].includes(v)) { blockEl.style.textAlign = 'left'; return true; }
+    if (['centro', 'centrato', 'centra'].includes(v)) { blockEl.style.textAlign = 'center'; return true; }
+    if (['destra'].includes(v)) { blockEl.style.textAlign = 'right'; return true; }
+    if (['giustificato', 'giustifica'].includes(v)) { blockEl.style.textAlign = 'justify'; return true; }
+    return false;
+  }
+
+  // Applica una lista di azioni di formattazione al documento. Ritorna il numero
+  // di blocchi toccati (0 = niente da fare, es. target senza corrispondenze).
+  function applyFormatActions(actions) {
+    if (!Array.isArray(actions)) return 0;
+    let touched = 0;
+    for (const a of actions) {
+      if (!a || typeof a !== 'object') continue;
+      const style = a.style || a.format || a.mark;
+      const isAlign = a.op === 'align' || (!style && (a.align !== undefined));
+      const targets = resolveTargets(a.target);
+      if (isAlign) {
+        const v = a.value !== undefined ? a.value : a.align;
+        for (const b of targets) if (applyBlockAlign(b, v)) touched++;
+      } else {
+        if (!style) continue;
+        for (const b of targets) {
+          let any = false;
+          for (const host of inlineHosts(b)) any = applyInlineStyle(host, style, a.value) || any;
+          if (any) touched++;
+        }
+      }
+    }
+    if (touched) { refreshCollapseToggles(); onDocInput(); }
+    return touched;
+  }
+
+  // Estrae { actions, reply } da una risposta della chat. Cerca un blocco
+  // ```json … ``` o, in mancanza, un oggetto JSON con campo "actions".
+  // Ritorna null se la risposta non contiene azioni (→ va mostrata come testo).
+  function parseFormatActions(text) {
+    if (!text || typeof text !== 'string') return null;
+    let jsonStr = null;
+    const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if (fence) jsonStr = fence[1].trim();
+    if (!jsonStr) {
+      const t = text.trim();
+      if (t.startsWith('{') && t.endsWith('}')) jsonStr = t;
+    }
+    if (!jsonStr) {
+      const m = text.match(/\{[\s\S]*?"actions"[\s\S]*\}/);
+      if (m) jsonStr = m[0];
+    }
+    if (!jsonStr) return null;
+    try {
+      const obj = JSON.parse(jsonStr);
+      if (obj && Array.isArray(obj.actions)) return { actions: obj.actions, reply: typeof obj.reply === 'string' ? obj.reply : '' };
+    } catch (_) { /* non era JSON valido → trattalo come testo */ }
+    return null;
+  }
+
+  // Istruzioni date al modello: come e quando emettere le azioni di formattazione.
+  const CHAT_FORMAT_INSTRUCTIONS = [
+    'Sei un assistente di scrittura dentro un editor di testo. Oltre a rispondere a domande, puoi MODIFICARE la formattazione del documento quando l\'utente lo chiede.',
+    '',
+    'Quando l\'utente chiede di cambiare l\'estetica o la formattazione del testo (grassetto, corsivo, sottolineato, barrato, dimensione, font, allineamento), rispondi SOLO con un oggetto JSON dentro un blocco ```json con questa forma:',
+    '{"actions":[{"op":"format","target":"headings","style":"bold","value":true}],"reply":"Ho messo in grassetto tutti i titoli."}',
+    '',
+    'Campi:',
+    '- op: "format" (stile inline) oppure "align" (allineamento del blocco)',
+    '- target: "all" (tutto il documento), "headings" (tutti i titoli), "h1"/"h2"/"h3" (un livello di titolo), "paragraphs" (i paragrafi), "selection" (il testo selezionato), oppure {"contains":"testo"} per i blocchi che contengono quel testo',
+    '- style (solo per op "format"): "bold" | "italic" | "underline" | "strike" | "fontSize" | "fontFamily"',
+    '- value: per bold/italic/underline/strike usa true (applica) o false (rimuovi); per fontSize una dimensione CSS come "1.4em" o "20px" (o "large"/"small"); per fontFamily il nome del font ("Georgia","Arial","Times New Roman",...); per op "align" usa "left"|"center"|"right"|"justify"',
+    '- reply: una frase breve in italiano che conferma cosa hai fatto',
+    '',
+    'Puoi includere più operazioni in "actions". Esempio: "scrivi in grassetto tutti i titoli" → {"actions":[{"op":"format","target":"headings","style":"bold","value":true}],"reply":"Fatto: titoli in grassetto."}',
+    '',
+    'Se invece l\'utente fa una domanda o chiede un\'analisi (non una modifica di formattazione), rispondi normalmente in testo, SENZA JSON.',
+    '',
+    'Documento corrente:',
+    '',
+  ].join('\n');
+
+  // Espone i motori di parsing/applicazione per i test (e per debug).
+  window.__filoEditorFormat = { parseFormatActions, applyFormatActions, resolveTargets };
+
   // ── Modulo: chat LLM ───────────────────────────────────────────────────
   function renderChat(cell, m) {
     if (!Array.isArray(m.data.messages)) m.data.messages = [];
