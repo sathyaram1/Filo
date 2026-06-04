@@ -503,6 +503,19 @@ class TabManager {
       // d'autore: equivale al <link filo://style/...> ma ignora la CSP della
       // pagina, che altrimenti lo bloccherebbe (YouTube, Reddit, ...).
       try { wc.insertCSS(getContentScriptCss()); } catch (_) {}
+      // GPC (Global Privacy Control): proprietà JS nel mondo della pagina, gemella
+      // dell'header Sec-GPC. executeJavaScript gira nel main world e ignora la CSP
+      // (un <script> iniettato verrebbe bloccato dalla CSP di molti siti). Spenta
+      // in modalità manuale. È un segnale "future-proof": oggi pochi siti UE lo
+      // rispettano, il lavoro vero lo fa il rifiuto del banner CMP.
+      if (this.cookieMode !== Cookies.MODES.MANUAL) {
+        try {
+          wc.executeJavaScript(
+            'try{Object.defineProperty(navigator,"globalPrivacyControl",{get:function(){return true;},configurable:true});}catch(e){}',
+            true,
+          ).catch(() => {});
+        } catch (_) {}
+      }
     });
 
     wc.on('did-start-loading', () => update({ loading: true }));
