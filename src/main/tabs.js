@@ -457,6 +457,18 @@ class TabManager {
         this.setContentFullscreen(false);
       }
     });
+    // Privacy: navigazione main-frame iniziata dalla pagina (click su link,
+    // window.location) verso un sito diverso → serve un'altra partizione, che
+    // non si può cambiare a view viva. Blocchiamo questa navigazione e ricreiamo
+    // la view nella partizione del nuovo sito. Best-effort: i redirect lato
+    // server a metà caricamento possono sfuggire (restano nel jar precedente),
+    // limite accettabile per una modalità privacy opt-in.
+    wc.on('will-navigate', (event, url) => {
+      if (this._needsRepartition(tab, url)) {
+        event.preventDefault();
+        this._recreateView(tab, url);
+      }
+    });
     // Debug helper: in dev relay i log della pagina al main.
     if (process.env.NODE_ENV !== 'production') {
       wc.on('console-message', (_e, level, message, line, source) => {
