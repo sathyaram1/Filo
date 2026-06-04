@@ -68,6 +68,27 @@ test('un comando slash apre un tab anche con una finestra figlia presente (#4)',
     .toBe(before + 1);
 });
 
+test('"/clear all" chiude tutte le schede e lascia una sola newtab', async ({ app, shell }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+
+  // Apri qualche scheda extra, così "tutte" è davvero > 1.
+  await runSlash(page, '/sicurezza');
+  await runSlash(page, '/preferenze');
+  await expect
+    .poll(async () => (await tabUrls(app)).length, { timeout: 8_000 })
+    .toBeGreaterThanOrEqual(3);
+
+  await runSlash(page, '/clear all');
+
+  // Tutte chiuse → resta una sola scheda, ed è una newtab fresca.
+  await expect
+    .poll(async () => (await tabUrls(app)).length, { timeout: 8_000 })
+    .toBe(1);
+  const urls = await tabUrls(app);
+  expect(urls[0].startsWith('filo://newtab')).toBe(true);
+});
+
 test('i nuovi comandi /sicurezza /preferenze /editor /feedback aprono le pagine giuste (#0)', async ({ app, shell }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
