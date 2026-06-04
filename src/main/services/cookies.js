@@ -131,8 +131,19 @@ function configureForMode(mode) {
   for (const ses of siteSessions.values()) applyGpc(ses, on);
 }
 
+// Ultima modalità/whitelist viste, così before-quit (sincrono) può lanciare il
+// wipe senza dover rileggere lo storage in modo asincrono.
+let _cached = { mode: MODES.DEFAULT, loginWhitelist: [] };
+
 function configureFromSettings(settings) {
-  configureForMode(getMode(settings));
+  _cached = { mode: getMode(settings), loginWhitelist: getLoginWhitelist(settings) };
+  configureForMode(_cached.mode);
+}
+
+// Wipe usando l'ultima configurazione vista (per before-quit). Ritorna una
+// promessa che si risolve quando i cookie non-whitelisted sono stati rimossi.
+function wipeOnExit() {
+  return wipeNonWhitelisted({ security: { cookies: _cached } });
 }
 
 // ─── wipe dei cookie non-whitelisted (modalità default) ─────────────────────
