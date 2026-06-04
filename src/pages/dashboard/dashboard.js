@@ -556,6 +556,7 @@
   const SLASH_COMMANDS = {
     '/home': () => { goHome(); },
     '/clear': () => { goHome(); },
+    '/clear all': () => { send({ type: MSG.CLOSE_ALL_TABS }); },
     '/kill': () => { send({ type: MSG.QUIT_APP }); },
     '/newtab': () => { send({ type: MSG.OPEN_URL, url: 'filo://newtab/' }); },
     '/models': () => { send({ type: MSG.OPEN_OPTIONS }); },
