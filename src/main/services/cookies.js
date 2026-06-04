@@ -185,4 +185,5 @@ module.exports = {
   configureForMode,
   configureFromSettings,
   wipeNonWhitelisted,
+  wipeOnExit,
 };
