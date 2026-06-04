@@ -168,6 +168,45 @@
     'google/gemini-3.1-flash-lite-preview': 'google/gemini-2.0-flash-lite-001',
   };
 
+  // Un'azione può ora puntare a PIÙ modelli: il valore del campo è una lista di
+  // nickname separati da virgola dove il primo è il modello primario e gli altri
+  // sono fallback in ordine (l'utente li prova a cascata se il primario fallisce).
+  // Questa funzione normalizza la stringa in un array di riferimenti, applicando
+  // la rimappatura dei modelli deprecati a ciascun elemento. Un singolo nickname
+  // (senza virgole) ritorna un array di un elemento, quindi è retro-compatibile.
+  function parseModelRefs(ref) {
+    return String(ref == null ? '' : ref)
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((r) => DEPRECATED_MODELS[r] || r);
+  }
+
+  // Costruisce la catena di tentativi per servire una richiesta AI a partire da
+  // una lista ordinata di nickname. Per ogni nickname (nell'ordine indicato
+  // dall'utente) prova i provider in `providerOrder`, scartando quelli senza
+  // chiave o senza un id concreto per quel modello. La catena risultante è
+  // l'ordine reale di fallback: prima tutti i provider del modello primario,
+  // poi quelli del secondo modello, e così via. I duplicati esatti
+  // (stesso provider + stesso id concreto) vengono saltati.
+  function buildModelAttempts(refs, registry, providerOrder, apiKeys) {
+    const out = [];
+    const seen = new Set();
+    for (const ref of refs || []) {
+      for (const provider of providerOrder || []) {
+        const apiKey = apiKeys && apiKeys[provider];
+        if (!apiKey) continue;
+        const concrete = resolveModel(ref, provider, registry);
+        if (!concrete) continue;
+        const key = `${provider}::${concrete}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({ provider, apiKey, model: concrete });
+      }
+    }
+    return out;
+  }
+
   const DEFAULT_PROVIDER = 'openrouter';
 
   // Prompt di sistema. Tutti centralizzati qui per evitare prompt sparsi nel codice.
