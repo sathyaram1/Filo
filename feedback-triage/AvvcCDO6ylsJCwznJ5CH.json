@@ -1,0 +1,7 @@
+{
+  "id": "AvvcCDO6ylsJCwznJ5CH",
+  "status": "clarify",
+  "notes": "Ho capito cosa vuoi: rifare la gestione dei modelli con ogni modello = nickname unico + provider + nome completo per le API; un tasto 'Prova' che misura latenza e token/secondo e li salva; e per ogni attivita una lista ordinata di modelli (il primo e quello usato, gli altri fallback in ordine). E una feature corposa che cambia come Filo sceglie i modelli, e ci sono dei bivi di design su cui non voglio decidere al posto tuo. 1) Oggi un nickname (es. 'flash') e gia mappato su ENTRAMBI i provider (OpenRouter + Gemini) e Filo prova in automatico l'altro provider come fallback. Col nuovo modello '1 modello = 1 provider', il fallback automatico tra provider deve sparire ed essere sostituito SOLO dalla lista ordinata che imposti tu per ogni attivita, o vuoi tenerli entrambi? 2) Il tasto 'Prova': dove vuoi vedere i risultati (latenza + token/s), un'etichetta accanto al modello che si aggiorna a ogni prova oppure uno storico delle prove? E la 'latenza' e il tempo alla prima risposta o il tempo totale della generazione di test? 3) Layout: la lista dei modelli per ogni attivita la vuoi con trascinamento per riordinare (primo = principale) o con frecce su/giu? E i modelli si gestiscono in un'unica tabella (aggiungi/modifica/elimina) sopra le attivita? Dimmi come preferisci e procedo.",
+  "queuedAt": "2026-06-04T00:27:04.257Z",
+  "queuedBy": "routine"
+}
