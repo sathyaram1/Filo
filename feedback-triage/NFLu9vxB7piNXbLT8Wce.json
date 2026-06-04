@@ -1,0 +1,7 @@
+{
+  "id": "NFLu9vxB7piNXbLT8Wce",
+  "status": "done",
+  "notes": "Ho rifatto la barra delle schede in stile Chrome: la scheda selezionata ora e' piu' larga delle altre e stacca leggermente, e le schede si toccano separate da una sottile linea verticale (che sparisce attorno alla scheda attiva e quando ci passi sopra il mouse) invece che da uno spazio vuoto. Verificato con un test automatico che controlla che la scheda attiva sia davvero piu' larga di ogni altra e che il separatore in stile Chrome sia presente. Nota: non ho replicato le curve 'a goccia' sul fondo delle schede di Chrome (sarebbe un intervento molto piu' invasivo); se le vuoi anche quelle dimmelo.",
+  "queuedAt": "2026-06-04T05:09:44.546Z",
+  "queuedBy": "routine"
+}
