@@ -75,7 +75,9 @@ html[data-chrome-compact="1"] .addr {
 .tabs {
   display: flex;
   align-items: flex-end;
-  gap: 2px;
+  /* Stile Chrome: le tab si toccano (niente gap) e sono separate da una
+     sottile linea verticale (vedi .tab::after) invece che da uno spazio. */
+  gap: 0;
   flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
@@ -83,6 +85,7 @@ html[data-chrome-compact="1"] .addr {
   app-region: no-drag;
 }
 .tab {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -107,6 +110,33 @@ html[data-chrome-compact="1"] .addr {
   color: var(--fg);
   margin-bottom: 0;
   z-index: 1;
+  /* La tab selezionata è un po' più larga delle altre (richiesta esplicita) e
+     "stacca" leggermente, in stile Chrome. */
+  flex-grow: 1.8;
+  min-width: 110px;
+  max-width: 280px;
+  box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.05);
+}
+
+/* Separatore verticale sottile fra tab inattive (la "divisione" di Chrome). */
+.tab::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 9px;
+  bottom: 9px;
+  width: 1px;
+  background: var(--border);
+  pointer-events: none;
+}
+/* Il separatore scompare: dopo l'ultima tab, sulla tab attiva e su quella che
+   la precede, e attorno alla tab in hover — esattamente come fa Chrome. */
+.tab:last-child::after,
+.tab.active::after,
+.tab:hover::after,
+.tab:has(+ .tab.active)::after,
+.tab:has(+ .tab:hover)::after {
+  display: none;
 }
 .tab .title {
   flex: 1;
