@@ -569,6 +569,7 @@
       if (body.dataset.state !== 'thread') goThread();
       const lines = [
         '/home, /clear — ricarica la dashboard',
+        '/clear all — chiudi tutte le schede',
         '/kill — chiudi Filo',
         '/newtab — apri una nuova scheda',
         '/models, /modelli — impostazioni modelli',
