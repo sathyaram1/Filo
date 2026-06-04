@@ -76,7 +76,47 @@
         </div>
       </div>
 
-      <div class="sn-toggle-row" id="sec-export-row">
+      <section id="sec-cookies" style="margin-top:28px">
+        <h2 id="sec-cookies-title" style="font-size:1.05rem;margin-bottom:4px"></h2>
+        <p class="sn-muted" id="sec-cookies-desc" style="margin-top:0"></p>
+
+        <div class="sn-cookie-modes" role="radiogroup" aria-labelledby="sec-cookies-title">
+          <label class="sn-cookie-mode">
+            <input type="radio" name="cookie-mode" id="cookie-mode-manual" value="manual" />
+            <span>
+              <span class="sn-cookie-mode-label" id="cookie-mode-manual-label"></span>
+              <span class="sn-muted sn-cookie-mode-desc" id="cookie-mode-manual-desc"></span>
+            </span>
+          </label>
+          <label class="sn-cookie-mode">
+            <input type="radio" name="cookie-mode" id="cookie-mode-default" value="default" />
+            <span>
+              <span class="sn-cookie-mode-label" id="cookie-mode-default-label"></span>
+              <span class="sn-muted sn-cookie-mode-desc" id="cookie-mode-default-desc"></span>
+            </span>
+          </label>
+          <label class="sn-cookie-mode">
+            <input type="radio" name="cookie-mode" id="cookie-mode-privacy" value="privacy" />
+            <span>
+              <span class="sn-cookie-mode-label" id="cookie-mode-privacy-label"></span>
+              <span class="sn-muted sn-cookie-mode-desc" id="cookie-mode-privacy-desc"></span>
+            </span>
+          </label>
+        </div>
+
+        <div id="sec-cookies-whitelist" style="margin-top:18px">
+          <div class="sn-info-box-title" id="sec-cookies-wl-title"></div>
+          <div class="sn-muted" id="sec-cookies-wl-desc" style="margin-bottom:8px"></div>
+          <div class="sn-muted" id="sec-cookies-wl-privacy-note" style="margin-bottom:8px;display:none"></div>
+          <div class="sn-cookie-wl-add" style="display:flex;gap:8px;margin-bottom:10px">
+            <input type="text" id="cookie-wl-input" />
+            <button type="button" id="cookie-wl-add-btn"></button>
+          </div>
+          <ul id="cookie-wl-list" style="list-style:none;padding:0;margin:0"></ul>
+        </div>
+      </section>
+
+      <div class="sn-toggle-row" id="sec-export-row" style="margin-top:28px">
         <div>
           <button type="button" id="sec-export-btn"></button>
           <span class="sn-muted" id="sec-export-desc" style="display:block;margin-top:6px"></span>
