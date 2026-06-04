@@ -217,11 +217,20 @@
     function hasPageDrawing() { return strokes.some((s) => s.points.length > 0); }
     // C'è un disegno da cancellare ovunque nell'app? (pagina O barra in alto)
     function hasAnyDrawing() { return hasPageDrawing() || topbarHasDrawing; }
-    function refreshClear() {
-      // Il pulsante tratteggiato "Cancella disegno" compare SOLO se c'è davvero
-      // qualcosa da cancellare.
-      clearBtn.hidden = !hasAnyDrawing();
+
+    // Il bottone è sempre presente: di default "Allega screenshot" (premuto =
+    // selezionato → all'invio si allega lo scatto della pagina anche senza
+    // disegnare). Appena si disegna diventa "Cancella" (stesso colore selezionato)
+    // e cliccarlo cancella il disegno.
+    let shotArmed = false;
+    function updateClearBtn() {
+      const drawing = hasAnyDrawing();
+      const selected = shotArmed || drawing;
+      clearBtn.textContent = drawing ? 'Cancella' : 'Allega screenshot';
+      clearBtn.classList.toggle('sn-fb-clear--on', selected);
+      clearBtn.setAttribute('aria-pressed', String(selected));
     }
+    const refreshClear = updateClearBtn;
 
     canvas.addEventListener('pointerdown', (e) => {
       drawing = true;
