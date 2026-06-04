@@ -124,21 +124,29 @@ test('wipe all\'uscita (default): cancella i non-whitelisted, tiene i whiteliste
   const res = await app.evaluate(async ({ session }) => {
     const Cookies = globalThis.__filoCookies;
     const ses = session.defaultSession;
-    await ses.cookies.set({ url: 'https://keep-login.example/', name: 'sess', value: '1' });
-    await ses.cookies.set({ url: 'https://tracker-drop.example/', name: 't', value: '1' });
-    const settings = { security: { cookies: { mode: 'default', loginWhitelist: ['keep-login.example'] } } };
+    await ses.cookies.set({ url: 'https://keep-login.com/', name: 'sess', value: '1' });
+    await ses.cookies.set({ url: 'https://tracker-drop.com/', name: 't', value: '1' });
+    const before = (await ses.cookies.get({})).map((c) => String(c.domain || '').replace(/^\./, ''));
+    const settings = { security: { cookies: { mode: 'default', loginWhitelist: ['keep-login.com'] } } };
     const r = await Cookies.wipeNonWhitelisted(settings);
-    const after = await ses.cookies.get({});
-    const domains = after.map((c) => String(c.domain || '').replace(/^\./, ''));
+    const after = (await ses.cookies.get({})).map((c) => String(c.domain || '').replace(/^\./, ''));
     return {
       skipped: !!r.skipped,
-      hasKeep: domains.includes('keep-login.example'),
-      hasDrop: domains.includes('tracker-drop.example'),
+      removed: r.removed,
+      before,
+      after,
+      setKeep: before.includes('keep-login.com'),
+      setDrop: before.includes('tracker-drop.com'),
+      hasKeep: after.includes('keep-login.com'),
+      hasDrop: after.includes('tracker-drop.com'),
     };
   });
+  // Pre-condizioni: entrambi i cookie sono stati davvero piazzati.
+  expect(res.setKeep, `setup cookie keep non piazzato — before=${JSON.stringify(res.before)}`).toBe(true);
+  expect(res.setDrop, `setup cookie drop non piazzato — before=${JSON.stringify(res.before)}`).toBe(true);
   expect(res.skipped).toBe(false);
-  expect(res.hasKeep).toBe(true);   // login preservato
-  expect(res.hasDrop).toBe(false);  // tracker cancellato
+  expect(res.hasKeep, `login preservato — after=${JSON.stringify(res.after)}`).toBe(true);
+  expect(res.hasDrop, `tracker cancellato — after=${JSON.stringify(res.after)}`).toBe(false);
 });
 
 test('wipe all\'uscita (privacy/manuale): è un no-op', async ({ app }) => {
