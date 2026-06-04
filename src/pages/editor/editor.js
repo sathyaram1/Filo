@@ -1572,12 +1572,29 @@
       renderLog();
       const docText = (docEl.textContent || '').slice(0, 6000);
       const messages = [
-        { role: 'system', content: 'Sei un assistente di scrittura dentro un editor. Ecco il documento corrente:\n\n' + docText },
+        { role: 'system', content: CHAT_FORMAT_INSTRUCTIONS + docText },
         ...m.data.messages.filter((x) => x !== thinking).map((x) => ({ role: x.role, content: x.content })),
       ];
       try {
         const r = await sendMessage({ type: MSG.AI_REQUEST, action: ACTIONS.EXPLAIN || 'explain', payload: { messages } });
-        thinking.content = (r && r.ok && r.text) ? r.text : ('Errore: ' + ((r && r.error) || 'nessuna risposta'));
+        const raw = (r && r.ok && typeof r.text === 'string') ? r.text : null;
+        if (raw == null) {
+          thinking.content = 'Errore: ' + ((r && r.error) || 'nessuna risposta');
+        } else {
+          // Se la risposta contiene azioni di formattazione, applicale al
+          // documento e mostra in chat la conferma; altrimenti è testo normale.
+          const parsed = parseFormatActions(raw);
+          if (parsed && parsed.actions.length) {
+            const n = applyFormatActions(parsed.actions);
+            thinking.content = parsed.reply
+              || (n ? 'Fatto.' : 'Non ho trovato testo a cui applicare la formattazione.');
+            if (!n && !parsed.reply) {
+              thinking.content = 'Non ho trovato testo a cui applicare la formattazione.';
+            }
+          } else {
+            thinking.content = raw;
+          }
+        }
       } catch (e) {
         thinking.content = 'Errore: ' + e.message;
       }
