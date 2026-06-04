@@ -212,13 +212,13 @@
     testOr.type = 'button';
     testOr.className = 'sn-btn sn-btn-secondary';
     testOr.textContent = I18n.t('options_model_test_or');
-    testOr.addEventListener('click', () => runRowTest('openrouter', orIn.value.trim(), status, testOr));
+    testOr.addEventListener('click', () => runRowTest('openrouter', orIn.value.trim(), row, testOr));
 
     const testGm = document.createElement('button');
     testGm.type = 'button';
     testGm.className = 'sn-btn sn-btn-secondary';
     testGm.textContent = I18n.t('options_model_test_gemini');
-    testGm.addEventListener('click', () => runRowTest('gemini', gemIn.value.trim(), status, testGm));
+    testGm.addEventListener('click', () => runRowTest('gemini', gemIn.value.trim(), row, testGm));
 
     const del = document.createElement('button');
     del.type = 'button';
