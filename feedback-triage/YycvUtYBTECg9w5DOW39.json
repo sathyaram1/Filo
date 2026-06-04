@@ -1,7 +1,0 @@
-{
-  "id": "YycvUtYBTECg9w5DOW39",
-  "status": "done",
-  "notes": "I menu a tendina di Filo (Tema, Dimensione del testo, Shell del terminale, Provider, ecc.) non usano piu' il popup di sistema con l'evidenziazione blu: ora c'e' un menu disegnato da Filo, tutto arancione coerente con la palette. L'opzione selezionata e' arancione piu' marcato, quella sotto il cursore arancione piu' tenue, e se passi il mouse sull'opzione gia' selezionata le due intensita' si sommano (cosi' l'hover da' comunque un riscontro visivo). Il blu non compare mai piu'. Verificato con test automatici che controllano i colori esatti nei tre stati (selezionata, in hover, entrambe) e che scegliere un'opzione applichi davvero la scelta (es. il cambio tema si vede subito). Nota: ho lasciato fuori di proposito il selettore del font dentro l'editor, perche' ha una gestione speciale della selezione del testo e si azzera a ogni uso; se vuoi l'arancione anche li' fammelo sapere.",
-  "queuedAt": "2026-06-04T05:09:57.558Z",
-  "queuedBy": "routine"
-}
