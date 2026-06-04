@@ -1,0 +1,7 @@
+{
+  "id": "V7zGjZ4hBPNOUGJ79a7r",
+  "status": "done",
+  "notes": "Ora dalla chat dell'editor puoi cambiare la formattazione del testo a parole. Per esempio scrivi «scrivi in grassetto tutti i titoli» e i titoli diventano subito grassetto. Funziona anche con corsivo, sottolineato, barrato, dimensione, font e allineamento, e puoi dire a cosa applicarlo: tutto il documento, solo i titoli (o un singolo livello h1/h2/h3), i paragrafi, il testo selezionato, oppure i blocchi che contengono una certa parola. Puoi anche fare il contrario a parole (es. «togli il grassetto dai titoli»). Oltre al chiesto: ho gestito tutti gli stili e i bersagli sopra, non solo il grassetto dei titoli. Verificato con test automatici che scrivono il comando nella chat e controllano che il documento cambi davvero e che la formattazione si salvi. Nota: queste modifiche fatte dalla chat non rientrano nell'annulla (Ctrl+Z) dell'editor; per tornare indietro chiedilo alla chat.",
+  "queuedAt": "2026-06-04T09:52:15.522Z",
+  "queuedBy": "routine"
+}
