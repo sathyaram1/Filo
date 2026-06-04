@@ -273,6 +273,18 @@ class TabManager {
     this._broadcast();
   }
 
+  // Chiude TUTTE le tab e lascia una singola newtab fresca (come Chrome quando
+  // si chiude l'ultima scheda: la finestra resta, con una scheda vuota).
+  closeAllTabs() {
+    for (const tab of this.tabs) {
+      try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
+      try { tab.view.webContents.close(); } catch (_) {}
+    }
+    this.tabs = [];
+    this.activeId = null;
+    this.openTab('filo://newtab/');
+  }
+
   activate(id) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
