@@ -125,16 +125,17 @@ test('wipe all\'uscita (default): cancella i non-whitelisted, tiene i whiteliste
     const Cookies = globalThis.__filoCookies;
     const ses = session.defaultSession;
     const domainsNow = async () => (await ses.cookies.get({})).map((c) => String(c.domain || '').replace(/^\./, ''));
-    await ses.cookies.set({ url: 'https://keep-login.com/', name: 'sess', value: '1' });
-    await ses.cookies.set({ url: 'https://tracker-drop.com/', name: 't', value: '1' });
-    // Il commit nello store cookie è asincrono: aspetta che entrambi siano
-    // davvero leggibili prima di lanciare il wipe (altrimenti sotto carico la
-    // get() immediata può non vederli ancora).
+    // All'avvio il main esegue UN wipe one-shot della sessione di default (la
+    // promessa "nessun profilo persistente"). Ri-piazziamo i cookie in loop
+    // finché non restano stabili: così siamo certi di operare DOPO quel wipe di
+    // boot e di testare il nostro wipe esplicito, non la corsa con quello d'avvio.
     let before = [];
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < 60; i++) {
+      await ses.cookies.set({ url: 'https://keep-login.com/', name: 'sess', value: '1' });
+      await ses.cookies.set({ url: 'https://tracker-drop.com/', name: 't', value: '1' });
+      await new Promise((r) => setTimeout(r, 50));
       before = await domainsNow();
       if (before.includes('keep-login.com') && before.includes('tracker-drop.com')) break;
-      await new Promise((r) => setTimeout(r, 50));
     }
     const settings = { security: { cookies: { mode: 'default', loginWhitelist: ['keep-login.com'] } } };
     const r = await Cookies.wipeNonWhitelisted(settings);
