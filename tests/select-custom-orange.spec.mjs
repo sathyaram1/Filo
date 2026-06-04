@@ -59,16 +59,13 @@ test('hover e selezione usano l\'arancione a due opacità che si sommano', async
 
   const bg = (loc) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);
 
-  // 1) Opzione selezionata, non in hover → arancione opacità maggiore.
-  //    (sposto prima il mouse altrove per non avere hover residuo)
-  await page.mouse.move(0, 0);
-  expect(await bg(selected)).toBe(ORANGE_SELECTED);
-
-  // 2) Hover su un'opzione NON selezionata → arancione bassa opacità.
+  // 1) Hover su un'opzione NON selezionata → arancione bassa opacità; e così
+  //    l'hover si sposta via dalla selezionata, che resta solo "selezionata".
   await other.hover();
   expect(await bg(other)).toBe(ORANGE_HOVER);
+  expect(await bg(selected)).toBe(ORANGE_SELECTED);
 
-  // 3) Hover sull'opzione selezionata → le opacità si sommano.
+  // 2) Hover sull'opzione selezionata → le opacità si sommano (0.18 + 0.30).
   await selected.hover();
   expect(await bg(selected)).toBe(ORANGE_BOTH);
 
