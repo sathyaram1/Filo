@@ -279,7 +279,8 @@
     return { registry: out, dups, missingNick };
   }
 
-  async function runRowTest(providerId, modelId, statusEl, btn) {
+  async function runRowTest(providerId, modelId, row, btn) {
+    const statusEl = row.querySelector('.sn-model-row-status');
     if (!modelId) {
       statusEl.textContent = I18n.t('options_model_no_id_for_provider', providerId);
       return;
@@ -306,7 +307,16 @@
       if (!res?.ok) {
         statusEl.textContent = `${providerId} · ${modelId} — ${I18n.t('options_test_failed', res?.error || '—')}`;
       } else {
-        statusEl.textContent = `${providerId} · ${modelId} — ${I18n.t('options_test_result', res.ttftMs ?? '—', res.tokensPerSec ?? '—')}`;
+        // Salva il risultato (latenza + token/sec) nella riga e persistilo nel
+        // registry, così resta visibile e confrontabile tra le sessioni.
+        row._test = row._test || {};
+        row._test[providerId] = {
+          ttftMs: res.ttftMs ?? null,
+          tokensPerSec: res.tokensPerSec ?? null,
+          at: new Date().toISOString(),
+        };
+        renderRowTest(row);
+        save();
       }
     } catch (e) {
       statusEl.textContent = I18n.t('options_test_failed', e?.message || String(e));
