@@ -281,8 +281,9 @@
   }
 
   // L'editor ha select speciali (font picker con preservazione della selezione
-  // del documento, config moduli): lo escludiamo per intero.
-  const IS_EDITOR = /\/editor\/editor\.html$/.test(location.pathname || '');
+  // del documento, config moduli): lo escludiamo per intero. Nelle URL filo://
+  // la pagina è l'hostname (es. filo://editor/editor.html → host "editor").
+  const IS_EDITOR = (location.hostname || '') === 'editor';
 
   if (!IS_EDITOR) {
     const start = () => {
