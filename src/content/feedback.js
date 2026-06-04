@@ -111,16 +111,17 @@
     root.innerHTML = `
       <canvas class="sn-fb-canvas"></canvas>
       <div class="sn-fb-modal" role="dialog" aria-modal="true" aria-label="Invia feedback">
+        <div class="sn-fb-drag" title="Trascina per spostare il box"><span class="sn-fb-grip"></span></div>
         <div class="sn-fb-body">
           <textarea class="sn-fb-text" rows="4" placeholder="Descrivi il bug o la feature che vorresti. Puoi trascinare qui documenti o immagini."></textarea>
           <div class="sn-fb-thumbs"></div>
           <div class="sn-fb-status" aria-live="polite"></div>
         </div>
         <div class="sn-fb-actions">
-          <button type="button" class="sn-fb-btn-secondary sn-fb-attach">${icon('screenshot', 16)}<span>Allega</span></button>
           <button type="button" class="sn-fb-btn-secondary sn-fb-cancel">Chiudi</button>
+          <button type="button" class="sn-fb-btn-secondary sn-fb-attach">${icon('screenshot', 16)}<span>Allega</span></button>
+          <button type="button" class="sn-fb-clear" aria-pressed="false">Allega screenshot</button>
           <button type="button" class="sn-fb-btn sn-fb-send">Invia</button>
-          <button type="button" class="sn-fb-clear" hidden>Cancella disegno</button>
         </div>
         <input type="file" class="sn-fb-file" accept="image/*" multiple hidden />
       </div>
