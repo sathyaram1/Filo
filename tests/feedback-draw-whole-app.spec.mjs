@@ -56,7 +56,8 @@ test('disegnare sulla barra in alto fa comparire "Cancella disegno" nel box; can
   await expect(shell.locator('#feedback-draw')).toBeVisible({ timeout: 4_000 });
 
   const clear = page.locator('.sn-fb-clear');
-  await expect(clear).toBeHidden();
+  // Sempre presente: senza disegni recita "Allega screenshot".
+  await expect(clear).toHaveText(/Allega screenshot/);
 
   // Disegna un tratto SULLA BARRA IN ALTO (shell), in alto a sinistra dove c'è
   // la tela. (y piccolo = dentro l'altezza della barra.)
@@ -68,12 +69,12 @@ test('disegnare sulla barra in alto fa comparire "Cancella disegno" nel box; can
   await shell.mouse.move(360, y, { steps: 6 });
   await shell.mouse.up();
 
-  // Il box (pagina) "vede" il disegno sulla barra → mostra "Cancella disegno".
-  await expect(clear).toBeVisible({ timeout: 4_000 });
+  // Il box (pagina) "vede" il disegno sulla barra → diventa "Cancella".
+  await expect(clear).toHaveText(/Cancella/, { timeout: 4_000 });
 
-  // Un solo "Cancella disegno" pulisce anche la barra → il bottone si rinasconde.
+  // Un solo "Cancella" pulisce anche la barra → torna "Allega screenshot".
   await clear.click();
-  await expect(clear).toBeHidden({ timeout: 4_000 });
+  await expect(clear).toHaveText(/Allega screenshot/, { timeout: 4_000 });
 
   await page.evaluate(() => window.SN_FEEDBACK_UI.close());
 });
