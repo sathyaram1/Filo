@@ -6,6 +6,7 @@
 const { WebContentsView, Menu, MenuItem } = require('electron');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
+const Cookies = require('./services/cookies');
 
 const PAGE_PRELOAD = path.join(__dirname, '..', 'preload', 'page-preload.js');
 const INTERNAL_PRELOAD = path.join(__dirname, '..', 'preload', 'internal-preload.js');
