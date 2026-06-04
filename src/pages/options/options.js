@@ -274,7 +274,10 @@
       if (!nick && !label && !or && !gem) continue;
       if (!nick) { missingNick = true; continue; }
       if (out[nick]) { dups.push(nick); continue; }
-      out[nick] = { label, openrouter: or, gemini: gem };
+      const entry = { label, openrouter: or, gemini: gem };
+      // Preserva i risultati di test misurati (latenza/token-sec) tra i salvataggi.
+      if (row._test && Object.keys(row._test).length) entry.test = row._test;
+      out[nick] = entry;
     }
     return { registry: out, dups, missingNick };
   }
