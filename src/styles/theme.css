@@ -50,7 +50,8 @@
 /* Dropdown nativo <select>: l'opzione evidenziata/selezionata di default è blu
    (highlight di sistema). Forziamo l'arancione della palette così è coerente
    con il resto della UI Filo. Chromium applica questi stili agli <option> nel
-   popup nativo. */
+   popup nativo (fallback: i <select> di Filo vengono comunque sostituiti dal
+   dropdown custom .sn-select-* qui sotto). */
 [data-sn-theme] option:checked,
 [data-sn-theme] option:hover {
   background-color: var(--sn-accent);
@@ -58,6 +59,108 @@
 }
 [data-sn-theme] select {
   accent-color: var(--sn-accent);
+}
+
+/* ===========================================================================
+   Dropdown custom per i <select> (vedi pageBootstrap.js → enhanceSelect).
+   Il popup nativo non rispetta `option:hover` e usa il blu di sistema: lo
+   rimpiazziamo con un popup di nostri <div> totalmente controllabile a CSS.
+   Il <select> nativo resta nel DOM ma trasparente, sotto al bottone custom.
+   =========================================================================== */
+.sn-select-wrap {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+/* Il <select> nativo resta nel DOM (sorgente di verità + Playwright selectOption)
+   ma invisibile e non cliccabile: l'utente interagisce col bottone custom. */
+.sn-select-wrap > select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.sn-select-button {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--sn-bg);
+  color: var(--sn-fg);
+  border: 1px solid var(--sn-border);
+  border-radius: var(--sn-radius);
+  font-family: var(--sn-font);
+  font-size: 13px;
+  cursor: pointer;
+}
+.sn-select-wrap.sn-open .sn-select-button,
+.sn-select-button:focus-visible {
+  border-color: var(--sn-accent);
+}
+.sn-select-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sn-select-chevron {
+  flex: 0 0 auto;
+  color: var(--sn-muted);
+  font-size: 11px;
+  transition: transform 120ms ease;
+}
+.sn-select-wrap.sn-open .sn-select-chevron {
+  transform: rotate(180deg);
+}
+
+.sn-select-pop {
+  position: absolute;
+  z-index: 2147483646;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 4px 0;
+  background: var(--sn-overlay-bg);
+  border: 1px solid var(--sn-border);
+  border-radius: var(--sn-radius);
+  box-shadow: var(--sn-shadow);
+  backdrop-filter: blur(4px);
+}
+.sn-select-pop[hidden] {
+  display: none;
+}
+.sn-select-option {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--sn-fg);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* HOVER: arancione a bassa opacità. SELEZIONATA: arancione a opacità maggiore.
+   SELEZIONATA + HOVER: le opacità si sommano (0.18 + 0.30 ≈ 0.48), così l'hover
+   sull'opzione già selezionata dà comunque un riscontro visivo. Mai il blu. */
+.sn-select-option.sn-hover {
+  background-color: rgba(var(--sn-accent-rgb), 0.18);
+}
+.sn-select-option.sn-selected {
+  background-color: rgba(var(--sn-accent-rgb), 0.30);
+}
+.sn-select-option.sn-selected.sn-hover {
+  background-color: rgba(var(--sn-accent-rgb), 0.48);
+}
+.sn-select-option[aria-disabled="true"] {
+  color: var(--sn-muted);
+  cursor: not-allowed;
 }
 
 /* Scrollbar globale — sottile, senza freccette, arrotondata */
