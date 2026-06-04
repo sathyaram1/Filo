@@ -124,9 +124,18 @@ test('wipe all\'uscita (default): cancella i non-whitelisted, tiene i whiteliste
   const res = await app.evaluate(async ({ session }) => {
     const Cookies = globalThis.__filoCookies;
     const ses = session.defaultSession;
+    const domainsNow = async () => (await ses.cookies.get({})).map((c) => String(c.domain || '').replace(/^\./, ''));
     await ses.cookies.set({ url: 'https://keep-login.com/', name: 'sess', value: '1' });
     await ses.cookies.set({ url: 'https://tracker-drop.com/', name: 't', value: '1' });
-    const before = (await ses.cookies.get({})).map((c) => String(c.domain || '').replace(/^\./, ''));
+    // Il commit nello store cookie è asincrono: aspetta che entrambi siano
+    // davvero leggibili prima di lanciare il wipe (altrimenti sotto carico la
+    // get() immediata può non vederli ancora).
+    let before = [];
+    for (let i = 0; i < 40; i++) {
+      before = await domainsNow();
+      if (before.includes('keep-login.com') && before.includes('tracker-drop.com')) break;
+      await new Promise((r) => setTimeout(r, 50));
+    }
     const settings = { security: { cookies: { mode: 'default', loginWhitelist: ['keep-login.com'] } } };
     const r = await Cookies.wipeNonWhitelisted(settings);
     const after = (await ses.cookies.get({})).map((c) => String(c.domain || '').replace(/^\./, ''));
