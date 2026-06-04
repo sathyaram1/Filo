@@ -1,7 +1,0 @@
-{
-  "id": "AvvcCDO6ylsJCwznJ5CH",
-  "status": "done",
-  "notes": "Ora nelle Opzioni → modelli per azione puoi indicare PIÙ modelli per ogni attività, separati da virgola: il primo è quello usato, gli altri scattano in ordine come fallback se quello prima fallisce (es. \"flash, claude-haiku\"). Col singolo nickname funziona esattamente come prima. Inoltre il risultato del tasto Prova di ogni modello (latenza TTFT + token/sec) ora viene SALVATO e resta visibile accanto al modello anche dopo aver riaperto le Opzioni, così confronti i modelli a colpo d'occhio.\n\nUna scelta che ti lascio confermare: ho mantenuto il registry modelli come prima (ogni nickname può avere sia l'id OpenRouter sia quello Gemini, così il fallback tra provider resta automatico) invece di legare ogni modello a un solo provider. Se preferisci che ogni modello abbia un unico provider + nome completo (schema più piatto), dimmelo e te lo restruttro.\n\nVerificato con la suite automatica (nuovo test che controlla l'ordine della catena di fallback per attività, la retro-compatibilità col singolo modello, e la persistenza del risultato del test tra i reload). Suite intera verde tranne un test di spellcheck nativo che fallisce anche senza le mie modifiche (manca il dizionario di sistema nell'ambiente cloud).",
-  "queuedAt": "2026-06-04T19:27:45.937Z",
-  "queuedBy": "routine"
-}
