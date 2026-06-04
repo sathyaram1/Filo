@@ -49,9 +49,10 @@
 
 .sn-fb-modal {
   position: absolute;
-  left: 50%;
+  /* `left` reale (intero) impostato da feedback.js: niente translateX(-50%),
+     che su display HiDPI cade su un pixel frazionario e sfoca il testo. */
+  left: 0;
   bottom: 24px;
-  transform: translateX(-50%);
   width: min(540px, 92vw);
   max-height: 72vh;
   display: flex;
@@ -62,6 +63,24 @@
   box-shadow: var(--sn-shadow);
   overflow: hidden;
   cursor: default;
+}
+
+/* Maniglia per spostare il box (richiesta utente): una barretta in alto. */
+.sn-fb-drag {
+  flex: 0 0 auto;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: move;
+  touch-action: none;
+  border-bottom: 1px solid var(--sn-border);
+}
+.sn-fb-grip {
+  width: 34px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--sn-border);
 }
 .sn-fb-modal.sn-fb-drop-hover {
   outline: 2px dashed var(--sn-accent, #888);
