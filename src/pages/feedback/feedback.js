@@ -289,6 +289,7 @@
           ${agentHtml}
           <div class="fb-text">${text}</div>
           ${imgsHtml}
+          ${filesHtml}
           ${notesBlock}
           <div class="fb-actions">${actionsFor(f)}</div>
         </article>
