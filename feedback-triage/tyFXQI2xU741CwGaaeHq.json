@@ -1,0 +1,7 @@
+{
+  "id": "tyFXQI2xU741CwGaaeHq",
+  "status": "done",
+  "notes": "Ora, mentre digiti nella barra della nuova scheda, un comando che inizia con '/' ma che non viene riconosciuto (non è un comando di Filo né un sito) viene colorato di rosso, così vedi subito che non farà nulla di speciale. I comandi validi restano arancioni (comandi Filo o siti) e azzurri (comandi shell in modalità terminale). In più, non richiesto: mentre stai ancora digitando il prefisso di un comando valido (per es. '/he' verso '/help') il testo NON diventa rosso, per non far lampeggiare il colore a ogni tasto. Verificato con un test automatico.",
+  "queuedAt": "2026-06-05T06:03:58.183Z",
+  "queuedBy": "routine"
+}
