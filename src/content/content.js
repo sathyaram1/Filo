@@ -1096,6 +1096,7 @@
       items.push({ type: 'item', label: I18n.t('menu_copy'), onClick: () => copyToClipboard(selInfo.selection) });
       items.push(buildPasteItem(clipboardHistory));
       items.push(buildDictateItem());
+      items.push(buildReadAloudItem(selInfo.selection));
       items.push({ type: 'separator' });
       items.push(buildInlineExplain(selInfo, { withDeepArrow: true }));
       items.push({
@@ -1114,6 +1115,7 @@
         label: I18n.t('menu_search_text'),
         onClick: () => searchTextOnWeb(selInfo.selection),
       });
+      items.push(buildReadAloudItem(selInfo.selection));
       items.push({ type: 'separator' });
       items.push(buildInlineExplain(selInfo, { withDeepArrow: true }));
       return items;
