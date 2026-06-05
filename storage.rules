@@ -1,9 +1,13 @@
 rules_version = '2';
 
 // Storage rules per l'alpha test.
-// Le immagini dei feedback vivono in /feedback/*.
-// - Upload: chiunque, fino a 4 MB, solo image/*
-// - Read: aperto (la dashboard mostra le immagini via link diretto al bucket).
+// Gli allegati dei feedback vivono in /feedback/*.
+// - Upload: chiunque, fino a 4 MB. Oltre alle immagini ora sono ammessi anche
+//   documenti leggeri (pdf, testo, markdown, json, csv, yaml…) così l'utente
+//   può allegare file di vario tipo al feedback. Il bucket è già pubblicamente
+//   leggibile/scrivibile per le immagini: ampliare i tipi non cambia
+//   l'esposizione (chiunque poteva già caricare 4 MB), aggiunge solo i formati.
+// - Read: aperto (la dashboard mostra immagini e file via link diretto).
 
 service firebase.storage {
   match /b/{bucket}/o {
@@ -12,7 +16,13 @@ service firebase.storage {
       allow read: if true;
       allow write: if
         request.resource.size < 4 * 1024 * 1024
-        && request.resource.contentType.matches('image/.*');
+        && (
+          request.resource.contentType.matches('image/.*')
+          || request.resource.contentType.matches('text/.*')
+          || request.resource.contentType == 'application/pdf'
+          || request.resource.contentType == 'application/json'
+          || request.resource.contentType == 'application/octet-stream'
+        );
     }
 
     // Tutto il resto è chiuso.
