@@ -276,4 +276,59 @@ function createSession({ shell, cwd } = {}) {
   return session;
 }
 
-module.exports = { createSession, defaultCwd };
+// Verifica veloce e "usa e getta" se un comando esiste nella shell scelta.
+// Serve all'evidenziazione live della dashboard in modalità terminale: un
+// "/comando" inesistente va colorato di rosso. È separata dalla sessione
+// persistente (che è in streaming) per non interferire con essa.
+//
+// SICUREZZA: il nome del comando NON viene mai interpolato in una stringa di
+// shell. Lo passiamo SEMPRE come argomento posizionale ($1 / $args[0]) al
+// resolver (`command -v`, `Get-Command`, `where`), così non può iniettare altro.
+function commandExists({ shell, cwd, command } = {}) {
+  return new Promise((resolve) => {
+    const cmd = String(command == null ? '' : command).trim();
+    // Niente da controllare, o token chiaramente non un nome di comando
+    // (newline/null): consideralo "non esiste".
+    if (!cmd || /[\n\r\0]/.test(cmd)) { resolve(false); return; }
+
+    let file, args;
+    if (process.platform !== 'win32') {
+      // Linux/macOS (incluse le routine cloud): /bin/sh, `command -v` copre
+      // builtin, funzioni ed eseguibili nel PATH.
+      file = '/bin/sh';
+      args = ['-c', 'command -v "$1" >/dev/null 2>&1', '_', cmd];
+    } else if (shell === 'cmd') {
+      // cmd.exe: `where` trova solo gli eseguibili nel PATH, non i builtin
+      // (dir, cd, echo…). Quelli li copriamo con una piccola allowlist.
+      const BUILTINS = new Set(['cd', 'dir', 'echo', 'cls', 'copy', 'del', 'move',
+        'type', 'set', 'md', 'mkdir', 'rd', 'rmdir', 'ren', 'rename', 'exit',
+        'pushd', 'popd', 'title', 'ver', 'vol', 'path', 'start', 'call', 'color']);
+      if (BUILTINS.has(cmd.toLowerCase())) { resolve(true); return; }
+      file = 'where.exe';
+      args = [cmd];
+    } else if (shell === 'bash') {
+      // WSL bash.
+      file = 'wsl.exe';
+      args = ['--', 'bash', '-c', 'command -v "$1" >/dev/null 2>&1', '_', cmd];
+    } else {
+      // PowerShell (default). Get-Command copre cmdlet, alias, funzioni e app.
+      file = 'powershell.exe';
+      args = ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command',
+        'if (Get-Command -Name $args[0] -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }',
+        cmd];
+    }
+
+    let done = false;
+    const finish = (val) => { if (done) return; done = true; try { proc.kill(); } catch (_) {} resolve(val); };
+    let proc;
+    try {
+      proc = spawn(file, args, { cwd: cwd || undefined, windowsHide: true, stdio: 'ignore' });
+    } catch (_) { resolve(false); return; }
+    // Timeout difensivo: un resolver che si impalla non deve restare appeso.
+    const timer = setTimeout(() => finish(false), 4000);
+    proc.on('error', () => { clearTimeout(timer); finish(false); });
+    proc.on('exit', (code) => { clearTimeout(timer); finish(code === 0); });
+  });
+}
+
+module.exports = { createSession, defaultCwd, commandExists };
