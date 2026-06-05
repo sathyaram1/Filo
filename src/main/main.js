@@ -275,11 +275,12 @@ app.on('before-quit', () => {
   } catch (_) {}
 });
 
-// Wipe dei cookie all'uscita (modalità 'default'): "nessun profilo persistente",
-// tranne i domini "resta connesso qui". Il wipe è asincrono: rimandiamo l'uscita
-// finché non termina (con un timeout di sicurezza, così l'app si chiude comunque
-// se il wipe si impalla). In privacy le sessioni sono effimere (niente da fare);
-// in manual non tocchiamo nulla.
+// Wipe dei cookie-tracker all'uscita (modalità 'default'): i cookie funzionali e
+// i login restano (le tue scelte non si perdono); rimuoviamo solo eventuali
+// cookie di domini-tracker noti. Il wipe è asincrono: rimandiamo l'uscita finché
+// non termina (con un timeout di sicurezza, così l'app si chiude comunque se il
+// wipe si impalla). In privacy le sessioni sono effimere (niente da fare); in
+// manual non tocchiamo nulla.
 let cookieWipeDone = false;
 app.on('before-quit', (e) => {
   if (cookieWipeDone) return;
