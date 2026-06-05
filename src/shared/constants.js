@@ -114,36 +114,38 @@
     },
   };
 
-  // Modello di default per ogni azione. I valori sono NICKNAME dal registry
-  // (non più id provider-specifici). Il router risolve al volo il nome
-  // concreto per ogni provider tentato (vedi resolveModel + buildAttemptChain).
+  // Modello di default per ogni azione. I valori sono liste di NICKNAME dal
+  // registry separate da virgola: il primo è il primario, gli altri sono
+  // fallback in ordine. Di default mettiamo il modello su Gemini (quota free,
+  // diretto) col gemello su OpenRouter come fallback, così se la Gemini API
+  // fallisce/è satura la richiesta passa da OpenRouter senza intervento.
   const DEFAULT_MODELS = {
-    [ACTIONS.EXPLAIN]: 'flash',
+    [ACTIONS.EXPLAIN]: 'flash, flash-or',
     [ACTIONS.EXPLAIN_DEEP]: 'claude-haiku',
-    [ACTIONS.TRANSLATE_SELECTION]: 'flash',
-    [ACTIONS.TRANSLATE_PAGE]: 'flash',
-    [ACTIONS.HELP]: 'flash',
-    [ACTIONS.CATEGORIZE]: 'flash',
-    [ACTIONS.DESCRIBE_IMAGE]: 'flash-lite',
+    [ACTIONS.TRANSLATE_SELECTION]: 'flash, flash-or',
+    [ACTIONS.TRANSLATE_PAGE]: 'flash, flash-or',
+    [ACTIONS.HELP]: 'flash, flash-or',
+    [ACTIONS.CATEGORIZE]: 'flash, flash-or',
+    [ACTIONS.DESCRIBE_IMAGE]: 'flash-lite, flash-lite-or',
     // OCR: serve un modello vision capace di leggere testo anche piccolo.
     // Flash è ok; con la chiave Gemini la richiesta è gratis e veloce.
-    [ACTIONS.TRANSCRIBE_IMAGE]: 'flash',
+    [ACTIONS.TRANSCRIBE_IMAGE]: 'flash, flash-or',
     // Dettatura: serve un modello che capisca audio. Gemini 2.0 Flash è
     // multimodale (audio/video/immagini) e gratis con la chiave Gemini.
-    [ACTIONS.TRANSCRIBE_AUDIO]: 'flash',
-    [ACTIONS.SPELLCHECK_SEMANTIC]: 'flash',
-    [ACTIONS.SPELLCHECK_WORD]: 'flash',
+    [ACTIONS.TRANSCRIBE_AUDIO]: 'flash, flash-or',
+    [ACTIONS.SPELLCHECK_SEMANTIC]: 'flash, flash-or',
+    [ACTIONS.SPELLCHECK_WORD]: 'flash, flash-or',
     [ACTIONS.EDIT_TEXT]: 'claude-haiku',
-    [ACTIONS.EXPLAIN_LINK]: 'flash',
+    [ACTIONS.EXPLAIN_LINK]: 'flash, flash-or',
     // Modelli "stupidi" per la pipeline di raccolta path: deve essere economico
     // e deterministico, non creativo. Lite va benissimo.
-    [ACTIONS.HELP_INTENT_GUESS]: 'flash-lite',
-    [ACTIONS.HELP_INTENT_JUDGE]: 'flash-lite',
+    [ACTIONS.HELP_INTENT_GUESS]: 'flash-lite, flash-lite-or',
+    [ACTIONS.HELP_INTENT_JUDGE]: 'flash-lite, flash-lite-or',
     // Filo agenti: chat = modello principale; gli altri (background) usano lite.
-    [ACTIONS.FILO_CHAT]: 'flash',
-    [ACTIONS.FILO_DASHBOARD]: 'flash',
-    [ACTIONS.FILO_LESSON]: 'flash-lite',
-    [ACTIONS.FILO_COMPACT]: 'flash',
+    [ACTIONS.FILO_CHAT]: 'flash, flash-or',
+    [ACTIONS.FILO_DASHBOARD]: 'flash, flash-or',
+    [ACTIONS.FILO_LESSON]: 'flash-lite, flash-lite-or',
+    [ACTIONS.FILO_COMPACT]: 'flash, flash-or',
   };
 
   // Risolve un riferimento a un modello (nickname OPPURE id raw legacy stile
