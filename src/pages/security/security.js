@@ -110,16 +110,17 @@
     return checked ? checked.value : 'default';
   }
 
-  // In "Privacy massima" niente sopravvive alla sessione: la whitelist non ha
-  // effetto, quindi la disabilitiamo e mostriamo la nota esplicativa.
+  // I "siti fidati" hanno effetto SOLO in "Privacy massima" (dove ogni sito è
+  // isolato/effimero): lì la lista è attiva. In "Automatico"/"Manuale" i login
+  // restano comunque, quindi la lista è informativa (disabilitata + nota).
   function syncCookieMode() {
     const privacy = currentMode() === 'privacy';
-    $('sec-cookies-wl-privacy-note').style.display = privacy ? 'block' : 'none';
+    $('sec-cookies-trusted-note').style.display = privacy ? 'none' : 'block';
     const wl = $('sec-cookies-whitelist');
-    wl.style.opacity = privacy ? '0.45' : '1';
-    $('cookie-wl-input').disabled = privacy;
-    $('cookie-wl-add-btn').disabled = privacy;
-    for (const btn of $('cookie-wl-list').querySelectorAll('button')) btn.disabled = privacy;
+    wl.style.opacity = privacy ? '1' : '0.45';
+    $('cookie-wl-input').disabled = !privacy;
+    $('cookie-wl-add-btn').disabled = !privacy;
+    for (const btn of $('cookie-wl-list').querySelectorAll('button')) btn.disabled = !privacy;
   }
 
   // Pulisce l'input utente in un dominio confrontabile: toglie schema, path,
