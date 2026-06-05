@@ -598,6 +598,7 @@
           userAgent: navigator.userAgent,
           clientId,
           images: outImages,
+          files: files.slice(), // allegati non-immagine (pdf, txt, md, json…)
         };
         const res = await chrome.runtime.sendMessage({ type: MSG.SUBMIT_FEEDBACK, payload });
         if (!res?.ok) throw new Error(res?.error || 'invio fallito');
