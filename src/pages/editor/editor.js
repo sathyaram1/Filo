@@ -480,46 +480,210 @@
     sel.removeAllRanges();
     sel.addRange(savedDocRange);
   }
+  // ~30 famiglie comuni, buona varietà (serif, sans-serif, monospace, display,
+  // corsivi). Garamond incluso. Ogni voce è uno stack con fallback sicuri così
+  // l'applicazione regge anche dove il font esatto non è installato.
+  const FONT_LIST = [
+    ['Arial, Helvetica, sans-serif', 'Arial'],
+    ['Helvetica, Arial, sans-serif', 'Helvetica'],
+    ['Verdana, Geneva, sans-serif', 'Verdana'],
+    ['Tahoma, Geneva, sans-serif', 'Tahoma'],
+    ['"Trebuchet MS", Helvetica, sans-serif', 'Trebuchet MS'],
+    ['Calibri, Candara, sans-serif', 'Calibri'],
+    ['"Segoe UI", Tahoma, sans-serif', 'Segoe UI'],
+    ['"Gill Sans", "Gill Sans MT", sans-serif', 'Gill Sans'],
+    ['"Century Gothic", AppleGothic, sans-serif', 'Century Gothic'],
+    ['"Franklin Gothic Medium", Arial, sans-serif', 'Franklin Gothic'],
+    ['Futura, "Century Gothic", sans-serif', 'Futura'],
+    ['Optima, "Segoe UI", sans-serif', 'Optima'],
+    ['Candara, Calibri, sans-serif', 'Candara'],
+    ['Corbel, "Lucida Grande", sans-serif', 'Corbel'],
+    ['Georgia, serif', 'Georgia'],
+    ['"Times New Roman", Times, serif', 'Times New Roman'],
+    ['Garamond, "EB Garamond", "Apple Garamond", serif', 'Garamond'],
+    ['"Palatino Linotype", Palatino, serif', 'Palatino'],
+    ['"Book Antiqua", Palatino, serif', 'Book Antiqua'],
+    ['Baskerville, "Baskerville Old Face", serif', 'Baskerville'],
+    ['Cambria, Georgia, serif', 'Cambria'],
+    ['Constantia, Georgia, serif', 'Constantia'],
+    ['Didot, "Didot LT STD", "Times New Roman", serif', 'Didot'],
+    ['"Bodoni MT", Didot, serif', 'Bodoni MT'],
+    ['Rockwell, "Courier New", serif', 'Rockwell'],
+    ['"Courier New", Courier, monospace', 'Courier New'],
+    ['Consolas, "Lucida Console", monospace', 'Consolas'],
+    ['"Lucida Console", Monaco, monospace', 'Lucida Console'],
+    ['Monaco, Consolas, monospace', 'Monaco'],
+    ['"Comic Sans MS", "Comic Sans", cursive', 'Comic Sans'],
+    ['Impact, Charcoal, sans-serif', 'Impact'],
+    ['"Brush Script MT", "Segoe Script", cursive', 'Brush Script'],
+    ['"Lucida Handwriting", "Segoe Script", cursive', 'Lucida Handwriting'],
+    ['Copperplate, "Copperplate Gothic Light", fantasy', 'Copperplate'],
+  ];
+
+  // Picker del font: dropdown custom (stile coerente con gli altri menu a
+  // tendina di Filo, classi .sn-select-*) con campo di ricerca per filtrare i
+  // font scrivendo. Sotto resta un <select> nativo NASCOSTO come sorgente di
+  // verità: serve all'accessibilità e ai test (Playwright `selectOption`), e
+  // applica il font tramite il suo handler `change` (condiviso con la UI custom).
   function renderFont(cell, m) {
     cell.classList.add('ed-fmt-mod');
     const pad = document.createElement('div');
     pad.className = 'ed-mod-pad ed-fmt ed-font';
+
+    const wrap = document.createElement('div');
+    wrap.className = 'sn-select-wrap ed-font-wrap';
+
     const sel = document.createElement('select');
     sel.className = 'ed-font-select';
     sel.title = 'Font del testo selezionato';
     sel.setAttribute('aria-label', 'Font del testo selezionato');
-    const fonts = [
-      ['', 'Font…'],
-      ['Georgia, serif', 'Georgia'],
-      ['"Times New Roman", serif', 'Times New Roman'],
-      ['Arial, sans-serif', 'Arial'],
-      ['Verdana, sans-serif', 'Verdana'],
-      ['"Courier New", monospace', 'Courier New'],
-      ['"Comic Sans MS", cursive', 'Comic Sans'],
-    ];
-    for (const [val, label] of fonts) {
+    const ph = document.createElement('option');
+    ph.value = ''; ph.textContent = 'Font…';
+    sel.appendChild(ph);
+    for (const [val, label] of FONT_LIST) {
       const o = document.createElement('option');
       o.value = val; o.textContent = label;
-      o.style.fontFamily = val || '';
+      o.style.fontFamily = val;
       sel.appendChild(o);
     }
+    wrap.appendChild(sel);
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'sn-select-button ed-font-button';
+    button.setAttribute('aria-haspopup', 'listbox');
+    button.setAttribute('aria-expanded', 'false');
+    button.setAttribute('aria-label', 'Font del testo selezionato');
+    const valueEl = document.createElement('span');
+    valueEl.className = 'sn-select-value';
+    valueEl.textContent = 'Font…';
+    const chevron = document.createElement('span');
+    chevron.className = 'sn-select-chevron';
+    chevron.setAttribute('aria-hidden', 'true');
+    chevron.textContent = '▾';
+    button.appendChild(valueEl);
+    button.appendChild(chevron);
+    wrap.appendChild(button);
+
+    const pop = document.createElement('div');
+    pop.className = 'sn-select-pop ed-font-pop';
+    pop.setAttribute('role', 'listbox');
+    pop.hidden = true;
+    const search = document.createElement('input');
+    search.type = 'text';
+    search.className = 'ed-font-search';
+    search.placeholder = 'Cerca un font…';
+    search.setAttribute('aria-label', 'Cerca un font');
+    const list = document.createElement('div');
+    list.className = 'ed-font-list';
+    pop.appendChild(search);
+    pop.appendChild(list);
+    wrap.appendChild(pop);
+
+    const optionEls = [];
+    let hoverEl = null;
+    const setHover = (o) => {
+      if (hoverEl === o) return;
+      if (hoverEl) hoverEl.classList.remove('sn-hover');
+      hoverEl = o || null;
+      if (hoverEl) { hoverEl.classList.add('sn-hover'); hoverEl.scrollIntoView({ block: 'nearest' }); }
+    };
+    for (const [val, label] of FONT_LIST) {
+      const o = document.createElement('div');
+      o.className = 'sn-select-option';
+      o.setAttribute('role', 'option');
+      o.dataset.value = val;
+      o.textContent = label;
+      o.style.fontFamily = val;
+      o.addEventListener('mousemove', () => setHover(o));
+      // Non rubare il focus/selezione del documento cliccando un'opzione.
+      o.addEventListener('mousedown', (e) => e.preventDefault());
+      o.addEventListener('click', () => choose(val));
+      list.appendChild(o);
+      optionEls.push(o);
+    }
+    const visibleOptions = () => optionEls.filter((o) => o.style.display !== 'none');
+    const applyFilter = (q) => {
+      const s = (q || '').trim().toLowerCase();
+      for (const o of optionEls) {
+        o.style.display = (!s || o.textContent.toLowerCase().includes(s)) ? '' : 'none';
+      }
+      const vis = visibleOptions();
+      if (!vis.includes(hoverEl)) setHover(vis[0] || null);
+    };
+    const moveHover = (dir) => {
+      const vis = visibleOptions();
+      if (!vis.length) return;
+      let i = vis.indexOf(hoverEl);
+      i = (i + dir + vis.length) % vis.length;
+      setHover(vis[i]);
+    };
+
+    function choose(val) {
+      if (val) {
+        sel.value = val;
+        sel.dispatchEvent(new Event('change', { bubbles: true })); // → applica il font
+      }
+      close();
+      button.focus();
+    }
+    const onDocDown = (e) => { if (!wrap.contains(e.target)) close(); };
+    function open() {
+      if (!pop.hidden) return;
+      saveDocSelection(); // prima che il focus passi al popup
+      pop.hidden = false;
+      wrap.classList.add('sn-open');
+      button.setAttribute('aria-expanded', 'true');
+      search.value = '';
+      applyFilter('');
+      setHover(visibleOptions()[0] || null);
+      document.addEventListener('mousedown', onDocDown, true);
+      setTimeout(() => search.focus(), 0);
+    }
+    function close() {
+      if (pop.hidden) return;
+      pop.hidden = true;
+      wrap.classList.remove('sn-open');
+      button.setAttribute('aria-expanded', 'false');
+      setHover(null);
+      document.removeEventListener('mousedown', onDocDown, true);
+    }
+
+    button.addEventListener('mousedown', (e) => {
+      if (settingsMode) { e.preventDefault(); e.stopPropagation(); openModuleConfig(m); return; }
+      saveDocSelection();
+    });
+    button.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (settingsMode) return;
+      pop.hidden ? open() : close();
+    });
+    search.addEventListener('input', () => applyFilter(search.value));
+    search.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown') { e.preventDefault(); moveHover(1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); moveHover(-1); }
+      else if (e.key === 'Enter') { e.preventDefault(); if (hoverEl) choose(hoverEl.dataset.value); }
+      else if (e.key === 'Escape') { e.preventDefault(); close(); button.focus(); }
+    });
+
     // In modalità modifica moduli il click apre la configurazione (parità con gli
     // altri moduli); altrimenti salva la selezione prima che il menu la perda.
     sel.addEventListener('mousedown', (e) => {
       if (settingsMode) { e.preventDefault(); e.stopPropagation(); openModuleConfig(m); return; }
       saveDocSelection();
     });
-    sel.addEventListener('click', (e) => { if (!settingsMode) e.stopPropagation(); });
     sel.addEventListener('change', (e) => {
       if (settingsMode) return;
       e.stopPropagation();
       const font = sel.value;
       sel.selectedIndex = 0; // torna al placeholder "Font…"
+      valueEl.textContent = 'Font…';
       if (!font) return;
       restoreDocSelection();
       execCss('fontName', font);
     });
-    pad.appendChild(sel);
+
+    pad.appendChild(wrap);
     cell.appendChild(pad);
   }
 
