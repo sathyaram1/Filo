@@ -150,17 +150,25 @@
 
   // Risolve un riferimento a un modello (nickname OPPURE id raw legacy stile
   // OpenRouter) nel nome concreto da inviare al provider indicato.
-  // Ritorna null se il provider non ha quel modello (es. nickname 'claude-haiku'
-  // → gemini: stringa vuota → caller deve saltare il provider).
+  // Ritorna null se quel modello non va servito dal provider richiesto (es. un
+  // modello con provider 'gemini' interrogato per 'openrouter' → null → il
+  // caller salta quel provider).
   //
-  // Backwards compat: se il riferimento non è un nickname noto, lo trattiamo
-  // come id raw stile OpenRouter e applichiamo la stessa logica di prima
-  // (toGeminiModelId per gemini). Così settings pre-refactor continuano a
-  // funzionare anche se la migrazione non parte.
+  // Tre forme di entry, gestite in ordine:
+  //   1. Nuova (un provider per modello): { provider, model }.
+  //   2. Legacy "duale" (un nickname, due id): { openrouter, gemini }.
+  //   3. Nessuna entry → ref trattato come id raw stile OpenRouter (con
+  //      toGeminiModelId per gemini). Così settings pre-refactor continuano a
+  //      funzionare anche se la migrazione non parte.
   function resolveModel(ref, providerName, registry) {
     if (!ref) return null;
     const entry = registry && registry[ref];
     if (entry) {
+      // Forma nuova: il modello ha un solo provider e un nome concreto.
+      if (entry.provider) {
+        return entry.provider === providerName ? (entry.model || null) : null;
+      }
+      // Forma legacy "duale": un id per provider (stringa vuota = assente).
       const id = entry[providerName];
       return id || null;
     }
