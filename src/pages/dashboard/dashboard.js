@@ -601,23 +601,43 @@
   }
 
   // Classifica l'input corrente per l'evidenziazione live:
-  //   'filo'  → comando interno di Filo (o navigazione a sito) → arancione
-  //   'shell' → andrà eseguito dalla shell (solo in modalità terminale) → azzurro
-  //   'none'  → testo normale (va all'LLM)
+  //   'filo'    → comando interno di Filo (o navigazione a sito) → arancione
+  //   'shell'   → andrà eseguito dalla shell (solo in modalità terminale) → azzurro
+  //   'unknown' → inizia con "/" ma non è un comando riconosciuto → rosso
+  //   'none'    → testo normale (va all'LLM)
   function classifyInput(value) {
     const t = value.trim();
     if (!t.startsWith('/')) return 'none';
     const firstToken = t.split(/\s+/)[0];
     if (SLASH_COMMANDS[t] || SLASH_COMMANDS[firstToken]) return 'filo';
     if (isSiteToken(t)) return 'filo';
+    // In modalità terminale qualsiasi "/x" è un comando shell valido (azzurro):
+    // non c'è nulla di "non riconosciuto".
     if (terminalMode) return 'shell';
-    return 'none';
+    // Modalità normale: un "/comando" che non è interno né un sito non verrà
+    // riconosciuto (finirebbe all'LLM come testo). Lo segnaliamo in rosso —
+    // MA non mentre l'utente sta ancora digitando un prefisso che potrebbe
+    // diventare un comando valido (es. "/he" → "/help"): in quel caso restiamo
+    // neutri così il rosso non lampeggia a ogni tasto.
+    const hasSpace = /\s/.test(t);
+    if (!hasSpace && isCommandPrefix(firstToken)) return 'none';
+    return 'unknown';
+  }
+
+  // Vero se `token` (es. "/he") è il prefisso non vuoto di un comando Filo noto
+  // (es. "/help"), ma non è ancora il comando completo.
+  function isCommandPrefix(token) {
+    if (!token || token === '/') return false;
+    return Object.keys(SLASH_COMMANDS).some(
+      (cmd) => cmd !== token && cmd.startsWith(token)
+    );
   }
 
   function updateInputClass() {
     const kind = classifyInput(inputEl.value);
     inputEl.classList.toggle('is-cmd-filo', kind === 'filo');
     inputEl.classList.toggle('is-cmd-shell', kind === 'shell');
+    inputEl.classList.toggle('is-cmd-unknown', kind === 'unknown');
   }
 
   function handleSlashCommand(text) {
