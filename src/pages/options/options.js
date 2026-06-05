@@ -276,13 +276,13 @@
     for (const row of host.querySelectorAll('.sn-model-row:not(.sn-model-row-head)')) {
       const nick = row.querySelector('.sn-model-nick').value.trim();
       const label = row.querySelector('.sn-model-label').value.trim();
-      const or = row.querySelector('.sn-model-or').value.trim();
-      const gem = row.querySelector('.sn-model-gemini').value.trim();
-      if (!nick && !label && !or && !gem) continue;
+      const provider = row.querySelector('.sn-model-provider').value;
+      const model = row.querySelector('.sn-model-id').value.trim();
+      if (!nick && !label && !model) continue;
       if (!nick) { missingNick = true; continue; }
       if (out[nick]) { dups.push(nick); continue; }
-      const entry = { label, openrouter: or, gemini: gem };
-      // Preserva i risultati di test misurati (latenza/token-sec) tra i salvataggi.
+      const entry = { label, provider, model };
+      // Preserva il risultato di test misurato (latenza/token-sec) tra i salvataggi.
       if (row._test && Object.keys(row._test).length) entry.test = row._test;
       out[nick] = entry;
     }
@@ -292,7 +292,7 @@
   async function runRowTest(providerId, modelId, row, btn) {
     const statusEl = row.querySelector('.sn-model-row-status');
     if (!modelId) {
-      statusEl.textContent = I18n.t('options_model_no_id_for_provider', providerId);
+      statusEl.textContent = I18n.t('options_model_no_full_id');
       return;
     }
     const keyEl = providerId === 'gemini' ? $('apiKeyGemini') : $('apiKey');
@@ -319,8 +319,8 @@
       } else {
         // Salva il risultato (latenza + token/sec) nella riga e persistilo nel
         // registry, così resta visibile e confrontabile tra le sessioni.
-        row._test = row._test || {};
-        row._test[providerId] = {
+        row._test = {
+          provider: providerId,
           ttftMs: res.ttftMs ?? null,
           tokensPerSec: res.tokensPerSec ?? null,
           at: new Date().toISOString(),
@@ -333,6 +333,102 @@
     } finally {
       btn.disabled = false;
     }
+  }
+
+  // ── Modelli per azione (slot primario + fallback) ──────────────────────────
+  // Crea uno slot (input nickname con datalist) + pulsante rimuovi (tranne il
+  // primario, che resta sempre). L'ordine degli slot È l'ordine di fallback.
+  function makeSlot(value, isPrimary) {
+    const slot = document.createElement('div');
+    slot.className = 'sn-model-slot';
+
+    const order = document.createElement('span');
+    order.className = 'sn-slot-order';
+    order.textContent = isPrimary ? '1' : '';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'sn-slot-input';
+    input.setAttribute('list', 'nicknames-list');
+    input.placeholder = isPrimary ? I18n.t('options_model_primary_ph') : I18n.t('options_model_fallback_ph');
+    input.value = value || '';
+
+    slot.appendChild(order);
+    slot.appendChild(input);
+
+    if (!isPrimary) {
+      const rm = document.createElement('button');
+      rm.type = 'button';
+      rm.className = 'sn-slot-remove';
+      rm.textContent = '×';
+      rm.title = I18n.t('options_model_remove_fallback');
+      rm.addEventListener('click', () => {
+        const cell = slot.parentElement?.parentElement;
+        slot.remove();
+        if (cell) renumberSlots(cell);
+        save();
+      });
+      slot.appendChild(rm);
+    }
+    return slot;
+  }
+
+  // Riallinea l'indicatore numerico degli slot (1 = primario, 2,3… = fallback).
+  function renumberSlots(cell) {
+    const slots = cell.querySelectorAll('.sn-model-slot');
+    slots.forEach((s, i) => {
+      const order = s.querySelector('.sn-slot-order');
+      if (order) order.textContent = String(i + 1);
+    });
+  }
+
+  function renderModelsGrid(models) {
+    const grid = $('modelsGrid');
+    grid.innerHTML = '';
+    for (const [action, labelKey] of ACTION_LABELS) {
+      const cell = document.createElement('div');
+      cell.dataset.action = action;
+
+      const label = document.createElement('label');
+      label.textContent = I18n.t(labelKey);
+      cell.appendChild(label);
+
+      const slots = document.createElement('div');
+      slots.className = 'sn-model-slots';
+      const refs = window.SN_CONST.parseModelRefs(models && models[action]);
+      const list = refs.length ? refs : [''];
+      list.forEach((ref, i) => slots.appendChild(makeSlot(ref, i === 0)));
+      cell.appendChild(slots);
+
+      const add = document.createElement('button');
+      add.type = 'button';
+      add.className = 'sn-add-fallback';
+      add.textContent = I18n.t('options_model_add_fallback');
+      add.addEventListener('click', () => {
+        slots.appendChild(makeSlot('', false));
+        renumberSlots(cell);
+        // Focus sul nuovo slot per digitare subito.
+        const inputs = slots.querySelectorAll('.sn-slot-input');
+        inputs[inputs.length - 1]?.focus();
+      });
+      cell.appendChild(add);
+
+      grid.appendChild(cell);
+    }
+  }
+
+  // Raccoglie i modelli per azione: per ogni cella unisce i nickname non vuoti
+  // degli slot (in ordine) in una stringa separata da virgola, lo stesso formato
+  // di storage di sempre (così parseModelRefs continua a funzionare ovunque).
+  function collectModels() {
+    const out = {};
+    for (const cell of $('modelsGrid').querySelectorAll('[data-action]')) {
+      const refs = [...cell.querySelectorAll('.sn-slot-input')]
+        .map((i) => i.value.trim())
+        .filter(Boolean);
+      out[cell.dataset.action] = refs.join(', ');
+    }
+    return out;
   }
 
   async function renderCategories() {
