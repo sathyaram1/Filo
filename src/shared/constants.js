@@ -683,6 +683,17 @@
     // mano. Viene iniettata come istruzione di sistema nelle azioni
     // conversazionali (vedi injectAgentStyle).
     agentStyle: '',
+    // Lettura ad alta voce (text-to-speech). Usa l'API Web Speech del browser
+    // (gratuita, nessuna chiave, funziona offline con le voci del sistema
+    // operativo). La voce dell'utente la sceglie da Preferenze.
+    // - voice: voiceURI/nome della voce preferita ('' = voce di default del SO)
+    // - rate: velocità di lettura (0.5–2, 1 = normale)
+    // - pitch: tono (0–2, 1 = normale)
+    tts: {
+      voice: '',
+      rate: 1,
+      pitch: 1,
+    },
     // Impostazioni di sicurezza/privacy per le pagine esterne (no filo://).
     // - protectIpLeak: forza WebRTC a usare solo l'interfaccia di rete pubblica
     //   (default_public_interface_only). Evita che siti possano leggere gli IP
