@@ -69,3 +69,26 @@ test('le tab si toccano e usano un separatore verticale in stile Chrome', async 
   expect(probe.inactiveDivider.display).not.toBe('none');
   expect(probe.inactiveDivider.width).toBe('1px');
 });
+
+test('la scheda attiva ha le curve "a goccia" in stile Chrome', async ({ shell, openTab }) => {
+  await openTab('filo://newtab/');
+  await openTab('filo://newtab/');
+  await expect(shell.locator('.tab.active')).toHaveCount(1, { timeout: 8_000 });
+
+  // I due piedini curvi sono pseudo-elementi ::before/::after sulla scheda
+  // attiva: devono essere visibili (display block, 8px) e disegnati con un
+  // radial-gradient (l'arco concavo che fonde la scheda con la barra).
+  const feet = await shell.locator('.tab.active').evaluate((el) => {
+    const read = (sel) => {
+      const s = getComputedStyle(el, sel);
+      return { display: s.display, width: s.width, bg: s.backgroundImage };
+    };
+    return { before: read('::before'), after: read('::after') };
+  });
+
+  for (const foot of [feet.before, feet.after]) {
+    expect(foot.display).not.toBe('none');
+    expect(foot.width).toBe('8px');
+    expect(foot.bg).toContain('radial-gradient');
+  }
+});
