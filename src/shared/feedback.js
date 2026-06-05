@@ -157,7 +157,7 @@
       throw new Error(`firestore create fallito (${res.status}): ${errText.slice(0, 300)}`);
     }
     const json = await res.json();
-    return { id: json.name?.split('/').pop() || '', images: uploaded };
+    return { id: json.name?.split('/').pop() || '', images: uploaded, files: uploadedFiles };
   }
 
   // Lista tutti i feedback (più recenti prima). Usata dalla dashboard.
