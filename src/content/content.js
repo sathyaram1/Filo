@@ -2401,9 +2401,11 @@
     const current = C.parseModelRefs ? (C.parseModelRefs(currentRaw)[0] || currentRaw) : currentRaw;
     const items = [];
     for (const [nickname, entry] of Object.entries(registry)) {
-      // Solo modelli con un binding Gemini: per ora è l'unico provider che
-      // accetta audio inline tramite la stessa chat completion che usiamo.
-      if (!entry || !entry.gemini) continue;
+      // Solo modelli serviti da Gemini: per ora è l'unico provider che accetta
+      // audio inline tramite la stessa chat completion che usiamo. Vale sia per
+      // lo schema nuovo (provider: 'gemini') sia per quello legacy duale (.gemini).
+      const isGemini = entry && (entry.provider === 'gemini' || (!entry.provider && entry.gemini));
+      if (!isGemini) continue;
       const checked = nickname === current;
       items.push({
         label: (checked ? '✓ ' : '   ') + (entry.label || nickname),
