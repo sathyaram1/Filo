@@ -57,9 +57,20 @@
   }
 
   // ── Registry editor (stesso schema della pagina Opzioni) ────────────────────
+  // Migra una entry legacy duale { openrouter, gemini } allo schema nuovo
+  // { provider, model } per la visualizzazione (Gemini preferito se presente).
+  function normalizeEntry(entry) {
+    const e = entry || {};
+    if (e.provider) return { provider: e.provider, model: e.model || '' };
+    if (e.gemini) return { provider: 'gemini', model: e.gemini };
+    if (e.openrouter) return { provider: 'openrouter', model: e.openrouter };
+    return { provider: 'gemini', model: '' };
+  }
+
   function makeModelRow(nick, entry) {
     const row = document.createElement('div');
     row.className = 'sn-model-row';
+    const norm = normalizeEntry(entry);
 
     const nickIn = document.createElement('input');
     nickIn.type = 'text';
@@ -73,17 +84,20 @@
     labelIn.value = (entry && entry.label) || '';
     labelIn.className = 'sn-model-label';
 
-    const orIn = document.createElement('input');
-    orIn.type = 'text';
-    orIn.placeholder = I18n.t('options_model_or_id');
-    orIn.value = (entry && entry.openrouter) || '';
-    orIn.className = 'sn-model-or';
+    const provSel = document.createElement('select');
+    provSel.className = 'sn-model-provider';
+    for (const [val, txt] of [['openrouter', 'OpenRouter'], ['gemini', 'Google Gemini']]) {
+      const opt = document.createElement('option');
+      opt.value = val; opt.textContent = txt;
+      provSel.appendChild(opt);
+    }
+    provSel.value = norm.provider;
 
-    const gemIn = document.createElement('input');
-    gemIn.type = 'text';
-    gemIn.placeholder = I18n.t('options_model_gemini_id');
-    gemIn.value = (entry && entry.gemini) || '';
-    gemIn.className = 'sn-model-gemini';
+    const modelIn = document.createElement('input');
+    modelIn.type = 'text';
+    modelIn.placeholder = I18n.t('options_model_full_id');
+    modelIn.value = norm.model;
+    modelIn.className = 'sn-model-id';
 
     const del = document.createElement('button');
     del.type = 'button';
@@ -93,8 +107,8 @@
 
     row.appendChild(nickIn);
     row.appendChild(labelIn);
-    row.appendChild(orIn);
-    row.appendChild(gemIn);
+    row.appendChild(provSel);
+    row.appendChild(modelIn);
     row.appendChild(del);
     return row;
   }
@@ -104,7 +118,7 @@
     host.innerHTML = '';
     const head = document.createElement('div');
     head.className = 'sn-model-row sn-model-row-head';
-    ['nickname', 'etichetta', 'id su OpenRouter', 'id su Gemini API', ''].forEach((label) => {
+    [I18n.t('options_model_nickname'), I18n.t('options_model_label'), I18n.t('options_model_provider'), I18n.t('options_model_full_id'), ''].forEach((label) => {
       const c = document.createElement('div'); c.textContent = label; head.appendChild(c);
     });
     host.appendChild(head);
@@ -124,12 +138,12 @@
     for (const row of host.querySelectorAll('.sn-model-row:not(.sn-model-row-head)')) {
       const nick = row.querySelector('.sn-model-nick').value.trim();
       const label = row.querySelector('.sn-model-label').value.trim();
-      const or = row.querySelector('.sn-model-or').value.trim();
-      const gem = row.querySelector('.sn-model-gemini').value.trim();
-      if (!nick && !label && !or && !gem) continue;
+      const provider = row.querySelector('.sn-model-provider').value;
+      const model = row.querySelector('.sn-model-id').value.trim();
+      if (!nick && !label && !model) continue;
       if (!nick) continue;
       if (out[nick]) continue;
-      out[nick] = { label, openrouter: or, gemini: gem };
+      out[nick] = { label, provider, model };
     }
     return out;
   }
@@ -146,31 +160,89 @@
     }
   }
 
-  // ── Modelli per azione ──────────────────────────────────────────────────────
+  // ── Modelli per azione (slot primario + fallback) ──────────────────────────
+  function makeSlot(value, isPrimary) {
+    const slot = document.createElement('div');
+    slot.className = 'sn-model-slot';
+
+    const order = document.createElement('span');
+    order.className = 'sn-slot-order';
+    order.textContent = isPrimary ? '1' : '';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'sn-slot-input';
+    input.setAttribute('list', 'nicknames-list');
+    input.placeholder = isPrimary ? I18n.t('options_model_primary_ph') : I18n.t('options_model_fallback_ph');
+    input.value = value || '';
+
+    slot.appendChild(order);
+    slot.appendChild(input);
+
+    if (!isPrimary) {
+      const rm = document.createElement('button');
+      rm.type = 'button';
+      rm.className = 'sn-slot-remove';
+      rm.textContent = '×';
+      rm.title = I18n.t('options_model_remove_fallback');
+      rm.addEventListener('click', () => {
+        const cell = slot.parentElement?.parentElement;
+        slot.remove();
+        if (cell) renumberSlots(cell);
+      });
+      slot.appendChild(rm);
+    }
+    return slot;
+  }
+
+  function renumberSlots(cell) {
+    cell.querySelectorAll('.sn-model-slot').forEach((s, i) => {
+      const order = s.querySelector('.sn-slot-order');
+      if (order) order.textContent = String(i + 1);
+    });
+  }
+
   function renderModelsGrid(models) {
     const grid = $('modelsGrid');
     grid.innerHTML = '';
     for (const [action, labelKey] of ACTION_LABELS) {
       const cell = document.createElement('div');
+      cell.dataset.action = action;
+
       const label = document.createElement('label');
       label.textContent = I18n.t(labelKey);
-      label.setAttribute('for', `model-${action}`);
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.id = `model-${action}`;
-      input.dataset.action = action;
-      input.setAttribute('list', 'nicknames-list');
-      input.value = (models && models[action]) || '';
       cell.appendChild(label);
-      cell.appendChild(input);
+
+      const slots = document.createElement('div');
+      slots.className = 'sn-model-slots';
+      const refs = window.SN_CONST.parseModelRefs(models && models[action]);
+      const list = refs.length ? refs : [''];
+      list.forEach((ref, i) => slots.appendChild(makeSlot(ref, i === 0)));
+      cell.appendChild(slots);
+
+      const add = document.createElement('button');
+      add.type = 'button';
+      add.className = 'sn-add-fallback';
+      add.textContent = I18n.t('options_model_add_fallback');
+      add.addEventListener('click', () => {
+        slots.appendChild(makeSlot('', false));
+        renumberSlots(cell);
+        const inputs = slots.querySelectorAll('.sn-slot-input');
+        inputs[inputs.length - 1]?.focus();
+      });
+      cell.appendChild(add);
+
       grid.appendChild(cell);
     }
   }
 
   function collectModels() {
     const out = {};
-    for (const input of $('modelsGrid').querySelectorAll('input[data-action]')) {
-      out[input.dataset.action] = input.value.trim();
+    for (const cell of $('modelsGrid').querySelectorAll('[data-action]')) {
+      const refs = [...cell.querySelectorAll('.sn-slot-input')]
+        .map((i) => i.value.trim())
+        .filter(Boolean);
+      out[cell.dataset.action] = refs.join(', ');
     }
     return out;
   }
