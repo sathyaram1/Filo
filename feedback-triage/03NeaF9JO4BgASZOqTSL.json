@@ -1,0 +1,7 @@
+{
+  "id": "03NeaF9JO4BgASZOqTSL",
+  "status": "done",
+  "notes": "La tendina dei font nell'editor ora si chiude cliccando in un punto qualsiasi fuori da essa (sul documento, sulla barra in alto, ovunque nella pagina). Prima restava sempre aperta: anche se internamente veniva 'chiusa', una regola di stile la teneva comunque visibile. Verificato con un test che apre la tendina e controlla che si chiuda cliccando in tre punti diversi al di fuori.",
+  "queuedAt": "2026-06-05T14:43:54.869Z",
+  "queuedBy": "routine"
+}
