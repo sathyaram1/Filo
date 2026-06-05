@@ -1,7 +1,0 @@
-{
-  "id": "NFLu9vxB7piNXbLT8Wce",
-  "status": "done",
-  "notes": "Ho aggiunto l'effetto 'a goccia' di Chrome alla scheda attiva: ora i suoi angoli inferiori curvano verso l'esterno e si fondono con la barra sottostante, come nelle tab di Chrome (le schede inattive restano separate dalla sottile linea verticale). Verificato con uno screenshot reale della barra schede e con un test automatico che controlla la presenza delle curve.",
-  "queuedAt": "2026-06-05T05:16:07.151Z",
-  "queuedBy": "routine"
-}
