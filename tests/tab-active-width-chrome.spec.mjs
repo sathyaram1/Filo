@@ -18,6 +18,12 @@ test('la tab selezionata è più larga delle altre', async ({ shell, openTab }) 
   await expect(shell.locator('.tab')).toHaveCount(3, { timeout: 8_000 });
   await expect(shell.locator('.tab.active')).toHaveCount(1);
 
+  // Attendi che il layout flex si assesti: subito dopo l'apertura la riga di
+  // tab può misurare 0px per un frame (corsa di layout), falsando i confronti.
+  await expect
+    .poll(() => shell.locator('.tab.active').evaluate((el) => el.getBoundingClientRect().width))
+    .toBeGreaterThan(0);
+
   const widths = await shell.locator('.tab').evaluateAll((els) =>
     els.map((el) => ({
       active: el.classList.contains('active'),
