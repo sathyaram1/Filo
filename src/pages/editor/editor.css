@@ -417,7 +417,11 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 .ed-font-button:hover { border-color: var(--sn-accent); }
 /* Popup font: ricerca fissa in alto, lista scrollabile sotto. Eredita i colori
    coerenti col tema dai .sn-select-* (vedi theme.css). */
+/* Fixed così il popup non viene tagliato da .ed-module { overflow: hidden }
+   (nessun antenato crea un containing block: il fixed sfugge al ritaglio). Le
+   coordinate sono impostate in JS dal rect del bottone all'apertura. */
 .sn-select-pop.ed-font-pop {
+  position: fixed; right: auto;
   display: flex; flex-direction: column;
   padding: 0; max-height: 280px; min-width: 180px;
 }
