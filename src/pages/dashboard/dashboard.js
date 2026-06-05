@@ -565,6 +565,8 @@
     '/preferenze': () => { send({ type: MSG.OPEN_URL, url: 'filo://preferences/preferences.html' }); },
     '/editor': () => { send({ type: MSG.OPEN_URL, url: 'filo://editor/editor.html' }); },
     '/feedback': () => { send({ type: MSG.OPEN_URL, url: 'filo://feedback/feedback.html' }); },
+    '/incognito': () => { send({ type: MSG.OPEN_INCOGNITO }); },
+    '/set': (text) => { handleSetCommand(text); },
     '/help': () => {
       if (body.dataset.state !== 'thread') goThread();
       const lines = [
