@@ -529,17 +529,18 @@
       e.preventDefault(); modal.classList.remove('sn-fb-drop-hover');
     }));
     modal.addEventListener('drop', async (e) => {
-      const files = e.dataTransfer?.files;
-      if (!files || !files.length) return;
-      for (const f of files) await addImageFromBlob(f);
+      const dropped = e.dataTransfer?.files;
+      if (!dropped || !dropped.length) return;
+      for (const f of dropped) await addAttachment(f);
     });
 
-    // "Allega": apre il selettore file per allegare immagini (oltre a
-    // incolla/trascina). Parità tra i cammini equivalenti.
+    // "Allega": apre il selettore file. Si possono allegare immagini E altri
+    // file (pdf, txt, md, json…), oltre a incolla/trascina. Parità tra i
+    // cammini equivalenti.
     attachBtn.addEventListener('click', () => { try { fileInput.click(); } catch (_) {} });
     fileInput.addEventListener('change', async () => {
-      const files = Array.from(fileInput.files || []);
-      for (const f of files) await addImageFromBlob(f);
+      const picked = Array.from(fileInput.files || []);
+      for (const f of picked) await addAttachment(f);
       fileInput.value = '';
     });
 
