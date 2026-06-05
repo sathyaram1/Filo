@@ -139,6 +139,24 @@
     const shellOpt = [...$('terminalShell').options].find((o) => o.value === shell);
     $('terminalShell').value = shellOpt ? shell : 'powershell';
 
+    const tts = settings.tts || {};
+    if (ttsSupported()) {
+      const rate = Number(tts.rate) || 1;
+      const pitch = Number(tts.pitch) || 1;
+      $('ttsRate').value = String(rate);
+      $('ttsRateVal').textContent = rate.toFixed(1) + '×';
+      $('ttsPitch').value = String(pitch);
+      $('ttsPitchVal').textContent = pitch.toFixed(1);
+      populateVoices(tts.voice || '');
+    } else {
+      const u = $('ttsUnsupported');
+      if (u) u.hidden = false;
+      ['ttsVoice', 'ttsRate', 'ttsPitch', 'ttsPreview'].forEach((id) => {
+        const el = $(id);
+        if (el) el.disabled = true;
+      });
+    }
+
     Bootstrap.applyTheme(settings.theme);
     Bootstrap.applyTextScale(settings.textScale);
   }
