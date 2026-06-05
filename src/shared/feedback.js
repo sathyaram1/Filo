@@ -99,8 +99,9 @@
   }
 
   // Invia un feedback. images: array di { dataUrl } (max ~5).
-  // Ritorna { id, url } del documento creato.
-  async function submit({ text, url, title, userAgent, clientId, images }) {
+  // files: array di { name, type, dataUrl } per allegati non-immagine (pdf,
+  // txt, md, json…), max ~5. Ritorna { id, url } del documento creato.
+  async function submit({ text, url, title, userAgent, clientId, images, files }) {
     const imgs = Array.isArray(images) ? images.slice(0, 5) : [];
     const uploaded = [];
     for (const img of imgs) {
@@ -116,6 +117,22 @@
       }
     }
 
+    // Allegati non-immagine: stesso bucket /feedback, ma conserviamo nome e
+    // tipo originali per mostrarli come link scaricabili nella dashboard.
+    const docs = Array.isArray(files) ? files.slice(0, 5) : [];
+    const uploadedFiles = [];
+    for (const f of docs) {
+      if (!f?.dataUrl) continue;
+      const blob = dataUrlToBlob(f.dataUrl);
+      if (blob.size > 4 * 1024 * 1024) continue;
+      try {
+        const u = await uploadImage(blob); // upload generico (usa blob.type)
+        uploadedFiles.push({ url: u.url, name: String(f.name || 'allegato'), type: String(f.type || blob.type || '') });
+      } catch (e) {
+        console.warn('[SN feedback] upload file fallito:', e);
+      }
+    }
+
     const doc = {
       fields: {
         text: toFsValue(text || ''),
@@ -124,6 +141,7 @@
         userAgent: toFsValue(userAgent || ''),
         clientId: toFsValue(clientId || ''),
         images: toFsValue(uploaded),
+        files: toFsValue(uploadedFiles),
         createdAt: { timestampValue: new Date().toISOString() },
       },
     };
