@@ -290,24 +290,26 @@
       'Filo non tocca nulla: i banner dei cookie compaiono come su qualsiasi browser e decidi tu, banner per banner.',
     options_cookies_mode_default: 'Automatico (consigliato)',
     options_cookies_mode_default_desc:
-      'Filo rifiuta da solo i cookie di tracciamento sui banner che riconosce, dice ai siti che non vuoi essere ' +
-      'profilato e carica i video YouTube senza cookie. Quando chiudi Filo i cookie vengono cancellati (nessun ' +
-      'profilo che ti segue nel tempo), tranne i siti dove hai scelto di "restare connesso".',
+      'Filo blocca a monte i tracker noti (Google Analytics, reti pubblicitarie, pixel dei social): lo script non ' +
+      'si carica nemmeno. Rifiuta da solo i banner cookie che riconosce, dice ai siti che non vuoi essere profilato ' +
+      'e carica i video YouTube senza cookie. I cookie utili a te (login, preferenze, le tue scelte sui siti) ' +
+      'restano: non perdi quello che hai impostato.',
     options_cookies_mode_privacy: 'Privacy massima',
     options_cookies_mode_privacy_desc:
       'Come l\'Automatico, ma ogni sito vive in uno spazio separato e usa-e-getta: i siti non possono mettersi ' +
-      'd\'accordo per riconoscerti e niente sopravvive alla chiusura di Filo, nemmeno i tuoi accessi. Massima ' +
-      'riservatezza, ma dovrai rifare il login ogni volta.',
-    options_cookies_whitelist_title: 'Resta connesso su questi siti',
+      'd\'accordo per riconoscerti e niente sopravvive alla chiusura di Filo, nemmeno i tuoi accessi — tranne i ' +
+      '"siti fidati" qui sotto. Massima riservatezza.',
+    options_cookies_whitelist_title: 'Siti fidati: resta connesso',
     options_cookies_whitelist_desc:
-      'In modalità Automatico i cookie di questi siti NON vengono cancellati alla chiusura, così resti connesso. ' +
-      'Aggiungi il sito (es. gmail.com) e premi Invio.',
+      'In "Privacy massima" ogni sito è isolato e usa-e-getta. I siti che aggiungi qui fanno eccezione: vivono in ' +
+      'uno spazio isolato ma persistente, così resti connesso. Aggiungi il sito (es. gmail.com) e premi Invio.',
     options_cookies_whitelist_placeholder: 'es. gmail.com',
     options_cookies_whitelist_add: 'Aggiungi',
     options_cookies_whitelist_remove: 'Rimuovi',
-    options_cookies_whitelist_empty: 'Nessun sito: alla chiusura di Filo verrai disconnesso da tutto.',
-    options_cookies_whitelist_disabled_privacy:
-      'In "Privacy massima" niente resta salvato, quindi questa lista non ha effetto.',
+    options_cookies_whitelist_empty: 'Nessun sito fidato: in "Privacy massima" dovrai rifare il login a ogni avvio.',
+    options_cookies_trusted_note_other:
+      'I siti fidati hanno effetto solo in "Privacy massima". In "Automatico" i tuoi login restano comunque salvati, ' +
+      'quindi qui non serve aggiungere nulla.',
     security_export_title: 'Esporta dati Filo',
     security_export_label: 'Esporta dati',
     security_export_desc:
