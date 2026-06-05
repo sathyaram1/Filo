@@ -1,0 +1,7 @@
+{
+  "id": "QpfdcLCA0vFnlQUHreab",
+  "status": "done",
+  "notes": "Aggiunti due comandi nella barra della nuova scheda. '/set timer 5:00' avvia un timer (anche '/set timer 8' per i soli minuti): compare subito nell'area attività con il conto alla rovescia. '/incognito' apre una nuova finestra in incognito. Entrambi sono evidenziati in arancione come comandi riconosciuti e compaiono nell'elenco di /help. Verificato con test automatici: il timer appare col countdown e la finestra incognito si apre.",
+  "queuedAt": "2026-06-05T11:24:51.591Z",
+  "queuedBy": "routine"
+}
