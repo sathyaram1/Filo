@@ -136,7 +136,7 @@ class TabManager {
     };
     const cookies = security?.cookies || {};
     this.cookieMode = Cookies.getMode({ security: { cookies } });
-    this.loginWhitelist = Array.isArray(cookies.loginWhitelist) ? cookies.loginWhitelist : [];
+    this.trustedSites = Cookies.getTrustedSites({ security: { cookies } });
     for (const tab of this.tabs) {
       this._applySecurity(tab);
     }
