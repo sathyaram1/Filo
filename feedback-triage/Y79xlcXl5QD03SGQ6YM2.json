@@ -1,7 +1,0 @@
-{
-  "id": "Y79xlcXl5QD03SGQ6YM2",
-  "status": "done",
-  "notes": "Ora un click sulla rotella del mouse attiva la 'modalità zoom': mentre è attiva, la rotella ingrandisce/rimpicciolisce la pagina invece di scrollare. Un altro click sulla rotella (o Esc) esce dalla modalità, e ho rimosso il vecchio autoscroll col tasto centrale. In più, non richiesto: un piccolo badge in alto a destra segnala quando la modalità zoom è attiva, e il click centrale su un link continua ad aprirlo in una nuova scheda (per non perdere quella funzione standard). Verificato con un test automatico: dopo il click sulla rotella la rotella zooma e non scrolla, un secondo click torna a scrollare, ed Esc esce dalla modalità.",
-  "queuedAt": "2026-06-05T06:03:47.096Z",
-  "queuedBy": "routine"
-}
