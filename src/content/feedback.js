@@ -318,6 +318,39 @@
         wrap.appendChild(xBtn);
         thumbsEl.appendChild(wrap);
       });
+      // Allegati non-immagine: una "pillola" con icona, nome e dimensione.
+      files.forEach((f, i) => {
+        const chip = document.createElement('div');
+        chip.className = 'sn-fb-file-chip';
+        chip.title = f.name;
+        const ic = document.createElement('span');
+        ic.className = 'sn-fb-file-ic';
+        ic.innerHTML = icon('file', 16);
+        const nameEl = document.createElement('span');
+        nameEl.className = 'sn-fb-file-name';
+        nameEl.textContent = f.name;
+        const sizeEl = document.createElement('span');
+        sizeEl.className = 'sn-fb-file-size';
+        sizeEl.textContent = humanSize(f.size);
+        const xBtn = document.createElement('button');
+        xBtn.type = 'button';
+        xBtn.className = 'sn-fb-file-x';
+        xBtn.setAttribute('aria-label', 'Rimuovi');
+        xBtn.textContent = '×';
+        xBtn.addEventListener('click', () => { files.splice(i, 1); renderThumbs(); });
+        chip.appendChild(ic);
+        chip.appendChild(nameEl);
+        chip.appendChild(sizeEl);
+        chip.appendChild(xBtn);
+        thumbsEl.appendChild(chip);
+      });
+    }
+
+    function humanSize(n) {
+      const b = Number(n) || 0;
+      if (b < 1024) return `${b} B`;
+      if (b < 1024 * 1024) return `${Math.round(b / 1024)} KB`;
+      return `${(b / (1024 * 1024)).toFixed(1)} MB`;
     }
 
     async function addImageFromBlob(blob) {
@@ -332,6 +365,30 @@
       }
       const dataUrl = await blobToDataUrl(blob);
       images.push({ dataUrl });
+      renderThumbs();
+    }
+
+    // Smista un file: le immagini seguono il percorso esistente (anteprima +
+    // annotazione), gli altri tipi (pdf, txt, md, json…) diventano allegati.
+    async function addAttachment(file) {
+      if (!file) return;
+      if (file.type && file.type.startsWith('image/')) { await addImageFromBlob(file); return; }
+      if (files.length >= MAX_FILES) {
+        statusEl.textContent = `Massimo ${MAX_FILES} file.`;
+        return;
+      }
+      if (file.size > MAX_ATTACH_BYTES) {
+        statusEl.textContent = 'File troppo grande (max 4 MB).';
+        return;
+      }
+      const dataUrl = await blobToDataUrl(file);
+      files.push({
+        name: file.name || 'allegato',
+        type: file.type || 'application/octet-stream',
+        size: file.size || 0,
+        dataUrl,
+      });
+      statusEl.textContent = '';
       renderThumbs();
     }
 
