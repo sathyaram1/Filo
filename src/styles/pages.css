@@ -401,10 +401,10 @@ section:has(#dictList) .sn-spell-add-row {
 }
 
 /* Registry modelli (editor in pagina Opzioni). Una riga per nickname con
-   campi nickname/etichetta/openrouter/gemini e tre azioni a destra. */
+   campi nickname/etichetta/provider/nome-completo e le azioni a destra. */
 .sn-model-row {
   display: grid;
-  grid-template-columns: 120px 160px 1fr 1fr auto auto auto;
+  grid-template-columns: 120px 150px 110px 1fr auto auto;
   gap: 6px;
   align-items: center;
   padding: 6px 8px;
@@ -413,8 +413,26 @@ section:has(#dictList) .sn-spell-add-row {
   border-radius: var(--sn-radius);
   background: var(--sn-bg);
 }
-.sn-model-row input[type="text"] { width: 100%; font-size: 12px; }
+.sn-model-row input[type="text"],
+.sn-model-row select { width: 100%; font-size: 12px; }
 .sn-model-row .sn-btn { padding: 4px 8px; font-size: 12px; }
+
+/* Modelli per azione: slot del primario + fallback impilati verticalmente,
+   con un pulsante "+ fallback" per aggiungerne altri. */
+.sn-model-slots { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+.sn-model-slot { display: flex; align-items: center; gap: 4px; }
+.sn-model-slot input[type="text"] { flex: 1; font-size: 13px; }
+.sn-model-slot .sn-slot-order { font-size: 11px; color: var(--sn-muted); min-width: 16px; }
+.sn-model-slot .sn-slot-remove {
+  border: none; background: transparent; cursor: pointer;
+  color: var(--sn-muted); font-size: 14px; line-height: 1; padding: 2px 6px;
+}
+.sn-model-slot .sn-slot-remove:hover { color: var(--sn-text); }
+.sn-add-fallback {
+  align-self: flex-start; background: transparent; border: none;
+  color: var(--sn-accent); cursor: pointer; font-size: 12px; padding: 2px 0;
+}
+.sn-add-fallback:hover { text-decoration: underline; }
 .sn-model-row-status {
   grid-column: 1 / -1;
   font-size: 11px;
