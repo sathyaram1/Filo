@@ -396,7 +396,7 @@
 
     // Riseleziona la casella che aveva il fuoco prima del re-render (vedi
     // captureFocus): salvare le note non deve più "deselezionare" il campo.
-    if (!window.__FILO_TEST_DISABLE_FOCUS_RESTORE) restoreFocus(focusSnap);
+    restoreFocus(focusSnap);
   }
 
   function applyFilter() {
