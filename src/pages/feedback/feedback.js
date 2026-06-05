@@ -189,7 +189,42 @@
     return '';
   }
 
+  // Cattura il campo (textarea/input) attualmente a fuoco dentro la lista, se
+  // identificabile da data-id, così da poterlo riselezionare dopo un re-render.
+  // Senza questo, salvare le note (patch → applyFilter → render rigenera tutto
+  // l'innerHTML) faceva perdere fuoco e cursore: l'utente smetteva di scrivere
+  // per un attimo e la casella si "deselezionava" da sola.
+  function captureFocus() {
+    const el = document.activeElement;
+    if (!el || !listEl.contains(el)) return null;
+    const id = el.dataset && el.dataset.id;
+    if (!id) return null;
+    // Distingue le textarea con stesso data-id (es. note) dalla classe.
+    const cls = el.classList && el.classList.contains('fb-notes') ? 'fb-notes' : null;
+    if (!cls) return null;
+    return {
+      cls,
+      id,
+      start: typeof el.selectionStart === 'number' ? el.selectionStart : null,
+      end: typeof el.selectionEnd === 'number' ? el.selectionEnd : null,
+      scrollTop: el.scrollTop || 0,
+    };
+  }
+
+  function restoreFocus(snap) {
+    if (!snap) return;
+    const sel = `.${snap.cls}[data-id="${(window.CSS && CSS.escape) ? CSS.escape(snap.id) : snap.id}"]`;
+    const el = listEl.querySelector(sel);
+    if (!el) return;
+    el.focus();
+    if (snap.start != null && typeof el.setSelectionRange === 'function') {
+      try { el.setSelectionRange(snap.start, snap.end ?? snap.start); } catch (_) {}
+    }
+    el.scrollTop = snap.scrollTop;
+  }
+
   function render(items) {
+    const focusSnap = captureFocus();
     countEl.textContent = items.length ? `${items.length} feedback` : '';
     if (!items.length) {
       listEl.innerHTML = '';
