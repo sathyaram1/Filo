@@ -1,0 +1,7 @@
+{
+  "id": "HS6xNuix8eG06Svb8ROG",
+  "status": "done",
+  "notes": "Ora nel box dei feedback puoi allegare anche file non-immagine (pdf, txt, md, json, csv, yaml...), sia con il tasto 'Allega' sia trascinandoli nel box. Le immagini restano anteprime; gli altri file compaiono come pillole con nome e dimensione, rimovibili con la x. Nella dashboard dei feedback gli allegati appaiono come link scaricabili col nome originale. Verificato il comportamento del box con test automatici. IMPORTANTE: perche il caricamento dei file non-immagine funzioni davvero serve un passo una-tantum da parte tua, esegui 'firebase deploy --only storage' dalla root del repo. Le regole dello Storage sono gia aggiornate nel codice per ammettere questi tipi di file, ma vanno pubblicate. L'upload dal vivo non e verificabile in cloud (richiede rete e regole pubblicate).",
+  "queuedAt": "2026-06-05T11:25:02.888Z",
+  "queuedBy": "routine"
+}
