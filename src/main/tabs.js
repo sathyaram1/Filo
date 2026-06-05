@@ -215,8 +215,9 @@ class TabManager {
 
   // Partizione (sessione Electron) che una view per `url` deve usare:
   //   - incognito → la partizione effimera della finestra (già isolata);
-  //   - privacy + pagina esterna → partizione effimera per-sito (eTLD+1),
-  //     così ogni sito ha un cookie jar isolato che non sopravvive alla sessione;
+  //   - privacy + pagina esterna → partizione per-sito (eTLD+1): effimera per i
+  //     siti normali (non sopravvive alla sessione), persistente per i siti
+  //     fidati (resti connesso), sempre isolata dagli altri siti;
   //   - altrimenti → null (sessione persistente di default della finestra).
   // Le pagine filo:// usano sempre la sessione della finestra (serve a storage
   // e protocollo), mai una partizione per-sito.
@@ -224,7 +225,11 @@ class TabManager {
     if (this.incognito) return this.partition || null;
     if (!url || url.startsWith('filo://')) return null;
     if (this.cookieMode === Cookies.MODES.PRIVACY) {
-      const { partition } = Cookies.partitionForTab(url, { mode: this.cookieMode, incognito: false });
+      const { partition } = Cookies.partitionForTab(url, {
+        mode: this.cookieMode,
+        incognito: false,
+        trusted: this.trustedSites,
+      });
       return partition || null;
     }
     return null;
