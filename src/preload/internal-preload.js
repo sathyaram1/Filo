@@ -5,7 +5,11 @@
 // quanto portato dall'estensione. Possiamo assegnare direttamente window.*
 // e l'assegnazione è visibile alla pagina.
 
-const { ipcRenderer } = require('electron');
+const { ipcRenderer, webFrame } = require('electron');
+
+// Modalità zoom con la rotella attivata dal click centrale (sostituisce
+// l'autoscroll nativo). Vedi wheel-zoom.js.
+try { require('./wheel-zoom.js')(webFrame); } catch (e) { console.error('[Filo internal] wheel-zoom', e); }
 
 let streamCounter = 0;
 
