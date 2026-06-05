@@ -95,7 +95,8 @@
     const mode = ['manual', 'default', 'privacy'].includes(cookies.mode) ? cookies.mode : 'default';
     const radio = document.querySelector(`input[name="cookie-mode"][value="${mode}"]`);
     if (radio) radio.checked = true;
-    cookieWhitelist = Array.isArray(cookies.loginWhitelist) ? cookies.loginWhitelist.slice() : [];
+    const trusted = cookies.trustedSites || cookies.loginWhitelist;
+    cookieWhitelist = Array.isArray(trusted) ? trusted.slice() : [];
     renderWhitelist();
     syncCookieMode();
   }
