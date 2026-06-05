@@ -422,8 +422,15 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
    coordinate sono impostate in JS dal rect del bottone all'apertura. */
 .sn-select-pop.ed-font-pop {
   position: fixed; right: auto;
-  display: flex; flex-direction: column;
+  flex-direction: column;
   padding: 0; max-height: 280px; min-width: 180px;
+}
+/* `display: flex` solo quando il popup è aperto: questa regola ha la stessa
+   specificità di `.sn-select-pop[hidden] { display: none }` (theme.css) ma è
+   caricata dopo, quindi senza `:not([hidden])` vincerebbe sempre e il popup
+   resterebbe visibile anche dopo close() (che imposta l'attributo hidden). */
+.sn-select-pop.ed-font-pop:not([hidden]) {
+  display: flex;
 }
 .ed-font-search {
   flex: 0 0 auto; margin: 6px; padding: 6px 8px;
