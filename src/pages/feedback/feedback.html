@@ -82,6 +82,11 @@
       background: var(--sn-overlay-bg); font-size: 13px; color: var(--sn-muted);
     }
     .fb-admin-banner button { margin-left: auto; }
+    /* `display: flex` qui sopra vince sull'attributo `hidden` (regola UA
+       [hidden]{display:none}, meno specifica di una regola d'autore): senza
+       questa riga il banner "sola lettura" restava visibile ANCHE per gli
+       admin, che lo vedevano pur potendo gestire i feedback. */
+    .fb-admin-banner[hidden] { display: none; }
   </style>
 </head>
 <body>
