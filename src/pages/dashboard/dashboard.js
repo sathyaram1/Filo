@@ -600,10 +600,17 @@
     return /^[\w-]+(\.[\w-]+)+(:\d+)?(\/\S*)?$/.test(raw) && /\.[a-z]{2,}(:|\/|$)/i.test(raw);
   }
 
+  // Cache "il comando shell esiste?" (token → bool), per non rifare lo spawn
+  // di controllo a ogni tasto. Il risultato non dipende dalla cwd per i comandi
+  // su PATH; per i casi limite (script relativi) la piccola imprecisione è ok.
+  const shellCmdCache = new Map();
+  let whichTimer = null;
+
   // Classifica l'input corrente per l'evidenziazione live:
   //   'filo'    → comando interno di Filo (o navigazione a sito) → arancione
-  //   'shell'   → andrà eseguito dalla shell (solo in modalità terminale) → azzurro
+  //   'shell'   → comando shell esistente (modalità terminale) → azzurro
   //   'unknown' → inizia con "/" ma non è un comando riconosciuto → rosso
+  //   'pending' → modalità terminale, esistenza del comando ancora da verificare
   //   'none'    → testo normale (va all'LLM)
   function classifyInput(value) {
     const t = value.trim();
@@ -611,9 +618,13 @@
     const firstToken = t.split(/\s+/)[0];
     if (SLASH_COMMANDS[t] || SLASH_COMMANDS[firstToken]) return 'filo';
     if (isSiteToken(t)) return 'filo';
-    // In modalità terminale qualsiasi "/x" è un comando shell valido (azzurro):
-    // non c'è nulla di "non riconosciuto".
-    if (terminalMode) return 'shell';
+    if (terminalMode) {
+      // In terminale "/x" è un comando shell: azzurro se esiste, rosso se no.
+      const cmd = firstToken.slice(1);
+      if (!cmd) return 'none';
+      if (shellCmdCache.has(cmd)) return shellCmdCache.get(cmd) ? 'shell' : 'unknown';
+      return 'pending'; // verifica in corso (vedi scheduleShellWhich)
+    }
     // Modalità normale: un "/comando" che non è interno né un sito non verrà
     // riconosciuto (finirebbe all'LLM come testo). Lo segnaliamo in rosso —
     // MA non mentre l'utente sta ancora digitando un prefisso che potrebbe
@@ -633,11 +644,33 @@
     );
   }
 
+  // Verifica (con debounce) se il primo token è un comando shell esistente e
+  // poi ricolora. Debounce così il controllo parte solo quando l'utente si
+  // ferma: digitando di getto "/git" i prefissi non vengono mai controllati e
+  // il rosso non lampeggia.
+  function scheduleShellWhich(value) {
+    clearTimeout(whichTimer);
+    whichTimer = setTimeout(async () => {
+      const firstToken = value.trim().split(/\s+/)[0];
+      const cmd = firstToken.slice(1);
+      if (!cmd || shellCmdCache.has(cmd)) { updateInputClass(); return; }
+      let exists = false;
+      try {
+        const r = await window.filo?.shellWhich?.({ command: cmd, shell: terminalShell, cwd: currentCwd });
+        exists = !!(r && r.exists);
+      } catch (_) { exists = false; }
+      shellCmdCache.set(cmd, exists);
+      updateInputClass(); // ricolora sullo stato attuale dell'input
+    }, 250);
+  }
+
   function updateInputClass() {
     const kind = classifyInput(inputEl.value);
     inputEl.classList.toggle('is-cmd-filo', kind === 'filo');
     inputEl.classList.toggle('is-cmd-shell', kind === 'shell');
     inputEl.classList.toggle('is-cmd-unknown', kind === 'unknown');
+    // In attesa del controllo "esiste?": nessun colore (neutro) e avvia il check.
+    if (kind === 'pending') scheduleShellWhich(inputEl.value);
   }
 
   function handleSlashCommand(text) {
