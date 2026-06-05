@@ -123,6 +123,82 @@ test('YouTube (default): gli embed vengono riscritti in youtube-nocookie.com', a
   expect(src).toContain('/embed/dQw4w9WgXcQ');
 });
 
+// Arma un osservatore (nel main) sugli errori di rete verso google-analytics.com
+// PRIMA di scatenare la richiesta. onErrorOccurred è un evento distinto da
+// onBeforeRequest (usato dal blocco), quindi non c'è conflitto. Quando la
+// richiesta viene annullata dal blocco tracker, Chromium riporta
+// 'net::ERR_BLOCKED_BY_CLIENT': è deterministico e scatta PRIMA di qualsiasi I/O
+// di rete, quindi il test non dipende dalla connettività.
+async function armTrackerObserver(app) {
+  await app.evaluate(({ session }) => {
+    globalThis.__filoTrackerErr = null;
+    session.defaultSession.webRequest.onErrorOccurred(
+      { urls: ['*://*.google-analytics.com/*'] },
+      (details) => { if (globalThis.__filoTrackerErr === null) globalThis.__filoTrackerErr = details.error; },
+    );
+  });
+}
+async function fireTrackerRequest(page) {
+  await page.evaluate(() => {
+    const img = new Image();
+    img.src = 'https://www.google-analytics.com/collect?v=1&_t=' + Date.now();
+    document.body.appendChild(img);
+  });
+}
+async function waitTrackerErr(app) {
+  return app.evaluate(async () => {
+    for (let i = 0; i < 80; i++) {
+      if (globalThis.__filoTrackerErr) return globalThis.__filoTrackerErr;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    return globalThis.__filoTrackerErr;
+  });
+}
+
+test('blocco tracker (default): la richiesta a Google Analytics viene annullata', async ({ app, openTab, testServer }) => {
+  await armTrackerObserver(app);
+  const page = await testServer.openReady(openTab, '<title>BLK</title><p>ok</p>');
+  await fireTrackerRequest(page);
+  const err = await waitTrackerErr(app);
+  expect(err).toBe('net::ERR_BLOCKED_BY_CLIENT');
+});
+
+test('blocco tracker (manuale): la richiesta NON viene annullata (controprova)', async ({ app, openTab, testServer }) => {
+  await setMode(openTab, 'manual');
+  await armTrackerObserver(app);
+  const page = await testServer.openReady(openTab, '<title>BLK_OFF</title><p>ok</p>');
+  await fireTrackerRequest(page);
+  const err = await waitTrackerErr(app);
+  // Senza blocco la richiesta va in rete: o ha successo (nessun errore) o
+  // fallisce per un motivo di rete (DNS/connessione) — MAI per blocco client.
+  expect(err).not.toBe('net::ERR_BLOCKED_BY_CLIENT');
+});
+
+test('lista tracker: riconosce i tracker noti e lascia stare i domini buoni', async ({ app }) => {
+  const res = await app.evaluate(() => {
+    const C = globalThis.__filoCookies;
+    return {
+      ga: C.isTrackerUrl('https://www.google-analytics.com/analytics.js'),
+      gtm: C.isTrackerUrl('https://www.googletagmanager.com/gtag/js?id=X'),
+      dc: C.isTrackerUrl('https://stats.g.doubleclick.net/x'),
+      fbPixel: C.isTrackerUrl('https://connect.facebook.net/en_US/fbevents.js'),
+      // domini buoni: NON devono risultare tracker
+      site: C.isTrackerUrl('https://example.com/page'),
+      google: C.isTrackerUrl('https://www.google.com/search?q=x'),
+      facebook: C.isTrackerUrl('https://www.facebook.com/me'),
+      youtube: C.isTrackerUrl('https://www.youtube.com/watch?v=x'),
+    };
+  });
+  expect(res.ga).toBe(true);
+  expect(res.gtm).toBe(true);
+  expect(res.dc).toBe(true);
+  expect(res.fbPixel).toBe(true);
+  expect(res.site).toBe(false);
+  expect(res.google).toBe(false);
+  expect(res.facebook).toBe(false);
+  expect(res.youtube).toBe(false);
+});
+
 test('wipe all\'uscita (default): cancella i non-whitelisted, tiene i whitelisted', async ({ app }) => {
   const res = await app.evaluate(async ({ session }) => {
     const Cookies = globalThis.__filoCookies;
