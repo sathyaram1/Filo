@@ -75,25 +75,42 @@
   };
 
   // Registry di modelli "logici" indicizzati per nickname.
-  // Ogni nickname mappa al nome concreto del modello presso ogni provider
-  // supportato. Stringa vuota = il provider non ha quel modello (verrà saltato
-  // nella catena di fallback). I nickname sono case-sensitive e devono essere
-  // dei semplici slug (es. 'flash', 'claude-haiku') così l'utente li riconosce.
+  // Ogni modello ha UN SOLO provider e il nome concreto da usare per chiamarlo
+  // (campo `model`). Per avere un fallback su un altro provider basta creare un
+  // secondo modello (es. 'flash' su Gemini + 'flash-or' su OpenRouter) e
+  // indicarli entrambi nella lista di un'azione (vedi DEFAULT_MODELS).
+  // I nickname sono case-sensitive e devono essere dei semplici slug (es.
+  // 'flash', 'claude-haiku') così l'utente li riconosce.
+  //
+  // Retro-compatibilità: vecchie config potevano avere entry "duali"
+  // { openrouter, gemini } (un nickname per due provider). resolveModel le
+  // gestisce ancora, così i settings salvati prima del refactor continuano a
+  // funzionare finché l'utente non li ri-salva dalla pagina Opzioni.
   const DEFAULT_MODEL_REGISTRY = {
     flash: {
       label: 'Gemini 2.0 Flash',
-      openrouter: 'google/gemini-2.0-flash-001',
-      gemini: 'gemini-2.0-flash',
+      provider: 'gemini',
+      model: 'gemini-2.0-flash',
+    },
+    'flash-or': {
+      label: 'Gemini 2.0 Flash (OpenRouter)',
+      provider: 'openrouter',
+      model: 'google/gemini-2.0-flash-001',
     },
     'flash-lite': {
       label: 'Gemini 2.0 Flash Lite',
-      openrouter: 'google/gemini-2.0-flash-lite-001',
-      gemini: 'gemini-2.0-flash-lite',
+      provider: 'gemini',
+      model: 'gemini-2.0-flash-lite',
+    },
+    'flash-lite-or': {
+      label: 'Gemini 2.0 Flash Lite (OpenRouter)',
+      provider: 'openrouter',
+      model: 'google/gemini-2.0-flash-lite-001',
     },
     'claude-haiku': {
       label: 'Claude 3.5 Haiku',
-      openrouter: 'anthropic/claude-3.5-haiku',
-      gemini: '',
+      provider: 'openrouter',
+      model: 'anthropic/claude-3.5-haiku',
     },
   };
 
