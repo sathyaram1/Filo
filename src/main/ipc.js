@@ -13,7 +13,7 @@ const path = require('node:path');
 const { handleMessage, handleStream, broadcastToTabs } = require('./services/handlers');
 const { showPopupMenu } = require('./popup-menu');
 const { showTooltip, hideTooltip } = require('./popup-tooltip');
-const { createSession, defaultCwd } = require('./services/shell');
+const { createSession, defaultCwd, commandExists } = require('./services/shell');
 const DiskStorage = require('./shim/storage');
 
 const inFlightStreams = new Map(); // requestId → AbortController
