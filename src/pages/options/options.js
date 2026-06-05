@@ -25,19 +25,7 @@
     document.querySelector('label[for="provider"]').textContent = I18n.t('options_provider');
     document.querySelector('label[for="apiKey"]').textContent = I18n.t('options_api_key');
 
-    $('lbl-explain').textContent = I18n.t('options_action_explain');
-    $('lbl-explain-deep').textContent = I18n.t('options_action_explain_deep');
-    $('lbl-tsel').textContent = I18n.t('options_action_translate_sel');
-    $('lbl-tpage').textContent = I18n.t('options_action_translate_page');
-    $('lbl-help').textContent = I18n.t('options_action_help');
-    $('lbl-cat').textContent = I18n.t('options_action_categorize');
-    $('lbl-describe-image').textContent = I18n.t('options_action_describe_image');
-    $('lbl-transcribe-image').textContent = I18n.t('options_action_transcribe_image');
-    $('lbl-transcribe-audio').textContent = I18n.t('options_action_transcribe_audio');
-    $('lbl-spellcheck-semantic').textContent = I18n.t('spell_action_semantic_label');
-    $('lbl-spellcheck-word').textContent = I18n.t('spell_action_word_label');
-    $('lbl-help-intent-guess').textContent = I18n.t('options_action_help_intent_guess');
-    $('lbl-help-intent-judge').textContent = I18n.t('options_action_help_intent_judge');
+    // Le etichette dei modelli per azione sono rese da renderModelsGrid().
 
     $('lbl-limit').textContent = I18n.t('options_monthly_limit');
     $('lbl-spent').textContent = I18n.t('options_current_spent');
