@@ -199,30 +199,31 @@ test('lista tracker: riconosce i tracker noti e lascia stare i domini buoni', as
   expect(res.youtube).toBe(false);
 });
 
-test('wipe all\'uscita (default): cancella i non-whitelisted, tiene i whitelisted', async ({ app }) => {
+test('wipe all\'uscita (default): cancella i cookie dei tracker, tiene quelli funzionali', async ({ app }) => {
   const res = await app.evaluate(async ({ session }) => {
     const Cookies = globalThis.__filoCookies;
     const ses = session.defaultSession;
     const domainsNow = async () => (await ses.cookies.get({})).map((c) => String(c.domain || '').replace(/^\./, ''));
-    // All'avvio il main esegue UN wipe one-shot della sessione di default (la
-    // promessa "nessun profilo persistente"). Ri-piazziamo i cookie in loop
-    // finché non restano stabili: così siamo certi di operare DOPO quel wipe di
-    // boot e di testare il nostro wipe esplicito, non la corsa con quello d'avvio.
+    // All'avvio il main esegue UN wipe one-shot dei cookie-tracker sulla sessione
+    // di default. Ri-piazziamo i cookie in loop finché non restano stabili: così
+    // siamo certi di operare DOPO quel wipe di boot e di testare il nostro wipe
+    // esplicito, non la corsa con quello d'avvio. keep-login.com è un cookie
+    // funzionale (prima parte): NON deve essere toccato. doubleclick.net è un
+    // dominio-tracker noto: deve sparire.
     let before = [];
     for (let i = 0; i < 60; i++) {
       await ses.cookies.set({ url: 'https://keep-login.com/', name: 'sess', value: '1' });
-      await ses.cookies.set({ url: 'https://tracker-drop.com/', name: 't', value: '1' });
+      await ses.cookies.set({ url: 'https://doubleclick.net/', name: 'id', value: '1' });
       await new Promise((r) => setTimeout(r, 50));
       before = await domainsNow();
-      if (before.includes('keep-login.com') && before.includes('tracker-drop.com')) break;
+      if (before.includes('keep-login.com') && before.includes('doubleclick.net')) break;
     }
-    const settings = { security: { cookies: { mode: 'default', loginWhitelist: ['keep-login.com'] } } };
-    const r = await Cookies.wipeNonWhitelisted(settings);
+    const r = await Cookies.wipeTrackerCookies({ security: { cookies: { mode: 'default' } } });
     // Anche remove() committa in modo asincrono: aspetta che il tracker sparisca.
     let after = [];
     for (let i = 0; i < 40; i++) {
       after = await domainsNow();
-      if (!after.includes('tracker-drop.com')) break;
+      if (!after.includes('doubleclick.net')) break;
       await new Promise((r) => setTimeout(r, 50));
     }
     return {
@@ -231,24 +232,24 @@ test('wipe all\'uscita (default): cancella i non-whitelisted, tiene i whiteliste
       before,
       after,
       setKeep: before.includes('keep-login.com'),
-      setDrop: before.includes('tracker-drop.com'),
+      setTracker: before.includes('doubleclick.net'),
       hasKeep: after.includes('keep-login.com'),
-      hasDrop: after.includes('tracker-drop.com'),
+      hasTracker: after.includes('doubleclick.net'),
     };
   });
   // Pre-condizioni: entrambi i cookie sono stati davvero piazzati.
-  expect(res.setKeep, `setup cookie keep non piazzato — before=${JSON.stringify(res.before)}`).toBe(true);
-  expect(res.setDrop, `setup cookie drop non piazzato — before=${JSON.stringify(res.before)}`).toBe(true);
+  expect(res.setKeep, `setup cookie funzionale non piazzato — before=${JSON.stringify(res.before)}`).toBe(true);
+  expect(res.setTracker, `setup cookie tracker non piazzato — before=${JSON.stringify(res.before)}`).toBe(true);
   expect(res.skipped).toBe(false);
-  expect(res.hasKeep, `login preservato — after=${JSON.stringify(res.after)}`).toBe(true);
-  expect(res.hasDrop, `tracker cancellato — after=${JSON.stringify(res.after)}`).toBe(false);
+  expect(res.hasKeep, `cookie funzionale preservato — after=${JSON.stringify(res.after)}`).toBe(true);
+  expect(res.hasTracker, `cookie tracker cancellato — after=${JSON.stringify(res.after)}`).toBe(false);
 });
 
 test('wipe all\'uscita (privacy/manuale): è un no-op', async ({ app }) => {
   const res = await app.evaluate(async () => {
     const Cookies = globalThis.__filoCookies;
-    const priv = await Cookies.wipeNonWhitelisted({ security: { cookies: { mode: 'privacy' } } });
-    const man = await Cookies.wipeNonWhitelisted({ security: { cookies: { mode: 'manual' } } });
+    const priv = await Cookies.wipeTrackerCookies({ security: { cookies: { mode: 'privacy' } } });
+    const man = await Cookies.wipeTrackerCookies({ security: { cookies: { mode: 'manual' } } });
     return { priv: !!priv.skipped, man: !!man.skipped };
   });
   expect(res.priv).toBe(true);
