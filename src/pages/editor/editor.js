@@ -663,6 +663,7 @@
       button.setAttribute('aria-expanded', 'false');
       setHover(null);
       document.removeEventListener('mousedown', onDocDown, true);
+      window.removeEventListener('scroll', close, true);
     }
 
     button.addEventListener('mousedown', (e) => {
