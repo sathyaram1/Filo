@@ -39,7 +39,7 @@
     $('cookie-mode-privacy-desc').textContent = I18n.t('options_cookies_mode_privacy_desc');
     $('sec-cookies-wl-title').textContent = I18n.t('options_cookies_whitelist_title');
     $('sec-cookies-wl-desc').textContent = I18n.t('options_cookies_whitelist_desc');
-    $('sec-cookies-wl-privacy-note').textContent = I18n.t('options_cookies_whitelist_disabled_privacy');
+    $('sec-cookies-trusted-note').textContent = I18n.t('options_cookies_trusted_note_other');
     $('cookie-wl-input').placeholder = I18n.t('options_cookies_whitelist_placeholder');
     $('cookie-wl-add-btn').textContent = I18n.t('options_cookies_whitelist_add');
     $('sec-export-btn').textContent = I18n.t('security_export_btn');
