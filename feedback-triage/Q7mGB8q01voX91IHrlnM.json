@@ -1,7 +1,0 @@
-{
-  "id": "Q7mGB8q01voX91IHrlnM",
-  "status": "clarify",
-  "notes": "Ho diviso la tua richiesta in tre parti. (1) 'Sei in sola lettura' mostrato agli admin: gia' corretto - se sei loggato come admin il banner non compare piu'. (2) Il box delle note che si deselezionava mentre scrivevi dalla dashboard: gia' risolto - ora il cursore resta dov'e' anche dopo il salvataggio automatico. Ho verificato entrambi con test automatici. (3) Mostrare i feedback inviati da un modello in un contenitore strutturato a piu' turni (testo originale, eventuale aggiunta, risposta del modello, tua risposta, altre domande...): questo richiede una tua decisione di design, perche' ci sono piu' modi non equivalenti di mostrare una conversazione a turni. Per procedere mi serve sapere: (a) preferisci una vista a 'chat' con bolle alternate modello/tu in ordine cronologico, oppure box separati ed etichettati per tipo (Originale / Aggiunta / Risposta modello / Tua risposta / Domande)? (b) la conversazione deve essere continuabile dalla dashboard (rispondi e il modello replica) o e' solo una visualizzazione di sola lettura dello storico? (c) i turni vanno salvati come campi separati del feedback o come una lista di messaggi? Scelto questo, implemento la parte (3).",
-  "queuedAt": "2026-06-05T14:44:18.266Z",
-  "queuedBy": "routine"
-}
