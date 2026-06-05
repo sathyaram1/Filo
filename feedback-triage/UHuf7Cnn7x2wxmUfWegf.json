@@ -1,7 +1,0 @@
-{
-  "id": "UHuf7Cnn7x2wxmUfWegf",
-  "status": "done",
-  "notes": "Tre migliorie sull'editor: 1) Ora afferri un modulo da QUALSIASI punto tenendolo premuto un istante — non serve più la maniglia ⠿ (che resta comunque come scorciatoia). Un click rapido resta un click e la selezione del testo dentro i moduli chat continua a funzionare. 2) Il menu del Font è stato rifatto con lo stile a tendina di Filo (stessi colori, accento arancione, hover coerente con gli altri menu) e ora ha un campo di ricerca in cima: scrivi e i font si filtrano al volo. 3) I font disponibili sono passati a oltre 30 famiglie comuni e varie (serif, sans-serif, monospace, corsivi/display), Garamond incluso. Verificato con test automatici (drag dal corpo del modulo, click rapido che non trascina, ricerca che filtra fino a Garamond e applica il font) e con screenshot del nuovo menu.",
-  "queuedAt": "2026-06-05T05:16:22.177Z",
-  "queuedBy": "routine"
-}
