@@ -1,7 +1,0 @@
-{
-  "id": "WOA4eCJkQU5sh5DXYMGz",
-  "status": "done",
-  "notes": "Aggiunta la lettura ad alta voce. Seleziona del testo in qualsiasi pagina e nel menu del tasto destro trovi '🔊 Leggi' (mentre legge diventa 'Interrompi lettura'). In Preferenze c'è una nuova sezione 'Lettura ad alta voce' dove scegli voce, velocità e tono, con un pulsante 'Prova la voce'. Usa il motore vocale del browser/sistema operativo: gratis, nessuna chiave, funziona anche offline.\n\nOltre al chiesto ho aggiunto: il comando 'Interrompi lettura' nel menu (se puoi avviare la lettura devi poterla fermare) e l'anteprima della voce in Preferenze.\n\nVerifica: test automatici che controllano (1) che 'Leggi' compaia sulla selezione e avvii davvero la lettura del testo selezionato, (2) che le preferenze TTS si salvino e sopravvivano al riavvio della pagina. Suite completa verde.\n\nSui modelli gratis di Google: la via gratuita e immediata è la sintesi vocale del sistema operativo (quella già attiva: voci del SO, zero configurazione, nessuna chiave). Per voci 'AI' più naturali, Google AI Studio offre i modelli Gemini TTS con un free tier: il migliore compromesso qualità/velocità è gemini-2.5-flash-tts, mentre gemini-2.5-pro-tts dà la qualità massima (circa 30 voci, 80+ lingue). Richiedono però una API key Gemini e la riproduzione lato app dell'audio generato: è un'integrazione più grande, da valutare come passo successivo se le voci di sistema non ti bastano.",
-  "queuedAt": "2026-06-05T00:27:41.461Z",
-  "queuedBy": "routine"
-}
