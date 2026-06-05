@@ -144,9 +144,7 @@ function partitionForUrl(url, trusted) {
   if (!reg) return null;
   const slug = reg.replace(/[^a-z0-9.-]/gi, '_');
   const base = 'filo-priv-' + slug;
-  const isTrusted = trusted && (trusted.has === undefined
-    ? false
-    : trusted.has(reg));
+  const isTrusted = trusted instanceof Set && trusted.has(reg);
   // 'persist:' → jar isolato per-sito ma persistente (resta connesso).
   // Senza prefisso → jar isolato ed effimero: niente correlazione cross-site e
   // niente sopravvive alla sessione.
