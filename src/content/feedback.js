@@ -550,8 +550,8 @@
       // Allega lo screenshot quando c'è un disegno (annotato) OPPURE quando
       // l'utente ha premuto "Allega screenshot" (scatto della pagina senza disegno).
       const wantShot = shotArmed || hasAnyDrawing();
-      if (!text && images.length === 0 && !wantShot) {
-        statusEl.textContent = 'Scrivi qualcosa, allega un\'immagine o annota lo schermo.';
+      if (!text && images.length === 0 && files.length === 0 && !wantShot) {
+        statusEl.textContent = 'Scrivi qualcosa, allega un file/immagine o annota lo schermo.';
         return;
       }
       sendBtn.disabled = true;
