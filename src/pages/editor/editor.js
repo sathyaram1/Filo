@@ -752,12 +752,50 @@
   // moduli chat perché il drag parte SOLO dall'handle. Mentre trascini, il
   // cursore diventa una "mano che afferra" (classe .ed-dragging in editor.css).
   function attachModuleDrag(cell, m) {
+    if (isFixed(m)) return; // moduli fissi (es. ingranaggio): non si spostano
     const handle = cell.querySelector('.ed-mod-drag');
-    if (!handle) return; // moduli fissi senza handle (es. ingranaggio): non si spostano
-    handle.addEventListener('mousedown', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      startModuleDrag(cell, m);
+    if (handle) {
+      // Dall'handle ⠿ il drag parte subito (scorciatoia sempre disponibile).
+      handle.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        startModuleDrag(cell, m);
+      });
+    }
+
+    // Drag da QUALSIASI punto del modulo "tenendo premuto" (feedback alpha:
+    // afferrare il modulo da ovunque, non solo dalla maniglia). Per non rubare i
+    // click sui controlli né la selezione del testo, il drag si "arma" solo se il
+    // pulsante resta premuto ~220ms restando fermo: un click rapido o un
+    // trascinamento immediato (selezione testo) annullano l'arming.
+    cell.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      // I controlli interattivi e la maniglia/resize gestiscono già il proprio
+      // mousedown: lì un long-press non deve trasformarsi in drag.
+      if (e.target.closest('.ed-mod-drag, .ed-mod-resize, .ed-mod-resize-h, button, input, textarea, select, a, [contenteditable="true"]')) return;
+      const startX = e.clientX, startY = e.clientY;
+      const HOLD_MS = 220, MOVE_TOL = 6;
+      let timer = 0;
+      const cleanup = () => {
+        clearTimeout(timer);
+        document.removeEventListener('mousemove', onPreMove, true);
+        document.removeEventListener('mouseup', onPreUp, true);
+        cell.classList.remove('ed-arming');
+      };
+      const onPreMove = (ev) => {
+        // Movimento prima dell'arming = interazione normale (selezione/scroll):
+        // lascia perdere il drag.
+        if (Math.hypot(ev.clientX - startX, ev.clientY - startY) > MOVE_TOL) cleanup();
+      };
+      const onPreUp = () => cleanup();
+      timer = setTimeout(() => {
+        cleanup();
+        window.getSelection && window.getSelection().removeAllRanges();
+        startModuleDrag(cell, m);
+      }, HOLD_MS);
+      cell.classList.add('ed-arming');
+      document.addEventListener('mousemove', onPreMove, true);
+      document.addEventListener('mouseup', onPreUp, true);
     });
   }
 
