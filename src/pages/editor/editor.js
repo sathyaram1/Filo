@@ -628,16 +628,32 @@
       button.focus();
     }
     const onDocDown = (e) => { if (!wrap.contains(e.target)) close(); };
+    function placePop() {
+      const r = button.getBoundingClientRect();
+      pop.style.left = `${r.left}px`;
+      pop.style.width = `${r.width}px`;
+      // Sotto al bottone; se non c'è spazio in basso, ribalta sopra.
+      const below = window.innerHeight - r.bottom;
+      if (below < 200 && r.top > below) {
+        pop.style.top = 'auto';
+        pop.style.bottom = `${window.innerHeight - r.top + 4}px`;
+      } else {
+        pop.style.bottom = 'auto';
+        pop.style.top = `${r.bottom + 4}px`;
+      }
+    }
     function open() {
       if (!pop.hidden) return;
       saveDocSelection(); // prima che il focus passi al popup
       pop.hidden = false;
+      placePop();
       wrap.classList.add('sn-open');
       button.setAttribute('aria-expanded', 'true');
       search.value = '';
       applyFilter('');
       setHover(visibleOptions()[0] || null);
       document.addEventListener('mousedown', onDocDown, true);
+      window.addEventListener('scroll', close, true);
       setTimeout(() => search.focus(), 0);
     }
     function close() {
