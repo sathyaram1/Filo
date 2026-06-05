@@ -1,0 +1,7 @@
+{
+  "id": "Md3kJQ1P9ICNWng1NY2u",
+  "status": "done",
+  "notes": "Nella barra dei comandi della nuova scheda, in modalità terminale un /comando ora resta rosso mentre Filo verifica se esiste, invece di tornare grigio a ogni lettera: niente più lampeggio. Quando il controllo finisce, il colore passa a rosso (non riconosciuto) o azzurro (comando della shell che esiste). Esempio: /he e /hel restano rossi, /help diventa arancione (comando Filo), /helpq torna rosso. Verificato con un test automatico che legge il colore subito dopo la digitazione.",
+  "queuedAt": "2026-06-05T11:24:43.094Z",
+  "queuedBy": "routine"
+}
