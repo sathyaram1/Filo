@@ -150,6 +150,20 @@ function registerIpcHandlers() {
     return { ok: true };
   });
 
+  // Esiste questo comando nella shell? Usato dall'evidenziazione live della
+  // dashboard (modalità terminale) per colorare di rosso i "/comando" che non
+  // verrebbero riconosciuti. Solo pagine interne filo:// (come shell:start).
+  ipcMain.handle('shell:which', async (event, { command, shell, cwd } = {}) => {
+    const url = event.sender.getURL() || '';
+    if (!url.startsWith('filo://')) return { ok: false, error: 'forbidden' };
+    try {
+      const exists = await commandExists({ shell, cwd, command });
+      return { ok: true, exists };
+    } catch (_) {
+      return { ok: false, exists: false };
+    }
+  });
+
   // Directory iniziale da mostrare nella riga grigia quando si attiva il terminale.
   ipcMain.handle('shell:home', () => {
     try { return { ok: true, cwd: defaultCwd() }; } catch (_) { return { ok: false }; }
