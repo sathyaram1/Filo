@@ -98,19 +98,6 @@
     $('apiKeyGemini').value = settings.apiKeys?.gemini || '';
     $('apiKeyTavily').value = settings.apiKeys?.tavily || '';
     $('geminiDirect').checked = settings.geminiDirect !== false;
-    $('model-explain').value = settings.models?.[ACTIONS.EXPLAIN] || '';
-    $('model-explain-deep').value = settings.models?.[ACTIONS.EXPLAIN_DEEP] || '';
-    $('model-translate-selection').value = settings.models?.[ACTIONS.TRANSLATE_SELECTION] || '';
-    $('model-translate-page').value = settings.models?.[ACTIONS.TRANSLATE_PAGE] || '';
-    $('model-help').value = settings.models?.[ACTIONS.HELP] || '';
-    $('model-categorize').value = settings.models?.[ACTIONS.CATEGORIZE] || '';
-    $('model-describe-image').value = settings.models?.[ACTIONS.DESCRIBE_IMAGE] || '';
-    $('model-transcribe-image').value = settings.models?.[ACTIONS.TRANSCRIBE_IMAGE] || '';
-    $('model-transcribe-audio').value = settings.models?.[ACTIONS.TRANSCRIBE_AUDIO] || '';
-    $('model-spellcheck-semantic').value = settings.models?.[ACTIONS.SPELLCHECK_SEMANTIC] || '';
-    $('model-spellcheck-word').value = settings.models?.[ACTIONS.SPELLCHECK_WORD] || '';
-    $('model-help-intent-guess').value = settings.models?.[ACTIONS.HELP_INTENT_GUESS] || '';
-    $('model-help-intent-judge').value = settings.models?.[ACTIONS.HELP_INTENT_JUDGE] || '';
     $('monthlyLimit').value = settings.monthlyLimitEur ?? 5;
     $('blocklist').value = (settings.blocklist || []).join('\n');
 
@@ -124,19 +111,22 @@
     // Datalist modelli (popola con i default + eventualmente API)
     populateDatalist(collectRawModelIds(settings));
 
-    // Registry modelli
+    // Registry modelli + modelli per azione (slot primario + fallback)
     renderModelRegistry(settings.modelRegistry || {});
+    renderModelsGrid(settings.models || {});
 
     await renderCategories();
   }
 
-  // Estrae gli id concreti (lato OpenRouter / Gemini) noti, per popolare la
-  // datalist dei due input "id su <provider>" nel registry editor.
+  // Estrae gli id concreti (nomi completi dei modelli) noti, per popolare la
+  // datalist dell'input "nome completo" nel registry editor. Gestisce sia lo
+  // schema nuovo (entry.model) sia quello legacy duale (openrouter/gemini).
   function collectRawModelIds(settings) {
     const out = [];
     const reg = settings.modelRegistry || {};
     for (const nick of Object.keys(reg)) {
       const e = reg[nick] || {};
+      if (e.model) out.push(e.model);
       if (e.openrouter) out.push(e.openrouter);
       if (e.gemini) out.push(e.gemini);
     }
