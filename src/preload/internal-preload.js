@@ -65,6 +65,9 @@ const filoApi = {
     };
   },
   shellHome: () => ipcRenderer.invoke('shell:home'),
+  // Esiste questo comando nella shell? Per l'evidenziazione live (rosso = non
+  // riconosciuto) della dashboard in modalità terminale.
+  shellWhich: (opts) => ipcRenderer.invoke('shell:which', opts),
 };
 
 window.filo = filoApi;
