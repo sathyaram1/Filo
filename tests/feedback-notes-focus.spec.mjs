@@ -93,3 +93,36 @@ test('feedback: la casella note resta a fuoco dopo il salvataggio in debounce', 
   await page.keyboard.type('!');
   await expect(notes).toHaveValue('una nota lunga abbastanza da avere un cursore!');
 });
+
+// Il banner "Sei in sola lettura" NON deve comparire per un admin loggato.
+//
+// BUG (feedback alpha): `.fb-admin-banner { display: flex }` vinceva sulla
+// regola UA `[hidden]{display:none}`, quindi `adminBanner.hidden = true` (cosa
+// che il codice fa quando isAdmin) non nascondeva nulla: l'admin vedeva il
+// banner pur potendo gestire i feedback. Pre-condizione che senza il fix CSS
+// (.fb-admin-banner[hidden]{display:none}) fallirebbe: il banner resta visibile
+// anche dopo il login admin.
+test('feedback: da admin il banner sola lettura sparisce', async ({ app, openTab }) => {
+  const page = await openTab(FEEDBACK_URL);
+  // Da sloggati il banner è giustamente visibile.
+  await expect(page.locator('#adminBanner')).toBeVisible({ timeout: 8_000 });
+
+  // Simula il login admin via broadcast: la pagina alza isAdmin e nasconde il
+  // banner (adminBanner.hidden = true).
+  await app.evaluate(async ({ webContents }) => {
+    for (const wc of webContents.getAllWebContents()) {
+      let url = '';
+      try { url = wc.getURL(); } catch (_) {}
+      if (url.includes('feedback')) {
+        wc.send('filo:broadcast', {
+          type: 'auth_changed',
+          signedIn: true,
+          isAdmin: true,
+          profile: { email: 'sathyarampontillo@gmail.com' },
+        });
+      }
+    }
+  });
+
+  await expect(page.locator('#adminBanner')).toBeHidden();
+});
