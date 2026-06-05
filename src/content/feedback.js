@@ -155,6 +155,10 @@
     // stato locale: data URLs delle immagini incollate/trascinate
     const images = [];
     const MAX_IMAGES = 5;
+    // Allegati NON immagine (pdf, txt, md, json, …): { name, type, size, dataUrl }
+    const files = [];
+    const MAX_FILES = 5;
+    const MAX_ATTACH_BYTES = 4 * 1024 * 1024;
 
     // ---- bozza di testo persistente ----
     let saveTimer = null;
