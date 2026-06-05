@@ -1,0 +1,7 @@
+{
+  "id": "Q7mGB8q01voX91IHrlnM",
+  "status": "clarify",
+  "notes": "Ho diviso la tua richiesta in tre punti.\n\n1) Banner 'sei in sola lettura' visibile anche agli admin: RISOLTO. Era un bug — il banner restava visibile anche dopo il login come amministratore (una regola di stile lo teneva sempre a video). Ora sparisce quando sei loggato come admin.\n\n2) La casella delle note che si deselezionava mentre scrivevi: RISOLTO. Mentre scrivi nelle note di un feedback esistente, il cursore ora resta dov'è e non perdi più il fuoco quando il testo viene salvato in automatico.\n\n3) Contenitori separati per la 'conversazione' di un feedback (testo originale, eventuale aggiunta, risposta del modello, tua risposta, altre domande, su più turni): qui mi serve una tua decisione di design prima di costruirlo, perché ci sono modi diversi e non equivalenti. Domande:\n- Vuoi che ogni turno sia un box separato con etichetta e colore, in stile chat verticale?\n- I turni dei modelli/routine e i tuoi devono essere distinti visivamente (lati opposti, oppure icona/colore diversi)?\n- Va bene partire dai dati che già esistono oggi (le note attuali, con i blocchi separati da '--- Riaperto il ... ---'), oppure preferisci che introduca una vera struttura a più turni salvata separatamente (più lavoro ma più pulita per il futuro)?\n\nDimmi come preferisci e nella prossima passata implemento il punto 3. (I punti 1 e 2 sono già attivi.)",
+  "queuedAt": "2026-06-05T06:04:13.098Z",
+  "queuedBy": "routine"
+}
