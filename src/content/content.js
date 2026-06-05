@@ -2248,6 +2248,59 @@
     window.open(`https://lens.google.com/uploadbyurl?url=${q}`, '_blank', 'noopener');
   }
 
+  // ------------------------------------------------------------
+  // Lettura ad alta voce (text-to-speech)
+  // ------------------------------------------------------------
+  // Usa l'API Web Speech del browser (speechSynthesis): gratuita, nessuna
+  // chiave, voci fornite dal sistema operativo. La voce/velocità/tono preferite
+  // arrivano da settings.tts (impostate in Preferenze).
+  function ttsSupported() {
+    return typeof window.speechSynthesis !== 'undefined'
+      && typeof window.SpeechSynthesisUtterance === 'function';
+  }
+
+  function stopReading() {
+    if (!ttsSupported()) return;
+    try { window.speechSynthesis.cancel(); } catch (_) {}
+  }
+
+  function readAloud(text) {
+    if (!ttsSupported()) {
+      Popup.showToast(I18n.t('tts_not_supported'));
+      return;
+    }
+    const clean = String(text || '').trim();
+    if (!clean) return;
+    const synth = window.speechSynthesis;
+    // Ferma un'eventuale lettura in corso prima di iniziarne una nuova: due
+    // letture sovrapposte sono incomprensibili.
+    synth.cancel();
+    const u = new SpeechSynthesisUtterance(clean);
+    const tts = (settings && settings.tts) || {};
+    const rate = Number(tts.rate);
+    const pitch = Number(tts.pitch);
+    u.rate = rate >= 0.5 && rate <= 2 ? rate : 1;
+    u.pitch = pitch >= 0 && pitch <= 2 ? pitch : 1;
+    if (tts.voice) {
+      const voices = synth.getVoices() || [];
+      const v = voices.find((vo) => vo.voiceURI === tts.voice || vo.name === tts.voice);
+      if (v) { u.voice = v; u.lang = v.lang; }
+    }
+    synth.speak(u);
+  }
+
+  // Voce di menu per la lettura: se sta già leggendo mostra "Interrompi
+  // lettura" (simmetria: se puoi avviare la lettura, devi poterla fermare),
+  // altrimenti "Leggi" il testo selezionato.
+  function buildReadAloudItem(text) {
+    const synth = ttsSupported() ? window.speechSynthesis : null;
+    const speaking = !!(synth && (synth.speaking || synth.pending));
+    if (speaking) {
+      return { type: 'item', label: '🔊 ' + I18n.t('menu_stop_reading'), onClick: () => stopReading() };
+    }
+    return { type: 'item', label: '🔊 ' + I18n.t('menu_read_aloud'), onClick: () => readAloud(text) };
+  }
+
   // Overflow panel: ora vive come griglia di icone (sotto-menu ancorato al
   // bottone "▸"). Vedi buildGlobalIconRow + Menu.openIconGridSubmenu.
 
