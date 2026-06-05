@@ -1,0 +1,7 @@
+{
+  "id": "Y79xlcXl5QD03SGQ6YM2",
+  "status": "done",
+  "notes": "Fatto: un click sulla rotella del mouse attiva una 'modalità zoom' in cui la rotella zooma/dezooma la pagina invece di scrollarla; un secondo click (oppure Esc) la disattiva, e quando è attiva compare un piccolo avviso in alto a destra. Il vecchio comportamento (autoscroll nativo, che ti costringeva a spostare il cursore sopra/sotto per scorrere) è stato eliminato. Il click centrale su un link continua ad aprirlo in una nuova scheda. Verificato con test automatici.",
+  "queuedAt": "2026-06-05T14:44:04.724Z",
+  "queuedBy": "routine"
+}
