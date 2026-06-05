@@ -184,7 +184,7 @@
   async function saveCookies() {
     const partial = {
       security: {
-        cookies: { mode: currentMode(), loginWhitelist: cookieWhitelist.slice() },
+        cookies: { mode: currentMode(), trustedSites: cookieWhitelist.slice() },
       },
     };
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
