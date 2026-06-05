@@ -119,11 +119,12 @@ class TabManager {
     // DEFAULT_SETTINGS.security così se setSecurity non viene mai chiamato la
     // protezione è comunque attiva.
     this.security = { protectIpLeak: true, blockPopups: true };
-    // Modalità cookie corrente ('manual' | 'default' | 'privacy') + whitelist
-    // "resta connesso". Ripopolata da setSecurity quando l'utente salva. In
-    // 'privacy' ogni sito naviga in una partizione effimera dedicata.
+    // Modalità cookie corrente ('manual' | 'default' | 'privacy') + siti fidati.
+    // Ripopolata da setSecurity quando l'utente salva. In 'privacy' ogni sito
+    // naviga in una partizione effimera dedicata; i siti fidati ricevono invece
+    // una partizione isolata ma PERSISTENTE (restano connessi).
     this.cookieMode = Cookies.MODES.DEFAULT;
-    this.loginWhitelist = [];
+    this.trustedSites = [];
   }
 
   // Aggiorna le impostazioni di sicurezza e le riapplica a tutti i tab esistenti.
