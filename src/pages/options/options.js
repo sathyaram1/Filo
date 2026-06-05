@@ -154,25 +154,42 @@
     return I18n.t('options_test_result', ttft, tps);
   }
 
-  // Mostra nel div di stato della riga i risultati di test memorizzati per i
-  // due provider, così la latenza/velocità misurata resta visibile tra le
-  // sessioni (non solo durante il test).
+  // Mostra nel div di stato della riga il risultato di test memorizzato (un solo
+  // provider per modello, ora), così la latenza/velocità misurata resta visibile
+  // tra le sessioni (non solo durante il test).
   function renderRowTest(row) {
     const statusEl = row.querySelector('.sn-model-row-status');
     if (!statusEl) return;
     const test = row._test || {};
-    const parts = [];
-    if (test.openrouter) parts.push(`OpenRouter — ${formatTestResult(test.openrouter)}`);
-    if (test.gemini) parts.push(`Gemini — ${formatTestResult(test.gemini)}`);
-    statusEl.textContent = parts.join('   ·   ');
+    if (test.ttftMs != null || test.tokensPerSec != null) {
+      const prov = test.provider === 'gemini' ? 'Gemini' : (test.provider === 'openrouter' ? 'OpenRouter' : '');
+      statusEl.textContent = `${prov ? prov + ' — ' : ''}${formatTestResult(test)}`;
+    } else {
+      statusEl.textContent = '';
+    }
+  }
+
+  // Normalizza un'entry del registry nel nuovo schema { provider, model }.
+  // Le entry legacy "duali" { openrouter, gemini } vengono migrate alla
+  // visualizzazione: si preferisce Gemini se presente (quota free), altrimenti
+  // OpenRouter. La forma legacy continua a funzionare a runtime finché l'utente
+  // non ri-salva (vedi resolveModel in constants.js).
+  function normalizeEntry(entry) {
+    const e = entry || {};
+    if (e.provider) return { provider: e.provider, model: e.model || '' };
+    if (e.gemini) return { provider: 'gemini', model: e.gemini };
+    if (e.openrouter) return { provider: 'openrouter', model: e.openrouter };
+    return { provider: 'gemini', model: '' };
   }
 
   function makeModelRow(nick, entry) {
     const row = document.createElement('div');
     row.className = 'sn-model-row';
     row.dataset.originalNick = nick || '';
-    // Risultati di test persistiti per provider: { openrouter:{ttftMs,tokensPerSec,at}, gemini:{...} }.
+    // Risultato di test persistito: { ttftMs, tokensPerSec, at, provider }.
     row._test = (entry && entry.test && typeof entry.test === 'object') ? { ...entry.test } : {};
+
+    const norm = normalizeEntry(entry);
 
     const nickIn = document.createElement('input');
     nickIn.type = 'text';
@@ -186,34 +203,30 @@
     labelIn.value = (entry && entry.label) || '';
     labelIn.className = 'sn-model-label';
 
-    const orIn = document.createElement('input');
-    orIn.type = 'text';
-    orIn.placeholder = I18n.t('options_model_or_id');
-    orIn.setAttribute('list', 'models-list');
-    orIn.value = (entry && entry.openrouter) || '';
-    orIn.className = 'sn-model-or';
+    const provSel = document.createElement('select');
+    provSel.className = 'sn-model-provider';
+    for (const [val, txt] of [['openrouter', 'OpenRouter'], ['gemini', 'Google Gemini']]) {
+      const opt = document.createElement('option');
+      opt.value = val; opt.textContent = txt;
+      provSel.appendChild(opt);
+    }
+    provSel.value = norm.provider;
 
-    const gemIn = document.createElement('input');
-    gemIn.type = 'text';
-    gemIn.placeholder = I18n.t('options_model_gemini_id');
-    gemIn.setAttribute('list', 'models-list');
-    gemIn.value = (entry && entry.gemini) || '';
-    gemIn.className = 'sn-model-gemini';
+    const modelIn = document.createElement('input');
+    modelIn.type = 'text';
+    modelIn.placeholder = I18n.t('options_model_full_id');
+    modelIn.setAttribute('list', 'models-list');
+    modelIn.value = norm.model;
+    modelIn.className = 'sn-model-id';
 
     const status = document.createElement('div');
     status.className = 'sn-model-row-status';
 
-    const testOr = document.createElement('button');
-    testOr.type = 'button';
-    testOr.className = 'sn-btn sn-btn-secondary';
-    testOr.textContent = I18n.t('options_model_test_or');
-    testOr.addEventListener('click', () => runRowTest('openrouter', orIn.value.trim(), row, testOr));
-
-    const testGm = document.createElement('button');
-    testGm.type = 'button';
-    testGm.className = 'sn-btn sn-btn-secondary';
-    testGm.textContent = I18n.t('options_model_test_gemini');
-    testGm.addEventListener('click', () => runRowTest('gemini', gemIn.value.trim(), row, testGm));
+    const testBtn = document.createElement('button');
+    testBtn.type = 'button';
+    testBtn.className = 'sn-btn sn-btn-secondary';
+    testBtn.textContent = I18n.t('options_model_test');
+    testBtn.addEventListener('click', () => runRowTest(provSel.value, modelIn.value.trim(), row, testBtn));
 
     const del = document.createElement('button');
     del.type = 'button';
@@ -223,10 +236,9 @@
 
     row.appendChild(nickIn);
     row.appendChild(labelIn);
-    row.appendChild(orIn);
-    row.appendChild(gemIn);
-    row.appendChild(testOr);
-    row.appendChild(testGm);
+    row.appendChild(provSel);
+    row.appendChild(modelIn);
+    row.appendChild(testBtn);
     row.appendChild(del);
     row.appendChild(status);
     renderRowTest(row);
@@ -239,7 +251,7 @@
 
     const head = document.createElement('div');
     head.className = 'sn-model-row sn-model-row-head';
-    ['nickname', 'etichetta', 'id su OpenRouter', 'id su Gemini API', '', '', ''].forEach((label) => {
+    [I18n.t('options_model_nickname'), I18n.t('options_model_label'), I18n.t('options_model_provider'), I18n.t('options_model_full_id'), '', ''].forEach((label) => {
       const c = document.createElement('div'); c.textContent = label; head.appendChild(c);
     });
     host.appendChild(head);
