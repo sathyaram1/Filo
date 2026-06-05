@@ -1,0 +1,7 @@
+{
+  "id": "tyFXQI2xU741CwGaaeHq",
+  "status": "done",
+  "notes": "Colorazione live dei comandi nella nuova scheda. In modalità normale: un '/comando' che non è interno a Filo né un sito diventa rosso (i comandi validi restano arancioni; il prefisso di un comando valido, es. '/he' verso '/help', non lampeggia di rosso mentre digiti). AGGIORNAMENTO: ora funziona anche in modalità TERMINALE — prima lì qualsiasi '/x' era azzurro (anche roba inesistente, come '/gargargus' nel tuo screenshot). Adesso Filo controlla davvero se il comando esiste nella shell: azzurro se esiste (es. /ls, /git), rosso se non esiste. Il controllo parte quando ti fermi a digitare, così il colore non lampeggia mentre scrivi. Verificato con test automatici sia in modalità normale sia in terminale (/ls azzurro, /gargargus rosso).",
+  "queuedAt": "2026-06-05T06:56:20.560Z",
+  "queuedBy": "routine"
+}
