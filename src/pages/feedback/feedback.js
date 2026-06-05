@@ -393,6 +393,10 @@
         timer = setTimeout(flush, 1500);
       });
     });
+
+    // Riseleziona la casella che aveva il fuoco prima del re-render (vedi
+    // captureFocus): salvare le note non deve più "deselezionare" il campo.
+    restoreFocus(focusSnap);
   }
 
   function applyFilter() {
