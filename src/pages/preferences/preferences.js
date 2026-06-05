@@ -36,6 +36,45 @@
     $('agentStylePreset').value = match ? match.key : CUSTOM_KEY;
   }
 
+  // ── Lettura ad alta voce (text-to-speech) ────────────────────────────────
+  function ttsSupported() {
+    return typeof window.speechSynthesis !== 'undefined'
+      && typeof window.SpeechSynthesisUtterance === 'function';
+  }
+
+  // Popola la select delle voci dalle voci del sistema. getVoices() può tornare
+  // [] al primo giro e popolarsi più tardi (evento voiceschanged), quindi la
+  // richiamiamo anche da lì. Mantiene la scelta corrente se ancora disponibile.
+  function populateVoices(selected) {
+    const sel = $('ttsVoice');
+    if (!sel || !ttsSupported()) return;
+    const want = selected !== undefined ? selected : sel.value;
+    const voices = window.speechSynthesis.getVoices() || [];
+    sel.innerHTML = '<option value="">Voce predefinita del sistema</option>';
+    for (const v of voices) {
+      const o = document.createElement('option');
+      o.value = v.voiceURI || v.name;
+      o.textContent = `${v.name} (${v.lang})${v.default ? ' — predefinita' : ''}`;
+      sel.appendChild(o);
+    }
+    if (want && [...sel.options].some((o) => o.value === want)) sel.value = want;
+  }
+
+  function previewTts() {
+    if (!ttsSupported()) return;
+    const synth = window.speechSynthesis;
+    synth.cancel();
+    const u = new SpeechSynthesisUtterance('Ciao, sono Filo. Questa è la voce scelta per la lettura ad alta voce.');
+    u.rate = parseFloat($('ttsRate').value) || 1;
+    u.pitch = parseFloat($('ttsPitch').value) || 1;
+    const voiceId = $('ttsVoice').value;
+    if (voiceId) {
+      const v = (synth.getVoices() || []).find((vo) => vo.voiceURI === voiceId || vo.name === voiceId);
+      if (v) { u.voice = v; u.lang = v.lang; }
+    }
+    synth.speak(u);
+  }
+
   async function persist() {
     const theme = $('theme').value;
     const textScale = parseFloat($('textScale').value) || 1;
@@ -45,10 +84,15 @@
       enabled: $('terminalEnabled').checked,
       shell: $('terminalShell').value,
     };
+    const tts = {
+      voice: $('ttsVoice').value || '',
+      rate: parseFloat($('ttsRate').value) || 1,
+      pitch: parseFloat($('ttsPitch').value) || 1,
+    };
 
     await chrome.runtime.sendMessage({
       type: MSG.UPDATE_SETTINGS,
-      settings: { theme, textScale, showHomeMessage, agentStyle, terminal },
+      settings: { theme, textScale, showHomeMessage, agentStyle, terminal, tts },
     });
 
     window.SN_PAGE_THEME = theme;
