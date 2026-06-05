@@ -7,10 +7,13 @@
 //   - Rifiuto CMP: un banner cookie con un pulsante "rifiuta tutto" viene
 //     premuto automaticamente (il banner sparisce); in "manuale" resta.
 //   - Embed YouTube riscritto in youtube-nocookie.com.
-//   - Wipe all'uscita (default): i cookie non-whitelisted vengono cancellati,
-//     quelli whitelisted ("resta connesso") restano; in privacy/manuale no-op.
+//   - Blocco tracker (default): le richieste ai tracker noti (es. Google
+//     Analytics) vengono annullate (ERR_BLOCKED_BY_CLIENT); in manuale no.
+//   - Wipe all'uscita (default): vengono cancellati SOLO i cookie dei domini
+//     tracker; quelli funzionali/di login restano; in privacy/manuale no-op.
 //   - Privacy: ogni sito riceve una sessione effimera isolata (partizione
-//     dedicata, non quella di default, senza prefisso persist:).
+//     dedicata, senza prefisso persist:); i siti "fidati" ricevono invece una
+//     partizione isolata ma persistente (persist:filo-priv-…).
 
 import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
