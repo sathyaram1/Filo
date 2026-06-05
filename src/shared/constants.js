@@ -209,18 +209,30 @@
       .map((r) => DEPRECATED_MODELS[r] || r);
   }
 
+  // Quali provider provare per un dato riferimento, nell'ordine giusto.
+  //  - Modello nuovo (un provider): SOLO il suo provider. È l'utente che, se
+  //    vuole un fallback su un altro provider, aggiunge un secondo modello nella
+  //    lista dell'azione. Così il provider del modello è autorevole anche se
+  //    "Gemini diretto" è spento.
+  //  - Modello legacy duale o id raw: si prova l'intero `providerOrder` come
+  //    prima del refactor (retro-compatibilità).
+  function providersForRef(ref, registry, providerOrder) {
+    const entry = registry && registry[ref];
+    if (entry && entry.provider) return [entry.provider];
+    return providerOrder || [];
+  }
+
   // Costruisce la catena di tentativi per servire una richiesta AI a partire da
   // una lista ordinata di nickname. Per ogni nickname (nell'ordine indicato
-  // dall'utente) prova i provider in `providerOrder`, scartando quelli senza
-  // chiave o senza un id concreto per quel modello. La catena risultante è
-  // l'ordine reale di fallback: prima tutti i provider del modello primario,
-  // poi quelli del secondo modello, e così via. I duplicati esatti
-  // (stesso provider + stesso id concreto) vengono saltati.
+  // dall'utente) prova i suoi provider, scartando quelli senza chiave o senza
+  // un id concreto per quel modello. La catena risultante è l'ordine reale di
+  // fallback: prima il modello primario, poi il secondo, e così via. I duplicati
+  // esatti (stesso provider + stesso id concreto) vengono saltati.
   function buildModelAttempts(refs, registry, providerOrder, apiKeys) {
     const out = [];
     const seen = new Set();
     for (const ref of refs || []) {
-      for (const provider of providerOrder || []) {
+      for (const provider of providersForRef(ref, registry, providerOrder)) {
         const apiKey = apiKeys && apiKeys[provider];
         if (!apiKey) continue;
         const concrete = resolveModel(ref, provider, registry);
