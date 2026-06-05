@@ -1,0 +1,95 @@
+// La casella note di un feedback non deve "deselezionarsi" mentre l'utente
+// scrive.
+//
+// BUG (feedback alpha): scrivendo nelle note di un feedback esistente dalla
+// dashboard, dopo ~1.5s di pausa il salvataggio in debounce rigenerava tutta
+// la lista (patch → applyFilter → render riscrive innerHTML), distruggendo la
+// textarea a fuoco: l'utente perdeva il cursore e doveva ri-cliccare.
+//
+// Pre-condizione che senza il fix fallirebbe: dopo il flush in debounce il
+// document.activeElement non è più la textarea (è il body). Col fix il fuoco
+// e il cursore vengono ripristinati sulla nuova textarea.
+//
+// La pagina feedback è in sola lettura senza un admin loggato, e i feedback
+// arrivano da Firestore (rete). Per un test deterministico e offline:
+//   - simuliamo il login admin inviando il broadcast 'auth_changed' dal main
+//     (la pagina lo ascolta via window.filo.onBroadcast → isAdmin = true);
+//   - sostituiamo SN_FEEDBACK.list con un mock (un feedback in "todo");
+//   - intercettiamo window.filo.message così feedback_update torna ok senza
+//     toccare il main (che rifiuterebbe: non c'è un vero admin).
+
+import { test, expect } from './fixtures/electron.mjs';
+
+const FEEDBACK_URL = 'filo://feedback/feedback.html';
+
+test('feedback: la casella note resta a fuoco dopo il salvataggio in debounce', async ({ app, openTab }) => {
+  const page = await openTab(FEEDBACK_URL);
+  await expect(page.locator('#adminBanner')).toBeVisible({ timeout: 8_000 });
+
+  // 1) Mock dei feedback + intercetta feedback_update (così patch va a buon
+  //    fine senza alert/rollback, che a sua volta re-renderizza).
+  await page.evaluate(() => {
+    window.SN_FEEDBACK.list = async () => ([{
+      _id: 'mock-focus-1',
+      status: 'todo',
+      text: 'Feedback di prova per il test del fuoco note.',
+      url: 'filo://newtab/',
+      notes: '',
+      createdAt: new Date().toISOString(),
+    }]);
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'feedback_update') return { ok: true };
+      return orig(msg);
+    };
+  });
+
+  // 2) Simula il login admin: il main fa il broadcast, la pagina alza isAdmin.
+  await app.evaluate(async ({ webContents }) => {
+    for (const wc of webContents.getAllWebContents()) {
+      let url = '';
+      try { url = wc.getURL(); } catch (_) {}
+      if (url.includes('feedback')) {
+        wc.send('filo:broadcast', {
+          type: 'auth_changed',
+          signedIn: true,
+          isAdmin: true,
+          profile: { email: 'sathyarampontillo@gmail.com' },
+        });
+      }
+    }
+  });
+
+  // 3) Ricarica con il mock e vai sul tab "Da risolvere" (todo): lì le note
+  //    sono editabili per gli admin.
+  await page.locator('#refresh').click();
+  await page.locator('[data-tab="todo"]').click();
+
+  const notes = page.locator('.fb-notes');
+  await expect(notes).toHaveCount(1);
+
+  // 4) Scrivi e attendi il flush in debounce (1500ms).
+  await notes.click();
+  await page.keyboard.type('una nota lunga abbastanza da avere un cursore');
+  await page.waitForTimeout(1800);
+
+  // 5) Senza il fix qui activeElement sarebbe il body (re-render ha distrutto
+  //    la textarea). Col fix il fuoco è ancora sulla textarea note.
+  const focused = await page.evaluate(() => {
+    const el = document.activeElement;
+    return {
+      isNotes: !!el && el.classList && el.classList.contains('fb-notes'),
+      value: el && 'value' in el ? el.value : null,
+      caret: el && typeof el.selectionStart === 'number' ? el.selectionStart : null,
+    };
+  });
+
+  expect(focused.isNotes).toBe(true);
+  expect(focused.value).toBe('una nota lunga abbastanza da avere un cursore');
+  // Il cursore è in fondo al testo appena digitato (nessun salto a inizio).
+  expect(focused.caret).toBe('una nota lunga abbastanza da avere un cursore'.length);
+
+  // 6) Continuare a scrivere appende dal cursore (la casella è davvero usabile).
+  await page.keyboard.type('!');
+  await expect(notes).toHaveValue('una nota lunga abbastanza da avere un cursore!');
+});
