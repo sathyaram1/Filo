@@ -64,7 +64,10 @@ test('le tab si toccano e usano un separatore verticale in stile Chrome', async 
     return result;
   });
 
-  expect(probe.activeDivider).toBe('none');
+  // La scheda attiva non mostra la sottile linea verticale da 1px (al suo posto
+  // ::after fa da piedino "a goccia", largo 8px — vedi test dedicato).
+  expect(probe.activeDivider).toBeTruthy();
+  expect(probe.activeDivider.width).not.toBe('1px');
   expect(probe.inactiveDivider).toBeTruthy();
   expect(probe.inactiveDivider.display).not.toBe('none');
   expect(probe.inactiveDivider.width).toBe('1px');
