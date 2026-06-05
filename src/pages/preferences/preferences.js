@@ -174,6 +174,21 @@
     $('terminalEnabled').addEventListener('change', persist);
     $('terminalShell').addEventListener('change', persist);
 
+    // Lettura ad alta voce: la lista voci può popolarsi in ritardo.
+    if (ttsSupported() && typeof window.speechSynthesis.addEventListener === 'function') {
+      window.speechSynthesis.addEventListener('voiceschanged', () => populateVoices());
+    }
+    $('ttsVoice').addEventListener('change', persist);
+    $('ttsRate').addEventListener('input', () => {
+      $('ttsRateVal').textContent = (parseFloat($('ttsRate').value) || 1).toFixed(1) + '×';
+      persistDebounced();
+    });
+    $('ttsPitch').addEventListener('input', () => {
+      $('ttsPitchVal').textContent = (parseFloat($('ttsPitch').value) || 1).toFixed(1);
+      persistDebounced();
+    });
+    $('ttsPreview').addEventListener('click', previewTts);
+
     // Stile agente: scegliere un preset riempie il textarea; scrivere a mano
     // riallinea la select su "Personalizzato".
     $('agentStylePreset').addEventListener('change', () => {
