@@ -138,6 +138,37 @@ html[data-chrome-compact="1"] .addr {
 .tab:has(+ .tab:hover)::after {
   display: none;
 }
+
+/* Curve "a goccia" in stile Chrome: la scheda attiva si allarga verso il basso
+   con due piedini che curvano all'infuori per fondersi con la barra sottostante.
+   Ogni piedino è uno pseudo-elemento 8×8 appena fuori dall'angolo inferiore
+   della scheda: un radial-gradient lascia trasparente il quarto di cerchio
+   esterno (si vede la barra) e riempie il resto col colore della scheda,
+   creando l'arco concavo caratteristico delle tab di Chrome. Riusiamo ::after
+   (che per la scheda attiva fa già da none) e introduciamo ::before. */
+.tab.active::before,
+.tab.active::after {
+  content: "";
+  position: absolute;
+  display: block;
+  bottom: 0;
+  top: auto;
+  width: 8px;
+  height: 8px;
+  background: transparent;
+  pointer-events: none;
+}
+.tab.active::before {
+  left: -8px;
+  right: auto;
+  background: radial-gradient(circle at top left, transparent 8px, var(--tab-active) 8px);
+}
+.tab.active::after {
+  right: -8px;
+  left: auto;
+  width: 8px;
+  background: radial-gradient(circle at top right, transparent 8px, var(--tab-active) 8px);
+}
 .tab .title {
   flex: 1;
   overflow: hidden;
