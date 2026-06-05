@@ -56,7 +56,7 @@ test('le tab si toccano e usano un separatore verticale in stile Chrome', async 
       const isActive = el.classList.contains('active');
       const isLast = el === els[els.length - 1];
       if (isActive) {
-        result.activeDivider = after.display;
+        result.activeDivider = { display: after.display, width: after.width };
       } else if (!isLast && result.inactiveDivider === null) {
         result.inactiveDivider = { display: after.display, width: after.width };
       }
