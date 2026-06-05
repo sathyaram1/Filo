@@ -27,6 +27,17 @@
       display: flex; align-items: center; justify-content: center;
       color: var(--sn-muted); font-size: 12px; font-style: italic;
     }
+    .fb-files { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .fb-file {
+      display: inline-flex; align-items: center; gap: 6px;
+      max-width: 240px; padding: 6px 10px;
+      border: 1px solid var(--sn-border); border-radius: 6px;
+      background: var(--sn-bg); color: inherit; text-decoration: none;
+      font-size: 12px;
+    }
+    .fb-file:hover { border-color: var(--sn-accent, var(--sn-border)); }
+    .fb-file svg { flex: 0 0 auto; color: var(--sn-muted); }
+    .fb-file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .fb-empty { color: var(--sn-muted); text-align: center; padding: 60px 0; }
     .fb-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
     .fb-search { flex: 1; }
