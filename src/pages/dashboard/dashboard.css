@@ -479,9 +479,11 @@ body[data-state="thread"] .dash-suggestion { justify-content: flex-start; paddin
 }
 
 /* Evidenziazione live dell'input: arancione = comando Filo (o sito),
-   azzurro = comando shell. Solo il colore del testo digitato cambia. */
-.dash-input.is-cmd-filo  { color: #d98324; font-weight: 600; }
-.dash-input.is-cmd-shell { color: #2f7fd1; font-weight: 600; }
+   azzurro = comando shell, rosso = comando "/" non riconosciuto. Solo il
+   colore del testo digitato cambia. */
+.dash-input.is-cmd-filo    { color: #d98324; font-weight: 600; }
+.dash-input.is-cmd-shell   { color: #2f7fd1; font-weight: 600; }
+.dash-input.is-cmd-unknown { color: #d14343; font-weight: 600; }
 
 /* Bolla "comando" (echo del comando digitato). */
 .dash-bubble.dash-term-cmd {
