@@ -279,6 +279,25 @@ test('privacy: siti diversi ottengono partizioni effimere isolate', async ({ app
   expect(res.def).toBeFalsy();
 });
 
+test('privacy: i siti fidati ottengono una partizione isolata ma PERSISTENTE', async ({ app }) => {
+  const res = await app.evaluate(() => {
+    const Cookies = globalThis.__filoCookies;
+    const trusted = ['gmail.com'];
+    // Sito fidato → persistente (resta connesso), ma ancora isolato per-sito.
+    const fav = Cookies.partitionForTab('https://mail.gmail.com/inbox', { mode: 'privacy', incognito: false, trusted });
+    // Sito non fidato → effimero.
+    const norm = Cookies.partitionForTab('https://beta-site.org/', { mode: 'privacy', incognito: false, trusted });
+    return { fav: fav.partition, norm: norm.partition };
+  });
+  // Fidato: prefisso persist: → sopravvive alla sessione (login conservato).
+  expect(res.fav.startsWith('persist:filo-priv-')).toBe(true);
+  // Non fidato: effimero, niente persist:.
+  expect(res.norm.startsWith('filo-priv-')).toBe(true);
+  expect(res.norm.startsWith('persist:')).toBe(false);
+  // Restano comunque due partizioni diverse (isolamento per-sito intatto).
+  expect(res.fav).not.toBe(res.norm);
+});
+
 test('privacy: una pagina esterna gira in una sessione diversa da quella di default', async ({ app, openTab, testServer }) => {
   await setMode(openTab, 'privacy');
   const page = await testServer.openReady(openTab, '<title>PRIV_SITE</title><p>isolato</p>');
