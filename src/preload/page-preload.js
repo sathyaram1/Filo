@@ -13,8 +13,12 @@
 // alla pagina, ma il DOM (document, window) è condiviso. Esattamente come
 // in Chrome con i content script.
 
-const { ipcRenderer } = require('electron');
+const { ipcRenderer, webFrame } = require('electron');
 const path = require('node:path');
+
+// Modalità zoom con la rotella attivata dal click centrale (sostituisce
+// l'autoscroll nativo). Vedi wheel-zoom.js.
+try { require('./wheel-zoom.js')(webFrame); } catch (e) { console.error('[Filo CS] wheel-zoom', e); }
 
 // ─── chrome.* shim per i content script ────────────────────────────────────
 //
