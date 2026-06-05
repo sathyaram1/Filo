@@ -56,6 +56,34 @@ test('il picker del font ha una ricerca, filtra mentre scrivi e applica il font 
   expect(html).toMatch(/font-family\s*:\s*[^;"']*Garamond/i);
 });
 
+test('il dropdown del font si chiude con un click fuori da esso', async ({ openTab }) => {
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('.ed-grid');
+  await addFontModule(page);
+
+  const mod = page.locator('.ed-module[data-type="font"]');
+  const button = mod.locator('.ed-font-button');
+  const pop = mod.locator('.ed-font-pop');
+
+  // Click sul documento → si chiude.
+  await button.click();
+  await expect(pop).toBeVisible();
+  await page.locator('#doc').click({ position: { x: 5, y: 5 } });
+  await expect(pop).toBeHidden();
+
+  // Click sulla topbar → si chiude.
+  await button.click();
+  await expect(pop).toBeVisible();
+  await page.locator('.ed-topbar').click({ position: { x: 5, y: 5 } });
+  await expect(pop).toBeHidden();
+
+  // Click in un angolo lontano della pagina → si chiude.
+  await button.click();
+  await expect(pop).toBeVisible();
+  await page.mouse.click(2, 2);
+  await expect(pop).toBeHidden();
+});
+
 test('un modulo si può afferrare da qualsiasi punto tenendo premuto (non solo dalla maniglia)', async ({ openTab }) => {
   const page = await openTab('filo://editor/editor.html');
   await page.waitForSelector('.ed-grid');
