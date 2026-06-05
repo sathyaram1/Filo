@@ -590,6 +590,58 @@
     },
   };
 
+  // Mostra una riga di risposta da Filo nel thread (usata dai comandi che
+  // hanno bisogno di dire qualcosa: es. l'uso corretto di /set timer).
+  function showFiloLine(text) {
+    if (body.dataset.state !== 'thread') goThread();
+    const bubble = makeBubble({ role: 'filo', text });
+    bubblesEl.appendChild(bubble);
+    bubblesEl.scrollTop = bubblesEl.scrollHeight;
+  }
+
+  // Converte l'argomento di "/set timer" in secondi.
+  //   "5:00" → 5 minuti 0 secondi → 300 ; "8" → 8 minuti → 480.
+  // Ritorna null se non è una durata valida.
+  function parseTimerArg(raw) {
+    const s = String(raw || '').trim();
+    if (!s) return null;
+    if (s.includes(':')) {
+      const parts = s.split(':');
+      if (parts.length !== 2) return null;
+      const mm = Number(parts[0]);
+      const ss = Number(parts[1]);
+      if (!Number.isInteger(mm) || !Number.isInteger(ss)) return null;
+      if (mm < 0 || ss < 0 || ss > 59) return null;
+      const total = mm * 60 + ss;
+      return total > 0 ? total : null;
+    }
+    if (!/^\d+$/.test(s)) return null;
+    const mins = Number(s);
+    return mins > 0 ? mins * 60 : null;
+  }
+
+  // "/set timer 5:00" oppure "/set timer 8" → avvia un timer.
+  function handleSetCommand(text) {
+    const m = /^\/set\s+timer\s+(.+)$/i.exec(String(text || '').trim());
+    if (!m) {
+      showFiloLine('Uso: /set timer 5:00 oppure /set timer 8 (minuti).');
+      return;
+    }
+    const seconds = parseTimerArg(m[1]);
+    if (seconds == null) {
+      showFiloLine(`Non ho capito la durata "${m[1].trim()}". Prova /set timer 5:00 o /set timer 8.`);
+      return;
+    }
+    send({ type: MSG.FILO_ADD_TIMER, label: 'Timer', seconds }).then((r) => {
+      if (r && r.ok !== false) {
+        goHome();
+        refreshLive();
+      } else {
+        showFiloLine('Non sono riuscito ad avviare il timer.');
+      }
+    });
+  }
+
   // Riconosce un singolo token "tipo sito" (es. google.com, github.com/x,
   // http://localhost:3000). DEVE essere preciso: un comando di shell come
   // `/git log v1.2` o `/cat file.txt` contiene un punto ma NON è un sito.
