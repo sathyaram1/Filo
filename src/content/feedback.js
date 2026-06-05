@@ -325,7 +325,9 @@
         chip.title = f.name;
         const ic = document.createElement('span');
         ic.className = 'sn-fb-file-ic';
-        ic.innerHTML = icon('file', 16);
+        // Icona documento in linea (coerente con lo stile a tratto di Filo):
+        // non esiste un'icona 'file' nel set condiviso.
+        ic.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>';
         const nameEl = document.createElement('span');
         nameEl.className = 'sn-fb-file-name';
         nameEl.textContent = f.name;
