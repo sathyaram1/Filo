@@ -779,6 +779,18 @@
         mode: 'default',
         trustedSites: [],
       },
+      // Protezione anti-fingerprinting: rumore deterministico per-sito sui
+      // segnali continui ad alta entropia (canvas 2D, WebGL, audio). Stessa
+      // struttura a 3 stati dei cookie. Vedi src/main/services/fingerprint.js
+      // e src/preload/fingerprint-guard.js.
+      // - 'off'     → nessun rumore (i siti possono identificare il browser).
+      // - 'default' → rumore con seed settimanale per sito (rompe la
+      //   correlazione cross-site, zero impatto su banche/Cloudflare/CAPTCHA).
+      // - 'privacy' → rumore con seed per-sessione (cambi identità a ogni avvio
+      //   dell'app; rari CAPTCHA extra possibili).
+      fingerprint: {
+        mode: 'default',
+      },
     },
     // Modalità terminale della dashboard: quando attiva, ogni comando con `/`
     // che non è un comando interno di Filo viene eseguito da una shell di
