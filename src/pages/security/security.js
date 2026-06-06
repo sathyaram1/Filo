@@ -107,6 +107,27 @@
     cookieWhitelist = Array.isArray(trusted) ? trusted.slice() : [];
     renderWhitelist();
     syncCookieMode();
+
+    const fp = sec.fingerprint || {};
+    const fpMode = ['off', 'default', 'privacy'].includes(fp.mode) ? fp.mode : 'default';
+    const fpRadio = document.querySelector(`input[name="fp-mode"][value="${fpMode}"]`);
+    if (fpRadio) fpRadio.checked = true;
+  }
+
+  // ─── protezione fingerprinting ─────────────────────────────────────────────
+
+  function currentFpMode() {
+    const checked = document.querySelector('input[name="fp-mode"]:checked');
+    return checked ? checked.value : 'default';
+  }
+
+  async function saveFingerprint() {
+    const partial = { security: { fingerprint: { mode: currentFpMode() } } };
+    await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
+    const hint = $('savedHint');
+    hint.classList.add('sn-show');
+    clearTimeout(saveFingerprint._t);
+    saveFingerprint._t = setTimeout(() => hint.classList.remove('sn-show'), 1500);
   }
 
   // ─── gestione cookie ──────────────────────────────────────────────────────
