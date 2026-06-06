@@ -45,9 +45,8 @@ test('Modelli: cambiare il limite mensile si salva da solo (auto-save)', async (
   await page.waitForSelector('#monthlyLimit', { timeout: 8_000 });
 
   await page.fill('#monthlyLimit', '12');
-  // `change` scatta al blur: spostiamo il focus su un campo sempre visibile
-  // (#blocklist non è dietro lo switch "Usa modelli predefiniti").
-  await page.locator('#blocklist').focus();
+  // `change` scatta al blur: togliamo il focus dal campo per farlo partire.
+  await page.locator('#monthlyLimit').blur();
   await expect(page.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 4_000 });
 
   await page.reload();
