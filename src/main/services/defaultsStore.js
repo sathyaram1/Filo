@@ -134,7 +134,6 @@ function get() {
 
   if (remoteModels) {
     if (typeof remoteModels.provider === 'string' && remoteModels.provider) out.provider = remoteModels.provider;
-    if (typeof remoteModels.geminiDirect === 'boolean') out.geminiDirect = remoteModels.geminiDirect;
     if (remoteModels.models && typeof remoteModels.models === 'object') {
       out.models = { ...out.models, ...remoteModels.models };
     }
