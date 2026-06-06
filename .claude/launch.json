@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "singolarita-static",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["-y", "serve", "C:/Users/agenti AI/Desktop/SINGOLARITA", "-l", "5599"],
+      "runtimeExecutable": "C:/Users/agenti AI/AppData/Local/Programs/Python/Python312/python.exe",
+      "runtimeArgs": ["-m", "http.server", "5599", "--directory", "C:/Users/agenti AI/Desktop/SINGOLARITA"],
       "port": 5599
     }
   ]
