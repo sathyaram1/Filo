@@ -40,6 +40,9 @@
     FILO_NOTIFICATIONS: 'filo_notifications',
     // Stato sessione corrente dashboard: ultima interazione, contatori, ecc.
     FILO_SESSION: 'filo_session',
+    // Flag "primo avvio mostrato": true dopo che il messaggio di benvenuto di
+    // Filo è stato presentato la prima volta che l'utente apre l'app.
+    FILO_WELCOMED: 'filo_welcomed',
   };
 
   const ACTIONS = {
