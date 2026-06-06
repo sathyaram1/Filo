@@ -2306,13 +2306,27 @@
   // Voce di menu per la lettura: se sta già leggendo mostra "Interrompi
   // lettura" (simmetria: se puoi avviare la lettura, devi poterla fermare),
   // altrimenti "Leggi" il testo selezionato.
-  function buildReadAloudItem(text) {
+  function isReadingNow() {
     const synth = ttsSupported() ? window.speechSynthesis : null;
-    const speaking = !!(synth && (synth.speaking || synth.pending));
-    if (speaking) {
-      return { type: 'item', label: '🔊 ' + I18n.t('menu_stop_reading'), onClick: () => stopReading() };
+    return !!(synth && (synth.speaking || synth.pending));
+  }
+
+  function buildReadAloudItem(text) {
+    const Icons = self.SN_ICONS;
+    if (isReadingNow()) {
+      return { type: 'item', icon: Icons.stopReading(18), label: I18n.t('menu_stop_reading'), onClick: () => stopReading() };
     }
-    return { type: 'item', label: '🔊 ' + I18n.t('menu_read_aloud'), onClick: () => readAloud(text) };
+    return { type: 'item', icon: Icons.readAloud(18), label: I18n.t('menu_read_aloud'), onClick: () => readAloud(text) };
+  }
+
+  // Voce "Interrompi lettura" globale: mentre una lettura è in corso deve
+  // comparire in QUALSIASI menu tasto destro, anche senza testo selezionato
+  // (l'utente avvia la lettura, clicca altrove e deve poterla comunque fermare).
+  // Ritorna null se non sta leggendo, così i chiamanti la possono filtrare.
+  function buildStopReadingItem() {
+    if (!isReadingNow()) return null;
+    const Icons = self.SN_ICONS;
+    return { type: 'item', icon: Icons.stopReading(18), label: I18n.t('menu_stop_reading'), onClick: () => stopReading() };
   }
 
   // Overflow panel: ora vive come griglia di icone (sotto-menu ancorato al
