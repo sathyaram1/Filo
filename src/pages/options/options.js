@@ -187,7 +187,8 @@
   function renderRowTest(row) {
     const statusEl = row.querySelector('.sn-model-row-status');
     if (!statusEl) return;
-    statusEl.textContent = formatTestResult(row._test);
+    const hasResult = row._test && (row._test.ttftMs != null || row._test.tokensPerSec != null);
+    statusEl.textContent = hasResult ? formatTestResult(row._test) : I18n.t('options_model_untested');
   }
 
   function makeModelRow(nick, entry) {
