@@ -95,6 +95,9 @@ app.whenReady().then(async () => {
     // Gestione cookie: emetti GPC sulla sessione di default secondo la modalità.
     const Cookies = require('./services/cookies');
     Cookies.configureFromSettings(s);
+    // Anti-fingerprinting: carica/genera il master secret persistente e fissa
+    // la modalità corrente (off/default/privacy) prima di aprire qualsiasi tab.
+    try { await require('./services/fingerprint').init(s); } catch (_) {}
     // Backstop del wipe: se dei cookie di tracker noti sono rimasti su disco
     // (es. da prima di attivare l'Automatico, o da un'uscita interrotta),
     // ripuliscili PRIMA di aprire qualsiasi tab. I cookie funzionali/di login
