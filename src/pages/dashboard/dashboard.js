@@ -96,6 +96,26 @@
     threadView.hidden = false;
   }
 
+  // Mostra il messaggio di benvenuto di Filo la PRIMA volta in assoluto che
+  // l'app viene aperta. Compare come una bolla di Filo in un thread, così
+  // l'utente può rispondere subito (e Filo si configura). Il flag su storage
+  // garantisce che venga mostrato una sola volta.
+  async function showWelcomeIfFirstRun() {
+    let welcomed = false;
+    try {
+      welcomed = await self.SN_STORAGE?.getRaw?.(STORAGE_KEYS.FILO_WELCOMED, false);
+    } catch (_) {}
+    if (welcomed) return;
+    try { await self.SN_STORAGE?.setRaw?.(STORAGE_KEYS.FILO_WELCOMED, true); } catch (_) {}
+    goThread();
+    const bubble = makeBubble({ role: 'filo', text: WELCOME_MESSAGE });
+    bubble.id = 'welcomeBubble';
+    bubblesEl.appendChild(bubble);
+    threadHistory.push({ role: 'filo', text: WELCOME_MESSAGE });
+    bubblesEl.scrollTop = bubblesEl.scrollHeight;
+    inputEl.focus();
+  }
+
 
   // ===== Suggerimenti (colonna sinistra) =====
   function iconLabel(icon) {
