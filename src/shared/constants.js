@@ -676,11 +676,6 @@
       // Aiuto come provider primario. Senza chiave si ricade su DuckDuckGo.
       tavily: '',
     },
-    // Quando true e l'utente ha configurato sia la chiave Gemini sia quella
-    // OpenRouter, per i modelli google/gemini-* l'estensione chiama PRIMA la
-    // Gemini API direttamente (quota free) e ricade su OpenRouter solo se
-    // Gemini fallisce (errore di rete, 429 quota, ecc.).
-    geminiDirect: true,
     models: { ...DEFAULT_MODELS },
     modelRegistry: { ...DEFAULT_MODEL_REGISTRY },
     // Costi stimati per 1M token (input/output) in USD. Valori indicativi.
