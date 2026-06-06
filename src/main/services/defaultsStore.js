@@ -166,7 +166,6 @@ function getPublicForAdmin() {
   const eff = get();
   return {
     provider: eff.provider,
-    geminiDirect: eff.geminiDirect,
     models: eff.models,
     modelRegistry: eff.modelRegistry,
     apiKeysPresent: {
