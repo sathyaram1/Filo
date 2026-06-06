@@ -476,10 +476,13 @@
       (next ? `\nFrase successiva: "${next}"` : '') +
       `\n\nLa parola è ortograficamente sbagliata (refuso, errore di battitura, parola inesistente)? ` +
       `Considera anche se "${word}" potrebbe essere un nome proprio, marca, termine tecnico o parola straniera legittima — in quei casi non è un errore.\n\n` +
+      `IMPORTANTISSIMO sulla lingua: la correzione DEVE essere nella STESSA lingua della frase in cui compare la parola. ` +
+      `Deduci la lingua dal contesto (frase corrente e frasi vicine): se la frase è in italiano la correzione è una parola italiana, se è in inglese è una parola inglese, e così via. ` +
+      `Non tradurre MAI la parola in un'altra lingua e non sostituirla con un termine inglese se il testo è in italiano.\n\n` +
       `Rispondi SOLO con un JSON valido (nessun altro testo, nessun markdown):\n` +
-      `{"misspelled": true|false, "correction": "<la parola corretta>"}\n\n` +
+      `{"misspelled": true|false, "correction": "<la parola corretta, nella lingua del testo>"}\n\n` +
       `Se misspelled è false, correction può essere stringa vuota. ` +
-      `Se misspelled è true, correction deve essere la singola migliore correzione (una sola parola o locuzione, niente preamboli).`,
+      `Se misspelled è true, correction deve essere la singola migliore correzione (una sola parola o locuzione, niente preamboli), nella lingua del testo.`,
 
     // ----- Pipeline di sanitizzazione per la raccolta path (Aiuto) -----
     //
