@@ -315,6 +315,7 @@
     models:       (size) => wrap(models, { size }),
     openForLater: (size) => wrap(openForLater, { size }),
     qrCode:       (size) => wrap(qrCode, { size }),
+    feedback:     (size) => wrap(feedback, { size }),
   };
 
   // Heuristica che il menu usa per capire se una stringa di "icona" è SVG
