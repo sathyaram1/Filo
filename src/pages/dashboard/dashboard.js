@@ -12,6 +12,18 @@
   'use strict';
 
   const { MSG } = self.SN_MSG;
+  const { STORAGE_KEYS } = self.SN_CONST;
+
+  // Messaggio di benvenuto mostrato UNA sola volta, la prima volta che l'utente
+  // apre Filo dopo averlo scaricato (feedback alpha). Compare come una bolla di
+  // Filo, "come appena inviato da lui", così l'utente può rispondere subito
+  // raccontandosi e Filo si configura nel tempo.
+  const WELCOME_MESSAGE =
+    'Ciao, sono Filo. Se mi racconti brevemente chi sei e come usi di solito ' +
+    'il computer mi configuro io. Altrimenti imparerò nel tempo.\n' +
+    'Qualsiasi dubbio tu abbia chiedimi pure, conosco abbastanza bene come ' +
+    'funziono. Ricorda che puoi sempre cliccare il tasto destro se vuoi fare ' +
+    'qualcosa con quello che stai guardando.';
 
   // ===== DOM =====
   const $ = (id) => document.getElementById(id);
