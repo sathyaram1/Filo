@@ -42,6 +42,14 @@
     $('sec-cookies-trusted-note').textContent = I18n.t('options_cookies_trusted_note_other');
     $('cookie-wl-input').placeholder = I18n.t('options_cookies_whitelist_placeholder');
     $('cookie-wl-add-btn').textContent = I18n.t('options_cookies_whitelist_add');
+    $('sec-fp-title').textContent = I18n.t('options_fp_title');
+    $('sec-fp-desc').textContent = I18n.t('options_fp_desc');
+    $('fp-mode-off-label').textContent = I18n.t('options_fp_mode_off');
+    $('fp-mode-off-desc').textContent = I18n.t('options_fp_mode_off_desc');
+    $('fp-mode-default-label').textContent = I18n.t('options_fp_mode_default');
+    $('fp-mode-default-desc').textContent = I18n.t('options_fp_mode_default_desc');
+    $('fp-mode-privacy-label').textContent = I18n.t('options_fp_mode_privacy');
+    $('fp-mode-privacy-desc').textContent = I18n.t('options_fp_mode_privacy_desc');
     $('sec-export-btn').textContent = I18n.t('security_export_btn');
     $('sec-export-desc').textContent = I18n.t('security_export_desc');
     $('savedHint').textContent = I18n.t('options_saved');
