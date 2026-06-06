@@ -62,7 +62,7 @@ service cloud.firestore {
     // Scrittura riservata agli admin (l'editor in app passa dal main con il
     // Firebase ID token come Bearer).
     //
-    // config/models  → provider/geminiDirect/models/modelRegistry. NON è segreto
+    // config/models  → provider/models/modelRegistry. NON è segreto
     //   (sono solo nomi di modelli): lettura PUBBLICA, così anche un utente non
     //   loggato riceve la config predefinita.
     // config/secrets → apiKeys predefinite (openrouter/gemini/tavily). SONO
