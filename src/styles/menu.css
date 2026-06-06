@@ -98,9 +98,19 @@
 .sn-menu-row-btn svg,
 .sn-menu-icon-btn svg,
 .sn-menu-split-icon svg,
+.sn-menu-item-icon svg,
 .sn-menu-history-icon svg {
   display: block;
   flex: 0 0 auto;
+}
+
+.sn-menu-item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  flex: 0 0 auto;
+  color: var(--sn-fg);
 }
 
 .sn-menu-row-btn:hover:not(:disabled):not(.sn-menu-btn-disabled) {
