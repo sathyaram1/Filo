@@ -435,6 +435,60 @@ section:has(#dictList) .sn-spell-add-row {
   margin-bottom: 2px;
 }
 
+/* Editor a segmenti della catena di modelli per azione (Modelli per azione).
+   Una "pillola" con un segmento per modello in ordine di priorità, separati da
+   un divisore accentato; "+" aggiunge un fallback, "×" rimuove un segmento. */
+.sn-chain {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid var(--sn-border);
+  border-radius: var(--sn-radius);
+  background: var(--sn-bg);
+  padding: 3px 4px;
+  min-height: 34px;
+}
+.sn-chain-seg { display: inline-flex; align-items: center; }
+.sn-chain-input {
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  padding: 2px 4px;
+  color: var(--sn-fg);
+}
+.sn-chain-input:focus { outline: none; }
+/* Divisore fra un modello e il successivo (la "linea rossa" della richiesta). */
+.sn-chain-sep {
+  width: 2px;
+  align-self: stretch;
+  background: var(--sn-accent);
+  margin: 2px 3px;
+  border-radius: 1px;
+}
+.sn-chain-rm {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--sn-muted);
+  font-size: 15px;
+  line-height: 1;
+  padding: 0 2px;
+}
+.sn-chain-rm:hover { color: var(--sn-accent); }
+.sn-chain-add {
+  border: 1px dashed var(--sn-border);
+  background: transparent;
+  cursor: pointer;
+  color: var(--sn-muted);
+  font-size: 15px;
+  line-height: 1;
+  border-radius: 6px;
+  padding: 1px 8px;
+  margin-left: 4px;
+}
+.sn-chain-add:hover { color: var(--sn-fg); border-color: var(--sn-fg); }
+
 /* Selettore modalità cookie: tre "card" radio impilate (Manuale/Automatico/
    Privacy). La card selezionata si evidenzia con bordo accentato. */
 .sn-page .sn-cookie-modes {
