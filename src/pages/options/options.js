@@ -306,7 +306,7 @@
   async function runRowTest(providerId, modelId, row, btn) {
     const statusEl = row.querySelector('.sn-model-row-status');
     if (!modelId) {
-      statusEl.textContent = I18n.t('options_model_no_id_for_provider', providerId);
+      statusEl.textContent = I18n.t('options_model_no_id');
       return;
     }
     const keyEl = providerId === 'gemini' ? $('apiKeyGemini') : $('apiKey');
