@@ -1,0 +1,7 @@
+{
+  "id": "irqVYWT7V3n0OXuA4exS",
+  "status": "done",
+  "notes": "Tolto l'emoji e il suffisso '(alpha)' dalla voce del menu tasto destro: ora si chiama semplicemente 'Invia feedback'. Verificato con un test che apre il menu e controlla che l'etichetta sia pulita (niente emoji, niente '(alpha)').",
+  "queuedAt": "2026-06-06T11:02:12.885Z",
+  "queuedBy": "routine"
+}
