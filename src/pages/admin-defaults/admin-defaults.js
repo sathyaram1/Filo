@@ -232,8 +232,6 @@
     if (tav) apiKeys.tavily = tav;
 
     const config = {
-      provider: $('provider').value,
-      geminiDirect: $('geminiDirect').checked,
       modelRegistry: collectModelRegistry(),
       models: collectModels(),
     };
