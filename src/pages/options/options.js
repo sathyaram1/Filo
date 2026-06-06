@@ -87,11 +87,9 @@
 
     $('useDefaultModels').checked = settings.useDefaultModels !== false;
     applyDefaultModelsVisibility();
-    $('provider').value = settings.provider || 'openrouter';
     $('apiKey').value = settings.apiKeys?.openrouter || '';
     $('apiKeyGemini').value = settings.apiKeys?.gemini || '';
     $('apiKeyTavily').value = settings.apiKeys?.tavily || '';
-    $('geminiDirect').checked = settings.geminiDirect !== false;
     $('model-explain').value = settings.models?.[ACTIONS.EXPLAIN] || '';
     $('model-explain-deep').value = settings.models?.[ACTIONS.EXPLAIN_DEEP] || '';
     $('model-translate-selection').value = settings.models?.[ACTIONS.TRANSLATE_SELECTION] || '';
