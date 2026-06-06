@@ -720,6 +720,9 @@ async function handleMessage(msg, sender = {}) {
           }
         }
       } catch (_) {}
+      // Anti-fingerprinting: aggiorna la modalità in cache così le pagine
+      // aperte/ricaricate dopo il salvataggio usano subito il nuovo livello.
+      try { require('./fingerprint').setMode(merged); } catch (_) {}
       // Riconfigura il rilevatore siti pericolosi (chiave GSB, LLM, rete, sandbox)
       // così le modifiche valgono subito senza riavviare. La chiave GSB è
       // condivisa (admin → Firestore): withDefaults la inietta nei settings.
