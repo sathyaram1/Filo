@@ -124,7 +124,6 @@ function get() {
   const C = globalThis.SN_CONST || {};
   const out = {
     provider: C.DEFAULT_PROVIDER || 'openrouter',
-    geminiDirect: C.DEFAULT_SETTINGS ? C.DEFAULT_SETTINGS.geminiDirect !== false : true,
     models: { ...(C.DEFAULT_MODELS || {}) },
     modelRegistry: { ...(C.DEFAULT_MODEL_REGISTRY || {}) },
     apiKeys: getBuildKeys(),
