@@ -308,6 +308,23 @@
     options_cookies_trusted_note_other:
       'I siti fidati hanno effetto solo in "Privacy massima". In "Automatico" i tuoi login restano comunque salvati, ' +
       'quindi qui non serve aggiungere nulla.',
+    // Protezione anti-fingerprinting
+    options_fp_title: 'Protezione fingerprinting',
+    options_fp_desc:
+      'Anche senza cookie, i siti possono riconoscere il tuo browser combinando segnali tecnici ' +
+      '(disegno su canvas, scheda grafica, audio). Filo aggiunge a questi segnali un disturbo minimo, ' +
+      'invisibile a te ma diverso per ogni sito, così non possono metterti insieme un\'impronta unica.',
+    options_fp_mode_off: 'Off',
+    options_fp_mode_off_desc:
+      'Nessuna protezione: i siti possono identificare il tuo browser.',
+    options_fp_mode_default: 'Automatico (consigliato)',
+    options_fp_mode_default_desc:
+      'I siti non possono seguirti nel tempo né riconoscerti da un sito all\'altro. Nessun impatto sulla ' +
+      'navigazione: banche, Cloudflare e CAPTCHA continuano a funzionare normalmente.',
+    options_fp_mode_privacy: 'Privacy massima',
+    options_fp_mode_privacy_desc:
+      'Come l\'Automatico, ma cambi "impronta" a ogni avvio di Filo: i siti non possono riconoscerti ' +
+      'nemmeno fra una sessione e l\'altra. In rari casi qualche CAPTCHA in più.',
     security_export_title: 'Esporta dati Filo',
     security_export_label: 'Esporta dati',
     security_export_desc:
