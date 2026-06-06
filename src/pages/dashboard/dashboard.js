@@ -1040,12 +1040,17 @@
     applyHomeMessageVisibility();
     if (terminalMode) await initCwd();
     applyTerminalMode();
+    // Primissima apertura? In tal caso il benvenuto di Filo prende il posto del
+    // commento generato (che senza storico sarebbe comunque generico).
+    const firstRun = await isFirstRun();
+    if (firstRun) {
+      try { await self.SN_STORAGE?.setRaw?.(STORAGE_KEYS.FILO_WELCOMED, true); } catch (_) {}
+    }
     // Carico in parallelo dashboard cache e live state per non sequenziare.
     await Promise.all([
-      loadDashboard().catch((e) => console.warn('[Filo] dashboard load', e)),
+      firstRun ? Promise.resolve() : loadDashboard().catch((e) => console.warn('[Filo] dashboard load', e)),
       refreshLive().catch((e) => console.warn('[Filo] live', e)),
     ]);
-    // Dopo il caricamento: alla primissima apertura mostra il benvenuto di Filo.
-    await showWelcomeIfFirstRun().catch((e) => console.warn('[Filo] welcome', e));
+    if (firstRun) showWelcomeMessage();
   })();
 })();
