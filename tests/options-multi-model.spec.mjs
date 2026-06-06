@@ -66,8 +66,9 @@ test('Modelli: il risultato del test (latenza/token-sec) persiste tra i reload',
   await page.evaluate(() => {
     const row = document.querySelector('.sn-model-row:not(.sn-model-row-head)');
     row.querySelector('.sn-model-nick').value = 'provatm';
-    row.querySelector('.sn-model-or').value = 'anthropic/claude-3.5-haiku';
-    row._test = { openrouter: { ttftMs: 321, tokensPerSec: 48.5, at: new Date().toISOString() } };
+    row.querySelector('.sn-model-provider').value = 'openrouter';
+    row.querySelector('.sn-model-id').value = 'anthropic/claude-3.5-haiku';
+    row._test = { ttftMs: 321, tokensPerSec: 48.5, at: new Date().toISOString() };
     // Forza il render immediato + il salvataggio (change bubbla fino a #page).
     row.dispatchEvent(new Event('change', { bubbles: true }));
   });
@@ -86,5 +87,4 @@ test('Modelli: il risultato del test (latenza/token-sec) persiste tra i reload',
   });
   expect(statusText).toContain('321');
   expect(statusText).toContain('48.5');
-  expect(statusText).toContain('OpenRouter');
 });
