@@ -185,25 +185,24 @@
     return I18n.t('options_test_result', ttft, tps);
   }
 
-  // Mostra nel div di stato della riga i risultati di test memorizzati per i
-  // due provider, così la latenza/velocità misurata resta visibile tra le
-  // sessioni (non solo durante il test).
+  // Mostra nel div di stato della riga il risultato di test memorizzato
+  // (latenza + token/sec), così la misura resta visibile tra le sessioni.
   function renderRowTest(row) {
     const statusEl = row.querySelector('.sn-model-row-status');
     if (!statusEl) return;
-    const test = row._test || {};
-    const parts = [];
-    if (test.openrouter) parts.push(`OpenRouter — ${formatTestResult(test.openrouter)}`);
-    if (test.gemini) parts.push(`Gemini — ${formatTestResult(test.gemini)}`);
-    statusEl.textContent = parts.join('   ·   ');
+    statusEl.textContent = formatTestResult(row._test);
   }
 
   function makeModelRow(nick, entry) {
     const row = document.createElement('div');
     row.className = 'sn-model-row';
     row.dataset.originalNick = nick || '';
-    // Risultati di test persistiti per provider: { openrouter:{ttftMs,tokensPerSec,at}, gemini:{...} }.
-    row._test = (entry && entry.test && typeof entry.test === 'object') ? { ...entry.test } : {};
+    const single = entryToSingle(entry);
+    // Etichetta descrittiva preservata "in silenzio" (non ha più una colonna
+    // dedicata, ma serve come hint nella datalist dei nickname per-azione).
+    row.dataset.label = (entry && entry.label) || '';
+    // Risultato di test persistito (flat): { ttftMs, tokensPerSec, at }.
+    row._test = normalizeTest(entry, single);
 
     const nickIn = document.createElement('input');
     nickIn.type = 'text';
@@ -211,40 +210,32 @@
     nickIn.value = nick || '';
     nickIn.className = 'sn-model-nick';
 
-    const labelIn = document.createElement('input');
-    labelIn.type = 'text';
-    labelIn.placeholder = I18n.t('options_model_label');
-    labelIn.value = (entry && entry.label) || '';
-    labelIn.className = 'sn-model-label';
+    // Un solo provider per modello.
+    const provSel = document.createElement('select');
+    provSel.className = 'sn-model-provider';
+    [['openrouter', 'OpenRouter'], ['gemini', 'Gemini API']].forEach(([val, label]) => {
+      const opt = document.createElement('option');
+      opt.value = val; opt.textContent = label;
+      provSel.appendChild(opt);
+    });
+    provSel.value = single.provider;
 
-    const orIn = document.createElement('input');
-    orIn.type = 'text';
-    orIn.placeholder = I18n.t('options_model_or_id');
-    orIn.setAttribute('list', 'models-list');
-    orIn.value = (entry && entry.openrouter) || '';
-    orIn.className = 'sn-model-or';
-
-    const gemIn = document.createElement('input');
-    gemIn.type = 'text';
-    gemIn.placeholder = I18n.t('options_model_gemini_id');
-    gemIn.setAttribute('list', 'models-list');
-    gemIn.value = (entry && entry.gemini) || '';
-    gemIn.className = 'sn-model-gemini';
+    // Stringa concreta per chiamare il modello presso il provider scelto.
+    const idIn = document.createElement('input');
+    idIn.type = 'text';
+    idIn.placeholder = I18n.t('options_model_id');
+    idIn.setAttribute('list', 'models-list');
+    idIn.value = single.model;
+    idIn.className = 'sn-model-id';
 
     const status = document.createElement('div');
     status.className = 'sn-model-row-status';
 
-    const testOr = document.createElement('button');
-    testOr.type = 'button';
-    testOr.className = 'sn-btn sn-btn-secondary';
-    testOr.textContent = I18n.t('options_model_test_or');
-    testOr.addEventListener('click', () => runRowTest('openrouter', orIn.value.trim(), row, testOr));
-
-    const testGm = document.createElement('button');
-    testGm.type = 'button';
-    testGm.className = 'sn-btn sn-btn-secondary';
-    testGm.textContent = I18n.t('options_model_test_gemini');
-    testGm.addEventListener('click', () => runRowTest('gemini', gemIn.value.trim(), row, testGm));
+    const test = document.createElement('button');
+    test.type = 'button';
+    test.className = 'sn-btn sn-btn-secondary';
+    test.textContent = I18n.t('options_model_test');
+    test.addEventListener('click', () => runRowTest(provSel.value, idIn.value.trim(), row, test));
 
     const del = document.createElement('button');
     del.type = 'button';
@@ -253,11 +244,9 @@
     del.addEventListener('click', () => { row.remove(); save(); });
 
     row.appendChild(nickIn);
-    row.appendChild(labelIn);
-    row.appendChild(orIn);
-    row.appendChild(gemIn);
-    row.appendChild(testOr);
-    row.appendChild(testGm);
+    row.appendChild(provSel);
+    row.appendChild(idIn);
+    row.appendChild(test);
     row.appendChild(del);
     row.appendChild(status);
     renderRowTest(row);
