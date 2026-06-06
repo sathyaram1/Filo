@@ -990,7 +990,10 @@
         stdinInput.value = '';
       }
     });
-    stdinInput.focus();
+    // Il cursore resta nella barra principale così l'utente può digitare subito
+    // il comando successivo senza ricliccare. Il campo "Invio testo al comando…"
+    // qui sopra resta cliccabile per i comandi interattivi che chiedono stdin.
+    inputEl.focus();
   }
 
   inputForm.addEventListener('submit', (e) => {
