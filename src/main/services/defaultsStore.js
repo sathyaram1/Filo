@@ -29,7 +29,7 @@ const MODELS_DOC = 'config/models';
 const SECRETS_DOC = 'config/secrets';
 
 // Cache degli override remoti dall'ultimo refresh.
-let remoteModels = null;  // { provider?, geminiDirect?, models?, modelRegistry? }
+let remoteModels = null;  // { provider?, models?, modelRegistry? }
 let remoteSecrets = null; // { apiKeys?: { openrouter?, gemini?, tavily? }, safeBrowsingKey? }
 let lastFetchTs = 0;
 
