@@ -236,7 +236,6 @@ function withDefaults(settings) {
   return {
     ...settings,
     provider: d.provider,
-    geminiDirect: d.geminiDirect,
     models: d.models,
     modelRegistry: d.modelRegistry,
     apiKeys,
