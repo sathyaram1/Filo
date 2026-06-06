@@ -323,6 +323,48 @@
     return url;
   }
 
+  // Etichette pulite per le schede delle pagine interne di Filo: niente prefisso
+  // "Filo —", e il nome è quello del tasto che apre la pagina (es. "Modelli" per
+  // le Opzioni). La newtab è "Home". Le pagine web esterne tengono il loro title.
+  const FILO_TAB_LABELS = {
+    'newtab': 'Home',
+    'options/options.html': 'Modelli',
+    'options/altro.html': 'Altro',
+    'security/security.html': 'Sicurezza',
+    'preferences/preferences.html': 'Preferenze',
+    'admin-defaults/admin-defaults.html': 'Modelli predefiniti',
+    'editor/editor.html': 'Editor',
+    'feedback/feedback.html': 'Feedback',
+    'history/history.html': 'Cronologia',
+    'home/home.html': 'Aperti per dopo',
+    'spellcheck/spellcheck.html': 'Correttore',
+  };
+
+  // Toglie un eventuale prefisso "Filo — " / "Filo -" da un titolo di pagina.
+  function stripFiloPrefix(title) {
+    return String(title || '').replace(/^\s*Filo\s*[—–-]\s*/i, '').trim();
+  }
+
+  // Nome da mostrare sulla scheda. Le pagine filo:// interne usano l'etichetta
+  // pulita; tutto il resto usa il title della pagina (o l'URL come ripiego).
+  function tabLabel(t) {
+    const url = t.url || '';
+    if (url.startsWith('filo://')) {
+      // Chiave = host + path, senza lo slash iniziale del path. La newtab è
+      // "filo://newtab/" → chiave "newtab".
+      const rest = url.slice('filo://'.length);
+      const noQuery = rest.split(/[?#]/)[0];
+      const key = noQuery.replace(/\/+$/, '');
+      if (FILO_TAB_LABELS[key]) return FILO_TAB_LABELS[key];
+      const host = key.split('/')[0];
+      if (FILO_TAB_LABELS[host]) return FILO_TAB_LABELS[host];
+      // Pagina interna non mappata: almeno togli il prefisso "Filo —".
+      const clean = stripFiloPrefix(t.title);
+      if (clean) return clean;
+    }
+    return t.title || displayUrl(t.url) || 'Nuova scheda';
+  }
+
   // La "home" di Filo è la newtab (mappata sulla dashboard). Senza tab attiva
   // trattiamo lo stato come home così la barra resta accessibile.
   function isHomeUrl(url) {
