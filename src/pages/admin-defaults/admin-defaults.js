@@ -183,8 +183,6 @@
 
   // ── Load / Save ─────────────────────────────────────────────────────────────
   function applyConfig(cfg) {
-    $('provider').value = cfg.provider || 'openrouter';
-    $('geminiDirect').checked = cfg.geminiDirect !== false;
     const present = cfg.apiKeysPresent || {};
     $('apiKey-state').textContent = `(${keyStateText(present.openrouter)})`;
     $('apiKeyGemini-state').textContent = `(${keyStateText(present.gemini)})`;
