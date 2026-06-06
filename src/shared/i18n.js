@@ -151,7 +151,7 @@
     options_use_default_models: 'Usa modelli predefiniti',
     options_use_default_models_desc:
       'Filo funziona subito con modelli e chiavi predefiniti, senza configurare nulla. Disattiva per usare le tue chiavi e scegliere i tuoi modelli.',
-    options_provider: 'Provider AI',
+    options_keys: 'Chiavi API',
     options_api_key: 'API key',
     options_models: 'Modelli per azione',
     options_costs: 'Costi e limiti',
