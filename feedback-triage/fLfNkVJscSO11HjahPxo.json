@@ -1,7 +1,0 @@
-{
-  "id": "fLfNkVJscSO11HjahPxo",
-  "status": "done",
-  "notes": "Alla primissima apertura di Filo (subito dopo il download) ora compare al centro della home il tuo messaggio di benvenuto, come se te lo scrivesse Filo: l'utente lo legge e può rispondere direttamente dalla barra qui sotto per farsi configurare. Compare una volta sola: a partire dalla seconda apertura torna il normale commento della dashboard. Verificato con un test che controlla che il benvenuto appaia al primo avvio e NON ricompaia ai successivi.",
-  "queuedAt": "2026-06-06T05:13:56.774Z",
-  "queuedBy": "routine"
-}

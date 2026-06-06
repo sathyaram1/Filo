@@ -1,7 +1,0 @@
-{
-  "id": "rszChLH1xKyzb8PnNzo2",
-  "status": "done",
-  "notes": "Ho aggiunto fra le icone del menu del tasto destro (nel pannello 'Altro…') quattro nuove scorciatoie: Impostazioni, Home, Editor e Feedback. Cliccandole apri direttamente quella pagina/app. Come tutte le altre icone puoi trascinarle nella riga principale se le usi spesso. Per chi aveva già personalizzato la disposizione, le nuove icone vengono aggiunte automaticamente senza toccare quelle esistenti. Ho disegnato una nuova icona a fumetto per il Feedback, coerente con lo stile delle altre. Verificato con un test che controlla la presenza delle quattro icone e che il click su Impostazioni/Editor apra la pagina giusta.",
-  "queuedAt": "2026-06-06T05:14:06.556Z",
-  "queuedBy": "routine"
-}

@@ -1,7 +1,0 @@
-{
-  "id": "TOOwDzRRHcrhiqRXt7v5",
-  "status": "done",
-  "notes": "Il correttore (correzione di una singola parola al click destro) suggeriva quasi sempre parole inglesi anche su testo italiano: la richiesta al modello non gli diceva mai in che lingua rispondere, così ripiegava sull'inglese. Ora gli chiedo esplicitamente di correggere nella STESSA lingua della frase (deducendola dal contesto) e di non tradurre/sostituire mai con un termine inglese se il testo è in italiano. Nota: la correzione vera la produce il modello AI, quindi serve una chiave configurata e non è verificabile end-to-end nell'ambiente di test headless; ho aggiunto un test che verifica che la richiesta al modello imponga il vincolo di lingua. Quando provi: scrivi una parola italiana storpiata (es. 'paaese'), tasto destro, e il suggerimento deve restare italiano.",
-  "queuedAt": "2026-06-06T05:14:17.530Z",
-  "queuedBy": "routine"
-}
