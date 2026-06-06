@@ -605,7 +605,16 @@
         statusEl.textContent = '';
         clearDraft();
         close();
-        Popup?.showToast?.('Grazie! Feedback inviato.', { duration: 2500 });
+        // Se qualche allegato non è riuscito a caricarsi, il feedback parte
+        // comunque (testo + allegati ok) ma avvisiamo l'utente di QUALI file
+        // sono andati persi, così non resta convinto che siano stati inviati.
+        const failed = Array.isArray(res.failed) ? res.failed : [];
+        if (failed.length) {
+          const names = failed.map((f) => f?.name || 'allegato').join(', ');
+          Popup?.showToast?.(`Feedback inviato, ma non sono riuscito a caricare: ${names}`, { duration: 6000 });
+        } else {
+          Popup?.showToast?.('Grazie! Feedback inviato.', { duration: 2500 });
+        }
       } catch (e) {
         console.error('[SN feedback] submit', e);
         statusEl.textContent = 'Errore invio: ' + (e?.message || e);
