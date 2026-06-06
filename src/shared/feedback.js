@@ -108,7 +108,6 @@
     const failed = [];
     const imgs = Array.isArray(images) ? images.slice(0, 5) : [];
     const uploaded = [];
-    imgs.forEach((img, i) => {});
     for (let i = 0; i < imgs.length; i++) {
       const img = imgs[i];
       if (!img?.dataUrl) continue;
