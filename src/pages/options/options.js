@@ -3,7 +3,6 @@
 (function () {
   'use strict';
 
-  const { ACTIONS } = window.SN_CONST;
   const { MSG } = window.SN_MSG;
   const I18n = window.SN_I18N;
   const Storage = window.SN_STORAGE;
