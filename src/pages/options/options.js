@@ -79,21 +79,13 @@
     $('apiKey').value = settings.apiKeys?.openrouter || '';
     $('apiKeyGemini').value = settings.apiKeys?.gemini || '';
     $('apiKeyTavily').value = settings.apiKeys?.tavily || '';
-    $('model-explain').value = settings.models?.[ACTIONS.EXPLAIN] || '';
-    $('model-explain-deep').value = settings.models?.[ACTIONS.EXPLAIN_DEEP] || '';
-    $('model-translate-selection').value = settings.models?.[ACTIONS.TRANSLATE_SELECTION] || '';
-    $('model-translate-page').value = settings.models?.[ACTIONS.TRANSLATE_PAGE] || '';
-    $('model-help').value = settings.models?.[ACTIONS.HELP] || '';
-    $('model-categorize').value = settings.models?.[ACTIONS.CATEGORIZE] || '';
-    $('model-describe-image').value = settings.models?.[ACTIONS.DESCRIBE_IMAGE] || '';
-    $('model-transcribe-image').value = settings.models?.[ACTIONS.TRANSCRIBE_IMAGE] || '';
-    $('model-transcribe-audio').value = settings.models?.[ACTIONS.TRANSCRIBE_AUDIO] || '';
-    $('model-spellcheck-semantic').value = settings.models?.[ACTIONS.SPELLCHECK_SEMANTIC] || '';
-    $('model-spellcheck-word').value = settings.models?.[ACTIONS.SPELLCHECK_WORD] || '';
-    $('model-help-intent-guess').value = settings.models?.[ACTIONS.HELP_INTENT_GUESS] || '';
-    $('model-help-intent-judge').value = settings.models?.[ACTIONS.HELP_INTENT_JUDGE] || '';
     $('monthlyLimit').value = settings.monthlyLimitEur ?? 5;
-    $('blocklist').value = (settings.blocklist || []).join('\n');
+
+    // Editor a segmenti "Modelli per azione": una catena di fallback per azione.
+    modelChains = ModelChain.renderGrid($('modelsGrid'), {
+      models: settings.models || {},
+      onChange: saveDebounced,
+    });
 
     // Costi
     try {
@@ -105,10 +97,8 @@
     // Datalist modelli (popola con i default + eventualmente API)
     populateDatalist(collectRawModelIds(settings));
 
-    // Registry modelli
+    // Registry modelli (popola anche la datalist dei nickname usata dai segmenti)
     renderModelRegistry(settings.modelRegistry || {});
-
-    await renderCategories();
   }
 
   // Estrae gli id concreti dei modelli noti, per popolare la datalist
