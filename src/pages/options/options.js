@@ -428,9 +428,5 @@
     });
     // L'input dentro le righe del registry e i segmenti dei modelli (creati
     // dinamicamente) fanno bubbling del `change` fino a #page → già coperti.
-    $('lnkShortcuts').addEventListener('click', (e) => {
-      e.preventDefault();
-      chrome.tabs.create({ url: 'chrome://extensions/shortcuts' });
-    });
   });
 })();
