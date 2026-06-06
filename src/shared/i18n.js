@@ -191,7 +191,7 @@
     options_h_model_registry: 'Modelli',
     options_model_registry_desc:
       'Ogni modello ha un nickname, un provider e la stringa esatta per chiamarlo su quel provider. Le azioni qui sotto fanno riferimento al nickname. Per avere un fallback su un altro provider crea un secondo modello (es. lo stesso modello su OpenRouter) ed elenca entrambi i nickname nell\'azione, separati da virgola.',
-    options_models_desc: 'Per ogni azione, scegli il nickname del modello da usare. Puoi indicarne anche più di uno separandoli con la virgola: il primo è il modello principale, gli altri vengono usati come fallback in ordine se quello prima fallisce.',
+    options_models_desc: 'Per ogni azione, scegli il modello da usare (per nickname). Con «+» puoi aggiungere altri modelli come fallback: il primo segmento è il modello principale, gli altri vengono provati in ordine se quello prima fallisce.',
     options_model_nickname: 'nickname',
     options_model_provider: 'provider',
     options_model_id: 'stringa modello',
