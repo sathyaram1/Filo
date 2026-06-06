@@ -66,6 +66,7 @@
   function buildSettings() {
     const entries = [
       { label: 'Modelli', icon: 'models', url: 'filo://options/options.html' },
+      { label: 'Altro', icon: 'options', url: 'filo://options/altro.html' },
       { label: 'Sicurezza', icon: 'lock', url: 'filo://security/security.html' },
       { type: 'separator' },
       { label: 'Preferenze', icon: 'colorPicker', url: 'filo://preferences/preferences.html' },
