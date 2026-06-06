@@ -435,6 +435,18 @@ section:has(#dictList) .sn-spell-add-row {
   margin-bottom: 2px;
 }
 
+/* Lista read-only dei modelli predefiniti: 4 colonne (nickname, provider,
+   stringa modello, Prova) — senza Rimuovi né input editabili. */
+.sn-default-model-row {
+  grid-template-columns: 120px 110px 1fr auto;
+}
+.sn-default-model-cell {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Editor a segmenti della catena di modelli per azione (Modelli per azione).
    Una "pillola" con un segmento per modello in ordine di priorità, separati da
    un divisore accentato; "+" aggiunge un fallback, "×" rimuove un segmento. */
