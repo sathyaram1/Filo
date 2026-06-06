@@ -191,6 +191,7 @@
     options_model_add: 'Aggiungi modello',
     options_model_remove: 'Rimuovi',
     options_model_test: 'Prova',
+    options_model_untested: 'Non ancora testato — premi «Prova».',
     options_model_no_id: 'Inserisci la stringa del modello',
     options_model_nickname_required: 'Il nickname è obbligatorio',
     options_model_nickname_duplicate: 'Nickname duplicato: %s',
