@@ -920,7 +920,7 @@
 
   // Icone ritirate dal registro: vanno purgate dal layout salvato per non
   // generare bottoni "fantasma" (registry lookup miss).
-  const RETIRED_ICONS = new Set(['openOptions', 'openForLater']);
+  const RETIRED_ICONS = new Set(['openForLater']);
 
   // Vecchio default (prima del cambio a 5 slot): se trovo esattamente questo
   // layout in storage, è il default che non è mai stato customizzato — migro.
