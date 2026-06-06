@@ -56,10 +56,21 @@
     return present ? I18n.t('admin_defaults_key_present') : I18n.t('admin_defaults_key_absent');
   }
 
-  // ── Registry editor (stesso schema della pagina Opzioni) ────────────────────
+  // ── Registry editor (stesso schema single-provider della pagina Opzioni) ─────
+  // Ogni modello ha UN solo provider e la stringa concreta per chiamarlo.
+  function entryToSingle(entry) {
+    const e = entry || {};
+    if (e.provider && e.model) return { provider: e.provider, model: e.model };
+    if (e.gemini) return { provider: 'gemini', model: e.gemini };
+    if (e.openrouter) return { provider: 'openrouter', model: e.openrouter };
+    return { provider: 'openrouter', model: '' };
+  }
+
   function makeModelRow(nick, entry) {
     const row = document.createElement('div');
     row.className = 'sn-model-row';
+    const single = entryToSingle(entry);
+    row.dataset.label = (entry && entry.label) || '';
 
     const nickIn = document.createElement('input');
     nickIn.type = 'text';
@@ -67,23 +78,20 @@
     nickIn.value = nick || '';
     nickIn.className = 'sn-model-nick';
 
-    const labelIn = document.createElement('input');
-    labelIn.type = 'text';
-    labelIn.placeholder = I18n.t('options_model_label');
-    labelIn.value = (entry && entry.label) || '';
-    labelIn.className = 'sn-model-label';
+    const provSel = document.createElement('select');
+    provSel.className = 'sn-model-provider';
+    [['openrouter', 'OpenRouter'], ['gemini', 'Gemini API']].forEach(([val, label]) => {
+      const opt = document.createElement('option');
+      opt.value = val; opt.textContent = label;
+      provSel.appendChild(opt);
+    });
+    provSel.value = single.provider;
 
-    const orIn = document.createElement('input');
-    orIn.type = 'text';
-    orIn.placeholder = I18n.t('options_model_or_id');
-    orIn.value = (entry && entry.openrouter) || '';
-    orIn.className = 'sn-model-or';
-
-    const gemIn = document.createElement('input');
-    gemIn.type = 'text';
-    gemIn.placeholder = I18n.t('options_model_gemini_id');
-    gemIn.value = (entry && entry.gemini) || '';
-    gemIn.className = 'sn-model-gemini';
+    const idIn = document.createElement('input');
+    idIn.type = 'text';
+    idIn.placeholder = I18n.t('options_model_id');
+    idIn.value = single.model;
+    idIn.className = 'sn-model-id';
 
     const del = document.createElement('button');
     del.type = 'button';
@@ -92,9 +100,8 @@
     del.addEventListener('click', () => { row.remove(); });
 
     row.appendChild(nickIn);
-    row.appendChild(labelIn);
-    row.appendChild(orIn);
-    row.appendChild(gemIn);
+    row.appendChild(provSel);
+    row.appendChild(idIn);
     row.appendChild(del);
     return row;
   }
@@ -104,7 +111,7 @@
     host.innerHTML = '';
     const head = document.createElement('div');
     head.className = 'sn-model-row sn-model-row-head';
-    ['nickname', 'etichetta', 'id su OpenRouter', 'id su Gemini API', ''].forEach((label) => {
+    [I18n.t('options_model_nickname'), I18n.t('options_model_provider'), I18n.t('options_model_id'), ''].forEach((label) => {
       const c = document.createElement('div'); c.textContent = label; head.appendChild(c);
     });
     host.appendChild(head);
@@ -123,13 +130,15 @@
     const out = {};
     for (const row of host.querySelectorAll('.sn-model-row:not(.sn-model-row-head)')) {
       const nick = row.querySelector('.sn-model-nick').value.trim();
-      const label = row.querySelector('.sn-model-label').value.trim();
-      const or = row.querySelector('.sn-model-or').value.trim();
-      const gem = row.querySelector('.sn-model-gemini').value.trim();
-      if (!nick && !label && !or && !gem) continue;
+      const provider = row.querySelector('.sn-model-provider').value;
+      const model = row.querySelector('.sn-model-id').value.trim();
+      const label = (row.dataset.label || '').trim();
+      if (!nick && !model) continue;
       if (!nick) continue;
       if (out[nick]) continue;
-      out[nick] = { label, openrouter: or, gemini: gem };
+      const entry = { provider, model };
+      if (label) entry.label = label;
+      out[nick] = entry;
     }
     return out;
   }
