@@ -445,17 +445,8 @@
     $('addModelRow').addEventListener('click', () => {
       $('modelRegistryList').appendChild(makeModelRow('', {}));
     });
-    // L'input dentro le righe del registry (creato dinamicamente) fa bubbling
-    // dell'evento `change` fino a #page, quindi è già coperto dall'handler sopra.
-    $('openHome').addEventListener('click', () => {
-      chrome.tabs.create({ url: chrome.runtime.getURL('src/pages/home/home.html') });
-    });
-    $('openHistory').addEventListener('click', () => {
-      chrome.tabs.create({ url: chrome.runtime.getURL('src/pages/history/history.html') });
-    });
-    $('openSpellcheck').addEventListener('click', () => {
-      chrome.tabs.create({ url: chrome.runtime.getURL('src/pages/spellcheck/spellcheck.html') });
-    });
+    // L'input dentro le righe del registry e i segmenti dei modelli (creati
+    // dinamicamente) fanno bubbling del `change` fino a #page → già coperti.
     $('lnkShortcuts').addEventListener('click', (e) => {
       e.preventDefault();
       chrome.tabs.create({ url: 'chrome://extensions/shortcuts' });
