@@ -333,8 +333,7 @@
       } else {
         // Salva il risultato (latenza + token/sec) nella riga e persistilo nel
         // registry, così resta visibile e confrontabile tra le sessioni.
-        row._test = row._test || {};
-        row._test[providerId] = {
+        row._test = {
           ttftMs: res.ttftMs ?? null,
           tokensPerSec: res.tokensPerSec ?? null,
           at: new Date().toISOString(),
