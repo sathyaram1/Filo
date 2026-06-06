@@ -1,7 +1,7 @@
 // Pagina admin "Modelli predefiniti".
 //
-// Editor della config condivisa (provider, geminiDirect, registry, modelli per
-// azione, chiavi API predefinite) che si propaga a TUTTI gli utenti via
+// Editor della config condivisa (registry modelli, modelli per azione, chiavi
+// API predefinite) che si propaga a TUTTI gli utenti via
 // Firestore. Riservata agli admin: il main (handler DEFAULTS_GET/UPDATE) rifiuta
 // i non-admin e le regole Firestore sono la garanzia forte. Le chiavi vere non
 // arrivano mai qui: il main manda solo `apiKeysPresent` (booleani).
