@@ -17,7 +17,8 @@ test('la newtab apre filo://newtab/ con la dashboard montata', async ({ shell, a
   // La newtab viene aperta automaticamente dal main process al boot.
   // Aspettiamo che compaia nella tab bar (l'aggiornamento arriva via IPC).
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
-  await expect(shell.locator('.tab .title')).toContainText('Filo', { timeout: 8_000 });
+  // La scheda della newtab si chiama "Home" (niente prefisso "Filo —").
+  await expect(shell.locator('.tab .title')).toHaveText('Home', { timeout: 8_000 });
 
   // Recupera la Page del WebContentsView del tab e verifica la dashboard.
   const allWindows = app.windows();
