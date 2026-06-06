@@ -41,10 +41,95 @@
   // Quando "usa modelli predefiniti" è ON, nasconde le sezioni di config
   // avanzata (provider/chiavi, registry, modelli per azione): l'utente usa i
   // default condivisi senza dover toccare nulla. OFF = mostra tutto.
+  // Mostra/nasconde anche la lista read-only dei modelli predefiniti.
   function applyDefaultModelsVisibility() {
     const useDefault = $('useDefaultModels').checked;
     for (const el of document.querySelectorAll('.sn-advanced-models')) {
       el.hidden = useDefault;
+    }
+    $('defaultModelsList').hidden = !useDefault;
+  }
+
+  // ── Lista read-only dei modelli predefiniti con tasto "Prova" ─────────────
+  // Quando useDefaultModels è ON, mostra i modelli del registry predefinito
+  // (costanti o override Firestore) con un pulsante "Prova" che testa il
+  // modello usando le chiavi effettive (le predefinite, non quelle dell'utente).
+
+  function renderDefaultModels(registry) {
+    const host = $('defaultModelsList');
+    host.innerHTML = '';
+    const entries = Object.entries(registry || {});
+    if (!entries.length) return;
+
+    const head = document.createElement('div');
+    head.className = 'sn-model-row sn-model-row-head sn-default-model-row';
+    [
+      I18n.t('options_model_nickname'),
+      I18n.t('options_model_provider'),
+      I18n.t('options_model_id'),
+      '',
+    ].forEach((label) => {
+      const c = document.createElement('div'); c.textContent = label; head.appendChild(c);
+    });
+    host.appendChild(head);
+
+    for (const [nick, entry] of entries) {
+      host.appendChild(makeDefaultModelRow(nick, entry));
+    }
+  }
+
+  function makeDefaultModelRow(nick, entry) {
+    const row = document.createElement('div');
+    row.className = 'sn-model-row sn-default-model-row';
+    const single = entryToSingle(entry);
+
+    const nickEl = document.createElement('div');
+    nickEl.className = 'sn-default-model-cell';
+    nickEl.textContent = nick;
+
+    const provEl = document.createElement('div');
+    provEl.className = 'sn-default-model-cell sn-muted';
+    provEl.textContent = single.provider === 'gemini' ? 'Gemini API' : 'OpenRouter';
+
+    const modelEl = document.createElement('div');
+    modelEl.className = 'sn-default-model-cell sn-muted';
+    modelEl.textContent = single.model;
+
+    const testBtn = document.createElement('button');
+    testBtn.type = 'button';
+    testBtn.className = 'sn-btn sn-btn-secondary';
+    testBtn.textContent = I18n.t('options_model_test');
+    testBtn.addEventListener('click', () => runDefaultModelTest(nick, row, testBtn));
+
+    const status = document.createElement('div');
+    status.className = 'sn-model-row-status';
+
+    row.appendChild(nickEl);
+    row.appendChild(provEl);
+    row.appendChild(modelEl);
+    row.appendChild(testBtn);
+    row.appendChild(status);
+    return row;
+  }
+
+  async function runDefaultModelTest(nickname, row, btn) {
+    const statusEl = row.querySelector('.sn-model-row-status');
+    statusEl.textContent = I18n.t('options_test_running');
+    btn.disabled = true;
+    try {
+      const res = await chrome.runtime.sendMessage({
+        type: MSG.TEST_DEFAULT_MODEL,
+        nickname,
+      });
+      if (!res?.ok) {
+        statusEl.textContent = I18n.t('options_test_failed', res?.error || '—');
+      } else {
+        statusEl.textContent = I18n.t('options_test_result', res.ttftMs ?? '—', res.tokensPerSec ?? '—');
+      }
+    } catch (e) {
+      statusEl.textContent = I18n.t('options_test_failed', e?.message || String(e));
+    } finally {
+      btn.disabled = false;
     }
   }
 
