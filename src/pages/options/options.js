@@ -288,14 +288,15 @@
     let missingNick = false;
     for (const row of host.querySelectorAll('.sn-model-row:not(.sn-model-row-head)')) {
       const nick = row.querySelector('.sn-model-nick').value.trim();
-      const label = row.querySelector('.sn-model-label').value.trim();
-      const or = row.querySelector('.sn-model-or').value.trim();
-      const gem = row.querySelector('.sn-model-gemini').value.trim();
-      if (!nick && !label && !or && !gem) continue;
+      const provider = row.querySelector('.sn-model-provider').value;
+      const model = row.querySelector('.sn-model-id').value.trim();
+      const label = (row.dataset.label || '').trim();
+      if (!nick && !model) continue;
       if (!nick) { missingNick = true; continue; }
       if (out[nick]) { dups.push(nick); continue; }
-      const entry = { label, openrouter: or, gemini: gem };
-      // Preserva i risultati di test misurati (latenza/token-sec) tra i salvataggi.
+      const entry = { provider, model };
+      if (label) entry.label = label;
+      // Preserva il risultato di test misurato (latenza/token-sec) tra i salvataggi.
       if (row._test && Object.keys(row._test).length) entry.test = row._test;
       out[nick] = entry;
     }
