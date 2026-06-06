@@ -400,11 +400,12 @@ section:has(#dictList) .sn-spell-add-row {
   grid-template-columns: 1fr auto;
 }
 
-/* Registry modelli (editor in pagina Opzioni). Una riga per nickname con
-   campi nickname/etichetta/openrouter/gemini e tre azioni a destra. */
+/* Registry modelli (editor in pagina Opzioni). Una riga per nickname:
+   nickname | provider | stringa modello | Prova | Rimuovi, con i dati di
+   test (latenza/token-sec) su una seconda riga a tutta larghezza. */
 .sn-model-row {
   display: grid;
-  grid-template-columns: 120px 160px 1fr 1fr auto auto auto;
+  grid-template-columns: 120px 150px 1fr auto auto;
   gap: 6px;
   align-items: center;
   padding: 6px 8px;
@@ -413,7 +414,8 @@ section:has(#dictList) .sn-spell-add-row {
   border-radius: var(--sn-radius);
   background: var(--sn-bg);
 }
-.sn-model-row input[type="text"] { width: 100%; font-size: 12px; }
+.sn-model-row input[type="text"],
+.sn-model-row select { width: 100%; font-size: 12px; }
 .sn-model-row .sn-btn { padding: 4px 8px; font-size: 12px; }
 .sn-model-row-status {
   grid-column: 1 / -1;
