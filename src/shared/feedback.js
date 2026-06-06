@@ -102,18 +102,28 @@
   // files: array di { name, type, dataUrl } per allegati non-immagine (pdf,
   // txt, md, json…), max ~5. Ritorna { id, url } del documento creato.
   async function submit({ text, url, title, userAgent, clientId, images, files }) {
+    // Allegati che NON sono riusciti a caricarsi: li riportiamo al chiamante
+    // così la UI può avvisare l'utente (un upload fallito veniva ingoiato in
+    // silenzio e il feedback partiva senza il file, senza alcun segnale).
+    const failed = [];
     const imgs = Array.isArray(images) ? images.slice(0, 5) : [];
     const uploaded = [];
-    for (const img of imgs) {
+    imgs.forEach((img, i) => {});
+    for (let i = 0; i < imgs.length; i++) {
+      const img = imgs[i];
       if (!img?.dataUrl) continue;
       const blob = dataUrlToBlob(img.dataUrl);
       // Limite difensivo lato client: 4 MB per immagine.
-      if (blob.size > 4 * 1024 * 1024) continue;
+      if (blob.size > 4 * 1024 * 1024) {
+        failed.push({ name: String(img.name || `immagine ${i + 1}`), reason: 'troppo grande (max 4 MB)' });
+        continue;
+      }
       try {
         const u = await uploadImage(blob);
         uploaded.push(u.url);
       } catch (e) {
         console.warn('[SN feedback] upload immagine fallito:', e);
+        failed.push({ name: String(img.name || `immagine ${i + 1}`), reason: 'caricamento non riuscito' });
       }
     }
 
@@ -122,14 +132,16 @@
     const docs = Array.isArray(files) ? files.slice(0, 5) : [];
     const uploadedFiles = [];
     for (const f of docs) {
-      if (!f?.dataUrl) continue;
+      const fname = String(f?.name || 'allegato');
+      if (!f?.dataUrl) { failed.push({ name: fname, reason: 'file vuoto' }); continue; }
       const blob = dataUrlToBlob(f.dataUrl);
-      if (blob.size > 4 * 1024 * 1024) continue;
+      if (blob.size > 4 * 1024 * 1024) { failed.push({ name: fname, reason: 'troppo grande (max 4 MB)' }); continue; }
       try {
         const u = await uploadImage(blob); // upload generico (usa blob.type)
-        uploadedFiles.push({ url: u.url, name: String(f.name || 'allegato'), type: String(f.type || blob.type || '') });
+        uploadedFiles.push({ url: u.url, name: fname, type: String(f.type || blob.type || '') });
       } catch (e) {
         console.warn('[SN feedback] upload file fallito:', e);
+        failed.push({ name: fname, reason: 'caricamento non riuscito' });
       }
     }
 
