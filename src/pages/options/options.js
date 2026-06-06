@@ -7,6 +7,10 @@
   const { MSG } = window.SN_MSG;
   const I18n = window.SN_I18N;
   const Storage = window.SN_STORAGE;
+  const ModelChain = window.SN_MODEL_CHAIN;
+
+  // Mappa azione → editor a segmenti della sua catena di modelli (popolata in load()).
+  let modelChains = {};
 
   function $(id) { return document.getElementById(id); }
 
