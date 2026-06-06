@@ -903,10 +903,10 @@
     }
   }
 
-  // Layout di default: 5 icone primarie nella riga, le altre nella griglia.
-  // `newTab` (logo Filo "f") al posto di `openForLater` e l'ingranaggio
-  // `openOptions` rimosso dalle azioni rapide (feedback alpha): le Opzioni
-  // restano accessibili dalla barra indirizzi (icona ingranaggio).
+  // Layout di default: icone primarie nella riga, le altre nella griglia
+  // "Altro…". Fra le secondarie ci sono le scorciatoie a Impostazioni (`openOptions`),
+  // Home (`home`) e alle app interne Editor (`editorApp`) e Feedback (`feedbackApp`),
+  // così sono raggiungibili direttamente dal menu del tasto destro (feedback alpha).
   const DEFAULT_ICON_LAYOUT = {
     primary: ['translate', 'screenshot', 'share', 'saveForLater', 'qrCode', 'newTab'],
     secondary: ['openOptions', 'home', 'editorApp', 'feedbackApp', 'incognito', 'screenshotCrop', 'transcribe', 'colorPicker', 'closeTab', 'fullscreen', 'back', 'forward', 'reload'],
