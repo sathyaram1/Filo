@@ -21,14 +21,15 @@ test('Modelli: la catena di fallback per azione ordina primario poi secondari', 
 
   const chain = await page.evaluate(() => {
     const C = window.SN_CONST;
-    const refs = C.parseModelRefs('flash, claude-haiku');
+    const refs = C.parseModelRefs('flash, flash-or, claude-haiku');
     const order = ['gemini', 'openrouter'];
     const keys = { gemini: 'gm', openrouter: 'or' };
     return C.buildModelAttempts(refs, C.DEFAULT_MODEL_REGISTRY, order, keys);
   });
 
-  // flash esiste su entrambi i provider, claude-haiku solo su OpenRouter →
-  // catena attesa: gemini(flash) → openrouter(flash) → openrouter(claude-haiku).
+  // Nuovo schema: ogni nickname ha UN solo provider. Il fallback cross-provider
+  // si ottiene elencando i gemelli ('flash' su Gemini, 'flash-or' su OpenRouter)
+  // → catena attesa: gemini(flash) → openrouter(flash-or) → openrouter(claude-haiku).
   expect(chain.map((a) => `${a.provider}:${a.model}`)).toEqual([
     'gemini:gemini-2.0-flash',
     'openrouter:google/gemini-2.0-flash-001',
@@ -36,7 +37,7 @@ test('Modelli: la catena di fallback per azione ordina primario poi secondari', 
   ]);
 });
 
-test('Modelli: la lista multipla è retro-compatibile col singolo nickname', async ({ openTab }) => {
+test('Modelli: un singolo nickname risolve solo sul suo provider', async ({ openTab }) => {
   const page = await openTab(OPTIONS_URL);
   await page.waitForFunction(() => !!window.SN_CONST?.buildModelAttempts, null, { timeout: 8_000 });
 
@@ -45,9 +46,9 @@ test('Modelli: la lista multipla è retro-compatibile col singolo nickname', asy
     const refs = C.parseModelRefs('flash');
     return C.buildModelAttempts(refs, C.DEFAULT_MODEL_REGISTRY, ['gemini', 'openrouter'], { gemini: 'gm', openrouter: 'or' });
   });
+  // 'flash' è un modello Gemini: non deve comparire alcun tentativo OpenRouter.
   expect(chain.map((a) => `${a.provider}:${a.model}`)).toEqual([
     'gemini:gemini-2.0-flash',
-    'openrouter:google/gemini-2.0-flash-001',
   ]);
 });
 
