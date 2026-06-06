@@ -1,7 +1,7 @@
 // Store della configurazione "predefinita" condivisa di Filo.
 //
 // Cosa contiene la config predefinita:
-//   - provider, geminiDirect, models (modello per azione), modelRegistry
+//   - provider, models (modello per azione), modelRegistry
 //     → NON sono segreti (sono solo nomi di modelli): vivono nel doc Firestore
 //       `config/models`, leggibile da TUTTI (anche utenti non loggati), così la
 //       modifica fatta dall'admin si propaga a ogni installazione.
