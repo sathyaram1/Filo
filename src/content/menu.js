@@ -282,6 +282,12 @@
       el.type = 'button';
       el.className = 'sn-menu-item';
       if (it.disabled) el.classList.add('sn-disabled');
+      if (it.icon) {
+        const ic = document.createElement('span');
+        ic.className = 'sn-menu-item-icon';
+        setIconContent(ic, it.icon);
+        el.appendChild(ic);
+      }
       const lbl = document.createElement('span');
       lbl.className = 'sn-menu-label';
       lbl.textContent = it.label;
