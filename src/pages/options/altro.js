@@ -17,10 +17,25 @@
     $('backToModels').textContent = I18n.t('options_back_to_models');
     $('h-blocklist').textContent = I18n.t('options_blocklist');
     $('h-categories').textContent = I18n.t('options_categories');
+    $('h-shortcuts').textContent = I18n.t('options_shortcuts');
     $('savedHint').textContent = I18n.t('options_saved');
     $('openHome').textContent = 'Aperti per dopo';
     $('openHistory').textContent = 'Cronologia AI';
     $('openSpellcheck').textContent = 'Gestisci correttore';
+
+    // Lista scorciatoie da tastiera
+    const sc = $('shortcutsList');
+    sc.innerHTML = '';
+    [
+      ['Alt+E', I18n.t('options_action_explain')],
+      ['Alt+T', I18n.t('options_action_translate_sel')],
+      ['Alt+S', 'Salva per dopo'],
+      ['Alt+H', I18n.t('options_action_help') + ' (Fase 2)'],
+    ].forEach(([k, v]) => {
+      const li = document.createElement('li');
+      li.textContent = `${k} — ${v}`;
+      sc.appendChild(li);
+    });
   }
 
   async function load() {
