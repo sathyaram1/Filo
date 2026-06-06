@@ -141,6 +141,9 @@
     window.SN_PAGE_BOOTSTRAP.applyTheme(settings.theme);
 
     $('useDefaultModels').checked = settings.useDefaultModels !== false;
+    // Popola la lista read-only dei modelli predefiniti (visibile solo se ON).
+    const C = window.SN_CONST || {};
+    renderDefaultModels(C.DEFAULT_MODEL_REGISTRY || {});
     applyDefaultModelsVisibility();
     $('apiKey').value = settings.apiKeys?.openrouter || '';
     $('apiKeyGemini').value = settings.apiKeys?.gemini || '';
