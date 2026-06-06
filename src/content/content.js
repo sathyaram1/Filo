@@ -2279,7 +2279,13 @@
       && typeof window.SpeechSynthesisUtterance === 'function';
   }
 
+  // Flag interno "sto leggendo": più affidabile di synth.speaking, che su alcuni
+  // motori torna false a intermittenza tra una frase e l'altra. Lo alziamo
+  // all'avvio e lo abbassiamo a fine lettura, in caso di errore o su stop.
+  let reading = false;
+
   function stopReading() {
+    reading = false;
     if (!ttsSupported()) return;
     try { window.speechSynthesis.cancel(); } catch (_) {}
   }
