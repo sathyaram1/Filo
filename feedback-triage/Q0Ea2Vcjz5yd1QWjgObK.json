@@ -1,0 +1,7 @@
+{
+  "id": "Q0Ea2Vcjz5yd1QWjgObK",
+  "status": "done",
+  "notes": "Il messaggio di benvenuto di Filo nella home ora appare come una classica bolla di chat (come una risposta scritta da lui): riquadro con sfondo, bordo e angoli arrotondati, allineato a sinistra in alto — non piu' il grande titolo centrato. Verificato con un test che controlla lo stile a bolla (sfondo, bordo, angoli, allineamento) e con uno screenshot.",
+  "queuedAt": "2026-06-06T11:02:21.074Z",
+  "queuedBy": "routine"
+}
