@@ -2329,6 +2329,7 @@
   // lettura" (simmetria: se puoi avviare la lettura, devi poterla fermare),
   // altrimenti "Leggi" il testo selezionato.
   function isReadingNow() {
+    if (reading) return true;
     const synth = ttsSupported() ? window.speechSynthesis : null;
     return !!(synth && (synth.speaking || synth.pending));
   }
