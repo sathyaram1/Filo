@@ -585,7 +585,7 @@
   function buildFeedbackItem() {
     return {
       type: 'item',
-      label: '💬 Invia feedback (alpha)',
+      label: 'Invia feedback',
       onClick: () => {
         try { self.SN_FEEDBACK_UI?.open(); } catch (e) { console.error('[SN] feedback open', e); }
       },
