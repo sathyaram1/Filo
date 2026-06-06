@@ -1,0 +1,7 @@
+{
+  "id": "gHBbDUUgGJrAKykVGuWX",
+  "status": "clarify",
+  "notes": "Cosa ho capito: volevi allegare un file con delle specifiche da implementare ('implementa queste specifiche'), ma il file non risulta salvato nel feedback (il campo allegati e' vuoto), quindi non posso leggere le specifiche. Cosa ho verificato: la pagina Feedback mostra correttamente gli allegati quando ci sono (sia immagini sia file pdf/txt/json/ecc.), quindi il problema non e' la visualizzazione ma che il file non e' arrivato a destinazione al momento dell'invio. Cosa mi serve per procedere: 1) ri-allega il file oppure incolla direttamente il testo delle specifiche nel feedback; 2) dimmi che tipo ed eventuale dimensione di file avevi provato ad allegare (es. .docx? un'immagine? un file oltre 4 MB?), cosi' posso riprodurre e correggere l'eventuale bug di upload.",
+  "queuedAt": "2026-06-06T11:02:31.439Z",
+  "queuedBy": "routine"
+}
