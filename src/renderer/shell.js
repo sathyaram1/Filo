@@ -285,7 +285,7 @@
 
       const title = document.createElement('span');
       title.className = 'title';
-      title.textContent = t.title || displayUrl(t.url) || 'Nuova scheda';
+      title.textContent = tabLabel(t);
       el.appendChild(title);
 
       const close = document.createElement('span');
