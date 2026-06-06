@@ -29,6 +29,23 @@ test('primo avvio: la home mostra il messaggio di benvenuto di Filo', async ({ a
   expect(txt).toContain('mi configuro io');
   // Resta in stato home: il benvenuto non deve far saltare la dashboard nel thread.
   await expect(page.locator('body')).toHaveAttribute('data-state', 'home');
+
+  // Il benvenuto deve apparire come una classica bolla di chat (risposta LLM):
+  // sfondo "card", bordo e angoli arrotondati, allineato a sinistra — non come
+  // grande titolo centrato (feedback alpha).
+  const bubble = await msg.evaluate((el) => {
+    const cs = getComputedStyle(el);
+    return {
+      radius: parseFloat(cs.borderTopLeftRadius) || 0,
+      borderWidth: parseFloat(cs.borderTopWidth) || 0,
+      bg: cs.backgroundColor,
+      textAlign: cs.textAlign,
+    };
+  });
+  expect(bubble.radius).toBeGreaterThan(0);
+  expect(bubble.borderWidth).toBeGreaterThan(0);
+  expect(bubble.textAlign).toBe('left');
+  expect(bubble.bg).not.toBe('rgba(0, 0, 0, 0)');
 });
 
 test('il benvenuto non ricompare alle aperture successive', async ({ app, shell }) => {
