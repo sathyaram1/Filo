@@ -909,7 +909,7 @@
   // restano accessibili dalla barra indirizzi (icona ingranaggio).
   const DEFAULT_ICON_LAYOUT = {
     primary: ['translate', 'screenshot', 'share', 'saveForLater', 'qrCode', 'newTab'],
-    secondary: ['incognito', 'screenshotCrop', 'transcribe', 'colorPicker', 'closeTab', 'fullscreen', 'back', 'forward', 'reload'],
+    secondary: ['openOptions', 'home', 'editorApp', 'feedbackApp', 'incognito', 'screenshotCrop', 'transcribe', 'colorPicker', 'closeTab', 'fullscreen', 'back', 'forward', 'reload'],
   };
 
   // Marker (storage) della promozione una-tantum di `qrCode` nella riga primaria.
