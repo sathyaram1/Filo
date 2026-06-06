@@ -2312,6 +2312,10 @@
       const v = voices.find((vo) => vo.voiceURI === tts.voice || vo.name === tts.voice);
       if (v) { u.voice = v; u.lang = v.lang; }
     }
+    // Tieni il flag allineato al ciclo di vita dell'utterance.
+    u.onend = () => { reading = false; };
+    u.onerror = () => { reading = false; };
+    reading = true;
     // Segnala l'avvio della lettura come evento sul document (DOM condiviso):
     // hook per eventuali integrazioni e segnale osservabile a fini di test,
     // indipendente dalla presenza di un motore vocale nel sistema.
