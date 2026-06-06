@@ -905,6 +905,45 @@ async function handleMessage(msg, sender = {}) {
         return { ok: false, error: e?.message || String(e) };
       }
     }
+    case MSG.TEST_DEFAULT_MODEL: {
+      try {
+        const nickname = (msg.nickname || '').trim();
+        if (!nickname) return { ok: false, error: 'Nickname mancante' };
+        const eff = await getEffectiveSettings();
+        const registry = eff.modelRegistry || SN_CONST.DEFAULT_MODEL_REGISTRY;
+        const entry = registry[nickname];
+        if (!entry) return { ok: false, error: `Modello "${nickname}" non trovato` };
+        const provider = entry.provider || 'openrouter';
+        const modelId = entry.model || '';
+        if (!modelId) return { ok: false, error: 'Stringa modello vuota' };
+        const apiKey = (eff.apiKeys || {})[provider] || '';
+        if (!apiKey) return { ok: false, error: `Chiave ${provider} non configurata` };
+        const model = provider === 'gemini' && !modelId.startsWith('google/')
+          ? `google/${modelId}` : modelId;
+        const messages = [{ role: 'user', content: 'Conta da 1 a 20 separando con virgole, senza testo extra.' }];
+        const startMs = performance.now();
+        let firstTokenMs = null;
+        let charCount = 0;
+        const result = await Providers.streamComplete({
+          provider, apiKey, model, messages,
+          onDelta: (delta) => {
+            if (firstTokenMs == null) firstTokenMs = performance.now() - startMs;
+            charCount += (delta || '').length;
+          },
+        });
+        const totalMs = performance.now() - startMs;
+        const tokens = (result?.usage?.completionTokens) || Math.max(1, Math.round(charCount / 4));
+        const tps = tokens > 0 && totalMs > 0 ? (tokens / (totalMs / 1000)) : 0;
+        return {
+          ok: true, provider, model: modelId, nickname,
+          ttftMs: firstTokenMs != null ? Math.round(firstTokenMs) : null,
+          totalMs: Math.round(totalMs), completionTokens: tokens,
+          tokensPerSec: Math.round(tps * 10) / 10,
+        };
+      } catch (e) {
+        return { ok: false, error: e?.message || String(e) };
+      }
+    }
     case MSG.OPEN_HOME: {
       const win = winOf(sender);
       if (win?._filoTabs) win._filoTabs.openTab('filo://home/home.html');
