@@ -273,6 +273,13 @@
   // --- Alias semantico: "Salvati per dopo" usa il logo di Filo
   const openForLater = filoLogo;
 
+  // --- Feedback: fumetto/balloon di chat con tre puntini (un messaggio).
+  const feedback =
+    `<path d="M4 5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-9l-4 4v-4H5a1 1 0 0 1-1-1z"/>` +
+    `<path d="M8.5 9.5h.01"/>` +
+    `<path d="M12 9.5h.01"/>` +
+    `<path d="M15.5 9.5h.01"/>`;
+
   // Esposizione: ciascuna icona è una FUNZIONE (size) => stringa SVG.
   // Permette ai consumer di chiedere taglie diverse (es. 16 per la riga,
   // 20 per la griglia overflow) senza ricreare manualmente il wrapper.
