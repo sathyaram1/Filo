@@ -84,7 +84,7 @@ service cloud.firestore {
 
       allow create: if
         request.resource.data.keys().hasOnly(
-          ['text', 'url', 'title', 'userAgent', 'clientId', 'images', 'createdAt']
+          ['text', 'url', 'title', 'userAgent', 'clientId', 'images', 'files', 'createdAt']
         )
         && request.resource.data.text is string
         && request.resource.data.text.size() <= 10000
@@ -97,7 +97,9 @@ service cloud.firestore {
         && request.resource.data.get('clientId', '') is string
         && request.resource.data.get('clientId', '').size() <= 100
         && request.resource.data.get('images', []) is list
-        && request.resource.data.get('images', []).size() <= 5;
+        && request.resource.data.get('images', []).size() <= 5
+        && request.resource.data.get('files', []) is list
+        && request.resource.data.get('files', []).size() <= 5;
 
       // Triage admin (pieno): solo i campi di stato/note/priorità/timestamp.
       // Tutto il resto del documento resta immutabile.
