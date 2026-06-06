@@ -266,6 +266,9 @@
     for (const r of document.querySelectorAll('input[name="cookie-mode"]')) {
       r.addEventListener('change', () => { syncCookieMode(); saveCookies(); });
     }
+    for (const r of document.querySelectorAll('input[name="fp-mode"]')) {
+      r.addEventListener('change', saveFingerprint);
+    }
     $('cookie-wl-add-btn').addEventListener('click', addWhitelistDomain);
     $('cookie-wl-input').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); addWhitelistDomain(); }
