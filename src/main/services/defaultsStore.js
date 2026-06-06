@@ -206,7 +206,6 @@ async function update(partial, idToken) {
   const modelFields = {};
   const modelMask = [];
   if (typeof partial.provider === 'string') { modelFields.provider = toFsValue(partial.provider); modelMask.push('provider'); }
-  if (typeof partial.geminiDirect === 'boolean') { modelFields.geminiDirect = toFsValue(partial.geminiDirect); modelMask.push('geminiDirect'); }
   if (partial.models && typeof partial.models === 'object') { modelFields.models = toFsValue(partial.models); modelMask.push('models'); }
   if (partial.modelRegistry && typeof partial.modelRegistry === 'object') { modelFields.modelRegistry = toFsValue(partial.modelRegistry); modelMask.push('modelRegistry'); }
   if (modelMask.length) await patchDoc(MODELS_DOC, modelFields, modelMask, idToken);
