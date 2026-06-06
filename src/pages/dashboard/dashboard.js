@@ -1044,5 +1044,7 @@
       loadDashboard().catch((e) => console.warn('[Filo] dashboard load', e)),
       refreshLive().catch((e) => console.warn('[Filo] live', e)),
     ]);
+    // Dopo il caricamento: alla primissima apertura mostra il benvenuto di Filo.
+    await showWelcomeIfFirstRun().catch((e) => console.warn('[Filo] welcome', e));
   })();
 })();
