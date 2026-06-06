@@ -22,7 +22,6 @@
     $('h-blocklist').textContent = I18n.t('options_blocklist');
     $('h-categories').textContent = I18n.t('options_categories');
 
-    document.querySelector('label[for="provider"]').textContent = I18n.t('options_provider');
     document.querySelector('label[for="apiKey"]').textContent = I18n.t('options_api_key');
 
     $('lbl-explain').textContent = I18n.t('options_action_explain');
