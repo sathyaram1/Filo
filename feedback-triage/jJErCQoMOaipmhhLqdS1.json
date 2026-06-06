@@ -1,0 +1,7 @@
+{
+  "id": "jJErCQoMOaipmhhLqdS1",
+  "status": "clarify",
+  "notes": "Ho già fatto due delle tre cose chieste, verificate con test automatici: (1) mentre Filo sta leggendo, la voce 'Interrompi lettura' ora compare in QUALSIASI menu tasto destro, anche senza testo selezionato — avvii la lettura, clicchi altrove e puoi comunque fermarla; (2) ho sostituito l'emoji con un'icona disegnata coerente con lo stile di Filo (altoparlante con onde per 'Leggi', altoparlante con una X per 'Interrompi lettura').\n\nMi resta la prima richiesta — 'aggiungere il modello ai TTS, impostabile come gli altri modelli, tenendo l'attuale come fallback' — e qui mi serve una tua decisione perche e diverso dagli altri modelli. Gli altri modelli sono di testo (OpenRouter/Gemini); la lettura ad alta voce oggi usa la voce del sistema operativo (gratis, nessuna chiave). Per renderla 'un modello configurabile' servono scelte: 1) quale servizio TTS vuoi usare? (es. Gemini ha un TTS via API; OpenRouter NON ha TTS, quindi non tutti i provider attuali andrebbero bene). 2) Va bene che usi una chiave API e consumi credito, con la voce di sistema come fallback automatico quando il modello non e configurato o fallisce? Dimmi il provider e confermami l'approccio e lo implemento (con la voce di sistema come fallback, come hai chiesto).",
+  "queuedAt": "2026-06-06T19:46:08.012Z",
+  "queuedBy": "routine"
+}
