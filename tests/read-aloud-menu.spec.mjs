@@ -48,14 +48,16 @@ test('mentre legge, "Interrompi lettura" compare anche in un menu senza selezion
 
   await page.evaluate(() => {
     window.__speaking = true;
-    window.speechSynthesis = {
+    const stub = {
       get speaking() { return window.__speaking; },
       get pending() { return false; },
       cancel() { window.__speaking = false; },
       speak() { window.__speaking = true; },
       getVoices() { return []; },
     };
-    window.SpeechSynthesisUtterance = function (t) { this.text = t; };
+    // speechSynthesis è una proprietà read-only: l'assegnazione diretta viene
+    // ignorata, quindi la ridefiniamo con defineProperty.
+    Object.defineProperty(window, 'speechSynthesis', { configurable: true, get() { return stub; } });
   });
 
   // Click destro su un punto "vuoto" della pagina: nessuna selezione di testo.
