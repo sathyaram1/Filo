@@ -20,6 +20,24 @@ const path = require('node:path');
 // l'autoscroll nativo). Vedi wheel-zoom.js.
 try { require('./wheel-zoom.js')(webFrame); } catch (e) { console.error('[Filo CS] wheel-zoom', e); }
 
+// ─── Protezione anti-fingerprinting ────────────────────────────────────────
+//
+// Inietta nel MAIN WORLD (prima degli script di pagina) gli override di
+// canvas/WebGL/audio che aggiungono rumore deterministico per-sito ai segnali
+// ad alta entropia. Il seed arriva SINCRONO dal main (HMAC col master secret),
+// così il secret non tocca mai il mondo non fidato della pagina. Solo http(s);
+// se la protezione è spenta (livello 0) non iniettiamo nulla.
+try {
+  const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
+  if (/^https?:/i.test(loc)) {
+    const cfg = ipcRenderer.sendSync('filo:fp-config', loc) || { level: 0, seed: 0 };
+    if (cfg && cfg.level > 0) {
+      const { buildGuardSource } = require('./fingerprint-guard.js');
+      webFrame.executeJavaScript(buildGuardSource(cfg.seed, cfg.level), true).catch(() => {});
+    }
+  }
+} catch (e) { /* la protezione non deve MAI bloccare il caricamento della pagina */ }
+
 // ─── chrome.* shim per i content script ────────────────────────────────────
 //
 // Gira nel preload context (mondo isolato), invisibile alla pagina. I content
