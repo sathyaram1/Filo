@@ -259,7 +259,12 @@
 
     const head = document.createElement('div');
     head.className = 'sn-model-row sn-model-row-head';
-    ['nickname', 'etichetta', 'id su OpenRouter', 'id su Gemini API', '', '', ''].forEach((label) => {
+    [
+      I18n.t('options_model_nickname'),
+      I18n.t('options_model_provider'),
+      I18n.t('options_model_id'),
+      '', '',
+    ].forEach((label) => {
       const c = document.createElement('div'); c.textContent = label; head.appendChild(c);
     });
     host.appendChild(head);
