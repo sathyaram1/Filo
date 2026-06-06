@@ -621,6 +621,18 @@
       for (const it of contextItems) items.push(it);
     }
 
+    // 3b. "Interrompi lettura" globale: mentre legge deve comparire in OGNI menu.
+    // Quando c'è una selezione la voce è già fra gli item contestuali (via
+    // buildReadAloudItem), quindi qui la aggiungo solo se non c'è selezione,
+    // per evitare doppioni.
+    if (!selInfo) {
+      const stopItem = buildStopReadingItem();
+      if (stopItem) {
+        items.push({ type: 'separator' });
+        items.push(stopItem);
+      }
+    }
+
     // 4. Feedback (alpha)
     items.push({ type: 'separator' });
     items.push(buildFeedbackItem());
