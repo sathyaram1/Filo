@@ -60,6 +60,19 @@ function registerIpcHandlers() {
     shellSessions.clear();
   });
 
+  // Config anti-fingerprinting per la pagina che sta per caricarsi. SINCRONO:
+  // il preload deve installare gli override PRIMA degli script di pagina, non
+  // può aspettare una Promise. Ritorna { level, seed }: il seed è derivato in
+  // main dal master secret (che NON attraversa mai questo confine). Vedi
+  // services/fingerprint.js e preload/fingerprint-guard.js.
+  ipcMain.on('filo:fp-config', (event, href) => {
+    try {
+      event.returnValue = require('./services/fingerprint').configForHref(href);
+    } catch (_) {
+      event.returnValue = { level: 0, seed: 0 };
+    }
+  });
+
   ipcMain.handle('filo:message', async (event, msg) => {
     const info = senderInfo(event);
     // In incognito avvolgiamo l'handler in runIncognito(): ogni lettura/scrittura
