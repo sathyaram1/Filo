@@ -38,9 +38,6 @@
     $('title').textContent = I18n.t('admin_defaults_title');
     $('denied-msg').textContent = I18n.t('admin_defaults_denied');
     $('intro').textContent = I18n.t('admin_defaults_intro');
-    $('h-provider').textContent = I18n.t('options_provider');
-    $('lbl-provider').textContent = I18n.t('options_provider');
-    $('geminiDirect-label').textContent = I18n.t('admin_defaults_gemini_direct');
     $('h-keys').textContent = I18n.t('admin_defaults_keys');
     $('keys-desc').textContent = I18n.t('admin_defaults_keys_desc');
     $('apiKeySafebrowse-desc').textContent = I18n.t('admin_defaults_safebrowse_key_desc');
