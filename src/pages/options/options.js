@@ -443,7 +443,6 @@
     const apiKey = $('apiKey').value.trim();
     const apiKeyGemini = $('apiKeyGemini').value.trim();
     const apiKeyTavily = $('apiKeyTavily').value.trim();
-    const blocklist = $('blocklist').value.split('\n').map((s) => s.trim()).filter(Boolean);
 
     // Auto-save: persistiamo solo le righe valide. Le righe incomplete
     // (nickname mancante) o duplicate vengono semplicemente ignorate finché
@@ -455,23 +454,8 @@
       useDefaultModels: $('useDefaultModels').checked,
       apiKeys: { openrouter: apiKey, gemini: apiKeyGemini, tavily: apiKeyTavily },
       modelRegistry: registry,
-      models: {
-        [ACTIONS.EXPLAIN]: $('model-explain').value.trim(),
-        [ACTIONS.EXPLAIN_DEEP]: $('model-explain-deep').value.trim(),
-        [ACTIONS.TRANSLATE_SELECTION]: $('model-translate-selection').value.trim(),
-        [ACTIONS.TRANSLATE_PAGE]: $('model-translate-page').value.trim(),
-        [ACTIONS.HELP]: $('model-help').value.trim(),
-        [ACTIONS.CATEGORIZE]: $('model-categorize').value.trim(),
-        [ACTIONS.DESCRIBE_IMAGE]: $('model-describe-image').value.trim(),
-        [ACTIONS.TRANSCRIBE_IMAGE]: $('model-transcribe-image').value.trim(),
-        [ACTIONS.TRANSCRIBE_AUDIO]: $('model-transcribe-audio').value.trim(),
-        [ACTIONS.SPELLCHECK_SEMANTIC]: $('model-spellcheck-semantic').value.trim(),
-        [ACTIONS.SPELLCHECK_WORD]: $('model-spellcheck-word').value.trim(),
-        [ACTIONS.HELP_INTENT_GUESS]: $('model-help-intent-guess').value.trim(),
-        [ACTIONS.HELP_INTENT_JUDGE]: $('model-help-intent-judge').value.trim(),
-      },
+      models: ModelChain.collect(modelChains),
       monthlyLimitEur: parseFloat($('monthlyLimit').value) || 0,
-      blocklist,
     };
 
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
