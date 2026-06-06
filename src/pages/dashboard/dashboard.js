@@ -953,7 +953,11 @@
     const finish = (label) => {
       if (finished) return;
       finished = true;
+      // Se il focus era sui controlli che sto per rimuovere (es. campo stdin),
+      // riportalo nella barra principale invece di perderlo nel vuoto.
+      const focusWasInControls = controls.contains(document.activeElement);
       controls.remove();
+      if (focusWasInControls) inputEl.focus();
       if (label) {
         const tag = document.createElement('div');
         tag.className = 'dash-term-exit';
