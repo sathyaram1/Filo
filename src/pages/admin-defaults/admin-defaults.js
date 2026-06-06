@@ -138,33 +138,13 @@
     }
   }
 
-  // ── Modelli per azione ──────────────────────────────────────────────────────
+  // ── Modelli per azione (stesso editor a segmenti della pagina Opzioni) ───────
   function renderModelsGrid(models) {
-    const grid = $('modelsGrid');
-    grid.innerHTML = '';
-    for (const [action, labelKey] of ACTION_LABELS) {
-      const cell = document.createElement('div');
-      const label = document.createElement('label');
-      label.textContent = I18n.t(labelKey);
-      label.setAttribute('for', `model-${action}`);
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.id = `model-${action}`;
-      input.dataset.action = action;
-      input.setAttribute('list', 'nicknames-list');
-      input.value = (models && models[action]) || '';
-      cell.appendChild(label);
-      cell.appendChild(input);
-      grid.appendChild(cell);
-    }
+    modelChains = ModelChain.renderGrid($('modelsGrid'), { models: models || {} });
   }
 
   function collectModels() {
-    const out = {};
-    for (const input of $('modelsGrid').querySelectorAll('input[data-action]')) {
-      out[input.dataset.action] = input.value.trim();
-    }
-    return out;
+    return ModelChain.collect(modelChains);
   }
 
   // ── Load / Save ─────────────────────────────────────────────────────────────
