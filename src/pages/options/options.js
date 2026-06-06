@@ -21,16 +21,11 @@
     $('h-provider').textContent = I18n.t('options_keys');
     $('h-models').textContent = I18n.t('options_models');
     $('h-costs').textContent = I18n.t('options_costs');
-    $('h-shortcuts').textContent = I18n.t('options_shortcuts');
-
     document.querySelector('label[for="apiKey"]').textContent = I18n.t('options_api_key');
 
     $('lbl-limit').textContent = I18n.t('options_monthly_limit');
     $('lbl-spent').textContent = I18n.t('options_current_spent');
 
-    $('lnkShortcuts').textContent = I18n.t('options_open_chrome_shortcuts');
-
-    $('openOther').textContent = I18n.t('options_more_link');
     $('savedHint').textContent = I18n.t('options_saved');
 
     $('testOpenrouter').textContent = I18n.t('options_test_provider');
