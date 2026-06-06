@@ -9,29 +9,15 @@
 (function () {
   'use strict';
 
-  const { ACTIONS } = window.SN_CONST;
   const { MSG } = window.SN_MSG;
   const I18n = window.SN_I18N;
   const Storage = window.SN_STORAGE;
+  const ModelChain = window.SN_MODEL_CHAIN;
+
+  // Mappa azione → editor a segmenti della catena di modelli (popolata in applyConfig()).
+  let modelChains = {};
 
   function $(id) { return document.getElementById(id); }
-
-  // Azione → chiave i18n per l'etichetta (riusa le stringhe della pagina Opzioni).
-  const ACTION_LABELS = [
-    [ACTIONS.EXPLAIN, 'options_action_explain'],
-    [ACTIONS.EXPLAIN_DEEP, 'options_action_explain_deep'],
-    [ACTIONS.TRANSLATE_SELECTION, 'options_action_translate_sel'],
-    [ACTIONS.TRANSLATE_PAGE, 'options_action_translate_page'],
-    [ACTIONS.HELP, 'options_action_help'],
-    [ACTIONS.CATEGORIZE, 'options_action_categorize'],
-    [ACTIONS.DESCRIBE_IMAGE, 'options_action_describe_image'],
-    [ACTIONS.TRANSCRIBE_IMAGE, 'options_action_transcribe_image'],
-    [ACTIONS.TRANSCRIBE_AUDIO, 'options_action_transcribe_audio'],
-    [ACTIONS.SPELLCHECK_SEMANTIC, 'spell_action_semantic_label'],
-    [ACTIONS.SPELLCHECK_WORD, 'spell_action_word_label'],
-    [ACTIONS.HELP_INTENT_GUESS, 'options_action_help_intent_guess'],
-    [ACTIONS.HELP_INTENT_JUDGE, 'options_action_help_intent_judge'],
-  ];
 
   function fillStaticText() {
     document.title = I18n.t('admin_defaults_title');
