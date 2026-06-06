@@ -454,7 +454,6 @@
   }
 
   async function save() {
-    const provider = $('provider').value;
     const apiKey = $('apiKey').value.trim();
     const apiKeyGemini = $('apiKeyGemini').value.trim();
     const apiKeyTavily = $('apiKeyTavily').value.trim();
