@@ -240,11 +240,13 @@
     del.textContent = I18n.t('options_model_remove');
     del.addEventListener('click', () => { row.remove(); save(); });
 
+    // Ordine richiesto: nickname · provider · stringa · Rimuovi · Prova, con i
+    // dati del test (latenza/token-sec) nella riga a tutta larghezza sotto.
     row.appendChild(nickIn);
     row.appendChild(provSel);
     row.appendChild(idIn);
-    row.appendChild(test);
     row.appendChild(del);
+    row.appendChild(test);
     row.appendChild(status);
     renderRowTest(row);
     return row;
