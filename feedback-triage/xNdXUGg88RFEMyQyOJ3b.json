@@ -1,0 +1,7 @@
+{
+  "id": "xNdXUGg88RFEMyQyOJ3b",
+  "status": "done",
+  "notes": "Ora dopo aver inviato un comando dalla barra (anche un comando della shell tipo /ls) il cursore resta nella barra: puoi scrivere subito il comando successivo senza ricliccare. Il campo per inviare testo a un comando interattivo in esecuzione resta comunque cliccabile quando serve. Verificato con un test automatico che invia un comando e controlla che il focus torni nella barra.",
+  "queuedAt": "2026-06-06T19:45:35.551Z",
+  "queuedBy": "routine"
+}
