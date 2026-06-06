@@ -125,17 +125,43 @@
     await renderCategories();
   }
 
-  // Estrae gli id concreti (lato OpenRouter / Gemini) noti, per popolare la
-  // datalist dei due input "id su <provider>" nel registry editor.
+  // Estrae gli id concreti dei modelli noti, per popolare la datalist
+  // dell'input "stringa modello" nel registry editor. Gestisce sia il nuovo
+  // schema ({ model }) sia il vecchio duale ({ openrouter, gemini }).
   function collectRawModelIds(settings) {
     const out = [];
     const reg = settings.modelRegistry || {};
     for (const nick of Object.keys(reg)) {
       const e = reg[nick] || {};
+      if (e.model) out.push(e.model);
       if (e.openrouter) out.push(e.openrouter);
       if (e.gemini) out.push(e.gemini);
     }
     return out;
+  }
+
+  // Normalizza una entry del registry (nuovo schema o vecchio duale) in
+  // { provider, model }. Per le vecchie entry duali sceglie un solo provider
+  // (preferendo Gemini, poi OpenRouter): al primo salvataggio diventerà
+  // single-provider e l'utente potrà aggiungere il gemello sull'altro provider
+  // come riga separata se vuole il fallback.
+  function entryToSingle(entry) {
+    const e = entry || {};
+    if (e.provider && e.model) return { provider: e.provider, model: e.model };
+    if (e.gemini) return { provider: 'gemini', model: e.gemini };
+    if (e.openrouter) return { provider: 'openrouter', model: e.openrouter };
+    return { provider: 'openrouter', model: '' };
+  }
+
+  // Normalizza i risultati di test (nuovo schema flat { ttftMs, tokensPerSec }
+  // o vecchio per-provider { openrouter:{...}, gemini:{...} }) nel formato flat,
+  // scegliendo il sotto-oggetto del provider attivo per le vecchie entry.
+  function normalizeTest(entry, single) {
+    const t = entry && entry.test;
+    if (!t || typeof t !== 'object') return null;
+    if (t.ttftMs != null || t.tokensPerSec != null) return { ...t };
+    const sub = t[single.provider];
+    return sub ? { ...sub } : null;
   }
 
   function populateNicknames(registry) {
