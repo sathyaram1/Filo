@@ -27,6 +27,19 @@ test('Shift + tasto destro NON apre il menu (escape hatch)', async ({ openTab, t
   await expect(page.locator('.sn-menu')).toHaveCount(0);
 });
 
+test('la voce feedback è "Invia feedback" senza emoji né "(alpha)"', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, HTML);
+  await page.locator('#paragraph').click({ button: 'right' });
+  const menu = page.locator('.sn-menu');
+  await expect(menu).toBeVisible();
+  // La voce esiste con l'etichetta pulita…
+  await expect(menu.getByText('Invia feedback', { exact: true })).toBeVisible();
+  // …e NON contiene più l'emoji o il suffisso "(alpha)".
+  const txt = (await menu.textContent()) || '';
+  expect(txt).not.toContain('💬');
+  expect(txt).not.toContain('(alpha)');
+});
+
 test('tasto destro su selezione mostra la sezione inline AI', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, HTML);
   await page.evaluate(() => {
