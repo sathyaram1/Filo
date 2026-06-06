@@ -21,8 +21,15 @@ test('la newtab apre filo://newtab/ con la dashboard montata', async ({ shell, a
   await expect(shell.locator('.tab .title')).toHaveText('Home', { timeout: 8_000 });
 
   // Recupera la Page del WebContentsView del tab e verifica la dashboard.
-  const allWindows = app.windows();
-  const tabPage = allWindows.find((w) => w.url().startsWith('filo://newtab'));
+  // Polling: la newtab è una WebContentsView che può registrare la sua URL
+  // qualche tick dopo che la scheda è comparsa nella tab bar.
+  let tabPage = null;
+  const deadline = Date.now() + 8_000;
+  while (Date.now() < deadline) {
+    tabPage = app.windows().find((w) => w.url().startsWith('filo://newtab'));
+    if (tabPage) break;
+    await new Promise((r) => setTimeout(r, 100));
+  }
   expect(tabPage).toBeTruthy();
   await tabPage.waitForLoadState('domcontentloaded');
   await expect(tabPage.locator('#input')).toBeVisible();
