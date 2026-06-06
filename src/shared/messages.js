@@ -23,6 +23,7 @@
     // Test provider: misura latenza al primo token e token al secondo
     // su un piccolo prompt fisso. Usato dalla pagina Opzioni.
     TEST_PROVIDER: 'test_provider',                 // { provider, apiKey, model? }
+    TEST_DEFAULT_MODEL: 'test_default_model',       // { nickname } → testa con chiavi effettive
 
     OPEN_HOME: 'open_home',
     OPEN_HISTORY: 'open_history',
