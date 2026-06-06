@@ -164,6 +164,14 @@
     if (!ref) return null;
     const entry = registry && registry[ref];
     if (entry) {
+      // Nuovo schema: un solo provider per modello ({ provider, model }).
+      // Il modello è servibile solo dal SUO provider; per gli altri ritorna
+      // null così la catena di fallback lo salta (il fallback cross-provider
+      // si ottiene elencando un secondo nickname nell'azione).
+      if (entry.provider && entry.model) {
+        return entry.provider === providerName ? entry.model : null;
+      }
+      // Legacy: entry "duale" { openrouter, gemini } salvata prima del refactor.
       const id = entry[providerName];
       return id || null;
     }
