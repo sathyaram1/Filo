@@ -281,10 +281,11 @@ function buildAttemptChain(settings, modelRef) {
   // provider disponibili (Gemini diretto → provider scelto → OpenRouter).
   const refs = SN_CONST.parseModelRefs(modelRef);
   if (!refs.length && modelRef) refs.push(modelRef);
-  const providerOrder = [];
-  if (settings.geminiDirect) providerOrder.push('gemini');
-  providerOrder.push(settings.provider || 'openrouter');
-  providerOrder.push('openrouter');
+  // Ogni modello del registry porta il proprio provider, quindi l'ordine qui
+  // conta solo per i ref "legacy" (id grezzi senza nickname): proviamo prima
+  // Gemini (quota free) poi OpenRouter. buildModelAttempts scarta da sé i
+  // provider senza chiave o senza un id concreto per quel modello.
+  const providerOrder = ['gemini', 'openrouter'];
   const out = SN_CONST.buildModelAttempts(refs, registry, providerOrder, settings.apiKeys || {});
   if (!out.length) {
     const e = new Error(I18n.t('err_no_api_key'));
