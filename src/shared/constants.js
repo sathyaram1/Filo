@@ -157,7 +157,7 @@
     // Filo agenti: chat = modello principale; gli altri (background) usano lite.
     [ACTIONS.FILO_CHAT]: 'flash, flash-or',
     [ACTIONS.FILO_DASHBOARD]: 'flash, flash-or',
-    [ACTIONS.FILO_LESSON]: 'flash-lite, flash-lite-or',
+    [ACTIONS.FILO_LESSON]: 'flash-lite-3, flash-lite-3-or',
     [ACTIONS.FILO_COMPACT]: 'flash, flash-or',
   };
 
