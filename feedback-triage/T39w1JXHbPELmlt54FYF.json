@@ -1,7 +1,0 @@
-{
-  "id": "T39w1JXHbPELmlt54FYF",
-  "status": "done",
-  "notes": "Le icone del menu di Filo non si 'rompono' più sui siti web. Su alcune pagine (come magnific.com) apparivano come quadratini/sagome piene: era il CSS del sito che riempiva di colore le nostre icone a contorno. Ora le icone del menu (e degli altri pannelli di Filo) restano protette dallo stile della pagina ospitante e si vedono correttamente ovunque. Verificato con un test automatico che simula un sito 'ostile' che forza il colore di riempimento sugli svg.",
-  "queuedAt": "2026-06-07T09:58:47.295Z",
-  "queuedBy": "routine"
-}
