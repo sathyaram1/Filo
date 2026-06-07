@@ -201,11 +201,10 @@
     // Bonifica di una nostra svista (non esistono su OpenRouter senza tilde):
     'google/gemini-flash-latest': 'google/gemini-2.0-flash-001',
     'google/gemini-pro-latest': 'anthropic/claude-3.5-haiku',
-    // `gemini-3.1-flash-lite-preview` non esiste sull'API Gemini ufficiale (e
-    // l'ID era stato preso da una preview OpenRouter ormai rimossa). Mappiamo
-    // sul flash-lite 2.0 stabile così la chiave Gemini gratuita viene davvero
-    // usata anche per i task "leggeri" come la descrizione immagini.
-    'google/gemini-3.1-flash-lite-preview': 'google/gemini-2.0-flash-lite-001',
+    // NB: `gemini-3.1-flash-lite` ora ESISTE sulla Gemini API ufficiale (sia il
+    // nome stabile sia il `-preview`), quindi qui NON va più rimappato/declassato.
+    // Il vecchio downgrade su flash-lite 2.0 è stato rimosso: declassava un
+    // modello valido.
   };
 
   // Un'azione può ora puntare a PIÙ modelli: il valore del campo è una lista di
