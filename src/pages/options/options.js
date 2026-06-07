@@ -278,12 +278,23 @@
     provSel.value = single.provider;
 
     // Stringa concreta per chiamare il modello presso il provider scelto.
+    // Il campo è un combobox: la datalist (per-provider) elenca tutti i modelli
+    // di quel provider; l'utente può scorrere o scrivere per filtrare, e resta
+    // libero di digitare un id non in lista.
     const idIn = document.createElement('input');
     idIn.type = 'text';
     idIn.placeholder = I18n.t('options_model_id');
-    idIn.setAttribute('list', 'models-list');
+    idIn.setAttribute('list', datalistIdFor(single.provider));
     idIn.value = single.model;
     idIn.className = 'sn-model-id';
+    // Carica la lista del provider la prima volta che l'utente apre il campo.
+    idIn.addEventListener('focus', () => ensureProviderModels(provSel.value));
+
+    // Cambiando provider, il combobox punta all'altra lista (e la carica).
+    provSel.addEventListener('change', () => {
+      idIn.setAttribute('list', datalistIdFor(provSel.value));
+      ensureProviderModels(provSel.value);
+    });
 
     const status = document.createElement('div');
     status.className = 'sn-model-row-status';
