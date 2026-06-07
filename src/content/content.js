@@ -2259,29 +2259,64 @@
   // ------------------------------------------------------------
   // Lettura ad alta voce (text-to-speech)
   // ------------------------------------------------------------
-  // Usa l'API Web Speech del browser (speechSynthesis): gratuita, nessuna
-  // chiave, voci fornite dal sistema operativo. La voce/velocità/tono preferite
-  // arrivano da settings.tts (impostate in Preferenze).
+  // Strategia: prima si tenta la sintesi vocale via MODELLO (Gemini TTS, voce di
+  // qualità) tramite il main process; se non c'è un modello/chiave o la chiamata
+  // fallisce, si ripiega sulla voce del browser (Web Speech: gratuita, offline,
+  // voci del sistema operativo). La voce/velocità/tono del fallback arrivano da
+  // settings.tts (Preferenze).
   function ttsSupported() {
     return typeof window.speechSynthesis !== 'undefined'
       && typeof window.SpeechSynthesisUtterance === 'function';
   }
 
-  function stopReading() {
-    if (!ttsSupported()) return;
-    try { window.speechSynthesis.cancel(); } catch (_) {}
+  // Audio in riproduzione dalla sintesi vocale a modello. A livello di modulo
+  // così stopReading() può fermarlo e il menu sa se sta "leggendo".
+  let ttsAudio = null;
+
+  function ttsBusy() {
+    if (ttsAudio && !ttsAudio.paused && !ttsAudio.ended) return true;
+    const synth = ttsSupported() ? window.speechSynthesis : null;
+    return !!(synth && (synth.speaking || synth.pending));
   }
 
-  function readAloud(text) {
-    if (!ttsSupported()) {
-      Popup.showToast(I18n.t('tts_not_supported'));
-      return;
+  function stopReading() {
+    if (ttsAudio) {
+      const a = ttsAudio;
+      ttsAudio = null;
+      try { a.pause(); } catch (_) {}
+      try { if (a.src) URL.revokeObjectURL(a.src); } catch (_) {}
     }
-    const clean = String(text || '').trim();
-    if (!clean) return;
+    if (ttsSupported()) { try { window.speechSynthesis.cancel(); } catch (_) {} }
+  }
+
+  // Incapsula PCM 16-bit little-endian mono (quello che torna Gemini TTS,
+  // audio/L16;rate=24000) in un WAV riproducibile da <audio>. Ritorna un blob URL.
+  function pcmBase64ToWavUrl(base64, sampleRate) {
+    const bin = atob(base64);
+    const n = bin.length;
+    const buffer = new ArrayBuffer(44 + n);
+    const view = new DataView(buffer);
+    let off = 0;
+    const writeStr = (s) => { for (let i = 0; i < s.length; i++) view.setUint8(off++, s.charCodeAt(i)); };
+    const writeU32 = (v) => { view.setUint32(off, v, true); off += 4; };
+    const writeU16 = (v) => { view.setUint16(off, v, true); off += 2; };
+    writeStr('RIFF'); writeU32(36 + n); writeStr('WAVE');
+    writeStr('fmt '); writeU32(16); writeU16(1); writeU16(1);
+    writeU32(sampleRate); writeU32(sampleRate * 2); writeU16(2); writeU16(16);
+    writeStr('data'); writeU32(n);
+    for (let i = 0; i < n; i++) view.setUint8(off++, bin.charCodeAt(i) & 0xff);
+    return URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' }));
+  }
+
+  function sampleRateFromMime(mime) {
+    const m = /rate=(\d+)/.exec(String(mime || ''));
+    return m ? parseInt(m[1], 10) : 24000;
+  }
+
+  // Fallback finale: voce del browser.
+  function readAloudBrowser(clean) {
+    if (!ttsSupported()) { Popup.showToast(I18n.t('tts_not_supported')); return; }
     const synth = window.speechSynthesis;
-    // Ferma un'eventuale lettura in corso prima di iniziarne una nuova: due
-    // letture sovrapposte sono incomprensibili.
     synth.cancel();
     const u = new SpeechSynthesisUtterance(clean);
     const tts = (settings && settings.tts) || {};
@@ -2294,22 +2329,52 @@
       const v = voices.find((vo) => vo.voiceURI === tts.voice || vo.name === tts.voice);
       if (v) { u.voice = v; u.lang = v.lang; }
     }
-    // Segnala l'avvio della lettura come evento sul document (DOM condiviso):
-    // hook per eventuali integrazioni e segnale osservabile a fini di test,
-    // indipendente dalla presenza di un motore vocale nel sistema.
+    synth.speak(u);
+  }
+
+  async function readAloud(text) {
+    const clean = String(text || '').trim();
+    if (!clean) return;
+    // Ferma un'eventuale lettura in corso (modello o browser): due letture
+    // sovrapposte sono incomprensibili.
+    stopReading();
+    // Segnale osservabile dell'avvio lettura, indipendente dal motore usato.
     try {
       document.dispatchEvent(new CustomEvent('filo:read-aloud', { detail: { text: clean } }));
     } catch (_) {}
-    synth.speak(u);
+
+    // 1) Sintesi vocale via modello (qualità migliore).
+    try {
+      const res = await chrome.runtime.sendMessage({ type: MSG.TTS_SYNTH, text: clean });
+      if (res && res.ok && res.audioBase64) {
+        const url = pcmBase64ToWavUrl(res.audioBase64, sampleRateFromMime(res.mimeType));
+        const audio = new Audio(url);
+        ttsAudio = audio;
+        audio.onended = () => {
+          try { URL.revokeObjectURL(url); } catch (_) {}
+          if (ttsAudio === audio) ttsAudio = null;
+        };
+        audio.onerror = () => {
+          try { URL.revokeObjectURL(url); } catch (_) {}
+          if (ttsAudio === audio) ttsAudio = null;
+          readAloudBrowser(clean); // riproduzione fallita → fallback
+        };
+        await audio.play();
+        return;
+      }
+    } catch (_) {
+      // nessun modello/chiave o errore di rete → fallback sotto
+    }
+
+    // 2) Fallback finale: voce del browser.
+    readAloudBrowser(clean);
   }
 
   // Voce di menu per la lettura: se sta già leggendo mostra "Interrompi
   // lettura" (simmetria: se puoi avviare la lettura, devi poterla fermare),
   // altrimenti "Leggi" il testo selezionato.
   function buildReadAloudItem(text) {
-    const synth = ttsSupported() ? window.speechSynthesis : null;
-    const speaking = !!(synth && (synth.speaking || synth.pending));
-    if (speaking) {
+    if (ttsBusy()) {
       return { type: 'item', label: '🔊 ' + I18n.t('menu_stop_reading'), onClick: () => stopReading() };
     }
     return { type: 'item', label: '🔊 ' + I18n.t('menu_read_aloud'), onClick: () => readAloud(text) };
