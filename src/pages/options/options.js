@@ -442,19 +442,16 @@
     populateDatalist('openrouter', byProv.openrouter);
   }
 
-  // Interroga l'API Gemini e ritorna i NOMI NATIVI dei modelli che supportano la
-  // generazione di testo (es. gemini-3.1-flash-lite), niente prefisso "google/":
-  // è esattamente la stringa che il provider Gemini si aspetta e che salviamo nel
-  // registry.
+  // Interroga l'API Gemini e ritorna TUTTI i modelli (testo, sintesi vocale,
+  // immagini, embedding…) col NOME NATIVO (es. gemini-3.1-flash-lite), niente
+  // prefisso "google/". meta = oggetto grezzo (serve per categoria/data).
   async function fetchGeminiModels(key) {
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     return (data.models || [])
-      .filter((m) => (m.supportedGenerationMethods || []).includes('generateContent'))
-      .map((m) => (m.name || '').replace(/^models\//, ''))
-      .filter(Boolean)
-      .sort();
+      .map((m) => ({ id: (m.name || '').replace(/^models\//, ''), meta: m }))
+      .filter((it) => it.id);
   }
 
   async function fetchOpenRouterModels(key) {
@@ -463,7 +460,7 @@
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    return (data.data || []).map((m) => m.id).filter(Boolean).sort();
+    return (data.data || []).map((m) => ({ id: m.id, meta: m })).filter((it) => it.id);
   }
 
   function providerKey(provider) {
