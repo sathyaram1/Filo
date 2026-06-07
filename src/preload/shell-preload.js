@@ -35,6 +35,13 @@ contextBridge.exposeInMainWorld('filoShell', {
     ipcRenderer.on('shell:menu-action', wrapped);
     return () => ipcRenderer.removeListener('shell:menu-action', wrapped);
   },
+  // L'agente "Aiuto" può azionare i comandi rapidi della barra (le icone in
+  // alto) chiedendo al main, che inoltra qui: la shell clicca il bottone reale.
+  onTriggerButton: (fn) => {
+    const wrapped = (_event, info) => { try { fn(info && info.command); } catch (_) {} };
+    ipcRenderer.on('shell:trigger-button', wrapped);
+    return () => ipcRenderer.removeListener('shell:trigger-button', wrapped);
+  },
   tooltipShow: (text, x, y) => ipcRenderer.send('shell:tooltip-show', { text, x, y }),
   tooltipHide: () => ipcRenderer.send('shell:tooltip-hide'),
   // Modalità annotazione del box feedback: la shell mette/toglie un velo
