@@ -167,7 +167,10 @@
     }
 
     inp.addEventListener('focus', open);
-    inp.addEventListener('input', () => { if (pop.hidden) open(); else build(); });
+    inp.addEventListener('input', () => {
+      filterText = inp.value || '';
+      if (pop.hidden) open(); else build();
+    });
     inp.addEventListener('keydown', (e) => {
       if (pop.hidden) {
         if (e.key === 'ArrowDown') { e.preventDefault(); open(); }
