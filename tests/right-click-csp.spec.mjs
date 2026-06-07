@@ -81,7 +81,12 @@ test('tasto destro: funziona anche se una newtab interna naviga verso il sito co
   await shell.waitForTimeout(400);
   const snap = await shell.evaluate(() => window.filoShell.tabs.snapshot());
   const tabs = snap.tabs || snap;
-  const newtab = tabs.find((t) => (t.url || '').startsWith('filo://newtab'));
+  // Naviga la scheda ATTIVA (quella che l'utente sta guardando): è il flusso
+  // reale. tabs.open() attiva la newtab appena aperta, quindi snap.activeId la
+  // identifica. Navigare una scheda in background (non attiva) non è un flusso
+  // UI possibile e lascerebbe la view ricreata correttamente nascosta.
+  const newtab = tabs.find((t) => t.id === snap.activeId && (t.url || '').startsWith('filo://newtab'))
+    || tabs.find((t) => (t.url || '').startsWith('filo://newtab'));
   expect(newtab).toBeTruthy();
   await shell.evaluate(({ id, u }) => window.filoShell.tabs.navigate(id, u), { id: newtab.id, u: origin });
   const page = await findPageByPort(app, port);
