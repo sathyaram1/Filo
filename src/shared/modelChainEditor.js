@@ -165,7 +165,7 @@
       hoverEl = null;
     }
 
-    inp.addEventListener('focus', open);
+    inp.addEventListener('focus', () => { filterText = ''; open(); });
     inp.addEventListener('input', () => {
       filterText = inp.value || '';
       if (pop.hidden) open(); else build();
