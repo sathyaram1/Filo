@@ -84,7 +84,7 @@ test('Modelli: il risultato del test (latenza/token-sec) persiste tra i reload',
   await page.waitForSelector('#sec-model-registry:not([hidden])', { timeout: 4_000 });
 
   const statusText = await page.evaluate(() => {
-    const rows = [...document.querySelectorAll('.sn-model-row:not(.sn-model-row-head)')];
+    const rows = [...document.querySelectorAll('#modelRegistryList .sn-model-row:not(.sn-model-row-head)')];
     const row = rows.find((r) => r.querySelector('.sn-model-nick')?.value === 'provatm');
     return row ? row.querySelector('.sn-model-row-status')?.textContent || '' : '';
   });
