@@ -46,6 +46,11 @@
     FULLSCREEN_CHANGED: 'fullscreen_changed',       // broadcast → { fullscreen: bool }
     OPEN_NEW_TAB: 'open_new_tab',
     OPEN_INCOGNITO: 'open_incognito',               // apre una nuova finestra incognito
+    // L'agente "Aiuto" aziona i comandi rapidi della barra di Filo (le icone in
+    // alto): home, settings, apps, account, fullscreen, minimize. "close" è
+    // ESCLUSO di proposito. Il main inoltra alla shell, che clicca il bottone
+    // reale → si riusa tutto il comportamento esistente. → { ok } | { ok:false }
+    SHELL_ACTION: 'shell_action',                   // { command }
     REPLACE_MISSPELLING: 'replace_misspelling',     // { suggestion }
 
     // Aiuto: invio percorso completato a fine sessione (passa per la pipeline
