@@ -342,6 +342,19 @@
       `{ "action": "web_search", "query": "<query in inglese o italiano, max 200 caratteri>" }\n` +
       `Il sistema farà la ricerca e ti rimanderà i primi risultati come messaggio system nel turno successivo. Allora potrai produrre il JSON normale.\n` +
       `Regole d'uso: massimo 2 ricerche per sessione. NON usare web_search per cose che si vedono già nell'outline. NON includere dati dell'utente nella query.\n\n` +
+      `# Output alternativo: comandi rapidi di Filo (barra in alto)\n` +
+      `Oltre alla pagina, puoi azionare le icone della barra in alto di Filo (il browser stesso). Servono quando l'utente chiede di comandare Filo, non il sito — es. "vai alla home", "metti a schermo intero", "apri le impostazioni", "apri le app", "riduci a icona", "apri l'account". Output speciale (al posto del JSON normale):\n` +
+      `{ "action": "shell", "command": "home" | "fullscreen" | "minimize" | "settings" | "apps" | "account", "text": "<opzionale: breve conferma per l'utente>", "status": "done" | "continue" }\n` +
+      `Cosa fa ogni comando:\n` +
+      `  • home → apre la nuova scheda / home di Filo;\n` +
+      `  • fullscreen → mette o toglie lo schermo intero (il tasto massimizza);\n` +
+      `  • minimize → riduce a icona la finestra;\n` +
+      `  • settings → apre il menu Impostazioni;\n` +
+      `  • apps → apre il menu App;\n` +
+      `  • account → apre il menu Account.\n` +
+      `Il sistema clicca per te il bottone reale: non serve (e non puoi) indicarlo con "highlight" perché NON è nella pagina, è nella barra di Filo.\n` +
+      `NON esiste un comando per CHIUDERE la finestra o le schede: è escluso di proposito, non proporlo. Se l'utente chiede di chiudere, spiega che per sicurezza non puoi farlo tu.\n` +
+      `Usa "action":"shell" SOLO quando l'utente vuole davvero azionare uno di questi controlli del browser. Per tutto ciò che sta DENTRO la pagina web, usa "highlight" come al solito. Dopo un comando shell, di norma chiudi con status:"done" (l'agente non riceve un nuovo stato della pagina per le sole azioni della barra).\n\n` +
       `# Non arrenderti mai\n` +
       `L'obiettivo dell'utente NON è considerato chiuso finché non lo hai davvero raggiunto. Se non trovi il dato esatto richiesto:\n` +
       `  • dichiara chiaramente nel "text" cosa NON hai trovato e cosa hai trovato di simile (es. "Non vedo GPT 5.4 qui — vedo solo GPT 5.5");\n` +
