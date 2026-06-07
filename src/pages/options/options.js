@@ -418,17 +418,76 @@
     }
   }
 
-  function populateDatalist(ids) {
-    const dl = $('models-list');
+  function populateDatalist(provider, ids) {
+    const dl = $(datalistIdFor(provider));
+    if (!dl) return;
     dl.innerHTML = '';
     const seen = new Set();
-    for (const id of ids) {
+    for (const id of ids || []) {
       if (!id || seen.has(id)) continue;
       seen.add(id);
       const opt = document.createElement('option');
       opt.value = id;
       dl.appendChild(opt);
     }
+  }
+
+  // Semina i combobox con gli id già presenti nel registry (divisi per provider)
+  // così, anche prima di interrogare l'API, il valore corrente di ogni riga
+  // compare nella tendina. L'eventuale fetch successivo lo rimpiazza col catalogo
+  // completo del provider.
+  function seedDatalistsFromRegistry(registry) {
+    const byProv = { gemini: [], openrouter: [] };
+    for (const nick of Object.keys(registry || {})) {
+      const s = entryToSingle(registry[nick]);
+      if (s.model && byProv[s.provider]) byProv[s.provider].push(s.model);
+    }
+    populateDatalist('gemini', byProv.gemini);
+    populateDatalist('openrouter', byProv.openrouter);
+  }
+
+  // Interroga l'API Gemini e ritorna i NOMI NATIVI dei modelli che supportano la
+  // generazione di testo (es. gemini-3.1-flash-lite), niente prefisso "google/":
+  // è esattamente la stringa che il provider Gemini si aspetta e che salviamo nel
+  // registry.
+  async function fetchGeminiModels(key) {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    return (data.models || [])
+      .filter((m) => (m.supportedGenerationMethods || []).includes('generateContent'))
+      .map((m) => (m.name || '').replace(/^models\//, ''))
+      .filter(Boolean)
+      .sort();
+  }
+
+  async function fetchOpenRouterModels(key) {
+    const res = await fetch('https://openrouter.ai/api/v1/models', {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    return (data.data || []).map((m) => m.id).filter(Boolean).sort();
+  }
+
+  function providerKey(provider) {
+    return (provider === 'gemini' ? $('apiKeyGemini') : $('apiKey')).value.trim();
+  }
+
+  // Carica (una sola volta) la lista modelli di un provider nel suo combobox,
+  // se c'è la chiave. Silenzioso: in caso di errore o chiave assente il campo
+  // resta un input libero, senza disturbare l'utente.
+  async function ensureProviderModels(provider) {
+    if (providerModelCache[provider]) return;
+    const key = providerKey(provider);
+    if (!key) return;
+    try {
+      const ids = provider === 'gemini'
+        ? await fetchGeminiModels(key)
+        : await fetchOpenRouterModels(key);
+      providerModelCache[provider] = ids;
+      populateDatalist(provider, ids);
+    } catch (_) { /* lista non disponibile: il campo resta libero */ }
   }
 
   // Popola la datalist di autocomplete della "stringa modello" interrogando
