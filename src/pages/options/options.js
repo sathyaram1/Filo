@@ -492,15 +492,13 @@
     } catch (_) { /* lista non disponibile: il campo resta libero */ }
   }
 
-  // Ricarica (forzando) le liste modelli di TUTTI i provider per cui c'è una
-  // chiave, popolando il combobox per-provider di ciascuna riga del registry.
-  // Ogni provider ha la sua datalist; la riga sceglie quale usare col menu a
-  // tendina del provider.
+  // Ricarica (forzando) i cataloghi dei modelli. OpenRouter è pubblico → si
+  // ricarica sempre; Gemini solo se c'è la chiave (gratuita). Ogni provider ha
+  // la sua datalist; la riga sceglie quale usare col menu a tendina del provider.
   async function loadModelsFromProvider() {
     $('modelsStatus').textContent = '…';
     const orKey = $('apiKey').value.trim();
     const gemKey = $('apiKeyGemini').value.trim();
-    if (!orKey && !gemKey) { $('modelsStatus').textContent = I18n.t('err_no_api_key'); return; }
     const errors = [];
     let total = 0;
     if (gemKey) {
@@ -511,7 +509,7 @@
         total += ids.length;
       } catch (e) { errors.push(`Gemini: ${e.message || e}`); }
     }
-    if (orKey) {
+    {
       try {
         const ids = await fetchOpenRouterModels(orKey);
         providerModelCache.openrouter = ids;
