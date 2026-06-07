@@ -49,6 +49,136 @@
     inp.size = Math.max((inp.value || '').length + 1, 6);
   }
 
+  // Sorgente delle opzioni per il dropdown: i nickname del registry, esposti
+  // nella <datalist id="nicknames-list"> da entrambe le pagine (Opzioni e
+  // Modelli predefiniti). Restano l'unica sorgente di verità: il dropdown
+  // custom la legge, non la duplica.
+  function readNicknameOptions() {
+    const dl = document.getElementById('nicknames-list');
+    if (!dl) return [];
+    return Array.from(dl.options).map((o) => ({
+      value: o.value,
+      label: o.label && o.label !== o.value ? o.label : '',
+    }));
+  }
+
+  // Collega un dropdown custom (stile .sn-select-* coerente col resto di Filo)
+  // a un input di segmento, al posto del popup nativo della <datalist> (che usa
+  // i colori di sistema, fuori palette). L'input resta editabile: si può sia
+  // scrivere a mano un nickname sia sceglierlo dalla lista; scrivendo, la lista
+  // si filtra. Ritorna una funzione per chiudere il popup.
+  function attachDropdown(seg, inp, onPick) {
+    const pop = document.createElement('div');
+    pop.className = 'sn-select-pop sn-chain-pop';
+    pop.setAttribute('role', 'listbox');
+    pop.hidden = true;
+    seg.appendChild(pop);
+
+    let optionEls = [];
+    let hoverEl = null;
+
+    function setHover(o) {
+      if (hoverEl === o) return;
+      if (hoverEl) hoverEl.classList.remove('sn-hover');
+      hoverEl = o || null;
+      if (hoverEl) {
+        hoverEl.classList.add('sn-hover');
+        hoverEl.scrollIntoView({ block: 'nearest' });
+      }
+    }
+
+    function build() {
+      const filter = (inp.value || '').trim().toLowerCase();
+      const all = readNicknameOptions();
+      const shown = filter
+        ? all.filter((o) => o.value.toLowerCase().includes(filter) || o.label.toLowerCase().includes(filter))
+        : all;
+      pop.textContent = '';
+      optionEls = [];
+      hoverEl = null;
+      const list = shown.length ? shown : all; // se il filtro non matcha, mostra tutto
+      for (const opt of list) {
+        const o = document.createElement('div');
+        o.className = 'sn-select-option';
+        o.setAttribute('role', 'option');
+        o.dataset.value = opt.value;
+        if (opt.label) {
+          const v = document.createElement('span');
+          v.className = 'sn-chain-opt-nick';
+          v.textContent = opt.value;
+          const l = document.createElement('span');
+          l.className = 'sn-chain-opt-label';
+          l.textContent = opt.label;
+          o.appendChild(v);
+          o.appendChild(l);
+        } else {
+          o.textContent = opt.value;
+        }
+        if (opt.value === (inp.value || '').trim()) {
+          o.classList.add('sn-selected');
+          o.setAttribute('aria-selected', 'true');
+        }
+        o.addEventListener('mousemove', () => setHover(o));
+        // mousedown (non click) così avviene prima del blur dell'input.
+        o.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          pick(opt.value);
+        });
+        pop.appendChild(o);
+        optionEls.push(o);
+      }
+      return optionEls.length;
+    }
+
+    function pick(value) {
+      inp.value = value;
+      fit(inp);
+      onPick(value);
+      close();
+      inp.focus();
+    }
+
+    function moveHover(dir) {
+      if (!optionEls.length) return;
+      let i = optionEls.indexOf(hoverEl);
+      i = (i + dir + optionEls.length) % optionEls.length;
+      setHover(optionEls[i]);
+    }
+
+    function open() {
+      if (!pop.hidden) return;
+      if (!build()) return; // niente nickname nel registry → niente popup
+      pop.hidden = false;
+      seg.classList.add('sn-chain-open');
+      const sel = optionEls.find((o) => o.classList.contains('sn-selected'));
+      setHover(sel || optionEls[0] || null);
+    }
+    function close() {
+      if (pop.hidden) return;
+      pop.hidden = true;
+      seg.classList.remove('sn-chain-open');
+      if (hoverEl) hoverEl.classList.remove('sn-hover');
+      hoverEl = null;
+    }
+
+    inp.addEventListener('focus', open);
+    inp.addEventListener('input', () => { if (pop.hidden) open(); else build(); });
+    inp.addEventListener('keydown', (e) => {
+      if (pop.hidden) {
+        if (e.key === 'ArrowDown') { e.preventDefault(); open(); }
+        return;
+      }
+      if (e.key === 'ArrowDown') { e.preventDefault(); moveHover(1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); moveHover(-1); }
+      else if (e.key === 'Enter') {
+        if (hoverEl) { e.preventDefault(); pick(hoverEl.dataset.value); }
+      } else if (e.key === 'Escape') { e.preventDefault(); close(); }
+    });
+    inp.addEventListener('blur', () => { setTimeout(close, 120); });
+
+    return close;
+  }
+
   // Costruisce l'editor a segmenti per UNA azione.
   // Ritorna { el, getValue } dove getValue() torna la stringa "a, b, c".
   function buildChain(value, onChange) {
