@@ -64,7 +64,10 @@ test('Modelli: il risultato del test (latenza/token-sec) persiste tra i reload',
   // (in cloud non c'è la API key per il vero "Prova", ma la persistenza non
   // dipende dalla rete: passa per lo stesso salvataggio del registry).
   await page.evaluate(() => {
-    const row = document.querySelector('.sn-model-row:not(.sn-model-row-head)');
+    // Scopa a #modelRegistryList: `.sn-model-row` è usata anche dalla lista
+    // read-only dei modelli predefiniti (#defaultModelsList), che apparendo
+    // prima nel DOM verrebbe presa per errore (e non ha .sn-model-nick).
+    const row = document.querySelector('#modelRegistryList .sn-model-row:not(.sn-model-row-head)');
     row.querySelector('.sn-model-nick').value = 'provatm';
     row.querySelector('.sn-model-provider').value = 'openrouter';
     row.querySelector('.sn-model-id').value = 'anthropic/claude-3.5-haiku';
