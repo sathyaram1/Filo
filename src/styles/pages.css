@@ -500,6 +500,16 @@ section:has(#dictList) .sn-spell-add-row {
   margin-left: 4px;
 }
 .sn-chain-add:hover { color: var(--sn-fg); border-color: var(--sn-fg); }
+/* Dropdown custom del segmento (al posto del popup nativo della datalist):
+   riusa le classi .sn-select-pop/.sn-select-option (theme.css) ma posizionato
+   sotto al segmento, abbastanza largo da mostrare nickname + etichetta. */
+.sn-chain-pop {
+  left: 0;
+  right: auto;
+  min-width: 200px;
+}
+.sn-chain-opt-nick { font-weight: 600; }
+.sn-chain-opt-label { color: var(--sn-muted); margin-left: 8px; }
 
 /* Selettore modalità cookie: tre "card" radio impilate (Manuale/Automatico/
    Privacy). La card selezionata si evidenzia con bordo accentato. */
