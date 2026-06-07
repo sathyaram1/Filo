@@ -266,10 +266,21 @@
         inp.value = ref;
         inp.placeholder = i === 0 ? t('options_chain_primary') : t('options_chain_fallback');
         fit(inp);
-        inp.addEventListener('input', () => { refs[i] = inp.value; fit(inp); emit(); });
-        inp.addEventListener('change', () => { refs[i] = inp.value; emit(); });
+        // Gate di commit: accetta il valore solo se compatibile con la funzione.
+        // Un modello non adatto NON viene scritto in refs (quindi non salvato) e
+        // mostra il motivo del blocco sotto il segmento.
+        const commit = (val) => {
+          const v = validate ? validate(val) : { ok: true };
+          if (!v.ok) { showSegMsg(seg, v.reason); return false; }
+          clearSegMsg(seg);
+          refs[i] = val;
+          emit();
+          return true;
+        };
+        inp.addEventListener('input', () => { fit(inp); commit(inp.value.trim()); });
+        inp.addEventListener('change', () => { commit(inp.value.trim()); });
         seg.appendChild(inp);
-        attachDropdown(seg, inp, (value) => { refs[i] = value; emit(); });
+        attachDropdown(seg, inp, (value) => { commit(value); }, validate);
 
         // Il pulsante di rimozione c'è solo se ci sono più segmenti: l'ultimo
         // rimasto non si può rimuovere (resterebbe l'azione senza modello).
