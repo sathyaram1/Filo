@@ -88,12 +88,15 @@ test('feedback: la casella note resta a fuoco dopo il salvataggio in debounce', 
     const el = document.activeElement;
     return {
       isNotes: !!el && el.classList && el.classList.contains('fb-notes'),
+      tag: el ? el.tagName : null,
+      notesCount: document.querySelectorAll('.fb-notes').length,
+      roCount: document.querySelectorAll('.fb-notes-readonly').length,
       value: el && 'value' in el ? el.value : null,
       caret: el && typeof el.selectionStart === 'number' ? el.selectionStart : null,
     };
   });
 
-  expect(focused.isNotes).toBe(true);
+  expect(JSON.stringify(focused)).toBe('DIAGREVEAL');
   expect(focused.value).toBe('una nota lunga abbastanza da avere un cursore');
   // Il cursore è in fondo al testo appena digitato (nessun salto a inizio).
   expect(focused.caret).toBe('una nota lunga abbastanza da avere un cursore'.length);
