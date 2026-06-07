@@ -157,10 +157,21 @@
           o.classList.add('sn-selected');
           o.setAttribute('aria-selected', 'true');
         }
+        // Modello non adatto a questa funzione → opzione disabilitata (visibile
+        // ma non selezionabile), con il motivo come tooltip.
+        const check = validate ? validate(opt.value) : { ok: true };
+        if (!check.ok) {
+          o.classList.add('sn-disabled');
+          o.setAttribute('aria-disabled', 'true');
+          o.style.opacity = '0.45';
+          o.style.cursor = 'not-allowed';
+          o.title = check.reason || '';
+        }
         o.addEventListener('mousemove', () => setHover(o));
         // mousedown (non click) così avviene prima del blur dell'input.
         o.addEventListener('mousedown', (e) => {
           e.preventDefault();
+          if (!check.ok) return; // opzione incompatibile: non selezionabile
           pick(opt.value);
         });
         pop.appendChild(o);
