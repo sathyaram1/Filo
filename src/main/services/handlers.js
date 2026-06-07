@@ -873,6 +873,46 @@ async function handleMessage(msg, sender = {}) {
         return { ok: false, error: e?.message || String(e) };
       }
     }
+    case MSG.TTS_SYNTH: {
+      // Sintesi vocale via modello. Costruisce la catena per l'azione TTS e
+      // prova i provider che la implementano (oggi: Gemini). Se nessuno è
+      // disponibile o tutti falliscono, torna { ok:false } e il content script
+      // ripiega sulla voce del browser (Web Speech).
+      try {
+        const settings = await getEffectiveSettings();
+        const model = modelForAction(settings, SN_CONST.ACTIONS.TTS);
+        let attempts;
+        try {
+          attempts = buildAttemptChain(settings, model);
+        } catch (_) {
+          return { ok: false, error: 'no_tts_model' };
+        }
+        const voice = (settings && settings.tts && settings.tts.modelVoice) || '';
+        let lastErr = null;
+        for (const a of attempts) {
+          // Solo Gemini implementa synthesizeSpeech; gli altri si saltano.
+          if (a.provider !== 'gemini') continue;
+          try {
+            const r = await Providers.getProvider('gemini').synthesizeSpeech({
+              apiKey: a.apiKey, model: a.model, text: msg.text, voice,
+            });
+            return {
+              ok: true,
+              audioBase64: r.audioBase64,
+              mimeType: r.mimeType,
+              provider: 'gemini',
+              model: a.model,
+            };
+          } catch (e) {
+            lastErr = e;
+            console.warn('[SN] TTS gemini fallito:', e.message || e);
+          }
+        }
+        return { ok: false, error: (lastErr && lastErr.message) || 'tts_failed' };
+      } catch (e) {
+        return { ok: false, error: e?.message || String(e) };
+      }
+    }
     case MSG.TEST_PROVIDER: {
       try {
         const provider = msg.provider;
