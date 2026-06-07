@@ -468,6 +468,20 @@
       if (obj.action === 'web_search' && typeof obj.query === 'string' && obj.query.trim()) {
         return { kind: 'web_search', query: obj.query.trim().slice(0, 300) };
       }
+      // Output speciale: comando della shell di Filo (icone della barra in alto).
+      // Eseguito in autonomia, senza coinvolgere l'utente. "close" è escluso.
+      if (obj.action === 'shell' && typeof obj.command === 'string') {
+        const allowed = ['home', 'settings', 'apps', 'account', 'fullscreen', 'minimize'];
+        const cmd = obj.command.trim().toLowerCase();
+        if (allowed.includes(cmd)) {
+          return {
+            kind: 'shell',
+            command: cmd,
+            display: typeof obj.text === 'string' ? obj.text : '',
+            status: obj.status === 'continue' ? 'continue' : 'done',
+          };
+        }
+      }
       const status = obj.status === 'continue' ? 'continue' : 'done';
       const collapseFlag = typeof obj.collapse === 'boolean' ? obj.collapse : null;
       let highlight = null;
