@@ -1,0 +1,7 @@
+{
+  "id": "BiA4JTqkNasdsRQ0A7eQ",
+  "status": "done",
+  "notes": "Il menu a tendina per scegliere i modelli (sezione 'Modelli per azione') ora ha lo stesso stile degli altri menu di Filo: niente più popup grigio di sistema fuori palette. Il cambiamento vale sia nella pagina Modelli (Opzioni) sia in Modelli predefiniti, perché condividono lo stesso editor. Mettendo a fuoco un campo si vedono subito tutti i modelli del registro; scrivendo, la lista si filtra; cliccando un'opzione il campo si compila. Verificato con test automatici.",
+  "queuedAt": "2026-06-07T09:58:55.468Z",
+  "queuedBy": "routine"
+}
