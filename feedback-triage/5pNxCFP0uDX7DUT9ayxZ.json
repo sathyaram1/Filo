@@ -1,7 +1,0 @@
-{
-  "id": "5pNxCFP0uDX7DUT9ayxZ",
-  "status": "done",
-  "notes": "Ora l'agente Aiuto puo' azionare i comandi rapidi della barra in alto di Filo: basta scrivergli in chat (es. \"metti a schermo intero\", \"vai alla home\", \"apri le impostazioni\", \"apri le app\", \"apri l'account\", \"riduci a icona\") e ci pensa lui a premere il tasto giusto, senza che tu debba cliccarlo. Come da richiesta, sono coperte TUTTE le icone tranne Chiudi: per sicurezza l'agente non puo' chiudere la finestra ne' le schede (se glielo chiedi te lo spiega). Verificato con un test automatico che esercita il percorso completo (comando -> barra -> azione) e con l'intera suite Playwright (nessuna regressione).",
-  "queuedAt": "2026-06-07T16:08:56.077Z",
-  "queuedBy": "routine"
-}
