@@ -7,6 +7,10 @@
     // Da content -> background
     AI_REQUEST: 'ai_request',                     // { action, payload }
     AI_REQUEST_STREAM_START: 'ai_request_stream', // streaming via port
+    // Sintesi vocale via modello (TTS). Ritorna l'audio grezzo; se nessun
+    // provider/modello TTS è disponibile torna { ok:false } e il chiamante
+    // ripiega sulla voce del browser (Web Speech). { text, voice? }
+    TTS_SYNTH: 'tts_synth',                        // → { ok, audioBase64, mimeType } | { ok:false, error }
     SAVE_PAGE: 'save_page',                       // { page }
     SAVE_LINK: 'save_link',                       // { url, title }
     GET_SETTINGS: 'get_settings',
