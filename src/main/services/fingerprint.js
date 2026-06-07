@@ -100,7 +100,13 @@ function isoWeekId(d = new Date()) {
 
 // Seed uint32 per un'origine (già ridotta a eTLD+1).
 function seedForOrigin(origin) {
-  if (!_secret) return 0;
+  // Garantisce un master secret anche se init() non ha ancora caricato/generato
+  // quello persistente. Senza questo, una pagina che chiede la config nella
+  // finestra di avvio (IPC sincrono filo:fp-config, prima che whenReady completi
+  // init) otterrebbe seed 0 = protezione anti-fingerprint silenziosamente spenta.
+  // Il fallback effimero la tiene attiva; init() poi sovrascrive _secret con
+  // quello persistente (coerente fra riavvii).
+  if (!_secret) _secret = crypto.randomBytes(32);
   const temporal = _mode === MODES.PRIVACY ? _sessionId : isoWeekId();
   const h = crypto.createHmac('sha256', _secret).update(`${origin}|${temporal}`).digest();
   return h.readUInt32BE(0) >>> 0;
