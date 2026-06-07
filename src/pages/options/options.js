@@ -166,6 +166,9 @@
     modelChains = ModelChain.renderGrid($('modelsGrid'), {
       models: settings.models || {},
       onChange: saveDebounced,
+      // Registry LIVE (dalle righe correnti, anche non salvate) così la
+      // validazione modello↔funzione riflette subito le modifiche.
+      getRegistry: () => collectModelRegistry().registry,
     });
 
     // Costi
