@@ -1,0 +1,7 @@
+{
+  "id": "tIPIRQ6GrW1BtGxzgSll",
+  "status": "done",
+  "notes": "Risolto: le schede ora hanno nomi puliti. La pagina iniziale si chiama 'Home', le altre prendono il nome del tasto che le apre ('Modelli', 'Sicurezza', 'Preferenze', 'Modelli predefiniti', 'Editor', ecc.), senza più il prefisso 'Filo —'. Verificato con test automatici (la scheda iniziale e' 'Home', le pagine interne mostrano il nome del tasto e nessuna scheda contiene 'Filo —'). Ho anche allineato un test di avvio che cercava ancora il vecchio nome.",
+  "queuedAt": "2026-06-07T05:11:30.470Z",
+  "queuedBy": "routine"
+}
