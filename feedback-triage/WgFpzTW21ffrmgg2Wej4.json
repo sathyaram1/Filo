@@ -1,7 +1,0 @@
-{
-  "id": "WgFpzTW21ffrmgg2Wej4",
-  "status": "clarify",
-  "notes": "Vuoi che Filo possa modificare le impostazioni delle Preferenze su richiesta (es. gli chiedi 'attiva il tema scuro' e lui lo fa). E' fattibile, ma servono due scelte prima di procedere: 1) Quali impostazioni puo' toccare Filo? Tutte le Preferenze (tema, commento nella home, modalita' terminale e shell, lettura/TTS...) o un sottoinsieme? E solo le Preferenze, oppure anche Modelli/Sicurezza? 2) Filo applica direttamente e ti mostra cosa ha cambiato, oppure chiede conferma prima di applicare? Dimmi questi due punti e lo implemento. Nota: il flusso passa dall'AI, quindi la verifica completa va fatta in locale (in cloud non ho la chiave del modello per provarlo end-to-end).",
-  "queuedAt": "2026-06-07T05:12:24.504Z",
-  "queuedBy": "routine"
-}
