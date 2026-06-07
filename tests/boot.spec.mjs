@@ -22,8 +22,17 @@ test('la newtab apre filo://newtab/ con la dashboard montata', async ({ shell, a
   await expect(shell.locator('.tab .title')).toContainText('Home', { timeout: 8_000 });
 
   // Recupera la Page del WebContentsView del tab e verifica la dashboard.
-  const allWindows = app.windows();
-  const tabPage = allWindows.find((w) => w.url().startsWith('filo://newtab'));
+  // Polling: il WebContentsView della newtab può non essere ancora fra le
+  // app.windows() nell'istante esatto in cui la tab compare nella bar (l'IPC
+  // della tab bar e l'attach della view non sono sincroni). Vedi la nota sulla
+  // race in fixtures/electron.mjs.
+  let tabPage = null;
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    tabPage = app.windows().find((w) => w.url().startsWith('filo://newtab'));
+    if (tabPage) break;
+    await new Promise((r) => setTimeout(r, 100));
+  }
   expect(tabPage).toBeTruthy();
   await tabPage.waitForLoadState('domcontentloaded');
   await expect(tabPage.locator('#input')).toBeVisible();
