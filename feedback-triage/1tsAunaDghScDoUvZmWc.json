@@ -1,7 +1,0 @@
-{
-  "id": "1tsAunaDghScDoUvZmWc",
-  "status": "clarify",
-  "notes": "Ho capito la richiesta in tre parti: (1) togliere la barra grigia in alto sulla nuova scheda, (2) spostare le sue icone (Home, Impostazioni, App, Account) dentro la pagina della home, (3) rendere il colore della scheda selezionata uguale allo sfondo crema della home. Le parti 1 e 3 sono chiare; la parte 2 e' una scelta di design sull'aspetto della schermata principale e non voglio decidere da solo dove mettere le icone. Mi servono due risposte: A) La barra va tolta SOLO sulla nuova scheda (e resta normale sui siti web, dove servono Indietro/Avanti/Ricarica/indirizzo), oppure vuoi nasconderla ovunque? B) Dove preferisci le icone dentro la home? Opzioni: (1) una riga di icone in alto a destra dentro la pagina; (2) accanto/sopra la barra \"Chiedi qualsiasi cosa\" in basso; (3) un piccolo gruppo fisso nell'angolo. Dimmi A e B (es. \"solo newtab, opzione 1\") e procedo con tutto, colore scheda incluso.",
-  "queuedAt": "2026-06-07T16:09:09.434Z",
-  "queuedBy": "routine"
-}
