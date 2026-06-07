@@ -92,7 +92,7 @@
     }
 
     function build() {
-      const filter = (inp.value || '').trim().toLowerCase();
+      const filter = filterText.trim().toLowerCase();
       const all = readNicknameOptions();
       const shown = filter
         ? all.filter((o) => o.value.toLowerCase().includes(filter) || o.label.toLowerCase().includes(filter))
