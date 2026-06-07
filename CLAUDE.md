@@ -56,13 +56,23 @@ hai toccato, non solo aver "verificato che compila" o "letto il diff".
 
 Il minimo accettabile dipende dall'ambiente:
 
-- **In sessione locale (Windows)**: `npm run test:shoot` con uno scenario che
-  esercita la modifica + ispezione visuale dello screenshot. Se la feature è
-  troppo dinamica per uno script, almeno `npm test` (Playwright headless) o
-  `npm run test:smoke`. Vedi sezione "Controlli visivi" più sotto.
+- **In sessione locale (Windows)**: verifica **solo la feature che hai toccato**,
+  non l'intera suite. ⚠️ **NON lanciare `npm test` (la suite completa) in
+  locale**: apre e chiude Electron centinaia di volte — finestre che lampeggiano
+  sullo schermo mentre l'utente sta usando il PC — ed è lentissimo (~25 min).
+  La regressione completa sulle **feature vecchie** è compito delle routine cloud
+  (vedi sotto), non delle sessioni locali. In locale usa invece:
+  - **il/gli spec mirati** della feature toccata:
+    `npx playwright test tests/<feature>.spec.mjs` (1-2 avvii di Electron, pochi
+    secondi) — questo è il minimo accettabile per dichiarare "fatto" in locale;
+  - in più, per modifiche visive, `npm run test:shoot` con uno scenario mirato +
+    ispezione dello screenshot (vedi "Controlli visivi" più sotto).
+  Non rilanciare l'intera suite "per sicurezza": se temi una regressione su
+  un'altra area, lascia che la verifichi la routine cloud.
 
-- **In routine cloud (Linux headless)**: `npm test` per assicurarti che la
-  suite Playwright passi, e — se la feature ha un comportamento UI nuovo —
+- **In routine cloud (Linux headless)**: **qui** gira la regressione completa.
+  `npm test` (intera suite Playwright) per assicurarti che nulla si sia rotto
+  sulle feature vecchie, e — se la feature ha un comportamento UI nuovo —
   **aggiungi un test Playwright** che lo eserciti (click + assert). `test:shoot`
   e `test:explore` **non funzionano nel cloud** (vedi sezione dedicata).
 
