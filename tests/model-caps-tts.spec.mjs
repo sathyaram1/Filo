@@ -78,17 +78,18 @@ test('Validazione: il dropdown disabilita i modelli non adatti alla funzione', a
   await revealAdvanced(page);
 
   // Funzione di testo (Spiega): il modello TTS è disabilitato, quelli di testo no.
-  const explain = actionCell(page, 'Spiega (inline)').locator('.sn-chain').first();
-  await explain.locator('.sn-chain-input').first().focus();
-  const explainPop = explain.locator('.sn-chain-pop');
+  // Ogni segmento ha il suo popup → scopo al PRIMO segmento (quello a fuoco).
+  const explainSeg = actionCell(page, 'Spiega (inline)').locator('.sn-chain-seg').first();
+  await explainSeg.locator('.sn-chain-input').focus();
+  const explainPop = explainSeg.locator('.sn-chain-pop');
   await expect(explainPop).toBeVisible({ timeout: 4_000 });
   await expect(explainPop.locator('.sn-select-option[data-value="tts"]')).toHaveClass(/sn-disabled/);
   await expect(explainPop.locator('.sn-select-option[data-value="flash"]')).not.toHaveClass(/sn-disabled/);
 
   // Funzione TTS (lettura ad alta voce): solo i modelli TTS sono abilitati.
-  const tts = actionCell(page, 'Lettura ad alta voce').locator('.sn-chain').first();
-  await tts.locator('.sn-chain-input').first().focus();
-  const ttsPop = tts.locator('.sn-chain-pop');
+  const ttsSeg = actionCell(page, 'Lettura ad alta voce').locator('.sn-chain-seg').first();
+  await ttsSeg.locator('.sn-chain-input').focus();
+  const ttsPop = ttsSeg.locator('.sn-chain-pop');
   await expect(ttsPop).toBeVisible({ timeout: 4_000 });
   await expect(ttsPop.locator('.sn-select-option[data-value="tts"]')).not.toHaveClass(/sn-disabled/);
   await expect(ttsPop.locator('.sn-select-option[data-value="flash"]')).toHaveClass(/sn-disabled/);
