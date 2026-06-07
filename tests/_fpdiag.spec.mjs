@@ -5,10 +5,12 @@ test('fpdiag', async ({ app }) => {
     const F = globalThis.__filoFingerprint;
     const before = F.configForHref('https://www.example.com/').seed;
     const seedDirect = F.seedForOrigin('example.com');
-    await F.init({});
+    let initErr = null;
+    try { await F.init({}); } catch (e) { initErr = String(e && e.message || e); }
     const after = F.configForHref('https://www.example.com/').seed;
-    return { before, seedDirect, after, hasF: !!F };
+    const afterDirect = F.seedForOrigin('example.com');
+    return { before, seedDirect, after, afterDirect, hasF: !!F, initErr };
   });
-  console.log('FPDIAG', JSON.stringify(r));
-  expect(true).toBe(true);
+  // Forza il fallimento per stampare i valori nel messaggio.
+  expect(JSON.stringify(r)).toBe('REVEAL');
 });
