@@ -33,7 +33,7 @@ test('Modelli per azione: dropdown custom Filo al posto della datalist nativa', 
   await expect(input).not.toHaveAttribute('list', /.*/);
 
   // (2) Il focus apre il dropdown custom con le opzioni del registry.
-  await input.click();
+  await input.focus();
   const pop = chain.locator('.sn-chain-pop');
   await expect(pop).toBeVisible({ timeout: 4_000 });
   const flashOpt = pop.locator('.sn-select-option', { hasText: 'flash' }).first();
