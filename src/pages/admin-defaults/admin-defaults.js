@@ -82,11 +82,56 @@
     del.textContent = I18n.t('options_model_remove');
     del.addEventListener('click', () => { row.remove(); });
 
+    const test = document.createElement('button');
+    test.type = 'button';
+    test.className = 'sn-btn sn-btn-secondary';
+    test.textContent = I18n.t('options_model_test');
+    test.addEventListener('click', () => runRowTest(nickIn, provSel, idIn, row, test));
+
+    const status = document.createElement('div');
+    status.className = 'sn-model-row-status';
+
     row.appendChild(nickIn);
     row.appendChild(provSel);
     row.appendChild(idIn);
     row.appendChild(del);
+    row.appendChild(test);
+    row.appendChild(status);
     return row;
+  }
+
+  async function runRowTest(nickIn, provSel, idIn, row, btn) {
+    const statusEl = row.querySelector('.sn-model-row-status');
+    const nickname = nickIn.value.trim();
+    const modelId = idIn.value.trim();
+    if (!modelId) {
+      statusEl.textContent = I18n.t('options_model_no_id');
+      return;
+    }
+    // Se il nickname è salvato nel registry predefinito, testa con le chiavi
+    // predefinite (TEST_DEFAULT_MODEL). Altrimenti non possiamo testare: le
+    // chiavi non sono visibili in questa pagina (solo "configurata/non").
+    if (!nickname) {
+      statusEl.textContent = I18n.t('options_model_nickname_required');
+      return;
+    }
+    statusEl.textContent = I18n.t('options_test_running');
+    btn.disabled = true;
+    try {
+      const res = await chrome.runtime.sendMessage({
+        type: MSG.TEST_DEFAULT_MODEL,
+        nickname,
+      });
+      if (!res?.ok) {
+        statusEl.textContent = I18n.t('options_test_failed', res?.error || '—');
+      } else {
+        statusEl.textContent = I18n.t('options_test_result', res.ttftMs ?? '—', res.tokensPerSec ?? '—');
+      }
+    } catch (e) {
+      statusEl.textContent = I18n.t('options_test_failed', e?.message || String(e));
+    } finally {
+      btn.disabled = false;
+    }
   }
 
   function renderModelRegistry(registry) {
