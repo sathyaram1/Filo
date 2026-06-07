@@ -174,8 +174,12 @@
       $('spentBox').textContent = `€${eur.toFixed(4)}`;
     } catch (_) {}
 
-    // Datalist modelli (popola con i default + eventualmente API)
-    populateDatalist(collectRawModelIds(settings));
+    // Combobox modelli: prima semina con gli id già nel registry (così il valore
+    // corrente compare subito), poi prova a caricare il catalogo completo di
+    // ciascun provider in background (non blocca il render).
+    seedDatalistsFromRegistry(settings.modelRegistry || {});
+    ensureProviderModels('gemini');
+    ensureProviderModels('openrouter');
 
     // Registry modelli (popola anche la datalist dei nickname usata dai segmenti)
     renderModelRegistry(settings.modelRegistry || {});
