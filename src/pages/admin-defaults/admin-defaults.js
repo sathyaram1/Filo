@@ -185,7 +185,10 @@
 
   // ── Modelli per azione (stesso editor a segmenti della pagina Opzioni) ───────
   function renderModelsGrid(models) {
-    modelChains = ModelChain.renderGrid($('modelsGrid'), { models: models || {} });
+    modelChains = ModelChain.renderGrid($('modelsGrid'), {
+      models: models || {},
+      getRegistry: () => collectModelRegistry(),
+    });
   }
 
   function collectModels() {
