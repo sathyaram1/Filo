@@ -461,7 +461,7 @@ section:has(#dictList) .sn-spell-add-row {
   padding: 3px 4px;
   min-height: 34px;
 }
-.sn-chain-seg { display: inline-flex; align-items: center; }
+.sn-chain-seg { display: inline-flex; align-items: center; position: relative; }
 .sn-chain-input {
   border: none;
   background: transparent;
