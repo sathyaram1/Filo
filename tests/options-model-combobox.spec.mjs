@@ -19,13 +19,16 @@ import { test, expect } from './fixtures/electron.mjs';
 
 const OPTIONS_URL = 'filo://options/options.html';
 
+// NB: `.sn-model-row` è usata sia dal registry editor (#modelRegistryList) sia
+// dalla lista read-only dei modelli predefiniti (#defaultModelsList): scopare
+// SEMPRE le query a #modelRegistryList per non prendere le righe sbagliate.
+const ROW = '#modelRegistryList .sn-model-row:not(.sn-model-row-head)';
+
 async function revealAdvanced(page) {
   await page.waitForSelector('#useDefaultModels', { timeout: 8_000 });
-  // Attendi che load() abbia finito di renderizzare le righe del registry
-  // (evita race: la sezione diventa visibile prima che le righe esistano).
-  await page.waitForSelector('.sn-model-row:not(.sn-model-row-head)', { timeout: 8_000 });
   await page.uncheck('#useDefaultModels');
   await page.waitForSelector('#sec-model-registry:not([hidden])', { timeout: 4_000 });
+  await page.waitForSelector(ROW, { timeout: 8_000 });
 }
 
 test('Modelli: il campo è un combobox legato al provider della riga', async ({ openTab }) => {
