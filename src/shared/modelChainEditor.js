@@ -102,7 +102,7 @@
   // i colori di sistema, fuori palette). L'input resta editabile: si può sia
   // scrivere a mano un nickname sia sceglierlo dalla lista; scrivendo, la lista
   // si filtra. Ritorna una funzione per chiudere il popup.
-  function attachDropdown(seg, inp, onPick) {
+  function attachDropdown(seg, inp, onPick, validate) {
     const pop = document.createElement('div');
     pop.className = 'sn-select-pop sn-chain-pop';
     pop.setAttribute('role', 'listbox');
