@@ -76,6 +76,10 @@
 
     let optionEls = [];
     let hoverEl = null;
+    // Filtro applicato alla lista: vuoto = mostra tutto. Si popola solo quando
+    // l'utente DIGITA (non al semplice focus), così aprendo un campo già
+    // compilato si vedono comunque tutti i modelli per cambiarlo.
+    let filterText = '';
 
     function setHover(o) {
       if (hoverEl === o) return;
