@@ -11,26 +11,35 @@
 
   const BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
-  // Converte un model id "stile OpenRouter" (google/gemini-2.0-flash-001) nel
-  // nome accettato dalla Gemini API (gemini-2.0-flash). Per modelli non-Google
-  // ritorna null: il caller deve quindi non usare Gemini e cadere su OpenRouter.
+  // Risolve un riferimento a modello nel nome accettato dalla Gemini API.
+  // Per modelli non-Google ritorna null: il caller deve quindi non usare Gemini
+  // e cadere su OpenRouter.
   //
-  // Normalizzazioni applicate:
-  //  - taglia il prefisso "google/"
-  //  - taglia le revisioni numeriche ("-001", "-002") che su OpenRouter sono
-  //    spesso solo alias del nome base (es. gemini-2.0-flash-001 → gemini-2.0-flash)
-  //  - taglia il suffisso "-preview" (i preview OpenRouter NON sempre sono
-  //    pubblicati sulla Gemini API con quel suffisso; provando il nome base
-  //    di solito si arriva al modello stable più vicino)
-  //  - se il nome è proprio "gemini" (caso patologico), torna null
+  // Due forme accettate:
+  //
+  //  1. Nome NATIVO Gemini/Gemma — è il "codice" come appare su Google AI Studio
+  //     (es. gemini-2.5-flash, gemini-3.1-flash-lite, gemma-4-31b-it). È
+  //     esattamente ciò che la Gemini API si aspetta: lo passiamo invariato.
+  //     Questo è anche il formato in cui il registry salva i modelli Gemini,
+  //     quindi senza questo ramo OGNI tentativo sul provider Gemini falliva e
+  //     ripiegava in silenzio su OpenRouter (la chiave Gemini non veniva mai
+  //     usata davvero).
+  //
+  //  2. Stile OpenRouter "google/..." (es. google/gemini-2.0-flash-001): togliamo
+  //     il prefisso "google/". Le revisioni "-001/-002" e il suffisso "-preview"
+  //     erano un tempo alias che la Gemini API non pubblicava; oggi quei nomi
+  //     esistono nativamente (es. gemini-2.0-flash-001, gemini-3.1-flash-lite-preview)
+  //     quindi NON li tagliamo più: tagliarli punterebbe a un modello diverso.
+  //     Se resta solo "gemini" (caso patologico), torna null.
   function toGeminiModelId(modelId) {
     if (!modelId) return null;
-    if (!modelId.startsWith('google/')) return null;
-    let id = modelId.replace(/^google\//, '');
-    id = id.replace(/-\d{3}$/, '');
-    id = id.replace(/-preview$/, '');
-    if (!id || id === 'gemini') return null;
-    return id;
+    if (/^(gemini|gemma|learnlm)[-.]/i.test(modelId)) return modelId;
+    if (modelId.startsWith('google/')) {
+      const id = modelId.replace(/^google\//, '');
+      if (!id || id === 'gemini') return null;
+      return id;
+    }
+    return null;
   }
 
   // Da messaggi OpenAI-style a struttura Gemini.
