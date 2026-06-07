@@ -185,21 +185,6 @@
     renderModelRegistry(settings.modelRegistry || {});
   }
 
-  // Estrae gli id concreti dei modelli noti, per popolare la datalist
-  // dell'input "stringa modello" nel registry editor. Gestisce sia il nuovo
-  // schema ({ model }) sia il vecchio duale ({ openrouter, gemini }).
-  function collectRawModelIds(settings) {
-    const out = [];
-    const reg = settings.modelRegistry || {};
-    for (const nick of Object.keys(reg)) {
-      const e = reg[nick] || {};
-      if (e.model) out.push(e.model);
-      if (e.openrouter) out.push(e.openrouter);
-      if (e.gemini) out.push(e.gemini);
-    }
-    return out;
-  }
-
   // Normalizza una entry del registry (nuovo schema o vecchio duale) in
   // { provider, model }. Per le vecchie entry duali sceglie un solo provider
   // (preferendo Gemini, poi OpenRouter): al primo salvataggio diventerà
