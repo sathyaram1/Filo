@@ -490,37 +490,34 @@
     } catch (_) { /* lista non disponibile: il campo resta libero */ }
   }
 
-  // Popola la datalist di autocomplete della "stringa modello" interrogando
-  // TUTTI i provider per cui c'è una chiave (OpenRouter e/o Gemini) e unendo
-  // gli id. La datalist è condivisa da tutte le righe del registry; il provider
-  // di ciascuna riga lo sceglie l'utente col menu a tendina.
+  // Ricarica (forzando) le liste modelli di TUTTI i provider per cui c'è una
+  // chiave, popolando il combobox per-provider di ciascuna riga del registry.
+  // Ogni provider ha la sua datalist; la riga sceglie quale usare col menu a
+  // tendina del provider.
   async function loadModelsFromProvider() {
     $('modelsStatus').textContent = '…';
     const orKey = $('apiKey').value.trim();
     const gemKey = $('apiKeyGemini').value.trim();
     if (!orKey && !gemKey) { $('modelsStatus').textContent = I18n.t('err_no_api_key'); return; }
-    const ids = [];
     const errors = [];
+    let total = 0;
     if (gemKey) {
       try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(gemKey)}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        for (const m of data.models || []) ids.push('google/' + (m.name || '').replace(/^models\//, ''));
+        const ids = await fetchGeminiModels(gemKey);
+        providerModelCache.gemini = ids;
+        populateDatalist('gemini', ids);
+        total += ids.length;
       } catch (e) { errors.push(`Gemini: ${e.message || e}`); }
     }
     if (orKey) {
       try {
-        const res = await fetch('https://openrouter.ai/api/v1/models', {
-          headers: { Authorization: `Bearer ${orKey}` },
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        for (const m of data.data || []) ids.push(m.id);
+        const ids = await fetchOpenRouterModels(orKey);
+        providerModelCache.openrouter = ids;
+        populateDatalist('openrouter', ids);
+        total += ids.length;
       } catch (e) { errors.push(`OpenRouter: ${e.message || e}`); }
     }
-    populateDatalist(ids);
-    $('modelsStatus').textContent = errors.length ? errors.join(' · ') : `${ids.length} modelli`;
+    $('modelsStatus').textContent = errors.length ? errors.join(' · ') : `${total} modelli`;
   }
 
   async function save() {
