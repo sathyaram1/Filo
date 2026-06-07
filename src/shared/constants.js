@@ -110,6 +110,16 @@
       provider: 'openrouter',
       model: 'google/gemini-2.0-flash-lite-001',
     },
+    'flash-lite-3': {
+      label: 'Gemini 3.1 Flash Lite',
+      provider: 'gemini',
+      model: 'gemini-3.1-flash-lite',
+    },
+    'flash-lite-3-or': {
+      label: 'Gemini 3.1 Flash Lite (OpenRouter)',
+      provider: 'openrouter',
+      model: 'google/gemini-3.1-flash-lite-preview',
+    },
     'claude-haiku': {
       label: 'Claude 3.5 Haiku',
       provider: 'openrouter',
