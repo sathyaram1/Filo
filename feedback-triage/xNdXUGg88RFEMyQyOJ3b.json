@@ -1,0 +1,7 @@
+{
+  "id": "xNdXUGg88RFEMyQyOJ3b",
+  "status": "done",
+  "notes": "Risolto: dopo aver inviato un comando dalla barra (comandi shell tipo /ls, comandi interni come /help, o messaggi normali) il cursore resta nella barra, così puoi scrivere subito il comando successivo senza dover ricliccare. Verificato con test automatici sui tre casi.",
+  "queuedAt": "2026-06-07T05:11:20.799Z",
+  "queuedBy": "routine"
+}
