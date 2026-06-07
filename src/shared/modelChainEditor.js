@@ -266,21 +266,29 @@
         inp.value = ref;
         inp.placeholder = i === 0 ? t('options_chain_primary') : t('options_chain_fallback');
         fit(inp);
-        // Gate di commit: accetta il valore solo se compatibile con la funzione.
-        // Un modello non adatto NON viene scritto in refs (quindi non salvato) e
-        // mostra il motivo del blocco sotto il segmento.
-        const commit = (val) => {
-          const v = validate ? validate(val) : { ok: true };
-          if (!v.ok) { showSegMsg(seg, v.reason); return false; }
-          clearSegMsg(seg);
-          refs[i] = val;
-          emit();
-          return true;
+        // Gate di compatibilità modello↔funzione. Durante la digitazione si è
+        // liberi (i valori parziali non sono nickname del registry, quindi non
+        // vengono bloccati). Alla conferma (blur/scelta) un modello NON adatto
+        // viene rifiutato: si ripristina l'ultimo valore valido e si mostra il
+        // motivo. Così non è possibile SALVARE un abbinamento incompatibile.
+        let lastGood = ref;
+        const accept = (val) => { clearSegMsg(seg); lastGood = val; refs[i] = val; emit(); };
+        const reject = (reason) => {
+          showSegMsg(seg, reason);
+          inp.value = lastGood; fit(inp);
+          refs[i] = lastGood; emit();
         };
-        inp.addEventListener('input', () => { fit(inp); commit(inp.value.trim()); });
-        inp.addEventListener('change', () => { commit(inp.value.trim()); });
+        inp.addEventListener('input', () => { refs[i] = inp.value; fit(inp); emit(); });
+        inp.addEventListener('change', () => {
+          const val = inp.value.trim();
+          const v = validate ? validate(val) : { ok: true };
+          if (v.ok) accept(val); else reject(v.reason);
+        });
         seg.appendChild(inp);
-        attachDropdown(seg, inp, (value) => { commit(value); }, validate);
+        attachDropdown(seg, inp, (value) => {
+          const v = validate ? validate(value) : { ok: true };
+          if (v.ok) accept(value); else reject(v.reason);
+        }, validate);
 
         // Il pulsante di rimozione c'è solo se ci sono più segmenti: l'ultimo
         // rimasto non si può rimuovere (resterebbe l'azione senza modello).
