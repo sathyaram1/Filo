@@ -404,16 +404,26 @@
     }
   }
 
-  function populateDatalist(provider, ids) {
+  // Popola la datalist di un provider. `items` può essere una lista di stringhe
+  // (solo id) o di { id, meta } (meta = oggetto grezzo dell'API, per categoria e
+  // data). I modelli sono ordinati col più recente in cima ed etichettati per
+  // categoria (Testo / Sintesi vocale / Immagini / Embedding…) via option.label.
+  function populateDatalist(provider, items) {
     const dl = $(datalistIdFor(provider));
     if (!dl) return;
+    const norm = (items || [])
+      .map((it) => (typeof it === 'string' ? { id: it } : it))
+      .filter((it) => it && it.id)
+      .map((it) => ({ id: it.id, provider, meta: it.meta }));
+    const sorted = Caps ? Caps.sortByRecency(norm) : norm;
     dl.innerHTML = '';
     const seen = new Set();
-    for (const id of ids || []) {
-      if (!id || seen.has(id)) continue;
-      seen.add(id);
+    for (const it of sorted) {
+      if (seen.has(it.id)) continue;
+      seen.add(it.id);
       const opt = document.createElement('option');
-      opt.value = id;
+      opt.value = it.id;
+      if (Caps) opt.label = Caps.categoryLabel(provider, it.id, it.meta);
       dl.appendChild(opt);
     }
   }
