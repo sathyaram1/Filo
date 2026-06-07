@@ -53,6 +53,18 @@ test('feedback: la casella note resta a fuoco dopo il salvataggio in debounce', 
     };
   });
 
+  // 1b) Attendi che il refreshAuth()+load D'AVVIO si concluda PRIMA di simulare
+  //     l'admin. All'apertura la pagina chiama auth_status (REALE: la richiesta
+  //     parte al load, prima che il mock qui sopra sia installato) e poi load().
+  //     Se quella catena si risolve più tardi — mentre l'utente sta scrivendo —
+  //     ribalta isAdmin a false e ricarica la lista (la textarea note sparisce):
+  //     era questa la causa del flake. Aspettiamo che il "Caricamento…" iniziale
+  //     sparisca, segnale che init è finito; da qui in poi comanda il #refresh.
+  await page.waitForFunction(() => {
+    const e = document.querySelector('.fb-empty');
+    return !e || !/Caricamento/.test(e.textContent || '');
+  }, null, { timeout: 10_000 });
+
   // 2) Simula il login admin: il main fa il broadcast, la pagina alza isAdmin.
   await app.evaluate(async ({ webContents }) => {
     for (const wc of webContents.getAllWebContents()) {
