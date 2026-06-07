@@ -328,13 +328,16 @@
   function renderGrid(host, opts) {
     const o = opts || {};
     const models = o.models || {};
+    const getRegistry = o.getRegistry;
     host.innerHTML = '';
     const chains = {};
     for (const [action, key] of actionLabels()) {
       const cell = document.createElement('div');
       const label = document.createElement('label');
       label.textContent = t(key);
-      const chain = buildChain(models[action] || '', o.onChange);
+      const chain = buildChain(models[action] || '', o.onChange, {
+        validate: makeValidator(action, getRegistry),
+      });
       cell.appendChild(label);
       cell.appendChild(chain.el);
       host.appendChild(cell);
