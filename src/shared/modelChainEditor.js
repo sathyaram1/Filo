@@ -50,6 +50,40 @@
     inp.size = Math.max((inp.value || '').length + 1, 6);
   }
 
+  // Validatore per una funzione: dato un nickname del registry, verifica che il
+  // suo modello soddisfi i requisiti dell'azione (es. un'azione di testo non può
+  // ricevere un modello di sola sintesi vocale). Nickname sconosciuti (non nel
+  // registry) NON vengono bloccati: potrebbero essere id grezzi legacy.
+  function makeValidator(action, getRegistry) {
+    return function (ref) {
+      const Caps = global.SN_MODEL_CAPS;
+      if (!Caps) return { ok: true };
+      const nick = String(ref == null ? '' : ref).trim();
+      if (!nick) return { ok: true };
+      const reg = (getRegistry && getRegistry())
+        || (global.SN_CONST && global.SN_CONST.DEFAULT_MODEL_REGISTRY) || {};
+      const entry = reg[nick];
+      if (!entry || !entry.provider || !entry.model) return { ok: true };
+      return Caps.modelMatchesAction(entry.provider, entry.model, action);
+    };
+  }
+
+  // Mostra/azzera il messaggio di blocco sotto un segmento (modello non adatto).
+  function showSegMsg(seg, reason) {
+    let m = seg.querySelector('.sn-chain-msg');
+    if (!m) {
+      m = document.createElement('span');
+      m.className = 'sn-chain-msg';
+      m.style.cssText = 'display:block;color:var(--sn-danger,#c0392b);font-size:11px;margin-top:2px;';
+      seg.appendChild(m);
+    }
+    m.textContent = t('caps_incompatible', reason || '');
+  }
+  function clearSegMsg(seg) {
+    const m = seg.querySelector('.sn-chain-msg');
+    if (m) m.remove();
+  }
+
   // Sorgente delle opzioni per il dropdown: i nickname del registry, esposti
   // nella <datalist id="nicknames-list"> da entrambe le pagine (Opzioni e
   // Modelli predefiniti). Restano l'unica sorgente di verità: il dropdown
