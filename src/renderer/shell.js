@@ -218,6 +218,25 @@
   setIcon(winMaxBtn, 'maximize', 14);
   setIcon(winCloseBtn, 'close', 16);
 
+  // Comandi shell pilotati dall'agente "Aiuto": l'AI aziona i comandi rapidi
+  // della barra cliccando il bottone REALE (così riusa menu, navigazione e
+  // toggle finestra senza duplicare logica). "close" è escluso di proposito:
+  // non è mappato qui, quindi l'AI non può chiudere la finestra.
+  if (api.onTriggerButton) {
+    const triggerMap = {
+      home: homeBtn,
+      settings: settingsBtn,
+      apps: appsBtn,
+      account: accountBtn,
+      minimize: winMinBtn,
+      fullscreen: winMaxBtn,
+    };
+    api.onTriggerButton((command) => {
+      const btn = triggerMap[command];
+      if (btn) btn.click();
+    });
+  }
+
   // Tooltip custom: legge `data-tip` su qualunque elemento della shell e chiede
   // al main di mostrare un mini-BrowserWindow stile Filo (vedi popup-tooltip.js),
   // invece del title nativo bianco squadrato. Serve una BrowserWindow secondaria
