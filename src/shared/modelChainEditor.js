@@ -235,7 +235,8 @@
 
   // Costruisce l'editor a segmenti per UNA azione.
   // Ritorna { el, getValue } dove getValue() torna la stringa "a, b, c".
-  function buildChain(value, onChange) {
+  function buildChain(value, onChange, ctx) {
+    const validate = ctx && ctx.validate;
     const el = document.createElement('div');
     el.className = 'sn-chain';
     let refs = splitRefs(value);
