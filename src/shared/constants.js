@@ -139,7 +139,7 @@
     [ACTIONS.TRANSLATE_PAGE]: 'flash, flash-or',
     [ACTIONS.HELP]: 'flash, flash-or',
     [ACTIONS.CATEGORIZE]: 'flash, flash-or',
-    [ACTIONS.DESCRIBE_IMAGE]: 'flash-lite, flash-lite-or',
+    [ACTIONS.DESCRIBE_IMAGE]: 'flash-lite-3, flash-lite-3-or',
     // OCR: serve un modello vision capace di leggere testo anche piccolo.
     // Flash è ok; con la chiave Gemini la richiesta è gratis e veloce.
     [ACTIONS.TRANSCRIBE_IMAGE]: 'flash, flash-or',
