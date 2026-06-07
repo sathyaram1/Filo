@@ -151,7 +151,6 @@
 
     function open() {
       if (!pop.hidden) return;
-      filterText = ''; // al focus mostra tutte le opzioni
       if (!build()) return; // niente nickname nel registry → niente popup
       pop.hidden = false;
       seg.classList.add('sn-chain-open');
