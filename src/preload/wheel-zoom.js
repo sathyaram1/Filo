@@ -5,16 +5,18 @@
 //   e per scrollare devi spostare il mouse su/giù rispetto al punto cliccato.
 //   Un alpha tester l'ha trovato scomodo e ha chiesto di sostituirlo con una
 //   "modalità zoom": un click sulla rotella la attiva, mentre è attiva la
-//   rotella zooma/dezooma la pagina (invece di scrollare); un altro click (o
-//   Esc) la disattiva.
+//   rotella zooma/dezooma la pagina (invece di scrollare).
 //
-// SCELTE (UX, non chieste esplicitamente ma necessarie per completezza):
-//   - Il click centrale su un LINK continua ad aprirlo in una nuova scheda
-//     (non lo intercettiamo): repurporre il tasto centrale non deve far perdere
-//     una funzione standard del browser.
-//   - La modalità è un toggle (un click attiva, un altro disattiva) e Esc esce.
-//   - Un piccolo badge in alto a destra segnala che la modalità è attiva.
-//   - Uscendo NON si azzera lo zoom raggiunto: si torna solo a scrollare.
+// COME SI CHIUDE (feedback alpha)
+//   Una volta attiva, QUALSIASI interazione la chiude: un altro click (sinistro,
+//   destro o centrale) e qualsiasi tasto della tastiera. L'unica eccezione è
+//   l'interazione col badge stesso, che ospita la percentuale di zoom editabile.
+//
+// IL BADGE
+//   In alto a destra un badge mostra "zoom 100%, rotella per zoomare". La
+//   percentuale è un campo editabile: l'utente può digitare un valore e premere
+//   Invio per impostare lo zoom esatto. Niente emoji, niente menzione di Esc.
+//   Uscendo NON si azzera lo zoom raggiunto: si torna solo a scrollare.
 //
 // Gira nel contesto del preload (ha accesso a `webFrame` di Electron), sia sulle
 // pagine web (page-preload) sia sulle pagine interne filo:// (internal-preload).
@@ -28,19 +30,72 @@ module.exports = function setupWheelZoom(webFrame) {
 
   let zoomMode = false;
   let badge = null;
+  let percentInput = null;
+  let suppressContextMenu = false;
+
+  // Percentuale di zoom corrente (100 = nessuno zoom).
+  function currentPercent() {
+    try { return Math.round(webFrame.getZoomFactor() * 100); }
+    catch (_) { return 100; }
+  }
+
+  function refreshPercent() {
+    // Non sovrascrivere mentre l'utente sta digitando nel campo.
+    if (percentInput && document.activeElement !== percentInput) {
+      percentInput.value = String(currentPercent());
+    }
+  }
+
+  // Applica la percentuale digitata nel campo come fattore di zoom esatto.
+  function applyPercentFromInput() {
+    if (!percentInput) return;
+    const v = parseInt(String(percentInput.value).replace(/[^\d]/g, ''), 10);
+    if (Number.isFinite(v) && v > 0) {
+      const factor = Math.max(0.25, Math.min(5, v / 100));
+      try { webFrame.setZoomFactor(factor); } catch (_) {}
+    }
+    if (percentInput) percentInput.value = String(currentPercent());
+  }
 
   function makeBadge() {
     const el = document.createElement('div');
     el.id = '__filo-zoom-badge';
     el.setAttribute('role', 'status');
-    el.textContent = '🔍 Zoom attivo — rotella per zoomare, Esc per uscire';
     Object.assign(el.style, {
       position: 'fixed', top: '12px', right: '12px', zIndex: '2147483647',
       background: 'rgba(20,20,20,0.88)', color: '#fff',
       font: '12px/1.4 system-ui, -apple-system, sans-serif',
-      padding: '6px 10px', borderRadius: '8px', pointerEvents: 'none',
+      padding: '6px 10px', borderRadius: '8px', pointerEvents: 'auto',
       boxShadow: '0 2px 8px rgba(0,0,0,0.35)', userSelect: 'none',
+      display: 'flex', alignItems: 'center', gap: '0',
     });
+    el.appendChild(document.createTextNode('zoom '));
+
+    const input = document.createElement('input');
+    input.id = '__filo-zoom-percent';
+    input.type = 'text';
+    input.inputMode = 'numeric';
+    input.setAttribute('aria-label', 'Percentuale zoom');
+    Object.assign(input.style, {
+      width: '3.4em', textAlign: 'right', background: 'transparent',
+      color: '#fff', border: 'none',
+      borderBottom: '1px dashed rgba(255,255,255,0.55)',
+      font: 'inherit', padding: '0 1px', margin: '0', outline: 'none',
+    });
+    input.addEventListener('keydown', (e) => {
+      // Mentre si edita la percentuale, i tasti NON chiudono la modalità.
+      e.stopPropagation();
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        applyPercentFromInput();
+        input.blur();
+      }
+    });
+    input.addEventListener('blur', () => { applyPercentFromInput(); });
+    el.appendChild(input);
+    percentInput = input;
+
+    el.appendChild(document.createTextNode('%, rotella per zoomare'));
     return el;
   }
 
@@ -50,6 +105,7 @@ module.exports = function setupWheelZoom(webFrame) {
     try {
       if (!badge) badge = makeBadge();
       (document.body || document.documentElement).appendChild(badge);
+      refreshPercent();
       document.documentElement.style.cursor = 'zoom-in';
     } catch (_) {}
     try { document.documentElement.dataset.filoZoomMode = '1'; } catch (_) {}
@@ -69,15 +125,39 @@ module.exports = function setupWheelZoom(webFrame) {
     return !!(target && target.closest && target.closest('a[href], area[href]'));
   }
 
-  // Click centrale: attiva/disattiva la modalità zoom e blocca l'autoscroll
-  // nativo (preventDefault sul mousedown del tasto centrale). Sui link, fuori
-  // dalla modalità zoom, lasciamo passare il comportamento nativo (nuova scheda).
+  // L'interazione col badge (editare la percentuale) non deve chiudere la modalità.
+  function isInBadge(target) {
+    return !!(badge && target && (target === badge || (badge.contains && badge.contains(target))));
+  }
+
+  // Click: il centrale attiva/disattiva la modalità (e blocca l'autoscroll
+  // nativo). In modalità zoom, QUALSIASI click (sinistro o destro) fuori dal
+  // badge la chiude. Sui link, fuori dalla modalità, il click centrale resta
+  // nativo (apre in nuova scheda).
   document.addEventListener('mousedown', (e) => {
-    if (e.button !== 1) return;
-    if (!zoomMode && isOnLink(e.target)) return;
-    e.preventDefault();   // niente autoscroll
-    e.stopPropagation();
-    toggle();
+    if (e.button === 1) {
+      if (!zoomMode && isOnLink(e.target)) return;
+      e.preventDefault();   // niente autoscroll
+      e.stopPropagation();
+      toggle();
+      return;
+    }
+    if (zoomMode && !isInBadge(e.target)) {
+      if (e.button === 2) suppressContextMenu = true; // niente menu sul destro
+      e.preventDefault();
+      e.stopPropagation();
+      exit();
+    }
+  }, true);
+
+  // Sopprimi il menu contestuale solo quando il click destro è servito a chiudere
+  // la modalità zoom (così il destro "chiude e basta", senza aprire il menu).
+  document.addEventListener('contextmenu', (e) => {
+    if (suppressContextMenu) {
+      suppressContextMenu = false;
+      e.preventDefault();
+      e.stopPropagation();
+    }
   }, true);
 
   // La rotella, in modalità zoom, zooma invece di scrollare.
@@ -89,14 +169,16 @@ module.exports = function setupWheelZoom(webFrame) {
     let next = webFrame.getZoomLevel() + dir * ZOOM_STEP;
     next = Math.max(MIN_LEVEL, Math.min(MAX_LEVEL, next));
     webFrame.setZoomLevel(next);
+    refreshPercent();
   }, { capture: true, passive: false });
 
-  // Esc esce dalla modalità zoom.
+  // Qualsiasi tasto chiude la modalità — tranne mentre si edita la percentuale
+  // nel badge (gestito dal listener sull'input, che ferma la propagazione).
   document.addEventListener('keydown', (e) => {
-    if (zoomMode && e.key === 'Escape') {
-      e.preventDefault();
-      e.stopPropagation();
-      exit();
-    }
+    if (!zoomMode) return;
+    if (isInBadge(e.target)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    exit();
   }, true);
 };
