@@ -374,18 +374,14 @@
     statusEl.textContent = `${providerId} · ${modelId} — ${I18n.t('options_test_running')}`;
     btn.disabled = true;
     try {
-      // Per Gemini il MSG.TEST_PROVIDER si aspetta un id "stile OpenRouter" che
-      // poi viene convertito da toGeminiModelId. Per testare un id nativo
-      // Gemini (es. "gemini-2.0-flash") lo wrappiamo con il prefisso google/
-      // così la conversione lo torna invariato dopo lo strip.
-      const modelForApi = providerId === 'gemini' && !modelId.startsWith('google/')
-        ? `google/${modelId}`
-        : modelId;
+      // Il provider Gemini accetta i nomi nativi (es. gemini-3.1-flash-lite),
+      // quindi l'id del registry va passato così com'è — stesso percorso
+      // dell'uso reale.
       const res = await chrome.runtime.sendMessage({
         type: MSG.TEST_PROVIDER,
         provider: providerId,
         apiKey,
-        model: modelForApi,
+        model: modelId,
       });
       if (!res?.ok) {
         statusEl.textContent = `${providerId} · ${modelId} — ${I18n.t('options_test_failed', res?.error || '—')}`;
