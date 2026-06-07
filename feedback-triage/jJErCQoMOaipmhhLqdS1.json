@@ -1,0 +1,7 @@
+{
+  "id": "jJErCQoMOaipmhhLqdS1",
+  "status": "clarify",
+  "notes": "Il feedback chiede tre cose. I punti (2) far comparire 'Interrompi lettura' in OGNI menu tasto destro mentre una lettura e' in corso, e (3) sostituire l'emoji con un'icona SVG coerente: sono chiari e posso implementarli. Il punto (1) 'aggiungere il modello ai TTS, impostabile come gli altri modelli, lasciando l'attuale come fallback' richiede una decisione: oggi la lettura ad alta voce usa le voci del sistema operativo (gratis, nessuna chiave). 'Aggiungere un modello TTS' significa usare un servizio vocale via API, che dipende dal provider. Quale preferisci? Es. OpenAI (gpt-4o-mini-tts / tts-1), Gemini TTS, ElevenLabs. Dimmi il provider/modello (confermo che resterebbe opzionale, con le voci di sistema come default) e implemento tutti e tre i punti insieme.",
+  "queuedAt": "2026-06-07T05:11:49.838Z",
+  "queuedBy": "routine"
+}
