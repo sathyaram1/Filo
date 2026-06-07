@@ -7,6 +7,7 @@
   const I18n = window.SN_I18N;
   const Storage = window.SN_STORAGE;
   const ModelChain = window.SN_MODEL_CHAIN;
+  const Caps = window.SN_MODEL_CAPS;
 
   // Mappa azione → editor a segmenti della sua catena di modelli (popolata in load()).
   let modelChains = {};
