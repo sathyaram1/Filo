@@ -64,6 +64,13 @@ test('dashboard: i comandi "/" non riconosciuti diventano rossi mentre si digita
 // roba inesistente. Su Linux (cloud) la shell è /bin/sh: `ls` esiste,
 // `gargargus` no.
 test('dashboard (terminale): /comando inesistente è rosso, esistente è azzurro', async ({ app, openTab }) => {
+  // Il controllo "il comando esiste?" usa la shell del sistema: su Linux/cloud
+  // (/bin/sh) `ls` esiste e `gargargus` no. Su Windows con shell 'bash' il
+  // resolver passa per WSL (wsl.exe): se WSL non è installato `ls` non si
+  // risolve e l'asserzione is-cmd-shell non può passare. È un controllo
+  // intrinsecamente legato alla shell Linux, quindi gira solo lì (le routine
+  // automatiche sulle feature girano in cloud Linux). Su Windows lo saltiamo.
+  test.skip(process.platform === 'win32', 'controllo shell ls/bash è specifico Linux/cloud (su Windows richiede WSL)');
   const page = await openTab(NEWTAB);
   const input = page.locator('#input');
   await expect(input).toBeVisible({ timeout: 8_000 });
