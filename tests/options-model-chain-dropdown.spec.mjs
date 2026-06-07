@@ -60,10 +60,12 @@ test('Modelli per azione: digitando si filtra la tendina custom', async ({ openT
 
   const chain = page.locator('#modelsGrid .sn-chain').nth(1);
   const input = chain.locator('.sn-chain-input').nth(0);
-  await input.click();
+  await input.focus();
   const pop = chain.locator('.sn-chain-pop');
   await expect(pop).toBeVisible({ timeout: 4_000 });
 
+  // Al focus si vedono TUTTI i nickname del registry (anche con il campo già
+  // compilato col default), così l'utente può sceglierne un altro.
   const total = await pop.locator('.sn-select-option').count();
   expect(total).toBeGreaterThan(1);
 
