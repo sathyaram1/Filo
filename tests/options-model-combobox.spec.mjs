@@ -40,7 +40,7 @@ test('Modelli: il campo è un combobox legato al provider della riga', async ({ 
   expect(await page.locator('#models-list-openrouter').count()).toBe(1);
   expect(await page.locator('#models-list').count()).toBe(0);
 
-  const row = page.locator('.sn-model-row:not(.sn-model-row-head)').first();
+  const row = page.locator(ROW).first();
   const idInput = row.locator('.sn-model-id');
 
   // Imposta il provider della riga su Gemini → il campo punta alla lista Gemini.
