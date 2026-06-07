@@ -664,6 +664,43 @@
         return;
       }
 
+      // Caso speciale: l'AI vuole azionare un comando rapido della barra di Filo
+      // (le icone in alto: home, impostazioni, app, account, schermo intero,
+      // riduci a icona). Lo eseguiamo in autonomia, come per reveal/hover, senza
+      // chiedere il click all'utente: i bottoni vivono nella shell, non nella
+      // pagina, quindi l'utente non potrebbe "cliccarli" nel flusso normale.
+      if (parsed.kind === 'shell') {
+        if (thinking) { thinking.stop(); thinking.el.remove(); }
+        const human = {
+          home: 'home', settings: 'impostazioni', apps: 'app',
+          account: 'account', fullscreen: 'schermo intero', minimize: 'riduci a icona',
+        }[parsed.command] || parsed.command;
+        let okShell = false;
+        try {
+          const r = await chrome.runtime.sendMessage({ type: MSG.SHELL_ACTION, command: parsed.command });
+          okShell = !!(r && r.ok);
+        } catch (_) {}
+        appendActionLog(okShell ? `comando Filo: ${human}` : `comando Filo non riuscito: ${human}`);
+        if (okShell && session) {
+          session.executedSteps.push({ selector: `shell:${parsed.command}`, action: 'shell', retracted: false });
+        }
+        if (parsed.display) {
+          appendChatMessage('assistant', parsed.display);
+          history.push({ role: 'assistant', content: parsed.display });
+        }
+        // Le azioni shell non modificano il DOM della pagina che l'agente vede
+        // (o la sostituiscono del tutto, come "home"): di norma chiudono il turno.
+        // Proseguiamo solo se l'AI chiede status:"continue" su un comando che
+        // NON ha cambiato pagina, così può concatenare più passi.
+        if (parsed.status === 'continue' && okShell && parsed.command !== 'home') {
+          const note = `ho eseguito il comando Filo "${parsed.command}". Valuta lo stato e prosegui, oppure chiudi con status:"done".`;
+          setTimeout(() => submit({ userAction: note, preActionUrl: location.href }), 200);
+        } else {
+          expand({ ai: true });
+        }
+        return;
+      }
+
       if (thinking) { thinking.stop(); thinking.el.remove(); }
       // Se il modello non ha messo testo ma c'è solo un highlight di routine,
       // mostriamo comunque una riga discreta in chat (es. "→ passo successivo")
