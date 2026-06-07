@@ -57,6 +57,10 @@
     // Trascrizione audio dal microfono (dettatura). L'input è un data URL
     // audio (es. audio/webm;base64,...) mandato a un modello multimodale.
     TRANSCRIBE_AUDIO: 'transcribe_audio',
+    // Lettura ad alta voce (text-to-speech) via modello: produce AUDIO da TESTO.
+    // Richiede un modello TTS (es. gemini-2.5-flash-preview-tts). Se non
+    // disponibile, la lettura ripiega sulla voce del browser (Web Speech).
+    TTS: 'tts',
     SPELLCHECK_SEMANTIC: 'spellcheck_semantic',
     SPELLCHECK_WORD: 'spellcheck_word',
     EDIT_TEXT: 'edit_text',
