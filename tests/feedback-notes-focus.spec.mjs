@@ -40,6 +40,15 @@ test('feedback: la casella note resta a fuoco dopo il salvataggio in debounce', 
     const orig = window.filo.message.bind(window.filo);
     window.filo.message = async (msg) => {
       if (msg && msg.type === 'feedback_update') return { ok: true };
+      // L'admin è simulato via broadcast auth_changed, ma la pagina ricontrolla
+      // lo stato con auth_status (init + #refresh). Senza token reale tornerebbe
+      // isAdmin:false, che durante l'attesa ribalterebbe isAdmin e ri-renderizza
+      // la lista in sola lettura (la textarea note sparisce) — falsando il test
+      // del fuoco. Manteniamo isAdmin:true così verifichiamo davvero il
+      // ripristino del fuoco dopo il salvataggio in debounce.
+      if (msg && msg.type === 'auth_status') {
+        return { ok: true, isAdmin: true, profile: { email: 'sathyarampontillo@gmail.com' } };
+      }
       return orig(msg);
     };
   });
