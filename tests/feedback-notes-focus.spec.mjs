@@ -87,7 +87,7 @@ test('feedback: la casella note resta a fuoco dopo il salvataggio in debounce', 
     };
   });
 
-  expect(focused.isNotes, 'DIAG ' + JSON.stringify(focused)).toBe(true);
+  expect(JSON.stringify(focused)).toBe('DIAGREVEAL');
   expect(focused.value).toBe('una nota lunga abbastanza da avere un cursore');
   // Il cursore è in fondo al testo appena digitato (nessun salto a inizio).
   expect(focused.caret).toBe('una nota lunga abbastanza da avere un cursore'.length);
