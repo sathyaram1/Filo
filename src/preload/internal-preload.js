@@ -11,6 +11,21 @@ const { ipcRenderer, webFrame } = require('electron');
 // l'autoscroll nativo). Vedi wheel-zoom.js.
 try { require('./wheel-zoom.js')(webFrame); } catch (e) { console.error('[Filo internal] wheel-zoom', e); }
 
+// ─── SICUREZZA: gate d'origine ─────────────────────────────────────────────
+// Questo preload è PRIVILEGIATO: espone window.filo (IPC, shell, AI stream) e
+// uno shim chrome.* con accesso a storage (chiavi API + TUTTI i dati utente) e
+// alle tab. È assegnato solo alle schede nate come filo://, ma il preload è
+// legato al WebContents, non all'URL corrente: se per qualunque motivo (un
+// redirect lato server a metà caricamento, o una navigazione in-place sfuggita
+// al guard will-navigate di tabs.js) un documento NON-filo finisse a girare qui,
+// NON deve ricevere le API privilegiate, altrimenti un sito esterno potrebbe
+// leggere/esfiltrare lo storage. Il preload gira DOPO il commit della
+// navigazione, quindi `location` riflette già l'origine reale del documento: se
+// non è filo:, non esponiamo nulla e non iniettiamo i content script.
+const IS_FILO_ORIGIN = (() => {
+  try { return location.protocol === 'filo:'; } catch (_) { return false; }
+})();
+
 let streamCounter = 0;
 
 const filoApi = {
