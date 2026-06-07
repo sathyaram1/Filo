@@ -918,8 +918,11 @@ async function handleMessage(msg, sender = {}) {
         if (!modelId) return { ok: false, error: 'Stringa modello vuota' };
         const apiKey = (eff.apiKeys || {})[provider] || '';
         if (!apiKey) return { ok: false, error: `Chiave ${provider} non configurata` };
-        const model = provider === 'gemini' && !modelId.startsWith('google/')
-          ? `google/${modelId}` : modelId;
+        // Il provider Gemini ora accetta i nomi nativi (es. gemini-3.1-flash-lite),
+        // quindi il modello del registry va passato così com'è: stesso percorso
+        // dell'uso reale (prima qui si anteponeva "google/" e l'uso reale no →
+        // il "Prova" passava ma la feature falliva).
+        const model = modelId;
         const messages = [{ role: 'user', content: 'Conta da 1 a 20 separando con virgole, senza testo extra.' }];
         const startMs = performance.now();
         let firstTokenMs = null;
