@@ -58,7 +58,7 @@ test('Modelli: un modello Gemini salvato compare nella tendina Gemini col nome n
 
   // Compila la prima riga con un modello Gemini nativo e salva.
   await page.evaluate(() => {
-    const row = document.querySelector('.sn-model-row:not(.sn-model-row-head)');
+    const row = document.querySelector('#modelRegistryList .sn-model-row:not(.sn-model-row-head)');
     row.querySelector('.sn-model-nick').value = 'miogem';
     row.querySelector('.sn-model-provider').value = 'gemini';
     row.querySelector('.sn-model-id').value = 'gemini-3.1-flash-lite';
