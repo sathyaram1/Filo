@@ -227,6 +227,7 @@
     listModels,
     complete,
     streamComplete,
+    synthesizeSpeech,
     toGeminiModelId,
     isGoogleModel: (id) => !!toGeminiModelId(id),
   };
