@@ -242,15 +242,20 @@ function loadContentScripts() {
 // Sovrascrivi lo stub di Chromium PRIMA di caricare i content script, così
 // chrome.runtime.sendMessage è già il nostro shim IPC quando content.js fa
 // fetchSettings() durante init().
-try {
-  Object.defineProperty(window, 'chrome', {
-    value: chromeShim,
-    writable: true,
-    configurable: true,
-    enumerable: true,
-  });
-} catch (e) {
-  try { window.chrome = chromeShim; } catch (_) { console.warn('[Filo] impossibile sovrascrivere window.chrome', e); }
+// Installa lo shim chrome.* SOLO su origine filo:// (vedi IS_FILO_ORIGIN). Su
+// un'origine non-filo finita qui per errore non esponiamo storage/IPC alla
+// pagina non fidata.
+if (IS_FILO_ORIGIN) {
+  try {
+    Object.defineProperty(window, 'chrome', {
+      value: chromeShim,
+      writable: true,
+      configurable: true,
+      enumerable: true,
+    });
+  } catch (e) {
+    try { window.chrome = chromeShim; } catch (_) { console.warn('[Filo] impossibile sovrascrivere window.chrome', e); }
+  }
 }
 
 function bootContentScripts() {
@@ -258,8 +263,17 @@ function bootContentScripts() {
   injectContentScriptStyles();
   loadContentScripts();
 }
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', bootContentScripts, { once: true });
+// I content script (e il loro accesso a chrome.*) girano solo sulle pagine
+// interne fidate. Su origine non-filo non iniettiamo nulla.
+if (IS_FILO_ORIGIN) {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootContentScripts, { once: true });
+  } else {
+    bootContentScripts();
+  }
 } else {
-  bootContentScripts();
+  try {
+    console.warn('[Filo] internal-preload su origine non-filo:', location.href,
+      '— API privilegiate non esposte');
+  } catch (_) {}
 }
