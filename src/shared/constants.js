@@ -152,8 +152,8 @@
     [ACTIONS.EXPLAIN_LINK]: 'flash, flash-or',
     // Modelli "stupidi" per la pipeline di raccolta path: deve essere economico
     // e deterministico, non creativo. Lite va benissimo.
-    [ACTIONS.HELP_INTENT_GUESS]: 'flash-lite, flash-lite-or',
-    [ACTIONS.HELP_INTENT_JUDGE]: 'flash-lite, flash-lite-or',
+    [ACTIONS.HELP_INTENT_GUESS]: 'flash-lite-3, flash-lite-3-or',
+    [ACTIONS.HELP_INTENT_JUDGE]: 'flash-lite-3, flash-lite-3-or',
     // Filo agenti: chat = modello principale; gli altri (background) usano lite.
     [ACTIONS.FILO_CHAT]: 'flash, flash-or',
     [ACTIONS.FILO_DASHBOARD]: 'flash, flash-or',
