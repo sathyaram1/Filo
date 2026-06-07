@@ -99,13 +99,13 @@ test('Validazione: assegnare un modello TTS a una funzione di testo è bloccato 
   const page = await openTab(OPTIONS_URL);
   await revealAdvanced(page);
 
-  const explain = actionCell(page, 'Spiega (inline)').locator('.sn-chain').first();
-  const input = explain.locator('.sn-chain-input').first();
+  const seg = actionCell(page, 'Spiega (inline)').locator('.sn-chain-seg').first();
+  const input = seg.locator('.sn-chain-input');
   await input.fill('tts');     // fill emette anche `change` → scatta il gate
   await page.keyboard.press('Tab'); // blur per sicurezza
 
   // Compare il messaggio di blocco e il valore viene ripristinato (non 'tts').
-  await expect(explain.locator('.sn-chain-msg')).toBeVisible({ timeout: 4_000 });
+  await expect(seg.locator('.sn-chain-msg')).toBeVisible({ timeout: 4_000 });
   await expect(input).not.toHaveValue('tts');
 
   const savedExplain = await page.evaluate(async () => {
