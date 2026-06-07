@@ -187,3 +187,38 @@
   width: 0;
   height: 0;
 }
+
+/* ===========================================================================
+   Difesa delle icone iniettate contro il CSS dei siti ospiti.
+   theme.css è iniettato anche nelle pagine web esterne (vedi page-preload.js),
+   dove però l'<html> del sito NON ha [data-sn-theme]: per questo le regole qui
+   sotto NON usano quel prefisso ma i contenitori Filo (.sn-menu/.sn-popup/…).
+
+   Perché serve (feedback alpha: "su magnific.com le icone sono rotte"): molte
+   pagine impostano regole globali tipo `svg { fill: currentColor }` (default di
+   parecchi framework di icone). Le nostre icone sono outline (fill="none",
+   stroke="currentColor"): la regola del sito sovrascrive l'attributo `fill` e
+   le riempie di colore pieno, trasformandole in sagome illeggibili. Qui
+   riasseriamo i default della famiglia DENTRO i contenitori Filo, con
+   !important e specificità più alta del sito, ma rispettando gli elementi che
+   hanno un fill/stroke proprio esplicito (es. i puntini pieni dell'icona App,
+   che usano fill="currentColor" stroke="none"). =========================== */
+.sn-menu svg,
+.sn-popup svg,
+.sn-sidebar svg,
+.sn-toast svg {
+  fill: none !important;
+  stroke: currentColor !important;
+}
+.sn-menu svg [fill="currentColor"],
+.sn-popup svg [fill="currentColor"],
+.sn-sidebar svg [fill="currentColor"],
+.sn-toast svg [fill="currentColor"] {
+  fill: currentColor !important;
+}
+.sn-menu svg [stroke="none"],
+.sn-popup svg [stroke="none"],
+.sn-sidebar svg [stroke="none"],
+.sn-toast svg [stroke="none"] {
+  stroke: none !important;
+}
