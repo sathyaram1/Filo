@@ -1,0 +1,174 @@
+// Capacità dei modelli e requisiti delle funzioni.
+//
+// Serve a tre cose:
+//   1. Etichettare ogni modello nel picker per CATEGORIA (testo, sintesi vocale,
+//      immagini, embedding, …).
+//   2. Ordinare i modelli per "recency" (i più recenti in cima).
+//   3. Validare l'abbinamento modello↔funzione: una funzione che vuole testo in
+//      output non può ricevere un modello di sola sintesi vocale, e viceversa.
+//
+// Le capacità si ricavano da provider + id (nome del modello), più — quando
+// disponibili — i metadati dell'API:
+//   - OpenRouter espone architecture.input_modalities/output_modalities e
+//     `created` (timestamp): precisi, li usiamo direttamente.
+//   - Gemini NON espone le modalità: TTS e testo hanno gli stessi
+//     supportedGenerationMethods. Le deduciamo dal nome (-tts, -image, embedding)
+//     e dal fatto che i gemini-* sono multimodali in input mentre i gemma-* no.
+//
+// Convenzione IIFE su globalThis come gli altri moduli shared/*.
+
+(function (global) {
+  'use strict';
+
+  // Modalità usate in inputs/outputs.
+  const M = { TEXT: 'text', IMAGE: 'image', AUDIO: 'audio', VIDEO: 'video', EMBED: 'embedding' };
+
+  function lc(s) { return String(s == null ? '' : s).toLowerCase(); }
+  function uniq(arr) { return Array.from(new Set(arr)); }
+
+  // Normalizza una lista di modalità "stile OpenRouter" nelle nostre.
+  function normModalities(list) {
+    const out = [];
+    for (const m of list || []) {
+      const v = lc(m);
+      if (v.includes('audio') || v.includes('speech')) out.push(M.AUDIO);
+      else if (v.includes('image')) out.push(M.IMAGE);
+      else if (v.includes('video')) out.push(M.VIDEO);
+      else if (v.includes('embed')) out.push(M.EMBED);
+      else out.push(M.TEXT);
+    }
+    return uniq(out.length ? out : [M.TEXT]);
+  }
+
+  // Capacità di un modello: { inputs:[], outputs:[] } con valori da M.
+  // `meta` è opzionale (l'oggetto grezzo dell'API per quel modello).
+  function capabilitiesFor(provider, modelId, meta) {
+    const id = lc(modelId);
+
+    // OpenRouter con metadati di modalità → precisi.
+    const arch = meta && (meta.architecture || meta);
+    if (arch && (arch.input_modalities || arch.output_modalities)) {
+      return {
+        inputs: normModalities(arch.input_modalities || ['text']),
+        outputs: normModalities(arch.output_modalities || ['text']),
+      };
+    }
+
+    // Euristiche sul nome (valgono soprattutto per Gemini).
+    if (/embedding|embed/.test(id)) return { inputs: [M.TEXT], outputs: [M.EMBED] };
+    // Sintesi vocale o musica → audio in output. (lyria = musica)
+    if (/(^|[-_/])tts([-_]|$)|-tts|\btts\b|speech|lyria/.test(id)) {
+      return { inputs: [M.TEXT], outputs: [M.AUDIO] };
+    }
+    // Generazione immagini.
+    if (/(image|imagen|nano-banana)/.test(id)) {
+      return { inputs: [M.TEXT, M.IMAGE], outputs: [M.IMAGE] };
+    }
+    // Generazione video.
+    if (/(^|[-_/])veo|video/.test(id)) {
+      return { inputs: [M.TEXT, M.IMAGE], outputs: [M.VIDEO] };
+    }
+
+    // Modello di testo. Input multimodale per i gemini-* (accettano immagini e
+    // audio); i gemma-* sono solo testo. Per OpenRouter senza metadati restiamo
+    // conservativi (solo testo): se servono immagini/audio l'utente sceglierà un
+    // modello con i metadati che lo dichiarano.
+    const inputs = [M.TEXT];
+    if (provider === 'gemini' && /^gemini/.test(id)) inputs.push(M.IMAGE, M.AUDIO);
+    return { inputs, outputs: [M.TEXT] };
+  }
+
+  // Categoria principale (chiave i18n caps_cat_*) per le etichette del picker.
+  function categoryKey(provider, modelId, meta) {
+    const caps = capabilitiesFor(provider, modelId, meta);
+    if (caps.outputs.includes(M.EMBED)) return 'embedding';
+    if (caps.outputs.includes(M.AUDIO)) return 'tts';
+    if (caps.outputs.includes(M.VIDEO)) return 'video';
+    if (caps.outputs.includes(M.IMAGE) && !caps.outputs.includes(M.TEXT)) return 'image';
+    if (caps.inputs.includes(M.IMAGE) || caps.inputs.includes(M.AUDIO)) return 'multimodal';
+    return 'text';
+  }
+
+  function categoryLabel(provider, modelId, meta) {
+    const key = categoryKey(provider, modelId, meta);
+    const t = global.SN_I18N && global.SN_I18N.t;
+    return t ? t('caps_cat_' + key) : key;
+  }
+
+  // Requisiti di una funzione: { output, inputs:[] }. Default = testo in output,
+  // nessun input speciale. Le eccezioni sono le funzioni multimodali.
+  function requirementsFor(action) {
+    const A = (global.SN_CONST && global.SN_CONST.ACTIONS) || {};
+    switch (action) {
+      case A.DESCRIBE_IMAGE:
+      case A.TRANSCRIBE_IMAGE:
+        return { output: M.TEXT, inputs: [M.IMAGE] };
+      case A.TRANSCRIBE_AUDIO:
+        return { output: M.TEXT, inputs: [M.AUDIO] };
+      case A.TTS:
+        return { output: M.AUDIO, inputs: [] };
+      default:
+        return { output: M.TEXT, inputs: [] };
+    }
+  }
+
+  // Verifica che un modello soddisfi i requisiti di una funzione.
+  // Ritorna { ok:true } oppure { ok:false, reason:'<testo i18n>' }.
+  function modelMatchesAction(provider, modelId, action, meta) {
+    const caps = capabilitiesFor(provider, modelId, meta);
+    const req = requirementsFor(action);
+    const t = (global.SN_I18N && global.SN_I18N.t) || ((k) => k);
+
+    if (!caps.outputs.includes(req.output)) {
+      const key = req.output === M.AUDIO ? 'caps_block_output_audio' : 'caps_block_output_text';
+      return { ok: false, reason: t(key) };
+    }
+    for (const inp of req.inputs) {
+      if (!caps.inputs.includes(inp)) {
+        const key = inp === M.AUDIO ? 'caps_block_input_audio' : 'caps_block_input_image';
+        return { ok: false, reason: t(key) };
+      }
+    }
+    return { ok: true };
+  }
+
+  // Chiave di ordinamento "più recente = più grande". L'ordinamento avviene
+  // SEMPRE dentro lo stesso provider (liste separate), quindi le scale diverse
+  // tra provider non si mischiano.
+  //   - OpenRouter: `created` (unix).
+  //   - Gemini: numero di versione dall'id (3.5 > 3.1 > 3 > 2.5 > 2.0), con la
+  //     data eventualmente presente in `version` come spareggio fine.
+  function recencyKey(provider, modelId, meta) {
+    if (provider === 'openrouter') {
+      const c = meta && meta.created;
+      return typeof c === 'number' ? c : 0;
+    }
+    const verMatch = lc(modelId).match(/(\d+(?:\.\d+)?)/);
+    let key = verMatch ? parseFloat(verMatch[1]) : 0;
+    const dm = lc((meta && meta.version) || '').match(/(\d{4})[-_](\d{2})/);
+    if (dm) key += (parseInt(dm[1], 10) * 12 + parseInt(dm[2], 10)) / 1e6;
+    return key;
+  }
+
+  // Ordina una lista di { id, provider, meta } per recency decrescente, con il
+  // nome come spareggio stabile.
+  function sortByRecency(items) {
+    return items.slice().sort((a, b) => {
+      const ka = recencyKey(a.provider, a.id, a.meta);
+      const kb = recencyKey(b.provider, b.id, b.meta);
+      if (kb !== ka) return kb - ka;
+      return String(a.id).localeCompare(String(b.id));
+    });
+  }
+
+  global.SN_MODEL_CAPS = {
+    M,
+    capabilitiesFor,
+    categoryKey,
+    categoryLabel,
+    requirementsFor,
+    modelMatchesAction,
+    recencyKey,
+    sortByRecency,
+  };
+})(typeof globalThis !== 'undefined' ? globalThis : self);
