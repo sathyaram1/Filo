@@ -31,6 +31,7 @@
       [A.DESCRIBE_IMAGE, 'options_action_describe_image'],
       [A.TRANSCRIBE_IMAGE, 'options_action_transcribe_image'],
       [A.TRANSCRIBE_AUDIO, 'options_action_transcribe_audio'],
+      [A.TTS, 'options_action_tts'],
       [A.SPELLCHECK_SEMANTIC, 'spell_action_semantic_label'],
       [A.SPELLCHECK_WORD, 'spell_action_word_label'],
       [A.HELP_INTENT_GUESS, 'options_action_help_intent_guess'],
