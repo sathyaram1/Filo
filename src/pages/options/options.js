@@ -473,13 +473,16 @@
     return (provider === 'gemini' ? $('apiKeyGemini') : $('apiKey')).value.trim();
   }
 
-  // Carica (una sola volta) la lista modelli di un provider nel suo combobox,
-  // se c'è la chiave. Silenzioso: in caso di errore o chiave assente il campo
-  // resta un input libero, senza disturbare l'utente.
+  // Carica (una sola volta) il catalogo di un provider nel suo combobox, così
+  // ogni modello è subito etichettato per categoria. È solo metadati (gratis):
+  //  - OpenRouter: catalogo pubblico → si carica SEMPRE, anche senza chiave.
+  //  - Gemini: il catalogo richiede la chiave (gratuita); senza, il campo resta
+  //    libero e le categorie si deducono dal nome del modello.
+  // Silenzioso: in caso di errore il campo resta un input libero.
   async function ensureProviderModels(provider) {
     if (providerModelCache[provider]) return;
     const key = providerKey(provider);
-    if (!key) return;
+    if (provider === 'gemini' && !key) return;
     try {
       const ids = provider === 'gemini'
         ? await fetchGeminiModels(key)
