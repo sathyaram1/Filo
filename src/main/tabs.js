@@ -338,11 +338,12 @@ class TabManager {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
     const target = normalizeUrl(url);
-    // In privacy ogni sito ha la sua partizione: se l'URL di destinazione
-    // appartiene a un sito diverso da quello della view corrente, la partizione
-    // (fissata alla creazione della WebContentsView) non basta più → ricreiamo
-    // la view nella partizione giusta invece di un semplice loadURL.
-    if (this._needsRepartition(tab, target)) {
+    // La WebContentsView va RICREATA (non basta un loadURL) quando cambia la
+    // partizione (privacy, fra siti diversi) oppure quando si attraversa il
+    // confine di fiducia interno↔esterno: il preload e contextIsolation sono
+    // fissati alla creazione della view e un loadURL non li rivaluta, quindi
+    // riusare la view caricherebbe il contenuto col preload sbagliato.
+    if (this._needsRecreate(tab, target)) {
       this._recreateView(tab, target);
       return;
     }
@@ -355,6 +356,24 @@ class TabManager {
     if (this.cookieMode !== Cookies.MODES.PRIVACY || this.incognito) return false;
     const next = this._partitionFor(url);
     return (next || null) !== (tab.partition || null);
+  }
+
+  // true se l'URL di destinazione attraversa il confine di FIDUCIA della view.
+  // La view nasce con un preload scelto in base all'internal-ness dell'URL:
+  // filo:// → preload privilegiato + contextIsolation:false (espone window.filo
+  // e chrome.storage); web esterno → preload isolato. Quel preload è legato al
+  // WebContents e NON cambia con un loadURL. Navigare una scheda interna verso un
+  // sito esterno sullo stesso WebContents farebbe quindi girare contenuto NON
+  // fidato col preload privilegiato (lettura chiavi API + dati). Va ricreata.
+  _crossesTrustBoundary(tab, url) {
+    const nextInternal = String(url || '').startsWith('filo://');
+    return nextInternal !== !!tab.isInternal;
+  }
+
+  // La view va ricreata (non basta un loadURL) se cambia partizione (privacy) o
+  // se si attraversa il confine di fiducia interno↔esterno (preload sbagliato).
+  _needsRecreate(tab, url) {
+    return this._crossesTrustBoundary(tab, url) || this._needsRepartition(tab, url);
   }
 
   // Ricrea la WebContentsView di `tab` nella partizione corretta per `url`,
