@@ -1,7 +1,0 @@
-{
-  "id": "RwhOoO6VEqDcjEhKg14M",
-  "status": "done",
-  "notes": "Risolto: ho rivisto la modalita' zoom (quella che si attiva cliccando la rotella). Ora si chiude con qualsiasi interazione — un tasto qualunque, click sinistro o destro — non solo con Esc o un secondo click. Il riquadro in alto adesso dice 'zoom <percentuale>%, rotella per zoomare', senza emoji ne' la menzione di Esc; e la percentuale e' un campo editabile: puoi digitare un valore (es. 150) e premere Invio per impostare lo zoom esatto. Verificato con test automatici (qualsiasi tasto/click chiude la modalita', il testo del riquadro e' corretto, e digitare la percentuale cambia davvero lo zoom).",
-  "queuedAt": "2026-06-07T05:11:39.463Z",
-  "queuedBy": "routine"
-}
