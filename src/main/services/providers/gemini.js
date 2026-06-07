@@ -170,6 +170,46 @@
     return { text: fullText, usage };
   }
 
+  // Sintesi vocale (text-to-speech). Usa generateContent con
+  // responseModalities:['AUDIO'] + speechConfig. La risposta contiene audio
+  // grezzo PCM (audio/L16;codec=pcm;rate=24000) in inlineData (base64).
+  // Ritorna { audioBase64, mimeType } — il chiamante lo incapsula in WAV.
+  async function synthesizeSpeech({ apiKey, model, text, voice, signal }) {
+    const geminiModel = toGeminiModelId(model);
+    if (!geminiModel) throw new Error(`Gemini: modello non Google (${model})`);
+    const clean = String(text == null ? '' : text).trim();
+    if (!clean) throw new Error('Gemini TTS: testo vuoto');
+    const url = `${BASE}/models/${encodeURIComponent(geminiModel)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const body = {
+      contents: [{ parts: [{ text: clean }] }],
+      generationConfig: {
+        responseModalities: ['AUDIO'],
+        speechConfig: {
+          voiceConfig: { prebuiltVoiceConfig: { voiceName: voice || 'Kore' } },
+        },
+      },
+    };
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal,
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`Gemini TTS ${res.status}: ${errText.slice(0, 300)}`);
+    }
+    const data = await res.json();
+    const parts = data?.candidates?.[0]?.content?.parts || [];
+    const part = parts.find((p) => p.inlineData || p.inline_data);
+    const inl = part && (part.inlineData || part.inline_data);
+    if (!inl || !inl.data) throw new Error('Gemini TTS: nessun audio nella risposta');
+    return {
+      audioBase64: inl.data,
+      mimeType: inl.mimeType || inl.mime_type || 'audio/L16;codec=pcm;rate=24000',
+    };
+  }
+
   async function listModels(apiKey) {
     const res = await fetch(`${BASE}/models?key=${encodeURIComponent(apiKey)}`);
     if (!res.ok) throw new Error(`Gemini models: ${res.status}`);
