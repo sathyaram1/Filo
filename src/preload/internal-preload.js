@@ -85,7 +85,8 @@ const filoApi = {
   shellWhich: (opts) => ipcRenderer.invoke('shell:which', opts),
 };
 
-window.filo = filoApi;
+// Espone window.filo SOLO su origine filo:// (vedi IS_FILO_ORIGIN sopra).
+if (IS_FILO_ORIGIN) window.filo = filoApi;
 
 // Shim chrome.* compatibile con il codice estensione: i file portati lo usano
 // senza sapere che siamo in Electron. Overscriviamo l'oggetto chrome stub
