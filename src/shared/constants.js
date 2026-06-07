@@ -170,6 +170,9 @@
     [ACTIONS.FILO_DASHBOARD]: 'flash, flash-or',
     [ACTIONS.FILO_LESSON]: 'flash-lite-3, flash-lite-3-or',
     [ACTIONS.FILO_COMPACT]: 'flash, flash-or',
+    // Lettura ad alta voce: modello TTS Gemini. Se fallisce/è assente, la voce
+    // del browser (Web Speech) fa da fallback finale lato content script.
+    [ACTIONS.TTS]: 'tts',
   };
 
   // Risolve un riferimento a un modello (nickname OPPURE id raw legacy stile
