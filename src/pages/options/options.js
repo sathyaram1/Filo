@@ -457,9 +457,12 @@
       .filter((it) => it.id);
   }
 
+  // Il catalogo OpenRouter è PUBBLICO: la chiave non serve per elencarlo (è
+  // solo metadati, niente inferenza → gratis). La passiamo se c'è, ma funziona
+  // anche senza, così le categorie sono precise da subito.
   async function fetchOpenRouterModels(key) {
     const res = await fetch('https://openrouter.ai/api/v1/models', {
-      headers: { Authorization: `Bearer ${key}` },
+      headers: key ? { Authorization: `Bearer ${key}` } : {},
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
