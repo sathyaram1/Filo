@@ -129,6 +129,13 @@
       provider: 'openrouter',
       model: 'anthropic/claude-3.5-haiku',
     },
+    // Sintesi vocale (TTS): producono AUDIO da testo. Usati SOLO dall'azione TTS
+    // (la validazione modello↔azione impedisce di assegnarli a funzioni di testo).
+    tts: {
+      label: 'Gemini 2.5 Flash TTS',
+      provider: 'gemini',
+      model: 'gemini-2.5-flash-preview-tts',
+    },
   };
 
   // Modello di default per ogni azione. I valori sono liste di NICKNAME dal
