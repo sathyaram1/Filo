@@ -21,6 +21,9 @@ const OPTIONS_URL = 'filo://options/options.html';
 
 async function revealAdvanced(page) {
   await page.waitForSelector('#useDefaultModels', { timeout: 8_000 });
+  // Attendi che load() abbia finito di renderizzare le righe del registry
+  // (evita race: la sezione diventa visibile prima che le righe esistano).
+  await page.waitForSelector('.sn-model-row:not(.sn-model-row-head)', { timeout: 8_000 });
   await page.uncheck('#useDefaultModels');
   await page.waitForSelector('#sec-model-registry:not([hidden])', { timeout: 4_000 });
 }
