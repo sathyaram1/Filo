@@ -482,14 +482,19 @@ class TabManager {
         this.setContentFullscreen(false);
       }
     });
-    // Privacy: navigazione main-frame iniziata dalla pagina (click su link,
-    // window.location) verso un sito diverso → serve un'altra partizione, che
-    // non si può cambiare a view viva. Blocchiamo questa navigazione e ricreiamo
-    // la view nella partizione del nuovo sito. Best-effort: i redirect lato
-    // server a metà caricamento possono sfuggire (restano nel jar precedente),
-    // limite accettabile per una modalità privacy opt-in.
+    // Navigazione main-frame iniziata dalla pagina (click su link,
+    // window.location). Due casi richiedono di RICREARE la view invece di
+    // lasciarla navigare in-place, perché preload/partizione sono fissati alla
+    // creazione del WebContents:
+    //   1) SICUREZZA — confine di fiducia interno↔esterno: una pagina interna
+    //      che naviga verso il web (o viceversa) non deve riusare il preload
+    //      privilegiato. Ricreiamo con il preload corretto per la destinazione.
+    //   2) Privacy — sito diverso in modalità privacy: serve un'altra partizione.
+    // Best-effort: i redirect lato server a metà caricamento possono sfuggire a
+    // will-navigate; la rete di sicurezza è il gate d'origine in
+    // internal-preload.js, che non espone le API se l'origine non è filo:.
     wc.on('will-navigate', (event, url) => {
-      if (this._needsRepartition(tab, url)) {
+      if (this._needsRecreate(tab, url)) {
         event.preventDefault();
         this._recreateView(tab, url);
       }
