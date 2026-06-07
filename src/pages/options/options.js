@@ -11,7 +11,18 @@
   // Mappa azione → editor a segmenti della sua catena di modelli (popolata in load()).
   let modelChains = {};
 
+  // Cache delle liste modelli per provider, usate dal combobox della "stringa
+  // modello" di ogni riga del registry. Riempite on-demand: al focus del campo,
+  // al cambio provider, o col pulsante "Aggiorna lista modelli". `null` = non
+  // ancora caricata (provo a caricarla); `[]` = caricata ma vuota/errore.
+  const providerModelCache = { gemini: null, openrouter: null };
+
   function $(id) { return document.getElementById(id); }
+
+  // Id della datalist (combobox) associata a un provider.
+  function datalistIdFor(provider) {
+    return provider === 'gemini' ? 'models-list-gemini' : 'models-list-openrouter';
+  }
 
   function fillStaticText() {
     document.title = I18n.t('options_title');
