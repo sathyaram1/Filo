@@ -204,13 +204,17 @@
         const inp = document.createElement('input');
         inp.type = 'text';
         inp.className = 'sn-chain-input';
-        inp.setAttribute('list', 'nicknames-list');
+        // Niente più `list="nicknames-list"`: il popup nativo della datalist usa
+        // i colori di sistema, fuori palette. Lo sostituiamo con un dropdown
+        // custom .sn-select-* coerente con gli altri menu a tendina di Filo.
+        inp.setAttribute('autocomplete', 'off');
         inp.value = ref;
         inp.placeholder = i === 0 ? t('options_chain_primary') : t('options_chain_fallback');
         fit(inp);
         inp.addEventListener('input', () => { refs[i] = inp.value; fit(inp); emit(); });
         inp.addEventListener('change', () => { refs[i] = inp.value; emit(); });
         seg.appendChild(inp);
+        attachDropdown(seg, inp, (value) => { refs[i] = value; emit(); });
 
         // Il pulsante di rimozione c'è solo se ci sono più segmenti: l'ultimo
         // rimasto non si può rimuovere (resterebbe l'azione senza modello).
