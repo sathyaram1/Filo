@@ -181,6 +181,7 @@
     }
 
     function pick(value) {
+      if (validate) { const v = validate(value); if (!v.ok) return; }
       inp.value = value;
       fit(inp);
       onPick(value);
