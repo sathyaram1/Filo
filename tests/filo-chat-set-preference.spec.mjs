@@ -9,8 +9,9 @@ import { test, expect } from './fixtures/electron.mjs';
 // Esegue un'azione di chat nel processo main e ritorna { res, settings }.
 async function runAction(app, action) {
   return app.evaluate(async ({ app: electronApp }, act) => {
-    const path = require('path');
-    const handlers = require(path.join(electronApp.getAppPath(), 'src', 'main', 'services', 'handlers.js'));
+    const req = process.mainModule.require.bind(process.mainModule);
+    const path = req('path');
+    const handlers = req(path.join(electronApp.getAppPath(), 'src', 'main', 'services', 'handlers.js'));
     const res = await handlers.executeFiloAction(act);
     const settings = await globalThis.SN_STORAGE.getSettings();
     return { res, settings };
