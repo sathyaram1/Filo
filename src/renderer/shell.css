@@ -108,7 +108,7 @@ html[data-chrome-compact="1"] .addr {
   -webkit-app-region: no-drag;
   app-region: no-drag;
 }
-.tab:hover { background: color-mix(in srgb, var(--tab-bg) 85%, var(--bg)); }
+.tab:hover { background: color-mix(in srgb, var(--tab-bg-eff) 85%, var(--bg)); }
 .tab.active {
   background: var(--tab-active);
   color: var(--fg);
