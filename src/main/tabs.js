@@ -269,6 +269,7 @@ class TabManager {
       loading: true,
       canBack: false,
       canFwd: false,
+      muted: false,
       isInternal,
       partition,
       partitionSite: isInternal ? null : Cookies.registrableOf(url),
