@@ -70,6 +70,10 @@
     // main; la shell lo applica attenuato alle tab INATTIVE.
     TAB_IDENTITY_COLOR: 'tab_identity_color',        // { color: 'rgb(r,g,b)' | null }
 
+    // §2.1 — segnali di attività della tab riportati dal content script, per la
+    // decisione di auto-archiviazione. Throttled. { lastInteractionAt?, scrollPct?, formDirty? }
+    TAB_ACTIVITY: 'tab_activity',
+
     // Aiuto: invio percorso completato a fine sessione (passa per la pipeline
     // di sanitizzazione 2-LLM in pathsCollector.js prima di toccare Firestore).
     SAVE_PATH: 'save_path',                        // { path: { domain, initialUrl, sanitizedSteps, rawUserMessages, success } }
