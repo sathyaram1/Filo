@@ -140,7 +140,16 @@
     reopen.className = 'sn-btn';
     reopen.textContent = 'Riapri';
     reopen.addEventListener('click', () => {
-      try { chrome.tabs.create({ url: t.url }); } catch (_) {}
+      // Riapre ripristinando lo scroll registrato (§3.1).
+      try {
+        chrome.runtime.sendMessage({
+          type: MSG.REOPEN_ARCHIVED_TAB,
+          url: t.url,
+          scrollPct: typeof t.scrollPosition === 'number' ? t.scrollPosition : null,
+        });
+      } catch (_) {
+        try { chrome.tabs.create({ url: t.url }); } catch (_) {}
+      }
     });
     actions.appendChild(reopen);
 
