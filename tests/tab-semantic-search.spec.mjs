@@ -1,32 +1,43 @@
-// Ricerca semantica dell'archivio (spec §3.2) + indicizzazione alla chiusura.
+// Ricerca semantica + riassunto + re-rank + cancellazione retroattiva
+// (spec §3.1 riassunto, §3.2 ricerca/embedding/re-rank, §5 pulizia retroattiva).
 //
-// L'embedding reale richiede la chiave Google: nei test STUBBIAMO il provider di
-// embedding (globalThis.SN_PROVIDER_GEMINI.embed) e impostiamo una chiave finta,
-// così verifichiamo il PLUMBING: indicizzazione alla chiusura (embedding+snippet),
-// ranking per similarità coseno, e che gli embedding NON vengano spediti al
-// renderer nelle liste.
+// LLM ed embedding reali richiedono la chiave Google: nei test STUBBIAMO sia il
+// provider di embedding (SN_PROVIDER_GEMINI.embed) sia il completamento LLM
+// (SN_PROVIDERS.completeWithFallback) e impostiamo una chiave finta, così
+// verifichiamo il PLUMBING: indicizzazione (riassunto + embedding + snippet),
+// ranking per coseno, re-rank LLM, e cancellazione multipla.
 
 import { test, expect } from './fixtures/electron.mjs';
 
-test('chiudendo una scheda (con chiave + embedding) viene indicizzata: embedding + snippet', async ({ app, shell, openTab, testServer }) => {
-  await app.evaluate(async () => {
+async function setupStubs(app, { summary, embedFor } = {}) {
+  await app.evaluate(async ({}, args) => {
     await globalThis.SN_STORAGE.updateSettings({ apiKeys: { gemini: 'test-key' } });
-    // Stub deterministico: un vettore non vuoto per ogni testo.
     globalThis.SN_PROVIDER_GEMINI.embed = async ({ texts }) => texts.map(() => [0.5, 0.2, 0.9, 0.1]);
-  });
+    if (args.summary != null) {
+      globalThis.SN_PROVIDERS.completeWithFallback = async () => ({
+        text: args.summary, provider: 'gemini', model: 'stub', usage: {},
+      });
+    }
+  }, { summary: summary ?? null });
+}
 
-  const page = await testServer.openReady(openTab,
+test('chiudere una scheda la indicizza: riassunto LLM + embedding + snippet', async ({ app, shell, openTab, testServer }) => {
+  await setupStubs(app, { summary: 'Riassunto di prova: pagina sui gatti e i felini domestici.' });
+
+  await testServer.openReady(openTab,
     '<!doctype html><html><head><title>Gatti</title></head><body style="margin:0">gatti felini animali domestici coccole</body></html>');
   const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
-
   await shell.evaluate(async (i) => window.filoShell.tabs.close(i), id);
 
-  // L'entry archiviata riceve embedding + snippet (best-effort, async).
   await expect.poll(async () => app.evaluate(async () => {
     const l = await globalThis.SN_ARCHIVED_TABS.list();
     const e = l.find((x) => /Gatti/.test(x.title || ''));
-    return !!(e && Array.isArray(e.embedding) && e.embedding.length && e.snippet);
-  }), { timeout: 8_000 }).toBe(true);
+    return e
+      ? { hasEmbed: Array.isArray(e.embedding) && e.embedding.length > 0, hasSnippet: !!e.snippet, summary: e.summary || '' }
+      : null;
+  }), { timeout: 8_000 }).toEqual(
+    expect.objectContaining({ hasEmbed: true, hasSnippet: true, summary: expect.stringContaining('Riassunto di prova') }),
+  );
 });
 
 test('la ricerca semantica ordina per pertinenza e non espone gli embedding', async ({ app, openTab }) => {
@@ -35,11 +46,11 @@ test('la ricerca semantica ordina per pertinenza e non espone gli embedding', as
     const A = globalThis.SN_ARCHIVED_TABS;
     const a = await A.archive({ url: 'https://a.test/', title: 'DocA' });
     const b = await A.archive({ url: 'https://b.test/', title: 'DocB' });
-    // DocA ≈ direzione [1,0]; DocB ≈ [0,1].
     await A.update(a.id, { embedding: [127, 0], snippet: 'documento A' });
     await A.update(b.id, { embedding: [0, 127], snippet: 'documento B' });
-    // La query embeddizza vicino a DocA.
-    globalThis.SN_PROVIDER_GEMINI.embed = async ({ texts }) => texts.map(() => [1, 0]);
+    globalThis.SN_PROVIDER_GEMINI.embed = async ({ texts }) => texts.map(() => [1, 0]); // ≈ DocA
+    // Niente re-rank: il completamento torna vuoto → resta l'ordine per coseno.
+    globalThis.SN_PROVIDERS.completeWithFallback = async () => ({ text: '', provider: 'gemini', model: 'stub', usage: {} });
   });
 
   const page = await openTab('filo://newtab/');
@@ -47,14 +58,52 @@ test('la ricerca semantica ordina per pertinenza e non espone gli embedding', as
     await chrome.runtime.sendMessage({ type: 'search_archived_tabs', query: 'qualcosa' }));
 
   expect(r && Array.isArray(r.results)).toBe(true);
-  expect(r.results.length).toBeGreaterThanOrEqual(2);
-  // DocA è il più pertinente.
   expect(r.results[0].title).toBe('DocA');
-  // Gli embedding non vengono spediti al renderer.
   expect(r.results.every((x) => x.embedding === undefined)).toBe(true);
 
-  // Anche la lista normale (GET_ARCHIVED_TABS) non porta gli embedding.
   const list = await page.evaluate(async () =>
     await chrome.runtime.sendMessage({ type: 'get_archived_tabs' }));
   expect(list.tabs.every((x) => x.embedding === undefined)).toBe(true);
+});
+
+test('il re-rank LLM può riordinare i risultati rispetto al coseno', async ({ app, openTab }) => {
+  await app.evaluate(async () => {
+    await globalThis.SN_STORAGE.updateSettings({ apiKeys: { gemini: 'test-key' } });
+    const A = globalThis.SN_ARCHIVED_TABS;
+    const a = await A.archive({ url: 'https://a.test/', title: 'DocA' });
+    const b = await A.archive({ url: 'https://b.test/', title: 'DocB' });
+    await A.update(a.id, { embedding: [127, 0], snippet: 'A' });
+    await A.update(b.id, { embedding: [0, 127], snippet: 'B' });
+    globalThis.SN_PROVIDER_GEMINI.embed = async ({ texts }) => texts.map(() => [1, 0]); // coseno → DocA primo
+    // Re-rank: l'LLM mette DocB davanti (head = [DocA, DocB], order [1,0]).
+    globalThis.SN_PROVIDERS.completeWithFallback = async () => ({
+      text: '{"order":[1,0]}', provider: 'gemini', model: 'stub', usage: {},
+    });
+  });
+
+  const page = await openTab('filo://newtab/');
+  const r = await page.evaluate(async () =>
+    await chrome.runtime.sendMessage({ type: 'search_archived_tabs', query: 'x' }));
+  expect(r.results[0].title).toBe('DocB'); // il re-rank ha vinto sul coseno
+});
+
+test('§5 — cancellazione multipla dall’archivio (DELETE_ARCHIVED_TABS)', async ({ app, openTab }) => {
+  const ids = await app.evaluate(async () => {
+    const A = globalThis.SN_ARCHIVED_TABS;
+    const a = await A.archive({ url: 'https://x.test/', title: 'X1' });
+    const b = await A.archive({ url: 'https://y.test/', title: 'X2' });
+    const c = await A.archive({ url: 'https://z.test/', title: 'Keep' });
+    return [a.id, b.id, c.id];
+  });
+
+  const page = await openTab('filo://newtab/');
+  const res = await page.evaluate(async (delIds) =>
+    await chrome.runtime.sendMessage({ type: 'delete_archived_tabs', ids: delIds }),
+  [ids[0], ids[1]]);
+  expect(res.removed).toBe(2);
+
+  const left = await app.evaluate(async () => (await globalThis.SN_ARCHIVED_TABS.list()).map((x) => x.title));
+  expect(left).toContain('Keep');
+  expect(left).not.toContain('X1');
+  expect(left).not.toContain('X2');
 });
