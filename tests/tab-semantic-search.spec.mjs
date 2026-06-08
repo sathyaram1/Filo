@@ -9,9 +9,18 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 
-async function setupStubs(app, { summary, embedFor } = {}) {
+// Forza il registry/modelli LOCALI (useDefaultModels:false) così la risoluzione
+// del modello non dipende dal registry remoto (Firestore), e stubba embedding +
+// completamento LLM con una chiave finta.
+async function setupStubs(app, { summary } = {}) {
   await app.evaluate(async ({}, args) => {
-    await globalThis.SN_STORAGE.updateSettings({ apiKeys: { gemini: 'test-key' } });
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { gemini: 'test-key', openrouter: '', tavily: '' },
+      models: { ...C.DEFAULT_MODELS },
+      modelRegistry: { ...C.DEFAULT_MODEL_REGISTRY },
+    });
     globalThis.SN_PROVIDER_GEMINI.embed = async ({ texts }) => texts.map(() => [0.5, 0.2, 0.9, 0.1]);
     if (args.summary != null) {
       globalThis.SN_PROVIDERS.completeWithFallback = async () => ({
