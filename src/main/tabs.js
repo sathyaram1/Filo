@@ -1182,6 +1182,24 @@ function hostOf(url) {
   } catch (_) { return null; }
 }
 
+// Hue (0..360) del colore identità per l'ordine cromatico (§1.3). Le tab senza
+// colore tornano Infinity → finiscono in coda.
+function hueOf(rgbStr) {
+  const m = /rgba?\(([^)]+)\)/.exec(rgbStr || '');
+  if (!m) return Infinity;
+  const p = m[1].split(',').map((s) => parseFloat(s.trim()));
+  if (p.length < 3 || p.some((n) => Number.isNaN(n))) return Infinity;
+  const r = p[0] / 255, g = p[1] / 255, b = p[2] / 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+  if (mx === mn) return Infinity;
+  const d = mx - mn;
+  let h;
+  if (mx === r) h = (g - b) / d + (g < b ? 6 : 0);
+  else if (mx === g) h = (b - r) / d + 2;
+  else h = (r - g) / d + 4;
+  return (h / 6) * 360;
+}
+
 function canGoBack(wc) {
   if (wc.navigationHistory?.canGoBack) return wc.navigationHistory.canGoBack();
   if (typeof wc.canGoBack === 'function') return wc.canGoBack();
