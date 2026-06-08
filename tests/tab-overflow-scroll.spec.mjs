@@ -27,7 +27,7 @@ test('con molte tab la striscia scrolla e tiene in vista la tab attiva', async (
   expect(dims.scrollW).toBeGreaterThan(dims.clientW);
 
   // La scheda attiva (l'ultima aperta) è effettivamente in vista nella striscia.
-  const inView = await expect.poll(async () => shell.evaluate(() => {
+  await expect.poll(async () => shell.evaluate(() => {
     const tabsEl = document.getElementById('tabs');
     const active = tabsEl.querySelector('.tab.active');
     if (!active) return false;
