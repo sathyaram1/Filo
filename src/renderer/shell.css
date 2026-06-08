@@ -80,10 +80,18 @@ html[data-chrome-compact="1"] .addr {
   gap: 0;
   flex: 0 1 auto;
   min-width: 0;
-  overflow: hidden;
+  /* §6 — overflow con molte tab (30+): le schede si restringono fino al loro
+     min-width, poi la striscia diventa SCROLLABILE orizzontalmente invece di
+     clippare le tab fuori vista. La rotellina del mouse scrolla in orizzontale
+     (vedi shell.js) e la scheda attiva viene sempre portata in vista. La
+     scrollbar è nascosta (stile Chrome): si scrolla con rotellina/trackpad. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none; /* Firefox */
   -webkit-app-region: no-drag;
   app-region: no-drag;
 }
+.tabs::-webkit-scrollbar { height: 0; width: 0; display: none; } /* Chromium */
 .tab {
   position: relative;
   display: inline-flex;
