@@ -409,6 +409,31 @@
       btn.textContent = `📅 ${a.title || a.titolo || ''}`;
       return btn;
     }
+    if (type === 'PULISCI_TAB') {
+      // Bottone di conferma: la pulizia parte SOLO al click (con conferma),
+      // mai automaticamente (spec §2.1).
+      const btn = document.createElement('button');
+      btn.className = 'dash-action-btn dash-action-btn-primary';
+      btn.type = 'button';
+      btn.textContent = '🧹 Riordina e archivia le schede';
+      btn.addEventListener('click', async () => {
+        if (btn.disabled) return;
+        const ok = window.confirm(
+          'Filo valuterà tutte le schede aperte e archivierà quelle non più utili. '
+          + 'Le schede archiviate restano riapribili da “Tab archiviate”. Procedo?',
+        );
+        if (!ok) return;
+        btn.disabled = true;
+        btn.textContent = '🧹 Riordino in corso…';
+        const r = await send({ type: MSG.RUN_TAB_TRIAGE });
+        const n = (r && r.archived) || 0;
+        btn.textContent = n > 0
+          ? `✓ Archiviate ${n} ${n === 1 ? 'scheda' : 'schede'}`
+          : '✓ Nessuna scheda da archiviare';
+        if (typeof onAck === 'function') onAck();
+      });
+      return btn;
+    }
     return null;
   }
 
