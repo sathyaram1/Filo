@@ -430,7 +430,6 @@
         btn.textContent = n > 0
           ? `✓ Archiviate ${n} ${n === 1 ? 'scheda' : 'schede'}`
           : '✓ Nessuna scheda da archiviare';
-        if (typeof onAck === 'function') onAck();
       });
       return btn;
     }
