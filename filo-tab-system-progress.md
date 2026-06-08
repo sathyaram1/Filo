@@ -33,13 +33,18 @@ sessione successiva riparte senza ambiguità.
   `tests/tab-help-menu.spec.mjs`.
 
 ## §1 — Aspetto visivo
-- 🟡 §1.1 Tab attiva "vetro smerigliato" — DECISO (utente): **colore live**, NON
-  blur catturato. Motivo: in Electron le WebContentsView native compongono sopra
-  la shell e il `backdrop-filter` CSS non legge i pixel di un'altra superficie
-  nativa → blur reale impossibile senza `capturePage` (latenza + bug #24694).
-  Realizzazione: micro content-script campiona il colore dominante della striscia
-  in cima al viewport, lo manda alla shell, che tinge la tab attiva e sceglie
-  testo chiaro/scuro per luminanza; aggiornamento allo scroll. In implementazione.
+- ✅ §1.1 Tab attiva "vetro smerigliato" → **colore live** (NON blur catturato).
+  Motivo della scelta: in Electron le WebContentsView native compongono sopra la
+  shell e il `backdrop-filter` CSS non legge i pixel di un'altra superficie nativa
+  → blur reale impossibile senza `capturePage` (latenza + bug #24694).
+  Fatto: micro content-script (`startTabColorSampler` in `content.js`) campiona il
+  colore dominante della striscia in cima al viewport (elementFromPoint + bg degli
+  antenati, throttle rAF ~100ms, invio solo se cambia) → `MSG.TAB_DOMINANT_COLOR`
+  → `handlers.js` → `tabs.setTabColor` → snapshot `color` → la shell tinge la tab
+  attiva via `--tab-active` e sceglie testo chiaro/scuro per luminanza; reset del
+  colore su `did-navigate`. Verificato con `tests/tab-live-color.spec.mjs`.
+  NOTA: solo la **tab attiva** (l'unico sito visibile). Le tab inattive useranno
+  il colore identità (§1.2). Per ora niente texture sfocata (colore liscio).
 - ⏳ §1.2 Colore identità attenuato sulle tab inattive (theme-color → favicon →
   fallback, cache per dominio).
 - ⏳ §1.3 Ordinamento cromatico (dipende da §1.2).
