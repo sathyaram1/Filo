@@ -70,7 +70,12 @@
     session = null;
   }
 
-  function open() {
+  // Contesto di invocazione dell'ultima apertura (es. { source:'tab', url, title }
+  // quando aperta dalla voce "Aiuto" del menu tasto destro su una scheda).
+  // Esposto per i test; serve a far sapere all'agente da dove è partito.
+  let lastInvocation = null;
+
+  function open(context) {
     if (root) return;
     history = [];
     collapsed = false;
@@ -80,6 +85,19 @@
     // se l'utente è arrivato qui da altre pagine, contano solo le azioni che
     // farà DA QUI in avanti.
     session.initialUrl = location.href;
+    // Se invocata dal menu tasto destro su una scheda, informiamo l'agente del
+    // contesto: una riga di storia (non mostrata in chat, ma inviata all'LLM)
+    // così "sa" che la richiesta parte da un click sulla tab.
+    lastInvocation = context || null;
+    if (context && context.source === 'tab') {
+      const ctxTitle = context.title || document.title || '';
+      const ctxUrl = context.url || location.href;
+      history.push({
+        role: 'user',
+        kind: 'action',
+        content: `(Sistema: l'utente ha aperto Aiuto col tasto destro sulla scheda «${ctxTitle}» (${ctxUrl}). Aspetta la sua domanda sulla scheda.)`,
+      });
+    }
     root = document.createElement('div');
     root.className = 'sn-sidebar';
     root.innerHTML = `
