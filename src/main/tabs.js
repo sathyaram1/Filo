@@ -340,6 +340,18 @@ class TabManager {
     this.setMuted(id, !tab.muted);
   }
 
+  // "Vetro smerigliato" (§1.1): registra il colore dominante della cima della
+  // pagina, campionato dal content script. Solo se cambia davvero (i sample
+  // arrivano spesso durante lo scroll) per non inondare la shell di redraw.
+  setTabColor(id, color) {
+    const tab = this.tabs.find((t) => t.id === id);
+    if (!tab) return;
+    const next = color || null;
+    if (tab.color === next) return;
+    tab.color = next;
+    this._broadcast();
+  }
+
   // Apre una copia della tab (stesso URL), attivandola — come "Duplica" di Chrome.
   // Ritorna l'id della nuova tab, o null se l'originale non esiste.
   duplicateTab(id) {
