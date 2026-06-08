@@ -57,10 +57,12 @@
     </p>
 
     <div class="sn-toolbar">
-      <input type="search" id="search" placeholder="Cerca per titolo o indirizzo…" />
+      <input type="search" id="search" placeholder="Cerca… (Invio = cerca nei contenuti)" />
+      <button class="sn-btn" id="semantic">🔎 Cerca nei contenuti</button>
       <button class="sn-btn sn-btn-secondary" id="clear">Svuota archivio</button>
       <button class="sn-btn sn-btn-secondary" id="openHistory">Cronologia AI</button>
     </div>
+    <p id="searchNote" class="sn-muted" style="margin:-6px 0 12px;" hidden></p>
 
     <div id="list"></div>
     <div id="empty" class="sn-empty" hidden>Nessuna tab archiviata, per ora.</div>
