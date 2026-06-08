@@ -781,6 +781,7 @@ class TabManager {
         loading: t.loading,
         canBack: t.canBack,
         canFwd: t.canFwd,
+        muted: !!t.muted,
         isInternal: t.isInternal,
       })),
     };
