@@ -210,6 +210,36 @@
     };
   }
 
+  // Embedding di uno o più testi (§3.2 ricerca semantica). Usa il modello di
+  // embedding di Google (default text-embedding-004) via batchEmbedContents.
+  // `dim` sfrutta Matryoshka (outputDimensionality) per accorciare i vettori e
+  // contenere lo storage. Ritorna un array di vettori (array di float).
+  async function embed({ apiKey, texts, model = 'text-embedding-004', dim = 256, signal }) {
+    const list = (Array.isArray(texts) ? texts : [texts]).map((t) => String(t == null ? '' : t).slice(0, 8000));
+    if (!list.length) return [];
+    const id = model.replace(/^models\//, '');
+    const url = `${BASE}/models/${encodeURIComponent(id)}:batchEmbedContents?key=${encodeURIComponent(apiKey)}`;
+    const body = {
+      requests: list.map((text) => ({
+        model: `models/${id}`,
+        content: { parts: [{ text: text || ' ' }] },
+        outputDimensionality: dim,
+      })),
+    };
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal,
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`Gemini embed ${res.status}: ${errText.slice(0, 300)}`);
+    }
+    const data = await res.json();
+    return (data.embeddings || []).map((e) => (e && Array.isArray(e.values) ? e.values : []));
+  }
+
   async function listModels(apiKey) {
     const res = await fetch(`${BASE}/models?key=${encodeURIComponent(apiKey)}`);
     if (!res.ok) throw new Error(`Gemini models: ${res.status}`);
