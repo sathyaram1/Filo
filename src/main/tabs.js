@@ -96,6 +96,10 @@ class TabManager {
     this.partition = partition || null;
     this.tabs = []; // [{ id, view, title, url, favicon, loading, canBack, canFwd }]
     this.activeId = null;
+    // §1.2 — cache del colore identità per dominio (host → 'rgb(r,g,b)'). Così
+    // una nuova tab su un dominio già visto mostra subito la sua tinta, senza
+    // aspettare che il content script ricalcoli.
+    this._identityColorCache = new Map();
     // Spazio extra riservato in alto (px): usato quando un dropdown della shell
     // (es. menu App) deve restare visibile sopra la WebContentsView attiva. Si
     // abbassa la view invece di nasconderla, evitando l'area vuota/bianca.
