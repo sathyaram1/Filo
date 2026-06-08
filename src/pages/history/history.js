@@ -134,6 +134,9 @@
       items = [];
       render();
     });
+    $('openArchive').addEventListener('click', () => {
+      chrome.tabs.create({ url: 'filo://archive/archive.html' });
+    });
     $('openHome').addEventListener('click', () => {
       chrome.tabs.create({ url: chrome.runtime.getURL('src/pages/home/home.html') });
     });
