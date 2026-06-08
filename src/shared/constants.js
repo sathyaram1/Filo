@@ -176,6 +176,8 @@
     [ACTIONS.FILO_DASHBOARD]: 'flash, flash-or',
     [ACTIONS.FILO_LESSON]: 'flash-lite-3, flash-lite-3-or',
     [ACTIONS.FILO_COMPACT]: 'flash, flash-or',
+    // Triage tab: decisione economica e frequente → lite va bene.
+    [ACTIONS.FILO_TAB_TRIAGE]: 'flash-lite-3, flash-lite-3-or',
     // Lettura ad alta voce: modello TTS Gemini. Se fallisce/è assente, la voce
     // del browser (Web Speech) fa da fallback finale lato content script.
     [ACTIONS.TTS]: 'tts',
