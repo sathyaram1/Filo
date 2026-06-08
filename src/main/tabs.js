@@ -100,6 +100,18 @@ class TabManager {
     // una nuova tab su un dominio già visto mostra subito la sua tinta, senza
     // aspettare che il content script ricalcoli.
     this._identityColorCache = new Map();
+    // §2.1 — ultima interazione dell'utente con Filo (qualsiasi tab/azione). Il
+    // timer di auto-archiviazione misura l'inattività dell'APP da qui.
+    this._lastAppInteractionAt = Date.now();
+    this._triageRunning = false;
+    if (!this.incognito) {
+      // Controllo periodico dell'inattività (ogni 5 min). La soglia vera (ore) e
+      // l'on/off vivono nelle preferenze e si leggono ad ogni tick.
+      this._autoArchiveTimer = setInterval(() => {
+        this._autoArchiveTick().catch(() => {});
+      }, 5 * 60 * 1000);
+      if (this._autoArchiveTimer.unref) this._autoArchiveTimer.unref();
+    }
     // Spazio extra riservato in alto (px): usato quando un dropdown della shell
     // (es. menu App) deve restare visibile sopra la WebContentsView attiva. Si
     // abbassa la view invece di nasconderla, evitando l'area vuota/bianca.
