@@ -1930,7 +1930,7 @@
     return lastMouseEvent;
   }
 
-  function handleShortcut(command) {
+  function handleShortcut(command, context) {
     if (isBlocked()) return;
     const selInfo = Extract.getSelectionWithSentence();
     const anchor = selectionAnchor();
