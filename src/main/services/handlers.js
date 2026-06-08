@@ -479,6 +479,10 @@ async function executeFiloAction(action) {
       case 'CERCA_WEB':
       case 'EVENTO_CALENDARIO':
         return { executed: false, kept: true };
+      case 'PULISCI_TAB':
+        // Non eseguiamo subito: il client mostra un bottone di conferma; al
+        // click manda RUN_TAB_TRIAGE. Teniamo il bottone nella bolla.
+        return { executed: false, kept: true };
       case 'APRI_FILE':
         return { executed: true, kept: true };
       default:
