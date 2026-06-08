@@ -77,6 +77,10 @@
     // decisione di auto-archiviazione. Throttled. { lastInteractionAt?, scrollPct?, formDirty? }
     TAB_ACTIVITY: 'tab_activity',
 
+    // §2.1 — pulizia/riordino su richiesta esplicita dell'utente (lo invoca
+    // l'agente Filo dopo conferma). Esegue il triage su tutte le tab della finestra.
+    RUN_TAB_TRIAGE: 'run_tab_triage',
+
     // Aiuto: invio percorso completato a fine sessione (passa per la pipeline
     // di sanitizzazione 2-LLM in pathsCollector.js prima di toccare Firestore).
     SAVE_PATH: 'save_path',                        // { path: { domain, initialUrl, sanitizedSteps, rawUserMessages, success } }
