@@ -284,6 +284,41 @@
     return state.tabs.find((t) => t.id === state.activeId) || null;
   }
 
+  // ── Menu contestuale (tasto destro) su una tab ────────────────────────────
+  // Riusa il popup-menu nativo della shell (sopra le WebContentsView). Le voci
+  // portano `action` custom prefissate `tab-`; la scelta torna via onMenuAction
+  // e si applica alla tab su cui si era aperto il menu (ctxTabId).
+  const MUTE_IND_SVG =
+    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+    'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9l4 6"/><path d="M21 9l-4 6"/></svg>';
+
+  let ctxTabId = null;
+  function openTabContextMenu(t, x, y) {
+    ctxTabId = t.id;
+    const entries = [
+      { label: 'Duplica', icon: 'duplicate', action: 'tab-duplicate' },
+      t.muted
+        ? { label: 'Riattiva audio', icon: 'mute', action: 'tab-mute' }
+        : { label: 'Muta', icon: 'sound', action: 'tab-mute' },
+      { type: 'separator' },
+      { label: 'Chiudi', icon: 'close', action: 'tab-close' },
+    ];
+    api.popupMenu(entries, Math.round(x), Math.round(y));
+  }
+
+  // Le azioni del menu tornano qui (canale globale onMenuAction): filtriamo solo
+  // quelle `tab-…` e le applichiamo alla tab memorizzata in ctxTabId.
+  if (api.onMenuAction) {
+    api.onMenuAction((action) => {
+      const id = ctxTabId;
+      if (!id) return;
+      if (action === 'tab-duplicate') api.tabs.duplicate(id);
+      else if (action === 'tab-mute') api.tabs.setMuted(id);
+      else if (action === 'tab-close') api.tabs.close(id);
+    });
+  }
+
   function render() {
     // tabs
     tabsEl.innerHTML = '';
