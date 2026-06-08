@@ -1521,6 +1521,10 @@ async function wireSafebrowse(settingsArg) {
   });
 }
 
+// Esposto su globalThis così il TabManager (src/main/tabs.js) può chiamare la
+// decisione LLM senza creare un ciclo di require fra tabs.js e handlers.js.
+globalThis.SN_TAB_TRIAGE_DECIDE = runTabTriageDecision;
+
 module.exports = {
   handleMessage,
   handleStream,
@@ -1529,4 +1533,5 @@ module.exports = {
   handleAIRequest,
   maybeCategorizeAsync,
   wireSafebrowse,
+  runTabTriageDecision,
 };
