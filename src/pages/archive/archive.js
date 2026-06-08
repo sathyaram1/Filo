@@ -145,7 +145,7 @@
     }
   }
 
-  function renderTab(t) {
+  function renderTab(t, { showScore = false } = {}) {
     const row = document.createElement('div');
     row.className = 'arc-tab';
     if (t.identityColor) row.style.setProperty('--arc-color', t.identityColor);
@@ -165,7 +165,21 @@
     url.className = 'arc-url';
     url.textContent = t.url || '';
     main.appendChild(url);
+    // Snippet del contenuto (se indicizzato): aiuta a riconoscere la pagina.
+    if (t.snippet) {
+      const sn = document.createElement('div');
+      sn.className = 'arc-snippet';
+      sn.textContent = t.snippet;
+      main.appendChild(sn);
+    }
     row.appendChild(main);
+
+    if (showScore && typeof t.score === 'number') {
+      const sc = document.createElement('div');
+      sc.className = 'arc-score';
+      sc.textContent = `${Math.round(Math.max(0, Math.min(1, t.score)) * 100)}%`;
+      row.appendChild(sc);
+    }
 
     const time = document.createElement('div');
     time.className = 'arc-time';
