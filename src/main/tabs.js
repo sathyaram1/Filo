@@ -325,12 +325,43 @@ class TabManager {
   // si chiude l'ultima scheda: la finestra resta, con una scheda vuota).
   closeAllTabs() {
     for (const tab of this.tabs) {
+      this._archiveClosedTab(tab); // §3.1 — anche "chiudi tutto" archivia
       try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
       try { tab.view.webContents.close(); } catch (_) {}
     }
     this.tabs = [];
     this.activeId = null;
     this.openTab('filo://newtab/');
+  }
+
+  // §3.1 — archivia i metadati di una tab che sta per essere chiusa. Best-effort
+  // e non bloccante (l'archivio è async; la chiusura della view prosegue subito).
+  // NON archivia: sessioni incognito (privacy, §5), pagine interne filo:// e la
+  // newtab (non sono "siti" da ritrovare). Senza store caricato, è un no-op.
+  _archiveClosedTab(tab) {
+    try {
+      if (!tab || this.incognito) return;
+      const Archive = globalThis.SN_ARCHIVED_TABS;
+      if (!Archive) return;
+      const url = tab.url || '';
+      if (!url || tab.isInternal || url.startsWith('filo://')) return;
+      if (!/^https?:\/\//i.test(url)) return;
+      const coOpenUrls = this.tabs
+        .filter((t) => t.id !== tab.id && t.url && /^https?:\/\//i.test(t.url))
+        .map((t) => t.url);
+      Promise.resolve(
+        Archive.archive({
+          url,
+          title: tab.title || url,
+          favicon: tab.favicon || '',
+          identityColor: tab.identityColor || null,
+          openedAt: tab.openedAt || null,
+          closedAt: new Date().toISOString(),
+          reason: 'manual',
+          coOpenUrls,
+        }),
+      ).catch(() => {});
+    } catch (_) { /* l'archiviazione non deve mai bloccare la chiusura */ }
   }
 
   // Silenzia/riattiva l'audio della tab. Lo stato vive sul tab (non sul
