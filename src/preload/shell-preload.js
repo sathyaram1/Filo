@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('filoShell', {
     // e duplica.
     setMuted: (id, muted) => ipcRenderer.invoke('tabs:set-muted', { id, muted }),
     duplicate: (id) => ipcRenderer.invoke('tabs:duplicate', { id }),
+    help: (id) => ipcRenderer.invoke('tabs:help', { id }),
     snapshot: () => ipcRenderer.invoke('tabs:snapshot'),
     setActiveVisible: (visible) => ipcRenderer.invoke('tabs:set-active-visible', { visible }),
     onUpdate: (fn) => {
