@@ -650,6 +650,18 @@ async function executeFiloAction(action) {
         if (text) await FiloMem.addNote({ text, context: action.context || action.contesto });
         return { executed: !!text, kept: false };
       }
+      case 'IMPOSTA_PREFERENZA': {
+        // Filo modifica una preferenza dell'app su richiesta dell'utente. La
+        // scrittura passa per applySettingsUpdate (stesso percorso della pagina
+        // Preferenze), così la modifica si applica live (es. il tema cambia
+        // subito nella dashboard, che ascolta SETTINGS_UPDATED).
+        const chiave = action.chiave ?? action.key ?? action.nome ?? action.name ?? action.preferenza;
+        const valore = action.valore ?? action.value ?? action.valoreNuovo ?? action.val;
+        const built = buildPreferencePartial(chiave, valore);
+        if (!built) return { executed: false, kept: false };
+        await applySettingsUpdate(built.partial);
+        return { executed: true, kept: false };
+      }
       case 'CERCA_WEB':
       case 'EVENTO_CALENDARIO':
         return { executed: false, kept: true };
