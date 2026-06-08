@@ -676,6 +676,15 @@ async function handleMessage(msg, sender = {}) {
       }
       return { ok: true };
     }
+    case MSG.TAB_IDENTITY_COLOR: {
+      // Colore identità del sito (§1.2) → cachato per dominio dal TabManager e
+      // applicato attenuato alle tab inattive.
+      const win = winOf(sender);
+      if (win && win._filoTabs && sender?.tab?.id) {
+        win._filoTabs.setTabIdentityColor(sender.tab.id, msg.color || null);
+      }
+      return { ok: true };
+    }
     case MSG.AI_REQUEST: {
       const r = await handleAIRequest({ action: msg.action, payload: msg.payload, origin });
       return { ok: true, ...r };
