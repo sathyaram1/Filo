@@ -437,11 +437,37 @@ class TabManager {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
     this.activeId = id;
+    // §2.1 segnale: quando una tab diventa attiva è "usata adesso". Aggiorna sia
+    // il momento di ultima attivazione sia l'ultima interazione (proxy grossolano;
+    // il content script raffina con i veri eventi di input).
+    const now = Date.now();
+    tab.lastActiveAt = now;
+    tab.lastInteractionAt = now;
     for (const t of this.tabs) {
       t.view.setVisible?.(t.id === id);
     }
     this.layout();
     this._broadcast();
+  }
+
+  // §2.1 — segnali di attività riportati dal content script (input, scroll,
+  // form sporco). Merge parziale sullo snapshot. Best-effort: throttled lato
+  // pagina, qui non rimbalziamo se nulla cambia in modo significativo.
+  setTabActivity(id, activity) {
+    const tab = this.tabs.find((t) => t.id === id);
+    if (!tab || !activity || typeof activity !== 'object') return;
+    let changed = false;
+    if (typeof activity.lastInteractionAt === 'number') {
+      tab.lastInteractionAt = activity.lastInteractionAt; changed = true;
+    }
+    if (typeof activity.scrollPct === 'number') {
+      const v = Math.max(0, Math.min(100, Math.round(activity.scrollPct)));
+      if (v !== tab.scrollPct) { tab.scrollPct = v; changed = true; }
+    }
+    if (typeof activity.formDirty === 'boolean') {
+      if (activity.formDirty !== tab.formDirty) { tab.formDirty = activity.formDirty; changed = true; }
+    }
+    if (changed) this._broadcast();
   }
 
   navigate(id, url) {
