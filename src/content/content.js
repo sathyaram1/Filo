@@ -36,6 +36,10 @@
     // e lo applica attenuato alle tab inattive.
     try { reportTabIdentityColor(); } catch (_) {}
 
+    // Segnali di attività (§2.1): ultima interazione, % di scroll, form sporco.
+    // Servono all'LLM per decidere cosa archiviare.
+    try { startTabActivityReporter(); } catch (_) {}
+
     // Esc esce dalla modalità "contenuto a tutto schermo" (vedi tabs.js). Va
     // registrato anche su pagine "bloccate" (senza menu) e in capture, così
     // pre-empta gli handler Escape della pagina solo quando la modalità è attiva.
