@@ -258,7 +258,7 @@ class TabManager {
     });
   }
 
-  openTab(url = 'filo://newtab/', { activate = true } = {}) {
+  openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null } = {}) {
     const id = randomUUID();
     const isInternal = url.startsWith('filo://');
     const partition = this._partitionFor(url);
