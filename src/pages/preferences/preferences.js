@@ -89,10 +89,17 @@
       rate: parseFloat($('ttsRate').value) || 1,
       pitch: parseFloat($('ttsPitch').value) || 1,
     };
+    const idleHoursRaw = parseInt($('autoArchiveIdleHours').value, 10);
+    const autoArchive = {
+      enabled: $('autoArchiveEnabled').checked,
+      onIdle: true,
+      idleHours: Number.isFinite(idleHoursRaw) && idleHoursRaw > 0 ? Math.min(168, idleHoursRaw) : 6,
+      onClose: $('autoArchiveOnClose').checked,
+    };
 
     await chrome.runtime.sendMessage({
       type: MSG.UPDATE_SETTINGS,
-      settings: { theme, textScale, showHomeMessage, agentStyle, terminal, tts },
+      settings: { theme, textScale, showHomeMessage, agentStyle, terminal, tts, autoArchive },
     });
 
     window.SN_PAGE_THEME = theme;
