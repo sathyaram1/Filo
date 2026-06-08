@@ -631,7 +631,8 @@
       `    {"type": "SALVA_APPUNTO", "text": "...", "context": "..."},\n` +
       `    {"type": "CERCA_WEB", "query": "..."},\n` +
       `    {"type": "EVENTO_CALENDARIO", "date": "YYYY-MM-DD", "time": "HH:MM", "title": "...", "details": "..."},\n` +
-      `    {"type": "APRI_FILE", "path": "...", "label": "..."}\n` +
+      `    {"type": "APRI_FILE", "path": "...", "label": "..."},\n` +
+      `    {"type": "PULISCI_TAB"}\n` +
       `  ]\n` +
       `}\n` +
       `Se non servono azioni, "actions" è un array vuoto. Mantieni "text" breve per i comandi (es. "Fatto, 25 minuti.").`,
