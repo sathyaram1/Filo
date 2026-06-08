@@ -456,6 +456,13 @@
       tabsEl.appendChild(el);
     }
 
+    // §6 — con la striscia scrollabile, assicuriamoci che la scheda attiva sia
+    // sempre visibile (può finire fuori vista dopo che ne apri molte).
+    const activeEl = tabsEl.querySelector('.tab.active');
+    if (activeEl) {
+      try { activeEl.scrollIntoView({ inline: 'nearest', block: 'nearest' }); } catch (_) {}
+    }
+
     // Barra di navigazione (icone). Il campo URL è stato rimosso: l'indirizzo
     // si digita dalla home di Filo. Qui aggiorniamo solo lo stato dei tasti.
     const a = activeTab();
