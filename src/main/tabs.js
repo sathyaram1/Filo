@@ -906,6 +906,16 @@ class TabManager {
   }
 }
 
+// Host di un URL (chiave della cache colore identità §1.2). Solo schemi web:
+// le pagine filo:// interne non hanno identità di sito da tinteggiare.
+function hostOf(url) {
+  try {
+    const u = new URL(url);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+    return u.host || null;
+  } catch (_) { return null; }
+}
+
 function canGoBack(wc) {
   if (wc.navigationHistory?.canGoBack) return wc.navigationHistory.canGoBack();
   if (typeof wc.canGoBack === 'function') return wc.canGoBack();
