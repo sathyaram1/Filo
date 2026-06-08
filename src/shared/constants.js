@@ -655,7 +655,8 @@
       `    {"type": "EVENTO_CALENDARIO", "date": "YYYY-MM-DD", "time": "HH:MM", "title": "...", "details": "..."},\n` +
       `    {"type": "APRI_FILE", "path": "...", "label": "..."},\n` +
       `    {"type": "PULISCI_TAB"},\n` +
-      `    {"type": "CANCELLA_ARCHIVIO", "query": "..."}\n` +
+      `    {"type": "CANCELLA_ARCHIVIO", "query": "..."},\n` +
+      `    {"type": "IMPOSTA_PREFERENZA", "chiave": "tema", "valore": "scuro"}\n` +
       `  ]\n` +
       `}\n` +
       `Se non servono azioni, "actions" è un array vuoto. Mantieni "text" breve per i comandi (es. "Fatto, 25 minuti.").`,
