@@ -61,6 +61,78 @@
     });
   }
 
+  // ------------------------------------------------------------
+  // Campionatore colore dominante della cima pagina (spec §1.1)
+  // ------------------------------------------------------------
+  function startTabColorSampler() {
+    let lastSent;        // ultimo colore inviato (dedup)
+    let scheduled = false;
+    let lastTime = 0;
+
+    function parseRGB(str) {
+      const m = /rgba?\(([^)]+)\)/.exec(str || '');
+      if (!m) return null;
+      const p = m[1].split(',').map((s) => parseFloat(s.trim()));
+      if (p.length < 3 || p.some((n) => Number.isNaN(n))) return null;
+      const a = p.length >= 4 ? p[3] : 1;
+      if (a < 0.5) return null; // troppo trasparente per "contare" come sfondo
+      return [p[0], p[1], p[2]];
+    }
+    // Risale dagli antenati finché trova uno sfondo opaco (max 6 salti).
+    function bgOf(el) {
+      let node = el; let hops = 0;
+      while (node && node.nodeType === 1 && hops < 6) {
+        const c = parseRGB(getComputedStyle(node).backgroundColor);
+        if (c) return c;
+        node = node.parentElement; hops++;
+      }
+      return null;
+    }
+    function compute() {
+      const w = Math.max(1, window.innerWidth);
+      const xs = [w * 0.2, w * 0.5, w * 0.8];
+      const ys = [6, 16, 28];
+      const acc = [0, 0, 0]; let n = 0;
+      for (const y of ys) for (const x of xs) {
+        let el = null;
+        try { el = document.elementFromPoint(x, y); } catch (_) {}
+        const c = el ? bgOf(el) : null;
+        if (c) { acc[0] += c[0]; acc[1] += c[1]; acc[2] += c[2]; n++; }
+      }
+      if (!n) {
+        const c = parseRGB(getComputedStyle(document.body || document.documentElement).backgroundColor)
+          || parseRGB(getComputedStyle(document.documentElement).backgroundColor);
+        if (c) { acc[0] = c[0]; acc[1] = c[1]; acc[2] = c[2]; n = 1; }
+      }
+      if (!n) return null;
+      return `rgb(${Math.round(acc[0] / n)}, ${Math.round(acc[1] / n)}, ${Math.round(acc[2] / n)})`;
+    }
+    function sample() {
+      scheduled = false;
+      lastTime = performance.now();
+      let color = null;
+      try { color = compute(); } catch (_) {}
+      if (color === lastSent) return;
+      lastSent = color;
+      try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.TAB_DOMINANT_COLOR, color })).catch(() => {}); } catch (_) {}
+    }
+    function schedule() {
+      if (scheduled) return;
+      scheduled = true;
+      const since = performance.now() - lastTime;
+      const delay = Math.max(0, 100 - since); // almeno ~100ms fra due campionamenti
+      if (delay > 0) setTimeout(() => requestAnimationFrame(sample), delay);
+      else requestAnimationFrame(sample);
+    }
+
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule, { passive: true });
+    // Primo campione subito + ritardati per le pagine che colorano dopo il paint.
+    schedule();
+    setTimeout(schedule, 400);
+    setTimeout(schedule, 1200);
+  }
+
   function isBlocked() {
     const url = location.href;
     if (PAGES_WITHOUT_MENU_PREFIXES.some((p) => url.startsWith(p))) return true;
