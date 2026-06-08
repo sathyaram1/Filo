@@ -85,3 +85,31 @@ test('riaprire una scheda dall’archivio ripristina la posizione di scroll', as
     try { return await p.evaluate(() => window.scrollY); } catch (_) { return 0; }
   }, { timeout: 10_000 }).toBeGreaterThan(100);
 });
+
+test('l’agente può lanciare la pulizia su richiesta (RUN_TAB_TRIAGE)', async ({ app, shell, openTab, testServer }) => {
+  await testServer.openReady(openTab, mk('Uno', 'rgb(200,40,40)'));
+  await testServer.openReady(openTab, mk('Due', 'rgb(40,80,200)'));
+  // La pagina dalla quale parte la richiesta (dashboard) diventa attiva e interna.
+  const dash = await openTab('filo://newtab/');
+
+  // Stub: archivia tutti i candidati (le due tab web).
+  await app.evaluate(async () => {
+    globalThis.SN_TAB_TRIAGE_DECIDE = async ({ tabs }) => ({
+      decisions: tabs.map((t, i) => ({ i, action: 'archive', reason: 'pulizia' })),
+    });
+  });
+
+  // L'agente, dopo conferma, manda RUN_TAB_TRIAGE: lo simuliamo dalla pagina.
+  const res = await dash.evaluate(async () =>
+    await chrome.runtime.sendMessage({ type: 'run_tab_triage' }));
+  expect(res.ok).toBe(true);
+  expect(res.archived).toBeGreaterThanOrEqual(2);
+
+  // Le due tab web non ci sono più; la dashboard (attiva, interna) resta.
+  const titles = await shell.evaluate(async () => {
+    const s = await window.filoShell.tabs.snapshot();
+    return s.tabs.map((t) => t.title);
+  });
+  expect(titles).not.toContain('Uno');
+  expect(titles).not.toContain('Due');
+});
