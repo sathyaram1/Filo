@@ -1904,4 +1904,6 @@ module.exports = {
   maybeCategorizeAsync,
   wireSafebrowse,
   runTabTriageDecision,
+  executeFiloAction,
+  buildPreferencePartial,
 };
