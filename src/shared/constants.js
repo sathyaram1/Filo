@@ -85,6 +85,10 @@
     // §2.1 — triage tab: l'LLM decide quali schede tenere e quali archiviare,
     // in batch su tutte le tab, dati i segnali + un estratto del contenuto.
     FILO_TAB_TRIAGE: 'filo_tab_triage',
+    // §3.1/§3.2 — riassunto di una pagina alla chiusura (per archivio + embedding).
+    FILO_TAB_SUMMARY: 'filo_tab_summary',
+    // §3.2 — re-rank LLM dei top-K risultati della ricerca semantica.
+    FILO_TAB_SEARCH: 'filo_tab_search',
   };
 
   // Registry di modelli "logici" indicizzati per nickname.
