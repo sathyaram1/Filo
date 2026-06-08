@@ -378,7 +378,7 @@ class TabManager {
           identityColor: tab.identityColor || null,
           openedAt: tab.openedAt || null,
           closedAt: new Date().toISOString(),
-          reason: 'manual',
+          reason: reason || 'manual',
           coOpenUrls,
           scrollPosition: typeof tab.scrollPct === 'number' ? tab.scrollPct : null,
         }),
