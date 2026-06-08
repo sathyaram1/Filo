@@ -36,5 +36,4 @@ test('con molte tab la striscia scrolla e tiene in vista la tab attiva', async (
     // tollera 2px di arrotondamento
     return a.left >= c.left - 2 && a.right <= c.right + 2;
   }), { timeout: 8_000 }).toBe(true);
-  expect(inView).toBe(true);
 });
