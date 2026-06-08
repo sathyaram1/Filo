@@ -46,6 +46,12 @@ const ICON_PATHS = {
     '<path d="M4 9v6h4l5 4V5L8 9z"/>' +
     '<path d="M17 9l4 6"/><path d="M21 9l-4 6"/>',
 
+  // Punto interrogativo in un fumetto — voce "Aiuto" (apre la chat con Filo).
+  help:
+    '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>' +
+    '<path d="M9.2 9.3a2.8 2.8 0 0 1 5.4 1c0 1.8-2.6 2.4-2.6 2.4"/>' +
+    '<path d="M12 15.2h.01"/>',
+
   user:
     '<circle cx="12" cy="8" r="4"/><path d="M5 20a7 7 0 0 1 14 0"/>',
 
