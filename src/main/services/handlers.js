@@ -21,6 +21,7 @@ const Providers = globalThis.SN_PROVIDERS;
 const Costs = globalThis.SN_COSTS;
 const SavedPages = globalThis.SN_SAVED_PAGES;
 const History = globalThis.SN_HISTORY;
+const ArchivedTabs = globalThis.SN_ARCHIVED_TABS;
 const I18n = globalThis.SN_I18N;
 const Categorizer = globalThis.SN_CATEGORIZER;
 const AICache = globalThis.SN_AI_CACHE;
