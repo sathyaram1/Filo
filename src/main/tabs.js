@@ -359,7 +359,7 @@ class TabManager {
   // e non bloccante (l'archivio è async; la chiusura della view prosegue subito).
   // NON archivia: sessioni incognito (privacy, §5), pagine interne filo:// e la
   // newtab (non sono "siti" da ritrovare). Senza store caricato, è un no-op.
-  _archiveClosedTab(tab) {
+  _archiveClosedTab(tab, reason = 'manual') {
     try {
       if (!tab || this.incognito) return;
       const Archive = globalThis.SN_ARCHIVED_TABS;
