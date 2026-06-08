@@ -49,6 +49,12 @@ contextBridge.exposeInMainWorld('filoShell', {
   },
   tooltipShow: (text, x, y) => ipcRenderer.send('shell:tooltip-show', { text, x, y }),
   tooltipHide: () => ipcRenderer.send('shell:tooltip-hide'),
+  // §2.3 — toast informativo (es. "Tab riordinate e salvate in cronologia").
+  onToast: (fn) => {
+    const wrapped = (_event, info) => { try { fn(info); } catch (_) {} };
+    ipcRenderer.on('shell:toast', wrapped);
+    return () => ipcRenderer.removeListener('shell:toast', wrapped);
+  },
   // Modalità annotazione del box feedback: la shell mette/toglie un velo
   // d'ombra sopra la propria barra in alto così tutto Filo va in penombra.
   onFeedbackDim: (fn) => {
