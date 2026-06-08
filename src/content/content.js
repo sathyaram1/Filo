@@ -1912,7 +1912,7 @@
         sendResponse({ savePayload: buildSavePayload() });
         return;
       }
-      handleShortcut(msg.command);
+      handleShortcut(msg.command, msg.context);
       sendResponse({ ok: true });
     }
   }
