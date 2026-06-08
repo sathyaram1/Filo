@@ -260,6 +260,77 @@
     setTimeout(send, 2000);
   }
 
+  // ------------------------------------------------------------
+  // Segnali di attività della tab (spec §2.1)
+  // ------------------------------------------------------------
+  // Riporta al main: quando l'utente ha interagito l'ultima volta, quanto ha
+  // scrollato (0-100%) e se ha "sporcato" un form (input non ancora inviato).
+  // Throttled per non inondare l'IPC.
+  function startTabActivityReporter() {
+    let formDirty = false;
+    let lastSentScroll = -1;
+    let pending = false;
+    let lastSend = 0;
+
+    function scrollPct() {
+      const doc = document.documentElement;
+      const max = (doc.scrollHeight || 0) - window.innerHeight;
+      if (max <= 0) return 0; // pagina che non scrolla → consumata per intero? la lasciamo a 0
+      const y = window.scrollY || doc.scrollTop || 0;
+      return Math.max(0, Math.min(100, (y / max) * 100));
+    }
+
+    function send(extra) {
+      const payload = { type: MSG.TAB_ACTIVITY, lastInteractionAt: Date.now(), ...extra };
+      try {
+        Promise.resolve(chrome.runtime.sendMessage(payload)).catch(() => {});
+      } catch (_) {}
+      lastSend = performance.now();
+    }
+
+    // Interazione "vera": pointer/keyboard → aggiorna lastInteractionAt (throttle 2s).
+    function onInteract() {
+      const since = performance.now() - lastSend;
+      if (since < 2000) return;
+      send({});
+    }
+
+    // Scroll: aggiorna % (throttle ~500ms) e conta come interazione.
+    function onScroll() {
+      if (pending) return;
+      pending = true;
+      setTimeout(() => {
+        pending = false;
+        const pct = Math.round(scrollPct());
+        if (pct !== lastSentScroll) {
+          lastSentScroll = pct;
+          send({ scrollPct: pct });
+        }
+      }, 500);
+    }
+
+    // Form "sporco": primo input/change su un campo editabile. Si manda una volta.
+    function onFormInput(e) {
+      if (formDirty) return;
+      const t = e.target;
+      if (!t) return;
+      const tag = (t.tagName || '').toUpperCase();
+      const editable = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || t.isContentEditable;
+      if (!editable) return;
+      formDirty = true;
+      send({ formDirty: true, scrollPct: Math.round(scrollPct()) });
+    }
+
+    window.addEventListener('pointerdown', onInteract, { passive: true, capture: true });
+    window.addEventListener('keydown', onInteract, { passive: true, capture: true });
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('input', onFormInput, { passive: true, capture: true });
+    window.addEventListener('change', onFormInput, { passive: true, capture: true });
+
+    // Primo campione dello scroll iniziale (alcune pagine aprono già scrollate).
+    setTimeout(() => send({ scrollPct: Math.round(scrollPct()) }), 600);
+  }
+
   function isBlocked() {
     const url = location.href;
     if (PAGES_WITHOUT_MENU_PREFIXES.some((p) => url.startsWith(p))) return true;
