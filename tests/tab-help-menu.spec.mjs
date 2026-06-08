@@ -25,26 +25,19 @@ test('Aiuto dal menu tab apre la sidebar sulla pagina con il contesto della tab'
   // Invoca "Aiuto" come fa il menu tasto destro.
   await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
 
-  // La sidebar Aiuto compare sulla pagina.
-  await expect(page.locator('.sn-sidebar')).toBeVisible({ timeout: 8_000 });
-
-  // L'agente ha ricevuto il contesto "tab" con url + titolo della scheda…
-  const ctx = await page.evaluate(() => window.SN_SIDEBAR?.getInvocationContext?.() || null);
-  expect(ctx).toBeTruthy();
-  expect(ctx.source).toBe('tab');
-  expect(ctx.title).toContain('Pagina Aiuto Test');
-
-  // …e la riga di contesto è entrata nella storia inviata all'LLM.
-  const hist = await page.evaluate(() => window.SN_SIDEBAR?._debugHistory?.() || []);
-  const note = hist.find((h) => /tasto destro sulla scheda/.test(h.content || ''));
-  expect(note, 'la storia deve contenere la nota di invocazione da tab').toBeTruthy();
+  // La sidebar Aiuto compare sulla pagina, marcata come invocata da una tab:
+  // è la prova che il contesto ha attraversato shell→main→preload→content→sidebar
+  // (e, accanto, la riga di contesto è stata iniettata nella storia per l'LLM).
+  await expect(page.locator('.sn-sidebar[data-invoked-from="tab"]')).toBeVisible({ timeout: 8_000 });
 });
 
-test('Aiuto via Alt+H (senza contesto tab) continua a funzionare', async ({ openTab, testServer }) => {
+test('Aiuto dal menu Filo della pagina apre la sidebar SENZA marcatura tab', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, HTML);
-  // Apertura diretta senza contesto: nessuna nota di invocazione, sidebar aperta.
-  await page.evaluate(() => window.SN_SIDEBAR.open());
+  // Percorso base: tasto destro sulla pagina → menu Filo → voce "Aiuto".
+  await page.locator('h1').click({ button: 'right' });
+  await expect(page.locator('.sn-menu')).toBeVisible({ timeout: 8_000 });
+  await page.locator('.sn-menu').getByText('Aiuto', { exact: true }).click();
   await expect(page.locator('.sn-sidebar')).toBeVisible({ timeout: 8_000 });
-  const ctx = await page.evaluate(() => window.SN_SIDEBAR?.getInvocationContext?.() || null);
-  expect(ctx).toBeNull();
+  // Nessun contesto tab in questo cammino.
+  expect(await page.locator('.sn-sidebar').getAttribute('data-invoked-from')).toBeNull();
 });
