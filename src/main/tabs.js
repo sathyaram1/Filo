@@ -275,6 +275,8 @@ class TabManager {
       canFwd: false,
       muted: false,
       isInternal,
+      // Quando la tab è stata aperta — metadato dell'archivio (§3.1).
+      openedAt: new Date().toISOString(),
       partition,
       partitionSite: isInternal ? null : Cookies.registrableOf(url),
     };
