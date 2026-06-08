@@ -9,6 +9,9 @@
     SETTINGS: 'settings',
     SAVED_PAGES: 'savedPages',
     HISTORY: 'aiHistory',
+    // §3.1 — tab archiviate (chiuse = salvate). Metadati per tab: vedi
+    // services/archivedTabs.js. Mostrate in filo://archive raggruppate per giorno.
+    ARCHIVED_TABS: 'archivedTabs',
     COSTS: 'costs',
     CATEGORIES: 'categories',
     BLOCKLIST: 'blocklist',
