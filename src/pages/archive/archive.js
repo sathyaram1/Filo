@@ -62,7 +62,43 @@
     return new Date(iso).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
   }
 
+  // Ricerca semantica: embeddizza la query e ordina per pertinenza (lato main).
+  async function runSemanticSearch() {
+    const q = ($('search').value || '').trim();
+    const note = $('searchNote');
+    if (!q) { semanticResults = null; note.hidden = true; render(); return; }
+    note.hidden = false;
+    note.textContent = 'Cerco nei contenuti…';
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.SEARCH_ARCHIVED_TABS, query: q }); } catch (_) {}
+    if (!r || !Array.isArray(r.results)) {
+      // Niente embedding disponibile (manca la chiave o nessuna tab indicizzata):
+      // ripiego sul filtro per sottostringa.
+      semanticResults = null;
+      note.textContent = 'Ricerca nei contenuti non disponibile: mostro i risultati per testo.';
+      render();
+      return;
+    }
+    semanticResults = r.results;
+    note.textContent = semanticResults.length
+      ? `${semanticResults.length} risultati per pertinenza · "${q}"`
+      : `Nessun risultato per "${q}"`;
+    render();
+  }
+
+  function renderSemantic() {
+    const list = $('list');
+    list.innerHTML = '';
+    if (!semanticResults.length) { $('empty').hidden = false; return; }
+    $('empty').hidden = true;
+    const wrap = document.createElement('div');
+    wrap.className = 'arc-tabs';
+    for (const t of semanticResults) wrap.appendChild(renderTab(t, { showScore: true }));
+    list.appendChild(wrap);
+  }
+
   function render() {
+    if (semanticResults) { renderSemantic(); return; }
     const q = ($('search').value || '').trim().toLowerCase();
     const list = $('list');
     list.innerHTML = '';
@@ -70,7 +106,7 @@
     let filtered = tabs;
     if (q) {
       filtered = filtered.filter((t) =>
-        `${t.title || ''} ${t.url || ''}`.toLowerCase().includes(q));
+        `${t.title || ''} ${t.url || ''} ${t.snippet || ''}`.toLowerCase().includes(q));
     }
 
     if (!filtered.length) {
