@@ -1553,23 +1553,54 @@ async function embedTexts(texts) {
   return G.embed({ apiKey: key, texts, model: SN_CONST.EMBED_MODEL, dim: SN_CONST.EMBED_DIM });
 }
 
-// §3.2 — arricchisce una tab archiviata con embedding + snippet del contenuto,
-// così diventa cercabile semanticamente. Best-effort: se manca la chiave o il
-// testo, è un no-op (la tab resta cercabile per sottostringa su titolo/url).
-async function enrichArchivedTab(id, text) {
+// §3.1/§3.2 — arricchisce una tab archiviata: genera un riassunto LLM, lo
+// embeddizza (modello Google) e salva riassunto + embedding + snippet, così la
+// tab diventa cercabile semanticamente e mostra una sintesi. `payload` può essere
+// { title, content } oppure una stringa (trattata come contenuto). Best-effort:
+// se manca la chiave o il testo, fa il possibile (anche solo snippet) e non rompe.
+async function enrichArchivedTab(id, payload) {
   try {
     if (!id) return;
-    const clean = String(text == null ? '' : text).replace(/\s+/g, ' ').trim();
-    if (!clean) return;
-    const vecs = await embedTexts([clean.slice(0, 4000)]);
-    if (!vecs || !vecs[0] || !vecs[0].length) return;
-    await ArchivedTabs.update(id, {
-      embedding: quantizeEmbedding(vecs[0]),
-      snippet: clean.slice(0, 240),
-    });
+    const title = (payload && typeof payload === 'object') ? (payload.title || '') : '';
+    const content = (payload && typeof payload === 'object')
+      ? (payload.content || '')
+      : String(payload == null ? '' : payload);
+    const base = `${title}\n${content}`.replace(/\s+/g, ' ').trim();
+    if (!base) return;
+
+    const summary = await summarizeTab(title, content); // best-effort (può essere '')
+    const toEmbed = (summary || base).slice(0, 4000);
+    const vecs = await embedTexts([toEmbed]);
+
+    const patch = {};
+    if (summary) patch.summary = summary;
+    patch.snippet = (summary || content || title).replace(/\s+/g, ' ').trim().slice(0, 240);
+    if (vecs && vecs[0] && vecs[0].length) patch.embedding = quantizeEmbedding(vecs[0]);
+    if (Object.keys(patch).length) await ArchivedTabs.update(id, patch);
   } catch (_) { /* l'arricchimento non deve mai disturbare */ }
 }
 globalThis.SN_TAB_ENRICH = enrichArchivedTab;
+
+// §3.2 step 4 — re-rank LLM dei top-K: legge i riassunti e riordina per pertinenza.
+// Ritorna un array di indici (in `items`) o null se non disponibile.
+async function rerankResults(query, items) {
+  const lines = items.map((it, i) =>
+    `#${i} ${it.title || ''}\n${(it.summary || it.snippet || it.url || '').slice(0, 300)}`).join('\n\n');
+  const messages = [
+    { role: 'system', content:
+      'Sei un motore di ricerca. Data una query e una lista di pagine (indice + riassunto), '
+      + 'ordina gli indici dal più pertinente al meno pertinente alla query, scartando i non '
+      + 'pertinenti. Rispondi SOLO con JSON: {"order":[indici]}.' },
+    { role: 'user', content: `Query: ${query}\n\nPagine:\n${lines}` },
+  ];
+  try {
+    const parsed = extractJson(await runOneShot(ACTIONS.FILO_TAB_SEARCH, messages));
+    const order = parsed && Array.isArray(parsed.order)
+      ? parsed.order.filter((n) => Number.isInteger(n) && n >= 0 && n < items.length)
+      : null;
+    return order && order.length ? order : null;
+  } catch (_) { return null; }
+}
 
 // Ricerca semantica: embeddizza la query, ordina le tab per similarità coseno.
 // Ritorna { results } (metadati senza embedding) oppure { results:null } se non
