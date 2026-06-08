@@ -22,6 +22,13 @@
     GET_SAVED_PAGES: 'get_saved_pages',
     REMOVE_SAVED_PAGE: 'remove_saved_page',       // { id }
     CONSUME_SAVED_PAGE: 'consume_saved_page',     // { id }
+
+    // §3.1/§3.3 — archivio tab chiuse (metadati). La scrittura avviene nel main
+    // alla chiusura di una tab; queste servono alla pagina archivio per leggere/
+    // rimuovere/svuotare.
+    GET_ARCHIVED_TABS: 'get_archived_tabs',
+    REMOVE_ARCHIVED_TAB: 'remove_archived_tab',   // { id }
+    CLEAR_ARCHIVED_TABS: 'clear_archived_tabs',
     GET_COSTS: 'get_costs',
     CAPTURE_VISIBLE_TAB: 'capture_visible_tab',
     // Test provider: misura latenza al primo token e token al secondo
