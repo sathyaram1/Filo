@@ -302,10 +302,26 @@
       }
       el.appendChild(ico);
 
+      // Indicatore "audio mutato": un altoparlante barrato accanto al titolo,
+      // così l'utente sa quali tab ha silenziato senza doverci passare sopra.
+      if (t.muted) {
+        const m = document.createElement('span');
+        m.className = 'mute-ind';
+        m.setAttribute('aria-label', 'Audio mutato');
+        m.innerHTML = MUTE_IND_SVG;
+        el.appendChild(m);
+      }
+
       const title = document.createElement('span');
       title.className = 'title';
       title.textContent = tabLabel(t);
       el.appendChild(title);
+
+      // Tasto destro su una tab → menu contestuale (Duplica / Muta / Chiudi).
+      el.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        openTabContextMenu(t, e.clientX, e.clientY);
+      });
 
       const close = document.createElement('span');
       close.className = 'close';
