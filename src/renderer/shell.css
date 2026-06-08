@@ -207,6 +207,16 @@ html[data-chrome-compact="1"] .addr {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+.tab .mute-ind {
+  flex: 0 0 13px;
+  height: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg-soft);
+}
+.tab .mute-ind svg { display: block; }
+
 .tab-new {
   flex: 0 0 28px;
   height: 28px;
