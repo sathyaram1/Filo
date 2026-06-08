@@ -639,9 +639,19 @@ class TabManager {
     wc.on('page-title-updated', (_e, title) => update({ title: title || tab.title }));
     wc.on('page-favicon-updated', (_e, favicons) => update({ favicon: favicons?.[0] || '' }));
     wc.on('did-navigate', (_e, url) => {
-      // Nuova pagina → il colore del sito precedente non vale più: lo azzeriamo
-      // (la tab torna al colore neutro finché il content script non ricampiona).
-      update({ url, color: null, canBack: canGoBack(wc), canFwd: canGoFwd(wc) });
+      // Nuova pagina → il colore live (§1.1) del sito precedente non vale più: lo
+      // azzeriamo (la tab torna al neutro finché il content script non ricampiona).
+      // Il colore IDENTITÀ (§1.2) invece dipende dal DOMINIO: se navighiamo su un
+      // host già in cache lo applichiamo subito, altrimenti azzeriamo e aspettiamo
+      // che il content script lo ricalcoli per il nuovo sito.
+      const cachedIdentity = this._identityColorCache.get(hostOf(url)) || null;
+      update({
+        url,
+        color: null,
+        identityColor: cachedIdentity,
+        canBack: canGoBack(wc),
+        canFwd: canGoFwd(wc),
+      });
       // Rilevamento siti pericolosi: ricontrolla l'URL FINALE (dopo i redirect)
       // appena il main-frame si è committato, prima che la pagina sia
       // interattiva. Best-effort, non blocca mai (vedi _sbOnNavigate).
