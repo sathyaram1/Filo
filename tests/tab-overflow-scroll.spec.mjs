@@ -31,12 +31,10 @@ test('con molte tab la striscia scrolla e tiene in vista la tab attiva', async (
     const tabsEl = document.getElementById('tabs');
     const active = tabsEl.querySelector('.tab.active');
     if (!active) return false;
-    const left = active.offsetLeft;
-    const right = left + active.offsetWidth;
-    const viewL = tabsEl.scrollLeft;
-    const viewR = viewL + tabsEl.clientWidth;
+    const a = active.getBoundingClientRect();
+    const c = tabsEl.getBoundingClientRect();
     // tollera 2px di arrotondamento
-    return right <= viewR + 2 && left >= viewL - 2;
+    return a.left >= c.left - 2 && a.right <= c.right + 2;
   }), { timeout: 8_000 }).toBe(true);
   expect(inView).toBe(true);
 });
