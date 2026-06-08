@@ -210,8 +210,9 @@
     del.className = 'sn-btn sn-btn-secondary';
     del.textContent = 'Rimuovi';
     del.addEventListener('click', async () => {
-      const r = await chrome.runtime.sendMessage({ type: MSG.REMOVE_ARCHIVED_TAB, id: t.id });
-      tabs = (r && r.tabs) || tabs.filter((x) => x.id !== t.id);
+      await chrome.runtime.sendMessage({ type: MSG.REMOVE_ARCHIVED_TAB, id: t.id });
+      tabs = tabs.filter((x) => x.id !== t.id);
+      if (semanticResults) semanticResults = semanticResults.filter((x) => x.id !== t.id);
       render();
     });
     actions.appendChild(del);
