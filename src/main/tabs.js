@@ -307,6 +307,9 @@ class TabManager {
     const idx = this.tabs.findIndex((t) => t.id === id);
     if (idx < 0) return;
     const tab = this.tabs[idx];
+    // §3.1/§4 — "Chiudi = archivia": prima di distruggere la view salviamo i
+    // metadati della tab nell'archivio (consultabile da filo://archive).
+    this._archiveClosedTab(tab);
     try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
     try { tab.view.webContents.close(); } catch (_) {}
     this.tabs.splice(idx, 1);
