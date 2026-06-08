@@ -82,6 +82,9 @@
     FILO_LESSON: 'filo_lesson',
     // Compattatore: integra le lezioni nei moduli di memoria.
     FILO_COMPACT: 'filo_compact',
+    // §2.1 — triage tab: l'LLM decide quali schede tenere e quali archiviare,
+    // in batch su tutte le tab, dati i segnali + un estratto del contenuto.
+    FILO_TAB_TRIAGE: 'filo_tab_triage',
   };
 
   // Registry di modelli "logici" indicizzati per nickname.
