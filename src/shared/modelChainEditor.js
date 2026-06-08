@@ -36,6 +36,7 @@
       [A.SPELLCHECK_WORD, 'spell_action_word_label'],
       [A.HELP_INTENT_GUESS, 'options_action_help_intent_guess'],
       [A.HELP_INTENT_JUDGE, 'options_action_help_intent_judge'],
+      [A.FILO_TAB_TRIAGE, 'options_action_tab_triage'],
     ];
   }
 
