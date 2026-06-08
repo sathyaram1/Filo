@@ -316,6 +316,7 @@
       if (!id) return;
       if (action === 'tab-duplicate') api.tabs.duplicate(id);
       else if (action === 'tab-mute') api.tabs.setMuted(id);
+      else if (action === 'tab-help') api.tabs.help(id);
       else if (action === 'tab-close') api.tabs.close(id);
     });
   }
