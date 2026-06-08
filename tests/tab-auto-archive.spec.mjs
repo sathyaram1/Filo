@@ -16,10 +16,18 @@ test('runAutoTriage archivia le tab decise, tiene la attiva e mostra il toast', 
   await testServer.openReady(openTab, mk('Bravo', 'rgb(40,80,200)'));
   await testServer.openReady(openTab, mk('Charlie', '')); // ultima → attiva
 
-  // Stub della decisione LLM nel main: archivia SOLO il primo candidato.
+  // Attendi che lo stato sia assestato: tutte e tre presenti e Charlie attiva.
+  await expect.poll(async () => shell.evaluate(async () => {
+    const s = await window.filoShell.tabs.snapshot();
+    const titles = s.tabs.map((t) => t.title);
+    const active = s.tabs.find((t) => t.id === s.activeId);
+    return ['Alpha', 'Bravo', 'Charlie'].every((x) => titles.includes(x)) && active && active.title === 'Charlie';
+  }), { timeout: 8_000 }).toBe(true);
+
+  // Stub della decisione LLM nel main: archivia SOLO "Alpha" (deterministico).
   const res = await app.evaluate(async ({ BrowserWindow }) => {
     globalThis.SN_TAB_TRIAGE_DECIDE = async ({ tabs }) => ({
-      decisions: tabs.map((t, i) => ({ i, action: i === 0 ? 'archive' : 'keep', reason: 'test' })),
+      decisions: tabs.map((t, i) => ({ i, action: t.title === 'Alpha' ? 'archive' : 'keep', reason: 'test' })),
     });
     const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
     return win._filoTabs.runAutoTriage({ trigger: 'test' });
