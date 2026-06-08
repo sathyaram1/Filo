@@ -26,21 +26,31 @@ sessione successiva riparte senza ambiguità.
   indicatore visivo sulla tab mutata e label che diventa "Riattiva audio".
 - ✅ **Chiudi** — chiude la tab. (Nota: la spec dice "Chiudi = archivia"; oggi
   chiude soltanto. Diventerà "archivia" quando esisterà lo store archivio §3.1.)
-- 🔵 **Aiuto** — apre chat con Filo sulla tab. RIMANDATO: richiede decidere
-  quale superficie chat usare (home/newtab? sidebar?) e come passarle il
-  contesto della tab (url/titolo). Da definire con l'utente.
+- 🟡 **Aiuto** — DECISO (utente): apre la sidebar Aiuto esistente (`SN_SIDEBAR`,
+  comportamento base) ma **inietta nel contesto dell'agente** che è stata
+  invocata cliccando col tasto destro su quella scheda (le passa url+titolo+
+  "fonte: tab"). In implementazione in questa sessione.
 
 ## §1 — Aspetto visivo
-- 🔵 §1.1 Tab bar "vetro smerigliato" con campionamento live — progetto a sé,
-  attriti con l'architettura WebContentsView (composizione sopra la shell).
+- 🟡 §1.1 Tab attiva "vetro smerigliato" — DECISO (utente): **colore live**, NON
+  blur catturato. Motivo: in Electron le WebContentsView native compongono sopra
+  la shell e il `backdrop-filter` CSS non legge i pixel di un'altra superficie
+  nativa → blur reale impossibile senza `capturePage` (latenza + bug #24694).
+  Realizzazione: micro content-script campiona il colore dominante della striscia
+  in cima al viewport, lo manda alla shell, che tinge la tab attiva e sceglie
+  testo chiaro/scuro per luminanza; aggiornamento allo scroll. In implementazione.
 - ⏳ §1.2 Colore identità attenuato sulle tab inattive (theme-color → favicon →
   fallback, cache per dominio).
 - ⏳ §1.3 Ordinamento cromatico (dipende da §1.2).
 
 ## §2 — Gestione automatica
-- 🔴 §2.1 Auto-archiviazione (trigger inattività/chiusura) — il cuore è
-  fattibile; la **decisione LLM** è il pezzo costoso.
-- 🔵 §2.2 Protezione/Pin (intuizione/apprendimento/istruzione esplicita).
+- 🔴 §2.1 Auto-archiviazione (trigger inattività/chiusura). Decisione LLM
+  **greenlit** dall'utente: costo trascurabile (~3 chiamate/giorno, Flash-lite +
+  quote gratuite). Resta da costruire il flusso (metriche tab → agente → azione).
+- ✅ §2.2 Protezione/Pin — RISOLTO via memoria (decisione utente): niente UI
+  dedicata. "Tieni sempre aperta WhatsApp" = lezione nel sistema di memoria (già
+  esistente) che l'agente di riordino legge. Basterà passargli il contesto giusto
+  quando si costruisce §2.1.
 - ⏳ §2.3 Toast "Tab riordinate e salvate in cronologia" (no pulsante annulla).
 
 ## §3 — Archivio e cronologia
