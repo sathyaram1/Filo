@@ -293,6 +293,18 @@
     'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
     '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9l4 6"/><path d="M21 9l-4 6"/></svg>';
 
+  // "Vetro smerigliato" della tab attiva (§1.1): dato il colore campionato dal
+  // sito, scegli un testo leggibile per contrasto (luminanza relativa).
+  function readableOn(rgbStr) {
+    const m = /rgba?\(([^)]+)\)/.exec(rgbStr || '');
+    if (!m) return null;
+    const p = m[1].split(',').map((s) => parseFloat(s.trim()));
+    if (p.length < 3 || p.some((n) => Number.isNaN(n))) return null;
+    const lin = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+    const L = 0.2126 * lin(p[0]) + 0.7152 * lin(p[1]) + 0.0722 * lin(p[2]);
+    return L > 0.45 ? '#1a1918' : '#f8f6f0';
+  }
+
   let ctxTabId = null;
   function openTabContextMenu(t, x, y) {
     ctxTabId = t.id;
