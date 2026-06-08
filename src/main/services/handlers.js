@@ -552,7 +552,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images }) {
   return { text: textReply, actions: renderedActions, model: r.model, provider: r.provider, costEur: r.costEur };
 }
 
-async function handleFiloGenerateDashboard({ force = false } = {}) {
+async function handleFiloGenerateDashboard({ force = false, openTabsCount = 0 } = {}) {
   // Pulisce i timer scaduti PRIMA di leggere la cache: gcTimers() invalida
   // la cache dashboard quando rimuove qualcosa, così evitiamo di riservire
   // un messaggio cached che parlava di un timer ormai scaduto (bug alpha
