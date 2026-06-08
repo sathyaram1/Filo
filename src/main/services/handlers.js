@@ -819,7 +819,10 @@ async function handleMessage(msg, sender = {}) {
     case MSG.CONSUME_SAVED_PAGE:
       return { ok: true, pages: await SavedPages.consume(msg.id) };
     case MSG.GET_ARCHIVED_TABS:
-      return { ok: true, tabs: await ArchivedTabs.list() };
+      // listMeta: senza embedding (non spediamo i vettori al renderer).
+      return { ok: true, tabs: await ArchivedTabs.listMeta() };
+    case MSG.SEARCH_ARCHIVED_TABS:
+      return await searchArchivedTabs(msg.query);
     case MSG.REMOVE_ARCHIVED_TAB:
       return { ok: true, tabs: await ArchivedTabs.remove(msg.id) };
     case MSG.CLEAR_ARCHIVED_TABS:
