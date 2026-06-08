@@ -810,6 +810,15 @@ async function handleMessage(msg, sender = {}) {
       return { ok: true, tabs: await ArchivedTabs.remove(msg.id) };
     case MSG.CLEAR_ARCHIVED_TABS:
       return { ok: true, tabs: await ArchivedTabs.clear() };
+    case MSG.REOPEN_ARCHIVED_TAB: {
+      // Riapre la scheda archiviata, ripristinando lo scroll registrato.
+      const win = winOf(sender);
+      if (win && win._filoTabs && msg.url) {
+        const pct = typeof msg.scrollPct === 'number' ? msg.scrollPct : null;
+        win._filoTabs.openTab(msg.url, { activate: true, restoreScrollPct: pct });
+      }
+      return { ok: true };
+    }
     case MSG.GET_CLIPBOARD_HISTORY: {
       const list = await Storage.getRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []);
       return { ok: true, items: Array.isArray(list) ? list : [] };
