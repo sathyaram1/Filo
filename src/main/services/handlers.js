@@ -1354,7 +1354,17 @@ async function handleMessage(msg, sender = {}) {
       return { ok: true, state, stateText };
     }
     case MSG.FILO_GENERATE_DASHBOARD: {
-      const r = await handleFiloGenerateDashboard({ force: !!msg.force });
+      // Numero di schede web aperte → l'agente può suggerire una pulizia (§6).
+      let openTabsCount = 0;
+      try {
+        const win = winOf(sender);
+        if (win && win._filoTabs) {
+          openTabsCount = win._filoTabs.tabs.filter(
+            (t) => !t.isInternal && /^https?:\/\//i.test(t.url || ''),
+          ).length;
+        }
+      } catch (_) {}
+      const r = await handleFiloGenerateDashboard({ force: !!msg.force, openTabsCount });
       return { ok: true, ...r };
     }
     case MSG.FILO_GET_MEMORY:
