@@ -248,6 +248,9 @@
     $('openHistory').addEventListener('click', () => {
       chrome.tabs.create({ url: chrome.runtime.getURL('src/pages/history/history.html') });
     });
+    $('openArchive').addEventListener('click', () => {
+      chrome.tabs.create({ url: 'filo://archive/archive.html' });
+    });
     $('openOptions').addEventListener('click', () => chrome.runtime.openOptionsPage());
   });
 })();
