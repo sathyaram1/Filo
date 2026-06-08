@@ -307,6 +307,31 @@ body[data-state="thread"] .dash-suggestion { justify-content: flex-start; paddin
 }
 .dash-action-btn-primary:hover { opacity: 0.85; }
 .dash-action-btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+/* §5 — bottone distruttivo (cancellazione definitiva dall'archivio). */
+.dash-action-btn-danger {
+  border-color: #c0392b;
+  background: #c0392b;
+  color: #fff;
+}
+.dash-action-btn-danger:hover { opacity: 0.88; background: #c0392b; color: #fff; }
+/* §5 — pannello di conferma cancellazione archivio. */
+.dash-delete-panel {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, #c0392b 40%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, #c0392b 6%, transparent);
+}
+.dash-delete-note { font-size: 13px; margin-bottom: 6px; }
+.dash-delete-list {
+  margin: 6px 0 10px;
+  padding-left: 18px;
+  max-height: 180px;
+  overflow: auto;
+  font-size: 12px;
+  opacity: 0.85;
+}
+.dash-delete-list li { margin: 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ===== Colonna destra: stato live ===== */
 .dash-right {
