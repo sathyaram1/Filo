@@ -553,6 +553,25 @@
     e.preventDefault();
   }, { passive: false });
 
+  // §2.3 — toast informativo (niente pulsante annulla, per scelta di design:
+  // l'annulla esiste via linguaggio naturale, "riapri le tab di X").
+  let toastTimer = null;
+  function showToast(text) {
+    if (!text) return;
+    let el = document.getElementById('shell-toast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'shell-toast';
+      el.className = 'shell-toast';
+      document.body.appendChild(el);
+    }
+    el.textContent = text;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 4500);
+  }
+  if (api.onToast) api.onToast((info) => showToast(info && info.text));
+
   newBtn.addEventListener('click', () => api.tabs.open('filo://newtab/'));
   backBtn.addEventListener('click', () => { const a = activeTab(); if (a) api.tabs.back(a.id); });
   fwdBtn.addEventListener('click', () => { const a = activeTab(); if (a) api.tabs.forward(a.id); });
