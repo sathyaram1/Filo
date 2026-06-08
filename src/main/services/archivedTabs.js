@@ -51,6 +51,36 @@
     return entry;
   }
 
+  // Come list() ma SENZA gli embedding: è ciò che mandiamo al renderer (la pagina
+  // archivio), per non spedire MB di vettori via IPP ad ogni apertura.
+  async function listMeta() {
+    const items = await list();
+    return items.map(({ embedding, ...rest }) => rest);
+  }
+
+  // Tiene gli embedding solo sulle ultime ARCHIVED_EMBED_LIMIT tab (le più
+  // recenti, che stanno in testa all'array): azzera i più vecchi per non sforare
+  // la quota. Muta l'array in place e ritorna true se ha cambiato qualcosa.
+  function capEmbeddings(items) {
+    let changed = false;
+    for (let i = ARCHIVED_EMBED_LIMIT; i < items.length; i++) {
+      if (items[i] && items[i].embedding) { items[i].embedding = null; changed = true; }
+    }
+    return changed;
+  }
+
+  // Aggiorna un'entry (es. aggiunta di embedding/snippet dopo l'arricchimento).
+  async function update(id, patch) {
+    if (!id || !patch) return null;
+    const items = await list();
+    const idx = items.findIndex((t) => t.id === id);
+    if (idx < 0) return null;
+    items[idx] = { ...items[idx], ...patch };
+    capEmbeddings(items);
+    await chrome.storage.local.set({ [STORAGE_KEYS.ARCHIVED_TABS]: items });
+    return items[idx];
+  }
+
   async function remove(id) {
     const items = await list();
     const filtered = items.filter((t) => t.id !== id);
