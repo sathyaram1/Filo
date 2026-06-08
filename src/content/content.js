@@ -1942,7 +1942,7 @@
       if (selInfo) triggerExplainOrTranslate(ACTIONS.TRANSLATE_SELECTION, selInfo, anchor);
       else Popup.showToast(I18n.t('err_no_selection'));
     } else if (command === 'open-help-sidebar') {
-      openHelpSidebar();
+      openHelpSidebar(context);
     }
     // save-for-later è gestito direttamente nel background
   }
