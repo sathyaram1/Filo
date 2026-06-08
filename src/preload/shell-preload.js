@@ -14,6 +14,10 @@ contextBridge.exposeInMainWorld('filoShell', {
     back: (id) => ipcRenderer.invoke('tabs:back', { id }),
     forward: (id) => ipcRenderer.invoke('tabs:forward', { id }),
     reload: (id) => ipcRenderer.invoke('tabs:reload', { id }),
+    // Menu tasto destro su tab: muta/riattiva audio (toggle se muted è omesso)
+    // e duplica.
+    setMuted: (id, muted) => ipcRenderer.invoke('tabs:set-muted', { id, muted }),
+    duplicate: (id) => ipcRenderer.invoke('tabs:duplicate', { id }),
     snapshot: () => ipcRenderer.invoke('tabs:snapshot'),
     setActiveVisible: (visible) => ipcRenderer.invoke('tabs:set-active-visible', { visible }),
     onUpdate: (fn) => {
