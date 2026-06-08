@@ -402,6 +402,144 @@ class TabManager {
     this.setMuted(id, !tab.muted);
   }
 
+  // ─── §2.1 auto-archiviazione / riordino ─────────────────────────────────
+
+  async _readSettings() {
+    try { return await globalThis.SN_STORAGE?.getSettings?.(); } catch (_) { return null; }
+  }
+
+  // Tick periodico: se Filo è inattivo da ≥ soglia (preferenze), avvia il triage.
+  async _autoArchiveTick() {
+    if (this.incognito || this._triageRunning) return;
+    const s = await this._readSettings();
+    const aa = s && s.autoArchive;
+    if (!aa || !aa.enabled || !aa.onIdle) return;
+    const hours = Number(aa.idleHours) > 0 ? Number(aa.idleHours) : 6;
+    if (Date.now() - this._lastAppInteractionAt < hours * 3600 * 1000) return;
+    await this.runAutoTriage({ trigger: 'idle' });
+    // Evita ritrigger immediato finché l'utente non torna a usare Filo.
+    this._lastAppInteractionAt = Date.now();
+  }
+
+  // Candidati archiviabili: tab web, non attiva, non in riproduzione audio, non
+  // interne. (Incognito è escluso a monte: niente timer in incognito.)
+  _triageCandidates() {
+    return this.tabs.filter((t) =>
+      t.id !== this.activeId
+      && !t.audible
+      && !t.isInternal
+      && /^https?:\/\//i.test(t.url || ''));
+  }
+
+  async _gatherTriageInput(cands) {
+    const now = Date.now();
+    const out = [];
+    for (const t of cands) {
+      let contentExtract = '';
+      try {
+        contentExtract = await t.view.webContents.executeJavaScript(
+          '(function(){try{return (document.body&&document.body.innerText||"").replace(/\\s+/g," ").slice(0,800);}catch(e){return "";}})()',
+          true,
+        );
+      } catch (_) {}
+      out.push({
+        url: t.url,
+        title: t.title,
+        ageMin: t.openedAt ? Math.round((now - new Date(t.openedAt).getTime()) / 60000) : null,
+        idleMin: t.lastInteractionAt ? Math.round((now - t.lastInteractionAt) / 60000) : null,
+        scrollPct: typeof t.scrollPct === 'number' ? t.scrollPct : null,
+        formDirty: !!t.formDirty,
+        audible: !!t.audible,
+        coOpenUrls: this.tabs
+          .filter((x) => x.id !== t.id && /^https?:\/\//i.test(x.url || ''))
+          .map((x) => x.url).slice(0, 20),
+        contentExtract,
+      });
+    }
+    return out;
+  }
+
+  // Esegue un giro di triage: raccoglie i candidati, chiede all'LLM (batch su
+  // tutte le tab) e applica le decisioni. Se manca la chiave o l'LLM fallisce,
+  // è un no-op silenzioso (non tocca le tab).
+  async runAutoTriage({ trigger = 'idle' } = {}) {
+    if (this.incognito || this._triageRunning) return { archived: 0 };
+    const decide = globalThis.SN_TAB_TRIAGE_DECIDE;
+    if (typeof decide !== 'function') return { archived: 0 };
+    const cands = this._triageCandidates();
+    if (!cands.length) return { archived: 0 };
+    this._triageRunning = true;
+    try {
+      const input = await this._gatherTriageInput(cands);
+      let decisions = [];
+      try {
+        const r = await decide({ tabs: input, trigger });
+        decisions = Array.isArray(r && r.decisions) ? r.decisions : [];
+      } catch (_) { return { archived: 0 }; }
+      return this.applyTriageDecisions(cands, decisions);
+    } finally {
+      this._triageRunning = false;
+    }
+  }
+
+  // Applica le decisioni LLM: archivia+chiude le tab marcate 'archive' (mai la
+  // attiva o con audio — salvaguardia), poi riordina cromaticamente i superstiti
+  // (§1.3) e mostra il toast (§2.3). `cands` è l'elenco indicizzato passato all'LLM.
+  applyTriageDecisions(cands, decisions) {
+    const byIndex = new Map();
+    for (const d of (decisions || [])) {
+      if (d && typeof d.i === 'number') byIndex.set(d.i, d);
+    }
+    const toArchive = [];
+    cands.forEach((tab, i) => {
+      const d = byIndex.get(i);
+      if (!d || d.action !== 'archive') return;
+      if (tab.id === this.activeId || tab.audible) return; // salvaguardia dura
+      toArchive.push({ tab, reason: d.reason || 'auto' });
+    });
+
+    for (const { tab, reason } of toArchive) {
+      this._archiveClosedTab(tab, reason);
+      const idx = this.tabs.findIndex((t) => t.id === tab.id);
+      if (idx >= 0) {
+        try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
+        try { tab.view.webContents.close(); } catch (_) {}
+        this.tabs.splice(idx, 1);
+      }
+    }
+
+    if (!this.tabs.length) this.openTab('filo://newtab/');
+    else if (!this.tabs.some((t) => t.id === this.activeId)) this.activate(this.tabs[0].id);
+
+    if (toArchive.length) {
+      this.reorderTabsByColor();
+      this._broadcast();
+      this._showTriageToast(toArchive.length);
+    }
+    return { archived: toArchive.length };
+  }
+
+  // §1.3 — riordina la striscia per colore (arcobaleno) in base all'identityColor.
+  // Le tab senza colore (interne, identità ignota) restano in coda nell'ordine.
+  reorderTabsByColor() {
+    const withIdx = this.tabs.map((t, i) => ({ t, i }));
+    withIdx.sort((a, b) => {
+      const ha = hueOf(a.t.identityColor);
+      const hb = hueOf(b.t.identityColor);
+      if (ha !== hb) return ha - hb;
+      return a.i - b.i; // stabile
+    });
+    this.tabs = withIdx.map((x) => x.t);
+  }
+
+  _showTriageToast(_n) {
+    try {
+      this.win.webContents.send('shell:toast', {
+        text: 'Tab riordinate e salvate in cronologia',
+      });
+    } catch (_) {}
+  }
+
   // "Vetro smerigliato" (§1.1): registra il colore dominante della cima della
   // pagina, campionato dal content script. Solo se cambia davvero (i sample
   // arrivano spesso durante lo scroll) per non inondare la shell di redraw.
