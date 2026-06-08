@@ -686,6 +686,16 @@ async function handleMessage(msg, sender = {}) {
       }
       return { ok: true };
     }
+    case MSG.RUN_TAB_TRIAGE: {
+      // Pulizia/riordino su richiesta esplicita (l'utente ha confermato nel
+      // bottone dell'agente). Gira sul TabManager della finestra del mittente.
+      const win = winOf(sender);
+      if (win && win._filoTabs) {
+        const res = await win._filoTabs.runAutoTriage({ trigger: 'manual' });
+        return { ok: true, archived: (res && res.archived) || 0 };
+      }
+      return { ok: false, archived: 0 };
+    }
     case MSG.TAB_ACTIVITY: {
       // Segnali di attività della tab (§2.1) → merge sullo snapshot.
       const win = winOf(sender);
