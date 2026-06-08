@@ -513,7 +513,7 @@ async function executeFiloAction(action) {
         // subito nella dashboard, che ascolta SETTINGS_UPDATED).
         const chiave = action.chiave ?? action.key ?? action.nome ?? action.name ?? action.preferenza;
         const valore = action.valore ?? action.value ?? action.valoreNuovo ?? action.val;
-        const built = buildPreferencePartial(chiave, valore);
+        const built = global.SN_PREF.buildPreferencePartial(chiave, valore);
         if (!built) return { executed: false, kept: false };
         await applySettingsUpdate(built.partial);
         return { executed: true, kept: false };
