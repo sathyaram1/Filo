@@ -541,6 +541,17 @@
     try { api.tabs.setChromeCompact?.(compact); } catch (_) {}
   }
 
+  // §6 — la rotellina verticale del mouse scrolla la striscia delle tab in
+  // orizzontale (la tab bar non ha scroll verticale). Solo quando c'è davvero
+  // overflow, così non intercettiamo gesti inutili.
+  tabsEl.addEventListener('wheel', (e) => {
+    if (tabsEl.scrollWidth <= tabsEl.clientWidth) return;
+    const delta = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+    if (!delta) return;
+    tabsEl.scrollLeft += delta;
+    e.preventDefault();
+  }, { passive: false });
+
   newBtn.addEventListener('click', () => api.tabs.open('filo://newtab/'));
   backBtn.addEventListener('click', () => { const a = activeTab(); if (a) api.tabs.back(a.id); });
   fwdBtn.addEventListener('click', () => { const a = activeTab(); if (a) api.tabs.forward(a.id); });
