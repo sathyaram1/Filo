@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <title>Filo — Tab archiviate</title>
+  <link rel="icon" href="filo://asset/icons/icon-32.png" />
+  <link rel="stylesheet" href="filo://style/theme.css" />
+  <link rel="stylesheet" href="filo://style/pages.css" />
+  <script src="filo://shared/pageBootstrap.js"></script>
+  <script src="filo://shared/constants.js"></script>
+  <script src="filo://shared/messages.js"></script>
+  <script src="filo://shared/i18n.js"></script>
+  <script src="filo://shared/storage.js"></script>
+  <style>
+    /* §3.3 — archivio come "diario visivo": un giorno per riga, dentro ogni
+       giorno le tab in ordine cromatico. */
+    .arc-intro { color: var(--sn-muted); font-size: 13px; margin: -6px 0 18px; }
+    .arc-day { margin: 22px 0 8px; }
+    .arc-day-label {
+      font-size: 13px; font-weight: 600; color: var(--sn-muted);
+      text-transform: capitalize; padding-bottom: 6px;
+      border-bottom: 1px solid var(--sn-border);
+    }
+    .arc-tabs { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; }
+    .arc-tab {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px; border-radius: 8px;
+      border-left: 4px solid var(--arc-color, transparent);
+      background: var(--sn-surface);
+    }
+    .arc-tab:hover { background: var(--sn-hover); }
+    .arc-fav {
+      width: 16px; height: 16px; flex: 0 0 16px; border-radius: 3px;
+      background-size: cover; background-position: center;
+      background-color: var(--arc-color, var(--sn-border));
+    }
+    .arc-main { flex: 1 1 auto; min-width: 0; }
+    .arc-title {
+      font-size: 13px; color: var(--sn-text);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .arc-url {
+      font-size: 11px; color: var(--sn-muted);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .arc-time { font-size: 11px; color: var(--sn-muted); flex: 0 0 auto; }
+    .arc-actions { display: flex; gap: 6px; flex: 0 0 auto; }
+    .arc-actions .sn-btn { padding: 4px 10px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <main class="sn-page">
+    <h1>Tab archiviate</h1>
+    <p class="arc-intro">
+      Quando chiudi una scheda non la perdi: finisce qui, raggruppata per giorno
+      e ordinata per colore. Riaprila quando vuoi.
+    </p>
+
+    <div class="sn-toolbar">
+      <input type="search" id="search" placeholder="Cerca per titolo o indirizzo…" />
+      <button class="sn-btn sn-btn-secondary" id="clear">Svuota archivio</button>
+      <button class="sn-btn sn-btn-secondary" id="openHistory">Cronologia AI</button>
+    </div>
+
+    <div id="list"></div>
+    <div id="empty" class="sn-empty" hidden>Nessuna tab archiviata, per ora.</div>
+  </main>
+
+  <script src="archive.js"></script>
+</body>
+</html>
