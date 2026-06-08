@@ -869,5 +869,10 @@
     submit({ userAction: aiNote, preActionUrl });
   }
 
-  global.SN_SIDEBAR = { open, close, isOpen, ensureNotOverTarget };
+  global.SN_SIDEBAR = {
+    open, close, isOpen, ensureNotOverTarget,
+    // Solo per ispezione/test: contesto dell'ultima apertura e storia corrente.
+    getInvocationContext: () => lastInvocation,
+    _debugHistory: () => history.slice(),
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
