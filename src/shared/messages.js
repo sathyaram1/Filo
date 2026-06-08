@@ -53,6 +53,11 @@
     SHELL_ACTION: 'shell_action',                   // { command }
     REPLACE_MISSPELLING: 'replace_misspelling',     // { suggestion }
 
+    // "Vetro smerigliato" della tab attiva (spec §1.1): il content script
+    // campiona il colore dominante della striscia in cima al viewport e lo manda
+    // al main, che lo mette sullo snapshot così la shell tinge la tab attiva.
+    TAB_DOMINANT_COLOR: 'tab_dominant_color',       // { color: 'rgb(r,g,b)' | null }
+
     // Aiuto: invio percorso completato a fine sessione (passa per la pipeline
     // di sanitizzazione 2-LLM in pathsCollector.js prima di toccare Firestore).
     SAVE_PATH: 'save_path',                        // { path: { domain, initialUrl, sanitizedSteps, rawUserMessages, success } }
