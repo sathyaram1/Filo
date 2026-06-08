@@ -155,12 +155,14 @@ globalThis.self = globalThis; // i moduli IIFE controllano `self` come fallback
 // Lo shortcut globale fa un webContents.send('shortcut:triggered'); il content
 // script registra un listener via chrome.runtime.onMessage su MSG.SHORTCUT_TRIGGERED.
 // Adattatore: ascolto shortcut:triggered e ribroadcast come filo:broadcast.
-ipcRenderer.on('shortcut:triggered', (_event, { command }) => {
+ipcRenderer.on('shortcut:triggered', (_event, { command, context } = {}) => {
   // Il payload deve usare il type MSG.SHORTCUT_TRIGGERED del catalogo messaggi.
   // Lo prendiamo dai constants caricati sopra (SN_MSG popolato da messages.js).
+  // `context` è opzionale: lo usa la voce "Aiuto" del menu tasto destro su una
+  // tab per dire all'agente da dove è stato invocato (url + titolo della scheda).
   const t = globalThis.SN_MSG?.MSG?.SHORTCUT_TRIGGERED || 'shortcut_triggered';
   for (const fn of broadcastListeners) {
-    try { fn({ type: t, command }, { id: 'filo-desktop' }, () => {}); } catch (_) {}
+    try { fn({ type: t, command, context }, { id: 'filo-desktop' }, () => {}); } catch (_) {}
   }
 });
 
