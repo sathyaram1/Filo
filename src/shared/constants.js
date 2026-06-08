@@ -661,6 +661,7 @@
       `APPUNTI RECENTI:\n${appunti || '(nessuno)'}\n\n` +
       `SALVATI PER DOPO:\n${salvati || '(nessuno)'}\n\n` +
       `MESSAGGIO PRECEDENTE: "${ultimoMessaggio || ''}"\n\n` +
+      `SCHEDE WEB APERTE ADESSO: ${typeof tabAperte === 'number' ? tabAperte : 0}\n\n` +
       `Produci due output:\n\n` +
       `1) MESSAGGIO centrale: 1-2 frasi, caldo e diretto, mai robotico. Comunica lo stato generale (tutto tranquillo / qualcosa di urgente / qualcosa di interessante). Adatta al momento (mattina lavorativa ≠ sera weekend). Se non c'è nulla di rilevante, una variante di "nulla di critico" con eventuale suggerimento positivo. Mai identico al messaggio precedente.\n\n` +
       `2) SUGGERIMENTI: lista di azioni che l'utente potrebbe voler fare adesso. Ogni suggerimento:\n` +
