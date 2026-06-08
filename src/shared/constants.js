@@ -649,7 +649,7 @@
       `Se non servono azioni, "actions" è un array vuoto. Mantieni "text" breve per i comandi (es. "Fatto, 25 minuti.").`,
 
     // Generatore dashboard: produce messaggio centrale + suggerimenti.
-    filoDashboard: ({ profilo, preferenze, espansioni, lezioni, stato, notifiche, appunti, salvati, ultimoMessaggio }) =>
+    filoDashboard: ({ profilo, preferenze, espansioni, lezioni, stato, notifiche, appunti, salvati, ultimoMessaggio, tabAperte }) =>
       `Sei Filo, un assistente personale. Il tuo compito è preparare la dashboard che l'utente vedrà aprendo un nuovo tab.\n\n` +
       `MEMORIE UTENTE:\n` +
       `PROFILO:\n${profilo || '(vuoto)'}\n\n` +
