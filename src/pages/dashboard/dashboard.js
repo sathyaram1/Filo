@@ -194,6 +194,12 @@
     const a = s.action;
     if (!a) return;
     const type = String(a.type || '').toUpperCase();
+    if (type === 'PULISCI_TAB') {
+      // §6 — suggerimento di pulizia dalla home: stessa conferma del bottone chat.
+      if (!window.confirm('Filo valuterà le schede aperte e archivierà quelle non più utili (restano in “Tab archiviate”). Procedo?')) return;
+      send({ type: MSG.RUN_TAB_TRIAGE });
+      return;
+    }
     if (type === 'NAVIGA' && a.url) {
       chrome.tabs.create({ url: a.url });
     } else if (type === 'APRI_FILE' && (a.path || a.url)) {
