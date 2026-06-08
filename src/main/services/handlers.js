@@ -483,6 +483,9 @@ async function executeFiloAction(action) {
         // Non eseguiamo subito: il client mostra un bottone di conferma; al
         // click manda RUN_TAB_TRIAGE. Teniamo il bottone nella bolla.
         return { executed: false, kept: true };
+      case 'CANCELLA_ARCHIVIO':
+        // §5 — azione distruttiva: il client mostra l'elenco dei match + conferma.
+        return { executed: false, kept: true };
       case 'APRI_FILE':
         return { executed: true, kept: true };
       default:
