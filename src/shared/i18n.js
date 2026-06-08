@@ -218,6 +218,7 @@
     options_model_nickname_duplicate: 'Nickname duplicato: %s',
     options_action_help_intent_guess: 'Aiuto — sintesi intento (anonimizzazione)',
     options_action_help_intent_judge: 'Aiuto — giudice intento (anonimizzazione)',
+    options_action_tab_triage: 'Riordino/archiviazione automatica delle schede',
     options_open_chrome_shortcuts: 'Modifica le scorciatoie nella pagina Chrome',
     options_feature_help: 'Aiuto (sidebar AI con visione)',
     options_feature_categorize: 'Categorizzazione automatica',
