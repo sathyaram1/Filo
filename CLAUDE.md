@@ -275,6 +275,15 @@ ritorna empty image in molte configurazioni. Il `smoke.mjs` aggira aprendo
 l'URL in una BrowserWindow primary dedicata e cattura quella. Replica il
 pattern se vuoi screenshot affidabili in nuovi test.
 
+## Pattern e convenzioni UI — leggi `PATTERNS.md` PRIMA di toccare la UI
+
+Il sapere condiviso su come si costruiscono le cose in Filo (pattern UI, convenzioni
+di design, filosofia minimale) vive in **`PATTERNS.md`** nella root. **Prima di
+toccare la UI o prendere una decisione di design, leggilo** — vale anche per le
+routine cloud. Quando stabilisci un pattern nuovo (o ne rendi esplicito uno implicito),
+**aggiorna `PATTERNS.md`**: è il modo in cui le decisioni si accumulano tra sessioni
+invece di essere ri-litigate ogni volta.
+
 ## Controlli visivi / agentici dopo OGNI feature
 
 Gli unit test Playwright non vedono i bug **compositi** (shell + WebContentsView
