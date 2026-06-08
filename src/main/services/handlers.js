@@ -1558,7 +1558,7 @@ async function summarizeTab(title, content) {
       + 'Nessun preambolo né meta-commento, solo il riassunto.' },
     { role: 'user', content: `Titolo: ${title || '(senza titolo)'}\n\nContenuto:\n${text || '(nessun testo estratto)'}` },
   ];
-  try { return (await runOneShot(ACTIONS.FILO_TAB_SUMMARY, messages)).trim(); } catch (_) { return ''; }
+  try { return (await runOneShot(ACTIONS.FILO_TAB_SUMMARY, messages)).trim(); } catch (e) { globalThis.__sumErr = String(e && e.message || e); return ''; }
 }
 
 // Embedding di testi via modello Google (chiave Gemini effettiva). null se manca.
