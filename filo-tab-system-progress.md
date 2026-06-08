@@ -26,10 +26,11 @@ sessione successiva riparte senza ambiguità.
   indicatore visivo sulla tab mutata e label che diventa "Riattiva audio".
 - ✅ **Chiudi** — chiude la tab. (Nota: la spec dice "Chiudi = archivia"; oggi
   chiude soltanto. Diventerà "archivia" quando esisterà lo store archivio §3.1.)
-- 🟡 **Aiuto** — DECISO (utente): apre la sidebar Aiuto esistente (`SN_SIDEBAR`,
-  comportamento base) ma **inietta nel contesto dell'agente** che è stata
-  invocata cliccando col tasto destro su quella scheda (le passa url+titolo+
-  "fonte: tab"). In implementazione in questa sessione.
+- ✅ **Aiuto** — apre la sidebar Aiuto esistente (`SN_SIDEBAR`, comportamento
+  base) SU quella scheda, **iniettando nel contesto dell'agente** che è stata
+  invocata da click sulla tab (riga di storia con url+titolo, inviata all'LLM;
+  il root sidebar porta `data-invoked-from="tab"`). Verificato con
+  `tests/tab-help-menu.spec.mjs`.
 
 ## §1 — Aspetto visivo
 - 🟡 §1.1 Tab attiva "vetro smerigliato" — DECISO (utente): **colore live**, NON
