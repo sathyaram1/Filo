@@ -841,6 +841,19 @@
       enabled: false,
       shell: 'powershell',
     },
+    // §2.1 — auto-archiviazione/riordino delle tab. Filo riordina e archivia da
+    // sé le schede non più necessarie (l'LLM decide su TUTTE le tab insieme). Le
+    // schede archiviate restano sempre riapribili dalla cronologia (filo://archive).
+    // - enabled: interruttore generale della funzione.
+    // - onIdle: archivia quando Filo resta inattivo (nessuna interazione) a lungo.
+    // - idleHours: soglia di inattività in ore (modificabile).
+    // - onClose: valuta/archivia anche alla chiusura→riapertura di Filo.
+    autoArchive: {
+      enabled: true,
+      onIdle: true,
+      idleHours: 6,
+      onClose: true,
+    },
   };
 
   // Preset di stile per gli agenti rivolti all'utente. `key` è solo per l'UI;
