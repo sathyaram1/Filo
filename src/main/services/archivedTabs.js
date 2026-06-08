@@ -88,6 +88,16 @@
     return filtered;
   }
 
+  // Cancellazione multipla (§5 pulizia retroattiva). Ritorna { removed, remaining }.
+  async function removeMany(ids) {
+    const set = new Set(Array.isArray(ids) ? ids : []);
+    if (!set.size) return { removed: 0, remaining: (await list()).length };
+    const items = await list();
+    const filtered = items.filter((t) => !set.has(t.id));
+    await chrome.storage.local.set({ [STORAGE_KEYS.ARCHIVED_TABS]: filtered });
+    return { removed: items.length - filtered.length, remaining: filtered.length };
+  }
+
   async function clear() {
     await chrome.storage.local.set({ [STORAGE_KEYS.ARCHIVED_TABS]: [] });
     return [];
