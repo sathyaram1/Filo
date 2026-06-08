@@ -305,6 +305,49 @@
     return L > 0.45 ? '#1a1918' : '#f8f6f0';
   }
 
+  // Colore identità attenuato (§1.2): smorza la saturazione del colore del sito
+  // a una frazione dell'originale (tinta "subliminale"). La luminosità non la
+  // tocchiamo qui: la spostiamo verso il neutro del tab bar mescolandola con
+  // --tab-bg via CSS color-mix (così resta giusta sia in tema chiaro che scuro).
+  function attenuateIdentity(rgbStr) {
+    const m = /rgba?\(([^)]+)\)/.exec(rgbStr || '');
+    if (!m) return null;
+    const p = m[1].split(',').map((s) => parseFloat(s.trim()));
+    if (p.length < 3 || p.some((n) => Number.isNaN(n))) return null;
+    const r = p[0] / 255, g = p[1] / 255, b = p[2] / 255;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    const l = (mx + mn) / 2;
+    let h = 0, s = 0;
+    if (mx !== mn) {
+      const d = mx - mn;
+      s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+      if (mx === r) h = (g - b) / d + (g < b ? 6 : 0);
+      else if (mx === g) h = (b - r) / d + 2;
+      else h = (r - g) / d + 4;
+      h /= 6;
+    }
+    s *= 0.18; // saturazione ridotta al ~18% dell'originale (spec: 15-20%)
+    const hue2rgb = (pp, qq, t) => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1 / 6) return pp + (qq - pp) * 6 * t;
+      if (t < 1 / 2) return qq;
+      if (t < 2 / 3) return pp + (qq - pp) * (2 / 3 - t) * 6;
+      return pp;
+    };
+    let nr, ng, nb;
+    if (s === 0) {
+      nr = ng = nb = l;
+    } else {
+      const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+      const pq = 2 * l - q;
+      nr = hue2rgb(pq, q, h + 1 / 3);
+      ng = hue2rgb(pq, q, h);
+      nb = hue2rgb(pq, q, h - 1 / 3);
+    }
+    return `rgb(${Math.round(nr * 255)}, ${Math.round(ng * 255)}, ${Math.round(nb * 255)})`;
+  }
+
   let ctxTabId = null;
   function openTabContextMenu(t, x, y) {
     ctxTabId = t.id;
