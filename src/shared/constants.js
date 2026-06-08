@@ -900,6 +900,10 @@
   // Lasciamo abbondante margine per gli altri consumer.
   const HISTORY_LIMIT_BYTES = 4 * 1024 * 1024; // 4MB
   const SAVED_PAGES_LIMIT = 1000;
+  // §3.1 — cap tab archiviate. ~1-2 KB/tab di metadati → 10k tab ≈ 20 MB, ma
+  // chrome.storage.local è ~10 MB condiviso: teniamo un cap prudente e ruotiamo
+  // le più vecchie. (Riassunto/embedding §3.2 sono rimandati: per ora solo metadati.)
+  const ARCHIVED_TABS_LIMIT = 5000;
   const HISTORY_ITEMS_HARD_CAP = 5000;
   const AI_CACHE_MAX_ENTRIES = 200;
   const CLIPBOARD_HISTORY_MAX = 50;
