@@ -342,6 +342,15 @@
       el.dataset.id = t.id;
       el.dataset.tip = t.title || t.url;
 
+      // Tab attiva: tingila col colore live del sito (§1.1). Sovrascriviamo la
+      // variabile --tab-active così anche i "piedini" a goccia (::before/::after)
+      // assumono lo stesso colore. Il testo passa a chiaro/scuro per contrasto.
+      if (t.id === state.activeId && t.color) {
+        const fg = readableOn(t.color);
+        el.style.setProperty('--tab-active', t.color);
+        if (fg) el.style.color = fg;
+      }
+
       const ico = document.createElement('div');
       if (t.loading) {
         ico.className = 'spinner';
