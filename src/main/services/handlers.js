@@ -823,6 +823,10 @@ async function handleMessage(msg, sender = {}) {
       return { ok: true, tabs: await ArchivedTabs.listMeta() };
     case MSG.SEARCH_ARCHIVED_TABS:
       return await searchArchivedTabs(msg.query);
+    case MSG.DELETE_ARCHIVED_TABS: {
+      const r = await ArchivedTabs.removeMany(msg.ids || []);
+      return { ok: true, removed: r.removed, remaining: r.remaining };
+    }
     case MSG.REMOVE_ARCHIVED_TAB:
       return { ok: true, tabs: await ArchivedTabs.remove(msg.id) };
     case MSG.CLEAR_ARCHIVED_TABS:
