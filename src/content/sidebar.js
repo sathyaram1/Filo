@@ -83,7 +83,6 @@
     // Se invocata dal menu tasto destro su una scheda, informiamo l'agente del
     // contesto: una riga di storia (non mostrata in chat, ma inviata all'LLM)
     // così "sa" che la richiesta parte da un click sulla tab.
-    lastInvocation = context || null;
     if (context && context.source === 'tab') {
       const ctxTitle = context.title || document.title || '';
       const ctxUrl = context.url || location.href;
