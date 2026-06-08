@@ -92,6 +92,28 @@ html[data-chrome-compact="1"] .addr {
   app-region: no-drag;
 }
 .tabs::-webkit-scrollbar { height: 0; width: 0; display: none; } /* Chromium */
+
+/* §2.3 — toast "Tab riordinate e salvate in cronologia". In basso al centro,
+   compare e svanisce da solo. Nessun pulsante annulla (scelta di design). */
+.shell-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%) translateY(12px);
+  max-width: 80vw;
+  padding: 10px 16px;
+  background: var(--tab-active);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  font-size: 13px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 9999;
+}
+.shell-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 .tab {
   position: relative;
   display: inline-flex;
