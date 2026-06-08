@@ -792,6 +792,12 @@ async function handleMessage(msg, sender = {}) {
       return { ok: true, pages: await SavedPages.remove(msg.id) };
     case MSG.CONSUME_SAVED_PAGE:
       return { ok: true, pages: await SavedPages.consume(msg.id) };
+    case MSG.GET_ARCHIVED_TABS:
+      return { ok: true, tabs: await ArchivedTabs.list() };
+    case MSG.REMOVE_ARCHIVED_TAB:
+      return { ok: true, tabs: await ArchivedTabs.remove(msg.id) };
+    case MSG.CLEAR_ARCHIVED_TABS:
+      return { ok: true, tabs: await ArchivedTabs.clear() };
     case MSG.GET_CLIPBOARD_HISTORY: {
       const list = await Storage.getRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []);
       return { ok: true, items: Array.isArray(list) ? list : [] };
