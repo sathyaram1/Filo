@@ -31,6 +31,11 @@
     // (anche quelle senza menu), perché il colore non c'entra col menu.
     try { startTabColorSampler(); } catch (_) {}
 
+    // Colore identità del sito (§1.2): calcolato una volta (theme-color →
+    // manifest → favicon → fallback) e mandato al main, che lo cacha per dominio
+    // e lo applica attenuato alle tab inattive.
+    try { reportTabIdentityColor(); } catch (_) {}
+
     // Esc esce dalla modalità "contenuto a tutto schermo" (vedi tabs.js). Va
     // registrato anche su pagine "bloccate" (senza menu) e in capture, così
     // pre-empta gli handler Escape della pagina solo quando la modalità è attiva.
