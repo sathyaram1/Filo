@@ -223,12 +223,24 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     load();
-    $('search').addEventListener('input', render);
+    // Digitare = filtro testuale immediato (e si esce dalla modalità semantica).
+    $('search').addEventListener('input', () => {
+      semanticResults = null;
+      $('searchNote').hidden = true;
+      render();
+    });
+    // Invio o bottone = ricerca semantica nei contenuti.
+    $('search').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); runSemanticSearch(); }
+    });
+    $('semantic').addEventListener('click', runSemanticSearch);
     $('clear').addEventListener('click', async () => {
       if (!tabs.length) return;
       if (!confirm('Svuotare l’archivio delle tab? L’operazione non è reversibile.')) return;
       await chrome.runtime.sendMessage({ type: MSG.CLEAR_ARCHIVED_TABS });
       tabs = [];
+      semanticResults = null;
+      $('searchNote').hidden = true;
       render();
     });
     $('openHistory').addEventListener('click', () => {
