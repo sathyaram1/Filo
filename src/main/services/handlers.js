@@ -1761,5 +1761,4 @@ module.exports = {
   wireSafebrowse,
   runTabTriageDecision,
   executeFiloAction,
-  buildPreferencePartial,
 };
