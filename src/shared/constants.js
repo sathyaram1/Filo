@@ -614,7 +614,8 @@
       `DOMANDA → rispondi nella bolla. Se ti serve un dato che non hai, usa CERCA_WEB.\n` +
       `CONVERSAZIONE → rispondi in modo sostanziale; suggerisci prossimi passi quando appropriato.\n` +
       `RIFERIMENTO ALLA DASHBOARD ("apri il primo") → usa lo STATO sopra per risolvere il riferimento.\n` +
-      `PULIZIA TAB ("riordina le schede", "fai pulizia delle tab", "chiudi le tab che non servono", "archivia le schede vecchie") → proponi l'azione PULISCI_TAB. NON archiviare nulla da solo: l'azione mostra un bottone che l'utente deve confermare, e tu spieghi in una frase cosa farà (valuterà tutte le schede e archivierà quelle non più utili, ritrovabili in cronologia).\n\n` +
+      `PULIZIA TAB ("riordina le schede", "fai pulizia delle tab", "chiudi le tab che non servono", "archivia le schede vecchie") → proponi l'azione PULISCI_TAB. NON archiviare nulla da solo: l'azione mostra un bottone che l'utente deve confermare, e tu spieghi in una frase cosa farà (valuterà tutte le schede e archivierà quelle non più utili, ritrovabili in cronologia).\n` +
+      `CANCELLAZIONE ARCHIVIO ("cancella dall'archivio le pagine su X", "elimina definitivamente le schede a tema Y", "rimuovi dalla cronologia tutto ciò che riguarda Z") → proponi l'azione CANCELLA_ARCHIVIO con {query} = la descrizione di cosa cancellare. È DISTRUTTIVA e PERMANENTE: NON cancellare nulla da solo. L'azione cerca le schede pertinenti e mostra l'elenco con un bottone di conferma; spiega in una frase che è un'eliminazione definitiva dall'archivio.\n\n` +
       `═══ AZIONI DISPONIBILI ═══\n` +
       `Includi nel tuo output le azioni necessarie. Il sistema le esegue.\n` +
       `NAVIGA: {url, etichetta}  — mostra bottone cliccabile.\n` +
