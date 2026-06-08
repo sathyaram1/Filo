@@ -183,6 +183,9 @@
       persist();
     });
     $('showHomeMessage').addEventListener('change', persist);
+    $('autoArchiveEnabled').addEventListener('change', persist);
+    $('autoArchiveOnClose').addEventListener('change', persist);
+    $('autoArchiveIdleHours').addEventListener('change', persist);
     $('terminalEnabled').addEventListener('change', persist);
     $('terminalShell').addEventListener('change', persist);
 
