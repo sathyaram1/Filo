@@ -34,6 +34,8 @@
     REOPEN_ARCHIVED_TAB: 'reopen_archived_tab',
     // §3.2 — ricerca semantica nell'archivio (embedding Google). { query }
     SEARCH_ARCHIVED_TABS: 'search_archived_tabs',
+    // §5 — cancellazione PERMANENTE di più tab archiviate (dopo conferma). { ids }
+    DELETE_ARCHIVED_TABS: 'delete_archived_tabs',
     GET_COSTS: 'get_costs',
     CAPTURE_VISIBLE_TAB: 'capture_visible_tab',
     // Test provider: misura latenza al primo token e token al secondo
