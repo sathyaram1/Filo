@@ -50,6 +50,25 @@
     </section>
 
     <section>
+      <h2>Gestione automatica delle schede</h2>
+      <p class="sn-muted">Filo riordina e archivia da sé le schede che non ti servono più, decidendo su tutte insieme. <strong>Archiviare non è perdere</strong>: le schede chiuse restano sempre riapribili da <em>Tab archiviate</em> (cronologia), con lo scroll dov'eri rimasto.</p>
+      <div class="sn-toggle-row">
+        <label>
+          <input type="checkbox" id="autoArchiveEnabled" />
+          <span>Attiva il riordino e l'archiviazione automatici</span>
+        </label>
+      </div>
+      <div class="sn-toggle-row">
+        <label>
+          <input type="checkbox" id="autoArchiveOnClose" />
+          <span>Riordina anche alla riapertura di Filo</span>
+        </label>
+      </div>
+      <label for="autoArchiveIdleHours" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Archivia dopo questo periodo di inattività di Filo (ore)</label>
+      <input type="number" id="autoArchiveIdleHours" min="1" max="168" step="1" style="width:120px;" />
+    </section>
+
+    <section>
       <h2>Stile dell'agente</h2>
       <p class="sn-muted">Come deve scrivere Filo quando ti risponde (chat, Aiuto, spiegazioni, chat dell'editor). Scegli uno stile già pronto oppure scrivine uno tuo.</p>
       <select id="agentStylePreset"></select>
