@@ -669,7 +669,8 @@
       `  - text: PERCHÉ è rilevante (non solo cosa) — es. "Marco ti ha risposto sul progetto" non "hai una mail"\n` +
       `  - action: { type, ...params } — usa lo stesso schema delle azioni di chat (NAVIGA, APRI_FILE, ecc.)\n` +
       `  - importance: 1..5 (vedi scala importanza: 1=passivo, 3=visibile-default, 5=critico)\n` +
-      `Massimo 12 suggerimenti totali. Considera: notifiche non gestite, lavori interrotti da riprendere, eventi calendario imminenti, appunti da elaborare, articoli salvati. Ignora tab inattive da molte ore se non rilevanti.\n\n` +
+      `Massimo 12 suggerimenti totali. Considera: notifiche non gestite, lavori interrotti da riprendere, eventi calendario imminenti, appunti da elaborare, articoli salvati. Ignora tab inattive da molte ore se non rilevanti.\n` +
+      `Se le SCHEDE WEB APERTE sono molte (indicativamente 20+), aggiungi UN suggerimento (icon "web", importance 2-3) che propone di fare pulizia delle schede, con action {"type":"PULISCI_TAB"}: Filo le valuterà e archivierà quelle non più utili (restano in cronologia). Non proporlo se le schede sono poche.\n\n` +
       `Output: SOLO JSON valido, niente markdown, niente \`\`\`:\n` +
       `{\n` +
       `  "message": "<testo centro dashboard>",\n` +
