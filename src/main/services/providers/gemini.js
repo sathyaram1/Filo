@@ -258,6 +258,7 @@
     complete,
     streamComplete,
     synthesizeSpeech,
+    embed,
     toGeminiModelId,
     isGoogleModel: (id) => !!toGeminiModelId(id),
   };
