@@ -699,6 +699,19 @@ class TabManager {
       }
     });
 
+    // §3.1 — ripristino scroll alla riapertura da archivio: a caricamento finito
+    // riportiamo la pagina alla percentuale registrata, una sola volta. Best-effort
+    // (la pagina potrebbe avere altezza diversa o caricare contenuti lazy).
+    wc.on('did-finish-load', () => {
+      if (typeof tab.restoreScrollPct !== 'number') return;
+      const pct = Math.max(0, Math.min(100, tab.restoreScrollPct));
+      tab.restoreScrollPct = null; // applica una volta sola
+      const js = `(()=>{try{const d=document.documentElement;const max=(d.scrollHeight||0)-window.innerHeight;if(max>0)window.scrollTo(0,max*${pct}/100);}catch(e){}})()`;
+      const run = () => { try { wc.executeJavaScript(js, true).catch(() => {}); } catch (_) {} };
+      run();
+      setTimeout(run, 500); // riprova dopo l'eventuale layout/lazy-load
+    });
+
     wc.on('did-start-loading', () => update({ loading: true }));
     wc.on('did-stop-loading', () => {
       update({
