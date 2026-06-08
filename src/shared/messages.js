@@ -58,6 +58,11 @@
     // al main, che lo mette sullo snapshot così la shell tinge la tab attiva.
     TAB_DOMINANT_COLOR: 'tab_dominant_color',       // { color: 'rgb(r,g,b)' | null }
 
+    // §1.2 — colore IDENTITÀ del sito (theme-color → manifest → favicon →
+    // fallback), calcolato una volta dal content script e cachato per dominio dal
+    // main; la shell lo applica attenuato alle tab INATTIVE.
+    TAB_IDENTITY_COLOR: 'tab_identity_color',        // { color: 'rgb(r,g,b)' | null }
+
     // Aiuto: invio percorso completato a fine sessione (passa per la pipeline
     // di sanitizzazione 2-LLM in pathsCollector.js prima di toccare Firestore).
     SAVE_PATH: 'save_path',                        // { path: { domain, initialUrl, sanitizedSteps, rawUserMessages, success } }
