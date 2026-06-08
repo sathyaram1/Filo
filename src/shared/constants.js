@@ -182,6 +182,10 @@
     [ACTIONS.FILO_COMPACT]: 'flash, flash-or',
     // Triage tab: decisione economica e frequente → lite va bene.
     [ACTIONS.FILO_TAB_TRIAGE]: 'flash-lite-3, flash-lite-3-or',
+    // Riassunto pagina alla chiusura: economico (gira spesso).
+    [ACTIONS.FILO_TAB_SUMMARY]: 'flash-lite-3, flash-lite-3-or',
+    // Re-rank ricerca semantica: legge i top-K riassunti → lite va bene.
+    [ACTIONS.FILO_TAB_SEARCH]: 'flash-lite-3, flash-lite-3-or',
     // Lettura ad alta voce: modello TTS Gemini. Se fallisce/è assente, la voce
     // del browser (Web Speech) fa da fallback finale lato content script.
     [ACTIONS.TTS]: 'tts',
