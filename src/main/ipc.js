@@ -254,6 +254,23 @@ function registerIpcHandlers() {
     if (win?._filoTabs) win._filoTabs.reload(id);
     return { ok: true };
   });
+  // Menu tasto destro su tab: silenzia/riattiva l'audio. Se `muted` non è
+  // passato (undefined) facciamo un toggle.
+  ipcMain.handle('tabs:set-muted', (event, { id, muted } = {}) => {
+    const win = winFor(event);
+    if (win?._filoTabs) {
+      if (muted === undefined) win._filoTabs.toggleMute(id);
+      else win._filoTabs.setMuted(id, muted);
+    }
+    return { ok: true };
+  });
+  // Menu tasto destro su tab: apre una copia della tab (stesso URL).
+  ipcMain.handle('tabs:duplicate', (event, { id } = {}) => {
+    const win = winFor(event);
+    if (!win?._filoTabs) return { ok: false };
+    const newId = win._filoTabs.duplicateTab(id);
+    return { ok: !!newId, id: newId };
+  });
   ipcMain.handle('tabs:set-active-visible', (event, { visible } = {}) => {
     const win = winFor(event);
     if (win?._filoTabs) win._filoTabs.setActiveVisible(visible !== false);
