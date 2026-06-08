@@ -616,6 +616,7 @@
       `CERCA_WEB: {query}  — cerca sul web (i risultati ti torneranno).\n` +
       `EVENTO_CALENDARIO: {data, ora, titolo, dettagli}\n` +
       `APRI_FILE: {percorso, etichetta}\n` +
+      `PULISCI_TAB: {}  — mostra un bottone "Riordina e archivia le schede"; l'utente conferma e Filo archivia le tab non più utili (riapribili dalla cronologia).\n` +
       `Puoi usare più azioni in una risposta.\n\n` +
       `═══ TONO E STILE ═══\n` +
       `Caldo e diretto. Mai robotico, mai sycophantic. Breve quando la domanda è semplice, approfondito quando serve. Usa il nome dell'utente con parsimonia. Adatta il tono al momento. Se non sai qualcosa, dillo. Le preferenze dell'utente hanno priorità su queste istruzioni.\n\n` +
