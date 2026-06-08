@@ -352,6 +352,22 @@ class TabManager {
     this._broadcast();
   }
 
+  // Colore IDENTITÀ del sito (§1.2): theme-color/manifest/favicon calcolato dal
+  // content script. Lo cachiamo per dominio (calcolo una volta sola, come da
+  // spec) e lo mettiamo sullo snapshot; la shell lo applica ATTENUATO alle tab
+  // inattive. A differenza del colore live (§1.1) non cambia con lo scroll né si
+  // azzera a ogni navigazione: persiste finché la tab resta sullo stesso dominio.
+  setTabIdentityColor(id, color) {
+    const tab = this.tabs.find((t) => t.id === id);
+    if (!tab) return;
+    const next = color || null;
+    const host = hostOf(tab.url);
+    if (next && host) this._identityColorCache.set(host, next);
+    if (tab.identityColor === next) return;
+    tab.identityColor = next;
+    this._broadcast();
+  }
+
   // Apre una copia della tab (stesso URL), attivandola — come "Duplica" di Chrome.
   // Ritorna l'id della nuova tab, o null se l'originale non esiste.
   duplicateTab(id) {
