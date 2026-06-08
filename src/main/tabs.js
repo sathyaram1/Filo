@@ -727,6 +727,15 @@ class TabManager {
     });
     wc.on('did-navigate-in-page', (_e, url) => update({ url, canBack: canGoBack(wc), canFwd: canGoFwd(wc) }));
 
+    // §2.1 segnale: la tab sta producendo audio? Una tab che riproduce
+    // audio/video NON va mai archiviata (decisione utente). L'evento arriva come
+    // (event, {audible}) nelle versioni recenti di Electron e come (event, audible)
+    // nelle vecchie: gestiamo entrambe.
+    wc.on('audio-state-changed', (_e, arg) => {
+      const audible = arg && typeof arg === 'object' ? !!arg.audible : !!arg;
+      if (tab.audible !== audible) { tab.audible = audible; this._broadcast(); }
+    });
+
     // Errore certificato: registra lo stato (scaduto, autofirmato, mismatch…)
     // per arricchire il verdetto safebrowse. Manteniamo il comportamento sicuro
     // di default (callback(false) = rifiuta la connessione non attendibile).
