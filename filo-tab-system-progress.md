@@ -82,7 +82,18 @@ sessione successiva riparte senza ambiguità.
   `tabs:set-muted` / `tabs:duplicate` in `src/main/ipc.js`; preload
   `setMuted/duplicate` in `src/preload/shell-preload.js`. `muted` è nello
   snapshot e viene riapplicato in `_recreateView`.
-- Icone menu: aggiunte `duplicate`/`mute`/`sound` in `ICON_PATHS` di
+- Icone menu: aggiunte `duplicate`/`mute`/`sound`/`help` in `ICON_PATHS` di
   `popup-menu.js`.
+- Aiuto: `tabs:help` (ipc) → `tabs.openHelp(id)` invia `shortcut:triggered`
+  `{command:'open-help-sidebar', context:{source:'tab',url,title}}` alla
+  webContents della tab; `page-preload.js` inoltra il `context`; `content.js`
+  `handleShortcut(command, context)` → `Sidebar.open(context)` che semina la
+  storia e mette `data-invoked-from` sul root. Sulle pagine filo:// interne (no
+  content script) non fa nulla, come Alt+H.
+- §1.1 colore live: messaggio `MSG.TAB_DOMINANT_COLOR` (messages.js), sampler
+  `startTabColorSampler` in content.js, case in handlers.js, `setTabColor` +
+  campo snapshot `color` in tabs.js, applicazione in shell.js (`readableOn` +
+  `--tab-active`). Prossimo: §1.2 riusa l'idea ma con colore IDENTITÀ
+  (theme-color/favicon) cachato per dominio, applicato alle tab INATTIVE.
 </content>
 </invoke>
