@@ -29,6 +29,9 @@
     GET_ARCHIVED_TABS: 'get_archived_tabs',
     REMOVE_ARCHIVED_TAB: 'remove_archived_tab',   // { id }
     CLEAR_ARCHIVED_TABS: 'clear_archived_tabs',
+    // Riapre una scheda archiviata come nuova tab, ripristinando lo scroll
+    // registrato. { url, scrollPct? }
+    REOPEN_ARCHIVED_TAB: 'reopen_archived_tab',
     GET_COSTS: 'get_costs',
     CAPTURE_VISIBLE_TAB: 'capture_visible_tab',
     // Test provider: misura latenza al primo token e token al secondo
