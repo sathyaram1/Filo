@@ -9,7 +9,7 @@
 (function (global) {
   'use strict';
 
-  const { STORAGE_KEYS, ARCHIVED_TABS_LIMIT } = global.SN_CONST;
+  const { STORAGE_KEYS, ARCHIVED_TABS_LIMIT, ARCHIVED_EMBED_LIMIT } = global.SN_CONST;
 
   function uuid() {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
