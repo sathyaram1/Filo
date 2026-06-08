@@ -925,6 +925,13 @@
   // chrome.storage.local è ~10 MB condiviso: teniamo un cap prudente e ruotiamo
   // le più vecchie. (Riassunto/embedding §3.2 sono rimandati: per ora solo metadati.)
   const ARCHIVED_TABS_LIMIT = 5000;
+  // §3.2 ricerca semantica: modello di embedding di Google e dimensione del
+  // vettore (Matryoshka: 256 dim = buon compromesso qualità/peso). I vettori si
+  // quantizzano a int8 e si tengono solo sulle ultime ARCHIVED_EMBED_LIMIT tab
+  // (le più recenti) per non sforare la quota di chrome.storage.
+  const EMBED_MODEL = 'text-embedding-004';
+  const EMBED_DIM = 256;
+  const ARCHIVED_EMBED_LIMIT = 2000;
   const HISTORY_ITEMS_HARD_CAP = 5000;
   const AI_CACHE_MAX_ENTRIES = 200;
   const CLIPBOARD_HISTORY_MAX = 50;
