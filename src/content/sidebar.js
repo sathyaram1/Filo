@@ -100,6 +100,9 @@
     }
     root = document.createElement('div');
     root.className = 'sn-sidebar';
+    // Traccia osservabile della fonte di invocazione (utile a debug/test e a
+    // future differenziazioni UI): presente solo se aperta dal menu di una tab.
+    if (context && context.source) root.dataset.invokedFrom = context.source;
     root.innerHTML = `
       <div class="sn-sidebar-header">
         <span class="sn-sidebar-title">${I18n.t('menu_help')}</span>
