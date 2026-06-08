@@ -283,6 +283,9 @@ class TabManager {
       audible: false,
       scrollPct: 0,
       formDirty: false,
+      // §3.1 — quando si riapre una scheda dall'archivio, ripristina la posizione
+      // di scroll registrata (percentuale). Applicato una volta a fine caricamento.
+      restoreScrollPct: typeof restoreScrollPct === 'number' ? restoreScrollPct : null,
       partition,
       partitionSite: isInternal ? null : Cookies.registrableOf(url),
     };
