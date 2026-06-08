@@ -834,6 +834,7 @@ class TabManager {
         canFwd: t.canFwd,
         muted: !!t.muted,
         color: t.color || null,
+        identityColor: t.identityColor || null,
         isInternal: t.isInternal,
       })),
     };
