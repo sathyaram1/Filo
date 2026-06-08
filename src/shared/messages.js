@@ -32,6 +32,8 @@
     // Riapre una scheda archiviata come nuova tab, ripristinando lo scroll
     // registrato. { url, scrollPct? }
     REOPEN_ARCHIVED_TAB: 'reopen_archived_tab',
+    // §3.2 — ricerca semantica nell'archivio (embedding Google). { query }
+    SEARCH_ARCHIVED_TABS: 'search_archived_tabs',
     GET_COSTS: 'get_costs',
     CAPTURE_VISIBLE_TAB: 'capture_visible_tab',
     // Test provider: misura latenza al primo token e token al secondo
