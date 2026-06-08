@@ -619,7 +619,9 @@ class TabManager {
     wc.on('page-title-updated', (_e, title) => update({ title: title || tab.title }));
     wc.on('page-favicon-updated', (_e, favicons) => update({ favicon: favicons?.[0] || '' }));
     wc.on('did-navigate', (_e, url) => {
-      update({ url, canBack: canGoBack(wc), canFwd: canGoFwd(wc) });
+      // Nuova pagina → il colore del sito precedente non vale più: lo azzeriamo
+      // (la tab torna al colore neutro finché il content script non ricampiona).
+      update({ url, color: null, canBack: canGoBack(wc), canFwd: canGoFwd(wc) });
       // Rilevamento siti pericolosi: ricontrolla l'URL FINALE (dopo i redirect)
       // appena il main-frame si è committato, prima che la pagina sia
       // interattiva. Best-effort, non blocca mai (vedi _sbOnNavigate).
