@@ -348,6 +348,23 @@ class TabManager {
     return this.openTab(tab.url || 'filo://newtab/', { activate: true });
   }
 
+  // Voce "Aiuto" del menu tasto destro su tab: apre la sidebar Aiuto (l'agente
+  // con visione) SU quella scheda, passandole il contesto "invocata da click
+  // sulla tab" (url + titolo) così l'agente sa da dove parte. Riusa lo stesso
+  // canale degli shortcut (page-preload → MSG.SHORTCUT_TRIGGERED). Sulle pagine
+  // interne senza content script non succede nulla, come per Alt+H.
+  openHelp(id) {
+    const tab = this.tabs.find((t) => t.id === id);
+    if (!tab) return;
+    if (this.activeId !== id) this.activate(id);
+    try {
+      tab.view.webContents.send('shortcut:triggered', {
+        command: 'open-help-sidebar',
+        context: { source: 'tab', url: tab.url, title: tab.title },
+      });
+    } catch (_) {}
+  }
+
   activate(id) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
