@@ -1619,10 +1619,25 @@ async function searchArchivedTabs(query, { topK = 40 } = {}) {
     scored.push({ score: cosineInt(qv, it.embedding), it });
   }
   scored.sort((a, b) => b.score - a.score);
-  const results = scored.slice(0, topK).map(({ score, it }) => {
+  let results = scored.slice(0, topK).map(({ score, it }) => {
     const { embedding, ...meta } = it;
     return { ...meta, score };
   });
+
+  // §3.2 step 4 — re-rank LLM dei primi risultati (best-effort): legge i riassunti
+  // e li riordina per pertinenza alla query. Se non disponibile, resta l'ordine
+  // per similarità coseno.
+  const rerankK = 25;
+  const head = results.slice(0, rerankK);
+  if (head.length > 1) {
+    const order = await rerankResults(q, head);
+    if (order) {
+      const seen = new Set(order);
+      const reranked = order.map((i) => head[i]);
+      const dropped = head.filter((_, i) => !seen.has(i)); // scartati dall'LLM → in coda
+      results = [...reranked, ...dropped, ...results.slice(rerankK)];
+    }
+  }
   return { ok: true, results };
 }
 
