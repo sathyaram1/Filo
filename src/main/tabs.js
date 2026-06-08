@@ -874,6 +874,16 @@ class TabManager {
         canBack: canGoBack(wc),
         canFwd: canGoFwd(wc),
       });
+      // §3.2 — cattura un estratto del contenuto (best-effort) da usare per la
+      // ricerca semantica dell'archivio e per il triage. Solo pagine web.
+      if (!tab.isInternal && /^https?:\/\//i.test(wc.getURL() || '')) {
+        try {
+          wc.executeJavaScript(
+            '(function(){try{return (document.body&&document.body.innerText||"").replace(/\\s+/g," ").slice(0,2000);}catch(e){return "";}})()',
+            true,
+          ).then((txt) => { if (typeof txt === 'string' && txt) tab.contentExtract = txt; }).catch(() => {});
+        } catch (_) {}
+      }
     });
     wc.on('page-title-updated', (_e, title) => update({ title: title || tab.title }));
     wc.on('page-favicon-updated', (_e, favicons) => update({ favicon: favicons?.[0] || '' }));
