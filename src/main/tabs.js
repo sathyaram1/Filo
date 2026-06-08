@@ -370,6 +370,7 @@ class TabManager {
       const coOpenUrls = this.tabs
         .filter((t) => t.id !== tab.id && t.url && /^https?:\/\//i.test(t.url))
         .map((t) => t.url);
+      const enrichText = [tab.title || '', tab.contentExtract || ''].join('\n').trim();
       Promise.resolve(
         Archive.archive({
           url,
@@ -382,7 +383,13 @@ class TabManager {
           coOpenUrls,
           scrollPosition: typeof tab.scrollPct === 'number' ? tab.scrollPct : null,
         }),
-      ).catch(() => {});
+      ).then((entry) => {
+        // §3.2 — arricchisci (embedding + snippet) in background, così la tab
+        // diventa cercabile semanticamente. Best-effort.
+        if (entry && entry.id && enrichText) {
+          try { globalThis.SN_TAB_ENRICH && globalThis.SN_TAB_ENRICH(entry.id, enrichText); } catch (_) {}
+        }
+      }).catch(() => {});
     } catch (_) { /* l'archiviazione non deve mai bloccare la chiusura */ }
   }
 
