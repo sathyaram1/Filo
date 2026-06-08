@@ -1510,6 +1510,39 @@ function cosineInt(a, b) {
   return s / (Math.sqrt(na) * Math.sqrt(nb));
 }
 
+// Completamento LLM one-shot per un'azione (risolve modello/chiave/limite e
+// registra il costo). Ritorna il testo. Usato da riassunto, triage, re-rank.
+async function runOneShot(action, messages) {
+  const settings = await getEffectiveSettings();
+  const model = modelForAction(settings, action);
+  const attempts = await applyLimitToChain(settings, buildAttemptChain(settings, model));
+  const result = await Providers.completeWithFallback({ attempts, messages });
+  const usedProvider = result.provider || attempts[0].provider;
+  const concreteModel = result.model || attempts[0].model;
+  try {
+    const pricing = usedProvider === 'gemini' ? null : settings.pricing?.[concreteModel];
+    await Costs.record({
+      action, provider: usedProvider, model: concreteModel,
+      usage: result.usage, pricing, usdToEur: settings.usdToEur,
+    });
+  } catch (_) {}
+  return result.text || '';
+}
+
+// §3.1 — riassunto breve di una pagina (per l'archivio + base dell'embedding).
+async function summarizeTab(title, content) {
+  const text = String(content == null ? '' : content).slice(0, 6000).trim();
+  if (!text && !title) return '';
+  const messages = [
+    { role: 'system', content:
+      'Riassumi in italiano il contenuto di una pagina web in 2-4 frasi (max ~120 parole), '
+      + 'così che l\'utente possa ritrovarla in futuro: cattura argomento, entità chiave e scopo. '
+      + 'Nessun preambolo né meta-commento, solo il riassunto.' },
+    { role: 'user', content: `Titolo: ${title || '(senza titolo)'}\n\nContenuto:\n${text || '(nessun testo estratto)'}` },
+  ];
+  try { return (await runOneShot(ACTIONS.FILO_TAB_SUMMARY, messages)).trim(); } catch (_) { return ''; }
+}
+
 // Embedding di testi via modello Google (chiave Gemini effettiva). null se manca.
 async function embedTexts(texts) {
   const G = globalThis.SN_PROVIDER_GEMINI;
