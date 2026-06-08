@@ -83,7 +83,13 @@ test('la ricerca semantica ordina per pertinenza e non espone gli embedding', as
 
 test('il re-rank LLM può riordinare i risultati rispetto al coseno', async ({ app, openTab }) => {
   await app.evaluate(async () => {
-    await globalThis.SN_STORAGE.updateSettings({ apiKeys: { gemini: 'test-key' } });
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { gemini: 'test-key', openrouter: '', tavily: '' },
+      models: { ...C.DEFAULT_MODELS },
+      modelRegistry: { ...C.DEFAULT_MODEL_REGISTRY },
+    });
     const A = globalThis.SN_ARCHIVED_TABS;
     const a = await A.archive({ url: 'https://a.test/', title: 'DocA' });
     const b = await A.archive({ url: 'https://b.test/', title: 'DocB' });
