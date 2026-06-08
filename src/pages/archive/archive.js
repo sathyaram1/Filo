@@ -10,6 +10,9 @@
   function $(id) { return document.getElementById(id); }
 
   let tabs = [];
+  // Quando valorizzato, mostriamo i risultati della ricerca semantica (lista
+  // piatta ordinata per pertinenza) invece dell'archivio raggruppato per giorno.
+  let semanticResults = null;
 
   async function load() {
     const settings = await Storage.getSettings();
