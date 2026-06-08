@@ -301,6 +301,7 @@
       t.muted
         ? { label: 'Riattiva audio', icon: 'mute', action: 'tab-mute' }
         : { label: 'Muta', icon: 'sound', action: 'tab-mute' },
+      { label: 'Aiuto', icon: 'help', action: 'tab-help' },
       { type: 'separator' },
       { label: 'Chiudi', icon: 'close', action: 'tab-close' },
     ];
