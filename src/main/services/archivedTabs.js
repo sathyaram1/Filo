@@ -103,5 +103,5 @@
     return [];
   }
 
-  global.SN_ARCHIVED_TABS = { list, listMeta, archive, update, remove, clear };
+  global.SN_ARCHIVED_TABS = { list, listMeta, archive, update, remove, removeMany, clear };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
