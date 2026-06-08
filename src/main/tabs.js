@@ -324,6 +324,30 @@ class TabManager {
     this.openTab('filo://newtab/');
   }
 
+  // Silenzia/riattiva l'audio della tab. Lo stato vive sul tab (non sul
+  // WebContents) così sopravvive a una _recreateView. Idempotente.
+  setMuted(id, muted) {
+    const tab = this.tabs.find((t) => t.id === id);
+    if (!tab) return;
+    tab.muted = !!muted;
+    try { tab.view.webContents.setAudioMuted(tab.muted); } catch (_) {}
+    this._broadcast();
+  }
+
+  toggleMute(id) {
+    const tab = this.tabs.find((t) => t.id === id);
+    if (!tab) return;
+    this.setMuted(id, !tab.muted);
+  }
+
+  // Apre una copia della tab (stesso URL), attivandola — come "Duplica" di Chrome.
+  // Ritorna l'id della nuova tab, o null se l'originale non esiste.
+  duplicateTab(id) {
+    const tab = this.tabs.find((t) => t.id === id);
+    if (!tab) return null;
+    return this.openTab(tab.url || 'filo://newtab/', { activate: true });
+  }
+
   activate(id) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
