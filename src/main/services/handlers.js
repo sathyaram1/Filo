@@ -1489,6 +1489,76 @@ async function runTabTriageDecision({ tabs = [], memory = '', trigger = 'idle' }
   return { decisions, model: concreteModel, provider: usedProvider };
 }
 
+// ─── §3.2 ricerca semantica dell'archivio ───────────────────────────────────
+
+// Quantizza un vettore float in int8 normalizzato (peso ~1 byte/dim invece di 4+).
+function quantizeEmbedding(vec) {
+  let norm = 0;
+  for (const v of vec) norm += v * v;
+  norm = Math.sqrt(norm) || 1;
+  return vec.map((v) => Math.max(-127, Math.min(127, Math.round((v / norm) * 127))));
+}
+
+function cosineInt(a, b) {
+  let s = 0, na = 0, nb = 0;
+  const n = Math.min(a.length, b.length);
+  for (let i = 0; i < n; i++) { s += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i]; }
+  if (!na || !nb) return 0;
+  return s / (Math.sqrt(na) * Math.sqrt(nb));
+}
+
+// Embedding di testi via modello Google (chiave Gemini effettiva). null se manca.
+async function embedTexts(texts) {
+  const G = globalThis.SN_PROVIDER_GEMINI;
+  if (!G || typeof G.embed !== 'function') return null;
+  const settings = await getEffectiveSettings();
+  const key = settings.apiKeys && settings.apiKeys.gemini;
+  if (!key) return null;
+  return G.embed({ apiKey: key, texts, model: SN_CONST.EMBED_MODEL, dim: SN_CONST.EMBED_DIM });
+}
+
+// §3.2 — arricchisce una tab archiviata con embedding + snippet del contenuto,
+// così diventa cercabile semanticamente. Best-effort: se manca la chiave o il
+// testo, è un no-op (la tab resta cercabile per sottostringa su titolo/url).
+async function enrichArchivedTab(id, text) {
+  try {
+    if (!id) return;
+    const clean = String(text == null ? '' : text).replace(/\s+/g, ' ').trim();
+    if (!clean) return;
+    const vecs = await embedTexts([clean.slice(0, 4000)]);
+    if (!vecs || !vecs[0] || !vecs[0].length) return;
+    await ArchivedTabs.update(id, {
+      embedding: quantizeEmbedding(vecs[0]),
+      snippet: clean.slice(0, 240),
+    });
+  } catch (_) { /* l'arricchimento non deve mai disturbare */ }
+}
+globalThis.SN_TAB_ENRICH = enrichArchivedTab;
+
+// Ricerca semantica: embeddizza la query, ordina le tab per similarità coseno.
+// Ritorna { results } (metadati senza embedding) oppure { results:null } se non
+// è possibile (niente chiave) così la pagina ripiega sul filtro per sottostringa.
+async function searchArchivedTabs(query, { topK = 40 } = {}) {
+  const q = String(query == null ? '' : query).trim();
+  if (!q) return { ok: true, results: null };
+  let qvecs = null;
+  try { qvecs = await embedTexts([q]); } catch (_) { qvecs = null; }
+  if (!qvecs || !qvecs[0] || !qvecs[0].length) return { ok: true, results: null, noEmbed: true };
+  const qv = quantizeEmbedding(qvecs[0]);
+  const items = await ArchivedTabs.list();
+  const scored = [];
+  for (const it of items) {
+    if (!Array.isArray(it.embedding) || !it.embedding.length) continue;
+    scored.push({ score: cosineInt(qv, it.embedding), it });
+  }
+  scored.sort((a, b) => b.score - a.score);
+  const results = scored.slice(0, topK).map(({ score, it }) => {
+    const { embedding, ...meta } = it;
+    return { ...meta, score };
+  });
+  return { ok: true, results };
+}
+
 function broadcastToTabs(message) {
   try {
     for (const win of BrowserWindow.getAllWindows()) {
