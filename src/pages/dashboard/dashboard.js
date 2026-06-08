@@ -433,7 +433,61 @@
       });
       return btn;
     }
+    if (type === 'CANCELLA_ARCHIVIO') {
+      return renderDeleteArchivePanel(a.query || a.testo || '');
+    }
     return null;
+  }
+
+  // §5 — pannello di cancellazione retroattiva: cerca le schede pertinenti nella
+  // cronologia e le elimina DEFINITIVAMENTE dopo conferma esplicita.
+  function renderDeleteArchivePanel(query) {
+    const panel = document.createElement('div');
+    panel.className = 'dash-delete-panel';
+    const note = document.createElement('div');
+    note.className = 'dash-delete-note';
+    note.textContent = `Cerco nell’archivio: “${query}”…`;
+    panel.appendChild(note);
+
+    (async () => {
+      const r = await send({ type: MSG.SEARCH_ARCHIVED_TABS, query });
+      const results = (r && Array.isArray(r.results)) ? r.results.slice(0, 20) : null;
+      if (!results || !results.length) {
+        note.textContent = results
+          ? `Nessuna scheda archiviata corrisponde a “${query}”.`
+          : 'Ricerca non disponibile (manca la chiave per la ricerca semantica).';
+        return;
+      }
+      note.textContent = `Trovate ${results.length} schede pertinenti a “${query}”. Verranno eliminate DEFINITIVAMENTE:`;
+      const ul = document.createElement('ul');
+      ul.className = 'dash-delete-list';
+      for (const it of results) {
+        const li = document.createElement('li');
+        li.textContent = it.title || it.url || '(senza titolo)';
+        li.title = it.url || '';
+        ul.appendChild(li);
+      }
+      panel.appendChild(ul);
+
+      const del = document.createElement('button');
+      del.className = 'dash-action-btn dash-action-btn-danger';
+      del.type = 'button';
+      del.textContent = `🗑 Elimina definitivamente ${results.length} ${results.length === 1 ? 'scheda' : 'schede'}`;
+      del.addEventListener('click', async () => {
+        if (del.disabled) return;
+        if (!window.confirm(`Eliminare definitivamente ${results.length} schede dall’archivio? L’operazione non è reversibile.`)) return;
+        del.disabled = true;
+        del.textContent = 'Elimino…';
+        const res = await send({ type: MSG.DELETE_ARCHIVED_TABS, ids: results.map((x) => x.id) });
+        const removed = (res && res.removed) || 0;
+        del.remove();
+        ul.remove();
+        note.textContent = `✓ Eliminate definitivamente ${removed} ${removed === 1 ? 'scheda' : 'schede'}.`;
+      });
+      panel.appendChild(del);
+    })();
+
+    return panel;
   }
 
   // ===== Invio messaggio =====
