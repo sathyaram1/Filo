@@ -494,6 +494,7 @@
     'editor/editor.html': 'Editor',
     'feedback/feedback.html': 'Feedback',
     'history/history.html': 'Cronologia',
+    'archive/archive.html': 'Tab archiviate',
     'home/home.html': 'Aperti per dopo',
     'spellcheck/spellcheck.html': 'Correttore',
   };
