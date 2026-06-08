@@ -1402,6 +1402,79 @@ async function handleMessage(msg, sender = {}) {
   }
 }
 
+// §2.1 — decisione LLM di triage tab. Riceve i metadati/segnali di TUTTE le tab
+// candidate + (opz.) un estratto del contenuto e la memoria a lungo termine, e
+// torna per ciascuna una decisione keep/archive con motivazione. Batch unico.
+// Ritorna { decisions: [{ i, action, reason }], model, provider, costEur } oppure
+// lancia se manca la chiave / supera il limite di costo.
+async function runTabTriageDecision({ tabs = [], memory = '', trigger = 'idle' } = {}) {
+  if (!Array.isArray(tabs) || !tabs.length) return { decisions: [] };
+  const settings = await getEffectiveSettings();
+  const model = modelForAction(settings, ACTIONS.FILO_TAB_TRIAGE);
+  const attemptsRaw = buildAttemptChain(settings, model);
+  const attempts = await applyLimitToChain(settings, attemptsRaw);
+
+  const system = [
+    'Sei il gestore delle schede del browser dell\'utente. Decidi quali schede',
+    'TENERE aperte e quali ARCHIVIARE. Archiviare NON è perdere: la scheda viene',
+    'chiusa ma salvata in cronologia e resta sempre riapribile. L\'obiettivo è',
+    'liberare la barra dalle schede non più utili, riducendo il rumore.',
+    '',
+    'Comprendi la NATURA del servizio, non solo le metriche:',
+    '- comunicazione/lavoro attivo (WhatsApp, email, editor, doc in modifica) → TIENI;',
+    '- feed di consumo (social, aggregatori) → ARCHIVIA anche se riaperti spesso;',
+    '- pagina di risultati di ricerca, "dead-end" aperta e mai più rivista,',
+    '  contenuto già consumato, duplicati → ARCHIVIA.',
+    'Segnali per TENERE: interazione recente, form compilato non inviato, audio in',
+    'riproduzione, contenuto consumato solo in parte (scroll basso), task in corso',
+    'collegato ad altre schede co-aperte.',
+    'Rispetta le istruzioni esplicite dell\'utente nella sua memoria (es. "tieni',
+    'sempre aperta X").',
+    '',
+    'Rispondi SOLO con JSON: {"decisions":[{"i":<indice>,"action":"keep"|"archive",',
+    '"reason":"<breve motivo in italiano>"}]} con una voce per OGNI scheda ricevuta.',
+  ].join('\n');
+
+  const lines = tabs.map((t, i) => {
+    const parts = [`#${i}`, t.title ? `"${String(t.title).slice(0, 120)}"` : '', t.url || ''];
+    const sig = [];
+    if (typeof t.idleMin === 'number') sig.push(`inattiva da ${t.idleMin}min`);
+    if (typeof t.ageMin === 'number') sig.push(`aperta da ${t.ageMin}min`);
+    if (typeof t.scrollPct === 'number') sig.push(`scroll ${t.scrollPct}%`);
+    if (t.formDirty) sig.push('form non inviato');
+    if (t.audible) sig.push('audio in riproduzione');
+    if (Array.isArray(t.coOpenUrls) && t.coOpenUrls.length) sig.push(`co-aperte: ${t.coOpenUrls.length}`);
+    let s = parts.filter(Boolean).join(' ') + (sig.length ? ` [${sig.join(', ')}]` : '');
+    if (t.contentExtract) s += `\n   estratto: ${String(t.contentExtract).slice(0, 500).replace(/\s+/g, ' ')}`;
+    return s;
+  }).join('\n');
+
+  const userParts = [];
+  if (memory) userParts.push(`Memoria/istruzioni dell'utente:\n${String(memory).slice(0, 1500)}\n`);
+  userParts.push(`Trigger: ${trigger}.`);
+  userParts.push(`Schede aperte (${tabs.length}):\n${lines}`);
+
+  const messages = [
+    { role: 'system', content: system },
+    { role: 'user', content: userParts.join('\n') },
+  ];
+
+  const result = await Providers.completeWithFallback({ attempts, messages });
+  const usedProvider = result.provider || attempts[0].provider;
+  const concreteModel = result.model || attempts[0].model;
+  try {
+    const pricing = usedProvider === 'gemini' ? null : settings.pricing?.[concreteModel];
+    await Costs.record({
+      action: ACTIONS.FILO_TAB_TRIAGE, provider: usedProvider, model: concreteModel,
+      usage: result.usage, pricing, usdToEur: settings.usdToEur,
+    });
+  } catch (_) {}
+
+  const parsed = extractJson(result.text) || {};
+  const decisions = Array.isArray(parsed.decisions) ? parsed.decisions : [];
+  return { decisions, model: concreteModel, provider: usedProvider };
+}
+
 function broadcastToTabs(message) {
   try {
     for (const win of BrowserWindow.getAllWindows()) {
