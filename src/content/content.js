@@ -26,6 +26,11 @@
     settings = await fetchSettings();
     applyTheme(settings.theme);
 
+    // "Vetro smerigliato" della tab attiva (§1.1): campiona il colore della cima
+    // della pagina e mandalo al main, che tinge la tab. Attivo su tutte le pagine
+    // (anche quelle senza menu), perché il colore non c'entra col menu.
+    try { startTabColorSampler(); } catch (_) {}
+
     // Esc esce dalla modalità "contenuto a tutto schermo" (vedi tabs.js). Va
     // registrato anche su pagine "bloccate" (senza menu) e in capture, così
     // pre-empta gli handler Escape della pagina solo quando la modalità è attiva.
