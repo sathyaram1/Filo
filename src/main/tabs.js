@@ -365,6 +365,7 @@ class TabManager {
           closedAt: new Date().toISOString(),
           reason: 'manual',
           coOpenUrls,
+          scrollPosition: typeof tab.scrollPct === 'number' ? tab.scrollPct : null,
         }),
       ).catch(() => {});
     } catch (_) { /* l'archiviazione non deve mai bloccare la chiusura */ }
