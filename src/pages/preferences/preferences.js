@@ -140,6 +140,11 @@
     $('agentStyleText').value = settings.agentStyle || '';
     syncPresetSelect();
 
+    const aa = settings.autoArchive || {};
+    $('autoArchiveEnabled').checked = aa.enabled !== false;
+    $('autoArchiveOnClose').checked = aa.onClose !== false;
+    $('autoArchiveIdleHours').value = String(Number(aa.idleHours) > 0 ? Number(aa.idleHours) : 6);
+
     const terminal = settings.terminal || {};
     $('terminalEnabled').checked = terminal.enabled === true;
     const shell = terminal.shell || 'powershell';
