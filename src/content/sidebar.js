@@ -70,11 +70,6 @@
     session = null;
   }
 
-  // Contesto di invocazione dell'ultima apertura (es. { source:'tab', url, title }
-  // quando aperta dalla voce "Aiuto" del menu tasto destro su una scheda).
-  // Esposto per i test; serve a far sapere all'agente da dove è partito.
-  let lastInvocation = null;
-
   function open(context) {
     if (root) return;
     history = [];
