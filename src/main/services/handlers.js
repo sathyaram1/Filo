@@ -668,6 +668,14 @@ async function handleMessage(msg, sender = {}) {
       if (win && win._filoTabs) win._filoTabs.closeTab(msg.id);
       return { ok: true };
     }
+    case MSG.TAB_DOMINANT_COLOR: {
+      // Colore dominante campionato dalla pagina → tinge la tab attiva (§1.1).
+      const win = winOf(sender);
+      if (win && win._filoTabs && sender?.tab?.id) {
+        win._filoTabs.setTabColor(sender.tab.id, msg.color || null);
+      }
+      return { ok: true };
+    }
     case MSG.AI_REQUEST: {
       const r = await handleAIRequest({ action: msg.action, payload: msg.payload, origin });
       return { ok: true, ...r };
