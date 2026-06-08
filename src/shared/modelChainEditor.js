@@ -37,6 +37,8 @@
       [A.HELP_INTENT_GUESS, 'options_action_help_intent_guess'],
       [A.HELP_INTENT_JUDGE, 'options_action_help_intent_judge'],
       [A.FILO_TAB_TRIAGE, 'options_action_tab_triage'],
+      [A.FILO_TAB_SUMMARY, 'options_action_tab_summary'],
+      [A.FILO_TAB_SEARCH, 'options_action_tab_search'],
     ];
   }
 
