@@ -598,6 +598,7 @@ async function handleFiloGenerateDashboard({ force = false, openTabsCount = 0 } 
       appunti: notesList.length ? notesList.slice(0, 20).map((n) => `- [${n.ts}] ${n.text}`).join('\n') : '(nessuno)',
       salvati: saved.length ? saved.slice(0, 20).map((p) => `- ${p.title || p.url} (${p.url})`).join('\n') : '(nessuno)',
       ultimoMessaggio: cached?.message || '',
+      tabAperte: openTabsCount,
     },
     origin: 'filo:dashboard',
   });
