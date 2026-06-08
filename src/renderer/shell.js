@@ -394,6 +394,21 @@
         if (fg) el.style.color = fg;
       }
 
+      // Tab INATTIVE: tinta identità attenuata del sito (§1.2). Smorziamo la
+      // saturazione e poi mescoliamo col neutro del tab bar via CSS, così la
+      // tinta è appena percepibile ma riconoscibile a livello subliminale.
+      // Usiamo la variabile --tab-bg-eff (non `background` diretto) per non
+      // rompere il feedback di hover, che è definito in CSS sulla stessa var.
+      if (t.id !== state.activeId && t.identityColor) {
+        const tint = attenuateIdentity(t.identityColor);
+        if (tint) {
+          el.style.setProperty(
+            '--tab-bg-eff',
+            `color-mix(in srgb, ${tint} 38%, var(--tab-bg))`,
+          );
+        }
+      }
+
       const ico = document.createElement('div');
       if (t.loading) {
         ico.className = 'spinner';
