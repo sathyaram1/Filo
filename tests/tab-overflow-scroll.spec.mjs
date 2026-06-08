@@ -20,12 +20,6 @@ test('con molte tab la striscia scrolla e tiene in vista la tab attiva', async (
   ), { timeout: 15_000 }).toBeGreaterThanOrEqual(N);
 
   // La striscia è in overflow → è scrollabile (non clippata).
-  const metrics = await expect.poll(async () => shell.evaluate(() => {
-    const tabsEl = document.getElementById('tabs');
-    return { scrollW: tabsEl.scrollWidth, clientW: tabsEl.clientWidth };
-  }), { timeout: 8_000 }).toEqual(
-    expect.objectContaining({}),
-  ).catch(() => null);
   const dims = await shell.evaluate(() => {
     const tabsEl = document.getElementById('tabs');
     return { scrollW: tabsEl.scrollWidth, clientW: tabsEl.clientWidth };
