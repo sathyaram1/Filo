@@ -1126,6 +1126,8 @@
   // MSG.SHELL_ACTION: il main lo inoltra alla shell, che clicca il bottone
   // corrispondente e apre il suo menu nativo (Impostazioni, App, Account) in
   // alto a destra, oppure naviga (Home). Nessuna logica di menu duplicata qui.
+  let accountCtrlBtn = null; // riferimento all'icona profilo (mostra l'avatar)
+
   function renderControls() {
     const host = $('dashControls');
     if (!host) return;
@@ -1137,6 +1139,7 @@
       { command: 'account', icon: 'user', label: 'Profilo' },
     ];
     host.replaceChildren();
+    accountCtrlBtn = null;
     for (const it of items) {
       const btn = document.createElement('button');
       btn.type = 'button';
@@ -1148,6 +1151,46 @@
       btn.innerHTML = svg || it.label.charAt(0);
       btn.addEventListener('click', () => { send({ type: MSG.SHELL_ACTION, command: it.command }); });
       host.appendChild(btn);
+      if (it.command === 'account') accountCtrlBtn = btn;
+    }
+    refreshAccountControl();
+  }
+
+  // L'icona profilo mostra la foto Google quando sei loggato (come faceva la
+  // vecchia barra in alto), con fallback all'icona utente se la foto non carica
+  // o se sei sloggato. Lo stato auth vive nel main: lo interroghiamo e ci
+  // iscriviamo a `auth_changed` per aggiornarla dal vivo a login/logout.
+  function applyAccountProfile(profile) {
+    if (!accountCtrlBtn) return;
+    const ICONS = self.SN_ICONS || {};
+    const userIcon = typeof ICONS.user === 'function' ? ICONS.user(18) : '';
+    if (profile && profile.picture) {
+      const name = profile.name || (profile.email || '').split('@')[0] || 'Account';
+      const img = document.createElement('img');
+      img.className = 'account-avatar';
+      img.alt = '';
+      img.referrerPolicy = 'no-referrer';
+      // Se la foto Google non carica (CSP/rete) ripieghiamo sull'icona utente.
+      img.onerror = () => { accountCtrlBtn.innerHTML = userIcon; };
+      img.src = profile.picture;
+      accountCtrlBtn.replaceChildren(img);
+      accountCtrlBtn.classList.add('signed-in');
+      accountCtrlBtn.title = profile.email ? `${name} — ${profile.email}` : name;
+      accountCtrlBtn.setAttribute('aria-label', `Account: ${name}`);
+    } else {
+      accountCtrlBtn.innerHTML = userIcon;
+      accountCtrlBtn.classList.remove('signed-in');
+      accountCtrlBtn.title = profile ? 'Profilo' : 'Accedi';
+      accountCtrlBtn.setAttribute('aria-label', profile ? 'Profilo' : 'Accedi');
+    }
+  }
+
+  async function refreshAccountControl() {
+    try {
+      const r = await send({ type: MSG.AUTH_STATUS });
+      applyAccountProfile(r && r.signedIn ? r.profile : null);
+    } catch (_) {
+      applyAccountProfile(null);
     }
   }
 
