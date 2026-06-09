@@ -11,12 +11,17 @@
       <div class="tabs" id="tabs" role="tablist"></div>
       <button class="tab-new" id="tab-new" data-tip="Nuova scheda (Ctrl+T)" aria-label="Nuova scheda"></button>
       <div class="tab-drag-spacer"></div>
+      <span class="incognito-badge" id="incognito-badge" hidden data-tip="Sessione incognito: niente cronologia né dati salvati su questo computer" aria-label="Finestra incognito"></span>
       <div class="window-controls">
         <button class="win-btn" id="win-min" data-tip="Minimizza" aria-label="Minimizza"></button>
         <button class="win-btn" id="win-max" data-tip="Massimizza" aria-label="Massimizza"></button>
         <button class="win-btn win-close" id="win-close" data-tip="Chiudi" aria-label="Chiudi"></button>
       </div>
     </div>
+    <!-- Barra indirizzi: sempre nascosta (vedi applyChrome). Gli elementi
+         restano nel DOM perché shell.js ne aggancia i gestori, ma le icone
+         visibili sono state spostate: indietro/avanti/ricarica nel menu tasto
+         destro, home/impostazioni/app/profilo dentro la pagina home. -->
     <nav class="addr">
       <button class="nav-btn" id="nav-back" data-tip="Indietro" aria-label="Indietro"></button>
       <button class="nav-btn" id="nav-forward" data-tip="Avanti" aria-label="Avanti"></button>
@@ -25,7 +30,6 @@
       <button class="nav-btn" id="nav-home" data-tip="Home" aria-label="Home"></button>
       <button class="nav-btn" id="nav-settings" data-tip="Impostazioni" aria-label="Impostazioni"></button>
       <button class="nav-btn" id="nav-apps" data-tip="App" aria-label="App"></button>
-      <span class="incognito-badge" id="incognito-badge" hidden data-tip="Sessione incognito: niente cronologia né dati salvati su questo computer" aria-label="Finestra incognito"></span>
       <button class="nav-btn nav-account" id="nav-account" data-tip="Accedi" aria-label="Accedi"></button>
     </nav>
   </header>
