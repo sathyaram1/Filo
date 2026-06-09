@@ -1120,7 +1120,39 @@
   });
 
   // ===== Bootstrap =====
+  // ===== Controlli del browser dentro la home (in alto a destra) =====
+  // Le icone home/impostazioni/app/profilo (un tempo nella barra in alto, ora
+  // rimossa) vivono qui. Ogni click aziona il comando REALE della shell via
+  // MSG.SHELL_ACTION: il main lo inoltra alla shell, che clicca il bottone
+  // corrispondente e apre il suo menu nativo (Impostazioni, App, Account) in
+  // alto a destra, oppure naviga (Home). Nessuna logica di menu duplicata qui.
+  function renderControls() {
+    const host = $('dashControls');
+    if (!host) return;
+    const ICONS = self.SN_ICONS || {};
+    const items = [
+      { command: 'home', icon: 'home', label: 'Home' },
+      { command: 'settings', icon: 'options', label: 'Impostazioni' },
+      { command: 'apps', icon: 'apps', label: 'App' },
+      { command: 'account', icon: 'user', label: 'Profilo' },
+    ];
+    host.replaceChildren();
+    for (const it of items) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'dash-ctrl';
+      btn.dataset.command = it.command;
+      btn.setAttribute('aria-label', it.label);
+      btn.title = it.label;
+      const svg = typeof ICONS[it.icon] === 'function' ? ICONS[it.icon](18) : '';
+      btn.innerHTML = svg || it.label.charAt(0);
+      btn.addEventListener('click', () => { send({ type: MSG.SHELL_ACTION, command: it.command }); });
+      host.appendChild(btn);
+    }
+  }
+
   (async function init() {
+    renderControls();
     await applySavedTheme();
     try {
       const settings = await self.SN_STORAGE?.getSettings?.();
