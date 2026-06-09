@@ -1116,6 +1116,9 @@
           applyTerminalMode();
         }
       }
+    } else if (msg?.type === MSG.AUTH_CHANGED) {
+      // Login/logout fatto altrove (es. dal menu profilo): aggiorna l'avatar.
+      applyAccountProfile(msg.signedIn ? msg.profile : null);
     }
   });
 
