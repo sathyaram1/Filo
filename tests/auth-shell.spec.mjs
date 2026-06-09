@@ -50,7 +50,9 @@ test('"Accedi con Google" dal menu account avvia il login (apre il browser di si
   // voce "Accedi con Google" avvia il login. Clicchiamo il bottone account, poi
   // la voce nel popup (non await sul login: signIn resta in attesa del redirect
   // che non arriverà — a noi basta che il browser sia stato aperto).
-  await shell.locator('#nav-account').click();
+  // Il bottone account è un trigger interno nascosto (le icone visibili sono
+  // nella home): lo azioniamo come fa il bridge, con un click DOM diretto.
+  await shell.evaluate(() => document.getElementById('nav-account').click());
   let clicked = false;
   const popupDeadline = Date.now() + 5_000;
   while (Date.now() < popupDeadline && !clicked) {
