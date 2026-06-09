@@ -1377,7 +1377,7 @@
       items.push({ type: 'item', label: I18n.t('menu_copy'), onClick: () => copyToClipboard(selInfo.selection) });
       items.push(buildPasteItem(clipboardHistory));
       items.push(buildDictateItem());
-      items.push(buildReadAloudItem(selInfo.selection));
+      { const ra = buildReadAloudItem(selInfo.selection); if (ra) items.push(ra); }
       items.push({ type: 'separator' });
       items.push(buildInlineExplain(selInfo, { withDeepArrow: true }));
       items.push({
