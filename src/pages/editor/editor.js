@@ -795,6 +795,33 @@
     document.execCommand('insertText', false, text);
   });
 
+  // ── Zoom del foglio ─────────────────────────────────────────────────
+  // Pinch sul trackpad e Ctrl+rotella generano wheel events con ctrlKey=true;
+  // da tastiera Ctrl+= / Ctrl+- / Ctrl+0. Lo zoom scala l'intero documento
+  // (testo e immagini) via la proprietà CSS `zoom`, senza toccare il modello
+  // salvato. (Vedi handleZoomKey() nel keydown globale per le scorciatoie.)
+  const ZOOM_MIN = 0.5, ZOOM_MAX = 3;
+  let zoomLevel = 1;
+  function applyZoom() {
+    zoomLevel = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round(zoomLevel * 100) / 100));
+    docEl.style.zoom = zoomLevel === 1 ? '' : String(zoomLevel);
+  }
+  function handleZoomKey(e) {
+    const k = e.key;
+    if (k === '+' || k === '=') { e.preventDefault(); zoomLevel += 0.1; applyZoom(); return true; }
+    if (k === '-' || k === '_') { e.preventDefault(); zoomLevel -= 0.1; applyZoom(); return true; }
+    if (k === '0') { e.preventDefault(); zoomLevel = 1; applyZoom(); return true; }
+    return false;
+  }
+  docWrap.addEventListener('wheel', (e) => {
+    if (!(e.ctrlKey || e.metaKey)) return;
+    // deltaY<0 (pinch-out / scroll su) → ingrandisci. Passo proporzionale al
+    // delta così il pinch del trackpad (incrementi piccoli) resta fluido.
+    e.preventDefault();
+    zoomLevel *= Math.exp(-e.deltaY * 0.0015);
+    applyZoom();
+  }, { passive: false });
+
   // ════════════════════════════════════════════════════════════════════
   //  GRIGLIA & MODULI
   // ════════════════════════════════════════════════════════════════════
