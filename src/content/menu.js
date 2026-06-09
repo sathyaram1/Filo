@@ -282,6 +282,14 @@
       el.type = 'button';
       el.className = 'sn-menu-item';
       if (it.disabled) el.classList.add('sn-disabled');
+      // Icona opzionale a sinistra dell'etichetta (stringa SVG dalle icone Filo).
+      if (it.icon) {
+        const ic = document.createElement('span');
+        ic.className = 'sn-menu-item-icon';
+        setIconContent(ic, it.icon);
+        el.appendChild(ic);
+        el.classList.add('sn-has-icon');
+      }
       const lbl = document.createElement('span');
       lbl.className = 'sn-menu-label';
       lbl.textContent = it.label;
