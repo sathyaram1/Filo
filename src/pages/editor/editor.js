@@ -2113,6 +2113,7 @@
   window.addEventListener('keydown', (e) => {
     const meta = e.ctrlKey || e.metaKey;
     if (meta && e.key.toLowerCase() === 's') { e.preventDefault(); save(true); return; }
+    if (meta && handleZoomKey(e)) return;
     if (meta && e.key === '\\') { e.preventDefault(); toggleSidebar(); return; }
     if (meta && e.key.toLowerCase() === 'f') {
       const sr = doc.modules.find((m) => m.type === 'search-replace');
