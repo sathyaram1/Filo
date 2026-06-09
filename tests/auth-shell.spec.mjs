@@ -14,9 +14,12 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 
-test('shell: il pulsante account esiste ed è cliccabile', async ({ shell }) => {
+test('shell: il pulsante account esiste come trigger interno del menu', async ({ shell }) => {
+  // La barra in alto è stata rimossa: l'utente apre l'account dall'icona DENTRO
+  // la home, che aziona questo bottone via MSG.SHELL_ACTION. Il bottone resta
+  // quindi nel DOM (trigger interno) ma non è più visibile nella shell.
   await expect(shell.locator('#nav-account')).toBeAttached({ timeout: 8_000 });
-  await expect(shell.locator('#nav-account')).toBeVisible();
+  await expect(shell.locator('#nav-account')).toBeHidden();
 });
 
 test('auth.status() risponde dal main: sloggato su userData pulito', async ({ shell }) => {
