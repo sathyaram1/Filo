@@ -603,3 +603,44 @@ body[data-state="thread"] .dash-suggestion { justify-content: flex-start; paddin
   0%, 100% { opacity: 0.5; }
   50% { opacity: 1; }
 }
+
+/* ── Controlli del browser dentro la home (in alto a destra) ──────────────────
+   Sostituiscono la vecchia barra in alto: home, impostazioni, app, profilo.
+   Stile minimale, in tinta con la "carta calda", così sembrano parte della
+   pagina e non una barra a sé. */
+.dash-controls {
+  position: fixed;
+  top: 10px;
+  right: 16px;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.dash-ctrl {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--dash-ink-soft);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  -webkit-app-region: no-drag;
+}
+.dash-ctrl:hover {
+  background: var(--dash-card);
+  color: var(--dash-ink);
+}
+.dash-ctrl:active { transform: translateY(0.5px); }
+.dash-ctrl svg { display: block; }
+.dash-ctrl .account-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+}
