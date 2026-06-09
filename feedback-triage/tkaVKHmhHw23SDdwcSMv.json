@@ -1,0 +1,7 @@
+{
+  "id": "tkaVKHmhHw23SDdwcSMv",
+  "status": "done",
+  "notes": "Mentre e' in corso una lettura ad alta voce, ora la voce 'Interrompi lettura' compare in QUALSIASI menu del tasto destro, anche senza testo selezionato, cosi' puoi fermarla da ovunque. Ho anche sostituito l'emoji con un'icona disegnata coerente con lo stile di Filo (un altoparlante per 'Leggi', un altoparlante muto per interrompere).",
+  "queuedAt": "2026-06-09T14:14:16.536Z",
+  "queuedBy": "routine"
+}
