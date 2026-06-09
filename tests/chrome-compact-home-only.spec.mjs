@@ -1,15 +1,16 @@
-// Feedback alpha: "leva la barra dell'url, voglio che ci siano solo le tab ed i
-// tasti della finestra. le altre icone devono comparire in alto solo nella home
-// di filo".
+// Feedback 1tsAuna: "leva questa barra, metti le icone nel contenuto della
+// pagina home". La barra in alto di Filo (indietro/avanti/ricarica +
+// home/impostazioni/app/profilo) è stata TOLTA del tutto: resta solo la fila di
+// tab + i controlli finestra, ovunque (home e siti). Le icone di controllo si
+// trovano ora DENTRO la home (vedi home-controls-in-page.spec.mjs); le frecce di
+// navigazione vivono nel menu tasto destro.
 //
-// La barra indirizzi (icone di navigazione + campo URL) deve sparire fuori dalla
-// home di Filo (la newtab) e ricomparire quando si torna sulla home. Quando è
-// nascosta, la WebContentsView attiva deve risalire a coprire lo spazio liberato
-// (niente fascia vuota), cioè il suo top passa da 88px (shell intera) a 40px (la
-// sola fila di tab).
+// Questo file asserisce l'invariante di LAYOUT: chrome sempre compatto, barra
+// indirizzi sempre nascosta, e la WebContentsView attiva sempre risalita a
+// coprire lo spazio (top = 40px, la sola tab-row) — non più 88px sulla home.
 //
-// Asserisce IL SUCCESSO: non solo il toggle CSS lato shell, ma anche che il main
-// riposiziona davvero la view del tab attivo.
+// (Supersede il vecchio comportamento "icone in alto solo nella home": ora le
+// icone non sono più nella barra, ma nel contenuto della home.)
 
 import { test, expect } from './fixtures/electron.mjs';
 
@@ -26,21 +27,21 @@ function layoutState(app) {
   });
 }
 
-test('la barra indirizzi compare solo sulla home; sui siti resta solo la fila di tab', async ({ app, shell, testServer, openTab }) => {
+test('la barra indirizzi è sempre nascosta (home e siti): resta solo la fila di tab', async ({ app, shell, testServer, openTab }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
 
   const addr = shell.locator('nav.addr');
   const compactAttr = shell.locator('html[data-chrome-compact="1"]');
 
-  // ── Stato iniziale: home (newtab) → barra indirizzi visibile, chrome esteso.
-  await expect(addr).toBeVisible();
-  await expect(compactAttr).toHaveCount(0);
+  // ── Stato iniziale: home (newtab) → barra indirizzi GIÀ nascosta, chrome
+  //    compatto, view risalita a top=40 (niente più fascia da 88px).
+  await expect(addr).toBeHidden();
+  await expect(compactAttr).toHaveCount(1, { timeout: 6_000 });
   await expect.poll(() => layoutState(app), { timeout: 6_000 }).toMatchObject({
-    compact: false, top: 88,
+    compact: true, top: 40,
   });
 
-  // ── Apre un sito esterno: la home se ne va → barra indirizzi nascosta e la
-  //    view risale a coprire lo spazio (top = 40, la sola tab-row).
+  // ── Apre un sito esterno: resta tutto compatto (nessun cambio di chrome).
   await testServer.openReady(openTab, '<title>Sito</title><h1>ciao</h1>');
   await expect(compactAttr).toHaveCount(1, { timeout: 6_000 });
   await expect(addr).toBeHidden();
@@ -48,13 +49,12 @@ test('la barra indirizzi compare solo sulla home; sui siti resta solo la fila di
     compact: true, top: 40,
   });
 
-  // ── Torna sulla home aprendo una nuova scheda: la barra indirizzi (con tutte
-  //    le icone) ricompare e il chrome torna esteso.
+  // ── Torna sulla home: ancora compatto, barra mai più visibile.
   await openTab('filo://newtab/');
-  await expect(compactAttr).toHaveCount(0, { timeout: 6_000 });
-  await expect(addr).toBeVisible();
+  await expect(compactAttr).toHaveCount(1, { timeout: 6_000 });
+  await expect(addr).toBeHidden();
   await expect.poll(() => layoutState(app), { timeout: 6_000 }).toMatchObject({
-    compact: false, top: 88,
+    compact: true, top: 40,
   });
 });
 
