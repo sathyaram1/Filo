@@ -32,6 +32,67 @@ test('Duplica crea una copia della tab con lo stesso URL', async ({ shell, openT
   await expect(shell.locator('.tab .title', { hasText: 'Modelli' })).toHaveCount(2, { timeout: 8_000 });
 });
 
+test('Duplica eredita lo zoom e la posizione di scroll della scheda sorgente', async ({ app, shell, openTab, testServer }) => {
+  // Pagina alta e scrollabile servita via http così è zoomabile/scrollabile.
+  const url = testServer.html(
+    '<html><body style="margin:0"><div style="height:6000px"></div>fine</body></html>',
+  );
+  const page = await openTab(url);
+  const target = new URL(url).hostname;
+
+  // Scrolla la sorgente a metà e impostale uno zoom noto (livello 2).
+  await page.evaluate(() => window.scrollTo(0, 2500));
+  await page.waitForFunction(() => window.scrollY > 2000, null, { timeout: 8_000 });
+
+  const srcId = await shell.evaluate(async () => {
+    const snap = await window.filoShell.tabs.snapshot();
+    return snap.activeId;
+  });
+  await app.evaluate(({ BrowserWindow }, id) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    const tab = win._filoTabs.tabs.find((t) => t.id === id);
+    tab.view.webContents.setZoomLevel(2);
+  }, srcId);
+
+  const before = await shell.locator('.tab').count();
+  const newId = await shell.evaluate(async () => {
+    const snap = await window.filoShell.tabs.snapshot();
+    return (await window.filoShell.tabs.duplicate(snap.activeId)).id;
+  });
+  expect(newId).toBeTruthy();
+  await expect(shell.locator('.tab')).toHaveCount(before + 1, { timeout: 8_000 });
+
+  // La copia, a caricamento finito, deve trovarsi allo zoom 2 (non al default 0).
+  await expect
+    .poll(
+      async () =>
+        app.evaluate(({ BrowserWindow }, id) => {
+          const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+          const tab = win._filoTabs.tabs.find((t) => t.id === id);
+          return tab ? tab.view.webContents.getZoomLevel() : null;
+        }, newId),
+      { timeout: 8_000 },
+    )
+    .toBe(2);
+
+  // ...e deve essere scrollata vicino alla posizione della sorgente (senza fix
+  // partirebbe da 0). Individuo la Page della copia: stesso host, diversa da
+  // quella sorgente.
+  await expect
+    .poll(
+      async () => {
+        const cands = app.windows().filter((w) => {
+          try { return new URL(w.url()).hostname === target; } catch (_) { return false; }
+        });
+        const dup = cands.find((w) => w !== page);
+        if (!dup) return 0;
+        try { return await dup.evaluate(() => window.scrollY); } catch (_) { return 0; }
+      },
+      { timeout: 8_000 },
+    )
+    .toBeGreaterThan(1500);
+});
+
 test('Muta silenzia la tab e mostra l\'indicatore; un secondo Muta lo toglie', async ({ shell, openTab }) => {
   await setup(openTab, shell);
   const id = await shell.evaluate(async () => {
