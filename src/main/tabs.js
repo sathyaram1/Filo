@@ -270,7 +270,7 @@ class TabManager {
     });
   }
 
-  openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null } = {}) {
+  openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null } = {}) {
     const id = randomUUID();
     const isInternal = url.startsWith('filo://');
     const partition = this._partitionFor(url);
