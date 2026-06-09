@@ -11,10 +11,15 @@
   <script src="filo://shared/messages.js"></script>
   <script src="filo://shared/i18n.js"></script>
   <script src="filo://shared/storage.js"></script>
+  <script src="filo://shared/icons.js"></script>
   <script src="filo://shared/filoMemory.js"></script>
   <script src="filo://shared/filoState.js"></script>
 </head>
 <body data-state="home">
+  <!-- Controlli del browser spostati dentro la home (la barra in alto di Filo è
+       stata tolta): home, impostazioni, app e profilo, in alto a destra. Ogni
+       icona aziona il comando reale della shell via MSG.SHELL_ACTION. -->
+  <nav class="dash-controls" id="dashControls" aria-label="Controlli Filo"></nav>
   <main class="dash" id="dash">
     <!-- Left column: suggested actions -->
     <aside class="dash-left" id="left">
