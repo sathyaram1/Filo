@@ -2645,14 +2645,21 @@
     readAloudBrowser(clean);
   }
 
-  // Voce di menu per la lettura: se sta già leggendo mostra "Interrompi
-  // lettura" (simmetria: se puoi avviare la lettura, devi poterla fermare),
-  // altrimenti "Leggi" il testo selezionato.
+  // Voce di menu "Leggi ad alta voce" sul testo selezionato. Mentre una
+  // lettura è in corso non la riproponiamo qui: lo stop è una voce globale
+  // presente in QUALSIASI menu (vedi buildStopReadingItem in buildMenuItems),
+  // così "ferma" è sempre raggiungibile, anche senza selezione.
   function buildReadAloudItem(text) {
-    if (ttsBusy()) {
-      return { type: 'item', label: '🔊 ' + I18n.t('menu_stop_reading'), onClick: () => stopReading() };
-    }
-    return { type: 'item', label: '🔊 ' + I18n.t('menu_read_aloud'), onClick: () => readAloud(text) };
+    if (ttsBusy()) return null;
+    const Icons = self.SN_ICONS;
+    return { type: 'item', icon: Icons.readAloud(18), label: I18n.t('menu_read_aloud'), onClick: () => readAloud(text) };
+  }
+
+  // Voce "Interrompi lettura": compare in ogni menu mentre la sintesi vocale
+  // sta riproducendo, indipendentemente dal contesto cliccato.
+  function buildStopReadingItem() {
+    const Icons = self.SN_ICONS;
+    return { type: 'item', icon: Icons.stopReading(18), label: I18n.t('menu_stop_reading'), onClick: () => stopReading() };
   }
 
   // Overflow panel: ora vive come griglia di icone (sotto-menu ancorato al
