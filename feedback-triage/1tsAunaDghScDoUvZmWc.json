@@ -1,0 +1,7 @@
+{
+  "id": "1tsAunaDghScDoUvZmWc",
+  "status": "done",
+  "notes": "Ho tolto la barra grigia in alto. Le quattro icone (home, impostazioni, app, profilo) sono ora dentro la pagina Nuova scheda, in alto a destra, e aprono gli stessi menu di prima. Le frecce Indietro/Avanti/Ricarica sono sparite dalla barra e restano nel menu del tasto destro, come hai chiesto. In alto resta solo la fila delle schede con i tasti finestra; il badge Incognito è ora accanto a quei tasti. Il colore della scheda selezionata l'ho lasciato com'era (come avevi scelto). Una cosa NON fatta: l'icona del profilo in pagina mostra un'icona generica, non la tua foto Google come faceva prima nella barra — dimmi se la vuoi anche lì. Verificato con test automatici e controllo visivo.",
+  "queuedAt": "2026-06-09T13:34:47.394Z",
+  "queuedBy": "routine"
+}
