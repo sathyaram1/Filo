@@ -32,7 +32,9 @@ test('voce "Sicurezza" nel menu Impostazioni con icona lucchetto', async ({ shel
   // Click sull'ingranaggio per aprire il dropdown. Il menu è una BrowserWindow
   // separata (popup-menu.js) che si carica via `data:text/html` URL.
   const before = new Set(app.windows().map((w) => w.url()));
-  await shell.locator('#nav-settings').click();
+  // L'ingranaggio è un trigger interno nascosto (la sua icona vive ora dentro la
+  // home): lo azioniamo con un click DOM diretto, come il bridge.
+  await shell.evaluate(() => document.getElementById('nav-settings').click());
   // Aspetta che compaia una nuova window con URL data:text/html (popup-menu)
   const deadline = Date.now() + 4_000;
   let menuWin = null;
@@ -48,7 +50,9 @@ test('voce "Sicurezza" nel menu Impostazioni con icona lucchetto', async ({ shel
 
 test('voce "Modelli" nel menu Impostazioni ha icona dedicata, diversa dall\'ingranaggio', async ({ shell, app }) => {
   const before = new Set(app.windows().map((w) => w.url()));
-  await shell.locator('#nav-settings').click();
+  // L'ingranaggio è un trigger interno nascosto (la sua icona vive ora dentro la
+  // home): lo azioniamo con un click DOM diretto, come il bridge.
+  await shell.evaluate(() => document.getElementById('nav-settings').click());
   const deadline = Date.now() + 4_000;
   let menuWin = null;
   while (Date.now() < deadline) {
