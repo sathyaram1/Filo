@@ -67,6 +67,10 @@ html, body {
 }
 .ed-icon-btn:hover { background: var(--sn-hover); color: var(--sn-fg); }
 .ed-icon-btn.active { color: var(--sn-accent); background: var(--sn-hover); }
+/* L'icona flotta sopra il foglio: un velo dello sfondo pagina la tiene
+   leggibile anche quando il testo scorre dietro. */
+.ed-topbar .ed-icon-btn { background: var(--sn-bg); }
+.ed-topbar .ed-icon-btn:hover { background: var(--sn-hover); }
 
 .ed-doc-wrap {
   flex: 1 1 auto;
