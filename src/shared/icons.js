@@ -329,6 +329,8 @@
     openForLater: (size) => wrap(openForLater, { size }),
     qrCode:       (size) => wrap(qrCode, { size }),
     feedback:     (size) => wrap(feedback, { size }),
+    readAloud:    (size) => wrap(readAloud, { size }),
+    stopReading:  (size) => wrap(stopReading, { size }),
   };
 
   // Heuristica che il menu usa per capire se una stringa di "icona" è SVG
