@@ -1,7 +1,0 @@
-{
-  "id": "ukXuUYCO1N5siyUgiwN9",
-  "status": "done",
-  "notes": "Ora 'Duplica' su una scheda non riapre solo lo stesso indirizzo: la copia parte esattamente com'era l'originale, allo stesso livello di zoom e nello stesso punto di scroll. Verificato con un test che apre una pagina lunga, la scrolla e la zooma, la duplica e controlla che la copia erediti zoom e posizione.",
-  "queuedAt": "2026-06-09T15:15:34.891Z",
-  "queuedBy": "routine"
-}
