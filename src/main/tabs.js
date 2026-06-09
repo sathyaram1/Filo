@@ -298,6 +298,9 @@ class TabManager {
       // §3.1 — quando si riapre una scheda dall'archivio, ripristina la posizione
       // di scroll registrata (percentuale). Applicato una volta a fine caricamento.
       restoreScrollPct: typeof restoreScrollPct === 'number' ? restoreScrollPct : null,
+      // Duplicazione tab: ripristina il livello di zoom della scheda sorgente
+      // (Electron zoom "level", 0 = 100%). Applicato una volta a fine caricamento.
+      restoreZoomLevel: typeof restoreZoomLevel === 'number' ? restoreZoomLevel : null,
       partition,
       partitionSite: isInternal ? null : Cookies.registrableOf(url),
     };
