@@ -21,7 +21,9 @@ import { test, expect } from './fixtures/electron.mjs';
 async function openMenuText(app, shell, btnId) {
   // Chiudi eventuali popup residui dando focus alla shell.
   await shell.bringToFront().catch(() => {});
-  await shell.locator(`#${btnId}`).click();
+  // I bottoni della barra sono ora trigger interni nascosti (le icone visibili
+  // sono dentro la home): li azioniamo con un click DOM diretto, come il bridge.
+  await shell.evaluate((id) => document.getElementById(id).click(), btnId);
   const deadline = Date.now() + 5000;
   while (Date.now() < deadline) {
     const popup = app.windows().find((w) => w.url().startsWith('data:text/html'));
