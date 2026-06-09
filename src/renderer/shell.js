@@ -82,7 +82,16 @@
   // WebContentsView native, stilizzato come il menu tasto destro.
   function showNativeMenu(btn, entries) {
     const r = btn.getBoundingClientRect();
-    api.popupMenu(entries, Math.round(r.left), Math.round(r.bottom + 4));
+    let x = Math.round(r.left);
+    let y = Math.round(r.bottom + 4);
+    // La barra in alto è nascosta e le icone reali hanno rect nullo: i menu
+    // (Impostazioni, App, Account) si aprono dove ora vivono le icone, cioè in
+    // alto a destra nella home. Coordinate relative alla finestra shell.
+    if (r.width === 0 && r.height === 0) {
+      x = Math.max(8, window.innerWidth - 240);
+      y = 52;
+    }
+    api.popupMenu(entries, x, y);
   }
 
   settingsBtn.addEventListener('click', () => showNativeMenu(settingsBtn, buildSettings()));
