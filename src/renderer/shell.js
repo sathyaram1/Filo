@@ -530,15 +530,17 @@
     return !url || url.startsWith('filo://newtab/');
   }
 
-  // Mostra/nasconde la barra indirizzi e avvisa il main di alzare/abbassare la
-  // WebContentsView. Idempotente: l'IPC parte solo quando lo stato cambia.
+  // La barra indirizzi è sempre nascosta: le icone di navigazione (indietro,
+  // avanti, ricarica) vivono nel menu tasto destro, mentre home/impostazioni/
+  // app/profilo sono state spostate DENTRO la pagina home (in alto a destra).
+  // Resta solo la fila di tab, e la WebContentsView risale a coprire lo spazio
+  // liberato. Manteniamo applyChrome (chiamata dal render) per idempotenza.
   let chromeCompact = null;
-  function applyChrome(isHome) {
-    const compact = !isHome;
+  function applyChrome(_isHome) {
+    const compact = true;
     if (compact === chromeCompact) return;
     chromeCompact = compact;
-    if (compact) document.documentElement.dataset.chromeCompact = '1';
-    else delete document.documentElement.dataset.chromeCompact;
+    document.documentElement.dataset.chromeCompact = '1';
     try { api.tabs.setChromeCompact?.(compact); } catch (_) {}
   }
 
