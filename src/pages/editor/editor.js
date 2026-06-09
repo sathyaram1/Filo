@@ -778,6 +778,23 @@
     else if (k === 'u') { e.preventDefault(); exec('underline'); }
   });
 
+  // ── Incolla come testo semplice ─────────────────────────────────────
+  // Di default il foglio è un documento "pulito": incollare da una pagina web
+  // portava dietro sfondi/colori/font della sorgente (la lamentela: il testo
+  // incollato aveva uno sfondo colorato). Intercettiamo il paste e inseriamo
+  // solo il testo. `insertText` passa per il normale stack di undo e dispatcha
+  // un input event, così onDocInput()/markDirty() partono da soli.
+  docEl.addEventListener('paste', (e) => {
+    const cd = e.clipboardData || window.clipboardData;
+    if (!cd) return;
+    // Se negli appunti c'è un'immagine (nessun testo), lascia il default:
+    // non vogliamo bloccare l'incolla di immagini.
+    const text = cd.getData('text/plain');
+    if (!text) return;
+    e.preventDefault();
+    document.execCommand('insertText', false, text);
+  });
+
   // ════════════════════════════════════════════════════════════════════
   //  GRIGLIA & MODULI
   // ════════════════════════════════════════════════════════════════════
