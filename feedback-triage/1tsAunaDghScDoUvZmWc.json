@@ -1,7 +1,0 @@
-{
-  "id": "1tsAunaDghScDoUvZmWc",
-  "status": "done",
-  "notes": "Ho tolto la barra grigia in alto. Le quattro icone (home, impostazioni, app, profilo) sono ora dentro la pagina Nuova scheda, in alto a destra, e aprono gli stessi menu di prima. Le frecce Indietro/Avanti/Ricarica restano nel menu del tasto destro, come hai chiesto. In alto resta solo la fila delle schede con i tasti finestra (il badge Incognito è accanto a quei tasti). L'icona del profilo mostra la tua foto Google quando sei loggato e si aggiorna dal vivo a login/logout, come faceva prima la barra. Colore della scheda selezionata lasciato com'era, come avevi scelto. Verificato con test automatici e controllo visivo.",
-  "queuedAt": "2026-06-09T13:47:37.257Z",
-  "queuedBy": "routine"
-}
