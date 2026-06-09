@@ -867,6 +867,13 @@ class TabManager {
     // riportiamo la pagina alla percentuale registrata, una sola volta. Best-effort
     // (la pagina potrebbe avere altezza diversa o caricare contenuti lazy).
     wc.on('did-finish-load', () => {
+      // Duplicazione tab: replica il livello di zoom della scheda sorgente,
+      // una sola volta a caricamento finito.
+      if (typeof tab.restoreZoomLevel === 'number') {
+        const z = tab.restoreZoomLevel;
+        tab.restoreZoomLevel = null;
+        try { wc.setZoomLevel(z); } catch (_) {}
+      }
       if (typeof tab.restoreScrollPct !== 'number') return;
       const pct = Math.max(0, Math.min(100, tab.restoreScrollPct));
       tab.restoreScrollPct = null; // applica una volta sola
