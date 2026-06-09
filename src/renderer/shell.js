@@ -85,11 +85,13 @@
     let x = Math.round(r.left);
     let y = Math.round(r.bottom + 4);
     // La barra in alto è nascosta e le icone reali hanno rect nullo: i menu
-    // (Impostazioni, App, Account) si aprono dove ora vivono le icone, cioè in
-    // alto a destra nella home. Coordinate relative alla finestra shell.
+    // (Impostazioni, App, Account) si aprono sotto le icone, che ora vivono in
+    // alto a destra DENTRO la home. La home parte sotto la fila di tab (~40px) e
+    // le icone sono alte ~34px: ancoriamo appena sotto. Coordinate relative alla
+    // finestra shell. popup-menu.js riallinea/clampa per restare nello schermo.
     if (r.width === 0 && r.height === 0) {
-      x = Math.max(8, window.innerWidth - 240);
-      y = 52;
+      x = Math.max(8, window.innerWidth - 250);
+      y = 86;
     }
     api.popupMenu(entries, x, y);
   }
