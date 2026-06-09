@@ -51,6 +51,20 @@
   flex: 1;
 }
 
+/* Icona SVG opzionale a sinistra dell'etichetta di un item. Box fisso 18px,
+   colore attenuato come le scorciatoie, allineata al testo. */
+.sn-menu-item-icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: var(--sn-muted);
+}
+.sn-menu-item:hover:not(.sn-disabled) .sn-menu-item-icon { color: var(--sn-fg); }
+.sn-menu-item-icon svg { display: block; }
+
 .sn-menu-shortcut {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 11px;
