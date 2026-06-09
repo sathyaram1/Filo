@@ -889,6 +889,13 @@
     items.push({ type: 'separator' });
     items.push(buildHelpItem());
 
+    // 2b. Interrompi lettura — presente in QUALSIASI menu mentre la sintesi
+    // vocale è in riproduzione, anche senza selezione/contesto, così la
+    // lettura si può sempre fermare da dove si è (richiesta alpha).
+    if (ttsBusy()) {
+      items.push(buildStopReadingItem());
+    }
+
     // 3. Zona contestuale — assente se non c'è contesto utile.
     const contextItems = buildContextualItems({ selInfo, linkEl, imgEl, editable, clipboardHistory });
     if (contextItems.length > 0) {
