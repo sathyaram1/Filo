@@ -40,6 +40,49 @@ test('La barra in alto di Filo è sparita (chrome compatto, barra indirizzi nasc
   expect(shellH).toBe(40);
 });
 
+test("L'icona profilo mostra l'avatar quando loggato (parità con la vecchia barra)", async ({ app, openTab }) => {
+  const page = await openTab('filo://newtab/');
+  const account = page.locator('#dashControls .dash-ctrl[data-command="account"]');
+  await account.waitFor({ timeout: 8_000 });
+
+  // Sloggato (stato dei test): icona utente generica, nessun avatar.
+  await expect(account.locator('img.account-avatar')).toHaveCount(0);
+
+  // Simula un login: broadcast `auth_changed` alla view della dashboard, come
+  // fa il main dopo il sign-in (broadcastToTabs). Avatar = data URL che carica
+  // davvero (così l'onerror di fallback non scatta).
+  const picture =
+    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22'%3E%3Crect width='22' height='22' fill='%23c0552b'/%3E%3C/svg%3E";
+  await app.evaluate(({ BrowserWindow }, pic) => {
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (!w._filoTabs) continue;
+      for (const t of w._filoTabs.tabs) {
+        try {
+          t.view.webContents.send('filo:broadcast', {
+            type: 'auth_changed', signedIn: true,
+            profile: { name: 'Mario Rossi', email: 'mario@example.it', picture: pic },
+          });
+        } catch (_) {}
+      }
+    }
+  }, picture);
+
+  // L'avatar compare al posto dell'icona generica.
+  await expect(account.locator('img.account-avatar')).toHaveCount(1, { timeout: 5_000 });
+  await expect(account).toHaveClass(/signed-in/);
+
+  // E un logout riporta l'icona generica (niente avatar).
+  await app.evaluate(({ BrowserWindow }) => {
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (!w._filoTabs) continue;
+      for (const t of w._filoTabs.tabs) {
+        try { t.view.webContents.send('filo:broadcast', { type: 'auth_changed', signedIn: false, profile: null }); } catch (_) {}
+      }
+    }
+  });
+  await expect(account.locator('img.account-avatar')).toHaveCount(0, { timeout: 5_000 });
+});
+
 test("Cliccare l'icona App nella home apre il menu nativo della shell", async ({ app, openTab }) => {
   const page = await openTab('filo://newtab/');
   await page.waitForSelector('#dashControls .dash-ctrl[data-command="apps"]', { timeout: 8_000 });
