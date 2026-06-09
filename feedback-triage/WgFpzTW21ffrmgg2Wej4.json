@@ -1,0 +1,7 @@
+{
+  "id": "WgFpzTW21ffrmgg2Wej4",
+  "status": "done",
+  "notes": "Ora puoi chiedere a Filo dalla chat di cambiare le impostazioni e le applica lui. Esempi: «metti il tema scuro», «ingrandisci il testo», «attiva la modalità terminale», «nascondi il commento nella home», «cambia lo stile con cui mi rispondi». La modifica si applica subito (il tema cambia all'istante) e Filo te lo conferma. Copre tutte le voci di Preferenze (tema, dimensione testo, commento home, stile agente, archiviazione automatica, modalità terminale + shell, velocità/tono della lettura). Le impostazioni delicate (chiavi API, provider) restano da cambiare a mano nelle Opzioni, per sicurezza. Verificato con test automatici.",
+  "queuedAt": "2026-06-09T13:33:22.870Z",
+  "queuedBy": "routine"
+}
