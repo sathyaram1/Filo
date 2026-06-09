@@ -22,22 +22,32 @@ html, body {
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--sn-border);
+  /* ancora la topbar flottante (icona + stato salvataggio) in alto a destra */
+  position: relative;
 }
 .ed-root.sidebar-hidden .ed-text-pane { border-right: none; }
 .ed-root.sidebar-hidden .ed-sidebar { display: none; }
 
+/* La topbar non è più una barra a tutta larghezza: è un gruppo di controlli
+   flottante in alto a destra, sopra il foglio. Niente bordo né sfondo, così
+   il documento parte direttamente dall'alto. */
 .ed-topbar {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  z-index: 5;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px 20px;
-  border-bottom: 1px solid var(--sn-border);
+  gap: 8px;
+  /* non intercettare i click sull'area vuota tra i controlli: solo i figli
+     reali (icona, stato) restano cliccabili */
+  pointer-events: none;
 }
-.ed-topbar-spacer { flex: 1 1 auto; }
+.ed-topbar > * { pointer-events: auto; }
+.ed-topbar-spacer { display: none; }
 .ed-save-state {
   font-size: 12px;
   color: var(--sn-muted);
-  min-width: 56px;
   text-align: right;
 }
 .ed-save-state.dirty { color: var(--sn-accent); }
