@@ -265,10 +265,10 @@ function registerIpcHandlers() {
     return { ok: true };
   });
   // Menu tasto destro su tab: apre una copia della tab (stesso URL).
-  ipcMain.handle('tabs:duplicate', (event, { id } = {}) => {
+  ipcMain.handle('tabs:duplicate', async (event, { id } = {}) => {
     const win = winFor(event);
     if (!win?._filoTabs) return { ok: false };
-    const newId = win._filoTabs.duplicateTab(id);
+    const newId = await win._filoTabs.duplicateTab(id);
     return { ok: !!newId, id: newId };
   });
   // Menu tasto destro su tab: "Aiuto" → apre la sidebar Aiuto su quella scheda
