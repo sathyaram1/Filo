@@ -579,11 +579,32 @@ class TabManager {
   }
 
   // Apre una copia della tab (stesso URL), attivandola — come "Duplica" di Chrome.
+  // A differenza di Chrome, replica anche lo zoom e la posizione di scroll della
+  // scheda sorgente: la copia è davvero "uguale a com'era", non solo stesso URL.
   // Ritorna l'id della nuova tab, o null se l'originale non esiste.
-  duplicateTab(id) {
+  async duplicateTab(id) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return null;
-    return this.openTab(tab.url || 'filo://newtab/', { activate: true });
+    // Zoom: leggibile in modo sincrono dal webContents (0 = 100%).
+    let zoomLevel = null;
+    try { zoomLevel = tab.view.webContents.getZoomLevel(); } catch (_) {}
+    // Scroll: prova a leggere la posizione ESATTA dalla pagina sorgente (più
+    // precisa del segnale `scrollPct` arrotondato dal content script); se la
+    // pagina non risponde (es. interna senza diritto di esecuzione) ricadi sul
+    // valore già tracciato.
+    let scrollPct = typeof tab.scrollPct === 'number' ? tab.scrollPct : null;
+    try {
+      const exact = await tab.view.webContents.executeJavaScript(
+        '(()=>{try{const d=document.documentElement;const max=(d.scrollHeight||0)-window.innerHeight;return max>0?Math.max(0,Math.min(100,(window.scrollY||d.scrollTop||0)/max*100)):0;}catch(e){return null;}})()',
+        true,
+      );
+      if (typeof exact === 'number') scrollPct = exact;
+    } catch (_) {}
+    return this.openTab(tab.url || 'filo://newtab/', {
+      activate: true,
+      restoreScrollPct: scrollPct,
+      restoreZoomLevel: zoomLevel,
+    });
   }
 
   // Voce "Aiuto" del menu tasto destro su tab: apre la sidebar Aiuto (l'agente
