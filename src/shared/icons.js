@@ -280,6 +280,19 @@
     `<path d="M12 9.5h.01"/>` +
     `<path d="M15.5 9.5h.01"/>`;
 
+  // --- Leggi ad alta voce: altoparlante che emette due onde sonore.
+  const readAloud =
+    `<path d="M4 9.5v5h3l4.5 3.5v-12L7 9.5H4z"/>` +
+    `<path d="M15.5 9.5a4 4 0 0 1 0 5"/>` +
+    `<path d="M18 7a7.5 7.5 0 0 1 0 10"/>`;
+
+  // --- Interrompi lettura: stesso altoparlante, ma con una "X" al posto
+  //     delle onde (muto/stop) per comunicare "ferma".
+  const stopReading =
+    `<path d="M4 9.5v5h3l4.5 3.5v-12L7 9.5H4z"/>` +
+    `<path d="M15.5 10l4 4"/>` +
+    `<path d="M19.5 10l-4 4"/>`;
+
   // Esposizione: ciascuna icona è una FUNZIONE (size) => stringa SVG.
   // Permette ai consumer di chiedere taglie diverse (es. 16 per la riga,
   // 20 per la griglia overflow) senza ricreare manualmente il wrapper.
