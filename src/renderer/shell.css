@@ -377,6 +377,11 @@ html[data-chrome-compact="1"] .addr {
 .incognito-badge {
   display: inline-flex;
   align-items: center;
+  /* Vive nella fila di tab (la barra indirizzi è nascosta): centrato in
+     verticale e staccato dai controlli finestra. */
+  align-self: center;
+  flex: 0 0 auto;
+  margin: -8px 6px 0 0;
   gap: 5px;
   height: 26px;
   padding: 0 10px;
