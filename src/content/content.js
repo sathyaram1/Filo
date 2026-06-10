@@ -838,7 +838,7 @@
 
     if (editable) {
       // Casella input senza selezione: incolla + detta.
-      items.push(buildPasteItem(clipboardHistory));
+      items.push(Actions.buildPasteItem(clipboardHistory));
       items.push(TTS.buildDictateItem());
       return items;
     }
