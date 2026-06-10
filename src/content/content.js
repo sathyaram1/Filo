@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  const { ACTIONS, PAGES_WITHOUT_MENU_PREFIXES, STORAGE_KEYS } = self.SN_CONST;
+  const { ACTIONS, PAGES_WITHOUT_MENU_PREFIXES } = self.SN_CONST;
   const { MSG } = self.SN_MSG;
   const I18n = self.SN_I18N;
   const Menu = self.SN_MENU;
