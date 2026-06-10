@@ -343,7 +343,7 @@ gitignorata → **probabilmente non è disponibile nel cloud**, ignoralo.
 
 Cosa puoi (e devi) usare invece:
 
-1. **`npm test`** — la suite Playwright (17 test) parte in Electron headless.
+1. **`npm test`** — la suite Playwright (~100 spec) parte in Electron headless.
    Eseguila SEMPRE prima di dichiarare un task done in cloud. Se rompi un
    test esistente, è un regress: fixalo prima di chiudere.
 
