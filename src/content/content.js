@@ -780,15 +780,15 @@
 
     if (selInfo) {
       // Testo selezionato nella pagina (non editabile)
-      items.push({ type: 'item', label: I18n.t('menu_copy'), onClick: () => copyToClipboard(selInfo.selection) });
+      items.push({ type: 'item', label: I18n.t('menu_copy'), onClick: () => Actions.copyToClipboard(selInfo.selection) });
       items.push({
         type: 'item',
         label: I18n.t('menu_search_text'),
-        onClick: () => searchTextOnWeb(selInfo.selection),
+        onClick: () => Actions.searchTextOnWeb(selInfo.selection),
       });
       { const ra = TTS.buildReadAloudItem(selInfo.selection); if (ra) items.push(ra); }
       items.push({ type: 'separator' });
-      items.push(buildInlineExplain(selInfo, { withDeepArrow: true }));
+      items.push(Actions.buildInlineExplain(selInfo, { withDeepArrow: true }));
       return items;
     }
 
