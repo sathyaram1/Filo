@@ -732,8 +732,8 @@
     // Tutte le icone della riga primaria/griglia sono SVG renderizzate a 18px.
     // Vedi src/shared/icons.js e src/styles/ICONS.md per la guida di stile.
     const I = (name) => Icons[name](18);
-    const translateIcon = pageHasTranslation ? I('showOriginal') : I('translate');
-    const translateLabel = pageHasTranslation ? I18n.t('menu_show_original') : I18n.t('menu_global_translate');
+    const translateIcon = Translate.hasTranslation() ? I('showOriginal') : I('translate');
+    const translateLabel = Translate.hasTranslation() ? I18n.t('menu_show_original') : I18n.t('menu_global_translate');
     // Quando navState non è disponibile (es. menu aperto da flussi che non lo
     // calcolano), lascia abilitati: meglio rispetto al falso "disabilitato".
     const canBack = navState ? !!navState.canBack : true;
