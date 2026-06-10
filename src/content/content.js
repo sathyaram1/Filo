@@ -1269,7 +1269,7 @@
     if (editable) {
       // Casella input senza selezione: incolla + detta.
       items.push(buildPasteItem(clipboardHistory));
-      items.push(buildDictateItem());
+      items.push(TTS.buildDictateItem());
       return items;
     }
 
