@@ -717,15 +717,10 @@
   function buildMenuItems({ selInfo, linkEl, imgEl, editable, clipboardHistory, navState }) {
     const items = [];
 
-    // Memorizza lo stato di navigazione dell'apertura corrente: serve a
-    // `redrawIconRows()` per ricostruire la riga icone dopo un drag SENZA
-    // perdere lo stato "disabilitato" (grigio) di avanti/indietro. Senza
-    // questo, riordinare un'icona faceva tornare avanti/indietro non grigi
-    // perché il rebuild girava con navState=undefined (→ canBack/canFwd=true).
-    lastNavState = navState || null;
-
     // 1. Riga icone globali (max 5 + overflow). Tutte mute, etichetta in tooltip.
-    items.push(buildGlobalIconRow(navState));
+    // Registro, layout persistente e drag-and-drop vivono in
+    // src/content/menuIcons.js (SN_MENU_ICONS), caricato prima di questo file.
+    items.push(MenuIcons.buildGlobalIconRow(navState));
 
     // 2. Aiuto — voce sempre presente, etichettata.
     items.push({ type: 'separator' });
