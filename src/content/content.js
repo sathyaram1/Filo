@@ -739,7 +739,7 @@
     const canBack = navState ? !!navState.canBack : true;
     const canFwd = navState ? !!navState.canFwd : true;
     return {
-      translate:     { id: 'translate',     icon: translateIcon,    label: translateLabel,                   onClick: () => (pageHasTranslation ? restoreOriginal() : translatePage()) },
+      translate:     { id: 'translate',     icon: translateIcon,    label: translateLabel,                   onClick: () => (Translate.hasTranslation() ? Translate.restoreOriginal() : Translate.translatePage()) },
       screenshot:    { id: 'screenshot',    icon: I('screenshot'),  label: I18n.t('menu_screenshot'),        onClick: () => takeScreenshot() },
       screenshotCrop:{ id: 'screenshotCrop',icon: I('screenshotCrop'),label: I18n.t('menu_screenshot_crop'), onClick: () => takePartialScreenshot() },
       transcribe:    { id: 'transcribe',    icon: I('transcribe'),  label: I18n.t('menu_transcribe'),        onClick: () => transcribeRegion() },
