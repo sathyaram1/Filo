@@ -97,6 +97,12 @@ async function run() {
           if (v) await v.click(arg).catch((e) => console.log('  click-view err', e.message));
           await d.sleep(400); break;
         }
+        case 'rclick-view': {
+          // Tasto destro su un selettore della view attiva: apre il menu Filo.
+          const v = await d.activeView(app, shell);
+          if (v) await v.click(arg, { button: 'right' }).catch((e) => console.log('  rclick-view err', e.message));
+          await d.sleep(700); break;
+        }
         case 'type': await d.typeText(app, shell, arg); break;
         case 'key': await d.pressKey(app, shell, arg); break;
         case 'wait': await d.sleep(Number(arg) || 0); break;
