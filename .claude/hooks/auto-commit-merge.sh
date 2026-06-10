@@ -43,8 +43,15 @@ git worktree list --porcelain | awk '/^worktree /{print substr($0,10)}' | while 
   fi
 
   BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
-  TS=$(date +%Y-%m-%dT%H:%M:%S)
-  git -c user.email=claude@local -c user.name=claude-local commit -q -m "auto: $TS" 2>/dev/null
+  # Commit message: list the changed files (first 3 + count) instead of a bare
+  # timestamp, so `git log` stays useful for archaeology. Git already records
+  # the date; the file list is the only signal the hook can cheaply provide.
+  CHANGED=$(git diff --cached --name-only 2>/dev/null | sed '/^$/d')
+  N=$(printf '%s\n' "$CHANGED" | sed '/^$/d' | wc -l | tr -d ' ')
+  SUMMARY=$(printf '%s\n' "$CHANGED" | head -3 | awk 'NR>1{printf ", "}{printf "%s",$0}')
+  [ "${N:-0}" -gt 3 ] && SUMMARY="$SUMMARY (+$((N-3)) file)"
+  [ -z "$SUMMARY" ] && SUMMARY=$(date +%Y-%m-%dT%H:%M:%S)
+  git -c user.email=claude@local -c user.name=claude-local commit -q -m "auto: $SUMMARY" 2>/dev/null
 
   # Multi-worktree mode: merge feature branch into TARGET_BRANCH worktree.
   if [ -n "$TARGET_WT" ] && [ "$wt" != "$TARGET_WT" ] && [ "$BRANCH" != "$TARGET_BRANCH" ]; then
