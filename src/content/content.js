@@ -1196,8 +1196,8 @@
       items.push({ type: 'item', label: I18n.t('menu_cut'), onClick: () => cutSelection() });
       items.push({ type: 'item', label: I18n.t('menu_copy'), onClick: () => copyToClipboard(selInfo.selection) });
       items.push(buildPasteItem(clipboardHistory));
-      items.push(buildDictateItem());
-      { const ra = buildReadAloudItem(selInfo.selection); if (ra) items.push(ra); }
+      items.push(TTS.buildDictateItem());
+      { const ra = TTS.buildReadAloudItem(selInfo.selection); if (ra) items.push(ra); }
       items.push({ type: 'separator' });
       items.push(buildInlineExplain(selInfo, { withDeepArrow: true }));
       items.push({
