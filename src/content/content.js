@@ -11,6 +11,7 @@
   const Extract = self.SN_EXTRACT;
   const Sidebar = self.SN_SIDEBAR;
   const SpellCheck = self.SN_SPELLCHECK;
+  const PageColor = self.SN_PAGE_COLOR;
 
   let settings = null;
   let pageTranslating = false;
