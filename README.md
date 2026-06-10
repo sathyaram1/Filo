@@ -106,21 +106,20 @@ main. Così le pagine girano quasi invariate.
 - [x] Hotkey globali (Alt+E/T/S/H)
 - [x] Pagine: dashboard, options, history, feedback, spellcheck (HTML/CSS/JS portati 1:1)
 - [x] **Content script** in pagine web (menu tasto destro, popup, sidebar, highlight, spellcheck, feedback) iniettati via `page-preload.js`
-- [x] Test Playwright adattati a `_electron.launch` (boot + context-menu + dashboard = 12 test)
-- [ ] Auto-update (electron-builder)
-- [ ] Packaging Windows/Mac/Linux
+- [x] Test Playwright adattati a `_electron.launch` (~100 spec)
+- [x] Auto-update (electron-builder/NSIS, vedi `src/main/updater.js`)
+- [x] Packaging Windows (NSIS); Mac/Linux non previsti per ora
 
 ## Test
 
 ```bash
 npm run test:smoke     # smoke headless con screenshot (tests/.smoke/)
-npm test               # suite Playwright completa (12 test)
+npm run test:unit      # unit test Node (veloci)
+npm test               # suite Playwright completa (~100 spec, ~25 min — solo in cloud)
 ```
 
-La suite copre:
-- **boot**: shell, newtab, opening filo://options/, filo://history/
-- **context-menu**: tasto destro apre `.sn-menu`, Shift+destro escape hatch, selezione + destro mostra sezione inline AI
-- **dashboard**: layout 3-zone, fallback senza API key, IPC `FILO_GET_STATE` / `FILO_ADD_TIMER` / `FILO_ADD_NOTE`
+In locale NON lanciare la suite completa: usa gli spec mirati della feature
+toccata (`npx playwright test tests/<feature>.spec.mjs`). Vedi CLAUDE.md.
 
 ## Sviluppo
 
