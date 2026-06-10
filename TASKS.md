@@ -53,7 +53,7 @@ contesto, per tempo, o perché l'utente chiude), la prossima riparte da qui.
   Per ciascuno: guardare il diff reale, chiedere all'utente se il lavoro va
   recuperato o buttato, poi eliminare branch+worktree. (stima: S)
 
-- [ ] **Spezzare `src/content/content.js` (3247 righe) — parte 1: estrazioni pulite** —
+- [~] **Spezzare `src/content/content.js` (3247 righe) — parte 1: estrazioni pulite** —
   Estrarre in moduli separati sotto `src/content/` le sezioni più autonome,
   mantenendo il pattern IIFE su globalThis (vedi CLAUDE.md "Convenzione di
   porting") e aggiungendo i `require()` in `src/preload/internal-preload.js`
