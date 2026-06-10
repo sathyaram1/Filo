@@ -71,7 +71,7 @@ contesto, per tempo, o perché l'utente chiude), la prossima riparte da qui.
   in node_modules: manca chrome_100_percent.pak) — non è una regressione;
   vedi memoria "npm install con Filo aperto".
 
-- [ ] **Spezzare `src/content/content.js` — parte 2: azioni e menu** —
+- [~] **Spezzare `src/content/content.js` — parte 2: azioni e menu** —
   Dopo la parte 1, valutare l'estrazione della sezione "Azioni" (~righe
   1477-1634 nel file originale) e "Nuove azioni globali/contestuali" in
   `content/actions.js`. Includere anche buildInlineExplainImage,
