@@ -12,6 +12,7 @@
   const Sidebar = self.SN_SIDEBAR;
   const SpellCheck = self.SN_SPELLCHECK;
   const PageColor = self.SN_PAGE_COLOR;
+  const Translate = self.SN_TRANSLATE_PAGE;
 
   let settings = null;
   let pageTranslating = false;
