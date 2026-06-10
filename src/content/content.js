@@ -30,7 +30,7 @@
     // "Vetro smerigliato" della tab attiva (§1.1): campiona il colore della cima
     // della pagina e mandalo al main, che tinge la tab. Attivo su tutte le pagine
     // (anche quelle senza menu), perché il colore non c'entra col menu.
-    try { startTabColorSampler(); } catch (_) {}
+    try { PageColor.startTabColorSampler(); } catch (_) {}
 
     // Colore identità del sito (§1.2): calcolato una volta (theme-color →
     // manifest → favicon → fallback) e mandato al main, che lo cacha per dominio
