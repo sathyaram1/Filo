@@ -819,20 +819,20 @@
       items.push({
         type: 'item',
         label: I18n.t('menu_copy_link'),
-        onClick: () => copyToClipboard(linkEl.href),
+        onClick: () => Actions.copyToClipboard(linkEl.href),
       });
       items.push({
         type: 'item',
         label: I18n.t('menu_save_link_for_later'),
-        onClick: () => saveLink(linkEl),
+        onClick: () => Actions.saveLink(linkEl),
       });
       items.push({
         type: 'item',
         label: I18n.t('menu_share_link'),
-        onClick: () => shareLink(linkEl),
+        onClick: () => Actions.shareLink(linkEl),
       });
       items.push({ type: 'separator' });
-      items.push(buildInlineExplainLink(linkEl));
+      items.push(Actions.buildInlineExplainLink(linkEl));
       return items;
     }
 
