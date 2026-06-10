@@ -919,7 +919,7 @@
     const anchor = selectionAnchor();
     if (command === 'explain-selection') {
       // La spiegazione breve ora è inline nel menu; lo shortcut apre direttamente l'approfondimento.
-      if (selInfo) triggerExplainOrTranslate(ACTIONS.EXPLAIN_DEEP, selInfo, anchor);
+      if (selInfo) Actions.triggerExplainOrTranslate(ACTIONS.EXPLAIN_DEEP, selInfo, anchor);
       else Popup.showToast(I18n.t('err_no_selection'));
     } else if (command === 'translate-selection') {
       if (selInfo) triggerExplainOrTranslate(ACTIONS.TRANSLATE_SELECTION, selInfo, anchor);
