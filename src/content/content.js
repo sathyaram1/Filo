@@ -15,11 +15,9 @@
   const Translate = self.SN_TRANSLATE_PAGE;
 
   let settings = null;
-  let pageTranslating = false;
   // Rispecchia la modalità "contenuto a tutto schermo" del main (vedi tabs.js).
   // Serve a mostrare l'icona/etichetta giusta nella voce di menu "Schermo intero".
   let contentFullscreen = false;
-  let pageHasTranslation = false;
 
   // ------------------------------------------------------------
   // Bootstrap
