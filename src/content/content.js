@@ -793,20 +793,20 @@
     }
 
     if (imgEl) {
-      items.push({ type: 'item', label: I18n.t('menu_copy_image'), onClick: () => copyImage(imgEl) });
-      items.push({ type: 'item', label: I18n.t('menu_save_image_as'), onClick: () => downloadImage(imgEl) });
+      items.push({ type: 'item', label: I18n.t('menu_copy_image'), onClick: () => Actions.copyImage(imgEl) });
+      items.push({ type: 'item', label: I18n.t('menu_save_image_as'), onClick: () => Actions.downloadImage(imgEl) });
       items.push({
         type: 'item',
         label: I18n.t('menu_copy_image_link'),
-        onClick: () => copyToClipboard(imgEl.currentSrc || imgEl.src),
+        onClick: () => Actions.copyToClipboard(imgEl.currentSrc || imgEl.src),
       });
       items.push({
         type: 'item',
         label: I18n.t('menu_search_image'),
-        onClick: () => searchImageOnWeb(imgEl),
+        onClick: () => Actions.searchImageOnWeb(imgEl),
       });
       items.push({ type: 'separator' });
-      items.push(buildInlineExplainImage(imgEl));
+      items.push(Actions.buildInlineExplainImage(imgEl));
       return items;
     }
 
