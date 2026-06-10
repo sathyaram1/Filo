@@ -53,27 +53,31 @@ contesto, per tempo, o perché l'utente chiude), la prossima riparte da qui.
   Per ciascuno: guardare il diff reale, chiedere all'utente se il lavoro va
   recuperato o buttato, poi eliminare branch+worktree. (stima: S)
 
-- [~] **Spezzare `src/content/content.js` (3247 righe) — parte 1: estrazioni pulite** —
-  Estrarre in moduli separati sotto `src/content/` le sezioni più autonome,
-  mantenendo il pattern IIFE su globalThis (vedi CLAUDE.md "Convenzione di
-  porting") e aggiungendo i `require()` in `src/preload/internal-preload.js`
-  (funzione `loadContentScripts`) e `src/preload/page-preload.js` nello stesso
-  ordine. Candidate (usare i commenti-sezione `// ---` come confini):
-  1. "Lettura ad alta voce (TTS)" (~righe 2542-3047) → `content/tts.js`
-  2. "Box Modifica (preview + conferma)" (~righe 3048-3245) → `content/editBox.js`
-  3. "Traduci pagina" (~righe 2047-2167) → `content/translatePage.js`
-  4. "Campionatore colore + colore identità sito" (~righe 73-263) → `content/pageColor.js`
-  Ogni estrazione: il modulo espone le funzioni che content.js usa via
-  `global.SN_<NOME>`, content.js le consuma come fa già con SN_MENU/SN_POPUP.
-  Estrarre UNA sezione alla volta e dopo ognuna lanciare gli spec mirati:
-  `npx playwright test tests/context-menu.spec.mjs tests/boot.spec.mjs`.
-  Criterio di fatto: content.js sotto ~1800 righe, spec verdi. (stima: L)
+- [x] **Spezzare `src/content/content.js` — parte 1: estrazioni pulite** (2026-06-10) —
+  Fatto: 4 moduli nuovi, pattern IIFE su globalThis, caricati prima di
+  content.js da entrambi i preload:
+  `pageColor.js` (SN_PAGE_COLOR), `translatePage.js` (SN_TRANSLATE_PAGE, lo
+  stato di traduzione ora vive lì), `tts.js` (SN_TTS: lettura ad alta voce +
+  dettatura; riceve da content.js via `TTS.init({...})` getSettings /
+  restorePasteContext / insertTextAtSelection / blobToDataUrl),
+  `editBox.js` (SN_EDITBOX: riceve accesso al pasteContext via `init`).
+  content.js: 3247 → 2433 righe. Le righe 2880-3045 della vecchia sezione TTS
+  (buildInlineExplainImage/Link, analyzeLinkSuspicious, levenshteinSmall) NON
+  sono TTS: lasciate in content.js per la parte 2 (vanno in actions.js).
+  Verificato: 17/17 spec verdi (boot, context-menu, read-aloud,
+  tts-preferences, tab-live-color, tab-identity-color, menu-icon-row,
+  select-custom-orange). Nota ambiente: `npm run test:smoke` fallisce su
+  questa macchina anche sul commit PRE-refactoring (Electron dist incompleto
+  in node_modules: manca chrome_100_percent.pak) — non è una regressione;
+  vedi memoria "npm install con Filo aperto".
 
 - [ ] **Spezzare `src/content/content.js` — parte 2: azioni e menu** —
   Dopo la parte 1, valutare l'estrazione della sezione "Azioni" (~righe
-  1477-1634) e "Nuove azioni globali/contestuali" (~righe 2233-2541) in
-  `content/actions.js`. Stesso metodo e stesse verifiche della parte 1.
-  Criterio di fatto: content.js è solo bootstrap + routing eventi
+  1477-1634 nel file originale) e "Nuove azioni globali/contestuali" in
+  `content/actions.js`. Includere anche buildInlineExplainImage,
+  buildInlineExplainLink, analyzeLinkSuspicious e levenshteinSmall (lasciati
+  in content.js dalla parte 1). Stesso metodo e stesse verifiche della
+  parte 1. Criterio di fatto: content.js è solo bootstrap + routing eventi
   (~600-900 righe). (stima: L)
 
 - [ ] **Spezzare lo switch di `src/main/services/handlers.js` (82 case, ~790 righe)** —
