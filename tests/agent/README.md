@@ -27,6 +27,7 @@ Passi (separati da `;`):
 | `marks:NOME` | come `shot` ma con badge numerati sugli elementi cliccabili (+ stampa la mappa) |
 | `click-shell:SEL` | click su selettore CSS della shell (tab bar / barra indirizzi) |
 | `click-view:SEL` | click su selettore CSS della view attiva |
+| `rclick-view:SEL` | tasto destro su selettore della view attiva (apre il menu Filo) |
 | `type:TESTO` | digita nella view attiva |
 | `key:KEY` | premi un tasto (`Enter`, `Control+b`, …) |
 | `wait:MS` | attendi |
