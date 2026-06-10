@@ -20,6 +20,10 @@ src/
 │   ├── protocol.js             Custom protocol filo://
 │   ├── ipc.js                  Routing IPC main↔renderer
 │   ├── shortcuts.js            Hotkey globali Alt+E/T/S/H
+│   ├── updater.js              Auto-update (electron-builder/NSIS)
+│   ├── popup-menu.js, popup-tooltip.js   Popup nativi della shell
+│   ├── auth/                   Login Google (PKCE, token store)
+│   ├── config/                 Chiavi default incastonate dal build
 │   ├── shim/
 │   │   ├── storage.js          chrome.storage.local → file JSON
 │   │   └── chrome-api.js       Namespace chrome.* per servizi portati
@@ -27,24 +31,32 @@ src/
 │       ├── loader.js           Carica i moduli SN_* su globalThis
 │       ├── handlers.js         Handler centrale messaggi (ex background.js)
 │       ├── providers/          OpenRouter, Gemini, fallback chain
-│       ├── categorizer.js, savedPages.js, historyStore.js, ...
-│       └── (porting 1:1 dei file background dell'estensione)
+│       ├── safebrowse/         Protezione phishing/typosquatting (12 moduli)
+│       ├── categorizer.js, savedPages.js, historyStore.js,
+│       │   archivedTabs.js, cookies.js, costTracker.js, exportData.js,
+│       │   fxRates.js, llmsTxt.js, webSearch.js, shell.js, ...
+│       └── (porting 1:1 dei file background dell'estensione + servizi nuovi)
 ├── preload/
 │   ├── shell-preload.js        Espone window.filoShell alla shell renderer
 │   ├── internal-preload.js     Espone window.filo + shim chrome alle pagine filo://
-│   └── page-preload.js         Iniezione content script in pagine web (TBD)
+│   ├── page-preload.js         Shim chrome + content script su pagine web esterne
+│   ├── popup-preload.js        Preload dei popup nativi
+│   └── wheel-zoom.js, fingerprint-guard.js
 ├── renderer/                   Shell del browser (tab bar + address bar)
 │   ├── shell.html / shell.css / shell.js
 ├── pages/                      Pagine interne servite via filo://
 │   ├── dashboard/   → filo://newtab/
-│   ├── options/     → filo://options/
-│   ├── history/     → filo://history/
-│   ├── feedback/    → filo://feedback/
-│   └── spellcheck/  → filo://spellcheck/
+│   ├── home/, editor/, options/, history/, feedback/,
+│   ├── spellcheck/, security/, admin-defaults/
+├── content/                    Content script (menu, popup, sidebar, highlight,
+│                               spellcheck, feedback, extractContext, ...)
 ├── shared/                     Moduli condivisi main+renderer (IIFE → globalThis)
-└── styles/                     CSS condivisi (theme, pages, ecc.)
+└── styles/                     CSS condivisi (theme, menu, popup, sidebar, ...)
 assets/icons/                   Icone applicazione
 ```
+
+La coda di lavoro multi-sessione vive in `TASKS.md`; le convenzioni UI in
+`PATTERNS.md`; le istruzioni operative per Claude in `CLAUDE.md`.
 
 ## Quick start
 
