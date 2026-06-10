@@ -892,7 +892,7 @@
       // Shortcut save-for-later: il SW chiede al content il payload.
       if (msg.command === 'save-for-later') {
         if (isBlocked()) { sendResponse({ savePayload: null }); return; }
-        sendResponse({ savePayload: buildSavePayload() });
+        sendResponse({ savePayload: Actions.buildSavePayload() });
         return;
       }
       handleShortcut(msg.command, msg.context);
