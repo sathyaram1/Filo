@@ -229,6 +229,7 @@ function loadContentScripts() {
   safe(path.join(CONTENT, 'spellcheck.js'));
   safe(path.join(SHARED, 'feedback.js'));
   safe(path.join(CONTENT, 'feedback.js'));
+  safe(path.join(CONTENT, 'pageColor.js'));
   safe(path.join(CONTENT, 'content.js'));
   try {
     document.documentElement.dataset.filoReady = '1';
