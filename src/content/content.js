@@ -15,16 +15,27 @@
   const Translate = self.SN_TRANSLATE_PAGE;
   const TTS = self.SN_TTS;
   const EditBox = self.SN_EDITBOX;
+  const Actions = self.SN_ACTIONS;
+  const MenuIcons = self.SN_MENU_ICONS;
 
-  // I moduli audio (tts.js) e box Modifica (editBox.js) hanno bisogno di pezzi
-  // che restano qui: settings correnti, gestione del pasteContext e
-  // blobToDataUrl. Le funzioni sono dichiarazioni hoisted, quindi i
-  // riferimenti sono già validi.
+  // I moduli estratti (actions.js, menuIcons.js, tts.js, editBox.js) hanno
+  // bisogno di pezzi che restano qui: settings correnti, gestione del
+  // pasteContext, blocklist e ultimo evento mouse. Le funzioni sono
+  // dichiarazioni hoisted, quindi i riferimenti sono già validi.
+  Actions.init({
+    getPasteContext: () => pasteContext,
+    restorePasteContext: () => restorePasteContext(),
+    isBlocked: () => isBlocked(),
+    getLastMouseEvent: () => lastMouseEvent,
+  });
+  MenuIcons.init({
+    isContentFullscreen: () => contentFullscreen,
+  });
   TTS.init({
     getSettings: () => settings,
     restorePasteContext: () => restorePasteContext(),
-    insertTextAtSelection: (text) => insertTextAtSelection(text),
-    blobToDataUrl: (blob) => blobToDataUrl(blob),
+    insertTextAtSelection: (text) => Actions.insertTextAtSelection(text),
+    blobToDataUrl: (blob) => Actions.blobToDataUrl(blob),
   });
   EditBox.init({
     getPasteContext: () => pasteContext,
