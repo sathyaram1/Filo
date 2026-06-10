@@ -50,7 +50,8 @@ bloccavano `npm start`.
 
 Per questo TUTTE le cartelle di artefatti dei test sono gitignorate:
 `tests/.shots/`, `tests/.smoke/`, `tests/.report/`, `tests/agent/.out/`,
-`tests/agent/reports/`, `test-results/`, `.feedback-images/`.
+`tests/agent/reports/`, `test-results/`, `.feedback-images/`,
+`tests/.fb/*.png` (lo script `render-popup.mjs` lì dentro resta versionato).
 
 Regole:
 
