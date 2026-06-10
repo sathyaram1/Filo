@@ -233,6 +233,8 @@ function loadContentScripts() {
   safe(path.join(CONTENT, 'translatePage.js'));
   safe(path.join(CONTENT, 'tts.js'));
   safe(path.join(CONTENT, 'editBox.js'));
+  safe(path.join(CONTENT, 'actions.js'));
+  safe(path.join(CONTENT, 'menuIcons.js'));
   safe(path.join(CONTENT, 'content.js'));
   try {
     document.documentElement.dataset.filoReady = '1';
