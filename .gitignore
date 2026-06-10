@@ -9,6 +9,7 @@ src/main/config/default-keys.generated.json
 tests/.report/
 tests/.shots/
 tests/.smoke/
+tests/.fb/*.png
 tests/agent/.env
 tests/agent/.out/
 tests/agent/reports/
