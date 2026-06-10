@@ -71,14 +71,29 @@ contesto, per tempo, o perché l'utente chiude), la prossima riparte da qui.
   in node_modules: manca chrome_100_percent.pak) — non è una regressione;
   vedi memoria "npm install con Filo aperto".
 
-- [~] **Spezzare `src/content/content.js` — parte 2: azioni e menu** —
-  Dopo la parte 1, valutare l'estrazione della sezione "Azioni" (~righe
-  1477-1634 nel file originale) e "Nuove azioni globali/contestuali" in
-  `content/actions.js`. Includere anche buildInlineExplainImage,
-  buildInlineExplainLink, analyzeLinkSuspicious e levenshteinSmall (lasciati
-  in content.js dalla parte 1). Stesso metodo e stesse verifiche della
-  parte 1. Criterio di fatto: content.js è solo bootstrap + routing eventi
-  (~600-900 righe). (stima: L)
+- [x] **Spezzare `src/content/content.js` — parte 2: azioni e menu** (2026-06-10) —
+  Fatto: 2 moduli nuovi, pattern IIFE su globalThis, caricati prima di
+  content.js da entrambi i preload:
+  `actions.js` (SN_ACTIONS, ~1370 righe: clipboard copia/taglia/incolla +
+  cronologia, screenshot pieno/regione, trascrizione OCR, salva/condividi/
+  cerca, color picker, QR code, spiegazioni inline testo/immagine/link,
+  prefetch "Spiega", analyzeLinkSuspicious + levenshteinSmall; riceve via
+  `Actions.init({...})` getPasteContext / restorePasteContext / isBlocked /
+  getLastMouseEvent) e `menuIcons.js` (SN_MENU_ICONS, ~255 righe: registro
+  icone globali, layout persistente + migrazioni, drag-and-drop; riceve
+  isContentFullscreen; lastNavState ora memorizzato da buildGlobalIconRow).
+  content.js: 2433 → 941 righe (bootstrap, routing contextmenu/runtime,
+  menu spellcheck, matrice contestuale). TTS.init ora passa
+  Actions.insertTextAtSelection/blobToDataUrl. In più: aggiunto comando
+  `rclick-view:SEL` a tests/agent/shoot.mjs (+README) per il check visivo
+  del menu. Verificato: 29/29 spec verdi (boot, context-menu, menu-icon-row,
+  menu-app-icons, menu-disabled-icons-drag, menu-qr-code, menu-nav-actions,
+  clipboard-paste-image, clipboard-history-search, spellcheck-input-menu-top,
+  read-aloud x2, fullscreen-content, tab-activity-signals) + test:shoot del
+  menu aperto (riga icone, Incolla con cronologia, Detta, feedback: ok).
+  Il criterio "~600-900 righe" non è raggiunto del tutto (941): il residuo
+  grosso è il menu spellcheck (~350 righe), estraibile in un'eventuale
+  parte 3 se serve.
 
 - [ ] **Spezzare lo switch di `src/main/services/handlers.js` (82 case, ~790 righe)** —
   Sostituire il mega-switch in `handleMessage` con un registro
