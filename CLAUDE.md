@@ -231,7 +231,8 @@ src/shared/                IIFE moduli che attaccano a globalThis (constants,
                            filoState, paths, feedback, pageBootstrap)
 src/content/               content scripts (menu, popup, sidebar, highlight,
                            spellcheck, feedback, extractContext, pageColor,
-                           translatePage, tts, editBox, content)
+                           translatePage, tts, editBox, actions, menuIcons,
+                           content)
 src/styles/                CSS condivisi (theme, menu, popup, sidebar, ...)
 ```
 
