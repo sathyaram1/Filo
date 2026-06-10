@@ -1216,7 +1216,7 @@
         label: I18n.t('menu_search_text'),
         onClick: () => searchTextOnWeb(selInfo.selection),
       });
-      { const ra = buildReadAloudItem(selInfo.selection); if (ra) items.push(ra); }
+      { const ra = TTS.buildReadAloudItem(selInfo.selection); if (ra) items.push(ra); }
       items.push({ type: 'separator' });
       items.push(buildInlineExplain(selInfo, { withDeepArrow: true }));
       return items;
