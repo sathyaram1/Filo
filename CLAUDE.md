@@ -230,7 +230,8 @@ src/shared/                IIFE moduli che attaccano a globalThis (constants,
                            messages, i18n, icons, storage, filoMemory,
                            filoState, paths, feedback, pageBootstrap)
 src/content/               content scripts (menu, popup, sidebar, highlight,
-                           spellcheck, feedback, extractContext, content)
+                           spellcheck, feedback, extractContext, pageColor,
+                           translatePage, tts, editBox, content)
 src/styles/                CSS condivisi (theme, menu, popup, sidebar, ...)
 ```
 
