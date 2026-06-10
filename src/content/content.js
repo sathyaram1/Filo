@@ -92,7 +92,7 @@
     window.addEventListener('contextmenu', onContextMenu, { capture: true });
     // Prefetch "Spiega" appena l'utente seleziona del testo, così quando apre il
     // menu il risultato è già in cache. Debounce + dedup gestiti dallo scheduler.
-    document.addEventListener('selectionchange', schedulePrefetchExplain);
+    document.addEventListener('selectionchange', Actions.schedulePrefetchExplain);
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       onRuntimeMessage(msg, sender, sendResponse);
       return true; // mantieni il canale aperto per sendResponse asincrono
