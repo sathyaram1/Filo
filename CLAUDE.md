@@ -13,6 +13,20 @@ Questo allinea anche tutti i worktree (condividono lo stesso `.git`). Se il
 pull fallisce per conflitti, fermati e chiedi all'utente prima di procedere
 — non risolvere conflitti senza autorizzazione.
 
+## Lavoro multi-sessione: `TASKS.md`
+
+La coda di lavoro persistente vive in **`TASKS.md`** nella root. Regole:
+
+- Se l'utente dice **"continua"** (o equivalenti) senza altro contesto →
+  leggi `TASKS.md` e riprendi dal primo task aperto (`[ ]` o `[~]`).
+- Se l'utente consegna una **spec grossa** → spezzala in task da una sessione
+  l'uno dentro `TASKS.md` (formato descritto lì), fatti confermare l'ordine,
+  poi parti dal primo.
+- **Budget contesto**: chiudi la sessione prima di ~150k token (oltre 200k il
+  costo sale del 50%). Quando ti avvicini: finisci il pezzo atomico in corso,
+  aggiorna `TASKS.md` con lo stato esatto, e di' all'utente di aprire
+  un'altra istanza e dire "continua".
+
 ## Push automatico su `origin/main`
 
 L'hook `.claude/hooks/auto-commit-merge.sh` pusha automaticamente `main` su
