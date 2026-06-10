@@ -14,15 +14,22 @@
   const PageColor = self.SN_PAGE_COLOR;
   const Translate = self.SN_TRANSLATE_PAGE;
   const TTS = self.SN_TTS;
+  const EditBox = self.SN_EDITBOX;
 
-  // Il modulo audio (tts.js) ha bisogno di pezzi che restano qui: settings
-  // correnti, gestione del pasteContext e blobToDataUrl. Le funzioni sono
-  // dichiarazioni hoisted, quindi i riferimenti sono già validi.
+  // I moduli audio (tts.js) e box Modifica (editBox.js) hanno bisogno di pezzi
+  // che restano qui: settings correnti, gestione del pasteContext e
+  // blobToDataUrl. Le funzioni sono dichiarazioni hoisted, quindi i
+  // riferimenti sono già validi.
   TTS.init({
     getSettings: () => settings,
     restorePasteContext: () => restorePasteContext(),
     insertTextAtSelection: (text) => insertTextAtSelection(text),
     blobToDataUrl: (blob) => blobToDataUrl(blob),
+  });
+  EditBox.init({
+    getPasteContext: () => pasteContext,
+    setPasteContext: (ctx) => { pasteContext = ctx; },
+    restorePasteContext: () => restorePasteContext(),
   });
 
   let settings = null;
