@@ -13,6 +13,17 @@
   const SpellCheck = self.SN_SPELLCHECK;
   const PageColor = self.SN_PAGE_COLOR;
   const Translate = self.SN_TRANSLATE_PAGE;
+  const TTS = self.SN_TTS;
+
+  // Il modulo audio (tts.js) ha bisogno di pezzi che restano qui: settings
+  // correnti, gestione del pasteContext e blobToDataUrl. Le funzioni sono
+  // dichiarazioni hoisted, quindi i riferimenti sono già validi.
+  TTS.init({
+    getSettings: () => settings,
+    restorePasteContext: () => restorePasteContext(),
+    insertTextAtSelection: (text) => insertTextAtSelection(text),
+    blobToDataUrl: (blob) => blobToDataUrl(blob),
+  });
 
   let settings = null;
   // Rispecchia la modalità "contenuto a tutto schermo" del main (vedi tabs.js).
