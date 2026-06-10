@@ -1214,7 +1214,7 @@
       items.push({
         type: 'item',
         label: I18n.t('menu_edit_selection'),
-        onClick: () => openEditBox(selInfo.selection),
+        onClick: () => EditBox.openEditBox(selInfo.selection),
       });
       return items;
     }
