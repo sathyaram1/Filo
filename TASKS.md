@@ -37,9 +37,21 @@ contesto, per tempo, o perché l'utente chiude), la prossima riparte da qui.
 
 ### Risanamento manutenibilità (valutazione 2026-06-10)
 
-- [~] **Pulizie rapide** — eliminare codice morto e scratch, riallineare doc,
-  pulire branch/worktree mergiati, migliorare i messaggi dell'hook auto-commit.
-  In corso in questa sessione. (stima: S)
+- [x] **Pulizie rapide** (2026-06-10) — Fatto: eliminato `src/shared/qrcode.js`
+  (444 righe morte, il QR vivo è `qr.js`); eliminati 10 file scratch in tests/;
+  PNG di `tests/.fb/` fuori da git (+gitignore); CLAUDE.md e README riallineati
+  (~100 spec, architettura completa); hook auto-commit ora scrive i file
+  cambiati nel messaggio invece del timestamp; rimossi 55 worktree/branch già
+  atterrati su main. Verificato con boot+context-menu spec (8/8 verdi).
+
+- [ ] **Decidere i 5 branch superstiti non atterrati** — Branch con patch mai
+  arrivate su main (`git cherry main <br>`): `claude/condescending-dubinsky-9ef8fb`
+  (editor, 2026-05-22), `claude/determined-leakey-b953af` (debug colore
+  tab/favicon + shell.js, 2026-06-09), e il trio identico
+  `claude/compassionate-kalam-dedd0f` / `claude/hopeful-easley-5f084f` /
+  `claude/vigilant-edison-c2b0b2` (ipc/shell/dashboard, 2026-06-02, 1 patch).
+  Per ciascuno: guardare il diff reale, chiedere all'utente se il lavoro va
+  recuperato o buttato, poi eliminare branch+worktree. (stima: S)
 
 - [ ] **Spezzare `src/content/content.js` (3247 righe) — parte 1: estrazioni pulite** —
   Estrarre in moduli separati sotto `src/content/` le sezioni più autonome,
