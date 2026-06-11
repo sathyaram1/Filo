@@ -174,6 +174,48 @@ module.exports = function register(on, ctx) {
     }
   });
 
+  // Catalogo modelli di un provider, recuperato dal main con le chiavi
+  // predefinite: la pagina admin non vede mai le chiavi vere, quindi non può
+  // interrogare le API da sola (a differenza delle Opzioni, che usano le
+  // chiavi dell'utente). Solo metadati, nessuna inferenza. Ritorna
+  // { ok, items: [{ id, label }] } già ordinati dal più recente e con
+  // l'etichetta di categoria (Testo / Multimodale / Sintesi vocale / …).
+  on(MSG.DEFAULT_MODELS_LIST, async (msg) => {
+    try {
+      if (!isAdmin()) {
+        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
+      }
+      const provider = msg.provider === 'gemini' ? 'gemini' : 'openrouter';
+      try { await Defaults.refreshIfStale(); } catch (_) {}
+      const apiKey = await defaultKeyFor(provider, Defaults.get());
+      let raw;
+      if (provider === 'gemini') {
+        // Il catalogo Gemini richiede la chiave (gratuita: solo metadati).
+        if (!apiKey) return { ok: false, error: 'Chiave gemini non configurata' };
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        raw = (data.models || [])
+          .map((m) => ({ id: (m.name || '').replace(/^models\//, ''), meta: m }))
+          .filter((it) => it.id);
+      } else {
+        // Il catalogo OpenRouter è pubblico: la chiave è facoltativa.
+        const res = await fetch('https://openrouter.ai/api/v1/models', {
+          headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        raw = (data.data || []).map((m) => ({ id: m.id, meta: m })).filter((it) => it.id);
+      }
+      const Caps = globalThis.SN_MODEL_CAPS;
+      const items = Caps.sortByRecency(raw.map((it) => ({ ...it, provider })))
+        .map((it) => ({ id: it.id, label: Caps.categoryLabel(provider, it.id, it.meta) }));
+      return { ok: true, provider, items };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  });
+
   on(MSG.WEB_SEARCH, async (msg) => {
     try {
       const settings = await getEffectiveSettings();
