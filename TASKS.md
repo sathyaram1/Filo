@@ -95,7 +95,7 @@ contesto, per tempo, o perché l'utente chiude), la prossima riparte da qui.
   grosso è il menu spellcheck (~350 righe), estraibile in un'eventuale
   parte 3 se serve.
 
-- [ ] **Spezzare lo switch di `src/main/services/handlers.js` (82 case, ~790 righe)** —
+- [~] **Spezzare lo switch di `src/main/services/handlers.js` (82 case, ~790 righe)** —
   Sostituire il mega-switch in `handleMessage` con un registro
   `Map<MSG.*, handlerFn>` popolato da moduli per dominio sotto
   `src/main/services/handlers/`: es. `nav.js` (NAV_*, OPEN_*, CLOSE_*,
