@@ -99,6 +99,15 @@ test('riga esplicita da non-admin: rifiutata senza chiamare il provider', async 
   assert.equal(state.calls.length, 0);
 });
 
+test('stream concluso senza contenuto → ok:false "risposto vuoto" (capita su alcuni endpoint :free)', async () => {
+  state.admin = true;
+  state.defaults.apiKeys = { openrouter: 'sk-or-default' };
+  state.emptyStream = true;
+  const res = await testModel({ provider: 'openrouter', model: 'nvidia/nemotron-3-ultra-550b-a55b:free' });
+  assert.equal(res.ok, false);
+  assert.match(String(res.error), /vuoto/i);
+});
+
 test('errore del provider propagato come ok:false (es. modello inesistente su OpenRouter)', async () => {
   state.admin = true;
   state.defaults.apiKeys = { openrouter: 'sk-or-default' };
