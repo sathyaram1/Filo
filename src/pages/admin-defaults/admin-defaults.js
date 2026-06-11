@@ -123,11 +123,22 @@
     });
     provSel.value = single.provider;
 
+    // Combobox: la datalist per-provider elenca il catalogo completo (scorri o
+    // scrivi per filtrare); resta possibile digitare un id non in lista.
     const idIn = document.createElement('input');
     idIn.type = 'text';
     idIn.placeholder = I18n.t('options_model_id');
+    idIn.setAttribute('list', datalistIdFor(single.provider));
     idIn.value = single.model;
     idIn.className = 'sn-model-id';
+    // Carica il catalogo la prima volta che l'utente apre il campo.
+    idIn.addEventListener('focus', () => ensureProviderModels(provSel.value));
+
+    // Cambiando provider, il combobox punta all'altra lista (e la carica).
+    provSel.addEventListener('change', () => {
+      idIn.setAttribute('list', datalistIdFor(provSel.value));
+      ensureProviderModels(provSel.value);
+    });
 
     const del = document.createElement('button');
     del.type = 'button';
