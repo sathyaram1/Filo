@@ -181,7 +181,24 @@
     }
 
     async function compute() {
-      return fromThemeColor() || (await fromManifest()) || (await fromFavicon()) || null;
+      // theme-color e manifest sono comodi ma spesso valgono la "chrome" neutra
+      // della pagina (YouTube dichiara theme-color BIANCO) — non l'identità del
+      // sito. Li accettiamo solo se hanno croma sufficiente (stessa regola del
+      // campionatore favicon); altrimenti si ripiega sul favicon, che è il vero
+      // segnale di brand. Se SN_TAB_COLOR non è caricato, degrada al vecchio
+      // comportamento (accetta comunque il theme-color).
+      const TC = self.SN_TAB_COLOR;
+      const ident = (c) => c && (!TC || TC.hasIdentity(c));
+
+      const theme = fromThemeColor();
+      if (ident(theme)) return theme;
+      const mani = await fromManifest();
+      if (ident(mani)) return mani;
+      const fav = await fromFavicon();
+      if (fav) return fav;
+      // Niente di "colorato": meglio nessuna tinta che il bianco/grigio neutro
+      // (che daremmo a YouTube). La tab resta neutra.
+      return null;
     }
 
     async function send() {
