@@ -90,18 +90,59 @@ module.exports = function register(on, ctx) {
     }
   });
 
+  // Normalizza una entry del registry (nuovo schema { provider, model } o
+  // vecchio duale { gemini, openrouter }) in { provider, model } — stessa
+  // logica delle pagine Opzioni/admin.
+  function registryEntryToSingle(entry) {
+    const e = entry || {};
+    if (e.provider && e.model) return { provider: e.provider, model: e.model };
+    if (e.gemini) return { provider: 'gemini', model: e.gemini };
+    if (e.openrouter) return { provider: 'openrouter', model: e.openrouter };
+    return { provider: 'openrouter', model: '' };
+  }
+
+  // Chiave per il provider con la stessa precedenza di withDefaults: prima la
+  // predefinita (build/override admin via Firestore), poi quella personale
+  // dell'utente come fallback — indipendentemente da useDefaultModels, perché
+  // qui si testano i modelli PREDEFINITI.
+  async function defaultKeyFor(provider, d) {
+    const fromDefaults = ((d && d.apiKeys) || {})[provider] || '';
+    if (fromDefaults) return fromDefaults;
+    const eff = await getEffectiveSettings();
+    return (eff.apiKeys || {})[provider] || '';
+  }
+
   on(MSG.TEST_DEFAULT_MODEL, async (msg) => {
     try {
       const nickname = (msg.nickname || '').trim();
-      if (!nickname) return { ok: false, error: 'Nickname mancante' };
-      const eff = await getEffectiveSettings();
-      const registry = eff.modelRegistry || SN_CONST.DEFAULT_MODEL_REGISTRY;
-      const entry = registry[nickname];
-      if (!entry) return { ok: false, error: `Modello "${nickname}" non trovato` };
-      const provider = entry.provider || 'openrouter';
-      const modelId = entry.model || '';
-      if (!modelId) return { ok: false, error: 'Stringa modello vuota' };
-      const apiKey = (eff.apiKeys || {})[provider] || '';
+      const explicitModel = (msg.model || '').trim();
+      try { await Defaults.refreshIfStale(); } catch (_) {}
+      const d = Defaults.get();
+      let provider; let modelId;
+      if (explicitModel) {
+        // Riga dell'editor admin, testata così com'è scritta (anche non ancora
+        // salvata). Spende le chiavi predefinite su un modello arbitrario →
+        // riservato agli amministratori.
+        if (!isAdmin()) {
+          return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
+        }
+        provider = msg.provider === 'gemini' ? 'gemini' : 'openrouter';
+        modelId = explicitModel;
+      } else {
+        // Lista read-only delle Opzioni: risolve il nickname nel registry
+        // PREDEFINITO (costanti + override Firestore), non nei settings
+        // personali — il nickname di un default deve trovarsi anche se
+        // l'utente gestisce i propri modelli (useDefaultModels OFF).
+        if (!nickname) return { ok: false, error: 'Nickname mancante' };
+        const registry = d.modelRegistry || SN_CONST.DEFAULT_MODEL_REGISTRY;
+        const entry = registry[nickname];
+        if (!entry) return { ok: false, error: `Modello "${nickname}" non trovato` };
+        const single = registryEntryToSingle(entry);
+        provider = single.provider || 'openrouter';
+        modelId = single.model || '';
+        if (!modelId) return { ok: false, error: 'Stringa modello vuota' };
+      }
+      const apiKey = await defaultKeyFor(provider, d);
       if (!apiKey) return { ok: false, error: `Chiave ${provider} non configurata` };
       // Il provider Gemini ora accetta i nomi nativi (es. gemini-3.1-flash-lite),
       // quindi il modello del registry va passato così com'è: stesso percorso
