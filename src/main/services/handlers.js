@@ -739,10 +739,6 @@ async function handleMessage(msg, sender = {}) {
   const fn = registry.get(msg.type);
   if (fn) return fn(msg, sender, origin);
   switch (msg.type) {
-    case MSG.AI_REQUEST: {
-      const r = await handleAIRequest({ action: msg.action, payload: msg.payload, origin });
-      return { ok: true, ...r };
-    }
     case MSG.CAPTURE_VISIBLE_TAB: {
       const win = winOf(sender);
       if (!win || !win._filoTabs) return { ok: false, error: 'no window' };
