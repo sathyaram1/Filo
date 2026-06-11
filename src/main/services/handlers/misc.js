@@ -79,7 +79,10 @@ module.exports = function register(on, ctx) {
       if (!url) return { ok: false, error: 'url mancante' };
       const controller = new AbortController();
       const t = setTimeout(() => controller.abort(), 4000);
-      const r = await fetch(url, { method: 'GET', signal: controller.signal, redirect: 'follow' });
+      // safeFetch: solo http/https + blocco di loopback/IP privati, rivalidando
+      // ogni redirect. Evita che una pagina usi questa fetch del main per
+      // sondare/leggere servizi locali o interni (SSRF).
+      const r = await safeFetch(url, { signal: controller.signal });
       clearTimeout(t);
       let html = '';
       const reader = r.body?.getReader?.();
