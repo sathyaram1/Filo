@@ -77,6 +77,10 @@ module.exports = function register(on, ctx) {
         },
       });
       const totalMs = performance.now() - startMs;
+      // Stream concluso senza alcun contenuto (capita ad alcuni endpoint
+      // gratuiti): per l'utente il modello NON funziona, quindi è un errore,
+      // non un "OK — null ms".
+      if (charCount === 0) return { ok: false, error: 'Il modello ha risposto vuoto' };
       const tokens = (result?.usage?.completionTokens) || Math.max(1, Math.round(charCount / 4));
       const tps = tokens > 0 && totalMs > 0 ? (tokens / (totalMs / 1000)) : 0;
       return {
