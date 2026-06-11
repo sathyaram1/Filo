@@ -709,6 +709,10 @@ const handlerCtx = {
   broadcastLiveUpdate,
   getEffectiveSettings,
   withDefaults,
+  Defaults,
+  isAdmin: () => {
+    try { return require('../auth/google-auth').isAdmin(); } catch (_) { return false; }
+  },
   applySettingsUpdate,
   wireSafebrowse,
   modelForAction,
