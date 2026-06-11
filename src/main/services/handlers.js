@@ -741,65 +741,6 @@ async function handleMessage(msg, sender = {}) {
       const r = await handleAIRequest({ action: msg.action, payload: msg.payload, origin });
       return { ok: true, ...r };
     }
-    case MSG.GET_CLIPBOARD_HISTORY: {
-      const list = await Storage.getRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []);
-      return { ok: true, items: Array.isArray(list) ? list : [] };
-    }
-    case MSG.PUSH_CLIPBOARD_ENTRY: {
-      const cap = SN_CONST.CLIPBOARD_HISTORY_MAX;
-      const list = await Storage.getRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []);
-      const arr = Array.isArray(list) ? list : [];
-      const e = msg.entry;
-      if (!e) return { ok: true, items: arr };
-      const norm = (s) => (s || '').replace(/\s+/g, ' ').trim();
-      const keyOf = (x) => {
-        if (!x) return '';
-        if (x.type === 'text') return 't:' + norm(x.text);
-        if (x.type === 'image') return 'i:' + (x.dataUrl || '');
-        return '';
-      };
-      const newKey = keyOf(e);
-      const seen = new Set([newKey]);
-      const filtered = [];
-      for (const x of arr) {
-        const k = keyOf(x);
-        if (k === newKey || seen.has(k)) continue;
-        seen.add(k);
-        filtered.push(x);
-      }
-      filtered.unshift({ ...e, ts: Date.now() });
-      const trimmed = filtered.slice(0, cap);
-      await Storage.setRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, trimmed);
-      return { ok: true, items: trimmed };
-    }
-    case MSG.UPDATE_CLIPBOARD_DESCRIPTION: {
-      const list = await Storage.getRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []);
-      const arr = Array.isArray(list) ? list : [];
-      let updated = false;
-      for (const x of arr) {
-        if (x.type === 'image' && x.dataUrl === msg.dataUrl) {
-          x.description = msg.description;
-          updated = true;
-          break;
-        }
-      }
-      if (updated) await Storage.setRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, arr);
-      return { ok: true, items: arr };
-    }
-    case MSG.CLEAR_CLIPBOARD_HISTORY:
-      await Storage.setRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []);
-      return { ok: true };
-    case MSG.GET_HISTORY:
-      return { ok: true, items: await History.list() };
-    case MSG.APPEND_HISTORY: {
-      const item = await History.append(msg.entry);
-      return { ok: true, item };
-    }
-    case MSG.CLEAR_HISTORY:
-      await History.clear();
-      return { ok: true };
-    case MSG.GET_COSTS:
-      return { ok: true, monthly: await Costs.getMonthly(), state: await Costs.getState() };
     case MSG.CAPTURE_VISIBLE_TAB: {
       const win = winOf(sender);
       if (!win || !win._filoTabs) return { ok: false, error: 'no window' };
