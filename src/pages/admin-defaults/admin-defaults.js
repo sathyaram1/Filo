@@ -167,24 +167,23 @@
   async function runRowTest(nickIn, provSel, idIn, row, btn) {
     const statusEl = row.querySelector('.sn-model-row-status');
     const nickname = nickIn.value.trim();
+    const provider = provSel.value;
     const modelId = idIn.value.trim();
     if (!modelId) {
       statusEl.textContent = I18n.t('options_model_no_id');
       return;
     }
-    // Se il nickname è salvato nel registry predefinito, testa con le chiavi
-    // predefinite (TEST_DEFAULT_MODEL). Altrimenti non possiamo testare: le
-    // chiavi non sono visibili in questa pagina (solo "configurata/non").
-    if (!nickname) {
-      statusEl.textContent = I18n.t('options_model_nickname_required');
-      return;
-    }
-    statusEl.textContent = I18n.t('options_test_running');
+    statusEl.textContent = `${provider} · ${modelId} — ${I18n.t('options_test_running')}`;
     btn.disabled = true;
     try {
+      // Testa la riga così com'è scritta (provider + stringa modello), anche
+      // prima del salvataggio: il main usa le chiavi predefinite (mai visibili
+      // qui). Il nickname viaggia solo come informazione di contorno.
       const res = await chrome.runtime.sendMessage({
         type: MSG.TEST_DEFAULT_MODEL,
         nickname,
+        provider,
+        model: modelId,
       });
       if (!res?.ok) {
         statusEl.textContent = I18n.t('options_test_failed', res?.error || '—');
