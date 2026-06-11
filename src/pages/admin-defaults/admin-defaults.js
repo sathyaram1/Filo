@@ -17,7 +17,60 @@
   // Mappa azione → editor a segmenti della catena di modelli (popolata in applyConfig()).
   let modelChains = {};
 
+  // Cache dei cataloghi modelli per provider (come nelle Opzioni), ma recuperati
+  // dal MAIN con le chiavi predefinite: questa pagina non vede mai le chiavi.
+  // `null` = non ancora caricato; lista = caricato.
+  const providerModelCache = { gemini: null, openrouter: null };
+
   function $(id) { return document.getElementById(id); }
+
+  // Id della datalist (combobox) associata a un provider.
+  function datalistIdFor(provider) {
+    return provider === 'gemini' ? 'models-list-gemini' : 'models-list-openrouter';
+  }
+
+  // Popola la datalist di un provider con [{ id, label }] (già ordinati dal più
+  // recente e etichettati per categoria dal main).
+  function populateDatalist(provider, items) {
+    const dl = $(datalistIdFor(provider));
+    if (!dl) return;
+    dl.innerHTML = '';
+    const seen = new Set();
+    for (const it of items || []) {
+      const id = typeof it === 'string' ? it : it.id;
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      const opt = document.createElement('option');
+      opt.value = id;
+      if (it && it.label) opt.label = it.label;
+      dl.appendChild(opt);
+    }
+  }
+
+  // Carica (una sola volta) il catalogo di un provider chiedendolo al main.
+  // Silenzioso: in caso di errore il campo resta un input libero.
+  async function ensureProviderModels(provider) {
+    if (providerModelCache[provider]) return;
+    try {
+      const res = await chrome.runtime.sendMessage({ type: MSG.DEFAULT_MODELS_LIST, provider });
+      if (res?.ok && Array.isArray(res.items) && res.items.length) {
+        providerModelCache[provider] = res.items;
+        populateDatalist(provider, res.items);
+      }
+    } catch (_) { /* lista non disponibile: il campo resta libero */ }
+  }
+
+  // Semina i combobox con gli id già nel registry (per provider) così il valore
+  // corrente compare subito; il fetch del catalogo completo poi li rimpiazza.
+  function seedDatalistsFromRegistry(registry) {
+    const byProv = { gemini: [], openrouter: [] };
+    for (const nick of Object.keys(registry || {})) {
+      const s = entryToSingle(registry[nick]);
+      if (s.model && byProv[s.provider]) byProv[s.provider].push(s.model);
+    }
+    if (!providerModelCache.gemini) populateDatalist('gemini', byProv.gemini);
+    if (!providerModelCache.openrouter) populateDatalist('openrouter', byProv.openrouter);
+  }
 
   function fillStaticText() {
     document.title = I18n.t('admin_defaults_title');
