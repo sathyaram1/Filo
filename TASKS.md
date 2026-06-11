@@ -95,19 +95,28 @@ contesto, per tempo, o perché l'utente chiude), la prossima riparte da qui.
   grosso è il menu spellcheck (~350 righe), estraibile in un'eventuale
   parte 3 se serve.
 
-- [~] **Spezzare lo switch di `src/main/services/handlers.js` (82 case, ~790 righe)** —
-  Sostituire il mega-switch in `handleMessage` con un registro
-  `Map<MSG.*, handlerFn>` popolato da moduli per dominio sotto
-  `src/main/services/handlers/`: es. `nav.js` (NAV_*, OPEN_*, CLOSE_*,
-  fullscreen), `filo.js` (FILO_*), `auth.js` (AUTH_*, DEFAULTS_*),
-  `safebrowse.js` (SAFEBROWSE_*), `misc.js` (resto). `handleMessage` resta
-  come lookup + fallback. Le funzioni di supporto condivise (buildMessages,
-  getEffectiveSettings, broadcastToTabs, …) restano in handlers.js ed
-  esportate ai sottomoduli via parametro o globalThis come già avviene.
-  Farlo un dominio alla volta; dopo ogni dominio: `npx playwright test
-  tests/boot.spec.mjs tests/context-menu.spec.mjs` + uno spec dell'area
-  spostata. Criterio di fatto: nessun case nello switch originale, suite
-  mirata verde. (stima: L)
+- [x] **Spezzare lo switch di `src/main/services/handlers.js`** (2026-06-11) —
+  Fatto: lo switch (89 case) non esiste più. `handleMessage` è lookup su un
+  registro `Map` + fallback; i case vivono in 9 moduli per dominio sotto
+  `src/main/services/handlers/`: `nav.js` (18: OPEN_*/NAV_*/CLOSE_*/
+  fullscreen/SHELL_ACTION/incognito/misspelling), `tabs.js` (12: _tabs:*,
+  colori/attività/triage, archivio), `storage.js` (15: _storage:*, settings,
+  export, clipboard, history, costi), `pages.js` (10: salvati+categorie),
+  `ai.js` (6: AI_REQUEST, TTS, test provider/modelli, web search, save path),
+  `filo.js` (12: chat/dashboard/memoria/note/timer/notifiche), `auth.js`
+  (6: AUTH_*, FEEDBACK_UPDATE, DEFAULTS_*), `safebrowse.js` (4), `misc.js`
+  (6: capture, feedback box, fetch_link_meta). Ogni modulo riceve via `ctx`
+  gli helper condivisi rimasti in handlers.js (winOf, getEffectiveSettings,
+  broadcast, …) e legge gli SN_* da globalThis. handlers.js: 1765 → 1025
+  righe. Dedup in più: il case UPDATE_SETTINGS duplicava riga per riga
+  `applySettingsUpdate` → ora la usa. CLAUDE.md e README aggiornati (punto
+  "nuovo messaggio IPC"). Verificato in 5 batch: 91 test verdi totali (boot,
+  context-menu, menu-nav-actions, fullscreen, tab-live-color/activity/archive,
+  settings-instant-apply, export-data, clipboard x2, dashboard, filo-chat-set-
+  preference, read-aloud, tts-preferences, agent-style, auth-shell,
+  admin-defaults-gate, feedback-admin-gate/batch/dim/draw, safebrowse,
+  cookies, incognito, slash-commands, tab-semantic-search,
+  sidebar-shell-actions) + test:shoot del menu tasto destro (ok).
 
 - [ ] **Consolidare la suite test (103 spec, ~25 min)** — Molti micro-spec
   avviano Electron per testare dettagli della stessa pagina (es.
