@@ -81,7 +81,26 @@ async function filoHandler(request) {
       return new Response('Forbidden', { status: 403 });
     }
 
-    return net.fetch(pathToFileURL(resolved).href);
+    const res = await net.fetch(pathToFileURL(resolved).href);
+    // CSP solo per i documenti HTML (le pagine privilegiate filo://): rete di
+    // sicurezza contro un eventuale XSS futuro su una pagina che ha accesso a
+    // storage + shellExec. Oggi nessun XSS sfruttabile (gli innerHTML esaminati
+    // escapano a monte), ma se in futuro un sink non escapato venisse introdotto,
+    // questa CSP impedisce l'esecuzione di script inline/eval iniettati.
+    //   - script-src 'self' filo:  → niente inline/eval; copre tutti gli host
+    //     filo:// (shared/shell/<page>). Verificato: nessun <script> inline,
+    //     nessun eval/new Function, nessun handler on*= nelle pagine.
+    //   - style-src include 'unsafe-inline' perché le pagine usano attributi
+    //     style= e stili dinamici (non un vettore di esecuzione codice).
+    //   - img/media/connect permissivi (https:, data:, blob:) per non rompere
+    //     favicon, anteprime e risorse caricate dalle pagine.
+    const ct = res.headers.get('content-type') || '';
+    if (/text\/html/i.test(ct)) {
+      const headers = new Headers(res.headers);
+      headers.set('Content-Security-Policy', FILO_PAGE_CSP);
+      return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+    }
+    return res;
   } catch (err) {
     return new Response('Filo protocol error: ' + (err.message || err), { status: 500 });
   }
