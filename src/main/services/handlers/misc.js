@@ -105,8 +105,4 @@ module.exports = function register(on, ctx) {
       return { ok: false, error: e.message || String(e) };
     }
   });
-
-  // I18n è importato per simmetria con gli altri domini ma qui non serve
-  // ancora: lasciato fuori dal ctx finché un handler non lo usa.
-  void I18n;
 };
