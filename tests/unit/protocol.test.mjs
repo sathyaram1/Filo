@@ -72,14 +72,15 @@ test('una traversal verso un sorgente fuori cartella non serve il file', async (
   assert.notEqual(res.status, 200);
 });
 
-// Verifica diretta del guard /\.\./: passando un rel che contiene davvero ".."
-// (qui via un host non riconosciuto + pathname costruito) il guard risponde 403
-// prima di toccare il file system. Replichiamo la condizione che sotto Electron
-// si presenta col %2e%2e superstite, chiamando il guard sul ramo che resta.
-test('il guard rifiuta esplicitamente un rel con .. (403)', async () => {
-  // Doppio encoding: %252e%252e → decode URL (parser) → %2e%2e → decode handler → ..
-  const res = await filoHandler({ url: 'filo://asset/%252e%252e/x' });
-  assert.equal(res.status, 403);
+// Verifica diretta del guard relIsUnsafe (è ciò che, sotto Electron, blocca il
+// `..` superstite del %2e%2e che il parser standard non normalizza).
+test('relIsUnsafe riconosce i segmenti .. e lascia passare i path leciti', () => {
+  for (const bad of ['..', '../x', 'a/../b', 'a/..', '..\\x', 'a\\..\\b', '../../package.json']) {
+    assert.equal(relIsUnsafe(bad), true, `${bad} dovrebbe essere unsafe`);
+  }
+  for (const ok of ['dashboard.html', 'sub/dir/file.js', 'a..b/c', 'foo.bar', '']) {
+    assert.equal(relIsUnsafe(ok), false, `${ok} dovrebbe essere safe`);
+  }
 });
 
 test('una richiesta legittima a un asset esistente passa', async () => {
