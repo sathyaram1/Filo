@@ -747,56 +747,6 @@ async function handleMessage(msg, sender = {}) {
     case '_storage:clear':
       await globalThis.chrome.storage.local.clear();
       return { ok: true };
-    case '_tabs:create': {
-      const win = winOf(sender);
-      if (!win || !win._filoTabs) return { ok: false };
-      const id = win._filoTabs.openTab(msg.url || 'filo://newtab/');
-      return { ok: true, id };
-    }
-    case '_tabs:remove': {
-      const win = winOf(sender);
-      if (win && win._filoTabs) win._filoTabs.closeTab(msg.id);
-      return { ok: true };
-    }
-    case MSG.TAB_DOMINANT_COLOR: {
-      // Colore dominante campionato dalla pagina → tinge la tab attiva (§1.1).
-      const win = winOf(sender);
-      if (win && win._filoTabs && sender?.tab?.id) {
-        win._filoTabs.setTabColor(sender.tab.id, msg.color || null);
-      }
-      return { ok: true };
-    }
-    case MSG.TAB_IDENTITY_COLOR: {
-      // Colore identità del sito (§1.2) → cachato per dominio dal TabManager e
-      // applicato attenuato alle tab inattive.
-      const win = winOf(sender);
-      if (win && win._filoTabs && sender?.tab?.id) {
-        win._filoTabs.setTabIdentityColor(sender.tab.id, msg.color || null);
-      }
-      return { ok: true };
-    }
-    case MSG.RUN_TAB_TRIAGE: {
-      // Pulizia/riordino su richiesta esplicita (l'utente ha confermato nel
-      // bottone dell'agente). Gira sul TabManager della finestra del mittente.
-      const win = winOf(sender);
-      if (win && win._filoTabs) {
-        const res = await win._filoTabs.runAutoTriage({ trigger: 'manual' });
-        return { ok: true, archived: (res && res.archived) || 0 };
-      }
-      return { ok: false, archived: 0 };
-    }
-    case MSG.TAB_ACTIVITY: {
-      // Segnali di attività della tab (§2.1) → merge sullo snapshot.
-      const win = winOf(sender);
-      if (win && win._filoTabs && sender?.tab?.id) {
-        win._filoTabs.setTabActivity(sender.tab.id, {
-          lastInteractionAt: msg.lastInteractionAt,
-          scrollPct: msg.scrollPct,
-          formDirty: msg.formDirty,
-        });
-      }
-      return { ok: true };
-    }
     case MSG.AI_REQUEST: {
       const r = await handleAIRequest({ action: msg.action, payload: msg.payload, origin });
       return { ok: true, ...r };
