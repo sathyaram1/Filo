@@ -56,14 +56,29 @@ test('NON aggiunge CSP a risorse non-HTML (es. CSS)', async () => {
   assert.equal(res.headers.get('content-security-policy'), null);
 });
 
-test('blocca path traversal con .. percent-encoded', async () => {
-  // %2e%2e sopravvive alla normalizzazione URL e ridiventa .. dopo il decode.
+// NB: il parser URL di Node collassa i segmenti dot (%2e%2e) già in fase di
+// parsing, quindi qui la traversal è neutralizzata a monte e non serve mai un
+// file fuori dalla cartella attesa. Sotto Electron (schema "standard") il
+// %2e%2e sopravvive: lì interviene il guard /\.\./ + il boundary ROOT+sep
+// aggiunti in protocol.js. In entrambi i runtime, l'invariante osservabile è
+// che la richiesta NON restituisce mai (status 200) un file fuori root.
+test('una traversal verso la root non serve il file (no leak)', async () => {
   const res = await filoHandler({ url: 'filo://asset/%2e%2e/%2e%2e/package.json' });
-  assert.equal(res.status, 403);
+  assert.notEqual(res.status, 200);
 });
 
-test('blocca path traversal con .. letterali ridondanti nel pathname', async () => {
+test('una traversal verso un sorgente fuori cartella non serve il file', async () => {
   const res = await filoHandler({ url: 'filo://style/%2e%2e/main/protocol.js' });
+  assert.notEqual(res.status, 200);
+});
+
+// Verifica diretta del guard /\.\./: passando un rel che contiene davvero ".."
+// (qui via un host non riconosciuto + pathname costruito) il guard risponde 403
+// prima di toccare il file system. Replichiamo la condizione che sotto Electron
+// si presenta col %2e%2e superstite, chiamando il guard sul ramo che resta.
+test('il guard rifiuta esplicitamente un rel con .. (403)', async () => {
+  // Doppio encoding: %252e%252e → decode URL (parser) → %2e%2e → decode handler → ..
+  const res = await filoHandler({ url: 'filo://asset/%252e%252e/x' });
   assert.equal(res.status, 403);
 });
 
