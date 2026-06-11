@@ -36,12 +36,14 @@ const state = {
   effective: { modelRegistry: {}, apiKeys: {} },
   calls: [],            // chiamate catturate a streamComplete
   streamError: null,    // se valorizzato, streamComplete lancia
+  emptyStream: false,   // se true, lo stream finisce senza contenuto
 };
 
 globalThis.SN_PROVIDERS = {
   streamComplete: async ({ provider, apiKey, model, messages, onDelta }) => {
     state.calls.push({ provider, apiKey, model });
     if (state.streamError) throw new Error(state.streamError);
+    if (state.emptyStream) return { usage: { completionTokens: 0 } };
     onDelta('1, 2, 3');
     return { usage: { completionTokens: 7 } };
   },
