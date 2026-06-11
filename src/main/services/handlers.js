@@ -727,6 +727,8 @@ const handlerCtx = {
 
 require('./handlers/nav')(on, handlerCtx);
 require('./handlers/tabs')(on, handlerCtx);
+require('./handlers/storage')(on, handlerCtx);
+require('./handlers/pages')(on, handlerCtx);
 
 // ─── handler centrale richiamato dall'IPC ───────────────────────────────────
 
