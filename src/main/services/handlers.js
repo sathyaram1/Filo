@@ -691,10 +691,49 @@ async function maybeCategorizeAsync(savedEntry, pageInput) {
   }
 }
 
+// ─── registro handler per dominio ────────────────────────────────────────────
+// Lo switch storico di handleMessage è spezzato in moduli sotto handlers/:
+// ogni modulo registra i propri tipi di messaggio nel registro, handleMessage
+// fa solo lookup + fallback. I sottomoduli ricevono via ctx le funzioni di
+// supporto condivise che restano in questo file (winOf, getEffectiveSettings,
+// broadcast, …); i singleton SN_* li leggono da globalThis come qui sopra.
+
+const registry = new Map();
+
+function on(type, fn) {
+  if (registry.has(type)) throw new Error(`[handlers] handler duplicato per "${type}"`);
+  registry.set(type, fn);
+}
+
+const handlerCtx = {
+  MSG,
+  winOf,
+  filoWin,
+  broadcastToTabs,
+  broadcastLiveUpdate,
+  getEffectiveSettings,
+  withDefaults,
+  applySettingsUpdate,
+  wireSafebrowse,
+  modelForAction,
+  buildAttemptChain,
+  applyLimitToChain,
+  handleAIRequest,
+  maybeCategorizeAsync,
+  searchArchivedTabs,
+  handleFiloChat,
+  handleFiloGenerateDashboard,
+};
+
+require('./handlers/nav')(on, handlerCtx);
+require('./handlers/tabs')(on, handlerCtx);
+
 // ─── handler centrale richiamato dall'IPC ───────────────────────────────────
 
 async function handleMessage(msg, sender = {}) {
   const origin = sender?.tab?.url || sender?.url || '';
+  const fn = registry.get(msg.type);
+  if (fn) return fn(msg, sender, origin);
   switch (msg.type) {
     // ── canali interni per lo shim chrome.* nel renderer ────────────────
     case '_storage:get':
