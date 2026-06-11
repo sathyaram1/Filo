@@ -41,7 +41,14 @@
     // Test provider: misura latenza al primo token e token al secondo
     // su un piccolo prompt fisso. Usato dalla pagina Opzioni.
     TEST_PROVIDER: 'test_provider',                 // { provider, apiKey, model? }
-    TEST_DEFAULT_MODEL: 'test_default_model',       // { nickname } → testa con chiavi effettive
+    // Test di un modello del registry PREDEFINITO con le chiavi predefinite.
+    // { nickname } → risolve nel registry predefinito (lista read-only Opzioni);
+    // { provider, model } → testa la riga così com'è scritta, anche non ancora
+    // salvata (editor admin, solo amministratori).
+    TEST_DEFAULT_MODEL: 'test_default_model',
+    // Catalogo modelli di un provider recuperato dal main con le chiavi
+    // predefinite (solo admin). { provider } → { ok, items: [{ id, label }] }
+    DEFAULT_MODELS_LIST: 'default_models_list',
 
     OPEN_HOME: 'open_home',
     OPEN_HISTORY: 'open_history',
