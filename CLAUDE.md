@@ -201,6 +201,7 @@ e shortcut globali OS.
 npm install                # Electron + Playwright (~150MB)
 npm start                  # avvia la app
 npm run test:smoke         # smoke headless con screenshot in tests/.smoke/
+npm run test:unit          # unit test logica pura (node:test, no Electron, ms)
 npm test                   # suite Playwright (~100 spec, ~25 min: solo in cloud)
 ```
 
