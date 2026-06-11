@@ -43,6 +43,14 @@ async function filoHandler(request) {
     const host = url.hostname; // shell | newtab | dashboard | history | ...
     const rel = decodeURIComponent(url.pathname.replace(/^\/+/, ''));
 
+    // Lo schema filo è "standard": il parser normalizza i `..` NON codificati nel
+    // pathname, ma i `..` percent-encoded (%2e%2e) sopravvivono e ridiventano `..`
+    // solo dopo decodeURIComponent — finendo in path.join e uscendo dalla cartella
+    // attesa. Rifiutiamo qualsiasi `..` rimasto dopo il decode.
+    if (/(^|[\\/])\.\.([\\/]|$)/.test(rel)) {
+      return new Response('Forbidden', { status: 403 });
+    }
+
     let fsPath;
     if (host === 'shell') {
       fsPath = path.join(SRC, 'renderer', rel || 'shell.html');
