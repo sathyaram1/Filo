@@ -138,4 +138,7 @@ function registerFiloProtocolForSession(sess) {
   }
 }
 
-module.exports = { registerProtocolSchemes, registerFiloProtocol, registerFiloProtocolForSession };
+module.exports = {
+  registerProtocolSchemes, registerFiloProtocol, registerFiloProtocolForSession,
+  filoHandler, FILO_PAGE_CSP, ROOT,
+};
