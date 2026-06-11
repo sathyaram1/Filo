@@ -267,6 +267,11 @@
     $('apiKeySafebrowse-state').textContent = `(${keyStateText(cfg.safeBrowsingKeyPresent)})`;
     renderModelRegistry(cfg.modelRegistry || {});
     renderModelsGrid(cfg.models || {});
+    // Combobox modelli: semina con gli id già nel registry (compaiono subito),
+    // poi carica i cataloghi completi in background (non blocca il render).
+    seedDatalistsFromRegistry(cfg.modelRegistry || {});
+    ensureProviderModels('openrouter');
+    ensureProviderModels('gemini');
   }
 
   async function load() {
