@@ -853,28 +853,6 @@ async function handleMessage(msg, sender = {}) {
       return { ok: true, pages: await SavedPages.remove(msg.id) };
     case MSG.CONSUME_SAVED_PAGE:
       return { ok: true, pages: await SavedPages.consume(msg.id) };
-    case MSG.GET_ARCHIVED_TABS:
-      // listMeta: senza embedding (non spediamo i vettori al renderer).
-      return { ok: true, tabs: await ArchivedTabs.listMeta() };
-    case MSG.SEARCH_ARCHIVED_TABS:
-      return await searchArchivedTabs(msg.query);
-    case MSG.DELETE_ARCHIVED_TABS: {
-      const r = await ArchivedTabs.removeMany(msg.ids || []);
-      return { ok: true, removed: r.removed, remaining: r.remaining };
-    }
-    case MSG.REMOVE_ARCHIVED_TAB:
-      return { ok: true, tabs: await ArchivedTabs.remove(msg.id) };
-    case MSG.CLEAR_ARCHIVED_TABS:
-      return { ok: true, tabs: await ArchivedTabs.clear() };
-    case MSG.REOPEN_ARCHIVED_TAB: {
-      // Riapre la scheda archiviata, ripristinando lo scroll registrato.
-      const win = winOf(sender);
-      if (win && win._filoTabs && msg.url) {
-        const pct = typeof msg.scrollPct === 'number' ? msg.scrollPct : null;
-        win._filoTabs.openTab(msg.url, { activate: true, restoreScrollPct: pct });
-      }
-      return { ok: true };
-    }
     case MSG.GET_CLIPBOARD_HISTORY: {
       const list = await Storage.getRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []);
       return { ok: true, items: Array.isArray(list) ? list : [] };
