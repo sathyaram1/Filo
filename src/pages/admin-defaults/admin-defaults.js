@@ -186,7 +186,7 @@
         model: modelId,
       });
       if (!res?.ok) {
-        statusEl.textContent = I18n.t('options_test_failed', res?.error || '—');
+        statusEl.textContent = `${provider} · ${modelId} — ${I18n.t('options_test_failed', res?.error || '—')}`;
       } else {
         statusEl.textContent = I18n.t('options_test_result', res.ttftMs ?? '—', res.tokensPerSec ?? '—');
       }
