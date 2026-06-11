@@ -131,6 +131,7 @@ finché l'estensione legacy esiste (ma vedi nota sopra: per ora è congelata).
 
 Quando aggiungi un nuovo messaggio IPC, ricordati di:
 1. Definirlo in `src/shared/messages.js` (costante `MSG.*`).
-2. Gestirlo in `src/main/services/handlers.js` (switch in `handleMessage`).
+2. Gestirlo nel modulo di dominio giusto sotto `src/main/services/handlers/`
+   registrandolo con `on(MSG.X, fn)` (il registro vive in `handlers.js`).
 3. Se è broadcast main→renderer, usa `broadcastToTabs` o
    `broadcastLiveUpdate` (vedi handlers.js).
