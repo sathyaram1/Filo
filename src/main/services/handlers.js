@@ -9,9 +9,7 @@
 // I moduli SN_* sono stati caricati dal loader.js — qui assumiamo siano su global.
 
 const { BrowserWindow } = require('electron');
-const auth = require('../auth/google-auth');
 const Defaults = require('./defaultsStore');
-const { permissionDeniedHelp } = require('./feedbackError');
 
 const { SN_CONST, SN_MSG } = globalThis;
 const { ACTIONS, PROMPTS, DEFAULT_SETTINGS } = SN_CONST;
