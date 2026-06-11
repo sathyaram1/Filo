@@ -1,6 +1,8 @@
 // Handler di dominio: cattura schermo, box feedback (annotazione/invio) e
 // fetch dei metadati Open Graph di un link.
 
+const { safeFetch } = require('../safe-fetch');
+
 module.exports = function register(on, ctx) {
   const { MSG, winOf } = ctx;
 
