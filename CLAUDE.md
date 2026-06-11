@@ -216,7 +216,9 @@ src/main/                  Processo main Electron (Node)
     chrome-api.js          chrome.* namespace per i moduli portati
   services/
     loader.js              carica shared/* + background/* su globalThis
-    handlers.js            switch centrale messaggi (ex background.js dell'extension)
+    handlers.js            registro messaggi + helper condivisi (ex background.js)
+    handlers/              handler per dominio (nav, tabs, storage, pages, ai,
+                           filo, auth, safebrowse, misc)
     providers/             openrouter, gemini, fallback
     categorizer.js, savedPages.js, historyStore.js, ...
 src/preload/

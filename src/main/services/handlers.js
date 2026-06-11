@@ -24,10 +24,8 @@ const I18n = globalThis.SN_I18N;
 const Categorizer = globalThis.SN_CATEGORIZER;
 const AICache = globalThis.SN_AI_CACHE;
 const Fx = globalThis.SN_FX;
-const PathsCollector = globalThis.SN_PATHS_COLLECTOR;
 const Paths = globalThis.SN_PATHS;
 const LlmsTxt = globalThis.SN_LLMS_TXT;
-const WebSearch = globalThis.SN_WEB_SEARCH;
 const FiloMem = globalThis.SN_FILO_MEMORY;
 const FiloState = globalThis.SN_FILO_STATE;
 
