@@ -272,7 +272,9 @@ Il codice portato chiama `chrome.runtime.sendMessage`, `chrome.storage.local`,
 
 Quando aggiungi un nuovo tipo di messaggio:
 1. Definiscilo in `src/shared/messages.js` (costante `MSG.*`)
-2. Gestiscilo in `src/main/services/handlers.js` (switch case in `handleMessage`)
+2. Gestiscilo nel modulo di dominio giusto sotto `src/main/services/handlers/`
+   (es. `nav.js`, `filo.js`, …) registrandolo con `on(MSG.X, async (msg, sender, origin) => …)`;
+   il registro e le funzioni di supporto condivise (passate via `ctx`) stanno in `handlers.js`
 3. Per broadcast main→renderer usa `broadcastToTabs` o `broadcastLiveUpdate`
 
 ## Test
