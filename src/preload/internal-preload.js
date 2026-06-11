@@ -229,6 +229,7 @@ function loadContentScripts() {
   safe(path.join(CONTENT, 'spellcheck.js'));
   safe(path.join(SHARED, 'feedback.js'));
   safe(path.join(CONTENT, 'feedback.js'));
+  safe(path.join(SHARED, 'tabColor.js'));
   safe(path.join(CONTENT, 'pageColor.js'));
   safe(path.join(CONTENT, 'translatePage.js'));
   safe(path.join(CONTENT, 'tts.js'));
