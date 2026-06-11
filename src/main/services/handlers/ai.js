@@ -1,0 +1,162 @@
+// Handler di dominio: richieste AI one-shot, sintesi vocale, test dei
+// provider/modelli dalle Opzioni, ricerca web e raccolta dei path "Aiuto".
+
+module.exports = function register(on, ctx) {
+  const {
+    MSG, handleAIRequest, getEffectiveSettings, modelForAction, buildAttemptChain,
+  } = ctx;
+  const { SN_CONST } = globalThis;
+  const Providers = globalThis.SN_PROVIDERS;
+  const WebSearch = globalThis.SN_WEB_SEARCH;
+  const PathsCollector = globalThis.SN_PATHS_COLLECTOR;
+
+  on(MSG.AI_REQUEST, async (msg, sender, origin) => {
+    const r = await handleAIRequest({ action: msg.action, payload: msg.payload, origin });
+    return { ok: true, ...r };
+  });
+
+  on(MSG.TTS_SYNTH, async (msg) => {
+    // Sintesi vocale via modello. Costruisce la catena per l'azione TTS e
+    // prova i provider che la implementano (oggi: Gemini). Se nessuno è
+    // disponibile o tutti falliscono, torna { ok:false } e il content script
+    // ripiega sulla voce del browser (Web Speech).
+    try {
+      const settings = await getEffectiveSettings();
+      const model = modelForAction(settings, SN_CONST.ACTIONS.TTS);
+      let attempts;
+      try {
+        attempts = buildAttemptChain(settings, model);
+      } catch (_) {
+        return { ok: false, error: 'no_tts_model' };
+      }
+      const voice = (settings && settings.tts && settings.tts.modelVoice) || '';
+      let lastErr = null;
+      for (const a of attempts) {
+        // Solo Gemini implementa synthesizeSpeech; gli altri si saltano.
+        if (a.provider !== 'gemini') continue;
+        try {
+          const r = await Providers.getProvider('gemini').synthesizeSpeech({
+            apiKey: a.apiKey, model: a.model, text: msg.text, voice,
+          });
+          return {
+            ok: true,
+            audioBase64: r.audioBase64,
+            mimeType: r.mimeType,
+            provider: 'gemini',
+            model: a.model,
+          };
+        } catch (e) {
+          lastErr = e;
+          console.warn('[SN] TTS gemini fallito:', e.message || e);
+        }
+      }
+      return { ok: false, error: (lastErr && lastErr.message) || 'tts_failed' };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  });
+
+  on(MSG.TEST_PROVIDER, async (msg) => {
+    try {
+      const provider = msg.provider;
+      const apiKey = (msg.apiKey || '').trim();
+      const model = msg.model || (provider === 'gemini'
+        ? 'google/gemini-2.0-flash-lite-001'
+        : 'google/gemini-2.0-flash-001');
+      if (!apiKey) return { ok: false, error: 'API key mancante' };
+      const messages = [{ role: 'user', content: 'Conta da 1 a 20 separando con virgole, senza testo extra.' }];
+      const startMs = performance.now();
+      let firstTokenMs = null;
+      let charCount = 0;
+      const result = await Providers.streamComplete({
+        provider, apiKey, model, messages,
+        onDelta: (delta) => {
+          if (firstTokenMs == null) firstTokenMs = performance.now() - startMs;
+          charCount += (delta || '').length;
+        },
+      });
+      const totalMs = performance.now() - startMs;
+      const tokens = (result?.usage?.completionTokens) || Math.max(1, Math.round(charCount / 4));
+      const tps = tokens > 0 && totalMs > 0 ? (tokens / (totalMs / 1000)) : 0;
+      return {
+        ok: true, provider, model,
+        ttftMs: firstTokenMs != null ? Math.round(firstTokenMs) : null,
+        totalMs: Math.round(totalMs), completionTokens: tokens,
+        tokensPerSec: Math.round(tps * 10) / 10,
+      };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  });
+
+  on(MSG.TEST_DEFAULT_MODEL, async (msg) => {
+    try {
+      const nickname = (msg.nickname || '').trim();
+      if (!nickname) return { ok: false, error: 'Nickname mancante' };
+      const eff = await getEffectiveSettings();
+      const registry = eff.modelRegistry || SN_CONST.DEFAULT_MODEL_REGISTRY;
+      const entry = registry[nickname];
+      if (!entry) return { ok: false, error: `Modello "${nickname}" non trovato` };
+      const provider = entry.provider || 'openrouter';
+      const modelId = entry.model || '';
+      if (!modelId) return { ok: false, error: 'Stringa modello vuota' };
+      const apiKey = (eff.apiKeys || {})[provider] || '';
+      if (!apiKey) return { ok: false, error: `Chiave ${provider} non configurata` };
+      // Il provider Gemini ora accetta i nomi nativi (es. gemini-3.1-flash-lite),
+      // quindi il modello del registry va passato così com'è: stesso percorso
+      // dell'uso reale (prima qui si anteponeva "google/" e l'uso reale no →
+      // il "Prova" passava ma la feature falliva).
+      const model = modelId;
+      const messages = [{ role: 'user', content: 'Conta da 1 a 20 separando con virgole, senza testo extra.' }];
+      const startMs = performance.now();
+      let firstTokenMs = null;
+      let charCount = 0;
+      const result = await Providers.streamComplete({
+        provider, apiKey, model, messages,
+        onDelta: (delta) => {
+          if (firstTokenMs == null) firstTokenMs = performance.now() - startMs;
+          charCount += (delta || '').length;
+        },
+      });
+      const totalMs = performance.now() - startMs;
+      const tokens = (result?.usage?.completionTokens) || Math.max(1, Math.round(charCount / 4));
+      const tps = tokens > 0 && totalMs > 0 ? (tokens / (totalMs / 1000)) : 0;
+      return {
+        ok: true, provider, model: modelId, nickname,
+        ttftMs: firstTokenMs != null ? Math.round(firstTokenMs) : null,
+        totalMs: Math.round(totalMs), completionTokens: tokens,
+        tokensPerSec: Math.round(tps * 10) / 10,
+      };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  });
+
+  on(MSG.WEB_SEARCH, async (msg) => {
+    try {
+      const settings = await getEffectiveSettings();
+      const tavilyKey = settings.apiKeys?.tavily || '';
+      const r = await WebSearch.search({ query: msg.query, tavilyKey, maxResults: 5 });
+      return { ok: true, ...r };
+    } catch (e) {
+      return { ok: false, error: e.message || String(e), results: [] };
+    }
+  });
+
+  on(MSG.SAVE_PATH, async (msg, sender, origin) => {
+    (async () => {
+      try {
+        const settings = await getEffectiveSettings();
+        if (!settings.apiKeys?.[settings.provider] && !settings.apiKeys?.gemini) return;
+        const ua = process.versions ? `Filo/${process.versions.electron || ''} Node/${process.version}` : '';
+        const cid = msg.payload?.clientId || '';
+        const invokeAI = ({ action, payload }) => handleAIRequest({ action, payload, origin });
+        const r = await PathsCollector.collectAndSave({
+          session: msg.payload?.session, invokeAI, userAgent: ua, clientId: cid,
+        });
+        if (r?.saved) console.info('[Filo] path salvato:', r.id, r.intent);
+      } catch (e) { console.warn('[Filo] save_path failed', e); }
+    })();
+    return { ok: true };
+  });
+};
