@@ -165,6 +165,8 @@ module.exports = function register(on, ctx) {
         },
       });
       const totalMs = performance.now() - startMs;
+      // Come in TEST_PROVIDER: stream vuoto = modello inutilizzabile = errore.
+      if (charCount === 0) return { ok: false, error: 'Il modello ha risposto vuoto' };
       const tokens = (result?.usage?.completionTokens) || Math.max(1, Math.round(charCount / 4));
       const tps = tokens > 0 && totalMs > 0 ? (tokens / (totalMs / 1000)) : 0;
       return {
