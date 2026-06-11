@@ -737,18 +737,6 @@ async function handleMessage(msg, sender = {}) {
   const fn = registry.get(msg.type);
   if (fn) return fn(msg, sender, origin);
   switch (msg.type) {
-    // ── canali interni per lo shim chrome.* nel renderer ────────────────
-    case '_storage:get':
-      return { ok: true, value: await globalThis.chrome.storage.local.get(msg.keys ?? null) };
-    case '_storage:set':
-      await globalThis.chrome.storage.local.set(msg.obj || {});
-      return { ok: true };
-    case '_storage:remove':
-      await globalThis.chrome.storage.local.remove(msg.keys);
-      return { ok: true };
-    case '_storage:clear':
-      await globalThis.chrome.storage.local.clear();
-      return { ok: true };
     case MSG.AI_REQUEST: {
       const r = await handleAIRequest({ action: msg.action, payload: msg.payload, origin });
       return { ok: true, ...r };
