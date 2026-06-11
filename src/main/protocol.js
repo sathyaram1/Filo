@@ -48,6 +48,15 @@ function registerProtocolSchemes() {
   ]);
 }
 
+// Un segmento `..` rimasto in `rel` (path relativo già decodificato) significa
+// tentativo di uscire dalla cartella attesa. Lo schema filo è "standard": il
+// parser normalizza i `..` NON codificati, ma i `..` percent-encoded (%2e%2e)
+// sopravvivono e ridiventano `..` solo dopo decodeURIComponent — finendo in
+// path.join. Esportato per i test.
+function relIsUnsafe(rel) {
+  return /(^|[\\/])\.\.([\\/]|$)/.test(String(rel || ''));
+}
+
 // Risolutore della richiesta filo:// → Response. Estratto come funzione pura
 // così possiamo registrarlo sia sulla sessione di default sia sulle sessioni
 // effimere delle finestre incognito (vedi registerFiloProtocolForSession).
@@ -57,11 +66,7 @@ async function filoHandler(request) {
     const host = url.hostname; // shell | newtab | dashboard | history | ...
     const rel = decodeURIComponent(url.pathname.replace(/^\/+/, ''));
 
-    // Lo schema filo è "standard": il parser normalizza i `..` NON codificati nel
-    // pathname, ma i `..` percent-encoded (%2e%2e) sopravvivono e ridiventano `..`
-    // solo dopo decodeURIComponent — finendo in path.join e uscendo dalla cartella
-    // attesa. Rifiutiamo qualsiasi `..` rimasto dopo il decode.
-    if (/(^|[\\/])\.\.([\\/]|$)/.test(rel)) {
+    if (relIsUnsafe(rel)) {
       return new Response('Forbidden', { status: 403 });
     }
 
