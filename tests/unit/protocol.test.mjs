@@ -35,7 +35,7 @@ Module._load = function (request, parent, isMain) {
   return origLoad.call(this, request, parent, isMain);
 };
 
-const { filoHandler, FILO_PAGE_CSP } = require(
+const { filoHandler, relIsUnsafe, FILO_PAGE_CSP } = require(
   join(__dirname, '..', '..', 'src', 'main', 'protocol.js'),
 );
 Module._load = origLoad;
