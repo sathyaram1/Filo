@@ -1066,63 +1066,6 @@ async function handleMessage(msg, sender = {}) {
         return { ok: false, error: e?.message || String(e) };
       }
     }
-    case MSG.OPEN_HOME: {
-      const win = winOf(sender);
-      if (win?._filoTabs) win._filoTabs.openTab('filo://home/home.html');
-      return { ok: true };
-    }
-    case MSG.OPEN_HISTORY: {
-      const win = winOf(sender);
-      if (win?._filoTabs) win._filoTabs.openTab('filo://history/history.html');
-      return { ok: true };
-    }
-    case MSG.OPEN_OPTIONS: {
-      const win = winOf(sender);
-      if (win?._filoTabs) win._filoTabs.openTab('filo://options/options.html');
-      return { ok: true };
-    }
-    case MSG.OPEN_SPELLCHECK_PAGE: {
-      const win = winOf(sender);
-      if (win?._filoTabs) win._filoTabs.openTab('filo://spellcheck/spellcheck.html');
-      return { ok: true };
-    }
-    case MSG.CLOSE_TAB:
-      if (sender?.tab?.id) {
-        const win = winOf(sender);
-        win?._filoTabs?.closeTab(sender.tab.id);
-      }
-      return { ok: true };
-    case MSG.CLOSE_ALL_TABS: {
-      const win = winOf(sender);
-      win?._filoTabs?.closeAllTabs();
-      return { ok: true };
-    }
-    case MSG.OPEN_URL: {
-      const win = winOf(sender);
-      if (win?._filoTabs && msg.url) win._filoTabs.openTab(msg.url);
-      return { ok: true };
-    }
-    case MSG.QUIT_APP:
-      app.quit();
-      return { ok: true };
-    case MSG.NAV_BACK:
-      if (sender?.tab?.id) {
-        const win = winOf(sender);
-        win?._filoTabs?.goBack(sender.tab.id);
-      }
-      return { ok: true };
-    case MSG.NAV_FORWARD:
-      if (sender?.tab?.id) {
-        const win = winOf(sender);
-        win?._filoTabs?.goForward(sender.tab.id);
-      }
-      return { ok: true };
-    case MSG.NAV_RELOAD:
-      if (sender?.tab?.id) {
-        const win = winOf(sender);
-        win?._filoTabs?.reload(sender.tab.id);
-      }
-      return { ok: true };
     case MSG.NAV_STATE: {
       if (!sender?.tab?.id) return { ok: false, canBack: false, canFwd: false };
       const win = winOf(sender);
