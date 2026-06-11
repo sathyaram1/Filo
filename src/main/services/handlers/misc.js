@@ -3,7 +3,6 @@
 
 module.exports = function register(on, ctx) {
   const { MSG, winOf } = ctx;
-  const I18n = globalThis.SN_I18N;
 
   on(MSG.CAPTURE_VISIBLE_TAB, async (msg, sender) => {
     const win = winOf(sender);
