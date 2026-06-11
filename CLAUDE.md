@@ -77,6 +77,12 @@ Il minimo accettabile dipende dall'ambiente:
   sullo schermo mentre l'utente sta usando il PC — ed è lentissimo (~25 min).
   La regressione completa sulle **feature vecchie** è compito delle routine cloud
   (vedi sotto), non delle sessioni locali. In locale usa invece:
+  - **prima scelta per la logica pura — gli unit test**: `npm run test:unit`
+    (runner `node:test`, gira in millisecondi **senza aprire Electron**, quindi
+    niente finestre che lampeggiano). Se hai toccato logica pura (parsing,
+    classificazione, validazione, trasformazioni in `src/shared/*` o servizi
+    che non toccano Electron), **aggiungi/aggiorna uno unit test in
+    `tests/unit/`** e lancialo. Vedi `tests/unit/README.md`.
   - **il/gli spec mirati** della feature toccata:
     `npx playwright test tests/<feature>.spec.mjs` (1-2 avvii di Electron, pochi
     secondi) — questo è il minimo accettabile per dichiarare "fatto" in locale;

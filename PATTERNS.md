@@ -34,3 +34,27 @@ deve sembrare e comportarsi come gli altri menu a tendina già presenti in Filo.
 - **Dove:** i token di tema vivono in `src/styles/` (theme). Prima di stilare un
   controllo nuovo, guarda come è fatto un controllo equivalente esistente e riusane
   variabili/classi invece di reinventare i colori.
+
+## Colore identità delle tab: brand del sito, mai chrome neutra
+
+Il colore con cui si tingono le tab (attiva = "vetro smerigliato" §1.1; inattive
+= tinta identità attenuata §1.2) deve rappresentare il **brand del sito**, non la
+sua chrome neutra. Un `theme-color`/sfondo bianco, nero o grigio **non è
+un'identità** e non va usato come tinta: in quel caso si ripiega sul **favicon**
+(il segnale di brand più affidabile). Es: YouTube dichiara `theme-color` bianco
+ma il suo brand è il rosso del favicon → la tab dev'essere rossa, non bianca.
+
+- **Regola operativa:** un colore "conta" come identità solo se ha croma
+  sufficiente (max−min dei canali RGB ≥ 24). La logica pura è in
+  `src/shared/tabColor.js` (`SN_TAB_COLOR.hasIdentity`), unit-testata in
+  `tests/unit/tabColor.test.mjs`. La catena di derivazione è
+  `theme-color → manifest → favicon`, ma ogni anello neutro viene saltato.
+- **Perché:** una tinta bianca/grigia è indistinguibile dal tab bar (tinta
+  invisibile) o, per la tab attiva, dà un bianco senza significato. Il favicon
+  porta quasi sempre il colore vero del sito.
+- **Limite noto:** se il favicon è cross-origin senza header CORS, il canvas si
+  "taint-a" e il colore non è estraibile → la tab resta neutra (meglio che
+  sbagliata). I favicon same-origin (come YouTube) funzionano.
+- **Dove:** campionamento in `src/content/pageColor.js` (catena `compute()`);
+  applicazione/ripiego nella shell in `src/renderer/shell.js` (`render`,
+  `hasColorIdentity`).
