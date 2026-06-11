@@ -81,6 +81,9 @@ test('Prova su una riga APPENA SCRITTA: testa provider+modello della riga, non i
   expect(sent.length).toBe(1);
   expect(sent[0].provider).toBe('openrouter');
   expect(sent[0].model).toBe('nvidia/nemotron-3-ultra-550b-a55b:free');
+
+  // Traccia visiva della run (cartella gitignorata, non è il primary signal).
+  await page.screenshot({ path: 'tests/.shots/admin-defaults-editor.png', fullPage: true }).catch(() => {});
 });
 
 test('la stringa modello è un combobox: datalist per provider popolata dal catalogo', async ({ openTab }) => {
