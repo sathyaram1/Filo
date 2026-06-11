@@ -29,7 +29,9 @@ src/
 │   │   └── chrome-api.js       Namespace chrome.* per servizi portati
 │   └── services/
 │       ├── loader.js           Carica i moduli SN_* su globalThis
-│       ├── handlers.js         Handler centrale messaggi (ex background.js)
+│       ├── handlers.js         Registro messaggi + helper condivisi (ex background.js)
+│       ├── handlers/           Handler per dominio (nav, tabs, storage, pages,
+│       │                       ai, filo, auth, safebrowse, misc)
 │       ├── providers/          OpenRouter, Gemini, fallback chain
 │       ├── safebrowse/         Protezione phishing/typosquatting (12 moduli)
 │       ├── categorizer.js, savedPages.js, historyStore.js,
