@@ -19,6 +19,20 @@ const ROOT = path.join(__dirname, '..', '..');
 const SRC = path.join(ROOT, 'src');
 const ASSETS = path.join(ROOT, 'assets');
 
+// CSP applicata ai soli documenti HTML serviti via filo:// (vedi filoHandler).
+const FILO_PAGE_CSP = [
+  "default-src 'self' filo:",
+  "script-src 'self' filo:",
+  "style-src 'self' filo: 'unsafe-inline'",
+  "img-src 'self' filo: data: blob: https:",
+  "media-src 'self' filo: data: blob: https:",
+  "font-src 'self' filo: data:",
+  "connect-src 'self' filo: https: data: blob:",
+  "frame-src 'self' filo: https:",
+  "object-src 'none'",
+  "base-uri 'none'",
+].join('; ');
+
 function registerProtocolSchemes() {
   protocol.registerSchemesAsPrivileged([
     {
