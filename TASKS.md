@@ -44,14 +44,24 @@ contesto, per tempo, o perché l'utente chiude), la prossima riparte da qui.
   cambiati nel messaggio invece del timestamp; rimossi 55 worktree/branch già
   atterrati su main. Verificato con boot+context-menu spec (8/8 verdi).
 
-- [ ] **Decidere i 5 branch superstiti non atterrati** — Branch con patch mai
-  arrivate su main (`git cherry main <br>`): `claude/condescending-dubinsky-9ef8fb`
-  (editor, 2026-05-22), `claude/determined-leakey-b953af` (debug colore
-  tab/favicon + shell.js, 2026-06-09), e il trio identico
-  `claude/compassionate-kalam-dedd0f` / `claude/hopeful-easley-5f084f` /
-  `claude/vigilant-edison-c2b0b2` (ipc/shell/dashboard, 2026-06-02, 1 patch).
-  Per ciascuno: guardare il diff reale, chiedere all'utente se il lavoro va
-  recuperato o buttato, poi eliminare branch+worktree. (stima: S)
+- [x] **Decidere i 5 branch superstiti non atterrati** (2026-06-11) — Esito:
+  `condescending-dubinsky` (editor 05-22) SCARTATO: superato — il suo "switch
+  globale" è evoluto in `isPinned` su main e `tests/editor.spec.mjs` esiste già
+  in versione più recente. Trio `compassionate-kalam`/`hopeful-easley`/
+  `vigilant-edison` SCARTATO: la patch unica (shell persistente per la modalità
+  terminale) è già su main con hash diverso. `determined-leakey` RECUPERATO e
+  adattato al refactor (il campionatore ora è in `pageColor.js`, non più in
+  content.js): fix "tab bianca su YouTube" — theme-color/manifest neutri
+  (croma < 24) non tingono più la tab, si ripiega sul favicon; nuovo modulo
+  `src/shared/tabColor.js` + unit test, fallback identità per la tab attiva in
+  shell.js, spec `tab-favicon-color`, sezione in PATTERNS.md, guida `test:unit`
+  in CLAUDE.md, eliminati gli spec scratch dbg/dbg2/dbg3. NON recuperati i due
+  ritocchi d'intensità della tinta (saturazione 18%→55%, mix 38%→60%): erano
+  esperimenti di debug che contraddicono la spec §1.2 "tinta subliminale" —
+  se la tinta delle tab inattive sembra troppo debole, è lì che si regola.
+  Verificato: 16/16 unit + spec tab-favicon-color/tab-live-color/
+  tab-identity-color/boot verdi. Eliminati anche i 3 branch più vecchi
+  (`loving-lalande`, `nifty-johnson`, `suspicious-lovelace`): zero patch uniche.
 
 - [x] **Spezzare `src/content/content.js` — parte 1: estrazioni pulite** (2026-06-10) —
   Fatto: 4 moduli nuovi, pattern IIFE su globalThis, caricati prima di
