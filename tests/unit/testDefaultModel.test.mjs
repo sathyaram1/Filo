@@ -71,6 +71,7 @@ beforeEach(() => {
   state.effective = { modelRegistry: {}, apiKeys: {} };
   state.calls = [];
   state.streamError = null;
+  state.emptyStream = false;
 });
 
 // ── { provider, model } espliciti: riga dell'editor admin, anche non salvata ─
