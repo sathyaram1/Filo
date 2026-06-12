@@ -66,7 +66,8 @@ function tryGit(args) {
 
 // Committa il singolo file di spool e lo fa atterrare su origin/<main>.
 // Best-effort: mai fatale. Rispecchia il push "single-worktree" dell'hook.
-function commitAndPush(file) {
+// Esportata perché la riusa anche queue-feedback.mjs (creazione sub-feedback).
+export function commitAndPush(file) {
   const mainBranch = process.env.FILO_MAIN_BRANCH || 'main';
   const rel = relative(ROOT, file).split(sep).join('/');
   if (!tryGit(['add', '--', rel]).ok) { console.warn('  ! git add fallito'); return; }
