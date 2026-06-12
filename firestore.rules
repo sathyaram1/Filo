@@ -130,7 +130,13 @@ service cloud.firestore {
         && request.resource.data.get('notes', '').size() <= 10000
         && request.resource.data.get('priority', 0) is int
         && request.resource.data.get('priority', 0) >= 0
-        && request.resource.data.get('priority', 0) <= 3;
+        && request.resource.data.get('priority', 0) <= 3
+        && request.resource.data.get('name', '') is string
+        && request.resource.data.get('name', '').size() <= 200
+        && request.resource.data.get('seq', 0) is int
+        && request.resource.data.get('seq', 0) >= 0
+        && request.resource.data.get('subSeq', 0) is int
+        && request.resource.data.get('subSeq', 0) >= 0;
 
       // Triage routine (limitato): può solo spostare tra `todo`/`done`/`clarify`
       // e scrivere `notes`/`resolvedAt`. NON tocca `priority`, NON marca
