@@ -43,9 +43,12 @@ test('Opzioni: i modelli della Home (dashboard e chat) sono impostabili e persis
 
   // I valori sono persistiti nei settings sotto le chiavi azione della Home —
   // le stesse che il main legge per scegliere il modello (modelForAction).
+  // Le celle arrivano pre-popolate con la catena predefinita ('flash, flash-or'):
+  // qui abbiamo sostituito il PRIMO segmento (il modello primario), gli altri
+  // restano come fallback.
   const models = await page.evaluate(async () => (await window.SN_STORAGE.getSettings()).models);
-  expect(models.filo_dashboard).toBe('miodash');
-  expect(models.filo_chat).toBe('miachat');
+  expect(models.filo_dashboard.split(',')[0].trim()).toBe('miodash');
+  expect(models.filo_chat.split(',')[0].trim()).toBe('miachat');
 
   // Dopo un reload l'editor rimostra i valori salvati.
   await page.reload();
