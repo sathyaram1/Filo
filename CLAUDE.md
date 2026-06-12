@@ -19,13 +19,21 @@ La coda di lavoro persistente vive in **`TASKS.md`** nella root. Regole:
 
 - Se l'utente dice **"continua"** (o equivalenti) senza altro contesto →
   leggi `TASKS.md` e riprendi dal primo task aperto (`[ ]` o `[~]`).
-- Se l'utente consegna una **spec grossa** → spezzala in task da una sessione
-  l'uno dentro `TASKS.md` (formato descritto lì), fatti confermare l'ordine,
-  poi parti dal primo.
-- **Budget contesto**: chiudi la sessione prima di ~150k token (oltre 200k il
-  costo sale del 50%). Quando ti avvicini: finisci il pezzo atomico in corso,
-  aggiorna `TASKS.md` con lo stato esatto, e di' all'utente di aprire
-  un'altra istanza e dire "continua".
+- Se l'utente consegna una **spec grossa** in chat → spezzala in task da una
+  sessione l'uno dentro `TASKS.md` (formato descritto lì), fatti confermare
+  l'ordine, poi parti dal primo. Se la spec arriva invece come **feedback**
+  (routine cloud), usa i **sub-feedback** — vedi "Spec corpose → spezzale in
+  sub-feedback" più sotto.
+- **Budget contesto — principio, non regola fissa**: quante cose fare in una
+  sessione dipende dalla loro complessità, non da un numero. La buona norma è
+  stare *spesso* sotto i ~200k token di contesto (oltre quella soglia i token
+  costano il 50% in più), ma **chiudere un task vale più che rispettare il
+  budget**: arrivare a 250k per finire un task è meglio che lasciarlo a metà,
+  perché riaprirlo in un'altra sessione costa comunque di più (bisogna
+  rileggere tutto il contesto da zero). Quindi: il task atomico in corso si
+  FINISCE; quello che non si fa è INIZIARE un task nuovo quando sei già oltre
+  ~150-200k. In quel caso: aggiorna `TASKS.md` con lo stato esatto e di'
+  all'utente di aprire un'altra istanza e dire "continua".
 
 ## Push automatico su `origin/main`
 
