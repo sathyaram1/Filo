@@ -188,7 +188,7 @@ async function getDoc(id, bearer) {
 }
 
 async function runQuery(structuredQuery, bearer) {
-  const res = await fetch(`${FIRESTORE_BASE.replace(/\/documents$/, '/documents')}:runQuery`, {
+  const res = await fetch(`${FIRESTORE_BASE}:runQuery`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
     body: JSON.stringify({ structuredQuery }),
