@@ -4,6 +4,7 @@
 module.exports = function register(on, ctx) {
   const {
     MSG, winOf, broadcastLiveUpdate, handleFiloChat, handleFiloGenerateDashboard,
+    executeFiloAction,
   } = ctx;
   const FiloMem = globalThis.SN_FILO_MEMORY;
   const FiloState = globalThis.SN_FILO_STATE;
