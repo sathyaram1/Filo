@@ -91,6 +91,7 @@ module.exports = function register(on, ctx) {
         images: (payload.images || []).length,
         url: payload.url,
       });
+      payload.name = await generateFeedbackName(payload.text);
       const submitP = globalThis.SN_FEEDBACK.submit(payload);
       const timeoutP = new Promise((_, rej) =>
         setTimeout(() => rej(new Error('timeout (20s) — controlla la rete')), 20000));
