@@ -197,6 +197,16 @@
     document.documentElement.dataset.snTheme = resolved;
   }
 
+  // Override dei token estetici (#146.1): le superfici Filo iniettate nella
+  // pagina (menu, popup, sidebar) usano le variabili --sn-* di theme.css; qui
+  // emettiamo le variabili sovrascritte dall'utente. Idempotente (upsert per
+  // id), quindi innocuo anche sulle pagine filo:// dove pageBootstrap fa già
+  // lo stesso lavoro.
+  function applyThemeTokens(tokens) {
+    const reg = self.SN_THEME_TOKENS;
+    if (reg) reg.applyToDocument(document, tokens || {});
+  }
+
   // ------------------------------------------------------------
   // Handler contextmenu
   // ------------------------------------------------------------
