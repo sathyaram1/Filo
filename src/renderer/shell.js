@@ -320,6 +320,14 @@
     'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
     '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9l4 6"/><path d="M21 9l-4 6"/></svg>';
 
+  // Indicatore "aperta da un altro paese": globo + codice paese, discreto e
+  // caldo (accento Filo, niente lucchetti da security tool).
+  const PROXY_IND_SVG =
+    '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+    'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+    '<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/>' +
+    '<path d="M12 3a13.5 13.5 0 0 1 0 18"/><path d="M12 3a13.5 13.5 0 0 0 0 18"/></svg>';
+
   // "Vetro smerigliato" della tab attiva (§1.1): dato il colore campionato dal
   // sito, scegli un testo leggibile per contrasto (luminanza relativa).
   function readableOn(rgbStr) {
