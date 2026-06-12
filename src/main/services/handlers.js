@@ -617,7 +617,12 @@ async function handleFiloChat({ userMessage, threadHistory, image, images }) {
   const renderedActions = [];
   for (const a of rawActions) {
     const res = await executeFiloAction(a);
-    if (res.kept) renderedActions.push(a);
+    if (!res.kept) continue;
+    // Azione sospesa in attesa di conferma (#146.2): il client renderizza il
+    // bottone che apre il popup/box e poi manda MSG.FILO_CONFIRM_ACTION.
+    renderedActions.push(res.needsConfirm
+      ? { ...a, _confirm: { level: res.needsConfirm, text: res.describe || '' } }
+      : a);
   }
   await FiloMem.appendRaw({ type: 'chat_filo', summary: textReply.slice(0, 200), extra: { actions: rawActions } });
   maybeRunLessonAgent({ userMessage, filoReply: textReply, stateText }).catch(() => {});
