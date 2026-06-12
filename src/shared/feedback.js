@@ -191,11 +191,18 @@
       }
     }
 
+    // Numero progressivo: best-effort, il feedback parte anche se la query
+    // fallisce (resterà senza numero invece di bloccare l'invio).
+    let seq = null;
+    try { seq = await nextSeq(); }
+    catch (e) { console.warn('[SN feedback] numerazione non disponibile:', e?.message || e); }
+
     const doc = {
       fields: {
         text: toFsValue(text || ''),
         url: toFsValue(url || ''),
         title: toFsValue(title || ''),
+        name: toFsValue(String(name || '').slice(0, 200)),
         userAgent: toFsValue(userAgent || ''),
         clientId: toFsValue(clientId || ''),
         images: toFsValue(uploaded),
@@ -203,6 +210,10 @@
         createdAt: { timestampValue: new Date().toISOString() },
       },
     };
+    if (seq) {
+      doc.fields.seq = { integerValue: String(seq) };
+      doc.fields.subSeq = { integerValue: '0' };
+    }
 
     const endpoint = `${FIRESTORE_BASE}/${COLLECTION}?key=${API_KEY}`;
     const res = await fetch(endpoint, {
