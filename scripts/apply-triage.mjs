@@ -224,8 +224,15 @@ function readSpool() {
       let entry;
       try { entry = JSON.parse(readFileSync(file, 'utf8')); }
       catch (e) { return { file, error: `JSON non valido: ${e.message}` }; }
-      // Due tipi di entry: `op: "create"` (nuovo feedback, da queue-feedback.mjs)
-      // e triage classico (id + status, da queue-triage.mjs).
+      // Tipi di entry: `op: "create"` (nuovo feedback, da queue-feedback.mjs),
+      // `op: "backfill"` (numerazione dei feedback storici), `op: "delete"`
+      // (SOLO documenti di test, clientId "test:*"), e triage classico
+      // (id + status, da queue-triage.mjs).
+      if (entry && entry.op === 'backfill') return { file, entry };
+      if (entry && entry.op === 'delete') {
+        if (!entry.id) return { file, error: 'delete senza id' };
+        return { file, entry };
+      }
       if (entry && entry.op === 'create') {
         if (!String(entry.text || '').trim()) return { file, error: 'create senza testo' };
         if (!String(entry.name || '').trim()) return { file, error: 'create senza name (titolo)' };
