@@ -1056,6 +1056,10 @@ async function wireSafebrowse(settingsArg) {
 // decisione LLM senza creare un ciclo di require fra tabs.js e handlers.js.
 globalThis.SN_TAB_TRIAGE_DECIDE = runTabTriageDecision;
 
+// Esposto su globalThis per i test Playwright (app.evaluate non ha require):
+// è il dispatch con il gate dei livelli di sicurezza (#146.2).
+globalThis.SN_EXECUTE_FILO_ACTION = executeFiloAction;
+
 module.exports = {
   handleMessage,
   handleStream,
