@@ -25,10 +25,37 @@ riaperto.
 }
 ```
 
+## Formato di un file `new-*.json` (creazione di un feedback)
+
+Oltre alle decisioni di triage, la coda accetta la **creazione** di nuovi
+feedback (è così che una routine spezza una spec corposa in sub-feedback
+`todo` lavorabili una sessione alla volta). Il nome file inizia per `new-`:
+
+```json
+{
+  "op": "create",
+  "text": "descrizione autoconsistente del task",
+  "name": "titolo breve",
+  "parentId": "<idFeedback del padre, o stringa vuota>",
+  "status": "todo | clarify",
+  "priority": 2,
+  "notes": "",
+  "queuedAt": "2026-06-12T12:00:00.000Z",
+  "queuedBy": "routine"
+}
+```
+
+L'applier assegna il **numero** al momento della creazione: con `parentId` il
+nuovo feedback eredita il numero del padre con suffisso (#22 → #22.1, #22.2…),
+senza `parentId` prende il prossimo numero progressivo top-level. Se il padre
+non ha ancora un numero (feedback storico), gliene viene assegnato uno al volo.
+
 ## Come si accoda (routine cloud)
 
 ```bash
-node scripts/queue-triage.mjs <id> <status:todo|done|clarify> "testo note"
+node scripts/queue-triage.mjs <id> <status:todo|done|clarify> "testo note"   # triage
+node scripts/queue-feedback.mjs --name "titolo" [--parent <id>] \
+  [--priority 0-3] [--status todo|clarify] "testo"                          # creazione
 ```
 
 oppure crea il file a mano con l'editor: in una sessione Claude l'hook di
