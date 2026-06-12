@@ -241,8 +241,7 @@ test('tier residential usa l\'endpoint residenziale (fallback configurato a part
     expect(res).toEqual({ ok: true, country: 'us', tier: 'residential' });
     await expect.poll(() => resSocks.connections.length, { timeout: 15_000 }).toBeGreaterThan(0);
     expect(dcSocks.connections.length).toBe(0); // il datacenter NON viene toccato
-    const proxiedPage = await findPage(app, (u) => u === url);
-    await proxiedPage.waitForSelector('#ok', { timeout: 10_000 });
+    await waitPageWith(app, (u) => u === url, '#ok');
   } finally {
     await dcSocks.close();
     await resSocks.close();
