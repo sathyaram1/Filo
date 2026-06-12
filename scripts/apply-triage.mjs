@@ -167,7 +167,141 @@ function toFsValue(v) {
   if (typeof v === 'boolean') return { booleanValue: v };
   if (Number.isInteger(v)) return { integerValue: String(v) };
   if (typeof v === 'number') return { doubleValue: v };
+  if (Array.isArray(v)) return { arrayValue: { values: v.map(toFsValue) } };
   throw new Error('tipo non supportato per Firestore value');
+}
+
+// Legge un campo intero da un documento Firestore REST (0 se assente).
+function intField(doc, name) {
+  const v = doc?.fields?.[name];
+  const n = v && 'integerValue' in v ? Number(v.integerValue) : NaN;
+  return Number.isInteger(n) ? n : 0;
+}
+
+async function getDoc(id, bearer) {
+  const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}`, {
+    headers: { Authorization: `Bearer ${bearer}` },
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`firestore get fallito (${res.status}): ${(await res.text()).slice(0, 200)}`);
+  return res.json();
+}
+
+async function runQuery(structuredQuery, bearer) {
+  const res = await fetch(`${FIRESTORE_BASE.replace(/\/documents$/, '/documents')}:runQuery`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
+    body: JSON.stringify({ structuredQuery }),
+  });
+  if (!res.ok) throw new Error(`firestore query fallita (${res.status}): ${(await res.text()).slice(0, 200)}`);
+  const arr = await res.json();
+  return arr.filter((r) => r.document).map((r) => r.document);
+}
+
+// ─── Numerazione (#22, #22.1) per i feedback creati dalla coda ──────────────
+// Allocatore con cache di run: se nella stessa run ci sono più creazioni
+// (es. una spec spezzata in 5 sub-feedback) i numeri escono consecutivi senza
+// rileggere Firestore a ogni giro.
+function makeNumberAllocator(bearer) {
+  let nextTop = null; // prossimo seq top-level libero
+  const nextSub = new Map(); // seq padre → prossimo subSeq libero
+
+  async function allocTop() {
+    if (nextTop === null) {
+      const docs = await runQuery({
+        from: [{ collectionId: 'feedback' }],
+        orderBy: [{ field: { fieldPath: 'seq' }, direction: 'DESCENDING' }],
+        limit: 1,
+      }, bearer);
+      nextTop = (docs.length ? intField(docs[0], 'seq') : 0) + 1;
+    }
+    return { seq: nextTop++, subSeq: 0 };
+  }
+
+  async function allocSub(parentSeq) {
+    if (!nextSub.has(parentSeq)) {
+      // Solo filtro di uguaglianza (niente orderBy su un secondo campo: non
+      // richiede indici compositi); il max si calcola qui.
+      const docs = await runQuery({
+        from: [{ collectionId: 'feedback' }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath: 'seq' },
+            op: 'EQUAL',
+            value: { integerValue: String(parentSeq) },
+          },
+        },
+        limit: 300,
+      }, bearer);
+      const maxSub = docs.reduce((m, d) => Math.max(m, intField(d, 'subSeq')), 0);
+      nextSub.set(parentSeq, maxSub + 1);
+    }
+    const sub = nextSub.get(parentSeq);
+    nextSub.set(parentSeq, sub + 1);
+    return { seq: parentSeq, subSeq: sub };
+  }
+
+  // Per un'entry `create`: con parentId numera sotto il padre (#22.1), senza
+  // è un top-level nuovo (#23). Se il padre esiste ma non ha ancora un numero
+  // (feedback storico), gliene assegna uno al volo via PATCH così i sub hanno
+  // un prefisso sensato.
+  return async function allocate(entry) {
+    if (!entry.parentId) return allocTop();
+    const parent = await getDoc(entry.parentId, bearer);
+    if (!parent) {
+      console.warn(`  ! padre ${entry.parentId} inesistente: creo top-level`);
+      return allocTop();
+    }
+    let pSeq = intField(parent, 'seq');
+    if (!pSeq) {
+      ({ seq: pSeq } = await allocTop());
+      const r = await patchFields(entry.parentId, { seq: pSeq, subSeq: 0 }, bearer);
+      if (!r.ok) console.warn(`  ! numerazione del padre fallita (HTTP ${r.status}); i sub usano comunque #${pSeq}`);
+    }
+    return allocSub(pSeq);
+  };
+}
+
+// PATCH generica di pochi campi su un feedback esistente.
+async function patchFields(id, obj, bearer) {
+  const fields = {};
+  const qs = Object.keys(obj).map((f) => `updateMask.fieldPaths=${encodeURIComponent(f)}`).join('&');
+  for (const [k, v] of Object.entries(obj)) fields[k] = toFsValue(v);
+  const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?${qs}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
+    body: JSON.stringify({ fields }),
+  });
+  return { status: res.status, ok: res.ok, body: res.ok ? '' : (await res.text()).slice(0, 200) };
+}
+
+// Crea il documento feedback per un'entry `create` della coda.
+async function createFeedback(entry, num, bearer) {
+  const fields = {
+    text: toFsValue(String(entry.text || '')),
+    name: toFsValue(String(entry.name || '').slice(0, 200)),
+    url: toFsValue(''),
+    title: toFsValue(''),
+    userAgent: toFsValue('routine'),
+    clientId: toFsValue(`routine:${String(entry.queuedBy || 'routine').slice(0, 80)}`),
+    images: toFsValue([]),
+    files: toFsValue([]),
+    status: toFsValue(entry.status),
+    notes: toFsValue(String(entry.notes || '')),
+    seq: toFsValue(num.seq),
+    subSeq: toFsValue(num.subSeq),
+    createdAt: { timestampValue: new Date().toISOString() },
+  };
+  const prio = Number(entry.priority);
+  if (Number.isInteger(prio) && prio >= 1 && prio <= 3) fields.priority = toFsValue(prio);
+  const res = await fetch(`${FIRESTORE_BASE}/feedback`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
+    body: JSON.stringify({ fields }),
+  });
+  if (!res.ok) return { ok: false, status: res.status, body: (await res.text()).slice(0, 200) };
+  const json = await res.json();
+  return { ok: true, status: res.status, id: json.name?.split('/').pop() || '' };
 }
 
 async function patchFeedback(entry, bearer) {
