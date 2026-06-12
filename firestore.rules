@@ -82,9 +82,18 @@ service cloud.firestore {
     match /feedback/{doc} {
       allow read: if true;
 
+      // Creazione admin: senza vincoli di forma. Serve all'applier locale
+      // dell'owner (npm run feedback:apply col token admin) per creare i
+      // sub-feedback accodati dalle routine, che portano campi non previsti
+      // dal create anonimo (status, notes, seq/subSeq, priority…).
+      allow create: if isAdmin();
+
+      // `name` = titolo breve generato da un LLM all'invio; `seq`/`subSeq` =
+      // numero progressivo leggibile (#22, #22.1) calcolato dal client.
       allow create: if
         request.resource.data.keys().hasOnly(
-          ['text', 'url', 'title', 'userAgent', 'clientId', 'images', 'files', 'createdAt']
+          ['text', 'url', 'title', 'name', 'userAgent', 'clientId', 'images',
+           'files', 'createdAt', 'seq', 'subSeq']
         )
         && request.resource.data.text is string
         && request.resource.data.text.size() <= 10000
@@ -92,6 +101,8 @@ service cloud.firestore {
         && request.resource.data.get('url', '').size() <= 2000
         && request.resource.data.get('title', '') is string
         && request.resource.data.get('title', '').size() <= 500
+        && request.resource.data.get('name', '') is string
+        && request.resource.data.get('name', '').size() <= 200
         && request.resource.data.get('userAgent', '') is string
         && request.resource.data.get('userAgent', '').size() <= 500
         && request.resource.data.get('clientId', '') is string
@@ -99,14 +110,21 @@ service cloud.firestore {
         && request.resource.data.get('images', []) is list
         && request.resource.data.get('images', []).size() <= 5
         && request.resource.data.get('files', []) is list
-        && request.resource.data.get('files', []).size() <= 5;
+        && request.resource.data.get('files', []).size() <= 5
+        && request.resource.data.get('seq', 0) is int
+        && request.resource.data.get('seq', 0) >= 0
+        && request.resource.data.get('seq', 0) <= 1000000
+        && request.resource.data.get('subSeq', 0) is int
+        && request.resource.data.get('subSeq', 0) >= 0
+        && request.resource.data.get('subSeq', 0) <= 100000;
 
-      // Triage admin (pieno): solo i campi di stato/note/priorità/timestamp.
-      // Tutto il resto del documento resta immutabile.
+      // Triage admin (pieno): campi di stato/note/priorità/timestamp, più
+      // numero e titolo (per backfill/rinomina). Il resto resta immutabile.
       allow update: if
         isAdmin()
         && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['status', 'notes', 'resolvedAt', 'verifiedAt', 'priority'])
+          .hasOnly(['status', 'notes', 'resolvedAt', 'verifiedAt', 'priority',
+                    'name', 'seq', 'subSeq'])
         && request.resource.data.get('status', 'new') in ['new', 'draft', 'todo', 'clarify', 'done', 'verified', 'ignored']
         && request.resource.data.get('notes', '') is string
         && request.resource.data.get('notes', '').size() <= 10000
