@@ -61,6 +61,26 @@ vivono in `settings.themeTokens` e si applicano **live** su tutte le superfici
   (filo://), `content.js` (pagine esterne), `shell.js` (shell). Test:
   `tests/unit/themeTokens.test.mjs`, `tests/theme-tokens.spec.mjs`.
 
+## Azioni di Filo: livello di sicurezza statico nel registro, mai deciso dall'LLM
+
+Ogni azione che Filo (l'AI) può intraprendere dichiara il proprio livello nel
+**registro** `src/shared/actionLevels.js` (#146.2): 1 = reversibile, esegue
+subito; 2 = popup di conferma con spiegazione (OK/Annulla); 3 = irreversibile,
+l'utente digita "conferma". Il dispatch (`executeFiloAction` nel main)
+**rifiuta le azioni non registrate**: un nuovo potere di Filo che non dichiara
+il livello non viene eseguito.
+
+- **Regola operativa:** quando aggiungi un'azione Filo, registrala in
+  `actionLevels.js` con livello + `describe()` (la spiegazione in chiaro per il
+  popup). Per le preferenze il livello è per-setter in `preferences.js`
+  (`level: 2` su ciò che tocca sicurezza/shell). La sospensione e la conferma
+  passano da `needsConfirm` → bottone in chat → `MSG.FILO_CONFIRM_ACTION`; il
+  main **riclassifica** alla conferma, non si fida del client.
+- **UI:** le conferme usano i componenti riusabili `SN_CONFIRM_UI.confirm`
+  (livello 2) e `SN_CONFIRM_UI.confirmTyped` (livello 3) in
+  `src/shared/confirmUi.js` — mai `window.confirm` nativo.
+- **Test:** `tests/unit/actionLevels.test.mjs`, `tests/filo-action-levels.spec.mjs`.
+
 ## Colore identità delle tab: brand del sito, mai chrome neutra
 
 Il colore con cui si tingono le tab (attiva = "vetro smerigliato" §1.1; inattive
