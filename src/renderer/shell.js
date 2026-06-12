@@ -388,18 +388,52 @@
   }
 
   let ctxTabId = null;
-  function openTabContextMenu(t, x, y) {
+  let ctxMenuPos = { x: 0, y: 0 };
+  // Stato proxy per il menu (lazy, richiesto a ogni apertura: la config può
+  // cambiare dalle impostazioni mentre l'app è aperta).
+  let ctxProxyStatus = null;
+  async function openTabContextMenu(t, x, y) {
     ctxTabId = t.id;
+    ctxMenuPos = { x: Math.round(x), y: Math.round(y) };
     const entries = [
       { label: 'Duplica', icon: 'duplicate', action: 'tab-duplicate' },
       t.muted
         ? { label: 'Riattiva audio', icon: 'mute', action: 'tab-mute' }
         : { label: 'Muta', icon: 'sound', action: 'tab-mute' },
       { label: 'Aiuto', icon: 'help', action: 'tab-help' },
+    ];
+    // "Apri da un altro paese" (proxy per-tab): solo se un endpoint è
+    // configurato — una voce che non può funzionare non deve comparire.
+    // Il click diretto usa il default (ultima location usata, altrimenti USA);
+    // la freccia apre la lista paesi. Su tab già proxata: "Torna in Italia".
+    try { ctxProxyStatus = await api.tabs.proxyStatus(); } catch (_) { ctxProxyStatus = null; }
+    if (ctxProxyStatus && ctxProxyStatus.configured) {
+      if (t.proxy) {
+        entries.push({ label: 'Torna in Italia', icon: 'globe', action: 'tab-proxy-clear' });
+      } else {
+        entries.push({
+          label: 'Apri da un altro paese', icon: 'globe',
+          action: 'tab-proxy-default', subAction: 'tab-proxy-pick',
+        });
+      }
+    }
+    entries.push(
       { type: 'separator' },
       { label: 'Chiudi', icon: 'close', action: 'tab-close' },
-    ];
-    api.popupMenu(entries, Math.round(x), Math.round(y));
+    );
+    api.popupMenu(entries, ctxMenuPos.x, ctxMenuPos.y);
+  }
+
+  // Secondo livello di "Apri da un altro paese": la lista delle location
+  // curate, riaperta nello stesso punto del menu tab.
+  function openProxyCountryMenu() {
+    const locs = (ctxProxyStatus && ctxProxyStatus.locations) || [];
+    if (!locs.length) return;
+    const entries = locs.map((l) => ({
+      label: l.label,
+      action: 'tab-proxy-go:' + l.code,
+    }));
+    api.popupMenu(entries, ctxMenuPos.x, ctxMenuPos.y);
   }
 
   // Le azioni del menu tornano qui (canale globale onMenuAction): filtriamo solo
@@ -412,6 +446,10 @@
       else if (action === 'tab-mute') api.tabs.setMuted(id);
       else if (action === 'tab-help') api.tabs.help(id);
       else if (action === 'tab-close') api.tabs.close(id);
+      else if (action === 'tab-proxy-default') api.tabs.setProxy(id);
+      else if (action === 'tab-proxy-clear') api.tabs.clearProxy(id);
+      else if (action === 'tab-proxy-pick') openProxyCountryMenu();
+      else if (action.startsWith('tab-proxy-go:')) api.tabs.setProxy(id, action.slice('tab-proxy-go:'.length));
     });
   }
 
