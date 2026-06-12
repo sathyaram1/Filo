@@ -28,9 +28,13 @@ function strField(doc, name) {
 async function listAll(bearer) {
   // runQuery ordinato per createdAt ASC: i feedback più vecchi prendono i
   // numeri più bassi. 1000 è ben oltre il volume attuale dell'alpha.
+  // La lettura della collezione è pubblica: il bearer serve solo se presente
+  // (in dry-run non si autentica affatto).
+  const headers = { 'Content-Type': 'application/json' };
+  if (bearer) headers.Authorization = `Bearer ${bearer}`;
   const res = await fetch(`${FIRESTORE_BASE}:runQuery`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
+    headers,
     body: JSON.stringify({
       structuredQuery: {
         from: [{ collectionId: 'feedback' }],
