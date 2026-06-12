@@ -29,6 +29,14 @@
     document.documentElement.style.setProperty('--sn-zoom', String(clamped));
   }
 
+  // Override dei token estetici (#146.1): inietta/aggiorna lo <style> con le
+  // variabili sovrascritte dall'utente. Il registro (themeTokens.js) è caricato
+  // via <script> prima di questo file; guardia se una pagina non lo include.
+  function applyThemeTokens(tokens) {
+    const reg = window.SN_THEME_TOKENS;
+    if (reg) reg.applyToDocument(document, tokens || {});
+  }
+
   // Tema/scala iniziali "best effort" prima che le impostazioni siano caricate.
   applyTheme('system');
 
@@ -40,6 +48,7 @@
       const s = (r && r.settings) || {};
       if (s.theme) { window.SN_PAGE_THEME = s.theme; applyTheme(s.theme); }
       applyTextScale(s.textScale);
+      applyThemeTokens(s.themeTokens);
     } catch (_) {}
   })();
 
