@@ -106,7 +106,9 @@ function computeMenuWidth(entries) {
     const fontPx = e.disabled ? 12 : 13;
     const charW = fontPx * 0.6;
     const hasIcon = !!e.icon && ICON_PATHS[e.icon];
-    const w = H_PADDING + (hasIcon ? ICON_COL : 0) + Math.ceil(label.length * charW);
+    // La freccia del submenu (subAction) occupa una colonna extra a destra.
+    const SUB_COL = e.subAction ? 30 : 0;
+    const w = H_PADDING + (hasIcon ? ICON_COL : 0) + SUB_COL + Math.ceil(label.length * charW);
     if (w > needed) needed = w;
   }
   return Math.min(MENU_MAX_W, needed);
