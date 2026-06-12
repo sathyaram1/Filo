@@ -68,17 +68,8 @@ async function startSocks5({ mapHostTo = null } = {}) {
   };
 }
 
-// Helpers che girano nel main process via app.evaluate.
-const findWebTab = `(win) => {
-  for (const w of win.BrowserWindow.getAllWindows()) {
-    if (!w._filoTabs) continue;
-    for (const t of w._filoTabs.tabs) {
-      if (/^https?:/.test(t.url || '')) return { tm: w._filoTabs, tab: t };
-    }
-  }
-  return null;
-}`;
-
+// Stato (id, partition, proxy, session, policy WebRTC) della prima tab web,
+// letto nel main process via app.evaluate.
 async function webTabInfo(app) {
   return app.evaluate(({ BrowserWindow, session }) => {
     for (const w of BrowserWindow.getAllWindows()) {
