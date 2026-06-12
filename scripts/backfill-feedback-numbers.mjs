@@ -32,7 +32,7 @@ async function listAll(bearer) {
   // (in dry-run non si autentica affatto).
   const headers = { 'Content-Type': 'application/json' };
   if (bearer) headers.Authorization = `Bearer ${bearer}`;
-  const res = await fetch(`${FIRESTORE_BASE}:runQuery`, {
+  const res = await fetch(`${FIRESTORE_BASE}:runQuery?key=${FIREBASE_API_KEY}`, {
     method: 'POST',
     headers,
     body: JSON.stringify({
