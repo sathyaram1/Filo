@@ -27,7 +27,12 @@ import { createServer as createNetServer, connect as netConnect } from 'node:net
 // dimostrare la risoluzione DNS lato proxy.
 async function startSocks5({ mapHostTo = null } = {}) {
   const connections = [];
+  // net.Server NON ha closeAllConnections (è di http.Server): tracciamo i
+  // socket a mano, o close() resterebbe appeso sui keep-alive di Chromium.
+  const live = new Set();
   const server = createNetServer((socket) => {
+    live.add(socket);
+    socket.on('close', () => live.delete(socket));
     socket.on('error', () => {});
     socket.once('data', (greeting) => {
       if (greeting[0] !== 0x05) { socket.end(); return; }
