@@ -62,12 +62,18 @@ html, body {
 .sn-page button.sn-btn {
   display: inline-block;
   padding: 8px 14px;
-  background: var(--sn-fg);
-  color: var(--sn-bg);
+  background: var(--sn-btn-bg);
+  color: var(--sn-btn-fg);
   border: none;
   border-radius: var(--sn-radius);
   font-size: 13px;
   cursor: pointer;
+}
+
+/* Link nelle pagine interne: token `link.color` (default: colore d'accento),
+   mai il blu di default del browser (vedi PATTERNS.md). */
+.sn-page a {
+  color: var(--sn-link);
 }
 
 .sn-page button.sn-btn:hover { opacity: 0.85; }
