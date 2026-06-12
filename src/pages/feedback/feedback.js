@@ -294,7 +294,7 @@
             ${!agent && ua ? `<span title="${escapeHtml(ua)}">UA</span>` : ''}
             ${priorityDotsHtml(f)}
           </div>
-          ${agentHtml}
+          ${agentHtml}${titleHtml}
           <div class="fb-text">${text}</div>
           ${imgsHtml}
           ${filesHtml}
