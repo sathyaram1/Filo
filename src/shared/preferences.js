@@ -26,6 +26,9 @@
   // Ogni voce: sinonimi di chiave + build(valore) → { partial, label }.
   // `partial` è il pezzo di settings da fondere (deepMerge preserva i campi
   // annidati vicini); `label` è la conferma leggibile per l'utente.
+  // `level` (opzionale, default 1) è il livello di sicurezza quando è FILO a
+  // cambiare la preferenza via chat (#146.2, vedi actionLevels.js): 1 applica
+  // subito, 2 chiede conferma con popup.
   const PREF_SETTERS = [
     {
       keys: ['tema', 'theme', 'aspetto'],
