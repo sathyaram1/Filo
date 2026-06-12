@@ -294,6 +294,20 @@ function registerIpcHandlers() {
     win._filoTabs.openBlockedPopup(url);
     return { ok: true };
   });
+  // Proxy per-tab ("Apri da un altro paese"): instrada/de-instrada una singola
+  // tab attraverso un endpoint in un altro paese. La lista location curate
+  // serve al menu tasto destro sulla tab (feedback UI separato).
+  ipcMain.handle('tabs:set-proxy', async (event, { id, country, tier } = {}) => {
+    const win = winFor(event);
+    if (!win?._filoTabs) return { ok: false, error: 'no_tab' };
+    return win._filoTabs.setTabProxy(id, country, { tier });
+  });
+  ipcMain.handle('tabs:clear-proxy', (event, { id } = {}) => {
+    const win = winFor(event);
+    if (!win?._filoTabs) return { ok: false, error: 'no_tab' };
+    return win._filoTabs.clearTabProxy(id);
+  });
+  ipcMain.handle('tabs:proxy-locations', () => require('./services/proxyTab').LOCATIONS);
 
   // ─── popup menu custom (sopra le WebContentsView) ────────────────────────
   ipcMain.handle('shell:popup-menu', (event, { entries, x, y }) => {
