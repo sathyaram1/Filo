@@ -98,10 +98,57 @@
     return out;
   }
 
+  // ---- numerazione progressiva ----
+  // Ogni feedback ha un numero leggibile: `seq` (intero progressivo) per i
+  // feedback top-level, `seq`+`subSeq` per i sub-feedback creati dalle routine
+  // quando spezzano una spec (es. #22 → #22.1, #22.2). formatNum produce la
+  // forma mostrata in dashboard.
+  function formatNum(seq, subSeq) {
+    const s = Number(seq);
+    if (!Number.isInteger(s) || s <= 0) return '';
+    const sub = Number(subSeq);
+    return Number.isInteger(sub) && sub > 0 ? `${s}.${sub}` : String(s);
+  }
+
+  // Titolo di ripiego quando l'LLM non è disponibile: prime parole del testo.
+  function fallbackName(text, maxWords = 6) {
+    const words = String(text || '').trim().replace(/\s+/g, ' ').split(' ').filter(Boolean);
+    if (!words.length) return '';
+    let out = words.slice(0, maxWords).join(' ');
+    if (out.length > 60) return out.slice(0, 57).trimEnd() + '…';
+    return words.length > maxWords ? out + '…' : out;
+  }
+
+  // Prossimo numero progressivo libero: max(seq) + 1. I documenti senza `seq`
+  // (storici, mai backfillati) non compaiono nella query: partono da 1.
+  // Best-effort: una race fra due invii simultanei può duplicare un numero,
+  // accettabile per il volume dell'alpha (il numero è un'etichetta, non una key).
+  async function nextSeq() {
+    const endpoint = `${FIRESTORE_BASE}:runQuery?key=${API_KEY}`;
+    const body = {
+      structuredQuery: {
+        from: [{ collectionId: COLLECTION }],
+        orderBy: [{ field: { fieldPath: 'seq' }, direction: 'DESCENDING' }],
+        limit: 1,
+      },
+    };
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`firestore nextSeq fallito (${res.status})`);
+    const arr = await res.json();
+    const top = arr.find((r) => r.document);
+    const max = top ? Number(fromFsValue(top.document.fields?.seq)) : 0;
+    return (Number.isInteger(max) && max > 0 ? max : 0) + 1;
+  }
+
   // Invia un feedback. images: array di { dataUrl } (max ~5).
   // files: array di { name, type, dataUrl } per allegati non-immagine (pdf,
-  // txt, md, json…), max ~5. Ritorna { id, url } del documento creato.
-  async function submit({ text, url, title, userAgent, clientId, images, files }) {
+  // txt, md, json…), max ~5. `name` è il titolo breve (generato da un LLM nel
+  // main process prima della chiamata). Ritorna { id, url } del documento creato.
+  async function submit({ text, url, title, userAgent, clientId, images, files, name }) {
     // Allegati che NON sono riusciti a caricarsi: li riportiamo al chiamante
     // così la UI può avvisare l'utente (un upload fallito veniva ingoiato in
     // silenzio e il feedback partiva senza il file, senza alcun segnale).
