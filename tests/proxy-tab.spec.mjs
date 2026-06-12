@@ -198,8 +198,10 @@ test('setTabProxy instrada la tab via SOCKS5 con DNS lato proxy; clearTabProxy t
       const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
       w._filoTabs.navigate(args.tabId, args.url);
     }, { tabId: before.id, url: directUrl });
-    await waitPageWith(app, (u) => u === directUrl, '#back');
+    const directPage = await waitPageWith(app, (u) => u === directUrl, '#back');
     expect(socks.connections.length).toBe(seen); // nessun nuovo passaggio dal proxy
+    // Tornata nel cookie jar normale: il cookie di prima è di nuovo visibile.
+    expect(await directPage.evaluate(() => document.cookie)).toContain('direct=1');
     const after = await webTabInfo(app);
     expect(after.proxy).toBeNull();
     expect(after.partition).toBeNull();
