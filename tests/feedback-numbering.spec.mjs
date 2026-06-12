@@ -5,15 +5,8 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 
+// Ordinati per data DESC, come li consegna SN_FEEDBACK.list vero.
 const FAKE = [
-  {
-    _id: 'spec1',
-    text: 'Spec corposa sulla gestione dei segreti',
-    name: 'gestione segreti',
-    seq: 22,
-    subSeq: 0,
-    createdAt: '2026-06-12T10:00:00Z',
-  },
   {
     _id: 'sub1',
     text: 'Implementare la rotazione automatica delle chiavi',
@@ -22,6 +15,14 @@ const FAKE = [
     subSeq: 1,
     clientId: 'routine:feedback-routine',
     createdAt: '2026-06-12T11:00:00Z',
+  },
+  {
+    _id: 'spec1',
+    text: 'Spec corposa sulla gestione dei segreti',
+    name: 'gestione segreti',
+    seq: 22,
+    subSeq: 0,
+    createdAt: '2026-06-12T10:00:00Z',
   },
   {
     _id: 'old1',
