@@ -69,6 +69,14 @@ const ICON_PATHS = {
     '<path d="M11 6.7L6.5 16.3"/>' +
     '<path d="M13 6.7L17.5 16.3"/>' +
     '<path d="M7.5 18L16.5 18"/>',
+
+  // Globo con meridiani — voce "Apri da un altro paese" / "Torna in Italia"
+  // (mai un lucchetto da security tool: il tono è "viaggio", non "sicurezza").
+  globe:
+    '<circle cx="12" cy="12" r="9"/>' +
+    '<path d="M3 12h18"/>' +
+    '<path d="M12 3a13.5 13.5 0 0 1 0 18"/>' +
+    '<path d="M12 3a13.5 13.5 0 0 0 0 18"/>',
 };
 
 function iconSvg(name, size) {
