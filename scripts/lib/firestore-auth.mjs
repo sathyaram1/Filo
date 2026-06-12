@@ -28,6 +28,7 @@ const ROOT = resolve(__dirname, '..', '..');
 const cfg = require(resolve(ROOT, 'src', 'main', 'auth', 'config.js'));
 
 export const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${cfg.firebaseProjectId}/databases/(default)/documents`;
+export const FIREBASE_API_KEY = cfg.firebaseApiKey;
 
 function git(args) {
   return execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' }).trim();
