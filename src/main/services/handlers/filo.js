@@ -14,6 +14,16 @@ module.exports = function register(on, ctx) {
     return { ok: true, ...r };
   });
 
+  // L'utente ha confermato dal client (popup livello 2 / "conferma" digitata
+  // livello 3) un'azione rimasta in sospeso: la eseguiamo ora. Il livello
+  // viene RICLASSIFICATO qui dentro (executeFiloAction consulta il registro
+  // anche con confirmed:true): un client compromesso non può far eseguire
+  // un'azione fuori registro.
+  on(MSG.FILO_CONFIRM_ACTION, async (msg) => {
+    const r = await executeFiloAction(msg.action, { confirmed: true });
+    return { ok: true, ...r };
+  });
+
   on(MSG.FILO_GET_STATE, async () => {
     const { state, stateText } = await FiloState.assemble();
     return { ok: true, state, stateText };
