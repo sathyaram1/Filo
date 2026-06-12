@@ -29,7 +29,11 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
-const SPOOL_DIR = resolve(ROOT, 'feedback-triage');
+// FILO_SPOOL_DIR: override per i test (scrivono in una dir temporanea senza
+// toccare la coda vera, che l'hook di auto-commit pusherebbe su origin/main).
+const SPOOL_DIR = process.env.FILO_SPOOL_DIR
+  ? resolve(process.env.FILO_SPOOL_DIR)
+  : resolve(ROOT, 'feedback-triage');
 const ALLOWED = ['todo', 'done', 'clarify'];
 
 // Scrive il file di spool (nessun effetto git). Ritorna il path assoluto.
