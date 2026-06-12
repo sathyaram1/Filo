@@ -92,19 +92,26 @@ async function webTabInfo(app) {
   });
 }
 
-// Ritrova la Page Playwright della tab (la view viene RICREATA da
-// setTabProxy/clearTabProxy, quindi il vecchio handle muore).
-async function findPage(app, predicate, timeout = 15_000) {
+// Ritrova la Page Playwright della tab e aspetta che `selector` sia visibile.
+// La view viene RICREATA da setTabProxy/clearTabProxy, quindi app.windows()
+// può contenere ancora l'handle MORTO della vecchia view accanto a quello
+// nuovo: proviamo ogni candidato finché uno risponde davvero.
+async function waitPageWith(app, predicate, selector, timeout = 30_000) {
   const deadline = Date.now() + timeout;
+  let lastErr = null;
   while (Date.now() < deadline) {
-    const page = app.windows().find((w) => { try { return predicate(w.url()); } catch (_) { return false; } });
-    if (page) {
-      await page.waitForLoadState('domcontentloaded').catch(() => {});
-      return page;
+    const candidates = app.windows().filter((w) => {
+      try { return !w.isClosed() && predicate(w.url()); } catch (_) { return false; }
+    });
+    for (const p of candidates.reverse()) { // la view ricreata è la più recente
+      try {
+        await p.waitForSelector(selector, { timeout: 2_000 });
+        return p;
+      } catch (e) { lastErr = e; }
     }
     await new Promise((r) => setTimeout(r, 150));
   }
-  throw new Error('findPage: nessuna window corrispondente');
+  throw new Error(`waitPageWith: nessuna window viva con ${selector} — ${lastErr?.message || 'nessun candidato'}`);
 }
 
 test('setTabProxy instrada la tab via SOCKS5 con DNS lato proxy; clearTabProxy torna diretto', async ({ app, openTab, testServer }) => {
