@@ -271,6 +271,14 @@
           ${am.area ? `<span class="fb-badge">${escapeHtml(am.area)}</span>` : ''}
         </div>
         ${am.title ? `<div class="fb-title">${escapeHtml(am.title)}</div>` : ''}` : '';
+      // Numero progressivo (#22, #22.1 per i sub creati dalle routine) +
+      // titolo breve generato dall'LLM all'invio. Le issue d'agente hanno già
+      // il loro titolo (agentHtml), qui copriamo tutti gli altri feedback.
+      const num = SN_FEEDBACK.formatNum(f.seq, f.subSeq);
+      const numHtml = num ? `<span class="fb-num">#${escapeHtml(num)}</span>` : '';
+      const titleHtml = !agent && (num || f.name)
+        ? `<div class="fb-title">${numHtml}${numHtml && f.name ? ' ' : ''}${escapeHtml(f.name || '')}</div>`
+        : '';
       const notesEditable = isAdmin && (currentTab === 'todo' || currentTab === 'draft' || currentTab === 'agent' || currentTab === 'clarify');
       const notesBlock = notesEditable
         ? `<label class="fb-notes-label">Note / decisioni di design:
