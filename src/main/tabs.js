@@ -371,6 +371,7 @@ class TabManager {
   closeAllTabs() {
     for (const tab of this.tabs) {
       this._archiveClosedTab(tab); // §3.1 — anche "chiudi tutto" archivia
+      ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
       try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
       try { tab.view.webContents.close(); } catch (_) {}
     }
