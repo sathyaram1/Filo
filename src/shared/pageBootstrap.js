@@ -71,6 +71,7 @@
     if (!s) return;
     if (s.theme) { window.SN_PAGE_THEME = s.theme; applyTheme(s.theme); }
     applyTextScale(s.textScale);
+    applyThemeTokens(s.themeTokens);
   }
   try {
     chrome.runtime.onMessage.addListener((msg) => {
