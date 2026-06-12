@@ -173,8 +173,7 @@ test('setTabProxy instrada la tab via SOCKS5 con DNS lato proxy; clearTabProxy t
       const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
       w._filoTabs.navigate(args.tabId, args.url);
     }, { tabId: before.id, url: fakeHostUrl });
-    const dnsPage = await findPage(app, (u) => u.includes('filo.invalid'));
-    await dnsPage.waitForSelector('#ok', { timeout: 10_000 }); // caricata = DNS via proxy
+    await waitPageWith(app, (u) => u.includes('filo.invalid'), '#ok'); // caricata = DNS via proxy
     const domainConn = socks.connections.find((c) => c.host === 'geo-block-test.filo.invalid');
     expect(domainConn).toBeTruthy();
     expect(domainConn.atyp).toBe('domain'); // il proxy riceve il NOME, mai l'IP locale
