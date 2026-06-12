@@ -893,6 +893,7 @@
     if (msg?.type === MSG.SETTINGS_UPDATED) {
       settings = msg.settings;
       applyTheme(settings.theme);
+      applyThemeTokens(settings.themeTokens);
       // SpellCheck.init registra listener globali; per non duplicarli su update
       // usiamo updateSettings (definito apposta da spellcheck.js).
       SpellCheck.updateSettings(isBlocked() ? { featureFlags: { spellcheck: false } } : settings);
