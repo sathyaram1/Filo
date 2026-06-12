@@ -39,7 +39,10 @@ import { fileURLToPath } from 'node:url';
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
-const SPOOL_DIR = resolve(ROOT, 'feedback-triage');
+// FILO_SPOOL_DIR: override per i test (vedi queue-triage.mjs).
+const SPOOL_DIR = process.env.FILO_SPOOL_DIR
+  ? resolve(process.env.FILO_SPOOL_DIR)
+  : resolve(ROOT, 'feedback-triage');
 const cfg = require(resolve(ROOT, 'src', 'main', 'auth', 'config.js'));
 
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${cfg.firebaseProjectId}/databases/(default)/documents`;
