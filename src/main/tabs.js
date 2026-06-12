@@ -258,7 +258,18 @@ class TabManager {
     return null;
   }
 
-  _makeView(url, partition) {
+  // Partizione effettiva per `tab` su `url`: una tab proxata ("Apri da un
+  // altro paese") vive nella sua partition dedicata proxy:<tabId> finché vive,
+  // su qualsiasi pagina esterna. Partition diversa = cookie jar separato: la
+  // tab proxata NON condivide i login con le altre (isolamento voluto, da non
+  // rompere). Le pagine filo:// restano nella sessione normale anche su tab
+  // proxate (sono interne, niente traffico da instradare).
+  _partitionForTab(tab, url) {
+    if (tab && tab.proxy && url && !url.startsWith('filo://')) {
+      return `proxy:${tab.id}`;
+    }
+    return this._partitionFor(url);
+  }
     const isInternal = url.startsWith('filo://');
     return new WebContentsView({
       webPreferences: {
