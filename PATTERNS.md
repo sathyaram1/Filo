@@ -81,6 +81,29 @@ il livello non viene eseguito.
   `src/shared/confirmUi.js` — mai `window.confirm` nativo.
 - **Test:** `tests/unit/actionLevels.test.mjs`, `tests/filo-action-levels.spec.mjs`.
 
+## Popup menu: il "submenu" è una voce a due zone che riapre il menu
+
+Il popup menu custom (`src/main/popup-menu.js`, una BrowserWindow frameless)
+non ha submenu a comparsa: quando una voce ha bisogno di un secondo livello
+(es. la lista paesi di "Apri da un altro paese"), la voce dichiara `subAction`
+e viene resa **a due zone di click** — il corpo esegue l'azione di default, la
+freccia `›` a destra manda `subAction` al renderer, che **riapre il popup**
+nello stesso punto con le voci del secondo livello.
+
+- **Perché:** un hover-submenu richiederebbe una seconda finestra sincronizzata
+  (posizione, blur, z-order) per un beneficio minimo; riaprire lo stesso popup
+  è coerente, robusto e riusa tutto (stile, selezione, chiusura su blur).
+- **Dove:** rendering in `buildHTML` (`.row` + `.subarrow`); esempio d'uso in
+  `openTabContextMenu` / `openProxyCountryMenu` in `src/renderer/shell.js`.
+
+## Feature opzionali nel menu: la voce compare solo se può funzionare
+
+Una voce di menu che dipende da configurazione esterna (es. "Apri da un altro
+paese" richiede un endpoint configurato) **non deve comparire** quando la
+feature non è configurata — niente voci disabilitate o toast "configura prima
+X" da un menu. Lo stato si chiede al main all'apertura del menu (è un IPC da
+millisecondi), non si cachea alla partenza.
+
 ## Colore identità delle tab: brand del sito, mai chrome neutra
 
 Il colore con cui si tingono le tab (attiva = "vetro smerigliato" §1.1; inattive
