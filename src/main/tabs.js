@@ -1222,6 +1222,9 @@ class TabManager {
         scrollPct: typeof t.scrollPct === 'number' ? t.scrollPct : 0,
         formDirty: !!t.formDirty,
         isInternal: t.isInternal,
+        // Proxy per-tab ("Apri da un altro paese"): { country, tier } o null.
+        // La shell lo userà per l'indicatore sulla tab (feedback UI separato).
+        proxy: t.proxy ? { country: t.proxy.country, tier: t.proxy.tier } : null,
       })),
     };
   }
