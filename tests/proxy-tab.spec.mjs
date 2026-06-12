@@ -67,7 +67,7 @@ async function startSocks5({ mapHostTo = null } = {}) {
     port: server.address().port,
     connections,
     async close() {
-      try { server.closeAllConnections?.(); } catch (_) {}
+      for (const s of live) { try { s.destroy(); } catch (_) {} }
       await new Promise((r) => server.close(r));
     },
   };
