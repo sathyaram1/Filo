@@ -450,11 +450,13 @@ class TabManager {
     try { settings = await this._readSettings(); } catch (_) {}
     // Senza paese esplicito (click diretto su "Apri da un altro paese") si usa
     // l'ultima location usata, altrimenti il default delle impostazioni (USA).
+    // Un paese esplicito ma non valido resta un errore: mai proxare in silenzio
+    // verso un paese diverso da quello chiesto.
     const p = (settings && settings.proxy) || {};
-    const code = ProxyTab.normalizeCountry(country)
-      || ProxyTab.normalizeCountry(p.lastCountry)
-      || ProxyTab.normalizeCountry(p.defaultCountry)
-      || 'us';
+    const code = country
+      ? ProxyTab.normalizeCountry(country)
+      : (ProxyTab.normalizeCountry(p.lastCountry) || ProxyTab.normalizeCountry(p.defaultCountry) || 'us');
+    if (!code) return { ok: false, error: 'bad_country' };
     const resolved = ProxyTab.resolve(code, { tier, settings });
     if (!resolved) return { ok: false, error: 'not_configured' };
     const partition = `proxy:${tab.id}`;
