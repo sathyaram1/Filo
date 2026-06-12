@@ -772,6 +772,11 @@
     },
     // Tema: 'system' | 'light' | 'dark'
     theme: 'system',
+    // Override dei token estetici (#146.1): mappa { nomeToken: valore }.
+    // Il registro dei token (nomi, tipi, default, gerarchia) vive in
+    // src/shared/themeTokens.js. La chiave è in REPLACE_KEYS dello storage:
+    // ogni salvataggio sostituisce l'intera mappa.
+    themeTokens: {},
     // Dimensione del testo della UI di Filo (moltiplicatore zoom delle pagine
     // interne). 1 = 100%. Impostato dalla pagina Preferenze.
     textScale: 1,
