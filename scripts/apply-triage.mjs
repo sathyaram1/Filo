@@ -40,6 +40,7 @@ import { fileURLToPath } from 'node:url';
 // L'autenticazione (service account in CI, refresh token admin in locale) è
 // condivisa con backfill-feedback-numbers.mjs: vive in lib/firestore-auth.mjs.
 import { acquireBearer, FIRESTORE_BASE } from './lib/firestore-auth.mjs';
+import { backfillNumbers } from './backfill-feedback-numbers.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
