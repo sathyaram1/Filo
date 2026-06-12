@@ -50,6 +50,17 @@ nuovo feedback eredita il numero del padre con suffisso (#22 → #22.1, #22.2…
 senza `parentId` prende il prossimo numero progressivo top-level. Se il padre
 non ha ancora un numero (feedback storico), gliene viene assegnato uno al volo.
 
+## Op di manutenzione (rare)
+
+La coda accetta anche due operazioni una-tantum, utili quando in locale non
+c'è nessuna credenziale admin (la Action le esegue col service account):
+
+- `{"op": "backfill"}` — assegna il numero progressivo ai feedback storici
+  che non ne hanno (equivale a `npm run feedback:backfill`).
+- `{"op": "delete", "id": "<idFeedback>"}` — elimina un documento, ma SOLO
+  se è un doc di test (`clientId` che inizia per `test:`). Per i feedback
+  veri la cancellazione resta un'azione manuale dell'admin.
+
 ## Come si accoda (routine cloud)
 
 ```bash
