@@ -57,4 +57,8 @@ test('Opzioni: i modelli della Home (dashboard e chat) sono impostabili e persis
   const chatAfter = await chainInput(page, 'Home — chat con Filo');
   await expect(dashAfter).toHaveValue('miodash');
   await expect(chatAfter).toHaveValue('miachat');
+
+  // Traccia visiva della run (cartella gitignorata, non è il primary signal).
+  await page.locator('#modelsGrid').scrollIntoViewIfNeeded().catch(() => {});
+  await page.screenshot({ path: 'tests/.shots/options-home-models.png', fullPage: true }).catch(() => {});
 });
