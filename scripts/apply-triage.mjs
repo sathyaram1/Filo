@@ -351,6 +351,7 @@ async function main() {
   if (DRY) {
     for (const it of items) {
       if (it.error) console.log(`  ✗ ${it.file}: ${it.error}`);
+      else if (it.entry.op === 'create') console.log(`  • CREA «${it.entry.name}» → ${it.entry.status}${it.entry.parentId ? `  (sub di ${it.entry.parentId})` : ''}`);
       else console.log(`  • ${it.entry.id} → ${it.entry.status}${it.entry.notes ? `  («${it.entry.notes.slice(0, 60)}»)` : ''}`);
     }
     console.log('\nDry-run: nessuna scrittura su Firestore, nessuna modifica a git.');
@@ -358,11 +359,29 @@ async function main() {
   }
 
   const bearer = await acquireBearer();
+  const allocateNumber = makeNumberAllocator(bearer);
 
   const applied = [];
   let failures = 0;
   for (const it of items) {
     if (it.error) { console.warn(`  ✗ salto ${it.file}: ${it.error}`); failures++; continue; }
+    if (it.entry.op === 'create') {
+      try {
+        const num = await allocateNumber(it.entry);
+        const r = await createFeedback(it.entry, num, bearer);
+        if (r.ok) {
+          console.log(`  ✓ creato #${num.subSeq ? `${num.seq}.${num.subSeq}` : num.seq} «${it.entry.name}» → ${it.entry.status} (${r.id})`);
+          unlinkSync(it.file); applied.push(it.file);
+        } else {
+          console.error(`  ✗ creazione «${it.entry.name}»: HTTP ${r.status} ${r.body}`);
+          failures++;
+        }
+      } catch (e) {
+        console.error(`  ✗ creazione «${it.entry.name}»: ${e.message}`);
+        failures++;
+      }
+      continue;
+    }
     const r = await patchFeedback(it.entry, bearer);
     if (r.ok) {
       console.log(`  ✓ ${it.entry.id} → ${it.entry.status}`);
