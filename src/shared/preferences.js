@@ -150,11 +150,15 @@
   function buildPreferencePartial(rawKey, rawVal) {
     const key = String(rawKey == null ? '' : rawKey).trim().toLowerCase();
     if (!key) return null;
+    const withLevel = (setter) => {
+      const r = setter.build(rawVal);
+      return r ? { ...r, level: setter.level || 1 } : null;
+    };
     for (const setter of PREF_SETTERS) {
-      if (setter.keys.includes(key)) return setter.build(rawVal);
+      if (setter.keys.includes(key)) return withLevel(setter);
     }
     for (const setter of PREF_SETTERS) {
-      if (setter.keys.some((k) => key.includes(k) || k.includes(key))) return setter.build(rawVal);
+      if (setter.keys.some((k) => key.includes(k) || k.includes(key))) return withLevel(setter);
     }
     return null;
   }
