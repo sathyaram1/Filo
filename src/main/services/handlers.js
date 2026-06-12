@@ -485,9 +485,37 @@ async function applySettingsUpdate(partial) {
   return merged;
 }
 
-async function executeFiloAction(action) {
+async function executeFiloAction(action, { confirmed = false } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
+
+  // ── gate dei livelli di sicurezza (#146.2) ────────────────────────────────
+  // Il livello è assegnato STATICAMENTE nel registro (src/shared/actionLevels.js),
+  // mai deciso dall'LLM. Azione non registrata → rifiutata (ogni nuovo potere
+  // di Filo è obbligato a dichiarare il suo livello). Livello ≥ 2 senza
+  // conferma utente → non si esegue: torna al client con la spiegazione, il
+  // client mostra popup (2) o box "digita conferma" (3) e solo allora rimanda
+  // l'azione via MSG.FILO_CONFIRM_ACTION. La riclassificazione avviene anche
+  // alla conferma (`confirmed` salta solo la sospensione, non il registro).
+  const Levels = globalThis.SN_ACTION_LEVELS;
+  const level = Levels ? Levels.levelFor(action) : 1;
+  if (Levels && !level) {
+    console.warn('[Filo] azione non registrata rifiutata:', type);
+    return { executed: false, kept: false, rejected: true };
+  }
+  // PULISCI_TAB e CANCELLA_ARCHIVIO hanno già un flusso di conferma dedicato
+  // lato client (bottone → RUN_TAB_TRIAGE / pannello eliminazione): restano
+  // `kept` come prima e la conferma la gestisce la loro UI specifica.
+  const hasBespokeConfirm = type === 'PULISCI_TAB' || type === 'CANCELLA_ARCHIVIO';
+  if (level >= 2 && !confirmed && !hasBespokeConfirm) {
+    return {
+      executed: false,
+      kept: true,
+      needsConfirm: level,
+      describe: Levels ? Levels.describe(action) : '',
+    };
+  }
+
   try {
     switch (type) {
       case 'NAVIGA':
