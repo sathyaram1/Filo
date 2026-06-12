@@ -305,6 +305,8 @@
     submit,
     list,
     updateStatus,
+    formatNum,
+    fallbackName,
     configPublic: { projectId: PROJECT_ID, bucket: BUCKET, collection: COLLECTION },
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
