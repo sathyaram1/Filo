@@ -165,7 +165,12 @@ class TabManager {
   _applySecurity(tab) {
     if (tab.isInternal) return; // le pagine filo:// sono fidate, niente da limitare
     try {
-      const policy = this.security.protectIpLeak ? 'default_public_interface_only' : 'default';
+      // Anti-leak proxy per-tab (OBBLIGATORIO, non disattivabile): in una tab
+      // proxata WebRTC non deve mai aprire UDP diretto, o qualsiasi sito legge
+      // l'IP reale via STUN. Vince anche su protectIpLeak=false.
+      const policy = tab.proxy
+        ? 'disable_non_proxied_udp'
+        : (this.security.protectIpLeak ? 'default_public_interface_only' : 'default');
       tab.view.webContents.setWebRTCIPHandlingPolicy(policy);
     } catch (_) { /* policy non supportata in qualche build */ }
   }
