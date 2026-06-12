@@ -1,0 +1,11 @@
+{
+  "op": "create",
+  "name": "token estetici centralizzati (fondamenta theming)",
+  "text": "[Sub-task 1/6 della spec #146 \"personalizzazione\"] Ogni variabile estetica di Filo deve diventare un token centralizzato e sovrascrivibile dall'utente: colori dei bottoni, font dei link, opacità della selezione, colore d'accento, ecc.\n\nCosa serve:\n- Un REGISTRO dei token estetici: nome → valore predefinito, con GERARCHIA a due livelli: i token specifici (es. \"colore bottone primario\") derivano di default da token di categoria (es. \"colore d'accento\"), così si può cambiare sia il singolo elemento sia l'intera categoria con una modifica sola. Se un token specifico è sovrascritto, vince sull'eredità di categoria.\n- Gli override dell'utente vivono nello storage (chrome.storage.local shim → storage.json) e vengono applicati a TUTTE le superfici: shell (src/renderer/), pagine filo:// (src/pages/), e popup/sidebar/menu iniettati nei content script (src/styles/*.css usano già variabili CSS in theme.css — partire da lì).\n- Applicazione live: cambiare un override deve aggiornare l'aspetto senza riavvio (broadcast main→renderer già esistente: broadcastToTabs/broadcastLiveUpdate).\n\nCriterio di fatto: impostando un override via storage l'aspetto cambia ovunque (shell + pagina filo:// + popup su pagina web) senza riavvio; rimuovendolo si torna al predefinito; cambiare il token di categoria cambia tutti gli elementi che ne ereditano. Unit test sul registro (risoluzione gerarchia/override) + spec Playwright che imposta un override e asserisce il CSS risultante.\n\nNOTA: questo task è la fondamenta per #146.2 (sezione codice nelle preferenze) e #146.4 (Filo cambia l'estetica via chat): progettare il registro pensando a chi lo leggerà programmaticamente (elenco completo di token con nome, descrizione, tipo: colore/font/opacità/durata…).",
+  "parentId": "MXtsf41N26tR6YVyvSQ3",
+  "status": "todo",
+  "priority": 3,
+  "notes": "",
+  "queuedAt": "2026-06-12T00:00:00.000Z",
+  "queuedBy": "sessione-locale"
+}
