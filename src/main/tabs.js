@@ -270,6 +270,8 @@ class TabManager {
     }
     return this._partitionFor(url);
   }
+
+  _makeView(url, partition) {
     const isInternal = url.startsWith('filo://');
     return new WebContentsView({
       webPreferences: {
