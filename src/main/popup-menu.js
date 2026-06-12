@@ -230,9 +230,23 @@ function buildHTML(entries, isDark, margin = 26) {
         // l'action con un prefisso sentinella per non confonderla con un url.
         const value = e.action ? ('@action:' + e.action) : (e.url || '');
         const escVal = value.replace(/'/g, "\\'");
-        items += `<button class="item" onclick="popupApi.select('${escVal}')">` +
+        const main = `<button class="item" onclick="popupApi.select('${escVal}')">` +
           `${icoSpan}` +
           `<span class="lbl">${label}</span></button>`;
+        if (e.subAction) {
+          // Voce a due zone di click: il corpo esegue `action`, la freccia a
+          // destra manda `subAction` (il chiamante riapre il menu col secondo
+          // livello — es. la lista paesi di "Apri da un altro paese").
+          const escSub = ('@action:' + e.subAction).replace(/'/g, "\\'");
+          items += `<div class="row">${main}` +
+            `<button class="subarrow" aria-label="Altre opzioni" ` +
+            `onclick="popupApi.select('${escSub}')">` +
+            `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" ` +
+            `fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ` +
+            `stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button></div>`;
+        } else {
+          items += main;
+        }
       }
     }
   }
