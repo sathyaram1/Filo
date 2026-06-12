@@ -46,6 +46,8 @@ test('dashboard: numero e titolo visibili sulle card (#22, #22.1)', async ({ ope
 
   const titles = page.locator('.fb-title');
   await expect(titles).toHaveCount(2); // il feedback storico non ne ha
+  // Traccia visiva della run (tests/.shots/ è gitignorata).
+  await page.screenshot({ path: 'tests/.shots/feedback-numbering.png' }).catch(() => {});
   await expect(titles.nth(0)).toContainText('#22.1');
   await expect(titles.nth(0)).toContainText('rotazione chiavi');
   await expect(titles.nth(1)).toContainText('#22');
