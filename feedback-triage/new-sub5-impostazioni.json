@@ -1,0 +1,11 @@
+{
+  "op": "create",
+  "name": "filo modifica qualsiasi impostazione",
+  "text": "[Sub-task 5/6 della spec #146 \"personalizzazione\" — dipende da #146.2 (livelli di sicurezza), da fare DOPO] La spec dice: \"filo deve poter modificare QUALSIASI impostazione\". Tutte le impostazioni esistenti dell'app (pagina opzioni: modelli, chiavi, sicurezza, lingua, suoni, limiti di spesa, ecc.) vanno esposte come azioni di Filo nel registro dei livelli (#146.2), ciascuna col livello adeguato assegnato staticamente:\n\n- esempi livello 1: cambi estetici, suono del timer, avviare un timer;\n- esempi livello 2 (popup di conferma): impostazioni in \"sicurezza\" o \"modelli\", inviare un feedback a nome dell'utente (oggi Filo non può: la spec dice che dovrebbe — aggiungere l'azione \"invia feedback\" con livello 2);\n- esempi livello 3 (digitare \"conferma\"): eliminare le memorie di Filo, eliminare file.\n\nCosa serve: un'azione generica \"imposta impostazione X a Y\" che mappa sul registro livelli con il livello della specifica impostazione (non un livello unico per tutte), più l'azione \"invia feedback\". L'elenco impostazione→livello va scritto esplicitamente (la spec insiste: non è Filo a decidere il livello).\n\nCriterio di fatto: chiedere a Filo di cambiare un'impostazione per ciascun livello produce il comportamento giusto (applica diretto / popup OK / digitare conferma) e l'impostazione cambia davvero (verificare leggendo lo storage). Spec Playwright per almeno un caso per livello.",
+  "parentId": "MXtsf41N26tR6YVyvSQ3",
+  "status": "todo",
+  "priority": 2,
+  "notes": "",
+  "queuedAt": "2026-06-12T00:00:00.000Z",
+  "queuedBy": "sessione-locale"
+}
