@@ -270,6 +270,40 @@ async function main() {
   let failures = 0;
   for (const it of items) {
     if (it.error) { console.warn(`  ✗ salto ${it.file}: ${it.error}`); failures++; continue; }
+    if (it.entry.op === 'backfill') {
+      try {
+        const r = await backfillNumbers(bearer);
+        if (r.failures) { console.error(`  ✗ backfill: ${r.failures} patch fallite (file lasciato in coda)`); failures++; }
+        else {
+          console.log(`  ✓ backfill: ${r.numbered} feedback numerati (${r.total} totali)`);
+          unlinkSync(it.file); applied.push(it.file);
+        }
+      } catch (e) { console.error(`  ✗ backfill: ${e.message}`); failures++; }
+      continue;
+    }
+    if (it.entry.op === 'delete') {
+      try {
+        const doc = await getDoc(it.entry.id, bearer);
+        if (!doc) {
+          console.warn(`  ! delete ${it.entry.id}: già inesistente — rimuovo dalla coda`);
+          unlinkSync(it.file); applied.push(it.file);
+        } else if (!String(doc.fields?.clientId?.stringValue || '').startsWith('test:')) {
+          // Guardrail: la coda può eliminare SOLO documenti di test. Per i
+          // feedback veri la cancellazione resta un'azione manuale dell'admin.
+          console.error(`  ✗ delete ${it.entry.id}: non è un doc di test (clientId "${doc.fields?.clientId?.stringValue || ''}") — rifiutato`);
+          failures++;
+        } else {
+          const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(it.entry.id)}`, {
+            method: 'DELETE', headers: { Authorization: `Bearer ${bearer}` },
+          });
+          if (res.ok) {
+            console.log(`  ✓ eliminato doc di test ${it.entry.id}`);
+            unlinkSync(it.file); applied.push(it.file);
+          } else { console.error(`  ✗ delete ${it.entry.id}: HTTP ${res.status}`); failures++; }
+        }
+      } catch (e) { console.error(`  ✗ delete ${it.entry.id}: ${e.message}`); failures++; }
+      continue;
+    }
     if (it.entry.op === 'create') {
       try {
         const num = await allocateNumber(it.entry);
