@@ -151,8 +151,7 @@ test('setTabProxy instrada la tab via SOCKS5 con DNS lato proxy; clearTabProxy t
     // La pagina si ricarica ATTRAVERSO il proxy: il SOCKS vede la connessione
     // e il contenuto è davvero visibile nella nuova view.
     await expect.poll(() => socks.connections.length, { timeout: 15_000 }).toBeGreaterThan(0);
-    const proxiedPage = await findPage(app, (u) => u === url);
-    await proxiedPage.waitForSelector('#ok', { timeout: 10_000 });
+    const proxiedPage = await waitPageWith(app, (u) => u === url, '#ok');
 
     const info = await webTabInfo(app);
     expect(info.proxy).toEqual({ country: 'us', tier: 'datacenter' });
