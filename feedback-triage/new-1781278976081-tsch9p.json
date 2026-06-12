@@ -1,0 +1,11 @@
+{
+  "op": "create",
+  "text": "Controllo del proxy per-tab via linguaggio naturale (spec completa in proxy-per-tab-spec.md nella root del repo; dipende dall'infrastruttura proxy per-tab, feedback separato). L'agente conversazionale di Filo deve avere accesso alle stesse primitive della UI: 'Apri questa tab dalla Francia' → setTabProxy(tabId, country); 'chiudi tutte le tab proxate' → enumerazione + clearTabProxy; 'questo sito sempre dagli USA' → istruzione persistente per dominio, salvata nella memoria a lungo termine di Filo (stessa infrastruttura del pin delle tab). Con un'istruzione persistente attiva, alla navigazione verso quel dominio la tab nasce gia' proxata sulla location indicata, e l'istruzione sopravvive al riavvio dell'app. Deve esistere anche il modo di rimuovere l'istruzione persistente ('togli la regola sugli USA per questo sito'). Criterio di fatto: unit test sul parsing/routing dei comandi verso le primitive + test Playwright che verifica che l'istruzione persistente venga salvata e che la riapertura del dominio nasca proxata anche dopo riavvio.",
+  "name": "proxy per-tab: linguaggio naturale + istruzioni persistenti per dominio",
+  "parentId": "",
+  "status": "todo",
+  "priority": 1,
+  "notes": "",
+  "queuedAt": "2026-06-12T15:42:56.079Z",
+  "queuedBy": "routine"
+}
