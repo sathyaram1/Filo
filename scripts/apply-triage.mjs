@@ -248,6 +248,10 @@ function readSpool() {
 async function main() {
   const items = readSpool();
   if (!items.length) { console.log('Coda vuota: niente da applicare.'); return; }
+  // Il backfill va applicato PRIMA delle creazioni: numera gli storici, così
+  // i nuovi feedback della stessa run prendono numeri successivi e coerenti.
+  const opRank = { backfill: 0, delete: 1, create: 2 };
+  items.sort((a, b) => (opRank[a.entry?.op] ?? 3) - (opRank[b.entry?.op] ?? 3));
 
   console.log(`${items.length} decisione/i in coda${DRY ? ' (dry-run)' : ''}.`);
 
