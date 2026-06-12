@@ -762,6 +762,7 @@ const handlerCtx = {
   searchArchivedTabs,
   handleFiloChat,
   handleFiloGenerateDashboard,
+  executeFiloAction,
 };
 
 require('./handlers/nav')(on, handlerCtx);
