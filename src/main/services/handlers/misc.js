@@ -4,7 +4,37 @@
 const { safeFetch } = require('../safe-fetch');
 
 module.exports = function register(on, ctx) {
-  const { MSG, winOf } = ctx;
+  const { MSG, winOf, getEffectiveSettings, buildAttemptChain } = ctx;
+
+  // Titolo breve del feedback, generato da un LLM economico al momento
+  // dell'invio (es. "gestione segreti"). Best-effort: se la catena modelli non
+  // è configurata o tarda, si ripiega sulle prime parole del testo — l'invio
+  // del feedback non deve MAI fallire per colpa del titolo.
+  async function generateFeedbackName(text) {
+    const fallback = globalThis.SN_FEEDBACK?.fallbackName?.(text) || '';
+    const t = String(text || '').trim();
+    if (!t) return fallback;
+    try {
+      const settings = await getEffectiveSettings();
+      const attempts = buildAttemptChain(settings, 'flash-lite');
+      const messages = [{
+        role: 'user',
+        content: 'Genera un titolo brevissimo (2-6 parole, nella stessa lingua del testo) che riassuma questo feedback su un\'app. Rispondi SOLO col titolo, senza virgolette e senza punto finale.\n\nFeedback:\n' + t.slice(0, 1500),
+      }];
+      const r = await Promise.race([
+        globalThis.SN_PROVIDERS.completeWithFallback({ attempts, messages }),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout titolo (8s)')), 8000)),
+      ]);
+      const name = String(r?.text || '').trim()
+        .split('\n')[0]
+        .replace(/^["'«\s]+|["'»\s.]+$/g, '')
+        .slice(0, 120);
+      return name || fallback;
+    } catch (e) {
+      console.warn('[Filo feedback] titolo LLM non disponibile:', e?.message || e);
+      return fallback;
+    }
+  }
 
   on(MSG.CAPTURE_VISIBLE_TAB, async (msg, sender) => {
     const win = winOf(sender);
