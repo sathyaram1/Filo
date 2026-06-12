@@ -1,0 +1,7 @@
+{
+  "id": "9qPBZj3Bxpzsy9ipvkWk",
+  "status": "done",
+  "notes": "Nel menu del tasto destro sulla tab ora c'e' 'Apri da un altro paese': il click diretto apre la tab dall'ultima location usata (la prima volta: Stati Uniti), la freccia a destra della voce apre la lista dei 7 paesi curati. Quando la tab e' instradata da un altro paese, la voce diventa 'Torna in Italia' e accanto al titolo della tab compare un indicatore discreto (piccolo globo + codice paese, nell'arancione caldo di Filo — niente lucchetti). Le parole VPN/proxy non compaiono mai. Se nessun endpoint e' configurato nelle impostazioni la voce non compare affatto (una voce che non puo' funzionare non deve esistere). Verificato con test Playwright che esercitano il flusso reale: right-click, click sulla voce, tab davvero instradata attraverso un proxy di test, indicatore che appare con 'US'/'FR' e scompare con 'Torna in Italia'. Suite completa: 294 test passati, fallimenti residui solo quelli preesistenti non legati a questa feature.",
+  "queuedAt": "2026-06-12T20:01:24.321Z",
+  "queuedBy": "routine"
+}
