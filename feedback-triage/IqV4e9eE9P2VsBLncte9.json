@@ -1,0 +1,7 @@
+{
+  "id": "IqV4e9eE9P2VsBLncte9",
+  "status": "done",
+  "notes": "Costruita la base di 'Apri da un altro paese': una tab puo' essere instradata da un altro paese e vive in un compartimento isolato (i login delle altre tab non la seguono, come da spec). Protezioni anti-leak attive: WebRTC non puo' rivelare l'IP reale e i nomi dei siti vengono risolti dal server remoto, mai dal PC. L'endpoint del servizio si configura da impostazioni o variabili d'ambiente (template con {country}, tier datacenter + residenziale); nessun provider commerciale e' integrato, come richiesto — la scelta resta nel feedback apposito. Oltre al chiesto: le primitive sono gia' esposte alla shell (per il menu tasto destro del feedback UI) e lo stato proxy della tab e' nel suo snapshot, con lista di 7 paesi curati. Verificato con un server SOCKS5 di test: la pagina si carica davvero attraverso il proxy, un hostname irrisolvibile in locale si apre lo stesso (DNS lato proxy), i cookie non passano tra tab proxata e normale, e 'torna diretto' ripristina tutto. Suite completa: 290 test passati; 4 fallimenti preesistenti gia' presenti prima della modifica (menu nativi/lettura ad alta voce in ambiente headless), non legati al proxy.",
+  "queuedAt": "2026-06-12T19:46:23.686Z",
+  "queuedBy": "routine"
+}
