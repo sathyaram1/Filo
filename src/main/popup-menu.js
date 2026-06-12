@@ -290,6 +290,14 @@ html,body{background:transparent;overflow:hidden;height:100%}
 .lbl{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .item.centered .lbl{flex:0 1 auto}
 .sep{height:1px;background:${c.border};margin:4px 8px}
+.row{display:flex;align-items:stretch}
+.row .item{flex:1;min-width:0}
+.subarrow{
+  all:unset;box-sizing:border-box;
+  display:inline-flex;align-items:center;justify-content:center;
+  flex:0 0 30px;cursor:pointer;color:${c.muted};
+}
+.subarrow:hover{background:rgba(${c.ar},0.12);color:rgba(${c.ar},0.95)}
 </style></head><body><div class="menu">${items}</div></body></html>`;
 }
 
