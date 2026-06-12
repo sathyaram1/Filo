@@ -2,9 +2,13 @@
 // svuota la coda. È la metà "consumatore" del flusso descritto in queue-triage.mjs.
 //
 // COSA FA
-//   Legge tutti i file `feedback-triage/*.json` e per ciascuno fa la PATCH REST
-//   sul documento feedback. Dopo una PATCH riuscita cancella il file di spool
-//   (la coda si svuota) e committa+pusha la rimozione, così non si riapplica.
+//   Legge tutti i file `feedback-triage/*.json` e per ciascuno:
+//   - entry di triage (id + status): PATCH REST sul documento feedback;
+//   - entry `op: "create"` (da queue-feedback.mjs): crea un NUOVO documento
+//     feedback (sub-feedback di una spec spezzata, o top-level), assegnandogli
+//     il numero progressivo (#23) o il numero del padre con suffisso (#22.1).
+//   Dopo un'applicazione riuscita cancella il file di spool (la coda si
+//   svuota) e committa+pusha la rimozione, così non si riapplica.
 //
 // AUTENTICAZIONE — due modalità, scelte in automatico:
 //
