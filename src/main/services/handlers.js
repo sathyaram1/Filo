@@ -455,6 +455,12 @@ async function maybeRunCompactor() {
 // Preferenze: condividerlo garantisce che una modifica fatta da Filo via chat
 // si comporti esattamente come una fatta a mano (es. il tema cambia live).
 async function applySettingsUpdate(partial) {
+  // Gli override dei token estetici finiscono dentro <style> iniettati in
+  // tutte le superfici (incluse pagine web esterne): qui, nel choke point
+  // delle scritture, teniamo solo i valori che passano la whitelist per tipo.
+  if (partial && partial.themeTokens && globalThis.SN_THEME_TOKENS) {
+    partial = { ...partial, themeTokens: globalThis.SN_THEME_TOKENS.sanitize(partial.themeTokens).clean };
+  }
   const merged = await Storage.updateSettings(partial);
   broadcastToTabs({ type: MSG.SETTINGS_UPDATED, settings: merged });
   try {
