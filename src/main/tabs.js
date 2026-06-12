@@ -54,13 +54,14 @@ function getContentScriptCss() {
   return CONTENT_SCRIPT_CSS;
 }
 
+/* Segue i token estetici (#146.1): colore/opacità della selezione arrivano
+   dalle variabili di theme.css (iniettato anche qui), con fallback letterale
+   per il primissimo paint quando [data-sn-theme] non è ancora impostato. */
 const PAGE_SELECTION_CSS = `
 ::selection { background-color: rgba(196, 90, 59, 0.30) !important; }
 ::-moz-selection { background-color: rgba(196, 90, 59, 0.30) !important; }
-[data-sn-theme="light"] ::selection { background-color: rgba(196, 90, 59, 0.25) !important; }
-[data-sn-theme="light"] ::-moz-selection { background-color: rgba(196, 90, 59, 0.25) !important; }
-[data-sn-theme="dark"] ::selection { background-color: rgba(196, 90, 59, 0.35) !important; }
-[data-sn-theme="dark"] ::-moz-selection { background-color: rgba(196, 90, 59, 0.35) !important; }
+[data-sn-theme] ::selection { background-color: var(--sn-selection-bg, rgba(196, 90, 59, 0.30)) !important; }
+[data-sn-theme] ::-moz-selection { background-color: var(--sn-selection-bg, rgba(196, 90, 59, 0.30)) !important; }
 `;
 
 function buildNativeContextMenu(wc, params) {
