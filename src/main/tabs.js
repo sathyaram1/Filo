@@ -446,10 +446,15 @@ class TabManager {
   async setTabProxy(id, country, { tier } = {}) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return { ok: false, error: 'no_tab' };
-    const code = ProxyTab.normalizeCountry(country);
-    if (!code) return { ok: false, error: 'bad_country' };
     let settings = null;
     try { settings = await this._readSettings(); } catch (_) {}
+    // Senza paese esplicito (click diretto su "Apri da un altro paese") si usa
+    // l'ultima location usata, altrimenti il default delle impostazioni (USA).
+    const p = (settings && settings.proxy) || {};
+    const code = ProxyTab.normalizeCountry(country)
+      || ProxyTab.normalizeCountry(p.lastCountry)
+      || ProxyTab.normalizeCountry(p.defaultCountry)
+      || 'us';
     const resolved = ProxyTab.resolve(code, { tier, settings });
     if (!resolved) return { ok: false, error: 'not_configured' };
     const partition = `proxy:${tab.id}`;
