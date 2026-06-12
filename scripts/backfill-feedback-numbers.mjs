@@ -11,7 +11,7 @@
 //   node scripts/backfill-feedback-numbers.mjs            applica
 //   node scripts/backfill-feedback-numbers.mjs --dry-run  mostra cosa farebbe
 
-import { acquireBearer, FIRESTORE_BASE } from './lib/firestore-auth.mjs';
+import { acquireBearer, FIRESTORE_BASE, FIREBASE_API_KEY } from './lib/firestore-auth.mjs';
 
 const DRY = process.argv.includes('--dry-run');
 
