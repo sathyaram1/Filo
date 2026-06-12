@@ -432,6 +432,56 @@ class TabManager {
     this.setMuted(id, !tab.muted);
   }
 
+  // ─── proxy per-tab ("Apri da un altro paese", vedi proxy-per-tab-spec.md) ──
+
+  // Instrada la tab attraverso un endpoint nel paese richiesto. La tab viene
+  // ricreata nella partition dedicata proxy:<tabId> (cookie jar separato dal
+  // resto del browser) con il proxy applicato alla sua session; la scelta vive
+  // finché vive la tab. `tier` è 'datacenter' (default) o 'residential'.
+  async setTabProxy(id, country, { tier } = {}) {
+    const tab = this.tabs.find((t) => t.id === id);
+    if (!tab) return { ok: false, error: 'no_tab' };
+    const code = ProxyTab.normalizeCountry(country);
+    if (!code) return { ok: false, error: 'bad_country' };
+    let settings = null;
+    try { settings = await this._readSettings(); } catch (_) {}
+    const resolved = ProxyTab.resolve(code, { tier, settings });
+    if (!resolved) return { ok: false, error: 'not_configured' };
+    const partition = `proxy:${tab.id}`;
+    // Niente prefisso persist: → la session proxata è effimera (in RAM): i suoi
+    // cookie non sopravvivono alla chiusura dell'app. setProxy va applicato e
+    // ATTESO prima di creare la view, o le prime richieste partirebbero dirette.
+    const ses = session.fromPartition(partition);
+    try {
+      await ses.setProxy({
+        proxyRules: resolved.proxyRules,
+        ...(resolved.bypassRules ? { proxyBypassRules: resolved.bypassRules } : {}),
+      });
+    } catch (e) {
+      return { ok: false, error: 'proxy_failed' };
+    }
+    ProxyTab.setPartitionAuth(partition, ses, resolved.auth);
+    tab.proxy = { country: code, tier: resolved.tier };
+    // Ricrea la view nella partition proxata sullo stesso URL (la ricreazione
+    // applica anche l'anti-leak WebRTC via _applySecurity). Vale anche per il
+    // cambio paese di una tab già proxata: stessa partition, proxy aggiornato,
+    // reload attraverso il nuovo endpoint.
+    this._recreateView(tab, tab.url || 'filo://newtab/');
+    return { ok: true, country: code, tier: resolved.tier };
+  }
+
+  // "Torna in Italia": rimuove il proxy dalla tab, che viene ricreata nella
+  // sessione normale (stesso URL, connessione diretta).
+  clearTabProxy(id) {
+    const tab = this.tabs.find((t) => t.id === id);
+    if (!tab) return { ok: false, error: 'no_tab' };
+    if (!tab.proxy) return { ok: true };
+    tab.proxy = null;
+    ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
+    this._recreateView(tab, tab.url || 'filo://newtab/');
+    return { ok: true };
+  }
+
   // ─── §2.1 auto-archiviazione / riordino ─────────────────────────────────
 
   async _readSettings() {
