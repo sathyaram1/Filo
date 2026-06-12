@@ -1,0 +1,7 @@
+{
+  "id": "R0tRTBcw6aO7lUciJDjj",
+  "status": "done",
+  "notes": "Fatte le fondamenta del theming: ogni variabile estetica di Filo (colore d'accento, sfondo, testo, bordi, font, raggio angoli, colore/opacità della selezione, colore di link e bottoni) è ora un token centralizzato con gerarchia a due livelli: i token specifici ereditano dalla categoria, quindi cambiando ad es. il colore d'accento cambiano insieme selezione e link, ma un override sul singolo token vince. Gli override vivono nelle impostazioni e si applicano SUBITO, senza riavvio, su tutte le superfici: barra del browser, pagine interne e popup/menu/sidebar sulle pagine web. Rimuovendo l'override si torna al predefinito. In più rispetto al chiesto: i valori malformati o ostili vengono rifiutati alla scrittura (per sicurezza, visto che finiscono in CSS iniettato anche nei siti) e i link delle pagine interne ora usano il colore d'accento invece del blu di default del browser. Non c'è ancora una UI per modificare i token: arriva con #146.3 (sezione codice nelle preferenze) e #146.4 (via chat). Verificato con unit test sul registro (gerarchia/override/validazione), test Playwright end-to-end sulle tre superfici (override live + reset) e suite completa: gli unici 2 test rossi falliscono anche senza queste modifiche (problemi pre-esistenti dell'ambiente headless).",
+  "queuedAt": "2026-06-12T14:52:18.245Z",
+  "queuedBy": "routine"
+}
