@@ -62,9 +62,10 @@ async function patchSeq(id, seq, bearer) {
   return { ok: res.ok, status: res.status, body: res.ok ? '' : (await res.text()).slice(0, 200) };
 }
 
-async function main() {
-  const bearer = DRY ? null : await acquireBearer();
-  // Anche in dry-run serve leggere: la lettura è pubblica, niente bearer.
+// Esegue il backfill. `bearer` null = dry-run (solo lettura, che è pubblica).
+// Esportata perché apply-triage.mjs la richiama per l'op di coda "backfill".
+export async function backfillNumbers(bearer) {
+  const dry = !bearer;
   const docs = await listAll(bearer || '');
   const withSeq = docs.filter((d) => intField(d, 'seq') > 0);
   const missing = docs.filter((d) => intField(d, 'seq') === 0);
@@ -75,7 +76,7 @@ async function main() {
   for (const d of missing) {
     const id = d.name.split('/').pop();
     const label = strField(d, 'name') || strField(d, 'text').slice(0, 50).replace(/\s+/g, ' ');
-    if (DRY) {
+    if (dry) {
       console.log(`  • #${next++} → ${id}  «${label}»`);
       continue;
     }
@@ -83,9 +84,19 @@ async function main() {
     if (r.ok) console.log(`  ✓ #${next++} → ${id}  «${label}»`);
     else { console.error(`  ✗ ${id}: HTTP ${r.status} ${r.body}`); failures++; }
   }
-  if (DRY) console.log('\nDry-run: nessuna scrittura.');
-  else console.log(`\nFatto${failures ? ` (${failures} falliti)` : ''}.`);
-  if (failures) process.exit(1);
+  return { total: docs.length, numbered: missing.length - failures, failures, dry };
 }
 
-main().catch((e) => { console.error('Errore:', e.message); process.exit(1); });
+const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
+if (isMain) {
+  const DRY = process.argv.includes('--dry-run');
+  try {
+    const bearer = DRY ? null : await acquireBearer();
+    const r = await backfillNumbers(bearer);
+    console.log(DRY ? '\nDry-run: nessuna scrittura.' : `\nFatto${r.failures ? ` (${r.failures} falliti)` : ''}.`);
+    if (r.failures) process.exit(1);
+  } catch (e) {
+    console.error('Errore:', e.message);
+    process.exit(1);
+  }
+}
