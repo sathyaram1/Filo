@@ -338,6 +338,30 @@
 
   function renderActionButton(a, { onAck } = {}) {
     const type = String(a.type || '').toUpperCase();
+    // Azione sospesa in attesa di conferma (#146.2): il main non l'ha eseguita
+    // (livello 2 o 3) e ha allegato spiegazione + livello. Il bottone apre il
+    // popup OK/Annulla (2) o il box "digita conferma" (3); solo dopo il sì
+    // dell'utente l'azione parte davvero via MSG.FILO_CONFIRM_ACTION.
+    // PULISCI_TAB e CANCELLA_ARCHIVIO non passano di qui: hanno la loro UI.
+    if (a._confirm && a._confirm.level >= 2) {
+      const btn = document.createElement('button');
+      btn.className = 'dash-action-btn dash-action-btn-primary';
+      btn.type = 'button';
+      btn.textContent = a._confirm.text || 'Esegui';
+      btn.addEventListener('click', async () => {
+        if (btn.disabled) return;
+        const Ui = window.SN_CONFIRM_UI;
+        const opts = { title: 'Filo chiede conferma', text: a._confirm.text || '' };
+        const ok = Ui
+          ? await (a._confirm.level >= 3 ? Ui.confirmTyped(opts) : Ui.confirm(opts))
+          : window.confirm(opts.text); // fallback se il modulo non è caricato
+        if (!ok) return;
+        btn.disabled = true;
+        const r = await send({ type: MSG.FILO_CONFIRM_ACTION, action: a });
+        btn.textContent = (r && r.executed) ? `✓ ${a._confirm.text}` : '✗ Non eseguita';
+      });
+      return btn;
+    }
     if (type === 'NAVIGA') {
       const btn = document.createElement('a');
       btn.href = a.url || '#';
