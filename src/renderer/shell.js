@@ -520,6 +520,16 @@
         el.appendChild(m);
       }
 
+      // Indicatore "aperta da un altro paese": globo + codice paese accanto al
+      // titolo, così si riconoscono a colpo d'occhio le tab instradate altrove.
+      if (t.proxy && t.proxy.country) {
+        const p = document.createElement('span');
+        p.className = 'proxy-ind';
+        p.setAttribute('aria-label', 'Aperta da un altro paese');
+        p.innerHTML = PROXY_IND_SVG + '<span class="cc">' + t.proxy.country.toUpperCase() + '</span>';
+        el.appendChild(p);
+      }
+
       const title = document.createElement('span');
       title.className = 'title';
       title.textContent = tabLabel(t);
