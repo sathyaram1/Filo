@@ -11,11 +11,8 @@ const NEWTAB = 'filo://newtab/';
 
 // Esegue un'azione Filo nel main process, come farebbe la chat (handleFiloChat).
 const execAction = (app, action, opts) =>
-  app.evaluate(({ app: eapp }, { action, opts }) => {
-    const path = require('node:path');
-    const handlers = require(path.join(eapp.getAppPath(), 'src', 'main', 'services', 'handlers.js'));
-    return handlers.executeFiloAction(action, opts);
-  }, { action, opts });
+  app.evaluate((_electron, { action, opts }) =>
+    globalThis.SN_EXECUTE_FILO_ACTION(action, opts), { action, opts });
 
 const getSettings = (page) =>
   page.evaluate(async () => (await chrome.runtime.sendMessage({ type: 'get_settings' })).settings);
