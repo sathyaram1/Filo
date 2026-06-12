@@ -448,10 +448,13 @@
       btn.textContent = '🧹 Riordina e archivia le schede';
       btn.addEventListener('click', async () => {
         if (btn.disabled) return;
-        const ok = window.confirm(
-          'Filo valuterà tutte le schede aperte e archivierà quelle non più utili. '
-          + 'Le schede archiviate restano riapribili da “Tab archiviate”. Procedo?',
-        );
+        // Livello 2 (#146.2): popup Filo che spiega la modifica, non il
+        // window.confirm nativo (PATTERNS.md: niente default del browser).
+        const text = 'Filo valuterà tutte le schede aperte e archivierà quelle non più utili. '
+          + 'Le schede archiviate restano riapribili da “Tab archiviate”.';
+        const ok = window.SN_CONFIRM_UI
+          ? await window.SN_CONFIRM_UI.confirm({ title: 'Riordino delle schede', text, okLabel: 'Procedi' })
+          : window.confirm(`${text} Procedo?`);
         if (!ok) return;
         btn.disabled = true;
         btn.textContent = '🧹 Riordino in corso…';
