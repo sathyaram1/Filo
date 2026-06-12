@@ -255,6 +255,8 @@ async function main() {
     for (const it of items) {
       if (it.error) console.log(`  ✗ ${it.file}: ${it.error}`);
       else if (it.entry.op === 'create') console.log(`  • CREA «${it.entry.name}» → ${it.entry.status}${it.entry.parentId ? `  (sub di ${it.entry.parentId})` : ''}`);
+      else if (it.entry.op === 'backfill') console.log('  • BACKFILL numerazione feedback storici');
+      else if (it.entry.op === 'delete') console.log(`  • ELIMINA doc di test ${it.entry.id}`);
       else console.log(`  • ${it.entry.id} → ${it.entry.status}${it.entry.notes ? `  («${it.entry.notes.slice(0, 60)}»)` : ''}`);
     }
     console.log('\nDry-run: nessuna scrittura su Firestore, nessuna modifica a git.');
