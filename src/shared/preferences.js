@@ -116,6 +116,7 @@
     },
     {
       keys: ['shell_terminale', 'shell terminale', 'shell'],
+      level: 2,
       build(v) {
         const s = String(v == null ? '' : v).trim().toLowerCase();
         const map = { powershell: 'powershell', ps: 'powershell', cmd: 'cmd', 'prompt dei comandi': 'cmd', prompt: 'cmd', bash: 'bash', wsl: 'bash' };
