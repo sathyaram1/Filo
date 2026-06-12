@@ -582,6 +582,7 @@ class TabManager {
 
     for (const { tab, reason } of toArchive) {
       this._archiveClosedTab(tab, reason);
+      ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
       const idx = this.tabs.findIndex((t) => t.id === tab.id);
       if (idx >= 0) {
         try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
