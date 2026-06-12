@@ -472,6 +472,49 @@ quindi nessun elenco di ID diventa stantio quando un feedback viene riaperto.
 in `new` (inbox), `draft` (bozze — richiedono decisioni di design dell'utente),
 `done` (già risolti, in attesa di verifica), `verified` e `ignored`.
 
+### Numerazione e titoli dei feedback
+
+Ogni feedback ha un **numero leggibile** (`#22`) e un **titolo breve** (es.
+"#22 gestione segreti"), visibili in dashboard e ricercabili. Il titolo viene
+generato da un LLM al momento dell'invio; il numero è progressivo. I
+sub-feedback creati dalle routine ereditano il numero del padre con suffisso:
+`#22.1`, `#22.2`, … Usa i numeri nei report e nelle note per riferirti ai
+feedback ("vedi #22.3"), sono più chiari degli ID Firestore.
+
+### Spec corpose → spezzale in sub-feedback (#N.M)
+
+Se un feedback `todo` è una **spec troppo grossa per una sessione** (file .md
+allegato, elenco di feature, redesign multi-area…), NON provare a implementare
+tutto in una volta lasciando lavoro a metà fatto e non verificato. Invece
+**pianifica**: spezzala in sub-feedback che le routine successive lavoreranno
+una alla volta.
+
+1. Leggi la spec intera e dividila in task **autoconsistenti** da ~una
+   sessione l'uno. Come dividere e come prioritizzare lo **decidi tu**
+   (dipendenze prima, poi valore per l'utente).
+2. Per ogni task accoda la creazione di un sub-feedback:
+
+   ```bash
+   node scripts/queue-feedback.mjs --parent <idFeedbackSpec> \
+     --name "titolo breve" --priority <0-3> "descrizione del task"
+   ```
+
+   Il sub-feedback nasce in `todo` col numero del padre + suffisso (#22 →
+   #22.1, #22.2…). La **descrizione deve bastare da sola** a una routine
+   futura che NON rileggerà la spec: includi i dettagli rilevanti della spec,
+   i vincoli, e il criterio di "fatto". Se un punto della spec è ambiguo,
+   crea quel singolo sub-feedback con `--status clarify` e nelle note la
+   domanda specifica (il resto della spec procede comunque).
+3. Chiudi il feedback-spec con
+   `node scripts/queue-triage.mjs <id> done "Spec pianificata e spezzata in #22.1–#22.N: <un rigo per sub con titolo>"`.
+   Il lavoro vero vive nei sub-feedback; il padre `done` documenta la
+   pianificazione e l'utente può verificarla/riaprirla come ogni feedback.
+4. Se dopo lo split resta abbastanza contesto, inizia subito il primo
+   sub-feedback (è un task normale a tutti gli effetti).
+
+Le creazioni finiscono nella stessa coda git del triage e vengono applicate
+dalla GitHub Action entro ~1-2 minuti (vedi `feedback-triage/README.md`).
+
 **Ordine di lavorazione = priorità.** Ogni feedback ha un campo `priority`
 (intero 0-3, dove 3 = massima urgenza, 0/assente = nessuna priorità assegnata).
 Tra i feedback `todo`, **affronta sempre per primi quelli con `priority` più
