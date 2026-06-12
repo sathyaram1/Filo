@@ -1,0 +1,7 @@
+{
+  "id": "MXtsf41N26tR6YVyvSQ3",
+  "status": "done",
+  "notes": "Spec pianificata e spezzata in 6 sub-feedback: #146.1 token estetici centralizzati (P3, fondamenta theming) · #146.2 framework livelli di sicurezza 1/2/3 (P3, fondamenta azioni) · #146.3 sezione codice nelle preferenze (P2, dopo .1) · #146.4 estetica via chat + GUI per ambiguità (P2, dopo .1 e .2) · #146.5 filo modifica qualsiasi impostazione (P2, dopo .2) · #146.6 comandi terminale con livelli (P1, dopo .2). Ordine consigliato: .1 e .2 prima (sono le fondamenta), poi gli altri per priorità.",
+  "queuedAt": "2026-06-12T12:34:48.144Z",
+  "queuedBy": "routine"
+}
