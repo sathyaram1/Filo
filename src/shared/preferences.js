@@ -106,6 +106,8 @@
     },
     {
       keys: ['modalita_terminale', 'modalità terminale', 'modalita terminale', 'terminale', 'terminal'],
+      // La modalità terminale dà a Filo accesso alla shell: conferma esplicita.
+      level: 2,
       build(v) {
         const b = parsePrefBool(v);
         if (b === null) return null;
