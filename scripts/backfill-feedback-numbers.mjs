@@ -10,10 +10,14 @@
 // USO:
 //   node scripts/backfill-feedback-numbers.mjs            applica
 //   node scripts/backfill-feedback-numbers.mjs --dry-run  mostra cosa farebbe
+//
+// In alternativa si può accodare un file `{"op":"backfill"}` nella coda
+// feedback-triage/: la GitHub Action lo esegue col service account (utile
+// quando in locale non c'è nessuna credenziale admin).
 
+import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 import { acquireBearer, FIRESTORE_BASE, FIREBASE_API_KEY } from './lib/firestore-auth.mjs';
-
-const DRY = process.argv.includes('--dry-run');
 
 function intField(doc, name) {
   const v = doc?.fields?.[name];
