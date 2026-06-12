@@ -421,7 +421,11 @@
     const q = (searchEl.value || '').trim().toLowerCase();
     const base = all.filter((f) => statusOf(f) === currentTab);
     const filtered = q
-      ? base.filter((f) => [f.text, f.url, f.clientId, f.userAgent, f.notes].join(' ').toLowerCase().includes(q))
+      ? base.filter((f) => {
+          const num = SN_FEEDBACK.formatNum(f.seq, f.subSeq);
+          return [f.text, f.url, f.clientId, f.userAgent, f.notes, f.name, num ? `#${num}` : '']
+            .join(' ').toLowerCase().includes(q);
+        })
       : base;
     // Priorità più alta in cima. `all` è già ordinato per data DESC e il sort
     // di JS è stabile, quindi a parità di priorità restano i più recenti prima.
