@@ -53,6 +53,7 @@
   async function init() {
     settings = await fetchSettings();
     applyTheme(settings.theme);
+    applyThemeTokens(settings.themeTokens);
 
     // "Vetro smerigliato" della tab attiva (§1.1): campiona il colore della cima
     // della pagina e mandalo al main, che tinge la tab. Attivo su tutte le pagine
