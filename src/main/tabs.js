@@ -702,10 +702,10 @@ class TabManager {
   }
 
   // true se navigare `tab` verso `url` richiede una partizione diversa da quella
-  // con cui la view è stata creata (solo in modalità privacy, fra siti diversi).
+  // con cui la view è stata creata: in modalità privacy fra siti diversi, oppure
+  // entrando/uscendo dalla partition proxata di una tab "da un altro paese".
   _needsRepartition(tab, url) {
-    if (this.cookieMode !== Cookies.MODES.PRIVACY || this.incognito) return false;
-    const next = this._partitionFor(url);
+    const next = this._partitionForTab(tab, url);
     return (next || null) !== (tab.partition || null);
   }
 
