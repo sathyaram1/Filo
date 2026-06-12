@@ -317,5 +317,5 @@
     }
   }
 
-  window.SN_PAGE_BOOTSTRAP = { applyTheme, applyTextScale, enhanceSelect, enhanceSelects };
+  window.SN_PAGE_BOOTSTRAP = { applyTheme, applyTextScale, applyThemeTokens, enhanceSelect, enhanceSelects };
 })();
