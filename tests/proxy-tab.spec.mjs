@@ -125,12 +125,14 @@ test('setTabProxy instrada la tab via SOCKS5 con DNS lato proxy; clearTabProxy t
   // un hostname inesistente si carica, la risoluzione è avvenuta LATO PROXY.
   const socks = await startSocks5({ mapHostTo: '127.0.0.1' });
   try {
-    // Pagina servita dal testServer locale; cookie nella sessione NORMALE per
-    // poi dimostrare che la partition proxata non lo vede.
-    const url = testServer.html('<title>PROXY_T1</title><h1 id="ok">contenuto</h1><script>document.cookie="direct=1"</script>');
+    const url = testServer.html('<title>PROXY_T1</title><h1 id="ok">contenuto</h1>');
     const page = await openTab(url);
     await page.waitForSelector('#ok');
     expect(socks.connections.length).toBe(0); // pre-condizione: niente proxy
+    // Cookie piazzato UNA TANTUM nella sessione NORMALE (non nell'HTML, che
+    // verrà ricaricato anche nella partition proxata): serve a dimostrare che
+    // il cookie jar della tab proxata è separato.
+    await page.evaluate(() => { document.cookie = 'direct=1'; });
 
     // Configura il provider di test (impostazioni; '<-loopback>' forza anche
     // 127.0.0.1 attraverso il proxy, che Chromium altrimenti bypassa).
