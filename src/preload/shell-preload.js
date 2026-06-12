@@ -32,10 +32,10 @@ contextBridge.exposeInMainWorld('filoShell', {
       return () => ipcRenderer.removeListener('tabs:popup-blocked', wrapped);
     },
     openBlockedPopup: (url) => ipcRenderer.invoke('tabs:open-blocked-popup', { url }),
-    // Proxy per-tab ("Apri da un altro paese") + lista location curate.
+    // Proxy per-tab ("Apri da un altro paese") + stato (configurato, location).
     setProxy: (id, country, tier) => ipcRenderer.invoke('tabs:set-proxy', { id, country, tier }),
     clearProxy: (id) => ipcRenderer.invoke('tabs:clear-proxy', { id }),
-    proxyLocations: () => ipcRenderer.invoke('tabs:proxy-locations'),
+    proxyStatus: () => ipcRenderer.invoke('tabs:proxy-status'),
   },
   popupMenu: (entries, x, y) => ipcRenderer.invoke('shell:popup-menu', { entries, x, y }),
   // Scelta di una voce di menu con `action` custom (vedi popup-menu.js).
