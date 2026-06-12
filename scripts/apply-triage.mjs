@@ -328,6 +328,14 @@ function readSpool() {
       let entry;
       try { entry = JSON.parse(readFileSync(file, 'utf8')); }
       catch (e) { return { file, error: `JSON non valido: ${e.message}` }; }
+      // Due tipi di entry: `op: "create"` (nuovo feedback, da queue-feedback.mjs)
+      // e triage classico (id + status, da queue-triage.mjs).
+      if (entry && entry.op === 'create') {
+        if (!String(entry.text || '').trim()) return { file, error: 'create senza testo' };
+        if (!String(entry.name || '').trim()) return { file, error: 'create senza name (titolo)' };
+        if (!['todo', 'clarify'].includes(entry.status)) return { file, error: `status non valido per create: "${entry.status}"` };
+        return { file, entry };
+      }
       if (!entry || !entry.id) return { file, error: 'manca il campo id' };
       if (!ALLOWED.includes(entry.status)) return { file, error: `status non valido: "${entry.status}"` };
       return { file, entry };
