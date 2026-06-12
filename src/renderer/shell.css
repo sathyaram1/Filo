@@ -253,6 +253,23 @@ html[data-chrome-compact="1"] .addr {
 }
 .tab .mute-ind svg { display: block; }
 
+/* Indicatore "aperta da un altro paese" (proxy per-tab): globo + codice paese
+   in accento Filo, discreto — un segnale di viaggio, non di sicurezza. */
+.tab .proxy-ind {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--accent);
+}
+.tab .proxy-ind svg { display: block; }
+.tab .proxy-ind .cc {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  line-height: 1;
+}
+
 .tab-new {
   flex: 0 0 28px;
   height: 28px;
