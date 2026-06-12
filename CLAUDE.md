@@ -388,6 +388,35 @@ dipende da Firestore live), almeno verifica via `node -e "require('./src/...')"`
 che i moduli toccati si caricano senza errori, e dichiara nel report finale
 "non testato end-to-end perché X".
 
+## Routine cloud: il prompt è solo "routine automatica."
+
+Le routine schedulate su claude.ai partono con un prompt minimo ("routine
+automatica." o equivalente, senza altro contesto). Tutte le istruzioni
+operative vivono qui — quando ricevi quel prompt in ambiente cloud:
+
+1. Sei nella root del repo Filo. Esegui `npm install` se non già fatto
+   (se il binario Electron non si scarica:
+   `node node_modules/electron/install.js`).
+2. Risolvi i feedback con status **`todo`** su Firestore (progetto
+   `filo-8b9cb`, collezione `feedback`) seguendo la sezione "Feedback alpha
+   tester" qui sotto. Ordine: `priority` più alta prima; a parità, i più
+   recenti.
+3. **Quanti feedback: lo decidi tu in base alla complessità.** I feedback
+   hanno difficoltà molto variabile: puoi farne 3-4 se sono tutti semplici
+   ritocchi UI, oppure dedicare l'intera sessione a un'unica feature
+   corposa. Vale il principio del budget contesto (sezione `TASKS.md`
+   sopra): il task iniziato si finisce, ma non iniziarne uno nuovo quando
+   sei già oltre ~150-200k token.
+4. Lavora in un **worktree dedicato** — l'hook fa commit, merge su `main` e
+   push in automatico. **NON aprire PR.**
+5. Verifica come da "REGOLA DURA" (in cloud: `npm test` + test Playwright
+   per le UI nuove) e chiudi accodando la decisione con
+   `node scripts/queue-triage.mjs <id> done|clarify "note"` — mai PATCH
+   diretta su Firestore: l'account robot è bloccato. Insisti con approcci
+   diversi prima di ripiegare su `clarify` (vedi "Insistere prima di
+   mollare").
+6. Se non ci sono feedback `todo`, termina senza fare nulla.
+
 ## Feedback alpha tester
 
 I feedback arrivano da Firestore (progetto `filo-8b9cb`, collezione `feedback`).
