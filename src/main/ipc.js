@@ -307,7 +307,20 @@ function registerIpcHandlers() {
     if (!win?._filoTabs) return { ok: false, error: 'no_tab' };
     return win._filoTabs.clearTabProxy(id);
   });
-  ipcMain.handle('tabs:proxy-locations', () => require('./services/proxyTab').LOCATIONS);
+  // Stato per il menu della shell: la voce compare solo se un endpoint è
+  // configurato; defaultCountry = ultima location usata, altrimenti il default.
+  ipcMain.handle('tabs:proxy-status', async () => {
+    const ProxyTab = require('./services/proxyTab');
+    let settings = null;
+    try { settings = await globalThis.SN_STORAGE?.getSettings?.(); } catch (_) {}
+    const p = (settings && settings.proxy) || {};
+    return {
+      configured: ProxyTab.isConfigured(settings),
+      locations: ProxyTab.LOCATIONS,
+      defaultCountry: ProxyTab.normalizeCountry(p.lastCountry)
+        || ProxyTab.normalizeCountry(p.defaultCountry) || 'us',
+    };
+  });
 
   // ─── popup menu custom (sopra le WebContentsView) ────────────────────────
   ipcMain.handle('shell:popup-menu', (event, { entries, x, y }) => {
