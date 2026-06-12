@@ -196,6 +196,9 @@
     FILO_DELETE_TIMER: 'filo_delete_timer',        // { id }
     FILO_GET_NOTIFICATIONS: 'filo_get_notifications',
     FILO_DISMISS_NOTIFICATION: 'filo_dismiss_notification', // { id }
+    // L'utente ha confermato (popup livello 2 / digitato "conferma" livello 3)
+    // un'azione di Filo rimasta in sospeso: ora va eseguita davvero. { action }
+    FILO_CONFIRM_ACTION: 'filo_confirm_action',
 
     // Da background -> content (broadcast)
     SETTINGS_UPDATED: 'settings_updated',
