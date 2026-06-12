@@ -508,7 +508,13 @@
       del.textContent = `🗑 Elimina definitivamente ${results.length} ${results.length === 1 ? 'scheda' : 'schede'}`;
       del.addEventListener('click', async () => {
         if (del.disabled) return;
-        if (!window.confirm(`Eliminare definitivamente ${results.length} schede dall’archivio? L’operazione non è reversibile.`)) return;
+        // Livello 3 (#146.2): eliminazione irreversibile → l'utente deve
+        // digitare espressamente "conferma".
+        const text = `Eliminare definitivamente ${results.length} ${results.length === 1 ? 'scheda' : 'schede'} dall’archivio.`;
+        const ok = window.SN_CONFIRM_UI
+          ? await window.SN_CONFIRM_UI.confirmTyped({ title: 'Eliminazione definitiva', text, okLabel: 'Elimina' })
+          : window.confirm(`${text} L’operazione non è reversibile.`);
+        if (!ok) return;
         del.disabled = true;
         del.textContent = 'Elimino…';
         const res = await send({ type: MSG.DELETE_ARCHIVED_TABS, ids: results.map((x) => x.id) });
