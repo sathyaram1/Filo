@@ -875,6 +875,21 @@
       enabled: false,
       shell: 'powershell',
     },
+    // Proxy per-tab — "Apri da un altro paese" (vedi proxy-per-tab-spec.md).
+    // Endpoint del provider come template URL con {country} sostituito dal
+    // codice paese (es. 'socks5://user-{country}:pass@gate.provider.com:7000').
+    // Vuoto = feature non configurata. Le env FILO_PROXY_DATACENTER /
+    // FILO_PROXY_RESIDENTIAL / FILO_PROXY_BYPASS hanno la precedenza.
+    // - datacenter: tier economico, primo tentativo (default)
+    // - residential: tier fallback quando il sito blocca gli IP datacenter
+    // - bypass: proxyBypassRules di Chromium (di norma vuoto)
+    // - defaultCountry: paese del click diretto su "Apri da un altro paese"
+    proxy: {
+      datacenter: '',
+      residential: '',
+      bypass: '',
+      defaultCountry: 'us',
+    },
     // §2.1 — auto-archiviazione/riordino delle tab. Filo riordina e archivia da
     // sé le schede non più necessarie (l'LLM decide su TUTTE le tab insieme). Le
     // schede archiviate restano sempre riapribili dalla cronologia (filo://archive).
