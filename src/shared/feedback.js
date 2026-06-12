@@ -216,11 +216,25 @@
     }
 
     const endpoint = `${FIRESTORE_BASE}/${COLLECTION}?key=${API_KEY}`;
-    const res = await fetch(endpoint, {
+    let res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(doc),
     });
+    if (res.status === 403) {
+      // Rules non ancora aggiornate ai campi nuovi (name/seq/subSeq): meglio
+      // un feedback senza numero/titolo che un invio fallito. Ritenta con il
+      // solo schema storico.
+      delete doc.fields.name;
+      delete doc.fields.seq;
+      delete doc.fields.subSeq;
+      seq = null;
+      res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(doc),
+      });
+    }
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
       throw new Error(`firestore create fallito (${res.status}): ${errText.slice(0, 300)}`);
