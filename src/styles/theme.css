@@ -4,6 +4,17 @@
   --sn-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --sn-radius: 6px;
   --sn-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  /* Token specifici (#146.1, registro in src/shared/themeTokens.js): di
+     default ereditano dal token di categoria via var(), così un override
+     della categoria si propaga da solo; un override del token specifico
+     viene emesso a specificità maggiore (html[data-sn-theme]) e vince. */
+  --sn-btn-bg: var(--sn-fg);
+  --sn-btn-fg: var(--sn-bg);
+  --sn-link: var(--sn-accent);
+  --sn-selection-color: var(--sn-accent);
+  --sn-selection-bg: color-mix(in srgb,
+      var(--sn-selection-color) calc(var(--sn-selection-opacity, 0.25) * 100%),
+      transparent);
 }
 
 [data-sn-theme="light"] {
@@ -16,7 +27,7 @@
   --sn-accent-rgb: 196, 90, 59;
   --sn-error: #b91c1c;
   --sn-overlay-bg: rgba(248, 246, 240, 0.98);
-  --sn-selection-bg: rgba(196, 90, 59, 0.25);
+  --sn-selection-opacity: 0.25;
   --sn-selection-fg: inherit;
 }
 
@@ -30,7 +41,7 @@
   --sn-accent-rgb: 196, 90, 59;
   --sn-error: #ff6b6b;
   --sn-overlay-bg: rgba(30, 29, 27, 0.98);
-  --sn-selection-bg: rgba(196, 90, 59, 0.35);
+  --sn-selection-opacity: 0.35;
   --sn-selection-fg: inherit;
 }
 
