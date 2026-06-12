@@ -884,11 +884,13 @@
     // - residential: tier fallback quando il sito blocca gli IP datacenter
     // - bypass: proxyBypassRules di Chromium (di norma vuoto)
     // - defaultCountry: paese del click diretto su "Apri da un altro paese"
+    // - lastCountry: ultima location usata (aggiornata dall'app, vince sul default)
     proxy: {
       datacenter: '',
       residential: '',
       bypass: '',
       defaultCountry: 'us',
+      lastCountry: '',
     },
     // §2.1 — auto-archiviazione/riordino delle tab. Filo riordina e archivia da
     // sé le schede non più necessarie (l'LLM decide su TUTTE le tab insieme). Le
