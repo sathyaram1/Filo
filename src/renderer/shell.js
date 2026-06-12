@@ -38,6 +38,22 @@
   setIcon(accountBtn, 'user', 16);
   setIcon(newBtn, 'plus', 16);
 
+  // Token estetici (#146.1): applica gli override dell'utente alle variabili
+  // della shell (--accent, --fg, …) al boot e live a ogni cambio impostazioni
+  // (stesso canale SETTINGS_UPDATED usato dalle pagine).
+  const ThemeTokens = window.SN_THEME_TOKENS;
+  function applyShellTokens(tokens) {
+    if (ThemeTokens) ThemeTokens.applyToDocument(document, tokens || {}, { shell: true });
+  }
+  api.message({ type: 'get_settings' })
+    .then((r) => applyShellTokens(r?.settings?.themeTokens))
+    .catch(() => {});
+  if (typeof api.onBroadcast === 'function') {
+    api.onBroadcast((m) => {
+      if (m?.type === 'settings_updated') applyShellTokens(m.settings?.themeTokens);
+    });
+  }
+
   // ── Modalità incognito ────────────────────────────────────────────────────
   // La finestra incognito carica shell.html?incognito=1. Applichiamo un tema
   // scuro dedicato (via data-incognito sul <html>, vedi shell.css) e mostriamo

@@ -32,7 +32,9 @@ html, body {
   margin: 0; padding: 0;
   background: var(--bg-deep);
   color: var(--fg);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  /* --font è il token estetico `font` (#146.1): di default non è definito e
+     vale il fallback; un override utente lo emette via shell.js. */
+  font-family: var(--font, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif);
   font-size: 14px;
   height: 100%;
   user-select: none;

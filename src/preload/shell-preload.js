@@ -78,6 +78,12 @@ contextBridge.exposeInMainWorld('filoShell', {
   // Apre una nuova finestra incognito (sessione effimera + storage in RAM).
   openIncognito: () => ipcRenderer.invoke('window:open-incognito'),
   message: (msg) => ipcRenderer.invoke('filo:message', msg),
+  // Broadcast generici main→shell (es. SETTINGS_UPDATED per i token estetici).
+  onBroadcast: (fn) => {
+    const wrapped = (_event, msg) => { try { fn(msg); } catch (_) {} };
+    ipcRenderer.on('filo:broadcast', wrapped);
+    return () => ipcRenderer.removeListener('filo:broadcast', wrapped);
+  },
   // Account "Accedi con Google". I token vivono nel main process: qui
   // arriva solo il profilo pubblico { email, name, picture }.
   auth: {
