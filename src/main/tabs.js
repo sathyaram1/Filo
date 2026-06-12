@@ -735,7 +735,7 @@ class TabManager {
   // dell'isolamento per-sito; resta intatta entro lo stesso sito).
   _recreateView(tab, url) {
     const wasActive = tab.id === this.activeId;
-    const partition = this._partitionFor(url);
+    const partition = this._partitionForTab(tab, url);
     try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
     try { tab.view.webContents.close(); } catch (_) {}
     const view = this._makeView(url, partition);
