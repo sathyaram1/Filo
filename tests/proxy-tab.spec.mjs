@@ -191,8 +191,7 @@ test('setTabProxy instrada la tab via SOCKS5 con DNS lato proxy; clearTabProxy t
       const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
       w._filoTabs.navigate(args.tabId, args.url);
     }, { tabId: before.id, url: directUrl });
-    const directPage = await findPage(app, (u) => u === directUrl);
-    await directPage.waitForSelector('#back', { timeout: 10_000 });
+    await waitPageWith(app, (u) => u === directUrl, '#back');
     expect(socks.connections.length).toBe(seen); // nessun nuovo passaggio dal proxy
     const after = await webTabInfo(app);
     expect(after.proxy).toBeNull();
