@@ -990,6 +990,14 @@ class TabManager {
       run();
       setTimeout(run, 500); // riprova dopo l'eventuale layout/lazy-load
     });
+    // Geo-block livello 1 (deterministico): pattern espliciti nel testo visibile
+    // (YouTube "not available in your country", country block di Cloudflare, …).
+    // Secondo campione ritardato per i messaggi che i player renderizzano via JS
+    // dopo il load. Vedi _geoTextCheck e proxy-per-tab-spec.md §4.
+    wc.on('did-finish-load', () => {
+      this._geoTextCheck(tab);
+      setTimeout(() => this._geoTextCheck(tab), 2000);
+    });
 
     wc.on('did-start-loading', () => update({ loading: true }));
     wc.on('did-stop-loading', () => {
