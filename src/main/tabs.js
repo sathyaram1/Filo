@@ -1245,6 +1245,47 @@ class TabManager {
     return { ok: true };
   }
 
+  // ─── rilevamento geo-block (livello 1 deterministico) ────────────────────
+  // (vedi src/main/services/geoBlock.js e proxy-per-tab-spec.md §4). Qui SOLO
+  // rilevamento + segnale interno: NESSUNA azione (niente retry via proxy,
+  // niente proposta UI) — le regole d'azione sono un livello separato che
+  // consuma GeoBlock.onDetected(). Un solo segnale per navigazione: la prima
+  // fonte che matcha vince (status > redirect > testo).
+
+  _geoBlockDetected(tab, url, source, detail) {
+    if (tab.geoBlock && tab.geoBlock.url === url) return; // già segnalato
+    let host = '';
+    try { host = new URL(url).hostname; } catch (_) {}
+    tab.geoBlock = { url, host, source, detail, at: Date.now() };
+    GeoBlock.emitDetected({ tabId: tab.id, url, host, source, detail, at: tab.geoBlock.at });
+  }
+
+  // Campiona titolo + testo visibile della pagina e applica i pattern espliciti
+  // noti (geoBlock.js). Best-effort: mai bloccante, ricontrolla che la tab non
+  // abbia navigato altrove nel frattempo.
+  _geoTextCheck(tab) {
+    const wc = tab.view && tab.view.webContents;
+    if (!wc || (wc.isDestroyed && wc.isDestroyed())) return;
+    let url = '';
+    try { url = wc.getURL() || ''; } catch (_) { return; }
+    if (!/^https?:\/\//i.test(url)) return;
+    if (tab.geoBlock && tab.geoBlock.url === url) return; // già rilevato
+    try {
+      wc.executeJavaScript(
+        '(function(){try{return document.title+"\\n"+(((document.body&&document.body.innerText)||"").slice(0,3000));}catch(e){return "";}})()',
+        true,
+      ).then((txt) => {
+        if (typeof txt !== 'string' || !txt) return;
+        const hit = GeoBlock.matchText(txt);
+        if (!hit) return;
+        let current = '';
+        try { current = wc.getURL() || ''; } catch (_) { return; }
+        if (current !== url) return; // nel frattempo ha navigato altrove
+        this._geoBlockDetected(tab, url, GeoBlock.SOURCES.TEXT, hit);
+      }).catch(() => {});
+    } catch (_) {}
+  }
+
   // ─── snapshot stato per la shell ────────────────────────────────────────
 
   snapshot() {
