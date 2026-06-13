@@ -1020,7 +1020,7 @@ class TabManager {
     });
     wc.on('page-title-updated', (_e, title) => update({ title: title || tab.title }));
     wc.on('page-favicon-updated', (_e, favicons) => update({ favicon: favicons?.[0] || '' }));
-    wc.on('did-navigate', (_e, url) => {
+    wc.on('did-navigate', (_e, url, httpResponseCode) => {
       // Nuova pagina → il colore live (§1.1) del sito precedente non vale più: lo
       // azzeriamo (la tab torna al neutro finché il content script non ricampiona).
       // Il colore IDENTITÀ (§1.2) invece dipende dal DOMINIO: se navighiamo su un
@@ -1038,8 +1038,33 @@ class TabManager {
       // appena il main-frame si è committato, prima che la pagina sia
       // interattiva. Best-effort, non blocca mai (vedi _sbOnNavigate).
       this._sbOnNavigate(tab, url);
+      // Geo-block livello 1 (deterministico): nuova navigazione → il segnale
+      // precedente decade; HTTP 451 è conclusivo, altrimenti vale l'eventuale
+      // redirect "di blocco" memorizzato durante questa navigazione.
+      const redirectHit = tab._geoRedirectHit || null;
+      tab._geoRedirectHit = null;
+      tab.geoBlock = null;
+      if (!/^filo:\/\//i.test(url || '')) {
+        if (GeoBlock.matchStatus(httpResponseCode)) {
+          this._geoBlockDetected(tab, url, GeoBlock.SOURCES.HTTP_451, 'http_451');
+        } else if (redirectHit) {
+          this._geoBlockDetected(tab, url, GeoBlock.SOURCES.REDIRECT, redirectHit.detail);
+        }
+      }
     });
     wc.on('did-navigate-in-page', (_e, url) => update({ url, canBack: canGoBack(wc), canFwd: canGoFwd(wc) }));
+    // Redirect main-frame verso URL "di blocco" (/geo, /not-available,
+    // /region-block, … — lista curata in geoBlock.js): il match viene
+    // memorizzato e diventa segnale al did-navigate dell'URL finale.
+    // Firma difensiva: Electron recenti passano i dettagli nell'event object,
+    // i vecchi come argomenti posizionali.
+    wc.on('did-redirect-navigation', (e, url, _inPlace, isMainFrame) => {
+      const target = typeof url === 'string' ? url : (e && e.url) || '';
+      const main = typeof isMainFrame === 'boolean' ? isMainFrame : !(e && e.isMainFrame === false);
+      if (!main || !target || tab._geoRedirectHit) return;
+      const hit = GeoBlock.matchRedirectUrl(target);
+      if (hit) tab._geoRedirectHit = { url: target, detail: hit };
+    });
 
     // §2.1 segnale: la tab sta producendo audio? Una tab che riproduce
     // audio/video NON va mai archiviata (decisione utente). L'evento arriva come
