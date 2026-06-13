@@ -8,6 +8,7 @@ const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const Cookies = require('./services/cookies');
 const ProxyTab = require('./services/proxyTab');
+const GeoBlock = require('./services/geoBlock');
 
 const PAGE_PRELOAD = path.join(__dirname, '..', 'preload', 'page-preload.js');
 const INTERNAL_PRELOAD = path.join(__dirname, '..', 'preload', 'internal-preload.js');
