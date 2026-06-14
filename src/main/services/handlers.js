@@ -574,6 +574,24 @@ async function executeFiloAction(action, { confirmed = false } = {}) {
         await applySettingsUpdate(built.partial);
         return { executed: true, kept: false };
       }
+      case 'IMPOSTA_ESTETICA': {
+        // Filo cambia un token estetico (colore/font/raggio/opacità) su
+        // richiesta in chat (#146.4). Lo applica SUBITO (livello 1) e la bolla
+        // mostra un controllo per raffinarlo. La scrittura fonde il token nella
+        // mappa esistente (themeTokens è REPLACE in storage: vietato passare il
+        // singolo token o si azzererebbero gli altri override) e passa per
+        // applySettingsUpdate, così il cambiamento è live su tutte le superfici.
+        const T = globalThis.SN_THEME_TOKENS;
+        const token = action.token ?? action.nome ?? action.name ?? action.chiave ?? action.elemento;
+        const valore = action.valore ?? action.value ?? action.val ?? action.colore;
+        if (!T || !T.validate(token, valore)) return { executed: false, kept: false };
+        const settings = await Storage.getSettings();
+        const overrides = { ...(settings.themeTokens || {}) };
+        overrides[token] = String(valore).trim();
+        await applySettingsUpdate({ themeTokens: overrides });
+        // kept:true → il client renderizza il bottone di raffinamento (GUI).
+        return { executed: true, kept: true };
+      }
       case 'CERCA_WEB':
       case 'EVENTO_CALENDARIO':
         return { executed: false, kept: true };
