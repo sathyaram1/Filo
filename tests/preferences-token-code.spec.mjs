@@ -64,8 +64,10 @@ test('valore non valido: errore puntuale, gli altri override restano intatti', a
   await expect.poll(() => storedTokens(page).then((t) => t.accent)).toBe('#0044cc');
   await expect.poll(() => storedTokens(page).then((t) => t.radius)).toBe('12px');
 
-  // Ora un colore malformato su accent: errore mostrato, riga in stato invalido.
+  // Ora un colore malformato su accent: al blur compare l'errore puntuale e la
+  // riga va in stato invalido (l'errore non lampeggia durante la digitazione).
   await page.fill('#tok-accent', 'non-un-colore');
+  await page.locator('#tok-accent').blur();
   const errLoc = page.locator('.sn-token-row[data-token="accent"] .sn-token-error');
   await expect(errLoc).toBeVisible();
   await expect(errLoc).toContainText('Colore non valido');
