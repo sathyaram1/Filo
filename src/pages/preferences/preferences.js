@@ -418,5 +418,17 @@
       persist();
     });
     $('agentStyleText').addEventListener('input', () => { syncPresetSelect(); persistDebounced(); });
+
+    // Token estetici: reset globale ai predefiniti.
+    $('resetAllTokens').addEventListener('click', resetAllTokens);
+
+    // Con tema "Come il sistema", il tema risolto può cambiare quando l'OS passa
+    // chiaro↔scuro: ridisegna le righe così i default mostrati restano corretti.
+    if (window.matchMedia) {
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => {
+        if ((window.SN_PAGE_THEME || 'system') !== 'system' || !Tokens) return;
+        for (const name of Tokens.names()) renderTokenRow(name);
+      });
+    }
   });
 })();
