@@ -164,36 +164,40 @@
     tokensSaveTimer = setTimeout(persistTokens, 400);
   }
 
+  // Ridisegna tutte le righe TRANNE quella in `exceptName` (che l'utente sta
+  // editando): serve quando si cambia un token-categoria, così i token che ne
+  // ereditano (es. link.color da accent) mostrano subito il valore ereditato.
+  function renderOtherTokenRows(exceptName) {
+    if (!Tokens) return;
+    for (const name of Tokens.names()) if (name !== exceptName) renderTokenRow(name);
+  }
+
   function onTokenInput(name) {
     const input = $(`tok-${name}`);
     const row = input.closest('.sn-token-row');
     const err = row.querySelector('.sn-token-error');
     const v = input.value.trim();
 
-    if (v === '') {
-      // Campo svuotato: torna al predefinito (rimuove l'override diretto).
-      delete currentOverrides[name];
-    } else if (!Tokens.validate(name, v)) {
-      // Non valido: errore puntuale, NON persistere, non perdere gli altri.
-      err.hidden = false;
-      err.textContent = tokenErrorMsg(name);
-      row.classList.add('sn-token-invalid');
-      return;
-    } else if (v === Tokens.defaultValue(name, resolvedTheme())) {
-      // Uguale al predefinito del tema corrente: non è un override.
+    // Mentre si digita NON mostriamo l'errore (eviterebbe di lampeggiare "non
+    // valido" a ogni carattere di un colore scritto a mano): l'errore puntuale
+    // compare al blur. Finché il valore non è valido, non applichiamo nulla.
+    err.hidden = true;
+    err.textContent = '';
+    row.classList.remove('sn-token-invalid');
+    if (v !== '' && !Tokens.validate(name, v)) return;
+
+    if (v === '' || v === Tokens.defaultValue(name, resolvedTheme())) {
+      // Vuoto o uguale al predefinito del tema corrente: nessun override.
       delete currentOverrides[name];
     } else {
       currentOverrides[name] = v;
     }
-
-    err.hidden = true;
-    err.textContent = '';
-    row.classList.remove('sn-token-invalid');
     row.classList.toggle('sn-token-modified', !!Tokens.validate(name, currentOverrides[name]));
     if (isColorToken(name)) {
       const sw = row.querySelector('.sn-token-swatch');
       if (sw) sw.style.background = Tokens.effectiveValue(name, currentOverrides, resolvedTheme()) || '';
     }
+    renderOtherTokenRows(name);
     applyTokensLive();
     persistTokensDebounced();
   }
