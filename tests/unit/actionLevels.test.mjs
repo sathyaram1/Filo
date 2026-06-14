@@ -10,8 +10,10 @@ import { dirname, join } from 'node:path';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
-// IMPOSTA_PREFERENZA delega il livello al setter in preferences.js.
+// IMPOSTA_PREFERENZA delega il livello al setter in preferences.js;
+// IMPOSTA_ESTETICA legge le etichette dei token da themeTokens.js.
 require(join(__dirname, '..', '..', 'src', 'shared', 'preferences.js'));
+require(join(__dirname, '..', '..', 'src', 'shared', 'themeTokens.js'));
 require(join(__dirname, '..', '..', 'src', 'shared', 'actionLevels.js'));
 
 const AL = globalThis.SN_ACTION_LEVELS;
