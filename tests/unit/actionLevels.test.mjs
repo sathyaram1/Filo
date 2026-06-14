@@ -58,6 +58,21 @@ test('IMPOSTA_PREFERENZA: livello per-preferenza, non unico', () => {
   assert.equal(AL.levelFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'boh', valore: 'x' }), 2);
 });
 
+test('IMPOSTA_ESTETICA: livello 1 di norma, 2 se rende il testo illeggibile', () => {
+  // Cambio estetico normale → si applica subito (livello 1).
+  assert.equal(AL.levelFor({ type: 'IMPOSTA_ESTETICA', token: 'button.bg', valore: '#3a7d44' }), 1);
+  // Il flag `_illegible` (calcolato dal main) alza il livello a 2 → conferma.
+  assert.equal(AL.levelFor({ type: 'IMPOSTA_ESTETICA', token: 'text', valore: '#f8f6f0', _illegible: true }), 2);
+});
+
+test('IMPOSTA_ESTETICA: describe usa l’etichetta del token e avvisa se illeggibile', () => {
+  const ok = AL.describe({ type: 'IMPOSTA_ESTETICA', token: 'button.bg', valore: '#3a7d44' });
+  assert.match(ok, /bottoni/i);          // "Sfondo dei bottoni primari"
+  assert.match(ok, /#3a7d44/);
+  const bad = AL.describe({ type: 'IMPOSTA_ESTETICA', token: 'text', valore: '#f8f6f0', _illegible: true });
+  assert.match(bad, /illeggibile/i);
+});
+
 test('describe spiega in chiaro la modifica per il popup', () => {
   assert.match(AL.describe({ type: 'IMPOSTA_PREFERENZA', chiave: 'terminale', valore: 'on' }), /[Tt]erminale/);
   assert.match(AL.describe({ type: 'PULISCI_TAB' }), /archivia/i);
