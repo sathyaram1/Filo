@@ -630,17 +630,25 @@
       `APRI_FILE: {percorso, etichetta}\n` +
       `PULISCI_TAB: {}  — mostra un bottone "Riordina e archivia le schede"; l'utente conferma e Filo archivia le tab non più utili (riapribili dalla cronologia).\n` +
       `CANCELLA_ARCHIVIO: {query}  — cerca nell'archivio le schede pertinenti a "query" e mostra un pannello di conferma per eliminarle DEFINITIVAMENTE.\n` +
-      `IMPOSTA_PREFERENZA: {chiave, valore}  — modifica una preferenza dell'app. Una sola chiave per azione (usa più azioni per più preferenze). Chiavi valide e valori ammessi:\n` +
+      `IMPOSTA_PREFERENZA: {chiave, valore}  — modifica un'impostazione dell'app. Una sola chiave per azione (usa più azioni per più impostazioni). Le impostazioni segnate [conferma] sono di livello 2 (il sistema chiede conferma all'utente da sé). Chiavi valide e valori ammessi:\n` +
       `  • tema: "sistema" | "chiaro" | "scuro"\n` +
       `  • dimensione_testo: "piccolo" | "normale" | "grande" | "molto grande" | "enorme"\n` +
       `  • commento_home: true | false  (commento di Filo al centro della home)\n` +
       `  • stile_agente: testo libero (come deve scrivere Filo)\n` +
-      `  • archiviazione_automatica: true | false\n` +
-      `  • archivia_alla_riapertura: true | false\n` +
+      `  • correttore: true | false  (correttore ortografico AI)\n` +
+      `  • sidebar_aiuto: true | false ; categorizzazione: true | false\n` +
+      `  • archiviazione_automatica: true | false ; archivia_alla_riapertura: true | false ; archivia_se_inattivo: true | false\n` +
       `  • ore_inattivita: numero 1-168 (dopo quante ore archiviare)\n` +
-      `  • modalita_terminale: true | false\n` +
-      `  • shell_terminale: "powershell" | "cmd" | "bash"\n` +
+      `  • modalita_terminale: true | false [conferma] ; shell_terminale: "powershell" | "cmd" | "bash" [conferma]\n` +
       `  • velocita_voce: numero 0.5-2 ; tono_voce: numero 0-2 (lettura ad alta voce)\n` +
+      `  • protezione_ip: true | false [conferma]  (anti-leak WebRTC)\n` +
+      `  • blocco_popup: true | false [conferma]\n` +
+      `  • navigazione_sicura: true | false [conferma]  (rilevamento siti pericolosi)\n` +
+      `  • gestione_cookie: "manuale" | "automatico" | "privacy" [conferma]\n` +
+      `  • fingerprint: "off" | "default" | "privacy" [conferma]  (anti-fingerprinting)\n` +
+      `  • provider: "openrouter" | "gemini" [conferma] ; modelli_predefiniti: true | false [conferma]\n` +
+      `  • chiave_openrouter / chiave_gemini / chiave_tavily: la chiave API come testo [conferma]\n` +
+      `  • limite_spesa: numero in euro (limite di spesa mensile) [conferma]\n` +
       `IMPOSTA_ESTETICA: {token, valore}  — cambia un singolo token estetico dell'app, applicato live a tutte le superfici. `
         + `\`valore\` è un valore CSS concreto: per i colori un esadecimale #rrggbb (NON nomi come "green"); per il raggio una misura con unità ("8px", "0.5rem"); per l'opacità un numero 0-1 ("0.4"); per il font una lista di famiglie ("Georgia, serif"). Token disponibili:\n` +
       `  • accent (colore d'accento, da cui ereditano link e selezione) · text (colore del testo) · background (sfondo) · muted (testo secondario) · border (bordi) · error (colore degli errori)\n` +
