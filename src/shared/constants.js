@@ -668,6 +668,7 @@
       `    {"type": "TIMER", "seconds": 1500, "label": "Pomodoro"},\n` +
       `    {"type": "SVEGLIA", "time": "07:00", "label": "..."},\n` +
       `    {"type": "SALVA_APPUNTO", "text": "...", "context": "..."},\n` +
+      `    {"type": "INVIA_FEEDBACK", "testo": "...", "titolo": "..."},\n` +
       `    {"type": "CERCA_WEB", "query": "..."},\n` +
       `    {"type": "EVENTO_CALENDARIO", "date": "YYYY-MM-DD", "time": "HH:MM", "title": "...", "details": "..."},\n` +
       `    {"type": "APRI_FILE", "path": "...", "label": "..."},\n` +
