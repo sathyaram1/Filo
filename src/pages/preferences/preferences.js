@@ -360,6 +360,11 @@
 
     Bootstrap.applyTheme(settings.theme);
     Bootstrap.applyTextScale(settings.textScale);
+
+    // Token estetici: il tema è già applicato su <html>, quindi i default
+    // mostrati riflettono il tema risolto corrente.
+    currentOverrides = { ...(settings.themeTokens || {}) };
+    buildTokenSection();
   }
 
   document.addEventListener('DOMContentLoaded', () => {
