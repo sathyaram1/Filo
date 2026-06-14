@@ -336,6 +336,40 @@
     container.appendChild(wrap);
   }
 
+  // #146.4 — bottone di raffinamento estetico. Filo ha già applicato un valore
+  // ragionevole al token (IMPOSTA_ESTETICA, livello 1); questo bottone apre il
+  // box (color picker / slider, secondo il tipo del token) per scegliere il
+  // valore esatto, con anteprima live e persistenza. La logica del box vive nel
+  // modulo condiviso SN_AESTHETIC_REFINER; qui colleghiamo solo le dipendenze
+  // (applica live = pageBootstrap; persisti = UPDATE_SETTINGS debounced).
+  function buildAestheticRefiner(a) {
+    const R = window.SN_AESTHETIC_REFINER;
+    const Tokens = window.SN_THEME_TOKENS;
+    if (!R || !Tokens) return null;
+    let persistTimer = null;
+    const persist = (overrides) => {
+      clearTimeout(persistTimer);
+      persistTimer = setTimeout(() => {
+        send({ type: MSG.UPDATE_SETTINGS, settings: { themeTokens: overrides } });
+      }, 200);
+    };
+    const applyLive = (overrides) => {
+      try { window.SN_PAGE_BOOTSTRAP.applyThemeTokens(overrides); } catch (_) {}
+    };
+    const resolveTheme = () => (document.documentElement.dataset.snTheme === 'dark' ? 'dark' : 'light');
+    // Risolve le dipendenze al click, leggendo gli override più freschi dallo
+    // storage (Filo potrebbe averne cambiati altri nel frattempo).
+    const resolve = async () => {
+      let overrides = {};
+      try {
+        const settings = await self.SN_STORAGE.getSettings();
+        overrides = { ...(settings.themeTokens || {}) };
+      } catch (_) {}
+      return { Tokens, theme: resolveTheme(), overrides, applyLive, persist, doc: document };
+    };
+    return R.buildButton(a, { Tokens, resolve });
+  }
+
   function renderActionButton(a, { onAck } = {}) {
     const type = String(a.type || '').toUpperCase();
     // Azione sospesa in attesa di conferma (#146.2): il main non l'ha eseguita
