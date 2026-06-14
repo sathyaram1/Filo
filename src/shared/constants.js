@@ -625,6 +625,7 @@
       `TIMER: {secondi, etichetta}  — crea timer nella colonna destra.\n` +
       `SVEGLIA: {orario, etichetta}  — programma sveglia (HH:MM o ISO).\n` +
       `SALVA_APPUNTO: {testo, contesto}  — salva idea/nota.\n` +
+      `INVIA_FEEDBACK: {testo, titolo}  — invia un feedback agli sviluppatori di Filo a nome dell'utente. \`testo\` è la segnalazione completa, \`titolo\` un riassunto di 2-6 parole. Il sistema chiede conferma all'utente (con anteprima) prima di inviare.\n` +
       `CERCA_WEB: {query}  — cerca sul web (i risultati ti torneranno).\n` +
       `EVENTO_CALENDARIO: {data, ora, titolo, dettagli}\n` +
       `APRI_FILE: {percorso, etichetta}\n` +
