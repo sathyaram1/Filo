@@ -562,6 +562,28 @@ async function executeFiloAction(action, { confirmed = false } = {}) {
         if (text) await FiloMem.addNote({ text, context: action.context || action.contesto });
         return { executed: !!text, kept: false };
       }
+      case 'INVIA_FEEDBACK': {
+        // Filo invia un feedback a nome dell'utente (#146.5). Livello 2: a
+        // questo punto la conferma è già passata (il gate sopra ha lasciato
+        // procedere solo con confirmed:true). Il feedback parte come quelli
+        // inviati dal box: stesso schema, ma clientId 'filo:chat' così in
+        // dashboard si vede che l'ha mandato Filo.
+        const testo = String(action.testo ?? action.text ?? action.messaggio ?? '').trim();
+        if (!testo) return { executed: false, kept: false };
+        const FB = globalThis.SN_FEEDBACK;
+        if (!FB || typeof FB.submit !== 'function') return { executed: false, kept: false };
+        const titolo = String(action.titolo ?? action.title ?? action.name ?? '').trim()
+          || (typeof FB.fallbackName === 'function' ? FB.fallbackName(testo) : '');
+        let userAgent = 'Filo desktop';
+        try { const { app } = require('electron'); userAgent = `Filo desktop ${app.getVersion()}`; } catch (_) {}
+        try {
+          const r = await FB.submit({ text: testo, name: titolo, clientId: 'filo:chat', userAgent });
+          return { executed: !!(r && r.id), kept: false };
+        } catch (e) {
+          console.warn('[Filo] invio feedback fallito', e?.message || e);
+          return { executed: false, kept: false };
+        }
+      }
       case 'IMPOSTA_PREFERENZA': {
         // Filo modifica una preferenza dell'app su richiesta dell'utente. La
         // scrittura passa per applySettingsUpdate (stesso percorso della pagina
