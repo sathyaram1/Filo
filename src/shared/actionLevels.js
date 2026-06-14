@@ -89,6 +89,26 @@
         return built ? `Impostare: ${built.label}` : 'Modificare una preferenza';
       },
     },
+    IMPOSTA_ESTETICA: {
+      // Cambio di un token estetico (colore, font, raggio, opacità) su richiesta
+      // in chat (#146.4). Reversibile → livello 1: si applica subito, e nella
+      // bolla compare un controllo per raffinarlo. ECCEZIONE: se la modifica
+      // rende il testo ~uguale allo sfondo (illeggibilità estrema) il livello
+      // sale a 2 → conferma prima di applicare. Il flag `_illegible` lo calcola
+      // il main process (ha i token correnti); mai l'LLM.
+      level: (a) => (a && a._illegible ? 2 : 1),
+      describe: (a) => {
+        const T = global.SN_THEME_TOKENS;
+        const t = T && T.get(estTok(a));
+        const label = (t && t.label) || estTok(a) || 'un elemento';
+        const val = estVal(a);
+        if (a && a._illegible) {
+          return `Cambiare “${label}” a ${val || 'questo valore'} renderebbe il testo `
+            + `quasi illeggibile (colore troppo vicino allo sfondo). Applico comunque?`;
+        }
+        return `Cambiare “${label}”${val ? ` a ${val}` : ''}`;
+      },
+    },
   };
 
   // Livello dell'azione: 1|2|3, oppure null se l'azione NON è registrata
