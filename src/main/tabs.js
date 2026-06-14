@@ -1278,15 +1278,47 @@ class TabManager {
         '(function(){try{return document.title+"\\n"+(((document.body&&document.body.innerText)||"").slice(0,3000));}catch(e){return "";}})()',
         true,
       ).then((txt) => {
-        if (typeof txt !== 'string' || !txt) return;
+        if (typeof txt !== 'string') return;
         const hit = GeoBlock.matchText(txt);
-        if (!hit) return;
         let current = '';
         try { current = wc.getURL() || ''; } catch (_) { return; }
         if (current !== url) return; // nel frattempo ha navigato altrove
-        this._geoBlockDetected(tab, url, GeoBlock.SOURCES.TEXT, hit);
+        if (hit) { this._geoBlockDetected(tab, url, GeoBlock.SOURCES.TEXT, hit); return; }
+        // Niente pattern deterministico: passa la coda ambigua al livello 2
+        // (classificatore LLM). Best-effort, mai bloccante.
+        this._geoLevel2Check(tab, url, txt);
       }).catch(() => {});
     } catch (_) {}
+  }
+
+  // Livello 2 del rilevamento geo-block (proxy-per-tab-spec.md §4): per i casi
+  // che i pattern deterministici non risolvono (403, pagina sostanzialmente
+  // vuota, "non disponibile" generico) chiede al classificatore LLM cosa sia
+  // il blocco. Il gate (shouldClassify) evita la chiamata sui casi non ambigui,
+  // quindi nella stragrande maggioranza delle pagine NON si chiama il modello.
+  // Solo `geo_block` emette il segnale (con SOURCES.LLM); le altre classi
+  // (paywall/login_wall/bot_block/errore_generico) non attivano nulla.
+  _geoLevel2Check(tab, url, text) {
+    const classify = globalThis.SN_GEO_CLASSIFY;
+    if (typeof classify !== 'function') return;
+    if (tab.geoBlock) return; // già rilevato (livello 1)
+    let host = '';
+    try { host = new URL(url).hostname; } catch (_) { return; }
+    const input = { title: tab.title || '', text, statusCode: tab._lastStatus || 0, host, url };
+    Promise.resolve()
+      .then(() => classify(input))
+      .then((res) => {
+        if (!res || res.skipped) return;
+        if (!res.route || !res.route.proxy) return; // solo geo_block agisce
+        const wc = tab.view && tab.view.webContents;
+        if (!wc || (wc.isDestroyed && wc.isDestroyed())) return;
+        let current = '';
+        try { current = wc.getURL() || ''; } catch (_) { return; }
+        if (current !== url) return; // nel frattempo ha navigato altrove
+        if (tab.geoBlock) return; // livello 1 nel frattempo ha vinto
+        this._geoBlockDetected(tab, url, GeoBlock.SOURCES.LLM, res.class);
+      })
+      .catch(() => {});
   }
 
   // ─── snapshot stato per la shell ────────────────────────────────────────
