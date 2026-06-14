@@ -49,13 +49,34 @@ test('il type è case-insensitive (gli LLM non sono affidabili sul case)', () =>
 });
 
 test('IMPOSTA_PREFERENZA: livello per-preferenza, non unico', () => {
-  // Estetica → livello 1: si applica subito.
+  // Estetica/comportamentali → livello 1: si applicano subito.
   assert.equal(AL.levelFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'tema', valore: 'scuro' }), 1);
+  assert.equal(AL.levelFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'correttore', valore: 'off' }), 1);
+  assert.equal(AL.levelFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'categorizzazione', valore: 'on' }), 1);
   // Modalità terminale → dà a Filo accesso alla shell: livello 2.
   assert.equal(AL.levelFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'terminale', valore: 'on' }), 2);
   assert.equal(AL.levelFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'shell', valore: 'bash' }), 2);
   // Preferenza sconosciuta → 2 per prudenza.
   assert.equal(AL.levelFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'boh', valore: 'x' }), 2);
+});
+
+test('IMPOSTA_PREFERENZA: impostazioni sensibili (#146.5) → livello 2 (conferma)', () => {
+  // Sicurezza / privacy.
+  assert.equal(AL.levelFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'gestione_cookie', valore: 'privacy' }), 2);
+  assert.equal(AL.levelFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'fingerprint', valore: 'off' }), 2);
+  assert.equal(AL.levelFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'navigazione_sicura', valore: 'off' }), 2);
+  assert.equal(AL.levelFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'protezione_ip', valore: 'off' }), 2);
+  // Modelli / provider / chiavi / costi.
+  assert.equal(AL.levelFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'provider', valore: 'gemini' }), 2);
+  assert.equal(AL.levelFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'chiave_gemini', valore: 'AIzaXXXX1234' }), 2);
+  assert.equal(AL.levelFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'limite_spesa', valore: '10' }), 2);
+});
+
+test('INVIA_FEEDBACK è livello 2 e descrive il testo nel popup', () => {
+  assert.equal(AL.levelFor({ type: 'INVIA_FEEDBACK', testo: 'la ricerca è lenta' }), 2);
+  const d = AL.describe({ type: 'INVIA_FEEDBACK', testo: 'la ricerca è lenta', titolo: 'ricerca lenta' });
+  assert.match(d, /feedback/i);
+  assert.match(d, /la ricerca è lenta/);
 });
 
 test('IMPOSTA_ESTETICA: livello 1 di norma, 2 se rende il testo illeggibile', () => {
