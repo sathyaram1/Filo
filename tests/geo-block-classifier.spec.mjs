@@ -80,7 +80,9 @@ test('geo-block livello 2: solo geo_block dalla coda ambigua emette il segnale (
     });
     const signals = () => app.evaluate(() => globalThis.__geoSignals);
     const modelCalls = () => app.evaluate(() => globalThis.__modelCalls);
-    const setClass = (c) => app.evaluate((cl) => { globalThis.__fakeClass = cl; }, c);
+    // NB: app.evaluate passa il modulo electron come PRIMO argomento; l'arg
+    // del test è il secondo.
+    const setClass = (c) => app.evaluate((_electron, cl) => { globalThis.__fakeClass = cl; }, c);
 
     // ── 403 ambiguo classificato geo_block → segnale con source llm_classifier ──
     await setClass('geo_block');
