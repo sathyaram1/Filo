@@ -58,6 +58,17 @@
       level: 1,
       describe: () => 'Salvare un appunto',
     },
+    INVIA_FEEDBACK: {
+      // Filo invia un feedback agli sviluppatori a NOME dell'utente (#146.5).
+      // Esce dall'app verso un servizio esterno (Firestore) → livello 2:
+      // mostra il testo nel popup e parte solo dopo l'OK dell'utente.
+      level: 2,
+      describe: (a) => {
+        const testo = String(a.testo ?? a.text ?? a.messaggio ?? '').trim();
+        const short = testo.length > 160 ? `${testo.slice(0, 160)}…` : testo;
+        return `Inviare questo feedback agli sviluppatori di Filo a tuo nome:\n“${short || '(vuoto)'}”`;
+      },
+    },
     CERCA_WEB: {
       level: 1,
       describe: (a) => `Cercare sul web "${a.query || ''}"`,
