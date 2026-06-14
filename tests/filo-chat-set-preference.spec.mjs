@@ -11,15 +11,53 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 
+// Al boot Filo apre una newtab (WebContentsView) subito dopo che la shell ha
+// caricato (createMainWindow → did-finish-load → tabs.openTab). Quella
+// navigazione può distruggere il contesto di esecuzione mentre la PRIMA
+// app.evaluate è ancora in volo → "Execution context was destroyed". Gli altri
+// test del file non lo vedono perché usano `openTab` (che risolve il fixture
+// `shell` e lascia assestare il boot prima del primo evaluate); questo invece
+// valuta subito. Aspettiamo quindi che la newtab iniziale sia comparsa e abbia
+// finito di caricare. Nei test lo userData è una temp dir fresca: niente
+// restore di sessione, la newtab viene sempre aperta.
+async function waitForBoot(app) {
+  const deadline = Date.now() + 10_000;
+  let tab = null;
+  while (Date.now() < deadline) {
+    tab = app.windows().find((w) => {
+      try { return new URL(w.url()).hostname === 'newtab'; }
+      catch (_) { return false; }
+    });
+    if (tab) break;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  if (tab) await tab.waitForLoadState('domcontentloaded').catch(() => {});
+}
+
+// app.evaluate resiliente: se la navigazione di boot distrugge comunque il
+// contesto al primo colpo, riassesta e ritenta una volta sola (la nav di boot
+// è one-shot, al secondo giro è finita). Non altera il risultato della
+// valutazione, solo la robustezza contro la race d'avvio.
+async function evalSafe(app, fn, arg) {
+  try {
+    return await app.evaluate(fn, arg);
+  } catch (e) {
+    if (!/Execution context was destroyed/.test(String(e && e.message))) throw e;
+    await waitForBoot(app);
+    return app.evaluate(fn, arg);
+  }
+}
+
 // Costruisce un partial dalla mappa reale caricata nel main (SN_PREF).
 async function build(app, chiave, valore) {
-  return app.evaluate(({}, [k, v]) => {
+  return evalSafe(app, ({}, [k, v]) => {
     const r = globalThis.SN_PREF.buildPreferencePartial(k, v);
     return r ? { partial: r.partial, label: r.label } : null;
   }, [chiave, valore]);
 }
 
 test('SN_PREF mappa il linguaggio naturale sulle preferenze giuste', async ({ app }) => {
+  await waitForBoot(app); // evita la race con la navigazione di boot
   expect(await build(app, 'tema', 'scuro')).toMatchObject({ partial: { theme: 'dark' } });
   expect(await build(app, 'tema', 'chiaro')).toMatchObject({ partial: { theme: 'light' } });
   expect(await build(app, 'dimensione_testo', 'grande')).toMatchObject({ partial: { textScale: 1.1 } });
