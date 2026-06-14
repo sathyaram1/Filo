@@ -66,7 +66,7 @@ test('buildPrompt: output vincolato alla lista chiusa nel system, dato nel user'
 
 test('buildPrompt: tronca il testo della pagina al budget (~500 char)', () => {
   const long = 'x'.repeat(5000);
-  const { messages } = C.buildPrompt({ title: 't', text: long, statusCode: 200, host: 'ex.com' });
+  const { messages } = C.buildPrompt({ title: 't', text: long, statusCode: 200, host: 'site.com' });
   // il testo iniettato non deve superare di molto il budget (titolo + label a parte)
   const xCount = (messages[1].content.match(/x/g) || []).length;
   assert.ok(xCount <= C.TEXT_BUDGET, `testo troncato a ${C.TEXT_BUDGET}, trovati ${xCount}`);
