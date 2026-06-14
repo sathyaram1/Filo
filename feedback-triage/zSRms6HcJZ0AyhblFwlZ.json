@@ -1,0 +1,7 @@
+{
+  "id": "zSRms6HcJZ0AyhblFwlZ",
+  "status": "done",
+  "notes": "Ora puoi chiedere a Filo in chat di cambiare l'aspetto dell'app ('rendi i bottoni verdi', 'angoli piu arrotondati', 'usa un font serif', 'i link in blu'): Filo applica SUBITO una scelta sensata e nella risposta compare un bottone che apre un riquadro per regolare il valore esatto, con anteprima dal vivo. Il controllo cambia in base a cosa stai regolando: color picker per i colori, slider per opacita e arrotondamento, menu per il font. Il valore scelto resta salvato. Se una richiesta renderebbe il testo illeggibile (stesso colore dello sfondo) Filo chiede conferma prima di applicarla. Oltre al chiesto: il controllo giusto per OGNI tipo (non solo colori) e un tasto Annulla che torna alla scelta di Filo. Verificato con test automatici (l'impostazione cambia davvero, il riquadro compare, il picker scrive e salva) e con screenshot dei quattro tipi di controllo.",
+  "queuedAt": "2026-06-14T17:53:09.686Z",
+  "queuedBy": "routine"
+}
