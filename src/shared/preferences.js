@@ -152,6 +152,161 @@
         return { partial: { tts: { pitch: n } }, label: `Tono lettura → ${n.toFixed(1)}` };
       },
     },
+
+    // ── Funzionalità (interruttori) — reversibili, nessun rischio → livello 1 ──
+    {
+      keys: ['correttore', 'correttore ortografico', 'correttore_ortografico', 'controllo ortografico', 'spellcheck', 'correzione'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { featureFlags: { spellcheck: b } }, label: `Correttore ortografico → ${b ? 'attivo' : 'disattivato'}` };
+      },
+    },
+    {
+      keys: ['sidebar_aiuto', 'sidebar aiuto', 'pannello aiuto', 'aiuto', 'help', 'assistente aiuto'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { featureFlags: { help: b } }, label: `Sidebar Aiuto → ${b ? 'attiva' : 'disattivata'}` };
+      },
+    },
+    {
+      keys: ['categorizzazione', 'categorie automatiche', 'categorizza', 'categorie'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { featureFlags: { categorize: b } }, label: `Categorizzazione automatica → ${b ? 'attiva' : 'disattivata'}` };
+      },
+    },
+    {
+      keys: ['archivia_se_inattivo', 'archivia quando inattivo', 'archiviazione su inattivita', 'archivia se inattivo', 'archiviazione inattivita'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { autoArchive: { onIdle: b } }, label: `Archivia quando inattivo → ${b ? 'attivo' : 'disattivato'}` };
+      },
+    },
+
+    // ── Sicurezza / privacy — livello 2 (popup di conferma prima di applicare) ──
+    {
+      keys: ['protezione_ip', 'protezione ip', 'proteggi ip', 'protezione ip locale', 'webrtc', 'protezione webrtc', 'ip locale'],
+      level: 2,
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { security: { protectIpLeak: b } }, label: `Protezione IP locale (WebRTC) → ${b ? 'attiva' : 'disattivata'}` };
+      },
+    },
+    {
+      keys: ['blocco_popup', 'blocco popup', 'blocca popup', 'popup', 'finestre popup'],
+      level: 2,
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { security: { blockPopups: b } }, label: `Blocco popup → ${b ? 'attivo' : 'disattivato'}` };
+      },
+    },
+    {
+      keys: ['navigazione_sicura', 'navigazione sicura', 'rilevamento siti pericolosi', 'siti pericolosi', 'safe browsing', 'safebrowsing', 'protezione phishing', 'rilevamento phishing'],
+      level: 2,
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { security: { safeBrowse: { enabled: b } } }, label: `Rilevamento siti pericolosi → ${b ? 'attivo' : 'disattivato'}` };
+      },
+    },
+    {
+      keys: ['gestione_cookie', 'gestione cookie', 'gestione dei cookie', 'cookie', 'banner cookie', 'banner dei cookie'],
+      level: 2,
+      build(v) {
+        const s = String(v == null ? '' : v).trim().toLowerCase();
+        const map = {
+          manuale: 'manual', manual: 'manual', 'a mano': 'manual', niente: 'manual', nessuna: 'manual', nessuno: 'manual',
+          automatico: 'default', automatica: 'default', default: 'default', predefinito: 'default', auto: 'default', normale: 'default',
+          privacy: 'privacy', riservatezza: 'privacy', massima: 'privacy', isolato: 'privacy', isolata: 'privacy',
+        };
+        const mode = map[s];
+        if (!mode) return null;
+        const labelMode = { manual: 'Manuale', default: 'Automatico', privacy: 'Privacy' }[mode];
+        return { partial: { security: { cookies: { mode } } }, label: `Gestione cookie → ${labelMode}` };
+      },
+    },
+    {
+      keys: ['fingerprint', 'anti-fingerprinting', 'anti fingerprinting', 'antifingerprint', 'impronta digitale', 'protezione impronta', 'protezione fingerprint'],
+      level: 2,
+      build(v) {
+        const s = String(v == null ? '' : v).trim().toLowerCase();
+        const map = {
+          off: 'off', no: 'off', disattivato: 'off', disattivata: 'off', spento: 'off', spenta: 'off', niente: 'off', nessuna: 'off',
+          default: 'default', automatico: 'default', automatica: 'default', normale: 'default', settimanale: 'default', auto: 'default', attivo: 'default', attiva: 'default', standard: 'default',
+          privacy: 'privacy', riservatezza: 'privacy', massima: 'privacy', massimo: 'privacy', sessione: 'privacy', 'per sessione': 'privacy',
+        };
+        const mode = map[s];
+        if (!mode) return null;
+        const labelMode = { off: 'Disattivato', default: 'Standard', privacy: 'Privacy' }[mode];
+        return { partial: { security: { fingerprint: { mode } } }, label: `Anti-fingerprinting → ${labelMode}` };
+      },
+    },
+
+    // ── Modelli / provider / chiavi / costi — livello 2 (conferma) ──
+    {
+      keys: ['modelli_predefiniti', 'modelli predefiniti', 'usa modelli predefiniti', 'modelli di default', 'configurazione predefinita modelli'],
+      level: 2,
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { useDefaultModels: b }, label: `Modelli predefiniti → ${b ? 'attivi' : 'disattivati'}` };
+      },
+    },
+    {
+      keys: ['provider', 'fornitore', 'provider ai', 'provider modelli'],
+      level: 2,
+      build(v) {
+        const s = String(v == null ? '' : v).trim().toLowerCase();
+        const map = { openrouter: 'openrouter', 'open router': 'openrouter', or: 'openrouter', gemini: 'gemini', google: 'gemini' };
+        const provider = map[s];
+        if (!provider) return null;
+        return { partial: { provider }, label: `Provider → ${provider === 'gemini' ? 'Google Gemini' : 'OpenRouter'}` };
+      },
+    },
+    {
+      keys: ['chiave_openrouter', 'chiave openrouter', 'api key openrouter', 'chiave api openrouter', 'openrouter key'],
+      level: 2,
+      build(v) {
+        const s = String(v == null ? '' : v).trim();
+        if (!s) return null;
+        return { partial: { apiKeys: { openrouter: s } }, label: `Chiave OpenRouter → ${maskKey(s)}` };
+      },
+    },
+    {
+      keys: ['chiave_gemini', 'chiave gemini', 'chiave google', 'api key gemini', 'chiave api gemini', 'gemini key'],
+      level: 2,
+      build(v) {
+        const s = String(v == null ? '' : v).trim();
+        if (!s) return null;
+        return { partial: { apiKeys: { gemini: s } }, label: `Chiave Google Gemini → ${maskKey(s)}` };
+      },
+    },
+    {
+      keys: ['chiave_tavily', 'chiave tavily', 'api key tavily', 'chiave ricerca', 'chiave api tavily', 'tavily key'],
+      level: 2,
+      build(v) {
+        const s = String(v == null ? '' : v).trim();
+        if (!s) return null;
+        return { partial: { apiKeys: { tavily: s } }, label: `Chiave Tavily → ${maskKey(s)}` };
+      },
+    },
+    {
+      keys: ['limite_spesa', 'limite di spesa', 'limite spesa', 'limite di spesa mensile', 'limite mensile', 'budget mensile', 'spesa massima', 'limite costi', 'budget'],
+      level: 2,
+      build(v) {
+        let n = parseFloat(String(v == null ? '' : v).replace(',', '.').replace(/[^0-9.]/g, ''));
+        if (!Number.isFinite(n) || n < 0) return null;
+        n = Math.min(10000, n);
+        const eur = Number.isInteger(n) ? String(n) : n.toFixed(2);
+        return { partial: { monthlyLimitEur: n }, label: `Limite di spesa mensile → ${eur}€` };
+      },
+    },
   ];
 
   // Trova il setter giusto per una chiave (match esatto, poi fuzzy) e costruisce
