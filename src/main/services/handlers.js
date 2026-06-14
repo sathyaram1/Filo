@@ -1107,12 +1107,11 @@ globalThis.SN_TAB_TRIAGE_DECIDE = runTabTriageDecision;
 // d'errore + status + dominio); il contenuto è input non fidato (hardening nel
 // prompt del classificatore). Cache (dominio, path-pattern) condivisa con TTL.
 // Esposto su globalThis per evitare il ciclo di require tabs.js↔handlers.js.
-const geoClassifierCache = globalThis.SN_GEOBLOCK_CLASSIFIER
-  ? globalThis.SN_GEOBLOCK_CLASSIFIER.createCache()
-  : null;
+let geoClassifierCache = null;
 globalThis.SN_GEO_CLASSIFY = async function geoClassify(input) {
   const Classifier = globalThis.SN_GEOBLOCK_CLASSIFIER;
   if (!Classifier) return { class: null, route: { proxy: false }, skipped: true };
+  if (!geoClassifierCache) geoClassifierCache = Classifier.createCache();
   const complete = async ({ messages, signal }) => {
     const s = await getEffectiveSettings();
     const attempts = buildAttemptChain(s, 'flash-lite');
