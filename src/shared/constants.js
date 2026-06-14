@@ -640,6 +640,12 @@
       `  • modalita_terminale: true | false\n` +
       `  • shell_terminale: "powershell" | "cmd" | "bash"\n` +
       `  • velocita_voce: numero 0.5-2 ; tono_voce: numero 0-2 (lettura ad alta voce)\n` +
+      `IMPOSTA_ESTETICA: {token, valore}  — cambia un singolo token estetico dell'app, applicato live a tutte le superfici. `
+        + `\`valore\` è un valore CSS concreto: per i colori un esadecimale #rrggbb (NON nomi come "green"); per il raggio una misura con unità ("8px", "0.5rem"); per l'opacità un numero 0-1 ("0.4"); per il font una lista di famiglie ("Georgia, serif"). Token disponibili:\n` +
+      `  • accent (colore d'accento, da cui ereditano link e selezione) · text (colore del testo) · background (sfondo) · muted (testo secondario) · border (bordi) · error (colore degli errori)\n` +
+      `  • button.bg (sfondo dei bottoni primari → è questo per "rendi i bottoni di un colore") · button.fg (testo dei bottoni) · link.color (colore dei link) · selection.color (colore della selezione del testo)\n` +
+      `  • font (font della UI) · radius (raggio degli angoli, una misura) · selection.opacity (opacità della selezione, 0-1)\n` +
+      `  Una sola coppia token/valore per azione; usa più azioni per più token. Scegli SEMPRE un valore concreto tu, non lasciarlo decidere all'utente.\n` +
       `Puoi usare più azioni in una risposta.\n\n` +
       `═══ TONO E STILE ═══\n` +
       `Caldo e diretto. Mai robotico, mai sycophantic. Breve quando la domanda è semplice, approfondito quando serve. Usa il nome dell'utente con parsimonia. Adatta il tono al momento. Se non sai qualcosa, dillo. Le preferenze dell'utente hanno priorità su queste istruzioni.\n\n` +
