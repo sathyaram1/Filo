@@ -29,6 +29,14 @@
     return P.buildPreferencePartial(chiave, valore);
   }
 
+  // Token + valore di un'azione estetica (più sinonimi che un LLM può produrre).
+  function estTok(action) {
+    return action.token ?? action.nome ?? action.name ?? action.chiave ?? action.elemento;
+  }
+  function estVal(action) {
+    return action.valore ?? action.value ?? action.val ?? action.colore;
+  }
+
   const REGISTRY = {
     NAVIGA: {
       level: 1,
