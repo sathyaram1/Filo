@@ -485,9 +485,35 @@ async function applySettingsUpdate(partial) {
   return merged;
 }
 
+// Risolve il tema effettivo (light/dark) come applicato sulle superfici: i
+// default di alcuni token estetici differiscono fra chiaro e scuro, e la
+// verifica di leggibilità (#146.4) deve confrontare i valori giusti.
+function resolveTheme(settings) {
+  const t = settings && settings.theme;
+  if (t === 'dark') return 'dark';
+  if (t === 'light') return 'light';
+  try { return require('electron').nativeTheme.shouldUseDarkColors ? 'dark' : 'light'; }
+  catch (_) { return 'light'; }
+}
+
 async function executeFiloAction(action, { confirmed = false } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
+
+  // IMPOSTA_ESTETICA: il livello (1 normale, 2 se rende il testo illeggibile)
+  // dipende dallo stato risultante, che solo il main conosce (ha i token
+  // correnti). Iniettiamo `_illegible` PRIMA del gate, mai dall'LLM (#146.4).
+  if (type === 'IMPOSTA_ESTETICA') {
+    try {
+      const T = globalThis.SN_THEME_TOKENS;
+      const token = action.token ?? action.nome ?? action.name ?? action.chiave ?? action.elemento;
+      const valore = action.valore ?? action.value ?? action.val ?? action.colore;
+      if (T && T.validate(token, valore)) {
+        const settings = await Storage.getSettings();
+        action._illegible = T.illegibleAfter(token, valore, settings.themeTokens || {}, resolveTheme(settings));
+      }
+    } catch (_) {}
+  }
 
   // ── gate dei livelli di sicurezza (#146.2) ────────────────────────────────
   // Il livello è assegnato STATICAMENTE nel registro (src/shared/actionLevels.js),
