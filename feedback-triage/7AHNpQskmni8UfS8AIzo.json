@@ -1,0 +1,7 @@
+{
+  "id": "7AHNpQskmni8UfS8AIzo",
+  "status": "done",
+  "notes": "Filo ora riconosce in automatico quando un contenuto e' bloccato per la tua area geografica (geo-block), con un primo livello 'sicuro' senza intelligenza artificiale: pagine con codice HTTP 451 (blocco legale), reindirizzamenti verso URL di blocco noti (es. /geo-blocked, /region-block, /not-available) e messaggi espliciti tipo il 'non disponibile nel tuo paese' di YouTube/Vimeo o il country-block di Cloudflare (anche in italiano). Per ora il rilevamento SOLO segnala internamente (dominio + motivo) e non agisce: la proposta di riaprire la tab da un altro paese e' il livello 'regole d'azione', gestito a parte (#151). Verificato con unit test sulla classificazione (451 vs 403 ambiguo, pattern di redirect, messaggi noti, e i casi ambigui come 'video rimosso'/paywall che NON devono scattare) e con un test Playwright che serve pagine 451/redirect/messaggio-YouTube e controlla che il segnale parta una sola volta per navigazione.",
+  "queuedAt": "2026-06-14T15:59:07.145Z",
+  "queuedBy": "routine"
+}
