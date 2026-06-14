@@ -16,6 +16,7 @@
 //   marks:NAME           come shot ma con badge numerati sugli elementi cliccabili
 //   click-shell:SELECT   click su selettore CSS della shell (tab bar/barra ind.)
 //   click-view:SELECT    click su selettore CSS della view attiva
+//   eval-view:JS         esegui JS nella view attiva (per stati dietro flussi non scriptabili)
 //   type:TESTO           digita testo nella view attiva
 //   key:KEY              premi un tasto (es. Enter, Control+b)
 //   wait:MS              attendi N ms
