@@ -103,6 +103,24 @@ async function run() {
           if (v) await v.click(arg, { button: 'right' }).catch((e) => console.log('  rclick-view err', e.message));
           await d.sleep(700); break;
         }
+        case 'eval-view': {
+          // Esegue JS arbitrario nella view attiva (gemello di eval-shell ma per
+          // il WebContentsView). Utile per portare la pagina in uno stato che
+          // serve a uno screenshot ma è dietro un flusso non scriptabile a mano
+          // (es. aprire un overlay che normalmente apre un'azione di chat).
+          // La funzione è costruita in Node (`new Function`) e iniettata da
+          // Playwright: gira nel contesto pagina ma NON passa per `eval` in-page,
+          // quindi non urta la CSP `script-src 'self' filo:`.
+          const v = await d.activeView(app, shell);
+          if (v) {
+            try {
+              const fn = new Function(`return (async () => { ${arg} })()`);
+              const r = await v.evaluate(fn);
+              console.log('  eval-view:', JSON.stringify(r));
+            } catch (e) { console.log('  eval-view err', e.message); }
+          }
+          await d.sleep(400); break;
+        }
         case 'type': await d.typeText(app, shell, arg); break;
         case 'key': await d.pressKey(app, shell, arg); break;
         case 'wait': await d.sleep(Number(arg) || 0); break;
