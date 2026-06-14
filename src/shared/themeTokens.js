@@ -211,6 +211,73 @@
     return null;
   }
 
+  // ── leggibilità (testo vs sfondo) ────────────────────────────────────────
+  // Serve al gate dei livelli (#146.2/#146.4): se Filo, su richiesta in chat,
+  // rende il testo praticamente uguale allo sfondo, la modifica diventa
+  // un'azione di livello 2 (conferma prima di applicare) invece di livello 1.
+  // Usiamo la luminanza relativa e il rapporto di contrasto WCAG: due colori
+  // identici danno rapporto 1.0, nero su bianco ~21.
+  function _rgbArray(color) {
+    const t = toRgbTriplet(color);
+    if (!t) return null;
+    const [r, g, b] = t.split(',').map((x) => parseInt(x, 10));
+    if (![r, g, b].every((n) => Number.isFinite(n))) return null;
+    return [r, g, b];
+  }
+
+  function relativeLuminance(color) {
+    const rgb = _rgbArray(color);
+    if (!rgb) return null;
+    const lin = rgb.map((c) => {
+      const s = c / 255;
+      return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2];
+  }
+
+  // Rapporto di contrasto WCAG fra due colori (1..21), oppure null se uno dei
+  // due non è interpretabile come colore.
+  function contrastRatio(c1, c2) {
+    const l1 = relativeLuminance(c1);
+    const l2 = relativeLuminance(c2);
+    if (l1 == null || l2 == null) return null;
+    const hi = Math.max(l1, l2);
+    const lo = Math.min(l1, l2);
+    return (hi + 0.05) / (lo + 0.05);
+  }
+
+  // Soglia di "illeggibilità estrema": sotto questo rapporto di contrasto il
+  // testo è di fatto indistinguibile dallo sfondo. Tenuta bassa (vicino a 1)
+  // di proposito: vogliamo intercettare SOLO i casi gravi (testo ≈ sfondo),
+  // non ogni scelta a basso contrasto ma ancora leggibile — un popup di
+  // conferma a ogni ritocco sarebbe più fastidioso che utile.
+  const LEGIBILITY_MIN_RATIO = 1.6;
+
+  // Le coppie testo-su-superficie che contano per la leggibilità: il testo
+  // globale sul suo sfondo, e il testo dei bottoni primari sul loro sfondo.
+  const LEGIBILITY_PAIRS = [
+    ['text', 'background'],
+    ['button.fg', 'button.bg'],
+  ];
+
+  // Vero se applicare l'override {name: value} sopra `overrides` rende una delle
+  // coppie testo/sfondo illeggibile (contrasto sotto la soglia). Calcolato sul
+  // valore EFFETTIVO risultante, così cattura sia "rendi il testo bianco" su
+  // sfondo chiaro sia "rendi lo sfondo nero" con testo già scuro.
+  function illegibleAfter(name, value, overrides, theme) {
+    const next = { ...(overrides || {}) };
+    if (validate(name, value)) next[name] = String(value).trim();
+    else if (name in next) delete next[name];
+    for (const [fg, bg] of LEGIBILITY_PAIRS) {
+      const r = contrastRatio(
+        effectiveValue(fg, next, theme),
+        effectiveValue(bg, next, theme),
+      );
+      if (r != null && r < LEGIBILITY_MIN_RATIO) return true;
+    }
+    return false;
+  }
+
   // ── emissione CSS ─────────────────────────────────────────────────────────
   // Emette SOLO le variabili sovrascritte: i default restano in theme.css e
   // l'eredità categoria→specifico la fa la catena var() nativa. Il selettore
