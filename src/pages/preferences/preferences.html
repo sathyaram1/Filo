@@ -39,6 +39,16 @@
       </select>
     </section>
 
+    <section id="sec-tokens">
+      <h2>Aspetto: token estetici</h2>
+      <p class="sn-muted">Tutti i colori, i font e le misure dell'aspetto di Filo, coi loro valori predefiniti. Cambia un valore per personalizzarlo: l'aspetto si aggiorna subito, ovunque (shell, pagine di Filo, menu sulle pagine web). I valori che hai modificato sono <strong>evidenziati</strong>; con <span aria-hidden="true">↺</span> riporti il singolo token al predefinito. I colori si scrivono come <code>#rrggbb</code> o <code>rgb(...)</code>; le misure come <code>6px</code>; le opacità come numero fra 0 e 1.</p>
+      <div class="sn-token-code" id="tokenCode" role="group" aria-label="Token estetici"></div>
+      <div class="sn-row" style="margin-top:12px;">
+        <button class="sn-btn sn-btn-secondary" id="resetAllTokens" type="button">Ripristina tutti i predefiniti</button>
+        <span id="tokenSavedHint" class="sn-saved-indicator">Salvato</span>
+      </div>
+    </section>
+
     <section>
       <h2>Commento nella home</h2>
       <p class="sn-muted">Il messaggio proattivo di Filo al centro della pagina Nuova scheda.</p>
