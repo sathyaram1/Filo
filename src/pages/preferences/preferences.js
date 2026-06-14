@@ -371,7 +371,14 @@
     load();
 
     // Tema e dimensione testo: anteprima immediata + salvataggio.
-    $('theme').addEventListener('change', () => { Bootstrap.applyTheme($('theme').value); persist(); });
+    $('theme').addEventListener('change', () => {
+      Bootstrap.applyTheme($('theme').value);
+      // I default di alcuni token cambiano fra chiaro e scuro: ridisegna le
+      // righe così i valori predefiniti mostrati seguono il nuovo tema (gli
+      // override diretti sono indipendenti dal tema e restano).
+      if (Tokens) for (const name of Tokens.names()) renderTokenRow(name);
+      persist();
+    });
     $('textScale').addEventListener('change', () => {
       Bootstrap.applyTextScale(parseFloat($('textScale').value) || 1);
       persist();
