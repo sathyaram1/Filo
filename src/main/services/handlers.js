@@ -1100,6 +1100,28 @@ async function wireSafebrowse(settingsArg) {
 // decisione LLM senza creare un ciclo di require fra tabs.js e handlers.js.
 globalThis.SN_TAB_TRIAGE_DECIDE = runTabTriageDecision;
 
+// Livello 2 del rilevamento geo-block (proxy-per-tab-spec.md §4): classificatore
+// LLM per la coda ambigua (403, pagina vuota, "non disponibile" generico). Come
+// per il giudice safebrowse, riusa la catena provider con un modello economico
+// e passa SOLO metadati minimali (titolo + ~500 char di testo della pagina
+// d'errore + status + dominio); il contenuto è input non fidato (hardening nel
+// prompt del classificatore). Cache (dominio, path-pattern) condivisa con TTL.
+// Esposto su globalThis per evitare il ciclo di require tabs.js↔handlers.js.
+const geoClassifierCache = globalThis.SN_GEOBLOCK_CLASSIFIER
+  ? globalThis.SN_GEOBLOCK_CLASSIFIER.createCache()
+  : null;
+globalThis.SN_GEO_CLASSIFY = async function geoClassify(input) {
+  const Classifier = globalThis.SN_GEOBLOCK_CLASSIFIER;
+  if (!Classifier) return { class: null, route: { proxy: false }, skipped: true };
+  const complete = async ({ messages, signal }) => {
+    const s = await getEffectiveSettings();
+    const attempts = buildAttemptChain(s, 'flash-lite');
+    const r = await Providers.completeWithFallback({ attempts, messages, signal });
+    return r.text;
+  };
+  return Classifier.classify(input, { complete, cache: geoClassifierCache });
+};
+
 // Esposto su globalThis per i test Playwright (app.evaluate non ha require):
 // è il dispatch con il gate dei livelli di sicurezza (#146.2).
 globalThis.SN_EXECUTE_FILO_ACTION = executeFiloAction;
