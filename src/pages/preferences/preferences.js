@@ -29,6 +29,189 @@
     _savedTimers[id] = setTimeout(() => hint.classList.remove('sn-show'), 1200);
   }
 
+  // ── Sezione "token estetici" (#146.3) ────────────────────────────────────
+  // Mostra TUTTI i token del registro (themeTokens.js) coi valori predefiniti,
+  // in forma di config testuale "a codice". Modificare un valore applica
+  // l'override live e lo persiste; i valori personalizzati sono evidenziati e
+  // hanno un ↺ per tornare al predefinito; in fondo un reset globale. Un valore
+  // non valido viene rifiutato con un errore puntuale, senza toccare gli altri.
+  //
+  // Modello: gli override vivono in una mappa piatta { token: valore }
+  // (settings.themeTokens, REPLACE in storage). Un token è "personalizzato"
+  // SOLO se ha un override diretto valido; i token che ereditano da una
+  // categoria sovrascritta mostrano il valore ereditato (effectiveValue) ma non
+  // risultano personalizzati finché non li si tocca direttamente.
+
+  let currentOverrides = {};
+  let tokensSaveTimer = null;
+
+  // Tema risolto (light/dark) com'è applicato ora su <html>: i default di alcuni
+  // token differiscono fra chiaro e scuro.
+  function resolvedTheme() {
+    return document.documentElement.dataset.snTheme === 'dark' ? 'dark' : 'light';
+  }
+
+  function isColorToken(name) {
+    const t = Tokens && Tokens.get(name);
+    return !!t && t.type === 'color';
+  }
+
+  // Messaggio d'errore puntuale per tipo di token.
+  function tokenErrorMsg(name) {
+    const t = Tokens && Tokens.get(name);
+    switch (t && t.type) {
+      case 'color': return 'Colore non valido: usa #rrggbb (o #rgb) oppure rgb(…)/rgba(…).';
+      case 'size': return 'Misura non valida: usa un numero con unità, es. 6px, 0.5rem, 50%.';
+      case 'opacity': return 'Opacità non valida: un numero fra 0 e 1, es. 0.3.';
+      case 'font': return 'Font non valido: solo nomi di famiglie separati da virgola.';
+      default: return 'Valore non valido.';
+    }
+  }
+
+  // (Ri)disegna una singola riga dal modello: valore effettivo, stato
+  // "personalizzato", anteprima colore. Cancella eventuali errori.
+  function renderTokenRow(name) {
+    const input = $(`tok-${name}`);
+    if (!input || !Tokens) return;
+    const row = input.closest('.sn-token-row');
+    const eff = Tokens.effectiveValue(name, currentOverrides, resolvedTheme()) || '';
+    input.value = eff;
+    input.dataset.orig = eff;
+    const modified = Tokens.validate(name, currentOverrides[name]);
+    row.classList.toggle('sn-token-modified', !!modified);
+    row.classList.remove('sn-token-invalid');
+    if (isColorToken(name)) {
+      const sw = row.querySelector('.sn-token-swatch');
+      if (sw) sw.style.background = eff;
+    }
+    const err = row.querySelector('.sn-token-error');
+    if (err) { err.hidden = true; err.textContent = ''; }
+  }
+
+  function buildTokenSection() {
+    const box = $('tokenCode');
+    if (!box || !Tokens) return;
+    box.textContent = '';
+    for (const name of Tokens.names()) {
+      const t = Tokens.get(name);
+      const row = document.createElement('div');
+      row.className = 'sn-token-row';
+      row.dataset.token = name;
+
+      const swatch = document.createElement('span');
+      swatch.className = 'sn-token-swatch';
+      if (t.type !== 'color') swatch.style.visibility = 'hidden';
+      row.appendChild(swatch);
+
+      const label = document.createElement('label');
+      label.className = 'sn-token-name';
+      label.setAttribute('for', `tok-${name}`);
+      label.title = t.label || name;
+      label.textContent = `${name}:`;
+      row.appendChild(label);
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'sn-token-input';
+      input.id = `tok-${name}`;
+      input.spellcheck = false;
+      input.autocomplete = 'off';
+      input.setAttribute('aria-label', t.label || name);
+      input.addEventListener('input', () => onTokenInput(name));
+      input.addEventListener('blur', () => {
+        const v = input.value.trim();
+        // Tieni il testo non valido (+ errore) così l'utente può correggerlo;
+        // altrimenti canonicalizza al valore effettivo.
+        if (v !== '' && !Tokens.validate(name, v)) return;
+        renderTokenRow(name);
+      });
+      row.appendChild(input);
+
+      const reset = document.createElement('button');
+      reset.type = 'button';
+      reset.className = 'sn-token-reset';
+      reset.textContent = '↺';
+      reset.title = 'Ripristina il predefinito';
+      reset.setAttribute('aria-label', `Ripristina ${name}`);
+      reset.addEventListener('click', () => resetToken(name));
+      row.appendChild(reset);
+
+      const err = document.createElement('span');
+      err.className = 'sn-token-error';
+      err.hidden = true;
+      err.setAttribute('role', 'alert');
+      row.appendChild(err);
+
+      box.appendChild(row);
+      renderTokenRow(name);
+    }
+  }
+
+  function applyTokensLive() {
+    Bootstrap.applyThemeTokens(currentOverrides);
+  }
+
+  function persistTokens() {
+    chrome.runtime.sendMessage({
+      type: MSG.UPDATE_SETTINGS,
+      settings: { themeTokens: currentOverrides },
+    });
+    flashSaved('tokenSavedHint');
+  }
+
+  function persistTokensDebounced() {
+    clearTimeout(tokensSaveTimer);
+    tokensSaveTimer = setTimeout(persistTokens, 400);
+  }
+
+  function onTokenInput(name) {
+    const input = $(`tok-${name}`);
+    const row = input.closest('.sn-token-row');
+    const err = row.querySelector('.sn-token-error');
+    const v = input.value.trim();
+
+    if (v === '') {
+      // Campo svuotato: torna al predefinito (rimuove l'override diretto).
+      delete currentOverrides[name];
+    } else if (!Tokens.validate(name, v)) {
+      // Non valido: errore puntuale, NON persistere, non perdere gli altri.
+      err.hidden = false;
+      err.textContent = tokenErrorMsg(name);
+      row.classList.add('sn-token-invalid');
+      return;
+    } else if (v === Tokens.defaultValue(name, resolvedTheme())) {
+      // Uguale al predefinito del tema corrente: non è un override.
+      delete currentOverrides[name];
+    } else {
+      currentOverrides[name] = v;
+    }
+
+    err.hidden = true;
+    err.textContent = '';
+    row.classList.remove('sn-token-invalid');
+    row.classList.toggle('sn-token-modified', !!Tokens.validate(name, currentOverrides[name]));
+    if (isColorToken(name)) {
+      const sw = row.querySelector('.sn-token-swatch');
+      if (sw) sw.style.background = Tokens.effectiveValue(name, currentOverrides, resolvedTheme()) || '';
+    }
+    applyTokensLive();
+    persistTokensDebounced();
+  }
+
+  function resetToken(name) {
+    delete currentOverrides[name];
+    renderTokenRow(name);
+    applyTokensLive();
+    persistTokens();
+  }
+
+  function resetAllTokens() {
+    currentOverrides = {};
+    if (Tokens) for (const name of Tokens.names()) renderTokenRow(name);
+    applyTokensLive();
+    persistTokens();
+  }
+
   // Restituisce lo stile testuale corrente dal textarea.
   function currentStyleText() {
     return $('agentStyleText').value;
