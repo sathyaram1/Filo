@@ -1,0 +1,7 @@
+{
+  "id": "RykVVNuw0cJOTZNsD4A2",
+  "status": "done",
+  "notes": "Ora puoi chiedere a Filo in chat di cambiare qualsiasi impostazione dell'app, non solo quelle estetiche. Le impostazioni semplici (tema, testo, correttore, archiviazione, sidebar aiuto, categorie) si applicano subito; quelle sensibili (sicurezza e privacy: cookie, anti-fingerprinting, blocco popup, protezione IP, rilevamento siti pericolosi; modelli/provider/chiavi API; limite di spesa mensile) chiedono prima un OK con un popup che mostra cosa sta per cambiare. Ho anche aggiunto l'azione 'invia feedback': puoi dire a Filo 'segnala agli sviluppatori che X non funziona' e lui prepara e invia il feedback a tuo nome, dopo un tuo OK. Verificato con test che cambiano davvero l'impostazione nello storage, un caso per ogni livello. NON incluso (lasciato a te per scelta): la lista dei domini esclusi resta da modificare a mano (e' una lista, non un on/off); cancellare una chiave API via chat e' bloccato di proposito per evitare cancellazioni accidentali; 'eliminare memorie/file' (gli esempi di livello 3 della spec) non sono impostazioni e restano per i sub-task su memorie/terminale.",
+  "queuedAt": "2026-06-14T21:07:54.055Z",
+  "queuedBy": "routine"
+}
