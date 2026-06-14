@@ -26,6 +26,9 @@ const SOURCES = {
   HTTP_451: 'http_451',
   REDIRECT: 'redirect_pattern',
   TEXT: 'text_pattern',
+  // Livello 2 (classificatore LLM, geoBlockClassifier.js): la coda ambigua che
+  // i pattern deterministici non risolvono, classificata come geo_block.
+  LLM: 'llm_classifier',
 };
 
 // ─── HTTP status ────────────────────────────────────────────────────────────
