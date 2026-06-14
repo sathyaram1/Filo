@@ -153,3 +153,31 @@ test('toRgbTriplet converte hex corti, lunghi e rgb()', () => {
   assert.equal(TT.toRgbTriplet('rgba(1, 2, 3, 0.5)'), '1, 2, 3');
   assert.equal(TT.toRgbTriplet('boh'), null);
 });
+
+// ── leggibilità (#146.4): testo vs sfondo ────────────────────────────────────
+
+test('contrastRatio: colori identici → 1, nero su bianco → ~21', () => {
+  assert.equal(TT.contrastRatio('#000000', '#000000'), 1);
+  assert.ok(Math.abs(TT.contrastRatio('#000000', '#ffffff') - 21) < 0.1);
+  assert.equal(TT.contrastRatio('#000000', 'non-un-colore'), null);
+});
+
+test('illegibleAfter intercetta "testo ≈ sfondo" (entrambe le direzioni)', () => {
+  // Default chiaro: testo #1a1918 su sfondo #f8f6f0 (alto contrasto).
+  // Rendere il testo uguale allo sfondo → illeggibile.
+  assert.equal(TT.illegibleAfter('text', '#f8f6f0', {}, 'light'), true);
+  // Rendere lo sfondo uguale al testo → illeggibile.
+  assert.equal(TT.illegibleAfter('background', '#1a1918', {}, 'light'), true);
+  // Bottone: sfondo del bottone uguale al testo del bottone (default chiaro) →
+  // illeggibile (è la coppia button.fg/button.bg).
+  assert.equal(TT.illegibleAfter('button.bg', '#f8f6f0', {}, 'light'), true);
+});
+
+test('illegibleAfter NON segnala i cambi estetici sensati', () => {
+  // Un accento verde non tocca la coppia testo/sfondo né i bottoni.
+  assert.equal(TT.illegibleAfter('accent', '#3a7d44', {}, 'light'), false);
+  // Un bottone verde resta leggibile sul testo chiaro dei bottoni.
+  assert.equal(TT.illegibleAfter('button.bg', '#3a7d44', {}, 'light'), false);
+  // Cambiare il raggio degli angoli non c'entra con la leggibilità.
+  assert.equal(TT.illegibleAfter('radius', '12px', {}, 'light'), false);
+});
