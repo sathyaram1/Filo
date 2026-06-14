@@ -9,6 +9,7 @@
   const { AGENT_STYLE_PRESETS } = window.SN_CONST;
   const Storage = window.SN_STORAGE;
   const Bootstrap = window.SN_PAGE_BOOTSTRAP;
+  const Tokens = window.SN_THEME_TOKENS;
 
   const CUSTOM_KEY = '__custom__';
 
@@ -16,11 +17,16 @@
 
   let saveTimer = null;
 
-  function flashSaved() {
-    const hint = $('savedHint');
+  // Indicatore "Salvato": può lampeggiare su più ancore (quella globale a fondo
+  // pagina e quella locale della sezione token), così la conferma è visibile
+  // vicino al controllo toccato.
+  const _savedTimers = {};
+  function flashSaved(id = 'savedHint') {
+    const hint = $(id);
+    if (!hint) return;
     hint.classList.add('sn-show');
-    clearTimeout(flashSaved._t);
-    flashSaved._t = setTimeout(() => hint.classList.remove('sn-show'), 1200);
+    clearTimeout(_savedTimers[id]);
+    _savedTimers[id] = setTimeout(() => hint.classList.remove('sn-show'), 1200);
   }
 
   // Restituisce lo stile testuale corrente dal textarea.
