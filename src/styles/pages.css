@@ -144,6 +144,84 @@ html, body {
 }
 .sn-page .sn-saved-indicator.sn-show { opacity: 1; }
 
+/* Sezione "token estetici" (#146.3): config "a codice" con tutti i token e i
+   loro valori. Aspetto da blocco di codice (monospace, sfondo soffuso), righe
+   `nome: valore` allineate. I valori personalizzati sono evidenziati; ogni riga
+   ha un ↺ per il reset del singolo token. */
+.sn-page .sn-token-code {
+  border: 1px solid var(--sn-border);
+  border-radius: var(--sn-radius);
+  background: var(--sn-hover);
+  padding: 10px 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 12.5px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow-x: auto;
+}
+.sn-page .sn-token-row {
+  display: grid;
+  grid-template-columns: 16px 168px minmax(140px, 1fr) 28px;
+  align-items: center;
+  column-gap: 8px;
+  padding: 3px 0;
+}
+.sn-page .sn-token-swatch {
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+  border: 1px solid var(--sn-border);
+  flex: none;
+}
+.sn-page label.sn-token-name {
+  margin: 0;
+  font-size: inherit;
+  color: var(--sn-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: default;
+}
+.sn-page input.sn-token-input {
+  font-family: inherit;
+  font-size: inherit;
+  padding: 3px 6px;
+  background: var(--sn-bg);
+  color: var(--sn-fg);
+  border: 1px solid var(--sn-border);
+  border-radius: 4px;
+}
+.sn-page .sn-token-row.sn-token-modified label.sn-token-name {
+  color: var(--sn-accent);
+  font-weight: 600;
+}
+.sn-page .sn-token-row.sn-token-modified input.sn-token-input {
+  border-color: var(--sn-accent);
+}
+.sn-page .sn-token-row.sn-token-invalid input.sn-token-input {
+  border-color: var(--sn-error);
+}
+.sn-page .sn-token-reset {
+  visibility: hidden;
+  background: transparent;
+  border: none;
+  color: var(--sn-muted);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.sn-page .sn-token-row.sn-token-modified .sn-token-reset { visibility: visible; }
+.sn-page .sn-token-reset:hover { color: var(--sn-fg); background: var(--sn-bg); }
+.sn-page .sn-token-error {
+  grid-column: 3 / -1;
+  color: var(--sn-error);
+  font-size: 11px;
+  margin-top: 2px;
+}
+
 .sn-card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
