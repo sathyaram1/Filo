@@ -211,6 +211,7 @@
   function resetToken(name) {
     delete currentOverrides[name];
     renderTokenRow(name);
+    renderOtherTokenRows(name); // se era una categoria, aggiorna chi ereditava
     applyTokensLive();
     persistTokens();
   }
