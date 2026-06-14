@@ -52,7 +52,7 @@ async function evalSafe(app, fn, arg) {
 async function build(app, chiave, valore) {
   return evalSafe(app, ({}, [k, v]) => {
     const r = globalThis.SN_PREF.buildPreferencePartial(k, v);
-    return r ? { partial: r.partial, label: r.label } : null;
+    return r ? { partial: r.partial, label: r.label, level: r.level } : null;
   }, [chiave, valore]);
 }
 
