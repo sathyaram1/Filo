@@ -1,7 +1,0 @@
-{
-  "id": "C8OGQ5LmuZ4Zr6tgwQWs",
-  "status": "done",
-  "notes": "Nella pagina Preferenze c'e' una nuova sezione 'Aspetto: token estetici' che mostra, in stile 'a codice' (config testuale), TUTTI i colori/font/misure dell'aspetto di Filo coi loro valori predefiniti. Cambiando un valore l'aspetto si aggiorna SUBITO ovunque (shell, pagine di Filo, menu sulle pagine web) e la modifica viene salvata. I valori che hai cambiato sono evidenziati (nome in arancione) e hanno un pulsante per tornare al singolo predefinito; in fondo c'e' 'Ripristina tutti i predefiniti'. Un valore scritto male (es. colore non valido) viene rifiutato con un messaggio puntuale quando esci dal campo, SENZA perdere le altre modifiche. Aggiunto oltre al chiesto: (a) una piccola anteprima del colore accanto a ogni token-colore; (b) i token che ereditano da una categoria (es. colore di link e selezione ereditano dall'accento) mostrano subito il valore ereditato quando cambi la categoria; (c) l'errore appare quando lasci il campo invece che a ogni carattere, per non disturbare mentre scrivi un colore a mano. Verificato con un test automatico (apre le Preferenze, cambia un token -> l'aspetto cambia ed e' salvato; valore non valido -> errore puntuale e gli altri override restano; reset singolo e globale -> ritorno ai predefiniti) e con controllo visivo degli screenshot.",
-  "queuedAt": "2026-06-14T16:19:16.549Z",
-  "queuedBy": "routine"
-}
