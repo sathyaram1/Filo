@@ -393,8 +393,19 @@
         btn.disabled = true;
         const r = await send({ type: MSG.FILO_CONFIRM_ACTION, action: a });
         btn.textContent = (r && r.executed) ? `✓ ${a._confirm.text}` : '✗ Non eseguita';
+        // #146.4 — modifica estetica illeggibile (livello 2): confermata ed
+        // applicata, offriamo subito il box per correggere il valore.
+        if (r && r.executed && type === 'IMPOSTA_ESTETICA') {
+          const refiner = buildAestheticRefiner(a);
+          if (refiner) btn.after(refiner);
+        }
       });
       return btn;
+    }
+    if (type === 'IMPOSTA_ESTETICA') {
+      // Livello 1 (caso normale): Filo l'ha già applicata server-side. Mostriamo
+      // direttamente il bottone di raffinamento.
+      return buildAestheticRefiner(a);
     }
     if (type === 'NAVIGA') {
       const btn = document.createElement('a');
