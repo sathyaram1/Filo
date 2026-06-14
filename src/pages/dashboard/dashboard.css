@@ -333,6 +333,87 @@ body[data-state="thread"] .dash-suggestion { justify-content: flex-start; paddin
 }
 .dash-delete-list li { margin: 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+/* #146.4 — box di raffinamento estetico (color picker / slider con anteprima
+   live). L'overlay è volutamente poco invadente: lo sfondo resta visibile così
+   l'anteprima live sulle superfici dietro si vede mentre si trascina. */
+.sn-refine-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--dash-ink) 18%, transparent);
+}
+.sn-refine-panel {
+  width: min(360px, 90vw);
+  background: var(--dash-card);
+  color: var(--dash-ink);
+  border: 1px solid var(--dash-line);
+  border-radius: 14px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.sn-refine-title { font-size: 15px; font-weight: 600; }
+.sn-refine-sample {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--dash-line);
+  border-radius: 10px;
+}
+.sn-refine-swatch {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid var(--dash-line);
+  flex-shrink: 0;
+}
+.sn-refine-sample-btn {
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+}
+.sn-refine-sample-text { font-size: 14px; }
+.sn-refine-sample-box {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--dash-line);
+  flex-shrink: 0;
+}
+.sn-refine-control { display: flex; }
+.sn-refine-input { width: 100%; font-family: inherit; }
+.sn-refine-color { height: 42px; padding: 2px; cursor: pointer; }
+.sn-refine-range { accent-color: var(--sn-accent, var(--dash-ink)); }
+.sn-refine-select {
+  padding: 8px 10px;
+  border: 1px solid var(--dash-line);
+  border-radius: 8px;
+  background: var(--dash-paper);
+  color: var(--dash-ink);
+  font-size: 14px;
+}
+.sn-refine-footer { display: flex; justify-content: flex-end; gap: 8px; }
+.sn-refine-btn {
+  padding: 7px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--dash-ink);
+  background: transparent;
+  color: var(--dash-ink);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.sn-refine-done { background: var(--dash-ink); color: var(--dash-paper); }
+.sn-refine-done:hover { opacity: 0.85; }
+.sn-refine-cancel:hover { background: var(--dash-ink); color: var(--dash-paper); }
+
 /* ===== Colonna destra: stato live ===== */
 .dash-right {
   grid-column: 3;
