@@ -23,6 +23,15 @@
     return null;
   }
 
+  // Maschera una chiave API per l'etichetta di conferma: mostra i primi/ultimi
+  // caratteri (così l'utente riconosce QUALE chiave sta impostando) senza
+  // stampare l'intero segreto nel popup. Vedi i setter `chiave_*`.
+  function maskKey(k) {
+    const s = String(k == null ? '' : k).trim();
+    if (s.length <= 8) return '••••';
+    return `${s.slice(0, 4)}…${s.slice(-4)}`;
+  }
+
   // Ogni voce: sinonimi di chiave + build(valore) → { partial, label }.
   // `partial` è il pezzo di settings da fondere (deepMerge preserva i campi
   // annidati vicini); `label` è la conferma leggibile per l'utente.
