@@ -868,9 +868,14 @@ class TabManager {
     // riusare la view caricherebbe il contenuto col preload sbagliato.
     if (this._needsRecreate(tab, target)) {
       this._recreateView(tab, target);
-      return;
+    } else {
+      tab.view.webContents.loadURL(target);
     }
-    tab.view.webContents.loadURL(target);
+    // #152 — born proxied: se il dominio di destinazione ha una regola
+    // persistente e la scheda non è già instradata su quel paese, instradala.
+    // Dopo il caricamento normale (mai prima): se il provider non è configurato
+    // resta la connessione diretta appena caricata, senza appendere la scheda.
+    this._maybeApplyDomainRule(tab, target);
   }
 
   // true se navigare `tab` verso `url` richiede una partizione diversa da quella
