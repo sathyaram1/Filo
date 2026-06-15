@@ -800,7 +800,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, sende
   const rawActions = Array.isArray(parsed.actions) ? parsed.actions : [];
   const renderedActions = [];
   for (const a of rawActions) {
-    const res = await executeFiloAction(a);
+    const res = await executeFiloAction(a, { sender });
     if (!res.kept) continue;
     // Azione sospesa in attesa di conferma (#146.2): il client renderizza il
     // bottone che apre il popup/box e poi manda MSG.FILO_CONFIRM_ACTION.
