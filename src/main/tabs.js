@@ -306,11 +306,11 @@ class TabManager {
     return new WebContentsView({ webPreferences });
   }
 
-  openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null } = {}) {
+  openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null, suppressAutoplay = false } = {}) {
     const id = randomUUID();
     const isInternal = url.startsWith('filo://');
     const partition = this._partitionFor(url);
-    const view = this._makeView(url, partition);
+    const view = this._makeView(url, partition, { suppressAutoplay });
 
     const tab = {
       id,
