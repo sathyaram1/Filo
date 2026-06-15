@@ -489,29 +489,31 @@
       return buildAestheticRefiner(a);
     }
     if (type === 'NAVIGA') {
+      // #162 — il link è già stato aperto direttamente dal main (executeFiloAction
+      // apre la scheda). Questo chip resta come riferimento per RIAPRIRLO, ma deve
+      // SEMPRE avere un'etichetta leggibile: il favicon da solo, senza testo, era
+      // il bottone "misterioso" del feedback. Mostriamo favicon + nome del sito.
+      let label = String(a.label || a.etichetta || '').trim();
+      if (!label) {
+        try { label = new URL(a.url).hostname.replace(/^www\./, ''); } catch (_) { label = a.url || 'Apri'; }
+      }
       const btn = document.createElement('a');
       btn.href = a.url || '#';
       btn.target = '_blank';
       btn.rel = 'noopener';
-      btn.title = a.label || a.url || 'Apri';
+      btn.className = 'dash-action-btn dash-action-link-chip';
+      btn.title = `Riapri ${label}`;
       const favUrl = faviconUrl(a.url);
       if (favUrl) {
-        btn.className = 'dash-action-link';
         const img = document.createElement('img');
         img.className = 'dash-action-favicon';
         img.src = favUrl;
         img.alt = '';
         img.referrerPolicy = 'no-referrer';
-        img.onerror = () => {
-          btn.className = 'dash-action-btn dash-action-btn-primary';
-          img.remove();
-          btn.textContent = a.label || 'Apri';
-        };
+        img.onerror = () => img.remove();
         btn.appendChild(img);
-      } else {
-        btn.className = 'dash-action-btn dash-action-btn-primary';
-        btn.textContent = a.label || 'Apri';
       }
+      btn.appendChild(document.createTextNode(`↗ ${label}`));
       return btn;
     }
     if (type === 'APRI_FILE') {
