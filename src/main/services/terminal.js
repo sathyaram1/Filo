@@ -82,7 +82,7 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env }
 
     const timer = setTimeout(() => {
       timedOut = true;
-      try { child.kill('SIGKILL'); } catch (_) {}
+      killTree(child);
     }, Math.max(1000, timeoutMs));
 
     const cap = (chunk, which) => {
