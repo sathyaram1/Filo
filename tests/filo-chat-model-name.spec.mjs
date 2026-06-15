@@ -54,7 +54,7 @@ test('il system prompt della chat nomina il modello con il suo id concreto, non 
       };
     };
     try {
-      await H.handleFiloChat({ userMessage: 'che modello sei?', threadHistory: [] });
+      await globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'che modello sei?', threadHistory: [] });
     } finally {
       globalThis.SN_PROVIDERS.completeWithFallback = orig;
     }
