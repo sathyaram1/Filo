@@ -1288,9 +1288,26 @@
     submitMessage(text);
   });
 
+  // Invio = manda il messaggio; Shift+Invio = a capo. Il campo è una textarea
+  // (non più un <input>), quindi Invio di suo andrebbe a capo: lo intercettiamo.
+  // `isComposing` evita di mandare a metà di una composizione IME.
+  inputEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+      e.preventDefault();
+      inputForm.requestSubmit ? inputForm.requestSubmit() : inputForm.dispatchEvent(new Event('submit'));
+    }
+  });
+
+  // La textarea parte a una riga e cresce mentre si va a capo (fino al max-height
+  // del CSS, poi scrolla). Va richiamata anche quando svuotiamo il campo da codice.
+  function autoGrowInput() {
+    inputEl.style.height = 'auto';
+    inputEl.style.height = `${inputEl.scrollHeight}px`;
+  }
+
   // Evidenziazione live mentre si scrive: arancione = comando Filo (o sito),
   // azzurro = comando shell (solo in modalità terminale).
-  inputEl.addEventListener('input', updateInputClass);
+  inputEl.addEventListener('input', () => { updateInputClass(); autoGrowInput(); });
 
   // ===== Bridge cambio stato live dal background =====
   chrome.runtime.onMessage.addListener((msg) => {
