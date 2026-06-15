@@ -1,7 +1,0 @@
-{
-  "id": "Q7mGB8q01voX91IHrlnM",
-  "status": "done",
-  "notes": "Ora ogni feedback si legge come una conversazione: la segnalazione iniziale, le risposte di Filo e le tue risposte stanno in riquadri separati ed etichettati (Segnalazione/Agente, Filo, Tu), in ordine di tempo, invece di essere ammassate in un unico blocco. In piu', oltre al chiesto: nel tab Chiarimenti c'e' un riquadro 'Invia risposta' per rispondere alle domande di Filo — la tua risposta resta nello storico (la domanda non si perde) e il feedback torna da solo in 'Da risolvere' per la prossima passata, cosi' non devi piu' scrivere a mano nel blocco note. Le note restano modificabili dove lavori tu (Da risolvere/Bozze). Verificato con test automatici e con un controllo visivo delle schermate Risolti/Chiarimenti.",
-  "queuedAt": "2026-06-15T13:13:46.405Z",
-  "queuedBy": "routine"
-}
