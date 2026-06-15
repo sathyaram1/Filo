@@ -731,7 +731,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         if (r && r.ok) refreshProxyRulesAllWindows();
         return {
           executed: !!(r && r.ok),
-          kept: true,
+          kept: false,
           output: r && r.ok ? { proxyRule: 'set', domain: r.domain, country: r.country } : { proxyRule: 'failed', error: r && r.error },
         };
       }
