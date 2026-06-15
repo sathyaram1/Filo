@@ -127,32 +127,36 @@ test('rispetta il tetto: due ondate separate → due run distanziati di >= inter
   assert.deepEqual(h.runs, ['uno', 'due']);
 });
 
-test('richieste durante un run vengono servite con un run successivo', async () => {
+test('una richiesta arrivata DURANTE un run produce un run successivo', async () => {
   let now = 0;
   let nextId = 1;
   const timers = new Map();
   const runs = [];
-  let resolveRun;
-  const sched = D.createScheduler({
+  let sched;
+  sched = D.createScheduler({
     minIntervalMs: 100,
     now: () => now,
     setTimer: (fn, ms) => { const id = nextId++; timers.set(id, { at: now + ms, fn }); return id; },
     clearTimer: (id) => timers.delete(id),
-    run: async (ctx) => { runs.push(ctx); await new Promise((r) => { resolveRun = r; }); },
+    run: async (ctx) => {
+      runs.push(ctx);
+      // Simula una modifica agli input mentre il ricalcolo è in corso.
+      if (runs.length === 1) sched.request('secondo');
+    },
   });
-  async function tick() {
-    for (const [id, t] of [...timers.entries()].sort((a, b) => a[1].at - b[1].at)) {
-      if (t.at <= now) { timers.delete(id); await t.fn(); return; }
+  async function advance(ms) {
+    now += ms;
+    let fired = true;
+    while (fired) {
+      fired = false;
+      for (const [id, t] of [...timers.entries()].sort((a, b) => a[1].at - b[1].at)) {
+        if (t.at <= now) { timers.delete(id); fired = true; await t.fn(); break; }
+      }
     }
   }
   sched.request('primo');
-  await tick();                 // entra in run('primo') e resta appeso
-  assert.deepEqual(runs, ['primo']);
-  sched.request('secondo');     // arriva DURANTE il run
-  now += 200;
-  resolveRun();                 // sblocca il primo run
-  await Promise.resolve(); await Promise.resolve();
-  await tick();                 // ora deve partire il secondo
-  resolveRun && resolveRun();
+  await advance(0);             // run('primo'); durante il run arriva 'secondo'
+  assert.deepEqual(runs, ['primo'], 'il secondo non parte mentre il primo gira');
+  await advance(200);           // passato l'intervallo: parte il run accodato
   assert.deepEqual(runs, ['primo', 'secondo']);
 });
