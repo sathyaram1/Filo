@@ -421,6 +421,47 @@ operative vivono qui — quando ricevi quel prompt in ambiente cloud:
    mollare").
 6. Se non ci sono feedback `todo`, termina senza fare nulla.
 
+### Più feedback senza appesantire il contesto: un sub-agente per feedback
+
+Per fare ~3 feedback in una routine **senza** che il contesto
+dell'orchestratore si riempia di letture file, diff e log dei test
+irrilevanti per gli altri task, **delega ogni feedback a un sub-agente**
+(tool Agent, `subagent_type: general-purpose`). Pattern:
+
+- **Sequenziale, non parallelo.** Un sub-agente alla volta. L'auto-commit hook
+  (`.claude/hooks/auto-commit-merge.sh`) è **globale e gira a ogni Edit**:
+  itera su tutte le worktree, le committa e le mergia su `main`. In parallelo
+  due agenti si pestano sull'`.git` (`index.lock`, merge abortiti) e la edit
+  di un fratello può mergiare su `main` il lavoro **a metà** di un altro.
+  Sequenziale = nessuna race, **zero modifiche all'infra**.
+- **Ogni sub-agente fa un feedback end-to-end**: legge testo+screenshot, trova
+  la **causa** (non il sintomo), implementa il fix + le invarianti UX ovvie, e
+  verifica con il **solo spec mirato** della feature toccata
+  (`npx playwright test tests/<feature>.spec.mjs`), poi torna un **report di
+  2-3 righe** (cosa vedrà l'utente, cosa ha aggiunto oltre il chiesto, come ha
+  verificato). L'orchestratore usa quel report per accodare il triage.
+- **`npm test` completo UNA volta sola, alla fine, dall'orchestratore**, dopo
+  che tutti i sub-agenti hanno chiuso. La regressione gira una volta invece di
+  3, e cattura le interazioni tra i fix. Se rompe qualcosa, l'orchestratore
+  capisce quale fix e lo corregge (o rilancia il sub-agente) prima di chiudere.
+- **Modelli**: orchestratore su Opus, sub-agenti su **Sonnet** (`model: "sonnet"`
+  nella chiamata Agent) — basta per il fix mirato e costa meno.
+- **Non obbligatorio per i ritocchi piccoli.** Un sub-agente "parte freddo" e
+  ri-deriva contesto (ri-legge CLAUDE.md, ri-esplora il codice): per un fix UI
+  da 5 minuti costa più di quanto risparmia. Usalo per i feedback **pesanti o
+  che richiedono esplorazione**; i ritocchi minimi e i feedback collegati tra
+  loro falli **inline** in sequenza (così l'orchestratore mantiene
+  l'apprendimento tra task).
+
+**Parallelismo vero** (più sub-agenti insieme) conviene solo se i feedback
+toccano aree di file **palesemente disgiunte** — consenso del settore: max
+2-4 agenti, *"assegna per dominio, non per file"*, merge **uno alla volta**
+con review del diff. Per i feedback di Filo questa precondizione **non è nota
+a priori** (due bug arbitrari possono toccare entrambi `handlers.js` o un CSS
+condiviso), e richiederebbe comunque di **modificare prima l'auto-commit hook**
+perché non auto-mergi le worktree dei sub-agenti durante il lavoro (merge in
+serie a fine routine). Finché l'hook non è adattato, **resta sul sequenziale**.
+
 ## Feedback alpha tester
 
 I feedback arrivano da Firestore (progetto `filo-8b9cb`, collezione `feedback`).
