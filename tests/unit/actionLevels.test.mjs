@@ -14,6 +14,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // IMPOSTA_ESTETICA legge le etichette dei token da themeTokens.js.
 require(join(__dirname, '..', '..', 'src', 'shared', 'preferences.js'));
 require(join(__dirname, '..', '..', 'src', 'shared', 'themeTokens.js'));
+// ESEGUI_COMANDO (#146.6) delega il livello al classificatore di comandi.
+require(join(__dirname, '..', '..', 'src', 'shared', 'cmdClassify.js'));
 require(join(__dirname, '..', '..', 'src', 'shared', 'actionLevels.js'));
 
 const AL = globalThis.SN_ACTION_LEVELS;
