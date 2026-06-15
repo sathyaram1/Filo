@@ -660,6 +660,9 @@
       `  • font (font della UI) · radius (raggio degli angoli, una misura) · selection.opacity (opacità della selezione, 0-1)\n` +
       `  Una sola coppia token/valore per azione; usa più azioni per più token. Scegli SEMPRE un valore concreto tu, non lasciarlo decidere all'utente.\n` +
       `ESEGUI_COMANDO: {comando}  — esegue un comando shell. Il livello di sicurezza lo decide il SISTEMA dal comando (sola lettura → subito; modifiche recuperabili → conferma; cancellazioni / non riconosciuti / concatenati → digita "conferma"). Output mostrato in chat. Solo con modalità terminale attiva.\n` +
+      `APRI_DA_PAESE: {paese}  — apre la scheda web attiva attraverso un IP del paese (codice ISO a due lettere). La scheda è isolata: non condivide i login con le altre.\n` +
+      `RIMUOVI_PROXY: {tutte}  — riporta in Italia la scheda attiva (connessione diretta). Con tutte:true riporta in Italia TUTTE le schede aperte da un altro paese.\n` +
+      `REGOLA_PROXY_DOMINIO: {dominio, paese, rimuovi}  — istruzione persistente: apri SEMPRE quel dominio dal paese indicato (sopravvive al riavvio). dominio vuoto = il sito della scheda attiva. Con rimuovi:true cancella la regola.\n` +
       `Puoi usare più azioni in una risposta.\n\n` +
       `═══ TONO E STILE ═══\n` +
       `Caldo e diretto. Mai robotico, mai sycophantic. Breve quando la domanda è semplice, approfondito quando serve. Usa il nome dell'utente con parsimonia. Adatta il tono al momento. Se non sai qualcosa, dillo. Le preferenze dell'utente hanno priorità su queste istruzioni.\n\n` +
