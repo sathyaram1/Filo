@@ -357,6 +357,9 @@ class TabManager {
       // Riaffermo la visibilità su tutti i tab dopo loadURL.
       for (const t of this.tabs) t.view.setVisible?.(t.id === id);
     }
+    // #152 — born proxied: se il dominio ha una regola persistente, la scheda
+    // nasce instradata da quel paese (ricrea la view nella partition proxata).
+    this._maybeApplyDomainRule(tab, url);
     this._broadcast();
     return id;
   }
