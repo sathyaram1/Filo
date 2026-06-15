@@ -106,3 +106,45 @@ test('dashboard (terminale): /comando inesistente è rosso, esistente è azzurro
   await expect(input).toHaveClass(/is-cmd-filo/);
   await expect(input).not.toHaveClass(/is-cmd-unknown/);
 });
+
+// FEEDBACK (alpha): "/dominio.tld inventato mi porta a una pagina bianca:
+// dovrebbe diventare rosso quando il sito non esiste e non fare nulla se inviato."
+//
+// Ora un "/sito.tld" viene verificato via DNS: se il dominio non risolve, l'input
+// diventa rosso e l'invio NON naviga (resta il testo in rosso). Mockiamo il
+// controllo DNS (window.filo.siteResolves) per essere deterministici e
+// indipendenti dalla rete: "nonesiste*" non risolve, tutto il resto sì.
+//
+// Pre-condizione che senza il fix fallirebbe: prima "/sito.tld" era sempre
+// arancione e l'invio navigava (svuotando l'input) anche per domini inventati.
+test('dashboard: /sito.tld inesistente diventa rosso e non naviga all’invio', async ({ openTab }) => {
+  const page = await openTab(NEWTAB);
+  const input = page.locator('#input');
+  await expect(input).toBeVisible({ timeout: 8_000 });
+
+  // Mock del controllo DNS: i domini con "nonesiste" non risolvono.
+  await page.evaluate(() => {
+    window.filo = window.filo || {};
+    window.filo.siteResolves = async ({ host }) => ({ ok: true, resolves: !/nonesiste/i.test(String(host)) });
+  });
+
+  // Sito inesistente → ROSSO (dopo il check DNS con debounce), non arancione.
+  await input.fill('/nonesiste-davvero-xyz.io');
+  await expect(input).toHaveClass(/is-cmd-unknown/, { timeout: 8_000 });
+  await expect(input).not.toHaveClass(/is-cmd-filo/);
+
+  // Invio: NON deve navigare → l'input conserva il testo (e resta rosso).
+  // (Senza il fix l'invio avrebbe svuotato l'input e aperto una pagina bianca.)
+  await input.press('Enter');
+  await expect(input).toHaveValue('/nonesiste-davvero-xyz.io');
+  await expect(input).toHaveClass(/is-cmd-unknown/);
+
+  // Sito esistente (mock → risolve) → arancione, non rosso.
+  await input.fill('/example.com');
+  await expect(input).toHaveClass(/is-cmd-filo/, { timeout: 8_000 });
+  await expect(input).not.toHaveClass(/is-cmd-unknown/);
+
+  // Invio di un sito valido → naviga e svuota l'input.
+  await input.press('Enter');
+  await expect(input).toHaveValue('');
+});
