@@ -683,7 +683,10 @@
       `    {"type": "CANCELLA_ARCHIVIO", "query": "..."},\n` +
       `    {"type": "IMPOSTA_PREFERENZA", "chiave": "tema", "valore": "scuro"},\n` +
       `    {"type": "IMPOSTA_ESTETICA", "token": "button.bg", "valore": "#3a7d44"},\n` +
-      `    {"type": "ESEGUI_COMANDO", "comando": "git status"}\n` +
+      `    {"type": "ESEGUI_COMANDO", "comando": "git status"},\n` +
+      `    {"type": "APRI_DA_PAESE", "paese": "fr"},\n` +
+      `    {"type": "RIMUOVI_PROXY", "tutte": true},\n` +
+      `    {"type": "REGOLA_PROXY_DOMINIO", "dominio": "netflix.com", "paese": "us"}\n` +
       `  ]\n` +
       `}\n` +
       `Se non servono azioni, "actions" è un array vuoto. Mantieni "text" breve per i comandi (es. "Fatto, 25 minuti.").`,
