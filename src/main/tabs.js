@@ -411,6 +411,12 @@ class TabManager {
           reason: reason || 'manual',
           coOpenUrls,
           scrollPosition: typeof tab.scrollPct === 'number' ? tab.scrollPct : null,
+          // §"Apri da un altro paese": se la tab era instradata da un altro
+          // paese, salva la location così la riapertura dall'archivio rinasce
+          // proxata sulla stessa location (vedi REOPEN_ARCHIVED_TAB).
+          proxy: tab.proxy && tab.proxy.country
+            ? { country: tab.proxy.country, tier: tab.proxy.tier || null }
+            : null,
         }),
       ).then((entry) => {
         // §3.1/§3.2 — arricchisci (riassunto + embedding + snippet) in background,
