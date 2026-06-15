@@ -1,0 +1,11 @@
+{
+  "op": "create",
+  "text": "Pagina 'Gestisci correttore' (src/pages/spellcheck/spellcheck.js). Le parole aggiunte al dizionario personale vengono salvate e mostrate sempre in minuscolo: addDictFromInput esegue w.toLowerCase() (riga ~195) e renderDict ri-minuscola tutto (riga ~148). Aggiungendo nomi propri o brand come 'iPhone' o 'Anthropic', l'utente li ritrova come 'iphone'/'anthropic' e la lista appare 'rotta'. NOTA: scelta di design discutibile, non un bug netto. Decidere se preservare il casing originale in visualizzazione mantenendo comunque il match case-insensitive. [Trovato da passata di audit proattivo]",
+  "name": "Dizionario personale: le parole vengono forzate in minuscolo",
+  "parentId": "",
+  "status": "new",
+  "priority": 0,
+  "notes": "",
+  "queuedAt": "2026-06-15T21:04:53.351Z",
+  "queuedBy": "routine"
+}
