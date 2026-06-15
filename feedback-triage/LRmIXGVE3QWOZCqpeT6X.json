@@ -1,7 +1,0 @@
-{
-  "id": "LRmIXGVE3QWOZCqpeT6X",
-  "status": "done",
-  "notes": "In modalita terminale i comandi installati tramite npm (come Firebase) ora vengono riconosciuti subito e mostrati in azzurro invece che in rosso. Il controllo 'questo comando esiste?' usava un metodo di PowerShell che su alcuni eseguibili (firebase, npm) impiegava ~5 secondi e andava in timeout, colorando per sbaglio di rosso un comando perfettamente valido; ora la verifica e quasi istantanea e affidabile. Verificato con uno unit test dedicato e provando dal vivo firebase/npm/node/git.",
-  "queuedAt": "2026-06-15T09:54:25.977Z",
-  "queuedBy": "routine"
-}
