@@ -1,7 +1,0 @@
-{
-  "id": "Jl3DL0jYzkWMxhy8YO0v",
-  "status": "done",
-  "notes": "Ora puoi chiedere a Filo in chat di lanciare comandi da terminale (es. «fai git status», «installa con npm install», «crea la cartella build»). Filo decide da solo quanto attrito serve in base al comando: la sola lettura (ls, git status, cat…) parte subito e l'output compare nella bolla di chat; le modifiche recuperabili (git push, npm install, mkdir…) chiedono una conferma; le cancellazioni (rm, del…), i comandi che non riconosce e quelli concatenati con && o ; richiedono di digitare «conferma». La classificazione la fa Filo sul comando vero, non si fida del livello suggerito dal modello; output troncato se enorme e timeout sui comandi che si bloccano. Serve la «modalità terminale» attiva nelle impostazioni: se è spenta Filo te lo dice e propone di attivarla. Verificato con unit test sulla classificazione (ls→subito, git push→conferma, rm/inventati/&&→conferma digitata) e con test d'interfaccia sul flusso completo. Con questo si chiude la spec #146 (era il 6° e ultimo sotto-task).",
-  "queuedAt": "2026-06-15T09:20:45.587Z",
-  "queuedBy": "routine"
-}
