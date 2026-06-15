@@ -315,7 +315,7 @@
     return div;
   }
 
-  function renderActions(container, actions, { onAck } = {}) {
+  function renderActions(container, actions, { onAck, autoConfirm = false } = {}) {
     if (!actions || !actions.length) return;
     const wrap = document.createElement('div');
     wrap.className = 'dash-bubble-actions';
@@ -339,6 +339,17 @@
       wrap.appendChild(ok);
     }
     container.appendChild(wrap);
+    // #159 — modifiche alle impostazioni: il popup di conferma si apre da SOLO,
+    // invece di richiedere all'utente di cliccare prima il bottone. L'utente ha
+    // chiesto che Filo "tenti di farlo in automatico, con un popup di conferma
+    // aperto". Lo facciamo SOLO per le impostazioni (preferenza/estetica) a
+    // livello 2 e SOLO se è l'unica azione della bolla: niente stacking di
+    // modali, e le azioni distruttive (livello 3) o esterne (feedback) restano
+    // a click esplicito.
+    if (autoConfirm && actions.length === 1) {
+      const auto = wrap.querySelector('[data-auto-confirm="1"]');
+      if (auto) setTimeout(() => { try { auto.click(); } catch (_) {} }, 0);
+    }
   }
 
   // #146.4 — bottone di raffinamento estetico. Filo ha già applicato un valore
