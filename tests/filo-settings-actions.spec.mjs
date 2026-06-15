@@ -1,11 +1,14 @@
 // #146.5 — "Filo deve poter modificare QUALSIASI impostazione".
 //
 // Ogni impostazione della pagina Opzioni è esposta come azione IMPOSTA_PREFERENZA
-// col proprio livello di sicurezza, più l'azione INVIA_FEEDBACK (livello 2). Qui
-// esercitiamo, nel processo reale dell'app, un caso PER LIVELLO end-to-end:
+// col proprio livello di sicurezza, più l'azione INVIA_FEEDBACK (livello 2) e
+// l'azione CANCELLA_MEMORIA (livello 3). Qui esercitiamo, nel processo reale
+// dell'app, un caso PER LIVELLO end-to-end:
 //   • livello 1: l'impostazione cambia SUBITO (verificato leggendo lo storage);
 //   • livello 2: NON cambia finché l'utente non conferma; alla conferma cambia
 //     davvero e i campi vicini restano intatti (deepMerge);
+//   • livello 3 (CANCELLA_MEMORIA): non parte senza conferma; dopo confirmed:true
+//     la memoria è davvero azzerata (verificata leggendo lo storage);
 //   • INVIA_FEEDBACK: è gated a livello 2 (non parte senza conferma).
 // Gli assert verificano il SUCCESSO (lo stato diventa quello richiesto), non
 // l'assenza di un errore.
