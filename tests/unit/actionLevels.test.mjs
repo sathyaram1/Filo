@@ -126,6 +126,23 @@ test('ESEGUI_COMANDO: describe mostra il comando ESATTO che verrà eseguito', ()
   assert.match(d, /git push origin main/);
 });
 
+test('proxy per-tab (#152): le azioni proxy via linguaggio naturale sono registrate a livello 1', () => {
+  // Senza registrazione il dispatch RIFIUTA l'azione: queste devono esserci,
+  // così "apri questa tab dalla Francia" non viene scartata.
+  assert.equal(AL.levelFor({ type: 'APRI_DA_PAESE', paese: 'fr' }), 1);
+  assert.equal(AL.levelFor({ type: 'RIMUOVI_PROXY' }), 1);
+  assert.equal(AL.levelFor({ type: 'RIMUOVI_PROXY', tutte: true }), 1);
+  assert.equal(AL.levelFor({ type: 'REGOLA_PROXY_DOMINIO', dominio: 'netflix.com', paese: 'us' }), 1);
+  assert.equal(AL.levelFor({ type: 'REGOLA_PROXY_DOMINIO', dominio: 'netflix.com', rimuovi: true }), 1);
+});
+
+test('proxy per-tab: describe spiega in chiaro cosa fara l\'azione', () => {
+  assert.match(AL.describe({ type: 'APRI_DA_PAESE', paese: 'fr' }), /FR/);
+  assert.match(AL.describe({ type: 'RIMUOVI_PROXY', tutte: true }), /tutte/i);
+  assert.match(AL.describe({ type: 'REGOLA_PROXY_DOMINIO', dominio: 'netflix.com', paese: 'us' }), /netflix\.com/);
+  assert.match(AL.describe({ type: 'REGOLA_PROXY_DOMINIO', dominio: 'netflix.com', rimuovi: true }), /[Tt]ogliere/);
+});
+
 test('ogni azione registrata ha un livello valido e una describe', () => {
   for (const [type, entry] of Object.entries(AL.REGISTRY)) {
     const lvl = AL.levelFor({ type, chiave: 'tema', valore: 'scuro' });
