@@ -706,7 +706,10 @@
     } else {
       const filoBubble = makeBubble({ role: 'filo', text: r.text || '' });
       bubblesEl.appendChild(filoBubble);
-      renderActions(filoBubble, r.actions || [], { onAck: goHome });
+      // #159 — risposta fresca: le impostazioni a livello 2 aprono il loro popup
+      // di conferma da sole (autoConfirm). Solo qui (nuova risposta), mai in
+      // replay storico.
+      renderActions(filoBubble, r.actions || [], { onAck: goHome, autoConfirm: true });
       threadHistory.push({ role: 'filo', text: r.text || '', actions: r.actions || [] });
     }
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
