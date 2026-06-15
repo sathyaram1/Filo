@@ -1317,6 +1317,15 @@
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg?.type === MSG.FILO_LIVE_UPDATED) {
       refreshLive().catch(() => {});
+    } else if (msg?.type === MSG.FILO_DASHBOARD_UPDATED) {
+      // #155 — il ricalcolo in background della home è pronto: aggiorna
+      // messaggio + suggerimenti senza rifare la chiamata all'LLM.
+      if (showHomeMessage) {
+        homeMessageEl.classList.remove('dash-home-msg-loading');
+        homeMessageEl.textContent = msg.message || 'Filo è in ascolto.';
+      }
+      suggestions = Array.isArray(msg.suggestions) ? msg.suggestions : [];
+      renderSuggestions();
     } else if (msg?.type === MSG.SETTINGS_UPDATED) {
       applySavedTheme().catch(() => {});
       if (msg.settings && typeof msg.settings.showHomeMessage === 'boolean') {
