@@ -124,6 +124,12 @@ class TabManager {
     // l'intera finestra, nascondendo la barra (tab + indirizzo) della shell.
     // Attivata dal menu (voce "Schermo intero"); si esce con Esc.
     this.contentFullscreen = false;
+    // true quando il fullscreen è stato richiesto DALLA pagina (HTML5
+    // requestFullscreen: pulsante "schermo intero" di YouTube/player video).
+    // In quel caso l'Esc deve passare alla pagina perché esca dal suo
+    // fullscreen (poi `leave-html-full-screen` ripristina la shell), invece di
+    // intercettarlo noi e lasciare la pagina convinta di essere a tutto schermo.
+    this.pageFullscreen = false;
     // Chrome compatto: fuori dalla home di Filo la barra indirizzi (icone di
     // navigazione + campo URL) viene nascosta, lasciando solo la fila di tab +
     // controlli finestra. In questo stato la WebContentsView risale a coprire
