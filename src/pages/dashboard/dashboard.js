@@ -642,6 +642,7 @@
     clearImagePreviews();
     // Svuota subito la textarea: la bolla utente è già visibile, niente attesa.
     inputEl.value = '';
+    autoGrowInput();
     // Prima query dalla home → entra in stato thread.
     if (body.dataset.state !== 'thread') goThread();
 
