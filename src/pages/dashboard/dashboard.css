@@ -264,6 +264,36 @@ body[data-state="thread"] .dash-suggestion { justify-content: flex-start; paddin
   border-bottom-left-radius: 6px;
 }
 .dash-bubble-filo.dash-bubble-pending { color: var(--dash-ink-mute); font-style: italic; }
+
+/* "Filo sta pensando": 3 righe di reasoning che scorrono verso l'alto.
+   La riga in cima è quasi trasparente (sta uscendo), quella in basso è piena
+   (è appena entrata). Restano al massimo 3 righe visibili; ogni ~900ms le frasi
+   slittano verso l'alto e ne entra una nuova dal basso. */
+.dash-thinking {
+  color: var(--dash-ink-mute);
+  font-style: italic;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.35;
+  overflow: hidden;
+}
+.dash-thinking-line {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: opacity 350ms ease;
+}
+.dash-thinking-line[data-slot="0"] { opacity: 0.25; }
+.dash-thinking-line[data-slot="1"] { opacity: 0.55; }
+.dash-thinking-line[data-slot="2"] { opacity: 0.95; }
+.dash-thinking-line.dash-thinking-enter {
+  animation: dash-thinking-enter 350ms ease-out;
+}
+@keyframes dash-thinking-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 0.95; transform: translateY(0); }
+}
 .dash-bubble-actions {
   margin-top: 10px;
   display: flex;
