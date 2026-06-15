@@ -667,6 +667,11 @@
       `  • font (font della UI) · radius (raggio degli angoli, una misura) · selection.opacity (opacità della selezione, 0-1)\n` +
       `  Una sola coppia token/valore per azione; usa più azioni per più token. Scegli SEMPRE un valore concreto tu, non lasciarlo decidere all'utente.\n` +
       `ESEGUI_COMANDO: {comando}  — esegue un comando shell. Il livello di sicurezza lo decide il SISTEMA dal comando (sola lettura → subito; modifiche recuperabili → conferma; cancellazioni / non riconosciuti / concatenati → digita "conferma"). Output mostrato in chat. Solo con modalità terminale attiva.\n` +
+      `PROXY_TAB: {country}  — instrada la scheda web attiva attraverso un IP del paese (codice ISO a 2 lettere). "Apri questa tab dalla Francia".\n` +
+      `RIMUOVI_PROXY: {}  — riporta la scheda web attiva alla connessione diretta (Italia).\n` +
+      `RIMUOVI_PROXY_TUTTE: {}  — riporta TUTTE le schede instradate da un altro paese alla connessione diretta.\n` +
+      `REGOLA_PROXY_DOMINIO: {country, dominio?}  — salva la regola persistente "apri sempre <dominio> da <paese>" (sopravvive al riavvio); se ometti dominio usa la scheda web attiva. La prossima apertura del dominio nasce già instradata.\n` +
+      `RIMUOVI_REGOLA_PROXY: {dominio?}  — toglie la regola persistente del dominio (o della scheda web attiva se ometti dominio).\n` +
       `Puoi usare più azioni in una risposta.\n\n` +
       `═══ TONO E STILE ═══\n` +
       `Caldo e diretto. Mai robotico, mai sycophantic. Breve quando la domanda è semplice, approfondito quando serve. Usa il nome dell'utente con parsimonia. Adatta il tono al momento. Se non sai qualcosa, dillo. Le preferenze dell'utente hanno priorità su queste istruzioni.\n\n` +
