@@ -426,6 +426,10 @@
     try { ctxProxyStatus = await api.tabs.proxyStatus(); } catch (_) { ctxProxyStatus = null; }
     if (ctxProxyStatus && ctxProxyStatus.configured) {
       if (t.proxy) {
+        // Tab già instradata: si può cambiare paese (apre la lista) o tornare
+        // diretti. Senza "Cambia paese" l'utente dovrebbe prima tornare in
+        // Italia e poi riproxare — un'asimmetria inutile.
+        entries.push({ label: 'Cambia paese', icon: 'globe', action: 'tab-proxy-pick' });
         entries.push({ label: 'Torna in Italia', icon: 'globe', action: 'tab-proxy-clear' });
       } else {
         entries.push({
