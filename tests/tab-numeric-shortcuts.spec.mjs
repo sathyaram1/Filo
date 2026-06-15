@@ -32,17 +32,8 @@ test('Alt+numero porta alla tab corrispondente (da una pagina web)', async ({ ap
   await expect.poll(() => tabsInfo(app).then((i) => i.activeId), { timeout: 10_000 })
     .toBe(before.ids[0]);
 
-  // Alt+3 → terza tab. (La pagina ora attiva è la prima.)
-  const first = app.windows ? null : null; // no-op, leggibilità
-  // Premo sulla shell-side via la pagina attualmente attiva, qualunque sia.
-  const active1 = await app.evaluate(({ BrowserWindow }) => {
-    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
-    const t = w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId);
-    try { t.view.webContents.focus(); } catch (_) {}
-    return t.url;
-  });
-  expect(active1).toBeTruthy();
-  // Invio Alt+3 alla webContents attiva tramite un input sintetico nel main.
+  // Alt+3 → terza tab. Invio un input sintetico Alt+3 alla webContents attiva
+  // (esercita il before-input-event nel main, il cammino "mentre scrivo").
   await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
     const t = w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId);
