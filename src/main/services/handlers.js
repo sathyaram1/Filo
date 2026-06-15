@@ -820,57 +820,64 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, sende
   return { text: textReply, actions: renderedActions, model: r.model, provider: r.provider, costEur: r.costEur };
 }
 
-async function handleFiloGenerateDashboard({ force = false, openTabsCount = 0 } = {}) {
-  // Pulisce i timer scaduti PRIMA di leggere la cache: gcTimers() invalida
-  // la cache dashboard quando rimuove qualcosa, così evitiamo di riservire
-  // un messaggio cached che parlava di un timer ormai scaduto (bug alpha
-  // tester: "Filo non dovrebbe menzionare il timer in alto a sinistra").
-  await FiloMem.gcTimers();
-  const cached = await FiloMem.getDashboardCache();
-  const now = Date.now();
-  if (!force && cached?.ts) {
-    const age = now - new Date(cached.ts).getTime();
-    if (age < DASHBOARD_REFRESH_COOLDOWN_MS) {
-      return { message: cached.message, suggestions: cached.suggestions, cached: true, ts: cached.ts };
-    }
-  }
+// #155 — raccoglie gli input della home (letture locali, NIENTE chiamata LLM) e
+// calcola la firma stabile per capire se andrebbe ricalcolata. Niente AI qui:
+// è la parte "economica" che si può fare a ogni apertura di scheda.
+async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
   const settings = await getEffectiveSettings();
-  if (!settings.apiKeys?.[settings.provider] && !settings.apiKeys?.gemini) {
-    const saved = await SavedPages.list();
-    const suggestions = saved.slice(0, 5).map((p) => ({
-      icon: 'link', text: p.title || p.url,
-      action: { type: 'NAVIGA', url: p.url, label: p.title || p.url },
-      importance: 2,
-    }));
-    const message = settings.apiKeys?.openrouter || settings.apiKeys?.gemini
-      ? 'Buongiorno. Filo è qui.'
-      : 'Imposta una chiave API nelle Opzioni per attivare Filo. Intanto, le tue pagine salvate sono qui.';
-    const payload = { message, suggestions };
-    await FiloMem.setDashboardCache(payload);
-    return { ...payload, cached: false, ts: new Date().toISOString() };
-  }
-
+  const hasKey = !!(settings.apiKeys?.[settings.provider] || settings.apiKeys?.gemini);
   const memory = await FiloMem.getMemory();
   const { profilo, preferenze, espansioni } = FiloMem.renderMemoryForPrompt(memory);
   const lezioni = await lessonsBufferText();
   const { stateText } = await FiloState.assemble();
   const notesList = await FiloMem.listNotes();
   const notiList = await FiloMem.listNotifications();
+  const timersList = await FiloMem.listTimers();
   const saved = await SavedPages.list();
 
-  const r = await handleAIRequest({
-    action: ACTIONS.FILO_DASHBOARD,
-    payload: {
-      profilo, preferenze, espansioni, lezioni, stato: stateText,
-      notifiche: notiList.length ? notiList.map((n) => `- [${n.ts}] ${n.kind}: ${n.text}`).join('\n') : '(nessuna)',
-      appunti: notesList.length ? notesList.slice(0, 20).map((n) => `- [${n.ts}] ${n.text}`).join('\n') : '(nessuno)',
-      salvati: saved.length ? saved.slice(0, 20).map((p) => `- ${p.title || p.url} (${p.url})`).join('\n') : '(nessuno)',
-      ultimoMessaggio: cached?.message || '',
-      tabAperte: openTabsCount,
-    },
-    origin: 'filo:dashboard',
+  const payload = {
+    profilo, preferenze, espansioni, lezioni, stato: stateText,
+    notifiche: notiList.length ? notiList.map((n) => `- [${n.ts}] ${n.kind}: ${n.text}`).join('\n') : '(nessuna)',
+    appunti: notesList.length ? notesList.slice(0, 20).map((n) => `- [${n.ts}] ${n.text}`).join('\n') : '(nessuno)',
+    salvati: saved.length ? saved.slice(0, 20).map((p) => `- ${p.title || p.url} (${p.url})`).join('\n') : '(nessuno)',
+    tabAperte: openTabsCount,
+  };
+
+  const signature = DashboardRefresh.computeSignature({
+    profilo, preferenze, espansioni, lezioni,
+    noteIds: notesList.map((n) => n.id || n.text),
+    notificaIds: notiList.map((n) => n.id || n.text),
+    salvatiUrls: saved.map((p) => p.url),
+    timerIds: timersList.map((t) => `${t.id}:${t.label}:${t.paused ? 1 : 0}`),
+    openTabsCount,
   });
 
+  return { settings, hasKey, payload, signature, saved };
+}
+
+// Messaggio "senza chiave API": istantaneo, dalle pagine salvate. Niente LLM.
+function buildNoKeyDashboard(settings, saved) {
+  const suggestions = saved.slice(0, 5).map((p) => ({
+    icon: 'link', text: p.title || p.url,
+    action: { type: 'NAVIGA', url: p.url, label: p.title || p.url },
+    importance: 2,
+  }));
+  const message = settings.apiKeys?.openrouter || settings.apiKeys?.gemini
+    ? 'Buongiorno. Filo è qui.'
+    : 'Imposta una chiave API nelle Opzioni per attivare Filo. Intanto, le tue pagine salvate sono qui.';
+  return { message, suggestions };
+}
+
+// Genera il messaggio della home con l'LLM e lo mette in cache (con la firma).
+// Questa è la parte COSTOSA: non va mai sul cammino di apertura di una scheda
+// (tranne il primissimo caricamento, quando non c'è ancora nulla in cache).
+async function generateDashboardFromInputs(inputs) {
+  const cached = await FiloMem.getDashboardCache();
+  const r = await handleAIRequest({
+    action: ACTIONS.FILO_DASHBOARD,
+    payload: { ...inputs.payload, ultimoMessaggio: cached?.message || '' },
+    origin: 'filo:dashboard',
+  });
   const parsed = extractJson(r.text);
   let message = '';
   let suggestions = [];
@@ -888,8 +895,69 @@ async function handleFiloGenerateDashboard({ force = false, openTabsCount = 0 } 
     }
   }
   if (!message) message = 'Filo è in ascolto.';
-  await FiloMem.setDashboardCache({ message, suggestions });
-  return { message, suggestions, cached: false, ts: new Date().toISOString() };
+  await FiloMem.setDashboardCache({ message, suggestions, signature: inputs.signature });
+  return { message, suggestions, ts: new Date().toISOString() };
+}
+
+// Scheduler throttle+coalesce per il ricalcolo in background (#155): al massimo
+// un ricalcolo ogni DASHBOARD_MIN_INTERVAL_MS, accorpando tutte le richieste.
+// Creato pigramente (SN_DASHBOARD_REFRESH è caricato dal loader).
+let _dashboardScheduler = null;
+function dashboardScheduler() {
+  if (_dashboardScheduler) return _dashboardScheduler;
+  _dashboardScheduler = DashboardRefresh.createScheduler({
+    minIntervalMs: DASHBOARD_MIN_INTERVAL_MS,
+    now: () => Date.now(),
+    setTimer: (fn, ms) => setTimeout(fn, ms),
+    clearTimer: (h) => clearTimeout(h),
+    run: async (openTabsCount) => {
+      // Ri-raccoglie gli input ORA: accorpa tutte le modifiche della finestra.
+      await FiloMem.gcTimers();
+      const inputs = await gatherDashboardInputs({ openTabsCount: openTabsCount || 0 });
+      if (!inputs.hasKey) return;
+      const cached = await FiloMem.getDashboardCache();
+      // Se nel frattempo gli input sono tornati uguali alla cache, niente AI.
+      if (cached && cached.signature === inputs.signature) return;
+      const result = await generateDashboardFromInputs(inputs);
+      // Spinge l'aggiornamento alle home aperte: si aggiornano senza rifare l'LLM.
+      broadcastToTabs({
+        type: MSG.FILO_DASHBOARD_UPDATED,
+        message: result.message, suggestions: result.suggestions, ts: result.ts,
+      });
+    },
+  });
+  return _dashboardScheduler;
+}
+
+async function handleFiloGenerateDashboard({ force = false, openTabsCount = 0 } = {}) {
+  // Pulisce i timer scaduti PRIMA di leggere la cache: gcTimers() invalida
+  // la cache dashboard quando rimuove qualcosa, così evitiamo di riservire
+  // un messaggio cached che parlava di un timer ormai scaduto (bug alpha
+  // tester: "Filo non dovrebbe menzionare il timer in alto a sinistra").
+  await FiloMem.gcTimers();
+  const inputs = await gatherDashboardInputs({ openTabsCount });
+  const cached = await FiloMem.getDashboardCache();
+
+  // Senza chiave API: messaggio istantaneo dalle pagine salvate (come prima).
+  if (!inputs.hasKey) {
+    const payload = buildNoKeyDashboard(inputs.settings, inputs.saved);
+    await FiloMem.setDashboardCache({ ...payload, signature: inputs.signature });
+    return { ...payload, cached: false, ts: new Date().toISOString() };
+  }
+
+  // C'è già una cache e non è un refresh esplicito: la serviamo SUBITO — la
+  // nuova scheda non aspetta MAI l'LLM. Se gli input sono cambiati, accodiamo
+  // un ricalcolo in background (throttle + coalesce); quando è pronto, la home
+  // si aggiorna da sola via FILO_DASHBOARD_UPDATED.
+  if (cached && cached.message && !force) {
+    if (cached.signature !== inputs.signature) dashboardScheduler().request(openTabsCount);
+    return { message: cached.message, suggestions: cached.suggestions, cached: true, ts: cached.ts };
+  }
+
+  // Primo caricamento (nessuna cache) o refresh forzato: genera ora.
+  const result = await generateDashboardFromInputs(inputs);
+  dashboardScheduler().markRan(); // il run sincrono conta per il throttle
+  return { ...result, cached: false };
 }
 
 async function maybeCategorizeAsync(savedEntry, pageInput) {
