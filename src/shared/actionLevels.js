@@ -120,6 +120,35 @@
         return `Cambiare “${label}”${val ? ` a ${val}` : ''}`;
       },
     },
+    APRI_DA_PAESE: {
+      // "Apri questa tab dalla Francia" → instrada la tab attiva attraverso un
+      // IP del paese chiesto. Reversibile (basta "torna in Italia") e fatto su
+      // richiesta esplicita dell'utente → livello 1, come l'estetica live.
+      level: 1,
+      describe: (a) => `Aprire la scheda da ${String(a.paese || a.country || '').toUpperCase() || 'un altro paese'}`,
+    },
+    RIMUOVI_PROXY: {
+      // "Torna in Italia" / "chiudi tutte le tab proxate" → toglie il proxy.
+      // Sempre sicuro (riporta alla connessione diretta) → livello 1.
+      level: 1,
+      describe: (a) => (a && (a.tutte === true || a.all === true)
+        ? 'Riportare in Italia tutte le schede aperte da un altro paese'
+        : 'Riportare questa scheda in Italia'),
+    },
+    REGOLA_PROXY_DOMINIO: {
+      // "Questo sito sempre dagli USA" / "togli la regola sugli USA per questo
+      // sito" → istruzione persistente per dominio. Reversibile (rimovibile) →
+      // livello 1.
+      level: 1,
+      describe: (a) => {
+        const dom = String(a.dominio || a.domain || a.sito || a.site || 'questo sito').trim();
+        if (a && (a.rimuovi === true || a.remove === true)) {
+          return `Togliere la regola "apri sempre da un altro paese" per ${dom}`;
+        }
+        const c = String(a.paese || a.country || '').toUpperCase();
+        return `Aprire sempre ${dom}${c ? ` da ${c}` : ' da un altro paese'} (anche dopo il riavvio)`;
+      },
+    },
     ESEGUI_COMANDO: {
       // Filo lancia un comando nel terminale (#146.6). Il livello NON è fisso:
       // dipende dal comando EFFETTIVO, classificato dal main (mai dall'LLM) in
