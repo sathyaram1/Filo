@@ -9,7 +9,19 @@
 // (src/shared/cmdClassify.js + actionLevels.js) PRIMA di chiamare runCommand.
 // Qui ci limitiamo a eseguire ciò che è già stato autorizzato.
 
-const { spawn } = require('node:child_process');
+const { spawn, execFile } = require('node:child_process');
+
+// Uccide l'INTERO albero del processo. Su Windows `child.kill()` non termina i
+// figli (es. una shell che ne lancia un'altra): le pipe restano aperte e la
+// `close` non scatta → il timeout non libererebbe mai. taskkill /T /F chiude
+// l'albero. Su POSIX SIGKILL sul processo basta nei casi comuni.
+function killTree(child) {
+  if (!child || child.killed) return;
+  if (process.platform === 'win32') {
+    try { execFile('taskkill', ['/pid', String(child.pid), '/T', '/F'], () => {}); return; } catch (_) {}
+  }
+  try { child.kill('SIGKILL'); } catch (_) {}
+}
 
 const DEFAULT_TIMEOUT_MS = 60_000;
 const MAX_OUTPUT_CHARS = 12_000;
