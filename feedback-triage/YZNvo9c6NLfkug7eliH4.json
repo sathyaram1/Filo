@@ -1,7 +1,0 @@
-{
-  "id": "YZNvo9c6NLfkug7eliH4",
-  "status": "done",
-  "notes": "Il classificatore LLM di livello 2 per i blocchi geografici ambigui (403, pagine vuote, 'contenuto non disponibile' senza pattern noto) era gia' implementato e funzionante: manda al modello solo titolo + ~500 caratteri della pagina d'errore + dominio + status, tratta quel testo come dato inerte (protezione anti prompt-injection), e restituisce una classe chiusa (geo_block / paywall / login_wall / bot_block / errore_generico). Solo geo_block attiva il proxy; bot_block non riprova mai via datacenter. Risultati in cache per (dominio, pattern di path) con scadenza. Verificato con 34 unit test che coprono costruzione del prompt, validazione dell'output, cache e routing per classe.",
-  "queuedAt": "2026-06-15T00:08:22.546Z",
-  "queuedBy": "routine"
-}
