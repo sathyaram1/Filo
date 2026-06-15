@@ -646,7 +646,7 @@
     tooltipEl = document.createElement('div');
     tooltipEl.className = 'sn-tooltip';
     tooltipEl.style.display = 'none';
-    document.documentElement.appendChild(tooltipEl);
+    menuHost().appendChild(tooltipEl);
     return tooltipEl;
   }
   function showTooltip(target, text) {
