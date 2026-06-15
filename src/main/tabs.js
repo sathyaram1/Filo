@@ -282,23 +282,28 @@ class TabManager {
     return this._partitionFor(url);
   }
 
-  _makeView(url, partition) {
+  _makeView(url, partition, opts = {}) {
     const isInternal = url.startsWith('filo://');
-    return new WebContentsView({
-      webPreferences: {
-        preload: isInternal ? INTERNAL_PRELOAD : PAGE_PRELOAD,
-        // Per le pagine interne (filo://) usiamo contextIsolation:false così
-        // possiamo overwritare window.chrome direttamente — i file portati
-        // dall'estensione si aspettano chrome.* in scope globale. Le pagine
-        // web esterne mantengono l'isolation (codice non fidato).
-        contextIsolation: !isInternal,
-        sandbox: false,
-        nodeIntegration: false,
-        webSecurity: true,
-        // partition: incognito (effimera della finestra) o per-sito in privacy.
-        ...(partition ? { partition } : {}),
-      },
-    });
+    const webPreferences = {
+      preload: isInternal ? INTERNAL_PRELOAD : PAGE_PRELOAD,
+      // Per le pagine interne (filo://) usiamo contextIsolation:false così
+      // possiamo overwritare window.chrome direttamente — i file portati
+      // dall'estensione si aspettano chrome.* in scope globale. Le pagine
+      // web esterne mantengono l'isolation (codice non fidato).
+      contextIsolation: !isInternal,
+      sandbox: false,
+      nodeIntegration: false,
+      webSecurity: true,
+      // partition: incognito (effimera della finestra) o per-sito in privacy.
+      ...(partition ? { partition } : {}),
+    };
+    // #145 — le tab RIPRISTINATE alla riapertura di Filo non devono far ripartire
+    // i media da sole (es. i video YouTube che ripartivano tutti insieme al boot).
+    // Il default di Electron è 'no-user-gesture-required' (autoplay sempre libero);
+    // qui imponiamo l'attivazione utente: il video resta in pausa finché l'utente
+    // non interagisce con quella pagina. Come si comporta un browser normale.
+    if (opts.suppressAutoplay) webPreferences.autoplayPolicy = 'document-user-activation-required';
+    return new WebContentsView({ webPreferences });
   }
 
   openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null } = {}) {
