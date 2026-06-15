@@ -1,0 +1,117 @@
+// Logica pura: trasforma un feedback (segnalazione + note) nella sua
+// CONVERSAZIONE a turni, così la dashboard può mostrarla a "bolle di chat"
+// invece di un unico blocco di testo dove segnalazione, risposte di Filo e
+// risposte dell'utente si mescolano (feedback #108: "un feedback ha testo
+// originale, risposta del modello, mia risposta, altre domande… ogni turno in
+// un box diverso").
+//
+// Il dato resta UNO solo (il campo `notes` su Firestore): qui non si cambia lo
+// schema, si PARSA ciò che già c'è. La struttura delle note è quella prodotta
+// dai due cammini che le scrivono:
+//   - le routine/Filo scrivono il loro report/le domande come testo libero;
+//   - la dashboard, quando l'utente riapre o risponde, APPENDE un blocco
+//     `--- Riaperto il <ts> ---\n<testo>` (o `--- La tua risposta del <ts> ---`).
+// Quindi: il segmento iniziale delle note è il turno di Filo; ogni marcatore
+// di riapertura/risposta apre un turno dell'utente.
+//
+// Convenzione IIFE su globalThis come gli altri moduli shared/*.
+
+(function (global) {
+  'use strict';
+
+  // Marcatori che, dentro `notes`, aprono un turno dell'UTENTE. Il primo
+  // ("Riaperto il") è quello storico già presente su Firestore: va riconosciuto
+  // per retro-compatibilità. Il secondo è quello che usa la risposta dal tab
+  // Chiarimenti. Cattura (group 1) il timestamp scritto nel marcatore.
+  const USER_TURN_RE = /^---\s*(?:Riaperto il|La tua risposta del)\s*(.*?)\s*---\s*$/;
+
+  // true se il feedback è stato inviato da un modello (issue d'agente o
+  // sub-feedback creato da una routine): in quel caso anche la segnalazione
+  // originale è "lato Filo", non "lato utente".
+  function isFromModel(clientId) {
+    const c = String(clientId || '');
+    return c.startsWith('agent:') || c.startsWith('routine:');
+  }
+
+  // Spezza il blob `notes` nei suoi turni. Ritorna una lista di
+  // { role: 'model'|'user', ts: string|null, body: string } senza i segmenti
+  // vuoti (es. note che iniziano direttamente con un marcatore di riapertura).
+  function splitNotes(notes) {
+    const lines = String(notes || '').split('\n');
+    const segments = [];
+    // Il testo prima di qualsiasi marcatore è il turno di Filo (il report/le
+    // domande scritte dalla routine).
+    let current = { role: 'model', ts: null, lines: [] };
+    for (const line of lines) {
+      const m = USER_TURN_RE.exec(line);
+      if (m) {
+        segments.push(current);
+        current = { role: 'user', ts: (m[1] || '').trim() || null, lines: [] };
+      } else {
+        current.lines.push(line);
+      }
+    }
+    segments.push(current);
+    return segments
+      .map((s) => ({ role: s.role, ts: s.ts, body: s.lines.join('\n').trim() }))
+      .filter((s) => s.body.length > 0);
+  }
+
+  // Costruisce la conversazione completa di un feedback.
+  // turni: { role, kind, body, ts }
+  //   role  'model' (Filo) | 'user' (utente) — decide il lato/colore della bolla
+  //   kind  'report' (la segnalazione iniziale) | 'note' (turno di Filo) |
+  //         'reply' (risposta/riapertura dell'utente) — decide l'etichetta
+  //   body  testo del turno (da escapare a valle, qui resta grezzo)
+  //   ts    timestamp del turno se noto (ISO per la segnalazione, stringa già
+  //         localizzata per i marcatori di riapertura), altrimenti null
+  function parse(feedback) {
+    const f = feedback || {};
+    const turns = [];
+    const text = String(f.text || '').trim();
+    if (text) {
+      turns.push({
+        role: isFromModel(f.clientId) ? 'model' : 'user',
+        kind: 'report',
+        body: text,
+        ts: f.createdAt || f._createTime || null,
+      });
+    }
+    for (const seg of splitNotes(f.notes)) {
+      turns.push({
+        role: seg.role,
+        kind: seg.role === 'model' ? 'note' : 'reply',
+        body: seg.body,
+        ts: seg.ts,
+      });
+    }
+    return turns;
+  }
+
+  // Marcatore da APPENDERE alle note quando l'utente risponde dal tab
+  // Chiarimenti (o riapre). Centralizzato qui così il parser e chi scrive
+  // restano allineati su una sola forma.
+  function userTurnMarker(ts, label) {
+    const when = ts || new Date().toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
+    return `--- ${label || 'La tua risposta del'} ${when} ---`;
+  }
+
+  // Appende un turno dell'utente al blob note esistente, conservando lo storico.
+  function appendUserTurn(oldNotes, replyText, opts) {
+    const o = opts || {};
+    const reply = String(replyText || '').trim();
+    if (!reply) return String(oldNotes || '');
+    const block = `${userTurnMarker(o.ts, o.label)}\n${reply}`;
+    const prev = String(oldNotes || '');
+    return prev ? `${prev}\n\n${block}` : block;
+  }
+
+  global.SN_FEEDBACK_THREAD = {
+    parse,
+    splitNotes,
+    isFromModel,
+    userTurnMarker,
+    appendUserTurn,
+    USER_TURN_RE,
+  };
+})(typeof globalThis !== 'undefined' ? globalThis : self);
