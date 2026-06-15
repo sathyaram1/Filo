@@ -28,11 +28,12 @@ test('PROMPTS.filoChat: con modelName, il prompt comunica il nome del modello', 
   assert.match(p, /quale modello/i);
 });
 
-test('PROMPTS.filoChat: senza modelName resta retrocompatibile (niente riga, niente "undefined")', () => {
+test('PROMPTS.filoChat: senza modelName resta retrocompatibile (niente riga rotta)', () => {
   const p = C.PROMPTS.filoChat({ ...basePayload });
-  assert.doesNotMatch(p, /undefined|null/);
-  // Non deve esserci la riga "Il modello che ti sta eseguendo è …".
+  // Non deve esserci la riga "Il modello che ti sta eseguendo è …" (né con un
+  // valore mancante "undefined").
   assert.doesNotMatch(p, /modello che ti sta eseguendo/);
+  assert.doesNotMatch(p, /eseguendo è (undefined|null)/);
 });
 
 test('risoluzione: il nickname si risolve nell\'id CONCRETO del modello, non nel nickname/label', () => {
