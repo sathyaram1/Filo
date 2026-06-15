@@ -992,6 +992,32 @@
     }, 250);
   }
 
+  // Verifica (immediata) se l'host di un "/sito.tld" risolve, e popola la cache.
+  // Usata sull'invio: in caso di dubbio (rete giù, errore) torna true così non
+  // blocca mai una navigazione legittima.
+  async function ensureSiteResolved(host) {
+    if (!host) return true;
+    if (siteResolveCache.has(host)) return siteResolveCache.get(host);
+    let resolves = true;
+    try {
+      const r = await window.filo?.siteResolves?.({ host });
+      resolves = !(r && r.resolves === false);
+    } catch (_) { resolves = true; }
+    siteResolveCache.set(host, resolves);
+    return resolves;
+  }
+
+  // Come sopra ma con debounce, per la verifica live mentre si scrive: parte
+  // solo quando l'utente si ferma, poi ricolora (rosso se il dominio non esiste).
+  function scheduleSiteResolve(host) {
+    clearTimeout(siteResolveTimer);
+    siteResolveTimer = setTimeout(async () => {
+      if (!host || siteResolveCache.has(host)) { updateInputClass(); return; }
+      await ensureSiteResolved(host);
+      updateInputClass();
+    }, 250);
+  }
+
   function updateInputClass() {
     const kind = classifyInput(inputEl.value);
     // 'pending' (terminale, esistenza del comando ancora da verificare) viene
@@ -1005,6 +1031,13 @@
     inputEl.classList.toggle('is-cmd-unknown', showUnknown);
     // In attesa del controllo "esiste?": rosso (vedi sopra) e avvia il check.
     if (kind === 'pending') scheduleShellWhich(inputEl.value);
+    // Sito (arancione) non ancora verificato: avvia il lookup DNS (debounce)
+    // così, se il dominio non esiste, l'input diventa rosso.
+    const t = inputEl.value.trim();
+    if (kind === 'filo' && t.startsWith('/') && isSiteToken(t)) {
+      const host = siteHostOf(t);
+      if (host && !siteResolveCache.has(host)) scheduleSiteResolve(host);
+    }
   }
 
   function handleSlashCommand(text) {
