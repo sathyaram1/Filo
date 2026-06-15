@@ -28,9 +28,13 @@ const Paths = globalThis.SN_PATHS;
 const LlmsTxt = globalThis.SN_LLMS_TXT;
 const FiloMem = globalThis.SN_FILO_MEMORY;
 const FiloState = globalThis.SN_FILO_STATE;
+const DashboardRefresh = globalThis.SN_DASHBOARD_REFRESH;
 
 const KNOWN_PATHS_BUDGET_CHARS = 20 * 1024;
-const DASHBOARD_REFRESH_COOLDOWN_MS = 5 * 60 * 1000;
+// #155 — intervallo minimo tra due ricalcoli in background della home: la nuova
+// scheda serve sempre la cache all'istante; il ricalcolo (costoso, con l'LLM)
+// avviene al massimo una volta ogni 2 minuti, accorpando le modifiche.
+const DASHBOARD_MIN_INTERVAL_MS = 2 * 60 * 1000;
 const FREE_PROVIDERS = new Set(['gemini']);
 
 // Finestra principale di Filo, quella che possiede il TabManager. NON usare
