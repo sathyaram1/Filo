@@ -243,15 +243,22 @@ html[data-chrome-compact="1"] .addr {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.tab .mute-ind {
+.tab .mute-ind,
+.tab .audio-ind {
   flex: 0 0 13px;
   height: 13px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   color: var(--fg-soft);
+  cursor: pointer;
 }
-.tab .mute-ind svg { display: block; }
+.tab .mute-ind svg,
+.tab .audio-ind svg { display: block; }
+/* Audio attivo: accento Filo (caldo), non il grigio del muto. */
+.tab .audio-ind { color: var(--accent); }
+.tab .mute-ind:hover,
+.tab .audio-ind:hover { opacity: 0.7; }
 
 /* Indicatore "aperta da un altro paese" (proxy per-tab): globo + codice paese
    in accento Filo, discreto — un segnale di viaggio, non di sicurezza. */
