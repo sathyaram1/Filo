@@ -1,7 +1,0 @@
-{
-  "id": "LrLTEgiZmTgA5bkNjndf",
-  "status": "done",
-  "notes": "Aggiunto il comando /pulisci (e l'alias /pulizia) nella barra della home: avvia il riordino e l'archiviazione delle schede non più utili. Per coerenza con il pulsante '🧹 Riordina e archivia le schede' chiede prima conferma con il popup di Filo e poi ti dice quante schede ha archiviato; le schede archiviate restano riapribili da 'Tab archiviate'. L'ho aggiunto anche all'elenco di /help. Verificato con un test che controlla che /pulisci (e /pulizia) siano riconosciuti come comando Filo e aprano la conferma del riordino.",
-  "queuedAt": "2026-06-15T23:20:39.178Z",
-  "queuedBy": "routine"
-}
