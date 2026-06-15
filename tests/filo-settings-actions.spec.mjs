@@ -95,3 +95,30 @@ test('le impostazioni sensibili NON sono auto-applicate da un giro di chat (rest
   // Il limite di default resta invariato.
   expect((await getSettings(page)).monthlyLimitEur).not.toBe(99);
 });
+
+test('livello 3: CANCELLA_MEMORIA — non parte senza conferma; dopo confirmed:true la memoria è azzerata', async ({ app, openTab }) => {
+  const page = await openTab(NEWTAB);
+  const action = { type: 'CANCELLA_MEMORIA' };
+
+  // Prima: scrivi qualcosa in memoria così abbiamo qualcosa da cancellare.
+  await app.evaluate(() =>
+    globalThis.SN_FILO_MEMORY.patchMemory({ PROFILO: 'utente di prova', PREFERENZE: 'preferisce il dark' }));
+  const memBefore = await app.evaluate(() => globalThis.SN_FILO_MEMORY.getMemory());
+  expect(memBefore.PROFILO).toBeTruthy();
+
+  // Senza conferma: NON esegue, richiede livello 3.
+  const r = await execAction(app, action);
+  expect(r.executed).toBe(false);
+  expect(r.needsConfirm).toBe(3);
+  expect(r.describe).toMatch(/memoria/i);
+  // La memoria è ancora intatta.
+  const memStill = await app.evaluate(() => globalThis.SN_FILO_MEMORY.getMemory());
+  expect(memStill.PROFILO).toBeTruthy();
+
+  // Con confirmed:true (l'utente ha digitato "conferma"): la memoria sparisce davvero.
+  const c = await execAction(app, action, { confirmed: true });
+  expect(c.executed).toBe(true);
+  const memAfter = await app.evaluate(() => globalThis.SN_FILO_MEMORY.getMemory());
+  expect(memAfter.PROFILO || '').toBe('');
+  expect(memAfter.PREFERENZE || '').toBe('');
+});
