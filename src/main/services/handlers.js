@@ -719,7 +719,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         const tm = win && win._filoTabs;
         if (!tm) return { executed: false, kept: false };
         const count = tm.clearAllProxies();
-        return { executed: true, kept: true, output: { proxy: 'cleared_all', count } };
+        return { executed: true, kept: false, output: { proxy: 'cleared_all', count } };
       }
       case 'REGOLA_PROXY_DOMINIO': {
         const { tm, tab } = targetWebTab(sender);
