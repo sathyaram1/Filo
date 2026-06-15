@@ -199,6 +199,9 @@
           type: MSG.REOPEN_ARCHIVED_TAB,
           url: t.url,
           scrollPct: typeof t.scrollPosition === 'number' ? t.scrollPosition : null,
+          // Se la tab era stata aperta "da un altro paese", riaprila proxata
+          // sulla stessa location.
+          proxy: t.proxy && t.proxy.country ? t.proxy : null,
         });
       } catch (_) {
         try { chrome.tabs.create({ url: t.url }); } catch (_) {}
