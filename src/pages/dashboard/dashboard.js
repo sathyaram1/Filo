@@ -1047,7 +1047,7 @@
     const firstToken = text.split(/\s+/)[0];
     // 1) Comandi interni di Filo: vincono SEMPRE, anche in modalità terminale.
     const handler = SLASH_COMMANDS[text] || SLASH_COMMANDS[firstToken];
-    if (handler) { handler(text); inputEl.value = ''; updateInputClass(); return true; }
+    if (handler) { handler(text); inputEl.value = ''; autoGrowInput(); updateInputClass(); return true; }
     // 2) Navigazione diretta a un sito: solo se è un singolo token "tipo sito".
     if (isSiteToken(text)) {
       const raw = text.slice(1);
