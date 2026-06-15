@@ -43,6 +43,28 @@
   }
 
   // ----------------------------------------------------------------------
+  // Avvisi inline (conflitto autocorrect, ecc.)
+  // ----------------------------------------------------------------------
+  let conflictTimer = null;
+  function showConflictMessage(conflictKey) {
+    let el = $('autocorrectConflict');
+    if (!el) {
+      el = document.createElement('p');
+      el.id = 'autocorrectConflict';
+      el.className = 'sn-muted';
+      el.style.cssText = 'color:var(--sn-danger,#c0392b);margin:4px 0 0';
+      // Inserisce dopo l'header h2 e la descrizione, prima della tabella.
+      const section = $('autocorrectList').parentElement;
+      section.insertBefore(el, $('autocorrectList'));
+    }
+    el.textContent = I18n.t('spell_page_conflict', { key: conflictKey }) ||
+      `"${conflictKey}" esiste già — modifica annullata.`;
+    el.hidden = false;
+    clearTimeout(conflictTimer);
+    conflictTimer = setTimeout(() => { el.hidden = true; }, 3500);
+  }
+
+  // ----------------------------------------------------------------------
   // Autocorrect
   // ----------------------------------------------------------------------
   function renderAutocorrect(map) {
