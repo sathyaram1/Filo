@@ -284,43 +284,55 @@ function createSession({ shell, cwd } = {}) {
 // SICUREZZA: il nome del comando NON viene mai interpolato in una stringa di
 // shell. Lo passiamo SEMPRE come argomento posizionale ($1 / $args[0]) al
 // resolver (`command -v`, `Get-Command`, `where`), così non può iniettare altro.
-function commandExists({ shell, cwd, command } = {}) {
-  return new Promise((resolve) => {
-    const cmd = String(command == null ? '' : command).trim();
-    // Niente da controllare, o token chiaramente non un nome di comando
-    // (newline/null): consideralo "non esiste".
-    if (!cmd || /[\n\r\0]/.test(cmd)) { resolve(false); return; }
+//
+// Builtin di cmd.exe che `where` non vede (non sono eseguibili nel PATH).
+const CMD_BUILTINS = new Set(['cd', 'dir', 'echo', 'cls', 'copy', 'del', 'move',
+  'type', 'set', 'md', 'mkdir', 'rd', 'rmdir', 'ren', 'rename', 'exit',
+  'pushd', 'popd', 'title', 'ver', 'vol', 'path', 'start', 'call', 'color']);
 
-    let file, args;
-    if (process.platform !== 'win32') {
-      // Linux/macOS (incluse le routine cloud): /bin/sh, `command -v` copre
-      // builtin, funzioni ed eseguibili nel PATH.
-      file = '/bin/sh';
-      args = ['-c', 'command -v "$1" >/dev/null 2>&1', '_', cmd];
-    } else if (shell === 'cmd') {
-      // cmd.exe: `where` trova solo gli eseguibili nel PATH, non i builtin
-      // (dir, cd, echo…). Quelli li copriamo con una piccola allowlist.
-      const BUILTINS = new Set(['cd', 'dir', 'echo', 'cls', 'copy', 'del', 'move',
-        'type', 'set', 'md', 'mkdir', 'rd', 'rmdir', 'ren', 'rename', 'exit',
-        'pushd', 'popd', 'title', 'ver', 'vol', 'path', 'start', 'call', 'color']);
-      if (BUILTINS.has(cmd.toLowerCase())) { resolve(true); return; }
-      file = 'where.exe';
-      args = [cmd];
-    } else if (shell === 'bash') {
-      // WSL bash.
-      file = 'wsl.exe';
-      args = ['--', 'bash', '-c', 'command -v "$1" >/dev/null 2>&1', '_', cmd];
-    } else {
-      // PowerShell (default). Get-Command copre cmdlet, alias, funzioni e app.
-      file = 'powershell.exe';
-      args = ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command',
+// I "probe" per verificare l'esistenza di un comando, in ordine di tentativo:
+// si prova il primo, e SOLO se non conferma si passa al successivo. Ogni probe
+// è { file, args } e l'esistenza è segnalata da exit code 0.
+function existenceProbes({ shell, cmd }) {
+  if (process.platform !== 'win32') {
+    // Linux/macOS (incluse le routine cloud): /bin/sh, `command -v` copre
+    // builtin, funzioni ed eseguibili nel PATH.
+    return [{ file: '/bin/sh', args: ['-c', 'command -v "$1" >/dev/null 2>&1', '_', cmd] }];
+  }
+  if (shell === 'cmd') {
+    // cmd.exe: i builtin li abbiamo già coperti a monte; `where` trova gli
+    // eseguibili nel PATH.
+    return [{ file: 'where.exe', args: [cmd] }];
+  }
+  if (shell === 'bash') {
+    // WSL bash.
+    return [{ file: 'wsl.exe', args: ['--', 'bash', '-c', 'command -v "$1" >/dev/null 2>&1', '_', cmd] }];
+  }
+  // PowerShell (default). `where.exe` PER PRIMO: risolve ogni eseguibile nel
+  // PATH in ~100ms ed è affidabile anche con gli shim .ps1/.cmd di npm. NON
+  // partire da Get-Command: per quegli shim (es. `firebase.ps1`) deve fare
+  // l'analisi dello script e ci mette anche 5s — oltre il timeout — finendo per
+  // colorare di rosso un comando perfettamente valido. Get-Command resta come
+  // fallback per ciò che `where` non vede: cmdlet, alias e funzioni (ls, cd,
+  // Get-ChildItem…). A quel punto NON è mai un eseguibile esterno → niente
+  // analisi pesante → risolve in fretta.
+  return [
+    { file: 'where.exe', args: [cmd] },
+    {
+      file: 'powershell.exe',
+      args: ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command',
         'if (Get-Command -Name $args[0] -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }',
-        cmd];
-    }
+        cmd],
+    },
+  ];
+}
 
+// Esegue UN probe e risolve true se il processo esce con codice 0.
+function runProbe({ file, args }, cwd) {
+  return new Promise((resolve) => {
     let done = false;
-    const finish = (val) => { if (done) return; done = true; try { proc.kill(); } catch (_) {} resolve(val); };
     let proc;
+    const finish = (val) => { if (done) return; done = true; try { proc.kill(); } catch (_) {} resolve(val); };
     try {
       proc = spawn(file, args, { cwd: cwd || undefined, windowsHide: true, stdio: 'ignore' });
     } catch (_) { resolve(false); return; }
@@ -329,6 +341,21 @@ function commandExists({ shell, cwd, command } = {}) {
     proc.on('error', () => { clearTimeout(timer); finish(false); });
     proc.on('exit', (code) => { clearTimeout(timer); finish(code === 0); });
   });
+}
+
+async function commandExists({ shell, cwd, command } = {}) {
+  const cmd = String(command == null ? '' : command).trim();
+  // Niente da controllare, o token chiaramente non un nome di comando
+  // (newline/null): consideralo "non esiste".
+  if (!cmd || /[\n\r\0]/.test(cmd)) return false;
+  // Builtin cmd.exe: sì senza spawnare nulla.
+  if (process.platform === 'win32' && shell === 'cmd' && CMD_BUILTINS.has(cmd.toLowerCase())) {
+    return true;
+  }
+  for (const probe of existenceProbes({ shell, cmd })) {
+    if (await runProbe(probe, cwd)) return true;
+  }
+  return false;
 }
 
 module.exports = { createSession, defaultCwd, commandExists };
