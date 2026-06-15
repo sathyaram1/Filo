@@ -1188,6 +1188,8 @@ globalThis.SN_GEO_CLASSIFY = async function geoClassify(input) {
 // Esposto su globalThis per i test Playwright (app.evaluate non ha require):
 // è il dispatch con il gate dei livelli di sicurezza (#146.2).
 globalThis.SN_EXECUTE_FILO_ACTION = executeFiloAction;
+// Idem per la chat della home: i test ne ispezionano il prompt costruito (#158).
+globalThis.SN_HANDLE_FILO_CHAT = handleFiloChat;
 
 module.exports = {
   handleMessage,
