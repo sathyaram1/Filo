@@ -324,25 +324,79 @@
       }));
     }
     for (const t of timers) {
-      const remaining = Math.max(0, Math.round((new Date(t.endsAt).getTime() - Date.now()) / 1000));
-      const mm = Math.floor(remaining / 60);
-      const ss = remaining % 60;
-      const txt = `${t.label}\n${mm}:${String(ss).padStart(2, '0')}${t.paused ? ' (in pausa)' : ''}`;
-      liveEl.appendChild(renderLiveCard({
-        kind: 'process',
-        text: txt,
-        onDismiss: () => send({ type: MSG.FILO_DELETE_TIMER, id: t.id }).then(refreshLive),
-      }));
+      if (t.ringing) {
+        liveEl.appendChild(renderRingingCard(t));
+      } else {
+        const remaining = Math.max(0, Math.round((new Date(t.endsAt).getTime() - Date.now()) / 1000));
+        const mm = Math.floor(remaining / 60);
+        const ss = remaining % 60;
+        const txt = `${t.label}\n${mm}:${String(ss).padStart(2, '0')}${t.paused ? ' (in pausa)' : ''}`;
+        liveEl.appendChild(renderLiveCard({
+          kind: 'process',
+          text: txt,
+          onDismiss: () => send({ type: MSG.FILO_DELETE_TIMER, id: t.id }).then(refreshLive),
+        }));
+      }
     }
+
+    // Gestione suoneria: parte se c'è almeno un timer ringing, si ferma altrimenti.
+    const hasRinging = timers.some((t) => t.ringing);
+    if (hasRinging) {
+      startAlarm();
+    } else {
+      stopAlarm();
+    }
+
+    // Stato osservabile per i test Playwright (non dipende dall'audio che in
+    // headless non suona): data-ringing="1" sul contenitore live.
+    liveEl.dataset.ringing = hasRinging ? '1' : '0';
+
     // Ticker per i timer: aggiorna il rendering ogni secondo SOLO se ci sono
-    // timer attivi non in pausa. Evita lavoro inutile su dashboard vuote.
-    const hasActiveTimer = timers.some((t) => !t.paused);
+    // timer attivi (compresi i ringing — un timer ringing non è in pausa
+    // quindi !t.paused è già true, ma includiamo t.ringing esplicitamente
+    // per robustezza nel caso futura variazione della logica di pausa).
+    const hasActiveTimer = timers.some((t) => !t.paused || t.ringing);
     if (hasActiveTimer && !liveTickHandle) {
       liveTickHandle = setInterval(refreshLive, 1000);
     } else if (!hasActiveTimer && liveTickHandle) {
       clearInterval(liveTickHandle);
       liveTickHandle = null;
     }
+  }
+
+  // Card speciale per un timer che sta suonando: bordo animato + pulsante "Ferma".
+  function renderRingingCard(t) {
+    const div = document.createElement('div');
+    div.className = 'dash-live-card';
+    div.dataset.kind = 'process';
+    div.dataset.ringing = '1';
+
+    const textEl = document.createElement('div');
+    textEl.className = 'dash-live-text';
+    textEl.textContent = `⏰ ${t.label} — scaduto`;
+    div.appendChild(textEl);
+
+    const stopBtn = document.createElement('button');
+    stopBtn.className = 'dash-live-stop';
+    stopBtn.type = 'button';
+    stopBtn.textContent = 'Ferma';
+    stopBtn.addEventListener('click', () => {
+      send({ type: MSG.FILO_STOP_TIMER_ALARM, id: t.id }).then(refreshLive);
+    });
+    div.appendChild(stopBtn);
+
+    // Pulsante × per dismissione rapida (stessa azione di "Ferma").
+    const dismissBtn = document.createElement('button');
+    dismissBtn.className = 'dash-live-dismiss';
+    dismissBtn.type = 'button';
+    dismissBtn.setAttribute('aria-label', 'Ferma');
+    dismissBtn.textContent = '\xD7';
+    dismissBtn.addEventListener('click', () => {
+      send({ type: MSG.FILO_STOP_TIMER_ALARM, id: t.id }).then(refreshLive);
+    });
+    div.appendChild(dismissBtn);
+
+    return div;
   }
 
   function renderLiveCard({ kind, text, onDismiss }) {
