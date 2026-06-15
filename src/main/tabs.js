@@ -1028,6 +1028,23 @@ class TabManager {
       if (this.contentFullscreen && input.type === 'keyDown' && input.key === 'Escape') {
         event.preventDefault();
         this.setContentFullscreen(false);
+        return;
+      }
+      // Alt+1…9 → vai alla N-esima tab, Alt+0 → la decima. Alt (non Ctrl) per
+      // non rubare il classico Ctrl/Cmd+numero del browser, e perché funziona
+      // anche mentre si scrive in una pagina (Alt+cifra non produce testo).
+      // Intercettiamo qui (per-webContents) invece che con un globalShortcut
+      // OS-wide, così la combinazione resta disponibile alle altre app.
+      if (input.type === 'keyDown' && input.alt && !input.control && !input.meta && !input.shift) {
+        const m = /^Digit([0-9])$/.exec(input.code || '');
+        if (m) {
+          const idx = m[1] === '0' ? 9 : Number(m[1]) - 1;
+          const target = this.tabs[idx];
+          if (target) {
+            event.preventDefault();
+            this.activate(target.id);
+          }
+        }
       }
     });
     // Navigazione main-frame iniziata dalla pagina (click su link,
