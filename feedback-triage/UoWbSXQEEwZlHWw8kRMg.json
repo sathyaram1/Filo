@@ -1,7 +1,0 @@
-{
-  "id": "UoWbSXQEEwZlHWw8kRMg",
-  "status": "done",
-  "notes": "Ora quando chiedi a Filo di aprire un link (es. «apri youtube») lo apre SUBITO in una nuova scheda, invece di lasciarti un bottone da cliccare. E quando l'unica cosa che fa è aprire un link non scrive più testo di riempimento: sparisce il fastidioso «(vuoto)». Il riferimento che resta nella bolla ora ha sempre un'etichetta leggibile (icona + nome del sito) per riaprire la pagina, non è più un bottone muto senza scritta. In più (oltre al chiesto): se Filo vuole solo PROPORTI più siti tra cui scegliere ora li elenca come link nel testo, così non si aprono tutti da soli. Verificato con test automatici (la scheda si apre davvero; il chip ha l'etichetta) e con la suite completa.",
-  "queuedAt": "2026-06-15T17:35:47.907Z",
-  "queuedBy": "routine"
-}
