@@ -36,9 +36,15 @@ test('il system prompt della chat nomina il modello con il suo id concreto, non 
   const out = await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
 
-    // Una chiave Gemini così la catena modelli si risolve (senza chiave
-    // buildAttemptChain non produrrebbe attempts → niente id concreto).
-    await globalThis.SN_STORAGE.updateSettings({ useDefaultModels: true, apiKeys: { gemini: 'k-test' } });
+    // Config esplicita e deterministica: il chat punta al nickname 'flash-lite-3'
+    // (id concreto 'gemini-3.1-flash-lite'), provider Gemini con chiave presente.
+    // useDefaultModels:false → niente dipendenza dai default bakati.
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { gemini: 'k-test' },
+      models: { [C.ACTIONS.FILO_CHAT]: 'flash-lite-3' },
+      modelRegistry: C.DEFAULT_MODEL_REGISTRY,
+    });
 
     // Stub del provider: cattura i messages e ritorna un JSON valido (niente rete).
     const captured = {};
