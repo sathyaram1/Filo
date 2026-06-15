@@ -182,8 +182,16 @@
     if (prog === 'git') return classifyGit(trimmed);
     if (prog === 'npm' || prog === 'pip' || prog === 'pip3') return classifyNpm(trimmed);
 
+    // Interpreti / build tool: codice arbitrario → 3, ma la sola interrogazione
+    // di versione/help è lettura → 1 (es. `node --version`, `go version`).
+    if (ARBITRARY_CODE.has(prog)) return isVersionQuery(trimmed) ? 1 : 3;
+
     if (LEVEL1.has(prog)) return 1; // sola lettura: i flag non la rendono distruttiva
-    if (LEVEL2.has(prog)) return DANGEROUS_FLAG_RE.test(trimmed) ? 3 : 2;
+    // Anche un comando LEVEL2 ridotto a `--version`/`--help` è sola lettura → 1.
+    if (LEVEL2.has(prog)) {
+      if (isVersionQuery(trimmed)) return 1;
+      return DANGEROUS_FLAG_RE.test(trimmed) ? 3 : 2;
+    }
 
     return 3; // comando non riconosciuto → livello 3 di default
   }
