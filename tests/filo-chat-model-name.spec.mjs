@@ -12,13 +12,28 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 
+// Al boot Filo apre una newtab (WebContentsView) subito dopo la shell: quella
+// navigazione può distruggere il contesto della PRIMA app.evaluate. Aspettiamo
+// che la newtab iniziale sia comparsa e si sia assestata.
+async function waitForBoot(app) {
+  const deadline = Date.now() + 10_000;
+  let tab = null;
+  while (Date.now() < deadline) {
+    tab = app.windows().find((w) => {
+      try { return new URL(w.url()).hostname === 'newtab'; } catch (_) { return false; }
+    });
+    if (tab) break;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  if (tab) await tab.waitForLoadState('domcontentloaded').catch(() => {});
+}
+
 test('il system prompt della chat nomina il modello con il suo id concreto, non il nickname', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await shell.waitForLoadState('domcontentloaded');
+  await waitForBoot(app);
 
-  const out = await app.evaluate(async ({ app: electronApp }) => {
-    const path = require('path');
-    const H = require(path.join(electronApp.getAppPath(), 'src', 'main', 'services', 'handlers.js'));
+  const out = await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
 
     // Una chiave Gemini così la catena modelli si risolve (senza chiave
