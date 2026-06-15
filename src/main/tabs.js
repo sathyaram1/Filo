@@ -1379,6 +1379,38 @@ class TabManager {
     } catch (_) {}
   }
 
+  _geoState(tab) {
+    if (!tab.geoDismissed) tab.geoDismissed = new Set(); // host con proposta rifiutata
+    return tab;
+  }
+
+  // L'utente ha accettato la proposta inline: instrada la tab dal paese indicato
+  // (cookie jar separato → nella tab proxata non sarà loggato, come avvertito).
+  async geoProposeAccept(tabId, country) {
+    const tab = this.tabs.find((t) => t.id === tabId);
+    if (!tab) return { ok: false, error: 'no_tab' };
+    // Accettando, l'host esce dallo stato "settled/dismissed": è una scelta esplicita.
+    let host = '';
+    try { host = tab.geoBlock ? tab.geoBlock.host : (tab.url ? new URL(tab.url).hostname : ''); } catch (_) {}
+    this._geoState(tab);
+    if (host) tab.geoDismissed.delete(host);
+    tab.geoRetry = { host, stage: 'settled' }; // scelta presa: niente auto-escalation
+    return this.setTabProxy(tabId, country);
+  }
+
+  // L'utente ha rifiutato/chiuso la proposta: non riproporla per questo dominio
+  // nel tab (simmetrico al dismiss del banner "sospetto").
+  geoProposeDismiss(tabId, url) {
+    const tab = this.tabs.find((t) => t.id === tabId);
+    if (!tab) return { ok: false, error: 'no_tab' };
+    this._geoState(tab);
+    let host = '';
+    try { host = url ? new URL(url).hostname : (tab.geoBlock ? tab.geoBlock.host : ''); } catch (_) {}
+    if (host) tab.geoDismissed.add(host);
+    tab.geoRetry = { host, stage: 'settled' };
+    return { ok: true };
+  }
+
   // Campiona titolo + testo visibile della pagina e applica i pattern espliciti
   // noti (geoBlock.js). Best-effort: mai bloccante, ricontrolla che la tab non
   // abbia navigato altrove nel frattempo.
