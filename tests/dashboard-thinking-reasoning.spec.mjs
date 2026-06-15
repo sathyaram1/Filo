@@ -61,16 +61,18 @@ test('dashboard: il reasoning è 3 righe che scorrono e sfumano, poi lascia il p
   await expect(lines).toHaveCount(3, { timeout: 3_000 });
 
   // L'opacità decresce salendo: slot 2 (in basso, fresca) più visibile di slot 0
-  // (in cima, in uscita). Verifichiamo l'ordine effettivo a runtime.
-  const op = await page.evaluate(() => {
-    const get = (slot) => {
-      const el = document.querySelector(`.dash-thinking .dash-thinking-line[data-slot="${slot}"]`);
-      return el ? parseFloat(getComputedStyle(el).opacity) : null;
-    };
-    return { top: get(0), mid: get(1), bottom: get(2) };
-  });
-  expect(op.bottom).toBeGreaterThan(op.mid);
-  expect(op.mid).toBeGreaterThan(op.top);
+  // (in cima, in uscita). La riga nuova entra con un'animazione (opacità 0→0.95),
+  // quindi campioniamo finché lo stato si assesta e il gradiente regge.
+  await expect.poll(async () => {
+    return page.evaluate(() => {
+      const get = (slot) => {
+        const el = document.querySelector(`.dash-thinking .dash-thinking-line[data-slot="${slot}"]`);
+        return el ? parseFloat(getComputedStyle(el).opacity) : null;
+      };
+      const top = get(0), mid = get(1), bottom = get(2);
+      return bottom > mid && mid > top;
+    });
+  }, { timeout: 3_000, intervals: [100] }).toBe(true);
 
   // Scorrimento: la frase in cima cambia col tempo (le righe slittano verso l'alto).
   const topBefore = await lines.nth(0).textContent();
