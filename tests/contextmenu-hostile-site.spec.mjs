@@ -21,4 +21,15 @@ test('right-click su pagina tipo-YouTube apre il menu Filo, non quello della pag
   await page.locator('#player').click({ button: 'right' });
   await page.waitForTimeout(300);
   await expect(page.locator('.sn-menu')).toBeVisible();
+  // Il menu della pagina ostile NON deve comparire: lo abbiamo pre-emptato.
+  await expect(page.locator('#yt-menu')).toHaveCount(0);
+});
+
+test('Shift + right-click su pagina ostile resta escape hatch (nessun menu Filo)', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, HTML);
+  await page.keyboard.down('Shift');
+  await page.locator('#player').click({ button: 'right' });
+  await page.keyboard.up('Shift');
+  await page.waitForTimeout(300);
+  await expect(page.locator('.sn-menu')).toHaveCount(0);
 });
