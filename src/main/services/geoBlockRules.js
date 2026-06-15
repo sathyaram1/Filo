@@ -99,7 +99,7 @@ function shouldNoteVideoData({ proxied, playingMs, alreadyNoted } = {}) {
 // sicurezza), quindi un falso positivo qui costa poco, un falso negativo molto.
 
 // Nomi che indicano in modo diretto una sessione/identità.
-const LOGIN_NAME_RE = /sess|(^|[_-])sid([_-]|$)|auth|token|jwt|login|logged|account|oauth|passport|remember|csrf|(^|[_-])uid([_-]|$)/i;
+const LOGIN_NAME_RE = /sess|(^|[._-])sid([._-]|$)|auth|token|jwt|login|logged|account|oauth|passport|remember|csrf|(^|[._-])uid([._-]|$)/i;
 
 // Cookie tecnici NON di autenticazione, anche quando httpOnly: consenso,
 // analytics, bot-management dei CDN. Non devono far scattare "sessione attiva".
