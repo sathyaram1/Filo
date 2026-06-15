@@ -1177,6 +1177,10 @@ class TabManager {
 
   // Spinge il verdetto al content script del tab (l'overlay/banner si ridisegna).
   _sbBroadcast(tab, url, verdict) {
+    // Memorizza l'ultimo livello di sicurezza applicato al tab: è l'input
+    // "sito flaggato sospetto/pericoloso" delle regole d'azione geo-block
+    // (#151), che NON deve mai aggirare i controlli di sicurezza di Filo.
+    try { tab.sbLevel = verdict ? (verdict.level || 'safe') : 'safe'; } catch (_) {}
     const T = (globalThis.SN_MSG && globalThis.SN_MSG.MSG && globalThis.SN_MSG.MSG.SAFEBROWSE_UPDATE) || 'safebrowse_update';
     try {
       tab.view.webContents.send('filo:broadcast', {
