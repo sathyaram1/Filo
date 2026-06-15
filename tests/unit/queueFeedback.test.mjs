@@ -46,10 +46,13 @@ test('buildCreateEntry: default = top-level, todo, priorità 0', () => {
   assert.equal(e.priority, 0);
 });
 
-test('buildCreateEntry: status clarify ammesso, altri no', () => {
+test('buildCreateEntry: status new/clarify ammessi, altri no', () => {
+  // 'new' = inbox/"Ricevuti": lo usano le passate proattive di audit per
+  // depositare i ritrovamenti da far rivedere all'utente prima di lavorarli.
+  assert.equal(buildCreateEntry({ text: 't', name: 'n', status: 'new' }).status, 'new');
   assert.equal(buildCreateEntry({ text: 't', name: 'n', status: 'clarify' }).status, 'clarify');
   assert.throws(() => buildCreateEntry({ text: 't', name: 'n', status: 'done' }), /status non valido/);
-  assert.throws(() => buildCreateEntry({ text: 't', name: 'n', status: 'new' }), /status non valido/);
+  assert.throws(() => buildCreateEntry({ text: 't', name: 'n', status: 'verified' }), /status non valido/);
 });
 
 test('buildCreateEntry: input invalidi rifiutati', () => {
