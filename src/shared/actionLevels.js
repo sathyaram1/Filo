@@ -105,7 +105,7 @@
     CANCELLA_ARCHIVIO: {
       level: 3,
       describe: (a) => `Eliminare DEFINITIVAMENTE dall'archivio le schede pertinenti a `
-        + `”${a.query || a.testo || ''}”.`,
+        + `“${a.query || a.testo || ''}”.`,
     },
     CANCELLA_MEMORIA: {
       // Cancella tutti i moduli di memoria di Filo (PROFILO, PREFERENZE, espansioni)
