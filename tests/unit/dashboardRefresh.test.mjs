@@ -59,6 +59,14 @@ test('cambiano memoria / appunti / salvati / notifiche / timer / n.tab → firma
   assert.notEqual(a, D.computeSignature({ ...baseInputs, openTabsCount: 3 }));
 });
 
+test('la fascia oraria grossolana (partOfDay) fa cambiare la firma', () => {
+  // Così il saluto si rinfresca da "mattina" a "sera", ma al massimo una volta
+  // per fascia (non al minuto).
+  const m = D.computeSignature({ ...baseInputs, partOfDay: 'mattina' });
+  const s = D.computeSignature({ ...baseInputs, partOfDay: 'sera' });
+  assert.notEqual(m, s);
+});
+
 test('campi temporali NON fanno parte della firma (niente ricalcoli a vuoto)', () => {
   // computeSignature ignora qualunque chiave non elencata: passare un "ora" che
   // cambia non deve cambiare la firma.
