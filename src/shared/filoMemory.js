@@ -218,31 +218,46 @@
     return filtered;
   }
 
-  // Pulizia: rimuove tutti i timer scaduti (endsAt <= now) e non in pausa.
-  //
-  // Storia: in passato lasciavamo un margine di 5 minuti per far "lampeggiare"
-  // i timer a 0:00 nella UI prima di sparire. Ma quando Filo viene chiuso
-  // mentre un timer è in corso e riaperto dopo la scadenza, non c'è stato
-  // nessun rendering né notifica: lasciare quel timer in lista significa
-  // farlo comparire come "processo attivo" / suggerimento ("Il timer sta per
-  // suonare") in modo permanente (bug riportato da alpha tester 2026-05).
-  // Meglio cancellarli silenziosamente: se il timer è scaduto in background
-  // l'utente lo scopre comunque dal raw_log o dalle notifiche, non da una
-  // card stantia.
+  // Pulizia: i timer scaduti (endsAt <= now) e non in pausa vengono marcati
+  // `ringing: true` invece di essere eliminati, così la UI può far suonare la
+  // suoneria e mostrare un controllo "Ferma". I timer in stato `ringing` restano
+  // finché l'utente li ferma esplicitamente (via stopTimerAlarm) oppure fino
+  // alla prossima apertura di Filo (in quel caso vengono rimossi silenziosamente
+  // perché la suoneria non avrebbe senso senza la UI aperta).
   async function gcTimers() {
     const list = await listTimers();
     const now = Date.now();
-    const filtered = list.filter((t) => {
-      if (t.paused) return true;
-      return new Date(t.endsAt).getTime() > now;
-    });
-    if (filtered.length !== list.length) {
-      await setRaw(KEYS.FILO_TIMERS, filtered);
-      // Invalida la cache della dashboard: se il messaggio centro o un
-      // suggerimento parlava del timer ora scaduto, ri-generiamo per non
-      // continuare a mostrare "Il timer sta per suonare" stantio.
+    let changed = false;
+    const result = [];
+    for (const t of list) {
+      if (t.paused) { result.push(t); continue; }
+      const expired = new Date(t.endsAt).getTime() <= now;
+      if (!expired) { result.push(t); continue; }
+      if (t.ringing) {
+        // Già marcato ringing: teniamolo in lista (l'utente non ha ancora
+        // premuto Ferma). Non invalidiamo la cache ogni secondo.
+        result.push(t);
+      } else {
+        // Prima volta che scade: passa a ringing e invalida la cache.
+        result.push({ ...t, ringing: true });
+        changed = true;
+      }
+    }
+    if (changed) {
+      await setRaw(KEYS.FILO_TIMERS, result);
+      // Invalida la cache della dashboard affinché eventuali suggerimenti
+      // "il timer sta per suonare" vengano rigenerati.
       await setRaw(KEYS.FILO_DASHBOARD_CACHE, null);
     }
+    return result;
+  }
+
+  // Silenzia un timer in stato ringing rimuovendolo dalla lista.
+  async function stopTimerAlarm(id) {
+    const list = await listTimers();
+    const filtered = list.filter((t) => t.id !== id);
+    await setRaw(KEYS.FILO_TIMERS, filtered);
+    await setRaw(KEYS.FILO_DASHBOARD_CACHE, null);
     return filtered;
   }
 
