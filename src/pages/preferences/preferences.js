@@ -275,11 +275,53 @@
     synth.speak(u);
   }
 
+  // ── Suoneria timer (anteprima tramite WebAudio API) ─────────────────────
+  // Stesso catalogo della dashboard (RINGTONES): riproduce una sequenza di
+  // beep senza file audio. Usato dal pulsante "Prova" in questa pagina.
+  let _previewCtx = null;
+  const RINGTONE_NOTES = {
+    default: [[880, 150], [0, 80], [880, 150], [0, 80], [880, 150], [0, 400]],
+    gentle:  [[523, 200], [0, 100], [659, 200], [0, 100], [784, 300], [0, 600]],
+    urgent:  [[1047, 80], [0, 50], [1047, 80], [0, 50], [1047, 80], [0, 50],
+              [1047, 80], [0, 50], [1047, 80], [0, 300]],
+    chime:   [[1046, 120], [0, 60], [1318, 120], [0, 60], [1568, 120], [0, 60],
+              [2093, 200], [0, 700]],
+  };
+
+  function previewRingtone() {
+    try {
+      if (!_previewCtx) _previewCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = _previewCtx;
+      const resume = ctx.state === 'suspended' ? ctx.resume() : Promise.resolve();
+      const toneId = $('timerRingtone').value;
+      const notes = RINGTONE_NOTES[toneId] || RINGTONE_NOTES.default;
+      resume.then(() => {
+        let t = ctx.currentTime;
+        for (const [freq, durMs] of notes) {
+          if (freq > 0) {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.35, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + durMs / 1000 - 0.01);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(t);
+            osc.stop(t + durMs / 1000);
+          }
+          t += durMs / 1000;
+        }
+      }).catch(() => {});
+    } catch (_) {}
+  }
+
   async function persist() {
     const theme = $('theme').value;
     const textScale = parseFloat($('textScale').value) || 1;
     const showHomeMessage = $('showHomeMessage').checked;
     const agentStyle = currentStyleText().trim();
+    const timerRingtone = $('timerRingtone').value || 'default';
     const terminal = {
       enabled: $('terminalEnabled').checked,
       shell: $('terminalShell').value,
@@ -299,7 +341,7 @@
 
     await chrome.runtime.sendMessage({
       type: MSG.UPDATE_SETTINGS,
-      settings: { theme, textScale, showHomeMessage, agentStyle, terminal, tts, autoArchive },
+      settings: { theme, textScale, showHomeMessage, agentStyle, timerRingtone, terminal, tts, autoArchive },
     });
 
     window.SN_PAGE_THEME = theme;
