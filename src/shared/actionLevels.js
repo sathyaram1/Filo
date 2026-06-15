@@ -105,7 +105,16 @@
     CANCELLA_ARCHIVIO: {
       level: 3,
       describe: (a) => `Eliminare DEFINITIVAMENTE dall'archivio le schede pertinenti a `
-        + `“${a.query || a.testo || ''}”.`,
+        + `”${a.query || a.testo || ''}”.`,
+    },
+    CANCELLA_MEMORIA: {
+      // Cancella tutti i moduli di memoria di Filo (PROFILO, PREFERENZE, espansioni)
+      // e il buffer delle lezioni non ancora compattate. Irreversibile: il profilo
+      // utente che Filo ha costruito nel tempo va perso → livello 3, digita “conferma”.
+      level: 3,
+      describe: () => 'Eliminare DEFINITIVAMENTE tutta la memoria di Filo: '
+        + 'profilo utente, preferenze apprese e lezioni non ancora salvate. '
+        + 'Filo ripartirà senza ricordare nulla di te.',
     },
     IMPOSTA_PREFERENZA: {
       // Livello per-preferenza: lo dichiara il setter in preferences.js
