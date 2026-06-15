@@ -1094,6 +1094,24 @@
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
   }
 
+  // "/pulisci" (o "/pulizia"): avvia il riordino/archiviazione delle schede non
+  // più utili, con la STESSA conferma del bottone "🧹 Riordina e archivia le
+  // schede" (mai automatico, spec §2.1). Riusa il popup Filo SN_CONFIRM_UI.
+  async function runTabCleanup() {
+    const text = 'Filo valuterà tutte le schede aperte e archivierà quelle non più utili. '
+      + 'Le schede archiviate restano riapribili da “Tab archiviate”.';
+    const ok = window.SN_CONFIRM_UI
+      ? await window.SN_CONFIRM_UI.confirm({ title: 'Riordino delle schede', text, okLabel: 'Procedi' })
+      : window.confirm(`${text} Procedo?`);
+    if (!ok) return;
+    showFiloLine('🧹 Riordino in corso…');
+    const r = await send({ type: MSG.RUN_TAB_TRIAGE });
+    const n = (r && r.archived) || 0;
+    showFiloLine(n > 0
+      ? `✓ Archiviate ${n} ${n === 1 ? 'scheda' : 'schede'}.`
+      : '✓ Nessuna scheda da archiviare.');
+  }
+
   // Converte l'argomento di "/set timer" in secondi.
   //   "5:00" → 5 minuti 0 secondi → 300 ; "8" → 8 minuti → 480.
   // Ritorna null se non è una durata valida.
