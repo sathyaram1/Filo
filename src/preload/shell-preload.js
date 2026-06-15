@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('filoShell', {
     close: (id) => ipcRenderer.invoke('tabs:close', { id }),
     activate: (id) => ipcRenderer.invoke('tabs:activate', { id }),
     navigate: (id, url) => ipcRenderer.invoke('tabs:navigate', { id, url }),
+    move: (id, toIndex) => ipcRenderer.invoke('tabs:move', { id, toIndex }),
     reserveTop: (px) => ipcRenderer.invoke('tabs:reserve-top', { px }),
     setChromeCompact: (on) => ipcRenderer.invoke('tabs:set-chrome-compact', { on }),
     back: (id) => ipcRenderer.invoke('tabs:back', { id }),
