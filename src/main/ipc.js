@@ -178,6 +178,22 @@ function registerIpcHandlers() {
     }
   });
 
+  // Questo "/dominio.tld" esiste davvero? Usato dalla barra comando della
+  // dashboard per (a) colorare di rosso un sito inesistente mentre si scrive e
+  // (b) non navigare a vuoto verso una pagina bianca quando lo si invia. Solo
+  // pagine interne filo:// (come shell:which). In caso di dubbio torna
+  // resolves:true così non blocca mai una navigazione legittima.
+  ipcMain.handle('net:resolves', async (event, { host } = {}) => {
+    const url = event.sender.getURL() || '';
+    if (!url.startsWith('filo://')) return { ok: false, error: 'forbidden' };
+    try {
+      const resolves = await hostResolves(host);
+      return { ok: true, resolves };
+    } catch (_) {
+      return { ok: true, resolves: true };
+    }
+  });
+
   // Directory iniziale da mostrare nella riga grigia quando si attiva il terminale.
   ipcMain.handle('shell:home', () => {
     try { return { ok: true, cwd: defaultCwd() }; } catch (_) { return { ok: false }; }
