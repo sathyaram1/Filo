@@ -1047,8 +1047,25 @@ class TabManager {
     // In modalità "contenuto a tutto schermo" la pagina copre la barra, quindi
     // Esc deve riportare la shell. Intercettiamo il tasto prima che la pagina lo
     // gestisca (vale anche per i siti esterni, senza dipendere dai content script).
+    // Fullscreen richiesto dalla pagina (pulsante "schermo intero" di un player
+    // video, requestFullscreen()): Electron emette enter/leave-html-full-screen.
+    // Senza questi handler la view restava confinata sotto la barra e il video
+    // non copriva davvero lo schermo. Riusiamo la stessa modalità del menu
+    // (view a tutta finestra + fullscreen OS), marcandola come page-initiated.
+    wc.on('enter-html-full-screen', () => {
+      this.pageFullscreen = true;
+      this.setContentFullscreen(true);
+    });
+    wc.on('leave-html-full-screen', () => {
+      this.pageFullscreen = false;
+      this.setContentFullscreen(false);
+    });
     wc.on('before-input-event', (event, input) => {
       if (this.contentFullscreen && input.type === 'keyDown' && input.key === 'Escape') {
+        // Se il fullscreen è della pagina, lascia che l'Esc arrivi alla pagina:
+        // uscirà dal suo fullscreen e `leave-html-full-screen` ripristinerà la
+        // shell. Intercettarlo noi lascerebbe la pagina bloccata in fullscreen.
+        if (this.pageFullscreen) return;
         event.preventDefault();
         this.setContentFullscreen(false);
         return;
