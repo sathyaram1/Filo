@@ -296,6 +296,48 @@
     });
   }
 
+  // ===== Proxy: regole persistenti per dominio (#152) =====
+  //
+  // "questo sito sempre dagli USA" → la regola vive qui (memoria a lungo
+  // termine di Filo, stessa persistenza di profilo/preferenze: storage.local
+  // → storage.json), quindi SOPRAVVIVE al riavvio. Alla navigazione verso il
+  // dominio la tab nasce già instradata (TabManager._maybeApplyDomainRule).
+  // La chiave è il dominio registrabile (eTLD+1) calcolato dal chiamante (che
+  // ha l'estrazione PSL); qui solo una normalizzazione difensiva.
+  function normProxyDomain(domain) {
+    return String(domain || '').trim().toLowerCase().replace(/^www\./, '');
+  }
+
+  async function listProxyRules() {
+    const r = await getRaw(KEYS.FILO_PROXY_RULES, {});
+    return r && typeof r === 'object' ? r : {};
+  }
+
+  async function setProxyRule(domain, { country, tier } = {}) {
+    const dom = normProxyDomain(domain);
+    const code = String(country || '').trim().toLowerCase();
+    if (!dom || !/^[a-z]{2}$/.test(code)) return null;
+    const rules = await listProxyRules();
+    rules[dom] = { country: code, tier: tier || null, ts: new Date().toISOString() };
+    await setRaw(KEYS.FILO_PROXY_RULES, rules);
+    return rules[dom];
+  }
+
+  async function removeProxyRule(domain) {
+    const dom = normProxyDomain(domain);
+    const rules = await listProxyRules();
+    if (dom in rules) {
+      delete rules[dom];
+      await setRaw(KEYS.FILO_PROXY_RULES, rules);
+    }
+    return rules;
+  }
+
+  async function getProxyRule(domain) {
+    const rules = await listProxyRules();
+    return rules[normProxyDomain(domain)] || null;
+  }
+
   // ===== Session =====
 
   async function getSession() {
