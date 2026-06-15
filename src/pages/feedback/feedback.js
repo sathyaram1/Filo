@@ -175,8 +175,9 @@
       `;
     }
     if (tab === 'clarify') {
-      // L'utente legge le domande della routine e o le risponde nelle note
-      // (poi → Da risolvere) o decide che è una scelta di design (→ Bozze).
+      // L'utente legge le domande di Filo (bolle) e risponde col composer
+      // "Invia risposta" (che riporta il feedback in "Da risolvere"); in
+      // alternativa lo sposta a mano in Bozze (scelta di design) o lo ignora.
       return `
         <button class="sn-btn fb-act" data-id="${escapeHtml(f._id)}" data-to="todo">→ Da risolvere</button>
         <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="draft">→ Bozze</button>
