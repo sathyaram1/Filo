@@ -1077,6 +1077,7 @@
         '/editor — apri l\'editor',
         '/feedback — apri i feedback',
         '/incognito — apri una finestra in incognito',
+        '/pulisci, /pulizia — riordina e archivia le schede non più utili',
         '/set timer 5:00 — avvia un timer (anche /set timer 8 = 8 minuti)',
         '/help — lista comandi',
         '/google.com — apri un sito',
