@@ -314,6 +314,20 @@ body[data-state="thread"] .dash-suggestion { justify-content: flex-start; paddin
   color: #fff;
 }
 .dash-action-btn-danger:hover { opacity: 0.88; background: #c0392b; color: #fff; }
+/* #162 — chip "link aperto/riapri": pill con favicon piccolo + nome del sito. */
+.dash-action-link-chip .dash-action-favicon {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+}
+/* #162 — bolla che contiene SOLO azioni (Filo ha solo eseguito, niente testo):
+   margini stretti, niente padding di testo che lascerebbe una "scatola vuota". */
+.dash-bubble.dash-bubble-actions-only {
+  padding: 8px 10px;
+  background: transparent;
+  border-color: transparent;
+}
+.dash-bubble.dash-bubble-actions-only .dash-bubble-actions { margin-top: 0; }
 /* #146.6 — esito di un comando da terminale mostrato in chat. */
 .dash-cmd-result {
   margin-top: 8px;
