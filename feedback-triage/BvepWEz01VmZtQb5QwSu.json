@@ -1,7 +1,0 @@
-{
-  "id": "BvepWEz01VmZtQb5QwSu",
-  "status": "done",
-  "notes": "Le schede aperte 'da un altro paese' ora si comportano come tutte le altre quando le chiudi e le ritrovi. (1) Chiudendo una scheda proxata, la posizione (il paese) viene salvata nell'archivio: riaprendola dalla cronologia rinasce proxata sulla stessa location, non in collegamento diretto. (2) In incognito, come per ogni altra scheda, non viene salvato nulla (vale anche per quelle proxate). (3) In Impostazioni → Sicurezza c'è ora una riga onesta che dichiara che le schede aperte da un altro paese passano per i server di un fornitore di rete terzo (e ne mostra l'host quando un fornitore è configurato), come qualsiasi VPN.\n\nIn più (oltre al chiesto): se apri una scheda da un altro paese e il fornitore non risponde, ora compare un messaggio onesto invece del silenzio — e non ci sono mai tentativi automatici ripetuti.\n\nVerificato con test Playwright che asseriscono il comportamento (archivia una scheda proxata → la riapre → stessa location; in incognito non archivia nulla; la riga privacy è presente con l'host del fornitore) e con la suite completa (312 verde; i 2 rossi residui sono preesistenti e non legati a questa modifica — riguardano il menu nativo TTS e il dropdown font in ambiente headless).",
-  "queuedAt": "2026-06-15T05:13:32.093Z",
-  "queuedBy": "routine"
-}
