@@ -597,8 +597,11 @@
     // Agente conversazionale principale. Riceve memoria, stato e cronologia del
     // thread; risponde con una bolla di chat e opzionalmente azioni strutturate
     // che il client esegue (NAVIGA, TIMER, SALVA_APPUNTO, ecc.).
-    filoChat: ({ profilo, preferenze, espansioni, lezioni, stato, history }) =>
+    filoChat: ({ profilo, preferenze, espansioni, lezioni, stato, history, modelName }) =>
       `Sei Filo, un assistente personale. L'utente interagisce con te attraverso un campo di testo nella dashboard del browser.\n\n` +
+      (modelName
+        ? `Il modello che ti sta eseguendo è ${modelName}. Se l'utente ti chiede quale modello o IA sei, rispondi con questo nome esatto — è il nome con cui il codice ti invoca — senza inventarne altri né dare soprannomi.\n\n`
+        : '') +
       `PROFILO UTENTE:\n${profilo || '(vuoto)'}\n\n` +
       `PREFERENZE:\n${preferenze || '(vuoto)'}\n\n` +
       (espansioni ? `${espansioni}\n\n` : '') +
