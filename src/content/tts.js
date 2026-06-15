@@ -210,12 +210,14 @@
     return m ? parseInt(m[1], 10) : 24000;
   }
 
-  // Fallback finale: voce del browser.
-  function readAloudBrowser(clean) {
-    if (!ttsSupported()) { Popup.showToast(I18n.t('tts_not_supported')); return; }
+  // Fallback voce-del-browser per una porzione di testo. `utterText` è il testo
+  // pronunciato; `baseChar` è l'offset di quel testo nel testo letto completo
+  // (per mappare l'onboundary ai token globali quando il fallback parte a metà).
+  function playBrowserChunk(s, utterText, baseChar) {
+    if (!ttsSupported()) { Popup.showToast(I18n.t('tts_not_supported')); clearHighlight(); return; }
     const synth = window.speechSynthesis;
     synth.cancel();
-    const u = new SpeechSynthesisUtterance(clean);
+    const u = new SpeechSynthesisUtterance(utterText);
     const settings = deps.getSettings();
     const tts = (settings && settings.tts) || {};
     const rate = Number(tts.rate);
@@ -227,55 +229,132 @@
       const v = voices.find((vo) => vo.voiceURI === tts.voice || vo.name === tts.voice);
       if (v) { u.voice = v; u.lang = v.lang; }
     }
+    // La voce del browser dà tempi ESATTI per parola (onboundary) → evidenzia
+    // con precisione, a differenza dell'audio del modello (solo stima).
+    if (readTokens.length) {
+      u.onboundary = (e) => {
+        if (!sessionAlive(s)) return;
+        if (e.name && e.name !== 'word') return;
+        setHighlight(Chunk.charIndexToToken(readTokens, baseChar + (e.charIndex || 0)));
+      };
+    }
+    u.onend = () => { if (sessionAlive(s)) clearHighlight(); };
     synth.speak(u);
   }
 
-  async function readAloud(text) {
-    const clean = String(text || '').trim();
-    if (!clean) return;
-    // Ferma un'eventuale lettura in corso (modello o browser): due letture
-    // sovrapposte sono incomprensibili.
+  // Riproduce un chunk già sintetizzato dal modello. Durante la riproduzione
+  // stima la parola corrente (frazione di durata → token) e la evidenzia.
+  function playModelChunk(s, res, chunk) {
+    return new Promise((resolve) => {
+      let url;
+      try { url = pcmBase64ToWavUrl(res.audioBase64, sampleRateFromMime(res.mimeType)); }
+      catch (_) { resolve(false); return; }
+      const audio = new Audio(url);
+      ttsAudio = audio;
+      let done = false;
+      const finish = (ok) => {
+        if (done) return;
+        done = true;
+        try { URL.revokeObjectURL(url); } catch (_) {}
+        if (ttsAudio === audio) ttsAudio = null;
+        resolve(ok);
+      };
+      audio.onended = () => finish(true);
+      audio.onerror = () => finish(false);
+      // Se l'utente ferma (stopReading mette in pausa), sblocca la pipeline.
+      audio.onpause = () => { if (!sessionAlive(s)) finish(true); };
+      if (chunk.from >= 0 && readTokens.length) {
+        audio.ontimeupdate = () => {
+          if (!sessionAlive(s)) return;
+          const d = audio.duration;
+          if (!d || !isFinite(d)) return;
+          setHighlight(Chunk.tokenIndexAtFraction(readTokens, chunk.from, chunk.to, audio.currentTime / d));
+        };
+      }
+      audio.play().catch(() => finish(false));
+    });
+  }
+
+  // Lettura ad alta voce. Strategia anti-attesa: il testo viene spezzato in
+  // frasi (chunk); la prima — corta — viene sintetizzata e suonata subito,
+  // mentre le successive si preparano in parallelo. Così il tempo prima della
+  // PRIMA parola crolla rispetto a sintetizzare tutto in un colpo solo. La
+  // parola in corso viene evidenziata sulla pagina (se `tokens` è presente).
+  async function readAloud(text, tokens) {
+    const full = String(text == null ? '' : text);
+    if (!full.trim()) return;
+    // Ferma un'eventuale lettura in corso: due letture sovrapposte sono
+    // incomprensibili (stopReading apre la strada e azzera lo stato).
     stopReading();
-    // Segnale osservabile dell'avvio lettura, indipendente dal motore usato.
+    const s = newSession();
+    readTokens = Array.isArray(tokens) ? tokens.slice() : [];
+    ensureReadStyle();
+    // Feedback immediato: evidenzia la prima parola appena si parte.
+    if (readTokens.length) setHighlight(0);
     try {
-      document.dispatchEvent(new CustomEvent('filo:read-aloud', { detail: { text: clean } }));
+      document.dispatchEvent(new CustomEvent('filo:read-aloud', { detail: { text: full.trim() } }));
     } catch (_) {}
 
-    // 1) Sintesi vocale via modello (qualità migliore).
-    try {
-      const res = await chrome.runtime.sendMessage({ type: MSG.TTS_SYNTH, text: clean });
-      if (res && res.ok && res.audioBase64) {
-        const url = pcmBase64ToWavUrl(res.audioBase64, sampleRateFromMime(res.mimeType));
-        const audio = new Audio(url);
-        ttsAudio = audio;
-        audio.onended = () => {
-          try { URL.revokeObjectURL(url); } catch (_) {}
-          if (ttsAudio === audio) ttsAudio = null;
-        };
-        audio.onerror = () => {
-          try { URL.revokeObjectURL(url); } catch (_) {}
-          if (ttsAudio === audio) ttsAudio = null;
-          readAloudBrowser(clean); // riproduzione fallita → fallback
-        };
-        await audio.play();
+    // Chunk in base ai token (frasi); senza token, un chunk unico (niente
+    // evidenziazione, from=-1).
+    const chunks = readTokens.length
+      ? Chunk.chunkTokens(readTokens, {})
+      : [{ from: -1, to: -1, start: 0, end: full.length }];
+
+    // Prefetch dell'audio del modello per chunk (al più corrente + successivo
+    // in volo). La cache nel main rende istantanei i chunk già letti.
+    const fetches = new Array(chunks.length);
+    const startFetch = (ci) => {
+      if (ci < 0 || ci >= chunks.length || fetches[ci]) return;
+      const c = chunks[ci];
+      const ctext = full.slice(c.start, c.end);
+      fetches[ci] = chrome.runtime.sendMessage({ type: MSG.TTS_SYNTH, text: ctext })
+        .then((res) => (res && res.ok && res.audioBase64 ? res : null))
+        .catch(() => null);
+    };
+
+    for (let ci = 0; ci < chunks.length; ci++) {
+      if (!sessionAlive(s)) return;
+      startFetch(ci);
+      startFetch(ci + 1);
+      const res = await fetches[ci];
+      if (!sessionAlive(s)) return;
+      if (res) {
+        startFetch(ci + 1); // mantieni il successivo in volo mentre si suona
+        await playModelChunk(s, res, chunks[ci]);
+        if (!sessionAlive(s)) return;
+      } else {
+        // Modello non disponibile/fallito da qui in poi → voce del browser per
+        // tutto il testo rimanente (un'unica utterance con onboundary).
+        playBrowserChunk(s, full.slice(chunks[ci].start), chunks[ci].start);
         return;
       }
-    } catch (_) {
-      // nessun modello/chiave o errore di rete → fallback sotto
     }
-
-    // 2) Fallback finale: voce del browser.
-    readAloudBrowser(clean);
+    if (sessionAlive(s)) clearHighlight();
   }
 
   // Voce di menu "Leggi ad alta voce" sul testo selezionato. Mentre una
   // lettura è in corso non la riproponiamo qui: lo stop è una voce globale
   // presente in QUALSIASI menu (vedi buildStopReadingItem in buildMenuItems),
   // così "ferma" è sempre raggiungibile, anche senza selezione.
+  //
+  // Cattura QUI il modello di lettura (testo + Range delle parole) perché la
+  // selezione esiste ancora alla costruzione del menu; al click potrebbe non
+  // esserci più. Se la cattura fallisce, si legge comunque il testo (senza
+  // evidenziazione).
   function buildReadAloudItem(text) {
     if (ttsBusy()) return null;
     const Icons = global.SN_ICONS;
-    return { type: 'item', icon: Icons.readAloud(18), label: I18n.t('menu_read_aloud'), onClick: () => readAloud(text) };
+    let model = null;
+    try { model = buildReadModel(); } catch (_) {}
+    const readText = (model && model.text) || text;
+    const readWords = (model && model.tokens) || null;
+    return {
+      type: 'item',
+      icon: Icons.readAloud(18),
+      label: I18n.t('menu_read_aloud'),
+      onClick: () => readAloud(readText, readWords),
+    };
   }
 
   // Voce "Interrompi lettura": compare in ogni menu mentre la sintesi vocale
