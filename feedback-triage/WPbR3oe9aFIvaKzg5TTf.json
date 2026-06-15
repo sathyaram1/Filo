@@ -1,0 +1,7 @@
+{
+  "id": "WPbR3oe9aFIvaKzg5TTf",
+  "status": "done",
+  "notes": "Ora puoi controllare l'apertura 'da un altro paese' parlando con Filo in chat. Funziona così: «apri questa scheda dalla Francia» instrada la scheda che hai davanti attraverso un IP francese; «torna in Italia» la riporta diretta; «togli il proxy da tutte le schede» le riporta tutte in Italia in un colpo. Puoi anche posare una regola fissa per un sito: «questo sito sempre dagli USA» (o «apri sempre netflix.com dagli Stati Uniti») — da quel momento, ogni volta che apri quel sito la scheda nasce già aperta da quel paese, e la regola resta valida anche dopo aver chiuso e riaperto Filo. Per disfarla: «togli la regola sugli USA per questo sito». Le schede aperte da un altro paese restano isolate (non condividono i login con le altre), come quelle aperte dal menu col tasto destro. Verificato con unit test sull'instradamento dei comandi e con test end-to-end che aprono davvero una scheda attraverso un proxy di prova e controllano che la regola venga salvata e applicata alla nascita della scheda. Nota: la regola viene salvata insieme alle altre impostazioni, quindi sopravvive al riavvio per costruzione (il test verifica il salvataggio, non un riavvio reale del processo).",
+  "queuedAt": "2026-06-15T10:00:52.076Z",
+  "queuedBy": "routine"
+}
