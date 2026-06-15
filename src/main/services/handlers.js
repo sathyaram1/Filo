@@ -600,8 +600,28 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
 
   try {
     switch (type) {
-      case 'NAVIGA':
-        return { executed: true, kept: true };
+      case 'NAVIGA': {
+        // #162 — Filo apre il link DIRETTAMENTE in una nuova scheda, invece di
+        // limitarsi a mostrare un bottone che l'utente deve cliccare. La chat di
+        // Filo vive nella dashboard (scheda interna): apriamo nel TabManager
+        // della finestra, attivando la nuova scheda (l'utente ha chiesto di
+        // aprire → vuole arrivarci). La bolla conserva comunque un riferimento
+        // cliccabile per riaprirlo (kept:true).
+        const url = String(action.url ?? action.href ?? action.link ?? '').trim();
+        if (!url) return { executed: false, kept: false };
+        let opened = false;
+        try {
+          const win = winOf(sender);
+          const tm = win && win._filoTabs;
+          if (tm && typeof tm.openTab === 'function') {
+            tm.openTab(url, { activate: true });
+            opened = true;
+          }
+        } catch (e) {
+          console.warn('[Filo] apertura link fallita', e?.message || e);
+        }
+        return { executed: opened, kept: true, opened };
+      }
       case 'TIMER': {
         const seconds = Number(action.seconds || action.secondi || 0);
         const label = String(action.label || action.etichetta || 'Timer');
