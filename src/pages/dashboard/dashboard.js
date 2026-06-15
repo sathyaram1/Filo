@@ -1671,6 +1671,9 @@
       showHomeMessage = settings?.showHomeMessage !== false;
       terminalMode = !!settings?.terminal?.enabled;
       terminalShell = settings?.terminal?.shell || 'powershell';
+      // Suoneria timer: legge la preferenza; se non impostata o non valida usa 'default'.
+      const saved = settings?.timerRingtone;
+      if (saved && RINGTONES[saved]) _timerRingTone = saved;
     } catch (_) {}
     applyHomeMessageVisibility();
     if (terminalMode) await initCwd();
