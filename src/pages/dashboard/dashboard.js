@@ -1054,6 +1054,7 @@
       const url = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
       send({ type: MSG.OPEN_URL, url });
       inputEl.value = '';
+      autoGrowInput();
       updateInputClass();
       return true;
     }
