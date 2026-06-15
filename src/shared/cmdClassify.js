@@ -42,12 +42,40 @@
     'restart', 'halt', 'poweroff', 'kill', 'killall', 'taskkill', 'pkill',
     'reg', 'regedit', 'sc', 'net', 'netsh', 'fsutil', 'bcdedit', 'mklink',
     'chmod', 'chown', 'chgrp', 'attrib', 'icacls', 'takeown',
-    // interpreti / esecutori di codice arbitrario
-    'sh', 'bash', 'zsh', 'fish', 'powershell', 'pwsh', 'cmd', 'node', 'deno',
-    'bun', 'python', 'python3', 'py', 'ruby', 'perl', 'php', 'osascript',
-    'eval', 'exec', 'npx', 'pnpm', 'yarn', 'make', 'cargo', 'go', 'rustc',
-    'gcc', 'docker', 'kubectl', 'ssh', 'scp', 'sudo', 'su', 'doas',
+    // shell ed esecutori diretti: SEMPRE 3 (anche `bash` da solo apre una
+    // sessione interattiva; nessuna eccezione "versione").
+    'sh', 'bash', 'zsh', 'fish', 'powershell', 'pwsh', 'cmd', 'eval', 'exec',
+    'ssh', 'scp', 'sudo', 'su', 'doas',
   ]);
+
+  // Interpreti / build tool / runner: eseguono codice arbitrario → livello 3,
+  // ECCEZIONE: una pura interrogazione di versione/help (`node --version`,
+  // `python -V`, `go version`, `docker --help`…) è sola lettura → livello 1.
+  const ARBITRARY_CODE = new Set([
+    'node', 'deno', 'bun', 'ts-node', 'tsx', 'python', 'python3', 'py', 'ruby',
+    'perl', 'php', 'osascript', 'npx', 'pnpm', 'yarn', 'make', 'cmake', 'cargo',
+    'go', 'rustc', 'gcc', 'g++', 'clang', 'docker', 'docker-compose', 'podman',
+    'kubectl', 'helm', 'terraform', 'ansible', 'java', 'javac', 'dotnet', 'mvn',
+    'gradle', 'tsc', 'dart', 'flutter', 'scala', 'kotlin', 'julia', 'lua',
+    'code', 'rustup', 'rbenv', 'pyenv', 'nvm', 'composer', 'bundle', 'gem',
+  ]);
+
+  // Token che da soli rendono un comando una pura interrogazione (lettura):
+  // versione o aiuto. `-v`/`-V` qui valgono "version" (vero per i tool sopra);
+  // l'ambiguità `-v`=verbose non danneggia, perché un `cmd -v` senza operandi
+  // non compie alcuna azione.
+  const VERSION_TOKENS = new Set([
+    '--version', '-version', '-v', '-V', 'version', '--help', '-help', '-h',
+    'help', '/?', '/version', '--usage', '-?',
+  ]);
+
+  // Il comando è SOLO programma + token di versione/help (almeno uno: un
+  // programma "nudo" come `node` apre invece un REPL e non è lettura sicura).
+  function isVersionQuery(cmd) {
+    const rest = tokens(cmd).slice(1);
+    if (!rest.length) return false;
+    return rest.every((t) => VERSION_TOKENS.has(t.toLowerCase()));
+  }
 
   // Sola lettura, nessun effetto sullo stato: livello 1.
   const LEVEL1 = new Set([
