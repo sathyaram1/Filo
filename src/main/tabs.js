@@ -1293,6 +1293,10 @@ class TabManager {
     const host = tab.geoBlock.host || '';
     const url = tab.geoBlock.url || '';
     if (!host || !/^https?:\/\//i.test(url)) return;
+    // L'utente ha già rifiutato la proposta per questo dominio nel tab: non
+    // riproporre, non riprovare.
+    this._geoState(tab);
+    if (tab.geoDismissed.has(host)) return;
 
     // Stadio del retry per QUESTO host (geoBlockRules.STAGES).
     const gr = tab.geoRetry;
