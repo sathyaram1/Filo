@@ -401,12 +401,16 @@ operative vivono qui — quando ricevi quel prompt in ambiente cloud:
    `filo-8b9cb`, collezione `feedback`) seguendo la sezione "Feedback alpha
    tester" qui sotto. Ordine: `priority` più alta prima; a parità, i più
    recenti.
-3. **Quanti feedback: lo decidi tu in base alla complessità.** I feedback
-   hanno difficoltà molto variabile: puoi farne 3-4 se sono tutti semplici
-   ritocchi UI, oppure dedicare l'intera sessione a un'unica feature
-   corposa. Vale il principio del budget contesto (sezione `TASKS.md`
-   sopra): il task iniziato si finisce, ma non iniziarne uno nuovo quando
-   sei già oltre ~150-200k token.
+3. **Punta a ~3 feedback per routine** (bersaglio di default), variando in
+   base alla complessità: se sono tutti semplici ritocchi UI puoi arrivare a
+   4-5; se uno è una feature corposa anche 1 solo va bene (e ricorda che le
+   spec grosse vanno **spezzate** in sub-feedback — vedi "Spec corpose" più
+   sotto — invece di lasciarle a metà). **3 è il bersaglio, non il minimo**:
+   dopo aver chiuso un feedback, se hai ancora contesto e budget, **prendine
+   un altro** invece di terminare la sessione. L'unica ragione per fermarsi
+   prima di ~3 è il budget contesto (sezione `TASKS.md` sopra): il task
+   iniziato si finisce sempre, ma non iniziarne uno nuovo quando sei già
+   oltre ~150-200k token.
 4. Lavora in un **worktree dedicato** — l'hook fa commit, merge su `main` e
    push in automatico. **NON aprire PR.**
 5. Verifica come da "REGOLA DURA" (in cloud: `npm test` + test Playwright
