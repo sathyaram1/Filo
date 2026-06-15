@@ -148,6 +148,12 @@ class TabManager {
     // #151 — nota consumo dati per tab proxate che riproducono video a lungo
     // (spec §5: una volta per SESSIONE, non bloccante). Flag globale di sessione.
     this._proxyVideoNoted = false;
+    // #152 — regole proxy persistenti per dominio ("questo sito sempre da X").
+    // Cache in-memory per la decisione SINCRONA "born proxied" in navigazione
+    // (will-navigate/navigate/openTab non possono attendere lo storage async).
+    // Sorgente di verità: SN_FILO_MEMORY.listProxyRules (storage.json).
+    this._proxyRules = {};
+    this.loadProxyRules().catch(() => {});
   }
 
   // Aggiorna le impostazioni di sicurezza e le riapplica a tutti i tab esistenti.
