@@ -370,6 +370,48 @@
     return R.buildButton(a, { Tokens, resolve });
   }
 
+  // Esito di un comando da terminale mostrato in chat (#146.6): la riga di
+  // comando + stdout/stderr in monospazio, con note per uscita/timeout/
+  // troncamento, o l'avviso "modalità terminale disattivata".
+  function renderCommandResult(out) {
+    const wrap = document.createElement('div');
+    wrap.className = 'dash-cmd-result';
+    if (!out) return wrap;
+    if (out.blocked === 'disabled') {
+      wrap.classList.add('dash-cmd-blocked');
+      wrap.textContent = 'Modalità terminale disattivata: attivala nelle impostazioni perché Filo possa eseguire comandi.';
+      return wrap;
+    }
+    if (out.blocked === 'empty') {
+      wrap.classList.add('dash-cmd-blocked');
+      wrap.textContent = 'Comando vuoto.';
+      return wrap;
+    }
+    const cmdLine = document.createElement('div');
+    cmdLine.className = 'dash-cmd-line';
+    cmdLine.textContent = `$ ${out.command || ''}`;
+    wrap.appendChild(cmdLine);
+    const body = (out.stdout || '') + (out.stderr ? (out.stdout ? '\n' : '') + out.stderr : '');
+    if (body.trim()) {
+      const pre = document.createElement('pre');
+      pre.className = 'dash-cmd-output';
+      if (out.stderr && !out.stdout) pre.classList.add('dash-cmd-output-err');
+      pre.textContent = body;
+      wrap.appendChild(pre);
+    }
+    const notes = [];
+    if (typeof out.code === 'number' && out.code !== 0) notes.push(`uscita ${out.code}`);
+    if (out.timedOut) notes.push('interrotto per timeout');
+    if (out.truncated) notes.push('output troncato');
+    if (notes.length) {
+      const note = document.createElement('div');
+      note.className = 'dash-cmd-note';
+      note.textContent = notes.join(' · ');
+      wrap.appendChild(note);
+    }
+    return wrap;
+  }
+
   function renderActionButton(a, { onAck } = {}) {
     const type = String(a.type || '').toUpperCase();
     // Azione sospesa in attesa di conferma (#146.2): il main non l'ha eseguita
