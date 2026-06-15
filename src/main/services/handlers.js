@@ -714,9 +714,13 @@ async function handleFiloChat({ userMessage, threadHistory, image, images }) {
     if (!res.kept) continue;
     // Azione sospesa in attesa di conferma (#146.2): il client renderizza il
     // bottone che apre il popup/box e poi manda MSG.FILO_CONFIRM_ACTION.
-    renderedActions.push(res.needsConfirm
+    const rendered = res.needsConfirm
       ? { ...a, _confirm: { level: res.needsConfirm, text: res.describe || '' } }
-      : a);
+      : { ...a };
+    // Output di un comando eseguito subito (livello 1) o esito bloccato
+    // (terminale spento): il client lo mostra in chat (#146.6).
+    if (res.output) rendered._output = res.output;
+    renderedActions.push(rendered);
   }
   await FiloMem.appendRaw({ type: 'chat_filo', summary: textReply.slice(0, 200), extra: { actions: rawActions } });
   maybeRunLessonAgent({ userMessage, filoReply: textReply, stateText }).catch(() => {});
