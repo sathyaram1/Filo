@@ -82,11 +82,16 @@ module.exports = function register(on, ctx) {
     const win = winOf(sender);
     if (win && win._filoTabs && msg.url) {
       const pct = typeof msg.scrollPct === 'number' ? msg.scrollPct : null;
-      const id = win._filoTabs.openTab(msg.url, { activate: true, restoreScrollPct: pct });
+      const px = msg.proxy;
+      // Se la tab archiviata aveva una sua location salvata, la applichiamo noi
+      // qui sotto: disattiviamo l'auto-proxy per dominio così la view non viene
+      // ricreata due volte (la location salvata vince su un'eventuale regola).
+      const id = win._filoTabs.openTab(msg.url, {
+        activate: true, restoreScrollPct: pct, applyDomainRule: !(px && px.country),
+      });
       // Se la tab archiviata era instradata "da un altro paese", riaprila
       // proxata sulla stessa location: setTabProxy ricrea la view nella
       // partition proxata e ricarica l'URL attraverso l'endpoint del paese.
-      const px = msg.proxy;
       if (id && px && px.country) {
         try { await win._filoTabs.setTabProxy(id, px.country, { tier: px.tier || undefined }); } catch (_) {}
       }
