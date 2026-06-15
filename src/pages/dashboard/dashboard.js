@@ -445,6 +445,13 @@
       const isCmd = type === 'ESEGUI_COMANDO';
       const short = cmdText.length > 60 ? `${cmdText.slice(0, 57)}…` : cmdText;
       btn.textContent = isCmd ? `▶ ${short}` : (a._confirm.text || 'Esegui');
+      // #159 — le modifiche alle impostazioni (preferenza/estetica) a livello 2
+      // aprono il popup di conferma da sole: marchiamo il bottone perché
+      // renderActions lo possa cliccare automaticamente. Le azioni esterne
+      // (feedback) o distruttive (livello 3) NON sono marcate: restano a click.
+      if ((type === 'IMPOSTA_PREFERENZA' || type === 'IMPOSTA_ESTETICA') && a._confirm.level === 2) {
+        btn.dataset.autoConfirm = '1';
+      }
       btn.addEventListener('click', async () => {
         if (btn.disabled) return;
         const Ui = window.SN_CONFIRM_UI;
