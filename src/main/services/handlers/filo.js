@@ -9,8 +9,8 @@ module.exports = function register(on, ctx) {
   const FiloMem = globalThis.SN_FILO_MEMORY;
   const FiloState = globalThis.SN_FILO_STATE;
 
-  on(MSG.FILO_CHAT, async (msg) => {
-    const r = await handleFiloChat({ userMessage: msg.userMessage, threadHistory: msg.threadHistory, image: msg.image, images: msg.images });
+  on(MSG.FILO_CHAT, async (msg, sender) => {
+    const r = await handleFiloChat({ userMessage: msg.userMessage, threadHistory: msg.threadHistory, image: msg.image, images: msg.images, sender });
     return { ok: true, ...r };
   });
 
