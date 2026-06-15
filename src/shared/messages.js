@@ -206,6 +206,7 @@
     FILO_GET_TIMERS: 'filo_get_timers',
     FILO_ADD_TIMER: 'filo_add_timer',              // { label, seconds }
     FILO_DELETE_TIMER: 'filo_delete_timer',        // { id }
+    FILO_STOP_TIMER_ALARM: 'filo_stop_timer_alarm', // { id } — silenzia/rimuove un timer che sta suonando
     FILO_GET_NOTIFICATIONS: 'filo_get_notifications',
     FILO_DISMISS_NOTIFICATION: 'filo_dismiss_notification', // { id }
     // L'utente ha confermato (popup livello 2 / digitato "conferma" livello 3)
