@@ -540,9 +540,23 @@
       if (t.muted) {
         const m = document.createElement('span');
         m.className = 'mute-ind';
-        m.setAttribute('aria-label', 'Audio mutato');
+        m.setAttribute('role', 'button');
+        m.title = 'Riattiva audio';
+        m.setAttribute('aria-label', 'Audio mutato — clicca per riattivare');
         m.innerHTML = MUTE_IND_SVG;
+        m.addEventListener('click', (e) => { e.stopPropagation(); api.tabs.setMuted(t.id); });
         el.appendChild(m);
+      } else if (t.audible) {
+        // Audio in riproduzione (e non mutato): indicatore + click rapido per
+        // silenziare, simmetrico all'indicatore di muto.
+        const a = document.createElement('span');
+        a.className = 'audio-ind';
+        a.setAttribute('role', 'button');
+        a.title = 'Silenzia';
+        a.setAttribute('aria-label', 'Audio in riproduzione — clicca per silenziare');
+        a.innerHTML = AUDIO_IND_SVG;
+        a.addEventListener('click', (e) => { e.stopPropagation(); api.tabs.setMuted(t.id); });
+        el.appendChild(a);
       }
 
       // Indicatore "aperta da un altro paese": globo + codice paese accanto al
