@@ -1,0 +1,7 @@
+{
+  "id": "RykVVNuw0cJOTZNsD4A2",
+  "status": "done",
+  "notes": "Tutte le impostazioni dell'app sono già esposte come azioni Filo con livello corretto (livello 1: estetica, suoni, feature toggle; livello 2: sicurezza, modelli, provider, chiavi API, limiti di spesa; livello 3: CANCELLA_MEMORIA aggiunta ora). INVIA_FEEDBACK a livello 2 era già implementata. Aggiunta CANCELLA_MEMORIA (livello 3): cancella profilo e preferenze apprese da Filo. Spec Playwright in tests/filo-settings-actions.spec.mjs: 6 test, tutti verdi (un caso per livello + INVIA_FEEDBACK + impostazioni sensibili non auto-applicate).",
+  "queuedAt": "2026-06-15T21:20:06.360Z",
+  "queuedBy": "routine"
+}
