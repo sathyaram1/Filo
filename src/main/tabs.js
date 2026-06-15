@@ -1088,6 +1088,34 @@ class TabManager {
       if (tab.audible !== audible) { tab.audible = audible; this._broadcast(); }
     });
 
+    // #151 — consumo dati delle tab proxate: i video via proxy bruciano GB in
+    // fretta (spec §1/§5). Se una tab PROXATA riproduce media per oltre 15 min
+    // (cumulativi), una nota discreta UNA volta per sessione. La soglia e il gate
+    // "già notato" stanno nella logica pura (geoBlockRules.shouldNoteVideoData);
+    // qui solo l'accumulo del tempo di riproduzione e il timer.
+    wc.on('media-started-playing', () => {
+      if (!tab.proxy || this._proxyVideoNoted) return;
+      if (!tab._proxyMedia) tab._proxyMedia = { accumulatedMs: 0, playingSince: 0, timer: null };
+      const m = tab._proxyMedia;
+      if (m.playingSince) return; // già in riproduzione
+      m.playingSince = Date.now();
+      const remaining = Math.max(0, GeoBlockRules.VIDEO_DATA_NOTE_MS - m.accumulatedMs);
+      m.timer = setTimeout(() => {
+        const playingMs = m.accumulatedMs + (m.playingSince ? Date.now() - m.playingSince : 0);
+        if (GeoBlockRules.shouldNoteVideoData({ proxied: !!tab.proxy, playingMs, alreadyNoted: this._proxyVideoNoted })) {
+          this._proxyVideoNoted = true;
+          this._geoToast('Le tab aperte da un altro paese consumano più dati — occhio ai video lunghi');
+        }
+      }, remaining);
+      if (m.timer.unref) m.timer.unref();
+    });
+    wc.on('media-paused', () => {
+      const m = tab._proxyMedia;
+      if (!m) return;
+      if (m.playingSince) { m.accumulatedMs += Date.now() - m.playingSince; m.playingSince = 0; }
+      if (m.timer) { clearTimeout(m.timer); m.timer = null; }
+    });
+
     // Errore certificato: registra lo stato (scaduto, autofirmato, mismatch…)
     // per arricchire il verdetto safebrowse. Manteniamo il comportamento sicuro
     // di default (callback(false) = rifiuta la connessione non attendibile).
