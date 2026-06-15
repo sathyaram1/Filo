@@ -506,7 +506,35 @@ function resolveTheme(settings) {
   catch (_) { return 'light'; }
 }
 
-async function executeFiloAction(action, { confirmed = false } = {}) {
+// Scheda WEB bersaglio dei comandi proxy ("apri QUESTA tab da X", #152). La
+// chat di Filo vive nella dashboard, che è essa stessa una scheda interna
+// (filo://) e non è instradabile: "questa tab" significa la scheda web attiva,
+// e se l'attiva è interna (l'utente è passato alla dashboard per parlare con
+// Filo) ripieghiamo sull'ultima scheda web usata — quella che stava guardando.
+function targetWebTab(sender) {
+  const win = winOf(sender);
+  const tm = win && win._filoTabs;
+  if (!tm) return { win: null, tm: null, tab: null };
+  const isWeb = (t) => t && !t.isInternal && /^https?:\/\//i.test(t.url || '');
+  const active = tm.tabs.find((t) => t.id === tm.activeId);
+  if (isWeb(active)) return { win, tm, tab: active };
+  const recent = tm.tabs.filter(isWeb).sort((a, b) => (b.lastActiveAt || 0) - (a.lastActiveAt || 0));
+  return { win, tm, tab: recent[0] || null };
+}
+
+// Risincronizza la cache delle regole proxy in TUTTE le finestre dopo un
+// cambio (la scrittura su storage è condivisa, le cache in-memory no).
+function refreshProxyRulesAllWindows() {
+  try {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (win._filoTabs && typeof win._filoTabs.loadProxyRules === 'function') {
+        win._filoTabs.loadProxyRules().catch(() => {});
+      }
+    }
+  } catch (_) {}
+}
+
+async function executeFiloAction(action, { confirmed = false, sender = null } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
 
