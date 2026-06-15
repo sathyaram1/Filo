@@ -65,6 +65,7 @@ const autoplayResult = (page) => page.evaluate(async () => {
 });
 
 test('le tab ripristinate non fanno partire i video (autoplay bloccato al boot)', async () => {
+  test.setTimeout(120_000); // due avvii di Electron in sequenza
   const userData = mkdtempSync(join(tmpdir(), 'filo-autoplay-'));
   // Server persistente: deve sopravvivere ai DUE avvii dell'app.
   const server = createServer((req, res) => {
