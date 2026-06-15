@@ -18,7 +18,7 @@ function tabsInfo(app) {
 
 test('Alt+numero porta alla tab corrispondente (da una pagina web)', async ({ app, openTab, testServer }) => {
   // Apri tre tab web; l'ultima resta attiva.
-  await openTab(testServer.html('<title>UNO</title><h1 id="ok">1</h1>'));
+  const page1 = await openTab(testServer.html('<title>UNO</title><h1 id="ok">1</h1>'));
   await openTab(testServer.html('<title>DUE</title><h1 id="ok">2</h1>'));
   const page3 = await openTab(testServer.html('<title>TRE</title><h1 id="ok">3</h1>'));
   await page3.waitForSelector('#ok');
@@ -26,20 +26,14 @@ test('Alt+numero porta alla tab corrispondente (da una pagina web)', async ({ ap
   const before = await tabsInfo(app);
   expect(before.ids.length).toBeGreaterThanOrEqual(3);
 
-  // Dalla pagina attiva premo Alt+1 → vado alla PRIMA tab.
-  await page3.bringToFront();
-  await page3.keyboard.press('Alt+1');
+  // Dalla pagina attiva premo Alt+1 → vado alla PRIMA tab (cammino
+  // before-input-event nel main: l'evento parte da una webContents di pagina).
+  await page3.keyboard.press('Alt+Digit1');
   await expect.poll(() => tabsInfo(app).then((i) => i.activeId), { timeout: 10_000 })
     .toBe(before.ids[0]);
 
-  // Alt+3 → terza tab. Invio un input sintetico Alt+3 alla webContents attiva
-  // (esercita il before-input-event nel main, il cammino "mentre scrivo").
-  await app.evaluate(({ BrowserWindow }) => {
-    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
-    const t = w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId);
-    const wc = t.view.webContents;
-    wc.sendInputEvent({ type: 'keyDown', keyCode: '3', modifiers: ['alt'] });
-  });
+  // Alt+3 dalla prima pagina → terza tab.
+  await page1.keyboard.press('Alt+Digit3');
   await expect.poll(() => tabsInfo(app).then((i) => i.activeId), { timeout: 10_000 })
     .toBe(before.ids[2]);
 });
