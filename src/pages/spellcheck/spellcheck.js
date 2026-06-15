@@ -198,11 +198,14 @@
     const w = $('newDictWord').value.trim();
     if (!w) return;
     const data = await chrome.storage.local.get(STORAGE_KEYS.PERSONAL_DICT);
-    const set = new Set((data[STORAGE_KEYS.PERSONAL_DICT] || []).map((x) => String(x).toLowerCase()));
-    set.add(w.toLowerCase());
-    const arr = [...set];
-    await chrome.storage.local.set({ [STORAGE_KEYS.PERSONAL_DICT]: arr });
-    renderDict(arr);
+    const existing = data[STORAGE_KEYS.PERSONAL_DICT] || [];
+    // Dedup case-insensitive: se esiste già una parola con lo stesso casing diverso, non aggiungerla.
+    const alreadyExists = existing.some((x) => String(x).toLowerCase() === w.toLowerCase());
+    if (!alreadyExists) {
+      existing.push(w); // preserva il casing originale
+    }
+    await chrome.storage.local.set({ [STORAGE_KEYS.PERSONAL_DICT]: existing });
+    renderDict(existing);
     $('newDictWord').value = '';
     $('newDictWord').focus();
   }
