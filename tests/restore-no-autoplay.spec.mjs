@@ -51,14 +51,17 @@ async function findWindow(app, predicate, timeoutMs = 12_000) {
 // utente. Se l'autoplay è bloccato dalla policy, play() rifiuta SUBITO con
 // 'NotAllowedError' (prima ancora di cercare una sorgente) — è esattamente il
 // motivo per cui un video YouTube resterebbe in pausa. Se invece l'autoplay è
-// permesso, play() procede e fallisce semmai per sorgente assente
-// ('NotSupportedError'): comunque NON 'NotAllowedError'.
+// permesso, play() procede oltre il controllo della policy (e, senza sorgente,
+// resta pendente o fallisce per sorgente assente): in ogni caso NON
+// 'NotAllowedError'. Il race con un timeout evita che play() resti appeso
+// nel caso "permesso senza sorgente".
 const autoplayResult = (page) => page.evaluate(async () => {
   const v = document.createElement('video');
   v.muted = false;
   document.body.appendChild(v);
-  try { await v.play(); return 'played'; }
-  catch (e) { return e && e.name ? e.name : String(e); }
+  const play = v.play().then(() => 'played', (e) => (e && e.name ? e.name : String(e)));
+  const timeout = new Promise((r) => setTimeout(() => r('pending'), 2000));
+  return Promise.race([play, timeout]);
 });
 
 test('le tab ripristinate non fanno partire i video (autoplay bloccato al boot)', async () => {
