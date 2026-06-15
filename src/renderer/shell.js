@@ -311,6 +311,63 @@
     return state.tabs.find((t) => t.id === state.activeId) || null;
   }
 
+  // ── Drag & drop per riordinare le tab ─────────────────────────────────────
+  // Implementazione a pointer (mousedown/mousemove/mouseup) invece di HTML5
+  // draggable: il drag nativo è inaffidabile in Electron sopra le
+  // WebContentsView ed è praticamente non testabile da Playwright. Con i mouse
+  // event il riordino è deterministico e si lascia esercitare dai test.
+  // `drag` resta non-null per tutta la trascinata; `moved` diventa true solo
+  // oltre la soglia, così un semplice click non viene scambiato per drag.
+  let drag = null; // { id, el, startX, moved }
+  let suppressClickId = null; // id della tab il cui prossimo click va ignorato
+
+  // Elemento .tab (escluso quello trascinato) dopo cui inserire, in base alla X.
+  function tabDragAfter(x) {
+    const els = [...tabsEl.querySelectorAll('.tab:not(.dragging)')];
+    let best = null;
+    let bestOffset = -Infinity;
+    for (const child of els) {
+      const box = child.getBoundingClientRect();
+      const offset = x - (box.left + box.width / 2);
+      if (offset < 0 && offset > bestOffset) { bestOffset = offset; best = child; }
+    }
+    return best;
+  }
+
+  function onTabPointerMove(e) {
+    if (!drag) return;
+    if (!drag.moved && Math.abs(e.clientX - drag.startX) < 4) return;
+    drag.moved = true;
+    drag.el.classList.add('dragging');
+    const after = tabDragAfter(e.clientX);
+    if (after == null) tabsEl.appendChild(drag.el);
+    else if (after !== drag.el.nextSibling) tabsEl.insertBefore(drag.el, after);
+  }
+
+  function onTabPointerUp() {
+    window.removeEventListener('mousemove', onTabPointerMove);
+    window.removeEventListener('mouseup', onTabPointerUp);
+    const d = drag;
+    drag = null;
+    if (!d) return;
+    d.el.classList.remove('dragging');
+    if (!d.moved) return;
+    // Il click che segue il mouseup non deve riattivare/spostare la tab.
+    suppressClickId = d.id;
+    const ids = [...tabsEl.querySelectorAll('.tab')].map((x) => x.dataset.id);
+    const toIndex = ids.indexOf(d.id);
+    if (toIndex >= 0) api.tabs.move(d.id, toIndex);
+  }
+
+  function startTabDrag(e, t, el) {
+    if (e.button !== 0) return;
+    // Non iniziare un drag dai controlli interni (chiudi, indicatori audio…).
+    if (e.target.closest('.close, .mute-ind, .audio-ind, .proxy-ind')) return;
+    drag = { id: t.id, el, startX: e.clientX, moved: false };
+    window.addEventListener('mousemove', onTabPointerMove);
+    window.addEventListener('mouseup', onTabPointerUp);
+  }
+
   // ── Menu contestuale (tasto destro) su una tab ────────────────────────────
   // Riusa il popup-menu nativo della shell (sopra le WebContentsView). Le voci
   // portano `action` custom prefissate `tab-`; la scelta torna via onMenuAction
