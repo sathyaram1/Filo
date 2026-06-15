@@ -398,6 +398,23 @@ class TabManager {
     this._broadcast();
   }
 
+  // Sposta la tab `id` alla posizione `toIndex` nell'ordine della barra (drag &
+  // drop nella shell). Riordina solo l'array `this.tabs` (l'ordine non incide
+  // sul layout delle WebContentsView native, solo su snapshot + sessione) e
+  // ridisegna. Ritorna true se l'ordine è cambiato.
+  moveTab(id, toIndex) {
+    const from = this.tabs.findIndex((t) => t.id === id);
+    if (from < 0) return false;
+    let to = Math.round(Number(toIndex));
+    if (!Number.isFinite(to)) return false;
+    to = Math.max(0, Math.min(this.tabs.length - 1, to));
+    if (from === to) return false;
+    const [tab] = this.tabs.splice(from, 1);
+    this.tabs.splice(to, 0, tab);
+    this._broadcast();
+    return true;
+  }
+
   // Chiude TUTTE le tab e lascia una singola newtab fresca (come Chrome quando
   // si chiude l'ultima scheda: la finestra resta, con una scheda vuota).
   closeAllTabs() {
