@@ -28,18 +28,27 @@ test('Alt+numero porta alla tab corrispondente (da una pagina web)', async ({ ap
   // L'ultima tab aperta è attiva; non è già la prima (altrimenti il test è muto).
   expect(before.activeId).not.toBe(before.ids[0]);
 
-  // Il focus dev'essere sulla webContents della pagina perché before-input-event
-  // scatti (stesso pattern del test fullscreen-content).
+  // Alt+1 mentre il focus è in una pagina → vado alla PRIMA tab. (Alt+cifra non
+  // produce testo: funziona anche mentre si scrive.) Inietto l'evento sulla
+  // webContents della tab attiva: esercita il before-input-event nel main —
+  // lo stesso cammino del tasto reale, ma deterministico in headless.
   await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
     const t = w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId);
-    try { t.view.webContents.focus(); } catch (_) {}
+    const wc = t.view.webContents;
+    wc.sendInputEvent({ type: 'keyDown', keyCode: '1', modifiers: ['alt'] });
   });
-  // Alt+1 mentre il focus è in una pagina → vado alla PRIMA tab. (Alt+cifra non
-  // produce testo: funziona anche mentre si scrive.)
-  await page3.keyboard.press('Alt+Digit1');
   await expect.poll(() => tabsInfo(app).then((i) => i.activeId), { timeout: 10_000 })
     .toBe(before.ids[0]);
+
+  // Alt+3 → terza tab.
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    const t = w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId);
+    t.view.webContents.sendInputEvent({ type: 'keyDown', keyCode: '3', modifiers: ['alt'] });
+  });
+  await expect.poll(() => tabsInfo(app).then((i) => i.activeId), { timeout: 10_000 })
+    .toBe(before.ids[2]);
 });
 
 test('Alt+numero dal focus sulla barra (shell) cambia tab', async ({ app, shell, openTab, testServer }) => {
