@@ -294,7 +294,17 @@ function buildAttemptChain(settings, modelRef) {
 async function handleAIRequest({ action, payload, origin }) {
   const settings = await getEffectiveSettings();
   const model = modelForAction(settings, action, payload?.modelOverride);
-  let messages = await buildMessages(action, payload);
+  // Nome CONCRETO del modello primario (es. 'gemini-3.1-flash-lite'), non il
+  // nickname: è il nome con cui il codice lo invoca. Lo passiamo al prompt così
+  // l'assistente può dire correttamente che modello è (#158). Best-effort: se la
+  // catena non è risolvibile (nessuna chiave) restiamo sul riferimento grezzo e
+  // lasciamo che sia la richiesta vera, più sotto, a sollevare l'errore.
+  let modelName = model;
+  try {
+    const ch = buildAttemptChain(settings, model);
+    if (ch[0] && ch[0].model) modelName = ch[0].model;
+  } catch (_) {}
+  let messages = await buildMessages(action, { ...payload, modelName });
   messages = SN_CONST.injectAgentStyle(messages, action, settings.agentStyle);
 
   const cached = await AICache.get({ provider: settings.provider, model, messages });
