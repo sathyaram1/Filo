@@ -1582,6 +1582,10 @@
           applyTerminalMode();
         }
       }
+      // Aggiorna suoneria in live se l'utente la cambia dalle opzioni.
+      if (msg.settings && msg.settings.timerRingtone && RINGTONES[msg.settings.timerRingtone]) {
+        _timerRingTone = msg.settings.timerRingtone;
+      }
     } else if (msg?.type === MSG.AUTH_CHANGED) {
       // Login/logout fatto altrove (es. dal menu profilo): aggiorna l'avatar.
       applyAccountProfile(msg.signedIn ? msg.profile : null);
