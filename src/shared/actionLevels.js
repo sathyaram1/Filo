@@ -37,6 +37,26 @@
     return action.valore ?? action.value ?? action.val ?? action.colore;
   }
 
+  // Etichetta leggibile di un paese per le azioni proxy (#152). Le location
+  // curate combaciano con ProxyTab.LOCATIONS; per qualsiasi altro alpha-2 valido
+  // ripieghiamo sul codice maiuscolo (il linguaggio naturale può chiedere paesi
+  // fuori dalla lista curata).
+  const COUNTRY_LABELS = {
+    us: 'Stati Uniti', gb: 'Regno Unito', fr: 'Francia', de: 'Germania',
+    es: 'Spagna', nl: 'Paesi Bassi', jp: 'Giappone',
+  };
+  function proxyCountry(action) {
+    return action.country ?? action.paese ?? action.codicePaese ?? action.location;
+  }
+  function countryLabel(c) {
+    const code = String(c || '').trim().toLowerCase();
+    if (!/^[a-z]{2}$/.test(code)) return '';
+    return COUNTRY_LABELS[code] || code.toUpperCase();
+  }
+  function proxyDomain(action) {
+    return action.dominio ?? action.domain ?? action.sito;
+  }
+
   const REGISTRY = {
     NAVIGA: {
       level: 1,
