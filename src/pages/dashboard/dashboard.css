@@ -314,6 +314,52 @@ body[data-state="thread"] .dash-suggestion { justify-content: flex-start; paddin
   color: #fff;
 }
 .dash-action-btn-danger:hover { opacity: 0.88; background: #c0392b; color: #fff; }
+/* #146.6 — esito di un comando da terminale mostrato in chat. */
+.dash-cmd-result {
+  margin-top: 8px;
+  width: 100%;
+}
+.dash-cmd-line {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: var(--dash-ink-soft);
+  padding: 6px 10px;
+  border: 1px solid var(--dash-line-strong);
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  background: color-mix(in srgb, var(--dash-ink) 5%, transparent);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.dash-cmd-output {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--dash-ink);
+  padding: 8px 10px;
+  border: 1px solid var(--dash-line-strong);
+  border-radius: 0 0 8px 8px;
+  background: color-mix(in srgb, var(--dash-ink) 3%, transparent);
+  max-height: 320px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.dash-cmd-output-err { color: var(--dash-accent); }
+.dash-cmd-note {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--dash-ink-mute);
+}
+.dash-cmd-blocked {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--dash-ink-soft);
+  padding: 8px 10px;
+  border: 1px dashed var(--dash-line-strong);
+  border-radius: 8px;
+}
 /* §5 — pannello di conferma cancellazione archivio. */
 .dash-delete-panel {
   margin-top: 8px;
