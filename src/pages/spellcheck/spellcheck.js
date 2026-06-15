@@ -111,13 +111,20 @@
     return row;
   }
 
-  async function updateAutocorrect(oldKey, newKey, newVal) {
+  async function updateAutocorrect(oldKey, newKey, newVal, opts = {}) {
     const data = await chrome.storage.local.get(STORAGE_KEYS.AUTOCORRECT);
     const map = { ...(data[STORAGE_KEYS.AUTOCORRECT] || {}) };
+    // Controllo conflitto: se stiamo rinominando (oldKey diverso da newKey) e
+    // newKey esiste già in un'altra riga, blocca la modifica e avvisa l'utente.
+    if (newKey && oldKey !== newKey && Object.prototype.hasOwnProperty.call(map, newKey)) {
+      if (opts.onConflict) opts.onConflict(newKey);
+      return false;
+    }
     if (oldKey && oldKey !== newKey) delete map[oldKey];
     map[newKey] = newVal;
     await chrome.storage.local.set({ [STORAGE_KEYS.AUTOCORRECT]: map });
     renderAutocorrect(map);
+    return true;
   }
 
   async function removeAutocorrect(word) {
