@@ -767,7 +767,7 @@ function broadcastLiveUpdate() {
   } catch (_) {}
 }
 
-async function handleFiloChat({ userMessage, threadHistory, image, images }) {
+async function handleFiloChat({ userMessage, threadHistory, image, images, sender = null }) {
   await FiloMem.touchSession();
   await FiloMem.appendRaw({ type: 'chat_user', summary: String(userMessage || '').slice(0, 200) });
   const memory = await FiloMem.getMemory();
