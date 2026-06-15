@@ -279,12 +279,57 @@
       const titleHtml = !agent && (num || f.name)
         ? `<div class="fb-title">${numHtml}${numHtml && f.name ? ' ' : ''}${escapeHtml(f.name || '')}</div>`
         : '';
-      const notesEditable = isAdmin && (currentTab === 'todo' || currentTab === 'draft' || currentTab === 'agent' || currentTab === 'clarify');
+      // Conversazione a turni (#108): segnalazione + risposte di Filo + risposte
+      // dell'utente in BOLLE diverse, in ordine cronologico, invece di un unico
+      // blocco. Gli allegati vivono nella bolla della segnalazione.
+      const turns = window.SN_FEEDBACK_THREAD ? SN_FEEDBACK_THREAD.parse(f) : [];
+      const convoTurns = turns.filter((t) => t.kind !== 'report');
+      const reportRole = window.SN_FEEDBACK_THREAD && SN_FEEDBACK_THREAD.isFromModel(f.clientId) ? 'model' : 'user';
+      const reportWho = reportRole === 'model' ? 'Agente' : 'Segnalazione';
+      // Note editabili (textarea) SOLO dove l'admin sta lavorando: todo/bozze/
+      // agente. Altrove (ricevuti/risolti/verificati/chiarimenti) le note di Filo
+      // diventano bolle di sola lettura — se mostrassi anche la textarea, lo
+      // stesso testo comparirebbe due volte.
+      const notesEditable = isAdmin && (currentTab === 'todo' || currentTab === 'draft' || currentTab === 'agent');
+      const clarifyReply = isAdmin && currentTab === 'clarify';
+      const showConvo = !notesEditable;
+      const reportBubble = `
+        <div class="fb-bubble fb-bubble--report fb-bubble--${reportRole}">
+          <div class="fb-bubble-head"><span class="fb-bubble-who">${reportWho}</span></div>
+          <div class="fb-bubble-body">${text}</div>
+          ${imgsHtml}
+          ${filesHtml}
+        </div>`;
+      const convoHtml = showConvo
+        ? convoTurns.map((t) => {
+            const who = t.kind === 'note' ? 'Filo' : 'Tu';
+            const tsLabel = t.ts ? `<span>${escapeHtml(String(t.ts))}</span>` : '';
+            return `
+              <div class="fb-bubble fb-bubble--${t.role}">
+                <div class="fb-bubble-head"><span class="fb-bubble-who">${who}</span>${tsLabel}</div>
+                <div class="fb-bubble-body">${escapeHtml(t.body)}</div>
+              </div>`;
+          }).join('')
+        : '';
+      const threadHtml = `<div class="fb-thread">${reportBubble}${convoHtml}</div>`;
       const notesBlock = notesEditable
         ? `<label class="fb-notes-label">Note / decisioni di design:
              <textarea class="fb-notes" data-id="${escapeHtml(f._id)}" rows="3" placeholder="Dettagli aggiuntivi, vincoli, scelte di design…">${escapeHtml(f.notes || '')}</textarea>
            </label>`
-        : (f.notes ? `<div class="fb-notes-readonly">${escapeHtml(f.notes)}</div>` : '');
+        : '';
+      // Tab Chiarimenti: rispondi alle domande di Filo come un turno di chat. La
+      // risposta si APPENDE allo storico (conserva la domanda) e il feedback
+      // torna "Da risolvere" perché una routine (o tu) lo riprenda.
+      const replyBlock = clarifyReply
+        ? `<div class="fb-reply">
+             <label class="fb-notes-label">La tua risposta:
+               <textarea class="fb-reply-text" data-id="${escapeHtml(f._id)}" rows="3" placeholder="Rispondi alle domande di Filo qui sopra…"></textarea>
+             </label>
+             <div class="fb-reply-buttons">
+               <button type="button" class="sn-btn fb-reply-send" data-id="${escapeHtml(f._id)}">Invia risposta</button>
+             </div>
+           </div>`
+        : '';
       return `
         <article class="fb-card fb-card--${statusOf(f)}${agent ? ' fb-card--agent' : ''}">
           <div class="fb-meta">
@@ -295,10 +340,9 @@
             ${priorityDotsHtml(f)}
           </div>
           ${agentHtml}${titleHtml}
-          <div class="fb-text">${text}</div>
-          ${imgsHtml}
-          ${filesHtml}
+          ${threadHtml}
           ${notesBlock}
+          ${replyBlock}
           <div class="fb-actions">${actionsFor(f)}</div>
         </article>
       `;
