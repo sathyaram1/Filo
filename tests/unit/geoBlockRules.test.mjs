@@ -78,6 +78,34 @@ test('input vuoto → nessuna azione (default difensivo)', () => {
   assert.equal(d.action, R.ACTIONS.NONE);
 });
 
+test('hasLoginCookie: riconosce sessione/auth per nome', () => {
+  assert.equal(R.looksLikeLoginCookie({ name: 'sessionid' }), true);
+  assert.equal(R.looksLikeLoginCookie({ name: 'connect.sid' }), true);
+  assert.equal(R.looksLikeLoginCookie({ name: 'auth_token' }), true);
+  assert.equal(R.looksLikeLoginCookie({ name: 'access_token' }), true);
+  assert.equal(R.looksLikeLoginCookie({ name: 'JWT' }), true);
+  assert.equal(R.looksLikeLoginCookie({ name: 'remember_me' }), true);
+  assert.equal(R.looksLikeLoginCookie({ name: 'user_uid' }), true);
+  assert.equal(R.hasLoginCookie([{ name: '_ga' }, { name: 'sessionid' }]), true);
+});
+
+test('hasLoginCookie: httpOnly conta come sessione (direzione conservativa)', () => {
+  // Nome neutro ma httpOnly → trattato come sessione (meglio proporre che
+  // riprovare in silenzio).
+  assert.equal(R.looksLikeLoginCookie({ name: 'x', httpOnly: true }), true);
+  assert.equal(R.looksLikeLoginCookie({ name: 'x', httpOnly: false }), false);
+});
+
+test('hasLoginCookie: cookie tecnici (consenso/analytics/bot) NON sono login', () => {
+  assert.equal(R.looksLikeLoginCookie({ name: 'cookieconsent_status', httpOnly: true }), false);
+  assert.equal(R.looksLikeLoginCookie({ name: '_ga', httpOnly: true }), false);
+  assert.equal(R.looksLikeLoginCookie({ name: '__cf_bm', httpOnly: true }), false);
+  assert.equal(R.looksLikeLoginCookie({ name: 'cf_clearance', httpOnly: true }), false);
+  assert.equal(R.hasLoginCookie([{ name: '_ga', httpOnly: true }, { name: 'cookieconsent', httpOnly: true }]), false);
+  assert.equal(R.hasLoginCookie([]), false);
+  assert.equal(R.hasLoginCookie(null), false);
+});
+
 test('shouldNoteVideoData: soglia 15 min, solo su tab proxata, una volta sola', () => {
   const T = R.VIDEO_DATA_NOTE_MS;
   assert.equal(T, 15 * 60 * 1000);
