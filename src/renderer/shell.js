@@ -320,6 +320,15 @@
     'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
     '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9l4 6"/><path d="M21 9l-4 6"/></svg>';
 
+  // Indicatore "audio in riproduzione": altoparlante con onde, così si
+  // riconoscono a colpo d'occhio le tab che stanno suonando — anche quelle in
+  // background. Cliccabile per silenziare al volo (parità col menu "Muta").
+  const AUDIO_IND_SVG =
+    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+    'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/>' +
+    '<path d="M18.5 6a9 9 0 0 1 0 12"/></svg>';
+
   // Indicatore "aperta da un altro paese": globo + codice paese, discreto e
   // caldo (accento Filo, niente lucchetti da security tool).
   const PROXY_IND_SVG =
