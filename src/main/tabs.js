@@ -924,7 +924,7 @@ class TabManager {
     const partition = this._partitionForTab(tab, url);
     try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
     try { tab.view.webContents.close(); } catch (_) {}
-    const view = this._makeView(url, partition);
+    const view = this._makeView(url, partition, { suppressAutoplay: tab.suppressAutoplay });
     tab.view = view;
     tab.partition = partition;
     tab.isInternal = url.startsWith('filo://');
