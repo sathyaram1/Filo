@@ -47,7 +47,19 @@ async function findWindow(app, predicate, timeoutMs = 12_000) {
   return null;
 }
 
-const policyOf = (page) => page.evaluate(() => navigator.getAutoplayPolicy('mediaelement'));
+// Prova reale di autoplay: crea un <video> e chiama play() senza alcun gesto
+// utente. Se l'autoplay è bloccato dalla policy, play() rifiuta SUBITO con
+// 'NotAllowedError' (prima ancora di cercare una sorgente) — è esattamente il
+// motivo per cui un video YouTube resterebbe in pausa. Se invece l'autoplay è
+// permesso, play() procede e fallisce semmai per sorgente assente
+// ('NotSupportedError'): comunque NON 'NotAllowedError'.
+const autoplayResult = (page) => page.evaluate(async () => {
+  const v = document.createElement('video');
+  v.muted = false;
+  document.body.appendChild(v);
+  try { await v.play(); return 'played'; }
+  catch (e) { return e && e.name ? e.name : String(e); }
+});
 
 test('le tab ripristinate non fanno partire i video (autoplay bloccato al boot)', async () => {
   const userData = mkdtempSync(join(tmpdir(), 'filo-autoplay-'));
