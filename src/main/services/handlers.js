@@ -640,6 +640,20 @@ async function executeFiloAction(action, { confirmed = false } = {}) {
         return { executed: false, kept: true };
       case 'APRI_FILE':
         return { executed: true, kept: true };
+      case 'ESEGUI_COMANDO': {
+        // A questo punto: modalità terminale attiva (gate sopra) e livello
+        // soddisfatto (1 = passa diretto; 2/3 = già confermato). Eseguiamo il
+        // comando ESATTO che è stato classificato: nessuna divergenza tra ciò
+        // che il gate ha valutato e ciò che lanciamo (stessa stringa `comando`).
+        const cmd = String(action.comando ?? action.command ?? action.cmd ?? '').trim();
+        if (!cmd) return { executed: false, kept: true, output: { command: '', blocked: 'empty' } };
+        let settings = {};
+        try { settings = await Storage.getSettings(); } catch (_) {}
+        const shell = settings.terminal && settings.terminal.shell;
+        const { runCommand } = require('./terminal');
+        const out = await runCommand(cmd, { shell });
+        return { executed: out.code === 0, kept: true, output: out };
+      }
       default:
         return { executed: false, kept: false };
     }
