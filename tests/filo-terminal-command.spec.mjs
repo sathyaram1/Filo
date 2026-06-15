@@ -1,0 +1,132 @@
+// #146.6 — Filo esegue comandi da terminale con livello di sicurezza dal comando.
+//
+// Contratto della spec (asserisce il SUCCESSO, non l'assenza di errore):
+//   • modalità terminale spenta → nessun comando viene eseguito;
+//   • "ls/echo" (sola lettura) esegue subito e l'output torna mostrato in chat;
+//   • "git push", "mkdir" (modifica recuperabile) NON eseguono senza conferma;
+//     dopo la conferma eseguono davvero;
+//   • "rm …", un comando inventato e una concatenazione con && richiedono di
+//     digitare "conferma" (livello 3);
+//   • il livello è deciso dal main sul comando effettivo, mai dall'LLM.
+
+import { test, expect } from './fixtures/electron.mjs';
+import os from 'node:os';
+import path from 'node:path';
+import fs from 'node:fs';
+
+const NEWTAB = 'filo://newtab/';
+
+// Esegue un'azione Filo nel main, come farebbe la chat (handleFiloChat).
+const execAction = (app, action, opts) =>
+  app.evaluate((_electron, { action, opts }) =>
+    globalThis.SN_EXECUTE_FILO_ACTION(action, opts), { action, opts });
+
+// Conferma un'azione sospesa (popup livello 2 / "conferma" digitata livello 3).
+const confirmAction = (page, action) =>
+  page.evaluate(async (a) =>
+    chrome.runtime.sendMessage({ type: 'filo_confirm_action', action: a }), action);
+
+// Attiva la modalità terminale (preferenza livello 2): la confermiamo subito.
+const enableTerminal = (page) =>
+  confirmAction(page, { type: 'IMPOSTA_PREFERENZA', chiave: 'terminale', valore: 'on' });
+
+test('modalità terminale spenta → il comando NON viene eseguito', async ({ app, openTab }) => {
+  await openTab(NEWTAB);
+  const r = await execAction(app, { type: 'ESEGUI_COMANDO', comando: 'echo ciao' });
+  expect(r.executed).toBe(false);
+  expect(r.output?.blocked).toBe('disabled');
+});
+
+test('livello 1 (sola lettura) esegue subito e cattura l’output', async ({ app, openTab }) => {
+  const page = await openTab(NEWTAB);
+  await enableTerminal(page);
+  const r = await execAction(app, { type: 'ESEGUI_COMANDO', comando: 'echo ciao-filo' });
+  expect(r.executed).toBe(true);
+  expect(r.output.stdout).toContain('ciao-filo');
+  expect(r.output.command).toBe('echo ciao-filo');
+});
+
+test('livello 2 (mkdir) non esegue senza conferma; la conferma crea la cartella', async ({ app, openTab }) => {
+  const page = await openTab(NEWTAB);
+  await enableTerminal(page);
+  const dir = path.join(os.tmpdir(), `filo-cmd-${Date.now()}`);
+  const action = { type: 'ESEGUI_COMANDO', comando: `mkdir "${dir}"` };
+
+  // Senza conferma: livello 2, non esegue, la cartella non esiste.
+  const r = await execAction(app, action);
+  expect(r.executed).toBe(false);
+  expect(r.needsConfirm).toBe(2);
+  expect(fs.existsSync(dir)).toBe(false);
+
+  // Con la conferma dell'utente: esegue davvero.
+  const c = await confirmAction(page, action);
+  expect(c.executed).toBe(true);
+  expect(fs.existsSync(dir)).toBe(true);
+  try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+});
+
+test('git push è livello 2 (popup), ma senza conferma non parte', async ({ app, openTab }) => {
+  const page = await openTab(NEWTAB);
+  await enableTerminal(page);
+  const r = await execAction(app, { type: 'ESEGUI_COMANDO', comando: 'git push' });
+  expect(r.executed).toBe(false);
+  expect(r.needsConfirm).toBe(2);
+  expect(r.describe).toContain('git push');
+});
+
+test('livello 3: rm, comando inventato e concatenazione richiedono "conferma"', async ({ app, openTab }) => {
+  const page = await openTab(NEWTAB);
+  await enableTerminal(page);
+  for (const comando of ['rm qualcosa', 'comandoinventato', 'echo a && echo b']) {
+    const r = await execAction(app, { type: 'ESEGUI_COMANDO', comando });
+    expect(r.executed, comando).toBe(false);
+    expect(r.needsConfirm, comando).toBe(3);
+  }
+});
+
+test('UI: l’output di un comando livello 1 compare nella bolla di chat', async ({ openTab }) => {
+  const page = await openTab(NEWTAB);
+  await enableTerminal(page);
+  const action = {
+    type: 'ESEGUI_COMANDO', comando: 'echo ciao',
+    _output: { command: 'echo ciao', stdout: 'ciao\n', stderr: '', code: 0, truncated: false, timedOut: false },
+  };
+  await page.evaluate((a) => {
+    const host = document.createElement('div');
+    host.id = 'test-actions';
+    document.body.appendChild(host);
+    window.__filoDashActions.renderActions(host, [a]);
+  }, action);
+  await expect(page.locator('#test-actions .dash-cmd-line')).toContainText('$ echo ciao');
+  await expect(page.locator('#test-actions .dash-cmd-output')).toContainText('ciao');
+});
+
+test('UI livello 3: digitando "conferma" il comando esegue e l’output compare in chat', async ({ openTab }) => {
+  const page = await openTab(NEWTAB);
+  await enableTerminal(page);
+  const action = {
+    type: 'ESEGUI_COMANDO', comando: 'echo confermato',
+    _confirm: { level: 3, text: 'Eseguire nel terminale:\necho confermato' },
+  };
+  await page.evaluate((a) => {
+    const host = document.createElement('div');
+    host.id = 'test-actions';
+    document.body.appendChild(host);
+    window.__filoDashActions.renderActions(host, [a]);
+  }, action);
+
+  const btn = page.locator('#test-actions .dash-action-btn');
+  await expect(btn).toContainText('echo confermato');
+  await btn.click();
+
+  const overlay = page.locator('.sn-confirm-overlay');
+  await expect(overlay).toBeVisible();
+  const ok = overlay.locator('.sn-confirm-btn-danger');
+  await expect(ok).toBeDisabled();           // bloccato finché non si digita "conferma"
+  await overlay.locator('.sn-confirm-input').fill('conferma');
+  await expect(ok).toBeEnabled();
+  await ok.click();
+
+  // Successo: l'output del comando appena eseguito compare nella bolla.
+  await expect(page.locator('#test-actions .dash-cmd-output')).toContainText('confermato');
+});
