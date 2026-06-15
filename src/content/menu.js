@@ -17,6 +17,16 @@
     else el.textContent = value;
   }
 
+  // Host dove montare il menu. Quando una pagina è in fullscreen HTML5 (es. il
+  // player video di YouTube a tutto schermo) il browser disegna SOLO l'elemento
+  // fullscreen e i suoi discendenti (top layer): un menu appeso a <html>
+  // resterebbe nascosto dietro al video — ed era il motivo per cui col tasto
+  // destro sul video non compariva nulla (e non si poteva mandare feedback).
+  // Se c'è un fullscreenElement montiamo lì dentro, così il menu è visibile.
+  function menuHost() {
+    return document.fullscreenElement || document.documentElement;
+  }
+
   let activeMenu = null;
 
   function close() {
