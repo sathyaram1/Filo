@@ -103,7 +103,17 @@
       const newVal = cIn.value.trim();
       if (!newKey || !newVal) return;
       if (oldKey === newKey && correction === newVal) return;
-      await updateAutocorrect(oldKey, newKey, newVal);
+      const ok = await updateAutocorrect(oldKey, newKey, newVal, {
+        onConflict: (conflictKey) => {
+          // Ripristina il valore precedente nel campo e avvisa l'utente.
+          wIn.value = wIn.dataset.original || oldKey;
+          showConflictMessage(conflictKey);
+        },
+      });
+      if (ok) {
+        // Aggiorna il dataset.original per le prossime modifiche.
+        wIn.dataset.original = newKey;
+      }
     };
     wIn.addEventListener('change', commit);
     cIn.addEventListener('change', commit);
