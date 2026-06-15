@@ -38,6 +38,10 @@
       list(inputs.salvatiUrls),
       list(inputs.timerIds),
       `tabs:${inputs.openTabsCount || 0}`,
+      // Fascia oraria GROSSOLANA (mattina/pomeriggio/sera/notte): così il saluto
+      // della home si rinfresca col passare della giornata, ma SENZA churn (al
+      // massimo un cambio per fascia). NON usare l'ora/minuto esatti qui.
+      `part:${inputs.partOfDay || ''}`,
     ];
     return hash(parts.join('\n##\n'));
   }
