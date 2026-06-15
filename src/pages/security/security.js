@@ -89,6 +89,18 @@
     Bootstrap.applyTheme(settings.theme);
     Bootstrap.applyTextScale(settings.textScale);
     const sec = settings.security || {};
+    // "Apri da un altro paese": se è configurato un fornitore proxy, mostra il
+    // suo host nella riga privacy (onestà: dichiariamo per chi passa il traffico).
+    const provHost = proxyProviderHost(settings.proxy);
+    const provEl = $('sec-proxy-box-provider');
+    if (provEl) {
+      if (provHost) {
+        provEl.textContent = I18n.t('options_security_proxy_box_provider').replace('%s', provHost);
+        provEl.style.display = '';
+      } else {
+        provEl.style.display = 'none';
+      }
+    }
     // Default-on: il merge con DEFAULT_SETTINGS.security mette già true/true se
     // l'utente non ha mai salvato, quindi qui leggiamo "!== false" per
     // riflettere il default anche in casi limite (es. chiave esistente ma null).
