@@ -515,6 +515,20 @@ async function executeFiloAction(action, { confirmed = false } = {}) {
     } catch (_) {}
   }
 
+  // ── modalità terminale: gate hard, indipendente dal livello (#146.6) ──────
+  // Filo non può eseguire ALCUN comando se l'utente non ha attivato la modalità
+  // terminale nelle impostazioni. Controllo PRIMA del gate dei livelli: così un
+  // terminale disattivato non fa nemmeno comparire il box "digita conferma" —
+  // l'utente vede subito che deve attivarlo.
+  if (type === 'ESEGUI_COMANDO') {
+    const cmd = String(action.comando ?? action.command ?? action.cmd ?? '').trim();
+    let s = {};
+    try { s = await Storage.getSettings(); } catch (_) {}
+    if (!s.terminal || !s.terminal.enabled) {
+      return { executed: false, kept: true, output: { command: cmd, blocked: 'disabled' } };
+    }
+  }
+
   // ── gate dei livelli di sicurezza (#146.2) ────────────────────────────────
   // Il livello è assegnato STATICAMENTE nel registro (src/shared/actionLevels.js),
   // mai deciso dall'LLM. Azione non registrata → rifiutata (ogni nuovo potere
