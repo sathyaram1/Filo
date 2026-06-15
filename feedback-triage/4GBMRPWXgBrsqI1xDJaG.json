@@ -1,7 +1,0 @@
-{
-  "id": "4GBMRPWXgBrsqI1xDJaG",
-  "status": "done",
-  "notes": "Nell'elenco delle correzioni automatiche, se rinomini la parola-trigger di una regola facendola coincidere con una regola già esistente, ora compare un avviso ('...esiste già — modifica annullata') e la modifica viene annullata, ripristinando il valore precedente: nessuna regola viene più persa in silenzio. Verificato con un test automatico che ricrea lo scenario (due regole, rinomino del trigger sulla chiave già usata) e controlla che l'avviso appaia e la regola originale resti.",
-  "queuedAt": "2026-06-15T21:55:14.904Z",
-  "queuedBy": "routine"
-}

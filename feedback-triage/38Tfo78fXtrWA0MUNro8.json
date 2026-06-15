@@ -1,7 +1,0 @@
-{
-  "id": "38Tfo78fXtrWA0MUNro8",
-  "status": "done",
-  "notes": "Le parole aggiunte al dizionario personale ora conservano le maiuscole/minuscole come le scrivi: 'iPhone' resta 'iPhone' (prima diventava 'iphone'). Il riconoscimento resta comunque senza distinzione di maiuscole, quindi la parola non viene segnalata come errore in nessuna forma, e non si creano doppioni che differiscono solo per il maiuscolo. Vale sia dalla pagina 'Gestisci correttore' sia dall'azione 'Aggiungi al dizionario' del menu tasto destro (allineati). Verificato con test automatici.",
-  "queuedAt": "2026-06-15T21:55:05.209Z",
-  "queuedBy": "routine"
-}
