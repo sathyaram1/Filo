@@ -112,21 +112,21 @@ test('le tab ripristinate non fanno partire i video (autoplay bloccato al boot)'
     const restored = await findWindow(app, (w) => w.url().startsWith(restoredUrl));
     expect(restored, 'tab ripristinata non trovata in fase 2').toBeTruthy();
     await restored.waitForLoadState('domcontentloaded').catch(() => {});
-    const restoredResult = await autoplayResult(restored);
+    const restoredPaused = await isPausedAfterAutoplay(restored);
 
     // Tab nuova (non ripristinata): mantiene l'autoplay permissivo di Filo.
     await shell.evaluate((u) => window.filoShell.tabs.open(u), freshUrl);
     const fresh = await findWindow(app, (w) => w.url().startsWith(freshUrl));
     expect(fresh, 'tab nuova non aperta').toBeTruthy();
     await fresh.waitForLoadState('domcontentloaded').catch(() => {});
-    const freshResult = await autoplayResult(fresh);
+    const freshPaused = await isPausedAfterAutoplay(fresh);
 
-    console.log('[autoplay] restored=', restoredResult, ' fresh=', freshResult);
+    console.log('[autoplay] restoredPaused=', restoredPaused, ' freshPaused=', freshPaused);
 
-    // Sulla tab ripristinata l'autoplay è rifiutato (video resterebbe in pausa);
-    // sulla tab nuova no (la prova è mirata al ripristino, non un blocco globale).
-    expect(restoredResult).toBe('NotAllowedError');
-    expect(freshResult).not.toBe('NotAllowedError');
+    // Sulla tab ripristinata il media resta in pausa (autoplay bloccato);
+    // sulla tab nuova suona (la prova è mirata al ripristino, non un blocco globale).
+    expect(restoredPaused).toBe(true);
+    expect(freshPaused).toBe(false);
   } finally {
     try { if (app) await app.close(); } catch (_) {}
     try { server.closeAllConnections?.(); } catch (_) {}
