@@ -218,6 +218,10 @@
     // Broadcast da background -> dashboard: lo stato live è cambiato
     // (nuovo timer, notifica, ecc.) e va re-renderizzato.
     FILO_LIVE_UPDATED: 'filo_live_updated',
+    // Broadcast da background -> dashboard (#155): il ricalcolo in background
+    // della home è pronto. La scheda aggiorna messaggio + suggerimenti senza
+    // rifare la chiamata all'LLM. { message, suggestions, ts }
+    FILO_DASHBOARD_UPDATED: 'filo_dashboard_updated',
   };
 
   // Port-based streaming
