@@ -81,6 +81,22 @@ il livello non viene eseguito.
   `src/shared/confirmUi.js` — mai `window.confirm` nativo.
 - **Test:** `tests/unit/actionLevels.test.mjs`, `tests/filo-action-levels.spec.mjs`.
 
+**Filo ESEGUE, non mostra bottoni inerti (#162/#159).** Quando l'utente chiede
+un'azione, Filo la compie — non lascia un bottone "da cliccare per davvero":
+- **NAVIGA apre subito** la scheda (in `executeFiloAction`, via `tm.openTab`); il
+  chip che resta nella bolla è solo un riferimento per RIAPRIRE e ha SEMPRE
+  un'etichetta (favicon + hostname), mai un favicon muto. Quando l'unica cosa che
+  Filo fa è aprire un link, `text` resta vuoto: niente "(vuoto)" di riempimento
+  (il fallback "(vuoto)" vale solo per la risposta davvero vuota, senza azioni).
+  Per PROPORRE link tra cui scegliere si usano link markdown nel testo, non NAVIGA
+  (che aprirebbe da solo).
+- **Le impostazioni di livello 2 aprono il popup di conferma DA SOLE**: `renderActions`
+  riceve `autoConfirm:true` sulle risposte fresche e clicca da sé l'unico bottone
+  `IMPOSTA_PREFERENZA`/`IMPOSTA_ESTETICA` di livello 2. Le azioni esterne
+  (`INVIA_FEEDBACK`) o distruttive (livello 3, comandi) restano a click esplicito —
+  niente stacking di modali, niente auto-conferma di cose irreversibili.
+- **Test:** `tests/filo-open-link-direct.spec.mjs`.
+
 ## Richieste ambigue: Filo applica subito + offre un controllo per raffinare
 
 Quando l'utente chiede in chat una modifica con un valore "giusto" non univoco
