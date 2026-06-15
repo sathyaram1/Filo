@@ -246,8 +246,9 @@ test('la regola persistente sopravvive al RIAVVIO: riaprendo il dominio la sched
     const set = await runAction(app1, { type: 'REGOLA_PROXY_DOMINIO', country: 'us', dominio: fakeHostUrl });
     expect(set.executed).toBe(true);
     // Garantisce che la regola sia su disco PRIMA della chiusura (le scritture
-    // dello storage sono debounced a 100ms).
-    await app1.evaluate(() => globalThis.SN_STORAGE.flushSync());
+    // dello storage sono debounced a 100ms). __filoStorage è lo shim esposto
+    // sotto NODE_ENV=test; flushSync scrive subito storage.json.
+    await app1.evaluate(() => globalThis.__filoStorage.flushSync());
   } finally {
     await app1.close();
   }
