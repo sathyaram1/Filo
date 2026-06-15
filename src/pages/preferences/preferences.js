@@ -463,6 +463,10 @@
     });
     $('ttsPreview').addEventListener('click', previewTts);
 
+    // Suoneria timer: salva al cambio + anteprima.
+    $('timerRingtone').addEventListener('change', persist);
+    $('timerRingtonePreview').addEventListener('click', previewRingtone);
+
     // Stile agente: scegliere un preset riempie il textarea; scrivere a mano
     // riallinea la select su "Personalizzato".
     $('agentStylePreset').addEventListener('change', () => {
