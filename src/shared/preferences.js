@@ -322,6 +322,25 @@
         return { partial: { monthlyLimitEur: n }, label: `Limite di spesa mensile → ${eur}€` };
       },
     },
+
+    // ── Suoneria timer — reversibile, innocuo → livello 1 ──
+    {
+      keys: ['suoneria_timer', 'suoneria timer', 'suoneria', 'ringtone', 'timer ringtone', 'suono timer', 'tono timer'],
+      level: 1,
+      build(v) {
+        const s = String(v == null ? '' : v).trim().toLowerCase();
+        const map = {
+          standard: 'default', default: 'default', normale: 'default',
+          delicata: 'gentle', gentle: 'gentle', dolce: 'gentle', morbida: 'gentle',
+          urgente: 'urgent', urgent: 'urgent', forte: 'urgent', acuto: 'urgent',
+          carillon: 'chime', chime: 'chime', campanello: 'chime', campana: 'chime',
+        };
+        const tone = map[s];
+        if (!tone) return null;
+        const labelMap = { default: 'Standard', gentle: 'Delicata', urgent: 'Urgente', chime: 'Carillon' };
+        return { partial: { timerRingtone: tone }, label: `Suoneria timer → ${labelMap[tone]}` };
+      },
+    },
   ];
 
   // Trova il setter giusto per una chiave (match esatto, poi fuzzy) e costruisce
