@@ -36,7 +36,7 @@ test('la home si aggiorna live al broadcast FILO_DASHBOARD_UPDATED', async ({ ap
     const msg = {
       type: t,
       message: 'Messaggio ricalcolato in background',
-      suggestions: [{ icon: 'link', text: 'Suggerimento ricalcolato', action: null, importance: 2 }],
+      suggestions: [{ icon: 'link', text: 'Suggerimento ricalcolato', action: null, importance: 3 }],
     };
     for (const win of BrowserWindow.getAllWindows()) {
       if (win._filoTabs) {
