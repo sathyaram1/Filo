@@ -1,7 +1,0 @@
-{
-  "id": "u4vtL9gt0VGvnws88Iz8",
-  "status": "done",
-  "notes": "Aggiunto il 'cervello' di Apri-da-un-altro-paese: quando Filo si accorge che un contenuto e' bloccato in Italia, ora reagisce in base alla situazione. Se il sito non e' segnalato come pericoloso e NON sei loggato, lo riapre da solo dall'estero e te lo dice con un messaggino discreto ('Aperto da Stati Uniti'). Se invece sei loggato su quel sito non tocca niente in automatico (cambiare paese ti scollegherebbe): ti mostra una strisciolina 'Lo apro dagli USA? In questa tab non sarai loggato' e scegli tu. Sui siti con avviso di pericolosita' non interviene mai. Se il primo tentativo e' a sua volta bloccato prova una seconda strada e poi si ferma proponendoti la scelta, senza tentativi a ripetizione. In piu': se una tab aperta dall'estero riproduce video a lungo, un avviso una-tantum sul consumo dati. Aggiunto oltre al chiesto: se rifiuti la proposta su un sito non te la ripropone piu' li'. Verificato con test automatici dei due flussi (riapertura automatica col messaggino; proposta con login attivo e accettazione), della guardia sui siti pericolosi, e della logica di decisione. Nota: l'escalation al secondo tentativo e l'avviso-video sono implementati e testati nella logica, ma la loro condizione richiede scenari reali (IP bloccato / 15 min di video) non riproducibili in un test rapido.",
-  "queuedAt": "2026-06-15T10:41:12.134Z",
-  "queuedBy": "routine"
-}
