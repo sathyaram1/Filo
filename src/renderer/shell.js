@@ -434,6 +434,22 @@
 
   // Secondo livello di "Apri da un altro paese": la lista delle location
   // curate, riaperta nello stesso punto del menu tab.
+  // Instrada una tab "da un altro paese". Un solo tentativo per click (mai
+  // retry automatici): se il fornitore non risponde, mostra un messaggio onesto
+  // invece di lasciare l'utente senza riscontro.
+  async function proxyTab(id, country) {
+    let res = null;
+    try { res = await api.tabs.setProxy(id, country); } catch (_) { res = { ok: false, error: 'proxy_failed' }; }
+    if (res && res.ok) return;
+    const err = res && res.error;
+    const msg = err === 'not_configured'
+      ? 'Nessun fornitore di rete configurato per aprire le schede da un altro paese. Configuralo in Impostazioni → Sicurezza.'
+      : err === 'bad_country'
+        ? 'Paese non riconosciuto: riprova con un altro.'
+        : 'Non sono riuscito ad aprire la scheda da un altro paese: il fornitore di rete non ha risposto. Riprova più tardi.';
+    showToast(msg);
+  }
+
   function openProxyCountryMenu() {
     const locs = (ctxProxyStatus && ctxProxyStatus.locations) || [];
     if (!locs.length) return;
