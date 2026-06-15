@@ -854,7 +854,7 @@
         const r = el.getBoundingClientRect();
         preview.style.width = r.width + 'px';
         preview.style.height = r.height + 'px';
-        document.documentElement.appendChild(preview);
+        menuHost().appendChild(preview);
         updatePreview(x, y);
       };
 
