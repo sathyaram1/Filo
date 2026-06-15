@@ -454,10 +454,10 @@
       else if (action === 'tab-mute') api.tabs.setMuted(id);
       else if (action === 'tab-help') api.tabs.help(id);
       else if (action === 'tab-close') api.tabs.close(id);
-      else if (action === 'tab-proxy-default') api.tabs.setProxy(id);
+      else if (action === 'tab-proxy-default') proxyTab(id);
       else if (action === 'tab-proxy-clear') api.tabs.clearProxy(id);
       else if (action === 'tab-proxy-pick') openProxyCountryMenu();
-      else if (action.startsWith('tab-proxy-go:')) api.tabs.setProxy(id, action.slice('tab-proxy-go:'.length));
+      else if (action.startsWith('tab-proxy-go:')) proxyTab(id, action.slice('tab-proxy-go:'.length));
     });
   }
 
