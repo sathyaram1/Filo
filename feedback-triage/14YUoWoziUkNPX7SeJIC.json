@@ -1,7 +1,0 @@
-{
-  "id": "14YUoWoziUkNPX7SeJIC",
-  "status": "done",
-  "notes": "Il menu col tasto destro di Filo ora compare su tutti i siti, YouTube compreso. Il problema era che alcuni siti (YouTube, Reddit…) registravano il proprio menu del tasto destro PRIMA del nostro e lo bloccavano, quindi il menu di Filo non si apriva. Ora Filo si registra per primo (appena la pagina inizia a caricare), così il suo menu vince sempre. Resta valida la scorciatoia Shift + tasto destro per far comparire il menu nativo del browser. Verificato con un test che simula un sito 'ostile' e controlla che si apra il menu di Filo e non quello del sito.",
-  "queuedAt": "2026-06-15T14:52:54.459Z",
-  "queuedBy": "routine"
-}
