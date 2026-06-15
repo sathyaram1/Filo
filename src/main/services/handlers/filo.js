@@ -19,8 +19,8 @@ module.exports = function register(on, ctx) {
   // viene RICLASSIFICATO qui dentro (executeFiloAction consulta il registro
   // anche con confirmed:true): un client compromesso non può far eseguire
   // un'azione fuori registro.
-  on(MSG.FILO_CONFIRM_ACTION, async (msg) => {
-    const r = await executeFiloAction(msg.action, { confirmed: true });
+  on(MSG.FILO_CONFIRM_ACTION, async (msg, sender) => {
+    const r = await executeFiloAction(msg.action, { confirmed: true, sender });
     return { ok: true, ...r };
   });
 
