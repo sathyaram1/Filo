@@ -419,7 +419,38 @@ operative vivono qui — quando ricevi quel prompt in ambiente cloud:
    diretta su Firestore: l'account robot è bloccato. Insisti con approcci
    diversi prima di ripiegare su `clarify` (vedi "Insistere prima di
    mollare").
-6. Se non ci sono feedback `todo`, termina senza fare nulla.
+6. **Se non ci sono feedback `todo`, NON terminare: fai una passata proattiva
+   di audit.** Invece di restare ferma, la routine cerca problemi che nessuno
+   ha ancora segnalato. Scegli **uno o più angoli** (non serve coprirli tutti:
+   meglio andare in profondità su pochi che sfiorarli tutti):
+   - **Edge case** — input limite, stati vuoti, valori nulli, sequenze di
+     azioni inusuali, race nei flussi async.
+   - **Sicurezza** — input non sanitizzati, dati che finiscono in HTML senza
+     escape (XSS), origin/permessi non verificati negli handler IPC, segreti
+     esposti, URL/navigazione non validati.
+   - **Feature probabilmente rotte** — esercita le feature esistenti (anche con
+     uno spec mirato o `test:explore`) e cerca quelle che non rispondono più,
+     regredite, o mai finite.
+   - **UX** — invarianti mancanti (puoi aggiungere X ma non rimuoverlo?),
+     incoerenze tra cammini equivalenti, attriti, stati senza feedback visivo.
+
+   **In questa passata NON correggere nulla di tua iniziativa**: l'obiettivo è
+   *trovare e segnalare*, non fixare — decide l'utente cosa vale la pena. Per
+   **ogni** cosa trovata apri un feedback in stato **`new`** (tab "Ricevuti",
+   **non** `todo`), così l'utente lo rivede prima di metterlo in lavorazione:
+
+   ```bash
+   node scripts/queue-feedback.mjs --status new --name "titolo breve" \
+     [--priority 0-3] "cosa hai trovato, in quale area/file, perché è un problema, come riprodurlo"
+   ```
+
+   La descrizione deve **bastare da sola** (area o file coinvolto, passi per
+   riprodurre, perché è un problema): una routine futura — o l'utente — non ha
+   il tuo contesto. Le creazioni finiscono nella stessa coda git e la GitHub
+   Action le applica entro ~1-2 minuti. **Nel report finale elenca cosa hai
+   depositato in "Ricevuti"**, così l'utente sa cosa trova da revisionare.
+7. Se non c'è proprio nulla di utile da segnalare nemmeno dopo l'audit,
+   termina senza fare nulla (non inventare feedback per riempire la coda).
 
 ### Più feedback senza appesantire il contesto: un sub-agente per feedback
 
