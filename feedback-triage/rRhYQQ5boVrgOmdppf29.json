@@ -1,7 +1,0 @@
-{
-  "id": "rRhYQQ5boVrgOmdppf29",
-  "status": "done",
-  "notes": "Ora dal tasto destro su una tab già aperta 'da un altro paese' compare la voce 'Cambia paese', che apre direttamente la lista dei paesi: prima, per cambiare nazionalità a una tab già instradata, dovevi prima tornare in Italia e poi ri-aprirla altrove — un giro inutile. Nota: la voce per instradare una tab ('Apri da un altro paese' → 'Cambia paese' / 'Torna in Italia') compare solo se hai configurato un fornitore di rete in Impostazioni → Sicurezza; senza quello non può funzionare e resta nascosta. Verificato con un test Playwright che instrada una tab dagli USA, poi via 'Cambia paese' la sposta in Francia restando sempre instradata (mai diretta nel mezzo).",
-  "queuedAt": "2026-06-15T22:31:40.469Z",
-  "queuedBy": "routine"
-}
