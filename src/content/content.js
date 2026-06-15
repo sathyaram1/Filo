@@ -224,22 +224,27 @@
     // Se l'utente tiene Shift premuto, lascia passare il menu nativo (escape hatch)
     if (e.shiftKey) return;
 
-    // Impedisci ad altri listener sullo stesso target (es. YouTube, Reddit) di
-    // gestire l'evento: stopImmediatePropagation blocca sia la propagazione sia
-    // gli handler successivi su window stesso.
+    // Impedisci alla pagina ospite (es. YouTube, Reddit) di gestire l'evento e
+    // mostrare il SUO menu: il nostro listener è registrato per primo (vedi sotto
+    // / page-preload bridge a document_start), quindi stopPropagation interrompe
+    // la discesa in cattura verso document e gli elementi — dove i siti mettono
+    // quasi sempre il loro handler `contextmenu` — prima che scatti.
     //
-    // NB: NON chiamiamo e.preventDefault() qui. In Electron il menu contestuale
-    // nativo non viene MAI mostrato in automatico (è l'app a doverlo costruire e
-    // fare popup: noi non lo facciamo, quindi non appare nulla di nativo). Ma
-    // chiamare preventDefault sul DOM event impedisce a Chromium di inviare al
-    // main process l'evento `context-menu` del webContents — quello che porta
-    // `misspelledWord` + `dictionarySuggestions` del correttore nativo. Senza
-    // quell'evento il suggerimento ortografico in cima al menu (che la vecchia
-    // estensione mostrava sfruttando il menu nativo di Chrome) non arrivava mai
-    // in produzione: i `_spell:native` partivano solo nei test che li iniettano
-    // a mano. Lasciando passare il default action, l'evento del webContents
-    // scatta, tabs.js inoltra i suggerimenti nativi e la correzione ricompare.
-    e.stopImmediatePropagation();
+    // PERCHÉ stopPropagation e NON stopImmediatePropagation: sulle pagine web il
+    // listener vive nel bridge del page-preload, registrato a document_start (per
+    // battere in ordine gli handler della pagina, che altrimenti vincevano —
+    // feedback alpha «tasto destro non funziona su YouTube»). Ma a quel timing
+    // stopImmediatePropagation sopprime anche l'evento `context-menu` del
+    // webContents che Chromium emette nel main (quello che porta `misspelledWord`
+    // + `dictionarySuggestions` del correttore nativo); stopPropagation invece lo
+    // lascia scattare. Usando stopPropagation manteniamo aperto il canale dei
+    // suggerimenti nativi e blocchiamo comunque gli handler di pagina su
+    // document/elementi (il caso comune).
+    //
+    // NB: NON chiamiamo nemmeno e.preventDefault(). In Electron il menu nativo non
+    // appare comunque da solo (è l'app a costruirlo), e preventDefault chiuderebbe
+    // lo stesso canale `context-menu` del webContents.
+    e.stopPropagation();
 
     // Spellcheck: in un editabile supportato, prima cerchiamo un errore "blu"
     // (sincrono); altrimenti partiamo con la richiesta on-demand all'LLM per la
