@@ -18,6 +18,7 @@
   const { MSG } = global.SN_MSG;
   const I18n = global.SN_I18N;
   const Popup = global.SN_POPUP;
+  const Chunk = global.SN_TTS_CHUNK;
 
   // Dipendenze iniettate da content.js (vedi init in fondo).
   let deps = {
@@ -32,6 +33,136 @@
       && typeof window.SpeechSynthesisUtterance === 'function';
   }
 
+  // ─── Evidenziazione della parola letta (CSS Custom Highlight API) ──────────
+  //
+  // Usiamo la Highlight API (CSS.highlights + ::highlight()) invece di avvolgere
+  // le parole in <span>: NON modifica il DOM della pagina (niente layout rotto,
+  // niente reflow, funziona anche su pagine React). Registriamo un Range sulla
+  // parola corrente sotto il nome 'filo-reading' e lo stiliamo via CSS.
+  const HL_NAME = 'filo-reading';
+  const hlSupported = typeof CSS !== 'undefined'
+    && CSS.highlights && typeof window.Highlight === 'function';
+
+  // Token (parole) della lettura corrente: { text, start, end, range }.
+  // start/end sono offset di carattere nel testo letto; range è il Range DOM.
+  let readTokens = [];
+  let hlIndex = -1;
+  let lastScrollMs = 0;
+
+  function ensureReadStyle() {
+    if (!hlSupported) return;
+    if (document.getElementById('sn-read-style')) return;
+    const st = document.createElement('style');
+    st.id = 'sn-read-style';
+    // color-mix con l'accent del tema (con fallback letterale se il token manca,
+    // es. pagine senza theme.css). ::highlight accetta solo poche proprietà:
+    // background-color/color/text-decoration sono tra queste.
+    st.textContent =
+      `::highlight(${HL_NAME}){background-color:color-mix(in srgb,var(--sn-accent,#c45a3b) 32%,transparent);border-radius:2px;}`;
+    (document.head || document.documentElement).appendChild(st);
+  }
+
+  function setHighlight(idx) {
+    if (!hlSupported || idx < 0 || idx >= readTokens.length || idx === hlIndex) return;
+    const tok = readTokens[idx];
+    if (!tok || !tok.range) return;
+    hlIndex = idx;
+    try { CSS.highlights.set(HL_NAME, new window.Highlight(tok.range)); } catch (_) {}
+    maybeScrollIntoView(tok.range);
+  }
+
+  function clearHighlight() {
+    hlIndex = -1;
+    if (hlSupported) { try { CSS.highlights.delete(HL_NAME); } catch (_) {} }
+  }
+
+  // Se la parola corrente è fuori dallo schermo, scorri (con parsimonia: al più
+  // ogni 400ms, e solo 'nearest' per non strappare la pagina sotto l'utente).
+  function maybeScrollIntoView(range) {
+    try {
+      const rect = range.getBoundingClientRect();
+      if (!rect || (!rect.width && !rect.height)) return;
+      const vh = window.innerHeight || document.documentElement.clientHeight;
+      if (rect.top >= 48 && rect.bottom <= vh - 48) return;
+      const now = Date.now();
+      if (now - lastScrollMs < 400) return;
+      lastScrollMs = now;
+      const anchor = range.startContainer.parentElement;
+      if (anchor && anchor.scrollIntoView) anchor.scrollIntoView({ block: 'nearest' });
+    } catch (_) {}
+  }
+
+  // Costruisce il "modello di lettura" dalla selezione corrente: il testo da
+  // leggere + i token-parola con i loro Range DOM (per l'evidenziazione).
+  // Cattura i Range AL MOMENTO della costruzione del menu, quando la selezione
+  // esiste ancora. Ritorna null se non c'è una selezione testuale.
+  function buildReadModel() {
+    if (!hlSupported) return null;
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !sel.rangeCount) return null;
+    const selRange = sel.getRangeAt(0);
+    const rootEl = selRange.commonAncestorContainer.nodeType === Node.TEXT_NODE
+      ? selRange.commonAncestorContainer.parentNode
+      : selRange.commonAncestorContainer;
+    if (!rootEl) return null;
+
+    const walker = document.createTreeWalker(rootEl, NodeFilter.SHOW_TEXT, {
+      acceptNode(n) {
+        if (!n.data || !selRange.intersectsNode(n)) return NodeFilter.FILTER_REJECT;
+        const p = n.parentElement;
+        if (p) {
+          const cs = window.getComputedStyle(p);
+          if (cs.display === 'none' || cs.visibility === 'hidden') return NodeFilter.FILTER_REJECT;
+        }
+        return NodeFilter.FILTER_ACCEPT;
+      },
+    });
+
+    let text = '';
+    const spans = []; // { node, nodeStart, globalStart, len }
+    let node;
+    while ((node = walker.nextNode())) {
+      let s = 0;
+      let e = node.data.length;
+      if (node === selRange.startContainer) s = selRange.startOffset;
+      if (node === selRange.endContainer) e = selRange.endOffset;
+      if (e <= s) continue;
+      const piece = node.data.slice(s, e);
+      // Separatore tra nodi adiacenti così parole di blocchi diversi non si
+      // fondono ("Ciao"+"mondo"). Lo spazio non appartiene ad alcuno span:
+      // i token (run di non-spazi) non lo includono mai.
+      if (text.length && !/\s$/.test(text) && !/^\s/.test(piece)) text += ' ';
+      spans.push({ node, nodeStart: s, globalStart: text.length, len: piece.length });
+      text += piece;
+    }
+    if (!text.trim()) return null;
+
+    const tokens = [];
+    for (const t of Chunk.tokenize(text)) {
+      const sp = spans.find((x) => t.start >= x.globalStart && t.start < x.globalStart + x.len);
+      if (!sp) continue;
+      const range = document.createRange();
+      const localStart = sp.nodeStart + (t.start - sp.globalStart);
+      const localEnd = Math.min(sp.nodeStart + (t.end - sp.globalStart), sp.nodeStart + sp.len);
+      try {
+        range.setStart(sp.node, localStart);
+        range.setEnd(sp.node, localEnd);
+      } catch (_) { continue; }
+      tokens.push({ text: t.text, start: t.start, end: t.end, range });
+    }
+    return { text, tokens };
+  }
+
+  // Sessione di lettura: ogni readAloud ne apre una nuova; stopReading marca
+  // cancellata quella corrente. Gli step async controllano sessionAlive() per
+  // non continuare una lettura che l'utente ha fermato (o sostituito).
+  let session = null;
+  function newSession() {
+    session = { id: ((session && session.id) || 0) + 1, cancelled: false };
+    return session;
+  }
+  function sessionAlive(s) { return session === s && !s.cancelled; }
+
   // Audio in riproduzione dalla sintesi vocale a modello. A livello di modulo
   // così stopReading() può fermarlo e il menu sa se sta "leggendo".
   let ttsAudio = null;
@@ -43,6 +174,7 @@
   }
 
   function stopReading() {
+    if (session) session.cancelled = true;
     if (ttsAudio) {
       const a = ttsAudio;
       ttsAudio = null;
@@ -50,6 +182,8 @@
       try { if (a.src) URL.revokeObjectURL(a.src); } catch (_) {}
     }
     if (ttsSupported()) { try { window.speechSynthesis.cancel(); } catch (_) {} }
+    clearHighlight();
+    readTokens = [];
   }
 
   // Incapsula PCM 16-bit little-endian mono (quello che torna Gemini TTS,
