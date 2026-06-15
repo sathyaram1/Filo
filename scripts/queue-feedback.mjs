@@ -16,7 +16,7 @@
 //
 // USO:
 //   node scripts/queue-feedback.mjs --name "titolo breve" \
-//     [--parent <idFeedbackPadre>] [--priority 0-3] [--status todo|clarify] \
+//     [--parent <idFeedbackPadre>] [--priority 0-3] [--status new|todo|clarify] \
 //     [--notes "note iniziali"] [--no-git] "testo del feedback"
 //
 //   Di default committa e pusha il file (come queue-triage.mjs). Con --no-git
@@ -119,7 +119,7 @@ if (isMain) {
     else commitAndPush(file);
   } catch (e) {
     console.error('Errore:', e.message);
-    console.error('Uso: node scripts/queue-feedback.mjs --name "titolo" [--parent <id>] [--priority 0-3] [--status todo|clarify] [--notes "..."] "testo"');
+    console.error('Uso: node scripts/queue-feedback.mjs --name "titolo" [--parent <id>] [--priority 0-3] [--status new|todo|clarify] [--notes "..."] "testo"');
     process.exit(1);
   }
 }
