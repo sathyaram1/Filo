@@ -211,16 +211,27 @@ async function update(partial, idToken) {
   if (modelMask.length) await patchDoc(MODELS_DOC, modelFields, modelMask, idToken);
 
   // Doc segreti (chiavi). Scriviamo solo i campi presenti come stringa.
+  //
+  // IMPORTANTE — merge, non replace: la maschera DEVE puntare ai singoli leaf
+  // (`apiKeys.gemini`, `apiKeys.openrouter`, …) e NON al map intero `apiKeys`.
+  // Con `updateMask=apiKeys` Firestore SOSTITUISCE l'intera mappa col valore
+  // inviato: salvando solo la chiave Gemini cancellavi l'override OpenRouter già
+  // presente, che poi risultava «non configurata» (feedback alpha). Con la
+  // maschera per-leaf Firestore fonde: tocca solo le chiavi digitate e lascia
+  // intatte le altre.
   const secretFields = {};
   const secretMask = [];
+  const akFields = {};
   if (partial.apiKeys && typeof partial.apiKeys === 'object') {
-    const ak = {};
     for (const k of ['openrouter', 'gemini', 'tavily']) {
-      if (typeof partial.apiKeys[k] === 'string') ak[k] = partial.apiKeys[k].trim();
+      const v = partial.apiKeys[k];
+      if (typeof v === 'string' && v.trim()) {
+        akFields[k] = toFsValue(v.trim());
+        secretMask.push(`apiKeys.${k}`);
+      }
     }
-    if (Object.keys(ak).length) {
-      secretFields.apiKeys = toFsValue(ak);
-      secretMask.push('apiKeys');
+    if (Object.keys(akFields).length) {
+      secretFields.apiKeys = { mapValue: { fields: akFields } };
     }
   }
   if (typeof partial.safeBrowsingKey === 'string') {
