@@ -20,6 +20,8 @@
     $('sec-block-popups-desc').textContent = I18n.t('options_security_block_popups_desc');
     $('sec-p2p-box-title').textContent = I18n.t('options_security_p2p_box_title');
     $('sec-p2p-box-body').textContent = I18n.t('options_security_p2p_box_body');
+    $('sec-proxy-box-title').textContent = I18n.t('options_security_proxy_box_title');
+    $('sec-proxy-box-body').textContent = I18n.t('options_security_proxy_box_body');
     $('sec-safebrowse-label').textContent = I18n.t('options_security_safebrowse');
     $('sec-safebrowse-desc').textContent = I18n.t('options_security_safebrowse_desc');
     $('sec-safebrowse-network-label').textContent = I18n.t('options_security_safebrowse_network');
