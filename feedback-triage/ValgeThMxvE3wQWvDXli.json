@@ -1,7 +1,0 @@
-{
-  "id": "ValgeThMxvE3wQWvDXli",
-  "status": "done",
-  "notes": "Ora l'assistente della home sa con esattezza quale modello lo sta eseguendo. Se gli chiedi 'che modello sei?' risponde con il nome reale con cui il codice lo richiama (es. gemini-3.1-flash-lite), non con un soprannome o l'etichetta amichevole del registro. In pratica gli passiamo nel prompt l'ID concreto del modello primario effettivamente in uso. Verificato con un test che intercetta il prompt costruito e controlla che contenga l'ID concreto del modello e non il nickname.",
-  "queuedAt": "2026-06-15T10:55:39.704Z",
-  "queuedBy": "routine"
-}
