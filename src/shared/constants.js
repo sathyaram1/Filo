@@ -46,6 +46,11 @@
     // Flag "primo avvio mostrato": true dopo che il messaggio di benvenuto di
     // Filo è stato presentato la prima volta che l'utente apre l'app.
     FILO_WELCOMED: 'filo_welcomed',
+    // Regole proxy persistenti per dominio (#152): "questo sito sempre da
+    // <paese>". Oggetto { <dominio registrabile>: { country, tier?, ts } }.
+    // Alla navigazione verso il dominio la tab nasce già instradata da quel
+    // paese (born proxied), e la regola sopravvive al riavvio dell'app.
+    FILO_PROXY_RULES: 'filo_proxy_rules',
   };
 
   const ACTIONS = {
