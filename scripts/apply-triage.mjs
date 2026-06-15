@@ -236,7 +236,7 @@ function readSpool() {
       if (entry && entry.op === 'create') {
         if (!String(entry.text || '').trim()) return { file, error: 'create senza testo' };
         if (!String(entry.name || '').trim()) return { file, error: 'create senza name (titolo)' };
-        if (!['todo', 'clarify'].includes(entry.status)) return { file, error: `status non valido per create: "${entry.status}"` };
+        if (!['new', 'todo', 'clarify'].includes(entry.status)) return { file, error: `status non valido per create: "${entry.status}"` };
         return { file, entry };
       }
       if (!entry || !entry.id) return { file, error: 'manca il campo id' };
