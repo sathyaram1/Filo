@@ -104,6 +104,21 @@
     </section>
 
     <section>
+      <h2>Suoneria del timer</h2>
+      <p class="sn-muted">Suono riprodotto alla scadenza del timer, finché non premi "Ferma". Generato dal browser (nessun file audio).</p>
+      <label for="timerRingtone" class="sn-muted" style="display:block;margin-bottom:4px;">Suoneria</label>
+      <div class="sn-row" style="align-items:center;gap:10px;">
+        <select id="timerRingtone">
+          <option value="default">Standard</option>
+          <option value="gentle">Delicata</option>
+          <option value="urgent">Urgente</option>
+          <option value="chime">Carillon</option>
+        </select>
+        <button type="button" class="sn-btn sn-btn-secondary" id="timerRingtonePreview">Prova</button>
+      </div>
+    </section>
+
+    <section>
       <h2>Modalità terminale</h2>
       <p class="sn-muted">Quando è attiva, nella dashboard i comandi che iniziano con <code>/</code> (e che non sono comandi di Filo) vengono eseguiti da una shell di sistema, con l'output mostrato in tempo reale. Sopra la barra di scrittura compare la cartella in cui ti trovi. <strong>Esegue comandi reali sul tuo computer</strong>: attivala solo se sai cosa stai facendo.</p>
       <div class="sn-toggle-row">
