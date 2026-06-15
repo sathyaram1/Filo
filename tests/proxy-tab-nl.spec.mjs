@@ -235,17 +235,19 @@ test('la regola persistente sopravvive al RIAVVIO: riaprendo il dominio la sched
   const url = testServer.html('<title>NL_RESTART</title><h1 id="ok">contenuto</h1>');
   const fakeHostUrl = url.replace('127.0.0.1', 'geo-restart-test.filo.invalid');
 
-  // ── Avvio 1: configura il provider e salva la regola, poi chiudi. ──
+  // ── Avvio 1: configura il provider e salva la regola via l'AZIONE reale
+  //    (stesso routing dell'agente), poi forza il flush su disco e chiudi. ──
   let app1 = await electron.launch(launchOpts);
   try {
     await app1.firstWindow();
     await app1.evaluate(async (_e, cfg) => {
       await globalThis.SN_STORAGE.updateSettings({ proxy: { datacenter: cfg.endpoint, bypass: '<-loopback>' } });
-      // La regola passa per la stessa memoria a lungo termine usata dall'azione.
-      const dom = globalThis.SN_FILO_MEMORY;
-      const { registrableOf } = require('./services/cookies');
-      await dom.setProxyRule(registrableOf(cfg.url), { country: 'us' });
-    }, { endpoint: `socks5://127.0.0.1:${socks.port}`, url: fakeHostUrl });
+    }, { endpoint: `socks5://127.0.0.1:${socks.port}` });
+    const set = await runAction(app1, { type: 'REGOLA_PROXY_DOMINIO', country: 'us', dominio: fakeHostUrl });
+    expect(set.executed).toBe(true);
+    // Garantisce che la regola sia su disco PRIMA della chiusura (le scritture
+    // dello storage sono debounced a 100ms).
+    await app1.evaluate(() => globalThis.SN_STORAGE.flushSync());
   } finally {
     await app1.close();
   }
