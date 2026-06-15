@@ -22,6 +22,7 @@ require(path.join(SHARED, 'filoMemory.js'));
 require(path.join(SHARED, 'filoState.js'));
 require(path.join(SHARED, 'feedback.js'));
 require(path.join(SHARED, 'preferences.js'));
+require(path.join(SHARED, 'cmdClassify.js'));
 require(path.join(SHARED, 'actionLevels.js'));
 require(path.join(SVC, 'providers', 'openrouter.js'));
 require(path.join(SVC, 'providers', 'gemini.js'));
