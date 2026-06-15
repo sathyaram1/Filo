@@ -909,11 +909,24 @@
     return /^[\w-]+(\.[\w-]+)+(:\d+)?(\/\S*)?$/.test(raw) && /\.[a-z]{2,}(:|\/|$)/i.test(raw);
   }
 
+  // Estrae l'host da un token "/sito" (toglie "/", lo schema e l'eventuale
+  // path/porta), per la verifica DNS.
+  function siteHostOf(text) {
+    const raw = text.slice(1).replace(/^https?:\/\//i, '');
+    return (raw.split(/[/:?#]/)[0] || '').toLowerCase();
+  }
+
   // Cache "il comando shell esiste?" (token → bool), per non rifare lo spawn
   // di controllo a ogni tasto. Il risultato non dipende dalla cwd per i comandi
   // su PATH; per i casi limite (script relativi) la piccola imprecisione è ok.
   const shellCmdCache = new Map();
   let whichTimer = null;
+
+  // Cache "il dominio /sito.tld esiste?" (host → bool). Evita di rifare il
+  // lookup DNS a ogni tasto; popolata sia dalla verifica live sia da quella
+  // sull'invio. Un host non in cache = ancora da verificare (resta arancione).
+  const siteResolveCache = new Map();
+  let siteResolveTimer = null;
 
   // Classifica l'input corrente per l'evidenziazione live:
   //   'filo'    → comando interno di Filo (o navigazione a sito) → arancione
