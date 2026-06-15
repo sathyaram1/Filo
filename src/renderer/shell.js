@@ -651,7 +651,11 @@
       });
       el.appendChild(close);
 
-      el.addEventListener('click', () => api.tabs.activate(t.id));
+      el.addEventListener('mousedown', (e) => startTabDrag(e, t, el));
+      el.addEventListener('click', () => {
+        if (suppressClickId === t.id) { suppressClickId = null; return; }
+        api.tabs.activate(t.id);
+      });
       el.addEventListener('auxclick', (e) => {
         if (e.button === 1) api.tabs.close(t.id);
       });
