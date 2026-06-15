@@ -116,11 +116,22 @@
   }
 
   async function addToDictionary(word) {
-    const w = String(word || '').trim().toLowerCase();
-    if (!w || personalDict.has(w)) return;
-    personalDict.add(w);
+    const w = String(word || '').trim();
+    if (!w) return;
+    const wLower = w.toLowerCase();
+    // Match case-insensitive: se la parola (in qualsiasi casing) è già presente, non aggiungerla.
+    if (personalDict.has(wLower)) return;
+    personalDict.add(wLower); // Il set interno resta lowercase per isInDictionary
     try {
-      await chrome.storage.local.set({ [STORAGE_KEYS.PERSONAL_DICT]: [...personalDict] });
+      // Legge l'array esistente dallo storage (che preserva il casing originale) e aggiunge
+      // la nuova parola mantenendo il casing, con dedup case-insensitive.
+      const d = await chrome.storage.local.get(STORAGE_KEYS.PERSONAL_DICT);
+      const existing = d?.[STORAGE_KEYS.PERSONAL_DICT] || [];
+      const alreadyExists = existing.some((x) => String(x).toLowerCase() === wLower);
+      if (!alreadyExists) {
+        existing.push(w); // preserva il casing originale
+        await chrome.storage.local.set({ [STORAGE_KEYS.PERSONAL_DICT]: existing });
+      }
     } catch (_) {}
   }
 
