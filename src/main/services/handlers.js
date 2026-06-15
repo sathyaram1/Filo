@@ -696,12 +696,15 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
       // Le primitive sono le STESSE della UI (tasto destro sulla tab): l'agente
       // chiama setTabProxy/clearTabProxy/regole-per-dominio del TabManager.
       case 'PROXY_TAB': {
+        // Eseguita subito (livello 1, completamente reversibile): nessun bottone
+        // di follow-up in chat — il testo della risposta è già la conferma, come
+        // per IMPOSTA_PREFERENZA. kept:false → non resta un'azione nella bolla.
         const { tm, tab } = targetWebTab(sender);
-        if (!tm || !tab) return { executed: false, kept: true, output: { proxy: 'no_web_tab' } };
+        if (!tm || !tab) return { executed: false, kept: false, output: { proxy: 'no_web_tab' } };
         const r = await tm.setTabProxy(tab.id, action.country ?? action.paese ?? action.codicePaese ?? action.location);
         return {
           executed: !!(r && r.ok),
-          kept: true,
+          kept: false,
           output: { proxy: r && r.ok ? 'on' : (r && r.error) || 'failed', country: r && r.country },
         };
       }
