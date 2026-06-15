@@ -112,7 +112,9 @@ test('archivia una tab proxata e la riapre proxata sulla stessa location', async
   }
 });
 
-test('in incognito una tab proxata non viene archiviata', async ({ app }) => {
+test('in incognito una tab proxata non viene archiviata', async ({ app, openTab, testServer }) => {
+  // Assicura che la finestra (con _filoTabs) sia pronta prima di interrogarla.
+  await testServer.openReady(openTab, PAGE);
   // Verifica la regola incognito direttamente sul TabManager: _archiveClosedTab
   // su un manager incognito non deve scrivere nulla nello store, nemmeno per una
   // tab con proxy. Usiamo un manager fittizio (incognito=true) senza toccare la
