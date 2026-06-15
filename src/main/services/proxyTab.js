@@ -149,6 +149,87 @@ function clearPartitionAuth(partition) {
   authBySession.delete(partition);
 }
 
+// ─── istruzioni persistenti per dominio ("questo sito sempre dagli USA") ────
+// Una regola per dominio vive in settings.proxy.domainRules:
+//   { "<host>": { country, tier } }
+// dove <host> è il dominio normalizzato (minuscolo, senza schema/porta/path,
+// senza "www."). Alla NASCITA di una tab su quel dominio (o un suo
+// sottodominio) la tab parte già proxata sulla location indicata; la regola sta
+// nelle impostazioni → finisce in storage.json → sopravvive al riavvio dell'app
+// (stessa persistenza di ogni altra impostazione). Logica pura: niente Electron,
+// testabile sotto node:test (tests/unit/).
+//
+// domainRules è una REPLACE_KEY in src/shared/storage.js: passare la mappa
+// intera la sostituisce (così rimuovere una regola la cancella davvero, non la
+// fonde di nuovo dentro la vecchia mappa).
+
+// Da un dominio o un URL al solo host normalizzato (minuscolo, senza schema,
+// porta, path, "www." iniziale e punti finali). null se non è un host valido.
+function normalizeDomain(input) {
+  let s = String(input || '').trim().toLowerCase();
+  if (!s) return null;
+  if (/^[a-z][a-z0-9+.-]*:\/\//.test(s)) {
+    try { s = new URL(s).hostname; } catch (_) { return null; }
+  } else {
+    // 'example.com/path' o 'example.com:443' → solo host.
+    s = s.split('/')[0].split('?')[0].split('#')[0].split(':')[0];
+  }
+  s = s.replace(/^www\./, '').replace(/\.+$/, '');
+  if (!s || /\s/.test(s) || !/^[a-z0-9.-]+$/.test(s) || !s.includes('.')) return null;
+  return s;
+}
+
+// Regola per un URL/host: match esatto o per sottodominio (news.bbc.co.uk
+// matcha la regola su bbc.co.uk). Vince la chiave più specifica. Ritorna
+// { country, tier } normalizzati o null.
+function domainRuleFor(domainRules, hostOrUrl) {
+  if (!domainRules || typeof domainRules !== 'object') return null;
+  const host = normalizeDomain(hostOrUrl);
+  if (!host) return null;
+  let best = null;
+  let bestLen = -1;
+  for (const key of Object.keys(domainRules)) {
+    const k = normalizeDomain(key);
+    if (!k) continue;
+    if ((host === k || host.endsWith(`.${k}`)) && k.length > bestLen) {
+      best = domainRules[key];
+      bestLen = k.length;
+    }
+  }
+  if (!best || typeof best !== 'object') return null;
+  const country = normalizeCountry(best.country);
+  if (!country) return null;
+  return { country, tier: normalizeTier(best.tier) };
+}
+
+// Aggiunge/aggiorna una regola; ritorna una NUOVA mappa (l'originale non viene
+// mutata). Paese non valido o dominio non valido → null (nessuna scrittura).
+function setDomainRule(domainRules, domainInput, country, tier) {
+  const host = normalizeDomain(domainInput);
+  const code = normalizeCountry(country);
+  if (!host || !code) return null;
+  const next = { ...(domainRules && typeof domainRules === 'object' ? domainRules : {}) };
+  // Cancella eventuali chiavi equivalenti (non normalizzate) prima di scrivere
+  // quella canonica, così non restano doppioni.
+  for (const key of Object.keys(next)) {
+    if (normalizeDomain(key) === host) delete next[key];
+  }
+  next[host] = { country: code, tier: normalizeTier(tier) };
+  return next;
+}
+
+// Rimuove la regola per un dominio; ritorna una NUOVA mappa (invariata se la
+// regola non c'era o il dominio non è valido).
+function removeDomainRule(domainRules, domainInput) {
+  const next = { ...(domainRules && typeof domainRules === 'object' ? domainRules : {}) };
+  const host = normalizeDomain(domainInput);
+  if (!host) return next;
+  for (const key of Object.keys(next)) {
+    if (normalizeDomain(key) === host) delete next[key];
+  }
+  return next;
+}
+
 module.exports = {
   LOCATIONS,
   TIERS,
@@ -160,4 +241,8 @@ module.exports = {
   resolve,
   setPartitionAuth,
   clearPartitionAuth,
+  normalizeDomain,
+  domainRuleFor,
+  setDomainRule,
+  removeDomainRule,
 };
