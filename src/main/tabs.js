@@ -342,6 +342,10 @@ class TabManager {
       // Proxy per-tab ("Apri da un altro paese"): { country, tier } finché la
       // tab è instradata da un altro paese, null altrimenti. Vedi setTabProxy.
       proxy: null,
+      // #145 — tab nata da un ripristino di sessione: l'autoplay resta bloccato
+      // (vedi _makeView). Memorizzato sulla tab così sopravvive a _recreateView
+      // (es. se la tab viene proxata alla nascita per una regola di dominio).
+      suppressAutoplay: !!suppressAutoplay,
     };
 
     this._wireEvents(tab);
