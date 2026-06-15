@@ -126,6 +126,29 @@ test('ESEGUI_COMANDO: describe mostra il comando ESATTO che verrà eseguito', ()
   assert.match(d, /git push origin main/);
 });
 
+test('proxy per-tab (#152): le primitive in linguaggio naturale sono livello 1', () => {
+  // Reversibili ("torna in Italia" / "togli la regola") → si eseguono subito.
+  assert.equal(AL.levelFor({ type: 'PROXY_TAB', country: 'fr' }), 1);
+  assert.equal(AL.levelFor({ type: 'RIMUOVI_PROXY' }), 1);
+  assert.equal(AL.levelFor({ type: 'RIMUOVI_PROXY_TUTTE' }), 1);
+  assert.equal(AL.levelFor({ type: 'REGOLA_PROXY_DOMINIO', country: 'us', dominio: 'netflix.com' }), 1);
+  assert.equal(AL.levelFor({ type: 'RIMUOVI_REGOLA_PROXY', dominio: 'netflix.com' }), 1);
+  // case-insensitive come le altre.
+  assert.equal(AL.levelFor({ type: 'proxy_tab', country: 'fr' }), 1);
+});
+
+test('proxy per-tab (#152): describe nomina il paese (etichetta) e il dominio', () => {
+  assert.match(AL.describe({ type: 'PROXY_TAB', country: 'fr' }), /Francia/);
+  // Sinonimo "paese" che un LLM potrebbe produrre al posto di "country".
+  assert.match(AL.describe({ type: 'PROXY_TAB', paese: 'us' }), /Stati Uniti/);
+  // Codice valido fuori dalla lista curata → fallback maiuscolo, mai vuoto.
+  assert.match(AL.describe({ type: 'PROXY_TAB', country: 'br' }), /BR/);
+  assert.match(AL.describe({ type: 'REGOLA_PROXY_DOMINIO', country: 'us', dominio: 'netflix.com' }), /netflix\.com/);
+  assert.match(AL.describe({ type: 'REGOLA_PROXY_DOMINIO', country: 'us', dominio: 'netflix.com' }), /Stati Uniti/);
+  assert.match(AL.describe({ type: 'RIMUOVI_REGOLA_PROXY', dominio: 'netflix.com' }), /netflix\.com/);
+  assert.match(AL.describe({ type: 'RIMUOVI_PROXY' }), /Italia/);
+});
+
 test('ogni azione registrata ha un livello valido e una describe', () => {
   for (const [type, entry] of Object.entries(AL.REGISTRY)) {
     const lvl = AL.levelFor({ type, chiave: 'tema', valore: 'scuro' });
