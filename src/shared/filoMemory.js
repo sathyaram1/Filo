@@ -293,6 +293,9 @@
       ts: new Date().toISOString(),
       message: payload?.message || '',
       suggestions: Array.isArray(payload?.suggestions) ? payload.suggestions : [],
+      // #155 — firma degli input con cui è stato generato questo messaggio:
+      // serve a capire se la home andrebbe ricalcolata (input cambiati).
+      signature: payload?.signature || '',
     });
   }
 
