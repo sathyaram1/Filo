@@ -1,0 +1,7 @@
+{
+  "id": "hyLDLBG5n4sLtiHcHKE5",
+  "status": "done",
+  "notes": "Ora le modifiche alle impostazioni che richiedono conferma (cookie, sicurezza, provider, chiavi API, limite di spesa…) aprono il popup di conferma DA SOLE appena Filo risponde: non devi più cliccare prima un bottone per far comparire la conferma. È esattamente quello che chiedevi — Filo «tenta di farlo in automatico, con il popup di conferma aperto». Le impostazioni semplici (tema, dimensione testo…) continuano ad applicarsi all'istante senza chiedere nulla. Restano invece a click esplicito, per sicurezza, le azioni irreversibili (cancellazioni, comandi da terminale) e l'invio di feedback. Per «aprire nuovi siti»: ora Filo li apre direttamente (stesso intervento del feedback gemello #162). Verificato con test automatici (il popup compare da solo su un cambio cookie; le azioni distruttive NON si auto-confermano) e con la suite completa.",
+  "queuedAt": "2026-06-15T17:35:57.179Z",
+  "queuedBy": "routine"
+}
