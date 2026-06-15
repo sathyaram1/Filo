@@ -575,6 +575,31 @@ body[data-state="thread"] .dash-suggestion { justify-content: flex-start; paddin
 }
 .dash-live-dismiss:hover { background: var(--dash-line); color: var(--dash-ink); }
 
+/* Timer in stato "squilla": bordo animato + colore laterale rosso */
+.dash-live-card[data-ringing="1"] {
+  border-color: var(--dash-accent);
+  animation: dash-ring-pulse 1s ease-in-out infinite;
+}
+.dash-live-card[data-ringing="1"]::before { background: var(--dash-accent); }
+@keyframes dash-ring-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--dash-accent) 30%, transparent); }
+}
+/* Pulsante "Ferma" nella card del timer che squilla */
+.dash-live-stop {
+  align-self: flex-start;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--dash-accent);
+  background: transparent;
+  color: var(--dash-accent);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  margin-top: 2px;
+}
+.dash-live-stop:hover { background: var(--dash-accent); color: var(--dash-paper); }
+
 /* ===== Barra input (footer) ===== */
 .dash-input-wrap {
   grid-column: 2;
