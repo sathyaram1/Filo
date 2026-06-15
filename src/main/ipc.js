@@ -14,6 +14,7 @@ const { handleMessage, handleStream, broadcastToTabs } = require('./services/han
 const { showPopupMenu } = require('./popup-menu');
 const { showTooltip, hideTooltip } = require('./popup-tooltip');
 const { createSession, defaultCwd, commandExists } = require('./services/shell');
+const { hostResolves } = require('./services/hostResolve');
 const DiskStorage = require('./shim/storage');
 
 const inFlightStreams = new Map(); // requestId → AbortController
