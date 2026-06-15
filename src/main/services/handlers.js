@@ -692,6 +692,58 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         const out = await runCommand(cmd, { shell });
         return { executed: out.code === 0, kept: true, output: out };
       }
+      // ── proxy per-tab via linguaggio naturale (#152) ───────────────────────
+      // Le primitive sono le STESSE della UI (tasto destro sulla tab): l'agente
+      // chiama setTabProxy/clearTabProxy/regole-per-dominio del TabManager.
+      case 'PROXY_TAB': {
+        const { tm, tab } = targetWebTab(sender);
+        if (!tm || !tab) return { executed: false, kept: true, output: { proxy: 'no_web_tab' } };
+        const r = await tm.setTabProxy(tab.id, action.country ?? action.paese ?? action.codicePaese ?? action.location);
+        return {
+          executed: !!(r && r.ok),
+          kept: true,
+          output: { proxy: r && r.ok ? 'on' : (r && r.error) || 'failed', country: r && r.country },
+        };
+      }
+      case 'RIMUOVI_PROXY': {
+        const { tm, tab } = targetWebTab(sender);
+        if (!tm || !tab) return { executed: false, kept: false };
+        const r = tm.clearTabProxy(tab.id);
+        return { executed: !!(r && r.ok), kept: false };
+      }
+      case 'RIMUOVI_PROXY_TUTTE': {
+        const win = winOf(sender);
+        const tm = win && win._filoTabs;
+        if (!tm) return { executed: false, kept: false };
+        const count = tm.clearAllProxies();
+        return { executed: true, kept: true, output: { proxy: 'cleared_all', count } };
+      }
+      case 'REGOLA_PROXY_DOMINIO': {
+        const { tm, tab } = targetWebTab(sender);
+        if (!tm) return { executed: false, kept: false };
+        const country = action.country ?? action.paese ?? action.codicePaese ?? action.location;
+        // Dominio esplicito dall'LLM, altrimenti quello della scheda web attiva.
+        const domain = action.dominio ?? action.domain ?? action.sito ?? (tab ? tab.url : '');
+        const r = await tm.setDomainProxyRule(country, { domain });
+        if (r && r.ok) refreshProxyRulesAllWindows();
+        return {
+          executed: !!(r && r.ok),
+          kept: true,
+          output: r && r.ok ? { proxyRule: 'set', domain: r.domain, country: r.country } : { proxyRule: 'failed', error: r && r.error },
+        };
+      }
+      case 'RIMUOVI_REGOLA_PROXY': {
+        const { tm, tab } = targetWebTab(sender);
+        if (!tm) return { executed: false, kept: false };
+        const domain = action.dominio ?? action.domain ?? action.sito ?? (tab ? tab.url : '');
+        const r = await tm.removeDomainProxyRule({ domain });
+        if (r && r.ok) refreshProxyRulesAllWindows();
+        return {
+          executed: !!(r && r.ok),
+          kept: false,
+          output: r && r.ok ? { proxyRule: 'removed', domain: r.domain } : { proxyRule: 'failed' },
+        };
+      }
       default:
         return { executed: false, kept: false };
     }
