@@ -145,8 +145,15 @@
   function renderDict(words) {
     const list = $('dictList');
     list.innerHTML = '';
-    const sorted = Array.from(new Set((words || []).map((w) => String(w).toLowerCase())))
-      .sort((a, b) => a.localeCompare(b));
+    // Dedup case-insensitive: tenere la prima occorrenza trovata (preserva il casing originale).
+    const seen = new Set();
+    const deduped = [];
+    for (const w of (words || [])) {
+      const s = String(w);
+      const key = s.toLowerCase();
+      if (!seen.has(key)) { seen.add(key); deduped.push(s); }
+    }
+    const sorted = deduped.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
     if (!sorted.length) {
       $('dictEmpty').hidden = false;
       return;
