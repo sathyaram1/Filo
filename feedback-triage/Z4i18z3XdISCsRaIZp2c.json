@@ -1,0 +1,7 @@
+{
+  "id": "Z4i18z3XdISCsRaIZp2c",
+  "status": "done",
+  "notes": "Ora mentre Filo elabora la risposta nella nuova scheda, al posto della scritta fissa \"Filo sta pensando…\" compare un indicatore di reasoning su 3 righe che scorrono verso l'alto e sfumano man mano che salgono (in cima quasi trasparente, in basso piena), sempre al massimo 3 righe visibili — lo stesso effetto che era già nella sidebar. Le frasi sono indicative perché il modello non restituisce il reasoning vero in streaming. Verificato con un test Playwright che asserisce le 3 righe, il gradiente di opacità decrescente verso l'alto, lo scorrimento nel tempo e la sostituzione con la risposta finale.",
+  "queuedAt": "2026-06-15T19:17:25.690Z",
+  "queuedBy": "routine"
+}
