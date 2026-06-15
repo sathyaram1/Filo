@@ -823,8 +823,13 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, sende
   });
 
   const parsed = extractJson(r.text) || { text: r.text || '', actions: [] };
-  const textReply = String(parsed.text || '').trim() || '(vuoto)';
   const rawActions = Array.isArray(parsed.actions) ? parsed.actions : [];
+  // #162 — quando Filo vuole solo ESEGUIRE qualcosa (es. aprire un link) non
+  // deve scrivere testo di riempimento: il "(vuoto)" che compariva era un
+  // placeholder confuso ("hai scritto tu vuoto o è stato prodotto da filo?").
+  // Il fallback "(vuoto)" resta SOLO per la risposta davvero vuota (niente
+  // testo E niente azioni), che sarebbe altrimenti una bolla muta.
+  const textReply = String(parsed.text || '').trim() || (rawActions.length ? '' : '(vuoto)');
   const renderedActions = [];
   for (const a of rawActions) {
     const res = await executeFiloAction(a, { sender });
