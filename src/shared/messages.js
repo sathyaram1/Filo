@@ -145,6 +145,18 @@
     // arricchimento asincrono RDAP/GSB/sandbox). Il content (ri)disegna l'avviso.
     SAFEBROWSE_UPDATE: 'safebrowse_update',         // → { url, level, message }
 
+    // === Geo-block: proposta inline (proxy-per-tab-spec.md §5, feedback #151) ===
+    // Broadcast main→content: un contenuto bloccato in Italia è stato rilevato su
+    // un tab con sessione di login attiva → non si riprova in silenzio, si propone.
+    // Il content disegna una striscia "Lo apro dagli USA? In questa tab non sarai
+    // loggato." con i bottoni Apri/No.
+    GEO_PROPOSE: 'geo_propose',                     // → { url, country, countryLabel }
+    // L'utente ha accettato la proposta inline: instrada la tab dal paese indicato.
+    GEO_PROPOSE_ACCEPT: 'geo_propose_accept',       // { url, country } → { ok, country }
+    // L'utente ha rifiutato/chiuso la proposta: non riproporla per questo dominio
+    // nel tab.
+    GEO_PROPOSE_DISMISS: 'geo_propose_dismiss',     // { url } → { ok }
+
     // === Gestione cookie / consenso (src/content/cookies.js) ===
     // Il content script chiede la modalità corrente per decidere se rifiutare i
     // banner CMP e riscrivere gli embed YouTube in nocookie. → { mode }
