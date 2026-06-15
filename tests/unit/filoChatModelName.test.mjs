@@ -1,0 +1,60 @@
+// Unit test per #158: l'assistente della home (FILO_CHAT) deve sapere QUALE
+// modello lo sta eseguendo, e il nome passato dev'essere quello CONCRETO con cui
+// il codice invoca il modello (es. 'gemini-3.1-flash-lite'), NON il nickname/label
+// del registry (es. la chiave 'flash-lite-3' o l'etichetta 'Gemini 3.1 Flash Lite').
+//
+// Due pezzi puri, testabili senza Electron né rete:
+//   1) il template del prompt (PROMPTS.filoChat) include il nome del modello;
+//   2) la risoluzione nickname → id concreto (buildModelAttempts), che è ciò che
+//      l'handler passa al prompt (attempts[0].model).
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
+const require = createRequire(import.meta.url);
+const __dirname = dirname(fileURLToPath(import.meta.url));
+require(join(__dirname, '..', '..', 'src', 'shared', 'constants.js'));
+const C = globalThis.SN_CONST;
+
+const basePayload = { profilo: 'x', preferenze: 'y', stato: 'z' };
+
+test('PROMPTS.filoChat: con modelName, il prompt comunica il nome del modello', () => {
+  const p = C.PROMPTS.filoChat({ ...basePayload, modelName: 'gemini-3.1-flash-lite' });
+  assert.match(p, /gemini-3\.1-flash-lite/);
+  // E istruisce a rispondere con QUEL nome se gli chiedono che modello è.
+  assert.match(p, /quale modello/i);
+});
+
+test('PROMPTS.filoChat: senza modelName resta retrocompatibile (niente riga, niente "undefined")', () => {
+  const p = C.PROMPTS.filoChat({ ...basePayload });
+  assert.doesNotMatch(p, /undefined|null/);
+  // Non deve esserci la riga "Il modello che ti sta eseguendo è …".
+  assert.doesNotMatch(p, /modello che ti sta eseguendo/);
+});
+
+test('risoluzione: il nickname si risolve nell\'id CONCRETO del modello, non nel nickname/label', () => {
+  const registry = C.DEFAULT_MODEL_REGISTRY;
+  // 'flash-lite-3' è il nickname (chiave del registry); 'Gemini 3.1 Flash Lite'
+  // è la label; 'gemini-3.1-flash-lite' è il nome con cui il codice lo invoca.
+  const refs = C.parseModelRefs('flash-lite-3');
+  const attempts = C.buildModelAttempts(refs, registry, ['gemini', 'openrouter'], { gemini: 'k' });
+  assert.ok(attempts.length > 0);
+  assert.equal(attempts[0].model, 'gemini-3.1-flash-lite'); // id concreto
+  assert.notEqual(attempts[0].model, 'flash-lite-3');        // non il nickname
+  assert.notEqual(attempts[0].model, registry['flash-lite-3'].label); // non la label
+});
+
+test('integrazione concettuale: ciò che l\'handler passa al prompt è l\'id concreto', () => {
+  // Replica la catena dell'handler: parseModelRefs → buildModelAttempts →
+  // attempts[0].model → PROMPTS.filoChat({ modelName }). Il prompt contiene l'id
+  // concreto, mai il nickname.
+  const registry = C.DEFAULT_MODEL_REGISTRY;
+  const attempts = C.buildModelAttempts(C.parseModelRefs('flash-lite-3'), registry, ['gemini', 'openrouter'], { gemini: 'k' });
+  const modelName = attempts[0].model;
+  const p = C.PROMPTS.filoChat({ ...basePayload, modelName });
+  assert.match(p, /gemini-3\.1-flash-lite/);
+  assert.doesNotMatch(p, /flash-lite-3\b/);
+});
