@@ -348,7 +348,32 @@ class TabManager {
       for (const t of this.tabs) t.view.setVisible?.(t.id === id);
     }
     this._broadcast();
+    // Istruzione persistente per dominio ("questo sito sempre dagli USA"): se
+    // l'utente ha posato una regola su questo dominio, la tab nasce proxata
+    // sulla location indicata. Asincrono e best-effort (ricrea la view nella
+    // partition proxata, come la riapertura dall'archivio).
+    if (applyDomainRule && !isInternal) this._maybeApplyDomainRule(id);
     return id;
+  }
+
+  // Applica l'eventuale istruzione persistente per dominio alla tab appena nata.
+  // Salta le sessioni incognito (privacy), le tab già proxate (es. riapertura
+  // archivio, che porta la sua location salvata) e quelle chiuse nel frattempo.
+  async _maybeApplyDomainRule(id) {
+    try {
+      if (this.incognito) return;
+      const tab = this.tabs.find((t) => t.id === id);
+      if (!tab || tab.proxy) return;
+      if (!/^https?:\/\//i.test(tab.url || '')) return;
+      const settings = await this._readSettings();
+      const rules = settings && settings.proxy && settings.proxy.domainRules;
+      const rule = ProxyTab.domainRuleFor(rules, tab.url);
+      if (!rule) return;
+      // La tab potrebbe essere stata chiusa o aver navigato altrove nel frattempo.
+      const still = this.tabs.find((t) => t.id === id);
+      if (!still || still.proxy || ProxyTab.domainRuleFor(rules, still.url)?.country !== rule.country) return;
+      await this.setTabProxy(id, rule.country, { tier: rule.tier });
+    } catch (_) { /* l'auto-proxy non deve mai bloccare l'apertura della tab */ }
   }
 
   closeTab(id) {
