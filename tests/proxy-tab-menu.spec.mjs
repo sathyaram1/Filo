@@ -191,6 +191,57 @@ test('la freccia apre la lista paesi e "Francia" proxa da fr', async ({ app, she
   }
 });
 
+test('su tab già instradata "Cambia paese" apre la lista e cambia paese senza tornare in Italia', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const socks = await startSocks5();
+  try {
+    const url = testServer.html('<title>MENU_CHANGE</title><h1 id="ok">pagina</h1>');
+    const page = await openTab(url);
+    await page.waitForSelector('#ok');
+    await configureProvider(app, socks.port);
+
+    // Proxa col default (USA).
+    await rightClickTab(shell);
+    const menu = await findMenuPopup(app, 'Apri da un altro paese');
+    await menu.evaluate(() => {
+      [...document.querySelectorAll('button.item')]
+        .find((b) => /Apri da un altro paese/.test(b.textContent)).click();
+    });
+    await expect(shell.locator('.tab .proxy-ind .cc')).toHaveText('US', { timeout: 10_000 });
+
+    // Su tab proxata il menu offre "Cambia paese" (oltre a "Torna in Italia"),
+    // senza obbligare a tornare diretti prima di re-instradare.
+    await rightClickTab(shell);
+    const menu2 = await findMenuPopup(app, 'Cambia paese');
+    const text2 = await menu2.evaluate(() => document.body.innerText);
+    expect(text2).toMatch(/Cambia paese/);
+    expect(text2).toMatch(/Torna in Italia/);
+    expect(text2).not.toMatch(/vpn|proxy/i);
+
+    // "Cambia paese" apre la lista delle location.
+    await menu2.evaluate(() => {
+      [...document.querySelectorAll('button.item')]
+        .find((b) => /Cambia paese/.test(b.textContent)).click();
+    });
+    const picker = await findMenuPopup(app, 'Francia');
+    await picker.evaluate(() => {
+      [...document.querySelectorAll('button.item')]
+        .find((b) => /Francia/.test(b.textContent)).click();
+    });
+
+    // La tab è re-instradata da fr (mai passata per l'Italia: resta proxata).
+    await expect(shell.locator('.tab .proxy-ind .cc')).toHaveText('FR', { timeout: 10_000 });
+    const proxy = await app.evaluate(({ BrowserWindow }) => {
+      const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+      const t = w._filoTabs.tabs.find((x) => /^https?:/.test(x.url || ''));
+      return t.proxy && t.proxy.country;
+    });
+    expect(proxy).toBe('fr');
+  } finally {
+    await socks.close();
+  }
+});
+
 test('senza endpoint configurato la voce non compare', async ({ app, shell, openTab, testServer }) => {
   const url = testServer.html('<title>MENU_NOCFG</title><p id="p">ok</p>');
   const page = await openTab(url);
