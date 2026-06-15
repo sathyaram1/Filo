@@ -156,6 +156,17 @@
         return { partial: { tts: { pitch: n } }, label: `Tono lettura → ${n.toFixed(1)}` };
       },
     },
+    {
+      // La voce TTS è una stringa URI (voiceURI o nome del sistema): si imposta
+      // passando la stringa esatta come valore (il sistema la riconosce all'avvio).
+      // Reversibile (puoi cambiarla di nuovo) → livello 1.
+      keys: ['voce', 'voce lettura', 'voce tts', 'ttsvoice', 'voce del sistema'],
+      build(v) {
+        const s = String(v == null ? '' : v).trim();
+        if (!s) return null;
+        return { partial: { tts: { voice: s } }, label: `Voce di lettura → "${s}"` };
+      },
+    },
 
     // ── Funzionalità (interruttori) — reversibili, nessun rischio → livello 1 ──
     {
