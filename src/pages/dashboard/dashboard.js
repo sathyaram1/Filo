@@ -939,7 +939,13 @@
     if (!t.startsWith('/')) return 'none';
     const firstToken = t.split(/\s+/)[0];
     if (SLASH_COMMANDS[t] || SLASH_COMMANDS[firstToken]) return 'filo';
-    if (isSiteToken(t)) return 'filo';
+    if (isSiteToken(t)) {
+      // Sito: arancione di default; rosso SOLO se abbiamo già verificato che il
+      // dominio non esiste (niente flicker mentre il lookup è in volo).
+      const host = siteHostOf(t);
+      if (host && siteResolveCache.get(host) === false) return 'unknown';
+      return 'filo';
+    }
     if (terminalMode) {
       // In terminale "/x" è un comando shell: azzurro se esiste, rosso se no.
       const cmd = firstToken.slice(1);
