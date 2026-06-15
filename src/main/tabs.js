@@ -514,6 +514,92 @@ class TabManager {
     return { ok: true };
   }
 
+  // "Torna in Italia" su TUTTE le tab instradate da un altro paese (comando
+  // "chiudi/togli tutte le tab proxate", #152). Ritorna quante ne ha riportate.
+  clearAllProxies() {
+    let n = 0;
+    for (const t of this.tabs) {
+      if (t.proxy) { this.clearTabProxy(t.id); n += 1; }
+    }
+    return n;
+  }
+
+  // ─── regole proxy persistenti per dominio (#152) ───────────────────────────
+
+  // Ricarica la cache in-memory delle regole dallo storage (memoria a lungo
+  // termine di Filo). Best-effort: in caso d'errore tiene la cache precedente.
+  async loadProxyRules() {
+    try {
+      const FM = globalThis.SN_FILO_MEMORY;
+      this._proxyRules = (FM && (await FM.listProxyRules())) || {};
+    } catch (_) {
+      this._proxyRules = this._proxyRules || {};
+    }
+    return this._proxyRules;
+  }
+
+  // Regola persistente per l'URL (match sul dominio registrabile), o null.
+  // Sincrono: usato in will-navigate dove non si può attendere lo storage.
+  _ruleForUrl(url) {
+    if (!url || url.startsWith('filo://') || !/^https?:\/\//i.test(url)) return null;
+    const dom = Cookies.registrableOf(url);
+    return (dom && this._proxyRules && this._proxyRules[dom]) || null;
+  }
+
+  // Se `url` ha una regola persistente e la tab non è già instradata su quel
+  // paese, avvia il proxy (born proxied). NON blocca né previene la navigazione:
+  // setTabProxy ricrea la view nella partition proxata SOLO se il provider è
+  // configurato — altrimenti è un no-op silenzioso e la pagina resta diretta
+  // (mai una tab "appesa" perché il proxy non è configurato). Ritorna true se
+  // ha avviato l'instradamento. Incognito escluso (nessuna persistenza, §6).
+  _maybeApplyDomainRule(tab, url) {
+    if (!tab || this.incognito) return false;
+    const rule = this._ruleForUrl(url);
+    if (!rule || !rule.country) return false;
+    const code = ProxyTab.normalizeCountry(rule.country);
+    if (!code) return false;
+    if (tab.proxy && tab.proxy.country === code) return false; // già a posto
+    tab.url = url; // setTabProxy ricrea la view su tab.url attraverso l'endpoint
+    this.setTabProxy(tab.id, code, { tier: rule.tier || undefined }).catch(() => {});
+    return true;
+  }
+
+  // Salva la regola "questo sito sempre da <paese>" e la applica subito alle
+  // tab già aperte su quel dominio. `domain` può essere un host nudo o una URL:
+  // lo riduciamo al dominio registrabile — la STESSA chiave usata dal match in
+  // navigazione (_ruleForUrl), così la regola scatta davvero alla riapertura.
+  async setDomainProxyRule(country, { domain } = {}) {
+    const code = ProxyTab.normalizeCountry(country);
+    if (!code) return { ok: false, error: 'bad_country' };
+    const src = String(domain || '');
+    const dom = src ? Cookies.registrableOf(/:\/\//.test(src) ? src : `https://${src}`) : null;
+    if (!dom) return { ok: false, error: 'no_domain' };
+    const FM = globalThis.SN_FILO_MEMORY;
+    if (FM) await FM.setProxyRule(dom, { country: code });
+    await this.loadProxyRules();
+    // Applica subito alle tab già aperte su quel dominio (born proxied immediato).
+    for (const t of this.tabs) {
+      if (t.isInternal || !/^https?:\/\//i.test(t.url || '')) continue;
+      if (Cookies.registrableOf(t.url) !== dom) continue;
+      if (t.proxy && t.proxy.country === code) continue;
+      try { await this.setTabProxy(t.id, code); } catch (_) {}
+    }
+    return { ok: true, domain: dom, country: code };
+  }
+
+  // Toglie la regola persistente per il dominio. Non tocca le tab già proxate
+  // (l'utente può "tornare in Italia" a parte): rimuove solo l'automatismo
+  // futuro alla navigazione.
+  async removeDomainProxyRule({ domain } = {}) {
+    const src = String(domain || '');
+    const dom = src ? Cookies.registrableOf(/:\/\//.test(src) ? src : `https://${src}`) : null;
+    if (!dom) return { ok: false, error: 'no_domain' };
+    const FM = globalThis.SN_FILO_MEMORY;
+    if (FM) await FM.removeProxyRule(dom);
+    await this.loadProxyRules();
+    return { ok: true, domain: dom };
+  }
+
   // ─── §2.1 auto-archiviazione / riordino ─────────────────────────────────
 
   async _readSettings() {
