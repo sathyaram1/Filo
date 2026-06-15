@@ -44,6 +44,12 @@
       coOpenUrls: Array.isArray(meta.coOpenUrls) ? meta.coOpenUrls.slice(0, 30) : [],
       // Posizione di scroll: rimandata (la consuma §2.1). Campo riservato.
       scrollPosition: typeof meta.scrollPosition === 'number' ? meta.scrollPosition : null,
+      // Location proxy ("Apri da un altro paese"): { country, tier } se la tab
+      // era proxata alla chiusura, null altrimenti. Riaprendo dalla cronologia
+      // la tab rinasce proxata sulla stessa location.
+      proxy: meta.proxy && meta.proxy.country
+        ? { country: String(meta.proxy.country), tier: meta.proxy.tier || null }
+        : null,
     };
     items.unshift(entry);
     if (items.length > ARCHIVED_TABS_LIMIT) items.length = ARCHIVED_TABS_LIMIT;
