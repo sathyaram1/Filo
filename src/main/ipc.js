@@ -244,6 +244,12 @@ function registerIpcHandlers() {
     if (win?._filoTabs) win._filoTabs.navigate(id, url);
     return { ok: true };
   });
+  // Drag & drop nella barra: sposta una tab a una nuova posizione (toIndex).
+  ipcMain.handle('tabs:move', (event, { id, toIndex } = {}) => {
+    const win = winFor(event);
+    const moved = win?._filoTabs ? win._filoTabs.moveTab(id, toIndex) : false;
+    return { ok: true, moved };
+  });
   ipcMain.handle('tabs:reserve-top', (event, { px }) => {
     const win = winFor(event);
     if (win?._filoTabs) win._filoTabs.setTopInset(px);
