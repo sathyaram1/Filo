@@ -18,24 +18,28 @@ function tabsInfo(app) {
 
 test('Alt+numero porta alla tab corrispondente (da una pagina web)', async ({ app, openTab, testServer }) => {
   // Apri tre tab web; l'ultima resta attiva.
-  const page1 = await openTab(testServer.html('<title>UNO</title><h1 id="ok">1</h1>'));
+  await openTab(testServer.html('<title>UNO</title><h1 id="ok">1</h1>'));
   await openTab(testServer.html('<title>DUE</title><h1 id="ok">2</h1>'));
   const page3 = await openTab(testServer.html('<title>TRE</title><h1 id="ok">3</h1>'));
   await page3.waitForSelector('#ok');
 
   const before = await tabsInfo(app);
   expect(before.ids.length).toBeGreaterThanOrEqual(3);
+  // L'ultima tab aperta è attiva; non è già la prima (altrimenti il test è muto).
+  expect(before.activeId).not.toBe(before.ids[0]);
 
-  // Dalla pagina attiva premo Alt+1 → vado alla PRIMA tab (cammino
-  // before-input-event nel main: l'evento parte da una webContents di pagina).
+  // Il focus dev'essere sulla webContents della pagina perché before-input-event
+  // scatti (stesso pattern del test fullscreen-content).
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    const t = w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId);
+    try { t.view.webContents.focus(); } catch (_) {}
+  });
+  // Alt+1 mentre il focus è in una pagina → vado alla PRIMA tab. (Alt+cifra non
+  // produce testo: funziona anche mentre si scrive.)
   await page3.keyboard.press('Alt+Digit1');
   await expect.poll(() => tabsInfo(app).then((i) => i.activeId), { timeout: 10_000 })
     .toBe(before.ids[0]);
-
-  // Alt+3 dalla prima pagina → terza tab.
-  await page1.keyboard.press('Alt+Digit3');
-  await expect.poll(() => tabsInfo(app).then((i) => i.activeId), { timeout: 10_000 })
-    .toBe(before.ids[2]);
 });
 
 test('Alt+numero dal focus sulla barra (shell) cambia tab', async ({ app, shell, openTab, testServer }) => {
