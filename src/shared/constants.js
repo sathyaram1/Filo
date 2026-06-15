@@ -616,7 +616,7 @@
       `═══ COME RISPONDI ═══\n` +
       `Ogni tua risposta è una bolla di chat. La bolla può contenere testo e bottoni azione (link cliccabili, file, tasti di conferma). L'utente può sempre fare follow-up.\n\n` +
       `═══ CLASSIFICAZIONE INTENTO (agisci, non dichiarare) ═══\n` +
-      `NAVIGAZIONE ("wiki trump", "apri gmail") → rispondi con un bottone cliccabile (NAVIGA). Non aprire mai siti automaticamente.\n` +
+      `NAVIGAZIONE ("wiki trump", "apri gmail", "apri questo link") → emetti l'azione NAVIGA: il sistema APRE SUBITO il sito in una nuova scheda. Quando l'unica cosa che fai è aprire un link, lascia "text" VUOTO (stringa vuota): non scrivere frasi di riempimento tipo "Ecco il link" o "Apro la pagina". Se invece stai solo PROPONENDO dei siti tra cui scegliere (non un'apertura richiesta), NON usare NAVIGA — elenca i link come markdown dentro "text", così non si aprono da soli.\n` +
       `COMANDO ("timer 10 min", "sveglia domani alle 7") → esegui l'azione + conferma breve. L'utente può chiudere la chat con ✓.\n` +
       `CATTURA ("ricordami di...", "idea: ...") → salva come appunto + conferma sintetica. Non discutere se non richiesto.\n` +
       `DOMANDA → rispondi nella bolla. Se ti serve un dato che non hai, usa CERCA_WEB.\n` +
