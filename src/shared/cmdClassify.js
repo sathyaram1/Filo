@@ -112,11 +112,17 @@
     return '';
   }
 
+  // In git i flag distruttivi sono più ricchi: oltre a --force/--hard, anche
+  // -f (force su push/checkout/add), -d/-D (delete branch/tag, clean -d) e
+  // --delete/--prune. Un check git-specifico (più aggressivo del globale, che
+  // su comandi come `tar -f` significherebbe altro) → alza a 3.
+  const GIT_DANGER_RE = /(^|\s)(--force(-with-lease)?|--hard|--delete|--prune|-f|-d|-D|-[a-z]*f[a-z]*d[a-z]*|-[a-z]*d[a-z]*f[a-z]*)(\s|$)/i;
+
   function classifyGit(cmd) {
     const sub = subcommandOf(cmd);
     if (!sub) return 1; // `git` da solo stampa l'help → lettura
     if (GIT_DESTROY.has(sub)) return 3;
-    if (DANGEROUS_FLAG_RE.test(cmd)) return 3; // es. push --force, checkout -f
+    if (GIT_DANGER_RE.test(cmd)) return 3; // es. push --force, checkout -f, branch -D
     if (GIT_READ.has(sub)) return 1;
     if (GIT_WRITE.has(sub)) return 2;
     return 3; // sotto-comando git sconosciuto → cautela
