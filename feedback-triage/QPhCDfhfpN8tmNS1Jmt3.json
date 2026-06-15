@@ -1,7 +1,0 @@
-{
-  "id": "QPhCDfhfpN8tmNS1Jmt3",
-  "status": "done",
-  "notes": "Aggiunte le scorciatoie numeriche per le tab: Alt+1…9 porta alla tab corrispondente e Alt+0 alla decima. Ho usato Alt (non il semplice tasto numerico) perché un numero da solo serve a scrivere — con Alt la scorciatoia funziona anche mentre stai scrivendo in una pagina o nella barra, senza inserire cifre nel testo, e senza rubare il classico Ctrl/Cmd+numero del browser. Funziona ovunque: sia col focus sulla barra di Filo sia dentro una pagina web. Verificato con un test Playwright (focus su pagina e su barra) che controlla il passaggio alla tab giusta. Nota: se preferivi davvero il tasto numerico nudo (senza Alt) in un contesto specifico, fammelo sapere e lo cambio.",
-  "queuedAt": "2026-06-15T22:31:30.105Z",
-  "queuedBy": "routine"
-}

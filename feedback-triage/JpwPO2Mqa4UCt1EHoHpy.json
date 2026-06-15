@@ -1,7 +1,0 @@
-{
-  "id": "JpwPO2Mqa4UCt1EHoHpy",
-  "status": "done",
-  "notes": "Ora le tab che stanno riproducendo audio mostrano un'icona di altoparlante (in tinta accento Filo) accanto al titolo, distinta da quella di 'audio mutato'. Così riconosci a colpo d'occhio quale scheda fa rumore, anche se è in background. Oltre al chiesto: l'icona è cliccabile per silenziare al volo, e ho reso cliccabile anche l'indicatore di muto (per riattivare) — prima erano solo decorativi. Verificato con un test Playwright che forza lo stato 'in riproduzione' e controlla comparsa dell'indicatore + il muta/riattiva al click.",
-  "queuedAt": "2026-06-15T22:31:18.906Z",
-  "queuedBy": "routine"
-}
