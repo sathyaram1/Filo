@@ -89,7 +89,17 @@
     // contextmenu prima di eventuali handler della pagina ospite (alcune pagine
     // — es. iframe artifact di claude.ai — gestiscono il tasto destro su certi
     // SVG e lasciavano comparire il menu nativo del browser; feedback alpha).
-    window.addEventListener('contextmenu', onContextMenu, { capture: true });
+    //
+    // Su pagine web esterne il page-preload ha già registrato a document_start
+    // un listener window+capture (PRIMA di ogni script di pagina): gli passiamo
+    // il nostro handler così siamo i primi a ricevere l'evento anche sui siti che
+    // bloccano il contextmenu con stopImmediatePropagation (YouTube, Reddit…).
+    // Sulle pagine filo:// (nessun preload-bridge) registriamo direttamente.
+    if (typeof self.__snSetContextMenuHandler === 'function') {
+      self.__snSetContextMenuHandler(onContextMenu);
+    } else {
+      window.addEventListener('contextmenu', onContextMenu, { capture: true });
+    }
     // Prefetch "Spiega" appena l'utente seleziona del testo, così quando apre il
     // menu il risultato è già in cache. Debounce + dedup gestiti dallo scheduler.
     document.addEventListener('selectionchange', Actions.schedulePrefetchExplain);
