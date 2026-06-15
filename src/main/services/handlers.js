@@ -847,13 +847,18 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
     tabAperte: openTabsCount,
   };
 
+  // Fascia oraria grossolana per rinfrescare il saluto col passare della giornata
+  // (mattina/pomeriggio/sera/notte) senza ricalcoli al minuto.
+  const h = new Date().getHours();
+  const partOfDay = h < 6 ? 'notte' : h < 12 ? 'mattina' : h < 18 ? 'pomeriggio' : 'sera';
+
   const signature = DashboardRefresh.computeSignature({
     profilo, preferenze, espansioni, lezioni,
     noteIds: notesList.map((n) => n.id || n.text),
     notificaIds: notiList.map((n) => n.id || n.text),
     salvatiUrls: saved.map((p) => p.url),
     timerIds: timersList.map((t) => `${t.id}:${t.label}:${t.paused ? 1 : 0}`),
-    openTabsCount,
+    openTabsCount, partOfDay,
   });
 
   return { settings, hasKey, payload, signature, saved };
