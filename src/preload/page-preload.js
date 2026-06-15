@@ -49,6 +49,28 @@ if (process.argv.includes('--filo-suppress-autoplay')) {
   } catch (_) { /* il blocco non deve MAI impedire il caricamento della pagina */ }
 }
 
+// ─── Bridge contextmenu installato a document_start ─────────────────────────
+//
+// Alcuni siti (YouTube, Reddit, …) registrano il PROPRIO listener `contextmenu`
+// in fase di CATTURA su window al primo script di pagina e lo bloccano con
+// stopImmediatePropagation() per mostrare il loro menu. Se il nostro content
+// script si registrasse solo a DOMContentLoaded arriverebbe DOPO il loro
+// listener window+capture: a parità di target/fase vince chi si registra prima,
+// quindi il loro stopImmediatePropagation impediva al nostro handler di partire
+// e il menu Filo non compariva (feedback alpha: «tasto destro non funziona su
+// YouTube»). Il preload gira PRIMA di qualunque script di pagina: registrando
+// qui — subito, a document_start — il listener window+capture, siamo sempre i
+// primi a ricevere l'evento, su ogni sito. Il vero handler (in content.js, che
+// ha bisogno di settings/spellcheck/Menu) si installa più tardi via
+// __snSetContextMenuHandler; fino ad allora il bridge non fa nulla.
+try {
+  let contextMenuHandler = null;
+  globalThis.__snSetContextMenuHandler = (fn) => { contextMenuHandler = fn; };
+  window.addEventListener('contextmenu', (e) => {
+    if (typeof contextMenuHandler === 'function') contextMenuHandler(e);
+  }, { capture: true });
+} catch (_) { /* il bridge non deve MAI impedire il caricamento della pagina */ }
+
 // Modalità zoom con la rotella attivata dal click centrale (sostituisce
 // l'autoscroll nativo). Vedi wheel-zoom.js.
 try { require('./wheel-zoom.js')(webFrame); } catch (e) { console.error('[Filo CS] wheel-zoom', e); }
