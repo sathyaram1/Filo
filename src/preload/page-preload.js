@@ -16,6 +16,39 @@
 const { ipcRenderer, webFrame } = require('electron');
 const path = require('node:path');
 
+// ─── #145 — blocco autoplay sulle schede RIPRISTINATE al boot ───────────────
+//
+// Le schede riaperte all'avvio di Filo nascono con il flag
+// '--filo-suppress-autoplay' (passato via additionalArguments dal main): i loro
+// media non devono partire da soli (i video YouTube ripartivano tutti insieme).
+// Installiamo SUBITO — prima ancora del caricamento della pagina — un listener
+// 'play' in fase di cattura che rimette in pausa qualunque media tenti di
+// autopartire. Si disattiva alla PRIMA interazione dell'utente con la scheda:
+// da lì in poi i media partono normalmente (è l'utente a comandarli). Il
+// listener vive nel mondo isolato del preload ma ascolta il DOM condiviso.
+if (process.argv.includes('--filo-suppress-autoplay')) {
+  try {
+    let active = true;
+    const onPlay = (e) => {
+      if (!active) return;
+      const m = e.target;
+      if (m && typeof m.pause === 'function') { try { m.pause(); } catch (_) {} }
+    };
+    document.addEventListener('play', onPlay, true);
+    const release = () => {
+      if (!active) return;
+      active = false;
+      document.removeEventListener('play', onPlay, true);
+      for (const ev of ['pointerdown', 'keydown', 'click', 'touchstart']) {
+        window.removeEventListener(ev, release, true);
+      }
+    };
+    for (const ev of ['pointerdown', 'keydown', 'click', 'touchstart']) {
+      window.addEventListener(ev, release, true);
+    }
+  } catch (_) { /* il blocco non deve MAI impedire il caricamento della pagina */ }
+}
+
 // Modalità zoom con la rotella attivata dal click centrale (sostituisce
 // l'autoscroll nativo). Vedi wheel-zoom.js.
 try { require('./wheel-zoom.js')(webFrame); } catch (e) { console.error('[Filo CS] wheel-zoom', e); }
