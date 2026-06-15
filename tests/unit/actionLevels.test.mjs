@@ -104,6 +104,28 @@ test('describe spiega in chiaro la modifica per il popup', () => {
   assert.equal(AL.describe({ type: 'SCONOSCIUTA' }), '');
 });
 
+test('ESEGUI_COMANDO (#146.6): il livello dipende dal comando, classificato dal registro', () => {
+  // Sola lettura → 1 (esegue subito).
+  assert.equal(AL.levelFor({ type: 'ESEGUI_COMANDO', comando: 'ls -la' }), 1);
+  assert.equal(AL.levelFor({ type: 'ESEGUI_COMANDO', comando: 'git status' }), 1);
+  // Modifica recuperabile → 2 (popup).
+  assert.equal(AL.levelFor({ type: 'ESEGUI_COMANDO', comando: 'git push' }), 2);
+  assert.equal(AL.levelFor({ type: 'ESEGUI_COMANDO', comando: 'npm install' }), 2);
+  // Cancellazione / non riconosciuto / concatenato → 3 (digita "conferma").
+  assert.equal(AL.levelFor({ type: 'ESEGUI_COMANDO', comando: 'rm -rf build' }), 3);
+  assert.equal(AL.levelFor({ type: 'ESEGUI_COMANDO', comando: 'comandoinventato' }), 3);
+  assert.equal(AL.levelFor({ type: 'ESEGUI_COMANDO', comando: 'ls && rm x' }), 3);
+  // Comando assente → 3 per cautela (mai eseguire alla cieca).
+  assert.equal(AL.levelFor({ type: 'ESEGUI_COMANDO' }), 3);
+  assert.equal(AL.levelFor({ type: 'ESEGUI_COMANDO', comando: '' }), 3);
+});
+
+test('ESEGUI_COMANDO: describe mostra il comando ESATTO che verrà eseguito', () => {
+  const d = AL.describe({ type: 'ESEGUI_COMANDO', comando: 'git push origin main' });
+  assert.match(d, /terminale/i);
+  assert.match(d, /git push origin main/);
+});
+
 test('ogni azione registrata ha un livello valido e una describe', () => {
   for (const [type, entry] of Object.entries(AL.REGISTRY)) {
     const lvl = AL.levelFor({ type, chiave: 'tema', valore: 'scuro' });
