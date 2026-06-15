@@ -1,7 +1,0 @@
-{
-  "id": "WuHvyBZ0bz9IpUrG9hDk",
-  "status": "done",
-  "notes": "Aprire una nuova scheda ora e' istantaneo: la home mostra subito l'ultima versione gia' pronta, senza aspettare che l'AI la rigeneri. Il ricalcolo del messaggio avviene in background SOLO quando cambia davvero qualcosa che lo influenza (nuove lezioni/memorie, appunti, pagine salvate, notifiche, timer, o e' cambiato il numero di schede aperte), con un tetto di massimo un ricalcolo ogni 2 minuti: tutte le modifiche che capitano nel mezzo vengono accorpate in un solo aggiornamento. Quando il nuovo messaggio e' pronto, le home aperte si aggiornano da sole, senza ricaricare. In piu' (oltre al chiesto): il saluto si rinfresca col passare della giornata (mattina/pomeriggio/sera/notte) e l'aggiornamento e' sincronizzato su tutte le schede home aperte contemporaneamente. Verificato con unit test sulla logica (quando ricalcolare + tetto/accorpamento) e con un test che controlla l'aggiornamento live della home; i test esistenti di dashboard restano verdi. Nota: il flusso col vero modello AI non e' testato end-to-end in locale (manca la chiave API nei test), ma usa la stessa infrastruttura AI gia' in uso altrove.",
-  "queuedAt": "2026-06-15T12:39:14.106Z",
-  "queuedBy": "routine"
-}
