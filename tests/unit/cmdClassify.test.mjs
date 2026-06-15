@@ -135,6 +135,44 @@ test('il path del programma è normalizzato (basename + estensione)', () => {
   assert.equal(lvl('/bin/rm file'), 3);
 });
 
+test('livello 1 — interrogazioni di versione/help dei tool comuni (sola lettura)', () => {
+  for (const cmd of [
+    'node --version', 'node -v', 'python --version', 'python -V', 'python3 --version',
+    'go version', 'docker --version', 'docker --help', 'kubectl version',
+    'java -version', 'dotnet --version', 'rustc --version', 'cargo --version',
+    'cargo -V', 'tsc --version', 'gcc --version', 'ruby -v', 'php --version',
+    'deno --version', 'npx --version', 'mvn --version', 'gradle --version',
+    // anche i tool LEVEL2 ridotti a --version/--help sono lettura
+    'curl --version', 'tar --version', 'mkdir --help', 'wget --version',
+  ]) {
+    assert.equal(lvl(cmd), 1, `"${cmd}" (versione/help) dovrebbe essere livello 1`);
+  }
+});
+
+test('livello 3 — gli stessi interpreti restano 3 quando eseguono codice', () => {
+  for (const cmd of [
+    'node', 'node app.js', 'python -c "print(1)"', 'go run main.go', 'go build',
+    'docker run alpine', 'docker ps', 'cargo build', 'npx create-react-app x',
+    'java -jar app.jar', 'make all', 'code .',
+  ]) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" (esecuzione) dovrebbe restare livello 3`);
+  }
+});
+
+test('le shell dirette restano sempre 3, anche con flag di versione', () => {
+  // `bash` da solo apre una sessione interattiva; nessuna eccezione versione.
+  assert.equal(lvl('bash'), 3);
+  assert.equal(lvl('bash --version'), 3);
+  assert.equal(lvl('powershell -Command Get-Process'), 3);
+  assert.equal(lvl('sh'), 3);
+});
+
+test('livello 1 — comandi di diagnostica di sola lettura aggiunti', () => {
+  for (const cmd of ['ps', 'ps aux', 'free -h', 'lscpu', 'lsblk', 'printenv PATH', 'whereis node', 'who', 'sha256sum file']) {
+    assert.equal(lvl(cmd), 1, `"${cmd}" dovrebbe essere livello 1`);
+  }
+});
+
 test('"criterio di fatto" della spec — gli esempi citati', () => {
   assert.equal(lvl('ls'), 1, 'ls esegue subito');
   assert.equal(lvl('git push'), 2, 'git push → popup');
