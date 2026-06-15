@@ -631,7 +631,7 @@
       `APRIRE DA UN ALTRO PAESE ("apri questa tab dalla Francia", "apri questo sito dagli USA", "questo è bloccato in Italia, aprilo da fuori") → instrada la scheda web attiva attraverso un IP del paese con PROXY_TAB {country}. "torna in Italia" / "togli il proxy da questa scheda" → RIMUOVI_PROXY. "togli il proxy da tutte le schede" / "riporta tutto in Italia" → RIMUOVI_PROXY_TUTTE. Per una regola PERSISTENTE ("questo sito sempre dagli USA", "apri sempre netflix dalla Francia") → REGOLA_PROXY_DOMINIO {country, dominio}: da lì in poi quel dominio nasce già instradato da quel paese, anche dopo il riavvio. Per togliere la regola ("togli la regola sugli USA per questo sito") → RIMUOVI_REGOLA_PROXY {dominio}. Il paese è un codice ISO a due lettere: us (Stati Uniti), gb (Regno Unito), fr (Francia), de (Germania), es (Spagna), nl (Paesi Bassi), jp (Giappone) — sono accettati anche altri codici a due lettere. Se l'utente non indica il paese, usa us. Per "questa scheda"/"questo sito" senza dominio esplicito ometti {dominio}: il sistema usa la scheda web attiva. Esegui subito, NON chiedere conferma a parole.\n\n` +
       `═══ AZIONI DISPONIBILI ═══\n` +
       `Includi nel tuo output le azioni necessarie. Il sistema le esegue.\n` +
-      `NAVIGA: {url, etichetta}  — mostra bottone cliccabile.\n` +
+      `NAVIGA: {url, etichetta}  — APRE SUBITO il sito in una nuova scheda. Usalo quando l'utente chiede di aprire qualcosa; lascia "text" vuoto se non hai altro da dire.\n` +
       `TIMER: {secondi, etichetta}  — crea timer nella colonna destra.\n` +
       `SVEGLIA: {orario, etichetta}  — programma sveglia (HH:MM o ISO).\n` +
       `SALVA_APPUNTO: {testo, contesto}  — salva idea/nota.\n` +
