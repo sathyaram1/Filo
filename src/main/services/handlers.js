@@ -659,6 +659,67 @@ async function executeFiloAction(action, { confirmed = false } = {}) {
         return { executed: false, kept: true };
       case 'APRI_FILE':
         return { executed: true, kept: true };
+      case 'APRI_DA_PAESE': {
+        // "Apri questa tab dalla Francia": instrada la tab web attiva via un IP
+        // del paese chiesto (le stesse primitive del menu tasto destro). Senza
+        // paese, setTabProxy usa l'ultima location usata.
+        const ProxyTab = require('./proxyTab');
+        const code = ProxyTab.normalizeCountry(action.paese ?? action.country ?? action.pais ?? action.codice);
+        const { tm, tab } = activeWebTab();
+        if (!tm || !tab) return { executed: false, kept: false };
+        const r = await tm.setTabProxy(tab.id, code || undefined);
+        return { executed: !!(r && r.ok), kept: false };
+      }
+      case 'RIMUOVI_PROXY': {
+        // "Torna in Italia" (tab attiva) o "chiudi tutte le tab proxate"
+        // (tutte:true → enumerazione + clearTabProxy su ognuna).
+        const all = action.tutte === true || action.tutte === 'true' || action.all === true;
+        const { tm, tab } = activeWebTab();
+        if (!tm) return { executed: false, kept: false };
+        let n = 0;
+        if (all) {
+          for (const t of tm.tabs.slice()) {
+            if (t.proxy) { try { tm.clearTabProxy(t.id); n += 1; } catch (_) {} }
+          }
+        } else if (tab && tab.proxy) {
+          try { tm.clearTabProxy(tab.id); n = 1; } catch (_) {}
+        }
+        return { executed: n > 0, kept: false };
+      }
+      case 'REGOLA_PROXY_DOMINIO': {
+        // "Questo sito sempre dagli USA" → istruzione persistente per dominio
+        // (sopravvive al riavvio). "Togli la regola per questo sito" → rimuovi.
+        const ProxyTab = require('./proxyTab');
+        const remove = action.rimuovi === true || action.rimuovi === 'true' || action.remove === true;
+        const { tm, tab } = activeWebTab();
+        let domainInput = action.dominio ?? action.domain ?? action.sito ?? action.site ?? '';
+        if (!domainInput && tab) domainInput = tab.url;
+        const host = ProxyTab.normalizeDomain(domainInput);
+        if (!host) return { executed: false, kept: false };
+        let settings = {};
+        try { settings = await Storage.getSettings(); } catch (_) {}
+        const rules = (settings.proxy && settings.proxy.domainRules) || {};
+        if (remove) {
+          const next = ProxyTab.removeDomainRule(rules, host);
+          await applySettingsUpdate({ proxy: { domainRules: next } });
+          // Coerenza: se la tab attiva era proxata per via di questa regola,
+          // riportala in Italia (la regola non c'è più).
+          if (tm && tab && tab.proxy && ProxyTab.normalizeDomain(tab.url) === host) {
+            try { tm.clearTabProxy(tab.id); } catch (_) {}
+          }
+          return { executed: true, kept: false };
+        }
+        const code = ProxyTab.normalizeCountry(action.paese ?? action.country ?? action.pais ?? action.codice);
+        const next = ProxyTab.setDomainRule(rules, host, code, action.tier);
+        if (!next) return { executed: false, kept: false };
+        await applySettingsUpdate({ proxy: { domainRules: next } });
+        // Effetto immediato: se la tab attiva è già su quel dominio e non è
+        // ancora proxata, applichiamo subito (non aspettiamo la prossima nascita).
+        if (tm && tab && !tab.proxy && ProxyTab.normalizeDomain(tab.url) === host) {
+          try { await tm.setTabProxy(tab.id, code); } catch (_) {}
+        }
+        return { executed: true, kept: false };
+      }
       case 'ESEGUI_COMANDO': {
         // A questo punto: modalità terminale attiva (gate sopra) e livello
         // soddisfatto (1 = passa diretto; 2/3 = già confermato). Eseguiamo il
