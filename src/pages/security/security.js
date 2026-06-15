@@ -11,6 +11,18 @@
 
   function $(id) { return document.getElementById(id); }
 
+  // Estrae l'host del fornitore proxy dal template datacenter configurato
+  // (es. 'socks5://user-{country}:pass@gate.provider.com:7000' → 'gate.provider.com').
+  // Ritorna '' se non configurato o non parsabile. La pagina mostra l'host per
+  // dichiarare onestamente per chi passa il traffico delle tab "da un altro paese".
+  function proxyProviderHost(proxy) {
+    const tmpl = String((proxy && proxy.datacenter) || '').trim();
+    if (!tmpl) return '';
+    const filled = tmpl.replace(/\{country\}/gi, 'us');
+    const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(filled) ? filled : `socks5://${filled}`;
+    try { return new URL(withScheme).hostname || ''; } catch (_) { return ''; }
+  }
+
   function fillStaticText() {
     document.title = I18n.t('security_title');
     $('title').textContent = I18n.t('security_title');
