@@ -1,0 +1,7 @@
+{
+  "id": "fwYLH9jryBgREzWIDqRy",
+  "status": "done",
+  "notes": "Ora la barra di Filo e' multilinea: premi Maiusc+Invio per andare a capo e scrivere su piu' righe; Invio da solo invia il messaggio. La barra cresce da sola mentre aggiungi righe e torna a una riga dopo l'invio (e gli a capo restano nel messaggio inviato). Verificato con un test che scrive due righe con Maiusc+Invio senza inviare e poi invia con Invio, e con un controllo visivo.",
+  "queuedAt": "2026-06-15T12:03:26.780Z",
+  "queuedBy": "routine"
+}
