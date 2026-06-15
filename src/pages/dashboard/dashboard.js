@@ -755,10 +755,8 @@
     });
     bubblesEl.appendChild(userBubble);
 
-    // Bolla Filo pending
-    const pending = makeBubble({ role: 'filo', text: 'Filo sta pensando…', pending: true });
-    bubblesEl.appendChild(pending);
-    bubblesEl.scrollTop = bubblesEl.scrollHeight;
+    // Bolla Filo "sta pensando": 3 righe di reasoning che scorrono e svaniscono.
+    const pending = appendThinking();
 
     const msg = {
       type: MSG.FILO_CHAT,
