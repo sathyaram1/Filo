@@ -10,7 +10,9 @@
   // chi manca è stato rimosso" (es. modelRegistry: rimuovere un nickname dalla
   // UI deve cancellarlo dallo storage, non lasciarlo lì in vita perché era in
   // target).
-  const REPLACE_KEYS = new Set(['modelRegistry', 'themeTokens']);
+  // domainRules (proxy.domainRules — "questo sito sempre dagli USA"): rimuovere
+  // una regola deve cancellarla, non rifonderla con la vecchia mappa.
+  const REPLACE_KEYS = new Set(['modelRegistry', 'themeTokens', 'domainRules']);
 
   function deepMerge(target, source, path = '') {
     if (typeof target !== 'object' || target === null) return source;
