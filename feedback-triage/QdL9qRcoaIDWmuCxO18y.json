@@ -1,0 +1,7 @@
+{
+  "id": "QdL9qRcoaIDWmuCxO18y",
+  "status": "done",
+  "notes": "Il pulsante 'schermo intero' dei siti (es. il player di YouTube) ora porta davvero il video a tutto schermo: prima la pagina restava confinata sotto la barra delle schede. Collegato a questo, ho risolto anche il tasto destro che 'non funzionava' col video a tutto schermo: il menu di Filo compariva ma restava nascosto dietro al video (in fullscreen il browser disegna solo l'elemento a schermo intero), quindi non potevi mandare feedback. Ora il menu si apre sopra al video. Premendo Esc si esce dal fullscreen del sito come da abitudine. Verificato con due test: uno che controlla che una richiesta di fullscreen porti davvero la view a coprire la finestra, e uno che, col contenuto a tutto schermo, il tasto destro apra il menu di Filo nel posto giusto.",
+  "queuedAt": "2026-06-15T23:20:37.567Z",
+  "queuedBy": "routine"
+}
