@@ -396,7 +396,7 @@
     // notes
     listNotes, addNote, deleteNote,
     // timer
-    listTimers, addTimer, deleteTimer, gcTimers,
+    listTimers, addTimer, deleteTimer, gcTimers, stopTimerAlarm,
     // notifications
     listNotifications, addNotification, dismissNotification,
     // dashboard cache
