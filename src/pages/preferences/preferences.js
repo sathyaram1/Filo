@@ -393,6 +393,11 @@
     const shellOpt = [...$('terminalShell').options].find((o) => o.value === shell);
     $('terminalShell').value = shellOpt ? shell : 'powershell';
 
+    // Suoneria timer
+    const ringtone = settings.timerRingtone || 'default';
+    const ringOpt = [...$('timerRingtone').options].find((o) => o.value === ringtone);
+    $('timerRingtone').value = ringOpt ? ringtone : 'default';
+
     const tts = settings.tts || {};
     if (ttsSupported()) {
       const rate = Number(tts.rate) || 1;
