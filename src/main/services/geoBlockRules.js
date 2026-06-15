@@ -89,6 +89,38 @@ function shouldNoteVideoData({ proxied, playingMs, alreadyNoted } = {}) {
   return Number(playingMs) >= VIDEO_DATA_NOTE_MS;
 }
 
+// "Cookie di login presenti per il dominio" (spec §5, riga (b)) — euristica pura
+// sui cookie già letti dalla session del tab. Il wiring legge i cookie reali
+// (Electron session.cookies.get) e passa qui solo {name, httpOnly}.
+//
+// Direzione conservativa voluta: nel dubbio si considera "c'è una sessione" →
+// PROPONE invece di riprovare in silenzio. La spec è esplicita che il retry
+// silenzioso a sessione attiva è il danno da evitare (logout forzati, alert di
+// sicurezza), quindi un falso positivo qui costa poco, un falso negativo molto.
+
+// Nomi che indicano in modo diretto una sessione/identità.
+const LOGIN_NAME_RE = /sess|(^|[_-])sid([_-]|$)|auth|token|jwt|login|logged|account|oauth|passport|remember|csrf|(^|[_-])uid([_-]|$)/i;
+
+// Cookie tecnici NON di autenticazione, anche quando httpOnly: consenso,
+// analytics, bot-management dei CDN. Non devono far scattare "sessione attiva".
+const NON_AUTH_NAME_RE = /consent|cookieconsent|gdpr|^_ga|^_gid|^_gat|^_gcl|analytics|^__cf_bm$|^cf_clearance$|^__cflb$|^_fbp$|^_hj/i;
+
+function looksLikeLoginCookie(cookie) {
+  if (!cookie) return false;
+  const name = String(cookie.name || '');
+  if (!name) return false;
+  if (NON_AUTH_NAME_RE.test(name)) return false;
+  if (LOGIN_NAME_RE.test(name)) return true;
+  // Un cookie httpOnly è gestito dal server e tipicamente accompagna una
+  // sessione: nel dubbio lo trattiamo come login (direzione conservativa).
+  return !!cookie.httpOnly;
+}
+
+function hasLoginCookie(cookies) {
+  if (!Array.isArray(cookies)) return false;
+  return cookies.some(looksLikeLoginCookie);
+}
+
 const api = {
   ACTIONS,
   TIERS,
@@ -96,6 +128,8 @@ const api = {
   VIDEO_DATA_NOTE_MS,
   decideGeoAction,
   shouldNoteVideoData,
+  looksLikeLoginCookie,
+  hasLoginCookie,
 };
 
 module.exports = api;
