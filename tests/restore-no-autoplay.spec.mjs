@@ -47,15 +47,14 @@ async function findWindow(app, predicate, timeoutMs = 12_000) {
   return null;
 }
 
-// Prova reale di autoplay: serve una SORGENTE vera (un minuscolo WAV silenzioso
-// come data-URI) così che play() superi la selezione della risorsa e arrivi al
-// controllo della policy. Senza gesto utente:
-//   - autoplay bloccato → play() rifiuta con 'NotAllowedError' (il video/audio
-//     resterebbe in pausa, esattamente ciò che vuole il feedback);
-//   - autoplay permesso → play() risolve → 'played'.
-// Il race col timeout è solo una rete di sicurezza contro un play() appeso.
-const autoplayResult = (page) => page.evaluate(async () => {
-  function makeWav(seconds = 0.2, rate = 8000) {
+// Prova reale di autoplay: crea un <audio> con una SORGENTE vera (un minuscolo
+// WAV silenzioso come data-URI, in loop così non finisce da solo) e tenta
+// l'autoplay senza alcun gesto utente. Dopo un istante guardiamo se sta
+// suonando: è ciò che l'utente vedrebbe come "il video è partito" o "è in pausa".
+//   - su una scheda ripristinata il blocco lo rimette in pausa → paused === true;
+//   - su una scheda nuova l'autoplay permissivo di Filo lo lascia suonare → false.
+const isPausedAfterAutoplay = (page) => page.evaluate(async () => {
+  function makeWav(seconds = 1, rate = 8000) {
     const n = Math.floor(seconds * rate);
     const buf = new ArrayBuffer(44 + n);
     const dv = new DataView(buf);
@@ -71,9 +70,10 @@ const autoplayResult = (page) => page.evaluate(async () => {
   }
   const a = new Audio(makeWav());
   a.muted = false;
-  const play = a.play().then(() => 'played', (e) => (e && e.name ? e.name : String(e)));
-  const timeout = new Promise((r) => setTimeout(() => r('pending'), 3000));
-  return Promise.race([play, timeout]);
+  a.loop = true;
+  a.play().catch(() => {}); // se bloccato rigetta; lo stato vero lo legge .paused
+  await new Promise((r) => setTimeout(r, 500)); // tempo al blocco di intervenire
+  return a.paused;
 });
 
 test('le tab ripristinate non fanno partire i video (autoplay bloccato al boot)', async () => {
