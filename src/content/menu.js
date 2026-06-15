@@ -325,7 +325,7 @@
       root.appendChild(el);
     }
 
-    document.documentElement.appendChild(root);
+    menuHost().appendChild(root);
 
     // Compensazione zoom (così il menu non scala con Ctrl+/-)
     const cleanupZoom = (global.SN_POPUP?.attachZoomCompensation || (() => () => {}))(root);
