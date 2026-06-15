@@ -1063,6 +1063,7 @@
     if (terminalMode) {
       runShellCommand(text.slice(1).trim());
       inputEl.value = '';
+      autoGrowInput();
       updateInputClass();
       return true;
     }
