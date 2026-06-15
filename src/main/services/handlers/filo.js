@@ -72,6 +72,12 @@ module.exports = function register(on, ctx) {
     return { ok: true, timers: list };
   });
 
+  on(MSG.FILO_STOP_TIMER_ALARM, async (msg) => {
+    const list = await FiloMem.stopTimerAlarm(msg.id);
+    broadcastLiveUpdate();
+    return { ok: true, timers: list };
+  });
+
   on(MSG.FILO_GET_NOTIFICATIONS, async () => ({ ok: true, notifications: await FiloMem.listNotifications() }));
 
   on(MSG.FILO_DISMISS_NOTIFICATION, async (msg) => {
