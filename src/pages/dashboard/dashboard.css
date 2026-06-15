@@ -550,13 +550,20 @@ body[data-state="thread"] .dash-suggestion { justify-content: flex-start; paddin
 }
 .dash-input {
   flex: 1;
+  min-width: 0;
   border: none;
   background: transparent;
   outline: none;
   padding: 10px 14px;
   font-size: 15px;
+  line-height: 1.4;
   color: var(--dash-ink);
   font-family: inherit;
+  /* Si comporta come una riga singola ma cresce con Shift+Invio fino a ~6 righe,
+     poi scrolla. resize:none toglie la maniglia nativa; l'altezza la pilota il JS. */
+  resize: none;
+  overflow-y: auto;
+  max-height: 160px;
 }
 .dash-input::placeholder { color: var(--dash-ink-mute); }
 .dash-send {
