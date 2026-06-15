@@ -88,3 +88,66 @@ test('LOCATIONS: lista curata (~5-8 paesi, non 50) con codici alpha-2 unici', ()
   }
   assert.ok(codes.includes('us')); // default da spec
 });
+
+// ─── istruzioni persistenti per dominio ("questo sito sempre dagli USA") ────
+
+test('normalizeDomain: estrae l\'host da dominio/URL, toglie www e porta/path', () => {
+  assert.equal(P.normalizeDomain('Example.com'), 'example.com');
+  assert.equal(P.normalizeDomain('www.netflix.com'), 'netflix.com');
+  assert.equal(P.normalizeDomain('https://news.bbc.co.uk/some/path?x=1'), 'news.bbc.co.uk');
+  assert.equal(P.normalizeDomain('example.com:443/path'), 'example.com');
+  assert.equal(P.normalizeDomain(' youtube.com. '), 'youtube.com');
+  // Non-domini → null (niente regola su roba senza punto o con spazi).
+  assert.equal(P.normalizeDomain('localhost'), null);
+  assert.equal(P.normalizeDomain('non un dominio'), null);
+  assert.equal(P.normalizeDomain(''), null);
+  assert.equal(P.normalizeDomain(null), null);
+});
+
+test('setDomainRule: aggiunge una regola normalizzata su una nuova mappa', () => {
+  const before = {};
+  const after = P.setDomainRule(before, 'www.Netflix.com', 'US', 'datacenter');
+  assert.deepEqual(after, { 'netflix.com': { country: 'us', tier: 'datacenter' } });
+  assert.deepEqual(before, {}); // immutabilità: l'originale non cambia
+  // Paese non valido o dominio non valido → null (nessuna scrittura).
+  assert.equal(P.setDomainRule({}, 'netflix.com', 'europa'), null);
+  assert.equal(P.setDomainRule({}, 'localhost', 'us'), null);
+  // tier residenziale rispettato; default datacenter.
+  assert.equal(P.setDomainRule({}, 'x.com', 'gb', 'residential')['x.com'].tier, 'residential');
+  assert.equal(P.setDomainRule({}, 'x.com', 'gb')['x.com'].tier, 'datacenter');
+});
+
+test('setDomainRule: aggiornare un dominio già presente non lascia doppioni', () => {
+  const r1 = P.setDomainRule({}, 'netflix.com', 'us');
+  const r2 = P.setDomainRule(r1, 'WWW.netflix.com', 'gb');
+  assert.deepEqual(Object.keys(r2), ['netflix.com']);
+  assert.equal(r2['netflix.com'].country, 'gb');
+});
+
+test('removeDomainRule: cancella la regola (anche per chiave non normalizzata)', () => {
+  const rules = { 'netflix.com': { country: 'us', tier: 'datacenter' }, 'bbc.co.uk': { country: 'gb' } };
+  const after = P.removeDomainRule(rules, 'https://www.netflix.com/');
+  assert.deepEqual(after, { 'bbc.co.uk': { country: 'gb' } });
+  assert.deepEqual(rules, { 'netflix.com': { country: 'us', tier: 'datacenter' }, 'bbc.co.uk': { country: 'gb' } });
+  // Dominio assente → mappa invariata (copia).
+  assert.deepEqual(P.removeDomainRule(rules, 'altro.com'), rules);
+});
+
+test('domainRuleFor: match esatto, per sottodominio, e chiave più specifica', () => {
+  const rules = {
+    'bbc.co.uk': { country: 'gb', tier: 'datacenter' },
+    'iplayer.bbc.co.uk': { country: 'us' },
+  };
+  // Esatto.
+  assert.deepEqual(P.domainRuleFor(rules, 'bbc.co.uk'), { country: 'gb', tier: 'datacenter' });
+  // Sottodominio non coperto da regola specifica → eredita quella del dominio.
+  assert.deepEqual(P.domainRuleFor(rules, 'https://news.bbc.co.uk/x'), { country: 'gb', tier: 'datacenter' });
+  // Chiave più specifica vince.
+  assert.deepEqual(P.domainRuleFor(rules, 'https://iplayer.bbc.co.uk/'), { country: 'us', tier: 'datacenter' });
+  // Nessuna regola → null.
+  assert.equal(P.domainRuleFor(rules, 'netflix.com'), null);
+  assert.equal(P.domainRuleFor({}, 'bbc.co.uk'), null);
+  assert.equal(P.domainRuleFor(null, 'bbc.co.uk'), null);
+  // Regola con paese corrotto → null (non si proxa verso il nulla).
+  assert.equal(P.domainRuleFor({ 'x.com': { country: 'zzz' } }, 'x.com'), null);
+});
