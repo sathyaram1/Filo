@@ -1,0 +1,7 @@
+{
+  "id": "WPbR3oe9aFIvaKzg5TTf",
+  "status": "done",
+  "notes": "@\nOra puoi controllare il proxy per-tab (\"apri da un altro paese\") parlando con Filo in chat. Esempi che funzionano: \"apri questa scheda dalla Francia\", \"torna in Italia\", \"togli il proxy da tutte le schede\", \"questo sito sempre dagli USA\" (regola persistente), \"togli la regola sugli USA per questo sito\". Con una regola persistente, riaprendo quel sito la scheda nasce gia instradata dal paese scelto, e la regola sopravvive al riavvio dell app. \"Questa scheda\" = la scheda web attiva (se parli con Filo dalla dashboard, l ultima scheda web che stavi guardando).\n\nOltre al chiesto ho aggiunto: il comando per riportare in Italia TUTTE le schede in un colpo solo; l instradamento automatico della regola scatta non solo aprendo una nuova scheda ma anche navigando dalla barra indirizzi o cliccando un link verso il dominio; e impostando una regola le schede gia aperte su quel sito vengono instradate subito.\n\nVerificato con unit test (routing dei comandi verso le primitive + salvataggio/normalizzazione/persistenza delle regole) e con test end-to-end Playwright che instradano davvero una scheda via proxy, salvano la regola e confermano che riaprendo il dominio la scheda nasce proxata anche dopo il riavvio. I test del proxy esistenti continuano a passare.\n@",
+  "queuedAt": "2026-06-15T11:45:45.726Z",
+  "queuedBy": "routine"
+}
