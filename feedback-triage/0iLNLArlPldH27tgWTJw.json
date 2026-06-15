@@ -1,7 +1,0 @@
-{
-  "id": "0iLNLArlPldH27tgWTJw",
-  "status": "done",
-  "notes": "Quando scrivi /indirizzo nella barra della nuova scheda, Filo ora controlla se il sito esiste davvero: se il dominio non esiste, il comando diventa rosso mentre lo scrivi e premendo Invio non succede nulla (niente piu pagina bianca di errore). I siti veri restano arancioni e si aprono normalmente; indirizzi IP e localhost non vengono mai bloccati, e in caso di problemi di rete/DNS momentanei non blocca per non impedire una navigazione legittima. Verificato con unit test, un test dell'interfaccia e provando il dominio esatto della tua segnalazione (risulta inesistente).",
-  "queuedAt": "2026-06-15T09:54:45.326Z",
-  "queuedBy": "routine"
-}
