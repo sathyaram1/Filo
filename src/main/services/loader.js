@@ -40,6 +40,7 @@ require(path.join(SVC, 'fxRates.js'));
 require(path.join(SVC, 'safebrowse', 'index.js'));
 require(path.join(SVC, 'geoBlock.js'));
 require(path.join(SVC, 'geoBlockClassifier.js'));
+require(path.join(SVC, 'geoBlockRules.js'));
 
 module.exports = {
   // Esponiamo gli oggetti popolati su globalThis per chi vuole un riferimento
