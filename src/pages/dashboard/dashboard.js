@@ -315,6 +315,78 @@
     return div;
   }
 
+  // Indicatore "sta pensando": 3 righe di reasoning che scorrono verso l'alto e
+  // svaniscono man mano che salgono (la riga in cima è quasi trasparente, quella
+  // in basso è piena). Restano sempre al massimo 3 righe visibili. Le frasi non
+  // sono il reasoning vero (il provider non lo restituisce in streaming), ma una
+  // prova di funzionamento — abbastanza varie da non sembrare uno spinner statico.
+  // Stesso pattern della sidebar (src/content/sidebar.js).
+  const THINKING_PHRASES = [
+    'Leggo la tua richiesta…',
+    'Analizzo il contesto…',
+    'Consulto la memoria…',
+    'Controllo schede e cronologia…',
+    'Valuto il prossimo passo…',
+    'Capisco cosa ti serve…',
+    'Cerco le informazioni giuste…',
+    'Compongo la risposta…',
+    'Riconosco i pattern noti…',
+    'Verifico i dettagli…',
+    'Scelgo l’azione migliore…',
+    'Metto in ordine le idee…',
+  ];
+
+  function appendThinking() {
+    const wrap = document.createElement('div');
+    wrap.className = 'dash-bubble dash-bubble-filo dash-thinking';
+    const lines = [];
+    for (let i = 0; i < 3; i++) {
+      const ln = document.createElement('div');
+      ln.className = 'dash-thinking-line';
+      ln.dataset.slot = String(i); // 0=top fading out, 1=mid, 2=bottom fresh
+      wrap.appendChild(ln);
+      lines.push(ln);
+    }
+    bubblesEl.appendChild(wrap);
+    bubblesEl.scrollTop = bubblesEl.scrollHeight;
+
+    // Pool casuale senza ripetizioni ravvicinate
+    const pool = THINKING_PHRASES.slice();
+    const recent = [];
+    function nextPhrase() {
+      const candidates = pool.filter((p) => !recent.includes(p));
+      const src = candidates.length ? candidates : pool;
+      const phrase = src[Math.floor(Math.random() * src.length)];
+      recent.push(phrase);
+      if (recent.length > 4) recent.shift();
+      return phrase;
+    }
+
+    lines[0].textContent = nextPhrase();
+    lines[1].textContent = nextPhrase();
+    lines[2].textContent = nextPhrase();
+
+    let stopped = false;
+    const tick = () => {
+      if (stopped || !wrap.isConnected) return;
+      // Shift verso l'alto: top esce, mid → top, bottom → mid, nuovo → bottom
+      lines[0].textContent = lines[1].textContent;
+      lines[1].textContent = lines[2].textContent;
+      lines[2].textContent = nextPhrase();
+      // Re-trigger animazione di entrata della riga nuova
+      lines[2].classList.remove('dash-thinking-enter');
+      void lines[2].offsetWidth;
+      lines[2].classList.add('dash-thinking-enter');
+    };
+    const interval = setInterval(tick, 900);
+    lines[2].classList.add('dash-thinking-enter');
+
+    return {
+      el: wrap,
+      remove() { stopped = true; clearInterval(interval); wrap.remove(); },
+    };
+  }
+
   function renderActions(container, actions, { onAck, autoConfirm = false } = {}) {
     if (!actions || !actions.length) return;
     const wrap = document.createElement('div');
