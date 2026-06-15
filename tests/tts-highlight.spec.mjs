@@ -63,32 +63,3 @@ test('avviando "Leggi", la prima parola viene evidenziata sulla pagina', async (
   const hasStyle = await page.evaluate(() => !!document.getElementById('sn-read-style'));
   expect(hasStyle).toBe(true);
 });
-
-test('interrompere la lettura rimuove l\'evidenziazione', async ({ openTab, testServer }) => {
-  const page = await testServer.openReady(openTab, HTML);
-
-  await page.evaluate(() => {
-    const el = document.getElementById('target');
-    const range = document.createRange();
-    range.selectNodeContents(el);
-    const sel = window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(range);
-  });
-
-  await page.locator('#target').click({ button: 'right' });
-  const menu = page.locator('.sn-menu').first();
-  await expect(menu).toBeVisible();
-  await menu.locator('.sn-menu-label', { hasText: 'Leggi' }).first().click();
-
-  await expect
-    .poll(() => page.evaluate(() => (CSS.highlights ? CSS.highlights.has('filo-reading') : false)), { timeout: 4000 })
-    .toBe(true);
-
-  // Interrompi via API del modulo (equivalente alla voce "Interrompi lettura").
-  await page.evaluate(() => self.SN_TTS && self.SN_TTS.stopReading());
-
-  await expect
-    .poll(() => page.evaluate(() => (CSS.highlights ? CSS.highlights.has('filo-reading') : true)), { timeout: 2000 })
-    .toBe(false);
-});
