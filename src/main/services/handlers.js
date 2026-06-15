@@ -54,6 +54,25 @@ function winOf(sender) {
   return (w && w._filoTabs) ? w : filoWin();
 }
 
+// Bersaglio delle azioni proxy "su questa tab" via linguaggio naturale: la tab
+// attiva se è una pagina web, altrimenti l'ultima tab web (la chat vive nella
+// dashboard, che è essa stessa una tab interna: "questa tab" è la pagina web
+// che l'utente ha davanti, non la dashboard). { tm, tab } con tab=null se non
+// c'è nessuna tab web aperta.
+function activeWebTab() {
+  const win = filoWin();
+  const tm = win && win._filoTabs;
+  if (!tm) return { tm: null, tab: null };
+  const isWeb = (t) => /^https?:/i.test((t && t.url) || '');
+  const active = tm.tabs.find((t) => t.id === tm.activeId);
+  let tab = active && isWeb(active) ? active : null;
+  if (!tab) {
+    const web = tm.tabs.filter(isWeb);
+    tab = web[web.length - 1] || null;
+  }
+  return { tm, tab };
+}
+
 // ─── helpers (identici al background.js originale) ──────────────────────────
 
 function clusterKey(p) {
