@@ -307,7 +307,11 @@
     const div = document.createElement('div');
     div.className = `dash-bubble dash-bubble-${role === 'user' ? 'user' : 'filo'}`;
     if (pending) div.classList.add('dash-bubble-pending');
-    div.textContent = text;
+    // #162 — testo vuoto (Filo ha solo eseguito un'azione, es. aperto un link):
+    // niente nodo di testo, la bolla conterrà solo i chip d'azione. Marchiamo
+    // la bolla così il CSS può stringere i margini quando è "solo azioni".
+    if (text) div.textContent = text;
+    else div.classList.add('dash-bubble-actions-only');
     return div;
   }
 
