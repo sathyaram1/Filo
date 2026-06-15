@@ -236,6 +236,7 @@ function loadContentScripts() {
   safe(path.join(SHARED, 'tabColor.js'));
   safe(path.join(CONTENT, 'pageColor.js'));
   safe(path.join(CONTENT, 'translatePage.js'));
+  safe(path.join(SHARED, 'ttsChunk.js'));
   safe(path.join(CONTENT, 'tts.js'));
   safe(path.join(CONTENT, 'editBox.js'));
   safe(path.join(CONTENT, 'actions.js'));
