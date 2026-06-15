@@ -57,8 +57,7 @@
       const section = $('autocorrectList').parentElement;
       section.insertBefore(el, $('autocorrectList'));
     }
-    el.textContent = I18n.t('spell_page_conflict', { key: conflictKey }) ||
-      `"${conflictKey}" esiste già — modifica annullata.`;
+    el.textContent = I18n.t('spell_page_conflict', conflictKey);
     el.hidden = false;
     clearTimeout(conflictTimer);
     conflictTimer = setTimeout(() => { el.hidden = true; }, 3500);
