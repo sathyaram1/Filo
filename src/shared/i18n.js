@@ -275,6 +275,15 @@
       'Le versioni che funzionano via Internet (server intermedio) restano operative. ' +
       'Se ti serve usare uno di questi servizi, disattiva temporaneamente la protezione qui sopra, ' +
       'usa il servizio, poi riattivala.',
+    options_security_proxy_box_title: 'Tab aperte da un altro paese',
+    options_security_proxy_box_body:
+      'Quando apri una scheda "da un altro paese", il traffico di quella scheda passa per i server di un ' +
+      'fornitore di rete terzo che ti presta un indirizzo IP locale del paese scelto: è l\'unico modo per ' +
+      'farti apparire come se navigassi da lì. Filo non vede e non conserva quel traffico, ma il fornitore ' +
+      'tecnicamente sì, come qualsiasi VPN. Vale solo per le schede che apri esplicitamente da un altro paese: ' +
+      'tutte le altre restano dirette. Ogni scheda proxata ha un suo spazio cookie separato, così non mescola ' +
+      'i tuoi accessi con quelli normali.',
+    options_security_proxy_box_provider: 'Fornitore attualmente configurato: %s.',
     options_security_popup_blocked: 'Popup bloccato da %s',
     options_security_popup_open: 'Apri',
     options_security_popup_dismiss: 'Chiudi',
