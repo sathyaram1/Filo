@@ -145,6 +145,9 @@ class TabManager {
     // una partizione isolata ma PERSISTENTE (restano connessi).
     this.cookieMode = Cookies.MODES.DEFAULT;
     this.trustedSites = [];
+    // #151 — nota consumo dati per tab proxate che riproducono video a lungo
+    // (spec §5: una volta per SESSIONE, non bloccante). Flag globale di sessione.
+    this._proxyVideoNoted = false;
   }
 
   // Aggiorna le impostazioni di sicurezza e le riapplica a tutti i tab esistenti.
