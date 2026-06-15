@@ -83,6 +83,9 @@ const filoApi = {
   // Esiste questo comando nella shell? Per l'evidenziazione live (rosso = non
   // riconosciuto) della dashboard in modalità terminale.
   shellWhich: (opts) => ipcRenderer.invoke('shell:which', opts),
+  // Questo "/dominio.tld" risolve davvero? Per colorare di rosso (e non
+  // navigare verso) un sito inesistente dalla barra comando della dashboard.
+  siteResolves: (opts) => ipcRenderer.invoke('net:resolves', opts),
 };
 
 // Espone window.filo SOLO su origine filo:// (vedi IS_FILO_ORIGIN sopra).
