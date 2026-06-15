@@ -84,6 +84,10 @@
     'clear', 'cls', 'grep', 'findstr', 'stat', 'basename', 'dirname',
     'realpath', 'readlink', 'du', 'df', 'uptime', 'id', 'groups', 'whatis',
     'cal', 'nproc', 'arch',
+    // diagnostica comune di sola lettura
+    'ps', 'free', 'lscpu', 'lsblk', 'lsusb', 'printenv', 'whereis', 'who',
+    'w', 'vmstat', 'lsof', 'column', 'cut', 'sort', 'uniq', 'nl', 'file',
+    'md5sum', 'sha1sum', 'sha256sum', 'cksum', 'sysctl',
   ]);
 
   // Modifica lo stato ma in modo recuperabile: livello 2.
