@@ -1,7 +1,0 @@
-{
-  "id": "KdZj72P0eY3MXWaXzNeD",
-  "status": "done",
-  "notes": "Ora alla scadenza il timer suona una suoneria in loop e resta visibile con un pulsante 'Ferma' finché non lo silenzi (prima spariva muto). Puoi scegliere tra 4 suonerie (Standard, Delicata, Urgente, Carillon) in Preferenze → 'Suoneria del timer', con un pulsante 'Prova' per l'anteprima; la scelta si applica subito anche a un timer in corso. Verificato con uno spec Playwright (timer-ringtone): timer scaduto -> stato 'suona' visibile + card presente, 'Ferma' lo rimuove, e la suoneria scelta persiste al reload. Nota: la suoneria suona in loop continuo finché non premi Ferma; se preferisci un numero fisso di ripetizioni con auto-stop, dimmelo.",
-  "queuedAt": "2026-06-15T21:33:19.532Z",
-  "queuedBy": "routine"
-}
