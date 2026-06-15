@@ -86,8 +86,8 @@
     'cal', 'nproc', 'arch',
     // diagnostica comune di sola lettura
     'ps', 'free', 'lscpu', 'lsblk', 'lsusb', 'printenv', 'whereis', 'who',
-    'w', 'vmstat', 'lsof', 'column', 'cut', 'sort', 'uniq', 'nl', 'file',
-    'md5sum', 'sha1sum', 'sha256sum', 'cksum', 'sysctl',
+    'w', 'vmstat', 'lsof', 'column', 'cut', 'uniq', 'nl', 'file',
+    'md5sum', 'sha1sum', 'sha256sum', 'cksum',
   ]);
 
   // Modifica lo stato ma in modo recuperabile: livello 2.
