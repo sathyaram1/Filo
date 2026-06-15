@@ -943,6 +943,10 @@
       idleHours: 6,
       onClose: true,
     },
+    // Suoneria del timer: suono riprodotto alla scadenza finché l'utente non
+    // preme "Ferma". Generato via WebAudio API (nessun file audio esterno).
+    // Valori: 'beep' | 'double_beep' | 'bell' | 'triple_beep'
+    timerRingtone: 'beep',
   };
 
   // Preset di stile per gli agenti rivolti all'utente. `key` è solo per l'UI;
