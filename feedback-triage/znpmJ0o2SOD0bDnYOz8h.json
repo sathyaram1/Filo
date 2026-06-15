@@ -1,0 +1,7 @@
+{
+  "id": "znpmJ0o2SOD0bDnYOz8h",
+  "status": "done",
+  "notes": "Riaprendo Filo le schede vengono ripristinate ma ora i loro media (es. video YouTube) restano in PAUSA: non ripartono piu' tutti insieme all'avvio. Il video parte normalmente appena interagisci con quella scheda (primo click o tasto), come in un browser normale. Vale solo per le schede ripristinate all'avvio: una scheda nuova che apri a mano mantiene il comportamento di prima. Verificato con un test in due fasi (apro una pagina con audio, chiudo e riapro Filo) che controlla che il media ripristinato resti in pausa mentre quello di una scheda nuova suona; passano anche i test esistenti di ripristino sessione e proxy.",
+  "queuedAt": "2026-06-15T12:20:16.059Z",
+  "queuedBy": "routine"
+}
