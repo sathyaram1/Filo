@@ -33,7 +33,11 @@ const ROOT = resolve(__dirname, '..');
 const SPOOL_DIR = process.env.FILO_SPOOL_DIR
   ? resolve(process.env.FILO_SPOOL_DIR)
   : resolve(ROOT, 'feedback-triage');
-const ALLOWED_STATUS = ['todo', 'clarify'];
+// 'new' = inbox/"Ricevuti": è lo stato usato dalle passate proattive di audit,
+// che depositano i ritrovamenti perché l'utente li riveda PRIMA di metterli in
+// lavorazione (le routine NON lavorano i 'new'). 'todo'/'clarify' = sub-feedback
+// di una spec spezzata.
+const ALLOWED_STATUS = ['new', 'todo', 'clarify'];
 
 // Valida i parametri e costruisce l'oggetto-entry per lo spool (logica pura,
 // testata in tests/unit). Lancia su input non valido.
