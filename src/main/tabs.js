@@ -1036,9 +1036,13 @@ class TabManager {
       // Intercettiamo qui (per-webContents) invece che con un globalShortcut
       // OS-wide, così la combinazione resta disponibile alle altre app.
       if (input.type === 'keyDown' && input.alt && !input.control && !input.meta && !input.shift) {
-        const m = /^Digit([0-9])$/.exec(input.code || '');
-        if (m) {
-          const idx = m[1] === '0' ? 9 : Number(m[1]) - 1;
+        // Riconosci la cifra dal codice fisico (Digit0–9, robusto al layout) o,
+        // in mancanza, dal key (0–9): copre sia la tastiera reale sia gli input
+        // sintetici.
+        const codeM = /^Digit([0-9])$/.exec(input.code || '');
+        const digit = codeM ? codeM[1] : (/^[0-9]$/.test(input.key || '') ? input.key : null);
+        if (digit != null) {
+          const idx = digit === '0' ? 9 : Number(digit) - 1;
           const target = this.tabs[idx];
           if (target) {
             event.preventDefault();
