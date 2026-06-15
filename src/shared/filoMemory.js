@@ -383,6 +383,8 @@
     listNotifications, addNotification, dismissNotification,
     // dashboard cache
     getDashboardCache, setDashboardCache,
+    // proxy: regole persistenti per dominio (#152)
+    listProxyRules, setProxyRule, removeProxyRule, getProxyRule,
     // session
     getSession, setSession, touchSession,
   };
