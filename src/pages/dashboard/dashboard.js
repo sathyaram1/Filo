@@ -423,7 +423,12 @@
       const btn = document.createElement('button');
       btn.className = 'dash-action-btn dash-action-btn-primary';
       btn.type = 'button';
-      btn.textContent = a._confirm.text || 'Esegui';
+      // Per i comandi (#146.6) l'etichetta è il comando stesso, conciso; la
+      // spiegazione completa resta nel popup di conferma (a._confirm.text).
+      const cmdText = String(a.comando || a.command || a.cmd || '').trim();
+      const isCmd = type === 'ESEGUI_COMANDO';
+      const short = cmdText.length > 60 ? `${cmdText.slice(0, 57)}…` : cmdText;
+      btn.textContent = isCmd ? `▶ ${short}` : (a._confirm.text || 'Esegui');
       btn.addEventListener('click', async () => {
         if (btn.disabled) return;
         const Ui = window.SN_CONFIRM_UI;
@@ -434,6 +439,12 @@
         if (!ok) return;
         btn.disabled = true;
         const r = await send({ type: MSG.FILO_CONFIRM_ACTION, action: a });
+        // #146.6 — comando confermato (livello 2/3): mostra l'output in chat.
+        if (isCmd) {
+          btn.textContent = (r && r.executed) ? `✓ ${short}` : `✗ ${short}`;
+          if (r && r.output) btn.after(renderCommandResult(r.output));
+          return;
+        }
         btn.textContent = (r && r.executed) ? `✓ ${a._confirm.text}` : '✗ Non eseguita';
         // #146.4 — modifica estetica illeggibile (livello 2): confermata ed
         // applicata, offriamo subito il box per correggere il valore.
@@ -443,6 +454,11 @@
         }
       });
       return btn;
+    }
+    if (type === 'ESEGUI_COMANDO') {
+      // Livello 1 (sola lettura) già eseguito dal main, oppure esito bloccato
+      // (terminale spento): mostriamo direttamente il risultato in chat.
+      return renderCommandResult(a._output);
     }
     if (type === 'IMPOSTA_ESTETICA') {
       // Livello 1 (caso normale): Filo l'ha già applicata server-side. Mostriamo
