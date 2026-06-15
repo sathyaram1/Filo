@@ -548,6 +548,10 @@
   }
 
   function render() {
+    // Durante una trascinata non ridisegnare: cancellare i nodi farebbe perdere
+    // il riferimento alla tab trascinata e interromperebbe il drag. Il riordino
+    // viene confermato dal broadcast successivo al rilascio (api.tabs.move).
+    if (drag && drag.moved) return;
     // tabs
     tabsEl.innerHTML = '';
     for (const t of state.tabs) {
