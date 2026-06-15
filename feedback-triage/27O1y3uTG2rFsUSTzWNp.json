@@ -1,0 +1,7 @@
+{
+  "id": "27O1y3uTG2rFsUSTzWNp",
+  "status": "done",
+  "notes": "Risolto: inserendo una chiave (es. quella di Google AI Studio/Gemini) le altre chiavi già configurate non vengono più cancellate. Prima, salvando una sola chiave, le altre (es. OpenRouter) venivano azzerate e risultavano 'non configurata' anche se i modelli continuavano a funzionare grazie alle chiavi di sistema. Ora il salvataggio aggiorna solo la chiave che hai effettivamente digitato e lascia intatte le altre. Verificato con uno unit test che controlla che salvando una chiave la richiesta tocchi solo quella e non sovrascriva l'intero blocco chiavi.",
+  "queuedAt": "2026-06-15T14:53:05.561Z",
+  "queuedBy": "routine"
+}
