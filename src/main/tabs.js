@@ -1700,7 +1700,9 @@ class TabManager {
 
     this._restoring = true;
     try {
-      for (const url of urls) this.openTab(url, { activate: false });
+      // #145 — suppressAutoplay: i media delle tab ripristinate restano in pausa
+      // al boot (niente più video YouTube che ripartono tutti insieme).
+      for (const url of urls) this.openTab(url, { activate: false, suppressAutoplay: true });
       if (activeIndex < 0 || activeIndex >= this.tabs.length) activeIndex = this.tabs.length - 1;
       const target = this.tabs[activeIndex];
       if (target) this.activate(target.id);
