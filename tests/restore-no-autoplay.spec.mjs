@@ -71,6 +71,7 @@ const isPausedAfterAutoplay = (page) => page.evaluate(async () => {
   const a = new Audio(makeWav());
   a.muted = false;
   a.loop = true;
+  document.body.appendChild(a); // come un <video> reale: in pagina, non distaccato
   a.play().catch(() => {}); // se bloccato rigetta; lo stato vero lo legge .paused
   await new Promise((r) => setTimeout(r, 500)); // tempo al blocco di intervenire
   return a.paused;
