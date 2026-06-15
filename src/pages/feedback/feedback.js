@@ -427,6 +427,30 @@
       });
     });
 
+    // Composer "Invia risposta" del tab Chiarimenti: appende la risposta
+    // dell'utente come turno (conservando la domanda di Filo nello storico) e
+    // rimette il feedback in "Da risolvere" perché una routine lo riprenda.
+    listEl.querySelectorAll('.fb-reply-send').forEach((btn) => {
+      const id = btn.dataset.id;
+      const card = btn.closest('.fb-card');
+      const ta = card && card.querySelector('.fb-reply-text');
+      const send = () => {
+        const reply = ta ? ta.value.trim() : '';
+        if (!reply) { if (ta) ta.focus(); return; }
+        const item = all.find((f) => f._id === id);
+        const oldNotes = (item && item.notes) || '';
+        const newNotes = window.SN_FEEDBACK_THREAD
+          ? SN_FEEDBACK_THREAD.appendUserTurn(oldNotes, reply)
+          : (oldNotes ? `${oldNotes}\n\n${reply}` : reply);
+        patch(id, { status: 'todo', notes: newNotes }, { status: 'todo', notes: newNotes });
+      };
+      btn.addEventListener('click', send);
+      // Ctrl/Cmd+Enter invia (come negli altri composer di Filo).
+      if (ta) ta.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); send(); }
+      });
+    });
+
     // Pallini priorità: clic sul pallino N imposta priorità = N; ri-clic sul
     // pallino già attivo (== priorità corrente) la azzera.
     listEl.querySelectorAll('.fb-dot').forEach((dot) => {
