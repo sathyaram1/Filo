@@ -459,7 +459,7 @@
       }
     }
 
-    document.documentElement.appendChild(sub);
+    menuHost().appendChild(sub);
     const cleanupZoom = (global.SN_POPUP?.attachZoomCompensation || (() => () => {}))(sub);
     activeMenu.cleanups.push(cleanupZoom);
     activeMenu.subRoot = sub;
@@ -570,7 +570,7 @@
       setTimeout(() => { try { input.focus({ preventScroll: true }); } catch (_) {} }, 0);
     }
 
-    document.documentElement.appendChild(sub);
+    menuHost().appendChild(sub);
     // Compensazione zoom anche per il sub-menu
     const cleanupZoom = (global.SN_POPUP?.attachZoomCompensation || (() => () => {}))(sub);
     activeMenu.cleanups.push(cleanupZoom);
@@ -617,7 +617,7 @@
     populateGrid(sub, items, { dropTarget: opts.dropTarget });
     if (opts.dropTarget) attachDropZone(sub, { target: opts.dropTarget, onDrop: opts.onDrop });
 
-    document.documentElement.appendChild(sub);
+    menuHost().appendChild(sub);
     const cleanupZoom = (global.SN_POPUP?.attachZoomCompensation || (() => () => {}))(sub);
     activeMenu.cleanups.push(cleanupZoom);
     activeMenu.subRoot = sub;
