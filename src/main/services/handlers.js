@@ -700,6 +700,20 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
       case 'CANCELLA_ARCHIVIO':
         // §5 — azione distruttiva: il client mostra l'elenco dei match + conferma.
         return { executed: false, kept: true };
+      case 'CANCELLA_MEMORIA': {
+        // Livello 3: a questo punto l'utente ha già digitato "conferma" (gate sopra).
+        // Azzera tutti i moduli di memoria (PROFILO, PREFERENZE, espansioni) e il
+        // buffer delle lezioni non compattate. Irreversibile.
+        try {
+          await FiloMem.setMemory({ PROFILO: '', PREFERENZE: '' });
+          await FiloMem.clearLessonsBuffer();
+          broadcastLiveUpdate();
+          return { executed: true, kept: false };
+        } catch (e) {
+          console.warn('[Filo] cancella memoria fallito', e?.message || e);
+          return { executed: false, kept: false };
+        }
+      }
       case 'APRI_FILE':
         return { executed: true, kept: true };
       case 'ESEGUI_COMANDO': {
