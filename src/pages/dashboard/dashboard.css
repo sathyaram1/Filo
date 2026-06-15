@@ -537,7 +537,7 @@ body[data-state="thread"] .dash-suggestion { justify-content: flex-start; paddin
   grid-row: 2;
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-end;
   gap: 8px;
   padding: 6px;
   background: var(--dash-card);
