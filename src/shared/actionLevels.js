@@ -159,6 +159,32 @@
         return `Eseguire nel terminale:\n${cmd || '(comando vuoto)'}`;
       },
     },
+    // ── proxy per-tab via linguaggio naturale (#152) ──────────────────────────
+    // Tutte livello 1: instradare una scheda da un altro paese (o salvare una
+    // regola per dominio) è completamente reversibile — "torna in Italia" /
+    // "togli la regola" annullano. La separazione del cookie jar è inerente al
+    // proxy e l'utente l'ha chiesta esplicitamente; il flusso AUTOMATICO da
+    // geo-block (che invece propone quando ci sono login attivi) vive altrove.
+    PROXY_TAB: {
+      level: 1,
+      describe: (a) => `Aprire questa scheda da ${countryLabel(proxyCountry(a)) || 'un altro paese'}`,
+    },
+    RIMUOVI_PROXY: {
+      level: 1,
+      describe: () => 'Riportare questa scheda alla connessione diretta (Italia)',
+    },
+    RIMUOVI_PROXY_TUTTE: {
+      level: 1,
+      describe: () => 'Riportare tutte le schede instradate da un altro paese alla connessione diretta',
+    },
+    REGOLA_PROXY_DOMINIO: {
+      level: 1,
+      describe: (a) => `Aprire sempre ${proxyDomain(a) || 'questo sito'} da ${countryLabel(proxyCountry(a)) || 'un altro paese'}`,
+    },
+    RIMUOVI_REGOLA_PROXY: {
+      level: 1,
+      describe: (a) => `Togliere la regola "apri sempre da un altro paese" per ${proxyDomain(a) || 'questo sito'}`,
+    },
   };
 
   // Livello dell'azione: 1|2|3, oppure null se l'azione NON è registrata
