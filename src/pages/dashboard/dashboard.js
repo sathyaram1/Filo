@@ -87,6 +87,7 @@
     threadHistory = [];
     bubblesEl.innerHTML = '';
     inputEl.value = '';
+    autoGrowInput();
     inputEl.focus();
   }
 
