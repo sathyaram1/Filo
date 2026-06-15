@@ -299,10 +299,16 @@ class TabManager {
     };
     // #145 — le tab RIPRISTINATE alla riapertura di Filo non devono far ripartire
     // i media da sole (es. i video YouTube che ripartivano tutti insieme al boot).
-    // Il default di Electron è 'no-user-gesture-required' (autoplay sempre libero);
-    // qui imponiamo l'attivazione utente: il video resta in pausa finché l'utente
-    // non interagisce con quella pagina. Come si comporta un browser normale.
-    if (opts.suppressAutoplay) webPreferences.autoplayPolicy = 'document-user-activation-required';
+    // Passiamo un flag al preload della pagina (page-preload.js), che mette in
+    // pausa qualunque media tenti di autopartire finché l'utente non interagisce
+    // con quella scheda. NB: webPreferences.autoplayPolicy non è onorato dalle
+    // WebContentsView in Electron 33, perciò il blocco lo fa il preload.
+    if (opts.suppressAutoplay && !isInternal) {
+      webPreferences.additionalArguments = [
+        ...(webPreferences.additionalArguments || []),
+        '--filo-suppress-autoplay',
+      ];
+    }
     return new WebContentsView({ webPreferences });
   }
 
