@@ -1031,6 +1031,11 @@ class TabManager {
         event.preventDefault();
         this._recreateView(tab, url);
       }
+      // #152 — born proxied su click-link/redirect verso un dominio con regola
+      // persistente: NON preventDefault (la navigazione in-place prosegue), poi
+      // _maybeApplyDomainRule instrada ricreando la view proxata se serve. Così
+      // se il proxy non è configurato la pagina resta semplicemente diretta.
+      this._maybeApplyDomainRule(tab, url);
     });
     // Debug helper: in dev relay i log della pagina al main.
     if (process.env.NODE_ENV !== 'production') {
