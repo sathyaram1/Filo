@@ -120,6 +120,25 @@
         return `Cambiare “${label}”${val ? ` a ${val}` : ''}`;
       },
     },
+    ESEGUI_COMANDO: {
+      // Filo lancia un comando nel terminale (#146.6). Il livello NON è fisso:
+      // dipende dal comando EFFETTIVO, classificato dal main (mai dall'LLM) in
+      // src/shared/cmdClassify.js. 1 = sola lettura (esegue subito); 2 =
+      // modifica recuperabile (popup); 3 = cancellazioni, comandi pericolosi,
+      // concatenazioni e qualsiasi comando non riconosciuto (digita "conferma").
+      // Comando assente o classificatore non caricato → 3 per massima cautela.
+      level: (a) => {
+        const C = global.SN_CMD_CLASSIFY;
+        const cmd = String((a && (a.comando ?? a.command ?? a.cmd)) || '').trim();
+        if (!cmd || !C) return 3;
+        const lvl = C.classify(cmd);
+        return lvl === 1 || lvl === 2 || lvl === 3 ? lvl : 3;
+      },
+      describe: (a) => {
+        const cmd = String((a && (a.comando ?? a.command ?? a.cmd)) || '').trim();
+        return `Eseguire nel terminale:\n${cmd || '(comando vuoto)'}`;
+      },
+    },
   };
 
   // Livello dell'azione: 1|2|3, oppure null se l'azione NON è registrata
