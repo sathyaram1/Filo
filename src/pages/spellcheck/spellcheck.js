@@ -172,10 +172,14 @@
     const w = $('newWord').value.trim().toLowerCase();
     const c = $('newCorrection').value.trim();
     if (!w || !c) return;
-    await updateAutocorrect('', w, c);
-    $('newWord').value = '';
-    $('newCorrection').value = '';
-    $('newWord').focus();
+    const ok = await updateAutocorrect('', w, c, {
+      onConflict: (conflictKey) => showConflictMessage(conflictKey),
+    });
+    if (ok) {
+      $('newWord').value = '';
+      $('newCorrection').value = '';
+      $('newWord').focus();
+    }
   }
 
   // ----------------------------------------------------------------------
