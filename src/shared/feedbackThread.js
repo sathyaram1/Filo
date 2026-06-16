@@ -33,6 +33,36 @@
     return c.startsWith('agent:') || c.startsWith('routine:');
   }
 
+  // true se il feedback è un invio MANUALE dell'owner (admin loggato). L'identità
+  // owner viene applicata nel main process al momento dell'invio (vedi
+  // ownerize): il content script non sa di esserlo.
+  function isFromOwner(clientId) {
+    return String(clientId || '').startsWith('owner:');
+  }
+
+  // Classifica l'ORIGINE di un feedback dal prefisso del clientId. Serve alla
+  // dashboard per colorare card e bolle a colpo d'occhio:
+  //   owner:<id>     → 'owner'    invio manuale dell'admin loggato (verde)
+  //   agent:<model>  → 'agent'    agente esploratore LLM (accento)
+  //   routine:<slug> → 'routine'  audit automatico delle routine cloud (blu)
+  //   <altro>        → 'user'     alpha tester esterno (arancione)
+  function originOf(clientId) {
+    const c = String(clientId || '');
+    if (c.startsWith('owner:')) return 'owner';
+    if (c.startsWith('agent:')) return 'agent';
+    if (c.startsWith('routine:')) return 'routine';
+    return 'user';
+  }
+
+  // Marca un clientId come invio dell'owner. Idempotente: non raddoppia il
+  // prefisso e NON marca i feedback già di origine modello (agent:/routine:),
+  // che owner non sono. Cap a 100 char = limite `clientId` delle Firestore rules.
+  function ownerize(clientId) {
+    const c = String(clientId || '');
+    if (!c || isFromModel(c) || c.startsWith('owner:')) return c;
+    return ('owner:' + c).slice(0, 100);
+  }
+
   // Spezza il blob `notes` nei suoi turni. Ritorna una lista di
   // { role: 'model'|'user', ts: string|null, body: string } senza i segmenti
   // vuoti (es. note che iniziano direttamente con un marcatore di riapertura).
