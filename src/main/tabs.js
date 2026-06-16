@@ -1875,22 +1875,46 @@ class TabManager {
   // allora un newtab vuoto).
   async restoreSession() {
     if (this.incognito) return false; // incognito: nessuna sessione da ripristinare
-    let urls = [];
+    // Entry normalizzate a { url, scrollPct, mediaTime }. Compat con la forma
+    // vecchia (bare array di stringhe, pre-#145.2): in quel caso scrollPct/
+    // mediaTime restano null (niente da ripristinare, solo l'URL).
+    let entries = [];
     let activeIndex = 0;
     try {
       const saved = await globalThis.SN_STORAGE?.getRaw?.(this._sessionKey(), null);
       if (saved && Array.isArray(saved.tabs)) {
-        urls = saved.tabs.filter((u) => typeof u === 'string' && u);
+        entries = saved.tabs
+          .map((e) => {
+            if (typeof e === 'string') return e ? { url: e, scrollPct: null, mediaTime: null } : null;
+            if (e && typeof e === 'object' && typeof e.url === 'string' && e.url) {
+              return {
+                url: e.url,
+                scrollPct: typeof e.scrollPct === 'number' ? e.scrollPct : null,
+                mediaTime: typeof e.mediaTime === 'number' ? e.mediaTime : null,
+              };
+            }
+            return null;
+          })
+          .filter(Boolean);
         if (Number.isInteger(saved.activeIndex)) activeIndex = saved.activeIndex;
       }
     } catch (_) {}
-    if (!urls.length) return false;
+    if (!entries.length) return false;
 
     this._restoring = true;
     try {
       // #145 — suppressAutoplay: i media delle tab ripristinate restano in pausa
       // al boot (niente più video YouTube che ripartono tutti insieme).
-      for (const url of urls) this.openTab(url, { activate: false, suppressAutoplay: true });
+      // #145.2 — restoreScrollPct/restoreMediaTime: la tab riparte da dove
+      // l'utente l'aveva lasciata (scroll + posizione del video), ma in pausa.
+      for (const e of entries) {
+        this.openTab(e.url, {
+          activate: false,
+          suppressAutoplay: true,
+          restoreScrollPct: e.scrollPct,
+          restoreMediaTime: e.mediaTime,
+        });
+      }
       if (activeIndex < 0 || activeIndex >= this.tabs.length) activeIndex = this.tabs.length - 1;
       const target = this.tabs[activeIndex];
       if (target) this.activate(target.id);
