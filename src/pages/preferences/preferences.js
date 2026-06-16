@@ -528,6 +528,16 @@
     const shellOpt = [...$('terminalShell').options].find((o) => o.value === shell);
     $('terminalShell').value = shellOpt ? shell : 'powershell';
 
+    // Notifiche (durata + suono)
+    populateNotifSounds();
+    const notif = settings.notifications || {};
+    const dur = Number(notif.durationSec);
+    $('notifDuration').value = String(Number.isFinite(dur) && dur >= 0 ? dur : 5);
+    $('notifSoundEnabled').checked = notif.soundEnabled === true;
+    const notifSound = notif.sound || 'default';
+    const nsOpt = [...$('notifSound').options].find((o) => o.value === notifSound);
+    $('notifSound').value = nsOpt ? notifSound : 'default';
+
     // Suoneria timer
     const ringtone = settings.timerRingtone || 'default';
     const ringOpt = [...$('timerRingtone').options].find((o) => o.value === ringtone);
