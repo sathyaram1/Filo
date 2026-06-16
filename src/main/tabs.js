@@ -1344,6 +1344,13 @@ class TabManager {
         this._notifyPopupBlocked(tab.id, url);
         return { action: 'deny' };
       }
+      // #170.3 — link verso un sito in blacklist aperto in una nuova scheda
+      // (target=_blank / window.open): stesso blocco di will-navigate. Il
+      // referrer è la pagina che ha originato l'apertura.
+      const fromUrl = (details.referrer && details.referrer.url) || wc.getURL();
+      if (this._maybeBlockNavigation(tab, url, { fromUrl })) {
+        return { action: 'deny' };
+      }
       this.openTab(url, { activate: true });
       return { action: 'deny' };
     });
