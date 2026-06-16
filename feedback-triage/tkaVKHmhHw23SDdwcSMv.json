@@ -1,0 +1,7 @@
+{
+  "id": "tkaVKHmhHw23SDdwcSMv",
+  "status": "done",
+  "notes": "Durante una lettura ad alta voce, ora QUALSIASI menu del tasto destro mostra la voce 'Interrompi lettura', anche aprendolo su un punto vuoto senza testo selezionato: la lettura si può sempre fermare da dove sei. La voce 'Leggi' usa un'icona SVG coerente con lo stile di Filo (niente più emoji). Verificato con test automatici che asseriscono entrambi i comportamenti.",
+  "queuedAt": "2026-06-16T22:19:34.326Z",
+  "queuedBy": "routine"
+}
