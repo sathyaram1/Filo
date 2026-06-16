@@ -223,6 +223,7 @@ function loadContentScripts() {
   safe(path.join(SHARED, 'i18n.js'));
   safe(path.join(SHARED, 'messages.js'));
   safe(path.join(SHARED, 'themeTokens.js'));
+  safe(path.join(SHARED, 'confirmUi.js'));
   safe(path.join(SHARED, 'icons.js'));
   safe(path.join(SHARED, 'qr.js'));
   safe(path.join(CONTENT, 'extractContext.js'));
