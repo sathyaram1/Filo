@@ -693,6 +693,7 @@
       `    {"type": "APRI_FILE", "path": "...", "label": "..."},\n` +
       `    {"type": "PULISCI_TAB"},\n` +
       `    {"type": "CANCELLA_ARCHIVIO", "query": "..."},\n` +
+      `    {"type": "CANCELLA_MEMORIA"},\n` +
       `    {"type": "IMPOSTA_PREFERENZA", "chiave": "tema", "valore": "scuro"},\n` +
       `    {"type": "IMPOSTA_ESTETICA", "token": "button.bg", "valore": "#3a7d44"},\n` +
       `    {"type": "ESEGUI_COMANDO", "comando": "git status"},\n` +
