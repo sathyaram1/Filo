@@ -31,18 +31,36 @@ function defaultShell() {
   return process.platform === 'win32' ? 'powershell' : 'bash';
 }
 
-// (programma, argv) per lanciare la shell con un'unica stringa di comando.
+// Risolve la shell RICHIESTA in quella EFFETTIVAMENTE disponibile sulla
+// piattaforma. Fuori da Windows, 'powershell'/'cmd' non esistono (pwsh è
+// raramente installato) → ricadiamo su /bin/sh, ESATTAMENTE come fa la shell
+// persistente della modalità terminale (src/main/services/shell.js, che fuori
+// da Windows usa sempre /bin/sh). Così i comandi dell'assistente girano davvero
+// anche su Linux/macOS invece di fallire con ENOENT, e le due shell restano
+// coerenti. 'bash' resta bash se esplicitamente preferito.
+function resolveShell(shell) {
+  const s = String(shell || '').toLowerCase();
+  if (process.platform === 'win32') {
+    if (s === 'cmd') return 'cmd';
+    if (s === 'bash') return 'bash';
+    return 'powershell';
+  }
+  return s === 'bash' ? 'bash' : 'sh';
+}
+
+// (programma, argv) per lanciare la shell EFFETTIVA con un'unica stringa di
+// comando. `shell` qui è già risolto da resolveShell().
 function shellInvocation(shell, command) {
-  switch (String(shell || '').toLowerCase()) {
+  switch (resolveShell(shell)) {
     case 'cmd':
       return { file: 'cmd.exe', args: ['/d', '/s', '/c', command] };
     case 'bash':
       return { file: 'bash', args: ['-c', command] };
+    case 'sh':
+      return { file: '/bin/sh', args: ['-c', command] };
     case 'powershell':
-    default: {
-      const ps = process.platform === 'win32' ? 'powershell.exe' : 'pwsh';
-      return { file: ps, args: ['-NoProfile', '-NonInteractive', '-Command', command] };
-    }
+    default:
+      return { file: 'powershell.exe', args: ['-NoProfile', '-NonInteractive', '-Command', command] };
   }
 }
 
