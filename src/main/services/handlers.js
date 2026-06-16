@@ -834,6 +834,35 @@ function broadcastLiveUpdate() {
   } catch (_) {}
 }
 
+// Rende leggibile al modello l'output dei comandi eseguiti in un turno: estrae
+// l'`_output` dalle azioni ESEGUI_COMANDO e lo formatta come osservazione. Va
+// accodato al messaggio dell'assistente di quel turno. Limita la dimensione per
+// non far esplodere il prompt.
+function commandOutputsForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const blocks = [];
+  for (const a of actions) {
+    if (!a || String(a.type || '').toUpperCase() !== 'ESEGUI_COMANDO') continue;
+    const out = a._output;
+    if (!out || out.blocked) continue; // comando bloccato (terminale spento): niente output reale
+    const cmd = String(out.command || a.comando || a.command || a.cmd || '').trim();
+    let body = String(out.stdout || '');
+    if (out.stderr) body += (body ? '\n' : '') + out.stderr;
+    body = body.trim();
+    if (body.length > 4000) body = body.slice(0, 4000) + '\n…(output troncato)';
+    const meta = [];
+    if (typeof out.code === 'number') meta.push(`uscita ${out.code}`);
+    if (out.cwd) meta.push(`cartella ${out.cwd}`);
+    if (out.timedOut) meta.push('interrotto per timeout');
+    blocks.push(
+      `[Ho eseguito nel terminale: ${cmd}]\n` +
+      (body ? `[Output]\n${body}` : '[Nessun output]') +
+      (meta.length ? `\n[Esito] ${meta.join(' · ')}` : ''),
+    );
+  }
+  return blocks.join('\n\n').trim();
+}
+
 async function handleFiloChat({ userMessage, threadHistory, image, images, sender = null }) {
   await FiloMem.touchSession();
   await FiloMem.appendRaw({ type: 'chat_user', summary: String(userMessage || '').slice(0, 200) });
