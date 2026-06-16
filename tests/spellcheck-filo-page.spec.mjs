@@ -79,6 +79,7 @@ test('(B) click destro su parola errata in textarea filo:// mostra la correzione
   // Usa document.body per non interferire con la struttura del newtab.
   const coords = await page.evaluate(() => {
     const ta = document.createElement('textarea');
+    ta.setAttribute('data-sn-test', 'spell');
     ta.style.cssText = 'position:fixed;top:50px;left:50px;width:300px;height:80px;font:16px monospace';
     ta.value = 'quii';
     document.body.appendChild(ta);
