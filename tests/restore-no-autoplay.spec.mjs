@@ -47,17 +47,12 @@ const APP_ROOT = resolve(__dirname, '..');
 const PAGE_HTML = `<!doctype html><html><head><meta charset="utf-8"><title>autoplay-probe</title></head>
 <body><h1>autoplay probe</h1><video id="v" autoplay loop playsinline></video></body></html>`;
 
-// Pagina con un <video> a durata reale (generato via MediaSource non serve:
-// basta un file servito con Content-Length/Range corretti). Usiamo un piccolo
-// MP4 generato al volo non è praticabile senza ffmpeg, quindi simuliamo la
-// "durata" sovrascrivendo le proprietà del video con un oggetto fittizio non è
-// possibile su un vero <video>. Strategia più semplice e robusta: usiamo un
-// <video> con un MediaSource-meno src ma impostiamo currentTime via un
-// elemento <video> il cui codec è gestito dal browser stesso (Chromium sa
-// decodificare WAV? no). Usiamo invece un <audio> (stesso identico codepath di
-// 'pickMainMedia' in content.js, che guarda sia video sia audio) con il WAV
-// silenzioso già usato per la prova di autoplay: leggero, supportato nativamente,
-// e con `loop` possiamo dargli una durata corta e avanzare currentTime.
+// Pagina per la prova di ripristino posizione: niente <audio>/<video> nel
+// markup (lo crea il test via JS con un WAV generato al volo, stesso
+// approccio della prova di autoplay sopra — leggero e supportato nativamente
+// senza dipendere da ffmpeg). content.js guarda sia <video> sia <audio>
+// (vedi pickMainMedia), quindi un <audio> con durata nota esercita lo stesso
+// codepath di un video reale.
 const MEDIA_PAGE_HTML = `<!doctype html><html><head><meta charset="utf-8"><title>media-restore-probe</title></head>
 <body><h1>media restore probe</h1></body></html>`;
 
