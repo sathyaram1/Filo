@@ -224,6 +224,134 @@
     persistTokens();
   }
 
+  // ── Sezione "colore identità delle tab" (Preferenze avanzate) ────────────
+  // Stessa estetica "a codice" dei token: una riga per ognuno dei sei parametri
+  // di src/shared/tabColor.js, con nome, valore numerico editabile, intervallo
+  // ammesso e commento. Modificare un valore lo clampa al range, lo persiste e
+  // (via SETTINGS_UPDATED) aggiorna live il colore delle tab. ↺ riporta il
+  // singolo parametro al predefinito; il bottone in fondo li azzera tutti.
+  let currentTabColor = {};
+  let tabColorSaveTimer = null;
+
+  function buildTabColorSection() {
+    const box = $('tabColorCode');
+    if (!box || !TabColor || !Array.isArray(TabColor.IDENTITY_PARAM_META)) return;
+    box.textContent = '';
+    for (const m of TabColor.IDENTITY_PARAM_META) {
+      const row = document.createElement('div');
+      row.className = 'sn-token-row';
+      row.dataset.param = m.key;
+
+      // Nessun campione colore qui: occupa lo spazio (allineamento con i token).
+      const spacer = document.createElement('span');
+      spacer.className = 'sn-token-swatch';
+      spacer.style.visibility = 'hidden';
+      row.appendChild(spacer);
+
+      const label = document.createElement('label');
+      label.className = 'sn-token-name';
+      label.setAttribute('for', `tabcol-${m.key}`);
+      label.title = m.comment || m.label;
+      label.textContent = `${m.key}:`;
+      row.appendChild(label);
+
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.className = 'sn-token-input';
+      input.id = `tabcol-${m.key}`;
+      input.min = String(m.min);
+      input.max = String(m.max);
+      input.step = String(m.step);
+      input.spellcheck = false;
+      input.autocomplete = 'off';
+      input.setAttribute('aria-label', `${m.label} (${m.min}–${m.max})`);
+      input.addEventListener('input', () => onTabColorInput(m.key));
+      input.addEventListener('blur', () => renderTabColorRow(m.key));
+      row.appendChild(input);
+
+      const reset = document.createElement('button');
+      reset.type = 'button';
+      reset.className = 'sn-token-reset';
+      reset.textContent = '↺';
+      reset.title = `Ripristina il predefinito (${m.def})`;
+      reset.setAttribute('aria-label', `Ripristina ${m.key}`);
+      reset.addEventListener('click', () => resetTabColorParam(m.key));
+      row.appendChild(reset);
+
+      // Intervallo + commento, su una riga dedicata sotto al controllo.
+      const help = document.createElement('span');
+      help.className = 'sn-token-error';
+      help.hidden = false;
+      help.style.color = 'var(--sn-muted, #888)';
+      help.style.gridColumn = '2 / -1';
+      help.textContent = `intervallo ${m.min}–${m.max} · ${m.comment}`;
+      row.appendChild(help);
+
+      box.appendChild(row);
+      renderTabColorRow(m.key);
+    }
+  }
+
+  function tabColorMeta(key) {
+    return (TabColor && TabColor.IDENTITY_PARAM_META || []).find((m) => m.key === key) || null;
+  }
+
+  function renderTabColorRow(key) {
+    const input = $(`tabcol-${key}`);
+    const m = tabColorMeta(key);
+    if (!input || !m) return;
+    const v = Number(currentTabColor[key]);
+    const val = Number.isFinite(v) ? v : m.def;
+    input.value = String(val);
+    const row = input.closest('.sn-token-row');
+    if (row) row.classList.toggle('sn-token-modified', val !== m.def);
+  }
+
+  function onTabColorInput(key) {
+    const input = $(`tabcol-${key}`);
+    const m = tabColorMeta(key);
+    if (!input || !m) return;
+    let n = parseFloat(String(input.value).replace(',', '.'));
+    if (!Number.isFinite(n)) return; // campo intermedio (vuoto/"-"): non salvare ora
+    n = Math.max(m.min, Math.min(m.max, n));
+    if (m.step >= 1) n = Math.round(n);
+    currentTabColor[key] = n;
+    const row = input.closest('.sn-token-row');
+    if (row) row.classList.toggle('sn-token-modified', n !== m.def);
+    persistTabColorDebounced();
+  }
+
+  function resetTabColorParam(key) {
+    const m = tabColorMeta(key);
+    if (!m) return;
+    currentTabColor[key] = m.def;
+    renderTabColorRow(key);
+    persistTabColor();
+  }
+
+  function resetAllTabColor() {
+    currentTabColor = TabColor ? TabColor.defaultParams() : {};
+    if (TabColor && Array.isArray(TabColor.IDENTITY_PARAM_META)) {
+      for (const m of TabColor.IDENTITY_PARAM_META) renderTabColorRow(m.key);
+    }
+    persistTabColor();
+  }
+
+  function persistTabColor() {
+    const clamped = TabColor ? TabColor.clampParams(currentTabColor) : currentTabColor;
+    currentTabColor = clamped;
+    chrome.runtime.sendMessage({
+      type: MSG.UPDATE_SETTINGS,
+      settings: { tabColor: clamped },
+    });
+    flashSaved('tabColorSavedHint');
+  }
+
+  function persistTabColorDebounced() {
+    clearTimeout(tabColorSaveTimer);
+    tabColorSaveTimer = setTimeout(persistTabColor, 400);
+  }
+
   // Restituisce lo stile testuale corrente dal textarea.
   function currentStyleText() {
     return $('agentStyleText').value;
