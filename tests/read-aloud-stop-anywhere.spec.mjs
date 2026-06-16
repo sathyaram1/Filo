@@ -40,8 +40,14 @@ test('la voce "Leggi" usa un\'icona SVG, non un\'emoji', async ({ openTab, testS
   expect(label).not.toMatch(/[\u{1F500}-\u{1FAFF}\u{2600}-\u{27BF}]/u);
 });
 
-test('durante la lettura, un menu senza selezione mostra "Interrompi lettura"', async ({ openTab, testServer }) => {
+test('durante la lettura, un menu senza selezione mostra "Interrompi lettura"', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, HTML);
+
+  // Abilita il seam TTS canned (opt-in): in headless non c'è motore vocale né
+  // chiave, quindi senza questo il modello fallisce e la lettura non parte mai.
+  // Col flag, MSG.TTS_SYNTH torna qualche secondo di PCM silenzioso → un <audio>
+  // reale suona → ttsBusy() è true → la voce di stop compare nei menu.
+  await app.evaluate(() => { globalThis.__filoTestTtsCanned = true; });
 
   // Avvia la lettura dal menu sulla selezione.
   await page.evaluate(() => {
