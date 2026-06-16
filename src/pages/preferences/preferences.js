@@ -10,6 +10,7 @@
   const Storage = window.SN_STORAGE;
   const Bootstrap = window.SN_PAGE_BOOTSTRAP;
   const Tokens = window.SN_THEME_TOKENS;
+  const TabColor = window.SN_TAB_COLOR;
 
   const CUSTOM_KEY = '__custom__';
 
