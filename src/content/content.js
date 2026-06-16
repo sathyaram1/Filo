@@ -195,7 +195,7 @@
       return best;
     }
     function sendMediaTime(force) {
-      const since = performance.now() - lastSentMediaAt;
+      const since = performance.now() - lastSentMediaAt; // tempo dall'ultimo invio
       if (!force && since < 3000) return;
       const m = pickMainMedia();
       if (!m) return;
