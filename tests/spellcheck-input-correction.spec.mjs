@@ -39,11 +39,19 @@ test('parola errata in <input>: estrazione + correzione applicate', async ({ app
     { timeout: 8_000 },
   );
 
+  // Il campo `#input` della dashboard è ora una <textarea> (non un <input type=text>):
+  // creiamo noi un <input type=text> dedicato per testare la funzione getInputWordAt.
+  // In questo modo il test resta valido anche se il layout della dashboard cambia.
   const result = await page.evaluate(() => {
-    const input = document.getElementById('input');
-    if (!input) return { error: 'input mancante' };
+    // Crea un <input type=text> di test con testo e dimensioni note.
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.setAttribute('data-sn-test', 'correction');
+    input.style.cssText = 'position:fixed;top:200px;left:50px;width:300px;font:16px monospace;padding:4px';
     input.value = 'ciiao come stai';
+    document.body.appendChild(input);
     input.focus();
+
     const r = input.getBoundingClientRect();
     const cs = getComputedStyle(input);
     // X viewport che cade sopra la prima parola "ciiao".
