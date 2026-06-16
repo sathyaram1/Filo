@@ -1,7 +1,0 @@
-{
-  "id": "NhSrOWULEcZCVRkyabEf",
-  "status": "done",
-  "notes": "Il feedback raccoglie 3 problemi distinti dei comandi shell dell'assistente, ognuno con una propria decisione tecnica/di design. L'ho pianificato spezzandolo in 3 sotto-attività lavorabili una alla volta: (1) l'assistente non vede l'output dei comandi che lancia [todo]; (2) non può concatenare comandi — apre questioni di sicurezza, serve una tua scelta [chiarimenti]; (3) il percorso mostrato nella barra non corrisponde alla cartella reale in cui girano i comandi [todo]. Il lavoro vero vive nelle 3 sotto-attività.",
-  "queuedAt": "2026-06-16T05:40:45.992Z",
-  "queuedBy": "routine"
-}
