@@ -54,10 +54,24 @@
     const v = tabColor && Number(tabColor.opacita_tab);
     if (Number.isFinite(v)) tabOpacity = Math.max(0, Math.min(1, v));
   }
+  // Config notifiche (spec #170.1): durata, suono on/off, suono scelto. Letta
+  // dalle impostazioni al boot e aggiornata live a ogni cambio prefs, così le
+  // notifiche successive rispettano i nuovi valori senza riavviare.
+  let notifConfig = { durationSec: 5, soundEnabled: false, sound: 'default' };
+  function applyNotifConfig(notifications) {
+    if (!notifications || typeof notifications !== 'object') return;
+    const d = Number(notifications.durationSec);
+    notifConfig = {
+      durationSec: Number.isFinite(d) && d >= 0 ? d : 5,
+      soundEnabled: notifications.soundEnabled === true,
+      sound: typeof notifications.sound === 'string' ? notifications.sound : 'default',
+    };
+  }
   api.message({ type: 'get_settings' })
     .then((r) => {
       applyShellTokens(r?.settings?.themeTokens);
       applyTabColorParams(r?.settings?.tabColor);
+      applyNotifConfig(r?.settings?.notifications);
       try { render(); } catch (_) {}
     })
     .catch(() => {});
@@ -66,6 +80,7 @@
       if (m?.type === 'settings_updated') {
         applyShellTokens(m.settings?.themeTokens);
         applyTabColorParams(m.settings?.tabColor);
+        applyNotifConfig(m.settings?.notifications);
         try { render(); } catch (_) {}
       }
     });
