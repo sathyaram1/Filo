@@ -315,6 +315,9 @@
     $('sec-protect-ip').addEventListener('change', save);
     $('sec-block-popups').addEventListener('change', save);
     $('sec-adblock').addEventListener('change', save);
+    $('sec-siteblock').addEventListener('change', () => { syncSiteBlockEnabled(); save(); });
+    $('sec-siteblock-lists').addEventListener('change', save);
+    $('sec-siteblock-blacklist').addEventListener('change', save);
     $('sec-safebrowse').addEventListener('change', () => { syncSafebrowseEnabled(); save(); });
     $('sec-safebrowse-network').addEventListener('change', save);
     $('sec-safebrowse-llm').addEventListener('change', save);
