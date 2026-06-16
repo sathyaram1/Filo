@@ -730,6 +730,22 @@
         return;
       }
 
+      // Caso speciale: azione tipizzata di Filo (es. inviare un feedback agli
+      // sviluppatori) — la stessa cosa che l'utente farebbe dal menu tasto
+      // destro. La eseguiamo passando per il registro dei livelli di sicurezza
+      // del main e, quando serve, per il popup di conferma di Filo (lo STESSO
+      // della chat dashboard): nessun canale privilegiato per la sidebar.
+      if (parsed.kind === 'filo_action') {
+        if (thinking) { thinking.stop(); thinking.el.remove(); }
+        if (parsed.display) {
+          appendChatMessage('assistant', parsed.display);
+          history.push({ role: 'assistant', content: parsed.display });
+        }
+        await runFiloAction(parsed.filoAction);
+        expand({ ai: true });
+        return;
+      }
+
       if (thinking) { thinking.stop(); thinking.el.remove(); }
       // Se il modello non ha messo testo ma c'è solo un highlight di routine,
       // mostriamo comunque una riga discreta in chat (es. "→ passo successivo")
