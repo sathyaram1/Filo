@@ -80,6 +80,15 @@ test('#2 l’output di un comando rientra nel contesto del modello al turno dopo
   await enableTerminal(page);
 
   const captured = await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    // Config deterministica con chiave presente: handleAIRequest non deve
+    // fermarsi su "API key mancante" prima di costruire i messages.
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { gemini: 'k-test' },
+      models: { [C.ACTIONS.FILO_CHAT]: 'flash-lite-3' },
+      modelRegistry: C.DEFAULT_MODEL_REGISTRY,
+    });
     // Stub del provider: cattura i messages costruiti e ritorna un JSON valido.
     const captured = {};
     const orig = globalThis.SN_PROVIDERS.completeWithFallback;
