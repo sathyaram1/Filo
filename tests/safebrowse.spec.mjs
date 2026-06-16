@@ -162,3 +162,37 @@ test('interstitial "pericoloso": copre la pagina e si toglie solo con "confermo"
   // Dopo la conferma l'overlay sparisce (bypass registrato per il dominio).
   await expect(page.getByText('Sito pericoloso')).toHaveCount(0, { timeout: 6_000 });
 });
+
+test('popup "sospetto": è un popup di conferma e si chiude solo con "Continua" (#176)', async ({ app, openTab, testServer }) => {
+  // Pagina esterna reale: di per sé "safe". Iniettiamo il verdetto "sospetto"
+  // come fa il main dopo l'analisi (es. il sito casinò del feedback #176).
+  const page = await testServer.openReady(openTab, '<title>SB_SUSPECT</title><p>contenuto pagina</p>');
+
+  await app.evaluate(({ BrowserWindow }) => {
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (!w._filoTabs) continue;
+      for (const t of w._filoTabs.tabs) {
+        const u = t.view?.webContents?.getURL?.() || '';
+        if (!/^https?:/.test(u)) continue;
+        t.view.webContents.send('filo:broadcast', {
+          type: 'safebrowse_update',
+          level: 'sospetto',
+          message: { title: 'Sito potenzialmente sospetto', body: 'Chiede credenziali o dati personali su un dominio non ufficiale.' },
+        });
+      }
+    }
+  });
+
+  // L'avviso compare come popup di conferma (non più la striscia "Ho capito"):
+  // titolo + corpo visibili, e i due pulsanti di scelta esplicita.
+  await expect(page.getByText('Sito potenzialmente sospetto')).toBeVisible({ timeout: 6_000 });
+  await expect(page.getByText(/credenziali o dati personali/)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Ho capito' })).toHaveCount(0);
+  const proceed = page.getByRole('button', { name: 'Continua' });
+  await expect(proceed).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Torna indietro' })).toBeVisible();
+
+  // Solo dopo la conferma esplicita ("Continua") il popup sparisce.
+  await proceed.click();
+  await expect(page.getByText('Sito potenzialmente sospetto')).toHaveCount(0, { timeout: 6_000 });
+});
