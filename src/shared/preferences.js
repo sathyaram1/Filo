@@ -270,6 +270,8 @@
     {
       keys: ['fingerprint', 'anti-fingerprinting', 'anti fingerprinting', 'antifingerprint', 'impronta digitale', 'protezione impronta', 'protezione fingerprint'],
       level: 2,
+      risk: 'Controlla la protezione contro il fingerprinting, cioè il riconoscimento del tuo '
+        + 'browser tra un sito e l’altro. Cambiarla incide sulla tua privacy e su come i siti ti identificano.',
       build(v) {
         const s = String(v == null ? '' : v).trim().toLowerCase();
         const map = {
