@@ -554,16 +554,22 @@
       wrap.appendChild(ok);
     }
     container.appendChild(wrap);
-    // #159 — modifiche alle impostazioni: il popup di conferma si apre da SOLO,
-    // invece di richiedere all'utente di cliccare prima il bottone. L'utente ha
-    // chiesto che Filo "tenti di farlo in automatico, con un popup di conferma
-    // aperto". Lo facciamo SOLO per le impostazioni (preferenza/estetica) a
-    // livello 2 e SOLO se è l'unica azione della bolla: niente stacking di
-    // modali, e le azioni distruttive (livello 3) o esterne (feedback) restano
-    // a click esplicito.
-    if (autoConfirm && actions.length === 1) {
-      const auto = wrap.querySelector('[data-auto-confirm="1"]');
-      if (auto) setTimeout(() => { try { auto.click(); } catch (_) {} }, 0);
+    // #159/#183 — le modifiche alle impostazioni di livello 2 NON sono chip
+    // inerti da cliccare: il popup di conferma (che spiega cosa Filo sta per
+    // fare e i rischi) si apre DA SOLO. Se nella stessa risposta ci sono più
+    // impostazioni sensibili, i popup si aprono UNO ALLA VOLTA — niente
+    // stacking di modali: aspettiamo che l'utente chiuda l'uno prima di aprire
+    // il successivo. Le azioni distruttive (livello 3) o esterne (feedback)
+    // restano a click esplicito (non marcate data-auto-confirm).
+    if (autoConfirm) {
+      const autos = Array.from(wrap.querySelectorAll('[data-auto-confirm="1"]'));
+      if (autos.length) {
+        setTimeout(async () => {
+          for (const auto of autos) {
+            try { await auto._runConfirm?.(); } catch (_) {}
+          }
+        }, 0);
+      }
     }
   }
 
