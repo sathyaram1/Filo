@@ -25,8 +25,9 @@
 
 'use strict';
 
-const { app, session, net } = require('electron');
-const fs = require('node:fs');
+// electron è richiesto in modo PIGRO (dentro le funzioni che lo usano) così la
+// logica pura (parseList, isBlockedHost, …) resta caricabile negli unit test
+// node:test, che girano senza Electron.
 const fsp = require('node:fs/promises');
 const path = require('node:path');
 
