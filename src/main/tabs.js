@@ -1372,6 +1372,36 @@ class TabManager {
     this.openTab(url, { activate: true });
   }
 
+  // #170.3 — decide se bloccare una navigazione top-level verso un sito in
+  // blacklist e, in caso, mostra la notifica. Ritorna true se ha bloccato.
+  // Le aperture originate da Filo (openTab dell'azione NAVIGA, navigazione
+  // interna filo://) non passano da qui (loadURL programmatico non emette
+  // will-navigate), quindi sono naturalmente consentite.
+  _maybeBlockNavigation(tab, url, { fromUrl = '' } = {}) {
+    let decision;
+    try {
+      decision = require('./services/siteBlock').shouldBlockNavigation(url, { fromUrl });
+    } catch (_) {
+      return false;
+    }
+    if (!decision || !decision.block) return false;
+    this._notifyBlocked(decision.host, url);
+    return true;
+  }
+
+  // Notifica in basso a destra (#170.1): sito bloccato + azione "Apri comunque".
+  // L'azione riusa il percorso openBlockedPopup (apertura programmatica, che
+  // bypassa il blocco).
+  _notifyBlocked(host, url) {
+    try {
+      const label = host || (() => { try { return new URL(url).host; } catch (_) { return url; } })();
+      this.win.webContents.send('shell:toast', {
+        text: `Sito bloccato: ${label}`,
+        opts: { actions: [{ label: 'Apri comunque', openUrl: url }] },
+      });
+    } catch (_) {}
+  }
+
   // ─── rilevamento siti pericolosi ─────────────────────────────────────────
   // (vedi src/main/services/safebrowse/). Tutto best-effort: NIENTE blocca mai
   // la navigazione. L'overlay "pericoloso"/banner "sospetto" vive in un content
