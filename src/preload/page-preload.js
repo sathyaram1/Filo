@@ -20,32 +20,111 @@ const path = require('node:path');
 //
 // Le schede riaperte all'avvio di Filo nascono con il flag
 // '--filo-suppress-autoplay' (passato via additionalArguments dal main): i loro
-// media non devono partire da soli (i video YouTube ripartivano tutti insieme).
-// Installiamo SUBITO — prima ancora del caricamento della pagina — un listener
-// 'play' in fase di cattura che rimette in pausa qualunque media tenti di
-// autopartire. Si disattiva alla PRIMA interazione dell'utente con la scheda:
-// da lì in poi i media partono normalmente (è l'utente a comandarli). Il
-// listener vive nel mondo isolato del preload ma ascolta il DOM condiviso.
+// media non devono partire da soli né emettere audio (i video YouTube
+// ripartivano tutti insieme, e un primo fix lasciava un breve "blip" audio
+// prima di fermare il media — feedback #145 riaperto).
+//
+// #145.2 — irrobustito su tre fronti:
+//   1) blip audio: oltre a pause() su 'play', ascoltiamo ANCHE 'playing' (il
+//      media può emettere già un frame audio fra 'play' e 'playing') e
+//      mutiamo il media finché la suppressione è attiva, ripristinando il
+//      muted originale al release. Così anche il frammento che il motore
+//      audio ha già in coda non si sente.
+//   2) reset posizione: NON tocchiamo currentTime qui — lo fa tabs.js via
+//      did-finish-load, restoreMediaTime. Questo listener si occupa solo di
+//      "non deve suonare/non deve partire", non della posizione.
+//   3) release "ovunque" → release "solo sul media": prima qualunque
+//      pointerdown/keydown/click sulla FINESTRA disattivava la suppressione,
+//      quindi bastava scrollare o cliccare altrove per far ripartire il video
+//      (feedback: "la pausa deve riattivarsi solo se clicco per levarlo dalla
+//      pausa"). Ora il release scatta SOLO se l'interazione ha come target (o
+//      antenato) un <video>/<audio>, o se è uno spazio/K mentre la pagina ha
+//      focus su un elemento media (controlli nativi/YouTube spesso spostano
+//      il focus sul player). Click/scroll sul resto della pagina non rilascia.
+//
+// Installiamo SUBITO — prima ancora del caricamento della pagina — i listener
+// in fase di cattura. Il listener vive nel mondo isolato del preload ma
+// ascolta il DOM condiviso.
 if (process.argv.includes('--filo-suppress-autoplay')) {
   try {
     let active = true;
-    const onPlay = (e) => {
-      if (!active) return;
-      const m = e.target;
-      if (m && typeof m.pause === 'function') { try { m.pause(); } catch (_) {} }
+    const mutedByUs = new WeakSet(); // media che abbiamo mutato noi (per non sovrascrivere un muted scelto dalla pagina)
+    const suppress = (m) => {
+      if (!m || typeof m.pause !== 'function') return;
+      try {
+        if (!m.muted) { m.muted = true; mutedByUs.add(m); }
+        m.pause();
+      } catch (_) {}
     };
-    document.addEventListener('play', onPlay, true);
+    const onPlayLike = (e) => {
+      if (!active) return;
+      suppress(e.target);
+    };
+    document.addEventListener('play', onPlayLike, true);
+    document.addEventListener('playing', onPlayLike, true);
+
+    const isMediaTarget = (node) => {
+      let n = node;
+      let hops = 0;
+      while (n && hops < 6) {
+        const tag = n.tagName;
+        if (tag === 'VIDEO' || tag === 'AUDIO') return true;
+        n = n.parentNode || (n.getRootNode && n.getRootNode().host) || null;
+        hops += 1;
+      }
+      return false;
+    };
+    const isMediaFocused = () => {
+      const a = document.activeElement;
+      return !!a && (a.tagName === 'VIDEO' || a.tagName === 'AUDIO');
+    };
+
     const release = () => {
       if (!active) return;
       active = false;
-      document.removeEventListener('play', onPlay, true);
+      document.removeEventListener('play', onPlayLike, true);
+      document.removeEventListener('playing', onPlayLike, true);
+      // Ripristina il muted SOLO sui media che abbiamo mutato noi.
+      try {
+        for (const m of document.querySelectorAll('video, audio')) {
+          if (mutedByUs.has(m)) { try { m.muted = false; } catch (_) {} }
+        }
+      } catch (_) {}
       for (const ev of ['pointerdown', 'keydown', 'click', 'touchstart']) {
-        window.removeEventListener(ev, release, true);
+        window.removeEventListener(ev, onMediaInteract, true);
       }
     };
-    for (const ev of ['pointerdown', 'keydown', 'click', 'touchstart']) {
-      window.addEventListener(ev, release, true);
+
+    function onMediaInteract(e) {
+      if (!active) return;
+      const type = e.type;
+      if (type === 'keydown') {
+        // Spazio/K: scorciatoie play/pause universali, ma rilascia solo se
+        // l'utente ha il focus sul media (altrimenti spaziare la pagina o
+        // digitare altrove rilascerebbe comunque — non è interazione col media).
+        const key = e.key;
+        if ((key === ' ' || key === 'Spacebar' || key === 'k' || key === 'K') && isMediaFocused()) {
+          release();
+        }
+        return;
+      }
+      // pointerdown/click/touchstart: rilascia solo se il target è/è dentro un media.
+      if (isMediaTarget(e.target)) release();
     }
+    for (const ev of ['pointerdown', 'keydown', 'click', 'touchstart']) {
+      window.addEventListener(ev, onMediaInteract, true);
+    }
+
+    // Proattivo: se al momento dell'iniezione (document-start può comunque
+    // correre dopo che la pagina ha già creato/avviato un <video> in casi rari,
+    // es. media creati da script inline molto precoci) c'è già un media in
+    // play, sopprimilo subito invece di aspettare l'evento.
+    const sweepExisting = () => {
+      if (!active) return;
+      try { for (const m of document.querySelectorAll('video, audio')) { if (!m.paused) suppress(m); } } catch (_) {}
+    };
+    sweepExisting();
+    document.addEventListener('DOMContentLoaded', sweepExisting, { once: true });
   } catch (_) { /* il blocco non deve MAI impedire il caricamento della pagina */ }
 }
 
