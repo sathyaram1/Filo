@@ -99,12 +99,14 @@ test('(B) click destro su parola errata in textarea filo:// mostra la correzione
     return { x, y };
   });
 
-  // Dispatcha il contextmenu sopra la parola.
+  // Dispatcha il contextmenu sopra la parola (sulla textarea stessa, non sul documento).
   await page.evaluate(({ x, y }) => {
+    const ta = document.querySelector('textarea[data-sn-test]') || document.body.querySelector('textarea');
+    if (!ta) return;
     const ev = new MouseEvent('contextmenu', {
       bubbles: true, cancelable: true, clientX: x, clientY: y, button: 2,
     });
-    document.dispatchEvent(ev);
+    ta.dispatchEvent(ev);
   }, coords);
 
   // Il menu Filo deve aprirsi con la correzione in cima.
