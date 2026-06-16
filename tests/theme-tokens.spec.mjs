@@ -81,6 +81,28 @@ test('le superfici Filo su pagina web esterna seguono i token (boot e live)', as
   await expect.poll(() => cssVar(page, '--sn-accent')).toBe(ACCENT_DEFAULT);
 });
 
+test('topbar (#184): colora la barra in alto della shell senza toccare le pagine', async ({ shell, openTab }) => {
+  const page = await openTab('filo://preferences/preferences.html');
+
+  const GREEN = '#1f3d2b';
+  const pageBgBefore = await cssVar(page, '--sn-bg');
+
+  await setTokens(shell, { topbar: GREEN });
+
+  // La fascia in alto (--bg-deep) e le tab inattive (--tab-bg) diventano verdi,
+  // live e senza riavvio: è ciò che il feedback chiedeva ("colore della barra").
+  await expect.poll(() => cssVar(shell, '--bg-deep')).toBe(GREEN);
+  await expect.poll(() => cssVar(shell, '--tab-bg')).toBe(GREEN);
+
+  // Ma le superfici di pagina restano intatte: topbar è di sola shell.
+  expect(await cssVar(page, '--sn-bg')).toBe(pageBgBefore);
+
+  // Reset: la barra torna al suo neutro (non più verde) ovunque.
+  await setTokens(shell, {});
+  await expect.poll(() => cssVar(shell, '--bg-deep')).not.toBe(GREEN);
+  await expect.poll(() => cssVar(shell, '--tab-bg')).not.toBe(GREEN);
+});
+
 test('i valori ostili vengono rifiutati alla scrittura (anti CSS-injection)', async ({ shell, openTab }) => {
   const page = await openTab('filo://preferences/preferences.html');
 
