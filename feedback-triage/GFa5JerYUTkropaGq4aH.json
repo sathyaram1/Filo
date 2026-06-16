@@ -1,7 +1,0 @@
-{
-  "id": "GFa5JerYUTkropaGq4aH",
-  "status": "done",
-  "notes": "Le impostazioni sensibili (terminale, cookie, fingerprint, protezione IP, blocco popup, navigazione sicura, modelli, provider, chiavi API, limite di spesa) ora NON lasciano piu un bottone da cliccare: il popup di conferma si apre da solo. Se ne tocchi piu d'una nella stessa risposta, i popup compaiono uno dopo l'altro invece di restare li inerti (era il bug del tuo screenshot). Ogni popup ora spiega cosa Filo sta per fare e qual e il rischio di quella impostazione. La rete di sicurezza resta (le impostazioni delicate chiedono conferma), ma sotto forma di popup come hai chiesto. Oltre al chiesto: un test blinda la regola (un'impostazione delicata aggiunta in futuro senza messaggio di rischio fa fallire i test). I comandi del terminale restano a click esplicito di proposito, cosi vedi il comando esatto prima che parta. Verificato con unit test (33/33) e Playwright (13/13, incluso il caso di piu popup in sequenza).",
-  "queuedAt": "2026-06-16T21:01:52.908Z",
-  "queuedBy": "routine"
-}
