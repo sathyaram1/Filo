@@ -821,6 +821,20 @@
     // Mostra il commento proattivo di Filo al centro della home (newtab).
     // Disattivabile da Preferenze per chi preferisce una home più sobria.
     showHomeMessage: true,
+    // Colore identità delle tab (spec "Colore identità delle tab"): i sei
+    // parametri che governano come si estrae il colore dal favicon e quanto
+    // tinge la tab. La fonte di verità dei default/range/commenti è
+    // IDENTITY_PARAM_META in src/shared/tabColor.js; i valori qui sotto devono
+    // restare allineati a quei default. L'utente li cambia a voce dalla chat
+    // ("voglio colori più vivaci nelle tab") o nelle Preferenze avanzate.
+    tabColor: {
+      soglia_saturazione: 0.30,
+      peso_centralita: 5.0,
+      bucket_tinta: 2,
+      saturazione_tab: 1.0,
+      luminosita_tab: 0.5,
+      opacita_tab: 0.6,
+    },
     // Stile di scrittura degli agenti rivolti all'utente (chat Filo, Aiuto,
     // spiegazioni, chat dell'editor). Stringa libera scelta in Preferenze:
     // può venire da un preset (professionale/amichevole/…) o essere scritta a
