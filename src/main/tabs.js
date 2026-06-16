@@ -428,6 +428,56 @@ class TabManager {
     return best;
   }
 
+  // La scheda WEB (non filo://) su cui agire quando Filo cambia l'estetica del
+  // contenuto via chat (#185). Di norma è la scheda attiva; ma la chat di Filo
+  // vive in una scheda interna (dashboard/newtab), quindi se l'attiva è interna
+  // ripieghiamo sull'ultima scheda web che l'utente ha guardato (activateSeq più
+  // alto). Null se non c'è alcuna pagina web aperta.
+  _activeWebTab() {
+    const active = this.tabs.find((t) => t.id === this.activeId);
+    if (active && !active.isInternal) return active;
+    let best = null;
+    for (const t of this.tabs) {
+      if (t.isInternal || !t.activateSeq) continue;
+      if (!best || t.activateSeq > best.activateSeq) best = t;
+    }
+    return best;
+  }
+
+  // Inietta un blocco CSS (già sanificato a monte) nella scheda web attiva.
+  // insertCSS ignora la CSP del sito (come già facciamo per ::selection e per
+  // gli stili dei content script), così l'estetica si applica ovunque. Tracciamo
+  // le chiavi sulla tab per poterle rimuovere con clearPageStyle. Il CSS è
+  // effimero: una navigazione/reload lo azzera da sé (le chiavi diventano stale,
+  // removeInsertedCSS le ignora senza errori).
+  applyPageStyle(css) {
+    if (!css || typeof css !== 'string') return { ok: false, reason: 'empty-css' };
+    const tab = this._activeWebTab();
+    if (!tab || !tab.view || !tab.view.webContents) return { ok: false, reason: 'no-web-tab' };
+    try {
+      const key = tab.view.webContents.insertCSS(css);
+      (tab._filoStyleKeys || (tab._filoStyleKeys = [])).push(key);
+      return { ok: true, key, tabId: tab.id };
+    } catch (e) {
+      console.warn('[Filo] applyPageStyle fallita', e?.message || e);
+      return { ok: false, reason: 'insert-failed' };
+    }
+  }
+
+  // Rimuove tutte le modifiche estetiche che Filo ha iniettato nella scheda web
+  // attiva. Reversibilità dell'azione STILE_PAGINA (#185).
+  clearPageStyle() {
+    const tab = this._activeWebTab();
+    if (!tab || !tab.view || !tab.view.webContents) return { ok: false, reason: 'no-web-tab' };
+    const keys = tab._filoStyleKeys || [];
+    let removed = 0;
+    for (const k of keys) {
+      try { tab.view.webContents.removeInsertedCSS(k); removed += 1; } catch (_) { /* chiave stale dopo reload */ }
+    }
+    tab._filoStyleKeys = [];
+    return { ok: true, removed };
+  }
+
   // Sposta la tab `id` alla posizione `toIndex` nell'ordine della barra (drag &
   // drop nella shell). Riordina solo l'array `this.tabs` (l'ordine non incide
   // sul layout delle WebContentsView native, solo su snapshot + sessione) e
