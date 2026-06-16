@@ -657,6 +657,10 @@
     const resetTabColorBtn = $('resetAllTabColor');
     if (resetTabColorBtn) resetTabColorBtn.addEventListener('click', resetAllTabColor);
 
+    // Ripristino completo di TUTTE le impostazioni ai predefiniti (#184).
+    const resetAllBtn = $('resetAllSettings');
+    if (resetAllBtn) resetAllBtn.addEventListener('click', resetAllSettings);
+
     // Con tema "Come il sistema", il tema risolto può cambiare quando l'OS passa
     // chiaro↔scuro: ridisegna le righe così i default mostrati restano corretti.
     if (window.matchMedia) {
