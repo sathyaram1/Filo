@@ -1,7 +1,0 @@
-{
-  "id": "XccgTG4rFInWZz0erky3",
-  "status": "done",
-  "notes": "Fix: il correttore italiano ora viene dichiarato primo nella lista del correttore (prima veniva dopo la lingua di sistema inglese). Questo risolve sia i suggerimenti in inglese sul testo italiano, sia l'assenza di suggerimenti col tasto destro nel box feedback: avevano la stessa causa. Verificato con nuovi test automatici sulle tre superfici del correttore.",
-  "queuedAt": "2026-06-16T05:35:51.058Z",
-  "queuedBy": "routine"
-}
