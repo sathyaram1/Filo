@@ -1628,6 +1628,10 @@
     const ICONS = self.SN_ICONS || {};
     const items = [
       { command: 'home', icon: 'home', label: 'Home' },
+      // Cronologia AI: apre direttamente la pagina interna (non passa dalla
+      // shell come gli altri, che ancorano un menu nativo) — è solo una
+      // navigazione. Risponde al feedback "metti la cronologia in alto a destra".
+      { command: 'history', icon: 'history', label: 'Cronologia', url: 'filo://history/history.html' },
       { command: 'settings', icon: 'options', label: 'Impostazioni' },
       { command: 'apps', icon: 'apps', label: 'App' },
       { command: 'account', icon: 'user', label: 'Profilo' },
@@ -1643,7 +1647,10 @@
       btn.title = it.label;
       const svg = typeof ICONS[it.icon] === 'function' ? ICONS[it.icon](18) : '';
       btn.innerHTML = svg || it.label.charAt(0);
-      btn.addEventListener('click', () => { send({ type: MSG.SHELL_ACTION, command: it.command }); });
+      btn.addEventListener('click', () => {
+        if (it.url) send({ type: MSG.OPEN_URL, url: it.url });
+        else send({ type: MSG.SHELL_ACTION, command: it.command });
+      });
       host.appendChild(btn);
       if (it.command === 'account') accountCtrlBtn = btn;
     }
