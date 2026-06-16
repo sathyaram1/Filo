@@ -175,6 +175,57 @@
     }
   }
 
+  // Mostra/nasconde l'indizio "Caricamento…" sotto la casella commento/risposta
+  // di un dato feedback, così l'admin vede che il paste è stato preso in carico
+  // (senza, l'upload è silenzioso per qualche secondo e sembra non avere fatto
+  // nulla).
+  function setUploadHint(id, text) {
+    const hint = listEl.querySelector(`.fb-upload-hint[data-id="${(window.CSS && CSS.escape) ? CSS.escape(id) : id}"]`);
+    if (!hint) return;
+    if (text) { hint.textContent = text; hint.hidden = false; }
+    else { hint.hidden = true; hint.textContent = ''; }
+  }
+
+  // Carica uno o più blob (immagini o file) incollati/allegati a un commento e
+  // li attacca al feedback `id`: le immagini finiscono in `images` (array di
+  // url), gli altri file in `files` ({url, name}) — stesso shape già usato dal
+  // form di invio, così la dashboard li rende con il codice esistente
+  // (fb-imgs/fb-files) senza bisogno di nulla nuovo lato rendering.
+  async function uploadAndAttach(id, blobs) {
+    if (!isAdmin) {
+      alert('Operazione riservata agli amministratori: accedi con un account autorizzato.');
+      return;
+    }
+    if (!window.SN_FEEDBACK?.uploadImage) return;
+    const item = all.find((f) => f._id === id);
+    if (!item) return;
+    setUploadHint(id, `Caricamento di ${blobs.length} allegat${blobs.length === 1 ? 'o' : 'i'}…`);
+    const newImages = [];
+    const newFiles = [];
+    const failed = [];
+    for (const blob of blobs) {
+      const name = blob.name || (blob.type?.startsWith('image/') ? 'immagine.png' : 'allegato');
+      if (blob.size > 4 * 1024 * 1024) { failed.push(`${name} (troppo grande, max 4 MB)`); continue; }
+      try {
+        const up = await SN_FEEDBACK.uploadImage(blob);
+        if (blob.type && blob.type.startsWith('image/')) newImages.push(up.url);
+        else newFiles.push({ url: up.url, name });
+      } catch (e) {
+        console.warn('[feedback dashboard] upload allegato fallito:', e);
+        failed.push(name);
+      }
+    }
+    setUploadHint(id, '');
+    if (!newImages.length && !newFiles.length) {
+      if (failed.length) alert('Caricamento non riuscito: ' + failed.join(', '));
+      return;
+    }
+    const images = [...(Array.isArray(item.images) ? item.images : []), ...newImages];
+    const files = [...(Array.isArray(item.files) ? item.files : []), ...newFiles];
+    await patch(id, { images, files }, { images, files });
+    if (failed.length) alert('Alcuni allegati non sono stati caricati: ' + failed.join(', '));
+  }
+
   function actionsFor(f) {
     // Non-admin: niente pulsanti d'azione (sola lettura).
     if (!isAdmin) return '';
