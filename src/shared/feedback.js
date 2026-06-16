@@ -278,7 +278,7 @@
   // opts.idToken (Firebase ID token) viene allegato come Bearer: serve perché le
   // Firestore rules verifichino che l'utente è un admin. Senza token la scrittura
   // riuscirà solo se le regole consentono l'accesso anonimo (sconsigliato).
-  async function updateStatus(id, { status, notes, priority }, opts = {}) {
+  async function updateStatus(id, { status, notes, priority, images, files }, opts = {}) {
     if (!id) throw new Error('id mancante');
     const idToken = opts.idToken;
     const fields = {};
@@ -291,6 +291,12 @@
       fields.priority = { integerValue: String(p) };
       mask.push('priority');
     }
+    // Allegati aggiunti incollando nella dashboard (vedi #commenti con paste):
+    // stesso shape di quelli inviati alla creazione (images: array di url,
+    // files: array di { url, name }), qui sovrascritti per intero (la dashboard
+    // manda già l'array completo, vecchi + nuovi).
+    if (images !== undefined) { fields.images = toFsValue(Array.isArray(images) ? images : []); mask.push('images'); }
+    if (files !== undefined) { fields.files = toFsValue(Array.isArray(files) ? files : []); mask.push('files'); }
     if (status === 'done') {
       fields.resolvedAt = { timestampValue: new Date().toISOString() };
       mask.push('resolvedAt');
