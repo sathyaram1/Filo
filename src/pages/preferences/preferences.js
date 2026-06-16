@@ -620,6 +620,10 @@
     // Token estetici: reset globale ai predefiniti.
     $('resetAllTokens').addEventListener('click', resetAllTokens);
 
+    // Colore identità delle tab: reset globale ai predefiniti.
+    const resetTabColorBtn = $('resetAllTabColor');
+    if (resetTabColorBtn) resetTabColorBtn.addEventListener('click', resetAllTabColor);
+
     // Con tema "Come il sistema", il tema risolto può cambiare quando l'OS passa
     // chiaro↔scuro: ridisegna le righe così i default mostrati restano corretti.
     if (window.matchMedia) {
