@@ -216,7 +216,7 @@ async function saveCache() {
 function fetchList(url) {
   return new Promise((resolve) => {
     let req;
-    try { req = net.request(url); } catch (_) { resolve(null); return; }
+    try { req = require('electron').net.request(url); } catch (_) { resolve(null); return; }
     let body = '';
     let bytes = 0;
     let done = false;
