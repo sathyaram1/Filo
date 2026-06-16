@@ -141,6 +141,8 @@
     {
       keys: ['shell_terminale', 'shell terminale', 'shell'],
       level: 2,
+      risk: 'Sceglie quale shell usa Filo per eseguire i comandi del terminale (PowerShell, '
+        + 'Prompt dei comandi o Bash). Cambia come vengono interpretati i comandi che Filo lancia.',
       build(v) {
         const s = String(v == null ? '' : v).trim().toLowerCase();
         const map = { powershell: 'powershell', ps: 'powershell', cmd: 'cmd', 'prompt dei comandi': 'cmd', prompt: 'cmd', bash: 'bash', wsl: 'bash' };
