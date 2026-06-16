@@ -180,7 +180,11 @@
     // ripristinare). Campiona su 'timeupdate'/'pause' (throttle ~3s) e ogni
     // tanto comunque, così anche un video in pausa che l'utente ha scrubbed
     // viene catturato.
-    let lastSentMediaAt = 0;
+    // -Infinity (non 0): "0" è già un timestamp valido di performance.now() in
+    // pagine vecchie/lente, quindi un primo evento entro i 3s dal load
+    // verrebbe scartato dal throttle. -Infinity garantisce che il primissimo
+    // campione passi sempre.
+    let lastSentMediaAt = -Infinity;
     function pickMainMedia() {
       const els = Array.from(document.querySelectorAll('video, audio'));
       let best = null;
@@ -198,10 +202,13 @@
       lastSentMediaAt = performance.now();
       send({ mediaTime: m.currentTime || 0, mediaDuration: m.duration || null });
     }
-    function onMediaEvent() { sendMediaTime(false); }
-    document.addEventListener('timeupdate', onMediaEvent, { passive: true, capture: true });
-    document.addEventListener('pause', onMediaEvent, { passive: true, capture: true });
-    document.addEventListener('loadedmetadata', onMediaEvent, { passive: true, capture: true });
+    // 'pause' è un evento poco frequente e ad alto valore (è esattamente il
+    // momento in cui l'utente lascia il video "dove l'ha lasciato" — la
+    // posizione da ripristinare al riavvio): lo forziamo sempre, ignorando il
+    // throttle, altrimenti un pause nei primi 3s dal load andrebbe perso.
+    document.addEventListener('timeupdate', () => sendMediaTime(false), { passive: true, capture: true });
+    document.addEventListener('pause', () => sendMediaTime(true), { passive: true, capture: true });
+    document.addEventListener('loadedmetadata', () => sendMediaTime(false), { passive: true, capture: true });
 
     window.addEventListener('pointerdown', onInteract, { passive: true, capture: true });
     window.addEventListener('keydown', onInteract, { passive: true, capture: true });
