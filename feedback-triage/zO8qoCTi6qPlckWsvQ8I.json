@@ -1,7 +1,0 @@
-{
-  "id": "zO8qoCTi6qPlckWsvQ8I",
-  "status": "done",
-  "notes": "Ho fatto in modo che l'agente Aiuto (il pannello Aiuto on-page) possa inviare un feedback agli sviluppatori a tuo nome — il punto esatto della conversazione allegata, dove diceva di non poterlo fare. Ora glielo chiedi (es. 'manda un feedback che lo schermo intero lascia la barra in alto') e Filo prepara la segnalazione e ti mostra lo STESSO popup di conferma del resto di Filo, con l'anteprima del testo: parte solo dopo il tuo OK. Passa per le stesse regole di sicurezza della chat della dashboard, quindi non e' un canale privilegiato. Il resto del 'qualsiasi cosa col tasto destro' l'ho pianificato in 3 sotto-feedback (#192.x: azioni su testo selezionato, su immagini, su link) cosi' le prossime passate li completano uno alla volta. Verificato con test automatico: il popup compare, Annulla non invia nulla, OK invia davvero il feedback.",
-  "queuedAt": "2026-06-16T22:58:25.693Z",
-  "queuedBy": "routine"
-}
