@@ -290,6 +290,8 @@
     {
       keys: ['modelli_predefiniti', 'modelli predefiniti', 'usa modelli predefiniti', 'modelli di default', 'configurazione predefinita modelli'],
       level: 2,
+      risk: 'Decide se Filo usa i modelli AI predefiniti o la tua configurazione personalizzata. '
+        + 'Cambia quali modelli elaborano le tue richieste, con effetti su qualità e costi.',
       build(v) {
         const b = parsePrefBool(v);
         if (b === null) return null;
