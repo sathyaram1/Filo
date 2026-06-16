@@ -337,6 +337,12 @@
       // stesso testo comparirebbe due volte.
       const notesEditable = isAdmin && (currentTab === 'todo' || currentTab === 'draft' || currentTab === 'agent');
       const clarifyReply = isAdmin && currentTab === 'clarify';
+      // Commento senza cambio di stato: su tutti i tab di sola lettura (vedi
+      // "iniziativa": ricevuti è la richiesta esplicita, ma vale la stessa
+      // logica anche su risolti/verificati/ignorati, per parità). Così l'admin
+      // può annotare PRIMA di decidere lo stato (es. commenta in "Ricevuti",
+      // poi sposta in "Da risolvere" col bottone esistente).
+      const commentable = isAdmin && !notesEditable && !clarifyReply;
       const showConvo = !notesEditable;
       const reportBubble = `
         <div class="fb-bubble fb-bubble--report fb-bubble--${reportRole} fb-bubble--origin-${origin}">
