@@ -400,7 +400,9 @@ operative vivono qui — quando ricevi quel prompt in ambiente cloud:
 2. Risolvi i feedback con status **`todo`** su Firestore (progetto
    `filo-8b9cb`, collezione `feedback`) seguendo la sezione "Feedback alpha
    tester" qui sotto. Ordine: `priority` più alta prima; a parità, i più
-   recenti.
+   recenti. **Prima di lavorare ogni feedback prendi il "semaforo"**
+   (`node scripts/claim-feedback.mjs acquire <id>`): se è già in lavorazione da
+   un'altra routine (exit 10), passa al prossimo. Vedi "Feedback alpha tester".
 3. **Punta a ~3 feedback per routine** (bersaglio di default), variando in
    base alla complessità: se sono tutti semplici ritocchi UI puoi arrivare a
    4-5; se uno è una feature corposa anche 1 solo va bene (e ricorda che le
