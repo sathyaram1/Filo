@@ -748,7 +748,12 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         try { settings = await Storage.getSettings(); } catch (_) {}
         const shell = settings.terminal && settings.terminal.shell;
         const { runCommand } = require('./terminal');
-        const out = await runCommand(cmd, { shell });
+        // cwd PERSISTENTE: partiamo dalla cartella corrente dell'assistente e
+        // catturiamo quella risultante, così un `cd` resta valido per il comando
+        // successivo e il percorso torna al client per aggiornare la barra.
+        const cwd = getAssistantCwd(sender);
+        const out = await runCommand(cmd, { shell, cwd, trackCwd: true });
+        if (out.cwd) setAssistantCwd(sender, out.cwd);
         return { executed: out.code === 0, kept: true, output: out };
       }
       // ── proxy per-tab via linguaggio naturale (#152) ───────────────────────
