@@ -76,8 +76,14 @@ function configureSpellchecker() {
     const pick = (pref) =>
       available.find((l) => l.toLowerCase() === String(pref).toLowerCase()) ||
       available.find((l) => base(l) === base(pref));
+    // L'italiano viene messo PRIMA della lingua di sistema: così i suggerimenti
+    // Hunspell per le parole italiane (quasi tutto il traffico dell'app)
+    // appaiono in cima alla lista `dictionarySuggestions` dell'evento
+    // `context-menu`. Con l'ordine inverso (locale en-US prima) le parole
+    // errate in italiano ricevevano suggerimenti in inglese anche quando il
+    // dizionario italiano era caricato (feedback alpha #4).
     const want = [];
-    for (const pref of [app.getLocale(), 'it', 'en-US', 'en']) {
+    for (const pref of ['it', app.getLocale(), 'en-US', 'en']) {
       const match = pick(pref);
       if (match && !want.includes(match)) want.push(match);
     }
