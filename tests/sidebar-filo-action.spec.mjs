@@ -71,7 +71,7 @@ test('dalla sidebar: il popup di conferma compare; Annulla NON invia; OK invia d
   await overlay.locator('.sn-confirm-btn-cancel').click();
   await expect(overlay).toHaveCount(0);
   expect(await app.evaluate(() => globalThis.__fbCalls.length)).toBe(0);
-  await expect(page.locator('.sn-sidebar-log')).toContainText('annullata');
+  await expect(page.locator('.sn-sidebar-log').last()).toContainText('annullata');
 
   // 2) OK → il feedback parte davvero (lo stub registra il testo).
   await page.evaluate((a) => { window.__filoSidebarTest.runFiloAction(a); }, action);
