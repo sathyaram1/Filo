@@ -660,6 +660,7 @@
       `  • provider: "openrouter" | "gemini" [conferma] ; modelli_predefiniti: true | false [conferma]\n` +
       `  • chiave_openrouter / chiave_gemini / chiave_tavily: la chiave API come testo [conferma]\n` +
       `  • limite_spesa: numero in euro (limite di spesa mensile) [conferma]\n` +
+      `  • colore_tab: "più vivaci" | "più neutre" | "nessuno" | "più preciso" | "predefinito"  (colore identità delle tab: "vivaci"=tinte accese, "neutre"=tinte spente, "nessuno"=tab senza colore, "più preciso"=estrai meglio quando la tab prende il colore sbagliato es. "Poste è verde non gialla", "predefinito"=ripristina). I singoli parametri numerici si regolano dalle Preferenze avanzate.\n` +
       `IMPOSTA_ESTETICA: {token, valore}  — cambia un singolo token estetico dell'app, applicato live a tutte le superfici. `
         + `\`valore\` è un valore CSS concreto: per i colori un esadecimale #rrggbb (NON nomi come "green"); per il raggio una misura con unità ("8px", "0.5rem"); per l'opacità un numero 0-1 ("0.4"); per il font una lista di famiglie ("Georgia, serif"). Token disponibili:\n` +
       `  • accent (colore d'accento, da cui ereditano link e selezione) · text (colore del testo) · background (sfondo) · muted (testo secondario) · border (bordi) · error (colore degli errori)\n` +
