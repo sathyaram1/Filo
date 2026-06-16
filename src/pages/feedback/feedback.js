@@ -525,6 +525,63 @@
       });
     });
 
+    // Composer "Aggiungi commento" (#22): come "Invia risposta" ma SENZA
+    // cambiare lo stato — resta nel tab corrente (es. Ricevuti). L'admin
+    // commenta prima, poi decide se/quando spostarlo con i bottoni azione.
+    listEl.querySelectorAll('.fb-comment-send').forEach((btn) => {
+      const id = btn.dataset.id;
+      const card = btn.closest('.fb-card');
+      const ta = card && card.querySelector('.fb-comment-text');
+      const send = () => {
+        const reply = ta ? ta.value.trim() : '';
+        if (!reply) { if (ta) ta.focus(); return; }
+        const item = all.find((f) => f._id === id);
+        const oldNotes = (item && item.notes) || '';
+        const newNotes = window.SN_FEEDBACK_THREAD
+          ? SN_FEEDBACK_THREAD.appendUserTurn(oldNotes, reply)
+          : (oldNotes ? `${oldNotes}\n\n${reply}` : reply);
+        patch(id, { notes: newNotes }, { notes: newNotes });
+        if (ta) ta.value = '';
+      };
+      btn.addEventListener('click', send);
+      if (ta) ta.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); send(); }
+      });
+    });
+
+    // "Allega" del commento: stesso effetto del paste, ma via selettore file
+    // (parità coi cammini equivalenti — vedi CLAUDE.md "Iniziativa").
+    listEl.querySelectorAll('.fb-comment-attach').forEach((input) => {
+      input.addEventListener('change', async () => {
+        const id = input.dataset.id;
+        const picked = Array.from(input.files || []);
+        input.value = '';
+        if (picked.length) await uploadAndAttach(id, picked);
+      });
+    });
+
+    // Paste di immagini/file nelle caselle commento/risposta/note: upload
+    // immediato su Storage (SN_FEEDBACK.uploadImage, già usato dal form di
+    // invio) e attacco il risultato a images/files del feedback esistente.
+    listEl.querySelectorAll('.fb-comment-text, .fb-reply-text, .fb-notes').forEach((ta) => {
+      ta.addEventListener('paste', async (e) => {
+        const items = e.clipboardData?.items;
+        if (!items || !items.length) return;
+        const blobs = [];
+        for (const it of items) {
+          if (it.kind === 'file') {
+            const f = it.getAsFile();
+            if (f) blobs.push(f);
+          }
+        }
+        if (!blobs.length) return;
+        // Non impedire l'eventuale testo incollato insieme (raro per le
+        // immagini, ma getAsFile() su un item 'file' non tocca il testo).
+        const id = ta.dataset.id;
+        await uploadAndAttach(id, blobs);
+      });
+    });
+
     // Pallini priorità: clic sul pallino N imposta priorità = N; ri-clic sul
     // pallino già attivo (== priorità corrente) la azzera.
     listEl.querySelectorAll('.fb-dot').forEach((dot) => {
