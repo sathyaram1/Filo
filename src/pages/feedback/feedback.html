@@ -133,6 +133,16 @@
       background: #e08e0b22; color: #b9770a; border: 1px solid #e08e0b88;
     }
     .fb-card--agent { border-left: 3px solid var(--sn-accent); }
+    /* Bordo a sinistra colorato per ORIGINE del feedback, leggibile a colpo
+       d'occhio in ogni tab. Legenda: arancione = alpha tester esterno, verde =
+       invio manuale dell'owner (admin loggato), blu = audit automatico di una
+       routine cloud, accento = agente esploratore LLM. Le regole d'origine
+       seguono .fb-card--agent così, a parità di specificità, vincono (una card
+       d'audit-routine resta blu invece dell'accento). */
+    .fb-card--origin-user { border-left: 3px solid #e08e0b; }
+    .fb-card--origin-owner { border-left: 3px solid #2e9e5b; }
+    .fb-card--origin-routine { border-left: 3px solid #5b6ee0; }
+    .fb-card--origin-agent { border-left: 3px solid var(--sn-accent); }
     .fb-reopen-form { width: 100%; display: flex; flex-direction: column; gap: 8px; }
     .fb-reopen-text { width: 100%; box-sizing: border-box; padding: 6px 8px; font: inherit; font-size: 13px; background: var(--sn-bg, transparent); color: inherit; border: 1px solid var(--sn-border); border-radius: 6px; resize: vertical; }
     .fb-reopen-buttons { display: flex; gap: 8px; justify-content: flex-end; }
