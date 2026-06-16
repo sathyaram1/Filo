@@ -5,7 +5,10 @@
 //
 //   1 — completamente reversibile: si esegue subito, senza chiedere nulla.
 //   2 — reversibile ma con possibili inconvenienti: popup di conferma che
-//       spiega in chiaro la modifica, con OK e Annulla (SN_CONFIRM_UI.confirm).
+//       spiega in chiaro la modifica E i suoi rischi, con OK e Annulla
+//       (SN_CONFIRM_UI.confirm). Il popup si apre DA SOLO sulle risposte
+//       fresche (#183), mai come chip inerte da cliccare; se ci sono più
+//       azioni di livello 2 i popup si aprono uno alla volta.
 //   3 — irreversibile: box con attrito maggiore, l'utente deve digitare
 //       espressamente "conferma" (SN_CONFIRM_UI.confirmTyped).
 //
