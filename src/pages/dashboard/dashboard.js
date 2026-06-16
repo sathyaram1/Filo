@@ -1742,5 +1742,5 @@
   // Hook per i test Playwright (stesso pattern di __filoEditorFormat
   // nell'editor): permette di renderizzare azioni come farebbe una bolla di
   // chat senza dover pilotare l'LLM.
-  window.__filoDashActions = { renderActions };
+  window.__filoDashActions = { renderActions, applyCommandCwd, getCwd: () => currentCwd };
 })();
