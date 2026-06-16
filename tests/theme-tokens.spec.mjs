@@ -103,6 +103,29 @@ test('topbar (#184): colora la barra in alto della shell senza toccare le pagine
   await expect.poll(() => cssVar(shell, '--tab-bg')).not.toBe(GREEN);
 });
 
+test('hover/overlay (#184): superfici di sola pagina (menu, popup) colorabili live', async ({ shell, openTab }) => {
+  const page = await openTab('filo://preferences/preferences.html');
+
+  // Default: hover #ffffff (chiaro), overlay translucido. Override a colori netti.
+  const HOVER = '#3a7d44';
+  const OVERLAY = '#101820';
+  await setTokens(shell, { hover: HOVER, overlay: OVERLAY });
+
+  // Le superfici di pagina (hover di menu/righe, sfondo di popup/sidebar)
+  // seguono l'override live, senza riavvio.
+  await expect.poll(() => cssVar(page, '--sn-hover')).toBe(HOVER);
+  await expect.poll(() => cssVar(page, '--sn-overlay-bg')).toBe(OVERLAY);
+
+  // Sono di sola pagina: la shell non ha variabili gemelle da cambiare.
+  expect(await cssVar(shell, '--sn-hover')).toBe('');
+  expect(await cssVar(shell, '--sn-overlay-bg')).toBe('');
+
+  // Reset: tornano ai predefiniti del tema.
+  await setTokens(shell, {});
+  await expect.poll(() => cssVar(page, '--sn-hover')).not.toBe(HOVER);
+  await expect.poll(() => cssVar(page, '--sn-overlay-bg')).not.toBe(OVERLAY);
+});
+
 test('i valori ostili vengono rifiutati alla scrittura (anti CSS-injection)', async ({ shell, openTab }) => {
   const page = await openTab('filo://preferences/preferences.html');
 
