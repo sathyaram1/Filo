@@ -82,6 +82,32 @@ test('"Apri comunque" apre il sito bypassando il blocco', async ({ app, shell, o
   }, { timeout: 8000 }).toBe(true);
 });
 
+test('Sicurezza: il toggle e la blacklist dedicata persistono', async ({ openTab }) => {
+  const page = await openTab('filo://security/security.html');
+  await page.waitForSelector('#sec-siteblock', { timeout: 8000 });
+
+  // I controlli esistono.
+  await expect(page.locator('#sec-siteblock')).toHaveCount(1);
+  await expect(page.locator('#sec-siteblock-lists')).toHaveCount(1);
+  await expect(page.locator('#sec-siteblock-blacklist')).toHaveCount(1);
+
+  // Aggiunge un dominio alla blacklist dedicata e salva (change).
+  await page.locator('#sec-siteblock-blacklist').fill('cattivo.example\naltro.test');
+  await page.locator('#sec-siteblock-blacklist').dispatchEvent('change');
+
+  await expect
+    .poll(() => page.evaluate(async () => {
+      const sb = (await window.SN_STORAGE.getSettings()).security?.siteBlock || {};
+      return sb.blacklist || [];
+    }), { timeout: 4000 })
+    .toEqual(['cattivo.example', 'altro.test']);
+
+  // Sopravvive a una ricarica della pagina.
+  await page.reload();
+  await page.waitForSelector('#sec-siteblock-blacklist', { timeout: 8000 });
+  await expect(page.locator('#sec-siteblock-blacklist')).toHaveValue('cattivo.example\naltro.test');
+});
+
 test('apertura via Filo (programmatica) verso sito in blacklist → consentita', async ({ shell, openTab, testServer }) => {
   await enableBlock(shell);
 
