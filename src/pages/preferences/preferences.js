@@ -552,6 +552,13 @@
     // mostrati riflettono il tema risolto corrente.
     currentOverrides = { ...(settings.themeTokens || {}) };
     buildTokenSection();
+
+    // Colore identità delle tab: parti dai valori salvati (clampati ai range),
+    // o dai default se mancano.
+    currentTabColor = TabColor
+      ? TabColor.clampParams(settings.tabColor || {})
+      : { ...(settings.tabColor || {}) };
+    buildTabColorSection();
   }
 
   document.addEventListener('DOMContentLoaded', () => {
