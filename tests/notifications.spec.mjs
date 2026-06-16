@@ -37,6 +37,37 @@ test('notifica infinita resta e si chiude solo con la X', async ({ shell }) => {
   await expect(shell.locator('.shell-notif')).toHaveCount(0, { timeout: 4000 });
 });
 
+test('Preferenze: i controlli notifiche esistono e persistono', async ({ openTab }) => {
+  const page = await openTab('filo://preferences/preferences.html');
+  await page.waitForSelector('#notifDuration', { timeout: 8_000 });
+
+  // I controlli della sezione esistono.
+  await expect(page.locator('#notifDuration')).toHaveCount(1);
+  await expect(page.locator('#notifSoundEnabled')).toHaveCount(1);
+  await expect(page.locator('#notifSound')).toHaveCount(1);
+  await expect(page.locator('#notifSoundPreview')).toHaveCount(1);
+  // Il select dei suoni è popolato con le stesse voci di SN_SOUNDS.
+  await expect(page.locator('#notifSound option')).toHaveCount(4);
+
+  // Imposta durata infinita (0) + suono attivo e attende il salvataggio.
+  await page.locator('#notifDuration').fill('0');
+  await page.locator('#notifDuration').dispatchEvent('change');
+  await page.locator('#notifSoundEnabled').check();
+
+  await expect
+    .poll(() => page.evaluate(async () => {
+      const n = (await window.SN_STORAGE.getSettings()).notifications || {};
+      return [n.durationSec, n.soundEnabled];
+    }), { timeout: 4000 })
+    .toEqual([0, true]);
+
+  // Sopravvive a una ricarica.
+  await page.reload();
+  await page.waitForSelector('#notifDuration', { timeout: 8_000 });
+  await expect(page.locator('#notifDuration')).toHaveValue('0');
+  await expect(page.locator('#notifSoundEnabled')).toBeChecked();
+});
+
 test('la durata configurata nelle Preferenze viene rispettata', async ({ shell }) => {
   // Imposta durata infinita (0) nelle impostazioni e propaga la config alla
   // shell come fa il broadcast settings_updated dopo il salvataggio.
