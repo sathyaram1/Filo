@@ -888,6 +888,7 @@ class TabManager {
     const now = Date.now();
     tab.lastActiveAt = now;
     tab.lastInteractionAt = now;
+    tab.activateSeq = this._nextActivationSeq(); // ordine MRU per la chiusura tab
     this._lastAppInteractionAt = now; // attivare una tab = usare Filo (§2.1)
     for (const t of this.tabs) {
       t.view.setVisible?.(t.id === id);
