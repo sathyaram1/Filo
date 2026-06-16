@@ -1,7 +1,0 @@
-{
-  "id": "V7gZ4hBPNOUGJ79a7r",
-  "status": "done",
-  "notes": "Ora puoi chiedere a Filo nella chat di cambiare l'aspetto del testo della pagina che stai guardando, es. \"scrivi in grassetto tutti i titoli\", \"ingrandisci il testo\", \"metti i link in rosso\". La modifica si applica subito e SOLO a quella pagina; basta ricaricarla per annullarla, oppure dire \"togli le modifiche\". Aggiunto anche (oltre al chiesto): il comando inverso per rimuovere gli stili applicati, e una sanificazione di sicurezza che scarta CSS pericoloso (così Filo non può iniettare nella pagina nulla oltre allo stile del testo). Verificato con test automatici: i titoli diventano davvero grassetto sulla pagina reale e tornano normali con l'annulla. Nota: per ora il comando si dà dalla chat di Filo (nuova scheda), non dal pannello Aiuto laterale.",
-  "queuedAt": "2026-06-16T23:02:08.209Z",
-  "queuedBy": "routine"
-}
