@@ -185,6 +185,29 @@ test('topbar (#184): è una superficie di sola shell che colora la barra in alto
   assert.equal(TT.pageCss({ topbar: '#1f3d2b' }), '');
 });
 
+test('hover/overlay: superfici di sola pagina esposte come token (#184)', () => {
+  // Entrambe esistono, sono colori e hanno un default per i due temi.
+  for (const name of ['hover', 'overlay']) {
+    assert.ok(TT.get(name), `${name} non registrato`);
+    assert.equal(TT.get(name).type, 'color');
+    assert.ok(TT.defaultValue(name, 'light'), `${name} senza default light`);
+    assert.ok(TT.defaultValue(name, 'dark'), `${name} senza default dark`);
+  }
+  // overlay è translucido di default (alpha 0.98): la whitelist accetta rgba().
+  assert.equal(TT.defaultValue('overlay', 'light'), 'rgba(248, 246, 240, 0.98)');
+  assert.ok(TT.validate('overlay', 'rgba(248, 246, 240, 0.98)'));
+
+  // Sovrascriverli emette le variabili di pagina --sn-* …
+  const page = TT.pageCss({ hover: '#3a7d44', overlay: '#101820' });
+  assert.match(page, /--sn-hover: #3a7d44;/);
+  assert.match(page, /--sn-overlay-bg: #101820;/);
+
+  // … ma NON toccano la shell (nessuna variabile gemella nella tab bar).
+  const shell = TT.shellCss({ hover: '#3a7d44', overlay: '#101820' });
+  assert.ok(!shell.includes('#3a7d44'));
+  assert.ok(!shell.includes('#101820'));
+});
+
 test('toRgbTriplet converte hex corti, lunghi e rgb()', () => {
   assert.equal(TT.toRgbTriplet('#fff'), '255, 255, 255');
   assert.equal(TT.toRgbTriplet('#1e90ff'), '30, 144, 255');
