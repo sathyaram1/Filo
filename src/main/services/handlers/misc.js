@@ -90,6 +90,15 @@ module.exports = function register(on, ctx) {
         throw new Error('SN_FEEDBACK non caricato nel main process');
       }
       const payload = msg.payload || {};
+      // Se l'utente è loggato come admin (l'owner), marca il suo invio come
+      // "owner:" così la dashboard lo distingue (verde) dai feedback dei tester
+      // esterni (arancione). L'identità owner è nota solo qui nel main (auth
+      // singleton): il content script che genera il clientId non sa di esserlo.
+      try {
+        if (auth.isAdmin() && globalThis.SN_FEEDBACK_THREAD?.ownerize) {
+          payload.clientId = globalThis.SN_FEEDBACK_THREAD.ownerize(payload.clientId);
+        }
+      } catch (_) {}
       console.log('[Filo feedback] submit start', {
         textLen: (payload.text || '').length,
         images: (payload.images || []).length,
