@@ -10,14 +10,15 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 
-test('La home mostra le icone di controllo (home/impostazioni/app/profilo)', async ({ openTab }) => {
+test('La home mostra le icone di controllo (home/cronologia/impostazioni/app/profilo)', async ({ openTab }) => {
   const page = await openTab('filo://newtab/');
   await page.waitForSelector('#dashControls .dash-ctrl', { timeout: 8_000 });
   const commands = await page.$$eval('#dashControls .dash-ctrl', (els) => els.map((e) => e.dataset.command));
-  expect(commands).toEqual(['home', 'settings', 'apps', 'account']);
+  // La cronologia è in alto a destra accanto agli altri controlli (vedi dashboard.js).
+  expect(commands).toEqual(['home', 'history', 'settings', 'apps', 'account']);
   // Ogni icona ha un'immagine SVG (non un fallback testuale).
   const svgs = await page.$$eval('#dashControls .dash-ctrl svg', (els) => els.length);
-  expect(svgs).toBe(4);
+  expect(svgs).toBe(5);
 });
 
 test('La barra in alto di Filo è sparita (chrome compatto, barra indirizzi nascosta)', async ({ shell, openTab }) => {
