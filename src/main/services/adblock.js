@@ -158,20 +158,14 @@ function isBlockedUrl(url) {
   return isBlockedHost(hostnameOf(url));
 }
 
-// ─── hook onBeforeRequest (una registrazione per sessione) ──────────────────
-
-const hookedSessions = new WeakSet();
-
-// Registra (una volta sola) il blocco su una sessione. Il filtro consulta lo
-// stato globale `enabled` a ogni richiesta, così attivare/disattivare il toggle
-// non richiede di ri-registrare nulla.
-function applyAdblock(ses) {
-  if (!ses || !ses.webRequest || hookedSessions.has(ses)) return;
-  hookedSessions.add(ses);
-  ses.webRequest.onBeforeRequest((details, callback) => {
-    if (enabled && isBlockedUrl(details.url)) callback({ cancel: true });
-    else callback({ cancel: false });
-  });
+// ─── decisione di blocco ────────────────────────────────────────────────────
+//
+// NON registriamo un nostro onBeforeRequest: Electron consente UN SOLO listener
+// per evento per sessione, e quel choke point è già di cookies.js (blocco
+// tracker). Quel listener consulta `shouldBlock` per coprire anche l'ad-blocking
+// a liste sulla stessa sessione (default + jar per-sito della modalità privacy).
+function shouldBlock(url) {
+  return enabled && isBlockedUrl(url);
 }
 
 // ─── cache su disco ─────────────────────────────────────────────────────────
