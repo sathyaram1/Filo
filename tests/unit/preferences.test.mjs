@@ -89,6 +89,31 @@ test('il livello di default è 1 quando il setter non lo dichiara', () => {
   assert.equal(build('stile_agente', 'professionale').level, 1);
 });
 
+// ── #183: il popup di livello 2 spiega cosa Filo fa E i rischi ───────────────
+// Itera sul registro REALE: qualsiasi setter di livello 2 aggiunto in futuro
+// senza `risk` fa diventare rosso questo test (è il guard-rail della regola).
+test('REGOLA #183: ogni setter di livello 2 dichiara un messaggio di rischio non vuoto', () => {
+  const senzaRischio = P.PREF_SETTERS
+    .filter((s) => s.level === 2)
+    .filter((s) => !s.risk || String(s.risk).trim().length < 20)
+    .map((s) => s.keys[0]);
+  assert.deepEqual(senzaRischio, [], `setter di livello 2 senza messaggio di rischio (#183): ${senzaRischio.join(', ')}`);
+});
+
+test('#183: il messaggio di rischio è esposto da buildPreferencePartial e parla del rischio', () => {
+  const term = build('terminale', 'on');
+  assert.equal(term.level, 2);
+  assert.match(term.risk, /shell/i, 'la modalità terminale spiega l’accesso alla shell');
+
+  const key = build('chiave_gemini', 'AIzaSEGRETO1234');
+  assert.match(key.risk, /credenzial|spes/i, 'la chiave API avvisa che autorizza spese');
+  // Il rischio NON deve stampare il segreto.
+  assert.doesNotMatch(key.risk, /AIzaSEGRETO1234/);
+
+  // Livello 1 → nessun rischio (si applica subito, senza popup).
+  assert.equal(build('tema', 'scuro').risk, '');
+});
+
 // ── Colore identità delle tab (setter `colore_tab`) ─────────────────────────
 // Il fix asserisce che una richiesta verbale produce un cambiamento CONCRETO
 // dei parametri tabColor (non solo un messaggio): se rimuovessi il setter,
