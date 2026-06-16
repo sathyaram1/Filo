@@ -408,13 +408,21 @@ class TabManager {
     this._broadcast();
   }
 
-  // Tab rimasta con il lastActiveAt più recente (= l'ultima che l'utente stava
-  // guardando prima di quella corrente). Ignora le tab mai attivate (null).
+  // Contatore monotòno di attivazione: ordina le tab per "ultima volta vista"
+  // in modo deterministico anche quando due attivazioni cadono nello stesso ms
+  // (Date.now() non basta). Ogni activate/apertura-attiva incrementa il seq.
+  _nextActivationSeq() {
+    this._activationSeq = (this._activationSeq || 0) + 1;
+    return this._activationSeq;
+  }
+
+  // Tab rimasta vista più di recente (= la penultima che l'utente stava
+  // guardando prima di quella corrente). Ignora le tab mai attivate.
   _mostRecentlyActiveTab() {
     let best = null;
     for (const t of this.tabs) {
-      if (t.lastActiveAt == null) continue;
-      if (!best || t.lastActiveAt > best.lastActiveAt) best = t;
+      if (!t.activateSeq) continue;
+      if (!best || t.activateSeq > best.activateSeq) best = t;
     }
     return best;
   }
