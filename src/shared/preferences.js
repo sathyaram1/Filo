@@ -336,6 +336,8 @@
     {
       keys: ['chiave_tavily', 'chiave tavily', 'api key tavily', 'chiave ricerca', 'chiave api tavily', 'tavily key'],
       level: 2,
+      risk: 'Imposta la chiave API di Tavily, il servizio di ricerca web. È una credenziale '
+        + 'collegata al tuo account Tavily: confermala solo se arriva davvero da te.',
       build(v) {
         const s = String(v == null ? '' : v).trim();
         if (!s) return null;
