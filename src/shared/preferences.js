@@ -325,6 +325,8 @@
     {
       keys: ['chiave_gemini', 'chiave gemini', 'chiave google', 'api key gemini', 'chiave api gemini', 'gemini key'],
       level: 2,
+      risk: 'Imposta la chiave API di Google Gemini. È una credenziale che autorizza spese sul tuo '
+        + 'account: confermala solo se questa chiave arriva davvero da te.',
       build(v) {
         const s = String(v == null ? '' : v).trim();
         if (!s) return null;
