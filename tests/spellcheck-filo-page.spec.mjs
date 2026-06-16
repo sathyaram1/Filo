@@ -100,9 +100,9 @@ test('(B) click destro su parola errata in textarea filo:// mostra la correzione
     return { x, y };
   });
 
-  // Dispatcha il contextmenu sopra la parola (sulla textarea stessa, non sul documento).
+  // Dispatcha il contextmenu sopra la parola (sulla textarea stessa).
   await page.evaluate(({ x, y }) => {
-    const ta = document.querySelector('textarea[data-sn-test]') || document.body.querySelector('textarea');
+    const ta = document.querySelector('textarea[data-sn-test="spell"]');
     if (!ta) return;
     const ev = new MouseEvent('contextmenu', {
       bubbles: true, cancelable: true, clientX: x, clientY: y, button: 2,
