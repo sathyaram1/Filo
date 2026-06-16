@@ -447,11 +447,9 @@
                <textarea class="fb-comment-text" data-id="${escapeHtml(f._id)}" rows="2" placeholder="Scrivi una nota… (puoi incollare immagini o file)"></textarea>
              </label>
              <div class="fb-upload-hint" data-id="${escapeHtml(f._id)}" hidden></div>
+             <input type="file" class="fb-comment-attach" data-id="${escapeHtml(f._id)}" multiple hidden>
              <div class="fb-reply-buttons">
-               <label class="sn-btn sn-btn-secondary fb-comment-attach-label" title="Allega immagine o file">
-                 Allega
-                 <input type="file" class="fb-comment-attach" data-id="${escapeHtml(f._id)}" multiple hidden>
-               </label>
+               <button type="button" class="sn-btn sn-btn-secondary fb-comment-attach-btn" data-id="${escapeHtml(f._id)}" title="Allega immagine o file">Allega</button>
                <button type="button" class="sn-btn fb-comment-send" data-id="${escapeHtml(f._id)}">Aggiungi commento</button>
              </div>
            </div>`
