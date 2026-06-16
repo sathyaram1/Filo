@@ -22,7 +22,7 @@ const P = globalThis.SN_PREF;
 const build = (k, v) => P.buildPreferencePartial(k, v);
 
 test('preferenze estetiche/comportamentali → livello 1, partial giusto', () => {
-  assert.deepEqual(build('tema', 'scuro'), { partial: { theme: 'dark' }, label: 'Tema → Scuro', level: 1 });
+  assert.deepEqual(build('tema', 'scuro'), { partial: { theme: 'dark' }, label: 'Tema → Scuro', level: 1, risk: '' });
   assert.equal(build('correttore', 'off').level, 1);
   assert.deepEqual(build('correttore', 'off').partial, { featureFlags: { spellcheck: false } });
   assert.deepEqual(build('sidebar_aiuto', 'attiva').partial, { featureFlags: { help: true } });
