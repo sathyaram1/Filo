@@ -602,6 +602,12 @@
     });
     $('ttsPreview').addEventListener('click', previewTts);
 
+    // Notifiche: durata + suono.
+    $('notifDuration').addEventListener('change', persist);
+    $('notifSoundEnabled').addEventListener('change', persist);
+    $('notifSound').addEventListener('change', persist);
+    $('notifSoundPreview').addEventListener('click', previewNotifSound);
+
     // Suoneria timer: salva al cambio + anteprima.
     $('timerRingtone').addEventListener('change', persist);
     $('timerRingtonePreview').addEventListener('click', previewRingtone);
