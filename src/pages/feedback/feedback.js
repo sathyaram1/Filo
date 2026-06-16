@@ -374,10 +374,31 @@
       const replyBlock = clarifyReply
         ? `<div class="fb-reply">
              <label class="fb-notes-label">La tua risposta:
-               <textarea class="fb-reply-text" data-id="${escapeHtml(f._id)}" rows="3" placeholder="Rispondi alle domande di Filo qui sopra…"></textarea>
+               <textarea class="fb-reply-text" data-id="${escapeHtml(f._id)}" rows="3" placeholder="Rispondi alle domande di Filo qui sopra… (puoi incollare immagini o file)"></textarea>
              </label>
+             <div class="fb-upload-hint" data-id="${escapeHtml(f._id)}" hidden></div>
              <div class="fb-reply-buttons">
                <button type="button" class="sn-btn fb-reply-send" data-id="${escapeHtml(f._id)}">Invia risposta</button>
+             </div>
+           </div>`
+        : '';
+      // Commento senza cambiare stato (#22: "voglio commentare i ricevuti, POI
+      // metterlo in da risolvere"). Stesso meccanismo del reply di Chiarimenti
+      // (appende un turno via appendUserTurn) ma il patch NON tocca `status`:
+      // il feedback resta dov'è e l'admin lo sposta a mano col bottone azione.
+      // Accetta anche immagini/file incollati (vedi listener 'paste' più sotto).
+      const commentBlock = commentable
+        ? `<div class="fb-reply fb-comment">
+             <label class="fb-notes-label">Aggiungi un commento:
+               <textarea class="fb-comment-text" data-id="${escapeHtml(f._id)}" rows="2" placeholder="Scrivi una nota… (puoi incollare immagini o file)"></textarea>
+             </label>
+             <div class="fb-upload-hint" data-id="${escapeHtml(f._id)}" hidden></div>
+             <div class="fb-reply-buttons">
+               <label class="sn-btn sn-btn-secondary fb-comment-attach-label" title="Allega immagine o file">
+                 Allega
+                 <input type="file" class="fb-comment-attach" data-id="${escapeHtml(f._id)}" multiple hidden>
+               </label>
+               <button type="button" class="sn-btn fb-comment-send" data-id="${escapeHtml(f._id)}">Aggiungi commento</button>
              </div>
            </div>`
         : '';
