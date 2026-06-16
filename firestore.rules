@@ -124,11 +124,13 @@ service cloud.firestore {
       // routine ha preso in carico il feedback (vedi scripts/claim-feedback.mjs).
       // Il lock vero vive su git; questi campi servono SOLO alla dashboard per
       // mostrare "in lavorazione". Sono stringhe (ISO/etichetta); '' = libero.
+      // `images`/`files` = allegati incollati dall'admin nei commenti della
+      // dashboard (stesso shape di quelli inviati alla creazione).
       allow update: if
         isAdmin()
         && request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['status', 'notes', 'resolvedAt', 'verifiedAt', 'priority',
-                    'name', 'seq', 'subSeq',
+                    'name', 'seq', 'subSeq', 'images', 'files',
                     'claimedBy', 'claimedAt', 'claimExpiresAt', 'claimNum'])
         && request.resource.data.get('status', 'new') in ['new', 'draft', 'todo', 'clarify', 'done', 'verified', 'ignored']
         && request.resource.data.get('notes', '') is string
@@ -142,6 +144,10 @@ service cloud.firestore {
         && request.resource.data.get('seq', 0) >= 0
         && request.resource.data.get('subSeq', 0) is int
         && request.resource.data.get('subSeq', 0) >= 0
+        && request.resource.data.get('images', []) is list
+        && request.resource.data.get('images', []).size() <= 50
+        && request.resource.data.get('files', []) is list
+        && request.resource.data.get('files', []).size() <= 50
         && request.resource.data.get('claimedBy', '') is string
         && request.resource.data.get('claimedBy', '').size() <= 120
         && request.resource.data.get('claimedAt', '') is string
