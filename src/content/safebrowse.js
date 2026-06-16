@@ -175,43 +175,69 @@
     try { input.focus(); } catch (_) {}
   }
 
-  // ── Striscia "sospetto" (chiudibile) ──────────────────────────────────────
+  // ── Popup "sospetto" (richiede conferma) ──────────────────────────────────
+  // #176 — l'utente vuole che il sito sospetto compaia con un popup di conferma
+  // (come gli altri popup di Filo), non con una striscia passiva chiudibile con
+  // "Ho capito" che si può ignorare. Il popup BLOCCA l'interazione finché non si
+  // sceglie: "Torna indietro" (lascia il sito) o "Continua" (conferma esplicita
+  // di voler restare). Meno severo dell'interstitial "pericoloso" (niente parola
+  // da digitare), ma comunque una scelta attiva, non un avviso ignorabile.
   function renderSuspect(url, message) {
     ensureHost();
     shadow.replaceChildren();
-    css(host, { pointerEvents: 'none' });
+    css(host, { pointerEvents: 'auto' });
 
-    const bar = document.createElement('div');
-    css(bar, {
-      position: 'fixed', top: '0', left: '0', right: '0', zIndex: '2147483647',
-      display: 'flex', alignItems: 'center', gap: '12px',
-      padding: '11px 16px', boxSizing: 'border-box',
-      background: '#7c2d12', color: '#fff',
-      font: '14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
-      boxShadow: '0 2px 10px rgba(0,0,0,0.25)',
-      pointerEvents: 'auto',
+    const overlay = document.createElement('div');
+    css(overlay, {
+      position: 'fixed', inset: '0', zIndex: '2147483647',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: '24px', boxSizing: 'border-box',
+      background: 'rgba(40, 20, 6, 0.78)',
+      backdropFilter: 'blur(3px)',
+      font: '15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
     });
 
-    const icon = document.createElement('span');
+    const card = document.createElement('div');
+    css(card, {
+      maxWidth: '480px', width: '100%', boxSizing: 'border-box',
+      background: '#fff', color: '#1a1a1a',
+      borderRadius: '16px', padding: '28px 28px 24px',
+      boxShadow: '0 24px 60px rgba(0,0,0,0.4)',
+      textAlign: 'center',
+    });
+
+    const icon = document.createElement('div');
     icon.textContent = '⚠️';
-    css(icon, { fontSize: '18px', flex: '0 0 auto' });
+    css(icon, { fontSize: '42px', lineHeight: '1', marginBottom: '12px' });
 
-    const txt = document.createElement('span');
-    const t = (message && message.title) ? (message.title + ' — ') : '';
-    txt.textContent = t + ((message && message.body) || 'Questo sito ha alcune caratteristiche sospette. Fai attenzione ai dati che inserisci.');
-    css(txt, { flex: '1 1 auto' });
+    const title = document.createElement('div');
+    title.textContent = (message && message.title) || 'Sito potenzialmente sospetto';
+    css(title, { font: '700 21px/1.25 inherit', color: '#9a3412', marginBottom: '10px' });
 
-    const ok = document.createElement('button');
-    ok.textContent = 'Ho capito';
-    css(ok, {
-      flex: '0 0 auto', font: '600 13px/1.2 inherit',
-      padding: '7px 14px', border: 'none', borderRadius: '6px', cursor: 'pointer',
-      color: '#7c2d12', background: '#fff',
+    const body = document.createElement('div');
+    body.textContent = (message && message.body) || 'Questo sito ha alcune caratteristiche sospette. Fai attenzione ai dati che inserisci.';
+    css(body, { fontSize: '15px', color: '#374151', marginBottom: '22px' });
+
+    const row = document.createElement('div');
+    css(row, { display: 'flex', gap: '10px', justifyContent: 'center' });
+
+    const back = mkButton('Torna indietro', false);
+    css(back, { color: '#9a3412', boxShadow: 'inset 0 0 0 1.5px #9a3412' });
+    const proceed = mkButton('Continua', true);
+    css(proceed, { background: '#9a3412' });
+
+    const doProceed = () => { send({ type: T_DISMISS, url }); clear(); };
+    proceed.addEventListener('click', doProceed);
+    back.addEventListener('click', () => {
+      try { if (history.length > 1) history.back(); else send({ type: T_DISMISS, url }, () => location.replace('about:blank')); }
+      catch (_) {}
     });
-    ok.addEventListener('click', () => { send({ type: T_DISMISS, url }); clear(); });
 
-    bar.appendChild(icon); bar.appendChild(txt); bar.appendChild(ok);
-    shadow.appendChild(bar);
+    row.appendChild(back); row.appendChild(proceed);
+    card.appendChild(icon); card.appendChild(title); card.appendChild(body); card.appendChild(row);
+    overlay.appendChild(card);
+    shadow.appendChild(overlay);
+    try { proceed.focus(); } catch (_) {}
   }
 
   function render(level, message, url) {
