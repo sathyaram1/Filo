@@ -219,6 +219,8 @@
     {
       keys: ['protezione_ip', 'protezione ip', 'proteggi ip', 'protezione ip locale', 'webrtc', 'protezione webrtc', 'ip locale'],
       level: 2,
+      risk: 'Controlla la protezione che impedisce ai siti di scoprire il tuo indirizzo IP locale '
+        + 'tramite WebRTC. Disattivarla espone più informazioni sulla tua rete ai siti che visiti.',
       build(v) {
         const b = parsePrefBool(v);
         if (b === null) return null;
