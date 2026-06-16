@@ -98,15 +98,19 @@ function extractCwdMark(rawStdout) {
 // Esegue `command` e risolve con { command, stdout, stderr, code, signal,
 // truncated, timedOut, durationMs }. Non rigetta mai: gli errori di spawn
 // finiscono in stderr/code così il chiamante può sempre mostrare un esito.
-function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env } = {}) {
+function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, trackCwd = false } = {}) {
   const cmd = String(command || '').trim();
   const startedAt = Date.now();
+  const usedShell = shell || defaultShell();
   return new Promise((resolve) => {
     if (!cmd) {
-      resolve({ command: cmd, stdout: '', stderr: 'Comando vuoto.', code: 1, signal: null, truncated: false, timedOut: false, durationMs: 0 });
+      resolve({ command: cmd, stdout: '', stderr: 'Comando vuoto.', code: 1, signal: null, cwd: cwd || undefined, truncated: false, timedOut: false, durationMs: 0 });
       return;
     }
-    const { file, args } = shellInvocation(shell || defaultShell(), cmd);
+    // Con trackCwd appendiamo la sonda che riporta exit code + cwd risultante,
+    // così un `cd` persiste tra i comandi dell'assistente.
+    const toRun = trackCwd ? withCwdProbe(usedShell, cmd) : cmd;
+    const { file, args } = shellInvocation(usedShell, toRun);
     let stdout = '';
     let stderr = '';
     let timedOut = false;
