@@ -400,7 +400,15 @@ async function main() {
     }
   }
 
-  if (applied.length) {
+  // Specchia su Firestore lo stato dei claim (per la dashboard) e pulisci i
+  // file di claim scaduti/risolti. Non fatale: i feedback applicati sopra non
+  // devono regredire se questo passo fallisce.
+  try { await reconcileClaims(bearer, resolvedIds); }
+  catch (e) { console.warn('  ! riconciliazione claim fallita:', String(e.message).slice(0, 160)); }
+
+  // Committa le rimozioni (triage applicati + claim scaduti/risolti). Gira anche
+  // quando la coda di triage era vuota ma un push di claim ha rimosso dei file.
+  {
     try {
       git(['add', '-A', '--', 'feedback-triage']);
       const staged = git(['diff', '--cached', '--name-only']);
@@ -410,7 +418,7 @@ async function main() {
         // (il path-filter su feedback-triage/ scatterebbe anche sulle rimozioni).
         git([
           '-c', 'user.email=filo-triage-bot@local', '-c', 'user.name=filo-triage-bot',
-          'commit', '-m', `feedback: applica e svuota ${applied.length} triage dalla coda [skip ci]`,
+          'commit', '-m', `feedback: applica ${applied.length} triage + riconcilia claim [skip ci]`,
         ]);
         // Push best-effort con un paio di retry: se una routine ha pushato nel
         // frattempo, rebase e ripeti (come fa il workflow di release).
