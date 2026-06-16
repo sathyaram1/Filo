@@ -450,9 +450,9 @@ class TabManager {
   // le chiavi sulla tab per poterle rimuovere con clearPageStyle. Il CSS è
   // effimero: una navigazione/reload lo azzera da sé (le chiavi diventano stale,
   // removeInsertedCSS le ignora senza errori).
-  applyPageStyle(css) {
+  applyPageStyle(css, tabArg = null) {
     if (!css || typeof css !== 'string') return { ok: false, reason: 'empty-css' };
-    const tab = this._activeWebTab();
+    const tab = tabArg || this._activeWebTab();
     if (!tab || !tab.view || !tab.view.webContents) return { ok: false, reason: 'no-web-tab' };
     try {
       const key = tab.view.webContents.insertCSS(css);
