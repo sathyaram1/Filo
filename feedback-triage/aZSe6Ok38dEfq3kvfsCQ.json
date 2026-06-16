@@ -1,0 +1,7 @@
+{
+  "id": "aZSe6Ok38dEfq3kvfsCQ",
+  "status": "done",
+  "notes": "Causa: Filo poteva già cancellare la memoria con un'azione protetta (chiede di scrivere 'conferma' prima di procedere), ma l'assistente non sapeva di averla a disposizione. Così quando gli chiedevi 'cancella le memorie' faceva finta di averlo fatto senza nessun avviso, e in una scheda nuova si inventava 'rimosse come richiesto' pur non sapendo nulla di altre schede. Ora: chiedere di cancellare la memoria fa partire la vera azione, che mostra il box di conferma (devi scrivere 'conferma') prima di cancellare davvero profilo, preferenze e lezioni. In più Filo non inventa più spiegazioni quando la memoria è semplicemente vuota e sa che ogni scheda parte da una conversazione nuova. Verificato con test sul prompt e sul backend di cancellazione (già coperto).",
+  "queuedAt": "2026-06-16T10:12:44.182Z",
+  "queuedBy": "routine"
+}
