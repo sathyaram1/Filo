@@ -81,12 +81,12 @@ const CWD_MARK = '__FILO_ONESHOT_CWD_8b9cb__';
 // gira SEMPRE (anche se il comando fallisce) e cattura l'exit code reale del
 // comando, non quello della sonda. Specifica per shell.
 function withCwdProbe(shell, command) {
-  const sh = String(shell || '').toLowerCase();
+  const sh = resolveShell(shell);
   if (sh === 'cmd') {
     // echo gira comunque; %errorlevel% = esito del comando, %cd% = directory.
     return `${command}\r\necho ${CWD_MARK}:%errorlevel%:%cd%`;
   }
-  if (sh === 'powershell' || (sh !== 'bash' && process.platform === 'win32')) {
+  if (sh === 'powershell') {
     // try/finally: il marcatore esce anche su errore terminante. Azzeriamo
     // $LASTEXITCODE prima così i cmdlet (che non lo toccano) riportano 0.
     return `$global:LASTEXITCODE=0\ntry { ${command} } finally { Write-Output "${CWD_MARK}:$($LASTEXITCODE):$((Get-Location).Path)" }`;
