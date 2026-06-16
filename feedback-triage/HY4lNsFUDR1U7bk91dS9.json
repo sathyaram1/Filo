@@ -1,0 +1,7 @@
+{
+  "id": "HY4lNsFUDR1U7bk91dS9",
+  "status": "done",
+  "notes": "Duplicato di un altro feedback identico (#170.1, stesso titolo e stesso testo): la funzione è già stata implementata e verificata in quella lavorazione — sistema di notifiche in basso a destra con durata configurabile (0 = infinita con X manuale) e suono opzionale, impostabili dalla sezione Notifiche delle Preferenze. Chiudo questo come duplicato; non serve altro lavoro.",
+  "queuedAt": "2026-06-16T11:49:36.754Z",
+  "queuedBy": "routine"
+}
