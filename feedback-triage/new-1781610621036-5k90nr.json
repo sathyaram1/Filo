@@ -1,0 +1,11 @@
+{
+  "op": "create",
+  "text": "Durante una routine cloud, 'npm test' su main (commit d25bf80, prima di qualsiasi modifica della routine) ha 2 spec che falliscono in modo riproducibile su Linux headless — verificato anche checkout pulito, NON è una regressione introdotta dalla routine. Le spec: (1) tests/read-aloud-stop-anywhere.spec.mjs:43 'durante la lettura, un menu senza selezione mostra Interrompi lettura' — il menu non mostra la voce; probabile limite headless (speechSynthesis non disponibile) ma da confermare. (2) tests/editor-font-search-drag.spec.mjs:59 'il dropdown del font si chiude con un click fuori da esso' — il dropdown non si chiude al click esterno. Inoltre tests/spellcheck-native-event-fires.spec.mjs risulta flaky (passa al retry). Perché è un problema: ogni routine cloud usa 'npm test' come gate per dichiarare done; con questi rossi fissi su main è difficile distinguere una nuova regressione da un fallimento preesistente. Riproduzione: xvfb-run -a npx playwright test tests/read-aloud-stop-anywhere.spec.mjs tests/editor-font-search-drag.spec.mjs. Da decidere: sono bug reali (read-aloud/dropdown rotti per davvero) o vanno marcati skip in headless?",
+  "name": "2 test falliscono su main (read-aloud + dropdown font editor)",
+  "parentId": "",
+  "status": "new",
+  "priority": 1,
+  "notes": "",
+  "queuedAt": "2026-06-16T11:50:21.036Z",
+  "queuedBy": "routine"
+}
