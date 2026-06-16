@@ -156,7 +156,10 @@
     }
     const item = all.find((f) => f._id === id);
     if (!item) return;
-    const prev = { status: item.status, notes: item.notes, priority: item.priority };
+    const prev = {
+      status: item.status, notes: item.notes, priority: item.priority,
+      images: item.images, files: item.files,
+    };
     Object.assign(item, optimistic);
     applyFilter();
     try {
