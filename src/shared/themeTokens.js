@@ -107,6 +107,29 @@
       css: '--sn-error',
       default: { light: '#b91c1c', dark: '#ff6b6b' },
     },
+    // Sfondo al passaggio del mouse: la tinta che prendono voci di menu, righe,
+    // bottoni secondari e azioni-carta in hover (theme.css `--sn-hover`). Era
+    // l'unico colore di superficie delle pagine filo:// non ancora esposto come
+    // token: senza, "rendi più evidente l'hover" o "fai l'evidenziazione del
+    // menu verde" non avevano un appiglio. Superficie di sola pagina (la shell
+    // deriva i suoi hover via color-mix dei propri token), quindi solo `css`.
+    hover: {
+      label: 'Sfondo al passaggio del mouse',
+      type: 'color',
+      css: '--sn-hover',
+      default: { light: '#ffffff', dark: '#282725' },
+    },
+    // Sfondo di menu, popup, barra laterale e dropdown custom (theme.css
+    // `--sn-overlay-bg`). È una variante quasi-opaca dello sfondo (alpha 0.98 di
+    // default, col blur dietro): distinta da `background` perché tinge SOLO le
+    // superfici sovrapposte. Accetta anche rgba(...) per mantenere la
+    // trasparenza se l'utente vuole. Superficie di sola pagina → solo `css`.
+    overlay: {
+      label: 'Sfondo di menu e popup',
+      type: 'color',
+      css: '--sn-overlay-bg',
+      default: { light: 'rgba(248, 246, 240, 0.98)', dark: 'rgba(30, 29, 27, 0.98)' },
+    },
     font: {
       label: 'Font della UI',
       type: 'font',
