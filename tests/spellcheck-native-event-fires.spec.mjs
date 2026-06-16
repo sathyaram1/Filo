@@ -22,13 +22,6 @@ const PAGE = `<!doctype html><html><body style="margin:0">
        style="font:24px monospace;padding:10px;width:500px;height:120px">testo</div>
 </body></html>`;
 
-// In headless Linux il CDP-simulated right-click non sempre fa scattare
-// l'evento `context-menu` del webContents (dipende da dbus/X11). Usiamo
-// test.retries per riprovare l'intera sequenza fino a 3 volte in uno stato
-// fresco senza mascherare i bug reali (se preventDefault fosse attivo, il test
-// fallirebbe consistentemente su tutti i retry).
-test.retries(3);
-
 test('il click destro lascia scattare l\'evento context-menu nativo (canale suggerimenti aperto)', async ({ app, openTab, testServer }) => {
   const url = testServer.html(PAGE);
   const host = new URL(url).host;
