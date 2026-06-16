@@ -1,0 +1,11 @@
+{
+  "op": "create",
+  "text": "Audit proattivo (sicurezza/edge case). Il file sorgente src/main/services/handlers/ai.js contiene tre byte NUL (0x00) letterali incorporati, alla riga della funzione ttsKey: il template della chiave di cache TTS e' scritto come `${model}\\0${voice}\\0${text}` con NUL come separatore al posto degli spazi (negli editor e nel diff appaiono come spazi, ma 'od -c' mostra \\0). Riproduzione: 'file src/main/services/handlers/ai.js' riporta 'data' invece di testo, e 'grep' lo tratta come 'binary file matches', quindi il file sfugge alle ricerche di codice/linter e la sintassi non viene evidenziata in alcuni editor. NON e' un bug funzionale: la chiave sha1 resta coerente (il NUL non e' duplicato altrove, ttsCache.js non ricalcola la chiave) e la cache funziona; e' quasi certamente una corruzione accidentale (un agente/editor ha inserito 0x00 invece di spazio). Rischi: un tool che normalizza/rifiuta i NUL puo' alterare silenziosamente la chiave (cache invalidata) o corrompere il file. Fix suggerito: sostituire i tre 0x00 con un separatore esplicito stampabile (es. `${model}\\u0000${voice}\\u0000${text}` se si vuole mantenere il NUL come delimitatore, oppure un carattere come '|') cosi' il file torna testo puro. E' l'unico file tracciato del repo con byte NUL.",
+  "name": "byte NUL in ai.js",
+  "parentId": "",
+  "status": "new",
+  "priority": 1,
+  "notes": "",
+  "queuedAt": "2026-06-16T06:55:26.506Z",
+  "queuedBy": "routine"
+}
