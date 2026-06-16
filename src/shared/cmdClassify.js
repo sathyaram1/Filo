@@ -79,6 +79,13 @@
 
   // Sola lettura, nessun effetto sullo stato: livello 1.
   const LEVEL1 = new Set([
+    // `cd`/`chdir`: cambia solo la cartella di lavoro (effetto benigno e
+    // pienamente reversibile, nessuna modifica su disco). È la primitiva di
+    // navigazione dell'assistente: la cwd è persistente tra i suoi comandi, e
+    // pretendere di digitare "conferma" a ogni spostamento la renderebbe
+    // inutilizzabile. I `cd` con metacaratteri ($(...), ;, &&…) restano 3 via
+    // CHAIN_RE.
+    'cd', 'chdir',
     'ls', 'dir', 'pwd', 'cat', 'type', 'echo', 'whoami', 'hostname', 'date',
     'where', 'which', 'head', 'tail', 'tree', 'wc', 'ver', 'uname', 'more',
     'clear', 'cls', 'grep', 'findstr', 'stat', 'basename', 'dirname',
