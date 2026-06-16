@@ -1,0 +1,7 @@
+{
+  "id": "U7difqky5PNx9Ce2NLPR",
+  "status": "done",
+  "notes": "Risolto (la feature era gia' implementata da una passata precedente; questa l'ha verificata e chiusa). Ora dopo che l'assistente esegue un comando nella home, il suo output rientra nel contesto del modello: nel turno successivo l'assistente sa davvero cosa ha prodotto il comando (prima rispondeva 'non ho ancora l'output'). L'output viene riaccodato al messaggio dell'assistente di quel turno, troncato se troppo lungo per non gonfiare il prompt. La shell persistente della modalita' terminale resta off-limits all'LLM e i comandi passano sempre dal gate di conferma per livello. Verificato con il test mirato (tests/filo-terminal-context.spec.mjs): l'assistente esegue 'ls' e al turno dopo l'output e' presente nel contesto.",
+  "queuedAt": "2026-06-16T09:54:24.537Z",
+  "queuedBy": "routine"
+}
