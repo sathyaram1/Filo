@@ -1,0 +1,7 @@
+{
+  "id": "U7difqky5PNx9Ce2NLPR",
+  "status": "done",
+  "notes": "Ora l'output dei comandi che Filo esegue gli RIENTRA nel contesto: nei turni successivi sa davvero cosa ha prodotto un comando e può commentarlo o proseguire (prima rispondeva 'non ho ancora l'output' pur avendolo appena lanciato). Ho anche aggiornato le istruzioni dell'assistente perché non neghi più di avere l'output di un comando appena eseguito. NB: l'auto-continuazione nello STESSO turno (Filo che propone/lancia da solo il comando successivo) NON l'ho implementata: e' la decisione di design che avevi segnalato tu — dimmi fin dove vuoi spingerti (solo commento? proporre il prossimo comando?) e la aggiungo. Verificato con un test che esegue un comando di sola lettura e controlla che il suo output arrivi davvero al modello nel turno dopo, piu' la suite completa.",
+  "queuedAt": "2026-06-16T08:09:37.076Z",
+  "queuedBy": "routine"
+}

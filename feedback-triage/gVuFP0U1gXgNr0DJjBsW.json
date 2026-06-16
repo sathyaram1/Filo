@@ -1,0 +1,7 @@
+{
+  "id": "gVuFP0U1gXgNr0DJjBsW",
+  "status": "done",
+  "notes": "Ora i comandi di Filo partono dalla STESSA cartella mostrata nella barra della home (prima giravano nella cartella del programma, da cui il 'pwd' diverso) e la cartella di lavoro e' PERSISTENTE: un 'cd' resta valido per il comando successivo e la barra del percorso si aggiorna di conseguenza. In piu' (oltre il chiesto): ho reso 'cd' un comando a esecuzione immediata invece di chiedere di digitare 'conferma' a ogni spostamento (altrimenti navigare era inutilizzabile); e su Mac/Linux i comandi ora usano /bin/sh invece di tentare PowerShell che li' non esiste — su Windows non cambia nulla. Verificato con un test in cui Filo fa 'cd' in una sottocartella e un 'pwd' successivo riflette quella cartella, e il percorso mostrato coincide.",
+  "queuedAt": "2026-06-16T08:09:37.128Z",
+  "queuedBy": "routine"
+}
