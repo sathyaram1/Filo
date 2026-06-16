@@ -924,6 +924,7 @@
       // replay storico.
       renderActions(filoBubble, r.actions || [], { onAck: goHome, autoConfirm: true });
       threadHistory.push({ role: 'filo', text: r.text || '', actions: r.actions || [] });
+      applyCommandCwd(r.actions);
     }
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
 
