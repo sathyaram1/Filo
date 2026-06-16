@@ -467,10 +467,16 @@
       idleHours: Number.isFinite(idleHoursRaw) && idleHoursRaw > 0 ? Math.min(168, idleHoursRaw) : 6,
       onClose: $('autoArchiveOnClose').checked,
     };
+    const durRaw = parseInt($('notifDuration').value, 10);
+    const notifications = {
+      durationSec: Number.isFinite(durRaw) && durRaw >= 0 ? Math.min(120, durRaw) : 5,
+      soundEnabled: $('notifSoundEnabled').checked,
+      sound: $('notifSound').value || 'default',
+    };
 
     await chrome.runtime.sendMessage({
       type: MSG.UPDATE_SETTINGS,
-      settings: { theme, textScale, showHomeMessage, agentStyle, timerRingtone, terminal, tts, autoArchive },
+      settings: { theme, textScale, showHomeMessage, agentStyle, timerRingtone, terminal, tts, autoArchive, notifications },
     });
 
     window.SN_PAGE_THEME = theme;
