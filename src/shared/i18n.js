@@ -273,6 +273,14 @@
       'il caricamento di pubblicità e tracker. Le liste si scaricano dalla rete, restano ' +
       'in cache sul tuo computer e si aggiornano da sole una volta a settimana. I siti ' +
       'che usi davvero (Google, YouTube, banche…) non vengono mai bloccati.',
+    options_security_siteblock: 'Blocca l’apertura dei siti in blacklist',
+    options_security_siteblock_desc:
+      'Impedisce di APRIRE i siti in blacklist (non solo le loro pubblicità). Se provi ' +
+      'ad aprire un sito bloccato compare una notifica con “Apri comunque”. ' +
+      'Eccezioni: se arrivi da un motore di ricerca o lo apre Filo per te, l’apertura ' +
+      'è permessa. Puoi aggiungere domini tuoi qui sotto (uno per riga).',
+    options_security_siteblock_lists: 'Usa anche le liste pubbliche (pubblicità/tracker) come blacklist',
+    options_security_siteblock_blacklist_label: 'Domini in blacklist (uno per riga)',
     options_security_p2p_box_title: 'Cosa succede ai servizi P2P se attivi la protezione IP',
     options_security_p2p_box_body:
       'Servizi tipo Snapdrop, ToffeeShare, alcuni giochi browser e alcune feature di scoperta dispositivi ' +
