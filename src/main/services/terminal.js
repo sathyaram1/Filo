@@ -52,6 +52,49 @@ function truncate(text) {
   return { text: s.slice(0, MAX_OUTPUT_CHARS), truncated: true };
 }
 
+// Marcatore (improbabile in output reale) con cui un comando one-shot riporta
+// l'exit code e la cwd RISULTANTE. Serve a far PERSISTERE la cwd tra i comandi
+// dell'assistente: ogni comando parte da una shell nuova, quindi senza questo un
+// `cd` non avrebbe effetto sul comando successivo. La cwd catturata viene
+// ripassata come `cwd` al comando seguente (vedi handlers.js).
+const CWD_MARK = '__FILO_ONESHOT_CWD_8b9cb__';
+
+// Appende al comando una "sonda" che stampa CWD_MARK:<exitcode>:<cwd>. La sonda
+// gira SEMPRE (anche se il comando fallisce) e cattura l'exit code reale del
+// comando, non quello della sonda. Specifica per shell.
+function withCwdProbe(shell, command) {
+  const sh = String(shell || '').toLowerCase();
+  if (sh === 'cmd') {
+    // echo gira comunque; %errorlevel% = esito del comando, %cd% = directory.
+    return `${command}\r\necho ${CWD_MARK}:%errorlevel%:%cd%`;
+  }
+  if (sh === 'powershell' || (sh !== 'bash' && process.platform === 'win32')) {
+    // try/finally: il marcatore esce anche su errore terminante. Azzeriamo
+    // $LASTEXITCODE prima così i cmdlet (che non lo toccano) riportano 0.
+    return `$global:LASTEXITCODE=0\ntry { ${command} } finally { Write-Output "${CWD_MARK}:$($LASTEXITCODE):$((Get-Location).Path)" }`;
+  }
+  // bash / sh (incluse le routine cloud Linux): cattura $? subito dopo il
+  // comando, poi stampa il marcatore (sempre eseguito, su riga propria).
+  return `${command}\n__filo_c=$?\nprintf '%s:%s:%s\\n' '${CWD_MARK}' "$__filo_c" "$PWD"`;
+}
+
+// Estrae dal grezzo stdout il marcatore CWD_MARK (se presente), ritornando
+// l'output ripulito + { code, cwd } dal marcatore. Va chiamato PRIMA del
+// troncamento, così non si perde il marcatore in coda quando l'output è enorme.
+function extractCwdMark(rawStdout) {
+  const i = rawStdout.lastIndexOf(CWD_MARK + ':');
+  if (i === -1) return { stdout: rawStdout, code: null, cwd: undefined };
+  const m = rawStdout.slice(i + CWD_MARK.length + 1).match(/^(-?\d+):([^\r\n]*)/);
+  let cut = i;
+  if (rawStdout[cut - 1] === '\n') cut--;
+  if (rawStdout[cut - 1] === '\r') cut--;
+  return {
+    stdout: rawStdout.slice(0, cut),
+    code: m ? (parseInt(m[1], 10) || 0) : null,
+    cwd: m ? (m[2].trim() || undefined) : undefined,
+  };
+}
+
 // Esegue `command` e risolve con { command, stdout, stderr, code, signal,
 // truncated, timedOut, durationMs }. Non rigetta mai: gli errori di spawn
 // finiscono in stderr/code così il chiamante può sempre mostrare un esito.
