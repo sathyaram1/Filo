@@ -41,6 +41,11 @@
       type: 'color',
       css: '--sn-accent',
       shellCss: ['--accent'],
+      // La dashboard (newtab) ha una palette propria (--dash-*) slegata dai
+      // token: senza `dashCss` un "rendi l'accento verde" non si vedeva lì
+      // (feedback #164). Emettiamo le gemelle --dash-* SOLO per i token che
+      // l'utente sovrascrive davvero, così l'estetica "carta" di default resta.
+      dashCss: ['--dash-accent'],
       // Emette anche la tripletta r,g,b usata dalle tinte rgba(…)
       rgbCss: '--sn-accent-rgb',
       shellRgbCss: '--accent-rgb',
@@ -51,6 +56,7 @@
       type: 'color',
       css: '--sn-bg',
       shellCss: ['--bg', '--tab-active'],
+      dashCss: ['--dash-paper', '--dash-card'],
       default: { light: '#f8f6f0', dark: '#1e1d1b' },
     },
     text: {
@@ -58,6 +64,7 @@
       type: 'color',
       css: '--sn-fg',
       shellCss: ['--fg'],
+      dashCss: ['--dash-ink'],
       default: { light: '#1a1918', dark: '#e5e3dc' },
     },
     muted: {
@@ -65,6 +72,7 @@
       type: 'color',
       css: '--sn-muted',
       shellCss: ['--fg-soft'],
+      dashCss: ['--dash-ink-soft', '--dash-ink-mute'],
       default: { light: '#6e6b63', dark: '#8a8780' },
     },
     border: {
@@ -72,6 +80,7 @@
       type: 'color',
       css: '--sn-border',
       shellCss: ['--border'],
+      dashCss: ['--dash-line', '--dash-line-strong'],
       default: { light: '#e0dcd4', dark: '#3a3835' },
     },
     error: {
