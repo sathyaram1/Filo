@@ -157,6 +157,16 @@ html[data-chrome-compact="1"] .addr {
   cursor: pointer;
 }
 .shell-notif-action:hover { background: var(--border); }
+/* Bagliore pulsante per tab con audio in riproduzione. L'animazione "sfuma
+   perdendo di intensità" come richiesto: parte da un'intensità percepibile e
+   scende quasi a zero, poi torna, con una transizione morbida (ease-in-out). */
+@keyframes tab-glow-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(0,0,0,0); }
+  35%  { box-shadow: 0 0 10px 2px var(--tab-glow-eff); }
+  65%  { box-shadow: 0 0 10px 2px var(--tab-glow-eff); }
+  100% { box-shadow: 0 0 0 0 rgba(0,0,0,0); }
+}
+
 .tab {
   position: relative;
   display: inline-flex;
@@ -165,12 +175,19 @@ html[data-chrome-compact="1"] .addr {
   height: 32px;
   flex: 1 1 0;
   min-width: 40px;
-  max-width: 220px;
+  /* Tab leggermente più larghe rispetto a prima: dà spazio al titolo e
+     all'icona audio a fine riga senza stringere troppo. */
+  max-width: 260px;
   padding: 0 8px 0 10px;
   /* --tab-bg-eff = sfondo effettivo della tab. Di default il neutro del tab bar;
      le tab inattive lo sovrascrivono inline con la tinta identità del sito
      (§1.2). Passa dalla variabile così l'hover sotto resta coerente col tint. */
   --tab-bg-eff: var(--tab-bg);
+  /* --tab-glow-color: colore base del bagliore audio (impostato inline da shell.js
+     con il colore identità del sito). Se non disponibile, fallback sull'accento Filo. */
+  --tab-glow-color: var(--accent);
+  /* Desatura e abbassa l'opacità: il bagliore è un suggerimento, non un grido. */
+  --tab-glow-eff: color-mix(in srgb, var(--tab-glow-color) 30%, transparent);
   background: var(--tab-bg-eff);
   border: none;
   border-radius: var(--radius) var(--radius) 0 0;
@@ -180,6 +197,11 @@ html[data-chrome-compact="1"] .addr {
   transition: background 0.1s ease;
   -webkit-app-region: no-drag;
   app-region: no-drag;
+}
+
+/* Tab che sta suonando: bagliore pulsante col colore del sito. */
+.tab.audible {
+  animation: tab-glow-pulse 2.4s ease-in-out infinite;
 }
 .tab:hover { background: color-mix(in srgb, var(--tab-bg-eff) 85%, var(--bg)); }
 /* Tab in trascinamento (riordino drag & drop): sollevata e semitrasparente, con
