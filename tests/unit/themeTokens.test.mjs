@@ -168,6 +168,23 @@ test('shellCss mappa i token sulle variabili della shell', () => {
   assert.ok(!css.includes('#ff0000'));
 });
 
+test('topbar (#184): è una superficie di sola shell che colora la barra in alto', () => {
+  // Esiste, è un colore, ha un default per entrambi i temi.
+  assert.ok(TT.get('topbar'));
+  assert.equal(TT.get('topbar').type, 'color');
+  assert.equal(TT.defaultValue('topbar', 'light'), '#f5ead7');
+  assert.equal(TT.defaultValue('topbar', 'dark'), '#14110e');
+
+  // Sovrascriverlo tinge la fascia (--bg-deep) E le tab inattive (--tab-bg)
+  // nella shell, in modo coerente.
+  const shell = TT.shellCss({ topbar: '#1f3d2b' });
+  assert.match(shell, /--bg-deep: #1f3d2b;/);
+  assert.match(shell, /--tab-bg: #1f3d2b;/);
+
+  // Ma NON tocca le superfici di pagina (--sn-*/--dash-*): non ha `css`.
+  assert.equal(TT.pageCss({ topbar: '#1f3d2b' }), '');
+});
+
 test('toRgbTriplet converte hex corti, lunghi e rgb()', () => {
   assert.equal(TT.toRgbTriplet('#fff'), '255, 255, 255');
   assert.equal(TT.toRgbTriplet('#1e90ff'), '30, 144, 255');
