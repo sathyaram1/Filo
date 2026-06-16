@@ -297,7 +297,7 @@ function ensurePeriodicRefresh() {
 // cache, e se serve avvia un refresh in background (mai bloccante).
 async function init(settings) {
   enabled = isEnabled(settings);
-  applyAdblock(session.defaultSession);
+  applyAdblock(require('electron').session.defaultSession);
   await loadCache();
   // In test non si tocca la rete: le liste si iniettano via setDomainsForTest.
   if (process.env.NODE_ENV === 'test' || process.env.FILO_SMOKE) return;
@@ -315,7 +315,7 @@ async function init(settings) {
 function configureFromSettings(settings) {
   const was = enabled;
   enabled = isEnabled(settings);
-  applyAdblock(session.defaultSession);
+  applyAdblock(require('electron').session.defaultSession);
   if (process.env.NODE_ENV === 'test' || process.env.FILO_SMOKE) return;
   if (enabled) {
     ensurePeriodicRefresh();
