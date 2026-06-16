@@ -496,6 +496,7 @@ async function applySettingsUpdate(partial) {
     Cookies.configureFromSettings(merged);
     broadcastToTabs({ type: MSG.COOKIES_CONFIG_UPDATE, mode: Cookies.getMode(merged) });
   } catch (_) {}
+  try { require('./adblock').configureFromSettings(merged); } catch (_) {}
   return merged;
 }
 
