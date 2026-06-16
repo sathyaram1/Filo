@@ -316,6 +316,8 @@ async function main() {
       else if (it.entry.op === 'delete') console.log(`  • ELIMINA doc di test ${it.entry.id}`);
       else console.log(`  • ${it.entry.id} → ${it.entry.status}${it.entry.notes ? `  («${it.entry.notes.slice(0, 60)}»)` : ''}`);
     }
+    const claims = liveClaims();
+    if (claims.length) console.log(`  • ${claims.length} claim attivo/i da specchiare su Firestore`);
     console.log('\nDry-run: nessuna scrittura su Firestore, nessuna modifica a git.');
     return;
   }
@@ -324,6 +326,9 @@ async function main() {
   const allocateNumber = makeNumberAllocator(bearer);
 
   const applied = [];
+  // Feedback risolti in questa run (done/clarify/todo applicati): il loro claim,
+  // se presente, va rilasciato — la riconciliazione azzera i campi su Firestore.
+  const resolvedIds = new Set();
   let failures = 0;
   for (const it of items) {
     if (it.error) { console.warn(`  ✗ salto ${it.file}: ${it.error}`); failures++; continue; }
