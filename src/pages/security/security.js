@@ -125,6 +125,11 @@
     $('sec-protect-ip').checked = sec.protectIpLeak !== false;
     $('sec-block-popups').checked = sec.blockPopups !== false;
     $('sec-adblock').checked = (sec.adblock || {}).enabled !== false;
+    const sblk = sec.siteBlock || {};
+    $('sec-siteblock').checked = sblk.enabled !== false;
+    $('sec-siteblock-lists').checked = sblk.useAdblockLists !== false;
+    $('sec-siteblock-blacklist').value = (Array.isArray(sblk.blacklist) ? sblk.blacklist : []).join('\n');
+    syncSiteBlockEnabled();
     const sb = sec.safeBrowse || {};
     $('sec-safebrowse').checked = sb.enabled !== false;
     $('sec-safebrowse-network').checked = sb.networkSignals !== false;
