@@ -45,12 +45,29 @@
   function applyShellTokens(tokens) {
     if (ThemeTokens) ThemeTokens.applyToDocument(document, tokens || {}, { shell: true });
   }
+  // Opacità del colore identità sulle tab inattive (param `opacita_tab` della
+  // spec "Colore identità delle tab"): governa quanto la tinta del sito copre lo
+  // sfondo del tab bar nel color-mix più sotto. 0 = nessun colore, 1 = tinta
+  // piena. Letta dalle impostazioni e aggiornata live al cambio prefs.
+  let tabOpacity = 0.6;
+  function applyTabColorParams(tabColor) {
+    const v = tabColor && Number(tabColor.opacita_tab);
+    if (Number.isFinite(v)) tabOpacity = Math.max(0, Math.min(1, v));
+  }
   api.message({ type: 'get_settings' })
-    .then((r) => applyShellTokens(r?.settings?.themeTokens))
+    .then((r) => {
+      applyShellTokens(r?.settings?.themeTokens);
+      applyTabColorParams(r?.settings?.tabColor);
+      try { render(); } catch (_) {}
+    })
     .catch(() => {});
   if (typeof api.onBroadcast === 'function') {
     api.onBroadcast((m) => {
-      if (m?.type === 'settings_updated') applyShellTokens(m.settings?.themeTokens);
+      if (m?.type === 'settings_updated') {
+        applyShellTokens(m.settings?.themeTokens);
+        applyTabColorParams(m.settings?.tabColor);
+        try { render(); } catch (_) {}
+      }
     });
   }
 
