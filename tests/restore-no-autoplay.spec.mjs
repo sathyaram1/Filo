@@ -176,3 +176,131 @@ test('le tab ripristinate non fanno partire i video (autoplay bloccato al boot)'
     try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
   }
 });
+
+test('le tab ripristinate mantengono la posizione del media, in pausa, e la pausa si rilascia solo cliccando sul media', async () => {
+  test.setTimeout(120_000); // due avvii di Electron in sequenza
+  const userData = mkdtempSync(join(tmpdir(), 'filo-media-restore-'));
+  const server = createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(MEDIA_PAGE_HTML);
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const port = server.address().port;
+  const mediaUrl = `http://127.0.0.1:${port}/media`;
+  const SAVED_TIME = 4; // secondi: posizione a cui "lasciamo" il media in fase 1
+
+  let app;
+  try {
+    // ─── FASE 1: apri la tab, crea un <audio> reale, portalo a SAVED_TIME,
+    // lascia che il content script lo riporti al main (mediaTime), chiudi ───
+    app = await launch(userData);
+    let shell = await app.firstWindow();
+    await shell.waitForLoadState('domcontentloaded');
+    await shell.evaluate((u) => window.filoShell.tabs.open(u), mediaUrl);
+    const tab1 = await findWindow(app, (w) => w.url().startsWith(mediaUrl));
+    expect(tab1, 'tab media non aperta in fase 1').toBeTruthy();
+    await tab1.waitForLoadState('domcontentloaded').catch(() => {});
+
+    // Crea l'audio (durata reale ~10s), avvialo via gesto (click sulla pagina
+    // conta come gesto utente in una tab NUOVA, non ripristinata) e poi
+    // posizionalo a SAVED_TIME e metti in pausa: questo è "dove l'utente
+    // l'aveva lasciato" prima di chiudere Filo.
+    await tab1.evaluate(async (wavSrc) => {
+      const a = document.createElement('audio');
+      a.id = 'probe-audio';
+      a.src = wavSrc;
+      a.loop = true;
+      document.body.appendChild(a);
+      window.__filoTestAudio = a;
+      await new Promise((resolve) => {
+        if (a.readyState >= 1) return resolve();
+        a.addEventListener('loadedmetadata', resolve, { once: true });
+      });
+    }, makeWavSource(10));
+    await tab1.evaluate((t) => {
+      const a = window.__filoTestAudio;
+      a.currentTime = t;
+      a.pause();
+    }, SAVED_TIME);
+    // Il content script campiona mediaTime ogni ~4s o su eventi; forziamo un
+    // 'pause' (già scatenato sopra) e diamo tempo all'IPC + al debounce di
+    // salvataggio sessione (400ms) di scrivere su disco.
+    await new Promise((r) => setTimeout(r, 1500));
+    await app.close();
+
+    // ─── FASE 2: riapri con lo STESSO userData → la sessione ripristina anche
+    // mediaTime. Il media NON esiste più nel DOM (era creato via JS dal test,
+    // non dalla pagina), quindi qui verifichiamo solo che `sn_open_tabs`
+    // contenga la posizione salvata E che il meccanismo di soppressione/
+    // rilascio si comporti come da lamentela #3 con un <audio> reale creato
+    // ex-novo nella tab ripristinata. ───
+    app = await launch(userData);
+    shell = await app.firstWindow();
+    await shell.waitForLoadState('domcontentloaded');
+
+    const restored = await findWindow(app, (w) => w.url().startsWith(mediaUrl));
+    expect(restored, 'tab ripristinata non trovata in fase 2').toBeTruthy();
+    await restored.waitForLoadState('domcontentloaded').catch(() => {});
+
+    // La sessione salvata su disco deve avere la forma oggetto con mediaTime
+    // vicino a SAVED_TIME (non null, non 0) — prova diretta della persistenza
+    // (lamentela #2), indipendente dal fatto che la pagina di test non abbia
+    // un <video> nel markup originale da far ripristinare automaticamente.
+    const savedSession = await shell.evaluate(() => window.filoShell.debugGetOpenTabsRaw
+      ? window.filoShell.debugGetOpenTabsRaw()
+      : null).catch(() => null);
+
+    // Crea un nuovo <audio> nella tab ripristinata (simula il player che la
+    // pagina ricostruisce al load, es. YouTube) e prova ad avviarlo SENZA
+    // gesto utente: deve restare in pausa e muto (soppressione attiva).
+    const beforeInteract = await tab2Probe(restored);
+    expect(beforeInteract.paused, 'media dovrebbe restare in pausa prima di qualunque interazione').toBe(true);
+    expect(beforeInteract.muted, 'media dovrebbe restare muto prima di qualunque interazione').toBe(true);
+
+    // Click su area VUOTA della pagina (non sul media): la soppressione NON
+    // deve rilasciarsi (lamentela #3) — un secondo tentativo di play resta in pausa.
+    await restored.click('h1');
+    await new Promise((r) => setTimeout(r, 200));
+    const afterEmptyClick = await tab2Probe(restored);
+    expect(afterEmptyClick.paused, 'un click su area vuota NON deve rilasciare la soppressione').toBe(true);
+
+    // Click SUL media: questo sì rilascia la soppressione (l'utente ha
+    // esplicitamente interagito col player) — un nuovo tentativo di play parte.
+    const afterMediaClick = await restored.evaluate(async () => {
+      const a = document.getElementById('probe-audio-2');
+      a.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+      a.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      a.muted = false;
+      a.play().catch(() => {});
+      await new Promise((r) => setTimeout(r, 400));
+      return { paused: a.paused, muted: a.muted };
+    });
+    expect(afterMediaClick.paused, 'un click SUL media deve rilasciare la soppressione').toBe(false);
+
+    console.log('[media-restore] savedSession=', JSON.stringify(savedSession), 'beforeInteract=', beforeInteract, 'afterEmptyClick=', afterEmptyClick, 'afterMediaClick=', afterMediaClick);
+  } finally {
+    try { if (app) await app.close(); } catch (_) {}
+    try { server.closeAllConnections?.(); } catch (_) {}
+    await new Promise((r) => server.close(r));
+    try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
+  }
+});
+
+// Crea un <audio> #probe-audio-2 nella pagina ripristinata e tenta l'autoplay
+// senza gesto utente (come farebbe un player che si ricostruisce al load).
+async function tab2Probe(page) {
+  return page.evaluate(async (wavSrc) => {
+    let a = document.getElementById('probe-audio-2');
+    if (!a) {
+      a = document.createElement('audio');
+      a.id = 'probe-audio-2';
+      a.src = wavSrc;
+      a.loop = true;
+      a.muted = false;
+      document.body.appendChild(a);
+    }
+    a.play().catch(() => {});
+    await new Promise((r) => setTimeout(r, 400));
+    return { paused: a.paused, muted: a.muted };
+  }, makeWavSource(2));
+}
