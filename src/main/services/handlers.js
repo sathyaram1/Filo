@@ -824,13 +824,13 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         if (!css) return { executed: false, kept: false };
         const { tm, tab } = targetWebTab(sender);
         if (!tm || !tab) return { executed: false, kept: false, output: { restyle: 'no-page' } };
-        const r = tm.applyPageStyle(css, tab);
+        const r = await tm.applyPageStyle(css, tab);
         return { executed: !!(r && r.ok), kept: false };
       }
       case 'RIPRISTINA_STILE_PAGINA': {
         const { tm, tab } = targetWebTab(sender);
         if (!tm || !tab) return { executed: false, kept: false, output: { restyle: 'no-page' } };
-        const r = tm.clearPageStyle(tab);
+        const r = await tm.clearPageStyle(tab);
         return { executed: !!(r && r.ok), kept: false };
       }
       default:
