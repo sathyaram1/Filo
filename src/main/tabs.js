@@ -450,12 +450,15 @@ class TabManager {
   // le chiavi sulla tab per poterle rimuovere con clearPageStyle. Il CSS è
   // effimero: una navigazione/reload lo azzera da sé (le chiavi diventano stale,
   // removeInsertedCSS le ignora senza errori).
-  applyPageStyle(css, tabArg = null) {
+  async applyPageStyle(css, tabArg = null) {
     if (!css || typeof css !== 'string') return { ok: false, reason: 'empty-css' };
     const tab = tabArg || this._activeWebTab();
     if (!tab || !tab.view || !tab.view.webContents) return { ok: false, reason: 'no-web-tab' };
     try {
-      const key = tab.view.webContents.insertCSS(css);
+      // insertCSS è ASINCRONO: ritorna una Promise che risolve nella "chiave"
+      // da passare a removeInsertedCSS per togliere lo stile. Va attesa, altrimenti
+      // memorizzeremmo la Promise come chiave e il ripristino non troverebbe lo stile.
+      const key = await tab.view.webContents.insertCSS(css);
       (tab._filoStyleKeys || (tab._filoStyleKeys = [])).push(key);
       return { ok: true, key, tabId: tab.id };
     } catch (e) {
