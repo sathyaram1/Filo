@@ -17,7 +17,15 @@
 // USO:
 //   node scripts/queue-feedback.mjs --name "titolo breve" \
 //     [--parent <idFeedbackPadre>] [--priority 0-3] [--status new|todo|clarify] \
-//     [--notes "note iniziali"] [--no-git] "testo del feedback"
+//     [--notes "note iniziali"] [--image path/to/shot.png ...] [--no-git] \
+//     "testo del feedback"
+//
+//   --image (ripetibile, max 5): carica uno screenshot locale su Firebase
+//     Storage al momento dell'accodamento (le storage.rules consentono l'upload
+//     senza auth, vedi lib/feedback-storage.mjs) e mette l'URL pubblico nel
+//     campo `images` del feedback, così l'utente vede la prova visiva del
+//     problema in dashboard. Se l'upload di un'immagine fallisce, il feedback
+//     parte comunque senza quell'immagine (warning su stderr).
 //
 //   Di default committa e pusha il file (come queue-triage.mjs). Con --no-git
 //   scrive soltanto il file e lascia il commit all'hook di auto-commit.
@@ -26,6 +34,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { commitAndPush } from './queue-triage.mjs';
+import { uploadScreenshotFile } from './lib/feedback-storage.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
