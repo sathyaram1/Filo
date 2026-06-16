@@ -387,6 +387,10 @@ async function main() {
     if (r.ok) {
       console.log(`  ✓ ${it.entry.id} → ${it.entry.status}`);
       unlinkSync(it.file); applied.push(it.file);
+      // Triage applicato → libera il claim di questo feedback (se esiste).
+      resolvedIds.add(it.entry.id);
+      const cf = resolve(CLAIMS_DIR, `${it.entry.id}.json`);
+      if (existsSync(cf)) { try { rmSync(cf, { force: true }); } catch (_) {} }
     } else if (r.status === 404) {
       console.warn(`  ! ${it.entry.id}: feedback inesistente (404) — rimuovo dalla coda`);
       unlinkSync(it.file); applied.push(it.file);
