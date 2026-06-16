@@ -32,13 +32,15 @@ module.exports = function register(on, ctx) {
     // disponibile o tutti falliscono, torna { ok:false } e il content script
     // ripiega sulla voce del browser (Web Speech).
 
-    // Seam di test (NODE_ENV=test): nel CI headless non esiste né una chiave
-    // Gemini né un motore vocale del sistema, quindi nessuna lettura potrebbe
-    // mai partire davvero. Ritorniamo qualche secondo di PCM silenzioso così il
+    // Seam di test OPT-IN: nel CI headless non esiste né una chiave Gemini né un
+    // motore vocale del sistema, quindi nessuna lettura potrebbe mai partire
+    // davvero. Quando un test attiva esplicitamente `globalThis.__filoTestTtsCanned`
+    // (via app.evaluate), ritorniamo qualche secondo di PCM silenzioso così il
     // content script riproduce un <audio> reale e lo stato "sta leggendo"
-    // (ttsBusy) diventa verificabile in modo deterministico. Stesso spirito dei
-    // seam NODE_ENV=test già presenti (es. src/main/shim/storage.js).
-    if (process.env.NODE_ENV === 'test') {
+    // (ttsBusy) diventa verificabile in modo deterministico. È OPT-IN per non
+    // alterare i test che verificano il degrado senza chiave (fallback voce
+    // browser): quelli non settano il flag e ricevono { ok:false } come in prod.
+    if (process.env.NODE_ENV === 'test' && globalThis.__filoTestTtsCanned) {
       const rate = 8000, seconds = 6;
       const audioBase64 = Buffer.alloc(rate * seconds * 2).toString('base64'); // PCM16 mono
       return { ok: true, audioBase64, mimeType: `audio/L16;rate=${rate}`, provider: 'test', model: 'test-tts' };
