@@ -1,7 +1,0 @@
-{
-  "id": "fzPW50l0IM3GjUFt897l",
-  "status": "done",
-  "notes": "Le tab che riproducono audio ora 'respirano' con un bagliore del colore del sito, desaturato e che sfuma di intensità (vale anche per le tab in background che suonano). L'icona dell'altoparlante compare a fine tab ed è SEMPRE visibile a prescindere dalla larghezza: quando la tab è troppo stretta l'icona prende il posto della favicon. Le tab sono anche un po' piu larghe quando c'è spazio. Entrambe le icone sono cliccabili per silenziare. NOTA per te: per ora nelle tab larghe l'icona audio appare due volte (nello slot favicon E a fine tab) — dimmi se la preferisci solo a fine tab quando c'è spazio, la nascondo nello slot favicon. Verificato con test automatici.",
-  "queuedAt": "2026-06-16T22:19:45.757Z",
-  "queuedBy": "routine"
-}

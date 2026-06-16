@@ -1,7 +1,0 @@
-{
-  "id": "BPjht0vaCGbs7QGGzx82",
-  "status": "done",
-  "notes": "Nell'editor ora puoi zoommare pizzicando il trackpad e con Ctrl+rotella, oltre a Ctrl+= / Ctrl+- per ingrandire/rimpicciolire e Ctrl+0 per tornare al 100%. Lo zoom scala l'intero documento (testo e immagini) senza modificare il contenuto. Verificato con test automatici.",
-  "queuedAt": "2026-06-16T22:19:55.077Z",
-  "queuedBy": "routine"
-}

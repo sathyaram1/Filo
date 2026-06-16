@@ -1,7 +1,0 @@
-{
-  "id": "bWwCyBkB2B4Zh7eWJq9m",
-  "status": "done",
-  "notes": "Il commento/spiegazione non cliccabile nel menu del tasto destro (es. la spiegazione di un errore evidenziato) ora è mostrato in corsivo, così si distingue a colpo d'occhio dalle voci d'azione cliccabili. Verificato con un test automatico.",
-  "queuedAt": "2026-06-16T22:19:24.732Z",
-  "queuedBy": "routine"
-}
