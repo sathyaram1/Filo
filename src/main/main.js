@@ -116,6 +116,9 @@ app.whenReady().then(async () => {
     // blocco alla sessione di default, carica la cache e — se attivo e stantia —
     // avvia un refresh in background. Non blocca l'avvio.
     try { await require('./services/adblock').init(s); } catch (_) {}
+    // Blocco apertura siti in blacklist (#170.3): legge la config dalle
+    // impostazioni (riusa le liste dell'ad-blocker + la blacklist dell'utente).
+    try { require('./services/siteBlock').configureFromSettings(s); } catch (_) {}
   } catch (_) {}
 
   // Ripristina la sessione "Accedi con Google" persistita (non fa rete: l'ID
