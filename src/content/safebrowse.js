@@ -4,7 +4,8 @@
 // process (services/safebrowse) e disegna:
 //   - "pericoloso" → interstitial a pagina piena che BLOCCA l'interazione.
 //     Per proseguire l'utente deve scrivere "confermo" e premere "Procedi".
-//   - "sospetto"   → striscia in alto, chiudibile con "Ho capito".
+//   - "sospetto"   → popup di conferma centrato che blocca l'interazione: per
+//     restare l'utente sceglie "Continua" (conferma), altrimenti "Torna indietro".
 //   - "safe"       → rimuove qualsiasi avviso.
 //
 // NON blocca mai la navigazione: la pagina carica normalmente, l'avviso la
