@@ -112,6 +112,10 @@ app.whenReady().then(async () => {
     // ripuliscili PRIMA di aprire qualsiasi tab. I cookie funzionali/di login
     // restano. In privacy le sessioni sono effimere; in manual non tocchiamo nulla.
     try { await Cookies.wipeTrackerCookies(s); } catch (_) {}
+    // Ad-blocking per-dominio basato su liste (StevenBlack/EasyList): applica il
+    // blocco alla sessione di default, carica la cache e — se attivo e stantia —
+    // avvia un refresh in background. Non blocca l'avvio.
+    try { await require('./services/adblock').init(s); } catch (_) {}
   } catch (_) {}
 
   // Ripristina la sessione "Accedi con Google" persistita (non fa rete: l'ID
