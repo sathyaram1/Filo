@@ -53,6 +53,11 @@
   // così è unit-testabile senza Electron.
 
   // I sei parametri della spec. Default = tab dal colore vivace e riconoscibile.
+  // I primi cinque governano l'ESTRAZIONE dal favicon (qui sotto); il sesto,
+  // `opacita_tab`, governa il BLEND del colore sullo sfondo della barra delle
+  // schede ed è applicato dalla shell (src/renderer/shell.js): non entra
+  // nell'estrazione, quindi non sta in IDENTITY_PARAMS (i soli parametri letti
+  // da extractIdentityFromPixels) ma è descritto nel meta più sotto.
   const IDENTITY_PARAMS = {
     soglia_saturazione: 0.30, // 0–0.5: sotto questa saturazione il pixel è ignorato dal path cromatico
     peso_centralita: 5.0,     // 0–10: forza del bias gaussiano verso il centro del favicon
@@ -60,6 +65,53 @@
     saturazione_tab: 1.0,     // 0–1: saturazione del colore cromatico adattato
     luminosita_tab: 0.5,      // 0–1: luminosità del colore cromatico adattato
   };
+
+  // Meta dei SEI parametri: è l'unica fonte di verità per i default, i range, le
+  // etichette e i commenti mostrati nelle Preferenze avanzate (la "zona codice")
+  // e per la validazione quando li si cambia (a voce dalla chat o nelle prefs).
+  // `stage`: 'extract' = usato dall'estrazione del favicon; 'blend' = usato dalla
+  // shell per il mix col fondo del tab bar.
+  const IDENTITY_PARAM_META = [
+    { key: 'soglia_saturazione', def: 0.30, min: 0, max: 0.5, step: 0.01, stage: 'extract',
+      label: 'Soglia saturazione',
+      comment: 'Sotto questa saturazione un pixel del favicon è considerato grigio e ignorato. Alzala se la tab prende un colore sbagliato da uno sfondo poco saturo (es. il giallo chiaro di Poste invece del verde del logo).' },
+    { key: 'peso_centralita', def: 5.0, min: 0, max: 10, step: 0.1, stage: 'extract',
+      label: 'Peso centralità',
+      comment: 'Quanto contano di più i pixel vicini al centro del favicon. Alzalo per dare priorità al logo centrale rispetto a bordi/cornici.' },
+    { key: 'bucket_tinta', def: 2, min: 2, max: 48, step: 1, stage: 'extract',
+      label: 'Bucket tinta',
+      comment: 'In quante fasce si divide la ruota dei colori per scegliere la tinta dominante. Pochi bucket = colori raggruppati; molti = distinzione più fine fra tinte simili.' },
+    { key: 'saturazione_tab', def: 1.0, min: 0, max: 1, step: 0.05, stage: 'extract',
+      label: 'Saturazione tab',
+      comment: 'Quanto è viva la tinta finale applicata alla tab. 0 = grigia, 1 = piena.' },
+    { key: 'luminosita_tab', def: 0.5, min: 0, max: 1, step: 0.05, stage: 'extract',
+      label: 'Luminosità tab',
+      comment: 'Quanto è chiara la tinta finale. 0 = scura, 1 = chiara.' },
+    { key: 'opacita_tab', def: 0.6, min: 0, max: 1, step: 0.05, stage: 'blend',
+      label: 'Opacità tab',
+      comment: 'Quanto il colore copre lo sfondo della barra delle schede. 0 = nessun colore, 1 = tinta piena.' },
+  ];
+
+  // Oggetto coi sei valori predefiniti.
+  function defaultParams() {
+    const o = {};
+    for (const m of IDENTITY_PARAM_META) o[m.key] = m.def;
+    return o;
+  }
+
+  // Normalizza un set di parametri (parziale o completo) ai sei validi, dentro i
+  // range, riempiendo i mancanti coi default. `bucket_tinta` viene arrotondato.
+  function clampParams(params) {
+    const out = {};
+    for (const m of IDENTITY_PARAM_META) {
+      let v = params && params[m.key];
+      v = (typeof v === 'number' && Number.isFinite(v)) ? v : m.def;
+      v = Math.max(m.min, Math.min(m.max, v));
+      if (m.step >= 1) v = Math.round(v);
+      out[m.key] = v;
+    }
+    return out;
+  }
 
   function rgbToHsl(r, g, b) {
     r /= 255; g /= 255; b /= 255;
