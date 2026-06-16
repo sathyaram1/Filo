@@ -1,0 +1,11 @@
+{
+  "op": "create",
+  "text": "Parte dello spec #170 (Migliorare blocchi e notifiche). Integra il blocco di domini pubblicitari/tracker usando una o piu liste di blocco GRATUITE e note (es. EasyList, o le hosts list tipo StevenBlack). Le liste vanno SCARICATE dalla rete, salvate in cache locale e AGGIORNATE automaticamente in modo periodico (es. settimanale), con un toggle per attivare/disattivare il blocco nelle impostazioni di Sicurezza. Quando una richiesta o navigazione punta a un dominio presente nelle liste, va bloccata (a livello di sessione Electron, es. webRequest/onBeforeRequest o intercept del TabManager). Oggi esiste solo un popup-blocker basato sulla disposition new-window (src/main/tabs.js, setWindowOpenHandler) — niente blocco per-dominio basato su liste. Questo e il motore di ad-blocking vero. Criterio di fatto: un dominio ad/tracker noto presente in lista viene bloccato; la lista si scarica e si rinfresca da sola; toggle nelle impostazioni. Vincoli: scaricare le liste solo se la rete e disponibile, gestire il fallimento del download senza rompere la navigazione, non bloccare domini legittimi (whitelist di base). Verifica con uno spec che, iniettata una lista di test con un dominio finto, asserisce che una richiesta a quel dominio e bloccata e una a un dominio non in lista passa.",
+  "name": "Blocco pubblicita con liste gratuite auto-aggiornate",
+  "parentId": "zceqrToaGEg5MqeIFRhw",
+  "status": "todo",
+  "priority": 2,
+  "notes": "",
+  "queuedAt": "2026-06-16T10:15:02.769Z",
+  "queuedBy": "routine"
+}
