@@ -1,0 +1,7 @@
+{
+  "id": "57vUptmMvOIMK9pDJdUb",
+  "status": "done",
+  "notes": "Aggiunto un vero sistema di notifiche in basso a destra della shell, riutilizzabile. Nelle Preferenze c'è ora una sezione Notifiche: imposti la durata in secondi (0 = la notifica resta finché non la chiudi con la X, altrimenti sparisce da sola dopo i secondi scelti) e puoi attivare un suono alla comparsa scegliendolo tra quattro toni (con tasto Prova). Il vecchio toast (es. schede riordinate, blocchi) ora passa per questo sistema, quindi rispetta la durata configurata. In più: ogni notifica ha sempre una X per chiuderla subito, e il sistema è pronto a mostrare pulsanti d'azione (lo useranno #170.2/#170.3 per offrire 'apri comunque'). Verificato con spec Playwright: la notifica a tempo sparisce dopo il timeout, quella infinita resta e si chiude solo con la X, e la durata impostata nelle Preferenze viene rispettata; più un test che la sezione Preferenze persiste durata e suono.",
+  "queuedAt": "2026-06-16T11:49:22.489Z",
+  "queuedBy": "routine"
+}
