@@ -13,6 +13,9 @@ import { dirname, join } from 'node:path';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
+// tabColor.js prima di preferences.js: il setter `colore_tab` usa SN_TAB_COLOR
+// (defaultParams) per il preset "predefinito".
+require(join(__dirname, '..', '..', 'src', 'shared', 'tabColor.js'));
 require(join(__dirname, '..', '..', 'src', 'shared', 'preferences.js'));
 
 const P = globalThis.SN_PREF;
