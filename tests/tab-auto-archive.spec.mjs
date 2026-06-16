@@ -57,8 +57,8 @@ test('runAutoTriage archivia le tab decise, tiene la attiva e mostra il toast', 
 
   // Toast §2.3 mostrato nella shell.
   await expect.poll(() => shell.evaluate(() => {
-    const el = document.getElementById('shell-toast');
-    return !!(el && el.classList.contains('show') && /cronologia/i.test(el.textContent || ''));
+    const el = document.querySelector('.shell-notif.show .shell-notif-msg');
+    return !!(el && /cronologia/i.test(el.textContent || ''));
   }), { timeout: 6_000 }).toBe(true);
 });
 
