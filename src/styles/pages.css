@@ -85,6 +85,15 @@ html, body {
 }
 .sn-page button.sn-btn-secondary:hover { background: var(--sn-hover); }
 
+/* Variante "azione distruttiva" (es. ripristino completo delle impostazioni):
+   bordo e testo rossi, sfondo trasparente finché non ci passi sopra. */
+.sn-page button.sn-btn-danger {
+  background: transparent;
+  color: #c0392b;
+  border: 1px solid #c0392b;
+}
+.sn-page button.sn-btn-danger:hover { background: rgba(192, 57, 43, 0.1); opacity: 1; }
+
 .sn-page .sn-row {
   display: flex;
   gap: 12px;
