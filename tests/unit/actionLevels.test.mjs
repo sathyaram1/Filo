@@ -108,6 +108,12 @@ test('ESEGUI_COMANDO (#146.6): il livello dipende dal comando, classificato dal 
   // Sola lettura → 1 (esegue subito).
   assert.equal(AL.levelFor({ type: 'ESEGUI_COMANDO', comando: 'ls -la' }), 1);
   assert.equal(AL.levelFor({ type: 'ESEGUI_COMANDO', comando: 'git status' }), 1);
+  // `cd` è navigazione benigna e reversibile → 1 (la cwd dell'assistente è
+  // persistente: pretendere "conferma" a ogni spostamento la renderebbe inutile).
+  assert.equal(AL.levelFor({ type: 'ESEGUI_COMANDO', comando: 'cd sub' }), 1);
+  assert.equal(AL.levelFor({ type: 'ESEGUI_COMANDO', comando: 'cd ..' }), 1);
+  // ma un `cd` con metacaratteri (sostituzione/concatenazione) resta 3.
+  assert.equal(AL.levelFor({ type: 'ESEGUI_COMANDO', comando: 'cd $(rm -rf x)' }), 3);
   // Modifica recuperabile → 2 (popup).
   assert.equal(AL.levelFor({ type: 'ESEGUI_COMANDO', comando: 'git push' }), 2);
   assert.equal(AL.levelFor({ type: 'ESEGUI_COMANDO', comando: 'npm install' }), 2);
