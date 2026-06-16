@@ -1220,13 +1220,43 @@ class TabManager {
         tab.restoreZoomLevel = null;
         try { wc.setZoomLevel(z); } catch (_) {}
       }
-      if (typeof tab.restoreScrollPct !== 'number') return;
-      const pct = Math.max(0, Math.min(100, tab.restoreScrollPct));
-      tab.restoreScrollPct = null; // applica una volta sola
-      const js = `(()=>{try{const d=document.documentElement;const max=(d.scrollHeight||0)-window.innerHeight;if(max>0)window.scrollTo(0,max*${pct}/100);}catch(e){}})()`;
-      const run = () => { try { wc.executeJavaScript(js, true).catch(() => {}); } catch (_) {} };
-      run();
-      setTimeout(run, 500); // riprova dopo l'eventuale layout/lazy-load
+      if (typeof tab.restoreScrollPct === 'number') {
+        const pct = Math.max(0, Math.min(100, tab.restoreScrollPct));
+        tab.restoreScrollPct = null; // applica una volta sola
+        const js = `(()=>{try{const d=document.documentElement;const max=(d.scrollHeight||0)-window.innerHeight;if(max>0)window.scrollTo(0,max*${pct}/100);}catch(e){}})()`;
+        const run = () => { try { wc.executeJavaScript(js, true).catch(() => {}); } catch (_) {} };
+        run();
+        setTimeout(run, 500); // riprova dopo l'eventuale layout/lazy-load
+      }
+      // #145 — ripristino sessione: riporta il media principale (video/audio con
+      // la durata maggiore, vedi content.js pickMainMedia) a `restoreMediaTime`
+      // e lo lascia IN PAUSA. Il media può non esistere ancora al primo
+      // tentativo (player che si costruisce via JS, es. YouTube/pubblicità):
+      // ripoll con backoff per qualche secondo, poi desiste (best-effort).
+      if (typeof tab.restoreMediaTime === 'number') {
+        const t = Math.max(0, tab.restoreMediaTime);
+        tab.restoreMediaTime = null; // applica una volta sola (il poll sotto usa la var locale)
+        const mediaJs = `(()=>{try{
+          const els = Array.from(document.querySelectorAll('video, audio'));
+          let best = null;
+          for (const m of els) { if (m && isFinite(m.duration) && m.duration > 0) { if (!best || m.duration > best.duration) best = m; } }
+          if (!best) return false;
+          best.pause();
+          if (isFinite(${t}) && ${t} <= (best.duration || Infinity)) best.currentTime = ${t};
+          best.pause();
+          return true;
+        } catch(e) { return false; }})()`;
+        let attempts = 0;
+        const tryRestore = () => {
+          attempts += 1;
+          try {
+            wc.executeJavaScript(mediaJs, true).then((ok) => {
+              if (!ok && attempts < 8) setTimeout(tryRestore, 500);
+            }).catch(() => { if (attempts < 8) setTimeout(tryRestore, 500); });
+          } catch (_) {}
+        };
+        tryRestore();
+      }
     });
     // Geo-block livello 1 (deterministico): pattern espliciti nel testo visibile
     // (YouTube "not available in your country", country block di Cloudflare, …).
