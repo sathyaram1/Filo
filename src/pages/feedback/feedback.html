@@ -109,6 +109,12 @@
       border-radius: 6px; resize: vertical;
     }
     .fb-reply-buttons { display: flex; gap: 8px; justify-content: flex-end; }
+    /* Commento senza cambio stato (#22): stesso look del composer "Rispondi",
+       ma più compatto e con il bottone "Allega" per pari con il paste. */
+    .fb-comment { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--sn-border); }
+    .fb-comment-attach-label { position: relative; overflow: hidden; cursor: pointer; }
+    .fb-upload-hint { font-size: 12px; color: var(--sn-muted); font-style: italic; }
+    .fb-upload-hint[hidden] { display: none; }
     .fb-tabs { display: flex; gap: 6px; margin-bottom: 12px; border-bottom: 1px solid var(--sn-border); }
     .fb-tab {
       background: transparent; border: 0; padding: 8px 14px;
