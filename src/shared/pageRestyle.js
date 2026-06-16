@@ -102,13 +102,28 @@
     return out;
   }
 
+  // Aggiunge !important a ogni dichiarazione che non ce l'ha gia'. SERVE: il
+  // main inietta il CSS con webContents.insertCSS, che lo applica a livello
+  // user-agent/user — piu' BASSO degli stili author del sito (il suo <style>).
+  // Senza !important, "scrivi in grassetto i titoli" perderebbe contro la regola
+  // del sito h1{font-weight:400} e non si vedrebbe nulla. L'utente ha chiesto
+  // esplicitamente questa estetica: deve vincere sulla pagina.
+  function importantify(decls) {
+    return decls
+      .split(';')
+      .map((d) => d.trim())
+      .filter(Boolean)
+      .map((d) => (/!important\s*$/i.test(d) ? d : `${d} !important`))
+      .join('; ') + ';';
+  }
+
   // Compone il blocco CSS finale da iniettare. Vuoto se non c'e' nulla di valido.
   function buildCss(rules) {
     const norm = Array.isArray(rules) && rules.length && rules[0] && rules[0].selector
       ? rules
       : normalizeRules(rules);
     if (!norm.length) return '';
-    return norm.map((r) => `${r.selector} { ${r.css} }`).join('\n');
+    return norm.map((r) => `${r.selector} { ${importantify(r.css)} }`).join('\n');
   }
 
   global.SN_PAGE_RESTYLE = { normalizeRules, buildCss, cleanSelector, cleanDeclarations };
