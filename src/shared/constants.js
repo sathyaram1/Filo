@@ -857,6 +857,17 @@
       rate: 1,
       pitch: 1,
     },
+    // Notifiche/toast in basso a destra della shell (spec #170.1). È la base
+    // riusata dai blocchi (#170.2/#170.3) per segnalare gli eventi.
+    // - durationSec: secondi prima dell'auto-dismiss. 0 = infinita: la notifica
+    //   resta finché l'utente non la chiude con la X.
+    // - soundEnabled: se true riproduce un breve tono alla comparsa.
+    // - sound: id del tono (default|gentle|urgent|chime, vedi SN_SOUNDS).
+    notifications: {
+      durationSec: 5,
+      soundEnabled: false,
+      sound: 'default',
+    },
     // Impostazioni di sicurezza/privacy per le pagine esterne (no filo://).
     // - protectIpLeak: forza WebRTC a usare solo l'interfaccia di rete pubblica
     //   (default_public_interface_only). Evita che siti possano leggere gli IP
