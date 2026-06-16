@@ -323,6 +323,40 @@
       },
     },
 
+    // ── Colore identità delle tab — cosmetico, reversibile → livello 1 ──
+    // Mappa le richieste verbali ("voglio colori più vivaci nelle tab", "rendile
+    // più neutre", "niente colore", "Poste è verde non gialla") sui sei parametri
+    // di src/shared/tabColor.js. I valori sono preset ASSOLUTI (non delta: il
+    // setter non vede lo stato corrente), così il risultato è deterministico e
+    // l'utente vede subito cambiare il colore delle tab. Il merge in storage è
+    // profondo su `tabColor`, quindi un preset parziale lascia intatti gli altri
+    // parametri. La regolazione fine dei singoli numeri sta nelle Preferenze.
+    {
+      keys: ['colore_tab', 'colore delle tab', 'colore tab', 'colori tab', 'colori delle tab',
+        'colore schede', 'colori schede', 'tinta tab', 'tinta delle tab', 'vivacita tab', 'vivacità tab'],
+      build(v) {
+        const s = String(v == null ? '' : v).trim().toLowerCase();
+        if (!s) return null;
+        const TC = global.SN_TAB_COLOR;
+        if (/(nessun|niente|senza colore|togli|spegn|spent|via il colore|incolore|0)/.test(s)) {
+          return { partial: { tabColor: { opacita_tab: 0 } }, label: 'Colore delle tab → nessuno' };
+        }
+        if (/(vivac|vivid|acces|caric|forte|forti|intens|brillant|sgargian|più colore|piu colore|più colorat|piu colorat)/.test(s)) {
+          return { partial: { tabColor: { saturazione_tab: 1, opacita_tab: 0.9 } }, label: 'Colore delle tab → più vivace' };
+        }
+        if (/(neutr|spent|tenu|delicat|sobri|smorzat|pastell|meno colore|meno colorat|legger)/.test(s)) {
+          return { partial: { tabColor: { saturazione_tab: 0.5, opacita_tab: 0.35 } }, label: 'Colore delle tab → più neutro' };
+        }
+        if (/(precis|sensibil|sbagliat|corregg|verde non gial|tinta giust|esatt|migliora estr)/.test(s)) {
+          return { partial: { tabColor: { soglia_saturazione: 0.4, peso_centralita: 7 } }, label: 'Colore delle tab → estrazione più precisa' };
+        }
+        if (/(default|predefinit|normal|standard|ripristin|reset|originale)/.test(s) && TC) {
+          return { partial: { tabColor: TC.defaultParams() }, label: 'Colore delle tab → predefinito' };
+        }
+        return null;
+      },
+    },
+
     // ── Suoneria timer — reversibile, innocuo → livello 1 ──
     {
       keys: ['suoneria_timer', 'suoneria timer', 'suoneria', 'ringtone', 'timer ringtone', 'suono timer', 'tono timer'],
