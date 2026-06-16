@@ -120,6 +120,7 @@
     // riflettere il default anche in casi limite (es. chiave esistente ma null).
     $('sec-protect-ip').checked = sec.protectIpLeak !== false;
     $('sec-block-popups').checked = sec.blockPopups !== false;
+    $('sec-adblock').checked = (sec.adblock || {}).enabled !== false;
     const sb = sec.safeBrowse || {};
     $('sec-safebrowse').checked = sb.enabled !== false;
     $('sec-safebrowse-network').checked = sb.networkSignals !== false;
