@@ -145,14 +145,26 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, 
     });
     child.on('close', (code, signal) => {
       clearTimeout(timer);
-      const out = truncate(stdout);
+      let rawOut = stdout;
+      let realCode = typeof code === 'number' ? code : (timedOut ? 124 : 1);
+      let resultCwd = trackCwd ? (cwd || undefined) : undefined;
+      if (trackCwd) {
+        // La sonda è l'ULTIMO comando eseguito: l'exit code del processo è il
+        // suo (0), non quello del comando. Prendiamo entrambi dal marcatore.
+        const parsed = extractCwdMark(rawOut);
+        rawOut = parsed.stdout;
+        if (parsed.code !== null) realCode = parsed.code;
+        if (parsed.cwd) resultCwd = parsed.cwd;
+      }
+      const out = truncate(rawOut);
       const err = truncate(stderr);
       resolve({
         command: cmd,
         stdout: out.text,
         stderr: err.text,
-        code: typeof code === 'number' ? code : (timedOut ? 124 : 1),
+        code: realCode,
         signal: signal || null,
+        cwd: resultCwd,
         truncated: out.truncated || err.truncated,
         timedOut,
         durationMs: Date.now() - startedAt,
