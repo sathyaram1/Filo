@@ -95,15 +95,24 @@ html[data-chrome-compact="1"] .addr {
 }
 .tabs::-webkit-scrollbar { height: 0; width: 0; display: none; } /* Chromium */
 
-/* §2.3 — toast "Tab riordinate e salvate in cronologia". In basso al centro,
-   compare e svanisce da solo. Nessun pulsante annulla (scelta di design). */
-.shell-toast {
+/* Notifiche/toast in basso a DESTRA (spec #170.1). Le card si impilano
+   nell'angolo; durata e suono sono configurabili in Preferenze. Le infinite
+   restano finché non si preme la X. Base riusata dai blocchi #170.2/#170.3. */
+.shell-notifs {
   position: fixed;
-  left: 50%;
-  bottom: 18px;
-  transform: translateX(-50%) translateY(12px);
-  max-width: 80vw;
-  padding: 10px 16px;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  z-index: 9999;
+  pointer-events: none;
+}
+.shell-notif {
+  position: relative;
+  max-width: min(360px, 80vw);
+  padding: 10px 30px 10px 14px;
   background: var(--tab-active);
   color: var(--fg);
   border: 1px solid var(--border);
@@ -111,11 +120,43 @@ html[data-chrome-compact="1"] .addr {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
   font-size: 13px;
   opacity: 0;
-  pointer-events: none;
+  transform: translateX(12px);
   transition: opacity 0.2s ease, transform 0.2s ease;
-  z-index: 9999;
+  pointer-events: auto;
 }
-.shell-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.shell-notif.show { opacity: 1; transform: translateX(0); }
+.shell-notif-msg { line-height: 1.4; word-break: break-word; }
+.shell-notif-close {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--muted, #888);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.shell-notif-close:hover { background: var(--border); color: var(--fg); }
+.shell-notif-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.shell-notif-action {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg, transparent);
+  color: var(--fg);
+  font-size: 12px;
+  cursor: pointer;
+}
+.shell-notif-action:hover { background: var(--border); }
 .tab {
   position: relative;
   display: inline-flex;
