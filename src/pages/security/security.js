@@ -289,6 +289,7 @@
     // Niente pulsante "Salva": ogni toggle viene applicato e persistito subito.
     $('sec-protect-ip').addEventListener('change', save);
     $('sec-block-popups').addEventListener('change', save);
+    $('sec-adblock').addEventListener('change', save);
     $('sec-safebrowse').addEventListener('change', () => { syncSafebrowseEnabled(); save(); });
     $('sec-safebrowse-network').addEventListener('change', save);
     $('sec-safebrowse-llm').addEventListener('change', save);
