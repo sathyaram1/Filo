@@ -32,8 +32,10 @@ test('"scrivi in grassetto tutti i titoli" → CSS valido sui titoli', () => {
   assert.equal(rules.length, 1);
   assert.equal(rules[0].selector, 'h1,h2,h3,h4,h5,h6');
   assert.match(rules[0].css, /font-weight:\s*700;/);
+  // buildCss aggiunge !important: l'estetica chiesta dall'utente deve vincere
+  // sugli stili del sito (insertCSS inietta a livello user-agent, piu' basso).
   const css = R.buildCss(rules);
-  assert.equal(css, 'h1,h2,h3,h4,h5,h6 { font-weight: 700; }');
+  assert.equal(css, 'h1,h2,h3,h4,h5,h6 { font-weight: 700 !important; }');
 });
 
 test('accetta i sinonimi che un LLM può produrre (selector/style, rules)', () => {
