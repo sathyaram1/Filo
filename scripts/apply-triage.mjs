@@ -34,13 +34,16 @@
 //   node scripts/apply-triage.mjs --dry-run  mostra cosa farebbe (no rete, no git)
 
 import { execFileSync } from 'node:child_process';
-import { readFileSync, readdirSync, unlinkSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, unlinkSync, existsSync, rmSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 // L'autenticazione (service account in CI, refresh token admin in locale) è
 // condivisa con backfill-feedback-numbers.mjs: vive in lib/firestore-auth.mjs.
 import { acquireBearer, FIRESTORE_BASE } from './lib/firestore-auth.mjs';
 import { backfillNumbers } from './backfill-feedback-numbers.mjs';
+// I claim (semaforo sui feedback per le routine) vivono in feedback-triage/claims/.
+// Qui li "specchiamo" su Firestore così la dashboard può mostrare "in lavorazione".
+import { liveClaims, expiredClaimFiles } from './claim-feedback.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
