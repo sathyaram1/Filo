@@ -314,6 +314,8 @@
     {
       keys: ['chiave_openrouter', 'chiave openrouter', 'api key openrouter', 'chiave api openrouter', 'openrouter key'],
       level: 2,
+      risk: 'Imposta la chiave API di OpenRouter. È una credenziale che autorizza spese sul tuo '
+        + 'account: confermala solo se questa chiave arriva davvero da te.',
       build(v) {
         const s = String(v == null ? '' : v).trim();
         if (!s) return null;
