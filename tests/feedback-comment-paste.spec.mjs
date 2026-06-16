@@ -164,8 +164,17 @@ test('Ricevuti: incollare un\'immagine nel commento la carica e la mostra sulla 
   expect(upd.status).toBeUndefined(); // ancora niente cambio di stato
 
   // E soprattutto: l'immagine compare DAVVERO sulla card (non solo nel
-  // payload mandato al main) — il re-render dopo il patch deve mostrarla.
-  await expect(page.locator('.fb-imgs img')).toHaveCount(1);
-  const src = await page.locator('.fb-imgs img').getAttribute('src');
+  // payload mandato al main) — il re-render dopo il patch deve renderizzare
+  // un <img> con l'url caricato. L'url è fittizio (test offline, niente rete
+  // reale): il browser lo segnala come "non disponibile" (la card lo sostituisce
+  // con un placeholder via il listener 'error' già esistente), ma l'<img> con
+  // il src giusto DEVE comparire prima — è quello il segnale che il rendering
+  // ha preso in carico il nuovo allegato. Verifichiamo l'attributo src appena
+  // inserito nel DOM, prima che l'evento 'error' (asincrono) lo sostituisca.
+  const imgHandle = await page.waitForFunction(() => {
+    const img = document.querySelector('.fb-imgs img');
+    return img && img.getAttribute('src');
+  }, null, { timeout: 8_000 });
+  const src = await imgHandle.jsonValue();
   expect(src).toMatch(/^https:\/\/fake\.storage\.test\/upload-/);
 });
