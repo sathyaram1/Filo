@@ -112,7 +112,7 @@ test('(a) sito non flaggato senza login → retry silenzioso e toast "Aperto da 
     await expect.poll(() => socks.connections.length, { timeout: 15_000 }).toBeGreaterThan(0);
 
     // Toast discreto nella shell: informa, non chiede.
-    const toast = shell.locator('#shell-toast.show');
+    const toast = shell.locator('.shell-notif.show .shell-notif-msg');
     await expect(toast).toBeVisible({ timeout: 10_000 });
     await expect(toast).toHaveText('Aperto da Stati Uniti');
   } finally {
