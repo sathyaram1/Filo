@@ -50,6 +50,43 @@ nuovo feedback eredita il numero del padre con suffisso (#22 → #22.1, #22.2…
 senza `parentId` prende il prossimo numero progressivo top-level. Se il padre
 non ha ancora un numero (feedback storico), gliene viene assegnato uno al volo.
 
+## Semaforo sui feedback — `claims/<id>.json`
+
+La sottocartella `claims/` è il **semaforo** che impedisce a due routine cloud
+avviate a poca distanza di prendere in carico **lo stesso** feedback (tutte
+leggono la stessa lista `todo` da Firestore e sceglierebbero lo stesso). A
+differenza dei file di triage qui sopra — consumati e cancellati dall'applier —
+i file di claim sono **persistenti** per tutta la durata del lavoro.
+
+```jsonc
+// feedback-triage/claims/<idFeedback>.json
+{
+  "id": "<idFeedback>",
+  "by": "<slug routine / host-pid>",
+  "claimedAt": "2026-06-16T12:00:00.000Z",
+  "expiresAt": "2026-06-16T13:00:00.000Z",  // claimedAt + TTL (default 60 min)
+  "num": "#22.1"
+}
+```
+
+- **Acquisizione/rilascio** con `scripts/claim-feedback.mjs` (vedi sotto). Il
+  file viene pushato su `origin/main` con un push ff-only, così le altre routine
+  lo vedono in **pochi secondi** (non i ~1-2 min della Action): è lì il
+  mutuo-esclusione vero.
+- **Scadenza (TTL)**: oltre `expiresAt` il claim è morto e il feedback torna
+  libero (così una routine che crasha non lo blocca per sempre). `apply-triage`
+  e `claim-feedback.mjs prune` rimuovono i file scaduti.
+- **UI**: `apply-triage.mjs` **specchia** i claim vivi su Firestore (campi
+  `claimedBy`/`claimExpiresAt`/`claimNum` sul doc feedback) così la dashboard
+  mostra "🔧 in lavorazione". Quel passo serve SOLO alla visualizzazione: il
+  lock non dipende da Firestore.
+
+```bash
+node scripts/claim-feedback.mjs acquire <id> [--num "#22.1"]  # exit 0=preso, 10=occupato
+node scripts/claim-feedback.mjs release <id>                  # a fine lavoro
+node scripts/claim-feedback.mjs list                          # claim attivi
+```
+
 ## Op di manutenzione (rare)
 
 La coda accetta anche due operazioni una-tantum, utili quando in locale non
