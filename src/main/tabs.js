@@ -466,8 +466,8 @@ class TabManager {
 
   // Rimuove tutte le modifiche estetiche che Filo ha iniettato nella scheda web
   // attiva. Reversibilità dell'azione STILE_PAGINA (#185).
-  clearPageStyle() {
-    const tab = this._activeWebTab();
+  clearPageStyle(tabArg = null) {
+    const tab = tabArg || this._activeWebTab();
     if (!tab || !tab.view || !tab.view.webContents) return { ok: false, reason: 'no-web-tab' };
     const keys = tab._filoStyleKeys || [];
     let removed = 0;
