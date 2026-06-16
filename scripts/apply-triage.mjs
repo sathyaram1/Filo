@@ -249,9 +249,58 @@ function readSpool() {
     });
 }
 
+// Specchia su Firestore lo stato dei claim (il semaforo vive su git; questi campi
+// servono SOLO alla dashboard per mostrare "in lavorazione"). Per ogni claim vivo
+// imposta claimedBy/claimedAt/claimExpiresAt; per ogni feedback che su Firestore
+// risulta claimato ma non ha più un claim vivo (rilasciato o scaduto) li azzera.
+// Inoltre rimuove dal disco i file di claim scaduti (verranno committati a valle).
+// Best-effort: un errore qui non deve far fallire l'applicazione del triage.
+async function reconcileClaims(bearer, resolvedIds = new Set()) {
+  const live = liveClaims();
+  const liveById = new Map(live.map((c) => [c.id, c]));
+
+  // 1) Imposta i campi per i claim vivi.
+  for (const c of live) {
+    const r = await patchFields(c.id, {
+      claimedBy: String(c.by || ''),
+      claimedAt: String(c.claimedAt || ''),
+      claimExpiresAt: String(c.expiresAt || ''),
+      claimNum: String(c.num || ''),
+    }, bearer);
+    if (!r.ok && r.status !== 404) console.warn(`  ! sync claim ${c.id}: HTTP ${r.status}`);
+  }
+
+  // 2) Azzera i campi sui feedback che su Firestore risultano ancora claimati
+  //    ma non hanno un claim vivo (rilasciati a fine lavoro o scaduti).
+  //    L'orderBy su claimExpiresAt seleziona solo i doc che HANNO quel campo.
+  let claimedDocs = [];
+  try {
+    claimedDocs = await runQuery({
+      from: [{ collectionId: 'feedback' }],
+      orderBy: [{ field: { fieldPath: 'claimExpiresAt' }, direction: 'DESCENDING' }],
+      limit: 200,
+    }, bearer);
+  } catch (e) { console.warn('  ! query claim attivi fallita:', String(e.message).slice(0, 120)); }
+  for (const d of claimedDocs) {
+    const id = d.name?.split('/').pop() || '';
+    const exp = d.fields?.claimExpiresAt?.stringValue || '';
+    if (!id || !exp) continue;
+    if (!liveById.has(id) || resolvedIds.has(id)) {
+      const r = await patchFields(id, { claimedBy: '', claimedAt: '', claimExpiresAt: '', claimNum: '' }, bearer);
+      if (r.ok) console.log(`  ✓ claim azzerato su ${id}`);
+      else if (r.status !== 404) console.warn(`  ! azzeramento claim ${id}: HTTP ${r.status}`);
+    }
+  }
+
+  // 3) Rimuovi dal disco i file di claim scaduti (il commit a valle li stage-a).
+  for (const f of expiredClaimFiles()) {
+    try { rmSync(f, { force: true }); } catch (_) {}
+  }
+}
+
 async function main() {
   const items = readSpool();
-  if (!items.length) { console.log('Coda vuota: niente da applicare.'); return; }
+  if (!items.length) console.log('Coda di triage vuota (controllo comunque i claim).');
   // Il backfill va applicato PRIMA delle creazioni: numera gli storici, così
   // i nuovi feedback della stessa run prendono numeri successivi e coerenti.
   const opRank = { backfill: 0, delete: 1, create: 2 };
