@@ -376,7 +376,7 @@
            </div>`
         : '';
       return `
-        <article class="fb-card fb-card--${statusOf(f)}${agent ? ' fb-card--agent' : ''}">
+        <article class="fb-card fb-card--${statusOf(f)} fb-card--origin-${origin}${agent ? ' fb-card--agent' : ''}">
           <div class="fb-meta">
             <span>${escapeHtml(when)}</span>
             ${safeUrl ? `<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener">${escapeHtml(url).slice(0, 80)}</a>` : (url ? `<span title="${escapeHtml(url)}">${escapeHtml(url).slice(0, 80)}</span>` : '')}
