@@ -37,19 +37,43 @@
   let all = [];
   let currentTab = 'inbox';
 
-  // Le issue trovate dagli agenti LLM arrivano con clientId "agent:<model>"
-  // (vedi tests/agent/feedback.mjs): categoria dedicata, niente schema extra.
+  // Ritrovamenti automatici → categoria "Agente". Due fonti:
+  //   - agente esploratore LLM: clientId "agent:<model>" (vedi tests/agent/feedback.mjs);
+  //   - audit proattivo di una routine cloud: clientId "routine:<slug>" e status
+  //     `new` (l'audit deposita i ritrovamenti come `new`). I sub-feedback di una
+  //     routine portano lo stesso prefisso ma nascono `todo`/`clarify`: NON sono
+  //     ritrovamenti d'agente, quindi qui si escludono col vincolo su status.
   function isAgent(f) {
-    return typeof f.clientId === 'string' && f.clientId.startsWith('agent:');
+    const c = String(f.clientId || '');
+    if (c.startsWith('agent:')) return true;
+    if (c.startsWith('routine:') && (f.status || 'new') === 'new') return true;
+    return false;
   }
-  // Decodifica i metadati codificati nei campi consentiti dalle rules.
+  // Origine del feedback (per la colorazione di card/bolle). Delega alla logica
+  // condivisa così dashboard e main usano la stessa classificazione.
+  function originOf(f) {
+    const c = String(f.clientId || '');
+    if (window.SN_FEEDBACK_THREAD && SN_FEEDBACK_THREAD.originOf) return SN_FEEDBACK_THREAD.originOf(c);
+    if (c.startsWith('owner:')) return 'owner';
+    if (c.startsWith('agent:')) return 'agent';
+    if (c.startsWith('routine:')) return 'routine';
+    return 'user';
+  }
+  // Decodifica i metadati del ritrovamento per il badge. L'agente esploratore
+  // codifica "severità|area|titolo" nel campo `title`; l'audit di una routine no
+  // (il titolo breve sta in `name`), quindi lo trattiamo a parte.
   function agentMeta(f) {
-    const model = (f.clientId || '').slice('agent:'.length) || '?';
+    const c = String(f.clientId || '');
+    if (c.startsWith('routine:')) {
+      const slug = c.slice('routine:'.length) || 'routine';
+      return { source: 'routine', model: slug, severity: '', area: '', title: String(f.name || '').trim() };
+    }
+    const model = c.slice('agent:'.length) || '?';
     const parts = String(f.title || '').split('|');
     const severity = parts.length >= 3 ? parts[0].trim() : '';
     const area = parts.length >= 3 ? parts[1].trim() : '';
     const title = parts.length >= 3 ? parts.slice(2).join('|').trim() : (f.title || '');
-    return { model, severity, area, title };
+    return { source: 'agent', model, severity, area, title };
   }
 
   // Priorità 1-3 (0 = nessuna). Più pallini pieni = priorità più alta: le
