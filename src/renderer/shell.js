@@ -900,7 +900,22 @@
   function showToast(text) { return NOTIFS.show(text); }
   if (api.onToast) api.onToast((info) => {
     if (!info || !info.text) return;
-    NOTIFS.show(info.text, info.opts);
+    // Le azioni che arrivano dal main non possono trasportare funzioni: le
+    // codifichiamo in modo dichiarativo e le traduciamo qui in onClick.
+    // - openUrl → apri quel sito bypassando il blocco (#170.3 "Apri comunque").
+    let opts = info.opts;
+    if (opts && Array.isArray(opts.actions)) {
+      opts = {
+        ...opts,
+        actions: opts.actions.map((a) => {
+          if (a && a.openUrl && !a.onClick) {
+            return { label: a.label, onClick: () => api.tabs.openBlockedPopup(a.openUrl) };
+          }
+          return a;
+        }),
+      };
+    }
+    NOTIFS.show(info.text, opts);
   });
   // Esposta per test e per usi programmatici dalla shell stessa.
   window.filoNotify = (text, opts) => NOTIFS.show(text, opts);
