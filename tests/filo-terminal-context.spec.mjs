@@ -39,7 +39,7 @@ test('#1 cwd dell’assistente: un cd persiste, il pwd successivo lo riflette', 
   fs.mkdirSync(path.join(base, 'sub'));
 
   // Entra nella cartella base (path assoluto): il main cattura la cwd risultante.
-  const cdBase = await execAction(app, { type: 'ESEGUI_COMANDO', comando: `cd "${base}"`, shell: 'bash' });
+  const cdBase = await execAction(app, { type: 'ESEGUI_COMANDO', comando: `cd "${base}"` });
   expect(cdBase.executed).toBe(true);
   expect(real(cdBase.output.cwd)).toBe(base);
 
