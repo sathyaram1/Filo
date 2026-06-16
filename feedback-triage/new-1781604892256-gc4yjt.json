@@ -1,0 +1,11 @@
+{
+  "op": "create",
+  "text": "Parte dello spec #170 (Migliorare blocchi e notifiche). Crea un sistema di notifiche/toast in basso a destra nella shell, riutilizzabile, con: (1) DURATA configurabile nelle Preferenze avanzate — valore in secondi, con 0 = durata infinita; quando e infinita la notifica mostra una X per chiuderla a mano, quando e finita si chiude da sola dopo i secondi impostati. (2) SUONO opzionale alla comparsa, attivabile/disattivabile e modificabile dalle Preferenze avanzate. Oggi esiste solo un toast con durata fissa (~4.5s, in src/renderer/shell.js, classe .shell-toast) e nessun suono. Questo task e la base UX che i task #170.2/#170.3 useranno per segnalare i blocchi: farlo per primo. Criterio di fatto: un helper della shell mostra una notifica in basso a destra rispettando la durata configurata (infinita -> X manuale, finita -> auto-dismiss) e riproduce il suono se attivo; le preferenze (durata, suono on/off, eventuale scelta del suono) vivono nella sezione avanzata di Preferenze, si persistono e si applicano. Verifica con spec Playwright: notifica finita sparisce dopo il timeout; notifica infinita resta e si chiude solo con la X.",
+  "name": "Notifiche in basso a destra configurabili (durata + suono)",
+  "parentId": "zceqrToaGEg5MqeIFRhw",
+  "status": "todo",
+  "priority": 2,
+  "notes": "",
+  "queuedAt": "2026-06-16T10:14:52.255Z",
+  "queuedBy": "routine"
+}
