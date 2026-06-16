@@ -117,6 +117,21 @@ test('Ricevuti: si può commentare senza cambiare stato, e il commento appare ne
 test('Ricevuti: incollare un\'immagine nel commento la carica e la mostra sulla card', async ({ app, openTab }) => {
   const page = await openTab(FEEDBACK_URL);
 
+  // L'upload è stubbato (offline/deterministico), ma l'<img src> risultante
+  // punta a un url fittizio che il browser tenterebbe di scaricare per
+  // davvero: senza intercettarlo la richiesta fallisce e il listener 'error'
+  // esistente sostituisce l'<img> con un placeholder "(immagine non
+  // disponibile)" prima che il test riesca a controllarne il src. Qui
+  // rispondiamo noi con un PNG valido, così l'<img> resta nel DOM e possiamo
+  // verificare che il rendering ha davvero recepito il nuovo allegato.
+  const png = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMBAQDJ/pLvAAAAAElFTkSuQmCC',
+    'base64',
+  );
+  await page.route('https://fake.storage.test/**', (route) => route.fulfill({
+    status: 200, contentType: 'image/png', body: png,
+  }));
+
   await setupAdmin(app, page, {
     _id: 'mock-inbox-2',
     status: 'new',
