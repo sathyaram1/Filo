@@ -202,6 +202,25 @@
       level: 1,
       describe: (a) => `Togliere la regola "apri sempre da un altro paese" per ${proxyDomain(a) || 'questo sito'}`,
     },
+    // ── estetica del CONTENUTO della pagina via chat (#185) ───────────────────
+    // Filo cambia l'aspetto del testo della pagina che l'utente sta guardando
+    // ("scrivi in grassetto tutti i titoli"). Livello 1: si applica subito, vale
+    // SOLO per quella pagina (CSS iniettato live) ed è completamente reversibile
+    // (basta ricaricare la pagina, o "togli le modifiche" → RIPRISTINA_STILE_PAGINA).
+    // Il CSS prodotto dall'LLM viene SANIFICATO dal main (src/shared/pageRestyle.js)
+    // prima dell'iniezione: niente at-rule, url(), graffe o markup.
+    STILE_PAGINA: {
+      level: 1,
+      describe: (a) => {
+        const d = a && (a.descrizione ?? a.description);
+        if (d) return `Cambiare l'aspetto della pagina: ${String(d).trim()}`;
+        return 'Cambiare l\'aspetto del testo della pagina';
+      },
+    },
+    RIPRISTINA_STILE_PAGINA: {
+      level: 1,
+      describe: () => 'Togliere le modifiche di stile applicate alla pagina',
+    },
   };
 
   // Livello dell'azione: 1|2|3, oppure null se l'azione NON è registrata
