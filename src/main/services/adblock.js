@@ -309,7 +309,6 @@ async function init(settings) {
 function configureFromSettings(settings) {
   const was = enabled;
   enabled = isEnabled(settings);
-  applyAdblock(require('electron').session.defaultSession);
   if (process.env.NODE_ENV === 'test' || process.env.FILO_SMOKE) return;
   if (enabled) {
     ensurePeriodicRefresh();
