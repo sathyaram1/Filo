@@ -252,6 +252,8 @@
     {
       keys: ['gestione_cookie', 'gestione cookie', 'gestione dei cookie', 'cookie', 'banner cookie', 'banner dei cookie'],
       level: 2,
+      risk: 'Decide come Filo gestisce i cookie dei siti. Le modalità più permissive aumentano '
+        + 'il tracciamento pubblicitario; quelle più strette possono farti perdere i login già attivi.',
       build(v) {
         const s = String(v == null ? '' : v).trim().toLowerCase();
         const map = {
