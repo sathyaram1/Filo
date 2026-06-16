@@ -208,6 +208,7 @@
 
   global.SN_TAB_COLOR = {
     IDENTITY_CHROMA_MIN, parseRgb, chroma, hasIdentity,
-    IDENTITY_PARAMS, rgbToHsl, hslToRgb, extractIdentityFromPixels,
+    IDENTITY_PARAMS, IDENTITY_PARAM_META, defaultParams, clampParams,
+    rgbToHsl, hslToRgb, extractIdentityFromPixels,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
