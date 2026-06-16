@@ -241,6 +241,8 @@
     {
       keys: ['navigazione_sicura', 'navigazione sicura', 'rilevamento siti pericolosi', 'siti pericolosi', 'safe browsing', 'safebrowsing', 'protezione phishing', 'rilevamento phishing'],
       level: 2,
+      risk: 'Controlla il rilevamento dei siti pericolosi (phishing e malware). Disattivarlo '
+        + 'toglie l’avviso prima che tu apra un sito potenzialmente dannoso.',
       build(v) {
         const b = parsePrefBool(v);
         if (b === null) return null;
