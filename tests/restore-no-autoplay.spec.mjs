@@ -80,29 +80,40 @@ async function findWindow(app, predicate, timeoutMs = 12_000) {
 // suonando: è ciò che l'utente vedrebbe come "il video è partito" o "è in pausa".
 //   - su una scheda ripristinata il blocco lo rimette in pausa → paused === true;
 //   - su una scheda nuova l'autoplay permissivo di Filo lo lascia suonare → false.
-const isPausedAfterAutoplay = (page) => page.evaluate(async () => {
-  function makeWav(seconds = 1, rate = 8000) {
-    const n = Math.floor(seconds * rate);
-    const buf = new ArrayBuffer(44 + n);
-    const dv = new DataView(buf);
-    const wr = (o, s) => { for (let i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)); };
-    wr(0, 'RIFF'); dv.setUint32(4, 36 + n, true); wr(8, 'WAVE');
-    wr(12, 'fmt '); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
-    dv.setUint32(24, rate, true); dv.setUint32(28, rate, true); dv.setUint16(32, 1, true); dv.setUint16(34, 8, true);
-    wr(36, 'data'); dv.setUint32(40, n, true);
-    for (let i = 0; i < n; i++) dv.setUint8(44 + i, 128); // 8-bit PCM: 128 = silenzio
-    const u8 = new Uint8Array(buf);
-    let bin = ''; for (let i = 0; i < u8.length; i++) bin += String.fromCharCode(u8[i]);
-    return `data:audio/wav;base64,${btoa(bin)}`;
-  }
-  const a = new Audio(makeWav());
+function makeWavSource(seconds, rate = 8000) {
+  const n = Math.floor(seconds * rate);
+  const buf = new ArrayBuffer(44 + n);
+  const dv = new DataView(buf);
+  const wr = (o, s) => { for (let i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)); };
+  wr(0, 'RIFF'); dv.setUint32(4, 36 + n, true); wr(8, 'WAVE');
+  wr(12, 'fmt '); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+  dv.setUint32(24, rate, true); dv.setUint32(28, rate, true); dv.setUint16(32, 1, true); dv.setUint16(34, 8, true);
+  wr(36, 'data'); dv.setUint32(40, n, true);
+  for (let i = 0; i < n; i++) dv.setUint8(44 + i, 128); // 8-bit PCM: 128 = silenzio
+  const u8 = new Uint8Array(buf);
+  let bin = ''; for (let i = 0; i < u8.length; i++) bin += String.fromCharCode(u8[i]);
+  return `data:audio/wav;base64,${btoa(bin)}`;
+}
+
+// Prova reale di autoplay: crea un <audio> con una SORGENTE vera (un minuscolo
+// WAV silenzioso come data-URI, in loop così non finisce da solo) e tenta
+// l'autoplay senza alcun gesto utente. Dopo un istante guardiamo se sta
+// suonando: è ciò che l'utente vedrebbe come "il video è partito" o "è in pausa".
+//   - su una scheda ripristinata il blocco lo rimette in pausa → paused === true;
+//   - su una scheda nuova l'autoplay permissivo di Filo lo lascia suonare → false.
+// Ritorna anche `muted`: sulla tab ripristinata deve restare true mentre la
+// soppressione è attiva (niente blip audio, lamentela #1).
+const probeAutoplay = (page) => page.evaluate(async (wavSrc) => {
+  const a = new Audio(wavSrc);
   a.muted = false;
   a.loop = true;
   document.body.appendChild(a); // come un <video> reale: in pagina, non distaccato
   a.play().catch(() => {}); // se bloccato rigetta; lo stato vero lo legge .paused
   await new Promise((r) => setTimeout(r, 500)); // tempo al blocco di intervenire
-  return a.paused;
-});
+  return { paused: a.paused, muted: a.muted };
+}, makeWavSource(1));
+
+const isPausedAfterAutoplay = async (page) => (await probeAutoplay(page)).paused;
 
 test('le tab ripristinate non fanno partire i video (autoplay bloccato al boot)', async () => {
   test.setTimeout(120_000); // due avvii di Electron in sequenza
