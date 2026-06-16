@@ -50,7 +50,7 @@ const ALLOWED_STATUS = ['new', 'todo', 'clarify'];
 
 // Valida i parametri e costruisce l'oggetto-entry per lo spool (logica pura,
 // testata in tests/unit). Lancia su input non valido.
-export function buildCreateEntry({ text, name, parentId, priority, status, notes, queuedBy }) {
+export function buildCreateEntry({ text, name, parentId, priority, status, notes, images, queuedBy }) {
   const t = String(text || '').trim();
   if (!t) throw new Error('testo mancante');
   if (t.length > 10000) throw new Error('testo troppo lungo (max 10000)');
@@ -71,6 +71,16 @@ export function buildCreateEntry({ text, name, parentId, priority, status, notes
       throw new Error(`--priority non valida: "${priority}" (intero 0-3)`);
     }
   }
+  // images = array di URL pubblici GIÀ caricati su Storage (l'upload avviene nel
+  // main, prima di costruire l'entry). Qui validiamo solo che siano URL http(s).
+  let imgs = [];
+  if (images !== undefined && images !== null) {
+    if (!Array.isArray(images)) throw new Error('images deve essere un array di URL');
+    imgs = images.map((u) => String(u || '').trim()).filter(Boolean).slice(0, 5);
+    for (const u of imgs) {
+      if (!/^https?:\/\//i.test(u)) throw new Error(`URL immagine non valido: "${u.slice(0, 60)}"`);
+    }
+  }
   return {
     op: 'create',
     text: t,
@@ -79,6 +89,7 @@ export function buildCreateEntry({ text, name, parentId, priority, status, notes
     status: st,
     priority: prio,
     notes: typeof notes === 'string' ? notes : '',
+    images: imgs,
     queuedAt: new Date().toISOString(),
     queuedBy: queuedBy || process.env.FILO_ROUTINE_SLUG || 'routine',
   };
