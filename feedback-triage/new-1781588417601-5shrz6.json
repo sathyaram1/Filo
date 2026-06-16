@@ -1,0 +1,11 @@
+{
+  "op": "create",
+  "text": "Continuazione del feedback padre #N (3 problemi tecnici dei comandi shell dell'assistente). PROBLEMA: l'assistente non può concatenare comandi. CAUSA: è voluto allo stato attuale — il system prompt (src/shared/constants.js, descrizione ESEGUI_COMANDO) impone 'UN comando per azione, niente concatenazioni con && o ;' e il classificatore di sicurezza (src/shared/cmdClassify.js) tratta le concatenazioni al massimo attrito (richiede di digitare 'conferma'). DECISIONE DI DESIGN (motivo del clarify): permettere la concatenazione apre un rischio — un comando di sola lettura in testa può nascondere in coda un comando distruttivo, sfuggendo alla classificazione per-segmento. DOMANDE PER L'UTENTE: (1) vuoi che l'assistente possa eseguire una sequenza di comandi? (2) preferisci più ESEGUI_COMANDO separati eseguiti in ordine (ognuno classificato e confermato singolarmente) oppure una vera catena '&&' con classificazione per-segmento? (3) la sequenza deve fermarsi al primo errore? Una volta deciso, l'implementazione segue di conseguenza.",
+  "name": "Assistente non può concatenare comandi",
+  "parentId": "NhSrOWULEcZCVRkyabEf",
+  "status": "clarify",
+  "priority": 1,
+  "notes": "",
+  "queuedAt": "2026-06-16T05:40:17.601Z",
+  "queuedBy": "routine"
+}

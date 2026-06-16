@@ -1,0 +1,7 @@
+{
+  "id": "Eg0Ck4MA0k3EuDdRAHMS",
+  "status": "done",
+  "notes": "La cronologia AI ora ha un pulsante dedicato in alto a destra nella home (icona orologio, accanto a Home): prima era raggiungibile solo dalla griglia App, per questo sembrava non esserci. La cronologia funziona: registra le interazioni con l'AI e si possono cercare/cancellare. Aggiunto oltre al chiesto: nulla di nascosto. Nota sulla 'pulizia' delle schede: funziona già chiedendola all'assistente ('fai pulizia delle schede', le valuta e archivia quelle inutili, ritrovabili in cronologia) e compare come suggerimento nella home quando hai molte schede aperte; se vuoi anche per lei un pulsante fisso dimmi dove preferisci metterlo. Verificato con un test automatico: il pulsante c'è e apre la cronologia.",
+  "queuedAt": "2026-06-16T05:40:46.046Z",
+  "queuedBy": "routine"
+}

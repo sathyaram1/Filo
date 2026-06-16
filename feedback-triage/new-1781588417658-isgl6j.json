@@ -1,0 +1,11 @@
+{
+  "op": "create",
+  "text": "Continuazione del feedback padre #N. PROBLEMA: nella barra di input della home è mostrato un percorso (es. C:\\Users\\agenti AI) che NON corrisponde alla cartella in cui i comandi dell'assistente vengono effettivamente eseguiti (un 'pwd' lanciato dall'assistente restituisce C:\\Users\\agenti AI\\Desktop\\Filo\\Filo). Vedi screenshot del padre. CAUSA: due shell diverse. Il percorso in barra è la cwd della sessione terminale PERSISTENTE (src/main/services/shell.js, defaultCwd()=os.homedir()), usata solo dalla modalità terminale con comandi '/...' digitati a mano. I comandi dell'assistente invece girano via runCommand one-shot (src/main/services/handlers.js case ESEGUI_COMANDO) SENZA cwd → ereditano la cwd del processo Electron (la cartella di Filo). Inoltre ogni comando one-shot parte da una shell nuova, quindi un 'cd' dell'assistente non persiste tra un comando e l'altro. OBIETTIVO: rendere coerenti percorso mostrato e cartella reale dei comandi dell'assistente, e far sì che la cwd persista tra i comandi dell'assistente (un 'cd' deve restare valido per il comando successivo). Criterio di fatto: un test in cui l'assistente fa 'cd' in una sottocartella e un 'pwd' successivo riflette quella cartella, e il percorso mostrato corrisponde.",
+  "name": "Percorso mostrato diverso dalla cartella reale dei comandi",
+  "parentId": "NhSrOWULEcZCVRkyabEf",
+  "status": "todo",
+  "priority": 1,
+  "notes": "",
+  "queuedAt": "2026-06-16T05:40:17.658Z",
+  "queuedBy": "routine"
+}
