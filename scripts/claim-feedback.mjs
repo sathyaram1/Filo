@@ -37,7 +37,10 @@ import { dirname, resolve, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = resolve(__dirname, '..');
+// FILO_REPO_ROOT: override della root del repo (e quindi del cwd di git). Esiste
+// SOLO per i test, che simulano due routine su due cloni dello stesso origin per
+// verificare la mutua esclusione senza toccare il repo/origin reale.
+const ROOT = process.env.FILO_REPO_ROOT ? resolve(process.env.FILO_REPO_ROOT) : resolve(__dirname, '..');
 // FILO_SPOOL_DIR: override per i test (vedi queue-triage.mjs). I claim vivono in
 // una sottocartella `claims/` così non si confondono con i file di triage.
 const SPOOL_DIR = process.env.FILO_SPOOL_DIR
