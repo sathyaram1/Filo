@@ -30,6 +30,8 @@
     $('sec-protect-ip-desc').textContent = I18n.t('options_security_protect_ip_desc');
     $('sec-block-popups-label').textContent = I18n.t('options_security_block_popups');
     $('sec-block-popups-desc').textContent = I18n.t('options_security_block_popups_desc');
+    $('sec-adblock-label').textContent = I18n.t('options_security_adblock');
+    $('sec-adblock-desc').textContent = I18n.t('options_security_adblock_desc');
     $('sec-p2p-box-title').textContent = I18n.t('options_security_p2p_box_title');
     $('sec-p2p-box-body').textContent = I18n.t('options_security_p2p_box_body');
     $('sec-proxy-box-title').textContent = I18n.t('options_security_proxy_box_title');
