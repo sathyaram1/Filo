@@ -387,12 +387,15 @@
   font-style: italic;
   font-size: 12px;
 }
-/* Riga informativa nei sotto-menu (es. spiegazione errore blu) */
+/* Riga informativa nei sotto-menu (es. spiegazione errore blu).
+   È un commento/spiegazione, non un'azione: lo rendiamo in corsivo per
+   distinguerlo visivamente dalle voci cliccabili del menu. */
 .sn-menu-info {
   padding: 8px 12px;
   font-size: 12px;
   line-height: 1.4;
   color: var(--sn-fg);
+  font-style: italic;
   white-space: pre-wrap;
   word-break: break-word;
   max-width: 280px;
