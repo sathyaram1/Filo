@@ -1,0 +1,11 @@
+{
+  "op": "create",
+  "text": "Estende il menu tasto destro all'agente Aiuto (sidebar) per le azioni su LINK. Contesto: #192.1 ha creato il ponte azioni-Filo (src/content/sidebar.js: parseAssistantOutput + runFiloAction + popup SN_CONFIRM_UI; azioni di sistema via FILO_RUN_ACTION→executeFiloAction + registro src/shared/actionLevels.js). Le azioni su link sono in parte azioni-PAGINA (src/content/actions.js: SN_ACTIONS.copyToClipboard per il link, saveLink, shareLink, buildInlineExplainLink) e in parte azioni di sistema già registrate (aprire un link in nuova scheda = azione NAVIGA del main, già nel registro actionLevels.js e instradabile via il ponte di #192.1!). Da fare: per 'apri link in nuova scheda' usare direttamente l'azione tipizzata NAVIGA via FILO_RUN_ACTION (già pronta); per copia link/salva link per dopo/condividi link/spiega link estendere il dispatcher azioni-pagina (vedi #192.2) risolvendo il link bersaglio da un selettore <a> fornito dall'agente. Popup di conferma dove opportuno (salva/condividi). Documentare nel prompt PROMPTS.help() (src/shared/constants.js). Aggiungere spec Playwright. Criterio di fatto: dall'agente Aiuto 'apri questo link in una nuova scheda' / 'salva questo link per dopo' funziona sul link indicato.",
+  "name": "Aiuto: azioni su link",
+  "parentId": "zO8qoCTi6qPlckWsvQ8I",
+  "status": "todo",
+  "priority": 1,
+  "notes": "",
+  "queuedAt": "2026-06-16T22:57:56.639Z",
+  "queuedBy": "routine"
+}
