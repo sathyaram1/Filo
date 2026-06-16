@@ -1,0 +1,7 @@
+{
+  "id": "qQlQsx3rzZfeqeC60lv7",
+  "status": "done",
+  "notes": "Ora Filo blocca l'apertura dei siti in blacklist: se provi ad aprire (cliccando un link) un sito bloccato, l'apertura viene impedita e compare una notifica in basso a destra con 'Apri comunque'. Eccezioni come da richiesta: se arrivi da un motore di ricerca (Google, Bing, DuckDuckGo, ecc.) o se e' Filo ad aprire il sito per te (azione Naviga / pagine interne), l'apertura e' permessa. Oltre al chiesto: in Preferenze > Sicurezza ho aggiunto un interruttore per attivare/disattivare il blocco, l'opzione per usare anche le liste pubbliche anti-pubblicita' come blacklist, e un campo dove aggiungere i tuoi domini da bloccare. Verificato con test automatici sui tre casi (blocco diretto, eccezione ricerca, eccezione Filo) piu' regressione completa.",
+  "queuedAt": "2026-06-16T16:13:45.953Z",
+  "queuedBy": "routine"
+}
