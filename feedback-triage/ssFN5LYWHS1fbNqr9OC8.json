@@ -1,0 +1,7 @@
+{
+  "id": "ssFN5LYWHS1fbNqr9OC8",
+  "status": "done",
+  "notes": "Duplicato esatto dell'altro feedback con lo stesso titolo (audit estetico, parte aperta del #184), inviato a pochi secondi di distanza con testo identico. Risolto dallo stesso intervento: ho esposto come token modificabili a voce/Preferenze le due uniche superfici di colore delle pagine ancora 'bloccate' — lo sfondo al passaggio del mouse ('hover') e lo sfondo di menu/popup/barra laterale ('overlay'); tutte le altre superfici (scrollbar, campi input, barra indirizzi, hover schede) erano già coperte dai token esistenti. Le ombre restano fuori di proposito (stringa composita non ammessa dalla whitelist anti-injection). Verificato con unit test e spec Playwright; suite estetica/preferenze verde.",
+  "queuedAt": "2026-06-16T20:44:57.425Z",
+  "queuedBy": "routine"
+}
