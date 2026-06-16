@@ -407,42 +407,29 @@
   // ── Suoneria timer (anteprima tramite WebAudio API) ─────────────────────
   // Stesso catalogo della dashboard (RINGTONES): riproduce una sequenza di
   // beep senza file audio. Usato dal pulsante "Prova" in questa pagina.
-  let _previewCtx = null;
-  const RINGTONE_NOTES = {
-    default: [[880, 150], [0, 80], [880, 150], [0, 80], [880, 150], [0, 400]],
-    gentle:  [[523, 200], [0, 100], [659, 200], [0, 100], [784, 300], [0, 600]],
-    urgent:  [[1047, 80], [0, 50], [1047, 80], [0, 50], [1047, 80], [0, 50],
-              [1047, 80], [0, 50], [1047, 80], [0, 300]],
-    chime:   [[1046, 120], [0, 60], [1318, 120], [0, 60], [1568, 120], [0, 60],
-              [2093, 200], [0, 700]],
-  };
+  // I toni (sequenze di note + player AudioContext) vivono nel modulo condiviso
+  // SN_SOUNDS, riusato anche dalla shell per il suono delle notifiche (#170.1).
+  const Sounds = window.SN_SOUNDS;
+
+  // Riempie il <select> dei suoni notifica con le stesse voci della suoneria.
+  function populateNotifSounds() {
+    const sel = $('notifSound');
+    if (!sel || sel.options.length) return;
+    const labels = (Sounds && Sounds.TONE_LABELS) || { default: 'Standard' };
+    const ids = (Sounds && Sounds.TONE_IDS) || ['default'];
+    for (const id of ids) {
+      const o = document.createElement('option');
+      o.value = id;
+      o.textContent = labels[id] || id;
+      sel.appendChild(o);
+    }
+  }
 
   function previewRingtone() {
-    try {
-      if (!_previewCtx) _previewCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const ctx = _previewCtx;
-      const resume = ctx.state === 'suspended' ? ctx.resume() : Promise.resolve();
-      const toneId = $('timerRingtone').value;
-      const notes = RINGTONE_NOTES[toneId] || RINGTONE_NOTES.default;
-      resume.then(() => {
-        let t = ctx.currentTime;
-        for (const [freq, durMs] of notes) {
-          if (freq > 0) {
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.type = 'sine';
-            osc.frequency.value = freq;
-            gain.gain.setValueAtTime(0.35, t);
-            gain.gain.exponentialRampToValueAtTime(0.001, t + durMs / 1000 - 0.01);
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start(t);
-            osc.stop(t + durMs / 1000);
-          }
-          t += durMs / 1000;
-        }
-      }).catch(() => {});
-    } catch (_) {}
+    if (Sounds) Sounds.play($('timerRingtone').value);
+  }
+  function previewNotifSound() {
+    if (Sounds) Sounds.play($('notifSound').value);
   }
 
   async function persist() {
