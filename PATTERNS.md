@@ -96,12 +96,17 @@ un'azione, Filo la compie — non lascia un bottone "da cliccare per davvero":
   (il fallback "(vuoto)" vale solo per la risposta davvero vuota, senza azioni).
   Per PROPORRE link tra cui scegliere si usano link markdown nel testo, non NAVIGA
   (che aprirebbe da solo).
-- **Le impostazioni di livello 2 aprono il popup di conferma DA SOLE**: `renderActions`
-  riceve `autoConfirm:true` sulle risposte fresche e clicca da sé l'unico bottone
-  `IMPOSTA_PREFERENZA`/`IMPOSTA_ESTETICA` di livello 2. Le azioni esterne
+- **Le impostazioni di livello 2 sono SEMPRE un popup, mai un chip inerte (#183).**
+  `renderActions` riceve `autoConfirm:true` sulle risposte fresche e apre da sé il
+  popup di conferma dei bottoni `IMPOSTA_PREFERENZA`/`IMPOSTA_ESTETICA` di livello 2.
+  Se nella stessa risposta ce ne sono **più d'una**, i popup si aprono **uno alla
+  volta** (`renderActions` attende `_runConfirm()` di ciascuno prima del successivo):
+  niente stacking di modali, ma neanche bottoni lasciati lì da cliccare a mano. Il
+  bottone resta solo come ripiego se l'utente **annulla**. Le azioni esterne
   (`INVIA_FEEDBACK`) o distruttive (livello 3, comandi) restano a click esplicito —
-  niente stacking di modali, niente auto-conferma di cose irreversibili.
-- **Test:** `tests/filo-open-link-direct.spec.mjs`.
+  niente auto-conferma di cose irreversibili.
+- **Test:** `tests/filo-open-link-direct.spec.mjs`, `tests/filo-action-levels.spec.mjs`
+  (più popup di livello 2 → si aprono in sequenza, nessun chip resta da cliccare).
 
 ## Richieste ambigue: Filo applica subito + offre un controllo per raffinare
 
