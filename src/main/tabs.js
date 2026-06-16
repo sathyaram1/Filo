@@ -397,11 +397,26 @@ class TabManager {
     try { tab.view.webContents.close(); } catch (_) {}
     this.tabs.splice(idx, 1);
     if (this.activeId === id) {
-      const next = this.tabs[idx] || this.tabs[idx - 1];
+      // Chiudendo la tab attiva, torna alla PENULTIMA tab che l'utente stava
+      // guardando (la più recente per lastActiveAt fra quelle rimaste), non
+      // semplicemente a quella a sinistra. Fallback all'adiacente se nessuna
+      // delle rimanenti è mai stata attivata (es. tutte aperte in background).
+      const next = this._mostRecentlyActiveTab() || this.tabs[idx] || this.tabs[idx - 1];
       if (next) this.activate(next.id);
       else this.openTab('filo://newtab/'); // niente tab → nuovo newtab
     }
     this._broadcast();
+  }
+
+  // Tab rimasta con il lastActiveAt più recente (= l'ultima che l'utente stava
+  // guardando prima di quella corrente). Ignora le tab mai attivate (null).
+  _mostRecentlyActiveTab() {
+    let best = null;
+    for (const t of this.tabs) {
+      if (t.lastActiveAt == null) continue;
+      if (!best || t.lastActiveAt > best.lastActiveAt) best = t;
+    }
+    return best;
   }
 
   // Sposta la tab `id` alla posizione `toIndex` nell'ordine della barra (drag &
