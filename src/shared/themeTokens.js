@@ -28,10 +28,13 @@
 
   const FONT_DEFAULT = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 
-  // name → { label, type, css, shellCss?, default | category }
+  // name → { label, type, css, shellCss?, dashCss?, default | category }
   // - `css` è la variabile applicata alle superfici --sn-* (shell esclusa).
   // - `shellCss` sono le variabili gemelle della shell (src/renderer/shell.css),
   //   che ha una palette propria: vengono emesse SOLO nella shell.
+  // - `dashCss` sono le gemelle della dashboard/newtab (--dash-*, palette propria
+  //   in dashboard.css): emesse nelle superfici --sn-* (pagine filo://) così una
+  //   modifica estetica si vede anche sulla dashboard. Innocue dove non servono.
   // - `default` può essere un valore unico o { light, dark }.
   // - i token con `category` ereditano il default dal token di categoria.
   const TOKENS = {
