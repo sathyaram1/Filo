@@ -598,12 +598,15 @@
       // tinta è appena percepibile ma riconoscibile a livello subliminale.
       // Usiamo la variabile --tab-bg-eff (non `background` diretto) per non
       // rompere il feedback di hover, che è definito in CSS sulla stessa var.
-      if (t.id !== state.activeId && t.identityColor) {
+      if (t.id !== state.activeId && t.identityColor && tabOpacity > 0) {
         const tint = attenuateIdentity(t.identityColor);
         if (tint) {
+          // `opacita_tab` controlla la frazione di tinta nel mix col fondo del
+          // tab bar: 0.6 (default) ≈ tinta percepibile ma sobria, 1 = piena.
+          const pct = Math.round(tabOpacity * 100);
           el.style.setProperty(
             '--tab-bg-eff',
-            `color-mix(in srgb, ${tint} 38%, var(--tab-bg))`,
+            `color-mix(in srgb, ${tint} ${pct}%, var(--tab-bg))`,
           );
         }
       }
