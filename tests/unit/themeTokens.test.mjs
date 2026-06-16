@@ -130,6 +130,28 @@ test('pageCss emette solo le variabili sovrascritte', () => {
   assert.ok(!css.includes('--sn-bg'));
 });
 
+test('pageCss emette anche le gemelle --dash-* della dashboard per i token sovrascritti (#164)', () => {
+  // La dashboard/newtab ha una palette propria (--dash-*): una modifica estetica
+  // chiesta in chat ("rendi le scritte rosse") deve VEDERSI anche lì.
+  const css = TT.pageCss({ text: '#ff0000', background: '#001122', accent: '#1e90ff' });
+  // Token --sn-* + gemella --dash-* nello stesso blocco.
+  assert.match(css, /--sn-fg: #ff0000;/);
+  assert.match(css, /--dash-ink: #ff0000;/);
+  assert.match(css, /--dash-paper: #001122;/);
+  assert.match(css, /--dash-card: #001122;/);
+  assert.match(css, /--dash-accent: #1e90ff;/);
+});
+
+test('pageCss: senza override la dashboard NON viene toccata (estetica "carta" intatta)', () => {
+  // Solo i token sovrascritti emettono le gemelle --dash-*; i default restano
+  // quelli di dashboard.css.
+  assert.equal(TT.pageCss({}), '');
+  const css = TT.pageCss({ accent: '#1e90ff' });
+  assert.match(css, /--dash-accent: #1e90ff;/);
+  // Nessun altro --dash-* (es. --dash-ink) se non si è toccato 'text'.
+  assert.ok(!css.includes('--dash-ink'));
+});
+
 test('pageCss scarta gli override non validi senza perdere gli altri', () => {
   const css = TT.pageCss({ accent: '#1e90ff', radius: 'evil;}' });
   assert.match(css, /--sn-accent: #1e90ff;/);
