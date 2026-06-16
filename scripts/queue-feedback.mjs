@@ -108,7 +108,7 @@ export function queueFeedbackCreate(opts) {
 }
 
 function parseArgs(argv) {
-  const out = { _: [] };
+  const out = { _: [], images: [] };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--no-git') out.noGit = true;
@@ -117,6 +117,7 @@ function parseArgs(argv) {
     else if (a === '--priority') out.priority = argv[++i];
     else if (a === '--status') out.status = argv[++i];
     else if (a === '--notes') out.notes = argv[++i];
+    else if (a === '--image') out.images.push(argv[++i]);
     else out._.push(a);
   }
   return out;
@@ -126,6 +127,19 @@ const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.m
 if (isMain) {
   const args = parseArgs(process.argv.slice(2));
   try {
+    // Carica gli screenshot su Storage PRIMA di costruire l'entry. Degradazione
+    // morbida: se un upload fallisce, lo segnaliamo e il feedback parte senza
+    // quell'immagine (meglio un feedback senza prova visiva che nessun feedback).
+    const imageUrls = [];
+    for (const p of args.images) {
+      try {
+        const u = await uploadScreenshotFile(resolve(p));
+        imageUrls.push(u);
+        console.log(`   ↑ screenshot caricato: ${p}`);
+      } catch (e) {
+        console.error(`   ! screenshot "${p}" non allegato: ${e.message}`);
+      }
+    }
     const file = queueFeedbackCreate({
       text: args._.join(' '),
       name: args.name,
@@ -133,13 +147,14 @@ if (isMain) {
       priority: args.priority,
       status: args.status,
       notes: args.notes,
+      images: imageUrls,
     });
     console.log(`OK: creazione feedback accodata → ${file}`);
     if (args.noGit) console.log('   (--no-git: file scritto ma non committato)');
     else commitAndPush(file);
   } catch (e) {
     console.error('Errore:', e.message);
-    console.error('Uso: node scripts/queue-feedback.mjs --name "titolo" [--parent <id>] [--priority 0-3] [--status new|todo|clarify] [--notes "..."] "testo"');
+    console.error('Uso: node scripts/queue-feedback.mjs --name "titolo" [--parent <id>] [--priority 0-3] [--status new|todo|clarify] [--notes "..."] [--image shot.png ...] "testo"');
     process.exit(1);
   }
 }
