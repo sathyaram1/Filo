@@ -293,6 +293,13 @@
     `<path d="M15.5 10l4 4"/>` +
     `<path d="M19.5 10l-4 4"/>`;
 
+  // --- Cronologia: orologio con freccia antioraria (il classico "indietro nel
+  //     tempo") + lancette. Usata dall'icona Cronologia in alto a destra nella home.
+  const history =
+    `<path d="M3.5 12a8.5 8.5 0 1 1 2.6 6.1"/>` +
+    `<path d="M3.5 18v-4h4"/>` +
+    `<path d="M12 7.5V12l3 2"/>`;
+
   // Esposizione: ciascuna icona è una FUNZIONE (size) => stringa SVG.
   // Permette ai consumer di chiedere taglie diverse (es. 16 per la riga,
   // 20 per la griglia overflow) senza ricreare manualmente il wrapper.
