@@ -371,6 +371,7 @@ class TabManager {
     // successive con "Current display surface not available".
     if (activate) {
       this.activeId = id;
+      tab.activateSeq = this._nextActivationSeq();
       this.layout();
     }
     view.webContents.loadURL(url);
