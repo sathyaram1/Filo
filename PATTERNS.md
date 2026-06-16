@@ -76,6 +76,12 @@ il livello non viene eseguito.
   (`level: 2` su ciò che tocca sicurezza/shell). La sospensione e la conferma
   passano da `needsConfirm` → bottone in chat → `MSG.FILO_CONFIRM_ACTION`; il
   main **riclassifica** alla conferma, non si fida del client.
+- **Il popup di livello 2 spiega COSA Filo fa e i RISCHI (#183).** Non basta
+  nominare la modifica: ogni setter di `preferences.js` di livello 2 **deve**
+  dichiarare un campo `risk` — una frase in chiaro su cosa controlla
+  l'impostazione e cosa si rischia a toccarla. `describe()` compone
+  label + `risk`, e il popup mostra entrambi. Un setter di livello 2 senza
+  `risk` è un bug: lo intercetta `tests/unit/preferences.test.mjs`.
 - **UI:** le conferme usano i componenti riusabili `SN_CONFIRM_UI.confirm`
   (livello 2) e `SN_CONFIRM_UI.confirmTyped` (livello 3) in
   `src/shared/confirmUi.js` — mai `window.confirm` nativo.
