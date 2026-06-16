@@ -21,29 +21,17 @@ if (process.platform === 'win32') {
   try { app.setAppUserModelId('ai.filo.desktop'); } catch (_) {}
 }
 
-// User agent pulito. Di default Electron infila nella UA i token
-// `<nomeApp>/<ver>` (es. `filo/0.2.47`) ed `Electron/<ver>`. Diversi provider
-// di login — Google, e di riflesso l'accesso a Claude e a molti altri siti —
-// leggono quei token come "browser embedded / non sicuro" e RIFIUTANO l'accesso
-// con un errore generico ("Si è verificato un errore durante l'accesso").
-// Rimuovendoli, le pagine esterne vedono una UA Chrome del tutto normale e i
-// login funzionano come in un browser desktop qualunque. `userAgentFallback` è
-// il default ereditato da ogni session/webContents che non imposta una UA
-// propria, quindi vale per tutte le tab. Va fissato PRIMA di whenReady.
-function stripEmbeddedTokensFromUA() {
-  try {
-    let ua = app.userAgentFallback || '';
-    if (!ua) return;
-    const name = app.getName();
-    if (name) {
-      const esc = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      ua = ua.replace(new RegExp('\\s*' + esc + '\\/[\\d.]+', 'i'), '');
-    }
-    ua = ua.replace(/\s*Electron\/[\d.]+/i, '').replace(/\s{2,}/g, ' ').trim();
-    app.userAgentFallback = ua;
-  } catch (_) { /* best-effort: in peggio resta la UA di default */ }
-}
-stripEmbeddedTokensFromUA();
+// User agent pulito (vedi src/main/userAgent.js per il perché). Togliamo i
+// token `filo/<ver>` ed `Electron/<ver>` dalla UA di default così i login dei
+// siti esterni (Google, Claude, …) non scambiano Filo per un browser embedded
+// e non rifiutano l'accesso. `userAgentFallback` è il default ereditato da ogni
+// session/webContents che non imposta una UA propria, quindi vale per tutte le
+// tab. Va fissato PRIMA di whenReady.
+try {
+  const { stripEmbeddedUaTokens } = require('./userAgent');
+  const cleaned = stripEmbeddedUaTokens(app.userAgentFallback || '', app.getName());
+  if (cleaned) app.userAgentFallback = cleaned;
+} catch (_) { /* best-effort: in peggio resta la UA di default */ }
 
 // Carica i moduli "shared/background" portati dall'estensione. Si registrano
 // tutti su `globalThis` (pattern IIFE preservato dal codice extension), così
