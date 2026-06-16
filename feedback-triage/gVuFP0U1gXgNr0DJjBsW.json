@@ -1,0 +1,7 @@
+{
+  "id": "gVuFP0U1gXgNr0DJjBsW",
+  "status": "done",
+  "notes": "Risolto (feature gia' implementata da una passata precedente; questa l'ha verificata e chiusa). I comandi dell'assistente ora partono dalla cartella mostrata nella barra della home (la home dell'utente) e quella cartella PERSISTE tra un comando e l'altro: un 'cd' resta valido per il comando dopo, e il percorso mostrato in barra si aggiorna alla cartella reale. Percorso mostrato e cartella reale dei comandi ora coincidono. Verificato con tests/filo-terminal-context.spec.mjs: 'cd' in una sottocartella + 'pwd' successivo riflettono la cartella, e la barra si aggiorna.",
+  "queuedAt": "2026-06-16T09:54:26.054Z",
+  "queuedBy": "routine"
+}
