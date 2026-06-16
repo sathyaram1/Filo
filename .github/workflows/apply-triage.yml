@@ -27,6 +27,7 @@ on:
     branches: [main]
     paths:
       - 'feedback-triage/*.json'
+      - 'feedback-triage/claims/*.json'   # push di claim/release dei semafori routine
   workflow_dispatch: {}   # pulsante "Run workflow" manuale (svuota la coda ora)
 
 permissions:
