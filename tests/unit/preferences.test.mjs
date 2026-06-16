@@ -85,3 +85,76 @@ test('il livello di default è 1 quando il setter non lo dichiara', () => {
   assert.equal(build('dimensione_testo', 'grande').level, 1);
   assert.equal(build('stile_agente', 'professionale').level, 1);
 });
+
+// ── Colore identità delle tab (setter `colore_tab`) ─────────────────────────
+// Il fix asserisce che una richiesta verbale produce un cambiamento CONCRETO
+// dei parametri tabColor (non solo un messaggio): se rimuovessi il setter,
+// questi assert diventerebbero rossi (build → null).
+test('colore_tab: "più vivaci" alza saturazione/opacità, livello 1', () => {
+  const r = build('colore_tab', 'voglio colori più vivaci');
+  assert.equal(r.level, 1);
+  assert.equal(r.partial.tabColor.saturazione_tab, 1);
+  assert.ok(r.partial.tabColor.opacita_tab > 0.6, 'opacità alzata sopra il default');
+});
+
+test('colore_tab: "più neutre" abbassa saturazione/opacità', () => {
+  const r = build('colore_tab', 'rendile più neutre');
+  assert.ok(r.partial.tabColor.saturazione_tab < 1);
+  assert.ok(r.partial.tabColor.opacita_tab < 0.6);
+});
+
+test('colore_tab: "nessun colore" azzera solo opacita_tab (gli altri restano)', () => {
+  const r = build('colore_tab', 'niente colore nelle tab');
+  assert.deepEqual(r.partial, { tabColor: { opacita_tab: 0 } });
+});
+
+test('colore_tab: "Poste è verde non gialla" → estrazione più selettiva', () => {
+  const r = build('colore_tab', 'Poste sbaglia, è verde non gialla');
+  assert.ok(r.partial.tabColor.soglia_saturazione > 0.3, 'soglia alzata');
+  assert.ok(r.partial.tabColor.peso_centralita > 5, 'centralità alzata');
+});
+
+test('colore_tab: "predefinito" ripristina tutti e sei i parametri', () => {
+  const r = build('colore_tab', 'rimetti i colori predefiniti');
+  const TC = globalThis.SN_TAB_COLOR;
+  assert.deepEqual(r.partial.tabColor, TC.defaultParams());
+});
+
+test('colore_tab: richiesta non riconosciuta → null (nessuna scrittura)', () => {
+  assert.equal(build('colore_tab', 'boh fai tu qualcosa'), null);
+});
+
+// ── Parametri tabColor: default, range, clamp ───────────────────────────────
+test('tabColor: defaultParams ha i sei parametri della spec', () => {
+  const TC = globalThis.SN_TAB_COLOR;
+  const d = TC.defaultParams();
+  assert.deepEqual(Object.keys(d).sort(), [
+    'bucket_tinta', 'luminosita_tab', 'opacita_tab',
+    'peso_centralita', 'saturazione_tab', 'soglia_saturazione',
+  ]);
+  assert.equal(d.opacita_tab, 0.6);
+});
+
+test('tabColor: clampParams riporta i valori dentro i range e arrotonda i bucket', () => {
+  const TC = globalThis.SN_TAB_COLOR;
+  const c = TC.clampParams({ opacita_tab: 5, saturazione_tab: -2, bucket_tinta: 2.7, ignoto: 9 });
+  assert.equal(c.opacita_tab, 1);      // clamp max
+  assert.equal(c.saturazione_tab, 0);  // clamp min
+  assert.equal(c.bucket_tinta, 3);     // arrotondato
+  assert.equal('ignoto' in c, false);  // chiavi estranee scartate
+  assert.equal(c.peso_centralita, 5);  // mancante → default
+});
+
+test('extractIdentityFromPixels rispetta saturazione_tab (param di estrazione)', () => {
+  const TC = globalThis.SN_TAB_COLOR;
+  const W = 32, H = 32;
+  const px = new Uint8ClampedArray(W * H * 4);
+  for (let i = 0; i < W * H; i++) { // logo rosso pieno
+    px[i * 4] = 220; px[i * 4 + 1] = 20; px[i * 4 + 2] = 20; px[i * 4 + 3] = 255;
+  }
+  const full = TC.extractIdentityFromPixels(px, W, H, { saturazione_tab: 1 });
+  const flat = TC.extractIdentityFromPixels(px, W, H, { saturazione_tab: 0 });
+  const sat = (s) => { const m = /rgb\((\d+),\s*(\d+),\s*(\d+)\)/.exec(s); const p = [+m[1], +m[2], +m[3]]; return Math.max(...p) - Math.min(...p); };
+  assert.ok(sat(full) > sat(flat), `saturazione 1 (${full}) deve essere più satura di 0 (${flat})`);
+  assert.equal(sat(flat), 0, 'saturazione 0 → grigio');
+});
