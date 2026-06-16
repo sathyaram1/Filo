@@ -681,6 +681,7 @@
         if (isCmd) {
           btn.textContent = (r && r.executed) ? `✓ ${short}` : `✗ ${short}`;
           if (r && r.output) btn.after(renderCommandResult(r.output));
+          if (r && r.output) applyCommandCwd([{ _output: r.output }]);
           return;
         }
         btn.textContent = (r && r.executed) ? `✓ ${a._confirm.text}` : '✗ Non eseguita';
