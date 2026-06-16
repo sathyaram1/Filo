@@ -297,21 +297,30 @@
       const filesHtml = fbFiles.length
         ? `<div class="fb-files">${fbFiles.map((x) => `<a class="fb-file" href="${escapeHtml(x.url)}" target="_blank" rel="noopener" download="${escapeHtml(x.name || '')}">${fileSvg}<span class="fb-file-name">${escapeHtml(x.name || 'allegato')}</span></a>`).join('')}</div>`
         : '';
-      // Issue d'agente: badge col modello che l'ha trovata + severità/area + titolo.
+      const origin = originOf(f);
+      // Numero progressivo (#22, #22.1 per i sub creati dalle routine).
+      const num = SN_FEEDBACK.formatNum(f.seq, f.subSeq);
+      const numHtml = num ? `<span class="fb-num">#${escapeHtml(num)}</span>` : '';
+      // Ritrovamento automatico (tab "Agente"): badge che distingue la fonte —
+      // 🤖 <modello> per l'agente esploratore LLM, 🔧 audit · <slug> per le
+      // routine cloud — + severità/area (solo agente) + titolo col numero.
       const agent = isAgent(f);
       const am = agent ? agentMeta(f) : null;
+      const isRoutineFind = am && am.source === 'routine';
+      const agentIcon = isRoutineFind ? '🔧' : '🤖';
+      const agentLabel = am ? (isRoutineFind ? `audit · ${am.model}` : am.model) : '';
+      const agentBadgeTitle = isRoutineFind ? 'Audit automatico di una routine cloud' : "Modello che ha trovato l'errore";
+      const agentTitleHtml = am && (am.title || num)
+        ? `<div class="fb-title">${numHtml}${numHtml && am.title ? ' ' : ''}${escapeHtml(am.title)}</div>` : '';
       const agentHtml = agent ? `
         <div class="fb-badges">
-          <span class="fb-badge fb-badge--model" title="Modello che ha trovato l'errore">🤖 ${escapeHtml(am.model)}</span>
+          <span class="fb-badge fb-badge--model" title="${escapeHtml(agentBadgeTitle)}">${agentIcon} ${escapeHtml(agentLabel)}</span>
           ${am.severity ? `<span class="fb-badge fb-badge--${escapeHtml(am.severity)}">${escapeHtml(am.severity)}</span>` : ''}
           ${am.area ? `<span class="fb-badge">${escapeHtml(am.area)}</span>` : ''}
         </div>
-        ${am.title ? `<div class="fb-title">${escapeHtml(am.title)}</div>` : ''}` : '';
-      // Numero progressivo (#22, #22.1 per i sub creati dalle routine) +
-      // titolo breve generato dall'LLM all'invio. Le issue d'agente hanno già
-      // il loro titolo (agentHtml), qui copriamo tutti gli altri feedback.
-      const num = SN_FEEDBACK.formatNum(f.seq, f.subSeq);
-      const numHtml = num ? `<span class="fb-num">#${escapeHtml(num)}</span>` : '';
+        ${agentTitleHtml}` : '';
+      // Titolo breve (#22 + nome generato dall'LLM all'invio) per i feedback
+      // non-agente; le issue d'agente hanno già il loro titolo in agentHtml.
       const titleHtml = !agent && (num || f.name)
         ? `<div class="fb-title">${numHtml}${numHtml && f.name ? ' ' : ''}${escapeHtml(f.name || '')}</div>`
         : '';
