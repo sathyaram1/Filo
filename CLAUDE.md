@@ -642,6 +642,22 @@ alta**; a parità di priorità, parti dai più recenti. Non azzerare né modific
 la `priority` di un feedback (è un segnale dell'utente): toccala solo se
 l'utente te lo chiede esplicitamente.
 
+**Prima di iniziare un feedback — prendi il "semaforo" (solo routine cloud).**
+Più routine possono partire a poca distanza e vedere la stessa lista `todo`:
+per non lavorare lo stesso feedback in due, **acquisisci il claim** prima di
+toccare il codice:
+
+```bash
+node scripts/claim-feedback.mjs acquire <id> [--num "#22.1"]
+```
+
+Se esce **0** è tuo: lavora pure. Se esce **10** è già in lavorazione da
+un'altra routine: **passa al prossimo feedback** (non insistere su quello). Il
+claim ha un TTL (default 60 min) e si rilascia da solo quando accodi il triage
+`done`/`clarify`; puoi anche rilasciarlo a mano con `claim-feedback.mjs release
+<id>` se cambi idea. La dashboard mostra "🔧 in lavorazione" sui feedback
+claimati. (In sessione **locale** non serve: non c'è concorrenza tra routine.)
+
 Per ogni feedback `todo`:
 1. Leggi testo + screenshot allegati. **Distingui sintomo da causa**: la
    lamentela descrive ciò che l'utente vede, non necessariamente cos'è
