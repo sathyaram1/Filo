@@ -347,6 +347,8 @@
     {
       keys: ['limite_spesa', 'limite di spesa', 'limite spesa', 'limite di spesa mensile', 'limite mensile', 'budget mensile', 'spesa massima', 'limite costi', 'budget'],
       level: 2,
+      risk: 'Imposta il tetto di spesa mensile per le richieste AI. Alzarlo può far aumentare i '
+        + 'costi; abbassarlo può bloccare le richieste una volta raggiunto il limite.',
       build(v) {
         let n = parseFloat(String(v == null ? '' : v).replace(',', '.').replace(/[^0-9.]/g, ''));
         if (!Number.isFinite(n) || n < 0) return null;
