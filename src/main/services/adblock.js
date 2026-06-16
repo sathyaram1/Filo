@@ -335,7 +335,7 @@ module.exports = {
   isBlockedHost,
   isBlockedUrl,
   isWhitelistedHost,
-  applyAdblock,
+  shouldBlock,
   refresh,
   init,
   configureFromSettings,
