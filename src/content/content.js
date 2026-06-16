@@ -202,12 +202,15 @@
       lastSentMediaAt = performance.now();
       send({ mediaTime: m.currentTime || 0, mediaDuration: m.duration || null });
     }
-    // 'pause' è un evento poco frequente e ad alto valore (è esattamente il
-    // momento in cui l'utente lascia il video "dove l'ha lasciato" — la
-    // posizione da ripristinare al riavvio): lo forziamo sempre, ignorando il
-    // throttle, altrimenti un pause nei primi 3s dal load andrebbe perso.
+    // 'pause'/'seeked' sono eventi poco frequenti e ad alto valore (sono
+    // esattamente i momenti in cui l'utente lascia il video "dove l'ha
+    // lasciato" — la posizione da ripristinare al riavvio): li forziamo
+    // sempre, ignorando il throttle, altrimenti un pause/seek nei primi 3s dal
+    // load andrebbe perso. 'seeked' serve anche per i player che impostano
+    // `currentTime` mentre il media è già in pausa (mai un 'pause' nuovo).
     document.addEventListener('timeupdate', () => sendMediaTime(false), { passive: true, capture: true });
     document.addEventListener('pause', () => sendMediaTime(true), { passive: true, capture: true });
+    document.addEventListener('seeked', () => sendMediaTime(true), { passive: true, capture: true });
     document.addEventListener('loadedmetadata', () => sendMediaTime(false), { passive: true, capture: true });
 
     window.addEventListener('pointerdown', onInteract, { passive: true, capture: true });
