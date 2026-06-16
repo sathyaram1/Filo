@@ -1,7 +1,0 @@
-{
-  "id": "8eqHUIOfzJ7p6WoInqTd",
-  "status": "done",
-  "notes": "I due byte NUL (0x00) che rendevano ai.js un file 'binario' per grep/linter/editor sono stati sostituiti con l'escape \\u0000. La chiave di cache TTS a runtime e' identica (nessuna cache invalidata) e il file e' tornato testo puro UTF-8, di nuovo cercabile e con sintassi evidenziata. Verificato: 'file ai.js' ora riporta 'Unicode text', il modulo si carica e la suite Playwright non mostra regressioni.",
-  "queuedAt": "2026-06-16T09:54:08.932Z",
-  "queuedBy": "routine"
-}
