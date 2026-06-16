@@ -1,7 +1,0 @@
-{
-  "id": "ykwIsabeQg9ZnmkcbuIg",
-  "status": "done",
-  "notes": "Ora quando Filo rileva un sito sospetto compare un popup di conferma centrato (come gli altri popup di Filo) che blocca la pagina finché non scegli: 'Continua' per restare (conferma esplicita) o 'Torna indietro' per uscire. Prima era una semplice striscia in alto con 'Ho capito' che si poteva ignorare. I siti palesemente pericolosi mantengono l'avviso più forte (devi scrivere 'confermo'). Verificato con test automatico che il popup compare e si chiude solo dopo la conferma esplicita.",
-  "queuedAt": "2026-06-16T10:09:23.388Z",
-  "queuedBy": "routine"
-}
