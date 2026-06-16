@@ -338,6 +338,7 @@
     feedback:     (size) => wrap(feedback, { size }),
     readAloud:    (size) => wrap(readAloud, { size }),
     stopReading:  (size) => wrap(stopReading, { size }),
+    history:      (size) => wrap(history, { size }),
   };
 
   // Heuristica che il menu usa per capire se una stringa di "icona" è SVG
