@@ -96,6 +96,16 @@ test('IMPOSTA_ESTETICA: describe usa l’etichetta del token e avvisa se illeggi
   assert.match(bad, /illeggibile/i);
 });
 
+test('#183: per il livello 2 describe compone COSA fa + i RISCHI', () => {
+  const d = AL.describe({ type: 'IMPOSTA_PREFERENZA', chiave: 'terminale', valore: 'on' });
+  assert.match(d, /Modalità terminale → attiva/);  // cosa Filo sta per fare
+  assert.match(d, /shell/i);                         // il rischio
+  // Una preferenza di livello 1 (tema) NON appende rischi: si applica subito.
+  const d1 = AL.describe({ type: 'IMPOSTA_PREFERENZA', chiave: 'tema', valore: 'scuro' });
+  assert.match(d1, /Tema → Scuro/);
+  assert.doesNotMatch(d1, /shell|rischi/i);
+});
+
 test('describe spiega in chiaro la modifica per il popup', () => {
   assert.match(AL.describe({ type: 'IMPOSTA_PREFERENZA', chiave: 'terminale', valore: 'on' }), /[Tt]erminale/);
   assert.match(AL.describe({ type: 'PULISCI_TAB' }), /archivia/i);
