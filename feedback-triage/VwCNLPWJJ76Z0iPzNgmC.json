@@ -1,0 +1,7 @@
+{
+  "id": "VwCNLPWJJ76Z0iPzNgmC",
+  "status": "done",
+  "notes": "Completato l'audit estetico (parte aperta del #184). Ho censito tutte le superfici di colore delle pagine: la maggior parte era già modificabile a voce perché deriva dai token esistenti (scrollbar → bordi/accento, campi input e barra indirizzi → sfondo, hover delle schede → tinta della scheda). Le uniche due superfici ancora 'bloccate' erano lo sfondo al passaggio del mouse (voci di menu, righe, bottoni secondari) e lo sfondo di menu/popup/barra laterale: ora sono due token nuovi, 'hover' e 'overlay', che l'utente può cambiare a voce ('rendi l'evidenziazione del menu verde', 'fai lo sfondo dei menu più scuro') o dalle Preferenze (compaiono in automatico). Note tecniche: le ombre NON sono state esposte di proposito — un'ombra è una stringa composita (offset+blur+colore) fuori dalla whitelist anti-injection che ammette solo color/size/opacity/font; esporla richiederebbe un nuovo tipo validato, da decidere a parte. Verificato con unit test (themeTokens) e uno spec Playwright che applica hover/overlay live su una pagina e controlla che la shell non venga toccata; tutta la suite estetica/preferenze resta verde.",
+  "queuedAt": "2026-06-16T20:44:03.267Z",
+  "queuedBy": "routine"
+}
