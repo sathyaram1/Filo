@@ -6,13 +6,19 @@
 // esposta dalla pagina Preferenze, e deve restare testabile senza Electron.
 //
 // Espone SN_PREF = { buildPreferencePartial, parsePrefBool, PREF_SETTERS }.
-// `buildPreferencePartial(chiave, valore)` → { partial, label, level } oppure
-// null se chiave/valore non sono validi. Solo le preferenze qui elencate sono
-// scrivibili. Dal #146.5 l'elenco copre TUTTE le impostazioni della pagina
+// `buildPreferencePartial(chiave, valore)` → { partial, label, level, risk }
+// oppure null se chiave/valore non sono validi. Solo le preferenze qui elencate
+// sono scrivibili. Dal #146.5 l'elenco copre TUTTE le impostazioni della pagina
 // Opzioni (modelli, provider, chiavi API, sicurezza/privacy, limite di spesa,
 // funzionalità) oltre a quelle estetiche/comportamentali: ognuna dichiara il
 // proprio `level` (1 = applica subito, 2 = popup di conferma). Le impostazioni
 // sensibili (sicurezza, modelli, chiavi, provider, costi) sono di livello 2.
+//
+// REGOLA (#183): ogni setter di livello 2 DEVE dichiarare anche `risk` — una
+// frase in chiaro che spiega cosa controlla l'impostazione e quali sono gli
+// eventuali rischi. È il testo che il popup di conferma mostra all'utente
+// (lo compone actionLevels.describe). Un setter di livello 2 senza `risk` è
+// un bug: il test tests/unit/preferences.test.mjs lo intercetta.
 
 (function (global) {
   'use strict';
