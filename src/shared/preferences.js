@@ -230,6 +230,8 @@
     {
       keys: ['blocco_popup', 'blocco popup', 'blocca popup', 'popup', 'finestre popup'],
       level: 2,
+      risk: 'Controlla il blocco delle finestre popup. Disattivarlo permette ai siti di aprire '
+        + 'finestre da soli, anche pubblicitarie o ingannevoli.',
       build(v) {
         const b = parsePrefBool(v);
         if (b === null) return null;
