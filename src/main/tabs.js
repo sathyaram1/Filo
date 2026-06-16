@@ -1103,6 +1103,13 @@ class TabManager {
     // will-navigate; la rete di sicurezza è il gate d'origine in
     // internal-preload.js, che non espone le API se l'origine non è filo:.
     wc.on('will-navigate', (event, url) => {
+      // #170.3 — Blocco apertura siti in blacklist. Click su un link generico
+      // (o window.location) verso un sito in blacklist: blocca, TRANNE se la
+      // pagina di partenza è un motore di ricerca (l'utente l'ha cercato).
+      if (this._maybeBlockNavigation(tab, url, { fromUrl: wc.getURL() })) {
+        event.preventDefault();
+        return;
+      }
       if (this._needsRecreate(tab, url)) {
         event.preventDefault();
         this._recreateView(tab, url);
