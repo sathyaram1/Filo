@@ -50,7 +50,10 @@ test('sicurezza/privacy → livello 2, partial annidato corretto', () => {
 });
 
 test('modelli / provider / chiavi / costi → livello 2', () => {
-  assert.deepEqual(build('provider', 'gemini'), { partial: { provider: 'gemini' }, label: 'Provider → Google Gemini', level: 2 });
+  const prov = build('provider', 'gemini');
+  assert.equal(prov.level, 2);
+  assert.equal(prov.label, 'Provider → Google Gemini');
+  assert.deepEqual(prov.partial, { provider: 'gemini' });
   assert.deepEqual(build('provider', 'openrouter').partial, { provider: 'openrouter' });
   assert.equal(build('modelli_predefiniti', 'off').level, 2);
   assert.deepEqual(build('modelli_predefiniti', 'off').partial, { useDefaultModels: false });
