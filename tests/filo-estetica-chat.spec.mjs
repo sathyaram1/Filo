@@ -164,3 +164,49 @@ test('la chat mostra il bottone di raffinamento e il picker scrive il nuovo colo
     expect(last && last.themeTokens && last.themeTokens['button.bg']).toBe('#112233');
   }).toPass({ timeout: 4_000 });
 });
+
+// #164 — "rendi le scritte rosse" diceva "Fatto" ma sulla dashboard (dove vive
+// la chat) non cambiava nulla: la newtab usa una palette propria (--dash-*)
+// slegata dai token. Ora un override di 'text' aggiorna DAVVERO --dash-ink (e il
+// colore effettivo del testo della dashboard), così la modifica si vede dove
+// l'utente l'ha chiesta.
+test("una modifica estetica si applica DAVVERO alla dashboard (--dash-* segue i token)", async ({ openTab }) => {
+  const page = await openTab(NEWTAB);
+  await expect(page.locator('#input')).toBeVisible({ timeout: 8_000 });
+
+  const read = () => page.evaluate(() => {
+    const cs = getComputedStyle(document.documentElement);
+    return {
+      ink: cs.getPropertyValue('--dash-ink').trim(),
+      paper: cs.getPropertyValue('--dash-paper').trim(),
+    };
+  });
+
+  // Default: la palette "carta" della dashboard, NON il token (estetica intatta).
+  const before = await read();
+  expect(before.ink.toLowerCase()).not.toBe('#ff0000');
+
+  // L'utente ha chiesto "rendi le scritte rosse": applichiamo l'override come fa
+  // il live-apply (SN_PAGE_BOOTSTRAP.applyThemeTokens, lo stesso path della chat).
+  await page.evaluate(() => {
+    window.SN_PAGE_BOOTSTRAP.applyThemeTokens({ text: '#ff0000', background: '#001122' });
+  });
+
+  // Ora la dashboard riflette davvero la modifica: --dash-ink/-paper seguono i token.
+  await expect(async () => {
+    const after = await read();
+    expect(after.ink.toLowerCase()).toBe('#ff0000');
+    expect(after.paper.toLowerCase()).toBe('#001122');
+  }).toPass({ timeout: 4_000 });
+
+  // E il colore effettivo del testo di una bolla risolve al rosso (non solo la var).
+  const bubbleRed = await page.evaluate(() => {
+    const probe = document.createElement('div');
+    probe.style.color = 'var(--dash-ink)';
+    document.body.appendChild(probe);
+    const c = getComputedStyle(probe).color;
+    probe.remove();
+    return c;
+  });
+  expect(bubbleRed.replace(/\s/g, '')).toBe('rgb(255,0,0)');
+});
