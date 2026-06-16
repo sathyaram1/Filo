@@ -24,6 +24,18 @@ module.exports = function register(on, ctx) {
     return { ok: true, ...r };
   });
 
+  // Primo dispatch (non confermato) di una singola azione di Filo richiesta
+  // dall'agente "Aiuto" (la sidebar on-page). Passa per lo STESSO
+  // executeFiloAction della chat dashboard: stesso registro dei livelli, stesse
+  // conferme. Se l'azione è di livello ≥ 2 torna needsConfirm + describe e NON
+  // viene eseguita finché la sidebar non rimanda la conferma (FILO_CONFIRM_ACTION).
+  // Le azioni fuori registro vengono rifiutate dal dispatch, esattamente come
+  // per la chat: la sidebar non è un canale privilegiato.
+  on(MSG.FILO_RUN_ACTION, async (msg, sender) => {
+    const r = await executeFiloAction(msg.action, { sender });
+    return { ok: true, ...r };
+  });
+
   on(MSG.FILO_GET_STATE, async () => {
     const { state, stateText } = await FiloState.assemble();
     return { ok: true, state, stateText };
