@@ -70,6 +70,21 @@
       dashCss: ['--dash-ink'],
       default: { light: '#1a1918', dark: '#e5e3dc' },
     },
+    // Barra in alto del browser (la fascia dietro le schede + le schede non
+    // attive). È una superficie della SOLA shell — le pagine non ce l'hanno —
+    // quindi nessun `css`/`dashCss`, solo `shellCss`. Mappa `--bg-deep` (la
+    // striscia) e `--tab-bg` (le tab inattive) insieme, così "rendi la barra in
+    // alto verde scuro" colora l'intera fascia in modo coerente. Senza questo
+    // token non c'era modo di cambiare SOLO la barra: `background` tingeva tutte
+    // le superfici e `colore_tab` agiva sulla tinta-identità delle singole tab,
+    // non sulla fascia (feedback #184). Il default combacia con `--bg-deep` di
+    // shell.css; finché non lo si sovrascrive, `--tab-bg` resta il suo neutro.
+    topbar: {
+      label: 'Barra in alto',
+      type: 'color',
+      shellCss: ['--bg-deep', '--tab-bg'],
+      default: { light: '#f5ead7', dark: '#14110e' },
+    },
     muted: {
       label: 'Testo secondario',
       type: 'color',
