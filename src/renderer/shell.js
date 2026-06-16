@@ -626,9 +626,39 @@
         }
       }
 
+      // Audio in riproduzione: aggiunge classe per il bagliore animato.
+      // Il colore del bagliore viene calcolato dal colore identità della tab
+      // (desaturato, come la tinta §1.2) e impostato come variabile CSS inline.
+      const isAudible = t.audible && !t.muted;
+      if (isAudible) {
+        el.classList.add('audible');
+        // Calcola il colore del bagliore: usa il colore identità se disponibile,
+        // altrimenti l'accento Filo come fallback. Desaturiamo già via CSS.
+        const glowBase = hasColorIdentity(t.color) ? t.color
+          : (t.identityColor || null);
+        if (glowBase) {
+          el.style.setProperty('--tab-glow-color', glowBase);
+        }
+      }
+
+      // Slot favicon / spinner. Quando la tab suona e lo slot è stretto,
+      // mostriamo l'icona audio al posto della favicon (sempre visibile).
+      // Lo slot ha sempre class "favicon-slot" così il CSS può puntarlo.
       const ico = document.createElement('div');
       if (t.loading) {
         ico.className = 'spinner';
+      } else if (isAudible) {
+        // Classe speciale: mostra l'icona audio sopra la favicon con CSS.
+        // In tab larghe la favicon resta visibile in background; in tab
+        // strettissime (<min-width di sicurezza) l'icona prende tutto lo slot.
+        ico.className = 'favicon favicon-audible';
+        if (t.favicon) ico.style.setProperty('--fav-url', `url("${t.favicon}")`);
+        ico.innerHTML = AUDIO_IND_SVG;
+        // Clic sullo slot favicon-audible muta la tab (come l'audio-ind finale).
+        ico.setAttribute('role', 'button');
+        ico.title = 'Silenzia';
+        ico.setAttribute('aria-label', 'Audio in riproduzione — clicca per silenziare');
+        ico.addEventListener('click', (e) => { e.stopPropagation(); api.tabs.setMuted(t.id); });
       } else {
         ico.className = 'favicon';
         if (t.favicon) ico.style.backgroundImage = `url("${t.favicon}")`;
@@ -646,17 +676,6 @@
         m.innerHTML = MUTE_IND_SVG;
         m.addEventListener('click', (e) => { e.stopPropagation(); api.tabs.setMuted(t.id); });
         el.appendChild(m);
-      } else if (t.audible) {
-        // Audio in riproduzione (e non mutato): indicatore + click rapido per
-        // silenziare, simmetrico all'indicatore di muto.
-        const a = document.createElement('span');
-        a.className = 'audio-ind';
-        a.setAttribute('role', 'button');
-        a.title = 'Silenzia';
-        a.setAttribute('aria-label', 'Audio in riproduzione — clicca per silenziare');
-        a.innerHTML = AUDIO_IND_SVG;
-        a.addEventListener('click', (e) => { e.stopPropagation(); api.tabs.setMuted(t.id); });
-        el.appendChild(a);
       }
 
       // Indicatore "aperta da un altro paese": globo + codice paese accanto al
@@ -679,6 +698,21 @@
         e.preventDefault();
         openTabContextMenu(t, e.clientX, e.clientY);
       });
+
+      // Indicatore audio in fondo alla tab (vicino al close), sempre visibile
+      // a prescindere dalla larghezza. In tab strette è già visibile nello slot
+      // favicon; qui compare in aggiunta quando c'è spazio (tab più larga del
+      // minimo) per dare un riferimento visivo chiaro a fine riga.
+      if (isAudible) {
+        const a = document.createElement('span');
+        a.className = 'audio-ind';
+        a.setAttribute('role', 'button');
+        a.title = 'Silenzia';
+        a.setAttribute('aria-label', 'Audio in riproduzione — clicca per silenziare');
+        a.innerHTML = AUDIO_IND_SVG;
+        a.addEventListener('click', (e) => { e.stopPropagation(); api.tabs.setMuted(t.id); });
+        el.appendChild(a);
+      }
 
       const close = document.createElement('span');
       close.className = 'close';
