@@ -932,6 +932,15 @@
       fingerprint: {
         mode: 'default',
       },
+      // Ad-blocking per-dominio basato su liste pubbliche e gratuite (StevenBlack
+      // hosts + EasyList). Le liste si scaricano dalla rete, si tengono in cache
+      // locale (userData/adblock/lists.json) e si aggiornano da sole una volta a
+      // settimana. Ogni richiesta verso un dominio in lista viene annullata a
+      // monte. Una whitelist di base protegge i domini legittimi. Vedi
+      // src/main/services/adblock.js. Default-on, disattivabile col toggle.
+      adblock: {
+        enabled: true,
+      },
     },
     // Modalità terminale della dashboard: quando attiva, ogni comando con `/`
     // che non è un comando interno di Filo viene eseguito da una shell di
