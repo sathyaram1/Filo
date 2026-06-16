@@ -116,6 +116,24 @@
     </section>
 
     <section>
+      <h2>Notifiche</h2>
+      <p class="sn-muted">I messaggi che Filo mostra in basso a destra (schede riordinate, blocchi di siti, ecc.).</p>
+      <label for="notifDuration" class="sn-muted" style="display:block;margin-bottom:4px;">Durata (secondi) — <strong>0 = resta finché non la chiudi</strong></label>
+      <input type="number" id="notifDuration" min="0" max="120" step="1" style="width:120px;" />
+      <div class="sn-toggle-row" style="margin-top:12px;">
+        <label>
+          <input type="checkbox" id="notifSoundEnabled" />
+          <span>Riproduci un suono quando compare una notifica</span>
+        </label>
+      </div>
+      <label for="notifSound" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Suono</label>
+      <div class="sn-row" style="align-items:center;gap:10px;">
+        <select id="notifSound"></select>
+        <button type="button" class="sn-btn sn-btn-secondary" id="notifSoundPreview">Prova</button>
+      </div>
+    </section>
+
+    <section>
       <h2>Suoneria del timer</h2>
       <p class="sn-muted">Suono riprodotto alla scadenza del timer, finché non premi "Ferma". Generato dal browser (nessun file audio).</p>
       <label for="timerRingtone" class="sn-muted" style="display:block;margin-bottom:4px;">Suoneria</label>
