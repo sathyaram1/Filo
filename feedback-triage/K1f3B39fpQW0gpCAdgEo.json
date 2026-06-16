@@ -1,7 +1,0 @@
-{
-  "id": "K1f3B39fpQW0gpCAdgEo",
-  "status": "done",
-  "notes": "Riscritto da zero come Filo ricava il colore delle tab. Prima partiva dal theme-color/manifest (quasi sempre bianchi o neri) e faceva una media grezza del favicon: i loghi a piu colori si impastavano in tinte sbagliate e i siti dal logo poco saturo restavano senza colore. Ora il colore si estrae SOLO dal favicon, raggruppando i pixel per tinta e premiando quelli piu saturi e centrali (il logo): cosi Poste resta gialla invece di diventare un grigio-verde, YouTube resta rosso, e i siti acromatici (Wikipedia, X, GitHub) prendono un grigio coerente invece di restare neutri. Il favicon e ora la fonte primaria; theme-color/manifest restano solo come ripiego per i rari favicon non leggibili. Verificato con unit test mirati (logo bicolore tipo Poste, sfondo+logo, favicon acromatico, centralita) e con la suite Playwright dei colori tab. NON ho ancora esposto i 6 parametri regolabili (saturazione, centralita, opacita...) ne via linguaggio naturale ne nelle preferenze avanzate, come chiede la parte finale della specifica: l'ho scorporato nel sotto-feedback collegato cosi si lavora a parte.",
-  "queuedAt": "2026-06-16T00:32:00.259Z",
-  "queuedBy": "routine"
-}
