@@ -79,6 +79,26 @@
       border-color: color-mix(in srgb, var(--sn-accent) 32%, var(--sn-border));
     }
     .fb-bubble--report.fb-bubble--user { align-self: stretch; }
+    /* Tinta della bolla-segnalazione per ORIGINE del feedback (vedi legenda
+       card più sotto). Più specifica di --model/--user, così vince sul tint
+       neutro/accento di default: arancione = tester esterno, verde = invio
+       dell'owner, blu = audit di una routine, accento = agente esploratore. */
+    .fb-bubble--report.fb-bubble--origin-user {
+      background: color-mix(in srgb, #e08e0b 12%, var(--sn-bg, transparent));
+      border-color: color-mix(in srgb, #e08e0b 34%, var(--sn-border));
+    }
+    .fb-bubble--report.fb-bubble--origin-owner {
+      background: color-mix(in srgb, #2e9e5b 13%, var(--sn-bg, transparent));
+      border-color: color-mix(in srgb, #2e9e5b 36%, var(--sn-border));
+    }
+    .fb-bubble--report.fb-bubble--origin-routine {
+      background: color-mix(in srgb, #5b6ee0 12%, var(--sn-bg, transparent));
+      border-color: color-mix(in srgb, #5b6ee0 34%, var(--sn-border));
+    }
+    .fb-bubble--report.fb-bubble--origin-agent {
+      background: color-mix(in srgb, var(--sn-accent) 10%, var(--sn-bg, transparent));
+      border-color: color-mix(in srgb, var(--sn-accent) 32%, var(--sn-border));
+    }
     /* Le immagini/allegati vivono dentro la bolla della segnalazione. */
     .fb-bubble .fb-imgs, .fb-bubble .fb-files { margin-top: 8px; }
     /* Composer "Rispondi" del tab Chiarimenti (e riapertura): stesso look. */
