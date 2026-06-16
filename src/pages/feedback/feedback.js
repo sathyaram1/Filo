@@ -416,6 +416,7 @@
           ${threadHtml}
           ${notesBlock}
           ${replyBlock}
+          ${commentBlock}
           <div class="fb-actions">${actionsFor(f)}</div>
         </article>
       `;
