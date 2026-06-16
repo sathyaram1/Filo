@@ -301,6 +301,8 @@
     {
       keys: ['provider', 'fornitore', 'provider ai', 'provider modelli'],
       level: 2,
+      risk: 'Cambia il fornitore AI che elabora le tue richieste (OpenRouter o Google Gemini). '
+        + 'Le richieste e i relativi costi passeranno dal nuovo provider, con la sua chiave API.',
       build(v) {
         const s = String(v == null ? '' : v).trim().toLowerCase();
         const map = { openrouter: 'openrouter', 'open router': 'openrouter', or: 'openrouter', gemini: 'gemini', google: 'gemini' };
