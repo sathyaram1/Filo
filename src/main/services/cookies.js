@@ -224,6 +224,10 @@ function ensureSiteSession(partition, { gpc } = {}) {
   const on = gpc !== false;
   applyGpc(ses, on);
   applyTrackerBlocking(ses, on);
+  // Anche il motore ad-blocking (liste) deve coprire i jar per-sito della
+  // modalità privacy, non solo la sessione di default. Il toggle vive in
+  // adblock.js: qui registriamo solo il filtro su questa sessione.
+  try { require('./adblock').applyAdblock(ses); } catch (_) {}
   return ses;
 }
 
