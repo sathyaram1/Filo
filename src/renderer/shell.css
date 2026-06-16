@@ -337,6 +337,33 @@ html[data-chrome-compact="1"] .addr {
 .tab .mute-ind:hover,
 .tab .audio-ind:hover { opacity: 0.7; }
 
+/* Slot favicon quando la tab sta suonando: mostra l'icona audio in overlay.
+   In tab larghe la favicon è visibile come sfondo; in tab strettissime
+   (quando il contenuto è clippato) l'icona audio occupa tutto lo slot e
+   rimane sempre visibile. La favicon resta come ::before via variabile CSS. */
+.tab .favicon.favicon-audible {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  cursor: pointer;
+  /* La favicon originale come sfondo: visibile nelle tab larghe, coperta
+     dall'icona SVG in centro. */
+  background-image: var(--fav-url, none);
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+/* L'SVG dell'icona audio nel favicon-slot sta sopra la favicon. */
+.tab .favicon.favicon-audible svg {
+  display: block;
+  /* Sfondo semi-opaco del colore tab per leggibilità sopra la favicon. */
+  background: color-mix(in srgb, var(--tab-bg-eff) 75%, transparent);
+  border-radius: 2px;
+}
+.tab .favicon.favicon-audible:hover { opacity: 0.7; }
+
 /* Indicatore "aperta da un altro paese" (proxy per-tab): globo + codice paese
    in accento Filo, discreto — un segnale di viaggio, non di sicurezza. */
 .tab .proxy-ind {
