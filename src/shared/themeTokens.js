@@ -101,6 +101,7 @@
       type: 'size',
       css: '--sn-radius',
       shellCss: ['--radius'],
+      dashCss: ['--dash-radius'],
       default: '6px',
     },
 
