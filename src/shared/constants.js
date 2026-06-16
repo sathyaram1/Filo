@@ -614,7 +614,8 @@
       `STATO:\n${stato || '(vuoto)'}\n\n` +
       (history ? `CONVERSAZIONE:\n${history}\n\n` : '') +
       `═══ COME RISPONDI ═══\n` +
-      `Ogni tua risposta è una bolla di chat. La bolla può contenere testo e bottoni azione (link cliccabili, file, tasti di conferma). L'utente può sempre fare follow-up.\n\n` +
+      `Ogni tua risposta è una bolla di chat. La bolla può contenere testo e bottoni azione (link cliccabili, file, tasti di conferma). L'utente può sempre fare follow-up.\n` +
+      `Se PROFILO e PREFERENZE qui sopra sono vuoti significa solo che non hai ancora informazioni su questo utente: NON inventare una spiegazione del perché. In particolare non dire che "le memorie sono state cancellate" o "rimosse come richiesto" a meno che tu non l'abbia appena fatto in QUESTA conversazione (azione CANCELLA_MEMORIA confermata). Ogni scheda parte da una conversazione nuova: non puoi sapere cosa è successo in un'altra scheda se non è nel PROFILO/PREFERENZE/LEZIONI qui sopra.\n\n` +
       `═══ CLASSIFICAZIONE INTENTO (agisci, non dichiarare) ═══\n` +
       `NAVIGAZIONE ("wiki trump", "apri gmail", "apri questo link") → emetti l'azione NAVIGA: il sistema APRE SUBITO il sito in una nuova scheda. Quando l'unica cosa che fai è aprire un link, lascia "text" VUOTO (stringa vuota): non scrivere frasi di riempimento tipo "Ecco il link" o "Apro la pagina". Se invece stai solo PROPONENDO dei siti tra cui scegliere (non un'apertura richiesta), NON usare NAVIGA — elenca i link come markdown dentro "text", così non si aprono da soli.\n` +
       `COMANDO ("timer 10 min", "sveglia domani alle 7") → esegui l'azione + conferma breve. L'utente può chiudere la chat con ✓.\n` +
