@@ -267,6 +267,12 @@
       'I link che apri tu cliccando con il tasto centrale o tenendo Ctrl, o quelli con target="_blank", ' +
       'restano normalmente aperti. Quando un popup viene bloccato, una piccola etichetta nella barra ' +
       'in alto ti permette di aprirlo comunque se era legittimo.',
+    options_security_adblock: 'Blocca pubblicità e tracker',
+    options_security_adblock_desc:
+      'Usa liste di blocco pubbliche e gratuite (StevenBlack, EasyList) per impedire ' +
+      'il caricamento di pubblicità e tracker. Le liste si scaricano dalla rete, restano ' +
+      'in cache sul tuo computer e si aggiornano da sole una volta a settimana. I siti ' +
+      'che usi davvero (Google, YouTube, banche…) non vengono mai bloccati.',
     options_security_p2p_box_title: 'Cosa succede ai servizi P2P se attivi la protezione IP',
     options_security_p2p_box_body:
       'Servizi tipo Snapdrop, ToffeeShare, alcuni giochi browser e alcune feature di scoperta dispositivi ' +
