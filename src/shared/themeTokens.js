@@ -323,6 +323,9 @@
           if (rgb) decls.push(`${t.shellRgbCss}: ${rgb};`);
         }
       } else {
+        // Token di sola shell (es. `topbar`): nessuna variabile di pagina da
+        // emettere sulle superfici --sn-*/--dash-*. Si salta qui.
+        if (!t.css) continue;
         decls.push(`${t.css}: ${value};`);
         if (t.rgbCss) {
           const rgb = toRgbTriplet(value);
