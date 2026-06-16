@@ -287,11 +287,11 @@ function ensurePeriodicRefresh() {
   if (refreshTimer.unref) refreshTimer.unref(); // non tenere vivo il processo
 }
 
-// Chiamato all'avvio: applica il blocco alla sessione di default, carica la
-// cache, e se serve avvia un refresh in background (mai bloccante).
+// Chiamato all'avvio: imposta il toggle, carica la cache, e se serve avvia un
+// refresh in background (mai bloccante). Il choke point onBeforeRequest è già
+// registrato da cookies.js, che consulta shouldBlock().
 async function init(settings) {
   enabled = isEnabled(settings);
-  applyAdblock(require('electron').session.defaultSession);
   await loadCache();
   // In test non si tocca la rete: le liste si iniettano via setDomainsForTest.
   if (process.env.NODE_ENV === 'test' || process.env.FILO_SMOKE) return;
