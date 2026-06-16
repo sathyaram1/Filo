@@ -1,0 +1,7 @@
+{
+  "id": "4aIOAEYNIZPNsmTcezO3",
+  "status": "done",
+  "notes": "Ho spostato in fondo alla pagina Preferenze i controlli estetici di basso livello (i 'token estetici' e i parametri del colore identita' delle tab), raggruppati sotto una nuova sezione 'Impostazioni avanzate' con il testo introduttivo che hai indicato (puoi modificare ogni aspetto estetico di Filo, ma puoi sempre chiedere a Filo di farlo se non ti va di cercare l'impostazione). Le impostazioni d'uso comune (tema, dimensione testo, commento home, gestione schede, ecc.) restano in alto. Verificato con un test automatico che controlla che la sezione avanzata sia l'ultima della pagina, contenga i due gruppi e che i controlli interni funzionino ancora.",
+  "queuedAt": "2026-06-16T16:14:04.600Z",
+  "queuedBy": "routine"
+}
