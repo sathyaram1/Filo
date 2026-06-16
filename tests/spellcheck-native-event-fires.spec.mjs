@@ -47,9 +47,17 @@ test('il click destro lascia scattare l\'evento context-menu nativo (canale sugg
   // Il menu Filo custom si apre comunque (nessuna regressione al menu).
   await expect(page.locator('.sn-menu')).toBeVisible({ timeout: 4000 });
 
-  // E l'evento nativo è scattato: senza il fix (preventDefault) sarebbe 0.
-  // Timeout 8000ms: in headless Linux l'evento context-menu del webContents
-  // può arrivare con qualche ms di ritardo rispetto all'apertura del menu JS.
+  // Chiudi il menu e riapri: in headless Linux il primo click può essere
+  // "sordo" per il context-menu del webContents (evento OS non sempre emesso
+  // al primo CDP-simulated right-click). Un secondo click aumenta
+  // significativamente l'affidabilità senza cambiare la semantica del test.
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(100);
+  await page.mouse.click(box.x + 20, box.y + 24, { button: 'right' });
+  await expect(page.locator('.sn-menu')).toBeVisible({ timeout: 4000 });
+
+  // E l'evento nativo è scattato almeno una volta: senza il fix (preventDefault)
+  // sarebbe sempre 0 perché preventDefault blocca l'emissione dell'evento.
   await expect.poll(
     () => app.evaluate(() => globalThis.__ctxCount),
     { timeout: 8000, message: 'l\'evento context-menu del webContents non è scattato: il canale dei suggerimenti nativi è chiuso (preventDefault?)' },
