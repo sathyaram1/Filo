@@ -1,0 +1,11 @@
+{
+  "op": "create",
+  "text": "Parte aperta del #184. Obiettivo: censire OGNI elemento estetico dell'app non ancora esposto come token modificabile e aggiungerlo al registro (src/shared/themeTokens.js), così l'agente può cambiarlo a voce e l'utente dalle Preferenze.\n\nContesto: il #184 ha già aggiunto il token 'topbar' (barra in alto = --bg-deep + --tab-bg della shell), che mancava ed era il motivo per cui l'agente non riusciva a 'colorare la barra in verde scuro'. Il reset completo ('Ripristina tutte le impostazioni') è gia implementato e funziona.\n\nCosa resta (la richiesta 'fai un controllo sistematico di ogni elemento estetico, non temere di rendere le impostazioni avanzate ampie'): passare in rassegna le palette della shell (src/renderer/shell.css), della dashboard/newtab (--dash-* in dashboard.css) e dei contenuti, e per ogni colore/dimensione/superficie significativa NON ancora coperta da un token, valutare se aggiungerla al registro. Candidati noti da verificare: sfondo profondo/hover delle tab, scrollbar, ombre, badge/pill, colore dei controlli finestra, sfondo dei campi input, hover dei bottoni, eventuale colore separato per la barra indirizzi. Per ognuno: aggiungere il token in themeTokens.js (con shellCss/css/dashCss giusti e default per light+dark), aggiungerlo alla lista IMPOSTA_ESTETICA nel prompt (src/shared/constants.js ~riga 669) e a un unit test in tests/unit/themeTokens.test.mjs. La pagina Preferenze li mostra in automatico (renderizza tutti i token del registro). Criterio di fatto: l'utente puo chiedere a voce di cambiare il colore di qualunque superficie visibile e vederlo applicato live.\n\nAttenzione: 'validate' in themeTokens.js e una whitelist anti CSS-injection: ogni nuovo token resta dentro i tipi color/size/opacity/font. Non spezzare in troppe sotto-superfici poco distinguibili (meglio raggruppare cio che si muove insieme, come ho fatto per topbar = striscia + tab inattive).",
+  "name": "Audit estetico sistematico: esporre ogni superficie come token",
+  "parentId": "npY883Y2UXdpglGvd5ak",
+  "status": "todo",
+  "priority": 1,
+  "notes": "",
+  "queuedAt": "2026-06-16T19:21:40.457Z",
+  "queuedBy": "routine"
+}
