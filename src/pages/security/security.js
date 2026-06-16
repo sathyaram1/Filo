@@ -272,12 +272,28 @@
     }
   }
 
+  // Disabilita i sotto-controlli del blocco siti quando il blocco è spento.
+  function syncSiteBlockEnabled() {
+    const on = !!$('sec-siteblock').checked;
+    const sub = $('sec-siteblock-sub');
+    if (sub) sub.style.opacity = on ? '1' : '0.45';
+    $('sec-siteblock-lists').disabled = !on;
+    $('sec-siteblock-blacklist').disabled = !on;
+  }
+
   async function save() {
+    const blacklist = $('sec-siteblock-blacklist').value
+      .split('\n').map((s) => s.trim()).filter(Boolean);
     const partial = {
       security: {
         protectIpLeak: !!$('sec-protect-ip').checked,
         blockPopups: !!$('sec-block-popups').checked,
         adblock: { enabled: !!$('sec-adblock').checked },
+        siteBlock: {
+          enabled: !!$('sec-siteblock').checked,
+          useAdblockLists: !!$('sec-siteblock-lists').checked,
+          blacklist,
+        },
         safeBrowse: {
           enabled: !!$('sec-safebrowse').checked,
           networkSignals: !!$('sec-safebrowse-network').checked,
