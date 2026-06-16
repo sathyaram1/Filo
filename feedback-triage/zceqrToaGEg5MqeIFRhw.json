@@ -1,7 +1,0 @@
-{
-  "id": "zceqrToaGEg5MqeIFRhw",
-  "status": "done",
-  "notes": "Spec corposa pianificata e spezzata in 3 sotto-task, da lavorare uno alla volta nelle prossime routine: #170.1 — Notifiche in basso a destra configurabili (durata variabile, anche infinita con X, + suono opzionale, in Preferenze avanzate): e la base UX, va fatta per prima. #170.2 — Blocco pubblicita con liste di blocco gratuite e note (EasyList/hosts), scaricate e auto-aggiornate, con toggle: il motore di ad-blocking vero. #170.3 — Blocco apertura dei siti in blacklist con eccezioni (consentito se arrivi da un motore di ricerca o da Filo) + notifica in basso a destra: dipende da #170.1 e #170.2. Ogni sotto-task ha gia la descrizione completa e il criterio di fatto. Niente e stato ancora implementato qui: questo feedback documenta solo la pianificazione.",
-  "queuedAt": "2026-06-16T10:15:24.959Z",
-  "queuedBy": "routine"
-}
