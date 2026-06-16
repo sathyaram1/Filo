@@ -48,8 +48,10 @@ test('il click destro lascia scattare l\'evento context-menu nativo (canale sugg
   await expect(page.locator('.sn-menu')).toBeVisible({ timeout: 4000 });
 
   // E l'evento nativo è scattato: senza il fix (preventDefault) sarebbe 0.
+  // Timeout 8000ms: in headless Linux l'evento context-menu del webContents
+  // può arrivare con qualche ms di ritardo rispetto all'apertura del menu JS.
   await expect.poll(
     () => app.evaluate(() => globalThis.__ctxCount),
-    { timeout: 4000, message: 'l\'evento context-menu del webContents non è scattato: il canale dei suggerimenti nativi è chiuso (preventDefault?)' },
+    { timeout: 8000, message: 'l\'evento context-menu del webContents non è scattato: il canale dei suggerimenti nativi è chiuso (preventDefault?)' },
   ).toBeGreaterThan(0);
 });
