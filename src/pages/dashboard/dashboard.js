@@ -1337,6 +1337,19 @@
     dashDir.textContent = currentCwd || '';
   }
 
+  // L'assistente ha eseguito uno o più comandi: se l'ultimo ha cambiato cartella
+  // (un `cd`, ora persistente), il main ce la riporta in _output.cwd. Aggiorniamo
+  // la barra del percorso così "percorso mostrato" e cartella reale coincidono.
+  function applyCommandCwd(actions) {
+    if (!Array.isArray(actions)) return;
+    let cwd = '';
+    for (const a of actions) {
+      const out = a && a._output;
+      if (out && out.cwd) cwd = out.cwd;
+    }
+    if (cwd && cwd !== currentCwd) { currentCwd = cwd; updateDirLine(); applyTerminalMode(); }
+  }
+
   function applyTerminalMode() {
     dashDir.hidden = !terminalMode || !currentCwd;
     inputEl.placeholder = terminalMode
