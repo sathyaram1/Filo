@@ -37,6 +37,25 @@ module.exports = function register(on, ctx) {
     return { ok: true, settings: merged };
   });
 
+  on(MSG.RESET_SETTINGS, async () => {
+    // Ripristino completo (#184): riscrive TUTTE le impostazioni ai valori
+    // predefiniti in un colpo solo, così qualsiasi personalizzazione estetica
+    // sfuggita di mano (token, tema, colore identità delle tab, dimensione del
+    // testo…) torna allo stato di fabbrica. Sostituisce l'INTERO oggetto
+    // settings (non un merge), così spariscono anche eventuali chiavi residue.
+    // Si preservano SOLO le credenziali — chiavi API e registro dei modelli —
+    // per non disconnettere l'utente dai provider AI con un reset estetico.
+    const current = await Storage.getSettings();
+    const defaults = JSON.parse(JSON.stringify(SN_CONST.DEFAULT_SETTINGS));
+    if (current && current.apiKeys) defaults.apiKeys = current.apiKeys;
+    if (current && current.modelRegistry) defaults.modelRegistry = current.modelRegistry;
+    await Storage.setSettings(defaults);
+    // Ripersiste i default e li propaga ovunque (broadcast SETTINGS_UPDATED,
+    // tema nativo, sicurezza, fingerprint, safebrowse, cookie, colore tab).
+    const merged = await applySettingsUpdate({});
+    return { ok: true, settings: merged };
+  });
+
   on(MSG.EXPORT_DATA, async (msg, sender) => {
     // Esporta TUTTI i dati di Filo in un unico .zip (data.json + immagini
     // copiate estratte come file). L'utente sceglie dove salvarlo.
