@@ -419,7 +419,7 @@
     if (!key) return null;
     const withLevel = (setter) => {
       const r = setter.build(rawVal);
-      return r ? { ...r, level: setter.level || 1 } : null;
+      return r ? { ...r, level: setter.level || 1, risk: setter.risk || '' } : null;
     };
     for (const setter of PREF_SETTERS) {
       if (setter.keys.includes(key)) return withLevel(setter);
