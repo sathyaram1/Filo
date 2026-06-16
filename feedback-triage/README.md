@@ -40,10 +40,17 @@ feedback (è così che una routine spezza una spec corposa in sub-feedback
   "status": "todo | clarify",
   "priority": 2,
   "notes": "",
+  "images": ["https://firebasestorage.googleapis.com/...?alt=media&token=..."],
   "queuedAt": "2026-06-12T12:00:00.000Z",
   "queuedBy": "routine"
 }
 ```
+
+`images` (opzionale) sono URL pubblici di screenshot **già caricati su Firebase
+Storage** da `queue-feedback.mjs --image <path>` al momento dell'accodamento (le
+storage.rules consentono l'upload senza auth, vedi `scripts/lib/feedback-storage.mjs`).
+L'applier li scrive nel campo `images` del documento feedback: la dashboard li
+mostra come prova visiva. Solo stringhe http(s), max 5.
 
 L'applier assegna il **numero** al momento della creazione: con `parentId` il
 nuovo feedback eredita il numero del padre con suffisso (#22 → #22.1, #22.2…),
