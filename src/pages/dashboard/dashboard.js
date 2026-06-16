@@ -671,7 +671,12 @@
       if ((type === 'IMPOSTA_PREFERENZA' || type === 'IMPOSTA_ESTETICA') && a._confirm.level === 2) {
         btn.dataset.autoConfirm = '1';
       }
-      btn.addEventListener('click', async () => {
+      // La conferma (popup + esecuzione) è una funzione a sé, così renderActions
+      // può aprirla DA SOLA — anche in sequenza quando ci sono più azioni di
+      // livello 2 nella stessa risposta (#183) — oltre che al click manuale.
+      // Ritorna una Promise che si risolve quando il popup è chiuso, perché
+      // l'auto-apertura sequenziale possa attendere l'una prima della successiva.
+      async function runConfirm() {
         if (btn.disabled) return;
         const Ui = window.SN_CONFIRM_UI;
         const opts = { title: 'Filo chiede conferma', text: a._confirm.text || '' };
@@ -688,14 +693,16 @@
           if (r && r.output) applyCommandCwd([{ _output: r.output }]);
           return;
         }
-        btn.textContent = (r && r.executed) ? `✓ ${a._confirm.text}` : '✗ Non eseguita';
+        btn.textContent = (r && r.executed) ? `✓ ${shortLabel}` : '✗ Non eseguita';
         // #146.4 — modifica estetica illeggibile (livello 2): confermata ed
         // applicata, offriamo subito il box per correggere il valore.
         if (r && r.executed && type === 'IMPOSTA_ESTETICA') {
           const refiner = buildAestheticRefiner(a);
           if (refiner) btn.after(refiner);
         }
-      });
+      }
+      btn._runConfirm = runConfirm;
+      btn.addEventListener('click', runConfirm);
       return btn;
     }
     if (type === 'ESEGUI_COMANDO') {
