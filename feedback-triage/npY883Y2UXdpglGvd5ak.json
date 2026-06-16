@@ -1,0 +1,7 @@
+{
+  "id": "npY883Y2UXdpglGvd5ak",
+  "status": "done",
+  "notes": "Ora puoi cambiare il colore della barra in alto. Ho aggiunto 'Barra in alto' tra gli elementi personalizzabili: chiedendo a Filo (es. 'colora la barra in alto di verde scuro') o dalle Preferenze avanzate ora la fascia dietro le schede cambia colore davvero. Prima non c'era modo di toccarla: l'agente provava ma finiva per tingere tutto lo sfondo, ed e per questo che 'non ci riusciva' e l'interfaccia restava verdina.\n\nIl bottone 'Ripristina tutte le impostazioni predefinite' (in Preferenze) era gia stato sistemato e ora riporta DAVVERO tutto ai valori di fabbrica in un colpo solo - colori, aspetto, colore delle schede, tema, dimensione del testo - tranne le tue chiavi API, che restano salvate per non disconnetterti.\n\nLa parte piu ampia della tua richiesta ('un controllo sistematico di OGNI elemento estetico, piu cose impostabili') l'ho pianificata come attivita a se (#184.1) cosi una prossima sessione passa in rassegna ogni superficie e aggiunge i token mancanti senza lasciare lavoro a meta.\n\nVerificato con test automatici: cambiare 'Barra in alto' tinge la fascia + le schede inattive della shell senza toccare le pagine, e il reset la riporta al neutro.",
+  "queuedAt": "2026-06-16T19:22:00.576Z",
+  "queuedBy": "routine"
+}
