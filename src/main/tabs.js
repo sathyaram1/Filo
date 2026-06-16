@@ -1836,11 +1836,18 @@ class TabManager {
 
   // ─── persistenza sessione (riapri i tab alla riapertura di Filo) ──────────
 
-  // Stato minimale da salvare/ripristinare: gli URL dei tab e quale era attivo.
+  // Stato minimale da salvare/ripristinare: url + scroll + posizione media di
+  // ogni tab, e quale era attivo. Forma oggetto (non bare string) da #145: la
+  // posizione media e lo scroll viaggiano insieme all'URL così la tab
+  // ripristinata riparte da dove l'utente l'aveva lasciata, in pausa.
   sessionState() {
     const tabs = this.tabs
-      .map((t) => t.url)
-      .filter((u) => typeof u === 'string' && u && u !== 'about:blank');
+      .filter((t) => typeof t.url === 'string' && t.url && t.url !== 'about:blank')
+      .map((t) => ({
+        url: t.url,
+        scrollPct: typeof t.scrollPct === 'number' ? t.scrollPct : null,
+        mediaTime: typeof t.mediaTime === 'number' ? t.mediaTime : null,
+      }));
     let activeIndex = this.tabs.findIndex((t) => t.id === this.activeId);
     if (activeIndex < 0) activeIndex = 0;
     return { tabs, activeIndex };
