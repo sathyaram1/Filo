@@ -1,14 +1,18 @@
-// Indicatore "audio in riproduzione" sulla tab (#feedback indicatore audio).
+// Indicatore "audio in riproduzione" sulla tab — comportamento atteso:
 //
-// Una tab che sta suonando deve mostrare un indicatore (altoparlante con onde),
-// distinto da quello di "audio mutato", così l'utente riconosce a colpo d'occhio
-// quale scheda fa rumore — anche se è in background. L'indicatore è cliccabile
-// per silenziare al volo (parità con la voce "Muta" del menu tasto destro).
+//  1) La tab suonante riceve la classe .audible e mostra un bagliore animato
+//     (box-shadow pulsante col colore del sito, desaturato).
+//  2) L'icona dell'altoparlante compare in DUE posti:
+//       a) nello slot favicon (class .favicon-audible) — sempre visibile,
+//          anche quando la tab è strettissima e il titolo è clippato;
+//       b) a fine tab, prima del close button (class .audio-ind) — visibile
+//          nelle tab sufficientemente larghe.
+//  3) Entrambi i punti di click silenziamo davvero la tab (muted nel main).
+//  4) Quando la tab è mutata appare l'indicatore .mute-ind; se poi viene
+//     riattivata e stava ancora suonando, tornano i due indicatori audio.
 //
-// Lo stato `audible` della tab è alimentato dall'evento Electron
-// `audio-state-changed`, che in headless non possiamo far scattare con audio
-// reale: lo forziamo dal main (è lo stesso campo che l'evento aggiorna) e
-// verifichiamo il rendering + il click reale sull'indicatore.
+// Lo stato `audible` è forzato dal main (stesso campo di audio-state-changed)
+// perché in headless non possiamo produrre audio reale.
 
 import { test, expect } from './fixtures/electron.mjs';
 
@@ -25,20 +29,54 @@ async function setAudible(app, value) {
   }, value);
 }
 
-test('una tab che suona mostra l\'indicatore audio, cliccarlo la silenzia', async ({ app, shell, openTab, testServer }) => {
+test('una tab che suona ha classe audible, icona favicon-audible e audio-ind a fine riga', async ({ app, shell, openTab, testServer }) => {
   const url = testServer.html('<title>AUDIO_TAB</title><h1 id="ok">pagina</h1>');
   const page = await openTab(url);
   await page.waitForSelector('#ok');
 
-  // All'inizio nessun indicatore audio.
+  // All'inizio nessun indicatore audio e nessuna classe audible.
+  await expect(shell.locator('.tab.audible')).toHaveCount(0);
   await expect(shell.locator('.tab .audio-ind')).toHaveCount(0);
+  await expect(shell.locator('.tab .favicon-audible')).toHaveCount(0);
 
-  // La tab inizia a suonare → compare l'indicatore (non quello di muto).
+  // La tab inizia a suonare → classe audible, icone in entrambi i posti, nessun mute-ind.
   await setAudible(app, true);
+  await expect(shell.locator('.tab.audible')).toHaveCount(1, { timeout: 10_000 });
+  await expect(shell.locator('.tab .favicon-audible')).toHaveCount(1, { timeout: 10_000 });
   await expect(shell.locator('.tab .audio-ind')).toHaveCount(1, { timeout: 10_000 });
   await expect(shell.locator('.tab .mute-ind')).toHaveCount(0);
 
-  // Click sull'indicatore → la tab viene silenziata davvero (muted nel main).
+  // Il bagliore è attivo: la tab ha l'animazione tab-glow-pulse.
+  const hasGlowAnimation = await shell.locator('.tab.audible').evaluate((el) => {
+    return getComputedStyle(el).animationName.includes('tab-glow-pulse');
+  });
+  expect(hasGlowAnimation).toBe(true);
+
+  // L'icona nel favicon-slot è visibile (non display:none) — essenziale per
+  // le tab strette dove il titolo è clippato.
+  const favAudibleVisible = await shell.locator('.tab .favicon-audible').evaluate((el) => {
+    const s = getComputedStyle(el);
+    return s.display !== 'none' && parseFloat(s.width) > 0;
+  });
+  expect(favAudibleVisible).toBe(true);
+
+  // L'audio-ind a fine riga è visibile.
+  const audioIndVisible = await shell.locator('.tab .audio-ind').evaluate((el) => {
+    const s = getComputedStyle(el);
+    return s.display !== 'none';
+  });
+  expect(audioIndVisible).toBe(true);
+});
+
+test('click sull\'audio-ind a fine riga silenzia la tab', async ({ app, shell, openTab, testServer }) => {
+  const url = testServer.html('<title>MUTE_TAB</title><h1 id="ok">pagina</h1>');
+  const page = await openTab(url);
+  await page.waitForSelector('#ok');
+
+  await setAudible(app, true);
+  await expect(shell.locator('.tab .audio-ind')).toHaveCount(1, { timeout: 10_000 });
+
+  // Click sull'audio-ind → la tab viene silenziata davvero (muted nel main).
   await shell.locator('.tab .audio-ind').click();
   await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
@@ -46,8 +84,10 @@ test('una tab che suona mostra l\'indicatore audio, cliccarlo la silenzia', asyn
     return !!t.muted;
   }), { timeout: 10_000 }).toBe(true);
 
-  // Da mutata: niente indicatore audio, c'è quello di muto (cliccabile per riattivare).
+  // Da mutata: niente classe audible, niente icone audio, compare mute-ind.
+  await expect(shell.locator('.tab.audible')).toHaveCount(0);
   await expect(shell.locator('.tab .audio-ind')).toHaveCount(0);
+  await expect(shell.locator('.tab .favicon-audible')).toHaveCount(0);
   await expect(shell.locator('.tab .mute-ind')).toHaveCount(1);
 
   // Click sull'indicatore di muto → riattiva.
@@ -57,6 +97,28 @@ test('una tab che suona mostra l\'indicatore audio, cliccarlo la silenzia', asyn
     const t = w._filoTabs.tabs.find((x) => /^https?:/.test(x.url || ''));
     return !!t.muted;
   }), { timeout: 10_000 }).toBe(false);
-  // Sta ancora suonando → torna l'indicatore audio.
+  // Stava ancora suonando → tornano entrambe le icone audio.
+  await expect(shell.locator('.tab.audible')).toHaveCount(1, { timeout: 10_000 });
+  await expect(shell.locator('.tab .favicon-audible')).toHaveCount(1, { timeout: 10_000 });
   await expect(shell.locator('.tab .audio-ind')).toHaveCount(1, { timeout: 10_000 });
+});
+
+test('click sul favicon-audible (slot favicon) silenzia la tab', async ({ app, shell, openTab, testServer }) => {
+  const url = testServer.html('<title>MUTE_FAV</title><h1 id="ok">pagina</h1>');
+  const page = await openTab(url);
+  await page.waitForSelector('#ok');
+
+  await setAudible(app, true);
+  await expect(shell.locator('.tab .favicon-audible')).toHaveCount(1, { timeout: 10_000 });
+
+  // Click sullo slot favicon → la tab viene silenziata.
+  await shell.locator('.tab .favicon-audible').click();
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    const t = w._filoTabs.tabs.find((x) => /^https?:/.test(x.url || ''));
+    return !!t.muted;
+  }), { timeout: 10_000 }).toBe(true);
+
+  await expect(shell.locator('.tab.audible')).toHaveCount(0);
+  await expect(shell.locator('.tab .favicon-audible')).toHaveCount(0);
 });
