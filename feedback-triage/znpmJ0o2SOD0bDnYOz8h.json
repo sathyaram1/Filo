@@ -1,0 +1,7 @@
+{
+  "id": "znpmJ0o2SOD0bDnYOz8h",
+  "status": "done",
+  "notes": "Risolto: alla riapertura di Filo i video delle schede ripristinate restano in pausa e non partono più da soli (parte solo ciò che fai partire tu interagendo con la scheda). Le schede nuove aperte a mano mantengono il comportamento normale. Verificato con un test automatico che riapre la sessione e controlla che un media in autoplay resti effettivamente in pausa.",
+  "queuedAt": "2026-06-16T22:31:32.678Z",
+  "queuedBy": "routine"
+}
