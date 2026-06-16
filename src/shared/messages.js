@@ -214,6 +214,14 @@
     // un'azione di Filo rimasta in sospeso: ora va eseguita davvero. { action }
     FILO_CONFIRM_ACTION: 'filo_confirm_action',
 
+    // Primo dispatch (non ancora confermato) di UNA singola azione di Filo,
+    // usato dall'agente "Aiuto" (sidebar) per attivare le azioni tipizzate di
+    // Filo — es. inviare un feedback — passando dallo stesso registro dei
+    // livelli di sicurezza della chat dashboard. Torna { executed, kept,
+    // needsConfirm, describe }: se needsConfirm il client mostra il popup di
+    // conferma e poi rimanda l'azione via FILO_CONFIRM_ACTION. { action }
+    FILO_RUN_ACTION: 'filo_run_action',
+
     // Da background -> content (broadcast)
     SETTINGS_UPDATED: 'settings_updated',
     SHORTCUT_TRIGGERED: 'shortcut_triggered',     // { command }
