@@ -917,6 +917,16 @@ class TabManager {
     if (typeof activity.formDirty === 'boolean') {
       if (activity.formDirty !== tab.formDirty) { tab.formDirty = activity.formDirty; changed = true; }
     }
+    // Posizione del media principale (video/audio) — usata per ripristinare la
+    // pagina in pausa al punto in cui l'utente l'aveva lasciata (vedi #145).
+    // Non triggera un _broadcast (cambia spesso, ogni paio di secondi: non
+    // serve far ridisegnare la shell), ma va salvata per la persistenza sessione.
+    if (typeof activity.mediaTime === 'number' && isFinite(activity.mediaTime)) {
+      tab.mediaTime = Math.max(0, activity.mediaTime);
+    }
+    if (typeof activity.mediaDuration === 'number' && isFinite(activity.mediaDuration)) {
+      tab.mediaDuration = activity.mediaDuration;
+    }
     if (changed) this._broadcast();
   }
 
