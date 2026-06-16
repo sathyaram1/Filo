@@ -800,24 +800,110 @@
     e.preventDefault();
   }, { passive: false });
 
-  // §2.3 — toast informativo (niente pulsante annulla, per scelta di design:
-  // l'annulla esiste via linguaggio naturale, "riapri le tab di X").
-  let toastTimer = null;
-  function showToast(text) {
-    if (!text) return;
-    let el = document.getElementById('shell-toast');
-    if (!el) {
-      el = document.createElement('div');
-      el.id = 'shell-toast';
-      el.className = 'shell-toast';
-      document.body.appendChild(el);
+  // Notifiche/toast in basso a destra (spec #170.1). Sistema riutilizzabile:
+  // ogni notifica è una card impilata nell'angolo, con durata configurabile
+  // (0 = infinita → resta finché l'utente non preme la X) e suono opzionale.
+  // È la base che i blocchi (#170.2/#170.3) usano per segnalare gli eventi.
+  const NOTIFS = (() => {
+    let host = null;
+    function hostEl() {
+      if (!host) {
+        host = document.getElementById('shell-notifs');
+        if (!host) {
+          host = document.createElement('div');
+          host.id = 'shell-notifs';
+          host.className = 'shell-notifs';
+          document.body.appendChild(host);
+        }
+      }
+      return host;
     }
-    el.textContent = text;
-    el.classList.add('show');
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => el.classList.remove('show'), 4500);
-  }
-  if (api.onToast) api.onToast((info) => showToast(info && info.text));
+    function dismiss(card) {
+      if (!card || card.dataset.closing === '1') return;
+      card.dataset.closing = '1';
+      if (card._timer) clearTimeout(card._timer);
+      card.classList.remove('show');
+      // attende la transizione prima di rimuovere dal DOM
+      setTimeout(() => { try { card.remove(); } catch (_) {} }, 220);
+    }
+    // showNotification(text, opts?) — opts: { durationSec, sound (toneId|false),
+    // actions: [{ label, onClick }] }. Senza opts usa la config delle Preferenze.
+    function show(text, opts) {
+      if (!text) return null;
+      opts = opts || {};
+      const card = document.createElement('div');
+      card.className = 'shell-notif';
+
+      const msg = document.createElement('div');
+      msg.className = 'shell-notif-msg';
+      msg.textContent = text;
+      card.appendChild(msg);
+
+      const durationSec = opts.durationSec != null
+        ? Number(opts.durationSec)
+        : notifConfig.durationSec;
+      const infinite = !(Number.isFinite(durationSec) && durationSec > 0);
+
+      // Azioni opzionali (es. "Apri comunque" per i blocchi #170.3).
+      if (Array.isArray(opts.actions) && opts.actions.length) {
+        const bar = document.createElement('div');
+        bar.className = 'shell-notif-actions';
+        for (const a of opts.actions) {
+          if (!a || !a.label) continue;
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'shell-notif-action';
+          btn.textContent = a.label;
+          btn.addEventListener('click', () => {
+            try { a.onClick && a.onClick(); } catch (_) {}
+            dismiss(card);
+          });
+          bar.appendChild(btn);
+        }
+        card.appendChild(bar);
+      }
+
+      // La X compare sempre per le notifiche infinite; per quelle a tempo è
+      // comunque utile poterle chiudere subito, quindi la mostriamo sempre.
+      const close = document.createElement('button');
+      close.type = 'button';
+      close.className = 'shell-notif-close';
+      close.setAttribute('aria-label', 'Chiudi notifica');
+      close.textContent = '×';
+      close.addEventListener('click', () => dismiss(card));
+      card.appendChild(close);
+
+      hostEl().appendChild(card);
+      // forza reflow così la transizione di entrata parte
+      // eslint-disable-next-line no-unused-expressions
+      card.offsetHeight;
+      card.classList.add('show');
+
+      // Suono opzionale alla comparsa.
+      const wantSound = opts.sound !== undefined
+        ? opts.sound
+        : (notifConfig.soundEnabled ? notifConfig.sound : false);
+      if (wantSound && window.SN_SOUNDS) {
+        try { window.SN_SOUNDS.play(typeof wantSound === 'string' ? wantSound : notifConfig.sound); } catch (_) {}
+      }
+
+      if (!infinite) {
+        card._timer = setTimeout(() => dismiss(card), durationSec * 1000);
+      }
+      return card;
+    }
+    return { show, dismiss };
+  })();
+
+  // Compat: il vecchio toast informativo (es. "Tab riordinate e salvate") ora
+  // passa per il sistema di notifiche, così rispetta la durata configurata.
+  function showToast(text) { return NOTIFS.show(text); }
+  if (api.onToast) api.onToast((info) => {
+    if (!info || !info.text) return;
+    NOTIFS.show(info.text, info.opts);
+  });
+  // Esposta per test e per usi programmatici dalla shell stessa.
+  window.filoNotify = (text, opts) => NOTIFS.show(text, opts);
 
   newBtn.addEventListener('click', () => api.tabs.open('filo://newtab/'));
   backBtn.addEventListener('click', () => { const a = activeTab(); if (a) api.tabs.back(a.id); });
