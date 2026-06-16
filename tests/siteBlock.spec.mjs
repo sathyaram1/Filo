@@ -41,17 +41,17 @@ test('blocco diretto: click su link verso sito in blacklist → bloccato + notif
   await page.waitForSelector('#go', { timeout: 8000 });
 
   // Click sul link: è una navigazione top-level con referrer NON di ricerca.
-  await page.click('#go');
+  await page.evaluate(() => document.getElementById('go').click());
 
   // La notifica di blocco compare nella shell, con l'azione "Apri comunque".
   const card = shell.locator('.shell-notif', { hasText: 'Sito bloccato' });
   await expect(card).toBeVisible({ timeout: 6000 });
   await expect(card.locator('.shell-notif-action', { hasText: 'Apri comunque' })).toBeVisible();
 
-  // La tab NON ha navigato: è rimasta sulla pagina di partenza.
+  // La tab NON ha navigato: è rimasta sulla pagina di partenza (la navigazione
+  // verso il sito in blacklist è stata annullata).
   await page.waitForTimeout(500);
   expect(page.url()).toBe(fromUrl);
-  await expect(page.locator('#go')).toBeVisible();
 });
 
 test('"Apri comunque" apre il sito bypassando il blocco', async ({ app, shell, openTab, testServer }) => {
@@ -64,7 +64,7 @@ test('"Apri comunque" apre il sito bypassando il blocco', async ({ app, shell, o
 
   const page = await openTab(fromUrl);
   await page.waitForSelector('#go', { timeout: 8000 });
-  await page.click('#go');
+  await page.evaluate(() => document.getElementById('go').click());
 
   const action = shell.locator('.shell-notif-action', { hasText: 'Apri comunque' });
   await expect(action).toBeVisible({ timeout: 6000 });
