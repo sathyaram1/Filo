@@ -72,6 +72,17 @@
     return `<div class="fb-priority" title="Priorità: ${p || '—'}">${dots}</div>`;
   }
 
+  // Badge "in lavorazione": una routine cloud ha preso in carico il feedback
+  // (semaforo in scripts/claim-feedback.mjs, specchiato su Firestore dall'applier).
+  // Mostrato solo finché il claim non è scaduto; '' / scaduto = libero.
+  function claimBadgeHtml(f) {
+    const exp = Date.parse(f.claimExpiresAt || '');
+    if (!Number.isFinite(exp) || exp <= Date.now()) return '';
+    const who = String(f.claimedBy || '').slice(0, 40);
+    const title = `Una routine ci sta lavorando${who ? ` (${who})` : ''} — scade ${fmtTs(f.claimExpiresAt)}`;
+    return `<span class="fb-claim" title="${escapeHtml(title)}">🔧 in lavorazione</span>`;
+  }
+
   function statusOf(f) {
     const s = f.status || 'new';
     if (s === 'ignored') return 'ignored';
