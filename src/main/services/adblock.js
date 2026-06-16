@@ -178,7 +178,7 @@ function applyAdblock(ses) {
 
 function cacheDir() {
   let base = '';
-  try { base = app.getPath('userData'); } catch (_) { base = process.env.FILO_USER_DATA || '.'; }
+  try { base = require('electron').app.getPath('userData'); } catch (_) { base = process.env.FILO_USER_DATA || '.'; }
   return path.join(base, 'adblock');
 }
 function cacheFile() { return path.join(cacheDir(), 'lists.json'); }
