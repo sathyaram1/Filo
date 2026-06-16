@@ -189,7 +189,15 @@ async function createFeedback(entry, num, bearer) {
     title: toFsValue(''),
     userAgent: toFsValue('routine'),
     clientId: toFsValue(`routine:${String(entry.queuedBy || 'routine').slice(0, 80)}`),
-    images: toFsValue([]),
+    // images = URL pubblici già caricati su Storage da queue-feedback.mjs
+    // (--image). Solo stringhe http(s), max 5: la dashboard li mostra come prova
+    // visiva del feedback d'audit.
+    images: toFsValue(
+      (Array.isArray(entry.images) ? entry.images : [])
+        .map((u) => String(u || '').trim())
+        .filter((u) => /^https?:\/\//i.test(u))
+        .slice(0, 5),
+    ),
     files: toFsValue([]),
     status: toFsValue(entry.status),
     notes: toFsValue(String(entry.notes || '')),
