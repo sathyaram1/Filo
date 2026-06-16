@@ -50,8 +50,8 @@ module.exports = function register(on, ctx) {
       }
       const idToken = await auth.getIdToken();
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
-      const { id, status, notes, priority } = msg;
-      await globalThis.SN_FEEDBACK.updateStatus(id, { status, notes, priority }, { idToken });
+      const { id, status, notes, priority, images, files } = msg;
+      await globalThis.SN_FEEDBACK.updateStatus(id, { status, notes, priority, images, files }, { idToken });
       return { ok: true };
     } catch (e) {
       const raw = e?.message || String(e);
