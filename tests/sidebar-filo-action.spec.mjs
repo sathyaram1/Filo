@@ -82,7 +82,7 @@ test('dalla sidebar: il popup di conferma compare; Annulla NON invia; OK invia d
   const sent = await app.evaluate(() => globalThis.__fbCalls[0]);
   expect(sent.text).toContain('schermo intero');
   expect(sent.clientId).toBe('filo:chat');
-  await expect(page.locator('.sn-sidebar-log')).toContainText('fatto');
+  await expect(page.locator('.sn-sidebar-log').last()).toContainText('fatto');
 
   // Ripristina il submit reale.
   await app.evaluate(() => { globalThis.SN_FEEDBACK.submit = globalThis.__origFbSubmit; });
