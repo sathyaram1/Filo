@@ -1,0 +1,7 @@
+{
+  "id": "PrK6EwY9Q4l8YOexE7wG",
+  "status": "done",
+  "notes": "Quando chiudi una scheda, ora Filo ti riporta all'ultima scheda che stavi guardando prima (la piu' recente fra quelle ancora aperte), non piu' semplicemente a quella a sinistra. Se la scheda chiusa non era stata preceduta da nessun'altra scheda gia' vista (es. schede aperte solo in background), ripiega sulla scheda adiacente come prima. Verificato con test automatici che simulano il percorso A>B>C>D, ritorno su B e chiusura di B: il focus torna su D.",
+  "queuedAt": "2026-06-16T16:13:55.221Z",
+  "queuedBy": "routine"
+}
