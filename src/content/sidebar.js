@@ -546,6 +546,59 @@
     }
   }
 
+  // ---------- Azioni tipizzate di Filo (parità col menu tasto destro) ----------
+  //
+  // L'agente "Aiuto" può attivare le azioni che l'utente farebbe col tasto
+  // destro — a partire dall'invio di un feedback agli sviluppatori. Queste
+  // azioni NON vengono eseguite localmente: passano per executeFiloAction nel
+  // main, che consulta il registro statico dei livelli di sicurezza
+  // (src/shared/actionLevels.js) e, per i livelli ≥ 2, ci rimanda una
+  // spiegazione da mostrare nel popup di conferma di Filo (SN_CONFIRM_UI), lo
+  // STESSO usato dalla chat della dashboard. Così la sidebar non è un canale
+  // privilegiato: stesso registro, stesse conferme, stesse regole.
+
+  // Etichetta breve per la riga di log in chat (cosa Filo ha fatto/sta facendo).
+  function filoActionLabel(action) {
+    const type = String(action && action.type || '').toUpperCase();
+    if (type === 'INVIA_FEEDBACK') return 'invio feedback agli sviluppatori';
+    return `azione Filo: ${type.toLowerCase().replace(/_/g, ' ')}`;
+  }
+
+  async function runFiloAction(action) {
+    const label = filoActionLabel(action);
+    let res = null;
+    try {
+      res = await chrome.runtime.sendMessage({ type: MSG.FILO_RUN_ACTION, action });
+    } catch (_) {}
+    if (!res || !res.ok) { appendActionLog(`${label}: non riuscita`); return false; }
+
+    // Livello ≥ 2: il main NON ha eseguito e ci ha mandato la spiegazione per il
+    // popup di conferma di Filo. Mostriamo il popup; solo dopo l'OK rimandiamo
+    // l'azione (riclassificata di nuovo nel main) via FILO_CONFIRM_ACTION.
+    if (res.needsConfirm) {
+      const Ui = global.SN_CONFIRM_UI;
+      const opts = { title: 'Filo chiede conferma', text: res.describe || '' };
+      let ok = false;
+      try {
+        ok = Ui
+          ? await (res.needsConfirm >= 3 ? Ui.confirmTyped(opts) : Ui.confirm(opts))
+          : global.confirm(opts.text);
+      } catch (_) { ok = false; }
+      if (!ok) { appendActionLog(`${label}: annullata`); return false; }
+      let c = null;
+      try {
+        c = await chrome.runtime.sendMessage({ type: MSG.FILO_CONFIRM_ACTION, action });
+      } catch (_) {}
+      const done = !!(c && c.executed);
+      appendActionLog(done ? `${label}: fatto` : `${label}: non riuscita`);
+      return done;
+    }
+
+    const done = !!res.executed;
+    appendActionLog(done ? `${label}: fatto` : `${label}: non riuscita`);
+    return done;
+  }
+
   // ---------- Submit / loop ----------
 
   function buildPayload(userMessage, userAction) {
