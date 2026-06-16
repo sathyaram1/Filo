@@ -813,6 +813,26 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
           output: r && r.ok ? { proxyRule: 'removed', domain: r.domain } : { proxyRule: 'failed' },
         };
       }
+      case 'STILE_PAGINA': {
+        // Filo cambia l'aspetto del testo della pagina che l'utente guarda
+        // (#185). Le regole {selettore, css} prodotte dall'LLM vengono SANIFICATE
+        // qui (mai fidarsi del CSS dell'LLM) e iniettate live nella scheda web
+        // attiva. Effimero (un reload lo toglie) e reversibile (RIPRISTINA_STILE_PAGINA).
+        const R = globalThis.SN_PAGE_RESTYLE;
+        if (!R) return { executed: false, kept: false };
+        const css = R.buildCss(R.normalizeRules(action));
+        if (!css) return { executed: false, kept: false };
+        const { tm, tab } = targetWebTab(sender);
+        if (!tm || !tab) return { executed: false, kept: false, output: { restyle: 'no-page' } };
+        const r = tm.applyPageStyle(css, tab);
+        return { executed: !!(r && r.ok), kept: false };
+      }
+      case 'RIPRISTINA_STILE_PAGINA': {
+        const { tm, tab } = targetWebTab(sender);
+        if (!tm || !tab) return { executed: false, kept: false, output: { restyle: 'no-page' } };
+        const r = tm.clearPageStyle(tab);
+        return { executed: !!(r && r.ok), kept: false };
+      }
       default:
         return { executed: false, kept: false };
     }
