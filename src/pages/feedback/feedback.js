@@ -267,7 +267,7 @@
       emptyEl.hidden = false;
       emptyEl.textContent = {
         inbox: 'Nessun feedback in arrivo.',
-        agent: 'Nessuna issue trovata dagli agenti.',
+        agent: 'Nessun ritrovamento automatico (agente esploratore o audit delle routine).',
         draft: 'Nessuna bozza in attesa di decisioni.',
         todo: 'Nessun feedback da risolvere.',
         clarify: 'Nessun feedback in attesa di chiarimenti.',
