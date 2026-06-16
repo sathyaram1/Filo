@@ -1,20 +1,38 @@
-// Feedback #145: "appena riapro Filo partono i video YouTube. fai in modo che
-// alla partenza i video siano in pausa".
+// Feedback #145 (riaperto, #145.2): "appena riapro Filo partono i video
+// YouTube. fai in modo che alla partenza i video siano in pausa", + tre lamentele
+// aggiuntive sul primo fix:
+//   1) "è partito l'audio per un attimo poi si è stoppato" — blip audio alla
+//      riapertura, il media non deve MAI farsi sentire.
+//   2) "il video si è resettato, è partito da capo (pubblicità incluse). lo
+//      vorrei dove l'avevo lasciato, in pausa" — la posizione va preservata.
+//   3) "la pausa deve riattivarsi solo se clicco per levarlo dalla pausa" —
+//      interagire con la pagina (scroll, click altrove) non deve far ripartire
+//      il media: solo un'interazione SUL media (o le sue scorciatoie) rilascia
+//      la soppressione.
 //
 // Causa: Electron abilita l'autoplay senza gesto utente per default
 // ('no-user-gesture-required'), quindi le tab ripristinate al boot facevano
-// ripartire i media tutti insieme. Fix: le tab nate da un ripristino di
-// sessione usano 'document-user-activation-required' → niente autoplay finché
-// l'utente non interagisce con la pagina (come un browser normale).
+// ripartire i media tutti insieme. Fix #145: pause() su 'play' lato preload +
+// 'document-user-activation-required'. Fix #145.2 (questo): muta anche il
+// media mentre è sopprresso (niente blip), persiste/ripristina currentTime
+// per-tab nella sessione salvata (sn_open_tabs ora salva oggetti
+// {url,scrollPct,mediaTime} invece di bare URL), e la soppressione si rilascia
+// SOLO su interazione col media (non su click/scroll generici sulla pagina).
 //
 // Il test ASSERISCE il comportamento, in due fasi con lo STESSO userData:
-//   FASE 1 — apri una pagina esterna come tab, lascia salvare la sessione, chiudi.
+//   FASE 1 — apri una pagina esterna con un video, fai avanzare currentTime,
+//            lascia salvare la sessione (col mediaTime), chiudi.
 //   FASE 2 — riapri: la sessione viene ripristinata. La tab ripristinata ha
-//            l'autoplay disabilitato; una tab NUOVA aperta a mano no (prova che
-//            la modifica è mirata al ripristino, non un blocco globale).
+//            l'autoplay disabilitato E muto (niente blip), il video è alla
+//            posizione salvata (non resettato a 0), e un click/scroll su area
+//            vuota della pagina NON rilascia la soppressione — solo un click
+//            sul video stesso la rilascia. Una tab NUOVA aperta a mano non ha
+//            invece alcuna soppressione (prova che la modifica è mirata al
+//            ripristino, non un blocco globale).
 //
 // Senza il fix la tab ripristinata avrebbe la stessa policy permissiva della
-// tab nuova → l'assert sulla tab ripristinata diventa rosso.
+// tab nuova, il video ripartirebbe da 0, e un click su area vuota rilascerebbe
+// la soppressione → gli assert sulla tab ripristinata diventano rossi.
 
 import { test, expect, _electron as electron } from '@playwright/test';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -28,6 +46,20 @@ const APP_ROOT = resolve(__dirname, '..');
 
 const PAGE_HTML = `<!doctype html><html><head><meta charset="utf-8"><title>autoplay-probe</title></head>
 <body><h1>autoplay probe</h1><video id="v" autoplay loop playsinline></video></body></html>`;
+
+// Pagina con un <video> a durata reale (generato via MediaSource non serve:
+// basta un file servito con Content-Length/Range corretti). Usiamo un piccolo
+// MP4 generato al volo non è praticabile senza ffmpeg, quindi simuliamo la
+// "durata" sovrascrivendo le proprietà del video con un oggetto fittizio non è
+// possibile su un vero <video>. Strategia più semplice e robusta: usiamo un
+// <video> con un MediaSource-meno src ma impostiamo currentTime via un
+// elemento <video> il cui codec è gestito dal browser stesso (Chromium sa
+// decodificare WAV? no). Usiamo invece un <audio> (stesso identico codepath di
+// 'pickMainMedia' in content.js, che guarda sia video sia audio) con il WAV
+// silenzioso già usato per la prova di autoplay: leggero, supportato nativamente,
+// e con `loop` possiamo dargli una durata corta e avanzare currentTime.
+const MEDIA_PAGE_HTML = `<!doctype html><html><head><meta charset="utf-8"><title>media-restore-probe</title></head>
+<body><h1>media restore probe</h1></body></html>`;
 
 function launch(userData) {
   return electron.launch({
