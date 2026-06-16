@@ -497,6 +497,20 @@
           };
         }
       }
+      // Output speciale: azione tipizzata di Filo (le stesse che la chat della
+      // dashboard può emettere — es. inviare un feedback agli sviluppatori). È
+      // ciò che l'utente farebbe col menu tasto destro. Non la eseguiamo qui:
+      // passa per il registro dei livelli di sicurezza nel main (e, se serve,
+      // per il popup di conferma) — vedi submit().
+      if (obj.action === 'filo' && obj.filo && typeof obj.filo === 'object'
+        && typeof obj.filo.type === 'string' && obj.filo.type.trim()) {
+        return {
+          kind: 'filo_action',
+          filoAction: obj.filo,
+          display: typeof obj.text === 'string' ? obj.text : '',
+          status: obj.status === 'continue' ? 'continue' : 'done',
+        };
+      }
       const status = obj.status === 'continue' ? 'continue' : 'done';
       const collapseFlag = typeof obj.collapse === 'boolean' ? obj.collapse : null;
       let highlight = null;
