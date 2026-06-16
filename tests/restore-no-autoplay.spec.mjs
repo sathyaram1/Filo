@@ -147,25 +147,28 @@ test('le tab ripristinate non fanno partire i video (autoplay bloccato al boot)'
     shell = await app.firstWindow();
     await shell.waitForLoadState('domcontentloaded');
 
-    // Tab ripristinata: autoplay disabilitato (il video non parte da solo).
+    // Tab ripristinata: autoplay disabilitato (il video non parte da solo) E
+    // muto (niente blip audio nemmeno per un istante — lamentela #1).
     const restored = await findWindow(app, (w) => w.url().startsWith(restoredUrl));
     expect(restored, 'tab ripristinata non trovata in fase 2').toBeTruthy();
     await restored.waitForLoadState('domcontentloaded').catch(() => {});
-    const restoredPaused = await isPausedAfterAutoplay(restored);
+    const restoredProbe = await probeAutoplay(restored);
 
     // Tab nuova (non ripristinata): mantiene l'autoplay permissivo di Filo.
     await shell.evaluate((u) => window.filoShell.tabs.open(u), freshUrl);
     const fresh = await findWindow(app, (w) => w.url().startsWith(freshUrl));
     expect(fresh, 'tab nuova non aperta').toBeTruthy();
     await fresh.waitForLoadState('domcontentloaded').catch(() => {});
-    const freshPaused = await isPausedAfterAutoplay(fresh);
+    const freshProbe = await probeAutoplay(fresh);
 
-    console.log('[autoplay] restoredPaused=', restoredPaused, ' freshPaused=', freshPaused);
+    console.log('[autoplay] restored=', restoredProbe, ' fresh=', freshProbe);
 
-    // Sulla tab ripristinata il media resta in pausa (autoplay bloccato);
-    // sulla tab nuova suona (la prova è mirata al ripristino, non un blocco globale).
-    expect(restoredPaused).toBe(true);
-    expect(freshPaused).toBe(false);
+    // Sulla tab ripristinata il media resta in pausa E muto (autoplay bloccato,
+    // niente blip); sulla tab nuova suona (prova mirata al ripristino, non un
+    // blocco globale).
+    expect(restoredProbe.paused).toBe(true);
+    expect(restoredProbe.muted).toBe(true);
+    expect(freshProbe.paused).toBe(false);
   } finally {
     try { if (app) await app.close(); } catch (_) {}
     try { server.closeAllConnections?.(); } catch (_) {}
