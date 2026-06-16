@@ -31,6 +31,19 @@ module.exports = function register(on, ctx) {
     // prova i provider che la implementano (oggi: Gemini). Se nessuno è
     // disponibile o tutti falliscono, torna { ok:false } e il content script
     // ripiega sulla voce del browser (Web Speech).
+
+    // Seam di test (NODE_ENV=test): nel CI headless non esiste né una chiave
+    // Gemini né un motore vocale del sistema, quindi nessuna lettura potrebbe
+    // mai partire davvero. Ritorniamo qualche secondo di PCM silenzioso così il
+    // content script riproduce un <audio> reale e lo stato "sta leggendo"
+    // (ttsBusy) diventa verificabile in modo deterministico. Stesso spirito dei
+    // seam NODE_ENV=test già presenti (es. src/main/shim/storage.js).
+    if (process.env.NODE_ENV === 'test') {
+      const rate = 8000, seconds = 6;
+      const audioBase64 = Buffer.alloc(rate * seconds * 2).toString('base64'); // PCM16 mono
+      return { ok: true, audioBase64, mimeType: `audio/L16;rate=${rate}`, provider: 'test', model: 'test-tts' };
+    }
+
     try {
       const settings = await getEffectiveSettings();
       const model = modelForAction(settings, SN_CONST.ACTIONS.TTS);
