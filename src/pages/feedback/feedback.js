@@ -541,9 +541,29 @@
             .join(' ').toLowerCase().includes(q);
         })
       : base;
-    // Priorità più alta in cima. `all` è già ordinato per data DESC e il sort
-    // di JS è stabile, quindi a parità di priorità restano i più recenti prima.
-    filtered.sort((a, b) => priorityOf(b) - priorityOf(a));
+    if (currentTab === 'done') {
+      // Tab "Risolti": ordina per numero (#1, #2, … #22.1, #22.2). I feedback
+      // senza numero (seq assente) finiscono in coda. Confronto numerico su
+      // seq e poi subSeq, così #22.2 viene dopo #22.10? No: numerico, quindi
+      // #22.2 < #22.10 — l'ordine "umano" atteso per i sub-feedback.
+      const numKey = (f) => {
+        const seq = Number(f.seq);
+        const sub = Number(f.subSeq);
+        return {
+          seq: Number.isFinite(seq) ? seq : Infinity,
+          sub: Number.isFinite(sub) ? sub : 0,
+        };
+      };
+      filtered.sort((a, b) => {
+        const ka = numKey(a);
+        const kb = numKey(b);
+        return ka.seq - kb.seq || ka.sub - kb.sub;
+      });
+    } else {
+      // Priorità più alta in cima. `all` è già ordinato per data DESC e il sort
+      // di JS è stabile, quindi a parità di priorità restano i più recenti prima.
+      filtered.sort((a, b) => priorityOf(b) - priorityOf(a));
+    }
     updateTabCounts();
     render(filtered);
   }
