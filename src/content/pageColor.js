@@ -87,8 +87,15 @@
   // Si calcola UNA VOLTA per pagina (con qualche retry per i siti che settano
   // theme-color/favicon dopo il paint) e si manda al main, che lo cacha per
   // dominio. La shell lo applica attenuato alle tab inattive.
-  function reportTabIdentityColor() {
+  // getParams (opzionale): funzione che ritorna i parametri di estrazione
+  // correnti (settings.tabColor). Vengono passati a extractIdentityFromPixels,
+  // così cambiarli (a voce o nelle Preferenze) cambia il colore estratto. Se
+  // assente, l'estrazione usa i default di SN_TAB_COLOR.
+  function reportTabIdentityColor(getParams) {
     let lastSent;
+    const params = () => {
+      try { return (typeof getParams === 'function' && getParams()) || null; } catch (_) { return null; }
+    };
 
     // Risolve qualsiasi stringa colore CSS (#hex, named, hsl…) in "rgb(r,g,b)".
     function toRGB(str) {
