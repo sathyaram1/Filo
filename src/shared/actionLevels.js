@@ -126,7 +126,12 @@
       },
       describe: (a) => {
         const built = prefBuilt(a);
-        return built ? `Impostare: ${built.label}` : 'Modificare una preferenza';
+        if (!built) return 'Modificare una preferenza';
+        // Il popup di conferma spiega COSA Filo sta per fare e, per le
+        // impostazioni sensibili (livello 2), anche i RISCHI (#183). Il `risk`
+        // arriva dal setter in preferences.js: è obbligatorio per il livello 2.
+        const base = `Filo vuole impostare: ${built.label}.`;
+        return built.risk ? `${base}\n\n${built.risk}` : base;
       },
     },
     IMPOSTA_ESTETICA: {
