@@ -120,11 +120,16 @@ service cloud.firestore {
 
       // Triage admin (pieno): campi di stato/note/priorità/timestamp, più
       // numero e titolo (per backfill/rinomina). Il resto resta immutabile.
+      // `claimedBy`/`claimedAt`/`claimExpiresAt`/`claimNum` = "semaforo" che una
+      // routine ha preso in carico il feedback (vedi scripts/claim-feedback.mjs).
+      // Il lock vero vive su git; questi campi servono SOLO alla dashboard per
+      // mostrare "in lavorazione". Sono stringhe (ISO/etichetta); '' = libero.
       allow update: if
         isAdmin()
         && request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['status', 'notes', 'resolvedAt', 'verifiedAt', 'priority',
-                    'name', 'seq', 'subSeq'])
+                    'name', 'seq', 'subSeq',
+                    'claimedBy', 'claimedAt', 'claimExpiresAt', 'claimNum'])
         && request.resource.data.get('status', 'new') in ['new', 'draft', 'todo', 'clarify', 'done', 'verified', 'ignored']
         && request.resource.data.get('notes', '') is string
         && request.resource.data.get('notes', '').size() <= 10000
@@ -136,7 +141,15 @@ service cloud.firestore {
         && request.resource.data.get('seq', 0) is int
         && request.resource.data.get('seq', 0) >= 0
         && request.resource.data.get('subSeq', 0) is int
-        && request.resource.data.get('subSeq', 0) >= 0;
+        && request.resource.data.get('subSeq', 0) >= 0
+        && request.resource.data.get('claimedBy', '') is string
+        && request.resource.data.get('claimedBy', '').size() <= 120
+        && request.resource.data.get('claimedAt', '') is string
+        && request.resource.data.get('claimedAt', '').size() <= 40
+        && request.resource.data.get('claimExpiresAt', '') is string
+        && request.resource.data.get('claimExpiresAt', '').size() <= 40
+        && request.resource.data.get('claimNum', '') is string
+        && request.resource.data.get('claimNum', '').size() <= 20;
 
       // Triage routine (limitato): può solo spostare tra `todo`/`done`/`clarify`
       // e scrivere `notes`/`resolvedAt`. NON tocca `priority`, NON marca
