@@ -1,0 +1,7 @@
+{
+  "id": "GzMBIGR21aSxlGLinvpv",
+  "status": "done",
+  "notes": "Causa trovata: quando chiedevi a Filo una modifica estetica (es. 'rendi tutte le scritte rosse'), Filo la applicava davvero e rispondeva 'Fatto', ma sulla schermata Nuova scheda — dove vive la chat — non si vedeva NIENTE, perche quella pagina usava colori propri scollegati dal tema. Sembrava quindi che servisse cliccare un bottone perche la modifica 'prendesse'. Ora le modifiche estetiche che chiedi (colore del testo, sfondo, accento, bordi, raggio degli angoli) si applicano subito e si VEDONO anche sulla Nuova scheda, senza cliccare nulla: il 'Fatto' di Filo corrisponde a cio che vedi. Il bottone 'Scegli il colore esatto' resta solo come rifinitura opzionale (la modifica e gia applicata). I link richiesti a Filo si aprono gia direttamente in una scheda. Verificato con test automatici (anche aprendo davvero la Nuova scheda e controllando che il testo diventi rosso). Nota: se con 'sistema di conferme' intendevi qualcos'altro di specifico che non funziona, riaprilo con un esempio e lo sistemo.",
+  "queuedAt": "2026-06-16T10:21:24.440Z",
+  "queuedBy": "routine"
+}
