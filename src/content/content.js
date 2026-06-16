@@ -173,6 +173,36 @@
       send({ formDirty: true, scrollPct: Math.round(scrollPct()) });
     }
 
+    // ── reopen-feedback: posizione del media più rilevante (per il ripristino
+    // a pagina-spenta-poi-riapri). Sceglie l'elemento <video>/<audio> con la
+    // durata maggiore (di solito il player principale, es. YouTube) tra quelli
+    // con metadata noti; ignora quelli a durata 0/Infinity (live, non utile da
+    // ripristinare). Campiona su 'timeupdate'/'pause' (throttle ~3s) e ogni
+    // tanto comunque, così anche un video in pausa che l'utente ha scrubbed
+    // viene catturato.
+    let lastSentMediaAt = 0;
+    function pickMainMedia() {
+      const els = Array.from(document.querySelectorAll('video, audio'));
+      let best = null;
+      for (const m of els) {
+        if (!m || !isFinite(m.duration) || m.duration <= 0) continue;
+        if (!best || m.duration > best.duration) best = m;
+      }
+      return best;
+    }
+    function sendMediaTime(force) {
+      const since = performance.now() - lastSentMediaAt;
+      if (!force && since < 3000) return;
+      const m = pickMainMedia();
+      if (!m) return;
+      lastSentMediaAt = performance.now();
+      send({ mediaTime: m.currentTime || 0, mediaDuration: m.duration || null });
+    }
+    function onMediaEvent() { sendMediaTime(false); }
+    document.addEventListener('timeupdate', onMediaEvent, { passive: true, capture: true });
+    document.addEventListener('pause', onMediaEvent, { passive: true, capture: true });
+    document.addEventListener('loadedmetadata', onMediaEvent, { passive: true, capture: true });
+
     window.addEventListener('pointerdown', onInteract, { passive: true, capture: true });
     window.addEventListener('keydown', onInteract, { passive: true, capture: true });
     window.addEventListener('scroll', onScroll, { passive: true });
@@ -181,6 +211,9 @@
 
     // Primo campione dello scroll iniziale (alcune pagine aprono già scrollate).
     setTimeout(() => send({ scrollPct: Math.round(scrollPct()) }), 600);
+    // Campione periodico della posizione media (anche senza eventi, es. video
+    // in pausa con currentTime invariato ma non ancora riportato).
+    setInterval(() => sendMediaTime(true), 4000);
   }
 
   function isBlocked() {
