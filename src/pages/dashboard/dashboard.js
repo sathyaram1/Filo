@@ -659,7 +659,11 @@
       const cmdText = String(a.comando || a.command || a.cmd || '').trim();
       const isCmd = type === 'ESEGUI_COMANDO';
       const short = cmdText.length > 60 ? `${cmdText.slice(0, 57)}…` : cmdText;
-      btn.textContent = isCmd ? `▶ ${short}` : (a._confirm.text || 'Esegui');
+      // Il testo completo (cosa fa + rischi, #183) vive nel popup. Sul bottone —
+      // che resta solo come ripiego se l'utente annulla — basta la prima riga.
+      const fullText = String(a._confirm.text || '');
+      const shortLabel = fullText.split('\n')[0] || 'Esegui';
+      btn.textContent = isCmd ? `▶ ${short}` : shortLabel;
       // #159 — le modifiche alle impostazioni (preferenza/estetica) a livello 2
       // aprono il popup di conferma da sole: marchiamo il bottone perché
       // renderActions lo possa cliccare automaticamente. Le azioni esterne
