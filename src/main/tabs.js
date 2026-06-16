@@ -1381,11 +1381,9 @@ class TabManager {
     let decision;
     try {
       decision = require('./services/siteBlock').shouldBlockNavigation(url, { fromUrl });
-    } catch (e) {
-      console.warn('[siteBlock] err', e && e.message);
+    } catch (_) {
       return false;
     }
-    console.warn('[siteBlock] check', url, 'from', fromUrl, '→', JSON.stringify(decision), 'status', JSON.stringify(require('./services/siteBlock').status()));
     if (!decision || !decision.block) return false;
     this._notifyBlocked(decision.host, url);
     return true;
