@@ -47,7 +47,9 @@
   // annidati vicini); `label` è la conferma leggibile per l'utente.
   // `level` (opzionale, default 1) è il livello di sicurezza quando è FILO a
   // cambiare la preferenza via chat (#146.2, vedi actionLevels.js): 1 applica
-  // subito, 2 chiede conferma con popup.
+  // subito, 2 chiede conferma con popup. `risk` (obbligatorio quando level=2,
+  // #183) è la spiegazione in chiaro mostrata nel popup: cosa controlla
+  // l'impostazione e quali rischi comporta toccarla.
   const PREF_SETTERS = [
     {
       keys: ['tema', 'theme', 'aspetto'],
