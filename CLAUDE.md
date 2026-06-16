@@ -452,13 +452,51 @@ operative vivono qui — quando ricevi quel prompt in ambiente cloud:
      incoerenze tra cammini equivalenti, attriti, stati senza feedback visivo.
 
    **In questa passata NON correggere nulla di tua iniziativa**: l'obiettivo è
-   *trovare e segnalare*, non fixare — decide l'utente cosa vale la pena. Per
-   **ogni** cosa trovata apri un feedback in stato **`new`** (vedi sotto dove
-   appare), così l'utente lo rivede prima di metterlo in lavorazione:
+   *trovare e segnalare*, non fixare — decide l'utente cosa vale la pena.
+
+   **REGOLE per scrivere un feedback d'audit leggibile e affidabile.** I
+   feedback auto-generati in passato erano *poco leggibili, ripetuti e alcuni
+   sbagliati*. Per ogni ritrovamento, PRIMA di accodarlo:
+
+   1. **Riproducilo da utente, non solo leggendo il codice.** Esercita
+      davvero il flusso (click/azioni reali) e **conferma con i tuoi occhi** che
+      il problema esista. Un sospetto nato solo dalla lettura del sorgente NON è
+      un feedback: o lo riproduci, o non lo apri. Questo è ciò che elimina i
+      feedback "sbagliati". Se il problema è visibile, **cattura uno screenshot
+      che mostra l'errore** (in cloud: `page.screenshot({ path: 'tests/.shots/audit-<slug>.png' })`
+      dentro lo spec; in locale: `npm run test:shoot`) e **allegalo** al
+      feedback con `--image <path>` (ripetibile, max 5). Lo screenshot viene
+      caricato su Storage e mostrato in dashboard: l'utente verifica a colpo
+      d'occhio invece di ricostruire il bug dal testo. Allega lo screenshot
+      **solo quando mostra davvero l'errore** — non uno screenshot generico.
+
+   2. **Scrivi prima la parte utente, poi quella tecnica, separate da un a
+      capo.** L'utente NON legge il codice: gli interessa solo capire *qual è il
+      problema e come riprodurlo per verificare che sia reale*. Quindi il testo
+      del feedback va così:
+      - **Primo blocco (non tecnico)**: cosa si rompe dal punto di vista
+        dell'utente e i **passi esatti per riprodurlo** ("apri X, clicca Y,
+        osserva che Z"). Niente nomi di file/funzioni/elementi qui.
+      - *(riga vuota)*
+      - **Secondo blocco (tecnico)**: dove sta la causa (area/file/funzione),
+        utile alla routine che poi lavorerà il fix. Sta **dopo**, separato.
+
+   3. **Controlla che non esista già.** Prima di accodare, **lista i feedback
+      esistenti** (la dashboard, o leggi quelli su Firestore) e verifica che lo
+      stesso problema non sia già in coda — in qualunque stato (`new`, `todo`,
+      `clarify`, `done`…). Se c'è già, **non duplicarlo**: passa oltre. È ciò
+      che elimina i feedback "ripetuti".
+
+   Per **ogni** cosa trovata (e superati i tre controlli) apri un feedback in
+   stato **`new`** (vedi sotto dove appare), così l'utente lo rivede prima di
+   metterlo in lavorazione:
 
    ```bash
    node scripts/queue-feedback.mjs --status new --name "titolo breve" \
-     [--priority 0-3] "cosa hai trovato, in quale area/file, perché è un problema, come riprodurlo"
+     [--priority 0-3] [--image tests/.shots/audit-<slug>.png] \
+     "PARTE UTENTE: cosa si rompe e passi per riprodurlo.
+
+   PARTE TECNICA: area/file/funzione coinvolta."
    ```
 
    I ritrovamenti d'audit delle routine nascono con clientId `routine:<slug>` e
@@ -466,11 +504,11 @@ operative vivono qui — quando ricevi quel prompt in ambiente cloud:
    ritrovamenti dell'agente esploratore LLM), **non** in "Ricevuti" — così non
    annegano i feedback dei tester reali e l'utente li revisiona in un posto solo.
 
-   La descrizione deve **bastare da sola** (area o file coinvolto, passi per
-   riprodurre, perché è un problema): una routine futura — o l'utente — non ha
-   il tuo contesto. Le creazioni finiscono nella stessa coda git e la GitHub
-   Action le applica entro ~1-2 minuti. **Nel report finale elenca cosa hai
-   depositato in "Agente"**, così l'utente sa cosa trova da revisionare.
+   La descrizione deve **bastare da sola** (passi per riprodurre + area
+   coinvolta): una routine futura — o l'utente — non ha il tuo contesto. Le
+   creazioni finiscono nella stessa coda git e la GitHub Action le applica entro
+   ~1-2 minuti. **Nel report finale elenca cosa hai depositato in "Agente"**,
+   così l'utente sa cosa trova da revisionare.
 7. Se non c'è proprio nulla di utile da segnalare nemmeno dopo l'audit,
    termina senza fare nulla (non inventare feedback per riempire la coda).
 
