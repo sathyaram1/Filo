@@ -2,6 +2,10 @@
 // fetch dei metadati Open Graph di un link.
 
 const { safeFetch } = require('../safe-fetch');
+const auth = require('../../auth/google-auth');
+// Registra SN_FEEDBACK_THREAD su globalThis (IIFE): ci serve ownerize() per
+// marcare gli invii dell'owner. Idempotente se già caricato dal loader.
+require('../../../shared/feedbackThread.js');
 
 module.exports = function register(on, ctx) {
   const { MSG, winOf, getEffectiveSettings, buildAttemptChain } = ctx;
