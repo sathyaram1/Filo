@@ -246,9 +246,13 @@ test('le tab ripristinate mantengono la posizione del media, in pausa, e la paus
     // vicino a SAVED_TIME (non null, non 0) — prova diretta della persistenza
     // (lamentela #2), indipendente dal fatto che la pagina di test non abbia
     // un <video> nel markup originale da far ripristinare automaticamente.
-    const savedSession = await shell.evaluate(() => window.filoShell.debugGetOpenTabsRaw
-      ? window.filoShell.debugGetOpenTabsRaw()
-      : null).catch(() => null);
+    const storageRes = await shell.evaluate(() => window.filoShell.message({ type: '_storage:get', keys: ['sn_open_tabs'] }));
+    const savedSession = storageRes?.value?.sn_open_tabs || null;
+    const savedEntry = savedSession?.tabs?.find((t) => t && typeof t === 'object' && t.url && t.url.startsWith(mediaUrl));
+    expect(savedEntry, 'voce di sessione per la tab media non trovata o ancora in forma bare-string').toBeTruthy();
+    expect(typeof savedEntry.mediaTime, 'mediaTime non persistito (forma vecchia bare-URL?)').toBe('number');
+    expect(savedEntry.mediaTime, `mediaTime salvato (${savedEntry.mediaTime}) lontano da SAVED_TIME=${SAVED_TIME}`).toBeGreaterThan(SAVED_TIME - 1.5);
+    expect(savedEntry.mediaTime).toBeLessThan(SAVED_TIME + 1.5);
 
     // Crea un nuovo <audio> nella tab ripristinata (simula il player che la
     // pagina ricostruisce al load, es. YouTube) e prova ad avviarlo SENZA
