@@ -909,6 +909,10 @@
       settings = msg.settings;
       applyTheme(settings.theme);
       applyThemeTokens(settings.themeTokens);
+      // Colore identità delle tab: i parametri di estrazione possono essere
+      // cambiati (a voce o nelle Preferenze). Ricalcola il colore del favicon
+      // coi nuovi parametri così la tinta della tab si aggiorna live.
+      try { PageColor.reportTabIdentityColor(() => settings && settings.tabColor); } catch (_) {}
       // SpellCheck.init registra listener globali; per non duplicarli su update
       // usiamo updateSettings (definito apposta da spellcheck.js).
       SpellCheck.updateSettings(isBlocked() ? { featureFlags: { spellcheck: false } } : settings);
