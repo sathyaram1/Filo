@@ -538,6 +538,27 @@ function refreshProxyRulesAllWindows() {
   } catch (_) {}
 }
 
+// ── cwd PERSISTENTE dei comandi dell'assistente ───────────────────────────────
+// I comandi dell'assistente girano via runCommand one-shot (shell nuova ogni
+// volta): senza traccia esplicita, ereditano la cwd del processo Electron (la
+// cartella di Filo) e un `cd` non avrebbe effetto sul comando successivo. La
+// teniamo per-webContents (muore con la scheda) con un fallback condiviso quando
+// non c'è sender (test / chiamate interne). Parte da defaultCwd() = home, la
+// STESSA mostrata nella barra della home → percorso mostrato e cartella reale
+// coincidono. La shell PERSISTENTE della modalità terminale (src/main/services/
+// shell.js) resta separata e off-limits all'LLM: qui non la tocchiamo.
+let _assistantCwdFallback = '';
+function getAssistantCwd(sender) {
+  const { defaultCwd } = require('./shell');
+  if (sender) return sender._filoAssistantCwd || defaultCwd();
+  return _assistantCwdFallback || defaultCwd();
+}
+function setAssistantCwd(sender, cwd) {
+  if (!cwd) return;
+  if (sender) { try { sender._filoAssistantCwd = cwd; } catch (_) {} }
+  else _assistantCwdFallback = cwd;
+}
+
 async function executeFiloAction(action, { confirmed = false, sender = null } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
