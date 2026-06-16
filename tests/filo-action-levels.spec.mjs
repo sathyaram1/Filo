@@ -97,6 +97,55 @@ test('il bottone in chat apre il popup di conferma: Annulla non applica, OK appl
   await expect(btn).toContainText('✓');
 });
 
+test('#183: più impostazioni di livello 2 in una risposta → i popup si aprono in sequenza, nessun chip inerte da cliccare', async ({ openTab }) => {
+  const page = await openTab(NEWTAB);
+  // Due impostazioni sensibili nella stessa risposta (come nel feedback #183:
+  // "voglio non crei bottoni ma applichi direttamente").
+  const actions = [
+    {
+      type: 'IMPOSTA_PREFERENZA', chiave: 'terminale', valore: 'on',
+      _confirm: {
+        level: 2,
+        text: 'Filo vuole impostare: Modalità terminale → attiva.\n\n'
+          + 'Questa impostazione decide se Filo può eseguire comandi nella shell del tuo computer.',
+      },
+    },
+    {
+      type: 'IMPOSTA_PREFERENZA', chiave: 'gestione_cookie', valore: 'privacy',
+      _confirm: {
+        level: 2,
+        text: 'Filo vuole impostare: Gestione cookie → Privacy.\n\n'
+          + 'Decide come Filo gestisce i cookie dei siti.',
+      },
+    },
+  ];
+
+  // Renderizza come una risposta FRESCA della chat (autoConfirm:true).
+  await page.evaluate((acts) => {
+    const host = document.createElement('div');
+    host.id = 'test-actions-multi';
+    document.body.appendChild(host);
+    window.__filoDashActions.renderActions(host, acts, { autoConfirm: true });
+  }, actions);
+
+  const overlay = page.locator('.sn-confirm-overlay');
+
+  // Il PRIMO popup si apre DA SOLO (nessun click manuale) e spiega cosa fa + il rischio.
+  await expect(overlay).toBeVisible();
+  await expect(overlay).toContainText('Modalità terminale');
+  await expect(overlay).toContainText('shell');
+  await overlay.locator('.sn-confirm-btn-ok').click();
+
+  // Chiuso il primo, si apre DA SOLO il SECONDO (sequenziale: niente stacking).
+  await expect(overlay).toContainText('Gestione cookie');
+  await overlay.locator('.sn-confirm-btn-ok').click();
+  await expect(overlay).toHaveCount(0);
+
+  // Entrambe applicate davvero (asserisce il SUCCESSO, non l'assenza di errore).
+  await expect.poll(async () => (await getSettings(page)).terminal?.enabled).toBe(true);
+  await expect.poll(async () => (await getSettings(page)).security?.cookies?.mode).toBe('privacy');
+});
+
 test('livello 3: il bottone resta bloccato finché non si digita "conferma"', async ({ openTab }) => {
   const page = await openTab(NEWTAB);
 
