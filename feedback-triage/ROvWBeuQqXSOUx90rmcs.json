@@ -1,0 +1,7 @@
+{
+  "id": "ROvWBeuQqXSOUx90rmcs",
+  "status": "clarify",
+  "notes": "Questo punto richiede una tua decisione di design prima di poterlo implementare, quindi lo sposto in Chiarimenti invece di chiuderlo. COSA HO CAPITO: oggi l'assistente non può concatenare comandi shell di proposito — il prompt impone un comando per azione e il classificatore di sicurezza tratta le concatenazioni (&& o ;) al massimo attrito. Il motivo è di sicurezza: in una catena un comando innocuo in testa può nascondere in coda uno distruttivo, sfuggendo alla classificazione. NON ho implementato nulla perché abilitare la concatenazione è una scelta con implicazioni di sicurezza che spetta a te. MI SERVE SAPERE: (1) vuoi che l'assistente possa eseguire una sequenza di comandi? (2) se sì, preferisci più comandi separati eseguiti in ordine, ognuno classificato e confermato singolarmente (più sicuro), oppure una vera catena '&&' con classificazione per-segmento? (3) la sequenza deve fermarsi al primo errore, o proseguire? Appena rispondi, rimettilo in 'Da risolvere' e una routine lo implementa di conseguenza.",
+  "queuedAt": "2026-06-16T20:47:26.141Z",
+  "queuedBy": "routine"
+}
