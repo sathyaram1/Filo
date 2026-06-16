@@ -310,6 +310,11 @@
           const rgb = toRgbTriplet(value);
           if (rgb) decls.push(`${t.rgbCss}: ${rgb};`);
         }
+        // Gemelle --dash-* della dashboard (newtab): emesse solo per i token
+        // sovrascritti, così la modifica estetica chiesta in chat si VEDE anche
+        // sulla dashboard (dove vive la chat di Filo), non solo sulle altre
+        // superfici --sn-* (feedback #164). Innocue sulle pagine che non le usano.
+        for (const v of t.dashCss || []) decls.push(`${v}: ${value};`);
       }
     }
     return decls;
