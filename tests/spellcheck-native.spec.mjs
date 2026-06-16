@@ -38,23 +38,24 @@ test('suggerimento nativo compare in cima al menu su parola errata', async ({ ap
     null, { timeout: 8000 },
   );
 
+  // Pre-popola i suggerimenti nativi per "wrlod" PRIMA del click (così sono già
+  // freschi quando il menu si compone, senza dipendere da timing/LLM).
+  // Inietta anche via main process (IPC) con attesa generosa per minimizzare
+  // la flakiness da race condition nel round-trip.
+  const sent = await sendNative(app, new URL(url).host, 'wrlod', ['world', 'word']);
+  expect(sent).toBe(true);
+  await page.waitForTimeout(300); // attesa più lunga per dare tempo all'IPC
+
   // Right-click esattamente sopra la parola "wrlod" (inizio del contenteditable).
   const box = await page.locator('#ce').boundingBox();
   await page.mouse.click(box.x + 18, box.y + 16, { button: 'right' });
 
   await expect(page.locator('.sn-menu')).toBeVisible();
 
-  // Inietta il broadcast nativo PER "wrlod" direttamente nel renderer (così è
-  // sincrono, senza round-trip IPC). Lo facciamo DOPO l'apertura del menu così
-  // l'handler `onNativeSuggestions` (che aspetta fino a 800ms) lo riceve e
-  // rivela la riga di correzione. Prima iniettavamo via sendNative (IPC) prima
-  // del click, ma il round-trip IPC rendeva il timing non deterministico (flaky).
-  await page.evaluate(() => {
-    const listeners = globalThis.chrome.runtime.onMessage._listeners;
-    for (const fn of listeners) {
-      try { fn({ type: '_spell:native', word: 'wrlod', suggestions: ['world', 'word'] }); } catch (_) {}
-    }
-  });
+  // Dopo l'apertura del menu, re-inietta il broadcast dal main così il waiter
+  // `onNativeSuggestions` (800ms) lo riceve. Questo copre il caso in cui
+  // `getNativeSuggestions` era vuoto al momento di comporre il menu.
+  await sendNative(app, new URL(url).host, 'wrlod', ['world', 'word']);
 
   // La riga di correzione deve mostrare il suggerimento nativo "world" in cima.
   const corr = page.locator('.sn-menu-correction:visible');
