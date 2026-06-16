@@ -156,12 +156,20 @@
         img.onerror = () => finish(null);
         img.onload = () => {
           try {
-            const W = 16, H = 16;
+            // Spec "Colore identità delle tab": scala il favicon a 64×64 e
+            // delega l'estrazione (path cromatico con clustering per tinta +
+            // fallback acromatico) alla logica pura in SN_TAB_COLOR, condivisa
+            // e unit-testata. Se non è caricata, degrada alla vecchia media.
+            const W = 64, H = 64;
             const cv = document.createElement('canvas');
             cv.width = W; cv.height = H;
             const cx = cv.getContext('2d', { willReadFrequently: true });
             cx.drawImage(img, 0, 0, W, H);
             const data = cx.getImageData(0, 0, W, H).data; // può lanciare se tainted
+            const TC = self.SN_TAB_COLOR;
+            if (TC && TC.extractIdentityFromPixels) {
+              return finish(TC.extractIdentityFromPixels(data, W, H));
+            }
             const acc = [0, 0, 0]; let n = 0;
             for (let i = 0; i < data.length; i += 4) {
               const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
