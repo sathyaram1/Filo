@@ -63,6 +63,26 @@ test('buildCreateEntry: input invalidi rifiutati', () => {
   assert.throws(() => buildCreateEntry({ text: 't', name: 'n', priority: 'alta' }), /--priority non valida/);
 });
 
+test('buildCreateEntry: images = URL http(s) normalizzati, max 5', () => {
+  // Senza images: array vuoto (non undefined) così l'applier scrive sempre il campo.
+  assert.deepEqual(buildCreateEntry({ text: 't', name: 'n' }).images, []);
+  // URL validi: tenuti e ripuliti (trim + scarto dei vuoti).
+  const e = buildCreateEntry({
+    text: 't', name: 'n',
+    images: ['  https://x/a.png ', '', 'http://y/b.jpg'],
+  });
+  assert.deepEqual(e.images, ['https://x/a.png', 'http://y/b.jpg']);
+  // Cap a 5.
+  const many = Array.from({ length: 8 }, (_, i) => `https://x/${i}.png`);
+  assert.equal(buildCreateEntry({ text: 't', name: 'n', images: many }).images.length, 5);
+});
+
+test('buildCreateEntry: images non-URL o non-array rifiutati', () => {
+  // Un path locale NON è un URL: deve fallire (l'upload produce sempre http(s)).
+  assert.throws(() => buildCreateEntry({ text: 't', name: 'n', images: ['/tmp/shot.png'] }), /URL immagine non valido/);
+  assert.throws(() => buildCreateEntry({ text: 't', name: 'n', images: 'https://x/a.png' }), /deve essere un array/);
+});
+
 test('queueFeedbackCreate: scrive un file new-*.json con l\'entry dentro lo spool', () => {
   const file = queueFeedbackCreate({ text: 'testo del sub-task', name: 'sub-task', parentId: 'p1' });
   assert.ok(file.startsWith(tmp), `file fuori dallo spool di test: ${file}`);
