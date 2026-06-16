@@ -1,0 +1,7 @@
+{
+  "id": "XccTG",
+  "status": "done",
+  "notes": "Fix: il correttore italiano ora viene dichiarato primo nella lista Hunspell (era dopo la lingua di sistema en-US). Questo risolve sia (A) i suggerimenti in inglese su testo italiano, sia (B) l'assenza di suggerimenti nella textarea del box feedback su filo:// — entrambi avevano la stessa causa radice. Tre nuovi test Playwright verificano il fix: dizionario italiano primo nella lista, suggerimento nativo su pagina filo://, click destro che lascia scattare l'evento context-menu del webContents (canale suggerimenti nativi aperto). Anche la pre-esistente regressione su spellcheck-input-correction e la flakiness di spellcheck-native sono stati risolti. Suite: 357 passed, 8 failed (tutti pre-esistenti: pwsh mancante su Linux, TTS, race condition su slash-commands).",
+  "queuedAt": "2026-06-16T05:35:02.781Z",
+  "queuedBy": "routine"
+}
