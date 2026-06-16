@@ -453,19 +453,24 @@ operative vivono qui — quando ricevi quel prompt in ambiente cloud:
 
    **In questa passata NON correggere nulla di tua iniziativa**: l'obiettivo è
    *trovare e segnalare*, non fixare — decide l'utente cosa vale la pena. Per
-   **ogni** cosa trovata apri un feedback in stato **`new`** (tab "Ricevuti",
-   **non** `todo`), così l'utente lo rivede prima di metterlo in lavorazione:
+   **ogni** cosa trovata apri un feedback in stato **`new`** (vedi sotto dove
+   appare), così l'utente lo rivede prima di metterlo in lavorazione:
 
    ```bash
    node scripts/queue-feedback.mjs --status new --name "titolo breve" \
      [--priority 0-3] "cosa hai trovato, in quale area/file, perché è un problema, come riprodurlo"
    ```
 
+   I ritrovamenti d'audit delle routine nascono con clientId `routine:<slug>` e
+   stato `new`: la dashboard li raccoglie nella tab **"Agente"** (insieme ai
+   ritrovamenti dell'agente esploratore LLM), **non** in "Ricevuti" — così non
+   annegano i feedback dei tester reali e l'utente li revisiona in un posto solo.
+
    La descrizione deve **bastare da sola** (area o file coinvolto, passi per
    riprodurre, perché è un problema): una routine futura — o l'utente — non ha
    il tuo contesto. Le creazioni finiscono nella stessa coda git e la GitHub
    Action le applica entro ~1-2 minuti. **Nel report finale elenca cosa hai
-   depositato in "Ricevuti"**, così l'utente sa cosa trova da revisionare.
+   depositato in "Agente"**, così l'utente sa cosa trova da revisionare.
 7. Se non c'è proprio nulla di utile da segnalare nemmeno dopo l'audit,
    termina senza fare nulla (non inventare feedback per riempire la coda).
 
