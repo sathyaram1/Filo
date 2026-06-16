@@ -469,13 +469,13 @@ class TabManager {
 
   // Rimuove tutte le modifiche estetiche che Filo ha iniettato nella scheda web
   // attiva. Reversibilità dell'azione STILE_PAGINA (#185).
-  clearPageStyle(tabArg = null) {
+  async clearPageStyle(tabArg = null) {
     const tab = tabArg || this._activeWebTab();
     if (!tab || !tab.view || !tab.view.webContents) return { ok: false, reason: 'no-web-tab' };
     const keys = tab._filoStyleKeys || [];
     let removed = 0;
     for (const k of keys) {
-      try { tab.view.webContents.removeInsertedCSS(k); removed += 1; } catch (_) { /* chiave stale dopo reload */ }
+      try { await tab.view.webContents.removeInsertedCSS(k); removed += 1; } catch (_) { /* chiave stale dopo reload */ }
     }
     tab._filoStyleKeys = [];
     return { ok: true, removed };
