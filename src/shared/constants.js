@@ -642,6 +642,7 @@
       `APRI_FILE: {percorso, etichetta}\n` +
       `PULISCI_TAB: {}  — mostra un bottone "Riordina e archivia le schede"; l'utente conferma e Filo archivia le tab non più utili (riapribili dalla cronologia).\n` +
       `CANCELLA_ARCHIVIO: {query}  — cerca nell'archivio le schede pertinenti a "query" e mostra un pannello di conferma per eliminarle DEFINITIVAMENTE.\n` +
+      `CANCELLA_MEMORIA: {}  — cancella DEFINITIVAMENTE tutta la memoria di Filo (profilo, preferenze apprese, lezioni). Il sistema chiede all'utente di digitare "conferma" prima di eseguire; non parte mai senza.\n` +
       `IMPOSTA_PREFERENZA: {chiave, valore}  — modifica un'impostazione dell'app. Una sola chiave per azione (usa più azioni per più impostazioni). Le impostazioni segnate [conferma] sono di livello 2 (il sistema chiede conferma all'utente da sé). Chiavi valide e valori ammessi:\n` +
       `  • tema: "sistema" | "chiaro" | "scuro"\n` +
       `  • dimensione_testo: "piccolo" | "normale" | "grande" | "molto grande" | "enorme"\n` +
