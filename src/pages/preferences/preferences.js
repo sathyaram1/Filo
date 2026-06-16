@@ -224,6 +224,30 @@
     persistTokens();
   }
 
+  // ── Ripristino completo (#184) ───────────────────────────────────────────
+  // Un solo bottone riporta TUTTE le impostazioni ai predefiniti: non solo i
+  // token estetici o il colore delle tab (che hanno il loro reset locale), ma
+  // anche tema, dimensione del testo, gestione schede, notifiche, ecc. Risolve
+  // il caso in cui una personalizzazione fatta a voce ("colore della barra")
+  // resta appiccicata e i reset parziali non bastano a toglierla. Le chiavi API
+  // si preservano (lo fa il main): un reset estetico non deve sloggare l'utente.
+  async function resetAllSettings() {
+    const Ui = window.SN_CONFIRM_UI;
+    const text = 'Riporta TUTTE le impostazioni di Filo ai valori predefiniti: '
+      + 'tema, colori e aspetto, colore delle schede, dimensione del testo, '
+      + 'notifiche, gestione delle schede e ogni altra preferenza. '
+      + 'Le tue chiavi API restano salvate. L’operazione non si può annullare.';
+    const ok = Ui
+      ? await Ui.confirm({ title: 'Ripristina tutte le impostazioni', text, okLabel: 'Ripristina tutto' })
+      : window.confirm(`${text} Procedo?`);
+    if (!ok) return;
+    await chrome.runtime.sendMessage({ type: MSG.RESET_SETTINGS });
+    // Ricarica la pagina: si ri-bootstrappa dai valori ora predefiniti (tema,
+    // token, colore tab applicati da zero), evitando qualunque stato residuo.
+    flashSaved('resetAllSavedHint');
+    setTimeout(() => { try { location.reload(); } catch (_) {} }, 350);
+  }
+
   // ── Sezione "colore identità delle tab" (Preferenze avanzate) ────────────
   // Stessa estetica "a codice" dei token: una riga per ognuno dei sei parametri
   // di src/shared/tabColor.js, con nome, valore numerico editabile, intervallo
