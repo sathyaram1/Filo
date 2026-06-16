@@ -122,7 +122,7 @@
     // Triage admin di un feedback (cambio stato/note/priorità). Instradato dal
     // main, che allega il Firebase ID token come Bearer e RIFIUTA se l'utente
     // loggato non è admin. → { ok } | { ok:false, error }
-    FEEDBACK_UPDATE: 'feedback_update',           // { id, status?, notes?, priority? }
+    FEEDBACK_UPDATE: 'feedback_update',           // { id, status?, notes?, priority?, images?, files? }
     // Config "modelli predefiniti" condivisa (admin-only, propaga a tutti via
     // Firestore). GET ritorna la config senza esporre le chiavi vere (solo se
     // presenti); UPDATE scrive provider/models/modelRegistry/apiKeys.
