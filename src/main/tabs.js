@@ -349,6 +349,11 @@ class TabManager {
       // Duplicazione tab: ripristina il livello di zoom della scheda sorgente
       // (Electron zoom "level", 0 = 100%). Applicato una volta a fine caricamento.
       restoreZoomLevel: typeof restoreZoomLevel === 'number' ? restoreZoomLevel : null,
+      // #145 — ripristino sessione: riporta il media principale della pagina al
+      // punto in cui l'utente l'aveva lasciato, ma IN PAUSA (vedi did-finish-load
+      // più sotto). Applicato una volta, best-effort.
+      restoreMediaTime: typeof restoreMediaTime === 'number' && isFinite(restoreMediaTime) ? restoreMediaTime : null,
+      mediaTime: typeof restoreMediaTime === 'number' && isFinite(restoreMediaTime) ? restoreMediaTime : null,
       partition,
       partitionSite: isInternal ? null : Cookies.registrableOf(url),
       // Proxy per-tab ("Apri da un altro paese"): { country, tier } finché la
