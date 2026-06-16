@@ -950,4 +950,7 @@
   }
 
   global.SN_SIDEBAR = { open, close, isOpen, ensureNotOverTarget };
+  // Hook di test: esercita il ponte azioni-Filo (popup di conferma + dispatch)
+  // senza dover passare dal modello. Stesso pattern di window.__filoDashActions.
+  global.__filoSidebarTest = { runFiloAction, filoActionLabel };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
