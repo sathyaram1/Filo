@@ -842,10 +842,21 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, sende
   const lezioni = await lessonsBufferText();
   const { stateText } = await FiloState.assemble();
   const cleanHistory = Array.isArray(threadHistory) ? threadHistory.slice(-20) : [];
-  const threadMessages = cleanHistory.map((m) => ({
-    role: m.role === 'filo' ? 'assistant' : 'user',
-    content: String(m.text || ''),
-  }));
+  // Re-immissione dell'output dei comandi nel contesto del modello: l'output di
+  // un ESEGUI_COMANDO eseguito in un turno precedente viene accodato al
+  // messaggio dell'assistente, così nei turni successivi il modello SA davvero
+  // cosa ha prodotto il comando (prima lo vedeva solo l'utente, e l'assistente
+  // rispondeva "non ho ancora l'output").
+  const threadMessages = [];
+  for (const m of cleanHistory) {
+    const role = m.role === 'filo' ? 'assistant' : 'user';
+    let content = String(m.text || '');
+    if (role === 'assistant') {
+      const obs = commandOutputsForPrompt(m.actions);
+      if (obs) content = content ? `${content}\n\n${obs}` : obs;
+    }
+    threadMessages.push({ role, content });
+  }
   const imageList = (Array.isArray(images) && images.length) ? images : (image ? [image] : []);
   if (imageList.length) {
     const parts = [];
