@@ -602,7 +602,16 @@
     });
 
     // "Allega" del commento: stesso effetto del paste, ma via selettore file
-    // (parità coi cammini equivalenti — vedi CLAUDE.md "Iniziativa").
+    // (parità coi cammini equivalenti — vedi CLAUDE.md "Iniziativa"). Il
+    // bottone visibile è un <button class="sn-btn"> (lo stile sn-btn è
+    // scoperto solo su `button`, non su `label`); apre il file input nascosto.
+    listEl.querySelectorAll('.fb-comment-attach-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const card = btn.closest('.fb-card');
+        const input = card && card.querySelector('.fb-comment-attach');
+        if (input) input.click();
+      });
+    });
     listEl.querySelectorAll('.fb-comment-attach').forEach((input) => {
       input.addEventListener('change', async () => {
         const id = input.dataset.id;
