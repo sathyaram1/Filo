@@ -23,6 +23,38 @@ test('si registra su globalThis con la sua API', () => {
   assert.equal(typeof TH.parse, 'function');
   assert.equal(typeof TH.appendUserTurn, 'function');
   assert.equal(typeof TH.userTurnMarker, 'function');
+  assert.equal(typeof TH.isFromOwner, 'function');
+  assert.equal(typeof TH.originOf, 'function');
+  assert.equal(typeof TH.ownerize, 'function');
+});
+
+test('originOf: classifica l’origine dal prefisso del clientId', () => {
+  assert.equal(TH.originOf('owner:abc'), 'owner');
+  assert.equal(TH.originOf('agent:gemini'), 'agent');
+  assert.equal(TH.originOf('routine:nightly'), 'routine');
+  assert.equal(TH.originOf('tester-123'), 'user');
+  assert.equal(TH.originOf(''), 'user');
+  assert.equal(TH.originOf(null), 'user');
+});
+
+test('isFromOwner: vero solo per il prefisso owner:', () => {
+  assert.equal(TH.isFromOwner('owner:abc'), true);
+  assert.equal(TH.isFromOwner('routine:x'), false);
+  assert.equal(TH.isFromOwner('tester-1'), false);
+});
+
+test('ownerize: marca i tester, è idempotente, non tocca le origini modello', () => {
+  // Un invio di tester (o dell’owner, stesso UUID) viene marcato owner:.
+  assert.equal(TH.ownerize('uuid-123'), 'owner:uuid-123');
+  // Idempotente: non raddoppia il prefisso.
+  assert.equal(TH.ownerize('owner:uuid-123'), 'owner:uuid-123');
+  // Le origini modello NON sono owner: restano intatte.
+  assert.equal(TH.ownerize('agent:gemini'), 'agent:gemini');
+  assert.equal(TH.ownerize('routine:nightly'), 'routine:nightly');
+  // Vuoto → vuoto (niente "owner:").
+  assert.equal(TH.ownerize(''), '');
+  // Cap a 100 char (limite clientId nelle Firestore rules).
+  assert.ok(TH.ownerize('x'.repeat(200)).length <= 100);
 });
 
 test('feedback senza note → un solo turno: la segnalazione dell’utente', () => {
