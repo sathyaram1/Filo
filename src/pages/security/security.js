@@ -268,6 +268,7 @@
       security: {
         protectIpLeak: !!$('sec-protect-ip').checked,
         blockPopups: !!$('sec-block-popups').checked,
+        adblock: { enabled: !!$('sec-adblock').checked },
         safeBrowse: {
           enabled: !!$('sec-safebrowse').checked,
           networkSignals: !!$('sec-safebrowse-network').checked,
