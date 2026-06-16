@@ -339,7 +339,7 @@
       const clarifyReply = isAdmin && currentTab === 'clarify';
       const showConvo = !notesEditable;
       const reportBubble = `
-        <div class="fb-bubble fb-bubble--report fb-bubble--${reportRole}">
+        <div class="fb-bubble fb-bubble--report fb-bubble--${reportRole} fb-bubble--origin-${origin}">
           <div class="fb-bubble-head"><span class="fb-bubble-who">${reportWho}</span></div>
           <div class="fb-bubble-body">${text}</div>
           ${imgsHtml}
