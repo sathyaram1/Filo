@@ -175,7 +175,7 @@
             const data = cx.getImageData(0, 0, W, H).data; // può lanciare se tainted
             const TC = self.SN_TAB_COLOR;
             if (TC && TC.extractIdentityFromPixels) {
-              return finish(TC.extractIdentityFromPixels(data, W, H));
+              return finish(TC.extractIdentityFromPixels(data, W, H, params()));
             }
             const acc = [0, 0, 0]; let n = 0;
             for (let i = 0; i < data.length; i += 4) {
