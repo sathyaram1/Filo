@@ -80,7 +80,7 @@ test('audit di una routine compare nella tab "Agente", non in "Ricevuti"', async
   // Default = "Ricevuti": ci sono solo i due feedback umani (owner + tester),
   // NON l'audit della routine.
   await expect(page.locator('.fb-card')).toHaveCount(2);
-  await expect(page.locator('.fb-card')).not.toContainText('cronologia stato vuoto');
+  await expect(page.locator('.fb-card', { hasText: 'cronologia stato vuoto' })).toHaveCount(0);
 
   // Tab "Agente": l'audit c'è, col badge che lo marca come audit di routine.
   await page.locator('[data-tab="agent"]').click();
