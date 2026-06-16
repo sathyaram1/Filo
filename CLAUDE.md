@@ -423,6 +423,21 @@ operative vivono qui — quando ricevi quel prompt in ambiente cloud:
    di audit.** Invece di restare ferma, la routine cerca problemi che nessuno
    ha ancora segnalato. Scegli **uno o più angoli** (non serve coprirli tutti:
    meglio andare in profondità su pochi che sfiorarli tutti):
+
+   **Passo attivo OBBLIGATORIO — usa davvero Filo, non limitarti a leggere il
+   codice.** L'audit deve includere almeno un tentativo di **esercitare un flusso
+   reale** cercando di romperlo (è lì che si nascondono gli edge case). Non basta
+   ispezionare il sorgente: prendi una feature, *usala* con input limite (campi
+   vuoti, testo enorme, caratteri strani, doppio clic, azioni in ordine inusuale,
+   stati vuoti) e osserva cosa succede.
+   - **In locale (Windows)**: `npm run test:explore` con un `--task` che esercita
+     il flusso passo per passo, oppure `npm run test:shoot` con uno scenario
+     mirato + ispezione degli screenshot in `tests/agent/.out/`.
+   - **In cloud (Linux headless)**: `test:shoot`/`test:explore` NON funzionano
+     (vedi sezione dedicata). Al loro posto **scrivi uno spec Playwright** che
+     *esercita* il flusso con input limite e **asserisce** il comportamento
+     atteso (non solo "non crasha"): è il modo cloud di "usare davvero" la feature.
+
    - **Edge case** — input limite, stati vuoti, valori nulli, sequenze di
      azioni inusuali, race nei flussi async.
    - **Sicurezza** — input non sanitizzati, dati che finiscono in HTML senza
