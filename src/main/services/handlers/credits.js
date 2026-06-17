@@ -7,6 +7,9 @@
 // trasporto: IPC verso la UI + REST Firestore autenticato con l'ID token utente.
 
 const auth = require('../../auth/google-auth');
+// SN_FEEDBACK_THREAD: ci serve splitNotes() per estrarre la spiegazione non
+// tecnica dalle note del feedback risolto (C5). Idempotente se già caricato.
+require('../../../shared/feedbackThread.js');
 
 module.exports = function register(on, ctx) {
   const { MSG, broadcastToTabs } = ctx;
