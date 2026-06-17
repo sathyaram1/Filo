@@ -1,0 +1,7 @@
+{
+  "id": "4f8PP5tTpvCIROz2rgh8",
+  "status": "done",
+  "notes": "L'agente Aiuto ora agisce sulle immagini della pagina come il menu tasto destro: copiare l'immagine, salvarla, copiarne il link e cercarla sul web (Google Lens). L'immagine bersaglio si indica con un selettore CSS o l'indirizzo; in mancanza usa l'immagine principale visibile. La ricerca sul web (esce verso l'esterno) chiede conferma col popup di Filo; copia/salva sono immediate. 'Spiega immagine' resta gestito facendo rispondere l'agente in chat (ha già lo screenshot della pagina). Verificato con spec Playwright (cerca immagine via selettore + apertura Lens col src, salva immagine): verde.",
+  "queuedAt": "2026-06-17T07:23:41.278Z",
+  "queuedBy": "routine"
+}
