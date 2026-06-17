@@ -331,11 +331,13 @@
       const convoTurns = turns.filter((t) => t.kind !== 'report');
       const reportRole = window.SN_FEEDBACK_THREAD && SN_FEEDBACK_THREAD.isFromModel(f.clientId) ? 'model' : 'user';
       const reportWho = reportRole === 'model' ? 'Agente' : 'Segnalazione';
-      // Note editabili (textarea) SOLO dove l'admin sta lavorando: todo/bozze/
-      // agente. Altrove (ricevuti/risolti/verificati/chiarimenti) le note di Filo
-      // diventano bolle di sola lettura — se mostrassi anche la textarea, lo
-      // stesso testo comparirebbe due volte.
-      const notesEditable = isAdmin && (currentTab === 'todo' || currentTab === 'draft' || currentTab === 'agent');
+      // Note editabili (textarea) dove l'admin sta lavorando: ricevuti/todo/
+      // bozze/agente. "Ricevuti" è incluso così si può COMMENTARE un feedback
+      // appena arrivato e poi spostarlo in "Da risolvere" (il commento viaggia
+      // col cambio di stato — vedi il gestore .fb-act). Altrove (risolti/
+      // verificati/chiarimenti) le note di Filo restano bolle di sola lettura —
+      // se mostrassi anche la textarea, lo stesso testo comparirebbe due volte.
+      const notesEditable = isAdmin && (currentTab === 'inbox' || currentTab === 'todo' || currentTab === 'draft' || currentTab === 'agent');
       const clarifyReply = isAdmin && currentTab === 'clarify';
       const showConvo = !notesEditable;
       const reportBubble = `
