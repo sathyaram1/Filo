@@ -71,21 +71,23 @@ test('il dropdown del font si chiude con un click fuori da esso', async ({ openT
   await page.locator('#doc').click({ position: { x: 5, y: 5 } });
   await expect(pop).toBeHidden();
 
-  // Click su un controllo della topbar → si chiude. NB: la .ed-topbar è un
-  // gruppo flottante con `pointer-events: none` sul contenitore (solo i suoi
-  // figli reali sono cliccabili — vedi editor.css), quindi un click sull'area
-  // vuota passerebbe ATTRAVERSO al documento sotto: va cliccato un controllo
-  // vero (qui il toggle della sidebar). Asserisce comunque l'invariante "click
-  // su un elemento della toolbar chiude il dropdown del font".
-  await button.click();
-  await expect(pop).toBeVisible();
-  await page.locator('#sidebarToggle').click();
-  await expect(pop).toBeHidden();
-
   // Click in un angolo lontano della pagina → si chiude.
   await button.click();
   await expect(pop).toBeVisible();
   await page.mouse.click(2, 2);
+  await expect(pop).toBeHidden();
+
+  // Click su un controllo della topbar → si chiude. NB: la .ed-topbar è un
+  // gruppo flottante con `pointer-events: none` sul contenitore (solo i suoi
+  // figli reali sono cliccabili — vedi editor.css), quindi cliccare l'area vuota
+  // passerebbe ATTRAVERSO al documento sotto (era la causa del flake in cloud:
+  // #docWrap intercettava il click su .ed-topbar): va cliccato un controllo
+  // vero. Usiamo il toggle della sidebar — asserisce l'invariante "click su un
+  // elemento della toolbar chiude il dropdown del font". È l'ultimo controllo
+  // perché ha un effetto collaterale (apre/chiude la sidebar).
+  await button.click();
+  await expect(pop).toBeVisible();
+  await page.locator('#sidebarToggle').click();
   await expect(pop).toBeHidden();
 });
 
