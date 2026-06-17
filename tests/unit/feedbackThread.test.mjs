@@ -152,3 +152,59 @@ test('appendUserTurn ignora una risposta vuota', () => {
   assert.equal(TH.appendUserTurn('x', '   '), 'x');
   assert.equal(TH.appendUserTurn('', ''), '');
 });
+
+// ── Fix: riaprire + ri-risolvere NON deve perdere lo storico ────────────────
+// Quando una routine ri-risolve un feedback già lavorato e riaperto, il suo
+// nuovo report deve APPENDERSI (turno dell'agente), conservando il report
+// precedente e l'annotazione di riapertura dell'utente.
+
+test('mergeModelReport: prima risoluzione → il report è il primo turno (no marcatore)', () => {
+  assert.equal(TH.mergeModelReport('', 'Risolto: aggiunto lo zoom.'), 'Risolto: aggiunto lo zoom.');
+  assert.equal(TH.mergeModelReport('   ', 'Risolto.'), 'Risolto.');
+});
+
+test('mergeModelReport: ri-risoluzione conserva report precedente + nota utente', () => {
+  // Stato dopo: report iniziale + riapertura dell'utente con la sua annotazione.
+  const existing = [
+    'Ho aggiunto lo zoom con Ctrl +.',
+    '',
+    '--- Riaperto il 16/06/26, 22:00 ---',
+    'Manca lo zoom col trackpad (pinch).',
+  ].join('\n');
+  const merged = TH.mergeModelReport(existing, 'Ora supporto anche il pinch sul trackpad.', { ts: '17/06/26, 09:00' });
+  // Niente è andato perso.
+  assert.match(merged, /Ho aggiunto lo zoom con Ctrl/);
+  assert.match(merged, /Manca lo zoom col trackpad/);
+  assert.match(merged, /Ora supporto anche il pinch/);
+  // E riparsa in 4 turni: report(utente) → nota(modello) → riapertura(utente)
+  // → nuovo aggiornamento (modello), con i lati giusti.
+  const turns = TH.parse({ text: 'rendi possibile zoommare col trackpad', notes: merged, clientId: 'user-1' });
+  assert.deepEqual(turns.map((t) => `${t.role}:${t.kind}`), [
+    'user:report',
+    'model:note',
+    'user:reply',
+    'model:note',
+  ]);
+  assert.match(turns[3].body, /Ora supporto anche il pinch/);
+});
+
+test('mergeModelReport: idempotente — re-applicare lo stesso report non duplica', () => {
+  const once = TH.mergeModelReport('Report iniziale.', 'Aggiornamento dopo riapertura.');
+  const twice = TH.mergeModelReport(once, 'Aggiornamento dopo riapertura.');
+  assert.equal(twice, once); // già presente → nessun secondo marcatore
+});
+
+test('mergeModelReport: report vuoto lascia intatte le note esistenti', () => {
+  assert.equal(TH.mergeModelReport('storico', '   '), 'storico');
+});
+
+test('splitNotes riconosce il marcatore del turno agente come lato modello', () => {
+  const notes = [
+    'Report iniziale di Filo.',
+    "--- Aggiornamento dell'agente del 17/06/26 ---",
+    'Secondo report di Filo.',
+  ].join('\n');
+  const segs = TH.splitNotes(notes);
+  assert.deepEqual(segs.map((s) => s.role), ['model', 'model']);
+  assert.equal(segs[1].body, 'Secondo report di Filo.');
+});
