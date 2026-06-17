@@ -300,6 +300,13 @@
     modelTurnMarker,
     appendModelTurn,
     mergeModelReport,
+    // Allegati per-turno (#190.3)
+    serializeAttachment,
+    parseAttachmentLine,
+    attachmentsBlock,
+    stripAttachments,
+    composeNotes,
+    ATTACH_PREFIX,
     USER_TURN_RE,
     MODEL_TURN_RE,
   };
