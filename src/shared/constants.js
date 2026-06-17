@@ -100,6 +100,54 @@
     FILO_TAB_SEARCH: 'filo_tab_search',
   };
 
+  // === Crediti (gamification) ===
+  // 1 credito = 0,08 centesimi di € = €0,0008. Saldo iniziale 1000, +100 ogni
+  // mezzanotte (locale). Il costo € reale di ogni chiamata resta DIETRO LE QUINTE:
+  // all'utente mostriamo solo i crediti. Vedi creditStore.js + CLAUDE.md.
+  const CREDIT = {
+    INITIAL: 1000,
+    DAILY_REFILL: 100,
+    EUR_PER_CREDIT: 0.0008,
+    // Tetto ai giorni di refill accumulabili in una volta (anti-abuso orologio).
+    MAX_REFILL_DAYS: 30,
+    // +5 crediti subito all'invio di un feedback.
+    FEEDBACK_SEND: 5,
+    // Ricompensa alla RISOLUZIONE di un feedback, per priorità (0-3).
+    FEEDBACK_RESOLVE_BY_PRIORITY: { 0: 50, 1: 100, 2: 200, 3: 300 },
+  };
+
+  // Raggruppamento azione → "tipo d'uso" mostrato nel grafico a torta dei crediti
+  // (per UTILIZZO, non per modello). Le azioni non mappate ricadono in "Altro".
+  const CREDIT_USAGE_GROUPS = {
+    [ACTIONS.SPELLCHECK_WORD]: 'Correttore ortografico',
+    [ACTIONS.SPELLCHECK_SEMANTIC]: 'Correttore ortografico',
+    [ACTIONS.EDIT_TEXT]: 'Riscrittura testo',
+    [ACTIONS.TRANSLATE_SELECTION]: 'Traduzione',
+    [ACTIONS.TRANSLATE_PAGE]: 'Traduzione',
+    [ACTIONS.EXPLAIN]: 'Spiegazioni',
+    [ACTIONS.EXPLAIN_DEEP]: 'Spiegazioni',
+    [ACTIONS.EXPLAIN_LINK]: 'Spiegazioni',
+    [ACTIONS.DESCRIBE_IMAGE]: 'Immagini',
+    [ACTIONS.TRANSCRIBE_IMAGE]: 'Immagini',
+    [ACTIONS.TRANSCRIBE_AUDIO]: 'Dettatura',
+    [ACTIONS.TTS]: 'Lettura ad alta voce',
+    [ACTIONS.HELP]: 'Aiuto',
+    [ACTIONS.HELP_INTENT_GUESS]: 'Aiuto',
+    [ACTIONS.HELP_INTENT_JUDGE]: 'Aiuto',
+    [ACTIONS.CATEGORIZE]: 'Categorizzazione',
+    [ACTIONS.FILO_CHAT]: 'Chat con Filo',
+    [ACTIONS.FILO_DASHBOARD]: 'Chat con Filo',
+    [ACTIONS.FILO_LESSON]: 'Memoria di Filo',
+    [ACTIONS.FILO_COMPACT]: 'Memoria di Filo',
+    [ACTIONS.FILO_TAB_TRIAGE]: 'Gestione schede',
+    [ACTIONS.FILO_TAB_SUMMARY]: 'Gestione schede',
+    [ACTIONS.FILO_TAB_SEARCH]: 'Gestione schede',
+  };
+
+  function creditUsageGroup(action) {
+    return CREDIT_USAGE_GROUPS[action] || 'Altro';
+  }
+
   // Registry di modelli "logici" indicizzati per nickname.
   // Ogni modello ha UN SOLO provider e il nome concreto da usare per chiamarlo
   // (campo `model`). Per avere un fallback su un altro provider basta creare un
