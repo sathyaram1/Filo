@@ -339,6 +339,13 @@
     uploadAttachment,
     formatNum,
     fallbackName,
+    // Plumbing REST riutilizzabile (es. dal motore crediti): encoder Value
+    // Firestore + endpoint/base. L'API_KEY è la chiave web pubblica Firebase
+    // (già nel client), non un segreto.
+    toFsValue,
+    fromFsValue,
+    fsDocToObject,
+    rest: { FIRESTORE_BASE, API_KEY, PROJECT_ID },
     configPublic: { projectId: PROJECT_ID, bucket: BUCKET, collection: COLLECTION },
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
