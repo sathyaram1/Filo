@@ -1,0 +1,7 @@
+{
+  "id": "Z4i18z3XdISCsRaIZp2c",
+  "status": "done",
+  "notes": "Ora, mentre Filo elabora la risposta nella nuova scheda, le 3 righe che scorrono mostrano il RAGIONAMENTO VERO del modello — non più le frasi indicative generiche — per i modelli che lo forniscono (sia con Gemini sia con OpenRouter). Il ragionamento arriva in diretta man mano che il modello pensa e scorre verso l'alto sfumando, sempre max 3 righe visibili, poi lascia il posto alla risposta. Per i modelli che non espongono il ragionamento restano (come prima) le frasi indicative, così non vedi mai uno spinner muto.\n\nVerificato con un test automatico che il ragionamento reale emesso dal modello compaia davvero nelle righe (testo distinto dalle frasi indicative) e poi venga sostituito dalla risposta, più un test sulla separazione ragionamento/risposta nei due provider. L'intera suite (431 test) passa.\n\nNote tecniche: attivato il reasoning in streaming sui provider (Gemini thinkingConfig.includeThoughts → parti thought separate; OpenRouter reasoning.enabled → delta.reasoning). La chat ora passa per il cammino in streaming quando il client apre il canale 'filo:reasoning' (handleAIRequest accetta onReasoning); i delta di ragionamento vengono inoltrati alla dashboard via IPC. La risposta finale e l'esecuzione delle azioni restano identiche a prima.",
+  "queuedAt": "2026-06-17T17:38:12.267Z",
+  "queuedBy": "routine"
+}
