@@ -113,6 +113,40 @@ test('popup blocker: window.open() automatico viene bloccato', async ({ openTab,
   expect(popupTab, `il tab del popup non deve esistere — snap: ${JSON.stringify(snap.tabs.map((x) => ({ t: x.title, u: x.url })))}`).toBeFalsy();
 });
 
+test('popup blocker: i popup di login (OAuth) restano consentiti col blocco attivo (#209)', async ({ openTab, testServer, app, shell }) => {
+  // Il blocco-popup è ON di default. Un popup verso un endpoint di
+  // autenticazione (parametri OAuth client_id+redirect_uri) NON è pubblicità:
+  // deve aprirsi come VERA finestra (così l'opener riceve l'esito del login),
+  // non venire bloccato né degradato a scheda. Senza il fix #209 veniva negato.
+  const authTarget = testServer.html('<title>AUTH_POPUP_OK</title><p>login</p>')
+    + '?client_id=abc&redirect_uri=https%3A%2F%2Fapp.example%2Fcb&response_type=code';
+  const opener = testServer.html(`
+    <title>OPENER_AUTH</title>
+    <script>
+      setTimeout(() => { window.open(${JSON.stringify(authTarget)}, '_blank', 'popup,width=480,height=640'); }, 200);
+    </script>
+    <p>opener</p>
+  `);
+
+  await openTab(opener);
+
+  // Il popup OAuth si apre come BrowserWindow reale: compare tra le window.
+  let popupWin = null;
+  const deadline = Date.now() + 8000;
+  while (Date.now() < deadline && !popupWin) {
+    await new Promise((r) => setTimeout(r, 200));
+    popupWin = app.windows().find((w) => {
+      try { return w.url().includes('client_id=abc'); } catch (_) { return false; }
+    });
+  }
+  expect(popupWin, 'il popup di login deve aprirsi come finestra reale').toBeTruthy();
+
+  // E NON deve essere stato degradato a scheda nella shell.
+  const snap = await shell.evaluate(() => window.filoShell.tabs.snapshot());
+  const asTab = snap.tabs.find((t) => (t.url || '').includes('client_id=abc'));
+  expect(asTab, 'il popup di login non deve diventare una scheda').toBeFalsy();
+});
+
 test('popup blocker disattivato: window.open() passa', async ({ openTab, testServer, shell }) => {
   // Prima disattiva il blocco dalla pagina Sicurezza (auto-save al toggle)
   const sec = await openTab('filo://security/');
