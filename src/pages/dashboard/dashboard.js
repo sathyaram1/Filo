@@ -1817,6 +1817,7 @@
       // Salva la versione corrente come "vista": il recap non riapparirà fino al
       // prossimo update.
       send({ type: MSG.MARK_UPDATE_SEEN });
+      if (typeof onClose === 'function') { try { onClose(); } catch (_) {} }
     }
     function onKey(e) {
       if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); }
