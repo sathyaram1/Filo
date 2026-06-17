@@ -103,7 +103,20 @@ Ordine = dipendenze (il motore va per primo). Numerare i task come C1..C5.
   mezzanotte multi-giorno, (b) conversione token→costo€→crediti, (c) aggregazione
   per uso. Verifica: `npm run test:unit`. (stima: L)
 
-- [~] **C2 — Pagina Crediti nel profilo + icona moneta cinese + grafico a torta**
+- [x] **C2 — Pagina Crediti nel profilo + icona moneta cinese + grafico a torta**
+  (2026-06-17) — FATTO. Voce **"Crediti"** aggiunta al menu account della shell
+  (sia loggato sia sloggato), apre `filo://credits/credits.html` (servita
+  automaticamente dal protocol handler `filo://<page>/` → `src/pages/<page>/`, no
+  registrazione extra). Nuova pagina (`credits.html`/`.css`/`.js`): saldo grande
+  con **icona moneta forata cinese + filo annodato** (nuova icona `credits` in
+  `src/shared/icons.js`), **grafico a torta SVG fatto a mano** del consumo per
+  TIPO D'USO (legge `byUsage` da `GET_CREDITS`, ogni fetta `data-group` + legenda),
+  movimenti recenti dalle ricompense, hint refill/offline. **Mai** il costo in €
+  (usa `publicView`). Live-refresh su `CREDITS_CHANGED`. Nuovo pattern in
+  PATTERNS.md (chart SVG a mano, niente lib, CSP). Changelog aggiornato.
+  **Verificato**: `tests/credits-page.spec.mjs` 2/2 verdi (saldo 700 dopo consumo
+  seed, 2 fette con etichette giuste + valori in legenda; stato vuoto a 1.000) +
+  `test:shoot` visivo dello stato vuoto (icona/tema/layout ok).
   — Aggiungi la voce **"Crediti"** nel menu account della shell
   (`src/renderer/shell.js:245`, ramo loggato e sloggato) che apre una nuova pagina
   `filo://credits/credits.html` (registrarla nel protocol/router come le altre
