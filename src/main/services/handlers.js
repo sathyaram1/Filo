@@ -295,7 +295,7 @@ function buildAttemptChain(settings, modelRef) {
   return out;
 }
 
-async function handleAIRequest({ action, payload, origin }) {
+async function handleAIRequest({ action, payload, origin, onReasoning = null, signal = null }) {
   const settings = await getEffectiveSettings();
   const model = modelForAction(settings, action, payload?.modelOverride);
   // Nome CONCRETO del modello primario (es. 'gemini-3.1-flash-lite'), non il
