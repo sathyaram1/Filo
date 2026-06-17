@@ -249,6 +249,7 @@
         showNativeMenu(accountBtn, [
           { label: authProfile.email || label, disabled: true },
           { type: 'separator' },
+          { label: 'Crediti', icon: 'credits', url: 'filo://credits/credits.html' },
           { label: 'Nuova finestra incognito', icon: 'incognito', action: 'open-incognito' },
           { label: 'Esci', icon: 'close', action: 'auth-signout' },
         ]);
@@ -256,6 +257,7 @@
         showNativeMenu(accountBtn, [
           { label: 'Accedi con Google', icon: 'user', action: 'auth-signin' },
           { type: 'separator' },
+          { label: 'Crediti', icon: 'credits', url: 'filo://credits/credits.html' },
           { label: 'Nuova finestra incognito', icon: 'incognito', action: 'open-incognito' },
         ]);
       }
