@@ -33,6 +33,62 @@
   // (group 1) il timestamp.
   const MODEL_TURN_RE = /^---\s*(?:Aggiornamento dell'agente del|Filo ha risposto il)\s*(.*?)\s*---\s*$/;
 
+  // Allegati PER-TURNO (#190.3). Il modello dati dei feedback ha `images`/`files`
+  // PIATTI sul documento (la segnalazione originale). Per legare un allegato a un
+  // singolo COMMENTO/turno — senza aggiungere campi a Firestore né cambiare le
+  // regole (il campo `notes` è già scrivibile dagli admin) — codifichiamo gli
+  // allegati di un turno come RIGHE-MARCATORE dentro `notes`, una per allegato:
+  //
+  //   @@filo-attachment {"kind":"img","url":"https://…"}
+  //   @@filo-attachment {"kind":"file","url":"https://…","name":"x.pdf","type":"application/pdf"}
+  //
+  // Il parser le riconosce e le toglie dal corpo del turno, raccogliendole in
+  // `turn.attachments`. Così l'allegato resta ANCORATO al turno in cui è stato
+  // incollato (a differenza degli array piatti, che li mescolerebbero tutti con
+  // la segnalazione originale). JSON su singola riga = nomi con spazi/caratteri
+  // speciali gestiti dall'escaping, prefisso improbabile nella prosa.
+  const ATTACH_PREFIX = '@@filo-attachment ';
+
+  // Serializza un allegato { kind, url, name?, type? } nella sua riga-marcatore.
+  function serializeAttachment(att) {
+    const a = att || {};
+    const kind = a.kind === 'file' ? 'file' : 'img';
+    const obj = { kind, url: String(a.url || '') };
+    if (kind === 'file') {
+      obj.name = String(a.name || 'allegato');
+      if (a.type) obj.type = String(a.type);
+    }
+    return ATTACH_PREFIX + JSON.stringify(obj);
+  }
+
+  // Riconosce una riga-marcatore di allegato e la decodifica, oppure null se la
+  // riga è prosa normale. Difensivo: scarta URL non http(s) (no javascript:/data:
+  // → niente vettore XSS quando l'URL finisce in un href/src in dashboard).
+  function parseAttachmentLine(line) {
+    const s = String(line || '');
+    if (s.indexOf(ATTACH_PREFIX) !== 0) return null;
+    try {
+      const obj = JSON.parse(s.slice(ATTACH_PREFIX.length));
+      const url = String(obj.url || '');
+      if (!/^https?:\/\//i.test(url)) return null;
+      const kind = obj.kind === 'file' ? 'file' : 'img';
+      const att = { kind, url };
+      if (kind === 'file') {
+        att.name = String(obj.name || 'allegato');
+        att.type = String(obj.type || '');
+      }
+      return att;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // Serializza una lista di allegati nelle loro righe-marcatore (una per riga).
+  function attachmentsBlock(attachments) {
+    const list = Array.isArray(attachments) ? attachments : [];
+    return list.map(serializeAttachment).filter(Boolean).join('\n');
+  }
+
   // true se il feedback è stato inviato da un modello (issue d'agente o
   // sub-feedback creato da una routine): in quel caso anche la segnalazione
   // originale è "lato Filo", non "lato utente".
