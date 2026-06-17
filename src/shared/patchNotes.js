@@ -14,12 +14,12 @@
   'use strict';
 
   const NOTES = [
-    // ↓ Nuove versioni in cima. Esempio di forma (da popolare nei task C2–C5):
-    // {
-    //   version: '0.2.50', date: '2026-06-18',
-    //   features: ['Nuova pagina Crediti nel profilo: vedi quanto ti resta e come lo usi.'],
-    //   fixes: [],
-    // },
+    // ↓ Nuove versioni in cima.
+    {
+      version: '0.2.49', date: '2026-06-17',
+      features: ['Nuova pagina Crediti nel profilo: vedi il saldo e un grafico di come hai usato i crediti.'],
+      fixes: [],
+    },
   ];
 
   // Confronto versioni stile semver leggero ('0.2.49' vs '0.2.5' → corretto).
