@@ -38,6 +38,14 @@
     // §5 — cancellazione PERMANENTE di più tab archiviate (dopo conferma). { ids }
     DELETE_ARCHIVED_TABS: 'delete_archived_tabs',
     GET_COSTS: 'get_costs',
+    // Crediti (gamification): saldo + consumo aggregato per tipo d'uso, per la
+    // pagina Crediti del profilo. NON espone mai il costo in €. Vedi creditStore.
+    GET_CREDITS: 'get_credits',
+    // Broadcast main→renderer quando il saldo crediti cambia (consumo, refill,
+    // ricompensa): la shell aggiorna l'icona/animazione, la pagina il grafico.
+    CREDITS_CHANGED: 'credits_changed',
+    // Ricompensa crediti per un feedback inviato (+5 subito). { } → { ok, credits, balance }
+    CREDITS_AWARD_FEEDBACK: 'credits_award_feedback',
     CAPTURE_VISIBLE_TAB: 'capture_visible_tab',
     // Test provider: misura latenza al primo token e token al secondo
     // su un piccolo prompt fisso. Usato dalla pagina Opzioni.
