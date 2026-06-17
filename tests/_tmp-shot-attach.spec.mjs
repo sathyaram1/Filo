@@ -38,7 +38,7 @@ test('shot: composer + per-turn attachments', async ({ app, openTab }) => {
   });
   await page.locator('#refresh').click();
   await page.locator('[data-tab="done"]').click();
-  await page.locator('.fb-bubble--report').waitFor({ state: 'visible', timeout: 8000 });
+  await page.locator('.fb-bubble--report', { hasText: 'la sidebar non si apre' }).waitFor({ state: 'visible', timeout: 8000 });
   await page.screenshot({ path: 'tests/.shots/attach-readonly.png', fullPage: true });
 
   // Tab "Da risolvere" con composer note editabile (mostra il pulsante Allega).
