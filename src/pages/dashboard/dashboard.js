@@ -961,10 +961,23 @@
     // Bolla Filo "sta pensando": 3 righe di reasoning che scorrono e svaniscono.
     const pending = appendThinking();
 
+    // Canale per il reasoning VERO in diretta: apriamo una sottoscrizione
+    // filtrata per reqId e la passiamo al main, che ci pusha i thought summary
+    // del modello mentre genera. Se il modello non ragiona, non arriva nulla e
+    // restano le frasi indicative.
+    const reasoningReqId = `r${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    let offReasoning = null;
+    if (window.filo?.onReasoning) {
+      offReasoning = window.filo.onReasoning((data) => {
+        if (data && data.reqId === reasoningReqId && data.text) pending.pushReasoning(data.text);
+      });
+    }
+
     const msg = {
       type: MSG.FILO_CHAT,
       userMessage: text || 'Descrivi questa immagine.',
       threadHistory: threadHistory.slice(0, -1),
+      reasoningReqId,
     };
     if (imagesToSend.length) {
       msg.image = imagesToSend[0]; // retrocompatibilità (provider mono-immagine)
@@ -972,6 +985,7 @@
     }
     const r = await send(msg);
 
+    if (offReasoning) { try { offReasoning(); } catch (_) {} }
     pending.remove();
     if (!r?.ok) {
       const err = makeBubble({ role: 'filo', text: r?.error || 'Errore.' });
