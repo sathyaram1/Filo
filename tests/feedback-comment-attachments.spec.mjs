@@ -100,9 +100,7 @@ test('un allegato in una RISPOSTA si mostra nella sua bolla, NON nella segnalazi
 
   // L'immagine compare nella bolla della RISPOSTA (lato utente, non report)…
   const replyBubble = page.locator('.fb-bubble--user:not(.fb-bubble--report)');
-  await expect(replyBubble.locator('img')).toHavecount
-    ? await expect(replyBubble.locator('img')).toHaveCount(1)
-    : await expect(replyBubble.locator('img')).toHaveCount(1);
+  await expect(replyBubble.locator('img')).toHaveCount(1);
   await expect(replyBubble.locator('img')).toHaveAttribute('src', /shot\.png/);
   // …e NON nella bolla della segnalazione (che resta senza immagini).
   await expect(page.locator('.fb-bubble--report img')).toHaveCount(0);
