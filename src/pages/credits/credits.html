@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <title>Filo — Crediti</title>
+  <link rel="icon" href="filo://asset/icons/icon-32.png" />
+  <link rel="stylesheet" href="filo://style/theme.css" />
+  <link rel="stylesheet" href="filo://style/pages.css" />
+  <link rel="stylesheet" href="credits.css" />
+  <script src="filo://shared/themeTokens.js"></script>
+  <script src="filo://shared/pageBootstrap.js"></script>
+  <script src="filo://shared/constants.js"></script>
+  <script src="filo://shared/messages.js"></script>
+  <script src="filo://shared/icons.js"></script>
+  <script src="filo://shared/storage.js"></script>
+</head>
+<body>
+  <main class="sn-page">
+    <h1 id="title">Crediti</h1>
+
+    <section class="sn-credits-hero">
+      <span class="sn-credits-coin" id="coin"></span>
+      <div class="sn-credits-balance">
+        <span class="sn-credits-amount" id="balance">—</span>
+        <span class="sn-credits-unit">crediti</span>
+      </div>
+    </section>
+
+    <p class="sn-muted" id="refillHint">Ricevi +100 crediti ogni giorno a mezzanotte.</p>
+    <p class="sn-muted" id="offlineHint" hidden>
+      Accedi col tuo account per sincronizzare i crediti su tutti i dispositivi.
+    </p>
+
+    <section class="sn-credits-usage" id="usageSection" hidden>
+      <h2>Come hai usato i crediti</h2>
+      <div class="sn-credits-chart-row">
+        <svg id="chart" class="sn-credits-chart" viewBox="0 0 220 220" aria-hidden="true"></svg>
+        <ul id="legend" class="sn-credits-legend"></ul>
+      </div>
+    </section>
+
+    <p class="sn-muted" id="usageEmpty" hidden>Non hai ancora consumato crediti.</p>
+
+    <section class="sn-credits-moves" id="movesSection" hidden>
+      <h2>Movimenti recenti</h2>
+      <ul id="moves" class="sn-credits-moves-list"></ul>
+    </section>
+  </main>
+
+  <script src="credits.js"></script>
+</body>
+</html>
