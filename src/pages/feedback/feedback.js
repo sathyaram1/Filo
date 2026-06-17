@@ -528,18 +528,26 @@
       // Note editabili (textarea) dove l'admin sta lavorando: ricevuti/todo/
       // bozze/agente. "Ricevuti" è incluso così si può COMMENTARE un feedback
       // appena arrivato e poi spostarlo in "Da risolvere" (il commento viaggia
-      // col cambio di stato — vedi il gestore .fb-act). Altrove (risolti/
-      // verificati/chiarimenti) le note di Filo restano bolle di sola lettura —
-      // se mostrassi anche la textarea, lo stesso testo comparirebbe due volte.
+      // col cambio di stato — vedi il gestore .fb-act).
       const notesEditable = isAdmin && (currentTab === 'inbox' || currentTab === 'todo' || currentTab === 'draft' || currentTab === 'agent');
       const clarifyReply = isAdmin && currentTab === 'clarify';
-      // I turni (segnalazione, nota dell'agente, riaperture/risposte dell'utente)
-      // sono SEMPRE bolle separate, anche nei tab dove l'admin lavora: prima lì
-      // l'intero blob `notes` finiva in un'unica textarea, così una riapertura
-      // appariva "dentro la stessa bolla" della nota. Ora ogni turno è una bolla
-      // a sé e l'admin AGGIUNGE una nuova nota da un composer dedicato (stesso
-      // schema del tab Chiarimenti) invece di riscrivere il blocco intero.
-      const showConvo = true;
+      // Render di un turno come bolla di sola lettura (segnalazione esclusa).
+      const convoBubble = (t) => {
+        const who = (t.kind === 'note' || t.role === 'model') ? 'Filo' : 'Tu';
+        const tsLabel = t.ts ? `<span>${escapeHtml(String(t.ts))}</span>` : '';
+        // Allegati ANCORATI a questo turno (#190.3): immagini + file separati.
+        const atts = Array.isArray(t.attachments) ? t.attachments : [];
+        const tImgs = atts.filter((a) => a && a.kind === 'img').map((a) => a.url);
+        const tFiles = atts.filter((a) => a && a.kind === 'file');
+        const bodyHtml = t.body ? `<div class="fb-bubble-body">${escapeHtml(t.body)}</div>` : '';
+        return `
+          <div class="fb-bubble fb-bubble--${t.role}">
+            <div class="fb-bubble-head"><span class="fb-bubble-who">${who}</span>${tsLabel}</div>
+            ${bodyHtml}
+            ${imagesGridHtml(tImgs)}
+            ${filesListHtml(tFiles)}
+          </div>`;
+      };
       const reportBubble = `
         <div class="fb-bubble fb-bubble--report fb-bubble--${reportRole} fb-bubble--origin-${origin}">
           <div class="fb-bubble-head"><span class="fb-bubble-who">${reportWho}</span></div>
@@ -547,41 +555,49 @@
           ${imgsHtml}
           ${filesHtml}
         </div>`;
-      const convoHtml = showConvo
-        ? convoTurns.map((t) => {
-            const who = t.kind === 'note' ? 'Filo' : 'Tu';
-            const tsLabel = t.ts ? `<span>${escapeHtml(String(t.ts))}</span>` : '';
-            // Allegati ANCORATI a questo turno (#190.3): immagini + file separati.
-            const atts = Array.isArray(t.attachments) ? t.attachments : [];
-            const tImgs = atts.filter((a) => a && a.kind === 'img').map((a) => a.url);
-            const tFiles = atts.filter((a) => a && a.kind === 'file');
-            const bodyHtml = t.body ? `<div class="fb-bubble-body">${escapeHtml(t.body)}</div>` : '';
-            return `
-              <div class="fb-bubble fb-bubble--${t.role}">
-                <div class="fb-bubble-head"><span class="fb-bubble-who">${who}</span>${tsLabel}</div>
-                ${bodyHtml}
-                ${imagesGridHtml(tImgs)}
-                ${filesListHtml(tFiles)}
-              </div>`;
-          }).join('')
-        : '';
+      // Nei tab dove l'admin lavora la textarea modifica SOLO la nota
+      // dell'agente (il "capo" delle note). Le riaperture/risposte dell'utente
+      // (la "coda") NON finiscono più dentro quella stessa casella: restano
+      // bolle a sé, sotto la nota. Prima invece l'intero blob `notes` (nota +
+      // "--- Riaperto il … ---") cadeva in un'unica textarea, così la
+      // riapertura sembrava "dentro la stessa bolla". Negli altri tab tutti i
+      // turni sono già bolle di sola lettura.
+      let headText = '';
+      let headAtts = [];
+      let tailStr = '';
+      let tailBubblesHtml = '';
+      let convoHtml = '';
+      if (notesEditable) {
+        const { head, tail } = splitNotesHeadTail(f.notes);
+        const stripped = window.SN_FEEDBACK_THREAD && SN_FEEDBACK_THREAD.stripAttachments
+          ? SN_FEEDBACK_THREAD.stripAttachments(head)
+          : { text: head, attachments: [] };
+        headText = stripped.text;
+        headAtts = stripped.attachments;
+        tailStr = tail;
+        const tailTurns = tail && window.SN_FEEDBACK_THREAD ? SN_FEEDBACK_THREAD.splitNotes(tail) : [];
+        tailBubblesHtml = tailTurns
+          .map((s) => convoBubble({ role: s.role, kind: s.role === 'model' ? 'note' : 'reply', ts: s.ts, body: s.body, attachments: s.attachments }))
+          .join('');
+      } else {
+        convoHtml = convoTurns.map(convoBubble).join('');
+      }
       const threadHtml = `<div class="fb-thread">${reportBubble}${convoHtml}</div>`;
-      // Composer per AGGIUNGERE una nota (decisione di design / commento di
-      // triage) come NUOVO turno dell'agente: si appende allo storico — diventa
-      // una bolla a sé — invece di riscrivere il blob. Su "Ricevuti" è un
-      // commento al volo che viaggia col cambio di stato (lo raccoglie .fb-act).
-      const notesLabelText = currentTab === 'inbox' ? 'Aggiungi un commento:' : 'Aggiungi una nota / decisione di design:';
+      const tailThreadHtml = tailBubblesHtml ? `<div class="fb-thread fb-thread--tail">${tailBubblesHtml}</div>` : '';
+      // Su "Ricevuti" la casella è un COMMENTO al volo (poi sposti in "Da
+      // risolvere"); altrove è la nota di triage/decisioni di design.
+      const notesLabelText = currentTab === 'inbox' ? 'Commento:' : 'Note / decisioni di design:';
       const notesPlaceholder = currentTab === 'inbox'
-        ? 'Scrivi un commento… (verrà conservato quando sposti il feedback in "Da risolvere")'
-        : 'Dettagli aggiuntivi, vincoli, scelte di design… (verrà aggiunta come nuova bolla)';
+        ? 'Aggiungi un commento… (verrà conservato quando sposti il feedback in "Da risolvere")'
+        : 'Dettagli aggiuntivi, vincoli, scelte di design…';
+      // La textarea mostra il capo pulito (senza le righe-marcatore degli
+      // allegati: quelle vivono come thumbnail nel compositore) e porta la coda
+      // in `data-tail`, così il salvataggio la riallega intatta (notesValueOf).
       const notesBlock = notesEditable
         ? `<label class="fb-notes-label">${notesLabelText}
-             <textarea class="fb-notes" data-id="${escapeHtml(f._id)}" rows="3" placeholder="${escapeHtml(notesPlaceholder)}"></textarea>
+             <textarea class="fb-notes" data-id="${escapeHtml(f._id)}" data-tail="${escapeHtml(tailStr)}" rows="3" placeholder="${escapeHtml(notesPlaceholder)}">${escapeHtml(headText || '')}</textarea>
            </label>
-           <div class="fb-attach-mount" data-id="${escapeHtml(f._id)}" data-kind="notes"></div>
-           <div class="fb-note-buttons">
-             <button type="button" class="sn-btn sn-btn-secondary fb-note-add" data-id="${escapeHtml(f._id)}">Aggiungi nota</button>
-           </div>`
+           <div class="fb-attach-mount" data-id="${escapeHtml(f._id)}" data-kind="notes"></div>`
         : '';
       // Tab Chiarimenti: rispondi alle domande di Filo come un turno di chat. La
       // risposta si APPENDE allo storico (conserva la domanda) e il feedback
