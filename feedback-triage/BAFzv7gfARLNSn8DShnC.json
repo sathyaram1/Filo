@@ -1,0 +1,7 @@
+{
+  "id": "BAFzv7gfARLNSn8DShnC",
+  "status": "done",
+  "notes": "Esteso l'agente Aiuto alle azioni sui link: aprire il link in una nuova scheda, copiarlo, salvarlo per dopo e condividerlo. 'Apri in nuova scheda' riusa l'azione di sistema di Filo, quindi apre davvero la scheda; 'condividi' chiede conferma prima di uscire verso l'esterno. Il link si indica a parole o per posizione. Verificato con un test automatico che asserisce l'apertura tramite il canale interno di navigazione e la copia/condivisione sull'indirizzo giusto.",
+  "queuedAt": "2026-06-17T07:23:48.301Z",
+  "queuedBy": "routine"
+}

@@ -1,0 +1,7 @@
+{
+  "id": "4f8PP5tTpvCIROz2rgh8",
+  "status": "done",
+  "notes": "Esteso l'agente Aiuto alle azioni sulle immagini: copia immagine, salva immagine, copia il link dell'immagine e cerca l'immagine sul web. L'immagine si indica a parole o per posizione; se non specifichi quale, usa l'immagine principale visibile della pagina. 'Cerca immagine sul web' chiede conferma e apre Google Lens sull'immagine; copia e salva sono immediate. Verificato con un test automatico che asserisce l'apertura di Lens con l'immagine giusta e il salvataggio sull'immagine indicata.",
+  "queuedAt": "2026-06-17T07:23:48.235Z",
+  "queuedBy": "routine"
+}
