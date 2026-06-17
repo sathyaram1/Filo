@@ -685,6 +685,19 @@
     });
   }
 
+  // Hook di test: inietta dati/stato e ridisegna senza dipendere da Firestore
+  // live né da un login admin reale. Stesso pattern di window.__filoSidebarTest.
+  // isAdmin qui è solo il gate UX (la garanzia forte è server-side: Firestore
+  // rules + check nel main), quindi forzarlo da client è innocuo.
+  window.__filoFeedbackTest = {
+    inject({ items, admin, tab } = {}) {
+      if (Array.isArray(items)) all = items;
+      if (typeof admin === 'boolean') isAdmin = admin;
+      if (tab) currentTab = tab;
+      applyFilter();
+    },
+  };
+
   // Carica prima lo stato admin, poi i feedback: così il primo render già
   // mostra (o nasconde) i controlli di gestione in modo coerente.
   refreshAuth().finally(load);
