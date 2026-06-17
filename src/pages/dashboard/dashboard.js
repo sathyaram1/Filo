@@ -2093,9 +2093,16 @@
       refreshLive().catch((e) => console.warn('[Filo] live', e)),
     ]);
     if (firstRun) showWelcomeMessage();
-    // Recap aggiornamento: solo se l'utente ha già visto una versione precedente
-    // (il main sopprime il caso "primo avvio") e ci sono note da mostrare.
-    maybeShowUpdateRecap().catch(() => {});
+    // Popup all'avvio, in sequenza per non sovrapporsi: prima il recap
+    // aggiornamento (solo se c'è una versione precedente vista e note nuove),
+    // POI il ringraziamento per i feedback risolti (C5). Se il recap non compare,
+    // il ringraziamento parte subito.
+    (async () => {
+      try {
+        const shown = await maybeShowUpdateRecap(() => maybeShowFeedbackRewards());
+        if (!shown) await maybeShowFeedbackRewards();
+      } catch (_) {}
+    })();
   })();
 
   // Hook per i test Playwright (stesso pattern di __filoEditorFormat
