@@ -56,6 +56,7 @@ module.exports = {
   get SN_STORAGE() { return globalThis.SN_STORAGE; },
   get SN_PROVIDERS() { return globalThis.SN_PROVIDERS; },
   get SN_COSTS() { return globalThis.SN_COSTS; },
+  get SN_CREDITS() { return globalThis.SN_CREDITS; },
   get SN_SAVED_PAGES() { return globalThis.SN_SAVED_PAGES; },
   get SN_HISTORY() { return globalThis.SN_HISTORY; },
   get SN_I18N() { return globalThis.SN_I18N; },
