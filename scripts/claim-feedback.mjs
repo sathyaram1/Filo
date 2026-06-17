@@ -160,6 +160,12 @@ export function acquire(id, opts = {}) {
       return { status: 'taken', by: existing.by, expiresAt: existing.expiresAt, num: existing.num || '' };
     }
     // 'free' o 'mine' → (ri)scrivo il claim con scadenza fresca e provo a landarlo.
+    // Ricreo la dir QUI (non solo prima del loop): il gitPullRebase() appena
+    // sopra può resettare il working tree quando origin/main è avanzato, e git
+    // non traccia le cartelle vuote — quindi se `claims/` non contiene ancora
+    // file, viene rimossa e la writeFileSync fallirebbe con ENOENT (il bug del
+    // semaforo inaffidabile sotto concorrenza). mkdir è idempotente.
+    mkdirSync(CLAIMS_DIR, { recursive: true });
     const claim = buildClaim(id, me, opts);
     writeFileSync(claimFile(id), JSON.stringify(claim, null, 2) + '\n', 'utf8');
     const committed = commitFile(claimFile(id), `feedback: claim ${id} (${me})`);
