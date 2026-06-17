@@ -933,10 +933,21 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     threadMessages.push({ role: 'user', content: String(userMessage || '') });
   }
 
+  // Reasoning "vero" in diretta: se il client ha aperto un canale (reasoningReqId)
+  // e abbiamo il webContents che ha inviato la richiesta, inoltriamo i thought
+  // summary del modello alla scheda mano a mano che arrivano. La dashboard li fa
+  // scorrere nelle 3 righe al posto delle frasi indicative. Se il modello non
+  // restituisce ragionamento, semplicemente non arriva nulla e restano le frasi.
+  const wc = sender?.wc || null;
+  const onReasoning = (reasoningReqId && wc && !wc.isDestroyed?.())
+    ? (text) => { try { wc.send('filo:reasoning', { reqId: reasoningReqId, text }); } catch (_) {} }
+    : null;
+
   const r = await handleAIRequest({
     action: ACTIONS.FILO_CHAT,
     payload: { profilo, preferenze, espansioni, lezioni, stato: stateText, threadMessages },
     origin: 'filo:chat',
+    onReasoning,
   });
 
   const parsed = extractJson(r.text) || { text: r.text || '', actions: [] };
