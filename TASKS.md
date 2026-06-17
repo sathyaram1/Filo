@@ -103,7 +103,7 @@ Ordine = dipendenze (il motore va per primo). Numerare i task come C1..C5.
   mezzanotte multi-giorno, (b) conversione token→costo€→crediti, (c) aggregazione
   per uso. Verifica: `npm run test:unit`. (stima: L)
 
-- [ ] **C2 — Pagina Crediti nel profilo + icona moneta cinese + grafico a torta**
+- [~] **C2 — Pagina Crediti nel profilo + icona moneta cinese + grafico a torta**
   — Aggiungi la voce **"Crediti"** nel menu account della shell
   (`src/renderer/shell.js:245`, ramo loggato e sloggato) che apre una nuova pagina
   `filo://credits/credits.html` (registrarla nel protocol/router come le altre
