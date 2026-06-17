@@ -327,6 +327,25 @@
     return ta.value;
   }
 
+  // Appende il contenuto del composer "Aggiungi nota" (testo + allegati) come
+  // NUOVO turno dell'agente in coda alle note esistenti, così diventa una bolla
+  // separata invece di mescolarsi nella precedente. Ritorna il blob aggiornato,
+  // o null se non c'è nulla da aggiungere.
+  function appendedNotesFor(id, ta) {
+    if (!ta) return null;
+    const text = (ta.value || '').trim();
+    const atts = ta._attachComposer ? ta._attachComposer.getAttachments() : [];
+    if (!text && !atts.length) return null;
+    const item = all.find((f) => f._id === id);
+    const oldNotes = (item && item.notes) || '';
+    if (window.SN_FEEDBACK_THREAD && SN_FEEDBACK_THREAD.appendModelTurn) {
+      return SN_FEEDBACK_THREAD.appendModelTurn(oldNotes, text, { attachments: atts });
+    }
+    // Fallback senza il modulo thread: separatore semplice.
+    const block = text + (atts.length ? '' : '');
+    return oldNotes ? `${oldNotes}\n\n${block}` : block;
+  }
+
   async function patch(id, payload, optimistic) {
     if (!isAdmin) {
       alert('Operazione riservata agli amministratori: accedi con un account autorizzato.');
