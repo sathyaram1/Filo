@@ -33,6 +33,10 @@ function balanceOf(app) {
 test('feedback risolto: popup di ringraziamento + ricompensa per priorità', async ({ app, openTab }) => {
   const page = await openTab('filo://newtab/');
   await page.waitForLoadState('domcontentloaded');
+  // Lascia che l'init iniziale (clientId ancora assente → nessun premio) si
+  // esaurisca PRIMA di seminare, così è il reload — l'unica esecuzione con il
+  // clientId impostato — ad accreditare la ricompensa e mostrare il popup.
+  await page.waitForTimeout(500);
 
   await seed(app, [
     {
@@ -60,6 +64,10 @@ test('feedback risolto: popup di ringraziamento + ricompensa per priorità', asy
 test('aggrega più feedback risolti e somma la ricompensa', async ({ app, openTab }) => {
   const page = await openTab('filo://newtab/');
   await page.waitForLoadState('domcontentloaded');
+  // Lascia che l'init iniziale (clientId ancora assente → nessun premio) si
+  // esaurisca PRIMA di seminare, così è il reload — l'unica esecuzione con il
+  // clientId impostato — ad accreditare la ricompensa e mostrare il popup.
+  await page.waitForTimeout(500);
 
   await seed(app, [
     { _id: 'fb1', clientId: CLIENT_ID, status: 'done', priority: 3, name: 'Uno', seq: 1, subSeq: 0, notes: 'Sistemato uno.' },
@@ -83,6 +91,10 @@ test('aggrega più feedback risolti e somma la ricompensa', async ({ app, openTa
 test('anti doppio-premio: alla riapertura non ricompare né ri-accredita', async ({ app, openTab }) => {
   const page = await openTab('filo://newtab/');
   await page.waitForLoadState('domcontentloaded');
+  // Lascia che l'init iniziale (clientId ancora assente → nessun premio) si
+  // esaurisca PRIMA di seminare, così è il reload — l'unica esecuzione con il
+  // clientId impostato — ad accreditare la ricompensa e mostrare il popup.
+  await page.waitForTimeout(500);
 
   await seed(app, [
     { _id: 'fbZ', clientId: CLIENT_ID, status: 'done', priority: 1, name: 'Una cosa', seq: 7, subSeq: 0, notes: 'Fatto.' },
