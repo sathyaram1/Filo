@@ -13,6 +13,10 @@
     // services/archivedTabs.js. Mostrate in filo://archive raggruppate per giorno.
     ARCHIVED_TABS: 'archivedTabs',
     COSTS: 'costs',
+    // Crediti (gamification): saldo, refill giornaliero, consumo aggregato per
+    // tipo d'uso e log ricompense. Cache locale del doc Firestore `credits/<uid>`.
+    // Vedi src/main/services/creditStore.js.
+    CREDITS: 'credits',
     CATEGORIES: 'categories',
     BLOCKLIST: 'blocklist',
     AI_CACHE: 'aiCache',
