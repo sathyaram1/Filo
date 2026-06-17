@@ -605,9 +605,10 @@
         const to = b.dataset.to; // 'todo' | 'done' | 'new' | 'ignored'
         const id = b.dataset.id;
         const payload = { status: to };
-        // Quando passo da inbox a "todo", porto con me eventuali note già digitate.
-        const ta = listEl.querySelector(`.fb-notes[data-id="${id}"]`);
-        if (ta) payload.notes = ta.value;
+        // Quando passo da inbox a "todo", porto con me eventuali note + allegati
+        // già aggiunti (notesValueOf ri-incorpora le thumbnail come marcatori).
+        const ta = listEl.querySelector(`.fb-notes[data-id="${cssEsc(id)}"]`);
+        if (ta) payload.notes = notesValueOf(ta);
         patch(id, payload, { status: to, notes: payload.notes });
       });
     });
