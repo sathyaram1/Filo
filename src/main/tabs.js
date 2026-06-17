@@ -1423,6 +1423,13 @@ class TabManager {
     // 'foreground-tab' e 'background-tab' sono link cliccati dall'utente.
     wc.setWindowOpenHandler((details) => {
       const { url, disposition } = details;
+      // #209 — i popup di login ("Continua con Google" e simili) NON sono
+      // pubblicità: vanno consentiti come VERA finestra popup (action 'allow'),
+      // così la relazione opener↔popup che l'OAuth usa per restituire l'esito
+      // resta intatta. Una nuova scheda (deny+openTab) la spezzerebbe.
+      if (tab.isInternal === false && isAuthPopup(url)) {
+        return { action: 'allow' };
+      }
       const isAdLikePopup = disposition === 'new-window';
       if (tab.isInternal === false && this.security.blockPopups && isAdLikePopup) {
         this._notifyPopupBlocked(tab.id, url);
