@@ -103,139 +103,23 @@
   }
 
   // Collega un dropdown custom (stile .sn-select-* coerente col resto di Filo)
-  // a un input di segmento, al posto del popup nativo della <datalist> (che usa
-  // i colori di sistema, fuori palette). L'input resta editabile: si può sia
-  // scrivere a mano un nickname sia sceglierlo dalla lista; scrivendo, la lista
-  // si filtra. Ritorna una funzione per chiudere il popup.
+  // a un input di segmento, al posto del popup nativo della <datalist>. La
+  // logica vive in SN_COMBOBOX (condivisa col campo "stringa modello" del
+  // registry); qui passiamo solo la sorgente delle opzioni (i nickname), il
+  // validatore di compatibilità e le classi/posizionamento del segmento.
+  // Ritorna una funzione per chiudere il popup.
   function attachDropdown(seg, inp, onPick, validate) {
-    const pop = document.createElement('div');
-    pop.className = 'sn-select-pop sn-chain-pop';
-    pop.setAttribute('role', 'listbox');
-    pop.hidden = true;
-    seg.appendChild(pop);
-
-    let optionEls = [];
-    let hoverEl = null;
-    // Filtro applicato alla lista: vuoto = mostra tutto. Si popola solo quando
-    // l'utente DIGITA (non al semplice focus), così aprendo un campo già
-    // compilato si vedono comunque tutti i modelli per cambiarlo.
-    let filterText = '';
-
-    function setHover(o) {
-      if (hoverEl === o) return;
-      if (hoverEl) hoverEl.classList.remove('sn-hover');
-      hoverEl = o || null;
-      if (hoverEl) {
-        hoverEl.classList.add('sn-hover');
-        hoverEl.scrollIntoView({ block: 'nearest' });
-      }
-    }
-
-    function build() {
-      const filter = filterText.trim().toLowerCase();
-      const all = readNicknameOptions();
-      const shown = filter
-        ? all.filter((o) => o.value.toLowerCase().includes(filter) || o.label.toLowerCase().includes(filter))
-        : all;
-      pop.textContent = '';
-      optionEls = [];
-      hoverEl = null;
-      const list = shown.length ? shown : all; // se il filtro non matcha, mostra tutto
-      for (const opt of list) {
-        const o = document.createElement('div');
-        o.className = 'sn-select-option';
-        o.setAttribute('role', 'option');
-        o.dataset.value = opt.value;
-        if (opt.label) {
-          const v = document.createElement('span');
-          v.className = 'sn-chain-opt-nick';
-          v.textContent = opt.value;
-          const l = document.createElement('span');
-          l.className = 'sn-chain-opt-label';
-          l.textContent = opt.label;
-          o.appendChild(v);
-          o.appendChild(l);
-        } else {
-          o.textContent = opt.value;
-        }
-        if (opt.value === (inp.value || '').trim()) {
-          o.classList.add('sn-selected');
-          o.setAttribute('aria-selected', 'true');
-        }
-        // Modello non adatto a questa funzione → opzione disabilitata (visibile
-        // ma non selezionabile), con il motivo come tooltip.
-        const check = validate ? validate(opt.value) : { ok: true };
-        if (!check.ok) {
-          o.classList.add('sn-disabled');
-          o.setAttribute('aria-disabled', 'true');
-          o.style.opacity = '0.45';
-          o.style.cursor = 'not-allowed';
-          o.title = check.reason || '';
-        }
-        o.addEventListener('mousemove', () => setHover(o));
-        // mousedown (non click) così avviene prima del blur dell'input.
-        o.addEventListener('mousedown', (e) => {
-          e.preventDefault();
-          if (!check.ok) return; // opzione incompatibile: non selezionabile
-          pick(opt.value);
-        });
-        pop.appendChild(o);
-        optionEls.push(o);
-      }
-      return optionEls.length;
-    }
-
-    function pick(value) {
-      if (validate) { const v = validate(value); if (!v.ok) return; }
-      inp.value = value;
-      fit(inp);
-      onPick(value);
-      close();
-      inp.focus();
-    }
-
-    function moveHover(dir) {
-      if (!optionEls.length) return;
-      let i = optionEls.indexOf(hoverEl);
-      i = (i + dir + optionEls.length) % optionEls.length;
-      setHover(optionEls[i]);
-    }
-
-    function open() {
-      if (!pop.hidden) return;
-      if (!build()) return; // niente nickname nel registry → niente popup
-      pop.hidden = false;
-      seg.classList.add('sn-chain-open');
-      const sel = optionEls.find((o) => o.classList.contains('sn-selected'));
-      setHover(sel || optionEls[0] || null);
-    }
-    function close() {
-      if (pop.hidden) return;
-      pop.hidden = true;
-      seg.classList.remove('sn-chain-open');
-      if (hoverEl) hoverEl.classList.remove('sn-hover');
-      hoverEl = null;
-    }
-
-    inp.addEventListener('focus', () => { filterText = ''; open(); });
-    inp.addEventListener('input', () => {
-      filterText = inp.value || '';
-      if (pop.hidden) open(); else build();
+    const Combo = global.SN_COMBOBOX;
+    if (!Combo) return () => {};
+    return Combo.attach(seg, inp, {
+      readOptions: readNicknameOptions,
+      onPick,
+      validate,
+      popClass: 'sn-chain-pop',
+      valueClass: 'sn-chain-opt-nick',
+      labelClass: 'sn-chain-opt-label',
+      sizeInput: true,
     });
-    inp.addEventListener('keydown', (e) => {
-      if (pop.hidden) {
-        if (e.key === 'ArrowDown') { e.preventDefault(); open(); }
-        return;
-      }
-      if (e.key === 'ArrowDown') { e.preventDefault(); moveHover(1); }
-      else if (e.key === 'ArrowUp') { e.preventDefault(); moveHover(-1); }
-      else if (e.key === 'Enter') {
-        if (hoverEl) { e.preventDefault(); pick(hoverEl.dataset.value); }
-      } else if (e.key === 'Escape') { e.preventDefault(); close(); }
-    });
-    inp.addEventListener('blur', () => { setTimeout(close, 120); });
-
-    return close;
   }
 
   // Costruisce l'editor a segmenti per UNA azione.
