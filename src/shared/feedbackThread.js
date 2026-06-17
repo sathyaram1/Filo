@@ -228,13 +228,46 @@
   }
 
   // Appende un turno dell'agente al blob note esistente, conservando lo storico.
+  // opts.attachments come in appendUserTurn (simmetria tra i due cammini).
   function appendModelTurn(oldNotes, reportText, opts) {
     const o = opts || {};
     const report = String(reportText || '').trim();
-    if (!report) return String(oldNotes || '');
-    const block = `${modelTurnMarker(o.ts, o.label)}\n${report}`;
+    const attBlock = attachmentsBlock(o.attachments);
+    if (!report && !attBlock) return String(oldNotes || '');
+    const parts = [modelTurnMarker(o.ts, o.label)];
+    if (report) parts.push(report);
+    if (attBlock) parts.push(attBlock);
+    const block = parts.join('\n');
     const prev = String(oldNotes || '');
     return prev ? `${prev}\n\n${block}` : block;
+  }
+
+  // ── Compositore note editabile (tab Ricevuti/Da risolvere/Bozze/Agente) ──
+  // Lì l'admin modifica l'INTERO blob `notes` come testo libero in una textarea.
+  // Per gestire gli allegati senza mostrargli le righe-marcatore grezze:
+  //   stripAttachments(notes) → { text, attachments } toglie le righe-marcatore
+  //     dal testo (lasciando intatti i marcatori di turno `--- … ---`) e ritorna
+  //     gli allegati raccolti, da mostrare come thumbnail sotto la textarea.
+  //   composeNotes(text, attachments) → ri-incorpora gli allegati come righe in
+  //     coda al testo al momento del salvataggio (inverso di stripAttachments).
+  function stripAttachments(notes) {
+    const lines = String(notes || '').split('\n');
+    const kept = [];
+    const attachments = [];
+    for (const line of lines) {
+      const att = parseAttachmentLine(line);
+      if (att) attachments.push(att);
+      else kept.push(line);
+    }
+    return { text: kept.join('\n'), attachments };
+  }
+
+  function composeNotes(text, attachments) {
+    const base = String(text == null ? '' : text);
+    const attBlock = attachmentsBlock(attachments);
+    if (!attBlock) return base;
+    const trimmed = base.replace(/\s+$/, '');
+    return trimmed ? `${trimmed}\n${attBlock}` : attBlock;
   }
 
   // Fonde il nuovo report di una routine con le note ESISTENTI, senza perderle.
