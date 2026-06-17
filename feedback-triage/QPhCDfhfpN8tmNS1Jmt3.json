@@ -1,0 +1,7 @@
+{
+  "id": "QPhCDfhfpN8tmNS1Jmt3",
+  "status": "done",
+  "notes": "Le scorciatoie numeriche per le tab ci sono: tieni premuto Alt e premi un numero (Alt+1 = prima tab … Alt+9 = nona, Alt+0 = decima). Funzionano sia mentre scrivi nella barra di Filo sia mentre scrivi dentro una pagina, perché Alt+cifra non inserisce testo (un numero da solo verrebbe invece digitato). Verificato con test automatici sia col focus sulla barra sia dentro una pagina web.",
+  "queuedAt": "2026-06-17T19:21:05.560Z",
+  "queuedBy": "routine"
+}
