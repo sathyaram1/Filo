@@ -626,8 +626,9 @@
         actionsDiv.innerHTML = `
           <div class="fb-reopen-form">
             <label class="fb-notes-label">Cosa non va / cosa manca:
-              <textarea class="fb-reopen-text" rows="3" placeholder="Spiega meglio il problema, allega contesto, indica passi per riprodurre…"></textarea>
+              <textarea class="fb-reopen-text" rows="3" placeholder="Spiega meglio il problema, allega contesto, indica passi per riprodurre… (puoi incollare/trascinare immagini e file)"></textarea>
             </label>
+            <div class="fb-attach-mount" data-kind="reopen"></div>
             <div class="fb-reopen-buttons">
               <button type="button" class="sn-btn sn-btn-secondary fb-reopen-cancel">Annulla</button>
               <button type="button" class="sn-btn fb-reopen-confirm">Conferma riapertura</button>
@@ -635,6 +636,12 @@
           </div>
         `;
         const ta = actionsDiv.querySelector('.fb-reopen-text');
+        // Compositore allegati per la riapertura (parità con gli altri composer).
+        const reopenComposer = makeAttachComposer({
+          textarea: ta,
+          mount: actionsDiv.querySelector('.fb-attach-mount[data-kind="reopen"]'),
+          initial: [],
+        });
         ta.focus();
         // Esc annulla, Ctrl/Cmd+Enter conferma — più comodo che cliccare.
         ta.addEventListener('keydown', (e) => {
