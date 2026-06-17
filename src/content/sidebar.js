@@ -973,6 +973,26 @@
         return;
       }
 
+      // Caso speciale: azione SULLA PAGINA (copia/cerca/leggi/immagine/link) —
+      // le stesse del menu tasto destro, eseguite dal content script.
+      if (parsed.kind === 'page_action') {
+        if (thinking) { thinking.stop(); thinking.el.remove(); }
+        if (parsed.display) {
+          appendChatMessage('assistant', parsed.display);
+          history.push({ role: 'assistant', content: parsed.display });
+        }
+        const ok = await runPageAction(parsed.page);
+        // Se l'agente vuole concatenare passi (status:"continue") e l'azione è
+        // andata a buon fine, prosegue con una nota di sistema; altrimenti chiude.
+        if (parsed.status === 'continue' && ok) {
+          const note = `ho eseguito l'azione di pagina "${parsed.page.op}". Valuta lo stato e prosegui, oppure chiudi con status:"done".`;
+          setTimeout(() => submit({ userAction: note, preActionUrl: location.href }), 200);
+        } else {
+          expand({ ai: true });
+        }
+        return;
+      }
+
       if (thinking) { thinking.stop(); thinking.el.remove(); }
       // Se il modello non ha messo testo ma c'è solo un highlight di routine,
       // mostriamo comunque una riga discreta in chat (es. "→ passo successivo")
