@@ -204,11 +204,18 @@
   }
 
   // Appende un turno dell'utente al blob note esistente, conservando lo storico.
+  // opts.attachments: lista di allegati { kind, url, name?, type? } ANCORATI a
+  // questo turno (serializzati come righe-marcatore subito sotto al testo).
   function appendUserTurn(oldNotes, replyText, opts) {
     const o = opts || {};
     const reply = String(replyText || '').trim();
-    if (!reply) return String(oldNotes || '');
-    const block = `${userTurnMarker(o.ts, o.label)}\n${reply}`;
+    const attBlock = attachmentsBlock(o.attachments);
+    // Una risposta fatta di soli allegati (senza parole) è valida.
+    if (!reply && !attBlock) return String(oldNotes || '');
+    const parts = [userTurnMarker(o.ts, o.label)];
+    if (reply) parts.push(reply);
+    if (attBlock) parts.push(attBlock);
+    const block = parts.join('\n');
     const prev = String(oldNotes || '');
     return prev ? `${prev}\n\n${block}` : block;
   }
