@@ -51,7 +51,7 @@ const ALLOWED_STATUS = ['new', 'todo', 'clarify'];
 
 // Valida i parametri e costruisce l'oggetto-entry per lo spool (logica pura,
 // testata in tests/unit). Lancia su input non valido.
-export function buildCreateEntry({ text, name, parentId, priority, status, notes, images, queuedBy }) {
+export function buildCreateEntry({ text, name, parentId, priority, status, notes, images, queuedBy, uid }) {
   const t = String(text || '').trim();
   if (!t) throw new Error('testo mancante');
   if (t.length > 10000) throw new Error('testo troppo lungo (max 10000)');
