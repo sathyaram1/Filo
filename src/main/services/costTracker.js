@@ -46,6 +46,12 @@
     m.byAction[action] = (m.byAction[action] || 0) + eur;
     m.byProvider[provider] = (m.byProvider[provider] || 0) + eur;
     await setState(state);
+    // Conteggio crediti (gamification): 1 credito = 0,08 centesimi. Il costo €
+    // resta qui dietro le quinte; il motore crediti converte e scala il saldo.
+    // Coperti così TUTTI i call site AI senza ritoccarli uno per uno.
+    try {
+      await global.SN_CREDITS?.recordConsumption({ action, costEur: eur, provider, model, usage });
+    } catch (_) { /* i crediti non devono mai far fallire una chiamata AI */ }
     return eur;
   }
 
