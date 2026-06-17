@@ -511,6 +511,21 @@
           status: obj.status === 'continue' ? 'continue' : 'done',
         };
       }
+      // Output speciale: azione SULLA PAGINA (le stesse del menu tasto destro su
+      // testo/immagine/link: copia, taglia, cerca sul web, leggi ad alta voce,
+      // copia/salva/cerca immagine, copia/salva/condividi/apri link). Non sono
+      // azioni del main (vivono in src/content/actions.js + tts.js): le esegue
+      // direttamente la sidebar via runPageAction(), col popup di conferma di
+      // Filo quando l'azione esce verso l'esterno. Vedi PROMPTS.help().
+      if (obj.action === 'page' && obj.page && typeof obj.page === 'object'
+        && typeof obj.page.op === 'string' && PAGE_ACTIONS[obj.page.op]) {
+        return {
+          kind: 'page_action',
+          page: obj.page,
+          display: typeof obj.text === 'string' ? obj.text : '',
+          status: obj.status === 'continue' ? 'continue' : 'done',
+        };
+      }
       const status = obj.status === 'continue' ? 'continue' : 'done';
       const collapseFlag = typeof obj.collapse === 'boolean' ? obj.collapse : null;
       let highlight = null;
