@@ -54,6 +54,22 @@
     return { url: publicUrl, name };
   }
 
+  // Carica un allegato (immagine O file) su Storage e lo classifica per la UI.
+  // Usata dalla dashboard per allegare immagini/file ai COMMENTI dei feedback
+  // (#190.3). Lo storage path feedback/* è scrivibile da chiunque (storage.rules),
+  // quindi non serve token. Ritorna { kind:'img'|'file', url, name, type }.
+  async function uploadAttachment(blob, name) {
+    const u = await uploadImage(blob); // upload generico (usa blob.type)
+    const type = (blob && blob.type) || '';
+    const kind = type.startsWith('image/') ? 'img' : 'file';
+    return {
+      kind,
+      url: u.url,
+      name: String(name || (kind === 'img' ? 'immagine' : 'allegato')),
+      type,
+    };
+  }
+
   // Converte un valore JS in un Value Firestore REST.
   function toFsValue(v) {
     if (v === null || v === undefined) return { nullValue: null };
