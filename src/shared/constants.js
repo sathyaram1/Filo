@@ -50,6 +50,10 @@
     // Flag "primo avvio mostrato": true dopo che il messaggio di benvenuto di
     // Filo è stato presentato la prima volta che l'utente apre l'app.
     FILO_WELCOMED: 'filo_welcomed',
+    // Ultima versione di cui l'utente ha visto il recap aggiornamento (popup
+    // all'avvio). All'avvio si confronta con app.getVersion(): se è più vecchia
+    // e ci sono note (src/shared/patchNotes.js), mostra il recap. Vedi C4.
+    LAST_SEEN_VERSION: 'filo_last_seen_version',
     // Regole proxy persistenti per dominio (#152): "questo sito sempre da
     // <paese>". Oggetto { <dominio registrabile>: { country, tier?, ts } }.
     // Alla navigazione verso il dominio la tab nasce già instradata da quel
