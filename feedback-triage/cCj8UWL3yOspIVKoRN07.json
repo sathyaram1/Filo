@@ -1,0 +1,7 @@
+{
+  "id": "cCj8UWL3yOspIVKoRN07",
+  "status": "done",
+  "notes": "Ora l'agente Aiuto (pannello laterale) può fare sul testo le stesse cose del menu tasto destro: copiare, tagliare, cercare sul web, leggere ad alta voce, fermare la lettura e aprire l'editor di riscrittura. Basta chiederglielo a parole ('copia questa frase', 'leggimelo ad alta voce', 'cerca questo sul web'). Le azioni che escono verso l'esterno (cerca sul web) mostrano il popup di conferma di Filo prima di partire; copia e lettura sono immediate. In più (oltre al chiesto) ho aggiunto 'ferma la lettura' e l'apertura dell'editor di riscrittura, per completare la parità col menu. Verificato con un nuovo test automatico che asserisce che la frase viene davvero copiata, che la ricerca apre Google col testo giusto e che il popup blocca/avvia l'azione.",
+  "queuedAt": "2026-06-17T07:23:30.959Z",
+  "queuedBy": "routine"
+}
