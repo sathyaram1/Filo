@@ -1,0 +1,7 @@
+{
+  "id": "U4rTlPpmQvgecHQhCHzO",
+  "status": "clarify",
+  "notes": "Cosa ho capito: le tab (soprattutto quelle non attive) ti sembrano troppo scure e poco sature — ti aspettavi che, con saturazione alta, il colore fosse vicino a quello vivo del sito (rosso YouTube).\n\nCosa ho trovato: le tab non attive sono disegnate apposta con una tinta molto smorzata (saturazione fissata a circa il 18%) e poi mescolata con lo sfondo scuro della barra, quindi risultano volutamente sobrie/scure. L'impostazione \"Saturazione tab\" delle preferenze al momento influenza solo il colore della tab ATTIVA (e quello memorizzato), non la tinta smorzata delle tab inattive: per questo portarla a 0.9 non le rende piu accese, ed e per quello che \"non sembra 0.9\".\n\nCosa mi serve da te per procedere (e una scelta di stile, e nel cloud non posso giudicare il risultato a occhio): vuoi che le tab inattive (a) rispettino l'impostazione \"Saturazione tab\" — cosi 0.9 = tab nettamente piu colorate, accettando che siano piu vistose; (b) restino in stile \"subliminale\" ma meno scure (alzo solo la luminosita/quota di tinta); oppure (c) solo la tab attiva vivace e le inattive smorzate come ora? E indicativamente quanto vive le vuoi (colore pieno del brand o, es., ~50%)? Se mi alleghi uno screenshot di come le immagini, le faccio combaciare esattamente.",
+  "queuedAt": "2026-06-17T19:30:14.947Z",
+  "queuedBy": "routine"
+}
