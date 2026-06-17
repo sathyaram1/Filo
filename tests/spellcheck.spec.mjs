@@ -50,7 +50,7 @@ async function expectCorrectionAtTop({ app, openTab, testServer }, html, selecto
   );
 
   const sent = await sendNative(app, new URL(url).host, 'ciiao', ['ciao', 'chiao']);
-  expect(sent).toBe(true);
+  expect(sent).toBeGreaterThanOrEqual(1);
   // Attende che il broadcast nativo sia stato EFFETTIVAMENTE registrato (non un
   // timeout fisso): solo allora il click destro troverà i suggerimenti pronti.
   await page.waitForFunction(
