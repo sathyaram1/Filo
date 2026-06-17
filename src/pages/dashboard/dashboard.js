@@ -1897,6 +1897,175 @@
     doneBtn.focus();
   }
 
+  // ===== Ringraziamento feedback risolto (C5) =====
+  // All'avvio chiediamo al main se qualche feedback INVIATO DA QUESTO UTENTE è
+  // passato a "risolto" da quando non guardava. Per ognuno il main ha già
+  // accreditato la ricompensa per priorità (50/100/200/300, una volta sola) e
+  // ci ritorna il testo da mostrare. Qui ringraziamo, spieghiamo cosa è cambiato
+  // (testo non tecnico preso dalle note) e animiamo i crediti verso il profilo.
+  async function maybeShowFeedbackRewards() {
+    let res;
+    try { res = await send({ type: MSG.GET_FEEDBACK_REWARDS }); } catch (_) { return; }
+    if (!res || !res.ok || !Array.isArray(res.rewards) || !res.rewards.length) return;
+    renderFeedbackRewards(res.rewards, res.totalCredits || 0);
+  }
+
+  // Anima alcune "monete credito" dorate dal centro dello schermo verso l'icona
+  // profilo (accountCtrlBtn). Riusa lo spirito di C3 ma vive nella home, dove
+  // l'icona account è un elemento DOM reale: puntiamo al suo centro. Decorativa,
+  // best-effort, rispetta prefers-reduced-motion.
+  function flyCreditsToAccount(amount) {
+    try {
+      const reduce = !!(window.matchMedia &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+      if (reduce) return;
+      const n = Math.max(1, Math.round(Number(amount) || 0));
+      const target = (accountCtrlBtn && accountCtrlBtn.getBoundingClientRect()) || null;
+      const tx = target ? target.left + target.width / 2 : Math.max(24, window.innerWidth - 26);
+      const ty = target ? target.top + target.height / 2 : 26;
+      const ox = window.innerWidth / 2;
+      const oy = window.innerHeight / 2;
+      const GOLD = '#e0a93f';
+
+      const layer = document.createElement('div');
+      layer.className = 'dash-credit-fly';
+      layer.setAttribute('aria-hidden', 'true');
+      Object.assign(layer.style, {
+        position: 'fixed', inset: '0', zIndex: '2147483647',
+        pointerEvents: 'none', overflow: 'hidden',
+      });
+      document.body.appendChild(layer);
+
+      const coinSvg = (self.SN_ICONS?.credits?.(22)) || '●';
+      const count = Math.min(9, Math.max(5, Math.round(n / 40) + 4));
+      let maxEnd = 1000;
+      for (let i = 0; i < count; i++) {
+        const c = document.createElement('div');
+        c.innerHTML = coinSvg;
+        Object.assign(c.style, {
+          position: 'fixed', left: '0', top: '0', width: '22px', height: '22px',
+          color: GOLD, filter: 'drop-shadow(0 1px 2px rgba(0,0,0,.4))',
+          willChange: 'transform, opacity',
+        });
+        layer.appendChild(c);
+        const sx = ox + (Math.random() - 0.5) * 120;
+        const sy = oy + (Math.random() - 0.5) * 80;
+        const mx = (sx + tx) / 2 + (Math.random() - 0.5) * 80;
+        const my = Math.min(sy, ty) - 50 - Math.random() * 50;
+        const delay = i * 45;
+        const dur = 700 + i * 50 + Math.random() * 140;
+        maxEnd = Math.max(maxEnd, delay + dur);
+        try {
+          c.animate([
+            { transform: `translate(${sx}px,${sy}px) scale(.6)`, opacity: 0 },
+            { transform: `translate(${mx}px,${my}px) scale(1.05)`, opacity: 1, offset: 0.5 },
+            { transform: `translate(${tx}px,${ty}px) scale(.45)`, opacity: 0 },
+          ], { duration: dur, delay, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'forwards' });
+        } catch (_) {}
+      }
+      setTimeout(() => { try { layer.remove(); } catch (_) {} }, maxEnd + 200);
+    } catch (_) {}
+  }
+
+  function renderFeedbackRewards(rewards, totalCredits) {
+    const overlay = document.createElement('div');
+    overlay.className = 'dash-recap-overlay dash-thanks-overlay';
+    overlay.id = 'thanksOverlay';
+    const box = document.createElement('div');
+    box.className = 'dash-recap-box dash-thanks-box';
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-modal', 'true');
+    box.setAttribute('aria-label', 'Feedback risolto');
+    overlay.appendChild(box);
+
+    let settled = false;
+    function close() {
+      if (settled) return;
+      settled = true;
+      document.removeEventListener('keydown', onKey, true);
+      overlay.remove();
+    }
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); }
+    }
+    document.addEventListener('keydown', onKey, true);
+    overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) close(); });
+
+    // Header: ringraziamento + totale crediti guadagnati.
+    const header = document.createElement('div');
+    header.className = 'dash-recap-header dash-thanks-header';
+    const title = document.createElement('div');
+    title.className = 'dash-recap-title';
+    title.textContent = rewards.length > 1
+      ? 'Grazie! I tuoi feedback sono stati risolti'
+      : 'Grazie! Il tuo feedback è stato risolto';
+    header.appendChild(title);
+    if (totalCredits > 0) {
+      const badge = document.createElement('div');
+      badge.className = 'dash-thanks-total';
+      const coin = self.SN_ICONS?.credits?.(18) || '';
+      badge.innerHTML = `${coin}<span>+${totalCredits} crediti</span>`;
+      header.appendChild(badge);
+    }
+    box.appendChild(header);
+
+    const xBtn = document.createElement('button');
+    xBtn.type = 'button';
+    xBtn.className = 'dash-recap-x';
+    xBtn.setAttribute('aria-label', 'Chiudi');
+    xBtn.innerHTML = self.SN_ICONS?.close?.(16) || '✕';
+    xBtn.addEventListener('click', close);
+    box.appendChild(xBtn);
+
+    const bodyEl = document.createElement('div');
+    bodyEl.className = 'dash-recap-body dash-thanks-body';
+    box.appendChild(bodyEl);
+
+    for (const r of rewards) {
+      const item = document.createElement('div');
+      item.className = 'dash-thanks-item';
+
+      const head = document.createElement('div');
+      head.className = 'dash-thanks-item-head';
+      const name = document.createElement('div');
+      name.className = 'dash-thanks-item-title';
+      const numTxt = r.num ? `#${r.num} ` : '';
+      name.textContent = `${numTxt}${r.name || 'Feedback risolto'}`;
+      head.appendChild(name);
+      if (Number(r.credits) > 0) {
+        const cr = document.createElement('div');
+        cr.className = 'dash-thanks-item-credits';
+        const coin = self.SN_ICONS?.credits?.(14) || '';
+        cr.innerHTML = `${coin}<span>+${r.credits}</span>`;
+        head.appendChild(cr);
+      }
+      item.appendChild(head);
+
+      const expl = document.createElement('div');
+      expl.className = 'dash-thanks-item-body';
+      expl.textContent = (r.explanation && String(r.explanation).trim())
+        || 'È stato sistemato: provalo e dicci com’è andata.';
+      item.appendChild(expl);
+
+      bodyEl.appendChild(item);
+    }
+
+    const footer = document.createElement('div');
+    footer.className = 'dash-recap-footer';
+    const doneBtn = document.createElement('button');
+    doneBtn.type = 'button';
+    doneBtn.className = 'dash-recap-btn dash-recap-done';
+    doneBtn.textContent = 'Fantastico!';
+    doneBtn.addEventListener('click', close);
+    footer.append(doneBtn);
+    box.appendChild(footer);
+
+    document.body.appendChild(overlay);
+    doneBtn.focus();
+    // Anima i crediti verso il profilo dopo un attimo (il box è già su schermo).
+    setTimeout(() => flyCreditsToAccount(totalCredits), 250);
+  }
+
   (async function init() {
     renderControls();
     await applySavedTheme();
