@@ -763,30 +763,46 @@
       });
     });
 
-    // Composer della NUOVA nota (Ricevuti/Da risolvere/Bozze/Agente): parte
-    // vuoto — gli allegati si ancorano al turno che si sta scrivendo, non al
-    // blob storico — e viene appeso col bottone "Aggiungi nota".
+    // Compositore allegati per la nota editabile (il "capo"): inizializzato con
+    // gli allegati del capo. Persiste subito (onChange → patch): notesValueOf
+    // ricompone capo (testo + allegati) + coda intatta.
     listEl.querySelectorAll('.fb-attach-mount[data-kind="notes"]').forEach((mount) => {
       const id = mount.dataset.id;
       const ta = listEl.querySelector(`.fb-notes[data-id="${cssEsc(id)}"]`);
       if (!ta || ta._attachComposer) return;
-      ta._attachComposer = makeAttachComposer({ textarea: ta, mount, initial: [] });
+      const item = all.find((f) => f._id === id);
+      const init = item && window.SN_FEEDBACK_THREAD && SN_FEEDBACK_THREAD.stripAttachments
+        ? SN_FEEDBACK_THREAD.stripAttachments(splitNotesHeadTail(item.notes).head).attachments
+        : [];
+      ta._attachComposer = makeAttachComposer({
+        textarea: ta,
+        mount,
+        initial: init,
+        onChange: () => {
+          const v = notesValueOf(ta);
+          const it = all.find((f) => f._id === id);
+          if (it && it.notes === v) return;
+          patch(id, { notes: v }, { notes: v });
+        },
+      });
     });
 
-    // Bottone "Aggiungi nota": appende il testo (+ allegati) come NUOVO turno
-    // dell'agente, conservando lo storico e creando una bolla a sé. Ctrl/Cmd+Enter
-    // fa lo stesso. Senza testo né allegati non fa nulla.
-    listEl.querySelectorAll('.fb-note-add').forEach((btn) => {
-      const id = btn.dataset.id;
-      const ta = listEl.querySelector(`.fb-notes[data-id="${cssEsc(id)}"]`);
-      const add = () => {
-        const newNotes = ta ? appendedNotesFor(id, ta) : null;
-        if (newNotes == null) { if (ta) ta.focus(); return; }
-        patch(id, { notes: newNotes }, { notes: newNotes });
+    // Salvataggio note: debounce su input + blur. Salva capo (testo + allegati)
+    // ricomposto con la coda (notesValueOf).
+    listEl.querySelectorAll('.fb-notes').forEach((ta) => {
+      let timer;
+      const flush = () => {
+        const id = ta.dataset.id;
+        const item = all.find((f) => f._id === id);
+        if (!item) return;
+        const v = notesValueOf(ta);
+        if (item.notes === v) return;
+        patch(id, { notes: v }, { notes: v });
       };
-      btn.addEventListener('click', add);
-      if (ta) ta.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); add(); }
+      ta.addEventListener('blur', flush);
+      ta.addEventListener('input', () => {
+        clearTimeout(timer);
+        timer = setTimeout(flush, 1500);
       });
     });
 
