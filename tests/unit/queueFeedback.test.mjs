@@ -83,6 +83,25 @@ test('buildCreateEntry: images non-URL o non-array rifiutati', () => {
   assert.throws(() => buildCreateEntry({ text: 't', name: 'n', images: 'https://x/a.png' }), /deve essere un array/);
 });
 
+test('buildCreateEntry: genera una uid valida come id documento (idempotenza)', () => {
+  // La uid serve da chiave di de-dup: applicata due volte la stessa entry crea
+  // il doc con lo STESSO id Firestore → la seconda POST riceve 409 invece di un
+  // duplicato. Deve essere un id documento valido (lettere/cifre/-/_).
+  const e = buildCreateEntry({ text: 't', name: 'n' });
+  assert.match(e.uid, /^[A-Za-z0-9_-]{1,128}$/, `uid non è un id documento valido: ${e.uid}`);
+  // Due entry distinte → uid distinte (niente collisione tra creazioni diverse).
+  const e2 = buildCreateEntry({ text: 't', name: 'n' });
+  assert.notEqual(e.uid, e2.uid, 'due entry diverse devono avere uid diverse');
+  // Una uid valida passata esplicitamente viene preservata (idempotenza stabile
+  // se la stessa creazione venisse ri-accodata con la stessa uid).
+  const fixed = buildCreateEntry({ text: 't', name: 'n', uid: 'abc-123_XY' });
+  assert.equal(fixed.uid, 'abc-123_XY');
+  // Una uid non valida (caratteri proibiti) viene scartata e rigenerata.
+  const sanitized = buildCreateEntry({ text: 't', name: 'n', uid: '../evil/id' });
+  assert.match(sanitized.uid, /^[A-Za-z0-9_-]{1,128}$/);
+  assert.notEqual(sanitized.uid, '../evil/id');
+});
+
 test('queueFeedbackCreate: scrive un file new-*.json con l\'entry dentro lo spool', () => {
   const file = queueFeedbackCreate({ text: 'testo del sub-task', name: 'sub-task', parentId: 'p1' });
   assert.ok(file.startsWith(tmp), `file fuori dallo spool di test: ${file}`);
