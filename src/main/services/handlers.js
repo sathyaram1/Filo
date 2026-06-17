@@ -319,7 +319,22 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, si
   const attemptsRaw = buildAttemptChain(settings, model);
   const attempts = await applyLimitToChain(settings, attemptsRaw);
 
-  const result = await Providers.completeWithFallback({ attempts, messages });
+  // Se il caller vuole il RAGIONAMENTO in diretta (es. la chat della home, #priorità1)
+  // usiamo il cammino in streaming, che espone i thought summary del modello via
+  // onReasoning man mano che arrivano. La risposta finale (`text`) è identica al
+  // cammino non-streaming: la accumuliamo dai delta. Senza onReasoning resta tutto
+  // come prima (una sola chiamata non-streaming).
+  const result = onReasoning
+    ? await (async () => {
+        let acc = '';
+        const r = await Providers.streamCompleteWithFallback({
+          attempts, messages, signal,
+          onDelta: (d) => { acc += d; },
+          onReasoning: (t) => { try { onReasoning(t); } catch (_) {} },
+        });
+        return { ...r, text: r.text != null ? r.text : acc };
+      })()
+    : await Providers.completeWithFallback({ attempts, messages, signal });
   const usedProvider = result.provider || attempts[0].provider;
   const concreteModel = result.model || attempts[0].model;
   const pricing = usedProvider === 'gemini' ? null : settings.pricing?.[concreteModel];
