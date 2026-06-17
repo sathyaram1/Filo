@@ -129,15 +129,26 @@ Ordine = dipendenze (il motore va per primo). Numerare i task come C1..C5.
   stile. **Done**: spec Playwright che apre la pagina, asserisce saldo + presenza
   del grafico con le fette attese; check visivo `test:shoot`. (stima: M)
 
-- [~] **C3 — Ricompense feedback: +5 all'invio con animazione, variabile alla risoluzione**
-  — All'invio di un feedback accredita **+5 crediti subito** (via il credit store
-  di C1). Animazione: alla chiusura del box feedback, i crediti "volano" verso
-  l'icona profilo nella shell (animazione DOM, vedi `PATTERNS.md`). La ricompensa
-  **variabile alla risoluzione** è in C5 (popup). File coinvolti: box/pagina
-  feedback (`src/content/feedback.js` / `src/pages/feedback/`), shell per
-  l'animazione verso l'icona account. **Done**: spec che asserisce che il saldo
-  aumenta di 5 dopo l'invio; check visivo dell'animazione con `test:shoot`.
-  (stima: M)
+- [x] **C3 — Ricompense feedback: +5 all'invio con animazione, variabile alla risoluzione**
+  (2026-06-17) — FATTO la parte invio (la variabile alla risoluzione resta C5).
+  All'invio riuscito di un feedback il box chiede `CREDITS_AWARD_FEEDBACK`
+  (handler già pronto da C1, +5 = `CREDIT.FEEDBACK_SEND`) e fa partire
+  `flyCredits()` in `src/content/feedback.js`: alcune "monete credito" (icona
+  `credits` dorata) volano dalla posizione del box verso l'angolo in **alto a
+  destra** con etichetta "+5", via Web Animations API (arco + stagger + fade,
+  rispetta `prefers-reduced-motion`). Toast aggiornato ("+5 crediti"). La
+  ricompensa compare anche nei "movimenti recenti" della pagina Crediti
+  (`feedback_sent`, già mappato). **Decisione di design**: la spec diceva "icona
+  profilo *nella shell*", ma l'icona account vive nella home (la barra chrome è
+  nascosta) e soprattutto **la shell disegna solo la barra in alto — l'area
+  pagina è coperta dalla WebContentsView nativa, quindi un'animazione disegnata
+  dalla shell sarebbe occlusa**. Perciò l'animazione vive nel content overlay
+  (dove sta il box) e punta all'angolo alto-destra, la direzione del profilo.
+  **Verificato**: `tests/feedback-credit-reward.spec.mjs` 1/1 verde (submit
+  stubbato senza rete; asserisce saldo **+5 esatto** dopo l'invio e la comparsa
+  del layer `.sn-fb-credit-fly`). Changelog aggiornato. Animazione transitoria
+  (~1s): non catturabile in modo affidabile con uno shot statico, la sua
+  presenza è asserita dallo spec.
 
 - [ ] **C4 — Popup recap aggiornamento (feature in alto, bugfix in basso, non tecnico)**
   — Al primo avvio dopo un update (confronto `lastSeenVersion` salvata vs
