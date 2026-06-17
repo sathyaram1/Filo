@@ -359,9 +359,15 @@
           }).join('')
         : '';
       const threadHtml = `<div class="fb-thread">${reportBubble}${convoHtml}</div>`;
+      // Su "Ricevuti" la casella è un COMMENTO al volo (poi sposti in "Da
+      // risolvere"); altrove è la nota di triage/decisioni di design.
+      const notesLabelText = currentTab === 'inbox' ? 'Commento:' : 'Note / decisioni di design:';
+      const notesPlaceholder = currentTab === 'inbox'
+        ? 'Aggiungi un commento… (verrà conservato quando sposti il feedback in "Da risolvere")'
+        : 'Dettagli aggiuntivi, vincoli, scelte di design…';
       const notesBlock = notesEditable
-        ? `<label class="fb-notes-label">Note / decisioni di design:
-             <textarea class="fb-notes" data-id="${escapeHtml(f._id)}" rows="3" placeholder="Dettagli aggiuntivi, vincoli, scelte di design…">${escapeHtml(f.notes || '')}</textarea>
+        ? `<label class="fb-notes-label">${notesLabelText}
+             <textarea class="fb-notes" data-id="${escapeHtml(f._id)}" rows="3" placeholder="${escapeHtml(notesPlaceholder)}">${escapeHtml(f.notes || '')}</textarea>
            </label>`
         : '';
       // Tab Chiarimenti: rispondi alle domande di Filo come un turno di chat. La
