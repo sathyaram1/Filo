@@ -1732,14 +1732,18 @@
   // note curate in src/shared/patchNotes.js) calcola quali versioni l'utente ha
   // saltato dall'ultima volta. Se ce ne sono, mostriamo un recap con le novità
   // in alto, le correzioni in basso e un pulsante per condividerlo/copiarlo.
-  async function maybeShowUpdateRecap() {
+  // Ritorna true se ha mostrato il popup (e chiamerà onClose alla chiusura),
+  // false altrimenti — così l'avvio può incatenare il ringraziamento feedback
+  // (C5) DOPO il recap, senza sovrapporre due popup.
+  async function maybeShowUpdateRecap(onClose) {
     let recap;
-    try { recap = await send({ type: MSG.GET_UPDATE_RECAP }); } catch (_) { return; }
-    if (!recap || !recap.ok) return;
+    try { recap = await send({ type: MSG.GET_UPDATE_RECAP }); } catch (_) { return false; }
+    if (!recap || !recap.ok) return false;
     // Nessuna versione vista prima (il main l'ha appena marcata: primo avvio) o
     // nessuna nota da mostrare → niente popup.
-    if (!recap.lastSeen || !Array.isArray(recap.notes) || !recap.notes.length) return;
-    renderUpdateRecap(recap);
+    if (!recap.lastSeen || !Array.isArray(recap.notes) || !recap.notes.length) return false;
+    renderUpdateRecap(recap, onClose);
+    return true;
   }
 
   // Testo del recap per la condivisione/copia.
