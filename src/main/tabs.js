@@ -1349,10 +1349,12 @@ class TabManager {
 
     // §2.1 segnale: la tab sta producendo audio? Una tab che riproduce
     // audio/video NON va mai archiviata (decisione utente). L'evento arriva come
-    // (event, {audible}) nelle versioni recenti di Electron e come (event, audible)
-    // nelle vecchie: gestiamo entrambe.
-    wc.on('audio-state-changed', (_e, arg) => {
-      const audible = arg && typeof arg === 'object' ? !!arg.audible : !!arg;
+    // In Electron 32+ l'audible sta SULL'oggetto evento (un solo argomento); in
+    // quelli più vecchi arriva come (event, {audible}) o (event, audible). Su
+    // Electron 33 leggere solo il secondo argomento dava sempre false →
+    // l'indicatore audio non si attivava mai. audibleFromEvent normalizza tutto.
+    wc.on('audio-state-changed', (e, arg) => {
+      const audible = audibleFromEvent(e, arg);
       if (tab.audible !== audible) { tab.audible = audible; this._broadcast(); }
     });
 
