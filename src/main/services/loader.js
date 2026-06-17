@@ -32,6 +32,7 @@ require(path.join(SHARED, 'ttsCache.js'));
 require(path.join(SVC, 'providers', 'openrouter.js'));
 require(path.join(SVC, 'providers', 'gemini.js'));
 require(path.join(SVC, 'providers', 'index.js'));
+require(path.join(SVC, 'creditStore.js'));
 require(path.join(SVC, 'costTracker.js'));
 require(path.join(SVC, 'savedPages.js'));
 require(path.join(SVC, 'historyStore.js'));
