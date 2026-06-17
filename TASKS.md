@@ -173,7 +173,31 @@ Ordine = dipendenze (il motore va per primo). Numerare i task come C1..C5.
   chiusura. **Done**: spec che, forzando una `lastSeenVersion` vecchia, asserisce
   che il popup elenca le entry attese nell'ordine giusto. (stima: M)
 
-- [~] **C5 — Popup ringraziamento feedback risolto + ricompensa per priorità (50/100/200/300)**
+- [x] **C5 — Popup ringraziamento feedback risolto + ricompensa per priorità (50/100/200/300)**
+  (2026-06-17) — FATTO. All'avvio la home chiede al main `GET_FEEDBACK_REWARDS`:
+  legge il `clientId` di questo install (`sn_feedback_client_id`, lo stesso che il
+  box allega all'invio), cerca su Firestore i feedback **suoi** (match anche sul
+  prefisso `owner:` per gli invii da admin) in stato `done`, e per ognuno NON
+  ancora premiato accredita la ricompensa per priorità
+  (`CREDIT.FEEDBACK_RESOLVE_BY_PRIORITY` 0→50/1→100/2→200/3→300, via il nuovo
+  puro `SN_CREDITS.rewardForPriority`). L'anti-doppio-premio è `rewardedFeedback`
+  nel doc credits (già in SYNC_FIELDS, quindi non ripaga su un altro dispositivo).
+  La home mostra un popup di ringraziamento (riusa lo stile `.dash-recap-*` +
+  `.dash-thanks-*`) con, per ciascun feedback, numero+titolo e **spiegazione non
+  tecnica** estratta dai turni "modello" delle note (`SN_FEEDBACK_THREAD.splitNotes`),
+  più il totale crediti; poi anima le monete verso l'icona profilo
+  (`flyCreditsToAccount`, variante home di C3, punta all'elemento account reale).
+  I due popup d'avvio (recap C4 + ringraziamento C5) sono **incatenati** per non
+  sovrapporsi: il ringraziamento parte alla chiusura del recap, o subito se il
+  recap non c'è. La pagina Crediti già etichetta `feedback_resolved` nei movimenti.
+  Changelog 0.2.50 aggiornato. **Verificato**: `tests/feedback-resolved-reward.spec.mjs`
+  3/3 (popup+saldo +200 per prio 2; aggregazione di 2 feedback = +350 escludendo
+  todo e feedback altrui; anti-doppio-premio alla riapertura) + 2 nuovi unit in
+  `creditStore.test.mjs` (rewardForPriority, clamp/stringa). Regressione mirata
+  verde: update-recap 3/3, credits-page 2/2, feedback-credit-reward 1/1.
+  **Nota tecnica**: il round-trip Firestore live (lista feedback reale) non è
+  testato headless — lo stub di `SN_FEEDBACK.list` rende lo spec deterministico/
+  offline; il filtro per clientId e la lettura note sono comunque esercitati.
   — All'update, se un feedback **inviato dall'utente** è passato a `done` da
   quando non guardava, mostra un popup per ciascuno (o aggregato) con:
   ringraziamento, conferma della risoluzione con **spiegazione non tecnica** presa
