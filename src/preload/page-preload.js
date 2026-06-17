@@ -72,8 +72,9 @@ try {
 } catch (_) { /* il bridge non deve MAI impedire il caricamento della pagina */ }
 
 // Modalità zoom con la rotella attivata dal click centrale (sostituisce
-// l'autoscroll nativo). Vedi wheel-zoom.js.
-try { require('./wheel-zoom.js')(webFrame); } catch (e) { console.error('[Filo CS] wheel-zoom', e); }
+// l'autoscroll nativo). Sulle pagine web abilitiamo anche lo zoom con Ctrl/Cmd
+// (pinch del trackpad, Ctrl+rotella, Ctrl +/-/0). Vedi wheel-zoom.js.
+try { require('./wheel-zoom.js')(webFrame, { pageZoom: true }); } catch (e) { console.error('[Filo CS] wheel-zoom', e); }
 
 // ─── Protezione anti-fingerprinting ────────────────────────────────────────
 //
