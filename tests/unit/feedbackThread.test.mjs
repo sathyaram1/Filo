@@ -208,3 +208,108 @@ test('splitNotes riconosce il marcatore del turno agente come lato modello', () 
   assert.deepEqual(segs.map((s) => s.role), ['model', 'model']);
   assert.equal(segs[1].body, 'Secondo report di Filo.');
 });
+
+// ── Allegati per-turno (#190.3) ─────────────────────────────────────────────
+// Un allegato incollato in un COMMENTO deve restare ancorato a QUEL turno, non
+// finire nella griglia immagini della segnalazione originale. Gli allegati
+// vivono come righe-marcatore dentro `notes` (niente cambio schema Firestore).
+
+test('serialize/parse di una riga-allegato: round-trip immagine e file', () => {
+  const img = { kind: 'img', url: 'https://x/i.png' };
+  const line = TH.serializeAttachment(img);
+  assert.ok(line.startsWith(TH.ATTACH_PREFIX));
+  assert.deepEqual(TH.parseAttachmentLine(line), img);
+
+  const file = { kind: 'file', url: 'https://x/d.pdf', name: 'doc 1.pdf', type: 'application/pdf' };
+  const fline = TH.serializeAttachment(file);
+  assert.deepEqual(TH.parseAttachmentLine(fline), file);
+});
+
+test('parseAttachmentLine: prosa normale → null; URL non http(s) scartato (no XSS)', () => {
+  assert.equal(TH.parseAttachmentLine('una riga di testo normale'), null);
+  assert.equal(TH.parseAttachmentLine(''), null);
+  // javascript:/data: non devono passare (finirebbero in href/src in dashboard).
+  assert.equal(TH.parseAttachmentLine(TH.ATTACH_PREFIX + '{"kind":"img","url":"javascript:alert(1)"}'), null);
+  assert.equal(TH.parseAttachmentLine(TH.ATTACH_PREFIX + '{"kind":"file","url":"data:text/html,x"}'), null);
+  // JSON rotto → null, niente crash.
+  assert.equal(TH.parseAttachmentLine(TH.ATTACH_PREFIX + '{rotto'), null);
+});
+
+test('splitNotes: la riga-allegato si ancora al turno, non al corpo testuale', () => {
+  const notes = [
+    'Ho commentato il problema.',
+    TH.serializeAttachment({ kind: 'img', url: 'https://x/a.png' }),
+  ].join('\n');
+  const segs = TH.splitNotes(notes);
+  assert.equal(segs.length, 1);
+  // Il corpo NON contiene la riga-marcatore (è prosa pulita)…
+  assert.equal(segs[0].body, 'Ho commentato il problema.');
+  // …e l'allegato è raccolto a parte sul turno.
+  assert.deepEqual(segs[0].attachments, [{ kind: 'img', url: 'https://x/a.png' }]);
+});
+
+test('parse: ogni turno porta i SUOI allegati, separati dalla segnalazione', () => {
+  const notes = [
+    'Nota di Filo con un file.',
+    TH.serializeAttachment({ kind: 'file', url: 'https://x/log.txt', name: 'log.txt', type: 'text/plain' }),
+    '--- La tua risposta del 10/06/26 ---',
+    'Ecco lo screenshot.',
+    TH.serializeAttachment({ kind: 'img', url: 'https://x/shot.png' }),
+  ].join('\n');
+  const turns = TH.parse({ text: 'segnalazione senza immagini', notes, clientId: 'user-1' });
+  assert.deepEqual(turns.map((t) => `${t.kind}`), ['report', 'note', 'reply']);
+  // La segnalazione non ha allegati nelle note (usa images/files piatti).
+  assert.deepEqual(turns[0].attachments, []);
+  // Il file sta sul turno di Filo; l'immagine sul turno della risposta utente.
+  assert.deepEqual(turns[1].attachments, [{ kind: 'file', url: 'https://x/log.txt', name: 'log.txt', type: 'text/plain' }]);
+  assert.deepEqual(turns[2].attachments, [{ kind: 'img', url: 'https://x/shot.png' }]);
+});
+
+test('appendUserTurn con allegati: ri-parsa nel turno giusto', () => {
+  const after = TH.appendUserTurn('Domanda di Filo.', 'Risposta con prova.', {
+    ts: '11/06/26, 09:00',
+    attachments: [{ kind: 'img', url: 'https://x/p.png' }],
+  });
+  const turns = TH.parse({ text: '', notes: after, clientId: 'u' });
+  assert.deepEqual(turns.map((t) => t.kind), ['note', 'reply']);
+  assert.equal(turns[1].body, 'Risposta con prova.');
+  assert.deepEqual(turns[1].attachments, [{ kind: 'img', url: 'https://x/p.png' }]);
+});
+
+test('appendUserTurn: una risposta di SOLI allegati (senza parole) è valida', () => {
+  const after = TH.appendUserTurn('', '  ', { attachments: [{ kind: 'img', url: 'https://x/q.png' }] });
+  const turns = TH.parse({ text: '', notes: after, clientId: 'u' });
+  assert.equal(turns.length, 1);
+  assert.equal(turns[0].body, '');
+  assert.deepEqual(turns[0].attachments, [{ kind: 'img', url: 'https://x/q.png' }]);
+});
+
+test('appendUserTurn: senza testo né allegati lascia le note intatte', () => {
+  assert.equal(TH.appendUserTurn('storico', '   ', { attachments: [] }), 'storico');
+  assert.equal(TH.appendUserTurn('storico', ''), 'storico');
+});
+
+test('stripAttachments/composeNotes: round-trip per il compositore note editabile', () => {
+  const notes = [
+    'La mia nota di triage.',
+    TH.serializeAttachment({ kind: 'img', url: 'https://x/n.png' }),
+  ].join('\n');
+  const { text, attachments } = TH.stripAttachments(notes);
+  // La textarea mostra solo prosa (niente righe-marcatore).
+  assert.equal(text, 'La mia nota di triage.');
+  assert.deepEqual(attachments, [{ kind: 'img', url: 'https://x/n.png' }]);
+  // Ricomponendo si torna a un blob ri-parsabile con l'allegato sul turno.
+  const recomposed = TH.composeNotes(text, attachments);
+  const segs = TH.splitNotes(recomposed);
+  assert.equal(segs[0].body, 'La mia nota di triage.');
+  assert.deepEqual(segs[0].attachments, [{ kind: 'img', url: 'https://x/n.png' }]);
+});
+
+test('composeNotes: senza allegati ritorna il testo invariato', () => {
+  assert.equal(TH.composeNotes('solo testo', []), 'solo testo');
+  assert.equal(TH.composeNotes('', []), '');
+  // Solo allegati, nessun testo → solo le righe-marcatore.
+  const onlyAtt = TH.composeNotes('', [{ kind: 'img', url: 'https://x/z.png' }]);
+  assert.equal(TH.parseAttachmentLine(onlyAtt), null === false ? TH.parseAttachmentLine(onlyAtt) : null); // sanity
+  assert.deepEqual(TH.stripAttachments(onlyAtt).attachments, [{ kind: 'img', url: 'https://x/z.png' }]);
+});
