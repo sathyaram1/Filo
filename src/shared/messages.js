@@ -54,6 +54,13 @@
     GET_UPDATE_RECAP: 'get_update_recap',
     // L'utente ha chiuso il recap: salva app.getVersion() come ultima vista.
     MARK_UPDATE_SEEN: 'mark_update_seen',
+    // Feedback dell'utente passati a `done` da quando non guardava (C5): il main
+    // cerca su Firestore i feedback inviati da questo client, accredita la
+    // ricompensa per priorità (50/100/200/300) una volta sola per feedback, e
+    // ritorna l'elenco da ringraziare. { } → { ok, rewards:[{num,name,explanation,
+    // credits,priority}], totalCredits }. La home mostra un popup di
+    // ringraziamento e anima i crediti verso il profilo.
+    GET_FEEDBACK_REWARDS: 'get_feedback_rewards',
     CAPTURE_VISIBLE_TAB: 'capture_visible_tab',
     // Test provider: misura latenza al primo token e token al secondo
     // su un piccolo prompt fisso. Usato dalla pagina Opzioni.
