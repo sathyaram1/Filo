@@ -1,7 +1,0 @@
-{
-  "id": "nsTngoQAM4DbdXC7Wzdc",
-  "status": "done",
-  "notes": "Il login 'Continua con Google' (e gli altri 'Continua con…') sui siti aperti dentro Filo veniva bloccato: la finestrella di accesso che il sito apre veniva scambiata per un popup pubblicitario e negata, così l'accesso falliva con 'errore durante l'accesso'. Ora le finestre di login vengono riconosciute e aperte come vere finestre (serve perché il sito riceva l'esito dell'accesso), mentre i popup pubblicitari restano bloccati come prima. Verificato con un test che apre un finto login e controlla che la finestra compaia e non venga bloccata.",
-  "queuedAt": "2026-06-17T20:34:12.980Z",
-  "queuedBy": "routine"
-}

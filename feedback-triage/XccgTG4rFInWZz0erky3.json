@@ -1,7 +1,0 @@
-{
-  "id": "XccgTG4rFInWZz0erky3",
-  "status": "done",
-  "notes": "Il correttore caricava sempre anche il dizionario inglese accanto all'italiano: così sulle parole italiane errate proponeva correzioni inglesi (es. 'funzion' -> 'function'). Ora su un sistema italiano carica solo l'italiano, quindi i suggerimenti tornano corretti ('funzione'). L'inglese viene attivato solo se è la lingua del tuo sistema. Verificato con test automatici. Nota: se scrivi spesso ANCHE in inglese su un sistema italiano, ora l'inglese non viene piu segnalato dal correttore — dimmi se preferisci un correttore multilingue (con piu lingue attive insieme) e te lo aggiungo come opzione.",
-  "queuedAt": "2026-06-17T20:34:22.799Z",
-  "queuedBy": "routine"
-}
