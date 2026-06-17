@@ -52,6 +52,7 @@ test('shot: composer + per-turn attachments', async ({ app, openTab }) => {
   });
   await page.locator('#refresh').click();
   await page.locator('[data-tab="todo"]').click();
+  await page.locator('.fb-bubble--report', { hasText: 'crash quando apro la sidebar' }).waitFor({ state: 'visible', timeout: 8000 });
   await page.locator('.fb-notes').waitFor({ state: 'visible', timeout: 8000 });
   await page.screenshot({ path: 'tests/.shots/attach-composer.png', fullPage: true });
 });
