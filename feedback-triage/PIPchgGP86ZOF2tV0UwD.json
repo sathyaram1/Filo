@@ -1,7 +1,0 @@
-{
-  "id": "PIPchgGP86ZOF2tV0UwD",
-  "status": "done",
-  "notes": "Questo feedback chiedeva due cose. (1) FATTO ORA: ora puoi commentare un feedback anche dal tab 'Ricevuti', non solo da 'Da risolvere' — la casella commento compare su ogni feedback appena arrivato e, se poi lo sposti in 'Da risolvere', il commento viaggia con lui (proprio il flusso 'commento POI lo metto da risolvere' che chiedevi). Verificato con test automatici. (2) DA FARE A PARTE: 'incollare immagini o altri file quando aggiungo commenti' è una feature più grande — tocca anche il salvataggio su database e le regole di sicurezza di Firestore (che vanno ridistribuite da te) e ha una scelta di design da fare (gli allegati incollati in un commento devono apparire accanto a quel commento o nell'area allegati condivisa del feedback?). L'ho scorporata in un sotto-feedback dedicato (#PIP.1 'Incollare immagini/file nei commenti', priorità 1) con la spec completa e la domanda di design, così una prossima passata la lavora senza lasciarla a metà. Lì troverai la decisione da prendere.",
-  "queuedAt": "2026-06-17T07:33:41.968Z",
-  "queuedBy": "routine"
-}
