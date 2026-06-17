@@ -34,18 +34,24 @@ test.describe('canale context-menu nativo', () => {
     const url = testServer.html(PAGE);
     const host = new URL(url).host;
     const page = await openTab(url);
+    // `filoContentReady` (non `filoReady`): init() è async e setta `filoReady`
+    // prima di registrare l'handler `contextmenu`; aspettare quello sbagliato
+    // lasciava una finestra in cui il click destro non era ancora intercettato.
     await page.waitForFunction(
-      () => document.documentElement.dataset.filoReady === '1',
+      () => document.documentElement.dataset.filoContentReady === '1',
       null, { timeout: 8000 },
     );
 
-    // Aggancia un contatore sull'evento `context-menu` del webContents del tab.
+    // Aggancia un contatore sull'evento `context-menu` di TUTTI i webContents con
+    // quell'host (non solo il primo): all'apertura di un tab Electron può averne
+    // due con la stessa URL, e attaccare il listener a quello sbagliato lasciava
+    // __ctxCount a 0 anche quando l'evento scattava (fonte di flakiness).
     await app.evaluate(({ webContents }, host) => {
       globalThis.__ctxCount = 0;
-      const wc = webContents.getAllWebContents().find((w) => {
+      const targets = webContents.getAllWebContents().filter((w) => {
         try { return new URL(w.getURL()).host === host; } catch { return false; }
       });
-      if (wc) wc.on('context-menu', () => { globalThis.__ctxCount++; });
+      for (const wc of targets) wc.on('context-menu', () => { globalThis.__ctxCount++; });
     }, host);
 
     // Vero click destro sul contenuto editabile.
