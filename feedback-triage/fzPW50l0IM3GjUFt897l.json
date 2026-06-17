@@ -1,0 +1,7 @@
+{
+  "id": "fzPW50l0IM3GjUFt897l",
+  "status": "done",
+  "notes": "Trovata la causa per cui non vedevi nulla: nelle versioni recenti di Filo lo stato 'audio in riproduzione' arriva in un formato diverso e veniva letto nel punto sbagliato, quindi ogni scheda risultava sempre 'silenziosa' e nessun indicatore si attivava. Ora una scheda che riproduce audio si riconosce davvero: bagliore del colore del sito (desaturato, che pulsa) e icona dell'altoparlante a fine scheda, sempre visibile (prende il posto della favicon quando la scheda è troppo stretta). Entrambi cliccabili per silenziare. Verificato con test automatici.",
+  "queuedAt": "2026-06-17T20:34:03.845Z",
+  "queuedBy": "routine"
+}
