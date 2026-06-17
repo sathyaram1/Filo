@@ -1,0 +1,7 @@
+{
+  "id": "cCj8UWL3yOspIVKoRN07",
+  "status": "done",
+  "notes": "L'agente Aiuto (sidebar nella pagina) ora può eseguire le stesse azioni del menu tasto destro sul testo selezionato: copiare, tagliare da una casella, cercare la frase sul web, leggerla ad alta voce (TTS) e aprire l'editor di riscrittura. Basta chiederglielo a parole ('cerca questa frase sul web', 'leggi ad alta voce'). Le azioni che escono verso l'esterno (ricerca sul web) chiedono conferma con il popup di Filo; copia/lettura sono immediate. Lo 'spiega' resta gestito facendo rispondere l'agente direttamente in chat (scelta di design del ponte azioni). Verificato con spec Playwright mirato (cerca/leggi/copia con assert sul successo): 11/11 verdi.",
+  "queuedAt": "2026-06-17T07:23:19.785Z",
+  "queuedBy": "routine"
+}
