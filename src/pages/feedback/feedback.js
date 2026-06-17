@@ -519,10 +519,17 @@
         ? convoTurns.map((t) => {
             const who = t.kind === 'note' ? 'Filo' : 'Tu';
             const tsLabel = t.ts ? `<span>${escapeHtml(String(t.ts))}</span>` : '';
+            // Allegati ANCORATI a questo turno (#190.3): immagini + file separati.
+            const atts = Array.isArray(t.attachments) ? t.attachments : [];
+            const tImgs = atts.filter((a) => a && a.kind === 'img').map((a) => a.url);
+            const tFiles = atts.filter((a) => a && a.kind === 'file');
+            const bodyHtml = t.body ? `<div class="fb-bubble-body">${escapeHtml(t.body)}</div>` : '';
             return `
               <div class="fb-bubble fb-bubble--${t.role}">
                 <div class="fb-bubble-head"><span class="fb-bubble-who">${who}</span>${tsLabel}</div>
-                <div class="fb-bubble-body">${escapeHtml(t.body)}</div>
+                ${bodyHtml}
+                ${imagesGridHtml(tImgs)}
+                ${filesListHtml(tFiles)}
               </div>`;
           }).join('')
         : '';
