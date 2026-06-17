@@ -212,7 +212,19 @@ async function createFeedback(entry, num, bearer) {
 async function patchFeedback(entry, bearer) {
   const fields = { status: toFsValue(entry.status) };
   const mask = ['status'];
-  if (typeof entry.notes === 'string') { fields.notes = toFsValue(entry.notes); mask.push('notes'); }
+  if (typeof entry.notes === 'string') {
+    // FONDI con lo storico invece di sovrascrivere: se il feedback è già stato
+    // lavorato e riaperto, le note esistenti contengono il report precedente e
+    // l'annotazione dell'utente — la routine non le conosce, quindi le
+    // preserviamo appendendo il nuovo report come turno separato dell'agente.
+    let notes = entry.notes;
+    if (String(entry.notes).trim()) {
+      const doc = await getDoc(entry.id, bearer).catch(() => null);
+      const existing = doc?.fields?.notes?.stringValue || '';
+      notes = THREAD ? THREAD.mergeModelReport(existing, entry.notes) : entry.notes;
+    }
+    fields.notes = toFsValue(notes); mask.push('notes');
+  }
   if (entry.status === 'done') { fields.resolvedAt = { timestampValue: new Date().toISOString() }; mask.push('resolvedAt'); }
   const qs = mask.map((f) => `updateMask.fieldPaths=${encodeURIComponent(f)}`).join('&');
   const url = `${FIRESTORE_BASE}/feedback/${encodeURIComponent(entry.id)}?${qs}`;
