@@ -679,6 +679,16 @@
       if (out.stderr && !out.stdout) pre.classList.add('dash-cmd-output-err');
       pre.textContent = body;
       wrap.appendChild(pre);
+    } else {
+      // Comando senza output (tipicamente un `cd`): non lasciare una scatola
+      // vuota e invisibile — mostra SEMPRE una risposta. Per i cambi di
+      // cartella diciamo dove sei finito ("sei in <percorso>"); per gli altri
+      // comandi muti un neutro "(nessun output)".
+      const empty = document.createElement('pre');
+      empty.className = 'dash-cmd-output dash-cmd-output-empty';
+      const isCd = /^\s*(cd|chdir)\b/i.test(out.command || '');
+      empty.textContent = (isCd && out.cwd) ? `sei in ${out.cwd}` : '(nessun output)';
+      wrap.appendChild(empty);
     }
     const notes = [];
     if (typeof out.code === 'number' && out.code !== 0) notes.push(`uscita ${out.code}`);
