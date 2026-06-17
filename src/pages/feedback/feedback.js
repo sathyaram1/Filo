@@ -462,19 +462,9 @@
       const ua = (f.userAgent || '').slice(0, 80);
       const cid = (f.clientId || '').slice(0, 12);
       const text = escapeHtml(f.text || '(senza testo)');
-      const imgs = Array.isArray(f.images) ? f.images.filter((u) => typeof u === 'string' && u) : [];
-      const imgsHtml = imgs.length
-        ? `<div class="fb-imgs">${imgs.map((u) => `<img src="${escapeHtml(u)}" data-full="${escapeHtml(u)}" loading="lazy" alt="">`).join('')}</div>`
-        : '';
-      // Allegati non-immagine (pdf, txt, md, json…): link scaricabili col nome
-      // originale del file.
-      const fbFiles = Array.isArray(f.files)
-        ? f.files.filter((x) => x && typeof x.url === 'string' && x.url)
-        : [];
-      const fileSvg = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>';
-      const filesHtml = fbFiles.length
-        ? `<div class="fb-files">${fbFiles.map((x) => `<a class="fb-file" href="${escapeHtml(x.url)}" target="_blank" rel="noopener" download="${escapeHtml(x.name || '')}">${fileSvg}<span class="fb-file-name">${escapeHtml(x.name || 'allegato')}</span></a>`).join('')}</div>`
-        : '';
+      // Allegati della SEGNALAZIONE originale: vivono nei campi piatti images/files.
+      const imgsHtml = imagesGridHtml(Array.isArray(f.images) ? f.images : []);
+      const filesHtml = filesListHtml(Array.isArray(f.files) ? f.files : []);
       const origin = originOf(f);
       // Numero progressivo (#22, #22.1 per i sub creati dalle routine).
       const num = SN_FEEDBACK.formatNum(f.seq, f.subSeq);
