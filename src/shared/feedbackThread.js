@@ -148,6 +148,41 @@
     return prev ? `${prev}\n\n${block}` : block;
   }
 
+  // Marcatore da APPENDERE quando l'AGENTE (una routine) ri-risolve un feedback
+  // già lavorato. Simmetrico a userTurnMarker.
+  function modelTurnMarker(ts, label) {
+    const when = ts || new Date().toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
+    return `--- ${label || "Aggiornamento dell'agente del"} ${when} ---`;
+  }
+
+  // Appende un turno dell'agente al blob note esistente, conservando lo storico.
+  function appendModelTurn(oldNotes, reportText, opts) {
+    const o = opts || {};
+    const report = String(reportText || '').trim();
+    if (!report) return String(oldNotes || '');
+    const block = `${modelTurnMarker(o.ts, o.label)}\n${report}`;
+    const prev = String(oldNotes || '');
+    return prev ? `${prev}\n\n${block}` : block;
+  }
+
+  // Fonde il nuovo report di una routine con le note ESISTENTI, senza perderle.
+  // È il fix di "riaprendo un feedback perdo la risposta dell'agente e la mia
+  // nota": quando una routine ri-risolve un feedback già lavorato, il suo report
+  // arriva da solo (la routine non conosce lo storico). Questa funzione decide:
+  //   - note esistenti vuote → il report diventa il primo turno (nessun marcatore);
+  //   - report già contenuto nelle note (re-applicazione/retry) → niente, evita
+  //     duplicati;
+  //   - altrimenti → APPENDI il report come nuovo turno dell'agente, conservando
+  //     report precedente + annotazione di riapertura dell'utente.
+  function mergeModelReport(existingNotes, incomingReport, opts) {
+    const incoming = String(incomingReport || '').trim();
+    const existing = String(existingNotes || '');
+    if (!incoming) return existing;
+    if (!existing.trim()) return incoming;
+    if (existing.includes(incoming)) return existing;
+    return appendModelTurn(existing, incoming, opts);
+  }
+
   global.SN_FEEDBACK_THREAD = {
     parse,
     splitNotes,
