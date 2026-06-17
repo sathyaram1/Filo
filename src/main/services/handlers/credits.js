@@ -160,11 +160,12 @@ module.exports = function register(on, ctx) {
       // quello vero anche dopo un cambio dispositivo) prima di premiare.
       await ensureAccountSync().catch(() => {});
       const id = await globalThis.SN_STORAGE?.getRaw?.('sn_feedback_client_id', null);
-      if (!id || !FB?.list) return empty;
+      if (!id || !FB?.list) return { ...empty, _dbg: { reason: 'no-id-or-list', id, hasList: !!FB?.list } };
 
       let all;
       try { all = await FB.list({ pageSize: 200 }); }
-      catch (e) { console.warn('[credits] lista feedback non disponibile:', e?.message || e); return empty; }
+      catch (e) { console.warn('[credits] lista feedback non disponibile:', e?.message || e); return { ...empty, _dbg: { reason: 'list-threw', err: String(e?.message || e) } }; }
+      const _dbg = { id, listLen: all.length, statuses: all.map((f) => f && f.status), cids: all.map((f) => f && f.clientId) };
 
       const state = await Credits.load();
       const rewarded = state.rewardedFeedback || {};
