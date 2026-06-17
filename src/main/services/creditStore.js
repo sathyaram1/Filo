@@ -225,8 +225,8 @@
 
   global.SN_CREDITS = {
     // pure (per i test e la logica)
-    freshState, ensure, applyRefill, costEurToCredits, applyConsumption,
-    applyAward, publicView, dateKey, daysBetween,
+    freshState, ensure, applyRefill, costEurToCredits, rewardForPriority,
+    applyConsumption, applyAward, publicView, dateKey, daysBetween,
     // async (runtime)
     load, getPublic, recordConsumption, award, wasFeedbackRewarded,
     readState, writeState, adopt, setOwner, onChange,
