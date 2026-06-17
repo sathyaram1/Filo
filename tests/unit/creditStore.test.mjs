@@ -138,3 +138,18 @@ test('ricompensa: accredita e logga, anti doppio-premio per feedback risolto', (
 test('ricompensa per priorità: la tabella è 50/100/200/300', () => {
   assert.deepEqual(CREDIT.FEEDBACK_RESOLVE_BY_PRIORITY, { 0: 50, 1: 100, 2: 200, 3: 300 });
 });
+
+test('rewardForPriority: mappa la priorità sulla fascia di crediti (C5)', () => {
+  assert.equal(C.rewardForPriority(0), 50);
+  assert.equal(C.rewardForPriority(1), 100);
+  assert.equal(C.rewardForPriority(2), 200);
+  assert.equal(C.rewardForPriority(3), 300);
+});
+
+test('rewardForPriority: priorità mancante/fuori scala → fascia 0 (50)', () => {
+  assert.equal(C.rewardForPriority(undefined), 50);
+  assert.equal(C.rewardForPriority(null), 50);
+  assert.equal(C.rewardForPriority(7), 300);   // clamp alto
+  assert.equal(C.rewardForPriority(-3), 50);    // clamp basso
+  assert.equal(C.rewardForPriority('2'), 200);  // stringa numerica
+});
