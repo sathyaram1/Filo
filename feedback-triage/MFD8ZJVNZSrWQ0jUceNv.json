@@ -1,7 +1,0 @@
-{
-  "id": "MFD8ZJVNZSrWQ0jUceNv",
-  "status": "done",
-  "notes": "Riaprire un feedback non perde più niente. Il problema era che, quando una routine ri-risolveva un feedback già riaperto, il nuovo commento dell'agente SOVRASCRIVEVA tutto lo storico: spariva sia la risposta precedente sia la tua annotazione di riapertura. Ora il nuovo commento viene APPESO come bolla 'Filo' separata, quindi la conversazione resta intera: segnalazione originale → risposta dell'agente → la tua nota → eventuale nuovo aggiornamento, ciascuno nel suo box. Verificato con unit test sulla logica di fusione e con un test della dashboard che mostra le 4 bolle nell'ordine giusto. Nota: il feedback sullo zoom che citavi aveva già perso i dati PRIMA di questa correzione e non sono recuperabili, ma da ora in poi non succede più.",
-  "queuedAt": "2026-06-17T07:34:14.605Z",
-  "queuedBy": "routine"
-}
