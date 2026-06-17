@@ -1,0 +1,7 @@
+{
+  "id": "Q6Lpmfv6dgiPugyc307n",
+  "status": "done",
+  "notes": "Ora nella dashboard feedback puoi incollare (Ctrl+V), trascinare o allegare col pulsante '+ Allega' immagini e file MENTRE scrivi un commento/nota: su Ricevuti, Da risolvere, Bozze, Agente, nella risposta dei Chiarimenti e nel form di riapertura (Risolti). Ogni allegato resta legato al singolo commento (alla bolla) in cui l'hai messo — non finisce mescolato con le immagini della segnalazione originale (opzione b). Le anteprime hanno una x per rimuoverle.\n\nOltre al chiesto ho aggiunto: il composer di riapertura su 'Risolti' e le tab Bozze/Agente (parita' tra cammini equivalenti) e la rimozione degli allegati.\n\nVerificato con: unit test del parser turni+allegati (27 test verdi) e 3 nuovi test della dashboard (allegato ancorato al turno giusto e non alla segnalazione, salvataggio e persistenza nelle note), piu' gli 8 test della dashboard esistenti che continuano a passare.\n\nNote tecniche: gli allegati dei commenti sono codificati come righe-marcatore dentro il campo 'notes' gia' esistente, quindi NON serve modificare le Firestore rules ne' fare deploy.",
+  "queuedAt": "2026-06-17T08:30:03.301Z",
+  "queuedBy": "routine"
+}
