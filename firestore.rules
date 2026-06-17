@@ -167,6 +167,19 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Crediti (gamification): un documento per utente, ID = uid Firebase.
+    // Ogni utente legge/scrive SOLO il proprio doc. È client-authoritative:
+    // l'app desktop calcola saldo/consumo nel main e sincronizza qui. In alpha
+    // accettiamo il caveat (un utente potrebbe gonfiarsi i crediti manomettendo
+    // il client): i crediti non danno accesso a risorse altrui né a dati di
+    // altri utenti, quindi il blast radius è solo "barare col proprio saldo".
+    // Se in futuro i crediti diventano spendibili per davvero, va spostato il
+    // calcolo su una Cloud Function autorevole.
+    match /credits/{uid} {
+      allow read, write: if request.auth != null
+        && request.auth.uid == uid;
+    }
+
     // Percorsi di navigazione raccolti dalla sidebar "Aiuto" (Fase 2).
     // Tupla anonima (sito, posizione iniziale, intento, azioni, esito) usata
     // per insegnare globalmente all'AI come muoversi su un dominio.
