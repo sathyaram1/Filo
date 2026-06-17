@@ -679,13 +679,18 @@
       const id = btn.dataset.id;
       const card = btn.closest('.fb-card');
       const ta = card && card.querySelector('.fb-reply-text');
+      // Compositore allegati della risposta (gli allegati si ancorano al turno
+      // della risposta dell'utente).
+      const mount = card && card.querySelector('.fb-attach-mount[data-kind="reply"]');
+      const composer = ta && mount ? makeAttachComposer({ textarea: ta, mount, initial: [] }) : null;
       const send = () => {
         const reply = ta ? ta.value.trim() : '';
-        if (!reply) { if (ta) ta.focus(); return; }
+        const atts = composer ? composer.getAttachments() : [];
+        if (!reply && !atts.length) { if (ta) ta.focus(); return; }
         const item = all.find((f) => f._id === id);
         const oldNotes = (item && item.notes) || '';
         const newNotes = window.SN_FEEDBACK_THREAD
-          ? SN_FEEDBACK_THREAD.appendUserTurn(oldNotes, reply)
+          ? SN_FEEDBACK_THREAD.appendUserTurn(oldNotes, reply, { attachments: atts })
           : (oldNotes ? `${oldNotes}\n\n${reply}` : reply);
         patch(id, { status: 'todo', notes: newNotes }, { status: 'todo', notes: newNotes });
       };
