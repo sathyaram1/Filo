@@ -93,6 +93,45 @@ test('un feedback risolto mostra la conversazione a bolle distinte (Segnalazione
   await expect(page.locator('.fb-notes-readonly')).toHaveCount(0);
 });
 
+test('riaprire + ri-risolvere conserva report iniziale, nota utente e nuovo report dell’agente (4 bolle)', async ({ app, openTab }) => {
+  const page = await openTab(FEEDBACK_URL);
+
+  // Stato dopo che una routine ha RI-risolto un feedback riaperto: il nuovo
+  // report dell'agente è appeso col marcatore "Aggiornamento dell'agente del…",
+  // SENZA cancellare report precedente + annotazione di riapertura dell'utente.
+  // Era il bug "riaprendo perdo la risposta dell'agente e la mia nota".
+  const notes = [
+    'Ho aggiunto lo zoom con Ctrl +.',
+    '',
+    '--- Riaperto il 16/06/26, 22:00 ---',
+    'Manca lo zoom col trackpad (pinch).',
+    '',
+    "--- Aggiornamento dell'agente del 17/06/26, 09:00 ---",
+    'Ora supporto anche il pinch sul trackpad.',
+  ].join('\n');
+
+  await setupAdmin(app, page, {
+    _id: 'mock-reopen-1',
+    status: 'done',
+    text: 'rendi possibile zoommare anche col trackpad',
+    url: 'https://example.com',
+    clientId: 'tester-123',
+    notes,
+    createdAt: new Date().toISOString(),
+  });
+
+  await page.locator('[data-tab="done"]').click();
+
+  // Tutto è ancora lì, in 4 bolle distinte e nell'ordine giusto.
+  const whos = await page.locator('.fb-bubble-who').allTextContents();
+  expect(whos).toEqual(['Segnalazione', 'Filo', 'Tu', 'Filo']);
+  await expect(page.locator('.fb-bubble--report')).toContainText('zoommare anche col trackpad');
+  await expect(page.locator('.fb-bubble--user:not(.fb-bubble--report)')).toContainText('Manca lo zoom col trackpad');
+  // Il secondo report è lato MODELLO (Filo), non attribuito all'utente.
+  await expect(page.locator('.fb-bubble--model')).toContainText('Ora supporto anche il pinch');
+  await expect(page.locator('.fb-bubble--model')).toContainText('Ho aggiunto lo zoom con Ctrl');
+});
+
 test('nel tab Chiarimenti la risposta si invia col composer: appende lo storico e torna in Da risolvere', async ({ app, openTab }) => {
   const page = await openTab(FEEDBACK_URL);
 
