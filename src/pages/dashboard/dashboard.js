@@ -460,9 +460,11 @@
 
   // Indicatore "sta pensando": 3 righe di reasoning che scorrono verso l'alto e
   // svaniscono man mano che salgono (la riga in cima è quasi trasparente, quella
-  // in basso è piena). Restano sempre al massimo 3 righe visibili. Le frasi non
-  // sono il reasoning vero (il provider non lo restituisce in streaming), ma una
-  // prova di funzionamento — abbastanza varie da non sembrare uno spinner statico.
+  // in basso è piena). Restano sempre al massimo 3 righe visibili.
+  // Quando il modello fornisce il RAGIONAMENTO VERO in streaming (vedi
+  // pushReasoning più sotto), nelle righe scorre quel testo; finché non arriva
+  // (o per i modelli che non ragionano) si mostrano queste frasi indicative —
+  // abbastanza varie da non sembrare uno spinner statico.
   // Stesso pattern della sidebar (src/content/sidebar.js).
   const THINKING_PHRASES = [
     'Leggo la tua richiesta…',
