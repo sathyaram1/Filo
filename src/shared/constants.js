@@ -1162,6 +1162,9 @@
   global.SN_CONST = {
     STORAGE_KEYS,
     ACTIONS,
+    CREDIT,
+    CREDIT_USAGE_GROUPS,
+    creditUsageGroup,
     DEFAULT_MODELS,
     DEFAULT_MODEL_REGISTRY,
     resolveModel,
