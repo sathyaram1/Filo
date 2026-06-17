@@ -150,7 +150,7 @@ Ordine = dipendenze (il motore va per primo). Numerare i task come C1..C5.
   (~1s): non catturabile in modo affidabile con uno shot statico, la sua
   presenza è asserita dallo spec.
 
-- [ ] **C4 — Popup recap aggiornamento (feature in alto, bugfix in basso, non tecnico)**
+- [~] **C4 — Popup recap aggiornamento (feature in alto, bugfix in basso, non tecnico)**
   — Al primo avvio dopo un update (confronto `lastSeenVersion` salvata vs
   `app.getVersion()`), mostra un popup con il recap aggregato di **tutte** le
   versioni saltate (calcolo "quante patch indietro" da `src/shared/patchNotes.js`).
