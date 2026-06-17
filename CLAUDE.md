@@ -110,6 +110,33 @@ Il minimo accettabile dipende dall'ambiente:
   "feature implementata ma non verificata perché X", così l'utente sa che
   deve provarla a mano.
 
+## Patch notes: aggiorna il changelog ad OGNI fix/feature visibile all'utente
+
+Filo mostra all'utente un **recap aggiornamento** ad ogni nuova versione (popup
+all'avvio). La sorgente è **`src/shared/patchNotes.js`** (IIFE su globalThis,
+`SN_PATCH_NOTES`): una lista ordinata di versioni, ciascuna con `features[]` e
+`fixes[]` **scritte in italiano, per l'utente, NON tecniche**.
+
+**Regola**: ogni volta che chiudi un fix o aggiungi una feature **visibile
+all'utente** (qualcosa che vedrà o userà — non refactor/test/infra interni),
+aggiungi anche **una riga al blocco della versione corrente** in
+`src/shared/patchNotes.js`:
+
+- è una **novità** → `features: [...]`; è una **correzione** → `fixes: [...]`.
+- Frase breve, orientata al beneficio, **senza spiegare perché era rotto né
+  come l'hai codato**. Esempi giusti: *"Migliorata la visualizzazione delle
+  schede con audio attivo"*, *"Ora puoi rimuovere le immagini allegate a un
+  feedback"*. L'utente vedrà da sé i dettagli.
+- Se la versione corrente non ha ancora un blocco in `SN_PATCH_NOTES`, crealo
+  con `version` = quella in `package.json` e la data di oggi; altrimenti
+  **accoda** alla versione corrente (più versioni al giorno = più blocchi).
+- Le voci puramente interne (refactor, test, build, hook) **non** vanno nel
+  changelog utente.
+
+Il file è la **singola sorgente di verità** sia del recap che del calcolo
+"quante patch sei indietro" (all'avvio si confronta la versione vista l'ultima
+volta con `app.getVersion()`). Tienilo allineato a `package.json`.
+
 ## Test che servono davvero (asserire successo, non assenza di errore)
 
 Il test deve **fallire prima del fix e passare solo se la feature fa la cosa
