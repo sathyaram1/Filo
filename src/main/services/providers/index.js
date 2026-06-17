@@ -53,14 +53,14 @@
     throw lastErr || new Error('Nessun provider disponibile');
   }
 
-  async function streamCompleteWithFallback({ attempts, model, messages, signal, onDelta, onFallback }) {
+  async function streamCompleteWithFallback({ attempts, model, messages, signal, onDelta, onReasoning, onFallback }) {
     let lastErr = null;
     for (let i = 0; i < attempts.length; i++) {
       const a = attempts[i];
       const aModel = a.model || model;
       try {
         const r = await getProvider(a.provider).streamComplete({
-          apiKey: a.apiKey, model: aModel, messages, signal, onDelta,
+          apiKey: a.apiKey, model: aModel, messages, signal, onDelta, onReasoning,
         });
         return { ...r, provider: a.provider, model: aModel };
       } catch (err) {
