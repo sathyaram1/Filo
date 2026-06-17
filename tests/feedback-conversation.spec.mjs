@@ -127,9 +127,11 @@ test('riaprire + ri-risolvere conserva report iniziale, nota utente e nuovo repo
   expect(whos).toEqual(['Segnalazione', 'Filo', 'Tu', 'Filo']);
   await expect(page.locator('.fb-bubble--report')).toContainText('zoommare anche col trackpad');
   await expect(page.locator('.fb-bubble--user:not(.fb-bubble--report)')).toContainText('Manca lo zoom col trackpad');
-  // Il secondo report è lato MODELLO (Filo), non attribuito all'utente.
-  await expect(page.locator('.fb-bubble--model')).toContainText('Ora supporto anche il pinch');
-  await expect(page.locator('.fb-bubble--model')).toContainText('Ho aggiunto lo zoom con Ctrl');
+  // Due bolle lato MODELLO (Filo): il report iniziale e il nuovo aggiornamento —
+  // il secondo NON è attribuito all'utente.
+  await expect(page.locator('.fb-bubble--model')).toHaveCount(2);
+  await expect(page.locator('.fb-bubble--model').first()).toContainText('Ho aggiunto lo zoom con Ctrl');
+  await expect(page.locator('.fb-bubble--model').last()).toContainText('Ora supporto anche il pinch');
 });
 
 test('nel tab Chiarimenti la risposta si invia col composer: appende lo storico e torna in Da risolvere', async ({ app, openTab }) => {
