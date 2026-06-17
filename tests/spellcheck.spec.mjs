@@ -33,14 +33,24 @@ const CE_PAGE = `<!doctype html><html><body style="margin:0">
 async function expectCorrectionAtTop({ app, openTab, testServer }, html, selector) {
   const url = testServer.html(html);
   const page = await openTab(url);
+  // `filoContentReady` (non `filoReady`): init() è async e setta `filoReady`
+  // PRIMA di registrare il listener `_spell:native` (dopo `await fetchSettings`).
+  // Aspettare `filoReady` lasciava una finestra in cui il broadcast nativo veniva
+  // perso → menu di correzione flaky. `filoContentReady` garantisce che il
+  // listener spellcheck sia attivo.
   await page.waitForFunction(
-    () => document.documentElement.dataset.filoReady === '1',
+    () => document.documentElement.dataset.filoContentReady === '1',
     null, { timeout: 8000 },
   );
 
   const sent = await sendNative(app, new URL(url).host, 'ciiao', ['ciao', 'chiao']);
   expect(sent).toBe(true);
-  await page.waitForTimeout(150);
+  // Attende che il broadcast nativo sia stato EFFETTIVAMENTE registrato (non un
+  // timeout fisso): solo allora il click destro troverà i suggerimenti pronti.
+  await page.waitForFunction(
+    () => document.documentElement.dataset.filoNativeWord === 'ciiao',
+    null, { timeout: 8000 },
+  );
 
   const box = await page.locator(selector).boundingBox();
   await page.mouse.click(box.x + 16, box.y + 16, { button: 'right' });
