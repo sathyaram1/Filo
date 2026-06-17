@@ -316,17 +316,6 @@
     return { getAttachments: () => attachments.slice() };
   }
 
-  // Valore da salvare per una textarea di note editabili: testo + allegati del
-  // compositore ri-incorporati come righe-marcatore (vedi composeNotes).
-  function notesValueOf(ta) {
-    if (!ta) return '';
-    const atts = ta._attachComposer ? ta._attachComposer.getAttachments() : [];
-    if (window.SN_FEEDBACK_THREAD && SN_FEEDBACK_THREAD.composeNotes) {
-      return SN_FEEDBACK_THREAD.composeNotes(ta.value, atts);
-    }
-    return ta.value;
-  }
-
   // Appende il contenuto del composer "Aggiungi nota" (testo + allegati) come
   // NUOVO turno dell'agente in coda alle note esistenti, così diventa una bolla
   // separata invece di mescolarsi nella precedente. Ritorna il blob aggiornato,
