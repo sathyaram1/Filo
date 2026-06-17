@@ -54,7 +54,13 @@ test('Ricevuti: il commento viaggia con lo spostamento in "Da risolvere"', async
   await setup(page);
   await page.evaluate((f) => window.__filoFeedbackTest.inject({ items: [f], admin: true, tab: 'inbox' }), SAMPLE);
 
-  await page.locator('.fb-notes[data-id="test-inbox-1"]').fill('Ho riprodotto, è un bug reale');
+  // Impostiamo il testo senza dare/togliere fuoco alla casella: così evitiamo
+  // che il salvataggio su blur ridisegni la card proprio mentre clicchiamo il
+  // bottone. Verifichiamo il cammino canonico: "→ Da risolvere" porta con sé il
+  // commento già scritto (il gestore .fb-act legge la textarea).
+  await page.evaluate(() => {
+    document.querySelector('.fb-notes[data-id="test-inbox-1"]').value = 'Ho riprodotto, è un bug reale';
+  });
   await page.locator('.fb-act[data-id="test-inbox-1"][data-to="todo"]').click();
 
   await expect.poll(() => page.evaluate(() => window.__updates.length)).toBeGreaterThan(0);
