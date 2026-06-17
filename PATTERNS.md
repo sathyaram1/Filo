@@ -34,6 +34,16 @@ deve sembrare e comportarsi come gli altri menu a tendina già presenti in Filo.
 - **Dove:** i token di tema vivono in `src/styles/` (theme). Prima di stilare un
   controllo nuovo, guarda come è fatto un controllo equivalente esistente e riusane
   variabili/classi invece di reinventare i colori.
+- **Combobox editabili → `SN_COMBOBOX`, mai `<datalist>` nativa.** Il popup della
+  `<datalist>` è renderizzato dall'OS (colori di sistema, non tematizzabile): è
+  l'esatto opposto di "coerente con Filo". Per un campo a tendina editabile (input
+  + lista filtrabile) usa `SN_COMBOBOX.attach(host, input, { readOptions, onPick, … })`
+  (`src/shared/comboBox.js`): riusa le classi `.sn-select-pop`/`.sn-select-option`
+  (theme.css) come gli altri menu. `host` dev'essere `position:relative` (il popup
+  si ancora lì). La `<datalist>` può restare come **sorgente dati** (popolata
+  altrove), ma togli l'attributo `list=` dall'input così il popup nativo non
+  appare. Usato dal campo "stringa modello" delle Opzioni/admin e dall'editor a
+  segmenti (`modelChainEditor.js`).
 
 ## Estetica: ogni variabile visiva è un token del registro, mai un valore sparso
 
