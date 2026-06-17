@@ -76,6 +76,11 @@
           suggestions: Array.isArray(m.suggestions) ? m.suggestions : [],
           ts: Date.now(),
         };
+        // Marker DOM per i test: espone l'ultima parola con suggerimenti nativi
+        // ricevuta, così un test può attendere che il broadcast sia stato
+        // EFFETTIVAMENTE registrato prima di simulare il click destro, invece di
+        // affidarsi a un timeout fisso (causa di flakiness). Innocuo a runtime.
+        try { document.documentElement.dataset.filoNativeWord = lastNative.word; } catch (_) {}
         for (const fn of [...nativeWaiters]) { try { fn(lastNative); } catch (_) {} }
       });
     } catch (_) {}
