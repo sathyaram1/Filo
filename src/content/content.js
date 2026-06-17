@@ -107,6 +107,16 @@
       onRuntimeMessage(msg, sender, sendResponse);
       return true; // mantieni il canale aperto per sendResponse asincrono
     });
+
+    // Marker DOM per i test: `filoReady` (impostato dal preload) segnala solo che
+    // i moduli sono CARICATI, ma init() è async e setta quel flag PRIMA di
+    // risolvere `await fetchSettings()` — cioè prima di SpellCheck.init() e del
+    // listener `_spell:native`. Un test che inietta un broadcast nativo appena
+    // visto `filoReady` poteva quindi farlo cadere nel vuoto (listener non ancora
+    // registrato), rendendo flaky il menu di correzione. Questo flag segnala che
+    // i listener (spellcheck incluso) sono attivi: i test lo aspettano prima di
+    // simulare il click destro. Innocuo a runtime (solo un dataset).
+    try { document.documentElement.dataset.filoContentReady = '1'; } catch (_) {}
   }
 
   // Il campionatore colore tab + colore identità sito vivono in
