@@ -29,6 +29,18 @@
     return provider === 'gemini' ? 'models-list-gemini' : 'models-list-openrouter';
   }
 
+  // Sorgente delle opzioni per il dropdown custom del campo "stringa modello":
+  // le <datalist> per-provider restano l'unica sorgente di verità, il combobox
+  // le legge senza duplicarle.
+  function readProviderOptions(provider) {
+    const dl = $(datalistIdFor(provider));
+    if (!dl) return [];
+    return Array.from(dl.options).map((o) => ({
+      value: o.value,
+      label: o.label && o.label !== o.value ? o.label : '',
+    }));
+  }
+
   // Popola la datalist di un provider con [{ id, label }] (già ordinati dal più
   // recente e etichettati per categoria dal main).
   function populateDatalist(provider, items) {
