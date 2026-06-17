@@ -509,6 +509,13 @@ section:has(#dictList) .sn-spell-add-row {
 }
 .sn-model-row input[type="text"],
 .sn-model-row select { width: 100%; font-size: 12px; }
+/* Campo "stringa modello": wrapper position:relative perché il popup custom
+   (.sn-select-pop) si ancora lì sotto, al posto della datalist nativa. */
+.sn-model-id-wrap { position: relative; }
+/* Opzioni del combobox custom (classi generiche di SN_COMBOBOX): id del modello
+   in evidenza, categoria attenuata accanto. */
+.sn-combo-opt-name { font-weight: 600; }
+.sn-combo-opt-label { color: var(--sn-muted); margin-left: 8px; }
 .sn-model-row .sn-btn { padding: 4px 8px; font-size: 12px; }
 .sn-model-row-status {
   grid-column: 1 / -1;
