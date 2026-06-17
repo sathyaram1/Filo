@@ -192,6 +192,10 @@
     ownerize,
     userTurnMarker,
     appendUserTurn,
+    modelTurnMarker,
+    appendModelTurn,
+    mergeModelReport,
     USER_TURN_RE,
+    MODEL_TURN_RE,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
