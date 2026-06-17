@@ -557,8 +557,9 @@
       const replyBlock = clarifyReply
         ? `<div class="fb-reply">
              <label class="fb-notes-label">La tua risposta:
-               <textarea class="fb-reply-text" data-id="${escapeHtml(f._id)}" rows="3" placeholder="Rispondi alle domande di Filo qui sopra…"></textarea>
+               <textarea class="fb-reply-text" data-id="${escapeHtml(f._id)}" rows="3" placeholder="Rispondi alle domande di Filo qui sopra… (puoi incollare/trascinare immagini e file)"></textarea>
              </label>
+             <div class="fb-attach-mount" data-id="${escapeHtml(f._id)}" data-kind="reply"></div>
              <div class="fb-reply-buttons">
                <button type="button" class="sn-btn fb-reply-send" data-id="${escapeHtml(f._id)}">Invia risposta</button>
              </div>
