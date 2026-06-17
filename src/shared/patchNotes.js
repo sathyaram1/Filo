@@ -19,6 +19,7 @@
       version: '0.2.50', date: '2026-06-17',
       features: [
         'Quando Filo si aggiorna ti mostra un recap delle novità e delle correzioni, con un pulsante per condividerlo.',
+        'Quando un tuo feedback viene risolto, Filo ti ringrazia, ti spiega cosa è cambiato e ti premia con crediti in base alla priorità.',
       ],
       fixes: [],
     },
