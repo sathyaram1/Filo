@@ -76,30 +76,18 @@ function syncNativeTheme(theme) {
 // configurazioni i suggerimenti dietro lo zigzag rosso non arrivano (il main
 // li inoltra al menu di correzione via `_spell:native`, vedi tabs.js). La
 // vecchia estensione Chrome aveva i dizionari pronti d'ufficio; qui li
-// attiviamo esplicitamente — locale di sistema + italiano + inglese — così la
-// correzione in cima al menu funziona anche senza chiave LLM. Su macOS la
-// chiamata è ignorata (Electron usa NSSpellChecker), nessun problema.
+// attiviamo esplicitamente — italiano (l'app è italiana) + lingua di sistema —
+// così la correzione in cima al menu funziona anche senza chiave LLM. NON
+// forziamo più l'inglese (#169): con il dizionario inglese sempre attivo le
+// parole italiane errate ricevevano suggerimenti inglesi ("funzion"→"function").
+// Su macOS la chiamata è ignorata (Electron usa NSSpellChecker), nessun problema.
 function configureSpellchecker() {
   try {
     const ses = session.defaultSession;
     if (!ses || typeof ses.setSpellCheckerLanguages !== 'function') return;
     const available = ses.availableSpellCheckerLanguages || [];
     if (!available.length) return; // macOS / nativo: nessuna lista Hunspell
-    const base = (s) => String(s || '').toLowerCase().split('-')[0];
-    const pick = (pref) =>
-      available.find((l) => l.toLowerCase() === String(pref).toLowerCase()) ||
-      available.find((l) => base(l) === base(pref));
-    // L'italiano viene messo PRIMA della lingua di sistema: così i suggerimenti
-    // Hunspell per le parole italiane (quasi tutto il traffico dell'app)
-    // appaiono in cima alla lista `dictionarySuggestions` dell'evento
-    // `context-menu`. Con l'ordine inverso (locale en-US prima) le parole
-    // errate in italiano ricevevano suggerimenti in inglese anche quando il
-    // dizionario italiano era caricato (feedback alpha #4).
-    const want = [];
-    for (const pref of ['it', app.getLocale(), 'en-US', 'en']) {
-      const match = pick(pref);
-      if (match && !want.includes(match)) want.push(match);
-    }
+    const want = globalThis.SN_SPELL_LANG.select(available, app.getLocale());
     if (want.length) ses.setSpellCheckerLanguages(want);
   } catch (_) { /* best-effort: il correttore resta sul default di sistema */ }
 }
