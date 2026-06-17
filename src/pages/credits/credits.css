@@ -1,0 +1,73 @@
+/* Pagina Crediti (profilo). Saldo + grafico a torta del consumo per tipo d'uso.
+   Riusa i token di tema (--sn-*); nessun colore hardcoded tranne la palette
+   delle fette del grafico, che deve restare distinguibile su entrambi i temi. */
+
+.sn-credits-hero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 8px 0 4px;
+}
+.sn-credits-coin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  color: var(--sn-accent);
+}
+.sn-credits-coin svg { width: 48px; height: 48px; }
+.sn-credits-balance {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.sn-credits-amount {
+  font-size: 44px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--sn-fg);
+}
+.sn-credits-unit { color: var(--sn-muted); font-size: 16px; }
+
+.sn-credits-usage, .sn-credits-moves { margin-top: 28px; }
+
+.sn-credits-chart-row {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.sn-credits-chart { width: 200px; height: 200px; flex: 0 0 auto; }
+
+.sn-credits-legend { list-style: none; padding: 0; margin: 0; min-width: 200px; }
+.sn-credits-legend li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 0;
+  font-size: 14px;
+}
+.sn-credits-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex: 0 0 auto;
+}
+.sn-credits-legend .sn-credits-label { flex: 1 1 auto; }
+.sn-credits-legend .sn-credits-value { color: var(--sn-muted); font-variant-numeric: tabular-nums; }
+
+.sn-credits-moves-list { list-style: none; padding: 0; margin: 12px 0 0; }
+.sn-credits-moves-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--sn-border);
+  font-size: 14px;
+}
+.sn-credits-moves-list li:last-child { border-bottom: none; }
+.sn-credits-move-gain { color: var(--sn-accent); font-weight: 600; font-variant-numeric: tabular-nums; }
+.sn-credits-move-label { flex: 1 1 auto; }
+.sn-credits-move-date { color: var(--sn-muted); font-size: 12px; }
