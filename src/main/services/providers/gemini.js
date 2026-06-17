@@ -90,7 +90,25 @@
   function extractText(data) {
     const cand = data?.candidates?.[0];
     const parts = cand?.content?.parts || [];
-    return parts.map((p) => p.text || '').join('');
+    // Con includeThoughts attivo, i "pensieri" arrivano come parti con
+    // thought:true: NON sono la risposta, vanno separati (vedi extractParts).
+    return parts.filter((p) => !p.thought).map((p) => p.text || '').join('');
+  }
+
+  // Separa, in un chunk di stream, il testo di RISPOSTA dal RAGIONAMENTO
+  // ("thought summary"). Con thinkingConfig.includeThoughts:true i pensieri
+  // arrivano come parti con `thought:true`; la risposta vera è nelle altre.
+  function extractParts(data) {
+    const cand = data?.candidates?.[0];
+    const parts = cand?.content?.parts || [];
+    let answer = '';
+    let thought = '';
+    for (const p of parts) {
+      if (!p || typeof p.text !== 'string') continue;
+      if (p.thought) thought += p.text;
+      else answer += p.text;
+    }
+    return { answer, thought };
   }
 
   function extractUsage(data) {
