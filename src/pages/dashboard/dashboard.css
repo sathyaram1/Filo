@@ -847,3 +847,155 @@ body[data-state="thread"] .dash-suggestion { justify-content: flex-start; paddin
   border-radius: 50%;
   object-fit: cover;
 }
+
+/* ===== Recap aggiornamento (C4) =====
+   Popup all'avvio dopo un update: novità in alto, correzioni in basso, header
+   "vecchia → nuova", pulsante condividi/copia. Vive nella pagina home (non
+   occlusa dalla WebContentsView, che copre l'area pagina solo sui siti). */
+.dash-recap-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(20, 16, 12, 0.42);
+  animation: dash-recap-fade 0.18s ease-out;
+}
+@keyframes dash-recap-fade { from { opacity: 0; } to { opacity: 1; } }
+.dash-recap-box {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(460px, calc(100vw - 48px));
+  max-height: calc(100vh - 64px);
+  background: var(--dash-card);
+  color: var(--dash-ink);
+  border: 1px solid var(--dash-line-strong);
+  border-radius: var(--dash-radius);
+  box-shadow: 0 18px 48px rgba(20, 16, 12, 0.28);
+  animation: dash-recap-pop 0.2s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+@keyframes dash-recap-pop {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+.dash-recap-header {
+  padding: 22px 24px 14px;
+  border-bottom: 1px solid var(--dash-line);
+}
+.dash-recap-title {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.dash-recap-ver {
+  margin-top: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--dash-ink-mute);
+}
+.dash-recap-old { color: var(--dash-ink-mute); }
+.dash-recap-arrow { color: var(--dash-ink-mute); }
+.dash-recap-new {
+  color: var(--dash-accent);
+  font-weight: 600;
+}
+.dash-recap-x {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dash-ink-soft);
+  cursor: pointer;
+}
+.dash-recap-x:hover { background: var(--dash-line); color: var(--dash-ink); }
+.dash-recap-x svg { display: block; }
+.dash-recap-body {
+  padding: 16px 24px 4px;
+  overflow-y: auto;
+}
+.dash-recap-section { margin-bottom: 16px; }
+.dash-recap-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+  color: var(--dash-ink-mute);
+}
+.dash-recap-features .dash-recap-section-title { color: var(--dash-accent); }
+.dash-recap-fixes .dash-recap-section-title { color: var(--dash-green); }
+.dash-recap-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.dash-recap-list li {
+  position: relative;
+  padding: 4px 0 4px 18px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--dash-ink);
+}
+.dash-recap-list li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 11px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.45;
+}
+.dash-recap-features .dash-recap-list li::before { background: var(--dash-accent); opacity: 0.7; }
+.dash-recap-fixes .dash-recap-list li::before { background: var(--dash-green); opacity: 0.7; }
+.dash-recap-footer {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 14px 24px 20px;
+  border-top: 1px solid var(--dash-line);
+}
+.dash-recap-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: var(--dash-radius-pill);
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.dash-recap-btn svg { display: block; }
+.dash-recap-share {
+  margin-right: auto;
+  background: transparent;
+  color: var(--dash-ink-soft);
+  border-color: var(--dash-line-strong);
+}
+.dash-recap-share:hover { background: var(--dash-line); color: var(--dash-ink); }
+.dash-recap-share.is-copied { color: var(--dash-green); border-color: var(--dash-green); }
+.dash-recap-done {
+  background: var(--dash-accent);
+  color: #fff;
+}
+.dash-recap-done:hover { opacity: 0.9; }
+@media (prefers-reduced-motion: reduce) {
+  .dash-recap-overlay, .dash-recap-box { animation: none; }
+}
