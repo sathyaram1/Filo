@@ -211,8 +211,10 @@ module.exports = function setupWheelZoom(webFrame, opts) {
       if (!(e.ctrlKey || e.metaKey)) return;
       e.preventDefault();
       e.stopPropagation();
+      // ~0.005/unità: un notch di rotella (deltaY≈100) ≈ un passo di Ctrl +/-
+      // (ZOOM_STEP=0.5); il pinch del trackpad (delta piccoli) resta fluido.
       let next;
-      try { next = webFrame.getZoomLevel() - e.deltaY * 0.01; }
+      try { next = webFrame.getZoomLevel() - e.deltaY * 0.005; }
       catch (_) { return; }
       setLevel(next);
     }, { capture: true, passive: false });
