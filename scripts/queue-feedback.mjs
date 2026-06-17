@@ -33,6 +33,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { randomUUID } from 'node:crypto';
 import { commitAndPush } from './queue-triage.mjs';
 import { uploadScreenshotFile } from './lib/feedback-storage.mjs';
 
