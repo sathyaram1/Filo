@@ -19,43 +19,45 @@ const PAGE = `<!doctype html><html><body style="margin:0">
 
 // Invia il broadcast nativo dal main al webContents della pagina, come fa
 // Electron quando l'utente clicca destro su una parola sotto lo zigzag rosso.
+// Invia a TUTTI i webContents con quell'host (non solo al primo): all'apertura
+// di un tab Electron può avere transitoriamente due WebContentsView con la stessa
+// URL, e un singolo `find()` poteva colpire quello sbagliato → broadcast perso →
+// test flaky. Vedi la stessa nota in spellcheck.spec.mjs.
 async function sendNative(app, host, word, suggestions) {
-  return app.evaluate(async ({ webContents }, { host, word, suggestions }) => {
-    const wc = webContents.getAllWebContents().find((w) => {
+  return app.evaluate(({ webContents }, { host, word, suggestions }) => {
+    const targets = webContents.getAllWebContents().filter((w) => {
       try { return new URL(w.getURL()).host === host; } catch { return false; }
     });
-    if (!wc) return false;
-    wc.send('filo:broadcast', { type: '_spell:native', word, suggestions });
-    return true;
+    for (const wc of targets) wc.send('filo:broadcast', { type: '_spell:native', word, suggestions });
+    return targets.length;
   }, { host, word, suggestions });
 }
 
 test('suggerimento nativo compare in cima al menu su parola errata', async ({ app, openTab, testServer }) => {
   const url = testServer.html(PAGE);
   const page = await openTab(url);
+  // `filoContentReady` (non `filoReady`): garantisce che il listener spellcheck
+  // sia già registrato — init() è async e setta `filoReady` prima di esso.
   await page.waitForFunction(
-    () => document.documentElement.dataset.filoReady === '1',
+    () => document.documentElement.dataset.filoContentReady === '1',
     null, { timeout: 8000 },
   );
 
-  // Pre-popola i suggerimenti nativi per "wrlod" PRIMA del click (così sono già
-  // freschi quando il menu si compone, senza dipendere da timing/LLM).
-  // Inietta anche via main process (IPC) con attesa generosa per minimizzare
-  // la flakiness da race condition nel round-trip.
+  // Pre-popola i suggerimenti nativi per "wrlod" e attende che siano stati
+  // EFFETTIVAMENTE registrati nel content script prima del click (niente timeout
+  // fisso): così sono freschi quando il menu si compone, in modo deterministico.
   const sent = await sendNative(app, new URL(url).host, 'wrlod', ['world', 'word']);
-  expect(sent).toBe(true);
-  await page.waitForTimeout(300); // attesa più lunga per dare tempo all'IPC
+  expect(sent).toBeGreaterThanOrEqual(1);
+  await page.waitForFunction(
+    () => document.documentElement.dataset.filoNativeWord === 'wrlod',
+    null, { timeout: 8000 },
+  );
 
   // Right-click esattamente sopra la parola "wrlod" (inizio del contenteditable).
   const box = await page.locator('#ce').boundingBox();
   await page.mouse.click(box.x + 18, box.y + 16, { button: 'right' });
 
   await expect(page.locator('.sn-menu')).toBeVisible();
-
-  // Dopo l'apertura del menu, re-inietta il broadcast dal main così il waiter
-  // `onNativeSuggestions` (800ms) lo riceve. Questo copre il caso in cui
-  // `getNativeSuggestions` era vuoto al momento di comporre il menu.
-  await sendNative(app, new URL(url).host, 'wrlod', ['world', 'word']);
 
   // La riga di correzione deve mostrare il suggerimento nativo "world" in cima.
   const corr = page.locator('.sn-menu-correction:visible');
