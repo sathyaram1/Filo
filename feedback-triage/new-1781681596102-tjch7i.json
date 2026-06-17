@@ -1,0 +1,11 @@
+{
+  "op": "create",
+  "text": "Parte 1 del feedback padre (#PIP 'Migliorare gestione commenti e allegati'): permettere di incollare/trascinare immagini e altri file mentre si AGGIUNGE UN COMMENTO a un feedback nella dashboard (caselle .fb-notes su Ricevuti/Da risolvere/Bozze/Agente, il composer Chiarimenti e il form di riapertura), come gia' si puo' fare quando si INVIA il feedback. Stato attuale: i commenti sono solo testo, salvati nel campo notes (vedi src/shared/feedbackThread.js); gli allegati esistono solo a livello di segnalazione iniziale (campi images/files, mostrati nella bolla 'Segnalazione'). L'infrastruttura di upload c'e' gia' (SN_FEEDBACK in src/shared/feedback.js: uploadImage carica su Firebase Storage; submit() converte dataUrl->blob e popola images[]/files[]). Da fare: (1) aggiungere handler paste/drop sulle textarea dei commenti che caricano i file via uploadImage e mostrano un'anteprima/chip nel composer; (2) ESTENDERE src/shared/feedback.js updateStatus() per accettare e scrivere images/files (oggi accetta solo status/notes/priority) e il messaggio FEEDBACK_UPDATE + l'handler in src/main/services/handlers/auth.js per passarli; (3) IMPORTANTE: le Firestore rules (firestore.rules, ramo 'allow update' admin, riga ~127) usano hasOnly([...]) che NON include 'images'/'files' -> vanno aggiunti alla allowlist e le rules ridistribuite dall'owner con 'firebase deploy --only firestore:rules' (una routine cloud non puo' deployarle). DECISIONE DI DESIGN per l'owner: gli allegati incollati in un commento devono comparire (a) accanto a quel commento specifico (richiede un modello a turni con allegati per-turno, piu' lavoro) oppure (b) nell'area allegati condivisa del feedback insieme a quelli della segnalazione (piu' semplice, riusa il rendering esistente in src/pages/feedback/feedback.js)? Default consigliato: (b). Criterio di fatto: dalla dashboard, incollando un'immagine mentre commento un feedback, l'immagine viene caricata e resta visibile riaprendo il feedback. Aggiungere spec Playwright che asserisce l'upload+persistenza (mock di uploadImage).",
+  "name": "Incollare immagini/file nei commenti",
+  "parentId": "PIPchgGP86ZOF2tV0UwD",
+  "status": "todo",
+  "priority": 1,
+  "notes": "",
+  "queuedAt": "2026-06-17T07:33:16.102Z",
+  "queuedBy": "routine"
+}
