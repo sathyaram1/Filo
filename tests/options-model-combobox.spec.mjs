@@ -31,11 +31,12 @@ async function revealAdvanced(page) {
   await page.waitForSelector(ROW, { timeout: 8_000 });
 }
 
-test('Modelli: il campo è un combobox legato al provider della riga', async ({ openTab }) => {
+test('Modelli: il campo è un combobox custom legato al provider della riga', async ({ openTab }) => {
   const page = await openTab(OPTIONS_URL);
   await revealAdvanced(page);
 
-  // Le due datalist per-provider esistono; la vecchia "models-list" condivisa no.
+  // Le due datalist per-provider esistono (sorgente dati del combobox); la
+  // vecchia "models-list" condivisa no.
   expect(await page.locator('#models-list-gemini').count()).toBe(1);
   expect(await page.locator('#models-list-openrouter').count()).toBe(1);
   expect(await page.locator('#models-list').count()).toBe(0);
@@ -43,13 +44,32 @@ test('Modelli: il campo è un combobox legato al provider della riga', async ({ 
   const row = page.locator(ROW).first();
   const idInput = row.locator('.sn-model-id');
 
-  // Imposta il provider della riga su Gemini → il campo punta alla lista Gemini.
-  await row.locator('.sn-model-provider').selectOption('gemini');
-  await expect(idInput).toHaveAttribute('list', 'models-list-gemini');
+  // Niente più popup NATIVO della datalist: il campo non ha l'attributo `list`
+  // (senza il fix questo è rosso). Il dropdown ora è quello custom .sn-select-*.
+  await expect(idInput).not.toHaveAttribute('list', /.*/);
 
-  // Cambiando provider, la tendina segue.
+  // Semina la lista Gemini con un id riconoscibile (gemini non fa fetch senza
+  // chiave, quindi la seed resta stabile).
+  await page.evaluate(() => {
+    const dl = document.getElementById('models-list-gemini');
+    const o = document.createElement('option'); o.value = 'gemini-test-model';
+    dl.appendChild(o);
+  });
+
+  // Provider Gemini → mettendo a fuoco il campo, il dropdown custom mostra il
+  // modello Gemini seminato.
+  await row.locator('.sn-model-provider').selectOption('gemini');
+  await idInput.focus();
+  const pop = row.locator('.sn-select-pop');
+  await expect(pop).toBeVisible({ timeout: 4_000 });
+  await expect(pop.locator('.sn-select-option', { hasText: 'gemini-test-model' })).toBeVisible();
+
+  // Cambiando provider su OpenRouter, il dropdown legge l'ALTRA lista: il
+  // modello Gemini non compare più (la tendina segue il provider della riga).
+  await idInput.blur();
   await row.locator('.sn-model-provider').selectOption('openrouter');
-  await expect(idInput).toHaveAttribute('list', 'models-list-openrouter');
+  await idInput.focus();
+  await expect(pop.locator('.sn-select-option', { hasText: 'gemini-test-model' })).toHaveCount(0);
 });
 
 test('Modelli: un modello Gemini salvato compare nella tendina Gemini col nome nativo', async ({ openTab }) => {
