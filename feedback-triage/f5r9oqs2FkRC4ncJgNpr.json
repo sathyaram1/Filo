@@ -1,0 +1,7 @@
+{
+  "id": "f5r9oqs2FkRC4ncJgNpr",
+  "status": "done",
+  "notes": "Quando riapri un feedback (o aggiungi dettagli), la tua spiegazione ora compare SEMPRE come una bolla separata, divisa dalla segnalazione originale e dalla nota dell'agente — non più infilata dentro la stessa casella della nota. Nei tab di lavorazione la casella modificabile contiene solo la nota dell'agente; le riaperture restano bolle a sé sotto di essa, e modificando la nota la riapertura non viene mai persa. Verificato con test automatici (la casella editabile non contiene il testo di riapertura, la riapertura è una bolla 'Tu' separata, e salvando una modifica la riapertura resta intatta).",
+  "queuedAt": "2026-06-17T19:34:20.159Z",
+  "queuedBy": "routine"
+}
