@@ -85,6 +85,14 @@
     return costEur / CREDIT.EUR_PER_CREDIT;
   }
 
+  // Ricompensa (crediti) per la RISOLUZIONE di un feedback in base alla priorità
+  // dell'utente (0-3). Priorità mancante/fuori scala → fascia 0. (C5)
+  function rewardForPriority(priority) {
+    const table = CREDIT.FEEDBACK_RESOLVE_BY_PRIORITY || {};
+    const p = Math.max(0, Math.min(3, Math.round(Number(priority) || 0)));
+    return Number(table[p]) || Number(table[0]) || 0;
+  }
+
   // Sottrae i crediti corrispondenti al costo € e aggrega per uso. Il saldo non
   // scende sotto 0. Ritorna { state, credits }.
   function applyConsumption(state, { action, costEur = 0, calls = 1 }) {
