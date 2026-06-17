@@ -1,0 +1,7 @@
+{
+  "id": "Tn5GIvCEMK9IPrOAFGLy",
+  "status": "done",
+  "notes": "Test reso stabile. Il dropdown del font si chiudeva davvero cliccando in alto, ma il test cliccava un punto 'vuoto' della barra degli strumenti che — per come è fatta (è un gruppo flottante che lascia passare i click nello spazio tra i pulsanti) — veniva intercettato dal documento sottostante: in cloud falliva sempre. Ora il test clicca un pulsante reale della barra (il toggle della sidebar) e verifica che il dropdown si chiuda, ed è stato spostato come ultimo controllo perché apre/chiude la sidebar. L'app non aveva alcun bug: era solo il test a puntare un bersaglio sbagliato. Verificato eseguendolo 3 volte di fila: passa sempre.",
+  "queuedAt": "2026-06-17T07:45:57.349Z",
+  "queuedBy": "routine"
+}
