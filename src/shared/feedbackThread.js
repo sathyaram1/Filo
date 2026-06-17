@@ -25,6 +25,14 @@
   // Chiarimenti. Cattura (group 1) il timestamp scritto nel marcatore.
   const USER_TURN_RE = /^---\s*(?:Riaperto il|La tua risposta del)\s*(.*?)\s*---\s*$/;
 
+  // Marcatore che, dentro `notes`, apre un nuovo turno dell'AGENTE/MODELLO. Serve
+  // quando una routine RI-risolve un feedback già lavorato (riaperto): il nuovo
+  // report va APPESO come turno separato, non sovrascrive lo storico (report
+  // precedente + annotazione di riapertura dell'utente). Senza questo marcatore
+  // il parser attribuirebbe il nuovo report al turno utente precedente. Cattura
+  // (group 1) il timestamp.
+  const MODEL_TURN_RE = /^---\s*(?:Aggiornamento dell'agente del|Filo ha risposto il)\s*(.*?)\s*---\s*$/;
+
   // true se il feedback è stato inviato da un modello (issue d'agente o
   // sub-feedback creato da una routine): in quel caso anche la segnalazione
   // originale è "lato Filo", non "lato utente".
