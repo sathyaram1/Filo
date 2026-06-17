@@ -1,0 +1,7 @@
+{
+  "id": "emXOmfonMkCuERz0bnsH",
+  "status": "done",
+  "notes": "Il menu a tendina per scegliere la stringa del modello (impostazioni → Modelli) ora usa lo stile di Filo invece del menu grigio di sistema: card arrotondata, evidenziazione arancione e categoria del modello (Testo / Immagini / …) accanto al nome, identico agli altri menu a tendina dell'app. Si filtra scrivendo e segue il provider della riga.\n\nOltre al chiesto: ho applicato lo stesso stile anche al campo modello della pagina admin 'Modelli predefiniti', per coerenza tra cammini equivalenti.\n\nVerificato con i test automatici delle Opzioni e della pagina admin (il dropdown compare, mostra i modelli del provider giusto e filtra digitando) e con uno screenshot della pagina.",
+  "queuedAt": "2026-06-17T19:59:54.120Z",
+  "queuedBy": "routine"
+}
