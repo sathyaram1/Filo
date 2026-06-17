@@ -20,9 +20,19 @@
 //
 // Gira nel contesto del preload (ha accesso a `webFrame` di Electron), sia sulle
 // pagine web (page-preload) sia sulle pagine interne filo:// (internal-preload).
+//
+// ZOOM CON CTRL (opts.pageZoom)
+//   Oltre alla modalità rotella, se `opts.pageZoom` è attivo la pagina zooma
+//   anche tenendo Ctrl/Cmd: pizzicando il trackpad, con Ctrl+rotella e da
+//   tastiera con Ctrl + / Ctrl - / Ctrl 0. Pinch e Ctrl+rotella arrivano
+//   entrambi come `wheel` con ctrlKey=true. Lo attiviamo SOLO sulle pagine web
+//   esterne (page-preload): le pagine interne filo:// che vogliono lo zoom lo
+//   gestiscono da sé (es. l'editor scala il foglio via CSS), quindi abilitarlo
+//   anche lì zoomerebbe due volte.
 
-module.exports = function setupWheelZoom(webFrame) {
+module.exports = function setupWheelZoom(webFrame, opts) {
   if (!webFrame || typeof document === 'undefined') return;
+  const pageZoom = !!(opts && opts.pageZoom);
 
   const ZOOM_STEP = 0.5;   // come un passo di Ctrl +/- (in "zoom level")
   const MIN_LEVEL = -5;
