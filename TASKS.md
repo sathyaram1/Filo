@@ -54,7 +54,32 @@ Spec utente (chat). Decisioni di design confermate dall'utente:
 
 Ordine = dipendenze (il motore va per primo). Numerare i task come C1..C5.
 
-- [~] **C1 — Motore crediti: ledger Firestore per-account + conteggio API a token + refill mezzanotte**
+- [x] **C1 — Motore crediti: ledger Firestore per-account + conteggio API a token + refill mezzanotte**
+  (2026-06-17) — FATTO il motore + l'accounting + i test. Cosa c'è:
+  `src/main/services/creditStore.js` (`SN_CREDITS`, logica pura + cache locale):
+  saldo iniziale 1000, refill **+100/mezzanotte locale** lazy multi-giorno (tetto
+  30 gg anti-abuso orologio), conversione costo€→crediti (1 cr = €0,0008),
+  aggregazione **per tipo d'uso** (`SN_CONST.CREDIT_USAGE_GROUPS`: correttore,
+  riordino schede, chat, traduzione…) e per-azione col costo€ **dietro le quinte**;
+  `publicView` elimina il costo € dalla vista UI. Aggancio all'accounting:
+  `costTracker.record` ora chiama `SN_CREDITS.recordConsumption` → **tutti** i ~7
+  call site AI coperti senza ritoccarli. IPC `GET_CREDITS`/`CREDITS_CHANGED`/
+  `CREDITS_AWARD_FEEDBACK` in `handlers/credits.js` (+wire in handlers.js). Sync
+  Firestore `credits/<uid>` per-account: load/adopt al login (lazy su GET_CREDITS),
+  push debounced su ogni mutazione, via REST con ID token utente (helper REST
+  esportati da feedback.js). Regola Firestore `match /credits/{uid}` (owner-only).
+  Costanti `CREDIT` (incl. FEEDBACK_SEND=5 e tabella priorità 50/100/200/300).
+  Scaffold changelog `src/shared/patchNotes.js` + sezione CLAUDE.md "Patch notes".
+  **Verificato**: `npm run test:unit` 326/326 verdi (16 nuovi in
+  `tests/unit/creditStore.test.mjs`: refill multi-giorno, costo→crediti,
+  aggregazione per uso, vista pubblica senza €, ricompense); `node --check` su
+  tutti i file toccati OK.
+  **NON verificato / azioni manuali richieste**:
+  (1) il round-trip Firestore live NON è testato headless (serve utente loggato);
+  (2) **le regole vanno deployate**: `firebase deploy --only firestore:rules` —
+  finché non lo fai, la sync per-account fallisce silenziosamente e i crediti
+  restano nella cache locale (offline). Caveat: client-authoritative (alpha),
+  vedi commento nelle rules.
   — Crea un *credit store* nel main process (es. `src/main/services/creditStore.js`,
   IIFE/CommonJS coerente col modulo) che tiene il saldo + uno storico aggregato
   **per tipo d'uso** (chat, correttore ortografico, riordino schede, spiegazione,
