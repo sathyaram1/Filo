@@ -20,8 +20,8 @@
     return getProvider(provider).complete({ apiKey, model, messages, signal });
   }
 
-  async function streamComplete({ provider, apiKey, model, messages, onDelta, signal }) {
-    return getProvider(provider).streamComplete({ apiKey, model, messages, onDelta, signal });
+  async function streamComplete({ provider, apiKey, model, messages, onDelta, onReasoning, signal }) {
+    return getProvider(provider).streamComplete({ apiKey, model, messages, onDelta, onReasoning, signal });
   }
 
   async function listModels({ provider, apiKey }) {
