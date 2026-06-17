@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.50', date: '2026-06-17',
+      features: [
+        'Quando Filo si aggiorna ti mostra un recap delle novità e delle correzioni, con un pulsante per condividerlo.',
+      ],
+      fixes: [],
+    },
+    {
       version: '0.2.49', date: '2026-06-17',
       features: [
         'Nuova pagina Crediti nel profilo: vedi il saldo e un grafico di come hai usato i crediti.',
