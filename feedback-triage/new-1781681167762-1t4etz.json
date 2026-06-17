@@ -1,0 +1,11 @@
+{
+  "op": "create",
+  "text": "Il test automatico tests/editor-font-search-drag.spec.mjs:59 ('il dropdown del font si chiude con un click fuori da esso') FALLISCE in modo deterministico (tutte le esecuzioni), sia sul codice attuale sia sul commit base e4f608d (quindi pre-esistente, non una regressione recente). L'assert sulla chiusura del dropdown del selettore font dell'editor dopo un click fuori non si verifica. Da capire se è il test ad essere obsoleto (selettore/markup cambiato) o se il dropdown davvero non si chiude più cliccando fuori nell'editor (filo://editor/editor.html). Impatto: 'npm test' fallisce sempre su questo caso.",
+  "name": "test rotto: dropdown font non si chiude",
+  "parentId": "",
+  "status": "new",
+  "priority": 1,
+  "notes": "",
+  "queuedAt": "2026-06-17T07:26:07.762Z",
+  "queuedBy": "routine"
+}

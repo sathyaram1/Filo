@@ -1,0 +1,11 @@
+{
+  "op": "create",
+  "text": "Il test automatico tests/spellcheck.spec.mjs:54 ('right-click su parola errata in textarea mostra correzione in cima') è INSTABILE (flaky): eseguito 3 volte di fila passa ~1 volta su 3 e fallisce le altre con 'expect(.sn-menu-correction:visible).toBeVisible() timeout'. Riprodotto sia sul codice attuale sia sul commit base e4f608d (quindi NON è una regressione recente). Probabile race tra l'apertura del menu tasto destro e la comparsa della voce di correzione (il suggerimento arriva async). Va reso deterministico (attendere il completamento del controllo ortografico prima dell'assert, o aumentare/condizionare il timeout). Impatto: rumore nella suite cloud, che fa fallire 'npm test' a intermittenza.",
+  "name": "test instabile: correzione ortografica",
+  "parentId": "",
+  "status": "new",
+  "priority": 1,
+  "notes": "",
+  "queuedAt": "2026-06-17T07:26:07.712Z",
+  "queuedBy": "routine"
+}
