@@ -117,6 +117,37 @@ module.exports = function register(on, ctx) {
     }
   });
 
+  // ── Recap aggiornamento (C4) ────────────────────────────────────────────────
+  // Calcola, lato main (qui c'è sia app.getVersion() sia le note caricate), il
+  // recap delle versioni saltate dall'ultima vista dall'utente. La pagina home
+  // (dashboard) lo mostra come popup all'avvio.
+  function appVersion() {
+    try { return require('electron').app.getVersion(); } catch (_) { return '0.0.0'; }
+  }
+
+  on(MSG.GET_UPDATE_RECAP, async () => {
+    const PN = globalThis.SN_PATCH_NOTES;
+    const KEYS = globalThis.SN_CONST.STORAGE_KEYS;
+    const current = appVersion();
+    if (!PN || !globalThis.SN_STORAGE) return { ok: true, current, lastSeen: current, notes: [] };
+    const lastSeen = await globalThis.SN_STORAGE.getRaw(KEYS.LAST_SEEN_VERSION, null);
+    // Primissimo avvio (nessuna versione vista): non mostrare nulla a sorpresa,
+    // ma marca la versione corrente come "vista" così il prossimo update parte
+    // pulito. Niente note ritornate → niente popup.
+    if (!lastSeen) {
+      try { await globalThis.SN_STORAGE.setRaw(KEYS.LAST_SEEN_VERSION, current); } catch (_) {}
+      return { ok: true, current, lastSeen: null, notes: [] };
+    }
+    const notes = PN.since(lastSeen, current);
+    return { ok: true, current, lastSeen, notes };
+  });
+
+  on(MSG.MARK_UPDATE_SEEN, async () => {
+    const KEYS = globalThis.SN_CONST.STORAGE_KEYS;
+    try { await globalThis.SN_STORAGE.setRaw(KEYS.LAST_SEEN_VERSION, appVersion()); } catch (_) {}
+    return { ok: true };
+  });
+
   on('fetch_link_meta', async (msg) => {
     try {
       const url = msg.url;
