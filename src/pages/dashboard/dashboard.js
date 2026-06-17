@@ -1727,6 +1727,171 @@
     }
   }
 
+  // ===== Recap aggiornamento (C4) =====
+  // Popup all'avvio dopo un update: il main (che ha sia app.getVersion() sia le
+  // note curate in src/shared/patchNotes.js) calcola quali versioni l'utente ha
+  // saltato dall'ultima volta. Se ce ne sono, mostriamo un recap con le novità
+  // in alto, le correzioni in basso e un pulsante per condividerlo/copiarlo.
+  async function maybeShowUpdateRecap() {
+    let recap;
+    try { recap = await send({ type: MSG.GET_UPDATE_RECAP }); } catch (_) { return; }
+    if (!recap || !recap.ok) return;
+    // Nessuna versione vista prima (il main l'ha appena marcata: primo avvio) o
+    // nessuna nota da mostrare → niente popup.
+    if (!recap.lastSeen || !Array.isArray(recap.notes) || !recap.notes.length) return;
+    renderUpdateRecap(recap);
+  }
+
+  // Testo del recap per la condivisione/copia.
+  function buildRecapText({ lastSeen, current, features, fixes }) {
+    const lines = [`Filo ${lastSeen} → ${current}`];
+    if (features.length) { lines.push('', 'Novità:'); for (const f of features) lines.push(`• ${f}`); }
+    if (fixes.length) { lines.push('', 'Correzioni:'); for (const f of fixes) lines.push(`• ${f}`); }
+    return lines.join('\n');
+  }
+
+  function flashCopied(btn) {
+    const span = btn.querySelector('span');
+    if (!span) return;
+    const prev = span.dataset.label || span.textContent;
+    span.dataset.label = prev;
+    span.textContent = 'Copiato!';
+    btn.classList.add('is-copied');
+    setTimeout(() => { span.textContent = prev; btn.classList.remove('is-copied'); }, 1600);
+  }
+
+  async function shareRecap(btn, data) {
+    const text = buildRecapText(data);
+    // Su desktop navigator.share di solito non esiste: ripieghiamo sulla copia.
+    try {
+      if (navigator.share) { await navigator.share({ title: 'Novità di Filo', text }); return; }
+    } catch (_) { /* l'utente ha annullato la share nativa: copia comunque */ }
+    try {
+      await navigator.clipboard.writeText(text);
+      flashCopied(btn);
+      return;
+    } catch (_) { /* fallback estremo sotto */ }
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+      flashCopied(btn);
+    } catch (_) {}
+  }
+
+  function renderUpdateRecap({ lastSeen, current, notes }) {
+    // Aggrega le voci di tutte le versioni saltate (notes è già ordinato dalla
+    // più recente): tutte le novità in un blocco, tutte le correzioni nell'altro.
+    const features = [];
+    const fixes = [];
+    for (const n of notes) {
+      for (const f of (n.features || [])) features.push(f);
+      for (const f of (n.fixes || [])) fixes.push(f);
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'dash-recap-overlay';
+    overlay.id = 'recapOverlay';
+    const box = document.createElement('div');
+    box.className = 'dash-recap-box';
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-modal', 'true');
+    box.setAttribute('aria-label', 'Novità di Filo');
+    overlay.appendChild(box);
+
+    let settled = false;
+    function close() {
+      if (settled) return;
+      settled = true;
+      document.removeEventListener('keydown', onKey, true);
+      overlay.remove();
+      // Salva la versione corrente come "vista": il recap non riapparirà fino al
+      // prossimo update.
+      send({ type: MSG.MARK_UPDATE_SEEN });
+    }
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); }
+    }
+    document.addEventListener('keydown', onKey, true);
+    overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) close(); });
+
+    // Header: "vecchia → nuova".
+    const header = document.createElement('div');
+    header.className = 'dash-recap-header';
+    const title = document.createElement('div');
+    title.className = 'dash-recap-title';
+    title.textContent = 'Filo si è aggiornato';
+    const ver = document.createElement('div');
+    ver.className = 'dash-recap-ver';
+    ver.id = 'recapVer';
+    const oldV = document.createElement('span'); oldV.className = 'dash-recap-old'; oldV.textContent = lastSeen;
+    const arrow = document.createElement('span'); arrow.className = 'dash-recap-arrow'; arrow.textContent = '→';
+    const newV = document.createElement('span'); newV.className = 'dash-recap-new'; newV.textContent = current;
+    ver.append(oldV, arrow, newV);
+    header.append(title, ver);
+    box.appendChild(header);
+
+    const xBtn = document.createElement('button');
+    xBtn.type = 'button';
+    xBtn.className = 'dash-recap-x';
+    xBtn.setAttribute('aria-label', 'Chiudi');
+    xBtn.innerHTML = self.SN_ICONS?.close?.(16) || '✕';
+    xBtn.addEventListener('click', close);
+    box.appendChild(xBtn);
+
+    const bodyEl = document.createElement('div');
+    bodyEl.className = 'dash-recap-body';
+    box.appendChild(bodyEl);
+
+    function section(label, items, kind) {
+      if (!items.length) return;
+      const sec = document.createElement('div');
+      sec.className = `dash-recap-section dash-recap-${kind}`;
+      sec.dataset.kind = kind;
+      const h = document.createElement('div');
+      h.className = 'dash-recap-section-title';
+      h.textContent = label;
+      sec.appendChild(h);
+      const ul = document.createElement('ul');
+      ul.className = 'dash-recap-list';
+      for (const it of items) {
+        const li = document.createElement('li');
+        li.textContent = it;
+        ul.appendChild(li);
+      }
+      sec.appendChild(ul);
+      bodyEl.appendChild(sec);
+    }
+    // Novità in alto, correzioni in basso (come da spec).
+    section('Novità', features, 'features');
+    section('Correzioni', fixes, 'fixes');
+
+    const footer = document.createElement('div');
+    footer.className = 'dash-recap-footer';
+    const shareBtn = document.createElement('button');
+    shareBtn.type = 'button';
+    shareBtn.className = 'dash-recap-btn dash-recap-share';
+    shareBtn.id = 'recapShare';
+    const shareIcon = self.SN_ICONS?.share?.(15) || '';
+    shareBtn.innerHTML = `${shareIcon}<span>Condividi</span>`;
+    shareBtn.addEventListener('click', () => shareRecap(shareBtn, { lastSeen, current, features, fixes }));
+    const doneBtn = document.createElement('button');
+    doneBtn.type = 'button';
+    doneBtn.className = 'dash-recap-btn dash-recap-done';
+    doneBtn.textContent = 'Fatto';
+    doneBtn.addEventListener('click', close);
+    footer.append(shareBtn, doneBtn);
+    box.appendChild(footer);
+
+    document.body.appendChild(overlay);
+    doneBtn.focus();
+  }
+
   (async function init() {
     renderControls();
     await applySavedTheme();
