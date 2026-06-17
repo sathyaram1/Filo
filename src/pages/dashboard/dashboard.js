@@ -1788,7 +1788,7 @@
     } catch (_) {}
   }
 
-  function renderUpdateRecap({ lastSeen, current, notes }) {
+  function renderUpdateRecap({ lastSeen, current, notes }, onClose) {
     // Aggrega le voci di tutte le versioni saltate (notes è già ordinato dalla
     // più recente): tutte le novità in un blocco, tutte le correzioni nell'altro.
     const features = [];
