@@ -316,23 +316,41 @@
     return { getAttachments: () => attachments.slice() };
   }
 
-  // Appende il contenuto del composer "Aggiungi nota" (testo + allegati) come
-  // NUOVO turno dell'agente in coda alle note esistenti, così diventa una bolla
-  // separata invece di mescolarsi nella precedente. Ritorna il blob aggiornato,
-  // o null se non c'è nulla da aggiungere.
-  function appendedNotesFor(id, ta) {
-    if (!ta) return null;
-    const text = (ta.value || '').trim();
+  // Valore da salvare per la textarea di note editabili. La textarea modifica
+  // SOLO il "capo" delle note (la nota dell'agente, prima di qualsiasi
+  // riapertura/risposta dell'utente): il resto della conversazione (la "coda":
+  // riaperture e turni successivi) vive in bolle a sé e va CONSERVATO intatto.
+  // Quindi ricomponiamo capo modificato + coda originale.
+  function notesValueOf(ta) {
+    if (!ta) return '';
     const atts = ta._attachComposer ? ta._attachComposer.getAttachments() : [];
-    if (!text && !atts.length) return null;
-    const item = all.find((f) => f._id === id);
-    const oldNotes = (item && item.notes) || '';
-    if (window.SN_FEEDBACK_THREAD && SN_FEEDBACK_THREAD.appendModelTurn) {
-      return SN_FEEDBACK_THREAD.appendModelTurn(oldNotes, text, { attachments: atts });
+    const headText = ta.value;
+    const head = window.SN_FEEDBACK_THREAD && SN_FEEDBACK_THREAD.composeNotes
+      ? SN_FEEDBACK_THREAD.composeNotes(headText, atts)
+      : headText;
+    const tail = ta.dataset && ta.dataset.tail ? ta.dataset.tail : '';
+    if (!tail) return head;
+    return head ? `${head}\n\n${tail}` : tail;
+  }
+
+  // Spezza il blob `notes` in { head, tail }: `head` è il testo fino al primo
+  // marcatore di turno utente/agente (la nota editabile dell'agente); `tail` è
+  // tutto il resto verbatim (riaperture/risposte e turni successivi), che viene
+  // mostrato come bolle separate e conservato intatto al salvataggio.
+  function splitNotesHeadTail(notes) {
+    const s = String(notes || '');
+    if (!s) return { head: '', tail: '' };
+    const T = window.SN_FEEDBACK_THREAD;
+    if (!T || !T.USER_TURN_RE) return { head: s, tail: '' };
+    const lines = s.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      if (T.USER_TURN_RE.test(lines[i]) || (T.MODEL_TURN_RE && T.MODEL_TURN_RE.test(lines[i]))) {
+        const head = lines.slice(0, i).join('\n').replace(/\n+$/, '');
+        const tail = lines.slice(i).join('\n');
+        return { head, tail };
+      }
     }
-    // Fallback senza il modulo thread: separatore semplice.
-    const block = text + (atts.length ? '' : '');
-    return oldNotes ? `${oldNotes}\n\n${block}` : block;
+    return { head: s, tail: '' };
   }
 
   async function patch(id, payload, optimistic) {
