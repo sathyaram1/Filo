@@ -135,20 +135,29 @@
     });
     provSel.value = single.provider;
 
-    // Combobox: la datalist per-provider elenca il catalogo completo (scorri o
-    // scrivi per filtrare); resta possibile digitare un id non in lista.
+    // Combobox custom (stile Filo, non il popup nativo della datalist): elenca
+    // il catalogo del provider scelto, si filtra digitando, resta libero di
+    // accettare un id non in lista. Il wrapper è position:relative per ancorare
+    // il popup .sn-select-pop.
+    const idWrap = document.createElement('div');
+    idWrap.className = 'sn-model-id-wrap';
     const idIn = document.createElement('input');
     idIn.type = 'text';
     idIn.placeholder = I18n.t('options_model_id');
-    idIn.setAttribute('list', datalistIdFor(single.provider));
+    idIn.setAttribute('autocomplete', 'off');
     idIn.value = single.model;
     idIn.className = 'sn-model-id';
+    idWrap.appendChild(idIn);
     // Carica il catalogo la prima volta che l'utente apre il campo.
     idIn.addEventListener('focus', () => ensureProviderModels(provSel.value));
+    if (window.SN_COMBOBOX) {
+      window.SN_COMBOBOX.attach(idWrap, idIn, {
+        readOptions: () => readProviderOptions(provSel.value),
+      });
+    }
 
-    // Cambiando provider, il combobox punta all'altra lista (e la carica).
+    // Cambiando provider, il combobox legge l'altra lista (e la carica).
     provSel.addEventListener('change', () => {
-      idIn.setAttribute('list', datalistIdFor(provSel.value));
       ensureProviderModels(provSel.value);
     });
 
