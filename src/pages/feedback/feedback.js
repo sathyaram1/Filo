@@ -507,7 +507,13 @@
       // se mostrassi anche la textarea, lo stesso testo comparirebbe due volte.
       const notesEditable = isAdmin && (currentTab === 'inbox' || currentTab === 'todo' || currentTab === 'draft' || currentTab === 'agent');
       const clarifyReply = isAdmin && currentTab === 'clarify';
-      const showConvo = !notesEditable;
+      // I turni (segnalazione, nota dell'agente, riaperture/risposte dell'utente)
+      // sono SEMPRE bolle separate, anche nei tab dove l'admin lavora: prima lì
+      // l'intero blob `notes` finiva in un'unica textarea, così una riapertura
+      // appariva "dentro la stessa bolla" della nota. Ora ogni turno è una bolla
+      // a sé e l'admin AGGIUNGE una nuova nota da un composer dedicato (stesso
+      // schema del tab Chiarimenti) invece di riscrivere il blocco intero.
+      const showConvo = true;
       const reportBubble = `
         <div class="fb-bubble fb-bubble--report fb-bubble--${reportRole} fb-bubble--origin-${origin}">
           <div class="fb-bubble-head"><span class="fb-bubble-who">${reportWho}</span></div>
