@@ -1,17 +1,15 @@
 import { test } from './fixtures/electron.mjs';
 const CLIENT_ID = 'test-client-c5';
-test('debug3', async ({ app, openTab }) => {
+test('debug4', async ({ app, openTab }) => {
   const page = await openTab('filo://newtab/');
   await page.waitForLoadState('domcontentloaded');
-  // call 1: set stub
-  await app.evaluate(async (_e, { feedback }) => {
-    globalThis.__dbgFb = feedback;
-    globalThis.SN_FEEDBACK.list = async () => globalThis.__dbgFb;
-  }, { feedback: [{ _id: 'fbA', clientId: CLIENT_ID, status: 'done', priority: 2, name: 'X', seq: 42, subSeq: 0, notes: 'S.' }] });
-  // call 2 (separate): read list length
-  const out = await app.evaluate(async () => {
-    const all = await globalThis.SN_FEEDBACK.list({ pageSize: 200 });
-    return { len: all.length, isStub: globalThis.SN_FEEDBACK.list.toString().includes('__dbgFb') };
-  });
-  console.log('DBG3 >>>', JSON.stringify(out));
+  await app.evaluate(async (_e, { clientId, feedback }) => {
+    await globalThis.chrome.storage.local.set({ sn_feedback_client_id: clientId });
+    await globalThis.SN_CREDITS.writeState(globalThis.SN_CREDITS.freshState());
+    globalThis.SN_FEEDBACK.list = async () => feedback;
+  }, { clientId: CLIENT_ID, feedback: [
+    { _id: 'fbA', clientId: CLIENT_ID, status: 'done', priority: 2, name: 'Incolla', seq: 42, subSeq: 0, notes: 'Sistemato.' },
+  ]});
+  const r = await page.evaluate(() => chrome.runtime.sendMessage({ type: 'get_feedback_rewards' }));
+  console.log('DBG4 >>>', JSON.stringify(r));
 });
