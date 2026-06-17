@@ -1,0 +1,7 @@
+{
+  "id": "BPjht0vaCGbs7QGGzx82",
+  "status": "clarify",
+  "notes": "Lo zoom del foglio nell'editor è già implementato e funzionante: puoi ingrandire/rimpicciolire con Ctrl+= e Ctrl+- (e Ctrl+0 per tornare al 100%), e anche con Ctrl+rotella / pizzicando il trackpad mentre il puntatore è sopra il foglio. L'ho verificato con un test automatico (Ctrl+= ingrandisce, Ctrl+0 ripristina, Ctrl+rotella ingrandisce).\n\nPer capire perché a te non funziona ho bisogno di due cose:\n1) Che versione di Filo usi? (la trovi nelle Impostazioni). La build corrente è la 0.2.49 e lo zoom c'è da prima — se la tua è più vecchia, basta aggiornare e riprovare.\n2) Cosa NON funziona di preciso? Funziona la tastiera (Ctrl+ e Ctrl-) ma NON il pinch del trackpad, oppure non funziona niente? Provando col puntatore esattamente SOPRA il foglio di testo?\n\nQuesto serve perché il pinch del trackpad, su alcuni sistemi, viene gestito dal sistema operativo/Chromium a un livello che la pagina non riesce sempre a intercettare: se è quello il caso (tastiera ok, pinch no) lo tratto come bug a parte con un approccio diverso.\n\nNota tecnica: zoom implementato in src/pages/editor/editor.js (handleZoomKey nel keydown su window + listener 'wheel' non-passive su docWrap che applica CSS zoom su #doc). Test in tests/editor-paste-zoom.spec.mjs. Possibile causa real-world non coperta dal test headless: wheel-event da pinch non cancellabile a livello compositor su certi setup.",
+  "queuedAt": "2026-06-17T12:33:34.531Z",
+  "queuedBy": "routine"
+}
