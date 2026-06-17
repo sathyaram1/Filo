@@ -335,6 +335,8 @@
     submit,
     list,
     updateStatus,
+    uploadImage,
+    uploadAttachment,
     formatNum,
     fallbackName,
     configPublic: { projectId: PROJECT_ID, bucket: BUCKET, collection: COLLECTION },
