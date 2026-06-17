@@ -60,7 +60,9 @@ test('Modelli: il campo è un combobox custom legato al provider della riga', as
   // modello Gemini seminato.
   await row.locator('.sn-model-provider').selectOption('gemini');
   await idInput.focus();
-  const pop = row.locator('.sn-select-pop');
+  // Scope al wrapper del campo: anche il <select> del provider è un menu custom
+  // di Filo con il suo .sn-select-pop, quindi nella riga ce n'è più d'uno.
+  const pop = row.locator('.sn-model-id-wrap .sn-select-pop');
   await expect(pop).toBeVisible({ timeout: 4_000 });
   await expect(pop.locator('.sn-select-option', { hasText: 'gemini-test-model' })).toBeVisible();
 
