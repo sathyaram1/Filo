@@ -745,20 +745,24 @@ body[data-state="thread"] .dash-suggestion { justify-content: flex-start; paddin
 .dash-input.is-cmd-shell   { color: #2f7fd1; font-weight: 600; }
 .dash-input.is-cmd-unknown { color: #d14343; font-weight: 600; }
 
-/* Bolla "comando" (echo del comando digitato). */
+/* Bolla "comando" (echo del comando digitato): scatola QUADRATA — i comandi si
+   distinguono così dalle bolle arrotondate delle istruzioni passate a Filo. */
 .dash-bubble.dash-term-cmd {
   font-family: 'Cascadia Code', 'Consolas', 'SFMono-Regular', ui-monospace, monospace;
   font-size: 13px;
+  border-radius: 3px;
 }
 .dash-term-prompt { color: var(--dash-accent-2); font-weight: 700; }
 
-/* Bolla output: monospace, scrollabile, con i controlli sotto. */
+/* Bolla output: monospace, scrollabile, con i controlli sotto. Anche la
+   risposta del terminale è QUADRATA, in coppia con la riga di comando. */
 .dash-bubble.dash-term {
   max-width: 92%;
   padding: 10px 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  border-radius: 3px;
 }
 .dash-term-out {
   margin: 0;
