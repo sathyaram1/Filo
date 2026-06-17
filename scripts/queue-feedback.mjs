@@ -84,6 +84,14 @@ export function buildCreateEntry({ text, name, parentId, priority, status, notes
   }
   return {
     op: 'create',
+    // uid = chiave di idempotenza E id del documento Firestore. Generata UNA
+    // volta qui, al momento dell'accodamento: se la stessa entry venisse
+    // applicata due volte (es. due run concorrenti della GitHub Action che
+    // leggono lo spool prima che la prima lo svuoti), entrambe creano il doc con
+    // QUESTO id → la seconda riceve 409 ALREADY_EXISTS invece di un duplicato.
+    // È race-free perché l'unicità è imposta da Firestore sull'id, non da un
+    // check-then-create lato applier. Solo cifre/lettere/-/_ così è un id valido.
+    uid: typeof uid === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(uid) ? uid : randomUUID(),
     text: t,
     name: n,
     parentId: parentId || '',
