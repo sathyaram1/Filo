@@ -540,10 +540,16 @@
       const notesPlaceholder = currentTab === 'inbox'
         ? 'Aggiungi un commento… (verrà conservato quando sposti il feedback in "Da risolvere")'
         : 'Dettagli aggiuntivi, vincoli, scelte di design…';
+      // La textarea mostra la PROSA pulita (senza le righe-marcatore degli
+      // allegati): quelle vivono come thumbnail nel compositore qui sotto.
+      const notesStripped = window.SN_FEEDBACK_THREAD && SN_FEEDBACK_THREAD.stripAttachments
+        ? SN_FEEDBACK_THREAD.stripAttachments(f.notes)
+        : { text: String(f.notes || ''), attachments: [] };
       const notesBlock = notesEditable
         ? `<label class="fb-notes-label">${notesLabelText}
-             <textarea class="fb-notes" data-id="${escapeHtml(f._id)}" rows="3" placeholder="${escapeHtml(notesPlaceholder)}">${escapeHtml(f.notes || '')}</textarea>
-           </label>`
+             <textarea class="fb-notes" data-id="${escapeHtml(f._id)}" rows="3" placeholder="${escapeHtml(notesPlaceholder)}">${escapeHtml(notesStripped.text || '')}</textarea>
+           </label>
+           <div class="fb-attach-mount" data-id="${escapeHtml(f._id)}" data-kind="notes"></div>`
         : '';
       // Tab Chiarimenti: rispondi alle domande di Filo come un turno di chat. La
       // risposta si APPENDE allo storico (conserva la domanda) e il feedback
