@@ -540,22 +540,22 @@
           }).join('')
         : '';
       const threadHtml = `<div class="fb-thread">${reportBubble}${convoHtml}</div>`;
-      // Su "Ricevuti" la casella è un COMMENTO al volo (poi sposti in "Da
-      // risolvere"); altrove è la nota di triage/decisioni di design.
-      const notesLabelText = currentTab === 'inbox' ? 'Commento:' : 'Note / decisioni di design:';
+      // Composer per AGGIUNGERE una nota (decisione di design / commento di
+      // triage) come NUOVO turno dell'agente: si appende allo storico — diventa
+      // una bolla a sé — invece di riscrivere il blob. Su "Ricevuti" è un
+      // commento al volo che viaggia col cambio di stato (lo raccoglie .fb-act).
+      const notesLabelText = currentTab === 'inbox' ? 'Aggiungi un commento:' : 'Aggiungi una nota / decisione di design:';
       const notesPlaceholder = currentTab === 'inbox'
-        ? 'Aggiungi un commento… (verrà conservato quando sposti il feedback in "Da risolvere")'
-        : 'Dettagli aggiuntivi, vincoli, scelte di design…';
-      // La textarea mostra la PROSA pulita (senza le righe-marcatore degli
-      // allegati): quelle vivono come thumbnail nel compositore qui sotto.
-      const notesStripped = window.SN_FEEDBACK_THREAD && SN_FEEDBACK_THREAD.stripAttachments
-        ? SN_FEEDBACK_THREAD.stripAttachments(f.notes)
-        : { text: String(f.notes || ''), attachments: [] };
+        ? 'Scrivi un commento… (verrà conservato quando sposti il feedback in "Da risolvere")'
+        : 'Dettagli aggiuntivi, vincoli, scelte di design… (verrà aggiunta come nuova bolla)';
       const notesBlock = notesEditable
         ? `<label class="fb-notes-label">${notesLabelText}
-             <textarea class="fb-notes" data-id="${escapeHtml(f._id)}" rows="3" placeholder="${escapeHtml(notesPlaceholder)}">${escapeHtml(notesStripped.text || '')}</textarea>
+             <textarea class="fb-notes" data-id="${escapeHtml(f._id)}" rows="3" placeholder="${escapeHtml(notesPlaceholder)}"></textarea>
            </label>
-           <div class="fb-attach-mount" data-id="${escapeHtml(f._id)}" data-kind="notes"></div>`
+           <div class="fb-attach-mount" data-id="${escapeHtml(f._id)}" data-kind="notes"></div>
+           <div class="fb-note-buttons">
+             <button type="button" class="sn-btn sn-btn-secondary fb-note-add" data-id="${escapeHtml(f._id)}">Aggiungi nota</button>
+           </div>`
         : '';
       // Tab Chiarimenti: rispondi alle domande di Filo come un turno di chat. La
       // risposta si APPENDE allo storico (conserva la domanda) e il feedback
