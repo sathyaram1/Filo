@@ -135,24 +135,29 @@
     const segments = [];
     // Il testo prima di qualsiasi marcatore è il turno di Filo (il report/le
     // domande scritte dalla routine).
-    let current = { role: 'model', ts: null, lines: [] };
+    let current = { role: 'model', ts: null, lines: [], atts: [] };
     for (const line of lines) {
       const mu = USER_TURN_RE.exec(line);
       const mm = mu ? null : MODEL_TURN_RE.exec(line);
       if (mu) {
         segments.push(current);
-        current = { role: 'user', ts: (mu[1] || '').trim() || null, lines: [] };
+        current = { role: 'user', ts: (mu[1] || '').trim() || null, lines: [], atts: [] };
       } else if (mm) {
         segments.push(current);
-        current = { role: 'model', ts: (mm[1] || '').trim() || null, lines: [] };
+        current = { role: 'model', ts: (mm[1] || '').trim() || null, lines: [], atts: [] };
       } else {
-        current.lines.push(line);
+        // Riga-allegato del turno corrente o prosa normale.
+        const att = parseAttachmentLine(line);
+        if (att) current.atts.push(att);
+        else current.lines.push(line);
       }
     }
     segments.push(current);
     return segments
-      .map((s) => ({ role: s.role, ts: s.ts, body: s.lines.join('\n').trim() }))
-      .filter((s) => s.body.length > 0);
+      .map((s) => ({ role: s.role, ts: s.ts, body: s.lines.join('\n').trim(), attachments: s.atts }))
+      // Tiene i segmenti con testo OPPURE con soli allegati (es. una risposta
+      // fatta solo di un'immagine, senza parole).
+      .filter((s) => s.body.length > 0 || s.attachments.length > 0);
   }
 
   // Costruisce la conversazione completa di un feedback.
