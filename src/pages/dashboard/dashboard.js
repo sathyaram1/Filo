@@ -510,22 +510,64 @@
     lines[2].textContent = nextPhrase();
 
     let stopped = false;
-    const tick = () => {
-      if (stopped || !wrap.isConnected) return;
-      // Shift verso l'alto: top esce, mid → top, bottom → mid, nuovo → bottom
-      lines[0].textContent = lines[1].textContent;
-      lines[1].textContent = lines[2].textContent;
-      lines[2].textContent = nextPhrase();
-      // Re-trigger animazione di entrata della riga nuova
+    // Mostra le ultime 3 righe di un elenco di segmenti, animando l'ingresso di
+    // quella in basso. Usato sia dalle frasi indicative sia dal reasoning vero.
+    const renderLines = (a, b, c) => {
+      if (lines[2].textContent === c) return; // niente cambi → niente flicker
+      lines[0].textContent = a || '';
+      lines[1].textContent = b || '';
+      lines[2].textContent = c || '';
       lines[2].classList.remove('dash-thinking-enter');
       void lines[2].offsetWidth;
       lines[2].classList.add('dash-thinking-enter');
     };
+    const tick = () => {
+      if (stopped || !wrap.isConnected) return;
+      // Shift verso l'alto: top esce, mid → top, bottom → mid, nuovo → bottom
+      renderLines(lines[1].textContent, lines[2].textContent, nextPhrase());
+    };
     const interval = setInterval(tick, 900);
     lines[2].classList.add('dash-thinking-enter');
 
+    // ── Reasoning VERO ─────────────────────────────────────────────────────
+    // Quando arriva il ragionamento reale del modello (stream di testo), si
+    // smette di animare le frasi indicative e si scorrono le righe vere: si
+    // spezza il testo in segmenti (a fine frase / a capo) e si tengono visibili
+    // gli ultimi 3, l'ultimo "in scrittura" finché non si chiude.
+    let realMode = false;
+    let buf = '';
+    const segments = [];
+    const splitSegments = (text) => {
+      // Divide su a-capo o terminatori di frase, mantenendo segmenti non vuoti.
+      return text
+        .split(/(?<=[.!?…])\s+|\n+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+    };
+    const renderReasoning = () => {
+      const done = splitSegments(buf);
+      // La coda senza terminatore è il segmento "in scrittura": tienilo come
+      // ultima riga così l'utente vede il testo comparire in diretta.
+      const all = done.slice();
+      const lastChunk = buf.split(/\n+/).pop().trim();
+      const matchedTail = done.length && buf.trimEnd().endsWith(done[done.length - 1]) && /[.!?…]\s*$/.test(buf);
+      if (lastChunk && (!done.length || !matchedTail)) {
+        if (!all.length || all[all.length - 1] !== lastChunk) all.push(lastChunk);
+      }
+      const n = all.length;
+      renderLines(all[n - 3], all[n - 2], all[n - 1]);
+      bubblesEl.scrollTop = bubblesEl.scrollHeight;
+    };
+
     return {
       el: wrap,
+      // Riceve un chunk di reasoning vero dal modello.
+      pushReasoning(text) {
+        if (stopped || !text) return;
+        if (!realMode) { realMode = true; clearInterval(interval); }
+        buf += text;
+        renderReasoning();
+      },
       remove() { stopped = true; clearInterval(interval); wrap.remove(); },
     };
   }
