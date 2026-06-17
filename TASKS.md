@@ -129,7 +129,7 @@ Ordine = dipendenze (il motore va per primo). Numerare i task come C1..C5.
   stile. **Done**: spec Playwright che apre la pagina, asserisce saldo + presenza
   del grafico con le fette attese; check visivo `test:shoot`. (stima: M)
 
-- [ ] **C3 — Ricompense feedback: +5 all'invio con animazione, variabile alla risoluzione**
+- [~] **C3 — Ricompense feedback: +5 all'invio con animazione, variabile alla risoluzione**
   — All'invio di un feedback accredita **+5 crediti subito** (via il credit store
   di C1). Animazione: alla chiusura del box feedback, i crediti "volano" verso
   l'icona profilo nella shell (animazione DOM, vedi `PATTERNS.md`). La ricompensa
