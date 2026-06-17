@@ -1,7 +1,0 @@
-{
-  "id": "BAFzv7gfARLNSn8DShnC",
-  "status": "done",
-  "notes": "L'agente Aiuto ora agisce sui link della pagina come il menu tasto destro: aprire il link in una nuova scheda, copiarlo, salvarlo per dopo e condividerlo. Il link bersaglio si indica con un selettore CSS o l'URL. 'Apri in nuova scheda' passa per lo stesso ponte di sistema di Filo (azione NAVIGA, già col controllo dei livelli di sicurezza); copia/salva sono immediate; condividi (esce verso l'esterno) chiede conferma col popup di Filo. 'Spiega link' resta gestito facendo rispondere l'agente in chat. Verificato con spec Playwright (apri→NAVIGA, copia href, salva per dopo, condividi con conferma, bersaglio mancante→nessuna azione): verde.",
-  "queuedAt": "2026-06-17T07:23:50.215Z",
-  "queuedBy": "routine"
-}
