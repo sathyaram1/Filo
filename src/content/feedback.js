@@ -692,16 +692,26 @@
         if (!res?.ok) throw new Error(res?.error || 'invio fallito');
         statusEl.textContent = '';
         clearDraft();
+        // Posizione del box PRIMA di chiuderlo: da lì partono le monete.
+        const originRect = modal.getBoundingClientRect();
         close();
+        // Ricompensa C3: +5 crediti subito all'invio. Best-effort, non blocca;
+        // l'importo effettivo lo decide il main (CREDIT.FEEDBACK_SEND).
+        let awarded = 5;
+        try {
+          const ar = await chrome.runtime.sendMessage({ type: MSG.CREDITS_AWARD_FEEDBACK });
+          if (ar?.ok && Number(ar.credits) > 0) awarded = Number(ar.credits);
+        } catch (_) {}
+        flyCredits(originRect, awarded);
         // Se qualche allegato non è riuscito a caricarsi, il feedback parte
         // comunque (testo + allegati ok) ma avvisiamo l'utente di QUALI file
         // sono andati persi, così non resta convinto che siano stati inviati.
         const failed = Array.isArray(res.failed) ? res.failed : [];
         if (failed.length) {
           const names = failed.map((f) => f?.name || 'allegato').join(', ');
-          Popup?.showToast?.(`Feedback inviato, ma non sono riuscito a caricare: ${names}`, { duration: 6000 });
+          Popup?.showToast?.(`Feedback inviato (+${awarded} crediti), ma non sono riuscito a caricare: ${names}`, { duration: 6000 });
         } else {
-          Popup?.showToast?.('Grazie! Feedback inviato.', { duration: 2500 });
+          Popup?.showToast?.(`Grazie! Feedback inviato. +${awarded} crediti.`, { duration: 2800 });
         }
       } catch (e) {
         console.error('[SN feedback] submit', e);
