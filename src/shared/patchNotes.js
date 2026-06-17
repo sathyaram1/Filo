@@ -17,7 +17,10 @@
     // ↓ Nuove versioni in cima.
     {
       version: '0.2.49', date: '2026-06-17',
-      features: ['Nuova pagina Crediti nel profilo: vedi il saldo e un grafico di come hai usato i crediti.'],
+      features: [
+        'Nuova pagina Crediti nel profilo: vedi il saldo e un grafico di come hai usato i crediti.',
+        'Ogni feedback che invii ti regala 5 crediti: le monete volano verso il tuo profilo.',
+      ],
       fixes: [],
     },
   ];
