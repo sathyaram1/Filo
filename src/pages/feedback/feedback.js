@@ -730,11 +730,9 @@
       });
     });
 
-    // Compositore allegati per le note editabili (Ricevuti/Da risolvere/Bozze/
-    // Agente). Va creato PRIMA del salvataggio note, così notesValueOf vede gli
-    // allegati. Persiste subito (onChange → patch): l'allegato vive nel blob notes.
-    // Composer della NUOVA nota: parte vuoto (gli eventuali allegati si ancorano
-    // al turno che si sta scrivendo, non al blob storico).
+    // Composer della NUOVA nota (Ricevuti/Da risolvere/Bozze/Agente): parte
+    // vuoto — gli allegati si ancorano al turno che si sta scrivendo, non al
+    // blob storico — e viene appeso col bottone "Aggiungi nota".
     listEl.querySelectorAll('.fb-attach-mount[data-kind="notes"]').forEach((mount) => {
       const id = mount.dataset.id;
       const ta = listEl.querySelector(`.fb-notes[data-id="${cssEsc(id)}"]`);
