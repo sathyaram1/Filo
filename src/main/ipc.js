@@ -50,6 +50,10 @@ function senderInfo(event) {
     // aprono i tab nella finestra giusta e l'IPC instrada lo storage in RAM.
     win: win || null,
     isIncognito: !!win?._filoIncognito,
+    // webContents grezzo del mittente: serve agli handler che vogliono PUSHARE
+    // dati alla scheda fuori dal ciclo richiesta/risposta (es. il reasoning in
+    // diretta della chat → canale 'filo:reasoning'). In-process, mai oltre IPC.
+    wc,
   };
 }
 
