@@ -41,6 +41,11 @@ import { fileURLToPath } from 'node:url';
 // condivisa con backfill-feedback-numbers.mjs: vive in lib/firestore-auth.mjs.
 import { acquireBearer, FIRESTORE_BASE } from './lib/firestore-auth.mjs';
 import { backfillNumbers } from './backfill-feedback-numbers.mjs';
+// feedbackThread è un IIFE su globalThis: importarlo lo registra come
+// globalThis.SN_FEEDBACK_THREAD. Lo usiamo per FONDERE il report della routine
+// con le note esistenti invece di sovrascriverle (vedi mergeModelReport).
+import '../src/shared/feedbackThread.js';
+const THREAD = globalThis.SN_FEEDBACK_THREAD;
 // I claim (semaforo sui feedback per le routine) vivono in feedback-triage/claims/.
 // Qui li "specchiamo" su Firestore così la dashboard può mostrare "in lavorazione".
 import { liveClaims, expiredClaimFiles } from './claim-feedback.mjs';
