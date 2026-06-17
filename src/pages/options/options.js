@@ -330,7 +330,7 @@
     // dati del test (latenza/token-sec) nella riga a tutta larghezza sotto.
     row.appendChild(nickIn);
     row.appendChild(provSel);
-    row.appendChild(idIn);
+    row.appendChild(idWrap);
     row.appendChild(del);
     row.appendChild(test);
     row.appendChild(status);
