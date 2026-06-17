@@ -184,10 +184,13 @@
         if (!payload || payload === '[DONE]') continue;
         try {
           const obj = JSON.parse(payload);
-          const delta = extractText(obj);
-          if (delta) {
-            fullText += delta;
-            try { onDelta && onDelta(delta); } catch (_) {}
+          const { answer, thought } = extractParts(obj);
+          if (thought) {
+            try { onReasoning && onReasoning(thought); } catch (_) {}
+          }
+          if (answer) {
+            fullText += answer;
+            try { onDelta && onDelta(answer); } catch (_) {}
           }
           const u = extractUsage(obj);
           if (u.promptTokens || u.completionTokens) usage = u;
