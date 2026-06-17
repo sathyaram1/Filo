@@ -1919,6 +1919,9 @@
       refreshLive().catch((e) => console.warn('[Filo] live', e)),
     ]);
     if (firstRun) showWelcomeMessage();
+    // Recap aggiornamento: solo se l'utente ha già visto una versione precedente
+    // (il main sopprime il caso "primo avvio") e ci sono note da mostrare.
+    maybeShowUpdateRecap().catch(() => {});
   })();
 
   // Hook per i test Playwright (stesso pattern di __filoEditorFormat
