@@ -190,7 +190,7 @@ module.exports = function register(on, ctx) {
         });
       }
       const totalCredits = rewards.reduce((s, r) => s + r.credits, 0);
-      return { ok: true, rewards, totalCredits };
+      return { ok: true, rewards, totalCredits, _dbg };
     } catch (e) {
       console.warn('[credits] GET_FEEDBACK_REWARDS fallito:', e?.message || e);
       return empty;
