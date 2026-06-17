@@ -35,6 +35,96 @@ contesto, per tempo, o perché l'utente chiude), la prossima riparte da qui.
 
 ## Coda
 
+### Sistema crediti + ricompense feedback + popup aggiornamento (spec 2026-06-17)
+
+Spec utente (chat). Decisioni di design confermate dall'utente:
+- **Crediti su Firestore per-account** (collezione `credits`, doc per utente),
+  con **cache locale** in `storage.json` come copia di lavoro veloce/offline che
+  si sincronizza al login e dopo ogni mutazione.
+- **Costo reale dai token**: ogni chiamata AI passa da `SN_PROVIDERS`
+  (`src/main/services/providers/index.js`) che già ritorna `usage`
+  (promptTokens/completionTokens). Da token × prezzo modello → costo € (tracciato
+  con 1 decimale **dietro le quinte, mai mostrato**); crediti consumati = costo/0,0008
+  (1 credito = 0,08 centesimi = €0,0008).
+- **Recap aggiornamento da file changelog curato** (`src/shared/patchNotes.js`,
+  IIFE su globalThis): lista ordinata di versioni con `features[]`/`fixes[]` non
+  tecniche. All'avvio si confronta la versione vista l'ultima volta con
+  `app.getVersion()` per calcolare "quante patch sei indietro"; il box mostra
+  `vecchia → nuova` in alto e ha un pulsante per condividere/copiare il recap.
+
+Ordine = dipendenze (il motore va per primo). Numerare i task come C1..C5.
+
+- [~] **C1 — Motore crediti: ledger Firestore per-account + conteggio API a token + refill mezzanotte**
+  — Crea un *credit store* nel main process (es. `src/main/services/creditStore.js`,
+  IIFE/CommonJS coerente col modulo) che tiene il saldo + uno storico aggregato
+  **per tipo d'uso** (chat, correttore ortografico, riordino schede, spiegazione,
+  ricerca semantica, traduzione, ecc.) e la cache locale in `storage.json`.
+  Sincronizzazione Firestore: doc per utente nella collezione `credits` (chiave =
+  uid/localId della sessione, fallback email), scritto via REST col pattern di
+  `src/shared/feedback.js` (`toValue`, FIRESTORE_BASE) e Bearer
+  `auth.getIdToken()`. Saldo iniziale **1000**; **+100 a mezzanotte** (refill lazy:
+  alla lettura/avvio confronta `lastRefillDate` con oggi e accredita i giorni
+  mancanti, una volta sola per giorno). Aggiornare `firestore.rules` perché un
+  utente legga/scriva **solo il proprio** doc credits (documentare il caveat
+  abuso: client-authoritative, accettabile in alpha) e **deployare le regole**
+  (`firebase deploy --only firestore:rules`). Agganciare il conteggio:
+  centralizzare in `SN_PROVIDERS` o in un wrapper attorno ad esso un hook
+  `onApiCall({ usage, model, tokens, costEur, credits })` e **etichettare ogni
+  call site** (i ~7 in `handlers.js`/`ai.js`) con il proprio `usage` type via un
+  parametro che arriva fino al provider. Tabella prezzi modelli (usare il pricing
+  di OpenRouter quando disponibile dal model list; tabella statica per Gemini;
+  fallback stima). IPC `credits_get` (saldo + aggregato per uso, **senza** il
+  costo €) per la UI. **Done**: unit test in `tests/unit/` per (a) refill
+  mezzanotte multi-giorno, (b) conversione token→costo€→crediti, (c) aggregazione
+  per uso. Verifica: `npm run test:unit`. (stima: L)
+
+- [ ] **C2 — Pagina Crediti nel profilo + icona moneta cinese + grafico a torta**
+  — Aggiungi la voce **"Crediti"** nel menu account della shell
+  (`src/renderer/shell.js:245`, ramo loggato e sloggato) che apre una nuova pagina
+  `filo://credits/credits.html` (registrarla nel protocol/router come le altre
+  pagine in `src/pages/`). La pagina mostra: saldo corrente, **icona moneta forata
+  cinese con un filo che ci passa attraverso** (SVG nuovo, da aggiungere anche a
+  `src/shared/icons.js` come icona riutilizzabile dei crediti), e un **grafico a
+  torta del consumo per tipo d'uso** (NON per modello: correttore, riordino
+  schede, chat, ecc.) leggendo l'aggregato da `credits_get`. NON mostrare mai il
+  costo in €. Storico essenziale delle ultime voci. Segui `PATTERNS.md` per lo
+  stile. **Done**: spec Playwright che apre la pagina, asserisce saldo + presenza
+  del grafico con le fette attese; check visivo `test:shoot`. (stima: M)
+
+- [ ] **C3 — Ricompense feedback: +5 all'invio con animazione, variabile alla risoluzione**
+  — All'invio di un feedback accredita **+5 crediti subito** (via il credit store
+  di C1). Animazione: alla chiusura del box feedback, i crediti "volano" verso
+  l'icona profilo nella shell (animazione DOM, vedi `PATTERNS.md`). La ricompensa
+  **variabile alla risoluzione** è in C5 (popup). File coinvolti: box/pagina
+  feedback (`src/content/feedback.js` / `src/pages/feedback/`), shell per
+  l'animazione verso l'icona account. **Done**: spec che asserisce che il saldo
+  aumenta di 5 dopo l'invio; check visivo dell'animazione con `test:shoot`.
+  (stima: M)
+
+- [ ] **C4 — Popup recap aggiornamento (feature in alto, bugfix in basso, non tecnico)**
+  — Al primo avvio dopo un update (confronto `lastSeenVersion` salvata vs
+  `app.getVersion()`), mostra un popup con il recap aggregato di **tutte** le
+  versioni saltate (calcolo "quante patch indietro" da `src/shared/patchNotes.js`).
+  Layout: in alto l'intestazione **`vecchia → nuova`**, poi **Novità** (features) in
+  alto e **Correzioni** (fixes) in basso; testo non tecnico, niente "perché era
+  rotto". Pulsante **Condividi/Copia** il recap. Salva `lastSeenVersion` alla
+  chiusura. **Done**: spec che, forzando una `lastSeenVersion` vecchia, asserisce
+  che il popup elenca le entry attese nell'ordine giusto. (stima: M)
+
+- [ ] **C5 — Popup ringraziamento feedback risolto + ricompensa per priorità (50/100/200/300)**
+  — All'update, se un feedback **inviato dall'utente** è passato a `done` da
+  quando non guardava, mostra un popup per ciascuno (o aggregato) con:
+  ringraziamento, conferma della risoluzione con **spiegazione non tecnica** presa
+  dalle `notes` del feedback (come/dove usare la nuova feature), e **ricompensa
+  crediti proporzionale alla priorità**: priorità 0→50, 1→100, 2→200, 3→300 (da
+  confermare la mappatura esatta col campo `priority` 0-3). Anima i crediti verso
+  il profilo (riusa C3). Richiede leggere da Firestore i feedback dell'utente
+  (per email/clientId) e il loro stato/priority/notes; tracciare quali sono già
+  stati premiati per non premiare due volte (campo nel doc credits). File:
+  motore C1 + integrazione Firestore feedback (`src/shared/feedback.js`).
+  **Done**: spec che simula un feedback `done` non ancora premiato e asserisce
+  popup + incremento crediti corretto per priorità. (stima: L)
+
 ### Risanamento manutenibilità (valutazione 2026-06-10)
 
 - [x] **Pulizie rapide** (2026-06-10) — Fatto: eliminato `src/shared/qrcode.js`
