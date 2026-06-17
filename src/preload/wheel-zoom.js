@@ -191,4 +191,47 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     e.stopPropagation();
     exit();
   }, true);
+
+  // ── Zoom della pagina con Ctrl/Cmd (solo se opts.pageZoom) ──────────────
+  // Indipendente dalla modalità rotella: basta tenere Ctrl (o pizzicare il
+  // trackpad). Usa il livello di zoom del webFrame, così scala l'intera pagina
+  // (testo + immagini) come il classico zoom del browser.
+  if (pageZoom) {
+    function setLevel(level) {
+      const clamped = Math.max(MIN_LEVEL, Math.min(MAX_LEVEL, level));
+      try { webFrame.setZoomLevel(clamped); } catch (_) {}
+      refreshPercent();
+    }
+
+    // Pinch del trackpad e Ctrl+rotella → wheel con ctrlKey=true. Passo
+    // proporzionale al delta così il pinch (incrementi piccoli) resta fluido.
+    // In modalità rotella ci pensa già l'handler sopra: qui ci tiriamo fuori.
+    document.addEventListener('wheel', (e) => {
+      if (zoomMode) return;
+      if (!(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      let next;
+      try { next = webFrame.getZoomLevel() - e.deltaY * 0.01; }
+      catch (_) { return; }
+      setLevel(next);
+    }, { capture: true, passive: false });
+
+    // Da tastiera: Ctrl + / Ctrl - / Ctrl 0 (e le varianti =, _ dei layout).
+    document.addEventListener('keydown', (e) => {
+      if (zoomMode) return; // in modalità rotella un tasto qualsiasi esce
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      const k = e.key;
+      if (k === '+' || k === '=') {
+        e.preventDefault(); e.stopPropagation();
+        try { setLevel(webFrame.getZoomLevel() + ZOOM_STEP); } catch (_) {}
+      } else if (k === '-' || k === '_') {
+        e.preventDefault(); e.stopPropagation();
+        try { setLevel(webFrame.getZoomLevel() - ZOOM_STEP); } catch (_) {}
+      } else if (k === '0') {
+        e.preventDefault(); e.stopPropagation();
+        setLevel(0); // 100%
+      }
+    }, true);
+  }
 };
