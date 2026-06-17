@@ -111,6 +111,8 @@ test('queueFeedbackCreate: scrive un file new-*.json con l\'entry dentro lo spoo
   assert.equal(saved.op, 'create');
   assert.equal(saved.text, 'testo del sub-task');
   assert.equal(saved.parentId, 'p1');
+  // La uid di idempotenza viaggia nel file: l'applier la usa come id documento.
+  assert.match(saved.uid, /^[A-Za-z0-9_-]{1,128}$/);
   // Il prefisso "new-" è il discriminante per apply-triage: niente collisioni
   // possibili con i file di triage (id Firestore non contengono "-"… ma il
   // punto è che un id non può iniziare per "new-<timestamp>").
