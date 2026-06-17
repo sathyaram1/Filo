@@ -1,7 +1,0 @@
-{
-  "id": "PIPchgGP86ZOF2tV0UwD",
-  "status": "done",
-  "notes": "Feedback in due parti. (1) Commentare i feedback in 'Ricevuti': fatto — ora la casella commento compare anche lì, e il commento viene conservato quando sposti il feedback in 'Da risolvere'. Verificato con un test della dashboard. (2) Incollare/allegare immagini e file nei commenti: questa parte richiede di abilitare la scrittura di allegati lato regole Firestore (un deploy che solo tu puoi fare) ed è una feature a sé con una scelta di design su come mostrare gli allegati di un commento. L'ho quindi scorporata nel sotto-feedback #PIP.1 (in 'Da risolvere'), con tutti i dettagli tecnici e la domanda di design — così la prima parte è chiusa e la seconda è tracciata senza restare a metà.",
-  "queuedAt": "2026-06-17T07:40:14.283Z",
-  "queuedBy": "routine"
-}
