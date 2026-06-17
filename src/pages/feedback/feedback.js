@@ -149,6 +149,184 @@
     return '';
   }
 
+  // ── Allegati nei commenti (#190.3) ─────────────────────────────────────────
+  // L'admin può incollare/trascinare/allegare immagini e file MENTRE commenta un
+  // feedback (note di triage, risposta nei Chiarimenti, riapertura). Gli allegati
+  // sono ANCORATI al singolo turno: vivono come righe-marcatore dentro `notes`
+  // (vedi SN_FEEDBACK_THREAD), così non serve cambiare lo schema Firestore né le
+  // regole. L'upload va diretto a Storage (path feedback/* è pubblico).
+  const ATTACH_MAX_IMAGES = 5;
+  const ATTACH_MAX_FILES = 5;
+  const ATTACH_MAX_BYTES = 4 * 1024 * 1024;
+  const ATTACH_ACCEPT = 'image/*,application/pdf,application/json,text/*,.pdf,.txt,.md,.markdown,.json,.csv,.log,.yml,.yaml';
+
+  const FILE_SVG = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>';
+
+  function cssEsc(s) {
+    return (window.CSS && CSS.escape) ? CSS.escape(s) : String(s);
+  }
+
+  // Griglia di immagini (riusata da segnalazione e turni della conversazione).
+  function imagesGridHtml(urls) {
+    const imgs = (urls || []).filter((u) => typeof u === 'string' && u);
+    if (!imgs.length) return '';
+    return `<div class="fb-imgs">${imgs.map((u) => `<img src="${escapeHtml(u)}" data-full="${escapeHtml(u)}" loading="lazy" alt="">`).join('')}</div>`;
+  }
+
+  // Lista di allegati non-immagine come link scaricabili (nome originale).
+  function filesListHtml(files) {
+    const fs = (files || []).filter((x) => x && typeof x.url === 'string' && x.url);
+    if (!fs.length) return '';
+    return `<div class="fb-files">${fs.map((x) => `<a class="fb-file" href="${escapeHtml(safeHref(x.url) || '#')}" target="_blank" rel="noopener" download="${escapeHtml(x.name || '')}">${FILE_SVG}<span class="fb-file-name">${escapeHtml(x.name || 'allegato')}</span></a>`).join('')}</div>`;
+  }
+
+  function humanSize(n) {
+    const b = Number(n) || 0;
+    if (b < 1024) return `${b} B`;
+    if (b < 1024 * 1024) return `${Math.round(b / 1024)} KB`;
+    return `${(b / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  // Crea un compositore di allegati legato a una textarea. Inserisce in `mount`
+  // un pulsante "Allega" + le thumbnail; intercetta incolla/trascina sulla
+  // textarea. Ogni file viene caricato SUBITO su Storage (così le note salvano
+  // solo l'URL). onChange() è chiamato dopo ogni aggiunta/rimozione — chi vuole
+  // persistenza immediata (note editabili) lo usa per fare patch.
+  // Ritorna { getAttachments } che torna la lista corrente { kind, url, name, type }.
+  function makeAttachComposer({ textarea, mount, initial, onChange }) {
+    if (!textarea || !mount) return { getAttachments: () => [] };
+    const attachments = Array.isArray(initial) ? initial.slice() : [];
+
+    const thumbs = document.createElement('div');
+    thumbs.className = 'fb-attach-thumbs';
+    const bar = document.createElement('div');
+    bar.className = 'fb-attach-bar';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sn-btn sn-btn-secondary fb-attach-btn';
+    btn.textContent = '+ Allega';
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.multiple = true;
+    fileInput.accept = ATTACH_ACCEPT;
+    fileInput.hidden = true;
+    const status = document.createElement('div');
+    status.className = 'fb-attach-status';
+    status.setAttribute('aria-live', 'polite');
+    bar.appendChild(btn);
+    bar.appendChild(fileInput);
+    bar.appendChild(status);
+    mount.appendChild(thumbs);
+    mount.appendChild(bar);
+
+    let uploading = 0;
+    const setStatus = (m) => { status.textContent = m || ''; };
+    function counts() {
+      let imgs = 0, files = 0;
+      for (const a of attachments) (a.kind === 'img' ? imgs++ : files++);
+      return { imgs, files };
+    }
+
+    function renderThumbs() {
+      thumbs.innerHTML = '';
+      attachments.forEach((a, i) => {
+        if (a.kind === 'img') {
+          const wrap = document.createElement('div');
+          wrap.className = 'fb-attach-thumb';
+          const im = document.createElement('img');
+          im.src = a.url; im.alt = '';
+          im.title = 'Clic per ingrandire';
+          im.addEventListener('click', () => { lightboxImg.src = a.url; lightbox.classList.add('open'); });
+          const x = document.createElement('button');
+          x.type = 'button'; x.className = 'fb-attach-x'; x.textContent = '×';
+          x.setAttribute('aria-label', 'Rimuovi');
+          x.addEventListener('click', () => { attachments.splice(i, 1); renderThumbs(); if (typeof onChange === 'function') onChange(); });
+          wrap.appendChild(im); wrap.appendChild(x);
+          thumbs.appendChild(wrap);
+        } else {
+          const chip = document.createElement('div');
+          chip.className = 'fb-attach-chip';
+          chip.title = a.name || 'allegato';
+          const ic = document.createElement('span');
+          ic.className = 'fb-attach-ic';
+          ic.innerHTML = FILE_SVG;
+          const nm = document.createElement('span');
+          nm.className = 'fb-attach-name';
+          nm.textContent = a.name || 'allegato';
+          const x = document.createElement('button');
+          x.type = 'button'; x.className = 'fb-attach-x'; x.textContent = '×';
+          x.setAttribute('aria-label', 'Rimuovi');
+          x.addEventListener('click', () => { attachments.splice(i, 1); renderThumbs(); if (typeof onChange === 'function') onChange(); });
+          chip.appendChild(ic); chip.appendChild(nm); chip.appendChild(x);
+          thumbs.appendChild(chip);
+        }
+      });
+    }
+
+    async function addFile(file) {
+      if (!file) return;
+      const isImg = (file.type || '').startsWith('image/');
+      const c = counts();
+      if (isImg && c.imgs >= ATTACH_MAX_IMAGES) { setStatus(`Massimo ${ATTACH_MAX_IMAGES} immagini.`); return; }
+      if (!isImg && c.files >= ATTACH_MAX_FILES) { setStatus(`Massimo ${ATTACH_MAX_FILES} file.`); return; }
+      if (file.size > ATTACH_MAX_BYTES) { setStatus(`«${file.name || 'file'}» troppo grande (max 4 MB).`); return; }
+      if (!window.SN_FEEDBACK?.uploadAttachment) { setStatus('Upload non disponibile.'); return; }
+      uploading++; btn.disabled = true; setStatus('Caricamento…');
+      try {
+        const att = await SN_FEEDBACK.uploadAttachment(file, file.name);
+        attachments.push(att);
+        renderThumbs();
+        setStatus('');
+        if (typeof onChange === 'function') onChange();
+      } catch (e) {
+        setStatus('Caricamento non riuscito: ' + (e?.message || e));
+      } finally {
+        uploading = Math.max(0, uploading - 1);
+        if (uploading === 0) btn.disabled = false;
+      }
+    }
+
+    btn.addEventListener('click', () => { try { fileInput.click(); } catch (_) {} });
+    fileInput.addEventListener('change', async () => {
+      const picked = Array.from(fileInput.files || []);
+      for (const f of picked) await addFile(f);
+      fileInput.value = '';
+    });
+    // Incolla (Ctrl+V): cattura SOLO i file dagli appunti (le immagini), lascia
+    // passare il testo normale.
+    textarea.addEventListener('paste', async (e) => {
+      const items = e.clipboardData && e.clipboardData.items;
+      if (!items) return;
+      const blobs = [];
+      for (const it of items) {
+        if (it.kind === 'file') { const b = it.getAsFile(); if (b) blobs.push(b); }
+      }
+      if (blobs.length) { e.preventDefault(); for (const b of blobs) await addFile(b); }
+    });
+    ['dragenter', 'dragover'].forEach((ev) => textarea.addEventListener(ev, (e) => { e.preventDefault(); textarea.classList.add('fb-drop-hover'); }));
+    ['dragleave', 'drop'].forEach((ev) => textarea.addEventListener(ev, (e) => { textarea.classList.remove('fb-drop-hover'); }));
+    textarea.addEventListener('drop', async (e) => {
+      const dropped = e.dataTransfer && e.dataTransfer.files;
+      if (!dropped || !dropped.length) return;
+      e.preventDefault();
+      for (const f of dropped) await addFile(f);
+    });
+
+    renderThumbs();
+    return { getAttachments: () => attachments.slice() };
+  }
+
+  // Valore da salvare per una textarea di note editabili: testo + allegati del
+  // compositore ri-incorporati come righe-marcatore (vedi composeNotes).
+  function notesValueOf(ta) {
+    if (!ta) return '';
+    const atts = ta._attachComposer ? ta._attachComposer.getAttachments() : [];
+    if (window.SN_FEEDBACK_THREAD && SN_FEEDBACK_THREAD.composeNotes) {
+      return SN_FEEDBACK_THREAD.composeNotes(ta.value, atts);
+    }
+    return ta.value;
+  }
+
   async function patch(id, payload, optimistic) {
     if (!isAdmin) {
       alert('Operazione riservata agli amministratori: accedi con un account autorizzato.');
