@@ -300,6 +300,15 @@
     `<path d="M3.5 18v-4h4"/>` +
     `<path d="M12 7.5V12l3 2"/>`;
 
+  // --- Crediti: moneta forata cinese (cerchio + foro quadrato) con un FILO che
+  //     passa nel foro e risale in un cappio annodato sopra la moneta. Unisce i
+  //     due simboli del prodotto: la moneta (i crediti) e il filo (il brand).
+  const credits =
+    `<circle cx="12" cy="13.5" r="7"/>` +
+    `<rect x="9.75" y="11.25" width="4.5" height="4.5" rx="0.5"/>` +
+    `<path d="M12 11.25V5.5"/>` +
+    `<path d="M12 5.5a2 2 0 1 0 0.01 0"/>`;
+
   // Esposizione: ciascuna icona è una FUNZIONE (size) => stringa SVG.
   // Permette ai consumer di chiedere taglie diverse (es. 16 per la riga,
   // 20 per la griglia overflow) senza ricreare manualmente il wrapper.
