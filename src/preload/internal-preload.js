@@ -36,6 +36,14 @@ const filoApi = {
     ipcRenderer.on('filo:broadcast', wrapped);
     return () => ipcRenderer.removeListener('filo:broadcast', wrapped);
   },
+  // Reasoning "vero" in diretta dal modello durante una FILO_CHAT. Il main
+  // pusha { reqId, text } sul canale 'filo:reasoning' man mano che arrivano i
+  // thought summary; il chiamante filtra per reqId. Ritorna un unsubscribe.
+  onReasoning: (fn) => {
+    const wrapped = (_event, data) => { try { fn(data); } catch (_) {} };
+    ipcRenderer.on('filo:reasoning', wrapped);
+    return () => ipcRenderer.removeListener('filo:reasoning', wrapped);
+  },
   aiStream: ({ action, payload, onMeta, onDelta, onDone, onError }) => {
     const requestId = `s${Date.now()}_${++streamCounter}`;
     const offMeta = (_e, data) => onMeta && onMeta(data);
