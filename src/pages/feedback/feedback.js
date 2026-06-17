@@ -714,14 +714,40 @@
       });
     });
 
-    // Salvataggio note: debounce su blur.
+    // Compositore allegati per le note editabili (Ricevuti/Da risolvere/Bozze/
+    // Agente). Va creato PRIMA del salvataggio note, così notesValueOf vede gli
+    // allegati. Persiste subito (onChange → patch): l'allegato vive nel blob notes.
+    listEl.querySelectorAll('.fb-attach-mount[data-kind="notes"]').forEach((mount) => {
+      const id = mount.dataset.id;
+      const ta = listEl.querySelector(`.fb-notes[data-id="${cssEsc(id)}"]`);
+      if (!ta || ta._attachComposer) return;
+      const item = all.find((f) => f._id === id);
+      const init = item && window.SN_FEEDBACK_THREAD && SN_FEEDBACK_THREAD.stripAttachments
+        ? SN_FEEDBACK_THREAD.stripAttachments(item.notes).attachments
+        : [];
+      ta._attachComposer = makeAttachComposer({
+        textarea: ta,
+        mount,
+        initial: init,
+        onChange: () => {
+          const v = notesValueOf(ta);
+          const it = all.find((f) => f._id === id);
+          if (it && it.notes === v) return;
+          patch(id, { notes: v }, { notes: v });
+        },
+      });
+    });
+
+    // Salvataggio note: debounce su blur. Salva testo + allegati (notesValueOf).
     listEl.querySelectorAll('.fb-notes').forEach((ta) => {
       let timer;
       const flush = () => {
         const id = ta.dataset.id;
         const item = all.find((f) => f._id === id);
-        if (!item || item.notes === ta.value) return;
-        patch(id, { notes: ta.value }, { notes: ta.value });
+        if (!item) return;
+        const v = notesValueOf(ta);
+        if (item.notes === v) return;
+        patch(id, { notes: v }, { notes: v });
       };
       ta.addEventListener('blur', flush);
       ta.addEventListener('input', () => {
