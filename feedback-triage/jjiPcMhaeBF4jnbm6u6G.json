@@ -1,7 +1,0 @@
-{
-  "id": "jjiPcMhaeBF4jnbm6u6G",
-  "status": "done",
-  "notes": "I comandi eseguiti da Filo e le loro risposte ora si vedono sempre: la riga di comando è in un riquadro squadrato col colore della tua bolla (sfondo scuro, testo chiaro e leggibile, non più 'bianco' invisibile) e la risposta in un riquadro squadrato sotto. I comandi senza output — tipico dei 'cd' — non lasciano più una scatola vuota: mostrano 'sei in <percorso>'; gli altri comandi muti mostrano '(nessun output)'. Ho reso squadrate anche le bolle della modalità terminale (comando digitato + risposta), per distinguerle a colpo d'occhio dalle bolle arrotondate delle istruzioni. Verificato con un test automatico sulle tre situazioni (cd senza output, comando con output, comando muto).",
-  "queuedAt": "2026-06-17T19:14:33.608Z",
-  "queuedBy": "routine"
-}
