@@ -98,12 +98,21 @@ test('un allegato in una RISPOSTA si mostra nella sua bolla, NON nella segnalazi
 
   await page.locator('[data-tab="done"]').click();
 
-  // L'immagine compare nella bolla della RISPOSTA (lato utente, non report)…
+  // L'allegato compare nell'area immagini della bolla RISPOSTA (lato utente, non
+  // report). La sorgente del file di test è un URL finto che non si carica:
+  // l'<img> può essere sostituito al volo dal placeholder "(immagine non
+  // disponibile)". In entrambe le forme l'URL è presente (img[src]/[data-full] o
+  // title del placeholder): asseriamo l'URL, non quale dei due nodi sopravvive,
+  // così il test non è in balìa del timing del fallimento di rete.
   const replyBubble = page.locator('.fb-bubble--user:not(.fb-bubble--report)');
-  await expect(replyBubble.locator('img')).toHaveCount(1);
-  await expect(replyBubble.locator('img')).toHaveAttribute('src', /shot\.png/);
+  const attEl = replyBubble.locator('.fb-imgs img, .fb-imgs .fb-img-broken');
+  await expect(attEl).toHaveCount(1);
+  const attUrl = await attEl.first().evaluate(
+    (el) => el.getAttribute('data-full') || el.getAttribute('src') || el.getAttribute('title') || '',
+  );
+  expect(attUrl).toMatch(/shot\.png/);
   // …e NON nella bolla della segnalazione (che resta senza immagini).
-  await expect(page.locator('.fb-bubble--report img')).toHaveCount(0);
+  await expect(page.locator('.fb-bubble--report .fb-imgs')).toHaveCount(0);
   // La riga-marcatore grezza non deve apparire come testo nella bolla.
   await expect(replyBubble).not.toContainText('@@filo-attachment');
 });
