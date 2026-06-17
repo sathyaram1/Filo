@@ -46,6 +46,14 @@
     CREDITS_CHANGED: 'credits_changed',
     // Ricompensa crediti per un feedback inviato (+5 subito). { } → { ok, credits, balance }
     CREDITS_AWARD_FEEDBACK: 'credits_award_feedback',
+    // Recap aggiornamento (popup all'avvio): confronta la versione vista
+    // l'ultima volta con app.getVersion() e ritorna le note delle versioni
+    // saltate. { } → { ok, current, lastSeen, notes:[{version,date,features,fixes}] }.
+    // Se non c'è una versione vista (primissimo avvio) la marca come vista e
+    // non ritorna note (niente popup a sorpresa). Vedi src/shared/patchNotes.js.
+    GET_UPDATE_RECAP: 'get_update_recap',
+    // L'utente ha chiuso il recap: salva app.getVersion() come ultima vista.
+    MARK_UPDATE_SEEN: 'mark_update_seen',
     CAPTURE_VISIBLE_TAB: 'capture_visible_tab',
     // Test provider: misura latenza al primo token e token al secondo
     // su un piccolo prompt fisso. Usato dalla pagina Opzioni.
