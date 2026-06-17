@@ -207,11 +207,26 @@ async function createFeedback(entry, num, bearer) {
   };
   const prio = Number(entry.priority);
   if (Number.isInteger(prio) && prio >= 1 && prio <= 3) fields.priority = toFsValue(prio);
-  const res = await fetch(`${FIRESTORE_BASE}/feedback`, {
+  // Idempotenza: se l'entry porta una `uid` (le crea queue-feedback.mjs), la uso
+  // come ID del documento via ?documentId=. Così se questa stessa entry viene
+  // applicata due volte — tipicamente due run concorrenti della GitHub Action
+  // che leggono lo spool prima che la prima lo svuoti — la seconda POST riceve
+  // 409 ALREADY_EXISTS invece di creare un duplicato. La de-dup è imposta da
+  // Firestore sull'id (atomica), non da un check-then-create soggetto a TOCTOU.
+  const uid = typeof entry.uid === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(entry.uid) ? entry.uid : '';
+  const url = uid
+    ? `${FIRESTORE_BASE}/feedback?documentId=${encodeURIComponent(uid)}`
+    : `${FIRESTORE_BASE}/feedback`;
+  const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
     body: JSON.stringify({ fields }),
   });
+  if (res.status === 409) {
+    // Già creato da un'applicazione precedente/parallela della stessa entry:
+    // non è un errore, l'entry è "applicata". Svuoto la coda senza duplicare.
+    return { ok: true, status: 409, id: uid, deduped: true };
+  }
   if (!res.ok) return { ok: false, status: res.status, body: (await res.text()).slice(0, 200) };
   const json = await res.json();
   return { ok: true, status: res.status, id: json.name?.split('/').pop() || '' };
