@@ -611,11 +611,13 @@
         const to = b.dataset.to; // 'todo' | 'done' | 'new' | 'ignored'
         const id = b.dataset.id;
         const payload = { status: to };
-        // Quando passo da inbox a "todo", porto con me eventuali note + allegati
-        // già aggiunti (notesValueOf ri-incorpora le thumbnail come marcatori).
+        // Una nota non ancora aggiunta col bottone viaggia col cambio di stato:
+        // la APPENDIAMO come nuovo turno dell'agente (bolla a sé), non
+        // sovrascrivendo lo storico.
         const ta = listEl.querySelector(`.fb-notes[data-id="${cssEsc(id)}"]`);
-        if (ta) payload.notes = notesValueOf(ta);
-        patch(id, payload, { status: to, notes: payload.notes });
+        const appended = ta ? appendedNotesFor(id, ta) : null;
+        if (appended != null) payload.notes = appended;
+        patch(id, payload, payload.notes != null ? { status: to, notes: payload.notes } : { status: to });
       });
     });
 
