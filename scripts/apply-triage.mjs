@@ -411,7 +411,8 @@ async function main() {
         const num = await allocateNumber(it.entry);
         const r = await createFeedback(it.entry, num, bearer);
         if (r.ok) {
-          console.log(`  ✓ creato #${num.subSeq ? `${num.seq}.${num.subSeq}` : num.seq} «${it.entry.name}» → ${it.entry.status} (${r.id})`);
+          if (r.deduped) console.log(`  ↺ «${it.entry.name}» già creato (uid ${r.id}) — entry duplicata, svuoto senza ricreare`);
+          else console.log(`  ✓ creato #${num.subSeq ? `${num.seq}.${num.subSeq}` : num.seq} «${it.entry.name}» → ${it.entry.status} (${r.id})`);
           unlinkSync(it.file); applied.push(it.file);
         } else {
           console.error(`  ✗ creazione «${it.entry.name}»: HTTP ${r.status} ${r.body}`);
