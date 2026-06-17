@@ -363,18 +363,23 @@ body[data-state="thread"] .dash-suggestion { justify-content: flex-start; paddin
   margin-top: 8px;
   width: 100%;
 }
+/* Riga di comando: scatola QUADRATA col colore della bolla utente (sfondo
+   scuro, testo chiaro), così il comando si distingue a colpo d'occhio dalle
+   bolle arrotondate delle istruzioni passate a Filo, ed è sempre leggibile
+   (prima il testo era tenue su sfondo trasparente → quasi invisibile). */
 .dash-cmd-line {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
-  color: var(--dash-ink-soft);
+  color: var(--dash-paper);
   padding: 6px 10px;
-  border: 1px solid var(--dash-line-strong);
+  border: 1px solid var(--dash-ink);
   border-bottom: none;
-  border-radius: 8px 8px 0 0;
-  background: color-mix(in srgb, var(--dash-ink) 5%, transparent);
+  border-radius: 3px 3px 0 0;
+  background: var(--dash-ink);
   white-space: pre-wrap;
   word-break: break-all;
 }
+/* Risposta del comando: scatola QUADRATA, testo pieno (mai bianco/illeggibile). */
 .dash-cmd-output {
   margin: 0;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -382,15 +387,18 @@ body[data-state="thread"] .dash-suggestion { justify-content: flex-start; paddin
   line-height: 1.45;
   color: var(--dash-ink);
   padding: 8px 10px;
-  border: 1px solid var(--dash-line-strong);
-  border-radius: 0 0 8px 8px;
-  background: color-mix(in srgb, var(--dash-ink) 3%, transparent);
+  border: 1px solid var(--dash-ink);
+  border-top: none;
+  border-radius: 0 0 3px 3px;
+  background: color-mix(in srgb, var(--dash-ink) 4%, transparent);
   max-height: 320px;
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-word;
 }
 .dash-cmd-output-err { color: var(--dash-accent); }
+/* Comando muto (cd / nessun output): testo attenuato ma comunque visibile. */
+.dash-cmd-output-empty { color: var(--dash-ink-mute); font-style: italic; }
 .dash-cmd-note {
   margin-top: 4px;
   font-size: 11px;
