@@ -68,9 +68,13 @@ test('Modelli: il campo è un combobox custom legato al provider della riga', as
 
   // Cambiando provider su OpenRouter, il dropdown legge l'ALTRA lista: il
   // modello Gemini non compare più (la tendina segue il provider della riga).
+  // Attendi la chiusura del popup (come quando l'utente clicca via dal campo)
+  // così la riapertura ricostruisce la lista col nuovo provider.
   await idInput.blur();
+  await expect(pop).toBeHidden();
   await row.locator('.sn-model-provider').selectOption('openrouter');
   await idInput.focus();
+  await expect(pop).toBeVisible({ timeout: 4_000 });
   await expect(pop.locator('.sn-select-option', { hasText: 'gemini-test-model' })).toHaveCount(0);
 });
 
