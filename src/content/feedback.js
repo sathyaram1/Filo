@@ -99,6 +99,94 @@
     catch (_) { return ''; }
   }
 
+  // Animazione ricompensa (C3): alla chiusura del box, alcune "monete credito"
+  // volano dalla posizione del box verso l'angolo in alto a destra — la
+  // direzione dell'icona profilo/account — con una piccola etichetta "+N".
+  // Vive nel content overlay (la barra in alto della shell è coperta dalla
+  // WebContentsView nativa, quindi un'animazione disegnata dalla shell sarebbe
+  // occlusa). Puramente decorativa: best-effort, non blocca, si auto-rimuove.
+  // Rispetta prefers-reduced-motion (niente volo, solo l'etichetta).
+  function flyCredits(originRect, amount) {
+    try {
+      const n = Math.max(1, Math.round(Number(amount) || 0));
+      const reduce = !!(global.matchMedia &&
+        global.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+      const layer = document.createElement('div');
+      layer.className = 'sn-fb-credit-fly';
+      layer.setAttribute('aria-hidden', 'true');
+      Object.assign(layer.style, {
+        position: 'fixed', inset: '0', zIndex: '2147483647',
+        pointerEvents: 'none', overflow: 'hidden',
+      });
+      document.documentElement.appendChild(layer);
+
+      const r = originRect && originRect.width
+        ? originRect
+        : { left: window.innerWidth / 2 - 20, top: window.innerHeight - 80, width: 40, height: 40 };
+      const ox = r.left + r.width / 2;
+      const oy = r.top + r.height / 2;
+      // Bersaglio: angolo in alto a destra, dove vive l'icona profilo/account.
+      const tx = Math.max(24, window.innerWidth - 26);
+      const ty = 26;
+      const GOLD = '#e0a93f';
+
+      // Etichetta "+N" che sale e svanisce sopra l'origine.
+      const label = document.createElement('div');
+      label.className = 'sn-fb-credit-label';
+      label.textContent = `+${n}`;
+      Object.assign(label.style, {
+        position: 'fixed', left: ox + 'px', top: (oy - 8) + 'px',
+        font: '700 16px system-ui, sans-serif', color: GOLD,
+        textShadow: '0 1px 3px rgba(0,0,0,.45)', whiteSpace: 'nowrap',
+      });
+      layer.appendChild(label);
+
+      const coinSvg = icon('credits', 22) || '●';
+      const coins = [];
+      const count = reduce ? 0 : Math.min(7, Math.max(4, n));
+      for (let i = 0; i < count; i++) {
+        const c = document.createElement('div');
+        c.className = 'sn-fb-coin';
+        c.innerHTML = coinSvg;
+        Object.assign(c.style, {
+          position: 'fixed', left: '0', top: '0', width: '22px', height: '22px',
+          color: GOLD, filter: 'drop-shadow(0 1px 2px rgba(0,0,0,.4))',
+          willChange: 'transform, opacity',
+        });
+        layer.appendChild(c);
+        coins.push(c);
+      }
+
+      let maxEnd = 900;
+      coins.forEach((c, i) => {
+        const sx = ox + (Math.random() - 0.5) * 80;
+        const sy = oy + (Math.random() - 0.5) * 30;
+        // Punto intermedio: si alza in un arco prima di puntare in alto a destra.
+        const mx = (sx + tx) / 2 + (Math.random() - 0.5) * 60;
+        const my = Math.min(sy, ty) - 40 - Math.random() * 40;
+        const delay = i * 40;
+        const dur = 650 + i * 50 + Math.random() * 120;
+        maxEnd = Math.max(maxEnd, delay + dur);
+        c.animate([
+          { transform: `translate(${sx}px,${sy}px) scale(.6)`, opacity: 0 },
+          { transform: `translate(${sx}px,${sy}px) scale(1)`, opacity: 1, offset: 0.12 },
+          { transform: `translate(${mx}px,${my}px) scale(1.05)`, opacity: 1, offset: 0.55 },
+          { transform: `translate(${tx}px,${ty}px) scale(.35)`, opacity: 0 },
+        ], { duration: dur, delay, easing: 'cubic-bezier(.45,0,.25,1)', fill: 'forwards' });
+      });
+
+      label.animate([
+        { transform: 'translate(-50%,-50%) scale(.7)', opacity: 0 },
+        { transform: 'translate(-50%,-110%) scale(1)', opacity: 1, offset: 0.25 },
+        { transform: 'translate(-50%,-200%) scale(1)', opacity: 0 },
+      ], { duration: reduce ? 900 : Math.max(900, maxEnd), easing: 'ease-out', fill: 'forwards' });
+
+      const total = (reduce ? 900 : maxEnd) + 120;
+      setTimeout(() => { try { layer.remove(); } catch (_) {} }, total);
+    } catch (_) {}
+  }
+
   function open() {
     if (activeRoot) return;
     const root = document.createElement('div');
