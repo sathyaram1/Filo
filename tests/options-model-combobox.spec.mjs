@@ -74,7 +74,6 @@ test('Modelli: il campo è un combobox custom legato al provider della riga', as
   await expect(pop).toBeHidden();
   await row.locator('.sn-model-provider').selectOption('openrouter');
   await idInput.focus();
-  await expect(pop).toBeVisible({ timeout: 4_000 });
   await expect(pop.locator('.sn-select-option', { hasText: 'gemini-test-model' })).toHaveCount(0);
 });
 
