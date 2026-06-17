@@ -9,14 +9,20 @@ import { test, expect } from './fixtures/electron.mjs';
 // NATIVI: li iniettiamo dal main via wc.send('filo:broadcast') esattamente come
 // fa l'evento context-menu di Electron in produzione.
 
+// Inietta i suggerimenti nativi su TUTTI i webContents con quell'host, non solo
+// sul primo: all'apertura di un tab Electron può avere transitoriamente due
+// WebContentsView con la stessa URL (uno è quello a cui è agganciata la Page di
+// Playwright, l'altro un duplicato/prerender). Un singolo `find()` poteva
+// colpire quello sbagliato → il broadcast andava perso e il menu di correzione
+// non compariva (la flakiness segnalata). Mandandolo a tutti, quello giusto lo
+// riceve sempre. Ritorna il numero di destinatari (>=1 se il tab esiste).
 async function sendNative(app, host, word, suggestions) {
-  return app.evaluate(async ({ webContents }, { host, word, suggestions }) => {
-    const wc = webContents.getAllWebContents().find((w) => {
+  return app.evaluate(({ webContents }, { host, word, suggestions }) => {
+    const targets = webContents.getAllWebContents().filter((w) => {
       try { return new URL(w.getURL()).host === host; } catch { return false; }
     });
-    if (!wc) return false;
-    wc.send('filo:broadcast', { type: '_spell:native', word, suggestions });
-    return true;
+    for (const wc of targets) wc.send('filo:broadcast', { type: '_spell:native', word, suggestions });
+    return targets.length;
   }, { host, word, suggestions });
 }
 
