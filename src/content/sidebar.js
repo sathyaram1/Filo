@@ -614,6 +614,165 @@
     return done;
   }
 
+  // ---------- Azioni SULLA PAGINA (parità col menu tasto destro) ----------
+  //
+  // L'agente "Aiuto" può eseguire le stesse azioni del menu contestuale su
+  // testo/immagine/link. A differenza delle azioni tipizzate di Filo (sopra),
+  // queste NON passano per il main: vivono nel content script (SN_ACTIONS in
+  // src/content/actions.js, SN_TTS in tts.js) e operano sull'elemento o sulla
+  // selezione corrente. Le azioni che ESCONO verso l'esterno (cerca sul web,
+  // condividi) chiedono conferma con lo stesso popup di Filo (SN_CONFIRM_UI);
+  // copia/leggi/salva-per-dopo sono immediate (locali).
+  //
+  // SN_ACTIONS/SN_TTS sono caricati DOPO sidebar.js (vedi i preload), quindi li
+  // risolviamo al volo dentro la funzione, non al top dell'IIFE.
+  const PAGE_ACTIONS = {
+    // testo / selezione
+    copy:         { target: 'text',  confirm: false, label: 'copia testo' },
+    cut:          { target: 'text',  confirm: false, label: 'taglia testo' },
+    search_text:  { target: 'text',  confirm: true,  label: 'cerca testo sul web' },
+    read_aloud:   { target: 'text',  confirm: false, label: 'leggi ad alta voce' },
+    stop_reading: { target: 'none',  confirm: false, label: 'ferma la lettura' },
+    edit_text:    { target: 'text',  confirm: false, label: 'modifica testo' },
+    // immagini
+    copy_image:      { target: 'image', confirm: false, label: 'copia immagine' },
+    save_image:      { target: 'image', confirm: false, label: 'salva immagine' },
+    copy_image_link: { target: 'image', confirm: false, label: 'copia link immagine' },
+    search_image:    { target: 'image', confirm: true,  label: 'cerca immagine sul web' },
+    // link
+    open_link:  { target: 'link', confirm: false, label: 'apri link in nuova scheda' },
+    copy_link:  { target: 'link', confirm: false, label: 'copia link' },
+    save_link:  { target: 'link', confirm: false, label: 'salva link per dopo' },
+    share_link: { target: 'link', confirm: true,  label: 'condividi link' },
+  };
+
+  // Testo bersaglio: quello fornito dall'agente, altrimenti la selezione corrente.
+  function resolveActionText(page) {
+    const provided = String(page.text ?? page.testo ?? page.query ?? page.selection ?? '').trim();
+    if (provided) return provided;
+    try { return (window.getSelection?.()?.toString() || '').trim(); } catch (_) { return ''; }
+  }
+
+  // Immagine bersaglio: per selettore, per src, altrimenti la più grande visibile.
+  function resolveImageEl(page) {
+    const sel = String(page.selector ?? page.css ?? '').trim();
+    if (sel) {
+      try {
+        const el = document.querySelector(sel);
+        if (el) return el.tagName === 'IMG' ? el : el.querySelector('img');
+      } catch (_) {}
+    }
+    const wanted = String(page.src ?? page.url ?? page.href ?? '').trim();
+    const imgs = Array.from(document.images || []);
+    if (wanted) {
+      const hit = imgs.find((im) => (im.currentSrc || im.src || '') === wanted)
+        || imgs.find((im) => (im.currentSrc || im.src || '').includes(wanted));
+      if (hit) return hit;
+    }
+    // Fallback: l'immagine visibile più grande (di norma l'immagine "principale").
+    let best = null; let bestArea = 0;
+    for (const im of imgs) {
+      const r = im.getBoundingClientRect();
+      const area = r.width * r.height;
+      if (area > bestArea && r.width > 32 && r.height > 32) { best = im; bestArea = area; }
+    }
+    return best;
+  }
+
+  // Link bersaglio: per selettore (anche su un figlio del link), per URL.
+  function resolveLinkEl(page) {
+    const sel = String(page.selector ?? page.css ?? '').trim();
+    if (sel) {
+      try {
+        const el = document.querySelector(sel);
+        const a = el && (el.tagName === 'A' ? el : (el.closest?.('a[href]') || el.querySelector?.('a[href]')));
+        if (a && a.href) return a;
+      } catch (_) {}
+    }
+    const wanted = String(page.url ?? page.href ?? '').trim();
+    if (wanted) {
+      const links = Array.from(document.querySelectorAll('a[href]'));
+      const hit = links.find((a) => a.href === wanted) || links.find((a) => a.href.includes(wanted));
+      if (hit) return hit;
+    }
+    return null;
+  }
+
+  async function runPageAction(page) {
+    const spec = PAGE_ACTIONS[page.op];
+    if (!spec) return false;
+    const Actions = global.SN_ACTIONS;
+    const Tts = global.SN_TTS;
+    const label = spec.label;
+
+    // Risolvi il bersaglio in anticipo: se manca, niente popup né esecuzione.
+    let text = '';
+    let imgEl = null;
+    let linkEl = null;
+    if (spec.target === 'text') {
+      text = resolveActionText(page);
+      if (!text && page.op !== 'edit_text') {
+        appendActionLog(`${label}: nessun testo selezionato`);
+        return false;
+      }
+    } else if (spec.target === 'image') {
+      imgEl = resolveImageEl(page);
+      if (!imgEl) { appendActionLog(`${label}: immagine non trovata`); return false; }
+    } else if (spec.target === 'link') {
+      linkEl = resolveLinkEl(page);
+      const fallbackUrl = String(page.url ?? page.href ?? '').trim();
+      if (!linkEl && !(page.op === 'open_link' && fallbackUrl)) {
+        appendActionLog(`${label}: link non trovato`);
+        return false;
+      }
+    }
+
+    // Conferma per le azioni che escono verso l'esterno (stesso popup di Filo).
+    if (spec.confirm) {
+      const Ui = global.SN_CONFIRM_UI;
+      let detail = '';
+      if (spec.target === 'text') detail = text.length > 80 ? `${text.slice(0, 80)}…` : text;
+      else if (imgEl) detail = imgEl.currentSrc || imgEl.src || '';
+      else if (linkEl) detail = linkEl.href || '';
+      const describe = `${label}${detail ? `:\n“${detail}”` : ''}`;
+      let ok = false;
+      try {
+        ok = Ui ? await Ui.confirm({ title: 'Filo chiede conferma', text: describe }) : global.confirm(describe);
+      } catch (_) { ok = false; }
+      if (!ok) { appendActionLog(`${label}: annullata`); return false; }
+    }
+
+    try {
+      switch (page.op) {
+        case 'copy': Actions?.copyToClipboard(text); break;
+        case 'cut': Actions?.cutSelection(); break;
+        case 'search_text': Actions?.searchTextOnWeb(text); break;
+        case 'read_aloud': await Tts?.readAloud(text); break;
+        case 'stop_reading': Tts?.stopReading(); break;
+        case 'edit_text': global.SN_EDITBOX?.openEditBox(text); break;
+        case 'copy_image': await Actions?.copyImage(imgEl); break;
+        case 'save_image': Actions?.downloadImage(imgEl); break;
+        case 'copy_image_link': Actions?.copyToClipboard(imgEl.currentSrc || imgEl.src); break;
+        case 'search_image': Actions?.searchImageOnWeb(imgEl); break;
+        case 'open_link': {
+          // "Apri in nuova scheda" è un'azione di sistema già registrata: la
+          // instradiamo via il ponte di #192.1 (NAVIGA → TabManager del main).
+          const url = (linkEl && linkEl.href) || String(page.url ?? page.href ?? '').trim();
+          return await runFiloAction({ type: 'NAVIGA', url });
+        }
+        case 'copy_link': Actions?.copyToClipboard(linkEl.href); break;
+        case 'save_link': await Actions?.saveLink(linkEl); break;
+        case 'share_link': await Actions?.shareLink(linkEl); break;
+        default: appendActionLog(`${label}: non riuscita`); return false;
+      }
+    } catch (_) {
+      appendActionLog(`${label}: non riuscita`);
+      return false;
+    }
+    appendActionLog(`${label}: fatto`);
+    return true;
+  }
+
   // ---------- Submit / loop ----------
 
   function buildPayload(userMessage, userAction) {
