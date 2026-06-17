@@ -10,7 +10,7 @@ module.exports = function register(on, ctx) {
   const FiloState = globalThis.SN_FILO_STATE;
 
   on(MSG.FILO_CHAT, async (msg, sender) => {
-    const r = await handleFiloChat({ userMessage: msg.userMessage, threadHistory: msg.threadHistory, image: msg.image, images: msg.images, sender });
+    const r = await handleFiloChat({ userMessage: msg.userMessage, threadHistory: msg.threadHistory, image: msg.image, images: msg.images, reasoningReqId: msg.reasoningReqId, sender });
     return { ok: true, ...r };
   });
 
