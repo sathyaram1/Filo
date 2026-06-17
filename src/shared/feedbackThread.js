@@ -81,10 +81,14 @@
     // domande scritte dalla routine).
     let current = { role: 'model', ts: null, lines: [] };
     for (const line of lines) {
-      const m = USER_TURN_RE.exec(line);
-      if (m) {
+      const mu = USER_TURN_RE.exec(line);
+      const mm = mu ? null : MODEL_TURN_RE.exec(line);
+      if (mu) {
         segments.push(current);
-        current = { role: 'user', ts: (m[1] || '').trim() || null, lines: [] };
+        current = { role: 'user', ts: (mu[1] || '').trim() || null, lines: [] };
+      } else if (mm) {
+        segments.push(current);
+        current = { role: 'model', ts: (mm[1] || '').trim() || null, lines: [] };
       } else {
         current.lines.push(line);
       }
