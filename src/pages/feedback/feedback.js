@@ -660,12 +660,13 @@
           const item = all.find((f) => f._id === id);
           const oldNotes = (item && item.notes) || '';
           const reason = ta.value.trim();
-          let newNotes = oldNotes;
-          if (reason) {
-            const ts = new Date().toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
-            const block = `--- Riaperto il ${ts} ---\n${reason}`;
-            newNotes = oldNotes ? `${oldNotes}\n\n${block}` : block;
-          }
+          const atts = reopenComposer.getAttachments();
+          const ts = new Date().toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
+          // La spiegazione (e/o gli allegati) si appendono come turno utente,
+          // conservando lo storico. Senza testo né allegati, le note restano com'erano.
+          const newNotes = window.SN_FEEDBACK_THREAD
+            ? SN_FEEDBACK_THREAD.appendUserTurn(oldNotes, reason, { ts, label: 'Riaperto il', attachments: atts })
+            : (reason ? (oldNotes ? `${oldNotes}\n\n--- Riaperto il ${ts} ---\n${reason}` : `--- Riaperto il ${ts} ---\n${reason}`) : oldNotes);
           patch(id, { status: 'new', notes: newNotes }, { status: 'new', notes: newNotes });
         });
       });
