@@ -284,21 +284,30 @@
     provSel.value = single.provider;
 
     // Stringa concreta per chiamare il modello presso il provider scelto.
-    // Il campo è un combobox: la datalist (per-provider) elenca tutti i modelli
-    // di quel provider; l'utente può scorrere o scrivere per filtrare, e resta
-    // libero di digitare un id non in lista.
+    // Il campo è un combobox custom (stile Filo, non il popup nativo della
+    // datalist): elenca i modelli del provider scelto, si filtra digitando, e
+    // resta libero di accettare un id non in lista. Il wrapper è position:relative
+    // perché il popup .sn-select-pop si ancora lì sotto.
+    const idWrap = document.createElement('div');
+    idWrap.className = 'sn-model-id-wrap';
     const idIn = document.createElement('input');
     idIn.type = 'text';
     idIn.placeholder = I18n.t('options_model_id');
-    idIn.setAttribute('list', datalistIdFor(single.provider));
+    idIn.setAttribute('autocomplete', 'off');
     idIn.value = single.model;
     idIn.className = 'sn-model-id';
+    idWrap.appendChild(idIn);
     // Carica la lista del provider la prima volta che l'utente apre il campo.
     idIn.addEventListener('focus', () => ensureProviderModels(provSel.value));
+    if (window.SN_COMBOBOX) {
+      window.SN_COMBOBOX.attach(idWrap, idIn, {
+        readOptions: () => readProviderOptions(provSel.value),
+        onPick: () => save(),
+      });
+    }
 
-    // Cambiando provider, il combobox punta all'altra lista (e la carica).
+    // Cambiando provider, il combobox legge l'altra lista (e la carica).
     provSel.addEventListener('change', () => {
-      idIn.setAttribute('list', datalistIdFor(provSel.value));
       ensureProviderModels(provSel.value);
     });
 
