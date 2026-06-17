@@ -626,6 +626,7 @@
           ${agentHtml}${titleHtml}
           ${threadHtml}
           ${notesBlock}
+          ${tailThreadHtml}
           ${replyBlock}
           <div class="fb-actions">${actionsFor(f)}</div>
         </article>
