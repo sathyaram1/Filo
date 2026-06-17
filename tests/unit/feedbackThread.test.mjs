@@ -308,8 +308,8 @@ test('stripAttachments/composeNotes: round-trip per il compositore note editabil
 test('composeNotes: senza allegati ritorna il testo invariato', () => {
   assert.equal(TH.composeNotes('solo testo', []), 'solo testo');
   assert.equal(TH.composeNotes('', []), '');
-  // Solo allegati, nessun testo → solo le righe-marcatore.
+  // Solo allegati, nessun testo → solo le righe-marcatore, ri-estraibili.
   const onlyAtt = TH.composeNotes('', [{ kind: 'img', url: 'https://x/z.png' }]);
-  assert.equal(TH.parseAttachmentLine(onlyAtt), null === false ? TH.parseAttachmentLine(onlyAtt) : null); // sanity
   assert.deepEqual(TH.stripAttachments(onlyAtt).attachments, [{ kind: 'img', url: 'https://x/z.png' }]);
+  assert.equal(TH.stripAttachments(onlyAtt).text, '');
 });
