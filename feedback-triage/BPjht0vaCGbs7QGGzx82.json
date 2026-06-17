@@ -1,7 +1,0 @@
-{
-  "id": "BPjht0vaCGbs7QGGzx82",
-  "status": "done",
-  "notes": "Ora puoi zoomare le pagine web tenendo Ctrl: con la rotella, pizzicando il trackpad, oppure con Ctrl + / Ctrl - / Ctrl 0 (Ctrl 0 torna al 100%). Lo zoom scala l'intera pagina come in un browser normale. Verificato con test automatici che esercitano sia Ctrl+rotella sia le scorciatoie da tastiera. Nota: l'editor di Filo continua a usare il suo zoom dedicato, quindi non c'è doppio zoom sulle pagine interne.",
-  "queuedAt": "2026-06-17T19:20:03.038Z",
-  "queuedBy": "routine"
-}
