@@ -178,6 +178,9 @@
         kind: 'report',
         body: text,
         ts: f.createdAt || f._createTime || null,
+        // Gli allegati della segnalazione originale vivono nei campi PIATTI
+        // `images`/`files`, non nelle note: la dashboard li mostra a parte.
+        attachments: [],
       });
     }
     for (const seg of splitNotes(f.notes)) {
@@ -186,6 +189,7 @@
         kind: seg.role === 'model' ? 'note' : 'reply',
         body: seg.body,
         ts: seg.ts,
+        attachments: seg.attachments || [],
       });
     }
     return turns;
