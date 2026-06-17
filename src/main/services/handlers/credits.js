@@ -130,4 +130,69 @@ module.exports = function register(on, ctx) {
     const r = await Credits.award({ kind: 'feedback_sent', credits: amount, ref: msg?.ref || null });
     return { ok: true, ...r };
   });
+
+  // ── Ricompensa alla risoluzione di un feedback (C5) ─────────────────────────
+  // base(clientId): toglie il prefisso "owner:" applicato agli invii dell'admin,
+  // così l'install riconosce come "suoi" sia i feedback inviati da sloggato sia
+  // quelli marcati owner quando era loggato (stesso clientId di base).
+  function baseClientId(c) {
+    const s = String(c || '');
+    return s.startsWith('owner:') ? s.slice(6) : s;
+  }
+
+  // Spiegazione NON tecnica della risoluzione: i turni "modello" (report scritti
+  // dalla routine, per l'utente) estratti dal blob note. Niente turni utente.
+  function resolutionExplanation(notes) {
+    const raw = String(notes || '').trim();
+    const FBT = globalThis.SN_FEEDBACK_THREAD;
+    if (!raw || !FBT?.splitNotes) return raw;
+    return FBT.splitNotes(raw)
+      .filter((s) => s.role === 'model' && s.body)
+      .map((s) => s.body)
+      .join('\n\n')
+      .trim();
+  }
+
+  on(MSG.GET_FEEDBACK_REWARDS, async () => {
+    const empty = { ok: true, rewards: [], totalCredits: 0 };
+    try {
+      // Allinea la cache crediti al doc dell'account (così rewardedFeedback è
+      // quello vero anche dopo un cambio dispositivo) prima di premiare.
+      await ensureAccountSync().catch(() => {});
+      const id = await globalThis.SN_STORAGE?.getRaw?.('sn_feedback_client_id', null);
+      if (!id || !FB?.list) return empty;
+
+      let all;
+      try { all = await FB.list({ pageSize: 200 }); }
+      catch (e) { console.warn('[credits] lista feedback non disponibile:', e?.message || e); return empty; }
+
+      const state = await Credits.load();
+      const rewarded = state.rewardedFeedback || {};
+      const rewards = [];
+      for (const f of all) {
+        if (!f || f.status !== 'done') continue;
+        if (baseClientId(f.clientId) !== id) continue; // solo i feedback DI questo install
+        const fid = f._id;
+        if (!fid || rewarded[fid]) continue;            // già premiato: niente doppio premio
+        const priority = Math.max(0, Math.min(3, Math.round(Number(f.priority) || 0)));
+        const credits = Credits.rewardForPriority(priority);
+        // Accredita e marca questo feedback come premiato (state.rewardedFeedback),
+        // così alla prossima apertura non ricompare.
+        await Credits.award({ kind: 'feedback_resolved', credits, ref: fid });
+        rewards.push({
+          id: fid,
+          num: FB.formatNum ? FB.formatNum(f.seq, f.subSeq) : '',
+          name: String(f.name || '').slice(0, 200),
+          explanation: resolutionExplanation(f.notes),
+          credits,
+          priority,
+        });
+      }
+      const totalCredits = rewards.reduce((s, r) => s + r.credits, 0);
+      return { ok: true, rewards, totalCredits };
+    } catch (e) {
+      console.warn('[credits] GET_FEEDBACK_REWARDS fallito:', e?.message || e);
+      return empty;
+    }
+  });
 };
