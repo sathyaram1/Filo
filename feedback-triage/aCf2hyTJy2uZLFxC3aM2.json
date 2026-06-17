@@ -1,0 +1,7 @@
+{
+  "id": "aCf2hyTJy2uZLFxC3aM2",
+  "status": "done",
+  "notes": "Duplicato creato da una race tra routine concorrenti (la stessa creazione applicata due volte). La versione canonica, con la spec tecnica completa e la domanda di design, è #190.3 — lavorate quella. Questo lo chiudo per non lasciare 4 copie identiche in 'Da risolvere'.",
+  "queuedAt": "2026-06-17T07:59:54.064Z",
+  "queuedBy": "routine"
+}
