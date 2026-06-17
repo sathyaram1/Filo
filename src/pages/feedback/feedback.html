@@ -109,6 +109,39 @@
       border-radius: 6px; resize: vertical;
     }
     .fb-reply-buttons { display: flex; gap: 8px; justify-content: flex-end; }
+    /* Compositore allegati nei commenti (#190.3): incolla/trascina/allega
+       immagini e file mentre si scrive una nota/risposta. Gli allegati si
+       ancorano al turno (vivono come marcatori dentro le note). */
+    .fb-attach-mount { margin-top: 6px; }
+    .fb-attach-thumbs { display: flex; flex-wrap: wrap; gap: 8px; }
+    .fb-attach-thumbs:not(:empty) { margin-bottom: 6px; }
+    .fb-attach-thumb { position: relative; }
+    .fb-attach-thumb img {
+      width: 64px; height: 64px; object-fit: cover;
+      border: 1px solid var(--sn-border); border-radius: 6px; cursor: zoom-in; display: block;
+    }
+    .fb-attach-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      max-width: 220px; padding: 5px 8px; padding-right: 24px; position: relative;
+      border: 1px solid var(--sn-border); border-radius: 6px;
+      background: var(--sn-bg, transparent); font-size: 12px;
+    }
+    .fb-attach-ic { display: inline-flex; color: var(--sn-muted); flex: 0 0 auto; }
+    .fb-attach-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .fb-attach-x {
+      position: absolute; top: -7px; right: -7px;
+      width: 18px; height: 18px; padding: 0; line-height: 16px;
+      border-radius: 50%; border: 1px solid var(--sn-border);
+      background: var(--sn-bg, #fff); color: var(--sn-text, inherit);
+      cursor: pointer; font-size: 13px; display: flex; align-items: center; justify-content: center;
+    }
+    .fb-attach-chip .fb-attach-x { top: 50%; right: 4px; transform: translateY(-50%); }
+    .fb-attach-x:hover { border-color: var(--sn-accent); color: var(--sn-accent); }
+    .fb-attach-bar { display: flex; align-items: center; gap: 10px; }
+    .fb-attach-btn { padding: 4px 10px; font-size: 12px; }
+    .fb-attach-status { font-size: 12px; color: var(--sn-muted); }
+    /* Feedback visivo quando si trascina un file sopra una textarea-composer. */
+    .fb-drop-hover { outline: 2px dashed var(--sn-accent); outline-offset: -2px; }
     .fb-tabs { display: flex; gap: 6px; margin-bottom: 12px; border-bottom: 1px solid var(--sn-border); }
     .fb-tab {
       background: transparent; border: 0; padding: 8px 14px;
