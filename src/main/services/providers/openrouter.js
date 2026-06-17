@@ -93,7 +93,12 @@
         if (payload === '[DONE]') continue;
         try {
           const obj = JSON.parse(payload);
-          const delta = obj.choices?.[0]?.delta?.content;
+          const choiceDelta = obj.choices?.[0]?.delta || {};
+          const reasoning = choiceDelta.reasoning;
+          if (reasoning) {
+            try { onReasoning && onReasoning(reasoning); } catch (_) {}
+          }
+          const delta = choiceDelta.content;
           if (delta) {
             fullText += delta;
             try { onDelta && onDelta(delta); } catch (_) {}
