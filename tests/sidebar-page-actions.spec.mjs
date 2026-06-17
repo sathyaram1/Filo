@@ -149,6 +149,17 @@ test('link: copia link risolve il selettore e copia l\'href', async ({ openTab }
   expect(await page.evaluate(() => window.__calls.copy)).toEqual(['https://example.com/article']);
 });
 
+test('link: salva link per dopo è immediato e salva l\'href indicato', async ({ openTab }) => {
+  const page = await openTab(NEWTAB);
+  await prep(page);
+  const ok = await page.evaluate(() => window.__filoSidebarTest.runPageAction({ op: 'save_link', selector: '#lnk' }));
+  expect(ok).toBe(true);
+  expect(await page.evaluate(() => window.__calls.saveLink)).toEqual(['https://example.com/article']);
+  // "Salva per dopo" è locale: nessun popup di conferma.
+  await expect(page.locator('.sn-confirm-overlay')).toHaveCount(0);
+  await expect(page.locator('.sn-sidebar-log').last()).toContainText('fatto');
+});
+
 test('link: condividi link chiede conferma; OK invoca la condivisione sull\'href', async ({ openTab }) => {
   const page = await openTab(NEWTAB);
   await prep(page);
