@@ -98,13 +98,26 @@ test('la stringa modello è un combobox: datalist per provider popolata dal cata
   expect(optionIds).toContain('nvidia/nemotron-3-ultra-550b-a55b:free');
   expect(optionIds).toContain('meta-llama/llama-4-maverick:free');
 
-  // Il campo della riga punta alla datalist del suo provider.
+  // Il campo NON usa più il popup nativo della datalist (niente attributo
+  // `list`): è il dropdown custom .sn-select-* coerente con Filo.
   const row = page.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head)').first();
-  await expect(row.locator('.sn-model-id')).toHaveAttribute('list', 'models-list-openrouter');
+  const idInput = row.locator('.sn-model-id');
+  await expect(idInput).not.toHaveAttribute('list', /.*/);
 
-  // Cambiando provider, il combobox punta all'altra lista.
+  // Mettendo a fuoco il campo (provider OpenRouter di default), il dropdown
+  // custom mostra il catalogo OpenRouter letto dalla datalist.
+  await idInput.focus();
+  const pop = row.locator('.sn-model-id-wrap .sn-select-pop');
+  await expect(pop).toBeVisible({ timeout: 4_000 });
+  await expect(pop.locator('.sn-select-option', { hasText: 'nvidia/nemotron-3-ultra-550b-a55b:free' })).toBeVisible();
+
+  // Cambiando provider su Gemini, il dropdown legge l'altra lista: il modello
+  // OpenRouter non compare più.
+  await idInput.blur();
+  await expect(pop).toBeHidden();
   await row.locator('.sn-model-provider').selectOption('gemini');
-  await expect(row.locator('.sn-model-id')).toHaveAttribute('list', 'models-list-gemini');
+  await idInput.focus();
+  await expect(pop.locator('.sn-select-option', { hasText: 'nvidia/nemotron-3-ultra-550b-a55b:free' })).toHaveCount(0);
 });
 
 test('il main rifiuta test espliciti e catalogo ai non admin (gate reale, senza stub)', async ({ openTab }) => {
