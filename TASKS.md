@@ -173,7 +173,7 @@ Ordine = dipendenze (il motore va per primo). Numerare i task come C1..C5.
   chiusura. **Done**: spec che, forzando una `lastSeenVersion` vecchia, asserisce
   che il popup elenca le entry attese nell'ordine giusto. (stima: M)
 
-- [ ] **C5 — Popup ringraziamento feedback risolto + ricompensa per priorità (50/100/200/300)**
+- [~] **C5 — Popup ringraziamento feedback risolto + ricompensa per priorità (50/100/200/300)**
   — All'update, se un feedback **inviato dall'utente** è passato a `done` da
   quando non guardava, mostra un popup per ciascuno (o aggregato) con:
   ringraziamento, conferma della risoluzione con **spiegazione non tecnica** presa
