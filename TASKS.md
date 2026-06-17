@@ -150,7 +150,20 @@ Ordine = dipendenze (il motore va per primo). Numerare i task come C1..C5.
   (~1s): non catturabile in modo affidabile con uno shot statico, la sua
   presenza è asserita dallo spec.
 
-- [~] **C4 — Popup recap aggiornamento (feature in alto, bugfix in basso, non tecnico)**
+- [x] **C4 — Popup recap aggiornamento (feature in alto, bugfix in basso, non tecnico)**
+  (2026-06-17) — FATTO. Il recap vive nella pagina home (`src/pages/dashboard`):
+  all'avvio il main (`handlers/misc.js`, nuovi `GET_UPDATE_RECAP`/`MARK_UPDATE_SEEN`)
+  confronta `LAST_SEEN_VERSION` salvata con `app.getVersion()` e ritorna le note
+  delle versioni saltate da `src/shared/patchNotes.js` (ora caricato anche nel
+  loader main). Il popup mostra header **`vecchia → nuova`**, **Novità** in alto e
+  **Correzioni** in basso (aggregate da tutte le versioni saltate), un pulsante
+  **Condividi** (copia il recap negli appunti, prova `navigator.share` se c'è) e
+  **Fatto**/X che salva la versione corrente come vista. Primissimo avvio
+  soppresso (nessuna sorpresa): il main marca la versione e non ritorna note.
+  Aggiunto il blocco changelog 0.2.50 con la feature. **Verificato**:
+  `tests/update-recap.spec.mjs` 3/3 verdi (popup con novità sopra/correzioni
+  sotto + header versioni; chiusura → marca visto e non riappare; primo avvio
+  soppresso ma versione marcata).
   — Al primo avvio dopo un update (confronto `lastSeenVersion` salvata vs
   `app.getVersion()`), mostra un popup con il recap aggregato di **tutte** le
   versioni saltate (calcolo "quante patch indietro" da `src/shared/patchNotes.js`).
