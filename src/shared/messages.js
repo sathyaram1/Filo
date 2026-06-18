@@ -19,6 +19,9 @@
     // Richiesta di fermare la lettura attiva ovunque sia (anche in un'altra
     // scheda). Il main inoltra TTS_STOP a tutte le schede.
     TTS_STOP_READING: 'tts_stop_reading',          // content→main
+    // Una scheda appena caricata chiede lo stato corrente (la lettura potrebbe
+    // essere partita PRIMA che esistesse, quindi avrebbe perso il broadcast).
+    TTS_READING_STATUS: 'tts_reading_status',       // content→main → { active: bool }
     SAVE_PAGE: 'save_page',                       // { page }
     SAVE_LINK: 'save_link',                       // { url, title }
     GET_SETTINGS: 'get_settings',
