@@ -1474,7 +1474,9 @@ class TabManager {
       const { url, disposition } = details;
       // SICUREZZA: nega l'apertura (window.open / target=_blank) verso schemi
       // non-web — stessa difesa di will-navigate (file:// → leak NTLM, ecc.).
+      // mailto:/tel:/sms: vengono consegnati all'OS invece di essere ignorati.
       if (isWebUnsafeNav(url)) {
+        openExternalScheme(url);
         return { action: 'deny' };
       }
       // #209 — i popup di login ("Continua con Google" e simili) NON sono
