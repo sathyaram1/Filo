@@ -65,9 +65,20 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
-  on(MSG.GET_SETTINGS, async () => ({ ok: true, settings: await Storage.getSettings() }));
+  on(MSG.GET_SETTINGS, async (msg, sender, origin) => {
+    const settings = await Storage.getSettings();
+    // Le pagine web (content script) leggono tema/spellcheck/ecc., ma non devono
+    // ricevere le chiavi API: le richieste AI girano nel main, che le allega.
+    if (!isFilo(origin) && settings && settings.apiKeys) {
+      return { ok: true, settings: { ...settings, apiKeys: undefined } };
+    }
+    return { ok: true, settings };
+  });
 
-  on(MSG.UPDATE_SETTINGS, async (msg) => {
+  on(MSG.UPDATE_SETTINGS, async (msg, sender, origin) => {
+    // Cambiare le impostazioni globali è riservato alle pagine interne (Opzioni,
+    // chat di Filo): una pagina web non deve poter riscrivere i settings.
+    if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
     // Tutta la propagazione (broadcast, tema nativo, sicurezza, fingerprint,
     // safebrowse, cookie) vive in applySettingsUpdate: stesso percorso usato
     // quando Filo cambia una preferenza via chat.
@@ -75,7 +86,8 @@ module.exports = function register(on, ctx) {
     return { ok: true, settings: merged };
   });
 
-  on(MSG.RESET_SETTINGS, async () => {
+  on(MSG.RESET_SETTINGS, async (msg, sender, origin) => {
+    if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
     // Ripristino completo (#184): riscrive TUTTE le impostazioni ai valori
     // predefiniti in un colpo solo, così qualsiasi personalizzazione estetica
     // sfuggita di mano (token, tema, colore identità delle tab, dimensione del
