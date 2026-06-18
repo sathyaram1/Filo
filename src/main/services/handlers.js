@@ -576,6 +576,21 @@ function setAssistantCwd(sender, cwd) {
   else _assistantCwdFallback = cwd;
 }
 
+// Corpus sensibile per il taint-match di NAVIGA (anti-esfiltrazione): SOLO i
+// dati personali persistenti che il modello aveva nel contesto — memoria
+// (profilo/preferenze/espansioni) e appunti. NON lo stato delle schede né le
+// loro URL: un legittimo "riapri la scheda X" porterebbe quell'URL nel link e
+// matcherebbe lo stato → falso positivo. Quelli non sono segreti da proteggere.
+async function navExfilCorpus() {
+  try {
+    const mem = await FiloMem.getMemory();
+    const { profilo, preferenze, espansioni } = FiloMem.renderMemoryForPrompt(mem);
+    let notes = '';
+    try { notes = (await FiloMem.listNotes()).map((n) => n && n.text).filter(Boolean).join('\n'); } catch (_) {}
+    return [profilo, preferenze, espansioni, notes].filter(Boolean).join('\n');
+  } catch (_) { return ''; }
+}
+
 async function executeFiloAction(action, { confirmed = false, sender = null } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
