@@ -763,8 +763,10 @@
 
     // 2b. Interrompi lettura — presente in QUALSIASI menu mentre la sintesi
     // vocale è in riproduzione, anche senza selezione/contesto, così la
-    // lettura si può sempre fermare da dove si è (richiesta alpha).
-    if (TTS.ttsBusy()) {
+    // lettura si può sempre fermare da dove si è (richiesta alpha). isAnyReading
+    // è true anche se a leggere è un'ALTRA scheda: lo stop chiede al main di
+    // inoltrare l'arresto alla scheda che legge davvero.
+    if (TTS.isAnyReading()) {
       items.push(TTS.buildStopReadingItem());
     }
 
