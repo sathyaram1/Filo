@@ -1,7 +1,0 @@
-{
-  "id": "tkaVKHmhHw23SDdwcSMv",
-  "status": "done",
-  "notes": "Ora 'Interrompi lettura' nel menu del tasto destro compare in QUALSIASI scheda mentre una lettura ad alta voce è in corso — non solo in quella dove l'hai avviata — e cliccandola da un'altra scheda la lettura si ferma davvero. La voce appare anche nelle schede aperte DOPO che la lettura è già partita. Verificato con test automatici che aprono due schede, avviano la lettura in una e fermano dall'altra.",
-  "queuedAt": "2026-06-18T14:51:36.615Z",
-  "queuedBy": "routine"
-}
