@@ -59,8 +59,16 @@ module.exports = function register(on, ctx) {
     if (!idToken) return;
     const fields = {};
     for (const k of SYNC_FIELDS) fields[k] = FB.toFsValue(state[k]);
+    // Registro utenti (#210.1): scriviamo anche email/name dell'account loggato
+    // sul proprio doc, così l'owner può risolvere email→uid (/gift) ed elencare
+    // gli iscritti (/users). Solo se il profilo è disponibile, e con la stessa
+    // updateMask così non azzeriamo nulla quando il profilo manca.
+    const maskPaths = [...SYNC_FIELDS];
+    const profile = auth.getProfile?.();
+    if (profile?.email) { fields.email = FB.toFsValue(String(profile.email).toLowerCase()); maskPaths.push('email'); }
+    if (profile?.name) { fields.name = FB.toFsValue(String(profile.name)); maskPaths.push('name'); }
     // updateMask così non azzeriamo campi non inviati.
-    const mask = SYNC_FIELDS.map((k) => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
+    const mask = maskPaths.map((k) => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
     const url = `${FB.rest.FIRESTORE_BASE}/credits/${encodeURIComponent(uid)}?${mask}&key=${FB.rest.API_KEY}`;
     const res = await fetch(url, {
       method: 'PATCH',
