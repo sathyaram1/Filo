@@ -43,13 +43,17 @@ async function stubSequence(app, turns) {
       modelRegistry: C.DEFAULT_MODEL_REGISTRY,
     });
     globalThis.__filoTurnCount = 0;
+    // Tieni la sequenza su globalThis: lo stub la legge da lì (un closure sul
+    // parametro `turns` non sopravvive in modo affidabile oltre evaluate()).
+    globalThis.__filoTurns = turns;
     // La chat della dashboard chiede il ragionamento in diretta → ogni turno di
     // chat passa dal cammino in STREAMING: lo stub qui SERVE la sequenza e conta
     // i turni reali della conversazione.
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts }) => {
+      const seq = globalThis.__filoTurns;
       const n = globalThis.__filoTurnCount;
       globalThis.__filoTurnCount += 1;
-      const payload = turns[Math.min(n, turns.length - 1)];
+      const payload = seq[Math.min(n, seq.length - 1)];
       return {
         text: JSON.stringify(payload),
         model: attempts[0].model, provider: attempts[0].provider, usage: {},
