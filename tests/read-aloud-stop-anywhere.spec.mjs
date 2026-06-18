@@ -3,6 +3,9 @@
 //      contenere "Interrompi lettura", anche senza testo selezionato;
 //   2. la voce di lettura usa un'icona SVG coerente con lo stile di Filo,
 //      non più l'emoji 🔊.
+//   3. (riapertura 18/06) "Interrompi lettura" deve comparire anche in un'ALTRA
+//      scheda, non solo in quella dove la lettura è partita; e da lì si deve
+//      poter fermare la lettura in corso nella scheda originale.
 //
 // Asserisce il SUCCESSO: la voce "Interrompi lettura" compare in un menu aperto
 // su un'area SENZA selezione mentre la sintesi è attiva. Prima del fix lo stop
