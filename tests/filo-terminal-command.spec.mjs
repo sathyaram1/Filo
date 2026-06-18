@@ -5,8 +5,10 @@
 //   • "ls/echo" (sola lettura) esegue subito e l'output torna mostrato in chat;
 //   • "git push", "mkdir" (modifica recuperabile) NON eseguono senza conferma;
 //     dopo la conferma eseguono davvero;
-//   • "rm …", un comando inventato e una concatenazione con && richiedono di
-//     digitare "conferma" (livello 3);
+//   • "rm …", un comando inventato e una concatenazione che CONTIENE un comando
+//     rischioso richiedono di digitare "conferma" (livello 3);
+//   • una concatenazione di soli comandi sicuri (es. `cd x && ls`, #201) NON
+//     chiede conferma: il livello è il massimo dei pezzi, non 3 d'ufficio;
 //   • il livello è deciso dal main sul comando effettivo, mai dall'LLM.
 
 import { test, expect } from './fixtures/electron.mjs';
