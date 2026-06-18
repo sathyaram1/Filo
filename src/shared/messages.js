@@ -61,6 +61,16 @@
     // credits,priority}], totalCredits }. La home mostra un popup di
     // ringraziamento e anima i crediti verso il profilo.
     GET_FEEDBACK_REWARDS: 'get_feedback_rewards',
+    // Comandi proprietario (#210). Riservati all'owner (auth.isAdmin()).
+    // OWNER_LIST_USERS: elenco email degli utenti registrati (campo `email` sui
+    //   doc credits/<uid>). { } → { ok, users:[{email,name,balance}] } | { ok:false, error }.
+    OWNER_LIST_USERS: 'owner_list_users',
+    // OWNER_GIFT_CREDITS: regala `amount` crediti all'utente con `email`.
+    //   { amount, email } → { ok, email, amount, balance } | { ok:false, error }.
+    OWNER_GIFT_CREDITS: 'owner_gift_credits',
+    // Broadcast main→renderer: l'utente corrente ha ricevuto crediti in regalo
+    // (#210.4). { amount } → la home mostra un popup una volta sola.
+    GIFT_NOTICE: 'gift_notice',
     CAPTURE_VISIBLE_TAB: 'capture_visible_tab',
     // Test provider: misura latenza al primo token e token al secondo
     // su un piccolo prompt fisso. Usato dalla pagina Opzioni.
