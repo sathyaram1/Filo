@@ -79,11 +79,30 @@ test('git push è livello 2 (popup), ma senza conferma non parte', async ({ app,
 test('livello 3: rm, comando inventato e concatenazione richiedono "conferma"', async ({ app, openTab }) => {
   const page = await openTab(NEWTAB);
   await enableTerminal(page);
-  for (const comando of ['rm qualcosa', 'comandoinventato', 'echo a && echo b']) {
+  // La concatenazione resta livello 3 SOLO se contiene un comando rischioso
+  // (qui `rm`): il massimo dei pezzi vince. Una sequenza di sole letture è
+  // gestita dal test successivo (#201).
+  for (const comando of ['rm qualcosa', 'comandoinventato', 'echo a && rm b']) {
     const r = await execAction(app, { type: 'ESEGUI_COMANDO', comando });
     expect(r.executed, comando).toBe(false);
     expect(r.needsConfirm, comando).toBe(3);
   }
+});
+
+test('#201 — una concatenazione di soli comandi sicuri esegue senza conferma', async ({ app, openTab }) => {
+  const page = await openTab(NEWTAB);
+  await enableTerminal(page);
+  // `cd <tmp> && echo <marker>`: due letture concatenate. Prima del fix #201 il
+  // solo `&&` la portava a livello 3 ("conferma" per un'azione irreversibile);
+  // ora il livello è il massimo dei pezzi (1) → esegue subito.
+  const marker = `filo201-${Date.now()}`;
+  const r = await execAction(app, {
+    type: 'ESEGUI_COMANDO',
+    comando: `cd "${os.tmpdir()}" && echo ${marker}`,
+  });
+  expect(r.executed).toBe(true);
+  expect(r.needsConfirm).toBeFalsy();
+  expect(r.output.stdout).toContain(marker);
 });
 
 test('UI: l’output di un comando livello 1 compare nella bolla di chat', async ({ openTab }) => {
