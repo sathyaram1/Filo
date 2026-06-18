@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.52', date: '2026-06-18',
+      features: [
+        'Quando attivi la modalità terminale, Filo può svolgere compiti a più passi da solo: esegue un comando, ne legge l’output e prosegue col successivo finché non ha finito, senza che tu debba rilanciarlo ogni volta. Sui comandi rischiosi chiede comunque conferma.',
+      ],
+      fixes: [],
+    },
+    {
       version: '0.2.51', date: '2026-06-18',
       features: [],
       fixes: [
