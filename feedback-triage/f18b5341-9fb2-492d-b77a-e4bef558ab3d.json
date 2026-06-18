@@ -1,0 +1,7 @@
+{
+  "id": "f18b5341-9fb2-492d-b77a-e4bef558ab3d",
+  "status": "done",
+  "notes": "Nuovo comando riservato all'owner: /gift NUMERO EMAIL (es. /gift 2000 mario@esempio.com) regala quei crediti all'utente con quella email. Filo conferma in chat con il nuovo saldo del destinatario. Numero non valido o email inesistente → messaggio chiaro, nessun accredito. Chi non è l'owner riceve 'Comando riservato al proprietario.'. Aggiunto in /help (solo owner).\n\nSe regali più volte prima che il destinatario veda l'avviso, gli importi si sommano in un unico avviso.\n\nVerificato: suite 448/448 verde + test mirato su comando cablato, validazione del numero e rifiuto del non-proprietario. L'accredito vero su un altro account richiede login owner + deploy regole (#210.1): va provato a mano dopo il deploy.",
+  "queuedAt": "2026-06-18T09:52:55.174Z",
+  "queuedBy": "routine"
+}
