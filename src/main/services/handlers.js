@@ -595,6 +595,27 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
     } catch (_) {}
   }
 
+  // NAVIGA: difesa anti-esfiltrazione. Una pagina ostile (prompt injection) può
+  // far aprire al modello un URL che PORTA FUORI dati che aveva nel contesto
+  // (memoria/profilo, appunti) codificandoli nella query/path/sottodominio. Il
+  // taint-match verifica se l'URL contiene pezzi del materiale sensibile; il
+  // fallback strutturale (solo da origine non fidata) copre i dati cifrati. Se
+  // sospetto, iniettiamo `_exfil` PRIMA del gate (mai dall'LLM): NAVIGA sale a
+  // livello 2 e l'utente conferma vedendo l'URL completo. Vedi src/shared/urlExfil.js.
+  if (type === 'NAVIGA') {
+    try {
+      const Exfil = globalThis.SN_URL_EXFIL;
+      const url = String(action.url ?? action.href ?? action.link ?? '').trim();
+      if (Exfil && url) {
+        const origin = sender?.tab?.url || sender?.url || '';
+        const fromUntrusted = /^https?:/i.test(origin);
+        const corpus = await navExfilCorpus();
+        const v = Exfil.assess(url, { corpus, fromUntrusted });
+        if (v.exfil) { action._exfil = true; action._exfilReason = v.reason; }
+      }
+    } catch (_) {}
+  }
+
   // ── modalità terminale: gate hard, indipendente dal livello (#146.6) ──────
   // Filo non può eseguire ALCUN comando se l'utente non ha attivato la modalità
   // terminale nelle impostazioni. Controllo PRIMA del gate dei livelli: così un
