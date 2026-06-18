@@ -1,0 +1,7 @@
+{
+  "id": "ml2UFNld3j7L30MVACGb",
+  "status": "done",
+  "notes": "Ora Filo, in modalità terminale, porta avanti un compito a più passi da solo: esegue un comando, ne legge l'output e prosegue col successivo finché non ha finito, senza che tu debba rilanciarlo ogni volta. Si ferma e chiede conferma solo sui comandi rischiosi (creazione/modifica/cancellazione), come prima. Verificato con un test automatico che simula una sequenza: dopo il primo comando la chat richiama Filo da sola fino a quando dichiara concluso il compito, e un comando rischioso interrompe la catena in attesa del tuo ok. Nota: dopo aver confermato un comando rischioso, per ora la parola torna a te (puoi dirgli 'continua'); l'auto-proseguimento riprende subito sui comandi non rischiosi.",
+  "queuedAt": "2026-06-18T05:22:39.578Z",
+  "queuedBy": "routine"
+}
