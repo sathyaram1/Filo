@@ -35,6 +35,28 @@ function isWebUnsafeNav(rawUrl) {
   return proto ? !WEB_NAV_SCHEMES.has(proto) : false;
 }
 
+// Schemi "azione del sistema operativo": NON sono pagine web (quindi bloccati da
+// isWebUnsafeNav), ma un browser completo li CONSEGNA all'OS invece di fallire —
+// `mailto:` apre il client di posta, `tel:`/`sms:` avviano chiamata/SMS. È una
+// ALLOWLIST volutamente minima: solo questi schemi notoriamente innocui passano
+// a shell.openExternal. Tutto il resto (file:, data:, javascript:, schemi
+// arbitrari che potrebbero lanciare altre app) resta BLOCCATO — non vogliamo che
+// un sito ostile inneschi handler di protocollo sconosciuti.
+const OS_DELEGATED_SCHEMES = new Set(['mailto:', 'tel:', 'sms:']);
+function isOsDelegatedScheme(rawUrl) {
+  let proto = '';
+  try { proto = new URL(String(rawUrl || '')).protocol.toLowerCase(); } catch (_) { return false; }
+  return OS_DELEGATED_SCHEMES.has(proto);
+}
+
+// Consegna all'OS un link mailto:/tel:/sms: (best-effort). Da chiamare SOLO dopo
+// aver bloccato la navigazione in-app, e SOLO per gli schemi dell'allowlist.
+function openExternalScheme(rawUrl) {
+  if (!isOsDelegatedScheme(rawUrl)) return false;
+  try { shell.openExternal(String(rawUrl)); } catch (_) {}
+  return true;
+}
+
 // Altezza della sola fila di tab (tab + nuova scheda + controlli finestra),
 // senza la barra indirizzi. In sync con `.tab-row { flex: 0 0 40px }` in
 // src/renderer/shell.css. Quando la shell è in "chrome compatto" (fuori dalla
