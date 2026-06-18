@@ -215,6 +215,7 @@
     if (ttsSupported()) { try { window.speechSynthesis.cancel(); } catch (_) {} }
     clearHighlight();
     readTokens = [];
+    reportReadingState(false);
   }
 
   // Incapsula PCM 16-bit little-endian mono (quello che torna Gemini TTS,
