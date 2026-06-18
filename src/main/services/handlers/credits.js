@@ -238,6 +238,29 @@ module.exports = function register(on, ctx) {
     return { ok: true, credits: await Credits.getPublic(), signedIn: auth.isSignedIn() };
   });
 
+  // ── Comandi proprietario (#210): /users e /gift ─────────────────────────────
+  on(MSG.OWNER_LIST_USERS, async () => {
+    if (!auth.isAdmin()) return { ok: false, error: 'Comando riservato al proprietario.' };
+    try { return { ok: true, users: await adminListUsers() }; }
+    catch (e) { return { ok: false, error: e?.message || String(e) }; }
+  });
+
+  on(MSG.OWNER_GIFT_CREDITS, async (msg) => {
+    if (!auth.isAdmin()) return { ok: false, error: 'Comando riservato al proprietario.' };
+    const amount = Math.round(Number(msg?.amount));
+    const email = String(msg?.email || '').trim().toLowerCase();
+    if (!Number.isInteger(amount) || amount <= 0) {
+      return { ok: false, error: 'Numero di crediti non valido: usa un intero positivo.' };
+    }
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      return { ok: false, error: 'Email non valida.' };
+    }
+    try {
+      const r = await adminGift(email, amount);
+      return { ok: true, email, amount, balance: r.balance };
+    } catch (e) { return { ok: false, error: e?.message || String(e) }; }
+  });
+
   // +5 crediti subito all'invio di un feedback (C3). Idempotenza per-invio è del
   // chiamante: ogni invio è un evento distinto, quindi premiamo ogni volta.
   on(MSG.CREDITS_AWARD_FEEDBACK, async (msg) => {
