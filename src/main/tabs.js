@@ -18,6 +18,23 @@ const { isAuthPopup } = globalThis.SN_AUTH_POPUP;
 const PAGE_PRELOAD = path.join(__dirname, '..', 'preload', 'page-preload.js');
 const INTERNAL_PRELOAD = path.join(__dirname, '..', 'preload', 'internal-preload.js');
 
+// SICUREZZA — schemi consentiti per le navigazioni ORIGINATE da contenuto web
+// (click su link, window.location, window.open) e dall'agente. Tutto il resto è
+// bloccato. In particolare `file://`: su Windows un percorso UNC
+// (file://attacker-host/share) fa partire l'autenticazione SMB e fa TRAPELARE
+// l'hash NTLM dell'utente a un sito ostile; `file:///C:/…` espone file locali.
+// `data:`/`javascript:` top-level sono vettori di phishing/script. Le pagine web
+// legittime navigano solo verso http(s); le interne verso filo://. La barra
+// indirizzi (navigazione esplicita dell'utente) NON passa da questo gate.
+const WEB_NAV_SCHEMES = new Set(['http:', 'https:', 'filo:', 'about:', 'blob:']);
+function isWebUnsafeNav(rawUrl) {
+  let proto = '';
+  try { proto = new URL(String(rawUrl || '')).protocol.toLowerCase(); } catch (_) { return false; }
+  // URL relativo/non parsabile → Electron lo risolve sull'origine corrente
+  // (stessa pagina web): non è un cambio di schema, non bloccare.
+  return proto ? !WEB_NAV_SCHEMES.has(proto) : false;
+}
+
 // Altezza della sola fila di tab (tab + nuova scheda + controlli finestra),
 // senza la barra indirizzi. In sync con `.tab-row { flex: 0 0 40px }` in
 // src/renderer/shell.css. Quando la shell è in "chrome compatto" (fuori dalla
