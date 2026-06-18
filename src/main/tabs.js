@@ -1227,8 +1227,11 @@ class TabManager {
       // SICUREZZA: blocca le navigazioni top-level verso schemi non-web
       // (file:// → leak hash NTLM via SMB su Windows; data:/javascript: →
       // phishing/script). Vale per le pagine web; le interne navigano filo://.
+      // I link "azione OS" (mailto:/tel:/sms:) non sono pagine: invece di
+      // fallire li consegniamo al sistema (apre posta/telefono), come un browser.
       if (isWebUnsafeNav(url)) {
         event.preventDefault();
+        openExternalScheme(url);
         return;
       }
       // #170.3 — Blocco apertura siti in blacklist. Click su un link generico
