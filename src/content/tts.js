@@ -396,7 +396,7 @@
   // sta riproducendo, indipendentemente dal contesto cliccato.
   function buildStopReadingItem() {
     const Icons = global.SN_ICONS;
-    return { type: 'item', icon: Icons.stopReading(18), label: I18n.t('menu_stop_reading'), onClick: () => stopReading() };
+    return { type: 'item', icon: Icons.stopReading(18), label: I18n.t('menu_stop_reading'), onClick: () => requestStopReading() };
   }
 
   // Decodifica un blob audio (qualunque formato che il browser sappia leggere
