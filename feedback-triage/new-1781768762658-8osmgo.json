@@ -1,0 +1,13 @@
+{
+  "op": "create",
+  "uid": "169e48b8-f676-4620-9a3b-63a9c9033aba",
+  "text": "Aggiungere un comando riservato al proprietario: /users restituisce la lista delle email di tutti gli utenti. Solo l'owner (account admin) può usarlo; per chiunque altro deve rispondere che è un comando riservato.\n\nPASSI PER VERIFICARE (da owner loggato): apri la nuova scheda, scrivi /users e invia → deve comparire in chat l'elenco delle email degli utenti registrati.\n\nPARTE TECNICA: i comandi slash interni sono in src/pages/dashboard/dashboard.js (oggetto SLASH_COMMANDS, ~riga 1180; routing in handleSlashCommand ~riga 1435 — i comandi interni vincono sempre, anche in modalità terminale). Aggiungere '/users'. Il main process deve esporre un IPC che, SOLO se auth.isAdmin() è true (src/main/auth), legge da Firestore le email di tutti gli utenti (registro introdotto in #210.1: campo 'email' sui doc credits/{uid}). DIPENDE da #210.1 (registro email + regola admin-read sui credits). Criterio di fatto: /users elenca le email; un non-admin riceve un rifiuto. Aggiungere voce in /help e (se user-visibile) una riga nel changelog src/shared/patchNotes.js.",
+  "name": "comando proprietario /users",
+  "parentId": "on1Jn6QFAJJyGV30PdwF",
+  "status": "todo",
+  "priority": 1,
+  "notes": "",
+  "images": [],
+  "queuedAt": "2026-06-18T07:46:02.658Z",
+  "queuedBy": "routine"
+}
