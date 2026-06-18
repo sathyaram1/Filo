@@ -76,13 +76,21 @@ module.exports = function register(on, ctx) {
   });
 
   on(MSG.UPDATE_SETTINGS, async (msg, sender, origin) => {
-    // Cambiare le impostazioni globali è riservato alle pagine interne (Opzioni,
-    // chat di Filo): una pagina web non deve poter riscrivere i settings.
-    if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
+    // I content script delle pagine web aggiornano legittimamente alcune
+    // preferenze (es. il modello di dettatura dal menu tasto destro), quindi
+    // l'update NON è vietato in blocco. Ma da un'origine web NON deve poter
+    // toccare le chiavi API: le strippiamo prima del merge, così una pagina
+    // ostile non può iniettare/sovrascrivere una apiKey (es. dirottare i
+    // prompt su una chiave attaccante). Dalle pagine interne filo:// passa tutto.
+    let incoming = msg.settings;
+    if (!isFilo(origin) && incoming && typeof incoming === 'object' && 'apiKeys' in incoming) {
+      incoming = { ...incoming };
+      delete incoming.apiKeys;
+    }
     // Tutta la propagazione (broadcast, tema nativo, sicurezza, fingerprint,
     // safebrowse, cookie) vive in applySettingsUpdate: stesso percorso usato
     // quando Filo cambia una preferenza via chat.
-    const merged = await applySettingsUpdate(msg.settings);
+    const merged = await applySettingsUpdate(incoming);
     return { ok: true, settings: merged };
   });
 
