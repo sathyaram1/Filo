@@ -9,20 +9,58 @@ module.exports = function register(on, ctx) {
   const Costs = globalThis.SN_COSTS;
   const I18n = globalThis.SN_I18N;
 
-  // ── canali interni per lo shim chrome.* nel renderer ──────────────────
-  on('_storage:get', async (msg) => ({ ok: true, value: await globalThis.chrome.storage.local.get(msg.keys ?? null) }));
+  // ── SICUREZZA: confine d'origine sui canali privilegiati ───────────────
+  // Questi handler sono registrati sul canale generico `filo:message`, che è
+  // raggiungibile SIA dalle pagine interne filo:// SIA dai content script delle
+  // pagine web esterne (shim chrome.* in page-preload.js). I content script
+  // girano nel mondo isolato, quindi oggi una pagina ostile non può chiamarli
+  // direttamente — ma far poggiare TUTTA la barriera sul solo isolamento di
+  // contesto è fragile. Difesa-in-profondità: le operazioni potenti (cancellare
+  // tutto lo storage, leggere le chiavi API, scrivere i settings) sono ammesse
+  // solo da origine filo://; ciò che i content script fanno davvero (leggere le
+  // impostazioni, salvare dizionario/draft/layout) resta consentito.
+  const SETTINGS_KEY = SN_CONST.STORAGE_KEYS.SETTINGS; // 'settings' → contiene apiKeys
+  const isFilo = (origin) => String(origin || '').startsWith('filo://');
+  // Le chiavi web non devono MAI vedere i segreti dentro `settings.apiKeys`: il
+  // renderer non ne ha bisogno (le richieste AI allegano la chiave nel main).
+  function redactForWeb(value) {
+    if (!value || typeof value !== 'object' || !value[SETTINGS_KEY]) return value;
+    const s = value[SETTINGS_KEY];
+    if (!s || typeof s !== 'object' || !s.apiKeys) return value;
+    return { ...value, [SETTINGS_KEY]: { ...s, apiKeys: undefined } };
+  }
+  // Una richiesta tocca la chiave `settings`? (set: oggetto; remove: lista chiavi)
+  const touchesSettings = (keys) =>
+    (Array.isArray(keys) ? keys : [keys]).some((k) => k === SETTINGS_KEY);
 
-  on('_storage:set', async (msg) => {
-    await globalThis.chrome.storage.local.set(msg.obj || {});
+  // ── canali interni per lo shim chrome.* nel renderer ──────────────────
+  on('_storage:get', async (msg, sender, origin) => {
+    const value = await globalThis.chrome.storage.local.get(msg.keys ?? null);
+    return { ok: true, value: isFilo(origin) ? value : redactForWeb(value) };
+  });
+
+  on('_storage:set', async (msg, sender, origin) => {
+    const obj = msg.obj || {};
+    // Una pagina web non può scrivere/avvelenare i settings (né iniettare apiKeys).
+    if (!isFilo(origin) && touchesSettings(Object.keys(obj))) {
+      return { ok: false, error: 'forbidden' };
+    }
+    await globalThis.chrome.storage.local.set(obj);
     return { ok: true };
   });
 
-  on('_storage:remove', async (msg) => {
+  on('_storage:remove', async (msg, sender, origin) => {
+    if (!isFilo(origin) && touchesSettings(msg.keys)) {
+      return { ok: false, error: 'forbidden' };
+    }
     await globalThis.chrome.storage.local.remove(msg.keys);
     return { ok: true };
   });
 
-  on('_storage:clear', async () => {
+  on('_storage:clear', async (msg, sender, origin) => {
+    // Azzerare TUTTI i dati utente non è mai un'operazione legittima per una
+    // pagina web: solo le pagine interne (Opzioni → "cancella dati") possono.
+    if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
     await globalThis.chrome.storage.local.clear();
     return { ok: true };
   });
