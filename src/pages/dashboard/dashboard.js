@@ -1882,8 +1882,10 @@
   async function refreshAccountControl() {
     try {
       const r = await send({ type: MSG.AUTH_STATUS });
+      isOwner = !!(r && r.signedIn && r.isAdmin);
       applyAccountProfile(r && r.signedIn ? r.profile : null);
     } catch (_) {
+      isOwner = false;
       applyAccountProfile(null);
     }
   }
