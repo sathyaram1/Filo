@@ -271,6 +271,9 @@
       };
     }
     u.onend = () => { if (sessionAlive(s)) { clearHighlight(); reportReadingState(false); } };
+    // Se la voce del browser fallisce, la lettura finisce comunque: non lasciamo
+    // lo stato "sta leggendo" appeso (le altre schede mostrerebbero uno stop morto).
+    u.onerror = () => { if (sessionAlive(s)) { clearHighlight(); reportReadingState(false); } };
     synth.speak(u);
   }
 
