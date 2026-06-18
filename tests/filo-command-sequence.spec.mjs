@@ -43,7 +43,7 @@ async function stubSequence(app, turns) {
       modelRegistry: C.DEFAULT_MODEL_REGISTRY,
     });
     globalThis.__filoTurnCount = 0;
-    globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts }) => {
+    const reply = (attempts) => {
       const n = globalThis.__filoTurnCount;
       globalThis.__filoTurnCount += 1;
       const payload = turns[Math.min(n, turns.length - 1)];
@@ -52,6 +52,10 @@ async function stubSequence(app, turns) {
         model: attempts[0].model, provider: attempts[0].provider, usage: {},
       };
     };
+    // La chat della dashboard chiede il ragionamento in diretta → il main usa il
+    // cammino in STREAMING. Stubbiamo entrambi i metodi del provider.
+    globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts }) => reply(attempts);
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts }) => reply(attempts);
   }, { turns });
 }
 
