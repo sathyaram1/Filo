@@ -13,6 +13,18 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
+  // Home vera di Filo (la newtab/dashboard): naviga la scheda CORRENTE, come il
+  // tasto home della barra. Distinto da OPEN_NEW_TAB (che apre una scheda nuova)
+  // e da OPEN_HOME (che apre la pagina "Aperti per dopo"). Se manca l'id della
+  // scheda mittente (flussi senza tab) ripieghiamo sull'apertura di una nuova.
+  on(MSG.GO_HOME, async (msg, sender) => {
+    const win = winOf(sender);
+    if (!win?._filoTabs) return { ok: true };
+    if (sender?.tab?.id) win._filoTabs.navigate(sender.tab.id, 'filo://newtab/');
+    else win._filoTabs.openTab('filo://newtab/');
+    return { ok: true };
+  });
+
   on(MSG.OPEN_HISTORY, async (msg, sender) => {
     const win = winOf(sender);
     if (win?._filoTabs) win._filoTabs.openTab('filo://history/history.html');
