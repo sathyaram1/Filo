@@ -76,9 +76,10 @@
       pieces.push(dec);
       cur = dec;
     }
-    // Decodifica base64 dei token lunghi (sulla forma già urldecodata).
+    // Decodifica base64 dei token lunghi (sulla forma già urldecodata). `=` è un
+    // separatore qui (es. "p=<base64>"): il padding lo ripristina tryBase64.
     const joined = pieces.join(' ');
-    for (const tok of joined.split(/[^A-Za-z0-9+/_=-]+/)) {
+    for (const tok of joined.split(/[^A-Za-z0-9+/_-]+/)) {
       if (tok.length >= 16) {
         const b = tryBase64(tok);
         if (b) pieces.push(b);
