@@ -1177,6 +1177,10 @@
     }
   });
 
+  // Vero se l'account loggato è l'owner (admin): abilita i comandi /users e
+  // /gift in /help. Il gate forte resta nel main (auth.isAdmin) + Firestore rules.
+  let isOwner = false;
+
   const SLASH_COMMANDS = {
     '/home': () => { goHome(); },
     '/clear': () => { goHome(); },
