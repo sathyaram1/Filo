@@ -1,0 +1,15 @@
+{
+  "op": "create",
+  "uid": "2af5670b-aad0-4be1-8f15-b1ba03c22273",
+  "text": "Apri Opzioni → Correttore (gestione correttore) e aggiungi al dizionario personale una parola molto lunga e senza spazi (es. un indirizzo, un codice, o una selezione lunga aggiunta col tasto destro 'Aggiungi al dizionario'). La riga della parola si allunga oltre il bordo della pagina: compare una barra di scorrimento orizzontale e il pulsante 'Rimuovi' viene spinto fuori dallo schermo, quindi non riesci più a cliccare 'Rimuovi' per togliere quella parola dal dizionario. Risultato: una parola che hai aggiunto resta bloccata lì e non puoi più rimuoverla.\n\nPARTE TECNICA: pagina filo://spellcheck/spellcheck.html. La riga del dizionario (.sn-spell-row-dict, display:grid) ha lo span .sn-spell-word con overflow:visible, word-break:normal e min-width:auto: un token lungo senza spazi non va a capo né viene troncato, sfora la cella della griglia e spinge il bottone 'Rimuovi' oltre il viewport (misurato: parola ~1049px, bottone a destra 1257px con viewport 1200 → fuori schermo + scroll orizzontale). Serve far andare a capo/troncare la parola (overflow-wrap/word-break o min-width:0 sulla cella + ellissi) così 'Rimuovi' resta sempre raggiungibile. Probabile stessa mancanza di wrap anche per correzioni/trigger molto lunghi nelle righe autocorrect.",
+  "name": "Correttore: parola lunga nel dizionario sfora e nasconde 'Rimuovi'",
+  "parentId": "",
+  "status": "new",
+  "priority": 1,
+  "notes": "",
+  "images": [
+    "https://firebasestorage.googleapis.com/v0/b/filo-8b9cb.firebasestorage.app/o/feedback%2F1781803314491_0f73ce47-d687-427d-9277-5944fafa3c92.png?alt=media&token=fa8ca1c4-b67c-4908-bd11-de98e0e3618b"
+  ],
+  "queuedAt": "2026-06-18T17:21:55.056Z",
+  "queuedBy": "routine"
+}
