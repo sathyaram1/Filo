@@ -85,6 +85,7 @@
     DEFAULT_MODELS_LIST: 'default_models_list',
 
     OPEN_HOME: 'open_home',
+    GO_HOME: 'go_home',                             // naviga la scheda corrente alla home (filo://newtab/)
     OPEN_HISTORY: 'open_history',
     OPEN_OPTIONS: 'open_options',
     OPEN_SPELLCHECK_PAGE: 'open_spellcheck_page',
