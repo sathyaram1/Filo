@@ -1791,7 +1791,18 @@
       }
     } else if (msg?.type === MSG.AUTH_CHANGED) {
       // Login/logout fatto altrove (es. dal menu profilo): aggiorna l'avatar.
+      isOwner = !!(msg.signedIn && msg.isAdmin);
       applyAccountProfile(msg.signedIn ? msg.profile : null);
+    } else if (msg?.type === MSG.GIFT_NOTICE) {
+      // L'owner ci ha regalato dei crediti (#210.4): avviso una volta sola.
+      const n = Math.round(Number(msg.amount) || 0);
+      if (n > 0 && window.SN_CONFIRM_UI?.notify) {
+        window.SN_CONFIRM_UI.notify({
+          title: 'Crediti in regalo 🎁',
+          text: `Ti sono stati regalati ${n} crediti! Sono già sul tuo saldo.`,
+          okLabel: 'Evviva!',
+        });
+      }
     }
   });
 
