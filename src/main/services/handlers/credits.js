@@ -94,6 +94,17 @@ module.exports = function register(on, ctx) {
         const remote = await loadRemote(uid);
         if (remote) {
           await Credits.adopt(remote, uid);
+          // Registro utenti (#210.1): se il doc remoto non ha ancora email/name
+          // (o sono cambiati), aggiorniamoli subito senza aspettare la prossima
+          // mutazione del saldo, così l'owner trova l'account in /users e /gift.
+          const profile = auth.getProfile?.();
+          const wantEmail = profile?.email ? String(profile.email).toLowerCase() : null;
+          if (wantEmail && (remote.email !== wantEmail || (profile?.name && remote.name !== profile.name))) {
+            await pushRemote(uid, await Credits.readState()).catch(() => {});
+          }
+          // Avviso crediti regalati (#210.4): se l'owner ha lasciato un avviso
+          // sul doc, mostralo una volta sola e azzeralo.
+          await maybeNotifyGift(uid, remote).catch(() => {});
         } else {
           // Primo accesso di questo account: lo stato locale (eventualmente già
           // 1000 di benvenuto) diventa il suo, e lo materializziamo su Firestore.
