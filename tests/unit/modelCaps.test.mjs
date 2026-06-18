@@ -106,3 +106,37 @@ test('modelMatchesAction: un modello di testo soddisfa una funzione testuale', (
   const res = CAPS.modelMatchesAction('gemini', 'gemini-2.0-flash', 'sn_summarize');
   assert.equal(res.ok, true);
 });
+
+test('capabilitiesFor: un modello OpenRouter senza metadati è marcato `uncertain`', () => {
+  // Capacità ignote: il nome non rivela le modalità (non è image/tts/embed/…)
+  // e non abbiamo i metadati. NON dobbiamo assumere "solo testo" con certezza.
+  const caps = CAPS.capabilitiesFor('openrouter', 'stepfun/step-3.7-flash');
+  assert.equal(caps.uncertain, true, 'OpenRouter senza metadati → uncertain');
+  // gemma-* (gemini provider) resta una capacità NOTA, non incerta.
+  assert.ok(!CAPS.capabilitiesFor('gemini', 'gemma-3-27b-it').uncertain);
+  // Con i metadati di modalità espliciti NON è più incerto.
+  const withMeta = CAPS.capabilitiesFor('openrouter', 'stepfun/step-3.7-flash', {
+    architecture: { input_modalities: ['text', 'image'], output_modalities: ['text'] },
+  });
+  assert.ok(!withMeta.uncertain, 'con metadati le capacità sono note');
+});
+
+test('modelMatchesAction: una vision OpenRouter NON va bloccata per "Descrizione immagini"', () => {
+  // Il bug (#qG0): stepfun/step-3.7-flash legge le immagini ma, senza metadati,
+  // l'euristica lo dava come solo-testo e il gate lo bloccava per DESCRIBE_IMAGE.
+  // Ora, capacità ignote ⇒ nel dubbio non si blocca.
+  const res = CAPS.modelMatchesAction('openrouter', 'stepfun/step-3.7-flash', ACTIONS.DESCRIBE_IMAGE);
+  assert.equal(res.ok, true, 'un modello OpenRouter ignoto non va bloccato per le immagini');
+  // Coi metadati che dichiarano l'input immagine resta ovviamente consentito.
+  const withMeta = CAPS.modelMatchesAction('openrouter', 'x', ACTIONS.DESCRIBE_IMAGE, {
+    architecture: { input_modalities: ['text', 'image'], output_modalities: ['text'] },
+  });
+  assert.equal(withMeta.ok, true);
+});
+
+test('modelMatchesAction: gemma-* (capacità nota) resta bloccato per le immagini', () => {
+  // La relax dell\'incertezza NON deve aprire le maglie a un modello la cui
+  // incapacità è NOTA: gemma-* è solo testo in input → niente immagini.
+  const res = CAPS.modelMatchesAction('gemini', 'gemma-3-27b-it', ACTIONS.DESCRIBE_IMAGE);
+  assert.equal(res.ok, false, 'gemma-* resta incompatibile con le immagini');
+});
