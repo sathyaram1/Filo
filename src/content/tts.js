@@ -246,7 +246,7 @@
   // pronunciato; `baseChar` è l'offset di quel testo nel testo letto completo
   // (per mappare l'onboundary ai token globali quando il fallback parte a metà).
   function playBrowserChunk(s, utterText, baseChar) {
-    if (!ttsSupported()) { Popup.showToast(I18n.t('tts_not_supported')); clearHighlight(); return; }
+    if (!ttsSupported()) { Popup.showToast(I18n.t('tts_not_supported')); clearHighlight(); reportReadingState(false); return; }
     const synth = window.speechSynthesis;
     synth.cancel();
     const u = new SpeechSynthesisUtterance(utterText);
