@@ -605,7 +605,19 @@
     try { _dictateState.rec.stop(); } catch (_) {}
   }
 
-  function init(d) { deps = { ...deps, ...d }; }
+  function init(d) {
+    deps = { ...deps, ...d };
+    // Una scheda appena aperta potrebbe non aver mai ricevuto il broadcast
+    // "sta leggendo" (la lettura era già partita altrove prima che esistesse):
+    // chiediamo lo stato corrente al main così il menu mostra subito "Interrompi
+    // lettura" anche qui.
+    try {
+      const p = chrome.runtime.sendMessage({ type: MSG.TTS_READING_STATUS });
+      if (p && typeof p.then === 'function') {
+        p.then((r) => { if (r && typeof r.active === 'boolean') globalReading = r.active; }).catch(() => {});
+      }
+    } catch (_) {}
+  }
 
   global.SN_TTS = {
     init,
