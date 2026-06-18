@@ -45,6 +45,40 @@ test('#1 una pagina web non può aprire file:// (window.open) né navigarci (loc
   expect(page.url()).toBe(startUrl);
 });
 
+test('#1b i link mailto:/tel: vengono consegnati all\'OS, file:// no', async ({ app, openTab, testServer }) => {
+  // Stub di shell.openExternal nel main: così il test verifica la DELEGA senza
+  // lanciare davvero il client di posta. tabs.js tiene lo stesso oggetto `shell`
+  // (require('electron')), quindi mutarne la proprietà è visibile al codice reale.
+  await app.evaluate(({ shell }) => {
+    globalThis.__ext = [];
+    shell.openExternal = (u) => { globalThis.__ext.push(String(u)); return Promise.resolve(); };
+  });
+
+  const page = await testServer.openReady(openTab, `
+    <!doctype html><meta charset="utf-8"><title>os-scheme</title><body><p>x</p>
+  `);
+  const startUrl = page.url();
+
+  await page.evaluate(() => { try { window.location.href = 'mailto:mario@esempio.it?subject=ciao'; } catch (_) {} });
+  await page.evaluate(() => { try { window.open('tel:+39055123456'); } catch (_) {} });
+  await page.evaluate(() => { try { window.open('file://attacker.example/share/x'); } catch (_) {} });
+
+  await new Promise((r) => setTimeout(r, 700));
+
+  const ext = await app.evaluate(() => globalThis.__ext || []);
+  expect(ext.some((u) => u.startsWith('mailto:'))).toBe(true);
+  expect(ext.some((u) => u.startsWith('tel:'))).toBe(true);
+  // file:// non deve MAI finire a shell.openExternal (resta solo bloccato).
+  expect(ext.some((u) => u.toLowerCase().startsWith('file:'))).toBe(false);
+
+  // La pagina non è stata dirottata e nessun tab file:// è comparso.
+  expect(page.url()).toBe(startUrl);
+  const fileWindows = app.windows().filter((w) => {
+    try { return w.url().toLowerCase().startsWith('file:'); } catch (_) { return false; }
+  });
+  expect(fileWindows.length).toBe(0);
+});
+
 test('#2 i canali privilegiati non trapelano le chiavi API a un\'origine web', async ({ app }) => {
   const SECRET = 'sk-or-v1-WEB-LEAK-' + Date.now();
   // Imposta una apiKey reale come farebbe una pagina interna (origine filo://).
