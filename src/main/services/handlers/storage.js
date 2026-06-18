@@ -91,6 +91,9 @@ module.exports = function register(on, ctx) {
     // safebrowse, cookie) vive in applySettingsUpdate: stesso percorso usato
     // quando Filo cambia una preferenza via chat.
     const merged = await applySettingsUpdate(incoming);
+    if (!isFilo(origin) && merged && merged.apiKeys) {
+      return { ok: true, settings: { ...merged, apiKeys: undefined } };
+    }
     return { ok: true, settings: merged };
   });
 
