@@ -62,8 +62,22 @@
 
   const REGISTRY = {
     NAVIGA: {
-      level: 1,
-      describe: (a) => `Aprire ${a.url || 'una pagina'}`,
+      // Aprire un link è di norma innocuo → livello 1, diretto. ECCEZIONE
+      // anti-esfiltrazione: se l'URL trasporta FUORI dati sensibili che il
+      // modello aveva nel contesto (taint-match) o ha la forma di un payload di
+      // esfiltrazione da origine non fidata (fallback strutturale), sale a
+      // livello 2 → conferma con l'URL mostrato. Il flag `_exfil` lo calcola il
+      // main (src/main/services/handlers.js → src/shared/urlExfil.js); mai l'LLM.
+      level: (a) => (a && a._exfil ? 2 : 1),
+      describe: (a) => {
+        const url = a.url || a.href || a.link || 'una pagina';
+        if (a && a._exfil) {
+          const why = a._exfilReason ? ` (${a._exfilReason})` : '';
+          return `Filo sta per aprire un link che${why}:\n${url}\n\n`
+            + 'Potrebbe inviare tuoi dati a un sito esterno. Apri solo se l\'hai chiesto tu.';
+        }
+        return `Aprire ${url}`;
+      },
     },
     APRI_FILE: {
       level: 1,
