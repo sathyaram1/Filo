@@ -73,6 +73,10 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
+  on(MSG.TTS_READING_STATUS, async () => {
+    return { ok: true, active: readingWcs.size > 0 };
+  });
+
   on(MSG.TTS_STOP_READING, async () => {
     // Inoltra lo stop a tutte le schede; quella che legge si ferma e poi segnala
     // reading:false (che azzera lo stato globale). Azzeriamo anche subito qui per
