@@ -365,7 +365,7 @@
         return;
       }
     }
-    if (sessionAlive(s)) clearHighlight();
+    if (sessionAlive(s)) { clearHighlight(); reportReadingState(false); }
   }
 
   // Voce di menu "Leggi ad alta voce" sul testo selezionato. Mentre una
