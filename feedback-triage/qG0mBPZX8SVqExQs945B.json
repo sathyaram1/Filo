@@ -1,0 +1,7 @@
+{
+  "id": "qG0mBPZX8SVqExQs945B",
+  "status": "done",
+  "notes": "Risolto. Ora nelle impostazioni dei \"Modelli predefiniti\" puoi assegnare alla \"Descrizione immagini\" un modello OpenRouter capace di leggere le immagini (come stepfun/step-3.7-flash): prima Filo lo rifiutava dicendo che non accettava immagini, anche quando in realta' le accetta. Quando l'immagine viene poi descritta, viene inviata correttamente al modello scelto.\n\nCosa ho aggiunto oltre al chiesto: ho applicato la stessa logica a TUTTE le funzioni che richiedono immagini/audio in input (es. trascrizione immagini), non solo alla descrizione — i modelli OpenRouter \"adatti ma non riconoscibili dal nome\" non vengono piu' bloccati a priori. I modelli la cui incapacita' e' certa (es. gemma, solo testo) restano correttamente bloccati.\n\nCome ho verificato: nuovi unit test su modelCaps (un modello OpenRouter senza metadati ora non viene bloccato per le immagini, mentre gemma resta bloccato) + l'intera suite Playwright (439 test, tutti verdi).\n\nNOTA TECNICA: il gate di compatibilita' (modelChainEditor) chiamava modelMatchesAction senza metadati di modalita'; per i modelli OpenRouter senza metadati l'euristica sul nome assumeva 'solo testo' e bloccava. Ora capabilitiesFor marca questi casi come 'uncertain' e modelMatchesAction, nel dubbio, non blocca (coerente con la regola gia' presente \"nickname sconosciuti non si bloccano\").",
+  "queuedAt": "2026-06-18T00:28:54.001Z",
+  "queuedBy": "routine"
+}
