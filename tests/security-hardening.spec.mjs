@@ -45,6 +45,55 @@ test('#1 una pagina web non può aprire file:// (window.open) né navigarci (loc
   expect(page.url()).toBe(startUrl);
 });
 
+test('#2 i canali privilegiati non trapelano le chiavi API a un\'origine web', async ({ app }) => {
+  const SECRET = 'sk-or-v1-WEB-LEAK-' + Date.now();
+  // Imposta una apiKey reale come farebbe una pagina interna (origine filo://).
+  await app.evaluate(async (_electron, secret) => {
+    const MSG = globalThis.SN_MSG.MSG;
+    await globalThis.SN_HANDLE_MESSAGE(
+      { type: MSG.UPDATE_SETTINGS, settings: { apiKeys: { openrouter: secret } } },
+      { url: 'filo://options/options.html' },
+    );
+  }, SECRET);
+
+  // Lettura da una PAGINA INTERNA: deve vedere la chiave (le Opzioni la editano).
+  const filoView = await app.evaluate(async () => {
+    const MSG = globalThis.SN_MSG.MSG;
+    const r = await globalThis.SN_HANDLE_MESSAGE({ type: MSG.GET_SETTINGS }, { url: 'filo://options/options.html' });
+    return r.settings.apiKeys && r.settings.apiKeys.openrouter;
+  });
+  expect(filoView).toBe(SECRET);
+
+  // Lettura da un'ORIGINE WEB (content script su una pagina http): niente chiavi.
+  const webView = await app.evaluate(async () => {
+    const MSG = globalThis.SN_MSG.MSG;
+    const get = await globalThis.SN_HANDLE_MESSAGE({ type: MSG.GET_SETTINGS }, { url: 'https://evil.example/page' });
+    const stor = await globalThis.SN_HANDLE_MESSAGE({ type: '_storage:get', keys: null }, { url: 'https://evil.example/page' });
+    return {
+      settingsApiKeys: get.settings.apiKeys,
+      storageApiKeys: stor.value && stor.value.settings && stor.value.settings.apiKeys,
+    };
+  });
+  expect(webView.settingsApiKeys).toBeFalsy();
+  expect(webView.storageApiKeys).toBeFalsy();
+
+  // Scrittura da un'origine web: non può iniettare/sovrascrivere una apiKey,
+  // ma una preferenza benigna (modello) passa. La chiave originale resta intatta.
+  const afterWebWrite = await app.evaluate(async () => {
+    const MSG = globalThis.SN_MSG.MSG;
+    await globalThis.SN_HANDLE_MESSAGE(
+      { type: MSG.UPDATE_SETTINGS, settings: { apiKeys: { openrouter: 'sk-ATTACKER' }, models: { x: 'm' } } },
+      { url: 'https://evil.example/page' },
+    );
+    // Niente clear da origine web.
+    const cleared = await globalThis.SN_HANDLE_MESSAGE({ type: '_storage:clear' }, { url: 'https://evil.example/page' });
+    const r = await globalThis.SN_HANDLE_MESSAGE({ type: MSG.GET_SETTINGS }, { url: 'filo://options/options.html' });
+    return { key: r.settings.apiKeys && r.settings.apiKeys.openrouter, clearOk: cleared.ok };
+  });
+  expect(afterWebWrite.key).toBe(SECRET); // non sovrascritta dall'attaccante
+  expect(afterWebWrite.clearOk).toBe(false); // clear da web rifiutato
+});
+
 test('#3 le chiavi API sono cifrate nel storage.json (mai in chiaro su disco)', async ({ app }) => {
   const SECRET = 'sk-or-v1-SEGRETISSIMA-' + Date.now();
   const userData = await app.evaluate(() => process.env.FILO_USER_DATA);
