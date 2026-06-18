@@ -81,3 +81,66 @@ test('durante la lettura, un menu senza selezione mostra "Interrompi lettura"', 
     return await menu.locator('.sn-menu-item', { hasText: 'Interrompi lettura' }).count();
   }, { timeout: 8000, intervals: [200, 300, 500, 800] }).toBeGreaterThan(0);
 });
+
+// Apre un secondo tab sulla stessa origin (stesso hostname → l'helper openTab
+// per-hostname sarebbe ambiguo) trovandolo per URL ESATTO, e aspetta i content
+// script. Restituisce la Page del WebContentsView.
+async function openTabByExactUrl(app, shell, url) {
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+  const deadline = Date.now() + 10_000;
+  let page = null;
+  while (Date.now() < deadline) {
+    page = app.windows().find((w) => { try { return w.url() === url; } catch (_) { return false; } });
+    if (page) break;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  if (!page) throw new Error(`openTabByExactUrl: nessuna window per ${url}`);
+  await page.waitForLoadState('domcontentloaded').catch(() => {});
+  await page.waitForFunction(
+    () => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 },
+  ).catch(() => {});
+  return page;
+}
+
+test('durante la lettura, "Interrompi lettura" compare e ferma anche da un\'ALTRA scheda', async ({ app, shell, openTab, testServer }) => {
+  await app.evaluate(() => { globalThis.__filoTestTtsCanned = true; });
+
+  // Scheda A: avvia la lettura.
+  const urlA = testServer.html(HTML);
+  const pageA = await openTab(urlA);
+  await pageA.waitForFunction(
+    () => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 },
+  );
+  await pageA.evaluate(() => {
+    const el = document.getElementById('target');
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  });
+  await pageA.locator('#target').click({ button: 'right' });
+  await expect(pageA.locator('.sn-menu').first()).toBeVisible();
+  await pageA.locator('.sn-menu-item', { hasText: 'Leggi' }).first().click();
+
+  // Scheda B: un'altra pagina, altra scheda. NESSUNA lettura parte qui.
+  const urlB = testServer.html(HTML);
+  const pageB = await openTabByExactUrl(app, shell, urlB);
+
+  // In B, su un'area senza selezione, "Interrompi lettura" deve comparire perché
+  // una lettura è attiva ALTROVE (prima del fix non comparirebbe mai in B).
+  const stopVisibleInB = async () => {
+    await pageB.keyboard.press('Escape').catch(() => {});
+    await pageB.locator('#empty').click({ button: 'right' });
+    const menu = pageB.locator('.sn-menu').first();
+    if (!(await menu.isVisible().catch(() => false))) return 0;
+    return await menu.locator('.sn-menu-item', { hasText: 'Interrompi lettura' }).count();
+  };
+  await expect.poll(stopVisibleInB, { timeout: 8000, intervals: [200, 300, 500, 800] }).toBeGreaterThan(0);
+
+  // Cliccando lo stop da B la lettura in A si ferma: lo stato globale torna
+  // inattivo e la voce sparisce dai menu di B.
+  await pageB.locator('.sn-menu-item', { hasText: 'Interrompi lettura' }).first().click();
+
+  await expect.poll(stopVisibleInB, { timeout: 8000, intervals: [200, 300, 500, 800] }).toBe(0);
+});
