@@ -16,11 +16,17 @@
 // sotto-comandi) esplicitamente riconosciuti come sicuri; tutto il resto è 3.
 //
 // Sicurezza by-design:
-//   • concatenazioni / redirezioni / sostituzioni (&&, ||, |, ;, &, backtick,
-//     $(...), ${...}, >, >>, <, newline) → il comando non è "interamente
-//     riconoscibile" → 3, sempre. Non proviamo a fare il parsing del quoting:
-//     un falso positivo qui costa solo più attrito (digitare "conferma"), mai
-//     un'esecuzione silenziosa indebita.
+//   • una SEQUENZA pura di comandi separati da `&&`, `||` o `;` — e composta
+//     solo da comandi a loro volta riconoscibili — prende il livello MASSIMO dei
+//     suoi pezzi. Così `cd Desktop && ls` (due letture) resta livello 1 invece
+//     di salire a 3 solo perché concatenato; `ls && rm -rf x` resta 3 (per via
+//     dell'rm). È sicuro perché il livello non scende mai sotto quello del pezzo
+//     più pericoloso.
+//   • pipe (|), background (&), redirezioni (>, >>, <), sostituzioni ($(...),
+//     ${...}, backtick) e newline NON sono semplici sequenze: il comando non è
+//     "interamente riconoscibile" → 3, sempre. Non proviamo a fare il parsing
+//     del quoting: un falso positivo qui costa solo più attrito (digitare
+//     "conferma"), mai un'esecuzione silenziosa indebita.
 //   • un backstop di programmi distruttivi (rm/del/format/…) resta 3 anche se
 //     per errore comparisse in una whitelist.
 //   • flag pericolosi (--force, --hard, -rf…) alzano un livello ≤2 a 3.
