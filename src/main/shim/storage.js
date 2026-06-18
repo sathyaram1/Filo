@@ -7,11 +7,62 @@
 //
 // API esposta: get / set / remove / clear (compatibili chrome.storage.local).
 
-const { app } = require('electron');
+const { app, safeStorage } = require('electron');
 const fs = require('node:fs');
 const fsp = require('node:fs/promises');
 const path = require('node:path');
 const { AsyncLocalStorage } = require('node:async_hooks');
+
+// === Cifratura a riposo delle chiavi API ===========================
+// Le chiavi API dei provider AI (settings.apiKeys) sono un segreto: a riposo NON
+// devono stare in chiaro nel storage.json (qualsiasi altro processo dell'utente,
+// un backup o un altro utente del FS potrebbe leggerle). Le cifriamo con
+// `safeStorage` di Electron (DPAPI su Windows, Keychain su macOS, libsecret su
+// Linux) — la stessa difesa già usata per i token di sessione (auth/token-store).
+// In MEMORIA (STATE.data) restano in chiaro: chi legge i settings (getSettings)
+// non cambia. La cifratura tocca solo il blob serializzato su disco.
+//
+// Compatibilità: un storage.json vecchio (apiKeys in chiaro) viene letto e, alla
+// prima scrittura, riscritto cifrato — migrazione trasparente. Se la cifratura
+// OS non è disponibile (es. Linux headless senza keyring), si ricade sul
+// comportamento precedente (apiKeys in chiaro) senza perdere dati.
+const ENC_PREFIX = 'safeStorage:v1:';
+
+function canEncrypt() {
+  try { return safeStorage.isEncryptionAvailable(); } catch (_) { return false; }
+}
+
+// Copia DA SCRIVERE su disco: sostituisce settings.apiKeys (in chiaro, in
+// memoria) con settings.apiKeysEnc (base64 del blob cifrato). Non muta `data`.
+function serializeForDisk(data) {
+  try {
+    const s = data && data.settings;
+    if (!s || typeof s !== 'object' || !s.apiKeys || typeof s.apiKeys !== 'object') return data;
+    if (!canEncrypt()) return data; // niente keyring OS → resta com'era (no perdita dati)
+    const blob = safeStorage.encryptString(JSON.stringify(s.apiKeys)).toString('base64');
+    const ns = { ...s, apiKeys: undefined, apiKeysEnc: ENC_PREFIX + blob };
+    return { ...data, settings: ns };
+  } catch (_) { return data; }
+}
+
+// Inverso di serializeForDisk: al load ripristina settings.apiKeys in chiaro in
+// memoria a partire dal blob cifrato, e rimuove il campo apiKeysEnc.
+function deserializeFromDisk(data) {
+  try {
+    const s = data && data.settings;
+    if (!s || typeof s !== 'object' || typeof s.apiKeysEnc !== 'string') return data;
+    if (!s.apiKeysEnc.startsWith(ENC_PREFIX) || !canEncrypt()) return data;
+    const buf = Buffer.from(s.apiKeysEnc.slice(ENC_PREFIX.length), 'base64');
+    const apiKeys = JSON.parse(safeStorage.decryptString(buf));
+    const ns = { ...s, apiKeys };
+    delete ns.apiKeysEnc;
+    return { ...data, settings: ns };
+  } catch (_) {
+    // Blob illeggibile (cifrato con un'altra chiave OS / altro utente): lascia
+    // i settings senza apiKeys (l'utente le re-inserisce), come fa token-store.
+    return data;
+  }
+}
 
 const STATE = {
   loaded: false,
