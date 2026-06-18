@@ -175,9 +175,15 @@ service cloud.firestore {
     // altri utenti, quindi il blast radius è solo "barare col proprio saldo".
     // Se in futuro i crediti diventano spendibili per davvero, va spostato il
     // calcolo su una Cloud Function autorevole.
+    // Oltre al proprietario, anche un ADMIN può leggere e scrivere qualsiasi
+    // doc credits: serve ai comandi proprietario /users (elenco utenti) e /gift
+    // (accredito crediti a un altro account). L'app desktop sincronizza qui
+    // anche `email`/`name` dell'utente, così l'admin può risolvere email→uid e
+    // listare gli iscritti. Resta client-authoritative per il saldo proprio.
     match /credits/{uid} {
       allow read, write: if request.auth != null
         && request.auth.uid == uid;
+      allow read, write: if isAdmin();
     }
 
     // Percorsi di navigazione raccolti dalla sidebar "Aiuto" (Fase 2).
