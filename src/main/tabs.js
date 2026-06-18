@@ -2021,4 +2021,4 @@ function normalizeUrl(input) {
   return 'https://www.google.com/search?q=' + encodeURIComponent(raw);
 }
 
-module.exports = { TabManager, normalizeUrl };
+module.exports = { TabManager, normalizeUrl, isWebUnsafeNav };
