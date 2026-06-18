@@ -181,13 +181,26 @@
     return 3; // run/exec/start/test/publish/sconosciuti → 3
   }
 
-  // Livello di sicurezza del comando: 1 | 2 | 3. Mai null: l'ignoto è 3.
-  function classify(cmd) {
-    if (typeof cmd !== 'string') return 3;
-    const trimmed = cmd.trim();
-    if (!trimmed) return 3;
-    if (CHAIN_RE.test(trimmed)) return 3;
+  // Se il comando è una pura sequenza di comandi separati da `&&`, `||` o `;`
+  // (senza pipe, background, redirezioni o sostituzioni), ritorna l'elenco dei
+  // singoli comandi; altrimenti null. Le sequenze "sicure" si classificano poi
+  // pezzo per pezzo prendendo il massimo: concatenare due letture (cd && ls)
+  // non deve trasformarle in un'azione irreversibile.
+  function splitSafeSequence(cmd) {
+    // Metacaratteri che NON sono semplice sequenziamento: redirezioni,
+    // sostituzioni, backtick, newline → non è una sequenza sicura.
+    if (/[`<>]|\$\(|\$\{|\r|\n/.test(cmd)) return null;
+    const parts = cmd.split(/\s*(?:&&|\|\||;)\s*/).filter(Boolean);
+    // Dopo aver tolto `&&`/`||`/`;`, un `&` o `|` "solitario" residuo significa
+    // background o pipe → non è una sequenza sicura.
+    for (const p of parts) {
+      if (/[&|]/.test(p)) return null;
+    }
+    return parts;
+  }
 
+  // Livello di un SINGOLO comando (senza metacaratteri di sequenza).
+  function classifyOne(trimmed) {
     const prog = programOf(trimmed);
     if (!prog) return 3;
     if (ALWAYS_3.has(prog)) return 3;
@@ -207,6 +220,23 @@
     }
 
     return 3; // comando non riconosciuto → livello 3 di default
+  }
+
+  // Livello di sicurezza del comando: 1 | 2 | 3. Mai null: l'ignoto è 3.
+  function classify(cmd) {
+    if (typeof cmd !== 'string') return 3;
+    const trimmed = cmd.trim();
+    if (!trimmed) return 3;
+
+    // Sequenza pura di comandi (`&&`/`||`/`;`) → livello = massimo dei pezzi.
+    const seq = splitSafeSequence(trimmed);
+    if (seq && seq.length > 1) {
+      return seq.reduce((max, part) => Math.max(max, classifyOne(part)), 1);
+    }
+    // Pipe / background / redirezioni / sostituzioni: non riconoscibili → 3.
+    if (!seq && CHAIN_RE.test(trimmed)) return 3;
+
+    return classifyOne(trimmed);
   }
 
   global.SN_CMD_CLASSIFY = { classify, programOf, subcommandOf };
