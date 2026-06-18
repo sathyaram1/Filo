@@ -272,8 +272,12 @@
     }
     u.onend = () => { if (sessionAlive(s)) { clearHighlight(); reportReadingState(false); } };
     // Se la voce del browser fallisce, la lettura finisce comunque: non lasciamo
-    // lo stato "sta leggendo" appeso (le altre schede mostrerebbero uno stop morto).
-    u.onerror = () => { if (sessionAlive(s)) { clearHighlight(); reportReadingState(false); } };
+    // lo stato "sta leggendo" appeso (le altre schede mostrerebbero uno stop
+    // morto). NON azzeriamo l'evidenziazione qui: in ambienti senza voci di
+    // sistema 'error' scatta subito e cancellerebbe l'evidenziazione della prima
+    // parola appena impostata (che è il segnale visibile che la lettura è
+    // partita) — la pulizia avviene comunque allo stop o alla fine reale.
+    u.onerror = () => { if (sessionAlive(s)) reportReadingState(false); };
     synth.speak(u);
   }
 
