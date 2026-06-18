@@ -4,7 +4,7 @@
 module.exports = function register(on, ctx) {
   const {
     MSG, handleAIRequest, getEffectiveSettings, modelForAction, buildAttemptChain,
-    Defaults, isAdmin,
+    Defaults, isAdmin, broadcastToTabs,
   } = ctx;
   const { SN_CONST } = globalThis;
   const Providers = globalThis.SN_PROVIDERS;
