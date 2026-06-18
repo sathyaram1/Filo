@@ -270,7 +270,7 @@
         setHighlight(Chunk.charIndexToToken(readTokens, baseChar + (e.charIndex || 0)));
       };
     }
-    u.onend = () => { if (sessionAlive(s)) clearHighlight(); };
+    u.onend = () => { if (sessionAlive(s)) { clearHighlight(); reportReadingState(false); } };
     synth.speak(u);
   }
 
