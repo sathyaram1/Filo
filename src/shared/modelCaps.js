@@ -70,12 +70,18 @@
     }
 
     // Modello di testo. Input multimodale per i gemini-* (accettano immagini e
-    // audio); i gemma-* sono solo testo. Per OpenRouter senza metadati restiamo
-    // conservativi (solo testo): se servono immagini/audio l'utente sceglierà un
-    // modello con i metadati che lo dichiarano.
+    // audio); i gemma-* sono solo testo (capacità NOTA, niente `uncertain`).
+    // Per un modello OpenRouter di cui non abbiamo i metadati di modalità le
+    // capacità reali sono IGNOTE: tanti modelli OpenRouter accettano immagini
+    // (es. vision) ma il nome non lo rivela. Lo marchiamo `uncertain` così il
+    // gate di compatibilità NON blocca l'utente che lo sceglie (vedi
+    // modelMatchesAction): a runtime, se davvero non legge le immagini, scatta
+    // il fallback. Default categoria resta "testo" (cosmetico).
     const inputs = [M.TEXT];
+    let uncertain = false;
     if (provider === 'gemini' && /^gemini/.test(id)) inputs.push(M.IMAGE, M.AUDIO);
-    return { inputs, outputs: [M.TEXT] };
+    else if (provider === 'openrouter') uncertain = true;
+    return { inputs, outputs: [M.TEXT], uncertain };
   }
 
   // Categoria principale (chiave i18n caps_cat_*) per le etichette del picker.
