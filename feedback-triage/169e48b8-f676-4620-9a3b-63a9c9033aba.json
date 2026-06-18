@@ -1,7 +1,0 @@
-{
-  "id": "169e48b8-f676-4620-9a3b-63a9c9033aba",
-  "status": "done",
-  "notes": "Nuovo comando riservato all'owner: scrivi /users nella nuova scheda per vedere l'elenco degli utenti registrati (email, nome e saldo crediti). Chi non è l'owner riceve 'Comando riservato al proprietario.'. Aggiunto anche in /help (visibile solo all'owner).\n\nOltre alle email ho incluso nome e saldo di ogni utente, per dare un colpo d'occhio più utile: dimmi se preferisci solo le email.\n\nVerificato: suite completa 448/448 verde + test mirato che il comando è cablato e che un non-proprietario viene rifiutato. L'elenco reale richiede login owner + deploy regole (vedi #210.1).",
-  "queuedAt": "2026-06-18T09:52:53.675Z",
-  "queuedBy": "routine"
-}

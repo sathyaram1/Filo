@@ -1,7 +1,0 @@
-{
-  "id": "9e014f1d-bcbc-4c74-a7d0-8647bf2b7ca3",
-  "status": "done",
-  "notes": "Fondamenta dei comandi proprietario. Ora ogni account, quando sincronizza i crediti, salva anche la propria email e il proprio nome: così l'owner può ritrovare gli utenti per email (/gift) ed elencarli (/users). Le regole di sicurezza ora permettono all'owner di leggere e accreditare i crediti di qualsiasi utente.\n\nIMPORTANTE: le nuove regole vanno pubblicate a mano dall'owner con 'firebase deploy --only firestore:rules' (la routine non può deployare). Finché non le pubblichi, /gift verso un altro account verrà rifiutato dal server.\n\nVerificato: suite completa 448/448 verde. La scrittura cross-account vera (saldo di un altro account che cresce) va provata a mano dopo il deploy, con due account.",
-  "queuedAt": "2026-06-18T09:52:11.968Z",
-  "queuedBy": "routine"
-}
