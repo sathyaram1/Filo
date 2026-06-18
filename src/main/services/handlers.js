@@ -647,6 +647,18 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         // cliccabile per riaprirlo (kept:true).
         const url = String(action.url ?? action.href ?? action.link ?? '').trim();
         if (!url) return { executed: false, kept: false };
+        // SICUREZZA: l'agente non apre schemi non-web. Una pagina ostile può
+        // iniettare istruzioni nel modello (prompt injection) per fargli aprire
+        // un file://attacker (leak hash NTLM su Windows) o data:/javascript:.
+        // NAVIGA è livello 1 (nessuna conferma), quindi il filtro è qui. Un URL
+        // "nudo" (es. "example.com") non parsa e prosegue: openTab → normalizeUrl
+        // gli antepone https://.
+        try {
+          const proto = new URL(url).protocol.toLowerCase();
+          if (!['http:', 'https:', 'filo:'].includes(proto)) {
+            return { executed: false, kept: true, output: { blocked: 'scheme' } };
+          }
+        } catch (_) { /* URL non assoluto: lo normalizza openTab */ }
         let opened = false;
         try {
           const win = winOf(sender);
