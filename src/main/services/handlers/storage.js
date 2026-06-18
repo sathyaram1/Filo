@@ -106,9 +106,12 @@ module.exports = function register(on, ctx) {
     return { ok: true, settings: merged };
   });
 
-  on(MSG.EXPORT_DATA, async (msg, sender) => {
+  on(MSG.EXPORT_DATA, async (msg, sender, origin) => {
     // Esporta TUTTI i dati di Filo in un unico .zip (data.json + immagini
-    // copiate estratte come file). L'utente sceglie dove salvarlo.
+    // copiate estratte come file). L'utente sceglie dove salvarlo. Solo dalle
+    // pagine interne (Opzioni): una pagina web non deve poter innescare un dump
+    // completo dei dati utente (incluse le chiavi API) né aprire un file dialog.
+    if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
     try {
       const { dialog } = require('electron');
       const fsp = require('node:fs/promises');
