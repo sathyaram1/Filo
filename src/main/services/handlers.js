@@ -1516,6 +1516,10 @@ globalThis.SN_GEO_CLASSIFY = async function geoClassify(input) {
 globalThis.SN_EXECUTE_FILO_ACTION = executeFiloAction;
 // Idem per la chat della home: i test ne ispezionano il prompt costruito (#158).
 globalThis.SN_HANDLE_FILO_CHAT = handleFiloChat;
+// Dispatch grezzo (msg, sender) per i test che verificano il gate d'origine sui
+// canali privilegiati (storage/settings): permette di simulare un mittente con
+// origine web e asserire che le chiavi API non trapelano. Vedi handlers/storage.js.
+globalThis.SN_HANDLE_MESSAGE = handleMessage;
 
 module.exports = {
   handleMessage,
