@@ -610,6 +610,8 @@
   global.SN_TTS = {
     init,
     ttsBusy,
+    isAnyReading,
+    handleBroadcast,
     stopReading,
     readAloud,
     buildReadAloudItem,
