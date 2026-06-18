@@ -43,7 +43,10 @@ async function stubSequence(app, turns) {
       modelRegistry: C.DEFAULT_MODEL_REGISTRY,
     });
     globalThis.__filoTurnCount = 0;
-    const reply = (attempts) => {
+    // La chat della dashboard chiede il ragionamento in diretta → ogni turno di
+    // chat passa dal cammino in STREAMING: lo stub qui SERVE la sequenza e conta
+    // i turni reali della conversazione.
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts }) => {
       const n = globalThis.__filoTurnCount;
       globalThis.__filoTurnCount += 1;
       const payload = turns[Math.min(n, turns.length - 1)];
@@ -52,10 +55,13 @@ async function stubSequence(app, turns) {
         model: attempts[0].model, provider: attempts[0].provider, usage: {},
       };
     };
-    // La chat della dashboard chiede il ragionamento in diretta → il main usa il
-    // cammino in STREAMING. Stubbiamo entrambi i metodi del provider.
-    globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts }) => reply(attempts);
-    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts }) => reply(attempts);
+    // Gli agenti in background (lezioni/compattatore) usano il cammino NON
+    // streaming: rispondiamo qualcosa di innocuo senza toccare il contatore dei
+    // turni di chat, così non inquinano la misura dell'auto-continuazione.
+    globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts }) => ({
+      text: JSON.stringify({ text: '', actions: [] }),
+      model: attempts[0].model, provider: attempts[0].provider, usage: {},
+    });
   }, { turns });
 }
 
