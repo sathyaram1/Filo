@@ -1197,6 +1197,8 @@
     '/pulisci': () => { runTabCleanup(); },
     '/pulizia': () => { runTabCleanup(); },
     '/set': (text) => { handleSetCommand(text); },
+    '/users': () => { handleUsersCommand(); },
+    '/gift': (text) => { handleGiftCommand(text); },
     '/help': () => {
       if (body.dataset.state !== 'thread') goThread();
       const lines = [
@@ -1215,11 +1217,45 @@
         '/help — lista comandi',
         '/google.com — apri un sito',
       ];
+      if (isOwner) {
+        lines.push(
+          '/users — elenca gli utenti registrati (proprietario)',
+          '/gift NUMERO EMAIL — regala crediti a un utente (proprietario)',
+        );
+      }
       const bubble = makeBubble({ role: 'filo', text: lines.join('\n') });
       bubblesEl.appendChild(bubble);
       bubblesEl.scrollTop = bubblesEl.scrollHeight;
     },
   };
+
+  // "/users": elenca le email degli utenti registrati. Riservato al proprietario
+  // (il main rifiuta i non-admin con un messaggio chiaro).
+  async function handleUsersCommand() {
+    showFiloLine('Recupero gli utenti registrati…');
+    const r = await send({ type: MSG.OWNER_LIST_USERS });
+    if (!r || r.ok === false) { showFiloLine(r?.error || 'Non sono riuscito a recuperare gli utenti.'); return; }
+    const users = Array.isArray(r.users) ? r.users : [];
+    if (!users.length) { showFiloLine('Nessun utente registrato.'); return; }
+    const lines = users.map((u) => `• ${u.email}${u.name ? ` (${u.name})` : ''} — ${u.balance} crediti`);
+    showFiloLine(`Utenti registrati (${users.length}):\n${lines.join('\n')}`);
+  }
+
+  // "/gift NUMERO EMAIL": regala crediti a un utente. Riservato al proprietario.
+  async function handleGiftCommand(text) {
+    const m = /^\/gift\s+(\S+)\s+(\S+)\s*$/i.exec(String(text || '').trim());
+    if (!m) { showFiloLine('Uso: /gift NUMERO EMAIL — es. /gift 2000 mario@esempio.com'); return; }
+    const amount = Number(m[1]);
+    const email = m[2];
+    if (!Number.isInteger(amount) || amount <= 0) {
+      showFiloLine(`"${m[1]}" non è un numero di crediti valido. Usa un intero positivo.`);
+      return;
+    }
+    showFiloLine(`Regalo ${amount} crediti a ${email}…`);
+    const r = await send({ type: MSG.OWNER_GIFT_CREDITS, amount, email });
+    if (!r || r.ok === false) { showFiloLine(r?.error || 'Operazione non riuscita.'); return; }
+    showFiloLine(`✓ Regalati ${r.amount} crediti a ${r.email}. Nuovo saldo del destinatario: ${r.balance}.`);
+  }
 
   // Mostra una riga di risposta da Filo nel thread (usata dai comandi che
   // hanno bisogno di dire qualcosa: es. l'uso corretto di /set timer).
