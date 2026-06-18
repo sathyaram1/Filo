@@ -1,7 +1,0 @@
-{
-  "id": "CICVl9OOKRncPBIPElvA",
-  "status": "done",
-  "notes": "Ora l'icona Home del menu del tasto destro ti riporta davvero alla home (la nuova scheda/dashboard), sostituendo la pagina su cui sei — come fa il tasto home della barra. Prima apriva invece la lista 'Aperti per dopo' (la stessa pagina dell'icona dedicata 'Aperti per dopo'), quindi non ti portava mai alla home. Verificato con un test automatico che riproduce il click sull'icona Home dal menu e controlla che la scheda corrente diventi la home senza aprire 'Aperti per dopo'; l'intera suite resta verde.",
-  "queuedAt": "2026-06-18T13:58:05.924Z",
-  "queuedBy": "routine"
-}
