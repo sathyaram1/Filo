@@ -89,6 +89,43 @@ test('livello 3 — concatenazioni e redirezioni (non interamente riconoscibili)
   }
 });
 
+test('sequenza sicura — letture concatenate con && / ; / || restano livello 1', () => {
+  // Il caso del feedback #201: `cd Desktop && ls` sono due letture, concatenarle
+  // non deve farle salire a livello 3 ("conferma" per un'azione irreversibile).
+  for (const cmd of [
+    'cd Desktop && ls',
+    'cd Desktop&&ls',
+    'cd .. && pwd && ls -la',
+    'ls; pwd',
+    'cat a.txt || echo vuoto',
+    'cd C:\\Users && dir',
+  ]) {
+    assert.equal(lvl(cmd), 1, `"${cmd}" (sequenza di sole letture) dovrebbe essere livello 1`);
+  }
+});
+
+test('sequenza — il livello è il MASSIMO dei pezzi', () => {
+  assert.equal(lvl('cd build && mkdir out'), 2, 'cd(1) && mkdir(2) → 2');
+  assert.equal(lvl('git status && git push'), 2, 'lettura(1) && push(2) → 2');
+  assert.equal(lvl('cd x && rm -rf y'), 3, 'cd(1) && rm(3) → 3');
+  assert.equal(lvl('ls && foobar'), 3, 'ls(1) && sconosciuto(3) → 3');
+  assert.equal(lvl('cd x && node app.js'), 3, 'cd(1) && interprete(3) → 3');
+});
+
+test('una sequenza con pipe/background/redirezione NON è sicura → resta 3', () => {
+  // Solo `&&`/`||`/`;` contano come sequenziamento sicuro: tutto il resto è 3
+  // anche se i singoli pezzi sarebbero letture.
+  for (const cmd of [
+    'ls | cat',          // pipe
+    'cat a && ls | cat', // pipe dentro una sequenza
+    'ls & pwd',          // background
+    'cd x && ls > out',  // redirezione
+    'cd x && echo $(pwd)',
+  ]) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" non è una sequenza sicura → livello 3`);
+  }
+});
+
 test('livello 3 — flag pericolosi alzano un comando altrimenti ≤2', () => {
   assert.equal(lvl('git reset --hard'), 3);
   assert.equal(lvl('git clean -fd'), 3);
