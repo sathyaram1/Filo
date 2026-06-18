@@ -212,5 +212,18 @@
     });
   }
 
-  global.SN_CONFIRM_UI = { confirm, confirmTyped };
+  // Avviso a un solo bottone — comunica qualcosa senza chiedere una scelta
+  // (es. "Hai ricevuto N crediti in regalo 🎁"). Risolve quando l'utente chiude.
+  function notify({ title = '', text = '', okLabel = 'OK' } = {}) {
+    return new Promise((resolve) => {
+      const { box, done } = buildOverlay(resolve);
+      header(box, { title, text });
+      const row = buttonRow(box);
+      const ok = makeBtn(row, okLabel, 'sn-confirm-btn-ok');
+      ok.addEventListener('click', () => done(true));
+      ok.focus();
+    });
+  }
+
+  global.SN_CONFIRM_UI = { confirm, confirmTyped, notify };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
