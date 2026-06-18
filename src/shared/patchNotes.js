@@ -30,6 +30,7 @@
         'Durante una lettura ad alta voce, "Interrompi lettura" compare nel menu del tasto destro di qualsiasi scheda — non solo di quella dove la lettura è partita — e da lì puoi fermarla.',
         'Rafforzata la protezione dei tuoi dati: le chiavi dei servizi AI sono ora salvate cifrate e i siti che visiti non possono raggiungere i file del tuo computer.',
         'I link email (mailto:) e telefono (tel:) nelle pagine ora aprono il tuo programma di posta o avviano la chiamata, invece di non fare nulla.',
+        'Se un link che Filo sta per aprire contiene tuoi dati personali, ora ti chiede conferma mostrandoti l’indirizzo completo, così una pagina malevola non può fartene uscire di nascosto.',
       ],
     },
     {
