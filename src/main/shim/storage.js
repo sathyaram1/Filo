@@ -289,7 +289,7 @@ function onChanged(fn) {
 function flushSync() {
   try {
     if (!STATE.loaded) return;
-    fs.writeFileSync(filePath(), JSON.stringify(STATE.data), 'utf8');
+    fs.writeFileSync(filePath(), JSON.stringify(serializeForDisk(STATE.data)), 'utf8');
   } catch (e) { /* ignore */ }
 }
 
