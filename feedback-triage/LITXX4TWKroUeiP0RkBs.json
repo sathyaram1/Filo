@@ -1,7 +1,0 @@
-{
-  "id": "LITXX4TWKroUeiP0RkBs",
-  "status": "done",
-  "notes": "Sistemato il caso che mostravi: quando Filo concatenava comandi sicuri (es. 'cd Desktop && ls' per spostarsi in una cartella ed elencarne il contenuto) ti chiedeva la conferma riservata alle azioni irreversibili ('scrivi conferma'). Era il livello sbagliato: ora una sequenza di comandi viene valutata sul comando più rischioso che contiene, quindi una sequenza di sole letture (cd, ls, cat, pwd…) esegue subito senza chiedere nulla. La richiesta di conferma scatta ancora, giustamente, se anche un solo comando della sequenza è pericoloso (es. 'ls && rm -rf x' resta livello 3), e pipe/redirezioni/sottoshell restano protette come prima.\n\nCosa NON ho toccato (per scelta tua): il punto 'aggiungi un pannello per ogni comando quando filo concatena' è una scelta di design con più strade non equivalenti (spezzare la sequenza in più azioni eseguite separatamente, o solo separarla a video) e cambierebbe come i comandi concatenati vengono eseguiti/mostrati. Con questo fix la sequenza sicura gira senza l'attrito della conferma, ma resta in un solo riquadro. Se vuoi i pannelli separati per ogni comando dimmi quale comportamento preferisci e lo aggiungo.\n\nVerificato: unit test del classificatore (incluso cd && ls = livello 1, ls && rm = livello 3) e test d'integrazione nel terminale (la sequenza di sole letture esegue senza conferma; una sequenza con un comando rischioso la richiede ancora). Suite completa verde.",
-  "queuedAt": "2026-06-18T08:03:00.483Z",
-  "queuedBy": "routine"
-}
