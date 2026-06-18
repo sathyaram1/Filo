@@ -81,13 +81,13 @@ test('#1b i link mailto:/tel: vengono consegnati all\'OS, file:// no', async ({ 
 
 test('#2 i canali privilegiati non trapelano le chiavi API a un\'origine web', async ({ app }) => {
   const SECRET = 'sk-or-v1-WEB-LEAK-' + Date.now();
-  // Imposta una apiKey reale come farebbe una pagina interna (origine filo://).
+  // Semina la apiKey direttamente nello storage (scrittura sincrona in memoria),
+  // come stato di partenza deterministico: evita il percorso async di
+  // applySettingsUpdate, che da solo introdurrebbe un flake di timing.
   await app.evaluate(async (_electron, secret) => {
-    const MSG = globalThis.SN_MSG.MSG;
-    await globalThis.SN_HANDLE_MESSAGE(
-      { type: MSG.UPDATE_SETTINGS, settings: { apiKeys: { openrouter: secret } } },
-      { url: 'filo://options/options.html' },
-    );
+    const S = globalThis.__filoStorage;
+    const cur = (await S.get('settings')).settings || {};
+    await S.set({ settings: { ...cur, apiKeys: { openrouter: secret } } });
   }, SECRET);
 
   // Lettura da una PAGINA INTERNA: deve vedere la chiave (le Opzioni la editano).
