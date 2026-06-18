@@ -13,10 +13,14 @@ import { dirname, join } from 'node:path';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
+// constants.js fornisce SN_CONST.ACTIONS (serve a requirementsFor per le azioni
+// multimodali come DESCRIBE_IMAGE); modelCaps.js è il modulo sotto test.
+require(join(__dirname, '..', '..', 'src', 'shared', 'constants.js'));
 require(join(__dirname, '..', '..', 'src', 'shared', 'modelCaps.js'));
 
 const CAPS = globalThis.SN_MODEL_CAPS;
 const { M } = CAPS;
+const ACTIONS = globalThis.SN_CONST.ACTIONS;
 
 test('modelCaps si registra su globalThis con la sua API', () => {
   assert.ok(CAPS, 'SN_MODEL_CAPS deve esistere');
