@@ -1447,6 +1447,11 @@ class TabManager {
     // 'foreground-tab' e 'background-tab' sono link cliccati dall'utente.
     wc.setWindowOpenHandler((details) => {
       const { url, disposition } = details;
+      // SICUREZZA: nega l'apertura (window.open / target=_blank) verso schemi
+      // non-web — stessa difesa di will-navigate (file:// → leak NTLM, ecc.).
+      if (isWebUnsafeNav(url)) {
+        return { action: 'deny' };
+      }
       // #209 — i popup di login ("Continua con Google" e simili) NON sono
       // pubblicità: vanno consentiti come VERA finestra popup (action 'allow'),
       // così la relazione opener↔popup che l'OAuth usa per restituire l'esito
