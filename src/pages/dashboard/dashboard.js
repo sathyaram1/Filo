@@ -945,6 +945,76 @@
   }
 
   // ===== Invio messaggio =====
+  // Quanti passi autonomi Filo può fare di fila prima di restituire comunque la
+  // parola all'utente: rete di sicurezza contro loop o costi che esplodono.
+  const MAX_AUTO_STEPS = 8;
+  // Nudge interno (mai mostrato come bolla) che fa proseguire Filo dopo un
+  // comando: vede l'output appena prodotto e continua col passo successivo,
+  // oppure — se ha finito — risponde senza eseguire altri comandi.
+  const AUTO_CONTINUE_PROMPT =
+    'Prosegui col prossimo passo usando l’output del comando qui sopra. ' +
+    'Se hai completato il compito, rispondi all’utente senza eseguire altri comandi.';
+
+  // Filo deve proseguire da solo quando ha appena ESEGUITO un comando da
+  // terminale (output reale tornato) e NON c'è nulla in attesa di conferma. Un
+  // comando rischioso (livello 2/3) resta con `_confirm` e mette in pausa il
+  // loop: compare il popup e la parola torna all'utente, come da spec.
+  function shouldAutoContinue(actions) {
+    if (!Array.isArray(actions) || !actions.length) return false;
+    if (actions.some((a) => a && a._confirm)) return false;
+    return actions.some((a) =>
+      a && String(a.type || '').toUpperCase() === 'ESEGUI_COMANDO'
+      && a._output && !a._output.blocked);
+  }
+
+  // Un singolo turno del modello: bolla "sta pensando" + reasoning live, invio
+  // FILO_CHAT, render della bolla di Filo con le sue azioni e registrazione del
+  // turno nello storico. Ritorna la risposta grezza per decidere se proseguire.
+  async function runFiloTurn({ userMessage, images = [] }) {
+    // Bolla Filo "sta pensando": 3 righe di reasoning che scorrono e svaniscono.
+    const pending = appendThinking();
+    // Canale per il reasoning VERO in diretta: apriamo una sottoscrizione
+    // filtrata per reqId e la passiamo al main, che ci pusha i thought summary
+    // del modello mentre genera. Se il modello non ragiona, non arriva nulla e
+    // restano le frasi indicative.
+    const reasoningReqId = `r${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    let offReasoning = null;
+    if (window.filo?.onReasoning) {
+      offReasoning = window.filo.onReasoning((data) => {
+        if (data && data.reqId === reasoningReqId && data.text) pending.pushReasoning(data.text);
+      });
+    }
+    const msg = {
+      type: MSG.FILO_CHAT,
+      userMessage,
+      threadHistory: threadHistory.slice(0, -1),
+      reasoningReqId,
+    };
+    if (images.length) {
+      msg.image = images[0]; // retrocompatibilità (provider mono-immagine)
+      msg.images = images;
+    }
+    const r = await send(msg);
+
+    if (offReasoning) { try { offReasoning(); } catch (_) {} }
+    pending.remove();
+    if (!r?.ok) {
+      const err = makeBubble({ role: 'filo', text: r?.error || 'Errore.' });
+      bubblesEl.appendChild(err);
+    } else {
+      const filoBubble = makeBubble({ role: 'filo', text: r.text || '' });
+      bubblesEl.appendChild(filoBubble);
+      // #159 — risposta fresca: le impostazioni a livello 2 aprono il loro popup
+      // di conferma da sole (autoConfirm). Solo qui (nuova risposta), mai in
+      // replay storico.
+      renderActions(filoBubble, r.actions || [], { onAck: goHome, autoConfirm: true });
+      threadHistory.push({ role: 'filo', text: r.text || '', actions: r.actions || [] });
+      applyCommandCwd(r.actions);
+    }
+    bubblesEl.scrollTop = bubblesEl.scrollHeight;
+    return r;
+  }
+
   async function submitMessage(text) {
     if ((!text && pendingImages.length === 0) || sending) return;
     sending = true;
@@ -970,49 +1040,21 @@
     });
     bubblesEl.appendChild(userBubble);
 
-    // Bolla Filo "sta pensando": 3 righe di reasoning che scorrono e svaniscono.
-    const pending = appendThinking();
+    let r = await runFiloTurn({ userMessage: text || 'Descrivi questa immagine.', images: imagesToSend });
 
-    // Canale per il reasoning VERO in diretta: apriamo una sottoscrizione
-    // filtrata per reqId e la passiamo al main, che ci pusha i thought summary
-    // del modello mentre genera. Se il modello non ragiona, non arriva nulla e
-    // restano le frasi indicative.
-    const reasoningReqId = `r${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    let offReasoning = null;
-    if (window.filo?.onReasoning) {
-      offReasoning = window.filo.onReasoning((data) => {
-        if (data && data.reqId === reasoningReqId && data.text) pending.pushReasoning(data.text);
-      });
+    // Esecuzione autonoma in sequenza: finché Filo ha appena eseguito un comando
+    // (e non c'è una conferma in sospeso), gli rimostriamo l'output e lo
+    // lasciamo proseguire da solo — un comando, il suo output, il successivo —
+    // senza che l'utente debba rilanciarlo. Si ferma quando Filo risponde senza
+    // più comandi (compito finito) o quando un'azione rischiosa apre il popup.
+    let steps = 0;
+    while (r?.ok && shouldAutoContinue(r.actions) && steps < MAX_AUTO_STEPS) {
+      steps += 1;
+      // Il nudge entra nello storico come turno utente "silenzioso" (niente
+      // bolla): dà al modello il contesto per il passo successivo.
+      threadHistory.push({ role: 'user', text: AUTO_CONTINUE_PROMPT });
+      r = await runFiloTurn({ userMessage: AUTO_CONTINUE_PROMPT });
     }
-
-    const msg = {
-      type: MSG.FILO_CHAT,
-      userMessage: text || 'Descrivi questa immagine.',
-      threadHistory: threadHistory.slice(0, -1),
-      reasoningReqId,
-    };
-    if (imagesToSend.length) {
-      msg.image = imagesToSend[0]; // retrocompatibilità (provider mono-immagine)
-      msg.images = imagesToSend;
-    }
-    const r = await send(msg);
-
-    if (offReasoning) { try { offReasoning(); } catch (_) {} }
-    pending.remove();
-    if (!r?.ok) {
-      const err = makeBubble({ role: 'filo', text: r?.error || 'Errore.' });
-      bubblesEl.appendChild(err);
-    } else {
-      const filoBubble = makeBubble({ role: 'filo', text: r.text || '' });
-      bubblesEl.appendChild(filoBubble);
-      // #159 — risposta fresca: le impostazioni a livello 2 aprono il loro popup
-      // di conferma da sole (autoConfirm). Solo qui (nuova risposta), mai in
-      // replay storico.
-      renderActions(filoBubble, r.actions || [], { onAck: goHome, autoConfirm: true });
-      threadHistory.push({ role: 'filo', text: r.text || '', actions: r.actions || [] });
-      applyCommandCwd(r.actions);
-    }
-    bubblesEl.scrollTop = bubblesEl.scrollHeight;
 
     sending = false;
     sendBtn.disabled = false;
