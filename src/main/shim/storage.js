@@ -148,7 +148,7 @@ async function loadIfNeeded() {
   if (STATE.loaded) return;
   try {
     const txt = await fsp.readFile(filePath(), 'utf8');
-    STATE.data = JSON.parse(txt) || {};
+    STATE.data = deserializeFromDisk(JSON.parse(txt) || {});
   } catch (err) {
     if (err.code !== 'ENOENT') console.warn('[Filo storage] read failed:', err.message);
     STATE.data = {};
