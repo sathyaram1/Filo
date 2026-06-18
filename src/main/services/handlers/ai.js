@@ -21,6 +21,66 @@ module.exports = function register(on, ctx) {
   const ttsKey = (model, voice, text) =>
     crypto.createHash('sha1').update(`${model}\u0000${voice}\u0000${text}`).digest('hex');
 
+  // ─── Stato globale "sta leggendo" (TTS) ───────────────────────────────────
+  // Una lettura ad alta voce vive nel content script della scheda dove è partita
+  // (l'<audio> suona lì). Perché "Interrompi lettura" compaia anche nei menu
+  // delle ALTRE schede, il main fa da fonte di verità condivisa: ogni scheda che
+  // legge segnala reading:true/false, il main tiene il set delle schede che
+  // leggono e ribroadcast TTS_GLOBAL_READING { active } a tutte. Lo stop globale
+  // (TTS_STOP_READING) viene inoltrato come TTS_STOP a tutte le schede: solo
+  // quella che legge davvero ha qualcosa da fermare.
+  const readingWcs = new Set();      // id dei webContents attualmente in lettura
+  const readingCleanups = new Map(); // id → funzione che stacca i listener
+  let lastGlobalReading = false;
+  function broadcastGlobalReading() {
+    const active = readingWcs.size > 0;
+    if (active === lastGlobalReading) return;
+    lastGlobalReading = active;
+    broadcastToTabs({ type: MSG.TTS_GLOBAL_READING, active });
+  }
+  function clearReading(wcId) {
+    if (!readingWcs.has(wcId)) return;
+    readingWcs.delete(wcId);
+    const cleanup = readingCleanups.get(wcId);
+    if (cleanup) { readingCleanups.delete(wcId); try { cleanup(); } catch (_) {} }
+    broadcastGlobalReading();
+  }
+  function markReading(wc, reading) {
+    if (!wc || typeof wc.id !== 'number') return;
+    const id = wc.id;
+    if (reading) {
+      if (!readingWcs.has(id)) {
+        readingWcs.add(id);
+        // Se la scheda che legge viene chiusa o naviga altrove, l'<audio> muore
+        // ma il "reading:false" potrebbe non arrivare mai: ripuliamo noi.
+        const onNav = (_e, _url, isInPlace, isMainFrame) => { if (isMainFrame) clearReading(id); };
+        const onGone = () => clearReading(id);
+        try { wc.on('did-start-navigation', onNav); } catch (_) {}
+        try { wc.once('destroyed', onGone); } catch (_) {}
+        readingCleanups.set(id, () => {
+          try { wc.removeListener('did-start-navigation', onNav); } catch (_) {}
+          try { wc.removeListener('destroyed', onGone); } catch (_) {}
+        });
+      }
+      broadcastGlobalReading();
+    } else {
+      clearReading(id);
+    }
+  }
+
+  on(MSG.TTS_READING_STATE, async (msg, sender) => {
+    markReading(sender && sender.wc, !!(msg && msg.reading));
+    return { ok: true };
+  });
+
+  on(MSG.TTS_STOP_READING, async () => {
+    // Inoltra lo stop a tutte le schede; quella che legge si ferma e poi segnala
+    // reading:false (che azzera lo stato globale). Azzeriamo anche subito qui per
+    // reattività: il flag tornerà comunque coerente al prossimo report.
+    broadcastToTabs({ type: MSG.TTS_STOP });
+    return { ok: true };
+  });
+
   on(MSG.AI_REQUEST, async (msg, sender, origin) => {
     const r = await handleAIRequest({ action: msg.action, payload: msg.payload, origin });
     return { ok: true, ...r };
