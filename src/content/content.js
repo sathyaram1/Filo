@@ -917,6 +917,13 @@
       contentFullscreen = !!msg.fullscreen;
       return;
     }
+    // Stato lettura ad alta voce condiviso tra le schede: aggiorna il flag
+    // globale (per mostrare "Interrompi lettura" anche se legge un'altra scheda)
+    // o ferma la lettura locale quando un'altra scheda chiede lo stop globale.
+    if (msg?.type === MSG.TTS_GLOBAL_READING || msg?.type === MSG.TTS_STOP) {
+      TTS.handleBroadcast(msg);
+      return;
+    }
     if (msg?.type === MSG.SETTINGS_UPDATED) {
       settings = msg.settings;
       applyTheme(settings.theme);
