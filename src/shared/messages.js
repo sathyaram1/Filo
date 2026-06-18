@@ -274,6 +274,13 @@
     // della home è pronto. La scheda aggiorna messaggio + suggerimenti senza
     // rifare la chiamata all'LLM. { message, suggestions, ts }
     FILO_DASHBOARD_UPDATED: 'filo_dashboard_updated',
+    // Broadcast da background -> content: una lettura ad alta voce è attiva
+    // (in QUALCHE scheda) oppure no. Ogni scheda usa questo flag per mostrare
+    // "Interrompi lettura" nel menu anche se non è lei a leggere. { active: bool }
+    TTS_GLOBAL_READING: 'tts_global_reading',
+    // Broadcast da background -> content: ferma la tua lettura locale, se ne hai
+    // una. Inviato a tutte le schede quando una di esse chiede lo stop globale.
+    TTS_STOP: 'tts_stop',
   };
 
   // Port-based streaming
