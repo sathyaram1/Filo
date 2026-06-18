@@ -20,6 +20,7 @@
       features: [],
       fixes: [
         'L’icona Home del menu del tasto destro ora ti riporta davvero alla home, sostituendo la pagina su cui sei (prima apriva la lista "Aperti per dopo").',
+        'Durante una lettura ad alta voce, "Interrompi lettura" compare nel menu del tasto destro di qualsiasi scheda — non solo di quella dove la lettura è partita — e da lì puoi fermarla.',
       ],
     },
     {
