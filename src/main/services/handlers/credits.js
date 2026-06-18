@@ -78,6 +78,103 @@ module.exports = function register(on, ctx) {
     if (!res.ok) throw new Error(`credits push ${res.status}`);
   }
 
+  // ── Comandi proprietario (#210): registro utenti + regalo crediti ───────────
+  // Tutte le operazioni qui sotto sono riservate all'owner (auth.isAdmin()): il
+  // gate applicativo è negli handler IPC, la garanzia forte è nelle Firestore
+  // rules (match /credits/{uid} … allow read,write: if isAdmin()). Le scritture
+  // cross-account usano l'ID token dell'owner come Bearer.
+
+  // Elenco di tutti gli utenti registrati (doc credits con campo `email`).
+  async function adminListUsers() {
+    if (!FB?.rest) return [];
+    const idToken = await auth.getIdToken();
+    if (!idToken) throw new Error('Sessione scaduta: rifai l\'accesso.');
+    const endpoint = `${FB.rest.FIRESTORE_BASE}:runQuery?key=${FB.rest.API_KEY}`;
+    const body = { structuredQuery: { from: [{ collectionId: 'credits' }], limit: 1000 } };
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`users ${res.status}`);
+    const rows = await res.json();
+    const users = [];
+    for (const r of rows) {
+      if (!r.document) continue;
+      const o = FB.fsDocToObject(r.document);
+      if (o.email) users.push({ email: o.email, name: o.name || '', balance: Math.round(Number(o.balance) || 0) });
+    }
+    users.sort((a, b) => a.email.localeCompare(b.email));
+    return users;
+  }
+
+  // Trova il doc credits il cui campo `email` corrisponde (esatto). Ritorna
+  // l'oggetto completo (incluso uid in _id e l'eventuale giftNotice) o null.
+  async function adminFindByEmail(email) {
+    if (!FB?.rest) return null;
+    const idToken = await auth.getIdToken();
+    if (!idToken) throw new Error('Sessione scaduta: rifai l\'accesso.');
+    const endpoint = `${FB.rest.FIRESTORE_BASE}:runQuery?key=${FB.rest.API_KEY}`;
+    const body = {
+      structuredQuery: {
+        from: [{ collectionId: 'credits' }],
+        where: { fieldFilter: { field: { fieldPath: 'email' }, op: 'EQUAL', value: { stringValue: email } } },
+        limit: 1,
+      },
+    };
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`lookup ${res.status}`);
+    const rows = await res.json();
+    for (const r of rows) { if (r.document) return FB.fsDocToObject(r.document); }
+    return null;
+  }
+
+  // Regala `amount` crediti all'utente con `email`: somma al suo saldo remoto e
+  // lascia un avviso `giftNotice` (cumulativo finché non lo vede) sul suo doc.
+  async function adminGift(email, amount) {
+    const target = await adminFindByEmail(email);
+    if (!target || !target._id) throw new Error('Nessun utente registrato con questa email.');
+    const uid = target._id;
+    const newBalance = Math.round((Number(target.balance) || 0) + amount);
+    const prevNotice = target.giftNotice && Math.round(Number(target.giftNotice.amount) || 0);
+    const noticeAmount = (prevNotice > 0 ? prevNotice : 0) + amount;
+    const idToken = await auth.getIdToken();
+    const fields = {
+      balance: FB.toFsValue(newBalance),
+      giftNotice: FB.toFsValue({ amount: noticeAmount, ts: Date.now() }),
+    };
+    const mask = ['balance', 'giftNotice'].map((k) => `updateMask.fieldPaths=${k}`).join('&');
+    const url = `${FB.rest.FIRESTORE_BASE}/credits/${encodeURIComponent(uid)}?${mask}&key=${FB.rest.API_KEY}`;
+    const res = await fetch(url, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields }),
+    });
+    if (!res.ok) throw new Error(`gift ${res.status}`);
+    return { balance: newBalance };
+  }
+
+  // Avviso "crediti regalati" (#210.4): se il doc dell'utente corrente porta un
+  // `giftNotice`, mostra il popup una volta sola e azzera il campo così non si
+  // ripresenta. `remote` è il doc appena letto in ensureAccountSync.
+  async function maybeNotifyGift(uid, remote) {
+    const amount = remote?.giftNotice && Math.round(Number(remote.giftNotice.amount) || 0);
+    if (!amount || amount <= 0) return;
+    broadcastToTabs({ type: MSG.GIFT_NOTICE, amount });
+    const idToken = await auth.getIdToken();
+    if (!idToken) return;
+    const url = `${FB.rest.FIRESTORE_BASE}/credits/${encodeURIComponent(uid)}?updateMask.fieldPaths=giftNotice&key=${FB.rest.API_KEY}`;
+    await fetch(url, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields: { giftNotice: { nullValue: null } } }),
+    }).catch(() => {});
+  }
+
   // Adotta lo stato remoto al (primo) accesso o cambio account; se il doc non
   // esiste ancora, ci pusha lo stato locale corrente. Idempotente per uid.
   let lastSyncedOwner; // undefined = mai sincronizzato in questa sessione
