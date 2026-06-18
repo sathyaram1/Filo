@@ -125,6 +125,12 @@
     const req = requirementsFor(action);
     const t = (global.SN_I18N && global.SN_I18N.t) || ((k) => k);
 
+    // Capacità non note (modello OpenRouter senza metadati di modalità): non
+    // blocchiamo. È coerente con la regola "nel dubbio non bloccare" già usata
+    // per i nickname sconosciuti — un blocco falso impedirebbe di usare un
+    // modello valido (es. una vision di OpenRouter per "Descrizione immagini").
+    if (caps.uncertain) return { ok: true };
+
     if (!caps.outputs.includes(req.output)) {
       const key = req.output === M.AUDIO ? 'caps_block_output_audio' : 'caps_block_output_text';
       return { ok: false, reason: t(key) };
