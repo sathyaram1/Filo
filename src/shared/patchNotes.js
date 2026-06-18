@@ -19,6 +19,7 @@
       version: '0.2.52', date: '2026-06-18',
       features: [
         'Quando attivi la modalità terminale, Filo può svolgere compiti a più passi da solo: esegue un comando, ne legge l’output e prosegue col successivo finché non ha finito, senza che tu debba rilanciarlo ogni volta. Sui comandi rischiosi chiede comunque conferma.',
+        'Se ricevi crediti in regalo, Filo te lo comunica con un avviso all’apertura (una volta sola).',
       ],
       fixes: [
         'Concatenare comandi sicuri (come spostarsi in una cartella ed elencarne subito il contenuto) non chiede più la conferma riservata alle azioni irreversibili: la richiesta scatta solo se almeno un comando della sequenza è davvero rischioso.',
