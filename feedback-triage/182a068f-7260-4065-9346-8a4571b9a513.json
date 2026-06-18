@@ -1,0 +1,7 @@
+{
+  "id": "182a068f-7260-4065-9346-8a4571b9a513",
+  "status": "done",
+  "notes": "Ora chi riceve crediti in regalo (via /gift) viene avvisato: alla prima apertura/sincronizzazione di Filo compare un popup 'Ti sono stati regalati N crediti 🎁', e i crediti sono già sul saldo. L'avviso si mostra una volta sola e non si ripresenta.\n\nNota: l'avviso compare alla successiva apertura di Filo del destinatario (o cambio account), non in tempo reale se è già aperto in quel momento.\n\nVerificato: suite 448/448 verde + test mirato che simula l'arrivo dell'avviso e controlla che il popup compaia con l'importo giusto e si chiuda. Il flusso completo end-to-end con due account va provato a mano dopo il deploy delle regole (#210.1).",
+  "queuedAt": "2026-06-18T09:52:57.319Z",
+  "queuedBy": "routine"
+}
