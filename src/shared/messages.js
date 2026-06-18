@@ -11,6 +11,14 @@
     // provider/modello TTS è disponibile torna { ok:false } e il chiamante
     // ripiega sulla voce del browser (Web Speech). { text, voice? }
     TTS_SYNTH: 'tts_synth',                        // → { ok, audioBase64, mimeType } | { ok:false, error }
+    // Stato lettura ad alta voce condiviso tra le schede. Il content script che
+    // legge segnala l'avvio/arresto al main ({ reading: bool }); il main tiene il
+    // conteggio globale e ribroadcast TTS_GLOBAL_READING a TUTTE le schede, così
+    // anche una scheda diversa da quella che legge mostra "Interrompi lettura".
+    TTS_READING_STATE: 'tts_reading_state',        // content→main { reading: bool }
+    // Richiesta di fermare la lettura attiva ovunque sia (anche in un'altra
+    // scheda). Il main inoltra TTS_STOP a tutte le schede.
+    TTS_STOP_READING: 'tts_stop_reading',          // content→main
     SAVE_PAGE: 'save_page',                       // { page }
     SAVE_LINK: 'save_link',                       // { url, title }
     GET_SETTINGS: 'get_settings',
