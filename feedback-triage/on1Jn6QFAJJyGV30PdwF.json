@@ -1,0 +1,7 @@
+{
+  "id": "on1Jn6QFAJJyGV30PdwF",
+  "status": "done",
+  "notes": "I comandi /users e /gift richiedono un pezzo di infrastruttura che non c'è ancora (un registro che colleghi gli utenti alla loro email e il permesso, per te, di accreditare crediti ad altri account) e un passaggio che solo tu puoi fare (pubblicare le nuove regole del database). Per non lasciare il lavoro a metà l'ho pianificato e spezzato in 4 parti, che le prossime routine svolgeranno una alla volta: #210.1 registro utenti + regole (da pubblicare tu con 'firebase deploy --only firestore:rules'); #210.2 comando /users (elenca le email); #210.3 comando /gift NUMERO EMAIL (regala crediti); #210.4 avviso a chi riceve i crediti. Le trovi già in coda 'Da risolvere'.",
+  "queuedAt": "2026-06-18T07:47:00.967Z",
+  "queuedBy": "routine"
+}
