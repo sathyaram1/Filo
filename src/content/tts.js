@@ -173,6 +173,37 @@
     return !!(synth && (synth.speaking || synth.pending));
   }
 
+  // ─── Stato lettura condiviso tra le schede ────────────────────────────────
+  // La lettura suona nella scheda dove è partita, ma l'utente vuole poterla
+  // fermare anche stando in un'altra scheda. Per questo segnaliamo al main
+  // l'avvio/arresto (reportReadingState) e riceviamo da lui un flag globale
+  // (globalReading) che dice se QUALCHE scheda sta leggendo. Il menu usa
+  // isAnyReading() = lettura locale OPPURE lettura altrove.
+  let reportedReading = false; // ultimo stato segnalato al main (dedup)
+  let globalReading = false;   // qualche scheda (anche un'altra) sta leggendo
+  function reportReadingState(active) {
+    if (active === reportedReading) return;
+    reportedReading = active;
+    try { chrome.runtime.sendMessage({ type: MSG.TTS_READING_STATE, reading: active }); } catch (_) {}
+  }
+  // Lettura attiva dal punto di vista del menu: locale o in un'altra scheda.
+  function isAnyReading() {
+    return ttsBusy() || globalReading;
+  }
+  // Ferma la lettura ovunque sia: quella locale subito, e — se sta leggendo
+  // un'altra scheda — chiede al main di inoltrare lo stop a tutte le schede.
+  function requestStopReading() {
+    stopReading();
+    try { chrome.runtime.sendMessage({ type: MSG.TTS_STOP_READING }); } catch (_) {}
+  }
+  // Broadcast in arrivo dal main (instradati da content.js).
+  function handleBroadcast(msg) {
+    if (!msg) return false;
+    if (msg.type === MSG.TTS_GLOBAL_READING) { globalReading = !!msg.active; return true; }
+    if (msg.type === MSG.TTS_STOP) { stopReading(); return true; }
+    return false;
+  }
+
   function stopReading() {
     if (session) session.cancelled = true;
     if (ttsAudio) {
