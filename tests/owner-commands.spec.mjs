@@ -62,7 +62,7 @@ test('da NON proprietario, "/users" risponde che è un comando riservato', async
   await expect(page.locator('#input')).toBeVisible({ timeout: 8_000 });
 
   await submit(page, '/users');
-  await expect(page.locator('.dash-bubble')).toContainText(/riservato al proprietario/i, { timeout: 8_000 });
+  await expect(page.locator('.dash-bubble').last()).toContainText(/riservato al proprietario/i, { timeout: 8_000 });
 });
 
 test('da NON proprietario, "/gift" valido risponde che è un comando riservato', async ({ openTab }) => {
@@ -70,7 +70,7 @@ test('da NON proprietario, "/gift" valido risponde che è un comando riservato',
   await expect(page.locator('#input')).toBeVisible({ timeout: 8_000 });
 
   await submit(page, '/gift 2000 mario@esempio.com');
-  await expect(page.locator('.dash-bubble')).toContainText(/riservato al proprietario/i, { timeout: 8_000 });
+  await expect(page.locator('.dash-bubble').last()).toContainText(/riservato al proprietario/i, { timeout: 8_000 });
 });
 
 test('il broadcast GIFT_NOTICE mostra il popup "crediti in regalo" una volta sola', async ({ app, openTab }) => {
