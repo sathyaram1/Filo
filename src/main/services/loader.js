@@ -25,6 +25,7 @@ require(path.join(SHARED, 'dashboardRefresh.js'));
 require(path.join(SHARED, 'feedback.js'));
 require(path.join(SHARED, 'preferences.js'));
 require(path.join(SHARED, 'cmdClassify.js'));
+require(path.join(SHARED, 'urlExfil.js'));
 require(path.join(SHARED, 'actionLevels.js'));
 require(path.join(SHARED, 'pageRestyle.js'));
 require(path.join(SHARED, 'ttsChunk.js'));
