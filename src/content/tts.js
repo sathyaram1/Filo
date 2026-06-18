@@ -319,6 +319,9 @@
     // incomprensibili (stopReading apre la strada e azzera lo stato).
     stopReading();
     const s = newSession();
+    // Segnala al main che questa scheda sta leggendo: le altre schede mostreranno
+    // "Interrompi lettura" finché non arriva il reading:false (sotto).
+    reportReadingState(true);
     readTokens = Array.isArray(tokens) ? tokens.slice() : [];
     ensureReadStyle();
     // Feedback immediato: evidenzia la prima parola appena si parte.
