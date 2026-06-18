@@ -322,17 +322,13 @@
     // incomprensibili (stopReading apre la strada e azzera lo stato).
     stopReading();
     const s = newSession();
-    console.error('DBG readAloud start, tokens=', tokens && tokens.length);
     // Segnala al main che questa scheda sta leggendo: le altre schede mostreranno
     // "Interrompi lettura" finché non arriva il reading:false (sotto).
     reportReadingState(true);
-    console.error('DBG after report');
     readTokens = Array.isArray(tokens) ? tokens.slice() : [];
     ensureReadStyle();
-    console.error('DBG readTokens.length=', readTokens.length);
     // Feedback immediato: evidenzia la prima parola appena si parte.
     if (readTokens.length) setHighlight(0);
-    console.error('DBG after setHighlight, has=', CSS.highlights ? CSS.highlights.has('filo-reading') : 'noapi');
     try {
       document.dispatchEvent(new CustomEvent('filo:read-aloud', { detail: { text: full.trim() } }));
     } catch (_) {}
