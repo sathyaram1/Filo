@@ -166,7 +166,7 @@ async function flush() {
   const target = filePath();
   const tmp = target + '.tmp';
   try {
-    const txt = JSON.stringify(STATE.data);
+    const txt = JSON.stringify(serializeForDisk(STATE.data));
     await fsp.mkdir(path.dirname(target), { recursive: true });
     await fsp.writeFile(tmp, txt, 'utf8');
     await fsp.rename(tmp, target);
