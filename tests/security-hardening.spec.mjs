@@ -53,7 +53,9 @@ test('#3 le chiavi API sono cifrate nel storage.json (mai in chiaro su disco)', 
   });
 
   // Scrive una apiKey reale e forza la scrittura sincrona su disco.
-  await app.evaluate(async (secret) => {
+  // NB: app.evaluate passa il modulo `electron` come PRIMO argomento; il nostro
+  // valore (SECRET) arriva come secondo.
+  await app.evaluate(async (_electron, secret) => {
     const S = globalThis.__filoStorage;
     await S.set({ settings: { apiKeys: { openrouter: secret }, theme: 'auto' } });
     S.flushSync();
