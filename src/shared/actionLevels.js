@@ -161,8 +161,9 @@
       // Filo lancia un comando nel terminale (#146.6). Il livello NON è fisso:
       // dipende dal comando EFFETTIVO, classificato dal main (mai dall'LLM) in
       // src/shared/cmdClassify.js. 1 = sola lettura (esegue subito); 2 =
-      // modifica recuperabile (popup); 3 = cancellazioni, comandi pericolosi,
-      // concatenazioni e qualsiasi comando non riconosciuto (digita "conferma").
+      // modifica recuperabile (popup); 3 = cancellazioni, comandi pericolosi e
+      // qualsiasi comando non riconosciuto (digita "conferma"). Una sequenza di
+      // comandi (`&&`/`||`/`;`) prende il livello massimo dei suoi pezzi.
       // Comando assente o classificatore non caricato → 3 per massima cautela.
       level: (a) => {
         const C = global.SN_CMD_CLASSIFY;
