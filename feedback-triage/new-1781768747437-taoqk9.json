@@ -1,0 +1,13 @@
+{
+  "op": "create",
+  "uid": "9e014f1d-bcbc-4c74-a7d0-8647bf2b7ca3",
+  "text": "DIPENDENZA per i comandi proprietario /users e /gift (feedback #210). Serve un registro che colleghi ogni utente alla sua email, e regole Firestore che permettano all'owner (admin) di leggere tutti gli utenti e di accreditare crediti a chiunque.\n\nPARTE TECNICA: oggi i crediti vivono in Firestore alla collezione 'credits/{uid}' (uid = Firebase user_id), SENZA email; la regola attuale (firestore.rules ~riga 178-181) consente lettura/scrittura solo al proprietario del doc (request.auth.uid == uid). Da fare: (1) al sync dei crediti il client scrive anche la propria 'email' (e 'name') sul doc credits/{uid} — vedi src/main/services/handlers/credits.js (currentUid/sync); (2) in firestore.rules aggiungere alla match /credits/{uid} 'allow read, write: ... || isAdmin()' (l'helper isAdmin() esiste già nelle rules). ⚠️ Le regole vanno DEPLOYATE dall'owner con 'firebase deploy --only firestore:rules' (la routine cloud non può deployare). Criterio di fatto: un client loggato salva la propria email sul doc credits; un admin può leggere i doc credits altrui e scriverci. Verifica: test sulle rules (emulator) o, in mancanza, documentare che serve verifica manuale post-deploy.",
+  "name": "registro utenti + regole credits admin",
+  "parentId": "on1Jn6QFAJJyGV30PdwF",
+  "status": "todo",
+  "priority": 2,
+  "notes": "",
+  "images": [],
+  "queuedAt": "2026-06-18T07:45:47.436Z",
+  "queuedBy": "routine"
+}
