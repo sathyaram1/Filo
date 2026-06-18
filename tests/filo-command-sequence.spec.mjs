@@ -34,7 +34,7 @@ const enableTerminal = (page) =>
 // (`__filoTurnCount`) registra quante volte il modello è stato interrogato in un
 // singolo invio dell'utente — è la prova che il loop autonomo ha richiamato Filo.
 async function stubSequence(app, turns) {
-  await app.evaluate(async ({ turns }) => {
+  await app.evaluate(async (_electron, { turns }) => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
