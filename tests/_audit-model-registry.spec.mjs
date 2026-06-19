@@ -21,8 +21,12 @@ test('model registry: row without nickname is dropped but UI says saved', async 
   // Compila SOLO provider + id modello, lascia il nickname VUOTO.
   await row.locator('.sn-model-provider').selectOption('openrouter');
   await row.locator('.sn-model-id').fill('openai/gpt-4o-mini');
-  // Blur -> change bubbling su #page -> save() debounced.
-  await page.locator('#useDefaultModels-label').click({ force: true });
+  // Blur senza toccare altri controlli: dispatch del change (bubbling su #page
+  // -> save() debounced). NON cliccare la label del checkbox (lo ri-attiva).
+  await row.locator('.sn-model-id').evaluate((el) => {
+    el.blur();
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
   await page.waitForTimeout(900);
 
   // SINTOMO 1: la UI mostra la conferma "salvato" anche se la riga verrà persa.
