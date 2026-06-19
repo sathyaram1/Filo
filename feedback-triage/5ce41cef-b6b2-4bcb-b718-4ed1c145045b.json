@@ -1,7 +1,0 @@
-{
-  "id": "5ce41cef-b6b2-4bcb-b718-4ed1c145045b",
-  "status": "done",
-  "notes": "Ora, nei 'Siti fidati' (Impostazioni → Sicurezza, Privacy massima), se scrivi un valore che non è un dominio valido (es. 'localhost', un IP, un nome senza punto) compare un avviso sotto il campo che lo spiega, e il testo resta nel campo così puoi correggerlo — prima spariva in silenzio senza aggiungere nulla. In più: se aggiungi un dominio già presente in lista, ora te lo segnala invece di non fare nulla; l'avviso sparisce appena ricominci a digitare. Verificato con un nuovo test Playwright (dominio non valido → avviso + lista vuota; dominio valido → aggiunto + avviso via) e l'intera suite (455 test verdi).",
-  "queuedAt": "2026-06-19T19:29:22.500Z",
-  "queuedBy": "routine"
-}
