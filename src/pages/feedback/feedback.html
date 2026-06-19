@@ -202,6 +202,14 @@
        questa riga il banner "sola lettura" restava visibile ANCHE per gli
        admin, che lo vedevano pur potendo gestire i feedback. */
     .fb-admin-banner[hidden] { display: none; }
+    /* Box dell'interruttore automazione (owner-only): stesso contorno morbido
+       del banner admin, così si legge come "zona proprietario". */
+    .fb-automation {
+      margin-bottom: 16px; padding: 4px 14px 12px;
+      border: 1px solid var(--sn-border); border-radius: 8px;
+      background: var(--sn-overlay-bg);
+    }
+    .fb-automation[hidden] { display: none; }
   </style>
 </head>
 <body>
