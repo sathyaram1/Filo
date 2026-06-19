@@ -912,6 +912,9 @@
   // ── Stato admin ──────────────────────────────────────────────────────────
   function renderAuthState(profile) {
     if (adminBanner) adminBanner.hidden = isAdmin;
+    // Lo switch automazione è un controllo da owner: visibile solo agli admin.
+    if (automationRow) automationRow.hidden = !isAdmin;
+    if (isAdmin) loadAutomation();
     if (!isAdmin && adminBannerText) {
       // Distingui "non loggato" da "loggato ma non admin": il secondo non può
       // diventare admin cliccando Accedi, quindi nascondiamo il pulsante.
