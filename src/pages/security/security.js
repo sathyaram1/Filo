@@ -236,16 +236,38 @@
     }
   }
 
+  // Mostra (o nasconde, con msg vuoto) un avviso inline sotto il campo "siti
+  // fidati". Senza questo, un input rifiutato spariva senza spiegazione.
+  function setWhitelistError(msg) {
+    const el = $('cookie-wl-error');
+    if (!el) return;
+    el.textContent = msg || '';
+    el.style.display = msg ? 'block' : 'none';
+  }
+
   function addWhitelistDomain() {
-    const domain = cleanDomain($('cookie-wl-input').value);
-    if (!domain) { $('cookie-wl-input').value = ''; return; }
-    if (!cookieWhitelist.includes(domain)) {
-      cookieWhitelist.push(domain);
-      cookieWhitelist.sort();
-      renderWhitelist();
-      saveCookies();
+    const input = $('cookie-wl-input');
+    const raw = String(input.value || '').trim();
+    if (!raw) { setWhitelistError(''); return; }
+    const domain = cleanDomain(raw);
+    if (!domain) {
+      // Input non vuoto ma non è un dominio valido: avvisa invece di svuotare
+      // in silenzio. Lascia il testo nel campo così l'utente può correggerlo.
+      setWhitelistError(I18n.t('options_cookies_whitelist_invalid'));
+      input.focus();
+      return;
     }
-    $('cookie-wl-input').value = '';
+    if (cookieWhitelist.includes(domain)) {
+      setWhitelistError(I18n.t('options_cookies_whitelist_dup', domain));
+      input.value = '';
+      return;
+    }
+    cookieWhitelist.push(domain);
+    cookieWhitelist.sort();
+    renderWhitelist();
+    saveCookies();
+    setWhitelistError('');
+    input.value = '';
   }
 
   async function saveCookies() {
