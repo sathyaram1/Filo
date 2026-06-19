@@ -354,6 +354,8 @@
     $('cookie-wl-input').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); addWhitelistDomain(); }
     });
+    // Mentre l'utente corregge il valore, togli l'avviso d'errore precedente.
+    $('cookie-wl-input').addEventListener('input', () => setWhitelistError(''));
     $('sec-export-btn').addEventListener('click', exportData);
   });
 })();
