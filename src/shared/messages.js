@@ -173,6 +173,10 @@
     // presenti); UPDATE scrive provider/models/modelRegistry/apiKeys.
     DEFAULTS_GET: 'defaults_get',                  // → { ok, config } | { ok:false, error }
     DEFAULTS_UPDATE: 'defaults_update',            // { config } → { ok, config } | { ok:false, error }
+    // Interruttore master dell'auto-miglioramento (doc config/automation, campo
+    // `enabled`). Owner-only. Vedi filo-security DESIGN §2.
+    AUTOMATION_GET: 'automation_get',              // → { ok, enabled } | { ok:false, error }
+    AUTOMATION_SET: 'automation_set',              // { enabled } → { ok, enabled } | { ok:false, error }
     WEB_SEARCH: 'web_search',                      // { query } → { ok, results: [{title,url,snippet}], provider }
 
     // === Rilevamento siti pericolosi (src/main/services/safebrowse/) ===
