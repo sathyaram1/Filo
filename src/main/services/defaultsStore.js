@@ -245,10 +245,32 @@ async function update(partial, idToken) {
   return getPublicForAdmin();
 }
 
+// ── Interruttore master dell'auto-miglioramento (config/automation) ──────────
+// Campo `enabled` (bool). Doc o campo assente ⇒ false = autonomia OFF (stato
+// sicuro di default: ogni feedback passa da revisione umana). Letto dalla
+// dashboard owner (qui) e, in futuro, dal backend di sicurezza (via admin SDK,
+// che bypassa le regole). Scrittura riservata agli admin: le regole Firestore
+// rifiutano i non-admin.
+async function getAutomationGate(idToken) {
+  const doc = await fetchDoc(AUTOMATION_DOC, idToken);
+  // doc === {} → 404 (mai scritto) ⇒ default OFF. null → lettura negata/fallita
+  // ⇒ default OFF prudente (non si attiva l'autonomia per un errore di rete).
+  if (!doc || typeof doc.enabled !== 'boolean') return false;
+  return doc.enabled;
+}
+
+async function setAutomationGate(enabled, idToken) {
+  if (!idToken) throw new Error('Serve un ID token admin per cambiare l\'interruttore.');
+  await patchDoc(AUTOMATION_DOC, { enabled: toFsValue(Boolean(enabled)) }, ['enabled'], idToken);
+  return Boolean(enabled);
+}
+
 module.exports = {
   get,
   getPublicForAdmin,
   refresh,
   refreshIfStale,
   update,
+  getAutomationGate,
+  setAutomationGate,
 };
