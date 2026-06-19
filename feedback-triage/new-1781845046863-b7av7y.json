@@ -1,0 +1,15 @@
+{
+  "op": "create",
+  "uid": "5ce41cef-b6b2-4bcb-b718-4ed1c145045b",
+  "text": "Apri Impostazioni → Sicurezza. Nella sezione 'Cookie e banner di consenso' scegli 'Privacy massima': si attiva il campo 'Siti fidati'. Scrivi nel campo un valore che non è un dominio valido (per esempio 'localhost', oppure un indirizzo IP come '192.168.1.1', o un nome senza estensione) e premi 'Aggiungi' (o Invio). Il testo che hai scritto sparisce dal campo ma NON viene aggiunto alla lista, e non compare nessun messaggio: sembra che non sia successo niente. L'utente non capisce se il sito è stato aggiunto o perché è stato rifiutato. Con un dominio valido (es. 'example.com') invece l'aggiunta funziona e appare in lista — quindi il caso valido e quello non valido si comportano in modo diverso senza spiegarlo.\n\nPARTE TECNICA: src/pages/security/security.js, addWhitelistDomain() (~riga 239) chiama cleanDomain() (~riga 196); se la validazione fallisce (regex che richiede un TLD: niente host a etichetta singola, niente IP) la funzione fa solo 'input.value = \"\"' e ritorna, senza alcun feedback. Manca l'invariante UX 'azione fallita → avvisa l'utente' (un breve messaggio d'errore o toast accanto al campo).",
+  "name": "Sicurezza: dominio non valido nei 'Siti fidati' sparisce senza avviso",
+  "parentId": "",
+  "status": "new",
+  "priority": 1,
+  "notes": "",
+  "images": [
+    "https://firebasestorage.googleapis.com/v0/b/filo-8b9cb.firebasestorage.app/o/feedback%2F1781845045780_49a45fea-b909-4dd0-8282-0948d050838b.png?alt=media&token=8ab0fa05-dd1a-4d96-be37-672da0d76a1f"
+  ],
+  "queuedAt": "2026-06-19T04:57:26.863Z",
+  "queuedBy": "routine"
+}
