@@ -214,6 +214,19 @@
       <button type="button" class="sn-btn" id="adminSignIn">Accedi</button>
     </div>
 
+    <!-- Interruttore master dell'auto-miglioramento (owner-only). Visibile solo
+         agli admin (lo smaschera feedback.js). Default OFF = autonomia spenta:
+         ogni feedback, anche sicuro, passa da te. Vedi filo-security DESIGN §2. -->
+    <div class="fb-automation" id="automationRow" hidden>
+      <div class="sn-toggle-row">
+        <label>
+          <input type="checkbox" id="automationToggle" />
+          <span>Gestione automatica dei feedback</span>
+        </label>
+        <span class="sn-muted" id="automationDesc"></span>
+      </div>
+    </div>
+
     <div class="fb-tabs" id="tabs">
       <button type="button" class="fb-tab fb-tab--active" data-tab="inbox">Ricevuti</button>
       <button type="button" class="fb-tab" data-tab="agent">Agente</button>
