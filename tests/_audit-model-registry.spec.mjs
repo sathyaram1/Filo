@@ -39,6 +39,8 @@ test('model registry: row without nickname is dropped but UI says saved', async 
   const idInDom = await row.locator('.sn-model-id').inputValue();
   console.log('ROW IN DOM, model id >>>', JSON.stringify(idInDom));
 
+  await row.scrollIntoViewIfNeeded();
+  await row.screenshot({ path: 'tests/.shots/audit-model-registry-row.png' }).catch(() => {});
   await page.screenshot({ path: 'tests/.shots/audit-model-registry-before.png', fullPage: true }).catch(() => {});
 
   // Ricarica la pagina: rilegge dallo storage.
