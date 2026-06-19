@@ -90,4 +90,36 @@ module.exports = function register(on, ctx) {
       return { ok: false, error: e?.message || String(e) };
     }
   });
+
+  // Interruttore master dell'auto-miglioramento (config/automation). Owner-only.
+  // Default OFF (autonomia spenta): mentre è OFF anche i feedback "sicuri"
+  // richiedono verifica umana. Vedi filo-security DESIGN §2. La scrittura passa
+  // dal main con l'ID token admin; le regole Firestore sono la garanzia forte.
+  on(MSG.AUTOMATION_GET, async () => {
+    try {
+      if (!auth.isAdmin()) {
+        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
+      }
+      const idToken = await auth.getIdToken();
+      if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
+      const enabled = await Defaults.getAutomationGate(idToken);
+      return { ok: true, enabled };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  });
+
+  on(MSG.AUTOMATION_SET, async (msg) => {
+    try {
+      if (!auth.isAdmin()) {
+        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
+      }
+      const idToken = await auth.getIdToken();
+      if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
+      const enabled = await Defaults.setAutomationGate(Boolean(msg.enabled), idToken);
+      return { ok: true, enabled };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  });
 };
