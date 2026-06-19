@@ -89,6 +89,40 @@ test('toggle persistito dopo salvataggio', async ({ openTab }) => {
   await expect(page.locator('#sec-block-popups')).toBeChecked();
 });
 
+test('siti fidati: un dominio non valido mostra un avviso e NON sparisce in silenzio (#218)', async ({ openTab }) => {
+  const page = await openTab('filo://security/');
+  await page.waitForSelector('#cookie-wl-input', { timeout: 8_000 });
+
+  // I "siti fidati" sono attivi solo in "Privacy massima": selezionala per
+  // abilitare il campo.
+  await page.locator('#cookie-mode-privacy').check();
+  await expect(page.locator('#cookie-wl-input')).toBeEnabled();
+
+  // Valore non valido (host a etichetta singola): senza il fix spariva muto.
+  await page.locator('#cookie-wl-input').fill('localhost');
+  await page.locator('#cookie-wl-add-btn').click();
+
+  // SUCCESSO = compare un avviso d'errore visibile e il testo resta nel campo
+  // (così l'utente può correggerlo), e NON viene aggiunto nulla alla lista.
+  await expect(page.locator('#cookie-wl-error')).toBeVisible();
+  await expect(page.locator('#cookie-wl-error')).toContainText(/dominio valido/i);
+  await expect(page.locator('#cookie-wl-input')).toHaveValue('localhost');
+  await expect(page.locator('#cookie-wl-list li span')).toHaveCount(0);
+
+  // Un IP è ugualmente rifiutato con avviso.
+  await page.locator('#cookie-wl-input').fill('192.168.1.1');
+  await page.locator('#cookie-wl-add-btn').click();
+  await expect(page.locator('#cookie-wl-error')).toBeVisible();
+  await expect(page.locator('#cookie-wl-list li span')).toHaveCount(0);
+
+  // Un dominio valido invece viene aggiunto e l'avviso sparisce.
+  await page.locator('#cookie-wl-input').fill('example.com');
+  await page.locator('#cookie-wl-add-btn').click();
+  await expect(page.locator('#cookie-wl-list li span')).toHaveText(['example.com']);
+  await expect(page.locator('#cookie-wl-error')).toBeHidden();
+  await expect(page.locator('#cookie-wl-input')).toHaveValue('');
+});
+
 test('popup blocker: window.open() automatico viene bloccato', async ({ openTab, testServer, shell }) => {
   // Pagina che chiama window.open() AL CARICAMENTO (no gesto utente) — è il
   // pattern degli ad popup. Disposition 'new-window' (per via di features=popup)
