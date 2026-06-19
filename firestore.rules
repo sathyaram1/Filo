@@ -79,6 +79,16 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // config/automation → interruttore master dell'auto-miglioramento (vedi
+    // filo-security DESIGN §2). Campo `enabled` (bool; assente = false = OFF, lo
+    // stato sicuro). Lo legge la dashboard owner e, in futuro, il backend di
+    // sicurezza (admin SDK, che bypassa le regole). Riservato agli admin:
+    // nessun utente normale lo legge o scrive.
+    match /config/automation {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
     match /feedback/{doc} {
       allow read: if true;
 
