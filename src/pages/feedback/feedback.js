@@ -15,6 +15,13 @@
   const adminBanner = document.getElementById('adminBanner');
   const adminBannerText = document.getElementById('adminBannerText');
   const adminSignInBtn = document.getElementById('adminSignIn');
+  // Interruttore master "gestione automatica dei feedback" (owner-only): vedi
+  // filo-security DESIGN §2. Default OFF (autonomia spenta): finché è OFF anche i
+  // feedback sicuri richiedono verifica umana. Il backend (futuro) leggerà lo
+  // stesso flag (doc Firestore config/automation, campo `enabled`).
+  const automationRow = document.getElementById('automationRow');
+  const automationToggle = document.getElementById('automationToggle');
+  const automationDesc = document.getElementById('automationDesc');
 
   // Gestione feedback (sposta di stato, priorità, note) è riservata agli
   // amministratori: senza account autorizzato la pagina resta in sola lettura.
