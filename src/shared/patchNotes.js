@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.58', date: '2026-06-19',
+      features: [],
+      fixes: [
+        'Nei "Siti fidati" (Impostazioni → Sicurezza, Privacy massima), se scrivi qualcosa che non è un dominio valido ora compare un avviso che lo spiega, invece di sparire in silenzio senza aggiungere nulla.',
+      ],
+    },
+    {
       version: '0.2.53', date: '2026-06-18',
       features: [],
       fixes: [
