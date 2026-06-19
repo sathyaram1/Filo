@@ -956,6 +956,44 @@
     });
   }
 
+  // ── Switch "gestione automatica dei feedback" (owner-only) ───────────────────
+  // Default OFF = autonomia spenta: ogni feedback, anche sicuro, passa da te. Lo
+  // stato vive nel doc Firestore config/automation (campo `enabled`); la
+  // scrittura passa dal main (handler admin-gated, ID token come Bearer).
+  function renderAutomation(enabled) {
+    if (automationToggle) automationToggle.checked = Boolean(enabled);
+    if (automationDesc) {
+      automationDesc.textContent = enabled
+        ? 'Attiva: i feedback classificati sicuri vengono gestiti in autonomia; i casi a rischio passano comunque da te.'
+        : 'Disattivata: ogni feedback, anche sicuro, richiede la tua verifica manuale.';
+    }
+  }
+
+  async function loadAutomation() {
+    try {
+      const r = await sendToMain({ type: 'automation_get' });
+      if (r?.ok) renderAutomation(Boolean(r.enabled));
+    } catch (_) { /* lo switch resta com'è; si riprova al prossimo refresh auth */ }
+  }
+
+  if (automationToggle) {
+    automationToggle.addEventListener('change', async () => {
+      const want = automationToggle.checked;
+      automationToggle.disabled = true;
+      renderAutomation(want); // ottimistico
+      try {
+        const r = await sendToMain({ type: 'automation_set', enabled: want });
+        if (!r || r.ok === false) throw new Error(r?.error || 'errore sconosciuto');
+        renderAutomation(Boolean(r.enabled));
+      } catch (e) {
+        renderAutomation(!want); // ripristina lo stato precedente
+        alert('Non sono riuscito a salvare l\'impostazione: ' + (e?.message || e));
+      } finally {
+        automationToggle.disabled = false;
+      }
+    });
+  }
+
   // Reagisci al login/logout fatto altrove (es. dal pulsante account della shell).
   if (window.filo?.onBroadcast) {
     window.filo.onBroadcast((m) => {
