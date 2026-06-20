@@ -32,7 +32,9 @@ test('AUDIT blacklist accetta voci non valide senza feedback (asimmetria con sit
   expect(hasBlacklistError).toBe(0);
 
   // 2) CONTRASTO — SITI FIDATI: la stessa voce non valida viene RIFIUTATA con
-  //    un avviso inline (comportamento corretto, fix #218).
+  //    un avviso inline (comportamento corretto, fix #218). Il campo è attivo
+  //    solo in "Privacy massima", quindi prima seleziono quella modalità.
+  await page2.locator('input[name="cookie-mode"][value="privacy"]').check();
   const wlInput = page2.locator('#cookie-wl-input');
   await wlInput.fill('facebook');
   await page2.locator('#cookie-wl-add-btn').click();
