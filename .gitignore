@@ -9,6 +9,11 @@ src/main/config/default-keys.generated.json
 tests/.report/
 tests/.shots/
 tests/.smoke/
+# Spec di audit usate dalle routine cloud per RIPRODURRE un ritrovamento prima
+# di accodarlo come feedback: sono usa-e-getta (asseriscono che il bug ESISTE,
+# quindi diventano rosse appena il bug viene fixato). Non vanno mai committate —
+# l'hook auto-commit fa `git add -A`, quindi senza questa regola finivano su main.
+tests/_audit*.spec.mjs
 tests/.fb/*.png
 tests/agent/.env
 tests/agent/.out/
