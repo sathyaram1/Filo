@@ -228,5 +228,28 @@ service cloud.firestore {
       allow update: if false;
       allow delete: if false;
     }
+
+    // ── Collezioni del backend di sicurezza (filo-security, DESIGN §13) ──────
+    // Scritte SOLO dal backend server-side via Admin SDK, che BYPASSA queste
+    // regole. Per il client sono di sola lettura admin (futuri pannelli di
+    // audit dell'owner) e MAI scrivibili: niente accesso utente.
+    //
+    // - identities/* : stato per account/IP (clean/spam/dangerous), contatori.
+    // - attacks/*    : corpus dei tentativi (testo, verdetti, sorgente etichetta).
+    // - judge-verdicts/* : log dei giudizi L2 (audit/benchmark).
+    // La logica e i prompt dei giudici NON vivono qui (sono nel backend
+    // privato): queste collezioni contengono solo stato/dati, non il "cervello".
+    match /identities/{doc} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    match /attacks/{doc} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    match /judge-verdicts/{doc} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
   }
 }
