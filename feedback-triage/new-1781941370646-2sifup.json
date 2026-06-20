@@ -1,0 +1,15 @@
+{
+  "op": "create",
+  "uid": "ed112644-10c7-4db0-aaf0-5c2b889e8605",
+  "text": "PARTE UTENTE: nell'editor di Filo il numero di parole è sbagliato appena il documento va a capo. Per riprodurre: apri l'editor, scrivi \"Hello world\", premi Invio, scrivi \"Foo bar\", premi Invio, scrivi \"apple\", Invio, \"banana\". Il documento contiene 6 parole, ma il modulo \"Conteggio parole\" (e l'overlay \"Statistiche documento\" che si apre cliccandolo) mostra 3. Succede con qualunque testo su più righe/paragrafi o in elenchi puntati: le parole a cavallo di un a-capo vengono fuse e contate come una sola, quindi il totale è sempre sottostimato. Anche \"Caratteri\" risulta leggermente diverso dal reale per lo stesso motivo.\n\nPARTE TECNICA: src/pages/editor/editor.js, funzione textStats(): il conteggio usa docEl.textContent, che concatena i blocchi (p, div, li, h…) SENZA separatore (es. \"Hello worldFoo barapplebanana\"), poi fa split su /\\s+/. L'ultima parola di un blocco e la prima del successivo si fondono. Fix: derivare il testo inserendo un separatore tra i blocchi (es. usare innerText, oppure unire i textContent dei blocchi con uno spazio/newline) prima di contare parole/caratteri/frasi. Distinto da #222 (che riguarda solo il documento vuoto). Riprodotto con tests/_audit-editor-wordcount-blocks.spec.mjs (6 parole reali → conta 3).",
+  "name": "Editor: conteggio parole sbagliato su più righe",
+  "parentId": "",
+  "status": "new",
+  "priority": 2,
+  "notes": "",
+  "images": [
+    "https://firebasestorage.googleapis.com/v0/b/filo-8b9cb.firebasestorage.app/o/feedback%2F1781941369736_18c8cb8e-7314-46bb-938f-9d10ffb204ac.png?alt=media&token=ffb1bf5e-e536-4e2b-88e2-71e19a3b142d"
+  ],
+  "queuedAt": "2026-06-20T07:42:50.646Z",
+  "queuedBy": "routine"
+}
