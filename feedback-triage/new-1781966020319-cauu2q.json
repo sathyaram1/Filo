@@ -1,0 +1,16 @@
+{
+  "op": "create",
+  "uid": "3b101ab4-82ef-40e2-bc60-2b8270223e72",
+  "text": "Apri Impostazioni → Sicurezza, attiva \"Blocca l'apertura dei siti in blacklist\" e nel campo \"Domini in blacklist\" scrivi un nome senza estensione, per esempio solo \"facebook\" invece di \"facebook.com\". Viene accettato senza alcun avviso e resta salvato anche dopo aver riaperto la pagina. Ma una voce così non blocca davvero il sito: credi di aver bloccato Facebook e invece riesci ad aprirlo normalmente, senza nessun segnale che qualcosa non va. Stessa cosa se incolli un indirizzo intero (es. https://www.facebook.com/feed): viene salvato così com'è. Per confronto, il campo \"Siti fidati\" poco più in basso (in \"Privacy massima\") rifiuta lo stesso input \"facebook\" con il messaggio \"Non sembra un dominio valido\". Alla blacklist manca quella stessa validazione e quell'avviso.\n\nPARTE TECNICA: in src/pages/security/security.js la funzione save() salva la blacklist come testo grezzo (split('\\n') + trim, righe 307-308), senza normalizzare né validare, mentre addWhitelistDomain() usa cleanDomain() con avviso inline (fix #218). Nel main (src/main/services/siteBlock.js, normalizeDomain) si ripuliscono schema/path/www ma NON c'è la validazione regex di cleanDomain, quindi una voce tipo \"facebook\" entra comunque nel Set e non matcha mai un host reale (matchesSuffix cerca facebook.com/com, non \"facebook\"). Allineare la blacklist al campo siti fidati: normalizzare e validare ogni riga, e segnalare quali righe vengono scartate.",
+  "name": "Blocco siti: la blacklist accetta domini non validi senza avviso",
+  "parentId": "",
+  "status": "new",
+  "priority": 1,
+  "notes": "",
+  "images": [
+    "https://firebasestorage.googleapis.com/v0/b/filo-8b9cb.firebasestorage.app/o/feedback%2F1781966018763_5eef55e0-8a16-4002-8fcc-3d47a36aeda3.png?alt=media&token=219215d1-5f30-479d-92ea-e817e7f0a710",
+    "https://firebasestorage.googleapis.com/v0/b/filo-8b9cb.firebasestorage.app/o/feedback%2F1781966019693_862ce69a-1733-45ac-8821-6cffd9e8689d.png?alt=media&token=32769fe5-7257-414d-a4d6-9d72bae061fc"
+  ],
+  "queuedAt": "2026-06-20T14:33:40.318Z",
+  "queuedBy": "routine"
+}
