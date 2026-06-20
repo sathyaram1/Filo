@@ -1,0 +1,13 @@
+{
+  "op": "create",
+  "uid": "4525ff16-ee4e-40b7-aeaa-d2e2a5b7cea4",
+  "text": "PARTE UTENTE: La suite di test automatici completa (npm test) fallisce su main in modo deterministico per UN test, quindi le routine cloud che verificano le modifiche vedono sempre la regressione 'rossa'. ATTENZIONE: non è un problema di sicurezza dell'app — le chiavi API vengono cifrate correttamente; è il test stesso ad avere un difetto di tempistica che lo fa fallire prima ancora di arrivare a controllare la cifratura.\n\nCome verificare: esegui 'xvfb-run -a npx playwright test tests/security-hardening.spec.mjs:131 --reporter=list'. Fallisce tutte e 3 le volte (iniziale + 2 retry) con 'Execution context was destroyed, most likely because of a navigation'. Gli altri test dello stesso file passano. NB: i due test segnalati in precedenza come rossi (dropdown font + correttore) ora PASSANO: il rosso attuale di npm test è dovuto a QUESTO test, diverso.\n\nPARTE TECNICA: tests/security-hardening.spec.mjs:131 ('#3 le chiavi API sono cifrate nel storage.json'). Il fixture 'app' (tests/fixtures/electron.mjs:28) è test-scoped: ogni test lancia un Electron fresco. Gli altri test del file passano per i fixture 'shell'/'openTab' che fanno 'await app.firstWindow()' + waitForLoadState, aspettando la fine della navigazione di boot. Il test #3 destruttura solo { app } e chiama subito 'app.evaluate(...)' (riga 134, il primo, per safeStorage.isEncryptionAvailable()) MENTRE l'app sta ancora navigando al boot → il contesto d'esecuzione viene distrutto. Il codice di cifratura (src/main/shim/storage.js serializeForDisk/deserializeFromDisk) è corretto e non viene neppure raggiunto. Fix: prima del primo app.evaluate, attendere che l'app sia pronta — es. aggiungere il fixture 'shell' alla firma del test (async ({ app, shell })) oppure 'await app.firstWindow()' + un breve waitForLoadState. Tiene npm test rosso in cloud (e in locale headless), minando il passo di verifica delle routine.",
+  "name": "npm test rosso: security-hardening #3 (race di boot, non un buco di sicurezza)",
+  "parentId": "",
+  "status": "new",
+  "priority": 1,
+  "notes": "",
+  "images": [],
+  "queuedAt": "2026-06-20T09:59:09.480Z",
+  "queuedBy": "routine"
+}
