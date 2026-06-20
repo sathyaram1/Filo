@@ -1,0 +1,13 @@
+{
+  "op": "create",
+  "uid": "e3d3a001-656d-4b57-b1dc-de7c840f8ea0",
+  "text": "PARTE UTENTE: Filo può eseguire comandi da terminale se attivi la modalità terminale in Impostazioni. I comandi di sola lettura li esegue subito, mentre quelli che modificano qualcosa dovrebbero chiederti conferma. Alcuni comandi che IN REALTÀ modificano la configurazione vengono però eseguiti subito, senza chiedere nulla.\n\nPassi per riprodurre: attiva la modalità terminale in Impostazioni, poi nella chat dell'assistente chiedi di eseguire 'npm config set registry http://esempio' (oppure 'git config core.pager qualcosa', 'git remote set-url origin http://esempio', 'git tag v1'). Filo lo esegue immediatamente, senza il box 'digita conferma' e senza popup di conferma, anche se questi comandi cambiano la configurazione (per esempio il registro da cui npm scarica i pacchetti, o l'indirizzo del remote git). Le versioni di sola lettura ('git config --list', 'npm config get registry', 'git remote -v') restano invece correttamente senza conferma.\n\nPARTE TECNICA: la causa è nel classificatore dei comandi (src/shared/cmdClassify.js). classifyGit/classifyNpm assegnano il livello guardando SOLO il nome del sotto-comando: 'config', 'remote' e 'tag' sono in GIT_READ, 'config' è in NPM_READ. Ma quei sotto-comandi sono letture solo in certe forme: 'git config --get/--list' legge ma 'git config <chiave> <valore>' SCRIVE; 'git remote -v' legge ma 'git remote add/set-url/remove/rename' SCRIVE; 'git tag' (lista) legge ma 'git tag <nome>' CREA; 'npm/pip config get' legge ma 'npm/pip config set/delete' SCRIVE. Tutte le forme di scrittura tornano livello 1 (esecuzione immediata senza conferma) perché il check guarda solo il sotto-comando, non gli argomenti. Serve una classificazione argument-aware (distinguere get/list/-v da set/add/delete/<valore>). Casi particolarmente sensibili, che andrebbero anche oltre il livello 2: 'git config alias.* !...', 'git config core.pager/core.sshCommand/core.editor' e 'npm config set registry' possono abilitare esecuzione di codice o redirezione supply-chain in un secondo momento. Riproducibile in modo deterministico: SN_CMD_CLASSIFY.classify() su queste stringhe torna 1 invece di >=2.",
+  "name": "Terminale: scritture mascherate da letture eseguite senza conferma (git/npm config)",
+  "parentId": "",
+  "status": "new",
+  "priority": 2,
+  "notes": "",
+  "images": [],
+  "queuedAt": "2026-06-20T22:11:58.077Z",
+  "queuedBy": "routine"
+}
