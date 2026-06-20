@@ -1,0 +1,14 @@
+{
+  "indexes": [
+    {
+      "//": "Conteggio rate L1 del backend di sicurezza (filo-security): feedback per clientId in una finestra temporale (where clientId == X and createdAt >= since). Equality + range su campi diversi richiede un indice composto.",
+      "collectionGroup": "feedback",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clientId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
