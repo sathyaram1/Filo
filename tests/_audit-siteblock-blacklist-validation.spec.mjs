@@ -31,6 +31,10 @@ test('AUDIT blacklist accetta voci non valide senza feedback (asimmetria con sit
   const hasBlacklistError = await page2.locator('#sec-siteblock-blacklist-error').count();
   expect(hasBlacklistError).toBe(0);
 
+  // Screenshot del campo blacklist con la voce non valida accettata in silenzio.
+  await page2.locator('#sec-siteblock-blacklist').scrollIntoViewIfNeeded();
+  await page2.screenshot({ path: 'tests/.shots/audit-siteblock-blacklist-accepts-invalid.png' });
+
   // 2) CONTRASTO — SITI FIDATI: la stessa voce non valida viene RIFIUTATA con
   //    un avviso inline (comportamento corretto, fix #218). Il campo è attivo
   //    solo in "Privacy massima", quindi prima seleziono quella modalità.
