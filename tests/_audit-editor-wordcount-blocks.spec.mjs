@@ -10,20 +10,17 @@ test('editor word-count: parole fuse tra paragrafi/elementi (sottostima)', async
   await page.waitForSelector('#doc');
   await page.click('#doc');
 
-  // Documento con 6 parole reali, distribuite su 2 paragrafi e una lista.
-  // "Hello world" / "Foo bar" / li "apple" / li "banana"  → 6 parole.
-  await page.evaluate(() => {
-    const doc = document.getElementById('doc');
-    doc.innerHTML =
-      '<p>Hello world</p>' +
-      '<p>Foo bar</p>' +
-      '<ul><li>apple</li><li>banana</li></ul>';
-    doc.dispatchEvent(new Event('input', { bubbles: true }));
-  });
+  // Scrive come un utente reale: 4 righe separate da Invio → 6 parole vere.
+  // (Invio in contenteditable crea blocchi separati: p/div.)
+  await page.keyboard.type('Hello world');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('Foo bar');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('apple');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('banana');
   await page.waitForTimeout(200);
 
-  // Apri l'overlay statistiche (clic sul modulo conteggio parole se presente,
-  // altrimenti calcola via la stessa logica esposta in pagina).
   const stats = await page.evaluate(() => {
     const docEl = document.getElementById('doc');
     const text = (docEl.textContent || '').trim();
@@ -33,6 +30,13 @@ test('editor word-count: parole fuse tra paragrafi/elementi (sottostima)', async
   console.log('textContent >>>', JSON.stringify(stats.textContent));
   console.log('WORDS COUNTED >>>', stats.words, '(reali: 6)');
 
+  // Apri l'overlay "Statistiche documento" cliccando il modulo conteggio parole,
+  // così lo screenshot mostra il numero sbagliato come lo vede l'utente.
+  const wc = page.locator('.ed-module[data-type="word-count"]').first();
+  if (await wc.count()) {
+    await wc.click().catch(() => {});
+    await page.waitForTimeout(300);
+  }
   await page.screenshot({ path: 'tests/.shots/audit-wordcount-blocks.png' }).catch(() => {});
 
   // Le 6 parole reali vengono contate male perché i blocchi si fondono:
