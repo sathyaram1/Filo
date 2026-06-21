@@ -149,6 +149,12 @@ test('live reveal: slot in attesa diventano rivelati e mostra esito validità', 
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
+  // L'area di rivelazione vive dentro il contenuto verificato (spec §8.4: solo
+  // i verificati la vedono). Mettiamo prima uno stato verificato così è visibile.
+  await page.evaluate(() => {
+    window.RedteamUI.applyState({ signedIn: true, verified: true, isOwner: false, gridUnlocked: {}, milestones: {} });
+  });
+
   // Parziale: solo B e D hanno risposto; A e C in attesa.
   await page.evaluate(() => {
     window.RedteamUI.renderReveal({
