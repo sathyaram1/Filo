@@ -82,6 +82,28 @@ test('il pannello "Invia attacco" ha due campi separati e il costo, e blocca con
   expect(statusAfter).not.toBe('Invio…');
 });
 
+test('il menu tasto destro ha "Invia attacco" che apre il pannello con i due campi', async ({ openTab, testServer }) => {
+  // Su una pagina esterna i content script (menu + redteamAttack) sono iniettati.
+  const url = testServer.html('<!doctype html><html><body><h1 id="t">pagina</h1></body></html>');
+  const page = await openTab(url);
+  await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
+
+  // Apri il menu contestuale Filo.
+  await page.locator('#t').click({ button: 'right' });
+  const menu = page.locator('.sn-menu').first();
+  await expect(menu).toBeVisible();
+
+  // La voce "Invia attacco (Red-team)" esiste.
+  const item = menu.locator('.sn-menu-item', { hasText: 'Invia attacco' });
+  await expect(item).toBeVisible();
+
+  // Click → apre il pannello con i due campi separati.
+  await item.click();
+  await expect(page.locator('.sn-rt-overlay .sn-rt-attack')).toBeVisible({ timeout: 4000 });
+  await expect(page.locator('.sn-rt-overlay .sn-rt-desc')).toBeVisible();
+  await expect(page.locator('.sn-rt-overlay .sn-rt-send')).toBeVisible();
+});
+
 test('mappa pura status→messaggio (spec §8.1)', async ({ openTab }) => {
   const page = await openTab(RT_URL);
   await page.waitForLoadState('domcontentloaded');
