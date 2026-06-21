@@ -746,6 +746,7 @@
       p.hidden = p.dataset.panel !== name;
     });
     if (name === 'leaderboard') loadLeaderboard();
+    if (name === 'codes') loadCodes();
   }
 
   async function send(type, args) {
