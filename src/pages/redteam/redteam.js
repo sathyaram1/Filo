@@ -840,6 +840,28 @@
         const msg = $('redeemMsg');
         const btn = $('redeemBtn');
         if (btn) btn.disabled = true;
+        // Da sloggato il codice non può legarsi a nessun account: prima accedi,
+        // poi riscatta nello stesso gesto (così "dove inserire il codice" è
+        // chiaro fin da sloggati e l'accesso non è un passaggio separato).
+        if (!lastState.signedIn) {
+          if (msg) {
+            msg.hidden = false;
+            msg.textContent = 'Accesso in corso…';
+            msg.classList.remove('rt-redeem-msg--err', 'rt-redeem-msg--ok');
+          }
+          const a = await send(MSG.AUTH_SIGNIN);
+          if (!a || !a.ok) {
+            if (msg) {
+              msg.hidden = false;
+              msg.textContent = 'Accesso non riuscito. Riprova.';
+              msg.classList.remove('rt-redeem-msg--ok');
+              msg.classList.add('rt-redeem-msg--err');
+            }
+            if (btn) btn.disabled = false;
+            return;
+          }
+          await loadState(); // aggiorna signedIn/isOwner
+        }
         const r = await send(MSG.REDTEAM_REDEEM, { code, handle });
         const result = redeemStatusMessage(r.status || (r.error ? 'error' : 'error'));
         if (msg) {
