@@ -58,6 +58,31 @@
     return new Intl.NumberFormat('it-IT').format(Math.round(Number(n) || 0));
   }
 
+  // Tempo relativo da un epoch ms (spec §6.1, colonna "Ora").
+  // Scala: "ora" → "Nm fa" → "Nh fa" → "ieri" → "Ng fa" → data assoluta (gg/mm/aaaa)
+  // oltre la settimana. now è iniettabile per i test (default Date.now()).
+  function formatRelativeTime(ts, now) {
+    const t = Number(ts);
+    if (!isFinite(t) || t <= 0) return '—';
+    const ref = (typeof now === 'number' && isFinite(now)) ? now : Date.now();
+    const diff = ref - t;
+    if (diff < 0) return 'ora';                       // timestamp futuro/clock skew
+    const sec = Math.floor(diff / 1000);
+    if (sec < 60) return 'ora';
+    const min = Math.floor(sec / 60);
+    if (min < 60) return min + 'm fa';
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return hr + 'h fa';
+    const day = Math.floor(hr / 24);
+    if (day === 1) return 'ieri';
+    if (day < 7) return day + 'g fa';
+    try {
+      return new Date(t).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    } catch (_) {
+      return '—';
+    }
+  }
+
   // ====================== FUNZIONI PURE DI RENDERING ======================
 
   // Griglia record 4×3 (giudici A/B/C/Δ × livelli Spam/Verifica/Via libera).
