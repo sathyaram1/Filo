@@ -180,7 +180,7 @@
       } catch (_) { signedIn = false; }
       if (signedIn) {
         try {
-          const c = await chrome.runtime.sendMessage({ type: MSG.CREDITS_GET });
+          const c = await chrome.runtime.sendMessage({ type: MSG.GET_CREDITS });
           if (c && Number.isFinite(Number(c.credits))) balance = Number(c.credits);
         } catch (_) {}
       }
