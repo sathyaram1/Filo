@@ -1,0 +1,15 @@
+{
+  "op": "create",
+  "uid": "027a2f73-f87a-4de6-bfa7-eede1e4e0b99",
+  "text": "Nell'editor (la pagina 'Documento'/editor), il modulo 'Cerca e sostituisci' non trova un'occorrenza di una parola se una parte di quella parola ha una formattazione diversa dal resto (grassetto, corsivo, sottolineato). Di conseguenza 'Sostituisci tutto' lascia silenziosamente alcune parole nel testo, dando l'illusione di averle sostituite tutte.\n\nPer riprodurlo:\n1. Apri l'editor e scrivi una frase con la stessa parola ripetuta, es: 'Nome: alfa, alfa e alfa.'\n2. Seleziona SOLO le ultime due lettere dell'ultima 'alfa' (la 'fa') e mettile in grassetto con Ctrl+B. Ora quella parola è scritta metà normale e metà grassetto.\n3. Apri il modulo 'Cerca e sostituisci' (l'icona con la lente fra le pagine dell'editor) e cerca 'alfa': il contatore mostra '1/2' invece di 1/3 — l'occorrenza col grassetto non viene trovata né evidenziata.\n4. Scrivi 'OMEGA' nel campo 'Sostituisci' e premi 'Tutto': il documento diventa 'Nome: OMEGA, OMEGA e alfa.' — l'ultima 'alfa' resta nel testo, NON sostituita, senza alcun avviso (vedi screenshot: in alto il testo con 'alfa' rimasto, a destra il box che dice 'nessun risultato').\n\nPARTE TECNICA: la ricerca scorre il contenuto testo-nodo per testo-nodo e cerca il termine dentro ogni singolo nodo di testo del contenteditable. Quando una parola è spezzata da un tag inline (es. <strong>) il browser la rappresenta come più nodi di testo ('al' + 'fa'): nessuno dei due contiene la stringa intera, quindi nessun match. In src/pages/editor/editor.js, runFind()/replaceAll() dovrebbero cercare sul testo concatenato dell'elemento (o di ciascun blocco) e mappare gli offset trovati ai nodi di testo, invece di cercare per-nodo.",
+  "name": "Editor: Cerca e sostituisci salta le parole con formattazione mista",
+  "parentId": "",
+  "status": "new",
+  "priority": 0,
+  "notes": "",
+  "images": [
+    "https://firebasestorage.googleapis.com/v0/b/filo-8b9cb.firebasestorage.app/o/feedback%2F1782017874959_59ed26a9-c98a-4622-94dc-84cd1ce718e8.png?alt=media&token=42ca54cd-f5d2-4523-a21e-1bc4994f77be"
+  ],
+  "queuedAt": "2026-06-21T04:57:55.493Z",
+  "queuedBy": "affectionate-bell"
+}
