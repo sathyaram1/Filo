@@ -853,6 +853,10 @@ body[data-state="thread"] .dash-suggestion { justify-content: flex-start; paddin
 }
 .dash-ctrl:active { transform: translateY(0.5px); }
 .dash-ctrl svg { display: block; }
+/* Red-team: icona in rosso (canale sicurezza), distinta dai controlli del
+   browser. Gli SVG ereditano currentColor, quindi basta il `color`. */
+.dash-ctrl[data-command="redteam"] { color: #d6243a; }
+.dash-ctrl[data-command="redteam"]:hover { color: #b91c1c; }
 .dash-ctrl .account-avatar {
   width: 22px;
   height: 22px;
