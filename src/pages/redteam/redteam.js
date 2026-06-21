@@ -614,6 +614,7 @@
       renderGrid(s.gridUnlocked);
       renderBadges(s.milestones);
       renderSummary(s);
+      renderHistory(s.recentAttempts || []);
       const ownerSection = $('ownerSection');
       if (ownerSection) ownerSection.hidden = !s.isOwner;
     }
