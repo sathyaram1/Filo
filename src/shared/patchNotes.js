@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.66', date: '2026-06-21',
+      features: [
+        'Nuova sezione Red-team: metti alla prova i giudici di sicurezza di Filo. La apri dall’icona in alto a destra nella home e invii i tuoi attacchi dal menu del tasto destro.',
+      ],
+      fixes: [],
+    },
+    {
       version: '0.2.58', date: '2026-06-19',
       features: [],
       fixes: [
