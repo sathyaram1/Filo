@@ -262,9 +262,55 @@
 /* Tentativo non valido: punteggio/punti in grigio (non contano, spec §6.1). */
 .rt-hist-muted { color: var(--sn-muted); }
 
-/* ---- Pannello owner: codici --------------------------------------------- */
-.rt-owner-section .sn-row { margin-top: 8px; align-items: center; }
-.rt-owner-section #genCount { width: 90px; }
+/* ---- Pannello owner: gestione codici ------------------------------------ */
+.rt-owner-gen .sn-row { margin-top: 8px; align-items: center; }
+.rt-owner-gen #genCount { width: 90px; }
+.rt-owner-gen .sn-muted { font-size: 13px; margin: 4px 0 0; }
+.rt-owner-list { margin-top: 28px; }
+.rt-owner-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.rt-owner-list-head h2 { margin: 0; }
+.rt-codes-scroll { margin-top: 10px; overflow-x: auto; }
+.rt-codes-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.rt-codes-table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--sn-muted);
+  font-size: 12px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--sn-border);
+}
+.rt-codes-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--sn-border);
+  vertical-align: middle;
+}
+.rt-ct-code code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 14px;
+  letter-spacing: 1px;
+}
+.rt-ct-badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 999px;
+}
+.rt-ct-badge--free { color: #2e9e5b; background: rgba(46, 158, 91, 0.16); }
+.rt-ct-badge--used { color: var(--sn-muted); background: var(--sn-hover); }
+.rt-ct-handle { color: var(--sn-fg); }
+.rt-ct-when { color: var(--sn-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rt-ct-act { text-align: right; white-space: nowrap; }
+.rt-ct-revoke { padding: 3px 12px; font-size: 12px; }
 .rt-codes {
   list-style: none;
   padding: 0;
