@@ -453,11 +453,13 @@
     host.appendChild(ruleBlock('Traguardi (singolo tentativo)', () => {
       const tbl = document.createElement('div'); tbl.className = 'rt-rules-scale';
       MILESTONES.forEach((ms) => {
-        const r = document.createElement('div'); r.className = 'rt-scale-row';
+        const r = document.createElement('div'); r.className = 'rt-scale-row rt-scale-row--ms';
+        const left = document.createElement('div'); left.className = 'rt-ms-left';
         const nm = document.createElement('span'); nm.className = 'rt-scale-name'; nm.textContent = ms.name;
         const cond = document.createElement('span'); cond.className = 'rt-scale-cond'; cond.textContent = ms.cond;
+        left.append(nm, cond);
         const cr = document.createElement('span'); cr.className = 'rt-scale-pt'; cr.textContent = ms.credits + ' cr';
-        r.append(nm, cond, cr);
+        r.append(left, cr);
         tbl.appendChild(r);
       });
       return tbl;
