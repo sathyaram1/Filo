@@ -51,6 +51,18 @@
 .rt-redeem-msg--ok { color: var(--sn-fg); background: rgba(46, 158, 91, 0.16); }
 .rt-redeem-msg--err { color: var(--sn-error); background: rgba(var(--sn-accent-rgb), 0.10); }
 
+/* ---- Card "Diventa red teamer verificato" (riscatto codice) ------------- */
+.rt-verify-title { margin: 0 0 6px; font-size: 17px; }
+.rt-verify-intro { margin: 0; font-size: 14px; color: var(--sn-muted); max-width: 460px; }
+.rt-verify-intro strong { color: var(--sn-fg); }
+/* Il codice è il campo guida: monospazio e in evidenza. */
+.rt-redeem #redeemCode {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.rt-redeem-hint { margin: 10px 0 0; font-size: 12px; }
+
 /* ---- Griglia record 4×3 ------------------------------------------------- */
 .rt-grid {
   display: flex;
