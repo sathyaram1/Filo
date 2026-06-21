@@ -15,15 +15,16 @@ import { test, expect } from './fixtures/electron.mjs';
 
 const URL = 'filo://redteam/redteam.html';
 
-test('le 3 tab esistono e cambiano il contenuto visibile', async ({ openTab }) => {
+test('le tab esistono e cambiano il contenuto visibile (Codici nascosta ai non-owner)', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
-  const tabs = page.locator('.rt-tab');
-  await expect(tabs).toHaveCount(3);
+  // 4 tab nel DOM, ma "Codici" è riservata all'owner → nascosta di default.
+  await expect(page.locator('.rt-tab')).toHaveCount(4);
   await expect(page.locator('.rt-tab[data-tab="stats"]')).toBeVisible();
   await expect(page.locator('.rt-tab[data-tab="leaderboard"]')).toBeVisible();
   await expect(page.locator('.rt-tab[data-tab="rules"]')).toBeVisible();
+  await expect(page.locator('#codesTab')).toBeHidden();
 
   // Di default Statistiche è attiva; Regole è nascosta.
   await expect(page.locator('#panel-stats')).toBeVisible();
