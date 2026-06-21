@@ -314,6 +314,12 @@
     // REDTEAM_GEN_CODES: genera codici monouso (SOLO owner). { count } →
     //   { ok, codes:[..] } | { ok:false, error }.
     REDTEAM_GEN_CODES: 'redteam_gen_codes',
+    // REDTEAM_LIST_CODES: elenca i codici esistenti (SOLO owner). { } →
+    //   { ok, codes:[{ code, used, usedAt?, createdAt?, handle? }] } | { ok:false, error }.
+    REDTEAM_LIST_CODES: 'redteam_list_codes',
+    // REDTEAM_REVOKE_CODE: revoca un codice ancora libero (SOLO owner). { code } →
+    //   { ok } | { ok:false, status:'invalid_code'|'code_used', error? }.
+    REDTEAM_REVOKE_CODE: 'redteam_revoke_code',
   };
 
   // Port-based streaming
