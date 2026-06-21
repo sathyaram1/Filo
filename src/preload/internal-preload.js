@@ -211,7 +211,7 @@ const path = require('node:path');
 const shouldInjectContentScripts = () => true;
 function injectContentScriptStyles() {
   const STYLES = ['theme.css', 'menu.css', 'popup.css', 'sidebar.css',
-    'highlight.css', 'spellcheck.css', 'feedback.css'];
+    'highlight.css', 'spellcheck.css', 'feedback.css', 'redteam-attack.css'];
   for (const f of STYLES) {
     if (document.querySelector(`link[href="filo://style/${f}"]`)) continue;
     const link = document.createElement('link');
