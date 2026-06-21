@@ -98,4 +98,24 @@ module.exports = function register(on, ctx) {
       return { ok: true, codes: (r && r.codes) || [] };
     } catch (e) { return { ok: false, error: e?.message || String(e) }; }
   });
+
+  // Elenco codici esistenti (SOLO owner) per il pannello di gestione. { } →
+  // { ok, codes:[{ code, used, usedAt?, createdAt?, handle? }] }.
+  on(MSG.REDTEAM_LIST_CODES, async () => {
+    if (!auth.isAdmin()) return { ok: false, error: 'Comando riservato al proprietario.' };
+    try {
+      const r = await callable('redteamListCodes', {});
+      return { ok: true, codes: (r && r.codes) || [] };
+    } catch (e) { return { ok: false, error: e?.message || String(e) }; }
+  });
+
+  // Revoca di un codice ancora libero (SOLO owner). { code } → { ok } |
+  // { ok:false, status } se non esiste o è già stato usato (non revocabile).
+  on(MSG.REDTEAM_REVOKE_CODE, async (msg) => {
+    if (!auth.isAdmin()) return { ok: false, error: 'Comando riservato al proprietario.' };
+    try {
+      const r = await callable('redteamRevokeCode', { code: String(msg?.code || '') });
+      return Object.assign({ ok: true }, r);
+    } catch (e) { return { ok: false, error: e?.message || String(e) }; }
+  });
 };
