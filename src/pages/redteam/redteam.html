@@ -125,6 +125,49 @@
       <div class="rt-rules" id="rules"></div>
     </section>
 
+    <!-- ====================== TAB CODICI (solo owner) ====================== -->
+    <section class="rt-panel" id="panel-codes" data-panel="codes" hidden>
+
+      <!-- Genera nuovi codici monouso (mostrati una sola volta, copiabili). -->
+      <section class="rt-owner-gen">
+        <h2>Genera codici di invito</h2>
+        <p class="sn-muted">Ogni codice è monouso: consegnalo a una persona, che lo inserirà per legarlo al proprio account.</p>
+        <form class="rt-gen" id="genForm" autocomplete="off">
+          <div class="sn-row">
+            <input type="number" id="genCount" min="1" max="200" value="5" />
+            <button type="submit" class="sn-btn" id="genBtn">Genera codici</button>
+          </div>
+          <p class="rt-gen-msg sn-muted" id="genMsg" role="status" hidden></p>
+          <ul class="rt-codes" id="genCodes" hidden></ul>
+        </form>
+      </section>
+
+      <!-- Elenco di tutti i codici con stato (libero/usato) e revoca dei liberi. -->
+      <section class="rt-owner-list">
+        <div class="rt-owner-list-head">
+          <h2>Codici esistenti</h2>
+          <button type="button" class="sn-btn sn-btn-secondary" id="refreshCodesBtn">Aggiorna</button>
+        </div>
+        <div class="rt-codes-scroll">
+          <table class="rt-codes-table" id="codesTable">
+            <thead>
+              <tr>
+                <th class="rt-ct-code">Codice</th>
+                <th class="rt-ct-state">Stato</th>
+                <th class="rt-ct-handle">Usato da</th>
+                <th class="rt-ct-when">Quando</th>
+                <th class="rt-ct-act"></th>
+              </tr>
+            </thead>
+            <tbody id="codesBody"></tbody>
+          </table>
+        </div>
+        <p class="rt-empty sn-muted" id="codesEmpty" hidden>Nessun codice ancora. Generane uno qui sopra.</p>
+        <p class="rt-error sn-muted" id="codesError" hidden></p>
+      </section>
+
+    </section>
+
   </main>
 
   <script src="redteam.js"></script>
