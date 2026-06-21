@@ -297,7 +297,9 @@
     //   { status:'insufficient_credits', have, needed } | { status:'empty' }.
     REDTEAM_SUBMIT: 'redteam_submit',
     // REDTEAM_STATE: stato gamification dell'utente per la tab Statistiche.
-    //   { } → { verified, handle?, bestPerJudge?, gridUnlocked?, milestones?, leaderboardScore? }.
+    //   { } → { signedIn, verified, isOwner, handle?, bestPerJudge?, gridUnlocked?,
+    //   milestones?, leaderboardScore?, recentAttempts?:[{ id, title, verdicts,
+    //   score, isValidAttack, status, createdAt }] }.
     REDTEAM_STATE: 'redteam_state',
     // REDTEAM_ATTEMPT: un tentativo (polling rivelazione live). { attemptId } →
     //   { attempt:{ title, verdicts, score, isValidAttack, status } } |
