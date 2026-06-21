@@ -662,11 +662,77 @@
     });
   }
 
+  // Tabella di gestione codici (pannello owner). data = { ok, codes:[{ code,
+  // used, usedAt, createdAt, handle }], error? }. Il rendering è puro; i bottoni
+  // "Revoca" (solo sui codici liberi) chiamano onRevoke(code, btn) — iniettabile
+  // per i test. Le stringhe controllabili (code, handle) vanno via textContent.
+  function renderCodesTable(data, onRevoke) {
+    const body = $('codesBody');
+    const emptyEl = $('codesEmpty');
+    const errEl = $('codesError');
+    if (!body) return;
+    body.textContent = '';
+    if (errEl) errEl.hidden = true;
+
+    const d = data || {};
+    if (d.ok === false || d.error) {
+      if (errEl) { errEl.hidden = false; errEl.textContent = d.error || 'Canale non ancora attivo. Riprova più tardi.'; }
+      if (emptyEl) emptyEl.hidden = true;
+      return;
+    }
+    const codes = Array.isArray(d.codes) ? d.codes : [];
+    if (emptyEl) emptyEl.hidden = codes.length > 0;
+    if (!codes.length) return;
+
+    const now = Date.now();
+    codes.forEach((c) => {
+      const it = c || {};
+      const used = !!it.used;
+      const tr = document.createElement('tr');
+      tr.className = 'rt-ct-row';
+      tr.dataset.state = used ? 'used' : 'free';
+
+      const code = document.createElement('td'); code.className = 'rt-ct-code';
+      const codeTxt = document.createElement('code'); codeTxt.textContent = String(it.code || '—');
+      code.appendChild(codeTxt);
+      tr.appendChild(code);
+
+      const state = document.createElement('td'); state.className = 'rt-ct-state';
+      const badge = document.createElement('span');
+      badge.className = 'rt-ct-badge ' + (used ? 'rt-ct-badge--used' : 'rt-ct-badge--free');
+      badge.textContent = used ? 'Usato' : 'Libero';
+      state.appendChild(badge);
+      tr.appendChild(state);
+
+      const handle = document.createElement('td'); handle.className = 'rt-ct-handle';
+      handle.textContent = (used && it.handle) ? String(it.handle) : '—'; // textContent → niente XSS
+      tr.appendChild(handle);
+
+      const when = document.createElement('td'); when.className = 'rt-ct-when';
+      when.textContent = formatRelativeTime(used ? it.usedAt : it.createdAt, now);
+      tr.appendChild(when);
+
+      const act = document.createElement('td'); act.className = 'rt-ct-act';
+      if (!used) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'sn-btn sn-btn-secondary rt-ct-revoke';
+        btn.textContent = 'Revoca';
+        btn.dataset.code = String(it.code || '');
+        btn.addEventListener('click', () => { if (typeof onRevoke === 'function') onRevoke(String(it.code || ''), btn); });
+        act.appendChild(btn);
+      }
+      tr.appendChild(act);
+
+      body.appendChild(tr);
+    });
+  }
+
   // Espone le funzioni pure per i test (vedi tests/redteam-page.spec.mjs).
   window.RedteamUI = {
     renderGrid, renderLeaderboard, renderRules, applyState,
     renderReveal, renderSummary, renderBadges, renderGenCodes,
-    renderHistory, formatRelativeTime,
+    renderHistory, formatRelativeTime, renderCodesTable,
     redeemStatusMessage,
   };
 
