@@ -65,10 +65,9 @@ test('stato verificato: griglia rende celle sbloccate/bloccate e riepilogo', asy
     });
   });
 
-  // Il contenuto verificato è visibile, i gate no.
+  // Il contenuto verificato è visibile, la card di verifica no.
   await expect(page.locator('#statsContent')).toBeVisible();
   await expect(page.locator('#gateVerify')).toBeHidden();
-  await expect(page.locator('#gateSignin')).toBeHidden();
 
   // 4 giudici × 3 livelli = 12 celle.
   await expect(page.locator('#grid .rt-cell')).toHaveCount(12);
