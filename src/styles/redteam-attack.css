@@ -1,0 +1,147 @@
+/* Pannello "Invia attacco" del canale Red-team (spec §8.1).
+   Modellato sul modale feedback (feedback.css): velo leggero + box trascinabile.
+   Usa solo token di tema (--sn-*) per restare coerente con Filo. */
+
+.sn-rt-overlay {
+  position: fixed;
+  inset: 0;
+  /* z-index gestito inline da redteamAttack.js via Popup.registerStack. */
+  z-index: 2147483600;
+  background: rgba(0, 0, 0, 0.18);
+  font-family: var(--sn-font);
+  color: var(--sn-fg);
+  animation: sn-fade-in 100ms ease-out;
+}
+
+.sn-rt-modal {
+  position: absolute;
+  left: 0;
+  bottom: 24px;
+  width: min(520px, 92vw);
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--sn-overlay-bg);
+  border: 1px solid var(--sn-border);
+  border-radius: var(--sn-radius);
+  box-shadow: var(--sn-shadow);
+  overflow: hidden;
+}
+
+/* Maniglia per spostare il box. */
+.sn-rt-drag {
+  flex: 0 0 auto;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: move;
+  touch-action: none;
+  border-bottom: 1px solid var(--sn-border);
+}
+.sn-rt-grip {
+  width: 34px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--sn-border);
+}
+
+.sn-rt-body {
+  padding: 10px 12px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sn-rt-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sn-rt-head-icon { display: inline-flex; color: var(--sn-accent, #c45a3b); }
+.sn-rt-head-icon svg { display: block; }
+.sn-rt-head-title { font-size: 14px; font-weight: 600; }
+
+.sn-rt-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sn-rt-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sn-fg);
+}
+.sn-rt-hint {
+  font-weight: 400;
+  opacity: 0.65;
+  font-size: 11px;
+}
+
+.sn-rt-attack,
+.sn-rt-desc {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 64px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--sn-fg);
+  background: var(--sn-bg);
+  border: 1px solid var(--sn-border) !important;
+  border-radius: 6px;
+  outline: none !important;
+  box-shadow: none !important;
+}
+.sn-rt-attack:focus,
+.sn-rt-desc:focus {
+  border-color: var(--sn-accent, #888) !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.sn-rt-status:empty { display: none; }
+.sn-rt-status {
+  font-size: 12px;
+  line-height: 1.4;
+}
+.sn-rt-status--err { color: #b91c1c; }
+.sn-rt-status--ok { color: #2e9e5b; }
+
+.sn-rt-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--sn-border);
+}
+/* Invia ultimo, primario, a destra. */
+.sn-rt-send { margin-left: auto; }
+
+.sn-rt-btn,
+.sn-rt-btn-secondary {
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--sn-border);
+}
+.sn-rt-btn-secondary {
+  background: var(--sn-bg);
+  color: var(--sn-fg);
+}
+.sn-rt-btn-secondary:hover { background: rgba(127, 127, 127, 0.1); }
+.sn-rt-btn {
+  background: var(--sn-accent);
+  border-color: var(--sn-accent);
+  color: #fff;
+}
+.sn-rt-btn:hover:not(:disabled) { opacity: 0.9; }
+.sn-rt-btn:disabled,
+.sn-rt-btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
