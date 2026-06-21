@@ -1,9 +1,11 @@
 // Feedback 1tsAuna: "leva questa barra, metti le icone nel contenuto della
 // pagina home". La barra in alto di Filo (indietro/avanti/ricarica +
 // home/impostazioni/app/profilo) è stata rimossa: indietro/avanti/ricarica
-// vivono nel menu tasto destro, mentre home/impostazioni/app/profilo sono ora
-// icone DENTRO la home, in alto a destra. Cliccarle apre i menu reali della
-// shell (nessuna logica duplicata).
+// vivono nel menu tasto destro, mentre red-team/home/cronologia/impostazioni/
+// app/profilo sono ora icone DENTRO la home, in alto a destra. Cliccarle apre
+// i menu reali della shell (nessuna logica duplicata). Il controllo Red-team
+// (più a sinistra, in rosso) apre direttamente filo://redteam/ — vedi
+// renderControls() in dashboard.js, "Spec §2".
 //
 // Gli assert verificano il SUCCESSO: le icone esistono nella home, la barra in
 // alto non c'è più (chrome compatto), e il click apre davvero il menu nativo.
