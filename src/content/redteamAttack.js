@@ -193,7 +193,7 @@
         // Invito a loggarsi: prova ad aprire il flusso login del main; se non
         // c'è, almeno spiega cosa fare.
         setStatus('Accedi al tuo account per inviare un attacco.', 'err');
-        try { chrome.runtime.sendMessage({ type: MSG.AUTH_SIGN_IN }); } catch (_) {}
+        try { chrome.runtime.sendMessage({ type: MSG.AUTH_SIGNIN }); } catch (_) {}
         return;
       }
       const attackText = attackEl.value.trim();
@@ -224,7 +224,7 @@
       // Non ok: mostra il messaggio, riabilita.
       setStatus(msg.text, 'err');
       if (msg.needLogin) {
-        try { chrome.runtime.sendMessage({ type: MSG.AUTH_SIGN_IN }); } catch (_) {}
+        try { chrome.runtime.sendMessage({ type: MSG.AUTH_SIGNIN }); } catch (_) {}
       }
       cancelBtn.disabled = false;
       sendBtn.disabled = false;
