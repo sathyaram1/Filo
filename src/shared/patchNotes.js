@@ -25,7 +25,8 @@
     {
       version: '0.2.66', date: '2026-06-21',
       features: [
-        'Nuova sezione Red-team: metti alla prova i giudici di sicurezza di Filo. La apri dall’icona in alto a destra nella home e invii i tuoi attacchi dal menu del tasto destro.',
+        'Nuova sezione Red-team: metti alla prova i giudici di sicurezza di Filo. La apri dall’icona in alto a destra nella home (ora in rosso) e invii i tuoi attacchi dal menu del tasto destro.',
+        'Puoi diventare red teamer verificato: inserisci nella sezione Red-team il codice di invito che hai ricevuto e si lega al tuo account, sbloccando statistiche e leaderboard.',
       ],
       fixes: [],
     },
