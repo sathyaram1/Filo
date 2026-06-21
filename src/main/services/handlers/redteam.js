@@ -51,13 +51,14 @@ module.exports = function register(on, ctx) {
     } catch (e) { return { status: 'error', error: e?.message || String(e) }; }
   });
 
-  // Stato gamification dell'utente per la tab Statistiche.
+  // Stato gamification dell'utente per la tab Statistiche. Include `isOwner`
+  // così la pagina può mostrare il pannello owner di generazione codici.
   on(MSG.REDTEAM_STATE, async () => {
-    if (!auth.isSignedIn()) return { verified: false, signedIn: false };
+    if (!auth.isSignedIn()) return { verified: false, signedIn: false, isOwner: false };
     try {
       const r = await callable('redteamState', {});
-      return Object.assign({ signedIn: true }, r);
-    } catch (e) { return { verified: false, signedIn: true, error: e?.message || String(e) }; }
+      return Object.assign({ signedIn: true, isOwner: auth.isAdmin() }, r);
+    } catch (e) { return { verified: false, signedIn: true, isOwner: auth.isAdmin(), error: e?.message || String(e) }; }
   });
 
   // Un tentativo (polling della rivelazione live). { attemptId }.
