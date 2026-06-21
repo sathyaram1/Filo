@@ -232,6 +232,105 @@
     }
   }
 
+  // Storico tentativi (spec §6.1): tabella scrollabile, già ordinata dal backend
+  // (più recente prima). Colonne: Ora · Titolo · Giudici (A,B,C,Δ) · Score · Validità.
+  // attempts = [{ id, title, verdicts, score, isValidAttack, status, createdAt }].
+  // I tentativi `pending` mostrano "in corso…" al posto dello score; quelli con
+  // isValidAttack===false hanno score/punti in grigio (non contano).
+  function renderHistory(attempts) {
+    const body = $('historyBody');
+    const emptyEl = $('historyEmpty');
+    if (!body) return;
+    body.textContent = '';
+
+    const list = Array.isArray(attempts) ? attempts : [];
+    if (emptyEl) emptyEl.hidden = list.length > 0;
+    if (!list.length) return;
+
+    const now = Date.now();
+    list.forEach((a) => {
+      const at = a || {};
+      const pending = at.status === 'pending';
+      const invalid = at.isValidAttack === false;
+
+      const tr = document.createElement('tr');
+      tr.className = 'rt-hist-row';
+      tr.dataset.status = pending ? 'pending' : 'complete';
+      if (invalid) tr.dataset.valid = 'false';
+
+      // Ora — tempo relativo da createdAt.
+      const when = document.createElement('td');
+      when.className = 'rt-hist-when';
+      when.textContent = formatRelativeTime(at.createdAt, now);
+      tr.appendChild(when);
+
+      // Titolo — output del modello → textContent (anti-XSS).
+      const title = document.createElement('td');
+      title.className = 'rt-hist-title';
+      title.textContent = at.title ? String(at.title) : '—';
+      tr.appendChild(title);
+
+      // Giudici — 4 icone colorate A,B,C,Δ. Verdetto errato → "?" neutro.
+      const judges = document.createElement('td');
+      judges.className = 'rt-hist-judges';
+      const verdicts = at.verdicts || {};
+      JUDGES.forEach((j) => {
+        const v = verdicts[j];
+        const ic = document.createElement('span');
+        ic.className = 'rt-hist-judge-icon';
+        ic.dataset.judge = j;
+        if (v && v.error) {
+          ic.dataset.state = 'error';
+          ic.textContent = '?';
+          ic.title = judgeLabel(j) + ': errore';
+        } else if (v && (v.class || typeof v.points === 'number')) {
+          const meta = LEVELS[v.class] || pointsMeta(v.points);
+          ic.dataset.state = 'ok';
+          ic.textContent = meta.icon;
+          ic.title = judgeLabel(j) + ': ' + meta.label;
+          ic.style.setProperty('--rt-judge-color', meta.color);
+        } else {
+          ic.dataset.state = 'waiting';
+          ic.textContent = '·';
+          ic.title = judgeLabel(j) + ': in attesa';
+        }
+        judges.appendChild(ic);
+      });
+      tr.appendChild(judges);
+
+      // Score — numero 0–12, oppure "in corso…" se pending. Grigio se non valido.
+      const score = document.createElement('td');
+      score.className = 'rt-hist-score';
+      if (pending) {
+        score.dataset.state = 'pending';
+        score.textContent = 'in corso…';
+      } else {
+        score.dataset.state = 'complete';
+        score.textContent = (typeof at.score === 'number' ? at.score : 0) + '/12';
+        if (invalid) score.classList.add('rt-hist-muted');
+      }
+      tr.appendChild(score);
+
+      // Validità — ✓ se valido, ✗ altrimenti (— se ancora pending).
+      const valid = document.createElement('td');
+      valid.className = 'rt-hist-valid';
+      if (pending) {
+        valid.dataset.valid = 'pending';
+        valid.textContent = '—';
+      } else if (invalid) {
+        valid.dataset.valid = 'false';
+        valid.textContent = '✗';
+        valid.classList.add('rt-hist-muted');
+      } else {
+        valid.dataset.valid = 'true';
+        valid.textContent = '✓';
+      }
+      tr.appendChild(valid);
+
+      body.appendChild(tr);
+    });
+  }
+
   // Leaderboard: tabella. entries già ordinate dal backend.
   function renderLeaderboard(data) {
     const body = $('leaderboardBody');
