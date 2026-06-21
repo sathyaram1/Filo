@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <title>Filo — Red Team</title>
+  <link rel="icon" href="filo://asset/icons/icon-32.png" />
+  <link rel="stylesheet" href="filo://style/theme.css" />
+  <link rel="stylesheet" href="filo://style/pages.css" />
+  <link rel="stylesheet" href="redteam.css" />
+  <script src="filo://shared/themeTokens.js"></script>
+  <script src="filo://shared/pageBootstrap.js"></script>
+  <script src="filo://shared/constants.js"></script>
+  <script src="filo://shared/messages.js"></script>
+  <script src="filo://shared/icons.js"></script>
+  <script src="filo://shared/storage.js"></script>
+</head>
+<body>
+  <main class="sn-page">
+    <h1>Red Team</h1>
+
+    <nav class="rt-tabs" id="tabs" role="tablist">
+      <button type="button" class="rt-tab rt-tab--active" data-tab="stats" role="tab">Statistiche</button>
+      <button type="button" class="rt-tab" data-tab="leaderboard" role="tab">Leaderboard</button>
+      <button type="button" class="rt-tab" data-tab="rules" role="tab">Regole</button>
+    </nav>
+
+    <!-- ====================== TAB STATISTICHE ====================== -->
+    <section class="rt-panel" id="panel-stats" data-panel="stats">
+
+      <!-- Gate: non loggato -->
+      <div class="rt-gate" id="gateSignin" hidden>
+        <p class="rt-gate-msg">Accedi per partecipare al red team.</p>
+      </div>
+
+      <!-- Gate: loggato ma non verificato -->
+      <div class="rt-gate" id="gateVerify" hidden>
+        <p class="rt-gate-msg">Verifica il tuo account per vedere i risultati dei tuoi tentativi.</p>
+        <form class="rt-redeem" id="redeemForm" autocomplete="off">
+          <label for="redeemHandle">Nome utente (handle)</label>
+          <input type="text" id="redeemHandle" maxlength="32" placeholder="il tuo nome in classifica" />
+          <label for="redeemCode">Codice di verifica</label>
+          <input type="text" id="redeemCode" maxlength="32" placeholder="ABCD-EFGH" />
+          <button type="submit" class="sn-btn" id="redeemBtn">Verifica</button>
+          <p class="rt-redeem-msg" id="redeemMsg" role="status" hidden></p>
+        </form>
+      </div>
+
+      <!-- Contenuto verificato -->
+      <div class="rt-verified" id="statsContent" hidden>
+
+        <!-- Live reveal (solo con ?attempt=) -->
+        <section class="rt-reveal" id="revealSection" hidden>
+          <h2>Tentativo in corso</h2>
+          <p class="rt-reveal-title sn-muted" id="revealTitle"></p>
+          <div class="rt-reveal-slots" id="revealSlots"></div>
+          <div class="rt-reveal-summary" id="revealSummary" hidden></div>
+        </section>
+
+        <!-- Griglia record 4×3 (hero) -->
+        <section class="rt-grid-section">
+          <h2>I tuoi record per giudice</h2>
+          <div class="rt-grid" id="grid" role="table" aria-label="Griglia record per giudice"></div>
+        </section>
+
+        <!-- Milestone aggregati -->
+        <section class="rt-badges-section">
+          <h2>Traguardi</h2>
+          <div class="rt-badges" id="badges"></div>
+        </section>
+
+        <!-- Riepilogo numerico -->
+        <section class="rt-summary-section">
+          <h2>Riepilogo</h2>
+          <div class="rt-summary" id="summary"></div>
+        </section>
+
+        <!-- Pannello owner: generazione codici -->
+        <section class="rt-owner-section" id="ownerSection" hidden>
+          <h2>Genera codici di verifica</h2>
+          <form class="rt-gen" id="genForm" autocomplete="off">
+            <div class="sn-row">
+              <input type="number" id="genCount" min="1" max="200" value="5" />
+              <button type="submit" class="sn-btn" id="genBtn">Genera codici</button>
+            </div>
+            <p class="rt-gen-msg sn-muted" id="genMsg" role="status" hidden></p>
+            <ul class="rt-codes" id="genCodes" hidden></ul>
+          </form>
+        </section>
+
+      </div>
+
+      <p class="rt-error sn-muted" id="statsError" hidden></p>
+    </section>
+
+    <!-- ====================== TAB LEADERBOARD ====================== -->
+    <section class="rt-panel" id="panel-leaderboard" data-panel="leaderboard" hidden>
+      <table class="rt-lb" id="leaderboard">
+        <thead>
+          <tr>
+            <th class="rt-lb-rank">#</th>
+            <th class="rt-lb-handle">Handle</th>
+            <th class="rt-lb-record">Record</th>
+            <th class="rt-lb-score">Score</th>
+            <th class="rt-lb-attempts">Tentativi</th>
+            <th class="rt-lb-badges">Traguardi</th>
+          </tr>
+        </thead>
+        <tbody id="leaderboardBody"></tbody>
+      </table>
+      <p class="rt-empty sn-muted" id="leaderboardEmpty" hidden>Nessun partecipante ancora.</p>
+      <p class="rt-error sn-muted" id="leaderboardError" hidden></p>
+    </section>
+
+    <!-- ====================== TAB REGOLE ====================== -->
+    <section class="rt-panel" id="panel-rules" data-panel="rules" hidden>
+      <div class="rt-rules" id="rules"></div>
+    </section>
+
+  </main>
+
+  <script src="redteam.js"></script>
+</body>
+</html>
