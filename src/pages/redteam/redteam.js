@@ -592,18 +592,33 @@
     const s = state || {};
     const signedIn = !!s.signedIn;
     const verified = !!s.verified;
+    const isOwner = !!s.isOwner;
 
-    const gateSignin = $('gateSignin');
     const gateVerify = $('gateVerify');
     const content = $('statsContent');
     const errEl = $('statsError');
+    const signinHint = $('signinHint');
+    const codesTab = $('codesTab');
 
-    if (gateSignin) gateSignin.hidden = signedIn;
-    if (gateVerify) gateVerify.hidden = !(signedIn && !verified);
-    if (content) content.hidden = !(signedIn && verified);
+    // La card di verifica resta visibile finché non sei verificato (anche da
+    // sloggato: il submit fa prima il login, poi riscatta). Le statistiche solo
+    // da verificato.
+    if (gateVerify) gateVerify.hidden = verified;
+    if (content) content.hidden = !verified;
+    // Suggerimento "accedi" solo quando non sei loggato.
+    if (signinHint) signinHint.hidden = signedIn;
+
+    // Tab "Codici": riservata all'owner. Se la stavi guardando e non sei (più)
+    // owner, torna a Statistiche.
+    if (codesTab) codesTab.hidden = !isOwner;
+    if (!isOwner) {
+      const codesPanel = $('panel-codes');
+      if (codesPanel && !codesPanel.hidden) switchTab('stats');
+    }
 
     if (errEl) {
-      // Errore di canale: mostralo solo se loggato (altrimenti il gate basta).
+      // Errore di canale: mostralo solo se loggato e non verificato (altrimenti
+      // la card di verifica basta da sola).
       if (signedIn && s.error && !verified) {
         errEl.hidden = false;
         errEl.textContent = 'Canale non ancora attivo. Riprova più tardi.';
@@ -612,13 +627,11 @@
       }
     }
 
-    if (signedIn && verified) {
+    if (verified) {
       renderGrid(s.gridUnlocked);
       renderBadges(s.milestones);
       renderSummary(s);
       renderHistory(s.recentAttempts || []);
-      const ownerSection = $('ownerSection');
-      if (ownerSection) ownerSection.hidden = !s.isOwner;
     }
     return s;
   }
