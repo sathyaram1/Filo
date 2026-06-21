@@ -309,6 +309,17 @@
     `<path d="M12 11.25V5.5"/>` +
     `<path d="M12 5.5a2 2 0 1 0 0.01 0"/>`;
 
+  // --- Red-team: scudo (sicurezza) con un mirino/bersaglio al centro (l'attacco
+  //     che prova a forare le difese). Usata dall'icona Red-team in alto a destra
+  //     nella home e dalla voce "Invia attacco" del menu tasto destro.
+  const redteam =
+    `<path d="M12 3.5l6.5 2.5v5c0 4.2-2.8 7.2-6.5 8.5-3.7-1.3-6.5-4.3-6.5-8.5v-5z"/>` +
+    `<circle cx="12" cy="11" r="2.4"/>` +
+    `<path d="M12 6.8v1.4"/>` +
+    `<path d="M12 13.8v1.4"/>` +
+    `<path d="M7.8 11h1.4"/>` +
+    `<path d="M14.8 11h1.4"/>`;
+
   // Esposizione: ciascuna icona è una FUNZIONE (size) => stringa SVG.
   // Permette ai consumer di chiedere taglie diverse (es. 16 per la riga,
   // 20 per la griglia overflow) senza ricreare manualmente il wrapper.
