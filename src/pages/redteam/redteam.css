@@ -26,6 +26,9 @@
   font-weight: 600;
   border-bottom-color: var(--sn-accent);
 }
+/* `all: unset` azzera anche `display`, quindi l'attributo [hidden] (tab Codici
+   riservata all'owner) non avrebbe effetto: ripristiniamolo esplicitamente. */
+.rt-tab[hidden] { display: none; }
 
 .rt-panel { margin-top: 4px; }
 .rt-panel h2 { font-size: 15px; }
