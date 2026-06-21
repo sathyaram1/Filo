@@ -252,31 +252,40 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // redteam/{uid} : stato del canale red-team per utente (DESIGN §9, §13):
-    // `verified` (account abilitato all'invio), `handle`, `prior` (giudici/combo
-    // già premiati) e `totalEarned` (per la leaderboard). È SERVER-AUTHORITATIVE:
-    // scritto SOLO dal backend via Admin SDK (che bypassa queste regole). Il
-    // client NON può scriverci — altrimenti un utente si auto-verificherebbe o
-    // falsificherebbe le ricompense. Lettura: solo il proprio doc (per sapere se
-    // è verificato e vedere i propri totali); la leaderboard la serve la Cloud
-    // Function `redteamLeaderboard` (Admin SDK), così `prior` altrui non trapela.
-    match /redteam/{uid} {
+    // ── Canale red-team (filo-redteam-ux-spec §9, DESIGN §9) ─────────────────
+    // SERVER-AUTHORITATIVE: scritto SOLO dal backend via Admin SDK (bypassa
+    // queste regole). Il client NON scrive MAI — altrimenti un utente si
+    // auto-verificherebbe, falsificherebbe punteggi/ricompense o si auto-
+    // attribuirebbe verdetti. Le LETTURE del client passano tutte da Cloud
+    // Function (redteamState/redteamAttempt/redteamLeaderboard, Admin SDK), che
+    // applicano il gating (proprietario, verificato). Quindi qui la lettura
+    // diretta è negata al client (solo admin, per pannelli owner futuri).
+    //
+    // redteam-users/{uid} : verifica + handle + stato gamification (bestPerJudge,
+    //   gridUnlocked, milestones, leaderboardScore) + contatori. Lettura del
+    //   PROPRIO doc consentita (abilita un eventuale listener real-time; non
+    //   espone dati altrui), oltre all'admin.
+    match /redteam-users/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow read: if isAdmin();
       allow write: if false;
     }
-
-    // redteam-codes/{code} : codici monouso di verifica (DESIGN §9). Il codice è
-    // l'UNICA prova di abilitazione: se il client potesse leggerli, potrebbe
-    // verificarsi da solo. Quindi LETTURA NEGATA al client (solo admin, per la
-    // gestione owner) e scrittura solo server-side (riscatto/generazione via
-    // Cloud Function con Admin SDK, che bypassa queste regole).
+    // redteam-attempts/{id} : tentativi (testo, descrizione, verdetti, score). I
+    //   non verificati NON devono vedere i risultati (spec §7.1): per non
+    //   replicare quel gating nelle regole, la lettura diretta è solo admin; il
+    //   client usa la callable redteamAttempt (che verifica proprietà + stato).
+    match /redteam-attempts/{id} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    // redteam-codes/{code} : codici monouso. Il codice è l'UNICA prova di
+    //   abilitazione: se il client potesse leggerli si verificherebbe da solo →
+    //   lettura solo admin, scrittura solo server-side (riscatto/generazione).
     match /redteam-codes/{code} {
       allow read: if isAdmin();
       allow write: if false;
     }
-    // redteam-handles/{h} : prenotazione handle (unicità in leaderboard). Stesso
-    // regime: scritta solo dal backend durante il riscatto; client mai.
+    // redteam-handles/{h} : prenotazione handle (unicità leaderboard). Solo backend.
     match /redteam-handles/{h} {
       allow read: if isAdmin();
       allow write: if false;
