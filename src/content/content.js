@@ -777,11 +777,30 @@
       for (const it of contextItems) items.push(it);
     }
 
-    // 4. Feedback (alpha)
+    // 4. Feedback (alpha) + Red-team (invia attacco)
     items.push({ type: 'separator' });
     items.push(buildFeedbackItem());
+    items.push(buildRedteamAttackItem());
 
     return items;
+  }
+
+  // Red-team — "Invia attacco" (spec §8.1): apre un pannello dedicato (mirrors
+  // il flusso feedback) con due campi separati (testo attacco + descrizione) e
+  // un bottone d'invio che mostra il costo (50 cr). Vive in
+  // src/content/redteamAttack.js (SN_REDTEAM_ATTACK_UI).
+  function buildRedteamAttackItem() {
+    const ricon = (self.SN_ICONS && typeof self.SN_ICONS.redteam === 'function')
+      ? self.SN_ICONS.redteam(16) : undefined;
+    return {
+      type: 'item',
+      icon: ricon,
+      label: 'Invia attacco (Red-team)',
+      onClick: () => {
+        try { self.SN_REDTEAM_ATTACK_UI?.open(); }
+        catch (e) { console.error('[SN] redteam attack open', e); }
+      },
+    };
   }
 
   function buildHelpItem() {
