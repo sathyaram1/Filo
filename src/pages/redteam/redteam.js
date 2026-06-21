@@ -893,12 +893,19 @@
         if (r.ok) {
           renderGenCodes(r.codes);
           if (msg) { msg.textContent = `${(r.codes || []).length} codici generati (mostrati una sola volta).`; }
+          loadCodes(); // riallinea la lista qui sotto coi nuovi codici
         } else {
           renderGenCodes([]);
           if (msg) { msg.hidden = false; msg.textContent = r.error || 'Generazione non riuscita.'; }
         }
         if (btn) btn.disabled = false;
       });
+    }
+
+    // Owner: aggiorna la lista codici
+    const refreshCodesBtn = $('refreshCodesBtn');
+    if (refreshCodesBtn) {
+      refreshCodesBtn.addEventListener('click', () => loadCodes());
     }
   }
 
