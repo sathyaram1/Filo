@@ -145,6 +145,147 @@ test('non verificato: il gate mostra il form di riscatto codice', async ({ openT
   await expect(page.locator('#gateVerify')).toBeHidden();
 });
 
+test('storico tentativi: righe con colonne/stati corretti ed ESCAPE del titolo (anti-XSS)', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+
+  const evil = '<img src=x onerror=window.__histXss=1>';
+  const now = Date.now();
+  await page.evaluate(({ evilTitle, nowMs }) => {
+    window.RedteamUI.applyState({
+      signedIn: true,
+      verified: true,
+      isOwner: false,
+      gridUnlocked: {},
+      milestones: {},
+      recentAttempts: [
+        // Completo + valido: score pieno, tutti i giudici hanno risposto.
+        {
+          id: 'a1',
+          title: 'Jailbreak via roleplay',
+          verdicts: {
+            A: { class: 'pass', points: 3 },
+            B: { class: 'review', points: 2 },
+            C: { class: 'spam', points: 1 },
+            D: { class: 'pass', points: 3 },
+          },
+          score: 9,
+          isValidAttack: true,
+          status: 'complete',
+          createdAt: nowMs - 2 * 60 * 60 * 1000, // 2h fa
+        },
+        // Completo ma NON valido: score in grigio, validità ✗.
+        {
+          id: 'a2',
+          title: evilTitle, // titolo malevolo: deve essere mostrato letterale
+          verdicts: {
+            A: { class: 'spam', points: 1 },
+            B: { error: true, points: 0 },
+            C: { class: 'spam', points: 1 },
+            D: { class: 'spam', points: 1 },
+          },
+          score: 3,
+          isValidAttack: false,
+          status: 'complete',
+          createdAt: nowMs - 26 * 60 * 60 * 1000, // ieri
+        },
+        // Pending: niente score, "in corso…".
+        {
+          id: 'a3',
+          title: 'Tentativo in corso',
+          verdicts: { A: { class: 'pass', points: 3 } },
+          status: 'pending',
+          createdAt: nowMs - 30 * 1000, // ora
+        },
+      ],
+    });
+  }, { evilTitle: evil, nowMs: now });
+
+  const rows = page.locator('#historyBody .rt-hist-row');
+  await expect(rows).toHaveCount(3);
+  await expect(page.locator('#historyEmpty')).toBeHidden();
+
+  // Riga 1: completo valido → score "9/12", validità ✓, 4 icone giudici.
+  const r1 = rows.nth(0);
+  await expect(r1.locator('.rt-hist-when')).toHaveText('2h fa');
+  await expect(r1.locator('.rt-hist-title')).toHaveText('Jailbreak via roleplay');
+  await expect(r1.locator('.rt-hist-judge-icon')).toHaveCount(4);
+  await expect(r1.locator('.rt-hist-score')).toHaveText('9/12');
+  await expect(r1.locator('.rt-hist-valid')).toHaveText('✓');
+  await expect(r1.locator('.rt-hist-valid')).toHaveAttribute('data-valid', 'true');
+
+  // Riga 2: non valido → score grigio, validità ✗; verdetto errato → "?".
+  const r2 = rows.nth(1);
+  await expect(r2.locator('.rt-hist-when')).toHaveText('ieri');
+  await expect(r2.locator('.rt-hist-score')).toHaveText('3/12');
+  await expect(r2.locator('.rt-hist-score')).toHaveClass(/rt-hist-muted/);
+  await expect(r2.locator('.rt-hist-valid')).toHaveText('✗');
+  await expect(r2.locator('.rt-hist-valid')).toHaveAttribute('data-valid', 'false');
+  await expect(r2.locator('.rt-hist-judge-icon[data-judge="B"]')).toHaveText('?');
+  await expect(r2.locator('.rt-hist-judge-icon[data-judge="B"]')).toHaveAttribute('data-state', 'error');
+
+  // ANTI-XSS: il titolo malevolo è mostrato come testo letterale, niente <img>
+  // creato, e l'handler onerror non è scattato.
+  await expect(r2.locator('.rt-hist-title')).toHaveText(evil);
+  await expect(page.locator('#historyBody img')).toHaveCount(0);
+  const xssFired = await page.evaluate(() => window.__histXss === 1);
+  expect(xssFired).toBe(false);
+
+  // Riga 3: pending → "in corso…", validità neutra "—".
+  const r3 = rows.nth(2);
+  await expect(r3.locator('.rt-hist-when')).toHaveText('ora');
+  await expect(r3.locator('.rt-hist-score')).toHaveText('in corso…');
+  await expect(r3.locator('.rt-hist-score')).toHaveAttribute('data-state', 'pending');
+  await expect(r3).toHaveAttribute('data-status', 'pending');
+  await expect(r3.locator('.rt-hist-valid')).toHaveText('—');
+});
+
+test('storico tentativi: lista vuota mostra lo stato "nessun tentativo"', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+
+  await page.evaluate(() => {
+    window.RedteamUI.applyState({
+      signedIn: true, verified: true, isOwner: false,
+      gridUnlocked: {}, milestones: {}, recentAttempts: [],
+    });
+  });
+
+  await expect(page.locator('#historyBody .rt-hist-row')).toHaveCount(0);
+  await expect(page.locator('#historyEmpty')).toBeVisible();
+});
+
+test('formatRelativeTime: scala da "ora" a data assoluta', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+
+  const out = await page.evaluate(() => {
+    const f = window.RedteamUI.formatRelativeTime;
+    const now = 1_700_000_000_000;
+    const m = 60 * 1000, h = 60 * m, d = 24 * h;
+    return {
+      justNow: f(now - 10 * 1000, now),
+      minutes: f(now - 5 * m, now),
+      hours: f(now - 3 * h, now),
+      yesterday: f(now - 26 * h, now),
+      days: f(now - 3 * d, now),
+      old: f(now - 30 * d, now),
+      missing: f(undefined, now),
+      future: f(now + 5 * m, now),
+    };
+  });
+
+  expect(out.justNow).toBe('ora');
+  expect(out.minutes).toBe('5m fa');
+  expect(out.hours).toBe('3h fa');
+  expect(out.yesterday).toBe('ieri');
+  expect(out.days).toBe('3g fa');
+  // Oltre la settimana: data assoluta gg/mm/aaaa (non una forma "fa").
+  expect(out.old).toMatch(/^\d{2}\/\d{2}\/\d{4}$/);
+  expect(out.missing).toBe('—');
+  expect(out.future).toBe('ora');
+});
+
 test('live reveal: slot in attesa diventano rivelati e mostra esito validità', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
