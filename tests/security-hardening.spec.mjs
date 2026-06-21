@@ -128,7 +128,12 @@ test('#2 i canali privilegiati non trapelano le chiavi API a un\'origine web', a
   expect(afterWebWrite.clearOk).toBe(false); // clear da web rifiutato
 });
 
-test('#3 le chiavi API sono cifrate nel storage.json (mai in chiaro su disco)', async ({ app }) => {
+test('#3 le chiavi API sono cifrate nel storage.json (mai in chiaro su disco)', async ({ app, shell }) => {
+  // `shell` attende app.firstWindow() + load: senza, il primo app.evaluate
+  // parte mentre l'app sta ancora navigando al boot e il contesto viene
+  // distrutto ("Execution context was destroyed"). Gli altri test del file
+  // passano proprio perché usano un fixture (shell/openTab) che aspetta il boot.
+  void shell;
   const SECRET = 'sk-or-v1-SEGRETISSIMA-' + Date.now();
   const userData = await app.evaluate(() => process.env.FILO_USER_DATA);
   const canEncrypt = await app.evaluate(({ safeStorage }) => {
