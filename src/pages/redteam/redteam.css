@@ -186,6 +186,70 @@
 .rt-judge-icon { font-size: 14px; }
 .rt-summary-plus { color: var(--sn-muted); }
 
+/* ---- Storico tentativi (spec §6.1) -------------------------------------- */
+.rt-history-section { margin-top: 24px; }
+.rt-history-scroll {
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--sn-border);
+  border-radius: 8px;
+  margin-top: 12px;
+}
+.rt-history {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.rt-history thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--sn-bg);
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--sn-muted);
+  font-weight: 600;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--sn-border);
+}
+.rt-history td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--sn-border);
+  vertical-align: middle;
+}
+.rt-history tbody tr:last-child td { border-bottom: none; }
+.rt-hist-when { color: var(--sn-muted); white-space: nowrap; width: 80px; }
+.rt-hist-title {
+  max-width: 0;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rt-hist-judges { white-space: nowrap; width: 96px; }
+.rt-hist-judge-icon { font-size: 15px; margin-right: 2px; }
+.rt-hist-judge-icon[data-state="waiting"],
+.rt-hist-judge-icon[data-state="error"] { color: var(--sn-muted); }
+.rt-hist-score {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  white-space: nowrap;
+  width: 78px;
+}
+.rt-hist-score[data-state="pending"] {
+  font-weight: 400;
+  font-style: italic;
+  color: var(--sn-muted);
+}
+.rt-hist-valid { text-align: center; width: 56px; }
+.rt-hist-valid[data-valid="true"] { color: #2e9e5b; }
+.rt-hist-valid[data-valid="false"] { color: var(--sn-muted); }
+.rt-hist-valid[data-valid="pending"] { color: var(--sn-muted); }
+/* Tentativo non valido: punteggio/punti in grigio (non contano, spec §6.1). */
+.rt-hist-muted { color: var(--sn-muted); }
+
 /* ---- Pannello owner: codici --------------------------------------------- */
 .rt-owner-section .sn-row { margin-top: 8px; align-items: center; }
 .rt-owner-section #genCount { width: 90px; }
