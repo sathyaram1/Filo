@@ -395,6 +395,9 @@
 .rt-scale-name { color: var(--sn-fg); }
 .rt-scale-cond { color: var(--sn-muted); font-size: 11px; }
 .rt-scale-pt { color: var(--sn-muted); font-variant-numeric: tabular-nums; text-align: right; }
+/* Righe "Traguardi": niente colonna icona — nome+condizione a sinistra, cr a destra. */
+.rt-scale-row--ms { grid-template-columns: 1fr auto; }
+.rt-ms-left { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 
 /* ---- Stati neutri ------------------------------------------------------- */
 .rt-empty, .rt-error { margin-top: 16px; }
