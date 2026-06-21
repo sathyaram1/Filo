@@ -1825,6 +1825,10 @@
       // shell come gli altri, che ancorano un menu nativo) — è solo una
       // navigazione. Risponde al feedback "metti la cronologia in alto a destra".
       { command: 'history', icon: 'history', label: 'Cronologia', url: 'filo://history/history.html' },
+      // Red-team: apre direttamente la pagina interna (come Cronologia, è solo
+      // una navigazione — non ancora un menu nativo). Spec §2: punto d'accesso
+      // in alto a destra nella home.
+      { command: 'redteam', icon: 'redteam', label: 'Red-team', url: 'filo://redteam/redteam.html' },
       { command: 'settings', icon: 'options', label: 'Impostazioni' },
       { command: 'apps', icon: 'apps', label: 'App' },
       { command: 'account', icon: 'user', label: 'Profilo' },
