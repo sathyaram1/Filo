@@ -651,6 +651,7 @@
   window.RedteamUI = {
     renderGrid, renderLeaderboard, renderRules, applyState,
     renderReveal, renderSummary, renderBadges, renderGenCodes,
+    renderHistory, formatRelativeTime,
     redeemStatusMessage,
   };
 
