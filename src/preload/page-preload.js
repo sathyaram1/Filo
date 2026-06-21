@@ -235,7 +235,7 @@ ipcRenderer.on('shortcut:triggered', (_event, { command, context } = {}) => {
 
 const STYLES = [
   'theme.css', 'menu.css', 'popup.css', 'sidebar.css',
-  'highlight.css', 'spellcheck.css', 'feedback.css',
+  'highlight.css', 'spellcheck.css', 'feedback.css', 'redteam-attack.css',
 ];
 
 function injectStyles() {
