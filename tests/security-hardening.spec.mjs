@@ -79,7 +79,12 @@ test('#1b i link mailto:/tel: vengono consegnati all\'OS, file:// no', async ({ 
   expect(fileWindows.length).toBe(0);
 });
 
-test('#2 i canali privilegiati non trapelano le chiavi API a un\'origine web', async ({ app }) => {
+test('#2 i canali privilegiati non trapelano le chiavi API a un\'origine web', async ({ app, shell }) => {
+  // `shell` attende la fine del boot (firstWindow + domcontentloaded). Senza,
+  // la semina qui sotto può correre con l'inizializzazione settings del main:
+  // un read-modify-write del boot sovrascrive il seed e la chiave viene letta
+  // vuota → flake ("Received ''"). Stessa cura del test #3.
+  void shell;
   const SECRET = 'sk-or-v1-WEB-LEAK-' + Date.now();
   // Semina la apiKey direttamente nello storage (scrittura sincrona in memoria),
   // come stato di partenza deterministico: evita il percorso async di
