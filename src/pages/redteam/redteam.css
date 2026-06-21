@@ -1,0 +1,336 @@
+/* Pagina Red Team (filo://redteam/). Riusa i token di tema (--sn-*); gli unici
+   colori "fissi" sono quelli dei 4 livelli/giudici (rosso/giallo/arancio/verde),
+   che — come la palette del grafico Crediti — devono restare distinguibili su
+   tema chiaro E scuro. Vengono passati per-elemento via --rt-cell-color /
+   --rt-judge-color / --rt-badge-color da redteam.js. */
+
+/* ---- Tabs ---------------------------------------------------------------- */
+.rt-tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--sn-border);
+  margin: 8px 0 20px;
+}
+.rt-tab {
+  all: unset;
+  cursor: pointer;
+  padding: 8px 14px;
+  font-size: 13px;
+  color: var(--sn-muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.rt-tab:hover { color: var(--sn-fg); }
+.rt-tab--active {
+  color: var(--sn-fg);
+  font-weight: 600;
+  border-bottom-color: var(--sn-accent);
+}
+
+.rt-panel { margin-top: 4px; }
+.rt-panel h2 { font-size: 15px; }
+
+/* ---- Gate (non loggato / non verificato) -------------------------------- */
+.rt-gate {
+  border: 1px solid var(--sn-border);
+  background: var(--sn-hover);
+  border-radius: 8px;
+  padding: 20px 22px;
+  margin-top: 8px;
+}
+.rt-gate-msg { font-size: 15px; margin: 0 0 4px; }
+.rt-redeem { margin-top: 12px; max-width: 360px; }
+.rt-redeem label { margin-top: 10px; }
+.rt-redeem .sn-btn { margin-top: 14px; }
+.rt-redeem-msg {
+  margin: 12px 0 0;
+  font-size: 13px;
+  padding: 8px 10px;
+  border-radius: var(--sn-radius);
+}
+.rt-redeem-msg--ok { color: var(--sn-fg); background: rgba(46, 158, 91, 0.16); }
+.rt-redeem-msg--err { color: var(--sn-error); background: rgba(var(--sn-accent-rgb), 0.10); }
+
+/* ---- Griglia record 4×3 ------------------------------------------------- */
+.rt-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+}
+.rt-grid-row {
+  display: grid;
+  grid-template-columns: 40px repeat(3, 1fr);
+  gap: 6px;
+  align-items: stretch;
+}
+.rt-grid-head { align-items: end; }
+.rt-grid-corner { }
+.rt-grid-colhead {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+  padding-bottom: 4px;
+}
+.rt-grid-icon { font-size: 16px; }
+.rt-grid-colname { font-size: 11px; color: var(--sn-muted); }
+.rt-grid-colcr { font-size: 10px; color: var(--sn-muted); }
+.rt-grid-rowhead {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--sn-fg);
+}
+.rt-cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  border-radius: var(--sn-radius);
+  border: 1px solid var(--sn-border);
+  font-variant-numeric: tabular-nums;
+  transition: transform 120ms ease;
+}
+.rt-cell--off {
+  background: var(--sn-hover);
+  color: var(--sn-muted);
+  opacity: 0.6;
+}
+.rt-cell--on {
+  background: color-mix(in srgb, var(--rt-cell-color, var(--sn-accent)) 22%, var(--sn-bg));
+  border-color: var(--rt-cell-color, var(--sn-accent));
+  color: var(--sn-fg);
+  font-weight: 600;
+}
+.rt-cell-val { font-size: 16px; }
+.rt-cell-check {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  font-size: 11px;
+  color: var(--rt-cell-color, var(--sn-accent));
+  font-weight: 700;
+}
+/* Sblocco appena rivelato (touch celebrativo, spec §8.4). */
+.rt-cell--justunlocked {
+  animation: rt-pop 600ms ease;
+}
+@keyframes rt-pop {
+  0% { transform: scale(0.9); }
+  50% { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rt-cell--justunlocked { animation: none; }
+}
+
+/* ---- Milestone aggregati ----------------------------------------------- */
+.rt-badges {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 12px;
+}
+.rt-badge {
+  border-radius: 8px;
+  border: 1px solid var(--sn-border);
+  padding: 14px 12px;
+  text-align: center;
+}
+.rt-badge--off {
+  background: var(--sn-hover);
+  color: var(--sn-muted);
+  opacity: 0.6;
+}
+.rt-badge--on {
+  background: color-mix(in srgb, var(--rt-badge-color, var(--sn-accent)) 18%, var(--sn-bg));
+  border-color: var(--rt-badge-color, var(--sn-accent));
+  color: var(--sn-fg);
+}
+.rt-badge-name { font-weight: 600; font-size: 14px; }
+.rt-badge-cr { font-size: 13px; margin-top: 2px; color: var(--rt-badge-color, var(--sn-muted)); }
+.rt-badge--off .rt-badge-cr { color: var(--sn-muted); }
+.rt-badge-cond { font-size: 11px; color: var(--sn-muted); margin-top: 6px; }
+
+/* ---- Riepilogo numerico ------------------------------------------------- */
+.rt-summary { margin-top: 12px; }
+.rt-summary-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--sn-border);
+}
+.rt-summary-lbl { color: var(--sn-muted); font-size: 13px; }
+.rt-summary-val { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.rt-summary-breakdown {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  color: var(--sn-muted);
+  font-size: 13px;
+}
+.rt-summary-judge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.rt-judge-icon { font-size: 14px; }
+.rt-summary-plus { color: var(--sn-muted); }
+
+/* ---- Pannello owner: codici --------------------------------------------- */
+.rt-owner-section .sn-row { margin-top: 8px; align-items: center; }
+.rt-owner-section #genCount { width: 90px; }
+.rt-codes {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rt-code {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--sn-border);
+  border-radius: var(--sn-radius);
+  padding: 6px 10px;
+  background: var(--sn-hover);
+}
+.rt-code-text {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 14px;
+  letter-spacing: 1px;
+}
+.rt-code-copy { padding: 3px 10px; font-size: 12px; }
+
+/* ---- Live reveal -------------------------------------------------------- */
+.rt-reveal {
+  border: 1px solid var(--sn-accent);
+  border-radius: 8px;
+  padding: 16px 18px;
+  margin-bottom: 24px;
+  background: color-mix(in srgb, var(--sn-accent) 6%, var(--sn-bg));
+}
+.rt-reveal h2 { margin-top: 0; border-bottom: none; padding-bottom: 0; }
+.rt-reveal-title { margin: 0 0 12px; font-style: italic; }
+.rt-reveal-slots {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.rt-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 8px;
+  border-radius: var(--sn-radius);
+  border: 1px solid var(--sn-border);
+  background: var(--sn-bg);
+  min-height: 72px;
+  justify-content: center;
+}
+.rt-slot-label { font-weight: 700; font-size: 15px; }
+.rt-slot-icon { font-size: 26px; line-height: 1; }
+.rt-slot-pts { font-size: 12px; color: var(--sn-muted); }
+.rt-slot--revealed { animation: rt-pop 400ms ease; border-color: var(--rt-judge-color, var(--sn-accent)); }
+.rt-slot--waiting .rt-slot-pts { font-style: italic; }
+.rt-slot-spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--sn-border);
+  border-top-color: var(--sn-accent);
+  animation: rt-spin 800ms linear infinite;
+}
+@keyframes rt-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .rt-slot-spinner { animation: none; }
+  .rt-slot--revealed { animation: none; }
+}
+.rt-reveal-summary {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--sn-border);
+}
+.rt-reveal-total { font-size: 18px; font-weight: 700; }
+.rt-reveal-validity { font-size: 13px; margin-top: 4px; }
+.rt-reveal-validity--valid { color: #2e9e5b; }
+.rt-reveal-validity--invalid { color: var(--sn-muted); }
+.rt-reveal-summary--invalid .rt-reveal-total { color: var(--sn-muted); }
+
+/* ---- Leaderboard -------------------------------------------------------- */
+.rt-lb {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 4px;
+  font-size: 14px;
+}
+.rt-lb th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--sn-muted);
+  font-weight: 600;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--sn-border);
+}
+.rt-lb td {
+  padding: 10px;
+  border-bottom: 1px solid var(--sn-border);
+  vertical-align: middle;
+}
+.rt-lb-rank { color: var(--sn-muted); font-variant-numeric: tabular-nums; width: 48px; }
+.rt-lb-handle { font-weight: 600; }
+.rt-lb-record .rt-record-icon { font-size: 15px; margin-right: 2px; }
+.rt-lb-score { font-variant-numeric: tabular-nums; font-weight: 600; width: 70px; }
+.rt-lb-attempts { font-variant-numeric: tabular-nums; color: var(--sn-muted); width: 90px; }
+.rt-lb-badges .rt-lb-badge-icon { font-size: 14px; margin-right: 2px; }
+
+/* ---- Regole ------------------------------------------------------------- */
+.rt-rules {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin-top: 4px;
+}
+.rt-rule {
+  border: 1px solid var(--sn-border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: var(--sn-hover);
+}
+.rt-rule-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.rt-rule-line { margin: 0; font-size: 13px; line-height: 1.5; }
+.rt-rule-note { margin: 6px 0 0; font-size: 11px; color: var(--sn-muted); }
+.rt-rules-scale { display: flex; flex-direction: column; gap: 4px; }
+.rt-scale-row {
+  display: grid;
+  grid-template-columns: 24px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+}
+.rt-scale-icon { font-size: 15px; text-align: center; }
+.rt-scale-name { color: var(--sn-fg); }
+.rt-scale-cond { color: var(--sn-muted); font-size: 11px; }
+.rt-scale-pt { color: var(--sn-muted); font-variant-numeric: tabular-nums; text-align: right; }
+
+/* ---- Stati neutri ------------------------------------------------------- */
+.rt-empty, .rt-error { margin-top: 16px; }
