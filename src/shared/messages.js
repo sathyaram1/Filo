@@ -288,6 +288,30 @@
     // Broadcast da background -> content: ferma la tua lettura locale, se ne hai
     // una. Inviato a tutte le schede quando una di esse chiede lo stop globale.
     TTS_STOP: 'tts_stop',
+
+    // ── Canale red-team (filo-redteam-ux-spec) ────────────────────────────────
+    // Ponte verso le Cloud Function di filo-security (backend "cervello"). Il main
+    // (handlers/redteam.js) le invoca col Firebase ID token dell'utente loggato.
+    // REDTEAM_SUBMIT: invia un tentativo. { attackText, description } →
+    //   { status:'ok', attemptId, balance, cost } | { status:'dormant' } |
+    //   { status:'insufficient_credits', have, needed } | { status:'empty' }.
+    REDTEAM_SUBMIT: 'redteam_submit',
+    // REDTEAM_STATE: stato gamification dell'utente per la tab Statistiche.
+    //   { } → { verified, handle?, bestPerJudge?, gridUnlocked?, milestones?, leaderboardScore? }.
+    REDTEAM_STATE: 'redteam_state',
+    // REDTEAM_ATTEMPT: un tentativo (polling rivelazione live). { attemptId } →
+    //   { attempt:{ title, verdicts, score, isValidAttack, status } } |
+    //   { hidden:true } | { notFound:true }.
+    REDTEAM_ATTEMPT: 'redteam_attempt',
+    // REDTEAM_LEADERBOARD: classifica (tutti i loggati). { } →
+    //   { entries:[{ handle, leaderboardScore, bestPerJudge, totalAttempts, milestones }] }.
+    REDTEAM_LEADERBOARD: 'redteam_leaderboard',
+    // REDTEAM_REDEEM: riscatta un codice monouso. { code, handle } →
+    //   { status:'ok', handle } | { status:'invalid_code'|'code_used'|'invalid_handle'|'handle_taken'|'already_verified', error? }.
+    REDTEAM_REDEEM: 'redteam_redeem',
+    // REDTEAM_GEN_CODES: genera codici monouso (SOLO owner). { count } →
+    //   { ok, codes:[..] } | { ok:false, error }.
+    REDTEAM_GEN_CODES: 'redteam_gen_codes',
   };
 
   // Port-based streaming
