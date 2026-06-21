@@ -265,5 +265,21 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow write: if false;
     }
+
+    // redteam-codes/{code} : codici monouso di verifica (DESIGN §9). Il codice è
+    // l'UNICA prova di abilitazione: se il client potesse leggerli, potrebbe
+    // verificarsi da solo. Quindi LETTURA NEGATA al client (solo admin, per la
+    // gestione owner) e scrittura solo server-side (riscatto/generazione via
+    // Cloud Function con Admin SDK, che bypassa queste regole).
+    match /redteam-codes/{code} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    // redteam-handles/{h} : prenotazione handle (unicità in leaderboard). Stesso
+    // regime: scritta solo dal backend durante il riscatto; client mai.
+    match /redteam-handles/{h} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
   }
 }
