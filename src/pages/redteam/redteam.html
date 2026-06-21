@@ -29,20 +29,20 @@
     <!-- ====================== TAB STATISTICHE ====================== -->
     <section class="rt-panel" id="panel-stats" data-panel="stats">
 
-      <!-- Gate: non loggato -->
-      <div class="rt-gate" id="gateSignin" hidden>
-        <p class="rt-gate-msg">Accedi per partecipare al red team.</p>
-      </div>
-
-      <!-- Gate: loggato ma non verificato -->
-      <div class="rt-gate" id="gateVerify" hidden>
-        <p class="rt-gate-msg">Verifica il tuo account per vedere i risultati dei tuoi tentativi.</p>
+      <!-- Verifica account via CODICE DI INVITO. Mostrata finché non sei
+           verificato, anche da sloggato: in quel caso "Verifica codice" fa
+           prima il login e poi riscatta (vedi redteam.js). Il campo codice è in
+           primo piano così è subito chiaro dove inserirlo. -->
+      <div class="rt-gate rt-verify" id="gateVerify" hidden>
+        <h2 class="rt-verify-title">Diventa red teamer verificato</h2>
+        <p class="rt-verify-intro">Inserisci il <strong>codice di invito</strong> che hai ricevuto: si lega al tuo account e sblocca le statistiche dei tuoi tentativi e la leaderboard.</p>
         <form class="rt-redeem" id="redeemForm" autocomplete="off">
-          <label for="redeemHandle">Nome utente (handle)</label>
-          <input type="text" id="redeemHandle" maxlength="32" placeholder="il tuo nome in classifica" />
-          <label for="redeemCode">Codice di verifica</label>
-          <input type="text" id="redeemCode" maxlength="32" placeholder="ABCD-EFGH" />
-          <button type="submit" class="sn-btn" id="redeemBtn">Verifica</button>
+          <label for="redeemCode">Codice di invito</label>
+          <input type="text" id="redeemCode" maxlength="32" placeholder="ABCD-EFGH" autocomplete="off" />
+          <label for="redeemHandle">Nome in classifica (handle)</label>
+          <input type="text" id="redeemHandle" maxlength="32" placeholder="come comparirai in leaderboard" autocomplete="off" />
+          <button type="submit" class="sn-btn" id="redeemBtn">Verifica codice</button>
+          <p class="rt-redeem-hint sn-muted" id="signinHint" hidden>Premi “Verifica codice” per accedere col tuo account e riscattare il codice.</p>
           <p class="rt-redeem-msg" id="redeemMsg" role="status" hidden></p>
         </form>
       </div>
