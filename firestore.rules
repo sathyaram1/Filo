@@ -251,5 +251,19 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow write: if false;
     }
+
+    // redteam/{uid} : stato del canale red-team per utente (DESIGN §9, §13):
+    // `verified` (account abilitato all'invio), `handle`, `prior` (giudici/combo
+    // già premiati) e `totalEarned` (per la leaderboard). È SERVER-AUTHORITATIVE:
+    // scritto SOLO dal backend via Admin SDK (che bypassa queste regole). Il
+    // client NON può scriverci — altrimenti un utente si auto-verificherebbe o
+    // falsificherebbe le ricompense. Lettura: solo il proprio doc (per sapere se
+    // è verificato e vedere i propri totali); la leaderboard la serve la Cloud
+    // Function `redteamLeaderboard` (Admin SDK), così `prior` altrui non trapela.
+    match /redteam/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow read: if isAdmin();
+      allow write: if false;
+    }
   }
 }
