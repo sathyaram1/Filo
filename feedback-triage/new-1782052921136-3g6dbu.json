@@ -1,0 +1,13 @@
+{
+  "op": "create",
+  "uid": "2d6e0e90-c1d4-4a59-bef8-be88d7b80843",
+  "text": "PARTE UTENTE: La suite di test automatici (npm test) è VERDE in modo deterministico su main: l'ho eseguita per intero, 461 test passati, zero falliti. C'è però UN test instabile (flaky): 'proxy-tab-menu > su tab già instradata Cambia paese apre la lista e cambia paese senza tornare in Italia' fallisce circa 2 volte su 5 quando lo si rilancia, e passa le altre. Per riprodurre: esegui piu volte di fila 'npx playwright test tests/proxy-tab-menu.spec.mjs:194 --retries=0' e vedrai alternarsi PASS e FAIL. Questa intermittenza e probabilmente la VERA causa dietro le tre segnalazioni 'npm test rosso' gia in coda nella tab Agente (security-hardening #3 'race di boot', dropdown font che non si chiude, spellcheck+editor font): quei test specifici li ho rieseguiti su main e passano puliti, quindi quelle segnalazioni sono flakiness diagnosticata per errore come rottura deterministica, non bug reali da correggere.\n\nPARTE TECNICA: tests/proxy-tab-menu.spec.mjs:194. Il fallimento e 'page.evaluate: Target page, context or browser has been closed' alle righe 222-224, dove il test clicca 'Cambia paese' sul popup del menu contestuale ottenuto via findMenuPopup a riga 215. Il riferimento al popup (menu2) diventa stale tra l'ottenimento e l'interazione: il popup del menu viene chiuso/ricreato come nuova finestra mentre il test tiene un handle vecchio. Fix probabile: ri-acquisire il popup con findMenuPopup subito prima del click (o attendere che la finestra del menu sia stabile) invece di riusare l'handle catturato prima. Stesso pattern flaky-handle puo affliggere altri spec che interagiscono coi menu popup.",
+  "name": "Test instabile: proxy-tab-menu Cambia paese fallisce a intermittenza",
+  "parentId": "",
+  "status": "new",
+  "priority": 1,
+  "notes": "",
+  "images": [],
+  "queuedAt": "2026-06-21T14:42:01.135Z",
+  "queuedBy": "routine"
+}
