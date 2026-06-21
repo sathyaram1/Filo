@@ -758,10 +758,29 @@
     }
   }
 
+  let lastState = {};
   async function loadState() {
     const r = await send(MSG.REDTEAM_STATE);
+    lastState = r || {};
     applyState(r);
     return r;
+  }
+
+  // ---- Owner: gestione codici (lista + revoca) ----------------------------
+  async function loadCodes() {
+    const r = await send(MSG.REDTEAM_LIST_CODES);
+    renderCodesTable(r, doRevoke);
+  }
+
+  async function doRevoke(code, btn) {
+    if (btn) btn.disabled = true;
+    const r = await send(MSG.REDTEAM_REVOKE_CODE, { code });
+    if (r && r.ok) {
+      await loadCodes(); // ricarica la lista aggiornata
+    } else if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Riprova';
+    }
   }
 
   let leaderboardLoaded = false;
