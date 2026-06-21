@@ -122,7 +122,7 @@ test('leaderboard rende le righe ed ESCAPE un handle con <script> (anti-XSS)', a
   expect(xssFired).toBe(false);
 });
 
-test('non verificato: il gate mostra il form di riscatto codice', async ({ openTab }) => {
+test('non verificato: la card mostra il form di riscatto codice (anche da sloggato)', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
@@ -132,18 +132,84 @@ test('non verificato: il gate mostra il form di riscatto codice', async ({ openT
 
   await expect(page.locator('#gateVerify')).toBeVisible();
   await expect(page.locator('#statsContent')).toBeHidden();
-  // Form di riscatto: campi handle + codice + bottone Verifica.
+  // Form di riscatto: il campo CODICE è in primo piano, più handle e bottone.
   await expect(page.locator('#redeemForm')).toBeVisible();
-  await expect(page.locator('#redeemHandle')).toBeVisible();
   await expect(page.locator('#redeemCode')).toBeVisible();
+  await expect(page.locator('#redeemHandle')).toBeVisible();
   await expect(page.locator('#redeemBtn')).toBeVisible();
+  // Da loggato il suggerimento "accedi" è nascosto.
+  await expect(page.locator('#signinHint')).toBeHidden();
 
-  // Non loggato → gate di accesso.
+  // Non loggato → la card di verifica (col campo codice) resta visibile, così è
+  // chiaro DOVE inserire il codice anche prima dell'accesso; compare il
+  // suggerimento ad accedere.
   await page.evaluate(() => {
     window.RedteamUI.applyState({ signedIn: false, verified: false });
   });
-  await expect(page.locator('#gateSignin')).toBeVisible();
-  await expect(page.locator('#gateVerify')).toBeHidden();
+  await expect(page.locator('#gateVerify')).toBeVisible();
+  await expect(page.locator('#redeemCode')).toBeVisible();
+  await expect(page.locator('#signinHint')).toBeVisible();
+});
+
+test('owner: la tab Codici è visibile e renderCodesTable elenca i codici con revoca solo sui liberi', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+
+  // Stato owner → la tab Codici compare.
+  await page.evaluate(() => {
+    window.RedteamUI.applyState({ signedIn: true, verified: false, isOwner: true });
+  });
+  await expect(page.locator('#codesTab')).toBeVisible();
+
+  // Vai alla tab e inietta una lista: 1 libero, 1 usato (con handle).
+  await page.locator('#codesTab').click();
+  await expect(page.locator('#panel-codes')).toBeVisible();
+
+  const revoked = await page.evaluate(() => {
+    const calls = [];
+    window.RedteamUI.renderCodesTable(
+      { ok: true, codes: [
+        { code: 'ABCD-EFGH', used: false, createdAt: Date.now() },
+        { code: 'JKMN-PQRS', used: true, handle: 'tester1', usedAt: Date.now() },
+      ] },
+      (code) => calls.push(code),
+    );
+    // Clicca la (sola) revoca disponibile.
+    const btn = document.querySelector('#codesBody .rt-ct-revoke');
+    if (btn) btn.click();
+    return calls;
+  });
+
+  // Due righe; il codice usato mostra l'handle; revoca SOLO sul libero.
+  await expect(page.locator('#codesBody .rt-ct-row')).toHaveCount(2);
+  await expect(page.locator('#codesBody .rt-ct-row[data-state="free"] .rt-ct-badge')).toHaveText('Libero');
+  await expect(page.locator('#codesBody .rt-ct-row[data-state="used"] .rt-ct-handle')).toHaveText('tester1');
+  await expect(page.locator('#codesBody .rt-ct-revoke')).toHaveCount(1);
+  // Il click di revoca ha invocato onRevoke col codice giusto.
+  expect(revoked).toEqual(['ABCD-EFGH']);
+
+  // Stato NON owner → la tab Codici sparisce.
+  await page.evaluate(() => {
+    window.RedteamUI.applyState({ signedIn: true, verified: true, isOwner: false, gridUnlocked: {}, milestones: {} });
+  });
+  await expect(page.locator('#codesTab')).toBeHidden();
+});
+
+test('owner: renderCodesTable con XSS nell\'handle lo mostra letterale (anti-XSS)', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+
+  const evil = '<img src=x onerror=window.__ctXss=1>';
+  await page.evaluate((evilHandle) => {
+    window.RedteamUI.renderCodesTable({ ok: true, codes: [
+      { code: 'ZZZZ-ZZZZ', used: true, handle: evilHandle, usedAt: Date.now() },
+    ] });
+  }, evil);
+
+  await expect(page.locator('#codesBody .rt-ct-handle')).toHaveText(evil);
+  await expect(page.locator('#codesBody img')).toHaveCount(0);
+  const xssFired = await page.evaluate(() => window.__ctXss === 1);
+  expect(xssFired).toBe(false);
 });
 
 test('storico tentativi: righe con colonne/stati corretti ed ESCAPE del titolo (anti-XSS)', async ({ openTab }) => {
