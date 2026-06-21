@@ -360,6 +360,7 @@
     stopReading:  (size) => wrap(stopReading, { size }),
     history:      (size) => wrap(history, { size }),
     credits:      (size) => wrap(credits, { size }),
+    redteam:      (size) => wrap(redteam, { size }),
   };
 
   // Heuristica che il menu usa per capire se una stringa di "icona" è SVG
