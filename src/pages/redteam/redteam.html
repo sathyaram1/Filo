@@ -74,6 +74,26 @@
           <div class="rt-summary" id="summary"></div>
         </section>
 
+        <!-- Storico tentativi (spec §6.1) -->
+        <section class="rt-history-section" id="historySection">
+          <h2>Storico tentativi</h2>
+          <div class="rt-history-scroll">
+            <table class="rt-history" id="history">
+              <thead>
+                <tr>
+                  <th class="rt-hist-when">Ora</th>
+                  <th class="rt-hist-title">Titolo</th>
+                  <th class="rt-hist-judges">Giudici</th>
+                  <th class="rt-hist-score">Score</th>
+                  <th class="rt-hist-valid">Validità</th>
+                </tr>
+              </thead>
+              <tbody id="historyBody"></tbody>
+            </table>
+          </div>
+          <p class="rt-empty sn-muted" id="historyEmpty" hidden>Nessun tentativo ancora.</p>
+        </section>
+
         <!-- Pannello owner: generazione codici -->
         <section class="rt-owner-section" id="ownerSection" hidden>
           <h2>Genera codici di verifica</h2>
