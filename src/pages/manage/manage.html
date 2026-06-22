@@ -259,8 +259,16 @@
 </head>
 <body>
   <main class="sn-page">
-    <h1>Gestione</h1>
-    <p class="sn-muted">Dashboard riservata all'owner per monitorare Filo.</p>
+    <!-- Switch "Modalità automatica": sempre visibile (non una sezione/tab),
+         attiva/disattiva l'operatività automatica di Filo. Owner-only. -->
+    <div class="mg-topbar">
+      <label class="mg-switch" id="mgAutoSwitch" title="Attiva o disattiva la modalità automatica di Filo">
+        <span class="mg-switch-text">Modalità automatica</span>
+        <input type="checkbox" id="mgAutoToggle" />
+        <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+        <span class="mg-switch-state" id="mgAutoState">Off</span>
+      </label>
+    </div>
 
     <!-- Banner sola lettura: scompare per gli admin -->
     <div class="mg-banner" id="mgBanner" hidden>
