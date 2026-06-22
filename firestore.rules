@@ -159,7 +159,11 @@ service cloud.firestore {
         && request.resource.data.get('claimExpiresAt', '') is string
         && request.resource.data.get('claimExpiresAt', '').size() <= 40
         && request.resource.data.get('claimNum', '') is string
-        && request.resource.data.get('claimNum', '').size() <= 20;
+        && request.resource.data.get('claimNum', '').size() <= 20
+        // `branch`: nome del branch git su cui vive il fix in attesa di verifica
+        // (stati `review`/`blocked` del cancello di merge delle routine).
+        && request.resource.data.get('branch', '') is string
+        && request.resource.data.get('branch', '').size() <= 200;
 
       // Triage routine (limitato): può solo spostare tra `todo`/`done`/`clarify`
       // e scrivere `notes`/`resolvedAt`. NON tocca `priority`, NON marca
