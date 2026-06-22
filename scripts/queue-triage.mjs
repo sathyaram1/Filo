@@ -15,7 +15,8 @@
 //   dell'idea "file con la lista dei risolti").
 //
 // USO:
-//   node scripts/queue-triage.mjs <id> <status:todo|done|clarify> "testo note"
+//   node scripts/queue-triage.mjs <id> <status:todo|done|clarify|review|blocked> "testo note"
+//   node scripts/queue-triage.mjs <id> <status> "note" --branch worker/42  (stato review/blocked + branch)
 //   node scripts/queue-triage.mjs <id> <status> "note" --no-git   (solo scrive il file)
 //
 //   Di default committa e pusha il file (così la decisione arriva su main anche
