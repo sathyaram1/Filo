@@ -1,8 +1,10 @@
 // Spec Playwright per la pagina di gestione (filo://manage/).
 //
 // Assert di COMPORTAMENTO:
-//   - 4 tab presenti con testo corretto; "Revisione" attiva di default;
-//   - le altre 3 tab mostrano il segnaposto "In arrivo";
+//   - 3 tab presenti con testo corretto; "Revisione" attiva di default;
+//   - le altre 2 tab mostrano il segnaposto "In arrivo";
+//   - lo switch "Modalità automatica" è sempre visibile (tutte le tab),
+//     si attiva/disattiva e lo stato sopravvive al ricaricamento;
 //   - con dati finti iniettati, un elemento compare nella lista bloccati
 //     e il click apre il pannello centrale con le bolle;
 //   - click sul mittente apre il pannello laterale con le info del mittente.
