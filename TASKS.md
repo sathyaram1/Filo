@@ -70,6 +70,24 @@ account** Filo. Decisioni di design confermate dall'utente:
 - **Massimizzare l'utilizzo**: soglia di costo ALTA (non conservativa). Il loop
   continua a prendere feedback e — quando finiscono — passa all'audit proattivo,
   finché la finestra 5h non è quasi piena. Su **2 account** sfasati (vedi R5).
+- **Feedback corposi → split + doppia verifica.** Lo splitting in sub-feedback
+  `#N.M` esiste già (`queue-feedback.mjs --parent`). Verifica a DUE livelli, non
+  ridondanti: (a) **per-pezzo** = automatico, ogni `#N.M` è un feedback normale e
+  passa dalla verifica avversariale (cattura la correttezza del singolo pezzo
+  quando è economico isolarlo); (b) **finale/integrazione** = alla chiusura
+  dell'ultimo `#N.M`, si auto-genera un `#N.final` (feedback in modalità review)
+  che verifica avversarialmente l'**intera feature contro la spec originale**
+  (buchi tra i pezzi, incoerenze, "la feature fa ciò che l'utente chiedeva?").
+  `#N.final` riusa la meccanica review esistente → nessuno stato nuovo.
+- **Sicurezza auto-modifica L4+L5 nel cancello di merge (PER-PEZZO).** Protegge
+  dal caso di una routine pilotata da un feedback con injection che committa
+  codice cattivo. **L5** (blocco deterministico sui file sensibili) e **L4**
+  (review LLM del diff *cieca al prompt*) girano nel merge-gate **prima** che
+  ogni branch entri in main — per-pezzo, perché un controllo "solo alla fine"
+  sarebbe senza denti (i pezzi sarebbero già atterrati). In più un **L4
+  d'integrazione** sul diff dell'intera feature alla fine, per i problemi
+  cross-pezzo. Allineare le definizioni L4/L5 al DESIGN di filo-security
+  ([[auto-improvement-loop]] in memoria).
 
 Macchina a stati feedback: `todo` → (worker risolve sul branch) → `review`
 (branch pronto, campo `branch` col nome) → verifica avversariale → PASS: merge
