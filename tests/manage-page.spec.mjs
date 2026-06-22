@@ -109,8 +109,9 @@ test('lo switch attiva/disattiva la modalità automatica e lo stato persiste', a
   // Simula l'owner: abilita lo switch (in produzione lo abilita applyAutoModeGate
   // quando isAdmin è true) e attivalo. Il change handler scrive su storage.
   await page.evaluate(() => { document.getElementById('mgAutoToggle').disabled = false; });
-  // Il checkbox nativo è visivamente nascosto (switch custom): force click.
-  await input.click({ force: true });
+  // Il checkbox nativo è visivamente nascosto (switch custom): clicchiamo la
+  // parte visibile dentro la <label>, che alterna il checkbox e scatena 'change'.
+  await page.locator('#mgAutoSwitch .mg-switch-track').click();
   await expect(input).toBeChecked();
   await expect(state).toHaveText('On');
 
