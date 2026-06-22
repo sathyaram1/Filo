@@ -129,9 +129,14 @@ su main + `done`; FAIL: correggi e ri-verifica (max 3 loop) → dopo 3 fail
   `scripts/merge-gate.mjs <branch>` (rebase su main + merge + push, con
   retry/rebase per push concorrenti dei 2 account) invocato dall'orchestratore
   al PASS. Il merge-gate è anche dove girano i controlli L4/L5 (R6): se L5
-  blocca, NON fondere → `blocked`. ⚠️ Le sessioni/branch NON-routine (lavoro
-  locale dell'utente) devono restare **invariate**: l'auto-merge attuale continua
-  per loro. **Done**: test che (1) una edit su un branch `worker/*` non arriva in
+  blocca, NON fondere → `blocked`. **Topologia (Modello B)**: per una feature
+  spezzata, i branch dei pezzi `worker/N.M` partono da `feature/N` e si fondono
+  su `feature/N` (non su main); l'hook NON deve auto-fondere né i `worker/*` né i
+  `feature/*` su main. Il merge verso main avviene solo via `merge-gate.mjs`,
+  invocato dall'orchestratore: per pezzo dentro `feature/N`, e una volta sola
+  `feature/N`→main a `#N.final`. Per i feedback standalone: branch → gate → main
+  diretto. ⚠️ Le sessioni/branch NON-routine (lavoro locale dell'utente) devono
+  restare **invariate**: l'auto-merge attuale continua per loro. **Done**: test che (1) una edit su un branch `worker/*` non arriva in
   `main`, (2) `merge-gate.mjs` lo porta in `main`, (3) una edit su un branch
   normale viene ancora auto-mergiata. Verifica con un repo di prova o asserzioni
   su git in uno spec. NON rompere l'auto-push esistente. (stima: L)
