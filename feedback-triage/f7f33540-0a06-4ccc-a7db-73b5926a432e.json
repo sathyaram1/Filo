@@ -1,7 +1,0 @@
-{
-  "id": "f7f33540-0a06-4ccc-a7db-73b5926a432e",
-  "status": "clarify",
-  "notes": "RISPOSTA DIAGNOSTICA (R4): SÌ, ccusage gira nella sandbox cloud (Linux headless).\n\n(a) Il comando 'npx -y ccusage@latest blocks --active --json' FUNZIONA, exit 0. La rete NON è bloccata (npx scarica il pacchetto), node è presente (v22.22.2 in /opt/node22), e i file .jsonl esistono: vivono in ~/.claude/projects/<slug>/<sessionId>.jsonl (HOME=/root). C'è almeno il .jsonl della sessione corrente della routine, quindi ccusage ha sempre dati da leggere.\n\n(b) Output del blocco 5h attivo (campi chiave, run del 2026-06-22T22:05Z):\n- costUSD: 0.7617\n- startTime: 2026-06-22T22:00:00.000Z\n- endTime:   2026-06-23T03:00:00.000Z (finestra di 5h)\n- isActive: true\n- projection.remainingMinutes: 294\n- projection.totalCost: 170.33 (stima a fine finestra estrapolando il burn rate corrente — qui gonfiata perché poche entry; usare costUSD reale come segnale, non la projection)\n- burnRate.costPerHour: 34.6\n- models: [claude-opus-4-8]\n\nCONCLUSIONE per R4: il cost-check è fattibile in cloud. L'orchestratore può leggere costUSD del blocco attivo con quel comando e confrontarlo con la soglia. Nota implementativa: leggere blocks[].costUSD (non projection.totalCost) e gestire il caso di array vuoto (nessun blocco attivo all'avvio, prima che la sessione scriva entry). La latenza del primo npx è ~qualche secondo (download pacchetto); valutare un install locale di ccusage per ridurla se chiamato spesso.",
-  "queuedAt": "2026-06-22T22:06:19.016Z",
-  "queuedBy": "routine"
-}
