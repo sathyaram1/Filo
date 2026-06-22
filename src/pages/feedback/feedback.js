@@ -419,6 +419,24 @@
         <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="new">← Ricevuti</button>
       `;
     }
+    if (tab === 'review') {
+      // Fix pronto su un branch, in attesa di verifica avversariale. L'utente
+      // può promuoverlo (✓ Risolto), rimandarlo a "Da risolvere" o bloccarlo.
+      return `
+        <button class="sn-btn fb-act" data-id="${escapeHtml(f._id)}" data-to="done">✓ Risolto</button>
+        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="todo">→ Da risolvere</button>
+        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="blocked">⛔ Blocca</button>
+      `;
+    }
+    if (tab === 'blocked') {
+      // In pausa (3 loop falliti o file sensibile nel cancello di merge): decide
+      // l'utente. Può rimetterlo in coda, marcarlo risolto a mano o ignorarlo.
+      return `
+        <button class="sn-btn fb-act" data-id="${escapeHtml(f._id)}" data-to="todo">→ Da risolvere</button>
+        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="done">✓ Risolto</button>
+        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="ignored">Ignora</button>
+      `;
+    }
     if (tab === 'done') {
       return `
         <button class="sn-btn fb-act" data-id="${escapeHtml(f._id)}" data-to="verified">✓ Verificato</button>
