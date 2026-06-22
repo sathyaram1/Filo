@@ -313,9 +313,12 @@ qualcosa di rotto — Filo **invia un feedback in autonomia**, senza azione uten
   ripetuta (più utenti la chiedono → più priorità). Può essere lo stesso
   componente che decide la priorità. **Dedup sicuro**: per gli auto-feedback usa
   il `capability-gap id` (dati strutturati, immune a injection); per il testo
-  libero degli utenti, similarità/LLM **trattando il testo come non-fidato** (lo
-  step legge tutta la coda → è un bersaglio d'injection, contraddice
-  l'isolamento "un feedback per agente": non eseguire istruzioni dal testo).
+  libero degli utenti, similarità/LLM **trattando il testo come non-fidato** (non
+  eseguire istruzioni dal testo). **Rischio injection: basso** (deciso utente
+  2026-06-22): pur leggendo tutta la coda, il peggio che questo step può fare è
+  cambiare una priorità o accorpare un feedback — irrilevante rispetto a un
+  attacco vero; inoltre L1/L2 girano PRIMA. Quindi cautela sì, ma non è un
+  bloccante.
   **Done**: spec che invia 2 feedback equivalenti → asserisce 1 solo originale
   con priorità alzata e il secondo allegato. (stima: M)
 
