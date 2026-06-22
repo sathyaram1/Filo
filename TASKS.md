@@ -116,12 +116,27 @@ su main + `done`; FAIL: correggi e ri-verifica (max 3 loop) → dopo 3 fail
   fondono automaticamente su `main`**. La fusione avviene solo via un nuovo
   `scripts/merge-gate.mjs <branch>` (rebase su main + merge + push, con
   retry/rebase per push concorrenti dei 2 account) invocato dall'orchestratore
-  al PASS. ⚠️ Le sessioni/branch NON-routine (lavoro locale dell'utente) devono
-  restare **invariate**: l'auto-merge attuale continua per loro. **Done**: test
-  che (1) una edit su un branch `worker/*` non arriva in `main`, (2)
-  `merge-gate.mjs` lo porta in `main`, (3) una edit su un branch normale viene
-  ancora auto-mergiata. Verifica con un repo di prova o asserzioni su git in uno
-  spec. NON rompere l'auto-push esistente. (stima: L)
+  al PASS. Il merge-gate è anche dove girano i controlli L4/L5 (R6): se L5
+  blocca, NON fondere → `blocked`. ⚠️ Le sessioni/branch NON-routine (lavoro
+  locale dell'utente) devono restare **invariate**: l'auto-merge attuale continua
+  per loro. **Done**: test che (1) una edit su un branch `worker/*` non arriva in
+  `main`, (2) `merge-gate.mjs` lo porta in `main`, (3) una edit su un branch
+  normale viene ancora auto-mergiata. Verifica con un repo di prova o asserzioni
+  su git in uno spec. NON rompere l'auto-push esistente. (stima: L)
+
+- [ ] **R6 — Controlli sicurezza L4/L5 nel cancello di merge** (dipende da R2) —
+  Integra nel `merge-gate.mjs`, prima di ogni fusione su `main`: **L5**
+  (deterministico) = se il diff tocca file sensibili (lista da definire allineata
+  al DESIGN filo-security: `firestore.rules`, `.claude/hooks/*`, script di
+  deploy/triage, chiavi/config, auth…) → NON fondere, feedback in `blocked` con
+  nota "attende revisione umana". **L4** (LLM) = un sotto-agente che vede SOLO il
+  diff (cieco al prompt/feedback → un'injection nel feedback non può
+  convincerlo) e lo giudica per problemi di sicurezza; verdetto FAIL → `blocked`.
+  Entrambi **per-pezzo** (ogni branch). In più: `#N.final` esegue un **L4
+  d'integrazione** sul diff cumulato della feature. **Done**: test che (1) un
+  diff su un file sensibile va in `blocked` e non in main, (2) un diff pulito
+  passa, (3) il revisore L4 non riceve il testo del feedback. Allineare al DESIGN
+  di filo-security ([[auto-improvement-loop]]). (stima: M)
 
 - [ ] **R3 — Recipe orchestratore + worker nel CLAUDE.md** — Riscrivi la sezione
   "Routine cloud" + "un sub-agente per feedback" con il nuovo flusso:
