@@ -35,10 +35,13 @@ const ROOT = resolve(__dirname, '..');
 const SPOOL_DIR = process.env.FILO_SPOOL_DIR
   ? resolve(process.env.FILO_SPOOL_DIR)
   : resolve(ROOT, 'feedback-triage');
-const ALLOWED = ['todo', 'done', 'clarify'];
+// `review` = fix pronto su un branch, in attesa di verifica avversariale;
+// `blocked` = fix in pausa (3 loop falliti o file sensibile nel cancello di
+// merge), decide l'utente. Entrambi accompagnati dal campo `branch`.
+const ALLOWED = ['todo', 'done', 'clarify', 'review', 'blocked'];
 
 // Scrive il file di spool (nessun effetto git). Ritorna il path assoluto.
-export function queueTriage(id, status, notes, queuedBy) {
+export function queueTriage(id, status, notes, queuedBy, branch) {
   if (!id) throw new Error('id mancante');
   if (!ALLOWED.includes(status)) {
     throw new Error(`status non valido: "${status}" (ammessi: ${ALLOWED.join(', ')})`);
@@ -47,6 +50,7 @@ export function queueTriage(id, status, notes, queuedBy) {
   if (!/^[A-Za-z0-9_-]+$/.test(id)) {
     throw new Error(`id con caratteri non ammessi in un filename: "${id}"`);
   }
+  const branchStr = typeof branch === 'string' ? branch.trim().slice(0, 200) : '';
   mkdirSync(SPOOL_DIR, { recursive: true });
   const entry = {
     id,
@@ -55,6 +59,7 @@ export function queueTriage(id, status, notes, queuedBy) {
     queuedAt: new Date().toISOString(),
     queuedBy: queuedBy || process.env.FILO_ROUTINE_SLUG || 'routine',
   };
+  if (branchStr) entry.branch = branchStr;
   const file = resolve(SPOOL_DIR, `${id}.json`);
   writeFileSync(file, JSON.stringify(entry, null, 2) + '\n', 'utf8');
   return file;
