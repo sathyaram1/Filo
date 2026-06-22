@@ -1,0 +1,13 @@
+{
+  "op": "create",
+  "uid": "7ea47c73-c289-4d0c-902c-d7339468db6c",
+  "text": "Apri Preferenze. Nel campo 'Archivia dopo questo periodo di inattività (ore)' scrivi un numero più grande del massimo, per esempio 999, e sposta il focus (Tab o clic altrove). Il campo continua a mostrare 999, ma Filo in realtà salva 168 (il massimo): le schede verranno archiviate molto prima di quanto il numero mostrato lasci credere, senza nessun avviso. Stesso problema nel campo 'Durata' delle notifiche: se scrivi un valore negativo (es. -5) il campo resta su -5 ma viene salvato 5. L'utente crede di aver impostato un valore che non è quello effettivamente in uso; solo riaprendo la pagina più tardi scopre il valore corretto. Atteso: appena lasci il campo, dovrebbe mostrare il valore realmente salvato (clampato all'intervallo) invece di tenere il numero fuori scala digitato.\n\nPARTE TECNICA: src/pages/preferences/preferences.js. persist() (campi autoArchiveIdleHours e notifDuration) clampa il valore con Math.min/Math.max e lo persiste, ma non riscrive il valore clampato nell'input. Simmetria mancante: i campi numerici del 'colore identità delle tab' (buildTabColorSection) hanno un handler di blur che richiama renderTabColorRow(key) e riallineano l'input al valore clampato; idleHours e notifDuration non hanno l'equivalente. Fix: aggiungere un blur/change che riscriva nel campo il valore effettivamente salvato (clamp di 1..168 per idleHours, 0..120 per notifDuration).",
+  "name": "Preferenze: valori fuori scala accettati senza correzione visibile",
+  "parentId": "",
+  "status": "new",
+  "priority": 1,
+  "notes": "",
+  "images": [],
+  "queuedAt": "2026-06-22T07:42:14.109Z",
+  "queuedBy": "routine"
+}
