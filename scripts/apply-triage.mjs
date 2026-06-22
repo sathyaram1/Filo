@@ -58,7 +58,7 @@ const SPOOL_DIR = process.env.FILO_SPOOL_DIR
   : resolve(ROOT, 'feedback-triage');
 const CLAIMS_DIR = resolve(SPOOL_DIR, 'claims');
 
-const ALLOWED = ['todo', 'done', 'clarify'];
+const ALLOWED = ['todo', 'done', 'clarify', 'review', 'blocked'];
 const DRY = process.argv.includes('--dry-run');
 const MAIN_BRANCH = process.env.FILO_MAIN_BRANCH || 'main';
 
