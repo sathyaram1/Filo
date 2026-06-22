@@ -1310,8 +1310,8 @@
   function textStats() {
     const text = (docPlainText() || '').replace(/ /g, ' ').trim();
     const words = text ? text.split(/\s+/).filter(Boolean).length : 0;
-    const chars = (docEl.textContent || '').length;
-    const sentences = text ? (text.match(/[.!?]+(\s|$)/g) || []).length || (text ? 1 : 0) : 0;
+    const chars = text.length;
+    const sentences = text ? (text.match(/[.!?]+(\s|$)/g) || []).length || 1 : 0;
     const paragraphs = docEl.querySelectorAll('p, h1, h2, h3, li, blockquote').length;
     const readingMin = Math.max(1, Math.round(words / 200));
     return { words, chars, sentences, paragraphs, readingMin };
