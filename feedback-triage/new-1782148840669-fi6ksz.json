@@ -1,0 +1,15 @@
+{
+  "op": "create",
+  "uid": "2f03789d-a56c-4a75-b1fa-d6c35386ba65",
+  "text": "Nella pagina Sicurezza c'è il pulsante \"Esporta dati (.zip)\" e la sua descrizione promette esplicitamente che è \"Utile come backup o per trasferire i dati su un altro computer\". Però in Filo non esiste alcun modo per re-importare quel file: non si può ripristinare un backup, e la promessa di trasferire i dati su un altro computer è irrealizzabile (sull'altro computer non c'è dove caricare lo .zip). Per riprodurre: apri Sicurezza (menu o filo://security/security.html), scorri in fondo alla pagina: c'è \"Esporta dati (.zip)\" ma nessun pulsante \"Importa\"/\"Ripristina\"/\"Carica\".\n\nPARTE TECNICA: esiste l'handler EXPORT_DATA (src/main/services/handlers/storage.js, che usa buildExportZip in src/main/services/exportData.js) e il bottone #sec-export-btn in src/pages/security/security.html, ma non c'è alcun messaggio IMPORT_DATA, nessuna funzione di lettura dello zip (readExportZip/fromZip) e nessun controllo UI di import in tutta l'app (verificato: 0 input[type=file], 0 pulsanti Importa/Carica/Ripristina nella pagina Sicurezza). Invariante UX \"se puoi esportare, devi poter importare\" rotta. Servirebbe un handler che legge data.json + le immagini dallo zip e le riscrive nello storage (con conferma/merge), più un bottone \"Importa dati\" accanto a Esporta. Spec di audit aggiunto: tests/audit-export-no-import.spec.mjs.",
+  "name": "Sicurezza: dati esportabili ma non reimportabili",
+  "parentId": "",
+  "status": "new",
+  "priority": 1,
+  "notes": "",
+  "images": [
+    "https://firebasestorage.googleapis.com/v0/b/filo-8b9cb.firebasestorage.app/o/feedback%2F1782148839985_23f346bc-b21a-4eb1-ba18-8258200c6b54.png?alt=media&token=f6f34c02-9c78-4578-8f64-b2c3cfe64575"
+  ],
+  "queuedAt": "2026-06-22T17:20:40.668Z",
+  "queuedBy": "routine"
+}
