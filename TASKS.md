@@ -208,6 +208,32 @@ su main + `done`; FAIL: correggi e ri-verifica (max 3 loop) → dopo 3 fail
   che `git push origin main` sia autenticato nella sandbox di entrambi gli
   account. Dipende da R1-R4 fatti. (utente)
 
+### Sicurezza: lettura feedback non più pubblica (spec 2026-06-22)
+
+- [ ] **S1 — Lockdown lettura feedback + canale di lettura per le routine**
+  (GATE del go-live routine) — Oggi `firestore.rules` ha `match /feedback`
+  `allow read: if true`: chiunque (con la API key non-segreta del client) legge
+  l'intero documento, **`status` incluso**. Con il nuovo sistema il feedback è
+  una superficie d'attacco (injection nel testo) e `blocked` è il segnale "il tuo
+  attacco è stato beccato" → lettura pubblica = **hill-climbing regalato**
+  all'attaccante. Va chiuso. **Problema duro da risolvere INSIEME**: le routine
+  oggi leggono i feedback *grazie* alla lettura pubblica e **non hanno auth
+  sicura** (l'account robot è bloccato, niente secret store) — e il repo
+  principale è **pubblico**, quindi non può ospitare i feedback. Le rules
+  Firestore controllano la lettura **per-documento, non per-campo** (non puoi
+  rendere pubblico `text` e privato `status`). Candidato principale (da
+  progettare, NON risolto): **mirror privato scritto dalla GitHub Action**
+  (service account legge Firestore bypassando le rules → esporta la coda
+  *sanitizzata* in un repo **privato** es. `filo-security`; le routine leggono da
+  lì). Da verificare: le sandbox routine hanno accesso in lettura a un repo
+  privato diverso da quello in cui girano? **Prima di toccare le rules**:
+  controllare il DESIGN di filo-security ([[auto-improvement-loop]]) — la lettura
+  pubblica + "pagina pubblica dei feedback" potrebbe essere una scelta
+  documentata lì, da ribaltare consapevolmente. **Done**: lettura feedback non
+  più pubblica (rules) E le routine leggono ancora la coda di lavoro;
+  `status`/`blocked` non osservabili da non-admin. Questo task **fa da gate**: se
+  si chiude la lettura senza il canale nuovo, le routine si rompono. (stima: L)
+
 ### Manifest capacità di Filo + feedback autonomo (spec 2026-06-22)
 
 Spec utente (chat 2026-06-22). Due feature collegate: F4 dipende da F1/F2.
