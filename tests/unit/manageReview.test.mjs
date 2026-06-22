@@ -111,7 +111,7 @@ test('sortReview: a parità di severità, più recenti prima', () => {
   assert.equal(out[2]._id, 'old');
 });
 
-test('sortReview: non muta l'array originale', () => {
+test('sortReview: non muta l\'array originale', () => {
   const input = [
     fb('a', { action: 'block_attack' }, '2026-01-02'),
     fb('s', { action: 'block_spam' },   '2026-01-01'),
