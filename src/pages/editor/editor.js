@@ -1858,7 +1858,7 @@
       const thinking = { role: 'assistant', content: '…' };
       m.data.messages.push(thinking);
       renderLog();
-      const docText = (docEl.textContent || '').slice(0, 6000);
+      const docText = docPlainText().slice(0, 6000);
       const messages = [
         { role: 'system', content: CHAT_FORMAT_INSTRUCTIONS + docText },
         ...m.data.messages.filter((x) => x !== thinking).map((x) => ({ role: x.role, content: x.content })),
