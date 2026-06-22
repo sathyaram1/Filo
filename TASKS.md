@@ -161,10 +161,15 @@ su main + `done`; FAIL: correggi e ri-verifica (max 3 loop) → dopo 3 fail
   cost-check da R4); worker unificato review-or-resolve; isolamento
   (orchestratore solo metadati, worker solo corpo, report come dati); macchina a
   stati `todo→review→done/blocked` con max 3 loop e merge-gate (R2). Aggiungi al
-  worker la regola **`#N.final`**: chiudendo un sub-feedback, se TUTTI i fratelli
-  dello stesso padre sono `done`, auto-genera `#N.final` (verifica integrazione
-  dell'intera feature vs spec originale, in modalità review) via
-  `queue-feedback.mjs --parent`. **Claim — già risolto, NON è un rischio**:
+  worker le regole **Modello B** per le feature spezzate: i pezzi `#N.M` si
+  lavorano **in sequenza** su branch basati su `feature/N`, si fondono su
+  `feature/N` (non su main), e finché la feature è in volo resta **priorità
+  massima** (così la flotta non prende altro sorgente e main non diverge).
+  Regola **`#N.final`**: chiudendo l'ultimo `#N.M` (tutti i fratelli `done`),
+  auto-genera `#N.final` (verifica integrazione dell'intera `feature/N` vs spec
+  originale, modalità review) via `queue-feedback.mjs --parent`; a PASS,
+  `merge-gate.mjs` fonde `feature/N`→main (unico cancello verso gli utenti).
+  **Claim — già risolto, NON è un rischio**:
   verificato in [claim-feedback.mjs](scripts/claim-feedback.mjs) che il lock NON
   vive su Firestore (l'account robot Google è bloccato) ma come file git
   `feedback-triage/claims/<id>.json` pushato ff-only su `origin/main`, visibile
