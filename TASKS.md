@@ -198,7 +198,10 @@ su main + `done`; FAIL: correggi e ri-verifica (max 3 loop) → dopo 3 fail
   429** osservato (placeholder finché non c'è il dato). Rete di sicurezza:
   intercetta il 429 → checkpoint stato + rilascio claim. **Done**: comando
   ccusage documentato + funzionante in cloud; regola scritta nel CLAUDE.md
-  (insieme a R3). (stima: M)
+  (insieme a R3). **NB**: la domanda "ccusage gira in cloud?" è già stata
+  accodata come feedback diagnostico (2026-06-22, priorità 2, "Diagnostica:
+  ccusage gira nella sandbox cloud?") — una routine lo testa e risponde in
+  `clarify`. Aspettare quella risposta prima di implementare R4. (stima: M)
 
 - [ ] **R5 — (UTENTE, su claude.ai) Scheduling 2 account sfasati** — NON è codice,
   lo fa l'utente nell'UI delle routine. Crea/aggiorna la routine su **entrambi**
