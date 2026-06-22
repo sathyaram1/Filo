@@ -114,6 +114,14 @@
     return `<span class="fb-claim" title="${escapeHtml(title)}">🔧 in lavorazione</span>`;
   }
 
+  // Badge col branch git su cui vive il fix in attesa di verifica (stati
+  // `review`/`blocked` del cancello di merge delle routine). Vuoto se assente.
+  function branchBadgeHtml(f) {
+    const b = String(f.branch || '').trim();
+    if (!b) return '';
+    return `<span class="fb-branch" title="Branch del fix: ${escapeHtml(b)}">⎇ ${escapeHtml(b)}</span>`;
+  }
+
   function statusOf(f) {
     const s = f.status || 'new';
     if (s === 'ignored') return 'ignored';
