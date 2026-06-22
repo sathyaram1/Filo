@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.69', date: '2026-06-22',
+      features: [
+        'Nella dashboard di gestione c’è ora un interruttore "Modalità automatica" sempre in vista, per attivare o disattivare al volo l’operatività automatica di Filo.',
+      ],
+      fixes: [],
+    },
+    {
       version: '0.2.68', date: '2026-06-22',
       features: [
         'Nuova dashboard di gestione: puoi vedere in un colpo d’occhio i feedback bloccati dal sistema di sicurezza, con i dettagli dei giudici e il parere di Filo.',
