@@ -653,6 +653,7 @@
             ${!agent && cid ? `<span>client: ${escapeHtml(cid)}</span>` : ''}
             ${!agent && ua ? `<span title="${escapeHtml(ua)}">UA</span>` : ''}
             ${claimBadgeHtml(f)}
+            ${branchBadgeHtml(f)}
             ${priorityDotsHtml(f)}
           </div>
           ${agentHtml}${titleHtml}
