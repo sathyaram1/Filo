@@ -112,7 +112,8 @@ Macchina a stati feedback: `todo` → (worker risolve sul branch) → `review`
 su main + `done`; FAIL: correggi e ri-verifica (max 3 loop) → dopo 3 fail
 `blocked`. Ordine = dipendenze. Numerare R1..R5.
 
-- [ ] **R1 — Nuovi stati feedback (`review`, `blocked`) + campo `branch`** —
+- [~] **R1 — Nuovi stati feedback (`review`, `blocked`) + campo `branch`** —
+  _(in lavorazione: routine affectionate-faraday-ckt1iw, 2026-06-22T22:06Z)_
   Aggiungi i due stati al modello feedback in tutti i punti che li enumerano:
   (a) `firestore.rules` ramo admin update riga ~143 (enum `status` → aggiungi
   `'review'`, `'blocked'`) e `affectedKeys().hasOnly([...])` (aggiungi `'branch'`
