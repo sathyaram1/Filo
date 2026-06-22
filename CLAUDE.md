@@ -448,8 +448,29 @@ operative vivono qui — quando ricevi quel prompt in ambiente cloud:
    diretta su Firestore: l'account robot è bloccato. Insisti con approcci
    diversi prima di ripiegare su `clarify` (vedi "Insistere prima di
    mollare").
-6. **Se non ci sono feedback `todo`, NON terminare: fai una passata proattiva
-   di audit.** Invece di restare ferma, la routine cerca problemi che nessuno
+6. **Se non ci sono feedback `todo`, NON terminare.** In ordine di priorità:
+
+   **6a — Prima: implementa i task aperti di `TASKS.md`.** È così che i piani
+   (R/S/F e gli altri task) vengono costruiti. Prendi il **primo task aperto
+   dall'alto** (`[ ]`, oppure un `[~]` lasciato a metà da una routine morta —
+   riprendilo leggendo le note su dove si era arrivati) e **rispetta
+   dipendenze/gate** scritti nel task ("dipende da…", "GATE", "aspetta la
+   risposta del feedback…"). **Claim via git** (come per i feedback): prima di
+   lavorare marca il task `[~]` col tuo slug + timestamp e fai commit+push
+   **subito**; se al rebase risulta già `[~]` di un'altra routine, **passa al
+   prossimo**. Così due account non lavorano lo stesso task. **Un task per
+   volta**, in sequenza (hanno dipendenze). Verifica con la **REGOLA DURA** (in
+   cloud: `npm test` + spec mirato per la feature), poi marca `[x]` con una riga
+   di esito; se resta a metà lascia `[~]` + "dove sono arrivato / prossimo passo".
+   ⚠️ **Cautela sui task che modificano l'infrastruttura delle routine stesse**
+   (l'hook di auto-commit in R2, le regole del CLAUDE.md in R3, il canale di
+   lettura in S1): stai modificando il sistema su cui stai girando — dopo,
+   **verifica che commit/push funzionino ancora** e, se rompi l'auto-push,
+   segnalalo subito invece di lasciare il sistema rotto. Quando non resta nessun
+   task aperto in `TASKS.md` → passa a 6b.
+
+   **6b — Se anche `TASKS.md` è senza task aperti: fai una passata proattiva di
+   audit.** Invece di restare ferma, la routine cerca problemi che nessuno
    ha ancora segnalato. Scegli **uno o più angoli** (non serve coprirli tutti:
    meglio andare in profondità su pochi che sfiorarli tutti):
 
