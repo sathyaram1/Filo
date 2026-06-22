@@ -112,8 +112,17 @@ Macchina a stati feedback: `todo` → (worker risolve sul branch) → `review`
 su main + `done`; FAIL: correggi e ri-verifica (max 3 loop) → dopo 3 fail
 `blocked`. Ordine = dipendenze. Numerare R1..R5.
 
-- [~] **R1 — Nuovi stati feedback (`review`, `blocked`) + campo `branch`** —
-  _(in lavorazione: routine affectionate-faraday-ckt1iw, 2026-06-22T22:06Z)_
+- [x] **R1 — Nuovi stati feedback (`review`, `blocked`) + campo `branch`** —
+  _(fatto: routine affectionate-faraday-ckt1iw, 2026-06-22. Aggiunti `review`/`blocked`
+  all'enum admin di `firestore.rules` + campo `branch` (string, <=200) in
+  `affectedKeys().hasOnly`; ramo `isRoutine` lasciato invariato — lo decide R3, e
+  comunque le routine ora scrivono via Action service-account che bypassa le rules.
+  Dashboard: due tab "In revisione" + "Bloccati" con conteggio e badge `⎇ branch`
+  sulle card. Script `queue-triage.mjs` (nuovi status + opzione `--branch`) e
+  `apply-triage.mjs` (status + patch del campo `branch`). Spec
+  `tests/feedback-review-blocked-tabs.spec.mjs` verde + suite completa (484 passed,
+  2 flaky proxy non correlati). **MANCA AZIONE OWNER**: `firebase deploy --only
+  firestore:rules` perché i nuovi stati/campo siano accettati lato server.)_
   Aggiungi i due stati al modello feedback in tutti i punti che li enumerano:
   (a) `firestore.rules` ramo admin update riga ~143 (enum `status` → aggiungi
   `'review'`, `'blocked'`) e `affectedKeys().hasOnly([...])` (aggiungi `'branch'`
