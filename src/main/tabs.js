@@ -70,6 +70,7 @@ const TAB_ROW_HEIGHT = 40;
 const NATIVE_MENU_PAGES = [
   'filo://options/', 'filo://preferences/', 'filo://security/', 'filo://history/',
   'filo://feedback/', 'filo://spellcheck/', 'filo://editor/', 'filo://admin-defaults/',
+  'filo://manage/',
 ];
 
 // Colore di selezione del testo coerente con la palette Filo, da iniettare sui
