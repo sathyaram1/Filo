@@ -36,6 +36,28 @@ test('conteggio parole si aggiorna in tempo reale', async ({ openTab }) => {
   await expect(page.locator('.ed-module[data-type="word-count"] .wc-num')).toHaveText('4');
 });
 
+test('conteggio parole non fonde parole a cavallo dei blocchi', async ({ openTab }) => {
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('.ed-module[data-type="word-count"] .wc-num');
+  await page.click('#doc');
+  // Documento su più paragrafi: 6 parole reali. Prima del fix textContent
+  // concatenava i blocchi ("worldFoo", "barapple"…) e contava solo 3.
+  await page.evaluate(() => {
+    const doc = document.getElementById('doc');
+    doc.innerHTML = '<p>Hello world</p><p>Foo bar</p><p>apple</p><p>banana</p>';
+    doc.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await expect(page.locator('.ed-module[data-type="word-count"] .wc-num')).toHaveText('6');
+
+  // Anche con elenchi puntati e <br> le parole non si fondono.
+  await page.evaluate(() => {
+    const doc = document.getElementById('doc');
+    doc.innerHTML = '<ul><li>primo punto</li><li>secondo punto</li></ul><p>uno<br>due</p>';
+    doc.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await expect(page.locator('.ed-module[data-type="word-count"] .wc-num')).toHaveText('6');
+});
+
 test('cambio pagina via switch mostra moduli della pagina 1', async ({ openTab }) => {
   const page = await openTab('filo://editor/editor.html');
   await page.waitForSelector('.ed-module[data-type="switch"]');
