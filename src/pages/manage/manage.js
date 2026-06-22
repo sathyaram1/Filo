@@ -72,6 +72,41 @@
     sendToMain({ type: 'auth_signin' }).catch(() => {});
   });
 
+  // ── Switch "Modalità automatica" ──────────────────────────────────────────
+  // Stato persistito in chrome.storage.local; lo switch è sempre visibile ma
+  // modificabile solo dall'owner (read-only per gli altri, come il resto della
+  // pagina).
+  function reflectAutoMode(on) {
+    mgAutoToggle.checked = !!on;
+    mgAutoState.textContent = on ? 'On' : 'Off';
+  }
+
+  async function loadAutoMode() {
+    try {
+      const data = await chrome.storage.local.get(AUTO_MODE_KEY);
+      reflectAutoMode(!!data[AUTO_MODE_KEY]);
+    } catch (_) {
+      reflectAutoMode(false);
+    }
+  }
+
+  mgAutoToggle.addEventListener('change', async () => {
+    const on = mgAutoToggle.checked;
+    reflectAutoMode(on);
+    try {
+      await chrome.storage.local.set({ [AUTO_MODE_KEY]: on });
+    } catch (err) {
+      // Ripristina lo stato precedente se il salvataggio fallisce.
+      reflectAutoMode(!on);
+      console.error('[manage] salvataggio modalità automatica fallito:', err);
+    }
+  });
+
+  function applyAutoModeGate() {
+    mgAutoToggle.disabled = !isAdmin;
+    mgAutoSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
+  }
+
   // ── Tab bar ───────────────────────────────────────────────────────────────
   mgTabs.addEventListener('click', (e) => {
     const btn = e.target.closest('.mg-tab');
