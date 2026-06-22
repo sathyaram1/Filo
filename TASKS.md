@@ -149,11 +149,14 @@ su main + `done`; FAIL: correggi e ri-verifica (max 3 loop) → dopo 3 fail
   nota "attende revisione umana". **L4** (LLM) = un sotto-agente che vede SOLO il
   diff (cieco al prompt/feedback → un'injection nel feedback non può
   convincerlo) e lo giudica per problemi di sicurezza; verdetto FAIL → `blocked`.
-  Entrambi **per-pezzo** (ogni branch). In più: `#N.final` esegue un **L4
-  d'integrazione** sul diff cumulato della feature. **Done**: test che (1) un
-  diff su un file sensibile va in `blocked` e non in main, (2) un diff pulito
-  passa, (3) il revisore L4 non riceve il testo del feedback. Allineare al DESIGN
-  di filo-security ([[auto-improvement-loop]]). (stima: M)
+  Entrambi **per-pezzo** (al merge di ogni `#N.M` dentro `feature/N`: tengono il
+  branch pulito). **Cancello critico = `feature/N`→main** (è ciò che l'auto-update
+  spedisce agli utenti): lì gira L5 completo + un **L4 d'integrazione** sul diff
+  cumulato dell'intera feature, che cattura il pezzo malevolo solo in
+  combinazione. **Done**: test che (1) un diff su un file sensibile va in
+  `blocked` e non in main, (2) un diff pulito passa, (3) il revisore L4 non
+  riceve il testo del feedback. Allineare al DESIGN di filo-security
+  ([[auto-improvement-loop]]). (stima: M)
 
 - [ ] **R3 — Recipe orchestratore + worker nel CLAUDE.md** — Riscrivi la sezione
   "Routine cloud" + "un sub-agente per feedback" con il nuovo flusso:
