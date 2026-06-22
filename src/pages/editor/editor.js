@@ -1307,6 +1307,31 @@
   }
 
   // ── Modulo: conteggio parole ───────────────────────────────────────────
+  // Estrae il testo del documento inserendo un separatore ai confini di blocco.
+  // docEl.textContent concatena i blocchi (p/div/li/h…) SENZA separatore, così
+  // l'ultima parola di un blocco e la prima del successivo si fondono (es.
+  // "Hello world" + "Foo bar" → "Hello worldFoo bar") e parole/caratteri/frasi
+  // risultano sottostimati su più righe. Ricostruiamo il testo a mano — niente
+  // dipendenza dal layout come innerText — aggiungendo "\n" dopo ogni blocco e
+  // per ogni <br>.
+  function docPlainText() {
+    const BLOCK = /^(P|DIV|LI|H[1-6]|BLOCKQUOTE|PRE|UL|OL|SECTION|ARTICLE|FIGURE|FIGCAPTION|TABLE|TR|HR)$/;
+    let out = '';
+    const walk = (node) => {
+      for (const child of node.childNodes) {
+        if (child.nodeType === 3) {
+          out += child.nodeValue;
+        } else if (child.nodeType === 1) {
+          if (child.tagName === 'BR') { out += '\n'; continue; }
+          const block = BLOCK.test(child.tagName);
+          walk(child);
+          if (block && !out.endsWith('\n')) out += '\n';
+        }
+      }
+    };
+    walk(docEl);
+    return out;
+  }
   function textStats() {
     const text = (docPlainText() || '').replace(/ /g, ' ').trim();
     const words = text ? text.split(/\s+/).filter(Boolean).length : 0;
