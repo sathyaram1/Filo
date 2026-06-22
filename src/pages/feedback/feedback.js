@@ -126,6 +126,11 @@
     if (s === 'new') return 'inbox';
     if (s === 'draft') return 'draft';
     if (s === 'todo') return 'todo';
+    // Cancello di merge delle routine: `review` = fix pronto su un branch in
+    // attesa di verifica avversariale; `blocked` = in pausa (3 loop falliti o
+    // file sensibile), decide l'utente. Entrambi mostrano il branch.
+    if (s === 'review') return 'review';
+    if (s === 'blocked') return 'blocked';
     if (s === 'clarify') return 'clarify';
     return 'inbox';
   }
