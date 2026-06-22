@@ -11,6 +11,11 @@
   const mgBanner     = document.getElementById('mgBanner');
   const mgSignInBtn  = document.getElementById('mgSignIn');
 
+  // Switch "Modalità automatica" (sempre visibile, owner-only)
+  const mgAutoSwitch = document.getElementById('mgAutoSwitch');
+  const mgAutoToggle = document.getElementById('mgAutoToggle');
+  const mgAutoState  = document.getElementById('mgAutoState');
+
   // Revisione — lista
   const mgListLoading = document.getElementById('mgListLoading');
   const mgList        = document.getElementById('mgList');
