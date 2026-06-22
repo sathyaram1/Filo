@@ -1308,7 +1308,7 @@
 
   // ── Modulo: conteggio parole ───────────────────────────────────────────
   function textStats() {
-    const text = (docEl.textContent || '').replace(/ /g, ' ').trim();
+    const text = (docPlainText() || '').replace(/ /g, ' ').trim();
     const words = text ? text.split(/\s+/).filter(Boolean).length : 0;
     const chars = (docEl.textContent || '').length;
     const sentences = text ? (text.match(/[.!?]+(\s|$)/g) || []).length || (text ? 1 : 0) : 0;
