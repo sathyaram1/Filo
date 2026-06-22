@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.68', date: '2026-06-22',
+      features: [],
+      fixes: [
+        'Nell’editor il conteggio di parole e caratteri ora è corretto anche quando il testo va a capo o è su più paragrafi o elenchi: prima le parole a cavallo di un a-capo venivano fuse e contate come una sola.',
+      ],
+    },
+    {
       version: '0.2.66', date: '2026-06-21',
       features: [
         'Nuova sezione Red-team: metti alla prova i giudici di sicurezza di Filo. La apri dall’icona in alto a destra nella home e invii i tuoi attacchi dal menu del tasto destro.',
