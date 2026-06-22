@@ -95,13 +95,18 @@ const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.m
 if (isMain) {
   const args = process.argv.slice(2);
   const noGit = args.includes('--no-git');
-  const [id, status, ...noteParts] = args.filter((a) => a !== '--no-git');
+  // --branch <nome>: estrai il valore e rimuovi entrambi i token dagli args.
+  let branch = '';
+  const bi = args.indexOf('--branch');
+  if (bi !== -1) branch = args[bi + 1] || '';
+  const positional = args.filter((a, i) => a !== '--no-git' && a !== '--branch' && !(bi !== -1 && i === bi + 1));
+  const [id, status, ...noteParts] = positional;
   if (!id || !status) {
-    console.error('Uso: node scripts/queue-triage.mjs <id> <status:todo|done|clarify> "testo note" [--no-git]');
+    console.error('Uso: node scripts/queue-triage.mjs <id> <status:todo|done|clarify|review|blocked> "testo note" [--branch <nome>] [--no-git]');
     process.exit(1);
   }
   try {
-    const file = queueTriage(id, status, noteParts.length ? noteParts.join(' ') : '');
+    const file = queueTriage(id, status, noteParts.length ? noteParts.join(' ') : '', undefined, branch);
     console.log(`OK: triage accodato → ${file}`);
     if (noGit) console.log('   (--no-git: file scritto ma non committato)');
     else commitAndPush(file);
