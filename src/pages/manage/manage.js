@@ -48,6 +48,7 @@
 
   const FB  = window.SN_FEEDBACK;
   const MR  = window.SN_MANAGE_REVIEW;
+  const AUTO_MODE_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTO_MODE) || 'filo_auto_mode';
 
   // ── Canale main process ───────────────────────────────────────────────────
   function sendToMain(msg) {
