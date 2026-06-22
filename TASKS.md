@@ -70,15 +70,27 @@ account** Filo. Decisioni di design confermate dall'utente:
 - **Massimizzare l'utilizzo**: soglia di costo ALTA (non conservativa). Il loop
   continua a prendere feedback e — quando finiscono — passa all'audit proattivo,
   finché la finestra 5h non è quasi piena. Su **2 account** sfasati (vedi R5).
-- **Feedback corposi → split + doppia verifica.** Lo splitting in sub-feedback
-  `#N.M` esiste già (`queue-feedback.mjs --parent`). Verifica a DUE livelli, non
-  ridondanti: (a) **per-pezzo** = automatico, ogni `#N.M` è un feedback normale e
-  passa dalla verifica avversariale (cattura la correttezza del singolo pezzo
-  quando è economico isolarlo); (b) **finale/integrazione** = alla chiusura
-  dell'ultimo `#N.M`, si auto-genera un `#N.final` (feedback in modalità review)
-  che verifica avversarialmente l'**intera feature contro la spec originale**
-  (buchi tra i pezzi, incoerenze, "la feature fa ciò che l'utente chiedeva?").
-  `#N.final` riusa la meccanica review esistente → nessuno stato nuovo.
+- **Feedback corposi → branch di feature, merge su main solo a feature finita
+  (Modello B).** Motivo decisivo: c'è l'**auto-update periodico**, quindi
+  `main` → TUTTI gli utenti. Una combinazione problematica/compromessa non deve
+  MAI toccare main → la feature spezzata vive su un branch `feature/N`; i pezzi
+  `#N.M` si fondono su `feature/N` (non su main), ognuno con la sua verifica
+  avversariale + L4/L5 (tengono `feature/N` pulito); il **merge verso main
+  avviene UNA volta sola** a `#N.final`, con L5 + **L4 d'integrazione cieco al
+  prompt** sull'intera feature assemblata. Così c'è un solo cancello verso main
+  per feature, che cattura anche il pezzo malevolo solo in combinazione (che in
+  un merge per-pezzo sarebbe già stato spedito agli utenti).
+  - **Niente conflitti, a una condizione**: appena parte una feature multipla le
+    si dà **priorità massima** e ce la si tiene finché non è finita → la flotta
+    lavora solo i suoi pezzi → nient'altro fonde *sorgente* su main → `feature/N`
+    non diverge → merge finale pulito. (I commit di bookkeeping su main —
+    coda triage/claim in `feedback-triage/` — toccano path disgiunti dal `src/`,
+    quindi non confliggono.) **Pezzi in sequenza**, non in parallelo sullo stesso
+    branch (naturale: spesso dipendono l'uno dall'altro).
+  - I feedback **standalone NON cambiano**: un singolo feedback = feature di
+    taglia 1, branch → cancello → main. Il branch di feature riguarda SOLO le
+    spezzate.
+  - Lo splitting in `#N.M` esiste già (`queue-feedback.mjs --parent`).
 - **Sicurezza auto-modifica L4+L5 nel cancello di merge (PER-PEZZO).** Protegge
   dal caso di una routine pilotata da un feedback con injection che committa
   codice cattivo. **L5** (blocco deterministico sui file sensibili) e **L4**
