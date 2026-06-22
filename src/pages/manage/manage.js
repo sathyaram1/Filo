@@ -412,6 +412,8 @@
   // ── Init ──────────────────────────────────────────────────────────────────
   async function init() {
     await refreshAuth();
+    applyAutoModeGate();
+    await loadAutoMode();
     await loadData();
   }
 
