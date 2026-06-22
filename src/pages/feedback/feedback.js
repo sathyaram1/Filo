@@ -486,6 +486,8 @@
         agent: 'Nessun ritrovamento automatico (agente esploratore o audit delle routine).',
         draft: 'Nessuna bozza in attesa di decisioni.',
         todo: 'Nessun feedback da risolvere.',
+        review: 'Nessun fix in revisione.',
+        blocked: 'Nessun feedback bloccato.',
         clarify: 'Nessun feedback in attesa di chiarimenti.',
         done: 'Nessun feedback risolto.',
         verified: 'Nessun feedback verificato.',
