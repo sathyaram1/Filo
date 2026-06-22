@@ -1,0 +1,13 @@
+{
+  "op": "create",
+  "uid": "aec7f2c5-b3e6-4d24-8f26-a1ea4581ffe4",
+  "text": "In una routine cloud (container Linux che gira come root) il comando di sanity-check rapido 'npm run test:smoke' fallisce SEMPRE: l'app non si avvia e dopo 20 secondi il test va in errore con \"sentinel non scritto entro 20000 ms\". Per riprodurlo: in un ambiente headless da utente root esegui 'npm run test:smoke' -> nello stderr compare 'Running as root without --no-sandbox is not supported' e il test fallisce. La suite completa 'npm test' (Playwright) invece funziona nello stesso ambiente, perche' avvia Electron con --no-sandbox in automatico. Conseguenza: lo smoke documentato come sanity-check per il cloud non e' utilizzabile da una routine che gira come root.\n\nPARTE TECNICA: tests/smoke.mjs avvia Electron direttamente con spawn(electronExe, ['.'], ...) senza passare --no-sandbox, e il main process non disabilita il sandbox di Chromium in modalita' test/FILO_SMOKE (nessun appendSwitch('no-sandbox')). Sotto root Chromium si rifiuta di partire (crbug.com/638180). Possibile fix: aggiungere '--no-sandbox' agli args dello spawn quando si gira come root o in CI (oppure sempre quando FILO_SMOKE/NODE_ENV=test e' settato), allineandosi a cio' che Playwright fa gia'. Verificato nello stesso ambiente: 'electron . --no-sandbox' sotto xvfb resta vivo e 'npx playwright test tests/boot.spec.mjs' passa 4/4.",
+  "name": "test:smoke non parte in cloud (root): manca --no-sandbox",
+  "parentId": "",
+  "status": "new",
+  "priority": 1,
+  "notes": "",
+  "images": [],
+  "queuedAt": "2026-06-22T04:58:22.993Z",
+  "queuedBy": "routine"
+}
