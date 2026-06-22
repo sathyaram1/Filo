@@ -35,6 +35,108 @@ contesto, per tempo, o perché l'utente chiude), la prossima riparte da qui.
 
 ## Coda
 
+### Sistema routine: verifica avversariale + cancello di merge + utilizzo budget (spec 2026-06-22)
+
+Spec utente (chat 2026-06-22). Obiettivo: rendere il ciclo delle routine cloud
+più sicuro e capace di **sfruttare tutto il budget 5h** disponibile su **2
+account** Filo. Decisioni di design confermate dall'utente:
+
+- **Verificare TUTTO, non selettivo.** Anche un CSS mediocre è un difetto in
+  un'app che vive di UX. Niente giudice "quale feedback verificare": si verifica
+  ogni correzione. Il verificatore è un sotto-agente sull'abbonamento → zero
+  costi API extra.
+- **Verifica indipendente e avversariale.** Chi verifica NON è chi ha corretto
+  (spawn separato, parte freddo, vede SOLO il sintomo utente del feedback —
+  mai il diff/ragionamento del risolutore). Mandato: riprodurre la lamentela e
+  romperla con input limite.
+- **Niente merge su `main` prima del PASS.** Durante tutto il ciclo
+  risolvi→verifica→correggi→verifica le modifiche restano sul branch; in `main`
+  solo dopo verifica passata. **Max 3 loop**, poi il feedback va in pausa in uno
+  **stato dedicato** (`blocked`) e decide l'utente.
+- **Orchestratore = LLM sottile** (Agent tool, non script). L'unica attivazione
+  della routine fa da orchestratore e spawna worker via Agent tool (i
+  sotto-agenti NON consumano attivazioni; le 5/giorno valgono solo per i trigger
+  di routine). L'orchestratore è **cieco**: loop "spawna worker finché il worker
+  dice «niente da fare» o il budget è quasi pieno", non legge i corpi dei
+  feedback, non sa quanti ce ne sono.
+- **Worker unificato** (review-or-resolve): all'avvio controlla se c'è un branch
+  da revisionare → se sì lo stressa avversarialmente; altrimenti claima un
+  feedback e lo risolve sul branch. Precedenza: prima smaltire le revisioni in
+  sospeso, poi prendere feedback nuovi.
+- **Isolamento anti prompt-injection**: orchestratore vede SOLO metadati
+  (id/numero/priority/titolo/status); il **corpo libero + screenshot** (input
+  non fidato) li riceve solo il worker isolato; il report del worker è trattato
+  come **dati**, non istruzioni.
+- **Massimizzare l'utilizzo**: soglia di costo ALTA (non conservativa). Il loop
+  continua a prendere feedback e — quando finiscono — passa all'audit proattivo,
+  finché la finestra 5h non è quasi piena. Su **2 account** sfasati (vedi R5).
+
+Macchina a stati feedback: `todo` → (worker risolve sul branch) → `review`
+(branch pronto, campo `branch` col nome) → verifica avversariale → PASS: merge
+su main + `done`; FAIL: correggi e ri-verifica (max 3 loop) → dopo 3 fail
+`blocked`. Ordine = dipendenze. Numerare R1..R5.
+
+- [ ] **R1 — Nuovi stati feedback (`review`, `blocked`) + campo `branch`** —
+  Aggiungi i due stati al modello feedback in tutti i punti che li enumerano:
+  (a) `firestore.rules` ramo admin update riga ~143 (enum `status` → aggiungi
+  `'review'`, `'blocked'`) e `affectedKeys().hasOnly([...])` (aggiungi `'branch'`
+  + validazione: string, <=200); valuta se anche il ramo `isRoutine` serve
+  ancora (le routine scrivono via Action service-account che bypassa le rules —
+  vedi R3). (b) dashboard feedback (`src/pages/feedback/feedback.js` +
+  `feedback.html`): due tab nuovi **"In revisione"** e **"Bloccati"**, con il
+  conteggio e il branch mostrato sui `blocked`/`review`. (c) script di coda
+  (`scripts/queue-triage.mjs`, `scripts/apply-triage.mjs`): accettare i nuovi
+  status + il campo `branch`. **Done**: spec Playwright che apre la dashboard e
+  asserisce i due tab + che un feedback in `review` mostri il branch; `node
+  --check` sugli script. **Azione manuale**: `firebase deploy --only
+  firestore:rules` (le rules non si auto-deployano — vedi memoria
+  [[feedback-schema-rules-deploy]]). (stima: L)
+
+- [ ] **R2 — Cancello di merge nell'hook auto-commit** — Modifica
+  `.claude/hooks/auto-commit-merge.sh`: i branch dei worker delle routine
+  (prefisso da decidere, es. `worker/*` o `routine/*`) si **committano ma NON si
+  fondono automaticamente su `main`**. La fusione avviene solo via un nuovo
+  `scripts/merge-gate.mjs <branch>` (rebase su main + merge + push, con
+  retry/rebase per push concorrenti dei 2 account) invocato dall'orchestratore
+  al PASS. ⚠️ Le sessioni/branch NON-routine (lavoro locale dell'utente) devono
+  restare **invariate**: l'auto-merge attuale continua per loro. **Done**: test
+  che (1) una edit su un branch `worker/*` non arriva in `main`, (2)
+  `merge-gate.mjs` lo porta in `main`, (3) una edit su un branch normale viene
+  ancora auto-mergiata. Verifica con un repo di prova o asserzioni su git in uno
+  spec. NON rompere l'auto-push esistente. (stima: L)
+
+- [ ] **R3 — Recipe orchestratore + worker nel CLAUDE.md** — Riscrivi la sezione
+  "Routine cloud" + "un sub-agente per feedback" con il nuovo flusso:
+  orchestratore sottile LLM (loop Agent tool cieco, sotto-agenti su Sonnet,
+  cost-check da R4); worker unificato review-or-resolve; isolamento
+  (orchestratore solo metadati, worker solo corpo, report come dati); macchina a
+  stati `todo→review→done/blocked` con max 3 loop e merge-gate (R2). **Verifica
+  un rischio aperto**: il sistema di **claim** (`scripts/claim-feedback.mjs`)
+  oggi scrive su Firestore — con l'account robot bloccato (vedi CLAUDE.md), va
+  confermato che il claim funzioni ancora per coordinare i 2 account, o
+  spostarlo sulla coda git/Action. **Done**: la sezione è coerente e
+  autosufficiente; un dry-run mentale del flusso non ha buchi. (stima: M)
+
+- [ ] **R4 — Cost-check / utilizzo budget nella sandbox cloud** — Verifica che
+  `npx ccusage@latest blocks --active --json` giri nella sandbox cloud (Linux,
+  node, rete) e legga il `costUSD` della finestra 5h attiva (include la spesa dei
+  sotto-agenti, stesso account/processo). Definisci la regola operativa per
+  l'orchestratore: prima di lanciare un nuovo worker, leggi `costUSD`; se <
+  soglia → procedi; se ≥ soglia → niente nuovi feedback, finisci/checkpoint,
+  termina. Soglia ALTA (obiettivo = usare il budget), **da calibrare al primo
+  429** osservato (placeholder finché non c'è il dato). Rete di sicurezza:
+  intercetta il 429 → checkpoint stato + rilascio claim. **Done**: comando
+  ccusage documentato + funzionante in cloud; regola scritta nel CLAUDE.md
+  (insieme a R3). (stima: M)
+
+- [ ] **R5 — (UTENTE, su claude.ai) Scheduling 2 account sfasati** — NON è codice,
+  lo fa l'utente nell'UI delle routine. Crea/aggiorna la routine su **entrambi**
+  gli account Filo (non quello privato), cron ogni 6h **sfasati**: account A
+  `0 0,6,12,18 * * *`, account B `0 3,9,15,21 * * *` (equidistanti 6h ciascuno,
+  insieme coprono ogni ~3h, ogni run trova una finestra 5h fresca). Verificare
+  che `git push origin main` sia autenticato nella sandbox di entrambi gli
+  account. Dipende da R1-R4 fatti. (utente)
+
 ### Sistema crediti + ricompense feedback + popup aggiornamento (spec 2026-06-17)
 
 Spec utente (chat). Decisioni di design confermate dall'utente:
