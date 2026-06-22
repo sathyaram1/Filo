@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <title>Filo — Gestione</title>
+  <link rel="icon" href="filo://asset/icons/icon-32.png" />
+  <link rel="stylesheet" href="filo://style/theme.css" />
+  <link rel="stylesheet" href="filo://style/pages.css" />
+  <script src="filo://shared/themeTokens.js"></script>
+  <script src="filo://shared/pageBootstrap.js"></script>
+  <script src="filo://shared/constants.js"></script>
+  <script src="filo://shared/messages.js"></script>
+  <script src="filo://shared/icons.js"></script>
+  <script src="filo://shared/feedback.js"></script>
+  <script src="filo://shared/manageReview.js"></script>
+  <style>
+    /* ── Tab bar (pattern fb-tabs di feedback.html) ───────────────────── */
+    .mg-tabs {
+      display: flex;
+      gap: 2px;
+      border-bottom: 1px solid var(--sn-border);
+      margin: 8px 0 20px;
+    }
+    .mg-tab {
+      all: unset;
+      cursor: pointer;
+      padding: 8px 14px;
+      font-size: 13px;
+      color: var(--sn-muted);
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+    }
+    .mg-tab:hover { color: var(--sn-fg); }
+    .mg-tab--active {
+      color: var(--sn-fg);
+      font-weight: 600;
+      border-bottom-color: var(--sn-accent);
+    }
+    .mg-tab[hidden] { display: none; }
+    .mg-panel { display: none; }
+    .mg-panel--active { display: block; }
+
+    /* ── Banner sola lettura (pattern fb-admin-banner) ─────────────────── */
+    .mg-banner {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 16px; padding: 10px 14px;
+      border: 1px solid var(--sn-border); border-radius: 8px;
+      background: var(--sn-overlay-bg); font-size: 13px; color: var(--sn-muted);
+    }
+    .mg-banner[hidden] { display: none; }
+    .mg-banner button { margin-left: auto; }
+
+    /* ── Placeholder "In arrivo" ────────────────────────────────────────── */
+    .mg-coming {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; padding: 80px 0;
+      color: var(--sn-muted); font-size: 14px; gap: 8px;
+    }
+    .mg-coming-icon { font-size: 32px; opacity: 0.4; }
+
+    /* ── Layout 3 colonne della sezione Revisione ──────────────────────── */
+    .mg-review {
+      display: grid;
+      grid-template-columns: 220px 1fr 280px;
+      gap: 12px;
+      height: calc(100vh - 180px);
+      min-height: 300px;
+    }
+    .mg-col {
+      display: flex; flex-direction: column;
+      border: 1px solid var(--sn-border); border-radius: 8px;
+      overflow: hidden;
+    }
+    .mg-col-head {
+      padding: 10px 12px 8px;
+      font-size: 12px; font-weight: 600; color: var(--sn-muted);
+      text-transform: uppercase; letter-spacing: 0.04em;
+      border-bottom: 1px solid var(--sn-border);
+      flex: 0 0 auto;
+    }
+    .mg-col-body {
+      flex: 1 1 0; overflow-y: auto; padding: 8px;
+    }
+
+    /* ── Lista feedback (colonna sinistra) ─────────────────────────────── */
+    .mg-list { display: flex; flex-direction: column; gap: 4px; }
+    .mg-item {
+      display: flex; flex-direction: column; gap: 2px;
+      padding: 8px 10px; border-radius: 6px; cursor: pointer;
+      border-left: 3px solid transparent;
+      border: 1px solid var(--sn-border);
+      border-left-width: 3px;
+      background: transparent;
+      transition: background 0.1s;
+    }
+    .mg-item:hover { background: var(--sn-hover); }
+    .mg-item--selected { background: var(--sn-hover); }
+    .mg-item-num { font-size: 11px; color: var(--sn-muted); font-weight: 600; }
+    .mg-item-title {
+      font-size: 13px; line-height: 1.4;
+      overflow: hidden; text-overflow: ellipsis;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    }
+    .mg-item-reason {
+      font-size: 10px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.05em; margin-top: 2px;
+    }
+    .mg-list-empty {
+      color: var(--sn-muted); font-size: 13px;
+      text-align: center; padding: 30px 8px;
+    }
+
+    /* ── Pannello centrale (dettaglio) ──────────────────────────────────── */
+    .mg-detail-empty {
+      display: flex; align-items: center; justify-content: center;
+      flex: 1; color: var(--sn-muted); font-size: 13px; font-style: italic;
+    }
+    .mg-detail { display: flex; flex-direction: column; height: 100%; }
+    .mg-detail-head {
+      padding: 10px 12px 8px; border-bottom: 1px solid var(--sn-border);
+      font-size: 12px; color: var(--sn-muted); flex: 0 0 auto;
+    }
+    .mg-sender-link {
+      color: var(--sn-accent); text-decoration: none; cursor: pointer;
+      font-weight: 600;
+    }
+    .mg-sender-link:hover { text-decoration: underline; }
+    .mg-judges-row {
+      display: flex; align-items: center; gap: 6px;
+      padding: 8px 12px; border-bottom: 1px solid var(--sn-border);
+      flex: 0 0 auto; font-size: 12px; color: var(--sn-muted);
+    }
+    .mg-judge-label { margin-right: 4px; }
+    .mg-dot {
+      width: 14px; height: 14px; border-radius: 50%;
+      border: 2px solid var(--sn-border);
+      background: transparent; display: inline-block;
+      flex: 0 0 auto;
+      transition: transform 0.1s;
+    }
+    .mg-dot--clickable {
+      cursor: pointer;
+    }
+    .mg-dot--clickable:hover { transform: scale(1.2); }
+    /* Colori giudici (fissi per distinguibilità su chiaro e scuro). */
+    .mg-dot--attack { background: #c0392b; border-color: #c0392b; }
+    .mg-dot--spam   { background: #e08e0b; border-color: #e08e0b; }
+    .mg-dot--design { background: #5b6ee0; border-color: #5b6ee0; }
+    .mg-dot--aligned { background: #2e9e5b; border-color: #2e9e5b; }
+
+    /* ── Bolle chat (stile fb-bubble) ───────────────────────────────────── */
+    .mg-thread {
+      flex: 1 1 0; overflow-y: auto;
+      display: flex; flex-direction: column; gap: 10px;
+      padding: 12px;
+    }
+    .mg-bubble {
+      padding: 10px 12px; border-radius: 12px;
+      border: 1px solid var(--sn-border);
+      background: var(--sn-bg, transparent);
+      max-width: 100%;
+    }
+    .mg-bubble--user { align-self: flex-end; border-bottom-right-radius: 4px; }
+    .mg-bubble--model {
+      align-self: flex-start; border-bottom-left-radius: 4px;
+      background: color-mix(in srgb, var(--sn-accent) 6%, var(--sn-bg, transparent));
+    }
+    .mg-bubble-who {
+      font-size: 11px; color: var(--sn-muted); font-weight: 600; margin-bottom: 4px;
+    }
+    .mg-bubble-body {
+      font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word;
+    }
+    .mg-bubble-body em { color: var(--sn-muted); font-style: italic; }
+    .mg-bubble-imgs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .mg-bubble-imgs img {
+      max-width: 200px; max-height: 200px; border-radius: 6px;
+      border: 1px solid var(--sn-border); cursor: zoom-in; object-fit: cover;
+    }
+
+    /* ── Lightbox ────────────────────────────────────────────────────────── */
+    .mg-lightbox {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+      display: none; align-items: center; justify-content: center;
+      cursor: zoom-out; z-index: 100;
+    }
+    .mg-lightbox.open { display: flex; }
+    .mg-lightbox img { max-width: 95vw; max-height: 95vh; }
+
+    /* ── Pannello laterale variabile (destra) ───────────────────────────── */
+    .mg-side { display: flex; flex-direction: column; height: 100%; }
+    .mg-side--hidden { display: none; }
+    .mg-side-head {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 12px 8px; border-bottom: 1px solid var(--sn-border);
+      flex: 0 0 auto; min-height: 38px;
+    }
+    .mg-side-title { font-weight: 600; font-size: 14px; flex: 1; }
+    .mg-side-close {
+      all: unset; cursor: pointer; font-size: 18px; color: var(--sn-muted);
+      width: 24px; height: 24px; display: flex; align-items: center;
+      justify-content: center; border-radius: 50%;
+    }
+    .mg-side-close:hover { background: var(--sn-hover); color: var(--sn-fg); }
+    .mg-side-body { flex: 1 1 0; overflow-y: auto; padding: 12px; }
+    .mg-side-empty {
+      display: flex; align-items: center; justify-content: center;
+      flex: 1; color: var(--sn-muted); font-size: 13px; font-style: italic;
+    }
+
+    /* Badge classe giudice */
+    .mg-class-badge {
+      display: inline-block; padding: 2px 9px; border-radius: 999px;
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.05em; border: 1px solid transparent;
+    }
+    .mg-class-badge--attack { background: #c0392b22; color: #c0392b; border-color: #c0392b88; }
+    .mg-class-badge--spam   { background: #e08e0b22; color: #b9770a; border-color: #e08e0b88; }
+    .mg-class-badge--design { background: #5b6ee022; color: #5b6ee0; border-color: #5b6ee088; }
+    .mg-class-badge--aligned { background: #2e9e5b22; color: #2e9e5b; border-color: #2e9e5b88; }
+
+    .mg-reasoning {
+      font-size: 13px; line-height: 1.6; white-space: pre-wrap;
+      word-break: break-word; color: var(--sn-text);
+      margin-top: 10px;
+    }
+    .mg-reasoning em { color: var(--sn-muted); font-style: italic; }
+
+    /* Mittente */
+    .mg-sender-info { display: flex; flex-direction: column; gap: 10px; }
+    .mg-sender-stat { font-size: 13px; color: var(--sn-muted); }
+    .mg-sender-stat strong { color: var(--sn-text); }
+    .mg-sender-list { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+    .mg-sender-item {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 8px; border-radius: 6px;
+      border: 1px solid var(--sn-border); border-left-width: 3px;
+      cursor: pointer; font-size: 13px; background: transparent;
+    }
+    .mg-sender-item:hover { background: var(--sn-hover); }
+    .mg-sender-item-num { font-size: 11px; color: var(--sn-muted); font-weight: 600; }
+    .mg-sender-item-title {
+      flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    /* Spinner di caricamento */
+    .mg-loading {
+      color: var(--sn-muted); font-size: 13px;
+      text-align: center; padding: 40px 0;
+    }
+  </style>
+</head>
+<body>
+  <main class="sn-page">
+    <h1>Gestione</h1>
+    <p class="sn-muted">Dashboard riservata all'owner per monitorare Filo.</p>
+
+    <!-- Banner sola lettura: scompare per gli admin -->
+    <div class="mg-banner" id="mgBanner" hidden>
+      <span>Sei in sola lettura. Questa pagina è riservata all'owner.</span>
+      <button type="button" class="sn-btn" id="mgSignIn">Accedi</button>
+    </div>
+
+    <!-- Tab bar -->
+    <nav class="mg-tabs" id="mgTabs" role="tablist">
+      <button type="button" class="mg-tab mg-tab--active" data-tab="review" role="tab">Revisione</button>
+      <button type="button" class="mg-tab" data-tab="queue" role="tab">Coda</button>
+      <button type="button" class="mg-tab" data-tab="stats" role="tab">Statistiche Red Team</button>
+      <button type="button" class="mg-tab" data-tab="auto" role="tab">Modalità automatica</button>
+    </nav>
+
+    <!-- ═══ TAB REVISIONE ═══════════════════════════════════════════════ -->
+    <section class="mg-panel mg-panel--active" id="panel-review" data-panel="review">
+      <div class="mg-review">
+
+        <!-- Colonna sinistra: lista feedback bloccati -->
+        <div class="mg-col" id="mgListCol">
+          <div class="mg-col-head">Bloccati</div>
+          <div class="mg-col-body" id="mgListBody">
+            <div class="mg-loading" id="mgListLoading">Caricamento…</div>
+            <div class="mg-list" id="mgList" hidden></div>
+            <div class="mg-list-empty" id="mgListEmpty" hidden>Nessun feedback bloccato.</div>
+          </div>
+        </div>
+
+        <!-- Colonna centrale: dettaglio -->
+        <div class="mg-col" id="mgDetailCol">
+          <div class="mg-detail-empty" id="mgDetailEmpty">
+            Seleziona un feedback dalla lista
+          </div>
+          <div class="mg-detail" id="mgDetail" hidden>
+            <div class="mg-detail-head" id="mgDetailHead"></div>
+            <div class="mg-judges-row" id="mgJudgesRow">
+              <span class="mg-judge-label">Giudici:</span>
+            </div>
+            <div class="mg-thread" id="mgThread"></div>
+          </div>
+        </div>
+
+        <!-- Colonna destra: pannello variabile -->
+        <div class="mg-col" id="mgSideCol">
+          <div class="mg-side-empty" id="mgSideEmpty">
+            Clicca un giudice o il mittente
+          </div>
+          <div class="mg-side" id="mgSide" hidden>
+            <div class="mg-side-head">
+              <span class="mg-side-title" id="mgSideTitle"></span>
+              <button type="button" class="mg-side-close" id="mgSideClose" title="Chiudi">×</button>
+            </div>
+            <div class="mg-side-body" id="mgSideBody"></div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ═══ TAB CODA ════════════════════════════════════════════════════ -->
+    <section class="mg-panel" id="panel-queue" data-panel="queue">
+      <div class="mg-coming">
+        <div class="mg-coming-icon">📋</div>
+        <div>In arrivo</div>
+      </div>
+    </section>
+
+    <!-- ═══ TAB STATISTICHE RED TEAM ════════════════════════════════════ -->
+    <section class="mg-panel" id="panel-stats" data-panel="stats">
+      <div class="mg-coming">
+        <div class="mg-coming-icon">📊</div>
+        <div>In arrivo</div>
+      </div>
+    </section>
+
+    <!-- ═══ TAB MODALITÀ AUTOMATICA ═════════════════════════════════════ -->
+    <section class="mg-panel" id="panel-auto" data-panel="auto">
+      <div class="mg-coming">
+        <div class="mg-coming-icon">⚙️</div>
+        <div>In arrivo</div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Lightbox -->
+  <div class="mg-lightbox" id="mgLightbox"><img id="mgLightboxImg" alt=""></div>
+
+  <script src="manage.js"></script>
+</body>
+</html>
