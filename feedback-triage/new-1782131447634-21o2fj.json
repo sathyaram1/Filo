@@ -1,0 +1,13 @@
+{
+  "op": "create",
+  "uid": "fec7e613-f468-4cbd-92c4-b51c19109420",
+  "text": "Se nella barra degli indirizzi scrivi un indirizzo che contiene una porta, Filo non ci va: apre invece una ricerca Google di quel testo.\n\nPer riprodurlo:\n- apri una scheda e nella barra in alto scrivi \"localhost:3000\" (o \"127.0.0.1:8080\", o un sito su porta non standard tipo \"example.com:8443/admin\") e premi Invio;\n- osserva che invece di aprire quell'indirizzo parte una ricerca Google con scritto \"localhost:3000\".\nSuccede con qualsiasi host seguito da \":porta\": è un caso comune per chi prova un server locale di sviluppo, un router/IoT su IP:porta, o un servizio su porta non standard. Tutti i browser normali (Chrome, Firefox, Edge) in questi casi navigano all'indirizzo. Anche un nome senza punto come \"localhost\" (senza porta) finisce in ricerca.\n\nPARTE TECNICA: la funzione che decide 'naviga o cerca' (normalizeUrl in src/main/tabs.js, usata da navigate()) riconosce come URL solo schema esplicito o pattern dominio con punto: la regex /^[\\w-]+(\\.[\\w-]+)+(\\/.*)?$/i non ammette la parte \":porta\", quindi ogni input host:porta cade nel ramo 'https://www.google.com/search?q=...'. Verificato chiamando direttamente normalizeUrl: \"localhost:3000\" e \"site.com:8080/path\" tornano un URL di ricerca Google invece dell'indirizzo. Fix: estendere il riconoscimento URL per accettare una porta opzionale (e valutare gli host senza punto noti tipo localhost).",
+  "name": "Barra indirizzi: gli indirizzi con porta finiscono in ricerca Google",
+  "parentId": "",
+  "status": "new",
+  "priority": 1,
+  "notes": "",
+  "images": [],
+  "queuedAt": "2026-06-22T12:30:47.634Z",
+  "queuedBy": "routine"
+}
