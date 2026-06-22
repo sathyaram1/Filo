@@ -87,6 +87,12 @@ account** Filo. Decisioni di design confermate dall'utente:
     coda triage/claim in `feedback-triage/` — toccano path disgiunti dal `src/`,
     quindi non confliggono.) **Pezzi in sequenza**, non in parallelo sullo stesso
     branch (naturale: spesso dipendono l'uno dall'altro).
+  - **Nota tecnica (file "caldo")**: `src/shared/patchNotes.js` è l'UNICO file
+    sorgente che *ogni* fix tocca (la riga di changelog obbligatoria). In
+    sequenza sullo stesso `feature/N` non confligge; ma è il punto più probabile
+    di conflitto se l'invariante "feature in volo = priorità massima" si rompe
+    (es. un fix urgente standalone che salta la coda mentre una feature è in
+    volo). Da tenere a mente implementando R2/R3.
   - I feedback **standalone NON cambiano**: un singolo feedback = feature di
     taglia 1, branch → cancello → main. Il branch di feature riguarda SOLO le
     spezzate.
