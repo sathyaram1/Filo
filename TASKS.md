@@ -243,10 +243,18 @@ su main + `done`; FAIL: correggi e ri-verifica (max 3 loop) → dopo 3 fail
     (l'attaccante non ha la chiave). Contro: chiave-nel-prompt leakabile (ma il
     contenuto è anonimizzato → danno limitato; ruotabile), il groomer F5 e la
     dashboard devono decifrare, niente query server-side sui campi cifrati (la
-    routine fa fetch-all + decrypt per filtrare i `todo` — ok in alpha), e gli
-    **screenshot su Storage** (URL pubblici) vanno protetti a parte in entrambi
-    gli approcci. Se si cifra anche `status`, l'hill-climbing è chiuso ma nessun
-    lettore non-autenticato può filtrare per stato.
+    routine fa fetch-all + decrypt per filtrare i `todo` — ok in alpha). Gli
+    **screenshot** sotto (B) si cifrano come tutto il resto (byte cifrati con la
+    chiave pubblica prima dell'upload → lo Storage può restare pubblico, è
+    ciphertext): uniforme, nessun trattamento speciale. Se si cifra anche
+    `status`, l'hill-climbing è chiuso ma nessun lettore non-autenticato può
+    filtrare per stato. **Chiave leakabile in 2 modi**: (1) esfiltrazione attiva
+    (injection/errore) → mitigata tenendo la chiave SOLO nell'orchestratore
+    (mai testo non fidato) + decrypt come step deterministico non-LLM (i worker
+    ricevono plaintext, mai la chiave); (2) esposizione passiva = la chiave sta
+    in chiaro nella config/log di claude.ai (non-vault) → se trapela, riapre
+    l'hill-climbing (danno limitato dall'anonimizzazione, chiave ruotabile).
+    Sotto (A) invece lo Storage va bloccato a parte (regole + canale autenticato).
   **Prima di toccare le rules**: controllare il DESIGN di filo-security
   ([[auto-improvement-loop]]) — la lettura pubblica + "pagina pubblica dei
   feedback" potrebbe essere una scelta documentata lì, da ribaltare
