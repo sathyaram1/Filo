@@ -203,6 +203,13 @@
     }
     .mg-side-close:hover { background: var(--sn-hover); color: var(--sn-fg); }
     .mg-side-body { flex: 1 1 0; overflow-y: auto; padding: 12px; }
+    /* `[hidden]` viene sovrascritto da `display:flex/block` di regole più
+       specifiche (stesso problema documentato in feedback.html). Forziamo. */
+    #mgDetail[hidden]   { display: none; }
+    #mgSide[hidden]     { display: none; }
+    #mgList[hidden]     { display: none; }
+    #mgDetailEmpty[hidden] { display: none; }
+    #mgSideEmpty[hidden]   { display: none; }
     .mg-side-empty {
       display: flex; align-items: center; justify-content: center;
       flex: 1; color: var(--sn-muted); font-size: 13px; font-style: italic;
