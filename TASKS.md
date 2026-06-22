@@ -143,11 +143,18 @@ su main + `done`; FAIL: correggi e ri-verifica (max 3 loop) → dopo 3 fail
   orchestratore sottile LLM (loop Agent tool cieco, sotto-agenti su Sonnet,
   cost-check da R4); worker unificato review-or-resolve; isolamento
   (orchestratore solo metadati, worker solo corpo, report come dati); macchina a
-  stati `todo→review→done/blocked` con max 3 loop e merge-gate (R2). **Verifica
-  un rischio aperto**: il sistema di **claim** (`scripts/claim-feedback.mjs`)
-  oggi scrive su Firestore — con l'account robot bloccato (vedi CLAUDE.md), va
-  confermato che il claim funzioni ancora per coordinare i 2 account, o
-  spostarlo sulla coda git/Action. **Done**: la sezione è coerente e
+  stati `todo→review→done/blocked` con max 3 loop e merge-gate (R2). Aggiungi al
+  worker la regola **`#N.final`**: chiudendo un sub-feedback, se TUTTI i fratelli
+  dello stesso padre sono `done`, auto-genera `#N.final` (verifica integrazione
+  dell'intera feature vs spec originale, in modalità review) via
+  `queue-feedback.mjs --parent`. **Claim — già risolto, NON è un rischio**:
+  verificato in [claim-feedback.mjs](scripts/claim-feedback.mjs) che il lock NON
+  vive su Firestore (l'account robot Google è bloccato) ma come file git
+  `feedback-triage/claims/<id>.json` pushato ff-only su `origin/main`, visibile
+  alle altre routine in pochi secondi; la Action lo specchia su Firestore solo
+  per la UI. La coordinazione multi-routine è il motivo stesso per cui il claim
+  esiste → i 2 account si coordinano già. Unico da confermare: entrambe le
+  sandbox sanno fare `git push origin main`. **Done**: la sezione è coerente e
   autosufficiente; un dry-run mentale del flusso non ha buchi. (stima: M)
 
 - [ ] **R4 — Cost-check / utilizzo budget nella sandbox cloud** — Verifica che
