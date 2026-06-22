@@ -1,0 +1,15 @@
+{
+  "op": "create",
+  "uid": "f5e2668f-7728-4188-ba7a-33ec136b9995",
+  "text": "PARTE UTENTE: dalla barra degli indirizzi in alto si possono aprire file del computer. Per riprodurre: apri Filo, clicca nella barra degli indirizzi, scrivi file:///etc/passwd (su Windows: file:///C:/Windows/win.ini) e premi Invio. Filo mostra il contenuto del file locale invece di rifiutarlo o cercarlo sul web (vedi screenshot: viene mostrato il file di sistema /etc/passwd). Su Windows un indirizzo tipo file://un-altro-pc/cartella puo' inoltre far partire una connessione di rete verso quel computer. La barra dovrebbe accettare solo indirizzi web (http/https) e pagine interne di Filo.\n\nPARTE TECNICA: navigate() in src/main/tabs.js chiama normalizeUrl() e poi webContents.loadURL() SENZA passare dal guard isWebUnsafeNav(). Quel guard e' registrato solo sugli handler will-navigate/will-redirect (circa righe 1233 e 1479), eventi che loadURL() programmatico NON emette: quindi la digitazione in barra lo aggira. normalizeUrl() (riga ~2047) ritorna l'URL grezzo per qualunque schema che matcha ^[a-z]+://, percio' file:// (e probabilmente javascript://, ecc.) passano dritti. Lo stesso vale per i tab ricreati via _recreateView. Fix suggerito: in navigate()/normalizeUrl scartare o consegnare a shell.openExternal gli schemi non presenti in WEB_NAV_SCHEMES prima del loadURL. Repro deterministico verificato con uno spec Playwright (navigate verso file:///etc/passwd -> la WebContentsView carica il file).",
+  "name": "Sicurezza: la barra indirizzi apre file:// (file locali esposti)",
+  "parentId": "",
+  "status": "new",
+  "priority": 2,
+  "notes": "",
+  "images": [
+    "https://firebasestorage.googleapis.com/v0/b/filo-8b9cb.firebasestorage.app/o/feedback%2F1782156000372_3258d1d6-2541-4670-9976-55f4691abdc6.png?alt=media&token=cfe1eb9d-5856-4740-88de-1425ab3d7f76"
+  ],
+  "queuedAt": "2026-06-22T19:20:01.300Z",
+  "queuedBy": "routine"
+}
