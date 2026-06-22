@@ -243,18 +243,34 @@ qualcosa di rotto — Filo **invia un feedback in autonomia**, senza azione uten
   capacità, o rileva una lamentela "di sfuggita" su qualcosa di rotto → compone e
   **invia un feedback senza azione utente**, marcato con source `auto:*`
   (capability-gap / complaint) così la dashboard lo raggruppa (come i ritrovamenti
-  routine in tab "Agente"). **DECISIONI DA CONFERMARE (vedi chat):**
-  (a) **PRIVACY** — i feedback sono leggibili pubblicamente: sanitizzare
-  (descrizione generica della capacità mancante, niente URL/testo personale
-  verbatim) vs consenso esplicito vs collezione privata dedicata;
-  (b) **notifica** — silenzioso vs toast non bloccante "segnalato agli
-  sviluppatori" con **undo**;
-  (c) **dedup** — N utenti che chiedono X = duplicati: **contatore di domanda**
-  (capacità mancante → +1) invece di N feedback uguali;
-  (d) **crediti** — i feedback automatici NON danno i +5 crediti (default, salvo
-  veto).
+  routine in tab "Agente"). **DECISIONI CONFERMATE (utente, 2026-06-22):**
+  (a) **PRIVACY** — sempre **anonimizzare a monte** (descrizione generica della
+  capacità mancante, NIENTE URL/testo personale verbatim; minimizzare il contesto
+  auto-allegato). Inoltre i feedback NON devono più essere pubblici → vedi **S1**
+  (lockdown lettura). Vale per tutti i feedback, non solo gli automatici.
+  (b) **notifica** — invio immediato + **toast non bloccante con undo**
+  ("L'ho segnalato a chi sviluppa Filo") + **voce in Impostazioni/Sicurezza,
+  ON di default** per abilitare/disabilitare il feedback autonomo.
+  (c) **dedup** — gestito da **F5** (groomer), non rimandato.
+  (d) **crediti** — NIENTE +5 per-feedback automatico (si farmerebbe); invece un
+  **bonus giornaliero ~+10 crediti finché l'opzione è ON** (incentivo a tenerla
+  attiva; si aggancia al refill giornaliero del motore crediti C1).
   **Done**: spec che simula una richiesta fuori-capacità → asserisce invio di un
-  feedback sanitizzato col source corretto. (stima: L)
+  feedback **sanitizzato** col source corretto, il toast con undo, e il bonus
+  giornaliero condizionato al setting. (stima: L)
+
+- [ ] **F5 — Groomer della coda: dedup + priorità** — Dopo i filtri di sicurezza,
+  uno step che legge i feedback in coda e: se è un **duplicato**, lo **allega al
+  primo** (arricchendo l'originale con eventuali info nuove sul bug) invece di
+  creare un doppione; **alza la priorità** dell'originale in base alla domanda
+  ripetuta (più utenti la chiedono → più priorità). Può essere lo stesso
+  componente che decide la priorità. **Dedup sicuro**: per gli auto-feedback usa
+  il `capability-gap id` (dati strutturati, immune a injection); per il testo
+  libero degli utenti, similarità/LLM **trattando il testo come non-fidato** (lo
+  step legge tutta la coda → è un bersaglio d'injection, contraddice
+  l'isolamento "un feedback per agente": non eseguire istruzioni dal testo).
+  **Done**: spec che invia 2 feedback equivalenti → asserisce 1 solo originale
+  con priorità alzata e il secondo allegato. (stima: M)
 
 ### Sistema crediti + ricompense feedback + popup aggiornamento (spec 2026-06-17)
 
