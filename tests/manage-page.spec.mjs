@@ -74,37 +74,53 @@ test('le tab 2/3 mostrano il segnaposto "In arrivo"', async ({ openTab }) => {
   await expect(page.locator('#panel-stats .mg-coming')).toBeVisible();
 });
 
-test('lo switch "Modalità automatica" è sempre visibile, si attiva e persiste', async ({ openTab }) => {
+test('lo switch "Modalità automatica" è sempre visibile ed è read-only per i non-admin', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
   const sw    = page.locator('#mgAutoSwitch');
   const input = page.locator('#mgAutoToggle');
-  const state = page.locator('#mgAutoState');
 
   // Sempre visibile sulla tab di default
   await expect(sw).toBeVisible();
-  // Stato iniziale: spento
+  // Resta visibile anche cambiando tab (non è una sezione, è uno switch globale)
+  await page.locator('.mg-tab[data-tab="stats"]').click();
+  await expect(sw).toBeVisible();
+  await page.locator('.mg-tab[data-tab="queue"]').click();
+  await expect(sw).toBeVisible();
+
+  // Da non-admin (userData pulito → nessuna sessione) lo switch è disabilitato:
+  // stesso contratto di sola lettura del banner.
+  await expect(input).toBeDisabled();
+  await expect(sw).toHaveClass(/mg-switch--disabled/);
+});
+
+test('lo switch attiva/disattiva la modalità automatica e lo stato persiste', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+
+  const input = page.locator('#mgAutoToggle');
+  const state = page.locator('#mgAutoState');
+
+  // Stato iniziale: spento.
   await expect(input).not.toBeChecked();
   await expect(state).toHaveText('Off');
 
-  // Resta visibile anche cambiando tab (non è una sezione)
-  await page.locator('.mg-tab[data-tab="stats"]').click();
-  await expect(sw).toBeVisible();
-
-  // Attiva lo switch
+  // Simula l'owner: abilita lo switch (in produzione lo abilita applyAutoModeGate
+  // quando isAdmin è true) e attivalo. Il change handler scrive su storage.
+  await page.evaluate(() => { document.getElementById('mgAutoToggle').disabled = false; });
   await input.click();
   await expect(input).toBeChecked();
   await expect(state).toHaveText('On');
 
-  // Lo stato è stato persistito in chrome.storage.local
+  // Lo stato è stato persistito in chrome.storage.local.
   const stored = await page.evaluate(async () => {
     const d = await window.chrome.storage.local.get('filo_auto_mode');
     return d.filo_auto_mode;
   });
   expect(stored).toBe(true);
 
-  // Sopravvive al ricaricamento della pagina
+  // Sopravvive al ricaricamento della pagina (loadAutoMode rilegge da storage).
   await page.reload();
   await page.waitForLoadState('domcontentloaded');
   await expect(page.locator('#mgAutoToggle')).toBeChecked();
