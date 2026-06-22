@@ -59,6 +59,10 @@
     // Alla navigazione verso il dominio la tab nasce già instradata da quel
     // paese (born proxied), e la regola sopravvive al riavvio dell'app.
     FILO_PROXY_RULES: 'filo_proxy_rules',
+    // Modalità automatica (dashboard Gestione): switch owner-only sempre visibile
+    // che attiva/disattiva l'operatività automatica di Filo (routine/red-team).
+    // Booleano persistito; default false (spento).
+    AUTO_MODE: 'filo_auto_mode',
   };
 
   const ACTIONS = {
