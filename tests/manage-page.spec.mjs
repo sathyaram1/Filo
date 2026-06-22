@@ -37,18 +37,20 @@ const FAKE_FB = {
   },
 };
 
-test('le 4 tab esistono con il testo corretto e "Revisione" e\' attiva di default', async ({ openTab }) => {
+test('le 3 tab esistono con il testo corretto e "Revisione" e\' attiva di default', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
-  // 4 tab presenti
-  await expect(page.locator('.mg-tab')).toHaveCount(4);
+  // 3 tab presenti (la ex-tab "Modalità automatica" è diventata uno switch)
+  await expect(page.locator('.mg-tab')).toHaveCount(3);
 
   // Testi corretti
   await expect(page.locator('.mg-tab[data-tab="review"]')).toHaveText('Revisione');
   await expect(page.locator('.mg-tab[data-tab="queue"]')).toHaveText('Coda');
   await expect(page.locator('.mg-tab[data-tab="stats"]')).toHaveText('Statistiche Red Team');
-  await expect(page.locator('.mg-tab[data-tab="auto"]')).toHaveText('Modalità automatica');
+
+  // Non esiste più una tab "Modalità automatica"
+  await expect(page.locator('.mg-tab[data-tab="auto"]')).toHaveCount(0);
 
   // "Revisione" attiva di default
   await expect(page.locator('.mg-tab[data-tab="review"]')).toHaveClass(/mg-tab--active/);
@@ -58,7 +60,7 @@ test('le 4 tab esistono con il testo corretto e "Revisione" e\' attiva di defaul
   await expect(page.locator('#panel-queue')).not.toHaveClass(/mg-panel--active/);
 });
 
-test('le tab 2/3/4 mostrano il segnaposto "In arrivo"', async ({ openTab }) => {
+test('le tab 2/3 mostrano il segnaposto "In arrivo"', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
@@ -70,10 +72,43 @@ test('le tab 2/3/4 mostrano il segnaposto "In arrivo"', async ({ openTab }) => {
   // Statistiche Red Team
   await page.locator('.mg-tab[data-tab="stats"]').click();
   await expect(page.locator('#panel-stats .mg-coming')).toBeVisible();
+});
 
-  // Modalità automatica
-  await page.locator('.mg-tab[data-tab="auto"]').click();
-  await expect(page.locator('#panel-auto .mg-coming')).toBeVisible();
+test('lo switch "Modalità automatica" è sempre visibile, si attiva e persiste', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+
+  const sw    = page.locator('#mgAutoSwitch');
+  const input = page.locator('#mgAutoToggle');
+  const state = page.locator('#mgAutoState');
+
+  // Sempre visibile sulla tab di default
+  await expect(sw).toBeVisible();
+  // Stato iniziale: spento
+  await expect(input).not.toBeChecked();
+  await expect(state).toHaveText('Off');
+
+  // Resta visibile anche cambiando tab (non è una sezione)
+  await page.locator('.mg-tab[data-tab="stats"]').click();
+  await expect(sw).toBeVisible();
+
+  // Attiva lo switch
+  await input.click();
+  await expect(input).toBeChecked();
+  await expect(state).toHaveText('On');
+
+  // Lo stato è stato persistito in chrome.storage.local
+  const stored = await page.evaluate(async () => {
+    const d = await window.chrome.storage.local.get('filo_auto_mode');
+    return d.filo_auto_mode;
+  });
+  expect(stored).toBe(true);
+
+  // Sopravvive al ricaricamento della pagina
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator('#mgAutoToggle')).toBeChecked();
+  await expect(page.locator('#mgAutoState')).toHaveText('On');
 });
 
 test('con dati finti: un elemento compare in lista e il click apre il pannello centrale', async ({ openTab }) => {
