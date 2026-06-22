@@ -224,18 +224,36 @@ su main + `done`; FAIL: correggi e ri-verifica (max 3 loop) → dopo 3 fail
   sicura** (l'account robot è bloccato, niente secret store) — e il repo
   principale è **pubblico**, quindi non può ospitare i feedback. Le rules
   Firestore controllano la lettura **per-documento, non per-campo** (non puoi
-  rendere pubblico `text` e privato `status`). Candidato principale (da
-  progettare, NON risolto): **mirror privato scritto dalla GitHub Action**
-  (service account legge Firestore bypassando le rules → esporta la coda
-  *sanitizzata* in un repo **privato** es. `filo-security`; le routine leggono da
-  lì). Da verificare: le sandbox routine hanno accesso in lettura a un repo
-  privato diverso da quello in cui girano? **Prima di toccare le rules**:
-  controllare il DESIGN di filo-security ([[auto-improvement-loop]]) — la lettura
-  pubblica + "pagina pubblica dei feedback" potrebbe essere una scelta
-  documentata lì, da ribaltare consapevolmente. **Done**: lettura feedback non
-  più pubblica (rules) E le routine leggono ancora la coda di lavoro;
-  `status`/`blocked` non osservabili da non-admin. Questo task **fa da gate**: se
-  si chiude la lettura senza il canale nuovo, le routine si rompono. (stima: L)
+  rendere pubblico `text` e privato `status`). **Il git è ANCH'ESSO un leak**
+  (verificato 2026-06-22): `queue-feedback.mjs` e `queue-triage.mjs` scrivono
+  `text`/`name`/`notes` in `feedback-triage/*.json` e fanno commit+push sul repo
+  **pubblico**, e restano **nella history per sempre** anche dopo che la Action
+  svuota la coda. Quindi S1 deve chiudere DUE canali: Firestore E il git.
+  Due approcci candidati (da decidere, NON risolti):
+  - **(A) Canale privato**: lettura Firestore solo admin/service-account + coda
+    git spostata in un **repo privato** (es. `filo-security`). Pro: niente crypto,
+    dedup/query in chiaro. Contro: serve risolvere l'auth delle sandbox routine a
+    un repo privato + migrare la coda.
+  - **(B) Cifratura (idea utente)**: l'app cifra i campi sensibili con una
+    **chiave pubblica** di Filo prima di scrivere (Firestore o git); decifrano
+    solo l'owner (dashboard, sulla sua macchina) e le routine (**chiave privata
+    passata nel prompt della routine**). Pro: il ciphertext è innocuo ovunque →
+    **collassa i due problemi** (Firestore pubblico e git pubblico restano ok,
+    niente repo privato, niente auth-routine da risolvere) e batte l'hill-climbing
+    (l'attaccante non ha la chiave). Contro: chiave-nel-prompt leakabile (ma il
+    contenuto è anonimizzato → danno limitato; ruotabile), il groomer F5 e la
+    dashboard devono decifrare, niente query server-side sui campi cifrati (la
+    routine fa fetch-all + decrypt per filtrare i `todo` — ok in alpha), e gli
+    **screenshot su Storage** (URL pubblici) vanno protetti a parte in entrambi
+    gli approcci. Se si cifra anche `status`, l'hill-climbing è chiuso ma nessun
+    lettore non-autenticato può filtrare per stato.
+  **Prima di toccare le rules**: controllare il DESIGN di filo-security
+  ([[auto-improvement-loop]]) — la lettura pubblica + "pagina pubblica dei
+  feedback" potrebbe essere una scelta documentata lì, da ribaltare
+  consapevolmente. **Done**: nessun canale (Firestore né git) espone testo/note/
+  stato dei feedback a non-admin; le routine leggono ancora la coda di lavoro.
+  Questo task **fa da gate**: se si chiude la lettura senza il canale nuovo, le
+  routine si rompono. (stima: L)
 
 ### Manifest capacità di Filo + feedback autonomo (spec 2026-06-22)
 
