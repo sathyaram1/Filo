@@ -208,6 +208,54 @@ su main + `done`; FAIL: correggi e ri-verifica (max 3 loop) → dopo 3 fail
   che `git push origin main` sia autenticato nella sandbox di entrambi gli
   account. Dipende da R1-R4 fatti. (utente)
 
+### Manifest capacità di Filo + feedback autonomo (spec 2026-06-22)
+
+Spec utente (chat 2026-06-22). Due feature collegate: F4 dipende da F1/F2.
+Obiettivo: l'agente dentro Filo conosce TUTTO ciò che Filo sa fare (manifest), e
+quando l'utente chiede qualcosa di non supportato — o si lamenta di sfuggita di
+qualcosa di rotto — Filo **invia un feedback in autonomia**, senza azione utente.
+
+- [ ] **F1 — Manifest delle capacità (bootstrap retroattivo)** — Crea un file
+  curato e strutturato (es. `src/shared/capabilities.js`, pattern IIFE su
+  globalThis come `patchNotes.js`) che elenca OGNI capacità visibile all'utente.
+  Per voce: `id`, `title`, descrizione in termini utente, come si invoca
+  (shortcut/menu/pagina), `category`, e il confine **"cosa NON fa"** dove
+  rilevante (serve a F4). Bootstrap = **audit vero del codice** (azioni menu in
+  `src/content/*`, shortcut in `src/main/shortcuts.js`, pagine
+  dashboard/options/history/credits, TTS/traduzione/spellcheck/salva-per-dopo/
+  gestione tab…). **Done**: file completo, accuratezza verificata incrociando col
+  codice (la "verifica retroattiva"). (stima: L)
+
+- [ ] **F2 — Esporre il manifest all'agente di Filo (on-demand)** — Wire perché
+  l'agente legga il manifest quando ragiona su "cosa può fare Filo / posso fare
+  X?". NON in contesto a ogni turno: **indice compatto** (titoli/categorie)
+  sempre disponibile + **dettaglio lazy** on-demand. **Done**: l'agente risponde
+  correttamente "puoi fare X?" e riconosce "non posso fare Y". (stima: M)
+
+- [ ] **F3 — Regola di sincronizzazione anti-stale** — Aggiungi al CLAUDE.md la
+  regola: ogni capacità nuova/modificata visibile all'utente → aggiorna il
+  manifest (stesso pattern della sezione "Patch notes"). + un angolo di audit per
+  le routine che rileva il drift manifest↔realtà. **Done**: regola scritta nel
+  CLAUDE.md. (stima: S)
+
+- [ ] **F4 — Feedback autonomo da Filo** (dipende da F1/F2) — Quando l'agente
+  conclude con confidenza ALTA (usando il manifest) che una richiesta è fuori
+  capacità, o rileva una lamentela "di sfuggita" su qualcosa di rotto → compone e
+  **invia un feedback senza azione utente**, marcato con source `auto:*`
+  (capability-gap / complaint) così la dashboard lo raggruppa (come i ritrovamenti
+  routine in tab "Agente"). **DECISIONI DA CONFERMARE (vedi chat):**
+  (a) **PRIVACY** — i feedback sono leggibili pubblicamente: sanitizzare
+  (descrizione generica della capacità mancante, niente URL/testo personale
+  verbatim) vs consenso esplicito vs collezione privata dedicata;
+  (b) **notifica** — silenzioso vs toast non bloccante "segnalato agli
+  sviluppatori" con **undo**;
+  (c) **dedup** — N utenti che chiedono X = duplicati: **contatore di domanda**
+  (capacità mancante → +1) invece di N feedback uguali;
+  (d) **crediti** — i feedback automatici NON danno i +5 crediti (default, salvo
+  veto).
+  **Done**: spec che simula una richiesta fuori-capacità → asserisce invio di un
+  feedback sanitizzato col source corretto. (stima: L)
+
 ### Sistema crediti + ricompense feedback + popup aggiornamento (spec 2026-06-17)
 
 Spec utente (chat). Decisioni di design confermate dall'utente:
