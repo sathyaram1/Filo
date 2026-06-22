@@ -1,7 +1,0 @@
-{
-  "id": "ed112644-10c7-4db0-aaf0-5c2b889e8605",
-  "status": "done",
-  "notes": "Nell'editor il conteggio di parole e caratteri ora è corretto anche quando il testo va a capo, è su più paragrafi o in elenchi puntati: prima le parole a cavallo di un a-capo venivano fuse (es. \"worldFoo\") e contate come una sola, sottostimando il totale. Ora ogni confine di blocco (e ogni <br>) viene trattato come separatore. Lo stesso problema affliggeva il testo del documento passato all'assistente AI del chat module: corretto anche lì. Verificato con un test Playwright (documento su 4 paragrafi → 6 parole, elenco+<br> → 6) e con l'intera suite (473 passati, 0 falliti).",
-  "queuedAt": "2026-06-22T09:52:16.799Z",
-  "queuedBy": "routine"
-}
