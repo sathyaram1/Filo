@@ -19,7 +19,8 @@ test('Sicurezza: esiste Esporta ma manca qualunque Importa', async ({ openTab })
   const desc = (await page.locator('#sec-export-desc').textContent())?.trim() || '';
   expect(desc.toLowerCase()).toContain('trasferire i dati su un altro computer');
 
-  await page.screenshot({ path: 'tests/.shots/audit-export-no-import.png' });
+  await exportBtn.scrollIntoViewIfNeeded();
+  await page.locator('#sec-export-row').screenshot({ path: 'tests/.shots/audit-export-no-import.png' });
 
   // NESSUN controllo di import in tutta la pagina: né per id, né per etichetta,
   // né un <input type=file>. Questo assert FALLISCE non appena l'import esiste.
