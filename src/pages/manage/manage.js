@@ -55,9 +55,22 @@
   // ── Stato ─────────────────────────────────────────────────────────────────
   let isAdmin       = false;
   let allFeedbacks  = [];       // tutti i feedback caricati
-  let blocked       = [];       // solo quelli con classifyBlock() != null
+  let currentTab    = 'inbox';  // tab lista attiva (inbox/queue/resolved/archived)
+  let currentList   = [];       // feedback della tab corrente, ordinati
   let selectedId    = null;     // ID del feedback selezionato nel pannello centrale
   let allByClient   = {};       // clientId → array di feedback (per il pannello mittente)
+
+  // Etichette/testi vuoto per le tab-lista (DB1).
+  const TAB_LABELS = {
+    inbox: 'Ricevuti', queue: 'In coda', resolved: 'Risolti', archived: 'Archiviati',
+  };
+  const TAB_EMPTY = {
+    inbox:    'Nessun feedback ricevuto.',
+    queue:    'Nessun feedback in coda.',
+    resolved: 'Nessun feedback risolto.',
+    archived: 'Nessun feedback archiviato.',
+  };
+  const LIST_TABS = ['inbox', 'queue', 'resolved', 'archived'];
 
   const FB  = window.SN_FEEDBACK;
   const MR  = window.SN_MANAGE_REVIEW;
