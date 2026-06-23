@@ -281,7 +281,8 @@ Obiettivo: l'agente dentro Filo conosce TUTTO ciò che Filo sa fare (manifest), 
 quando l'utente chiede qualcosa di non supportato — o si lamenta di sfuggita di
 qualcosa di rotto — Filo **invia un feedback in autonomia**, senza azione utente.
 
-- [ ] **F1 — Manifest delle capacità (bootstrap retroattivo)** — Crea un file
+- [~] **F1 — Manifest delle capacità (bootstrap retroattivo)** — _(in corso:
+  routine blissful-hamilton-0853rw, 2026-06-23)_ — Crea un file
   curato e strutturato (es. `src/shared/capabilities.js`, pattern IIFE su
   globalThis come `patchNotes.js`) che elenca OGNI capacità visibile all'utente.
   Per voce: `id`, `title`, descrizione in termini utente, come si invoca
