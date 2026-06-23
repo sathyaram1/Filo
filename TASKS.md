@@ -94,17 +94,19 @@ separata a permessi ridotti** dove gli utenti verificano i fix già rilasciati.
   inline → ora asseriscono pannello destro + assenza reasoning nel centro) +
   controllo a vista `test:shoot` (screenshot `da1-detail`/`da1-sidebar`).
 
-- [ ] **DA2 — Sfruttare la larghezza + righe feedback su una riga** — File:
-  `src/pages/manage/manage.html` (blocco `<style>`). Causa larghezza: `.sn-page
-  { max-width: 960px }` in `src/styles/pages.css:14` strozza la griglia. Su
-  manage **override locale** `.sn-page { max-width: none }` (NON toccare
-  `pages.css` globale, serve alle altre pagine). Righe feedback: `.mg-item` oggi è
-  a 2 righe (titolo a 2 righe + label `.mg-item-reason`); renderla **una riga**
-  `#N · titolo` con ellissi e **togliere la label testuale** del motivo (l'attacco
-  resta implicito dal `border-left` color già impostato da `classifyBlock`).
-  **Done**: la pagina usa la larghezza piena, ogni item è una riga sola colorata;
-  `test:shoot` in locale / in cloud uno spec che asserisce assenza della
-  reason-label e presenza di num+titolo. (stima: S)
+- [x] **DA2 — Sfruttare la larghezza + righe feedback su una riga** _(fatto:
+  sessione locale 2026-06-23)_ — **Esito**: aggiunto override locale `.sn-page {
+  max-width: none }` in cima al `<style>` di `manage.html` (globale `pages.css`
+  intatto) → la dashboard usa tutta la larghezza. `.mg-item` ora è `display:flex`
+  row su UNA riga (`#N` + titolo con `white-space:nowrap` + ellissi), rimossa la
+  label `.mg-item-reason` (sia dal CSS sia da `renderList`): il motivo resta
+  implicito nel colore del `border-left`. Aggiunto `item.title` col testo completo
+  per il tooltip. **Verificato**: `tests/manage-page.spec.mjs` 10/10 (riscritto il
+  test "con dati finti" per usare il vero `renderList` via `__mgTest.setData`,
+  assert: 1 item, num+titolo presenti, `.mg-item-reason` count 0, titolo
+  `white-space:nowrap`, border-left non trasparente) + `test:shoot` (screenshot
+  `da2-list`: larghezza piena, righe singole #236 rosso/#237 arancio col titolo
+  troncato).
 
 - [ ] **DA3 — Fix grafica switch "Modalità automatica"** — File:
   `src/pages/manage/manage.html` (regole `.mg-switch*` nel `<style>`). Sintomo
