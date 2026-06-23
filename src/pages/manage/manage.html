@@ -120,10 +120,11 @@
 
     /* ── Lista feedback (colonna sinistra) ─────────────────────────────── */
     .mg-list { display: flex; flex-direction: column; gap: 4px; }
+    /* Una riga sola: #N · titolo con ellissi. Il motivo (attacco/spam/…) resta
+       implicito nel colore del border-left, non più in una label testuale. */
     .mg-item {
-      display: flex; flex-direction: column; gap: 2px;
+      display: flex; flex-direction: row; align-items: baseline; gap: 6px;
       padding: 8px 10px; border-radius: 6px; cursor: pointer;
-      border-left: 3px solid transparent;
       border: 1px solid var(--sn-border);
       border-left-width: 3px;
       background: transparent;
@@ -131,15 +132,11 @@
     }
     .mg-item:hover { background: var(--sn-hover); }
     .mg-item--selected { background: var(--sn-hover); }
-    .mg-item-num { font-size: 11px; color: var(--sn-muted); font-weight: 600; }
+    .mg-item-num { font-size: 11px; color: var(--sn-muted); font-weight: 600; flex: 0 0 auto; }
     .mg-item-title {
       font-size: 13px; line-height: 1.4;
-      overflow: hidden; text-overflow: ellipsis;
-      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-    }
-    .mg-item-reason {
-      font-size: 10px; font-weight: 600; text-transform: uppercase;
-      letter-spacing: 0.05em; margin-top: 2px;
+      flex: 1 1 auto; min-width: 0;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .mg-list-empty {
       color: var(--sn-muted); font-size: 13px;
