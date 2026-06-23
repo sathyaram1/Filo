@@ -369,6 +369,16 @@
             </div>
             <div class="mg-verdicts" id="mgVerdicts" hidden></div>
             <div class="mg-thread" id="mgThread"></div>
+            <!-- Azioni di revisione (owner-only): sblocca il feedback con un
+                 commento opzionale; rientra nella coda di lavoro (todo). -->
+            <div class="mg-actions" id="mgActions" hidden>
+              <textarea id="mgAcceptComment" class="mg-accept-comment" rows="2"
+                placeholder="Commento (opzionale): perché lo sblocchi…"></textarea>
+              <div class="mg-actions-row">
+                <button type="button" class="sn-btn" id="mgAcceptBtn">Accetta e sblocca</button>
+                <span class="mg-action-msg" id="mgActionMsg" role="status"></span>
+              </div>
+            </div>
           </div>
         </div>
 
