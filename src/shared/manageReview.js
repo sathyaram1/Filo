@@ -124,8 +124,32 @@
     });
   }
 
+  // ── Preferiti ⭐ (DB2) ─────────────────────────────────────────────────────
+  // Il flag `starred` è un "parcheggio per il futuro": l'owner lo mette su un
+  // feedback qualsiasi, a prescindere dallo status. La tab Archiviati ha un
+  // filtro ⭐ che, quando attivo, mostra TUTTI i preferiti (di ogni status),
+  // non solo gli `archived`.
+  function isStarred(fb) {
+    return !!(fb && fb.starred === true);
+  }
+
+  // Lista per la tab Archiviati:
+  //   starredOnly=false → i feedback in stato `archived` (recenti prima);
+  //   starredOnly=true  → tutti i preferiti ⭐, di qualunque status (recenti prima).
+  function listArchiveTab(feedbacks, opts) {
+    const starredOnly = !!(opts && opts.starredOnly);
+    const items = (feedbacks || []).filter((f) =>
+      starredOnly ? isStarred(f) : manageTabFor(f) === 'archived');
+    return items.slice().sort((a, b) => {
+      const ta = new Date(a.createdAt || 0).getTime();
+      const tb = new Date(b.createdAt || 0).getTime();
+      return tb - ta;
+    });
+  }
+
   global.SN_MANAGE_REVIEW = {
     classifyBlock, sortReview, REASONS, manageTabFor, listForManageTab,
+    isStarred, listArchiveTab,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
