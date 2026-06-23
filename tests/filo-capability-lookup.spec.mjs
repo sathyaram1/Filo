@@ -122,16 +122,10 @@ test('l\'indice compatto delle capacità è sempre nel prompt (primo turno)', as
 
   // Già al PRIMO turno (nessuna azione richiesta) l'agente ha l'indice delle
   // capacità nel system prompt: sa SE Filo fa una cosa senza round-trip.
-  const dbg = await app.evaluate(() => ({
-    turns: globalThis.__filoTurnCount,
-    streamLen: (globalThis.__filoMsgsByTurn || []).length,
-    bgLen: (globalThis.__filoBgMsgs || []).length,
-    bg0: (globalThis.__filoBgMsgs || [])[0] ? (globalThis.__filoBgMsgs[0]).slice(0, 200) : '',
-    s0: (globalThis.__filoMsgsByTurn || [])[0] ? (globalThis.__filoMsgsByTurn[0]).slice(0, 200) : '',
-  }));
-  console.log('DBG', JSON.stringify(dbg));
-  const t1 = await msgsForTurn(app, 0);
-  expect(t1).toContain('COSA SA FARE FILO');
-  expect(t1).toContain('[save-for-later]');
-  expect(t1).toContain('[translate-page]');
+  const [hasSection, hasSave, hasTranslate] = await turnContains(app, 0, [
+    'COSA SA FARE FILO', '[save-for-later]', '[translate-page]',
+  ]);
+  expect(hasSection).toBe(true);
+  expect(hasSave).toBe(true);
+  expect(hasTranslate).toBe(true);
 });
