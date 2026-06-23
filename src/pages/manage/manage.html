@@ -32,7 +32,10 @@
     .mg-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
     .mg-switch-track {
       position: relative; width: 40px; height: 22px; border-radius: 999px;
-      background: var(--sn-border); transition: background 0.15s; flex: 0 0 auto;
+      /* A riposo un grigio marcato e theme-aware: `--sn-border` sul tema chiaro
+         è quasi bianco e non leggeva come switch. `--sn-muted` è visibile su
+         chiaro e scuro; da acceso passa a `--sn-accent`. */
+      background: var(--sn-muted); transition: background 0.15s; flex: 0 0 auto;
     }
     .mg-switch-thumb {
       position: absolute; top: 2px; left: 2px; width: 18px; height: 18px;
