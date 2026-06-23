@@ -196,8 +196,7 @@ test('il pannello centrale si apre al click e mostra bolle + giudici', async ({ 
       item.dataset.id = fb._id;
       item.style.borderLeftColor = cl ? cl.color : 'transparent';
       item.innerHTML = (num ? `<span class="mg-item-num">#${num}</span>` : '')
-        + `<span class="mg-item-title">${title}</span>`
-        + (cl ? `<span class="mg-item-reason" style="color:${cl.color}">${cl.label}</span>` : '');
+        + `<span class="mg-item-title">${title}</span>`;
 
       item.addEventListener('click', () => {
         // Simula openDetail: mostra pannello centrale
