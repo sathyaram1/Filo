@@ -369,13 +369,26 @@
             </div>
             <div class="mg-thread" id="mgThread"></div>
             <!-- Azioni di revisione (owner-only): sblocca il feedback con un
-                 commento opzionale; rientra nella coda di lavoro (todo). -->
+                 commento opzionale; rientra nella coda di lavoro (todo).
+                 Mostrate solo per i feedback bloccati dal pipeline. -->
             <div class="mg-actions" id="mgActions" hidden>
               <textarea id="mgAcceptComment" class="mg-accept-comment" rows="2"
                 placeholder="Commento (opzionale): perché lo sblocchi…"></textarea>
               <div class="mg-actions-row">
                 <button type="button" class="sn-btn" id="mgAcceptBtn">Accetta e sblocca</button>
                 <span class="mg-action-msg" id="mgActionMsg" role="status"></span>
+              </div>
+            </div>
+
+            <!-- Risposta ai chiarimenti (owner-only): per i feedback in stato
+                 `clarify`, l'owner risponde alle domande di Filo; la risposta
+                 si aggiunge alle note e il feedback rientra in coda (todo). -->
+            <div class="mg-actions" id="mgClarify" hidden>
+              <textarea id="mgClarifyText" class="mg-accept-comment" rows="3"
+                placeholder="Rispondi alle domande di Filo qui sopra…"></textarea>
+              <div class="mg-actions-row">
+                <button type="button" class="sn-btn" id="mgClarifyBtn">Invia risposta</button>
+                <span class="mg-action-msg" id="mgClarifyMsg" role="status"></span>
               </div>
             </div>
           </div>
