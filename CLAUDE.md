@@ -137,6 +137,37 @@ Il file è la **singola sorgente di verità** sia del recap che del calcolo
 "quante patch sei indietro" (all'avvio si confronta la versione vista l'ultima
 volta con `app.getVersion()`). Tienilo allineato a `package.json`.
 
+## Manifesto capacità: aggiorna `capabilities.js` ad OGNI capacità che cambia
+
+Filo tiene un **manifesto curato di tutto ciò che sa fare**, visibile
+all'utente, in **`src/shared/capabilities.js`** (IIFE su globalThis,
+`SN_CAPABILITIES`: lista di voci `{ id, title, category, desc, invoke, doesNot? }`
+**scritte in italiano, per l'utente, NON tecniche**). Serve all'agente dentro
+Filo per rispondere con verità a "puoi fare X?" e per riconoscere "non posso
+fare Y" (vedi `TASKS.md` → F2/F4), ed è la base del feedback autonomo.
+
+**Regola (stesso pattern dei "Patch notes")**: ogni volta che aggiungi,
+modifichi o rimuovi una **capacità visibile all'utente** (una feature che
+vedrà o userà — non refactor/test/infra interni), aggiorna **nello stesso
+commit** la voce corrispondente in `src/shared/capabilities.js`:
+
+- nuova capacità → **aggiungi** una voce con `id` kebab-case **stabile** (non
+  riusarne uno vecchio, non cambiarlo più dopo);
+- capacità cambiata (diverso modo di invocarla, confine diverso) → **aggiorna**
+  `desc`/`invoke`/`doesNot` della voce esistente;
+- capacità rimossa → **togli** la voce (lasciarla è peggio che ometterla:
+  l'agente prometterebbe il falso).
+- `desc`/`invoke`/`doesNot` sono per l'utente finale: niente nomi di
+  file/funzioni. `doesNot` (il confine "cosa NON fa") è opzionale ma prezioso.
+- Le voci puramente interne (refactor, test, build, hook) **non** vanno nel
+  manifesto: è l'elenco delle capacità *utente*, non un changelog tecnico.
+
+Un manifesto che mente (descrive una feature che non c'è più, o ne manca una
+nuova) è **peggio di uno assente**. L'unit test `tests/unit/capabilities.test.mjs`
+incrocia alcune voci col codice reale (shortcut globali, pagine `filo://`) e
+diventa **rosso** se una capacità deriva: lancialo (`npm run test:unit`, gira in
+ms senza Electron) dopo aver toccato shortcut, pagine interne o il manifesto.
+
 ## Test che servono davvero (asserire successo, non assenza di errore)
 
 Il test deve **fallire prima del fix e passare solo se la feature fa la cosa
