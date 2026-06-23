@@ -138,7 +138,8 @@ su main + `done`; FAIL: correggi e ri-verifica (max 3 loop) → dopo 3 fail
   firestore:rules` (le rules non si auto-deployano — vedi memoria
   [[feedback-schema-rules-deploy]]). (stima: L)
 
-- [ ] **R2 — Cancello di merge nell'hook auto-commit** — Modifica
+- [~] **R2 — Cancello di merge nell'hook auto-commit** — _(in corso: routine
+  peaceful-allen-otgmfi, 2026-06-23)_ — Modifica
   `.claude/hooks/auto-commit-merge.sh`: i branch dei worker delle routine
   (prefisso da decidere, es. `worker/*` o `routine/*`) si **committano ma NON si
   fondono automaticamente su `main`**. La fusione avviene solo via un nuovo
