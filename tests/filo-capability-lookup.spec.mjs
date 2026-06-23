@@ -65,7 +65,7 @@ const turnCount = (app) => app.evaluate(() => globalThis.__filoTurnCount);
 // date. Fa il match DENTRO il main process per non trasferire il prompt intero
 // (grande) attraverso evaluate.
 const turnContains = (app, n, needles) =>
-  app.evaluate(({ i, needles }) => {
+  app.evaluate((_electron, { i, needles }) => {
     const s = (globalThis.__filoMsgsByTurn || [])[i] || '';
     return needles.map((x) => s.includes(x));
   }, { i: n, needles });
