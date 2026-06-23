@@ -586,10 +586,6 @@
       allByClient[c].push(fb);
     }
 
-    // Filtra + ordina i bloccati
-    const withBlock = allFeedbacks.filter((fb) => MR.classifyBlock(fb) !== null);
-    blocked = MR.sortReview(withBlock);
-
     renderList();
   }
 
