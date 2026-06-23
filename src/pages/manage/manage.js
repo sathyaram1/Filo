@@ -270,14 +270,63 @@
     // Bolle chat
     renderThread(fb);
 
-    // Azioni di revisione: solo l'owner può sbloccare. Reset comment + messaggio.
-    mgActions.hidden = !isAdmin;
+    // Azioni contestuali (owner-only):
+    //  - feedback bloccato dal pipeline → "Accetta e sblocca";
+    //  - feedback in chiarimento → box di risposta che lo rimette in coda;
+    //  - altrimenti nessuna azione.
+    const isBlocked = MR.classifyBlock(fb) !== null;
+    const isClarify = (fb.status || 'new') === 'clarify';
+    mgActions.hidden = !(isAdmin && isBlocked);
     mgAcceptComment.value = '';
     setActionMsg('', '');
+    mgClarify.hidden = !(isAdmin && isClarify);
+    mgClarifyText.value = '';
+    setClarifyMsg('', '');
 
     // Chiudi pannello laterale
     closeSidebar();
   }
+
+  function setClarifyMsg(text, kind) {
+    mgClarifyMsg.textContent = text || '';
+    mgClarifyMsg.className = 'mg-action-msg' + (kind ? ` mg-${kind}` : '');
+  }
+
+  // Risposta dell'owner a un feedback in `clarify`: la risposta si appende alle
+  // note (come turno utente, preservando lo storico) e il feedback rientra in
+  // coda (todo) per la prossima passata.
+  async function sendClarifyReply() {
+    if (!selectedId) return;
+    const id = selectedId;
+    const reply = (mgClarifyText.value || '').trim();
+    if (!reply) { mgClarifyText.focus(); return; }
+    const fb = allFeedbacks.find((f) => f._id === id);
+    const oldNotes = (fb && fb.notes) || '';
+    const newNotes = window.SN_FEEDBACK_THREAD
+      ? window.SN_FEEDBACK_THREAD.appendUserTurn(oldNotes, reply, {})
+      : (oldNotes ? `${oldNotes}\n\n${reply}` : reply);
+
+    mgClarifyBtn.disabled = true;
+    setClarifyMsg('Invio in corso…', '');
+    try {
+      const r = await sendToMain({ type: 'feedback_update', id, status: 'todo', notes: newNotes });
+      if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
+      if (fb) { fb.status = 'todo'; fb.notes = newNotes; }
+      // Il feedback non è più in chiarimento: esce dalla tab Ricevuti.
+      selectedId = null;
+      mgDetail.hidden = true;
+      mgDetailEmpty.hidden = false;
+      mgClarify.hidden = true;
+      closeSidebar();
+      renderList();
+    } catch (e) {
+      setClarifyMsg(e.message || 'Errore nell\'invio', 'err');
+    } finally {
+      mgClarifyBtn.disabled = false;
+    }
+  }
+
+  mgClarifyBtn.addEventListener('click', sendClarifyReply);
 
   // ── Azione: accetta e sblocca un feedback bloccato ──────────────────────────
   function setActionMsg(text, kind) {
