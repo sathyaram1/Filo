@@ -107,14 +107,20 @@ if (isMain) {
   let branch = '';
   const bi = args.indexOf('--branch');
   if (bi !== -1) branch = args[bi + 1] || '';
-  const positional = args.filter((a, i) => a !== '--no-git' && a !== '--branch' && !(bi !== -1 && i === bi + 1));
+  // --starred / --unstar: alza/abbassa il flag ⭐ "preferito" (DB2).
+  let starred;
+  if (args.includes('--starred')) starred = true;
+  else if (args.includes('--unstar')) starred = false;
+  const positional = args.filter((a, i) =>
+    a !== '--no-git' && a !== '--branch' && a !== '--starred' && a !== '--unstar'
+    && !(bi !== -1 && i === bi + 1));
   const [id, status, ...noteParts] = positional;
   if (!id || !status) {
-    console.error('Uso: node scripts/queue-triage.mjs <id> <status:todo|done|clarify|review|blocked> "testo note" [--branch <nome>] [--no-git]');
+    console.error('Uso: node scripts/queue-triage.mjs <id> <status:todo|done|clarify|review|blocked|archived> "testo note" [--branch <nome>] [--starred|--unstar] [--no-git]');
     process.exit(1);
   }
   try {
-    const file = queueTriage(id, status, noteParts.length ? noteParts.join(' ') : '', undefined, branch);
+    const file = queueTriage(id, status, noteParts.length ? noteParts.join(' ') : '', undefined, branch, starred);
     console.log(`OK: triage accodato → ${file}`);
     if (noGit) console.log('   (--no-git: file scritto ma non committato)');
     else commitAndPush(file);
