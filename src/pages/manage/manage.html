@@ -264,6 +264,35 @@
     }
     .mg-reasoning em { color: var(--sn-muted); font-style: italic; }
 
+    /* ── Verdetti dei giudici, inline e collassabili (sopra la chat) ──────── */
+    .mg-verdicts {
+      flex: 0 0 auto; max-height: 42%; overflow-y: auto;
+      display: flex; flex-direction: column; gap: 6px;
+      padding: 10px 12px; border-bottom: 1px solid var(--sn-border);
+    }
+    .mg-verdicts[hidden] { display: none; }
+    .mg-verdict {
+      border: 1px solid var(--sn-border); border-radius: 8px;
+      background: var(--sn-bg, transparent);
+    }
+    .mg-verdict > summary {
+      list-style: none; cursor: pointer;
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 10px; font-size: 12px;
+    }
+    .mg-verdict > summary::-webkit-details-marker { display: none; }
+    .mg-verdict-name { font-weight: 600; color: var(--sn-fg); font-size: 13px; }
+    .mg-verdict-caret {
+      margin-left: auto; color: var(--sn-muted); font-size: 11px;
+      transition: transform 0.1s;
+    }
+    .mg-verdict[open] .mg-verdict-caret { transform: rotate(90deg); }
+    .mg-verdict-reason {
+      padding: 0 10px 10px; font-size: 13px; line-height: 1.55;
+      white-space: pre-wrap; word-break: break-word; color: var(--sn-text);
+    }
+    .mg-verdict-reason em { color: var(--sn-muted); font-style: italic; }
+
     /* Mittente */
     .mg-sender-info { display: flex; flex-direction: column; gap: 10px; }
     .mg-sender-stat { font-size: 13px; color: var(--sn-muted); }
