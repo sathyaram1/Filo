@@ -411,7 +411,7 @@ qualcosa di rotto — Filo **invia un feedback in autonomia**, senza azione uten
   **Done**: spec che invia 2 feedback equivalenti → asserisce 1 solo originale
   con priorità alzata e il secondo allegato. (stima: M)
 
-- [ ] **F6 — Completare il manifest: sottosistema ASSISTENTE mancante** — La
+- [~] **F6 — Completare il manifest: sottosistema ASSISTENTE mancante** — _(in corso: routine happy-curie-q67v31, 2026-06-23)_ — La
   verifica del 2026-06-23 (controllo del codice) ha trovato che
   `src/shared/capabilities.js` copre bene browser/menu/pagine (43 voci, il test
   `tests/unit/capabilities.test.mjs` passa) ma **manca tutto il sottosistema
