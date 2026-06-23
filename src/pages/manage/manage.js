@@ -449,6 +449,20 @@
     renderList();
   }
 
+  // ── Hook di test ────────────────────────────────────────────────────────
+  // Solo per gli spec Playwright: inietta feedback e apre il dettaglio
+  // esercitando il VERO codice di rendering, senza duplicarne la logica nel
+  // test (vedi CLAUDE.md → "Test che servono davvero"). Inerte in produzione.
+  window.__mgTest = {
+    setData(fbs) {
+      allFeedbacks = Array.isArray(fbs) ? fbs : [];
+      blocked = MR.sortReview(allFeedbacks.filter((f) => MR.classifyBlock(f) !== null));
+      renderList();
+    },
+    setAdmin(v) { isAdmin = !!v; },
+    openDetail,
+  };
+
   // ── Init ──────────────────────────────────────────────────────────────────
   async function init() {
     await refreshAuth();
