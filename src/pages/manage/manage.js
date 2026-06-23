@@ -16,7 +16,8 @@
   const mgAutoToggle = document.getElementById('mgAutoToggle');
   const mgAutoState  = document.getElementById('mgAutoState');
 
-  // Revisione — lista
+  // Lista (tab corrente)
+  const mgListHead    = document.getElementById('mgListHead');
   const mgListLoading = document.getElementById('mgListLoading');
   const mgList        = document.getElementById('mgList');
   const mgListEmpty   = document.getElementById('mgListEmpty');
