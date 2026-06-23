@@ -86,6 +86,50 @@ test('ogni comando degli shortcut globali è coperto dal manifesto', () => {
   }
 });
 
+test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () => {
+  // Il sottosistema "assistente" (chat, dashboard generata, memoria, note, timer,
+  // notifiche, azioni agentiche) vive negli handler MSG.FILO_* di filo.js. Ogni
+  // handler che corrisponde a una capacità VISIBILE all'utente deve avere una
+  // voce nel manifesto: se aggiungi un nuovo handler FILO_* senza aggiornare il
+  // manifesto (e questa mappa), il test diventa rosso.
+  const src = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers', 'filo.js'), 'utf8');
+  const handlers = [...src.matchAll(/on\(MSG\.(FILO_[A-Z_]+)/g)].map((m) => m[1]);
+  assert.ok(handlers.length >= 10, `mi aspetto ≥10 handler FILO_*, trovati ${handlers.length}`);
+
+  // Handler interni che NON sono una capacità utente a sé (l'agente li usa dietro
+  // le quinte): vanno dichiarati qui per non far fallire il test, ma con una
+  // ragione esplicita così la lista resta onesta.
+  const INTERNAL = new Set([
+    'FILO_GET_STATE', // assemblaggio dello stato (schede/cronologia) per il prompt dell'agente
+  ]);
+
+  // Mappa handler → id della capacità che lo descrive nel manifesto. Più handler
+  // della stessa feature (es. add/get/delete) puntano alla stessa voce.
+  const FILO_MSG_TO_CAP = {
+    FILO_CHAT: 'filo-assistant',
+    FILO_GENERATE_DASHBOARD: 'generate-dashboard',
+    FILO_RUN_ACTION: 'agent-actions',
+    FILO_CONFIRM_ACTION: 'agent-actions',
+    FILO_GET_MEMORY: 'filo-memory',
+    FILO_GET_NOTES: 'filo-notes',
+    FILO_ADD_NOTE: 'filo-notes',
+    FILO_DELETE_NOTE: 'filo-notes',
+    FILO_GET_TIMERS: 'filo-timers',
+    FILO_ADD_TIMER: 'filo-timers',
+    FILO_DELETE_TIMER: 'filo-timers',
+    FILO_STOP_TIMER_ALARM: 'filo-timers',
+    FILO_GET_NOTIFICATIONS: 'filo-notifications',
+    FILO_DISMISS_NOTIFICATION: 'filo-notifications',
+  };
+
+  for (const h of handlers) {
+    if (INTERNAL.has(h)) continue;
+    const capId = FILO_MSG_TO_CAP[h];
+    assert.ok(capId, `handler ${h} non mappato: aggiungi una voce nel manifesto e in FILO_MSG_TO_CAP (o, se è interno, in INTERNAL con la ragione)`);
+    assert.ok(CAP.get(capId), `manca la capacità "${capId}" nel manifesto per l'handler ${h}`);
+  }
+});
+
 test('ogni pagina filo:// citata nel manifesto esiste davvero', () => {
   // Estrai i path filo://<area>/<file>.html dalle invocazioni/descrizioni.
   const refs = new Set();
