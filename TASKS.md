@@ -108,7 +108,13 @@ separata a permessi ridotti** dove gli utenti verificano i fix già rilasciati.
   `da2-list`: larghezza piena, righe singole #236 rosso/#237 arancio col titolo
   troncato).
 
-- [ ] **DA3 — Fix grafica switch "Modalità automatica"** — File:
+- [x] **DA3 — Fix grafica switch "Modalità automatica"** — Track a riposo ora
+  `var(--sn-muted)` (grigio leggibile su chiaro e scuro) invece di `--sn-border`
+  (quasi bianco/invisibile); da acceso resta `--sn-accent`. Lo spec
+  `tests/manage-page.spec.mjs` ora asserisce — in modo theme-agnostico — che il
+  colore della track a riposo sia opaco e DIVERSO da `--sn-border` (va rosso se
+  si regredisce al valore buggato; verificato). Suite manage 10/10 verde.
+- [ ] **DA3 (orig) — Fix grafica switch "Modalità automatica"** — File:
   `src/pages/manage/manage.html` (regole `.mg-switch*` nel `<style>`). Sintomo
   (screenshot owner): si vede solo il pallino bianco, la pista è invisibile
   perché `.mg-switch-track { background: var(--sn-border) }` sul tema chiaro è
