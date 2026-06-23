@@ -38,10 +38,17 @@ const SPOOL_DIR = process.env.FILO_SPOOL_DIR
 // `review` = fix pronto su un branch, in attesa di verifica avversariale;
 // `blocked` = fix in pausa (3 loop falliti o file sensibile nel cancello di
 // merge), decide l'utente. Entrambi accompagnati dal campo `branch`.
-const ALLOWED = ['todo', 'done', 'clarify', 'review', 'blocked'];
+// `archived` (DB2): stato terminale "fuori dalla coda attiva", mostrato nella
+// tab Archiviati della dashboard `manage`. Ci finisce un feedback chiuso e
+// archiviato a mano dall'owner, oppure (DC3) auto-archiviato a punteggio dopo
+// 24h. Diverso da `done`/`verified`: quelli restano "Risolti"; `archived` è il
+// cassetto storico.
+const ALLOWED = ['todo', 'done', 'clarify', 'review', 'blocked', 'archived'];
 
 // Scrive il file di spool (nessun effetto git). Ritorna il path assoluto.
-export function queueTriage(id, status, notes, queuedBy, branch) {
+// `starred` (DB2, opzionale): se booleano, accoda anche il flag ⭐ "preferito"
+// (parcheggiato per il futuro). undefined = non toccare il flag esistente.
+export function queueTriage(id, status, notes, queuedBy, branch, starred) {
   if (!id) throw new Error('id mancante');
   if (!ALLOWED.includes(status)) {
     throw new Error(`status non valido: "${status}" (ammessi: ${ALLOWED.join(', ')})`);
