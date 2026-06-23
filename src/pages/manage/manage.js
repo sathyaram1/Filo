@@ -134,15 +134,36 @@
   }
 
   // ── Tab bar ───────────────────────────────────────────────────────────────
+  // Le tab-lista (inbox/queue/resolved/archived) condividono il pannello
+  // `panel-list`: cambia solo quale sottoinsieme di feedback popola la lista a
+  // sinistra. Le tab segnaposto (stats/models) hanno il loro pannello.
+  function selectTab(tab) {
+    document.querySelectorAll('.mg-tab').forEach((t) => {
+      t.classList.toggle('mg-tab--active', t.dataset.tab === tab);
+    });
+    const isList = LIST_TABS.includes(tab);
+    const panelId = isList ? 'panel-list' : `panel-${tab}`;
+    document.querySelectorAll('.mg-panel').forEach((p) => {
+      p.classList.toggle('mg-panel--active', p.id === panelId);
+    });
+    if (isList) {
+      currentTab = tab;
+      // Cambiando tab si azzera la selezione: il feedback aperto potrebbe non
+      // appartenere alla nuova lista.
+      selectedId = null;
+      mgDetail.hidden = true;
+      mgDetailEmpty.hidden = false;
+      mgActions.hidden = true;
+      mgClarify.hidden = true;
+      closeSidebar();
+      renderList();
+    }
+  }
+
   mgTabs.addEventListener('click', (e) => {
     const btn = e.target.closest('.mg-tab');
     if (!btn) return;
-    const tab = btn.dataset.tab;
-    document.querySelectorAll('.mg-tab').forEach((t) => t.classList.remove('mg-tab--active'));
-    btn.classList.add('mg-tab--active');
-    document.querySelectorAll('.mg-panel').forEach((p) => p.classList.remove('mg-panel--active'));
-    const panel = document.getElementById(`panel-${tab}`);
-    if (panel) panel.classList.add('mg-panel--active');
+    selectTab(btn.dataset.tab);
   });
 
   // ── Lightbox ──────────────────────────────────────────────────────────────
