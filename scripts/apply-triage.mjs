@@ -251,6 +251,9 @@ async function patchFeedback(entry, bearer) {
   // `branch`: il nome del branch git su cui vive il fix (stati review/blocked
   // del cancello di merge). Scritto solo se la coda lo porta; '' lo azzera.
   if (typeof entry.branch === 'string') { fields.branch = toFsValue(entry.branch.slice(0, 200)); mask.push('branch'); }
+  // `starred` (DB2): flag ⭐ "preferito". Booleano; scritto solo se la coda lo
+  // porta, così non si azzera per chi non lo tocca.
+  if (typeof entry.starred === 'boolean') { fields.starred = toFsValue(entry.starred); mask.push('starred'); }
   if (entry.status === 'done') { fields.resolvedAt = { timestampValue: new Date().toISOString() }; mask.push('resolvedAt'); }
   const qs = mask.map((f) => `updateMask.fieldPaths=${encodeURIComponent(f)}`).join('&');
   const url = `${FIRESTORE_BASE}/feedback/${encodeURIComponent(entry.id)}?${qs}`;
