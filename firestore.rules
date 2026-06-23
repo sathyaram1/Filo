@@ -164,7 +164,15 @@ service cloud.firestore {
         // `branch`: nome del branch git su cui vive il fix in attesa di verifica
         // (stati `review`/`blocked` del cancello di merge delle routine).
         && request.resource.data.get('branch', '') is string
-        && request.resource.data.get('branch', '').size() <= 200;
+        && request.resource.data.get('branch', '').size() <= 200
+        // Override di revisione: l'owner sblocca/conferma a mano un feedback
+        // fermato dalla sicurezza, con un commento opzionale. `reviewDecision`
+        // 'accepted' lo riammette nel flusso (vedi SN_MANAGE_REVIEW.classifyBlock).
+        && request.resource.data.get('reviewDecision', '') in ['', 'accepted', 'rejected']
+        && request.resource.data.get('reviewComment', '') is string
+        && request.resource.data.get('reviewComment', '').size() <= 2000
+        && request.resource.data.get('reviewedAt', '') is string
+        && request.resource.data.get('reviewedAt', '').size() <= 40;
 
       // Triage routine (limitato): può solo spostare tra `todo`/`done`/`clarify`
       // e scrivere `notes`/`resolvedAt`. NON tocca `priority`, NON marca
