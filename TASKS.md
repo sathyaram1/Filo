@@ -108,13 +108,7 @@ separata a permessi ridotti** dove gli utenti verificano i fix già rilasciati.
   `da2-list`: larghezza piena, righe singole #236 rosso/#237 arancio col titolo
   troncato).
 
-- [x] **DA3 — Fix grafica switch "Modalità automatica"** — Track a riposo ora
-  `var(--sn-muted)` (grigio leggibile su chiaro e scuro) invece di `--sn-border`
-  (quasi bianco/invisibile); da acceso resta `--sn-accent`. Lo spec
-  `tests/manage-page.spec.mjs` ora asserisce — in modo theme-agnostico — che il
-  colore della track a riposo sia opaco e DIVERSO da `--sn-border` (va rosso se
-  si regredisce al valore buggato; verificato). Suite manage 10/10 verde.
-- [ ] **DA3 (orig) — Fix grafica switch "Modalità automatica"** — File:
+- [x] **DA3 — Fix grafica switch "Modalità automatica"** — File:
   `src/pages/manage/manage.html` (regole `.mg-switch*` nel `<style>`). Sintomo
   (screenshot owner): si vede solo il pallino bianco, la pista è invisibile
   perché `.mg-switch-track { background: var(--sn-border) }` sul tema chiaro è
@@ -123,6 +117,12 @@ separata a permessi ridotti** dove gli utenti verificano i fix già rilasciati.
   DOM input→track è già corretto). **Done**: `test:shoot` off/on in locale mostra
   una pillola con pallino che scorre; in cloud uno spec che asserisce il cambio
   di stato (`.mg-switch-state` Off→On). (stima: S)
+  **Fatto**: la track a riposo era già passata a `var(--sn-muted)` (grigio
+  leggibile su tema chiaro e scuro), da acceso resta `var(--sn-accent)`.
+  Rafforzato `tests/manage-page.spec.mjs`: oltre allo stato Off→On, ora asserisce
+  in modo theme-agnostico che il colore della track a riposo sia opaco e DIVERSO
+  da `--sn-border` — quindi diventa rosso se si regredisce al valore buggato
+  (verificato: rosso col bug, verde col fix). Suite `manage-page` 10/10 verde.
 
 #### Gruppo DB — dashboard unificata (modello dati + tab + migrazione)
 
