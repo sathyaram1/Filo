@@ -200,11 +200,17 @@
   // ── Rendering colonna sinistra ────────────────────────────────────────────
   function renderList() {
     mgListLoading.hidden = true;
-    // Svuota SEMPRE: se `blocked` torna vuoto (es. dopo uno sblocco) non deve
+    if (mgListHead) mgListHead.textContent = TAB_LABELS[currentTab] || '';
+    mgListEmpty.textContent = TAB_EMPTY[currentTab] || 'Nessun feedback.';
+
+    // Sottoinsieme della tab corrente, ordinato (logica pura condivisa).
+    currentList = MR.listForManageTab(allFeedbacks, currentTab);
+
+    // Svuota SEMPRE: se la lista torna vuota (es. dopo uno sblocco) non deve
     // restare la card vecchia in un contenitore nascosto.
     mgList.innerHTML = '';
 
-    if (blocked.length === 0) {
+    if (currentList.length === 0) {
       mgList.hidden = true;
       mgListEmpty.hidden = false;
       return;
@@ -212,7 +218,7 @@
     mgListEmpty.hidden = true;
     mgList.hidden = false;
 
-    for (const fb of blocked) {
+    for (const fb of currentList) {
       const cl = MR.classifyBlock(fb);
       const num = FB.formatNum(fb.seq, fb.subSeq);
       const title = fb.name || FB.fallbackName(fb.text) || '(senza titolo)';
