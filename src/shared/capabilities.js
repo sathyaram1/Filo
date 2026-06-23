@@ -253,6 +253,48 @@
       desc: 'Segnala un problema o una richiesta a chi sviluppa Filo, anche con immagini allegate, e segui le risposte in un thread.',
       invoke: 'Menu del tasto destro → "Feedback", oppure filo://feedback/feedback.html.',
     },
+    {
+      id: 'filo-assistant', title: 'Chiedi a Filo (assistente)', category: 'assistant',
+      desc: 'L’assistente conversazionale di Filo: gli scrivi a parole cosa ti serve e ti risponde, tenendo conto di ciò che gli hai detto in passato. Oltre a rispondere può fare cose per te — aprire pagine, cercare sul web, impostare timer, prendere appunti, regolare preferenze — chiedendoti conferma per le azioni delicate.',
+      invoke: 'Apri una nuova scheda (la sua pagina iniziale è l’assistente) e scrivi nel campo "Chiedi qualsiasi cosa"; in alternativa filo://dashboard/dashboard.html.',
+      doesNot: 'Non interviene sulla pagina web che stai guardando: per farti assistere SU una pagina aperta usa l’assistente laterale (Alt+H). Le risposte si basano sui tuoi dati locali, non condivide nulla all’esterno senza chiedertelo.',
+    },
+    {
+      id: 'generate-dashboard', title: 'Dashboard personale di Filo', category: 'assistant',
+      desc: 'Quando apri una nuova scheda, Filo prepara un breve messaggio per te e qualche suggerimento utile, in base a ciò che stavi facendo e a ciò che ricorda di te.',
+      invoke: 'Si genera da sola all’apertura di una nuova scheda; il messaggio centrale si può nascondere dalle Preferenze ("Commento nella home").',
+      doesNot: 'I suggerimenti nascono dai tuoi dati locali e non vengono inviati all’esterno.',
+    },
+    {
+      id: 'agent-actions', title: 'Filo agisce al posto tuo', category: 'assistant',
+      desc: 'Su tua richiesta Filo può compiere azioni per te: aprire pagine o file, cercare sul web, impostare timer e sveglie, salvare appunti, regolare preferenze e aspetto, archiviare schede, persino inviare un feedback a tuo nome.',
+      invoke: 'Chiedile a parole all’assistente (nuova scheda) oppure all’assistente laterale di pagina (Alt+H).',
+      doesNot: 'Le azioni delicate ti vengono prima descritte e partono solo dopo la tua conferma; le più rischiose (cancellazioni irreversibili) chiedono di digitare "conferma". Non esegue nulla di delicato di nascosto.',
+    },
+    {
+      id: 'filo-memory', title: 'Memoria di Filo', category: 'assistant',
+      desc: 'Filo ricorda nel tempo chi sei e come preferisci le cose (un profilo e le preferenze che impara dalle conversazioni), così le risposte diventano più su misura.',
+      invoke: 'Si costruisce da sola mentre usi l’assistente; per farle dimenticare tutto chiedi a Filo di cancellare la memoria (ti chiederà di digitare "conferma").',
+      doesNot: 'Resta solo sul tuo computer. Ricorda ciò che emerge dalle conversazioni con l’assistente, non il contenuto delle pagine che visiti.',
+    },
+    {
+      id: 'filo-notes', title: 'Appunti di Filo', category: 'assistant',
+      desc: 'Puoi chiedere a Filo di prendere nota di qualcosa ("prendi nota che…"): lo salva tra i suoi appunti e può riusarlo nelle conversazioni successive.',
+      invoke: 'Chiedi all’assistente di salvare un appunto.',
+      doesNot: 'Gli appunti sono salvati solo in locale; tiene gli ultimi e i più vecchi vengono scartati.',
+    },
+    {
+      id: 'filo-timers', title: 'Timer', category: 'assistant',
+      desc: 'Chiedi a Filo di farti da timer ("timer di 10 minuti per la pasta"): il conto alla rovescia compare in alto nella nuova scheda e, allo scadere, parte un avviso sonoro che puoi fermare.',
+      invoke: 'Chiedi un timer all’assistente; i timer attivi e quelli che stanno suonando si vedono in alto nella nuova scheda.',
+      doesNot: 'La suoneria si sente quando Filo è aperto.',
+    },
+    {
+      id: 'filo-notifications', title: 'Avvisi di Filo', category: 'assistant',
+      desc: 'Filo può mostrarti dei brevi avvisi in alto nella nuova scheda (promemoria o segnalazioni discrete) che puoi chiudere quando li hai visti.',
+      invoke: 'Compaiono in alto nella nuova scheda; chiudili con la loro "X".',
+      doesNot: 'Restano dentro Filo: non sono notifiche del sistema operativo.',
+    },
 
     // ─────────────────────────── Pagine interne ──────────────────────────────
     {
