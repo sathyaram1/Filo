@@ -327,6 +327,64 @@ test('il pannello centrale si apre al click e mostra bolle + giudici', async ({ 
     .toContainText('prompt injection');
 });
 
+test('i verdetti di TUTTI i giudici compaiono inline e collassabili, con reasoning (#1, #3)', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK);
+
+  // Esercita il VERO codice di rendering tramite l'hook di test.
+  await page.evaluate((fb) => {
+    window.__mgTest.setData([fb]);
+    window.__mgTest.openDetail(fb._id);
+  }, FAKE_FB);
+
+  // Entrambi i verdetti sono visibili insieme (non uno alla volta).
+  await expect(page.locator('#mgVerdicts .mg-verdict')).toHaveCount(2);
+
+  // Il reasoning di ciascun giudice è presente.
+  await expect(page.locator('#mgVerdicts .mg-verdict-reason').first()).toContainText('aggirare i filtri');
+  await expect(page.locator('#mgVerdicts .mg-verdict-reason').nth(1)).toContainText('Prompt injection');
+
+  // Sono collassabili (<details>) e aperti di default sui blocchi gravi.
+  const firstOpen = await page.locator('#mgVerdicts .mg-verdict').first().evaluate((el) => el.open);
+  expect(firstOpen).toBe(true);
+  // Richiudibili: dopo un toggle, si chiude.
+  await page.locator('#mgVerdicts .mg-verdict summary').first().click();
+  const afterClose = await page.locator('#mgVerdicts .mg-verdict').first().evaluate((el) => el.open);
+  expect(afterClose).toBe(false);
+});
+
+test('nome giudice: anonimizzato per i non-owner, modello reale per l owner (#2)', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK);
+
+  const FB_MODEL = {
+    ...FAKE_FB,
+    _id: 'fb-model-001',
+    pipeline: {
+      ...FAKE_FB.pipeline,
+      verdicts: [{ judge: 'A', class: 'attack', reasoning: 'x', model: 'gemini-3.1-flash-lite' }],
+    },
+  };
+
+  // Non-owner → anonimizzato "Giudice A".
+  await page.evaluate((fb) => {
+    window.__mgTest.setAdmin(false);
+    window.__mgTest.setData([fb]);
+    window.__mgTest.openDetail(fb._id);
+  }, FB_MODEL);
+  await expect(page.locator('#mgVerdicts .mg-verdict-name').first()).toHaveText('Giudice A');
+
+  // Owner → nome del modello reale.
+  await page.evaluate((fb) => {
+    window.__mgTest.setAdmin(true);
+    window.__mgTest.setData([fb]);
+    window.__mgTest.openDetail(fb._id);
+  }, FB_MODEL);
+  await expect(page.locator('#mgVerdicts .mg-verdict-name').first()).toHaveText('gemini-3.1-flash-lite');
+});
+
 test('la pagina carica senza errori JavaScript', async ({ openTab }) => {
   const errors = [];
   const page = await openTab(URL);
