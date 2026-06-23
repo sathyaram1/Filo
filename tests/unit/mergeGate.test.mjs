@@ -68,6 +68,32 @@ function freshClone(base, origin, name) {
   return dir;
 }
 
+// ─── logica pura del CLI (niente git) ───────────────────────────────────────
+
+const { parseArgs, isValidBranch, runSecurityGate } = await import(
+  '../../scripts/merge-gate.mjs'
+);
+
+test('parseArgs: source + target di default main', () => {
+  assert.deepEqual(parseArgs(['worker/1']), { source: 'worker/1', target: 'main', dryRun: false });
+});
+test('parseArgs: --into e --dry-run', () => {
+  assert.deepEqual(parseArgs(['worker/1.2', '--into', 'feature/1', '--dry-run']),
+    { source: 'worker/1.2', target: 'feature/1', dryRun: true });
+});
+test('isValidBranch: accetta nomi tipici, rifiuta injection', () => {
+  assert.ok(isValidBranch('worker/12'));
+  assert.ok(isValidBranch('feature/12.final'));
+  assert.ok(!isValidBranch('--force'));            // niente flag travestiti da branch
+  assert.ok(!isValidBranch('a; rm -rf /'));        // niente metacaratteri shell
+  assert.ok(!isValidBranch('a..b'));               // niente range
+  assert.ok(!isValidBranch(''));
+});
+test('runSecurityGate è un pass-through finché R6 non lo riempie', () => {
+  // R2 fornisce solo il SEAM: deve lasciar passare. R6 lo sostituirà con L4/L5.
+  assert.deepEqual(runSecurityGate('diff qualsiasi', { source: 'worker/1', target: 'main' }), { ok: true });
+});
+
 const skip = !hasGit() ? 'git non disponibile' : false;
 
 test('un branch normale viene ancora auto-pushato su main dall\'hook', { skip }, () => {
