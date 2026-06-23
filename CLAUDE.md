@@ -529,6 +529,13 @@ operative vivono qui — quando ricevi quel prompt in ambiente cloud:
      regredite, o mai finite.
    - **UX** — invarianti mancanti (puoi aggiungere X ma non rimuoverlo?),
      incoerenze tra cammini equivalenti, attriti, stati senza feedback visivo.
+   - **Drift del manifesto capacità** — confronta `src/shared/capabilities.js`
+     con la realtà: una voce che descrive una feature non più presente (o
+     un'invocazione cambiata), oppure una capacità utente reale che nel manifesto
+     **manca**. Parti da `npm run test:unit` (che incrocia shortcut e pagine
+     `filo://`); poi esercita qualche flusso e verifica che ciò che fa combaci
+     con `desc`/`invoke`/`doesNot`. Un manifesto che mente fa promettere il falso
+     all'agente → è un finding reale.
 
    **In questa passata NON correggere nulla di tua iniziativa**: l'obiettivo è
    *trovare e segnalare*, non fixare — decide l'utente cosa vale la pena.
