@@ -244,7 +244,11 @@
         if (cls) dot.classList.add(`mg-dot--${cls}`);
         dot.classList.add('mg-dot--clickable');
         dot.title = `Giudice ${judgeLetters[i]}: ${cls}`;
-        dot.addEventListener('click', () => openSidebarJudge(i, v, judgeLetters[i]));
+        // Click sul pallino → espande il verdetto corrispondente qui sotto.
+        dot.addEventListener('click', () => {
+          const det = mgVerdicts.children[i];
+          if (det) { det.open = true; det.scrollIntoView({ block: 'nearest' }); }
+        });
       } else {
         dot.title = `Giudice ${judgeLetters[i]}: in attesa`;
       }
