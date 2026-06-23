@@ -45,18 +45,12 @@ async function stubSequence(app, turns) {
         model: attempts[0].model, provider: attempts[0].provider, usage: {},
       };
     };
-    // Path non-streaming (agenti in background: lezioni/compattatore/dashboard).
-    // Non conta i turni di chat, ma cattura i messaggi per debug nel caso la
-    // chat finisca su questo path.
-    globalThis.__filoBgMsgs = [];
-    globalThis.SN_PROVIDERS.completeWithFallback = async (opts) => {
-      const { attempts } = opts;
-      globalThis.__filoBgMsgs.push(JSON.stringify(opts.messages || []));
-      return {
-        text: JSON.stringify({ text: '', actions: [] }),
-        model: attempts[0].model, provider: attempts[0].provider, usage: {},
-      };
-    };
+    // Path non-streaming (agenti in background: lezioni/compattatore/dashboard):
+    // risposta innocua, non conta nei turni di chat (che usano lo stream).
+    globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts }) => ({
+      text: JSON.stringify({ text: '', actions: [] }),
+      model: attempts[0].model, provider: attempts[0].provider, usage: {},
+    });
   }, { turns });
 }
 
