@@ -1,13 +1,14 @@
 // Spec Playwright per la pagina di gestione (filo://manage/).
 //
 // Assert di COMPORTAMENTO:
-//   - 3 tab presenti con testo corretto; "Revisione" attiva di default;
-//   - le altre 2 tab mostrano il segnaposto "In arrivo";
+//   - dashboard unificata (DB1): 6 tab, "Ricevuti" attiva di default; le tab
+//     lista (Ricevuti/In coda/Risolti/Archiviati) condividono panel-list;
+//     stats/models sono segnaposto;
 //   - lo switch "Modalità automatica" è sempre visibile (tutte le tab),
 //     si attiva/disattiva e lo stato sopravvive al ricaricamento;
-//   - con dati finti iniettati, un elemento compare nella lista bloccati
-//     e il click apre il pannello centrale con le bolle;
-//   - click sul mittente apre il pannello laterale con le info del mittente.
+//   - con dati finti iniettati, un blocco compare in "In coda" e il click apre
+//     il pannello centrale con le bolle;
+//   - un feedback in `clarify` mostra il box risposta dell'owner sotto Ricevuti.
 
 import { test, expect } from './fixtures/electron.mjs';
 
