@@ -36,6 +36,12 @@
   const mgSideClose  = document.getElementById('mgSideClose');
   const mgSideBody   = document.getElementById('mgSideBody');
 
+  // Revisione — azioni (accetta/sblocca, owner-only)
+  const mgActions       = document.getElementById('mgActions');
+  const mgAcceptComment = document.getElementById('mgAcceptComment');
+  const mgAcceptBtn     = document.getElementById('mgAcceptBtn');
+  const mgActionMsg     = document.getElementById('mgActionMsg');
+
   // Lightbox
   const mgLightbox    = document.getElementById('mgLightbox');
   const mgLightboxImg = document.getElementById('mgLightboxImg');
