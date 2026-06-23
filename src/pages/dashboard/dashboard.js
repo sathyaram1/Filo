@@ -954,6 +954,26 @@
   const AUTO_CONTINUE_PROMPT =
     'Prosegui col prossimo passo usando l’output del comando qui sopra. ' +
     'Se hai completato il compito, rispondi all’utente senza eseguire altri comandi.';
+  // Nudge interno dopo un CAPACITA_DETTAGLIO: ora l'agente ha i dettagli esatti
+  // delle capacità qui sopra e deve rispondere all'utente (non chiederne altri).
+  const AUTO_CONTINUE_CAPABILITY =
+    'Ora hai i dettagli delle capacità di Filo qui sopra. Rispondi all’utente: ' +
+    'se la capacità esiste spiega con parole tue cosa fa e come si usa; se NON ' +
+    'esiste, dillo con onestà senza inventare. Non emettere altre azioni CAPACITA_DETTAGLIO.';
+
+  function isType(a, t) {
+    return a && String(a.type || '').toUpperCase() === t;
+  }
+  // Nudge giusto per il passo automatico successivo, in base a cosa ha appena
+  // fatto Filo: un lookup di capacità chiede una risposta, un comando chiede di
+  // proseguire la sequenza.
+  function autoContinueNudge(actions) {
+    const cmd = Array.isArray(actions) && actions.some((a) => isType(a, 'ESEGUI_COMANDO') && a._output && !a._output.blocked);
+    if (!cmd && Array.isArray(actions) && actions.some((a) => isType(a, 'CAPACITA_DETTAGLIO') && a._output)) {
+      return AUTO_CONTINUE_CAPABILITY;
+    }
+    return AUTO_CONTINUE_PROMPT;
+  }
 
   // Filo deve proseguire da solo quando ha appena ESEGUITO un comando da
   // terminale (output reale tornato) e NON c'è nulla in attesa di conferma. Un
