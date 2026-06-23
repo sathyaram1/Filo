@@ -165,6 +165,9 @@ service cloud.firestore {
         // (stati `review`/`blocked` del cancello di merge delle routine).
         && request.resource.data.get('branch', '') is string
         && request.resource.data.get('branch', '').size() <= 200
+        // `starred` (DB2): flag ⭐ "preferito"/parcheggiato, settabile su
+        // qualunque feedback dall'owner. Booleano puro.
+        && request.resource.data.get('starred', false) is bool
         // Override di revisione: l'owner sblocca/conferma a mano un feedback
         // fermato dalla sicurezza, con un commento opzionale. `reviewDecision`
         // 'accepted' lo riammette nel flusso (vedi SN_MANAGE_REVIEW.classifyBlock).
