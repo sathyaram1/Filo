@@ -61,7 +61,14 @@ async function stubSequence(app, turns) {
 }
 
 const turnCount = (app) => app.evaluate(() => globalThis.__filoTurnCount);
-const msgsForTurn = (app, n) => app.evaluate((i) => globalThis.__filoMsgsByTurn[i] || '', n);
+// Verifica che il prompt+conversazione del turno `n` contenga TUTTE le sottostringhe
+// date. Fa il match DENTRO il main process per non trasferire il prompt intero
+// (grande) attraverso evaluate.
+const turnContains = (app, n, needles) =>
+  app.evaluate(({ i, needles }) => {
+    const s = (globalThis.__filoMsgsByTurn || [])[i] || '';
+    return needles.map((x) => s.includes(x));
+  }, { i: n, needles });
 
 test('Filo consulta il manifesto e risponde col dettaglio reale della capacità', async ({ app, openTab }) => {
   const page = await openTab(NEWTAB);
