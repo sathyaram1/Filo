@@ -1,7 +1,10 @@
-// Dashboard di gestione di Filo (filo://manage/).
-// Sezione "Revisione": mostra i feedback bloccati dal pipeline di sicurezza,
-// con dettaglio a 3 colonne (lista / chat / pannello laterale variabile).
-// Le altre sezioni sono segnaposto per ora.
+// Dashboard di gestione unificata di Filo (filo://manage/, owner-only).
+// Tab-lista (Ricevuti / In coda / Risolti / Archiviati) che condividono un
+// layout a 3 colonne (lista filtrata per tab / dettaglio / pannello laterale):
+// la lista a sinistra mostra il sottoinsieme di feedback della tab corrente,
+// il dettaglio al centro ne mostra la conversazione + azioni contestuali
+// (sblocco per i bloccati, risposta per i chiarimenti). Le tab "Statistiche
+// Red Team" e "Modelli di supporto" sono segnaposto per ora.
 
 (function () {
   'use strict';
