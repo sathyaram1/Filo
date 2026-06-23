@@ -160,7 +160,7 @@ su main + `done`; FAIL: correggi e ri-verifica (max 3 loop) → dopo 3 fail
   root), ma R2 non tocca codice app. **Prossimo**: R6 (L4/L5 nel seam).
   _(Spec originale R2 conservata nella history git, commit precedenti.)_
 
-- [ ] **R6 — Controlli sicurezza L4/L5 nel cancello di merge** (dipende da R2) —
+- [~] **R6 — Controlli sicurezza L4/L5 nel cancello di merge** (dipende da R2) — _(in corso: routine peaceful-allen-h8z99n, 2026-06-23)_ —
   Integra nel `merge-gate.mjs`, prima di ogni fusione su `main`: **L5**
   (deterministico) = se il diff tocca file sensibili (lista da definire allineata
   al DESIGN filo-security: `firestore.rules`, `.claude/hooks/*`, script di
