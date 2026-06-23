@@ -199,3 +199,44 @@ test('listForManageTab: filtra per tab e ordina (queue per severità, altre per 
   assert.deepEqual(MR.listForManageTab(items, 'resolved').map((f) => f._id), ['d1']);
   assert.deepEqual(MR.listForManageTab(items, 'archived').map((f) => f._id), []);
 });
+
+// ── Preferiti ⭐ e tab Archiviati (DB2) ─────────────────────────────────────
+
+test('espone isStarred e listArchiveTab', () => {
+  assert.equal(typeof MR.isStarred, 'function');
+  assert.equal(typeof MR.listArchiveTab, 'function');
+});
+
+test('isStarred: solo starred===true conta', () => {
+  assert.equal(MR.isStarred({ starred: true }), true);
+  assert.equal(MR.isStarred({ starred: false }), false);
+  assert.equal(MR.isStarred({}), false);
+  assert.equal(MR.isStarred(null), false);
+  // niente coercizioni strane: una stringa "true" non è una stella.
+  assert.equal(MR.isStarred({ starred: 'true' }), false);
+});
+
+test('listArchiveTab: senza filtro mostra solo gli archived (recenti prima)', () => {
+  const items = [
+    { _id: 'a1', status: 'archived', createdAt: '2026-01-01' },
+    { _id: 'a2', status: 'archived', createdAt: '2026-06-01' },
+    { _id: 'd1', status: 'done', createdAt: '2026-03-01' },
+    { _id: 's1', status: 'todo', starred: true, createdAt: '2026-05-01' },
+  ];
+  assert.deepEqual(MR.listArchiveTab(items).map((f) => f._id), ['a2', 'a1']);
+  assert.deepEqual(MR.listArchiveTab(items, { starredOnly: false }).map((f) => f._id), ['a2', 'a1']);
+});
+
+test('listArchiveTab: filtro ⭐ mostra TUTTI i preferiti di qualunque status', () => {
+  const items = [
+    { _id: 'a1', status: 'archived', starred: true, createdAt: '2026-01-01' },
+    { _id: 'a2', status: 'archived', createdAt: '2026-06-01' },          // archived ma non ⭐
+    { _id: 's1', status: 'todo', starred: true, createdAt: '2026-05-01' }, // ⭐ ma non archived
+    { _id: 'n1', status: 'new', starred: true, createdAt: '2026-02-01' },
+  ];
+  // Solo i ⭐, di qualunque status, più recenti prima.
+  assert.deepEqual(
+    MR.listArchiveTab(items, { starredOnly: true }).map((f) => f._id),
+    ['s1', 'n1', 'a1']
+  );
+});
