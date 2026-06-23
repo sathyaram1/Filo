@@ -320,5 +320,49 @@
     return CAPABILITIES.slice();
   }
 
-  global.SN_CAPABILITIES = { CATEGORIES, CAPABILITIES, index, get, byCategory, all };
+  // ── Rendering per il prompt dell'agente (F2) ────────────────────────────────
+  //
+  // Indice COMPATTO da tenere sempre in contesto all'agente di chat: una riga per
+  // capacità (titolo + id stabile), raggruppata per categoria. Pesa poco (~44
+  // righe) e basta all'agente per capire SE Filo sa fare una cosa; per il COME
+  // esatto (invoke) e i limiti (doesNot) c'è renderDetailForPrompt(ids), che
+  // l'agente recupera on-demand con l'azione CAPACITA_DETTAGLIO. L'id tra []
+  // serve all'agente per chiedere il dettaglio della voce giusta.
+  function renderIndexForPrompt() {
+    const lines = [];
+    for (const [cat, label] of Object.entries(CATEGORIES)) {
+      const items = CAPABILITIES.filter((c) => c.category === cat);
+      if (!items.length) continue;
+      lines.push(`${label}:`);
+      for (const c of items) lines.push(`  - ${c.title} [${c.id}]`);
+    }
+    return lines.join('\n');
+  }
+
+  // Dettaglio completo (cosa fa / come si attiva / limiti) di una o più capacità
+  // per id, formattato per essere reinserito nel contesto dell'agente come
+  // OSSERVAZIONE (dati, non istruzioni). Gli id sconosciuti vengono segnalati
+  // esplicitamente così l'agente non finge di averli trovati.
+  function renderDetailForPrompt(ids) {
+    const list = Array.isArray(ids) ? ids : (ids ? [ids] : []);
+    if (!list.length) return '(nessuna capacità richiesta)';
+    const blocks = [];
+    for (const rawId of list) {
+      const id = String(rawId || '').trim();
+      const c = get(id);
+      if (!c) {
+        blocks.push(`• "${id}": nessuna capacità con questo id (Filo non sa fare questa cosa).`);
+        continue;
+      }
+      let b = `• ${c.title} [${c.id}]\n  Cosa fa: ${c.desc}\n  Come si attiva: ${c.invoke}`;
+      if (c.doesNot) b += `\n  Limiti: ${c.doesNot}`;
+      blocks.push(b);
+    }
+    return blocks.join('\n\n');
+  }
+
+  global.SN_CAPABILITIES = {
+    CATEGORIES, CAPABILITIES, index, get, byCategory, all,
+    renderIndexForPrompt, renderDetailForPrompt,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
