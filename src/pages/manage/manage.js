@@ -36,11 +36,17 @@
   const mgSideClose  = document.getElementById('mgSideClose');
   const mgSideBody   = document.getElementById('mgSideBody');
 
-  // Revisione — azioni (accetta/sblocca, owner-only)
+  // Azioni (accetta/sblocca un bloccato, owner-only)
   const mgActions       = document.getElementById('mgActions');
   const mgAcceptComment = document.getElementById('mgAcceptComment');
   const mgAcceptBtn     = document.getElementById('mgAcceptBtn');
   const mgActionMsg     = document.getElementById('mgActionMsg');
+
+  // Risposta ai chiarimenti (owner-only)
+  const mgClarify     = document.getElementById('mgClarify');
+  const mgClarifyText = document.getElementById('mgClarifyText');
+  const mgClarifyBtn  = document.getElementById('mgClarifyBtn');
+  const mgClarifyMsg  = document.getElementById('mgClarifyMsg');
 
   // Lightbox
   const mgLightbox    = document.getElementById('mgLightbox');
