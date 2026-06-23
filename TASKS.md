@@ -411,6 +411,25 @@ qualcosa di rotto — Filo **invia un feedback in autonomia**, senza azione uten
   **Done**: spec che invia 2 feedback equivalenti → asserisce 1 solo originale
   con priorità alzata e il secondo allegato. (stima: M)
 
+- [ ] **F6 — Completare il manifest: sottosistema ASSISTENTE mancante** — La
+  verifica del 2026-06-23 (controllo del codice) ha trovato che
+  `src/shared/capabilities.js` copre bene browser/menu/pagine (43 voci, il test
+  `tests/unit/capabilities.test.mjs` passa) ma **manca tutto il sottosistema
+  assistente di Filo**, esposto in `src/main/services/handlers/filo.js`. Aggiungi
+  voci dedicate (id kebab-case stabile, `desc`/`invoke`/`doesNot` per l'utente)
+  per: **memoria di Filo** (`FILO_GET_MEMORY`), **timer** (`FILO_ADD_TIMER`/
+  `GET_TIMERS`/`STOP_TIMER_ALARM`/`DELETE_TIMER`), **note** (`FILO_ADD_NOTE`/
+  `GET_NOTES`/`DELETE_NOTE`), **notifiche** (`FILO_GET_NOTIFICATIONS`/
+  `DISMISS_NOTIFICATION`), **chat con Filo** (`FILO_CHAT`), **genera dashboard**
+  (`FILO_GENERATE_DASHBOARD`), **azioni agentiche sulla pagina** (`FILO_RUN_ACTION`/
+  `FILO_CONFIRM_ACTION` — Filo che agisce al posto dell'utente, col suo confine
+  `doesNot`). **Metodo**: scorri TUTTI gli `MSG.FILO_*` di `filo.js` e ogni voce
+  utente che ne deriva; poi ri-controlla che nessun'altra superficie (content
+  actions, pagine `filo://` come `redteam`, shortcut) sia rimasta fuori. **Done**:
+  ogni feature assistente reale ha una voce nel manifest; estendi
+  `capabilities.test.mjs` perché incroci anche gli `MSG.FILO_*` chiave col
+  manifest e diventi rosso se manca una voce. (stima: M)
+
 ### Sistema crediti + ricompense feedback + popup aggiornamento (spec 2026-06-17)
 
 Spec utente (chat). Decisioni di design confermate dall'utente:
