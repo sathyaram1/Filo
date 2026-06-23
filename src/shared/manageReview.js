@@ -78,6 +78,54 @@
     });
   }
 
-  global.SN_MANAGE_REVIEW = { classifyBlock, sortReview, REASONS };
+  // ── Dashboard unificata (DB1): mappatura feedback → tab ───────────────────
+  // Le tab di `manage` (owner-only) sono:
+  //   inbox    "Ricevuti"   → status `new` (inclusi i ritrovamenti agente/routine,
+  //                           che nascono `new`) + `clarify`
+  //   queue    "In coda"    → `todo` + `review` + i blocchi del pipeline di
+  //                           sicurezza (attacco/spam/design), uniti
+  //   resolved "Risolti"    → `done` + `verified` (DB3 lo restringerà ai soli
+  //                           fix davvero rilasciati)
+  //   archived "Archiviati" → `archived` (DB2)
+  //   ignored / altro       → null (non mostrato nelle tab principali)
+  const QUEUE_OVERRIDE_STOP = ['done', 'verified', 'archived', 'ignored'];
+
+  function manageTabFor(fb) {
+    const s = (fb && fb.status) || 'new';
+
+    // Un blocco del pipeline (attacco/spam/design) vive in "In coda" accanto a
+    // todo/review, a prescindere dallo status grezzo — purché non sia già
+    // chiuso/archiviato/ignorato (in quel caso vince lo status).
+    if (classifyBlock(fb) && !QUEUE_OVERRIDE_STOP.includes(s)) return 'queue';
+
+    switch (s) {
+      case 'new':
+      case 'clarify':   return 'inbox';
+      case 'todo':
+      case 'review':
+      case 'blocked':   return 'queue';
+      case 'done':
+      case 'verified':  return 'resolved';
+      case 'archived':  return 'archived';
+      case 'ignored':   return null;
+      default:          return 'inbox';
+    }
+  }
+
+  // Feedback di una singola tab, già ordinati: "In coda" per severità del blocco
+  // poi recenza (come la Revisione); le altre per createdAt DESC.
+  function listForManageTab(feedbacks, tab) {
+    const items = (feedbacks || []).filter((f) => manageTabFor(f) === tab);
+    if (tab === 'queue') return sortReview(items);
+    return items.slice().sort((a, b) => {
+      const ta = new Date(a.createdAt || 0).getTime();
+      const tb = new Date(b.createdAt || 0).getTime();
+      return tb - ta;
+    });
+  }
+
+  global.SN_MANAGE_REVIEW = {
+    classifyBlock, sortReview, REASONS, manageTabFor, listForManageTab,
+  };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
