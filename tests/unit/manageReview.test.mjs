@@ -81,6 +81,18 @@ test('classifyBlock: spam vince su design', () => {
   assert.notEqual(r.reason, 'design');
 });
 
+test('classifyBlock: reviewDecision=accepted → null anche con pipeline di blocco', () => {
+  // L'override dell'owner vince su qualsiasi verdetto: il feedback esce dai bloccati.
+  assert.equal(MR.classifyBlock({ reviewDecision: 'accepted', pipeline: { action: 'block_attack' } }), null);
+  assert.equal(MR.classifyBlock({ reviewDecision: 'accepted', pipeline: { l2Class: 'spam' } }), null);
+});
+
+test('classifyBlock: reviewDecision diverso da accepted NON sblocca', () => {
+  // Solo 'accepted' sblocca; altri valori lasciano il blocco attivo.
+  const r = MR.classifyBlock({ reviewDecision: 'rejected', pipeline: { action: 'block_attack' } });
+  assert.equal(r.reason, 'attack');
+});
+
 // ── sortReview ─────────────────────────────────────────────────────────────
 
 function fb(id, pipeline, createdAt) {
