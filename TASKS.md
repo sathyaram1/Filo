@@ -224,6 +224,34 @@ su main + `done`; FAIL: correggi e ri-verifica (max 3 loop) → dopo 3 fail
   che `git push origin main` sia autenticato nella sandbox di entrambi gli
   account. Dipende da R1-R4 fatti. (utente)
 
+### Dashboard revisione sicurezza (manage) — fatto, con dipendenze aperte (2026-06-23)
+
+Migliorata la UI di `filo://manage/` tab Revisione (richiesta owner in chat):
+(1) tutti i verdetti dei giudici **inline insieme** (non uno per click); (2) nome
+del **modello** del giudice mostrato all'owner, anonimizzato "Giudice A/B…" per
+gli altri; (3) **reasoning collassabile** sopra la chat; (4) **"Accetta e
+sblocca"** + commento opzionale (owner) → scrive `reviewDecision='accepted'` +
+`reviewComment` + `reviewedAt`, `status`→`todo`, il feedback esce dai Bloccati e
+rientra in coda. Bug collaterale corretto: `renderList` lasciava la card vecchia
+in un contenitore nascosto quando la lista si svuotava. **Verificato**:
+`tests/manage-page.spec.mjs` 10/10 + `tests/unit/manageReview.test.mjs` 18/18.
+File: `src/pages/manage/manage.{html,js}`, `src/shared/manageReview.js`
+(classifyBlock esclude gli accettati), `src/shared/feedback.js` (updateStatus +
+campi review), `src/main/services/handlers/auth.js`, `firestore.rules`.
+
+DIPENDENZE APERTE (non chiudibili da questo repo):
+- [ ] **Deploy rules — AZIONE OWNER**: `firebase deploy --only firestore:rules`
+  perché i nuovi campi `reviewDecision`/`reviewComment`/`reviewedAt` siano
+  accettati lato server (finché non lo fai, l'accept fallisce con permission
+  denied). (Nota: in sospeso anche il deploy rules di R1 per `review`/`blocked`/
+  `branch`.)
+- [ ] **Backend sicurezza (privato) — nome modello nei verdetti**: includere in
+  ogni verdetto un campo `model` (la UI legge `model`, fallback `judgeModel`);
+  senza, l'owner vede comunque "Giudice A".
+- [ ] **Backend sicurezza (privato) — onorare l'override**: un feedback con
+  `reviewDecision === 'accepted'` NON va ri-bloccato alla passata successiva,
+  altrimenti l'accept dell'owner viene annullato.
+
 ### Sicurezza: lettura feedback non più pubblica (spec 2026-06-22)
 
 - [ ] **S1 — Lockdown lettura feedback + canale di lettura per le routine**
