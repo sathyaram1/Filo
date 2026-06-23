@@ -138,10 +138,10 @@ service cloud.firestore {
         isAdmin()
         && request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['status', 'notes', 'resolvedAt', 'verifiedAt', 'priority',
-                    'name', 'seq', 'subSeq', 'branch',
+                    'name', 'seq', 'subSeq', 'branch', 'starred',
                     'claimedBy', 'claimedAt', 'claimExpiresAt', 'claimNum',
                     'reviewDecision', 'reviewComment', 'reviewedAt'])
-        && request.resource.data.get('status', 'new') in ['new', 'draft', 'todo', 'clarify', 'review', 'blocked', 'done', 'verified', 'ignored']
+        && request.resource.data.get('status', 'new') in ['new', 'draft', 'todo', 'clarify', 'review', 'blocked', 'done', 'verified', 'ignored', 'archived']
         && request.resource.data.get('notes', '') is string
         && request.resource.data.get('notes', '').size() <= 10000
         && request.resource.data.get('priority', 0) is int
