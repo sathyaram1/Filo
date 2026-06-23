@@ -388,6 +388,11 @@
     const verdicts = (fb.pipeline && fb.pipeline.verdicts) || [];
     const judgeLetters = ['A', 'B', 'C', 'D'];
 
+    // Senza alcun verdetto la riga giudici non ha senso (es. feedback ricevuti o
+    // in chiarimento, mai passati dal pipeline): nascondila del tutto.
+    if (verdicts.length === 0) { mgJudgesRow.hidden = true; return; }
+    mgJudgesRow.hidden = false;
+
     for (let i = 0; i < 4; i++) {
       const v = verdicts[i];
       const dot = document.createElement('span');
