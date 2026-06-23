@@ -140,7 +140,7 @@ separata a permessi ridotti** dove gli utenti verificano i fix già rilasciati.
   **pre-esistenti** (riprodotti al commit base 953e7a8, indipendenti da `manage`).
   (stima: L)
 
-- [ ] **DB2 — Stato `archived` + flag `starred` (⭐) + rimozione Bozze** — File:
+- [~] **DB2 — Stato `archived` + flag `starred` (⭐) + rimozione Bozze** — File:
   `firestore.rules` (enum `status` + campo `starred` in `affectedKeys().hasOnly`),
   `scripts/queue-triage.mjs` + `scripts/apply-triage.mjs` (nuovo status
   `archived`), `src/shared/feedback.js`, `src/pages/manage/*`. `archived` = nuovo
@@ -150,6 +150,43 @@ separata a permessi ridotti** dove gli utenti verificano i fix già rilasciati.
   gestisce la migrazione DB5). **AZIONE OWNER**: `firebase deploy --only
   firestore:rules`. **Done**: spec — archiviare sposta in Archiviati; ⭐ fa
   comparire nel filtro preferiti; `node --check` sugli script. (stima: M)
+  _(in corso: routine affectionate-faraday-lq7r83, 2026-06-23 — **SUBSTRATO
+  FATTO E VERIFICATO**; manca la **UI owner-app**, lasciata a una sessione con
+  Electron)._
+  - **FATTO (verificato senza Electron):**
+    - `firestore.rules`: aggiunto `archived` all'enum `status` del ramo update
+      admin + chiave `starred` in `affectedKeys().hasOnly` con validazione
+      `is bool`. (NON toccato il ramo `isRoutine`: archiviare/stellare resta
+      owner-only — blast radius stretto.) ⚠️ **AZIONE OWNER residua**: `firebase
+      deploy --only firestore:rules` perché l'owner-app possa scrivere i due campi.
+    - `scripts/queue-triage.mjs`: `archived` in `ALLOWED`; flag CLI
+      `--starred`/`--unstar` + 6° param `starred` in `queueTriage()` (serializza
+      `starred` nello spool). Per DC3 (auto-archivio a punteggio).
+    - `scripts/apply-triage.mjs`: `archived` in `ALLOWED`; scrive il campo
+      `starred` (bool) nel PATCH quando la coda lo porta.
+    - `src/shared/manageReview.js`: `manageTabFor` già instradava `archived`→tab
+      Archiviati (DB1); aggiunti i puri `isStarred(fb)` e
+      `listArchiveTab(feedbacks, {starredOnly})` — filtro OFF = solo `archived`,
+      filtro ⭐ ON = TUTTI i preferiti di qualunque status (recenti prima).
+    - Verifica: `tests/unit/queueTriageArchive.test.mjs` (nuovo, 5 test) +
+      `tests/unit/manageReview.test.mjs` (4 test ⭐ aggiunti) → 9/9 verdi; suite
+      `npm run test:unit` 426/427 (l'unico rosso, `defaultsSecretsMerge`, è un
+      artefatto del sandbox: `require('electron')` non installabile in cloud,
+      non un bug). `node --check` ok su entrambi gli script + smoke CLI.
+  - **MANCA (richiede Electron/Playwright per verificare → prossima sessione):**
+    - `src/pages/manage/manage.{html,js}`: nel pannello dettaglio owner un
+      pulsante **Archivia** (set status `archived`) e un toggle **⭐**; nel
+      header della lista Archiviati un filtro ⭐ che chiama
+      `MR.listArchiveTab(allFeedbacks, {starredOnly})`. Bozze come tab è già
+      assente da DB1 (nessuna rimozione da fare lato UI).
+    - Passaggio `starred` nel percorso owner-app: `src/main/services/handlers/auth.js`
+      (destructure `starred` in `FEEDBACK_UPDATE`) + `src/shared/feedback.js`
+      `updateStatus` (aggiungere `starred` a fields/mask come già fa per
+      `reviewComment`). Le rules lo accettano già (vedi sopra).
+    - `tests/manage-page.spec.mjs`: spec che archivia un feedback e verifica che
+      compaia in Archiviati, e che il filtro ⭐ mostri i soli preferiti.
+    - Patch note utente + eventuale voce in `capabilities.js` SOLO quando la UI
+      è visibile (ora il substrato non è user-visible → niente changelog).
 
 - [ ] **DB3 — "In produzione" = versione rilasciata + `shippedInVersion`** — La
   tab **Risolti** deve contenere solo i fix **davvero deployati**, non ogni
