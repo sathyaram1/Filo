@@ -25,6 +25,21 @@ git rev-parse --git-dir >/dev/null 2>&1 || exit 0
 # The integration branch. Default "main". Override via FILO_MAIN_BRANCH.
 TARGET_BRANCH="${FILO_MAIN_BRANCH:-main}"
 
+# Merge gate (R2): branches matching these prefixes are the routines' worker /
+# feature branches. They get committed and pushed for traceability, but are
+# NEVER auto-merged onto TARGET_BRANCH by this hook. They reach TARGET_BRANCH
+# only through scripts/merge-gate.mjs, invoked by the orchestrator after the
+# adversarial verification PASS (and, per R6, after the L4/L5 security checks).
+# Everything else (the user's local branches, the routines' own driver branch
+# claude/*) keeps the existing auto-merge / auto-push behaviour unchanged.
+is_gated_branch() {
+  case "$1" in
+    worker/*|feature/*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+export -f is_gated_branch 2>/dev/null || true
+
 # Find a worktree (if any) that has TARGET_BRANCH checked out.
 TARGET_WT=$(git worktree list --porcelain | awk -v tb="refs/heads/$TARGET_BRANCH" '
   /^worktree /{wt=substr($0,10)}
