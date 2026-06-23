@@ -992,9 +992,14 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     ? (text) => { try { wc.send('filo:reasoning', { reqId: reasoningReqId, text }); } catch (_) {} }
     : null;
 
+  // Indice COMPATTO delle capacità di Filo, sempre in contesto: l'agente sa SE
+  // Filo fa una cosa e chiede il dettaglio on-demand con CAPACITA_DETTAGLIO (F2).
+  const Caps = globalThis.SN_CAPABILITIES;
+  const capacita = Caps ? Caps.renderIndexForPrompt() : '';
+
   const r = await handleAIRequest({
     action: ACTIONS.FILO_CHAT,
-    payload: { profilo, preferenze, espansioni, lezioni, stato: stateText, threadMessages },
+    payload: { profilo, preferenze, espansioni, lezioni, stato: stateText, threadMessages, capacita },
     origin: 'filo:chat',
     onReasoning,
   });
