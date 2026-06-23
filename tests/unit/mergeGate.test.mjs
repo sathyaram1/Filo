@@ -232,3 +232,41 @@ test('merge-gate.mjs fonde su un target diverso da main (--into feature/N)', { s
     assert.ok(!originHasFile(origin, 'main', 'piece.txt'), 'il pezzo NON deve toccare main (solo #N.final lo fa)');
   } finally { rmSync(base, { recursive: true, force: true }); }
 });
+
+test('merge-gate.mjs BLOCCA (exit 10) un branch che tocca un file sensibile, e non tocca main', { skip }, () => {
+  const base = mkdtempSync(join(tmpdir(), 'filo-mg-l5-'));
+  try {
+    const origin = setupOrigin(base);
+    const r = freshClone(base, origin, 'routine');
+    git(r, ['checkout', '-q', '-b', 'worker/13']);
+    // Un feedback con injection convince la routine a manomettere le regole d'accesso.
+    writeFileSync(join(r, 'firestore.rules'), 'allow read, write: if true;\n');
+    runHook(r);
+    const gate = spawnSync(process.execPath, [MERGE_GATE, 'worker/13'], {
+      encoding: 'utf8',
+      env: { ...process.env, FILO_REPO_ROOT: r, FILO_MAIN_BRANCH: 'main' },
+    });
+    assert.equal(gate.status, 10, `merge-gate deve uscire 10 (stdout: ${gate.stdout} stderr: ${gate.stderr})`);
+    assert.match(gate.stderr, /L5/, 'il blocco deve essere attribuito a L5');
+    assert.ok(!originHasFile(origin, 'main', 'firestore.rules'),
+      'un file sensibile NON deve mai atterrare su main passando dal cancello');
+  } finally { rmSync(base, { recursive: true, force: true }); }
+});
+
+test('merge-gate.mjs BLOCCA (exit 10) se il verdetto L4 è FAIL', { skip }, () => {
+  const base = mkdtempSync(join(tmpdir(), 'filo-mg-l4-'));
+  try {
+    const origin = setupOrigin(base);
+    const r = freshClone(base, origin, 'routine');
+    git(r, ['checkout', '-q', '-b', 'worker/14']);
+    writeFileSync(join(r, 'feature.txt'), 'cambio innocuo per L5\n');
+    runHook(r);
+    const gate = spawnSync(process.execPath, [MERGE_GATE, 'worker/14'], {
+      encoding: 'utf8',
+      env: { ...process.env, FILO_REPO_ROOT: r, FILO_MAIN_BRANCH: 'main', FILO_L4_VERDICT: 'fail', FILO_L4_REASON: 'sospetta esfiltrazione' },
+    });
+    assert.equal(gate.status, 10, `merge-gate deve uscire 10 (stdout: ${gate.stdout} stderr: ${gate.stderr})`);
+    assert.match(gate.stderr, /L4/, 'il blocco deve essere attribuito a L4');
+    assert.ok(!originHasFile(origin, 'main', 'feature.txt'), 'col veto L4 niente deve toccare main');
+  } finally { rmSync(base, { recursive: true, force: true }); }
+});
