@@ -180,10 +180,12 @@
       item.className = 'mg-item' + (fb._id === selectedId ? ' mg-item--selected' : '');
       item.dataset.id = fb._id;
       item.style.borderLeftColor = cl ? cl.color : 'transparent';
+      // Una riga sola: #N · titolo (ellissi). Il motivo (attacco/spam/…) resta
+      // implicito nel colore del border-left; il titolo completo nel tooltip.
+      item.title = (num ? `#${num} · ` : '') + title;
       item.innerHTML = `
         ${num ? `<span class="mg-item-num">#${esc(num)}</span>` : ''}
         <span class="mg-item-title">${esc(title)}</span>
-        ${cl ? `<span class="mg-item-reason" style="color:${cl.color}">${esc(cl.label)}</span>` : ''}
       `;
       item.addEventListener('click', () => openDetail(fb._id));
       mgList.appendChild(item);
