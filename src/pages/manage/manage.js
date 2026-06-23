@@ -596,10 +596,16 @@
   window.__mgTest = {
     setData(fbs) {
       allFeedbacks = Array.isArray(fbs) ? fbs : [];
-      blocked = MR.sortReview(allFeedbacks.filter((f) => MR.classifyBlock(f) !== null));
+      // Reindicizza per mittente (il pannello laterale lo usa).
+      allByClient = {};
+      for (const fb of allFeedbacks) {
+        const c = fb.clientId || '__anon__';
+        (allByClient[c] || (allByClient[c] = [])).push(fb);
+      }
       renderList();
     },
     setAdmin(v) { isAdmin = !!v; },
+    setTab(tab) { selectTab(tab); },
     openDetail,
   };
 
