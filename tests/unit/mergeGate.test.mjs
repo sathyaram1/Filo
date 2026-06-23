@@ -70,7 +70,7 @@ function freshClone(base, origin, name) {
 
 // ─── logica pura del CLI (niente git) ───────────────────────────────────────
 
-const { parseArgs, isValidBranch, runSecurityGate } = await import(
+const { parseArgs, isValidBranch, runSecurityGate, changedPaths, l5SensitiveHits } = await import(
   '../../scripts/merge-gate.mjs'
 );
 
