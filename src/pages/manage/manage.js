@@ -365,50 +365,37 @@
 
   mgSideClose.addEventListener('click', closeSidebar);
 
-  // Verdetti per esteso di TUTTI i giudici, sopra la chat. Ogni verdetto è
-  // collassabile (<details>): classe sempre visibile, reasoning a scomparsa.
-  // Il NOME del giudice è il modello reale SOLO per l'owner (isAdmin); per gli
-  // altri resta anonimizzato in "Giudice A/B/…". Il nome del modello compare
-  // solo se il backend di sicurezza lo include nel verdetto (campo `model`);
-  // altrimenti si ripiega sulla lettera anche per l'owner.
+  // Nome del giudice: il modello reale SOLO per l'owner (isAdmin); per gli altri
+  // resta anonimizzato in "Giudice A/B/…". Il nome del modello compare solo se il
+  // backend di sicurezza lo include nel verdetto (campo `model`); altrimenti si
+  // ripiega sulla lettera anche per l'owner.
   function judgeName(v, letter) {
     const model = v && (v.model || v.judgeModel);
     return (isAdmin && model) ? String(model) : `Giudice ${letter}`;
   }
 
-  function renderVerdicts(fb) {
-    mgVerdicts.innerHTML = '';
+  // Click su un pallino giudice → apre QUEL giudice nel pannello destro:
+  // nome (modello reale per l'owner), badge classe, reasoning completo.
+  function openSidebarJudge(fb, i) {
     const verdicts = (fb.pipeline && fb.pipeline.verdicts) || [];
-    if (!verdicts.length) {
-      mgVerdicts.hidden = true;
-      return;
-    }
-    mgVerdicts.hidden = false;
+    const v = verdicts[i];
+    if (!v) return;
 
     const letters = ['A', 'B', 'C', 'D'];
-    verdicts.forEach((v, i) => {
-      const cls = v.class || '';
-      const letter = v.judge || letters[i] || String(i + 1);
-      const name = judgeName(v, letter);
-      const badgeClass = cls ? `mg-class-badge--${cls}` : '';
+    const letter  = v.judge || letters[i] || String(i + 1);
+    const name    = judgeName(v, letter);
+    const cls     = v.class || '';
+    const badgeClass = cls ? `mg-class-badge--${cls}` : '';
 
-      const det = document.createElement('details');
-      det.className = 'mg-verdict';
-      // Reasoning visibile di default sui blocchi gravi (attacco/spam), così
-      // l'owner lo legge senza un click; richiudibile.
-      det.open = cls === 'attack' || cls === 'spam';
-      det.innerHTML = `
-        <summary>
-          <span class="mg-verdict-name">${esc(name)}</span>
-          <span class="mg-class-badge ${badgeClass}">${esc(cls || '—')}</span>
-          <span class="mg-verdict-caret">▸</span>
-        </summary>
-        <div class="mg-verdict-reason">${
+    const html = `
+      <div class="mg-judge-detail">
+        <span class="mg-class-badge ${badgeClass}">${esc(cls || '—')}</span>
+        <div class="mg-reasoning">${
           v.reasoning ? esc(v.reasoning) : '<em>Nessun ragionamento disponibile.</em>'
         }</div>
-      `;
-      mgVerdicts.appendChild(det);
-    });
+      </div>
+    `;
+    openSidebar(name, html);
   }
 
   function openSidebarSender(clientId) {
