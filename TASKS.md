@@ -297,12 +297,25 @@ qualcosa di rotto — Filo **invia un feedback in autonomia**, senza azione uten
   require nel loader (sentinel smoke scritto). Originariamente stima L. **Done**: file completo, accuratezza verificata incrociando col
   codice (la "verifica retroattiva"). (stima: L)
 
-- [~] **F2 — Esporre il manifest all'agente di Filo (on-demand)** — _(in corso:
-  routine gifted-goldberg-gl8x1i, 2026-06-23)_ — Wire perché
-  l'agente legga il manifest quando ragiona su "cosa può fare Filo / posso fare
-  X?". NON in contesto a ogni turno: **indice compatto** (titoli/categorie)
-  sempre disponibile + **dettaglio lazy** on-demand. **Done**: l'agente risponde
-  correttamente "puoi fare X?" e riconosce "non posso fare Y". (stima: M)
+- [x] **F2 — Esporre il manifest all'agente di Filo (on-demand)** — _(fatto:
+  routine gifted-goldberg-gl8x1i, 2026-06-23. L'agente di chat (filoChat) ora ha
+  SEMPRE in contesto l'**indice compatto** delle capacità (titolo + id per
+  categoria, generato da `SN_CAPABILITIES.renderIndexForPrompt()`), abbastanza per
+  sapere SE Filo fa una cosa senza pesare sul prompt. Il **dettaglio lazy
+  on-demand** è una nuova azione `CAPACITA_DETTAGLIO {ids}` (registrata a livello 1
+  in `actionLevels.js`): l'agente la emette quando gli serve il "come si attiva" o
+  i limiti esatti, l'handler restituisce desc/invoke/doesNot dal manifesto
+  (`renderDetailForPrompt`), e il loop di auto-continuazione della dashboard
+  ri-immette il dettaglio nel contesto (come per l'output dei comandi) così
+  l'agente risponde nello stesso invio. Istruzione di **onestà** nel prompt: se
+  nessuna capacità corrisponde, dire che Filo non sa farlo (niente procedure
+  inventate). Chip "📖 Verifico cosa so fare" per trasparenza. Verifica: 6 unit
+  test in `tests/unit/capabilitiesPrompt.test.mjs` (indice/dettaglio/prompt/livello)
+  + 2 spec Playwright `tests/filo-capability-lookup.spec.mjs` che asseriscono il
+  round-trip (il dettaglio REALE rientra nel contesto al 2° turno) e l'indice
+  sempre presente; suite completa 486 passed, 2 flaky non correlati
+  (proxy/tab-width). **Nota**: il manifesto NON ha una voce per l'assistente di chat
+  stesso — possibile gap da valutare, non toccato qui per non fare scope creep.)_
 
 - [x] **F3 — Regola di sincronizzazione anti-stale** — _(fatto: routine
   affectionate-bell-u2mnxt, 2026-06-23. Aggiunta a CLAUDE.md la sezione
