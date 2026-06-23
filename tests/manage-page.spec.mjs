@@ -164,8 +164,9 @@ test('con dati finti: un elemento su UNA riga (#N + titolo, niente label motivo)
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   // Esercita il VERO renderList tramite l'hook di test (niente replica manuale).
+  // Un blocco "attacco" vive nella tab "In coda": selezionala.
   await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK);
-  await page.evaluate((fb) => window.__mgTest.setData([fb]), FAKE_FB);
+  await page.evaluate((fb) => { window.__mgTest.setData([fb]); window.__mgTest.setTab('queue'); }, FAKE_FB);
 
   // Un elemento in lista, col numero e il titolo.
   await expect(page.locator('.mg-item')).toHaveCount(1);
