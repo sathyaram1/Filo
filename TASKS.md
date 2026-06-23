@@ -281,16 +281,20 @@ Obiettivo: l'agente dentro Filo conosce TUTTO ciò che Filo sa fare (manifest), 
 quando l'utente chiede qualcosa di non supportato — o si lamenta di sfuggita di
 qualcosa di rotto — Filo **invia un feedback in autonomia**, senza azione utente.
 
-- [~] **F1 — Manifest delle capacità (bootstrap retroattivo)** — _(in corso:
-  routine blissful-hamilton-0853rw, 2026-06-23)_ — Crea un file
-  curato e strutturato (es. `src/shared/capabilities.js`, pattern IIFE su
-  globalThis come `patchNotes.js`) che elenca OGNI capacità visibile all'utente.
-  Per voce: `id`, `title`, descrizione in termini utente, come si invoca
-  (shortcut/menu/pagina), `category`, e il confine **"cosa NON fa"** dove
-  rilevante (serve a F4). Bootstrap = **audit vero del codice** (azioni menu in
-  `src/content/*`, shortcut in `src/main/shortcuts.js`, pagine
-  dashboard/options/history/credits, TTS/traduzione/spellcheck/salva-per-dopo/
-  gestione tab…). **Done**: file completo, accuratezza verificata incrociando col
+- [x] **F1 — Manifest delle capacità (bootstrap retroattivo)** — _(fatto:
+  routine blissful-hamilton-0853rw, 2026-06-23)_ — Creato
+  `src/shared/capabilities.js` (IIFE su globalThis come `patchNotes.js`,
+  registrato nel loader dopo patchNotes): **44 capacità** curate e verificate
+  incrociando il codice (shortcut in `src/main/shortcuts.js`, icone/azioni del
+  menu in `src/content/menuIcons.js`+`actions.js`, etichette reali da
+  `src/shared/i18n.js`, le 14 pagine in `src/pages/*`). Ogni voce: `id` stabile
+  kebab-case, `title`, `category` (12 categorie), `desc` e `invoke` in termini
+  utente, `doesNot` dove utile (per F4). API: `index()` (indice compatto
+  id/title/category per F2), `get(id)`, `byCategory()`, `all()`. **Verifica**:
+  unit test `tests/unit/capabilities.test.mjs` (6 test, integrità + anti-stale
+  che incrocia shortcut e pagine filo:// col codice reale → diventa rosso se una
+  capacità deriva); suite unit 388/388 verde; app che bootta con il nuovo
+  require nel loader (sentinel smoke scritto). Originariamente stima L. **Done**: file completo, accuratezza verificata incrociando col
   codice (la "verifica retroattiva"). (stima: L)
 
 - [ ] **F2 — Esporre il manifest all'agente di Filo (on-demand)** — Wire perché
