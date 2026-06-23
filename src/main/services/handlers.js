@@ -966,7 +966,8 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     const role = m.role === 'filo' ? 'assistant' : 'user';
     let content = String(m.text || '');
     if (role === 'assistant') {
-      const obs = commandOutputsForPrompt(m.actions);
+      const obs = [commandOutputsForPrompt(m.actions), capabilityDetailsForPrompt(m.actions)]
+        .filter(Boolean).join('\n\n');
       if (obs) content = content ? `${content}\n\n${obs}` : obs;
     }
     threadMessages.push({ role, content });
