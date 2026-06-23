@@ -375,16 +375,20 @@ test('owner accetta e sblocca un feedback bloccato → patch corretto + esce dai
     };
   });
 
-  // Owner + dati + apri dettaglio (vero codice di rendering).
+  // Owner + dati + tab "In coda" + apri dettaglio (vero codice di rendering).
   await page.evaluate((fb) => {
     window.__mgTest.setAdmin(true);
     window.__mgTest.setData([fb]);
+    window.__mgTest.setTab('queue');
     window.__mgTest.openDetail(fb._id);
   }, FAKE_FB);
 
-  // Per l'owner le azioni sono visibili; un elemento è in lista.
+  // Per l'owner le azioni di sblocco sono visibili; un elemento è in lista.
   await expect(page.locator('#mgActions')).toBeVisible();
   await expect(page.locator('.mg-item')).toHaveCount(1);
+  // Il blocco "attacco" colora il border-left di rosso.
+  const beforeColor = await page.locator('.mg-item').evaluate((el) => getComputedStyle(el).borderLeftColor);
+  expect(beforeColor).not.toBe('rgba(0, 0, 0, 0)');
 
   // Scrivi un commento e accetta.
   await page.locator('#mgAcceptComment').fill('Falso positivo: richiesta legittima.');
@@ -397,9 +401,69 @@ test('owner accetta e sblocca un feedback bloccato → patch corretto + esce dai
   expect(patch.status).toBe('todo');
   expect(patch.reviewComment).toContain('Falso positivo');
 
-  // Esce dai bloccati: lista vuota + dettaglio richiuso.
-  await expect(page.locator('.mg-item')).toHaveCount(0);
+  // Esce dai bloccati: il dettaglio si richiude. Resta in "In coda" come `todo`,
+  // ma senza più il colore di blocco (border-left trasparente).
   await expect(page.locator('#mgDetail')).toBeHidden();
+  await expect(page.locator('.mg-item')).toHaveCount(1);
+  const afterColor = await page.locator('.mg-item').evaluate((el) => getComputedStyle(el).borderLeftColor);
+  expect(afterColor).toBe('rgba(0, 0, 0, 0)');
+});
+
+test('un feedback in `clarify` mostra il box risposta dell owner sotto Ricevuti (DB1)', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
+
+  // Intercetta feedback_update per catturare il patch senza rete/main.
+  await page.evaluate(() => {
+    window.__updates = [];
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'feedback_update') { window.__updates.push(msg); return { ok: true }; }
+      return orig(msg);
+    };
+  });
+
+  const CLARIFY_FB = {
+    _id: 'fb-clarify-001',
+    text: 'Il pulsante X non funziona.',
+    name: 'Pulsante X',
+    seq: 42, subSeq: 0,
+    status: 'clarify',
+    notes: '--- Filo ---\nQuale pulsante X intendi? Non lo trovo.',
+    clientId: 'tester@example.com',
+    createdAt: '2026-06-22T10:00:00Z',
+    images: [],
+  };
+
+  // Owner, tab Ricevuti di default: i `clarify` vivono lì.
+  await page.evaluate((fb) => {
+    window.__mgTest.setAdmin(true);
+    window.__mgTest.setData([fb]);
+  }, CLARIFY_FB);
+
+  // Compare in Ricevuti.
+  await expect(page.locator('#mgListHead')).toHaveText('Ricevuti');
+  await expect(page.locator('.mg-item')).toHaveCount(1);
+
+  // Apri il dettaglio: il box risposta chiarimenti è visibile, lo sblocco no.
+  await page.evaluate((id) => window.__mgTest.openDetail(id), CLARIFY_FB._id);
+  await expect(page.locator('#mgClarify')).toBeVisible();
+  await expect(page.locator('#mgActions')).toBeHidden();
+  // Niente riga giudici per un feedback mai passato dal pipeline.
+  await expect(page.locator('#mgJudgesRow')).toBeHidden();
+
+  // Rispondi: il patch rimette in coda (todo) e appende la risposta alle note.
+  await page.locator('#mgClarifyText').fill('Intendo il pulsante in alto a destra.');
+  await page.locator('#mgClarifyBtn').click();
+
+  await expect.poll(() => page.evaluate(() => window.__updates.length)).toBe(1);
+  const patch = await page.evaluate(() => window.__updates[0]);
+  expect(patch.status).toBe('todo');
+  expect(patch.notes).toContain('Intendo il pulsante in alto a destra');
+  // La risposta data, il feedback lascia Ricevuti (diventa todo → In coda).
+  await expect(page.locator('#mgDetail')).toBeHidden();
+  await expect(page.locator('.mg-item')).toHaveCount(0);
 });
 
 test('la pagina carica senza errori JavaScript', async ({ openTab }) => {
