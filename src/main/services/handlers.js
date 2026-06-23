@@ -960,6 +960,22 @@ function commandOutputsForPrompt(actions) {
   return blocks.join('\n\n').trim();
 }
 
+// Re-immissione del DETTAGLIO delle capacità richieste con CAPACITA_DETTAGLIO in
+// un turno precedente (F2): l'agente vede i dati esatti (cosa fa / come si attiva
+// / limiti) e risponde all'utente senza indovinare l'invocazione a memoria.
+// Sono DATI affidabili di sistema, non istruzioni.
+function capabilityDetailsForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const blocks = [];
+  for (const a of actions) {
+    if (!a || String(a.type || '').toUpperCase() !== 'CAPACITA_DETTAGLIO') continue;
+    const out = a._output;
+    if (!out || !out.detail) continue;
+    blocks.push(`[Dettaglio delle capacità di Filo richiesto]\n${out.detail}`);
+  }
+  return blocks.join('\n\n').trim();
+}
+
 async function handleFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, sender = null }) {
   await FiloMem.touchSession();
   await FiloMem.appendRaw({ type: 'chat_user', summary: String(userMessage || '').slice(0, 200) });
