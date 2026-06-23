@@ -171,8 +171,15 @@ function mergeAndPush(source, target, { dryRun } = {}) {
 
   // 4) Cancello di sicurezza (R6) sul diff target..source PRIMA di fondere.
   const diff = tryGit(['diff', `${target}...${sourceRef}`]).out;
-  const verdict = runSecurityGate(diff, { source, target });
-  if (!verdict.ok) return { code: 10, msg: `bloccato dal cancello di sicurezza: ${verdict.reason || ''}` };
+  const verdict = runSecurityGate(diff, {
+    source, target,
+    // Verdetto L4 prodotto dall'orchestratore (sotto-agente cieco) e passato via
+    // env: il diff lo calcola il gate, il giudizio LLM no (un node script non può
+    // spawnare un Agent sull'abbonamento). Assente = L4 non pone veto.
+    l4Verdict: process.env.FILO_L4_VERDICT,
+    l4Reason: process.env.FILO_L4_REASON,
+  });
+  if (!verdict.ok) return { code: 10, msg: `bloccato dal cancello di sicurezza [${verdict.level}]: ${verdict.reason || ''}` };
 
   // 5) Merge. Conflitto → abort, niente fusione (esito 20).
   const merge = tryGit(['merge', '--no-edit', sourceRef]);
