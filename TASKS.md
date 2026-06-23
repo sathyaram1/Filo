@@ -297,7 +297,8 @@ qualcosa di rotto — Filo **invia un feedback in autonomia**, senza azione uten
   require nel loader (sentinel smoke scritto). Originariamente stima L. **Done**: file completo, accuratezza verificata incrociando col
   codice (la "verifica retroattiva"). (stima: L)
 
-- [ ] **F2 — Esporre il manifest all'agente di Filo (on-demand)** — Wire perché
+- [~] **F2 — Esporre il manifest all'agente di Filo (on-demand)** — _(in corso:
+  routine gifted-goldberg-gl8x1i, 2026-06-23)_ — Wire perché
   l'agente legga il manifest quando ragiona su "cosa può fare Filo / posso fare
   X?". NON in contesto a ogni turno: **indice compatto** (titoli/categorie)
   sempre disponibile + **dettaglio lazy** on-demand. **Done**: l'agente risponde
