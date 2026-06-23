@@ -160,6 +160,9 @@
   // ── Rendering colonna sinistra ────────────────────────────────────────────
   function renderList() {
     mgListLoading.hidden = true;
+    // Svuota SEMPRE: se `blocked` torna vuoto (es. dopo uno sblocco) non deve
+    // restare la card vecchia in un contenitore nascosto.
+    mgList.innerHTML = '';
 
     if (blocked.length === 0) {
       mgList.hidden = true;
@@ -169,7 +172,6 @@
     mgListEmpty.hidden = true;
     mgList.hidden = false;
 
-    mgList.innerHTML = '';
     for (const fb of blocked) {
       const cl = MR.classifyBlock(fb);
       const num = FB.formatNum(fb.seq, fb.subSeq);
