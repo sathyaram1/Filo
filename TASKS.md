@@ -122,20 +122,23 @@ separata a permessi ridotti** dove gli utenti verificano i fix già rilasciati.
 
 #### Gruppo DB — dashboard unificata (modello dati + tab + migrazione)
 
-- [~] **DB1 — Tab unificate in `manage` + merge Ricevuti/Agente/Chiarimenti** —
-  _(in corso: routine intelligent-brown-fnbznf, 2026-06-23)_ —
-  File: `src/pages/manage/manage.{html,js}`, riusando la logica tab/stati da
-  `src/pages/feedback/feedback.js`. Tab (tutta la pagina owner-only): **Ricevuti**
-  (status `new` + ritrovamenti agente/routine + `clarify`, in UNA tab con
-  sezioni/filtri che **preservano il workflow chiarimenti** — la risposta owner
-  ai `clarify` resta possibile), **In coda** (`todo` + `review`/`blocked`
-  insieme), **Risolti** (DB3), **Archiviati** (DB2), **Statistiche Red Team**
-  (placeholder esistente), **Modelli di supporto** (DD1). Stati feedback
-  esistenti: new/todo/clarify/review/blocked/done/verified/ignored. La vecchia
-  `feedback.js` ha già il rendering di queste tab → portarne/riusarne il codice.
-  **NON** eliminare `src/pages/feedback` (coesistenza finché tutto pronto).
-  **Done**: spec che apre manage e asserisce le tab nuove + che un `clarify`
-  mostri il box risposta owner sotto Ricevuti. (stima: L)
+- [x] **DB1 — Tab unificate in `manage` + merge Ricevuti/Agente/Chiarimenti**
+  _(fatto: routine intelligent-brown-fnbznf, 2026-06-23)_ — **Esito**: la
+  dashboard `manage` ha ora 6 tab — **Ricevuti** (`new` + ritrovamenti
+  agente/routine + `clarify`), **In coda** (`todo` + `review` + i blocchi del
+  pipeline, uniti), **Risolti** (`done`/`verified`), **Archiviati** (`archived`),
+  **Statistiche Red Team** (segnaposto), **Modelli di supporto** (segnaposto DD1).
+  Le 4 tab-lista condividono il layout a 3 colonne (`panel-list`): la lista a
+  sinistra è filtrata per tab, il dettaglio al centro mostra azioni contestuali
+  (sblocco per i bloccati, **box risposta owner per i `clarify`** → appende alle
+  note e rimette in `todo`). Logica di mappatura feedback→tab estratta come pura
+  in `manageReview.js` (`manageTabFor`/`listForManageTab`). La vecchia
+  `src/pages/feedback` resta intatta (coesistenza). **Verificato**:
+  `tests/manage-page.spec.mjs` 11/11 (riscritti per la nuova struttura + nuovo
+  test del box chiarimenti sotto Ricevuti), `tests/unit/manageReview.test.mjs`
+  26/26, e `npm test` completo — gli unici rossi (11, tutti in `feedback-*`) sono
+  **pre-esistenti** (riprodotti al commit base 953e7a8, indipendenti da `manage`).
+  (stima: L)
 
 - [ ] **DB2 — Stato `archived` + flag `starred` (⭐) + rimozione Bozze** — File:
   `firestore.rules` (enum `status` + campo `starred` in `affectedKeys().hasOnly`),
