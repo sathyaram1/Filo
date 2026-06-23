@@ -245,12 +245,21 @@ DIPENDENZE APERTE (non chiudibili da questo repo):
   accettati lato server (finché non lo fai, l'accept fallisce con permission
   denied). (Nota: in sospeso anche il deploy rules di R1 per `review`/`blocked`/
   `branch`.)
-- [ ] **Backend sicurezza (privato) — nome modello nei verdetti**: includere in
-  ogni verdetto un campo `model` (la UI legge `model`, fallback `judgeModel`);
-  senza, l'owner vede comunque "Giudice A".
-- [ ] **Backend sicurezza (privato) — onorare l'override**: un feedback con
-  `reviewDecision === 'accepted'` NON va ri-bloccato alla passata successiva,
-  altrimenti l'accept dell'owner viene annullato.
+- [x] **Backend sicurezza (privato) — nome modello nei verdetti** (fatto
+  2026-06-23, repo filo-security commit 7ce1570): `l2/judges.js` (makeJudge) +
+  `l2/index.js` (runPanel) ora includono `model` in ogni verdetto; arriva fino a
+  `pipeline.verdicts[]`. 145/145 test.
+- [x] **Backend sicurezza (privato) — onorare l'override** (fatto 2026-06-23,
+  stesso commit): guardia su `reviewDecision === 'accepted'` (match esatto) in
+  `pipeline.js` `decide()` (→ `owner_accepted`) + short-circuit in `runner.js`
+  (niente chiamate LLM, niente ri-blocco). Test parametrico che varianti
+  ('Accepted',' accepted','accept',null) NON bypassano.
+- [ ] **Deploy functions — AZIONE OWNER**: il codice backend è su
+  `origin/main` di filo-security ma le Cloud Functions vanno **deployate** per
+  andare in produzione: `firebase deploy --only functions` dalla root di
+  filo-security (a meno che non ci sia già una CI che lo fa al push). Finché non
+  è deployato, in produzione i verdetti non avranno `model` e l'override non sarà
+  onorato lato server.
 
 ### Sicurezza: lettura feedback non più pubblica (spec 2026-06-22)
 
