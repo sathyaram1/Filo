@@ -101,10 +101,14 @@ test('Filo consulta il manifesto e risponde col dettaglio reale della capacità'
   // PROVA CHIAVE: al secondo turno il contesto contiene il DETTAGLIO VERO della
   // capacità (descrizione + "come si attiva"), preso dal manifesto — non un testo
   // generico. È questo che permette a Filo di rispondere con verità.
-  const t2 = await msgsForTurn(app, 1);
-  expect(t2).toContain('Mette da parte la pagina corrente'); // desc di save-for-later
-  expect(t2).toContain('Come si attiva');
-  expect(t2).toContain('Alt+S'); // invoke reale della capacità
+  const [hasDesc, hasComeSi, hasInvoke] = await turnContains(app, 1, [
+    'Mette da parte la pagina corrente', // desc di save-for-later
+    'Come si attiva',
+    'Alt+S', // invoke reale della capacità
+  ]);
+  expect(hasDesc).toBe(true);
+  expect(hasComeSi).toBe(true);
+  expect(hasInvoke).toBe(true);
 });
 
 test('l\'indice compatto delle capacità è sempre nel prompt (primo turno)', async ({ app, openTab }) => {
