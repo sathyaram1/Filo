@@ -352,18 +352,20 @@
       });
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
 
-      // Aggiorna lo stato locale e rimuovi dalla colonna Bloccati (ottimistico).
+      // Aggiorna lo stato locale (ottimistico): l'override "accepted" toglie il
+      // blocco e il feedback diventa un `todo` — resta in "In coda", non più tra
+      // i bloccati. renderList ricalcola la lista dalla sorgente.
       const fb = allFeedbacks.find((f) => f._id === id);
       if (fb) { fb.reviewDecision = 'accepted'; fb.reviewComment = comment; fb.status = 'todo'; }
-      blocked = blocked.filter((f) => f._id !== id);
-      renderList();
 
       // Il feedback non è più in revisione: torna allo stato vuoto del dettaglio.
       selectedId = null;
       mgDetail.hidden = true;
       mgDetailEmpty.hidden = false;
       mgActions.hidden = true;
+      mgClarify.hidden = true;
       closeSidebar();
+      renderList();
     } catch (e) {
       setActionMsg(e.message || 'Errore nello sblocco', 'err');
     } finally {
