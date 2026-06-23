@@ -778,6 +778,7 @@
       `    {"type": "SALVA_APPUNTO", "text": "...", "context": "..."},\n` +
       `    {"type": "INVIA_FEEDBACK", "testo": "...", "titolo": "..."},\n` +
       `    {"type": "CERCA_WEB", "query": "..."},\n` +
+      `    {"type": "CAPACITA_DETTAGLIO", "ids": ["save-for-later"]},\n` +
       `    {"type": "EVENTO_CALENDARIO", "date": "YYYY-MM-DD", "time": "HH:MM", "title": "...", "details": "..."},\n` +
       `    {"type": "APRI_FILE", "path": "...", "label": "..."},\n` +
       `    {"type": "PULISCI_TAB"},\n` +
