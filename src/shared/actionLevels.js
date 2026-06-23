@@ -110,6 +110,16 @@
       level: 1,
       describe: (a) => `Cercare sul web "${a.query || ''}"`,
     },
+    CAPACITA_DETTAGLIO: {
+      // Filo consulta il proprio manifesto delle capacità per rispondere a "puoi
+      // fare X?" (#F2). Sola lettura di dati statici interni, nessun effetto
+      // collaterale né uscita verso l'esterno → livello 1.
+      level: 1,
+      describe: (a) => {
+        const ids = Array.isArray(a.ids) ? a.ids : (a.id ? [a.id] : []);
+        return `Verificare cosa sa fare Filo${ids.length ? ` (${ids.join(', ')})` : ''}`;
+      },
+    },
     EVENTO_CALENDARIO: {
       level: 1,
       describe: (a) => `Creare l'evento "${a.title || a.titolo || ''}"`,
