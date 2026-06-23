@@ -136,3 +136,66 @@ test('sortReview: non muta l\'array originale', () => {
 test('sortReview: lista vuota → array vuoto', () => {
   assert.deepEqual(MR.sortReview([]), []);
 });
+
+// ── manageTabFor / listForManageTab (dashboard unificata DB1) ───────────────
+
+test('espone manageTabFor e listForManageTab', () => {
+  assert.equal(typeof MR.manageTabFor, 'function');
+  assert.equal(typeof MR.listForManageTab, 'function');
+});
+
+test('manageTabFor: new e clarify → inbox (Ricevuti)', () => {
+  assert.equal(MR.manageTabFor({ status: 'new' }), 'inbox');
+  assert.equal(MR.manageTabFor({ status: 'clarify' }), 'inbox');
+  // Status assente = nuovo per definizione.
+  assert.equal(MR.manageTabFor({}), 'inbox');
+});
+
+test('manageTabFor: ritrovamenti agente/routine (clientId, status new) → inbox', () => {
+  assert.equal(MR.manageTabFor({ status: 'new', clientId: 'routine:nice-wozniak' }), 'inbox');
+  assert.equal(MR.manageTabFor({ status: 'new', clientId: 'agent:gemini-3.1-flash-lite' }), 'inbox');
+});
+
+test('manageTabFor: todo/review/blocked → queue (In coda)', () => {
+  assert.equal(MR.manageTabFor({ status: 'todo' }), 'queue');
+  assert.equal(MR.manageTabFor({ status: 'review' }), 'queue');
+  assert.equal(MR.manageTabFor({ status: 'blocked' }), 'queue');
+});
+
+test('manageTabFor: un blocco del pipeline → queue qualunque sia lo status grezzo', () => {
+  // Un feedback ancora `new` ma bloccato come attacco appartiene a "In coda".
+  assert.equal(MR.manageTabFor({ status: 'new', pipeline: { action: 'block_attack' } }), 'queue');
+  assert.equal(MR.manageTabFor({ status: 'clarify', pipeline: { l2Class: 'spam' } }), 'queue');
+});
+
+test('manageTabFor: un done/archived/ignored vince sul blocco del pipeline', () => {
+  // Già chiuso/archiviato: lo status vince, non resta in coda.
+  assert.equal(MR.manageTabFor({ status: 'done', pipeline: { action: 'block_attack' } }), 'resolved');
+  assert.equal(MR.manageTabFor({ status: 'archived', pipeline: { l2Class: 'spam' } }), 'archived');
+  assert.equal(MR.manageTabFor({ status: 'ignored', pipeline: { l2Class: 'attack' } }), null);
+});
+
+test('manageTabFor: done e verified → resolved (Risolti); archived → archived; ignored → null', () => {
+  assert.equal(MR.manageTabFor({ status: 'done' }), 'resolved');
+  assert.equal(MR.manageTabFor({ status: 'verified' }), 'resolved');
+  assert.equal(MR.manageTabFor({ status: 'archived' }), 'archived');
+  assert.equal(MR.manageTabFor({ status: 'ignored' }), null);
+});
+
+test('listForManageTab: filtra per tab e ordina (queue per severità, altre per data)', () => {
+  const items = [
+    { _id: 'n1', status: 'new', createdAt: '2026-01-01' },
+    { _id: 'n2', status: 'new', createdAt: '2026-06-01' },
+    { _id: 't1', status: 'todo', createdAt: '2026-02-01' },
+    { _id: 'b1', status: 'new', pipeline: { action: 'block_attack' }, createdAt: '2026-01-01' },
+    { _id: 'd1', status: 'done', createdAt: '2026-03-01' },
+    { _id: 'ig', status: 'ignored', createdAt: '2026-03-01' },
+  ];
+  // inbox: i due `new` puri, più recente prima; il blocco va in queue, non qui.
+  assert.deepEqual(MR.listForManageTab(items, 'inbox').map((f) => f._id), ['n2', 'n1']);
+  // queue: il blocco attacco (severità alta) prima del todo.
+  assert.deepEqual(MR.listForManageTab(items, 'queue').map((f) => f._id), ['b1', 't1']);
+  // resolved / archived.
+  assert.deepEqual(MR.listForManageTab(items, 'resolved').map((f) => f._id), ['d1']);
+  assert.deepEqual(MR.listForManageTab(items, 'archived').map((f) => f._id), []);
+});
