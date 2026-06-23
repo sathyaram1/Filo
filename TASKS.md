@@ -108,15 +108,17 @@ separata a permessi ridotti** dove gli utenti verificano i fix già rilasciati.
   `da2-list`: larghezza piena, righe singole #236 rosso/#237 arancio col titolo
   troncato).
 
-- [ ] **DA3 — Fix grafica switch "Modalità automatica"** — File:
-  `src/pages/manage/manage.html` (regole `.mg-switch*` nel `<style>`). Sintomo
-  (screenshot owner): si vede solo il pallino bianco, la pista è invisibile
-  perché `.mg-switch-track { background: var(--sn-border) }` sul tema chiaro è
-  quasi bianca → non legge come switch. Dare alla track un colore visibile a
-  riposo (grigio più marcato), mantenere `var(--sn-accent)` da acceso (l'ordine
-  DOM input→track è già corretto). **Done**: `test:shoot` off/on in locale mostra
-  una pillola con pallino che scorre; in cloud uno spec che asserisce il cambio
-  di stato (`.mg-switch-state` Off→On). (stima: S)
+- [x] **DA3 — Fix grafica switch "Modalità automatica"** _(fatto: sessione locale
+  2026-06-23)_ — **Esito**: `.mg-switch-track` a riposo passa da `var(--sn-border)`
+  (quasi bianco sul tema chiaro → invisibile) a `var(--sn-muted)`, grigio marcato e
+  theme-aware (chiaro #6e6b63 / scuro #8a8780); acceso resta `var(--sn-accent)`.
+  **Verificato**: `test:shoot` off/on (screenshot `da3-off`/`da3-on`: pillola
+  grigia con pallino che scorre a destra + "On") + assert nello spec esistente
+  "lo switch attiva/disattiva…" che la pista a riposo è `--sn-muted` e NON
+  `--sn-border` (theme-independent, 10/10 verde). Misurato che lo switch NON è
+  tagliato dal bordo (35px di margine reale a innerWidth 1280: l'apparenza tagliata
+  negli screenshot è scaling DPI del composite, non un bug → nessuna regressione da
+  DA2).
 
 #### Gruppo DB — dashboard unificata (modello dati + tab + migrazione)
 
