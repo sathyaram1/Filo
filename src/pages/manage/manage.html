@@ -341,13 +341,15 @@
       <button type="button" class="mg-tab" data-tab="models" role="tab">Modelli di supporto</button>
     </nav>
 
-    <!-- ═══ TAB REVISIONE ═══════════════════════════════════════════════ -->
-    <section class="mg-panel mg-panel--active" id="panel-review" data-panel="review">
+    <!-- ═══ TAB LISTA (Ricevuti / In coda / Risolti / Archiviati) ════════ -->
+    <!-- Layout condiviso a 3 colonne: la lista a sinistra è filtrata per tab,
+         il dettaglio al centro e il pannello laterale a destra sono comuni. -->
+    <section class="mg-panel mg-panel--active" id="panel-list" data-panel="list">
       <div class="mg-review">
 
-        <!-- Colonna sinistra: lista feedback bloccati -->
+        <!-- Colonna sinistra: lista feedback della tab corrente -->
         <div class="mg-col" id="mgListCol">
-          <div class="mg-col-head">Bloccati</div>
+          <div class="mg-col-head" id="mgListHead">Ricevuti</div>
           <div class="mg-col-body" id="mgListBody">
             <div class="mg-loading" id="mgListLoading">Caricamento…</div>
             <div class="mg-list" id="mgList" hidden></div>
