@@ -45,15 +45,15 @@ async function stubSequence(app, turns) {
         model: attempts[0].model, provider: attempts[0].provider, usage: {},
       };
     };
+    // Path non-streaming (agenti in background: lezioni/compattatore/dashboard).
+    // Non conta i turni di chat, ma cattura i messaggi per debug nel caso la
+    // chat finisca su questo path.
+    globalThis.__filoBgMsgs = [];
     globalThis.SN_PROVIDERS.completeWithFallback = async (opts) => {
       const { attempts } = opts;
-      const seq = globalThis.__filoTurns;
-      const n = globalThis.__filoTurnCount;
-      globalThis.__filoTurnCount += 1;
-      globalThis.__filoMsgsByTurn[n] = JSON.stringify(opts.messages || []);
-      const payload = seq[Math.min(n, seq.length - 1)];
+      globalThis.__filoBgMsgs.push(JSON.stringify(opts.messages || []));
       return {
-        text: JSON.stringify(payload),
+        text: JSON.stringify({ text: '', actions: [] }),
         model: attempts[0].model, provider: attempts[0].provider, usage: {},
       };
     };
