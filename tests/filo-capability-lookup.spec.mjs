@@ -32,22 +32,31 @@ async function stubSequence(app, turns) {
     globalThis.__filoTurnCount = 0;
     globalThis.__filoTurns = turns;
     globalThis.__filoMsgsByTurn = [];
-    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages }) => {
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async (opts) => {
+      const { attempts } = opts;
       const seq = globalThis.__filoTurns;
       const n = globalThis.__filoTurnCount;
       globalThis.__filoTurnCount += 1;
       // Cattura il prompt+conversazione di QUESTO turno per le asserzioni.
-      globalThis.__filoMsgsByTurn[n] = JSON.stringify(messages);
+      globalThis.__filoMsgsByTurn[n] = JSON.stringify(opts.messages || []);
       const payload = seq[Math.min(n, seq.length - 1)];
       return {
         text: JSON.stringify(payload),
         model: attempts[0].model, provider: attempts[0].provider, usage: {},
       };
     };
-    globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts }) => ({
-      text: JSON.stringify({ text: '', actions: [] }),
-      model: attempts[0].model, provider: attempts[0].provider, usage: {},
-    });
+    globalThis.SN_PROVIDERS.completeWithFallback = async (opts) => {
+      const { attempts } = opts;
+      const seq = globalThis.__filoTurns;
+      const n = globalThis.__filoTurnCount;
+      globalThis.__filoTurnCount += 1;
+      globalThis.__filoMsgsByTurn[n] = JSON.stringify(opts.messages || []);
+      const payload = seq[Math.min(n, seq.length - 1)];
+      return {
+        text: JSON.stringify(payload),
+        model: attempts[0].model, provider: attempts[0].provider, usage: {},
+      };
+    };
   }, { turns });
 }
 
