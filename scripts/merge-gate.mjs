@@ -71,17 +71,74 @@ function tryGit(args) {
 
 // ─── cancello di sicurezza (R6: L4/L5) ───────────────────────────────────────
 //
-// SEAM PER R6. Qui R6 collega:
-//   - L5 (deterministico): se il diff tocca file sensibili (firestore.rules,
-//     .claude/hooks/*, script di deploy/triage, chiavi/config, auth…) →
-//     { ok:false } → il chiamante esce 10 e mette il feedback in `blocked`.
-//   - L4 (LLM cieco al prompt): un sotto-agente che vede SOLO il diff (mai il
-//     testo del feedback → un'injection nel feedback non può convincerlo) e lo
-//     giudica per problemi di sicurezza; verdetto FAIL → { ok:false }.
-// Finché R6 non è implementato, il cancello è un no-op che lascia passare: R2
-// fornisce solo la TOPOLOGIA dei branch (l'hook non auto-fonde, il merge passa
-// di qui), non i controlli di sicurezza.
-export function runSecurityGate(_diff, _ctx) {
+// Protegge `main` (e quindi gli utenti, via auto-update) dal caso di una routine
+// pilotata da un feedback con prompt-injection che committa codice cattivo.
+//
+//   - L5 (deterministico, gira SEMPRE qui): se il diff tocca file sensibili →
+//     blocco. È il muro con i denti: nessun LLM da convincere, una regola fissa.
+//   - L4 (giudizio LLM, cieco al prompt): un sotto-agente che vede SOLO il diff
+//     (mai il testo del feedback → un'injection nel feedback non può
+//     convincerlo). Il verdetto è prodotto FUORI da questo script — un node
+//     script non può usare l'abbonamento per spawnare un Agent — dall'orchestratore
+//     (vedi R3), e passato qui come `ctx.l4Verdict` (`pass`|`fail`). Qui si APPLICA
+//     soltanto: `fail` → blocco. L'isolamento è strutturale: questa funzione
+//     riceve SOLO il diff + i metadati di branch + il verdetto, MAI il corpo del
+//     feedback.
+//
+// In entrambi i casi { ok:false }: il chiamante esce 10 e l'orchestratore mette
+// il feedback in `blocked` (attende revisione umana).
+
+// Path (relativi alla root del repo) il cui cambiamento richiede sempre revisione
+// umana: regole/config di sicurezza, infrastruttura delle routine, deploy/triage,
+// auth, segreti. La lista è volutamente conservativa: meglio un blocco di troppo
+// (l'utente sblocca) che un file sensibile fuso senza occhi umani.
+export const SENSITIVE_PATTERNS = [
+  /^firestore\.rules$/,                  // regole d'accesso al DB feedback
+  /^storage\.rules$/,                    // regole d'accesso agli screenshot
+  /^firebase\.json$/,                    // config deploy Firebase
+  /^\.firebaserc$/,                      // progetto Firebase di default
+  /^\.claude\/hooks\//,                  // l'auto-commit/merge su cui girano le routine
+  /^\.github\/workflows\//,              // la Action che applica i triage col service account
+  /^scripts\/(apply-triage|merge-gate|claim-feedback|queue-triage|queue-feedback|admin-login)\.mjs$/,
+  /^scripts\/lib\//,                     // firestore-auth, feedback-storage (auth + scrittura)
+  /^src\/main\/services\/handlers\/auth\.js$/, // flusso di login/admin
+  /^src\/shared\/feedback\.js$/,         // client Firestore (porta API key + scritture)
+  /(^|\/)\.env($|\.)/,                   // segreti d'ambiente
+  /\.(pem|key)$/,                        // chiavi private
+  /(service[-_]?account|credentials)[^/]*\.json$/i, // chiavi service-account
+];
+
+// Estrae i path dei file toccati da un diff unificato di git. Robusto su
+// add/delete/rename: legge sia le righe `diff --git a/X b/Y` sia `+++`/`---`.
+export function changedPaths(diff) {
+  if (typeof diff !== 'string' || !diff) return [];
+  const paths = new Set();
+  for (const line of diff.split('\n')) {
+    let m = line.match(/^diff --git a\/(.+?) b\/(.+)$/);
+    if (m) { paths.add(m[1]); paths.add(m[2]); continue; }
+    m = line.match(/^\+\+\+ b\/(.+)$/);
+    if (m && m[1] !== '/dev/null') { paths.add(m[1]); continue; }
+    m = line.match(/^--- a\/(.+)$/);
+    if (m && m[1] !== '/dev/null') { paths.add(m[1]); continue; }
+  }
+  return [...paths];
+}
+
+// L5: i path sensibili toccati dal diff (vuoto = nessuno → L5 passa).
+export function l5SensitiveHits(diff) {
+  return changedPaths(diff).filter((p) => SENSITIVE_PATTERNS.some((re) => re.test(p)));
+}
+
+export function runSecurityGate(diff, ctx = {}) {
+  // L5 — deterministico, con i denti: file sensibili non passano senza occhi umani.
+  const hits = l5SensitiveHits(diff);
+  if (hits.length) {
+    return { ok: false, level: 'L5', reason: `tocca file sensibili: ${hits.join(', ')}` };
+  }
+  // L4 — applica il verdetto del sotto-agente cieco (prodotto dall'orchestratore).
+  if (ctx.l4Verdict === 'fail') {
+    return { ok: false, level: 'L4', reason: ctx.l4Reason || 'revisione di sicurezza LLM: FAIL' };
+  }
   return { ok: true };
 }
 
