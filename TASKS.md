@@ -82,17 +82,17 @@ separata a permessi ridotti** dove gli utenti verificano i fix già rilasciati.
 
 #### Gruppo DA — fix UI su `manage` / Revisione (indipendenti, mandabili subito)
 
-- [ ] **DA1 — Verdetti dei giudici nel pannello destro** — File:
-  `src/pages/manage/manage.js` + `manage.html`. Oggi `renderVerdicts` mostra
-  TUTTI i verdetti inline nel pannello centrale (`#mgVerdicts`, sopra la chat):
-  toglierlo dal centro. Il click su un pallino giudice (`renderJudgesRow`,
-  `.mg-dot--clickable`) deve aprire QUEL giudice nel **pannello destro** (riusa
-  `openSidebar(title, html)` come fa `openSidebarSender`): mostra nome giudice
-  (`judgeName`, modello reale per owner), badge classe, reasoning completo. Il
-  centro resta: head + riga pallini + chat (`mgThread`) + azioni. **Done**: spec
-  in `tests/manage-page.spec.mjs` — click su un pallino con verdetto → il
-  pannello destro mostra quel reasoning, e il centro non contiene più il
-  reasoning esteso. (stima: S)
+- [x] **DA1 — Verdetti dei giudici nel pannello destro** _(fatto: sessione locale
+  2026-06-23)_ — **Esito**: rimosso `renderVerdicts` + l'elemento `#mgVerdicts` (e
+  la CSS `.mg-verdict*` ormai morta) dal pannello centrale. Il click su un pallino
+  giudice con verdetto (`renderJudgesRow`, `.mg-dot--clickable`) ora chiama il nuovo
+  `openSidebarJudge(fb, i)` che apre QUEL giudice nel pannello destro via
+  `openSidebar(name, html)`: titolo = nome giudice (`judgeName`, modello reale per
+  l'owner / "Giudice A/B…" per gli altri), badge classe, reasoning completo. Il
+  centro resta head + riga pallini + chat + azioni. **Verificato**:
+  `tests/manage-page.spec.mjs` 10/10 (riscritti i 2 spec che asserivano i verdetti
+  inline → ora asseriscono pannello destro + assenza reasoning nel centro) +
+  controllo a vista `test:shoot` (screenshot `da1-detail`/`da1-sidebar`).
 
 - [ ] **DA2 — Sfruttare la larghezza + righe feedback su una riga** — File:
   `src/pages/manage/manage.html` (blocco `<style>`). Causa larghezza: `.sn-page
