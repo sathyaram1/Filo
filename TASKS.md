@@ -35,6 +35,246 @@ contesto, per tempo, o perché l'utente chiude), la prossima riparte da qui.
 
 ## Coda
 
+### Dashboard unificata + board utente + modelli di supporto (spec 2026-06-23)
+
+Spec utente (chat 2026-06-23). Obiettivo: far convergere TUTTA la gestione
+feedback nella nuova dashboard `filo://manage/` (la vecchia `filo://feedback/`
+**resta in piedi finché non è tutto pronto** — coesistono, la elimineremo alla
+fine), sistemare i bug UI della tab Revisione, e creare una **board utente
+separata a permessi ridotti** dove gli utenti verificano i fix già rilasciati.
+
+**Decisioni di design confermate dall'utente:**
+- **Tutta `manage` è owner-only.** L'unica superficie a permessi ridotti è la
+  board utente (gruppo DC).
+- Tab di `manage`: **Ricevuti** (new + ritrovamenti agente/routine + chiarimenti,
+  insieme) · **In coda** (todo + review/blocked uniti) · **Risolti** (in
+  produzione) · **Archiviati** (con filtro ⭐) · **Statistiche Red Team** ·
+  **Modelli di supporto**. **Bozze rimosso** → sostituito da un **⭐ preferiti**
+  (parcheggio idee per il futuro) usabile in Archivio.
+- **"In produzione" = il fix è in una versione RILASCIATA** (non basta `done`).
+- **Archiviazione**: dopo 24h, se il **punteggio** dei voti supera una soglia →
+  `archived`. Punteggio = Σ credibilità(voti "funziona") − Σ credibilità(voti
+  "non funziona"); credibilità = 1 per ora. **Override owner** sempre possibile.
+- **Board utente = solo verifica** (funziona/non-funziona) sui fix rilasciati.
+  Superficie **positiva**: mostra solo descrizioni non tecniche, **ZERO info di
+  sicurezza** (niente stati blocked/review, classi, verdetti giudici, priorità).
+  Login per votare/scrivere; anonimi leggono. **10 crediti** a voto (per
+  l'animazione/ricompensa, non il valore), una volta per feedback. **Niente
+  timeout/penalità ora** (si tara solo con dati veri), ma il **substrato della
+  credibilità** si registra subito.
+- **Sanitizzazione**: rimuovere SEMPRE i metadati (identità, orario); **non**
+  riscrivere il testo, salvo che un **LLM** giudichi necessaria una redazione
+  (info personali) e la faccia. Il modello è configurabile.
+- **Modelli di supporto**: una sezione della dashboard che centralizza la scelta
+  di TUTTI i modelli di supporto (sanitizer, giudice L2, giudice red-team,
+  giudice priorità), con UX **analoga a Impostazioni/Modelli e Modelli
+  predefiniti** (riuso del componente esistente `src/shared/modelChainEditor.js`).
+
+**Note di dipendenza / intreccio:**
+- I gruppi **DA** (fix UI) sono indipendenti e mandabili subito.
+- I giudici **L2 e red-team girano nel backend privato `filo-security`** (Cloud
+  Functions), non in questo repo → centralizzare la loro scelta richiede
+  coordinamento cross-repo (config su Firestore letta dalle Functions), vedi DD3.
+- La board (DC) intreccia **S1 (cifratura)**: mostra SOLO la versione
+  sanitizzata, mai il testo grezzo altrui.
+- Più task richiedono `firebase deploy --only firestore:rules` (AZIONE OWNER) per
+  i nuovi stati/campi — vedi memoria [[feedback-schema-rules-deploy]].
+
+#### Gruppo DA — fix UI su `manage` / Revisione (indipendenti, mandabili subito)
+
+- [ ] **DA1 — Verdetti dei giudici nel pannello destro** — File:
+  `src/pages/manage/manage.js` + `manage.html`. Oggi `renderVerdicts` mostra
+  TUTTI i verdetti inline nel pannello centrale (`#mgVerdicts`, sopra la chat):
+  toglierlo dal centro. Il click su un pallino giudice (`renderJudgesRow`,
+  `.mg-dot--clickable`) deve aprire QUEL giudice nel **pannello destro** (riusa
+  `openSidebar(title, html)` come fa `openSidebarSender`): mostra nome giudice
+  (`judgeName`, modello reale per owner), badge classe, reasoning completo. Il
+  centro resta: head + riga pallini + chat (`mgThread`) + azioni. **Done**: spec
+  in `tests/manage-page.spec.mjs` — click su un pallino con verdetto → il
+  pannello destro mostra quel reasoning, e il centro non contiene più il
+  reasoning esteso. (stima: S)
+
+- [ ] **DA2 — Sfruttare la larghezza + righe feedback su una riga** — File:
+  `src/pages/manage/manage.html` (blocco `<style>`). Causa larghezza: `.sn-page
+  { max-width: 960px }` in `src/styles/pages.css:14` strozza la griglia. Su
+  manage **override locale** `.sn-page { max-width: none }` (NON toccare
+  `pages.css` globale, serve alle altre pagine). Righe feedback: `.mg-item` oggi è
+  a 2 righe (titolo a 2 righe + label `.mg-item-reason`); renderla **una riga**
+  `#N · titolo` con ellissi e **togliere la label testuale** del motivo (l'attacco
+  resta implicito dal `border-left` color già impostato da `classifyBlock`).
+  **Done**: la pagina usa la larghezza piena, ogni item è una riga sola colorata;
+  `test:shoot` in locale / in cloud uno spec che asserisce assenza della
+  reason-label e presenza di num+titolo. (stima: S)
+
+- [ ] **DA3 — Fix grafica switch "Modalità automatica"** — File:
+  `src/pages/manage/manage.html` (regole `.mg-switch*` nel `<style>`). Sintomo
+  (screenshot owner): si vede solo il pallino bianco, la pista è invisibile
+  perché `.mg-switch-track { background: var(--sn-border) }` sul tema chiaro è
+  quasi bianca → non legge come switch. Dare alla track un colore visibile a
+  riposo (grigio più marcato), mantenere `var(--sn-accent)` da acceso (l'ordine
+  DOM input→track è già corretto). **Done**: `test:shoot` off/on in locale mostra
+  una pillola con pallino che scorre; in cloud uno spec che asserisce il cambio
+  di stato (`.mg-switch-state` Off→On). (stima: S)
+
+#### Gruppo DB — dashboard unificata (modello dati + tab + migrazione)
+
+- [ ] **DB1 — Tab unificate in `manage` + merge Ricevuti/Agente/Chiarimenti** —
+  File: `src/pages/manage/manage.{html,js}`, riusando la logica tab/stati da
+  `src/pages/feedback/feedback.js`. Tab (tutta la pagina owner-only): **Ricevuti**
+  (status `new` + ritrovamenti agente/routine + `clarify`, in UNA tab con
+  sezioni/filtri che **preservano il workflow chiarimenti** — la risposta owner
+  ai `clarify` resta possibile), **In coda** (`todo` + `review`/`blocked`
+  insieme), **Risolti** (DB3), **Archiviati** (DB2), **Statistiche Red Team**
+  (placeholder esistente), **Modelli di supporto** (DD1). Stati feedback
+  esistenti: new/todo/clarify/review/blocked/done/verified/ignored. La vecchia
+  `feedback.js` ha già il rendering di queste tab → portarne/riusarne il codice.
+  **NON** eliminare `src/pages/feedback` (coesistenza finché tutto pronto).
+  **Done**: spec che apre manage e asserisce le tab nuove + che un `clarify`
+  mostri il box risposta owner sotto Ricevuti. (stima: L)
+
+- [ ] **DB2 — Stato `archived` + flag `starred` (⭐) + rimozione Bozze** — File:
+  `firestore.rules` (enum `status` + campo `starred` in `affectedKeys().hasOnly`),
+  `scripts/queue-triage.mjs` + `scripts/apply-triage.mjs` (nuovo status
+  `archived`), `src/shared/feedback.js`, `src/pages/manage/*`. `archived` = nuovo
+  stato, mostrato in **Archiviati**. **Bozze (`draft`) rimosso come tab**; al suo
+  posto un **⭐ `starred`** che l'owner mette su qualsiasi feedback ("parcheggiato
+  per il futuro"), visibile in Archivio con filtro ⭐ (i `draft` esistenti li
+  gestisce la migrazione DB5). **AZIONE OWNER**: `firebase deploy --only
+  firestore:rules`. **Done**: spec — archiviare sposta in Archiviati; ⭐ fa
+  comparire nel filtro preferiti; `node --check` sugli script. (stima: M)
+
+- [ ] **DB3 — "In produzione" = versione rilasciata + `shippedInVersion`** — La
+  tab **Risolti** deve contenere solo i fix **davvero deployati**, non ogni
+  `done`. Serve sapere in quale versione un fix è uscito. Approccio: al passaggio
+  a `done` (merge su main), stampare `resolvedInVersion` = la prossima release
+  (legare al version bump in `package.json` / al commit `release: vX`); un
+  feedback è "in produzione" quando `resolvedInVersion` ≤ **ultima versione
+  rilasciata** (definire la sorgente di "ultima rilasciata": es. l'ultimo blocco
+  in `src/shared/patchNotes.js` / `app.getVersion()`). Risolti = `done` & in
+  produzione; `done`-ma-non-ancora-spedito resta In coda (o sotto-stato). **Done**:
+  unit/spec — un `done` con `resolvedInVersion` già rilasciata appare in Risolti,
+  uno con versione futura no; documentare come si determina "ultima rilasciata".
+  (stima: M)
+
+- [ ] **DB4 — Struttura dati dei voti di verifica sul feedback** — File:
+  `src/shared/feedback.js` (schema) + `firestore.rules`. Aggiungere al doc
+  feedback la struttura voti: per ogni votante `uid` → `{ vote: 'works'|'broken',
+  at, credibilitySnapshot }`, con conteggi/derivati per il punteggio (DC3). Solo
+  loggati (uid), **un voto per utente, cambiabile**. È il **substrato** letto
+  dalla board (DC*) e dall'archiviazione (DC3) → va definito PRIMA della board.
+  rules: ciascuno scrive solo il proprio voto (`uid == request.auth.uid`). **Done**:
+  unit/spec sullo schema + round-trip; **AZIONE OWNER** deploy rules. (stima: M)
+
+- [ ] **DB5 — Migrazione dei feedback esistenti nella dashboard unificata**
+  (dipende da DB1/DB2) — Far sì che TUTTI i feedback oggi sparsi nella vecchia
+  dashboard (ricevuti, ritrovamenti agente, chiarimenti, draft) compaiano nei
+  posti nuovi corretti di `manage`. I `draft` (Bozze rimossa) → restano sotto
+  Ricevuti nel loro stato, con ⭐ se vanno tenuti per il futuro. **Nessuna perdita
+  dati**: la vecchia `feedback` resta come rete finché l'owner non conferma.
+  **Done**: spec che inietta feedback di vari stati e asserisce in quale tab
+  finiscono. (stima: M)
+
+#### Gruppo DC — board utente (verifica), permessi ridotti
+
+- [ ] **DC1 — Pagina board utente a permessi ridotti** — Nuova pagina (es.
+  `filo://board/board.html`, servita come le altre da `filo://<page>/` →
+  `src/pages/<page>/`). **NON owner-gated**: login per votare/scrivere, anonimi
+  leggono. Mostra SOLO contenuto sicuro: descrizioni non tecniche, **ZERO info di
+  sicurezza** (niente status blocked/review, classi, verdetti giudici, priorità).
+  Superficie **positiva** (novità / conferma / segnala); il red-team resta
+  invisibile. Mostra il testo **sanitizzato** (metadati rimossi sempre; redazione
+  LLM se serve — DD2; finché DD2 non c'è, almeno identità/orario rimossi). **Done**:
+  spec — un non-owner apre la board, vede i risolti votabili, e NON vede
+  status/priorità/verdetti. (stima: M)
+
+- [ ] **DC2 — Voto funziona/non-funziona + ricompensa 10 crediti** (dipende da
+  DB3, DB4) — File: board page + handler IPC + `src/main/services/creditStore.js`.
+  Sui feedback **deployati** (DB3): voto ✅ funziona / ❌ non-funziona, un voto per
+  utente (uid) cambiabile, scritto in DB4. **Ricompensa 10 crediti** a voto, **una
+  volta per feedback per utente** (anti-doppio-premio come `rewardedFeedback` nel
+  credit store), con **animazione** (riusa `flyCredits` di
+  `src/content/feedback.js` / variante home). **NIENTE timeout/penalità.** **Done**:
+  spec — il voto registra + accredita 10 crediti una sola volta; un secondo voto
+  sullo stesso feedback non ripaga. (stima: M)
+
+- [ ] **DC3 — Archiviazione automatica a punteggio dopo 24h** (dipende da DB2,
+  DB4) — Logica pura in `src/shared/*` + unit test (no Electron) + il punto che la
+  applica. Punteggio = Σ credibilità(voti "works") − Σ credibilità(voti "broken"),
+  credibilità = 1 per ora. Dopo **24h** dalla messa in produzione (definire se da
+  produzione o dal primo voto), se punteggio ≥ **soglia configurabile** (default
+  basso alpha, es. 2) → `archived`. **Override owner** sempre. Punteggio
+  fortemente negativo senza riapertura → **emerge all'owner** (sezione/badge "gli
+  utenti dicono che non va"), NON auto-riapre. **Done**: unit — soglia dopo 24h
+  archivia; sotto soglia no; negativo emerge; override owner archivia subito.
+  (stima: M)
+
+- [ ] **DC4 — Riapertura a pagamento** — Dalla board un utente può inviare un
+  feedback che **riapre** un fix verificato (lo toglie da Risolti, torna nell'iter
+  normale), **collegato all'originale**. **Costa pochi crediti** (anti-spam),
+  **ricompensa a risoluzione** come gli altri feedback. **Done**: spec — la
+  riapertura crea un feedback collegato, scala i crediti, e l'originale esce da
+  Risolti. (stima: M)
+
+- [ ] **DC5 — Fondamenta credibilità per utente (substrato, NO policy)** — Campo
+  `credibilità` per utente (=1) in un doc dedicato (es. `users/<uid>` o dentro
+  `credits`). Registrare TUTTO ciò che servirà a calcolarla un domani: storico
+  voti (già DB4), esito (il voto coincideva con la decisione finale?), età
+  account, frequenza — almeno i campi grezzi. Il punto dove il guadagno-da-voto
+  sarà **gated dalla credibilità** esiste ma è **flag spento** (soglia che lascia
+  passare tutti). **NON** implementare timeout/penalità/calcolo dinamico (senza
+  dati si tara alla cieca — deciso). **Done**: unit — i record si salvano; il gate
+  esiste ma è pass-through; cred resta 1. (stima: M)
+
+#### Gruppo DD — modelli di supporto
+
+- [ ] **DD1 — Sezione "Modelli di supporto" (riuso `modelChainEditor`)** — File:
+  `src/pages/manage/*` + riuso `src/shared/modelChainEditor.js` (lo stesso
+  componente dietro Impostazioni/Modelli e admin-defaults/Modelli predefiniti).
+  Sezione owner-only con uno **slot per compito**: **sanitizer**, **giudice L2**,
+  **giudice red-team**, **giudice priorità** (F5). Ogni slot = selettore a catena
+  modelli + fallback, UX identica a `options.js`/`admin-defaults.js`. La scelta va
+  salvata in un posto **leggibile anche dal backend** per i compiti che girano lì
+  (DD3): un doc di config su Firestore. **Done**: spec — la sezione mostra gli slot
+  e salva/ricarica la scelta col componente esistente. (stima: M)
+
+- [ ] **DD2 — Sanitizer LLM dei feedback per la board** (dipende soft da DD1) —
+  Un passo che, prima che un feedback diventi visibile sulla board, **rimuove
+  sempre i metadati** (identità, orario) e fa decidere a un **LLM** se il testo
+  libero va redatto (info personali) e lo redige **solo se necessario**; salva la
+  versione sanitizzata accanto all'originale (l'originale owner-only/cifrato resta
+  per l'owner). Modello = slot "sanitizer" (DD1) con un default se non
+  configurato. **Dove gira**: valutare backend (accanto a L2) vs app; coordinare
+  con `filo-security`. Intreccio **S1**: la board mostra la versione sanitizzata,
+  mai il testo grezzo altrui. **Done**: spec/unit — un testo con info personali
+  viene redatto; uno pulito passa invariato (a parte i metadati). (stima: M)
+
+- [ ] **DD3 — Audit LLM hard-coded + centralizzazione (incl. cross-repo)** —
+  Stanare tutti gli LLM hard-coded e portarli sotto "Modelli di supporto": nel
+  repo principale (es. `src/main/services/safebrowse/llm.js`, i modelli
+  dell'agente in `tests/agent`, i default provider dove ha senso); per i **giudici
+  L2/red-team** che girano in **`filo-security`** (Functions), far leggere al
+  backend la scelta dal doc di config di DD1 (coordinamento cross-repo,
+  documentare in filo-security — vedi memoria [[auto-improvement-loop]]). **Done**:
+  elenco completo degli LLM hard-coded, ognuno spostato nello slot giusto o
+  documentato il perché resta; backend che legge la config. (stima: L,
+  multi-sessione, cross-repo)
+
+#### Differito (design salvato, NON ora) — voto popolare sui design-class
+
+Quando ci sarà una **base utenti vera**, accendere il voto popolare sui feedback
+classificati **"design"** (non miglioramenti puri: potenziali violazioni dei
+principi di Filo / UX peggiorativa) come canale di approvazione, per rendere il
+sistema più autonomo. **Invariante dura**: l'approvazione popolare cambia SOLO
+se/quando un task entra in coda e con che priorità — **non eleva mai la fiducia
+nel testo del feedback né salta il cancello di merge L4/L5 (R6)**. Mitigazioni da
+implementare allora (discusse 2026-06-23): **report-as-attack pre-esecuzione**
+(ha senso solo prima che il fix sia spedito, NON nella verifica), **tenere aperto
+X ore** a prescindere dai voti, **reliability scoring** (substrato già in DC5),
+**classe intermedia con approvazione owner** (già esprimibile via `blocked` +
+review in manage), **sezione commenti** (testo non fidato → escaping rigoroso +
+moderazione owner). Accendere **reward + penalità credibilità INSIEME** (sono due
+metà della stessa moneta: la penalità serve solo perché si paga il voto).
+
 ### Sistema routine: verifica avversariale + cancello di merge + utilizzo budget (spec 2026-06-22)
 
 Spec utente (chat 2026-06-22). Obiettivo: rendere il ciclo delle routine cloud
