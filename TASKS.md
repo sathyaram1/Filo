@@ -177,7 +177,7 @@ su main + `done`; FAIL: correggi e ri-verifica (max 3 loop) → dopo 3 fail
   riceve il testo del feedback. Allineare al DESIGN di filo-security
   ([[auto-improvement-loop]]). (stima: M)
 
-- [ ] **R3 — Recipe orchestratore + worker nel CLAUDE.md** — Riscrivi la sezione
+- [~] **R3 — Recipe orchestratore + worker nel CLAUDE.md** — _(in corso: routine:amazing-galileo-rkaicz, 2026-06-23)_ — Riscrivi la sezione
   "Routine cloud" + "un sub-agente per feedback" con il nuovo flusso:
   orchestratore sottile LLM (loop Agent tool cieco, sotto-agenti su Sonnet,
   cost-check da R4); worker unificato review-or-resolve; isolamento
