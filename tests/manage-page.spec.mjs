@@ -38,41 +38,48 @@ const FAKE_FB = {
   },
 };
 
-test('le 3 tab esistono con il testo corretto e "Revisione" e\' attiva di default', async ({ openTab }) => {
+test('le 6 tab esistono col testo corretto e "Ricevuti" e\' attiva di default (DB1)', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
-  // 3 tab presenti (la ex-tab "Modalità automatica" è diventata uno switch)
-  await expect(page.locator('.mg-tab')).toHaveCount(3);
-
-  // Testi corretti
-  await expect(page.locator('.mg-tab[data-tab="review"]')).toHaveText('Revisione');
-  await expect(page.locator('.mg-tab[data-tab="queue"]')).toHaveText('Coda');
+  // 6 tab della dashboard unificata.
+  await expect(page.locator('.mg-tab')).toHaveCount(6);
+  await expect(page.locator('.mg-tab[data-tab="inbox"]')).toHaveText('Ricevuti');
+  await expect(page.locator('.mg-tab[data-tab="queue"]')).toHaveText('In coda');
+  await expect(page.locator('.mg-tab[data-tab="resolved"]')).toHaveText('Risolti');
+  await expect(page.locator('.mg-tab[data-tab="archived"]')).toHaveText('Archiviati');
   await expect(page.locator('.mg-tab[data-tab="stats"]')).toHaveText('Statistiche Red Team');
+  await expect(page.locator('.mg-tab[data-tab="models"]')).toHaveText('Modelli di supporto');
 
-  // Non esiste più una tab "Modalità automatica"
-  await expect(page.locator('.mg-tab[data-tab="auto"]')).toHaveCount(0);
+  // La vecchia tab "Revisione" non esiste più (assorbita in "In coda").
+  await expect(page.locator('.mg-tab[data-tab="review"]')).toHaveCount(0);
 
-  // "Revisione" attiva di default
-  await expect(page.locator('.mg-tab[data-tab="review"]')).toHaveClass(/mg-tab--active/);
-  await expect(page.locator('#panel-review')).toHaveClass(/mg-panel--active/);
-
-  // Gli altri pannelli non sono attivi
-  await expect(page.locator('#panel-queue')).not.toHaveClass(/mg-panel--active/);
+  // "Ricevuti" attiva di default → mostra il pannello lista condiviso.
+  await expect(page.locator('.mg-tab[data-tab="inbox"]')).toHaveClass(/mg-tab--active/);
+  await expect(page.locator('#panel-list')).toHaveClass(/mg-panel--active/);
+  await expect(page.locator('#mgListHead')).toHaveText('Ricevuti');
 });
 
-test('le tab 2/3 mostrano il segnaposto "In arrivo"', async ({ openTab }) => {
+test('le tab-lista condividono panel-list; stats/models sono segnaposto "In arrivo" (DB1)', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
-  // Coda
-  await page.locator('.mg-tab[data-tab="queue"]').click();
-  await expect(page.locator('#panel-queue')).toHaveClass(/mg-panel--active/);
-  await expect(page.locator('#panel-queue .mg-coming')).toBeVisible();
+  // Le 4 tab-lista usano lo STESSO pannello (panel-list), cambia solo l'intestazione.
+  for (const [tab, head] of [['queue', 'In coda'], ['resolved', 'Risolti'], ['archived', 'Archiviati'], ['inbox', 'Ricevuti']]) {
+    await page.locator(`.mg-tab[data-tab="${tab}"]`).click();
+    await expect(page.locator('#panel-list')).toHaveClass(/mg-panel--active/);
+    await expect(page.locator('#mgListHead')).toHaveText(head);
+  }
 
-  // Statistiche Red Team
+  // Statistiche Red Team → segnaposto dedicato.
   await page.locator('.mg-tab[data-tab="stats"]').click();
+  await expect(page.locator('#panel-stats')).toHaveClass(/mg-panel--active/);
   await expect(page.locator('#panel-stats .mg-coming')).toBeVisible();
+  await expect(page.locator('#panel-list')).not.toHaveClass(/mg-panel--active/);
+
+  // Modelli di supporto → segnaposto dedicato.
+  await page.locator('.mg-tab[data-tab="models"]').click();
+  await expect(page.locator('#panel-models .mg-coming')).toBeVisible();
 });
 
 test('lo switch "Modalità automatica" è sempre visibile ed è read-only per i non-admin', async ({ openTab }) => {
