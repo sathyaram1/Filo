@@ -327,7 +327,7 @@ test('il pannello centrale si apre al click e mostra bolle + giudici', async ({ 
     .toContainText('prompt injection');
 });
 
-test('i verdetti di TUTTI i giudici compaiono inline e collassabili, con reasoning (#1, #3)', async ({ openTab }) => {
+test('click su un pallino giudice apre il reasoning nel pannello destro; il centro non lo contiene piu (DA1)', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK);
@@ -338,23 +338,27 @@ test('i verdetti di TUTTI i giudici compaiono inline e collassabili, con reasoni
     window.__mgTest.openDetail(fb._id);
   }, FAKE_FB);
 
-  // Entrambi i verdetti sono visibili insieme (non uno alla volta).
-  await expect(page.locator('#mgVerdicts .mg-verdict')).toHaveCount(2);
+  // Il centro NON contiene più i verdetti estesi (rimossi da DA1).
+  await expect(page.locator('#mgVerdicts')).toHaveCount(0);
+  await expect(page.locator('#mgDetail')).not.toContainText('aggirare i filtri');
 
-  // Il reasoning di ciascun giudice è presente.
-  await expect(page.locator('#mgVerdicts .mg-verdict-reason').first()).toContainText('aggirare i filtri');
-  await expect(page.locator('#mgVerdicts .mg-verdict-reason').nth(1)).toContainText('Prompt injection');
+  // Il pannello destro parte chiuso (stato vuoto visibile).
+  await expect(page.locator('#mgSideEmpty')).toBeVisible();
+  await expect(page.locator('#mgSide')).toBeHidden();
 
-  // Sono collassabili (<details>) e aperti di default sui blocchi gravi.
-  const firstOpen = await page.locator('#mgVerdicts .mg-verdict').first().evaluate((el) => el.open);
-  expect(firstOpen).toBe(true);
-  // Richiudibili: dopo un toggle, si chiude.
-  await page.locator('#mgVerdicts .mg-verdict summary').first().click();
-  const afterClose = await page.locator('#mgVerdicts .mg-verdict').first().evaluate((el) => el.open);
-  expect(afterClose).toBe(false);
+  // Click sul PRIMO pallino con verdetto → apre quel giudice a destra col reasoning.
+  await page.locator('#mgJudgesRow .mg-dot--clickable').first().click();
+  await expect(page.locator('#mgSide')).toBeVisible();
+  await expect(page.locator('#mgSideBody')).toContainText('aggirare i filtri');
+  // Il badge della classe è presente nel pannello.
+  await expect(page.locator('#mgSideBody .mg-class-badge')).toBeVisible();
+
+  // Click sul SECONDO pallino → il pannello mostra il secondo reasoning.
+  await page.locator('#mgJudgesRow .mg-dot--clickable').nth(1).click();
+  await expect(page.locator('#mgSideBody')).toContainText('Prompt injection');
 });
 
-test('nome giudice: anonimizzato per i non-owner, modello reale per l owner (#2)', async ({ openTab }) => {
+test('nome giudice nel pannello destro: anonimizzato per i non-owner, modello reale per l owner (#2, DA1)', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK);
@@ -368,21 +372,23 @@ test('nome giudice: anonimizzato per i non-owner, modello reale per l owner (#2)
     },
   };
 
-  // Non-owner → anonimizzato "Giudice A".
+  // Non-owner → titolo del pannello anonimizzato "Giudice A".
   await page.evaluate((fb) => {
     window.__mgTest.setAdmin(false);
     window.__mgTest.setData([fb]);
     window.__mgTest.openDetail(fb._id);
   }, FB_MODEL);
-  await expect(page.locator('#mgVerdicts .mg-verdict-name').first()).toHaveText('Giudice A');
+  await page.locator('#mgJudgesRow .mg-dot--clickable').first().click();
+  await expect(page.locator('#mgSideTitle')).toHaveText('Giudice A');
 
-  // Owner → nome del modello reale.
+  // Owner → titolo del pannello = nome del modello reale.
   await page.evaluate((fb) => {
     window.__mgTest.setAdmin(true);
     window.__mgTest.setData([fb]);
     window.__mgTest.openDetail(fb._id);
   }, FB_MODEL);
-  await expect(page.locator('#mgVerdicts .mg-verdict-name').first()).toHaveText('gemini-3.1-flash-lite');
+  await page.locator('#mgJudgesRow .mg-dot--clickable').first().click();
+  await expect(page.locator('#mgSideTitle')).toHaveText('gemini-3.1-flash-lite');
 });
 
 test('owner accetta e sblocca un feedback bloccato → patch corretto + esce dai bloccati (#4)', async ({ openTab }) => {
