@@ -303,7 +303,8 @@ qualcosa di rotto — Filo **invia un feedback in autonomia**, senza azione uten
   sempre disponibile + **dettaglio lazy** on-demand. **Done**: l'agente risponde
   correttamente "puoi fare X?" e riconosce "non posso fare Y". (stima: M)
 
-- [ ] **F3 — Regola di sincronizzazione anti-stale** — Aggiungi al CLAUDE.md la
+- [~] **F3 — Regola di sincronizzazione anti-stale** — _(in corso: routine
+  affectionate-bell-u2mnxt, 2026-06-23)_ — Aggiungi al CLAUDE.md la
   regola: ogni capacità nuova/modificata visibile all'utente → aggiorna il
   manifest (stesso pattern della sezione "Patch notes"). + un angolo di audit per
   le routine che rileva il drift manifest↔realtà. **Done**: regola scritta nel
