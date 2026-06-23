@@ -214,11 +214,9 @@
       openSidebarSender(clientId);
     });
 
-    // Riga giudici (4 pallini, riassunto a colpo d'occhio)
+    // Riga giudici (4 pallini, riassunto a colpo d'occhio). Il click su un
+    // pallino apre QUEL giudice (nome + classe + reasoning) nel pannello destro.
     renderJudgesRow(fb);
-
-    // Verdetti per esteso (tutti i giudici, reasoning collassabile, sopra la chat)
-    renderVerdicts(fb);
 
     // Bolle chat
     renderThread(fb);
