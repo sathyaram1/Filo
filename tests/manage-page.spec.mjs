@@ -385,6 +385,48 @@ test('nome giudice: anonimizzato per i non-owner, modello reale per l owner (#2)
   await expect(page.locator('#mgVerdicts .mg-verdict-name').first()).toHaveText('gemini-3.1-flash-lite');
 });
 
+test('owner accetta e sblocca un feedback bloccato → patch corretto + esce dai bloccati (#4)', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
+
+  // Intercetta feedback_update: cattura il patch e risponde ok, senza rete/main.
+  await page.evaluate(() => {
+    window.__updates = [];
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'feedback_update') { window.__updates.push(msg); return { ok: true }; }
+      return orig(msg);
+    };
+  });
+
+  // Owner + dati + apri dettaglio (vero codice di rendering).
+  await page.evaluate((fb) => {
+    window.__mgTest.setAdmin(true);
+    window.__mgTest.setData([fb]);
+    window.__mgTest.openDetail(fb._id);
+  }, FAKE_FB);
+
+  // Per l'owner le azioni sono visibili; un elemento è in lista.
+  await expect(page.locator('#mgActions')).toBeVisible();
+  await expect(page.locator('.mg-item')).toHaveCount(1);
+
+  // Scrivi un commento e accetta.
+  await page.locator('#mgAcceptComment').fill('Falso positivo: richiesta legittima.');
+  await page.locator('#mgAcceptBtn').click();
+
+  // Il patch inviato contiene l'override + il ritorno in coda + il commento.
+  await expect.poll(() => page.evaluate(() => window.__updates.length)).toBe(1);
+  const patch = await page.evaluate(() => window.__updates[0]);
+  expect(patch.reviewDecision).toBe('accepted');
+  expect(patch.status).toBe('todo');
+  expect(patch.reviewComment).toContain('Falso positivo');
+
+  // Esce dai bloccati: lista vuota + dettaglio richiuso.
+  await expect(page.locator('.mg-item')).toHaveCount(0);
+  await expect(page.locator('#mgDetail')).toBeHidden();
+});
+
 test('la pagina carica senza errori JavaScript', async ({ openTab }) => {
   const errors = [];
   const page = await openTab(URL);
