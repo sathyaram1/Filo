@@ -134,88 +134,31 @@ test('lo switch attiva/disattiva la modalità automatica e lo stato persiste', a
   await expect(page.locator('#mgAutoState')).toHaveText('On');
 });
 
-test('con dati finti: un elemento compare in lista e il click apre il pannello centrale', async ({ openTab }) => {
+test('con dati finti: un elemento su UNA riga (#N + titolo, niente label motivo) — DA2', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
+  // Esercita il VERO renderList tramite l'hook di test (niente replica manuale).
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK);
+  await page.evaluate((fb) => window.__mgTest.setData([fb]), FAKE_FB);
 
-  // Inietta dati finti PRIMA che manage.js li carichi: sostituiamo SN_FEEDBACK.list
-  // con uno stub sincrono. Poiché manage.js usa await FB.list(), il modo più
-  // robusto è aspettare che SN_FEEDBACK sia disponibile (caricato dagli script)
-  // e poi rimpiazzare list.
-  await page.waitForFunction(() => typeof window.SN_FEEDBACK !== 'undefined');
-
-  await page.evaluate((fakeFb) => {
-    // Rimpiazza SN_FEEDBACK.list con uno stub che ritorna il feedback finto
-    window.SN_FEEDBACK.list = async () => [fakeFb];
-    // Rimpiazza anche SN_MANAGE_REVIEW per sicurezza (già caricato)
-    // e forza il ricaricamento dei dati chiamando loadData() se esposta,
-    // oppure eseguiamo la logica direttamente
-  }, FAKE_FB);
-
-  // Re-carica la pagina con lo stub già in place — ma stub post-caricamento
-  // non funziona perché init() è già partito. Usiamo page.addInitScript.
-  // Invece: ricarichiamo la pagina dopo aver impostato lo stub via addInitScript.
-  await page.addInitScript((fakeFb) => {
-    // Questo gira PRIMA di qualsiasi script della pagina: sovrascrive il metodo
-    // list non appena SN_FEEDBACK viene creato.
-    Object.defineProperty(window, '__FAKE_FB__', { value: fakeFb, configurable: true });
-  }, FAKE_FB);
-
-  // Ricarichiamo per applicare lo stub dall'inizio
-  await page.reload();
-  await page.waitForLoadState('domcontentloaded');
-
-  // Ora sovrascriviamo list DOPO il caricamento degli script, poi chiamiamo
-  // una funzione globale che forza il reload dei dati.
-  await page.waitForFunction(() => typeof window.SN_FEEDBACK !== 'undefined');
-  await page.evaluate((fakeFb) => {
-    window.SN_FEEDBACK.list = async () => [fakeFb];
-  }, FAKE_FB);
-
-  // Aspettiamo che la lista carichi (potrebbe essere già caricata con dati
-  // reali se la rete è lenta; la lista sarà vuota o piena). Iniettare direttamente:
-  await page.evaluate((fakeFb) => {
-    const MR = window.SN_MANAGE_REVIEW;
-    const FB = window.SN_FEEDBACK;
-    const mgListLoading = document.getElementById('mgListLoading');
-    const mgList = document.getElementById('mgList');
-    const mgListEmpty = document.getElementById('mgListEmpty');
-
-    const blocked = MR.sortReview([fakeFb].filter(f => MR.classifyBlock(f) !== null));
-
-    // Ripulisci e ri-renderizza
-    if (mgListLoading) mgListLoading.hidden = true;
-    if (mgListEmpty) mgListEmpty.hidden = true;
-    if (!mgList) return;
-    mgList.hidden = false;
-    mgList.innerHTML = '';
-
-    for (const fb of blocked) {
-      const cl = MR.classifyBlock(fb);
-      const num = FB.formatNum(fb.seq, fb.subSeq);
-      const title = fb.name || FB.fallbackName(fb.text) || '(senza titolo)';
-      const item = document.createElement('div');
-      item.className = 'mg-item';
-      item.dataset.id = fb._id;
-      item.style.borderLeftColor = cl ? cl.color : 'transparent';
-      item.innerHTML = (num ? `<span class="mg-item-num">#${num}</span>` : '')
-        + `<span class="mg-item-title">${title}</span>`
-        + (cl ? `<span class="mg-item-reason" style="color:${cl.color}">${cl.label}</span>` : '');
-      mgList.appendChild(item);
-    }
-  }, FAKE_FB);
-
-  // La lista deve avere un elemento
+  // Un elemento in lista, col numero e il titolo.
   await expect(page.locator('.mg-item')).toHaveCount(1);
-
-  // Il titolo è corretto
   await expect(page.locator('.mg-item-title')).toHaveText('Test attacco finto');
-
-  // Il numero è corretto (#99)
   await expect(page.locator('.mg-item-num')).toHaveText('#99');
 
-  // Il motivo è "Attacco"
-  await expect(page.locator('.mg-item-reason')).toHaveText('Attacco');
+  // DA2: la label testuale del motivo è stata rimossa (resta solo il colore del
+  // border-left). Il titolo è su una riga sola (no clamp a 2 righe).
+  await expect(page.locator('.mg-item-reason')).toHaveCount(0);
+  const whiteSpace = await page.locator('.mg-item-title').evaluate(
+    (el) => getComputedStyle(el).whiteSpace
+  );
+  expect(whiteSpace).toBe('nowrap');
+
+  // Il border-left porta ancora il colore della classe (attacco = rosso).
+  const borderColor = await page.locator('.mg-item').evaluate(
+    (el) => getComputedStyle(el).borderLeftColor
+  );
+  expect(borderColor).not.toBe('rgba(0, 0, 0, 0)'); // non trasparente
 });
 
 test('il pannello centrale si apre al click e mostra bolle + giudici', async ({ openTab }) => {
