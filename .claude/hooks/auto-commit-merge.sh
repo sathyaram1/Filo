@@ -108,6 +108,13 @@ else
   # Push the feature branch (best-effort, for traceability/debugging).
   git push origin "$CUR_BRANCH" >/dev/null 2>&1 || true
 
+  # Gated branches (worker/*, feature/*) stop here: they are pushed for
+  # traceability but must NOT land on TARGET_BRANCH automatically. The
+  # orchestrator merges them via scripts/merge-gate.mjs after PASS (R2).
+  if is_gated_branch "$CUR_BRANCH"; then
+    exit 0
+  fi
+
   # Push HEAD to TARGET_BRANCH on origin. Fast-forward only (no --force).
   # If origin/TARGET_BRANCH has moved ahead concurrently, push is rejected →
   # the feature branch is still on origin so nothing is lost; the next run can
