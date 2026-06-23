@@ -279,39 +279,48 @@ DIPENDENZE APERTE (non chiudibili da questo repo):
   `text`/`name`/`notes` in `feedback-triage/*.json` e fanno commit+push sul repo
   **pubblico**, e restano **nella history per sempre** anche dopo che la Action
   svuota la coda. Quindi S1 deve chiudere DUE canali: Firestore E il git.
-  Due approcci candidati (da decidere, NON risolti):
-  - **(A) Canale privato**: lettura Firestore solo admin/service-account + coda
-    git spostata in un **repo privato** (es. `filo-security`). Pro: niente crypto,
-    dedup/query in chiaro. Contro: serve risolvere l'auth delle sandbox routine a
-    un repo privato + migrare la coda.
-  - **(B) Cifratura (idea utente)**: l'app cifra i campi sensibili con una
-    **chiave pubblica** di Filo prima di scrivere (Firestore o git); decifrano
-    solo l'owner (dashboard, sulla sua macchina) e le routine (**chiave privata
-    passata nel prompt della routine**). Pro: il ciphertext è innocuo ovunque →
-    **collassa i due problemi** (Firestore pubblico e git pubblico restano ok,
-    niente repo privato, niente auth-routine da risolvere) e batte l'hill-climbing
-    (l'attaccante non ha la chiave). Contro: chiave-nel-prompt leakabile (ma il
-    contenuto è anonimizzato → danno limitato; ruotabile), il groomer F5 e la
-    dashboard devono decifrare, niente query server-side sui campi cifrati (la
-    routine fa fetch-all + decrypt per filtrare i `todo` — ok in alpha). Gli
-    **screenshot** sotto (B) si cifrano come tutto il resto (byte cifrati con la
-    chiave pubblica prima dell'upload → lo Storage può restare pubblico, è
-    ciphertext): uniforme, nessun trattamento speciale. Se si cifra anche
-    `status`, l'hill-climbing è chiuso ma nessun lettore non-autenticato può
-    filtrare per stato. **Chiave leakabile in 2 modi**: (1) esfiltrazione attiva
-    (injection/errore) → mitigata tenendo la chiave SOLO nell'orchestratore
-    (mai testo non fidato) + decrypt come step deterministico non-LLM (i worker
-    ricevono plaintext, mai la chiave); (2) esposizione passiva = la chiave sta
-    in chiaro nella config/log di claude.ai (non-vault) → se trapela, riapre
-    l'hill-climbing (danno limitato dall'anonimizzazione, chiave ruotabile).
-    Sotto (A) invece lo Storage va bloccato a parte (regole + canale autenticato).
-  **Prima di toccare le rules**: controllare il DESIGN di filo-security
-  ([[auto-improvement-loop]]) — la lettura pubblica + "pagina pubblica dei
-  feedback" potrebbe essere una scelta documentata lì, da ribaltare
-  consapevolmente. **Done**: nessun canale (Firestore né git) espone testo/note/
-  stato dei feedback a non-admin; le routine leggono ancora la coda di lavoro.
-  Questo task **fa da gate**: se si chiude la lettura senza il canale nuovo, le
-  routine si rompono. (stima: L)
+  **APPROCCIO DECISO (owner, 2026-06-23): (B) CIFRATURA.** L'app cifra i campi
+  sensibili con una **chiave pubblica** di Filo prima di scriverli (Firestore o
+  coda git); decifrano solo chi ha la **chiave privata**: l'owner (dashboard,
+  sulla sua macchina), il backend di sicurezza (filo-security, chiave nei
+  secrets delle Functions) e le routine (chiave passata nel prompt). Il
+  ciphertext è innocuo ovunque → Firestore e git pubblici restano ok, niente
+  repo privato, niente auth-routine da risolvere, e l'hill-climbing è battuto
+  (l'attaccante non ha la chiave). **Prima di iniziare, leggi il DESIGN di
+  filo-security** ([[auto-improvement-loop]]) e coordina lo schema chiavi col
+  backend (è lui che decifra per giudicare e che scrive `pipeline`).
+
+  Spezzato in sotto-task ordinati (S1.1→S1.5), uno per sessione:
+  - [ ] **S1.1 — Modulo crypto condiviso** `src/shared/feedbackCrypto.js`: schema
+    asimmetrico tipo *sealed box* (tweetnacl/libsodium o WebCrypto ECIES):
+    `encryptForOwner(plaintext)->ciphertext` (solo chiave PUBBLICA, shippata
+    nell'app), `decrypt(ciphertext, privKey)->plaintext`. Script
+    `scripts/gen-feedback-keys.mjs` che genera la coppia: committa SOLO la
+    pubblica; la privata resta all'owner. Unit test round-trip. (stima: M)
+  - [ ] **S1.2 — Cifra in scrittura**: `SN_FEEDBACK.submit` cifra i campi
+    sensibili (`text`, `url`, `notes`, `clientId`) prima di scrivere su Firestore;
+    `queue-feedback.mjs`/`queue-triage.mjs` cifrano `text`/`notes` nei file di
+    coda git; gli **screenshot**: cifra i byte prima dell'upload (Storage resta
+    pubblico, è ciphertext). Lascia in chiaro solo metadati non sensibili
+    (`seq`/`createdAt`). **`status` e `pipeline`/`verdicts` vanno cifrati** (lo
+    stato `blocked` e i verdetti sono il segnale di hill-climbing). (stima: L)
+  - [ ] **S1.3 — Decifra in lettura**: dashboard owner (ha la privkey in locale),
+    il groomer F5, e il lettore delle routine. ⚠️ Per le routine la decifratura
+    è uno **step deterministico NON-LLM** che riceve la privkey via env e passa
+    ai worker SOLO il plaintext (la chiave non entra mai in un contesto LLM con
+    testo non fidato → niente esfiltrazione via injection). (stima: M)
+  - [ ] **S1.4 — Coordina col backend filo-security**: il backend deve decifrare
+    il feedback per farlo giudicare (chiave privata nei secrets delle Functions)
+    e **cifrare `pipeline`/`verdicts`** che scrive. Cross-repo: documenta lì.
+    Le rules Firestore possono lasciare la lettura com'è (il contenuto è cifrato),
+    ma verifica che NESSUN campo in chiaro riveli lo stato di blocco. (stima: M)
+  - [ ] **S1.5 — Slot chiave (azione owner)**: dove l'owner mette la privkey
+    (setting locale / env), dove le routine la ricevono (prompt→env), dove il
+    backend la tiene (Functions secrets). Documenta la rotazione. La generazione
+    e l'inserimento della chiave sono **azione owner**.
+  **Done complessivo**: testo/note/stato/verdetti dei feedback non leggibili da
+  chi non ha la chiave, su NESSUN canale (Firestore, git, Storage); owner +
+  routine + backend continuano a lavorare via decrypt. (stima: L, multi-sessione)
 
 ### Manifest capacità di Filo + feedback autonomo (spec 2026-06-22)
 
