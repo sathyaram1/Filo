@@ -122,7 +122,8 @@ separata a permessi ridotti** dove gli utenti verificano i fix già rilasciati.
 
 #### Gruppo DB — dashboard unificata (modello dati + tab + migrazione)
 
-- [ ] **DB1 — Tab unificate in `manage` + merge Ricevuti/Agente/Chiarimenti** —
+- [~] **DB1 — Tab unificate in `manage` + merge Ricevuti/Agente/Chiarimenti** —
+  _(in corso: routine intelligent-brown-fnbznf, 2026-06-23)_ —
   File: `src/pages/manage/manage.{html,js}`, riusando la logica tab/stati da
   `src/pages/feedback/feedback.js`. Tab (tutta la pagina owner-only): **Ricevuti**
   (status `new` + ritrovamenti agente/routine + `clarify`, in UNA tab con
