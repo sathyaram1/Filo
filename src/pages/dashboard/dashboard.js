@@ -1073,9 +1073,11 @@
     while (r?.ok && shouldAutoContinue(r.actions) && steps < MAX_AUTO_STEPS) {
       steps += 1;
       // Il nudge entra nello storico come turno utente "silenzioso" (niente
-      // bolla): dà al modello il contesto per il passo successivo.
-      threadHistory.push({ role: 'user', text: AUTO_CONTINUE_PROMPT });
-      r = await runFiloTurn({ userMessage: AUTO_CONTINUE_PROMPT });
+      // bolla): dà al modello il contesto per il passo successivo. Il testo
+      // dipende da cosa Filo ha appena fatto (comando vs lookup di capacità).
+      const nudge = autoContinueNudge(r.actions);
+      threadHistory.push({ role: 'user', text: nudge });
+      r = await runFiloTurn({ userMessage: nudge });
     }
 
     sending = false;
