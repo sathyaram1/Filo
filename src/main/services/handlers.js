@@ -779,6 +779,18 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
       case 'CERCA_WEB':
       case 'EVENTO_CALENDARIO':
         return { executed: false, kept: true };
+      case 'CAPACITA_DETTAGLIO': {
+        // Lookup del manifesto delle capacità (F2): l'agente chiede il dettaglio
+        // di una o più voci per id; glielo restituiamo come output, che il client
+        // ri-immette nel contesto (auto-continue) così l'agente risponde con i
+        // dati esatti. Sola lettura: nessun effetto collaterale.
+        const Caps = globalThis.SN_CAPABILITIES;
+        const ids = Array.isArray(action.ids) ? action.ids
+          : (action.id ? [action.id]
+            : (action.capacita != null ? [].concat(action.capacita) : []));
+        const detail = Caps ? Caps.renderDetailForPrompt(ids) : '';
+        return { executed: true, kept: true, output: { capabilities: ids, detail } };
+      }
       case 'PULISCI_TAB':
         // Non eseguiamo subito: il client mostra un bottone di conferma; al
         // click manda RUN_TAB_TRIAGE. Teniamo il bottone nella bolla.
