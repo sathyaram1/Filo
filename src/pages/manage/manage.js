@@ -207,8 +207,11 @@
       openSidebarSender(clientId);
     });
 
-    // Riga giudici (4 pallini)
+    // Riga giudici (4 pallini, riassunto a colpo d'occhio)
     renderJudgesRow(fb);
+
+    // Verdetti per esteso (tutti i giudici, reasoning collassabile, sopra la chat)
+    renderVerdicts(fb);
 
     // Bolle chat
     renderThread(fb);
