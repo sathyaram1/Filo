@@ -550,6 +550,7 @@ Quando ricevi quel prompt in ambiente cloud:
    (finisci il pezzo atomico in corso; non iniziarne uno nuovo oltre ~150-200k
    token). Rete di sicurezza: a un **429** → checkpoint + rilascio claim +
    termina.
+
 6. **Se non ci sono feedback `todo`, NON terminare.** In ordine di priorità:
 
    **6a — Prima: implementa i task aperti di `TASKS.md`.** È così che i piani
