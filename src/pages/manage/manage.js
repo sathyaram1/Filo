@@ -222,9 +222,59 @@
     // Bolle chat
     renderThread(fb);
 
+    // Azioni di revisione: solo l'owner può sbloccare. Reset comment + messaggio.
+    mgActions.hidden = !isAdmin;
+    mgAcceptComment.value = '';
+    setActionMsg('', '');
+
     // Chiudi pannello laterale
     closeSidebar();
   }
+
+  // ── Azione: accetta e sblocca un feedback bloccato ──────────────────────────
+  function setActionMsg(text, kind) {
+    mgActionMsg.textContent = text || '';
+    mgActionMsg.className = 'mg-action-msg' + (kind ? ` mg-${kind}` : '');
+  }
+
+  async function acceptSelected() {
+    if (!selectedId) return;
+    const id = selectedId;
+    const comment = (mgAcceptComment.value || '').trim();
+    mgAcceptBtn.disabled = true;
+    setActionMsg('Sblocco in corso…', '');
+    try {
+      // Override owner: il feedback esce dai bloccati e rientra nella coda (todo).
+      const r = await sendToMain({
+        type: 'feedback_update',
+        id,
+        reviewDecision: 'accepted',
+        reviewComment: comment,
+        reviewedAt: new Date().toISOString(),
+        status: 'todo',
+      });
+      if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
+
+      // Aggiorna lo stato locale e rimuovi dalla colonna Bloccati (ottimistico).
+      const fb = allFeedbacks.find((f) => f._id === id);
+      if (fb) { fb.reviewDecision = 'accepted'; fb.reviewComment = comment; fb.status = 'todo'; }
+      blocked = blocked.filter((f) => f._id !== id);
+      renderList();
+
+      // Il feedback non è più in revisione: torna allo stato vuoto del dettaglio.
+      selectedId = null;
+      mgDetail.hidden = true;
+      mgDetailEmpty.hidden = false;
+      mgActions.hidden = true;
+      closeSidebar();
+    } catch (e) {
+      setActionMsg(e.message || 'Errore nello sblocco', 'err');
+    } finally {
+      mgAcceptBtn.disabled = false;
+    }
+  }
+
+  mgAcceptBtn.addEventListener('click', acceptSelected);
 
   function renderJudgesRow(fb) {
     // Pulisce tutto tranne la label
