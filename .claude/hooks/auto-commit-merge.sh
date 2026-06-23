@@ -69,7 +69,9 @@ git worktree list --porcelain | awk '/^worktree /{print substr($0,10)}' | while 
   git -c user.email=claude@local -c user.name=claude-local commit -q -m "auto: $SUMMARY" 2>/dev/null
 
   # Multi-worktree mode: merge feature branch into TARGET_BRANCH worktree.
-  if [ -n "$TARGET_WT" ] && [ "$wt" != "$TARGET_WT" ] && [ "$BRANCH" != "$TARGET_BRANCH" ]; then
+  # Gated branches (worker/*, feature/*) are committed above but NOT merged
+  # here — they go through scripts/merge-gate.mjs (R2).
+  if [ -n "$TARGET_WT" ] && [ "$wt" != "$TARGET_WT" ] && [ "$BRANCH" != "$TARGET_BRANCH" ] && ! is_gated_branch "$BRANCH"; then
     cd "$TARGET_WT" || continue
     MERGE_OUT=$(git -c user.email=claude@local -c user.name=claude-local merge --no-edit "$BRANCH" 2>&1)
     MERGE_RC=$?
