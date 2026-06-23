@@ -14,6 +14,11 @@
   <script src="filo://shared/feedback.js"></script>
   <script src="filo://shared/manageReview.js"></script>
   <style>
+    /* La dashboard di gestione sfrutta tutta la larghezza: override locale del
+       limite globale `.sn-page { max-width: 960px }` di pages.css (che serve alle
+       altre pagine, quindi NON si tocca lì). */
+    .sn-page { max-width: none; }
+
     /* ── Switch "Modalità automatica" (sempre visibile, owner-only) ─────── */
     .mg-topbar {
       display: flex; align-items: center; justify-content: flex-end;
