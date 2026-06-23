@@ -846,6 +846,16 @@
       btn.textContent = `🔎 ${a.query}`;
       return btn;
     }
+    if (type === 'CAPACITA_DETTAGLIO') {
+      // Chip inerte: rende trasparente che Filo sta consultando il proprio
+      // manifesto delle capacità (#F2) prima di rispondere.
+      const btn = document.createElement('button');
+      btn.className = 'dash-action-btn';
+      btn.type = 'button';
+      btn.disabled = true;
+      btn.textContent = '📖 Verifico cosa so fare';
+      return btn;
+    }
     if (type === 'EVENTO_CALENDARIO') {
       const btn = document.createElement('button');
       btn.className = 'dash-action-btn';
