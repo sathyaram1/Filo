@@ -138,9 +138,28 @@ su main + `done`; FAIL: correggi e ri-verifica (max 3 loop) → dopo 3 fail
   firestore:rules` (le rules non si auto-deployano — vedi memoria
   [[feedback-schema-rules-deploy]]). (stima: L)
 
-- [~] **R2 — Cancello di merge nell'hook auto-commit** — _(in corso: routine
-  peaceful-allen-otgmfi, 2026-06-23)_ — Modifica
-  `.claude/hooks/auto-commit-merge.sh`: i branch dei worker delle routine
+- [x] **R2 — Cancello di merge nell'hook auto-commit** — _(fatto: routine
+  peaceful-allen-otgmfi, 2026-06-23)_ — **Esito**: l'hook
+  `.claude/hooks/auto-commit-merge.sh` ora NON auto-fonde/auto-pusha su `main` i
+  branch `worker/*` e `feature/*` (li committa e pusha solo sul loro branch per
+  tracciabilità); tutti gli altri branch (incl. `claude/*` e il lavoro locale)
+  restano invariati. La fusione di questi branch passa dal nuovo
+  `scripts/merge-gate.mjs <source> [--into <target>]` (default target `main`):
+  fetch + checkout target + cancello di sicurezza (SEAM per R6) + merge +
+  push-con-retry sui push concorrenti. Exit code: 0 fuso, 10 bloccato (R6), 20
+  conflitto, 1 errore. Il cancello L4/L5 vero è lasciato come seam
+  `runSecurityGate()` (no-op pass-through finché R6 non lo riempie). Cambiamento
+  **additivo e dormiente**: nessuna routine usa ancora `worker/*`/`feature/*`,
+  quindi non altera il comportamento attuale. **Verificato** con
+  `tests/unit/mergeGate.test.mjs` (git reale in sandbox, niente Electron): (1)
+  edit su `worker/*` non arriva su main ma resta sul branch, (2) `merge-gate.mjs`
+  la porta su main, (3) `--into feature/N` fonde sul branch di feature non su
+  main, (4) un branch normale viene ancora auto-pushato su main + test puri su
+  parseArgs/isValidBranch/seam. `npm run test:unit` verde (390). NB: la suite
+  Playwright/Electron non gira in questa sandbox (Electron rifiuta di partire da
+  root), ma R2 non tocca codice app. **Prossimo**: R6 (L4/L5 nel seam).
+- ~~[ ] **R2 — Cancello di merge nell'hook auto-commit** — Modifica
+  `.claude/hooks/auto-commit-merge.sh`: i branch dei worker delle routine~~
   (prefisso da decidere, es. `worker/*` o `routine/*`) si **committano ma NON si
   fondono automaticamente su `main`**. La fusione avviene solo via un nuovo
   `scripts/merge-gate.mjs <branch>` (rebase su main + merge + push, con
