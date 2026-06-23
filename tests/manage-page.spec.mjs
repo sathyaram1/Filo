@@ -89,6 +89,31 @@ test('lo switch "Modalità automatica" è sempre visibile ed è read-only per i 
   await page.locator('.mg-tab[data-tab="queue"]').click();
   await expect(sw).toBeVisible();
 
+  // DA3: a riposo la pista dello switch deve LEGGERSI come switch, non sparire.
+  // Il bug era `background: var(--sn-border)` (quasi bianco sul tema chiaro):
+  // la track diventava invisibile e si vedeva solo il pallino. Verifichiamo
+  // (in modo theme-agnostico) che il colore della track a riposo sia opaco e
+  // DIVERSO da `--sn-border` — se qualcuno ri-regredisse a quel valore, qui
+  // diventa rosso.
+  const track = page.locator('#mgAutoSwitch .mg-switch-track');
+  const trackColors = await track.evaluate((el) => {
+    const cs = getComputedStyle(el);
+    const borderVal = getComputedStyle(document.documentElement)
+      .getPropertyValue('--sn-border').trim();
+    // Risolvi --sn-border al suo rgb() reale per il confronto.
+    const probe = document.createElement('span');
+    probe.style.color = borderVal;
+    document.body.appendChild(probe);
+    const borderRgb = getComputedStyle(probe).color;
+    probe.remove();
+    return { bg: cs.backgroundColor, borderRgb };
+  });
+  // Opaco (non transparent / alpha 0).
+  expect(trackColors.bg).not.toBe('transparent');
+  expect(trackColors.bg).not.toMatch(/rgba\([^)]*,\s*0\)\s*$/);
+  // Distinto dal bordo quasi-bianco (il valore buggato).
+  expect(trackColors.bg).not.toBe(trackColors.borderRgb);
+
   // Da non-admin (userData pulito → nessuna sessione) lo switch è disabilitato:
   // stesso contratto di sola lettura del banner.
   await expect(input).toBeDisabled();
