@@ -22,6 +22,11 @@
    *   null se il feedback non ha motivo di blocco (aligned / no pipeline).
    */
   function classifyBlock(fb) {
+    // Override dell'owner: un feedback "accettato" (sbloccato a mano dalla
+    // dashboard di revisione) NON è più un blocco — esce dalla colonna Bloccati
+    // e rientra nel flusso normale. Vince su qualsiasi verdetto del pipeline.
+    if (fb && fb.reviewDecision === 'accepted') return null;
+
     const p = fb && fb.pipeline;
     if (!p) return null;
 
