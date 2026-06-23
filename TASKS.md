@@ -303,12 +303,14 @@ qualcosa di rotto — Filo **invia un feedback in autonomia**, senza azione uten
   sempre disponibile + **dettaglio lazy** on-demand. **Done**: l'agente risponde
   correttamente "puoi fare X?" e riconosce "non posso fare Y". (stima: M)
 
-- [~] **F3 — Regola di sincronizzazione anti-stale** — _(in corso: routine
-  affectionate-bell-u2mnxt, 2026-06-23)_ — Aggiungi al CLAUDE.md la
-  regola: ogni capacità nuova/modificata visibile all'utente → aggiorna il
-  manifest (stesso pattern della sezione "Patch notes"). + un angolo di audit per
-  le routine che rileva il drift manifest↔realtà. **Done**: regola scritta nel
-  CLAUDE.md. (stima: S)
+- [x] **F3 — Regola di sincronizzazione anti-stale** — _(fatto: routine
+  affectionate-bell-u2mnxt, 2026-06-23. Aggiunta a CLAUDE.md la sezione
+  "Manifesto capacità: aggiorna `capabilities.js` ad OGNI capacità che cambia"
+  (stesso pattern dei Patch notes: nuova/cambiata/rimossa → aggiorna la voce nello
+  stesso commit; rimanda all'unit test anti-stale). Aggiunto l'angolo di audit
+  "Drift del manifesto capacità" alla lista 6b. Verificato: il test anti-stale
+  `tests/unit/capabilities.test.mjs` passa 6/6 senza Electron → manifesto allineato
+  alla realtà ora.)_
 
 - [ ] **F4 — Feedback autonomo da Filo** (dipende da F1/F2) — Quando l'agente
   conclude con confidenza ALTA (usando il manifest) che una richiesta è fuori
