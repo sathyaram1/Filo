@@ -456,15 +456,23 @@ separata a permessi ridotti** dove gli utenti verificano i fix già rilasciati.
 
 #### Gruppo DD — modelli di supporto
 
-- [ ] **DD1 — Sezione "Modelli di supporto" (riuso `modelChainEditor`)** — File:
-  `src/pages/manage/*` + riuso `src/shared/modelChainEditor.js` (lo stesso
-  componente dietro Impostazioni/Modelli e admin-defaults/Modelli predefiniti).
-  Sezione owner-only con uno **slot per compito**: **sanitizer**, **giudice L2**,
-  **giudice red-team**, **giudice priorità** (F5). Ogni slot = selettore a catena
-  modelli + fallback, UX identica a `options.js`/`admin-defaults.js`. La scelta va
-  salvata in un posto **leggibile anche dal backend** per i compiti che girano lì
-  (DD3): un doc di config su Firestore. **Done**: spec — la sezione mostra gli slot
-  e salva/ricarica la scelta col componente esistente. (stima: M)
+- [x] **DD1 — Sezione "Modelli di supporto" (riuso `modelChainEditor`)** _(fatto:
+  sessione locale 2026-06-24)_ — **Esito**: sostituito il segnaposto della tab
+  "Modelli di supporto" in `manage` con la sezione reale, **owner-only**. 4 slot
+  (`sanitizer`, `judgeL2`, `judgeRedTeam`, `judgePriority`), ciascuno istanzia
+  `SN_MODEL_CHAIN.buildChain` nel proprio container (riuso identico del componente,
+  pattern "senza validatore d'azione" come le azioni custom; `<datalist>` di
+  nickname dal `DEFAULT_MODEL_REGISTRY` come options/admin-defaults). Caricamento
+  lazy al click sulla tab, bottone Salva. **Persistenza**: nuovo doc Firestore
+  `config/supportModels` (un campo stringa-catena per slot), scrittura PATCH
+  per-campo (merge) con idToken admin — nuovo `src/main/services/supportModelsStore.js`
+  + handler `SUPPORT_MODELS_GET`/`UPDATE` in `handlers/auth.js` (owner-gated). Il
+  backend filo-security lo leggerà via Admin SDK (DD3). **Verificato**:
+  `npx playwright test tests/manage-page.spec.mjs` 20 passed (1 flaky timing
+  preesistente, non DD1) + `npm run test:unit` 558/0. **`manage` è owner-only →
+  niente changelog/capabilities.** ⚠️ **AZIONE OWNER**: `firebase deploy --only
+  firestore:rules` (aggiunta regola `config/supportModels`: read/write isAdmin).
+  (stima: M)
 
 - [ ] **DD2 — Sanitizer LLM dei feedback per la board** (dipende soft da DD1) —
   Un passo che, prima che un feedback diventi visibile sulla board, **rimuove
