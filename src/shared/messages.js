@@ -213,6 +213,12 @@
     // presenti); UPDATE scrive provider/models/modelRegistry/apiKeys.
     DEFAULTS_GET: 'defaults_get',                  // → { ok, config } | { ok:false, error }
     DEFAULTS_UPDATE: 'defaults_update',            // { config } → { ok, config } | { ok:false, error }
+    // Config "modelli di supporto" (doc Firestore config/supportModels, admin-only).
+    // Un campo per slot: sanitizer, judgeL2, judgeRedTeam, judgePriority.
+    // Valore di ogni slot = stringa catena (es. "flash, flash-or"), stesso formato
+    // dei modelli per azione. Letta anche dal backend filo-security (DD3).
+    SUPPORT_MODELS_GET: 'support_models_get',      // → { ok, models } | { ok:false, error }
+    SUPPORT_MODELS_UPDATE: 'support_models_update',// { models } → { ok, models } | { ok:false, error }
     // Interruttore master dell'auto-miglioramento (doc config/automation, campo
     // `enabled`). Owner-only. Vedi filo-security DESIGN §2.
     AUTOMATION_GET: 'automation_get',              // → { ok, enabled } | { ok:false, error }
