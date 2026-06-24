@@ -28,9 +28,6 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-// S1.2: cifratura notes nei file di coda (la history git del repo pubblico è
-// un canale di leak). Import lazy-eval così il modulo si carica solo se usato.
-import { encryptFieldsForQueue } from './lib/encrypt-feedback-fields.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
