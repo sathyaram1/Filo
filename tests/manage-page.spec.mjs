@@ -77,9 +77,10 @@ test('le tab-lista condividono panel-list; stats/models sono segnaposto "In arri
   await expect(page.locator('#panel-stats .mg-coming')).toBeVisible();
   await expect(page.locator('#panel-list')).not.toHaveClass(/mg-panel--active/);
 
-  // Modelli di supporto → segnaposto dedicato.
+  // Modelli di supporto → pannello dedicato (DD1: non più un segnaposto).
   await page.locator('.mg-tab[data-tab="models"]').click();
-  await expect(page.locator('#panel-models .mg-coming')).toBeVisible();
+  await expect(page.locator('#panel-models')).toHaveClass(/mg-panel--active/);
+  await expect(page.locator('#panel-list')).not.toHaveClass(/mg-panel--active/);
 });
 
 test('lo switch "Modalità automatica" è sempre visibile ed è read-only per i non-admin', async ({ openTab }) => {
