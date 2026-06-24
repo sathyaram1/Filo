@@ -205,3 +205,46 @@ test('anti doppio-premio voto: un secondo voto sullo stesso feedback NON ripaga 
   // guard), accrediterebbe di nuovo: la riprova che il guard è OBBLIGATORIO
   // e che la chiamata pubblica è awardVoteOnce (async), non applyAward da sola.
 });
+
+// ── Riapertura a pagamento (DC4): spesa anti-spam, niente saldo negativo ───
+
+test('CREDIT.BOARD_REOPEN = 5', () => {
+  assert.equal(CREDIT.BOARD_REOPEN, 5);
+});
+
+test('applyConsumptionIfAffordable: saldo sufficiente → scala esattamente amount', () => {
+  const s = C.freshState('2026-06-17');
+  const { state, ok, balance } = C.applyConsumptionIfAffordable(s, CREDIT.BOARD_REOPEN);
+  assert.equal(ok, true);
+  assert.equal(balance, 1000 - CREDIT.BOARD_REOPEN);
+  assert.equal(state.balance, 1000 - CREDIT.BOARD_REOPEN);
+});
+
+test('applyConsumptionIfAffordable: saldo insufficiente → rifiuta, saldo INTOCCATO', () => {
+  let s = C.freshState('2026-06-17');
+  s.balance = 3; // meno del costo (5)
+  const { state, ok, balance } = C.applyConsumptionIfAffordable(s, CREDIT.BOARD_REOPEN);
+  assert.equal(ok, false);
+  assert.equal(balance, 3);
+  assert.equal(state.balance, 3); // nessuna mutazione, niente saldo negativo
+});
+
+test('applyConsumptionIfAffordable: saldo ESATTAMENTE uguale al costo → permesso, arriva a zero', () => {
+  let s = C.freshState('2026-06-17');
+  s.balance = 5;
+  const { ok, balance } = C.applyConsumptionIfAffordable(s, 5);
+  assert.equal(ok, true);
+  assert.equal(balance, 0);
+});
+
+test('applyConsumptionIfAffordable: diversa da applyConsumption — qui un saldo insufficiente blocca, non clampa a 0 gratis', () => {
+  let s = C.freshState('2026-06-17');
+  s.balance = 2;
+  // applyConsumption (costo AI dietro le quinte) scalerebbe comunque, clampando a 0.
+  const consumed = C.applyConsumption({ ...s }, { action: 'filo_chat', costEur: 0.5 * 0.0008 });
+  assert.equal(consumed.state.balance, 0); // applyConsumption: passa comunque, clamp a 0
+  // applyConsumptionIfAffordable invece RIFIUTA (saldo 2 < costo 5), niente scalo.
+  const affordable = C.applyConsumptionIfAffordable({ ...s }, CREDIT.BOARD_REOPEN);
+  assert.equal(affordable.ok, false);
+  assert.equal(affordable.balance, 2);
+});
