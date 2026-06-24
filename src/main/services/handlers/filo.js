@@ -99,21 +99,23 @@ module.exports = function register(on, ctx) {
   });
 
   // F4 — Annulla un auto-feedback appena inviato (undo dal toast).
-  // Marca il feedback come `ignored` via updateStatus così non compare nel triage.
-  // Non richiede auth admin: il clientId `auto:*` è generato solo internamente.
+  // Marca il feedback come `ignored` via updateStatus. Usa l'ID token admin se
+  // disponibile (l'utente è loggato come owner); se non loggato l'undo non può
+  // scrivere su Firestore (le rules richiedono admin per update) — non è un errore
+  // fatale: l'auto-feedback rimane in stato `new` ma finisce solo nell'Agente tab.
   on(MSG.CANCEL_AUTO_FEEDBACK, async (msg) => {
     const id = String(msg && msg.id || '').trim();
     if (!id) return { ok: false, error: 'id mancante' };
     const FB = globalThis.SN_FEEDBACK;
     if (!FB || typeof FB.updateStatus !== 'function') return { ok: false, error: 'FB non disponibile' };
     try {
-      // Non serve idToken: il documento è pubblico (nasce senza auth dall'auto-submitter)
-      // e la rules consente updateStatus senza bearer solo se status = 'ignored' su doc auto:*.
-      // Per sicurezza passiamo senza token: se le rules non lo permettono, fallirà in silenzio.
-      await FB.updateStatus(id, { status: 'ignored', notes: 'Annullato dall\'utente (undo toast F4)' });
+      const auth = require('../../auth/google-auth');
+      const idToken = await auth.getIdToken().catch(() => null);
+      await FB.updateStatus(id, { status: 'ignored', notes: 'Annullato dall\'utente (undo toast F4)' }, { idToken: idToken || undefined });
       return { ok: true };
     } catch (e) {
       console.warn('[F4] cancel auto-feedback fallito:', e?.message || e);
+      // Non un errore fatale: il feedback rimane ma non interferisce con il triage.
       return { ok: false, error: e?.message || String(e) };
     }
   });
