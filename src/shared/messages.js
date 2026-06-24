@@ -175,6 +175,9 @@
     // Invio feedback alpha → Firestore/Storage. Va instradato dal main process
     // perché le CSP delle pagine ospiti bloccano fetch diretti dal preload.
     SUBMIT_FEEDBACK: 'submit_feedback',           // { text, url, title, userAgent, clientId, images: [{dataUrl}] }
+    // F4 — Annulla un auto-feedback appena inviato (undo dal toast). Marca il
+    // feedback come `ignored` così non compare nel triage. { id } → { ok }
+    CANCEL_AUTO_FEEDBACK: 'cancel_auto_feedback', // { id }
     // Entra/esce dalla "modalità annotazione" del box feedback: il box vive in
     // un content script sulla pagina (WebContentsView) e da lì non può oscurare
     // la barra in alto di Filo (renderizzata dalla shell). Questo messaggio fa
