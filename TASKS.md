@@ -474,16 +474,27 @@ separata a permessi ridotti** dove gli utenti verificano i fix già rilasciati.
   firestore:rules` (aggiunta regola `config/supportModels`: read/write isAdmin).
   (stima: M)
 
-- [ ] **DD2 — Sanitizer LLM dei feedback per la board** (dipende soft da DD1) —
-  Un passo che, prima che un feedback diventi visibile sulla board, **rimuove
-  sempre i metadati** (identità, orario) e fa decidere a un **LLM** se il testo
-  libero va redatto (info personali) e lo redige **solo se necessario**; salva la
-  versione sanitizzata accanto all'originale (l'originale owner-only/cifrato resta
-  per l'owner). Modello = slot "sanitizer" (DD1) con un default se non
-  configurato. **Dove gira**: valutare backend (accanto a L2) vs app; coordinare
-  con `filo-security`. Intreccio **S1**: la board mostra la versione sanitizzata,
-  mai il testo grezzo altrui. **Done**: spec/unit — un testo con info personali
-  viene redatto; uno pulito passa invariato (a parte i metadati). (stima: M)
+- [x] **DD2 — Sanitizer LLM dei feedback per la board** _(logica pura fatta:
+  sessione locale 2026-06-24; cablaggio backend/board → S1.F2.3/DD3)_ — **Esito**:
+  nuovo modulo puro `src/shared/feedbackSanitizer.js` (IIFE `SN_FEEDBACK_SANITIZER`):
+  - `sanitizeMetadata(doc)` — rimozione metadati SEMPRE (deterministica): proietta
+    su **allowlist** esplicita (`name`, `seq`, `subSeq`, `statusPublic`,
+    `resolvedInVersion`, `isShipped`, `sanitizedText`); scarta clientId/userAgent/
+    createdAt/resolvedAt/url/text/votes/notes/priority/branch/parentId/ecc.
+  - `sanitizeText(text, llmFn)` — `llm`-fn iniettabile; il modello chiede
+    `CLEAN:<testo>` (passa invariato) o `REDACTED:<testo>` (redatto). Salta i
+    ciphertext S1 (`FENC1:`). **Fallback conservativo**: llm-fn che lancia/risponde
+    male → `sanitizedText=null` (board mostra solo il titolo, mai testo dubbio).
+  - `sanitize(doc, llmFn)` combina i due → oggetto pronto da salvare.
+  - **Verificato**: `tests/unit/feedbackSanitizer.test.mjs` (22 test: testo con info
+    personali → redatto; pulito → invariato; metadati sempre assenti; llm-fn rotta →
+    fallback solo-titolo) → `npm run test:unit` 584/0.
+  - **Raccomandazione (decisione presa)**: la sanitizzazione gira **lato backend
+    filo-security (Admin SDK) o owner-app**, NON sul client utente, perché `text` è
+    cifrato S1 e solo chi ha la chiave privata lo decifra. Punto di chiamata
+    naturale: subito dopo che il merge-gate porta un feedback a `done` (la routine
+    cloud ha già la privkey). **Resta da cablare** (→ S1.F2.3/DD3): persistere il
+    risultato in `sanitized`/sub-doc e far leggere la board da lì. (stima: M)
 
 - [ ] **DD3 — Audit LLM hard-coded + centralizzazione (incl. cross-repo)** —
   Stanare tutti gli LLM hard-coded e portarli sotto "Modelli di supporto": nel
