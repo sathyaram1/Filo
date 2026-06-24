@@ -244,7 +244,7 @@
   // queue-feedback.mjs): il collegato nasce come un feedback normale (numero
   // proprio), `parentId` serve solo a far comparire "collegato a #N" in
   // dashboard e a far risalire chi triagia all'originale.
-  async function submit({ text, url, title, userAgent, clientId, images, files, name, parentId, capabilityGapId }) {
+  async function submit({ text, url, title, userAgent, clientId, clientIdHash, images, files, name, parentId, capabilityGapId }) {
     // Allegati che NON sono riusciti a caricarsi: li riportiamo al chiamante
     // così la UI può avvisare l'utente (un upload fallito veniva ingoiato in
     // silenzio e il feedback partiva senza il file, senza alcun segnale).
