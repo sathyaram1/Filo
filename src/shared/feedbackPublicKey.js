@@ -14,6 +14,6 @@
 (function (global) {
   'use strict';
   // === FILO_FEEDBACK_PUBKEY (gestito da gen-feedback-keys.mjs) ===
-  global.SN_FEEDBACK_PUBKEY = null;
+  global.SN_FEEDBACK_PUBKEY = "BM44td2o-xZx_7Wvnx9LMeJLvdpgQU_DwidPKFFkIrHJ2abUMtBKVonlXdTRt3G3wWmtbZago2UCJfB9vnrqso8";
   // === /FILO_FEEDBACK_PUBKEY ===
 })(typeof globalThis !== 'undefined' ? globalThis : self);
