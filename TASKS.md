@@ -256,15 +256,28 @@ separata a permessi ridotti** dove gli utenti verificano i fix già rilasciati.
   - Niente changelog/capabilities: la board utente (UI dei voti) arriva con DC*;
     qui è solo substrato dati, non ancora user-visible.
 
-- [~] **DB5 — Migrazione dei feedback esistenti nella dashboard unificata**
-  _(in corso: routine affectionate-bell-vb8kaf, 2026-06-24)_
-  (dipende da DB1/DB2) — Far sì che TUTTI i feedback oggi sparsi nella vecchia
-  dashboard (ricevuti, ritrovamenti agente, chiarimenti, draft) compaiano nei
-  posti nuovi corretti di `manage`. I `draft` (Bozze rimossa) → restano sotto
-  Ricevuti nel loro stato, con ⭐ se vanno tenuti per il futuro. **Nessuna perdita
-  dati**: la vecchia `feedback` resta come rete finché l'owner non conferma.
-  **Done**: spec che inietta feedback di vari stati e asserisce in quale tab
-  finiscono. (stima: M)
+- [x] **DB5 — Migrazione dei feedback esistenti nella dashboard unificata**
+  _(fatto: routine affectionate-bell-vb8kaf, 2026-06-24)_ — La migrazione era già
+  **strutturalmente cablata** da DB1/DB2/DB3: `manage.js` carica TUTTI i feedback
+  (`FB.list({ pageSize: 500 })`) e instrada ogni tab con la sola logica pura
+  `manageTabFor`/`listForManageTab` (+ filtro ⭐ Archiviati). I `draft` (Bozze
+  rimossa) cadono nel `default → inbox`, quindi restano sotto **Ricevuti** nel
+  loro stato; ⭐ li può tenere per il futuro (visibili nel filtro Archiviati). La
+  vecchia `feedback` resta in piedi come rete (coesistenza, DB1) → nessuna perdita.
+  - **Deliverable (verifica)**: `tests/unit/manageMigration.test.mjs` (5 test):
+    inietta un corpus con OGNI stato (new utente/routine/agente, clarify, draft,
+    todo, review, blocked, blocco-pipeline, done, verified, archived, ignored) e
+    asserisce (1) la tab attesa per ciascuno, (2) **NESSUNA PERDITA**: ogni
+    feedback non-`ignored` compare in **esattamente una** tab-lista (gli `ignored`
+    restano nascosti come nella vecchia dashboard — non è perdita), (3) gli
+    `archived` solo in Archiviati senza doppioni, (4) il filtro ⭐ raccoglie i
+    preferiti di ogni stato, (5) il gate DB3 `releasedVersion` tiene In coda un
+    `done` non ancora rilasciato.
+  - **Verifica**: `npm run test:unit` 451/452 (l'unico rosso, `defaultsSecretsMerge`,
+    è il noto artefatto del sandbox: `require('electron')` non installabile in
+    cloud). Il rendering UI delle tab è già coperto dallo spec Electron esistente
+    `tests/manage-page.spec.mjs` (DB1), che gira in ambienti col binario Electron.
+  - Niente changelog/capabilities: `manage` è owner-only, non user-visible.
 
 #### Gruppo DC — board utente (verifica), permessi ridotti
 
