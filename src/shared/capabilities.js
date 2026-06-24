@@ -307,6 +307,12 @@
       desc: 'All’avvio di una nuova versione, un riquadro riassume le novità e le correzioni in parole semplici.',
       invoke: 'Compare da solo all’avvio dopo un aggiornamento.',
     },
+    {
+      id: 'board', title: 'Bacheca dei miglioramenti', category: 'pages',
+      desc: 'La pagina dove ritrovi i miglioramenti già rilasciati e puoi dire se funzionano o no, votando con un tocco. Leggono tutti; per votare basta accedere.',
+      invoke: 'Menu App → "Bacheca", oppure filo://board/board.html.',
+      doesNot: 'Non mostra segnalazioni in lavorazione né dettagli tecnici o di sicurezza: solo i miglioramenti già usciti.',
+    },
 
     // ───────────────────────────── Impostazioni ──────────────────────────────
     {
