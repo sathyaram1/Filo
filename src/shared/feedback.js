@@ -359,6 +359,9 @@
     // Preferito ⭐ (DB2): bool, "parcheggio per il futuro". Le Firestore rules
     // accettano `starred` (is bool) nel ramo update admin.
     if (starred !== undefined) { fields.starred = { booleanValue: !!starred }; mask.push('starred'); }
+    // Override owner per l'auto-archiviazione a punteggio (DC3, vedi
+    // boardArchive.js): 'archived' | 'keep_open' | '' (nessun override).
+    if (archiveOverride !== undefined) { fields.archiveOverride = toFsValue(archiveOverride); mask.push('archiveOverride'); }
     if (priority !== undefined) {
       // Priorità 1-3 (0 = nessuna). Le regole Firestore validano int 0..3.
       const p = Math.max(0, Math.min(3, Math.round(Number(priority) || 0)));
