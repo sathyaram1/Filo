@@ -213,3 +213,62 @@ test('decryptFeedbackList: lista mista (vecchi in chiaro + nuovi cifrati)', asyn
   assert.equal(result[0].text, 'vecchio in chiaro', 'il vecchio feedback resta in chiaro');
   assert.equal(result[1].text, 'testo cifrato', 'il nuovo feedback viene decifrato');
 });
+
+// ─── Test 8: batch IPC handler — decryptFeedbackList decifra tutti i campi rilevanti
+
+test('batch IPC handler: decryptFeedbackList decifra text/url/name/title/notes/reviewComment, ignora il resto', async () => {
+  const { pub, priv } = await genTestKeys();
+
+  // Simula tre feedback come li riceverebbe il renderer da Firestore,
+  // uno per ogni caso: tutto cifrato, misto, e tutto in chiaro.
+  const [ctText, ctUrl, ctName, ctTitle, ctNotes, ctReviewComment] = await Promise.all([
+    C.encryptForOwner('Testo feedback cifrato', pub),
+    C.encryptForOwner('https://example.com/pagina?q=riservata', pub),
+    C.encryptForOwner('Nome tester riservato', pub),
+    C.encryptForOwner('Titolo breve cifrato', pub),
+    C.encryptForOwner('Note di triage riservate', pub),
+    C.encryptForOwner('Commento review riservato', pub),
+  ]);
+
+  const input = [
+    // tutti e 6 i campi cifrati
+    { _id: 'fb1', text: ctText, url: ctUrl, name: ctName, title: ctTitle, notes: ctNotes, reviewComment: ctReviewComment, status: 'todo', priority: 2 },
+    // misto: solo text cifrato, il resto in chiaro
+    { _id: 'fb2', text: ctText, url: 'https://chiaro.it', name: 'Mario', title: 'titolo', notes: '', reviewComment: null, status: 'done' },
+    // tutti in chiaro (feedback vecchio retrocompat)
+    { _id: 'fb3', text: 'vecchio in chiaro', url: null, name: 'Utente', title: '', notes: 'no', reviewComment: undefined, status: 'new' },
+  ];
+
+  // Il batch handler decifra ogni oggetto in sequenza (stesso pattern di auth.js).
+  const result = await decryptFeedbackList(input, priv);
+
+  assert.equal(result.length, 3, 'il numero di feedback deve restare invariato');
+
+  // fb1: tutti i 6 campi decifrati
+  assert.equal(result[0].text,          'Testo feedback cifrato',              'fb1.text decifrato');
+  assert.equal(result[0].url,           'https://example.com/pagina?q=riservata', 'fb1.url decifrata');
+  assert.equal(result[0].name,          'Nome tester riservato',               'fb1.name decifrato');
+  assert.equal(result[0].title,         'Titolo breve cifrato',                'fb1.title decifrato');
+  assert.equal(result[0].notes,         'Note di triage riservate',            'fb1.notes decifrate');
+  assert.equal(result[0].reviewComment, 'Commento review riservato',           'fb1.reviewComment decifrato');
+  // i campi non testuali restano invariati
+  assert.equal(result[0].status,   'todo', 'fb1.status non viene toccato');
+  assert.equal(result[0].priority, 2,      'fb1.priority non viene toccata');
+
+  // fb2: solo text era cifrato
+  assert.equal(result[1].text, 'Testo feedback cifrato', 'fb2.text decifrato');
+  assert.equal(result[1].url,  'https://chiaro.it',      'fb2.url in chiaro rimane invariato');
+  assert.equal(result[1].name, 'Mario',                  'fb2.name in chiaro rimane invariato');
+
+  // fb3: tutti in chiaro — retrocompatibilità
+  assert.equal(result[2].text, 'vecchio in chiaro', 'fb3.text in chiaro rimane invariato');
+  assert.equal(result[2].status, 'new',             'fb3.status non viene toccato');
+
+  // Nessun campo deve essere ancora FENC1: dopo la decifratura
+  for (const fb of result) {
+    for (const field of ['text', 'url', 'name', 'title', 'notes', 'reviewComment']) {
+      const v = fb[field];
+      assert.ok(!C.isEncrypted(v), `${fb._id}.${field} non deve restare FENC1: dopo la decifratura`);
+    }
+  }
+});
