@@ -466,6 +466,145 @@ test('un feedback in `clarify` mostra il box risposta dell owner sotto Ricevuti 
   await expect(page.locator('.mg-item')).toHaveCount(0);
 });
 
+// ── DB2: stato `archived` + preferito ⭐ ────────────────────────────────────
+const FB_ARCHIVED = {
+  _id: 'fb-arch-001', text: 'Feedback archiviato.', name: 'Archiviato',
+  seq: 10, subSeq: 0, status: 'archived',
+  clientId: 'tester@example.com', createdAt: '2026-06-20T10:00:00Z', images: [],
+};
+const FB_STARRED_TODO = {
+  _id: 'fb-star-001', text: 'Preferito ma in coda.', name: 'Preferito in coda',
+  seq: 11, subSeq: 0, status: 'todo', starred: true,
+  clientId: 'tester@example.com', createdAt: '2026-06-21T10:00:00Z', images: [],
+};
+const FB_PLAIN_TODO = {
+  _id: 'fb-plain-001', text: 'Feedback normale in coda.', name: 'Normale in coda',
+  seq: 12, subSeq: 0, status: 'todo',
+  clientId: 'tester@example.com', createdAt: '2026-06-22T10:00:00Z', images: [],
+};
+
+function stubFeedbackUpdate(page) {
+  return page.evaluate(() => {
+    window.__updates = [];
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'feedback_update') { window.__updates.push(msg); return { ok: true }; }
+      return orig(msg);
+    };
+  });
+}
+
+test('tab Archiviati: OFF mostra i soli archiviati, il filtro ⭐ mostra tutti i preferiti (DB2)', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK);
+
+  await page.evaluate((fbs) => {
+    window.__mgTest.setAdmin(true);
+    window.__mgTest.setData(fbs);
+    window.__mgTest.setTab('archived');
+  }, [FB_ARCHIVED, FB_STARRED_TODO, FB_PLAIN_TODO]);
+
+  // Il filtro ⭐ esiste solo nella tab Archiviati.
+  await expect(page.locator('#mgArchiveFilter')).toBeVisible();
+
+  // Filtro OFF: solo i feedback in stato `archived` (non i preferiti in coda).
+  await expect(page.locator('.mg-item')).toHaveCount(1);
+  await expect(page.locator('.mg-item-title')).toHaveText('Archiviato');
+
+  // Filtro ⭐ ON: tutti e soli i preferiti, di qualunque stato (qui il todo ⭐).
+  await page.locator('#mgStarFilter').check();
+  await expect(page.locator('.mg-item')).toHaveCount(1);
+  await expect(page.locator('.mg-item-title')).toHaveText('Preferito in coda');
+
+  // Il filtro sparisce sulle altre tab.
+  await page.locator('.mg-tab[data-tab="inbox"]').click();
+  await expect(page.locator('#mgArchiveFilter')).toBeHidden();
+});
+
+test('owner archivia un feedback dalla coda → patch status:archived + lascia la coda (DB2)', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
+  await stubFeedbackUpdate(page);
+
+  await page.evaluate((fb) => {
+    window.__mgTest.setAdmin(true);
+    window.__mgTest.setData([fb]);
+    window.__mgTest.setTab('queue');
+    window.__mgTest.openDetail(fb._id);
+  }, FB_PLAIN_TODO);
+
+  // I controlli di gestione sono visibili per l'owner; bottone "Archivia".
+  await expect(page.locator('#mgManage')).toBeVisible();
+  await expect(page.locator('#mgArchiveBtn')).toHaveText('Archivia');
+  await expect(page.locator('.mg-item')).toHaveCount(1);
+
+  await page.locator('#mgArchiveBtn').click();
+
+  // Patch corretto: status → archived.
+  await expect.poll(() => page.evaluate(() => window.__updates.length)).toBe(1);
+  const patch = await page.evaluate(() => window.__updates[0]);
+  expect(patch.status).toBe('archived');
+
+  // Esce dalla coda: il dettaglio si richiude e la lista "In coda" si svuota.
+  await expect(page.locator('#mgDetail')).toBeHidden();
+  await expect(page.locator('.mg-item')).toHaveCount(0);
+});
+
+test('owner mette/leva il preferito ⭐ → patch starred + il bottone riflette lo stato (DB2)', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
+  await stubFeedbackUpdate(page);
+
+  await page.evaluate((fb) => {
+    window.__mgTest.setAdmin(true);
+    window.__mgTest.setData([fb]);
+    window.__mgTest.setTab('queue');
+    window.__mgTest.openDetail(fb._id);
+  }, FB_PLAIN_TODO);
+
+  const star = page.locator('#mgStarBtn');
+  await expect(star).toHaveAttribute('aria-pressed', 'false');
+  await expect(star).toContainText('☆');
+
+  await star.click();
+
+  await expect.poll(() => page.evaluate(() => window.__updates.length)).toBe(1);
+  const patch = await page.evaluate(() => window.__updates[0]);
+  expect(patch.starred).toBe(true);
+
+  // Il bottone riflette lo stato acceso (★, aria-pressed true).
+  await expect(star).toHaveAttribute('aria-pressed', 'true');
+  await expect(star).toContainText('★');
+});
+
+test('owner ripristina un feedback archiviato → bottone "Ripristina" + patch status:todo (DB2)', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
+  await stubFeedbackUpdate(page);
+
+  await page.evaluate((fb) => {
+    window.__mgTest.setAdmin(true);
+    window.__mgTest.setData([fb]);
+    window.__mgTest.setTab('archived');
+    window.__mgTest.openDetail(fb._id);
+  }, FB_ARCHIVED);
+
+  // Su un feedback già archiviato il bottone ripristina.
+  await expect(page.locator('#mgArchiveBtn')).toHaveText('Ripristina');
+  await page.locator('#mgArchiveBtn').click();
+
+  await expect.poll(() => page.evaluate(() => window.__updates.length)).toBe(1);
+  const patch = await page.evaluate(() => window.__updates[0]);
+  expect(patch.status).toBe('todo');
+
+  // Lascia gli Archiviati.
+  await expect(page.locator('.mg-item')).toHaveCount(0);
+});
+
 test('la pagina carica senza errori JavaScript', async ({ openTab }) => {
   const errors = [];
   const page = await openTab(URL);
