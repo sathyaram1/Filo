@@ -240,8 +240,9 @@ test('applyConsumptionIfAffordable: saldo ESATTAMENTE uguale al costo → permes
 test('applyConsumptionIfAffordable: diversa da applyConsumption — qui un saldo insufficiente blocca, non clampa a 0 gratis', () => {
   let s = C.freshState('2026-06-17');
   s.balance = 2;
-  // applyConsumption (costo AI dietro le quinte) scalerebbe comunque, clampando a 0.
-  const consumed = C.applyConsumption({ ...s }, { action: 'filo_chat', costEur: 0.5 * 0.0008 });
+  // applyConsumption (costo AI dietro le quinte) scalerebbe comunque, clampando a 0,
+  // anche se il costo in crediti (qui 10, da un costEur volutamente alto) supera il saldo.
+  const consumed = C.applyConsumption({ ...s }, { action: 'filo_chat', costEur: 10 * 0.0008 });
   assert.equal(consumed.state.balance, 0); // applyConsumption: passa comunque, clamp a 0
   // applyConsumptionIfAffordable invece RIFIUTA (saldo 2 < costo 5), niente scalo.
   const affordable = C.applyConsumptionIfAffordable({ ...s }, CREDIT.BOARD_REOPEN);
