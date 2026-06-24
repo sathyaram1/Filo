@@ -70,6 +70,7 @@
   let currentList   = [];       // feedback della tab corrente, ordinati
   let selectedId    = null;     // ID del feedback selezionato nel pannello centrale
   let allByClient   = {};       // clientId → array di feedback (per il pannello mittente)
+  let starredOnly   = false;    // filtro ⭐ della tab Archiviati (DB2)
 
   // Etichette/testi vuoto per le tab-lista (DB1).
   const TAB_LABELS = {
