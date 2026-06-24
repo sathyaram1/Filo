@@ -765,6 +765,128 @@
     openDetail,
   };
 
+  // ── Sezione "Modelli di supporto" (DD1) ──────────────────────────────────
+  // Slot → editor a segmenti (buildChain del modelChainEditor).
+  // Caricato pigro: viene inizializzato la prima volta che l'utente clicca la tab.
+  const SM_SLOTS = ['sanitizer', 'judgeL2', 'judgeRedTeam', 'judgePriority'];
+  let smChains = {};        // slot → { getValue }
+  let smLoaded  = false;    // true dopo il primo caricamento riuscito
+  let smLoading = false;    // guard anti-doppio-caricamento
+
+  const mgSmLoading = document.getElementById('mgSmLoading');
+  const mgSmDenied  = document.getElementById('mgSmDenied');
+  const mgSmEditor  = document.getElementById('mgSmEditor');
+  const mgSmSaveBtn = document.getElementById('mgSmSaveBtn');
+  const mgSmStatus  = document.getElementById('mgSmStatus');
+
+  // Popola la <datalist id="mgSmNicknamesList"> con i nickname del registry
+  // predefinito (SN_CONST.DEFAULT_MODEL_REGISTRY), così il dropdown del
+  // modelChainEditor propone i modelli noti anche senza un registry separato.
+  function populateSmNicknames() {
+    const dl = document.getElementById('mgSmNicknamesList');
+    if (!dl) return;
+    dl.innerHTML = '';
+    const reg = (window.SN_CONST && window.SN_CONST.DEFAULT_MODEL_REGISTRY) || {};
+    for (const nick of Object.keys(reg)) {
+      const opt = document.createElement('option');
+      opt.value = nick;
+      const entry = reg[nick] || {};
+      if (entry.label) opt.label = entry.label;
+      dl.appendChild(opt);
+    }
+  }
+
+  // Rende gli editor a segmenti per tutti gli slot, usando SN_MODEL_CHAIN.buildChain.
+  // Ogni chain è attaccata al div #mgSmChain-<slot>.
+  function renderSmSlots(models) {
+    const ModelChain = window.SN_MODEL_CHAIN;
+    if (!ModelChain) return;
+    smChains = {};
+    for (const slot of SM_SLOTS) {
+      const host = document.getElementById(`mgSmChain-${slot}`);
+      if (!host) continue;
+      host.innerHTML = '';
+      // Nessun validatore di azione (questi slot non corrispondono a un'azione
+      // in SN_CONST.ACTIONS): accettiamo qualunque nickname. Il validatore è
+      // opzionale in buildChain — basta non passarlo.
+      const chain = ModelChain.buildChain(models[slot] || '', null, {});
+      host.appendChild(chain.el);
+      smChains[slot] = chain;
+    }
+  }
+
+  function setSmStatus(text, kind) {
+    mgSmStatus.textContent = text || '';
+    mgSmStatus.className = 'mg-sm-status' + (kind ? ` mg-${kind}` : '');
+  }
+
+  async function loadSupportModels() {
+    if (smLoading) return;
+    smLoading = true;
+    mgSmLoading.hidden = false;
+    mgSmDenied.hidden  = true;
+    mgSmEditor.hidden  = true;
+
+    try {
+      const r = await sendToMain({ type: 'support_models_get' });
+      if (!r || r.ok === false) {
+        mgSmLoading.hidden = true;
+        mgSmDenied.hidden  = false;
+        return;
+      }
+      populateSmNicknames();
+      renderSmSlots(r.models || {});
+      mgSmLoading.hidden = true;
+      mgSmEditor.hidden  = false;
+      smLoaded = true;
+    } catch (e) {
+      mgSmLoading.hidden = true;
+      mgSmDenied.hidden  = false;
+      console.error('[manage] errore caricamento modelli di supporto:', e);
+    } finally {
+      smLoading = false;
+    }
+  }
+
+  async function saveSupportModels() {
+    if (!smLoaded) return;
+    const models = {};
+    for (const slot of SM_SLOTS) {
+      models[slot] = smChains[slot] ? smChains[slot].getValue() : '';
+    }
+    mgSmSaveBtn.disabled = true;
+    setSmStatus('Salvataggio…', '');
+    try {
+      const r = await sendToMain({ type: 'support_models_update', models });
+      if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
+      // Ricarica i valori salvati (confirma round-trip Firestore).
+      renderSmSlots(r.models || models);
+      setSmStatus('Salvato.', 'ok');
+    } catch (e) {
+      setSmStatus(e.message || 'Errore nel salvataggio', 'err');
+    } finally {
+      mgSmSaveBtn.disabled = false;
+      clearTimeout(saveSupportModels._t);
+      saveSupportModels._t = setTimeout(() => setSmStatus('', ''), 4000);
+    }
+  }
+
+  if (mgSmSaveBtn) mgSmSaveBtn.addEventListener('click', saveSupportModels);
+
+  // Caricamento pigro: avviene la prima volta che l'utente seleziona la tab
+  // "Modelli di supporto". La funzione selectTab già esiste e gestisce il
+  // pannello; qui interceptiamo il click sulla tab models.
+  mgTabs.addEventListener('click', (e) => {
+    const btn = e.target.closest('.mg-tab');
+    if (!btn || btn.dataset.tab !== 'models') return;
+    if (!smLoaded && !smLoading) loadSupportModels();
+  });
+
+  // Esponi per gli spec Playwright (hook di test).
+  window.__mgTest.loadSupportModels = loadSupportModels;
+  window.__mgTest.getSmChains = () => smChains;
+  window.__mgTest.getSmSlots = () => SM_SLOTS;
+
   // ── Init ──────────────────────────────────────────────────────────────────
   async function init() {
     await refreshAuth();
