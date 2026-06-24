@@ -152,6 +152,9 @@
     const fpMode = ['off', 'default', 'privacy'].includes(fp.mode) ? fp.mode : 'default';
     const fpRadio = document.querySelector(`input[name="fp-mode"][value="${fpMode}"]`);
     if (fpRadio) fpRadio.checked = true;
+
+    // F4 — Default ON quando il setting non è ancora stato scritto (undefined → true).
+    $('sec-auto-feedback').checked = sec.autoFeedback === undefined ? true : !!sec.autoFeedback;
   }
 
   // ─── protezione fingerprinting ─────────────────────────────────────────────
