@@ -301,10 +301,11 @@
   global.SN_CREDITS = {
     // pure (per i test e la logica)
     freshState, ensure, applyRefill, costEurToCredits, rewardForPriority,
-    applyConsumption, applyAward, isVoteRewardPending, publicView, dateKey, daysBetween,
+    applyConsumption, applyAward, isVoteRewardPending, applyConsumptionIfAffordable,
+    publicView, dateKey, daysBetween,
     // async (runtime)
     load, getPublic, recordConsumption, award, wasFeedbackRewarded,
-    wasVoteRewarded, awardVoteOnce,
+    wasVoteRewarded, awardVoteOnce, spendIfAffordable,
     readState, writeState, adopt, setOwner, onChange,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
