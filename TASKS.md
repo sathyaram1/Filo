@@ -350,7 +350,7 @@ separata a permessi ridotti** dove gli utenti verificano i fix già rilasciati.
     `npm test`. Changelog (`patchNotes.js` 0.2.76) e `capabilities.js` (voce
     `board`) aggiornati.
 
-- [ ] **DC3 — Archiviazione automatica a punteggio dopo 24h** (dipende da DB2,
+- [~] **DC3 — Archiviazione automatica a punteggio dopo 24h** _(in corso: routine happy-curie-s1qf4z, 2026-06-24)_ (dipende da DB2,
   DB4) — Logica pura in `src/shared/*` + unit test (no Electron) + il punto che la
   applica. Punteggio = Σ credibilità(voti "works") − Σ credibilità(voti "broken"),
   credibilità = 1 per ora. Dopo **24h** dalla messa in produzione (definire se da
