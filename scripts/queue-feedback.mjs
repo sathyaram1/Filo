@@ -125,9 +125,11 @@ export function queueFeedbackCreate(opts) {
 // i campi sensibili opachi nella history git (repo pubblico).
 export async function queueFeedbackCreateEncrypted(opts) {
   const entry = buildCreateEntry(opts);
-  // S1.2: cifra i campi di contenuto libero. Guard inclusa in encryptFieldsForQueue:
-  // senza pubkey i valori restano in chiaro (comportamento identico a prima).
-  await encryptFieldsForQueue(entry, ['text', 'name', 'notes']);
+  // S1.2 (Fase 1): cifra SOLO `text` (contenuto inviato, non mostrato ad altri
+  // utenti). NON `name` (titolo, mostrato all'utente da C5) né `notes`
+  // (spiegazione user-facing) → Fase 2. Guard + gate dormiente in
+  // encryptFieldsForQueue: senza attivazione i valori restano in chiaro.
+  await encryptFieldsForQueue(entry, ['text']);
   mkdirSync(SPOOL_DIR, { recursive: true });
   const rand = Math.random().toString(36).slice(2, 8);
   const file = resolve(SPOOL_DIR, `new-${Date.now()}-${rand}.json`);
