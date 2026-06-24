@@ -526,10 +526,76 @@
     </section>
 
     <!-- ═══ TAB MODELLI DI SUPPORTO (DD1) ═══════════════════════════════ -->
+    <!-- Un selettore a catena (modelChainEditor) per ciascuno dei 4 slot di
+         supporto: sanitizer, giudice L2, giudice red-team, giudice priorità.
+         La scelta viene salvata nel doc Firestore config/supportModels (owner-
+         gated) così è leggibile anche dal backend filo-security (DD3). -->
     <section class="mg-panel" id="panel-models" data-panel="models">
-      <div class="mg-coming">
-        <div class="mg-coming-icon">🧠</div>
-        <div>In arrivo</div>
+      <div class="mg-support-models" id="mgSmSection">
+
+        <!-- Stato di caricamento / accesso negato -->
+        <div class="mg-sm-loading" id="mgSmLoading">Caricamento…</div>
+        <div class="mg-sm-denied" id="mgSmDenied" hidden>
+          Questa sezione è riservata all'owner.
+        </div>
+
+        <!-- Editor vero (nascosto finché non caricato) -->
+        <div id="mgSmEditor" hidden>
+          <h2>Modelli di supporto</h2>
+          <p class="mg-sm-intro">
+            Seleziona il modello (o la catena con fallback) per ogni compito
+            interno di Filo. La scelta viene salvata nel cloud e letta anche
+            dal backend di sicurezza.
+          </p>
+
+          <!-- datalist dei nickname per i dropdown del modelChainEditor.
+               Popolata da manage.js dopo il caricamento dei modelli predefiniti. -->
+          <datalist id="mgSmNicknamesList"></datalist>
+
+          <div class="mg-sm-slots" id="mgSmSlots">
+            <!-- Slot 1: sanitizer -->
+            <div class="mg-sm-slot" data-slot="sanitizer">
+              <label>Sanitizer feedback</label>
+              <div class="mg-sm-chain-host" id="mgSmChain-sanitizer"></div>
+              <span class="mg-sm-slot-desc">
+                Riscrive i feedback prima che appaiano nella board pubblica.
+              </span>
+            </div>
+
+            <!-- Slot 2: judgeL2 -->
+            <div class="mg-sm-slot" data-slot="judgeL2">
+              <label>Giudice L2</label>
+              <div class="mg-sm-chain-host" id="mgSmChain-judgeL2"></div>
+              <span class="mg-sm-slot-desc">
+                Giudice di sicurezza principale (classifica i feedback in arrivo).
+              </span>
+            </div>
+
+            <!-- Slot 3: judgeRedTeam -->
+            <div class="mg-sm-slot" data-slot="judgeRedTeam">
+              <label>Giudice red-team</label>
+              <div class="mg-sm-chain-host" id="mgSmChain-judgeRedTeam"></div>
+              <span class="mg-sm-slot-desc">
+                Valuta i tentativi nel canale red-team (F3).
+              </span>
+            </div>
+
+            <!-- Slot 4: judgePriority -->
+            <div class="mg-sm-slot" data-slot="judgePriority">
+              <label>Giudice priorità</label>
+              <div class="mg-sm-chain-host" id="mgSmChain-judgePriority"></div>
+              <span class="mg-sm-slot-desc">
+                Assegna la priorità ai feedback (F5).
+              </span>
+            </div>
+          </div>
+
+          <div class="mg-sm-toolbar">
+            <button type="button" class="sn-btn" id="mgSmSaveBtn">Salva</button>
+            <span class="mg-sm-status" id="mgSmStatus" role="status"></span>
+          </div>
+        </div>
+
       </div>
     </section>
 
