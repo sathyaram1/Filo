@@ -128,10 +128,10 @@ module.exports = function register(on, ctx) {
       }
       const idToken = await auth.getIdToken();
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
-      const { id, status, notes, priority, reviewDecision, reviewComment, reviewedAt, starred } = msg;
+      const { id, status, notes, priority, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride } = msg;
       await globalThis.SN_FEEDBACK.updateStatus(
         id,
-        { status, notes, priority, reviewDecision, reviewComment, reviewedAt, starred },
+        { status, notes, priority, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride },
         { idToken },
       );
       return { ok: true };
