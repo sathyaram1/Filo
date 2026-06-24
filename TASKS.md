@@ -1109,6 +1109,12 @@ qualcosa di rotto — Filo **invia un feedback in autonomia**, senza azione uten
   Bonus +10/giorno: `applyRefill` in creditStore.js passa `autoFeedbackEnabled` da `getAutoFeedbackEnabled()`.
   `capabilityGapId` aggiunto a `feedback.submit()` + Firestore rules.
   **Verificato**: `tests/unit/autoFeedback.test.mjs` (27 test: analyzeReply / compose / bonus) → 636 pass.
+  ⚠️ **NON verificato e2e**: la UI (toast+undo, toggle Sicurezza) è implementata ma
+  in questa sessione locale NON è stata esercitata con uno spec Playwright (nessun
+  `.spec.mjs` nuovo) — **da verificare** con uno spec mirato in cloud o provando
+  l'app. La logica pura sì (27 unit). ⚠️ **AZIONE OWNER**: `firebase deploy --only
+  firestore:rules` (aggiunto `capabilityGapId` al create `hasOnly` + validazione
+  string ≤100).
 
 - [x] **F5 — Groomer della coda: dedup + priorità** _(logica pura fatta: sessione
   locale 2026-06-24; applier runtime → routine/backend)_ — **Esito**: nuovo modulo
