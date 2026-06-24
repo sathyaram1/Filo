@@ -334,6 +334,11 @@
     if (parentId) {
       doc.fields.parentId = toFsValue(String(parentId));
     }
+    // F4 — auto-feedback: id strutturale del gap di capacità (per dedup F5).
+    // Solo per feedback auto (`clientId` inizia con 'auto:'), non per quelli utente.
+    if (capabilityGapId && String(clientId || '').startsWith('auto:')) {
+      doc.fields.capabilityGapId = toFsValue(String(capabilityGapId).slice(0, 100));
+    }
 
     const endpoint = `${FIRESTORE_BASE}/${COLLECTION}?key=${API_KEY}`;
     let res = await fetch(endpoint, {
