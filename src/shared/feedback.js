@@ -54,6 +54,41 @@
     return { url: publicUrl, name };
   }
 
+  // ---- S1.F2.1: statusPublic — enum grossolano in chiaro ----------------------
+  // Mapping fine→pubblico. Tre valori: 'open' (in lavorazione OPPURE bloccato —
+  // i due collassano per non regalare hill-climbing: l'attaccante non distingue
+  // `blocked` da un normale feedback in lavorazione), 'closed' (risolto/archiviato),
+  // 'pending-approval' (riservato al futuro, oggi mai assegnato).
+  //
+  // ⚠️ NOTA SICUREZZA CRITICA: `blocked` DEVE mappare su `open`, non su `closed`.
+  //   Se mappasse su `closed` o su un valore distinto, chi legge Firestore senza
+  //   chiave potrebbe riconoscere un attacco beccato e usarlo per fare hill-climbing.
+  //
+  // Questa è l'UNICA sorgente del mapping: non duplicarla altrove.
+  const STATUS_PUBLIC_MAP = {
+    new:     'open',
+    draft:   'open',
+    todo:    'open',
+    clarify: 'open',
+    review:  'open',
+    blocked: 'open',   // ← CUORE DI SICUREZZA: collassa insieme agli "in lavorazione"
+    done:     'closed',
+    verified: 'closed',
+    ignored:  'closed',
+    archived: 'closed',
+  };
+
+  /**
+   * Funzione pura condivisa: mappa uno status fine al valore pubblico grossolano.
+   * Riusata in tutti i percorsi di scrittura di `status`. Da un unico posto.
+   *
+   * @param {string} fineStatus - Valore `status` fine (es. 'blocked', 'done').
+   * @returns {'open'|'closed'|'pending-approval'} Valore pubblico sicuro.
+   */
+  function statusToPublic(fineStatus) {
+    return STATUS_PUBLIC_MAP[fineStatus] || 'open'; // default safe: unknown → 'open'
+  }
+
   // ---- cifratura campi sensibili (S1.2) ----
   // Cifra un campo testo se la chiave pubblica è disponibile. Guard: se la
   // pubblica non c'è (hasPublicKey() false) restituisce il valore invariato
