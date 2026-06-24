@@ -67,6 +67,37 @@
       background: rgba(192, 57, 43, 0.15); border-color: #c0392b; color: #c0392b;
     }
     .bd-vote-count { font-variant-numeric: tabular-nums; }
+
+    /* Riapertura a pagamento (DC4): link discreto sotto i voti, form inline
+       in stile Filo (niente window.prompt nativo, vedi PATTERNS.md). */
+    .bd-reopen { flex: 1 1 100%; }
+    .bd-reopen-link {
+      font: inherit; font-size: 12px; color: var(--sn-muted); cursor: pointer;
+      background: none; border: none; padding: 2px 0; text-decoration: underline;
+    }
+    .bd-reopen-link:hover { color: var(--sn-fg); }
+    .bd-reopen-done { font-size: 12px; color: var(--sn-muted); flex: 1 1 100%; }
+    .bd-reopen-form {
+      margin-top: 8px; padding: 10px; border: 1px solid var(--sn-border);
+      border-radius: 10px; background: var(--sn-bg);
+    }
+    .bd-reopen-hint { margin: 0 0 6px; font-size: 12px; color: var(--sn-muted); }
+    .bd-reopen-text {
+      width: 100%; min-height: 60px; resize: vertical; font: inherit; font-size: 13px;
+      border: 1px solid var(--sn-border); border-radius: 8px; padding: 8px;
+      background: var(--sn-card); color: var(--sn-fg); box-sizing: border-box;
+    }
+    .bd-reopen-text:focus { outline: none; border-color: var(--sn-accent); }
+    .bd-reopen-actions { display: flex; gap: 8px; margin-top: 8px; }
+    .bd-reopen-actions button {
+      font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+      border: 1px solid var(--sn-border); border-radius: 8px; padding: 6px 12px;
+      background: var(--sn-card); color: var(--sn-fg);
+    }
+    .bd-reopen-actions button:hover { border-color: var(--sn-accent); }
+    .bd-reopen-actions button[disabled] { opacity: .6; cursor: default; }
+    .bd-reopen-cancel { background: transparent; }
+    .bd-reopen-err { margin: 6px 0 0; font-size: 12px; color: #c0392b; }
   </style>
 </head>
 <body>
