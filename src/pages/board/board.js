@@ -1,4 +1,4 @@
-// Bacheca utente di Filo (filo://board/, DC1).
+// Bacheca utente di Filo (filo://board/, DC1 + DC2).
 //
 // Superficie a PERMESSI RIDOTTI, NON owner-gated: gli anonimi leggono, per
 // votare serve il login. Mostra SOLO i miglioramenti già IN PRODUZIONE (fix
@@ -11,9 +11,11 @@
 //
 // La struttura dati dei voti (works/broken per uid) è DB4; il filtro "in
 // produzione + niente blocchi" è la pura `SN_MANAGE_REVIEW.listBoardTab`.
-// NB: la PERSISTENZA del voto su Firestore e la ricompensa di 10 crediti sono
-// volutamente lasciate a DC2 (vedi TASKS.md): qui i pulsanti sono la superficie
-// "votabile" e riflettono il conteggio + la scelta locale dell'utente.
+// Il voto (DC2) persiste su Firestore tramite l'handler IPC BOARD_CAST_VOTE/
+// BOARD_CLEAR_VOTE: il main allega l'ID token del votante (mai esposto qui) e
+// premia +10 crediti una sola volta per feedback per utente (anti-doppio-
+// premio nel credit store). Il conteggio mostrato è il tally REALE ritornato
+// dal main dopo la scrittura, non solo l'aggiornamento ottimistico locale.
 
 (function () {
   'use strict';
