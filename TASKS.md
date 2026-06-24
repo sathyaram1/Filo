@@ -1102,9 +1102,13 @@ qualcosa di rotto — Filo **invia un feedback in autonomia**, senza azione uten
   (d) **crediti** — NIENTE +5 per-feedback automatico (si farmerebbe); invece un
   **bonus giornaliero ~+10 crediti finché l'opzione è ON** (incentivo a tenerla
   attiva; si aggancia al refill giornaliero del motore crediti C1).
-  **Done**: spec che simula una richiesta fuori-capacità → asserisce invio di un
-  feedback **sanitizzato** col source corretto, il toast con undo, e il bonus
-  giornaliero condizionato al setting. (stima: L)
+  **Esito**: `src/shared/autoFeedback.js` (logica pura: `analyzeReply` + `compose` + bonus).
+  Wired in `handleFiloChat` (handlers.js) — fire-and-forget dopo la risposta.
+  Toast con undo (`cancelAutoFeedback` dichiarativo in shell.js → `CANCEL_AUTO_FEEDBACK` IPC → filo.js).
+  Toggle in Impostazioni → Sicurezza (`sec-auto-feedback`, default ON).
+  Bonus +10/giorno: `applyRefill` in creditStore.js passa `autoFeedbackEnabled` da `getAutoFeedbackEnabled()`.
+  `capabilityGapId` aggiunto a `feedback.submit()` + Firestore rules.
+  **Verificato**: `tests/unit/autoFeedback.test.mjs` (27 test: analyzeReply / compose / bonus) → 636 pass.
 
 - [x] **F5 — Groomer della coda: dedup + priorità** _(logica pura fatta: sessione
   locale 2026-06-24; applier runtime → routine/backend)_ — **Esito**: nuovo modulo
