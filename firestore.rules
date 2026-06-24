@@ -176,7 +176,13 @@ service cloud.firestore {
         && request.resource.data.get('reviewComment', '') is string
         && request.resource.data.get('reviewComment', '').size() <= 2000
         && request.resource.data.get('reviewedAt', '') is string
-        && request.resource.data.get('reviewedAt', '').size() <= 40;
+        && request.resource.data.get('reviewedAt', '').size() <= 40
+        // Override owner per l'archiviazione automatica a punteggio (DC3):
+        // 'archived' = l'owner ha archiviato a mano (vince sempre su punteggio
+        // /età); 'keep_open' = l'owner ha deciso esplicitamente di NON
+        // archiviare nonostante il punteggio. '' = nessun override (substrato
+        // SN_BOARD_ARCHIVE.hasOwnerOverride).
+        && request.resource.data.get('archiveOverride', '') in ['', 'archived', 'keep_open'];
 
       // Voto di verifica della board utente (DB4): un utente LOGGATO scrive SOLO
       // il proprio voto nel map `votes` (chiave = suo uid). Un voto per utente,
