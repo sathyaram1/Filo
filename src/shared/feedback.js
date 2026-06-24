@@ -321,6 +321,9 @@
         clientId: toFsValue(clientId || ''),
         images: toFsValue(uploaded),
         files: toFsValue(uploadedFiles),
+        // S1.F2.1: statusPublic SEMPRE in chiaro anche se status fine è cifrato.
+        // Un feedback nuovo parte da 'new' → mappa su 'open'.
+        statusPublic: toFsValue('open'),
         createdAt: { timestampValue: new Date().toISOString() },
       },
     };
