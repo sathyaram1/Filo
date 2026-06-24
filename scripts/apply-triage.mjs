@@ -59,6 +59,17 @@ const SPOOL_DIR = process.env.FILO_SPOOL_DIR
 const CLAIMS_DIR = resolve(SPOOL_DIR, 'claims');
 
 const ALLOWED = ['todo', 'done', 'clarify', 'review', 'blocked', 'archived'];
+
+// DB3: la versione in cui un fix confluisce = quella corrente di package.json
+// (è la release in costruzione, la "prossima" che uscirà). Stampata su
+// `resolvedInVersion` al passaggio a `done`, serve alla dashboard `manage` per
+// distinguere i fix "in produzione" (resolvedInVersion ≤ versione rilasciata)
+// dai done-ma-non-ancora-spediti. Vedi src/shared/manageReview.js → isShipped.
+function packageVersion() {
+  try {
+    return JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8')).version || '';
+  } catch (_) { return ''; }
+}
 const DRY = process.argv.includes('--dry-run');
 const MAIN_BRANCH = process.env.FILO_MAIN_BRANCH || 'main';
 
