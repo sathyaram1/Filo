@@ -122,6 +122,9 @@
     FEEDBACK_SEND: 5,
     // Ricompensa alla RISOLUZIONE di un feedback, per priorità (0-3).
     FEEDBACK_RESOLVE_BY_PRIORITY: { 0: 50, 1: 100, 2: 200, 3: 300 },
+    // +10 crediti per il voto funziona/non-funziona in bacheca (DC2), una sola
+    // volta per feedback per utente. Niente timeout né penalità.
+    BOARD_VOTE: 10,
   };
 
   // Raggruppamento azione → "tipo d'uso" mostrato nel grafico a torta dei crediti
