@@ -82,10 +82,15 @@ module.exports = function register(on, ctx) {
   const { MSG, broadcastToTabs } = ctx;
 
   // I token restano nel main process: qui torniamo solo il profilo pubblico
-  // + se l'utente è admin (può triagiare i feedback).
-  on(MSG.AUTH_STATUS, async () => (
-    { ok: true, signedIn: auth.isSignedIn(), isAdmin: auth.isAdmin(), profile: auth.getProfile() }
-  ));
+  // + se l'utente è admin (può triagiare i feedback). `uid` è il claim
+  // Firebase REALE (request.auth.uid nelle Firestore rules) — diverso
+  // dall'email del profilo — usato dalla bacheca (DC2) per riconoscere i
+  // propri voti nella mappa `votes` autorevole letta da Firestore.
+  on(MSG.AUTH_STATUS, async () => {
+    const signedIn = auth.isSignedIn();
+    const uid = signedIn ? await auth.getUid() : null;
+    return { ok: true, signedIn, isAdmin: auth.isAdmin(), profile: auth.getProfile(), uid };
+  });
 
   on(MSG.AUTH_SIGNIN, async () => {
     try {
