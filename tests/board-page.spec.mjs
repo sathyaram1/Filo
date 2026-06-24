@@ -1,4 +1,4 @@
-// Spec Playwright per la bacheca utente (filo://board/, DC1).
+// Spec Playwright per la bacheca utente (filo://board/, DC1 + DC2).
 //
 // Assert di COMPORTAMENTO (asserisce il SUCCESSO della feature, non l'assenza
 // di un errore):
@@ -7,7 +7,11 @@
 //   - NON vede nulla del red-team: niente stato, priorità, verdetti dei giudici,
 //     testo del feedback bloccato, mittente, pipeline. Un feedback "attack" anche
 //     se chiuso NON compare e il suo testo/verdetti non sono nel DOM;
-//   - anonimo → invito ad accedere; loggato → può esprimere un voto (toggle locale).
+//   - anonimo → invito ad accedere; loggato → il voto (DC2) passa dall'IPC
+//     BOARD_CAST_VOTE/BOARD_CLEAR_VOTE verso il main, che scrive su Firestore
+//     con l'idToken e accredita i crediti — vedi tests/board-vote.spec.mjs per
+//     il dettaglio del flusso IPC e tests/unit/creditStore.test.mjs per
+//     l'anti-doppio-premio.
 
 import { test, expect } from './fixtures/electron.mjs';
 
