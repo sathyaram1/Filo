@@ -57,7 +57,8 @@ async function getPrivateKey() {
 // Retrocompatibile: i valori non cifrati passano invariati.
 // Senza chiave privata i campi cifrati diventano il placeholder leggibile.
 // S1.F2.1: aggiunto 'status' (cifrato quando gate on) — NON 'statusPublic' (sempre in chiaro).
-const TEXT_FIELDS_TO_DECRYPT = ['text', 'url', 'name', 'title', 'notes', 'reviewComment', 'status'];
+// S1.F2.2: aggiunto 'clientId' (cifrato quando gate on; clientIdHash resta in chiaro).
+const TEXT_FIELDS_TO_DECRYPT = ['text', 'url', 'name', 'title', 'notes', 'reviewComment', 'status', 'clientId'];
 const PLACEHOLDER_NO_KEY = '[cifrato — chiave privata non configurata]';
 
 async function decryptFeedbackObject(fields) {
