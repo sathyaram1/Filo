@@ -20,10 +20,12 @@
   const mgAutoState  = document.getElementById('mgAutoState');
 
   // Lista (tab corrente)
-  const mgListHead    = document.getElementById('mgListHead');
-  const mgListLoading = document.getElementById('mgListLoading');
-  const mgList        = document.getElementById('mgList');
-  const mgListEmpty   = document.getElementById('mgListEmpty');
+  const mgListHead     = document.getElementById('mgListHead');
+  const mgListLoading  = document.getElementById('mgListLoading');
+  const mgList         = document.getElementById('mgList');
+  const mgListEmpty    = document.getElementById('mgListEmpty');
+  const mgArchiveFilter = document.getElementById('mgArchiveFilter');
+  const mgStarFilter    = document.getElementById('mgStarFilter');
 
   // Revisione — dettaglio
   const mgDetailEmpty = document.getElementById('mgDetailEmpty');
