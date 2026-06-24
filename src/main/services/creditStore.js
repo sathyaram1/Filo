@@ -143,6 +143,25 @@
     return !!feedbackId && !s.rewardedVotes[feedbackId];
   }
 
+  // ── Spesa anti-spam (DC4 — riapertura bacheca) ──────────────────────────────
+  // PURA: "può permetterselo → scala ESATTAMENTE amount" altrimenti "rifiuta,
+  // saldo INTOCCATO". Niente saldo negativo, niente scalo parziale. Diversa da
+  // applyConsumption (che clampa a 0 e scala sempre, usata per il costo AI
+  // dietro le quinte): qui è un costo NOTO e fisso pagato di tasca dall'utente,
+  // quindi un saldo insufficiente deve bloccare l'azione, non far scendere il
+  // saldo sotto zero o farla passare gratis.
+  // Ritorna { state, ok, balance }: `state` è SEMPRE quello passato in input se
+  // ok=false (nessuna mutazione), con balance aggiornato se ok=true.
+  function applyConsumptionIfAffordable(state, amount) {
+    const s = ensure(state);
+    const cost = Math.max(0, Number(amount) || 0);
+    if (s.balance < cost) {
+      return { state: s, ok: false, balance: Math.round(s.balance) };
+    }
+    s.balance -= cost;
+    return { state: s, ok: true, balance: Math.round(s.balance) };
+  }
+
   // Vista PUBBLICA per la UI: niente costo € (né totale né per-azione). Solo
   // saldo + consumo per tipo d'uso (per la torta) + ricompense.
   function publicView(state) {
