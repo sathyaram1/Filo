@@ -4,6 +4,7 @@
 const path = require('node:path');
 const auth = require('../../auth/google-auth');
 const Defaults = require('../defaultsStore');
+const SupportModels = require('../supportModelsStore');
 const { permissionDeniedHelp } = require('../feedbackError');
 
 // ---- Slot chiave privata feedback (S1.3) ----------------------------------------
