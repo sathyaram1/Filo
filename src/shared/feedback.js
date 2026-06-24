@@ -61,7 +61,7 @@
   async function maybeEncrypt(value) {
     if (value == null || value === '') return value;
     const C = global.SN_FEEDBACK_CRYPTO;
-    if (!C || !C.hasPublicKey()) return value;
+    if (!C || !C.isEnabled()) return value; // dormiente finché il cutover non accende SN_FEEDBACK_ENC_ENABLED
     try { return await C.encryptForOwner(String(value)); }
     catch (e) { console.warn('[SN feedback] cifratura testo fallita:', e?.message || e); return value; }
   }
