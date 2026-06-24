@@ -115,7 +115,7 @@ service cloud.firestore {
       // forma usata altrove nel repo: alfanumerico/`-`/`_`).
       allow create: if
         request.resource.data.keys().hasOnly(
-          ['text', 'url', 'title', 'name', 'userAgent', 'clientId', 'images',
+          ['text', 'url', 'title', 'name', 'userAgent', 'clientId', 'clientIdHash', 'images',
            'files', 'createdAt', 'seq', 'subSeq', 'parentId',
            'statusPublic',   // S1.F2.1: aggiunto statusPublic (sempre in chiaro, nuovo nei submit)
            'capabilityGapId' // F4: id gap capacità per dedup auto-feedback (F5)
@@ -133,8 +133,12 @@ service cloud.firestore {
         && request.resource.data.get('name', '').size() <= 200
         && request.resource.data.get('userAgent', '') is string
         && request.resource.data.get('userAgent', '').size() <= 500
+        // S1.F2.2: clientId può essere raw (<=100) o cifrato FENC1: (<=300).
         && request.resource.data.get('clientId', '') is string
-        && request.resource.data.get('clientId', '').size() <= 100
+        && request.resource.data.get('clientId', '').size() <= 300
+        // S1.F2.2: clientIdHash — hash SHA-256 troncato in chiaro (32 char hex) per match C5.
+        && request.resource.data.get('clientIdHash', '') is string
+        && request.resource.data.get('clientIdHash', '').size() <= 64
         && request.resource.data.get('images', []) is list
         && request.resource.data.get('images', []).size() <= 5
         && request.resource.data.get('files', []) is list
