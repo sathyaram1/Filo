@@ -393,12 +393,51 @@ separata a permessi ridotti** dove gli utenti verificano i fix già rilasciati.
     override owner archivia/blocca subito — usando il vero `tallyVotes`. Niente
     `patchNotes.js`/`capabilities.js`: tutto dentro `manage`, owner-only.
 
-- [~] **DC4 — Riapertura a pagamento** _(in corso: routine happy-curie-s1qf4z, 2026-06-24)_ — Dalla board un utente può inviare un
+- [x] **DC4 — Riapertura a pagamento** _(fatto: routine happy-curie-s1qf4z, 2026-06-24)_ — Dalla board un utente può inviare un
   feedback che **riapre** un fix verificato (lo toglie da Risolti, torna nell'iter
   normale), **collegato all'originale**. **Costa pochi crediti** (anti-spam),
   **ricompensa a risoluzione** come gli altri feedback. **Done**: spec — la
   riapertura crea un feedback collegato, scala i crediti, e l'originale esce da
   Risolti. (stima: M)
+  - **FATTO (routine happy-curie-s1qf4z, 2026-06-24):** in Bacheca ogni fix
+    rilasciato ha il link "Ancora rotto?" → modulo. L'invio (handler
+    `BOARD_REOPEN` in `handlers/board.js`): rilegge l'originale dal server
+    (non dalla cache renderer), gate `SN_MANAGE_REVIEW.canReopen` (solo fix
+    "Risolti" senza red-team + guard anti-doppia-riapertura `hasReopenRequest`),
+    **scala `CREDIT.BOARD_REOPEN` (5) solo se il saldo basta** (nuovo puro
+    `creditStore.applyConsumptionIfAffordable`/`spendIfAffordable` — niente saldo
+    negativo, niente azione "gratis"), crea il feedback **collegato** (`parentId`)
+    e marca `reopenRequests.<uid>` sull'originale (stesso pattern non-admin di
+    `votes`, DB4). **Ricompensa a risoluzione**: riusa il premio standard quando
+    il collegato arriva a `done`. **Compensazione**: se la creazione fallisce dopo
+    aver scalato, i crediti vengono restituiti.
+  - **"Esce da Risolti" (criterio DC4):** completato lato vista —
+    `listBoardTab` ora **esclude** i fix con riapertura in sospeso, così
+    l'originale sparisce subito dalla bacheca (non più "risolto, conferma se
+    funziona"). Il **flip di `status`** dell'originale fuori da "Risolti" in
+    `manage` resta al **percorso fidato/triage** (un utente non può scrivere lo
+    `status` di un altro doc — vincolo di sicurezza): è il segnale `reopenRequests`
+    che il triage legge per spostarlo. _(Se l'owner vuole che la sola
+    segnalazione utente sposti l'originale anche in `manage` senza un passaggio
+    di triage, è una scelta di design da confermare — substrato pronto.)_
+  - **Oltre il chiesto:** messaggio "già segnalato" sull'anti-doppia-riapertura,
+    rimborso crediti su fallimento, `capabilities.js` (voce `board`) e changelog
+    (`patchNotes.js` 0.2.76) aggiornati.
+  - ⚠️ **AZIONE OWNER**: `firebase deploy --only firestore:rules` — le rules ora
+    accettano `parentId` in creazione (string ≤128) e un nuovo ramo update
+    `reopenRequests` (utente loggato scrive SOLO la propria chiave `<uid>`,
+    entry `{at:string≤40}` — stesso schema stretto di `votes`). **Unico deploy**
+    copre anche `archiveOverride` di DC3. Finché non è deployato, la riapertura
+    fallisce in produzione.
+  - **Verificato:** `npm run test:unit` 516/517 (unico rosso preesistente
+    `defaultsSecretsMerge`). Nuovi unit: idoneità riapertura + anti-doppia
+    (`manageReview.test.mjs`), spesa crediti "basta→scala / non basta→rifiuta
+    senza toccare il saldo" (`creditStore.test.mjs`), e **`listBoardTab` esclude
+    i fix riaperti** (test aggiunto dall'orchestratore in verifica). Spec
+    Playwright `tests/board-reopen.spec.mjs` (contratto IPC end-to-end: rifiuto
+    senza sessione/id mancante/testo vuoto-o-troppo-lungo) scritto ma **NON
+    eseguito** in sandbox (Electron non installabile) — gira in locale/cloud con
+    `npm test`.
 
 - [ ] **DC5 — Fondamenta credibilità per utente (substrato, NO policy)** — Campo
   `credibilità` per utente (=1) in un doc dedicato (es. `users/<uid>` o dentro
