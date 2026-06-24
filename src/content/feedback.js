@@ -701,6 +701,7 @@
           title: document.title,
           userAgent: navigator.userAgent,
           clientId,
+          clientIdHash, // S1.F2.2: hash deterministico in chiaro per match C5
           images: outImages,
           files: files.slice(), // allegati non-immagine (pdf, txt, md, json…)
         };
