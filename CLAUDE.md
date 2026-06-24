@@ -706,6 +706,26 @@ coda e sceglie la modalità:
   vuoti, testo enorme, caratteri strani, doppio clic, sequenze inusuali). Torna
   **PASS** (la feature fa davvero la cosa giusta) o **FAIL** + cosa si rompe.
 
+**Decifratura feedback (S1) — obbligatoria prima di lavorare testo+screenshot.**
+I campi sensibili dei feedback (`text`, `url`, `status`, `clientId`, `name`, `notes`, …)
+possono essere cifrati dal gate S1 (prefisso `FENC1:`). In entrambe le modalità,
+il worker DEVE decifrare il feedback **prima** di passarlo al contesto LLM:
+
+```js
+import { decryptFeedbackFields } from '../../scripts/lib/decrypt-feedback-fields.mjs';
+const plain = await decryptFeedbackFields(feedbackObject);
+// plain.text, plain.notes, ecc. sono ora in chiaro
+```
+
+La chiave privata va configurata nel cloud via env **`FILO_FEEDBACK_PRIVKEY`**
+(stringa PKCS8 base64, generata da `scripts/gen-feedback-keys.mjs`; **non committarla
+mai**). In locale si può mettere in `tests/agent/.env` come
+`FILO_FEEDBACK_PRIVKEY=<base64>` — il modulo la carica automaticamente da lì.
+I metadati che l'orchestratore vede (`statusPublic`, `num`, `priority`, `name`/titolo)
+restano **sempre in chiaro** e non richiedono decifratura. Se la chiave non è
+configurata, i campi cifrati diventano `[cifrato — chiave privata non configurata]`:
+il worker NON può lavorare quel feedback e lo segnala all'orchestratore.
+
 **`npm test` completo UNA volta sola, alla fine, dall'orchestratore**, dopo che
 i worker hanno chiuso e prima/insieme ai merge finali: cattura le regressioni
 incrociate. Se rompe qualcosa, l'orchestratore capisce quale fix e rilancia il
