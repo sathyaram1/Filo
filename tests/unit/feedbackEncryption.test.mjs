@@ -49,7 +49,7 @@ test('round-trip: cifra con encryptFieldsForQueue, decifra con decryptFeedbackFi
   globalThis.SN_FEEDBACK_PUBKEY = pub;
 
   const { encryptFieldsForQueue } = await import(toFileUrl(join(ROOT, 'scripts', 'lib', 'encrypt-feedback-fields.mjs')));
-  const { decryptFeedbackFields } = await import(join(ROOT, 'scripts', 'lib', 'decrypt-feedback-fields.mjs'));
+  const { decryptFeedbackFields } = await import(toFileUrl(join(ROOT, 'scripts', 'lib', 'decrypt-feedback-fields.mjs')));
 
   const entry = { text: 'Il pulsante non funziona quando incollo.', name: 'bug pulsante', notes: 'riprodotto su Mac', extra: 'invariato' };
   const encrypted = await encryptFieldsForQueue(entry, ['text', 'name', 'notes']);
@@ -77,7 +77,7 @@ test('round-trip: cifra con encryptFieldsForQueue, decifra con decryptFeedbackFi
 
 test('retrocompatibilità: valori in chiaro passano invariati attraverso decryptFeedbackFields', async () => {
   const { priv } = await genTestKeys();
-  const { decryptFeedbackFields } = await import(join(ROOT, 'scripts', 'lib', 'decrypt-feedback-fields.mjs'));
+  const { decryptFeedbackFields } = await import(toFileUrl(join(ROOT, 'scripts', 'lib', 'decrypt-feedback-fields.mjs')));
 
   const oldFeedback = { text: 'feedback vecchio in chiaro', name: 'titolo vecchio', notes: 'note vecchie', status: 'done' };
   const plain = await decryptFeedbackFields(oldFeedback, priv);
@@ -116,7 +116,7 @@ test('senza privkey: campi cifrati diventano placeholder leggibile, niente crash
   globalThis.SN_FEEDBACK_PUBKEY = pub;
 
   const { encryptFieldsForQueue } = await import(toFileUrl(join(ROOT, 'scripts', 'lib', 'encrypt-feedback-fields.mjs')));
-  const { decryptFeedbackFields } = await import(join(ROOT, 'scripts', 'lib', 'decrypt-feedback-fields.mjs'));
+  const { decryptFeedbackFields } = await import(toFileUrl(join(ROOT, 'scripts', 'lib', 'decrypt-feedback-fields.mjs')));
 
   const entry = { text: 'testo cifrato', name: 'titolo cifrato', notes: '' };
   await encryptFieldsForQueue(entry, ['text', 'name', 'notes']);
@@ -149,7 +149,7 @@ test('queueFeedbackCreateEncrypted: il file scritto ha i campi sensibili cifrati
   try {
     const { readFileSync, readdirSync } = await import('node:fs');
     const { queueFeedbackCreateEncrypted } = await import(join(ROOT, 'scripts', 'queue-feedback.mjs'));
-    const { decryptFeedbackFields } = await import(join(ROOT, 'scripts', 'lib', 'decrypt-feedback-fields.mjs'));
+    const { decryptFeedbackFields } = await import(toFileUrl(join(ROOT, 'scripts', 'lib', 'decrypt-feedback-fields.mjs')));
 
     await queueFeedbackCreateEncrypted({
       text: 'Fix critico nel gestore eventi',
@@ -186,7 +186,7 @@ test('decryptFeedbackList: lista mista (vecchi in chiaro + nuovi cifrati)', asyn
   const savedPub = globalThis.SN_FEEDBACK_PUBKEY;
   globalThis.SN_FEEDBACK_PUBKEY = pub;
 
-  const { decryptFeedbackList } = await import(join(ROOT, 'scripts', 'lib', 'decrypt-feedback-fields.mjs'));
+  const { decryptFeedbackList } = await import(toFileUrl(join(ROOT, 'scripts', 'lib', 'decrypt-feedback-fields.mjs')));
 
   const ctOld = await C.encryptForOwner('testo cifrato', pub);
   const list = [
