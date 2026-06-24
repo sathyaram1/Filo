@@ -327,6 +327,13 @@
       'Il controllo della blacklist ufficiale di Google (phishing e malware) usa una chiave condivisa, ' +
       'gestita centralmente dall\'amministratore in "Modelli predefiniti": è già attiva per tutti gli ' +
       'account, non devi configurare nulla qui.',
+    // F4 — Feedback autonomo
+    options_security_auto_feedback: 'Segnalazione automatica dei problemi',
+    options_security_auto_feedback_desc:
+      'Quando Filo non riesce a fare una cosa che gli chiedi, oppure rileva un problema, ' +
+      'lo segnala automaticamente a chi sviluppa Filo — senza rivelare URL o testo delle ' +
+      'tue conversazioni. La segnalazione è anonima e generica. Attivando questa opzione ' +
+      'ricevi 10 crediti extra al giorno.',
     // Gestione cookie / consenso
     options_cookies_title: 'Cookie e banner di consenso',
     options_cookies_desc:
