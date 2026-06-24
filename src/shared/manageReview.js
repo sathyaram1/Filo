@@ -193,7 +193,7 @@
 
   global.SN_MANAGE_REVIEW = {
     classifyBlock, sortReview, REASONS, manageTabFor, listForManageTab,
-    isStarred, listArchiveTab,
+    isStarred, listArchiveTab, isShipped, cmpVersion,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
