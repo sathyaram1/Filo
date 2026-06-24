@@ -108,11 +108,27 @@ export function buildCreateEntry({ text, name, parentId, priority, status, notes
 }
 
 // Scrive il file di spool (nessun effetto git). Ritorna il path assoluto.
+// Versione sincrona: usata nei test unitari che testano solo la validazione.
 export function queueFeedbackCreate(opts) {
   const entry = buildCreateEntry(opts);
   mkdirSync(SPOOL_DIR, { recursive: true });
   // Il nome file inizia con "new-": è ciò che distingue le creazioni dalle
   // decisioni di triage (<idFeedback>.json) dentro la stessa coda.
+  const rand = Math.random().toString(36).slice(2, 8);
+  const file = resolve(SPOOL_DIR, `new-${Date.now()}-${rand}.json`);
+  writeFileSync(file, JSON.stringify(entry, null, 2) + '\n', 'utf8');
+  return file;
+}
+
+// Versione asincrona con cifratura S1.2: cifra text/name/notes prima di
+// scrivere il file di spool. Stessa logica di queueFeedbackCreate ma con
+// i campi sensibili opachi nella history git (repo pubblico).
+export async function queueFeedbackCreateEncrypted(opts) {
+  const entry = buildCreateEntry(opts);
+  // S1.2: cifra i campi di contenuto libero. Guard inclusa in encryptFieldsForQueue:
+  // senza pubkey i valori restano in chiaro (comportamento identico a prima).
+  await encryptFieldsForQueue(entry, ['text', 'name', 'notes']);
+  mkdirSync(SPOOL_DIR, { recursive: true });
   const rand = Math.random().toString(36).slice(2, 8);
   const file = resolve(SPOOL_DIR, `new-${Date.now()}-${rand}.json`);
   writeFileSync(file, JSON.stringify(entry, null, 2) + '\n', 'utf8');
