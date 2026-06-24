@@ -197,6 +197,20 @@ async function getIdToken() {
   return refreshIfNeeded();
 }
 
+// uid Firebase (claim user_id/sub) dell'utente loggato corrente. È QUESTO uid —
+// non l'email — quello che le Firestore rules vedono come request.auth.uid (es.
+// nel vincolo chiave==uid di `votes.<uid>` per il voto board, DC2). null se non
+// loggato o se il token non è disponibile.
+async function getUid() {
+  if (!isSignedIn()) return null;
+  try {
+    const tok = await getIdToken();
+    if (!tok) return null;
+    const p = decodeJwtPayload(tok);
+    return p.user_id || p.sub || null;
+  } catch (_) { return null; }
+}
+
 function getProfile() {
   if (!session) return null;
   return { email: session.email, name: session.name, picture: session.picture };
