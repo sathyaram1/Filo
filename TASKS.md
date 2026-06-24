@@ -949,8 +949,25 @@ DIPENDENZE APERTE (non chiudibili da questo repo):
     plaintext corretto; unit test che verifica che C5 (`GET_FEEDBACK_REWARDS`) continui
     a trovare i feedback "risolti" senza chiave privata. (stima: M)
 
-  - [ ] **S1.F2.2 — Cifra `clientId` con hash deterministico in chiaro** _(dipende da
-    nulla; indipendente da S1.F2.1)_ — **Problema**: `clientId` è usato da C5
+  - [x] **S1.F2.2 — Cifra `clientId` con hash deterministico in chiaro** _(fatto:
+    sessione locale 2026-06-24)_ — **Esito**: nuovo modulo `src/shared/feedbackClientIdHash.js`
+    (`SN_FEEDBACK_CLIENT_ID_HASH.hashClientId` = SHA-256 troncato a 32 hex, WebCrypto,
+    identico in browser/preload e Node — verificato). `submit` scrive `clientIdHash`
+    in chiaro + cifra `clientId` (FENC1:) se gate ON (retry 403 rimuove `clientIdHash`
+    per retrocompat con rules non ancora deployate). `src/content/feedback.js` calcola
+    l'hash nel renderer. **C5** (`credits.js`): match via `clientIdHash` se presente,
+    **fallback su raw `clientId` per i feedback storici** (retrocompat). `clientId`
+    aggiunto a `TEXT_FIELDS_TO_DECRYPT`/`decrypt-feedback-fields.mjs` (dashboard owner
+    vede il raw). `queue-feedback.mjs` calcola l'hash e cifra `clientId` se attiva.
+    Caricato in loader + 2 preload. **Invariante dormiente** (flag off, default):
+    `clientId` resta in chiaro, si aggiunge solo `clientIdHash`; C5 matcha come prima.
+    **firestore.rules**: `clientIdHash` nel create `hasOnly` (string ≤64), `clientId`
+    allargato a ≤300 (ciphertext più lungo). **Verificato**:
+    `tests/unit/feedbackClientIdHash...` 8 nuovi test (submit cifrato → hash chiaro +
+    clientId FENC1; match C5 via hash; dormiente in chiaro; storico senza hash matcha
+    via raw) → `npm run test:unit` 644/0. ⚠️ **AZIONE OWNER**: `firebase deploy --only
+    firestore:rules` (vedi checklist S1.5). (stima: S)
+    — _Spec originale sotto:_ **Problema**: `clientId` è usato da C5
     (`GET_FEEDBACK_REWARDS`, `credits.js` riga 313) per il match "questo feedback è
     dell'install corrente" — la macchina utente non ha la chiave privata, quindi non
     può decifrare. **Soluzione**: conservare un `clientIdHash` (SHA-256 troncato, es.
