@@ -314,7 +314,7 @@ separata a permessi ridotti** dove gli utenti verificano i fix già rilasciati.
     già documentati in DB1) o flakiness headless ("browser has been closed" in
     `page-ctrl-zoom`/`proxy-tab-nl`): **zero regressioni** da DC1.
 
-- [~] **DC2 — Voto funziona/non-funziona + ricompensa 10 crediti** _(in corso: routine happy-curie-s1qf4z, 2026-06-24)_ (dipende da
+- [x] **DC2 — Voto funziona/non-funziona + ricompensa 10 crediti** _(fatto: routine happy-curie-s1qf4z, 2026-06-24)_ (dipende da
   DB3, DB4) — File: board page + handler IPC + `src/main/services/creditStore.js`.
   Sui feedback **deployati** (DB3): voto ✅ funziona / ❌ non-funziona, un voto per
   utente (uid) cambiabile, scritto in DB4. **Ricompensa 10 crediti** a voto, **una
@@ -323,6 +323,32 @@ separata a permessi ridotti** dove gli utenti verificano i fix già rilasciati.
   `src/content/feedback.js` / variante home). **NIENTE timeout/penalità.** **Done**:
   spec — il voto registra + accredita 10 crediti una sola volta; un secondo voto
   sullo stesso feedback non ripaga. (stima: M)
+  - **FATTO (routine happy-curie-s1qf4z, 2026-06-24):** il voto bacheca ora
+    persiste su Firestore (`votes.<uid>`, DB4) via nuovo handler IPC
+    `src/main/services/handlers/board.js` (`BOARD_CAST_VOTE`/`BOARD_CLEAR_VOTE`,
+    idToken allegato nel main, mai esposto al renderer). Premio **+10 crediti
+    (`CREDIT.BOARD_VOTE`) una sola volta per feedback per utente** via nuovo
+    `creditStore.awardVoteOnce` (namespace `rewardedVotes` **separato** da
+    `rewardedFeedback`, così "risolto" e "votato" non si bloccano a vicenda);
+    idempotente su cambio voto ✅↔❌, rivoto, doppio-click, retry rete. Animazione
+    monete (`flyCreditsFromButton`, variante board di `flyCredits`). Niente
+    timeout/penalità: il ritiro voto (`clearVote`) NON revoca il premio.
+  - **Oltre il chiesto:** (1) corretto un bug latente di DC1 — il "mio voto"
+    dopo reload usava l'email invece dell'uid Firebase reale (le rules indicizzano
+    `votes.<uid>` per uid): aggiunto `uid` (claim reale) ad `AUTH_STATUS` e
+    centralizzato `getUid` in `google-auth.js` (riusato anche da `credits.js`,
+    rimosso il decode JWT duplicato). (2) pulsanti disabilitati durante la
+    richiesta (anti doppio-click). (3) rollback ottimistico se la scrittura fallisce.
+  - **Verificato:** `npm run test:unit` 483/484 (l'unico rosso è il preesistente
+    `defaultsSecretsMerge`, richiede Electron — non regressione). Nuovi unit in
+    `tests/unit/creditStore.test.mjs` asseriscono il successo: primo voto paga 10,
+    secondo NON ripaga (anche cambiando ✅↔❌), namespace voto/risoluzione
+    indipendenti, `BOARD_VOTE=10`. Spec Playwright `tests/board-vote.spec.mjs`
+    (nuovo) + `tests/board-page.spec.mjs` (esteso) scritti per il contratto IPC
+    end-to-end ma **NON eseguiti** in questa sandbox (Electron/Playwright non
+    installabili: `npm install` fallisce su TLS) — girano in locale/cloud con
+    `npm test`. Changelog (`patchNotes.js` 0.2.76) e `capabilities.js` (voce
+    `board`) aggiornati.
 
 - [ ] **DC3 — Archiviazione automatica a punteggio dopo 24h** (dipende da DB2,
   DB4) — Logica pura in `src/shared/*` + unit test (no Electron) + il punto che la
