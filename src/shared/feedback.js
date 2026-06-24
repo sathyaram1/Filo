@@ -101,6 +101,16 @@
     catch (e) { console.warn('[SN feedback] cifratura testo fallita:', e?.message || e); return value; }
   }
 
+  // S1.F2.1: cifra il campo `status` fine quando il gate è acceso.
+  // `statusPublic` (il mapping grossolano) viene sempre scritto in chiaro accanto:
+  // calcolato PRIMA della cifratura, in modo che i lettori senza chiave privata
+  // (C5, board utente) usino quello. Ritorna { fineStatus, publicStatus }.
+  async function encryptStatus(status) {
+    const publicStatus = statusToPublic(status);
+    const fineStatus = await maybeEncrypt(status); // cifra solo se isEnabled()
+    return { fineStatus, publicStatus };
+  }
+
   // Cifra i byte di un'immagine prima dell'upload su Storage.
   // Ritorna un Blob con contentType application/octet-stream (il contenuto è
   // opaco: ciphertext Uint8Array). Guard: senza pubkey ritorna il blob originale.
