@@ -305,6 +305,9 @@
     if (reviewDecision !== undefined) { fields.reviewDecision = toFsValue(reviewDecision); mask.push('reviewDecision'); }
     if (reviewComment !== undefined) { fields.reviewComment = toFsValue(reviewComment); mask.push('reviewComment'); }
     if (reviewedAt !== undefined) { fields.reviewedAt = toFsValue(reviewedAt); mask.push('reviewedAt'); }
+    // Preferito ⭐ (DB2): bool, "parcheggio per il futuro". Le Firestore rules
+    // accettano `starred` (is bool) nel ramo update admin.
+    if (starred !== undefined) { fields.starred = { booleanValue: !!starred }; mask.push('starred'); }
     if (priority !== undefined) {
       // Priorità 1-3 (0 = nessuna). Le regole Firestore validano int 0..3.
       const p = Math.max(0, Math.min(3, Math.round(Number(priority) || 0)));
