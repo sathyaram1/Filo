@@ -79,16 +79,27 @@
   }
 
   // Accredita +DAILY_REFILL per ogni mezzanotte passata da lastRefillDate,
-  // fino a MAX_REFILL_DAYS. Ritorna { state, added }.
-  function applyRefill(state, today = dateKey()) {
+  // fino a MAX_REFILL_DAYS. Se autoFeedbackEnabled è true, aggiunge anche
+  // il bonus giornaliero +10 (una sola volta al giorno, idempotente).
+  // Ritorna { state, added, bonusAdded }.
+  function applyRefill(state, today = dateKey(), autoFeedbackEnabled = false) {
     const s = ensure(state);
     const missed = daysBetween(s.lastRefillDate, today);
-    if (missed <= 0) return { state: s, added: 0 };
-    const days = Math.min(missed, CREDIT.MAX_REFILL_DAYS);
-    const added = days * CREDIT.DAILY_REFILL;
-    s.balance += added;
-    s.lastRefillDate = today;
-    return { state: s, added };
+    let added = 0;
+    if (missed > 0) {
+      const days = Math.min(missed, CREDIT.MAX_REFILL_DAYS);
+      added = days * CREDIT.DAILY_REFILL;
+      s.balance += added;
+      s.lastRefillDate = today;
+    }
+    // F4: bonus giornaliero auto-feedback (idempotente via lastAutoFeedbackBonusDate).
+    const AF = global.SN_AUTO_FEEDBACK;
+    let bonusAdded = 0;
+    if (AF && typeof AF.applyAutoFeedbackBonus === 'function') {
+      const { bonusAdded: b } = AF.applyAutoFeedbackBonus(s, today, autoFeedbackEnabled);
+      bonusAdded = b;
+    }
+    return { state: s, added, bonusAdded };
   }
 
   function costEurToCredits(costEur) {
