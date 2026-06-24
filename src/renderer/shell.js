@@ -106,6 +106,7 @@
     { label: 'Editor', icon: 'editor', url: 'filo://editor/editor.html' },
     { type: 'separator' },
     { label: 'Feedback', icon: 'feedback', url: 'filo://feedback/feedback.html' },
+    { label: 'Bacheca', icon: 'share', url: 'filo://board/board.html' },
     { label: 'Gestione', icon: 'feedback', url: 'filo://manage/manage.html' },
   ];
   // Voci del menu Impostazioni (ingranaggio): Modelli, Sicurezza, Preferenze —
