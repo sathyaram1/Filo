@@ -165,6 +165,23 @@ module.exports = function register(on, ctx) {
     }
   });
 
+  // Legge il documento feedback intero via REST (GET singolo, no proiezione):
+  // serve a BOARD_REOPEN per verificare idoneità con i dati FRESCHI dal server
+  // (status/resolvedInVersion/reopenRequests), non con quanto il renderer ha in
+  // cache. Ritorna null se non trovato o in caso d'errore di rete.
+  async function fetchFeedback(id) {
+    if (!FB?.rest) return null;
+    try {
+      const url = `${FB.rest.FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?key=${FB.rest.API_KEY}`;
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      const doc = await res.json();
+      return FB.fsDocToObject(doc);
+    } catch (_) {
+      return null;
+    }
+  }
+
   // Legge SOLO il campo `votes` del documento feedback via REST (GET singolo,
   // proiezione mask) — più leggero di un FB.list({pageSize:500}) per un solo
   // documento. Ritorna {} se il documento non ha ancora voti o in caso d'errore
