@@ -73,6 +73,8 @@
     if (!s.rewardedVotes) s.rewardedVotes = {};
     if (typeof s.balance !== 'number') s.balance = CREDIT.INITIAL;
     if (!s.lastRefillDate) s.lastRefillDate = dateKey();
+    // F4: campo bonus auto-feedback (retrocompatibile).
+    if (typeof s.lastAutoFeedbackBonusDate !== 'string') s.lastAutoFeedbackBonusDate = '';
     return s;
   }
 
