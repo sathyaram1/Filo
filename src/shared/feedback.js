@@ -338,10 +338,121 @@
     return true;
   }
 
+  // ---- voti di verifica (DB4) ----
+  // Substrato dei voti "funziona / non funziona" che la board utente (DC*) e
+  // l'archiviazione automatica a punteggio (DC3) leggono. I voti vivono in un
+  // campo `votes` (map) SUL documento feedback: chiave = uid del votante, valore
+  // = { vote, at, credibilitySnapshot }. Un voto per utente, cambiabile.
+  // Le Firestore rules vincolano ogni utente a scrivere SOLO la propria chiave.
+  const VOTE_WORKS = 'works';
+  const VOTE_BROKEN = 'broken';
+  const VOTE_VALUES = [VOTE_WORKS, VOTE_BROKEN];
+
+  // Credibilità di default di un votante: 1 "per ora" (DC3 — il substrato
+  // credibilità per-utente arriva con DC5; finché non c'è, ogni voto pesa 1).
+  function normalizeCredibility(v) {
+    const c = Number(v);
+    return Number.isFinite(c) && c >= 0 ? c : 1;
+  }
+
+  // PURA: ripulisce un map di voti grezzo (es. da fsDocToObject) tenendo solo le
+  // entry ben formate. Scarta voti con `vote` non valido o entry non-oggetto;
+  // normalizza `at` (stringa) e `credibilitySnapshot` (numero ≥ 0, default 1).
+  function normalizeVotes(raw) {
+    const out = {};
+    if (!raw || typeof raw !== 'object') return out;
+    for (const [uid, v] of Object.entries(raw)) {
+      if (!uid || !v || typeof v !== 'object') continue;
+      if (v.vote !== VOTE_WORKS && v.vote !== VOTE_BROKEN) continue;
+      out[uid] = {
+        vote: v.vote,
+        at: typeof v.at === 'string' ? v.at : '',
+        credibilitySnapshot: normalizeCredibility(v.credibilitySnapshot),
+      };
+    }
+    return out;
+  }
+
+  // PURA: conteggi e punteggio derivati dai voti. score = Σ credibilità("works")
+  // − Σ credibilità("broken") (DC3). total = numero di votanti validi.
+  function tallyVotes(raw) {
+    const votes = normalizeVotes(raw);
+    let works = 0;
+    let broken = 0;
+    let score = 0;
+    for (const v of Object.values(votes)) {
+      if (v.vote === VOTE_WORKS) { works += 1; score += v.credibilitySnapshot; }
+      else { broken += 1; score -= v.credibilitySnapshot; }
+    }
+    return { works, broken, total: works + broken, score };
+  }
+
+  // PURA: il voto corrente di un utente ('works' | 'broken' | null).
+  function userVote(raw, uid) {
+    if (!uid) return null;
+    const votes = normalizeVotes(raw);
+    return votes[uid] ? votes[uid].vote : null;
+  }
+
+  // RETE: l'utente loggato esprime/cambia il proprio voto su un feedback.
+  // Scrive solo `votes.<uid>` (updateMask mirato → non tocca altri voti né altri
+  // campi). `opts.idToken` = Firebase ID token del votante (le rules verificano
+  // chiave==uid). Ritorna l'entry scritta.
+  async function castVote(id, { uid, vote, credibilitySnapshot } = {}, opts = {}) {
+    if (!id) throw new Error('id mancante');
+    if (!uid) throw new Error('uid mancante');
+    if (vote !== VOTE_WORKS && vote !== VOTE_BROKEN) {
+      throw new Error("vote dev'essere 'works' o 'broken'");
+    }
+    const entry = {
+      vote,
+      at: new Date().toISOString(),
+      credibilitySnapshot: normalizeCredibility(credibilitySnapshot),
+    };
+    const fieldPath = `votes.\`${uid}\``;
+    const qs = `updateMask.fieldPaths=${encodeURIComponent(fieldPath)}`;
+    const endpoint = `${FIRESTORE_BASE}/${COLLECTION}/${encodeURIComponent(id)}?${qs}&key=${API_KEY}`;
+    const headers = { 'Content-Type': 'application/json' };
+    if (opts.idToken) headers.Authorization = `Bearer ${opts.idToken}`;
+    const body = { fields: { votes: { mapValue: { fields: { [uid]: toFsValue(entry) } } } } };
+    const res = await fetch(endpoint, { method: 'PATCH', headers, body: JSON.stringify(body) });
+    if (!res.ok) {
+      const t = await res.text().catch(() => '');
+      throw new Error(`firestore castVote fallito (${res.status}): ${t.slice(0, 300)}`);
+    }
+    return entry;
+  }
+
+  // RETE: l'utente ritira il proprio voto (cancella `votes.<uid>`). updateMask
+  // sul field path SENZA includerlo nel body → Firestore elimina solo quella
+  // chiave, lasciando intatti i voti altrui.
+  async function clearVote(id, uid, opts = {}) {
+    if (!id) throw new Error('id mancante');
+    if (!uid) throw new Error('uid mancante');
+    const fieldPath = `votes.\`${uid}\``;
+    const qs = `updateMask.fieldPaths=${encodeURIComponent(fieldPath)}`;
+    const endpoint = `${FIRESTORE_BASE}/${COLLECTION}/${encodeURIComponent(id)}?${qs}&key=${API_KEY}`;
+    const headers = { 'Content-Type': 'application/json' };
+    if (opts.idToken) headers.Authorization = `Bearer ${opts.idToken}`;
+    const res = await fetch(endpoint, { method: 'PATCH', headers, body: JSON.stringify({ fields: {} }) });
+    if (!res.ok) {
+      const t = await res.text().catch(() => '');
+      throw new Error(`firestore clearVote fallito (${res.status}): ${t.slice(0, 300)}`);
+    }
+    return true;
+  }
+
   global.SN_FEEDBACK = {
     submit,
     list,
     updateStatus,
+    // Voti di verifica (DB4): substrato letto da board (DC*) e archiviazione (DC3).
+    castVote,
+    clearVote,
+    normalizeVotes,
+    tallyVotes,
+    userVote,
+    VOTE_VALUES,
     uploadImage,
     uploadAttachment,
     formatNum,
