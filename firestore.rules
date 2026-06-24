@@ -145,12 +145,17 @@ service cloud.firestore {
       allow update: if
         isAdmin()
         && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['status', 'notes', 'resolvedAt', 'verifiedAt', 'priority',
+          // S1.F2.1: aggiunto statusPublic (enum grossolano in chiaro) e resolvedInVersion.
+          .hasOnly(['status', 'statusPublic', 'notes', 'resolvedAt', 'verifiedAt', 'priority',
                     'name', 'seq', 'subSeq', 'branch', 'starred',
                     'claimedBy', 'claimedAt', 'claimExpiresAt', 'claimNum',
-                    'reviewDecision', 'reviewComment', 'reviewedAt',
+                    'reviewDecision', 'reviewComment', 'reviewedAt', 'resolvedInVersion',
                     'archiveOverride', 'reopenRequests'])
-        && request.resource.data.get('status', 'new') in ['new', 'draft', 'todo', 'clarify', 'review', 'blocked', 'done', 'verified', 'ignored', 'archived']
+        // S1.F2.1: status accetta l'enum esistente O un ciphertext FENC1: (gate on).
+        && (request.resource.data.get('status', 'new') in ['new', 'draft', 'todo', 'clarify', 'review', 'blocked', 'done', 'verified', 'ignored', 'archived']
+            || request.resource.data.get('status', '').matches('^FENC1:.*'))
+        // S1.F2.1: statusPublic (se presente) deve essere uno dei tre valori grossolani.
+        && request.resource.data.get('statusPublic', 'open') in ['open', 'closed', 'pending-approval']
         && request.resource.data.get('notes', '') is string
         && request.resource.data.get('notes', '').size() <= 10000
         && request.resource.data.get('priority', 0) is int
