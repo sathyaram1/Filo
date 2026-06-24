@@ -123,14 +123,24 @@
     return { state: s, credits };
   }
 
-  // Accredita una ricompensa (feedback inviato/risolto). Ritorna { state, credits }.
+  // Accredita una ricompensa (feedback inviato/risolto/votato). Ritorna { state, credits }.
   function applyAward(state, { kind, credits = 0, ref = null, ts = Date.now() }) {
     const s = ensure(state);
     const amount = Math.max(0, Number(credits) || 0);
     s.balance += amount;
     s.rewards.push({ ts, kind, credits: amount, ref });
     if (kind === 'feedback_resolved' && ref) s.rewardedFeedback[ref] = true;
+    if (kind === 'feedback_voted' && ref) s.rewardedVotes[ref] = true;
     return { state: s, credits: amount };
+  }
+
+  // PURA (DC2): true se quel feedback ha già ricevuto il premio voto per questo
+  // utente (la cache crediti è già per-account). Usata per decidere SENZA I/O se
+  // accreditare — il chiamante async (awardVoteOnce) la usa per restare idempotente
+  // anche se invocata più volte di fila (cambio voto, doppio click, retry di rete).
+  function isVoteRewardPending(state, feedbackId) {
+    const s = ensure(state);
+    return !!feedbackId && !s.rewardedVotes[feedbackId];
   }
 
   // Vista PUBBLICA per la UI: niente costo € (né totale né per-azione). Solo
