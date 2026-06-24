@@ -121,14 +121,18 @@
   //                           che nascono `new`) + `clarify`
   //   queue    "In coda"    → `todo` + `review` + i blocchi del pipeline di
   //                           sicurezza (attacco/spam/design), uniti
-  //   resolved "Risolti"    → `done` + `verified` (DB3 lo restringerà ai soli
-  //                           fix davvero rilasciati)
+  //   resolved "Risolti"    → `done` + `verified` MA solo se "in produzione"
+  //                           (resolvedInVersion ≤ releasedVersion, DB3); i fix
+  //                           chiusi ma non ancora spediti restano in "In coda"
   //   archived "Archiviati" → `archived` (DB2)
   //   ignored / altro       → null (non mostrato nelle tab principali)
   const QUEUE_OVERRIDE_STOP = ['done', 'verified', 'archived', 'ignored'];
 
-  function manageTabFor(fb) {
+  // `opts.releasedVersion` (DB3): versione dell'app in esecuzione = ultima
+  // rilasciata. Se assente, il gate "in produzione" è disattivo (done→resolved).
+  function manageTabFor(fb, opts) {
     const s = (fb && fb.status) || 'new';
+    const releasedVersion = opts && opts.releasedVersion;
 
     // Un blocco del pipeline (attacco/spam/design) vive in "In coda" accanto a
     // todo/review, a prescindere dallo status grezzo — purché non sia già
@@ -141,8 +145,10 @@
       case 'todo':
       case 'review':
       case 'blocked':   return 'queue';
+      // DB3: un fix chiuso è in "Risolti" solo se davvero spedito; altrimenti
+      // resta visibile in "In coda" (done-ma-non-ancora-rilasciato).
       case 'done':
-      case 'verified':  return 'resolved';
+      case 'verified':  return isShipped(fb, releasedVersion) ? 'resolved' : 'queue';
       case 'archived':  return 'archived';
       case 'ignored':   return null;
       default:          return 'inbox';
@@ -151,8 +157,9 @@
 
   // Feedback di una singola tab, già ordinati: "In coda" per severità del blocco
   // poi recenza (come la Revisione); le altre per createdAt DESC.
-  function listForManageTab(feedbacks, tab) {
-    const items = (feedbacks || []).filter((f) => manageTabFor(f) === tab);
+  // `opts.releasedVersion` (DB3) è passato a manageTabFor per il gate "Risolti".
+  function listForManageTab(feedbacks, tab, opts) {
+    const items = (feedbacks || []).filter((f) => manageTabFor(f, opts) === tab);
     if (tab === 'queue') return sortReview(items);
     return items.slice().sort((a, b) => {
       const ta = new Date(a.createdAt || 0).getTime();
