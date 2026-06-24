@@ -129,15 +129,14 @@ test('senza privkey: campi cifrati diventano placeholder leggibile, niente crash
 
 // ─── Test 5: queueFeedbackCreateEncrypted scrive file con campi cifrati ─────────
 
-test('queueFeedbackCreateEncrypted: il file scritto ha i campi sensibili cifrati', async () => {
+test('queueFeedbackCreateEncrypted: con attivazione ON cifra SOLO text; name/notes restano in chiaro (Fase 1)', async () => {
   const { pub, priv } = await genTestKeys();
-  // Inietta temporaneamente la pubkey di test per questo test (non c'è modo di
-  // passare override a queueFeedbackCreateEncrypted senza cambiarne la firma).
-  // Usiamo un spool separato + chiave di test: anche se SN_FEEDBACK_PUBKEY fosse
-  // quella del repo, il test verificherebbe solo che i campi SONO FENC1: (qualunque
-  // chiave). Il round-trip lo verifichiamo col priv del test.
+  // Fase 1: la cifratura via queue è gated dall'interruttore di attivazione.
+  // Inietta pubkey di test + accendi il flag SOLO per questo test.
   const savedPub = globalThis.SN_FEEDBACK_PUBKEY;
+  const savedFlag = globalThis.SN_FEEDBACK_ENC_ENABLED;
   globalThis.SN_FEEDBACK_PUBKEY = pub;
+  globalThis.SN_FEEDBACK_ENC_ENABLED = true;
 
   const tmp = mkdtempSync(join(tmpdir(), 'filo-enc-test-'));
   const savedSpool = process.env.FILO_SPOOL_DIR;
@@ -159,19 +158,41 @@ test('queueFeedbackCreateEncrypted: il file scritto ha i campi sensibili cifrati
 
     const entry = JSON.parse(readFileSync(join(tmp, files[0]), 'utf8'));
     assert.ok(C.isEncrypted(entry.text), 'text nel file deve essere FENC1:');
-    assert.ok(C.isEncrypted(entry.name), 'name nel file deve essere FENC1:');
-    assert.ok(C.isEncrypted(entry.notes), 'notes nel file deve essere FENC1:');
+    assert.ok(!C.isEncrypted(entry.name), 'name NON deve essere cifrato in Fase 1 (user-facing C5)');
+    assert.ok(!C.isEncrypted(entry.notes), 'notes NON deve essere cifrato in Fase 1 (user-facing C5)');
 
-    // Decifra e verifica round-trip.
+    // Round-trip su text; name/notes già in chiaro.
     const plain = await decryptFeedbackFields(entry, priv);
     assert.equal(plain.text, 'Fix critico nel gestore eventi', 'text decifrato deve tornare al valore originale');
-    assert.equal(plain.name, 'gestore eventi rotto', 'name decifrato deve tornare al valore originale');
-    assert.equal(plain.notes, 'riprodotto su Windows', 'notes decifrato deve tornare al valore originale');
+    assert.equal(plain.name, 'gestore eventi rotto', 'name resta il valore originale (mai cifrato)');
   } finally {
     rmSync(tmp, { recursive: true, force: true });
     if (savedSpool !== undefined) process.env.FILO_SPOOL_DIR = savedSpool;
     else delete process.env.FILO_SPOOL_DIR;
     globalThis.SN_FEEDBACK_PUBKEY = savedPub;
+    globalThis.SN_FEEDBACK_ENC_ENABLED = savedFlag;
+  }
+});
+
+// ─── Test 7: gate di attivazione dormiente — pubkey presente ma flag OFF ────────
+
+test('gate dormiente: con pubkey presente ma SN_FEEDBACK_ENC_ENABLED OFF non si cifra nulla', async () => {
+  const { pub } = await genTestKeys();
+  const savedPub = globalThis.SN_FEEDBACK_PUBKEY;
+  const savedFlag = globalThis.SN_FEEDBACK_ENC_ENABLED;
+  globalThis.SN_FEEDBACK_PUBKEY = pub;     // chiave presente…
+  globalThis.SN_FEEDBACK_ENC_ENABLED = false; // …ma attivazione spenta
+
+  try {
+    assert.equal(C.isEnabled(), false, 'isEnabled deve essere false con flag OFF anche se la pubkey c\'è');
+    // Senza override, encryptFieldsForQueue rispetta il gate → non cifra.
+    const entry = { text: 'contenuto' };
+    const result = await encryptFieldsForQueue(entry, ['text']); // nessun override
+    assert.equal(result, false, 'non deve cifrare con gate dormiente');
+    assert.equal(entry.text, 'contenuto', 'text resta in chiaro con gate dormiente');
+  } finally {
+    globalThis.SN_FEEDBACK_PUBKEY = savedPub;
+    globalThis.SN_FEEDBACK_ENC_ENABLED = savedFlag;
   }
 });
 
