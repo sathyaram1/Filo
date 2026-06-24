@@ -250,8 +250,17 @@ async function createFeedback(entry, num, bearer) {
 }
 
 async function patchFeedback(entry, bearer) {
-  const fields = { status: toFsValue(entry.status) };
-  const mask = ['status'];
+  // S1.F2.1: cifra status fine se il gate è on; scrivi sempre statusPublic in chiaro.
+  let fineStatus = entry.status;
+  const C = _crypto();
+  if (C && C.isEnabled && C.isEnabled()) {
+    try { fineStatus = await C.encryptForOwner(String(entry.status)); } catch (_) { /* niente crash */ }
+  }
+  const statusToPublic = _statusToPublic();
+  const publicStatus = statusToPublic ? statusToPublic(entry.status) : 'open';
+
+  const fields = { status: toFsValue(fineStatus), statusPublic: toFsValue(publicStatus) };
+  const mask = ['status', 'statusPublic'];
   if (typeof entry.notes === 'string') {
     // FONDI con lo storico invece di sovrascrivere: se il feedback è già stato
     // lavorato e riaperto, le note esistenti contengono il report precedente e
