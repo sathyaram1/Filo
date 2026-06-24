@@ -1106,21 +1106,27 @@ qualcosa di rotto — Filo **invia un feedback in autonomia**, senza azione uten
   feedback **sanitizzato** col source corretto, il toast con undo, e il bonus
   giornaliero condizionato al setting. (stima: L)
 
-- [ ] **F5 — Groomer della coda: dedup + priorità** — Dopo i filtri di sicurezza,
-  uno step che legge i feedback in coda e: se è un **duplicato**, lo **allega al
-  primo** (arricchendo l'originale con eventuali info nuove sul bug) invece di
-  creare un doppione; **alza la priorità** dell'originale in base alla domanda
-  ripetuta (più utenti la chiedono → più priorità). Può essere lo stesso
-  componente che decide la priorità. **Dedup sicuro**: per gli auto-feedback usa
-  il `capability-gap id` (dati strutturati, immune a injection); per il testo
-  libero degli utenti, similarità/LLM **trattando il testo come non-fidato** (non
-  eseguire istruzioni dal testo). **Rischio injection: basso** (deciso utente
-  2026-06-22): pur leggendo tutta la coda, il peggio che questo step può fare è
-  cambiare una priorità o accorpare un feedback — irrilevante rispetto a un
-  attacco vero; inoltre L1/L2 girano PRIMA. Quindi cautela sì, ma non è un
-  bloccante.
-  **Done**: spec che invia 2 feedback equivalenti → asserisce 1 solo originale
-  con priorità alzata e il secondo allegato. (stima: M)
+- [x] **F5 — Groomer della coda: dedup + priorità** _(logica pura fatta: sessione
+  locale 2026-06-24; applier runtime → routine/backend)_ — **Esito**: nuovo modulo
+  puro `src/shared/feedbackGroomer.js` (IIFE `SN_FEEDBACK_GROOMER`):
+  `groom(feedbacks, {llmSimilar?}) → { merges:[{keepId,dropId,mergedNotes}],
+  priorityBumps:[{id,from,to}] }` (decisione pura, NON scrive).
+  - **Dedup auto-feedback**: su dato STRUTTURATO `capabilityGapId` (o estratto da
+    `clientId` `auto:capability-gap:<id>`) → immune a injection (decisione dipende
+    solo dall'id, mai dal testo).
+  - **Dedup testo utente**: Jaccard su token normalizzati (soglia 0.65); se
+    `llmSimilar(a,b)` è iniettata, giudica le coppie sotto soglia (sinonimi). Il
+    testo è **non-fidato**: si misura solo "simili sì/no", nessuna esecuzione di
+    istruzioni dal testo.
+  - **Priorità (solo alzare, cap 3)**: 1+ dup → +1; 3+ → +2; 5+ → +2 cap 3. Mai
+    abbassare. Originale tenuto = il più vecchio (`createdAt`, tiebreak su `id`).
+  - **Verificato**: `tests/unit/feedbackGroomer.test.mjs` (12 test: 2 equivalenti →
+    1 originale tenuto + merge + priorità alzata; 2 diversi → nessun merge/bump;
+    testo non-fidato con llm-fn mockata) → `npm run test:unit` 609/0.
+  - **Residuo (applier runtime)**: la routine/script legge la coda da Firestore,
+    chiama `groom()`, applica i merge (appende `mergedNotes` all'originale +
+    archivia il duplicato) e i `priorityBump`; può iniettare una vera `llmSimilar`
+    (modello leggero) per il dedup semantico in produzione. (stima: M)
 
 - [x] **F6 — Completare il manifest: sottosistema ASSISTENTE mancante** — _(fatto: routine happy-curie-q67v31, 2026-06-23)_ — **Esito**: aggiunte al manifesto `src/shared/capabilities.js` 7 voci per il sottosistema assistente, prima assente: `filo-assistant` (chat "Chiedi a Filo", FILO_CHAT), `generate-dashboard` (dashboard personale, FILO_GENERATE_DASHBOARD), `agent-actions` (Filo agisce al posto tuo con conferme, FILO_RUN_ACTION/FILO_CONFIRM_ACTION), `filo-memory` (FILO_GET_MEMORY), `filo-notes` (FILO_GET/ADD/DELETE_NOTE), `filo-timers` (FILO_GET/ADD/DELETE_TIMER + STOP_TIMER_ALARM), `filo-notifications` (FILO_GET_NOTIFICATIONS/DISMISS_NOTIFICATION). Tutte con `desc`/`invoke`/`doesNot` per l'utente; il nuovo-tab è la pagina dell'assistente (filo://newtab → dashboard.html), citato come filo://dashboard/dashboard.html. **Test esteso**: `tests/unit/capabilities.test.mjs` ora estrae tutti gli `on(MSG.FILO_*)` da `filo.js` e li incrocia con il manifesto via mappa `FILO_MSG_TO_CAP` (+ allowlist `INTERNAL` per `FILO_GET_STATE`): un nuovo handler FILO_* senza voce → test ROSSO. **Verificato**: `tests/unit/capabilities.test.mjs` 7/7; suite unit 409/410 (l'unico fallimento è `defaultsSecretsMerge.test.mjs`, preesistente e indipendente: richiede il modulo `electron` non installato in questa sandbox). Prova della "rossezza" del test fatta rimuovendo una voce in memoria. **Fuori scope, da valutare**: le pagine sicurezza `filo://redteam/redteam.html` e `filo://manage/` sono raggiungibili dall'utente ma non hanno una voce nel manifesto (sottosistema sicurezza, distinto dall'assistente) — candidato per un F-successivo o per l'audit "drift del manifesto". La
   verifica del 2026-06-23 (controllo del codice) ha trovato che
