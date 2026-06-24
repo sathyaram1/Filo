@@ -46,6 +46,12 @@ import { backfillNumbers } from './backfill-feedback-numbers.mjs';
 // con le note esistenti invece di sovrascriverle (vedi mergeModelReport).
 import '../src/shared/feedbackThread.js';
 const THREAD = globalThis.SN_FEEDBACK_THREAD;
+// S1.F2.1: statusToPublic (mapping status fine→grossolano) + crypto per cifrare status.
+// feedback.js e feedbackCrypto.js sono IIFE su globalThis: importarli li registra.
+import '../src/shared/feedbackCrypto.js';
+import '../src/shared/feedback.js';
+const _statusToPublic = () => globalThis.SN_FEEDBACK?.statusToPublic;
+const _crypto = () => globalThis.SN_FEEDBACK_CRYPTO;
 // I claim (semaforo sui feedback per le routine) vivono in feedback-triage/claims/.
 // Qui li "specchiamo" su Firestore così la dashboard può mostrare "in lavorazione".
 import { liveClaims, expiredClaimFiles } from './claim-feedback.mjs';
