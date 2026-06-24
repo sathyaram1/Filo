@@ -637,18 +637,27 @@ DIPENDENZE APERTE (non chiudibili da questo repo):
     `node --check` su tutti i file nuovi. **Azione owner (rimandata a S1.5)**: girare
     `gen-feedback-keys.mjs` per attivare la cifratura e custodire la privata.
     **Prossimo**: S1.2 (cifrare in scrittura: submit + code git + screenshot). (stima: M)
-  - [ ] **S1.2 — Cifra in scrittura**: `SN_FEEDBACK.submit` cifra i campi
-    sensibili (`text`, `url`, `notes`, `clientId`) prima di scrivere su Firestore;
-    `queue-feedback.mjs`/`queue-triage.mjs` cifrano `text`/`notes` nei file di
-    coda git; gli **screenshot**: cifra i byte prima dell'upload (Storage resta
-    pubblico, è ciphertext). Lascia in chiaro solo metadati non sensibili
-    (`seq`/`createdAt`). **`status` e `pipeline`/`verdicts` vanno cifrati** (lo
-    stato `blocked` e i verdetti sono il segnale di hill-climbing). (stima: L)
-  - [ ] **S1.3 — Decifra in lettura**: dashboard owner (ha la privkey in locale),
-    il groomer F5, e il lettore delle routine. ⚠️ Per le routine la decifratura
-    è uno **step deterministico NON-LLM** che riceve la privkey via env e passa
-    ai worker SOLO il plaintext (la chiave non entra mai in un contesto LLM con
-    testo non fidato → niente esfiltrazione via injection). (stima: M)
+  - [~] **S1.2 — Cifra in scrittura** _(Fase 1 fatta, in corso — sessione locale 2026-06-24)_:
+    **Fatto**: `SN_FEEDBACK.submit` cifra `text`, `url`, `title`, `name` prima di
+    scrivere su Firestore; `updateStatus` cifra `notes` e `reviewComment`; gli
+    screenshot/allegati vengono cifrati byte-by-byte con `encryptBytesForOwner`
+    prima dell'upload su Storage. `queue-feedback.mjs` usa `queueFeedbackCreateEncrypted`
+    che cifra `text`/`name`/`notes` nei file di coda git. `queue-triage.mjs` usa
+    `queueTriageEncrypted` che cifra `notes`. Helper riusabili in
+    `scripts/lib/encrypt-feedback-fields.mjs`. Guard inclusa: senza pubkey tutto
+    in chiaro come prima. Fuori scope (→ Fase 2): `status`, `pipeline`, `verdicts`,
+    `clientId` (dipendenze su rules/C5/filtraggio). (stima: L)
+  - [~] **S1.3 — Decifra in lettura** _(Fase 1 fatta, in corso — sessione locale 2026-06-24)_:
+    **Fatto**: Handler IPC `FEEDBACK_DECRYPT_FIELDS` nel main (`src/main/services/handlers/auth.js`)
+    che riceve campi FENC1: dal renderer, li decifra con la privata, ritorna plaintext
+    (privata NON lascia mai il main). Slot chiave privata in `getPrivateKey()`: legge
+    da env `FILO_FEEDBACK_PRIVKEY` → `tests/agent/.env` → storage.json campo
+    `feedbackPrivateKey`. Helper riusabile `scripts/lib/decrypt-feedback-fields.mjs`
+    per le routine (passo NON-LLM: privkey via env, plaintext ai worker). Retrocompat:
+    valori in chiaro passano invariati. Senza privata → placeholder leggibile.
+    Costante `MSG.FEEDBACK_DECRYPT_FIELDS` in `src/shared/messages.js`. Test unit
+    471/471. **Prossimo**: integrare il renderer (manage.js chiama
+    `FEEDBACK_DECRYPT_FIELDS` dopo `FB.list()`), e la Fase 2 (status/pipeline/verdicts/clientId).
   - [ ] **S1.4 — Coordina col backend filo-security**: il backend deve decifrare
     il feedback per farlo giudicare (chiave privata nei secrets delle Functions)
     e **cifrare `pipeline`/`verdicts`** che scrive. Cross-repo: documenta lì.
