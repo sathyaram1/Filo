@@ -78,6 +78,43 @@
     });
   }
 
+  // ── DB3: "In produzione" = fix uscito in una versione RILASCIATA ──────────
+  // Confronto versioni stile semver leggero ('0.2.9' < '0.2.10'). Self-contained
+  // così manageReview non dipende dal caricamento di patchNotes nei test.
+  function cmpVersion(a, b) {
+    const pa = String(a || '0').split('.').map((n) => parseInt(n, 10) || 0);
+    const pb = String(b || '0').split('.').map((n) => parseInt(n, 10) || 0);
+    const len = Math.max(pa.length, pb.length);
+    for (let i = 0; i < len; i++) {
+      const d = (pa[i] || 0) - (pb[i] || 0);
+      if (d !== 0) return d < 0 ? -1 : 1;
+    }
+    return 0;
+  }
+
+  // Un feedback chiuso (`done`/`verified`) è "in produzione" SOLO se il suo fix
+  // è davvero uscito in una versione rilasciata.
+  //
+  // - `releasedVersion` = "ultima versione rilasciata". La sorgente è la versione
+  //   dell'APP IN ESECUZIONE (`app.getVersion()`), che il chiamante passa: l'owner
+  //   gira sempre una build rilasciata, quindi la sua versione è, per definizione,
+  //   l'ultima che gli utenti hanno. Senza `releasedVersion` non possiamo gattare
+  //   → trattiamo il feedback come spedito (preserva il comportamento storico
+  //   done→Risolti per chi non passa la versione: nessuna regressione).
+  // - `resolvedInVersion` viene stampato sul feedback al momento del `done`
+  //   (apply-triage.mjs lo mette = versione corrente di `package.json`, cioè
+  //   quella in cui il fix è confluito). Un `done` con `resolvedInVersion` futura
+  //   (non ancora rilasciata) NON è in produzione: resta in "In coda" finché
+  //   quella versione esce. Un `done` storico SENZA `resolvedInVersion` è
+  //   considerato già spedito (i fix chiusi prima di DB3 sono quasi certamente
+  //   già usciti).
+  function isShipped(fb, releasedVersion) {
+    if (!releasedVersion) return true;
+    const v = fb && fb.resolvedInVersion;
+    if (!v) return true;
+    return cmpVersion(v, releasedVersion) <= 0;
+  }
+
   // ── Dashboard unificata (DB1): mappatura feedback → tab ───────────────────
   // Le tab di `manage` (owner-only) sono:
   //   inbox    "Ricevuti"   → status `new` (inclusi i ritrovamenti agente/routine,
