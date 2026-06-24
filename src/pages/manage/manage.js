@@ -316,9 +316,98 @@
     mgClarifyText.value = '';
     setClarifyMsg('', '');
 
+    // Gestione (⭐ + archivia/ripristina): visibile per l'owner su QUALUNQUE
+    // feedback selezionato, accanto alle azioni contestuali.
+    mgManage.hidden = !isAdmin;
+    reflectManage(fb);
+    setManageMsg('', '');
+
     // Chiudi pannello laterale
     closeSidebar();
   }
+
+  // Riflette lo stato corrente del feedback sui controlli di gestione:
+  // il bottone ⭐ acceso se è preferito; "Archivia" o "Ripristina" a seconda
+  // che il feedback sia già archiviato.
+  function reflectManage(fb) {
+    const starred = MR.isStarred(fb);
+    mgStarBtn.setAttribute('aria-pressed', starred ? 'true' : 'false');
+    mgStarBtn.textContent = starred ? '★ Preferito' : '☆ Preferito';
+    mgStarBtn.title = starred ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti';
+    const archived = (fb.status || '') === 'archived';
+    mgArchiveBtn.textContent = archived ? 'Ripristina' : 'Archivia';
+    mgArchiveBtn.title = archived
+      ? 'Riporta il feedback in coda'
+      : 'Sposta il feedback negli archiviati';
+  }
+
+  function setManageMsg(text, kind) {
+    mgManageMsg.textContent = text || '';
+    mgManageMsg.className = 'mg-action-msg' + (kind ? ` mg-${kind}` : '');
+  }
+
+  // ── Azione: preferito ⭐ (toggle) ───────────────────────────────────────────
+  // Il flag `starred` è indipendente dallo stato: l'owner può "parcheggiare"
+  // qualunque feedback per il futuro. Compare nel filtro ⭐ della tab Archiviati.
+  async function toggleStarred() {
+    if (!selectedId) return;
+    const id = selectedId;
+    const fb = allFeedbacks.find((f) => f._id === id);
+    if (!fb) return;
+    const next = !MR.isStarred(fb);
+
+    mgStarBtn.disabled = true;
+    setManageMsg(next ? 'Aggiungo ai preferiti…' : 'Rimuovo dai preferiti…', '');
+    try {
+      const r = await sendToMain({ type: 'feedback_update', id, starred: next });
+      if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
+      fb.starred = next;
+      reflectManage(fb);
+      setManageMsg(next ? 'Aggiunto ai preferiti.' : 'Rimosso dai preferiti.', 'ok');
+      // Se il filtro ⭐ è attivo, un feedback de-preferito deve sparire dalla lista.
+      if (currentTab === 'archived' && starredOnly) renderList();
+    } catch (e) {
+      setManageMsg(e.message || 'Errore', 'err');
+    } finally {
+      mgStarBtn.disabled = false;
+    }
+  }
+
+  // ── Azione: archivia / ripristina ───────────────────────────────────────────
+  // Archivia → status `archived` (tab Archiviati). Su un feedback già archiviato
+  // il bottone ripristina, riportandolo in coda (todo): invariante UX "se puoi
+  // archiviare, puoi togliere dall'archivio".
+  async function toggleArchive() {
+    if (!selectedId) return;
+    const id = selectedId;
+    const fb = allFeedbacks.find((f) => f._id === id);
+    if (!fb) return;
+    const wasArchived = (fb.status || '') === 'archived';
+    const next = wasArchived ? 'todo' : 'archived';
+
+    mgArchiveBtn.disabled = true;
+    setManageMsg(wasArchived ? 'Ripristino…' : 'Archivio…', '');
+    try {
+      const r = await sendToMain({ type: 'feedback_update', id, status: next });
+      if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
+      fb.status = next;
+      // Il feedback cambia tab: chiudi il dettaglio e ricalcola la lista corrente.
+      selectedId = null;
+      mgDetail.hidden = true;
+      mgDetailEmpty.hidden = false;
+      mgActions.hidden = true;
+      mgClarify.hidden = true;
+      mgManage.hidden = true;
+      closeSidebar();
+      renderList();
+    } catch (e) {
+      setManageMsg(e.message || 'Errore', 'err');
+      mgArchiveBtn.disabled = false;
+    }
+  }
+
+  mgStarBtn.addEventListener('click', toggleStarred);
+  mgArchiveBtn.addEventListener('click', toggleArchive);
 
   function setClarifyMsg(text, kind) {
     mgClarifyMsg.textContent = text || '';
