@@ -281,7 +281,7 @@ test('canReopen: status todo (non ancora risolto) → NON riapribile', () => {
 test('canReopen: feedback con blocco di sicurezza nel pipeline → NON riapribile (mai visibilità board al red-team)', () => {
   const fb = {
     status: 'done', resolvedInVersion: '0.2.70', createdAt: '2026-06-01',
-    action: 'block_attack',
+    pipeline: { action: 'block_attack' },
   };
   assert.equal(MR.canReopen(fb, { releasedVersion: '0.2.74' }), false);
 });
