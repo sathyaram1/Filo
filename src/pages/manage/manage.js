@@ -215,8 +215,20 @@
     if (mgListHead) mgListHead.textContent = TAB_LABELS[currentTab] || '';
     mgListEmpty.textContent = TAB_EMPTY[currentTab] || 'Nessun feedback.';
 
+    // Il filtro ⭐ esiste solo nella tab Archiviati (DB2).
+    const isArchived = currentTab === 'archived';
+    if (mgArchiveFilter) mgArchiveFilter.hidden = !isArchived;
+
     // Sottoinsieme della tab corrente, ordinato (logica pura condivisa).
-    currentList = MR.listForManageTab(allFeedbacks, currentTab);
+    if (isArchived) {
+      // OFF = solo i feedback `archived`; ON = tutti i preferiti ⭐ (ogni stato).
+      currentList = MR.listArchiveTab(allFeedbacks, { starredOnly });
+      mgListEmpty.textContent = starredOnly
+        ? 'Nessun feedback preferito.'
+        : (TAB_EMPTY.archived || 'Nessun feedback archiviato.');
+    } else {
+      currentList = MR.listForManageTab(allFeedbacks, currentTab);
+    }
 
     // Svuota SEMPRE: se la lista torna vuota (es. dopo uno sblocco) non deve
     // restare la card vecchia in un contenitore nascosto.
