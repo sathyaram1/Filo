@@ -22,15 +22,19 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
 const ROOT = resolve(__dirname, '..', '..');
 
-// Carica feedbackPublicKey.js + feedbackCrypto.js (IIFE su globalThis).
-// Idempotente: se già caricati da un altro modulo nella stessa run non fa nulla.
+// Carica feedbackCrypto.js (IIFE su globalThis) se non è già disponibile.
+// NON ri-carica feedbackPublicKey.js se SN_FEEDBACK_PUBKEY è già definita:
+// così i test (o chi inietta una pubkey di test) non vengono sovrascritti dalla
+// chiave di produzione bakeata nel file.
 function loadCrypto() {
-  if (!globalThis.SN_FEEDBACK_PUBKEY === undefined) {
-    // Non ancora caricato
-  }
   try {
-    require(resolve(ROOT, 'src', 'shared', 'feedbackPublicKey.js'));
-    require(resolve(ROOT, 'src', 'shared', 'feedbackCrypto.js'));
+    // Solo la pubkey se non ancora presente (evita sovrascrittura chiavi di test).
+    if (globalThis.SN_FEEDBACK_PUBKEY === undefined) {
+      require(resolve(ROOT, 'src', 'shared', 'feedbackPublicKey.js'));
+    }
+    if (!globalThis.SN_FEEDBACK_CRYPTO) {
+      require(resolve(ROOT, 'src', 'shared', 'feedbackCrypto.js'));
+    }
   } catch (e) {
     console.warn('[encrypt-feedback-fields] impossibile caricare crypto:', e?.message || e);
   }
