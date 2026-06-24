@@ -54,6 +54,35 @@
     return { url: publicUrl, name };
   }
 
+  // ---- cifratura campi sensibili (S1.2) ----
+  // Cifra un campo testo se la chiave pubblica è disponibile. Guard: se la
+  // pubblica non c'è (hasPublicKey() false) restituisce il valore invariato
+  // (niente crash, scrittura in chiaro come prima).
+  async function maybeEncrypt(value) {
+    if (value == null || value === '') return value;
+    const C = global.SN_FEEDBACK_CRYPTO;
+    if (!C || !C.hasPublicKey()) return value;
+    try { return await C.encryptForOwner(String(value)); }
+    catch (e) { console.warn('[SN feedback] cifratura testo fallita:', e?.message || e); return value; }
+  }
+
+  // Cifra i byte di un'immagine prima dell'upload su Storage.
+  // Ritorna un Blob con contentType application/octet-stream (il contenuto è
+  // opaco: ciphertext Uint8Array). Guard: senza pubkey ritorna il blob originale.
+  async function maybeEncryptBlob(blob) {
+    const C = global.SN_FEEDBACK_CRYPTO;
+    if (!C || !C.hasPublicKey()) return blob;
+    try {
+      const ab = await blob.arrayBuffer();
+      const plain = new Uint8Array(ab);
+      const sealed = await C.encryptBytesForOwner(plain);
+      return new Blob([sealed], { type: 'application/octet-stream' });
+    } catch (e) {
+      console.warn('[SN feedback] cifratura bytes fallita:', e?.message || e);
+      return blob;
+    }
+  }
+
   // Carica un allegato (immagine O file) su Storage e lo classifica per la UI.
   // Usata dalla dashboard per allegare immagini/file ai COMMENTI dei feedback
   // (#190.3). Lo storage path feedback/* è scrivibile da chiunque (storage.rules),
