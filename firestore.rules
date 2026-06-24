@@ -177,6 +177,34 @@ service cloud.firestore {
         && request.resource.data.get('reviewedAt', '') is string
         && request.resource.data.get('reviewedAt', '').size() <= 40;
 
+      // Voto di verifica della board utente (DB4): un utente LOGGATO scrive SOLO
+      // il proprio voto nel map `votes` (chiave = suo uid). Un voto per utente,
+      // cambiabile (ri-PATCH della stessa chiave) e ritirabile (cancellazione
+      // della chiave). La read del feedback è già pubblica. Il vincolo
+      // chiave==uid impedisce di toccare i voti altrui o qualunque altro campo:
+      // l'unica chiave del map che può cambiare è quella del richiedente.
+      // Entry: { vote: 'works'|'broken', at: <ISO>, credibilitySnapshot: <num> }.
+      // È il substrato che board (DC*) e archiviazione a punteggio (DC3) leggono.
+      allow update: if
+        request.auth != null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['votes'])
+        && request.resource.data.get('votes', {}) is map
+        && request.resource.data.get('votes', {})
+             .diff(resource.data.get('votes', {})).affectedKeys()
+             .hasOnly([request.auth.uid])
+        && (
+             !(request.auth.uid in request.resource.data.get('votes', {}))
+             || (
+                  request.resource.data.votes[request.auth.uid].keys()
+                    .hasOnly(['vote', 'at', 'credibilitySnapshot'])
+                  && request.resource.data.votes[request.auth.uid].vote in ['works', 'broken']
+                  && request.resource.data.votes[request.auth.uid].at is string
+                  && request.resource.data.votes[request.auth.uid].at.size() <= 40
+                  && request.resource.data.votes[request.auth.uid].credibilitySnapshot is number
+                  && request.resource.data.votes[request.auth.uid].credibilitySnapshot >= 0
+                )
+           );
+
       // Triage routine (limitato): può solo spostare tra `todo`/`done`/`clarify`
       // e scrivere `notes`/`resolvedAt`. NON tocca `priority`, NON marca
       // `verified`/`ignored`, NON cancella. Più stretto del ramo admin di
