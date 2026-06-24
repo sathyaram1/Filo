@@ -291,6 +291,26 @@ separata a permessi ridotti** dove gli utenti verificano i fix già rilasciati.
   LLM se serve — DD2; finché DD2 non c'è, almeno identità/orario rimossi). **Done**:
   spec — un non-owner apre la board, vede i risolti votabili, e NON vede
   status/priorità/verdetti. (stima: M)
+  - **FATTO (routine gifted-goldberg-frmiou, 2026-06-24):** nuova pagina
+    `filo://board/board.html` + `board.js`, voce "Bacheca" nel menu App
+    (`src/renderer/shell.js`). Mostra SOLO i fix in produzione (riusa il nuovo
+    puro `SN_MANAGE_REVIEW.listBoardTab` = gate "Risolti" DB3 **+ esclusione di
+    qualunque feedback con blocco nel pipeline**, così il red-team resta
+    invisibile anche se per assurdo un `attack` finisse in `done`). Ogni scheda
+    mostra solo il **titolo breve** (`name`, mai il testo grezzo che è cifrato/
+    tecnico) + `#num` + due pulsanti voto funziona/non-funziona col conteggio.
+    Anonimo → invito ad accedere; loggato → voto con toggle locale. Aggiornati
+    `capabilities.js` (voce `board`) e `patchNotes.js` (0.2.75).
+  - **Confine con DC2 (lasciato a DC2 come da spec):** la **persistenza** del
+    voto su Firestore e la **ricompensa di 10 crediti** NON sono qui — in board
+    il voto aggiorna solo lo stato locale (la superficie "votabile"). DC2
+    aggiunge l'handler IPC che persiste via `FB.castVote`/`clearVote` (idToken
+    dal main) + accredita i crediti con animazione.
+  - **Verificato:** `tests/unit/boardList.test.mjs` (6/6, filtro sicurezza puro)
+    + `tests/board-page.spec.mjs` (3/3: solo i fix in produzione votabili; ZERO
+    materiale red-team nel DOM; anonimo invitato/loggato vota) + nessuna
+    regressione su `tests/manage-page.spec.mjs` (16/16). [GATE finale: `npm test`
+    completo in corso prima di marcare `[x]`.]
 
 - [ ] **DC2 — Voto funziona/non-funziona + ricompensa 10 crediti** (dipende da
   DB3, DB4) — File: board page + handler IPC + `src/main/services/creditStore.js`.
