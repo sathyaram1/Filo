@@ -347,6 +347,55 @@
       color: var(--sn-muted); font-size: 13px;
       text-align: center; padding: 40px 0;
     }
+
+    /* ── Sezione "Modelli di supporto" (DD1) ────────────────────────────── */
+    .mg-support-models {
+      max-width: 760px;
+      padding: 24px 0 32px;
+    }
+    .mg-support-models h2 {
+      font-size: 15px; font-weight: 700; margin: 0 0 4px;
+      color: var(--sn-fg);
+    }
+    .mg-support-models .mg-sm-intro {
+      font-size: 13px; color: var(--sn-muted);
+      margin: 0 0 20px;
+    }
+    .mg-sm-slots {
+      display: flex; flex-direction: column; gap: 16px;
+    }
+    .mg-sm-slot {
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      align-items: start; gap: 8px 16px;
+    }
+    .mg-sm-slot label {
+      font-size: 13px; font-weight: 600; color: var(--sn-fg);
+      padding-top: 6px; /* allinea al primo segmento della catena */
+    }
+    .mg-sm-slot .mg-sm-slot-desc {
+      grid-column: 2; font-size: 12px; color: var(--sn-muted);
+      margin-top: -4px;
+    }
+    .mg-sm-toolbar {
+      display: flex; align-items: center; gap: 12px;
+      margin-top: 24px;
+    }
+    .mg-sm-status {
+      font-size: 12px; color: var(--sn-muted);
+    }
+    .mg-sm-status.mg-ok  { color: #2e9e5b; }
+    .mg-sm-status.mg-err { color: #c0392b; }
+    .mg-sm-loading {
+      font-size: 13px; color: var(--sn-muted); padding: 40px 0;
+    }
+    .mg-sm-denied {
+      font-size: 13px; color: var(--sn-muted); padding: 20px 0;
+    }
+    /* nicknames-list è usato da modelChainEditor per popolare il dropdown;
+       nella manage page viene popolato dal main tramite SUPPORT_MODELS_GET.
+       Hidden come nelle altre pagine che usano modelChainEditor. */
+    #mgSmNicknamesList { display: none; }
   </style>
 </head>
 <body>
