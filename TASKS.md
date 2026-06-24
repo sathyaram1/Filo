@@ -614,12 +614,29 @@ DIPENDENZE APERTE (non chiudibili da questo repo):
   backend (è lui che decifra per giudicare e che scrive `pipeline`).
 
   Spezzato in sotto-task ordinati (S1.1→S1.5), uno per sessione:
-  - [ ] **S1.1 — Modulo crypto condiviso** `src/shared/feedbackCrypto.js`: schema
-    asimmetrico tipo *sealed box* (tweetnacl/libsodium o WebCrypto ECIES):
-    `encryptForOwner(plaintext)->ciphertext` (solo chiave PUBBLICA, shippata
-    nell'app), `decrypt(ciphertext, privKey)->plaintext`. Script
-    `scripts/gen-feedback-keys.mjs` che genera la coppia: committa SOLO la
-    pubblica; la privata resta all'owner. Unit test round-trip. (stima: M)
+  - [x] **S1.1 — Modulo crypto condiviso** _(fatto: sessione locale 2026-06-24)_ —
+    **Esito**: `src/shared/feedbackCrypto.js` (IIFE su globalThis `SN_FEEDBACK_CRYPTO`)
+    implementa un *sealed box* su **WebCrypto** (zero dipendenze nuove, gira identico
+    in Node 22 e nel browser): ECDH **P-256** con coppia EFFIMERA per messaggio →
+    HKDF-SHA256 (info = chiave effimera) → AES-256-GCM. API:
+    `encryptForOwner(text[,pub])`/`decrypt(str,priv)` (stringa `FENC1:`+base64url),
+    `encryptBytesForOwner`/`decryptBytes` (per gli screenshot, ritorna/accetta
+    Uint8Array), `isEncrypted`, `hasPublicKey`. La PUBBLICA vive in
+    `src/shared/feedbackPublicKey.js` (committabile, ora `null` = cifratura inattiva
+    finché l'owner non genera la coppia); la PRIVATA non tocca mai il repo.
+    `scripts/gen-feedback-keys.mjs` genera la coppia, scrive la pubblica nel file
+    (sostituzione fra marcatori) e **stampa** la privata con le istruzioni su dove
+    metterla (owner/Functions secret/env routine `FILO_FEEDBACK_PRIVKEY`); `--print`
+    per stampare senza toccare il file. Registrati nel loader (pubkey prima di
+    crypto). **Verificato**: `tests/unit/feedbackCrypto.test.mjs` 12/12 (round-trip
+    testo+byte, unicode/emoji, chiave effimera→output sempre diverso, privata
+    sbagliata non decifra, ciphertext manomesso rifiutato da AES-GCM, no-op su null,
+    errore esplicito senza chiave); suite unit completa 465/465; pipeline end-to-end
+    provata davvero (gen reale → bake → cifra con pubblica del file → decifra con la
+    privata stampata → file ripristinato a null per non committare chiavi orfane);
+    `node --check` su tutti i file nuovi. **Azione owner (rimandata a S1.5)**: girare
+    `gen-feedback-keys.mjs` per attivare la cifratura e custodire la privata.
+    **Prossimo**: S1.2 (cifrare in scrittura: submit + code git + screenshot). (stima: M)
   - [ ] **S1.2 — Cifra in scrittura**: `SN_FEEDBACK.submit` cifra i campi
     sensibili (`text`, `url`, `notes`, `clientId`) prima di scrivere su Firestore;
     `queue-feedback.mjs`/`queue-triage.mjs` cifrano `text`/`notes` nei file di
