@@ -17,22 +17,9 @@ module.exports = function register(on, ctx) {
   const FB = globalThis.SN_FEEDBACK;
 
   // ── uid dell'utente loggato (claim dell'ID token Firebase) ──────────────────
-  function decodeJwt(token) {
-    try {
-      const payload = token.split('.')[1];
-      const json = Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
-      return JSON.parse(json);
-    } catch (_) { return {}; }
-  }
-  async function currentUid() {
-    if (!auth.isSignedIn()) return null;
-    try {
-      const tok = await auth.getIdToken();
-      if (!tok) return null;
-      const p = decodeJwt(tok);
-      return p.user_id || p.sub || null;
-    } catch (_) { return null; }
-  }
+  // Centralizzato in google-auth.js (getUid): lo riusa anche l'handler board.js
+  // (DC2) per lo stesso scopo (votes.<uid> richiede l'uid Firebase, non l'email).
+  const currentUid = auth.getUid;
 
   // ── REST Firestore sul doc credits/<uid> ────────────────────────────────────
   // Campi sincronizzati: tutto lo stato del motore (saldo, refill, aggregati,
