@@ -111,6 +111,10 @@ export function buildCreateEntry({ text, name, parentId, priority, status, notes
     queuedAt: new Date().toISOString(),
     queuedBy: queuedBy || process.env.FILO_ROUTINE_SLUG || 'routine',
   };
+  // S1.F2.2: i feedback accodati dalle routine NON hanno un clientId utente reale
+  // (sono sub-feedback di spec o feedback di audit). clientIdHash non serve qui
+  // (il match C5 è per i feedback dell'utente, non quelli delle routine).
+  // La funzione resta pulita: nessun clientIdHash nelle entry di coda.
 }
 
 // Scrive il file di spool (nessun effetto git). Ritorna il path assoluto.
