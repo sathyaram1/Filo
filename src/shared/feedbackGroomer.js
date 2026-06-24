@@ -114,16 +114,29 @@
   }
 
   // Ritorna true se due feedback a testo libero sono considerati duplicati.
-  // llmSimilar (opzionale): funzione sincrona (a, b) → boolean — iniettata
-  // dall'host per giudizio semantico; i test la mockano. NON viene chiamata
-  // con il testo grezzo in modi che potrebbero eseguire istruzioni: riceve
-  // solo i due testi e ritorna un booleano.
+  //
+  // Strategia a due livelli:
+  //   1. Jaccard strutturale: se ≥ JACCARD_THRESHOLD → duplicati certi,
+  //      nessuna llm-fn necessaria.
+  //   2. llmSimilar (iniettabile): se sotto soglia Jaccard ma la funzione è
+  //      fornita, la si chiama per giudizio semantico. Usata per coppie
+  //      semanticamente equivalenti che condividono pochi token di superficie
+  //      (es. "segnalibri" vs "preferiti"). Se Jaccard ≥ JACCARD_THRESHOLD_WITH_LLM
+  //      la chiamata è quasi certa; altrimenti la si chiama comunque (il Jaccard
+  //      vicino a 0 = probabilmente troppo diversi → l'LLM deciderà, ma in
+  //      pratica sarà false per la maggior parte delle coppie).
+  //
+  // In entrambi i casi il testo è trattato come NON FIDATO: la funzione
+  // misura "simili sì/no" ma non esegue NESSUNA istruzione contenuta nel testo.
   function areSimilarText(fbA, fbB, llmSimilar) {
     const tA = tokenize(fbA.text || fbA.name || '');
     const tB = tokenize(fbB.text || fbB.name || '');
     const j = jaccard(tA, tB);
+    // Soglia strutturale: certezza senza LLM
     if (j >= JACCARD_THRESHOLD) return true;
-    if (llmSimilar && j >= JACCARD_THRESHOLD_WITH_LLM) {
+    // Giudizio semantico iniettato: chiamato quando la similarità lessicale
+    // non è sufficiente ma un giudice esterno può stabilire l'equivalenza.
+    if (llmSimilar) {
       try {
         return !!llmSimilar(
           String(fbA.text || fbA.name || ''),
