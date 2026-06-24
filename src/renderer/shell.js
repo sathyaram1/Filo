@@ -949,6 +949,14 @@
           if (a && a.openUrl && !a.onClick) {
             return { label: a.label, onClick: () => api.tabs.openBlockedPopup(a.openUrl) };
           }
+          // F4 — undo auto-feedback: azione dichiarativa cancelAutoFeedback.
+          if (a && a.cancelAutoFeedback && !a.onClick) {
+            const fbId = a.cancelAutoFeedback;
+            return {
+              label: a.label,
+              onClick: () => api.message({ type: 'cancel_auto_feedback', id: fbId }).catch(() => {}),
+            };
+          }
           return a;
         }),
       };
