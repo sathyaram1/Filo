@@ -33,6 +33,7 @@ require(path.join(SHARED, 'ttsChunk.js'));
 require(path.join(SHARED, 'ttsCache.js'));
 require(path.join(SHARED, 'patchNotes.js'));
 require(path.join(SHARED, 'capabilities.js'));
+require(path.join(SHARED, 'autoFeedback.js'));  // F4 — dipende da capabilities
 require(path.join(SHARED, 'feedbackPublicKey.js'));
 require(path.join(SHARED, 'feedbackCrypto.js'));
 require(path.join(SHARED, 'userCredibility.js'));
