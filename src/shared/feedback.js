@@ -366,13 +366,14 @@
       body: JSON.stringify(doc),
     });
     if (res.status === 403) {
-      // Rules non ancora aggiornate ai campi nuovi (name/seq/subSeq/parentId):
+      // Rules non ancora aggiornate ai campi nuovi (name/seq/subSeq/parentId/clientIdHash):
       // meglio un feedback senza numero/titolo/collegamento che un invio
       // fallito. Ritenta con il solo schema storico.
       delete doc.fields.name;
       delete doc.fields.seq;
       delete doc.fields.subSeq;
       delete doc.fields.parentId;
+      delete doc.fields.clientIdHash; // S1.F2.2: rules vecchie potrebbero rifiutarlo
       seq = null;
       res = await fetch(endpoint, {
         method: 'POST',
