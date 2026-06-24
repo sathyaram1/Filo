@@ -688,6 +688,131 @@ DIPENDENZE APERTE (non chiudibili da questo repo):
     e **cifrare `pipeline`/`verdicts`** che scrive. Cross-repo: documenta lì.
     Le rules Firestore possono lasciare la lettura com'è (il contenuto è cifrato),
     ma verifica che NESSUN campo in chiaro riveli lo stato di blocco. (stima: M)
+
+  ---
+  ### S1 — Fase 2: campi rimanenti in chiaro (status, pipeline/verdicts, clientId, name/notes)
+
+  Contesto: la Fase 1 (S1.1–S1.3) ha cifrato `text`/`url` e gli screenshot.
+  Restano in chiaro i campi indicati sotto. Il cuore di sicurezza di S1 (vedi
+  sezione S1 in TASKS.md) è nascondere `status=blocked` agli attaccanti, che
+  userebbero quel segnale per fare hill-climbing. I sub-task sotto vanno eseguiti
+  nell'ordine indicato; ognuno ha le proprie dipendenze esplicite.
+
+  **Decisione di design APERTA (GATE su S1.F2.1 e S1.F2.2): come cifrare `status`?**
+  Tre opzioni, servono risposta owner prima di implementare:
+
+  - **Opzione A — "Stato grossolano pubblico + stato fine cifrato"** (raccomandata):
+    Mantieni un campo `statusPublic` con valori grossolani (es. `open`/`closed`) in
+    chiaro, e cifra il campo `status` fine (`blocked`/`review`/…) col nome invariato.
+    Il match C5 usa `statusPublic`; la dashboard owner decifra `status` via batch IPC.
+    Vantaggio: la board utente (DC*) può usare `statusPublic` senza chiave privata;
+    C5 (popup ricompense) funziona su `statusPublic === 'closed'` senza chiave; la
+    Action `apply-triage.mjs` scrive entrambi; le `firestore.rules` accettano un enum
+    ristretto su `statusPublic`. Svantaggio: aggiunge un campo al doc Firestore (+
+    `hasOnly` nelle rules, + deploy).
+
+  - **Opzione B — Cifra `status` direttamente, aggiusta i lettori senza chiave**:
+    Cifra il campo `status` come stringa `FENC1:…`. Tutti i lettori con chiave
+    (dashboard owner, routine) lo decifrano come ora. C5 (senza chiave) non può
+    più confrontare `status === 'done'` → si basa su un nuovo campo bool `isResolved`
+    in chiaro scritto da `apply-triage.mjs` al passaggio `done`. Svantaggio: C5 e la
+    board utente dipendono da un campo derivato che potrebbe desincronizzarsi.
+
+  - **Opzione C — Cifra `status` nel solo canale a rischio (git), non in Firestore**:
+    Il leak principale era il git pubblico. `queue-triage.mjs` cifra `status` nel file
+    `feedback-triage/*.json`; su Firestore `status` resta in chiaro (ma la lettura è
+    owner-only dopo S1.6, che lockda la read di Firestore). Svantaggio: S1.6 (lockdown
+    lettura Firestore) non è ancora pianificato ed è un'operazione delicata.
+
+  **→ Segnala la tua scelta di design PRIMA di iniziare S1.F2.1. Il task è marcato
+    con GATE–OWNER: non iniziare senza risposta. L'opzione raccomandata è A.**
+
+  - [ ] **S1.F2.1 — Cifra `status` in scrittura + decifratura dashboard** _(GATE–OWNER:
+    attende la decisione di design sopra, Opzione A/B/C)_ — **Cosa fa**: cifra il campo
+    `status` nei percorsi di scrittura (in base all'opzione scelta) e aggiorna la
+    decifratura nei lettori admin. File da toccare: `src/shared/feedback.js`
+    (aggiunge `statusPublic` al doc submit se Opzione A, oppure cifra `status` se B);
+    `scripts/apply-triage.mjs` (scrive entrambi i campi; mantiene l'enum `ALLOWED` per
+    `statusPublic`); `scripts/queue-triage.mjs` (con Opzione C: cifra `status` nel file
+    JSON spool); `src/main/services/handlers/auth.js` (handler
+    `FEEDBACK_DECRYPT_FIELDS` batch già esiste: aggiungere `status` ai campi da
+    decifrare); `scripts/lib/decrypt-feedback-fields.mjs` (aggiungere `status` a
+    `TEXT_FIELDS`). **Filtraggio dashboard**: `manage.js` e `feedback.js` già fanno
+    batch-decrypt prima del render (S1.3 §1 cablato) — se il campo `status` arriva
+    cifrato al renderer viene decifrato PRIMA che `manageTabFor`/`statusOf` lo leggano;
+    quindi le logiche di tab NON cambiano. **Dipendenza C5**: il popup ricompense in
+    `src/main/services/handlers/credits.js` riga 312 fa `f.status !== 'done'` — con
+    Opzione A si sposta su `f.statusPublic !== 'closed'`; con Opzione B si sposta su
+    `!f.isResolved`. Aggiornare il controllo. **Dipendenza `firestore.rules`**: con
+    Opzione A aggiungere `statusPublic` a `hasOnly` dell'update admin + enum ristretto
+    `['open','closed']`; con Opzione B il campo `status` nell'enum admin diventa
+    `string` free-form (perché il ciphertext non è nell'enum). ⚠️ **AZIONE OWNER**:
+    `firebase deploy --only firestore:rules` dopo ogni modifica alle rules.
+    **Done**: unit test che verifica che con il flag acceso `status` (o `statusPublic`)
+    sia cifrato nel doc inviato e che la dashboard (tramite batch-decrypt) veda il
+    plaintext corretto; unit test che verifica che C5 (`GET_FEEDBACK_REWARDS`) continui
+    a trovare i feedback "risolti" senza chiave privata. (stima: M)
+
+  - [ ] **S1.F2.2 — Cifra `clientId` con hash deterministico in chiaro** _(dipende da
+    nulla; indipendente da S1.F2.1)_ — **Problema**: `clientId` è usato da C5
+    (`GET_FEEDBACK_REWARDS`, `credits.js` riga 313) per il match "questo feedback è
+    dell'install corrente" — la macchina utente non ha la chiave privata, quindi non
+    può decifrare. **Soluzione**: conservare un `clientIdHash` (SHA-256 troncato, es.
+    hex 16 char, in chiaro) accanto a un `clientId` cifrato (`FENC1:…`). Il match C5
+    si basa su `clientIdHash`. **File da toccare**: `src/content/feedback.js` (al submit
+    calcola `clientIdHash = sha256(clientId).slice(0,32)` prima di inviare — WebCrypto
+    disponibile nel renderer); `src/shared/feedback.js` (funzione `submit`: aggiunge
+    `clientIdHash` al doc Firestore se la cifratura è attiva, cifra `clientId`);
+    `scripts/queue-feedback.mjs` (aggiunge `clientIdHash` al file spool, cifra
+    `clientId` se attiva); `src/main/services/creditStore.js` / `credits.js` (al carico
+    del `sn_feedback_client_id` calcola l'hash e lo usa per il confronto invece del
+    raw); `scripts/lib/decrypt-feedback-fields.mjs` (aggiungere `clientId` a
+    `TEXT_FIELDS`); `src/main/services/handlers/auth.js` (batch-decrypt include
+    `clientId`). **Firestore rules**: aggiungere `clientIdHash` a `hasOnly` del create
+    anonimo (string ≤ 64 char) + validazione size; cifrare `clientId` lo fa diventare
+    `FENC1:…` (stringa ≤ ~300 char) → allargare il limite `clientId.size() <= 300`
+    nelle rules. ⚠️ **AZIONE OWNER**: `firebase deploy --only firestore:rules`.
+    **Done**: unit test — un submit con cifratura attiva produce `clientIdHash` in
+    chiaro + `clientId` come `FENC1:…`; il match C5 trova il feedback con l'hash; la
+    dashboard (via batch-decrypt) vede il `clientId` originale. (stima: S)
+
+  - [ ] **S1.F2.3 — `name`/`notes` e proiezione sanitizzata (DD2)** _(dipende da DD2
+    che è già in lista; questo sub-task documenta la dipendenza e il contratto)_ —
+    `name` e `notes` oggi restano in chiaro perché C5 li mostra all'utente senza
+    chiave privata. La Fase 2 **NON** li cifra finché DD2 (sanitizer LLM) non è pronto,
+    perché non esiste ancora la proiezione user-facing separata. **Questo task è un
+    placeholder di dipendenza**: quando DD2 esiste e salva una versione sanitizzata
+    (es. `nameSanitized`, `notesSanitized`) in chiaro, allora si può cifrare `name` e
+    `notes` originali. Il sub-task concreto sarà: (1) `src/shared/feedback.js` cifra
+    `name`/`notes` nel doc submit e in `updateStatus`; (2) C5 usa `nameSanitized`
+    /`notesSanitized` invece dei campi raw; (3) `scripts/lib/decrypt-feedback-fields.mjs`
+    include `name`/`notes` in `TEXT_FIELDS` (già presente da S1.3, ricontrollare);
+    (4) aggiornare `firestore.rules` (size dei campi cifrati). **GATE**: aspettare DD2
+    completato. Non aprire come task attivo finché DD2 non è in stato `done`. (stima: S)
+
+  - [ ] **S1.F2.4 — `pipeline`/`verdicts`: coordinamento backend filo-security** _(dipende
+    da S1.4, cross-repo)_ — `pipeline` e `verdicts` sono scritti **esclusivamente** dal
+    backend `filo-security` via Admin SDK (bypassano le `firestore.rules` lato client).
+    Non transitano mai da `apply-triage.mjs` né da `queue-triage.mjs`: non c'è leakage
+    git per questi campi. Il leakage esiste solo su **Firestore** (lettura pubblica).
+    **Nota importante dalla ricognizione del codice**: `classifyBlock` in
+    `src/shared/manageReview.js` legge `fb.pipeline.l2Class`, `fb.pipeline.action`,
+    `fb.pipeline.l1Category`, `fb.pipeline.verdicts` per classificare i blocchi
+    "Attacco/Spam/Design" nella dashboard. Se questi campi fossero cifrati, la
+    dashboard owner dovrebbe decifrarli prima di passarli a `classifyBlock` — il batch-
+    decrypt esistente (S1.3 §1) dovrebbe essere esteso a coprire anche il campo
+    `pipeline` come oggetto (non una semplice stringa). **Azione**: questo sub-task
+    è un **placeholder di coordinamento cross-repo**: va aperto come task separato
+    nel repo `filo-security` con le istruzioni su come cifrare il campo `pipeline`
+    nella Cloud Function che lo scrive, e come farlo transitare fino all'estensione
+    del batch-decrypt. Segnala la dipendenza a S1.4. Non implementabile in questo
+    repo senza modifiche al backend. ⚠️ **Non è bloccante per il cutover Fase 1**
+    (il cutover può procedere senza cifrare `pipeline`/`verdicts`): il leak di
+    `pipeline` su Firestore è meno grave di `status=blocked`, perché descrive la
+    classe (spam/attacco) non il fatto di essere stati "beccati". (stima: coordinamento,
+    non codice — cross-repo)
+
+  ---
   - [~] **S1.5 — Slot chiave + checklist di cutover (azione owner)** _(slot fatti, cutover da fare)_:
     Slot privata implementati (vedi S1.3 `getPrivateKey`): env `FILO_FEEDBACK_PRIVKEY`
     (priorità) → `tests/agent/.env` locale → storage.json `feedbackPrivateKey`.
