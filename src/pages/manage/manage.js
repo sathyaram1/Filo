@@ -237,7 +237,9 @@
         ? 'Nessun feedback preferito.'
         : (TAB_EMPTY.archived || 'Nessun feedback archiviato.');
     } else {
-      currentList = MR.listForManageTab(allFeedbacks, currentTab);
+      // DB3: passa la versione rilasciata così "Risolti" contiene solo i fix
+      // davvero in produzione; i done-ma-non-ancora-spediti restano in "In coda".
+      currentList = MR.listForManageTab(allFeedbacks, currentTab, { releasedVersion });
     }
 
     // Svuota SEMPRE: se la lista torna vuota (es. dopo uno sblocco) non deve
