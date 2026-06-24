@@ -327,6 +327,8 @@
           llmJudge: !!$('sec-safebrowse-llm').checked,
           sandbox: !!$('sec-safebrowse-sandbox').checked,
         },
+        // F4 — Feedback autonomo: letto da maybeAutoFeedback nel main process.
+        autoFeedback: !!$('sec-auto-feedback').checked,
       },
     };
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
