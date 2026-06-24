@@ -743,6 +743,8 @@
     },
     setAdmin(v) { isAdmin = !!v; },
     setTab(tab) { selectTab(tab); },
+    // DB3: imposta la "versione rilasciata" usata dal gate "Risolti" e rirende.
+    setReleasedVersion(v) { releasedVersion = v || ''; renderList(); },
     openDetail,
   };
 
