@@ -137,6 +137,22 @@ module.exports = function register(on, ctx) {
     }
   });
 
+  // S1.3: decifratura dei campi feedback nel main (la privkey non esce mai da qui).
+  // Il renderer manda i campi con valori potenzialmente cifrati; il main li
+  // decifra e ritorna plaintext. Owner-only: se l'utente non è admin rifiuta.
+  on(MSG.FEEDBACK_DECRYPT_FIELDS, async (msg) => {
+    try {
+      if (!auth.isAdmin()) {
+        return { ok: false, error: 'Operazione riservata agli amministratori.' };
+      }
+      const fields = msg.fields || {};
+      const decrypted = await decryptFeedbackObject(fields);
+      return { ok: true, fields: decrypted };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  });
+
   // Config "modelli predefiniti" condivisa. La lettura (per l'editor admin)
   // NON espone le chiavi vere, solo se sono configurate. La scrittura è
   // riservata agli admin (Firebase ID token come Bearer): le regole Firestore
