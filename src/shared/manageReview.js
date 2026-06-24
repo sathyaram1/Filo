@@ -205,9 +205,34 @@
       .filter((fb) => !classifyBlock(fb));
   }
 
+  // ── DC4: riapertura a pagamento dalla board ──────────────────────────────
+  // PURA: un fix è riapribile solo se è OGGI visibile nella board (stessa
+  // identica regola di "Risolti senza red-team" di listBoardTab, applicata al
+  // singolo feedback) E nessuno l'ha già riaperto. Riusa `reopenRequests`
+  // (map uid → { at }) scritta da SN_FEEDBACK.castReopenRequest — stesso
+  // pattern non-admin di `votes` — per il guard anti-doppia-riapertura: NON è
+  // "un utente riapre una volta sola", è "una volta riaperto da chiunque, il
+  // fix è già nell'iter normale" (evita N feedback collegati duplicati per lo
+  // stesso fix rotto). Se il fix esce da "Risolti" il guard si auto-risolve:
+  // quando rientra eventualmente in produzione, riparte da `reopenRequests`
+  // vuoto solo se chi applica il done successivo lo azzera (vedi notes nel
+  // task) — finché non viene azzerato, resta bloccato: meglio prudente che
+  // permettere riaperture a raffica sullo stesso fix.
+  function hasReopenRequest(fb) {
+    const r = fb && fb.reopenRequests;
+    return !!(r && typeof r === 'object' && Object.keys(r).length > 0);
+  }
+
+  function canReopen(fb, opts) {
+    if (!fb) return false;
+    if (hasReopenRequest(fb)) return false;
+    return listBoardTab([fb], opts).length > 0;
+  }
+
   global.SN_MANAGE_REVIEW = {
     classifyBlock, sortReview, REASONS, manageTabFor, listForManageTab,
     isStarred, listArchiveTab, isShipped, cmpVersion, listBoardTab,
+    hasReopenRequest, canReopen,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
