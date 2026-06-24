@@ -439,15 +439,20 @@ separata a permessi ridotti** dove gli utenti verificano i fix già rilasciati.
     eseguito** in sandbox (Electron non installabile) — gira in locale/cloud con
     `npm test`.
 
-- [ ] **DC5 — Fondamenta credibilità per utente (substrato, NO policy)** — Campo
-  `credibilità` per utente (=1) in un doc dedicato (es. `users/<uid>` o dentro
-  `credits`). Registrare TUTTO ciò che servirà a calcolarla un domani: storico
-  voti (già DB4), esito (il voto coincideva con la decisione finale?), età
-  account, frequenza — almeno i campi grezzi. Il punto dove il guadagno-da-voto
-  sarà **gated dalla credibilità** esiste ma è **flag spento** (soglia che lascia
-  passare tutti). **NON** implementare timeout/penalità/calcolo dinamico (senza
-  dati si tara alla cieca — deciso). **Done**: unit — i record si salvano; il gate
-  esiste ma è pass-through; cred resta 1. (stima: M)
+- [x] **DC5 — Fondamenta credibilità per utente (substrato, NO policy)** _(fatto:
+  sessione locale 2026-06-24)_ — **Esito**: nuovo modulo puro
+  `src/shared/userCredibility.js` (IIFE `SN_USER_CREDIBILITY`, registrato in
+  `src/main/services/loader.js`), separato dal credit store (che resta saldo/premi)
+  per singola responsabilità. Store in memoria `{ [uid]: entry }` (il chiamante lo
+  persiste dove vuole, es. `users/<uid>`); credibility default = 1. Registra i
+  campi grezzi (storico voti via DB4 `votes`, esito voto vs decisione finale,
+  primo-visto/età, frequenza) senza calcolare nulla. Gate `canEarnFromVote(cred,
+  opts)` **pass-through**: senza `{flagEnabled:true}` ritorna sempre true (punto
+  futuro di gating documentato, soglia `EARN_GATE_THRESHOLD`). NESSUN
+  timeout/penalità/calcolo dinamico. **Verificato**: `tests/unit/credibility.test.mjs`
+  (25 test, asseriscono successo: round-trip dei record, gate pass-through anche
+  con cred bassa, default=1) → `npm run test:unit` 558/0. Nessuna azione owner
+  (modulo locale, niente nuovi campi Firestore). (stima: M)
 
 #### Gruppo DD — modelli di supporto
 
