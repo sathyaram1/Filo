@@ -347,17 +347,14 @@
     const fields = {};
     const mask = [];
     if (status !== undefined) { fields.status = toFsValue(status); mask.push('status'); }
-    // S1.2: cifra notes e reviewComment (contenuto libero sensibile).
-    if (notes !== undefined) {
-      fields.notes = toFsValue(await maybeEncrypt(notes));
-      mask.push('notes');
-    }
+    // Fase 1: `notes` NON è cifrato — è la spiegazione mostrata all'utente nel
+    // popup ricompense (C5) sulla sua macchina, che non ha la chiave privata.
+    // Cifrarlo (insieme a status/verdetti) è Fase 2, con una proiezione
+    // sanitizzata user-facing separata.
+    if (notes !== undefined) { fields.notes = toFsValue(notes); mask.push('notes'); }
     // Override di revisione (owner sblocca un feedback fermato dalla sicurezza).
     if (reviewDecision !== undefined) { fields.reviewDecision = toFsValue(reviewDecision); mask.push('reviewDecision'); }
-    if (reviewComment !== undefined) {
-      fields.reviewComment = toFsValue(await maybeEncrypt(reviewComment));
-      mask.push('reviewComment');
-    }
+    if (reviewComment !== undefined) { fields.reviewComment = toFsValue(reviewComment); mask.push('reviewComment'); }
     if (reviewedAt !== undefined) { fields.reviewedAt = toFsValue(reviewedAt); mask.push('reviewedAt'); }
     // Preferito ⭐ (DB2): bool, "parcheggio per il futuro". Le Firestore rules
     // accettano `starred` (is bool) nel ramo update admin.
