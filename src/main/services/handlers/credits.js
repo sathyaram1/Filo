@@ -296,7 +296,17 @@ module.exports = function register(on, ctx) {
       const rewarded = state.rewardedFeedback || {};
       const rewards = [];
       for (const f of all) {
-        if (!f || f.status !== 'done') continue;
+        // S1.F2.1: la macchina UTENTE non ha la chiave privata → non può leggere `status`
+        // cifrato. Usa `statusPublic === 'closed'` (sempre in chiaro) come segnale di
+        // "risolto". Fallback per feedback vecchi senza statusPublic: se `status` è in
+        // chiaro (non FENC1:) usa la logica vecchia; se è cifrato tratta come non risolto.
+        const isResolved = (() => {
+          if (f.statusPublic !== undefined) return f.statusPublic === 'closed';
+          const s = f.status;
+          if (typeof s === 'string' && !s.startsWith('FENC1:')) return s === 'done';
+          return false; // cifrato senza statusPublic → non premiare (non si sa)
+        })();
+        if (!f || !isResolved) continue;
         if (baseClientId(f.clientId) !== id) continue; // solo i feedback DI questo install
         const fid = f._id;
         if (!fid || rewarded[fid]) continue;            // già premiato: niente doppio premio
