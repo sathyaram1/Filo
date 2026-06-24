@@ -168,10 +168,13 @@ test('testo con istruzioni di injection → groomer non le esegue, ritorna dati 
   assert.equal(result.priorityBumps.length, 0, 'nessun bump spurio da injection');
 });
 
-// ── Test 6: llmSimilar iniettabile decide nella banda ambigua ─────────────────
+// ── Test 6: llmSimilar iniettabile decide per testi semanticamente equivalenti ─
 
-test('llmSimilar mockata decide il merge nella banda Jaccard [0.45, 0.65)', () => {
-  // Testi leggermente diversi ma semanticamente equivalenti (Jaccard ~0.5)
+test('llmSimilar mockata decide il merge per testi semanticamente equivalenti', () => {
+  // Testi semanticamente equivalenti ma con pochi token in comune (Jaccard ~0):
+  // "segnalibri" vs "preferiti", "aggiungere" vs "salvare" — nessun overlap.
+  // Senza llmSimilar il Jaccard non supera la soglia strutturale → nessun merge.
+  // Con llmSimilar che ritorna true → merge.
   const fb1 = makeUser(
     'non posso aggiungere segnalibri alle pagine che visito',
     { id: 'sem-a', createdAt: '2026-06-01T10:00:00.000Z' },
@@ -181,17 +184,18 @@ test('llmSimilar mockata decide il merge nella banda Jaccard [0.45, 0.65)', () =
     { id: 'sem-b', createdAt: '2026-06-02T10:00:00.000Z' },
   );
 
-  // Senza llmSimilar: Jaccard basso → nessun merge
+  // Senza llmSimilar: Jaccard ~0 → nessun merge
   const withoutLlm = GROOMER.groom([fb1, fb2]);
-  assert.equal(withoutLlm.merges.length, 0, 'senza llmSimilar: testi diversi → nessun merge');
+  assert.equal(withoutLlm.merges.length, 0, 'senza llmSimilar: testi semanticamente diversi (Jaccard~0) → nessun merge');
 
   // Con llmSimilar che ritorna true: il groomer deve accorpare
-  const llmTrue = (a, b) => true;
+  const llmTrue = (_a, _b) => true;
   const withLlmTrue = GROOMER.groom([fb1, fb2], { llmSimilar: llmTrue });
   assert.equal(withLlmTrue.merges.length, 1, 'con llmSimilar=true: deve mergiare');
+  assert.equal(withLlmTrue.merges[0].keepId, 'sem-a', 'keep = più vecchio');
 
   // Con llmSimilar che ritorna false: stesso risultato di senza
-  const llmFalse = (a, b) => false;
+  const llmFalse = (_a, _b) => false;
   const withLlmFalse = GROOMER.groom([fb1, fb2], { llmSimilar: llmFalse });
   assert.equal(withLlmFalse.merges.length, 0, 'con llmSimilar=false: nessun merge');
 });
