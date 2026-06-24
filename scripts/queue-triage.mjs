@@ -77,6 +77,26 @@ export function queueTriage(id, status, notes, queuedBy, branch, starred) {
   return file;
 }
 
+// S1.2: versione asincrona con cifratura delle notes (la sincrona resta per i
+// test unitari e per chi la usa già come funzione pura).
+export async function queueTriageEncrypted(id, status, notes, queuedBy, branch, starred) {
+  const file = queueTriage(id, status, notes, queuedBy, branch, starred);
+  // Rileggi l'entry appena scritta, cifra notes se necessario, riscrivila.
+  // Approccio "cifra-dopo-scrittura": così queueTriage non deve diventare async
+  // e i test esistenti non si rompono.
+  try {
+    const { readFileSync } = await import('node:fs');
+    const entry = JSON.parse(readFileSync(file, 'utf8'));
+    if (await encryptFieldsForQueue(entry, ['notes'])) {
+      writeFileSync(file, JSON.stringify(entry, null, 2) + '\n', 'utf8');
+    }
+  } catch (e) {
+    // Non fatale: il file è già scritto con le notes in chiaro, si usa quello.
+    console.warn('[queue-triage] cifratura notes fallita:', e?.message || e);
+  }
+  return file;
+}
+
 function tryGit(args) {
   try { return { ok: true, out: execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' }).trim() }; }
   catch (e) { return { ok: false, out: `${e.stdout || ''}${e.stderr || ''}`.trim() || e.message }; }
