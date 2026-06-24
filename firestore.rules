@@ -187,7 +187,12 @@ service cloud.firestore {
         // /età); 'keep_open' = l'owner ha deciso esplicitamente di NON
         // archiviare nonostante il punteggio. '' = nessun override (substrato
         // SN_BOARD_ARCHIVE.hasOwnerOverride).
-        && request.resource.data.get('archiveOverride', '') in ['', 'archived', 'keep_open'];
+        && request.resource.data.get('archiveOverride', '') in ['', 'archived', 'keep_open']
+        // `reopenRequests` (DC4): l'admin può azzerarlo (es. {}) quando un fix
+        // riaperto viene risistemato e rispedito, sbloccando una futura
+        // riapertura sullo stesso doc. Nessun vincolo di forma extra qui: il
+        // ramo non-admin sotto resta l'unico modo per gli utenti di scriverlo.
+        && request.resource.data.get('reopenRequests', {}) is map;
 
       // Voto di verifica della board utente (DB4): un utente LOGGATO scrive SOLO
       // il proprio voto nel map `votes` (chiave = suo uid). Un voto per utente,
