@@ -695,6 +695,16 @@
     mgList.hidden = true;
     mgListEmpty.hidden = true;
 
+    // DB3: la versione dell'app in esecuzione è, per definizione, l'ultima
+    // rilasciata (l'owner gira una build pubblicata). La leggiamo dal recap
+    // aggiornamento, che il main calcola con app.getVersion().
+    if (!releasedVersion) {
+      try {
+        const r = await sendToMain({ type: 'get_update_recap' });
+        if (r && r.current) releasedVersion = r.current;
+      } catch (_) { /* gate inattivo: senza versione, done→Risolti come prima */ }
+    }
+
     try {
       allFeedbacks = await FB.list({ pageSize: 500 });
     } catch (err) {
