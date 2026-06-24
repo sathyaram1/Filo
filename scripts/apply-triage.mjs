@@ -217,6 +217,9 @@ async function createFeedback(entry, num, bearer) {
     ),
     files: toFsValue([]),
     status: toFsValue(entry.status),
+    // S1.F2.1: statusPublic SEMPRE in chiaro (i feedback creati dalla coda non
+    // vanno mai cifrati lato create — è la Action del service account che li crea).
+    statusPublic: toFsValue((() => { const fn = _statusToPublic(); return fn ? fn(entry.status) : 'open'; })()),
     notes: toFsValue(String(entry.notes || '')),
     seq: toFsValue(num.seq),
     subSeq: toFsValue(num.subSeq),
