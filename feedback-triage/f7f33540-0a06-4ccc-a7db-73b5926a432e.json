@@ -1,7 +1,0 @@
-{
-  "id": "f7f33540-0a06-4ccc-a7db-73b5926a432e",
-  "status": "clarify",
-  "notes": "RISPOSTA DIAGNOSTICA R4 (ri-verificata oggi 2026-06-24 nella sandbox cloud Linux headless).\n\nSÌ, ccusage gira in cloud. Il comando 'npx -y ccusage@latest blocks --active --json' funziona (exit 0): la rete non è bloccata (npx scarica il pacchetto), node è presente (v22.22.2), e i .jsonl esistono in ~/.claude/projects/<slug>/ (HOME=/root). C'è sempre almeno il .jsonl della sessione corrente, quindi ccusage ha dati da leggere.\n\nOutput del blocco 5h attivo (run di oggi):\n- costUSD: 1.00  (questo è il segnale reale da confrontare con la soglia)\n- finestra: 2026-06-24T07:00 → 12:00 UTC, isActive: true\n- projection.remainingMinutes: 262\n- burnRate.costPerHour: ~42\n- models: [claude-opus-4-8]\n- projection.totalCost: 185 (estrapolazione gonfiata su poche entry — NON usarla come segnale, usa costUSD)\n\nNote implementative per R4:\n- leggere blocks[0].costUSD, NON projection.totalCost;\n- gestire array vuoto (nessun blocco attivo prima che la sessione scriva entry);\n- prima chiamata npx ha ~qualche secondo di latenza (download pacchetto): un install locale ridurrebbe la latenza se chiamato spesso.\n\nConclusione: il cost-check R4 è fattibile in cloud. Lasciato in 'clarify' come richiesto dal task (non chiuso come done) così l'owner decide la soglia.",
-  "queuedAt": "2026-06-24T07:38:25.875Z",
-  "queuedBy": "routine"
-}
