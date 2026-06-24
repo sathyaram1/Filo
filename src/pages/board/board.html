@@ -48,10 +48,11 @@
     }
     .bd-card-sub { margin-top: 3px; font-size: 12px; color: var(--sn-muted); }
 
-    /* Voti: due pulsanti funziona/non-funziona + conteggi. La PERSISTENZA del
-       voto e la ricompensa in crediti arrivano con DC2: qui i pulsanti sono la
-       superficie "votabile" (riflettono il conteggio e la scelta locale). */
+    /* Voti: due pulsanti funziona/non-funziona + conteggi. Persistiti su
+       Firestore (DC2) tramite l'handler IPC; il conteggio riflette il tally
+       reale dei voti, non solo la scelta locale dell'utente. */
     .bd-vote { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+    .bd-vote-btn[disabled] { opacity: .6; cursor: default; }
     .bd-vote-btn {
       font: inherit; cursor: pointer; display: inline-flex; align-items: center;
       gap: 6px; border: 1px solid var(--sn-border); border-radius: 999px;
