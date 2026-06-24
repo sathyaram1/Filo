@@ -830,7 +830,7 @@ DIPENDENZE APERTE (non chiudibili da questo repo):
     match C5 → serve un hash deterministico in chiaro + originale cifrato);
     `name`/`notes` (servono di una **proiezione sanitizzata user-facing**, DD2).
     (stima: L)
-  - [~] **S1.3 — Decifra in lettura** _(Fase 1 parziale — sessione locale 2026-06-24)_:
+  - [x] **S1.3 — Decifra in lettura** _(fatto: sessione locale 2026-06-24; §1 e §2 chiusi)_:
     **Fatto**: Handler IPC `FEEDBACK_DECRYPT_FIELDS` nel main (`auth.js`), owner-only,
     decifra i campi FENC1: con la privata e ritorna plaintext (la privata NON lascia
     mai il main). Slot chiave privata `getPrivateKey()`: env `FILO_FEEDBACK_PRIVKEY`
