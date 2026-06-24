@@ -34,10 +34,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
 const ROOT = resolve(__dirname, '..', '..');
 
-// Campi di testo libero da decifrare. I campi fuori-scope di questa Fase 1
-// (status, pipeline, verdicts, clientId, priority, seq, subSeq, createdAt)
-// NON sono toccati: vengono passati invariati.
-const TEXT_FIELDS = ['text', 'url', 'name', 'title', 'notes', 'reviewComment'];
+// Campi di testo da decifrare. S1.F2.1: aggiunto 'status' (cifrato quando gate on).
+// 'statusPublic' NON è nella lista: è sempre in chiaro e non va toccato.
+const TEXT_FIELDS = ['text', 'url', 'name', 'title', 'notes', 'reviewComment', 'status'];
 
 // Carica feedbackCrypto.js (IIFE su globalThis) se non è già disponibile.
 // NON ri-carica feedbackPublicKey.js se SN_FEEDBACK_PUBKEY è già definita:
