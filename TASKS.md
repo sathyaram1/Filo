@@ -350,7 +350,7 @@ separata a permessi ridotti** dove gli utenti verificano i fix già rilasciati.
     `npm test`. Changelog (`patchNotes.js` 0.2.76) e `capabilities.js` (voce
     `board`) aggiornati.
 
-- [~] **DC3 — Archiviazione automatica a punteggio dopo 24h** _(in corso: routine happy-curie-s1qf4z, 2026-06-24)_ (dipende da DB2,
+- [x] **DC3 — Archiviazione automatica a punteggio dopo 24h** _(fatto: routine happy-curie-s1qf4z, 2026-06-24)_ (dipende da DB2,
   DB4) — Logica pura in `src/shared/*` + unit test (no Electron) + il punto che la
   applica. Punteggio = Σ credibilità(voti "works") − Σ credibilità(voti "broken"),
   credibilità = 1 per ora. Dopo **24h** dalla messa in produzione (definire se da
@@ -360,6 +360,38 @@ separata a permessi ridotti** dove gli utenti verificano i fix già rilasciati.
   utenti dicono che non va"), NON auto-riapre. **Done**: unit — soglia dopo 24h
   archivia; sotto soglia no; negativo emerge; override owner archivia subito.
   (stima: M)
+  - **FATTO (routine happy-curie-s1qf4z, 2026-06-24):** logica pura in
+    `src/shared/boardArchive.js` (`SN_BOARD_ARCHIVE`): `shouldAutoArchive`,
+    `usersSayBroken`, `hasOwnerOverride`, `applyAutoArchive(feedbacks)→{toArchive,
+    toFlag}` (decisione pura, NON scrive). Riusa `SN_FEEDBACK.tallyVotes` per il
+    punteggio (nessun duplicato) e `SN_MANAGE_REVIEW.isShipped` per il gate "in
+    produzione". **Decisioni**: finestra 24h dalla **produzione** (proxy
+    `resolvedAt`; fallback voto più vecchio per lo storico) — più deterministica
+    del "primo voto"; soglia archivio **2**, soglia negativa **-2** (in `DEFAULTS`,
+    configurabili); senza `releasedVersion` NON auto-archivia (prudente, non
+    decide alla cieca). **Override owner** via nuovo campo `archiveOverride`
+    (`archived`|`keep_open`|`''`): il bottone Archivia/Ripristina di `manage`
+    (DB2) ora lo scrive, così "l'owner vince sempre" è applicato, non solo
+    teorico. **Applicatore** `scripts/auto-archive.mjs` (`npm run
+    feedback:auto-archive`, `--dry-run`) che accoda via la coda git esistente
+    (`queue-triage` status `archived`) — nessuna scrittura diretta Firestore.
+  - **Lasciato a un task/decisione futura (segnalato, non indovinato):** il
+    **badge UI** "gli utenti dicono che non va" nella dashboard owner — il
+    segnale puro (`usersSayBroken`/`toFlag`) è pronto, ma dove/come renderizzarlo
+    è una scelta di design da owner.
+  - ⚠️ **AZIONE OWNER**: `firebase deploy --only firestore:rules` — aggiunto
+    `archiveOverride` (enum `''|archived|keep_open`) al ramo update **admin-only**
+    delle rules; finché non è deployato, scrivere l'override dalla dashboard owner
+    verrà rifiutato. (Le routine scrivono via la GitHub Action service-account
+    che bypassa le rules, quindi l'auto-archivio funziona già; serve solo per
+    l'override **manuale** owner dalla UI.)
+  - **Verificato:** `npm run test:unit` 502/503 (unico rosso preesistente
+    `defaultsSecretsMerge`, richiede Electron). 19 nuovi unit in
+    `tests/unit/boardArchive.test.mjs` asseriscono TUTTI i criteri: ≥soglia dopo
+    24h archivia, sotto soglia no, <24h no anche con punteggio alto, negativo
+    `usersSayBroken` true ma `shouldAutoArchive` false (no archivio/no riapertura),
+    override owner archivia/blocca subito — usando il vero `tallyVotes`. Niente
+    `patchNotes.js`/`capabilities.js`: tutto dentro `manage`, owner-only.
 
 - [ ] **DC4 — Riapertura a pagamento** — Dalla board un utente può inviare un
   feedback che **riapre** un fix verificato (lo toglie da Risolti, torna nell'iter
