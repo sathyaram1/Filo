@@ -167,6 +167,7 @@
       mgDetailEmpty.hidden = false;
       mgActions.hidden = true;
       mgClarify.hidden = true;
+      mgManage.hidden = true;
       closeSidebar();
       renderList();
     }
@@ -177,6 +178,14 @@
     if (!btn) return;
     selectTab(btn.dataset.tab);
   });
+
+  // Filtro ⭐ della tab Archiviati: ricalcola la lista (la selezione resta).
+  if (mgStarFilter) {
+    mgStarFilter.addEventListener('change', () => {
+      starredOnly = mgStarFilter.checked;
+      renderList();
+    });
+  }
 
   // ── Lightbox ──────────────────────────────────────────────────────────────
   function openLightbox(src) {
