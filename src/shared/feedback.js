@@ -203,14 +203,18 @@
     for (let i = 0; i < imgs.length; i++) {
       const img = imgs[i];
       if (!img?.dataUrl) continue;
-      const blob = dataUrlToBlob(img.dataUrl);
-      // Limite difensivo lato client: 4 MB per immagine.
-      if (blob.size > 4 * 1024 * 1024) {
+      const rawBlob = dataUrlToBlob(img.dataUrl);
+      // Limite difensivo lato client: 4 MB per immagine (misurato sul raw,
+      // prima della cifratura che aggiunge ~90 byte di overhead fisso).
+      if (rawBlob.size > 4 * 1024 * 1024) {
         failed.push({ name: String(img.name || `immagine ${i + 1}`), reason: 'troppo grande (max 4 MB)' });
         continue;
       }
       try {
-        const u = await uploadImage(blob);
+        // S1.2: cifra i byte prima dell'upload. Guard inclusa in maybeEncryptBlob:
+        // senza pubkey carica il blob originale invariato.
+        const blobToUpload = await maybeEncryptBlob(rawBlob);
+        const u = await uploadImage(blobToUpload);
         uploaded.push(u.url);
       } catch (e) {
         console.warn('[SN feedback] upload immagine fallito:', e);
@@ -225,11 +229,13 @@
     for (const f of docs) {
       const fname = String(f?.name || 'allegato');
       if (!f?.dataUrl) { failed.push({ name: fname, reason: 'file vuoto' }); continue; }
-      const blob = dataUrlToBlob(f.dataUrl);
-      if (blob.size > 4 * 1024 * 1024) { failed.push({ name: fname, reason: 'troppo grande (max 4 MB)' }); continue; }
+      const rawBlob = dataUrlToBlob(f.dataUrl);
+      if (rawBlob.size > 4 * 1024 * 1024) { failed.push({ name: fname, reason: 'troppo grande (max 4 MB)' }); continue; }
       try {
-        const u = await uploadImage(blob); // upload generico (usa blob.type)
-        uploadedFiles.push({ url: u.url, name: fname, type: String(f.type || blob.type || '') });
+        // S1.2: cifra anche gli allegati non-immagine.
+        const blobToUpload = await maybeEncryptBlob(rawBlob);
+        const u = await uploadImage(blobToUpload); // upload generico (usa blob.type)
+        uploadedFiles.push({ url: u.url, name: fname, type: String(f.type || rawBlob.type || '') });
       } catch (e) {
         console.warn('[SN feedback] upload file fallito:', e);
         failed.push({ name: fname, reason: 'caricamento non riuscito' });
@@ -242,12 +248,21 @@
     try { seq = await nextSeq(); }
     catch (e) { console.warn('[SN feedback] numerazione non disponibile:', e?.message || e); }
 
+    // S1.2: cifra i campi di contenuto libero prima di scrivere su Firestore.
+    // Guard: senza pubkey i valori restano in chiaro (comportamento identico a prima).
+    const [encText, encUrl, encTitle, encName] = await Promise.all([
+      maybeEncrypt(text || ''),
+      maybeEncrypt(url || ''),
+      maybeEncrypt(title || ''),
+      maybeEncrypt(String(name || '').slice(0, 200)),
+    ]);
+
     const doc = {
       fields: {
-        text: toFsValue(text || ''),
-        url: toFsValue(url || ''),
-        title: toFsValue(title || ''),
-        name: toFsValue(String(name || '').slice(0, 200)),
+        text: toFsValue(encText),
+        url: toFsValue(encUrl),
+        title: toFsValue(encTitle),
+        name: toFsValue(encName),
         userAgent: toFsValue(userAgent || ''),
         clientId: toFsValue(clientId || ''),
         images: toFsValue(uploaded),
