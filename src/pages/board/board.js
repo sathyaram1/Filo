@@ -125,7 +125,128 @@
     card.appendChild(main);
 
     card.appendChild(renderVote(fb));
+
+    const reopen = renderReopen(fb);
+    if (reopen) card.appendChild(reopen);
+
     return card;
+  }
+
+  // ── Riapertura a pagamento (DC4) ────────────────────────────────────────
+  // Link discreto "Ancora rotto?" sotto i voti: apre un piccolo form inline
+  // (textarea + invia) invece di un prompt nativo, per restare nel tema di
+  // Filo (vedi PATTERNS.md — niente window.prompt). Non mostrato se l'utente
+  // ha già chiesto la riapertura di QUESTO fix (reopenRequests non vuoto):
+  // l'eventuale ❌ è già stata raccolta nei voti, e la riapertura è UNA volta
+  // sola per fix (vedi guard SN_MANAGE_REVIEW.canReopen), non per voto.
+  function renderReopen(fb) {
+    if (MR.hasReopenRequest(fb)) {
+      const done = document.createElement('div');
+      done.className = 'bd-reopen-done';
+      done.textContent = 'Hai già segnalato che questo fix non funziona ancora.';
+      return done;
+    }
+
+    const wrap = document.createElement('div');
+    wrap.className = 'bd-reopen';
+
+    const link = document.createElement('button');
+    link.type = 'button';
+    link.className = 'bd-reopen-link';
+    link.textContent = 'Ancora rotto?';
+
+    const form = document.createElement('div');
+    form.className = 'bd-reopen-form';
+    form.hidden = true;
+
+    const hint = document.createElement('p');
+    hint.className = 'bd-reopen-hint';
+    hint.textContent = `Spiega cosa non funziona ancora. Costa ${SN_CONST.CREDIT.BOARD_REOPEN} crediti, per evitare segnalazioni a caso.`;
+
+    const textarea = document.createElement('textarea');
+    textarea.className = 'bd-reopen-text';
+    textarea.placeholder = 'Cosa succede ancora?';
+    textarea.maxLength = 2000;
+
+    const actions = document.createElement('div');
+    actions.className = 'bd-reopen-actions';
+    const sendBtn = document.createElement('button');
+    sendBtn.type = 'button';
+    sendBtn.textContent = 'Invia';
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.textContent = 'Annulla';
+    cancelBtn.className = 'bd-reopen-cancel';
+    actions.appendChild(sendBtn);
+    actions.appendChild(cancelBtn);
+
+    const err = document.createElement('p');
+    err.className = 'bd-reopen-err';
+    err.hidden = true;
+
+    form.appendChild(hint);
+    form.appendChild(textarea);
+    form.appendChild(err);
+    form.appendChild(actions);
+
+    link.addEventListener('click', () => {
+      if (!signedIn || !uid) {
+        sendToMain({ type: 'auth_signin' })
+          .then(() => refreshAuth())
+          .then(() => renderList())
+          .catch(() => {});
+        return;
+      }
+      form.hidden = !form.hidden;
+      if (!form.hidden) textarea.focus();
+    });
+    cancelBtn.addEventListener('click', () => {
+      form.hidden = true;
+      err.hidden = true;
+      textarea.value = '';
+    });
+    sendBtn.addEventListener('click', () => onReopen(fb, textarea, sendBtn, err));
+
+    wrap.appendChild(link);
+    wrap.appendChild(form);
+    return wrap;
+  }
+
+  // Invio della riapertura: scala crediti + crea il feedback collegato lato
+  // main (BOARD_REOPEN). Bottone disabilitato durante l'invio; errore mostrato
+  // inline (testo vuoto, saldo insufficiente, fix già riaperto, sessione
+  // scaduta…). A successo il link/form scompare e compare la conferma — niente
+  // duplicati possibili senza ricaricare la pagina.
+  function onReopen(fb, textarea, sendBtn, errEl) {
+    const text = textarea.value.trim();
+    errEl.hidden = true;
+    if (!text) {
+      errEl.textContent = 'Scrivi cosa non funziona ancora.';
+      errEl.hidden = false;
+      return;
+    }
+    const id = fb._id;
+    if (!id || pending.has(`reopen:${id}`)) return;
+    pending.add(`reopen:${id}`);
+    sendBtn.disabled = true;
+
+    sendToMain({ type: 'board_reopen', id, text })
+      .then((r) => {
+        if (r && r.ok) {
+          fb.reopenRequests = { ...(fb.reopenRequests || {}), [uid]: { at: new Date().toISOString() } };
+          renderList();
+        } else {
+          errEl.textContent = (r && r.error) || 'Invio non riuscito, riprova.';
+          errEl.hidden = false;
+          sendBtn.disabled = false;
+        }
+      })
+      .catch(() => {
+        errEl.textContent = 'Invio non riuscito, riprova.';
+        errEl.hidden = false;
+        sendBtn.disabled = false;
+      })
+      .finally(() => { pending.delete(`reopen:${id}`); });
   }
 
   function renderVote(fb) {
