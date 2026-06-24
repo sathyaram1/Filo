@@ -196,7 +196,8 @@ separata a permessi ridotti** dove gli utenti verificano i fix già rilasciati.
   - ⚠️ **AZIONE OWNER residua** (invariata): `firebase deploy --only
     firestore:rules` perché l'owner-app possa scrivere `archived`/`starred`.
 
-- [ ] **DB3 — "In produzione" = versione rilasciata + `shippedInVersion`** — La
+- [~] **DB3 — "In produzione" = versione rilasciata + `shippedInVersion`**
+  _(in corso: routine blissful-hamilton-1sgrnd, 2026-06-24)_ — La
   tab **Risolti** deve contenere solo i fix **davvero deployati**, non ogni
   `done`. Serve sapere in quale versione un fix è uscito. Approccio: al passaggio
   a `done` (merge su main), stampare `resolvedInVersion` = la prossima release
