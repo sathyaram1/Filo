@@ -265,7 +265,13 @@ async function patchFeedback(entry, bearer) {
   // `starred` (DB2): flag ⭐ "preferito". Booleano; scritto solo se la coda lo
   // porta, così non si azzera per chi non lo tocca.
   if (typeof entry.starred === 'boolean') { fields.starred = toFsValue(entry.starred); mask.push('starred'); }
-  if (entry.status === 'done') { fields.resolvedAt = { timestampValue: new Date().toISOString() }; mask.push('resolvedAt'); }
+  if (entry.status === 'done') {
+    fields.resolvedAt = { timestampValue: new Date().toISOString() }; mask.push('resolvedAt');
+    // DB3: registra la versione in cui il fix è confluito (= package.json
+    // corrente), così la dashboard può sapere quando è davvero "in produzione".
+    const ver = packageVersion();
+    if (ver) { fields.resolvedInVersion = toFsValue(ver); mask.push('resolvedInVersion'); }
+  }
   const qs = mask.map((f) => `updateMask.fieldPaths=${encodeURIComponent(f)}`).join('&');
   const url = `${FIRESTORE_BASE}/feedback/${encodeURIComponent(entry.id)}?${qs}`;
   const res = await fetch(url, {
