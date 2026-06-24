@@ -496,16 +496,42 @@ separata a permessi ridotti** dove gli utenti verificano i fix già rilasciati.
     cloud ha già la privkey). **Resta da cablare** (→ S1.F2.3/DD3): persistere il
     risultato in `sanitized`/sub-doc e far leggere la board da lì. (stima: M)
 
-- [ ] **DD3 — Audit LLM hard-coded + centralizzazione (incl. cross-repo)** —
-  Stanare tutti gli LLM hard-coded e portarli sotto "Modelli di supporto": nel
-  repo principale (es. `src/main/services/safebrowse/llm.js`, i modelli
-  dell'agente in `tests/agent`, i default provider dove ha senso); per i **giudici
-  L2/red-team** che girano in **`filo-security`** (Functions), far leggere al
-  backend la scelta dal doc di config di DD1 (coordinamento cross-repo,
-  documentare in filo-security — vedi memoria [[auto-improvement-loop]]). **Done**:
-  elenco completo degli LLM hard-coded, ognuno spostato nello slot giusto o
-  documentato il perché resta; backend che legge la config. (stima: L,
-  multi-sessione, cross-repo)
+- [~] **DD3 — Audit LLM hard-coded + centralizzazione (incl. cross-repo)** —
+  **PARTE IN-REPO FATTA** (sessione locale 2026-06-24); **resta la parte backend
+  cross-repo `filo-security`**. Stanare tutti gli LLM hard-coded e portarli sotto
+  "Modelli di supporto". **Done**: elenco completo + ognuno spostato/documentato +
+  backend che legge la config. (stima: L, multi-sessione, cross-repo)
+  - **AUDIT COMPLETO (in-repo)** — modelli hard-coded trovati e decisione:
+    - `src/shared/constants.js` (registry + `DEFAULT_MODELS` azioni chat) → **resta**:
+      è config *utente* (Opzioni), non uno slot di supporto.
+    - `src/main/services/handlers.js:~1549` (safebrowse judge `flash-lite`) e
+      `:~1579` (geoblock classifier `flash-lite`) → **restano**: sarebbero un
+      eventuale slot futuro "judgeSafebrowse"/"judgeGeo" NON previsto dai 4 slot
+      DD1 (aggiungerlo = nuova voce store+rules+deploy, fuori scope).
+    - `src/main/services/handlers/misc.js:~23` (titolo feedback `flash-lite`) →
+      **resta**: UX utente, non un giudice.
+    - `src/main/services/handlers/ai.js:~172` (`TEST_PROVIDER` test connettività) →
+      **resta**: default di test UI.
+    - `src/content/actions.js:~347` (`FALLBACK_MODEL` descrizione immagine) →
+      **resta**: gira nel renderer, niente accesso a supportModelsStore (servirebbe
+      round-trip IPC).
+    - `tests/agent/explore.mjs`, `tests/agent/daily.mjs` → **restano**: tool di
+      sviluppo, leggono da `.env`, non runtime app.
+    - `src/shared/feedbackSanitizer.js` (DD2) → già corretto: `llmFn` iniettata,
+      nessun modello interno.
+  - **CENTRALIZZATO (backward-compatible)**: nuovo `src/main/services/resolveSupportModel.js`
+    — puro `resolveSupportModel(slot, fallback, getConfig?)`: legge lo slot da
+    `supportModelsStore.get()`, **fallback al valore hard-coded se config
+    assente/vuota/errore** (INVARIANTE: zero cambi di comportamento osservabili).
+    Espone `SLOT_DEFAULTS`. Pronto per il call-site del sanitizer (cablaggio
+    backend). **Verificato**: `tests/unit/resolveSupportModel.test.mjs` (13 test:
+    config presente→usa config; assente/vuota/eccezione→fallback) → `npm run
+    test:unit` 597/0. Nessun file esistente modificato (zero rischio regressione).
+  - **RESIDUO cross-repo (filo-security)**: il backend, al passaggio a `done`, deve
+    chiamare l'equivalente di `resolveSupportModel('sanitizer', <default>)` via
+    Admin SDK e passare la `llmFn` a `SN_FEEDBACK_SANITIZER.sanitize` (cablaggio
+    DD2). I giudici L2/red-team/priorità leggono già `config/supportModels` lato
+    backend. Nessuna azione owner residua (doc già scrivibile, rules DD1 deployate).
 
 #### Differito (design salvato, NON ora) — voto popolare sui design-class
 
