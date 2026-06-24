@@ -48,7 +48,7 @@ test('round-trip: cifra con encryptFieldsForQueue, decifra con decryptFeedbackFi
   const savedPub = globalThis.SN_FEEDBACK_PUBKEY;
   globalThis.SN_FEEDBACK_PUBKEY = pub;
 
-  const { encryptFieldsForQueue } = await import(join(ROOT, 'scripts', 'lib', 'encrypt-feedback-fields.mjs'));
+  const { encryptFieldsForQueue } = await import(toFileUrl(join(ROOT, 'scripts', 'lib', 'encrypt-feedback-fields.mjs')));
   const { decryptFeedbackFields } = await import(join(ROOT, 'scripts', 'lib', 'decrypt-feedback-fields.mjs'));
 
   const entry = { text: 'Il pulsante non funziona quando incollo.', name: 'bug pulsante', notes: 'riprodotto su Mac', extra: 'invariato' };
@@ -96,7 +96,7 @@ test('guard senza pubkey: encryptFieldsForQueue ritorna false e lascia in chiaro
   const savedPub = globalThis.SN_FEEDBACK_PUBKEY;
   globalThis.SN_FEEDBACK_PUBKEY = null;
 
-  const { encryptFieldsForQueue } = await import(join(ROOT, 'scripts', 'lib', 'encrypt-feedback-fields.mjs'));
+  const { encryptFieldsForQueue } = await import(toFileUrl(join(ROOT, 'scripts', 'lib', 'encrypt-feedback-fields.mjs')));
 
   const entry = { text: 'testo sensibile', name: 'titolo', notes: 'note' };
   const result = await encryptFieldsForQueue(entry, ['text', 'name', 'notes']);
@@ -115,7 +115,7 @@ test('senza privkey: campi cifrati diventano placeholder leggibile, niente crash
   const savedPub = globalThis.SN_FEEDBACK_PUBKEY;
   globalThis.SN_FEEDBACK_PUBKEY = pub;
 
-  const { encryptFieldsForQueue } = await import(join(ROOT, 'scripts', 'lib', 'encrypt-feedback-fields.mjs'));
+  const { encryptFieldsForQueue } = await import(toFileUrl(join(ROOT, 'scripts', 'lib', 'encrypt-feedback-fields.mjs')));
   const { decryptFeedbackFields } = await import(join(ROOT, 'scripts', 'lib', 'decrypt-feedback-fields.mjs'));
 
   const entry = { text: 'testo cifrato', name: 'titolo cifrato', notes: '' };
