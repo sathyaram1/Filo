@@ -99,7 +99,7 @@ test('ZERO info di sicurezza: attack escluso, suoi testi/verdetti assenti dal DO
   }
 });
 
-test('anonimo: invito ad accedere; loggato: può votare (toggle locale)', async ({ openTab }) => {
+test('anonimo: invito ad accedere; loggato (lato renderer): il voto passa dal main', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
@@ -107,18 +107,28 @@ test('anonimo: invito ad accedere; loggato: può votare (toggle locale)', async 
   await seed(page, {});
   await expect(page.locator('#bdSignIn')).toBeVisible();
 
-  // Loggato: niente pulsante Accedi; un voto si registra localmente (aria-pressed).
+  // Loggato lato renderer (hook di test): niente pulsante Accedi.
   await seed(page, { signedIn: 'me@example.com' });
   await expect(page.locator('#bdSignIn')).toBeHidden();
 
+  // Il voto reale (DC2) passa SEMPRE dall'IPC BOARD_CAST_VOTE — il main, non il
+  // renderer, scrive su Firestore con l'idToken e accredita i crediti. In questo
+  // ambiente di test non esiste una sessione reale lato main (il login Google
+  // dal vivo non è simulabile da Playwright — vedi auth-pkce.spec.mjs), quindi
+  // l'IPC torna ok:false ("Accedi per votare..."): l'aggiornamento ottimistico
+  // locale viene mostrato e poi RIPRISTINATO con garbo, senza crash né stato
+  // sporco. Questo è il comportamento corretto e verificabile qui; il flusso
+  // end-to-end con un account reale è verificato dall'unit test della
+  // ricompensa (creditStore) + dalla code review della scrittura idToken.
   const works = page.locator('.bd-card .bd-vote-works');
   await expect(works).toHaveAttribute('aria-pressed', 'false');
   await expect(works.locator('.bd-vote-count')).toHaveText('1');
   await works.click();
-  await expect(works).toHaveAttribute('aria-pressed', 'true');
-  await expect(works.locator('.bd-vote-count')).toHaveText('2'); // il mio voto si aggiunge
-  // Ri-cliccare annulla (toggle).
-  await works.click();
+  // Mentre la richiesta è in volo il pulsante è disabilitato (anti doppio-click).
+  await expect(works).toBeDisabled();
+  // A risposta arrivata (errore: non autenticato lato main) torna allo stato
+  // precedente — niente voto fantasma, niente crash della pagina.
+  await expect(works).toBeEnabled();
   await expect(works).toHaveAttribute('aria-pressed', 'false');
   await expect(works.locator('.bd-vote-count')).toHaveText('1');
 });
