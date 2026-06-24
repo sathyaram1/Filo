@@ -196,19 +196,32 @@ separata a permessi ridotti** dove gli utenti verificano i fix già rilasciati.
   - ⚠️ **AZIONE OWNER residua** (invariata): `firebase deploy --only
     firestore:rules` perché l'owner-app possa scrivere `archived`/`starred`.
 
-- [~] **DB3 — "In produzione" = versione rilasciata + `shippedInVersion`**
-  _(in corso: routine blissful-hamilton-1sgrnd, 2026-06-24)_ — La
-  tab **Risolti** deve contenere solo i fix **davvero deployati**, non ogni
-  `done`. Serve sapere in quale versione un fix è uscito. Approccio: al passaggio
-  a `done` (merge su main), stampare `resolvedInVersion` = la prossima release
-  (legare al version bump in `package.json` / al commit `release: vX`); un
-  feedback è "in produzione" quando `resolvedInVersion` ≤ **ultima versione
-  rilasciata** (definire la sorgente di "ultima rilasciata": es. l'ultimo blocco
-  in `src/shared/patchNotes.js` / `app.getVersion()`). Risolti = `done` & in
-  produzione; `done`-ma-non-ancora-spedito resta In coda (o sotto-stato). **Done**:
-  unit/spec — un `done` con `resolvedInVersion` già rilasciata appare in Risolti,
-  uno con versione futura no; documentare come si determina "ultima rilasciata".
-  (stima: M)
+- [x] **DB3 — "In produzione" = versione rilasciata + `resolvedInVersion`**
+  _(fatto: routine blissful-hamilton-1sgrnd, 2026-06-24)_ — La tab **Risolti**
+  ora contiene solo i fix **davvero in produzione**, non ogni `done`.
+  - **Sorgente di "in quale versione è uscito il fix"**: al passaggio a `done`,
+    `scripts/apply-triage.mjs` stampa `resolvedInVersion` = versione corrente di
+    `package.json` (la release in costruzione in cui il fix confluisce).
+  - **Sorgente di "ultima versione rilasciata"**: la versione dell'**app in
+    esecuzione** (`app.getVersion()`), letta da `manage.js` via il recap
+    aggiornamento (`get_update_recap` → `current`). L'owner gira sempre una build
+    pubblicata, quindi la sua versione è per definizione l'ultima rilasciata.
+  - **Logica pura** in `src/shared/manageReview.js`: `cmpVersion`, `isShipped(fb,
+    releasedVersion)` e `manageTabFor(fb, {releasedVersion})`/`listForManageTab(...,
+    opts)`. Un `done`/`verified` va in **Risolti** solo se `resolvedInVersion` ≤
+    rilasciata; altrimenti resta in **In coda**. Casi limite: senza
+    `releasedVersion` il gate è OFF (comportamento storico done→Risolti, nessuna
+    regressione); un `done` storico **senza** `resolvedInVersion` è considerato
+    già spedito.
+  - **Verifica**: `tests/unit/manageReviewShipped.test.mjs` (11 test, asseriscono
+    il successo: rilasciato→Risolti, futuro→In coda, storico→Risolti, gate-off
+    invariato) → verdi; suite `npm run test:unit` 437/438 (l'unico rosso,
+    `defaultsSecretsMerge`, è l'artefatto noto del sandbox: `require('electron')`
+    non installabile in cloud). Aggiunto anche `tests/manage-page.spec.mjs`
+    (spec DB3 che esercita il VERO renderList via `__mgTest.setReleasedVersion`)
+    — **non eseguito qui** perché Electron non è installato in questo sandbox;
+    girerà con la suite Playwright in un ambiente provvisto del binario.
+  - Niente changelog/capabilities: `manage` è owner-only, non user-visible.
 
 - [ ] **DB4 — Struttura dati dei voti di verifica sul feedback** — File:
   `src/shared/feedback.js` (schema) + `firestore.rules`. Aggiungere al doc

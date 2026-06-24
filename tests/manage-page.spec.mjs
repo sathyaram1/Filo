@@ -620,3 +620,45 @@ test('la pagina carica senza errori JavaScript', async ({ openTab }) => {
   );
   expect(jsErrors).toHaveLength(0);
 });
+
+// ── DB3: "In produzione" = fix uscito in una versione rilasciata ─────────────
+// Un `done` con resolvedInVersion ≤ versione rilasciata appare in "Risolti";
+// un `done` con versione futura (non ancora spedito) resta in "In coda".
+// Esercita il VERO renderList via l'hook di test (niente replica manuale della
+// logica): inietta i feedback, fissa la versione rilasciata e cambia tab.
+test('DB3: solo i fix rilasciati appaiono in Risolti; i non-spediti restano In coda', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_MANAGE_REVIEW);
+
+  const shipped = {
+    _id: 'db3-shipped', name: 'Fix gia rilasciato', seq: 201, subSeq: 0,
+    status: 'done', resolvedInVersion: '0.2.70',
+    clientId: 'tester@example.com', createdAt: '2026-06-20T10:00:00Z', images: [],
+  };
+  const pending = {
+    _id: 'db3-pending', name: 'Fix non ancora spedito', seq: 202, subSeq: 0,
+    status: 'done', resolvedInVersion: '0.2.99',
+    clientId: 'tester@example.com', createdAt: '2026-06-21T10:00:00Z', images: [],
+  };
+
+  await page.evaluate(({ a, b }) => {
+    window.__mgTest.setData([a, b]);
+    window.__mgTest.setReleasedVersion('0.2.74');
+  }, { a: shipped, b: pending });
+
+  // Tab "Risolti": solo il fix spedito.
+  await page.evaluate(() => window.__mgTest.setTab('resolved'));
+  await expect(page.locator('.mg-item')).toHaveCount(1);
+  await expect(page.locator('.mg-item-title')).toHaveText('Fix gia rilasciato');
+
+  // Tab "In coda": il done non ancora spedito è qui (visibile finché non esce).
+  await page.evaluate(() => window.__mgTest.setTab('queue'));
+  await expect(page.locator('.mg-item')).toHaveCount(1);
+  await expect(page.locator('.mg-item-title')).toHaveText('Fix non ancora spedito');
+
+  // Quando la versione rilasciata raggiunge quella del fix, passa a "Risolti".
+  await page.evaluate(() => window.__mgTest.setReleasedVersion('0.2.99'));
+  await page.evaluate(() => window.__mgTest.setTab('resolved'));
+  await expect(page.locator('.mg-item')).toHaveCount(2);
+});
