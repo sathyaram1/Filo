@@ -332,6 +332,12 @@
       invoke: 'Pagina filo://security/security.html.',
     },
     {
+      id: 'auto-feedback', title: 'Segnalazione automatica dei problemi', category: 'settings',
+      desc: 'Quando Filo non riesce a fare qualcosa che gli chiedi, invia automaticamente una segnalazione anonima e generica a chi sviluppa l\'app — senza includere URL o testo personale. Tenerlo attivo premia con 10 crediti extra al giorno.',
+      invoke: 'Impostazioni → Sicurezza → "Segnalazione automatica dei problemi".',
+      doesNot: 'Non invia mai URL, testo delle conversazioni o dati personali: solo una nota generica sulla funzione mancante.',
+    },
+    {
       id: 'theme', title: 'Tema chiaro / scuro', category: 'settings',
       desc: 'Sceglie l’aspetto chiaro, scuro o automatico per le pagine di Filo.',
       invoke: 'Preferenze → Tema.',
