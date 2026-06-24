@@ -58,6 +58,9 @@
       // a vicenda. Una sola entry per feedback per utente (la cache è già per-uid).
       rewardedVotes: {},  // { [feedbackId]: true }
       owner: null,        // uid/email a cui appartiene questa cache (switch account)
+      // F4: data dell'ultimo bonus giornaliero "feedback autonomo attivo".
+      // Stringa 'YYYY-MM-DD'; '' = mai ricevuto.
+      lastAutoFeedbackBonusDate: '',
     };
   }
 
