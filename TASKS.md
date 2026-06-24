@@ -314,7 +314,7 @@ separata a permessi ridotti** dove gli utenti verificano i fix già rilasciati.
     già documentati in DB1) o flakiness headless ("browser has been closed" in
     `page-ctrl-zoom`/`proxy-tab-nl`): **zero regressioni** da DC1.
 
-- [ ] **DC2 — Voto funziona/non-funziona + ricompensa 10 crediti** (dipende da
+- [~] **DC2 — Voto funziona/non-funziona + ricompensa 10 crediti** _(in corso: routine happy-curie-s1qf4z, 2026-06-24)_ (dipende da
   DB3, DB4) — File: board page + handler IPC + `src/main/services/creditStore.js`.
   Sui feedback **deployati** (DB3): voto ✅ funziona / ❌ non-funziona, un voto per
   utente (uid) cambiabile, scritto in DB4. **Ricompensa 10 crediti** a voto, **una
