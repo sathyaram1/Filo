@@ -857,9 +857,24 @@ DIPENDENZE APERTE (non chiudibili da questo repo):
     owner-only dopo S1.6, che lockda la read di Firestore). Svantaggio: S1.6 (lockdown
     lettura Firestore) non è ancora pianificato ed è un'operazione delicata.
 
-  - [ ] **S1.F2.1 — Cifra `status` in scrittura + decifratura dashboard** _(Opzione A
-    scelta dall'owner — vedi decisione sopra; enum pubblico open/closed/pending-approval)_
-    — **Cosa fa**: cifra il campo
+  - [x] **S1.F2.1 — Cifra `status` in scrittura + decifratura dashboard** _(FATTO:
+    sessione locale 2026-06-24, Opzione A; enum pubblico open/closed/pending-approval)_
+    — **Esito**: `statusToPublic` (mapping `blocked→open` collassa con "in lavorazione" =
+    cuore di sicurezza; `done/verified/ignored/archived→closed`) in `src/shared/feedback.js`,
+    esposto su `SN_FEEDBACK`. `submit` scrive `statusPublic:'open'`; `updateStatus` usa
+    `encryptStatus()` → scrive `status` (cifrato solo se gate on) + `statusPublic` (sempre
+    in chiaro). `apply-triage.mjs` (patch+create) idem. `'status'` aggiunto a
+    `TEXT_FIELDS_TO_DECRYPT` (auth.js) e `TEXT_FIELDS` (decrypt-feedback-fields.mjs) →
+    dashboard/routine vedono lo status fine in chiaro, filtraggio per tab invariato. C5
+    (`credits.js`) usa `statusPublic==='closed'`, con fallback sicuro (status cifrato senza
+    statusPublic → NON premiato). `firestore.rules`: `statusPublic` in `hasOnly`
+    (create+update) + enum, `status` accetta enum O `^FENC1:`. Verificato:
+    `tests/unit/feedbackStatusEncryption.test.mjs` (15 test: mapping, round-trip cifrato,
+    C5 senza chiave); `npm run test:unit` 488/488. ⚠️ **AZIONE OWNER pendente**: gira
+    `firebase deploy --only firestore:rules` PRIMA del cutover (le rules ora richiedono
+    `statusPublic` nell'enum) — vedi checklist S1.5. ⚠️ Default ignored/archived→closed
+    con ricompensa: confermare con owner.
+    — **Cosa fa (storico spec)**: cifra il campo
     `status` nei percorsi di scrittura (in base all'opzione scelta) e aggiorna la
     decifratura nei lettori admin. File da toccare: `src/shared/feedback.js`
     (aggiunge `statusPublic` al doc submit se Opzione A, oppure cifra `status` se B);
