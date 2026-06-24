@@ -256,7 +256,8 @@ separata a permessi ridotti** dove gli utenti verificano i fix già rilasciati.
   - Niente changelog/capabilities: la board utente (UI dei voti) arriva con DC*;
     qui è solo substrato dati, non ancora user-visible.
 
-- [ ] **DB5 — Migrazione dei feedback esistenti nella dashboard unificata**
+- [~] **DB5 — Migrazione dei feedback esistenti nella dashboard unificata**
+  _(in corso: routine affectionate-bell-vb8kaf, 2026-06-24)_
   (dipende da DB1/DB2) — Far sì che TUTTI i feedback oggi sparsi nella vecchia
   dashboard (ricevuti, ritrovamenti agente, chiarimenti, draft) compaiano nei
   posti nuovi corretti di `manage`. I `draft` (Bozze rimossa) → restano sotto
