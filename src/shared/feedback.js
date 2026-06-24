@@ -71,7 +71,7 @@
   // opaco: ciphertext Uint8Array). Guard: senza pubkey ritorna il blob originale.
   async function maybeEncryptBlob(blob) {
     const C = global.SN_FEEDBACK_CRYPTO;
-    if (!C || !C.hasPublicKey()) return blob;
+    if (!C || !C.isEnabled()) return blob; // dormiente finché il cutover non accende SN_FEEDBACK_ENC_ENABLED
     try {
       const ab = await blob.arrayBuffer();
       const plain = new Uint8Array(ab);
