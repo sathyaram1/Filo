@@ -188,6 +188,11 @@
   function hasPublicKey() {
     return !!(global.SN_FEEDBACK_PUBKEY);
   }
+  // La cifratura è ATTIVA solo se c'è la chiave pubblica E l'interruttore di
+  // attivazione (cutover) è acceso. Vedi feedbackPublicKey.js → SN_FEEDBACK_ENC_ENABLED.
+  function isEnabled() {
+    return hasPublicKey() && !!global.SN_FEEDBACK_ENC_ENABLED;
+  }
 
   global.SN_FEEDBACK_CRYPTO = {
     encryptForOwner,
