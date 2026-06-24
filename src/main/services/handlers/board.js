@@ -63,6 +63,86 @@ module.exports = function register(on, ctx) {
     }
   });
 
+  // Riapertura a pagamento (DC4): l'utente loggato segnala che un fix
+  // "Risolti" è ancora rotto. Tre passi atomici-quanto-possibile:
+  //   1. verifica idoneità (è davvero in Risolti, nessuno l'ha già riaperto);
+  //   2. scala CREDIT.BOARD_REOPEN (anti-spam — rifiuta senza scrivere nulla
+  //      se il saldo non basta, applyConsumptionIfAffordable in creditStore.js);
+  //   3. crea il feedback collegato (parentId) + marca `reopenRequests.<uid>`
+  //      sull'originale (segnale per il triage: un utente normale non può
+  //      scrivere `status`, quindi il flip fuori da "Risolti" resta al
+  //      percorso fidato — vedi nota in messages.js).
+  // Se il passo 3 fallisce DOPO aver già scalato i crediti al passo 2, li
+  // restituiamo (compensazione best-effort) invece di lasciare l'utente
+  // scalato senza nulla in cambio.
+  on(MSG.BOARD_REOPEN, async (msg) => {
+    try {
+      if (!auth.isSignedIn()) {
+        return { ok: false, error: 'Accedi per segnalare che un fix è ancora rotto.' };
+      }
+      const id = String(msg?.id || '').trim();
+      const text = String(msg?.text || '').trim();
+      if (!id) return { ok: false, error: 'Feedback non valido.' };
+      if (!text) return { ok: false, error: 'Descrivi cosa non funziona ancora.' };
+      if (text.length > 10000) return { ok: false, error: 'Testo troppo lungo.' };
+
+      const uid = await auth.getUid();
+      if (!uid) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
+      const idToken = await auth.getIdToken();
+      if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
+      if (!FB?.castReopenRequest || !FB?.submit) throw new Error('SN_FEEDBACK non caricato nel main process');
+
+      const MR = globalThis.SN_MANAGE_REVIEW;
+      if (!MR?.canReopen) throw new Error('SN_MANAGE_REVIEW non caricato nel main process');
+
+      // Idoneità: rilegge il documento originale (non fidarsi dello stato che
+      // il renderer aveva in cache) e applica lo stesso gate "Risolti, niente
+      // red-team" della board + il guard anti-doppia-riapertura.
+      const original = await fetchFeedback(id);
+      if (!original) return { ok: false, error: 'Feedback non trovato.' };
+      let releasedVersion = '';
+      try { releasedVersion = require('electron').app.getVersion(); } catch (_) { /* test env */ }
+      if (!MR.canReopen(original, { releasedVersion })) {
+        return MR.hasReopenRequest(original)
+          ? { ok: false, error: 'Questo fix è già stato segnalato come ancora rotto.' }
+          : { ok: false, error: 'Questo fix non è (più) riapribile dalla bacheca.' };
+      }
+
+      // Anti-spam: scala i crediti SOLO se il saldo basta (nessun saldo
+      // negativo, nessun tentativo "gratis" se insufficiente).
+      const amount = SN_CONST.CREDIT.BOARD_REOPEN;
+      const spend = await Credits.spendIfAffordable(amount, { kind: 'board_reopen', ref: id });
+      if (!spend.ok) {
+        return { ok: false, error: `Servono ${amount} crediti per riaprire un fix (saldo: ${spend.balance}).` };
+      }
+
+      let created;
+      try {
+        const profile = (await auth.getProfile?.()) || {};
+        created = await FB.submit({
+          text: `[Riapertura #${original.seq || id}] ${text}`,
+          url: original.url || '',
+          title: original.title || '',
+          userAgent: '',
+          clientId: `uid:${uid}`,
+          parentId: id,
+          name: '',
+        });
+        await FB.castReopenRequest(id, uid, { idToken });
+      } catch (e) {
+        // Compensazione best-effort: il segnale/feedback non è andato a buon
+        // fine dopo aver già scalato — restituiamo i crediti invece di
+        // lasciare l'utente scalato senza nulla in cambio.
+        try { await Credits.award(`refund:${id}:${Date.now()}`, amount, 'board_reopen_refund'); } catch (_) {}
+        throw e;
+      }
+
+      return { ok: true, feedbackId: created.id, balance: spend.balance };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  });
+
   on(MSG.BOARD_CLEAR_VOTE, async (msg) => {
     try {
       if (!auth.isSignedIn()) {
