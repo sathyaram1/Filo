@@ -140,7 +140,7 @@ separata a permessi ridotti** dove gli utenti verificano i fix già rilasciati.
   **pre-esistenti** (riprodotti al commit base 953e7a8, indipendenti da `manage`).
   (stima: L)
 
-- [~] **DB2 — Stato `archived` + flag `starred` (⭐) + rimozione Bozze** — File:
+- [x] **DB2 — Stato `archived` + flag `starred` (⭐) + rimozione Bozze** — File:
   `firestore.rules` (enum `status` + campo `starred` in `affectedKeys().hasOnly`),
   `scripts/queue-triage.mjs` + `scripts/apply-triage.mjs` (nuovo status
   `archived`), `src/shared/feedback.js`, `src/pages/manage/*`. `archived` = nuovo
