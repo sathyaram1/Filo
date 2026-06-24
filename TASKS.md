@@ -670,11 +670,16 @@ DIPENDENZE APERTE (non chiudibili da questo repo):
     via env, plaintext ai worker). Retrocompat: valori in chiaro invariati; senza
     privata → placeholder leggibile. Test unit 472/472.
     **ANCORA DA FARE (prima del cutover)**:
-    1. **Wiring renderer dashboard**: né `manage.js` né `feedback.js` (pagina)
-       chiamano ancora `FEEDBACK_DECRYPT_FIELDS` dopo `FB.list()`/`get`. Finché la
-       cifratura è dormiente non serve, ma è prerequisito per accenderla. Serve
-       decifrare `text`/`url` (batch, non N chiamate IPC) prima del render in
-       ENTRAMBE le dashboard (vecchia + manage).
+    1. [x] **Wiring renderer dashboard** _(fatto: sessione locale 2026-06-24)_ —
+       Handler `FEEDBACK_DECRYPT_FIELDS` esteso al **batch**: con `msg.list` (array)
+       decifra ogni feedback con `decryptFeedbackObject` e torna `{ ok, list }` in una
+       sola IPC (path singolo `msg.fields` invariato per retrocompat). Sia `manage.js`
+       sia `feedback.js` (pagina vecchia), se admin e lista non vuota, fanno UNA IPC
+       batch dopo `FB.list()` e prima del render, con fallback graceful (try/catch:
+       se non-admin o IPC ko, lasciano i valori com'erano → dashboard non si rompe).
+       No-op trasparente coi feedback in chiaro (cifratura dormiente). Verificato:
+       `tests/unit/feedbackEncryption.test.mjs` Test 8 (batch su 3 feedback: tutti
+       cifrati/misto/chiari, round-trip dei 6 campi); `npm run test:unit` 473/473.
     2. **Wiring lettore routine**: i worker devono usare `decrypt-feedback-fields.mjs`
        sui corpi prima di lavorarli; documentare nel recipe orchestratore (CLAUDE.md)
        che la privata va in env `FILO_FEEDBACK_PRIVKEY` nel cloud.
