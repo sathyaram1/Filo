@@ -55,7 +55,8 @@ async function getPrivateKey() {
 // Decifra i campi FENC1: di un oggetto con la chiave privata del main.
 // Retrocompatibile: i valori non cifrati passano invariati.
 // Senza chiave privata i campi cifrati diventano il placeholder leggibile.
-const TEXT_FIELDS_TO_DECRYPT = ['text', 'url', 'name', 'title', 'notes', 'reviewComment'];
+// S1.F2.1: aggiunto 'status' (cifrato quando gate on) — NON 'statusPublic' (sempre in chiaro).
+const TEXT_FIELDS_TO_DECRYPT = ['text', 'url', 'name', 'title', 'notes', 'reviewComment', 'status'];
 const PLACEHOLDER_NO_KEY = '[cifrato — chiave privata non configurata]';
 
 async function decryptFeedbackObject(fields) {
