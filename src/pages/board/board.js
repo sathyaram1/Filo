@@ -188,10 +188,11 @@
     try {
       allFeedbacks = await FB.list({ pageSize: 500 });
     } catch (err) {
-      bdLoading.textContent = 'Errore nel caricamento.';
       console.error('[board] errore caricamento:', err);
-      return;
+      allFeedbacks = [];
     }
+    // renderList nasconde sempre il loader (anche a lista vuota), così la pagina
+    // raggiunge uno stato stabile a fine caricamento.
     renderList();
   }
 
