@@ -140,7 +140,8 @@ service cloud.firestore {
           .hasOnly(['status', 'notes', 'resolvedAt', 'verifiedAt', 'priority',
                     'name', 'seq', 'subSeq', 'branch', 'starred',
                     'claimedBy', 'claimedAt', 'claimExpiresAt', 'claimNum',
-                    'reviewDecision', 'reviewComment', 'reviewedAt'])
+                    'reviewDecision', 'reviewComment', 'reviewedAt',
+                    'archiveOverride'])
         && request.resource.data.get('status', 'new') in ['new', 'draft', 'todo', 'clarify', 'review', 'blocked', 'done', 'verified', 'ignored', 'archived']
         && request.resource.data.get('notes', '') is string
         && request.resource.data.get('notes', '').size() <= 10000
