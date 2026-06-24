@@ -198,7 +198,6 @@
           // includere voti di altri utenti arrivati nel frattempo).
           fb.votes = (r.votes && typeof r.votes === 'object') ? r.votes : fb.votes;
           if (r.uid) uid = r.uid;
-          if (r.awarded) flyCreditsFromButton(originRect, r.credits || FB.formatNum ? undefined : undefined);
           if (r.awarded && r.credits) flyCreditsFromButton(originRect, r.credits);
         } else {
           // Errore: torna allo stato precedente al click.
