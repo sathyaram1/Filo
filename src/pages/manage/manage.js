@@ -330,6 +330,8 @@
   // il bottone ⭐ acceso se è preferito; "Archivia" o "Ripristina" a seconda
   // che il feedback sia già archiviato.
   function reflectManage(fb) {
+    mgStarBtn.disabled = false;
+    mgArchiveBtn.disabled = false;
     const starred = MR.isStarred(fb);
     mgStarBtn.setAttribute('aria-pressed', starred ? 'true' : 'false');
     mgStarBtn.textContent = starred ? '★ Preferito' : '☆ Preferito';
