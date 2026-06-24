@@ -248,21 +248,24 @@
     try { seq = await nextSeq(); }
     catch (e) { console.warn('[SN feedback] numerazione non disponibile:', e?.message || e); }
 
-    // S1.2: cifra i campi di contenuto libero prima di scrivere su Firestore.
-    // Guard: senza pubkey i valori restano in chiaro (comportamento identico a prima).
-    const [encText, encUrl, encTitle, encName] = await Promise.all([
+    // S1.2 (Fase 1): cifra SOLO il contenuto inviato dall'utente che nessun
+    // altro utente deve poter leggere — `text` e `url` (la superficie d'attacco
+    // injection + il contesto di navigazione). NON si cifrano `title`/`name`:
+    // sono mostrati all'utente che ha inviato il feedback dal popup ricompense
+    // (C5), che gira sulla sua macchina SENZA chiave privata → cifrarli li
+    // renderebbe illeggibili. Restano per la Fase 2 (con proiezione sanitizzata).
+    // Guard: gate dormiente, senza attivazione i valori restano in chiaro.
+    const [encText, encUrl] = await Promise.all([
       maybeEncrypt(text || ''),
       maybeEncrypt(url || ''),
-      maybeEncrypt(title || ''),
-      maybeEncrypt(String(name || '').slice(0, 200)),
     ]);
 
     const doc = {
       fields: {
         text: toFsValue(encText),
         url: toFsValue(encUrl),
-        title: toFsValue(encTitle),
-        name: toFsValue(encName),
+        title: toFsValue(title || ''),
+        name: toFsValue(String(name || '').slice(0, 200)),
         userAgent: toFsValue(userAgent || ''),
         clientId: toFsValue(clientId || ''),
         images: toFsValue(uploaded),
