@@ -43,11 +43,15 @@
   }
 
   // ── Auth (anonimi leggono; per votare serve login) ──────────────────────
+  // `uid` è il claim Firebase REALE (request.auth.uid nelle Firestore rules),
+  // non l'email: è la chiave con cui i voti sono salvati in `votes.<uid>` (DB4).
+  // Senza questo, dopo un reload "il mio voto" non si riconoscerebbe più
+  // (i voti salvati sono sempre per uid reale, mai per email).
   async function refreshAuth() {
     try {
       const r = await sendToMain({ type: 'auth_status' });
       signedIn = !!(r && r.signedIn);
-      uid = (r && r.profile && r.profile.email) || null;
+      uid = (r && r.uid) || null;
     } catch (_) {
       signedIn = false; uid = null;
     }
