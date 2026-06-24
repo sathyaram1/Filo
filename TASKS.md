@@ -393,7 +393,7 @@ separata a permessi ridotti** dove gli utenti verificano i fix già rilasciati.
     override owner archivia/blocca subito — usando il vero `tallyVotes`. Niente
     `patchNotes.js`/`capabilities.js`: tutto dentro `manage`, owner-only.
 
-- [ ] **DC4 — Riapertura a pagamento** — Dalla board un utente può inviare un
+- [~] **DC4 — Riapertura a pagamento** _(in corso: routine happy-curie-s1qf4z, 2026-06-24)_ — Dalla board un utente può inviare un
   feedback che **riapre** un fix verificato (lo toglie da Risolti, torna nell'iter
   normale), **collegato all'originale**. **Costa pochi crediti** (anti-spam),
   **ricompensa a risoluzione** come gli altri feedback. **Done**: spec — la
