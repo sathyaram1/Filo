@@ -133,7 +133,7 @@ module.exports = function register(on, ctx) {
         // Compensazione best-effort: il segnale/feedback non è andato a buon
         // fine dopo aver già scalato — restituiamo i crediti invece di
         // lasciare l'utente scalato senza nulla in cambio.
-        try { await Credits.award(`refund:${id}:${Date.now()}`, amount, 'board_reopen_refund'); } catch (_) {}
+        try { await Credits.award({ kind: 'board_reopen_refund', credits: amount, ref: id }); } catch (_) {}
         throw e;
       }
 
