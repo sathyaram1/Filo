@@ -715,6 +715,16 @@
       return;
     }
 
+    // S1.3: decifratura batch dei campi FENC1: — una sola IPC per tutta la lista.
+    // Se l'utente non è admin (o il modulo non è disponibile) i valori restano
+    // invariati (graceful fallback: la dashboard non si rompe, mostra il ciphertext).
+    if (isAdmin && allFeedbacks.length > 0) {
+      try {
+        const r = await sendToMain({ type: 'feedback_decrypt_fields', list: allFeedbacks });
+        if (r && r.ok && Array.isArray(r.list)) allFeedbacks = r.list;
+      } catch (_) { /* fallback: render con valori cifrati */ }
+    }
+
     // Indice per mittente
     allByClient = {};
     for (const fb of allFeedbacks) {
