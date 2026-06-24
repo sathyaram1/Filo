@@ -193,7 +193,13 @@
   // files: array di { name, type, dataUrl } per allegati non-immagine (pdf,
   // txt, md, json…), max ~5. `name` è il titolo breve (generato da un LLM nel
   // main process prima della chiamata). Ritorna { id, url } del documento creato.
-  async function submit({ text, url, title, userAgent, clientId, images, files, name }) {
+  // `parentId` (DC4): se presente, questo feedback nasce COLLEGATO a un altro
+  // (es. la riapertura di un fix "Risolti" dalla board). Nessuna sub-numerazione
+  // automatica qui (quella è solo per le spec spezzate dalle routine, vedi
+  // queue-feedback.mjs): il collegato nasce come un feedback normale (numero
+  // proprio), `parentId` serve solo a far comparire "collegato a #N" in
+  // dashboard e a far risalire chi triagia all'originale.
+  async function submit({ text, url, title, userAgent, clientId, images, files, name, parentId }) {
     // Allegati che NON sono riusciti a caricarsi: li riportiamo al chiamante
     // così la UI può avvisare l'utente (un upload fallito veniva ingoiato in
     // silenzio e il feedback partiva senza il file, senza alcun segnale).
