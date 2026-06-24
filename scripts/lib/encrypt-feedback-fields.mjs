@@ -55,10 +55,12 @@ function loadCrypto() {
 export async function encryptFieldsForQueue(entry, fields, pubKeyOverride) {
   loadCrypto();
   const C = globalThis.SN_FEEDBACK_CRYPTO;
-  // Se è passata una pubkey override la usiamo direttamente; altrimenti
-  // ci affidiamo a hasPublicKey() che legge SN_FEEDBACK_PUBKEY da globalThis.
+  // Con pubKeyOverride (test del meccanismo) si cifra direttamente. In
+  // produzione (nessun override) la cifratura è gated dall'interruttore di
+  // attivazione: isEnabled() = chiave pubblica presente E SN_FEEDBACK_ENC_ENABLED.
+  // Dormiente finché l'owner non fa il cutover (vedi feedbackPublicKey.js).
   if (!C) return false;
-  if (!pubKeyOverride && !C.hasPublicKey()) return false;
+  if (!pubKeyOverride && !(C.isEnabled ? C.isEnabled() : C.hasPublicKey())) return false;
 
   let encrypted = false;
   for (const f of fields) {
