@@ -217,6 +217,29 @@ service cloud.firestore {
                 )
            );
 
+      // Riapertura a pagamento dalla board (DC4): un utente LOGGATO scrive SOLO
+      // la propria chiave nel map `reopenRequests` (stesso pattern di `votes`
+      // sopra — chiave==uid, nessun altro campo toccabile). È solo il SEGNALE
+      // "ho chiesto la riapertura": non tocca `status` (quello resta admin/
+      // routine, vedi i rami sopra) — il flip fuori da "Risolti" lo applica il
+      // percorso fidato leggendo questo campo. Entry: { at: <ISO> }.
+      allow update: if
+        request.auth != null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reopenRequests'])
+        && request.resource.data.get('reopenRequests', {}) is map
+        && request.resource.data.get('reopenRequests', {})
+             .diff(resource.data.get('reopenRequests', {})).affectedKeys()
+             .hasOnly([request.auth.uid])
+        && (
+             !(request.auth.uid in request.resource.data.get('reopenRequests', {}))
+             || (
+                  request.resource.data.reopenRequests[request.auth.uid].keys()
+                    .hasOnly(['at'])
+                  && request.resource.data.reopenRequests[request.auth.uid].at is string
+                  && request.resource.data.reopenRequests[request.auth.uid].at.size() <= 40
+                )
+           );
+
       // Triage routine (limitato): può solo spostare tra `todo`/`done`/`clarify`
       // e scrivere `notes`/`resolvedAt`. NON tocca `priority`, NON marca
       // `verified`/`ignored`, NON cancella. Più stretto del ramo admin di
