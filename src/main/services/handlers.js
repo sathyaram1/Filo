@@ -976,6 +976,68 @@ function capabilityDetailsForPrompt(actions) {
   return blocks.join('\n\n').trim();
 }
 
+// F4 — invia un feedback autonomo in background se la risposta segnala un gap
+// di capacità o una lamentela. Non blocca mai il flusso della chat.
+// Privacy: invia solo una descrizione GENERICA (nessun URL, nessun testo utente).
+// Undo: manda un toast con azione "Annulla" che cancella il feedback appena creato.
+async function maybeAutoFeedback({ textReply, rawActions, userMessage, sender }) {
+  try {
+    const AF = globalThis.SN_AUTO_FEEDBACK;
+    const FB = globalThis.SN_FEEDBACK;
+    if (!AF || !FB || typeof FB.submit !== 'function') return;
+
+    // Leggi il setting autoFeedback (default ON se non impostato dall'utente).
+    const settings = await getEffectiveSettings().catch(() => ({}));
+    const autoEnabled = (settings && settings.security && settings.security.autoFeedback) === undefined
+      ? true  // default ON
+      : !!(settings && settings.security && settings.security.autoFeedback);
+    if (!autoEnabled) return;
+
+    const Caps = globalThis.SN_CAPABILITIES;
+    const capabilities = Caps ? Caps.all() : [];
+    const analysis = AF.analyzeReply(textReply, rawActions, userMessage, capabilities);
+    if (!analysis || !analysis.kind) return;
+
+    const payload = AF.compose(analysis);
+    if (!payload) return;
+
+    let userAgent = 'Filo desktop auto';
+    try { const { app } = require('electron'); userAgent = `Filo desktop ${app.getVersion()} auto`; } catch (_) {}
+
+    const result = await FB.submit({
+      text: payload.text,
+      name: payload.name,
+      clientId: payload.clientId,
+      userAgent,
+      capabilityGapId: payload.capabilityGapId || undefined,
+    }).catch((e) => { console.warn('[F4] submit auto-feedback fallito:', e?.message || e); return null; });
+
+    if (!result || !result.id) return;
+    const feedbackId = result.id;
+
+    // Toast non bloccante con undo: l'utente può annullare entro la durata del toast.
+    const win = winOf(sender);
+    if (win) {
+      try {
+        win.webContents.send('shell:toast', {
+          text: 'L\'ho segnalato a chi sviluppa Filo',
+          opts: {
+            durationSec: 8,
+            actions: [{
+              label: 'Annulla',
+              // L'azione è dichiarativa (openUrl non è il meccanismo giusto qui):
+              // usiamo un canale custom che la shell interpreta come "cancella feedback".
+              cancelAutoFeedback: feedbackId,
+            }],
+          },
+        });
+      } catch (_) {}
+    }
+  } catch (e) {
+    console.warn('[F4] maybeAutoFeedback errore:', e?.message || e);
+  }
+}
+
 async function handleFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, sender = null }) {
   await FiloMem.touchSession();
   await FiloMem.appendRaw({ type: 'chat_user', summary: String(userMessage || '').slice(0, 200) });
