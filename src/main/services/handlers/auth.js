@@ -1,9 +1,81 @@
 // Handler di dominio: account "Accedi con Google", triage admin dei feedback
 // e config condivisa "modelli predefiniti".
 
+const path = require('node:path');
 const auth = require('../../auth/google-auth');
 const Defaults = require('../defaultsStore');
 const { permissionDeniedHelp } = require('../feedbackError');
+
+// ---- Slot chiave privata feedback (S1.3) ----------------------------------------
+// La chiave privata non deve MAI uscire dal main process né essere passata al
+// renderer. Il main la legge da env FILO_FEEDBACK_PRIVKEY oppure da
+// storage.json (campo `feedbackPrivateKey`), in quest'ordine.
+//
+// DOVE L'OWNER LA METTE
+//   - Locale: `FILO_FEEDBACK_PRIVKEY=<base64>` nel file `tests/agent/.env`
+//     (gitignorato) oppure come variabile d'ambiente prima di lanciare Filo.
+//   - Cloud/routine: passata come env `FILO_FEEDBACK_PRIVKEY` nella config
+//     del runner (secrets della routine — NON in chiaro nel prompt).
+//   - Alternativa: impostare il campo `feedbackPrivateKey` in storage.json
+//     (il file di storage locale, mai nel repo) con il valore base64 della chiave.
+//     Lo storage si trova in %APPDATA%/Filo/storage.json (produzione) o nel
+//     percorso in $FILO_USER_DATA/storage.json (test).
+//
+// La chiave viene letta a ogni chiamata (non cachata) per restare aggiornata
+// se l'utente la cambia a runtime.
+async function getPrivateKey() {
+  // 1. Variabile d'ambiente (priorità massima: setting esplicito del runner).
+  if (process.env.FILO_FEEDBACK_PRIVKEY) return process.env.FILO_FEEDBACK_PRIVKEY.trim();
+
+  // 2. File .env locale (per comodità in sviluppo; gitignorato).
+  try {
+    const fs = require('node:fs');
+    const envFile = path.join(path.dirname(path.dirname(path.dirname(path.dirname(path.dirname(__dirname))))), 'tests', 'agent', '.env');
+    if (fs.existsSync(envFile)) {
+      const lines = fs.readFileSync(envFile, 'utf8').split('\n');
+      for (const line of lines) {
+        const m = line.match(/^FILO_FEEDBACK_PRIVKEY\s*=\s*(.+)$/);
+        if (m) return m[1].trim().replace(/^["']|["']$/g, '');
+      }
+    }
+  } catch (_) {}
+
+  // 3. Storage.json locale (campo feedbackPrivateKey).
+  try {
+    if (globalThis.SN_STORAGE) {
+      const v = await globalThis.SN_STORAGE.getRaw('feedbackPrivateKey', null);
+      if (v && typeof v === 'string') return v.trim();
+    }
+  } catch (_) {}
+
+  return null;
+}
+
+// Decifra i campi FENC1: di un oggetto con la chiave privata del main.
+// Retrocompatibile: i valori non cifrati passano invariati.
+// Senza chiave privata i campi cifrati diventano il placeholder leggibile.
+const TEXT_FIELDS_TO_DECRYPT = ['text', 'url', 'name', 'title', 'notes', 'reviewComment'];
+const PLACEHOLDER_NO_KEY = '[cifrato — chiave privata non configurata]';
+
+async function decryptFeedbackObject(fields) {
+  const C = globalThis.SN_FEEDBACK_CRYPTO;
+  if (!C) return fields; // modulo non caricato: passthrough
+
+  const priv = await getPrivateKey();
+  const out = { ...fields };
+  for (const f of TEXT_FIELDS_TO_DECRYPT) {
+    const v = out[f];
+    if (!C.isEncrypted(v)) continue; // in chiaro o null: invariato
+    if (!priv) { out[f] = PLACEHOLDER_NO_KEY; continue; }
+    try {
+      out[f] = await C.decrypt(v, priv);
+    } catch (e) {
+      console.warn(`[auth] decifratura campo "${f}" fallita:`, e?.message || e);
+      out[f] = PLACEHOLDER_NO_KEY;
+    }
+  }
+  return out;
+}
 
 module.exports = function register(on, ctx) {
   const { MSG, broadcastToTabs } = ctx;
