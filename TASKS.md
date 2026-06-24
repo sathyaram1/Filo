@@ -281,7 +281,7 @@ separata a permessi ridotti** dove gli utenti verificano i fix già rilasciati.
 
 #### Gruppo DC — board utente (verifica), permessi ridotti
 
-- [ ] **DC1 — Pagina board utente a permessi ridotti** — Nuova pagina (es.
+- [~] **DC1 — Pagina board utente a permessi ridotti** _(in corso: routine gifted-goldberg-frmiou, 2026-06-24)_ — Nuova pagina (es.
   `filo://board/board.html`, servita come le altre da `filo://<page>/` →
   `src/pages/<page>/`). **NON owner-gated**: login per votare/scrivere, anonimi
   leggono. Mostra SOLO contenuto sicuro: descrizioni non tecniche, **ZERO info di
