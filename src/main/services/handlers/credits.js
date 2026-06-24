@@ -162,13 +162,28 @@ module.exports = function register(on, ctx) {
     }).catch(() => {});
   }
 
+  // Legge il flag "feedback autonomo attivo" dalle impostazioni correnti.
+  // Fallback false: sicuro (no bonus se il setting non è leggibile).
+  async function getAutoFeedbackEnabled() {
+    try {
+      const Storage = globalThis.SN_STORAGE;
+      if (!Storage || typeof Storage.getSettings !== 'function') return false;
+      const s = await Storage.getSettings();
+      return (s && s.security && s.security.autoFeedback) !== false
+        && (s && s.security && s.security.autoFeedback) !== undefined
+        ? !!(s && s.security && s.security.autoFeedback)
+        : false;
+    } catch (_) { return false; }
+  }
+
   // Adotta lo stato remoto al (primo) accesso o cambio account; se il doc non
   // esiste ancora, ci pusha lo stato locale corrente. Idempotente per uid.
   let lastSyncedOwner; // undefined = mai sincronizzato in questa sessione
   let syncing = null;
   async function ensureAccountSync() {
     const uid = await currentUid();
-    const state = await Credits.load();
+    const autoFeedbackEnabled = await getAutoFeedbackEnabled().catch(() => false);
+    const state = await Credits.load({ autoFeedbackEnabled });
     // Non loggato: la cache locale resta com'è (modalità offline/anonima).
     if (!uid) { lastSyncedOwner = null; return state; }
     if (uid === lastSyncedOwner && state.owner === uid) return state;
