@@ -76,4 +76,5 @@ module.exports = {
   get SN_WEB_SEARCH() { return globalThis.SN_WEB_SEARCH; },
   get SN_FILO_MEMORY() { return globalThis.SN_FILO_MEMORY; },
   get SN_FILO_STATE() { return globalThis.SN_FILO_STATE; },
+  get SN_MANAGE_REVIEW() { return globalThis.SN_MANAGE_REVIEW; },
 };
