@@ -290,3 +290,15 @@ test('canReopen: null/undefined → false, niente crash', () => {
   assert.equal(MR.canReopen(null, {}), false);
   assert.equal(MR.canReopen(undefined, {}), false);
 });
+
+test('listBoardTab: un fix con riapertura in sospeso ESCE da Risolti (criterio DC4)', () => {
+  const shipped = { id: 'a', status: 'done', resolvedInVersion: '0.2.70', createdAt: '2026-06-01' };
+  const reopened = {
+    id: 'b', status: 'done', resolvedInVersion: '0.2.70', createdAt: '2026-06-02',
+    reopenRequests: { someUid: { at: '2026-06-20' } },
+  };
+  const board = MR.listBoardTab([shipped, reopened], { releasedVersion: '0.2.74' });
+  const ids = board.map((f) => f.id);
+  assert.ok(ids.includes('a'), 'il fix non riaperto resta in board');
+  assert.ok(!ids.includes('b'), 'il fix riaperto NON è più in board');
+});
