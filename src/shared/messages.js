@@ -72,6 +72,22 @@
     // credits,priority}], totalCredits }. La home mostra un popup di
     // ringraziamento e anima i crediti verso il profilo.
     GET_FEEDBACK_REWARDS: 'get_feedback_rewards',
+    // === Bacheca utente — voto funziona/non-funziona (DC2) ===================
+    // BOARD_CAST_VOTE: l'utente loggato esprime/cambia il proprio voto su un
+    // feedback già in produzione (DB3). Il main allega il SUO Firebase ID token
+    // come Bearer (mai esposto al renderer) e scrive votes.<uid> via FB.castVote
+    // (DB4). Premia +10 crediti (CREDIT.BOARD_VOTE) UNA SOLA VOLTA per feedback
+    // per utente (anti-doppio-premio in creditStore — rewardedVotes), anche se
+    // l'utente cambia idea works↔broken o rivota lo stesso valore: niente
+    // timeout, niente penalità. { id, vote:'works'|'broken' } →
+    // { ok, votes, awarded, credits, balance } | { ok:false, error }.
+    // `votes` è il map aggiornato (per ridisegnare il conteggio reale lato UI).
+    BOARD_CAST_VOTE: 'board_cast_vote',
+    // BOARD_CLEAR_VOTE: l'utente ritira il proprio voto (cancella votes.<uid>).
+    // NON revoca il premio già accreditato (non è una penalità, è solo ritiro
+    // del voto): rewardedVotes resta marcato, quindi un voto successivo sullo
+    // stesso feedback non ripaga. { id } → { ok, votes } | { ok:false, error }.
+    BOARD_CLEAR_VOTE: 'board_clear_vote',
     // Comandi proprietario (#210). Riservati all'owner (auth.isAdmin()).
     // OWNER_LIST_USERS: elenco email degli utenti registrati (campo `email` sui
     //   doc credits/<uid>). { } → { ok, users:[{email,name,balance}] } | { ok:false, error }.
