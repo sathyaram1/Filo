@@ -70,6 +70,8 @@
     $('fp-mode-default-desc').textContent = I18n.t('options_fp_mode_default_desc');
     $('fp-mode-privacy-label').textContent = I18n.t('options_fp_mode_privacy');
     $('fp-mode-privacy-desc').textContent = I18n.t('options_fp_mode_privacy_desc');
+    $('sec-auto-feedback-label').textContent = I18n.t('options_security_auto_feedback');
+    $('sec-auto-feedback-desc').textContent = I18n.t('options_security_auto_feedback_desc');
     $('sec-export-btn').textContent = I18n.t('security_export_btn');
     $('sec-export-desc').textContent = I18n.t('security_export_desc');
     $('savedHint').textContent = I18n.t('options_saved');
