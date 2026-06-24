@@ -80,7 +80,7 @@ module.exports = function register(on, ctx) {
       // NB: nessuna revoca del premio (non è una penalità, è solo ritiro del
       // voto) — rewardedVotes resta marcato: un voto successivo non ripaga.
       const votes = await fetchVotes(id);
-      return { ok: true, votes };
+      return { ok: true, uid, votes };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
