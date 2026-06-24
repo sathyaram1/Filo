@@ -351,6 +351,7 @@
     $('sec-safebrowse-network').addEventListener('change', save);
     $('sec-safebrowse-llm').addEventListener('change', save);
     $('sec-safebrowse-sandbox').addEventListener('change', save);
+    $('sec-auto-feedback').addEventListener('change', save);
     for (const r of document.querySelectorAll('input[name="cookie-mode"]')) {
       r.addEventListener('change', () => { syncCookieMode(); saveCookies(); });
     }
