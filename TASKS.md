@@ -173,20 +173,28 @@ separata a permessi ridotti** dove gli utenti verificano i fix già rilasciati.
       `npm run test:unit` 426/427 (l'unico rosso, `defaultsSecretsMerge`, è un
       artefatto del sandbox: `require('electron')` non installabile in cloud,
       non un bug). `node --check` ok su entrambi gli script + smoke CLI.
-  - **MANCA (richiede Electron/Playwright per verificare → prossima sessione):**
-    - `src/pages/manage/manage.{html,js}`: nel pannello dettaglio owner un
-      pulsante **Archivia** (set status `archived`) e un toggle **⭐**; nel
-      header della lista Archiviati un filtro ⭐ che chiama
-      `MR.listArchiveTab(allFeedbacks, {starredOnly})`. Bozze come tab è già
-      assente da DB1 (nessuna rimozione da fare lato UI).
-    - Passaggio `starred` nel percorso owner-app: `src/main/services/handlers/auth.js`
-      (destructure `starred` in `FEEDBACK_UPDATE`) + `src/shared/feedback.js`
-      `updateStatus` (aggiungere `starred` a fields/mask come già fa per
-      `reviewComment`). Le rules lo accettano già (vedi sopra).
-    - `tests/manage-page.spec.mjs`: spec che archivia un feedback e verifica che
-      compaia in Archiviati, e che il filtro ⭐ mostri i soli preferiti.
-    - Patch note utente + eventuale voce in `capabilities.js` SOLO quando la UI
-      è visibile (ora il substrato non è user-visible → niente changelog).
+  - **COMPLETATO (UI owner-app, routine peaceful-allen-fyv98e, 2026-06-24):**
+    - `src/pages/manage/manage.{html,js}`: nel pannello dettaglio owner un footer
+      di gestione (`#mgManage`, owner-only, visibile su QUALUNQUE feedback) con un
+      toggle **⭐ Preferito** (☆/★, `aria-pressed`) e un pulsante **Archivia**;
+      su un feedback già `archived` il pulsante diventa **Ripristina** (→ `todo`,
+      invariante UX "se puoi archiviare puoi togliere dall'archivio"). Header della
+      lista Archiviati: filtro **⭐ Solo preferiti** (`#mgArchiveFilter`, visibile
+      solo in quella tab) che chiama `MR.listArchiveTab(allFeedbacks,{starredOnly})`
+      — OFF mostra gli `archived`, ON tutti i preferiti di ogni stato.
+    - Passaggio `starred` nel percorso owner-app: `auth.js` (destructure `starred`
+      in `FEEDBACK_UPDATE`) + `src/shared/feedback.js` `updateStatus` (`starred`
+      come `booleanValue` in fields/mask). Le rules lo accettano già.
+    - `tests/manage-page.spec.mjs`: 4 spec nuovi (archivia→lascia la coda + patch
+      `status:archived`; ⭐ toggle→patch `starred:true` + bottone riflette; filtro
+      ⭐ OFF=archived/ON=preferiti; Ripristina→patch `status:todo`).
+    - **Verifica**: `npm run test:unit` 428/428; `tests/manage-page.spec.mjs`
+      15/15 (Electron headless via Playwright, binario installato a mano: il
+      download `got` di Electron abortisce nel cloud → scaricato lo zip con curl
+      ed estratto in `node_modules/electron/dist`, `path.txt` SENZA newline finale).
+    - Niente changelog/capabilities: `manage` è owner-only, non user-visible.
+  - ⚠️ **AZIONE OWNER residua** (invariata): `firebase deploy --only
+    firestore:rules` perché l'owner-app possa scrivere `archived`/`starred`.
 
 - [ ] **DB3 — "In produzione" = versione rilasciata + `shippedInVersion`** — La
   tab **Risolti** deve contenere solo i fix **davvero deployati**, non ogni
