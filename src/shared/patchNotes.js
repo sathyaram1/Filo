@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.75', date: '2026-06-24',
+      features: [
+        'Nuova "Bacheca": ritrovi i miglioramenti già rilasciati e puoi dire con un tocco se funzionano o no. La trovi nel menu App.',
+      ],
+      fixes: [],
+    },
+    {
       version: '0.2.71', date: '2026-06-23',
       features: [
         'Quando chiedi all’assistente «puoi fare…?» o «come si fa…?», ora risponde in modo affidabile su cosa Filo sa (e non sa) fare, con le indicazioni giuste su come usarlo.',
