@@ -202,6 +202,7 @@
     isEncrypted,
     isEncryptedBytes,
     hasPublicKey,
+    isEnabled,
     STR_PREFIX,
     VERSION,
   };
