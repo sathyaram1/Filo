@@ -53,6 +53,12 @@
   const mgClarifyBtn  = document.getElementById('mgClarifyBtn');
   const mgClarifyMsg  = document.getElementById('mgClarifyMsg');
 
+  // Gestione feedback: preferito ⭐ + archivia/ripristina (owner-only)
+  const mgManage     = document.getElementById('mgManage');
+  const mgStarBtn    = document.getElementById('mgStarBtn');
+  const mgArchiveBtn = document.getElementById('mgArchiveBtn');
+  const mgManageMsg  = document.getElementById('mgManageMsg');
+
   // Lightbox
   const mgLightbox    = document.getElementById('mgLightbox');
   const mgLightboxImg = document.getElementById('mgLightboxImg');
