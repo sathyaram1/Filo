@@ -309,7 +309,7 @@
     },
     {
       id: 'board', title: 'Bacheca dei miglioramenti', category: 'pages',
-      desc: 'La pagina dove ritrovi i miglioramenti già rilasciati e puoi dire se funzionano o no, votando con un tocco. Leggono tutti; per votare basta accedere.',
+      desc: 'La pagina dove ritrovi i miglioramenti già rilasciati e puoi dire se funzionano o no, votando con un tocco. Leggono tutti; per votare basta accedere. Il primo voto su ogni miglioramento regala 10 crediti, e puoi sempre cambiare idea o ritirare il voto.',
       invoke: 'Menu App → "Bacheca", oppure filo://board/board.html.',
       doesNot: 'Non mostra segnalazioni in lavorazione né dettagli tecnici o di sicurezza: solo i miglioramenti già usciti.',
     },
