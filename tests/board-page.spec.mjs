@@ -53,6 +53,10 @@ const TODO = {
 
 async function seed(page, { signedIn } = {}) {
   await page.waitForFunction(() => window.__boardTest && window.SN_FEEDBACK && window.SN_MANAGE_REVIEW);
+  // Aspetta che il caricamento live (FB.list verso Firestore) si sia stabilizzato
+  // prima di iniettare i dati di test: così setData è SEMPRE l'ultimo render e i
+  // dati finti non vengono clobberati dalla load reale che parte all'init.
+  await page.locator('#bdLoading').waitFor({ state: 'hidden' });
   await page.evaluate(({ list, email }) => {
     window.__boardTest.setReleasedVersion('0.2.71');
     if (email) window.__boardTest.setSignedIn(email);
