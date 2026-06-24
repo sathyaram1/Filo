@@ -148,7 +148,7 @@ test('queueFeedbackCreateEncrypted: il file scritto ha i campi sensibili cifrati
 
   try {
     const { readFileSync, readdirSync } = await import('node:fs');
-    const { queueFeedbackCreateEncrypted } = await import(join(ROOT, 'scripts', 'queue-feedback.mjs'));
+    const { queueFeedbackCreateEncrypted } = await import(toFileUrl(join(ROOT, 'scripts', 'queue-feedback.mjs')));
     const { decryptFeedbackFields } = await import(toFileUrl(join(ROOT, 'scripts', 'lib', 'decrypt-feedback-fields.mjs')));
 
     await queueFeedbackCreateEncrypted({
