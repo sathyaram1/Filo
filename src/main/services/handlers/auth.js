@@ -30,7 +30,8 @@ async function getPrivateKey() {
   // 2. File .env locale (per comodità in sviluppo; gitignorato).
   try {
     const fs = require('node:fs');
-    const envFile = path.join(path.dirname(path.dirname(path.dirname(path.dirname(path.dirname(__dirname))))), 'tests', 'agent', '.env');
+    // __dirname = src/main/services/handlers → root = ../../../../
+    const envFile = path.join(__dirname, '..', '..', '..', '..', 'tests', 'agent', '.env');
     if (fs.existsSync(envFile)) {
       const lines = fs.readFileSync(envFile, 'utf8').split('\n');
       for (const line of lines) {
