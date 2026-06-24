@@ -171,8 +171,12 @@
     // S1.3: decifratura campi feedback lato main (la chiave privata NON lascia
     // mai il main process). Il renderer manda i campi con valori potenzialmente
     // cifrati; il main li decifra e torna il plaintext. Owner-only.
-    // { fields: {text?,url?,name?,title?,notes?,reviewComment?} }
-    // → { ok, fields: {…decifrati} } | { ok:false, error }
+    // Modalità singola:  { fields: {text?,url?,name?,title?,notes?,reviewComment?} }
+    //   → { ok, fields: {…decifrati} } | { ok:false, error }
+    // Modalità batch:    { list: [{…}, …] }
+    //   → { ok, list: [{…decifrati}, …] } | { ok:false, error }
+    // (Il batch serve alle dashboard che caricano centinaia di feedback: una sola
+    //  IPC per tutta la lista invece di N.)
     FEEDBACK_DECRYPT_FIELDS: 'feedback_decrypt_fields',
     // Config "modelli predefiniti" condivisa (admin-only, propaga a tutti via
     // Firestore). GET ritorna la config senza esporre le chiavi vere (solo se
