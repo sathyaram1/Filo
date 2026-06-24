@@ -354,6 +354,14 @@
         <!-- Colonna sinistra: lista feedback della tab corrente -->
         <div class="mg-col" id="mgListCol">
           <div class="mg-col-head" id="mgListHead">Ricevuti</div>
+          <!-- Filtro ⭐ della tab Archiviati (DB2): OFF = solo gli archiviati,
+               ON = tutti i preferiti di qualunque stato. Nascosto sulle altre tab. -->
+          <div class="mg-list-filter" id="mgArchiveFilter" hidden>
+            <label class="mg-star-filter">
+              <input type="checkbox" id="mgStarFilter" />
+              <span>⭐ Solo preferiti</span>
+            </label>
+          </div>
           <div class="mg-col-body" id="mgListBody">
             <div class="mg-loading" id="mgListLoading">Caricamento…</div>
             <div class="mg-list" id="mgList" hidden></div>
