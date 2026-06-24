@@ -191,9 +191,23 @@
     });
   }
 
+  // ── DC1: la board utente (filo://board/) ─────────────────────────────────
+  // Superficie POSITIVA a permessi ridotti: mostra SOLO i fix già in produzione
+  // (done/verified + spediti in una versione rilasciata, DB3) e MAI nulla del
+  // red-team. Riusa il gate "Risolti" (listForManageTab → 'resolved'), poi
+  // esclude per sicurezza qualunque feedback con un blocco nel pipeline
+  // (attacco/spam/design): la board non deve mai dare visibilità a materiale
+  // segnalato dalla sicurezza, nemmeno se per qualche motivo è finito in `done`.
+  // PURA: niente rete, niente Electron — unit-testabile.
+  function listBoardTab(feedbacks, opts) {
+    const releasedVersion = opts && opts.releasedVersion;
+    return listForManageTab(feedbacks, 'resolved', { releasedVersion })
+      .filter((fb) => !classifyBlock(fb));
+  }
+
   global.SN_MANAGE_REVIEW = {
     classifyBlock, sortReview, REASONS, manageTabFor, listForManageTab,
-    isStarred, listArchiveTab, isShipped, cmpVersion,
+    isStarred, listArchiveTab, isShipped, cmpVersion, listBoardTab,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
