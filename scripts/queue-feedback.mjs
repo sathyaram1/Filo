@@ -36,6 +36,9 @@ import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { commitAndPush } from './queue-triage.mjs';
 import { uploadScreenshotFile } from './lib/feedback-storage.mjs';
+// S1.2: cifratura dei campi sensibili nei file di coda (la history git del repo
+// pubblico è un canale di leak tanto quanto Firestore).
+import { encryptFieldsForQueue } from './lib/encrypt-feedback-fields.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
