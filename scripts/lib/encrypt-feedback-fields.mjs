@@ -42,24 +42,31 @@ function loadCrypto() {
 
 /**
  * Cifra in-place i campi indicati dell'oggetto `entry` usando la chiave
- * pubblica bakeata in feedbackPublicKey.js.
+ * pubblica bakeata in feedbackPublicKey.js (o quella passata esplicitamente).
  *
- * @param {object} entry    - L'oggetto da cifrare (modificato in-place).
- * @param {string[]} fields - Array di chiavi da cifrare (es. ['text','name','notes']).
+ * @param {object}  entry      - L'oggetto da cifrare (modificato in-place).
+ * @param {string[]} fields    - Array di chiavi da cifrare (es. ['text','name','notes']).
+ * @param {string}  [pubKeyOverride] - Chiave pubblica base64url esplicita (opzionale;
+ *   se omessa usa SN_FEEDBACK_PUBKEY da globalThis). Usata nei test per passare
+ *   una chiave di test senza toccare globalThis, evitando interferenze in suite parallela.
  * @returns {Promise<boolean>} true se almeno un campo è stato cifrato; false se
  *   la pubkey non è disponibile (guard senza crash).
  */
-export async function encryptFieldsForQueue(entry, fields) {
+export async function encryptFieldsForQueue(entry, fields, pubKeyOverride) {
   loadCrypto();
   const C = globalThis.SN_FEEDBACK_CRYPTO;
-  if (!C || !C.hasPublicKey()) return false;
+  // Se è passata una pubkey override la usiamo direttamente; altrimenti
+  // ci affidiamo a hasPublicKey() che legge SN_FEEDBACK_PUBKEY da globalThis.
+  if (!C) return false;
+  if (!pubKeyOverride && !C.hasPublicKey()) return false;
 
   let encrypted = false;
   for (const f of fields) {
     const v = entry[f];
     if (v == null || v === '') continue;
     try {
-      entry[f] = await C.encryptForOwner(String(v));
+      // encryptForOwner accetta pubKeyOverride come secondo argomento opzionale.
+      entry[f] = await C.encryptForOwner(String(v), pubKeyOverride || undefined);
       encrypted = true;
     } catch (e) {
       console.warn(`[encrypt-feedback-fields] cifratura campo "${f}" fallita:`, e?.message || e);
