@@ -404,7 +404,14 @@
     const idToken = opts.idToken;
     const fields = {};
     const mask = [];
-    if (status !== undefined) { fields.status = toFsValue(status); mask.push('status'); }
+    if (status !== undefined) {
+      // S1.F2.1: cifra status fine se il gate è on; scrivi SEMPRE statusPublic in chiaro.
+      const { fineStatus, publicStatus } = await encryptStatus(status);
+      fields.status = toFsValue(fineStatus);
+      mask.push('status');
+      fields.statusPublic = toFsValue(publicStatus);
+      mask.push('statusPublic');
+    }
     // Fase 1: `notes` NON è cifrato — è la spiegazione mostrata all'utente nel
     // popup ricompense (C5) sulla sua macchina, che non ha la chiave privata.
     // Cifrarlo (insieme a status/verdetti) è Fase 2, con una proiezione
