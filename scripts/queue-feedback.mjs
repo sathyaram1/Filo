@@ -42,6 +42,12 @@ import { encryptFieldsForQueue } from './lib/encrypt-feedback-fields.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
+
+// S1.F2.2: hash deterministico del clientId (Node crypto — stesso risultato di WebCrypto).
+// SHA-256 troncato a 32 char hex (16 byte). Deterministica: stesso input → stesso output.
+function hashClientIdSync(clientId) {
+  return createHash('sha256').update(String(clientId || '')).digest('hex').slice(0, 32);
+}
 // FILO_SPOOL_DIR: override per i test (vedi queue-triage.mjs).
 const SPOOL_DIR = process.env.FILO_SPOOL_DIR
   ? resolve(process.env.FILO_SPOOL_DIR)
