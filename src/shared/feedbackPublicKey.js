@@ -16,4 +16,17 @@
   // === FILO_FEEDBACK_PUBKEY (gestito da gen-feedback-keys.mjs) ===
   global.SN_FEEDBACK_PUBKEY = "BM44td2o-xZx_7Wvnx9LMeJLvdpgQU_DwidPKFFkIrHJ2abUMtBKVonlXdTRt3G3wWmtbZago2UCJfB9vnrqso8";
   // === /FILO_FEEDBACK_PUBKEY ===
+
+  // INTERRUTTORE DI ATTIVAZIONE (S1, cutover). La presenza della chiave pubblica
+  // NON basta ad accendere la cifratura: serve anche questo flag = true. Così il
+  // codice di cifratura vive su main in modo DORMIENTE senza rompere i lettori
+  // che non hanno ancora la chiave privata (dashboard owner, routine cloud,
+  // backend filo-security) né le feature utente che leggono i campi (ricompense
+  // C5). L'owner lo mette a `true` SOLO al cutover, dopo aver: (1) distribuito la
+  // privata a dashboard/routine/backend, (2) verificato che dashboard e routine
+  // decifrano, (3) confermato che nessun campo cifrato è mostrato a un utente
+  // senza chiave. Vedi CLAUDE.md → S1 e TASKS.md → S1.5 (checklist di cutover).
+  if (global.SN_FEEDBACK_ENC_ENABLED === undefined) {
+    global.SN_FEEDBACK_ENC_ENABLED = false;
+  }
 })(typeof globalThis !== 'undefined' ? globalThis : self);
