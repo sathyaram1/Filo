@@ -31,9 +31,10 @@
 
   // ── Stato ──────────────────────────────────────────────────────────────
   let signedIn = false;
-  let uid = null;               // identità del votante (email), per votes.<uid>
+  let uid = null;               // uid Firebase REALE (claim id token), per votes.<uid>
   let allFeedbacks = [];
   let releasedVersion = '';
+  const pending = new Set();    // id feedback con voto in volo (IPC), per disabilitare i pulsanti
 
   function sendToMain(msg) {
     if (window.filo?.message)                return window.filo.message(msg);
