@@ -260,6 +260,23 @@
     return { credits, balance: Math.round(state.balance), awarded: true };
   }
 
+  // Scala `amount` crediti SOLO se il saldo basta (DC4 — riapertura bacheca,
+  // anti-spam). Logga la spesa come un award negativo (kind 'board_reopen',
+  // ref = id del feedback originale riaperto) così compare nello storico
+  // `rewards` accanto alle ricompense — utile per audit ("ho speso 5 crediti
+  // per riaprire #22"). Se il saldo non basta NON scrive nulla e ritorna
+  // { ok:false, balance } col saldo INVARIATO: il chiamante mostra il rifiuto
+  // senza che l'utente perda crediti per un tentativo respinto.
+  async function spendIfAffordable(amount, { kind = 'spend', ref = null } = {}) {
+    const state = await load();
+    const { ok, balance } = applyConsumptionIfAffordable(state, amount);
+    if (!ok) return { ok: false, balance };
+    state.rewards.push({ ts: Date.now(), kind, credits: -Math.abs(Number(amount) || 0), ref });
+    await writeState(state);
+    emitChange(state, 'spend');
+    return { ok: true, balance };
+  }
+
   // ── sincronizzazione (usate da handlers/credits.js) ─────────────────────────
 
   // Sostituisce lo stato locale con quello adottato da Firestore per `owner`
