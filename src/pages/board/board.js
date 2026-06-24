@@ -131,33 +131,37 @@
   function renderVote(fb) {
     const tally = FB.tallyVotes(fb.votes);
     const mine = uid ? FB.userVote(fb.votes, uid) : null;
+    const busy = pending.has(fb._id);
 
     const wrap = document.createElement('div');
     wrap.className = 'bd-vote';
 
-    const works = mkVoteBtn('works', '✅', tally.works, mine === 'works', fb);
-    const broken = mkVoteBtn('broken', '❌', tally.broken, mine === 'broken', fb);
+    const works = mkVoteBtn('works', '✅', tally.works, mine === 'works', fb, busy);
+    const broken = mkVoteBtn('broken', '❌', tally.broken, mine === 'broken', fb, busy);
     wrap.appendChild(works);
     wrap.appendChild(broken);
     return wrap;
   }
 
-  function mkVoteBtn(vote, glyph, count, pressed, fb) {
+  function mkVoteBtn(vote, glyph, count, pressed, fb, busy) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = `bd-vote-btn bd-vote-${vote}`;
     btn.dataset.vote = vote;
+    btn.disabled = !!busy;
     btn.setAttribute('aria-pressed', pressed ? 'true' : 'false');
     btn.setAttribute('aria-label', vote === 'works' ? 'Funziona' : 'Non funziona');
     btn.innerHTML = `<span aria-hidden="true">${glyph}</span><span class="bd-vote-count">${count}</span>`;
-    btn.addEventListener('click', () => onVote(fb, vote));
+    btn.addEventListener('click', () => onVote(fb, vote, btn));
     return btn;
   }
 
-  // Voto: anonimo → invito al login; loggato → aggiornamento ottimistico locale
-  // del conteggio e della scelta. La persistenza su Firestore + ricompensa di 10
-  // crediti sono DC2 (vedi TASKS.md): qui non si scrive ancora sul server.
-  function onVote(fb, vote) {
+  // Voto: anonimo → invito al login; loggato → scrive su Firestore tramite il
+  // main (BOARD_CAST_VOTE/BOARD_CLEAR_VOTE, DC2), che allega l'idToken del
+  // votante e accredita +10 crediti una sola volta per feedback per utente.
+  // Aggiornamento ottimistico locale per reattività immediata, poi sostituito
+  // dal tally REALE che il main rilegge da Firestore dopo la scrittura.
+  function onVote(fb, vote, btn) {
     if (!signedIn || !uid) {
       sendToMain({ type: 'auth_signin' })
         .then(() => refreshAuth())
@@ -165,18 +169,124 @@
         .catch(() => {});
       return;
     }
-    // Toggle locale: ri-cliccare la propria scelta la annulla.
-    const votes = (fb.votes && typeof fb.votes === 'object') ? { ...fb.votes } : {};
-    const current = FB.userVote(votes, uid);
-    if (current === vote) {
-      delete votes[uid];
+    const id = fb._id;
+    if (!id || pending.has(id)) return;
+
+    // Ottimistico: ri-cliccare la propria scelta la annulla (toggle).
+    const prevVotes = (fb.votes && typeof fb.votes === 'object') ? fb.votes : {};
+    const current = FB.userVote(prevVotes, uid);
+    const clearing = current === vote;
+    const optimistic = { ...prevVotes };
+    if (clearing) {
+      delete optimistic[uid];
     } else {
-      votes[uid] = { vote, at: new Date().toISOString(), credibilitySnapshot: 1 };
+      optimistic[uid] = { vote, at: new Date().toISOString(), credibilitySnapshot: 1 };
     }
-    fb.votes = votes;
+    fb.votes = optimistic;
+    pending.add(id);
     renderList();
-    // DC2: persistere con FB.castVote/clearVote (idToken via main) + accreditare
-    // 10 crediti una sola volta per feedback per utente, con animazione.
+
+    const originRect = btn && btn.getBoundingClientRect ? btn.getBoundingClientRect() : null;
+    const msg = clearing
+      ? { type: 'board_clear_vote', id }
+      : { type: 'board_cast_vote', id, vote };
+
+    sendToMain(msg)
+      .then((r) => {
+        if (r && r.ok) {
+          // Tally autorevole dal server: sostituisce l'ottimistico (può
+          // includere voti di altri utenti arrivati nel frattempo).
+          fb.votes = (r.votes && typeof r.votes === 'object') ? r.votes : fb.votes;
+          if (r.uid) uid = r.uid;
+          if (r.awarded) flyCreditsFromButton(originRect, r.credits || FB.formatNum ? undefined : undefined);
+          if (r.awarded && r.credits) flyCreditsFromButton(originRect, r.credits);
+        } else {
+          // Errore: torna allo stato precedente al click.
+          fb.votes = prevVotes;
+        }
+      })
+      .catch(() => { fb.votes = prevVotes; })
+      .finally(() => {
+        pending.delete(id);
+        renderList();
+      });
+  }
+
+  // ── Animazione ricompensa crediti ───────────────────────────────────────
+  // Variante locale alla bacheca (pagina senza icona account in vista): vola
+  // dal pulsante di voto verso l'angolo in alto a destra. Stesso spirito di
+  // flyCredits (content/feedback.js) e flyCreditsToAccount (dashboard.js).
+  // Decorativa, best-effort, rispetta prefers-reduced-motion.
+  function flyCreditsFromButton(originRect, amount) {
+    try {
+      const n = Math.max(1, Math.round(Number(amount) || 0));
+      const reduce = !!(window.matchMedia &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+      const r = originRect && originRect.width
+        ? originRect
+        : { left: window.innerWidth / 2 - 20, top: window.innerHeight - 80, width: 40, height: 40 };
+      const ox = r.left + r.width / 2;
+      const oy = r.top + r.height / 2;
+      const tx = Math.max(24, window.innerWidth - 26);
+      const ty = 26;
+      const GOLD = '#e0a93f';
+
+      const layer = document.createElement('div');
+      layer.className = 'bd-credit-fly';
+      layer.setAttribute('aria-hidden', 'true');
+      Object.assign(layer.style, {
+        position: 'fixed', inset: '0', zIndex: '2147483647',
+        pointerEvents: 'none', overflow: 'hidden',
+      });
+      document.body.appendChild(layer);
+
+      const label = document.createElement('div');
+      label.textContent = `+${n}`;
+      Object.assign(label.style, {
+        position: 'fixed', left: ox + 'px', top: (oy - 8) + 'px',
+        font: '700 16px system-ui, sans-serif', color: GOLD,
+        textShadow: '0 1px 3px rgba(0,0,0,.45)', whiteSpace: 'nowrap',
+      });
+      layer.appendChild(label);
+      try {
+        label.animate(
+          [{ transform: 'translateY(0)', opacity: 1 }, { transform: 'translateY(-22px)', opacity: 0 }],
+          { duration: 900, easing: 'ease-out', fill: 'forwards' }
+        );
+      } catch (_) {}
+
+      let maxEnd = 900;
+      if (!reduce) {
+        const coinSvg = (window.SN_ICONS?.credits?.(20)) || '●';
+        const count = Math.min(7, Math.max(4, n));
+        for (let i = 0; i < count; i++) {
+          const c = document.createElement('div');
+          c.innerHTML = coinSvg;
+          Object.assign(c.style, {
+            position: 'fixed', left: '0', top: '0', width: '20px', height: '20px',
+            color: GOLD, filter: 'drop-shadow(0 1px 2px rgba(0,0,0,.4))',
+            willChange: 'transform, opacity',
+          });
+          layer.appendChild(c);
+          const sx = ox + (Math.random() - 0.5) * 60;
+          const sy = oy + (Math.random() - 0.5) * 20;
+          const mx = (sx + tx) / 2 + (Math.random() - 0.5) * 60;
+          const my = Math.min(sy, ty) - 40 - Math.random() * 40;
+          const delay = i * 40;
+          const dur = 650 + i * 50 + Math.random() * 120;
+          maxEnd = Math.max(maxEnd, delay + dur);
+          try {
+            c.animate([
+              { transform: `translate(${sx}px,${sy}px) scale(.6)`, opacity: 0 },
+              { transform: `translate(${mx}px,${my}px) scale(1.05)`, opacity: 1, offset: 0.5 },
+              { transform: `translate(${tx}px,${ty}px) scale(.45)`, opacity: 0 },
+            ], { duration: dur, delay, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'forwards' });
+          } catch (_) {}
+        }
+      }
+      setTimeout(() => { try { layer.remove(); } catch (_) {} }, maxEnd + 200);
+    } catch (_) {}
   }
 
   // ── Caricamento ─────────────────────────────────────────────────────────
