@@ -31,9 +31,9 @@
 //   scrive soltanto il file e lascia il commit all'hook di auto-commit.
 
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname, resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import { commitAndPush } from './queue-triage.mjs';
 import { uploadScreenshotFile } from './lib/feedback-storage.mjs';
 // S1.2: cifratura dei campi sensibili nei file di coda (la history git del repo
