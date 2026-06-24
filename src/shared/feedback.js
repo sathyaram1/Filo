@@ -336,6 +336,8 @@
         name: toFsValue(String(name || '').slice(0, 200)),
         userAgent: toFsValue(userAgent || ''),
         clientId: toFsValue(encClientId),
+        // S1.F2.2: hash in chiaro per il match C5 (il raw clientId può essere cifrato).
+        clientIdHash: toFsValue(resolvedClientIdHash),
         images: toFsValue(uploaded),
         files: toFsValue(uploadedFiles),
         // S1.F2.1: statusPublic SEMPRE in chiaro anche se status fine è cifrato.
