@@ -240,3 +240,53 @@ test('listArchiveTab: filtro ⭐ mostra TUTTI i preferiti di qualunque status', 
     ['s1', 'n1', 'a1']
   );
 });
+
+// ── Riapertura a pagamento dalla board (DC4) ────────────────────────────────
+
+test('espone hasReopenRequest e canReopen', () => {
+  assert.equal(typeof MR.hasReopenRequest, 'function');
+  assert.equal(typeof MR.canReopen, 'function');
+});
+
+test('hasReopenRequest: true solo con almeno una entry nel map', () => {
+  assert.equal(MR.hasReopenRequest({ reopenRequests: { uid1: { at: '2026-06-24' } } }), true);
+  assert.equal(MR.hasReopenRequest({ reopenRequests: {} }), false);
+  assert.equal(MR.hasReopenRequest({}), false);
+  assert.equal(MR.hasReopenRequest(null), false);
+});
+
+test('canReopen: un fix "Risolti" spedito e senza riaperture pregresse → riapribile', () => {
+  const fb = { status: 'done', resolvedInVersion: '0.2.70', createdAt: '2026-06-01' };
+  assert.equal(MR.canReopen(fb, { releasedVersion: '0.2.74' }), true);
+});
+
+test('canReopen: già riaperto da qualcuno → NON riapribile di nuovo (anti-doppia-riapertura)', () => {
+  const fb = {
+    status: 'done', resolvedInVersion: '0.2.70', createdAt: '2026-06-01',
+    reopenRequests: { someUid: { at: '2026-06-20' } },
+  };
+  assert.equal(MR.canReopen(fb, { releasedVersion: '0.2.74' }), false);
+});
+
+test('canReopen: non ancora in produzione (resolvedInVersion futura) → NON riapribile', () => {
+  const fb = { status: 'done', resolvedInVersion: '0.2.90', createdAt: '2026-06-01' };
+  assert.equal(MR.canReopen(fb, { releasedVersion: '0.2.74' }), false);
+});
+
+test('canReopen: status todo (non ancora risolto) → NON riapribile', () => {
+  const fb = { status: 'todo', createdAt: '2026-06-01' };
+  assert.equal(MR.canReopen(fb, { releasedVersion: '0.2.74' }), false);
+});
+
+test('canReopen: feedback con blocco di sicurezza nel pipeline → NON riapribile (mai visibilità board al red-team)', () => {
+  const fb = {
+    status: 'done', resolvedInVersion: '0.2.70', createdAt: '2026-06-01',
+    action: 'block_attack',
+  };
+  assert.equal(MR.canReopen(fb, { releasedVersion: '0.2.74' }), false);
+});
+
+test('canReopen: null/undefined → false, niente crash', () => {
+  assert.equal(MR.canReopen(null, {}), false);
+  assert.equal(MR.canReopen(undefined, {}), false);
+});
