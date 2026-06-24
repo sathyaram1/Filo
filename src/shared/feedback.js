@@ -283,6 +283,9 @@
       doc.fields.seq = { integerValue: String(seq) };
       doc.fields.subSeq = { integerValue: '0' };
     }
+    if (parentId) {
+      doc.fields.parentId = toFsValue(String(parentId));
+    }
 
     const endpoint = `${FIRESTORE_BASE}/${COLLECTION}?key=${API_KEY}`;
     let res = await fetch(endpoint, {
@@ -291,12 +294,13 @@
       body: JSON.stringify(doc),
     });
     if (res.status === 403) {
-      // Rules non ancora aggiornate ai campi nuovi (name/seq/subSeq): meglio
-      // un feedback senza numero/titolo che un invio fallito. Ritenta con il
-      // solo schema storico.
+      // Rules non ancora aggiornate ai campi nuovi (name/seq/subSeq/parentId):
+      // meglio un feedback senza numero/titolo/collegamento che un invio
+      // fallito. Ritenta con il solo schema storico.
       delete doc.fields.name;
       delete doc.fields.seq;
       delete doc.fields.subSeq;
+      delete doc.fields.parentId;
       seq = null;
       res = await fetch(endpoint, {
         method: 'POST',
