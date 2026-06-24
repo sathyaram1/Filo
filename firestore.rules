@@ -162,7 +162,8 @@ service cloud.firestore {
                     'name', 'seq', 'subSeq', 'branch', 'starred',
                     'claimedBy', 'claimedAt', 'claimExpiresAt', 'claimNum',
                     'reviewDecision', 'reviewComment', 'reviewedAt', 'resolvedInVersion',
-                    'archiveOverride', 'reopenRequests'])
+                    'archiveOverride', 'reopenRequests',
+                    'capabilityGapId']) // F4: permettere update del gap id (backfill)
         // S1.F2.1: status accetta l'enum esistente O un ciphertext FENC1: (gate on).
         && (request.resource.data.get('status', 'new') in ['new', 'draft', 'todo', 'clarify', 'review', 'blocked', 'done', 'verified', 'ignored', 'archived']
             || request.resource.data.get('status', '').matches('^FENC1:.*'))
