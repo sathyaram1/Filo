@@ -163,16 +163,17 @@ module.exports = function register(on, ctx) {
   }
 
   // Legge il flag "feedback autonomo attivo" dalle impostazioni correnti.
-  // Fallback false: sicuro (no bonus se il setting non è leggibile).
+  // Default ON (true) quando il setting non è ancora stato scritto dall'utente
+  // (=== undefined): corrisponde alla politica "ON di default" di F4.
+  // Fallback false (safe) solo in caso di errore di lettura.
   async function getAutoFeedbackEnabled() {
     try {
       const Storage = globalThis.SN_STORAGE;
       if (!Storage || typeof Storage.getSettings !== 'function') return false;
       const s = await Storage.getSettings();
-      return (s && s.security && s.security.autoFeedback) !== false
-        && (s && s.security && s.security.autoFeedback) !== undefined
-        ? !!(s && s.security && s.security.autoFeedback)
-        : false;
+      const v = s && s.security && s.security.autoFeedback;
+      // undefined → mai impostato → default ON
+      return v === undefined ? true : !!v;
     } catch (_) { return false; }
   }
 
