@@ -51,7 +51,12 @@
       totalSpentCredits: 0,
       totalCostEur: 0,    // dietro le quinte
       rewards: [],        // [{ ts, kind, credits, ref }]
-      rewardedFeedback: {},// { [feedbackId]: true } — anti doppio premio (C5)
+      rewardedFeedback: {},// { [feedbackId]: true } — anti doppio premio risoluzione (C5)
+      // Anti doppio premio VOTO board (DC2): namespace SEPARATO da rewardedFeedback,
+      // perché un feedback può essere sia "risolto" (premio C5) sia "votato in
+      // bacheca" (premio DC2) — sono due eventi distinti che non devono bloccarsi
+      // a vicenda. Una sola entry per feedback per utente (la cache è già per-uid).
+      rewardedVotes: {},  // { [feedbackId]: true }
       owner: null,        // uid/email a cui appartiene questa cache (switch account)
     };
   }
@@ -62,6 +67,7 @@
     if (!s.byAction) s.byAction = {};
     if (!Array.isArray(s.rewards)) s.rewards = [];
     if (!s.rewardedFeedback) s.rewardedFeedback = {};
+    if (!s.rewardedVotes) s.rewardedVotes = {};
     if (typeof s.balance !== 'number') s.balance = CREDIT.INITIAL;
     if (!s.lastRefillDate) s.lastRefillDate = dateKey();
     return s;
