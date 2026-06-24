@@ -20,6 +20,7 @@
       features: [
         'Votare nella "Bacheca" ora premia: il primo voto ✅/❌ su ogni miglioramento ti regala 10 crediti, con una piccola animazione.',
         'Nella "Bacheca" puoi segnalare con "Ancora rotto?" un miglioramento che in realtà non funziona: la segnalazione torna in lavorazione collegata all\'originale (costa pochi crediti, per evitare segnalazioni a caso).',
+        'Filo ora segnala automaticamente quando non riesce a fare qualcosa che gli chiedi: nessun URL o testo personale, solo una nota anonima a chi sviluppa l\'app. Puoi disattivarlo in Impostazioni → Sicurezza. Tenerlo attivo ti regala 10 crediti extra al giorno.',
       ],
       fixes: [],
     },
