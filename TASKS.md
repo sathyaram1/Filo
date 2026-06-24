@@ -694,7 +694,8 @@ DIPENDENZE APERTE (non chiudibili da questo repo):
     Owner: chiave generata e privata custodita in un txt fuori repo (2026-06-24).
     **CHECKLIST DI CUTOVER (accendere `SN_FEEDBACK_ENC_ENABLED=true`):** NON
     accendere finché TUTTO sotto non è vero, o si rompono lettori/feature:
-    1. [ ] Wiring decifratura dashboard (manage.js + pagina feedback) — S1.3 §1.
+    1. [x] Wiring decifratura dashboard (manage.js + pagina feedback) — S1.3 §1.
+       _(fatto 2026-06-24: handler batch + entrambe le dashboard)_
     2. [ ] Privata in env `FILO_FEEDBACK_PRIVKEY` nella sandbox delle routine cloud
        (entrambi gli account) + worker che decifrano i corpi (S1.3 §2).
     3. [ ] Backend filo-security: privata nei Functions secrets + decifratura in
