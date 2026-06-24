@@ -52,6 +52,7 @@ module.exports = function register(on, ctx) {
 
       return {
         ok: true,
+        uid,
         votes,
         awarded: reward.awarded,
         credits: reward.credits,
