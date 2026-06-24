@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.76', date: '2026-06-24',
+      features: [
+        'Votare nella "Bacheca" ora premia: il primo voto ✅/❌ su ogni miglioramento ti regala 10 crediti, con una piccola animazione.',
+      ],
+      fixes: [],
+    },
+    {
       version: '0.2.75', date: '2026-06-24',
       features: [
         'Nuova "Bacheca": ritrovi i miglioramenti già rilasciati e puoi dire con un tocco se funzionano o no. La trovi nel menu App.',
