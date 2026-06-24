@@ -198,11 +198,18 @@
   // esclude per sicurezza qualunque feedback con un blocco nel pipeline
   // (attacco/spam/design): la board non deve mai dare visibilità a materiale
   // segnalato dalla sicurezza, nemmeno se per qualche motivo è finito in `done`.
+  // Un fix con una riapertura in sospeso (DC4) ESCE dalla board: l'utente l'ha
+  // segnalato come ancora rotto e il fix è tornato nell'iter normale, quindi non
+  // va più mostrato come "risolto, conferma se funziona" (criterio DC4
+  // "l'originale esce da Risolti", lato vista — il flip di `status` lo applica
+  // poi il percorso fidato/triage). `hasReopenRequest` è dichiarata sotto
+  // (hoisting): riusarla qui tiene una sola definizione del guard.
   // PURA: niente rete, niente Electron — unit-testabile.
   function listBoardTab(feedbacks, opts) {
     const releasedVersion = opts && opts.releasedVersion;
     return listForManageTab(feedbacks, 'resolved', { releasedVersion })
-      .filter((fb) => !classifyBlock(fb));
+      .filter((fb) => !classifyBlock(fb))
+      .filter((fb) => !hasReopenRequest(fb));
   }
 
   // ── DC4: riapertura a pagamento dalla board ──────────────────────────────
