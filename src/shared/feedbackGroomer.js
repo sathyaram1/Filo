@@ -52,9 +52,10 @@
   // Prefisso dei clientId generati da Filo in autonomia (F4).
   const AUTO_SOURCE_PREFIX = 'auto:';
 
-  // Soglie di similarità Jaccard per il testo utente.
-  const JACCARD_THRESHOLD = 0.65;          // strutturale (senza llmSimilar)
-  const JACCARD_THRESHOLD_WITH_LLM = 0.45; // abbassata se l'LLM conferma
+  // Soglia di similarità Jaccard per il testo utente (dedup strutturale).
+  // Se la funzione llmSimilar è iniettata, il giudice semantico viene chiamato
+  // per le coppie sotto questa soglia (vedi areSimilarText).
+  const JACCARD_THRESHOLD = 0.65;
 
   // Bump di priorità: quanti duplicati → quanto si alza.
   // dupeCount = numero di duplicati già trovati PER quell'originale.
