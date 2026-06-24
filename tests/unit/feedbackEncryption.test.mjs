@@ -7,6 +7,11 @@
 // - senza pubkey i valori escono in chiaro (guard, niente crash)
 // - senza privkey i campi cifrati diventano il placeholder leggibile
 //
+// NOTA PARALLELISMO: i test di questa suite girano in parallelo con altri file
+// (node --test con glob). Per evitare interferenze su globalThis.SN_FEEDBACK_PUBKEY,
+// i test usano il parametro pubKeyOverride di encryptFieldsForQueue e passano
+// la chiave di test ESPLICITAMENTE, senza toccare globalThis.
+//
 // Gira senza Electron in millisecondi (node:test, nessuna dipendenza da UI).
 
 import { test } from 'node:test';
@@ -39,20 +44,18 @@ async function genTestKeys() {
   return { pub, priv };
 }
 
-// ─── Test 1: round-trip campi feedback via encryptFieldsForQueue + decryptFeedbackFields ──
+// Import una volta sola (caching ESM: stessa istanza per tutti i test).
+const { encryptFieldsForQueue } = await import(toFileUrl(join(ROOT, 'scripts', 'lib', 'encrypt-feedback-fields.mjs')));
+const { decryptFeedbackFields, decryptFeedbackList } = await import(toFileUrl(join(ROOT, 'scripts', 'lib', 'decrypt-feedback-fields.mjs')));
+
+// ─── Test 1: round-trip campi feedback ────────────────────────────────────────
 
 test('round-trip: cifra con encryptFieldsForQueue, decifra con decryptFeedbackFields', async () => {
   const { pub, priv } = await genTestKeys();
 
-  // Inietta temporaneamente la pubkey di test su globalThis (simula chiave configurata).
-  const savedPub = globalThis.SN_FEEDBACK_PUBKEY;
-  globalThis.SN_FEEDBACK_PUBKEY = pub;
-
-  const { encryptFieldsForQueue } = await import(toFileUrl(join(ROOT, 'scripts', 'lib', 'encrypt-feedback-fields.mjs')));
-  const { decryptFeedbackFields } = await import(toFileUrl(join(ROOT, 'scripts', 'lib', 'decrypt-feedback-fields.mjs')));
-
+  // Passa la pubkey di test ESPLICITAMENTE (non toccare globalThis — parallelismo).
   const entry = { text: 'Il pulsante non funziona quando incollo.', name: 'bug pulsante', notes: 'riprodotto su Mac', extra: 'invariato' };
-  const encrypted = await encryptFieldsForQueue(entry, ['text', 'name', 'notes']);
+  const encrypted = await encryptFieldsForQueue(entry, ['text', 'name', 'notes'], pub);
 
   assert.ok(encrypted, 'encryptFieldsForQueue deve ritornare true con pubkey configurata');
   assert.ok(C.isEncrypted(entry.text), 'text deve essere FENC1: dopo la cifratura');
@@ -68,16 +71,12 @@ test('round-trip: cifra con encryptFieldsForQueue, decifra con decryptFeedbackFi
   assert.equal(plain.name, 'bug pulsante', 'name deve tornare identico dopo decifratura');
   assert.equal(plain.notes, 'riprodotto su Mac', 'notes deve tornare identico dopo decifratura');
   assert.equal(plain.extra, 'invariato', 'i campi non cifrati restano invariati');
-
-  // Ripristina.
-  globalThis.SN_FEEDBACK_PUBKEY = savedPub;
 });
 
 // ─── Test 2: retrocompatibilità — valori in chiaro passano invariati ────────────
 
 test('retrocompatibilità: valori in chiaro passano invariati attraverso decryptFeedbackFields', async () => {
   const { priv } = await genTestKeys();
-  const { decryptFeedbackFields } = await import(toFileUrl(join(ROOT, 'scripts', 'lib', 'decrypt-feedback-fields.mjs')));
 
   const oldFeedback = { text: 'feedback vecchio in chiaro', name: 'titolo vecchio', notes: 'note vecchie', status: 'done' };
   const plain = await decryptFeedbackFields(oldFeedback, priv);
@@ -91,15 +90,14 @@ test('retrocompatibilità: valori in chiaro passano invariati attraverso decrypt
 // ─── Test 3: guard senza pubkey — scrive in chiaro, niente crash ────────────────
 
 test('guard senza pubkey: encryptFieldsForQueue ritorna false e lascia in chiaro', async () => {
-  // Assicurati che non ci sia una pubkey globale (nella stessa run il test
-  // precedente l'ha ripristinata a null; ma per sicurezza).
+  // Non passa pubkey: né override né globalThis.SN_FEEDBACK_PUBKEY se è null.
+  // Forziamo il caso senza pubkey passando undefined + assicurando che globalThis sia null.
   const savedPub = globalThis.SN_FEEDBACK_PUBKEY;
   globalThis.SN_FEEDBACK_PUBKEY = null;
 
-  const { encryptFieldsForQueue } = await import(toFileUrl(join(ROOT, 'scripts', 'lib', 'encrypt-feedback-fields.mjs')));
-
   const entry = { text: 'testo sensibile', name: 'titolo', notes: 'note' };
-  const result = await encryptFieldsForQueue(entry, ['text', 'name', 'notes']);
+  // Senza override e senza globalThis.SN_FEEDBACK_PUBKEY: deve ritornare false.
+  const result = await encryptFieldsForQueue(entry, ['text', 'name', 'notes']); // nessun override
 
   assert.equal(result, false, 'deve ritornare false quando pubkey non disponibile');
   assert.equal(entry.text, 'testo sensibile', 'text deve restare in chiaro senza pubkey');
@@ -112,14 +110,9 @@ test('guard senza pubkey: encryptFieldsForQueue ritorna false e lascia in chiaro
 
 test('senza privkey: campi cifrati diventano placeholder leggibile, niente crash', async () => {
   const { pub } = await genTestKeys();
-  const savedPub = globalThis.SN_FEEDBACK_PUBKEY;
-  globalThis.SN_FEEDBACK_PUBKEY = pub;
-
-  const { encryptFieldsForQueue } = await import(toFileUrl(join(ROOT, 'scripts', 'lib', 'encrypt-feedback-fields.mjs')));
-  const { decryptFeedbackFields } = await import(toFileUrl(join(ROOT, 'scripts', 'lib', 'decrypt-feedback-fields.mjs')));
 
   const entry = { text: 'testo cifrato', name: 'titolo cifrato', notes: '' };
-  await encryptFieldsForQueue(entry, ['text', 'name', 'notes']);
+  await encryptFieldsForQueue(entry, ['text', 'name', 'notes'], pub);
 
   // Decifra SENZA passare la privata (e senza FILO_FEEDBACK_PRIVKEY in env).
   const savedEnv = process.env.FILO_FEEDBACK_PRIVKEY;
@@ -132,13 +125,17 @@ test('senza privkey: campi cifrati diventano placeholder leggibile, niente crash
   assert.ok(!C.isEncrypted(plain.text), 'il placeholder NON deve essere FENC1: (deve essere leggibile)');
 
   if (savedEnv !== undefined) process.env.FILO_FEEDBACK_PRIVKEY = savedEnv;
-  globalThis.SN_FEEDBACK_PUBKEY = savedPub;
 });
 
 // ─── Test 5: queueFeedbackCreateEncrypted scrive file con campi cifrati ─────────
 
 test('queueFeedbackCreateEncrypted: il file scritto ha i campi sensibili cifrati', async () => {
   const { pub, priv } = await genTestKeys();
+  // Inietta temporaneamente la pubkey di test per questo test (non c'è modo di
+  // passare override a queueFeedbackCreateEncrypted senza cambiarne la firma).
+  // Usiamo un spool separato + chiave di test: anche se SN_FEEDBACK_PUBKEY fosse
+  // quella del repo, il test verificherebbe solo che i campi SONO FENC1: (qualunque
+  // chiave). Il round-trip lo verifichiamo col priv del test.
   const savedPub = globalThis.SN_FEEDBACK_PUBKEY;
   globalThis.SN_FEEDBACK_PUBKEY = pub;
 
@@ -149,7 +146,6 @@ test('queueFeedbackCreateEncrypted: il file scritto ha i campi sensibili cifrati
   try {
     const { readFileSync, readdirSync } = await import('node:fs');
     const { queueFeedbackCreateEncrypted } = await import(toFileUrl(join(ROOT, 'scripts', 'queue-feedback.mjs')));
-    const { decryptFeedbackFields } = await import(toFileUrl(join(ROOT, 'scripts', 'lib', 'decrypt-feedback-fields.mjs')));
 
     await queueFeedbackCreateEncrypted({
       text: 'Fix critico nel gestore eventi',
@@ -183,11 +179,8 @@ test('queueFeedbackCreateEncrypted: il file scritto ha i campi sensibili cifrati
 
 test('decryptFeedbackList: lista mista (vecchi in chiaro + nuovi cifrati)', async () => {
   const { pub, priv } = await genTestKeys();
-  const savedPub = globalThis.SN_FEEDBACK_PUBKEY;
-  globalThis.SN_FEEDBACK_PUBKEY = pub;
 
-  const { decryptFeedbackList } = await import(toFileUrl(join(ROOT, 'scripts', 'lib', 'decrypt-feedback-fields.mjs')));
-
+  // Cifra con pubkey esplicita (no globalThis).
   const ctOld = await C.encryptForOwner('testo cifrato', pub);
   const list = [
     { text: 'vecchio in chiaro', name: 'titolo', _id: 'old1' },
@@ -198,6 +191,4 @@ test('decryptFeedbackList: lista mista (vecchi in chiaro + nuovi cifrati)', asyn
   assert.equal(result.length, 2);
   assert.equal(result[0].text, 'vecchio in chiaro', 'il vecchio feedback resta in chiaro');
   assert.equal(result[1].text, 'testo cifrato', 'il nuovo feedback viene decifrato');
-
-  globalThis.SN_FEEDBACK_PUBKEY = savedPub;
 });
