@@ -88,6 +88,20 @@
     // del voto): rewardedVotes resta marcato, quindi un voto successivo sullo
     // stesso feedback non ripaga. { id } → { ok, votes } | { ok:false, error }.
     BOARD_CLEAR_VOTE: 'board_clear_vote',
+    // === Bacheca utente — riapertura a pagamento (DC4) =======================
+    // BOARD_REOPEN: l'utente loggato segnala che un fix "Risolti" (DB3) è
+    // ancora rotto. Crea un NUOVO feedback collegato all'originale (campo
+    // `parentId`, stesso percorso di creazione anonimo di SN_FEEDBACK.submit —
+    // nasce in `new`, come ogni feedback utente, per il triage dell'owner) e
+    // scala CREDIT.BOARD_REOPEN crediti come anti-spam (rifiuta senza scrivere
+    // nulla se il saldo è insufficiente — niente saldo negativo). Scrive anche
+    // `reopenRequests.<uid>` SULL'ORIGINALE (stesso pattern non-admin di
+    // `votes`, vedi firestore.rules) come segnale per il percorso fidato
+    // (routine/owner) che deve flippare lo status dell'originale fuori da
+    // "Risolti" — un utente normale NON può scrivere `status` di un doc che
+    // non ha creato lui (ramo admin delle regole), quindi quel passo resta al
+    // triage. { id, text } → { ok, feedbackId, balance } | { ok:false, error }.
+    BOARD_REOPEN: 'board_reopen',
     // Comandi proprietario (#210). Riservati all'owner (auth.isAdmin()).
     // OWNER_LIST_USERS: elenco email degli utenti registrati (campo `email` sui
     //   doc credits/<uid>). { } → { ok, users:[{email,name,balance}] } | { ok:false, error }.
