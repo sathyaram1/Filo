@@ -817,8 +817,22 @@ DIPENDENZE APERTE (non chiudibili da questo repo):
   userebbero quel segnale per fare hill-climbing. I sub-task sotto vanno eseguiti
   nell'ordine indicato; ognuno ha le proprie dipendenze esplicite.
 
-  **Decisione di design APERTA (GATE su S1.F2.1 e S1.F2.2): come cifrare `status`?**
-  Tre opzioni, servono risposta owner prima di implementare:
+  **DECISIONE OWNER (2026-06-24): Opzione A — "dettagli minimi non cifrati".**
+  Campo `statusPublic` in chiaro con un enum **a 3 valori grossolani**, `status` fine
+  cifrato. Enum pubblico (semantica owner):
+  - `open` (**"aperto"**) = in lavorazione **O bloccato** → i due collassano nello
+    stesso valore pubblico: è il cuore di sicurezza, l'attaccante non distingue
+    `blocked` da un normale "in lavorazione".
+  - `closed` (**"chiuso"**) = risolto.
+  - `pending-approval` (**"in attesa di approvazione"**) = riservato al futuro (quando
+    l'owner lascerà agli utenti decisioni di design di alcune feature); **per ora mai
+    assegnato**.
+  Mapping fine→pubblico (default, vedi nota ignored/archived in S1.F2.1): `new`,`draft`,
+  `todo`,`clarify`,`review`,`blocked` → `open`; `done`,`verified` → `closed`;
+  `ignored`,`archived` → `closed` (da confermare con owner — vedi S1.F2.1). GATE chiuso:
+  S1.F2.1/S1.F2.2 possono partire. _(opzioni B/C scartate, conservate sotto come storico.)_
+
+  Opzioni considerate (storico):
 
   - **Opzione A — "Stato grossolano pubblico + stato fine cifrato"** (raccomandata):
     Mantieni un campo `statusPublic` con valori grossolani (es. `open`/`closed`) in
