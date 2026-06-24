@@ -216,13 +216,15 @@
 
   // Carica lo stato applicando il refill mezzanotte. Persiste solo se è cambiato
   // (refill applicato o prima inizializzazione). Notifica se ha accreditato.
-  async function load() {
+  // opts.autoFeedbackEnabled: se true, applica anche il bonus giornaliero F4.
+  async function load({ autoFeedbackEnabled = false } = {}) {
     const raw = await chrome.storage.local.get(STORAGE_KEYS.CREDITS);
     const had = !!raw[STORAGE_KEYS.CREDITS];
-    const { state, added } = applyRefill(ensure(raw[STORAGE_KEYS.CREDITS]), dateKey());
-    if (!had || added > 0) {
+    const { state, added, bonusAdded } = applyRefill(ensure(raw[STORAGE_KEYS.CREDITS]), dateKey(), autoFeedbackEnabled);
+    const changed = !had || added > 0 || bonusAdded > 0;
+    if (changed) {
       await writeState(state);
-      if (added > 0) emitChange(state, 'refill');
+      if (added > 0 || bonusAdded > 0) emitChange(state, 'refill');
     }
     return state;
   }
