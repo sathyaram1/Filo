@@ -133,13 +133,22 @@ export function queueFeedbackCreate(opts) {
 // Versione asincrona con cifratura S1.2: cifra text/name/notes prima di
 // scrivere il file di spool. Stessa logica di queueFeedbackCreate ma con
 // i campi sensibili opachi nella history git (repo pubblico).
+// S1.F2.2: se l'entry ha un `clientId`, calcola `clientIdHash` e cifra `clientId`.
 export async function queueFeedbackCreateEncrypted(opts) {
   const entry = buildCreateEntry(opts);
+  // S1.F2.2: calcola clientIdHash PRIMA di cifrare il clientId (se presente).
+  // Le entry delle routine di norma NON hanno clientId (è un campo utente), ma
+  // se venisse passato (es. feedback di audit con clientId 'auto:...'), lo gestiamo.
+  if (entry.clientId) {
+    entry.clientIdHash = hashClientIdSync(entry.clientId);
+  }
   // S1.2 (Fase 1): cifra SOLO `text` (contenuto inviato, non mostrato ad altri
   // utenti). NON `name` (titolo, mostrato all'utente da C5) né `notes`
   // (spiegazione user-facing) → Fase 2. Guard + gate dormiente in
   // encryptFieldsForQueue: senza attivazione i valori restano in chiaro.
-  await encryptFieldsForQueue(entry, ['text']);
+  // S1.F2.2: cifra anche `clientId` se presente (il match usa clientIdHash).
+  const fieldsToEncrypt = entry.clientId ? ['text', 'clientId'] : ['text'];
+  await encryptFieldsForQueue(entry, fieldsToEncrypt);
   mkdirSync(SPOOL_DIR, { recursive: true });
   const rand = Math.random().toString(36).slice(2, 8);
   const file = resolve(SPOOL_DIR, `new-${Date.now()}-${rand}.json`);
