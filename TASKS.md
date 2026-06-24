@@ -857,11 +857,9 @@ DIPENDENZE APERTE (non chiudibili da questo repo):
     owner-only dopo S1.6, che lockda la read di Firestore). Svantaggio: S1.6 (lockdown
     lettura Firestore) non è ancora pianificato ed è un'operazione delicata.
 
-  **→ Segnala la tua scelta di design PRIMA di iniziare S1.F2.1. Il task è marcato
-    con GATE–OWNER: non iniziare senza risposta. L'opzione raccomandata è A.**
-
-  - [ ] **S1.F2.1 — Cifra `status` in scrittura + decifratura dashboard** _(GATE–OWNER:
-    attende la decisione di design sopra, Opzione A/B/C)_ — **Cosa fa**: cifra il campo
+  - [ ] **S1.F2.1 — Cifra `status` in scrittura + decifratura dashboard** _(Opzione A
+    scelta dall'owner — vedi decisione sopra; enum pubblico open/closed/pending-approval)_
+    — **Cosa fa**: cifra il campo
     `status` nei percorsi di scrittura (in base all'opzione scelta) e aggiorna la
     decifratura nei lettori admin. File da toccare: `src/shared/feedback.js`
     (aggiunge `statusPublic` al doc submit se Opzione A, oppure cifra `status` se B);
