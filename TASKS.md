@@ -1085,7 +1085,7 @@ qualcosa di rotto — Filo **invia un feedback in autonomia**, senza azione uten
   `tests/unit/capabilities.test.mjs` passa 6/6 senza Electron → manifesto allineato
   alla realtà ora.)_
 
-- [ ] **F4 — Feedback autonomo da Filo** (dipende da F1/F2) — Quando l'agente
+- [x] **F4 — Feedback autonomo da Filo** _(implementato sessione locale 2026-06-24)_ — Quando l'agente
   conclude con confidenza ALTA (usando il manifest) che una richiesta è fuori
   capacità, o rileva una lamentela "di sfuggita" su qualcosa di rotto → compone e
   **invia un feedback senza azione utente**, marcato con source `auto:*`
