@@ -223,7 +223,7 @@ separata a permessi ridotti** dove gli utenti verificano i fix già rilasciati.
     girerà con la suite Playwright in un ambiente provvisto del binario.
   - Niente changelog/capabilities: `manage` è owner-only, non user-visible.
 
-- [ ] **DB4 — Struttura dati dei voti di verifica sul feedback** — File:
+- [~] **DB4 — Struttura dati dei voti di verifica sul feedback** — File:
   `src/shared/feedback.js` (schema) + `firestore.rules`. Aggiungere al doc
   feedback la struttura voti: per ogni votante `uid` → `{ vote: 'works'|'broken',
   at, credibilitySnapshot }`, con conteggi/derivati per il punteggio (DC3). Solo
@@ -231,6 +231,7 @@ separata a permessi ridotti** dove gli utenti verificano i fix già rilasciati.
   dalla board (DC*) e dall'archiviazione (DC3) → va definito PRIMA della board.
   rules: ciascuno scrive solo il proprio voto (`uid == request.auth.uid`). **Done**:
   unit/spec sullo schema + round-trip; **AZIONE OWNER** deploy rules. (stima: M)
+  _(in corso: routine affectionate-bell-vb8kaf, 2026-06-24)_
 
 - [ ] **DB5 — Migrazione dei feedback esistenti nella dashboard unificata**
   (dipende da DB1/DB2) — Far sì che TUTTI i feedback oggi sparsi nella vecchia
