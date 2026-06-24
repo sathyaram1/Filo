@@ -19,6 +19,7 @@
       version: '0.2.76', date: '2026-06-24',
       features: [
         'Votare nella "Bacheca" ora premia: il primo voto ✅/❌ su ogni miglioramento ti regala 10 crediti, con una piccola animazione.',
+        'Nella "Bacheca" puoi segnalare con "Ancora rotto?" un miglioramento che in realtà non funziona: la segnalazione torna in lavorazione collegata all\'originale (costa pochi crediti, per evitare segnalazioni a caso).',
       ],
       fixes: [],
     },
