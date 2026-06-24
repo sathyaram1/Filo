@@ -218,6 +218,29 @@
     return !!state.rewardedFeedback[id];
   }
 
+  // True se quel feedback ha già ricevuto il premio voto (DC2) per l'utente
+  // corrente (la cache è già per-account, vedi ensureAccountSync nell'handler).
+  async function wasVoteRewarded(id) {
+    const state = await load();
+    return !!state.rewardedVotes[id];
+  }
+
+  // Accredita il premio voto UNA SOLA VOLTA per feedback per utente (DC2).
+  // Idempotente: se `feedbackId` è già in rewardedVotes non accredita di nuovo
+  // (es. l'utente cambia idea works↔broken, o rivota lo stesso feedback) e
+  // ritorna { credits: 0, awarded: false }. Altrimenti accredita `amount` e
+  // marca il feedback come premiato. Ritorna { credits, balance, awarded }.
+  async function awardVoteOnce(feedbackId, amount) {
+    const state = await load();
+    if (!isVoteRewardPending(state, feedbackId)) {
+      return { credits: 0, balance: Math.round(state.balance), awarded: false };
+    }
+    const { credits } = applyAward(state, { kind: 'feedback_voted', credits: amount, ref: feedbackId });
+    await writeState(state);
+    emitChange(state, 'award');
+    return { credits, balance: Math.round(state.balance), awarded: true };
+  }
+
   // ── sincronizzazione (usate da handlers/credits.js) ─────────────────────────
 
   // Sostituisce lo stato locale con quello adottato da Firestore per `owner`
