@@ -344,10 +344,17 @@
     const fields = {};
     const mask = [];
     if (status !== undefined) { fields.status = toFsValue(status); mask.push('status'); }
-    if (notes !== undefined) { fields.notes = toFsValue(notes); mask.push('notes'); }
+    // S1.2: cifra notes e reviewComment (contenuto libero sensibile).
+    if (notes !== undefined) {
+      fields.notes = toFsValue(await maybeEncrypt(notes));
+      mask.push('notes');
+    }
     // Override di revisione (owner sblocca un feedback fermato dalla sicurezza).
     if (reviewDecision !== undefined) { fields.reviewDecision = toFsValue(reviewDecision); mask.push('reviewDecision'); }
-    if (reviewComment !== undefined) { fields.reviewComment = toFsValue(reviewComment); mask.push('reviewComment'); }
+    if (reviewComment !== undefined) {
+      fields.reviewComment = toFsValue(await maybeEncrypt(reviewComment));
+      mask.push('reviewComment');
+    }
     if (reviewedAt !== undefined) { fields.reviewedAt = toFsValue(reviewedAt); mask.push('reviewedAt'); }
     // Preferito ⭐ (DB2): bool, "parcheggio per il futuro". Le Firestore rules
     // accettano `starred` (is bool) nel ramo update admin.
