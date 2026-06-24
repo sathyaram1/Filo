@@ -908,6 +908,15 @@
     emptyEl.hidden = true;
     try {
       all = await SN_FEEDBACK.list({ pageSize: 500 });
+      // S1.3: decifratura batch dei campi FENC1: — una sola IPC per tutta la lista.
+      // Graceful fallback: se l'utente non è admin o l'IPC fallisce, i valori
+      // restano invariati (la dashboard non si rompe, mostra il ciphertext).
+      if (isAdmin && all.length > 0) {
+        try {
+          const r = await sendToMain({ type: 'feedback_decrypt_fields', list: all });
+          if (r && r.ok && Array.isArray(r.list)) all = r.list;
+        } catch (_) { /* fallback: render con valori cifrati */ }
+      }
       applyFilter();
     } catch (e) {
       listEl.innerHTML = '';
