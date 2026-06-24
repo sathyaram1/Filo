@@ -168,7 +168,8 @@ if (isMain) {
         console.error(`   ! screenshot "${p}" non allegato: ${e.message}`);
       }
     }
-    const file = queueFeedbackCreate({
+    // S1.2: usa la versione cifrata per proteggere la history git pubblica.
+    const file = await queueFeedbackCreateEncrypted({
       text: args._.join(' '),
       name: args.name,
       parentId: args.parentId,
