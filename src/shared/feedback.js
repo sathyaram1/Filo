@@ -311,6 +311,23 @@
       maybeEncrypt(url || ''),
     ]);
 
+    // S1.F2.2: hash deterministico del clientId (SHA-256 troncato, 32 hex, in chiaro).
+    // Calcolato SEMPRE (anche con gate dormiente) per uniformità del match C5.
+    // Se il chiamante ha già calcolato l'hash (es. src/content/feedback.js), riusa quello.
+    let resolvedClientIdHash = (typeof clientIdHash === 'string' && clientIdHash.length === 32) ? clientIdHash : '';
+    if (!resolvedClientIdHash) {
+      try {
+        const H = global.SN_FEEDBACK_CLIENT_ID_HASH;
+        if (H && H.hashClientId) {
+          resolvedClientIdHash = await H.hashClientId(clientId || '');
+        }
+      } catch (_) {}
+    }
+
+    // S1.F2.2: cifra `clientId` se la cifratura è attiva (il match avviene via hash).
+    // Con gate dormiente, clientId rimane in chiaro (retrocompat).
+    const encClientId = await maybeEncrypt(clientId || '');
+
     const doc = {
       fields: {
         text: toFsValue(encText),
@@ -318,7 +335,7 @@
         title: toFsValue(title || ''),
         name: toFsValue(String(name || '').slice(0, 200)),
         userAgent: toFsValue(userAgent || ''),
-        clientId: toFsValue(clientId || ''),
+        clientId: toFsValue(encClientId),
         images: toFsValue(uploaded),
         files: toFsValue(uploadedFiles),
         // S1.F2.1: statusPublic SEMPRE in chiaro anche se status fine è cifrato.
