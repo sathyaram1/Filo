@@ -389,13 +389,20 @@
     if (!fb) return;
     const wasArchived = (fb.status || '') === 'archived';
     const next = wasArchived ? 'todo' : 'archived';
+    // Override owner (DC3, SN_BOARD_ARCHIVE.hasOwnerOverride): un'azione manuale
+    // qui è sempre esplicita → vince per sempre sull'auto-archiviazione a
+    // punteggio. Archivio a mano → 'archived' (non riarchiviabile/non
+    // riapribile dall'automazione); ripristino a mano → 'keep_open' (il
+    // punteggio NON lo farà ri-archiviare anche se sopra soglia).
+    const nextOverride = wasArchived ? 'keep_open' : 'archived';
 
     mgArchiveBtn.disabled = true;
     setManageMsg(wasArchived ? 'Ripristino…' : 'Archivio…', '');
     try {
-      const r = await sendToMain({ type: 'feedback_update', id, status: next });
+      const r = await sendToMain({ type: 'feedback_update', id, status: next, archiveOverride: nextOverride });
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
       fb.status = next;
+      fb.archiveOverride = nextOverride;
       // Il feedback cambia tab: chiudi il dettaglio e ricalcola la lista corrente.
       selectedId = null;
       mgDetail.hidden = true;
