@@ -106,8 +106,11 @@ service cloud.firestore {
       allow create: if
         request.resource.data.keys().hasOnly(
           ['text', 'url', 'title', 'name', 'userAgent', 'clientId', 'images',
-           'files', 'createdAt', 'seq', 'subSeq', 'parentId']
+           'files', 'createdAt', 'seq', 'subSeq', 'parentId',
+           'statusPublic']   // S1.F2.1: aggiunto statusPublic (sempre in chiaro, nuovo nei submit)
         )
+        // S1.F2.1: se presente, statusPublic deve essere un valore valido.
+        && request.resource.data.get('statusPublic', 'open') in ['open', 'closed', 'pending-approval']
         && request.resource.data.text is string
         && request.resource.data.text.size() <= 10000
         && request.resource.data.get('url', '') is string
