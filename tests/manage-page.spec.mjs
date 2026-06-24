@@ -663,3 +663,123 @@ test('DB3: solo i fix rilasciati appaiono in Risolti; i non-spediti restano In c
   await page.evaluate(() => window.__mgTest.setTab('resolved'));
   await expect(page.locator('.mg-item')).toHaveCount(2);
 });
+
+// ── DD1: Sezione "Modelli di supporto" ──────────────────────────────────────
+
+// Modelli finti restituiti dal mock di support_models_get.
+const FAKE_SUPPORT_MODELS = {
+  sanitizer:    'flash',
+  judgeL2:      'flash, flash-or',
+  judgeRedTeam: 'flash',
+  judgePriority: '',
+};
+
+// Stub IPC: intercetta support_models_get e support_models_update senza rete.
+async function stubSupportModels(page, initialModels, isAdmin = true) {
+  await page.evaluate(({ models, admin }) => {
+    window.__smUpdates = [];
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'auth_status') return { isAdmin: admin };
+      if (msg && msg.type === 'support_models_get') {
+        if (!admin) return { ok: false, error: 'non admin' };
+        return { ok: true, models };
+      }
+      if (msg && msg.type === 'support_models_update') {
+        window.__smUpdates.push(msg.models);
+        return { ok: true, models: msg.models };
+      }
+      return orig(msg);
+    };
+  }, { models: initialModels, admin: isAdmin });
+}
+
+test('DD1: la tab Modelli di supporto renderizza i 4 slot col modelChainEditor', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.filo);
+
+  await stubSupportModels(page, FAKE_SUPPORT_MODELS);
+
+  // Clicca la tab: innesca il caricamento lazy.
+  await page.locator('.mg-tab[data-tab="models"]').click();
+
+  // Attendi che l'editor sia visibile (caricamento IPC completato).
+  await expect(page.locator('#mgSmEditor')).toBeVisible({ timeout: 5000 });
+
+  // 4 slot presenti nel DOM.
+  await expect(page.locator('.mg-sm-slot')).toHaveCount(4);
+  await expect(page.locator('[data-slot="sanitizer"]')).toBeVisible();
+  await expect(page.locator('[data-slot="judgeL2"]')).toBeVisible();
+  await expect(page.locator('[data-slot="judgeRedTeam"]')).toBeVisible();
+  await expect(page.locator('[data-slot="judgePriority"]')).toBeVisible();
+
+  // Ogni slot ha almeno un input (modelChainEditor crea .sn-chain-input per ogni segmento).
+  const chainInputs = page.locator('.mg-sm-chain-host .sn-chain-input');
+  const count = await chainInputs.count();
+  expect(count).toBeGreaterThanOrEqual(4);
+
+  // Il bottone "Salva" è visibile.
+  await expect(page.locator('#mgSmSaveBtn')).toBeVisible();
+});
+
+test('DD1: i valori caricati popolano i campi (slot con catena ha più segmenti)', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.filo);
+
+  await stubSupportModels(page, FAKE_SUPPORT_MODELS);
+  await page.locator('.mg-tab[data-tab="models"]').click();
+  await expect(page.locator('#mgSmEditor')).toBeVisible({ timeout: 5000 });
+
+  // Lo slot "sanitizer" ha valore "flash" → un solo input con "flash".
+  const sanitizerHost = page.locator('#mgSmChain-sanitizer');
+  const sanitizerInput = sanitizerHost.locator('.sn-chain-input').first();
+  await expect(sanitizerInput).toHaveValue('flash');
+
+  // Lo slot "judgeL2" ha valore "flash, flash-or" → due segmenti (due input).
+  const judgeL2Inputs = page.locator('#mgSmChain-judgeL2 .sn-chain-input');
+  await expect(judgeL2Inputs).toHaveCount(2);
+  await expect(judgeL2Inputs.nth(0)).toHaveValue('flash');
+  await expect(judgeL2Inputs.nth(1)).toHaveValue('flash-or');
+});
+
+test('DD1: il bottone Salva invia support_models_update con i valori corretti', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.filo);
+
+  await stubSupportModels(page, FAKE_SUPPORT_MODELS);
+  await page.locator('.mg-tab[data-tab="models"]').click();
+  await expect(page.locator('#mgSmEditor')).toBeVisible({ timeout: 5000 });
+
+  // Salva senza modifiche.
+  await page.locator('#mgSmSaveBtn').click();
+
+  // La IPC support_models_update è stata chiamata una volta.
+  await expect.poll(() => page.evaluate(() => window.__smUpdates.length)).toBe(1);
+  const sent = await page.evaluate(() => window.__smUpdates[0]);
+
+  // I 4 slot sono presenti nel payload.
+  expect(sent).toHaveProperty('sanitizer');
+  expect(sent).toHaveProperty('judgeL2');
+  expect(sent).toHaveProperty('judgeRedTeam');
+  expect(sent).toHaveProperty('judgePriority');
+
+  // I valori tornati dal mock vengono confermati (status "Salvato.").
+  await expect(page.locator('#mgSmStatus')).toHaveText('Salvato.');
+});
+
+test('DD1: per i non-admin la sezione mostra il messaggio di accesso negato', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.filo);
+
+  // Stub con admin=false.
+  await stubSupportModels(page, {}, false);
+  await page.locator('.mg-tab[data-tab="models"]').click();
+
+  // Aspetta che il caricamento finisca (il denied appare subito dopo la risposta).
+  await expect(page.locator('#mgSmDenied')).toBeVisible({ timeout: 5000 });
+  await expect(page.locator('#mgSmEditor')).toBeHidden();
+});
