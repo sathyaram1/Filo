@@ -35,8 +35,9 @@ const require = createRequire(import.meta.url);
 const ROOT = resolve(__dirname, '..', '..');
 
 // Campi di testo da decifrare. S1.F2.1: aggiunto 'status' (cifrato quando gate on).
+// S1.F2.2: aggiunto 'clientId' (cifrato quando gate on; clientIdHash resta in chiaro).
 // 'statusPublic' NON è nella lista: è sempre in chiaro e non va toccato.
-const TEXT_FIELDS = ['text', 'url', 'name', 'title', 'notes', 'reviewComment', 'status'];
+const TEXT_FIELDS = ['text', 'url', 'name', 'title', 'notes', 'reviewComment', 'status', 'clientId'];
 
 // Carica feedbackCrypto.js (IIFE su globalThis) se non è già disponibile.
 // NON ri-carica feedbackPublicKey.js se SN_FEEDBACK_PUBKEY è già definita:
