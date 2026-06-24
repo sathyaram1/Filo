@@ -683,10 +683,25 @@ DIPENDENZE APERTE (non chiudibili da questo repo):
     e **cifrare `pipeline`/`verdicts`** che scrive. Cross-repo: documenta lì.
     Le rules Firestore possono lasciare la lettura com'è (il contenuto è cifrato),
     ma verifica che NESSUN campo in chiaro riveli lo stato di blocco. (stima: M)
-  - [ ] **S1.5 — Slot chiave (azione owner)**: dove l'owner mette la privkey
-    (setting locale / env), dove le routine la ricevono (prompt→env), dove il
-    backend la tiene (Functions secrets). Documenta la rotazione. La generazione
-    e l'inserimento della chiave sono **azione owner**.
+  - [~] **S1.5 — Slot chiave + checklist di cutover (azione owner)** _(slot fatti, cutover da fare)_:
+    Slot privata implementati (vedi S1.3 `getPrivateKey`): env `FILO_FEEDBACK_PRIVKEY`
+    (priorità) → `tests/agent/.env` locale → storage.json `feedbackPrivateKey`.
+    Owner: chiave generata e privata custodita in un txt fuori repo (2026-06-24).
+    **CHECKLIST DI CUTOVER (accendere `SN_FEEDBACK_ENC_ENABLED=true`):** NON
+    accendere finché TUTTO sotto non è vero, o si rompono lettori/feature:
+    1. [ ] Wiring decifratura dashboard (manage.js + pagina feedback) — S1.3 §1.
+    2. [ ] Privata in env `FILO_FEEDBACK_PRIVKEY` nella sandbox delle routine cloud
+       (entrambi gli account) + worker che decifrano i corpi (S1.3 §2).
+    3. [ ] Backend filo-security: privata nei Functions secrets + decifratura in
+       pipeline (S1.4).
+    4. [ ] Owner ha messo la privata in locale (`tests/agent/.env` o storage) e
+       verificato che la dashboard mostra il testo in chiaro.
+    5. [ ] Confermato che NESSUN campo cifrato è mostrato a un utente senza chiave
+       (C5: `name`/`notes` restano in chiaro in Fase 1 — ok).
+    Solo allora: metti `SN_FEEDBACK_ENC_ENABLED = true` in `feedbackPublicKey.js`
+    (si propaga a tutti via auto-update). Documenta la **rotazione**: rigenerare la
+    coppia rende illeggibili i feedback cifrati con la vecchia chiave → ruotare a
+    freddo o conservare la vecchia privata per lo storico.
   **Done complessivo**: testo/note/stato/verdetti dei feedback non leggibili da
   chi non ha la chiave, su NESSUN canale (Firestore, git, Storage); owner +
   routine + backend continuano a lavorare via decrypt. (stima: L, multi-sessione)
