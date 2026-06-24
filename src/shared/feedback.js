@@ -506,6 +506,32 @@
     return true;
   }
 
+  // ---- riapertura a pagamento (DC4) ----
+  // RETE: marca SUL FEEDBACK ORIGINALE che l'uid ha chiesto la riapertura.
+  // Scrive solo `reopenRequests.<uid>` (updateMask mirato, stesso pattern non-
+  // admin di castVote): un utente normale NON può toccare `status` di un doc
+  // che non ha creato (ramo admin delle regole, vedi firestore.rules) — flippare
+  // l'originale fuori da "Risolti" resta al percorso fidato (routine/owner) che
+  // legge questo campo. Qui scriviamo solo il SEGNALE + (nel chiamante) creiamo
+  // il feedback collegato: è la parte che un utente può fare da solo.
+  async function castReopenRequest(id, uid, opts = {}) {
+    if (!id) throw new Error('id mancante');
+    if (!uid) throw new Error('uid mancante');
+    const entry = { at: new Date().toISOString() };
+    const fieldPath = `reopenRequests.\`${uid}\``;
+    const qs = `updateMask.fieldPaths=${encodeURIComponent(fieldPath)}`;
+    const endpoint = `${FIRESTORE_BASE}/${COLLECTION}/${encodeURIComponent(id)}?${qs}&key=${API_KEY}`;
+    const headers = { 'Content-Type': 'application/json' };
+    if (opts.idToken) headers.Authorization = `Bearer ${opts.idToken}`;
+    const body = { fields: { reopenRequests: { mapValue: { fields: { [uid]: toFsValue(entry) } } } } };
+    const res = await fetch(endpoint, { method: 'PATCH', headers, body: JSON.stringify(body) });
+    if (!res.ok) {
+      const t = await res.text().catch(() => '');
+      throw new Error(`firestore castReopenRequest fallito (${res.status}): ${t.slice(0, 300)}`);
+    }
+    return entry;
+  }
+
   global.SN_FEEDBACK = {
     submit,
     list,
@@ -517,6 +543,8 @@
     tallyVotes,
     userVote,
     VOTE_VALUES,
+    // Riapertura a pagamento (DC4).
+    castReopenRequest,
     uploadImage,
     uploadAttachment,
     formatNum,
