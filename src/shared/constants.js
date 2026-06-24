@@ -125,6 +125,12 @@
     // +10 crediti per il voto funziona/non-funziona in bacheca (DC2), una sola
     // volta per feedback per utente. Niente timeout né penalità.
     BOARD_VOTE: 10,
+    // Costo della RIAPERTURA di un fix verificato dalla bacheca (DC4): pochi
+    // crediti, solo anti-spam (NON un prezzo "vero" — la valuta non è mai
+    // scambiata con denaro reale, vedi nota in testa al file). Basso apposta:
+    // chi riapre sta segnalando un problema reale, non va disincentivato con
+    // una cifra punitiva; basta a scoraggiare riaperture a raffica senza motivo.
+    BOARD_REOPEN: 5,
   };
 
   // Raggruppamento azione → "tipo d'uso" mostrato nel grafico a torta dei crediti
