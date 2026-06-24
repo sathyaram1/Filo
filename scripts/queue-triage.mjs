@@ -144,7 +144,8 @@ if (isMain) {
     process.exit(1);
   }
   try {
-    const file = queueTriage(id, status, noteParts.length ? noteParts.join(' ') : '', undefined, branch, starred);
+    // S1.2: usa la versione cifrata per proteggere la history git pubblica.
+    const file = await queueTriageEncrypted(id, status, noteParts.length ? noteParts.join(' ') : '', undefined, branch, starred);
     console.log(`OK: triage accodato → ${file}`);
     if (noGit) console.log('   (--no-git: file scritto ma non committato)');
     else commitAndPush(file);
