@@ -36,6 +36,7 @@ require(path.join(SHARED, 'capabilities.js'));
 require(path.join(SHARED, 'autoFeedback.js'));  // F4 — dipende da capabilities
 require(path.join(SHARED, 'feedbackPublicKey.js'));
 require(path.join(SHARED, 'feedbackCrypto.js'));
+require(path.join(SHARED, 'feedbackClientIdHash.js')); // S1.F2.2: hash deterministico clientId
 require(path.join(SHARED, 'userCredibility.js'));
 require(path.join(SHARED, 'spellLanguages.js'));
 require(path.join(SVC, 'providers', 'openrouter.js'));
