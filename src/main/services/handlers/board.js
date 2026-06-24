@@ -46,13 +46,9 @@ module.exports = function register(on, ctx) {
 
       // Rilegge il documento per tornare il tally REALE (altri voti compresi),
       // così la UI non deve fidarsi solo dell'aggiornamento ottimistico locale.
-      let votes = null;
-      try {
-        const list = await FB.list({ pageSize: 1 }); // placeholder: vedi sotto
-      } catch (_) { /* ignorato: il fallback è il voto appena scritto */ }
       // FB.list non filtra per id: leggiamo il singolo documento via REST diretto
-      // usando lo stesso plumbing esposto da SN_FEEDBACK (rest/fromFsValue).
-      votes = await fetchVotes(id);
+      // (fetchVotes sotto, stesso plumbing esposto da SN_FEEDBACK).
+      const votes = await fetchVotes(id);
 
       return {
         ok: true,
