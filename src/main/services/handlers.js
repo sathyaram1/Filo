@@ -1056,6 +1056,8 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   }
   await FiloMem.appendRaw({ type: 'chat_filo', summary: textReply.slice(0, 200), extra: { actions: rawActions } });
   maybeRunLessonAgent({ userMessage, filoReply: textReply, stateText }).catch(() => {});
+  // F4 — Feedback autonomo: fire-and-forget, non blocca la risposta all'utente.
+  maybeAutoFeedback({ textReply, rawActions, userMessage, sender }).catch(() => {});
   return { text: textReply, actions: renderedActions, model: r.model, provider: r.provider, costEur: r.costEur };
 }
 
