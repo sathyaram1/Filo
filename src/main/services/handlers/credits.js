@@ -308,6 +308,14 @@ module.exports = function register(on, ctx) {
       try { all = await FB.list({ pageSize: 200 }); }
       catch (e) { console.warn('[credits] lista feedback non disponibile:', e?.message || e); return empty; }
 
+      // S1.F2.2: pre-calcola l'hash del clientId locale UNA VOLTA per tutti i confronti.
+      // Stesso algoritmo di feedbackClientIdHash.js (SHA-256 troncato 32 hex).
+      let localIdHash = '';
+      try {
+        const H = globalThis.SN_FEEDBACK_CLIENT_ID_HASH;
+        if (H && H.hashClientId) localIdHash = await H.hashClientId(id);
+      } catch (_) {}
+
       const state = await Credits.load();
       const rewarded = state.rewardedFeedback || {};
       const rewards = [];
@@ -323,7 +331,16 @@ module.exports = function register(on, ctx) {
           return false; // cifrato senza statusPublic → non premiare (non si sa)
         })();
         if (!f || !isResolved) continue;
-        if (baseClientId(f.clientId) !== id) continue; // solo i feedback DI questo install
+        // S1.F2.2: match via clientIdHash (in chiaro, disponibile anche se clientId è cifrato).
+        // RETROCOMPAT: se il feedback non ha clientIdHash (storico), ricadi sul confronto raw.
+        const matched = (() => {
+          if (f.clientIdHash && localIdHash) {
+            return f.clientIdHash === localIdHash;
+          }
+          // Fallback per feedback storici senza clientIdHash: confronto raw clientId.
+          return baseClientId(f.clientId) === id;
+        })();
+        if (!matched) continue; // solo i feedback DI questo install
         const fid = f._id;
         if (!fid || rewarded[fid]) continue;            // già premiato: niente doppio premio
         const priority = Math.max(0, Math.min(3, Math.round(Number(f.priority) || 0)));
