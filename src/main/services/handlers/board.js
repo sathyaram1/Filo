@@ -118,7 +118,6 @@ module.exports = function register(on, ctx) {
 
       let created;
       try {
-        const profile = (await auth.getProfile?.()) || {};
         created = await FB.submit({
           text: `[Riapertura #${original.seq || id}] ${text}`,
           url: original.url || '',
