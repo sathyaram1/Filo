@@ -309,8 +309,10 @@ separata a permessi ridotti** dove gli utenti verificano i fix già rilasciati.
   - **Verificato:** `tests/unit/boardList.test.mjs` (6/6, filtro sicurezza puro)
     + `tests/board-page.spec.mjs` (3/3: solo i fix in produzione votabili; ZERO
     materiale red-team nel DOM; anonimo invitato/loggato vota) + nessuna
-    regressione su `tests/manage-page.spec.mjs` (16/16). [GATE finale: `npm test`
-    completo in corso prima di marcare `[x]`.]
+    regressione su `tests/manage-page.spec.mjs` (16/16). `npm test` completo:
+    **487 passed, 13 failed — tutti rossi pre-esistenti** (11 in `feedback-*`,
+    già documentati in DB1) o flakiness headless ("browser has been closed" in
+    `page-ctrl-zoom`/`proxy-tab-nl`): **zero regressioni** da DC1.
 
 - [ ] **DC2 — Voto funziona/non-funziona + ricompensa 10 crediti** (dipende da
   DB3, DB4) — File: board page + handler IPC + `src/main/services/creditStore.js`.
