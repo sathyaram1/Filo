@@ -153,3 +153,55 @@ test('rewardForPriority: priorità mancante/fuori scala → fascia 0 (50)', () =
   assert.equal(C.rewardForPriority(-3), 50);    // clamp basso
   assert.equal(C.rewardForPriority('2'), 200);  // stringa numerica
 });
+
+// ── Voto bacheca (DC2): +10 crediti una sola volta per feedback per utente ──
+
+test('isVoteRewardPending: true al primo voto, false dopo il premio', () => {
+  let s = C.freshState('2026-06-17');
+  assert.equal(C.isVoteRewardPending(s, 'fb-board-1'), true);
+  s = C.applyAward(s, { kind: 'feedback_voted', credits: 10, ref: 'fb-board-1' }).state;
+  assert.equal(C.isVoteRewardPending(s, 'fb-board-1'), false);
+});
+
+test('isVoteRewardPending: senza id ritorna false (niente da premiare)', () => {
+  const s = C.freshState('2026-06-17');
+  assert.equal(C.isVoteRewardPending(s, null), false);
+  assert.equal(C.isVoteRewardPending(s, ''), false);
+});
+
+test('applyAward(feedback_voted): accredita e marca rewardedVotes, NON rewardedFeedback', () => {
+  let s = C.freshState('2026-06-17');
+  s = C.applyAward(s, { kind: 'feedback_voted', credits: 10, ref: 'fb-board-1' }).state;
+  assert.equal(s.balance, 1010);
+  assert.equal(s.rewardedVotes['fb-board-1'], true);
+  assert.equal(!!s.rewardedFeedback['fb-board-1'], false);
+});
+
+test('CREDIT.BOARD_VOTE = 10', () => {
+  assert.equal(CREDIT.BOARD_VOTE, 10);
+});
+
+test('namespace separato: il premio di RISOLUZIONE (C5) e quello di VOTO (DC2) non si bloccano a vicenda', () => {
+  let s = C.freshState('2026-06-17');
+  // Lo stesso feedback viene sia risolto (C5) sia votato (DC2): sono due
+  // eventi distinti, entrambi devono accreditare.
+  s = C.applyAward(s, { kind: 'feedback_resolved', credits: 200, ref: 'fb-42' }).state;
+  assert.equal(C.isVoteRewardPending(s, 'fb-42'), true); // il voto non è ancora bloccato dal premio C5
+  s = C.applyAward(s, { kind: 'feedback_voted', credits: 10, ref: 'fb-42' }).state;
+  assert.equal(s.balance, 1210);
+  assert.equal(s.rewardedFeedback['fb-42'], true);
+  assert.equal(s.rewardedVotes['fb-42'], true);
+});
+
+test('anti doppio-premio voto: un secondo voto sullo stesso feedback NON ripaga (anche cambiando works↔broken)', () => {
+  let s = C.freshState('2026-06-17');
+  assert.equal(C.isVoteRewardPending(s, 'fb-99'), true);
+  s = C.applyAward(s, { kind: 'feedback_voted', credits: 10, ref: 'fb-99' }).state;
+  assert.equal(s.balance, 1010);
+  // Il chiamante (awardVoteOnce) controlla isVoteRewardPending PRIMA di
+  // chiamare applyAward di nuovo: simuliamo qui il guard a livello di stato.
+  assert.equal(C.isVoteRewardPending(s, 'fb-99'), false);
+  // Se per errore applyAward venisse richiamato comunque (bypassando il
+  // guard), accrediterebbe di nuovo: la riprova che il guard è OBBLIGATORIO
+  // e che la chiamata pubblica è awardVoteOnce (async), non applyAward da sola.
+});
