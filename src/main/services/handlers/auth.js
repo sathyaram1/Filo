@@ -141,11 +141,25 @@ module.exports = function register(on, ctx) {
   // S1.3: decifratura dei campi feedback nel main (la privkey non esce mai da qui).
   // Il renderer manda i campi con valori potenzialmente cifrati; il main li
   // decifra e ritorna plaintext. Owner-only: se l'utente non è admin rifiuta.
+  //
+  // Modalità singola:  { fields: {text?,url?,…} } → { ok, fields: {…decifrati} }
+  // Modalità batch:    { list: [{…}, …] }         → { ok, list: [{…decifrati}, …] }
+  // (Il path singolo esiste per retrocompat; il batch serve alle dashboard che
+  //  caricano centinaia di feedback — una sola IPC invece di N.)
   on(MSG.FEEDBACK_DECRYPT_FIELDS, async (msg) => {
     try {
       if (!auth.isAdmin()) {
         return { ok: false, error: 'Operazione riservata agli amministratori.' };
       }
+      // Batch: array di oggetti feedback → decifra ciascuno in sequenza.
+      if (Array.isArray(msg.list)) {
+        const list = [];
+        for (const item of msg.list) {
+          list.push(await decryptFeedbackObject(item || {}));
+        }
+        return { ok: true, list };
+      }
+      // Singolo (retrocompat).
       const fields = msg.fields || {};
       const decrypted = await decryptFeedbackObject(fields);
       return { ok: true, fields: decrypted };
