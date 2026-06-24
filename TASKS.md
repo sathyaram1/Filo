@@ -849,9 +849,15 @@ DIPENDENZE APERTE (non chiudibili da questo repo):
        No-op trasparente coi feedback in chiaro (cifratura dormiente). Verificato:
        `tests/unit/feedbackEncryption.test.mjs` Test 8 (batch su 3 feedback: tutti
        cifrati/misto/chiari, round-trip dei 6 campi); `npm run test:unit` 473/473.
-    2. **Wiring lettore routine**: i worker devono usare `decrypt-feedback-fields.mjs`
-       sui corpi prima di lavorarli; documentare nel recipe orchestratore (CLAUDE.md)
-       che la privata va in env `FILO_FEEDBACK_PRIVKEY` nel cloud.
+    2. [x] **Wiring lettore routine** _(fatto: sessione locale 2026-06-24)_ —
+       Aggiunto a CLAUDE.md (sezione "Orchestratore + worker unificato", paragrafo
+       "Decifratura feedback (S1)"): il worker, prima di passare corpo+screenshot al
+       contesto LLM, decifra i campi `FENC1:` con `scripts/lib/decrypt-feedback-fields.mjs`
+       (`decryptFeedbackFields`); privata via env `FILO_FEEDBACK_PRIVKEY` nel cloud
+       (in locale `tests/agent/.env`), mai committata; senza chiave i campi restano
+       placeholder e il worker segnala l'impossibilità di procedere. I metadati visti
+       dall'orchestratore (`statusPublic`/num/priority/titolo) sono sempre in chiaro.
+       `node --check` ok sull'helper referenziato.
   - [ ] **S1.4 — Coordina col backend filo-security**: il backend deve decifrare
     il feedback per farlo giudicare (chiave privata nei secrets delle Functions)
     e **cifrare `pipeline`/`verdicts`** che scrive. Cross-repo: documenta lì.
