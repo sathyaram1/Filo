@@ -223,15 +223,38 @@ separata a permessi ridotti** dove gli utenti verificano i fix già rilasciati.
     girerà con la suite Playwright in un ambiente provvisto del binario.
   - Niente changelog/capabilities: `manage` è owner-only, non user-visible.
 
-- [~] **DB4 — Struttura dati dei voti di verifica sul feedback** — File:
-  `src/shared/feedback.js` (schema) + `firestore.rules`. Aggiungere al doc
-  feedback la struttura voti: per ogni votante `uid` → `{ vote: 'works'|'broken',
-  at, credibilitySnapshot }`, con conteggi/derivati per il punteggio (DC3). Solo
-  loggati (uid), **un voto per utente, cambiabile**. È il **substrato** letto
-  dalla board (DC*) e dall'archiviazione (DC3) → va definito PRIMA della board.
-  rules: ciascuno scrive solo il proprio voto (`uid == request.auth.uid`). **Done**:
-  unit/spec sullo schema + round-trip; **AZIONE OWNER** deploy rules. (stima: M)
-  _(in corso: routine affectionate-bell-vb8kaf, 2026-06-24)_
+- [x] **DB4 — Struttura dati dei voti di verifica sul feedback** _(fatto:
+  routine affectionate-bell-vb8kaf, 2026-06-24)_ — Substrato dei voti
+  "funziona/non funziona" pronto per board (DC*) e archiviazione a punteggio
+  (DC3). I voti vivono in un campo **`votes` (map) SUL documento feedback**:
+  chiave = `uid` del votante, valore = `{ vote: 'works'|'broken', at: <ISO>,
+  credibilitySnapshot: <num> }`. Un voto per utente, **cambiabile** (ri-PATCH
+  della propria chiave) e **ritirabile** (cancellazione della chiave).
+  - **`src/shared/feedback.js`** (in `SN_FEEDBACK`):
+    - puri (testabili senza rete): `normalizeVotes(raw)` (scarta entry
+      malformate, default credibilità=1), `tallyVotes(raw)` → `{ works, broken,
+      total, score }` con **score = Σ cred("works") − Σ cred("broken")** (DC3),
+      `userVote(raw, uid)`, costante `VOTE_VALUES`.
+    - rete: `castVote(id, { uid, vote, credibilitySnapshot }, { idToken })` e
+      `clearVote(id, uid, { idToken })` — PATCH con **updateMask mirato su
+      `votes.<uid>`** (non toccano i voti altrui né altri campi).
+  - **`firestore.rules`**: nuovo ramo `allow update` per `feedback/{doc}` —
+    utente **loggato** che cambia **SOLO la propria chiave** del map `votes`
+    (`request.resource.data.get('votes',{}).diff(...).affectedKeys().hasOnly([request.auth.uid])`),
+    con validazione di forma dell'entry (vote in works/broken, at string≤40,
+    credibilitySnapshot num≥0) e cancellazione consentita (ritiro voto). Il
+    vincolo chiave==uid impedisce di toccare i voti altrui o qualunque altro
+    campo. (Rami admin/routine invariati — blast radius stretto.)
+  - **Verifica**: `tests/unit/feedbackVotes.test.mjs` (9 test: normalizeVotes
+    scarta malformati + default cred, tallyVotes pesato, userVote, round-trip
+    encoding Firestore `toFsValue→fromFsValue` del map voti) → 9/9 verdi; suite
+    `npm run test:unit` 446/447 (l'unico rosso, `defaultsSecretsMerge`, è il noto
+    artefatto del sandbox: `require('electron')` non installabile in cloud).
+    Rules: bilanciamento sintattico ok; **non** compilabili qui (manca firebase CLI).
+  - ⚠️ **AZIONE OWNER**: `firebase deploy --only firestore:rules` perché la board
+    utente possa scrivere i voti.
+  - Niente changelog/capabilities: la board utente (UI dei voti) arriva con DC*;
+    qui è solo substrato dati, non ancora user-visible.
 
 - [ ] **DB5 — Migrazione dei feedback esistenti nella dashboard unificata**
   (dipende da DB1/DB2) — Far sì che TUTTI i feedback oggi sparsi nella vecchia
