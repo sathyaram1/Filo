@@ -647,6 +647,22 @@
       statusEl.textContent = 'Invio in corso…';
       try {
         const clientId = await getClientId();
+        // S1.F2.2: hash deterministico del clientId per il match C5 sulla macchina utente.
+        // Il main process userà questo hash per il confronto (la macchina non ha la privata).
+        const clientIdHash = await (async () => {
+          try {
+            const H = global.SN_FEEDBACK_CLIENT_ID_HASH;
+            if (H && H.hashClientId) return await H.hashClientId(clientId);
+            // Fallback: WebCrypto diretto (il modulo potrebbe non essere caricato nel preload)
+            const enc = new TextEncoder();
+            const buf = enc.encode(String(clientId || ''));
+            const hashBuf = await global.crypto.subtle.digest('SHA-256', buf);
+            const bytes = new Uint8Array(hashBuf);
+            let hex = '';
+            for (let i = 0; i < 16; i++) hex += bytes[i].toString(16).padStart(2, '0');
+            return hex;
+          } catch (_) { return ''; }
+        })();
         // Costruisce la lista immagini: incollate/trascinate/allegate + (se c'è
         // un disegno) lo screenshot di tutta l'app con sopra l'annotazione.
         const outImages = images.slice();
