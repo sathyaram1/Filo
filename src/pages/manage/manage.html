@@ -304,6 +304,22 @@
     .mg-action-msg.mg-ok  { color: #2e9e5b; }
     .mg-action-msg.mg-err { color: #c0392b; }
 
+    /* ── Gestione feedback (⭐ + archivia/ripristina), owner-only ────────── */
+    .mg-manage[hidden] { display: none; }
+    .mg-star-btn {
+      all: unset; cursor: pointer;
+      padding: 7px 12px; border-radius: 8px;
+      border: 1px solid var(--sn-border); background: var(--sn-bg, transparent);
+      color: var(--sn-fg); font-size: 13px; font-weight: 600;
+      transition: background 0.1s, border-color 0.1s;
+    }
+    .mg-star-btn:hover { background: var(--sn-hover); }
+    /* Acceso = preferito attivo: bordo e testo color "stella". */
+    .mg-star-btn[aria-pressed="true"] {
+      border-color: #e0a30b; color: #b9770a;
+      background: color-mix(in srgb, #e0a30b 12%, var(--sn-bg, transparent));
+    }
+
     /* Mittente */
     .mg-sender-info { display: flex; flex-direction: column; gap: 10px; }
     .mg-sender-stat { font-size: 13px; color: var(--sn-muted); }
