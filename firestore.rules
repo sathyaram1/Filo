@@ -100,10 +100,13 @@ service cloud.firestore {
 
       // `name` = titolo breve generato da un LLM all'invio; `seq`/`subSeq` =
       // numero progressivo leggibile (#22, #22.1) calcolato dal client.
+      // `parentId` (DC4): presente solo quando questo feedback è la riapertura
+      // di un fix "Risolti" — collega al doc originale (ID Firestore, stessa
+      // forma usata altrove nel repo: alfanumerico/`-`/`_`).
       allow create: if
         request.resource.data.keys().hasOnly(
           ['text', 'url', 'title', 'name', 'userAgent', 'clientId', 'images',
-           'files', 'createdAt', 'seq', 'subSeq']
+           'files', 'createdAt', 'seq', 'subSeq', 'parentId']
         )
         && request.resource.data.text is string
         && request.resource.data.text.size() <= 10000
@@ -126,7 +129,9 @@ service cloud.firestore {
         && request.resource.data.get('seq', 0) <= 1000000
         && request.resource.data.get('subSeq', 0) is int
         && request.resource.data.get('subSeq', 0) >= 0
-        && request.resource.data.get('subSeq', 0) <= 100000;
+        && request.resource.data.get('subSeq', 0) <= 100000
+        && request.resource.data.get('parentId', '') is string
+        && request.resource.data.get('parentId', '').size() <= 128;
 
       // Triage admin (pieno): campi di stato/note/priorità/timestamp, più
       // numero e titolo (per backfill/rinomina). Il resto resta immutabile.
