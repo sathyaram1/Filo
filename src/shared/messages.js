@@ -168,6 +168,12 @@
     // main, che allega il Firebase ID token come Bearer e RIFIUTA se l'utente
     // loggato non è admin. → { ok } | { ok:false, error }
     FEEDBACK_UPDATE: 'feedback_update',           // { id, status?, notes?, priority? }
+    // S1.3: decifratura campi feedback lato main (la chiave privata NON lascia
+    // mai il main process). Il renderer manda i campi con valori potenzialmente
+    // cifrati; il main li decifra e torna il plaintext. Owner-only.
+    // { fields: {text?,url?,name?,title?,notes?,reviewComment?} }
+    // → { ok, fields: {…decifrati} } | { ok:false, error }
+    FEEDBACK_DECRYPT_FIELDS: 'feedback_decrypt_fields',
     // Config "modelli predefiniti" condivisa (admin-only, propaga a tutti via
     // Firestore). GET ritorna la config senza esporre le chiavi vere (solo se
     // presenti); UPDATE scrive provider/models/modelRegistry/apiKeys.
