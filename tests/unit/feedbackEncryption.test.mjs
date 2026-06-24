@@ -13,7 +13,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { webcrypto as crypto } from 'node:crypto';
 import { createRequire } from 'node:module';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -21,6 +21,9 @@ import { tmpdir } from 'node:os';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
 const require = createRequire(import.meta.url);
+
+// Helper: converte un path assoluto in file:// URL per import() dinamico su Windows.
+function toFileUrl(absPath) { return pathToFileURL(absPath).href; }
 
 // Carica feedbackCrypto direttamente (feedbackPublicKey resta null: la chiave
 // di test la passiamo esplicitamente, non usiamo quella del repo).
