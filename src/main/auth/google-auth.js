@@ -244,6 +244,7 @@ module.exports = {
   signIn,
   signOut,
   getIdToken,
+  getUid,
   getProfile,
   getTokenClaims,
   isSignedIn,
