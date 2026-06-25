@@ -87,19 +87,27 @@ test.beforeEach(async () => {
       await globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: false } });
     } catch (_) {}
   });
-  // Chiudi eventuali tab web/newtab lasciate aperte dal test precedente, così
-  // ogni test apre la propria newtab pulita e gli helper che cercano "la prima
-  // newtab" non trovano residui.
+  // Chiudi eventuali tab lasciate aperte dal test precedente e qualunque
+  // finestra incognito creata da un test, così ogni test riparte con ESATTAMENTE
+  // una newtab nella finestra principale (come quando ogni test girava su
+  // un'app appena lanciata). Chiudendo tutte le tab, il TabManager ne riapre
+  // automaticamente una newtab fresca → count torna a 1.
   await app.evaluate(({ BrowserWindow }) => {
-    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    // Chiudi le finestre incognito effimere create dal test "/incognito".
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (w._filoIncognito) { try { w.close(); } catch (_) {} }
+    }
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
     if (!w || !w._filoTabs) return;
-    const tabs = [...w._filoTabs.tabs];
-    if (tabs.length <= 1) return;
-    // Tieni solo la prima tab; chiudi le altre per evitare accumulo.
-    for (const t of tabs.slice(1)) {
-      try { w._filoTabs.close(t.id); } catch (_) {}
+    for (const t of [...w._filoTabs.tabs]) {
+      try { w._filoTabs.closeTab(t.id); } catch (_) {}
     }
   });
+  // Attendi che la finestra principale torni a una sola tab (la newtab riaperta).
+  await expect.poll(async () => app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    return w && w._filoTabs ? w._filoTabs.tabs.length : 0;
+  }), { timeout: 8_000 }).toBe(1);
 });
 
 // ───────────────────────── dashboard-command-color ─────────────────────────
