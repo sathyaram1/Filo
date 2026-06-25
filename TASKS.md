@@ -1449,13 +1449,38 @@ Ordine = dipendenze (il motore va per primo). Numerare i task come C1..C5.
   cookies, incognito, slash-commands, tab-semantic-search,
   sidebar-shell-actions) + test:shoot del menu tasto destro (ok).
 
-- [ ] **Consolidare la suite test (103 spec, ~25 min)** — Molti micro-spec
+- [~] **Consolidare la suite test (103 spec, ~25 min)** — Molti micro-spec
   avviano Electron per testare dettagli della stessa pagina (es.
   dashboard-command-color/-focus/-extra). Accorpare gli spec per pagina/area
   in file unici che condividono il `beforeAll`/fixture (1 avvio → N test).
   NON cambiare il fixture `tests/fixtures/electron.mjs`. Obiettivo: dimezzare
-  gli avvii di Electron senza perdere copertura. Verifica: `npm test` in cloud
-  (NON in locale). Questo task è ideale per una routine cloud. (stima: M)
+  gli avvii di Electron senza perdere copertura. (stima: M)
+  - **PATTERN STABILITO (sessione locale 2026-06-25)**: i file accorpati fanno UN
+    solo `beforeAll` con `_electron.launch` condiviso (+ `afterAll` di chiusura +
+    `beforeEach` mirato che ripulisce lo stato globale che trapelerebbe tra test),
+    SENZA modificare il fixture condiviso. Modello di riferimento:
+    `tests/dashboard-command.spec.mjs`. Verifica: solo `npx playwright test
+    tests/<merged>.spec.mjs` per file (mai `npm test` completo in locale).
+  - **FATTO — 7 cluster accorpati, 21 file → 7, ~34 avvii Electron in meno, 56 test
+    preservati (conteggi combaciano):**
+    - Batch 1: `dashboard-command` (4→1, 13 test), `editor-switch` (2→1, 7),
+      `editor-grid` (2→1, 6), `account-menu` (2→1, 3).
+    - Batch 2: `editor-modules` (5→1, 17: format-modules+font-search-drag+paste-zoom
+      +module-drag+chat-format), `tab-colors` (4→1, 4: live-color+identity-color
+      +favicon-color+activity-signals), `tab-bar-layout` (3→1, 6: labels+
+      active-width-chrome+overflow-scroll).
+  - **RESTA DA FARE (cluster a stato persistente, più delicati — isolamento da
+    progettare con cura, NON rushare):**
+    - `geo-block-*` e `proxy-tab-*`: stato globale main (listener accumulabili,
+      proxy/SOCKS persistente) — i test asseriscono conteggi esatti.
+    - `options-*` (default-models/model-chain/multi-model/home-models): impostazioni
+      persistenti, alcuni test assumono lo stato di default.
+    - `spellcheck-*`: config correttore nativo + listener context-menu nel main +
+      dizionario personale persistente.
+    - `dashboard-*` extra (history-control/pulisci/live-refresh/welcome): history,
+      card live, flag "welcome visto" persistenti.
+    - `tab-archive`/`tab-auto-archive`: archivio persistente + orchestrazione
+      multi-tab via `app.evaluate`.
 
 - [x] **Valutare se spezzare `src/pages/editor/editor.js` (2157 righe) e
   `src/main/tabs.js` (1299 righe)** — _(valutato + tabs.js spezzato: sessione
