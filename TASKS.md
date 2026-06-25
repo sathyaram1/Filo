@@ -1457,7 +1457,37 @@ Ordine = dipendenze (il motore va per primo). Numerare i task come C1..C5.
   gli avvii di Electron senza perdere copertura. Verifica: `npm test` in cloud
   (NON in locale). Questo task è ideale per una routine cloud. (stima: M)
 
-- [ ] **Valutare se spezzare `src/pages/editor/editor.js` (2157 righe) e
+- [~] **Valutare se spezzare `src/pages/editor/editor.js` (2157 righe) e
   `src/main/tabs.js` (1299 righe)** — Solo dopo i task sopra: leggere la
   struttura, decidere se il taglio vale il rischio, proporre all'utente.
   (stima: M)
+  - **VALUTAZIONE FATTA (sessione locale 2026-06-25, via sotto-agente).
+    Implementazione IN ATTESA di decisione owner.** Esito:
+    - **`editor.js` → NON spezzare ora.** File lungo ma molto coeso: unica IIFE
+      con stato module-scoped condiviso via closure (`doc`, `dirty`, `settingsMode`,
+      `GRID_COLS/ROWS`, funzioni mutuamente ricorsive `renderGrid`↔`renderModuleBody`
+      ↔`openModuleConfig`). Spezzarlo = refactor architetturale (serve un oggetto di
+      stato condiviso), non un taglia-e-incolla → **rischio medio-alto**. In più si
+      carica via `<script>` in `editor.html` (niente bundler), quindi nuovi file
+      reintrodurrebbero l'accoppiamento via globali. L'unico pezzo a rischio BASSO è
+      il motore chat→formattazione (`parseFormatActions`/`applyFormatActions`, ~250
+      righe, già quasi puro + già esposto come `window.__filoEditorFormat` + testato
+      da `editor-chat-format.spec.mjs`): estraibile in `editorFormatActions` se mai
+      si vorrà.
+    - **`tabs.js` → SÌ, ma un taglio chirurgico e prudente.** Due blocchi già
+      autocontenuti e dichiarati "livelli separati" nei commenti: **safebrowse**
+      (rilevamento siti pericolosi, ~110 righe: `_sbState/_sbApplyState/_sbBroadcast/
+      safebrowseGet/_sbOnNavigate/safebrowseProceed/safebrowseDismiss`) e **geo-block**
+      (~210 righe: `_geoBlockDetected`…`_geoLevel2Check`). Insieme ~320 righe
+      estraibili in `tabSafebrowse.js`/`tabGeoBlock.js` con **rischio basso**:
+      comunicano col resto solo via l'oggetto `tab` e `this.tabs.find(...)`, e i
+      `proxy-tab*.spec.mjs` (4 spec) coprono già il geo-block. NON toccare
+      `_wireEvents`/lifecycle/layout/`_recreateView` (cuore con stato critico:
+      preload sbagliato = leak chiavi API).
+    - **Copertura test**: editor 11 spec, tabs ~24 spec (incl. 4 proxy-tab) →
+      rete di sicurezza solida se si procede col taglio tabs.js.
+    - **Raccomandazione**: fare solo il taglio tabs.js (alto valore, basso rischio);
+      editor.js solo se emerge una necessità reale (es. riuso dell'editor altrove).
+      Mantenere invariate le superfici pubbliche (`module.exports` di tabs.js,
+      `window.__filoEditorFormat`). Verificare con i soli spec mirati dell'area.
+    - **Prossimo passo**: attende che l'owner dica se procedere col taglio tabs.js.
