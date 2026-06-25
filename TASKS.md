@@ -1071,11 +1071,23 @@ DIPENDENZE APERTE (non chiudibili da questo repo):
     nel repo `filo-security` con le istruzioni su come cifrare il campo `pipeline`
     nella Cloud Function che lo scrive, e come farlo transitare fino all'estensione
     del batch-decrypt. Segnala la dipendenza a S1.4. Non implementabile in questo
-    repo senza modifiche al backend. ⚠️ **Non è bloccante per il cutover Fase 1**
-    (il cutover può procedere senza cifrare `pipeline`/`verdicts`): il leak di
-    `pipeline` su Firestore è meno grave di `status=blocked`, perché descrive la
-    classe (spam/attacco) non il fatto di essere stati "beccati". (stima: coordinamento,
-    non codice — cross-repo)
+    repo senza modifiche al backend. (stima: coordinamento + codice cross-repo)
+    - ⚠️ **CORREZIONE 2026-06-25 (verificata nel codice backend) — più grave del
+      previsto.** `feedbackState.recordDecision` scrive l'oggetto `pipeline`
+      (`action`, `l2Class`, `verdicts`, `filoSummary`…) **in chiaro** sullo stesso
+      doc `feedback/{id}`, che ha `allow read: if true` (PUBBLICO). Quindi quando il
+      backend L1/L2 è deployato e la cifratura è ON, `pipeline.action === 'block_attack'`
+      e i reasoning dei giudici **ri-espongono pubblicamente** proprio il segnale
+      "sei stato beccato" che `statusPublic` doveva nascondere → **hill-climbing di
+      nuovo regalato**. Non è "meno grave di status=blocked": è lo STESSO leak.
+    - **CONSEGUENZA OPERATIVA**: NON deployare il backend L1/L2 con la cifratura ON
+      finché S1.F2.4 non cifra `pipeline`/`verdicts`/`filoSummary` in scrittura (e la
+      dashboard owner non estende il batch-decrypt all'oggetto `pipeline`). Le
+      routine possono comunque partire SENZA il backend L1/L2 deployato (si difendono
+      con l'isolamento dei worker + cancello L4/L5); il backend è difesa-in-profondità
+      separata, da accendere dopo S1.F2.4. (La collezione `attacks`, dove il corpus
+      salva il `text` decifrato in chiaro, è invece OK: `allow read: if isAdmin()`,
+      scrittura solo server-side → plaintext owner-only, non pubblico.)
 
   ---
   - [~] **S1.5 — Slot chiave + checklist di cutover (azione owner)** _(slot fatti, cutover da fare)_:
