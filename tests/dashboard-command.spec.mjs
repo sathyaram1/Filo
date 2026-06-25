@@ -87,9 +87,18 @@ test.beforeEach(async () => {
       await globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: false } });
     } catch (_) {}
     // Azzera i timer persistiti: i timer sopravvivono in storage e ricompaiono
-    // in ogni newtab. Senza app fresca per test, un timer creato da un test
-    // verrebbe contato anche nel successivo. Svuota la chiave filo_timers.
-    try { await globalThis.SN_STORAGE.set({ filo_timers: [] }); } catch (_) {}
+    // in ogni newtab (e nelle dashboard già aperte via live-update). Senza app
+    // fresca per test, un timer creato da un test verrebbe contato anche nel
+    // successivo. Cancella ogni timer e notifica le dashboard.
+    try {
+      const Mem = globalThis.SN_FILO_MEMORY;
+      if (Mem) {
+        const list = await Mem.listTimers();
+        for (const t of list) { try { await Mem.deleteTimer(t.id); } catch (_) {} }
+      }
+      await globalThis.SN_STORAGE.set({ filo_timers: [] });
+    } catch (_) {}
+    try { globalThis.SN_HANDLERS?.broadcastLiveUpdate?.(); } catch (_) {}
   });
   // Chiudi eventuali tab lasciate aperte dal test precedente e qualunque
   // finestra incognito creata da un test, così ogni test riparte con ESATTAMENTE
