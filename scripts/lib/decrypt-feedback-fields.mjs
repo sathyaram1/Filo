@@ -114,6 +114,20 @@ export async function decryptFeedbackFields(fb, privKey) {
       out[f] = PLACEHOLDER;
     }
   }
+
+  // S1.F2.4: il campo `pipeline` (scritto dal backend di sicurezza sul documento
+  // PUBBLICO) è cifrato come un'unica stringa FENC1: che racchiude l'INTERO
+  // oggetto pipeline serializzato in JSON. Decifralo e re-idratalo a oggetto, così
+  // chi legge `fb.pipeline.action` ecc. lo trova invariato. Casi: assente o già
+  // oggetto → invariato; FENC1: senza chiave → lascia la stringa (no crash);
+  // errore di parse → lascia com'è.
+  if (C && C.isEncrypted(out.pipeline) && priv) {
+    try {
+      out.pipeline = JSON.parse(await C.decrypt(out.pipeline, priv));
+    } catch (e) {
+      console.warn('[decrypt-feedback-fields] decifratura/parse del pipeline fallita:', e?.message || e);
+    }
+  }
   return out;
 }
 
