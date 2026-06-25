@@ -61,6 +61,26 @@ async function getPrivateKey() {
 const TEXT_FIELDS_TO_DECRYPT = ['text', 'url', 'name', 'title', 'notes', 'reviewComment', 'status', 'clientId'];
 const PLACEHOLDER_NO_KEY = '[cifrato — chiave privata non configurata]';
 
+// S1.F2.4: il campo `pipeline` (scritto dal backend di sicurezza sul documento
+// PUBBLICO) è cifrato come un'unica stringa FENC1: che racchiude l'INTERO oggetto
+// pipeline serializzato in JSON. La dashboard owner deve decifrarlo PRIMA del
+// render così classifyBlock/manageReview leggono `fb.pipeline.action` ecc. come
+// sempre (ricevono già l'oggetto). Casi: assente → niente; già oggetto (vecchi
+// feedback in chiaro, retrocompat) → lascia; FENC1: senza chiave privata →
+// lascia la stringa com'è (placeholder, niente crash).
+async function decryptPipelineField(out, C, priv) {
+  const p = out.pipeline;
+  if (!C.isEncrypted(p)) return; // assente, già oggetto, o null: invariato
+  if (!priv) return; // senza chiave: lascia la stringa cifrata (no crash)
+  try {
+    out.pipeline = JSON.parse(await C.decrypt(p, priv));
+  } catch (e) {
+    console.warn('[auth] decifratura/parse del pipeline fallita:', e?.message || e);
+    // lascia il valore com'è: i lettori (classifyBlock) gestiscono `pipeline`
+    // non-oggetto come "nessun blocco" senza crashare.
+  }
+}
+
 async function decryptFeedbackObject(fields) {
   const C = globalThis.SN_FEEDBACK_CRYPTO;
   if (!C) return fields; // modulo non caricato: passthrough
@@ -78,6 +98,7 @@ async function decryptFeedbackObject(fields) {
       out[f] = PLACEHOLDER_NO_KEY;
     }
   }
+  await decryptPipelineField(out, C, priv);
   return out;
 }
 
