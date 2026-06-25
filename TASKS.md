@@ -1087,13 +1087,21 @@ DIPENDENZE APERTE (non chiudibili da questo repo):
     1. [x] Wiring decifratura dashboard (manage.js + pagina feedback) — S1.3 §1.
        _(fatto 2026-06-24: handler batch + entrambe le dashboard)_
     2. [ ] Privata in env `FILO_FEEDBACK_PRIVKEY` nella sandbox delle routine cloud
-       (entrambi gli account) + worker che decifrano i corpi (S1.3 §2).
-    3. [ ] Backend filo-security: privata nei Functions secrets + decifratura in
-       pipeline (S1.4).
-    4. [ ] Owner ha messo la privata in locale (`tests/agent/.env` o storage) e
-       verificato che la dashboard mostra il testo in chiaro.
-    5. [ ] Confermato che NESSUN campo cifrato è mostrato a un utente senza chiave
-       (C5: `name`/`notes` restano in chiaro in Fase 1 — ok).
+       (entrambi gli account) + worker che decifrano i corpi (S1.3 §2). **[OWNER-CLOUD]**.
+    3. [~] Backend filo-security: **decifratura FATTA** (S1.4, commit 9baa637+2e91d45:
+       runner decifra prima dei giudici, secret dichiarato sul trigger). RESTA il
+       provisioning: `firebase functions:secrets:set FILO_FEEDBACK_PRIVKEY` (serve il
+       VALORE della chiave, ce l'ha l'owner) + `firebase deploy --only functions`
+       (PRIMO deploy del backend sicurezza sul flusso feedback live → conferma owner).
+       ⚠️ I comandi `firebase functions:secrets:*` hanno dato "Authentication Error /
+       login --reauth" il 2026-06-25 (mentre `deploy --only firestore:rules` funziona):
+       l'owner deve fare `firebase login --reauth` prima del secret/functions deploy.
+    4. [ ] Owner mette la privata in locale (`tests/agent/.env`, riga
+       `FILO_FEEDBACK_PRIVKEY=<base64>`) — **verificato 2026-06-25: ANCORA ASSENTE** —
+       e conferma che la dashboard mostra il testo in chiaro. **[OWNER]**.
+    5. [x] Confermato che NESSUN campo cifrato è mostrato a un utente senza chiave
+       (audit 2026-06-25: C5 usa `statusPublic`/`clientIdHash` in chiaro; `name`/`notes`
+       restano in chiaro in Fase 1 → ricompense C5 non si rompono).
     Solo allora: metti `SN_FEEDBACK_ENC_ENABLED = true` in `feedbackPublicKey.js`
     (si propaga a tutti via auto-update). Documenta la **rotazione**: rigenerare la
     coppia rende illeggibili i feedback cifrati con la vecchia chiave → ruotare a
