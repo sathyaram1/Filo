@@ -858,11 +858,39 @@ DIPENDENZE APERTE (non chiudibili da questo repo):
        placeholder e il worker segnala l'impossibilità di procedere. I metadati visti
        dall'orchestratore (`statusPublic`/num/priority/titolo) sono sempre in chiaro.
        `node --check` ok sull'helper referenziato.
-  - [ ] **S1.4 — Coordina col backend filo-security**: il backend deve decifrare
+  - [~] **S1.4 — Coordina col backend filo-security**: il backend deve decifrare
     il feedback per farlo giudicare (chiave privata nei secrets delle Functions)
     e **cifrare `pipeline`/`verdicts`** che scrive. Cross-repo: documenta lì.
     Le rules Firestore possono lasciare la lettura com'è (il contenuto è cifrato),
     ma verifica che NESSUN campo in chiaro riveli lo stato di blocco. (stima: M)
+    - **CODICE FATTO + WIRING (sessione locale 2026-06-25, repo filo-security,
+      commit 9baa637 + 2e91d45):** il backend ora decifra i feedback PRIMA dei
+      giudici. Aggiunti `functions/src/feedbackCrypto.js` (porting CommonJS del
+      sealed box di Filo: ECDH P-256 effimero + HKDF-SHA256 + AES-256-GCM, parsing
+      `FENC1:`, interoperabile e testato contro l'impl di Filo) e
+      `functions/src/feedbackDecrypt.js` (`decryptFeedbackFields`, stessa lista campi
+      dell'helper routine: text/url/name/title/notes/reviewComment/status/clientId;
+      chiave assente → passthrough = zero regressione con cifratura dormiente).
+      `runner.js` decifra come step 0a prima di L1/L2. `index.js`: dichiarato il
+      secret `FILO_FEEDBACK_PRIVKEY` sul trigger `onFeedbackCreate`. **Test 145→153
+      verdi** (nuovi: round-trip, interop con Filo, runner consegna PLAINTEXT ai
+      giudici, chiave assente → passthrough; rossi se si rimuove il decrypt).
+    - **RESTA (deploy, owner-coordinato perché è il PRIMO deploy delle Functions
+      sul flusso feedback LIVE → trigger iniziano a girare):**
+      1. `firebase functions:secrets:set FILO_FEEDBACK_PRIVKEY` (la stessa privata
+         PKCS8 base64 la cui pubblica è bakeata in Filo) — **serve il valore della
+         chiave** (ce l'ha l'owner).
+      2. `firebase deploy --only functions` dalla root di filo-security. NB: in
+         "Fase 0" la pipeline OSSERVA/ANNOTA `feedback.pipeline` senza agire sul
+         flusso user-facing (L2 stub degradato → tutto resta a revisione umana), e
+         senza `JUDGE_OPENROUTER_KEY` i giudici sono dormienti → deploy sicuro, ma
+         resta un primo-deploy che attiva i trigger: confermare con owner.
+    - **Follow-up NON fatto (S1.F2.4, non bloccante per il cutover):** cifrare
+      `pipeline`/`verdicts` in scrittura — richiede un cambio coordinato lato
+      dashboard Filo (estendere il batch-decrypt all'oggetto `pipeline`), altrimenti
+      la dashboard leggerebbe pipeline cifrato senza saperlo decifrare. Lasciati in
+      chiaro come ora (il leak di `pipeline` è meno grave di `status=blocked`, già
+      coperto da `statusPublic`).
     - ⚠️ **AUDIT 2026-06-25 — IL GAP È PIÙ GRANDE DEL PREVISTO. Questo è IL collo
       di bottiglia del go-live routine.** Il repo `filo-security`
       (`C:\Users\agenti AI\Desktop\Filo\filo-security`, accessibile in locale) NON
