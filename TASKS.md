@@ -863,6 +863,24 @@ DIPENDENZE APERTE (non chiudibili da questo repo):
     e **cifrare `pipeline`/`verdicts`** che scrive. Cross-repo: documenta lì.
     Le rules Firestore possono lasciare la lettura com'è (il contenuto è cifrato),
     ma verifica che NESSUN campo in chiaro riveli lo stato di blocco. (stima: M)
+    - ⚠️ **AUDIT 2026-06-25 — IL GAP È PIÙ GRANDE DEL PREVISTO. Questo è IL collo
+      di bottiglia del go-live routine.** Il repo `filo-security`
+      (`C:\Users\agenti AI\Desktop\Filo\filo-security`, accessibile in locale) NON
+      sa NULLA di S1: `functions/src/runner.js` (~righe 46-53) legge `feedback.text`
+      GREZZO e lo passa a `classifyIdentity`/`runPanel`; grep su `functions/src` →
+      ZERO occorrenze di `FENC1`/`decrypt`/`feedbackCrypto`/`FILO_FEEDBACK_PRIVKEY`;
+      `pipeline`/`verdicts` scritti in chiaro. Inoltre `functions/index.js` dice
+      "SKELETON — NON ANCORA DEPLOYATO" → la pipeline non è mai andata in prod.
+      **Conseguenza**: accendere `SN_FEEDBACK_ENC_ENABLED=true` ORA romperebbe i
+      giudici (riceverebbero `FENC1:...` invece del testo) → la difesa anti-injection
+      di S1 salterebbe. **Lavoro concreto [LOCALE-CODE in filo-security]**: (1) portare
+      un modulo crypto in `functions/src` (equivalente di `src/shared/feedbackCrypto.js`,
+      decrypt con privata); (2) `runner.js` decifra i campi `FENC1:` PRIMA di L1/L2;
+      (3) cifrare `pipeline`/`verdicts` in scrittura (→ assorbe anche S1.F2.4 e il
+      residuo backend di DD3: risolvere lo slot modello `sanitizer` e cifrare al
+      passaggio `done`). Poi [DEPLOY]: privata nei Functions secrets + `firebase
+      deploy --only functions`. **Questo task NON è solo "coordinamento": è codice
+      backend da scrivere, fattibile in locale in filo-security.**
 
   ---
   ### S1 — Fase 2: campi rimanenti in chiaro (status, pipeline/verdicts, clientId, name/notes)
