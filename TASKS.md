@@ -1055,8 +1055,23 @@ DIPENDENZE APERTE (non chiudibili da questo repo):
     (4) aggiornare `firestore.rules` (size dei campi cifrati). **GATE**: aspettare DD2
     completato. Non aprire come task attivo finché DD2 non è in stato `done`. (stima: S)
 
-  - [ ] **S1.F2.4 — `pipeline`/`verdicts`: coordinamento backend filo-security** _(dipende
-    da S1.4, cross-repo)_ — `pipeline` e `verdicts` sono scritti **esclusivamente** dal
+  - [x] **S1.F2.4 — `pipeline`/`verdicts`: cifrati** _(fatto: sessione locale 2026-06-25,
+    cross-repo)_ — **ESITO**: il backend cifra l'intero oggetto `pipeline` con la
+    PUBBLICA prima di scriverlo su `feedback/{id}` (filo-security: `feedbackCrypto.js`
+    ora ha `encryptForOwner` + pubkey bakeata identica a Filo; `feedbackState.recordDecision`
+    serializza+cifra → campo `pipeline` = stringa `FENC1:`, fail-safe: se la cifratura
+    fallisce NON scrive in chiaro). La dashboard owner decifra `pipeline` nel batch-decrypt
+    (`auth.js` `decryptFeedbackObject` + `decrypt-feedback-fields.mjs`): `FENC1:`→decrypt→
+    `JSON.parse`→oggetto, così `classifyBlock`/verdetti leggono l'oggetto invariato. Board
+    sicura senza modifiche (gate primario `statusPublic`: un `blocked` è `open`→mai in
+    Risolti). **Sempre attiva** lato backend (non gated dal flag: il pipeline è sensibile
+    in sé). **Verificato**: filo-security 153→157 test (round-trip, recordDecision scrive
+    FENC1 mai plaintext → rosso se si toglie la cifratura, interop con Filo); Filo unit
+    644→651 (batch-decrypt del pipeline, classifyBlock dopo decrypt, listBoardTab esclude
+    un blocked con pipeline cifrato). ⚠️ **Pubkey duplicata in 2 repo**: se si ruota la
+    coppia in Filo, aggiornare `FEEDBACK_PUBKEY` in `filo-security/functions/src/feedbackCrypto.js`.
+    Resta solo il deploy del backend (orchestratore/owner), non bloccante per le routine.
+    — _Spec originale:_ `pipeline` e `verdicts` sono scritti **esclusivamente** dal
     backend `filo-security` via Admin SDK (bypassano le `firestore.rules` lato client).
     Non transitano mai da `apply-triage.mjs` né da `queue-triage.mjs`: non c'è leakage
     git per questi campi. Il leakage esiste solo su **Firestore** (lettura pubblica).
