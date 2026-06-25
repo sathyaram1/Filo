@@ -1123,9 +1123,10 @@ DIPENDENZE APERTE (non chiudibili da questo repo):
        ⚠️ I comandi `firebase functions:secrets:*` hanno dato "Authentication Error /
        login --reauth" il 2026-06-25 (mentre `deploy --only firestore:rules` funziona):
        l'owner deve fare `firebase login --reauth` prima del secret/functions deploy.
-    4. [ ] Owner mette la privata in locale (`tests/agent/.env`, riga
-       `FILO_FEEDBACK_PRIVKEY=<base64>`) — **verificato 2026-06-25: ANCORA ASSENTE** —
-       e conferma che la dashboard mostra il testo in chiaro. **[OWNER]**.
+    4. [x] Owner ha messo la privata in locale (`tests/agent/.env`,
+       `FILO_FEEDBACK_PRIVKEY`) — **VERIFICATO 2026-06-25**: round-trip deterministico
+       (cifra con la pubblica bakeata → decifra con la privata del `.env` → identico,
+       PASS). La dashboard decifrerà correttamente dopo il flip. **[FATTO]**.
     5. [x] Confermato che NESSUN campo cifrato è mostrato a un utente senza chiave
        (audit 2026-06-25: C5 usa `statusPublic`/`clientIdHash` in chiaro; `name`/`notes`
        restano in chiaro in Fase 1 → ricompense C5 non si rompono).
