@@ -10,6 +10,8 @@ const Cookies = require('./services/cookies');
 const ProxyTab = require('./services/proxyTab');
 const GeoBlock = require('./services/geoBlock');
 const GeoBlockRules = require('./services/geoBlockRules');
+const { installSafebrowse } = require('./tabs/tabSafebrowse');
+const { installGeoBlock } = require('./tabs/tabGeoBlock');
 require('../shared/audioState');
 const { audibleFromEvent } = globalThis.SN_AUDIO_STATE;
 require('../shared/authPopup');
