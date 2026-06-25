@@ -1680,6 +1680,13 @@ class TabManager {
   }
 }
 
+// Installa i blocchi estratti come metodi di TabManager (mixin). Le definizioni
+// vivono in moduli separati per leggibilità; qui li agganciamo al prototype così
+// `this._sbBroadcast(...)`, `this._geoTextCheck(...)`, ecc. restano metodi
+// d'istanza identici a prima del refactor.
+installSafebrowse(TabManager);
+installGeoBlock(TabManager);
+
 // Host di un URL (chiave della cache colore identità §1.2). Solo schemi web:
 // le pagine filo:// interne non hanno identità di sito da tinteggiare.
 function hostOf(url) {
