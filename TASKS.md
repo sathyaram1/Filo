@@ -1471,8 +1471,9 @@ Ordine = dipendenze (il motore va per primo). Numerare i task come C1..C5.
       active-width-chrome+overflow-scroll).
   - **RESTA DA FARE (cluster a stato persistente, più delicati — isolamento da
     progettare con cura, NON rushare):**
-    - `geo-block-*` e `proxy-tab-*`: stato globale main (listener accumulabili,
-      proxy/SOCKS persistente) — i test asseriscono conteggi esatti.
+    - _(`geo-block-*`/`proxy-tab-*`: NON consolidare — l'owner ha deciso 2026-06-25
+      che il servizio proxy/geo è costoso e verrà ripreso solo molto in futuro;
+      lasciare gli spec così come sono.)_
     - `options-*` (default-models/model-chain/multi-model/home-models): impostazioni
       persistenti, alcuni test assumono lo stato di default.
     - `spellcheck-*`: config correttore nativo + listener context-menu nel main +
