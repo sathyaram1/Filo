@@ -1457,12 +1457,17 @@ Ordine = dipendenze (il motore va per primo). Numerare i task come C1..C5.
   gli avvii di Electron senza perdere copertura. Verifica: `npm test` in cloud
   (NON in locale). Questo task è ideale per una routine cloud. (stima: M)
 
-- [~] **Valutare se spezzare `src/pages/editor/editor.js` (2157 righe) e
-  `src/main/tabs.js` (1299 righe)** — Solo dopo i task sopra: leggere la
-  struttura, decidere se il taglio vale il rischio, proporre all'utente.
+- [x] **Valutare se spezzare `src/pages/editor/editor.js` (2157 righe) e
+  `src/main/tabs.js` (1299 righe)** — _(valutato + tabs.js spezzato: sessione
+  locale 2026-06-25)_. **ESITO**: `editor.js` lasciato monolitico (decisione:
+  rischio medio-alto, troppo coeso); `tabs.js` **spezzato** col taglio chirurgico
+  raccomandato — safebrowse e geo-block estratti in `src/main/tabs/tabSafebrowse.js`
+  + `src/main/tabs/tabGeoBlock.js` (mixin via `Object.assign(prototype)`,
+  `module.exports` invariato). Verificato: 24/24 spec mirati pass
+  (proxy-tab*, safebrowse, geo-block*). Refactor puro, zero cambi di comportamento.
+  Dettaglio valutazione sotto.
   (stima: M)
-  - **VALUTAZIONE FATTA (sessione locale 2026-06-25, via sotto-agente).
-    Implementazione IN ATTESA di decisione owner.** Esito:
+  - **VALUTAZIONE (sessione locale 2026-06-25, via sotto-agente):**
     - **`editor.js` → NON spezzare ora.** File lungo ma molto coeso: unica IIFE
       con stato module-scoped condiviso via closure (`doc`, `dirty`, `settingsMode`,
       `GRID_COLS/ROWS`, funzioni mutuamente ricorsive `renderGrid`↔`renderModuleBody`
