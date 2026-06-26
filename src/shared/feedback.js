@@ -471,6 +471,13 @@
       }
       mask.push('priority');
     }
+    // priorityManual: flag booleano, non cifrato (indica che l'owner ha fissato
+    // la priorità a mano — il backend di sicurezza lo usa per saltare l'override
+    // automatico). Scritto solo quando esplicitamente passato `true`.
+    if (priorityManual === true) {
+      fields.priorityManual = { booleanValue: true };
+      mask.push('priorityManual');
+    }
     if (status === 'done') {
       fields.resolvedAt = { timestampValue: new Date().toISOString() };
       mask.push('resolvedAt');
