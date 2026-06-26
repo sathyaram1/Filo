@@ -453,9 +453,22 @@
     // boardArchive.js): 'archived' | 'keep_open' | '' (nessun override).
     if (archiveOverride !== undefined) { fields.archiveOverride = toFsValue(archiveOverride); mask.push('archiveOverride'); }
     if (priority !== undefined) {
-      // Priorità 1-3 (0 = nessuna). Le regole Firestore validano int 0..3.
+      // Priorità 1-3 (0 = nessuna). Clamp PRIMA di cifrare.
       const p = Math.max(0, Math.min(3, Math.round(Number(priority) || 0)));
-      fields.priority = { integerValue: String(p) };
+      // S1.priority: con cifratura attiva, `priority` va scritto come stringValue
+      // (ciphertext FENC1:). Senza cifratura, integerValue come prima (retrocompat).
+      const C = global.SN_FEEDBACK_CRYPTO;
+      if (C && C.isEnabled()) {
+        try {
+          const encPriority = await C.encryptForOwner(String(p));
+          fields.priority = { stringValue: encPriority };
+        } catch (e) {
+          console.warn('[SN feedback] cifratura priority fallita, scrivo in chiaro:', e?.message || e);
+          fields.priority = { integerValue: String(p) };
+        }
+      } else {
+        fields.priority = { integerValue: String(p) };
+      }
       mask.push('priority');
     }
     if (status === 'done') {
