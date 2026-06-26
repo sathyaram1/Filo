@@ -1134,6 +1134,21 @@ DIPENDENZE APERTE (non chiudibili da questo repo):
     (si propaga a tutti via auto-update). Documenta la **rotazione**: rigenerare la
     coppia rende illeggibili i feedback cifrati con la vecchia chiave → ruotare a
     freddo o conservare la vecchia privata per lo storico.
+    - ✅ **FLAG ACCESO — CUTOVER FATTO (2026-06-25):** `SN_FEEDBACK_ENC_ENABLED` ora
+      default `true` in `feedbackPublicKey.js`. Deciso con l'owner: nessun tester
+      reale ancora → zero rischio di bloccare qualcuno. `npm run test:unit` 651/651
+      verde col flag ON. Da ora i nuovi feedback degli utenti vengono cifrati; la
+      dashboard owner li decifra (chiave verificata, punto 4).
+    - ⚠️ **CAVEAT dev vs prod sul `.env`**: lo slot `tests/agent/.env` è risolto via
+      `__dirname` relativo al repo → funziona con `npm start` dal repo. In un **build
+      pacchettizzato** (asar) quel file non c'è: lì l'owner deve mettere la privata in
+      `storage.json` (campo `feedbackPrivateKey`, in `%APPDATA%/Filo/storage.json`)
+      oppure come env di sistema `FILO_FEEDBACK_PRIVKEY`. (Slot 1 env e slot 3 storage
+      funzionano in entrambi i casi; solo lo slot 2 `.env` è dev-only.)
+    - ⏳ **RESTA per riattivare le routine cloud** (punto 2): privata nelle sandbox dei
+      2 account. ⚠️ **NON** nel campo "Variabili d'ambiente" del dialog ambiente cloud
+      (è dichiarato visibile/non-segreto) → passarla **nel prompt** della routine
+      (`FILO_FEEDBACK_PRIVKEY=<base64>`), come da design "chiave nel prompt".
   **Done complessivo**: testo/note/stato/verdetti dei feedback non leggibili da
   chi non ha la chiave, su NESSUN canale (Firestore, git, Storage); owner +
   routine + backend continuano a lavorare via decrypt. (stima: L, multi-sessione)
