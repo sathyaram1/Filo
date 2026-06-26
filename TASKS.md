@@ -67,22 +67,6 @@ design confermate dall'utente:
 Task ordinati (dipendenze: P1 fondamento → P2/P3):
 
 - [x] **P1 — Cifra `priority` end-to-end** (fondamento) — _(fatto: sessione locale 2026-06-26)_ — **Esito**: `priority` ora cifrata come campo S1 (`FENC1:`), guardata da `isEnabled()`, retrocompat coi valori interi in chiaro. Toccati: `decrypt-feedback-fields.mjs` (decifra→Number), `feedback.js` `updateStatus` (cifra→stringValue), `handlers/auth.js` `decryptFeedbackObject` (layer IPC che usano entrambe le dashboard — sito extra trovato dal worker), `queue-feedback.mjs` (cifra priority nello spool pubblico), `apply-triage.mjs` (stringValue vs integerValue duale), `firestore.rules` (accetta int 0-3 legacy OPPURE stringa `FENC1:`, **deployate**). 6 nuovi unit test in `tests/unit/feedbackPriorityEncryption.test.mjs`. `npm run test:unit` 657/657 verde (verificato dall'orchestratore). Non testato end-to-end: scrittura/lettura cifrata via Firestore live (solo unit sui componenti).
-- [ ] ~~**P1 — Cifra `priority` end-to-end** (fondamento)~~ — Aggiungi `priority` ai
-  campi cifrati. (a) `scripts/lib/decrypt-feedback-fields.mjs`: gestisci `priority`
-  (intero) — decifra la stringa `FENC1:` e riportala a numero; retrocompat con i
-  valori già in chiaro. (b) Cifra in **scrittura** dove oggi è in chiaro, con la
-  stessa guardia `isEnabled()` degli altri campi S1 (vedi `src/shared/feedback.js`
-  → `submit` usa `maybeEncrypt`; `scripts/queue-feedback.mjs` → `buildCreateEntry`
-  scrive `priority: prio` in chiaro nella coda git pubblica; `scripts/queue-triage.mjs`
-  se tocca priority). La chiave pubblica è in `src/shared/feedbackPublicKey.js`
-  (cifrare è disponibile ovunque). (c) Verifica che la dashboard owner
-  (`src/pages/feedback/feedback.js`, ha la chiave privata) legga/scriva priority
-  cifrata senza rompersi — owner-only, NON mostrata a chi invia (verificato: non
-  è in `src/content/`). **Fatto**: unit test in `tests/unit/` che cifra una
-  priority, la decifra e ritorna l'intero originale; round-trip via i percorsi di
-  scrittura toccati. Verifica `npm run test:unit` (NO `npm test`, NO Electron in
-  locale). (stima: M)
-
 - [ ] **P2 — Selettore isolato `scripts/next-feedback.mjs`** (dipende da P1) —
   Script non-LLM che: interroga Firestore (`runQuery` come `nextSeq()` in
   `src/shared/feedback.js`) per i feedback `todo` non-claimati (incrocia con
