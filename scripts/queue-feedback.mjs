@@ -149,6 +149,20 @@ export async function queueFeedbackCreateEncrypted(opts) {
   // S1.F2.2: cifra anche `clientId` se presente (il match usa clientIdHash).
   const fieldsToEncrypt = entry.clientId ? ['text', 'clientId'] : ['text'];
   await encryptFieldsForQueue(entry, fieldsToEncrypt);
+  // S1.priority: cifra `priority` separatamente perché è un intero, non testo.
+  // encryptFieldsForQueue lavora su stringhe; qui convertiamo esplicitamente
+  // String(entry.priority) → cifratura → il valore diventa una stringa FENC1:.
+  // Con gate dormiente (isEnabled() false): lasciamo il valore intero invariato.
+  {
+    const C = globalThis.SN_FEEDBACK_CRYPTO;
+    if (C && C.isEnabled && C.isEnabled() && entry.priority !== undefined && entry.priority !== null) {
+      try {
+        entry.priority = await C.encryptForOwner(String(entry.priority));
+      } catch (e) {
+        console.warn('[queue-feedback] cifratura priority fallita, scrivo in chiaro:', e?.message || e);
+      }
+    }
+  }
   mkdirSync(SPOOL_DIR, { recursive: true });
   const rand = Math.random().toString(36).slice(2, 8);
   const file = resolve(SPOOL_DIR, `new-${Date.now()}-${rand}.json`);
