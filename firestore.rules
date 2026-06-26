@@ -209,6 +209,9 @@ service cloud.firestore {
         // `starred` (DB2): flag ⭐ "preferito"/parcheggiato, settabile su
         // qualunque feedback dall'owner. Booleano puro.
         && request.resource.data.get('starred', false) is bool
+        // `priorityManual` (P6): flag booleano — l'owner ha impostato la priorità
+        // a mano. Il giudice automatico (filo-security) lo rispetta e non sovrascrive.
+        && request.resource.data.get('priorityManual', false) is bool
         // Override di revisione: l'owner sblocca/conferma a mano un feedback
         // fermato dalla sicurezza, con un commento opzionale. `reviewDecision`
         // 'accepted' lo riammette nel flusso (vedi SN_MANAGE_REVIEW.classifyBlock).
