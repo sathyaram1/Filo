@@ -27,6 +27,6 @@
   // decifrano, (3) confermato che nessun campo cifrato è mostrato a un utente
   // senza chiave. Vedi CLAUDE.md → S1 e TASKS.md → S1.5 (checklist di cutover).
   if (global.SN_FEEDBACK_ENC_ENABLED === undefined) {
-    global.SN_FEEDBACK_ENC_ENABLED = false;
+    global.SN_FEEDBACK_ENC_ENABLED = true; // CUTOVER 2026-06-25: cifratura S1 ATTIVA.
   }
 })(typeof globalThis !== 'undefined' ? globalThis : self);
