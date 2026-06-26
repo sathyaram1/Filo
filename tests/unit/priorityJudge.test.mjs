@@ -19,19 +19,20 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
 
-// Import diretti dai file (ESM).
+// Import diretti dai file (ESM). Su Windows occorre pathToFileURL per evitare
+// ERR_UNSUPPORTED_ESM_URL_SCHEME con path assoluti C:\...
 const { applyClamp, makePriorityJudge, buildUserPrompt } = await import(
-  resolve(ROOT, 'scripts', 'lib', 'priority-judge.mjs')
+  pathToFileURL(resolve(ROOT, 'scripts', 'lib', 'priority-judge.mjs')).href
 );
 
 const { applyGrooming } = await import(
-  resolve(ROOT, 'scripts', 'groom-apply.mjs')
+  pathToFileURL(resolve(ROOT, 'scripts', 'groom-apply.mjs')).href
 );
 
 // ── Helper: feedback minimale ─────────────────────────────────────────────────
