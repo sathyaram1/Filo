@@ -134,19 +134,17 @@ Task ordinati (dipendenze: P1 fondamento → P2/P3):
   Playwright per costruire lo stato + catturare il composito reale). Si valida
   SOLO nel runner cloud. Vedi il feedback in coda. (stima: M, cloud-only)
 
-- [ ] **P5 — Split `CLAUDE.md` → `ROUTINES.md` + 6 prompt sotto-agenti** (dipende
-  da P1-P3) — Estrai TUTTA la recipe-routine da `CLAUDE.md` (oggi ~metà del file,
-  "incasinato e lunghissimo" per l'utente) in un file dedicato `ROUTINES.md` nella
-  root. `CLAUDE.md` resta snello (convenzioni repo: porting IIFE, shim, test
-  locali, patch notes, capabilities, niente recipe-routine — lascia un puntatore a
-  `ROUTINES.md`). `ROUTINES.md` contiene: il flusso orchestratore cieco, la
-  macchina a stati, il cancello di merge, e **il prompt minimo standardizzato dei
-  6 sotto-agenti** (1 verifica-diff-cieca, 2 verifica-risoluzione-con-stress-e-visivo,
-  3 risolvi-con-critica, 4 sub-feedback, 5 nuovo-feedback, 6 audit-autonomo): il
-  prompt di Claude per ciascun sotto-agente è ~2 righe ("sei il worker X, leggi
-  ROUTINES.md §N"), tutto il resto standardizzato vive nel file. Riusa next-feedback
-  (P2) e il giudice (P3) nel flusso descritto. **Fatto**: i due file coerenti,
-  nessun riferimento orfano, `node --check` sugli script citati verde. (stima: M)
+- [x] **P5 — Split `CLAUDE.md` → `ROUTINES.md` + 6 prompt sotto-agenti** (dipende
+  da P1-P3) — _(fatto: sessione locale 2026-06-26)_ — **Esito**: `CLAUDE.md`
+  ridotto da 995 a 358 righe (conv. repo pura: porting IIFE, shim, run/test,
+  patch notes, capabilities, worktree). Tutto il materiale operativo delle
+  routine estratto nel nuovo `ROUTINES.md` (376 righe): flusso orchestratore
+  cieco, tabella di precedenza dei 6 sotto-agenti, macchina a stati, cancello
+  di merge (L4+L5), Modello B feature spezzate, decifratura S1, coda su git,
+  claim, priorità, sezione "Insistere prima di mollare". Ogni sotto-agente (M1–M6)
+  ha la propria sezione con: prompt standardizzato 2 righe, cosa vede/NON vede,
+  passi, come verifica, come riporta. `node --check` su tutti gli script citati:
+  verde. Nessun riferimento orfano in `CLAUDE.md`. (stima: M)
 
 ### Dashboard unificata + board utente + modelli di supporto (spec 2026-06-23)
 
