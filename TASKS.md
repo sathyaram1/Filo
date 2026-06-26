@@ -107,7 +107,7 @@ Task ordinati (dipendenze: P1 fondamento → P2/P3):
   è ancora da decidere. La logica pura resta in `feedbackGroomer.js`; il runtime è un task
   futuro da collocare.
 
-- [ ] **P6 — Marcatore override owner `priorityManual`** (GATE per attivare il giudice in
+- [x] **P6 — Marcatore override owner `priorityManual`** (GATE per attivare il giudice in
   produzione) — Il giudice di priorità (P3, in `filo-security`) ha già il check difensivo
   `feedback.priorityManual === true → skip`, ma il campo non esiste ancora nello schema.
   Senza, il giudice potrebbe sovrascrivere una priority impostata a mano dall'owner (requisito
