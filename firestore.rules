@@ -178,9 +178,15 @@ service cloud.firestore {
         && request.resource.data.get('statusPublic', 'open') in ['open', 'closed', 'pending-approval']
         && request.resource.data.get('notes', '') is string
         && request.resource.data.get('notes', '').size() <= 10000
-        && request.resource.data.get('priority', 0) is int
-        && request.resource.data.get('priority', 0) >= 0
-        && request.resource.data.get('priority', 0) <= 3
+        // S1.priority: priority accetta int 0-3 (legacy in chiaro) OPPURE
+        // una stringa ciphertext FENC1: (gate on). Retrocompatibile.
+        && (
+             (request.resource.data.get('priority', 0) is int
+              && request.resource.data.get('priority', 0) >= 0
+              && request.resource.data.get('priority', 0) <= 3)
+             || (request.resource.data.get('priority', '') is string
+                 && request.resource.data.get('priority', '').matches('^FENC1:.*'))
+           )
         && request.resource.data.get('name', '') is string
         && request.resource.data.get('name', '').size() <= 200
         && request.resource.data.get('seq', 0) is int
