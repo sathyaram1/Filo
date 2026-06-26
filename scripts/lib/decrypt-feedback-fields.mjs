@@ -116,6 +116,29 @@ export async function decryptFeedbackFields(fb, privKey) {
     }
   }
 
+  // S1.priority: `priority` è un intero (0-3), NON testo → logica dedicata.
+  // Retrocompat: se è già un numero (legacy in chiaro) → invariato.
+  // Se è una stringa FENC1: → decifra e riconverti a Number (parseInt).
+  // Senza chiave privata: lascia invariato (non sostituire col placeholder testuale:
+  // i consumatori si aspettano un numero o undefined; NaN/null romperebbe l'ordinamento).
+  if (C && C.isEncrypted(out.priority)) {
+    if (!priv) {
+      // Nessuna chiave: non possiamo decifrare. Lascia il ciphertext così com'è;
+      // il chiamante deve sapere che priority non è disponibile.
+      // (Non sostituiamo col placeholder perché priorityOf() fa Number() e NaN è ok.)
+    } else {
+      try {
+        const plain = await C.decrypt(out.priority, priv);
+        const num = parseInt(plain, 10);
+        out.priority = Number.isInteger(num) ? num : 0;
+      } catch (e) {
+        console.warn('[decrypt-feedback-fields] decifratura campo "priority" fallita:', e?.message || e);
+        // In caso di errore lascia il ciphertext: meglio che un numero inventato.
+      }
+    }
+  }
+  // Se non è cifrato (numero in chiaro o undefined): lascia invariato.
+
   // S1.F2.4: il campo `pipeline` (scritto dal backend di sicurezza sul documento
   // PUBBLICO) è cifrato come un'unica stringa FENC1: che racchiude l'INTERO
   // oggetto pipeline serializzato in JSON. Decifralo e re-idratalo a oggetto, così
