@@ -35,6 +35,101 @@ contesto, per tempo, o perché l'utente chiude), la prossima riparte da qui.
 
 ## Coda
 
+### Finalizzazione automazione routine (spec 2026-06-26)
+
+Spec utente (chat 2026-06-26). Ridisegno del flusso routine: l'orchestratore è
+un dispatcher cieco che spawna **un** sotto-agente per volta; ogni sotto-agente
+fa **uno** fra 6 compiti (in ordine di precedenza): (1) verifica sicurezza di un
+diff cieca al feedback, (2) verifica risoluzione con stress test (edge case +
+vulnerabilità + **visivo/estetico**), (3) risolve un feedback data una critica
+del verificatore, (4) avvia un sub-feedback, (5) avvia un feedback nuovo
+(spezzandolo se corposo), (6) audit autonomo → genera feedback. Decisioni di
+design confermate dall'utente:
+
+- **Isolamento lettura feedback**: un sotto-agente vede **un solo feedback** (il
+  vincitore per priorità). La selezione la fa uno **script non-LLM** che decifra
+  le priorità in locale, ordina, e stampa **solo** il vincitore (corpo decifrato).
+- **`priority` è CIFRATA** (campo sensibile `FENC1:`): in chiaro rivelerebbe a
+  chi invia se il suo feedback è stato schedulato (segnale di hill-climbing, come
+  `blocked`). Conseguenze: niente `orderBy priority` server-side → ordina lo
+  script in locale; cifrare priority anche nella **coda git** (repo pubblico).
+- **Giudice di priorità LLM con libertà**: la scaletta (sicurezza 3 / bug 2 /
+  feature 1 / estetica 0) è **solo linea guida**; dentro **0-2** l'LLM giudica
+  liberamente pesando i segnali (es. un bug UI segnalato da 5 utenti può essere
+  2). **Unico vincolo duro, in codice**: il **3 è riservato ESCLUSIVAMENTE alla
+  sicurezza**. Il giudice produce `{ isSecurity: bool, priority: 0..2 }`; il
+  codice forza `isSecurity → 3` e clampa tutto il resto a max 2. Override owner
+  vince sempre. La classificazione priorità è **solo ordinamento**, NON il gate
+  di sicurezza (L4/L5 + red-team girano comunque): un errore del giudice mis-ordina
+  la coda, non fa passare codice insicuro.
+- **Test visivi in cloud**: incognita da sciogliere (punto 4, vive come feedback).
+
+Task ordinati (dipendenze: P1 fondamento → P2/P3):
+
+- [ ] **P1 — Cifra `priority` end-to-end** (fondamento) — Aggiungi `priority` ai
+  campi cifrati. (a) `scripts/lib/decrypt-feedback-fields.mjs`: gestisci `priority`
+  (intero) — decifra la stringa `FENC1:` e riportala a numero; retrocompat con i
+  valori già in chiaro. (b) Cifra in **scrittura** dove oggi è in chiaro, con la
+  stessa guardia `isEnabled()` degli altri campi S1 (vedi `src/shared/feedback.js`
+  → `submit` usa `maybeEncrypt`; `scripts/queue-feedback.mjs` → `buildCreateEntry`
+  scrive `priority: prio` in chiaro nella coda git pubblica; `scripts/queue-triage.mjs`
+  se tocca priority). La chiave pubblica è in `src/shared/feedbackPublicKey.js`
+  (cifrare è disponibile ovunque). (c) Verifica che la dashboard owner
+  (`src/pages/feedback/feedback.js`, ha la chiave privata) legga/scriva priority
+  cifrata senza rompersi — owner-only, NON mostrata a chi invia (verificato: non
+  è in `src/content/`). **Fatto**: unit test in `tests/unit/` che cifra una
+  priority, la decifra e ritorna l'intero originale; round-trip via i percorsi di
+  scrittura toccati. Verifica `npm run test:unit` (NO `npm test`, NO Electron in
+  locale). (stima: M)
+
+- [ ] **P2 — Selettore isolato `scripts/next-feedback.mjs`** (dipende da P1) —
+  Script non-LLM che: interroga Firestore (`runQuery` come `nextSeq()` in
+  `src/shared/feedback.js`) per i feedback `todo` non-claimati (incrocia con
+  `scripts/claim-feedback.mjs` → `liveClaims()`), **decifra le priorità in locale**
+  (`decrypt-feedback-fields.mjs`, ha la chiave privata via env), ordina per
+  **priority DESC poi FIFO** (createdAt/seq ASC a parità), prende il vincitore,
+  **decifra solo il suo corpo** e lo stampa (JSON su stdout). NON decifra i
+  perdenti (isolamento massimo). Esce non-zero se non c'è nulla da prendere.
+  **Fatto**: unit test sulla logica pura di ordinamento (priority DESC + FIFO,
+  con priorità cifrate mockate decifrate) in `tests/unit/`; `npm run test:unit`
+  verde. La parte di rete (runQuery) resta thin e best-effort. (stima: M)
+
+- [ ] **P3 — Applier groomer + giudice priorità LLM** (dipende da P1) — Costruisci
+  il runtime mancante di `src/shared/feedbackGroomer.js` (oggi solo logica pura,
+  vedi F5): legge la coda feedback, chiama `groom()`, applica merge (append
+  `mergedNotes` + archivia dup) e priorità. **Aggiungi il giudice di priorità**:
+  funzione che, dato il testo di UN feedback + n. duplicati, ritorna
+  `{ isSecurity, priority: 0..2 }`; un **wrapper deterministico** forza
+  `isSecurity → 3` e clampa il resto a 0-2 (riserva del 3 garantita in codice, non
+  nel prompt). Il modello del giudice è un **modello di supporto già previsto**:
+  cerca lo slot "giudice priorità" in `src/main/services/resolveSupportModel.js` /
+  `supportModelsStore.js` / `src/pages/manage/manage.js` e risolvilo da lì (NON
+  hardcodare il modello). Il giudice è iniettabile come `llmSimilar` nel groomer
+  (testabile con mock). **Fatto**: unit test che verificano il clamp (security→3
+  sempre; non-security→max 2 anche se l'LLM dice 3; override owner intatto) con un
+  giudice mockato; integrazione col groomer esistente. `npm run test:unit` verde.
+  (stima: M)
+
+- [ ] **P4 — (FEEDBACK, non qui) Spike cattura visiva in cloud** — Vive come
+  feedback creato il 2026-06-26 (cattura del display xvfb via
+  `desktopCapturer.getSources({types:['screen']})` o `x11grab`, pilotando Filo con
+  Playwright per costruire lo stato + catturare il composito reale). Si valida
+  SOLO nel runner cloud. Vedi il feedback in coda. (stima: M, cloud-only)
+
+- [ ] **P5 — Split `CLAUDE.md` → `ROUTINES.md` + 6 prompt sotto-agenti** (dipende
+  da P1-P3) — Estrai TUTTA la recipe-routine da `CLAUDE.md` (oggi ~metà del file,
+  "incasinato e lunghissimo" per l'utente) in un file dedicato `ROUTINES.md` nella
+  root. `CLAUDE.md` resta snello (convenzioni repo: porting IIFE, shim, test
+  locali, patch notes, capabilities, niente recipe-routine — lascia un puntatore a
+  `ROUTINES.md`). `ROUTINES.md` contiene: il flusso orchestratore cieco, la
+  macchina a stati, il cancello di merge, e **il prompt minimo standardizzato dei
+  6 sotto-agenti** (1 verifica-diff-cieca, 2 verifica-risoluzione-con-stress-e-visivo,
+  3 risolvi-con-critica, 4 sub-feedback, 5 nuovo-feedback, 6 audit-autonomo): il
+  prompt di Claude per ciascun sotto-agente è ~2 righe ("sei il worker X, leggi
+  ROUTINES.md §N"), tutto il resto standardizzato vive nel file. Riusa next-feedback
+  (P2) e il giudice (P3) nel flusso descritto. **Fatto**: i due file coerenti,
+  nessun riferimento orfano, `node --check` sugli script citati verde. (stima: M)
+
 ### Dashboard unificata + board utente + modelli di supporto (spec 2026-06-23)
 
 Spec utente (chat 2026-06-23). Obiettivo: far convergere TUTTA la gestione
