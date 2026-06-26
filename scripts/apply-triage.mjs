@@ -225,8 +225,18 @@ async function createFeedback(entry, num, bearer) {
     subSeq: toFsValue(num.subSeq),
     createdAt: { timestampValue: new Date().toISOString() },
   };
-  const prio = Number(entry.priority);
-  if (Number.isInteger(prio) && prio >= 1 && prio <= 3) fields.priority = toFsValue(prio);
+  // S1.priority: priority può essere un intero legacy (in chiaro) OPPURE una
+  // stringa FENC1: (cifrata). toFsValue mappa string→stringValue e int→integerValue:
+  // passare direttamente il valore (qualunque tipo) produce il tipo Firestore giusto.
+  // Caso intero legacy: scriviamo solo se 1-3 (0 = nessuna priority, non scrivere).
+  // Caso ciphertext: scriviamo sempre (il valore cifrato non possiamo decifrarlo qui).
+  if (typeof entry.priority === 'string' && entry.priority.startsWith('FENC1:')) {
+    // priority cifrata: scrivi come stringValue.
+    fields.priority = toFsValue(entry.priority);
+  } else {
+    const prio = Number(entry.priority);
+    if (Number.isInteger(prio) && prio >= 1 && prio <= 3) fields.priority = toFsValue(prio);
+  }
   // Idempotenza: se l'entry porta una `uid` (le crea queue-feedback.mjs), la uso
   // come ID del documento via ?documentId=. Così se questa stessa entry viene
   // applicata due volte — tipicamente due run concorrenti della GitHub Action
