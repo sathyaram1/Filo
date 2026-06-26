@@ -604,17 +604,9 @@
 
   mgSideClose.addEventListener('click', closeSidebar);
 
-  // Nome del giudice: il modello reale SOLO per l'owner (isAdmin); per gli altri
-  // resta anonimizzato in "Giudice A/B/…". Il nome del modello compare solo se il
-  // backend di sicurezza lo include nel verdetto (campo `model`); altrimenti si
-  // ripiega sulla lettera anche per l'owner.
-  function judgeName(v, letter) {
-    const model = v && (v.model || v.judgeModel);
-    return (isAdmin && model) ? String(model) : `Giudice ${letter}`;
-  }
-
   // Click su un pallino giudice → apre QUEL giudice nel pannello destro:
-  // nome (modello reale per l'owner), badge classe, reasoning completo.
+  // identità dello slot giudice (titolo), badge classe, MODELLO che ha emesso il
+  // verdetto (solo owner), reasoning completo.
   function openSidebarJudge(fb, i) {
     const verdicts = (fb.pipeline && fb.pipeline.verdicts) || [];
     const v = verdicts[i];
@@ -622,19 +614,28 @@
 
     const letters = ['A', 'B', 'C', 'D'];
     const letter  = v.judge || letters[i] || String(i + 1);
-    const name    = judgeName(v, letter);
     const cls     = v.class || '';
     const badgeClass = cls ? `mg-class-badge--${cls}` : '';
+
+    // Riga "Modello" — SOLO per l'owner (isAdmin); per gli altri resta nascosta
+    // (anonimizzazione). Mostra il modello reale che ha emesso QUESTO verdetto
+    // (campo `model` nel verdetto del backend); se non è registrato (verdetti di
+    // pipeline precedenti) lo dichiara esplicitamente invece di sparire.
+    const model = v && (v.model || v.judgeModel);
+    const modelRow = isAdmin
+      ? `<div class="mg-judge-model">Modello: ${model ? esc(String(model)) : '<em>non registrato</em>'}</div>`
+      : '';
 
     const html = `
       <div class="mg-judge-detail">
         <span class="mg-class-badge ${badgeClass}">${esc(cls || '—')}</span>
+        ${modelRow}
         <div class="mg-reasoning">${
           v.reasoning ? esc(v.reasoning) : '<em>Nessun ragionamento disponibile.</em>'
         }</div>
       </div>
     `;
-    openSidebar(name, html);
+    openSidebar(`Giudice ${esc(letter)}`, html);
   }
 
   function openSidebarSender(clientId) {
