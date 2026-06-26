@@ -541,7 +541,11 @@
         // Click sul pallino → apre QUEL giudice nel pannello destro.
         dot.addEventListener('click', () => openSidebarJudge(fb, i));
       } else {
-        dot.title = `Giudice ${judgeLetters[i]}: in attesa`;
+        // Pipeline già passata (la riga compare solo con ≥1 verdetto): un pallino
+        // vuoto = quel giudice NON ha emesso un verdetto in quella run (timeout/
+        // errore/giudice non configurato), non "in attesa".
+        dot.classList.add('mg-dot--empty');
+        dot.title = `Giudice ${judgeLetters[i]}: nessun verdetto`;
       }
       mgJudgesRow.appendChild(dot);
     }
