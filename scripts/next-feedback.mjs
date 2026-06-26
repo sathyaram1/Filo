@@ -1,0 +1,312 @@
+// Selettore isolato del prossimo feedback da lavorare.
+//
+// PERCHÉ ESISTE
+//   L'orchestratore deve consegnare a ogni worker LLM UN SOLO feedback (mai
+//   la lista intera): un worker che vede tutti i feedback potrebbe essere
+//   pilotato da un body malevolo verso la scelta "sbagliata" (prompt-injection
+//   sull'ordinamento). Questo script è NON-LLM: riceve la chiave privata via
+//   env, decifra le priorità in locale, ordina, e stampa SOLO il vincitore.
+//
+// ISOLAMENTO
+//   - I perdenti NON vengono decifrati nel corpo: per loro si usa solo la
+//     priorità (per ordinare) e lo status (per filtrare). Niente testo.
+//   - La chiave privata non viene mai passata a un LLM.
+//
+// USO
+//   node scripts/next-feedback.mjs
+//
+//   Stdout: JSON dell'oggetto feedback vincitore, con tutti i campi decifrati.
+//   Stderr: messaggi di diagnostica.
+//   Exit 0 → vincitore trovato (stdout è il JSON).
+//   Exit 2 → coda vuota (nessun feedback da lavorare).
+//   Exit 1 → errore di rete/sistema.
+
+import { createRequire } from 'node:module';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ROOT = resolve(__dirname, '..');
+const require = createRequire(import.meta.url);
+
+// ─── Costanti Firestore (specchio di src/shared/feedback.js) ─────────────────
+
+const PROJECT_ID = 'filo-8b9cb';
+const API_KEY = 'AIzaSyDN_fpshLW_K78QLV0MMiX1gd-OfO7x-CY';
+const COLLECTION = 'feedback';
+const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
+
+// ─── Helpers REST (specchio di src/shared/feedback.js) ───────────────────────
+
+function fromFsValue(val) {
+  if (!val) return null;
+  if ('stringValue' in val) return val.stringValue;
+  if ('integerValue' in val) return Number(val.integerValue);
+  if ('doubleValue' in val) return val.doubleValue;
+  if ('booleanValue' in val) return val.booleanValue;
+  if ('timestampValue' in val) return val.timestampValue;
+  if ('nullValue' in val) return null;
+  if ('arrayValue' in val) return (val.arrayValue.values || []).map(fromFsValue);
+  if ('mapValue' in val) {
+    const out = {};
+    for (const [k, v] of Object.entries(val.mapValue.fields || {})) out[k] = fromFsValue(v);
+    return out;
+  }
+  return null;
+}
+
+function fsDocToObject(doc) {
+  const out = {};
+  for (const [k, v] of Object.entries(doc.fields || {})) out[k] = fromFsValue(v);
+  out._id = doc.name?.split('/').pop() || '';
+  out._createTime = doc.createTime || null;
+  return out;
+}
+
+// ─── Logica pura di ordinamento/selezione (esportata, testabile) ─────────────
+
+/**
+ * Seleziona il feedback vincitore da un array di candidati già filtrati
+ * (status = todo, non claimati, priority già decifrata a numero).
+ *
+ * Ordinamento:
+ *   1. priority DESC (numero più alto prima; undefined/NaN → 0)
+ *   2. FIFO a parità: createdAt ASC (ISO string, confronto lessicografico)
+ *   3. seq ASC a parità di createdAt (feedback senza createdAt)
+ *   4. _id ASC come ultimo tie-break deterministico
+ *
+ * @param {Array<{ _id: string, priority?: number, createdAt?: string, seq?: number, claimed?: boolean }>} candidates
+ *   Array di feedback con priority GIÀ decifrata (numero) e claimed già calcolato.
+ *   I candidati con claimed=true vengono scartati.
+ * @returns {string|null} L'_id del vincitore, oppure null se la coda è vuota.
+ */
+export function selectWinner(candidates) {
+  if (!Array.isArray(candidates) || candidates.length === 0) return null;
+
+  // Scarta i claimati.
+  const free = candidates.filter((c) => !c.claimed);
+  if (!free.length) return null;
+
+  // Estrae il numero di priorità in modo sicuro (fallback a 0 su NaN/undefined).
+  function priorityOf(c) {
+    const n = Number(c.priority);
+    return Number.isFinite(n) ? Math.max(0, Math.round(n)) : 0;
+  }
+
+  // Copia e ordina.
+  const sorted = [...free].sort((a, b) => {
+    // 1. priority DESC
+    const pa = priorityOf(a);
+    const pb = priorityOf(b);
+    if (pb !== pa) return pb - pa;
+
+    // 2. createdAt ASC (ISO string — confronto lessicografico corretto)
+    const ca = typeof a.createdAt === 'string' ? a.createdAt : '';
+    const cb = typeof b.createdAt === 'string' ? b.createdAt : '';
+    if (ca && cb && ca !== cb) return ca < cb ? -1 : 1;
+    // Un feedback con createdAt va prima di uno senza.
+    if (ca && !cb) return -1;
+    if (!ca && cb) return 1;
+
+    // 3. seq ASC (più vecchio = numero più basso)
+    const sa = Number(a.seq);
+    const sb = Number(b.seq);
+    const hasSa = Number.isFinite(sa);
+    const hasSb = Number.isFinite(sb);
+    if (hasSa && hasSb && sa !== sb) return sa - sb;
+    if (hasSa && !hasSb) return -1;
+    if (!hasSa && hasSb) return 1;
+
+    // 4. _id ASC come tie-break finale (deterministico)
+    const ia = String(a._id || '');
+    const ib = String(b._id || '');
+    return ia < ib ? -1 : ia > ib ? 1 : 0;
+  });
+
+  return sorted[0]._id;
+}
+
+// ─── Parte di rete (thin) ─────────────────────────────────────────────────────
+
+/**
+ * Scarica da Firestore i candidati con statusPublic == 'open'.
+ * NOTA: 'open' include todo, new, draft, clarify, review, blocked.
+ * Filtriamo ulteriormente per status == 'todo' DOPO la decifratura.
+ *
+ * @returns {Promise<object[]>} Array di oggetti feedback (non decifrati).
+ */
+async function fetchOpenCandidates() {
+  const endpoint = `${FIRESTORE_BASE}:runQuery?key=${API_KEY}`;
+  const body = {
+    structuredQuery: {
+      from: [{ collectionId: COLLECTION }],
+      where: {
+        fieldFilter: {
+          field: { fieldPath: 'statusPublic' },
+          op: 'EQUAL',
+          value: { stringValue: 'open' },
+        },
+      },
+      // Non ordiniamo per priority server-side (è cifrata) né per createdAt
+      // (vogliamo tutti i candidati e ordiniamo lato client). Usiamo un limit
+      // generoso: in alpha il volume è basso; se cresce, ridurre via paginazione.
+      limit: 500,
+    },
+  };
+
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`Firestore runQuery fallito (${res.status}): ${errText.slice(0, 300)}`);
+  }
+
+  const arr = await res.json();
+  const out = [];
+  for (const row of arr) {
+    if (!row.document) continue;
+    out.push(fsDocToObject(row.document));
+  }
+  return out;
+}
+
+/**
+ * Punto di ingresso principale.
+ * Stampa su stdout il JSON del feedback vincitore (decifrato), oppure esce
+ * con codice 2 se la coda è vuota.
+ */
+export async function run() {
+  // Carica feedbackCrypto (IIFE su globalThis) — necessario per decryptFeedbackFields.
+  // Carichiamo qui (non al top-level) per non inquinare i test che iniettano mock.
+  try {
+    if (!globalThis.SN_FEEDBACK_PUBKEY) {
+      require(resolve(ROOT, 'src', 'shared', 'feedbackPublicKey.js'));
+    }
+    if (!globalThis.SN_FEEDBACK_CRYPTO) {
+      require(resolve(ROOT, 'src', 'shared', 'feedbackCrypto.js'));
+    }
+  } catch (e) {
+    process.stderr.write(`[next-feedback] avviso: impossibile caricare crypto (${e?.message || e})\n`);
+  }
+
+  const { decryptFeedbackFields } = await import('./lib/decrypt-feedback-fields.mjs');
+
+  // 1. Claim vivi da escludere.
+  const { liveClaims } = await import('./claim-feedback.mjs');
+  const claimed = new Set(liveClaims().map((c) => c.id));
+
+  // 2. Fetch candidati open da Firestore.
+  let rawCandidates;
+  try {
+    rawCandidates = await fetchOpenCandidates();
+  } catch (e) {
+    process.stderr.write(`[next-feedback] errore Firestore: ${e.message}\n`);
+    process.exit(1);
+  }
+
+  if (!rawCandidates.length) {
+    process.stderr.write('[next-feedback] nessun feedback da lavorare (coda vuota)\n');
+    process.exit(2);
+  }
+
+  // 3. Per ogni candidato: decifra SOLO la priority (e lo status, per filtrare).
+  //    NON decifriamo il corpo completo dei perdenti — isolamento massimo.
+  //    Decifriamo i campi minimi: priority + status.
+  const C = globalThis.SN_FEEDBACK_CRYPTO;
+
+  /**
+   * Decifra i soli campi necessari per l'ordinamento/filtro (priority, status).
+   * Ritorna { _id, priority: number, status: string, createdAt, seq, claimed }.
+   */
+  async function decryptMinimal(fb) {
+    let priority = fb.priority;
+    let status = fb.status;
+
+    // Decifra priority.
+    if (C && C.isEncrypted && C.isEncrypted(priority)) {
+      try {
+        const { decryptFeedbackFields: dec } = await import('./lib/decrypt-feedback-fields.mjs');
+        const mini = await dec({ _id: fb._id, priority });
+        priority = mini.priority;
+      } catch (e) {
+        // Decifratura fallita → tratta come priorità minima (non crashare).
+        process.stderr.write(`[next-feedback] avviso: priority di ${fb._id} non decifrabile (${e?.message || e}), trattata come 0\n`);
+        priority = 0;
+      }
+    }
+    // Normalizza a numero intero.
+    const pNum = Number(priority);
+    const priorityNum = Number.isFinite(pNum) ? Math.max(0, Math.round(pNum)) : 0;
+
+    // Decifra status (per filtrare solo i 'todo').
+    if (C && C.isEncrypted && C.isEncrypted(status)) {
+      try {
+        const { decryptFeedbackFields: dec } = await import('./lib/decrypt-feedback-fields.mjs');
+        const mini = await dec({ _id: fb._id, status });
+        status = mini.status;
+      } catch (e) {
+        process.stderr.write(`[next-feedback] avviso: status di ${fb._id} non decifrabile, escluso\n`);
+        status = null;
+      }
+    }
+
+    return {
+      _id: fb._id,
+      priority: priorityNum,
+      status,
+      createdAt: fb.createdAt || null,
+      seq: fb.seq,
+      claimed: claimed.has(fb._id),
+    };
+  }
+
+  // Decifra in parallelo i campi minimi di tutti i candidati.
+  const minimal = await Promise.all(rawCandidates.map(decryptMinimal));
+
+  // 4. Filtra: solo status == 'todo', non claimati.
+  const todoFree = minimal.filter((fb) => fb.status === 'todo' && !fb.claimed);
+
+  if (!todoFree.length) {
+    process.stderr.write('[next-feedback] nessun feedback da lavorare (nessun todo non claimato)\n');
+    process.exit(2);
+  }
+
+  // 5. Seleziona il vincitore (logica pura).
+  const winnerId = selectWinner(todoFree);
+  if (!winnerId) {
+    process.stderr.write('[next-feedback] nessun feedback da lavorare (selectWinner ha tornato null)\n');
+    process.exit(2);
+  }
+
+  // 6. Decifra SOLO il vincitore nel corpo completo.
+  const winnerRaw = rawCandidates.find((fb) => fb._id === winnerId);
+  if (!winnerRaw) {
+    // Non dovrebbe accadere, ma per robustezza:
+    process.stderr.write(`[next-feedback] errore interno: vincitore ${winnerId} non trovato nei candidati raw\n`);
+    process.exit(1);
+  }
+
+  let winner;
+  try {
+    winner = await decryptFeedbackFields(winnerRaw);
+  } catch (e) {
+    process.stderr.write(`[next-feedback] errore decifratura vincitore: ${e.message}\n`);
+    process.exit(1);
+  }
+
+  // 7. Stampa su stdout (solo il vincitore, niente altro).
+  process.stdout.write(JSON.stringify(winner, null, 2) + '\n');
+  process.exit(0);
+}
+
+// Esegui solo quando è il modulo principale (non quando importato dai test).
+const isMainModule = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
+if (isMainModule) {
+  run().catch((e) => {
+    process.stderr.write(`[next-feedback] errore fatale: ${e.message}\n`);
+    process.exit(1);
+  });
+}
