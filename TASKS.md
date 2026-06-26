@@ -67,17 +67,16 @@ design confermate dall'utente:
 Task ordinati (dipendenze: P1 fondamento → P2/P3):
 
 - [x] **P1 — Cifra `priority` end-to-end** (fondamento) — _(fatto: sessione locale 2026-06-26)_ — **Esito**: `priority` ora cifrata come campo S1 (`FENC1:`), guardata da `isEnabled()`, retrocompat coi valori interi in chiaro. Toccati: `decrypt-feedback-fields.mjs` (decifra→Number), `feedback.js` `updateStatus` (cifra→stringValue), `handlers/auth.js` `decryptFeedbackObject` (layer IPC che usano entrambe le dashboard — sito extra trovato dal worker), `queue-feedback.mjs` (cifra priority nello spool pubblico), `apply-triage.mjs` (stringValue vs integerValue duale), `firestore.rules` (accetta int 0-3 legacy OPPURE stringa `FENC1:`, **deployate**). 6 nuovi unit test in `tests/unit/feedbackPriorityEncryption.test.mjs`. `npm run test:unit` 657/657 verde (verificato dall'orchestratore). Non testato end-to-end: scrittura/lettura cifrata via Firestore live (solo unit sui componenti).
-- [ ] **P2 — Selettore isolato `scripts/next-feedback.mjs`** (dipende da P1) —
-  Script non-LLM che: interroga Firestore (`runQuery` come `nextSeq()` in
-  `src/shared/feedback.js`) per i feedback `todo` non-claimati (incrocia con
-  `scripts/claim-feedback.mjs` → `liveClaims()`), **decifra le priorità in locale**
-  (`decrypt-feedback-fields.mjs`, ha la chiave privata via env), ordina per
-  **priority DESC poi FIFO** (createdAt/seq ASC a parità), prende il vincitore,
-  **decifra solo il suo corpo** e lo stampa (JSON su stdout). NON decifra i
-  perdenti (isolamento massimo). Esce non-zero se non c'è nulla da prendere.
-  **Fatto**: unit test sulla logica pura di ordinamento (priority DESC + FIFO,
-  con priorità cifrate mockate decifrate) in `tests/unit/`; `npm run test:unit`
-  verde. La parte di rete (runQuery) resta thin e best-effort. (stima: M)
+- [x] **P2 — Selettore isolato `scripts/next-feedback.mjs`** (dipende da P1) —
+  _(fatto: sessione locale 2026-06-26)_ — **Esito**: script non-LLM creato in
+  `scripts/next-feedback.mjs`. Filtra server-side con `statusPublic == 'open'`
+  (unico campo in chiaro utile; include anche new/draft/clarify/review/blocked),
+  poi filtra lato client dopo aver decifrato `status` per isolare solo i `todo`.
+  Decifra solo la `priority` dei perdenti (per ordinare); decifra il corpo
+  completo SOLO del vincitore (isolamento massimo). Logica pura `selectWinner`
+  esportata (testabile senza rete). 15 unit test in `tests/unit/nextFeedback.test.mjs`.
+  `npm run test:unit` 672/672 verde. Non testata end-to-end: parte di rete
+  (runQuery su Firestore live) — thin per design. (stima: M)
 
 - [ ] **P3 — Applier groomer + giudice priorità LLM** (dipende da P1) — Costruisci
   il runtime mancante di `src/shared/feedbackGroomer.js` (oggi solo logica pura,
