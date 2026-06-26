@@ -99,6 +99,23 @@ async function decryptFeedbackObject(fields) {
     }
   }
   await decryptPipelineField(out, C, priv);
+
+  // S1.priority: `priority` è un intero, non testo → logica dedicata (come in
+  // decrypt-feedback-fields.mjs). Retrocompat: se è già un numero → invariato.
+  if (C.isEncrypted(out.priority)) {
+    if (priv) {
+      try {
+        const plain = await C.decrypt(out.priority, priv);
+        const num = parseInt(plain, 10);
+        out.priority = Number.isInteger(num) ? num : 0;
+      } catch (e) {
+        console.warn('[auth] decifratura campo "priority" fallita:', e?.message || e);
+        // lascia il ciphertext: priorityOf() fa Number() → NaN → 0 (safe)
+      }
+    }
+    // senza chiave: lascia il ciphertext invariato (stessa scelta di decryptPipelineField)
+  }
+
   return out;
 }
 
