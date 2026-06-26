@@ -800,7 +800,9 @@
         const item = all.find((f) => f._id === id);
         const cur = item ? priorityOf(item) : 0;
         const next = cur === n ? 0 : n;
-        patch(id, { priority: next }, { priority: next });
+        // priorityManual:true segnala al backend che questa è una scelta manuale
+        // dell'owner: il giudice di priorità automatico non sovrascriverà.
+        patch(id, { priority: next, priorityManual: true }, { priority: next });
       });
     });
 
