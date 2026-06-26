@@ -78,55 +78,54 @@ Task ordinati (dipendenze: P1 fondamento → P2/P3):
   `npm run test:unit` 672/672 verde. Non testata end-to-end: parte di rete
   (runQuery su Firestore live) — thin per design. (stima: M)
 
-- [x] **P3 — Applier groomer + giudice priorità LLM** (dipende da P1) —
-  _(fatto: sessione locale 2026-06-26)_ — **Esito**:
-  - `scripts/lib/priority-judge.mjs`: giudice iniettabile (`makePriorityJudge(llmCallOverride?)`)
-    + wrapper deterministico `applyClamp` (security→3 SEMPRE in codice; non-security→clamp
-    a max 2 anche se LLM dice 3) + `buildUserPrompt`. Modello: slot `judgePriority` di
-    `resolveSupportModel` già esistente; in produzione usa `FILO_JUDGE_MODEL` env o
-    `gemini-3.1-flash-lite` come fallback (resolveSupportModel non è ESM standalone,
-    segnalato nel report). Override LLM completo tramite `llmCallOverride`.
-  - `scripts/groom-apply.mjs`: applier runtime — legge coda da Firestore (`fetchTodoFeedbacks`,
-    filtra `status=todo`, decifra con `decryptFeedbackList`), chiama `groom()`, applica merge
-    (archivia drop, aggiorna note keep), chiama giudice LLM su feedback con duplicati con
-    `dupeCount` da `merges`; fallback al bump deterministico se giudice non configurato o
-    `--no-priority-judge`. Priority scritta cifrata (`encryptPriorityForQueue`, stesso pattern
-    di `queue-feedback.mjs`). **Override owner**: skip se `fb.priorityManual === true`
-    (campo non ancora nello schema Firestore — vedi nota da confermare sotto).
-  - `tests/unit/priorityJudge.test.mjs`: 22 unit test con giudice mockato. Verificano:
-    clamp security→3 sempre; non-security→max 2 anche se LLM dice 3 o 99; override owner
-    (priorityManual=true) intatto; dupeCount da groom passato correttamente al giudice;
-    fallback deterministico con llmJudge=false; buildUserPrompt (trunca, include dupeCount).
-  - `npm run test:unit`: **694/694 verde** (baseline 672, +22).
-  - **Override owner da confermare**: il marcatore `priorityManual: boolean` non esiste
-    ancora nello schema Firestore. Il giudice è già pronto a rispettarlo, ma serve
-    aggiungerlo al doc feedback + `hasOnly` in `firestore.rules` + deploy quando l'owner
-    imposta priority a mano dalla dashboard. Oggi il giudice può sovrascrivere priority
-    manuali (nessun campo che lo impedisca). Decidere e segnalare prima di abilitare.
-  - **Non testato e2e in locale**: lettura/scrittura Firestore reale + chiamata LLM reale
-    (parte thin per design — testabile solo in cloud con GEMINI_API_KEY e Firestore live).
+- [x] **P3 — Giudice di priorità** (dipende da P1) — _(fatto 2026-06-26; **ricollocato**
+  in `filo-security` dopo correzione architetturale dell'owner)_ — **Esito**: il giudice
+  di priorità è stato implementato dove vive L2, nel backend privato **`filo-security`**
+  (repo `sathyaram1/filo-security`, `C:/Users/agenti AI/Desktop/Filo/filo-security`), NON
+  nel repo pubblico. Motivo (owner, 2026-06-26): è la stessa forma di L2 (LLM legge il
+  feedback decifrato → classifica), e lì la chiave privata, la decifratura e la config dei
+  modelli sono già risolte. È un **giudice SEPARATO** (non parte di L2: le classi di L2 —
+  attack/spam/design/aligned — sono l'asse sicurezza, il giudice di priorità è l'asse
+  priorità-di-prodotto; `isSecurity` = "il feedback SEGNALA un problema di sicurezza in
+  Filo", diverso da `attack`). Gira **solo** quando `decision.action` ∈ {`CANDIDATE_CHANGE`
+  (aligned + automazione ON), `OWNER_ACCEPTED` (l'owner accetta a mano → entra in coda)};
+  mai su block/human-review. Files in filo-security: `functions/src/priority/judge.js`
+  (`buildPriorityJudge`/`runPriorityJudge`/`parsePriorityVerdict`/`applyClamp` — clamp duro
+  security→3, non-security→max 2), `data/feedbackState.js` (`recordPriority` cifra con
+  `encryptForOwner` e scrive `{priority}` merge, fail-safe), `runner.js` (`maybeJudgePriority`
+  agganciato ai due rami), `test/priority.test.js` (35 test). Suite filo-security **186/186
+  verde**. Modello default `anthropic/claude-haiku-4-5`, rimappabile via env
+  `PRIORITY_JUDGE_MODEL`; chiave = stesso `JUDGE_OPENROUTER_KEY` di L2. Commit `eb90f74`
+  pushato su `filo-security/main`, **NON deployato** (azione owner). Check difensivo
+  override owner presente (`priorityManual===true` → skip), ma il campo va completato (→ P6).
+  **Pulizia repo pubblico**: rimossi i file P3 mal collocati (`scripts/lib/priority-judge.mjs`,
+  `scripts/groom-apply.mjs`, `tests/unit/priorityJudge.test.mjs`). `next-feedback.mjs` (P2)
+  resta (legge la priority cifrata scritta dal backend); `src/shared/feedbackGroomer.js`
+  (logica pura dedup F5) resta intatto. `npm run test:unit` 672/672 verde dopo la pulizia.
+  **Aperto separato**: l'**applier del groomer/dedup** (runtime che chiama `groom()` e applica
+  i merge) NON ha più una casa — l'owner ha detto che dove gira (routine pubblica o backend)
+  è ancora da decidere. La logica pura resta in `feedbackGroomer.js`; il runtime è un task
+  futuro da collocare.
 
-- [ ] **P6 — Marcatore override owner `priorityManual`** (emerso da P3, GATE per
-  abilitare il giudice in produzione) — Il giudice di priorità (P3) può sovrascrivere
-  una priority che l'owner ha impostato a mano, perché nello schema non c'è un campo
-  che segnali "decisa dall'owner, non toccare". Aggiungi `priorityManual: boolean` al
-  doc feedback: la dashboard owner lo mette a `true` quando l'owner cambia la priority
-  a mano (cerca dove `updateStatus({priority})` viene invocato dalla UI in
-  `src/pages/feedback/feedback.js` e `src/pages/manage/`); aggiorna `hasOnly` in
-  `firestore.rules` (ramo update admin) per ammettere il campo + **deploy**. Il giudice
-  (`scripts/groom-apply.mjs`) già salta i feedback con `priorityManual === true`.
-  **Fatto**: unit test che il giudice salta i manuali; rules deployate; la UI setta il
-  flag al cambio manuale. (stima: S)
+- [ ] **P6 — Marcatore override owner `priorityManual`** (GATE per attivare il giudice in
+  produzione) — Il giudice di priorità (P3, in `filo-security`) ha già il check difensivo
+  `feedback.priorityManual === true → skip`, ma il campo non esiste ancora nello schema.
+  Senza, il giudice potrebbe sovrascrivere una priority impostata a mano dall'owner (requisito
+  esplicito owner: "io posso comunque cambiare le priorità"). Serve: (a) la dashboard owner
+  scrive `priorityManual: true` sul doc quando l'owner cambia la priority a mano (cerca dove
+  `updateStatus({priority})` è invocato dalla UI in `src/pages/feedback/feedback.js` e
+  `src/pages/manage/`); (b) `hasOnly` in `firestore.rules` (ramo update admin) ammette il
+  campo; (c) **deploy** rules. NB: `filo-security` usa l'admin SDK (bypassa le rules in
+  scrittura) ma il check del campo è già pronto lato backend. **Fatto**: la UI setta il flag
+  al cambio manuale; rules deployate; il giudice salta i manuali (già coperto da test in
+  filo-security). (stima: S)
 
-- [ ] **P7 — Estrarre `resolveSupportModel` in modulo ESM importabile da CLI**
-  (emerso da P3) — Lo slot "giudice priorità" (`judgePriority`) esiste nei Modelli di
-  supporto (`resolveSupportModel.js`/`supportModelsStore.js`), ma `resolveSupportModel`
-  non è importabile dagli script CLI (dipende da google-auth + Firestore), quindi il
-  giudice in `scripts/groom-apply.mjs` usa `FILO_JUDGE_MODEL` (env) con fallback
-  hardcodato invece del modello configurato dall'utente in dashboard. Estrai la
-  risoluzione del modello in un modulo ESM standalone (senza dipendenze Electron) così
-  gli script delle routine leggono il modello scelto dall'owner. **Fatto**: il groomer
-  applier risolve il modello del giudice dallo store di supporto; unit test. (stima: M)
+- [x] **P7 — ~~Estrarre `resolveSupportModel` per CLI~~ (OBSOLETO)** — Dissolto dalla
+  ricollocazione di P3 in `filo-security`. Esisteva solo perché avevo messo il giudice in
+  uno script CLI del repo pubblico, dove arrivare alla config del modello è scomodo. Nel
+  backend il modello si legge come per L2 (env/secret rimappabili, in prospettiva config
+  Firestore — DD3). Nessun lavoro da fare. _(Se mai servisse leggere lo slot `judgePriority`
+  dei Modelli di supporto dal backend, è il coordinamento cross-repo già previsto in DD3.)_
 
 - [ ] **P4 — (FEEDBACK, non qui) Spike cattura visiva in cloud** — Vive come
   feedback creato il 2026-06-26 (cattura del display xvfb via
