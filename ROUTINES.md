@@ -721,8 +721,18 @@ pubblici visibili senza decifratura: `statusPublic` (lossy), `seq`/`num`, titolo
 
 ### Come viene assegnata la priorità
 
-All'ingresso di ogni feedback, lo script `scripts/groom-apply.mjs` chiama il
-giudice LLM in `scripts/lib/priority-judge.mjs`. Scaletta **guida**:
+La priorità la assegna un **giudice di priorità separato** che vive nel backend
+privato **`filo-security`** (non nelle routine pubbliche: è la stessa forma di L2
+— un LLM che legge il feedback decifrato — e lì chiave privata, decifratura e
+config dei modelli sono già risolte). Files: `functions/src/priority/judge.js`,
+agganciato in `functions/src/runner.js` (`maybeJudgePriority`). Gira **solo**
+quando la pipeline di sicurezza decide che il feedback **entra in coda
+automatica**, cioè `decision.action` ∈ {`CANDIDATE_CHANGE` (aligned + automazione
+ON), `OWNER_ACCEPTED` (l'owner accetta a mano)}; mai su block/spam/human-review.
+
+⚠️ Non è l'asse di L2: le classi L2 (attack/spam/design/aligned) sono sicurezza
+& allineamento; qui `isSecurity` = "il feedback **segnala un problema di sicurezza
+dentro Filo**", non "il feedback è un attacco". Scaletta **guida**:
 
 - `3` — sicurezza (**SOLO** sicurezza: vincolo duro in codice, non bypassabile)
 - `2` — bug funzionale
@@ -730,8 +740,10 @@ giudice LLM in `scripts/lib/priority-judge.mjs`. Scaletta **guida**:
 - `0` — estetica / nitpick
 
 Dentro 0-2 il giudice ha libertà (pesa quanti utenti, quanto fastidio). Il
-codice forza `isSecurity → 3` e clampa tutto il resto a max 2. Override owner
-(`priorityManual: true`) vince sempre — il giudice salta quei feedback.
+codice (`applyClamp`) forza `isSecurity → 3` e clampa tutto il resto a max 2.
+La priority viene scritta **cifrata** sul doc. Override owner
+(`priorityManual: true`) vince sempre — il giudice salta quei feedback (il campo
+`priorityManual` è in completamento, vedi TASKS.md → P6).
 
 ### Ordine di lavorazione
 
