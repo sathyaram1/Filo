@@ -37,6 +37,7 @@ const ROOT = resolve(__dirname, '..', '..');
 // Campi di testo da decifrare. S1.F2.1: aggiunto 'status' (cifrato quando gate on).
 // S1.F2.2: aggiunto 'clientId' (cifrato quando gate on; clientIdHash resta in chiaro).
 // 'statusPublic' NON è nella lista: è sempre in chiaro e non va toccato.
+// 'priority' NON è qui (è un intero, non testo): ha logica dedicata sotto.
 const TEXT_FIELDS = ['text', 'url', 'name', 'title', 'notes', 'reviewComment', 'status', 'clientId'];
 
 // Carica feedbackCrypto.js (IIFE su globalThis) se non è già disponibile.
