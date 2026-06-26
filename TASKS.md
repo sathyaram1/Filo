@@ -78,21 +78,33 @@ Task ordinati (dipendenze: P1 fondamento → P2/P3):
   `npm run test:unit` 672/672 verde. Non testata end-to-end: parte di rete
   (runQuery su Firestore live) — thin per design. (stima: M)
 
-- [ ] **P3 — Applier groomer + giudice priorità LLM** (dipende da P1) — Costruisci
-  il runtime mancante di `src/shared/feedbackGroomer.js` (oggi solo logica pura,
-  vedi F5): legge la coda feedback, chiama `groom()`, applica merge (append
-  `mergedNotes` + archivia dup) e priorità. **Aggiungi il giudice di priorità**:
-  funzione che, dato il testo di UN feedback + n. duplicati, ritorna
-  `{ isSecurity, priority: 0..2 }`; un **wrapper deterministico** forza
-  `isSecurity → 3` e clampa il resto a 0-2 (riserva del 3 garantita in codice, non
-  nel prompt). Il modello del giudice è un **modello di supporto già previsto**:
-  cerca lo slot "giudice priorità" in `src/main/services/resolveSupportModel.js` /
-  `supportModelsStore.js` / `src/pages/manage/manage.js` e risolvilo da lì (NON
-  hardcodare il modello). Il giudice è iniettabile come `llmSimilar` nel groomer
-  (testabile con mock). **Fatto**: unit test che verificano il clamp (security→3
-  sempre; non-security→max 2 anche se l'LLM dice 3; override owner intatto) con un
-  giudice mockato; integrazione col groomer esistente. `npm run test:unit` verde.
-  (stima: M)
+- [x] **P3 — Applier groomer + giudice priorità LLM** (dipende da P1) —
+  _(fatto: sessione locale 2026-06-26)_ — **Esito**:
+  - `scripts/lib/priority-judge.mjs`: giudice iniettabile (`makePriorityJudge(llmCallOverride?)`)
+    + wrapper deterministico `applyClamp` (security→3 SEMPRE in codice; non-security→clamp
+    a max 2 anche se LLM dice 3) + `buildUserPrompt`. Modello: slot `judgePriority` di
+    `resolveSupportModel` già esistente; in produzione usa `FILO_JUDGE_MODEL` env o
+    `gemini-3.1-flash-lite` come fallback (resolveSupportModel non è ESM standalone,
+    segnalato nel report). Override LLM completo tramite `llmCallOverride`.
+  - `scripts/groom-apply.mjs`: applier runtime — legge coda da Firestore (`fetchTodoFeedbacks`,
+    filtra `status=todo`, decifra con `decryptFeedbackList`), chiama `groom()`, applica merge
+    (archivia drop, aggiorna note keep), chiama giudice LLM su feedback con duplicati con
+    `dupeCount` da `merges`; fallback al bump deterministico se giudice non configurato o
+    `--no-priority-judge`. Priority scritta cifrata (`encryptPriorityForQueue`, stesso pattern
+    di `queue-feedback.mjs`). **Override owner**: skip se `fb.priorityManual === true`
+    (campo non ancora nello schema Firestore — vedi nota da confermare sotto).
+  - `tests/unit/priorityJudge.test.mjs`: 22 unit test con giudice mockato. Verificano:
+    clamp security→3 sempre; non-security→max 2 anche se LLM dice 3 o 99; override owner
+    (priorityManual=true) intatto; dupeCount da groom passato correttamente al giudice;
+    fallback deterministico con llmJudge=false; buildUserPrompt (trunca, include dupeCount).
+  - `npm run test:unit`: **694/694 verde** (baseline 672, +22).
+  - **Override owner da confermare**: il marcatore `priorityManual: boolean` non esiste
+    ancora nello schema Firestore. Il giudice è già pronto a rispettarlo, ma serve
+    aggiungerlo al doc feedback + `hasOnly` in `firestore.rules` + deploy quando l'owner
+    imposta priority a mano dalla dashboard. Oggi il giudice può sovrascrivere priority
+    manuali (nessun campo che lo impedisca). Decidere e segnalare prima di abilitare.
+  - **Non testato e2e in locale**: lettura/scrittura Firestore reale + chiamata LLM reale
+    (parte thin per design — testabile solo in cloud con GEMINI_API_KEY e Firestore live).
 
 - [ ] **P4 — (FEEDBACK, non qui) Spike cattura visiva in cloud** — Vive come
   feedback creato il 2026-06-26 (cattura del display xvfb via
