@@ -106,6 +106,28 @@ Task ordinati (dipendenze: P1 fondamento → P2/P3):
   - **Non testato e2e in locale**: lettura/scrittura Firestore reale + chiamata LLM reale
     (parte thin per design — testabile solo in cloud con GEMINI_API_KEY e Firestore live).
 
+- [ ] **P6 — Marcatore override owner `priorityManual`** (emerso da P3, GATE per
+  abilitare il giudice in produzione) — Il giudice di priorità (P3) può sovrascrivere
+  una priority che l'owner ha impostato a mano, perché nello schema non c'è un campo
+  che segnali "decisa dall'owner, non toccare". Aggiungi `priorityManual: boolean` al
+  doc feedback: la dashboard owner lo mette a `true` quando l'owner cambia la priority
+  a mano (cerca dove `updateStatus({priority})` viene invocato dalla UI in
+  `src/pages/feedback/feedback.js` e `src/pages/manage/`); aggiorna `hasOnly` in
+  `firestore.rules` (ramo update admin) per ammettere il campo + **deploy**. Il giudice
+  (`scripts/groom-apply.mjs`) già salta i feedback con `priorityManual === true`.
+  **Fatto**: unit test che il giudice salta i manuali; rules deployate; la UI setta il
+  flag al cambio manuale. (stima: S)
+
+- [ ] **P7 — Estrarre `resolveSupportModel` in modulo ESM importabile da CLI**
+  (emerso da P3) — Lo slot "giudice priorità" (`judgePriority`) esiste nei Modelli di
+  supporto (`resolveSupportModel.js`/`supportModelsStore.js`), ma `resolveSupportModel`
+  non è importabile dagli script CLI (dipende da google-auth + Firestore), quindi il
+  giudice in `scripts/groom-apply.mjs` usa `FILO_JUDGE_MODEL` (env) con fallback
+  hardcodato invece del modello configurato dall'utente in dashboard. Estrai la
+  risoluzione del modello in un modulo ESM standalone (senza dipendenze Electron) così
+  gli script delle routine leggono il modello scelto dall'owner. **Fatto**: il groomer
+  applier risolve il modello del giudice dallo store di supporto; unit test. (stima: M)
+
 - [ ] **P4 — (FEEDBACK, non qui) Spike cattura visiva in cloud** — Vive come
   feedback creato il 2026-06-26 (cattura del display xvfb via
   `desktopCapturer.getSources({types:['screen']})` o `x11grab`, pilotando Filo con
