@@ -107,18 +107,36 @@ Task ordinati (dipendenze: P1 fondamento → P2/P3):
   è ancora da decidere. La logica pura resta in `feedbackGroomer.js`; il runtime è un task
   futuro da collocare.
 
-- [x] **P6 — Marcatore override owner `priorityManual`** (GATE per attivare il giudice in
-  produzione) — Il giudice di priorità (P3, in `filo-security`) ha già il check difensivo
-  `feedback.priorityManual === true → skip`, ma il campo non esiste ancora nello schema.
-  Senza, il giudice potrebbe sovrascrivere una priority impostata a mano dall'owner (requisito
-  esplicito owner: "io posso comunque cambiare le priorità"). Serve: (a) la dashboard owner
-  scrive `priorityManual: true` sul doc quando l'owner cambia la priority a mano (cerca dove
-  `updateStatus({priority})` è invocato dalla UI in `src/pages/feedback/feedback.js` e
-  `src/pages/manage/`); (b) `hasOnly` in `firestore.rules` (ramo update admin) ammette il
-  campo; (c) **deploy** rules. NB: `filo-security` usa l'admin SDK (bypassa le rules in
-  scrittura) ma il check del campo è già pronto lato backend. **Fatto**: la UI setta il flag
-  al cambio manuale; rules deployate; il giudice salta i manuali (già coperto da test in
-  filo-security). (stima: S)
+- [x] **P6 — Marcatore override owner `priorityManual`** — _(fatto + deployato 2026-06-26)_
+  **Esito**: la dashboard owner scrive `priorityManual: true` quando l'owner cambia la
+  priority a mano (click sui pallini di priorità in `src/pages/feedback/feedback.js` →
+  passa `priorityManual:true` a `updateStatus`; handler IPC `FEEDBACK_UPDATE` in
+  `handlers/auth.js` lo propaga; `feedback.js updateStatus` lo scrive come `booleanValue`,
+  non cifrato). `firestore.rules`: `priorityManual` aggiunto a `hasOnly` del ramo update
+  admin + type-check `is bool`; **rules deployate** su filo-8b9cb. Il giudice in
+  `filo-security` salta `priorityManual===true` (coperto da test). 5 unit test in
+  `tests/unit/feedbackPriorityManual.test.mjs`; `npm run test:unit` 677/677 verde.
+
+- [x] **P8 — Modello del giudice di priorità impostabile da dashboard** _(fatto + deployato
+  2026-06-26)_ — Richiesta owner: rendere il giudice di priorità configurabile come gli altri
+  modelli di supporto. La UI aveva già lo slot `judgePriority` (in `config/supportModels`) ma
+  NESSUNO slot era cablato a un modello reale (`resolveSupportModel` non consumato). **Esito**:
+  in `filo-security` nuovo `functions/src/priority/resolveModel.js` — legge
+  `config/supportModels.judgePriority` + `config/models.modelRegistry` da Firestore, risolve il
+  primo nickname a un id **OpenRouter** (i nickname solo-Gemini → variante `-or`; coerente coi
+  giudici L2/red-team che sono tutti OpenRouter), cascata di fallback: slot → `env
+  PRIORITY_JUDGE_MODEL` → default `anthropic/claude-haiku-4-5`. Agganciato in `judge.js` con DI.
+  23 test, suite filo-security **209/209**. È il **primo slot di supporto davvero cablato
+  end-to-end** (gli altri restano DD3). Commit `6e629c5`, **Functions deployate**. NB: legge la
+  config ad ogni `run()` (no cache) — ok per il volume, eventuale TTL se serve.
+
+- [x] **Deploy + secret (2026-06-26)** — `firebase deploy --only firestore:rules` (P6) e
+  `firebase deploy --only functions:security` (filo-security, codebase `security`, predeploy =
+  209 test) entrambi completati su filo-8b9cb. Provisionato in Secret Manager il secret
+  mancante **`FILO_FEEDBACK_PRIVKEY`** (chiave privata master dei feedback, prima assente →
+  404: il backend non poteva decifrare i feedback dopo il cutover S1; ora può) da
+  `tests/agent/.env`, senza esporla. `JUDGE_OPENROUTER_KEY` era già presente. Warning benigno
+  sulla pulizia immagini di build (eventuale piccolo costo, cancellabili a mano dalla console).
 
 - [x] **P7 — ~~Estrarre `resolveSupportModel` per CLI~~ (OBSOLETO)** — Dissolto dalla
   ricollocazione di P3 in `filo-security`. Esisteva solo perché avevo messo il giudice in
