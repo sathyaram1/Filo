@@ -19,11 +19,11 @@
 // (con y-SHELL_HEIGHT nelle coordinate della pagina view).
 
 import { _electron as electron } from 'playwright';
-import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const APP_ROOT = resolve(__dirname, '..', '..');
