@@ -218,7 +218,8 @@ Task ordinati (dipendenze: P1 fondamento → P2/P3):
   Firestore — DD3). Nessun lavoro da fare. _(Se mai servisse leggere lo slot `judgePriority`
   dei Modelli di supporto dal backend, è il coordinamento cross-repo già previsto in DD3.)_
 
-- [ ] **P4 — (FEEDBACK, non qui) Spike cattura visiva in cloud** — Vive come
+- [ ] **P4 — (FEEDBACK, non qui) Spike cattura visiva in cloud** — ➡️ **GIÀ
+  FEEDBACK #237** (non duplicare). Vive come
   feedback creato il 2026-06-26 (cattura del display xvfb via
   `desktopCapturer.getSources({types:['screen']})` o `x11grab`, pilotando Filo con
   Playwright per costruire lo stato + catturare il composito reale). Si valida
