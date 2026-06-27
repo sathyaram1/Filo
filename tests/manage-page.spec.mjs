@@ -189,6 +189,45 @@ test('con dati finti: un elemento su UNA riga (#N + titolo, niente label motivo)
   expect(borderColor).not.toBe('rgba(0, 0, 0, 0)'); // non trasparente
 });
 
+// Redesign routine: un feedback bloccato per LOOP (3 verifiche fallite di fila)
+// deve avere il bordo NERO, distinto dai blocchi del pipeline di sicurezza.
+const FAKE_FB_LOOP = {
+  _id: 'test-fb-loop',
+  text: 'Fix bloccato dopo tre verifiche avversariali fallite.',
+  name: 'Test blocco loop',
+  seq: 77,
+  subSeq: 0,
+  clientId: 'tester@example.com',
+  createdAt: '2026-06-27T10:00:00Z',
+  images: [],
+  status: 'blocked',
+  blockReason: 'loop',
+};
+
+test('un blocco per LOOP (blocked + blockReason=loop) ha il border-left NERO', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_MANAGE_REVIEW);
+
+  // Verifica la logica pura: classifyBlock → reason 'loop', colore nero.
+  const cl = await page.evaluate((fb) => window.SN_MANAGE_REVIEW.classifyBlock(fb), FAKE_FB_LOOP);
+  expect(cl).not.toBeNull();
+  expect(cl.reason).toBe('loop');
+  expect(cl.color).toBe('#111111');
+
+  // Esercita il VERO renderList: il blocco loop vive in "In coda".
+  await page.evaluate((fb) => { window.__mgTest.setData([fb]); window.__mgTest.setTab('queue'); }, FAKE_FB_LOOP);
+
+  await expect(page.locator('.mg-item')).toHaveCount(1);
+  await expect(page.locator('.mg-item-title')).toHaveText('Test blocco loop');
+
+  // Border-left NERO (#111111 → rgb(17, 17, 17)), distinto dal rosso/arancio/blu.
+  const borderColor = await page.locator('.mg-item').evaluate(
+    (el) => getComputedStyle(el).borderLeftColor
+  );
+  expect(borderColor).toBe('rgb(17, 17, 17)');
+});
+
 test('il pannello centrale si apre al click e mostra bolle + giudici', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
