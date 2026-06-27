@@ -133,8 +133,9 @@ if (isMain) {
   if (args.includes('--starred')) starred = true;
   else if (args.includes('--unstar')) starred = false;
   const positional = args.filter((a, i) =>
-    a !== '--no-git' && a !== '--branch' && a !== '--starred' && a !== '--unstar'
-    && !(bi !== -1 && i === bi + 1));
+    a !== '--no-git' && a !== '--branch' && a !== '--reason' && a !== '--starred' && a !== '--unstar'
+    && !(bi !== -1 && i === bi + 1)
+    && !(ri !== -1 && i === ri + 1));
   const [id, status, ...noteParts] = positional;
   if (!id || !status) {
     console.error('Uso: node scripts/queue-triage.mjs <id> <status:todo|done|clarify|review|blocked|archived> "testo note" [--branch <nome>] [--starred|--unstar] [--no-git]');
