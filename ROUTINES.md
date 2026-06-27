@@ -11,7 +11,7 @@ testi liberi dei feedback), elimina la superficie d'attacco da prompt-injection
 sull'ordinamento, e stampa al worker il ruolo + il payload + il file-ruolo da
 eseguire. L'orchestratore non legge NIENTE: né metadati, né corpi, né screenshot.
 
-> **Non è per sessioni locali.** Chi lavora in locale legge `CLAUDE.md` e `LOCAL.md`.
+> **Non è per sessioni locali.** Chi lavora in locale legge `CLAUDE.md`.
 
 ---
 
