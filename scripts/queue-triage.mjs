@@ -17,6 +17,7 @@
 // USO:
 //   node scripts/queue-triage.mjs <id> <status:todo|done|clarify|review|blocked|archived> "testo note"
 //   node scripts/queue-triage.mjs <id> <status> "note" --branch worker/42  (stato review/blocked + branch)
+//   node scripts/queue-triage.mjs <id> <status> "note" --reason loop        (motivo strutturato del blocco)
 //   node scripts/queue-triage.mjs <id> <status> "note" --starred|--unstar   (flag ⭐ preferito, DB2)
 //   node scripts/queue-triage.mjs <id> <status> "note" --no-git   (solo scrive il file)
 //
