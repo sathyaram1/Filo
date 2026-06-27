@@ -1063,7 +1063,12 @@ DIPENDENZE APERTE (non chiudibili da questo repo):
        placeholder e il worker segnala l'impossibilità di procedere. I metadati visti
        dall'orchestratore (`statusPublic`/num/priority/titolo) sono sempre in chiaro.
        `node --check` ok sull'helper referenziato.
-  - [~] **S1.4 — Coordina col backend filo-security**: il backend deve decifrare
+  - [~] **S1.4 — Coordina col backend filo-security** — ➡️ **MIGRATO IN
+    `filo-security/TASKS.md`** (2026-06-27): è lavoro+deploy del backend privato.
+    Il codice di decifratura è già fatto (commit 9baa637+2e91d45); il **residuo
+    (provisioning secret + `firebase deploy --only functions`)** vive ora nel
+    `TASKS.md` di `filo-security`, fuori dalla portata delle routine.
+    Il backend deve decifrare
     il feedback per farlo giudicare (chiave privata nei secrets delle Functions)
     e **cifrare `pipeline`/`verdicts`** che scrive. Cross-repo: documenta lì.
     Le rules Firestore possono lasciare la lettura com'è (il contenuto è cifrato),
