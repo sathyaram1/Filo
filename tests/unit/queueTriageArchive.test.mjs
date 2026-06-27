@@ -55,3 +55,35 @@ test('starred convive con branch (review/blocked) senza calpestarsi', () => {
   assert.equal(e.starred, true);
   assert.equal(e.status, 'review');
 });
+
+test('queueTriage serializza il motivo strutturato `reason` (es. loop)', () => {
+  queueTriage('loop1', 'blocked', 'bloccato dopo 3 fallimenti', 'routine-test', 'worker/loop1', undefined, 'loop');
+  const e = read('loop1');
+  assert.equal(e.status, 'blocked');
+  assert.equal(e.branch, 'worker/loop1');
+  assert.equal(e.reason, 'loop');
+});
+
+test('queueTriage NON scrive reason se omesso o vuoto', () => {
+  queueTriage('noreason', 'blocked', '', 'routine-test', 'worker/x');
+  assert.equal('reason' in read('noreason'), false);
+  queueTriage('emptyreason', 'blocked', '', 'routine-test', 'worker/x', undefined, '   ');
+  assert.equal('reason' in read('emptyreason'), false);
+});
+
+// CLI: --reason <slug> finisce sull'entry (stesso pattern di --branch).
+test('CLI queue-triage.mjs --reason loop accoda entry.reason', () => {
+  const { execFileSync } = require('node:child_process');
+  const { fileURLToPath } = require('node:url');
+  const { dirname, join } = require('node:path');
+  const here = dirname(fileURLToPath(import.meta.url));
+  const script = join(here, '..', '..', 'scripts', 'queue-triage.mjs');
+  execFileSync(process.execPath, [script, 'cli-loop', 'blocked', 'nota', '--branch', 'worker/cli', '--reason', 'loop', '--no-git'],
+    { env: { ...process.env, FILO_SPOOL_DIR: tmp }, encoding: 'utf8' });
+  const e = read('cli-loop');
+  assert.equal(e.status, 'blocked');
+  assert.equal(e.branch, 'worker/cli');
+  assert.equal(e.reason, 'loop');
+  // La nota positional non viene mangiata dai flag.
+  assert.equal(e.notes, 'nota');
+});
