@@ -93,6 +93,35 @@ test('classifyBlock: reviewDecision diverso da accepted NON sblocca', () => {
   assert.equal(r.reason, 'attack');
 });
 
+// ── loop (redesign routine): blocco duro dopo 3 verifiche fallite ───────────
+
+test('classifyBlock: blocked + blockReason=loop → reason=loop, bordo nero, severità massima', () => {
+  const r = MR.classifyBlock({ status: 'blocked', blockReason: 'loop' });
+  assert.equal(r.reason, 'loop');
+  assert.equal(r.color, '#111111');
+  assert.equal(r.severity, 4); // sopra attack(3)/spam(2)/design(1)
+});
+
+test('classifyBlock: loop vince sul pipeline di sicurezza', () => {
+  // Un feedback bloccato per loop che ha anche un verdetto pipeline → resta loop.
+  const r = MR.classifyBlock({ status: 'blocked', blockReason: 'loop', pipeline: { action: 'block_attack' } });
+  assert.equal(r.reason, 'loop');
+});
+
+test('classifyBlock: blockReason=loop ma status non blocked → non è un blocco loop', () => {
+  // Il loop richiede lo stato `blocked`; senza, ricade sulla logica pipeline (qui null).
+  assert.equal(MR.classifyBlock({ status: 'todo', blockReason: 'loop' }), null);
+});
+
+test('classifyBlock: blocked senza blockReason loop → nessun bordo loop', () => {
+  // Un `blocked` generico (es. branch sensibile) non è un loop: niente nero.
+  assert.equal(MR.classifyBlock({ status: 'blocked' }), null);
+});
+
+test('classifyBlock: loop sotto reviewDecision=accepted → null (override owner vince)', () => {
+  assert.equal(MR.classifyBlock({ status: 'blocked', blockReason: 'loop', reviewDecision: 'accepted' }), null);
+});
+
 // ── sortReview ─────────────────────────────────────────────────────────────
 
 function fb(id, pipeline, createdAt) {
