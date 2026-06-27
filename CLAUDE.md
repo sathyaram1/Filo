@@ -26,29 +26,25 @@ condividono lo stesso `.git`):
 git -C "C:/Users/agenti AI/Desktop/Filo/Filo" pull --rebase origin main
 ```
 
-Se il pull fallisce per conflitti, fermati e chiedi all'utente prima di
-procedere — non risolvere conflitti senza autorizzazione.
+Se il pull fallisce per conflitti, riolvi in utonomia, chiedi all'utente solo se ci sono decisioni importanti.
 
 ## Lavoro multi-sessione e "continua"
 
-Non c'è più una grande coda pubblica in `TASKS.md`: il lavoro di prodotto vive
-nei **feedback** (Firestore), il lavoro delle routine lo sceglie
-`scripts/dispatch.mjs`, e `TASKS.md` resta solo come **promemoria di azioni
-owner** (vedi il file stesso).
+Il lavoro di prodotto vive nei **feedback** (Firestore); quello delle routine lo
+sceglie `scripts/dispatch.mjs`. Non c'è una coda pubblica di task.
 
-- Se l'utente dice **"continua"** (o equivalenti) senza altro contesto: riprendi
-  dal **contesto della conversazione**; se manca, guarda `LOCAL.md` (modalità
-  locale) e — per il backend privato — `filo-security/TASKS.md`. Le azioni owner
-  ancora aperte sono in `TASKS.md`.
+- Se l'utente dice **"continua"** senza altro contesto: riprendi dal **contesto
+  della conversazione**; se manca, guarda `LOCAL.md` e — per il backend privato —
+  `filo-security/TASKS.md`.
 - Se l'utente consegna una **spec grossa** in chat: spezzala in pezzi da una
   sessione l'uno e fatti confermare l'ordine prima di partire. Se la spec arriva
   come **feedback** (routine cloud) → vedi `ROUTINES.md` (ruolo `new-work`).
 - **Budget contesto — principio, non regola fissa**: stai *spesso* sotto i ~200k
   token (oltre quella soglia i token costano il 50% in più), ma **chiudere un
   task vale più che rispettare il budget**: il task atomico in corso si FINISCE;
-  quello che non si fa è INIZIARE un task nuovo quando sei già oltre ~150-200k. In
-  quel caso aggiorna lo stato (in `TASKS.md` se è un'azione owner, o di' all'utente
-  dove sei arrivato) e fai aprire un'altra istanza con "continua".
+  quello che non si fa è INIZIARE un task nuovo quando sei già oltre ~200k. In
+  quel caso di' all'utente dove sei arrivato e fai aprire un'altra istanza con
+  "continua".
 
 ## Push automatico su `origin/main`
 
@@ -168,13 +164,8 @@ Quando risolvi un feedback puoi (anzi: dovresti) prendere iniziativa sulle
 
 Queste non sono scelte di design — sono completezza. Falle.
 
-**Limite**: quando ci sono più modi non equivalenti di fare la cosa (grid vs
-accordion vs modal-galleria vs lista a thumb), non scegliere tu. Proponi 2-3
-opzioni nel report o lascialo come `clarify`.
-
 **Regola d'oro anti scope-creep**: nel report finale **elenca esplicitamente cosa
-hai aggiunto oltre il chiesto**, così l'utente lo vede e può dire "no, questo non
-lo voglio". Senza elenco esplicito è invisibile e si accumula nel codice.
+hai aggiunto oltre il chiesto**. Senza elenco esplicito è invisibile e si accumula nel codice.
 
 ## Tono dei report e delle notes
 
