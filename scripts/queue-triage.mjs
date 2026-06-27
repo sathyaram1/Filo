@@ -124,6 +124,10 @@ if (isMain) {
   let branch = '';
   const bi = args.indexOf('--branch');
   if (bi !== -1) branch = args[bi + 1] || '';
+  // --reason <slug>: motivo strutturato del blocco (es. loop). Stesso pattern di --branch.
+  let reason = '';
+  const ri = args.indexOf('--reason');
+  if (ri !== -1) reason = args[ri + 1] || '';
   // --starred / --unstar: alza/abbassa il flag ⭐ "preferito" (DB2).
   let starred;
   if (args.includes('--starred')) starred = true;
