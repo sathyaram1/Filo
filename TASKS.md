@@ -40,9 +40,11 @@ contesto, per tempo, o perché l'utente chiude), la prossima riparte da qui.
 Spec durevole in **`ROUTINE-REDESIGN.md`** (design confermato dall'owner). Ordine
 di esecuzione consigliato a 6 step. Stato:
 
-- [ ] **Step 1 — Migrare il residuo `filo-security` in `filo-security/TASKS.md` +
-  implementarlo (DD3 / S1.4 / S1.F2.3)** — sessione locale, repo privato
-  `filo-security`. Le routine non hanno accesso a quel repo. _Non iniziato._
+- [x] **Step 1 — Migrare il residuo `filo-security` in `filo-security/TASKS.md` +
+  implementarlo (DD3 / S1.4 / S1.F2.3)** — _(fatto)_ — DD3-residuo / S1.4 / S1.F2.3
+  sono stati **migrati in `filo-security/TASKS.md`** (repo privato) e il sanitizer
+  backend di DD3 è stato **implementato + testato lì** (232/232). Questi item ora
+  vivono nel repo privato `filo-security`, fuori dalla portata delle routine.
 
 - [x] **Step 2 (parziale) + Step 3 — Doc dei ruoli + `dispatch.mjs`** —
   _(fatto: sessione locale 2026-06-27)_ — **Esito**:
