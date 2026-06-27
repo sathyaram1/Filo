@@ -1,16 +1,23 @@
 // Store della config "modelli di supporto" di Filo.
 //
 // Vive nel doc Firestore `config/supportModels`. Contiene un campo per ogni
-// slot di supporto (sanitizer, judgeL2, judgeRedTeam, judgePriority): ogni
-// valore è una stringa catena di nickname ("flash, flash-or"), lo stesso formato
-// che il backend usa per `config/models`. È leggibile dal backend filo-security
-// (Cloud Functions, via Admin SDK) senza passare per queste regole. Dal client
-// è write-only admin.
+// slot di supporto: ogni valore è una stringa catena di nickname
+// ("flash, flash-or"), lo stesso formato che il backend usa per `config/models`.
+// È leggibile dal backend filo-security (Cloud Functions, via Admin SDK) senza
+// passare per queste regole. Dal client è write-only admin.
+//
+// I 3 giudici fissi del panel L2 + il giudice dinamico hanno ciascuno il proprio
+// slot (judge1/judge2/judge3/judgeDynamic) così l'owner può impostare il modello
+// di OGNI giudice separatamente dalla dashboard. Il vecchio slot unico `judgeL2`
+// non era letto da nessuno ed è stato rimosso.
 //
 // Schema doc:
 //   {
 //     sanitizer:     "flash",
-//     judgeL2:       "flash, flash-or",
+//     judge1:        "flash, flash-or",
+//     judge2:        "flash",
+//     judge3:        "flash",
+//     judgeDynamic:  "flash",
 //     judgeRedTeam:  "flash",
 //     judgePriority: "flash",
 //   }
