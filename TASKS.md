@@ -698,8 +698,12 @@ separata a permessi ridotti** dove gli utenti verificano i fix già rilasciati.
     risultato in `sanitized`/sub-doc e far leggere la board da lì. (stima: M)
 
 - [~] **DD3 — Audit LLM hard-coded + centralizzazione (incl. cross-repo)** —
-  **PARTE IN-REPO FATTA** (sessione locale 2026-06-24); **resta la parte backend
-  cross-repo `filo-security`**. Stanare tutti gli LLM hard-coded e portarli sotto
+  ➡️ **RESIDUO MIGRATO IN `filo-security/TASKS.md`** (2026-06-27): la parte in-repo
+  è chiusa; il **residuo backend cross-repo è ora in `filo-security/TASKS.md`** e il
+  sanitizer backend è stato **implementato + testato lì** (232/232). Non c'è più
+  lavoro su questo repo pubblico per DD3.
+  **PARTE IN-REPO FATTA** (sessione locale 2026-06-24); ~~resta la parte backend
+  cross-repo `filo-security`~~ (→ migrata). Stanare tutti gli LLM hard-coded e portarli sotto
   "Modelli di supporto". **Done**: elenco completo + ognuno spostato/documentato +
   backend che legge la config. (stima: L, multi-sessione, cross-repo)
   - **AUDIT COMPLETO (in-repo)** — modelli hard-coded trovati e decisione:
