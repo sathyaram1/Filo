@@ -1,7 +1,0 @@
-{
-  "id": "fc791313-d849-4a12-a2b4-ccdf319f45c7",
-  "status": "done",
-  "notes": "Sicurezza OK (L4 pass): nessun problema rilevato. Diff aggiunge cattura screenshot composita su Linux via scrot/xvfb al driver di test agente. execFileSync con array fissi, nessun input utente in posizioni pericolose, nessuna modifica a hook/deploy/regole Firestore. Fuso su main.",
-  "queuedAt": "2026-06-27T12:31:40.563Z",
-  "queuedBy": "vm-routine"
-}
