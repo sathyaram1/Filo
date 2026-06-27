@@ -35,6 +35,68 @@ contesto, per tempo, o perché l'utente chiude), la prossima riparte da qui.
 
 ## Coda
 
+### Ridisegno automazione routine — orchestratore banale + dispatch (spec 2026-06-27)
+
+Spec durevole in **`ROUTINE-REDESIGN.md`** (design confermato dall'owner). Ordine
+di esecuzione consigliato a 6 step. Stato:
+
+- [ ] **Step 1 — Migrare il residuo `filo-security` in `filo-security/TASKS.md` +
+  implementarlo (DD3 / S1.4 / S1.F2.3)** — sessione locale, repo privato
+  `filo-security`. Le routine non hanno accesso a quel repo. _Non iniziato._
+
+- [x] **Step 2 (parziale) + Step 3 — Doc dei ruoli + `dispatch.mjs`** —
+  _(fatto: sessione locale 2026-06-27)_ — **Esito**:
+  - Nuova struttura `routines/`: `routines/shared.md` (decifratura S1, coda git,
+    claim, tono report, sintomo-vs-causa, invarianti UX, insistere, verifica) +
+    `routines/roles/{secaudit,verifier,fixer,new-work,prober}.md`. Modello di
+    isolamento del ridisegno applicato: **secaudit** = isolamento STRUTTURALE
+    (mai il feedback), **verifier** = isolamento COMPORTAMENTALE (sintomo +
+    codice eseguibile via checkout, MAI il diff/report del risolutore). **M4+M5
+    fusi** in `new-work` (è il ruolo a decidere se spezzare la spec).
+  - `scripts/dispatch.mjs`: dispatcher deterministico non-LLM. Funzioni pure
+    esportate (`chooseBucket`, `classifyReview`, `applyVerifierVerdict`,
+    `applyFixed`, `applySecaudit`, `buildPayload`, stato su disco). Precedenza
+    secaudit>verifier>fixer>new-work>prober; claim atomico; contatore loop
+    persistito in `feedback-triage/state/<id>.json` (su git come i claim); a 3
+    FAIL → accoda `blocked` (motivo loop nel testo) e prosegue. Output JSON che
+    **inlina il file-ruolo** (`instructions`) → worker sempre `general-purpose`.
+    Riusa `next-feedback.mjs` (`fetchOpenCandidates` esportato + `selectWinner`).
+    Sotto-comandi `--record-verifier|--record-fixed|--record-secaudit|--clear-state`.
+  - `tests/unit/dispatch.test.mjs`: **26 test** (precedenza, classifyReview,
+    transizioni di stato, cap loop=3, ISOLAMENTO payload — secaudit non vede il
+    feedback, verifier non vede il diff — round-trip stato su disco). Smoke CLI
+    dei `--record-*` ok. `npm run test:unit` **703/703 verde**.
+  - `ROUTINES.md` riscritto a **orchestratore-only** (loop cieco che spawna un
+    worker generico che lancia `dispatch.mjs`; budget R4; sequenzialità; contratto
+    di dispatch; macchina a stati; Modello B feature spezzate). I dettagli dei
+    ruoli ora vivono in `routines/roles/*`; le convenzioni in `routines/shared.md`.
+  - **NON verificato end-to-end** la parte di rete di dispatch (fetch Firestore +
+    decifratura live): thin by design, come `next-feedback.mjs`. Testata la logica
+    pura. Le routine cloud sono spente, quindi nessun impatto live.
+
+- [ ] **Step 2 (residuo) — `CLAUDE.md` minimo + `LOCAL.md`** — Trimmare `CLAUDE.md`
+  a ~100 righe (convenzioni repo per QUALSIASI agente + "switch di ruolo" in cima
+  che punta a `LOCAL.md` per il locale e a `ROUTINES.md`+`routines/roles/` per le
+  routine). Creare `LOCAL.md` (sessione locale owner+Claude). **Delicato**:
+  `CLAUDE.md` è caricato in ogni sessione; trimmarlo male degrada tutte le sessioni
+  future. `LOCAL.md` descrive uno **stato bersaglio** (locale non scrive codice in
+  Filo) che oggi NON è attivo (routine spente → si fa tutto in locale): scriverlo
+  in modo che non contraddica la realtà corrente. _Non iniziato._
+
+- [ ] **Step 4 — Dashboard: estendere `classifyBlock`/`REASONS`** — stato
+  **bloccato** nella tassonomia colori di `manage` + **nero** riservato a
+  `blocked` per **loop** (i 3 FAIL verifier→fixer). Richiede anche un campo
+  strutturato `reason: loop` su `queue-triage.mjs` (oggi dispatch mette il motivo
+  solo nel testo della nota). _Non iniziato._
+
+- [ ] **Step 5 — Convertire gli item pubblici in feedback + eliminare `TASKS.md`
+  pubblico** — il lavoro pubblico vive nei feedback; `filo-security` ha il suo
+  `TASKS.md`. Consolidamento suite test → feedback. _Non iniziato._
+
+- [ ] **Step 6 — Verificare deploy rules arretrati** (DB2/DB4/DC3/DC4:
+  `reviewDecision`, `archiveOverride`, `reopenRequests`, `votes`, `priorityManual`)
+  + **ricordare all'owner R5** (schedulare 2 account su claude.ai). _Non iniziato._
+
 ### Finalizzazione automazione routine (spec 2026-06-26)
 
 Spec utente (chat 2026-06-26). Ridisegno del flusso routine: l'orchestratore è
