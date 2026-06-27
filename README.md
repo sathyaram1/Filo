@@ -57,8 +57,10 @@ src/
 assets/icons/                   Icone applicazione
 ```
 
-La coda di lavoro multi-sessione vive in `TASKS.md`; le convenzioni UI in
-`PATTERNS.md`; le istruzioni operative per Claude in `CLAUDE.md`.
+Le istruzioni operative per Claude vivono in `CLAUDE.md` (con lo "switch di
+ruolo": `LOCAL.md` per le sessioni locali, `ROUTINES.md` + `routines/` per le
+routine cloud); le azioni owner in sospeso in `TASKS.md`; le convenzioni UI in
+`PATTERNS.md`.
 
 ## Quick start
 
