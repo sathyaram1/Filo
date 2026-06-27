@@ -280,11 +280,12 @@ di design discutibile / non-bug → **NON** cambiarla di iniziativa, **segnalala
 all'utente; sospetto falso positivo dell'harness → **riproducilo con `test:shoot`**
 prima di trattarlo come bug.
 
-**In cloud (Linux headless)** `test:shoot`/`test:explore` non girano: usa `npm
-test`, aggiungi uno spec Playwright per la feature, `npm run test:smoke` come
-sanity check. Se non riesci a scrivere un test affidabile (es. UI dipende da
-Firestore live): verifica con `node -e "require('./src/...')"` che i moduli si
-caricano e dichiaralo nel report.
+**In cloud (Linux headless)** `test:shoot` **gira**: usa `xvfb-run -a npm run
+test:shoot -- "<scenario>"` come tester (`su tester -c "..."`) per catturare
+screenshot compositi reali. `test:explore` dipende dalla chiave API Gemini.
+Usa `npm run test:smoke` come sanity check rapido. Se non riesci a scrivere un
+test affidabile (es. UI dipende da Firestore live): verifica con
+`node -e "require('./src/...')"` che i moduli si caricano e dichiaralo nel report.
 
 ## Architettura (riepilogo)
 
