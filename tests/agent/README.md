@@ -3,9 +3,15 @@
 Due strumenti complementari per scoprire problemi UI (specie quelli **compositi**
 shell + WebContentsView, che i normali test Playwright per-pagina non vedono).
 
-Entrambi catturano la **finestra reale composita** via Win32 `PrintWindow`
-(`PW_RENDERFULLCONTENT`): cattura il contenuto della finestra Filo anche se non è
-in primo piano o è occlusa, quindi è robusto e non dipende dal focus.
+Entrambi catturano la **finestra reale composita** (shell + WebContentsView) tramite
+`captureComposite` in `driver.mjs`:
+
+- **Windows**: Win32 `PrintWindow(PW_RENDERFULLCONTENT)` — cattura il contenuto
+  anche se la finestra non è in primo piano/occlusa.
+- **Linux/xvfb** (cloud): `scrot` cattura il framebuffer X11 del display virtuale —
+  già include il composito Electron completo. Richiede `scrot` installato
+  (`apt-get install -y scrot`) e la variabile `DISPLAY` impostata da `xvfb-run`.
+  Fallback: `xwd` + ImageMagick `convert`.
 
 ## 1. `shoot.mjs` — controllo visivo SCRIPTATO (deterministico, niente LLM)
 
