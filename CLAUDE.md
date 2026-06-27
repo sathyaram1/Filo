@@ -109,8 +109,10 @@ Il minimo accettabile dipende dall'ambiente:
 
 - **In routine cloud (Linux headless)**: **qui** gira la regressione completa.
   `npm test` (intera suite Playwright); se la feature ha UI nuova, **aggiungi uno
-  spec Playwright** che la eserciti (click + assert). `test:shoot`/`test:explore`
-  **non funzionano nel cloud** (vedi "Controlli visivi").
+  spec Playwright** che la eserciti (click + assert). `test:shoot` **ora funziona
+  in cloud** tramite `scrot`/xvfb (vedi "Controlli visivi"); `test:explore` (LLM
+  Gemini) dipende dalla chiave API in `tests/agent/.env` — può non essere
+  disponibile.
 
 - **Se la verifica non è possibile** (es. richiede hardware che Playwright non
   simula): dichiaralo esplicitamente nel report finale — "implementato ma non
