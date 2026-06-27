@@ -4,8 +4,7 @@
 //   Il testo dei feedback (e il loro stato/verdetti) è una superficie d'attacco:
 //   chiunque legga Firestore o la history del repo PUBBLICO non deve poterlo
 //   leggere, altrimenti lo stato `blocked` ("il tuo attacco è stato beccato")
-//   diventa hill-climbing regalato all'attaccante. Vedi CLAUDE.md → S1 e
-//   TASKS.md → S1.1.
+//   diventa hill-climbing regalato all'attaccante. (Cifratura S1; storia in git.)
 //
 // COME FUNZIONA (sealed box, stile libsodium ma su WebCrypto, zero dipendenze)
 //   - Chi cifra usa SOLO la chiave PUBBLICA di Filo (bakeata nell'app).
