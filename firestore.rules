@@ -206,6 +206,10 @@ service cloud.firestore {
         // (stati `review`/`blocked` del cancello di merge delle routine).
         && request.resource.data.get('branch', '') is string
         && request.resource.data.get('branch', '').size() <= 200
+        // `blockReason`: motivo strutturato del blocco (es. 'loop' = 3 FAIL del
+        // verifier→fixer). Usato dalla dashboard `manage` per il colore del bordo.
+        && request.resource.data.get('blockReason', '') is string
+        && request.resource.data.get('blockReason', '').size() <= 60
         // `starred` (DB2): flag ⭐ "preferito"/parcheggiato, settabile su
         // qualunque feedback dall'owner. Booleano puro.
         && request.resource.data.get('starred', false) is bool
