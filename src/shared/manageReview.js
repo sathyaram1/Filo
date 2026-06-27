@@ -9,7 +9,13 @@
 
   // Motivi di blocco, in ordine di severità discendente.
   // color: usato come --mg-item-color nei CSS (border-left + badge).
+  // `loop` è il blocco "duro" introdotto dal redesign delle routine: un fix che
+  // fallisce la verifica avversariale 3 volte di fila (verifier→fixer) viene
+  // messo in `blocked` con `blockReason: 'loop'` perché decida l'owner. Bordo
+  // NERO, severità massima: è l'unico blocco che non viene dal pipeline di
+  // sicurezza (attacco/spam/design), ma dall'iter di lavorazione bloccato.
   const REASONS = {
+    loop:   { label: 'Loop',     color: '#111111', severity: 4 },
     attack: { label: 'Attacco',  color: '#c0392b', severity: 3 },
     spam:   { label: 'Spam',     color: '#e08e0b', severity: 2 },
     design: { label: 'Design',   color: '#5b6ee0', severity: 1 },
