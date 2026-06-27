@@ -1766,7 +1766,14 @@ Ordine = dipendenze (il motore va per primo). Numerare i task come C1..C5.
   cookies, incognito, slash-commands, tab-semantic-search,
   sidebar-shell-actions) + test:shoot del menu tasto destro (ok).
 
-- [~] **Consolidare la suite test (103 spec, ~25 min)** — Molti micro-spec
+- [~] **Consolidare la suite test (103 spec, ~25 min)** — ➡️ **CONVERTITO IN
+  FEEDBACK PUBBLICO (in coda)** (2026-06-27): il residuo "da fare" (cluster a stato
+  persistente: `options-*`, `spellcheck-*`, `dashboard-*` extra, `tab-archive*`) è
+  stato accodato come feedback "Consolidare la suite di test" via
+  `queue-feedback.mjs --status new` con tutti i dettagli tecnici (pattern stabilito,
+  cluster già fatti, cluster residui, esclusione `geo-block-*`/`proxy-tab-*`). Il
+  lavoro pubblico vive ora nei feedback. Storico tecnico conservato qui sotto.
+  — Molti micro-spec
   avviano Electron per testare dettagli della stessa pagina (es.
   dashboard-command-color/-focus/-extra). Accorpare gli spec per pagina/area
   in file unici che condividono il `beforeAll`/fixture (1 avvio → N test).
