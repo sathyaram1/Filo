@@ -1251,7 +1251,12 @@ DIPENDENZE APERTE (non chiudibili da questo repo):
     chiaro + `clientId` come `FENC1:…`; il match C5 trova il feedback con l'hash; la
     dashboard (via batch-decrypt) vede il `clientId` originale. (stima: S)
 
-  - [ ] **S1.F2.3 — `name`/`notes` e proiezione sanitizzata (DD2)** _(dipende da DD2
+  - [ ] **S1.F2.3 — `name`/`notes` e proiezione sanitizzata (DD2)** — ➡️ **MIGRATO
+    IN `filo-security/TASKS.md`** (2026-06-27): dipende dal sanitizer DD2, il cui
+    cablaggio backend vive in `filo-security` (sanitizer implementato lì). Il
+    contratto del sub-task resta documentato qui sotto per memoria, ma il lavoro
+    attivo è tracciato nel `TASKS.md` privato.
+    _(dipende da DD2
     che è già in lista; questo sub-task documenta la dipendenza e il contratto)_ —
     `name` e `notes` oggi restano in chiaro perché C5 li mostra all'utente senza
     chiave privata. La Fase 2 **NON** li cifra finché DD2 (sanitizer LLM) non è pronto,
