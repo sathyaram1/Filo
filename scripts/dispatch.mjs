@@ -335,12 +335,12 @@ export async function run() {
   // blocked-loop: dispatch stesso accoda `blocked` con motivo loop, pulisce lo
   // stato, e ri-sceglie il prossimo bucket (non c'è un worker per questo).
   if (bucket.role === 'blocked-loop') {
-    // NB: il motivo `loop` resta nel testo della nota. Il campo strutturato
-    // `reason: loop` (per il colore nero in dashboard) è un passo successivo del
-    // redesign (estensione di queue-triage + classifyBlock).
+    // Il motivo `loop` viaggia sia nel testo della nota (leggibile dall'owner)
+    // sia come campo strutturato `--reason loop` → `blockReason` sul doc, che la
+    // dashboard `manage` usa per colorare di nero il bordo (classifyBlock).
     const note = `Bloccato dopo ${bucket.loopCount} verifiche fallite (motivo: loop). Ultima critica: ${bucket.state?.verifierCritique || '—'}`;
     try {
-      execFileSync('node', [resolve(ROOT, 'scripts', 'queue-triage.mjs'), bucket.id, 'blocked', note, '--branch', bucket.branch],
+      execFileSync('node', [resolve(ROOT, 'scripts', 'queue-triage.mjs'), bucket.id, 'blocked', note, '--branch', bucket.branch, '--reason', 'loop'],
         { cwd: ROOT, encoding: 'utf8', stdio: 'ignore' });
     } catch (_) { /* la nota resta in coda al prossimo giro */ }
     clearState(bucket.id);
