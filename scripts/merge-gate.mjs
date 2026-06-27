@@ -12,7 +12,7 @@
 //   (vedi auto-commit-merge.sh): restano sul loro branch finché l'orchestratore,
 //   dopo la verifica avversariale (PASS), chiama QUESTO script per fonderli.
 //
-//   Topologia (Modello B, vedi TASKS.md):
+//   Topologia (Modello B, vedi ROUTINES.md § Feature spezzate):
 //     - feedback standalone: `worker/<id>`  → gate → `main`
 //     - feature spezzata:    `worker/<N.M>` → gate → `feature/N`   (per-pezzo)
 //                            `feature/N`    → gate → `main`         (#N.final)
