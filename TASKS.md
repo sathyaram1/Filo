@@ -942,11 +942,11 @@ File: `src/pages/manage/manage.{html,js}`, `src/shared/manageReview.js`
 campi review), `src/main/services/handlers/auth.js`, `firestore.rules`.
 
 DIPENDENZE APERTE (non chiudibili da questo repo):
-- [ ] **Deploy rules — AZIONE OWNER**: `firebase deploy --only firestore:rules`
-  perché i nuovi campi `reviewDecision`/`reviewComment`/`reviewedAt` siano
-  accettati lato server (finché non lo fai, l'accept fallisce con permission
-  denied). (Nota: in sospeso anche il deploy rules di R1 per `review`/`blocked`/
-  `branch`.)
+- [x] **Deploy rules — ~~AZIONE OWNER~~ FATTO** _(deployato, Step 4/6 del redesign
+  2026-06-27)_: i campi `reviewDecision`/`reviewComment`/`reviewedAt` (più
+  `review`/`blocked`/`branch` di R1, `blockReason`, e tutto il backlog DB/DC) sono
+  presenti in `firestore.rules` e le rules sono state **deployate**. L'accept owner
+  e i nuovi stati funzionano lato server.
 - [x] **Backend sicurezza (privato) — nome modello nei verdetti** (fatto
   2026-06-23, repo filo-security commit 7ce1570): `l2/judges.js` (makeJudge) +
   `l2/index.js` (runPanel) ora includono `model` in ogni verdetto; arriva fino a
