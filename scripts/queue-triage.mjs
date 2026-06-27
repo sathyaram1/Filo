@@ -74,6 +74,7 @@ export function queueTriage(id, status, notes, queuedBy, branch, starred, reason
   };
   if (branchStr) entry.branch = branchStr;
   if (typeof starred === 'boolean') entry.starred = starred;
+  if (reasonStr) entry.reason = reasonStr;
   const file = resolve(SPOOL_DIR, `${id}.json`);
   writeFileSync(file, JSON.stringify(entry, null, 2) + '\n', 'utf8');
   return file;
