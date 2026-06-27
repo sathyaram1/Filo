@@ -258,8 +258,8 @@ Se `npm install` non scarica il binario Electron (succede su alcuni setup):
 
 Gli unit test non vedono i bug **compositi** (shell + WebContentsView native) né
 le regressioni visive. Dopo una feature, esegui un controllo visivo dell'area
-toccata. Strumenti in `tests/agent/` (cattura la finestra reale via Win32
-`PrintWindow`, vedi `tests/agent/README.md`):
+toccata. Strumenti in `tests/agent/` (cattura la finestra reale composita,
+vedi `tests/agent/README.md`):
 
 1. **Controllo a vista (deterministico, gratis)** — `npm run test:shoot`:
    ```bash
