@@ -91,13 +91,22 @@ di esecuzione consigliato a 6 step. Stato:
   `blockReason` su `queue-triage.mjs`. Le `firestore.rules` per `blockReason` sono
   state **deployate**.
 
-- [ ] **Step 5 — Convertire gli item pubblici in feedback + eliminare `TASKS.md`
-  pubblico** — il lavoro pubblico vive nei feedback; `filo-security` ha il suo
-  `TASKS.md`. Consolidamento suite test → feedback. _Non iniziato._
+- [~] **Step 5 — Convertire gli item pubblici in feedback + dispositionare
+  `TASKS.md` pubblico** — _(in corso: sessione locale 2026-06-27)_ — Tutti gli
+  item aperti di `TASKS.md` sono stati dispositionati secondo la spec
+  (`ROUTINE-REDESIGN.md` § "Disposizione…"): residuo filo-security → migrato (Step
+  1); consolidamento suite test → **convertito in feedback pubblico (in coda)**;
+  P4 → già feedback **#237** (non duplicato); R4 → regola in `ROUTINES.md` (budget);
+  deploy rules → fatti (Step 4/6). **`TASKS.md` NON eliminato**: restano item che
+  NON sono né owner-action né migrati né convertiti (azioni owner + dipendenze
+  backend filo-security ancora aperte) → vedi report. L'eliminazione completa
+  resta una decisione owner sui residui product-work.
 
-- [ ] **Step 6 — Verificare deploy rules arretrati** (DB2/DB4/DC3/DC4:
-  `reviewDecision`, `archiveOverride`, `reopenRequests`, `votes`, `priorityManual`)
-  + **ricordare all'owner R5** (schedulare 2 account su claude.ai). _Non iniziato._
+- [x] **Step 6 — Verificare deploy rules arretrati** — _(fatto)_ — le rules di
+  backlog (`reviewDecision`, `archiveOverride`, `reopenRequests`, `votes`,
+  `priorityManual`, `blockReason`) sono tutte **presenti in `firestore.rules` e
+  deployate**. **R5** (schedulare 2 account su claude.ai) resta **azione owner**
+  (non codice) → da ricordare all'owner.
 
 ### Finalizzazione automazione routine (spec 2026-06-26)
 
