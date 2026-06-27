@@ -60,4 +60,7 @@ routine NON possono o NON devono fare.
 | `filo-security` | in locale | in locale |
 | `firebase deploy` | Claude in locale | coordinato con owner |
 
-**Modalità attiva ADESSO: routine SPENTE → si fa tutto in locale.**
+**Modalità attiva ADESSO: routine RIACCESE.** Di norma il codice Filo lo lavorano
+le routine; in locale owner + Claude discutono, scrivono feedback e lavorano su
+`filo-security`. L'owner resta l'autorità: se ti chiede esplicitamente di lavorare
+codice Filo in locale, fallo.
