@@ -47,8 +47,7 @@ routine NON possono o NON devono fare.
   **scrivono feedback** (incluso spezzare le spec grosse in sub-feedback che poi
   le routine lavorano), e **lavorano su `filo-security`** (il backend privato che
   le routine non vedono e non possono toccare).
-- I `firebase deploy` tornano coordinati con l'owner dove serve (vedi le azioni
-  owner in `TASKS.md`).
+- I `firebase deploy` tornano coordinati con l'owner dove serve.
 
 ---
 
