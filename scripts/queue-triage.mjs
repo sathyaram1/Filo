@@ -86,8 +86,8 @@ export function queueTriage(id, status, notes, queuedBy, branch, starred, reason
 // (insieme a status/verdetti, con proiezione sanitizzata user-facing) è Fase 2.
 // La funzione resta async e separata per non cambiare i call site quando la
 // Fase 2 reintrodurrà la cifratura qui.
-export async function queueTriageEncrypted(id, status, notes, queuedBy, branch, starred) {
-  return queueTriage(id, status, notes, queuedBy, branch, starred);
+export async function queueTriageEncrypted(id, status, notes, queuedBy, branch, starred, reason) {
+  return queueTriage(id, status, notes, queuedBy, branch, starred, reason);
 }
 
 function tryGit(args) {
