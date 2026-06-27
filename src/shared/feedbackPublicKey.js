@@ -25,7 +25,7 @@
   // C5). L'owner lo mette a `true` SOLO al cutover, dopo aver: (1) distribuito la
   // privata a dashboard/routine/backend, (2) verificato che dashboard e routine
   // decifrano, (3) confermato che nessun campo cifrato è mostrato a un utente
-  // senza chiave. Vedi CLAUDE.md → S1 e TASKS.md → S1.5 (checklist di cutover).
+  // senza chiave. (Cutover S1 fatto 2026-06-25; storia in git.)
   if (global.SN_FEEDBACK_ENC_ENABLED === undefined) {
     global.SN_FEEDBACK_ENC_ENABLED = true; // CUTOVER 2026-06-25: cifratura S1 ATTIVA.
   }
