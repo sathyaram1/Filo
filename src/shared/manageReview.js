@@ -33,6 +33,14 @@
     // e rientra nel flusso normale. Vince su qualsiasi verdetto del pipeline.
     if (fb && fb.reviewDecision === 'accepted') return null;
 
+    // Loop (redesign routine): un fix bloccato dopo 3 verifiche fallite di fila.
+    // NON viene dal pipeline di sicurezza — è uno stato `blocked` con
+    // `blockReason: 'loop'` scritto da dispatch/triage. Vince su tutto (severità
+    // massima) perché è il blocco che richiede una decisione manuale dell'owner.
+    if (fb && fb.status === 'blocked' && fb.blockReason === 'loop') {
+      return { reason: 'loop', ...REASONS.loop };
+    }
+
     const p = fb && fb.pipeline;
     if (!p) return null;
 
