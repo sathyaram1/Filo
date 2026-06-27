@@ -1,0 +1,81 @@
+# Ruolo: new-work — risolvi un feedback (e, se è una spec grossa, spezzalo)
+
+Sei un worker `general-purpose`. `scripts/dispatch.mjs` ti ha scelto perché c'è un
+feedback `todo` (vincitore per priorità) da lavorare, e te lo ha già **claimato**
+e **decifrato** (è in `payload.feedback`). Leggi `routines/shared.md` (tono,
+sintomo-vs-causa, invarianti UX, coda git).
+
+> **M4+M5 fusi.** Solo dopo aver letto il feedback sai se è "spec da spezzare" o
+> "fix normale" — quindi è questo ruolo a decidere e a forkare, non lo script.
+
+## Decidi: fix normale o spec da spezzare?
+
+Guarda il feedback decifrato. È una **spec troppo grossa per una sessione** (file
+.md allegato, elenco di feature, redesign multi-area, stima L/XL)?
+
+### Caso A — spec grossa → SPEZZA (ex M4)
+
+NON implementare tutto in una volta.
+
+1. Leggi la spec intera, dividila in task **autoconsistenti** da ~una sessione
+   l'uno. Dipendenze prima, poi valore per l'utente.
+2. Per ogni task accoda un sub-feedback (la descrizione deve **bastare da sola**:
+   chi la lavora non ha contesto — includi dettagli, vincoli, criterio di
+   "fatto"):
+   ```bash
+   node scripts/queue-feedback.mjs --parent <id> \
+     --name "titolo breve" --priority <0-3> "descrizione self-contained"
+   ```
+   Se un punto è ambiguo, crea quel sub-feedback con `--status clarify` e scrivi
+   la domanda specifica (il resto della spec procede comunque).
+3. Chiudi il feedback-spec:
+   ```bash
+   node scripts/queue-triage.mjs <id> done \
+     "Spec pianificata e spezzata in #<num>.1–#<num>.N: <una riga per sub>"
+   ```
+4. Se resta abbastanza contesto, parti subito col primo sub (è un fix normale,
+   caso B).
+
+> **Feature spezzate — Modello B.** I sub `#N.M` si lavorano in sequenza su
+> branch `worker/<N.M>` basati su `feature/N` e si fondono su **`feature/N`**, non
+> su `main` (`merge-gate.mjs worker/<N.M> --into feature/N`). Il merge verso
+> `main` avviene UNA volta sola a feature finita, via `#N.final` (verifica
+> d'integrazione). Vedi `ROUTINES.md` § Feature spezzate.
+
+### Caso B — fix normale (ex M5)
+
+1. **Distingui sintomo da causa**: la lamentela è ciò che l'utente vede, non
+   cos'è rotto. Riformula "l'utente voleva X, gli è fallito perché Y".
+2. Crea il branch di lavoro:
+   ```bash
+   git worktree add .claude/worktrees/worker-<id> -b worker/<id>
+   ```
+3. Trova il codice coinvolto; leggi i cammini equivalenti affiancati (le
+   simmetrie mancanti sono spesso la causa).
+4. Implementa il fix sul **comportamento**, non sul messaggio.
+5. Applica le **invarianti UX ovvie** rilevanti (vedi `routines/shared.md`).
+6. **Verifica** con lo spec mirato:
+   ```bash
+   npx playwright test tests/<feature>.spec.mjs
+   ```
+   Lo spec deve **asserire il successo** (vedi `routines/shared.md` § Verifica).
+   Aggiungilo se non esiste.
+7. Aggiorna `src/shared/patchNotes.js` (se user-visible) e
+   `src/shared/capabilities.js` (se cambia una capacità utente).
+8. **Non fondere su `main`**: l'hook committa e pusha su `worker/<id>`.
+
+## Come riporti
+
+Report di 2-3 frasi **per l'utente** (cosa vedrà di diverso, cosa hai aggiunto
+oltre il chiesto, come hai verificato). Senza nomi tecnici.
+
+Poi metti il feedback in `review` col branch — il prossimo giro di dispatch lo
+instraderà al **verifier**:
+
+```bash
+node scripts/queue-triage.mjs <id> review "[il tuo report]" --branch worker/<id>
+```
+
+Se il feedback è ambiguo / richiede una decisione di design / mancano
+informazioni → `clarify` invece di `review` (vedi `routines/shared.md` §
+Insistere prima di mollare). Non usare `clarify` come scappatoia.
