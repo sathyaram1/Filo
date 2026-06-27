@@ -1,0 +1,13 @@
+{
+  "op": "create",
+  "uid": "c96369ec-7a8a-49d9-92d5-4cf2f1b216ea",
+  "text": "FENC1:AQTB9HT6VAXfeXkBi85Z57XA1IKdfAH8ZY21tm6ncifi8L7FNOZO_xTc11EBG-6fILVl2RTZXMTcCet9vrjTFutF68eLlVmCKJ4LyvAyNRgSFmBy_BEg_Ll1WB7VlhatTVeXDVw-9q9MJtzVAyJ3jRKpTpL80Q",
+  "name": "test-list",
+  "parentId": "",
+  "status": "new",
+  "priority": "FENC1:AQSK2vTEVQfCmBAtr7KoUoqZ18iuo5zaK8c6IClgO9afmu7lfXCR1gcE7H-ZUtPilD2PWYzf4nWvC6NCipRcM7o0DNu0NjGUR4DIG5JzNoIXKSonEcUUFXkDNgahReI",
+  "notes": "",
+  "images": [],
+  "queuedAt": "2026-06-27T12:33:59.913Z",
+  "queuedBy": "vm-routine"
+}
