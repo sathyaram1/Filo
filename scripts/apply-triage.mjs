@@ -290,6 +290,10 @@ async function patchFeedback(entry, bearer) {
   // `branch`: il nome del branch git su cui vive il fix (stati review/blocked
   // del cancello di merge). Scritto solo se la coda lo porta; '' lo azzera.
   if (typeof entry.branch === 'string') { fields.branch = toFsValue(entry.branch.slice(0, 200)); mask.push('branch'); }
+  // `blockReason`: motivo strutturato del blocco (es. 'loop' = 3 FAIL del
+  // verifier→fixer). La dashboard `manage` lo usa per il colore del bordo
+  // (loop = nero). Scritto solo se la coda lo porta.
+  if (typeof entry.reason === 'string') { fields.blockReason = toFsValue(entry.reason.slice(0, 60)); mask.push('blockReason'); }
   // `starred` (DB2): flag ⭐ "preferito". Booleano; scritto solo se la coda lo
   // porta, così non si azzera per chi non lo tocca.
   if (typeof entry.starred === 'boolean') { fields.starred = toFsValue(entry.starred); mask.push('starred'); }
