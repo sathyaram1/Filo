@@ -10,6 +10,9 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
 
 const tmp = mkdtempSync(join(tmpdir(), 'filo-triage-'));
 process.env.FILO_SPOOL_DIR = tmp;
