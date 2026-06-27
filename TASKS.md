@@ -85,11 +85,11 @@ di esecuzione consigliato a 6 step. Stato:
   Filo) che oggi NON è attivo (routine spente → si fa tutto in locale): scriverlo
   in modo che non contraddica la realtà corrente. _Non iniziato._
 
-- [ ] **Step 4 — Dashboard: estendere `classifyBlock`/`REASONS`** — stato
-  **bloccato** nella tassonomia colori di `manage` + **nero** riservato a
-  `blocked` per **loop** (i 3 FAIL verifier→fixer). Richiede anche un campo
-  strutturato `reason: loop` su `queue-triage.mjs` (oggi dispatch mette il motivo
-  solo nel testo della nota). _Non iniziato._
+- [x] **Step 4 — Dashboard: estendere `classifyBlock`/`REASONS`** — _(fatto, rules
+  deployate)_ — stato **bloccato** nella tassonomia colori di `manage` + **nero**
+  riservato a `blocked` per **loop** (i 3 FAIL verifier→fixer) + campo strutturato
+  `blockReason` su `queue-triage.mjs`. Le `firestore.rules` per `blockReason` sono
+  state **deployate**.
 
 - [ ] **Step 5 — Convertire gli item pubblici in feedback + eliminare `TASKS.md`
   pubblico** — il lavoro pubblico vive nei feedback; `filo-security` ha il suo
