@@ -63,6 +63,7 @@ export function queueTriage(id, status, notes, queuedBy, branch, starred, reason
     throw new Error(`id con caratteri non ammessi in un filename: "${id}"`);
   }
   const branchStr = typeof branch === 'string' ? branch.trim().slice(0, 200) : '';
+  const reasonStr = typeof reason === 'string' ? reason.trim().slice(0, 60) : '';
   mkdirSync(SPOOL_DIR, { recursive: true });
   const entry = {
     id,
