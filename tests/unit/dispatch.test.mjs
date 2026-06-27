@@ -1,0 +1,248 @@
+// Unit test per la logica pura di scripts/dispatch.mjs (il dispatcher
+// deterministico delle routine).
+//
+// COSA TESTIAMO (tutto puro, niente rete né Electron, gira in ms):
+//   - classifyReview: stato di un feedback `review` → ruolo
+//   - chooseBucket: precedenza secaudit > verifier > fixer > new-work > prober
+//   - applyVerifierVerdict / applyFixed / applySecaudit: transizioni di stato
+//   - il contatore loop e il cap (3 FAIL → blocked-loop)
+//   - buildPayload: ISOLAMENTO (secaudit non vede il feedback; verifier non vede il diff)
+//   - readState/writeState/clearState su una STATE_DIR temporanea
+//
+// La parte di rete (buildSnapshot/fetchOpenCandidates) NON è testata qui: thin.
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync, existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { resolve } from 'node:path';
+
+// STATE_DIR isolata PRIMA di importare il modulo (è letta a import-time).
+const TMP = mkdtempSync(resolve(tmpdir(), 'filo-dispatch-'));
+process.env.FILO_DISPATCH_STATE_DIR = TMP;
+
+const {
+  classifyReview,
+  chooseBucket,
+  applyVerifierVerdict,
+  applyFixed,
+  applySecaudit,
+  buildPayload,
+  defaultState,
+  readState,
+  writeState,
+  clearState,
+} = await import('../../scripts/dispatch.mjs');
+
+// ─── Helper ───────────────────────────────────────────────────────────────────
+
+// review item per chooseBucket: { id, num, branch, state }
+function review(id, state) {
+  return { id, num: id, branch: `worker/${id}`, state };
+}
+
+// ─── classifyReview ───────────────────────────────────────────────────────────
+
+test('classifyReview: nessuno stato o verdetto null → verifier', () => {
+  assert.equal(classifyReview(null), 'verifier');
+  assert.equal(classifyReview({ verifierVerdict: null }), 'verifier');
+  assert.equal(classifyReview(defaultState('x', 'worker/x')), 'verifier');
+});
+
+test('classifyReview: verifier pass + secaudit non fatto → secaudit', () => {
+  assert.equal(classifyReview({ verifierVerdict: 'pass', secauditDone: false }), 'secaudit');
+});
+
+test('classifyReview: verifier pass + secaudit fatto → null (tocca al gate)', () => {
+  assert.equal(classifyReview({ verifierVerdict: 'pass', secauditDone: true }), null);
+});
+
+test('classifyReview: verifier fail sotto al cap → fixer', () => {
+  assert.equal(classifyReview({ verifierVerdict: 'fail', loopCount: 1 }, 3), 'fixer');
+  assert.equal(classifyReview({ verifierVerdict: 'fail', loopCount: 2 }, 3), 'fixer');
+});
+
+test('classifyReview: verifier fail al cap → blocked-loop', () => {
+  assert.equal(classifyReview({ verifierVerdict: 'fail', loopCount: 3 }, 3), 'blocked-loop');
+  assert.equal(classifyReview({ verifierVerdict: 'fail', loopCount: 5 }, 3), 'blocked-loop');
+});
+
+// ─── chooseBucket: precedenza ─────────────────────────────────────────────────
+
+test('chooseBucket: snapshot vuoto → prober', () => {
+  assert.equal(chooseBucket({ reviews: [], todoWinner: null }).role, 'prober');
+  assert.equal(chooseBucket({}).role, 'prober');
+});
+
+test('chooseBucket: solo todo → new-work col vincitore', () => {
+  const b = chooseBucket({ reviews: [], todoWinner: { id: 'F1', num: '#5' } });
+  assert.equal(b.role, 'new-work');
+  assert.equal(b.id, 'F1');
+  assert.equal(b.num, '#5');
+});
+
+test('chooseBucket: review da verificare batte un todo', () => {
+  const b = chooseBucket({
+    reviews: [review('A', { verifierVerdict: null })],
+    todoWinner: { id: 'F1' },
+  });
+  assert.equal(b.role, 'verifier');
+  assert.equal(b.id, 'A');
+});
+
+test('chooseBucket: secaudit batte verifier batte fixer', () => {
+  const reviews = [
+    review('FX', { verifierVerdict: 'fail', loopCount: 1 }), // fixer
+    review('VF', { verifierVerdict: null }),                  // verifier
+    review('SA', { verifierVerdict: 'pass', secauditDone: false }), // secaudit
+  ];
+  const b = chooseBucket({ reviews, todoWinner: { id: 'F1' } });
+  assert.equal(b.role, 'secaudit');
+  assert.equal(b.id, 'SA');
+  assert.equal(b.branch, 'worker/SA');
+});
+
+test('chooseBucket: senza secaudit, verifier batte fixer', () => {
+  const reviews = [
+    review('FX', { verifierVerdict: 'fail', loopCount: 1 }),
+    review('VF', { verifierVerdict: null }),
+  ];
+  assert.equal(chooseBucket({ reviews, todoWinner: null }).role, 'verifier');
+});
+
+test('chooseBucket: solo un fail sotto cap → fixer; passa la critica nello stato', () => {
+  const b = chooseBucket({
+    reviews: [review('FX', { verifierVerdict: 'fail', loopCount: 2, verifierCritique: 'si rompe X' })],
+    todoWinner: null,
+  });
+  assert.equal(b.role, 'fixer');
+  assert.equal(b.loopCount, 2);
+  assert.equal(b.state.verifierCritique, 'si rompe X');
+});
+
+test('chooseBucket: fail al cap → blocked-loop (non fixer)', () => {
+  const b = chooseBucket({
+    reviews: [review('FX', { verifierVerdict: 'fail', loopCount: 3 })],
+    todoWinner: { id: 'F1' },
+  });
+  assert.equal(b.role, 'blocked-loop');
+  assert.equal(b.id, 'FX');
+});
+
+test('chooseBucket: review già passato secaudit non viene ridispatchato → resta il todo', () => {
+  const b = chooseBucket({
+    reviews: [review('DONE', { verifierVerdict: 'pass', secauditDone: true })],
+    todoWinner: { id: 'F1' },
+  });
+  assert.equal(b.role, 'new-work');
+  assert.equal(b.id, 'F1');
+});
+
+// ─── Transizioni di stato ─────────────────────────────────────────────────────
+
+test('applyVerifierVerdict pass: imposta pass, loop invariato', () => {
+  const s = applyVerifierVerdict(defaultState('A', 'worker/A'), 'pass');
+  assert.equal(s.verifierVerdict, 'pass');
+  assert.equal(s.loopCount, 0);
+});
+
+test('applyVerifierVerdict fail: incrementa il loop e salva la critica', () => {
+  let s = applyVerifierVerdict(defaultState('A', 'worker/A'), 'fail', 'rotto qui');
+  assert.equal(s.verifierVerdict, 'fail');
+  assert.equal(s.loopCount, 1);
+  assert.equal(s.verifierCritique, 'rotto qui');
+  // secondo fail
+  s = applyVerifierVerdict(s, 'fail', 'ancora rotto');
+  assert.equal(s.loopCount, 2);
+  assert.equal(s.verifierCritique, 'ancora rotto');
+});
+
+test('applyFixed: ri-mette in coda verifier ma conserva il loop', () => {
+  const failed = applyVerifierVerdict(defaultState('A', 'worker/A'), 'fail', 'x');
+  const fixed = applyFixed(failed);
+  assert.equal(fixed.verifierVerdict, null);
+  assert.equal(fixed.verifierCritique, '');
+  assert.equal(fixed.loopCount, 1, 'il contatore loop NON si azzera col fix');
+});
+
+test('ciclo completo: fail→fix→fail→fix→fail = loop 3 → blocked-loop', () => {
+  let s = defaultState('A', 'worker/A');
+  s = applyVerifierVerdict(s, 'fail', '1');
+  s = applyFixed(s);
+  s = applyVerifierVerdict(s, 'fail', '2');
+  s = applyFixed(s);
+  s = applyVerifierVerdict(s, 'fail', '3');
+  assert.equal(s.loopCount, 3);
+  assert.equal(classifyReview(s, 3), 'blocked-loop');
+});
+
+test('applySecaudit: marca secauditDone e il verdetto', () => {
+  const passed = applyVerifierVerdict(defaultState('A', 'worker/A'), 'pass');
+  const sa = applySecaudit(passed, 'pass');
+  assert.equal(sa.secauditDone, true);
+  assert.equal(sa.secauditVerdict, 'pass');
+  assert.equal(classifyReview(sa), null);
+});
+
+// ─── buildPayload: ISOLAMENTO ─────────────────────────────────────────────────
+
+test('buildPayload secaudit: vede il diff, MAI il feedback', () => {
+  const bucket = { role: 'secaudit', id: 'A', num: '#1', branch: 'worker/A' };
+  const p = buildPayload(bucket, { diff: 'diff --git ...', feedback: { text: 'SEGRETO' } });
+  assert.equal(p.diff, 'diff --git ...');
+  assert.equal(p.branch, 'worker/A');
+  assert.equal(p.feedback, undefined, 'secaudit NON deve ricevere il feedback');
+  assert.ok(!JSON.stringify(p).includes('SEGRETO'));
+});
+
+test('buildPayload verifier: vede il feedback (sintomo), MAI il diff', () => {
+  const bucket = { role: 'verifier', id: 'A', num: '#1', branch: 'worker/A' };
+  const p = buildPayload(bucket, { feedback: { text: 'non funziona' }, diff: 'DIFF' });
+  assert.equal(p.feedback.text, 'non funziona');
+  assert.equal(p.branch, 'worker/A');
+  assert.equal(p.diff, undefined, 'verifier NON deve ricevere il diff');
+  assert.ok(!JSON.stringify(p).includes('DIFF'));
+});
+
+test('buildPayload fixer: feedback + critica del verifier', () => {
+  const bucket = { role: 'fixer', id: 'A', num: '#1', branch: 'worker/A', loopCount: 1, state: { verifierCritique: 'rotto X' } };
+  const p = buildPayload(bucket, { feedback: { text: 'lamentela' } });
+  assert.equal(p.feedback.text, 'lamentela');
+  assert.equal(p.verifierCritique, 'rotto X');
+  assert.equal(p.loopCount, 1);
+});
+
+test('buildPayload new-work: feedback completo', () => {
+  const bucket = { role: 'new-work', id: 'F1', num: '#5' };
+  const p = buildPayload(bucket, { feedback: { text: 'spec' } });
+  assert.equal(p.feedback.text, 'spec');
+  assert.equal(p.id, 'F1');
+});
+
+test('buildPayload prober: payload vuoto', () => {
+  assert.deepEqual(buildPayload({ role: 'prober' }), {});
+});
+
+// ─── Stato su disco ───────────────────────────────────────────────────────────
+
+test('writeState/readState/clearState: round-trip su STATE_DIR temporanea', () => {
+  const s = applyVerifierVerdict(defaultState('DISK1', 'worker/DISK1'), 'fail', 'boom');
+  writeState(s);
+  const back = readState('DISK1');
+  assert.equal(back.verifierVerdict, 'fail');
+  assert.equal(back.loopCount, 1);
+  assert.equal(back.verifierCritique, 'boom');
+  clearState('DISK1');
+  assert.equal(readState('DISK1'), null);
+});
+
+test('readState: id inesistente → null', () => {
+  assert.equal(readState('NOPE-NOPE'), null);
+});
+
+// ─── teardown ─────────────────────────────────────────────────────────────────
+
+test('cleanup STATE_DIR temporanea', () => {
+  rmSync(TMP, { recursive: true, force: true });
+  assert.ok(!existsSync(TMP));
+});
