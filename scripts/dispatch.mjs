@@ -292,8 +292,6 @@ async function buildSnapshot() {
 
   // Vincitore todo: riusa next-feedback (exit 0 = JSON vincitore, 2 = vuoto).
   let todoWinner = null;
-  const nf = tryGit; // no-op placeholder to keep lints calm; real call below
-  void nf;
   try {
     const out = execFileSync('node', [resolve(ROOT, 'scripts', 'next-feedback.mjs')], {
       cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
