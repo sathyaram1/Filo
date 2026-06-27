@@ -180,11 +180,11 @@ Non dichiarare "fatto" senza **eseguire il codice** toccato.
 
 - **In cloud (Linux headless)**: `npm test` (suite Playwright) per la regressione,
   e per una feature con UI nuova **aggiungi uno spec Playwright** che la esercita
-  (click + assert sul **successo**, non sull'assenza di errore). `test:shoot`/
-  `test:explore` (Win32 PrintWindow) **non** girano in cloud. La cattura visiva
-  fedele in cloud è lo spike "P4" (feedback dedicato): finché non è validato, usa
-  `page.screenshot()` col workaround BrowserWindow e salva in `tests/.shots/`
-  (gitignorata).
+  (click + assert sul **successo**, non sull'assenza di errore). `test:shoot`
+  **ora funziona in cloud** tramite `scrot`+xvfb: usa
+  `su tester -c "xvfb-run -a npm run test:shoot -- \"<scenario>\""` per catturare
+  screenshot compositi reali (shell + WebContentsView). `test:explore` dipende
+  dalla chiave API Gemini in `tests/agent/.env`.
 - **Logica pura** (parsing, classificazione, validazione, trasformazioni in
   `src/shared/*` o script): aggiungi/aggiorna uno unit test in `tests/unit/` e
   lancia `npm run test:unit` (node:test, ms, niente Electron).

@@ -19,11 +19,11 @@
 // (con y-SHELL_HEIGHT nelle coordinate della pagina view).
 
 import { _electron as electron } from 'playwright';
-import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const APP_ROOT = resolve(__dirname, '..', '..');
@@ -82,14 +82,26 @@ export async function windowHandle(app) {
   });
 }
 
-// Cattura nativa in PNG via Win32 PrintWindow(PW_RENDERFULLCONTENT): cattura il
-// contenuto reale della finestra (shell + WebContentsView composite) anche se
-// non è in primo piano/occlusa. Niente dipendenza dal focus → robusto.
-// IMPORTANTE: NON portiamo la finestra in foreground qui. Farlo (win.focus())
+// Cattura nativa composita (shell + WebContentsView).
+//
+// Su Windows usa Win32 PrintWindow(PW_RENDERFULLCONTENT): cattura il contenuto
+// reale della finestra anche se non è in primo piano/occlusa — robusto, niente
+// dipendenza dal focus.
+//
+// Su Linux (cloud/xvfb): usa `scrot` per catturare l'intero display virtuale X11.
+// Electron gira dentro xvfb, quindi il framebuffer X include già il composito
+// shell + WebContentsView. Richiede la variabile d'ambiente DISPLAY (impostata
+// automaticamente da xvfb-run) e il binario `scrot` installato (scrot 1.x+).
+// Fallback: se scrot non è disponibile, prova con xwd + ImageMagick convert.
+//
+// IMPORTANTE (Windows): NON portare la finestra in foreground qui. Farlo
 // ruberebbe il focus da tastiera alla WebContentsView attiva, rompendo la
-// digitazione tra uno step e l'altro (es. click su #doc in uno step, type nello
-// step successivo). PrintWindow non ne ha bisogno.
+// digitazione tra uno step e l'altro.
 export async function captureComposite(app, outPath) {
+  if (process.platform === 'linux') {
+    return captureCompositeLinux(app, outPath);
+  }
+  // Windows: Win32 PrintWindow
   const hwnd = await windowHandle(app);
   const safePath = outPath.replace(/\\/g, '\\\\');
   const ps = `
@@ -126,6 +138,77 @@ public class WinCap {
     throw new Error('captureComposite PS fallita: ' + (e.stderr || e.message));
   }
   return outPath;
+}
+
+// Cattura X11 su Linux: usa scrot per catturare il display virtuale (xvfb).
+// Il composito shell + WebContentsView è già nel framebuffer X → nessun workaround.
+// Prima porta la finestra in primo piano (altrimenti potrebbe essere dietro un
+// altro client X, anche se xvfb di solito ha solo Electron).
+async function captureCompositeLinux(app, outPath) {
+  const display = process.env.DISPLAY || ':0';
+
+  // Porta la finestra in primo piano nel display X (importante: in xvfb non c'è
+  // un window manager, quindi moveTop + show garantisce che sia visibile nel fb).
+  try {
+    await app.evaluate(async ({ BrowserWindow }) => {
+      const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs) || BrowserWindow.getAllWindows()[0];
+      if (!win) return;
+      win.show();
+      win.moveTop();
+      win.focus();
+    });
+    await sleep(300); // attendi che X dispatchi gli eventi di layout
+  } catch (_) {}
+
+  // Prova prima scrot (disponibile su Ubuntu/Debian dal pacchetto `scrot`).
+  const scrot = resolveExecutable('scrot');
+  if (scrot) {
+    try {
+      execFileSync(scrot, ['-D', display, '--overwrite', outPath], {
+        stdio: 'pipe',
+        encoding: 'utf8',
+        env: { ...process.env, DISPLAY: display },
+      });
+      return outPath;
+    } catch (e) {
+      throw new Error('captureCompositeLinux scrot fallita: ' + (e.stderr || e.message));
+    }
+  }
+
+  // Fallback: xwd → ImageMagick convert (presente su quasi tutte le distro Linux).
+  const xwd = resolveExecutable('xwd');
+  const convert = resolveExecutable('convert');
+  if (xwd && convert) {
+    try {
+      const xwdData = execFileSync(xwd, ['-display', display, '-root', '-silent'], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: { ...process.env, DISPLAY: display },
+      });
+      // xwd emette un formato XWD (X Window Dump), ImageMagick lo converte in PNG.
+      const tmpXwd = outPath + '.xwd';
+      require('node:fs').writeFileSync(tmpXwd, xwdData);
+      execFileSync(convert, [tmpXwd, outPath], { stdio: 'pipe' });
+      try { require('node:fs').unlinkSync(tmpXwd); } catch (_) {}
+      return outPath;
+    } catch (e) {
+      throw new Error('captureCompositeLinux xwd/convert fallita: ' + (e.stderr || e.message));
+    }
+  }
+
+  throw new Error(
+    'captureCompositeLinux: nessun tool di cattura disponibile. ' +
+    'Installa `scrot` (apt-get install -y scrot) oppure `xwd` + ImageMagick `convert`.'
+  );
+}
+
+// Risolve il percorso di un eseguibile, restituisce null se non trovato.
+function resolveExecutable(name) {
+  try {
+    const path = execSync(`which ${name}`, { stdio: 'pipe', encoding: 'utf8' }).trim();
+    return path || null;
+  } catch (_) {
+    return null;
+  }
 }
 
 // Trova la Page della tab attiva interrogando il main per l'URL attivo.
