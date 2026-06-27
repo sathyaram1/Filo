@@ -35,8 +35,7 @@ branch ha **passato il verifier** e attende il gate di sicurezza prima del merge
 
 ## Come riporti
 
-Torna **esattamente** una di queste due forme (le legge l'orchestratore per
-lanciare il gate):
+Il tuo verdetto L4 è una di queste due forme:
 
 ```
 FILO_L4_VERDICT=pass
@@ -48,23 +47,23 @@ FILO_L4_VERDICT=fail
 FILO_L4_REASON="<descrizione concisa del problema, max 2 frasi>"
 ```
 
-Poi registra l'esito nello **stato del branch** così il prossimo giro di
-dispatch sa che il secaudit è fatto:
+L'orchestratore è cieco: NON aspetta che faccia lui qualcosa col verdetto. **Sei
+tu** a registrare l'esito e a far girare il gate (L5 deterministico + il tuo L4):
 
-```bash
-node scripts/dispatch.mjs --record-secaudit <id> <pass|fail>
-```
-
-L'orchestratore esporta il verdetto ed esegue il gate (L5 deterministico + L4 dal
-tuo verdetto):
-
-```bash
-FILO_L4_VERDICT=pass FILO_L4_REASON="..." node scripts/merge-gate.mjs <branch>
-# feature spezzata: ... node scripts/merge-gate.mjs <branch> --into feature/N
-```
-
-Exit del gate: `0` → fuso, accoda `done`; `10` → bloccato (L5 o L4), accoda
-`blocked`; `20` → conflitto, risolvi o accoda `blocked`; `1` → errore tecnico.
+1. Registra l'esito nello stato del branch:
+   ```bash
+   node scripts/dispatch.mjs --record-secaudit <id> <pass|fail>
+   ```
+2. Su **pass**, esegui il gate (su **fail** non fondere: accoda `blocked` e basta):
+   ```bash
+   FILO_L4_VERDICT=pass FILO_L4_REASON="..." node scripts/merge-gate.mjs <branch>
+   # feature spezzata: ... node scripts/merge-gate.mjs <branch> --into feature/N
+   ```
+3. Chiudi in base all'exit del gate:
+   - `0` → fuso sul target → `node scripts/queue-triage.mjs <id> done "<report>"` + `node scripts/dispatch.mjs --clear-state <id>`
+   - `10` → BLOCCATO (L5 o L4) → `node scripts/queue-triage.mjs <id> blocked "<nota del gate>" --branch <branch>`
+   - `20` → conflitto → risolvi o accoda `blocked`.
+   - `1` → errore tecnico.
 
 **Nota:** L5 (blocco deterministico sui file sensibili) gira **dentro** il gate,
 non qui. Tu sei solo L4 (il giudizio LLM). I due livelli si completano.
