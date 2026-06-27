@@ -135,7 +135,7 @@ export function selectWinner(candidates) {
  *
  * @returns {Promise<object[]>} Array di oggetti feedback (non decifrati).
  */
-async function fetchOpenCandidates() {
+export async function fetchOpenCandidates() {
   const endpoint = `${FIRESTORE_BASE}:runQuery?key=${API_KEY}`;
   const body = {
     structuredQuery: {
