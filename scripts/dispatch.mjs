@@ -335,19 +335,14 @@ export async function run() {
   // blocked-loop: dispatch stesso accoda `blocked` con motivo loop, pulisce lo
   // stato, e ri-sceglie il prossimo bucket (non c'è un worker per questo).
   if (bucket.role === 'blocked-loop') {
+    // NB: il motivo `loop` resta nel testo della nota. Il campo strutturato
+    // `reason: loop` (per il colore nero in dashboard) è un passo successivo del
+    // redesign (estensione di queue-triage + classifyBlock).
     const note = `Bloccato dopo ${bucket.loopCount} verifiche fallite (motivo: loop). Ultima critica: ${bucket.state?.verifierCritique || '—'}`;
-    tryGit(['rev-parse', 'HEAD']); // touch git (best-effort)
     try {
-      execFileSync('node', [resolve(ROOT, 'scripts', 'queue-triage.mjs'), bucket.id, 'blocked', note, '--branch', bucket.branch, '--reason', 'loop'],
+      execFileSync('node', [resolve(ROOT, 'scripts', 'queue-triage.mjs'), bucket.id, 'blocked', note, '--branch', bucket.branch],
         { cwd: ROOT, encoding: 'utf8', stdio: 'ignore' });
-    } catch (_) {
-      // se --reason non è supportato dalla versione corrente di queue-triage,
-      // riprova senza (il motivo resta nella nota).
-      try {
-        execFileSync('node', [resolve(ROOT, 'scripts', 'queue-triage.mjs'), bucket.id, 'blocked', note, '--branch', bucket.branch],
-          { cwd: ROOT, encoding: 'utf8', stdio: 'ignore' });
-      } catch (_) { /* la nota resta in coda al prossimo giro */ }
-    }
+    } catch (_) { /* la nota resta in coda al prossimo giro */ }
     clearState(bucket.id);
     // Ricostruisci lo snapshot senza questo feedback e ri-scegli.
     const next = { reviews: snapshot.reviews.filter((r) => r.id !== bucket.id), todoWinner: snapshot.todoWinner };
