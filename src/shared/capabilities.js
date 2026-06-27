@@ -1,7 +1,7 @@
 // SINGOLA SORGENTE del "manifesto delle capacità" di Filo: l'elenco curato di
 // TUTTO ciò che Filo sa fare, visibile all'utente. Serve all'agente dentro
 // Filo per rispondere con verità a "puoi fare X?" e per riconoscere "non posso
-// fare Y" (vedi TASKS.md → F1/F2/F4), e come base per il feedback autonomo.
+// fare Y", e come base per il feedback autonomo.
 //
 // Pattern: IIFE su globalThis come patchNotes.js. Caricato dal loader
 // (src/main/services/loader.js) e disponibile come globalThis.SN_CAPABILITIES.
