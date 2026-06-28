@@ -217,7 +217,8 @@
     DEFAULTS_GET: 'defaults_get',                  // → { ok, config } | { ok:false, error }
     DEFAULTS_UPDATE: 'defaults_update',            // { config } → { ok, config } | { ok:false, error }
     // Config "modelli di supporto" (doc Firestore config/supportModels, admin-only).
-    // Un campo per slot: sanitizer, judgeL2, judgeRedTeam, judgePriority.
+    // Un campo per slot: sanitizer, judge1, judge2, judge3, judgeDynamic,
+    // judgeRedTeam, judgePriority.
     // Valore di ogni slot = stringa catena (es. "flash, flash-or"), stesso formato
     // dei modelli per azione. Letta anche dal backend filo-security (DD3).
     SUPPORT_MODELS_GET: 'support_models_get',      // → { ok, models } | { ok:false, error }
