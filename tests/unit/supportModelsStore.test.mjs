@@ -34,3 +34,35 @@ test('il vecchio slot unico judgeL2 è stato rimosso', () => {
 test('SLOTS non ha duplicati', () => {
   assert.equal(SLOTS.length, new Set(SLOTS).size, 'gli slot devono essere unici');
 });
+
+// ── Registro modelli dei giudici (judgeRegistry) ─────────────────────────────
+
+test('sanitizeRegistry: voce valida → provider openrouter forzato, model conservato', () => {
+  const out = sanitizeRegistry({ 'giudice-veloce': { model: 'deepseek/deepseek-v4-pro' } });
+  assert.deepEqual(out, { 'giudice-veloce': { provider: 'openrouter', model: 'deepseek/deepseek-v4-pro' } });
+});
+
+test('sanitizeRegistry: conserva la label se presente', () => {
+  const out = sanitizeRegistry({ g: { model: 'x/y', label: 'Giudice rapido' } });
+  assert.equal(out.g.label, 'Giudice rapido');
+});
+
+test('sanitizeRegistry: scarta voci senza nickname o senza modello', () => {
+  const out = sanitizeRegistry({
+    '': { model: 'x/y' },          // nickname vuoto
+    'no-model': { model: '  ' },   // modello vuoto
+    buona: { model: 'a/b' },
+  });
+  assert.deepEqual(Object.keys(out), ['buona']);
+});
+
+test('sanitizeRegistry: trim del nickname e del modello', () => {
+  const out = sanitizeRegistry({ '  g  ': { model: '  a/b  ' } });
+  assert.deepEqual(out, { g: { provider: 'openrouter', model: 'a/b' } });
+});
+
+test('sanitizeRegistry: input non-oggetto → mappa vuota', () => {
+  assert.deepEqual(sanitizeRegistry(null), {});
+  assert.deepEqual(sanitizeRegistry(undefined), {});
+  assert.deepEqual(sanitizeRegistry('stringa'), {});
+});
