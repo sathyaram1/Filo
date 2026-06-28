@@ -124,11 +124,15 @@ test('slot sconosciuto senza fallback → "flash" come safe default', async () =
 
 // ── Test 7: SLOT_DEFAULTS espone i 4 slot attesi ───────────────────────────
 
-test('SLOT_DEFAULTS ha i 4 slot di DD1', () => {
+test('SLOT_DEFAULTS ha gli slot di supporto (giudici 1/2/3 + dinamico, judgeL2 rimosso)', () => {
   assert.ok('sanitizer' in SLOT_DEFAULTS, 'slot sanitizer');
-  assert.ok('judgeL2' in SLOT_DEFAULTS, 'slot judgeL2');
+  assert.ok('judge1' in SLOT_DEFAULTS, 'slot judge1');
+  assert.ok('judge2' in SLOT_DEFAULTS, 'slot judge2');
+  assert.ok('judge3' in SLOT_DEFAULTS, 'slot judge3');
+  assert.ok('judgeDynamic' in SLOT_DEFAULTS, 'slot judgeDynamic');
   assert.ok('judgeRedTeam' in SLOT_DEFAULTS, 'slot judgeRedTeam');
   assert.ok('judgePriority' in SLOT_DEFAULTS, 'slot judgePriority');
+  assert.ok(!('judgeL2' in SLOT_DEFAULTS), 'il vecchio slot judgeL2 è stato rimosso');
   // I valori devono essere stringhe non vuote.
   for (const [k, v] of Object.entries(SLOT_DEFAULTS)) {
     assert.equal(typeof v, 'string', `SLOT_DEFAULTS.${k} deve essere una stringa`);
