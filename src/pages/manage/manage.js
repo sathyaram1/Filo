@@ -608,26 +608,31 @@
 
   mgSideClose.addEventListener('click', closeSidebar);
 
-  // Click su un pallino giudice → apre QUEL giudice nel pannello destro:
-  // identità dello slot giudice (titolo), badge classe, MODELLO che ha emesso il
-  // verdetto (solo owner), reasoning completo.
+  // Click su un pallino giudice → apre QUEL giudice nel pannello destro.
+  // Titolo: per l'OWNER è il MODELLO reale che ha emesso il verdetto (così l'owner
+  // vede subito quale modello ha votato cosa); per i non-owner è anonimizzato e
+  // posizionale ("Giudice A/B/C/D" — mai l'id interno del giudice né il modello).
   function openSidebarJudge(fb, i) {
     const verdicts = (fb.pipeline && fb.pipeline.verdicts) || [];
     const v = verdicts[i];
     if (!v) return;
 
     const letters = ['A', 'B', 'C', 'D'];
-    const letter  = v.judge || letters[i] || String(i + 1);
+    const anonLabel = `Giudice ${letters[i] || String(i + 1)}`;
     const cls     = v.class || '';
     const badgeClass = cls ? `mg-class-badge--${cls}` : '';
 
-    // Riga "Modello" — SOLO per l'owner (isAdmin); per gli altri resta nascosta
-    // (anonimizzazione). Mostra il modello reale che ha emesso QUESTO verdetto
-    // (campo `model` nel verdetto del backend); se non è registrato (verdetti di
-    // pipeline precedenti) lo dichiara esplicitamente invece di sparire.
+    // Modello reale del verdetto (campo `model` del backend). All'owner lo
+    // mostriamo come TITOLO del pannello; se non è registrato (verdetti di
+    // pipeline vecchie, precedenti all'aggiunta del campo) ripieghiamo
+    // sull'etichetta anonima e lo dichiariamo nel corpo.
     const model = v && (v.model || v.judgeModel);
-    const modelRow = isAdmin
-      ? `<div class="mg-judge-model">Modello: ${model ? esc(String(model)) : '<em>non registrato</em>'}</div>`
+    const title = (isAdmin && model) ? String(model) : anonLabel;
+
+    // Corpo: la riga "Modello" serve solo quando il modello NON è nel titolo, cioè
+    // all'owner quando il modello manca (lo dichiara invece di sparire).
+    const modelRow = (isAdmin && !model)
+      ? `<div class="mg-judge-model"><em>Modello non registrato</em></div>`
       : '';
 
     const html = `
@@ -639,7 +644,7 @@
         }</div>
       </div>
     `;
-    openSidebar(`Giudice ${esc(letter)}`, html);
+    openSidebar(title, html);
   }
 
   function openSidebarSender(clientId) {
