@@ -41,6 +41,8 @@ const API_KEY = 'AIzaSyDN_fpshLW_K78QLV0MMiX1gd-OfO7x-CY'; // pubblica per desig
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 
 const SUPPORT_MODELS_DOC = 'config/supportModels';
+// Doc separato per la chiave (segreta) dei giudici. Regole: solo owner.
+const JUDGE_SECRETS_DOC = 'config/judgeSecrets';
 
 // Slot validi. Stabile: i backend filo-security li leggono per nome.
 // I 3 giudici fissi del panel L2 + il giudice dinamico hanno ciascuno il proprio
