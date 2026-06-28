@@ -790,11 +790,16 @@ test('DD1: i valori caricati popolano i campi (slot con catena ha più segmenti)
   const sanitizerInput = sanitizerHost.locator('.sn-chain-input').first();
   await expect(sanitizerInput).toHaveValue('flash');
 
-  // Lo slot "judgeL2" ha valore "flash, flash-or" → due segmenti (due input).
-  const judgeL2Inputs = page.locator('#mgSmChain-judgeL2 .sn-chain-input');
-  await expect(judgeL2Inputs).toHaveCount(2);
-  await expect(judgeL2Inputs.nth(0)).toHaveValue('flash');
-  await expect(judgeL2Inputs.nth(1)).toHaveValue('flash-or');
+  // Lo slot "judge1" ha valore "flash, flash-or" → due segmenti (due input).
+  const judge1Inputs = page.locator('#mgSmChain-judge1 .sn-chain-input');
+  await expect(judge1Inputs).toHaveCount(2);
+  await expect(judge1Inputs.nth(0)).toHaveValue('flash');
+  await expect(judge1Inputs.nth(1)).toHaveValue('flash-or');
+
+  // judge2/judge3/judgeDynamic hanno valori indipendenti (un solo segmento "flash").
+  await expect(page.locator('#mgSmChain-judge2 .sn-chain-input')).toHaveValue('flash');
+  await expect(page.locator('#mgSmChain-judge3 .sn-chain-input')).toHaveValue('flash');
+  await expect(page.locator('#mgSmChain-judgeDynamic .sn-chain-input')).toHaveValue('flash');
 });
 
 test('DD1: il bottone Salva invia support_models_update con i valori corretti', async ({ openTab }) => {
