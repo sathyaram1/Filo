@@ -132,13 +132,21 @@ async function patchDoc(docPath, fields, mask, idToken) {
 async function get() {
   let idToken = null;
   try { idToken = await auth.getIdToken(); } catch (_) {}
-  const doc = await fetchDoc(SUPPORT_MODELS_DOC, idToken);
-  if (!doc) return emptyModels();
-  return sanitize(doc);
+  const [doc, secrets] = await Promise.all([
+    fetchDoc(SUPPORT_MODELS_DOC, idToken),
+    fetchDoc(JUDGE_SECRETS_DOC, idToken),
+  ]);
+  const out = doc ? sanitize(doc) : emptyModels();
+  // La chiave vera non esce mai da qui: solo presente/assente.
+  const key = secrets && typeof secrets.openrouterKey === 'string' ? secrets.openrouterKey.trim() : '';
+  out.openrouterKeyPresent = Boolean(key);
+  return out;
 }
 
 // Scrive (PATCH per-campo) il doc config/supportModels. Richiede ID token admin.
-// Accetta solo i campi in SLOTS; gli altri vengono ignorati.
+// Accetta gli slot in SLOTS + `judgeRegistry` (mappa). La chiave OpenRouter dei
+// giudici (`openrouterKey`, segreta) va su un doc separato; si scrive solo se
+// passata e non vuota (vuoto = "non toccare").
 async function update(partial, idToken) {
   if (!idToken) throw new Error('Serve un ID token admin per modificare i modelli di supporto.');
   partial = partial || {};
@@ -150,19 +158,56 @@ async function update(partial, idToken) {
       mask.push(slot);
     }
   }
-  if (!mask.length) return get();
-  await patchDoc(SUPPORT_MODELS_DOC, fields, mask, idToken);
+  if (partial.judgeRegistry && typeof partial.judgeRegistry === 'object') {
+    fields.judgeRegistry = toFsValue(sanitizeRegistry(partial.judgeRegistry));
+    mask.push('judgeRegistry');
+  }
+  if (mask.length) await patchDoc(SUPPORT_MODELS_DOC, fields, mask, idToken);
+
+  // Chiave giudici (doc separato): scrivi solo se digitata.
+  if (typeof partial.openrouterKey === 'string' && partial.openrouterKey.trim()) {
+    await patchDoc(
+      JUDGE_SECRETS_DOC,
+      { openrouterKey: toFsValue(partial.openrouterKey.trim()) },
+      ['openrouterKey'],
+      idToken
+    );
+  }
   return get();
 }
 
 function emptyModels() {
-  return Object.fromEntries(SLOTS.map((s) => [s, '']));
+  const out = Object.fromEntries(SLOTS.map((s) => [s, '']));
+  out.judgeRegistry = {};
+  out.openrouterKeyPresent = false;
+  return out;
 }
 
 function sanitize(doc) {
   const out = emptyModels();
   for (const slot of SLOTS) {
     if (typeof doc[slot] === 'string') out[slot] = doc[slot];
+  }
+  out.judgeRegistry = sanitizeRegistry(doc.judgeRegistry);
+  return out;
+}
+
+// Tiene solo le voci valide del registro giudici: nickname non vuoto →
+// { provider, model } con provider OpenRouter (il backend giudici è OR-only) e
+// model non vuoto. `label` opzionale conservata.
+function sanitizeRegistry(reg) {
+  const out = {};
+  if (!reg || typeof reg !== 'object') return out;
+  for (const [nick, raw] of Object.entries(reg)) {
+    const name = String(nick || '').trim();
+    if (!name) continue;
+    const e = raw || {};
+    const model = String(e.model || '').trim();
+    if (!model) continue;
+    const entry = { provider: 'openrouter', model };
+    const label = String(e.label || '').trim();
+    if (label) entry.label = label;
+    out[name] = entry;
   }
   return out;
 }
