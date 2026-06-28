@@ -11,7 +11,18 @@
 // di OGNI giudice separatamente dalla dashboard. Il vecchio slot unico `judgeL2`
 // non era letto da nessuno ed è stato rimosso.
 //
-// Schema doc:
+// Oltre agli slot, il doc contiene il REGISTRO MODELLI DEDICATO AI GIUDICI
+// (`judgeRegistry`): mappa nickname → { provider, model }. È l'analogo del
+// `modelRegistry` di "Modelli predefiniti", ma SEPARATO: l'owner dà ai giudici
+// scorciatoie/modelli propri, indipendenti dal resto di Filo. Il backend
+// filo-security lo unisce (con precedenza) al registro condiviso per risolvere i
+// nickname degli slot. Provider OpenRouter (il backend giudici è OpenRouter-only).
+//
+// La CHIAVE OpenRouter dei giudici è un SEGRETO e vive in un doc SEPARATO
+// (`config/judgeSecrets`, campo `openrouterKey`): regole solo-owner, mai inviata
+// alle pagine. Qui esponiamo solo il booleano "presente/assente".
+//
+// Schema doc config/supportModels:
 //   {
 //     sanitizer:     "flash",
 //     judge1:        "flash, flash-or",
@@ -20,6 +31,7 @@
 //     judgeDynamic:  "flash",
 //     judgeRedTeam:  "flash",
 //     judgePriority: "flash",
+//     judgeRegistry: { "<nick>": { provider: "openrouter", model: "...", label?: "..." } },
 //   }
 
 const auth = require('../auth/google-auth');
