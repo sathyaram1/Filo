@@ -823,6 +823,11 @@
     for (const slot of SM_SLOTS) {
       const host = document.getElementById(`mgSmChain-${slot}`);
       if (!host) continue;
+      // Allinea la <label> dello slot all'etichetta amichevole (la mappa è la
+      // sorgente di verità: HTML e JS non possono divergere).
+      const slotEl = host.closest('.mg-sm-slot');
+      const labelEl = slotEl && slotEl.querySelector('label');
+      if (labelEl && SM_SLOT_LABELS[slot]) labelEl.textContent = SM_SLOT_LABELS[slot];
       host.innerHTML = '';
       // Nessun validatore di azione (questi slot non corrispondono a un'azione
       // in SN_CONST.ACTIONS): accettiamo qualunque nickname. Il validatore è
