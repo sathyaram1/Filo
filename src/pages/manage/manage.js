@@ -773,7 +773,20 @@
   // ── Sezione "Modelli di supporto" (DD1) ──────────────────────────────────
   // Slot → editor a segmenti (buildChain del modelChainEditor).
   // Caricato pigro: viene inizializzato la prima volta che l'utente clicca la tab.
-  const SM_SLOTS = ['sanitizer', 'judgeL2', 'judgeRedTeam', 'judgePriority'];
+  const SM_SLOTS = ['sanitizer', 'judge1', 'judge2', 'judge3', 'judgeDynamic', 'judgeRedTeam', 'judgePriority'];
+  // Etichette amichevoli per slot (i giudici del panel L2 sono "Giudice 1/2/3"
+  // + "Giudice dinamico"; l'id grezzo non va mai mostrato all'utente). L'HTML
+  // ha già le <label> statiche; questa mappa è la sorgente di verità se in
+  // futuro le label venissero generate dal JS.
+  const SM_SLOT_LABELS = {
+    sanitizer:     'Sanitizer feedback',
+    judge1:        'Giudice 1',
+    judge2:        'Giudice 2',
+    judge3:        'Giudice 3',
+    judgeDynamic:  'Giudice dinamico',
+    judgeRedTeam:  'Giudice red-team',
+    judgePriority: 'Giudice priorità',
+  };
   let smChains = {};        // slot → { getValue }
   let smLoaded  = false;    // true dopo il primo caricamento riuscito
   let smLoading = false;    // guard anti-doppio-caricamento
