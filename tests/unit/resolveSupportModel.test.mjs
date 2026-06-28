@@ -27,7 +27,10 @@ const { resolveSupportModel, SLOT_DEFAULTS } = require(
 // ── Helper getter mockati ──────────────────────────────────────────────────
 
 function configWith(overrides) {
-  return async () => ({ sanitizer: '', judgeL2: '', judgeRedTeam: '', judgePriority: '', ...overrides });
+  return async () => ({
+    sanitizer: '', judge1: '', judge2: '', judge3: '', judgeDynamic: '',
+    judgeRedTeam: '', judgePriority: '', ...overrides,
+  });
 }
 
 function configThrows() {
