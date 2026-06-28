@@ -297,7 +297,11 @@ module.exports = function register(on, ctx) {
       }
       const idToken = await auth.getIdToken();
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
-      const models = await SupportModels.update(msg.models || {}, idToken);
+      // Slot + registro giudici + (eventuale) chiave OpenRouter dei giudici.
+      const partial = Object.assign({}, msg.models || {});
+      if (msg.judgeRegistry && typeof msg.judgeRegistry === 'object') partial.judgeRegistry = msg.judgeRegistry;
+      if (typeof msg.openrouterKey === 'string') partial.openrouterKey = msg.openrouterKey;
+      const models = await SupportModels.update(partial, idToken);
       return { ok: true, models };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
