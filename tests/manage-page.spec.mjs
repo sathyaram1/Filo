@@ -736,7 +736,7 @@ async function stubSupportModels(page, initialModels, isAdmin = true) {
   }, { models: initialModels, admin: isAdmin });
 }
 
-test('DD1: la tab Modelli di supporto renderizza i 4 slot col modelChainEditor', async ({ openTab }) => {
+test('DD1: la tab Modelli di supporto renderizza tutti gli slot col modelChainEditor', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.filo);
@@ -749,17 +749,28 @@ test('DD1: la tab Modelli di supporto renderizza i 4 slot col modelChainEditor',
   // Attendi che l'editor sia visibile (caricamento IPC completato).
   await expect(page.locator('#mgSmEditor')).toBeVisible({ timeout: 5000 });
 
-  // 4 slot presenti nel DOM.
-  await expect(page.locator('.mg-sm-slot')).toHaveCount(4);
+  // 7 slot presenti nel DOM (sanitizer + 3 giudici fissi + dinamico + red-team + priorità).
+  await expect(page.locator('.mg-sm-slot')).toHaveCount(7);
   await expect(page.locator('[data-slot="sanitizer"]')).toBeVisible();
-  await expect(page.locator('[data-slot="judgeL2"]')).toBeVisible();
+  await expect(page.locator('[data-slot="judge1"]')).toBeVisible();
+  await expect(page.locator('[data-slot="judge2"]')).toBeVisible();
+  await expect(page.locator('[data-slot="judge3"]')).toBeVisible();
+  await expect(page.locator('[data-slot="judgeDynamic"]')).toBeVisible();
   await expect(page.locator('[data-slot="judgeRedTeam"]')).toBeVisible();
   await expect(page.locator('[data-slot="judgePriority"]')).toBeVisible();
+  // Il vecchio slot unico non deve più esistere.
+  await expect(page.locator('[data-slot="judgeL2"]')).toHaveCount(0);
+
+  // I 4 giudici del panel mostrano etichette amichevoli (non l'id grezzo).
+  await expect(page.locator('[data-slot="judge1"] label')).toHaveText('Giudice 1');
+  await expect(page.locator('[data-slot="judge2"] label')).toHaveText('Giudice 2');
+  await expect(page.locator('[data-slot="judge3"] label')).toHaveText('Giudice 3');
+  await expect(page.locator('[data-slot="judgeDynamic"] label')).toHaveText('Giudice dinamico');
 
   // Ogni slot ha almeno un input (modelChainEditor crea .sn-chain-input per ogni segmento).
   const chainInputs = page.locator('.mg-sm-chain-host .sn-chain-input');
   const count = await chainInputs.count();
-  expect(count).toBeGreaterThanOrEqual(4);
+  expect(count).toBeGreaterThanOrEqual(7);
 
   // Il bottone "Salva" è visibile.
   await expect(page.locator('#mgSmSaveBtn')).toBeVisible();
