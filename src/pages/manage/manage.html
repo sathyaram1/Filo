@@ -369,6 +369,30 @@
       font-size: 13px; color: var(--sn-muted);
       margin: 0 0 20px;
     }
+    /* Blocchi "Chiave dei giudici" e "Modelli dei giudici": riquadri leggeri
+       per separarli visivamente dai selettori per-giudice. */
+    .mg-sm-block {
+      margin: 0 0 24px; padding: 16px 18px;
+      border: 1px solid var(--sn-border); border-radius: 10px;
+      background: var(--sn-surface, transparent);
+    }
+    .mg-sm-block h3 {
+      margin: 0 0 6px; font-size: 14px; font-weight: 600; color: var(--sn-fg);
+    }
+    .mg-sm-block-desc {
+      font-size: 12px; color: var(--sn-muted); margin: 0 0 12px;
+    }
+    .mg-sm-block label {
+      display: block; font-size: 13px; font-weight: 600; color: var(--sn-fg);
+      margin-bottom: 4px;
+    }
+    .mg-sm-block input[type="password"] {
+      width: 100%; max-width: 420px; box-sizing: border-box;
+    }
+    .mg-sm-key-state { font-weight: 400; color: var(--sn-muted); font-size: 12px; }
+    .mg-sm-slots-title {
+      margin: 0 0 12px; font-size: 14px; font-weight: 600; color: var(--sn-fg);
+    }
     .mg-sm-slots {
       display: flex; flex-direction: column; gap: 16px;
     }
