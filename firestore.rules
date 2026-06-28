@@ -79,6 +79,17 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // config/judgeSecrets → chiave OpenRouter DEDICATA ai giudici di sicurezza,
+    // SEPARATA dalle chiavi del resto di Filo (DESIGN §4/§14). L'owner la imposta
+    // dalla schermata "Modelli di supporto"; il backend filo-security la legge via
+    // Admin SDK (bypassa le regole). Più stretta di config/secrets: lettura e
+    // scrittura SOLO admin (nessun altro utente loggato può leggerla). Campo:
+    // `openrouterKey` (stringa).
+    match /config/judgeSecrets {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
     // config/automation → interruttore master dell'auto-miglioramento (vedi
     // filo-security DESIGN §2). Campo `enabled` (bool; assente = false = OFF, lo
     // stato sicuro). Lo legge la dashboard owner e, in futuro, il backend di
