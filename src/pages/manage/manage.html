@@ -552,15 +552,44 @@
         <div id="mgSmEditor" hidden>
           <h2>Modelli di supporto</h2>
           <p class="mg-sm-intro">
-            Seleziona il modello (o la catena con fallback) per ogni compito
-            interno di Filo. La scelta viene salvata nel cloud e letta anche
-            dal backend di sicurezza.
+            I giudici di sicurezza e gli altri compiti interni usano modelli e
+            chiavi DEDICATI, separati dal resto di Filo. Imposta qui la chiave, dai
+            un nickname a ogni modello e scegli quale modello usa ogni giudice. Il
+            tutto viene salvato nel cloud e letto dal backend di sicurezza.
           </p>
 
-          <!-- datalist dei nickname per i dropdown del modelChainEditor.
-               Popolata da manage.js dopo il caricamento dei modelli predefiniti. -->
-          <datalist id="mgSmNicknamesList"></datalist>
+          <!-- ── Chiave dei giudici (separata dal resto di Filo) ──────────── -->
+          <section class="mg-sm-block" id="mgSmKeys">
+            <h3>Chiave dei giudici</h3>
+            <p class="mg-sm-block-desc">
+              I giudici usano una chiave OpenRouter dedicata, diversa da quelle
+              che usi nel resto di Filo. Lascia il campo vuoto per non cambiarla.
+            </p>
+            <label for="mgSmKeyOpenrouter">
+              OpenRouter API key
+              <span class="mg-sm-key-state" id="mgSmKeyOpenrouterState"></span>
+            </label>
+            <input type="password" id="mgSmKeyOpenrouter" placeholder="sk-or-v1-…" autocomplete="off" />
+          </section>
 
+          <!-- ── Registro modelli dei giudici (nickname → modello OpenRouter) ─ -->
+          <section class="mg-sm-block" id="mgSmRegistry">
+            <h3>Modelli dei giudici</h3>
+            <p class="mg-sm-block-desc">
+              Dai un nome breve (nickname) a ogni modello OpenRouter che i giudici
+              possono usare. I selettori qui sotto propongono questi nickname.
+            </p>
+            <div id="mgSmRegistryList"></div>
+            <div class="sn-row" style="margin-top: 10px;">
+              <button class="sn-btn sn-btn-secondary" id="mgSmRegistryAdd" type="button">Aggiungi modello</button>
+            </div>
+          </section>
+
+          <!-- datalist dei nickname per i dropdown del modelChainEditor (id letto
+               da SN_MODEL_CHAIN). Popolata da manage.js dal registro giudici. -->
+          <datalist id="nicknames-list"></datalist>
+
+          <h3 class="mg-sm-slots-title">Modello per ogni giudice</h3>
           <div class="mg-sm-slots" id="mgSmSlots">
             <!-- Slot 1: sanitizer -->
             <div class="mg-sm-slot" data-slot="sanitizer">
