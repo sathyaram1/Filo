@@ -48,9 +48,17 @@ test('slot sanitizer con config "gemma" → ritorna "gemma"', async () => {
   assert.equal(model, 'gemma', 'deve ritornare il valore dalla config, non il fallback');
 });
 
-test('slot judgeL2 con config "claude-haiku, flash" → ritorna la catena', async () => {
-  const model = await resolveSupportModel('judgeL2', 'flash, flash-or', configWith({ judgeL2: 'claude-haiku, flash' }));
+test('slot judge1 con config "claude-haiku, flash" → ritorna la catena', async () => {
+  const model = await resolveSupportModel('judge1', 'flash, flash-or', configWith({ judge1: 'claude-haiku, flash' }));
   assert.equal(model, 'claude-haiku, flash');
+});
+
+test('ogni giudice del panel ha uno slot indipendente', async () => {
+  const cfg = configWith({ judge1: 'a', judge2: 'b', judge3: 'c', judgeDynamic: 'd' });
+  assert.equal(await resolveSupportModel('judge1', 'x', cfg), 'a');
+  assert.equal(await resolveSupportModel('judge2', 'x', cfg), 'b');
+  assert.equal(await resolveSupportModel('judge3', 'x', cfg), 'c');
+  assert.equal(await resolveSupportModel('judgeDynamic', 'x', cfg), 'd');
 });
 
 test('valore config con spazi marginali → ritornato trimmato', async () => {
