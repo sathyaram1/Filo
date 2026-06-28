@@ -89,9 +89,11 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // config/supportModels → modelli per i 4 slot di supporto (sanitizer,
-    // judgeL2, judgeRedTeam, judgePriority). Ogni campo è una stringa catena
-    // di nickname ("flash, flash-or"), stesso formato di config/models.
+    // config/supportModels → modelli per gli slot di supporto (sanitizer,
+    // judge1, judge2, judge3, judgeDynamic, judgeRedTeam, judgePriority). Ogni
+    // campo è una stringa catena di nickname ("flash, flash-or"), stesso
+    // formato di config/models. Le regole NON enumerano i campi (read/write
+    // admin-only), quindi nuovi slot non richiedono un redeploy.
     // Lettura riservata agli admin dal client; il backend filo-security la legge
     // via Admin SDK (bypassa queste regole). Scrittura solo admin.
     match /config/supportModels {
