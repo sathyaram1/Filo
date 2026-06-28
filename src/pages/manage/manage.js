@@ -860,8 +860,10 @@
     del.textContent = 'Rimuovi';
     del.addEventListener('click', () => { row.remove(); populateSmNicknames(); });
 
-    // Aggiornare un nickname ridisegna i suggerimenti dei selettori.
+    // Aggiornare nickname o modello ridisegna i suggerimenti dei selettori
+    // (un nickname compare tra i suggerimenti solo quando ha anche un modello).
     nickIn.addEventListener('input', () => populateSmNicknames());
+    modelIn.addEventListener('input', () => populateSmNicknames());
 
     row.appendChild(nickIn);
     row.appendChild(modelIn);

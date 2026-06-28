@@ -35,6 +35,8 @@ test('editor giudici: chiave, registro e datalist nickname si popolano dai dati'
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.renderSupportModelsEditor);
 
+  await page.evaluate(() => window.__mgTest.setTab("models"));
+
   await page.evaluate((m) => window.__mgTest.renderSupportModelsEditor(m), FAKE_MODELS);
 
   // Editor visibile.
@@ -66,6 +68,8 @@ test('il registro raccoglie le righe (anche quelle aggiunte) come voci OpenRoute
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.renderSupportModelsEditor);
+
+  await page.evaluate(() => window.__mgTest.setTab("models"));
 
   await page.evaluate((m) => window.__mgTest.renderSupportModelsEditor(m), FAKE_MODELS);
   await expect(page.locator('#mgSmEditor')).toBeVisible();
