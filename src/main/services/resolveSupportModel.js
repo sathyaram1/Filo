@@ -1,8 +1,9 @@
 // Helper: risolve il modello (nickname catena) per uno slot di supporto.
 //
 // PERCHÉ ESISTE
-//   DD1 ha creato il doc Firestore `config/supportModels` con 4 slot
-//   (sanitizer, judgeL2, judgeRedTeam, judgePriority). I chiamanti che devono
+//   DD1 ha creato il doc Firestore `config/supportModels` con uno slot per
+//   funzione di supporto (sanitizer, judge1, judge2, judge3, judgeDynamic,
+//   judgeRedTeam, judgePriority). I chiamanti che devono
 //   scegliere il modello per un task di supporto usano questa funzione per
 //   leggere lo slot dalla config remota con fallback al valore hard-coded
 //   passato come parametro — garantendo la backward-compat se la config è
