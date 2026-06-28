@@ -44,7 +44,7 @@ const SLOT_DEFAULTS = {
 /**
  * Risolve il modello per uno slot di supporto.
  *
- * @param {string} slot         - Uno di: sanitizer, judgeL2, judgeRedTeam, judgePriority
+ * @param {string} slot         - Uno di: sanitizer, judge1, judge2, judge3, judgeDynamic, judgeRedTeam, judgePriority
  * @param {string} [hardcoded]  - Fallback hard-coded se la config è assente/vuota.
  *                                 Se omesso, usa SLOT_DEFAULTS[slot] oppure 'flash'.
  * @param {Function} [getConfig] - Getter asincrono che ritorna { [slot]: string }.
