@@ -33,7 +33,10 @@ const SupportModels = require('./supportModelsStore');
 // Firestore che l'owner configura dalla dashboard.
 const SLOT_DEFAULTS = {
   sanitizer:     'flash',
-  judgeL2:       'flash, flash-or',
+  judge1:        'flash, flash-or',
+  judge2:        'flash, flash-or',
+  judge3:        'flash, flash-or',
+  judgeDynamic:  'flash, flash-or',
   judgeRedTeam:  'flash',
   judgePriority: 'flash',
 };
