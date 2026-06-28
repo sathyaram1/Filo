@@ -31,7 +31,10 @@ const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_I
 const SUPPORT_MODELS_DOC = 'config/supportModels';
 
 // Slot validi. Stabile: i backend filo-security li leggono per nome.
-const SLOTS = ['sanitizer', 'judgeL2', 'judgeRedTeam', 'judgePriority'];
+// I 3 giudici fissi del panel L2 + il giudice dinamico hanno ciascuno il proprio
+// slot (judge1/judge2/judge3/judgeDynamic). Il vecchio slot unico `judgeL2`,
+// non letto da nessuno, è stato rimosso.
+const SLOTS = ['sanitizer', 'judge1', 'judge2', 'judge3', 'judgeDynamic', 'judgeRedTeam', 'judgePriority'];
 
 // ── Firestore Value <-> JS ───────────────────────────────────────────────────
 function toFsValue(v) {
