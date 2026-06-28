@@ -965,6 +965,18 @@
     }
   }
 
+  // Render dell'editor (chiave + registro giudici + nickname + slot) e reveal.
+  // Estratta da loadSupportModels così i test possono esercitarla senza il canale.
+  function renderSupportModelsEditor(models) {
+    applyJudgeKeyState(models || {});
+    renderJudgeRegistry((models || {}).judgeRegistry || {});
+    populateSmNicknames();
+    renderSmSlots(models || {});
+    mgSmLoading.hidden = true;
+    mgSmDenied.hidden  = true;
+    mgSmEditor.hidden  = false;
+  }
+
   async function saveSupportModels() {
     if (!smLoaded) return;
     const models = {};
