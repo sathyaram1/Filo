@@ -954,12 +954,7 @@
         mgSmDenied.hidden  = false;
         return;
       }
-      applyJudgeKeyState(r.models || {});
-      renderJudgeRegistry((r.models || {}).judgeRegistry || {});
-      populateSmNicknames();
-      renderSmSlots(r.models || {});
-      mgSmLoading.hidden = true;
-      mgSmEditor.hidden  = false;
+      renderSupportModelsEditor(r.models || {});
       smLoaded = true;
     } catch (e) {
       mgSmLoading.hidden = true;
