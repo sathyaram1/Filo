@@ -106,8 +106,8 @@ test('getter che lancia → usa il fallback passato esplicitamente', async () =>
 // ── Test 5: nessun fallback esplicito → SLOT_DEFAULTS ──────────────────────
 
 test('senza fallback esplicito → usa SLOT_DEFAULTS[slot]', async () => {
-  const model = await resolveSupportModel('judgeL2', undefined, configNull());
-  assert.equal(model, SLOT_DEFAULTS.judgeL2, 'deve usare il default built-in dello slot');
+  const model = await resolveSupportModel('judge1', undefined, configNull());
+  assert.equal(model, SLOT_DEFAULTS.judge1, 'deve usare il default built-in dello slot');
 });
 
 test('senza fallback esplicito per sanitizer → SLOT_DEFAULTS.sanitizer', async () => {
