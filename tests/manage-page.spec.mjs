@@ -818,11 +818,23 @@ test('DD1: il bottone Salva invia support_models_update con i valori corretti', 
   await expect.poll(() => page.evaluate(() => window.__smUpdates.length)).toBe(1);
   const sent = await page.evaluate(() => window.__smUpdates[0]);
 
-  // I 4 slot sono presenti nel payload.
+  // Tutti gli slot sono presenti nel payload, con uno slot per giudice del panel.
   expect(sent).toHaveProperty('sanitizer');
-  expect(sent).toHaveProperty('judgeL2');
+  expect(sent).toHaveProperty('judge1');
+  expect(sent).toHaveProperty('judge2');
+  expect(sent).toHaveProperty('judge3');
+  expect(sent).toHaveProperty('judgeDynamic');
   expect(sent).toHaveProperty('judgeRedTeam');
   expect(sent).toHaveProperty('judgePriority');
+  // Il vecchio slot unico non viene più inviato.
+  expect(sent).not.toHaveProperty('judgeL2');
+
+  // I 4 giudici persistono in modo indipendente: i valori distinti del mock
+  // arrivano ognuno nel proprio slot (judge1 catena, gli altri "flash").
+  expect(sent.judge1).toBe('flash, flash-or');
+  expect(sent.judge2).toBe('flash');
+  expect(sent.judge3).toBe('flash');
+  expect(sent.judgeDynamic).toBe('flash');
 
   // I valori tornati dal mock vengono confermati (status "Salvato.").
   await expect(page.locator('#mgSmStatus')).toHaveText('Salvato.');
