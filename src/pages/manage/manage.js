@@ -1024,6 +1024,10 @@
   window.__mgTest.loadSupportModels = loadSupportModels;
   window.__mgTest.getSmChains = () => smChains;
   window.__mgTest.getSmSlots = () => SM_SLOTS;
+  // Render diretto dell'editor con dati finti (bypassa il canale main: i test
+  // non hanno una sessione admin né Firestore).
+  window.__mgTest.renderSupportModelsEditor = (models) => { renderSupportModelsEditor(models); smLoaded = true; };
+  window.__mgTest.collectJudgeRegistry = collectJudgeRegistry;
 
   // ── Init ──────────────────────────────────────────────────────────────────
   async function init() {
