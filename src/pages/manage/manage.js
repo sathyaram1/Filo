@@ -976,12 +976,18 @@
     for (const slot of SM_SLOTS) {
       models[slot] = smChains[slot] ? smChains[slot].getValue() : '';
     }
+    const judgeRegistry = collectJudgeRegistry();
+    const openrouterKey = mgSmKeyInput ? mgSmKeyInput.value.trim() : '';
     mgSmSaveBtn.disabled = true;
     setSmStatus('Salvataggio…', '');
     try {
-      const r = await sendToMain({ type: 'support_models_update', models });
+      const r = await sendToMain({ type: 'support_models_update', models, judgeRegistry, openrouterKey });
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
       // Ricarica i valori salvati (confirma round-trip Firestore).
+      if (mgSmKeyInput) mgSmKeyInput.value = ''; // non riteniamo la chiave in pagina
+      applyJudgeKeyState(r.models || {});
+      renderJudgeRegistry((r.models || {}).judgeRegistry || judgeRegistry);
+      populateSmNicknames();
       renderSmSlots(r.models || models);
       setSmStatus('Salvato.', 'ok');
     } catch (e) {
