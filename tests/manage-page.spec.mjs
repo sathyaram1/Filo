@@ -708,7 +708,10 @@ test('DB3: solo i fix rilasciati appaiono in Risolti; i non-spediti restano In c
 // Modelli finti restituiti dal mock di support_models_get.
 const FAKE_SUPPORT_MODELS = {
   sanitizer:    'flash',
-  judgeL2:      'flash, flash-or',
+  judge1:       'flash, flash-or',
+  judge2:       'flash',
+  judge3:       'flash',
+  judgeDynamic: 'flash',
   judgeRedTeam: 'flash',
   judgePriority: '',
 };
