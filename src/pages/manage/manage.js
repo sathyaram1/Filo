@@ -946,6 +946,8 @@
         mgSmDenied.hidden  = false;
         return;
       }
+      applyJudgeKeyState(r.models || {});
+      renderJudgeRegistry((r.models || {}).judgeRegistry || {});
       populateSmNicknames();
       renderSmSlots(r.models || {});
       mgSmLoading.hidden = true;
