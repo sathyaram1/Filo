@@ -801,22 +801,106 @@
   const mgSmEditor  = document.getElementById('mgSmEditor');
   const mgSmSaveBtn = document.getElementById('mgSmSaveBtn');
   const mgSmStatus  = document.getElementById('mgSmStatus');
+  const mgSmKeyInput     = document.getElementById('mgSmKeyOpenrouter');
+  const mgSmKeyState     = document.getElementById('mgSmKeyOpenrouterState');
+  const mgSmRegistryList = document.getElementById('mgSmRegistryList');
+  const mgSmRegistryAdd  = document.getElementById('mgSmRegistryAdd');
 
-  // Popola la <datalist id="mgSmNicknamesList"> con i nickname del registry
-  // predefinito (SN_CONST.DEFAULT_MODEL_REGISTRY), così il dropdown del
-  // modelChainEditor propone i modelli noti anche senza un registry separato.
+  // Popola la <datalist id="nicknames-list"> (l'id letto da SN_MODEL_CHAIN) coi
+  // nickname che i giudici possono usare: quelli definiti nel registro giudici
+  // (righe correnti) uniti ai predefiniti condivisi, così i selettori per-giudice
+  // li propongono. Va richiamata dopo ogni modifica al registro.
   function populateSmNicknames() {
-    const dl = document.getElementById('mgSmNicknamesList');
+    const dl = document.getElementById('nicknames-list');
     if (!dl) return;
     dl.innerHTML = '';
-    const reg = (window.SN_CONST && window.SN_CONST.DEFAULT_MODEL_REGISTRY) || {};
-    for (const nick of Object.keys(reg)) {
+    const seen = new Set();
+    const addNick = (nick, label) => {
+      const name = String(nick || '').trim();
+      if (!name || seen.has(name)) return;
+      seen.add(name);
       const opt = document.createElement('option');
-      opt.value = nick;
-      const entry = reg[nick] || {};
-      if (entry.label) opt.label = entry.label;
+      opt.value = name;
+      if (label) opt.label = label;
       dl.appendChild(opt);
+    };
+    // 1. Registro dedicato ai giudici (priorità: compaiono per primi).
+    const judgeReg = collectJudgeRegistry();
+    for (const nick of Object.keys(judgeReg)) addNick(nick, judgeReg[nick].label);
+    // 2. Registro condiviso predefinito (fallback comodo: flash, haiku, …).
+    const shared = (window.SN_CONST && window.SN_CONST.DEFAULT_MODEL_REGISTRY) || {};
+    for (const nick of Object.keys(shared)) addNick(nick, (shared[nick] || {}).label);
+  }
+
+  // ── Registro modelli dei giudici (nickname → modello OpenRouter) ───────────
+  // Una riga = nickname + stringa modello OpenRouter + rimuovi. Provider implicito
+  // OpenRouter (il backend dei giudici è OpenRouter-only).
+  function makeRegistryRow(nick, entry) {
+    const e = entry || {};
+    const row = document.createElement('div');
+    row.className = 'sn-model-row mg-sm-reg-row';
+    row.dataset.label = (e.label || '');
+
+    const nickIn = document.createElement('input');
+    nickIn.type = 'text';
+    nickIn.className = 'sn-model-nick';
+    nickIn.placeholder = 'nickname (es. giudice-veloce)';
+    nickIn.value = nick || '';
+
+    const modelIn = document.createElement('input');
+    modelIn.type = 'text';
+    modelIn.className = 'sn-model-id';
+    modelIn.setAttribute('autocomplete', 'off');
+    modelIn.placeholder = 'modello OpenRouter (es. deepseek/deepseek-v4-pro)';
+    modelIn.value = e.model || '';
+
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'sn-btn sn-btn-secondary';
+    del.textContent = 'Rimuovi';
+    del.addEventListener('click', () => { row.remove(); populateSmNicknames(); });
+
+    // Aggiornare un nickname ridisegna i suggerimenti dei selettori.
+    nickIn.addEventListener('input', () => populateSmNicknames());
+
+    row.appendChild(nickIn);
+    row.appendChild(modelIn);
+    row.appendChild(del);
+    return row;
+  }
+
+  function renderJudgeRegistry(registry) {
+    if (!mgSmRegistryList) return;
+    mgSmRegistryList.innerHTML = '';
+    const head = document.createElement('div');
+    head.className = 'sn-model-row sn-model-row-head mg-sm-reg-row';
+    ['Nickname', 'Modello OpenRouter', ''].forEach((label) => {
+      const c = document.createElement('div'); c.textContent = label; head.appendChild(c);
+    });
+    mgSmRegistryList.appendChild(head);
+
+    const entries = Object.entries(registry || {});
+    if (!entries.length) {
+      mgSmRegistryList.appendChild(makeRegistryRow('', {}));
+    } else {
+      for (const [nick, e] of entries) mgSmRegistryList.appendChild(makeRegistryRow(nick, e));
     }
+  }
+
+  function collectJudgeRegistry() {
+    const out = {};
+    if (!mgSmRegistryList) return out;
+    for (const row of mgSmRegistryList.querySelectorAll('.sn-model-row:not(.sn-model-row-head)')) {
+      const nick = row.querySelector('.sn-model-nick').value.trim();
+      const model = row.querySelector('.sn-model-id').value.trim();
+      const label = (row.dataset.label || '').trim();
+      if (!nick || !model) continue;
+      if (out[nick]) continue;
+      const entry = { provider: 'openrouter', model };
+      if (label) entry.label = label;
+      out[nick] = entry;
+    }
+    return out;
   }
 
   // Rende gli editor a segmenti per tutti gli slot, usando SN_MODEL_CHAIN.buildChain.
