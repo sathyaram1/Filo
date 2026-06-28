@@ -1000,6 +1000,9 @@
   }
 
   if (mgSmSaveBtn) mgSmSaveBtn.addEventListener('click', saveSupportModels);
+  if (mgSmRegistryAdd) mgSmRegistryAdd.addEventListener('click', () => {
+    if (mgSmRegistryList) mgSmRegistryList.appendChild(makeRegistryRow('', {}));
+  });
 
   // Caricamento pigro: avviene la prima volta che l'utente seleziona la tab
   // "Modelli di supporto". La funzione selectTab già esiste e gestisce il
