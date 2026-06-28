@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.89', date: '2026-06-28',
+      features: [
+        'La schermata dei modelli di supporto ora ti fa configurare i giudici di sicurezza come i "Modelli predefiniti": imposti una chiave dedicata (diversa da quelle del resto di Filo), dai un nickname ai modelli che i giudici possono usare e scegli quale modello usa ogni giudice.',
+      ],
+      fixes: [],
+    },
+    {
       version: '0.2.76', date: '2026-06-24',
       features: [
         'Votare nella "Bacheca" ora premia: il primo voto ✅/❌ su ogni miglioramento ti regala 10 crediti, con una piccola animazione.',
