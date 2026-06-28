@@ -1,8 +1,0 @@
-{
-  "id": "d82f3e03-2015-4776-ae61-708730ef4f76",
-  "status": "archived",
-  "notes": "Falso allarme generato in automatico: la suite di test non è rotta. Era un artefatto di come è stato preparato l'ambiente di test in questa sessione (binario di Electron installato a mano con un percorso malformato), già sistemato — i test girano regolarmente. Nessuna azione richiesta.",
-  "queuedAt": "2026-06-28T00:27:04.892Z",
-  "queuedBy": "routine",
-  "reason": "false-positive"
-}
