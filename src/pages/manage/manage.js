@@ -932,6 +932,14 @@
     mgSmStatus.className = 'mg-sm-status' + (kind ? ` mg-${kind}` : '');
   }
 
+  // Mostra "configurata/non configurata" accanto al campo chiave (la chiave vera
+  // non lascia mai il main: dal GET arriva solo il booleano).
+  function applyJudgeKeyState(models) {
+    if (!mgSmKeyState) return;
+    const present = !!(models && models.openrouterKeyPresent);
+    mgSmKeyState.textContent = present ? '(configurata)' : '(non configurata)';
+  }
+
   async function loadSupportModels() {
     if (smLoading) return;
     smLoading = true;
