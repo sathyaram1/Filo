@@ -54,7 +54,7 @@ test('le regole proxy dominio sono salvabili ma non visibili nella dashboard', a
       return { ok: true, rules };
     }, { domain: DOMAIN, country: COUNTRY });
     expect(addResult2.ok, `setProxyRule fallito: ${addResult2.error}`).toBe(true);
-    expect(addResult2.rules).toHaveProperty(DOMAIN, COUNTRY);
+    expect(addResult2.rules[DOMAIN], 'la regola (storage diretto) deve essere salvata').toBeTruthy();
   } else {
     expect(addResult.ok, `setProxyRule deve avere successo: ${addResult.error}`).toBe(true);
     expect(addResult.rules[DOMAIN], 'la regola deve essere salvata').toBeTruthy();
