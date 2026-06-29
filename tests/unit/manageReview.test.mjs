@@ -21,10 +21,32 @@ test('espone classifyBlock e sortReview', () => {
   assert.equal(typeof MR.sortReview, 'function');
 });
 
-test('classifyBlock: nessuna pipeline → null', () => {
-  assert.equal(MR.classifyBlock({}), null);
-  assert.equal(MR.classifyBlock({ pipeline: null }), null);
-  assert.equal(MR.classifyBlock({ pipeline: undefined }), null);
+test('classifyBlock: nessuna pipeline → bianco se aperto (mai giudicato), null se chiuso', () => {
+  // Un feedback aperto senza pipeline non è ancora stato giudicato → non filtrato.
+  assert.equal(MR.classifyBlock({ status: 'new' }).reason, 'unfiltered');
+  assert.equal(MR.classifyBlock({}).reason, 'unfiltered');          // status assente = new
+  assert.equal(MR.classifyBlock({ pipeline: null }).reason, 'unfiltered');
+  assert.equal(MR.classifyBlock({ pipeline: undefined }).reason, 'unfiltered');
+  // I chiusi non vanno giudicati → nessun colore (e restano nella board/Risolti).
+  assert.equal(MR.classifyBlock({ status: 'done' }), null);
+  assert.equal(MR.classifyBlock({ status: 'verified' }), null);
+  assert.equal(MR.classifyBlock({ status: 'archived' }), null);
+  assert.equal(MR.classifyBlock({ status: 'ignored' }), null);
+});
+
+test('classifyBlock: mittente fidato (routine/owner) bloccato a L1 → unfiltered, non attacco', () => {
+  // Identità dell'owner flaggata per errore: va RI-GIUDICATA, non mostrata come attacco.
+  const r = MR.classifyBlock({ clientId: 'routine:routine', pipeline: { action: 'human_review', l1Category: 'dangerous', verdicts: [] } });
+  assert.equal(r.reason, 'unfiltered');
+  // Un mittente ESTERNO con lo stesso pipeline resta un attacco (rosso).
+  const ext = MR.classifyBlock({ clientId: 'caf22093', pipeline: { action: 'human_review', l1Category: 'dangerous', verdicts: [] } });
+  assert.equal(ext.reason, 'attack');
+});
+
+test('classifyBlock: mittente fidato CON verdetti completi → classificato normalmente', () => {
+  const verdicts = ['fixed_1', 'fixed_2', 'fixed_3', 'dynamic'].map((j) => ({ judge: j, class: 'design' }));
+  const r = MR.classifyBlock({ clientId: 'routine:routine', pipeline: { l2Class: 'design', verdicts } });
+  assert.equal(r.reason, 'design');
 });
 
 test('classifyBlock: aligned / nessun motivo → null', () => {
