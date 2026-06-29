@@ -574,22 +574,26 @@
       mgJudgesRow.appendChild(lbl);
     }
 
-    // Un pallino per ogni giudice ATTESO del panel (non per verdetto): così un
-    // panel parziale mostra i mancanti nella loro posizione corretta (pallino
-    // tratteggiato), non un panel "accorciato". `expectedJudges` arriva dalla
-    // pipeline; per i feedback vecchi (senza quel campo) ripieghiamo sui verdetti.
-    const expected = expectedJudgeNames(fb);
-    const verdicts = (fb.pipeline && fb.pipeline.verdicts) || [];
+    // Un pallino per ogni giudice ATTESO del panel (non per verdetto): un panel
+    // parziale mostra i mancanti come pallini tratteggiati, non un panel
+    // "accorciato". Pipeline NUOVA → posizioni esatte da `expectedJudges`.
+    // STORICO (senza quel campo) → mostriamo i verdetti presenti e poi pad-iamo
+    // con pallini tratteggiati fino alla dimensione attesa del panel (così 2
+    // giudici su 4 = 2 colorati + 2 tratteggiati).
+    const p = (fb && fb.pipeline) || {};
+    const verdicts = Array.isArray(p.verdicts) ? p.verdicts : [];
+    const expected = (Array.isArray(p.expectedJudges) && p.expectedJudges.length) ? p.expectedJudges : null;
     const judgeLetters = ['A', 'B', 'C', 'D', 'E'];
 
-    // Senza alcun giudice atteso né verdetto la riga non ha senso (es. feedback
+    // Senza giudici attesi né verdetti la riga non ha senso (es. feedback
     // ricevuti o in chiarimento, mai passati dal pipeline): nascondila del tutto.
-    if (expected.length === 0 && verdicts.length === 0) { mgJudgesRow.hidden = true; return; }
+    if (!expected && verdicts.length === 0) { mgJudgesRow.hidden = true; return; }
     mgJudgesRow.hidden = false;
 
-    const names = expected.length ? expected : verdicts.map((v, i) => (v && v.judge) || `judge_${i}`);
-    for (let i = 0; i < names.length; i++) {
-      const v = verdictByName(fb, names[i]);
+    const fallbackSize = Math.max(verdicts.length, (MR.EXPECTED_PANEL_SIZE || 4));
+    const size = expected ? expected.length : fallbackSize;
+    for (let i = 0; i < size; i++) {
+      const v = expected ? verdictByName(fb, expected[i]) : (verdicts[i] || null);
       const dot = document.createElement('span');
       dot.className = 'mg-dot';
       if (v) {
@@ -608,15 +612,6 @@
       }
       mgJudgesRow.appendChild(dot);
     }
-  }
-
-  // Nomi dei giudici attesi del panel (ordine stabile per i pallini). Preferisce
-  // `pipeline.expectedJudges`; per i feedback vecchi ripiega sui nomi nei verdetti.
-  function expectedJudgeNames(fb) {
-    const p = (fb && fb.pipeline) || {};
-    if (Array.isArray(p.expectedJudges) && p.expectedJudges.length) return p.expectedJudges;
-    const v = Array.isArray(p.verdicts) ? p.verdicts : [];
-    return v.map((x, i) => (x && x.judge) || `judge_${i}`);
   }
 
   // Verdetto di un dato giudice (per nome) su un feedback, o null se mancante.
