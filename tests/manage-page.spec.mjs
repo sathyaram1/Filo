@@ -1,11 +1,12 @@
 // Spec Playwright per la pagina di gestione (filo://manage/).
 //
 // Assert di COMPORTAMENTO:
-//   - dashboard unificata (DB1): 6 tab, "Ricevuti" attiva di default; le tab
+//   - dashboard unificata (DB1): 7 tab, "Ricevuti" attiva di default; le tab
 //     lista (Ricevuti/In coda/Risolti/Archiviati) condividono panel-list;
-//     stats/models sono segnaposto;
-//   - lo switch "Modalità automatica" è sempre visibile (tutte le tab),
+//     stats/models sono segnaposto; "Automazioni" raccoglie le impostazioni;
+//   - lo switch "Modalità automatica" vive nella tab "Automazioni",
 //     si attiva/disattiva e lo stato sopravvive al ricaricamento;
+//   - il numero di tentativi del loop di correzione è editabile e persiste;
 //   - con dati finti iniettati, un blocco compare in "Ricevuti" (richiede la mia
 //     approvazione) e il click apre il pannello centrale con le bolle;
 //   - un feedback in `clarify` mostra il box risposta dell'owner sotto Ricevuti.
