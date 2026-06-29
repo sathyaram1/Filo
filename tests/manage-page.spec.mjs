@@ -228,6 +228,77 @@ test('un blocco per LOOP (blocked + blockReason=loop) ha il border-left NERO', a
   expect(borderColor).toBe('rgb(17, 17, 17)');
 });
 
+// Panel parziale "non filtrato": almeno un giudice non ha votato. Bianco, nei
+// Ricevuti, col bottone di ri-valutazione che ri-prova solo i mancanti.
+const FAKE_FB_UNFILTERED = {
+  _id: 'test-fb-unfiltered',
+  text: 'Feedback il cui panel giudici e\' rimasto parziale.',
+  name: 'Test non filtrato',
+  seq: 88, subSeq: 0, status: 'new',
+  clientId: 'tester@example.com', createdAt: '2026-06-28T10:00:00Z', images: [],
+  pipeline: {
+    action: 'human_review',
+    l2Class: 'aligned',
+    l2Unfiltered: true,
+    expectedJudges: ['fixed_1', 'fixed_2', 'fixed_3', 'dynamic'],
+    missingJudges: ['dynamic'],
+    verdicts: [
+      { judge: 'fixed_1', class: 'aligned', reasoning: 'Bug reale.' },
+      { judge: 'fixed_2', class: 'aligned', reasoning: 'Allineato.' },
+      { judge: 'fixed_3', class: 'aligned', reasoning: 'Ok.' },
+    ],
+    stage: 'L2', decidedAt: '2026-06-28T10:01:00Z',
+  },
+};
+
+test('un feedback "non filtrato" è bianco, sta nei Ricevuti, mostra i giudici mancanti e il bottone ri-valuta', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_MANAGE_REVIEW && window.filo);
+
+  // Logica pura: classifyBlock → unfiltered/bianco; instradamento → Ricevuti.
+  const cl = await page.evaluate((fb) => window.SN_MANAGE_REVIEW.classifyBlock(fb), FAKE_FB_UNFILTERED);
+  expect(cl.reason).toBe('unfiltered');
+  expect(cl.color).toBe('#ffffff');
+  const tab = await page.evaluate((fb) => window.SN_MANAGE_REVIEW.manageTabFor(fb), FAKE_FB_UNFILTERED);
+  expect(tab).toBe('inbox');
+
+  // Stub IPC della ri-valutazione (cattura la chiamata senza rete/main).
+  await page.evaluate(() => {
+    window.__reeval = [];
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'feedback_reevaluate') { window.__reeval.push(msg); return { ok: true, reevaluated: 1, results: [] }; }
+      return orig(msg);
+    };
+  });
+
+  // Owner + dati: il bianco vive nei Ricevuti (tab di default).
+  await page.evaluate((fb) => { window.__mgTest.setAdmin(true); window.__mgTest.setData([fb]); }, FAKE_FB_UNFILTERED);
+
+  await expect(page.locator('#mgListHead')).toHaveText('Ricevuti');
+  await expect(page.locator('.mg-item')).toHaveCount(1);
+  await expect(page.locator('.mg-item--unfiltered')).toHaveCount(1);
+  const border = await page.locator('.mg-item').evaluate((el) => getComputedStyle(el).borderLeftColor);
+  expect(border).toBe('rgb(255, 255, 255)'); // bianco
+
+  // Aprendo il dettaglio: 4 pallini (panel atteso), 3 aligned + 1 mancante
+  // (tratteggiato) nella posizione corretta.
+  await page.evaluate((id) => window.__mgTest.openDetail(id), FAKE_FB_UNFILTERED._id);
+  await expect(page.locator('#mgJudgesRow')).toBeVisible();
+  await expect(page.locator('#mgJudgesRow .mg-dot')).toHaveCount(4);
+  await expect(page.locator('#mgJudgesRow .mg-dot--aligned')).toHaveCount(3);
+  await expect(page.locator('#mgJudgesRow .mg-dot--empty')).toHaveCount(1);
+
+  // La barra "Ri-valuta i non filtrati" compare col conteggio e invia il solo id bianco.
+  await expect(page.locator('#mgReevalBar')).toBeVisible();
+  await expect(page.locator('#mgReevalBtn')).toContainText('1');
+  await page.locator('#mgReevalBtn').click();
+  await expect.poll(() => page.evaluate(() => window.__reeval.length)).toBe(1);
+  const sent = await page.evaluate(() => window.__reeval[0]);
+  expect(sent.feedbackIds).toEqual(['test-fb-unfiltered']);
+});
+
 test('il pannello centrale si apre al click e mostra bolle + giudici', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
