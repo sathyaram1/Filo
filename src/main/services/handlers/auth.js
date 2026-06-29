@@ -314,6 +314,25 @@ module.exports = function register(on, ctx) {
     }
   });
 
+  // Ri-valutazione dei feedback "non filtrati": la dashboard (che decifra i
+  // pipeline e quindi sa quali sono bianchi) passa la lista degli id; il backend
+  // ri-esegue SOLO i giudici mancanti di ciascuno. Owner-only.
+  on(MSG.FEEDBACK_REEVALUATE, async (msg) => {
+    try {
+      if (!auth.isAdmin()) {
+        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
+      }
+      const feedbackIds = Array.isArray(msg.feedbackIds)
+        ? msg.feedbackIds.map(String).filter(Boolean)
+        : [];
+      if (!feedbackIds.length) return { ok: true, reevaluated: 0, results: [] };
+      const r = await callSecurityFunction('reevaluateUnfiltered', { feedbackIds });
+      return Object.assign({ ok: true }, r);
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  });
+
   on(MSG.SUPPORT_MODELS_UPDATE, async (msg) => {
     try {
       if (!auth.isAdmin()) {
