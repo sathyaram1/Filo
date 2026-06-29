@@ -260,7 +260,10 @@
       const title = fb.name || FB.fallbackName(fb.text) || '(senza titolo)';
 
       const item = document.createElement('div');
-      item.className = 'mg-item' + (fb._id === selectedId ? ' mg-item--selected' : '');
+      const unfilteredCls = cl && cl.reason === 'unfiltered' ? ' mg-item--unfiltered' : '';
+      item.className = 'mg-item'
+        + (fb._id === selectedId ? ' mg-item--selected' : '')
+        + unfilteredCls;
       item.dataset.id = fb._id;
       item.style.borderLeftColor = cl ? cl.color : 'transparent';
       // Una riga sola: #N · titolo (ellissi). Il motivo (attacco/spam/…) resta
