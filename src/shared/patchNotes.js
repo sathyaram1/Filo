@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.93', date: '2026-06-29',
+      features: [
+        'Nella dashboard di gestione, ri-valutare i feedback "non filtrati" ora procede uno alla volta e mostra un\'animazione sul feedback che i giudici stanno valutando in quel momento.',
+      ],
+      fixes: [],
+    },
+    {
       version: '0.2.89', date: '2026-06-28',
       features: [
         'La schermata dei modelli di supporto ora ti fa configurare i giudici di sicurezza come i "Modelli predefiniti": imposti una chiave dedicata (diversa da quelle del resto di Filo), dai un nickname ai modelli che i giudici possono usare e scegli quale modello usa ogni giudice.',
