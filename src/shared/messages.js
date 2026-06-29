@@ -226,6 +226,10 @@
     // Tutto letto anche dal backend filo-security (DD3).
     SUPPORT_MODELS_GET: 'support_models_get',      // → { ok, models } | { ok:false, error }
     SUPPORT_MODELS_UPDATE: 'support_models_update',// { models, judgeRegistry?, openrouterKey? } → { ok, models } | { ok:false, error }
+    // Ri-valutazione owner dei feedback "non filtrati" (panel parziale): la
+    // dashboard passa gli id dei feedback bianchi; il backend ri-esegue SOLO i
+    // giudici mancanti e riscrive il pipeline. Owner-only.
+    FEEDBACK_REEVALUATE: 'feedback_reevaluate',    // { feedbackIds:[...] } → { ok, reevaluated, results } | { ok:false, error }
     // Interruttore master dell'auto-miglioramento (doc config/automation, campo
     // `enabled`). Owner-only. Vedi filo-security DESIGN §2.
     AUTOMATION_GET: 'automation_get',              // → { ok, enabled } | { ok:false, error }
