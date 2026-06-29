@@ -385,7 +385,9 @@ function recordSecaudit(id, verdict) {
 
 export async function run() {
   const snapshot = await buildSnapshot();
-  const bucket = chooseBucket(snapshot);
+  // Cap EFFETTIVO: env > config/automation (scelto dall'owner) > default.
+  const cap = resolveLoopCap({ envRaw: process.env.FILO_LOOP_CAP, remote: await fetchRemoteLoopCap() });
+  const bucket = chooseBucket(snapshot, cap);
 
   // blocked-loop: dispatch stesso accoda `blocked` con motivo loop, pulisce lo
   // stato, e ri-sceglie il prossimo bucket (non c'è un worker per questo).
@@ -401,15 +403,16 @@ export async function run() {
     clearState(bucket.id);
     // Ricostruisci lo snapshot senza questo feedback e ri-scegli.
     const next = { reviews: snapshot.reviews.filter((r) => r.id !== bucket.id), todoWinner: snapshot.todoWinner };
-    return finalizeBucket(chooseBucket(next), next);
+    return finalizeBucket(chooseBucket(next, cap), next, cap);
   }
 
-  return finalizeBucket(bucket, snapshot);
+  return finalizeBucket(bucket, snapshot, cap);
 }
 
 // Raccoglie il payload (diff/feedback), fa il claim per i bucket feedback-bound,
-// e stampa il JSON. Ritorna { exit }.
-async function finalizeBucket(bucket, snapshot) {
+// e stampa il JSON. Ritorna { exit }. `cap` è il loop cap effettivo (per le
+// ri-scelte dopo un claim già preso).
+async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP) {
   if (bucket.role === 'prober') {
     emit(bucket, {});
     return { exit: 0 };
