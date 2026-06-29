@@ -943,6 +943,8 @@
       renderList();
     },
     setAdmin(v) { isAdmin = !!v; applyAutoModeGate(); },
+    // Ri-legge il loop cap dalla fonte (IPC) — usato dai test dopo aver stubbato.
+    loadLoopCap,
     setTab(tab) { selectTab(tab); },
     // DB3: imposta la "versione rilasciata" usata dal gate "Risolti" e rirende.
     setReleasedVersion(v) { releasedVersion = v || ''; renderList(); },
