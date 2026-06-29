@@ -63,10 +63,11 @@
     // che attiva/disattiva l'operatività automatica di Filo (routine/red-team).
     // Booleano persistito; default false (spento).
     AUTO_MODE: 'filo_auto_mode',
-    // Numero massimo di tentativi del loop di correzione avversariale prima di
-    // bloccare un fix con motivo `loop` (tab Automazioni). Intero persistito;
-    // default AUTOMATION.LOOP_CAP_DEFAULT. È l'analogo lato UI dell'override
-    // `FILO_LOOP_CAP` letto da scripts/dispatch.mjs nelle routine cloud.
+    // Cache locale del numero di tentativi del loop di correzione (tab
+    // Automazioni). La FONTE DI VERITÀ è il doc Firestore config/automation
+    // (campo loopCap), che le routine leggono in scripts/dispatch.mjs; questa
+    // chiave serve solo a mostrare subito un valore all'avvio / come ripiego
+    // offline. Default AUTOMATION.LOOP_CAP_DEFAULT.
     AUTOMATION_LOOP_CAP: 'filo_automation_loop_cap',
   };
 
