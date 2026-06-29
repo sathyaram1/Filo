@@ -76,7 +76,8 @@ test('manageTabFor: senza opts il comportamento storico è intatto (done→Risol
 test('listForManageTab: spedito in Risolti, non-spedito in In coda', () => {
   const shipped   = { id: 'a', status: 'done', resolvedInVersion: '0.2.70', createdAt: '2026-06-20' };
   const pending   = { id: 'b', status: 'done', resolvedInVersion: '0.2.90', createdAt: '2026-06-21' };
-  const todo      = { id: 'c', status: 'todo', createdAt: '2026-06-22' };
+  // todo APPROVATO (aligned+automatica): senza approvazione finirebbe nei Ricevuti.
+  const todo      = { id: 'c', status: 'todo', pipeline: { action: 'candidate_change' }, createdAt: '2026-06-22' };
   const all = [shipped, pending, todo];
   const opts = { releasedVersion: '0.2.74' };
 
