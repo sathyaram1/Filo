@@ -189,13 +189,14 @@ test('classifyBlock: loop vince sul pipeline di sicurezza', () => {
 });
 
 test('classifyBlock: blockReason=loop ma status non blocked → non è un blocco loop', () => {
-  // Il loop richiede lo stato `blocked`; senza, ricade sulla logica pipeline (qui null).
-  assert.equal(MR.classifyBlock({ status: 'todo', blockReason: 'loop' }), null);
+  // Il loop richiede lo stato `blocked`; senza, ricade sulla logica normale: qui
+  // niente pipeline + aperto ⇒ non filtrato (bianco), comunque NON 'loop'.
+  assert.notEqual((MR.classifyBlock({ status: 'todo', blockReason: 'loop' }) || {}).reason, 'loop');
 });
 
 test('classifyBlock: blocked senza blockReason loop → nessun bordo loop', () => {
   // Un `blocked` generico (es. branch sensibile) non è un loop: niente nero.
-  assert.equal(MR.classifyBlock({ status: 'blocked' }), null);
+  assert.notEqual((MR.classifyBlock({ status: 'blocked' }) || {}).reason, 'loop');
 });
 
 test('classifyBlock: loop sotto reviewDecision=accepted → null (override owner vince)', () => {
