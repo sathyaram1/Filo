@@ -59,10 +59,24 @@
     // Alla navigazione verso il dominio la tab nasce già instradata da quel
     // paese (born proxied), e la regola sopravvive al riavvio dell'app.
     FILO_PROXY_RULES: 'filo_proxy_rules',
-    // Modalità automatica (dashboard Gestione): switch owner-only sempre visibile
+    // Modalità automatica (dashboard Gestione → tab Automazioni): switch owner-only
     // che attiva/disattiva l'operatività automatica di Filo (routine/red-team).
     // Booleano persistito; default false (spento).
     AUTO_MODE: 'filo_auto_mode',
+    // Numero massimo di tentativi del loop di correzione avversariale prima di
+    // bloccare un fix con motivo `loop` (tab Automazioni). Intero persistito;
+    // default AUTOMATION.LOOP_CAP_DEFAULT. È l'analogo lato UI dell'override
+    // `FILO_LOOP_CAP` letto da scripts/dispatch.mjs nelle routine cloud.
+    AUTOMATION_LOOP_CAP: 'filo_automation_loop_cap',
+  };
+
+  // Parametri delle automazioni configurabili dall'owner (tab Automazioni della
+  // dashboard Gestione). `LOOP_CAP_DEFAULT` deve restare allineato al default di
+  // `scripts/dispatch.mjs` (LOOP_CAP, quante FAIL del verifier prima del blocco).
+  const AUTOMATION = {
+    LOOP_CAP_DEFAULT: 3,
+    LOOP_CAP_MIN: 1,
+    LOOP_CAP_MAX: 10,
   };
 
   const ACTIONS = {
