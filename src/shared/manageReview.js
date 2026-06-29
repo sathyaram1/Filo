@@ -50,31 +50,39 @@
     const p = fb && fb.pipeline;
     if (!p) return null;
 
+    // Blocchi di IDENTITÀ (L1) o panel COMPLETO che ha deciso "attacco/spam":
+    // NON sono "non filtrati", sono decisioni vere → tengono il loro colore.
+    // (Con un panel parziale l'instradamento forza `human_review`, quindi
+    // `action: block_attack/block_spam` implica panel completo.)
+    if (p.action === 'block_attack' || p.l1Category === 'dangerous') {
+      return { reason: 'attack', ...REASONS.attack };
+    }
+    if (p.action === 'block_spam' || p.l1Category === 'spam') {
+      return { reason: 'spam', ...REASONS.spam };
+    }
+
     // Panel parziale ("non filtrato"): vince su attacco/spam/design perché
     // segnala che il filtraggio NON è affidabile (un giudice è saltato). Bianco.
-    // I verdetti parziali restano visibili nei pallini dei giudici.
-    // `l2Degraded` copre i feedback giudicati dalla pipeline VECCHIA (prima del
-    // campo `l2Unfiltered`): panel a zero verdetti = tutti i giudici mancanti =
-    // non filtrato, così anche lo storico finisce bianco nei Ricevuti.
-    if (p.l2Unfiltered === true || p.l2Degraded === true) {
+    // Tre modi di rilevarlo:
+    //   - `l2Unfiltered` (pipeline nuova: lo dichiara esplicitamente);
+    //   - `l2Degraded` (panel a zero verdetti: tutti i giudici mancanti);
+    //   - DEDOTTO (storico): alcuni verdetti ma MENO del panel atteso. Avere
+    //     almeno un verdetto implica che L2 è girato (L1 era pulito), quindi
+    //     verdetti < panel = un giudice è saltato.
+    const verdicts = Array.isArray(p.verdicts) ? p.verdicts : [];
+    if (
+      p.l2Unfiltered === true ||
+      p.l2Degraded === true ||
+      (verdicts.length > 0 && verdicts.length < panelSize(p))
+    ) {
       return { reason: 'unfiltered', ...REASONS.unfiltered };
     }
 
-    // Attack: la condizione più grave vince.
-    if (
-      p.action === 'block_attack' ||
-      p.l1Category === 'dangerous' ||
-      p.l2Class === 'attack'
-    ) {
+    // Classi L2 a panel COMPLETO.
+    if (p.l2Class === 'attack') {
       return { reason: 'attack', ...REASONS.attack };
     }
-
-    // Spam.
-    if (
-      p.action === 'block_spam' ||
-      p.l1Category === 'spam' ||
-      p.l2Class === 'spam'
-    ) {
+    if (p.l2Class === 'spam') {
       return { reason: 'spam', ...REASONS.spam };
     }
 
