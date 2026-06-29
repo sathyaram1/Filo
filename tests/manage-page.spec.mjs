@@ -415,11 +415,12 @@ test('owner accetta e sblocca un feedback bloccato → patch corretto + esce dai
     };
   });
 
-  // Owner + dati + tab "In coda" + apri dettaglio (vero codice di rendering).
+  // Owner + dati + tab "Ricevuti" (i bloccati attendono la mia approvazione) +
+  // apri dettaglio (vero codice di rendering).
   await page.evaluate((fb) => {
     window.__mgTest.setAdmin(true);
     window.__mgTest.setData([fb]);
-    window.__mgTest.setTab('queue');
+    window.__mgTest.setTab('inbox');
     window.__mgTest.openDetail(fb._id);
   }, FAKE_FB);
 
@@ -441,12 +442,10 @@ test('owner accetta e sblocca un feedback bloccato → patch corretto + esce dai
   expect(patch.status).toBe('todo');
   expect(patch.reviewComment).toContain('Falso positivo');
 
-  // Esce dai bloccati: il dettaglio si richiude. Resta in "In coda" come `todo`,
-  // ma senza più il colore di blocco (border-left trasparente).
+  // Approvato: il dettaglio si richiude e il feedback LASCIA i Ricevuti (ora è
+  // approvato → si sposta in "In coda"), quindi la lista Ricevuti si svuota.
   await expect(page.locator('#mgDetail')).toBeHidden();
-  await expect(page.locator('.mg-item')).toHaveCount(1);
-  const afterColor = await page.locator('.mg-item').evaluate((el) => getComputedStyle(el).borderLeftColor);
-  expect(afterColor).toBe('rgba(0, 0, 0, 0)');
+  await expect(page.locator('.mg-item')).toHaveCount(0);
 });
 
 test('un feedback in `clarify` mostra il box risposta dell owner sotto Ricevuti (DB1)', async ({ openTab }) => {
