@@ -914,6 +914,13 @@
     }
   }
 
+  // Escape di un id per usarlo dentro un selettore CSS (`[data-id="…"]`).
+  // Gli id Firestore sono alfanumerici, ma CSS.escape copre ogni evenienza.
+  function cssSel(s) {
+    const str = String(s ?? '');
+    return (window.CSS && CSS.escape) ? CSS.escape(str) : str.replace(/["\\]/g, '\\$&');
+  }
+
   // ── Escape HTML ───────────────────────────────────────────────────────────
   function esc(s) {
     return String(s ?? '')
