@@ -48,13 +48,65 @@ const ROLES_DIR = resolve(ROOT, 'routines', 'roles');
 const MAIN_BRANCH = process.env.FILO_MAIN_BRANCH || 'main';
 
 // Quante FAIL consecutive del verifier prima di bloccare con motivo `loop`.
-// Default 3 (allineato a SN_CONST.AUTOMATION.LOOP_CAP_DEFAULT, che l'owner regola
-// dalla tab Automazioni della dashboard Gestione). L'override `FILO_LOOP_CAP` è
-// il modo per imporlo nelle routine cloud.
+// Precedenza: override d'ambiente FILO_LOOP_CAP > valore scelto dall'owner nella
+// tab Automazioni (doc Firestore config/automation, campo `loopCap`) > default 3.
+// Range [1, 10], allineato a SN_CONST.AUTOMATION. `LOOP_CAP` qui sotto è solo il
+// fallback sincrono (env o 3) usato come default dei param delle funzioni pure;
+// il valore EFFETTIVO si risolve in run() con resolveLoopCap (include il remoto).
+const LOOP_CAP_MIN = 1;
+const LOOP_CAP_MAX = 10;
+const LOOP_CAP_DEFAULT = 3;
 const LOOP_CAP = (() => {
   const n = Number(process.env.FILO_LOOP_CAP);
-  return Number.isFinite(n) && n > 0 ? n : 3;
+  return Number.isFinite(n) && n > 0 ? Math.min(LOOP_CAP_MAX, Math.max(LOOP_CAP_MIN, Math.round(n))) : LOOP_CAP_DEFAULT;
 })();
+
+/**
+ * Risolve il cap EFFETTIVO data la precedenza env > remoto > default, con clamp
+ * nel range valido. Funzione pura (testata in tests/unit/dispatch.test.mjs).
+ * @param {{ envRaw?: string|number, remote?: number|null }} src
+ */
+export function resolveLoopCap({ envRaw, remote } = {}) {
+  const clamp = (n) => Math.min(LOOP_CAP_MAX, Math.max(LOOP_CAP_MIN, Math.round(n)));
+  const env = Number(envRaw);
+  if (Number.isFinite(env) && env > 0) return clamp(env);
+  const rem = Number(remote);
+  if (Number.isFinite(rem) && rem > 0) return clamp(rem);
+  return LOOP_CAP_DEFAULT;
+}
+
+/**
+ * Legge config/automation.loopCap da Firestore in modo BEST-EFFORT: serve un
+ * bearer admin (il doc è admin-only), che si ricava da service account o refresh
+ * token dell'owner. Se manca la credenziale o la rete fallisce, ritorna null
+ * (→ si ricade sul default): non deve MAI bloccare il dispatch.
+ */
+async function fetchRemoteLoopCap() {
+  try {
+    const fa = await import('./lib/firestore-auth.mjs');
+    let bearer = null;
+    try {
+      const sa = fa.loadServiceAccount();
+      if (sa) bearer = await fa.mintAccessTokenFromSA(sa);
+    } catch (_) { /* prova il refresh token */ }
+    if (!bearer) {
+      const rt = fa.findAdminRefreshToken();
+      if (rt) { try { bearer = await fa.mintIdToken(rt); } catch (_) {} }
+    }
+    if (!bearer) return null; // nessuna credenziale → default
+    const url = `${fa.FIRESTORE_BASE}/config/automation?key=${fa.FIREBASE_API_KEY}`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${bearer}` } });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const f = json && json.fields && json.fields.loopCap;
+    if (!f) return null;
+    if (f.integerValue != null) return Number(f.integerValue);
+    if (f.doubleValue != null) return Number(f.doubleValue);
+    return null;
+  } catch (_) {
+    return null;
+  }
+}
 
 // ─── Logica pura (esportata, testata in tests/unit/dispatch.test.mjs) ─────────
 
