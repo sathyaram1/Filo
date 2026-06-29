@@ -34,7 +34,7 @@ test('le regole proxy dominio sono salvabili ma non visibili nella dashboard', a
     const FM = globalThis.SN_FILO_MEMORY;
     if (!FM) return { error: 'SN_FILO_MEMORY non disponibile' };
     if (typeof FM.setProxyRule !== 'function') return { error: 'setProxyRule non è una funzione', keys: Object.keys(FM) };
-    await FM.setProxyRule(domain, country);
+    await FM.setProxyRule(domain, { country });
     const rules = await FM.listProxyRules();
     return { ok: true, rules };
   }, { domain: DOMAIN, country: COUNTRY });
