@@ -85,23 +85,26 @@ test('le tab-lista condividono panel-list; stats/models sono segnaposto "In arri
   await expect(page.locator('#panel-list')).not.toHaveClass(/mg-panel--active/);
 });
 
-test('lo switch "Modalità automatica" è sempre visibile ed è read-only per i non-admin', async ({ openTab }) => {
+test('lo switch "Modalità automatica" vive nella tab Automazioni ed è read-only per i non-admin', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
   const sw    = page.locator('#mgAutoSwitch');
   const input = page.locator('#mgAutoToggle');
 
-  // Sempre visibile sulla tab di default
+  // Lo switch non è più nella barra in alto: è dentro la tab "Automazioni".
+  await expect(sw).toBeHidden();
+  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await expect(page.locator('#panel-automation')).toHaveClass(/mg-panel--active/);
   await expect(sw).toBeVisible();
-  // Resta visibile anche cambiando tab (non è una sezione, è uno switch globale)
-  await page.locator('.mg-tab[data-tab="stats"]').click();
-  await expect(sw).toBeVisible();
+
+  // Cambiando tab lo switch non è più visibile (è una sezione, non globale).
   await page.locator('.mg-tab[data-tab="queue"]').click();
-  await expect(sw).toBeVisible();
+  await expect(sw).toBeHidden();
 
   // Da non-admin (userData pulito → nessuna sessione) lo switch è disabilitato:
   // stesso contratto di sola lettura del banner.
+  await page.locator('.mg-tab[data-tab="automation"]').click();
   await expect(input).toBeDisabled();
   await expect(sw).toHaveClass(/mg-switch--disabled/);
 });
@@ -110,6 +113,8 @@ test('lo switch attiva/disattiva la modalità automatica e lo stato persiste', a
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
+  // Lo switch vive nella tab Automazioni.
+  await page.locator('.mg-tab[data-tab="automation"]').click();
   const input = page.locator('#mgAutoToggle');
   const state = page.locator('#mgAutoState');
 
