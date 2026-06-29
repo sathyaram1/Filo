@@ -241,6 +241,33 @@ test('readState: id inesistente → null', () => {
   assert.equal(readState('NOPE-NOPE'), null);
 });
 
+// ─── resolveLoopCap: precedenza env > remoto > default, con clamp ─────────────
+
+test('resolveLoopCap: niente env né remoto → default 3', () => {
+  assert.equal(resolveLoopCap({}), 3);
+  assert.equal(resolveLoopCap({ envRaw: undefined, remote: null }), 3);
+});
+
+test('resolveLoopCap: il valore remoto (scelto dall owner) si usa se manca l env', () => {
+  assert.equal(resolveLoopCap({ remote: 5 }), 5);
+  assert.equal(resolveLoopCap({ envRaw: '', remote: 7 }), 7);
+});
+
+test('resolveLoopCap: l env override vince sul remoto', () => {
+  assert.equal(resolveLoopCap({ envRaw: '4', remote: 9 }), 4);
+});
+
+test('resolveLoopCap: clamp nel range [1, 10] sia env sia remoto', () => {
+  assert.equal(resolveLoopCap({ remote: 99 }), 10);
+  assert.equal(resolveLoopCap({ remote: 0 }), 3);   // 0 non valido → default
+  assert.equal(resolveLoopCap({ envRaw: 50 }), 10);
+  assert.equal(resolveLoopCap({ remote: 2.6 }), 3); // arrotonda a 3
+});
+
+test('resolveLoopCap: valori non numerici → default', () => {
+  assert.equal(resolveLoopCap({ envRaw: 'abc', remote: 'xyz' }), 3);
+});
+
 // ─── teardown ─────────────────────────────────────────────────────────────────
 
 test('cleanup STATE_DIR temporanea', () => {
