@@ -142,18 +142,35 @@
     return cmpVersion(v, releasedVersion) <= 0;
   }
 
+  // ── Approvazione: cosa può stare "In coda" ────────────────────────────────
+  // Un feedback è APPROVATO (può andare in coda, in attesa che Claude lo risolva)
+  // SOLO se:
+  //   - l'owner l'ha sbloccato a mano dalla dashboard (`reviewDecision==='accepted'`), OPPURE
+  //   - la pipeline l'ha auto-approvato: tutti i giudici "aligned" E modalità
+  //     automatica ON ⇒ azione `candidate_change`.
+  // Tutto il resto (panel parziale/non filtrato, blocchi attacco/spam/design,
+  // aligned con automatica OFF, feedback non ancora giudicati) NON è approvato e
+  // resta nei "Ricevuti" in attesa dell'approvazione manuale dell'owner.
+  function isApproved(fb) {
+    if (!fb) return false;
+    if (fb.reviewDecision === 'accepted') return true;
+    const p = fb.pipeline;
+    if (p && p.action === 'candidate_change') return true;
+    return false;
+  }
+
   // ── Dashboard unificata (DB1): mappatura feedback → tab ───────────────────
   // Le tab di `manage` (owner-only) sono:
-  //   inbox    "Ricevuti"   → status `new` (inclusi i ritrovamenti agente/routine,
-  //                           che nascono `new`) + `clarify`
-  //   queue    "In coda"    → `todo` + `review` + i blocchi del pipeline di
-  //                           sicurezza (attacco/spam/design), uniti
+  //   inbox    "Ricevuti"   → tutto ciò che richiede la mia approvazione: feedback
+  //                           non ancora approvati (non giudicati, panel parziale,
+  //                           bloccati attacco/spam/design, aligned con automatica OFF)
+  //   queue    "In coda"    → feedback APPROVATI (auto o a mano) in attesa che
+  //                           Claude li risolva
   //   resolved "Risolti"    → `done` + `verified` MA solo se "in produzione"
   //                           (resolvedInVersion ≤ releasedVersion, DB3); i fix
   //                           chiusi ma non ancora spediti restano in "In coda"
   //   archived "Archiviati" → `archived` (DB2)
   //   ignored / altro       → null (non mostrato nelle tab principali)
-  const QUEUE_OVERRIDE_STOP = ['done', 'verified', 'archived', 'ignored'];
 
   // `opts.releasedVersion` (DB3): versione dell'app in esecuzione = ultima
   // rilasciata. Se assente, il gate "in produzione" è disattivo (done→resolved).
@@ -161,24 +178,16 @@
     const s = (fb && fb.status) || 'new';
     const releasedVersion = opts && opts.releasedVersion;
 
-    // Un blocco del pipeline (attacco/spam/design) vive in "In coda" accanto a
-    // todo/review, a prescindere dallo status grezzo — purché non sia già
-    // chiuso/archiviato/ignorato (in quel caso vince lo status).
-    if (classifyBlock(fb) && !QUEUE_OVERRIDE_STOP.includes(s)) return 'queue';
-
     switch (s) {
-      case 'new':
-      case 'clarify':   return 'inbox';
-      case 'todo':
-      case 'review':
-      case 'blocked':   return 'queue';
       // DB3: un fix chiuso è in "Risolti" solo se davvero spedito; altrimenti
       // resta visibile in "In coda" (done-ma-non-ancora-rilasciato).
       case 'done':
       case 'verified':  return isShipped(fb, releasedVersion) ? 'resolved' : 'queue';
       case 'archived':  return 'archived';
       case 'ignored':   return null;
-      default:          return 'inbox';
+      // new/clarify/todo/review/blocked: l'approvazione decide la tab. Approvato
+      // ⇒ In coda; altrimenti ⇒ Ricevuti (richiede la mia approvazione).
+      default:          return isApproved(fb) ? 'queue' : 'inbox';
     }
   }
 
