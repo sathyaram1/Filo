@@ -205,23 +205,45 @@ test('manageTabFor: ritrovamenti agente/routine (clientId, status new) → inbox
   assert.equal(MR.manageTabFor({ status: 'new', clientId: 'agent:gemini-3.1-flash-lite' }), 'inbox');
 });
 
-test('manageTabFor: todo/review/blocked → queue (In coda)', () => {
-  assert.equal(MR.manageTabFor({ status: 'todo' }), 'queue');
-  assert.equal(MR.manageTabFor({ status: 'review' }), 'queue');
-  assert.equal(MR.manageTabFor({ status: 'blocked' }), 'queue');
+test('manageTabFor: todo/review/blocked NON approvati → inbox (Ricevuti)', () => {
+  // Nuova semantica: stare "In coda" richiede l'approvazione. Un feedback non
+  // approvato (nessun candidate_change, nessun reviewDecision) resta nei Ricevuti.
+  assert.equal(MR.manageTabFor({ status: 'todo' }), 'inbox');
+  assert.equal(MR.manageTabFor({ status: 'review' }), 'inbox');
+  assert.equal(MR.manageTabFor({ status: 'blocked' }), 'inbox');
 });
 
-test('manageTabFor: un blocco del pipeline → queue qualunque sia lo status grezzo', () => {
-  // Un feedback ancora `new` ma bloccato come attacco appartiene a "In coda".
-  assert.equal(MR.manageTabFor({ status: 'new', pipeline: { action: 'block_attack' } }), 'queue');
-  assert.equal(MR.manageTabFor({ status: 'clarify', pipeline: { l2Class: 'spam' } }), 'queue');
+test('manageTabFor: approvato (aligned+automatica o owner) → queue (In coda)', () => {
+  // Auto-approvato: la pipeline ha emesso candidate_change (aligned + automatica ON).
+  assert.equal(MR.manageTabFor({ status: 'todo', pipeline: { action: 'candidate_change' } }), 'queue');
+  // Approvato a mano dall'owner.
+  assert.equal(MR.manageTabFor({ status: 'todo', reviewDecision: 'accepted' }), 'queue');
+  assert.equal(MR.manageTabFor({ status: 'blocked', reviewDecision: 'accepted' }), 'queue');
 });
 
-test('manageTabFor: un done/archived/ignored vince sul blocco del pipeline', () => {
-  // Già chiuso/archiviato: lo status vince, non resta in coda.
-  assert.equal(MR.manageTabFor({ status: 'done', pipeline: { action: 'block_attack' } }), 'resolved');
-  assert.equal(MR.manageTabFor({ status: 'archived', pipeline: { l2Class: 'spam' } }), 'archived');
-  assert.equal(MR.manageTabFor({ status: 'ignored', pipeline: { l2Class: 'attack' } }), null);
+test('manageTabFor: blocchi e non-filtrati → inbox (richiedono approvazione)', () => {
+  // Un blocco di sicurezza o un panel parziale NON è approvato → Ricevuti.
+  assert.equal(MR.manageTabFor({ status: 'new', pipeline: { action: 'block_attack' } }), 'inbox');
+  assert.equal(MR.manageTabFor({ status: 'todo', pipeline: { l2Class: 'spam' } }), 'inbox');
+  assert.equal(MR.manageTabFor({ status: 'todo', pipeline: { l2Unfiltered: true } }), 'inbox');
+});
+
+test('manageTabFor: done/archived/ignored vincono sull\'approvazione', () => {
+  // Già chiuso/archiviato: lo status vince a prescindere dall'approvazione.
+  assert.equal(MR.manageTabFor({ status: 'done', pipeline: { action: 'candidate_change' } }), 'resolved');
+  assert.equal(MR.manageTabFor({ status: 'archived', reviewDecision: 'accepted' }), 'archived');
+  assert.equal(MR.manageTabFor({ status: 'ignored', pipeline: { action: 'candidate_change' } }), null);
+});
+
+// ── isApproved ──────────────────────────────────────────────────────────────
+
+test('isApproved: vero solo con owner-accepted o candidate_change', () => {
+  assert.equal(MR.isApproved({ reviewDecision: 'accepted' }), true);
+  assert.equal(MR.isApproved({ pipeline: { action: 'candidate_change' } }), true);
+  assert.equal(MR.isApproved({ status: 'todo' }), false);
+  assert.equal(MR.isApproved({ pipeline: { action: 'human_review' } }), false);
+  assert.equal(MR.isApproved({ pipeline: { l2Unfiltered: true } }), false);
+  assert.equal(MR.isApproved(null), false);
 });
 
 test('manageTabFor: done e verified → resolved (Risolti); archived → archived; ignored → null', () => {
