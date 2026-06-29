@@ -48,6 +48,9 @@ const ROLES_DIR = resolve(ROOT, 'routines', 'roles');
 const MAIN_BRANCH = process.env.FILO_MAIN_BRANCH || 'main';
 
 // Quante FAIL consecutive del verifier prima di bloccare con motivo `loop`.
+// Default 3 (allineato a SN_CONST.AUTOMATION.LOOP_CAP_DEFAULT, che l'owner regola
+// dalla tab Automazioni della dashboard Gestione). L'override `FILO_LOOP_CAP` è
+// il modo per imporlo nelle routine cloud.
 const LOOP_CAP = (() => {
   const n = Number(process.env.FILO_LOOP_CAP);
   return Number.isFinite(n) && n > 0 ? n : 3;
