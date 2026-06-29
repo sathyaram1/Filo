@@ -334,6 +334,34 @@ test('storico parziale (2 verdetti su 4, senza expectedJudges) → bianco e 4 pa
   await expect(page.locator('#mgJudgesRow .mg-dot--empty')).toHaveCount(2);
 });
 
+// Caso #261: un feedback dell'automazione dell'owner (routine:) che era stato
+// bloccato a L1 (identità flaggata per errore) NON deve apparire come attacco
+// (rosso) ma come "da ri-giudicare" (bianco), con il panel atteso tratteggiato.
+const FAKE_FB_TRUSTED_BLOCKED = {
+  _id: 'test-fb-routine-blocked', text: 'Regole proxy per dominio: nessuna UI per vederle.',
+  name: 'Regole proxy', seq: 261, subSeq: 0, status: 'new',
+  clientId: 'routine:routine', createdAt: '2026-06-29T10:00:00Z', images: [],
+  pipeline: { action: 'human_review', l1Category: 'dangerous', l1Reasons: ['linked_prior_attack'], verdicts: [], stage: 'L1' },
+};
+
+test('feedback di routine bloccato a L1 → bianco (non rosso) e panel atteso tratteggiato', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_MANAGE_REVIEW);
+
+  // Logica pura: mittente fidato senza verdetti → unfiltered, non attack.
+  const cl = await page.evaluate((fb) => window.SN_MANAGE_REVIEW.classifyBlock(fb), FAKE_FB_TRUSTED_BLOCKED);
+  expect(cl.reason).toBe('unfiltered');
+
+  await page.evaluate((fb) => { window.__mgTest.setAdmin(true); window.__mgTest.setData([fb]); }, FAKE_FB_TRUSTED_BLOCKED);
+  await expect(page.locator('.mg-item--unfiltered')).toHaveCount(1);
+
+  // Dettaglio: 4 pallini tutti tratteggiati (nessun giudice ha votato).
+  await page.evaluate((id) => window.__mgTest.openDetail(id), FAKE_FB_TRUSTED_BLOCKED._id);
+  await expect(page.locator('#mgJudgesRow .mg-dot')).toHaveCount(4);
+  await expect(page.locator('#mgJudgesRow .mg-dot--empty')).toHaveCount(4);
+});
+
 test('il pannello centrale si apre al click e mostra bolle + giudici', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
