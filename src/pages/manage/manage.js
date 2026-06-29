@@ -26,6 +26,9 @@
   const mgListEmpty    = document.getElementById('mgListEmpty');
   const mgArchiveFilter = document.getElementById('mgArchiveFilter');
   const mgStarFilter    = document.getElementById('mgStarFilter');
+  const mgReevalBar     = document.getElementById('mgReevalBar');
+  const mgReevalBtn     = document.getElementById('mgReevalBtn');
+  const mgReevalMsg     = document.getElementById('mgReevalMsg');
 
   // Revisione — dettaglio
   const mgDetailEmpty = document.getElementById('mgDetailEmpty');
