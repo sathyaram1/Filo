@@ -253,19 +253,22 @@ test('manageTabFor: done e verified → resolved (Risolti); archived → archive
   assert.equal(MR.manageTabFor({ status: 'ignored' }), null);
 });
 
-test('listForManageTab: filtra per tab e ordina (queue per severità, altre per data)', () => {
+test('listForManageTab: filtra per tab e ordina (Ricevuti per severità, In coda solo approvati)', () => {
   const items = [
     { _id: 'n1', status: 'new', createdAt: '2026-01-01' },
     { _id: 'n2', status: 'new', createdAt: '2026-06-01' },
-    { _id: 't1', status: 'todo', createdAt: '2026-02-01' },
-    { _id: 'b1', status: 'new', pipeline: { action: 'block_attack' }, createdAt: '2026-01-01' },
+    { _id: 't1', status: 'todo', createdAt: '2026-02-01' },                                   // non approvato → inbox
+    { _id: 'b1', status: 'new', pipeline: { action: 'block_attack' }, createdAt: '2026-01-01' }, // blocco → inbox
+    { _id: 'u1', status: 'new', pipeline: { l2Unfiltered: true }, createdAt: '2026-05-01' },    // non filtrato → inbox
+    { _id: 'q1', status: 'todo', pipeline: { action: 'candidate_change' }, createdAt: '2026-04-01' }, // approvato → queue
     { _id: 'd1', status: 'done', createdAt: '2026-03-01' },
     { _id: 'ig', status: 'ignored', createdAt: '2026-03-01' },
   ];
-  // inbox: i due `new` puri, più recente prima; il blocco va in queue, non qui.
-  assert.deepEqual(MR.listForManageTab(items, 'inbox').map((f) => f._id), ['n2', 'n1']);
-  // queue: il blocco attacco (severità alta) prima del todo.
-  assert.deepEqual(MR.listForManageTab(items, 'queue').map((f) => f._id), ['b1', 't1']);
+  // inbox: tutto ciò che attende approvazione, per severità poi recenza:
+  // u1 (non filtrato, sev4) > b1 (attacco, sev3) > i sev0 per data (n2, t1, n1).
+  assert.deepEqual(MR.listForManageTab(items, 'inbox').map((f) => f._id), ['u1', 'b1', 'n2', 't1', 'n1']);
+  // queue: solo gli approvati.
+  assert.deepEqual(MR.listForManageTab(items, 'queue').map((f) => f._id), ['q1']);
   // resolved / archived.
   assert.deepEqual(MR.listForManageTab(items, 'resolved').map((f) => f._id), ['d1']);
   assert.deepEqual(MR.listForManageTab(items, 'archived').map((f) => f._id), []);
