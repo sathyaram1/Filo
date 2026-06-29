@@ -1180,6 +1180,7 @@
     await refreshAuth();
     applyAutoModeGate();
     await loadAutoMode();
+    await loadLoopCap();
     await loadData();
   }
 
