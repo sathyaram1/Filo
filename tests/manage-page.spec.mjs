@@ -516,9 +516,11 @@ const FB_STARRED_TODO = {
   seq: 11, subSeq: 0, status: 'todo', starred: true,
   clientId: 'tester@example.com', createdAt: '2026-06-21T10:00:00Z', images: [],
 };
+// Todo APPROVATO (owner-accepted): per stare davvero in "In coda" un feedback
+// dev'essere approvato; senza approvazione vivrebbe nei Ricevuti.
 const FB_PLAIN_TODO = {
   _id: 'fb-plain-001', text: 'Feedback normale in coda.', name: 'Normale in coda',
-  seq: 12, subSeq: 0, status: 'todo',
+  seq: 12, subSeq: 0, status: 'todo', reviewDecision: 'accepted',
   clientId: 'tester@example.com', createdAt: '2026-06-22T10:00:00Z', images: [],
 };
 
