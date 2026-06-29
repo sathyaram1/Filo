@@ -245,6 +245,10 @@
       currentList = MR.listForManageTab(allFeedbacks, currentTab, { releasedVersion });
     }
 
+    // Barra "Ri-valuta i non filtrati": compare solo nei Ricevuti quando c'è
+    // almeno un feedback bianco (panel parziale) da ri-valutare.
+    updateReevalBar();
+
     // Svuota SEMPRE: se la lista torna vuota (es. dopo uno sblocco) non deve
     // restare la card vecchia in un contenitore nascosto.
     mgList.innerHTML = '';
