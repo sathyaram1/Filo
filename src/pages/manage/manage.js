@@ -14,10 +14,13 @@
   const mgBanner     = document.getElementById('mgBanner');
   const mgSignInBtn  = document.getElementById('mgSignIn');
 
-  // Switch "Modalità automatica" (sempre visibile, owner-only)
+  // Tab "Automazioni" (owner-only): switch modalità automatica + parametri.
   const mgAutoSwitch = document.getElementById('mgAutoSwitch');
   const mgAutoToggle = document.getElementById('mgAutoToggle');
   const mgAutoState  = document.getElementById('mgAutoState');
+  const mgLoopCap    = document.getElementById('mgLoopCap');
+  const mgLoopCapSave = document.getElementById('mgLoopCapSave');
+  const mgLoopCapMsg  = document.getElementById('mgLoopCapMsg');
 
   // Lista (tab corrente)
   const mgListHead     = document.getElementById('mgListHead');
