@@ -90,6 +90,13 @@ test('classifyBlock: unfiltered sotto reviewDecision=accepted → null (override
   assert.equal(MR.classifyBlock({ reviewDecision: 'accepted', pipeline: { l2Unfiltered: true } }), null);
 });
 
+test('classifyBlock: l2Degraded (pipeline vecchia, zero verdetti) → unfiltered/bianco', () => {
+  // Lo storico giudicato prima del campo l2Unfiltered: panel a zero verdetti.
+  const r = MR.classifyBlock({ pipeline: { l2Degraded: true, action: 'human_review', verdicts: [] } });
+  assert.equal(r.reason, 'unfiltered');
+  assert.equal(r.color, '#ffffff');
+});
+
 test('classifyBlock: attack vince su spam se entrambi presenti', () => {
   const r = MR.classifyBlock({ pipeline: { action: 'block_attack', l1Category: 'spam' } });
   assert.equal(r.reason, 'attack');
