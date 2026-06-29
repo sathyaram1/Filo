@@ -50,6 +50,13 @@
     const p = fb && fb.pipeline;
     if (!p) return null;
 
+    // Panel parziale ("non filtrato"): vince su attacco/spam/design perché
+    // segnala che il filtraggio NON è affidabile (un giudice è saltato). Bianco.
+    // I verdetti parziali restano visibili nei pallini dei giudici.
+    if (p.l2Unfiltered === true) {
+      return { reason: 'unfiltered', ...REASONS.unfiltered };
+    }
+
     // Attack: la condizione più grave vince.
     if (
       p.action === 'block_attack' ||
