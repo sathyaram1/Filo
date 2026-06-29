@@ -60,7 +60,24 @@
     }
 
     const p = fb && fb.pipeline;
-    if (!p) return null;
+    const verdicts = (p && Array.isArray(p.verdicts)) ? p.verdicts.filter((v) => v && v.class) : [];
+    const trusted = isTrustedClient(fb && fb.clientId);
+    const closed = CLOSED_STATUSES.includes((fb && fb.status) || 'new');
+
+    // Mittente FIDATO (automazione dell'owner: owner:/routine:/agent:) SENZA
+    // verdetti = i giudici non sono (ancora) girati su un feedback del proprietario
+    // — spesso perché l'identità era stata flaggata per errore. NON è un blocco:
+    // è "da ri-giudicare" (bianco). Va prima dei controlli di blocco identità.
+    if (p && trusted && verdicts.length === 0) {
+      return { reason: 'unfiltered', ...REASONS.unfiltered };
+    }
+
+    // Nessun pipeline: un feedback APERTO non è ancora stato giudicato → bianco
+    // ("non filtrato", da giudicare). I chiusi (done/verified/archived/ignored)
+    // non vanno giudicati → nessun colore (e restano nei loro flussi/board).
+    if (!p) {
+      return closed ? null : { reason: 'unfiltered', ...REASONS.unfiltered };
+    }
 
     // Blocchi di IDENTITÀ (L1) o panel COMPLETO che ha deciso "attacco/spam":
     // NON sono "non filtrati", sono decisioni vere → tengono il loro colore.
@@ -81,7 +98,6 @@
     //   - DEDOTTO (storico): alcuni verdetti ma MENO del panel atteso. Avere
     //     almeno un verdetto implica che L2 è girato (L1 era pulito), quindi
     //     verdetti < panel = un giudice è saltato.
-    const verdicts = Array.isArray(p.verdicts) ? p.verdicts : [];
     if (
       p.l2Unfiltered === true ||
       p.l2Degraded === true ||
