@@ -1204,6 +1204,7 @@
 
   global.SN_CONST = {
     STORAGE_KEYS,
+    AUTOMATION,
     ACTIONS,
     CREDIT,
     CREDIT_USAGE_GROUPS,
