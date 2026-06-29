@@ -140,6 +140,12 @@
     }
     .mg-item:hover { background: var(--sn-hover); }
     .mg-item--selected { background: var(--sn-hover); }
+    /* "Non filtrato": il colore del bordo è bianco. Per renderlo leggibile su
+       qualunque tema affianchiamo al bordo bianco una sottile linea grigia. */
+    .mg-item--unfiltered {
+      border-left-color: #ffffff;
+      box-shadow: inset 4px 0 0 -1px rgba(127, 127, 127, 0.5);
+    }
     .mg-item-num { font-size: 11px; color: var(--sn-muted); font-weight: 600; flex: 0 0 auto; }
     .mg-item-title {
       font-size: 13px; line-height: 1.4;
