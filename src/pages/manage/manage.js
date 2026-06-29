@@ -317,8 +317,13 @@
       const r = await sendToMain({ type: 'feedback_reevaluate', feedbackIds: ids });
       if (!r || r.ok === false) throw new Error((r && r.error) || 'ri-valutazione rifiutata');
       const n = r.reevaluated || 0;
-      setReevalMsg(n ? `Ri-valutati ${n} feedback.` : 'Nessun cambiamento.', 'ok');
-      // Ricarica: i feedback risolti escono dai bianchi e si spostano di tab.
+      const rem = r.remaining || 0;
+      setReevalMsg(
+        rem ? `Ri-valutati ${n}, ne restano ${rem} — ripremi per continuare.`
+            : (n ? `Ri-valutati ${n} feedback.` : 'Nessun cambiamento.'),
+        'ok',
+      );
+      // Ricarica: i feedback giudicati escono dai bianchi e si spostano di tab.
       await loadData();
     } catch (e) {
       setReevalMsg(e.message || 'Errore nella ri-valutazione', 'err');
