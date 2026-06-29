@@ -682,12 +682,14 @@
   // vede subito quale modello ha votato cosa); per i non-owner è anonimizzato e
   // posizionale ("Giudice A/B/C/D" — mai l'id interno del giudice né il modello).
   function openSidebarJudge(fb, i) {
-    // `i` è la posizione nel panel ATTESO (stessa indicizzazione dei pallini),
-    // non un indice nell'array compatto dei verdetti: risolviamo per nome così
-    // un panel parziale apre il giudice giusto.
-    const names = expectedJudgeNames(fb);
-    const name = names[i];
-    const v = verdictByName(fb, name);
+    // `i` è la posizione del pallino. Con la pipeline NUOVA (expectedJudges) il
+    // pallino mappa per nome alla posizione del panel; con lo STORICO è l'indice
+    // posizionale nei verdetti presenti. In entrambi i casi i pallini tratteggiati
+    // (giudici mancanti) non aprono nulla.
+    const p = (fb && fb.pipeline) || {};
+    const expected = (Array.isArray(p.expectedJudges) && p.expectedJudges.length) ? p.expectedJudges : null;
+    const verdicts = Array.isArray(p.verdicts) ? p.verdicts : [];
+    const v = expected ? verdictByName(fb, expected[i]) : (verdicts[i] || null);
     if (!v) return;
 
     const letters = ['A', 'B', 'C', 'D', 'E'];
