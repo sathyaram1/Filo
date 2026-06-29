@@ -300,6 +300,37 @@ module.exports = function register(on, ctx) {
     }
   });
 
+  // Tentativi del loop di correzione (config/automation, campo `loopCap`).
+  // Owner-only. È la fonte di verità letta dalle routine: cambiarlo qui ha
+  // effetto sul prossimo giro del loop avversariale.
+  on(MSG.AUTOMATION_LOOP_CAP_GET, async () => {
+    try {
+      if (!auth.isAdmin()) {
+        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
+      }
+      const idToken = await auth.getIdToken();
+      if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
+      const loopCap = await Defaults.getAutomationLoopCap(idToken);
+      return { ok: true, loopCap };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  });
+
+  on(MSG.AUTOMATION_LOOP_CAP_SET, async (msg) => {
+    try {
+      if (!auth.isAdmin()) {
+        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
+      }
+      const idToken = await auth.getIdToken();
+      if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
+      const loopCap = await Defaults.setAutomationLoopCap(msg.loopCap, idToken);
+      return { ok: true, loopCap };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  });
+
   // Config "modelli di supporto" (doc config/supportModels). Owner-only.
   // GET legge i 4 slot; UPDATE scrive solo i campi passati (per-campo PATCH).
   on(MSG.SUPPORT_MODELS_GET, async () => {
