@@ -261,7 +261,7 @@ test('resolveLoopCap: clamp nel range [1, 10] sia env sia remoto', () => {
   assert.equal(resolveLoopCap({ remote: 99 }), 10);
   assert.equal(resolveLoopCap({ remote: 0 }), 3);   // 0 non valido → default
   assert.equal(resolveLoopCap({ envRaw: 50 }), 10);
-  assert.equal(resolveLoopCap({ remote: 2.6 }), 3); // arrotonda a 3
+  assert.equal(resolveLoopCap({ remote: 7.4 }), 7); // arrotonda a 7
 });
 
 test('resolveLoopCap: valori non numerici → default', () => {
