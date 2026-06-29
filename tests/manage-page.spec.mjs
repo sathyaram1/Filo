@@ -571,9 +571,11 @@ test('un feedback in `clarify` mostra il box risposta dell owner sotto Ricevuti 
   const patch = await page.evaluate(() => window.__updates[0]);
   expect(patch.status).toBe('todo');
   expect(patch.notes).toContain('Intendo il pulsante in alto a destra');
-  // La risposta data, il feedback lascia Ricevuti (diventa todo → In coda).
+  // Risposto: il dettaglio si chiude. Il feedback torna `todo` ma NON è ancora
+  // approvato → resta nei Ricevuti (in attesa di approvazione/ri-giudizio),
+  // senza più il box chiarimenti.
   await expect(page.locator('#mgDetail')).toBeHidden();
-  await expect(page.locator('.mg-item')).toHaveCount(0);
+  await expect(page.locator('.mg-item').filter({ hasText: 'Pulsante X' })).toHaveCount(1);
 });
 
 // ── DB2: stato `archived` + preferito ⭐ ────────────────────────────────────
