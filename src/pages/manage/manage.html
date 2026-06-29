@@ -163,6 +163,13 @@
       flex: 0 0 auto;
     }
     .mg-list-filter[hidden] { display: none; }
+    /* Barra "Ri-valuta i non filtrati" (solo Ricevuti, quando ci sono bianchi). */
+    .mg-reeval-bar {
+      padding: 8px 12px; border-bottom: 1px solid var(--sn-border);
+      flex: 0 0 auto; display: flex; align-items: center; gap: 8px;
+    }
+    .mg-reeval-bar[hidden] { display: none; }
+    .mg-reeval-msg { font-size: 12px; color: var(--sn-muted); }
     .mg-star-filter {
       display: inline-flex; align-items: center; gap: 6px;
       font-size: 12.5px; color: var(--sn-muted); cursor: pointer; user-select: none;
