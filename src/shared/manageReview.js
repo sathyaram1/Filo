@@ -27,6 +27,18 @@
     design:     { label: 'Design',       color: '#5b6ee0', severity: 1 },
   };
 
+  // Dimensione attesa del panel dei giudici per i feedback: 3 fissi + 1 dinamico.
+  // Per la pipeline NUOVA il numero esatto è in `pipeline.expectedJudges`; per lo
+  // STORICO (senza quel campo) usiamo questo default per dedurre se un panel è
+  // parziale (meno verdetti del previsto = un giudice è saltato).
+  const DEFAULT_PANEL_SIZE = 4;
+  function panelSize(p) {
+    if (p && Array.isArray(p.expectedJudges) && p.expectedJudges.length) {
+      return p.expectedJudges.length;
+    }
+    return DEFAULT_PANEL_SIZE;
+  }
+
   /**
    * Classifica un feedback nel pipeline di sicurezza.
    * @param {object} fb – oggetto feedback (con campo `pipeline` opzionale)
