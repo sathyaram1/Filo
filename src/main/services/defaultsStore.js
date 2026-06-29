@@ -265,6 +265,42 @@ async function setAutomationGate(enabled, idToken) {
   return Boolean(enabled);
 }
 
+// Tentativi del loop di correzione (config/automation, campo `loopCap`): quante
+// FAIL consecutive del verifier prima di bloccare un fix con motivo `loop`. È la
+// fonte di verità letta dalle routine (scripts/dispatch.mjs). Default e range da
+// SN_CONST.AUTOMATION; clamp prudente sia in lettura sia in scrittura.
+function automationDefaults() {
+  const A = (globalThis.SN_CONST && globalThis.SN_CONST.AUTOMATION) || {};
+  return {
+    def: Number.isFinite(A.LOOP_CAP_DEFAULT) ? A.LOOP_CAP_DEFAULT : 3,
+    min: Number.isFinite(A.LOOP_CAP_MIN) ? A.LOOP_CAP_MIN : 1,
+    max: Number.isFinite(A.LOOP_CAP_MAX) ? A.LOOP_CAP_MAX : 10,
+  };
+}
+
+function clampLoopCap(n) {
+  const { def, min, max } = automationDefaults();
+  const v = Math.round(Number(n));
+  if (!Number.isFinite(v)) return def;
+  return Math.min(max, Math.max(min, v));
+}
+
+async function getAutomationLoopCap(idToken) {
+  const { def } = automationDefaults();
+  const doc = await fetchDoc(AUTOMATION_DOC, idToken);
+  // doc === {} (404) o campo assente ⇒ default. null (lettura negata/fallita) ⇒
+  // default prudente (non rompere il loop per un errore di rete).
+  if (!doc || doc.loopCap == null) return def;
+  return clampLoopCap(doc.loopCap);
+}
+
+async function setAutomationLoopCap(loopCap, idToken) {
+  if (!idToken) throw new Error('Serve un ID token admin per cambiare i tentativi del loop.');
+  const v = clampLoopCap(loopCap);
+  await patchDoc(AUTOMATION_DOC, { loopCap: toFsValue(v) }, ['loopCap'], idToken);
+  return v;
+}
+
 module.exports = {
   get,
   getPublicForAdmin,
