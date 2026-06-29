@@ -309,4 +309,6 @@ module.exports = {
   update,
   getAutomationGate,
   setAutomationGate,
+  getAutomationLoopCap,
+  setAutomationLoopCap,
 };
