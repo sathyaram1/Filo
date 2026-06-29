@@ -78,8 +78,9 @@
     // Mittente FIDATO (automazione dell'owner: owner:/routine:/agent:) SENZA
     // verdetti = i giudici non sono (ancora) girati su un feedback del proprietario
     // — spesso perché l'identità era stata flaggata per errore. NON è un blocco:
-    // è "da ri-giudicare" (bianco). Va prima dei controlli di blocco identità.
-    if (p && trusted && verdicts.length === 0) {
+    // è "da ri-giudicare" (bianco). Va prima dei controlli di blocco identità, ma
+    // SOLO se aperto (un feedback chiuso non va ri-giudicato).
+    if (p && trusted && verdicts.length === 0 && !closed) {
       return { reason: 'unfiltered', ...REASONS.unfiltered };
     }
 
