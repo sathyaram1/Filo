@@ -97,6 +97,37 @@ test('classifyBlock: l2Degraded (pipeline vecchia, zero verdetti) → unfiltered
   assert.equal(r.color, '#ffffff');
 });
 
+test('classifyBlock: storico con DUE verdetti su quattro attesi → unfiltered (dedotto dal conteggio)', () => {
+  // Pipeline vecchia senza l2Unfiltered/expectedJudges: 2 verdetti < 4 attesi.
+  const r = MR.classifyBlock({ pipeline: {
+    action: 'human_review', l2Class: 'aligned', l1Category: 'clean',
+    verdicts: [{ judge: 'fixed_1', class: 'aligned' }, { judge: 'fixed_2', class: 'aligned' }],
+  } });
+  assert.equal(r.reason, 'unfiltered');
+});
+
+test('classifyBlock: panel COMPLETO (4 verdetti) design → design, non unfiltered', () => {
+  const verdicts = ['fixed_1', 'fixed_2', 'fixed_3', 'dynamic'].map((j) => ({ judge: j, class: 'design' }));
+  const r = MR.classifyBlock({ pipeline: { l2Class: 'design', verdicts } });
+  assert.equal(r.reason, 'design');
+});
+
+test('classifyBlock: expectedJudges accorcia il panel atteso (2 attesi, 2 verdetti → completo)', () => {
+  const r = MR.classifyBlock({ pipeline: {
+    l2Class: 'design', expectedJudges: ['fixed_1', 'fixed_2'],
+    verdicts: [{ judge: 'fixed_1', class: 'design' }, { judge: 'fixed_2', class: 'design' }],
+  } });
+  assert.equal(r.reason, 'design'); // 2 di 2 = completo, non unfiltered
+});
+
+test('classifyBlock: block_attack a panel parziale resta attacco (decisione L1/completa, non bianco)', () => {
+  // action block_attack ⇒ decisione vera: tiene il rosso anche con pochi verdetti.
+  const r = MR.classifyBlock({ pipeline: {
+    action: 'block_attack', l2Class: 'attack', verdicts: [{ judge: 'fixed_1', class: 'attack' }],
+  } });
+  assert.equal(r.reason, 'attack');
+});
+
 test('classifyBlock: attack vince su spam se entrambi presenti', () => {
   const r = MR.classifyBlock({ pipeline: { action: 'block_attack', l1Category: 'spam' } });
   assert.equal(r.reason, 'attack');
