@@ -637,11 +637,15 @@
   // vede subito quale modello ha votato cosa); per i non-owner è anonimizzato e
   // posizionale ("Giudice A/B/C/D" — mai l'id interno del giudice né il modello).
   function openSidebarJudge(fb, i) {
-    const verdicts = (fb.pipeline && fb.pipeline.verdicts) || [];
-    const v = verdicts[i];
+    // `i` è la posizione nel panel ATTESO (stessa indicizzazione dei pallini),
+    // non un indice nell'array compatto dei verdetti: risolviamo per nome così
+    // un panel parziale apre il giudice giusto.
+    const names = expectedJudgeNames(fb);
+    const name = names[i];
+    const v = verdictByName(fb, name);
     if (!v) return;
 
-    const letters = ['A', 'B', 'C', 'D'];
+    const letters = ['A', 'B', 'C', 'D', 'E'];
     const anonLabel = `Giudice ${letters[i] || String(i + 1)}`;
     const cls     = v.class || '';
     const badgeClass = cls ? `mg-class-badge--${cls}` : '';
