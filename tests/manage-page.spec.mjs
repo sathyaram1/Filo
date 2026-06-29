@@ -299,6 +299,41 @@ test('un feedback "non filtrato" è bianco, sta nei Ricevuti, mostra i giudici m
   expect(sent.feedbackIds).toEqual(['test-fb-unfiltered']);
 });
 
+// Storico (pipeline vecchia): solo 2 dei 4 giudici hanno votato, niente
+// expectedJudges/l2Unfiltered. Va comunque dedotto come "non filtrato" (bianco)
+// e mostrare 4 pallini (2 votati + 2 mancanti tratteggiati).
+const FAKE_FB_LEGACY_PARTIAL = {
+  _id: 'test-fb-legacy', text: 'Feedback giudicato dalla pipeline vecchia.',
+  name: 'Test storico parziale', seq: 70, subSeq: 0, status: 'new',
+  clientId: 'tester@example.com', createdAt: '2026-06-26T10:00:00Z', images: [],
+  pipeline: {
+    action: 'human_review', l2Class: 'aligned', l1Category: 'clean',
+    verdicts: [
+      { judge: 'fixed_1', class: 'aligned', reasoning: 'Bug reale.' },
+      { judge: 'fixed_2', class: 'aligned', reasoning: 'Ok.' },
+    ],
+    stage: 'L2', decidedAt: '2026-06-26T10:01:00Z',
+  },
+};
+
+test('storico parziale (2 verdetti su 4, senza expectedJudges) → bianco e 4 pallini (2 votati + 2 mancanti)', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_MANAGE_REVIEW);
+
+  const cl = await page.evaluate((fb) => window.SN_MANAGE_REVIEW.classifyBlock(fb), FAKE_FB_LEGACY_PARTIAL);
+  expect(cl.reason).toBe('unfiltered');
+
+  await page.evaluate((fb) => { window.__mgTest.setAdmin(true); window.__mgTest.setData([fb]); }, FAKE_FB_LEGACY_PARTIAL);
+  await expect(page.locator('.mg-item--unfiltered')).toHaveCount(1);
+
+  // Apri il dettaglio: 4 pallini (2 aligned + 2 mancanti tratteggiati).
+  await page.evaluate((id) => window.__mgTest.openDetail(id), FAKE_FB_LEGACY_PARTIAL._id);
+  await expect(page.locator('#mgJudgesRow .mg-dot')).toHaveCount(4);
+  await expect(page.locator('#mgJudgesRow .mg-dot--aligned')).toHaveCount(2);
+  await expect(page.locator('#mgJudgesRow .mg-dot--empty')).toHaveCount(2);
+});
+
 test('il pannello centrale si apre al click e mostra bolle + giudici', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
