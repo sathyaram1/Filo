@@ -142,6 +142,36 @@
       border-left-color: #ffffff;
       box-shadow: inset 4px 0 0 -1px rgba(127, 127, 127, 0.5);
     }
+    /* Feedback in valutazione dai giudici (ri-valutazione uno alla volta): il
+       bordo pulsa col colore d'accento e a destra compaiono tre pallini animati
+       ("i giudici stanno votando"). Solo sulla card di turno, non sulle altre. */
+    .mg-item--evaluating {
+      border-left-color: var(--sn-accent);
+      animation: mg-eval-pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes mg-eval-pulse {
+      0%, 100% { box-shadow: inset 4px 0 0 -1px var(--sn-accent); }
+      50%      { box-shadow: inset 4px 0 0 -1px var(--sn-accent),
+                             0 0 0 1px color-mix(in srgb, var(--sn-accent) 45%, transparent); }
+    }
+    .mg-eval-dots { display: inline-flex; align-items: center; gap: 3px; flex: 0 0 auto; margin-left: 2px; }
+    .mg-eval-dots i {
+      width: 5px; height: 5px; border-radius: 50%;
+      background: var(--sn-accent);
+      animation: mg-eval-bounce 1s ease-in-out infinite;
+    }
+    .mg-eval-dots i:nth-child(2) { animation-delay: 0.15s; }
+    .mg-eval-dots i:nth-child(3) { animation-delay: 0.3s; }
+    @keyframes mg-eval-bounce {
+      0%, 80%, 100% { opacity: 0.3; transform: scale(0.7); }
+      40%           { opacity: 1;   transform: scale(1); }
+    }
+    /* Rispetta chi preferisce meno movimento: niente pulsazioni, restano i dot
+       fissi come indicatore di stato. */
+    @media (prefers-reduced-motion: reduce) {
+      .mg-item--evaluating { animation: none; }
+      .mg-eval-dots i { animation: none; opacity: 0.8; }
+    }
     .mg-item-num { font-size: 11px; color: var(--sn-muted); font-weight: 600; flex: 0 0 auto; }
     .mg-item-title {
       font-size: 13px; line-height: 1.4;
