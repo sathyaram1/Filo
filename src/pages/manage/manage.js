@@ -165,13 +165,33 @@
     return Math.min(AUTOMATION.LOOP_CAP_MAX, Math.max(AUTOMATION.LOOP_CAP_MIN, n));
   }
 
+  // Fonte di verità: il doc Firestore config/automation (campo loopCap), che le
+  // routine leggono in dispatch.mjs — così cambiarlo qui ha effetto sul loop.
+  // chrome.storage.local è solo una CACHE locale per mostrare subito un valore
+  // (e un ripiego se l'IPC non risponde / non si è admin).
+  const LOOP_CAP_GET = (window.SN_MSG?.MSG?.AUTOMATION_LOOP_CAP_GET) || 'automation_loop_cap_get';
+  const LOOP_CAP_SET = (window.SN_MSG?.MSG?.AUTOMATION_LOOP_CAP_SET) || 'automation_loop_cap_set';
+
   async function loadLoopCap() {
     if (!mgLoopCap) return;
     let val = AUTOMATION.LOOP_CAP_DEFAULT;
+    let fromRemote = false;
+    // Sorgente autorevole: Firestore via main (owner-gated).
     try {
-      const data = await chrome.storage.local.get(LOOP_CAP_KEY);
-      if (data[LOOP_CAP_KEY] != null) val = clampLoopCap(data[LOOP_CAP_KEY]);
+      const r = await sendToMain({ type: LOOP_CAP_GET });
+      if (r && r.ok && r.loopCap != null) {
+        val = clampLoopCap(r.loopCap);
+        fromRemote = true;
+        chrome.storage.local.set({ [LOOP_CAP_KEY]: val }).catch(() => {});
+      }
     } catch (_) {}
+    // Ripiego sulla cache locale se il remoto non ha risposto (non admin/offline).
+    if (!fromRemote) {
+      try {
+        const data = await chrome.storage.local.get(LOOP_CAP_KEY);
+        if (data[LOOP_CAP_KEY] != null) val = clampLoopCap(data[LOOP_CAP_KEY]);
+      } catch (_) {}
+    }
     mgLoopCap.value = String(val);
   }
 
@@ -187,7 +207,17 @@
     const val = clampLoopCap(mgLoopCap.value);
     mgLoopCap.value = String(val); // normalizza eventuali fuori-range
     try {
-      await chrome.storage.local.set({ [LOOP_CAP_KEY]: val });
+      // Scrive su Firestore (fonte di verità delle routine); il main applica il
+      // gate admin e ri-clampa. Usa il valore confermato dal main.
+      const r = await sendToMain({ type: LOOP_CAP_SET, loopCap: val });
+      if (!r || !r.ok) {
+        setLoopCapMsg(r?.error ? 'Salvataggio fallito.' : 'Salvataggio fallito.', 'err');
+        if (r?.error) console.error('[manage] salvataggio tentativi loop:', r.error);
+        return;
+      }
+      const saved = clampLoopCap(r.loopCap != null ? r.loopCap : val);
+      mgLoopCap.value = String(saved);
+      chrome.storage.local.set({ [LOOP_CAP_KEY]: saved }).catch(() => {});
       setLoopCapMsg('Salvato.', 'ok');
     } catch (err) {
       setLoopCapMsg('Salvataggio fallito.', 'err');
