@@ -39,6 +39,17 @@
     return DEFAULT_PANEL_SIZE;
   }
 
+  // Stati "chiusi": non vanno (più) giudicati, restano nei loro flussi.
+  const CLOSED_STATUSES = ['done', 'verified', 'archived', 'ignored'];
+
+  // Mittenti FIDATI = automazione dell'owner (owner:/routine:/agent:). I loro
+  // feedback non sono attacchi: se risultano bloccati a livello di identità è un
+  // errore (identità flaggata) e vanno ri-giudicati, non mostrati come "attacco".
+  // Speculare a isTrustedIdentity nel backend (filo-security/data/identities.js).
+  function isTrustedClient(clientId) {
+    return /^(owner|routine|agent):/i.test(String(clientId || ''));
+  }
+
   /**
    * Classifica un feedback nel pipeline di sicurezza.
    * @param {object} fb – oggetto feedback (con campo `pipeline` opzionale)
