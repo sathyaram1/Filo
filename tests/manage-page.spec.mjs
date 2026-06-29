@@ -6,8 +6,8 @@
 //     stats/models sono segnaposto;
 //   - lo switch "Modalità automatica" è sempre visibile (tutte le tab),
 //     si attiva/disattiva e lo stato sopravvive al ricaricamento;
-//   - con dati finti iniettati, un blocco compare in "In coda" e il click apre
-//     il pannello centrale con le bolle;
+//   - con dati finti iniettati, un blocco compare in "Ricevuti" (richiede la mia
+//     approvazione) e il click apre il pannello centrale con le bolle;
 //   - un feedback in `clarify` mostra il box risposta dell'owner sotto Ricevuti.
 
 import { test, expect } from './fixtures/electron.mjs';
