@@ -425,7 +425,7 @@ async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP) {
     if (res.status === 'taken') {
       // Già in lavorazione da un'altra routine: escludilo e ri-scegli.
       const next = { reviews: snapshot.reviews.filter((r) => r.id !== bucket.id), todoWinner: snapshot.todoWinner?.id === bucket.id ? null : snapshot.todoWinner };
-      return finalizeBucket(chooseBucket(next), next);
+      return finalizeBucket(chooseBucket(next, cap), next, cap);
     }
   }
 
