@@ -524,34 +524,55 @@
       mgJudgesRow.appendChild(lbl);
     }
 
+    // Un pallino per ogni giudice ATTESO del panel (non per verdetto): così un
+    // panel parziale mostra i mancanti nella loro posizione corretta (pallino
+    // tratteggiato), non un panel "accorciato". `expectedJudges` arriva dalla
+    // pipeline; per i feedback vecchi (senza quel campo) ripieghiamo sui verdetti.
+    const expected = expectedJudgeNames(fb);
     const verdicts = (fb.pipeline && fb.pipeline.verdicts) || [];
-    const judgeLetters = ['A', 'B', 'C', 'D'];
+    const judgeLetters = ['A', 'B', 'C', 'D', 'E'];
 
-    // Senza alcun verdetto la riga giudici non ha senso (es. feedback ricevuti o
-    // in chiarimento, mai passati dal pipeline): nascondila del tutto.
-    if (verdicts.length === 0) { mgJudgesRow.hidden = true; return; }
+    // Senza alcun giudice atteso né verdetto la riga non ha senso (es. feedback
+    // ricevuti o in chiarimento, mai passati dal pipeline): nascondila del tutto.
+    if (expected.length === 0 && verdicts.length === 0) { mgJudgesRow.hidden = true; return; }
     mgJudgesRow.hidden = false;
 
-    for (let i = 0; i < 4; i++) {
-      const v = verdicts[i];
+    const names = expected.length ? expected : verdicts.map((v, i) => (v && v.judge) || `judge_${i}`);
+    for (let i = 0; i < names.length; i++) {
+      const v = verdictByName(fb, names[i]);
       const dot = document.createElement('span');
       dot.className = 'mg-dot';
       if (v) {
         const cls = v.class || '';
         if (cls) dot.classList.add(`mg-dot--${cls}`);
         dot.classList.add('mg-dot--clickable');
-        dot.title = `Giudice ${judgeLetters[i]}: ${cls}`;
+        dot.title = `Giudice ${judgeLetters[i] || i + 1}: ${cls}`;
         // Click sul pallino → apre QUEL giudice nel pannello destro.
         dot.addEventListener('click', () => openSidebarJudge(fb, i));
       } else {
-        // Pipeline già passata (la riga compare solo con ≥1 verdetto): un pallino
-        // vuoto = quel giudice NON ha emesso un verdetto in quella run (timeout/
-        // errore/giudice non configurato), non "in attesa".
+        // Quel giudice NON ha emesso un verdetto in quella run (timeout/errore/
+        // giudice non configurato): pallino tratteggiato. È la causa del
+        // "non filtrato" (panel parziale).
         dot.classList.add('mg-dot--empty');
-        dot.title = `Giudice ${judgeLetters[i]}: nessun verdetto`;
+        dot.title = `Giudice ${judgeLetters[i] || i + 1}: nessun verdetto`;
       }
       mgJudgesRow.appendChild(dot);
     }
+  }
+
+  // Nomi dei giudici attesi del panel (ordine stabile per i pallini). Preferisce
+  // `pipeline.expectedJudges`; per i feedback vecchi ripiega sui nomi nei verdetti.
+  function expectedJudgeNames(fb) {
+    const p = (fb && fb.pipeline) || {};
+    if (Array.isArray(p.expectedJudges) && p.expectedJudges.length) return p.expectedJudges;
+    const v = Array.isArray(p.verdicts) ? p.verdicts : [];
+    return v.map((x, i) => (x && x.judge) || `judge_${i}`);
+  }
+
+  // Verdetto di un dato giudice (per nome) su un feedback, o null se mancante.
+  function verdictByName(fb, name) {
+    const v = (fb && fb.pipeline && Array.isArray(fb.pipeline.verdicts)) ? fb.pipeline.verdicts : [];
+    return v.find((x) => x && x.judge === name) || null;
   }
 
   function renderThread(fb) {
