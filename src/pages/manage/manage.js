@@ -388,28 +388,72 @@
     mgReevalBar.hidden = !show;
     if (show && mgReevalBtn) mgReevalBtn.textContent = `Ri-valuta i non filtrati (${whites.length})`;
   }
+  // Evidenzia la card di un feedback come "in valutazione" (animazione giudici)
+  // e la porta in vista; ritorna l'elemento card (o null se non è nella lista).
+  function startCardEvaluating(id) {
+    const card = mgList.querySelector(`.mg-item[data-id="${cssSel(id)}"]`);
+    if (!card) return null;
+    card.classList.add('mg-item--evaluating');
+    if (!card.querySelector('.mg-eval-dots')) {
+      const dots = document.createElement('span');
+      dots.className = 'mg-eval-dots';
+      dots.setAttribute('aria-label', 'Valutazione dei giudici in corso');
+      dots.innerHTML = '<i></i><i></i><i></i>';
+      card.appendChild(dots);
+    }
+    try { card.scrollIntoView({ block: 'nearest' }); } catch (_) {}
+    return card;
+  }
+  function stopCardEvaluating(card) {
+    if (!card) return;
+    card.classList.remove('mg-item--evaluating');
+    const dots = card.querySelector('.mg-eval-dots');
+    if (dots) dots.remove();
+  }
+
+  // Ri-valuta i "non filtrati" UNO ALLA VOLTA: scorre i bianchi in sequenza,
+  // accende l'animazione sulla card di turno, invia il singolo id ai giudici,
+  // attende l'esito e passa al successivo. Così l'owner vede esattamente quale
+  // feedback i giudici stanno valutando in questo momento.
   async function reevaluateUnfiltered() {
     const ids = unfilteredFeedbacks().map((f) => f._id).filter(Boolean);
     if (!ids.length) return;
     mgReevalBtn.disabled = true;
-    setReevalMsg('Ri-valutazione in corso…', '');
-    try {
-      const r = await sendToMain({ type: 'feedback_reevaluate', feedbackIds: ids });
-      if (!r || r.ok === false) throw new Error((r && r.error) || 'ri-valutazione rifiutata');
-      const n = r.reevaluated || 0;
-      const rem = r.remaining || 0;
-      setReevalMsg(
-        rem ? `Ri-valutati ${n}, ne restano ${rem} — ripremi per continuare.`
-            : (n ? `Ri-valutati ${n} feedback.` : 'Nessun cambiamento.'),
-        'ok',
-      );
-      // Ricarica: i feedback giudicati escono dai bianchi e si spostano di tab.
-      await loadData();
-    } catch (e) {
-      setReevalMsg(e.message || 'Errore nella ri-valutazione', 'err');
-    } finally {
-      mgReevalBtn.disabled = false;
+
+    const total = ids.length;
+    let valued = 0;            // quanti effettivamente ri-valutati
+    let stopped = null;        // 'budget' | 'error' se ci fermiamo prima della fine
+
+    for (let i = 0; i < total; i++) {
+      const id = ids[i];
+      setReevalMsg(`Valutazione ${i + 1} di ${total}…`, '');
+      const card = startCardEvaluating(id);
+      try {
+        const r = await sendToMain({ type: 'feedback_reevaluate', feedbackIds: [id] });
+        if (!r || r.ok === false) { stopped = 'error'; stopCardEvaluating(card); break; }
+        if (r.reevaluated) valued += r.reevaluated;
+        // Un singolo id non ri-valutato ma "remaining" = limite/budget raggiunto:
+        // inutile insistere sugli altri, fermati e invita a riprovare più tardi.
+        else if (r.remaining) { stopped = 'budget'; stopCardEvaluating(card); break; }
+      } catch (e) {
+        stopped = 'error';
+        stopCardEvaluating(card);
+        break;
+      }
+      stopCardEvaluating(card);
     }
+
+    if (stopped === 'budget') {
+      setReevalMsg(`Valutati ${valued} feedback. Limite raggiunto: riprova più tardi.`, 'ok');
+    } else if (stopped === 'error') {
+      setReevalMsg(`Valutati ${valued} feedback prima di un errore. Riprova per continuare.`, 'err');
+    } else {
+      setReevalMsg(valued ? `Valutati ${valued} feedback.` : 'Nessun cambiamento.', 'ok');
+    }
+
+    // Ricarica: i feedback giudicati escono dai bianchi e si spostano di tab.
+    await loadData();
+    mgReevalBtn.disabled = false;
   }
   if (mgReevalBtn) mgReevalBtn.addEventListener('click', reevaluateUnfiltered);
 
