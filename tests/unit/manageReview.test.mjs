@@ -325,9 +325,10 @@ test('listForManageTab: filtra per tab e ordina (Ricevuti per severità, In coda
     { _id: 'd1', status: 'done', createdAt: '2026-03-01' },
     { _id: 'ig', status: 'ignored', createdAt: '2026-03-01' },
   ];
-  // inbox: tutto ciò che attende approvazione, per severità poi recenza:
-  // u1 (non filtrato, sev4) > b1 (attacco, sev3) > i sev0 per data (n2, t1, n1).
-  assert.deepEqual(MR.listForManageTab(items, 'inbox').map((f) => f._id), ['u1', 'b1', 'n2', 't1', 'n1']);
+  // inbox: tutto ciò che attende approvazione, per severità poi recenza. I new/
+  // todo senza pipeline sono "non filtrati" (sev4) come u1; b1 (attacco) è sev3.
+  // sev4 per data: n2(06) > u1(05) > t1(02) > n1(01); poi b1 (sev3).
+  assert.deepEqual(MR.listForManageTab(items, 'inbox').map((f) => f._id), ['n2', 'u1', 't1', 'n1', 'b1']);
   // queue: solo gli approvati.
   assert.deepEqual(MR.listForManageTab(items, 'queue').map((f) => f._id), ['q1']);
   // resolved / archived.
