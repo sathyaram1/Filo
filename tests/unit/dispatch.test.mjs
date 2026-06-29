@@ -32,6 +32,7 @@ const {
   readState,
   writeState,
   clearState,
+  resolveLoopCap,
 } = await import('../../scripts/dispatch.mjs');
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
