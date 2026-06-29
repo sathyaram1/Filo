@@ -57,7 +57,8 @@ test('le regole proxy dominio sono salvabili ma non visibili nella dashboard', a
     expect(addResult2.rules).toHaveProperty(DOMAIN, COUNTRY);
   } else {
     expect(addResult.ok, `setProxyRule deve avere successo: ${addResult.error}`).toBe(true);
-    expect(addResult.rules, 'la regola deve essere salvata').toHaveProperty(DOMAIN, COUNTRY);
+    expect(addResult.rules, 'la regola deve essere salvata').toHaveProperty(DOMAIN);
+    expect(addResult.rules[DOMAIN]?.country, 'il paese deve essere salvato').toBe(COUNTRY);
   }
 
   // (b) La regola NON è visibile in nessuna pagina dell'app.
