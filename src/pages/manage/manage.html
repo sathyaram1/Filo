@@ -485,6 +485,12 @@
               <span>⭐ Solo preferiti</span>
             </label>
           </div>
+          <!-- Ri-valuta i feedback "non filtrati" (bianchi): ri-prova SOLO i
+               giudici mancanti. Visibile solo nei Ricevuti quando ce n'è almeno uno. -->
+          <div class="mg-reeval-bar" id="mgReevalBar" hidden>
+            <button type="button" class="sn-btn sn-btn-secondary" id="mgReevalBtn">Ri-valuta i non filtrati</button>
+            <span class="mg-reeval-msg" id="mgReevalMsg"></span>
+          </div>
           <div class="mg-col-body" id="mgListBody">
             <div class="mg-loading" id="mgListLoading">Caricamento…</div>
             <div class="mg-list" id="mgList" hidden></div>
