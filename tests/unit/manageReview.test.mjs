@@ -99,7 +99,7 @@ test('classifyBlock: blocked + blockReason=loop → reason=loop, bordo nero, sev
   const r = MR.classifyBlock({ status: 'blocked', blockReason: 'loop' });
   assert.equal(r.reason, 'loop');
   assert.equal(r.color, '#111111');
-  assert.equal(r.severity, 4); // sopra attack(3)/spam(2)/design(1)
+  assert.equal(r.severity, 5); // sopra unfiltered(4)/attack(3)/spam(2)/design(1)
 });
 
 test('classifyBlock: loop vince sul pipeline di sicurezza', () => {
