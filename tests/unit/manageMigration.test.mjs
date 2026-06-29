@@ -37,9 +37,11 @@ function corpus() {
     { _id: 'clarify-1',   status: 'clarify', clientId: 'owner:caf', createdAt: '2026-06-17' },
     // ── Bozze rimosse (DB2): un `draft` resta sotto Ricevuti nel suo stato ──
     { _id: 'draft-1',     status: 'draft',  clientId: 'routine:routine', createdAt: '2026-06-16' },
-    // ── In coda: todo + review/blocked uniti, più i blocchi del pipeline ──
-    { _id: 'todo-1',      status: 'todo',   createdAt: '2026-06-15' },
-    { _id: 'review-1',    status: 'review', branch: 'worker/x', createdAt: '2026-06-14' },
+    // ── In coda: solo i feedback APPROVATI (auto o a mano) in lavorazione ──
+    { _id: 'todo-1',      status: 'todo',   reviewDecision: 'accepted', createdAt: '2026-06-15' },
+    { _id: 'review-1',    status: 'review', branch: 'worker/x', pipeline: { action: 'candidate_change' }, createdAt: '2026-06-14' },
+    // ── Ricevuti: un blocco worker e un blocco di sicurezza richiedono la mia
+    //    approvazione → restano nei Ricevuti finché non li sblocco. ──
     { _id: 'blocked-1',   status: 'blocked', branch: 'worker/y', createdAt: '2026-06-13' },
     { _id: 'pipe-block',  status: 'new', pipeline: { action: 'block_attack' }, createdAt: '2026-06-12' },
     // ── Risolti: solo i fix davvero spediti (DB3). Senza releasedVersion il gate
