@@ -73,22 +73,24 @@
     const p = fb && fb.pipeline;
     const verdicts = (p && Array.isArray(p.verdicts)) ? p.verdicts.filter((v) => v && v.class) : [];
     const trusted = isTrustedClient(fb && fb.clientId);
-    const closed = CLOSED_STATUSES.includes((fb && fb.status) || 'new');
+    const status = (fb && fb.status) || 'new';
+    // "Da giudicare": feedback aperto e in attesa di giudizio. Esclude i chiusi
+    // (done/verified/archived/ignored) e i `clarify` (sono un dialogo con l'owner,
+    // non in attesa dei giudici).
+    const judgeable = !CLOSED_STATUSES.includes(status) && status !== 'clarify';
 
     // Mittente FIDATO (automazione dell'owner: owner:/routine:/agent:) SENZA
     // verdetti = i giudici non sono (ancora) girati su un feedback del proprietario
     // — spesso perché l'identità era stata flaggata per errore. NON è un blocco:
-    // è "da ri-giudicare" (bianco). Va prima dei controlli di blocco identità, ma
-    // SOLO se aperto (un feedback chiuso non va ri-giudicato).
-    if (p && trusted && verdicts.length === 0 && !closed) {
+    // è "da ri-giudicare" (bianco). Va prima dei controlli di blocco identità.
+    if (p && trusted && verdicts.length === 0 && judgeable) {
       return { reason: 'unfiltered', ...REASONS.unfiltered };
     }
 
-    // Nessun pipeline: un feedback APERTO non è ancora stato giudicato → bianco
-    // ("non filtrato", da giudicare). I chiusi (done/verified/archived/ignored)
-    // non vanno giudicati → nessun colore (e restano nei loro flussi/board).
+    // Nessun pipeline: un feedback APERTO non ancora giudicato → bianco ("non
+    // filtrato", da giudicare). Chiusi e `clarify` → nessun colore.
     if (!p) {
-      return closed ? null : { reason: 'unfiltered', ...REASONS.unfiltered };
+      return judgeable ? { reason: 'unfiltered', ...REASONS.unfiltered } : null;
     }
 
     // Blocchi di IDENTITÀ (L1) o panel COMPLETO che ha deciso "attacco/spam":
