@@ -394,6 +394,65 @@ test('un feedback "non filtrato" è bianco, sta nei Ricevuti, mostra i giudici m
   expect(sent.feedbackIds).toEqual(['test-fb-unfiltered']);
 });
 
+// La ri-valutazione processa i non filtrati UNO ALLA VOLTA: con 3 bianchi deve
+// arrivare al backend una chiamata per ciascuno (un solo id per chiamata), non
+// una sola chiamata con tutti gli id. Verifica anche che la card di turno mostri
+// l'animazione "giudici al lavoro" mentre la sua valutazione è in corso.
+test('ri-valuta i non filtrati uno alla volta (una chiamata per feedback) con animazione sulla card di turno', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_MANAGE_REVIEW && window.filo);
+
+  const whites = [0, 1, 2].map((i) => ({
+    _id: `white-${i}`,
+    text: `Feedback bianco numero ${i}.`,
+    name: `Bianco ${i}`,
+    seq: 90 + i, subSeq: 0, status: 'new',
+    clientId: 'tester@example.com', createdAt: `2026-06-2${8 - i}T10:00:00Z`, images: [],
+    pipeline: {
+      action: 'human_review', l2Class: 'aligned', l2Unfiltered: true,
+      expectedJudges: ['fixed_1', 'fixed_2', 'fixed_3', 'dynamic'],
+      verdicts: [{ judge: 'fixed_1', class: 'aligned', reasoning: 'Ok.' }],
+      stage: 'L2',
+    },
+  }));
+
+  // Stub IPC: registra ogni chiamata e, MENTRE è "in volo", cattura quante card
+  // mostrano l'animazione (devono essere al massimo 1 — quella di turno).
+  await page.evaluate(() => {
+    window.__reeval = [];
+    window.__maxEvaluatingDuringCall = 0;
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'feedback_reevaluate') {
+        window.__reeval.push(msg);
+        // Misura le card animate nell'istante della chiamata (valutazione in corso).
+        const n = document.querySelectorAll('.mg-item--evaluating').length;
+        if (n > window.__maxEvaluatingDuringCall) window.__maxEvaluatingDuringCall = n;
+        return { ok: true, reevaluated: 1, results: [] };
+      }
+      return orig(msg);
+    };
+  });
+
+  await page.evaluate((fbs) => { window.__mgTest.setAdmin(true); window.__mgTest.setData(fbs); }, whites);
+  await expect(page.locator('.mg-item--unfiltered')).toHaveCount(3);
+  await expect(page.locator('#mgReevalBtn')).toContainText('3');
+
+  await page.locator('#mgReevalBtn').click();
+
+  // Una chiamata per ciascun bianco, ognuna con un solo id.
+  await expect.poll(() => page.evaluate(() => window.__reeval.length)).toBe(3);
+  const calls = await page.evaluate(() => window.__reeval.map((m) => m.feedbackIds));
+  for (const ids of calls) expect(ids.length).toBe(1);
+  const flat = calls.flat().sort();
+  expect(flat).toEqual(['white-0', 'white-1', 'white-2']);
+
+  // Durante le chiamate al massimo una card era in valutazione (uno alla volta).
+  const maxDuring = await page.evaluate(() => window.__maxEvaluatingDuringCall);
+  expect(maxDuring).toBe(1);
+});
+
 // Storico (pipeline vecchia): solo 2 dei 4 giudici hanno votato, niente
 // expectedJudges/l2Unfiltered. Va comunque dedotto come "non filtrato" (bianco)
 // e mostrare 4 pallini (2 votati + 2 mancanti tratteggiati).
