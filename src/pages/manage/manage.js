@@ -285,6 +285,49 @@
     }
   }
 
+  // ── Ri-valutazione dei feedback "non filtrati" (panel parziale) ───────────
+  // Un feedback è "non filtrato" (bianco) quando il panel dei giudici è rimasto
+  // parziale. Il bottone ne ri-prova SOLO i giudici mancanti (lato backend).
+  function isUnfiltered(fb) {
+    const cl = MR.classifyBlock(fb);
+    return !!(cl && cl.reason === 'unfiltered');
+  }
+  function unfilteredFeedbacks() {
+    return allFeedbacks.filter(isUnfiltered);
+  }
+  function setReevalMsg(text, kind) {
+    if (!mgReevalMsg) return;
+    mgReevalMsg.textContent = text || '';
+    mgReevalMsg.className = 'mg-reeval-msg' + (kind ? ` mg-${kind}` : '');
+  }
+  function updateReevalBar() {
+    if (!mgReevalBar) return;
+    const whites = unfilteredFeedbacks();
+    // Solo l'owner, solo nei Ricevuti (dove vivono i bianchi), solo se ce n'è.
+    const show = isAdmin && currentTab === 'inbox' && whites.length > 0;
+    mgReevalBar.hidden = !show;
+    if (show && mgReevalBtn) mgReevalBtn.textContent = `Ri-valuta i non filtrati (${whites.length})`;
+  }
+  async function reevaluateUnfiltered() {
+    const ids = unfilteredFeedbacks().map((f) => f._id).filter(Boolean);
+    if (!ids.length) return;
+    mgReevalBtn.disabled = true;
+    setReevalMsg('Ri-valutazione in corso…', '');
+    try {
+      const r = await sendToMain({ type: 'feedback_reevaluate', feedbackIds: ids });
+      if (!r || r.ok === false) throw new Error((r && r.error) || 'ri-valutazione rifiutata');
+      const n = r.reevaluated || 0;
+      setReevalMsg(n ? `Ri-valutati ${n} feedback.` : 'Nessun cambiamento.', 'ok');
+      // Ricarica: i feedback risolti escono dai bianchi e si spostano di tab.
+      await loadData();
+    } catch (e) {
+      setReevalMsg(e.message || 'Errore nella ri-valutazione', 'err');
+    } finally {
+      mgReevalBtn.disabled = false;
+    }
+  }
+  if (mgReevalBtn) mgReevalBtn.addEventListener('click', reevaluateUnfiltered);
+
   // ── Rendering pannello centrale ───────────────────────────────────────────
   function openDetail(id) {
     selectedId = id;
