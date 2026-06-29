@@ -234,6 +234,11 @@
     // `enabled`). Owner-only. Vedi filo-security DESIGN §2.
     AUTOMATION_GET: 'automation_get',              // → { ok, enabled } | { ok:false, error }
     AUTOMATION_SET: 'automation_set',              // { enabled } → { ok, enabled } | { ok:false, error }
+    // Tentativi del loop di correzione (doc config/automation, campo `loopCap`):
+    // quante FAIL del verifier prima del blocco `loop`. Letto dalle routine
+    // (scripts/dispatch.mjs). Owner-only.
+    AUTOMATION_LOOP_CAP_GET: 'automation_loop_cap_get', // → { ok, loopCap } | { ok:false, error }
+    AUTOMATION_LOOP_CAP_SET: 'automation_loop_cap_set', // { loopCap } → { ok, loopCap } | { ok:false, error }
     WEB_SEARCH: 'web_search',                      // { query } → { ok, results: [{title,url,snippet}], provider }
 
     // === Rilevamento siti pericolosi (src/main/services/safebrowse/) ===
