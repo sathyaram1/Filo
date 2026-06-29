@@ -70,6 +70,26 @@ test('classifyBlock: reason=design via l2Class=design', () => {
   assert.equal(r.severity, 1);
 });
 
+// ── Non filtrato (panel parziale): bianco, severità sopra attacco ────────────
+
+test('classifyBlock: l2Unfiltered → reason=unfiltered, bianco', () => {
+  const r = MR.classifyBlock({ pipeline: { l2Unfiltered: true, l2Class: 'aligned' } });
+  assert.equal(r.reason, 'unfiltered');
+  assert.equal(r.color, '#ffffff');
+  assert.equal(r.severity, 4);
+});
+
+test('classifyBlock: unfiltered vince su un verdetto parziale di attacco', () => {
+  // Un giudice presente dice attack ma il panel è parziale: prevale il bianco
+  // (filtraggio non affidabile), i verdetti parziali restano nei pallini.
+  const r = MR.classifyBlock({ pipeline: { l2Unfiltered: true, l2Class: 'attack' } });
+  assert.equal(r.reason, 'unfiltered');
+});
+
+test('classifyBlock: unfiltered sotto reviewDecision=accepted → null (override owner)', () => {
+  assert.equal(MR.classifyBlock({ reviewDecision: 'accepted', pipeline: { l2Unfiltered: true } }), null);
+});
+
 test('classifyBlock: attack vince su spam se entrambi presenti', () => {
   const r = MR.classifyBlock({ pipeline: { action: 'block_attack', l1Category: 'spam' } });
   assert.equal(r.reason, 'attack');
