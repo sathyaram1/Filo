@@ -7,6 +7,30 @@ const Defaults = require('../defaultsStore');
 const SupportModels = require('../supportModelsStore');
 const { permissionDeniedHelp } = require('../feedbackError');
 
+// Base delle Cloud Function callable del backend di sicurezza (filo-security):
+// stessa region/progetto del deploy. Override per i test via env.
+const FUNCTIONS_BASE = process.env.FILO_FUNCTIONS_BASE
+  || 'https://europe-west1-filo-8b9cb.cloudfunctions.net';
+
+// Invoca una callable gen2 (protocollo onCall) con l'ID token admin. Lancia su
+// errore (auth/rete/HTTP). Speculare a handlers/redteam.js → callable().
+async function callSecurityFunction(name, data = {}) {
+  const idToken = await auth.getIdToken();
+  if (!idToken) throw new Error('Sessione scaduta: rifai l\'accesso.');
+  const res = await fetch(`${FUNCTIONS_BASE}/${name}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+    body: JSON.stringify({ data }),
+  });
+  if (!res.ok) {
+    let detail = '';
+    try { detail = (await res.json())?.error?.message || ''; } catch (_) {}
+    throw new Error(`callable ${name} ${res.status}${detail ? ': ' + detail : ''}`);
+  }
+  const body = await res.json();
+  return body && body.result;
+}
+
 // ---- Slot chiave privata feedback (S1.3) ----------------------------------------
 // La chiave privata non deve MAI uscire dal main process né essere passata al
 // renderer. Il main la legge da env FILO_FEEDBACK_PRIVKEY oppure da
