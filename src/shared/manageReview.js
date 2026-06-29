@@ -196,7 +196,9 @@
   // `opts.releasedVersion` (DB3) è passato a manageTabFor per il gate "Risolti".
   function listForManageTab(feedbacks, tab, opts) {
     const items = (feedbacks || []).filter((f) => manageTabFor(f, opts) === tab);
-    if (tab === 'queue') return sortReview(items);
+    // "Ricevuti" e "In coda" ordinano per severità del blocco poi recenza: così
+    // nei Ricevuti i non-filtrati (bianchi) e i bloccati gravi salgono in cima.
+    if (tab === 'queue' || tab === 'inbox') return sortReview(items);
     return items.slice().sort((a, b) => {
       const ta = new Date(a.createdAt || 0).getTime();
       const tb = new Date(b.createdAt || 0).getTime();
