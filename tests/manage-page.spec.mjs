@@ -164,8 +164,70 @@ test('lo switch attiva/disattiva la modalità automatica e lo stato persiste', a
   // Sopravvive al ricaricamento della pagina (loadAutoMode rilegge da storage).
   await page.reload();
   await page.waitForLoadState('domcontentloaded');
+  await page.locator('.mg-tab[data-tab="automation"]').click();
   await expect(page.locator('#mgAutoToggle')).toBeChecked();
   await expect(page.locator('#mgAutoState')).toHaveText('On');
+});
+
+test('il numero di tentativi del loop è editabile, si salva e persiste al reload', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_CONST);
+
+  await page.locator('.mg-tab[data-tab="automation"]').click();
+  const input = page.locator('#mgLoopCap');
+  await expect(input).toBeVisible();
+
+  // Valore iniziale = default del manifesto (3), letto da chrome.storage o fallback.
+  await expect(input).toHaveValue('3');
+
+  // Da non-admin il campo è in sola lettura (stesso contratto dello switch).
+  await expect(input).toBeDisabled();
+  await expect(page.locator('#mgLoopCapSave')).toBeDisabled();
+
+  // Simula l'owner: abilita i controlli (in produzione lo fa applyAutoModeGate).
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await expect(input).toBeEnabled();
+
+  // Cambia il valore e salva.
+  await input.fill('5');
+  await page.locator('#mgLoopCapSave').click();
+  await expect(page.locator('#mgLoopCapMsg')).toHaveText('Salvato.');
+
+  // Persistito in chrome.storage.local sotto la chiave del manifesto.
+  const stored = await page.evaluate(async () => {
+    const key = window.SN_CONST.STORAGE_KEYS.AUTOMATION_LOOP_CAP;
+    const d = await window.chrome.storage.local.get(key);
+    return d[key];
+  });
+  expect(stored).toBe(5);
+
+  // Sopravvive al reload (loadLoopCap rilegge da storage).
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await expect(page.locator('#mgLoopCap')).toHaveValue('5');
+});
+
+test('il numero di tentativi del loop viene clampato nel range [1, 10] al salvataggio', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_CONST);
+
+  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+
+  const input = page.locator('#mgLoopCap');
+
+  // Sopra il massimo → riportato a 10.
+  await input.fill('99');
+  await page.locator('#mgLoopCapSave').click();
+  await expect(input).toHaveValue('10');
+
+  // Sotto il minimo → riportato a 1.
+  await input.fill('0');
+  await page.locator('#mgLoopCapSave').click();
+  await expect(input).toHaveValue('1');
 });
 
 test('con dati finti: un elemento su UNA riga (#N + titolo, niente label motivo) — DA2', async ({ openTab }) => {
