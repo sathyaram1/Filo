@@ -152,7 +152,52 @@
   function applyAutoModeGate() {
     mgAutoToggle.disabled = !isAdmin;
     mgAutoSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
+    if (mgLoopCap)     mgLoopCap.disabled = !isAdmin;
+    if (mgLoopCapSave) mgLoopCapSave.disabled = !isAdmin;
   }
+
+  // ── Tentativi del loop di correzione (tab Automazioni) ────────────────────
+  // Intero persistito in chrome.storage.local; default AUTOMATION.LOOP_CAP_DEFAULT
+  // (allineato a scripts/dispatch.mjs). Limitato a [MIN, MAX].
+  function clampLoopCap(n) {
+    n = Math.round(Number(n));
+    if (!Number.isFinite(n)) return AUTOMATION.LOOP_CAP_DEFAULT;
+    return Math.min(AUTOMATION.LOOP_CAP_MAX, Math.max(AUTOMATION.LOOP_CAP_MIN, n));
+  }
+
+  async function loadLoopCap() {
+    if (!mgLoopCap) return;
+    let val = AUTOMATION.LOOP_CAP_DEFAULT;
+    try {
+      const data = await chrome.storage.local.get(LOOP_CAP_KEY);
+      if (data[LOOP_CAP_KEY] != null) val = clampLoopCap(data[LOOP_CAP_KEY]);
+    } catch (_) {}
+    mgLoopCap.value = String(val);
+  }
+
+  function setLoopCapMsg(text, kind) {
+    if (!mgLoopCapMsg) return;
+    mgLoopCapMsg.textContent = text || '';
+    mgLoopCapMsg.classList.toggle('mg-ok', kind === 'ok');
+    mgLoopCapMsg.classList.toggle('mg-err', kind === 'err');
+  }
+
+  async function saveLoopCap() {
+    if (!mgLoopCap) return;
+    const val = clampLoopCap(mgLoopCap.value);
+    mgLoopCap.value = String(val); // normalizza eventuali fuori-range
+    try {
+      await chrome.storage.local.set({ [LOOP_CAP_KEY]: val });
+      setLoopCapMsg('Salvato.', 'ok');
+    } catch (err) {
+      setLoopCapMsg('Salvataggio fallito.', 'err');
+      console.error('[manage] salvataggio tentativi loop fallito:', err);
+    }
+  }
+
+  if (mgLoopCapSave) mgLoopCapSave.addEventListener('click', saveLoopCap);
+  // Digitando si azzera il messaggio di esito precedente.
+  if (mgLoopCap) mgLoopCap.addEventListener('input', () => setLoopCapMsg('', null));
 
   // ── Tab bar ───────────────────────────────────────────────────────────────
   // Le tab-lista (inbox/queue/resolved/archived) condividono il pannello
