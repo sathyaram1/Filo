@@ -62,10 +62,10 @@ test('migrazione: ogni stato finisce nella tab attesa', () => {
     'new-agent': 'inbox',
     'clarify-1': 'inbox',
     'draft-1': 'inbox',       // Bozze rimosse → draft resta sotto Ricevuti
-    'todo-1': 'queue',
-    'review-1': 'queue',
-    'blocked-1': 'queue',
-    'pipe-block': 'queue',    // blocco pipeline → In coda anche se status grezzo è new
+    'todo-1': 'queue',        // approvato a mano dall'owner
+    'review-1': 'queue',      // auto-approvato (aligned + automatica)
+    'blocked-1': 'inbox',     // blocco worker: richiede la mia approvazione
+    'pipe-block': 'inbox',    // blocco di sicurezza: richiede la mia approvazione
     'done-1': 'resolved',
     'verified-1': 'resolved',
     'archived-1': 'archived',
