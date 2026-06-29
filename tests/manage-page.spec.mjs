@@ -169,65 +169,91 @@ test('lo switch attiva/disattiva la modalità automatica e lo stato persiste', a
   await expect(page.locator('#mgAutoState')).toHaveText('On');
 });
 
-test('il numero di tentativi del loop è editabile, si salva e persiste al reload', async ({ openTab }) => {
+// Stub dell'IPC del loop cap: simula il doc Firestore config/automation senza
+// rete/main. Cattura ogni `set` per provare che il valore LASCIA il client (è la
+// fonte che le routine leggono → "il cambiamento ha effetto").
+async function stubLoopCap(page, initial = 3) {
+  await page.evaluate((init) => {
+    window.__loopCapValue = init;
+    window.__loopCapSets = [];
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'automation_loop_cap_get') {
+        return { ok: true, loopCap: window.__loopCapValue };
+      }
+      if (msg && msg.type === 'automation_loop_cap_set') {
+        const v = Math.min(10, Math.max(1, Math.round(Number(msg.loopCap))));
+        window.__loopCapValue = v;
+        window.__loopCapSets.push(v);
+        return { ok: true, loopCap: v };
+      }
+      return orig(msg);
+    };
+  }, initial);
+}
+
+test('il numero di tentativi del loop è editabile e il salvataggio lo scrive nella config delle routine', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
-  await page.waitForFunction(() => window.__mgTest && window.SN_CONST);
+  await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
 
   await page.locator('.mg-tab[data-tab="automation"]').click();
   const input = page.locator('#mgLoopCap');
   await expect(input).toBeVisible();
 
-  // Valore iniziale = default del manifesto (3), letto da chrome.storage o fallback.
-  await expect(input).toHaveValue('3');
-
   // Da non-admin il campo è in sola lettura (stesso contratto dello switch).
   await expect(input).toBeDisabled();
   await expect(page.locator('#mgLoopCapSave')).toBeDisabled();
 
-  // Simula l'owner: abilita i controlli (in produzione lo fa applyAutoModeGate).
+  // Simula l'owner: stub della config (valore corrente 7) + abilita i controlli.
+  await stubLoopCap(page, 7);
   await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.loadLoopCap()); // rilegge dalla config stubbata
   await expect(input).toBeEnabled();
+  // Il campo riflette il valore della config, non un default locale.
+  await expect(input).toHaveValue('7');
 
   // Cambia il valore e salva.
   await input.fill('5');
   await page.locator('#mgLoopCapSave').click();
   await expect(page.locator('#mgLoopCapMsg')).toHaveText('Salvato.');
 
-  // Persistito in chrome.storage.local sotto la chiave del manifesto.
-  const stored = await page.evaluate(async () => {
+  // Il valore è stato SCRITTO nella config (l'IPC che le routine leggono): è qui
+  // che "ha effetto", non solo in una cache locale.
+  await expect.poll(() => page.evaluate(() => window.__loopCapSets)).toEqual([5]);
+  expect(await page.evaluate(() => window.__loopCapValue)).toBe(5);
+
+  // È anche specchiato nella cache locale (display istantaneo all'avvio).
+  const cached = await page.evaluate(async () => {
     const key = window.SN_CONST.STORAGE_KEYS.AUTOMATION_LOOP_CAP;
     const d = await window.chrome.storage.local.get(key);
     return d[key];
   });
-  expect(stored).toBe(5);
-
-  // Sopravvive al reload (loadLoopCap rilegge da storage).
-  await page.reload();
-  await page.waitForLoadState('domcontentloaded');
-  await page.locator('.mg-tab[data-tab="automation"]').click();
-  await expect(page.locator('#mgLoopCap')).toHaveValue('5');
+  expect(cached).toBe(5);
 });
 
 test('il numero di tentativi del loop viene clampato nel range [1, 10] al salvataggio', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
-  await page.waitForFunction(() => window.__mgTest && window.SN_CONST);
+  await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
 
   await page.locator('.mg-tab[data-tab="automation"]').click();
+  await stubLoopCap(page, 3);
   await page.evaluate(() => window.__mgTest.setAdmin(true));
 
   const input = page.locator('#mgLoopCap');
 
-  // Sopra il massimo → riportato a 10.
+  // Sopra il massimo → riportato a 10 (e 10 è ciò che viene scritto).
   await input.fill('99');
   await page.locator('#mgLoopCapSave').click();
   await expect(input).toHaveValue('10');
+  expect(await page.evaluate(() => window.__loopCapValue)).toBe(10);
 
   // Sotto il minimo → riportato a 1.
   await input.fill('0');
   await page.locator('#mgLoopCapSave').click();
   await expect(input).toHaveValue('1');
+  expect(await page.evaluate(() => window.__loopCapValue)).toBe(1);
 });
 
 test('con dati finti: un elemento su UNA riga (#N + titolo, niente label motivo) — DA2', async ({ openTab }) => {
