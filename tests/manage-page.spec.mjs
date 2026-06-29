@@ -215,8 +215,8 @@ test('un blocco per LOOP (blocked + blockReason=loop) ha il border-left NERO', a
   expect(cl.reason).toBe('loop');
   expect(cl.color).toBe('#111111');
 
-  // Esercita il VERO renderList: il blocco loop vive in "In coda".
-  await page.evaluate((fb) => { window.__mgTest.setData([fb]); window.__mgTest.setTab('queue'); }, FAKE_FB_LOOP);
+  // Esercita il VERO renderList: il blocco loop non è approvato → "Ricevuti".
+  await page.evaluate((fb) => { window.__mgTest.setData([fb]); window.__mgTest.setTab('inbox'); }, FAKE_FB_LOOP);
 
   await expect(page.locator('.mg-item')).toHaveCount(1);
   await expect(page.locator('.mg-item-title')).toHaveText('Test blocco loop');
