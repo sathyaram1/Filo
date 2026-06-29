@@ -94,6 +94,8 @@
   const FB  = window.SN_FEEDBACK;
   const MR  = window.SN_MANAGE_REVIEW;
   const AUTO_MODE_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTO_MODE) || 'filo_auto_mode';
+  const LOOP_CAP_KEY  = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_LOOP_CAP) || 'filo_automation_loop_cap';
+  const AUTOMATION = window.SN_CONST?.AUTOMATION || { LOOP_CAP_DEFAULT: 3, LOOP_CAP_MIN: 1, LOOP_CAP_MAX: 10 };
 
   // ── Canale main process ───────────────────────────────────────────────────
   function sendToMain(msg) {
