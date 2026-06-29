@@ -301,6 +301,7 @@
     classifyBlock, sortReview, REASONS, manageTabFor, listForManageTab,
     isStarred, listArchiveTab, isShipped, cmpVersion, listBoardTab,
     hasReopenRequest, canReopen, isApproved,
+    panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
