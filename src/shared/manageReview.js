@@ -53,7 +53,10 @@
     // Panel parziale ("non filtrato"): vince su attacco/spam/design perché
     // segnala che il filtraggio NON è affidabile (un giudice è saltato). Bianco.
     // I verdetti parziali restano visibili nei pallini dei giudici.
-    if (p.l2Unfiltered === true) {
+    // `l2Degraded` copre i feedback giudicati dalla pipeline VECCHIA (prima del
+    // campo `l2Unfiltered`): panel a zero verdetti = tutti i giudici mancanti =
+    // non filtrato, così anche lo storico finisce bianco nei Ricevuti.
+    if (p.l2Unfiltered === true || p.l2Degraded === true) {
       return { reason: 'unfiltered', ...REASONS.unfiltered };
     }
 
