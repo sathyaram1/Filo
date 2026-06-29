@@ -585,9 +585,23 @@
     const expected = (Array.isArray(p.expectedJudges) && p.expectedJudges.length) ? p.expectedJudges : null;
     const judgeLetters = ['A', 'B', 'C', 'D', 'E'];
 
-    // Senza giudici attesi né verdetti la riga non ha senso (es. feedback
-    // ricevuti o in chiarimento, mai passati dal pipeline): nascondila del tutto.
-    if (!expected && verdicts.length === 0) { mgJudgesRow.hidden = true; return; }
+    // Nessun verdetto registrato. Se il feedback è "non filtrato" (da giudicare —
+    // es. mai giudicato o identità dell'owner sbloccata), mostra COMUNQUE il panel
+    // atteso tutto tratteggiato, così l'owner vede i giudici che non hanno (ancora)
+    // votato. Altrimenti (clarify, chiusi…) nascondi la riga.
+    if (!expected && verdicts.length === 0) {
+      const cl = MR.classifyBlock(fb);
+      if (!cl || cl.reason !== 'unfiltered') { mgJudgesRow.hidden = true; return; }
+      mgJudgesRow.hidden = false;
+      const n = MR.EXPECTED_PANEL_SIZE || 4;
+      for (let i = 0; i < n; i++) {
+        const dot = document.createElement('span');
+        dot.className = 'mg-dot mg-dot--empty';
+        dot.title = `Giudice ${judgeLetters[i] || i + 1}: nessun verdetto`;
+        mgJudgesRow.appendChild(dot);
+      }
+      return;
+    }
     mgJudgesRow.hidden = false;
 
     const fallbackSize = Math.max(verdicts.length, (MR.EXPECTED_PANEL_SIZE || 4));
