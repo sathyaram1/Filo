@@ -277,7 +277,7 @@
   global.SN_MANAGE_REVIEW = {
     classifyBlock, sortReview, REASONS, manageTabFor, listForManageTab,
     isStarred, listArchiveTab, isShipped, cmpVersion, listBoardTab,
-    hasReopenRequest, canReopen,
+    hasReopenRequest, canReopen, isApproved,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
