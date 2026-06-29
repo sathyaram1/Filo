@@ -15,10 +15,16 @@
   // NERO, severità massima: è l'unico blocco che non viene dal pipeline di
   // sicurezza (attacco/spam/design), ma dall'iter di lavorazione bloccato.
   const REASONS = {
-    loop:   { label: 'Loop',     color: '#111111', severity: 4 },
-    attack: { label: 'Attacco',  color: '#c0392b', severity: 3 },
-    spam:   { label: 'Spam',     color: '#e08e0b', severity: 2 },
-    design: { label: 'Design',   color: '#5b6ee0', severity: 1 },
+    loop:       { label: 'Loop',         color: '#111111', severity: 5 },
+    // "Non filtrato": il panel dei giudici non si è completato (almeno un giudice
+    // non ha votato). BIANCO per distinguerlo — non è una classe di rischio, è
+    // "filtraggio incompleto" — ma per coerenza è trattato come il caso più severo
+    // ai fini dell'instradamento (mai in coda: resta nei Ricevuti finché l'owner
+    // non lo risolve o ri-valuta i giudici mancanti).
+    unfiltered: { label: 'Non filtrato', color: '#ffffff', severity: 4 },
+    attack:     { label: 'Attacco',      color: '#c0392b', severity: 3 },
+    spam:       { label: 'Spam',         color: '#e08e0b', severity: 2 },
+    design:     { label: 'Design',       color: '#5b6ee0', severity: 1 },
   };
 
   /**
