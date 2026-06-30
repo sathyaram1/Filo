@@ -431,7 +431,7 @@
   global.SN_MANAGE_REVIEW = {
     classifyBlock, sortReview, REASONS, manageTabFor, listForManageTab, priorityOf,
     isStarred, listArchiveTab, isShipped, cmpVersion, listBoardTab,
-    hasReopenRequest, canReopen, isApproved,
+    hasReopenRequest, canReopen, isApproved, isAligned, ALIGNED, ALIGNED_COLOR: ALIGNED.color,
     panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE, isTrustedClient,
     classifyReevalResult, reevalErrorHint, REEVAL_WASTE_LIMIT,
   };
