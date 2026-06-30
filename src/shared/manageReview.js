@@ -342,6 +342,46 @@
     return listBoardTab([fb], opts).length > 0;
   }
 
+  // ── Ri-valutazione "non filtrati": esito onesto di UN feedback ────────────
+  // La dashboard ri-valuta i bianchi uno alla volta (un id per chiamata). Il
+  // backend, per ogni id, ri-esegue SOLO i giudici mancanti e torna un dettaglio
+  // con `recovered` (quanti giudici prima assenti hanno finalmente votato) e
+  // `attempted` (quanti ne ha ri-eseguiti = quanti hanno potenzialmente speso
+  // crediti). Questa funzione PURA traduce quel dettaglio nell'esito che conta
+  // per l'owner, così la UI dice la verità invece di contare come "valutato" un
+  // feedback rimasto bianco:
+  //   'recovered' almeno un giudice mancante ha votato → progresso reale;
+  //   'wasted'    giudici ri-eseguiti (crediti spesi) ma NESSUNO recuperato →
+  //               il feedback è ancora non filtrato e i crediti sono andati a
+  //               vuoto (tipico di modelli mal configurati o credito esaurito);
+  //   'budget'    il backend si è fermato per tempo/budget: riprovare più tardi;
+  //   'noop'      niente da ri-valutare (già completo / non più non-filtrato) →
+  //               nessun credito speso;
+  //   'error'     la chiamata è fallita.
+  // `r` è la risposta completa del canale (con `results[0]` = dettaglio del
+  // singolo id, `remaining` = budget lato server). Ritorna { outcome, recovered }.
+  function classifyReevalResult(r) {
+    if (!r || r.ok === false) return { outcome: 'error', recovered: 0 };
+    if (r.remaining) return { outcome: 'budget', recovered: 0 };
+    const det = (Array.isArray(r.results) && r.results[0]) || r;
+    if (det && det.ok === false) return { outcome: 'error', recovered: 0 };
+    const recovered = Math.max(0, Number(det && det.recovered) || 0);
+    // Run completa (feedback mai giudicato / L1 sbloccato): produce un pipeline
+    // nuovo, non ha il concetto di "recuperati" → è sempre progresso reale.
+    if (det && det.fullRun) return { outcome: 'recovered', recovered: recovered || 1 };
+    if (recovered > 0) return { outcome: 'recovered', recovered };
+    // Ha provato a ri-eseguire dei giudici ma non ne ha recuperato nessuno:
+    // crediti spesi, feedback ancora bianco.
+    if (Number(det && det.attempted) > 0) return { outcome: 'wasted', recovered: 0 };
+    return { outcome: 'noop', recovered: 0 };
+  }
+
+  // Quanti esiti 'wasted' consecutivi tollerare prima di fermare l'intera
+  // ri-valutazione: se i giudici falliscono a vuoto più volte di fila è quasi
+  // certo un problema di configurazione/credito, inutile bruciare crediti sul
+  // resto della lista. Basso di proposito (il segnale arriva subito).
+  const REEVAL_WASTE_LIMIT = 3;
+
   global.SN_MANAGE_REVIEW = {
     classifyBlock, sortReview, REASONS, manageTabFor, listForManageTab, priorityOf,
     isStarred, listArchiveTab, isShipped, cmpVersion, listBoardTab,
