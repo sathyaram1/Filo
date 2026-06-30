@@ -22,6 +22,7 @@
       ],
       fixes: [
         'Ri-valutare i feedback "non filtrati" ora dice la verità: conta solo i feedback in cui un giudice mancante ha davvero votato e non li segna più come "valutati" se sono rimasti senza verdetto. Se i giudici continuano a non rispondere si ferma da solo, invece di spendere altri crediti a vuoto, e ti avvisa che probabilmente c\'è un problema di modelli o di credito.',
+        'Corretti i colori dei pallini dei giudici nella dashboard di gestione: ora combaciano con il colore della scheda (design = blu) e i verdetti "tutto a posto" sono verdi. Prima blu e verde erano invertiti, così un feedback giudicato a posto sembrava avere il colore sbagliato.',
       ],
     },
     {
