@@ -204,6 +204,7 @@ function emptyModels() {
   const out = Object.fromEntries(SLOTS.map((s) => [s, '']));
   out.judgeRegistry = {};
   out.openrouterKeyPresent = false;
+  out.judgeTimeoutMs = null; // null = non impostato → la UI mostra il default
   return out;
 }
 
@@ -213,6 +214,9 @@ function sanitize(doc) {
     if (typeof doc[slot] === 'string') out[slot] = doc[slot];
   }
   out.judgeRegistry = sanitizeRegistry(doc.judgeRegistry);
+  if (doc.judgeTimeoutMs != null && Number.isFinite(Number(doc.judgeTimeoutMs))) {
+    out.judgeTimeoutMs = clampTimeoutMs(doc.judgeTimeoutMs);
+  }
   return out;
 }
 
