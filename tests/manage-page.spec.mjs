@@ -453,6 +453,61 @@ test('ri-valuta i non filtrati uno alla volta (una chiamata per feedback) con an
   expect(maxDuring).toBe(1);
 });
 
+// Il bug riportato: l'owner clicca "Ri-valuta", i giudici continuano a NON
+// rispondere (crediti spesi, pallini ancora bianchi) ma la dashboard diceva
+// "Valutati N". Ora: se la ri-valutazione spende crediti senza recuperare nessun
+// giudice più volte di fila, si FERMA (non brucia crediti sul resto) e lo dice
+// onestamente — niente più falso "valutato" con i pallini bianchi.
+test('ri-valuta: i giudici falliscono a vuoto → si ferma e segnala i crediti spesi senza risultato', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_MANAGE_REVIEW && window.filo);
+
+  // 8 bianchi: più della soglia di stop, così verifichiamo che NON li chiama tutti.
+  const whites = Array.from({ length: 8 }, (_, i) => ({
+    _id: `fail-${i}`,
+    text: `Bianco che non si recupera ${i}.`,
+    name: `Bianco ${i}`,
+    seq: 200 + i, subSeq: 0, status: 'new',
+    clientId: 'tester@example.com', createdAt: `2026-06-28T10:0${i}:00Z`, images: [],
+    pipeline: {
+      action: 'human_review', l2Class: 'aligned', l2Unfiltered: true,
+      expectedJudges: ['fixed_1', 'fixed_2', 'fixed_3', 'dynamic'],
+      verdicts: [{ judge: 'fixed_1', class: 'aligned', reasoning: 'Ok.' }],
+      stage: 'L2',
+    },
+  }));
+
+  // Stub: ogni id ri-esegue un giudice (attempted:1) ma non ne recupera nessuno
+  // (recovered:0, stillUnfiltered) — esattamente lo scenario "crediti a vuoto".
+  await page.evaluate(() => {
+    window.__reeval = [];
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'feedback_reevaluate') {
+        window.__reeval.push(msg);
+        return { ok: true, reevaluated: 0, remaining: 0, results: [{ ok: true, changed: false, recovered: 0, attempted: 1, stillUnfiltered: true }] };
+      }
+      return orig(msg);
+    };
+  });
+
+  await page.evaluate((fbs) => { window.__mgTest.setAdmin(true); window.__mgTest.setData(fbs); }, whites);
+  await expect(page.locator('#mgReevalBtn')).toContainText('8');
+  await page.locator('#mgReevalBtn').click();
+
+  // Si è fermato alla soglia (3 tentativi a vuoto), NON ha chiamato tutti gli 8.
+  await expect.poll(() => page.evaluate(() => window.__reeval.length)).toBe(3);
+  // Per sicurezza: anche aspettando, non parte una quarta chiamata.
+  await page.waitForTimeout(200);
+  expect(await page.evaluate(() => window.__reeval.length)).toBe(3);
+
+  // Messaggio onesto: niente "valutati", parla di crediti spesi senza verdetti.
+  const msg = await page.locator('#mgReevalMsg').textContent();
+  expect(msg.toLowerCase()).toContain('credit');
+  expect(msg.toLowerCase()).not.toContain('recuperati 3');
+});
+
 // Storico (pipeline vecchia): solo 2 dei 4 giudici hanno votato, niente
 // expectedJudges/l2Unfiltered. Va comunque dedotto come "non filtrato" (bianco)
 // e mostrare 4 pallini (2 votati + 2 mancanti tratteggiati).
