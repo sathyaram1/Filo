@@ -24,6 +24,7 @@
       fixes: [
         'Ri-valutare i feedback "non filtrati" ora dice la verità: conta solo i feedback in cui un giudice mancante ha davvero votato e non li segna più come "valutati" se sono rimasti senza verdetto. Se i giudici continuano a non rispondere si ferma da solo, invece di spendere altri crediti a vuoto, e ti avvisa che probabilmente c\'è un problema di modelli o di credito.',
         'Resi coerenti i colori dei verdetti dei giudici nella dashboard di gestione: scala rosso → giallo → verde → blu (attacco, spam, design, allineato). Ora i pallini, il bordo della scheda e le etichette usano lo stesso colore per la stessa classe.',
+        'Quando i giudici non riescono a valutare un feedback, la dashboard ora dice il motivo preciso (credito OpenRouter esaurito, chiave non valida, provider sovraccarico, modello inesistente o timeout) invece di un messaggio generico, e non spreca tempo a ritentare gli errori che non si risolvono da soli (come il credito esaurito).',
       ],
     },
     {
