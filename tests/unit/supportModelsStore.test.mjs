@@ -66,3 +66,26 @@ test('sanitizeRegistry: input non-oggetto → mappa vuota', () => {
   assert.deepEqual(sanitizeRegistry(undefined), {});
   assert.deepEqual(sanitizeRegistry('stringa'), {});
 });
+
+// ── Timeout dei giudici (judgeTimeoutMs, in ms) ──────────────────────────────
+// Bound di default (fallback senza SN_CONST): 10s..120s → 10000..120000 ms.
+
+test('clampTimeoutMs: un valore valido nel range resta invariato', () => {
+  assert.equal(clampTimeoutMs(45000), 45000);
+  assert.equal(clampTimeoutMs(60000), 60000);
+});
+
+test('clampTimeoutMs: sotto il minimo → minimo (10s); sopra il massimo → massimo (120s)', () => {
+  assert.equal(clampTimeoutMs(1000), 10000);   // 1s → 10s
+  assert.equal(clampTimeoutMs(500000), 120000); // 500s → 120s
+});
+
+test('clampTimeoutMs: valori non numerici → null (campo non scritto)', () => {
+  assert.equal(clampTimeoutMs('abc'), null);
+  assert.equal(clampTimeoutMs(NaN), null);
+  assert.equal(clampTimeoutMs(undefined), null);
+});
+
+test('clampTimeoutMs: arrotonda i decimali', () => {
+  assert.equal(clampTimeoutMs(45000.7), 45001);
+});
