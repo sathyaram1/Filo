@@ -638,11 +638,24 @@
 
     // Azioni contestuali (owner-only):
     //  - feedback bloccato dal pipeline → "Accetta e sblocca";
+    //  - feedback allineato ancora nei Ricevuti (automatica OFF) → "Approva e
+    //    metti in coda" (problema #2: senza automatica serve un'approvazione manuale);
     //  - feedback in chiarimento → box di risposta che lo rimette in coda;
     //  - altrimenti nessuna azione.
     const isBlocked = MR.classifyBlock(fb) !== null;
+    const tab = MR.manageTabFor(fb, { releasedVersion, autoMode: autoModeOn });
+    const alignedInbox = MR.isAligned(fb) && tab === 'inbox';
     const isClarify = (fb.status || 'new') === 'clarify';
-    mgActions.hidden = !(isAdmin && isBlocked);
+    mgActions.hidden = !(isAdmin && (isBlocked || alignedInbox));
+    // Etichetta/placeholder del box: sblocco per i bloccati, approvazione per gli
+    // allineati. L'azione sottostante è la stessa (accetta → In coda).
+    if (isBlocked) {
+      mgAcceptBtn.textContent = 'Accetta e sblocca';
+      mgAcceptComment.placeholder = 'Commento (opzionale): perché lo sblocchi…';
+    } else {
+      mgAcceptBtn.textContent = 'Approva e metti in coda';
+      mgAcceptComment.placeholder = 'Commento (opzionale): perché lo approvi…';
+    }
     mgAcceptComment.value = '';
     setActionMsg('', '');
     mgClarify.hidden = !(isAdmin && isClarify);
