@@ -253,11 +253,14 @@
       cursor: pointer;
     }
     .mg-dot--clickable:hover { transform: scale(1.2); }
-    /* Colori giudici (fissi per distinguibilità su chiaro e scuro). */
+    /* Colori giudici (fissi per distinguibilità su chiaro e scuro). DEVONO
+       combaciare con il colore del bordo della card (vedi REASONS in
+       manageReview.js): attacco=rosso, spam=arancio, design=BLU. "aligned" non
+       ha un colore di bordo (è l'esito buono) → pallino VERDE, intuitivo. */
     .mg-dot--attack { background: #c0392b; border-color: #c0392b; }
     .mg-dot--spam   { background: #e08e0b; border-color: #e08e0b; }
-    .mg-dot--design { background: #2e9e5b; border-color: #2e9e5b; }
-    .mg-dot--aligned { background: #5b6ee0; border-color: #5b6ee0; }
+    .mg-dot--design { background: #5b6ee0; border-color: #5b6ee0; }
+    .mg-dot--aligned { background: #2e9e5b; border-color: #2e9e5b; }
     /* Giudice che non ha emesso un verdetto in quella run: anello tratteggiato. */
     .mg-dot--empty { border-style: dashed; opacity: 0.6; }
 
