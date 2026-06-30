@@ -532,6 +532,7 @@
     let valued = 0;            // quanti feedback hanno recuperato almeno un giudice
     let wasteStreak = 0;       // ri-valutazioni di fila che hanno speso crediti a vuoto
     let stopped = null;        // 'budget' | 'error' | 'nofix' se ci fermiamo prima
+    let lastErrorKind = null;  // causa dell'ultimo "a vuoto" (credit/auth/…)
 
     for (let i = 0; i < total; i++) {
       const id = ids[i];
@@ -546,7 +547,7 @@
         break;
       }
       stopCardEvaluating(card);
-      const { outcome, recovered } = MR.classifyReevalResult(r);
+      const { outcome, recovered, errorKind } = MR.classifyReevalResult(r);
       if (outcome === 'error') { stopped = 'error'; break; }
       // "remaining" lato server = budget/tempo esaurito: fermati e riprova dopo.
       if (outcome === 'budget') { stopped = 'budget'; break; }
@@ -555,30 +556,34 @@
         wasteStreak = 0;
       } else if (outcome === 'wasted') {
         // Giudici ri-eseguiti ma nessuno recuperato: crediti spesi, feedback
-        // ancora bianco. Se càpita più volte di fila è quasi certo un problema di
-        // modelli/credito: fermati per non bruciare crediti sul resto della lista.
+        // ancora bianco. `errorKind` dice PERCHÉ (es. credito esaurito). Se càpita
+        // più volte di fila è quasi certo un problema strutturale: fermati per non
+        // bruciare crediti/tempo sul resto della lista.
+        if (errorKind) lastErrorKind = errorKind;
         wasteStreak += 1;
         if (wasteStreak >= MR.REEVAL_WASTE_LIMIT) { stopped = 'nofix'; break; }
       }
       // 'noop' (niente da fare): non spende crediti, prosegui.
     }
 
+    // Causa specifica (credito/chiave/modelli/timeout) se i giudici non hanno
+    // recuperato nulla: vince sul generico, così l'owner sa cosa sistemare.
+    const hint = MR.reevalErrorHint(lastErrorKind);
     if (stopped === 'budget') {
       setReevalMsg(`Recuperati ${valued} feedback. Limite raggiunto: riprova più tardi.`, 'ok');
     } else if (stopped === 'error') {
       setReevalMsg(`Recuperati ${valued} feedback prima di un errore. Riprova per continuare.`, 'err');
     } else if (stopped === 'nofix') {
-      // L'owner deve sapere che i crediti sono stati spesi senza risultato: i
-      // giudici continuano a non rispondere (probabile modello/credito).
       setReevalMsg(
-        `Mi sono fermato: i giudici hanno continuato a non rispondere e i crediti spesi non hanno prodotto verdetti (probabile problema di modelli o credito). Recuperati ${valued} feedback.`,
+        (hint || 'I giudici hanno continuato a non rispondere e i feedback sono rimasti non filtrati.')
+          + ` Mi sono fermato. Recuperati ${valued} feedback.`,
         'err'
       );
     } else {
       setReevalMsg(
         valued
           ? `Recuperati ${valued} feedback.`
-          : 'Nessun giudice recuperato: i feedback sono rimasti non filtrati (controlla modelli e credito dei giudici).',
+          : ((hint || 'Nessun giudice recuperato: i feedback sono rimasti non filtrati (controlla modelli e credito dei giudici).')),
         valued ? 'ok' : 'err'
       );
     }
