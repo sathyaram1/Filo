@@ -336,6 +336,39 @@ test('listForManageTab: filtra per tab e ordina (Ricevuti per severità, In coda
   assert.deepEqual(MR.listForManageTab(items, 'archived').map((f) => f._id), []);
 });
 
+// ── Priorità (visibile + modificabile dalla dashboard) ─────────────────────
+
+test('priorityOf: normalizza a 1-3, fuori range/non numerico → 0', () => {
+  assert.equal(MR.priorityOf({ priority: 1 }), 1);
+  assert.equal(MR.priorityOf({ priority: 3 }), 3);
+  assert.equal(MR.priorityOf({ priority: '2' }), 2);   // stringhe numeriche ok
+  assert.equal(MR.priorityOf({ priority: 0 }), 0);
+  assert.equal(MR.priorityOf({ priority: 5 }), 0);     // sopra il massimo → nessuna
+  assert.equal(MR.priorityOf({ priority: -1 }), 0);
+  assert.equal(MR.priorityOf({ priority: 'FENC1:abc' }), 0); // cifrato non decifrato → 0 (no crash)
+  assert.equal(MR.priorityOf({}), 0);
+  assert.equal(MR.priorityOf(null), 0);
+});
+
+test('listForManageTab queue: priorità DESC come criterio primario', () => {
+  // Tutti approvati → in coda. La priorità detta l'ordine: 3 > 1 > (0).
+  const items = [
+    { _id: 'lo', status: 'todo', reviewDecision: 'accepted', priority: 0, createdAt: '2026-06-01' },
+    { _id: 'hi', status: 'todo', reviewDecision: 'accepted', priority: 3, createdAt: '2026-01-01' },
+    { _id: 'mid', status: 'todo', reviewDecision: 'accepted', priority: 1, createdAt: '2026-03-01' },
+  ];
+  assert.deepEqual(MR.listForManageTab(items, 'queue').map((f) => f._id), ['hi', 'mid', 'lo']);
+});
+
+test('listForManageTab queue: a parità di priorità resta l\'ordine per recenza', () => {
+  // Stessa priorità → il sort stabile conserva sortReview (severità poi recenza).
+  const items = [
+    { _id: 'old', status: 'todo', reviewDecision: 'accepted', priority: 2, createdAt: '2026-01-01' },
+    { _id: 'new', status: 'todo', reviewDecision: 'accepted', priority: 2, createdAt: '2026-06-01' },
+  ];
+  assert.deepEqual(MR.listForManageTab(items, 'queue').map((f) => f._id), ['new', 'old']);
+});
+
 // ── Preferiti ⭐ e tab Archiviati (DB2) ─────────────────────────────────────
 
 test('espone isStarred e listArchiveTab', () => {
