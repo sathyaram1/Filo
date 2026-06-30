@@ -457,11 +457,15 @@
 
       const item = document.createElement('div');
       const unfilteredCls = cl && cl.reason === 'unfiltered' ? ' mg-item--unfiltered' : '';
+      // Allineato (tutti i giudici d'accordo, nessun blocco) → bordo BLU.
+      const aligned = !cl && MR.isAligned(fb);
+      const alignedCls = aligned ? ' mg-item--aligned' : '';
       item.className = 'mg-item'
         + (fb._id === selectedId ? ' mg-item--selected' : '')
-        + unfilteredCls;
+        + unfilteredCls
+        + alignedCls;
       item.dataset.id = fb._id;
-      item.style.borderLeftColor = cl ? cl.color : 'transparent';
+      item.style.borderLeftColor = cl ? cl.color : (aligned ? MR.ALIGNED_COLOR : 'transparent');
       // Una riga sola: #N · titolo (ellissi). Il motivo (attacco/spam/…) resta
       // implicito nel colore del border-left; il titolo completo nel tooltip.
       item.title = (num ? `#${num} · ` : '') + title;
