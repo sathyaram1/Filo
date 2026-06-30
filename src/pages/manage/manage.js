@@ -145,11 +145,15 @@
   mgAutoToggle.addEventListener('change', async () => {
     const on = mgAutoToggle.checked;
     reflectAutoMode(on);
+    // Attivando/disattivando l'automatica i feedback allineati si spostano subito
+    // tra Ricevuti e In coda: ricalcola la lista corrente.
+    renderList();
     try {
       await chrome.storage.local.set({ [AUTO_MODE_KEY]: on });
     } catch (err) {
       // Ripristina lo stato precedente se il salvataggio fallisce.
       reflectAutoMode(!on);
+      renderList();
       console.error('[manage] salvataggio modalità automatica fallito:', err);
     }
   });
