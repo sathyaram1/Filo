@@ -359,6 +359,7 @@
       item.innerHTML = `
         ${num ? `<span class="mg-item-num">#${esc(num)}</span>` : ''}
         <span class="mg-item-title">${esc(title)}</span>
+        ${priorityDotsHtml(fb)}
       `;
       item.addEventListener('click', () => openDetail(fb._id));
       mgList.appendChild(item);
