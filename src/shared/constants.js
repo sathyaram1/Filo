@@ -78,6 +78,13 @@
     LOOP_CAP_DEFAULT: 3,
     LOOP_CAP_MIN: 1,
     LOOP_CAP_MAX: 10,
+    // Timeout di ogni giudice di sicurezza (secondi). I modelli "thinking"
+    // ragionano per qualche secondo prima del verdetto: troppo basso e quel
+    // giudice non risponde mai → panel parziale ("non filtrato"). Salvato in
+    // config/supportModels (ms) e letto dal backend dei giudici.
+    JUDGE_TIMEOUT_DEFAULT_S: 60,
+    JUDGE_TIMEOUT_MIN_S: 10,
+    JUDGE_TIMEOUT_MAX_S: 120,
   };
 
   const ACTIONS = {
