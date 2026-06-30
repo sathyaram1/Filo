@@ -471,3 +471,44 @@ test('listBoardTab: un fix con riapertura in sospeso ESCE da Risolti (criterio D
   assert.ok(ids.includes('a'), 'il fix non riaperto resta in board');
   assert.ok(!ids.includes('b'), 'il fix riaperto NON è più in board');
 });
+
+// ── classifyReevalResult: esito onesto della ri-valutazione dei "non filtrati" ─
+// Traduce la risposta del backend (per UN feedback, un id per chiamata) nell'esito
+// che la dashboard mostra all'owner, distinguendo il PROGRESSO reale dai crediti
+// spesi a vuoto. È la difesa contro "Valutati N" con i pallini ancora bianchi.
+
+test('classifyReevalResult: recupero reale (recovered>0) → outcome recovered', () => {
+  const r = { ok: true, remaining: 0, results: [{ ok: true, changed: true, recovered: 1, attempted: 1 }] };
+  assert.deepEqual(MR.classifyReevalResult(r), { outcome: 'recovered', recovered: 1 });
+});
+
+test('classifyReevalResult: giudici ri-eseguiti ma nessun recupero → outcome wasted (crediti a vuoto)', () => {
+  const r = { ok: true, remaining: 0, results: [{ ok: true, changed: false, recovered: 0, attempted: 1, stillUnfiltered: true }] };
+  assert.deepEqual(MR.classifyReevalResult(r), { outcome: 'wasted', recovered: 0 });
+});
+
+test('classifyReevalResult: niente da fare (already_complete / not_unfiltered) → outcome noop', () => {
+  const r = { ok: true, remaining: 0, results: [{ ok: true, changed: false, reason: 'already_complete' }] };
+  assert.equal(MR.classifyReevalResult(r).outcome, 'noop');
+});
+
+test('classifyReevalResult: run completa (fullRun, mai giudicato) → outcome recovered', () => {
+  const r = { ok: true, remaining: 0, results: [{ ok: true, changed: true, fullRun: true }] };
+  assert.equal(MR.classifyReevalResult(r).outcome, 'recovered');
+});
+
+test('classifyReevalResult: budget/tempo lato server (remaining>0) → outcome budget', () => {
+  const r = { ok: true, remaining: 1, results: [] };
+  assert.equal(MR.classifyReevalResult(r).outcome, 'budget');
+});
+
+test('classifyReevalResult: errore di canale o di singolo id → outcome error', () => {
+  assert.equal(MR.classifyReevalResult({ ok: false }).outcome, 'error');
+  assert.equal(MR.classifyReevalResult(null).outcome, 'error');
+  assert.equal(MR.classifyReevalResult({ ok: true, results: [{ ok: false, error: 'x' }] }).outcome, 'error');
+});
+
+test('REEVAL_WASTE_LIMIT: soglia bassa e positiva (basta poco per capire che i giudici non rispondono)', () => {
+  assert.equal(typeof MR.REEVAL_WASTE_LIMIT, 'number');
+  assert.ok(MR.REEVAL_WASTE_LIMIT >= 1 && MR.REEVAL_WASTE_LIMIT <= 5);
+});

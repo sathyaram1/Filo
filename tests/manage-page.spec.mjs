@@ -363,7 +363,7 @@ test('un feedback "non filtrato" è bianco, sta nei Ricevuti, mostra i giudici m
     window.__reeval = [];
     const orig = window.filo.message.bind(window.filo);
     window.filo.message = async (msg) => {
-      if (msg && msg.type === 'feedback_reevaluate') { window.__reeval.push(msg); return { ok: true, reevaluated: 1, results: [] }; }
+      if (msg && msg.type === 'feedback_reevaluate') { window.__reeval.push(msg); return { ok: true, reevaluated: 1, results: [{ ok: true, changed: true, recovered: 1, attempted: 1 }] }; }
       return orig(msg);
     };
   });
