@@ -142,6 +142,10 @@
       border-left-color: #ffffff;
       box-shadow: inset 4px 0 0 -1px rgba(127, 127, 127, 0.5);
     }
+    /* "Allineato": tutti i giudici d'accordo, nessun blocco → bordo BLU (lo
+       stesso dei pallini --mg-dot--aligned). Il colore esatto è impostato inline
+       da JS (MR.ALIGNED_COLOR); qui lasciamo solo un fallback. */
+    .mg-item--aligned { border-left-color: #5b6ee0; }
     /* Feedback in valutazione dai giudici (ri-valutazione uno alla volta): il
        bordo pulsa col colore d'accento e a destra compaiono tre pallini animati
        ("i giudici stanno votando"). Solo sulla card di turno, non sulle altre. */
