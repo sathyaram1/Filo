@@ -24,7 +24,7 @@
     unfiltered: { label: 'Non filtrato', color: '#ffffff', severity: 4 },
     attack:     { label: 'Attacco',      color: '#c0392b', severity: 3 },
     spam:       { label: 'Spam',         color: '#e08e0b', severity: 2 },
-    design:     { label: 'Design',       color: '#5b6ee0', severity: 1 },
+    design:     { label: 'Design',       color: '#2e9e5b', severity: 1 },
   };
 
   // Dimensione attesa del panel dei giudici per i feedback: 3 fissi + 1 dinamico.
