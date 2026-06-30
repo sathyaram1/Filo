@@ -19,6 +19,7 @@
       version: '0.2.94', date: '2026-06-30',
       features: [
         'Nella dashboard di gestione, i feedback "In coda" mostrano ora la priorità con dei pallini e puoi cambiarla con un clic: la coda si riordina mettendo per prima la priorità più alta.',
+        'Nella tab Automazioni puoi ora impostare il "Timeout dei giudici" (in secondi): se usi modelli che ragionano a lungo, alza il valore così fanno in tempo a rispondere e i feedback non restano "non filtrati".',
       ],
       fixes: [
         'Ri-valutare i feedback "non filtrati" ora dice la verità: conta solo i feedback in cui un giudice mancante ha davvero votato e non li segna più come "valutati" se sono rimasti senza verdetto. Se i giudici continuano a non rispondere si ferma da solo, invece di spendere altri crediti a vuoto, e ti avvisa che probabilmente c\'è un problema di modelli o di credito.',
