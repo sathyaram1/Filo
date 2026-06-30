@@ -302,6 +302,55 @@
     return `${diff} giorni fa`;
   }
 
+  // ── Priorità (1-3 pallini) sulle card ─────────────────────────────────────
+  // Visibile a colpo d'occhio in "In coda" e "Ricevuti"; modificabile solo
+  // dall'owner. Più pallini pieni = priorità più alta → le routine di Claude la
+  // affrontano prima. Non mostrata su Risolti/Archiviati (lì non serve agire).
+  function priorityHasDots() {
+    return currentTab === 'queue' || currentTab === 'inbox';
+  }
+  function priorityDotsHtml(fb) {
+    if (!priorityHasDots()) return '';
+    const p = MR.priorityOf(fb);
+    const dots = [1, 2, 3].map((n) => {
+      const on = n <= p ? ' mg-dot--on' : '';
+      if (!isAdmin) return `<span class="mg-dot mg-dot--readonly${on}" aria-label="Priorità ${n}"></span>`;
+      const reset = p === n ? ' (clic per azzerare)' : '';
+      return `<button type="button" class="mg-dot${on}" data-prio-id="${esc(fb._id)}" data-prio-n="${n}" title="Priorità ${n}${reset}" aria-label="Priorità ${n}"></button>`;
+    }).join('');
+    return `<span class="mg-priority" title="Priorità: ${p || '—'}">${dots}</span>`;
+  }
+
+  // Click su un pallino: imposta la priorità = N; ri-clic sul pallino già attivo
+  // (== priorità corrente) la azzera. `priorityManual:true` dice al backend che è
+  // una scelta dell'owner → il giudice di priorità automatico non la sovrascrive.
+  async function setPriorityFromDot(id, n) {
+    const fb = allFeedbacks.find((f) => f._id === id);
+    if (!fb) return;
+    const cur = MR.priorityOf(fb);
+    const next = cur === n ? 0 : n;
+    if (next === cur) return;
+    const prev = fb.priority;
+    fb.priority = next; // ottimistico: aggiorna subito i pallini e l'ordine
+    renderList();
+    try {
+      const r = await sendToMain({ type: 'feedback_update', id, priority: next, priorityManual: true });
+      if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
+    } catch (e) {
+      fb.priority = prev; // rollback in caso di errore
+      renderList();
+    }
+  }
+
+  // Delegazione: un solo listener per tutta la lista. Il click sul pallino NON
+  // deve aprire il dettaglio della card → stopPropagation.
+  mgList.addEventListener('click', (e) => {
+    const dot = e.target.closest('.mg-dot[data-prio-id]');
+    if (!dot) return;
+    e.stopPropagation();
+    setPriorityFromDot(dot.dataset.prioId, Number(dot.dataset.prioN));
+  });
+
   // ── Rendering colonna sinistra ────────────────────────────────────────────
   function renderList() {
     mgListLoading.hidden = true;
