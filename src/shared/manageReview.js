@@ -366,14 +366,34 @@
     const det = (Array.isArray(r.results) && r.results[0]) || r;
     if (det && det.ok === false) return { outcome: 'error', recovered: 0 };
     const recovered = Math.max(0, Number(det && det.recovered) || 0);
+    const errorKind = (det && det.errorKind) || null;
     // Run completa (feedback mai giudicato / L1 sbloccato): produce un pipeline
     // nuovo, non ha il concetto di "recuperati" → è sempre progresso reale.
-    if (det && det.fullRun) return { outcome: 'recovered', recovered: recovered || 1 };
-    if (recovered > 0) return { outcome: 'recovered', recovered };
+    if (det && det.fullRun) return { outcome: 'recovered', recovered: recovered || 1, errorKind };
+    if (recovered > 0) return { outcome: 'recovered', recovered, errorKind };
     // Ha provato a ri-eseguire dei giudici ma non ne ha recuperato nessuno:
-    // crediti spesi, feedback ancora bianco.
-    if (Number(det && det.attempted) > 0) return { outcome: 'wasted', recovered: 0 };
-    return { outcome: 'noop', recovered: 0 };
+    // crediti spesi, feedback ancora bianco. `errorKind` dice PERCHÉ.
+    if (Number(det && det.attempted) > 0) return { outcome: 'wasted', recovered: 0, errorKind };
+    return { outcome: 'noop', recovered: 0, errorKind };
+  }
+
+  // Traduce la causa tecnica del fallimento dei giudici in una frase per l'owner.
+  // null/'other' → null (nessun messaggio specifico, resta quello generico).
+  function reevalErrorHint(errorKind) {
+    switch (errorKind) {
+      case 'credit':
+        return 'Il credito OpenRouter della chiave dei giudici è esaurito: ricaricalo per far girare i giudici.';
+      case 'auth':
+        return 'La chiave OpenRouter dei giudici è assente o non valida: reimpostala nei Modelli di supporto.';
+      case 'rate_limit':
+        return 'Il provider dei giudici è sovraccarico (limite di richieste): riprova tra poco.';
+      case 'bad_request':
+        return 'Un modello dei giudici non è valido o non esiste più: controlla i modelli nei Modelli di supporto.';
+      case 'timeout':
+        return 'I giudici non hanno risposto in tempo: alza il "Timeout dei giudici" in Automazioni se usi modelli lenti.';
+      default:
+        return null;
+    }
   }
 
   // Quanti esiti 'wasted' consecutivi tollerare prima di fermare l'intera
