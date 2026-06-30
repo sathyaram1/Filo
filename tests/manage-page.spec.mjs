@@ -560,7 +560,7 @@ test('ri-valuta: i giudici falliscono a vuoto → si ferma e segnala i crediti s
     window.filo.message = async (msg) => {
       if (msg && msg.type === 'feedback_reevaluate') {
         window.__reeval.push(msg);
-        return { ok: true, reevaluated: 0, remaining: 0, results: [{ ok: true, changed: false, recovered: 0, attempted: 1, stillUnfiltered: true }] };
+        return { ok: true, reevaluated: 0, remaining: 0, results: [{ ok: true, changed: false, recovered: 0, attempted: 1, stillUnfiltered: true, errorKind: 'credit' }] };
       }
       return orig(msg);
     };
