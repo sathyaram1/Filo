@@ -192,6 +192,80 @@ async function stubLoopCap(page, initial = 3) {
   }, initial);
 }
 
+// Stub dell'IPC del timeout giudici: simula config/supportModels.judgeTimeoutMs
+// (in MS) via i messaggi support_models_*. Cattura i `set` per provare che il
+// valore (in ms) lascia il client verso la config che il backend giudici legge.
+async function stubJudgeTimeout(page, initialMs = 60000) {
+  await page.evaluate((init) => {
+    window.__judgeTimeoutMs = init;
+    window.__judgeTimeoutSets = [];
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'support_models_get') {
+        return { ok: true, models: { judgeTimeoutMs: window.__judgeTimeoutMs } };
+      }
+      if (msg && msg.type === 'support_models_update' && msg.judgeTimeoutMs != null) {
+        const v = Math.min(120000, Math.max(10000, Math.round(Number(msg.judgeTimeoutMs))));
+        window.__judgeTimeoutMs = v;
+        window.__judgeTimeoutSets.push(v);
+        return { ok: true, models: { judgeTimeoutMs: v } };
+      }
+      return orig(msg);
+    };
+  }, initialMs);
+}
+
+test('il timeout dei giudici è editabile (in secondi) e il salvataggio lo scrive in config (ms)', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
+
+  await page.locator('.mg-tab[data-tab="automation"]').click();
+  const input = page.locator('#mgJudgeTimeout');
+  await expect(input).toBeVisible();
+
+  // Non-admin: sola lettura.
+  await expect(input).toBeDisabled();
+  await expect(page.locator('#mgJudgeTimeoutSave')).toBeDisabled();
+
+  // Owner + config stubbata a 90s (90000 ms).
+  await stubJudgeTimeout(page, 90000);
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.loadJudgeTimeout());
+  await expect(input).toBeEnabled();
+  // La UI mostra SECONDI (90), non i ms.
+  await expect(input).toHaveValue('90');
+
+  // Cambia a 45s e salva → in config arriva 45000 ms.
+  await input.fill('45');
+  await page.locator('#mgJudgeTimeoutSave').click();
+  await expect(page.locator('#mgJudgeTimeoutMsg')).toHaveText('Salvato.');
+  await expect.poll(() => page.evaluate(() => window.__judgeTimeoutSets)).toEqual([45000]);
+});
+
+test('il timeout dei giudici viene clampato nel range [10, 120] secondi', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
+
+  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await stubJudgeTimeout(page, 60000);
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  const input = page.locator('#mgJudgeTimeout');
+
+  // Sopra il massimo → 120s (120000 ms scritti).
+  await input.fill('999');
+  await page.locator('#mgJudgeTimeoutSave').click();
+  await expect(input).toHaveValue('120');
+  expect(await page.evaluate(() => window.__judgeTimeoutMs)).toBe(120000);
+
+  // Sotto il minimo → 10s.
+  await input.fill('1');
+  await page.locator('#mgJudgeTimeoutSave').click();
+  await expect(input).toHaveValue('10');
+  expect(await page.evaluate(() => window.__judgeTimeoutMs)).toBe(10000);
+});
+
 test('il numero di tentativi del loop è editabile e il salvataggio lo scrive nella config delle routine', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
