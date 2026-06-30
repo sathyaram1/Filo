@@ -1128,6 +1128,8 @@
     setAdmin(v) { isAdmin = !!v; applyAutoModeGate(); },
     // Ri-legge il loop cap dalla fonte (IPC) — usato dai test dopo aver stubbato.
     loadLoopCap,
+    // Ri-legge il timeout dei giudici (IPC) — usato dai test dopo lo stub.
+    loadJudgeTimeout,
     setTab(tab) { selectTab(tab); },
     // DB3: imposta la "versione rilasciata" usata dal gate "Risolti" e rirende.
     setReleasedVersion(v) { releasedVersion = v || ''; renderList(); },
