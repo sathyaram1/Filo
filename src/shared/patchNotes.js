@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.94', date: '2026-06-30',
+      features: [
+        'Nella dashboard di gestione, i feedback "In coda" mostrano ora la priorità con dei pallini e puoi cambiarla con un clic: la coda si riordina mettendo per prima la priorità più alta.',
+      ],
+      fixes: [],
+    },
+    {
       version: '0.2.93', date: '2026-06-29',
       features: [
         'Nella dashboard di gestione, ri-valutare i feedback "non filtrati" ora procede uno alla volta e mostra un\'animazione sul feedback che i giudici stanno valutando in quel momento.',
