@@ -263,8 +263,10 @@
       case 'archived':  return 'archived';
       case 'ignored':   return null;
       // new/clarify/todo/review/blocked: l'approvazione decide la tab. Approvato
-      // ⇒ In coda; altrimenti ⇒ Ricevuti (richiede la mia approvazione).
-      default:          return isApproved(fb) ? 'queue' : 'inbox';
+      // ⇒ In coda; altrimenti ⇒ Ricevuti (richiede la mia approvazione). L'opts
+      // (con `autoMode`) propaga la modalità automatica così gli allineati entrano
+      // in coda quando l'automatica è ON.
+      default:          return isApproved(fb, opts) ? 'queue' : 'inbox';
     }
   }
 
