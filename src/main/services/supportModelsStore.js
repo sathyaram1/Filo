@@ -50,6 +50,22 @@ const JUDGE_SECRETS_DOC = 'config/judgeSecrets';
 // non letto da nessuno, è stato rimosso.
 const SLOTS = ['sanitizer', 'judge1', 'judge2', 'judge3', 'judgeDynamic', 'judgeRedTeam', 'judgePriority'];
 
+// Timeout per giudice, salvato in MILLISECONDI nel campo `judgeTimeoutMs` dello
+// stesso doc (lo legge il backend dei giudici). I bound vivono nelle costanti
+// condivise (in secondi); qui clampiamo in ms. Fallback letterali se le costanti
+// non sono caricate su globalThis (robustezza nel main process).
+function timeoutBoundsMs() {
+  const A = (globalThis.SN_CONST && globalThis.SN_CONST.AUTOMATION) || {};
+  const s = (v, d) => (Number.isFinite(v) ? v : d) * 1000;
+  return { min: s(A.JUDGE_TIMEOUT_MIN_S, 10), max: s(A.JUDGE_TIMEOUT_MAX_S, 120) };
+}
+function clampTimeoutMs(n) {
+  const { min, max } = timeoutBoundsMs();
+  const v = Math.round(Number(n));
+  if (!Number.isFinite(v)) return null;
+  return Math.min(max, Math.max(min, v));
+}
+
 // ── Firestore Value <-> JS ───────────────────────────────────────────────────
 function toFsValue(v) {
   if (v === null || v === undefined) return { nullValue: null };
