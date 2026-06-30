@@ -244,14 +244,29 @@
     }
   }
 
-  // Feedback di una singola tab, già ordinati: "In coda" per severità del blocco
-  // poi recenza (come la Revisione); le altre per createdAt DESC.
+  // Priorità di un feedback, normalizzata: 1-3 (più alta = affrontata prima dalle
+  // routine di Claude), 0 = nessuna. Robusta a valori cifrati/non numerici (NaN→0).
+  function priorityOf(fb) {
+    const p = Math.round(Number(fb && fb.priority) || 0);
+    return p >= 1 && p <= 3 ? p : 0;
+  }
+
+  // Feedback di una singola tab, già ordinati:
+  //   "Ricevuti" → severità del blocco poi recenza (come la Revisione): i
+  //                non-filtrati (bianchi) e i bloccati gravi salgono in cima.
+  //   "In coda"  → priorità DESC (Claude affronta prima le alte), poi severità
+  //                del blocco, poi recenza. La priorità qui detta l'ordine di
+  //                lavoro, quindi è il criterio primario.
+  //   altre      → createdAt DESC.
   // `opts.releasedVersion` (DB3) è passato a manageTabFor per il gate "Risolti".
   function listForManageTab(feedbacks, tab, opts) {
     const items = (feedbacks || []).filter((f) => manageTabFor(f, opts) === tab);
-    // "Ricevuti" e "In coda" ordinano per severità del blocco poi recenza: così
-    // nei Ricevuti i non-filtrati (bianchi) e i bloccati gravi salgono in cima.
-    if (tab === 'queue' || tab === 'inbox') return sortReview(items);
+    if (tab === 'inbox') return sortReview(items);
+    // In coda: priorità DESC come criterio primario. `sort` è stabile, quindi a
+    // parità di priorità si conserva l'ordine di sortReview (severità poi recenza).
+    if (tab === 'queue') {
+      return sortReview(items).sort((a, b) => priorityOf(b) - priorityOf(a));
+    }
     return items.slice().sort((a, b) => {
       const ta = new Date(a.createdAt || 0).getTime();
       const tb = new Date(b.createdAt || 0).getTime();
