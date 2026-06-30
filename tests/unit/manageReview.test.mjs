@@ -479,12 +479,33 @@ test('listBoardTab: un fix con riapertura in sospeso ESCE da Risolti (criterio D
 
 test('classifyReevalResult: recupero reale (recovered>0) → outcome recovered', () => {
   const r = { ok: true, remaining: 0, results: [{ ok: true, changed: true, recovered: 1, attempted: 1 }] };
-  assert.deepEqual(MR.classifyReevalResult(r), { outcome: 'recovered', recovered: 1 });
+  const out = MR.classifyReevalResult(r);
+  assert.equal(out.outcome, 'recovered');
+  assert.equal(out.recovered, 1);
 });
 
 test('classifyReevalResult: giudici ri-eseguiti ma nessun recupero → outcome wasted (crediti a vuoto)', () => {
   const r = { ok: true, remaining: 0, results: [{ ok: true, changed: false, recovered: 0, attempted: 1, stillUnfiltered: true }] };
-  assert.deepEqual(MR.classifyReevalResult(r), { outcome: 'wasted', recovered: 0 });
+  const out = MR.classifyReevalResult(r);
+  assert.equal(out.outcome, 'wasted');
+  assert.equal(out.recovered, 0);
+});
+
+test('classifyReevalResult: propaga errorKind (es. credito esaurito) per il messaggio all\'owner', () => {
+  const r = { ok: true, remaining: 0, results: [{ ok: true, changed: false, attempted: 1, stillUnfiltered: true, errorKind: 'credit' }] };
+  const out = MR.classifyReevalResult(r);
+  assert.equal(out.outcome, 'wasted');
+  assert.equal(out.errorKind, 'credit');
+});
+
+test('reevalErrorHint: ogni causa azionabile ha una frase; sconosciuto/other → null', () => {
+  assert.match(MR.reevalErrorHint('credit'), /credito/i);
+  assert.match(MR.reevalErrorHint('auth'), /chiave/i);
+  assert.match(MR.reevalErrorHint('rate_limit'), /sovraccarico|riprova/i);
+  assert.match(MR.reevalErrorHint('bad_request'), /modell/i);
+  assert.match(MR.reevalErrorHint('timeout'), /[Tt]imeout/);
+  assert.equal(MR.reevalErrorHint('other'), null);
+  assert.equal(MR.reevalErrorHint(null), null);
 });
 
 test('classifyReevalResult: niente da fare (already_complete / not_unfiltered) → outcome noop', () => {
