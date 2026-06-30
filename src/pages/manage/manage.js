@@ -1396,6 +1396,7 @@
     applyAutoModeGate();
     await loadAutoMode();
     await loadLoopCap();
+    await loadJudgeTimeout();
     await loadData();
   }
 
