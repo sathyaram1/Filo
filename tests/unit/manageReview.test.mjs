@@ -307,6 +307,60 @@ test('isApproved: vero solo con owner-accepted o candidate_change', () => {
   assert.equal(MR.isApproved(null), false);
 });
 
+// ── isAligned: panel completo, tutti i giudici d'accordo (bordo BLU) ─────────
+
+test('espone isAligned e ALIGNED_COLOR (blu)', () => {
+  assert.equal(typeof MR.isAligned, 'function');
+  assert.equal(typeof MR.ALIGNED_COLOR, 'string');
+  assert.match(MR.ALIGNED_COLOR, /^#/);
+});
+
+test('isAligned: l2Class aligned / candidate_change / verdetti tutti aligned → true', () => {
+  assert.equal(MR.isAligned({ pipeline: { l2Class: 'aligned' } }), true);
+  assert.equal(MR.isAligned({ pipeline: { action: 'candidate_change' } }), true);
+  const verdicts = ['fixed_1', 'fixed_2', 'fixed_3', 'dynamic'].map((j) => ({ judge: j, class: 'aligned' }));
+  assert.equal(MR.isAligned({ pipeline: { verdicts } }), true);
+});
+
+test('isAligned: blocchi/non-filtrati/in-corso → false', () => {
+  assert.equal(MR.isAligned({ pipeline: { action: 'block_attack' } }), false);
+  assert.equal(MR.isAligned({ pipeline: { l2Class: 'spam' } }), false);
+  assert.equal(MR.isAligned({ pipeline: { l2Unfiltered: true, l2Class: 'aligned' } }), false); // panel parziale
+  assert.equal(MR.isAligned({ pipeline: { stage: 'L1' } }), false); // nessun verdetto ancora
+  assert.equal(MR.isAligned({ status: 'new' }), false);             // nessuna pipeline
+  assert.equal(MR.isAligned(null), false);
+});
+
+// ── Problema #3: automatica ON sposta gli allineati (anche i vecchi) in coda ──
+
+test('isApproved: automatica ON approva un allineato senza candidate_change inciso', () => {
+  // Vecchio allineato giudicato con automatica OFF (nessun candidate_change).
+  const old = { status: 'todo', pipeline: { l2Class: 'aligned', action: 'human_review' } };
+  assert.equal(MR.isApproved(old), false);                       // automatica OFF → resta in attesa
+  assert.equal(MR.isApproved(old, { autoMode: true }), true);    // automatica ON → approvato
+  // Un blocco NON viene approvato dall'automatica.
+  assert.equal(MR.isApproved({ pipeline: { action: 'block_attack' } }, { autoMode: true }), false);
+});
+
+test('manageTabFor: automatica ON ⇒ vecchio allineato passa da Ricevuti a In coda', () => {
+  const old = { status: 'todo', pipeline: { l2Class: 'aligned', action: 'human_review' } };
+  assert.equal(MR.manageTabFor(old), 'inbox');                        // OFF
+  assert.equal(MR.manageTabFor(old, { autoMode: true }), 'queue');    // ON
+});
+
+test('listForManageTab: automatica ON sposta gli allineati in coda', () => {
+  const items = [
+    { _id: 'al', status: 'todo', pipeline: { l2Class: 'aligned' }, createdAt: '2026-01-01' },
+    { _id: 'bl', status: 'new', pipeline: { action: 'block_attack' }, createdAt: '2026-01-02' },
+  ];
+  // OFF: l'allineato è ancora nei Ricevuti, la coda è vuota.
+  assert.deepEqual(MR.listForManageTab(items, 'queue').map((f) => f._id), []);
+  assert.deepEqual(MR.listForManageTab(items, 'inbox').map((f) => f._id), ['bl', 'al']);
+  // ON: l'allineato entra in coda; il blocco resta nei Ricevuti.
+  assert.deepEqual(MR.listForManageTab(items, 'queue', { autoMode: true }).map((f) => f._id), ['al']);
+  assert.deepEqual(MR.listForManageTab(items, 'inbox', { autoMode: true }).map((f) => f._id), ['bl']);
+});
+
 test('manageTabFor: done e verified → resolved (Risolti); archived → archived; ignored → null', () => {
   assert.equal(MR.manageTabFor({ status: 'done' }), 'resolved');
   assert.equal(MR.manageTabFor({ status: 'verified' }), 'resolved');
