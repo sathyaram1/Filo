@@ -429,7 +429,7 @@ test('ri-valuta i non filtrati uno alla volta (una chiamata per feedback) con an
         // Misura le card animate nell'istante della chiamata (valutazione in corso).
         const n = document.querySelectorAll('.mg-item--evaluating').length;
         if (n > window.__maxEvaluatingDuringCall) window.__maxEvaluatingDuringCall = n;
-        return { ok: true, reevaluated: 1, results: [] };
+        return { ok: true, reevaluated: 1, results: [{ ok: true, changed: true, recovered: 1, attempted: 1 }] };
       }
       return orig(msg);
     };
