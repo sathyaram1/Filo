@@ -195,20 +195,44 @@
     return cmpVersion(v, releasedVersion) <= 0;
   }
 
+  // ── "Allineato": panel completo con tutti i giudici d'accordo ─────────────
+  // Colore BLU nella dashboard (come i pallini --mg-dot--aligned). Distinto dai
+  // blocchi (classifyBlock) perché NON è una segnalazione di rischio: è un
+  // feedback che ha passato i giudici puliti. Un blocco/non-filtrato/loop NON è
+  // allineato (classifyBlock torna non-null → escluso subito).
+  const ALIGNED = { color: '#5b6ee0', label: 'Allineato' };
+  function isAligned(fb) {
+    if (!fb) return false;
+    if (classifyBlock(fb)) return false; // blocco/non-filtrato/loop → non allineato
+    const p = fb.pipeline;
+    if (!p) return false;
+    // Decisione esplicita del pipeline: auto-approvato o classe L2 aligned.
+    if (p.action === 'candidate_change') return true;
+    if (p.l2Class === 'aligned') return true;
+    // Storico senza l2Class: panel COMPLETO (classifyBlock già escluderebbe i
+    // parziali) i cui verdetti presenti sono tutti 'aligned'.
+    const verdicts = Array.isArray(p.verdicts) ? p.verdicts.filter((v) => v && v.class) : [];
+    return verdicts.length > 0 && verdicts.every((v) => v.class === 'aligned');
+  }
+
   // ── Approvazione: cosa può stare "In coda" ────────────────────────────────
   // Un feedback è APPROVATO (può andare in coda, in attesa che Claude lo risolva)
   // SOLO se:
-  //   - l'owner l'ha sbloccato a mano dalla dashboard (`reviewDecision==='accepted'`), OPPURE
-  //   - la pipeline l'ha auto-approvato: tutti i giudici "aligned" E modalità
-  //     automatica ON ⇒ azione `candidate_change`.
+  //   - l'owner l'ha sbloccato/approvato a mano dalla dashboard (`reviewDecision==='accepted'`), OPPURE
+  //   - la pipeline l'ha auto-approvato al momento del giudizio: tutti i giudici
+  //     "aligned" E modalità automatica ON ⇒ azione `candidate_change`, OPPURE
+  //   - la modalità automatica è ON ORA (`opts.autoMode`) e il feedback è allineato:
+  //     così attivando l'automatica anche i VECCHI allineati (giudicati quando
+  //     era OFF, senza `candidate_change` inciso) entrano in coda.
   // Tutto il resto (panel parziale/non filtrato, blocchi attacco/spam/design,
   // aligned con automatica OFF, feedback non ancora giudicati) NON è approvato e
   // resta nei "Ricevuti" in attesa dell'approvazione manuale dell'owner.
-  function isApproved(fb) {
+  function isApproved(fb, opts) {
     if (!fb) return false;
     if (fb.reviewDecision === 'accepted') return true;
     const p = fb.pipeline;
     if (p && p.action === 'candidate_change') return true;
+    if (opts && opts.autoMode && isAligned(fb)) return true;
     return false;
   }
 
