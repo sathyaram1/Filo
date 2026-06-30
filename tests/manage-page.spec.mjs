@@ -911,6 +911,123 @@ test('owner accetta e sblocca un feedback bloccato → patch corretto + esce dai
   await expect(page.locator('.mg-item')).toHaveCount(0);
 });
 
+// ── Allineati (tutti i giudici d'accordo): bordo BLU, approva → coda ─────────
+// Panel completo, 4 verdetti 'aligned', giudicato con automatica OFF (action
+// human_review, niente candidate_change inciso): è un "vecchio allineato".
+const FAKE_FB_ALIGNED = {
+  _id: 'test-fb-aligned',
+  text: 'Suggerimento utile e allineato.',
+  name: 'Test allineato',
+  seq: 55, subSeq: 0, status: 'todo',
+  clientId: 'tester@example.com', createdAt: '2026-06-29T10:00:00Z', images: [],
+  pipeline: {
+    action: 'human_review', l2Class: 'aligned',
+    expectedJudges: ['fixed_1', 'fixed_2', 'fixed_3', 'dynamic'],
+    verdicts: ['fixed_1', 'fixed_2', 'fixed_3', 'dynamic'].map((j) => ({ judge: j, class: 'aligned', reasoning: 'Bug reale.' })),
+    stage: 'L2', decidedAt: '2026-06-29T10:01:00Z',
+  },
+};
+
+test('un allineato ha il border-left BLU e sta nei Ricevuti finché l automatica è OFF (#1)', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_MANAGE_REVIEW);
+
+  // Logica pura: non è un blocco (classifyBlock null) ma è allineato.
+  const out = await page.evaluate((fb) => ({
+    cl: window.SN_MANAGE_REVIEW.classifyBlock(fb),
+    aligned: window.SN_MANAGE_REVIEW.isAligned(fb),
+    tab: window.SN_MANAGE_REVIEW.manageTabFor(fb),
+  }), FAKE_FB_ALIGNED);
+  expect(out.cl).toBeNull();
+  expect(out.aligned).toBe(true);
+  expect(out.tab).toBe('inbox'); // automatica OFF → resta nei Ricevuti
+
+  await page.evaluate((fb) => { window.__mgTest.setAdmin(true); window.__mgTest.setData([fb]); window.__mgTest.setTab('inbox'); }, FAKE_FB_ALIGNED);
+  await expect(page.locator('.mg-item')).toHaveCount(1);
+  await expect(page.locator('.mg-item--aligned')).toHaveCount(1);
+
+  // Border-left BLU (#5b6ee0 → rgb(91, 110, 224)), distinto dai blocchi.
+  const border = await page.locator('.mg-item').evaluate((el) => getComputedStyle(el).borderLeftColor);
+  expect(border).toBe('rgb(91, 110, 224)');
+});
+
+test('un allineato nei Ricevuti mostra "Approva e metti in coda" → patch corretto + esce dai Ricevuti (#2)', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
+
+  await page.evaluate(() => {
+    window.__updates = [];
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'feedback_update') { window.__updates.push(msg); return { ok: true }; }
+      return orig(msg);
+    };
+  });
+
+  await page.evaluate((fb) => {
+    window.__mgTest.setAdmin(true);
+    window.__mgTest.setData([fb]);
+    window.__mgTest.setTab('inbox');
+    window.__mgTest.openDetail(fb._id);
+  }, FAKE_FB_ALIGNED);
+
+  // Il box azione è visibile col testo di approvazione (non "sblocca").
+  await expect(page.locator('#mgActions')).toBeVisible();
+  await expect(page.locator('#mgAcceptBtn')).toHaveText('Approva e metti in coda');
+
+  await page.locator('#mgAcceptBtn').click();
+
+  // Il patch approva e mette in coda (accepted + todo).
+  await expect.poll(() => page.evaluate(() => window.__updates.length)).toBe(1);
+  const patch = await page.evaluate(() => window.__updates[0]);
+  expect(patch.reviewDecision).toBe('accepted');
+  expect(patch.status).toBe('todo');
+
+  // Approvato → lascia i Ricevuti.
+  await expect(page.locator('#mgDetail')).toBeHidden();
+  await expect(page.locator('.mg-item')).toHaveCount(0);
+});
+
+test('automatica ON: i vecchi allineati passano da Ricevuti a In coda; OFF tornano (#3)', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_MANAGE_REVIEW);
+
+  // Owner + dati. Default automatica OFF → l'allineato è nei Ricevuti.
+  await page.evaluate((fb) => { window.__mgTest.setAdmin(true); window.__mgTest.setData([fb]); window.__mgTest.setTab('inbox'); }, FAKE_FB_ALIGNED);
+  await expect(page.locator('.mg-item')).toHaveCount(1);
+
+  // In coda è vuota finché l'automatica è OFF.
+  await page.locator('.mg-tab[data-tab="queue"]').click();
+  await expect(page.locator('.mg-item')).toHaveCount(0);
+
+  // Accendi l'automatica (come l'owner): il change handler ricalcola la lista.
+  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await page.evaluate(() => {
+    const el = document.getElementById('mgAutoToggle');
+    el.disabled = false; el.checked = true;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+
+  // Ora l'allineato è In coda, e NON più nei Ricevuti.
+  await page.locator('.mg-tab[data-tab="queue"]').click();
+  await expect(page.locator('.mg-item')).toHaveCount(1);
+  await page.locator('.mg-tab[data-tab="inbox"]').click();
+  await expect(page.locator('.mg-item')).toHaveCount(0);
+
+  // Spegnendo l'automatica torna nei Ricevuti (la lente è reversibile).
+  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await page.evaluate(() => {
+    const el = document.getElementById('mgAutoToggle');
+    el.checked = false;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await page.locator('.mg-tab[data-tab="inbox"]').click();
+  await expect(page.locator('.mg-item')).toHaveCount(1);
+});
+
 test('un feedback in `clarify` mostra il box risposta dell owner sotto Ricevuti (DB1)', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
