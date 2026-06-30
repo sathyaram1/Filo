@@ -430,7 +430,8 @@
     } else {
       // DB3: passa la versione rilasciata così "Risolti" contiene solo i fix
       // davvero in produzione; i done-ma-non-ancora-spediti restano in "In coda".
-      currentList = MR.listForManageTab(allFeedbacks, currentTab, { releasedVersion });
+      // `autoMode`: ON ⇒ gli allineati entrano in coda (anche i vecchi).
+      currentList = MR.listForManageTab(allFeedbacks, currentTab, { releasedVersion, autoMode: autoModeOn });
     }
 
     // Barra "Ri-valuta i non filtrati": compare solo nei Ricevuti quando c'è
