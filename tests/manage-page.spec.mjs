@@ -936,6 +936,91 @@ test('owner ripristina un feedback archiviato → bottone "Ripristina" + patch s
   await expect(page.locator('.mg-item')).toHaveCount(0);
 });
 
+// ── Priorità visibile + modificabile dalla coda ─────────────────────────────
+// I feedback "In coda" mostrano i pallini priorità; per l'owner il click li
+// modifica (patch priority + priorityManual) e la coda si riordina (priorità
+// più alta prima).
+const FB_QUEUE_A = {
+  _id: 'fb-prio-a', text: 'Feedback A in coda.', name: 'Coda A',
+  seq: 30, subSeq: 0, status: 'todo', reviewDecision: 'accepted', priority: 0,
+  clientId: 'tester@example.com', createdAt: '2026-06-22T10:00:00Z', images: [],
+};
+const FB_QUEUE_B = {
+  _id: 'fb-prio-b', text: 'Feedback B in coda.', name: 'Coda B',
+  seq: 31, subSeq: 0, status: 'todo', reviewDecision: 'accepted', priority: 0,
+  clientId: 'tester@example.com', createdAt: '2026-06-21T10:00:00Z', images: [],
+};
+
+test('In coda: i pallini priorità sono visibili e il click li imposta (patch + riordino)', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
+  await stubFeedbackUpdate(page);
+
+  await page.evaluate((fbs) => {
+    window.__mgTest.setAdmin(true);
+    window.__mgTest.setData(fbs);
+    window.__mgTest.setTab('queue');
+  }, [FB_QUEUE_A, FB_QUEUE_B]);
+
+  // Due card in coda, ciascuna con 3 pallini priorità (owner → bottoni cliccabili).
+  await expect(page.locator('.mg-item')).toHaveCount(2);
+  await expect(page.locator('.mg-item .mg-priority')).toHaveCount(2);
+  await expect(page.locator('.mg-item').first().locator('.mg-dot')).toHaveCount(3);
+
+  // Ordine iniziale: priorità 0 ovunque → per recenza, A (22) prima di B (21).
+  await expect(page.locator('.mg-item-title').first()).toHaveText('Coda A');
+
+  // Alza B a priorità 3 cliccando il terzo pallino della sua card.
+  const cardB = page.locator('.mg-item', { hasText: 'Coda B' });
+  await cardB.locator('.mg-dot').nth(2).click();
+
+  // Patch inviato: priority=3 + priorityManual=true (scelta manuale dell'owner).
+  await expect.poll(() => page.evaluate(() => window.__updates.length)).toBe(1);
+  const patch = await page.evaluate(() => window.__updates[0]);
+  expect(patch.id).toBe('fb-prio-b');
+  expect(patch.priority).toBe(3);
+  expect(patch.priorityManual).toBe(true);
+
+  // La coda si riordina: B (priorità 3) sale in cima, sopra A (priorità 0).
+  await expect(page.locator('.mg-item-title').first()).toHaveText('Coda B');
+  // I tre pallini di B sono ora accesi.
+  await expect(page.locator('.mg-item', { hasText: 'Coda B' }).locator('.mg-dot--on')).toHaveCount(3);
+
+  // Il click sul pallino NON deve aprire il dettaglio (è un'azione a parte).
+  await expect(page.locator('#mgDetail')).toBeHidden();
+});
+
+test('Priorità: ri-clic sul pallino attivo azzera; per i non-admin i pallini sono in sola lettura', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
+  await stubFeedbackUpdate(page);
+
+  // Owner: parte da priorità 2, ri-clic sul 2° pallino → azzera (priority 0).
+  await page.evaluate((fb) => {
+    window.__mgTest.setAdmin(true);
+    window.__mgTest.setData([{ ...fb, priority: 2 }]);
+    window.__mgTest.setTab('queue');
+  }, FB_QUEUE_A);
+
+  await expect(page.locator('.mg-item .mg-dot--on')).toHaveCount(2);
+  await page.locator('.mg-item .mg-dot').nth(1).click();
+  await expect.poll(() => page.evaluate(() => window.__updates.length)).toBe(1);
+  const patch = await page.evaluate(() => window.__updates[0]);
+  expect(patch.priority).toBe(0);
+
+  // Non-admin: i pallini ci sono ma sono in sola lettura (nessun bottone cliccabile).
+  await page.evaluate((fb) => {
+    window.__mgTest.setAdmin(false);
+    window.__mgTest.setData([{ ...fb, priority: 1 }]);
+    window.__mgTest.setTab('queue');
+  }, FB_QUEUE_A);
+  await expect(page.locator('.mg-item .mg-priority')).toHaveCount(1);
+  await expect(page.locator('.mg-item .mg-dot--readonly')).toHaveCount(3);
+  await expect(page.locator('.mg-item button.mg-dot')).toHaveCount(0);
+});
+
 test('la pagina carica senza errori JavaScript', async ({ openTab }) => {
   const errors = [];
   const page = await openTab(URL);
