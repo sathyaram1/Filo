@@ -128,6 +128,7 @@
   // modificabile solo dall'owner (read-only per gli altri, come il resto della
   // pagina).
   function reflectAutoMode(on) {
+    autoModeOn = !!on;
     mgAutoToggle.checked = !!on;
     mgAutoState.textContent = on ? 'On' : 'Off';
   }
