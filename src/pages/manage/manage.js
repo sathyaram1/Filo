@@ -157,6 +157,8 @@
     mgAutoSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
     if (mgLoopCap)     mgLoopCap.disabled = !isAdmin;
     if (mgLoopCapSave) mgLoopCapSave.disabled = !isAdmin;
+    if (mgJudgeTimeout)     mgJudgeTimeout.disabled = !isAdmin;
+    if (mgJudgeTimeoutSave) mgJudgeTimeoutSave.disabled = !isAdmin;
   }
 
   // ── Tentativi del loop di correzione (tab Automazioni) ────────────────────
