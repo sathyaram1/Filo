@@ -846,7 +846,7 @@
       closeSidebar();
       renderList();
     } catch (e) {
-      setActionMsg(e.message || 'Errore nello sblocco', 'err');
+      setActionMsg(e.message || (wasBlocked ? 'Errore nello sblocco' : 'Errore nell\'approvazione'), 'err');
     } finally {
       mgAcceptBtn.disabled = false;
     }
