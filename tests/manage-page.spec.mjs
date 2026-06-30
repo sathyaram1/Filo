@@ -564,7 +564,7 @@ const FAKE_FB_FULL_PANEL = {
   },
 };
 
-test('colori giudici: il pallino "design" combacia col bordo blu della card; "aligned" è verde e diverso', async ({ openTab }) => {
+test('colori giudici: scala rosso→giallo→verde→blu; "design" è verde e combacia col bordo della card, "aligned" è blu', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_MANAGE_REVIEW);
@@ -572,18 +572,21 @@ test('colori giudici: il pallino "design" combacia col bordo blu della card; "al
   await page.evaluate((fb) => { window.__mgTest.setAdmin(true); window.__mgTest.setData([fb]); }, FAKE_FB_FULL_PANEL);
   await page.evaluate((id) => window.__mgTest.openDetail(id), FAKE_FB_FULL_PANEL._id);
 
-  // Bordo della card per un aggregato "design" = il blu di REASONS.design.
+  // Bordo della card per un aggregato "design" = il verde di REASONS.design.
   const itemBorder = await page.locator('.mg-item').evaluate((el) => getComputedStyle(el).borderLeftColor);
   const designDot = await page.locator('#mgJudgesRow .mg-dot--design').first().evaluate((el) => getComputedStyle(el).backgroundColor);
   const alignedDot = await page.locator('#mgJudgesRow .mg-dot--aligned').first().evaluate((el) => getComputedStyle(el).backgroundColor);
 
   // Il pallino "design" ha lo STESSO colore del bordo "design" della card.
   expect(designDot).toBe(itemBorder);
-  // "aligned" (verde) è distinto da "design" (blu): nessuno scambio.
+  // "design" (verde) e "aligned" (blu) sono distinti: nessuno scambio.
   expect(alignedDot).not.toBe(designDot);
-  // E "aligned" è verde (canale G dominante), non blu.
-  const g = alignedDot.match(/\d+/g).map(Number);
-  expect(g[1]).toBeGreaterThan(g[2]); // verde > blu
+  // "design" è verde (canale G dominante).
+  const d = designDot.match(/\d+/g).map(Number);
+  expect(d[1]).toBeGreaterThan(d[2]); // verde > blu
+  // "aligned" è blu (canale B dominante).
+  const a = alignedDot.match(/\d+/g).map(Number);
+  expect(a[2]).toBeGreaterThan(a[1]); // blu > verde
 });
 
 // Caso #261: un feedback dell'automazione dell'owner (routine:) che era stato
