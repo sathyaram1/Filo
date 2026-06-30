@@ -343,7 +343,7 @@
   }
 
   global.SN_MANAGE_REVIEW = {
-    classifyBlock, sortReview, REASONS, manageTabFor, listForManageTab,
+    classifyBlock, sortReview, REASONS, manageTabFor, listForManageTab, priorityOf,
     isStarred, listArchiveTab, isShipped, cmpVersion, listBoardTab,
     hasReopenRequest, canReopen, isApproved,
     panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE, isTrustedClient,
