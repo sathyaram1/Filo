@@ -178,6 +178,14 @@ async function update(partial, idToken) {
     fields.judgeRegistry = toFsValue(sanitizeRegistry(partial.judgeRegistry));
     mask.push('judgeRegistry');
   }
+  // Timeout per giudice (ms): si scrive solo se passato un numero valido, clampato.
+  if (partial.judgeTimeoutMs != null && Number.isFinite(Number(partial.judgeTimeoutMs))) {
+    const ms = clampTimeoutMs(partial.judgeTimeoutMs);
+    if (ms != null) {
+      fields.judgeTimeoutMs = toFsValue(ms);
+      mask.push('judgeTimeoutMs');
+    }
+  }
   if (mask.length) await patchDoc(SUPPORT_MODELS_DOC, fields, mask, idToken);
 
   // Chiave giudici (doc separato): scrivi solo se digitata.
