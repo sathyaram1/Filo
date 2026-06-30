@@ -543,6 +543,49 @@ test('storico parziale (2 verdetti su 4, senza expectedJudges) → bianco e 4 pa
   await expect(page.locator('#mgJudgesRow .mg-dot--empty')).toHaveCount(2);
 });
 
+// Coerenza dei colori: il pallino di un giudice DEVE avere lo stesso colore del
+// bordo della card per quella classe (es. "design" blu = stesso blu del bordo).
+// "aligned" è l'esito buono: pallino verde, distinto dal blu di "design". Questo
+// blinda lo scambio design↔aligned che mostrava i giudici col colore sbagliato.
+const FAKE_FB_FULL_PANEL = {
+  _id: 'test-fb-colors', text: 'Feedback con panel completo per i colori dei giudici.',
+  name: 'Colori giudici', seq: 252, subSeq: 0, status: 'new',
+  clientId: 'tester@example.com', createdAt: '2026-06-28T10:00:00Z', images: [],
+  pipeline: {
+    action: 'human_review', l2Class: 'design',
+    expectedJudges: ['fixed_1', 'fixed_2', 'fixed_3', 'dynamic'],
+    verdicts: [
+      { judge: 'fixed_1', class: 'design', reasoning: 'Fuori scope.' },
+      { judge: 'fixed_2', class: 'aligned', reasoning: 'Bug reale.' },
+      { judge: 'fixed_3', class: 'aligned', reasoning: 'Bug reale.' },
+      { judge: 'dynamic', class: 'aligned', reasoning: 'Bug reale.' },
+    ],
+    stage: 'L2',
+  },
+};
+
+test('colori giudici: il pallino "design" combacia col bordo blu della card; "aligned" è verde e diverso', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_MANAGE_REVIEW);
+
+  await page.evaluate((fb) => { window.__mgTest.setAdmin(true); window.__mgTest.setData([fb]); }, FAKE_FB_FULL_PANEL);
+  await page.evaluate((id) => window.__mgTest.openDetail(id), FAKE_FB_FULL_PANEL._id);
+
+  // Bordo della card per un aggregato "design" = il blu di REASONS.design.
+  const itemBorder = await page.locator('.mg-item').evaluate((el) => getComputedStyle(el).borderLeftColor);
+  const designDot = await page.locator('#mgJudgesRow .mg-dot--design').first().evaluate((el) => getComputedStyle(el).backgroundColor);
+  const alignedDot = await page.locator('#mgJudgesRow .mg-dot--aligned').first().evaluate((el) => getComputedStyle(el).backgroundColor);
+
+  // Il pallino "design" ha lo STESSO colore del bordo "design" della card.
+  expect(designDot).toBe(itemBorder);
+  // "aligned" (verde) è distinto da "design" (blu): nessuno scambio.
+  expect(alignedDot).not.toBe(designDot);
+  // E "aligned" è verde (canale G dominante), non blu.
+  const g = alignedDot.match(/\d+/g).map(Number);
+  expect(g[1]).toBeGreaterThan(g[2]); // verde > blu
+});
+
 // Caso #261: un feedback dell'automazione dell'owner (routine:) che era stato
 // bloccato a L1 (identità flaggata per errore) NON deve apparire come attacco
 // (rosso) ma come "da ri-giudicare" (bianco), con il panel atteso tratteggiato.
