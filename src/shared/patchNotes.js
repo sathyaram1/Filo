@@ -16,6 +16,16 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.96', date: '2026-06-30',
+      features: [
+        'Nella dashboard di gestione i feedback su cui tutti i giudici sono d\'accordo (allineati) ora hanno un bordo blu, così li riconosci a colpo d\'occhio.',
+        'Puoi approvare un feedback allineato e metterlo in coda con un pulsante dedicato, senza dover attivare la modalità automatica.',
+      ],
+      fixes: [
+        'Attivando la modalità automatica ora anche i feedback allineati già ricevuti in precedenza passano in coda (prima restavano nei Ricevuti); disattivandola tornano in attesa di approvazione.',
+      ],
+    },
+    {
       version: '0.2.94', date: '2026-06-30',
       features: [
         'Nella dashboard di gestione, i feedback "In coda" mostrano ora la priorità con dei pallini e puoi cambiarla con un clic: la coda si riordina mettendo per prima la priorità più alta.',
