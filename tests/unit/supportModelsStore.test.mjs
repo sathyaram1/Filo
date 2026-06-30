@@ -13,7 +13,7 @@ const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
 
-const { SLOTS, sanitizeRegistry } = require(join(ROOT, 'src', 'main', 'services', 'supportModelsStore.js'));
+const { SLOTS, sanitizeRegistry, clampTimeoutMs } = require(join(ROOT, 'src', 'main', 'services', 'supportModelsStore.js'));
 
 test('SLOTS espone uno slot per ogni giudice del panel L2 + dinamico', () => {
   for (const slot of ['judge1', 'judge2', 'judge3', 'judgeDynamic']) {
