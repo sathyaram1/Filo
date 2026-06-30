@@ -234,6 +234,54 @@
   // Digitando si azzera il messaggio di esito precedente.
   if (mgLoopCap) mgLoopCap.addEventListener('input', () => setLoopCapMsg('', null));
 
+  // ── Timeout dei giudici ────────────────────────────────────────────────────
+  // Fonte di verità: config/supportModels (campo `judgeTimeoutMs`, in MS), che il
+  // backend dei giudici legge per ogni chiamata. La UI lavora in SECONDI; salva e
+  // legge via i messaggi support_models_* (PATCH per-campo: non tocca i modelli).
+  const JT_DEF = AUTOMATION.JUDGE_TIMEOUT_DEFAULT_S || 60;
+  const JT_MIN = AUTOMATION.JUDGE_TIMEOUT_MIN_S || 10;
+  const JT_MAX = AUTOMATION.JUDGE_TIMEOUT_MAX_S || 120;
+  function clampJudgeTimeoutS(n) {
+    const v = Math.round(Number(n));
+    if (!Number.isFinite(v)) return JT_DEF;
+    return Math.min(JT_MAX, Math.max(JT_MIN, v));
+  }
+  function setJudgeTimeoutMsg(text, kind) {
+    if (!mgJudgeTimeoutMsg) return;
+    mgJudgeTimeoutMsg.textContent = text || '';
+    mgJudgeTimeoutMsg.classList.toggle('mg-ok', kind === 'ok');
+    mgJudgeTimeoutMsg.classList.toggle('mg-err', kind === 'err');
+  }
+  async function loadJudgeTimeout() {
+    if (!mgJudgeTimeout) return;
+    let seconds = JT_DEF;
+    try {
+      const r = await sendToMain({ type: 'support_models_get' });
+      const ms = r && r.ok !== false && r.models ? r.models.judgeTimeoutMs : null;
+      if (ms != null && Number.isFinite(Number(ms))) seconds = clampJudgeTimeoutS(Number(ms) / 1000);
+    } catch (_) { /* offline → resta il default */ }
+    mgJudgeTimeout.value = String(seconds);
+  }
+  async function saveJudgeTimeout() {
+    if (!mgJudgeTimeout) return;
+    const seconds = clampJudgeTimeoutS(mgJudgeTimeout.value);
+    mgJudgeTimeout.value = String(seconds); // normalizza i fuori-range
+    try {
+      const r = await sendToMain({ type: 'support_models_update', judgeTimeoutMs: seconds * 1000 });
+      if (!r || r.ok === false) { setJudgeTimeoutMsg('Salvataggio fallito.', 'err'); return; }
+      const savedMs = r.models && r.models.judgeTimeoutMs;
+      if (savedMs != null && Number.isFinite(Number(savedMs))) {
+        mgJudgeTimeout.value = String(clampJudgeTimeoutS(Number(savedMs) / 1000));
+      }
+      setJudgeTimeoutMsg('Salvato.', 'ok');
+    } catch (err) {
+      setJudgeTimeoutMsg('Salvataggio fallito.', 'err');
+      console.error('[manage] salvataggio timeout giudici fallito:', err);
+    }
+  }
+  if (mgJudgeTimeoutSave) mgJudgeTimeoutSave.addEventListener('click', saveJudgeTimeout);
+  if (mgJudgeTimeout) mgJudgeTimeout.addEventListener('input', () => setJudgeTimeoutMsg('', null));
+
   // ── Tab bar ───────────────────────────────────────────────────────────────
   // Le tab-lista (inbox/queue/resolved/archived) condividono il pannello
   // `panel-list`: cambia solo quale sottoinsieme di feedback popola la lista a
