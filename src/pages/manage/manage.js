@@ -476,34 +476,58 @@
     mgReevalBtn.disabled = true;
 
     const total = ids.length;
-    let valued = 0;            // quanti effettivamente ri-valutati
-    let stopped = null;        // 'budget' | 'error' se ci fermiamo prima della fine
+    let valued = 0;            // quanti feedback hanno recuperato almeno un giudice
+    let wasteStreak = 0;       // ri-valutazioni di fila che hanno speso crediti a vuoto
+    let stopped = null;        // 'budget' | 'error' | 'nofix' se ci fermiamo prima
 
     for (let i = 0; i < total; i++) {
       const id = ids[i];
       setReevalMsg(`Valutazione ${i + 1} di ${total}…`, '');
       const card = startCardEvaluating(id);
+      let r;
       try {
-        const r = await sendToMain({ type: 'feedback_reevaluate', feedbackIds: [id] });
-        if (!r || r.ok === false) { stopped = 'error'; stopCardEvaluating(card); break; }
-        if (r.reevaluated) valued += r.reevaluated;
-        // Un singolo id non ri-valutato ma "remaining" = limite/budget raggiunto:
-        // inutile insistere sugli altri, fermati e invita a riprovare più tardi.
-        else if (r.remaining) { stopped = 'budget'; stopCardEvaluating(card); break; }
+        r = await sendToMain({ type: 'feedback_reevaluate', feedbackIds: [id] });
       } catch (e) {
         stopped = 'error';
         stopCardEvaluating(card);
         break;
       }
       stopCardEvaluating(card);
+      const { outcome, recovered } = MR.classifyReevalResult(r);
+      if (outcome === 'error') { stopped = 'error'; break; }
+      // "remaining" lato server = budget/tempo esaurito: fermati e riprova dopo.
+      if (outcome === 'budget') { stopped = 'budget'; break; }
+      if (outcome === 'recovered') {
+        valued += recovered ? 1 : 0;
+        wasteStreak = 0;
+      } else if (outcome === 'wasted') {
+        // Giudici ri-eseguiti ma nessuno recuperato: crediti spesi, feedback
+        // ancora bianco. Se càpita più volte di fila è quasi certo un problema di
+        // modelli/credito: fermati per non bruciare crediti sul resto della lista.
+        wasteStreak += 1;
+        if (wasteStreak >= MR.REEVAL_WASTE_LIMIT) { stopped = 'nofix'; break; }
+      }
+      // 'noop' (niente da fare): non spende crediti, prosegui.
     }
 
     if (stopped === 'budget') {
-      setReevalMsg(`Valutati ${valued} feedback. Limite raggiunto: riprova più tardi.`, 'ok');
+      setReevalMsg(`Recuperati ${valued} feedback. Limite raggiunto: riprova più tardi.`, 'ok');
     } else if (stopped === 'error') {
-      setReevalMsg(`Valutati ${valued} feedback prima di un errore. Riprova per continuare.`, 'err');
+      setReevalMsg(`Recuperati ${valued} feedback prima di un errore. Riprova per continuare.`, 'err');
+    } else if (stopped === 'nofix') {
+      // L'owner deve sapere che i crediti sono stati spesi senza risultato: i
+      // giudici continuano a non rispondere (probabile modello/credito).
+      setReevalMsg(
+        `Mi sono fermato: i giudici hanno continuato a non rispondere e i crediti spesi non hanno prodotto verdetti (probabile problema di modelli o credito). Recuperati ${valued} feedback.`,
+        'err'
+      );
     } else {
-      setReevalMsg(valued ? `Valutati ${valued} feedback.` : 'Nessun cambiamento.', 'ok');
+      setReevalMsg(
+        valued
+          ? `Recuperati ${valued} feedback.`
+          : 'Nessun giudice recuperato: i feedback sono rimasti non filtrati (controlla modelli e credito dei giudici).',
+        valued ? 'ok' : 'err'
+      );
     }
 
     // Ricarica: i feedback giudicati escono dai bianchi e si spostano di tab.
