@@ -21,6 +21,9 @@
   const mgLoopCap    = document.getElementById('mgLoopCap');
   const mgLoopCapSave = document.getElementById('mgLoopCapSave');
   const mgLoopCapMsg  = document.getElementById('mgLoopCapMsg');
+  const mgJudgeTimeout     = document.getElementById('mgJudgeTimeout');
+  const mgJudgeTimeoutSave = document.getElementById('mgJudgeTimeoutSave');
+  const mgJudgeTimeoutMsg  = document.getElementById('mgJudgeTimeoutMsg');
 
   // Lista (tab corrente)
   const mgListHead     = document.getElementById('mgListHead');
