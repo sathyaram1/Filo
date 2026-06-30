@@ -375,6 +375,8 @@ module.exports = function register(on, ctx) {
       const partial = Object.assign({}, msg.models || {});
       if (msg.judgeRegistry && typeof msg.judgeRegistry === 'object') partial.judgeRegistry = msg.judgeRegistry;
       if (typeof msg.openrouterKey === 'string') partial.openrouterKey = msg.openrouterKey;
+      // Timeout per giudice (ms): solo se passato (PATCH per-campo, non tocca il resto).
+      if (msg.judgeTimeoutMs != null) partial.judgeTimeoutMs = msg.judgeTimeoutMs;
       const models = await SupportModels.update(partial, idToken);
       return { ok: true, models };
     } catch (e) {
