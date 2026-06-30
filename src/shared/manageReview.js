@@ -387,6 +387,7 @@
     isStarred, listArchiveTab, isShipped, cmpVersion, listBoardTab,
     hasReopenRequest, canReopen, isApproved,
     panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE, isTrustedClient,
+    classifyReevalResult, REEVAL_WASTE_LIMIT,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
