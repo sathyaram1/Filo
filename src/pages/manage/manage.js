@@ -815,8 +815,10 @@
     if (!selectedId) return;
     const id = selectedId;
     const comment = (mgAcceptComment.value || '').trim();
+    const fbSel = allFeedbacks.find((f) => f._id === id);
+    const wasBlocked = fbSel ? MR.classifyBlock(fbSel) !== null : true;
     mgAcceptBtn.disabled = true;
-    setActionMsg('Sblocco in corso…', '');
+    setActionMsg(wasBlocked ? 'Sblocco in corso…' : 'Approvazione in corso…', '');
     try {
       // Override owner: il feedback esce dai bloccati e rientra nella coda (todo).
       const r = await sendToMain({
