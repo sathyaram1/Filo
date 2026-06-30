@@ -240,4 +240,4 @@ function sanitizeRegistry(reg) {
   return out;
 }
 
-module.exports = { get, update, SLOTS, sanitizeRegistry };
+module.exports = { get, update, SLOTS, sanitizeRegistry, clampTimeoutMs };
