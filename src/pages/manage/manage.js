@@ -410,7 +410,12 @@
         <span class="mg-item-title">${esc(title)}</span>
         ${priorityDotsHtml(fb)}
       `;
-      item.addEventListener('click', () => openDetail(fb._id));
+      item.addEventListener('click', (e) => {
+        // Il click su un pallino priorità non apre il dettaglio (lo gestisce il
+        // listener delegato di mgList).
+        if (e.target.closest('.mg-dot')) return;
+        openDetail(fb._id);
+      });
       mgList.appendChild(item);
     }
   }
