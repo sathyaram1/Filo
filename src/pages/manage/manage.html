@@ -811,6 +811,23 @@
             <span class="mg-action-msg" id="mgLoopCapMsg" role="status"></span>
           </div>
         </section>
+
+        <!-- Timeout di ogni giudice di sicurezza (secondi). -->
+        <section class="mg-auto-block">
+          <label class="mg-auto-field-label" for="mgJudgeTimeout">Timeout dei giudici (secondi)</label>
+          <p class="mg-auto-block-desc">
+            Quanto Filo aspetta la risposta di ogni giudice prima di considerarlo
+            "non pervenuto". Con modelli che ragionano a lungo, alza il valore: se
+            è troppo basso il giudice non fa in tempo a rispondere e il feedback
+            resta "non filtrato".
+          </p>
+          <div class="mg-auto-field-row">
+            <input type="number" id="mgJudgeTimeout" class="mg-auto-number"
+              min="10" max="120" step="1" inputmode="numeric" />
+            <button type="button" class="sn-btn" id="mgJudgeTimeoutSave">Salva</button>
+            <span class="mg-action-msg" id="mgJudgeTimeoutMsg" role="status"></span>
+          </div>
+        </section>
       </div>
     </section>
 
