@@ -220,6 +220,13 @@
 
     wrap.appendChild(link);
     wrap.appendChild(form);
+
+    // Form riaperto da solo dopo il login: sposta il focus sulla textarea
+    // appena il nodo è nel DOM (subito dopo renderList l'ha già inserito).
+    if (reopenAfterLogin) {
+      requestAnimationFrame(() => { try { textarea.focus(); } catch (_) {} });
+    }
+
     return wrap;
   }
 
