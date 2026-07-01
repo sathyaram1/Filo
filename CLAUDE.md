@@ -117,6 +117,15 @@ Il minimo accettabile dipende dall'ambiente:
   Gemini) dipende dalla chiave API in `tests/agent/.env` — può non essere
   disponibile.
 
+- **Electron in cloud — preparalo una volta**: l'installer nativo di Electron
+  abortisce il download del binario dietro il proxy, quindi un `npm install`
+  secco fallisce. Installa saltando quel download e prendi il binario con `curl`
+  (idempotente): `ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install && node
+  scripts/ensure-electron.mjs`. Poi, da **root**, lancia i test con
+  `ELECTRON_DISABLE_SANDBOX=1 xvfb-run -a npm test` (idem `test:shoot`). Il
+  `SessionStart` hook lo fa già all'avvio della sessione, ma tienilo a mente se
+  reinstalli le dipendenze a mano.
+
 - **Se la verifica non è possibile** (es. richiede hardware che Playwright non
   simula): dichiaralo esplicitamente nel report finale — "implementato ma non
   verificato perché X", così l'utente sa che deve provarlo a mano.
