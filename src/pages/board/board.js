@@ -204,11 +204,13 @@
             // `openReopenAfterLogin` resta impostato fino a QUESTO render finale
             // (i render intermedi innescati da refreshAuth/AUTH_CHANGED non lo
             // devono consumare prima del tempo, altrimenti il form si richiude
-            // subito dopo essersi aperto).
+            // subito dopo essersi aperto): se il login non è riuscito lo si
+            // azzera PRIMA di ridisegnare, altrimenti resta impostato per
+            // questo render (che apre il form) e viene azzerato subito dopo.
             const ok = !!(r && r.ok && signedIn && uid);
-            openReopenAfterLogin = null;
+            if (!ok) openReopenAfterLogin = null;
             renderList();
-            if (ok) return; // già riaperto dentro renderList tramite reopenAfterLogin
+            if (ok) openReopenAfterLogin = null;
           })
           .catch(() => { openReopenAfterLogin = null; renderList(); });
         return;
