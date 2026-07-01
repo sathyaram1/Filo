@@ -122,9 +122,10 @@ Il minimo accettabile dipende dall'ambiente:
   secco fallisce. Installa saltando quel download e prendi il binario con `curl`
   (idempotente): `ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install && node
   scripts/ensure-electron.mjs`. Poi, da **root**, lancia i test con
-  `ELECTRON_DISABLE_SANDBOX=1 xvfb-run -a npm test` (idem `test:shoot`). Il
-  `SessionStart` hook lo fa già all'avvio della sessione, ma tienilo a mente se
-  reinstalli le dipendenze a mano.
+  `ELECTRON_DISABLE_SANDBOX=1 xvfb-run -a npm test` (idem `test:shoot`).
+  L'ideale è farlo fare al `SessionStart` hook (`.claude/hooks/session-start.sh`)
+  così ogni routine parte pronta; finché quel blocco non è aggiunto, il worker
+  lancia `node scripts/ensure-electron.mjs` dopo l'install.
 
 - **Se la verifica non è possibile** (es. richiede hardware che Playwright non
   simula): dichiaralo esplicitamente nel report finale — "implementato ma non
