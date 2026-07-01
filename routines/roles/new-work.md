@@ -2,8 +2,8 @@
 
 Sei un worker `general-purpose`. `scripts/dispatch.mjs` ti ha scelto perché c'è un
 feedback `todo` (vincitore per priorità) da lavorare, e te lo ha già **claimato**
-e **decifrato** (è in `payload.feedback`). Leggi `routines/shared.md` (tono,
-sintomo-vs-causa, invarianti UX, coda git).
+e **decifrato** (è in `payload.feedback`). Le convenzioni di lavoro
+(sintomo-vs-causa, invarianti UX, tono, clarify, verifica) sono in `CLAUDE.md`.
 
 > **M4+M5 fusi.** Solo dopo aver letto il feedback sai se è "spec da spezzare" o
 > "fix normale" — quindi è questo ruolo a decidere e a forkare, non lo script.
