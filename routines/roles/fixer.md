@@ -23,7 +23,7 @@ convenzioni di lavoro (sintomo-vs-causa, invarianti UX, tono, verifica) sono in
    sono spesso la causa.
 5. Implementa il fix sul **comportamento**, non sul messaggio. Se ti trovi a
    cambiare solo una stringa per un bug funzionale, fermati e ripensa.
-6. Applica le **invarianti UX ovvie** rilevanti (vedi `routines/shared.md`).
+6. Applica le **invarianti UX ovvie** rilevanti (vedi `CLAUDE.md` § Iniziativa).
 7. **Verifica** con lo spec mirato della feature:
    ```bash
    npx playwright test tests/<feature>.spec.mjs
