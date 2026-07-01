@@ -1,8 +1,10 @@
 # ROUTINES — l'orchestratore banale delle routine cloud di Filo
 
 Questo file è **solo l'orchestratore**: avvio, loop, budget, sequenzialità, come
-spawna. Non contiene i dettagli dei ruoli: quelli vivono in `routines/roles/*.md`
-(un file per ruolo) e la conoscenza condivisa in `routines/shared.md`.
+spawna. I dettagli di ciascun ruolo vivono in `routines/roles/*.md` (un file per
+ruolo); `scripts/dispatch.mjs` inlina quello giusto al worker. Le convenzioni di
+lavoro (verifica, sintomo-vs-causa, invarianti UX, tono, clarify) stanno in
+`CLAUDE.md`, che arriva a ogni worker.
 
 **Principio centrale (ridisegno 2026-06-27).** L'orchestratore decide solo **SE**
 continuare il loop, non **QUALE** ruolo lanciare. Il "quale" lo decide uno
