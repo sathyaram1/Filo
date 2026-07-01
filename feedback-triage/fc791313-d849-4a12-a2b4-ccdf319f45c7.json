@@ -1,0 +1,7 @@
+{
+  "id": "fc791313-d849-4a12-a2b4-ccdf319f45c7",
+  "status": "done",
+  "notes": "Questo task era già stato completato in una passata precedente (v0.2.83): le routine cloud sanno già catturare uno screenshot fedele dell'interfaccia reale di Filo (shell + scheda, stato dopo un'interazione), usando la cattura del framebuffer del display virtuale. Il feedback è ricomparso in coda per un problema di stato interno (claim/release), non perché il lavoro fosse mancante. Ho riverificato che la funzione è tuttora presente e funzionante: ho rilanciato il test dedicato (tests/capture-composite.spec.mjs) e ho anche generato a mano due nuovi screenshot (nuova scheda e dashboard) — entrambi mostrano davvero l'interfaccia composita, non un'immagine nera. Nessuna modifica al codice del repo: ho solo corretto un problema di ambiente locale a questa macchina (un file di configurazione di Electron con un carattere in più che impediva a Playwright di avviare l'app in questa sessione specifica) e installato lo strumento di cattura schermo mancante su questa macchina — non è qualcosa che va nel codice del progetto.",
+  "queuedAt": "2026-07-01T00:19:18.879Z",
+  "queuedBy": "routine"
+}
