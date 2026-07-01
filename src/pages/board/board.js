@@ -190,12 +190,20 @@
     form.appendChild(err);
     form.appendChild(actions);
 
+    // Se l'utente non è ancora autenticato, l'intenzione (aprire il form "Ancora
+    // rotto?") non va persa: dopo un login riuscito `renderList()` ricrea il DOM,
+    // quindi segniamo l'id del fix in `openReopenAfterLogin` e lo controlliamo
+    // in `renderReopen` alla ricostruzione, per riaprire il form da solo.
     link.addEventListener('click', () => {
       if (!signedIn || !uid) {
+        openReopenAfterLogin = fb._id;
         sendToMain({ type: 'auth_signin' })
-          .then(() => refreshAuth())
-          .then(() => renderList())
-          .catch(() => {});
+          .then((r) => refreshAuth().then(() => r))
+          .then((r) => {
+            if (!(r && r.ok && signedIn && uid)) openReopenAfterLogin = null;
+            renderList();
+          })
+          .catch(() => { openReopenAfterLogin = null; });
         return;
       }
       form.hidden = !form.hidden;
