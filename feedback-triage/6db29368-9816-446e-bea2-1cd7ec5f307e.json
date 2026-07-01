@@ -1,8 +1,0 @@
-{
-  "id": "6db29368-9816-446e-bea2-1cd7ec5f307e",
-  "status": "review",
-  "notes": "Nella Bacheca, se voti un miglioramento (Funziona/Non funziona) o usi 'Ancora rotto?' senza aver ancora fatto l'accesso, ora ti basta accedere una volta sola: l'azione che avevi scelto si completa da sola (il voto viene registrato, il modulo 'Ancora rotto?' si apre gia' pronto da scrivere), senza doverla ripetere con un secondo clic. Verificato con test automatici che simulano il login e controllano che il voto arrivi davvero e che il modulo si apra da solo.",
-  "queuedAt": "2026-07-01T07:38:23.115Z",
-  "queuedBy": "routine",
-  "branch": "worker/6db29368-9816-446e-bea2-1cd7ec5f307e"
-}
