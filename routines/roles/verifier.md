@@ -22,7 +22,10 @@ Convenzioni (tono, sintomo-vs-causa): `CLAUDE.md`.
 1. Il feedback decifrato è nel payload (`feedback.text`, `feedback.images`,
    `feedback.num`, `feedback.id`). Capisci il **sintomo**: cosa voleva fare
    l'utente e cosa lamentava.
-2. `git checkout <branch>`; `npm install` se serve.
+2. `git checkout <branch>`. Se devi installare: in cloud l'installer di Electron
+   abortisce dietro il proxy, quindi usa
+   `ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install && node scripts/ensure-electron.mjs`
+   (idempotente). I test da root: `ELECTRON_DISABLE_SANDBOX=1 xvfb-run -a ...`.
 3. **Riproduci la lamentela** esattamente come la descriverebbe l'utente: esegui
    i suoi passi e verifica che la feature risponda correttamente. Asserisci il
    **successo** (la cosa che l'utente voleva accade), non l'assenza di un certo
