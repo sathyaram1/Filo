@@ -1,20 +1,27 @@
 # Istruzioni per Claude Code
 
-Questo file raccoglie le **convenzioni del repo valide per QUALSIASI agente**
-(locale o cloud). La recipe operativa specifica vive altrove a seconda di chi sei
-→ vedi lo "switch di ruolo" qui sotto.
+Convenzioni valide per **qualsiasi agente** su Filo, locale o cloud. La recipe
+specifica del tuo ruolo sta altrove → switch qui sotto.
 
 ## Switch di ruolo — leggi PRIMA il file giusto
 
-- **Sessione locale** (owner + Claude, prompt normale in chat) → leggi anche
-  **`LOCAL.md`** (cosa si fa in locale, modalità attiva oggi).
-- **Routine cloud** (attivazione schedulata con prompt minimo tipo
-  `"routine automatica."`) → leggi **`ROUTINES.md`** integralmente, più i
-  file-ruolo in **`routines/roles/*`** e la conoscenza condivisa in
-  **`routines/shared.md`**. L'orchestratore banale spawna un worker che lancia
-  `scripts/dispatch.mjs`, che sceglie il ruolo e inlina il file-ruolo giusto.
+- **Sessione locale** (owner + Claude in chat) → leggi anche **`LOCAL.md`** (nella
+  cartella sopra il repo): cosa fai in locale e come si lavora sul backend privato
+  `filo-security`.
+- **Routine cloud** (prompt schedulato tipo `"routine automatica."`) → leggi
+  **`ROUTINES.md`** (l'orchestratore). Quando `scripts/dispatch.mjs` ti assegna un
+  ruolo, il file in **`routines/roles/*`** te lo inlina già: quella è la tua
+  recipe. Questo CLAUDE.md ti arriva comunque — le convenzioni qui sotto valgono
+  anche lì.
 
-In entrambi i casi valgono le convenzioni di questo file.
+## Indipendenza — il basso livello lo decidi tu
+
+Filo è ambizioso e l'owner non entra nel dettaglio tecnico. Lui decide **l'UX**; le
+**scelte architetturali importanti** le discutete insieme e gliele spieghi caso
+per caso. Tutto il resto lo decidi **tu, senza chiedere**: deploy Firebase,
+conflitti git, scelta di una libreria, struttura del codice, come testare.
+Comportati da collaboratore che porta a casa il risultato, non da esecutore che
+aspetta l'ok a ogni passo.
 
 ## PRIMA DI TUTTO: sync con `origin/main`
 
