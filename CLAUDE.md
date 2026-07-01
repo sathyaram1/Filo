@@ -393,7 +393,7 @@ firebase deploy                             # entrambe
 
 Per le convenzioni di scrittura su Firestore (coda su git, `queue-triage.mjs`,
 GitHub Action) e il workflow `todo`→`review`→`done`/`blocked` → vedi
-`ROUTINES.md` e `routines/shared.md`.
+`ROUTINES.md`.
 
 ## Workflow worktree
 
