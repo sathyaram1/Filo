@@ -201,10 +201,16 @@
         sendToMain({ type: 'auth_signin' })
           .then((r) => refreshAuth().then(() => r))
           .then((r) => {
-            if (!(r && r.ok && signedIn && uid)) openReopenAfterLogin = null;
+            // `openReopenAfterLogin` resta impostato fino a QUESTO render finale
+            // (i render intermedi innescati da refreshAuth/AUTH_CHANGED non lo
+            // devono consumare prima del tempo, altrimenti il form si richiude
+            // subito dopo essersi aperto).
+            const ok = !!(r && r.ok && signedIn && uid);
+            openReopenAfterLogin = null;
             renderList();
+            if (ok) return; // già riaperto dentro renderList tramite reopenAfterLogin
           })
-          .catch(() => { openReopenAfterLogin = null; });
+          .catch(() => { openReopenAfterLogin = null; renderList(); });
         return;
       }
       form.hidden = !form.hidden;
