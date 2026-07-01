@@ -282,11 +282,22 @@
   // votante e accredita +10 crediti una sola volta per feedback per utente.
   // Aggiornamento ottimistico locale per reattività immediata, poi sostituito
   // dal tally REALE che il main rilegge da Firestore dopo la scrittura.
+  //
+  // Se l'utente non è ancora autenticato, il voto scelto NON va perso: dopo un
+  // login riuscito il flusso riprende da solo e il voto viene eseguito subito
+  // (niente secondo click). `renderList()` ricrea il DOM (perde `btn`), quindi
+  // il retry richiama onVote con l'`fb` fresco preso dalla lista ricreata.
   function onVote(fb, vote, btn) {
     if (!signedIn || !uid) {
       sendToMain({ type: 'auth_signin' })
-        .then(() => refreshAuth())
-        .then(() => renderList())
+        .then((r) => refreshAuth().then(() => r))
+        .then((r) => {
+          renderList();
+          if (r && r.ok && signedIn && uid) {
+            const freshFb = allFeedbacks.find((x) => x._id === fb._id) || fb;
+            onVote(freshFb, vote, null);
+          }
+        })
         .catch(() => {});
       return;
     }
