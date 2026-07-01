@@ -35,6 +35,7 @@
   let allFeedbacks = [];
   let releasedVersion = '';
   const pending = new Set();    // id feedback con voto in volo (IPC), per disabilitare i pulsanti
+  let openReopenAfterLogin = null; // id del fix il cui form "Ancora rotto?" va riaperto dopo un login riuscito
 
   function sendToMain(msg) {
     if (window.filo?.message)                return window.filo.message(msg);
