@@ -78,5 +78,5 @@ node scripts/queue-triage.mjs <id> review "[il tuo report]" --branch worker/<id>
 ```
 
 Se il feedback è ambiguo / richiede una decisione di design / mancano
-informazioni → `clarify` invece di `review` (vedi `routines/shared.md` §
-Insistere prima di mollare). Non usare `clarify` come scappatoia.
+informazioni → `clarify` invece di `review` (vedi `CLAUDE.md` § clarify). Non
+usare `clarify` come scappatoia.
