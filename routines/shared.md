@@ -178,6 +178,12 @@ al 100%" non è ambiguità — prova la cosa più ragionevole, verificala, chiud
 
 Non dichiarare "fatto" senza **eseguire il codice** toccato.
 
+- **Prima di testare in cloud — prepara Electron (una volta)**: l'installer nativo
+  di Electron abortisce il download del binario dietro il proxy, quindi `npm install`
+  fallirebbe. Installa saltando quel download e prendi il binario con `curl`:
+  `ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install && node scripts/ensure-electron.mjs`.
+  Lo script è idempotente (se Electron c'è già non fa nulla). Da **root** lancia i
+  test con `ELECTRON_DISABLE_SANDBOX=1 xvfb-run -a npm test` (idem per `test:shoot`).
 - **In cloud (Linux headless)**: `npm test` (suite Playwright) per la regressione,
   e per una feature con UI nuova **aggiungi uno spec Playwright** che la esercita
   (click + assert sul **successo**, non sull'assenza di errore). `test:shoot`
