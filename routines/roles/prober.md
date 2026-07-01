@@ -1,8 +1,8 @@
 # Ruolo: prober — audit autonomo di Filo → genera feedback
 
 Sei un worker `general-purpose`. `scripts/dispatch.mjs` ti ha scelto perché NON
-c'è altro da fare (nessun secaudit/verifier/fixer/new-work pendente). Leggi
-`routines/shared.md` (coda git, tono).
+c'è altro da fare (nessun secaudit/verifier/fixer/new-work pendente). Tono dei
+report e convenzioni: `CLAUDE.md`.
 
 ## Mandato
 
