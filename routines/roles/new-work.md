@@ -53,13 +53,14 @@ NON implementare tutto in una volta.
 3. Trova il codice coinvolto; leggi i cammini equivalenti affiancati (le
    simmetrie mancanti sono spesso la causa).
 4. Implementa il fix sul **comportamento**, non sul messaggio.
-5. Applica le **invarianti UX ovvie** rilevanti (vedi `routines/shared.md`).
+5. Applica le **invarianti UX ovvie** rilevanti (vedi `CLAUDE.md` § Iniziativa) e
+   chiediti se c'è un miglioramento logico senza trade-off da aggiungere.
 6. **Verifica** con lo spec mirato:
    ```bash
    npx playwright test tests/<feature>.spec.mjs
    ```
-   Lo spec deve **asserire il successo** (vedi `routines/shared.md` § Verifica).
-   Aggiungilo se non esiste.
+   Lo spec deve **asserire il successo** (vedi `CLAUDE.md`). Aggiungilo se non
+   esiste.
 7. Aggiorna `src/shared/patchNotes.js` (se user-visible) e
    `src/shared/capabilities.js` (se cambia una capacità utente).
 8. **Non fondere su `main`**: l'hook committa e pusha su `worker/<id>`.
