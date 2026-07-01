@@ -170,15 +170,13 @@ feature spezzata in `#N.M` NON fonde i pezzi su `main` uno a uno.
 
 ---
 
-## Convenzioni operative
+## Convenzioni operative (orchestratore)
 
-Coda su git (`queue-triage`/`queue-feedback`), claim, decifratura S1, priorità,
-tono dei report, sintomo-vs-causa, invarianti UX, "insistere prima di mollare":
-**tutto in `routines/shared.md`** (lo legge il worker, non l'orchestratore).
+Il worker prende le convenzioni di lavoro da `CLAUDE.md` e i comandi che gli
+servono dal suo file-ruolo. Qui solo ciò che tocca l'orchestratore:
 
-Solo i punti che toccano l'orchestratore:
-
-- **Mai PATCH diretta su Firestore** (l'account robot è bloccato): ogni decisione
-  passa dalla coda git e dalla GitHub Action `apply-triage.yml` (~1-2 min).
+- **Mai PATCH diretta su Firestore** (l'account robot è bloccato): ogni cambio di
+  stato passa dalla coda git e dalla GitHub Action `apply-triage.yml` (~1-2 min).
+  La scrive il worker; l'orchestratore non tocca Firestore.
 - **Claim**: lo fa `dispatch.mjs`. L'orchestratore non claima a mano.
 - **Numerazione**: ogni feedback ha `#N` + titolo; i sub ereditano `#N.M`.
