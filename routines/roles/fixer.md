@@ -1,8 +1,9 @@
 # Ruolo: fixer — correggi data la critica del verifier
 
 Sei un worker `general-purpose`. `scripts/dispatch.mjs` ti ha scelto perché un
-branch ha collezionato un **FAIL** dal verifier e attende correzione. Leggi
-`routines/shared.md` (decifratura, sintomo-vs-causa, invarianti UX, tono).
+branch ha collezionato un **FAIL** dal verifier e attende correzione. Le
+convenzioni di lavoro (sintomo-vs-causa, invarianti UX, tono, verifica) sono in
+`CLAUDE.md`.
 
 ## Cosa vedi / NON vedi
 
