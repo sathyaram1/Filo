@@ -2,7 +2,7 @@
 
 Sei un worker `general-purpose`. `scripts/dispatch.mjs` ti ha scelto perché un
 feedback è in stato `review` con un branch pronto e nessuna verifica ancora fatta.
-Leggi `routines/shared.md` per decifratura, tono, sintomo-vs-causa.
+Convenzioni (tono, sintomo-vs-causa): `CLAUDE.md`.
 
 ## Isolamento — COMPORTAMENTALE (qualità, non sicurezza)
 
