@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.97', date: '2026-07-01',
+      features: [],
+      fixes: [
+        'In "Bacheca", se voti un miglioramento o segnali "Ancora rotto?" senza aver fatto l\'accesso, ora basta accedere una volta sola: l\'azione si completa da sola, senza doverla ripetere.',
+      ],
+    },
+    {
       version: '0.2.96', date: '2026-06-30',
       features: [
         'Nella dashboard di gestione i feedback su cui tutti i giudici sono d\'accordo (allineati) ora hanno un bordo blu, così li riconosci a colpo d\'occhio.',
