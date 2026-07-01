@@ -160,7 +160,6 @@
     form.className = 'bd-reopen-form';
     const reopenAfterLogin = openReopenAfterLogin === fb._id;
     form.hidden = !reopenAfterLogin;
-    if (reopenAfterLogin) openReopenAfterLogin = null;
 
     const hint = document.createElement('p');
     hint.className = 'bd-reopen-hint';
