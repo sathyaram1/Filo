@@ -47,6 +47,15 @@ hai ricevuto questo lavoro).
 node scripts/dispatch.mjs --record-fixed <id>
 ```
 
+Infine **rilascia il claim** (se resta vivo, il prossimo giro non può instradare
+il verifier su questo feedback finché il TTL non scade — la GitHub Action
+riconcilia i claim solo quando cambia lo status su Firestore, e il fixer non lo
+cambia):
+
+```bash
+node scripts/claim-feedback.mjs release <id>
+```
+
 ## Limite loop
 
 Dopo il **3° FAIL** consecutivo del verifier, dispatch NON ti chiama più: instrada
