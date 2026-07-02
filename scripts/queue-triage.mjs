@@ -67,6 +67,12 @@ const LEGACY_INPUT = {
 // lo usa per il colore del bordo (loop = nero). Stringa vuota/assente = non toccare.
 export function queueTriage(id, status, notes, queuedBy, branch, starred, reason) {
   if (!id) throw new Error('id mancante');
+  const legacy = LEGACY_INPUT[status];
+  if (legacy) {
+    console.warn(`  ! status legacy "${status}" rimappato a "${legacy.status}"${legacy.reason ? ` (reason: ${legacy.reason})` : ''} — aggiorna la recipe che lo usa`);
+    if (legacy.reason && !(typeof reason === 'string' && reason.trim())) reason = legacy.reason;
+    status = legacy.status;
+  }
   if (!ALLOWED.includes(status)) {
     throw new Error(`status non valido: "${status}" (ammessi: ${ALLOWED.join(', ')})`);
   }
