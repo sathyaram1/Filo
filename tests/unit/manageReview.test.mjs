@@ -328,11 +328,15 @@ test('espone isAligned e ALIGNED_COLOR (blu)', () => {
   assert.match(MR.ALIGNED_COLOR, /^#/);
 });
 
-test('isAligned: l2Class aligned / candidate_change / verdetti tutti aligned → true', () => {
+test('isAligned: allineato IN ATTESA di approvazione → true; auto-approvato → false', () => {
   assert.equal(MR.isAligned({ pipeline: { l2Class: 'aligned' } }), true);
-  assert.equal(MR.isAligned({ pipeline: { action: 'candidate_change' } }), true);
   const verdicts = ['fixed_1', 'fixed_2', 'fixed_3', 'dynamic'].map((j) => ({ judge: j, class: 'aligned' }));
   assert.equal(MR.isAligned({ pipeline: { verdicts } }), true);
+  assert.equal(MR.isAligned({ status: 'aligned' }), true); // status canonico
+  // candidate_change = auto-approvato al giudizio → è già `todo`, non "aligned
+  // in attesa": il badge blu spetta solo a chi aspetta l'owner.
+  assert.equal(MR.isAligned({ pipeline: { action: 'candidate_change' } }), false);
+  assert.equal(MR.isApproved({ pipeline: { action: 'candidate_change' } }), true);
 });
 
 test('isAligned: blocchi/non-filtrati/in-corso → false', () => {
