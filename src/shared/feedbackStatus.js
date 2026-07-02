@@ -1,0 +1,215 @@
+// Macchina a stati dei feedback — vocabolario UNICO (spec: FEEDBACK-STATES.md).
+// Espone SN_FB_STATUS su globalThis: lista chiusa degli stati canonici, colori,
+// mappatura status→tab della dashboard, tabella delle transizioni legali con
+// l'attore autorizzato, mappatura degli stati legacy ritirati.
+//
+// Il campo `status` persistito su Firestore è la SOLA fonte di verità dello
+// stato di un feedback. Chi scrive uno status passa da canTransition; chi legge
+// deriva la tab con tabFor. NESSUN consumer ricalcola lo stato da `pipeline.*`,
+// `reviewDecision` o dalla modalità automatica (quella agisce una volta sola,
+// al momento del giudizio, lato filo-security).
+//
+// Testabile via `npm run test:unit` (tests/unit/feedbackStatus.test.mjs).
+// Pattern IIFE su globalThis: vedi CLAUDE.md → "Convenzione di porting".
+
+(function (global) {
+  'use strict';
+
+  // ── Stati canonici (lista CHIUSA — spec §2) ────────────────────────────────
+  // tab: 'inbox' Ricevuti | 'queue' In coda | 'resolved' Risolti |
+  //      'archived' Archiviati. `done` è l'unico ambivalente (queue finché il
+  //      fix non è in una versione rilasciata, poi resolved): tabFor accetta
+  //      opts.shipped per scioglierlo.
+  // color: bordo/badge nella dashboard; null = nessun colore di rischio.
+  // terminal: true = ci resta finché l'owner non lo riapre esplicitamente.
+  const STATUSES = {
+    unlabeled:           { tab: 'inbox',    color: '#ffffff', label: 'Non filtrato',      severity: 4 },
+    suspicious_file:     { tab: 'inbox',    color: '#111111', label: 'File sospetto',     severity: 5 },
+    attack:              { tab: 'inbox',    color: '#c0392b', label: 'Attacco',           severity: 3 },
+    spam:                { tab: 'inbox',    color: '#e08e0b', label: 'Spam',              severity: 2 },
+    design:              { tab: 'inbox',    color: '#2e9e5b', label: 'Design',            severity: 1 },
+    aligned:             { tab: 'inbox',    color: '#5b6ee0', label: 'Allineato',         severity: 0 },
+    todo:                { tab: 'queue',    color: null,      label: 'In coda',           severity: 0 },
+    working:             { tab: 'queue',    color: null,      label: 'In lavorazione',    severity: 0 },
+    revision_capability: { tab: 'queue',    color: null,      label: 'Verifica fix',      severity: 0 },
+    revision_security:   { tab: 'queue',    color: null,      label: 'Audit sicurezza',   severity: 0 },
+    done:                { tab: 'queue',    color: null,      label: 'Risolto',           severity: 0 },
+    archived:            { tab: 'archived', color: null,      label: 'Archiviato',        severity: 0 },
+    attack_confirmed:    { tab: 'archived', color: '#c0392b', label: 'Attacco confermato', severity: 0, terminal: true },
+    spam_confirmed:      { tab: 'archived', color: '#e08e0b', label: 'Spam confermato',    severity: 0, terminal: true },
+  };
+
+  const CANONICAL = Object.keys(STATUSES);
+
+  function isCanonical(status) {
+    return Object.prototype.hasOwnProperty.call(STATUSES, String(status || ''));
+  }
+
+  // ── Tab della dashboard: lookup PURA su status (spec §4) ──────────────────
+  // `done` va in 'resolved' SOLO se il fix è davvero uscito (opts.shipped,
+  // calcolato dal chiamante con isShipped/resolvedInVersion — gate DB3);
+  // altrimenti resta visibile 'queue'. Status sconosciuto/legacy → null: il
+  // chiamante deve prima normalizzare (vedi LEGACY sotto).
+  function tabFor(status, opts) {
+    if (!isCanonical(status)) return null;
+    if (status === 'done') return (opts && opts.shipped) ? 'resolved' : 'queue';
+    return STATUSES[status].tab;
+  }
+
+  // ── Transizioni legali (spec §3) ───────────────────────────────────────────
+  // from → { to: [attori autorizzati] }. Attori:
+  //   'owner'    dashboard di gestione (solo l'owner fa uscire dagli stati di
+  //              revisione umana);
+  //   'pipeline' filo-security (giudici + gate file): è l'UNICO che fa uscire
+  //              da `unlabeled`;
+  //   'routine'  routine Claude via coda triage/Action (iter di lavorazione).
+  // Una coppia (from,to) assente = transizione ILLEGALE: il writer la rifiuta.
+  const TRANSITIONS = {
+    unlabeled: {
+      suspicious_file: ['pipeline'], // gate file (corre prima dei giudici)
+      attack:          ['pipeline'],
+      spam:            ['pipeline'],
+      design:          ['pipeline'],
+      todo:            ['pipeline'], // sicuro + automatica ON (letta al giudizio)
+      aligned:         ['pipeline'], // sicuro + automatica OFF
+    },
+    suspicious_file: {
+      todo:             ['owner'],
+      attack_confirmed: ['owner'],
+      spam_confirmed:   ['owner'],
+      archived:         ['owner'],
+    },
+    attack: {
+      attack_confirmed: ['owner'],
+      todo:             ['owner'],   // falso positivo
+      unlabeled:        ['pipeline'], // mittente fidato flaggato per errore → ri-giudizio
+    },
+    spam: {
+      spam_confirmed: ['owner'],
+      todo:           ['owner'],
+      unlabeled:      ['pipeline'],
+    },
+    design: {
+      todo:     ['owner'],  // l'owner risponde in chat e rimette in coda
+      archived: ['owner'],  // oppure decide che non si fa
+    },
+    aligned: {
+      todo: ['owner'],      // approvazione manuale (anche bulk)
+    },
+    todo: {
+      working: ['routine'], // presa in carico (claim git = lock primario)
+      design:  ['routine'], // la routine ha domande → chat + statusReason clarify
+    },
+    working: {
+      revision_capability: ['routine'], // fix pronto su branch
+      design:              ['routine'], // domande a metà lavorazione
+      todo:                ['routine'], // TTL 60min scaduto → riconciliazione
+    },
+    revision_capability: {
+      revision_security: ['routine'], // PASS verifica comportamentale
+      design:            ['routine'], // FAIL×3 → statusReason loop
+    },
+    revision_security: {
+      done:   ['routine'], // PASS secaudit + merge-gate fonde su main
+      design: ['routine'], // FAIL fixer-loop → statusReason loop
+    },
+    done: {
+      archived: ['owner'],  // verifica umana ok
+      todo:     ['owner'],  // "manca qualcosa" → riapertura
+    },
+    archived: {
+      todo: ['owner'],      // ripristino
+    },
+    attack_confirmed: {
+      todo: ['owner'],      // "era legittimo"
+    },
+    spam_confirmed: {
+      todo: ['owner'],
+    },
+  };
+
+  const ACTORS = ['owner', 'pipeline', 'routine'];
+
+  /**
+   * Una transizione è legale? PURA: nessun default permissivo — stato o attore
+   * sconosciuti, o coppia non elencata ⇒ false.
+   * @param {string} from  status di partenza (canonico)
+   * @param {string} to    status di arrivo (canonico)
+   * @param {string} actor 'owner' | 'pipeline' | 'routine'
+   */
+  function canTransition(from, to, actor) {
+    const row = TRANSITIONS[String(from || '')];
+    if (!row) return false;
+    const allowed = row[String(to || '')];
+    if (!allowed) return false;
+    return allowed.includes(String(actor || ''));
+  }
+
+  /** Tutte le destinazioni legali da uno stato per un attore (per la UI). */
+  function transitionsFrom(from, actor) {
+    const row = TRANSITIONS[String(from || '')];
+    if (!row) return [];
+    return Object.keys(row).filter((to) => row[to].includes(String(actor || '')));
+  }
+
+  // ── Stati legacy RITIRATI (spec §8) ────────────────────────────────────────
+  // Mappatura semplice status→status per i legacy che non dipendono da altri
+  // campi. `new` e `blocked` NON sono qui: richiedono il documento intero
+  // (pipeline/blockReason) → normalizeStatus in manageReview.js li scioglie.
+  // statusReason suggerito accanto, per conservare l'origine.
+  const LEGACY_SIMPLE = {
+    clarify:  { status: 'design',              statusReason: 'clarify' },
+    review:   { status: 'revision_capability', statusReason: null },
+    verified: { status: 'archived',            statusReason: null },
+    ignored:  { status: 'archived',            statusReason: 'legacy-ignored' },
+    draft:    { status: 'unlabeled',           statusReason: null },
+  };
+
+  const LEGACY_STATUSES = Object.keys(LEGACY_SIMPLE).concat(['new', 'blocked']);
+
+  function isLegacy(status) {
+    return LEGACY_STATUSES.includes(String(status || ''));
+  }
+
+  // ── Lock di lavorazione (spec §6) ──────────────────────────────────────────
+  // TTL del `working`: più vecchio = istanza morta, chiunque lo riporta a todo.
+  const WORKING_TTL_MS = 60 * 60 * 1000;
+
+  /**
+   * Un `working` è scaduto? true se lo status è working e workingSince manca o
+   * è più vecchio del TTL (workingSince assente = non sapremo mai quando è
+   * partito: trattalo come morto, torna in coda).
+   * @param {object} fb  documento feedback ({ status, workingSince })
+   * @param {number} [now]  epoch ms (default Date.now(), iniettabile nei test)
+   */
+  function isWorkingExpired(fb, now) {
+    if (!fb || fb.status !== 'working') return false;
+    const t = new Date(fb.workingSince || 0).getTime();
+    if (!t) return true;
+    return ((now == null ? Date.now() : now) - t) > WORKING_TTL_MS;
+  }
+
+  // ── statusPublic (S1.F2.1) per i nuovi stati ───────────────────────────────
+  // Enum grossolano in chiaro accanto allo status fine (eventualmente cifrato).
+  // ⚠️ SICUREZZA: tutti gli stati "beccati" (attack/spam/suspicious_file e i
+  // confermati) DEVONO collassare sugli stessi valori dei feedback normali —
+  // mai un valore distinto, o chi legge Firestore senza chiave riconosce un
+  // attacco intercettato e fa hill-climbing. Aperti → 'open', chiusi → 'closed'.
+  const PUBLIC_MAP = {
+    unlabeled: 'open', suspicious_file: 'open', attack: 'open', spam: 'open',
+    design: 'open', aligned: 'open', todo: 'open', working: 'open',
+    revision_capability: 'open', revision_security: 'open',
+    done: 'closed', archived: 'closed',
+    attack_confirmed: 'closed', spam_confirmed: 'closed',
+  };
+
+  global.SN_FB_STATUS = {
+    STATUSES, CANONICAL, isCanonical,
+    tabFor,
+    TRANSITIONS, ACTORS, canTransition, transitionsFrom,
+    LEGACY_SIMPLE, LEGACY_STATUSES, isLegacy,
+    WORKING_TTL_MS, isWorkingExpired,
+    PUBLIC_MAP,
+  };
+
+})(typeof globalThis !== 'undefined' ? globalThis : self);
