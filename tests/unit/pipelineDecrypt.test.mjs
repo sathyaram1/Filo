@@ -32,6 +32,7 @@ const require = createRequire(import.meta.url);
 // pubkey di test esplicita (encryptForOwner accetta un override).
 const C = require(join(ROOT, 'src', 'shared', 'feedbackCrypto.js'));
 // manageReview: classifyBlock / listBoardTab.
+require(join(ROOT, 'src', 'shared', 'feedbackStatus.js'));
 require(join(ROOT, 'src', 'shared', 'manageReview.js'));
 const MR = globalThis.SN_MANAGE_REVIEW;
 

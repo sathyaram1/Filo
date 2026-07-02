@@ -12,6 +12,7 @@ import { dirname, join } from 'node:path';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
+require(join(__dirname, '..', '..', 'src', 'shared', 'feedbackStatus.js'));
 require(join(__dirname, '..', '..', 'src', 'shared', 'manageReview.js'));
 
 const MR = globalThis.SN_MANAGE_REVIEW;
@@ -22,9 +23,11 @@ test('espone listBoardTab', () => {
   assert.equal(typeof MR.listBoardTab, 'function');
 });
 
-test('mostra solo done/verified spediti; esclude todo/new/review/clarify', () => {
+test('mostra solo i done spediti; esclude iter in corso e archiviati', () => {
   const fbs = [
     { _id: 'done-shipped', status: 'done', resolvedInVersion: '0.2.70', createdAt: '2026-06-20' },
+    // Macchina a stati: `verified` (ritirato) = verificato dall'owner = archiviato
+    // → esce dalla bacheca (non serve più la conferma degli utenti).
     { _id: 'verified-shipped', status: 'verified', resolvedInVersion: '0.2.71', createdAt: '2026-06-21' },
     { _id: 'todo', status: 'todo', createdAt: '2026-06-22' },
     { _id: 'new', status: 'new', createdAt: '2026-06-22' },
@@ -34,7 +37,7 @@ test('mostra solo done/verified spediti; esclude todo/new/review/clarify', () =>
     { _id: 'ignored', status: 'ignored', createdAt: '2026-06-22' },
   ];
   const out = MR.listBoardTab(fbs, { releasedVersion: '0.2.71' });
-  assert.deepEqual(ids(out).sort(), ['done-shipped', 'verified-shipped']);
+  assert.deepEqual(ids(out).sort(), ['done-shipped']);
 });
 
 test('esclude un fix chiuso ma NON ancora rilasciato (resolvedInVersion futura)', () => {
