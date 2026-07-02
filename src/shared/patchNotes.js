@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.101', date: '2026-07-02',
+      features: [
+        'Nell\'archivio delle tab, le schede chiuse sono ora raggruppate per giorno in righe orizzontali compatte: tasto destro su una scheda per riaprirla o eliminarla.',
+      ],
+      fixes: [],
+    },
+    {
       version: '0.2.97', date: '2026-07-01',
       features: [],
       fixes: [

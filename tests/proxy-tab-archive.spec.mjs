@@ -93,13 +93,17 @@ test('archivia una tab proxata e la riapre proxata sulla stessa location', async
       return e && e.proxy ? e.proxy.country : null;
     }), { timeout: 8_000 }).toBe('us');
 
-    // Riapri dall'archivio: la pagina archivio mostra la riga e il pulsante
-    // "Riapri" manda anche la location proxy all'handler.
+    // Riapri dall'archivio: la pagina archivio mostra la chip e la voce
+    // "Riapri" del menu contestuale (tasto destro) manda anche la location
+    // proxy all'handler.
     const archive = await openTab('filo://archive/archive.html');
     await archive.waitForLoadState('domcontentloaded');
     const row = archive.locator('.arc-tab', { hasText: 'Sito Proxato' });
     await expect(row).toBeVisible({ timeout: 8_000 });
-    await row.getByText('Riapri').click();
+    await row.click({ button: 'right' });
+    const menu = archive.locator('.arc-ctxmenu');
+    await expect(menu).toBeVisible();
+    await menu.getByText('Riapri', { exact: true }).click();
 
     // La tab riaperta NASCE proxata sulla stessa location (us), non diretta.
     await expect.poll(async () => app.evaluate(({ BrowserWindow }, target) => {

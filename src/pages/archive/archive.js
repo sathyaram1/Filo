@@ -1,5 +1,7 @@
 // Pagina archivio tab (§3.3): le schede chiuse, raggruppate per giorno e
-// ordinate per colore (ordine cromatico). Riapri / rimuovi / svuota.
+// ordinate per colore (ordine cromatico), mostrate come chip orizzontali.
+// Riapri / elimina via menu contestuale (tasto destro) su ogni chip; svuota
+// l'intero archivio dalla toolbar.
 
 (function () {
   'use strict';
@@ -145,34 +147,111 @@
     }
   }
 
+  // Riapre una tab archiviata ripristinando lo scroll registrato (§3.1).
+  function reopenTab(t) {
+    try {
+      chrome.runtime.sendMessage({
+        type: MSG.REOPEN_ARCHIVED_TAB,
+        url: t.url,
+        scrollPct: typeof t.scrollPosition === 'number' ? t.scrollPosition : null,
+        // Se la tab era stata aperta "da un altro paese", riaprila proxata
+        // sulla stessa location.
+        proxy: t.proxy && t.proxy.country ? t.proxy : null,
+      });
+    } catch (_) {
+      try { chrome.tabs.create({ url: t.url }); } catch (_) {}
+    }
+  }
+
+  async function removeTab(t) {
+    await chrome.runtime.sendMessage({ type: MSG.REMOVE_ARCHIVED_TAB, id: t.id });
+    tabs = tabs.filter((x) => x.id !== t.id);
+    if (semanticResults) semanticResults = semanticResults.filter((x) => x.id !== t.id);
+    render();
+  }
+
+  // Menu contestuale (tasto destro) con "Riapri"/"Elimina": sostituisce i
+  // bottoni sempre visibili, coerente con le chip orizzontali compatte.
+  // Riusa le classi .sn-select-pop/.sn-select-option (stesso look degli altri
+  // menu di Filo, vedi PATTERNS.md § "Controlli UI custom").
+  let openMenu = null;
+  function closeCtxMenu() {
+    if (!openMenu) return;
+    openMenu.remove();
+    openMenu = null;
+    document.removeEventListener('mousedown', onOutsideClick, true);
+    document.removeEventListener('keydown', onMenuKeydown, true);
+    window.removeEventListener('scroll', closeCtxMenu, true);
+    window.removeEventListener('resize', closeCtxMenu);
+  }
+  function onOutsideClick(e) {
+    if (openMenu && !openMenu.contains(e.target)) closeCtxMenu();
+  }
+  function onMenuKeydown(e) {
+    if (e.key === 'Escape') closeCtxMenu();
+  }
+  function openCtxMenu(x, y, t) {
+    closeCtxMenu();
+    const menu = document.createElement('div');
+    menu.className = 'sn-select-pop arc-ctxmenu';
+    menu.setAttribute('role', 'menu');
+
+    const reopenOpt = document.createElement('div');
+    reopenOpt.className = 'sn-select-option';
+    reopenOpt.setAttribute('role', 'menuitem');
+    reopenOpt.textContent = 'Riapri';
+    reopenOpt.addEventListener('click', () => { closeCtxMenu(); reopenTab(t); });
+    menu.appendChild(reopenOpt);
+
+    const delOpt = document.createElement('div');
+    delOpt.className = 'sn-select-option';
+    delOpt.setAttribute('role', 'menuitem');
+    delOpt.textContent = 'Elimina';
+    delOpt.addEventListener('click', () => { closeCtxMenu(); removeTab(t); });
+    menu.appendChild(delOpt);
+
+    document.body.appendChild(menu);
+
+    // Clamp alla viewport (il menu non deve uscire dal bordo destro/basso).
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const w = menu.offsetWidth, h = menu.offsetHeight;
+    menu.style.left = `${Math.max(4, Math.min(x, vw - w - 4))}px`;
+    menu.style.top = `${Math.max(4, Math.min(y, vh - h - 4))}px`;
+
+    openMenu = menu;
+    // setTimeout: evita che il mousedown/click che ha aperto il menu lo chiuda
+    // subito tramite il listener "outside click".
+    setTimeout(() => {
+      document.addEventListener('mousedown', onOutsideClick, true);
+      document.addEventListener('keydown', onMenuKeydown, true);
+      window.addEventListener('scroll', closeCtxMenu, true);
+      window.addEventListener('resize', closeCtxMenu);
+    }, 0);
+  }
+
   function renderTab(t, { showScore = false } = {}) {
     const row = document.createElement('div');
     row.className = 'arc-tab';
+    row.tabIndex = 0;
+    row.setAttribute('role', 'button');
     if (t.identityColor) row.style.setProperty('--arc-color', t.identityColor);
+
+    const titleText = t.title || t.url || '';
+    // Tooltip: conserva URL/orario/snippet, non più sempre visibili nella
+    // chip compatta ma comunque consultabili al passaggio del mouse.
+    const tipParts = [titleText, t.url, timeLabel(t.closedAt)];
+    if (t.snippet) tipParts.push(t.snippet);
+    row.title = tipParts.filter(Boolean).join('\n');
 
     const fav = document.createElement('div');
     fav.className = 'arc-fav';
     if (t.favicon) fav.style.backgroundImage = `url("${t.favicon}")`;
     row.appendChild(fav);
 
-    const main = document.createElement('div');
-    main.className = 'arc-main';
     const title = document.createElement('div');
     title.className = 'arc-title';
-    title.textContent = t.title || t.url || '';
-    main.appendChild(title);
-    const url = document.createElement('div');
-    url.className = 'arc-url';
-    url.textContent = t.url || '';
-    main.appendChild(url);
-    // Snippet del contenuto (se indicizzato): aiuta a riconoscere la pagina.
-    if (t.snippet) {
-      const sn = document.createElement('div');
-      sn.className = 'arc-snippet';
-      sn.textContent = t.snippet;
-      main.appendChild(sn);
-    }
-    row.appendChild(main);
+    title.textContent = titleText;
+    row.appendChild(title);
 
     if (showScore && typeof t.score === 'number') {
       const sc = document.createElement('div');
@@ -181,46 +260,20 @@
       row.appendChild(sc);
     }
 
-    const time = document.createElement('div');
-    time.className = 'arc-time';
-    time.textContent = timeLabel(t.closedAt);
-    row.appendChild(time);
-
-    const actions = document.createElement('div');
-    actions.className = 'arc-actions';
-
-    const reopen = document.createElement('button');
-    reopen.className = 'sn-btn';
-    reopen.textContent = 'Riapri';
-    reopen.addEventListener('click', () => {
-      // Riapre ripristinando lo scroll registrato (§3.1).
-      try {
-        chrome.runtime.sendMessage({
-          type: MSG.REOPEN_ARCHIVED_TAB,
-          url: t.url,
-          scrollPct: typeof t.scrollPosition === 'number' ? t.scrollPosition : null,
-          // Se la tab era stata aperta "da un altro paese", riaprila proxata
-          // sulla stessa location.
-          proxy: t.proxy && t.proxy.country ? t.proxy : null,
-        });
-      } catch (_) {
-        try { chrome.tabs.create({ url: t.url }); } catch (_) {}
+    row.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      openCtxMenu(e.clientX, e.clientY, t);
+    });
+    // Tastiera: Invio/Spazio apre lo stesso menu (parità con l'uso da mouse,
+    // dato che le azioni non hanno più bottoni sempre visibili e focus-abili).
+    row.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        const r = row.getBoundingClientRect();
+        openCtxMenu(r.left, r.bottom, t);
       }
     });
-    actions.appendChild(reopen);
 
-    const del = document.createElement('button');
-    del.className = 'sn-btn sn-btn-secondary';
-    del.textContent = 'Rimuovi';
-    del.addEventListener('click', async () => {
-      await chrome.runtime.sendMessage({ type: MSG.REMOVE_ARCHIVED_TAB, id: t.id });
-      tabs = tabs.filter((x) => x.id !== t.id);
-      if (semanticResults) semanticResults = semanticResults.filter((x) => x.id !== t.id);
-      render();
-    });
-    actions.appendChild(del);
-
-    row.appendChild(actions);
     return row;
   }
 

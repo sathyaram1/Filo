@@ -33,10 +33,11 @@ test('chiudere una scheda la archivia e la pagina archivio la mostra', async ({ 
   const archive = await openTab('filo://archive/archive.html');
   await archive.waitForLoadState('domcontentloaded');
 
-  // La riga della scheda archiviata compare, con titolo e URL.
+  // La riga della scheda archiviata compare, come chip compatta col titolo;
+  // l'URL non è più visibile a schermo ma resta nel tooltip (title).
   const row = archive.locator('.arc-tab', { hasText: 'Sito Archivio' });
   await expect(row).toBeVisible({ timeout: 8_000 });
-  await expect(row.locator('.arc-url')).toContainText('127.0.0.1');
+  await expect(row).toHaveAttribute('title', /127\.0\.0\.1/);
 
   // Metadato cromatico preservato: la riga porta il colore identità (--arc-color),
   // usato per l'ordine arcobaleno dentro il giorno.
@@ -48,13 +49,38 @@ test('chiudere una scheda la archivia e la pagina archivio la mostra', async ({ 
 
   // Le pagine interne filo:// NON vengono archiviate (privacy/utilità).
   const hasInternal = await archive.evaluate(() =>
-    [...document.querySelectorAll('.arc-url')].some((e) => /filo:\/\//.test(e.textContent || '')));
+    [...document.querySelectorAll('.arc-tab')].some((e) => /filo:\/\//.test(e.title || '')));
   expect(hasInternal).toBe(false);
 
-  // "Riapri" riapre l'URL come nuova scheda.
-  await row.getByRole('button', { name: 'Riapri' }).click();
+  // Tasto destro sulla chip apre il menu contestuale con "Riapri"/"Elimina".
+  await row.click({ button: 'right' });
+  const menu = archive.locator('.arc-ctxmenu');
+  await expect(menu).toBeVisible();
+  await menu.getByText('Riapri', { exact: true }).click();
   await expect.poll(async () => shell.evaluate(async () => {
     const snap = await window.filoShell.tabs.snapshot();
     return snap.tabs.some((t) => /127\.0\.0\.1/.test(t.url || ''));
   }), { timeout: 8_000 }).toBe(true);
+});
+
+test('menu contestuale: "Elimina" rimuove la tab dall\'archivio', async ({ shell, openTab, testServer }) => {
+  await testServer.openReady(openTab, PAGE);
+  const tabId = await shell.evaluate(async () => {
+    const snap = await window.filoShell.tabs.snapshot();
+    return snap.activeId;
+  });
+  await shell.evaluate(async (id) => window.filoShell.tabs.close(id), tabId);
+
+  const archive = await openTab('filo://archive/archive.html');
+  await archive.waitForLoadState('domcontentloaded');
+  const row = archive.locator('.arc-tab', { hasText: 'Sito Archivio' });
+  await expect(row).toBeVisible({ timeout: 8_000 });
+
+  await row.click({ button: 'right' });
+  const menu = archive.locator('.arc-ctxmenu');
+  await expect(menu).toBeVisible();
+  await menu.getByText('Elimina', { exact: true }).click();
+
+  // La chip sparisce dalla pagina: la tab è stata rimossa dall'archivio.
+  await expect(archive.locator('.arc-tab', { hasText: 'Sito Archivio' })).toHaveCount(0, { timeout: 8_000 });
 });
