@@ -138,7 +138,6 @@
   // Il raggruppamento è una FUNZIONE DI VISUALIZZAZIONE: il mazzo resta una
   // lista piatta, i gruppi si calcolano al volo da (deck, dati carta).
 
-  const WUBRG = ['W', 'U', 'B', 'R', 'G'];
   const TIPO_ORDINE = ['Comandante', 'Creature', 'Istantanei', 'Stregonerie', 'Artefatti', 'Incantesimi', 'Planeswalker', 'Battaglie', 'Terre', 'Altro'];
   const COLORE_ORDINE = ['Bianco', 'Blu', 'Nero', 'Rosso', 'Verde', 'Multicolore', 'Incolore'];
   const COLORE_NOME = { W: 'Bianco', U: 'Blu', B: 'Nero', R: 'Rosso', G: 'Verde' };
