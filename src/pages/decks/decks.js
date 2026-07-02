@@ -1,7 +1,7 @@
-// App deck builder Commander (DECK-BUILDER-SPEC.md) — task 1: routing a tre
-// schermate (Mazzi / Builder / Partita stub) + libreria. Il contenuto vero del
-// Builder (chat, elenco carte, statistiche) arriva coi task successivi: qui c'è
-// lo scheletro a tre colonne e l'identità del documento (nome, commander).
+// App deck builder Commander (DECK-BUILDER-SPEC.md): routing a tre schermate
+// (Mazzi / Builder / Partita stub), libreria, layout del Builder a tre colonne
+// FISSE con divisori trascinabili persistiti (§2) e header-switcher del mazzo
+// (§8.2). Chat, elenco carte e statistiche arrivano coi task successivi.
 //
 // Routing su hash:  #/            → libreria (home)
 //                   #/deck/<id>   → builder del mazzo
