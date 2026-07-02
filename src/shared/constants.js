@@ -12,6 +12,9 @@
     // §3.1 — tab archiviate (chiuse = salvate). Metadati per tab: vedi
     // services/archivedTabs.js. Mostrate in filo://archive raggruppate per giorno.
     ARCHIVED_TABS: 'archivedTabs',
+    // Deck builder Commander (DECK-BUILDER-SPEC.md §13.1): lista dei mazzi,
+    // storage interamente locale. Vedi src/main/services/deckStore.js.
+    DECKS: 'decks',
     COSTS: 'costs',
     // Crediti (gamification): saldo, refill giornaliero, consumo aggregato per
     // tipo d'uso e log ricompense. Cache locale del doc Firestore `credits/<uid>`.
