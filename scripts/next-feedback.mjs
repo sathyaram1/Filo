@@ -328,8 +328,20 @@ export async function run() {
     process.exit(2);
   }
 
+  // 4b. Dipendenze fra sub-feedback: #N.k è lavorabile solo se i fratelli
+  //     precedenti (#N.1..#N.k-1) sono CHIUSI; un top-level con figli aperti
+  //     aspetta i figli. I "blocchi" sono TUTTI i doc open (minimal), anche
+  //     claimati o non-todo: un fratello in lavorazione o in review blocca
+  //     comunque il successivo.
+  const eligible = filterEligible(todoFree, minimal);
+
+  if (!eligible.length) {
+    process.stderr.write('[next-feedback] nessun feedback lavorabile: i todo restanti aspettano i predecessori della loro famiglia\n');
+    process.exit(2);
+  }
+
   // 5. Seleziona il vincitore (logica pura).
-  const winnerId = selectWinner(todoFree);
+  const winnerId = selectWinner(eligible);
   if (!winnerId) {
     process.stderr.write('[next-feedback] nessun feedback da lavorare (selectWinner ha tornato null)\n');
     process.exit(2);
