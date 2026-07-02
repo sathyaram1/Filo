@@ -303,7 +303,8 @@ test('manageTabFor: done/archived/ignored vincono sull\'approvazione', () => {
   // Già chiuso/archiviato: lo status vince a prescindere dall'approvazione.
   assert.equal(MR.manageTabFor({ status: 'done', pipeline: { action: 'candidate_change' } }), 'resolved');
   assert.equal(MR.manageTabFor({ status: 'archived', reviewDecision: 'accepted' }), 'archived');
-  assert.equal(MR.manageTabFor({ status: 'ignored', pipeline: { action: 'candidate_change' } }), null);
+  // `ignored` è ritirato: diventa un archiviato (resta ispezionabile come log).
+  assert.equal(MR.manageTabFor({ status: 'ignored', pipeline: { action: 'candidate_change' } }), 'archived');
 });
 
 // ── isApproved ──────────────────────────────────────────────────────────────
