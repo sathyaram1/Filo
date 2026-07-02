@@ -23,6 +23,7 @@ require(path.join(SHARED, 'filoMemory.js'));
 require(path.join(SHARED, 'filoState.js'));
 require(path.join(SHARED, 'dashboardRefresh.js'));
 require(path.join(SHARED, 'feedback.js'));
+require(path.join(SHARED, 'feedbackStatus.js')); // prima di manageReview: vocabolario stati
 require(path.join(SHARED, 'manageReview.js'));
 require(path.join(SHARED, 'preferences.js'));
 require(path.join(SHARED, 'cmdClassify.js'));
