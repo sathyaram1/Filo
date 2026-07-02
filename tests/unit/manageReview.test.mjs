@@ -289,11 +289,14 @@ test('manageTabFor: approvato (aligned+automatica o owner) → queue (In coda)',
   assert.equal(MR.manageTabFor({ status: 'blocked', reviewDecision: 'accepted' }), 'queue');
 });
 
-test('manageTabFor: blocchi e non-filtrati → inbox (richiedono approvazione)', () => {
-  // Un blocco di sicurezza o un panel parziale NON è approvato → Ricevuti.
+test('manageTabFor: blocchi e non-filtrati legacy → inbox (richiedono decisione)', () => {
+  // Un legacy `new` si scioglie dai verdetti: blocco di sicurezza o panel
+  // parziale → Ricevuti. Con status canonico (es. todo) i verdetti NON contano
+  // più: la fonte di verità è lo status.
   assert.equal(MR.manageTabFor({ status: 'new', pipeline: { action: 'block_attack' } }), 'inbox');
-  assert.equal(MR.manageTabFor({ status: 'todo', pipeline: { l2Class: 'spam' } }), 'inbox');
-  assert.equal(MR.manageTabFor({ status: 'todo', pipeline: { l2Unfiltered: true } }), 'inbox');
+  assert.equal(MR.manageTabFor({ status: 'new', pipeline: { l2Class: 'spam' } }), 'inbox');
+  assert.equal(MR.manageTabFor({ status: 'new', pipeline: { l2Unfiltered: true } }), 'inbox');
+  assert.equal(MR.manageTabFor({ status: 'todo', pipeline: { l2Class: 'spam' } }), 'queue');
 });
 
 test('manageTabFor: done/archived/ignored vincono sull\'approvazione', () => {
