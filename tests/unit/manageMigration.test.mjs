@@ -88,16 +88,12 @@ test('migrazione: NESSUNA PERDITA — ogni feedback visibile compare in esattame
       seen.set(fb._id, tab);
     }
   }
-  // Tutti i NON-ignored devono comparire da qualche parte; gli ignored no.
+  // Macchina a stati: NIENTE stati invisibili — anche gli ignored (ritirati)
+  // compaiono, come archiviati. Ogni feedback sta in esattamente una tab.
   for (const fb of all) {
-    if (fb.status === 'ignored') {
-      assert.equal(seen.has(fb._id), false, `${fb._id} ignored non deve comparire`);
-    } else {
-      assert.equal(seen.has(fb._id), true, `${fb._id} PERSO: non in nessuna tab`);
-    }
+    assert.equal(seen.has(fb._id), true, `${fb._id} PERSO: non in nessuna tab`);
   }
-  // Conteggio: 14 nel corpus, 1 ignored ⇒ 13 visibili instradati.
-  assert.equal(seen.size, all.length - 1);
+  assert.equal(seen.size, all.length);
 });
 
 test('migrazione: gli archived compaiono SOLO in Archiviati (no doppione in coda)', () => {
