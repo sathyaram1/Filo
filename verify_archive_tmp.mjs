@@ -222,6 +222,7 @@ async function main() {
   console.log(JSON.stringify(results, null, 2));
 
   await browser.close();
+  server.close();
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });
