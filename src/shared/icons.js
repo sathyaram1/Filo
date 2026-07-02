@@ -320,6 +320,12 @@
     `<path d="M7.8 11h1.4"/>` +
     `<path d="M14.8 11h1.4"/>`;
 
+  // --- Mazzi (deck builder Commander): due carte a ventaglio, quella davanti
+  //     dritta e quella dietro ruotata — il gesto di sventagliare una mano.
+  const decks =
+    `<rect x="8" y="5" width="10" height="14" rx="1.5"/>` +
+    `<path d="M6.5 7.2l-2.9.8 3.1 11 3.4-.9"/>`;
+
   // Esposizione: ciascuna icona è una FUNZIONE (size) => stringa SVG.
   // Permette ai consumer di chiedere taglie diverse (es. 16 per la riga,
   // 20 per la griglia overflow) senza ricreare manualmente il wrapper.
