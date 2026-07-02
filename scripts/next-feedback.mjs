@@ -160,7 +160,17 @@ export function selectWinner(candidates) {
     if (hasSa && !hasSb) return -1;
     if (!hasSa && hasSb) return 1;
 
-    // 4. _id ASC come tie-break finale (deterministico)
+    // 4. subSeq ASC (fratelli della stessa famiglia: #N.1 prima di #N.2 anche
+    //    se creati nello stesso millisecondo — createdAt identico)
+    const ba = Number(a.subSeq);
+    const bb = Number(b.subSeq);
+    const hasBa = Number.isFinite(ba);
+    const hasBb = Number.isFinite(bb);
+    if (hasBa && hasBb && ba !== bb) return ba - bb;
+    if (hasBa && !hasBb) return 1;   // il padre (senza subSeq) prima dei figli
+    if (!hasBa && hasBb) return -1;
+
+    // 5. _id ASC come tie-break finale (deterministico)
     const ia = String(a._id || '');
     const ib = String(b._id || '');
     return ia < ib ? -1 : ia > ib ? 1 : 0;
