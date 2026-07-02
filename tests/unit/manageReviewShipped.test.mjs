@@ -58,9 +58,11 @@ test('manageTabFor: done con versione FUTURA → resta In coda (queue)', () => {
   assert.equal(MR.manageTabFor(fb, { releasedVersion: '0.2.74' }), 'queue');
 });
 
-test('manageTabFor: verified non ancora spedito → In coda', () => {
+test('manageTabFor: verified (ritirato) → Archiviati, il gate versione non lo tocca', () => {
+  // Macchina a stati: `verified` = verificato dall'owner = archiviato. Il gate
+  // "spedito" riguarda solo `done` (che aspetta ancora la verifica umana).
   const fb = { status: 'verified', resolvedInVersion: '0.2.99' };
-  assert.equal(MR.manageTabFor(fb, { releasedVersion: '0.2.74' }), 'queue');
+  assert.equal(MR.manageTabFor(fb, { releasedVersion: '0.2.74' }), 'archived');
 });
 
 test('manageTabFor: done storico senza versione → Risolti', () => {
