@@ -398,8 +398,17 @@ async function main() {
   if (!items.length) console.log('Coda di triage vuota (controllo comunque i claim).');
   // Il backfill va applicato PRIMA delle creazioni: numera gli storici, così
   // i nuovi feedback della stessa run prendono numeri successivi e coerenti.
+  // A parità di op, l'ordine è quello di ACCODAMENTO (queuedAt, poi nome file
+  // come tie-break: contiene il timestamp ms): per i sub-feedback di una spec
+  // l'ordine di accodamento È l'ordine delle dipendenze, e qui diventa l'ordine
+  // dei numeri (#N.1, #N.2, …) e dei createdAt — quello che next-feedback.mjs
+  // usa per servire la famiglia in sequenza. Non affidarsi all'ordine di
+  // readdirSync (non garantito).
   const opRank = { backfill: 0, delete: 1, create: 2 };
-  items.sort((a, b) => (opRank[a.entry?.op] ?? 3) - (opRank[b.entry?.op] ?? 3));
+  items.sort((a, b) =>
+    ((opRank[a.entry?.op] ?? 3) - (opRank[b.entry?.op] ?? 3))
+    || String(a.entry?.queuedAt || '').localeCompare(String(b.entry?.queuedAt || ''))
+    || String(a.file || '').localeCompare(String(b.file || '')));
 
   console.log(`${items.length} decisione/i in coda${DRY ? ' (dry-run)' : ''}.`);
 
