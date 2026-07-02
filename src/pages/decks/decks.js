@@ -25,6 +25,64 @@
   let decks = [];        // cache della lista per la libreria
   let current = null;    // mazzo aperto nel builder
 
+  // ── Layout del Builder (§2): larghezze delle colonne ───────────────────────
+  // Tre colonne a larghezza FISSA: nessun resize automatico, mai. L'unico
+  // resize ammesso è il trascinamento deliberato dei due divisori; le larghezze
+  // finiscono in chrome.storage.local e sopravvivono alla riapertura.
+  const LAYOUT_KEY = window.SN_CONST.STORAGE_KEYS.DECKS_UI;
+  const LAYOUT_DEFAULT = { leftW: 340, centerW: 300 };
+  const LAYOUT_MIN = { leftW: 220, centerW: 220 };
+  let layout = { ...LAYOUT_DEFAULT };
+
+  function applyLayout() {
+    $('builderGrid').style.gridTemplateColumns =
+      `${layout.leftW}px 6px ${layout.centerW}px 6px 1fr`;
+  }
+
+  async function loadLayout() {
+    try {
+      const res = await chrome.storage.local.get(LAYOUT_KEY);
+      const saved = res && res[LAYOUT_KEY];
+      if (saved && typeof saved === 'object') {
+        layout.leftW = Math.max(LAYOUT_MIN.leftW, Number(saved.leftW) || LAYOUT_DEFAULT.leftW);
+        layout.centerW = Math.max(LAYOUT_MIN.centerW, Number(saved.centerW) || LAYOUT_DEFAULT.centerW);
+      }
+    } catch (_) {}
+    applyLayout();
+  }
+
+  function persistLayout() {
+    chrome.storage.local.set({ [LAYOUT_KEY]: { ...layout } }).catch?.(() => {});
+  }
+
+  // Trascinamento dei divisori: aggiorna la larghezza live, persiste al rilascio.
+  function wireDivider(el, prop, originOf) {
+    el.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      el.classList.add('dragging');
+      const move = (ev) => {
+        const w = Math.max(LAYOUT_MIN[prop], Math.round(ev.clientX - originOf()));
+        if (w !== layout[prop]) { layout[prop] = w; applyLayout(); }
+      };
+      const up = () => {
+        el.classList.remove('dragging');
+        document.removeEventListener('mousemove', move);
+        document.removeEventListener('mouseup', up);
+        persistLayout();
+      };
+      document.addEventListener('mousemove', move);
+      document.addEventListener('mouseup', up);
+    });
+  }
+
+  function wireDividers() {
+    const gridLeft = () => $('builderGrid').getBoundingClientRect().left;
+    // Colonna sinistra: dal bordo del grid al cursore.
+    wireDivider($('dividerLeft'), 'leftW', gridLeft);
+    // Colonna centrale: dal bordo destro del primo divisore al cursore.
+    wireDivider($('dividerRight'), 'centerW', () => gridLeft() + layout.leftW + 6);
+  }
+
   // ── Routing ────────────────────────────────────────────────────────────────
 
   function parseRoute() {
