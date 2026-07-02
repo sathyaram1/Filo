@@ -1,0 +1,7 @@
+{
+  "id": "f5656f31-0fc9-4ce7-95ba-80e5688f85fb",
+  "status": "done",
+  "notes": "La colonna centrale del mazzo è viva: le carte compaiono con nome e simboli di mana ufficiali, raggruppate per tipo (o per tag, per costo, per colore — si cambia dal selettore in alto) in gruppi richiudibili, ordinate per costo dentro ogni gruppo. Passando il mouse sulla colonna compare anche il prezzo per riga. Col tasto destro su una carta: rimuovi, sposta in un altro gruppo o in un altro mazzo (copia o sposta), imposta come commander, apri su Scryfall. Il commander vive nell'intestazione, e se qualcosa non è legale in Commander (doppioni, carte fuori dai colori del commander, carte bandite) compare un avviso chiaro sotto il conteggio. Verificato con 8 nuovi test di logica e 3 test end-to-end (più i 9 esistenti, tutti verdi). Nota: il controllo visivo con lo strumento screenshot su questa macchina cattura una finestra nera minuscola (limite dell'harness locale, non dell'app) — la resa visiva andrà controllata a occhio alla prossima apertura.",
+  "queuedAt": "2026-07-02T17:56:04.021Z",
+  "queuedBy": "routine"
+}
