@@ -351,6 +351,12 @@ function readSpool() {
         return { file, entry };
       }
       if (!entry || !entry.id) return { file, error: 'manca il campo id' };
+      // Rimappa i nomi ritirati (file accodati prima del cambio di vocabolario).
+      const legacy = LEGACY_INPUT[entry.status];
+      if (legacy) {
+        if (legacy.reason && !String(entry.reason || '').trim()) entry.reason = legacy.reason;
+        entry.status = legacy.status;
+      }
       if (!ALLOWED.includes(entry.status)) return { file, error: `status non valido: "${entry.status}"` };
       return { file, entry };
     });
