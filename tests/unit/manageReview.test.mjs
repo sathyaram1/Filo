@@ -309,12 +309,14 @@ test('manageTabFor: done/archived/ignored vincono sull\'approvazione', () => {
 
 // ── isApproved ──────────────────────────────────────────────────────────────
 
-test('isApproved: vero solo con owner-accepted o candidate_change', () => {
-  assert.equal(MR.isApproved({ reviewDecision: 'accepted' }), true);
-  assert.equal(MR.isApproved({ pipeline: { action: 'candidate_change' } }), true);
-  assert.equal(MR.isApproved({ status: 'todo' }), false);
+test('isApproved: vero se lo status (normalizzato) è nell\'iter di lavorazione', () => {
+  assert.equal(MR.isApproved({ reviewDecision: 'accepted' }), true);              // legacy accepted → todo
+  assert.equal(MR.isApproved({ pipeline: { action: 'candidate_change' } }), true); // auto-approvato → todo
+  assert.equal(MR.isApproved({ status: 'todo' }), true);                          // todo È approvato per definizione
+  assert.equal(MR.isApproved({ status: 'working' }), true);
   assert.equal(MR.isApproved({ pipeline: { action: 'human_review' } }), false);
   assert.equal(MR.isApproved({ pipeline: { l2Unfiltered: true } }), false);
+  assert.equal(MR.isApproved({ status: 'aligned' }), false);                      // aspetta l'owner
   assert.equal(MR.isApproved(null), false);
 });
 
