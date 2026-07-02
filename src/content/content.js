@@ -94,11 +94,20 @@
     // un listener window+capture (PRIMA di ogni script di pagina): gli passiamo
     // il nostro handler così siamo i primi a ricevere l'evento anche sui siti che
     // bloccano il contextmenu con stopImmediatePropagation (YouTube, Reddit…).
-    // Sulle pagine filo:// (nessun preload-bridge) registriamo direttamente.
+    // Sulle pagine filo:// (nessun preload-bridge) registriamo in BUBBLE, non
+    // in capture: le pagine interne sono NOSTRE e alcune hanno un menu
+    // contestuale proprio (chip dell'archivio, card dei mazzi) attaccato agli
+    // elementi. In capture + stopPropagation il nostro handler li soffocava
+    // (il tasto destro sulle pagine interne apriva solo il menu di Filo). In
+    // bubble l'handler della pagina scatta per primo: se ha già gestito il
+    // click (e.preventDefault()), il menu di Filo si fa da parte.
     if (typeof self.__snSetContextMenuHandler === 'function') {
       self.__snSetContextMenuHandler(onContextMenu);
     } else {
-      window.addEventListener('contextmenu', onContextMenu, { capture: true });
+      window.addEventListener('contextmenu', (e) => {
+        if (e.defaultPrevented) return; // la pagina interna ha il SUO menu
+        onContextMenu(e);
+      });
     }
     // Prefetch "Spiega" appena l'utente seleziona del testo, così quando apre il
     // menu il risultato è già in cache. Debounce + dedup gestiti dallo scheduler.
