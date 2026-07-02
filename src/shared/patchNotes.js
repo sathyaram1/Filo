@@ -19,6 +19,7 @@
       version: '0.2.103', date: '2026-07-02',
       features: [
         'Nell\'app Mazzi il banco di lavoro prende forma: tre colonne (ricerca, mazzo, statistiche) con divisori che puoi trascinare a piacere — la disposizione viene ricordata. Cliccando sul nome del mazzo si apre il menu di gestione: cambia mazzo, nuovo, duplica, rinomina, budget, elimina.',
+        'La colonna del mazzo mostra le carte con i simboli di mana ufficiali, raggruppate per tipo (o per tag, costo, colore) in gruppi richiudibili. Tasto destro su una carta per rimuoverla, spostarla di gruppo o in un altro mazzo, nominarla commander o aprirla su Scryfall. L\'app avvisa se qualcosa non è legale in Commander (doppioni, carte fuori colore, carte bandite).',
       ],
       fixes: [],
     },
