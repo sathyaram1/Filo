@@ -104,6 +104,7 @@
   // Registro app del launcher. Il Feedback vive qui fra le App.
   const APPS = [
     { label: 'Editor', icon: 'editor', url: 'filo://editor/editor.html' },
+    { label: 'Mazzi', icon: 'decks', url: 'filo://decks/decks.html' },
     { type: 'separator' },
     { label: 'Feedback', icon: 'feedback', url: 'filo://feedback/feedback.html' },
     { label: 'Bacheca', icon: 'share', url: 'filo://board/board.html' },
