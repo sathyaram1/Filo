@@ -96,15 +96,19 @@ test('migrazione: NESSUNA PERDITA — ogni feedback visibile compare in esattame
   assert.equal(seen.size, all.length);
 });
 
-test('migrazione: gli archived compaiono SOLO in Archiviati (no doppione in coda)', () => {
+test('migrazione: gli archiviati compaiono SOLO in Archiviati (no doppione in coda)', () => {
   const all = corpus();
-  assert.deepEqual(MR.listForManageTab(all, 'archived').map((f) => f._id), ['archived-1']);
+  // verified/ignored ritirati → archiviati anche loro (recenti prima).
+  assert.deepEqual(MR.listForManageTab(all, 'archived').map((f) => f._id),
+    ['verified-1', 'archived-1', 'ignored-1']);
   for (const tab of ['inbox', 'queue', 'resolved']) {
-    assert.equal(
-      MR.listForManageTab(all, tab).some((f) => f._id === 'archived-1'),
-      false,
-      `archived-1 non deve comparire in ${tab}`,
-    );
+    for (const id of ['archived-1', 'verified-1', 'ignored-1']) {
+      assert.equal(
+        MR.listForManageTab(all, tab).some((f) => f._id === id),
+        false,
+        `${id} non deve comparire in ${tab}`,
+      );
+    }
   }
 });
 
