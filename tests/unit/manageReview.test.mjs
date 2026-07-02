@@ -178,11 +178,13 @@ test('classifyBlock: reviewDecision diverso da accepted NON sblocca', () => {
 
 // ── loop (redesign routine): blocco duro dopo 3 verifiche fallite ───────────
 
-test('classifyBlock: blocked + blockReason=loop → reason=loop, bordo nero, severità massima', () => {
+test('classifyBlock: blocked + blockReason=loop → design con reason=loop (macchina a stati)', () => {
+  // Il loop è uno dei tre sotto-casi di `design` (spec §5): verde, la storia
+  // sta nella chat. Il nero è ora riservato a `suspicious_file`.
   const r = MR.classifyBlock({ status: 'blocked', blockReason: 'loop' });
   assert.equal(r.reason, 'loop');
-  assert.equal(r.color, '#111111');
-  assert.equal(r.severity, 5); // sopra unfiltered(4)/attack(3)/spam(2)/design(1)
+  assert.equal(r.color, '#2e9e5b');
+  assert.equal(r.label, 'Design');
 });
 
 test('classifyBlock: loop vince sul pipeline di sicurezza', () => {
