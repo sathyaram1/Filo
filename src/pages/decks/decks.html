@@ -146,8 +146,16 @@
             <div class="dk-commander-line" id="commanderLine"></div>
           </div>
           <div class="dk-col-body">
-            <p class="dk-count" id="deckCount"></p>
-            <p class="dk-placeholder">L'elenco delle carte del mazzo arriverà qui.</p>
+            <div class="dk-deck-toolbar">
+              <span class="dk-count" id="deckCount"></span>
+              <button id="groupBy" class="dk-groupby" title="Cambia raggruppamento">per tipo ▾</button>
+            </div>
+            <p class="dk-legality" id="deckLegality" hidden></p>
+            <div id="deckList"></div>
+            <p class="dk-placeholder" id="deckListEmpty">
+              Nessuna carta nel mazzo: aggiungile dalla ricerca (in arrivo) o
+              importa una lista.
+            </p>
           </div>
         </div>
         <div class="dk-divider" id="dividerRight" role="separator" aria-orientation="vertical"

@@ -124,3 +124,115 @@ test('sortForLibrary: ultima modifica in cima', () => {
   const sorted = D.sortForLibrary([a, b]);
   assert.equal(sorted[0].nome, 'recente');
 });
+
+// ─── Task 4: raggruppamento della colonna mazzo (§8.1) ────────────────────────
+
+// Carte finte minimali per i test di raggruppamento/legalità.
+const CARDS = {
+  'c-bolt':   { id: 'c-bolt', name: 'Lightning Bolt', typeLine: 'Instant', cmc: 1, colors: ['R'], colorIdentity: ['R'], legalCommander: true },
+  'c-dragon': { id: 'c-dragon', name: 'Shivan Dragon', typeLine: 'Creature — Dragon', cmc: 6, colors: ['R'], colorIdentity: ['R'], legalCommander: true },
+  'c-goblin': { id: 'c-goblin', name: 'Goblin Guide', typeLine: 'Creature — Goblin Scout', cmc: 1, colors: ['R'], colorIdentity: ['R'], legalCommander: true },
+  'c-island': { id: 'c-island', name: 'Island', typeLine: 'Basic Land — Island', cmc: 0, colors: [], colorIdentity: ['U'], legalCommander: true },
+  'c-sol':    { id: 'c-sol', name: 'Sol Ring', typeLine: 'Artifact', cmc: 1, colors: [], colorIdentity: [], legalCommander: true },
+  'c-lutri':  { id: 'c-lutri', name: 'Lutri, the Spellchaser', typeLine: 'Legendary Creature — Elemental Otter', cmc: 3, colors: ['U','R'], colorIdentity: ['U','R'], legalCommander: false },
+};
+
+function deckWith(entries, extra = {}) {
+  const base = D.newDeck({ nome: 'T' });
+  return { ...base, carte: entries, ...extra };
+}
+
+test('groupDeck per tipo: gruppi canonici in ordine, CMC crescente dentro il gruppo', () => {
+  const deck = deckWith([
+    { scryfall_id: 'c-dragon', qty: 1, tags: [] },
+    { scryfall_id: 'c-goblin', qty: 1, tags: [] },
+    { scryfall_id: 'c-bolt', qty: 1, tags: [] },
+    { scryfall_id: 'c-island', qty: 10, tags: [] },
+  ]);
+  const groups = D.groupDeck(deck, CARDS);
+  assert.deepEqual(groups.map((g) => g.name), ['Creature', 'Istantanei', 'Terre']);
+  const creature = groups[0].entries.map((e) => e.card.name);
+  assert.deepEqual(creature, ['Goblin Guide', 'Shivan Dragon'], 'CMC 1 prima di CMC 6');
+});
+
+test('groupDeck per tag: la carta appare UNA volta, nel primo gruppo che matcha', () => {
+  const deck = deckWith([
+    { scryfall_id: 'c-sol', qty: 1, tags: ['ramp', 'artefatti'] }, // primo tag visto: ramp
+    { scryfall_id: 'c-bolt', qty: 1, tags: ['removal'] },
+    { scryfall_id: 'c-goblin', qty: 1, tags: [] },
+  ], { raggruppamento: 'tag' });
+  const groups = D.groupDeck(deck, CARDS);
+  assert.deepEqual(groups.map((g) => g.name), ['ramp', 'removal', 'Senza tag']);
+  const inRamp = groups[0].entries.map((e) => e.entry.scryfall_id);
+  assert.deepEqual(inRamp, ['c-sol'], 'Sol Ring solo in ramp, mai duplicato in artefatti');
+  const total = groups.reduce((n, g) => n + g.entries.length, 0);
+  assert.equal(total, 3, 'ogni carta esattamente una volta');
+});
+
+test('groupDeck: l\'override esplicito vince sul raggruppamento naturale', () => {
+  let deck = deckWith([{ scryfall_id: 'c-bolt', qty: 1, tags: [] }]);
+  deck = D.setGroupOverride(deck, 'c-bolt', 'Removal');
+  const groups = D.groupDeck(deck, CARDS);
+  assert.deepEqual(groups.map((g) => g.name), ['Removal']);
+  // Rimuovere l'override riporta la carta nel suo gruppo naturale.
+  deck = D.setGroupOverride(deck, 'c-bolt', null);
+  assert.deepEqual(D.groupDeck(deck, CARDS).map((g) => g.name), ['Istantanei']);
+});
+
+test('groupDeck per cmc e per colore', () => {
+  const deck = deckWith([
+    { scryfall_id: 'c-bolt', qty: 1, tags: [] },
+    { scryfall_id: 'c-dragon', qty: 1, tags: [] },
+    { scryfall_id: 'c-sol', qty: 1, tags: [] },
+  ], { raggruppamento: 'cmc' });
+  assert.deepEqual(D.groupDeck(deck, CARDS).map((g) => g.name), ['1', '6']);
+  const byColor = D.groupDeck({ ...deck, raggruppamento: 'colore' }, CARDS);
+  assert.deepEqual(byColor.map((g) => g.name), ['Rosso', 'Incolore']);
+});
+
+// ─── Task 4: legalità Commander (§8.4) ────────────────────────────────────────
+
+test('legalityChecks: singleton viola su duplicati ma NON sulle basic land', () => {
+  const deck = deckWith([
+    { scryfall_id: 'c-island', qty: 24, tags: [] },   // basics: qty libera
+    { scryfall_id: 'c-bolt', qty: 2, tags: [] },      // viola: qty 2
+    { scryfall_id: 'c-goblin', qty: 1, tags: [] },
+    { scryfall_id: 'c-goblin', qty: 1, tags: [] },    // viola: doppione
+  ]);
+  const r = D.legalityChecks(deck, CARDS);
+  assert.equal(r.singleton.ok, false);
+  assert.deepEqual(r.singleton.violations, ['Lightning Bolt', 'Goblin Guide']);
+});
+
+test('legalityChecks: identity per carta rispetto al commander; senza commander nessun check', () => {
+  const entries = [
+    { scryfall_id: 'c-island', qty: 1, tags: [] },  // identity U: fuori da un mazzo mono-R
+    { scryfall_id: 'c-bolt', qty: 1, tags: [] },
+  ];
+  const withCmd = deckWith(entries, { commander: 'c-dragon', commanderMeta: { name: 'Shivan', colors: ['R'] } });
+  const r = D.legalityChecks(withCmd, CARDS);
+  assert.equal(r.identity.ok, false);
+  assert.deepEqual(r.identity.violations, ['Island']);
+  const noCmd = deckWith(entries);
+  assert.equal(D.legalityChecks(noCmd, CARDS).identity.ok, true);
+});
+
+test('legalityChecks: banned list e conteggio con commander', () => {
+  const deck = deckWith([
+    { scryfall_id: 'c-lutri', qty: 1, tags: [] },   // banned in Commander
+    { scryfall_id: 'c-bolt', qty: 1, tags: [] },
+  ], { commander: 'c-dragon', commanderMeta: { name: 'Shivan', colors: ['U','R'] } });
+  const r = D.legalityChecks(deck, CARDS);
+  assert.equal(r.banned.ok, false);
+  assert.deepEqual(r.banned.violations, ['Lutri, the Spellchaser']);
+  assert.equal(r.count, 3, '2 carte + il commander');
+});
+
+test('setRaggruppamento cambia vista e versione; vista invalida ignorata', () => {
+  const deck = D.newDeck();
+  const r = D.setRaggruppamento(deck, 'cmc');
+  assert.equal(r.raggruppamento, 'cmc');
+  assert.equal(r.versione, deck.versione + 1);
+  assert.equal(D.setRaggruppamento(deck, 'boh'), deck);
+  assert.equal(D.setRaggruppamento(deck, 'tipo'), deck, 'stessa vista: nessun edit');
+});
