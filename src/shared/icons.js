@@ -361,6 +361,7 @@
     history:      (size) => wrap(history, { size }),
     credits:      (size) => wrap(credits, { size }),
     redteam:      (size) => wrap(redteam, { size }),
+    decks:        (size) => wrap(decks, { size }),
   };
 
   // Heuristica che il menu usa per capire se una stringa di "icona" è SVG
