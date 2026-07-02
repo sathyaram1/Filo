@@ -1,10 +1,12 @@
 // Standalone verification harness: loads the real archive.html/archive.js from
-// the worktree in headless Chromium (no Electron), mocking filo:// resources
-// and chrome.runtime.sendMessage, to exercise the actual page code black-box.
+// the worktree in headless Chromium (no Electron), serving filo:// resources
+// via a local HTTP server (mirroring src/main/protocol.js's mapping) and
+// mocking chrome.runtime.sendMessage, to exercise the actual page code
+// black-box.
 import { chromium } from 'playwright';
 import path from 'node:path';
 import fs from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import http from 'node:http';
 
 const ROOT = '/home/user/Filo/.claude/worktrees/worker-MtJGj28gN1uJMkcGog1R';
 const SRC = path.join(ROOT, 'src');
@@ -17,30 +19,46 @@ function mime(p) {
   return 'application/octet-stream';
 }
 
+function resolveFsPath(host, rel) {
+  if (host === 'style') return path.join(SRC, 'styles', rel);
+  if (host === 'shared') return path.join(SRC, 'shared', rel);
+  if (host === 'asset') return path.join(ROOT, 'assets', rel);
+  return path.join(SRC, 'pages', host, rel || `${host}.html`);
+}
+
+function startServer() {
+  return new Promise((resolve) => {
+    const server = http.createServer((req, res) => {
+      const u = new URL(req.url, 'http://localhost');
+      const parts = u.pathname.replace(/^\/+/, '').split('/');
+      const host = parts.shift();
+      const rel = parts.join('/');
+      const fsPath = resolveFsPath(host, rel);
+      try {
+        let body = fs.readFileSync(fsPath);
+        if (fsPath.endsWith('.html')) {
+          // Rewrite filo://<host>/<rel> refs to http://localhost:PORT/<host>/<rel>
+          body = Buffer.from(body.toString('utf8').replace(/filo:\/\//g, `http://localhost:${server.address().port}/`));
+        }
+        res.writeHead(200, { 'Content-Type': mime(fsPath) });
+        res.end(body);
+      } catch (e) {
+        res.writeHead(404);
+        res.end('not found: ' + fsPath);
+      }
+    });
+    server.listen(0, '127.0.0.1', () => resolve(server));
+  });
+}
+
 async function main() {
+  const server = await startServer();
+  const port = server.address().port;
   const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox'] });
   const page = await browser.newPage();
 
   page.on('console', (msg) => console.log('[console]', msg.type(), msg.text()));
   page.on('pageerror', (err) => console.log('[pageerror]', err.message));
-
-  await page.route('filo://**', async (route) => {
-    const url = new URL(route.request().url());
-    const host = url.hostname;
-    const rel = decodeURIComponent(url.pathname.replace(/^\/+/, ''));
-    let fsPath;
-    if (host === 'style') fsPath = path.join(SRC, 'styles', rel);
-    else if (host === 'shared') fsPath = path.join(SRC, 'shared', rel);
-    else if (host === 'asset') fsPath = path.join(ROOT, 'assets', rel);
-    else fsPath = path.join(SRC, 'pages', host, rel || `${host}.html`);
-    try {
-      const body = fs.readFileSync(fsPath);
-      await route.fulfill({ status: 200, contentType: mime(fsPath), body });
-    } catch (e) {
-      console.log('[route 404]', fsPath, e.message);
-      await route.fulfill({ status: 404, body: 'not found' });
-    }
-  });
 
   // Data fixture: archived tabs across two days, including a colored one and
   // an internal filo:// one (should never appear — that's already existing
