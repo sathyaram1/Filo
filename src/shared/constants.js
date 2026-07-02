@@ -15,6 +15,9 @@
     // Deck builder Commander (DECK-BUILDER-SPEC.md §13.1): lista dei mazzi,
     // storage interamente locale. Vedi src/main/services/deckStore.js.
     DECKS: 'decks',
+    // Preferenze UI del deck builder (posizione dei divisori del Builder, §2):
+    // persistite perché il layout scelto a mano deve sopravvivere alla riapertura.
+    DECKS_UI: 'decksUi',
     // Cache Scryfall (§13.3): dati carta per id (prezzo con TTL logico) e
     // mappa dei simboli di mana (permanente). Vedi services/scryfall.js.
     SCRYFALL_CARDS: 'scryfallCards',
