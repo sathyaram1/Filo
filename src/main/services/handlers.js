@@ -1342,6 +1342,7 @@ require('./handlers/auth')(on, handlerCtx);
 require('./handlers/credits')(on, handlerCtx);
 require('./handlers/board')(on, handlerCtx);
 require('./handlers/decks')(on, handlerCtx);
+require('./handlers/scryfall')(on, handlerCtx);
 require('./handlers/safebrowse')(on, handlerCtx);
 require('./handlers/redteam')(on, handlerCtx);
 require('./handlers/misc')(on, handlerCtx);
