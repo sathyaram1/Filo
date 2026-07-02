@@ -1,0 +1,8 @@
+{
+  "id": "MtJGj28gN1uJMkcGog1R",
+  "status": "review",
+  "notes": "Nella pagina delle tab archiviate: tolto il testo introduttivo in cima e le schede chiuse ora si vedono come righe orizzontali di \"pastiglie\" per giorno (una fila per giorno, invece di un elenco verticale), con solo nome e icona del sito. Tasto destro su una scheda apre un piccolo menu con \"Riapri\" ed \"Elimina\", al posto dei due bottoni sempre visibili.\n\nIn più: l'indirizzo, l'orario e l'anteprima del contenuto restano disponibili passandoci sopra col mouse (tooltip), e ho aggiunto anche l'accesso da tastiera (Tab per raggiungere una scheda, Invio per aprire lo stesso menu) così chi non usa il mouse non perde le due azioni.\n\nVerificato eseguendo il codice reale della pagina in un browser Chromium headless (Electron non è disponibile in questa sessione): raggruppamento per giorno, fila orizzontale, apertura/chiusura del menu, \"Riapri\" e \"Elimina\" che mandano davvero il comando giusto e aggiornano la lista, click fuori dal menu che lo chiude senza eseguire nulla, e i controlli da tastiera. Ho anche aggiornato/aggiunto i test Playwright della pagina (non eseguibili qui per la stessa assenza di Electron: li lascio pronti per la verifica in cloud).",
+  "queuedAt": "2026-07-02T07:30:09.822Z",
+  "queuedBy": "routine",
+  "branch": "worker/MtJGj28gN1uJMkcGog1R"
+}
