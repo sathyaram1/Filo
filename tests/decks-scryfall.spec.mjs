@@ -2,7 +2,8 @@
 // carta via Scryfall (qui mockato: niente rete) e la libreria mostra art crop
 // e pip dei colori REALI. La ricerca vincola automaticamente la query alla
 // color identity del commander (§4). Il fetch è sostituito nel main con
-// SN_SCRYFALL._setFetch: il test esercita servizio + handler + storage + UI.
+// SN_SCRYFALL._setFetch; i messaggi partono dalla pagina con
+// chrome.runtime.sendMessage — lo stesso cammino IPC dell'app vera.
 
 import { test, expect } from './fixtures/electron.mjs';
 
@@ -42,23 +43,30 @@ async function mockScryfall(app) {
   });
 }
 
+// Crea un mazzo dalla UI e gli imposta il commander mockato via IPC (la UI di
+// scelta commander arriva coi task 4/5). Ritorna l'id del mazzo, col builder aperto.
+async function deckWithCommander(page) {
+  await page.click('#newDeck');
+  await expect(page.locator('#screenBuilder')).toBeVisible();
+  const hash = await page.evaluate(() => location.hash);
+  const deckId = decodeURIComponent(hash.replace('#/deck/', ''));
+  const r = await page.evaluate(async (id) => {
+    const { MSG } = window.SN_MSG;
+    return chrome.runtime.sendMessage({ type: MSG.DECKS_SET_COMMANDER, id, scryfallId: 'niv-1' });
+  }, deckId);
+  expect(r && r.ok, 'set commander deve riuscire: ' + JSON.stringify(r)).toBe(true);
+  return deckId;
+}
+
 test('impostare il commander porta art crop e pip reali nella libreria', async ({ app, openTab }) => {
   await mockScryfall(app);
-
-  // Crea un mazzo e imposta il commander via handler (la UI arriva col task 4/5).
-  const deckId = await app.evaluate(async () => {
-    const { handleMessage } = require('./src/main/services/handlers.js');
-    const MSG = globalThis.SN_MSG.MSG;
-    const created = await handleMessage({ type: MSG.DECKS_CREATE, nome: 'Izzet' }, null);
-    const r = await handleMessage({ type: MSG.DECKS_SET_COMMANDER, id: created.deck.id, scryfallId: 'niv-1' }, null);
-    if (!r.ok) throw new Error('set commander fallito: ' + r.error);
-    return created.deck.id;
-  });
-
   const page = await openTab('filo://decks/decks.html');
   await page.waitForLoadState('domcontentloaded');
+  const deckId = await deckWithCommander(page);
 
-  // La card del mazzo mostra i pip U e R (in quest'ordine WUBRG) e l'art crop.
+  // Torna alla libreria: la card del mazzo mostra i pip U e R (ordine WUBRG)
+  // e l'art crop del commander.
+  await page.click('#backToLibrary');
   const card = page.locator(`[data-deck-id="${deckId}"]`);
   await expect(card).toBeVisible();
   await expect(card.locator('.dk-pip')).toHaveCount(2);
@@ -72,25 +80,25 @@ test('impostare il commander porta art crop e pip reali nella libreria', async (
   await expect(page.locator('#commanderLine')).toHaveText(/Niv-Mizzet, Parun/);
 });
 
-test('la ricerca è vincolata all\'identity del commander; sintassi esplicita passa invariata', async ({ app }) => {
+test('la ricerca è vincolata all\'identity del commander; sintassi esplicita passa invariata', async ({ app, openTab }) => {
   await mockScryfall(app);
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  const deckId = await deckWithCommander(page);
 
-  const { qAuto, qExplicit, cardName } = await app.evaluate(async () => {
-    const { handleMessage } = require('./src/main/services/handlers.js');
-    const MSG = globalThis.SN_MSG.MSG;
-    const created = await handleMessage({ type: MSG.DECKS_CREATE, nome: 'Izzet' }, null);
-    await handleMessage({ type: MSG.DECKS_SET_COMMANDER, id: created.deck.id, scryfallId: 'niv-1' }, null);
-    globalThis.__scryRequests.length = 0;
-
+  const { cardName } = await page.evaluate(async (id) => {
+    const { MSG } = window.SN_MSG;
     // Ricerca nel contesto del mazzo: id<=UR aggiunto da solo.
-    const r1 = await handleMessage({ type: MSG.SCRYFALL_SEARCH, query: 'modi per dare haste', deckId: created.deck.id }, null);
+    const r1 = await chrome.runtime.sendMessage({ type: MSG.SCRYFALL_SEARCH, query: 'modi per dare haste', deckId: id });
     // Sintassi ibrida con vincolo esplicito: passa invariata.
-    await handleMessage({ type: MSG.SCRYFALL_SEARCH, query: 't:goblin id:R', deckId: created.deck.id }, null);
+    await chrome.runtime.sendMessage({ type: MSG.SCRYFALL_SEARCH, query: 't:goblin id:R', deckId: id });
+    return { cardName: r1.cards && r1.cards[0] && r1.cards[0].name };
+  }, deckId);
 
-    const urls = globalThis.__scryRequests.filter((u) => u.includes('/cards/search'));
-    const qOf = (u) => new URL(u).searchParams.get('q');
-    return { qAuto: qOf(urls[0]), qExplicit: qOf(urls[1]), cardName: r1.cards[0] && r1.cards[0].name };
-  });
+  const [qAuto, qExplicit] = await app.evaluate(() =>
+    globalThis.__scryRequests
+      .filter((u) => u.includes('/cards/search'))
+      .map((u) => new URL(u).searchParams.get('q')));
 
   expect(qAuto).toBe('modi per dare haste id<=UR');
   expect(qExplicit).toBe('t:goblin id:R');
