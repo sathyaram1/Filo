@@ -274,7 +274,52 @@ async function createFeedback(entry, num, bearer) {
   return { ok: true, status: res.status, id: json.name?.split('/').pop() || '' };
 }
 
+// Attore di una entry di coda, per la tabella delle transizioni (spec §3).
+// La coda è il canale delle ROUTINE; le uniche eccezioni delegate dall'owner
+// sono l'auto-archivio a punteggio (DC3) e le entry accodate esplicitamente
+// come owner (sessioni locali che agiscono per suo conto).
+function actorOf(entry) {
+  const by = String(entry.queuedBy || '');
+  if (/^owner\b/i.test(by) || by === 'routine:auto-archive') return 'owner';
+  return 'routine';
+}
+
+// Valida la transizione status→status contro la macchina a stati. `doc` è il
+// documento Firestore corrente (già scaricato). Regole di prudenza:
+//   - doc assente/illeggibile o status cifrato non decifrabile → ok (non
+//     possiamo validare; meglio applicare che perdere la decisione);
+//   - from LEGACY (new/blocked/…) → ok (lo scioglimento esatto richiede i campi
+//     grezzi; sparirà con la migrazione F5);
+//   - from === to → ok (retry/aggiornamento note idempotente);
+//   - altrimenti decide canTransition(from, to, actor).
+async function checkTransition(entry, doc) {
+  const FS = _fbStatus();
+  if (!FS || !doc) return { ok: true };
+  let from = doc.fields?.status?.stringValue || '';
+  const C = _crypto();
+  if (C && C.isEncrypted && C.isEncrypted(from)) {
+    try {
+      const { decryptFeedbackFields: dec } = await import('./lib/decrypt-feedback-fields.mjs');
+      from = (await dec({ _id: entry.id, status: from })).status || '';
+    } catch (_) { return { ok: true }; }
+  }
+  if (!FS.isCanonical(from)) return { ok: true, from };
+  if (from === entry.status) return { ok: true, from };
+  const actor = actorOf(entry);
+  return { ok: FS.canTransition(from, entry.status, actor), from, actor };
+}
+
 async function patchFeedback(entry, bearer) {
+  // Un solo GET per entry: serve alla fusione delle note E alla validazione.
+  const doc = await getDoc(entry.id, bearer).catch(() => null);
+
+  // Macchina a stati: le transizioni non elencate vengono RIFIUTATE qui, alla
+  // scrittura (spec §3 "il writer le rifiuta").
+  const check = await checkTransition(entry, doc);
+  if (!check.ok) {
+    return { status: 0, ok: false, rejected: true, body: `transizione illegale ${check.from} → ${entry.status} (attore ${check.actor})` };
+  }
+
   // S1.F2.1: cifra status fine se il gate è on; scrivi sempre statusPublic in chiaro.
   let fineStatus = entry.status;
   const C = _crypto();
@@ -286,6 +331,11 @@ async function patchFeedback(entry, bearer) {
 
   const fields = { status: toFsValue(fineStatus), statusPublic: toFsValue(publicStatus) };
   const mask = ['status', 'statusPublic'];
+  // Lock di lavorazione (spec §6): entrare in `working` stampa il timestamp;
+  // uscirne (qualsiasi altro status) lo azzera, così un `workingSince` presente
+  // implica SEMPRE "sta lavorando" e la riconciliazione può fidarsi.
+  fields.workingSince = toFsValue(entry.status === 'working' ? new Date().toISOString() : '');
+  mask.push('workingSince');
   if (typeof entry.notes === 'string') {
     // FONDI con lo storico invece di sovrascrivere: se il feedback è già stato
     // lavorato e riaperto, le note esistenti contengono il report precedente e
@@ -293,19 +343,22 @@ async function patchFeedback(entry, bearer) {
     // preserviamo appendendo il nuovo report come turno separato dell'agente.
     let notes = entry.notes;
     if (String(entry.notes).trim()) {
-      const doc = await getDoc(entry.id, bearer).catch(() => null);
       const existing = doc?.fields?.notes?.stringValue || '';
       notes = THREAD ? THREAD.mergeModelReport(existing, entry.notes) : entry.notes;
     }
     fields.notes = toFsValue(notes); mask.push('notes');
   }
-  // `branch`: il nome del branch git su cui vive il fix (stati review/blocked
-  // del cancello di merge). Scritto solo se la coda lo porta; '' lo azzera.
+  // `branch`: il nome del branch git su cui vive il fix (da revision_* in poi).
+  // Scritto solo se la coda lo porta; '' lo azzera.
   if (typeof entry.branch === 'string') { fields.branch = toFsValue(entry.branch.slice(0, 200)); mask.push('branch'); }
-  // `blockReason`: motivo strutturato del blocco (es. 'loop' = 3 FAIL del
-  // verifier→fixer). La dashboard `manage` lo usa per il colore del bordo
-  // (loop = nero). Scritto solo se la coda lo porta.
-  if (typeof entry.reason === 'string') { fields.blockReason = toFsValue(entry.reason.slice(0, 60)); mask.push('blockReason'); }
+  // `statusReason`: sottotesto dello status per la dashboard (es. 'loop' = 3
+  // FAIL del verifier→fixer, 'clarify' = domande della routine). MAI usato per
+  // la logica. `blockReason` è il nome vecchio: specchiato per lo storico non
+  // ancora migrato, da togliere dopo F5.
+  if (typeof entry.reason === 'string') {
+    fields.statusReason = toFsValue(entry.reason.slice(0, 60)); mask.push('statusReason');
+    fields.blockReason = toFsValue(entry.reason.slice(0, 60)); mask.push('blockReason');
+  }
   // `starred` (DB2): flag ⭐ "preferito". Booleano; scritto solo se la coda lo
   // porta, così non si azzera per chi non lo tocca.
   if (typeof entry.starred === 'boolean') { fields.starred = toFsValue(entry.starred); mask.push('starred'); }
