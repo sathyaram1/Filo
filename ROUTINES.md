@@ -50,6 +50,18 @@ Ripeti finché un worker torna «niente da fare» **oppure** il budget è quasi 
      task nuovo oltre ~150-200k token).
    - Rete di sicurezza: a un **429** → checkpoint + rilascio claim + termina.
 
+   **Calibrazione osservata (sessione 2026-07-02, 5 giri prober):**
+   - `ccusage` **gira** in cloud e riporta `costUSD` correttamente.
+   - Costo per giro: ~**$2–3 a worker Sonnet** (incluso l'overhead
+     dell'orchestratore); setup iniziale ~$2.5.
+   - Contesto dell'orchestratore: cresce di **~5–6% del window a giro** →
+     dopo 5 giri era solo al ~34%. Il contesto sostiene **~10–12 giri** per
+     sessione prima di avvicinarsi alla soglia dei ~150-200k token.
+   - Quindi: finché la soglia ALTA in dollari non è fissata dall'owner, **il
+     gate operativo è il contesto** — continua il loop finché un worker torna
+     «niente da fare» o il contesto supera ~70-75%; NON fermarti prima per
+     "rendimenti decrescenti" o per il solo costo in dollari.
+
 2. **Spawna UN worker generico** (tool Agent, `subagent_type: general-purpose`,
    `model: "sonnet"`) con un prompt minimo:
 
