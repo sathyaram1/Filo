@@ -175,15 +175,19 @@ Script one-shot (o normalizzazione in lettura + riscrittura al primo write):
 Aggiorna QUESTO file spuntando le fasi man mano. Worktree:
 `.claude/worktrees/feedback-status-machine` (branch `claude/feedback-status-machine`).
 
-- [ ] **F1 — Vocabolario condiviso**: `src/shared/feedbackStatus.js` (SN_FB_STATUS:
-      stati, colori, tabFor, transizioni+canTransition, normalizeStatus legacy) +
-      `tests/unit/feedbackStatus.test.mjs`. Caricarlo in `loader.js` e nelle pagine che
-      usano manageReview.
-- [ ] **F2 — Dashboard su status**: `manageReview.js` (manageTabFor→lookup su
-      normalizeStatus; isApproved/autoMode fuori dalla logica tab), `manage.js`
-      (bulk aligned→todo, filtro Bloccati confermati, colori/sottotesto da
-      status+statusReason), `feedback.js` (STATUS_PUBLIC_MAP esteso). Unit test
-      aggiornati + spec mirato manage.
+- [x] **F1 — Vocabolario condiviso** (fatto 2026-07-02): `src/shared/feedbackStatus.js`
+      (SN_FB_STATUS: stati, colori, tabFor, transizioni+canTransition, LEGACY_SIMPLE,
+      isWorkingExpired, PUBLIC_MAP) + `tests/unit/feedbackStatus.test.mjs` (13 test
+      verdi). Caricato in `loader.js` e `manage.html` prima di manageReview.
+      NB: `normalizeStatus(fb)` (scioglimento di new/blocked dal pipeline) va in
+      manageReview.js (F2), perché riusa classifyBlock/isAligned.
+- [ ] **F2a — Logica dashboard su status**: `manageReview.js` (normalizeStatus(fb) →
+      canonico; manageTabFor→lookup pura su normalizeStatus+isShipped, VIA autoMode/
+      isApproved dalla logica tab), `feedback.js` (STATUS_PUBLIC_MAP esteso ai nuovi
+      stati via SN_FB_STATUS.PUBLIC_MAP). Unit test aggiornati.
+- [ ] **F2b — UI dashboard**: `manage.js` (bulk aligned→todo, filtro "Bloccati
+      confermati" in Archiviati, colori/sottotesto da status+statusReason, azioni per
+      stato da transitionsFrom(s,'owner')). Spec mirato manage.
 - [ ] **F3 — Routine/scripts**: queue-triage + apply-triage (ALLOWED nuovi,
       canTransition, workingSince, riconciliazione working scaduti), next-feedback
       (skip working freschi), dispatch/ruoli (todo→working→revision_*→done,
