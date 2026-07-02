@@ -351,12 +351,8 @@
       ]);
     });
 
-    const name = $('deckName');
-    name.addEventListener('blur', saveRename);
-    name.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); name.blur(); }
-      if (e.key === 'Escape') { name.value = current ? current.nome : ''; name.blur(); }
-    });
+    $('deckName').addEventListener('click', (e) => { e.stopPropagation(); openSwitcher(); });
+    wireDividers();
 
     window.addEventListener('hashchange', route);
   }
@@ -366,6 +362,7 @@
     window.SN_PAGE_THEME = settings.theme;
     window.SN_PAGE_BOOTSTRAP.applyTheme(settings.theme);
     wire();
+    await loadLayout();
     await route();
   }
 
