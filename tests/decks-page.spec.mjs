@@ -1,10 +1,20 @@
-// App Mazzi (deck builder Commander, task 1): routing a tre schermate +
+// App Mazzi (deck builder Commander, task 1+3): routing a tre schermate +
 // libreria. Asserisce il SUCCESSO del flusso utente: creo un mazzo → atterro
 // nel Builder col nome giusto → torno alla libreria e la card c'è → rinomino
-// dal Builder e la libreria riflette il nome → duplico ed elimino dal menu
+// dallo switcher e la libreria riflette il nome → duplico ed elimino dal menu
 // contestuale. Senza l'app, il test fallisce già all'apertura di filo://decks.
 
 import { test, expect } from './fixtures/electron.mjs';
+
+// Rinomina il mazzo aperto nel Builder passando dallo switcher (§8.2):
+// click sul nome → "Rinomina…" → campo di modifica → Invio.
+async function renameViaSwitcher(page, nome) {
+  await page.click('#deckName');
+  await page.locator('.dk-switcher .sn-select-option', { hasText: 'Rinomina' }).click();
+  await page.fill('#deckNameEdit', nome);
+  await page.press('#deckNameEdit', 'Enter');
+  await expect(page.locator('#deckNameText')).toHaveText(nome);
+}
 
 test('creare, rinominare, duplicare ed eliminare un mazzo dalla libreria', async ({ openTab }) => {
   const page = await openTab('filo://decks/decks.html');
@@ -16,12 +26,11 @@ test('creare, rinominare, duplicare ed eliminare un mazzo dalla libreria', async
   // "+ Nuovo mazzo" crea e naviga al Builder (routing #/deck/<id>).
   await page.click('#newDeck');
   await expect(page.locator('#screenBuilder')).toBeVisible();
-  await expect(page.locator('#deckName')).toHaveValue('Nuovo mazzo');
+  await expect(page.locator('#deckNameText')).toHaveText('Nuovo mazzo');
   await expect(page.locator('#deckCount')).toHaveText('0/100 carte');
 
-  // Rinomina dall'header del Builder (identità del documento, §8.2).
-  await page.fill('#deckName', 'Izzet Spellslinger');
-  await page.press('#deckName', 'Enter');
+  // Rinomina dallo switcher (identità del documento, §8.2).
+  await renameViaSwitcher(page, 'Izzet Spellslinger');
 
   // Torna alla libreria: la card esiste col nome nuovo.
   await page.click('#backToLibrary');
@@ -56,7 +65,7 @@ test('routing: il click su una card apre il suo mazzo; Partita è uno stub raggi
   // viene riletto dallo storage, non dalla memoria della pagina).
   await page.click('[data-deck-id]');
   await expect(page.locator('#screenBuilder')).toBeVisible();
-  await expect(page.locator('#deckName')).toHaveValue('Nuovo mazzo');
+  await expect(page.locator('#deckNameText')).toHaveText('Nuovo mazzo');
 
   // Schermata Partita: stub con ritorno alla libreria.
   await page.click('#backToLibrary');
@@ -70,8 +79,8 @@ test('i mazzi sopravvivono alla riapertura della pagina (storage locale)', async
   const page = await openTab('filo://decks/decks.html');
   await page.waitForLoadState('domcontentloaded');
   await page.click('#newDeck');
-  await page.fill('#deckName', 'Persistente');
-  await page.press('#deckName', 'Enter');
+  await expect(page.locator('#screenBuilder')).toBeVisible();
+  await renameViaSwitcher(page, 'Persistente');
 
   // Ricarica la pagina da zero: la libreria rilegge dallo storage del main.
   await page.goto('filo://decks/decks.html');
