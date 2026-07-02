@@ -39,6 +39,7 @@ require(path.join(SHARED, 'feedbackCrypto.js'));
 require(path.join(SHARED, 'feedbackClientIdHash.js')); // S1.F2.2: hash deterministico clientId
 require(path.join(SHARED, 'userCredibility.js'));
 require(path.join(SHARED, 'spellLanguages.js'));
+require(path.join(SHARED, 'decks.js'));
 require(path.join(SVC, 'providers', 'openrouter.js'));
 require(path.join(SVC, 'providers', 'gemini.js'));
 require(path.join(SVC, 'providers', 'index.js'));
