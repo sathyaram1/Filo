@@ -1,5 +1,7 @@
 // Pagina archivio tab (§3.3): le schede chiuse, raggruppate per giorno e
-// ordinate per colore (ordine cromatico). Riapri / rimuovi / svuota.
+// ordinate per colore (ordine cromatico), mostrate come chip orizzontali.
+// Riapri / elimina via menu contestuale (tasto destro) su ogni chip; svuota
+// l'intero archivio dalla toolbar.
 
 (function () {
   'use strict';
