@@ -65,7 +65,9 @@ async function seedDeck(page) {
     }
     await chrome.runtime.sendMessage({ type: MSG.DECKS_UPDATE, deck });
   }, deckId);
-  await page.goto(`filo://decks/decks.html#/deck/${encodeURIComponent(deckId)}`);
+  // location.reload(): il goto sullo stesso URL (cambia solo l'hash già
+  // uguale) NON ricaricherebbe il documento e la pagina resterebbe stale.
+  await page.evaluate(() => location.reload());
   await page.waitForLoadState('domcontentloaded');
   await expect(page.locator('.dk-row')).toHaveCount(3);
   return deckId;
@@ -92,11 +94,14 @@ test('l\'elenco raggruppa per tipo, mostra i simboli di mana e collassa i gruppi
   // Le basics mostrano la quantità (10×).
   await expect(page.locator('.dk-row', { hasText: 'Island' })).toContainText('10×');
 
-  // Collassa "Terre": le sue righe spariscono, le altre restano.
+  // Collassa "Terre": le sue righe scompaiono alla vista, le altre restano.
+  const terreRows = page.locator('.dk-group[data-group="Terre"] .dk-group-rows');
   await page.locator('.dk-group-head', { hasText: 'Terre' }).click();
-  await expect(page.locator('.dk-row')).toHaveCount(2);
+  await expect(terreRows).toBeHidden();
+  await expect(page.locator('.dk-row:visible')).toHaveCount(2);
   await page.locator('.dk-group-head', { hasText: 'Terre' }).click();
-  await expect(page.locator('.dk-row')).toHaveCount(3);
+  await expect(terreRows).toBeVisible();
+  await expect(page.locator('.dk-row:visible')).toHaveCount(3);
 });
 
 test('cambio vista (per costo) e override di gruppo dal tasto destro', async ({ app, openTab }) => {
