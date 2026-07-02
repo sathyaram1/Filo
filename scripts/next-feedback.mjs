@@ -100,7 +100,7 @@ export function filterEligible(candidates, openAll) {
     for (const o of all) {
       if (!o || o._id === c._id) continue;
       if (num(o.seq) !== seq) continue;
-      const oSub = num(o.subSeq);
+      const oSub = subOf(o.subSeq);
       if (oSub === null) continue;                 // il padre aperto non blocca
       if (sub === null) return false;              // padre con figlio aperto
       if (oSub < sub) return false;                // fratello precedente aperto
