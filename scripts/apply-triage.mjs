@@ -50,8 +50,11 @@ const THREAD = globalThis.SN_FEEDBACK_THREAD;
 // feedback.js e feedbackCrypto.js sono IIFE su globalThis: importarli li registra.
 import '../src/shared/feedbackCrypto.js';
 import '../src/shared/feedback.js';
+// Macchina a stati (spec FEEDBACK-STATES.md): vocabolario + transizioni legali.
+import '../src/shared/feedbackStatus.js';
 const _statusToPublic = () => globalThis.SN_FEEDBACK?.statusToPublic;
 const _crypto = () => globalThis.SN_FEEDBACK_CRYPTO;
+const _fbStatus = () => globalThis.SN_FB_STATUS;
 // I claim (semaforo sui feedback per le routine) vivono in feedback-triage/claims/.
 // Qui li "specchiamo" su Firestore così la dashboard può mostrare "in lavorazione".
 import { liveClaims, expiredClaimFiles } from './claim-feedback.mjs';
