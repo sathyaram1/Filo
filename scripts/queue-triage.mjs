@@ -15,9 +15,12 @@
 //   dell'idea "file con la lista dei risolti").
 //
 // USO:
-//   node scripts/queue-triage.mjs <id> <status:todo|done|clarify|review|blocked|archived> "testo note"
-//   node scripts/queue-triage.mjs <id> <status> "note" --branch worker/42  (stato review/blocked + branch)
-//   node scripts/queue-triage.mjs <id> <status> "note" --reason loop        (motivo strutturato del blocco)
+//   node scripts/queue-triage.mjs <id> <status> "testo note"
+//     status ∈ todo|working|revision_capability|revision_security|done|design|archived
+//     (macchina a stati: vedi FEEDBACK-STATES.md; i vecchi clarify/review/blocked
+//     vengono rimappati con un avviso)
+//   node scripts/queue-triage.mjs <id> <status> "note" --branch worker/42  (da revision_* in poi)
+//   node scripts/queue-triage.mjs <id> <status> "note" --reason loop|clarify (sottotesto statusReason)
 //   node scripts/queue-triage.mjs <id> <status> "note" --starred|--unstar   (flag ⭐ preferito, DB2)
 //   node scripts/queue-triage.mjs <id> <status> "note" --no-git   (solo scrive il file)
 //
