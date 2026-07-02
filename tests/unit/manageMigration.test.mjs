@@ -64,13 +64,13 @@ test('migrazione: ogni stato finisce nella tab attesa', () => {
     'clarify-1': 'inbox',
     'draft-1': 'inbox',       // Bozze rimosse → draft resta sotto Ricevuti
     'todo-1': 'queue',        // approvato a mano dall'owner
-    'review-1': 'queue',      // auto-approvato (aligned + automatica)
+    'review-1': 'queue',      // legacy review → revision_capability (In coda)
     'blocked-1': 'inbox',     // blocco worker: richiede la mia approvazione
     'pipe-block': 'inbox',    // blocco di sicurezza: richiede la mia approvazione
     'done-1': 'resolved',
-    'verified-1': 'resolved',
+    'verified-1': 'archived', // macchina a stati: verificato dall'owner = archiviato
     'archived-1': 'archived',
-    'ignored-1': null,        // nascosto (come nella vecchia dashboard)
+    'ignored-1': 'archived',  // ritirato: resta ispezionabile come log in Archiviati
   };
   for (const fb of corpus()) {
     assert.equal(MR.manageTabFor(fb), expected[fb._id], `${fb._id} (${fb.status})`);
