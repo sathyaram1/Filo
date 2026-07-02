@@ -486,6 +486,47 @@
     $('deckName').addEventListener('click', (e) => { e.stopPropagation(); openSwitcher(); });
     wireDividers();
 
+    // Colonna mazzo: collassa/espandi i gruppi al click sul divisore.
+    const list = $('deckList');
+    list.addEventListener('click', (e) => {
+      const head = e.target.closest('.dk-group-head');
+      if (!head) return;
+      const g = head.dataset.g;
+      if (collapsedGroups.has(g)) collapsedGroups.delete(g);
+      else collapsedGroups.add(g);
+      renderDeckList();
+    });
+    // Tasto destro sulla riga carta (§8.3).
+    list.addEventListener('contextmenu', (e) => {
+      const row = e.target.closest('.dk-row');
+      if (!row) return;
+      e.preventDefault();
+      const id = row.dataset.cardId;
+      const card = cardsById[id];
+      const items = [
+        { label: 'Rimuovi', run: () => removeFromDeck(id) },
+        { label: 'Sposta in gruppo…', run: () => chooseGroup(e.clientX, e.clientY, id) },
+        { label: 'Copia in un altro mazzo…', run: () => chooseDeck(e.clientX, e.clientY, id, false) },
+        { label: 'Sposta in un altro mazzo…', run: () => chooseDeck(e.clientX, e.clientY, id, true) },
+        { label: 'Imposta come commander', run: () => makeCommander(id) },
+      ];
+      if (card && card.scryfallUri) {
+        items.push({ label: 'Apri su Scryfall', run: () => send({ type: MSG.OPEN_URL, url: card.scryfallUri }) });
+      }
+      openCtx(e.clientX, e.clientY, items);
+    });
+    // Cambio di raggruppamento (vista, non dato: §8.1).
+    $('groupBy').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const r = $('groupBy').getBoundingClientRect();
+      openCtx(r.left, r.bottom + 2, [
+        { label: 'per tipo', run: () => saveDeck(Decks.setRaggruppamento(current, 'tipo')) },
+        { label: 'per tag', run: () => saveDeck(Decks.setRaggruppamento(current, 'tag')) },
+        { label: 'per costo di mana', run: () => saveDeck(Decks.setRaggruppamento(current, 'cmc')) },
+        { label: 'per colore', run: () => saveDeck(Decks.setRaggruppamento(current, 'colore')) },
+      ]);
+    });
+
     window.addEventListener('hashchange', route);
   }
 
