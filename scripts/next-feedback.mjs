@@ -312,6 +312,7 @@ export async function run() {
       status,
       createdAt: fb.createdAt || null,
       seq: fb.seq,
+      subSeq: fb.subSeq,
       claimed: claimed.has(fb._id),
     };
   }
