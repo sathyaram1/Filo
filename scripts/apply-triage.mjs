@@ -67,7 +67,16 @@ const SPOOL_DIR = process.env.FILO_SPOOL_DIR
   : resolve(ROOT, 'feedback-triage');
 const CLAIMS_DIR = resolve(SPOOL_DIR, 'claims');
 
-const ALLOWED = ['todo', 'done', 'clarify', 'review', 'blocked', 'archived'];
+// Status canonici accettati dalla coda (stesso elenco di queue-triage.mjs).
+const ALLOWED = ['todo', 'working', 'revision_capability', 'revision_security',
+  'done', 'design', 'archived'];
+// Nomi RITIRATI ancora accettati in ingresso (file accodati da recipe vecchie):
+// rimappati al canonico. Rimuovere a migrazione completata.
+const LEGACY_INPUT = {
+  clarify: { status: 'design', reason: 'clarify' },
+  review:  { status: 'revision_capability' },
+  blocked: { status: 'design', reason: 'loop' },
+};
 
 // DB3: la versione in cui un fix confluisce = quella corrente di package.json
 // (è la release in costruzione, la "prossima" che uscirà). Stampata su
