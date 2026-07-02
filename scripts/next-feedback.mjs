@@ -66,16 +66,59 @@ function fsDocToObject(doc) {
 // ─── Logica pura di ordinamento/selezione (esportata, testabile) ─────────────
 
 /**
+ * Regola di DIPENDENZA fra sub-feedback (#N.1, #N.2, …): quando una spec viene
+ * spezzata in figli, l'ordine di creazione È l'ordine di lavorazione (x.1 prima
+ * di x.2). Il vincolo è imposto QUI, non-LLM — non nel testo dei feedback:
+ *
+ *   - un figlio #N.k è eleggibile SOLO se nessun fratello precedente #N.j (j<k)
+ *     è ancora aperto (todo/review/clarify/blocked/claimato: qualunque cosa non
+ *     sia chiusa). "Chiuso" = non compare più fra i doc open di Firestore.
+ *   - un top-level #N con figli ancora aperti NON è eleggibile (es. il feedback
+ *     "ombrello" che traccia una spec: si lavora solo quando i figli sono done).
+ *   - i feedback senza numero non hanno vincoli (nessuna famiglia).
+ *
+ * NB: un figlio NON è bloccato dal proprio padre aperto (il padre-tracker resta
+ * open per tutta la durata della famiglia, per costruzione).
+ *
+ * @param {Array<{ _id: string, seq?: number, subSeq?: number }>} candidates
+ *   I candidati lavorabili (todo, non claimati).
+ * @param {Array<{ _id: string, seq?: number, subSeq?: number }>} openAll
+ *   TUTTI i feedback ancora aperti (qualunque status, claimati compresi):
+ *   sono i potenziali "blocchi" delle dipendenze.
+ * @returns {Array} I candidati senza predecessori aperti.
+ */
+export function filterEligible(candidates, openAll) {
+  const all = Array.isArray(openAll) ? openAll : [];
+  const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
+  return (Array.isArray(candidates) ? candidates : []).filter((c) => {
+    const seq = num(c.seq);
+    if (seq === null) return true;
+    const sub = num(c.subSeq);
+    for (const o of all) {
+      if (!o || o._id === c._id) continue;
+      if (num(o.seq) !== seq) continue;
+      const oSub = num(o.subSeq);
+      if (oSub === null) continue;                 // il padre aperto non blocca
+      if (sub === null) return false;              // padre con figlio aperto
+      if (oSub < sub) return false;                // fratello precedente aperto
+    }
+    return true;
+  });
+}
+
+/**
  * Seleziona il feedback vincitore da un array di candidati già filtrati
- * (status = todo, non claimati, priority già decifrata a numero).
+ * (status = todo, non claimati, dipendenze soddisfatte via filterEligible,
+ * priority già decifrata a numero).
  *
  * Ordinamento:
  *   1. priority DESC (numero più alto prima; undefined/NaN → 0)
  *   2. FIFO a parità: createdAt ASC (ISO string, confronto lessicografico)
  *   3. seq ASC a parità di createdAt (feedback senza createdAt)
- *   4. _id ASC come ultimo tie-break deterministico
+ *   4. subSeq ASC a parità di seq (i sub-feedback nell'ordine della famiglia)
+ *   5. _id ASC come ultimo tie-break deterministico
  *
- * @param {Array<{ _id: string, priority?: number, createdAt?: string, seq?: number, claimed?: boolean }>} candidates
+ * @param {Array<{ _id: string, priority?: number, createdAt?: string, seq?: number, subSeq?: number, claimed?: boolean }>} candidates
  *   Array di feedback con priority GIÀ decifrata (numero) e claimed già calcolato.
  *   I candidati con claimed=true vengono scartati.
  * @returns {string|null} L'_id del vincitore, oppure null se la coda è vuota.
