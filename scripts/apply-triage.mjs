@@ -570,6 +570,12 @@ async function main() {
     } else if (r.status === 404) {
       console.warn(`  ! ${it.entry.id}: feedback inesistente (404) — rimuovo dalla coda`);
       unlinkSync(it.file); applied.push(it.file);
+    } else if (r.rejected) {
+      // Transizione illegale (macchina a stati): la decisione viene SCARTATA
+      // (file rimosso, feedback intatto) e resta visibile in questo log.
+      console.error(`  ✗ ${it.entry.id}: ${r.body} — decisione scartata`);
+      unlinkSync(it.file);
+      failures++;
     } else {
       console.error(`  ✗ ${it.entry.id}: HTTP ${r.status} ${r.body}`);
       failures++;
