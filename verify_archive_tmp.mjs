@@ -152,7 +152,6 @@ async function main() {
   await page.mouse.click(5, 5);
   await page.waitForTimeout(150);
   results.menuClosedOnOutsideClick = !(await page.locator('.arc-ctxmenu').isVisible().catch(() => false));
-  results.callsAfterOutsideClick = JSON.parse(JSON.stringify(window ? null : null)); // placeholder
 
   // 6. "Riapri" sends reopen message with correct url.
   await youtubeRow.click({ button: 'right' });
