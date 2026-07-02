@@ -1,35 +1,20 @@
 # ROUTINES — l'orchestratore banale delle routine cloud di Filo
 
-Questo file è **solo l'orchestratore**: avvio, loop, budget, sequenzialità, come
-spawna. I dettagli di ciascun ruolo vivono in `routines/roles/*.md` (un file per
-ruolo); `scripts/dispatch.mjs` inlina quello giusto al worker. Le convenzioni di
-lavoro (verifica, sintomo-vs-causa, invarianti UX, tono, clarify) stanno in
-`CLAUDE.md`, che arriva a ogni worker.
+Questo file è **solo l'orchestratore**: avvlio, oop, budget, sequenzialità, come
+spawna. Non contiene i dettagli dei ruoli: quelli vivono in `routines/roles/*.md`
+(un file per ruolo) e la conoscenza condivisa in `routines/shared.md`.
 
 **Principio centrale (ridisegno 2026-06-27).** L'orchestratore decide solo **SE**
 continuare il loop, non **QUALE** ruolo lanciare. Il "quale" lo decide uno
-**script deterministico** — `scripts/dispatch.mjs` — che legge solo lo STATO (mai
-testi liberi dei feedback), elimina la superficie d'attacco da prompt-injection
-sull'ordinamento, e stampa al worker il ruolo + il payload + il file-ruolo da
-eseguire. L'orchestratore non legge NIENTE: né metadati, né corpi, né screenshot.
-
-> **Non è per sessioni locali.** Chi lavora in locale legge `CLAUDE.md`.
-
----
-
-## Stato di rollout
-
-Le routine cloud sono in **ridisegno**. R1/R2/R6 (stati `review`/`blocked` +
-campo `branch`, hook che NON auto-fonde `worker/*`/`feature/*`, cancello
-`merge-gate.mjs` con L5+L4) sono fatti. Il **cost-check R4** (`ccusage` in cloud)
-è in calibrazione: finché non confermato, ripiega sul budget di contesto.
+**script deterministico** — `scripts/dispatch.mjs` — che legge lo stato, e stampa al worker il ruolo + il payload + il file-ruolo da
+eseguire. L'orchestratore non legge NIENTE: né metadati, né corpi, né screenshot. e NON esegue `scripts/dispatch.mjs` 
 
 ---
 
 ## Flusso dell'orchestratore
 
 Le routine schedulate su claude.ai partono con un prompt minimo
-(`"routine automatica."`). Quell'attivazione **è l'orchestratore**.
+(`"routine automatica. [chiave per decifrare i feedback]"`). Quell'attivazione **è l'orchestratore**.
 
 ### Avvio
 
@@ -39,7 +24,7 @@ Le routine schedulate su claude.ai partono con un prompt minimo
 
 ### Loop principale
 
-Ripeti finché un worker torna «niente da fare» **oppure** il budget è quasi pieno:
+Ripeti finché il budget è quasi pieno:
 
 1. **Controllo budget (R4)** — prima di rispawnare:
    ```bash
@@ -150,7 +135,7 @@ itera su tutte le worktree, le committa e (per i branch non gattati) le mergia s
 `main`. Due worker in parallelo si pestano sull'`.git` (`index.lock`, merge
 abortiti). **Un solo worker per volta. Sempre.**
 
-**Modelli:** orchestratore su **Opus**, worker su **Sonnet**.
+**Modelli:** usa semplre fable 5.
 
 ### `npm test` completo: quando
 
@@ -182,13 +167,15 @@ feature spezzata in `#N.M` NON fonde i pezzi su `main` uno a uno.
 
 ---
 
-## Convenzioni operative (orchestratore)
+## Convenzioni operative
 
-Il worker prende le convenzioni di lavoro da `CLAUDE.md` e i comandi che gli
-servono dal suo file-ruolo. Qui solo ciò che tocca l'orchestratore:
+Coda su git (`queue-triage`/`queue-feedback`), claim, decifratura S1, priorità,
+tono dei report, sintomo-vs-causa, invarianti UX, "insistere prima di mollare":
+**tutto in `routines/shared.md`** (lo legge il worker, non l'orchestratore).
 
-- **Mai PATCH diretta su Firestore** (l'account robot è bloccato): ogni cambio di
-  stato passa dalla coda git e dalla GitHub Action `apply-triage.yml` (~1-2 min).
-  La scrive il worker; l'orchestratore non tocca Firestore.
+Solo i punti che toccano l'orchestratore:
+
+- **Mai PATCH diretta su Firestore** (l'account robot è bloccato): ogni decisione
+  passa dalla coda git e dalla GitHub Action `apply-triage.yml` (~1-2 min).
 - **Claim**: lo fa `dispatch.mjs`. L'orchestratore non claima a mano.
 - **Numerazione**: ogni feedback ha `#N` + titolo; i sub ereditano `#N.M`.
