@@ -181,10 +181,19 @@ Aggiorna QUESTO file spuntando le fasi man mano. Worktree:
       verdi). Caricato in `loader.js` e `manage.html` prima di manageReview.
       NB: `normalizeStatus(fb)` (scioglimento di new/blocked dal pipeline) va in
       manageReview.js (F2), perché riusa classifyBlock/isAligned.
-- [ ] **F2a — Logica dashboard su status**: `manageReview.js` (normalizeStatus(fb) →
-      canonico; manageTabFor→lookup pura su normalizeStatus+isShipped, VIA autoMode/
-      isApproved dalla logica tab), `feedback.js` (STATUS_PUBLIC_MAP esteso ai nuovi
-      stati via SN_FB_STATUS.PUBLIC_MAP). Unit test aggiornati.
+- [x] **F2a — Logica dashboard su status** (fatto 2026-07-03): `manageReview.js`
+      riscritto — `normalizeStatus(fb)` (canonico→invariato; legacy semplice→mappa;
+      new/blocked→scioglimento dai grezzi con classifyLegacyBlock/isAlignedLegacy,
+      interni non esportati); `manageTabFor` = lookup pura; `classifyBlock` deriva da
+      status (loop=design verde, nero riservato a suspicious_file); `isAligned` = solo
+      chi ASPETTA approvazione; `isApproved` = status nell'iter (autoMode IGNORATO —
+      era il bug strutturale); board: guard red-team resta sui grezzi APPOSTA.
+      `feedback.js`: statusToPublic con lookup pigra su SN_FB_STATUS.PUBLIC_MAP.
+      Unit test aggiornati al nuovo contratto: 808/808 verdi.
+      ⚠️ Conseguenze semantiche da dire all'owner: (1) legacy `verified`/`ignored` →
+      Archiviati (verified esce dalla board utenti); (2) status `todo` = SEMPRE in
+      coda (prima un todo "non approvato" stava nei Ricevuti); (3) pipeline "in
+      corso" ora bianco `unlabeled` (prima nessun colore).
 - [ ] **F2b — UI dashboard**: `manage.js` (bulk aligned→todo, filtro "Bloccati
       confermati" in Archiviati, colori/sottotesto da status+statusReason, azioni per
       stato da transitionsFrom(s,'owner')). Spec mirato manage.
