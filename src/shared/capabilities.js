@@ -137,6 +137,12 @@
       desc: 'Un editor per scrivere e impaginare testo con moduli a blocchi; il contenuto viene salvato da solo.',
       invoke: 'Menu del tasto destro → "Editor", oppure filo://editor/editor.html.',
     },
+    {
+      id: 'deck-builder', title: 'Mazzi Commander (Magic)', category: 'writing',
+      desc: 'Una libreria dei tuoi mazzi Commander: crea, duplica, rinomina ed elimina mazzi, salvati sul tuo computer. La costruzione vera e propria (ricerca carte, statistiche, chat) è in arrivo.',
+      invoke: 'Menu App → "Mazzi", oppure filo://decks/decks.html.',
+      doesNot: 'Non cerca ancora le carte e non gioca partite: per ora gestisce la libreria dei mazzi.',
+    },
 
     // ─────────────────────── Lettura e traduzione ───────────────────────────
     {
