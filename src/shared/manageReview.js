@@ -205,79 +205,107 @@
     return cmpVersion(v, releasedVersion) <= 0;
   }
 
-  // ── "Allineato": panel completo con tutti i giudici d'accordo ─────────────
-  // Colore BLU nella dashboard (come i pallini --mg-dot--aligned). Distinto dai
-  // blocchi (classifyBlock) perché NON è una segnalazione di rischio: è un
-  // feedback che ha passato i giudici puliti. Un blocco/non-filtrato/loop NON è
-  // allineato (classifyBlock torna non-null → escluso subito).
+  // ── "Allineato" LEGACY: panel completo con tutti i giudici d'accordo ──────
+  // Usata SOLO da normalizeStatus per lo storico. Colore BLU (--mg-dot--aligned).
   const ALIGNED = { color: '#5b6ee0', label: 'Allineato' };
-  function isAligned(fb) {
+  function isAlignedLegacy(fb) {
     if (!fb) return false;
-    if (classifyBlock(fb)) return false; // blocco/non-filtrato/loop → non allineato
+    if (classifyLegacyBlock(fb)) return false; // blocco/non-filtrato/loop → non allineato
     const p = fb.pipeline;
     if (!p) return false;
     // Decisione esplicita del pipeline: auto-approvato o classe L2 aligned.
     if (p.action === 'candidate_change') return true;
     if (p.l2Class === 'aligned') return true;
-    // Storico senza l2Class: panel COMPLETO (classifyBlock già escluderebbe i
-    // parziali) i cui verdetti presenti sono tutti 'aligned'.
+    // Storico senza l2Class: panel COMPLETO (classifyLegacyBlock già escluderebbe
+    // i parziali) i cui verdetti presenti sono tutti 'aligned'.
     const verdicts = Array.isArray(p.verdicts) ? p.verdicts.filter((v) => v && v.class) : [];
     return verdicts.length > 0 && verdicts.every((v) => v.class === 'aligned');
   }
 
+  // ── normalizeStatus: la SOLA porta d'ingresso allo stato di un feedback ───
+  // Ritorna sempre uno status CANONICO (spec FEEDBACK-STATES.md §2) + il
+  // sottotesto statusReason. Tre casi:
+  //   1. status già canonico → passa invariato (la fonte di verità è lui);
+  //   2. legacy "semplice" (clarify/review/verified/ignored/draft) → mappa fissa;
+  //   3. legacy new/blocked/assente → deriva UNA VOLTA dai campi grezzi con la
+  //      stessa logica storica (reviewDecision, blockReason, pipeline). È il
+  //      ponte per lo storico non ancora migrato: quando la migrazione (F5)
+  //      riscrive i documenti, il ramo 3 non scatta più.
+  function normalizeStatus(fb) {
+    const fs = FS();
+    const s = fb && fb.status;
+    if (fs.isCanonical(s)) return { status: s, statusReason: (fb && fb.statusReason) || null };
+
+    const simple = fs.LEGACY_SIMPLE[s];
+    if (simple) return { status: simple.status, statusReason: (fb && fb.statusReason) || simple.statusReason };
+
+    // new / blocked / status assente: scioglimento dai campi grezzi.
+    if (fb && fb.reviewDecision === 'accepted') return { status: 'todo', statusReason: null };
+    const cl = classifyLegacyBlock(fb);
+    if (cl) {
+      if (cl.reason === 'loop')       return { status: 'design', statusReason: 'loop' };
+      if (cl.reason === 'attack')     return { status: 'attack', statusReason: null };
+      if (cl.reason === 'spam')       return { status: 'spam', statusReason: null };
+      if (cl.reason === 'design')     return { status: 'design', statusReason: 'judges' };
+      return { status: 'unlabeled', statusReason: null }; // unfiltered
+    }
+    if (isAlignedLegacy(fb)) {
+      // Auto-approvazione incisa al giudizio (automatica ON allora) → in coda;
+      // altrimenti aspetta l'approvazione manuale. La modalità automatica di
+      // OGGI non c'entra: agisce una volta sola, al momento del giudizio.
+      const p = fb.pipeline;
+      if (p && p.action === 'candidate_change') return { status: 'todo', statusReason: null };
+      return { status: 'aligned', statusReason: null };
+    }
+    return { status: 'unlabeled', statusReason: null };
+  }
+
+  // Come si presenta lo status in "Ricevuti": reason per lo storico dei consumer
+  // (unfiltered/attack/spam/design/loop) + colore/label/severity dal vocabolario.
+  function reasonOf(status, statusReason) {
+    if (status === 'unlabeled') return 'unfiltered';
+    if (status === 'design' && statusReason === 'loop') return 'loop';
+    return status; // attack | spam | design | suspicious_file
+  }
+
+  /**
+   * Classifica un feedback per la colonna Revisione/Ricevuti. Deriva SOLO dallo
+   * status normalizzato (lookup sul vocabolario): torna { reason, color,
+   * severity, label } per gli stati di revisione umana, null per tutto il resto
+   * (aligned incluso: non è una segnalazione di rischio, ha il suo badge blu).
+   */
+  function classifyBlock(fb) {
+    const fs = FS();
+    const { status, statusReason } = normalizeStatus(fb);
+    if (status === 'aligned') return null;
+    const info = fs.STATUSES[status];
+    if (!info || info.tab !== 'inbox') return null;
+    return { reason: reasonOf(status, statusReason), color: info.color, severity: info.severity, label: info.label };
+  }
+
+  // "Allineato" = status normalizzato `aligned` (badge blu, aspetta approvazione).
+  function isAligned(fb) {
+    return normalizeStatus(fb).status === 'aligned';
+  }
+
   // ── Approvazione: cosa può stare "In coda" ────────────────────────────────
-  // Un feedback è APPROVATO (può andare in coda, in attesa che Claude lo risolva)
-  // SOLO se:
-  //   - l'owner l'ha sbloccato/approvato a mano dalla dashboard (`reviewDecision==='accepted'`), OPPURE
-  //   - la pipeline l'ha auto-approvato al momento del giudizio: tutti i giudici
-  //     "aligned" E modalità automatica ON ⇒ azione `candidate_change`, OPPURE
-  //   - la modalità automatica è ON ORA (`opts.autoMode`) e il feedback è allineato:
-  //     così attivando l'automatica anche i VECCHI allineati (giudicati quando
-  //     era OFF, senza `candidate_change` inciso) entrano in coda.
-  // Tutto il resto (panel parziale/non filtrato, blocchi attacco/spam/design,
-  // aligned con automatica OFF, feedback non ancora giudicati) NON è approvato e
-  // resta nei "Ricevuti" in attesa dell'approvazione manuale dell'owner.
-  function isApproved(fb, opts) {
-    if (!fb) return false;
-    if (fb.reviewDecision === 'accepted') return true;
-    const p = fb.pipeline;
-    if (p && p.action === 'candidate_change') return true;
-    if (opts && opts.autoMode && isAligned(fb)) return true;
-    return false;
+  // APPROVATO = lo status è già nell'iter di lavorazione (todo e successivi).
+  // Non si ricalcola più da reviewDecision/pipeline/autoMode: chi approva SCRIVE
+  // `todo` (owner dalla dashboard, o la pipeline al giudizio con automatica ON).
+  function isApproved(fb) {
+    const { status } = normalizeStatus(fb);
+    return ['todo', 'working', 'revision_capability', 'revision_security', 'done'].includes(status);
   }
 
   // ── Dashboard unificata (DB1): mappatura feedback → tab ───────────────────
-  // Le tab di `manage` (owner-only) sono:
-  //   inbox    "Ricevuti"   → tutto ciò che richiede la mia approvazione: feedback
-  //                           non ancora approvati (non giudicati, panel parziale,
-  //                           bloccati attacco/spam/design, aligned con automatica OFF)
-  //   queue    "In coda"    → feedback APPROVATI (auto o a mano) in attesa che
-  //                           Claude li risolva
-  //   resolved "Risolti"    → `done` + `verified` MA solo se "in produzione"
-  //                           (resolvedInVersion ≤ releasedVersion, DB3); i fix
-  //                           chiusi ma non ancora spediti restano in "In coda"
-  //   archived "Archiviati" → `archived` (DB2)
-  //   ignored / altro       → null (non mostrato nelle tab principali)
-
-  // `opts.releasedVersion` (DB3): versione dell'app in esecuzione = ultima
-  // rilasciata. Se assente, il gate "in produzione" è disattivo (done→resolved).
+  // Lookup PURA sul vocabolario (spec §4): niente pipeline, niente isApproved,
+  // niente modalità automatica. L'unico ingrediente extra è il gate DB3
+  // (`opts.releasedVersion`): un `done` è "Risolti" solo se davvero spedito,
+  // altrimenti resta visibile "In coda".
   function manageTabFor(fb, opts) {
-    const s = (fb && fb.status) || 'new';
-    const releasedVersion = opts && opts.releasedVersion;
-
-    switch (s) {
-      // DB3: un fix chiuso è in "Risolti" solo se davvero spedito; altrimenti
-      // resta visibile in "In coda" (done-ma-non-ancora-rilasciato).
-      case 'done':
-      case 'verified':  return isShipped(fb, releasedVersion) ? 'resolved' : 'queue';
-      case 'archived':  return 'archived';
-      case 'ignored':   return null;
-      // new/clarify/todo/review/blocked: l'approvazione decide la tab. Approvato
-      // ⇒ In coda; altrimenti ⇒ Ricevuti (richiede la mia approvazione). L'opts
-      // (con `autoMode`) propaga la modalità automatica così gli allineati entrano
-      // in coda quando l'automatica è ON.
-      default:          return isApproved(fb, opts) ? 'queue' : 'inbox';
-    }
+    const { status } = normalizeStatus(fb);
+    const shipped = status === 'done' ? isShipped(fb, opts && opts.releasedVersion) : false;
+    return FS().tabFor(status, { shipped });
   }
 
   // Priorità di un feedback, normalizzata: 1-3 (più alta = affrontata prima dalle
