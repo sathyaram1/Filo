@@ -10,6 +10,7 @@ import { dirname, join } from 'node:path';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
+require(join(__dirname, '..', '..', 'src', 'shared', 'feedbackStatus.js'));
 require(join(__dirname, '..', '..', 'src', 'shared', 'manageReview.js'));
 
 const MR = globalThis.SN_MANAGE_REVIEW;
@@ -49,9 +50,11 @@ test('classifyBlock: mittente fidato CON verdetti completi → classificato norm
   assert.equal(r.reason, 'design');
 });
 
-test('classifyBlock: aligned / nessun motivo → null', () => {
+test('classifyBlock: aligned/auto-approvato → null; pipeline in corso → unlabeled', () => {
   assert.equal(MR.classifyBlock({ pipeline: { l2Class: 'aligned', action: 'candidate_change' } }), null);
-  assert.equal(MR.classifyBlock({ pipeline: { stage: 'L1' } }), null);
+  // Macchina a stati: panel non completo = `unlabeled` (bianco), anche se la
+  // pipeline è solo "in corso" — prima tornava null.
+  assert.equal((MR.classifyBlock({ pipeline: { stage: 'L1' } }) || {}).reason, 'unfiltered');
 });
 
 test('classifyBlock: reason=attack via action block_attack', () => {
