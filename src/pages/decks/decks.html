@@ -50,30 +50,55 @@
     .dk-ctxmenu { position: fixed; right: auto; top: auto; min-width: 140px; }
 
     /* ── Builder (§2): tre colonne a larghezza FISSA, mai resize automatico.
-       I divisori trascinabili arrivano col task 3: qui le larghezze di
-       partenza (sinistra media, centro ~300px, destra il resto). ── */
+       L'UNICO resize ammesso è il trascinamento A MANO dei due divisori
+       (deliberato, mai su hover/click); le larghezze sono persistite e le
+       imposta il JS in grid-template-columns. Default: sinistra media,
+       centro ~300px, destra il resto. ── */
     .dk-builder {
-      display: grid; grid-template-columns: 340px 300px 1fr;
+      display: grid; grid-template-columns: 340px 6px 300px 6px 1fr;
       gap: 0; height: calc(100vh - 96px); min-height: 320px;
       border: 1px solid var(--sn-border); border-radius: 10px; overflow: hidden;
     }
     .dk-col { display: flex; flex-direction: column; min-width: 0; }
-    .dk-col + .dk-col { border-left: 1px solid var(--sn-border); }
+    /* Divisore: linea sottile al centro, zona di presa larga 6px. */
+    .dk-divider {
+      cursor: col-resize;
+      background: var(--sn-border);
+      background-clip: content-box;
+      padding: 0 2.5px;
+    }
+    .dk-divider:hover, .dk-divider.dragging { background-color: var(--sn-accent); }
     .dk-col-head {
       padding: 10px 12px; border-bottom: 1px solid var(--sn-border);
       font-size: 13px; font-weight: 600;
     }
     .dk-col-body { flex: 1; overflow: auto; padding: 12px; }
     .dk-placeholder { color: var(--sn-muted); font-size: 13px; }
-    /* Header identità del documento (§8.2): nome mazzo + commander. */
+    /* Header identità del documento (§8.2): nome mazzo + commander, sempre
+       visibili. Il click sul nome apre lo SWITCHER (gestione mazzi); la
+       rinomina è una voce dello switcher che scambia il bottone con l'input. */
+    .dk-head-center { position: relative; }
     #deckName {
       font: inherit; font-size: 15px; font-weight: 600;
-      color: var(--sn-text); background: transparent;
+      color: var(--sn-text); background: transparent; cursor: pointer;
       border: 1px solid transparent; border-radius: 6px;
-      padding: 2px 6px; width: 100%;
+      padding: 2px 6px; width: 100%; text-align: left;
+      display: flex; align-items: center; gap: 6px;
     }
-    #deckName:hover { border-color: var(--sn-border); }
-    #deckName:focus { border-color: var(--sn-accent); outline: none; }
+    #deckName:hover, #deckName:focus-visible { border-color: var(--sn-border); }
+    #deckName .dk-caret { color: var(--sn-muted); font-size: 10px; margin-left: auto; }
+    #deckName .dk-name-text {
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    #deckNameEdit, #deckBudgetEdit {
+      font: inherit; font-size: 15px; font-weight: 600;
+      color: var(--sn-text); background: transparent;
+      border: 1px solid var(--sn-accent); border-radius: 6px;
+      padding: 2px 6px; width: 100%; outline: none;
+    }
+    #deckBudgetEdit { font-weight: 400; font-size: 13px; }
+    .dk-switcher { position: absolute; left: 0; right: auto; top: calc(100% + 2px); min-width: 200px; max-width: 280px; }
+    .dk-switcher .sn-select-option.dk-sw-sep { border-top: 1px solid var(--sn-border); margin-top: 4px; padding-top: 8px; }
     .dk-commander-line { font-size: 12px; color: var(--sn-muted); padding: 0 6px 6px; }
     .dk-count { font-size: 12px; color: var(--sn-muted); }
 
