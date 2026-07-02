@@ -37,15 +37,27 @@ const ROOT = resolve(__dirname, '..');
 const SPOOL_DIR = process.env.FILO_SPOOL_DIR
   ? resolve(process.env.FILO_SPOOL_DIR)
   : resolve(ROOT, 'feedback-triage');
-// `review` = fix pronto su un branch, in attesa di verifica avversariale;
-// `blocked` = fix in pausa (3 loop falliti o file sensibile nel cancello di
-// merge), decide l'utente. Entrambi accompagnati dal campo `branch`.
-// `archived` (DB2): stato terminale "fuori dalla coda attiva", mostrato nella
-// tab Archiviati della dashboard `manage`. Ci finisce un feedback chiuso e
-// archiviato a mano dall'owner, oppure (DC3) auto-archiviato a punteggio dopo
-// 24h. Diverso da `done`/`verified`: quelli restano "Risolti"; `archived` è il
-// cassetto storico.
-const ALLOWED = ['todo', 'done', 'clarify', 'review', 'blocked', 'archived'];
+// Macchina a stati (spec FEEDBACK-STATES.md): la coda accoda SOLO status
+// canonici. Quelli dell'iter di lavorazione delle routine:
+//   working              = presa in carico (lock, + workingSince scritto da apply)
+//   revision_capability  = fix pronto su branch, aspetta la verifica comportamentale
+//   revision_security    = verifica passata, aspetta secaudit + merge-gate
+//   done                 = fuso su main; aspetta la verifica umana dell'owner
+//   design               = serve una decisione dell'owner (domande → --reason
+//                          clarify; 3 verifiche fallite → --reason loop)
+//   todo                 = rimessa in coda (es. reset di un working scaduto)
+// più `archived` (archiviazione delegata, es. auto-archivio a punteggio DC3).
+const ALLOWED = ['todo', 'working', 'revision_capability', 'revision_security',
+  'done', 'design', 'archived'];
+
+// Nomi RITIRATI accettati in ingresso per cortesia (vecchi file-ruolo/istruzioni
+// ancora in giro): rimappati al canonico con un avviso. Rimuovere quando tutte
+// le recipe citano solo i canonici.
+const LEGACY_INPUT = {
+  clarify: { status: 'design', reason: 'clarify' },
+  review:  { status: 'revision_capability' },
+  blocked: { status: 'design', reason: 'loop' },
+};
 
 // Scrive il file di spool (nessun effetto git). Ritorna il path assoluto.
 // `starred` (DB2, opzionale): se booleano, accoda anche il flag ⭐ "preferito"
