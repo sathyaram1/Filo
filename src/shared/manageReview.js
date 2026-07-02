@@ -50,13 +50,23 @@
     return /^(owner|routine|agent):/i.test(String(clientId || ''));
   }
 
+  // Vocabolario unico della macchina a stati (src/shared/feedbackStatus.js).
+  // Letto pigramente: nelle pagine filo:// va incluso PRIMA di questo file,
+  // nei test unit va require-ato prima. Se manca, errore chiaro subito.
+  function FS() {
+    const m = global.SN_FB_STATUS;
+    if (!m) throw new Error('SN_FB_STATUS mancante: carica shared/feedbackStatus.js prima di manageReview.js');
+    return m;
+  }
+
   /**
-   * Classifica un feedback nel pipeline di sicurezza.
-   * @param {object} fb – oggetto feedback (con campo `pipeline` opzionale)
-   * @returns {{ reason: string, color: string, severity: number, label: string }|null}
-   *   null se il feedback non ha motivo di blocco (aligned / no pipeline).
+   * Classificazione LEGACY dai campi grezzi (`pipeline.*`, `blockReason`,
+   * `reviewDecision`). Serve SOLO a normalizeStatus per sciogliere gli stati
+   * ritirati (`new`, `blocked`) dello storico: i feedback nuovi arrivano già
+   * con uno status canonico scritto dalla pipeline (filo-security). NON è più
+   * il criterio delle tab: nessun consumer deve ricalcolare lo stato dai grezzi.
    */
-  function classifyBlock(fb) {
+  function classifyLegacyBlock(fb) {
     // Override dell'owner: un feedback "accettato" (sbloccato a mano dalla
     // dashboard di revisione) NON è più un blocco — esce dalla colonna Bloccati
     // e rientra nel flusso normale. Vince su qualsiasi verdetto del pipeline.
