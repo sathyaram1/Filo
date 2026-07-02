@@ -19,7 +19,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { selectWinner } from '../../scripts/next-feedback.mjs';
+import { selectWinner, filterEligible } from '../../scripts/next-feedback.mjs';
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
 
@@ -198,4 +198,74 @@ test('selectWinner: priority già decifrata come numero funziona identicamente',
   ];
   // 3 vince su 2 e 0.
   assert.equal(selectWinner(candidates), 'cipher-high');
+});
+
+// ─── Test: dipendenze fra sub-feedback (filterEligible) ──────────────────────
+// L'ordine di lavorazione di una famiglia #N.1..#N.k è imposto dallo script,
+// non dal testo dei feedback: un figlio è eleggibile solo se i fratelli
+// precedenti sono chiusi (= non compaiono più fra i doc open), e il top-level
+// con figli aperti aspetta i figli.
+
+// Candidato/blocco con numerazione. subSeq null = top-level (padre o singolo).
+function fam(id, seq, subSeq, extra = {}) {
+  const out = { _id: id, seq, priority: 3, ...extra };
+  if (subSeq !== null) out.subSeq = subSeq;
+  return out;
+}
+
+test('filterEligible: il figlio .2 non è eleggibile finché .1 è aperto', () => {
+  const parent = fam('p', 150, null);
+  const c1 = fam('c1', 150, 1);
+  const c2 = fam('c2', 150, 2);
+  const openAll = [parent, c1, c2];
+  const ids = filterEligible([c1, c2], openAll).map((c) => c._id);
+  assert.deepEqual(ids, ['c1']);
+});
+
+test('filterEligible: chiuso .1, il .2 si sblocca (e .3 resta bloccato)', () => {
+  const parent = fam('p', 150, null);
+  const c2 = fam('c2', 150, 2);
+  const c3 = fam('c3', 150, 3);
+  // c1 è done → NON compare fra i doc open.
+  const openAll = [parent, c2, c3];
+  const ids = filterEligible([c2, c3], openAll).map((c) => c._id);
+  assert.deepEqual(ids, ['c2']);
+});
+
+test('filterEligible: un fratello precedente CLAIMATO o in review blocca comunque', () => {
+  // c1 è ancora open (in lavorazione da un\'altra routine, o in review):
+  // non è fra i candidati todo, ma È fra i doc open → blocca c2.
+  const c1 = fam('c1', 150, 1, { claimed: true });
+  const c2 = fam('c2', 150, 2);
+  const ids = filterEligible([c2], [c1, c2]).map((c) => c._id);
+  assert.deepEqual(ids, []);
+});
+
+test('filterEligible: il padre con figli aperti NON è eleggibile; senza figli aperti sì', () => {
+  const parent = fam('p', 150, null);
+  const c1 = fam('c1', 150, 1);
+  // Con un figlio open il padre è bloccato…
+  assert.deepEqual(filterEligible([parent], [parent, c1]).map((c) => c._id), []);
+  // …quando tutti i figli sono chiusi, il padre torna lavorabile.
+  assert.deepEqual(filterEligible([parent], [parent]).map((c) => c._id), ['p']);
+});
+
+test('filterEligible: il padre aperto NON blocca i figli; famiglie diverse non interferiscono', () => {
+  const parent = fam('p', 150, null);
+  const c1 = fam('c1', 150, 1);
+  const other = fam('x1', 151, 2);   // famiglia 151: il suo .1 è chiuso
+  const single = { _id: 's', priority: 1 };  // senza numero: mai vincolato
+  const openAll = [parent, c1, other, single];
+  const ids = filterEligible([c1, other, single], openAll).map((c) => c._id);
+  assert.deepEqual(ids, ['c1', 'x1', 's']);
+});
+
+test('selectWinner: a parità totale i fratelli escono in ordine di subSeq', () => {
+  // Stesso createdAt (creati nella stessa run della Action, stesso ms), stesso
+  // seq: deve vincere il subSeq più basso, non l\'_id alfabetico.
+  const candidates = [
+    { _id: 'zzz-ma-primo', priority: 3, createdAt: T1, seq: 150, subSeq: 1 },
+    { _id: 'aaa-ma-secondo', priority: 3, createdAt: T1, seq: 150, subSeq: 2 },
+  ];
+  assert.equal(selectWinner(candidates), 'zzz-ma-primo');
 });

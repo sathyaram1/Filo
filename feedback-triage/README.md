@@ -57,6 +57,24 @@ nuovo feedback eredita il numero del padre con suffisso (#22 → #22.1, #22.2…
 senza `parentId` prende il prossimo numero progressivo top-level. Se il padre
 non ha ancora un numero (feedback storico), gliene viene assegnato uno al volo.
 
+### Ordine di accodamento = ordine delle dipendenze
+
+Quando spezzi una spec in sub-feedback, **accodali nell'ordine in cui vanno
+lavorati** (prima il task che serve al successivo). Il resto è imposto dagli
+script, non dal testo:
+
+- `apply-triage.mjs` applica le `create` **in ordine di `queuedAt`** → i numeri
+  (#22.1, #22.2, …) seguono l'ordine di accodamento;
+- `next-feedback.mjs` (`filterEligible`) rende un sub-feedback **#N.k
+  lavorabile solo quando #N.1..#N.k-1 sono chiusi** (done: fuori dai doc open);
+  un fratello ancora todo/claimato/in review blocca il successivo. Il
+  **top-level con figli aperti** (es. il feedback "ombrello" di una spec) non è
+  mai eleggibile: si lavora — cioè si verifica e si chiude — solo quando tutti
+  i figli sono done.
+
+Scrivere "dipende dal task X" nel testo resta utile per chi lavora il feedback,
+ma non è ciò che garantisce l'ordine.
+
 ## Semaforo sui feedback — `claims/<id>.json`
 
 La sottocartella `claims/` è il **semaforo** che impedisce a due routine cloud
