@@ -139,9 +139,9 @@
     },
     {
       id: 'deck-builder', title: 'Mazzi Commander (Magic)', category: 'writing',
-      desc: 'Una libreria dei tuoi mazzi Commander: crea, duplica, rinomina ed elimina mazzi, salvati sul tuo computer. La costruzione vera e propria (ricerca carte, statistiche, chat) è in arrivo.',
-      invoke: 'Menu App → "Mazzi", oppure filo://decks/decks.html.',
-      doesNot: 'Non cerca ancora le carte e non gioca partite: per ora gestisce la libreria dei mazzi.',
+      desc: 'Costruttore di mazzi Commander salvati sul tuo computer: libreria dei mazzi, banco di lavoro a tre colonne regolabili, elenco carte con simboli di mana raggruppato per tipo/tag/costo/colore, commander con avvisi di legalità (doppioni, colori, carte bandite), budget in euro.',
+      invoke: 'Menu App → "Mazzi", oppure filo://decks/decks.html. Tasto destro su carte e mazzi per le azioni; click sul nome del mazzo per gestirlo.',
+      doesNot: 'Non cerca ancora le carte dal testo libero e non gioca partite: ricerca in chat e statistiche complete sono in arrivo.',
     },
 
     // ─────────────────────── Lettura e traduzione ───────────────────────────
