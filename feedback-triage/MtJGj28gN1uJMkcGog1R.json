@@ -1,0 +1,7 @@
+{
+  "id": "MtJGj28gN1uJMkcGog1R",
+  "status": "done",
+  "notes": "Audit di sicurezza superato e fuso su main: nessuna vulnerabilità rilevata nelle nuove funzioni Automazioni (tentativi loop, timeout giudici, priorità, ri-valutazione feedback non filtrati) né nel redesign della pagina Tab archiviate. Tutte le impostazioni sono riservate all'owner e i valori numerici sono validati anche lato server.",
+  "queuedAt": "2026-07-02T07:52:11.660Z",
+  "queuedBy": "routine"
+}
