@@ -48,6 +48,7 @@ require(path.join(SVC, 'costTracker.js'));
 require(path.join(SVC, 'savedPages.js'));
 require(path.join(SVC, 'historyStore.js'));
 require(path.join(SVC, 'archivedTabs.js'));
+require(path.join(SVC, 'deckStore.js'));   // dipende da SN_DECKS (shared/decks.js)
 require(path.join(SVC, 'aiCache.js'));
 require(path.join(SVC, 'categorizer.js'));
 require(path.join(SVC, 'pathsCollector.js'));
