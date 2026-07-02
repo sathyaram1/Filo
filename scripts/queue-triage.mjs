@@ -159,7 +159,7 @@ if (isMain) {
     && !(ri !== -1 && i === ri + 1));
   const [id, status, ...noteParts] = positional;
   if (!id || !status) {
-    console.error('Uso: node scripts/queue-triage.mjs <id> <status:todo|done|clarify|review|blocked|archived> "testo note" [--branch <nome>] [--reason <slug>] [--starred|--unstar] [--no-git]');
+    console.error('Uso: node scripts/queue-triage.mjs <id> <status:todo|working|revision_capability|revision_security|done|design|archived> "testo note" [--branch <nome>] [--reason <slug>] [--starred|--unstar] [--no-git]');
     process.exit(1);
   }
   try {
