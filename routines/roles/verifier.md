@@ -71,6 +71,15 @@ instradare a secaudit su PASS o a fixer su FAIL):
 node scripts/dispatch.mjs --record-verifier <id> <pass|fail>
 ```
 
+Infine **rilascia il claim** (dispatch lo ha acquisito per consegnarti il lavoro;
+se resta vivo, il prossimo giro NON può instradare secaudit/fixer su questo
+feedback finché il TTL non scade — la GitHub Action riconcilia i claim solo
+quando cambia lo status su Firestore, e il verifier non lo cambia):
+
+```bash
+node scripts/claim-feedback.mjs release <id>
+```
+
 - **PASS** → al prossimo giro dispatch sceglie **secaudit** (gate di sicurezza),
   poi il merge-gate fonde e accoda `done`.
 - **FAIL** → al prossimo giro dispatch sceglie **fixer** con la tua critica.
