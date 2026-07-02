@@ -20,7 +20,9 @@
       features: [
         'Nuova app "Mazzi" (nel menu App): la libreria dei tuoi mazzi Commander di Magic — crea, duplica, rinomina ed elimina mazzi. La costruzione con ricerca carte, statistiche e chat arriverà nelle prossime versioni.',
       ],
-      fixes: [],
+      fixes: [
+        'Il tasto destro sulle schede archiviate torna ad aprire il loro menu (Riapri/Elimina) invece del menu generale di Filo.',
+      ],
     },
     {
       version: '0.2.101', date: '2026-07-02',
