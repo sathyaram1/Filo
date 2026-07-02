@@ -269,3 +269,15 @@ test('selectWinner: a parità totale i fratelli escono in ordine di subSeq', () 
   ];
   assert.equal(selectWinner(candidates), 'zzz-ma-primo');
 });
+
+test('filterEligible: forma REALE di Firestore — il top-level ha subSeq 0, non assente', () => {
+  // Regressione: l'applier scrive subSeq: 0 sui top-level. Un padre con
+  // subSeq 0 e figli aperti deve restare bloccato, e NON deve bloccare i figli
+  // come se fosse un fratello ".0".
+  const parent = { _id: 'p', seq: 289, subSeq: 0, priority: 3 };
+  const c1 = { _id: 'c1', seq: 289, subSeq: 1, priority: 3 };
+  const c2 = { _id: 'c2', seq: 289, subSeq: 2, priority: 3 };
+  const openAll = [parent, c1, c2];
+  const ids = filterEligible([parent, c1, c2], openAll).map((c) => c._id);
+  assert.deepEqual(ids, ['c1']);
+});
