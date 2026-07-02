@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.102', date: '2026-07-02',
+      features: [
+        'Nuova app "Mazzi" (nel menu App): la libreria dei tuoi mazzi Commander di Magic — crea, duplica, rinomina ed elimina mazzi. La costruzione con ricerca carte, statistiche e chat arriverà nelle prossime versioni.',
+      ],
+      fixes: [],
+    },
+    {
       version: '0.2.101', date: '2026-07-02',
       features: [
         'Nell\'archivio delle tab, le schede chiuse sono ora raggruppate per giorno in righe orizzontali compatte: tasto destro su una scheda per riaprirla o eliminarla.',
