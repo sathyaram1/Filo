@@ -90,10 +90,13 @@ function fsDocToObject(doc) {
 export function filterEligible(candidates, openAll) {
   const all = Array.isArray(openAll) ? openAll : [];
   const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
+  // subSeq "vero" solo se >= 1: l'applier scrive subSeq: 0 sui TOP-LEVEL
+  // (non assente!), quindi 0 = "non è un figlio", mai un figlio ".0".
+  const subOf = (v) => { const n = num(v); return n !== null && n >= 1 ? n : null; };
   return (Array.isArray(candidates) ? candidates : []).filter((c) => {
     const seq = num(c.seq);
     if (seq === null) return true;
-    const sub = num(c.subSeq);
+    const sub = subOf(c.subSeq);
     for (const o of all) {
       if (!o || o._id === c._id) continue;
       if (num(o.seq) !== seq) continue;
