@@ -125,16 +125,24 @@
       <div class="dk-back">
         <button class="sn-btn sn-btn-secondary" id="backToLibrary">← Mazzi</button>
       </div>
-      <div class="dk-builder">
+      <div class="dk-builder" id="builderGrid">
         <div class="dk-col" id="colChat">
           <div class="dk-col-head">Chat e ricerca</div>
           <div class="dk-col-body"><p class="dk-placeholder">
             Qui potrai cercare carte e parlare con Filo del tuo mazzo. In arrivo.
           </p></div>
         </div>
+        <div class="dk-divider" id="dividerLeft" role="separator" aria-orientation="vertical"
+             aria-label="Ridimensiona chat e mazzo"></div>
         <div class="dk-col" id="colDeck">
-          <div class="dk-col-head">
-            <input id="deckName" type="text" aria-label="Nome del mazzo" />
+          <div class="dk-col-head dk-head-center" id="deckHead">
+            <button id="deckName" aria-haspopup="menu" aria-label="Gestione mazzo">
+              <span class="dk-name-text" id="deckNameText"></span>
+              <span class="dk-caret">▾</span>
+            </button>
+            <input id="deckNameEdit" type="text" aria-label="Rinomina il mazzo" hidden />
+            <input id="deckBudgetEdit" type="number" min="0" step="1"
+                   aria-label="Budget del mazzo in euro" placeholder="Budget in € (vuoto = nessuno)" hidden />
             <div class="dk-commander-line" id="commanderLine"></div>
           </div>
           <div class="dk-col-body">
