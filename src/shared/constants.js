@@ -15,6 +15,10 @@
     // Deck builder Commander (DECK-BUILDER-SPEC.md §13.1): lista dei mazzi,
     // storage interamente locale. Vedi src/main/services/deckStore.js.
     DECKS: 'decks',
+    // Cache Scryfall (§13.3): dati carta per id (prezzo con TTL logico) e
+    // mappa dei simboli di mana (permanente). Vedi services/scryfall.js.
+    SCRYFALL_CARDS: 'scryfallCards',
+    SCRYFALL_SYMBOLS: 'scryfallSymbols',
     COSTS: 'costs',
     // Crediti (gamification): saldo, refill giornaliero, consumo aggregato per
     // tipo d'uso e log ricompense. Cache locale del doc Firestore `credits/<uid>`.
