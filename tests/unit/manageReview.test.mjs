@@ -348,41 +348,43 @@ test('isAligned: blocchi/non-filtrati/in-corso → false', () => {
   assert.equal(MR.isAligned(null), false);
 });
 
-// ── Problema #3: automatica ON sposta gli allineati (anche i vecchi) in coda ──
+// ── La modalità automatica NON è più letta dai consumer (macchina a stati) ──
+// Agisce UNA volta, al momento del giudizio (pipeline scrive todo o aligned).
+// Attivarla dopo non ri-tocca i vecchi allineati: l'owner li approva (bulk
+// aligned→todo). Era il bug strutturale: dashboard e routine usavano due
+// criteri diversi per "questo è lavorabile?".
 
-test('isApproved: automatica ON approva un allineato senza candidate_change inciso', () => {
+test('isApproved/manageTabFor: la modalità automatica di OGGI viene IGNORATA', () => {
   // Vecchio allineato giudicato con automatica OFF (nessun candidate_change).
-  const old = { status: 'todo', pipeline: { l2Class: 'aligned', action: 'human_review' } };
-  assert.equal(MR.isApproved(old), false);                       // automatica OFF → resta in attesa
-  assert.equal(MR.isApproved(old, { autoMode: true }), true);    // automatica ON → approvato
-  // Un blocco NON viene approvato dall'automatica.
+  const old = { status: 'new', pipeline: { l2Class: 'aligned', action: 'human_review' } };
+  assert.equal(MR.isApproved(old), false);
+  assert.equal(MR.isApproved(old, { autoMode: true }), false);       // ignorata
+  assert.equal(MR.manageTabFor(old), 'inbox');
+  assert.equal(MR.manageTabFor(old, { autoMode: true }), 'inbox');   // ignorata
+  // Un blocco non è mai approvato.
   assert.equal(MR.isApproved({ pipeline: { action: 'block_attack' } }, { autoMode: true }), false);
 });
 
-test('manageTabFor: automatica ON ⇒ vecchio allineato passa da Ricevuti a In coda', () => {
-  const old = { status: 'todo', pipeline: { l2Class: 'aligned', action: 'human_review' } };
-  assert.equal(MR.manageTabFor(old), 'inbox');                        // OFF
-  assert.equal(MR.manageTabFor(old, { autoMode: true }), 'queue');    // ON
-});
-
-test('listForManageTab: automatica ON sposta gli allineati in coda', () => {
+test('listForManageTab: gli allineati restano nei Ricevuti finché l\'owner non scrive todo', () => {
   const items = [
-    { _id: 'al', status: 'todo', pipeline: { l2Class: 'aligned' }, createdAt: '2026-01-01' },
+    { _id: 'al', status: 'new', pipeline: { l2Class: 'aligned' }, createdAt: '2026-01-01' },
     { _id: 'bl', status: 'new', pipeline: { action: 'block_attack' }, createdAt: '2026-01-02' },
   ];
-  // OFF: l'allineato è ancora nei Ricevuti, la coda è vuota.
   assert.deepEqual(MR.listForManageTab(items, 'queue').map((f) => f._id), []);
   assert.deepEqual(MR.listForManageTab(items, 'inbox').map((f) => f._id), ['bl', 'al']);
-  // ON: l'allineato entra in coda; il blocco resta nei Ricevuti.
-  assert.deepEqual(MR.listForManageTab(items, 'queue', { autoMode: true }).map((f) => f._id), ['al']);
-  assert.deepEqual(MR.listForManageTab(items, 'inbox', { autoMode: true }).map((f) => f._id), ['bl']);
+  // Anche con automatica ON (parametro ormai ignorato): identico.
+  assert.deepEqual(MR.listForManageTab(items, 'queue', { autoMode: true }).map((f) => f._id), []);
+  // L'approvazione = SCRIVERE lo status (bulk aligned→todo): allora è in coda.
+  const approved = { ...items[0], status: 'todo' };
+  assert.deepEqual(MR.listForManageTab([approved], 'queue').map((f) => f._id), ['al']);
 });
 
-test('manageTabFor: done e verified → resolved (Risolti); archived → archived; ignored → null', () => {
+test('manageTabFor: done → resolved; verified/ignored (ritirati) → archived', () => {
   assert.equal(MR.manageTabFor({ status: 'done' }), 'resolved');
-  assert.equal(MR.manageTabFor({ status: 'verified' }), 'resolved');
+  // `verified` era "verificato dall'owner" = l'archived della macchina a stati.
+  assert.equal(MR.manageTabFor({ status: 'verified' }), 'archived');
   assert.equal(MR.manageTabFor({ status: 'archived' }), 'archived');
-  assert.equal(MR.manageTabFor({ status: 'ignored' }), null);
+  assert.equal(MR.manageTabFor({ status: 'ignored' }), 'archived');
 });
 
 test('listForManageTab: filtra per tab e ordina (Ricevuti per severità, In coda solo approvati)', () => {
