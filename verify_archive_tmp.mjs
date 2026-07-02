@@ -112,7 +112,7 @@ async function main() {
     window.__STORAGE_OVERRIDE__ = true;
   }, FIXTURE_TABS);
 
-  await page.goto('filo://archive/archive.html');
+  await page.goto(`http://localhost:${port}/archive/archive.html`);
   // storage.js / pageBootstrap.js are the real files (served via route), so
   // Storage.getSettings() should work using chrome.storage shim if present.
   // If not, patch a minimal fallback after load.
