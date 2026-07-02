@@ -105,8 +105,8 @@
       const res = await send({ type: MSG.DECKS_GET, id: r.id });
       if (!res || !res.ok) { location.hash = '#/'; return; }
       current = res.deck;
-      renderBuilder();
       show('builder');
+      await renderBuilder();
       return;
     }
     if (r.screen === 'game') { show('game'); return; }
