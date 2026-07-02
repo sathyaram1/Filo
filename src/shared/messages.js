@@ -48,6 +48,14 @@
     SEARCH_ARCHIVED_TABS: 'search_archived_tabs',
     // §5 — cancellazione PERMANENTE di più tab archiviate (dopo conferma). { ids }
     DELETE_ARCHIVED_TABS: 'delete_archived_tabs',
+    // Deck builder Commander (DECK-BUILDER-SPEC.md): CRUD dei mazzi, storage
+    // locale nel main (deckStore). Usati dalla pagina filo://decks.
+    DECKS_LIST: 'decks_list',
+    DECKS_GET: 'decks_get',             // { id }
+    DECKS_CREATE: 'decks_create',       // { nome? }
+    DECKS_UPDATE: 'decks_update',       // { deck } (mazzo intero già toccato dal modello)
+    DECKS_DELETE: 'decks_delete',       // { id }
+    DECKS_DUPLICATE: 'decks_duplicate', // { id }
     GET_COSTS: 'get_costs',
     // Crediti (gamification): saldo + consumo aggregato per tipo d'uso, per la
     // pagina Crediti del profilo. NON espone mai il costo in €. Vedi creditStore.
