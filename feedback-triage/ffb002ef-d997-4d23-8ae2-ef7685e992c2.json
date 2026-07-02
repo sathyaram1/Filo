@@ -1,7 +1,0 @@
-{
-  "id": "ffb002ef-d997-4d23-8ae2-ef7685e992c2",
-  "status": "done",
-  "notes": "L'app Mazzi ora parla con Scryfall: quando un mazzo ha un commander, la libreria mostra la sua illustrazione e i pallini dei colori reali, e ogni ricerca di carte viene limitata da sola ai colori del commander (se scrivi tu un filtro di colori esplicito, vince il tuo). Prezzi, simboli di mana e dati carta vengono ricordati in locale per non richiamare il servizio di continuo, rispettando i suoi limiti di cortesia. Verificato con 9 test di logica e 3 test end-to-end con servizio simulato (senza rete).",
-  "queuedAt": "2026-07-02T17:00:00.455Z",
-  "queuedBy": "routine"
-}
