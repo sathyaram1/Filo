@@ -271,11 +271,13 @@ test('manageTabFor: ritrovamenti agente/routine (clientId, status new) → inbox
   assert.equal(MR.manageTabFor({ status: 'new', clientId: 'agent:gemini-3.1-flash-lite' }), 'inbox');
 });
 
-test('manageTabFor: todo/review/blocked NON approvati → inbox (Ricevuti)', () => {
-  // Nuova semantica: stare "In coda" richiede l'approvazione. Un feedback non
-  // approvato (nessun candidate_change, nessun reviewDecision) resta nei Ricevuti.
-  assert.equal(MR.manageTabFor({ status: 'todo' }), 'inbox');
-  assert.equal(MR.manageTabFor({ status: 'review' }), 'inbox');
+test('manageTabFor: lo status È la verità — todo/review in coda, blocked si scioglie', () => {
+  // Macchina a stati: `todo` significa "approvato, in coda" per definizione
+  // (chi approva SCRIVE todo). `review` legacy = fix in attesa di verifica →
+  // revision_capability (In coda). `blocked` legacy senza pipeline né loop →
+  // unlabeled (Ricevuti, bianco).
+  assert.equal(MR.manageTabFor({ status: 'todo' }), 'queue');
+  assert.equal(MR.manageTabFor({ status: 'review' }), 'queue');
   assert.equal(MR.manageTabFor({ status: 'blocked' }), 'inbox');
 });
 
