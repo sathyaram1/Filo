@@ -117,8 +117,9 @@ test('migrazione: il filtro ⭐ Archiviati raccoglie i preferiti di qualunque st
     { _id: 'star-todo', status: 'todo', starred: true, createdAt: '2026-06-07' },
     { _id: 'star-done', status: 'done', starred: true, createdAt: '2026-06-06' },
   ]);
-  // OFF: solo gli archived.
-  assert.deepEqual(MR.listArchiveTab(all, { starredOnly: false }).map((f) => f._id), ['archived-1']);
+  // OFF: tutti gli archiviati (inclusi verified/ignored ritirati), recenti prima.
+  assert.deepEqual(MR.listArchiveTab(all, { starredOnly: false }).map((f) => f._id),
+    ['verified-1', 'archived-1', 'ignored-1']);
   // ON: tutti i ⭐, di qualunque stato (recenti prima).
   assert.deepEqual(
     MR.listArchiveTab(all, { starredOnly: true }).map((f) => f._id),
