@@ -470,6 +470,7 @@
   const REEVAL_WASTE_LIMIT = 3;
 
   global.SN_MANAGE_REVIEW = {
+    normalizeStatus,
     classifyBlock, sortReview, REASONS, manageTabFor, listForManageTab, priorityOf,
     isStarred, listArchiveTab, isShipped, cmpVersion, listBoardTab,
     hasReopenRequest, canReopen, isApproved, isAligned, ALIGNED, ALIGNED_COLOR: ALIGNED.color,
