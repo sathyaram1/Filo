@@ -387,26 +387,25 @@ test('manageTabFor: done → resolved; verified/ignored (ritirati) → archived'
   assert.equal(MR.manageTabFor({ status: 'ignored' }), 'archived');
 });
 
-test('listForManageTab: filtra per tab e ordina (Ricevuti per severità, In coda solo approvati)', () => {
+test('listForManageTab: filtra per tab e ordina (Ricevuti per severità, In coda per status)', () => {
   const items = [
     { _id: 'n1', status: 'new', createdAt: '2026-01-01' },
     { _id: 'n2', status: 'new', createdAt: '2026-06-01' },
-    { _id: 't1', status: 'todo', createdAt: '2026-02-01' },                                   // non approvato → inbox
+    { _id: 't1', status: 'todo', createdAt: '2026-02-01' },                                   // todo = in coda
     { _id: 'b1', status: 'new', pipeline: { action: 'block_attack' }, createdAt: '2026-01-01' }, // blocco → inbox
     { _id: 'u1', status: 'new', pipeline: { l2Unfiltered: true }, createdAt: '2026-05-01' },    // non filtrato → inbox
-    { _id: 'q1', status: 'todo', pipeline: { action: 'candidate_change' }, createdAt: '2026-04-01' }, // approvato → queue
+    { _id: 'q1', status: 'todo', pipeline: { action: 'candidate_change' }, createdAt: '2026-04-01' }, // in coda
     { _id: 'd1', status: 'done', createdAt: '2026-03-01' },
     { _id: 'ig', status: 'ignored', createdAt: '2026-03-01' },
   ];
-  // inbox: tutto ciò che attende approvazione, per severità poi recenza. I new/
-  // todo senza pipeline sono "non filtrati" (sev4) come u1; b1 (attacco) è sev3.
-  // sev4 per data: n2(06) > u1(05) > t1(02) > n1(01); poi b1 (sev3).
-  assert.deepEqual(MR.listForManageTab(items, 'inbox').map((f) => f._id), ['n2', 'u1', 't1', 'n1', 'b1']);
-  // queue: solo gli approvati.
-  assert.deepEqual(MR.listForManageTab(items, 'queue').map((f) => f._id), ['q1']);
-  // resolved / archived.
+  // inbox: i new senza verdetti sono "non filtrati" (sev4) come u1; b1 è sev3.
+  // sev4 per data: n2(06) > u1(05) > n1(01); poi b1 (sev3).
+  assert.deepEqual(MR.listForManageTab(items, 'inbox').map((f) => f._id), ['n2', 'u1', 'n1', 'b1']);
+  // queue: tutti i todo (a parità di priorità/severità: più recenti prima).
+  assert.deepEqual(MR.listForManageTab(items, 'queue').map((f) => f._id), ['q1', 't1']);
+  // resolved / archived (ignored ritirato → archiviato).
   assert.deepEqual(MR.listForManageTab(items, 'resolved').map((f) => f._id), ['d1']);
-  assert.deepEqual(MR.listForManageTab(items, 'archived').map((f) => f._id), []);
+  assert.deepEqual(MR.listForManageTab(items, 'archived').map((f) => f._id), ['ig']);
 });
 
 // ── Priorità (visibile + modificabile dalla dashboard) ─────────────────────
