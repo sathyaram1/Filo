@@ -56,6 +56,14 @@
     DECKS_UPDATE: 'decks_update',       // { deck } (mazzo intero già toccato dal modello)
     DECKS_DELETE: 'decks_delete',       // { id }
     DECKS_DUPLICATE: 'decks_duplicate', // { id }
+    // Imposta il commander di un mazzo (§8.4): il main risolve la carta via
+    // Scryfall e scrive commander + commanderMeta (nome, identity, art crop).
+    DECKS_SET_COMMANDER: 'decks_set_commander', // { id, scryfallId }
+    // Client Scryfall (§13.2), tutto nel main (rate limit + cache condivisi).
+    SCRYFALL_SEARCH: 'scryfall_search',   // { query, deckId? } → identity auto dal commander
+    SCRYFALL_NAMED: 'scryfall_named',     // { name } (risoluzione fuzzy)
+    SCRYFALL_CARDS: 'scryfall_cards',     // { ids, freshPrices? } → mappa id → carta
+    SCRYFALL_SYMBOLS: 'scryfall_symbols', // {} → mappa '{U}' → svg_uri
     GET_COSTS: 'get_costs',
     // Crediti (gamification): saldo + consumo aggregato per tipo d'uso, per la
     // pagina Crediti del profilo. NON espone mai il costo in €. Vedi creditStore.
