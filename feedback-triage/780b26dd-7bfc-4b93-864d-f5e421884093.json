@@ -1,0 +1,7 @@
+{
+  "id": "780b26dd-7bfc-4b93-864d-f5e421884093",
+  "status": "done",
+  "notes": "Il banco di lavoro dei mazzi ha ora le sue tre colonne fisse (ricerca, mazzo, statistiche) con i due divisori trascinabili a mano: la larghezza che scegli viene ricordata alla riapertura. Cliccando sul nome del mazzo si apre il menu di gestione: passare a un altro mazzo, crearne uno nuovo, duplicare, rinominare, impostare un budget in euro (visibile sotto il nome), eliminare. Verificato con 6 test end-to-end su trascinamento+persistenza e su tutte le voci del menu. Importa/esporta arriveranno con la loro funzione (per ora la voce non compare: in Filo le voci di menu esistono solo se funzionano).",
+  "queuedAt": "2026-07-02T17:07:38.076Z",
+  "queuedBy": "routine"
+}
