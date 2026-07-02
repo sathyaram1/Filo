@@ -378,7 +378,10 @@
   function listBoardTab(feedbacks, opts) {
     const releasedVersion = opts && opts.releasedVersion;
     return listForManageTab(feedbacks, 'resolved', { releasedVersion })
-      .filter((fb) => !classifyBlock(fb))
+      // Guard red-team: qui si guardano APPOSTA i verdetti grezzi del pipeline
+      // (non lo status): un feedback segnalato dalla sicurezza non va mai in
+      // board nemmeno se per qualche motivo è arrivato a `done`.
+      .filter((fb) => !classifyLegacyBlock(fb))
       .filter((fb) => !hasReopenRequest(fb));
   }
 
