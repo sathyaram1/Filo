@@ -212,24 +212,111 @@
     await loadLibrary();
   }
 
-  // ── Builder: identità del documento (§8.2) ─────────────────────────────────
+  // ── Builder: identità del documento + switcher (§8.2) ──────────────────────
 
   function renderBuilder() {
-    const name = $('deckName');
-    name.value = current.nome;
-    const cl = $('commanderLine');
-    cl.textContent = (current.commanderMeta && current.commanderMeta.name)
+    $('deckNameText').textContent = current.nome;
+    const commander = (current.commanderMeta && current.commanderMeta.name)
       ? `Commander: ${current.commanderMeta.name}`
       : 'Nessun commander — potrai impostarlo dalla ricerca carte.';
+    const budget = (current.budget !== null && current.budget !== undefined)
+      ? ` · Budget: ${current.budget} €` : '';
+    $('commanderLine').textContent = commander + budget;
     $('deckCount').textContent = `${Decks.deckCount(current)}/100 carte`;
   }
 
-  async function saveRename() {
-    if (!current) return;
-    const next = Decks.renameDeck(current, $('deckName').value);
-    if (next === current) { $('deckName').value = current.nome; return; }
+  async function saveDeck(next) {
+    if (next === current) return;
     const res = await send({ type: MSG.DECKS_UPDATE, deck: next });
     if (res && res.ok) { current = res.deck; renderBuilder(); }
+  }
+
+  // Lo switcher (§8.2): click sul nome → gestione mazzi, DOVE vive il mazzo.
+  // Popup ancorato sotto l'header (stesse classi dei menu di Filo).
+  let switcherEl = null;
+  function closeSwitcher() {
+    if (switcherEl) { switcherEl.remove(); switcherEl = null; }
+    document.removeEventListener('click', closeSwitcher, true);
+    document.removeEventListener('keydown', switcherKey, true);
+  }
+  function switcherKey(e) { if (e.key === 'Escape') closeSwitcher(); }
+
+  async function openSwitcher() {
+    if (switcherEl) { closeSwitcher(); return; }
+    const res = await send({ type: MSG.DECKS_LIST });
+    const others = Decks.sortForLibrary((res && res.decks) || [])
+      .filter((d) => d.id !== current.id);
+
+    const pop = document.createElement('div');
+    pop.className = 'sn-select-pop dk-switcher';
+    const add = (label, run, cls = '') => {
+      const row = document.createElement('div');
+      row.className = 'sn-select-option' + (cls ? ` ${cls}` : '');
+      row.textContent = label;
+      row.addEventListener('click', (e) => { e.stopPropagation(); closeSwitcher(); run(); });
+      pop.appendChild(row);
+    };
+
+    for (const d of others.slice(0, 8)) {
+      add(d.nome, () => { location.hash = `#/deck/${encodeURIComponent(d.id)}`; });
+    }
+    add('+ Nuovo mazzo', async () => {
+      const r = await send({ type: MSG.DECKS_CREATE });
+      if (r && r.ok) location.hash = `#/deck/${encodeURIComponent(r.deck.id)}`;
+    }, others.length ? 'dk-sw-sep' : '');
+    add('Duplica questo mazzo', async () => {
+      const r = await send({ type: MSG.DECKS_DUPLICATE, id: current.id });
+      if (r && r.ok) location.hash = `#/deck/${encodeURIComponent(r.deck.id)}`;
+    });
+    add('Rinomina…', () => startEdit('deckNameEdit', current.nome, async (v) => {
+      await saveDeck(Decks.renameDeck(current, v));
+    }));
+    add('Budget…', () => startEdit('deckBudgetEdit', current.budget ?? '', async (v) => {
+      await saveDeck(Decks.setBudget(current, v === '' ? null : v));
+    }));
+    add('Elimina…', async () => {
+      const ok = await window.SN_CONFIRM_UI.confirm({
+        title: 'Eliminare il mazzo?',
+        text: `"${current.nome}" verrà eliminato definitivamente.`,
+        okLabel: 'Elimina',
+      });
+      if (!ok) return;
+      await send({ type: MSG.DECKS_DELETE, id: current.id });
+      location.hash = '#/';
+    });
+
+    $('deckHead').appendChild(pop);
+    switcherEl = pop;
+    setTimeout(() => {
+      document.addEventListener('click', closeSwitcher, true);
+      document.addEventListener('keydown', switcherKey, true);
+    }, 0);
+  }
+
+  // Scambia il bottone del nome con un campo di modifica (rinomina/budget):
+  // Invio o blur salvano, Escape annulla. Un solo campo attivo alla volta.
+  function startEdit(inputId, value, save) {
+    const btn = $('deckName');
+    const input = $(inputId);
+    btn.hidden = true;
+    input.hidden = false;
+    input.value = value;
+    input.focus();
+    input.select?.();
+    let done = false;
+    const finish = async (commit) => {
+      if (done) return;
+      done = true;
+      input.hidden = true;
+      btn.hidden = false;
+      if (commit) await save(input.value.trim());
+      input.onblur = input.onkeydown = null;
+    };
+    input.onblur = () => finish(true);
+    input.onkeydown = (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+      if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+    };
   }
 
   // ── Eventi ─────────────────────────────────────────────────────────────────
