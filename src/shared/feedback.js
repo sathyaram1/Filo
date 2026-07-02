@@ -64,7 +64,11 @@
   //   Se mappasse su `closed` o su un valore distinto, chi legge Firestore senza
   //   chiave potrebbe riconoscere un attacco beccato e usarlo per fare hill-climbing.
   //
-  // Questa è l'UNICA sorgente del mapping: non duplicarla altrove.
+  // Gli stati CANONICI della macchina a stati stanno in SN_FB_STATUS.PUBLIC_MAP
+  // (shared/feedbackStatus.js): lì i "beccati" (attack/spam/suspicious_file e i
+  // confermati) collassano sugli stessi valori dei feedback normali. Qui resta
+  // solo il mapping degli stati LEGACY ritirati (documenti storici non ancora
+  // migrati). Non duplicare il mapping altrove.
   const STATUS_PUBLIC_MAP = {
     new:     'open',
     draft:   'open',
@@ -81,11 +85,15 @@
   /**
    * Funzione pura condivisa: mappa uno status fine al valore pubblico grossolano.
    * Riusata in tutti i percorsi di scrittura di `status`. Da un unico posto.
+   * Lookup pigra su SN_FB_STATUS (se caricato) così i due file non impongono un
+   * ordine di caricamento; il fallback legacy copre gli stati ritirati.
    *
-   * @param {string} fineStatus - Valore `status` fine (es. 'blocked', 'done').
+   * @param {string} fineStatus - Valore `status` fine (es. 'attack', 'done').
    * @returns {'open'|'closed'|'pending-approval'} Valore pubblico sicuro.
    */
   function statusToPublic(fineStatus) {
+    const FS = global.SN_FB_STATUS;
+    if (FS && FS.PUBLIC_MAP[fineStatus]) return FS.PUBLIC_MAP[fineStatus];
     return STATUS_PUBLIC_MAP[fineStatus] || 'open'; // default safe: unknown → 'open'
   }
 
