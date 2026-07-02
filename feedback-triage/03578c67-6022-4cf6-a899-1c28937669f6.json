@@ -1,7 +1,0 @@
-{
-  "id": "03578c67-6022-4cf6-a899-1c28937669f6",
-  "status": "done",
-  "notes": "Prima versione dell'app Mazzi: dal menu App si apre la libreria dei mazzi Commander — puoi creare un mazzo, rinominarlo dal builder, duplicarlo ed eliminarlo col tasto destro, e tutto resta salvato sul tuo computer. Il builder ha già le tre colonne (chat, mazzo, statistiche) come scheletro e la schermata Partita è un segnaposto raggiungibile. Oltre al chiesto: sistemato un problema per cui il tasto destro sulle pagine interne (es. le schede archiviate) apriva sempre il menu generale di Filo invece del menu dell'elemento. Verificato con unit test (12 nuovi), 3 test automatici end-to-end sull'app e screenshot delle due schermate.",
-  "queuedAt": "2026-07-02T13:48:30.221Z",
-  "queuedBy": "routine"
-}
