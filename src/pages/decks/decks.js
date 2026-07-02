@@ -214,21 +214,153 @@
 
   // ── Builder: identità del documento + switcher (§8.2) ──────────────────────
 
-  function renderBuilder() {
+  async function renderBuilder() {
     $('deckNameText').textContent = current.nome;
     const commander = (current.commanderMeta && current.commanderMeta.name)
       ? `Commander: ${current.commanderMeta.name}`
-      : 'Nessun commander — potrai impostarlo dalla ricerca carte.';
+      : 'Nessun commander — impostalo col tasto destro su una carta del mazzo.';
     const budget = (current.budget !== null && current.budget !== undefined)
       ? ` · Budget: ${current.budget} €` : '';
     $('commanderLine').textContent = commander + budget;
     $('deckCount').textContent = `${Decks.deckCount(current)}/100 carte`;
+    await Promise.all([ensureSymbols(), loadDeckCards()]);
+    renderDeckList();
   }
 
   async function saveDeck(next) {
     if (next === current) return;
     const res = await send({ type: MSG.DECKS_UPDATE, deck: next });
-    if (res && res.ok) { current = res.deck; renderBuilder(); }
+    if (res && res.ok) { current = res.deck; await renderBuilder(); }
+  }
+
+  // ── Colonna mazzo (§8.1): dati carta, gruppi collassabili, righe ───────────
+
+  let cardsById = {};      // scryfall_id → carta semplificata (cache di pagina)
+  let symbolsMap = null;   // '{U}' → svg_uri (symbology, chiesta una volta)
+  const collapsedGroups = new Set();
+  const VIEW_LABEL = { tipo: 'tipo', tag: 'tag', cmc: 'costo', colore: 'colore' };
+
+  async function ensureSymbols() {
+    if (symbolsMap) return;
+    const r = await send({ type: MSG.SCRYFALL_SYMBOLS });
+    symbolsMap = (r && r.ok && r.symbols) || {};
+  }
+
+  async function loadDeckCards() {
+    const ids = current.carte.map((c) => c.scryfall_id);
+    if (current.commander) ids.push(current.commander);
+    if (!ids.length) { cardsById = {}; return; }
+    const r = await send({ type: MSG.SCRYFALL_CARDS, ids });
+    cardsById = (r && r.ok && r.cards) || {};
+  }
+
+  function manaHtml(cost) {
+    return window.SN_SCRYFALL_Q.parseManaCost(cost).map((s) => {
+      const uri = symbolsMap && symbolsMap[`{${s}}`];
+      return uri
+        ? `<img class="dk-mana" src="${esc(uri)}" alt="${esc(s)}" />`
+        : `<span>${esc(s)}</span>`;
+    }).join('');
+  }
+
+  function rowHtml({ entry, card }) {
+    const name = card ? card.name : entry.scryfall_id;
+    const qty = entry.qty > 1 ? `<span class="dk-row-qty">${entry.qty}×</span>` : '';
+    const price = card && card.priceEur != null
+      ? `${card.priceEur.toFixed(2).replace('.', ',')} €` : '';
+    const mana = card ? manaHtml(card.manaCost) : '';
+    return `
+      <div class="dk-row" data-card-id="${esc(entry.scryfall_id)}" tabindex="0">
+        ${qty}<span class="dk-row-name">${esc(name)}</span>
+        <span class="dk-row-price">${esc(price)}</span>
+        <span class="dk-row-mana">${mana}</span>
+      </div>`;
+  }
+
+  function renderDeckList() {
+    $('deckListEmpty').hidden = current.carte.length > 0;
+    $('groupBy').textContent = `per ${VIEW_LABEL[current.raggruppamento] || 'tipo'} ▾`;
+    const groups = Decks.groupDeck(current, cardsById);
+    $('deckList').innerHTML = groups.map((g) => {
+      const closed = collapsedGroups.has(g.name);
+      return `
+      <div class="dk-group" data-group="${esc(g.name)}">
+        <div class="dk-group-head" data-g="${esc(g.name)}">
+          <span>${closed ? '▸' : '▾'}</span><span>${esc(g.name)}</span>
+          <span class="dk-group-n">${g.entries.length}</span>
+        </div>
+        <div class="dk-group-rows" ${closed ? 'hidden' : ''}>
+          ${g.entries.map(rowHtml).join('')}
+        </div>
+      </div>`;
+    }).join('');
+    renderLegality();
+  }
+
+  // Riepilogo di legalità (§8.4) sotto il conteggio: compare SOLO quando c'è
+  // un problema (doppioni / identity / banned). Il pannello statistiche
+  // completo arriva col suo task; i check devono esserci già.
+  function renderLegality() {
+    const el = $('deckLegality');
+    const r = Decks.legalityChecks(current, cardsById);
+    const parts = [];
+    if (!r.singleton.ok) parts.push(`doppioni: ${r.singleton.violations.join(', ')}`);
+    if (!r.identity.ok) parts.push(`fuori dai colori del commander: ${r.identity.violations.join(', ')}`);
+    if (!r.banned.ok) parts.push(`bandite in Commander: ${r.banned.violations.join(', ')}`);
+    el.hidden = !parts.length;
+    el.textContent = parts.length ? `⚠ ${parts.join(' · ')}` : '';
+  }
+
+  async function removeFromDeck(cardId) {
+    const { deck, removed } = Decks.removeCard(current, cardId);
+    if (removed) await saveDeck(deck);
+  }
+
+  // "Sposta in gruppo": secondo livello del menu — i gruppi esistenti della
+  // vista corrente + il ritorno al gruppo naturale (toglie l'override).
+  function chooseGroup(x, y, cardId) {
+    const items = Decks.groupDeck(current, cardsById).map((g) => ({
+      label: g.name,
+      run: () => saveDeck(Decks.setGroupOverride(current, cardId, g.name)),
+    }));
+    items.push({
+      label: '(gruppo naturale)',
+      run: () => saveDeck(Decks.setGroupOverride(current, cardId, null)),
+    });
+    openCtx(x, y, items);
+  }
+
+  // "Copia/Sposta in un altro mazzo": secondo livello con l'elenco dei mazzi.
+  async function chooseDeck(x, y, cardId, move) {
+    const res = await send({ type: MSG.DECKS_LIST });
+    const others = Decks.sortForLibrary((res && res.decks) || [])
+      .filter((d) => d.id !== current.id);
+    if (!others.length) return;
+    const entry = current.carte.find((c) => c.scryfall_id === cardId);
+    openCtx(x, y, others.map((d) => ({
+      label: d.nome,
+      run: async () => {
+        const t = await send({ type: MSG.DECKS_GET, id: d.id });
+        if (t && t.ok) {
+          const { deck: target, added } = Decks.addCard(t.deck, cardId, {
+            qty: entry ? entry.qty : 1, tags: entry ? entry.tags : [],
+          });
+          if (added) await send({ type: MSG.DECKS_UPDATE, deck: target });
+        }
+        if (move) await removeFromDeck(cardId);
+      },
+    })));
+  }
+
+  // "Imposta come commander" (§8.4): il commander è un PARAMETRO del mazzo,
+  // non una carta dell'elenco — la riga esce dall'elenco.
+  async function makeCommander(cardId) {
+    const r = await send({ type: MSG.DECKS_SET_COMMANDER, id: current.id, scryfallId: cardId });
+    if (!r || !r.ok) return;
+    current = r.deck;
+    const { deck, removed } = Decks.removeCard(current, cardId);
+    if (removed) await saveDeck(deck);
+    else await renderBuilder();
   }
 
   // Lo switcher (§8.2): click sul nome → gestione mazzi, DOVE vive il mazzo.
