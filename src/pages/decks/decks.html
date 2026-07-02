@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <title>Filo — Mazzi</title>
+  <link rel="icon" href="filo://asset/icons/icon-32.png" />
+  <link rel="stylesheet" href="filo://style/theme.css" />
+  <link rel="stylesheet" href="filo://style/pages.css" />
+  <script src="filo://shared/themeTokens.js"></script>
+  <script src="filo://shared/pageBootstrap.js"></script>
+  <script src="filo://shared/constants.js"></script>
+  <script src="filo://shared/messages.js"></script>
+  <script src="filo://shared/i18n.js"></script>
+  <script src="filo://shared/storage.js"></script>
+  <script src="filo://shared/confirmUi.js"></script>
+  <script src="filo://shared/decks.js"></script>
+  <style>
+    /* App deck builder Commander (DECK-BUILDER-SPEC.md). Tre schermate su hash
+       routing: #/ libreria mazzi · #/deck/<id> builder · #/game partita (stub).
+       Solo una .dk-screen è visibile alla volta. */
+    .dk-screen[hidden] { display: none; }
+
+    /* ── Libreria (§10): griglia di card, art crop del commander come thumb ── */
+    .dk-thumb {
+      aspect-ratio: 626 / 457; /* proporzione dell'art crop Scryfall */
+      background: var(--sn-hover);
+      background-size: cover; background-position: center;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--sn-muted); font-size: 26px;
+    }
+    .dk-meta {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 12px; color: var(--sn-muted);
+    }
+    /* Pip dei colori identity del commander (palette WUBRG fissa: come per i
+       grafici, i token di tema non bastano — servono 5 colori distinguibili
+       su tema chiaro E scuro). */
+    .dk-pips { display: inline-flex; gap: 3px; }
+    .dk-pip {
+      width: 10px; height: 10px; border-radius: 50%;
+      border: 1px solid var(--sn-border);
+    }
+    .dk-pip[data-c="W"] { background: #f5edd8; }
+    .dk-pip[data-c="U"] { background: #4f8fc4; }
+    .dk-pip[data-c="B"] { background: #4a4550; }
+    .dk-pip[data-c="R"] { background: #d4644a; }
+    .dk-pip[data-c="G"] { background: #5f9663; }
+    /* Menu contestuale della card mazzo: stesse classi .sn-select-pop del resto
+       di Filo, posizionato fixed alle coordinate del click (come in archivio). */
+    .dk-ctxmenu { position: fixed; right: auto; top: auto; min-width: 140px; }
+
+    /* ── Builder (§2): tre colonne a larghezza FISSA, mai resize automatico.
+       I divisori trascinabili arrivano col task 3: qui le larghezze di
+       partenza (sinistra media, centro ~300px, destra il resto). ── */
+    .dk-builder {
+      display: grid; grid-template-columns: 340px 300px 1fr;
+      gap: 0; height: calc(100vh - 96px); min-height: 320px;
+      border: 1px solid var(--sn-border); border-radius: 10px; overflow: hidden;
+    }
+    .dk-col { display: flex; flex-direction: column; min-width: 0; }
+    .dk-col + .dk-col { border-left: 1px solid var(--sn-border); }
+    .dk-col-head {
+      padding: 10px 12px; border-bottom: 1px solid var(--sn-border);
+      font-size: 13px; font-weight: 600;
+    }
+    .dk-col-body { flex: 1; overflow: auto; padding: 12px; }
+    .dk-placeholder { color: var(--sn-muted); font-size: 13px; }
+    /* Header identità del documento (§8.2): nome mazzo + commander. */
+    #deckName {
+      font: inherit; font-size: 15px; font-weight: 600;
+      color: var(--sn-text); background: transparent;
+      border: 1px solid transparent; border-radius: 6px;
+      padding: 2px 6px; width: 100%;
+    }
+    #deckName:hover { border-color: var(--sn-border); }
+    #deckName:focus { border-color: var(--sn-accent); outline: none; }
+    .dk-commander-line { font-size: 12px; color: var(--sn-muted); padding: 0 6px 6px; }
+    .dk-count { font-size: 12px; color: var(--sn-muted); }
+
+    .dk-back { margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <main class="sn-page">
+    <!-- ── Schermata Mazzi (libreria, home dell'app) ─────────────────────── -->
+    <section id="screenLibrary" class="dk-screen">
+      <h1>Mazzi</h1>
+      <div class="sn-toolbar">
+        <button class="sn-btn" id="newDeck">+ Nuovo mazzo</button>
+        <button class="sn-btn sn-btn-secondary" id="openGame">Partita</button>
+      </div>
+      <div id="deckGrid" class="sn-card-grid"></div>
+      <div id="deckEmpty" class="sn-empty" hidden>
+        Nessun mazzo, per ora. Creane uno con "+ Nuovo mazzo".
+      </div>
+    </section>
+
+    <!-- ── Schermata Builder (§2) ────────────────────────────────────────── -->
+    <section id="screenBuilder" class="dk-screen" hidden>
+      <div class="dk-back">
+        <button class="sn-btn sn-btn-secondary" id="backToLibrary">← Mazzi</button>
+      </div>
+      <div class="dk-builder">
+        <div class="dk-col" id="colChat">
+          <div class="dk-col-head">Chat e ricerca</div>
+          <div class="dk-col-body"><p class="dk-placeholder">
+            Qui potrai cercare carte e parlare con Filo del tuo mazzo. In arrivo.
+          </p></div>
+        </div>
+        <div class="dk-col" id="colDeck">
+          <div class="dk-col-head">
+            <input id="deckName" type="text" aria-label="Nome del mazzo" />
+            <div class="dk-commander-line" id="commanderLine"></div>
+          </div>
+          <div class="dk-col-body">
+            <p class="dk-count" id="deckCount"></p>
+            <p class="dk-placeholder">L'elenco delle carte del mazzo arriverà qui.</p>
+          </div>
+        </div>
+        <div class="dk-col" id="colDetail">
+          <div class="dk-col-head">Statistiche</div>
+          <div class="dk-col-body"><p class="dk-placeholder">
+            Le statistiche del mazzo (curva di mana, colori, budget) arriveranno qui.
+          </p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Schermata Partita (stub, §12) ─────────────────────────────────── -->
+    <section id="screenGame" class="dk-screen" hidden>
+      <div class="dk-back">
+        <button class="sn-btn sn-btn-secondary" id="gameBack">← Mazzi</button>
+      </div>
+      <h1>Partita</h1>
+      <p class="dk-placeholder">
+        Il tavolo di gioco arriverà in una versione futura. Intanto puoi
+        costruire i tuoi mazzi dalla schermata Mazzi.
+      </p>
+    </section>
+  </main>
+
+  <script src="decks.js"></script>
+</body>
+</html>
