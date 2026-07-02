@@ -48,8 +48,10 @@
       font-size: 10px; color: var(--sn-muted); flex: 0 0 auto;
     }
     /* Menu contestuale (tasto destro): stesse classi .sn-select-pop/-option del
-       resto di Filo, ma posizionato "fixed" alle coordinate del click. */
-    .arc-ctxmenu { position: fixed; min-width: 140px; }
+       resto di Filo, ma posizionato "fixed" alle coordinate del click (non
+       ancorato a un host relative come i dropdown normali) — resetta
+       right/top ereditati da .sn-select-pop, che JS imposta esplicitamente. */
+    .arc-ctxmenu { position: fixed; right: auto; top: auto; min-width: 140px; }
   </style>
 </head>
 <body>
