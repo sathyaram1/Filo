@@ -59,6 +59,10 @@
     // Imposta il commander di un mazzo (§8.4): il main risolve la carta via
     // Scryfall e scrive commander + commanderMeta (nome, identity, art crop).
     DECKS_SET_COMMANDER: 'decks_set_commander', // { id, scryfallId }
+    // Chat unificata del Builder (§3-§4): NL → query Scryfall / carte
+    // cross-mazzo via LLM. { deckId, text, history? } →
+    // { ok, reply, cardIds, cards, query }.
+    DECKS_CHAT: 'decks_chat',
     // Client Scryfall (§13.2), tutto nel main (rate limit + cache condivisi).
     SCRYFALL_SEARCH: 'scryfall_search',   // { query, deckId? } → identity auto dal commander
     SCRYFALL_NAMED: 'scryfall_named',     // { name } (risoluzione fuzzy)
