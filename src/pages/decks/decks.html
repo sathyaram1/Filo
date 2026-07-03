@@ -235,6 +235,65 @@
     #carouselToggle[data-in="1"] { color: var(--sn-accent); border-color: var(--sn-accent); }
     .dk-carousel-hint { font-size: 11px; color: var(--sn-muted); margin: 4px 0 0; }
 
+    /* ── Statistiche (§9): card verticali nello stato di riposo. Grafici in
+       puro HTML/CSS (niente librerie, come da PATTERNS.md): la curva è una
+       riga di colonnine flex, i colori righe con pip + barra. ── */
+    .dk-stat-card {
+      border: 1px solid var(--sn-border); border-radius: 8px;
+      padding: 10px; margin-bottom: 10px; font-size: 12px;
+    }
+    .dk-stat-title { font-weight: 600; font-size: 12px; margin-bottom: 8px; }
+    .dk-stat-sub { color: var(--sn-muted); font-size: 11px; margin: 6px 0 0; }
+    .dk-curve { display: flex; align-items: flex-end; gap: 4px; height: 72px; }
+    .dk-curve-col {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; gap: 2px; min-width: 0; height: 100%;
+      justify-content: flex-end;
+    }
+    .dk-curve-n { font-size: 10px; color: var(--sn-muted); line-height: 1; }
+    .dk-curve-bar {
+      width: 100%; border-radius: 3px 3px 0 0;
+      background: var(--sn-accent); opacity: .75; min-height: 2px;
+    }
+    .dk-curve-col[data-n="0"] .dk-curve-bar { background: var(--sn-border); opacity: .6; }
+    .dk-curve-label { font-size: 10px; color: var(--sn-muted); line-height: 1; }
+    /* Colori: una riga per colore — pip, richiesto (pip nei costi) e prodotto
+       (fonti). Barre proporzionali al massimo della colonna. */
+    .dk-color-head, .dk-color-row {
+      display: grid; grid-template-columns: 14px 1fr 1fr; gap: 6px;
+      align-items: center; margin-bottom: 4px;
+    }
+    .dk-color-head { color: var(--sn-muted); font-size: 10px; }
+    .dk-color-cell { display: flex; align-items: center; gap: 4px; min-width: 0; }
+    .dk-color-bar { height: 8px; border-radius: 4px; background: var(--sn-accent); opacity: .55; }
+    .dk-color-n { font-size: 10px; color: var(--sn-muted); flex: 0 0 auto; }
+    .dk-type-row { display: flex; justify-content: space-between; padding: 1px 0; }
+    .dk-type-row .dk-type-n { color: var(--sn-muted); }
+    /* Legalità (§9.1): riga per check, ✓ ok / ✗ con l'elenco dei problemi. */
+    .dk-leg-row { display: flex; gap: 6px; padding: 1px 0; }
+    .dk-leg-row[data-ok="1"] .dk-leg-mark { color: var(--sn-accent); }
+    .dk-leg-row[data-ok="0"] { color: var(--sn-danger, #c0392b); }
+    /* Budget (§9.2): totale/residuo sempre visibili; residuo negativo in rosso. */
+    .dk-budget-row { display: flex; justify-content: space-between; padding: 1px 0; }
+    .dk-budget-row .dk-budget-n { font-weight: 600; }
+    .dk-budget-row[data-over="1"] .dk-budget-n { color: var(--sn-danger, #c0392b); }
+    /* Calcolatore di probabilità (§9.3). */
+    .dk-prob-row {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 8px; padding: 2px 0;
+    }
+    .dk-prob-row label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    .dk-prob-row input {
+      width: 56px; font: inherit; font-size: 12px; text-align: right;
+      color: var(--sn-text); background: transparent;
+      border: 1px solid var(--sn-border); border-radius: 6px;
+      padding: 3px 6px; outline: none;
+    }
+    .dk-prob-row input:focus { border-color: var(--sn-accent); }
+    .dk-prob-actions { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+    .dk-prob-actions .sn-btn { font-size: 12px; padding: 4px 10px; }
+    .dk-prob-result { font-weight: 600; }
+
     .dk-back { margin-bottom: 12px; }
   </style>
 </head>
