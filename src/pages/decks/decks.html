@@ -302,10 +302,39 @@
         <div class="dk-divider" id="dividerRight" role="separator" aria-orientation="vertical"
              aria-label="Ridimensiona mazzo e statistiche"></div>
         <div class="dk-col" id="colDetail">
-          <div class="dk-col-head">Statistiche</div>
-          <div class="dk-col-body"><p class="dk-placeholder">
-            Le statistiche del mazzo (curva di mana, colori, budget) arriveranno qui.
-          </p></div>
+          <div class="dk-col-head" id="detailTitle">Statistiche</div>
+          <div class="dk-col-body">
+            <!-- Stato di riposo (§5): le statistiche vere arrivano col task 7. -->
+            <div class="dk-detail-state" id="stateStats">
+              <p class="dk-placeholder">
+                Le statistiche del mazzo (curva di mana, colori, budget)
+                arriveranno qui. Passa il mouse su una carta per l'anteprima,
+                cliccala per sfogliare la lista una carta alla volta.
+              </p>
+            </div>
+            <!-- Preview su hover (§5.1-§5.2): carta nel contesto del mazzo. -->
+            <div class="dk-detail-state" id="statePreview" hidden>
+              <img class="dk-card-img" id="previewImg" alt="" />
+              <div class="dk-detail-ctx" id="previewCtx"></div>
+              <div class="dk-detail-module" id="previewModule"
+                   title="Tasto destro per scegliere il modulo"></div>
+            </div>
+            <!-- Carosello su click (§5.3): flusso di triage, pinnato. -->
+            <div class="dk-detail-state" id="stateCarousel" hidden>
+              <img class="dk-card-img" id="carouselImg" alt="" />
+              <div class="dk-carousel-bar">
+                <span class="dk-carousel-pos" id="carouselPos"></span>
+                <button class="dk-car-btn" id="carouselPrev" title="Carta precedente (←)"
+                        aria-label="Carta precedente">←</button>
+                <button class="dk-car-btn" id="carouselToggle" aria-label="Aggiungi o rimuovi dal mazzo"></button>
+                <button class="dk-car-btn" id="carouselNext" title="Carta successiva (→)"
+                        aria-label="Carta successiva">→</button>
+                <button class="dk-car-btn" id="carouselClose" title="Chiudi (Esc)"
+                        aria-label="Chiudi il carosello">✕</button>
+              </div>
+              <p class="dk-carousel-hint">←/→ scorri · Invio o Spazio aggiungi/rimuovi · Esc chiudi</p>
+            </div>
+          </div>
         </div>
       </div>
     </section>
