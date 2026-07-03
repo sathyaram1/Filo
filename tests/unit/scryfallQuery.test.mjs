@@ -116,3 +116,51 @@ test('isFresh: dentro il TTL sì, oltre no, timestamp rotto no', () => {
   assert.equal(Q.isFresh('boh', ttl, now), false);
   assert.equal(Q.isFresh(null, ttl, now), false);
 });
+
+// ── parseAgentReply (chat unificata §3): JSON tollerante ─────────────────────
+
+test('parseAgentReply: JSON pulito → campi normalizzati', () => {
+  const r = Q.parseAgentReply('{"reply":"Ecco","query":"o:haste","cards":["a","b"]}');
+  assert.deepEqual(r, { reply: 'Ecco', query: 'o:haste', cards: ['a', 'b'] });
+});
+
+test('parseAgentReply: tollera fence ```json e testo attorno', () => {
+  const fenced = 'Certo!\n```json\n{"query":"t:dragon"}\n```\ngrazie';
+  assert.equal(Q.parseAgentReply(fenced).query, 't:dragon');
+  const attorno = 'premessa {"reply":"ok","cards":[]} coda';
+  assert.equal(Q.parseAgentReply(attorno).reply, 'ok');
+});
+
+test('parseAgentReply: non-JSON → il testo grezzo diventa reply', () => {
+  const r = Q.parseAgentReply('Non ho capito la richiesta');
+  assert.deepEqual(r, { reply: 'Non ho capito la richiesta', query: '', cards: [] });
+});
+
+test('parseAgentReply: campi mancanti/tipi sbagliati → default sicuri', () => {
+  assert.deepEqual(Q.parseAgentReply('{"query":42,"cards":"no"}'),
+    { reply: '', query: '', cards: [] });
+  assert.deepEqual(Q.parseAgentReply(''), { reply: '', query: '', cards: [] });
+  assert.deepEqual(Q.parseAgentReply(null), { reply: '', query: '', cards: [] });
+});
+
+// ── proseSegments ([[Nome Carta]] §3.5) ──────────────────────────────────────
+
+test('proseSegments: spezza la prosa sui marcatori [[...]]', () => {
+  assert.deepEqual(Q.proseSegments('Prova [[Sol Ring]] e [[Arcane Signet]].'), [
+    { type: 'text', text: 'Prova ' },
+    { type: 'card', name: 'Sol Ring' },
+    { type: 'text', text: ' e ' },
+    { type: 'card', name: 'Arcane Signet' },
+    { type: 'text', text: '.' },
+  ]);
+});
+
+test('proseSegments: testo senza marcatori / vuoto / marcatore vuoto', () => {
+  assert.deepEqual(Q.proseSegments('solo testo'), [{ type: 'text', text: 'solo testo' }]);
+  assert.deepEqual(Q.proseSegments(''), []);
+  assert.deepEqual(Q.proseSegments('a [[ ]] b'), [
+    { type: 'text', text: 'a ' },
+    { type: 'text', text: '[[ ]]' },
+    { type: 'text', text: ' b' },
+  ]);
+});
