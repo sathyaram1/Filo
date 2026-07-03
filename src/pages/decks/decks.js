@@ -30,7 +30,7 @@
   // resize ammesso è il trascinamento deliberato dei due divisori; le larghezze
   // finiscono in chrome.storage.local e sopravvivono alla riapertura.
   const LAYOUT_KEY = window.SN_CONST.STORAGE_KEYS.DECKS_UI;
-  const LAYOUT_DEFAULT = { leftW: 340, centerW: 300 };
+  const LAYOUT_DEFAULT = { leftW: 340, centerW: 300, module: 'default' };
   const LAYOUT_MIN = { leftW: 220, centerW: 220 };
   let layout = { ...LAYOUT_DEFAULT };
 
