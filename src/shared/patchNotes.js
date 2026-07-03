@@ -16,6 +16,16 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.104', date: '2026-07-03',
+      features: [
+        'Nella dashboard di gestione puoi approvare in blocco tutti i feedback allineati con un solo click: entrano subito nella coda di lavoro.',
+        'Puoi confermare un attacco o uno spam segnalato: esce dai Ricevuti e resta consultabile negli Archiviati sotto il nuovo filtro "Bloccati confermati".',
+      ],
+      fixes: [
+        'La coda di lavoro dei feedback e la dashboard ora vedono la stessa lista: un feedback approvato è davvero in coda e viene lavorato, senza più code "fantasma".',
+      ],
+    },
+    {
       version: '0.2.103', date: '2026-07-02',
       features: [
         'Nell\'app Mazzi il banco di lavoro prende forma: tre colonne (ricerca, mazzo, statistiche) con divisori che puoi trascinare a piacere — la disposizione viene ricordata. Cliccando sul nome del mazzo si apre il menu di gestione: cambia mazzo, nuovo, duplica, rinomina, budget, elimina.',
