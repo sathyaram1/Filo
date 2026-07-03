@@ -6,7 +6,9 @@
 import { test, expect } from './fixtures/electron.mjs';
 
 async function mockScryfall(app, { emptySearch = false } = {}) {
-  await app.evaluate(({ emptySearch }) => {
+  // NB: in ElectronApplication.evaluate il PRIMO parametro è il modulo
+  // electron; l'argomento passato arriva come secondo.
+  await app.evaluate((_electron, { emptySearch }) => {
     const COMMANDER = {
       id: 'niv-1',
       name: 'Niv-Mizzet, Parun',
