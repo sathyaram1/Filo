@@ -1,8 +1,0 @@
-{
-  "id": "0491417d-8e2a-4a8c-b025-05efac867355",
-  "status": "revision_capability",
-  "notes": "Il pannello destro del builder ora ha i tre stati previsti: a riposo mostra le statistiche (segnaposto in attesa del task 7), passando il mouse su una carta — nei risultati di ricerca, nell'elenco del mazzo o su un nome citato in chat — appare l'anteprima con immagine, prezzo in euro, tag e indicatore 'già nel mazzo', e cliccando una carta si apre il carosello di valutazione: indicatore di posizione (es. 23/50), frecce o tastiera per scorrere, Invio/Spazio per aggiungere o rimuovere (la carta compare subito nel gruppo giusto della colonna centrale), Esc per chiudere. I tempi di apertura/aggiornamento/uscita seguono la spec (200ms/100ms/1s), le immagini si caricano solo all'hover con prefetch delle vicine nel carosello, la geometria del pannello non cambia mai. Sotto l'anteprima c'è il riquadro modulare: tasto destro per scegliere il contenuto (per ora il modulo di default coi dati della carta; gli altri arrivano col task 8). Oltre il chiesto: click su un nome carta citato in prosa apre il carosello anche lì, e la scelta del modulo viene ricordata. Verificato con 3 nuovi test automatici su hover/preview/carosello con tastiera (più i test esistenti dell'app Mazzi, tutti verdi) e controllo visivo con screenshot dei tre stati.",
-  "queuedAt": "2026-07-03T14:05:27.598Z",
-  "queuedBy": "routine",
-  "branch": "claude/deck-builder-6"
-}
