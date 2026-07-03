@@ -853,6 +853,7 @@
 
     $('deckName').addEventListener('click', (e) => { e.stopPropagation(); openSwitcher(); });
     wireDividers();
+    wireDetailPanel();
 
     // Chat unificata (§3): invio col form (Enter), toggle carta e collasso
     // bolle in delega sul log, risoluzione fuzzy dei nomi in prosa all'hover.
