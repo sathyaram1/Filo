@@ -1,0 +1,7 @@
+{
+  "id": "d67c83ab-6e85-4f4d-8fc3-97dfc44d6e1b",
+  "status": "done",
+  "notes": "Chat con Filo nell'app Mazzi: puoi cercare carte scrivendo una query secca o una frase in linguaggio naturale, i risultati arrivano gia filtrati sui colori del commander e ogni riga ha il tasto per aggiungere o togliere la carta dal mazzo. Le liste vecchie si richiudono in una riga di sintesi riapribile e puoi anche chiedere pareri sul mazzo. Verificato con test automatici mirati (unit + due scenari end-to-end sulla pagina) e audit di sicurezza superato.",
+  "queuedAt": "2026-07-03T11:55:42.063Z",
+  "queuedBy": "routine"
+}
