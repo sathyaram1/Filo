@@ -87,7 +87,10 @@
   let starredOnly   = false;    // filtro ⭐ della tab Archiviati (DB2)
   let confirmedOnly = false;    // filtro "Bloccati confermati" (attack/spam confermati)
   let releasedVersion = '';     // versione dell'app in esecuzione = ultima rilasciata (DB3)
-  let autoModeOn    = false;    // modalità automatica: ON ⇒ gli allineati vanno in coda
+  // Modalità automatica: agisce UNA volta al momento del giudizio (lato
+  // pipeline: sicuro+ON → todo, sicuro+OFF → aligned). NON è più una lente
+  // sulle liste: le tab derivano solo dallo status (macchina a stati).
+  let autoModeOn    = false;
 
   // Etichette/testi vuoto per le tab-lista (DB1).
   const TAB_LABELS = {
