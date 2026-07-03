@@ -54,15 +54,16 @@ tu** a registrare l'esito e a far girare il gate (L5 deterministico + il tuo L4)
    ```bash
    node scripts/dispatch.mjs --record-secaudit <id> <pass|fail>
    ```
-2. Su **pass**, esegui il gate (su **fail** non fondere: accoda `blocked` e basta):
+2. Su **pass**, esegui il gate (su **fail** non fondere: accoda `design` con
+   `--reason loop` e la tua critica nella nota — decide l'owner):
    ```bash
    FILO_L4_VERDICT=pass FILO_L4_REASON="..." node scripts/merge-gate.mjs <branch>
    # feature spezzata: ... node scripts/merge-gate.mjs <branch> --into feature/N
    ```
 3. Chiudi in base all'exit del gate:
    - `0` → fuso sul target → `node scripts/queue-triage.mjs <id> done "<report>"` + `node scripts/dispatch.mjs --clear-state <id>`
-   - `10` → BLOCCATO (L5 o L4) → `node scripts/queue-triage.mjs <id> blocked "<nota del gate>" --branch <branch>`
-   - `20` → conflitto → risolvi o accoda `blocked`.
+   - `10` → BLOCCATO (L5 o L4) → `node scripts/queue-triage.mjs <id> design "<nota del gate>" --branch <branch> --reason secaudit`
+   - `20` → conflitto → risolvi o accoda `design` (come sopra).
    - `1` → errore tecnico.
 
 **Nota:** L5 (blocco deterministico sui file sensibili) gira **dentro** il gate,

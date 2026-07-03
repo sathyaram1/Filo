@@ -70,13 +70,14 @@ NON implementare tutto in una volta.
 Report di 2-3 frasi **per l'utente** (cosa vedrà di diverso, cosa hai aggiunto
 oltre il chiesto, come hai verificato). Senza nomi tecnici.
 
-Poi metti il feedback in `review` col branch — il prossimo giro di dispatch lo
-instraderà al **verifier**:
+Poi metti il feedback in `revision_capability` col branch — il prossimo giro di
+dispatch lo instraderà al **verifier**:
 
 ```bash
-node scripts/queue-triage.mjs <id> review "[il tuo report]" --branch worker/<id>
+node scripts/queue-triage.mjs <id> revision_capability "[il tuo report]" --branch worker/<id>
 ```
 
 Se il feedback è ambiguo / richiede una decisione di design / mancano
-informazioni → `clarify` invece di `review` (vedi `CLAUDE.md` § clarify). Non
-usare `clarify` come scappatoia.
+informazioni → `design` con `--reason clarify` e le TUE DOMANDE nella nota
+(finiscono nella chat del feedback, l'owner risponde da lì). Non usarlo come
+scappatoia.

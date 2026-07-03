@@ -51,27 +51,33 @@ test('queueTriage NON scrive starred se omesso (undefined → non tocca il flag)
   assert.equal('starred' in read('nostar'), false);
 });
 
-test('starred convive con branch (review/blocked) senza calpestarsi', () => {
+test('starred convive con branch senza calpestarsi (e i nomi RITIRATI vengono rimappati)', () => {
+  // `review` è ritirato: la coda lo rimappa al canonico `revision_capability`.
   queueTriage('combo', 'review', 'in revisione', 'routine-test', 'worker/combo', true);
   const e = read('combo');
   assert.equal(e.branch, 'worker/combo');
   assert.equal(e.starred, true);
-  assert.equal(e.status, 'review');
+  assert.equal(e.status, 'revision_capability');
 });
 
 test('queueTriage serializza il motivo strutturato `reason` (es. loop)', () => {
+  // `blocked` è ritirato → `design` (macchina a stati); il reason resta.
   queueTriage('loop1', 'blocked', 'bloccato dopo 3 fallimenti', 'routine-test', 'worker/loop1', undefined, 'loop');
   const e = read('loop1');
-  assert.equal(e.status, 'blocked');
+  assert.equal(e.status, 'design');
   assert.equal(e.branch, 'worker/loop1');
   assert.equal(e.reason, 'loop');
 });
 
-test('queueTriage NON scrive reason se omesso o vuoto', () => {
-  queueTriage('noreason', 'blocked', '', 'routine-test', 'worker/x');
+test('queueTriage NON scrive reason se omesso o vuoto (status canonico)', () => {
+  queueTriage('noreason', 'design', '', 'routine-test', 'worker/x');
   assert.equal('reason' in read('noreason'), false);
-  queueTriage('emptyreason', 'blocked', '', 'routine-test', 'worker/x', undefined, '   ');
+  queueTriage('emptyreason', 'design', '', 'routine-test', 'worker/x', undefined, '   ');
   assert.equal('reason' in read('emptyreason'), false);
+  // Il legacy `blocked` senza reason invece EREDITA il motivo loop dal remap.
+  queueTriage('legacyblocked', 'blocked', '', 'routine-test', 'worker/x');
+  assert.equal(read('legacyblocked').status, 'design');
+  assert.equal(read('legacyblocked').reason, 'loop');
 });
 
 // CLI: --reason <slug> finisce sull'entry (stesso pattern di --branch).
@@ -81,10 +87,10 @@ test('CLI queue-triage.mjs --reason loop accoda entry.reason', () => {
   const { dirname, join } = require('node:path');
   const here = dirname(fileURLToPath(import.meta.url));
   const script = join(here, '..', '..', 'scripts', 'queue-triage.mjs');
-  execFileSync(process.execPath, [script, 'cli-loop', 'blocked', 'nota', '--branch', 'worker/cli', '--reason', 'loop', '--no-git'],
+  execFileSync(process.execPath, [script, 'cli-loop', 'design', 'nota', '--branch', 'worker/cli', '--reason', 'loop', '--no-git'],
     { env: { ...process.env, FILO_SPOOL_DIR: tmp }, encoding: 'utf8' });
   const e = read('cli-loop');
-  assert.equal(e.status, 'blocked');
+  assert.equal(e.status, 'design');
   assert.equal(e.branch, 'worker/cli');
   assert.equal(e.reason, 'loop');
   // La nota positional non viene mangiata dai flag.

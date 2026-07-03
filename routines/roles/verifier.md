@@ -83,5 +83,6 @@ node scripts/claim-feedback.mjs release <id>
 - **PASS** → al prossimo giro dispatch sceglie **secaudit** (gate di sicurezza),
   poi il merge-gate fonde e accoda `done`.
 - **FAIL** → al prossimo giro dispatch sceglie **fixer** con la tua critica.
-  Il contatore loop si incrementa; dopo il **3° FAIL** dispatch instrada a
-  `blocked` con motivo `loop` invece che a fixer.
+  Il contatore loop si incrementa; dopo il **3° FAIL** dispatch mette il
+  feedback in `design` con motivo `loop` (decide l'owner) invece di richiamare
+  fixer.
