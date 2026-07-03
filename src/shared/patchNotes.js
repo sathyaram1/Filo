@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.105', date: '2026-07-03',
+      features: [
+        'Nell\'app Mazzi arriva la chat con Filo: scrivi una ricerca secca ("draghi rossi") o una frase ("modi per dare fretta alle creature") e ottieni una lista di carte, già filtrata sui colori del tuo commander. Ogni riga ha un tasto per aggiungere o togliere la carta dal mazzo al volo; le liste vecchie si richiudono in una riga di sintesi e si riaprono con un click. Puoi anche chiedere pareri sul mazzo o pescare carte da un altro tuo mazzo ("il ramp del mazzo X").',
+      ],
+      fixes: [],
+    },
+    {
       version: '0.2.104', date: '2026-07-03',
       features: [
         'Nella dashboard di gestione puoi approvare in blocco tutti i feedback allineati con un solo click: entrano subito nella coda di lavoro.',
