@@ -106,6 +106,9 @@
       const res = await send({ type: MSG.DECKS_GET, id: r.id });
       if (!res || !res.ok) { location.hash = '#/'; return; }
       current = res.deck;
+      // Cambio di mazzo/schermata: il pannello destro riparte dal riposo.
+      carousel = null;
+      setDetailState('stats');
       show('builder');
       await renderBuilder();
       return;
