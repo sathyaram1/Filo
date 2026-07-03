@@ -257,7 +257,8 @@
     const ids = current.carte.map((c) => c.scryfall_id);
     if (current.commander) ids.push(current.commander);
     if (!ids.length) { cardsById = {}; return; }
-    const r = await send({ type: MSG.SCRYFALL_CARDS, ids });
+    // freshPrices: il budget (§9.2) vuole prezzi EUR con TTL, non eterni.
+    const r = await send({ type: MSG.SCRYFALL_CARDS, ids, freshPrices: true });
     cardsById = (r && r.ok && r.cards) || {};
   }
 
