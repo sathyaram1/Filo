@@ -306,7 +306,10 @@ async function checkTransition(entry, doc) {
   if (!FS.isCanonical(from)) return { ok: true, from };
   if (from === entry.status) return { ok: true, from };
   const actor = actorOf(entry);
-  return { ok: FS.canTransition(from, entry.status, actor), from, actor };
+  // canReach (non canTransition): la coda tiene UN file per feedback, quindi
+  // passi consecutivi possono collassare (todo→working→revision_capability
+  // arriva come todo→revision_capability). Vale la catena, non il passo.
+  return { ok: FS.canReach(from, entry.status, actor), from, actor };
 }
 
 async function patchFeedback(entry, bearer) {
