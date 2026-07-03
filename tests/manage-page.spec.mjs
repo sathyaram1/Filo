@@ -1277,6 +1277,15 @@ test('In coda: i pallini priorità sono visibili e il click li imposta (patch + 
   // I tre pallini di B sono ora accesi.
   await expect(page.locator('.mg-item', { hasText: 'Coda B' }).locator('.mg-dot--on')).toHaveCount(3);
 
+  // REGRESSIONE: il pallino acceso deve essere VISIVAMENTE pieno, non solo
+  // avere la classe. La classe .mg-dot è riusata dalla riga giudici del
+  // dettaglio, il cui `background: transparent` (dichiarato dopo nel CSS)
+  // vinceva sulla .mg-dot--on → cerchietti sempre vuoti anche con priorità.
+  const bg = await page.locator('.mg-item .mg-dot--on').first()
+    .evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(bg).not.toBe('rgba(0, 0, 0, 0)');
+  expect(bg).not.toBe('transparent');
+
   // Il click sul pallino NON deve aprire il dettaglio (è un'azione a parte).
   await expect(page.locator('#mgDetail')).toBeHidden();
 });
