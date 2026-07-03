@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.106', date: '2026-07-03',
+      features: [
+        'Nell\'app Mazzi il pannello di destra prende vita: passa il mouse su una carta — nei risultati di ricerca, nel mazzo o su un nome citato in chat — e vedi subito l\'immagine con prezzo, tag e se è già nel mazzo. Cliccala e si apre il carosello per valutare le carte una a una: frecce per scorrere, Invio o Spazio per aggiungere/rimuovere (la carta entra subito nel gruppo giusto del mazzo), Esc per chiudere. Tasto destro sul riquadro sotto l\'anteprima per scegliere cosa mostrare.',
+      ],
+      fixes: [],
+    },
+    {
       version: '0.2.105', date: '2026-07-03',
       features: [
         'Nell\'app Mazzi arriva la chat con Filo: scrivi una ricerca secca ("draghi rossi") o una frase ("modi per dare fretta alle creature") e ottieni una lista di carte, già filtrata sui colori del tuo commander. Ogni riga ha un tasto per aggiungere o togliere la carta dal mazzo al volo; le liste vecchie si richiudono in una riga di sintesi e si riaprono con un click. Puoi anche chiedere pareri sul mazzo o pescare carte da un altro tuo mazzo ("il ramp del mazzo X").',
