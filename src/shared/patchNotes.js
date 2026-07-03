@@ -16,6 +16,14 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.107', date: '2026-07-03',
+      features: [],
+      fixes: [
+        'Nella dashboard di gestione i pallini della priorità ora si riempiono davvero: prima restavano sempre vuoti anche quando la priorità era impostata.',
+        'I giudici dei feedback non saltano più il voto: i modelli che "ragionano" prima di rispondere venivano tagliati e il feedback restava non valutato (bianco). Ora hanno lo spazio per finire, e anche la priorità automatica e il commento di Filo arrivano più affidabilmente.',
+      ],
+    },
+    {
       version: '0.2.106', date: '2026-07-03',
       features: [
         'Nell\'app Mazzi il pannello di destra prende vita: passa il mouse su una carta — nei risultati di ricerca, nel mazzo o su un nome citato in chat — e vedi subito l\'immagine con prezzo, tag e se è già nel mazzo. Cliccala e si apre il carosello per valutare le carte una a una: frecce per scorrere, Invio o Spazio per aggiungere/rimuovere (la carta entra subito nel gruppo giusto del mazzo), Esc per chiudere. Tasto destro sul riquadro sotto l\'anteprima per scegliere cosa mostrare.',
