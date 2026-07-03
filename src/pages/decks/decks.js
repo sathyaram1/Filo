@@ -495,7 +495,7 @@
   }
 
   // Hover su un nome in prosa: risoluzione fuzzy una-tantum (§3.5); l'id
-  // risolto resta nel dataset (lo consumerà il pannello preview, task 6).
+  // risolto resta nel dataset e, se il mouse è ancora lì, parte la preview.
   async function resolveProseCard(el) {
     if (el.dataset.cardId || el.dataset.resolving) return;
     el.dataset.resolving = '1';
@@ -505,7 +505,227 @@
       el.dataset.cardId = r.card.id;
       cardsById[r.card.id] = r.card;
       el.title = `${r.card.name} — ${r.card.typeLine}`;
+      // La risoluzione è arrivata DOPO il mouseover: se il puntatore è ancora
+      // sul nome non ci sarà un nuovo evento — la preview parte da qui.
+      if (el.matches(':hover')) hoverEnter(r.card.id);
     }
+  }
+
+  // ── Pannello destro a tre stati (§5): statistiche / preview / carosello ────
+  // Le statistiche sono lo stato di RIPOSO; hover su una riga carta (ovunque:
+  // risultati in chat, righe mazzo, nomi [[...]] in prosa) → preview; click →
+  // carosello pinnato. Il contenuto cambia, la geometria MAI.
+  //
+  // Timing (§5.1, valori di partenza): apertura ~200ms (anti-flicker),
+  // passaggio riga→riga con grace ~100ms e aggiornamento SUL POSTO (mai
+  // chiudi-riapri), uscita con linger ~1s prima di tornare alle statistiche.
+  const PREVIEW_OPEN_MS = 200;
+  const PREVIEW_GRACE_MS = 100;
+  const PREVIEW_LINGER_MS = 1000;
+
+  const DETAIL_TITLES = { stats: 'Statistiche', preview: 'Anteprima', carousel: 'Carosello' };
+  let detailState = 'stats';
+  let hoverTimer = 0;    // apertura/aggiornamento ritardato della preview
+  let lingerTimer = 0;   // ritorno ritardato alle statistiche
+
+  function setDetailState(s) {
+    detailState = s;
+    $('detailTitle').textContent = DETAIL_TITLES[s];
+    $('stateStats').hidden = s !== 'stats';
+    $('statePreview').hidden = s !== 'preview';
+    $('stateCarousel').hidden = s !== 'carousel';
+  }
+
+  // Box modulare del detail (§5.2): SLOT del sistema moduli — tasto destro sul
+  // box → scelta del modulo. I tre moduli alpha (mini curva, prezzo/dati,
+  // parere di Filo) arrivano con un task successivo: oggi il registro ha il
+  // default "dati carta". La scelta è persistita col layout.
+  const DETAIL_MODULES = {
+    default: {
+      label: 'Dati carta',
+      render(card, host) {
+        const price = card.priceEur != null
+          ? `${card.priceEur.toFixed(2).replace('.', ',')} €` : 'n.d.';
+        host.innerHTML = `
+          <p class="dk-module-title">${esc(card.name)}</p>
+          <p>${esc(card.typeLine)}</p>
+          <p>Costo di mana convertito: ${esc(String(card.cmc))} · Prezzo: ${esc(price)}</p>`;
+      },
+    },
+  };
+
+  function renderDetailModule(card) {
+    const host = $('previewModule');
+    const mod = DETAIL_MODULES[layout.module] || DETAIL_MODULES.default;
+    mod.render(card, host);
+  }
+
+  // Riga di contesto del detail (§5.2): prezzo EUR + tag assegnati + "già nel
+  // mazzo" (vale anche per il commander, che nel mazzo c'è eccome).
+  function renderDetailCtx(card) {
+    const entry = current.carte.find((c) => c.scryfall_id === card.id);
+    const parts = [];
+    if (card.priceEur != null) {
+      parts.push(`<span>${esc(card.priceEur.toFixed(2).replace('.', ','))} €</span>`);
+    }
+    for (const t of (entry && entry.tags) || []) {
+      parts.push(`<span class="dk-tag">${esc(t)}</span>`);
+    }
+    if (entry || card.id === current.commander) {
+      parts.push('<span class="dk-indeck">✓ già nel mazzo</span>');
+    }
+    $('previewCtx').innerHTML = parts.join('');
+  }
+
+  // Mostra/aggiorna la preview SUL POSTO: immagine (caricata solo ora — mai
+  // prima dell'hover, §5.1; la cachea l'HTTP cache del browser), contesto,
+  // modulo. Se lo stato era già preview non si passa dalle statistiche.
+  function showPreview(cardId) {
+    const card = cardsById[cardId];
+    if (!card) return;
+    const img = $('previewImg');
+    if (img.dataset.cardId !== card.id) {
+      img.src = card.image || '';
+      img.alt = card.name;
+      img.dataset.cardId = card.id;
+    }
+    renderDetailCtx(card);
+    renderDetailModule(card);
+    if (detailState !== 'preview') setDetailState('preview');
+  }
+
+  // L'id carta sotto il puntatore, qualunque sia il consumatore (§5.1):
+  // riga risultati/mazzo (.dk-row) o nome in prosa risolto (.dk-prose-card).
+  function hoverCardId(target) {
+    if (!target || !target.closest) return null;
+    const row = target.closest('.dk-row[data-card-id]');
+    if (row) return row.dataset.cardId;
+    const span = target.closest('.dk-prose-card');
+    if (span && span.dataset.cardId) return span.dataset.cardId;
+    return null;
+  }
+
+  function hoverEnter(cardId) {
+    if (detailState === 'carousel') return; // il carosello è PINNATO: l'hover non lo scalza
+    if (lingerTimer) { clearTimeout(lingerTimer); lingerTimer = 0; }
+    if (hoverTimer) clearTimeout(hoverTimer);
+    const delay = detailState === 'preview' ? PREVIEW_GRACE_MS : PREVIEW_OPEN_MS;
+    hoverTimer = setTimeout(() => { hoverTimer = 0; showPreview(cardId); }, delay);
+  }
+
+  function hoverLeave() {
+    if (detailState === 'carousel') return;
+    if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = 0; }
+    if (detailState === 'preview' && !lingerTimer) {
+      lingerTimer = setTimeout(() => {
+        lingerTimer = 0;
+        if (detailState === 'preview') setDetailState('stats');
+      }, PREVIEW_LINGER_MS);
+    }
+  }
+
+  // ── Carosello (§5.3): flusso di triage, pinnato al click ───────────────────
+  // Naviga la lista DA CUI è partito (i risultati di quella bolla, o l'elenco
+  // del mazzo). Occhi sull'immagine, mano sulla tastiera.
+  let carousel = null; // { ids: string[], i: number }
+
+  function openCarousel(ids, i) {
+    if (!ids.length) return;
+    if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = 0; }
+    if (lingerTimer) { clearTimeout(lingerTimer); lingerTimer = 0; }
+    carousel = { ids, i: Math.max(0, Math.min(i, ids.length - 1)) };
+    setDetailState('carousel');
+    renderCarousel();
+  }
+
+  function closeCarousel() {
+    carousel = null;
+    setDetailState('stats');
+  }
+
+  function renderCarousel() {
+    if (!carousel) return;
+    const id = carousel.ids[carousel.i];
+    const card = cardsById[id];
+    const img = $('carouselImg');
+    img.src = (card && card.image) || '';
+    img.alt = (card && card.name) || '';
+    $('carouselPos').textContent = `${carousel.i + 1}/${carousel.ids.length}`;
+    const added = inDeck(id);
+    const btn = $('carouselToggle');
+    btn.dataset.in = added ? '1' : '0';
+    btn.textContent = added ? '✓ nel mazzo' : '+ aggiungi';
+    btn.title = added ? 'Rimuovi dal mazzo (Invio)' : 'Aggiungi al mazzo (Invio)';
+    // Prefetch di precedente e successiva (§5.1): la navigazione non aspetta.
+    for (const j of [carousel.i - 1, carousel.i + 1]) {
+      const c = cardsById[carousel.ids[j]];
+      if (c && c.image) { const pre = new Image(); pre.src = c.image; }
+    }
+  }
+
+  function carouselNav(delta) {
+    if (!carousel) return;
+    const next = carousel.i + delta;
+    if (next < 0 || next >= carousel.ids.length) return;
+    carousel.i = next;
+    renderCarousel();
+  }
+
+  // Toggle aggiungi/rimuovi della carta corrente: all'aggiunta la riga appare
+  // nel gruppo giusto della colonna centrale (via saveDeck → renderDeckList).
+  async function carouselToggle() {
+    if (!carousel) return;
+    await toggleCard(carousel.ids[carousel.i]);
+    renderCarousel();
+  }
+
+  // Apre il carosello dalla riga cliccata: la lista è l'ordine VISIBILE delle
+  // righe del contenitore di partenza (la CardList della bolla o #deckList).
+  function openCarouselFromRow(row, containerSel) {
+    const box = row.closest(containerSel);
+    if (!box) return;
+    const ids = [...box.querySelectorAll('.dk-row[data-card-id]')].map((r) => r.dataset.cardId);
+    openCarousel(ids, ids.indexOf(row.dataset.cardId));
+  }
+
+  function wireDetailPanel() {
+    // Hover unificato (§5.1), in delega sul documento: un mouseover su una
+    // riga carta apre/aggiorna; su qualsiasi altra cosa fa partire il linger.
+    document.addEventListener('mouseover', (e) => {
+      const id = hoverCardId(e.target);
+      if (id) hoverEnter(id);
+      else hoverLeave();
+    });
+
+    // Tastiera del carosello (§5.3): frecce naviga, Invio/Spazio aggiunge o
+    // rimuove, Esc chiude e torna alle statistiche.
+    document.addEventListener('keydown', (e) => {
+      if (detailState !== 'carousel') return;
+      if (e.target && /^(input|textarea|select)$/i.test(e.target.tagName)) return;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); carouselNav(1); }
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); carouselNav(-1); }
+      else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); carouselToggle(); }
+      else if (e.key === 'Escape') { e.preventDefault(); closeCarousel(); }
+    });
+
+    $('carouselPrev').addEventListener('click', () => carouselNav(-1));
+    $('carouselNext').addEventListener('click', () => carouselNav(1));
+    $('carouselToggle').addEventListener('click', () => carouselToggle());
+    $('carouselClose').addEventListener('click', () => closeCarousel());
+
+    // Tasto destro sul box modulare (§5.2): scelta del modulo dello slot.
+    $('previewModule').addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      openCtx(e.clientX, e.clientY, Object.entries(DETAIL_MODULES).map(([key, mod]) => ({
+        label: mod.label + (layout.module === key ? ' ✓' : ''),
+        run: () => {
+          layout.module = key;
+          persistLayout();
+          const imgId = $('previewImg').dataset.cardId;
+          if (imgId && cardsById[imgId]) renderDetailModule(cardsById[imgId]);
+        },
+      })));
+    });
   }
 
   // Lo switcher (§8.2): click sul nome → gestione mazzi, DOVE vive il mazzo.
