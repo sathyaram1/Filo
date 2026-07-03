@@ -72,5 +72,60 @@
     return now - t < ttlMs;
   }
 
-  global.SN_SCRYFALL_Q = { WUBRG, identityCode, buildSearchQuery, parseManaCost, simplifyCard, isFresh };
+  // ── Chat unificata (§3): parsing della risposta dell'agente ───────────────
+  // L'agente risponde con un JSON { reply?, query?, cards? }. I modelli a volte
+  // lo avvolgono in ```json … ``` o aggiungono testo attorno: qui si estrae il
+  // primo oggetto JSON valido in modo tollerante. Output sempre normalizzato:
+  // { reply: string, query: string, cards: string[] } (mai null/undefined).
+  function parseAgentReply(text) {
+    const none = { reply: '', query: '', cards: [] };
+    const raw = String(text || '').trim();
+    if (!raw) return none;
+    // Candidati: contenuto dei fence ```…```, testo intero, primo blocco {...}.
+    const candidates = [];
+    const fence = /```(?:json)?\s*([\s\S]*?)```/i.exec(raw);
+    if (fence) candidates.push(fence[1].trim());
+    candidates.push(raw);
+    const brace = raw.indexOf('{');
+    if (brace >= 0) candidates.push(raw.slice(brace, raw.lastIndexOf('}') + 1));
+    for (const c of candidates) {
+      try {
+        const o = JSON.parse(c);
+        if (!o || typeof o !== 'object' || Array.isArray(o)) continue;
+        return {
+          reply: typeof o.reply === 'string' ? o.reply.trim() : '',
+          query: typeof o.query === 'string' ? o.query.trim() : '',
+          cards: Array.isArray(o.cards) ? o.cards.map(String).filter(Boolean) : [],
+        };
+      } catch (_) { /* prova il prossimo candidato */ }
+    }
+    // Nessun JSON: il testo grezzo diventa la reply (degradazione garbata).
+    return { ...none, reply: raw };
+  }
+
+  // Prosa con nomi carta marcati [[Nome Carta]] (§3.5) → segmenti tipizzati:
+  // [{ type:'text', text }, { type:'card', name }, …]. Il renderer trasforma i
+  // segmenti 'card' in span hoverable risolti via fuzzy. Marcatori vuoti
+  // restano testo normale.
+  function proseSegments(text) {
+    const s = String(text || '');
+    const out = [];
+    const re = /\[\[([^[\]]+)\]\]/g;
+    let last = 0;
+    let m;
+    while ((m = re.exec(s))) {
+      if (m.index > last) out.push({ type: 'text', text: s.slice(last, m.index) });
+      const name = m[1].trim();
+      if (name) out.push({ type: 'card', name });
+      else out.push({ type: 'text', text: m[0] });
+      last = m.index + m[0].length;
+    }
+    if (last < s.length) out.push({ type: 'text', text: s.slice(last) });
+    return out;
+  }
+
+  global.SN_SCRYFALL_Q = {
+    WUBRG, identityCode, buildSearchQuery, parseManaCost, simplifyCard, isFresh,
+    parseAgentReply, proseSegments,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
