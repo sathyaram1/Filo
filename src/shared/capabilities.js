@@ -139,8 +139,8 @@
     },
     {
       id: 'deck-builder', title: 'Mazzi Commander (Magic)', category: 'writing',
-      desc: 'Costruttore di mazzi Commander salvati sul tuo computer: libreria dei mazzi, banco di lavoro a tre colonne regolabili, elenco carte con simboli di mana raggruppato per tipo/tag/costo/colore, commander con avvisi di legalità (doppioni, colori, carte bandite), budget in euro. Nel banco di lavoro c\'è la chat con Filo: cerchi carte con una query secca o una frase in linguaggio naturale (risultati già filtrati sui colori del commander, con tasto per aggiungerle al mazzo), chiedi pareri o peschi carte da un altro tuo mazzo.',
-      invoke: 'Menu App → "Mazzi", oppure filo://decks/decks.html. Tasto destro su carte e mazzi per le azioni; click sul nome del mazzo per gestirlo; la barra in basso a sinistra del banco di lavoro è la chat/ricerca.',
+      desc: 'Costruttore di mazzi Commander salvati sul tuo computer: libreria dei mazzi, banco di lavoro a tre colonne regolabili, elenco carte con simboli di mana raggruppato per tipo/tag/costo/colore, commander con avvisi di legalità (doppioni, colori, carte bandite), budget in euro. Nel banco di lavoro c\'è la chat con Filo: cerchi carte con una query secca o una frase in linguaggio naturale (risultati già filtrati sui colori del commander, con tasto per aggiungerle al mazzo), chiedi pareri o peschi carte da un altro tuo mazzo. Passando il mouse su una carta (nei risultati, nel mazzo o nei nomi citati in chat) il pannello destro mostra l\'anteprima con immagine, prezzo e tag; cliccandola si apre il carosello per valutare le carte una a una con la tastiera (frecce per scorrere, Invio per aggiungere/rimuovere, Esc per chiudere).',
+      invoke: 'Menu App → "Mazzi", oppure filo://decks/decks.html. Tasto destro su carte e mazzi per le azioni; click sul nome del mazzo per gestirlo; la barra in basso a sinistra del banco di lavoro è la chat/ricerca; click su una carta per sfogliarla nel carosello.',
       doesNot: 'Non gioca partite; le statistiche complete del mazzo sono in arrivo.',
     },
 
