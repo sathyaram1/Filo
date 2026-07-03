@@ -108,9 +108,15 @@ test('l\'iter di lavorazione è delle routine', () => {
   assert.ok(!FS.canTransition('revision_security', 'done', 'owner'));
 });
 
+test('lavori senza branch: la routine può chiudere direttamente (estensione §3)', () => {
+  // Es. il pianificatore che spezza una spec in sub-feedback: nessun branch da
+  // verificare, chiude il padre con done.
+  assert.ok(FS.canTransition('todo', 'done', 'routine'));
+  assert.ok(FS.canTransition('working', 'done', 'routine'));
+  assert.ok(!FS.canTransition('todo', 'done', 'owner'));
+});
+
 test('transizioni NON elencate = illegali (nessun default permissivo)', () => {
-  assert.ok(!FS.canTransition('todo', 'done', 'routine'));      // niente salti dell'iter
-  assert.ok(!FS.canTransition('working', 'done', 'routine'));
   assert.ok(!FS.canTransition('attack', 'spam', 'owner'));
   assert.ok(!FS.canTransition('archived', 'done', 'owner'));
   assert.ok(!FS.canTransition('done', 'todo', 'pipeline'));
