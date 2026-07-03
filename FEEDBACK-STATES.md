@@ -194,17 +194,37 @@ Aggiorna QUESTO file spuntando le fasi man mano. Worktree:
       Archiviati (verified esce dalla board utenti); (2) status `todo` = SEMPRE in
       coda (prima un todo "non approvato" stava nei Ricevuti); (3) pipeline "in
       corso" ora bianco `unlabeled` (prima nessun colore).
-- [ ] **F2b — UI dashboard**: `manage.js` (bulk aligned→todo, filtro "Bloccati
-      confermati" in Archiviati, colori/sottotesto da status+statusReason, azioni per
-      stato da transitionsFrom(s,'owner')). Spec mirato manage.
-- [ ] **F3 — Routine/scripts**: queue-triage + apply-triage (ALLOWED nuovi,
-      canTransition, workingSince, riconciliazione working scaduti), next-feedback
-      (skip working freschi), dispatch/ruoli (todo→working→revision_*→done,
-      loop→design). Unit test dove possibile.
-- [ ] **F4 — firestore.rules**: enum status nuovi + statusReason/workingSince in
-      hasOnly + deploy (`firebase deploy --only firestore:rules` dalla root del repo).
-- [ ] **F5 — Migrazione**: script `scripts/migrate-status.mjs` (mappa §8, dry-run di
-      default, `--apply` per scrivere) + esecuzione + verifica in dashboard.
+- [x] **F2b — UI dashboard** (fatto 2026-07-03): `manage.html`+`manage.js` — barra
+      "Approva tutti gli allineati (N) → In coda" nei Ricevuti (bulk aligned→todo);
+      filtro "Bloccati confermati" negli Archiviati; bottone "Conferma attacco/spam"
+      nel dettaglio (attack/spam/suspicious_file → *_confirmed, con
+      reviewDecision: rejected); tooltip card con statusReason; il box risposta
+      chiarimenti ora scatta su design+statusReason clarify (oltre al legacy).
+      Spec manage-page.spec.mjs aggiornato (fixture allineato → status new;
+      test automatica riscritto: il toggle NON sposta più le liste).
+- [x] **F3 — Routine/scripts** (fatto 2026-07-03): queue-triage e apply-triage con
+      ALLOWED canonici + remap legacy in ingresso (clarify→design/clarify,
+      review→revision_capability, blocked→design/loop); apply-triage valida le
+      transizioni con canReach (catene, perché la coda tiene UN file per feedback
+      e i passi collassano) e SCARTA le illegali (log + file rimosso); scrive
+      statusReason (+ blockReason specchiato per lo storico) e workingSince
+      (set su working, azzerato altrimenti); nota vuota NON cancella più le note;
+      riconciliazione: working scaduti (TTL 60min) → todo. dispatch: seleziona
+      revision_*/review con branch, accoda working al claim di new-work, i
+      --record-* riflettono lo status (pass→revision_security, fix→revision_
+      capability), loop 3× → design/loop. Ruoli + ROUTINES.md aggiornati.
+      Estensione documentata: todo/working→done (routine) per lavori senza branch
+      (es. pianificatore). Attore owner delegato: routine:auto-archive.
+- [x] **F4 — firestore.rules** (editate 2026-07-03): enum esteso ai canonici (legacy
+      mantenuti per lo storico), statusReason/workingSince in hasOnly (admin e ramo
+      routine, con size check); ramo routine: iter completo todo/working/revision_*/
+      done/design (+clarify transizione). ⚠️ DEPLOY da fare:
+      `firebase deploy --only firestore:rules` dalla root del repo Filo.
+- [ ] **F5 — Migrazione**: `scripts/migrate-status.mjs` SCRITTO (dry-run default,
+      `--apply` per scrivere; riusa normalizeStatus). ⚠️ NON eseguito: in locale
+      manca FILO_ADMIN_REFRESH_TOKEN (serve `node scripts/admin-login.mjs`
+      dell'owner, o girarlo dove c'è FILO_SA_KEY). Prima esegui il dry-run e fai
+      confermare all'owner la mappatura (punti [CONFERMARE] in fondo).
 - [ ] **F6 — filo-security**: pipeline scrive status nativo (§7a.1-2), gate
       deterministico file → `suspicious_file` (§7a.3), stretta `storage.rules`.
       Repo separato: `C:/Users/agenti AI/Desktop/Filo/filo-security`.
