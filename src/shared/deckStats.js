@@ -241,30 +241,33 @@
     let seen = 0;
 
     for (let it = 0; it < iters; it++) {
-      // Fisher-Yates parziale: bastano le prime `need` posizioni mescolate.
-      const shuffleFirst = (need) => {
-        for (let i = 0; i < Math.min(need, idx.length - 1); i++) {
+      // Fisher-Yates parziale: si mescolano solo le posizioni [from, to).
+      const shuffleRange = (from, to) => {
+        for (let i = from; i < Math.min(to, idx.length - 1); i++) {
           const j = i + Math.floor(rng() * (idx.length - i));
           const tmp = idx[i]; idx[i] = idx[j]; idx[j] = tmp;
         }
       };
 
       // Mano iniziale con eventuale mulligan (7 → 6 → 5 … finché keep regge).
+      // La mano TENUTA resta nelle prime `handSize` posizioni: le pescate dei
+      // turni successivi escono dal resto della libreria, senza rimescolarla.
       let handSize = Math.min(7, lib.length);
+      shuffleRange(0, handSize);
       if (keepReqs.length && mulligans > 0) {
         let taken = 0;
         for (;;) {
-          shuffleFirst(handSize);
           const hand = [];
           for (let i = 0; i < handSize; i++) hand.push(lib[idx[i]]);
           if (handSatisfies(hand, keepReqs) || taken >= mulligans || handSize <= 1) break;
           taken++;
           handSize = Math.max(1, handSize - 1);
+          shuffleRange(0, handSize);
         }
       }
 
       const total = Math.min(lib.length, handSize + laterDraws);
-      shuffleFirst(total);
+      shuffleRange(handSize, total);
       const drawn = [];
       for (let i = 0; i < total; i++) {
         const tags = lib[idx[i]];
