@@ -99,11 +99,17 @@
     todo: {
       working: ['routine'], // presa in carico (claim git = lock primario)
       design:  ['routine'], // la routine ha domande → chat + statusReason clarify
+      // Estensione oltre la spec §3 (documentata in FEEDBACK-STATES.md): i
+      // lavori SENZA branch da verificare (es. il pianificatore che spezza una
+      // spec in sub-feedback) chiudono direttamente — l'iter revision_* vale
+      // solo per i fix su branch.
+      done:    ['routine'],
     },
     working: {
       revision_capability: ['routine'], // fix pronto su branch
       design:              ['routine'], // domande a metà lavorazione
       todo:                ['routine'], // TTL 60min scaduto → riconciliazione
+      done:                ['routine'], // lavoro senza branch (vedi todo→done)
     },
     revision_capability: {
       revision_security: ['routine'], // PASS verifica comportamentale
