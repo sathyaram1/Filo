@@ -462,6 +462,29 @@ async function reconcileClaims(bearer, resolvedIds = new Set()) {
   for (const f of expiredClaimFiles()) {
     try { rmSync(f, { force: true }); } catch (_) {}
   }
+
+  // 4) `working` scaduti → todo (spec §6: TTL 60min = istanza morta). Ci si
+  //    fida di `workingSince`: viene stampato entrando in working e azzerato
+  //    uscendone (patchFeedback), quindi un valore presente = sta lavorando.
+  //    L'orderBy seleziona solo i doc che HANNO il campo (come per i claim).
+  const FS = _fbStatus();
+  let workingDocs = [];
+  try {
+    workingDocs = await runQuery({
+      from: [{ collectionId: 'feedback' }],
+      orderBy: [{ field: { fieldPath: 'workingSince' }, direction: 'DESCENDING' }],
+      limit: 200,
+    }, bearer);
+  } catch (e) { console.warn('  ! query working attivi fallita:', String(e.message).slice(0, 120)); }
+  for (const d of workingDocs) {
+    const id = d.name?.split('/').pop() || '';
+    const ws = d.fields?.workingSince?.stringValue || '';
+    if (!id || !ws) continue;
+    if (!FS || !FS.isWorkingExpired({ status: 'working', workingSince: ws })) continue;
+    const r = await patchFeedback({ id, status: 'todo', queuedBy: 'routine:reconcile' }, bearer);
+    if (r.ok) console.log(`  ✓ working scaduto su ${id} → todo`);
+    else if (r.status !== 404) console.warn(`  ! reset working ${id}: ${r.body || `HTTP ${r.status}`}`);
+  }
 }
 
 async function main() {
