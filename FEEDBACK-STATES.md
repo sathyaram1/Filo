@@ -220,11 +220,14 @@ Aggiorna QUESTO file spuntando le fasi man mano. Worktree:
       routine, con size check); ramo routine: iter completo todo/working/revision_*/
       done/design (+clarify transizione). DEPLOYATE il 2026-07-03 (deploy ok su
       progetto filo-8b9cb).
-- [ ] **F5 — Migrazione**: `scripts/migrate-status.mjs` SCRITTO (dry-run default,
-      `--apply` per scrivere; riusa normalizeStatus). ⚠️ NON eseguito: in locale
-      manca FILO_ADMIN_REFRESH_TOKEN (serve `node scripts/admin-login.mjs`
-      dell'owner, o girarlo dove c'è FILO_SA_KEY). Prima esegui il dry-run e fai
-      confermare all'owner la mappatura (punti [CONFERMARE] in fondo).
+- [x] **F5 — Migrazione** (ESEGUITA 2026-07-03, owner ha confermato le scelte):
+      `scripts/migrate-status.mjs --apply` con token admin in tests/agent/.env
+      (gitignorato). 101 migrati / 226 già canonici / 0 errori: 40→aligned,
+      2→attack, 1→spam, 3→design(judges), 4 clarify→design(clarify),
+      21→unlabeled, 30 ignored→archived. Rilanciata a vuoto: 0 da migrare
+      (idempotente). Nota: lo script decifra TUTTO il doc (soprattutto
+      `pipeline`) con decrypt-feedback-fields, altrimenti classifica tutto
+      unlabeled.
 - [x] **F6 — filo-security** (fatto 2026-07-03, commit bd93b47, DEPLOYATO):
       `src/statusMap.js` (decisione→status canonico; fidati mai attack/spam →
       unlabeled; canWriteStatus = la pipeline non regredisce feedback oltre il
