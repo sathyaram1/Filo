@@ -405,10 +405,10 @@
     for (const inp of host.querySelectorAll('input[data-tag]')) {
       prev[inp.dataset.tag] = inp.value;
     }
-    host.innerHTML = cats.map((tag) => `
+    host.innerHTML = cats.map((tag, i) => `
       <div class="dk-prob-row">
-        <label for="prob-tag-${esc(tag)}">${esc(tag)}</label>
-        <input id="prob-tag-${esc(tag)}" data-tag="${esc(tag)}" type="number"
+        <label for="probTag${i}">${esc(tag)}</label>
+        <input id="probTag${i}" data-tag="${esc(tag)}" type="number"
                min="0" max="99" step="1" value="${esc(prev[tag] || '0')}" />
       </div>`).join('');
     $('probHint').hidden = cats.length > 1;
