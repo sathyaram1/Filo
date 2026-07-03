@@ -216,9 +216,18 @@
       <div class="dk-builder" id="builderGrid">
         <div class="dk-col" id="colChat">
           <div class="dk-col-head">Chat e ricerca</div>
-          <div class="dk-col-body"><p class="dk-placeholder">
-            Qui potrai cercare carte e parlare con Filo del tuo mazzo. In arrivo.
-          </p></div>
+          <div class="dk-col-body dk-chat-body" id="chatLog" aria-live="polite">
+            <p class="dk-placeholder" id="chatEmpty">
+              Cerca carte o parla con Filo del tuo mazzo: una query secca
+              ("draghi rossi") o una frase ("modi per stappare il commander").
+              Ogni ricerca è già filtrata sui colori del commander.
+            </p>
+          </div>
+          <form class="dk-chat-form" id="chatForm">
+            <input id="chatInput" type="text" autocomplete="off" spellcheck="false"
+                   placeholder="Cerca carte o chiedi a Filo…"
+                   aria-label="Cerca carte o chiedi a Filo" />
+          </form>
         </div>
         <div class="dk-divider" id="dividerLeft" role="separator" aria-orientation="vertical"
              aria-label="Ridimensiona chat e mazzo"></div>
