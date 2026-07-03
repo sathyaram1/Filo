@@ -992,42 +992,38 @@ test('un allineato nei Ricevuti mostra "Approva e metti in coda" → patch corre
   await expect(page.locator('.mg-item')).toHaveCount(0);
 });
 
-test('automatica ON: i vecchi allineati passano da Ricevuti a In coda; OFF tornano (#3)', async ({ openTab }) => {
+test('la modalità automatica NON sposta gli allineati: restano nei Ricevuti finché non li approvo (#3)', async ({ openTab }) => {
+  // Macchina a stati: l'automatica agisce UNA volta, al momento del giudizio
+  // (la pipeline scrive todo o aligned). Il toggle di OGGI non è più una lente
+  // sulle liste — era il bug per cui dashboard e routine vedevano code diverse.
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_MANAGE_REVIEW);
 
-  // Owner + dati. Default automatica OFF → l'allineato è nei Ricevuti.
+  // Owner + dati: l'allineato (in attesa di approvazione) è nei Ricevuti.
   await page.evaluate((fb) => { window.__mgTest.setAdmin(true); window.__mgTest.setData([fb]); window.__mgTest.setTab('inbox'); }, FAKE_FB_ALIGNED);
   await expect(page.locator('.mg-item')).toHaveCount(1);
-
-  // In coda è vuota finché l'automatica è OFF.
   await page.locator('.mg-tab[data-tab="queue"]').click();
   await expect(page.locator('.mg-item')).toHaveCount(0);
 
-  // Accendi l'automatica (come l'owner): il change handler ricalcola la lista.
+  // Accendi l'automatica: NON deve cambiare nulla nelle liste.
   await page.locator('.mg-tab[data-tab="automation"]').click();
   await page.evaluate(() => {
     const el = document.getElementById('mgAutoToggle');
     el.disabled = false; el.checked = true;
     el.dispatchEvent(new Event('change', { bubbles: true }));
   });
-
-  // Ora l'allineato è In coda, e NON più nei Ricevuti.
   await page.locator('.mg-tab[data-tab="queue"]').click();
+  await expect(page.locator('.mg-item')).toHaveCount(0);
+  await page.locator('.mg-tab[data-tab="inbox"]').click();
+  await expect(page.locator('.mg-item')).toHaveCount(1);
+
+  // È l'APPROVAZIONE (che scrive lo status todo) a spostarlo in coda.
+  const approved = { ...FAKE_FB_ALIGNED, status: 'todo' };
+  await page.evaluate((fb) => { window.__mgTest.setData([fb]); window.__mgTest.setTab('queue'); }, approved);
   await expect(page.locator('.mg-item')).toHaveCount(1);
   await page.locator('.mg-tab[data-tab="inbox"]').click();
   await expect(page.locator('.mg-item')).toHaveCount(0);
-
-  // Spegnendo l'automatica torna nei Ricevuti (la lente è reversibile).
-  await page.locator('.mg-tab[data-tab="automation"]').click();
-  await page.evaluate(() => {
-    const el = document.getElementById('mgAutoToggle');
-    el.checked = false;
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-  });
-  await page.locator('.mg-tab[data-tab="inbox"]').click();
-  await expect(page.locator('.mg-item')).toHaveCount(1);
 });
 
 test('un feedback in `clarify` mostra il box risposta dell owner sotto Ricevuti (DB1)', async ({ openTab }) => {
