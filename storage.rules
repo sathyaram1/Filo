@@ -2,11 +2,12 @@ rules_version = '2';
 
 // Storage rules per l'alpha test.
 // Gli allegati dei feedback vivono in /feedback/*.
-// - Upload: chiunque, fino a 4 MB. Oltre alle immagini ora sono ammessi anche
-//   documenti leggeri (pdf, testo, markdown, json, csv, yaml…) così l'utente
-//   può allegare file di vario tipo al feedback. Il bucket è già pubblicamente
-//   leggibile/scrivibile per le immagini: ampliare i tipi non cambia
-//   l'esposizione (chiunque poteva già caricare 4 MB), aggiunge solo i formati.
+// - Upload: chiunque, fino a 4 MB, SOLO tipi passivi in allowlist esplicita.
+//   ⚠️ NIENTE wildcard `text/.*` o `image/.*`: lasciavano passare content-type
+//   attivi (`text/html` con script, `image/svg+xml`). Il gate deterministico
+//   lato pipeline (filo-security, L0 fileGate) marca comunque `suspicious_file`
+//   i feedback con allegati fuori allowlist: questa regola è la cintura,
+//   quello le bretelle.
 // - Read: aperto (la dashboard mostra immagini e file via link diretto).
 
 service firebase.storage {
@@ -17,10 +18,13 @@ service firebase.storage {
       allow write: if
         request.resource.size < 4 * 1024 * 1024
         && (
-          request.resource.contentType.matches('image/.*')
-          || request.resource.contentType.matches('text/.*')
+          request.resource.contentType.matches('image/(png|jpeg|jpg|gif|webp|bmp)')
+          || request.resource.contentType == 'text/plain'
+          || request.resource.contentType == 'text/markdown'
+          || request.resource.contentType == 'text/csv'
           || request.resource.contentType == 'application/pdf'
           || request.resource.contentType == 'application/json'
+          // blob cifrati S1.2 (maybeEncryptBlob) viaggiano come octet-stream
           || request.resource.contentType == 'application/octet-stream'
         );
     }
