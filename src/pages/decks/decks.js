@@ -1,7 +1,9 @@
 // App deck builder Commander (DECK-BUILDER-SPEC.md): routing a tre schermate
 // (Mazzi / Builder / Partita stub), libreria, layout del Builder a tre colonne
-// FISSE con divisori trascinabili persistiti (§2) e header-switcher del mazzo
-// (§8.2). Chat, elenco carte e statistiche arrivano coi task successivi.
+// FISSE con divisori trascinabili persistiti (§2), header-switcher del mazzo
+// (§8.2), chat unificata (§3) e pannello destro a tre stati (§5: statistiche /
+// preview su hover / carosello di triage). Le statistiche vere e i moduli del
+// detail arrivano coi task successivi.
 //
 // Routing su hash:  #/            → libreria (home)
 //                   #/deck/<id>   → builder del mazzo
