@@ -81,19 +81,23 @@ async function main() {
   const counts = {};
   let migrated = 0, skipped = 0, failures = 0;
 
+  const { decryptFeedbackFields } = await import('./lib/decrypt-feedback-fields.mjs');
   for (const d of docs) {
-    const fb = fsDocToObject(d);
+    let fb = fsDocToObject(d);
 
-    // Decifra lo status se cifrato (serve la chiave privata dell'owner).
+    // Decifra TUTTI i campi cifrati (status, ma soprattutto `pipeline`: senza i
+    // verdetti in chiaro la normalizzazione classificherebbe tutto "unlabeled").
+    try {
+      fb = await decryptFeedbackFields(fb);
+    } catch (e) {
+      console.warn(`  ! ${fb._id}: decifratura fallita — salto (${e?.message || e})`);
+      failures++;
+      continue;
+    }
     if (CRYPTO && CRYPTO.isEncrypted && CRYPTO.isEncrypted(fb.status)) {
-      try {
-        const { decryptFeedbackFields } = await import('./lib/decrypt-feedback-fields.mjs');
-        fb.status = (await decryptFeedbackFields({ _id: fb._id, status: fb.status })).status;
-      } catch (e) {
-        console.warn(`  ! ${fb._id}: status cifrato non decifrabile — salto`);
-        failures++;
-        continue;
-      }
+      console.warn(`  ! ${fb._id}: status ancora cifrato (chiave privata assente?) — salto`);
+      failures++;
+      continue;
     }
 
     if (FS.isCanonical(fb.status)) { skipped++; continue; }
