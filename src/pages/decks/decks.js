@@ -849,6 +849,15 @@
       else if (e.key === 'Escape') { e.preventDefault(); closeCarousel(); }
     });
 
+    // Calcolatore di probabilità (§9.3): Invio su un campo = Calcola.
+    $('probRun').addEventListener('click', runProb);
+    $('stateStats').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && e.target && e.target.matches('#probTurn, #probNeeds input')) {
+        e.preventDefault();
+        runProb();
+      }
+    });
+
     $('carouselPrev').addEventListener('click', () => carouselNav(-1));
     $('carouselNext').addEventListener('click', () => carouselNav(1));
     $('carouselToggle').addEventListener('click', () => carouselToggle());
