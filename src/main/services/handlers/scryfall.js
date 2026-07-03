@@ -56,6 +56,85 @@ module.exports = function register(on, ctx) {
     }
   });
 
+  // ── Chat unificata del Builder (§3-§4) ─────────────────────────────────────
+  // Ricerca e chat sono lo stesso pannello: il messaggio dell'utente passa
+  // dall'LLM che decide se è una ricerca (→ query Scryfall, eseguita QUI col
+  // filtro identity automatico), una selezione cross-mazzo (→ scryfall_id presi
+  // dal contesto degli altri mazzi) o solo conversazione (→ reply).
+
+  // Riga compatta di contesto per il prompt: nome + tag (+ id dove serve
+  // all'LLM per rispondere con scryfall_id reali, cioè negli ALTRI mazzi).
+  function cardLine(entry, card, withId) {
+    const name = (card && card.name) || entry.scryfall_id;
+    const tags = (entry.tags && entry.tags.length) ? ` — tag: ${entry.tags.join(', ')}` : '';
+    return withId ? `  - ${name} [id: ${entry.scryfall_id}]${tags}` : `  - ${name}${tags}`;
+  }
+
+  on(MSG.DECKS_CHAT, async (msg) => {
+    try {
+      const text = String(msg?.text || '').trim();
+      if (!text) return { ok: false, error: 'empty' };
+      const deckId = String(msg?.deckId || '');
+      const deck = deckId ? await Store.get(deckId) : null;
+      if (!deck) return { ok: false, error: 'not_found' };
+
+      // Contesto: nomi/tag del mazzo corrente + degli altri mazzi (per le
+      // query cross-mazzo, §4). I nomi arrivano dalla cache carte (le carte di
+      // un mazzo sono già state risolte quando sono entrate).
+      const all = await Store.list();
+      const others = all.filter((d) => d.id !== deck.id);
+      const allIds = [];
+      for (const d of [deck, ...others]) for (const c of d.carte) allIds.push(c.scryfall_id);
+      const known = await Scry.cards(allIds).catch(() => ({}));
+
+      const identityColors = (deck.commanderMeta && Array.isArray(deck.commanderMeta.colors))
+        ? deck.commanderMeta.colors : null;
+      const sys = PROMPTS.decksChat({
+        deckName: deck.nome,
+        commanderName: deck.commanderMeta && deck.commanderMeta.name,
+        identity: identityColors ? Q.identityCode(identityColors) : '',
+        deckCards: deck.carte.map((c) => cardLine(c, known[c.scryfall_id], false)).join('\n'),
+        otherDecks: others.map((d) => (
+          `Mazzo "${d.nome}"${d.commanderMeta && d.commanderMeta.name ? ` (commander: ${d.commanderMeta.name})` : ''}:\n` +
+          (d.carte.length ? d.carte.map((c) => cardLine(c, known[c.scryfall_id], true)).join('\n') : '  (vuoto)')
+        )).join('\n'),
+      });
+      const history = Array.isArray(msg?.history)
+        ? msg.history
+            .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+            .slice(-12)
+        : [];
+      const messages = [{ role: 'system', content: sys }, ...history, { role: 'user', content: text }];
+
+      const r = await handleAIRequest({
+        action: ACTIONS.DECKS_CHAT,
+        payload: { messages },
+        origin: 'filo://decks',
+      });
+      const parsed = Q.parseAgentReply(r.text);
+
+      let cardIds = [];
+      let cards = {};
+      let query = '';
+      if (parsed.query) {
+        // Filtro identity AUTOMATICO (§4): lo aggiunge search/buildSearchQuery;
+        // se l'utente/LLM ha già un vincolo id esplicito, quello vince.
+        const sr = await Scry.search(parsed.query, { identity: identityColors });
+        cardIds = sr.cards.map((c) => c.id);
+        for (const c of sr.cards) cards[c.id] = c;
+        query = sr.query;
+      } else if (parsed.cards.length) {
+        // Cross-mazzo: gli id vengono dal contesto (mai inventati) → risolti
+        // dalla cache; quelli ignoti si scartano.
+        cards = await Scry.cards(parsed.cards).catch(() => ({}));
+        cardIds = parsed.cards.filter((id) => cards[id]);
+      }
+      return { ok: true, reply: parsed.reply, cardIds, cards, query };
+    } catch (e) {
+      return { ok: false, error: e?.message || 'chat fallita' };
+    }
+  });
+
   // Imposta il commander (§8.4): risolve la carta, scrive id + meta di
   // presentazione (nome, color identity, art crop) e incrementa la versione.
   // La legalità (banned/non leggendaria) NON blocca qui: è una riga delle
