@@ -119,9 +119,11 @@ test('isFresh: dentro il TTL sì, oltre no, timestamp rotto no', () => {
 
 // ── parseAgentReply (chat unificata §3): JSON tollerante ─────────────────────
 
+const NONE = { reply: '', query: '', cards: [], hasBudget: false, budget: null, prob: null };
+
 test('parseAgentReply: JSON pulito → campi normalizzati', () => {
   const r = Q.parseAgentReply('{"reply":"Ecco","query":"o:haste","cards":["a","b"]}');
-  assert.deepEqual(r, { reply: 'Ecco', query: 'o:haste', cards: ['a', 'b'] });
+  assert.deepEqual(r, { ...NONE, reply: 'Ecco', query: 'o:haste', cards: ['a', 'b'] });
 });
 
 test('parseAgentReply: tollera fence ```json e testo attorno', () => {
@@ -133,14 +135,31 @@ test('parseAgentReply: tollera fence ```json e testo attorno', () => {
 
 test('parseAgentReply: non-JSON → il testo grezzo diventa reply', () => {
   const r = Q.parseAgentReply('Non ho capito la richiesta');
-  assert.deepEqual(r, { reply: 'Non ho capito la richiesta', query: '', cards: [] });
+  assert.deepEqual(r, { ...NONE, reply: 'Non ho capito la richiesta' });
 });
 
 test('parseAgentReply: campi mancanti/tipi sbagliati → default sicuri', () => {
-  assert.deepEqual(Q.parseAgentReply('{"query":42,"cards":"no"}'),
-    { reply: '', query: '', cards: [] });
-  assert.deepEqual(Q.parseAgentReply(''), { reply: '', query: '', cards: [] });
-  assert.deepEqual(Q.parseAgentReply(null), { reply: '', query: '', cards: [] });
+  assert.deepEqual(Q.parseAgentReply('{"query":42,"cards":"no"}'), NONE);
+  assert.deepEqual(Q.parseAgentReply(''), NONE);
+  assert.deepEqual(Q.parseAgentReply(null), NONE);
+});
+
+test('parseAgentReply: budget — numero imposta, null rimuove, spazzatura si ignora', () => {
+  assert.deepEqual(Q.parseAgentReply('{"budget":40}'), { ...NONE, hasBudget: true, budget: 40 });
+  assert.deepEqual(Q.parseAgentReply('{"budget":"25"}'), { ...NONE, hasBudget: true, budget: 25 });
+  assert.deepEqual(Q.parseAgentReply('{"budget":null}'), { ...NONE, hasBudget: true, budget: null });
+  assert.deepEqual(Q.parseAgentReply('{"budget":"boh"}'), NONE);
+  assert.deepEqual(Q.parseAgentReply('{"budget":-5}'), NONE);
+});
+
+test('parseAgentReply: prob — needs come oggetto o array, tag normalizzati, invalidi scartati', () => {
+  const asObj = Q.parseAgentReply('{"prob":{"turn":10,"needs":{"Ramp":2,"terre":3}}}');
+  assert.deepEqual(asObj.prob, { turn: 10, needs: [{ tag: 'ramp', n: 2 }, { tag: 'terre', n: 3 }] });
+  const asArr = Q.parseAgentReply('{"prob":{"turn":"4","needs":[{"tag":"Draw","n":"1"}]}}');
+  assert.deepEqual(asArr.prob, { turn: 4, needs: [{ tag: 'draw', n: 1 }] });
+  assert.equal(Q.parseAgentReply('{"prob":{"turn":0,"needs":{"a":1}}}').prob, null);
+  assert.equal(Q.parseAgentReply('{"prob":{"turn":5,"needs":{"a":0}}}').prob, null);
+  assert.equal(Q.parseAgentReply('{"prob":"domani"}').prob, null);
 });
 
 // ── proseSegments ([[Nome Carta]] §3.5) ──────────────────────────────────────
