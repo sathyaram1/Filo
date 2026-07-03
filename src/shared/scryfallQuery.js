@@ -77,12 +77,38 @@
   }
 
   // ── Chat unificata (§3): parsing della risposta dell'agente ───────────────
-  // L'agente risponde con un JSON { reply?, query?, cards? }. I modelli a volte
-  // lo avvolgono in ```json … ``` o aggiungono testo attorno: qui si estrae il
-  // primo oggetto JSON valido in modo tollerante. Output sempre normalizzato:
-  // { reply: string, query: string, cards: string[] } (mai null/undefined).
+  // L'agente risponde con un JSON { reply?, query?, cards?, budget?, prob? }.
+  // I modelli a volte lo avvolgono in ```json … ``` o aggiungono testo attorno:
+  // qui si estrae il primo oggetto JSON valido in modo tollerante. Output
+  // sempre normalizzato: { reply, query, cards } sempre presenti; in più
+  //   hasBudget/budget  → l'utente ha chiesto di impostare (numero ≥ 0) o
+  //                       rimuovere (null) il tetto di budget (§9.2)
+  //   prob              → richiesta al calcolatore di probabilità (§9.3):
+  //                       { turn: int ≥ 1, needs: [{ tag, n }] } oppure null
+  function normalizeProb(p) {
+    if (!p || typeof p !== 'object' || Array.isArray(p)) return null;
+    const turn = Math.floor(Number(p.turn));
+    if (!Number.isFinite(turn) || turn < 1) return null;
+    const rawNeeds = p.needs;
+    const needs = [];
+    if (Array.isArray(rawNeeds)) {
+      for (const it of rawNeeds) {
+        const tag = String((it && it.tag) || '').trim().toLowerCase();
+        const n = Math.floor(Number(it && it.n));
+        if (tag && Number.isFinite(n) && n > 0) needs.push({ tag, n });
+      }
+    } else if (rawNeeds && typeof rawNeeds === 'object') {
+      for (const [tag, v] of Object.entries(rawNeeds)) {
+        const t = String(tag).trim().toLowerCase();
+        const n = Math.floor(Number(v));
+        if (t && Number.isFinite(n) && n > 0) needs.push({ tag: t, n });
+      }
+    }
+    return needs.length ? { turn, needs } : null;
+  }
+
   function parseAgentReply(text) {
-    const none = { reply: '', query: '', cards: [] };
+    const none = { reply: '', query: '', cards: [], hasBudget: false, budget: null, prob: null };
     const raw = String(text || '').trim();
     if (!raw) return none;
     // Candidati: contenuto dei fence ```…```, testo intero, primo blocco {...}.
@@ -96,10 +122,22 @@
       try {
         const o = JSON.parse(c);
         if (!o || typeof o !== 'object' || Array.isArray(o)) continue;
+        // Budget: presente = intenzione esplicita. null lo rimuove; un numero
+        // valido lo imposta; qualsiasi altro valore si ignora.
+        let hasBudget = false; let budget = null;
+        if ('budget' in o) {
+          if (o.budget === null) { hasBudget = true; budget = null; }
+          else if (Number.isFinite(Number(o.budget)) && Number(o.budget) >= 0) {
+            hasBudget = true; budget = Number(o.budget);
+          }
+        }
         return {
           reply: typeof o.reply === 'string' ? o.reply.trim() : '',
           query: typeof o.query === 'string' ? o.query.trim() : '',
           cards: Array.isArray(o.cards) ? o.cards.map(String).filter(Boolean) : [],
+          hasBudget,
+          budget,
+          prob: normalizeProb(o.prob),
         };
       } catch (_) { /* prova il prossimo candidato */ }
     }
