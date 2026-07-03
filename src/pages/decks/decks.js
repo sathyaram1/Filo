@@ -888,11 +888,16 @@
     const list = $('deckList');
     list.addEventListener('click', (e) => {
       const head = e.target.closest('.dk-group-head');
-      if (!head) return;
-      const g = head.dataset.g;
-      if (collapsedGroups.has(g)) collapsedGroups.delete(g);
-      else collapsedGroups.add(g);
-      renderDeckList();
+      if (head) {
+        const g = head.dataset.g;
+        if (collapsedGroups.has(g)) collapsedGroups.delete(g);
+        else collapsedGroups.add(g);
+        renderDeckList();
+        return;
+      }
+      // Click su una riga del mazzo → carosello sull'elenco del mazzo (§5.3).
+      const row = e.target.closest('.dk-row[data-card-id]');
+      if (row) openCarouselFromRow(row, '#deckList');
     });
     // Tasto destro sulla riga carta (§8.3).
     list.addEventListener('contextmenu', (e) => {
