@@ -141,20 +141,20 @@ test('click su una riga del mazzo apre il carosello: tastiera per navigare, rimu
   await page.waitForLoadState('domcontentloaded');
   await seedDeck(page);
 
-  // Click sulla riga del Bolt (CMC 1, prima nell'ordine visibile) → carosello
-  // pinnato con indicatore 1/2 e l'immagine giusta.
+  // Click sulla riga del Bolt → carosello pinnato sull'ordine VISIBILE del
+  // mazzo (gruppi per tipo: Creature prima, Istantanei dopo → il Bolt è 2/2).
   await page.locator('#deckList .dk-row', { hasText: 'Lightning Bolt' }).click();
   await expect(page.locator('#stateCarousel')).toBeVisible();
-  await expect(page.locator('#carouselPos')).toHaveText('1/2');
+  await expect(page.locator('#carouselPos')).toHaveText('2/2');
   await expect(page.locator('#carouselImg')).toHaveAttribute('src', 'https://cards.test/bolt.jpg');
   await expect(page.locator('#carouselToggle')).toHaveAttribute('data-in', '1');
 
-  // → passa al drago (2/2); ← torna al Bolt.
-  await page.keyboard.press('ArrowRight');
-  await expect(page.locator('#carouselPos')).toHaveText('2/2');
-  await expect(page.locator('#carouselImg')).toHaveAttribute('src', 'https://cards.test/dragon.jpg');
+  // ← passa al drago (1/2); → torna al Bolt.
   await page.keyboard.press('ArrowLeft');
   await expect(page.locator('#carouselPos')).toHaveText('1/2');
+  await expect(page.locator('#carouselImg')).toHaveAttribute('src', 'https://cards.test/dragon.jpg');
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('#carouselPos')).toHaveText('2/2');
 
   // Invio RIMUOVE il Bolt (era nel mazzo): sparisce dalla colonna centrale,
   // il toggle passa a "aggiungi". Il carosello resta pinnato.
