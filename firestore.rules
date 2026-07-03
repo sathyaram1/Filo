@@ -184,16 +184,29 @@ service cloud.firestore {
           // S1.F2.1: aggiunto statusPublic (enum grossolano in chiaro) e resolvedInVersion.
           .hasOnly(['status', 'statusPublic', 'notes', 'resolvedAt', 'verifiedAt', 'priority',
                     'priorityManual', // P6: flag manuale owner (il giudice auto non sovrascrive)
+                    // Macchina a stati (FEEDBACK-STATES.md): statusReason = sottotesto
+                    // dello status (loop/clarify/…), workingSince = timestamp del lock.
+                    'statusReason', 'workingSince',
                     'name', 'seq', 'subSeq', 'branch', 'blockReason', 'starred',
                     'claimedBy', 'claimedAt', 'claimExpiresAt', 'claimNum',
                     'reviewDecision', 'reviewComment', 'reviewedAt', 'resolvedInVersion',
                     'archiveOverride', 'reopenRequests',
                     'capabilityGapId']) // F4: permettere update del gap id (backfill)
         // S1.F2.1: status accetta l'enum esistente O un ciphertext FENC1: (gate on).
-        && (request.resource.data.get('status', 'new') in ['new', 'draft', 'todo', 'clarify', 'review', 'blocked', 'done', 'verified', 'ignored', 'archived']
+        // Enum: stati CANONICI della macchina a stati (FEEDBACK-STATES.md) +
+        // legacy ritirati (documenti storici non ancora migrati).
+        && (request.resource.data.get('status', 'new') in
+              ['unlabeled', 'suspicious_file', 'attack', 'spam', 'design', 'aligned',
+               'todo', 'working', 'revision_capability', 'revision_security', 'done',
+               'archived', 'attack_confirmed', 'spam_confirmed',
+               'new', 'draft', 'clarify', 'review', 'blocked', 'verified', 'ignored']
             || request.resource.data.get('status', '').matches('^FENC1:.*'))
         // S1.F2.1: statusPublic (se presente) deve essere uno dei tre valori grossolani.
         && request.resource.data.get('statusPublic', 'open') in ['open', 'closed', 'pending-approval']
+        && request.resource.data.get('statusReason', '') is string
+        && request.resource.data.get('statusReason', '').size() <= 60
+        && request.resource.data.get('workingSince', '') is string
+        && request.resource.data.get('workingSince', '').size() <= 40
         && request.resource.data.get('notes', '') is string
         && request.resource.data.get('notes', '').size() <= 10000
         // S1.priority: priority accetta int 0-3 (legacy in chiaro) OPPURE
@@ -308,15 +321,24 @@ service cloud.firestore {
                 )
            );
 
-      // Triage routine (limitato): può solo spostare tra `todo`/`done`/`clarify`
-      // e scrivere `notes`/`resolvedAt`. NON tocca `priority`, NON marca
-      // `verified`/`ignored`, NON cancella. Più stretto del ramo admin di
-      // proposito: è il contenimento del blast radius del ruolo routine.
+      // Triage routine (limitato): può solo muovere l'ITER DI LAVORAZIONE della
+      // macchina a stati (todo/working/revision_*/done/design) e scrivere
+      // `notes`/`resolvedAt`/`statusReason`/`workingSince`/`branch`. NON tocca
+      // `priority`, NON archivia, NON conferma attacchi, NON cancella. Più
+      // stretto del ramo admin di proposito: è il contenimento del blast radius
+      // del ruolo routine. (`clarify` legacy resta per la transizione.)
       allow update: if
         isRoutine()
         && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['status', 'notes', 'resolvedAt'])
-        && request.resource.data.get('status', 'new') in ['todo', 'done', 'clarify']
+          .hasOnly(['status', 'notes', 'resolvedAt', 'statusReason', 'workingSince', 'branch'])
+        && request.resource.data.get('status', 'new') in
+             ['todo', 'working', 'revision_capability', 'revision_security', 'done', 'design', 'clarify']
+        && request.resource.data.get('statusReason', '') is string
+        && request.resource.data.get('statusReason', '').size() <= 60
+        && request.resource.data.get('workingSince', '') is string
+        && request.resource.data.get('workingSince', '').size() <= 40
+        && request.resource.data.get('branch', '') is string
+        && request.resource.data.get('branch', '').size() <= 200
         && request.resource.data.get('notes', '') is string
         && request.resource.data.get('notes', '').size() <= 10000;
 

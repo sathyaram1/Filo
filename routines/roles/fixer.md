@@ -58,6 +58,7 @@ node scripts/claim-feedback.mjs release <id>
 
 ## Limite loop
 
-Dopo il **3° FAIL** consecutivo del verifier, dispatch NON ti chiama più: instrada
-il feedback a `blocked` con motivo `loop` (la dashboard lo mostra in nero). Decide
-l'utente. Non c'è nulla che tu debba fare in quel caso — è dispatch a gestirlo.
+Dopo il **3° FAIL** consecutivo del verifier, dispatch NON ti chiama più: mette
+il feedback in `design` con motivo `loop` (verde in dashboard, con l'ultima
+critica del verifier nella chat). Decide l'utente. Non c'è nulla che tu debba
+fare in quel caso — è dispatch a gestirlo.

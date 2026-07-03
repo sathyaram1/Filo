@@ -76,14 +76,14 @@ leggendo solo lo STATO e stampa il JSON per il worker:
 | Precedenza | Condizione (dallo stato) | Ruolo | File |
 |-----------|--------------------------|-------|------|
 | 1ª | branch passato dal verifier, secaudit non ancora fatto | **secaudit** | `routines/roles/secaudit.md` |
-| 2ª | feedback `review` con branch, non ancora verificato | **verifier** | `routines/roles/verifier.md` |
+| 2ª | feedback `revision_capability` con branch, non ancora verificato | **verifier** | `routines/roles/verifier.md` |
 | 3ª | branch con FAIL del verifier in attesa (loop < 3) | **fixer** | `routines/roles/fixer.md` |
 | 4ª | c'è un todo (vincitore di `next-feedback`) | **new-work** | `routines/roles/new-work.md` |
 | 5ª | niente di tutto ciò | **prober** | `routines/roles/prober.md` |
 
 - A **3 FAIL** del verifier sullo stesso branch, dispatch NON chiama il fixer:
-  accoda `blocked` (motivo `loop`), pulisce lo stato, e passa al bucket
-  successivo.
+  accoda `design` (motivo `loop`, con l'ultima critica del verifier nella chat),
+  pulisce lo stato, e passa al bucket successivo.
 - `dispatch.mjs` fa il **claim** atomico del feedback prima di consegnarlo (se già
   preso da un'altra routine → prossimo bucket).
 - L'output JSON **inlina** il file-ruolo in `instructions`: i ruoli sono letti
@@ -107,13 +107,13 @@ node scripts/dispatch.mjs --clear-state <id>
 
 ```
 todo
- └─ new-work risolve su worker/<id>  →  review  (+ branch)
+ └─ new-work risolve su worker/<id>  →  revision_capability  (+ branch)
                                            │
                                   verifier (avversariale)
                                     ┌─────┴──────┐
                                   PASS          FAIL
                                     │              └─ fixer corregge → ri-verifica
-                              secaudit (L4)            (max 3 FAIL → blocked/loop)
+                              secaudit (L4)            (max 3 FAIL → design/loop)
                                     │
                               merge-gate (L5+L4)
                                     │
@@ -123,8 +123,9 @@ todo
 - **Niente arriva su `main` prima del PASS del verifier + secaudit.** Le modifiche
   restano su `worker/*`; l'hook le committa e pusha sul branch ma NON le fonde su
   `main` — solo `merge-gate.mjs` (lanciato dal worker secaudit) lo fa.
-- I cambi di stato (`review`/`done`/`blocked`/`clarify`) li accoda **il worker**
-  via `queue-triage.mjs`; l'orchestratore non tocca Firestore.
+- I cambi di stato (`working`/`revision_*`/`done`/`design`) li accoda **il worker**
+  via `queue-triage.mjs` (vocabolario completo in `FEEDBACK-STATES.md`);
+  l'orchestratore non tocca Firestore.
 
 ---
 
