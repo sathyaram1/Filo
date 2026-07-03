@@ -290,6 +290,8 @@
     [ACTIONS.FILO_DASHBOARD]: 'flash, flash-or',
     [ACTIONS.FILO_LESSON]: 'flash-lite-3, flash-lite-3-or',
     [ACTIONS.FILO_COMPACT]: 'flash, flash-or',
+    // Chat del deck builder: traduzione NL→query Scryfall + risposte brevi.
+    [ACTIONS.DECKS_CHAT]: 'flash, flash-or',
     // Triage tab: decisione economica e frequente → lite va bene.
     [ACTIONS.FILO_TAB_TRIAGE]: 'flash-lite-3, flash-lite-3-or',
     // Riassunto pagina alla chiusura: economico (gira spesso).
