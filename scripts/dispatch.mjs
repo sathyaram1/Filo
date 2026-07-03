@@ -433,6 +433,16 @@ async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP) {
       const next = { reviews: snapshot.reviews.filter((r) => r.id !== bucket.id), todoWinner: snapshot.todoWinner?.id === bucket.id ? null : snapshot.todoWinner };
       return finalizeBucket(chooseBucket(next, cap), next, cap);
     }
+    // Macchina a stati (spec §6): il claim su git è il lock PRIMARIO; lo status
+    // `working` è il suo riflesso persistito per la dashboard. Solo per la
+    // presa in carico di un lavoro nuovo (todo→working): i bucket dell'iter di
+    // revisione hanno già il loro status revision_*.
+    if (bucket.role === 'new-work') {
+      try {
+        execFileSync('node', [resolve(ROOT, 'scripts', 'queue-triage.mjs'), bucket.id, 'working', ''],
+          { cwd: ROOT, encoding: 'utf8', stdio: 'ignore' });
+      } catch (_) { /* best-effort: il lock vero è il claim */ }
+    }
   }
 
   // Raccogli il contesto specifico del ruolo (rispettando l'isolamento).
