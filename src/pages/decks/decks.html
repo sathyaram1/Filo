@@ -142,6 +142,54 @@
     }
     #colDeck:hover .dk-row-price, #colDeck:focus-within .dk-row-price { visibility: visible; }
 
+    /* ── Colonna Chat/Risultati (§3): chat unificata, bolle tipizzate ── */
+    .dk-chat-body { display: flex; flex-direction: column; gap: 8px; }
+    .dk-msg { max-width: 100%; font-size: 13px; }
+    .dk-msg-user {
+      align-self: flex-end; max-width: 85%;
+      background: var(--sn-hover); border-radius: 10px 10px 2px 10px;
+      padding: 6px 10px; white-space: pre-wrap; overflow-wrap: break-word;
+    }
+    .dk-msg-bot { align-self: stretch; }
+    .dk-msg-text { white-space: pre-wrap; overflow-wrap: break-word; margin: 0 0 4px; }
+    .dk-msg-pending, .dk-msg-error { color: var(--sn-muted); font-size: 12px; }
+    .dk-msg-error { color: var(--sn-danger, #c0392b); }
+    /* Nomi carta in prosa [[...]] (§3.5): span hoverable. */
+    .dk-prose-card {
+      color: var(--sn-accent); cursor: default;
+      text-decoration: underline dotted; text-underline-offset: 2px;
+    }
+    /* CardList (§3.2-§3.4): ultima bolla ~10 righe con scroll interno; le
+       precedenti collassate a una riga di sintesi riespandibile (§3.3). */
+    .dk-cardlist { max-height: 232px; overflow: auto; }
+    .dk-list-summary {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px; color: var(--sn-muted);
+      padding: 4px 2px; border: none; background: transparent;
+      font: inherit; cursor: pointer; width: 100%; text-align: left;
+      border-radius: 5px;
+    }
+    .dk-list-summary:hover { background: var(--sn-hover); }
+    /* Toggle aggiungi-al-mazzo per riga (§3.4). */
+    .dk-add {
+      flex: 0 0 auto; width: 20px; height: 20px;
+      display: inline-flex; align-items: center; justify-content: center;
+      border: 1px solid var(--sn-border); border-radius: 5px;
+      background: transparent; color: var(--sn-muted);
+      font: inherit; font-size: 13px; line-height: 1; cursor: pointer;
+    }
+    .dk-add:hover { border-color: var(--sn-accent); color: var(--sn-accent); }
+    .dk-add[data-in="1"] { color: var(--sn-accent); border-color: var(--sn-accent); }
+    /* Barra input in fondo alla colonna: la ricerca È la chat (§3.1). */
+    .dk-chat-form { border-top: 1px solid var(--sn-border); padding: 8px; }
+    #chatInput {
+      width: 100%; font: inherit; font-size: 13px;
+      color: var(--sn-text); background: var(--sn-bg, transparent);
+      border: 1px solid var(--sn-border); border-radius: 8px;
+      padding: 7px 10px; outline: none;
+    }
+    #chatInput:focus { border-color: var(--sn-accent); }
+
     .dk-back { margin-bottom: 12px; }
   </style>
 </head>
