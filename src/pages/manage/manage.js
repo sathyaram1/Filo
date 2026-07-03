@@ -438,19 +438,29 @@
     if (isArchived) {
       // OFF = solo i feedback `archived`; ON = tutti i preferiti ⭐ (ogni stato).
       currentList = MR.listArchiveTab(allFeedbacks, { starredOnly });
-      mgListEmpty.textContent = starredOnly
-        ? 'Nessun feedback preferito.'
-        : (TAB_EMPTY.archived || 'Nessun feedback archiviato.');
+      // Filtro "Bloccati confermati": solo gli attacchi/spam confermati.
+      if (confirmedOnly) {
+        currentList = currentList.filter((f) => String(MR.normalizeStatus(f).status).endsWith('_confirmed'));
+      }
+      mgListEmpty.textContent = confirmedOnly
+        ? 'Nessun attacco o spam confermato.'
+        : starredOnly
+          ? 'Nessun feedback preferito.'
+          : (TAB_EMPTY.archived || 'Nessun feedback archiviato.');
     } else {
       // DB3: passa la versione rilasciata così "Risolti" contiene solo i fix
       // davvero in produzione; i done-ma-non-ancora-spediti restano in "In coda".
-      // `autoMode`: ON ⇒ gli allineati entrano in coda (anche i vecchi).
-      currentList = MR.listForManageTab(allFeedbacks, currentTab, { releasedVersion, autoMode: autoModeOn });
+      // Macchina a stati: la tab deriva SOLO dallo status (la modalità
+      // automatica non è più una lente sulle liste).
+      currentList = MR.listForManageTab(allFeedbacks, currentTab, { releasedVersion });
     }
 
     // Barra "Ri-valuta i non filtrati": compare solo nei Ricevuti quando c'è
     // almeno un feedback bianco (panel parziale) da ri-valutare.
     updateReevalBar();
+    // Barra "Approva tutti gli allineati": è QUI che l'owner mette in coda in
+    // blocco i blu (scrive `todo` su ciascuno).
+    updateAlignedBar();
 
     // Svuota SEMPRE: se la lista torna vuota (es. dopo uno sblocco) non deve
     // restare la card vecchia in un contenitore nascosto.
