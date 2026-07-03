@@ -364,6 +364,149 @@
     else await renderBuilder();
   }
 
+  // ── Colonna Chat / Risultati (§3): la ricerca È la chat ────────────────────
+  // Messaggi TIPIZZATI (§3.2): una bolla utente è testo; una bolla di Filo può
+  // avere testo (con [[Nome Carta]] resi span hoverable, §3.5) e/o una CardList
+  // renderizzata dagli ID salvati come DATI (mai markdown). L'ultima bolla
+  // mostra la lista con scroll interno; le precedenti collassano a una riga di
+  // sintesi riespandibile (§3.3). Stato per-mazzo, vive per la sessione.
+
+  const chatByDeck = new Map(); // deckId → [{ who, text, reply, cardIds, query, error, pending, expanded }]
+  let chatBusy = false;
+
+  function chatMsgs() {
+    if (!chatByDeck.has(current.id)) chatByDeck.set(current.id, []);
+    return chatByDeck.get(current.id);
+  }
+
+  function inDeck(cardId) {
+    return current.carte.some((c) => c.scryfall_id === cardId);
+  }
+
+  // Riga della CardList (§3.4): nome + costo mana destro-allineato + toggle
+  // aggiungi-al-mazzo. Niente immagini finché non c'è hover (task 6).
+  function chatRowHtml(id) {
+    const card = cardsById[id];
+    const name = card ? card.name : id;
+    const mana = card ? manaHtml(card.manaCost) : '';
+    const added = inDeck(id);
+    return `
+      <div class="dk-row" data-card-id="${esc(id)}">
+        <button class="dk-add" data-add="${esc(id)}" data-in="${added ? 1 : 0}"
+                title="${added ? 'Rimuovi dal mazzo' : 'Aggiungi al mazzo'}"
+                aria-label="${added ? `Rimuovi ${esc(name)} dal mazzo` : `Aggiungi ${esc(name)} al mazzo`}">${added ? '✓' : '+'}</button>
+        <span class="dk-row-name">${esc(name)}</span>
+        <span class="dk-row-mana">${mana}</span>
+      </div>`;
+  }
+
+  // Prosa con [[Nome Carta]] → span hoverable (§3.5), risolti fuzzy all'hover.
+  function proseHtml(text) {
+    return window.SN_SCRYFALL_Q.proseSegments(text).map((seg) => (
+      seg.type === 'card'
+        ? `<span class="dk-prose-card" data-card-name="${esc(seg.name)}">${esc(seg.name)}</span>`
+        : esc(seg.text)
+    )).join('');
+  }
+
+  function chatBubbleHtml(m, isLast) {
+    if (m.who === 'user') return `<div class="dk-msg dk-msg-user">${esc(m.text)}</div>`;
+    if (m.pending) return `<div class="dk-msg dk-msg-bot dk-msg-pending">Filo sta pensando…</div>`;
+    if (m.error) return `<div class="dk-msg dk-msg-bot dk-msg-error">Non ha funzionato: ${esc(m.error)}</div>`;
+    const parts = [];
+    if (m.reply) parts.push(`<p class="dk-msg-text">${proseHtml(m.reply)}</p>`);
+    if (m.cardIds && m.cardIds.length) {
+      const n = m.cardIds.length;
+      const label = m.query ? `per "${m.query}"` : '';
+      // CMC crescente, il default di ordinamento delle liste (§3.4).
+      const ids = [...m.cardIds].sort((a, b) => {
+        const ca = Number(cardsById[a] && cardsById[a].cmc) || 0;
+        const cb = Number(cardsById[b] && cardsById[b].cmc) || 0;
+        return ca - cb;
+      });
+      const open = isLast || m.expanded;
+      parts.push(`
+        <button class="dk-list-summary" data-toggle-list="1" aria-expanded="${open ? 'true' : 'false'}">
+          <span>${open ? '▾' : '▸'}</span>
+          <span>${n} risultat${n === 1 ? 'o' : 'i'} ${esc(label)}</span>
+        </button>
+        <div class="dk-cardlist" ${open ? '' : 'hidden'}>${ids.map(chatRowHtml).join('')}</div>`);
+    } else if (!m.reply) {
+      parts.push(`<p class="dk-msg-text dk-msg-pending">Nessun risultato${m.query ? ` per "${esc(m.query)}"` : ''}.</p>`);
+    }
+    return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${parts.join('')}</div>`;
+  }
+
+  function renderChat() {
+    const log = $('chatLog');
+    const msgs = chatMsgs();
+    msgs.forEach((m, i) => { m._i = i; });
+    $('chatEmpty').hidden = msgs.length > 0;
+    // Il placeholder resta come primo figlio; le bolle si rigenerano dopo.
+    for (const el of [...log.querySelectorAll('.dk-msg')]) el.remove();
+    $('chatEmpty').insertAdjacentHTML('afterend',
+      msgs.map((m, i) => chatBubbleHtml(m, i === msgs.length - 1)).join(''));
+    log.scrollTop = log.scrollHeight;
+  }
+
+  async function sendChat(text) {
+    if (chatBusy) return;
+    chatBusy = true;
+    const msgs = chatMsgs();
+    // Le bolle precedenti tornano collassate quando arriva un nuovo scambio (§3.3).
+    for (const m of msgs) m.expanded = false;
+    // La cronologia per l'agente si costruisce PRIMA di accodare il nuovo turno.
+    const history = msgs
+      .filter((m) => (m.who === 'user' && m.text) || (m.who === 'bot' && m.reply))
+      .map((m) => (m.who === 'user'
+        ? { role: 'user', content: m.text }
+        : { role: 'assistant', content: m.reply }));
+    msgs.push({ who: 'user', text });
+    const bot = { who: 'bot', pending: true };
+    msgs.push(bot);
+    renderChat();
+    try {
+      const r = await send({ type: MSG.DECKS_CHAT, deckId: current.id, text, history });
+      bot.pending = false;
+      if (!r || !r.ok) {
+        bot.error = (r && r.error) || 'nessuna risposta';
+      } else {
+        bot.reply = r.reply || '';
+        bot.cardIds = r.cardIds || [];
+        bot.query = r.query || '';
+        Object.assign(cardsById, r.cards || {});
+      }
+    } catch (e) {
+      bot.pending = false;
+      bot.error = (e && e.message) || 'errore di rete';
+    }
+    chatBusy = false;
+    renderChat();
+  }
+
+  // Toggle aggiungi/rimuovi dalla riga della CardList (§3.4): la carta entra
+  // nel gruppo giusto della colonna centrale, feedback immediato.
+  async function toggleCard(cardId) {
+    const { deck, added } = inDeck(cardId)
+      ? (() => { const r = Decks.removeCard(current, cardId); return { deck: r.deck, added: r.removed }; })()
+      : Decks.addCard(current, cardId);
+    if (added) await saveDeck(deck); // renderBuilder → renderDeckList + renderChat
+  }
+
+  // Hover su un nome in prosa: risoluzione fuzzy una-tantum (§3.5); l'id
+  // risolto resta nel dataset (lo consumerà il pannello preview, task 6).
+  async function resolveProseCard(el) {
+    if (el.dataset.cardId || el.dataset.resolving) return;
+    el.dataset.resolving = '1';
+    const r = await send({ type: MSG.SCRYFALL_NAMED, name: el.dataset.cardName });
+    delete el.dataset.resolving;
+    if (r && r.ok && r.card) {
+      el.dataset.cardId = r.card.id;
+      cardsById[r.card.id] = r.card;
+      el.title = `${r.card.name} — ${r.card.typeLine}`;
+    }
+  }
+
   // Lo switcher (§8.2): click sul nome → gestione mazzi, DOVE vive il mazzo.
   // Popup ancorato sotto l'header (stesse classi dei menu di Filo).
   let switcherEl = null;
