@@ -602,6 +602,7 @@
     const bot = { who: 'bot', pending: true };
     msgs.push(bot);
     renderChat();
+    let deckChanged = false;
     try {
       const r = await send({ type: MSG.DECKS_CHAT, deckId: current.id, text, history });
       bot.pending = false;
@@ -612,13 +613,17 @@
         bot.cardIds = r.cardIds || [];
         bot.query = r.query || '';
         Object.assign(cardsById, r.cards || {});
+        // La chat può aver modificato il mazzo (es. budget, §9.2): il mazzo
+        // aggiornato torna nella risposta → header e statistiche si rinfrescano.
+        if (r.deck && r.deck.id === current.id) { current = r.deck; deckChanged = true; }
       }
     } catch (e) {
       bot.pending = false;
       bot.error = (e && e.message) || 'errore di rete';
     }
     chatBusy = false;
-    renderChat();
+    if (deckChanged) await renderBuilder();
+    else renderChat();
   }
 
   // Toggle aggiungi/rimuovi dalla riga della CardList (§3.4): la carta entra
