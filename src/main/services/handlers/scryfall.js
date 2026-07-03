@@ -3,10 +3,12 @@
 // limit e cache sono condivisi fra tutte le superfici.
 
 module.exports = function register(on, ctx) {
-  const { MSG } = ctx;
+  const { MSG, handleAIRequest } = ctx;
   const Scry = globalThis.SN_SCRYFALL;
   const Decks = globalThis.SN_DECKS;
   const Store = globalThis.SN_DECK_STORE;
+  const Q = globalThis.SN_SCRYFALL_Q;
+  const { ACTIONS, PROMPTS } = globalThis.SN_CONST;
 
   // Identity del mazzo per il filtro automatico (§4): dai colori del
   // commander. Senza commander nessun vincolo (si cerca in tutto Scryfall).
