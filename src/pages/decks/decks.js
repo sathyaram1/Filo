@@ -232,6 +232,7 @@
     await Promise.all([ensureSymbols(), loadDeckCards()]);
     renderDeckList();
     renderChat();
+    renderStats();
   }
 
   async function saveDeck(next) {
