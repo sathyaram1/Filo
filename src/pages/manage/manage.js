@@ -334,6 +334,15 @@
     });
   }
 
+  // Filtro "Bloccati confermati" (Archiviati): mostra solo gli attacchi/spam
+  // confermati dall'owner — fuori dai Ricevuti, ispezionabili qui come storico.
+  if (mgConfirmedFilter) {
+    mgConfirmedFilter.addEventListener('change', () => {
+      confirmedOnly = mgConfirmedFilter.checked;
+      renderList();
+    });
+  }
+
   // ── Lightbox ──────────────────────────────────────────────────────────────
   function openLightbox(src) {
     mgLightboxImg.src = src;
