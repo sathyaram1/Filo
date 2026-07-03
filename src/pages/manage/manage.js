@@ -35,6 +35,10 @@
   const mgReevalBar     = document.getElementById('mgReevalBar');
   const mgReevalBtn     = document.getElementById('mgReevalBtn');
   const mgReevalMsg     = document.getElementById('mgReevalMsg');
+  const mgConfirmedFilter = document.getElementById('mgConfirmedFilter');
+  const mgAlignedBar    = document.getElementById('mgAlignedBar');
+  const mgAlignedBtn    = document.getElementById('mgAlignedBtn');
+  const mgAlignedMsg    = document.getElementById('mgAlignedMsg');
 
   // Revisione — dettaglio
   const mgDetailEmpty = document.getElementById('mgDetailEmpty');
