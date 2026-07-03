@@ -305,13 +305,56 @@
         <div class="dk-col" id="colDetail">
           <div class="dk-col-head" id="detailTitle">Statistiche</div>
           <div class="dk-col-body">
-            <!-- Stato di riposo (§5): le statistiche vere arrivano col task 7. -->
+            <!-- Stato di riposo (§5, §9): card verticali di statistiche. -->
             <div class="dk-detail-state" id="stateStats">
-              <p class="dk-placeholder">
-                Le statistiche del mazzo (curva di mana, colori, budget)
-                arriveranno qui. Passa il mouse su una carta per l'anteprima,
-                cliccala per sfogliare la lista una carta alla volta.
+              <p class="dk-placeholder" id="statsEmpty">
+                Aggiungi carte al mazzo per vedere le statistiche (curva di
+                mana, colori, budget). Passa il mouse su una carta per
+                l'anteprima, cliccala per sfogliare la lista una alla volta.
               </p>
+              <div id="statsBody" hidden>
+                <div class="dk-stat-card">
+                  <div class="dk-stat-title">Curva di mana</div>
+                  <div class="dk-curve" id="statCurve" role="img" aria-label="Curva dei costi di mana"></div>
+                  <p class="dk-stat-sub" id="statAvg"></p>
+                </div>
+                <div class="dk-stat-card">
+                  <div class="dk-stat-title">Colori</div>
+                  <div id="statColors"></div>
+                </div>
+                <div class="dk-stat-card">
+                  <div class="dk-stat-title">Composizione</div>
+                  <div id="statTypes"></div>
+                  <p class="dk-stat-sub" id="statTotal"></p>
+                </div>
+                <div class="dk-stat-card">
+                  <div class="dk-stat-title">Legalità</div>
+                  <div id="statLegality"></div>
+                </div>
+                <div class="dk-stat-card">
+                  <div class="dk-stat-title">Budget</div>
+                  <div id="statBudget"></div>
+                </div>
+                <!-- Calcolatore di probabilità (§9.3): sotto-pannello. Le
+                     categorie sono i tag del mazzo + "terre"; il motore è la
+                     simulazione Monte Carlo locale (millisecondi, zero costi). -->
+                <div class="dk-stat-card" id="probCard">
+                  <div class="dk-stat-title">Probabilità</div>
+                  <p class="dk-stat-sub">Quante carte di ogni categoria vuoi avere pescato, e a che turno?</p>
+                  <div class="dk-prob-row">
+                    <label for="probTurn">Turno</label>
+                    <input id="probTurn" type="number" min="1" max="30" step="1" value="4" />
+                  </div>
+                  <div id="probNeeds"></div>
+                  <div class="dk-prob-actions">
+                    <button class="sn-btn" id="probRun">Calcola</button>
+                    <span class="dk-prob-result" id="probResult" aria-live="polite"></span>
+                  </div>
+                  <p class="dk-stat-sub" id="probHint" hidden>
+                    Tagga le carte del mazzo per avere più categorie oltre alle terre.
+                  </p>
+                </div>
+              </div>
             </div>
             <!-- Preview su hover (§5.1-§5.2): carta nel contesto del mazzo. -->
             <div class="dk-detail-state" id="statePreview" hidden>
