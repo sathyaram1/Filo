@@ -491,8 +491,11 @@
       item.dataset.id = fb._id;
       item.style.borderLeftColor = cl ? cl.color : (aligned ? MR.ALIGNED_COLOR : 'transparent');
       // Una riga sola: #N · titolo (ellissi). Il motivo (attacco/spam/…) resta
-      // implicito nel colore del border-left; il titolo completo nel tooltip.
-      item.title = (num ? `#${num} · ` : '') + title;
+      // implicito nel colore del border-left; il titolo completo nel tooltip,
+      // col sottotesto dello stato (statusReason: loop, clarify, …) se presente.
+      const norm = MR.normalizeStatus(fb);
+      item.title = (num ? `#${num} · ` : '') + title
+        + (norm.statusReason ? ` — ${norm.statusReason}` : '');
       item.innerHTML = `
         ${num ? `<span class="mg-item-num">#${esc(num)}</span>` : ''}
         <span class="mg-item-title">${esc(title)}</span>
