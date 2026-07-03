@@ -1,0 +1,8 @@
+{
+  "id": "d67c83ab-6e85-4f4d-8fc3-97dfc44d6e1b",
+  "status": "revision_capability",
+  "notes": "Nel banco di lavoro dei Mazzi ora la colonna di sinistra è una chat vera: scrivi una ricerca secca o una frase in linguaggio naturale e Filo la traduce in una ricerca carte, con i risultati in una lista dentro la bolla — ogni riga ha nome, simboli di mana e un tasto + per aggiungere (o togliere) la carta al mazzo, che compare subito nel gruppo giusto della colonna centrale. Le ricerche sono filtrate automaticamente sui colori del commander; le liste degli scambi precedenti si richiudono in una riga di sintesi riespandibile; i nomi carta citati nel testo sono evidenziati e riconosciuti al passaggio del mouse; puoi anche chiedere pareri o pescare carte da un altro tuo mazzo. Oltre al chiesto: aggiornato il messaggio della colonna centrale a mazzo vuoto (puntava a una ricerca 'in arrivo'). Verificato con 2 nuovi test end-to-end con AI e Scryfall simulati (ricerca→lista, +→mazzo, filtro colori, collasso/riespansione), 6 nuovi unit test, la regressione dei 12 test esistenti dell'app Mazzi e un controllo visivo della pagina.",
+  "queuedAt": "2026-07-03T11:42:16.540Z",
+  "queuedBy": "LAPTOP-GGMVRCBJ-36908",
+  "branch": "claude/deck-builder-5"
+}
