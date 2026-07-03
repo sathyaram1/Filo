@@ -670,10 +670,24 @@
     //  - feedback in chiarimento → box di risposta che lo rimette in coda;
     //  - altrimenti nessuna azione.
     const isBlocked = MR.classifyBlock(fb) !== null;
-    const tab = MR.manageTabFor(fb, { releasedVersion, autoMode: autoModeOn });
+    const tab = MR.manageTabFor(fb, { releasedVersion });
     const alignedInbox = MR.isAligned(fb) && tab === 'inbox';
-    const isClarify = (fb.status || 'new') === 'clarify';
+    const normSel = MR.normalizeStatus(fb);
+    // design con domande (ex clarify) → box risposta; legacy clarify idem.
+    const isClarify = normSel.status === 'design' && (normSel.statusReason === 'clarify' || (fb.status || '') === 'clarify');
     mgActions.hidden = !(isAdmin && (isBlocked || alignedInbox));
+    // "Conferma blocco" (macchina a stati): per attack/spam/suspicious_file
+    // l'owner può confermare — il feedback diventa attack_confirmed/
+    // spam_confirmed (terminale, esce dai Ricevuti, resta in Archiviati sotto
+    // il filtro "Bloccati confermati").
+    if (mgConfirmBtn) {
+      const conf = normSel.status === 'spam' ? 'spam_confirmed'
+        : (normSel.status === 'attack' || normSel.status === 'suspicious_file') ? 'attack_confirmed'
+        : null;
+      mgConfirmBtn.hidden = !conf;
+      mgConfirmBtn.dataset.confirmStatus = conf || '';
+      mgConfirmBtn.textContent = conf === 'spam_confirmed' ? 'Conferma spam' : 'Conferma attacco';
+    }
     // Etichetta/placeholder del box: sblocco per i bloccati, approvazione per gli
     // allineati. L'azione sottostante è la stessa (accetta → In coda).
     if (isBlocked) {
