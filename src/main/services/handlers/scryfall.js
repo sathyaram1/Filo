@@ -129,7 +129,35 @@ module.exports = function register(on, ctx) {
         cards = await Scry.cards(parsed.cards).catch(() => ({}));
         cardIds = parsed.cards.filter((id) => cards[id]);
       }
-      return { ok: true, reply: parsed.reply, cardIds, cards, query };
+
+      // Budget via chat (§9.2): l'LLM estrae il numero, il tetto lo applica IL
+      // SISTEMA (mai fidarsi che il modello "abbia già fatto"). Il mazzo
+      // aggiornato torna alla pagina, che rinfresca header e statistiche.
+      let reply = parsed.reply;
+      let deckOut = null;
+      if (parsed.hasBudget) {
+        const saved = await Store.put(Decks.setBudget(deck, parsed.budget));
+        if (saved) {
+          deckOut = saved;
+          reply = [reply, parsed.budget === null
+            ? 'Budget rimosso.'
+            : `Budget impostato a ${parsed.budget} €.`].filter(Boolean).join('\n');
+        }
+      }
+
+      // Calcolatore di probabilità via chat (§9.3): la simulazione Monte Carlo
+      // gira QUI, locale e gratis; il risultato si accoda alla reply.
+      if (parsed.prob) {
+        const Stats = globalThis.SN_DECK_STATS;
+        const library = Stats.buildLibrary(deckOut || deck, known);
+        const r2 = Stats.simulate({ library, want: parsed.prob.needs, turn: parsed.prob.turn });
+        const pct = (r2.probability * 100).toFixed(1).replace('.', ',');
+        const wantsTxt = parsed.prob.needs.map((w) => `${w.n} ${w.tag}`).join(' + ');
+        reply = [reply, `Probabilità di avere ${wantsTxt} al turno ${parsed.prob.turn}: ≈ ${pct}% (${r2.iterations.toLocaleString('it-IT')} mani simulate).`]
+          .filter(Boolean).join('\n');
+      }
+
+      return { ok: true, reply, cardIds, cards, query, ...(deckOut ? { deck: deckOut } : {}) };
     } catch (e) {
       return { ok: false, error: e?.message || 'chat fallita' };
     }
