@@ -60,6 +60,10 @@
       image: String(img.normal || img.large || ''),
       artCrop: String(img.art_crop || ''),
       priceEur: Number.isFinite(price) ? price : null,
+      // Mana prodotto dalla carta (terre/rock/dork): alimenta "mana prodotto
+      // per colore" nelle statistiche (§9.1). Sempre array (vuoto = non
+      // produce): `undefined` marca le entry di cache vecchio schema da rifare.
+      producedMana: Array.isArray(api.produced_mana) ? api.produced_mana.map(String) : [],
       legalCommander: !!(api.legalities && api.legalities.commander === 'legal'),
       scryfallUri: String(api.scryfall_uri || ''),
     };
