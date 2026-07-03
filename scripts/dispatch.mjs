@@ -340,8 +340,12 @@ async function buildSnapshot() {
       try { status = (await decryptFeedbackFields({ _id: fb._id, status })).status; }
       catch (_) { status = null; }
     }
-    if (status === 'review' && typeof fb.branch === 'string' && fb.branch) {
-      reviews.push({ id: fb._id, num: fb.num || fb.seq || '', branch: fb.branch, state: readState(fb._id) });
+    // Macchina a stati: l'iter di revisione vive in `revision_capability`
+    // (aspetta il verifier) e `revision_security` (aspetta il secaudit).
+    // `review` è il nome RITIRATO: accettato finché lo storico non è migrato.
+    if (['revision_capability', 'revision_security', 'review'].includes(status)
+        && typeof fb.branch === 'string' && fb.branch) {
+      reviews.push({ id: fb._id, num: fb.num || fb.seq || '', branch: fb.branch, state: readState(fb._id), status });
     }
   }
 
