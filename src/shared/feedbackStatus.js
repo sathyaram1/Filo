@@ -158,6 +158,28 @@
     return Object.keys(row).filter((to) => row[to].includes(String(actor || '')));
   }
 
+  /**
+   * `to` è raggiungibile da `from` con una CATENA di transizioni tutte legali
+   * per lo stesso attore? Serve al writer della coda triage: la coda tiene un
+   * solo file per feedback (l'ultima decisione sovrascrive), quindi due passi
+   * consecutivi possono collassare in uno (es. todo→working→revision_capability
+   * applicato come todo→revision_capability). BFS sul grafo, PURA.
+   */
+  function canReach(from, to, actor) {
+    if (canTransition(from, to, actor)) return true;
+    const a = String(actor || '');
+    const seen = new Set([String(from || '')]);
+    const queue = [String(from || '')];
+    while (queue.length) {
+      const cur = queue.shift();
+      for (const next of transitionsFrom(cur, a)) {
+        if (next === String(to || '')) return true;
+        if (!seen.has(next)) { seen.add(next); queue.push(next); }
+      }
+    }
+    return false;
+  }
+
   // ── Stati legacy RITIRATI (spec §8) ────────────────────────────────────────
   // Mappatura semplice status→status per i legacy che non dipendono da altri
   // campi. `new` e `blocked` NON sono qui: richiedono il documento intero
