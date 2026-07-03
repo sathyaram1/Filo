@@ -225,6 +225,7 @@
     $('deckCount').textContent = `${Decks.deckCount(current)}/100 carte`;
     await Promise.all([ensureSymbols(), loadDeckCards()]);
     renderDeckList();
+    renderChat();
   }
 
   async function saveDeck(next) {
