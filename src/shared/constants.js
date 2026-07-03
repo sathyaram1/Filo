@@ -913,6 +913,31 @@
       `PREFERENZE:\n[contenuto completo aggiornato]\n\n` +
       `NOME_ESPANSIONE:\n[contenuto completo]\n\n` +
       `Se non c'è davvero nulla da modificare, scrivi solo: NESSUNA MODIFICA`,
+
+    // === Deck builder (DECK-BUILDER-SPEC.md §3-§4) ===
+    //
+    // Chat unificata del Builder: la barra di ricerca È la chat. Query secca
+    // ("commander izzet") o frase conversazionale ("modi per stappare il
+    // commander") → l'LLM decide se serve una ricerca Scryfall (`query`), una
+    // selezione da un altro mazzo (`cards`, query cross-mazzo) o solo una
+    // risposta testuale (`reply`). Il filtro di color identity NON va messo
+    // qui: lo aggiunge il codice (buildSearchQuery) a valle, sempre.
+    decksChat: ({ deckName, commanderName, identity, deckCards, otherDecks }) =>
+      `Sei l'assistente di un deck builder per Magic: The Gathering, formato Commander. L'utente ti scrive in una chat che è anche la barra di ricerca carte.\n\n` +
+      `MAZZO CORRENTE: "${deckName || '(senza nome)'}"\n` +
+      `Commander: ${commanderName || '(non impostato)'}\n` +
+      `Color identity: ${identity || '(nessun vincolo)'}\n` +
+      `Carte nel mazzo (nome — tag):\n${deckCards || '(vuoto)'}\n\n` +
+      `ALTRI MAZZI DELL'UTENTE (per le richieste che citano un altro mazzo):\n${otherDecks || '(nessuno)'}\n\n` +
+      `Decidi la natura del messaggio e rispondi con UN SOLO JSON valido (niente markdown, niente \`\`\`):\n` +
+      `{"reply": "<testo breve in italiano, opzionale>", "query": "<query Scryfall, opzionale>", "cards": ["<scryfall_id>", ...] (opzionale)}\n\n` +
+      `Regole:\n` +
+      `- RICERCA (query secca o frase che chiede carte): produci "query" in sintassi Scryfall (termini in inglese: o:, t:, cmc, kw:, ecc.). NON aggiungere vincoli di color identity (id/id<=): li aggiunge il sistema automaticamente. "reply" può restare vuota o contenere UNA frase di contesto.\n` +
+      `- SINTASSI ESPLICITA: se il messaggio contiene già sintassi Scryfall (es. "o:haste cmc<=2", "t:dragon"), quelle parti passano INVARIATE nella query; traduci solo l'eventuale parte in linguaggio naturale attorno.\n` +
+      `- CROSS-MAZZO ("il ramp di mazzo X", "le terre del mio mazzo Y"): NON fare una query. Seleziona dalla lista dell'altro mazzo le carte pertinenti (usa nomi e tag) e metti i loro scryfall_id in "cards", nell'ordine della lista. In "reply" una frase breve su cosa hai selezionato.\n` +
+      `- CONVERSAZIONE (domanda, parere, chiacchiera sul mazzo): solo "reply", niente "query" né "cards".\n` +
+      `- Nella "reply", marca SEMPRE ogni nome di carta con [[Nome Carta]] (nome inglese ufficiale), es. "Per stappare il commander guarda [[Seedborn Muse]]".\n` +
+      `- Non inventare scryfall_id: usa solo quelli presenti nelle liste qui sopra.`,
   };
 
   const DEFAULT_SETTINGS = {
