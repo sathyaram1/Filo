@@ -1,0 +1,7 @@
+{
+  "id": "0491417d-8e2a-4a8c-b025-05efac867355",
+  "status": "done",
+  "notes": "Il pannello destro del banco di lavoro ora ha tre stati: statistiche a riposo, anteprima della carta al passaggio del mouse (immagine, prezzo, tag, indicazione se e' gia' nel mazzo) e carosello al click per sfogliare le carte una a una con la tastiera (frecce, Invio/Spazio per aggiungere o rimuovere, Esc per chiudere). Verificato con test automatici mirati che coprono hover, navigazione e aggiunta/rimozione reale delle carte, piu' controllo di sicurezza sul codice: tutto in ordine.",
+  "queuedAt": "2026-07-03T14:16:42.070Z",
+  "queuedBy": "routine"
+}
