@@ -630,6 +630,32 @@
     $('deckName').addEventListener('click', (e) => { e.stopPropagation(); openSwitcher(); });
     wireDividers();
 
+    // Chat unificata (§3): invio col form (Enter), toggle carta e collasso
+    // bolle in delega sul log, risoluzione fuzzy dei nomi in prosa all'hover.
+    $('chatForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const input = $('chatInput');
+      const text = input.value.trim();
+      if (!text || chatBusy) return;
+      input.value = '';
+      sendChat(text);
+    });
+    const log = $('chatLog');
+    log.addEventListener('click', (e) => {
+      const add = e.target.closest('[data-add]');
+      if (add) { toggleCard(add.dataset.add); return; }
+      const sum = e.target.closest('[data-toggle-list]');
+      if (sum) {
+        const bubble = sum.closest('[data-msg-i]');
+        const m = chatMsgs()[Number(bubble.dataset.msgI)];
+        if (m) { m.expanded = !(m.expanded || sum.getAttribute('aria-expanded') === 'true'); renderChat(); }
+      }
+    });
+    log.addEventListener('mouseover', (e) => {
+      const span = e.target.closest('.dk-prose-card');
+      if (span) resolveProseCard(span);
+    });
+
     // Colonna mazzo: collassa/espandi i gruppi al click sul divisore.
     const list = $('deckList');
     list.addEventListener('click', (e) => {
