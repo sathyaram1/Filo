@@ -190,6 +190,50 @@
     }
     #chatInput:focus { border-color: var(--sn-accent); }
 
+    /* ── Pannello destro a tre stati (§5): statistiche / preview / carosello.
+       Il contenuto cambia, la GEOMETRIA mai: stessa colonna, stessa larghezza.
+       La carta è portrait 63:88 e si renderizza nella larghezza corrente del
+       pannello; l'aspect-ratio fissa evita salti di layout mentre carica. ── */
+    .dk-detail-state[hidden] { display: none; }
+    .dk-card-img {
+      display: block; width: 100%; aspect-ratio: 63 / 88;
+      object-fit: cover; border-radius: 4.75% / 3.5%;
+      background: var(--sn-hover);
+    }
+    /* Riga di contesto del detail (§5.2): prezzo + tag + "già nel mazzo". */
+    .dk-detail-ctx {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      font-size: 12px; color: var(--sn-muted); padding: 8px 2px;
+    }
+    .dk-detail-ctx .dk-indeck { color: var(--sn-accent); }
+    .dk-tag {
+      border: 1px solid var(--sn-border); border-radius: 999px;
+      padding: 0 7px; font-size: 11px;
+    }
+    /* Box modulare (§5.2): slot del sistema moduli; il contenuto si sceglie
+       col tasto destro → i moduli veri arrivano con un task successivo,
+       oggi c'è il default (dati carta). */
+    .dk-detail-module {
+      border: 1px solid var(--sn-border); border-radius: 8px;
+      padding: 10px; font-size: 12px; color: var(--sn-muted);
+      min-height: 48px;
+    }
+    .dk-detail-module .dk-module-title {
+      font-weight: 600; color: var(--sn-text); margin: 0 0 4px; font-size: 12px;
+    }
+    /* Carosello (§5.3): immagine piena, barra con indicatore + frecce +
+       toggle. Occhi sull'immagine, mano sulla tastiera. */
+    .dk-carousel-bar { display: flex; align-items: center; gap: 6px; padding: 8px 0; }
+    .dk-carousel-pos { font-size: 12px; color: var(--sn-muted); margin-right: auto; }
+    .dk-car-btn {
+      border: 1px solid var(--sn-border); border-radius: 6px;
+      background: transparent; color: var(--sn-text);
+      font: inherit; font-size: 13px; padding: 3px 9px; cursor: pointer;
+    }
+    .dk-car-btn:hover { border-color: var(--sn-accent); color: var(--sn-accent); }
+    #carouselToggle[data-in="1"] { color: var(--sn-accent); border-color: var(--sn-accent); }
+    .dk-carousel-hint { font-size: 11px; color: var(--sn-muted); margin: 4px 0 0; }
+
     .dk-back { margin-bottom: 12px; }
   </style>
 </head>
