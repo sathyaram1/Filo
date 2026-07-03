@@ -338,7 +338,8 @@ firebase deploy                             # entrambe
 ```
 
 Per le convenzioni di scrittura su Firestore (coda su git, `queue-triage.mjs`,
-GitHub Action) e il workflow `todo`→`review`→`done`/`blocked` → vedi
+GitHub Action) e la macchina a stati dei feedback (`todo`→`working`→
+`revision_*`→`done`, spec completa in **`FEEDBACK-STATES.md`**) → vedi
 `ROUTINES.md` e `routines/shared.md`.
 
 ## Workflow worktree

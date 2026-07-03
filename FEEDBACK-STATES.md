@@ -225,12 +225,22 @@ Aggiorna QUESTO file spuntando le fasi man mano. Worktree:
       manca FILO_ADMIN_REFRESH_TOKEN (serve `node scripts/admin-login.mjs`
       dell'owner, o girarlo dove c'è FILO_SA_KEY). Prima esegui il dry-run e fai
       confermare all'owner la mappatura (punti [CONFERMARE] in fondo).
-- [ ] **F6 — filo-security**: pipeline scrive status nativo (§7a.1-2), gate
-      deterministico file → `suspicious_file` (§7a.3), stretta `storage.rules`.
-      Repo separato: `C:/Users/agenti AI/Desktop/Filo/filo-security`.
-- [ ] **F7 — Rifiniture**: patch notes (recap utente), capabilities se cambia qualcosa
-      di visibile, PATTERNS.md se emerge un pattern nuovo, pulizia stati legacy dai
-      commenti/docs (ROUTINES.md, routines/shared.md).
+- [x] **F6 — filo-security** (fatto 2026-07-03, commit bd93b47, DEPLOYATO):
+      `src/statusMap.js` (decisione→status canonico; fidati mai attack/spam →
+      unlabeled; canWriteStatus = la pipeline non regredisce feedback oltre il
+      giudizio — vale anche per le ri-valutazioni); `src/l0/fileGate.js` (gate
+      deterministico allowlist su `files[]`, PRIMA dei giudici → suspicious_file,
+      niente panel); `feedbackState.recordDecision` scrive `status` CIFRATO (come
+      il pipeline: anti hill-climbing, la dashboard lo decifra già — status è nei
+      TEXT_FIELDS) + `statusPublic` in chiaro; runner: gate L0, owner-accepted →
+      todo, trusted, reeval aggiorna lo status. Test 279 verdi. `storage.rules`
+      (repo Filo): via i wildcard `text/.*`/`image/.*` (passava text/html!),
+      allowlist esplicita — DEPLOYATE.
+- [x] **F7 — Rifiniture** (fatto 2026-07-03): patch notes v0.2.104 (bulk approva,
+      filtro confermati, coda coerente); CLAUDE.md aggiornato (workflow → macchina
+      a stati, punta a questo file); ruoli/ROUTINES.md già in F3. Capabilities:
+      nessuna capacità utente cambiata (il gate file è moderazione, non un confine
+      promesso) → non toccato.
 
 **Punti [DECIDERE/CONFERMARE] per l'owner:**
 1. Mappatura `ignored` → `archived` (con statusReason) vs `spam_confirmed`.
