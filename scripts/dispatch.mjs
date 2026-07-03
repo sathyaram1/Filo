@@ -393,15 +393,17 @@ export async function run() {
   const cap = resolveLoopCap({ envRaw: process.env.FILO_LOOP_CAP, remote: await fetchRemoteLoopCap() });
   const bucket = chooseBucket(snapshot, cap);
 
-  // blocked-loop: dispatch stesso accoda `blocked` con motivo loop, pulisce lo
-  // stato, e ri-sceglie il prossimo bucket (non c'è un worker per questo).
+  // blocked-loop: dispatch stesso accoda `design` con motivo loop (spec §5:
+  // il fix fallito 3× è uno dei sotto-casi di design — decide l'owner), pulisce
+  // lo stato, e ri-sceglie il prossimo bucket (non c'è un worker per questo).
   if (bucket.role === 'blocked-loop') {
-    // Il motivo `loop` viaggia sia nel testo della nota (leggibile dall'owner)
-    // sia come campo strutturato `--reason loop` → `blockReason` sul doc, che la
-    // dashboard `manage` usa per colorare di nero il bordo (classifyBlock).
-    const note = `Bloccato dopo ${bucket.loopCount} verifiche fallite (motivo: loop). Ultima critica: ${bucket.state?.verifierCritique || '—'}`;
+    // Il motivo `loop` viaggia sia nel testo della nota (leggibile dall'owner,
+    // con l'ultima critica del verifier come chiede la spec) sia come campo
+    // strutturato `--reason loop` → `statusReason` sul doc (sottotesto in
+    // dashboard).
+    const note = `Fix fermato dopo ${bucket.loopCount} verifiche fallite (loop). Ultima critica: ${bucket.state?.verifierCritique || '—'}`;
     try {
-      execFileSync('node', [resolve(ROOT, 'scripts', 'queue-triage.mjs'), bucket.id, 'blocked', note, '--branch', bucket.branch, '--reason', 'loop'],
+      execFileSync('node', [resolve(ROOT, 'scripts', 'queue-triage.mjs'), bucket.id, 'design', note, '--branch', bucket.branch, '--reason', 'loop'],
         { cwd: ROOT, encoding: 'utf8', stdio: 'ignore' });
     } catch (_) { /* la nota resta in coda al prossimo giro */ }
     clearState(bucket.id);
