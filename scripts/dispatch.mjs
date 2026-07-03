@@ -366,16 +366,33 @@ async function buildSnapshot() {
 
 // ─── Sotto-comandi --record-* (li chiamano i ruoli) ──────────────────────────
 
+// Riflesso della macchina a stati (best-effort): l'esito del verifier muove lo
+// status persistito, così la dashboard vede l'iter avanzare senza aspettare i
+// report dei ruoli. Il lock/iter vero resta nei file di stato locali.
+function queueStatus(id, status, note = '', reason = '') {
+  try {
+    const args = [resolve(ROOT, 'scripts', 'queue-triage.mjs'), id, status, note];
+    if (reason) args.push('--reason', reason);
+    execFileSync('node', args, { cwd: ROOT, encoding: 'utf8', stdio: 'ignore' });
+  } catch (_) { /* best-effort */ }
+}
+
 function recordVerifier(id, verdict, critique) {
   const next = applyVerifierVerdict({ ...defaultState(id, ''), ...(readState(id) || {}), id }, verdict, critique);
   next.id = id;
   writeState(next);
+  // PASS → aspetta l'audit di sicurezza; FAIL → resta/torna in verifica fix
+  // (il caso 3° FAIL → design lo gestisce il giro dopo: chooseBucket →
+  // blocked-loop). Idempotente se lo status è già quello.
+  queueStatus(id, verdict === 'pass' ? 'revision_security' : 'revision_capability');
   return next;
 }
 function recordFixed(id) {
   const next = applyFixed({ ...(readState(id) || defaultState(id, '')), id });
   next.id = id;
   writeState(next);
+  // Fix ri-applicato → torna in attesa della verifica comportamentale.
+  queueStatus(id, 'revision_capability');
   return next;
 }
 function recordSecaudit(id, verdict) {
