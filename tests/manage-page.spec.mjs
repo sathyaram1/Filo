@@ -914,11 +914,13 @@ test('owner accetta e sblocca un feedback bloccato → patch corretto + esce dai
 // ── Allineati (tutti i giudici d'accordo): bordo BLU, approva → coda ─────────
 // Panel completo, 4 verdetti 'aligned', giudicato con automatica OFF (action
 // human_review, niente candidate_change inciso): è un "vecchio allineato".
+// Status legacy `new`: la macchina a stati lo normalizza in `aligned` (aspetta
+// l'approvazione dell'owner nei Ricevuti). Con `todo` sarebbe già In coda.
 const FAKE_FB_ALIGNED = {
   _id: 'test-fb-aligned',
   text: 'Suggerimento utile e allineato.',
   name: 'Test allineato',
-  seq: 55, subSeq: 0, status: 'todo',
+  seq: 55, subSeq: 0, status: 'new',
   clientId: 'tester@example.com', createdAt: '2026-06-29T10:00:00Z', images: [],
   pipeline: {
     action: 'human_review', l2Class: 'aligned',
