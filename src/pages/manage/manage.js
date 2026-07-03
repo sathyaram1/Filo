@@ -535,6 +535,43 @@
     mgReevalBar.hidden = !show;
     if (show && mgReevalBtn) mgReevalBtn.textContent = `Ri-valuta i non filtrati (${whites.length})`;
   }
+
+  // ── Approvazione in blocco degli allineati (macchina a stati) ─────────────
+  // L'approvazione È scrivere `todo`: la modalità automatica di oggi non sposta
+  // più nulla nelle liste, quindi i blu si mettono in coda da qui (o uno a uno
+  // dal dettaglio).
+  function alignedFeedbacks() {
+    return allFeedbacks.filter((f) => MR.isAligned(f));
+  }
+  function updateAlignedBar() {
+    if (!mgAlignedBar) return;
+    const blues = alignedFeedbacks();
+    const show = isAdmin && currentTab === 'inbox' && blues.length > 0;
+    mgAlignedBar.hidden = !show;
+    if (show && mgAlignedBtn) mgAlignedBtn.textContent = `Approva tutti gli allineati (${blues.length}) → In coda`;
+  }
+  async function approveAllAligned() {
+    const blues = alignedFeedbacks();
+    if (!blues.length || !mgAlignedBtn) return;
+    mgAlignedBtn.disabled = true;
+    let ok = 0, errs = 0;
+    for (const fb of blues) {
+      try {
+        const r = await sendToMain({
+          type: 'feedback_update', id: fb._id,
+          reviewDecision: 'accepted', reviewedAt: new Date().toISOString(),
+          status: 'todo',
+        });
+        if (!r || r.ok === false) throw new Error((r && r.error) || 'rifiutato');
+        fb.reviewDecision = 'accepted'; fb.status = 'todo'; ok++;
+        if (mgAlignedMsg) mgAlignedMsg.textContent = `Approvati ${ok}/${blues.length}…`;
+      } catch (_) { errs++; }
+    }
+    if (mgAlignedMsg) mgAlignedMsg.textContent = errs ? `${ok} approvati, ${errs} falliti.` : `${ok} approvati e messi in coda.`;
+    mgAlignedBtn.disabled = false;
+    renderList();
+  }
+  if (mgAlignedBtn) mgAlignedBtn.addEventListener('click', approveAllAligned);
   // Evidenzia la card di un feedback come "in valutazione" (animazione giudici)
   // e la porta in vista; ritorna l'elemento card (o null se non è nella lista).
   function startCardEvaluating(id) {
