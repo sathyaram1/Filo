@@ -46,6 +46,7 @@
       if (saved && typeof saved === 'object') {
         layout.leftW = Math.max(LAYOUT_MIN.leftW, Number(saved.leftW) || LAYOUT_DEFAULT.leftW);
         layout.centerW = Math.max(LAYOUT_MIN.centerW, Number(saved.centerW) || LAYOUT_DEFAULT.centerW);
+        if (DETAIL_MODULES[saved.module]) layout.module = saved.module;
       }
     } catch (_) {}
     applyLayout();
