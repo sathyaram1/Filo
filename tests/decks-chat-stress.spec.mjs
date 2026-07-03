@@ -80,7 +80,7 @@ async function mockProvider(app) {
 }
 
 async function setReply(app, value) {
-  await app.evaluate((v) => { globalThis.__nextReply = v; }, value);
+  await app.evaluate((_electron, v) => { globalThis.__nextReply = v; }, value);
 }
 
 async function deckWithCommander(page) {
