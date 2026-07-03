@@ -870,7 +870,14 @@
         const bubble = sum.closest('[data-msg-i]');
         const m = chatMsgs()[Number(bubble.dataset.msgI)];
         if (m) { m.expanded = !(m.expanded || sum.getAttribute('aria-expanded') === 'true'); renderChat(); }
+        return;
       }
+      // Click su una riga risultato → carosello sulla lista di QUELLA bolla (§5.3).
+      const row = e.target.closest('.dk-row[data-card-id]');
+      if (row) { openCarouselFromRow(row, '.dk-cardlist'); return; }
+      // Click su un nome in prosa risolto → carosello su quella sola carta.
+      const span = e.target.closest('.dk-prose-card');
+      if (span && span.dataset.cardId) openCarousel([span.dataset.cardId], 0);
     });
     log.addEventListener('mouseover', (e) => {
       const span = e.target.closest('.dk-prose-card');
