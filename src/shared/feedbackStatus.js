@@ -234,7 +234,7 @@
   global.SN_FB_STATUS = {
     STATUSES, CANONICAL, isCanonical,
     tabFor,
-    TRANSITIONS, ACTORS, canTransition, transitionsFrom,
+    TRANSITIONS, ACTORS, canTransition, transitionsFrom, canReach,
     LEGACY_SIMPLE, LEGACY_STATUSES, isLegacy,
     WORKING_TTL_MS, isWorkingExpired,
     PUBLIC_MAP,
