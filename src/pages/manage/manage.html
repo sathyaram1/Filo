@@ -570,6 +570,13 @@
             <button type="button" class="sn-btn sn-btn-secondary" id="mgReevalBtn">Ri-valuta i non filtrati</button>
             <span class="mg-reeval-msg" id="mgReevalMsg"></span>
           </div>
+          <!-- Approvazione in blocco degli allineati (blu): scrive `todo` su
+               tutti — è QUESTA l'approvazione, la modalità automatica di oggi
+               non sposta più nulla. Visibile solo nei Ricevuti quando ce n'è. -->
+          <div class="mg-reeval-bar" id="mgAlignedBar" hidden>
+            <button type="button" class="sn-btn" id="mgAlignedBtn">Approva tutti gli allineati</button>
+            <span class="mg-reeval-msg" id="mgAlignedMsg"></span>
+          </div>
           <div class="mg-col-body" id="mgListBody">
             <div class="mg-loading" id="mgListLoading">Caricamento…</div>
             <div class="mg-list" id="mgList" hidden></div>
