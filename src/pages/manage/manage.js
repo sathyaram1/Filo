@@ -58,6 +58,7 @@
   const mgActions       = document.getElementById('mgActions');
   const mgAcceptComment = document.getElementById('mgAcceptComment');
   const mgAcceptBtn     = document.getElementById('mgAcceptBtn');
+  const mgConfirmBtn    = document.getElementById('mgConfirmBtn');
   const mgActionMsg     = document.getElementById('mgActionMsg');
 
   // Risposta ai chiarimenti (owner-only)
