@@ -101,7 +101,9 @@
     const missing = [];
     for (const id of wanted) {
       const e = map[id];
-      if (e && Q.isFresh(e.fetchedAt, maxAgeMs)) out[id] = e.card;
+      // `producedMana === undefined` = entry scritta prima che il campo
+      // esistesse (schema vecchio): si rifetcha per avere il mana prodotto.
+      if (e && Q.isFresh(e.fetchedAt, maxAgeMs) && e.card && e.card.producedMana !== undefined) out[id] = e.card;
       else missing.push(id);
     }
     const fetched = [];
