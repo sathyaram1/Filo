@@ -320,6 +320,135 @@
     el.textContent = parts.length ? `⚠ ${parts.join(' · ')}` : '';
   }
 
+  // ── Statistiche (§9): stato di riposo del pannello destro ──────────────────
+  // Tutto calcolato in pagina da (current, cardsById) via SN_DECK_STATS (logica
+  // pura): curva CMC, colori richiesti/prodotti, composizione, legalità,
+  // budget. Rirenderizzate ad ogni renderBuilder (ogni edit del mazzo ci passa).
+
+  const Stats = window.SN_DECK_STATS;
+  const COLOR_LABEL = { W: 'Bianco', U: 'Blu', B: 'Nero', R: 'Rosso', G: 'Verde', C: 'Incolore' };
+
+  function fmtEur(n) { return `${n.toFixed(2).replace('.', ',')} €`; }
+
+  function renderCurve(curve) {
+    const max = Math.max(1, ...curve.map((b) => b.n));
+    $('statCurve').innerHTML = curve.map((b) => `
+      <div class="dk-curve-col" data-cmc="${esc(b.label)}" data-n="${b.n}"
+           title="${b.n} cart${b.n === 1 ? 'a' : 'e'} a costo ${esc(b.label)}">
+        <span class="dk-curve-n">${b.n || ''}</span>
+        <div class="dk-curve-bar" style="height:${Math.round((b.n / max) * 48)}px"></div>
+        <span class="dk-curve-label">${esc(b.label)}</span>
+      </div>`).join('');
+  }
+
+  function renderColors(pips, produced) {
+    const rows = ['W', 'U', 'B', 'R', 'G', 'C']
+      .filter((c) => (pips[c] || 0) > 0 || (produced[c] || 0) > 0);
+    const maxPip = Math.max(1, ...rows.map((c) => pips[c] || 0));
+    const maxProd = Math.max(1, ...rows.map((c) => produced[c] || 0));
+    const cell = (n, max) => `
+      <span class="dk-color-cell">
+        <span class="dk-color-bar" style="width:${Math.round((n / max) * 100)}%"></span>
+        <span class="dk-color-n">${n}</span>
+      </span>`;
+    $('statColors').innerHTML = rows.length ? `
+      <div class="dk-color-head"><span></span><span>richiesto</span><span>prodotto</span></div>
+      ${rows.map((c) => `
+        <div class="dk-color-row" data-color="${c}" title="${esc(COLOR_LABEL[c])}: ${pips[c] || 0} pip nei costi, ${produced[c] || 0} fonti">
+          <span class="dk-pip" data-c="${c}"></span>
+          ${cell(pips[c] || 0, maxPip)}
+          ${cell(produced[c] || 0, maxProd)}
+        </div>`).join('')}`
+      : '<p class="dk-stat-sub">Nessun costo colorato né fonte di mana, per ora.</p>';
+  }
+
+  function renderStatLegality() {
+    const r = Decks.legalityChecks(current, cardsById);
+    const row = (key, label, chk) => `
+      <div class="dk-leg-row" data-check="${key}" data-ok="${chk.ok ? 1 : 0}">
+        <span class="dk-leg-mark">${chk.ok ? '✓' : '✗'}</span>
+        <span>${label}${chk.ok ? '' : `: ${esc(chk.violations.join(', '))}`}</span>
+      </div>`;
+    $('statLegality').innerHTML =
+      row('singleton', 'Singleton', r.singleton) +
+      row('identity', 'Colori del commander', r.identity) +
+      row('banned', 'Nessuna carta bandita', r.banned);
+  }
+
+  function renderBudget() {
+    const b = Stats.budgetInfo(current, cardsById);
+    const rows = [`
+      <div class="dk-budget-row" data-b="total">
+        <span>Totale mazzo</span><span class="dk-budget-n">${fmtEur(b.total)}</span>
+      </div>`];
+    if (b.budget !== null) {
+      rows.push(`
+        <div class="dk-budget-row" data-b="cap">
+          <span>Tetto</span><span class="dk-budget-n">${fmtEur(b.budget)}</span>
+        </div>
+        <div class="dk-budget-row" data-b="residuo" data-over="${b.residuo < 0 ? 1 : 0}">
+          <span>Residuo</span><span class="dk-budget-n">${fmtEur(b.residuo)}</span>
+        </div>`);
+    } else {
+      rows.push('<p class="dk-stat-sub">Nessun tetto: impostalo dal menu del mazzo (click sul nome) o in chat ("budget 40 euro").</p>');
+    }
+    if (b.missing) rows.push(`<p class="dk-stat-sub">${b.missing} cart${b.missing === 1 ? 'a' : 'e'} senza prezzo noto.</p>`);
+    $('statBudget').innerHTML = rows.join('');
+  }
+
+  // Sotto-pannello probabilità (§9.3): una riga-input per categoria (tag del
+  // mazzo + "terre"). I valori già digitati sopravvivono al rerender.
+  function renderProbForm() {
+    const cats = Stats.categoriesOf(current, cardsById);
+    const host = $('probNeeds');
+    const prev = {};
+    for (const inp of host.querySelectorAll('input[data-tag]')) {
+      prev[inp.dataset.tag] = inp.value;
+    }
+    host.innerHTML = cats.map((tag) => `
+      <div class="dk-prob-row">
+        <label for="prob-tag-${esc(tag)}">${esc(tag)}</label>
+        <input id="prob-tag-${esc(tag)}" data-tag="${esc(tag)}" type="number"
+               min="0" max="99" step="1" value="${esc(prev[tag] || '0')}" />
+      </div>`).join('');
+    $('probHint').hidden = cats.length > 1;
+    $('probCard').hidden = !cats.length;
+  }
+
+  function runProb() {
+    const want = [...$('probNeeds').querySelectorAll('input[data-tag]')]
+      .map((inp) => ({ tag: inp.dataset.tag, n: Number(inp.value) || 0 }))
+      .filter((w) => w.n > 0);
+    const out = $('probResult');
+    if (!want.length) { out.textContent = 'Scegli almeno una categoria.'; return; }
+    const turn = Math.max(1, Number($('probTurn').value) || 1);
+    const library = Stats.buildLibrary(current, cardsById);
+    const r = Stats.simulate({ library, want, turn });
+    out.textContent = `≈ ${(r.probability * 100).toFixed(1).replace('.', ',')}%`;
+    out.title = `${r.iterations.toLocaleString('it-IT')} mani simulate, ${r.seen} carte viste`;
+  }
+
+  function renderStats() {
+    const has = current.carte.length > 0;
+    $('statsEmpty').hidden = has;
+    $('statsBody').hidden = !has;
+    if (!has) return;
+    renderCurve(Stats.manaCurve(current, cardsById));
+    const avg = Stats.avgCmc(current, cardsById);
+    $('statAvg').textContent = avg === null
+      ? '' : `CMC medio (terre escluse): ${avg.toFixed(2).replace('.', ',')}`;
+    renderColors(Stats.pipCounts(current, cardsById), Stats.producedCounts(current, cardsById));
+    $('statTypes').innerHTML = Stats.typeCounts(current, cardsById).map((t) => `
+      <div class="dk-type-row" data-type="${esc(t.name)}">
+        <span>${esc(t.name)}</span><span class="dk-type-n">${t.n}</span>
+      </div>`).join('');
+    const total = Decks.deckCount(current) + (current.commander ? 1 : 0);
+    $('statTotal').textContent = `Totale: ${total}/100 (commander incluso)`;
+    renderStatLegality();
+    renderBudget();
+    renderProbForm();
+  }
+
   async function removeFromDeck(cardId) {
     const { deck, removed } = Decks.removeCard(current, cardId);
     if (removed) await saveDeck(deck);
