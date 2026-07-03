@@ -218,8 +218,8 @@ Aggiorna QUESTO file spuntando le fasi man mano. Worktree:
 - [x] **F4 — firestore.rules** (editate 2026-07-03): enum esteso ai canonici (legacy
       mantenuti per lo storico), statusReason/workingSince in hasOnly (admin e ramo
       routine, con size check); ramo routine: iter completo todo/working/revision_*/
-      done/design (+clarify transizione). ⚠️ DEPLOY da fare:
-      `firebase deploy --only firestore:rules` dalla root del repo Filo.
+      done/design (+clarify transizione). DEPLOYATE il 2026-07-03 (deploy ok su
+      progetto filo-8b9cb).
 - [ ] **F5 — Migrazione**: `scripts/migrate-status.mjs` SCRITTO (dry-run default,
       `--apply` per scrivere; riusa normalizeStatus). ⚠️ NON eseguito: in locale
       manca FILO_ADMIN_REFRESH_TOKEN (serve `node scripts/admin-login.mjs`
