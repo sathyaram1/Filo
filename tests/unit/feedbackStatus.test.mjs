@@ -125,6 +125,23 @@ test('transizioni NON elencate = illegali (nessun default permissivo)', () => {
   assert.ok(!FS.canTransition('todo', 'working', ''));
 });
 
+test('canReach: accetta le CATENE di passi dello stesso attore (coda collassata)', () => {
+  // La coda tiene un file per feedback: todo→working→revision_capability può
+  // arrivare all'apply come un solo salto. Vale la catena.
+  assert.ok(FS.canReach('todo', 'revision_capability', 'routine'));
+  assert.ok(FS.canReach('todo', 'revision_security', 'routine'));
+  assert.ok(FS.canReach('todo', 'done', 'routine'));
+  assert.ok(FS.canReach('working', 'done', 'routine'));
+  // Ma NON mischia attori né inventa salti: la routine non arriva ad archived,
+  // né agli stati owner-only; l'owner non attraversa l'iter delle routine.
+  assert.ok(!FS.canReach('todo', 'archived', 'routine'));
+  assert.ok(!FS.canReach('aligned', 'todo', 'routine'));
+  assert.ok(!FS.canReach('todo', 'revision_capability', 'owner'));
+  assert.ok(!FS.canReach('attack', 'done', 'owner'));
+  // L'owner però raggiunge todo→…→? no: da todo l'owner non ha uscite.
+  assert.deepEqual(FS.transitionsFrom('todo', 'owner'), []);
+});
+
 test('transitionsFrom elenca le destinazioni per attore', () => {
   assert.deepEqual(FS.transitionsFrom('aligned', 'owner'), ['todo']);
   assert.deepEqual(FS.transitionsFrom('aligned', 'routine'), []);
