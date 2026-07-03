@@ -930,11 +930,13 @@
       `Carte nel mazzo (nome — tag):\n${deckCards || '(vuoto)'}\n\n` +
       `ALTRI MAZZI DELL'UTENTE (per le richieste che citano un altro mazzo):\n${otherDecks || '(nessuno)'}\n\n` +
       `Decidi la natura del messaggio e rispondi con UN SOLO JSON valido (niente markdown, niente \`\`\`):\n` +
-      `{"reply": "<testo breve in italiano, opzionale>", "query": "<query Scryfall, opzionale>", "cards": ["<scryfall_id>", ...] (opzionale)}\n\n` +
+      `{"reply": "<testo breve in italiano, opzionale>", "query": "<query Scryfall, opzionale>", "cards": ["<scryfall_id>", ...] (opzionale), "budget": <numero | null> (opzionale), "prob": {"turn": <N>, "needs": {"<categoria>": <quante>}} (opzionale)}\n\n` +
       `Regole:\n` +
       `- RICERCA (query secca o frase che chiede carte): produci "query" in sintassi Scryfall (termini in inglese: o:, t:, cmc, kw:, ecc.). NON aggiungere vincoli di color identity (id/id<=): li aggiunge il sistema automaticamente. "reply" può restare vuota o contenere UNA frase di contesto.\n` +
       `- SINTASSI ESPLICITA: se il messaggio contiene già sintassi Scryfall (es. "o:haste cmc<=2", "t:dragon"), quelle parti passano INVARIATE nella query; traduci solo l'eventuale parte in linguaggio naturale attorno.\n` +
       `- CROSS-MAZZO ("il ramp di mazzo X", "le terre del mio mazzo Y"): NON fare una query. Seleziona dalla lista dell'altro mazzo le carte pertinenti (usa nomi e tag) e metti i loro scryfall_id in "cards", nell'ordine della lista. In "reply" una frase breve su cosa hai selezionato.\n` +
+      `- BUDGET ("budget 40 euro", "metti un tetto di 25€", "togli il budget"): metti in "budget" il numero in euro, oppure null per rimuovere il tetto. Il sistema lo applica e conferma da solo: "reply" può restare vuota.\n` +
+      `- PROBABILITÀ ("che probabilità ho di avere 2 ramp e 3 terre al turno 10?"): compila "prob" con "turn" e "needs" (chiavi = categorie richieste, valori = quante carte). Le categorie valide sono i tag del mazzo elencati sopra, più "terre" (le terre del mazzo). Il sistema esegue la simulazione e aggiunge il risultato: "reply" può restare vuota. Se l'utente usa una categoria che non esiste tra i tag, dillo in "reply" e non compilare "prob".\n` +
       `- CONVERSAZIONE (domanda, parere, chiacchiera sul mazzo): solo "reply", niente "query" né "cards".\n` +
       `- Nella "reply", marca SEMPRE ogni nome di carta con [[Nome Carta]] (nome inglese ufficiale), es. "Per stappare il commander guarda [[Seedborn Muse]]".\n` +
       `- Non inventare scryfall_id: usa solo quelli presenti nelle liste qui sopra.`,
