@@ -339,16 +339,13 @@ async function patchFeedback(entry, bearer) {
   // implica SEMPRE "sta lavorando" e la riconciliazione può fidarsi.
   fields.workingSince = toFsValue(entry.status === 'working' ? new Date().toISOString() : '');
   mask.push('workingSince');
-  if (typeof entry.notes === 'string') {
-    // FONDI con lo storico invece di sovrascrivere: se il feedback è già stato
-    // lavorato e riaperto, le note esistenti contengono il report precedente e
-    // l'annotazione dell'utente — la routine non le conosce, quindi le
-    // preserviamo appendendo il nuovo report come turno separato dell'agente.
-    let notes = entry.notes;
-    if (String(entry.notes).trim()) {
-      const existing = doc?.fields?.notes?.stringValue || '';
-      notes = THREAD ? THREAD.mergeModelReport(existing, entry.notes) : entry.notes;
-    }
+  // Note: FONDI con lo storico invece di sovrascrivere (report precedenti e
+  // annotazioni dell'utente vanno preservati). Una nota VUOTA non tocca le
+  // note esistenti (le entry di solo cambio-status, es. `working`, non devono
+  // cancellare la conversazione).
+  if (typeof entry.notes === 'string' && String(entry.notes).trim()) {
+    const existing = doc?.fields?.notes?.stringValue || '';
+    const notes = THREAD ? THREAD.mergeModelReport(existing, entry.notes) : entry.notes;
     fields.notes = toFsValue(notes); mask.push('notes');
   }
   // `branch`: il nome del branch git su cui vive il fix (da revision_* in poi).
