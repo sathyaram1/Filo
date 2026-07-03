@@ -933,6 +933,43 @@
 
   mgAcceptBtn.addEventListener('click', acceptSelected);
 
+  // ── Azione: conferma un attacco/spam (terminale, macchina a stati) ─────────
+  async function confirmSelected() {
+    if (!selectedId || !mgConfirmBtn) return;
+    const id = selectedId;
+    const to = mgConfirmBtn.dataset.confirmStatus;
+    if (!to) return;
+    const comment = (mgAcceptComment.value || '').trim();
+    mgConfirmBtn.disabled = true;
+    setActionMsg('Conferma in corso…', '');
+    try {
+      const r = await sendToMain({
+        type: 'feedback_update',
+        id,
+        reviewDecision: 'rejected',
+        reviewComment: comment,
+        reviewedAt: new Date().toISOString(),
+        status: to,
+      });
+      if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
+      const fb = allFeedbacks.find((f) => f._id === id);
+      if (fb) { fb.reviewDecision = 'rejected'; fb.reviewComment = comment; fb.status = to; }
+      selectedId = null;
+      mgDetail.hidden = true;
+      mgDetailEmpty.hidden = false;
+      mgActions.hidden = true;
+      mgClarify.hidden = true;
+      closeSidebar();
+      renderList();
+    } catch (e) {
+      setActionMsg(e.message || 'Errore nella conferma', 'err');
+    } finally {
+      mgConfirmBtn.disabled = false;
+    }
+  }
+
+  if (mgConfirmBtn) mgConfirmBtn.addEventListener('click', confirmSelected);
+
   function renderJudgesRow(fb) {
     // Pulisce tutto tranne la label
     const label = mgJudgesRow.querySelector('.mg-judge-label');
