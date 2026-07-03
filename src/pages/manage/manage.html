@@ -603,6 +603,10 @@
                 placeholder="Commento (opzionale): perché lo sblocchi…"></textarea>
               <div class="mg-actions-row">
                 <button type="button" class="sn-btn" id="mgAcceptBtn">Accetta e sblocca</button>
+                <!-- Macchina a stati: per attacchi/spam/file sospetti l'owner può
+                     CONFERMARE il blocco (terminale, va negli Archiviati sotto
+                     "Bloccati confermati"). -->
+                <button type="button" class="sn-btn sn-btn-secondary" id="mgConfirmBtn" hidden>Conferma attacco</button>
                 <span class="mg-action-msg" id="mgActionMsg" role="status"></span>
               </div>
             </div>
