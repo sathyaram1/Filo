@@ -1,14 +1,7 @@
 {
   "id": "iSLQGZeo9U6J6KDK9a4O",
   "status": "revision_capability",
-<<<<<<< HEAD
   "notes": "",
   "queuedAt": "2026-07-04T18:50:22.171Z",
   "queuedBy": "routine"
-=======
-  "notes": "Ho trovato una causa concreta e diversa dalle due già escluse (identificativo del browser e blocco popup): la protezione anti-tracciamento di Filo introduce un piccolo \"rumore\" nell'impronta del browser (canvas/audio) su OGNI sito, inclusa la pagina di accesso di Google. Quel rumore è invisibile a un umano ma è proprio il tipo di segnale che i sistemi antifrode di Google (e di provider simili come Microsoft o GitHub) usano per riconoscere un tentativo di accesso sospetto — probabile causa del blocco \"si è verificato un errore durante l'accesso\" che continuava a comparire anche dopo i fix precedenti.\n\nHo escluso le pagine di accesso di questi provider dalla protezione anti-tracciamento, così il loro controllo di sicurezza vede un browser \"pulito\" come su qualunque altro PC. Il resto della navigazione mantiene la stessa protezione di prima, invariata.\n\nNon ho potuto rifare il test di accesso reale con inserimento delle credenziali (ambiente automatico cloud, senza schermo, e in più questa sessione non è riuscita a scaricare il componente Electron per aprire l'app — problema di rete dell'ambiente, non del codice). Ho verificato con un test automatico mirato che riproduce esattamente la richiesta di prima del fix (fallisce) e dopo il fix (passa): conferma che la pagina di Google ora è davvero esentata, non solo che \"non dà errori\".\n\nSe il problema persistesse ANCHE dopo questo fix, tornano utili le domande già fatte nel giro precedente (si apre la finestra di Google o l'errore compare subito senza aprirla; \"Continua con email\" funziona; lo stesso account Google fallisce anche su altri siti; modalità cookie \"privacy\" attiva o no).",
-  "queuedAt": "2026-07-04T18:20:04.217Z",
-  "queuedBy": "routine",
-  "branch": "claude/eloquent-pasteur-tkpsdy"
->>>>>>> origin/claude/eloquent-pasteur-tkpsdy
 }
