@@ -951,7 +951,7 @@
       `Carte nel mazzo (nome — tag):\n${deckCards || '(vuoto)'}\n\n` +
       `ALTRI MAZZI DELL'UTENTE (per le richieste che citano un altro mazzo):\n${otherDecks || '(nessuno)'}\n\n` +
       `Decidi la natura del messaggio e rispondi con UN SOLO JSON valido (niente markdown, niente \`\`\`):\n` +
-      `{"reply": "<testo breve in italiano, opzionale>", "query": "<query Scryfall, opzionale>", "cards": ["<scryfall_id>", ...] (opzionale), "budget": <numero | null> (opzionale), "prob": {"turn": <N>, "needs": {"<categoria>": <quante>}} (opzionale)}\n\n` +
+      `{"reply": "<testo breve in italiano, opzionale>", "query": "<query Scryfall, opzionale>", "cards": ["<scryfall_id>", ...] (opzionale), "budget": <numero | null> (opzionale), "prob": {"turn": <N>, "needs": {"<categoria>": <quante>}} (opzionale), "evaluate": "deck" | "results" (opzionale), "tagWith": ["<tag>", ...] (opzionale)}\n\n` +
       `Regole:\n` +
       `- RICERCA (query secca o frase che chiede carte): produci "query" in sintassi Scryfall (termini in inglese: o:, t:, cmc, kw:, ecc.). NON aggiungere vincoli di color identity (id/id<=): li aggiunge il sistema automaticamente. "reply" può restare vuota o contenere UNA frase di contesto.\n` +
       `- SINTASSI ESPLICITA: se il messaggio contiene già sintassi Scryfall (es. "o:haste cmc<=2", "t:dragon"), quelle parti passano INVARIATE nella query; traduci solo l'eventuale parte in linguaggio naturale attorno.\n` +
