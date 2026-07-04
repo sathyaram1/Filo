@@ -1,0 +1,8 @@
+{
+  "id": "c3bc6c7b-9145-47d2-af5c-8b5f5780c749",
+  "status": "revision_capability",
+  "notes": "Il pannello destro dei Mazzi ora ha le statistiche complete a riposo: curva di mana con costo medio, mana richiesto e prodotto per colore, composizione per tipo con totale su 100 e i check di legalità Commander. C'è il budget (tetto dal menu del mazzo o in chat con 'budget 40 euro', totale e residuo sempre visibili, sforamento in rosso) e il calcolatore di probabilità Monte Carlo (dal sotto-pannello o chiedendo in chat 'che probabilità ho di avere 2 ramp e 3 terre al turno 10?'), con mulligan e pescate extra gestiti dal motore.\n\nOltre al chiesto: aggiornati il recap aggiornamento e il manifesto delle capacità (che ancora diceva 'statistiche in arrivo'), e aggiunto un test end-to-end nuovo che verifica numeri esatti di statistiche, budget da menu e da chat, e due casi di probabilità certi (100% e 0%).\n\nVerifica: unit test del motore Monte Carlo confrontati con l'oracolo ipergeometrico e dei conteggi mana/budget — tutti verdi (60/60 sui moduli mazzi). NON ho potuto eseguire il test end-to-end nuovo né la suite Playwright: in questa sessione cloud il binario Electron non è scaricabile (rete limitata al solo repo). Il verifier deve lanciare tests/decks-stats.spec.mjs.\n\nNote tecniche: il grosso dell'implementazione (motore statistiche, UI del pannello, budget e probabilità via chat) era già su main da una sessione precedente interrotta prima della chiusura; questo branch aggiunge patch notes, manifesto capacità e lo spec Playwright.",
+  "queuedAt": "2026-07-04T00:27:25.194Z",
+  "queuedBy": "routine",
+  "branch": "worker/c3bc6c7b-9145-47d2-af5c-8b5f5780c749"
+}
