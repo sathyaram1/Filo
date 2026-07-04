@@ -314,6 +314,12 @@
     const status = document.createElement('div');
     status.className = 'sn-model-row-status';
 
+    // Messaggio non bloccante per righe scartate dal salvataggio (nickname
+    // mancante o duplicato, #216): a tutta larghezza sotto la riga, popolato/
+    // svuotato da markRegistryRowIssues() dopo ogni save().
+    const msg = document.createElement('div');
+    msg.className = 'sn-model-row-msg';
+
     const test = document.createElement('button');
     test.type = 'button';
     test.className = 'sn-btn sn-btn-secondary';
@@ -334,6 +340,7 @@
     row.appendChild(del);
     row.appendChild(test);
     row.appendChild(status);
+    row.appendChild(msg);
     renderRowTest(row);
     return row;
   }
