@@ -1,0 +1,7 @@
+{
+  "id": "iSLQGZeo9U6J6KDK9a4O",
+  "status": "todo",
+  "notes": "reset di un working orfano: il worker della routine ha esaurito i crediti prima di iniziare il lavoro; claim gia rilasciato",
+  "queuedAt": "2026-07-04T12:32:31.238Z",
+  "queuedBy": "routine"
+}
