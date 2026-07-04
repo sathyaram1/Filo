@@ -1,0 +1,7 @@
+{
+  "id": "c3bc6c7b-9145-47d2-af5c-8b5f5780c749",
+  "status": "done",
+  "notes": "Verifica di sicurezza superata e aggiornamento pubblicato: nell'app Mazzi il pannello destro ora mostra le statistiche complete (curva di mana, colori, composizione, legalità), il budget in euro con tetto impostabile e il calcolatore di probabilità di pescata, anche via chat. Il controllo di sicurezza sul cambiamento non ha rilevato problemi. Nota: in questa sessione cloud non è stato possibile rieseguire i test dell'interfaccia (Electron non scaricabile), ma la verifica funzionale era già stata superata nel passaggio precedente e i nuovi test automatici gireranno alla prossima regressione.",
+  "queuedAt": "2026-07-04T00:40:03.653Z",
+  "queuedBy": "routine"
+}
