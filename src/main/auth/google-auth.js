@@ -156,6 +156,7 @@ async function signIn() {
     prompt: 'consent',
   }).toString();
 
+  const { shell } = require('electron');
   await shell.openExternal(authUrl.toString());
 
   const code = await waitForCode();
