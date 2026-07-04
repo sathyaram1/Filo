@@ -6,16 +6,21 @@
 // vive in userData/auth.bin. Se la cifratura OS non è disponibile, NON
 // scriviamo in chiaro: rinunciamo alla persistenza (l'utente rifarà il login).
 
-const { app, safeStorage } = require('electron');
+// Niente require('electron') a livello di modulo: questo file viene richiesto
+// (transitivamente, via google-auth → defaultsStore/supportModelsStore) anche
+// dagli unit test node:test che girano fuori da Electron. `app`/`safeStorage`
+// servono solo dentro le funzioni, quindi si richiedono lazy lì.
 const fs = require('node:fs');
 const path = require('node:path');
 
 function filePath() {
+  const { app } = require('electron');
   return path.join(app.getPath('userData'), 'auth.bin');
 }
 
 function canEncrypt() {
   try {
+    const { safeStorage } = require('electron');
     return safeStorage.isEncryptionAvailable();
   } catch (_) {
     return false;
