@@ -309,6 +309,10 @@
     [ACTIONS.FILO_COMPACT]: 'flash, flash-or',
     // Chat del deck builder: traduzione NL→query Scryfall + risposte brevi.
     [ACTIONS.DECKS_CHAT]: 'flash, flash-or',
+    // Parere carta-vs-mazzo (§6): giudizio breve ma sensato → flash.
+    [ACTIONS.DECKS_OPINION]: 'flash, flash-or',
+    // Auto-tag (§7): giudizio booleano carta-per-tag → modello economico.
+    [ACTIONS.DECKS_AUTOTAG]: 'flash-lite-3, flash-lite-3-or',
     // Triage tab: decisione economica e frequente → lite va bene.
     [ACTIONS.FILO_TAB_TRIAGE]: 'flash-lite-3, flash-lite-3-or',
     // Riassunto pagina alla chiusura: economico (gira spesso).
