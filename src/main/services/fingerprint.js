@@ -159,5 +159,6 @@ module.exports = {
   etld1,
   isoWeekId,
   seedForOrigin,
+  isIdentityProviderHref,
   configForHref,
 };
