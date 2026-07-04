@@ -47,6 +47,9 @@
     const manaCost = api.mana_cost != null && api.mana_cost !== ''
       ? api.mana_cost
       : faces.map((f) => f.mana_cost).filter(Boolean).join(' // ');
+    const oracleText = api.oracle_text != null && api.oracle_text !== ''
+      ? api.oracle_text
+      : faces.map((f) => f.oracle_text).filter(Boolean).join(' // ');
     const priceRaw = api.prices && api.prices.eur;
     const price = priceRaw == null ? null : Number(priceRaw);
     return {
@@ -64,6 +67,10 @@
       // per colore" nelle statistiche (§9.1). Sempre array (vuoto = non
       // produce): `undefined` marca le entry di cache vecchio schema da rifare.
       producedMana: Array.isArray(api.produced_mana) ? api.produced_mana.map(String) : [],
+      // Testo Oracle: serve ai giudizi LLM (auto-tag §7, parere §6). Sempre
+      // stringa (vuota = carta senza testo): `undefined` marca le entry di
+      // cache vecchio schema da rifetchare.
+      oracleText: String(oracleText || ''),
       legalCommander: !!(api.legalities && api.legalities.commander === 'legal'),
       scryfallUri: String(api.scryfall_uri || ''),
     };
@@ -108,7 +115,7 @@
   }
 
   function parseAgentReply(text) {
-    const none = { reply: '', query: '', cards: [], hasBudget: false, budget: null, prob: null };
+    const none = { reply: '', query: '', cards: [], hasBudget: false, budget: null, prob: null, evaluate: '', tagWith: [] };
     const raw = String(text || '').trim();
     if (!raw) return none;
     // Candidati: contenuto dei fence ```…```, testo intero, primo blocco {...}.
@@ -138,6 +145,13 @@
           hasBudget,
           budget,
           prob: normalizeProb(o.prob),
+          // Valutazione batch esplicita (§6.1): 'deck' | 'results'. true
+          // legacy/sbrigativo dei modelli → 'deck'. Tutto il resto → ''.
+          evaluate: o.evaluate === 'deck' || o.evaluate === 'results' ? o.evaluate
+            : (o.evaluate === true ? 'deck' : ''),
+          // Auto-tag (§7): tag richiesti, normalizzati minuscoli.
+          tagWith: Array.isArray(o.tagWith)
+            ? o.tagWith.map((t) => String(t).trim().toLowerCase()).filter(Boolean) : [],
         };
       } catch (_) { /* prova il prossimo candidato */ }
     }
