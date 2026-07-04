@@ -56,6 +56,16 @@ module.exports = function register(on, ctx) {
     }
   });
 
+  // Conteggio ristampe per nome (modulo "Prezzo e dati" del detail, §5.2).
+  on(MSG.SCRYFALL_PRINTS, async (msg) => {
+    try {
+      const prints = await Scry.prints(msg?.name);
+      return prints === null ? { ok: false, error: 'nome mancante' } : { ok: true, prints };
+    } catch (e) {
+      return { ok: false, error: e?.message || 'ristampe non disponibili' };
+    }
+  });
+
   // ── Chat unificata del Builder (§3-§4) ─────────────────────────────────────
   // Ricerca e chat sono lo stesso pannello: il messaggio dell'utente passa
   // dall'LLM che decide se è una ricerca (→ query Scryfall, eseguita QUI col
@@ -155,6 +165,54 @@ module.exports = function register(on, ctx) {
         const wantsTxt = parsed.prob.needs.map((w) => `${w.n} ${w.tag}`).join(' + ');
         reply = [reply, `Probabilità di avere ${wantsTxt} al turno ${parsed.prob.turn}: ≈ ${pct}% (${r2.iterations.toLocaleString('it-IT')} mani simulate).`]
           .filter(Boolean).join('\n');
+      }
+
+      // Auto-tag via chat (§7): "tagga il mazzo con ramp, draw, removal…".
+      // I giudizi li fa IL SISTEMA (LLM economico in batch + cache carta/tag),
+      // mai il modello della chat "a parole". Il mazzo aggiornato torna alla
+      // pagina, che rinfresca elenco (gruppi per tag) e statistiche.
+      if (parsed.tagWith.length) {
+        const Opinions = globalThis.SN_DECK_OPINIONS_SVC;
+        const base = deckOut || deck;
+        const rt = await Opinions.autoTag({
+          deck: base, cards: known, tags: parsed.tagWith, handleAIRequest,
+        });
+        if (rt.changed) {
+          const saved = await Store.put(rt.deck);
+          if (saved) deckOut = saved;
+        }
+        reply = [reply, rt.taggedCount
+          ? `Ho taggato ${rt.taggedCount} cart${rt.taggedCount === 1 ? 'a' : 'e'} con: ${parsed.tagWith.join(', ')}. Raggruppa "per tag" per vederle divise.`
+          : 'Nessuna carta del mazzo corrisponde ai tag richiesti.']
+          .filter(Boolean).join('\n');
+      }
+
+      // Valutazione batch esplicita (§6.1): "valuta il mazzo" / "valuta questi
+      // risultati". MAI in automatico: solo su richiesta. Calcola i pareri
+      // mancanti/stantii in un colpo e li mette in cache (§6.2); la sintesi
+      // complessiva va nella reply della chat.
+      if (parsed.evaluate) {
+        const Opinions = globalThis.SN_DECK_OPINIONS_SVC;
+        const base = deckOut || deck;
+        const targetIds = parsed.evaluate === 'results'
+          ? (Array.isArray(msg?.lastResults) ? msg.lastResults.map(String).filter(Boolean) : [])
+          : base.carte.map((c) => c.scryfall_id);
+        if (!targetIds.length) {
+          reply = [reply, parsed.evaluate === 'results'
+            ? 'Non ho una lista di risultati recente da valutare.'
+            : 'Il mazzo è vuoto: non c\'è ancora nulla da valutare.']
+            .filter(Boolean).join('\n');
+        } else {
+          const targetCards = await Scry.cards(targetIds).catch(() => ({}));
+          const re = await Opinions.computeOpinions({
+            deck: base, cards: targetCards, cardIds: targetIds,
+            mode: 'stale', wantSintesi: true, handleAIRequest,
+          });
+          const n = Object.keys(re.opinions).length;
+          reply = [reply, re.sintesi,
+            n ? `Parere pronto su ${n} cart${n === 1 ? 'a' : 'e'}: lo leggi passando il mouse su una carta, col modulo «Parere di Filo» attivo nel riquadro del dettaglio (tasto destro sul riquadro per sceglierlo).` : '']
+            .filter(Boolean).join('\n');
+        }
       }
 
       return { ok: true, reply, cardIds, cards, query, ...(deckOut ? { deck: deckOut } : {}) };

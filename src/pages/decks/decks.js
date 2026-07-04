@@ -107,8 +107,11 @@
     if (r.screen === 'builder') {
       const res = await send({ type: MSG.DECKS_GET, id: r.id });
       if (!res || !res.ok) { location.hash = '#/'; return; }
+      const prevId = current && current.id;
       current = res.deck;
       // Cambio di mazzo/schermata: il pannello destro riparte dal riposo.
+      // I pareri sono per-mazzo (§6.2): cambiando mazzo la cache di pagina si svuota.
+      if (prevId !== current.id) opinionsByCard.clear();
       carousel = null;
       setDetailState('stats');
       show('builder');
@@ -230,6 +233,7 @@
     $('commanderLine').textContent = commander + budget;
     $('deckCount').textContent = `${Decks.deckCount(current)}/100 carte`;
     await Promise.all([ensureSymbols(), loadDeckCards()]);
+    refreshOpinionStaleness();
     renderDeckList();
     renderChat();
     renderStats();
@@ -239,6 +243,14 @@
     if (next === current) return;
     const res = await send({ type: MSG.DECKS_UPDATE, deck: next });
     if (res && res.ok) { current = res.deck; await renderBuilder(); }
+  }
+
+  // La versione del mazzo è avanzata (edit): i pareri calcolati su versioni
+  // precedenti diventano stantii SUL POSTO (§6.2) — restano visibili, marcati.
+  function refreshOpinionStaleness() {
+    for (const op of opinionsByCard.values()) {
+      op.stale = (Number(op.versione) || 0) < (Number(current.versione) || 1);
+    }
   }
 
   // ── Colonna mazzo (§8.1): dati carta, gruppi collassabili, righe ───────────
@@ -598,13 +610,17 @@
       .map((m) => (m.who === 'user'
         ? { role: 'user', content: m.text }
         : { role: 'assistant', content: m.reply }));
+    // "Valuta questi risultati" (§6.1): l'insieme indicato è l'ultima CardList
+    // mostrata — sono DATI della bolla, si passano come id al main.
+    const lastList = [...msgs].reverse().find((m) => m.who === 'bot' && m.cardIds && m.cardIds.length);
+    const lastResults = lastList ? [...lastList.cardIds] : [];
     msgs.push({ who: 'user', text });
     const bot = { who: 'bot', pending: true };
     msgs.push(bot);
     renderChat();
     let deckChanged = false;
     try {
-      const r = await send({ type: MSG.DECKS_CHAT, deckId: current.id, text, history });
+      const r = await send({ type: MSG.DECKS_CHAT, deckId: current.id, text, history, lastResults });
       bot.pending = false;
       if (!r || !r.ok) {
         bot.error = (r && r.error) || 'nessuna risposta';
@@ -613,6 +629,10 @@
         bot.cardIds = r.cardIds || [];
         bot.query = r.query || '';
         Object.assign(cardsById, r.cards || {});
+        // La chat può aver calcolato pareri nuovi ("valuta il mazzo", §6.1):
+        // la cache di pagina si svuota così il prossimo hover legge dal main
+        // i pareri freschi invece di mostrare quelli vecchi.
+        opinionsByCard.clear();
         // La chat può aver modificato il mazzo (es. budget, §9.2): il mazzo
         // aggiornato torna nella risposta → header e statistiche si rinfrescano.
         if (r.deck && r.deck.id === current.id) { current = r.deck; deckChanged = true; }
@@ -629,10 +649,16 @@
   // Toggle aggiungi/rimuovi dalla riga della CardList (§3.4): la carta entra
   // nel gruppo giusto della colonna centrale, feedback immediato.
   async function toggleCard(cardId) {
-    const { deck, added } = inDeck(cardId)
-      ? (() => { const r = Decks.removeCard(current, cardId); return { deck: r.deck, added: r.removed }; })()
-      : Decks.addCard(current, cardId);
-    if (added) await saveDeck(deck); // renderBuilder → renderDeckList + renderChat
+    const adding = !inDeck(cardId);
+    const { deck, added } = adding
+      ? Decks.addCard(current, cardId)
+      : (() => { const r = Decks.removeCard(current, cardId); return { deck: r.deck, added: r.removed }; })();
+    if (added) {
+      await saveDeck(deck); // renderBuilder → renderDeckList + renderChat
+      // Parere per la carta appena AGGIUNTA (§6.1): calcolato in background
+      // sulla versione nuova del mazzo, pronto in cache al prossimo hover.
+      if (adding) requestOpinions([cardId], { refresh: true }).catch(() => {});
+    }
   }
 
   // Hover su un nome in prosa: risoluzione fuzzy una-tantum (§3.5); l'id
@@ -678,9 +704,62 @@
   }
 
   // Box modulare del detail (§5.2): SLOT del sistema moduli — tasto destro sul
-  // box → scelta del modulo. I tre moduli alpha (mini curva, prezzo/dati,
-  // parere di Filo) arrivano con un task successivo: oggi il registro ha il
-  // default "dati carta". La scelta è persistita col layout.
+  // box → scelta del modulo (sia in preview sia nel carosello, stesso slot).
+  // Moduli alpha: dati carta (default), mini curva di mana con l'evidenza di
+  // dove cadrebbe la carta, prezzo+dati (ristampe, legalità), parere di Filo
+  // (§6). La scelta è persistita col layout.
+
+  // ── Parere di Filo (§6): cache di pagina + richieste al main ──────────────
+  // opinionsByCard: cardId → { text, versione, stale } (solo per il mazzo
+  // corrente: si svuota al cambio mazzo). Il calcolo vero e la cache
+  // persistente per (carta, versione mazzo) vivono nel main.
+  const opinionsByCard = new Map();
+  const opinionPending = new Set();
+
+  // La carta mostrata ADESSO nel pannello destro (preview o carosello).
+  function currentDetailCard() {
+    if (detailState === 'carousel' && carousel) return cardsById[carousel.ids[carousel.i]] || null;
+    if (detailState === 'preview') return cardsById[$('previewImg').dataset.cardId] || null;
+    return null;
+  }
+
+  // Chiede al main i pareri per gli id dati (UNA richiesta, il main fa UN
+  // batch LLM per i soli mancanti/stantii). refresh=true ricalcola comunque
+  // (il refresh on-demand di §6.2). Al ritorno, se la carta mostrata è tra
+  // quelle chieste, il modulo si aggiorna sul posto.
+  async function requestOpinions(ids, { refresh = false } = {}) {
+    // Senza refresh si chiedono solo i pareri che la pagina non ha: uno
+    // stantio resta visibile marcato, si ricalcola SOLO col bottone (§6.2).
+    const ask = ids.filter((id) => refresh
+      || (!opinionsByCard.has(id) && !opinionPending.has(id)));
+    if (!ask.length || !current) return;
+    for (const id of ask) opinionPending.add(id);
+    try {
+      const r = await send({ type: MSG.DECKS_OPINION, deckId: current.id, cardIds: ask, compute: true, refresh });
+      if (r && r.ok) {
+        for (const [id, op] of Object.entries(r.opinions || {})) opinionsByCard.set(id, op);
+      }
+    } finally {
+      for (const id of ask) opinionPending.delete(id);
+    }
+    const cur = currentDetailCard();
+    if (cur && layout.module === 'opinion' && ask.includes(cur.id)) renderDetailModule(cur);
+  }
+
+  // ── Ristampe (modulo "Prezzo e dati"): conteggio lazy, cache nel main ─────
+  const printsByName = new Map();
+  const printsPending = new Set();
+  async function fetchPrints(card) {
+    if (printsByName.has(card.name) || printsPending.has(card.name)) return;
+    printsPending.add(card.name);
+    try {
+      const r = await send({ type: MSG.SCRYFALL_PRINTS, name: card.name });
+      if (r && r.ok) printsByName.set(card.name, r.prints);
+    } finally { printsPending.delete(card.name); }
+    const cur = currentDetailCard();
+    if (cur && cur.name === card.name && layout.module === 'price') renderDetailModule(cur);
+  }
+
   const DETAIL_MODULES = {
     default: {
       label: 'Dati carta',
@@ -693,10 +772,97 @@
           <p>Costo di mana convertito: ${esc(String(card.cmc))} · Prezzo: ${esc(price)}</p>`;
       },
     },
+    // Mini curva di mana (§5.2.1): la curva del mazzo con EVIDENZIATA la
+    // colonna dove cadrebbe la carta — "mi fixa la curva?" ha risposta visiva.
+    curve: {
+      label: 'Mini curva di mana',
+      render(card, host) {
+        const curve = Stats.manaCurve(current, cardsById);
+        const land = /\bLand\b/i.test(String(card.typeLine).split('//')[0]);
+        const n = Math.max(0, Math.floor(Number(card.cmc) || 0));
+        const bucket = land ? null : (n >= 7 ? '7+' : String(n));
+        const already = inDeck(card.id);
+        // Se la carta NON è nel mazzo, la sua colonna mostra un segmento
+        // "fantasma" (+1) sopra la barra: dove cadrebbe aggiungendola.
+        const ghost = bucket !== null && !already;
+        const max = Math.max(1, ...curve.map((b) => b.n + (ghost && b.label === bucket ? 1 : 0)));
+        const unit = 36;
+        host.innerHTML = `
+          <p class="dk-module-title">Mini curva di mana</p>
+          <div class="dk-curve dk-curve-mini" role="img" aria-label="Curva di mana del mazzo con la posizione della carta">
+            ${curve.map((b) => {
+              const hit = b.label === bucket;
+              return `
+              <div class="dk-curve-col${hit ? ' dk-curve-hit' : ''}" data-cmc="${esc(b.label)}" data-n="${b.n}">
+                <span class="dk-curve-n">${b.n || ''}</span>
+                ${hit && ghost ? `<div class="dk-curve-ghost" style="height:${Math.max(3, Math.round(unit / max))}px"></div>` : ''}
+                <div class="dk-curve-bar" style="height:${Math.max(b.n ? 2 : 0, Math.round((b.n / max) * unit))}px"></div>
+                <span class="dk-curve-label">${esc(b.label)}</span>
+              </div>`;
+            }).join('')}
+          </div>
+          <p class="dk-mod-note">${land
+            ? 'È una terra: non entra nella curva.'
+            : (already ? `Conta nella colonna ${esc(bucket)}.` : `Cadrebbe nella colonna ${esc(bucket)}.`)}</p>`;
+      },
+    },
+    // Prezzo + dati (§5.2.2): prezzo, ristampe (lazy, cache permanente), legalità.
+    price: {
+      label: 'Prezzo e dati',
+      render(card, host) {
+        const price = card.priceEur != null
+          ? `${card.priceEur.toFixed(2).replace('.', ',')} € (Cardmarket)` : 'n.d.';
+        const prints = printsByName.get(card.name);
+        host.innerHTML = `
+          <p class="dk-module-title">Prezzo e dati</p>
+          <p>Prezzo: ${esc(price)}</p>
+          <p data-prints>${prints != null
+            ? `Ristampe: ${prints} stamp${prints === 1 ? 'a' : 'e'}` : 'Ristampe: …'}</p>
+          <p data-legal="${card.legalCommander ? 1 : 0}">${card.legalCommander
+            ? '✓ Legale in Commander' : '✗ Non legale in Commander'}</p>`;
+        if (prints == null) fetchPrints(card);
+      },
+    },
+    // Parere di Filo (§6): giudizio contestuale carta-vs-mazzo. L'hover con
+    // questo modulo attivo È il trigger (§6.1): cache-first, LLM solo per i
+    // mancanti/stantii. Stantio = pallino discreto + "Aggiorna" (§6.2).
+    opinion: {
+      label: 'Parere di Filo',
+      render(card, host) {
+        const op = opinionsByCard.get(card.id);
+        const pending = opinionPending.has(card.id);
+        let body;
+        if (op) {
+          const staleBar = !op.stale ? '' : (pending
+            ? `
+              <div class="dk-mod-actions">
+                <span class="dk-stale-dot" title="Parere calcolato su una versione precedente del mazzo"></span>
+                <span class="dk-mod-note">Aggiorno…</span>
+              </div>`
+            : `
+              <div class="dk-mod-actions">
+                <span class="dk-stale-dot" title="Parere calcolato su una versione precedente del mazzo"></span>
+                <span class="dk-mod-note">Il mazzo è cambiato da allora.</span>
+                <button class="dk-mod-btn" data-op-refresh="${esc(card.id)}">Aggiorna</button>
+              </div>`);
+          body = `<p class="dk-op-text">${proseHtml(op.text)}</p>${staleBar}`;
+        } else {
+          body = `<p class="dk-mod-note dk-op-pending">${pending ? 'Filo sta pensando…' : 'Chiedo un parere a Filo…'}</p>`;
+        }
+        host.innerHTML = `<p class="dk-module-title">Parere di Filo</p>${body}`;
+        // L'hover con questo modulo attivo È il trigger (§6.1): cache-first.
+        // Un parere STANTIO invece non si ricalcola da solo: refresh solo su
+        // richiesta (§6.2), col bottone qui sopra.
+        if (!op && !pending) requestOpinions([card.id]).catch(() => {});
+      },
+    },
   };
 
-  function renderDetailModule(card) {
-    const host = $('previewModule');
+  // Renderizza il modulo scelto nello slot dello stato ATTIVO del pannello
+  // (preview o carosello: stesso sistema, stesso menu col tasto destro).
+  function renderDetailModule(card, hostId) {
+    const host = $(hostId || (detailState === 'carousel' ? 'carouselModule' : 'previewModule'));
+    if (!host) return;
     const mod = DETAIL_MODULES[layout.module] || DETAIL_MODULES.default;
     mod.render(card, host);
   }
@@ -802,6 +968,15 @@
       const c = cardsById[carousel.ids[j]];
       if (c && c.image) { const pre = new Image(); pre.src = c.image; }
     }
+    // Il box modulare vive anche nel carosello (§5.2): stesso slot, stesso menu.
+    if (card) renderDetailModule(card, 'carouselModule');
+    // Parere di Filo attivo → prefetch dei pareri delle carte VICINE (§6.1):
+    // scorrendo, il parere è già lì. Una sola richiesta per corrente+vicine.
+    if (card && layout.module === 'opinion') {
+      const near = [carousel.i, carousel.i - 1, carousel.i + 1]
+        .map((j) => carousel.ids[j]).filter(Boolean);
+      requestOpinions(near).catch(() => {});
+    }
   }
 
   function carouselNav(delta) {
@@ -863,19 +1038,36 @@
     $('carouselToggle').addEventListener('click', () => carouselToggle());
     $('carouselClose').addEventListener('click', () => closeCarousel());
 
-    // Tasto destro sul box modulare (§5.2): scelta del modulo dello slot.
-    $('previewModule').addEventListener('contextmenu', (e) => {
+    // Tasto destro sul box modulare (§5.2): scelta del modulo dello slot —
+    // vale sia per la preview sia per il carosello (stesso sistema moduli).
+    const openModuleMenu = (e) => {
       e.preventDefault();
       openCtx(e.clientX, e.clientY, Object.entries(DETAIL_MODULES).map(([key, mod]) => ({
         label: mod.label + (layout.module === key ? ' ✓' : ''),
         run: () => {
           layout.module = key;
           persistLayout();
-          const imgId = $('previewImg').dataset.cardId;
-          if (imgId && cardsById[imgId]) renderDetailModule(cardsById[imgId]);
+          const cur = currentDetailCard();
+          if (cur) renderDetailModule(cur);
         },
       })));
-    });
+    };
+    $('previewModule').addEventListener('contextmenu', openModuleMenu);
+    $('carouselModule').addEventListener('contextmenu', openModuleMenu);
+
+    // "Aggiorna" di un parere stantio (§6.2): refresh on-demand della SOLA
+    // carta mostrata. In delega su entrambi gli slot del modulo.
+    const onModuleClick = (e) => {
+      const btn = e.target.closest('[data-op-refresh]');
+      if (!btn) return;
+      const id = btn.dataset.opRefresh;
+      btn.disabled = true;
+      requestOpinions([id], { refresh: true }).catch(() => {});
+      const cur = currentDetailCard();
+      if (cur && cur.id === id) renderDetailModule(cur); // mostra "sta pensando"
+    };
+    $('previewModule').addEventListener('click', onModuleClick);
+    $('carouselModule').addEventListener('click', onModuleClick);
   }
 
   // Lo switcher (§8.2): click sul nome → gestione mazzi, DOVE vive il mazzo.

@@ -222,6 +222,36 @@
     .dk-detail-module .dk-module-title {
       font-weight: 600; color: var(--sn-text); margin: 0 0 4px; font-size: 12px;
     }
+    /* Mini curva di mana (modulo §5.2): versione compatta della curva delle
+       statistiche, con la colonna della carta evidenziata e un segmento
+       "fantasma" (+1) dove la carta cadrebbe se aggiunta. */
+    .dk-curve-mini { height: 56px; margin: 4px 0; }
+    .dk-curve-mini .dk-curve-bar { min-height: 0; }
+    .dk-curve-hit .dk-curve-label { color: var(--sn-accent); font-weight: 600; }
+    .dk-curve-hit .dk-curve-bar { opacity: 1; }
+    .dk-curve-ghost {
+      width: 100%; border-radius: 3px 3px 0 0;
+      background: var(--sn-accent); opacity: .3;
+    }
+    /* Parere di Filo (modulo §6): testo del parere + barra "stantio" col
+       pallino DISCRETO (mai un muro) e il refresh on-demand. */
+    .dk-op-text { margin: 0; color: var(--sn-text); white-space: pre-wrap; }
+    .dk-stale-dot {
+      display: inline-block; flex: 0 0 auto; width: 7px; height: 7px;
+      border-radius: 50%; background: var(--sn-muted);
+    }
+    .dk-mod-actions { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+    .dk-mod-note { margin: 4px 0 0; color: var(--sn-muted); font-size: 11px; }
+    .dk-mod-actions .dk-mod-note { margin: 0; }
+    .dk-mod-btn {
+      border: 1px solid var(--sn-border); border-radius: 6px;
+      background: transparent; color: var(--sn-text);
+      font: inherit; font-size: 11px; padding: 2px 8px; cursor: pointer;
+      margin-left: auto;
+    }
+    .dk-mod-btn:hover { border-color: var(--sn-accent); color: var(--sn-accent); }
+    /* Nel carosello il box modulare sta tra la barra e l'hint tastiera. */
+    #carouselModule { margin-top: 2px; }
     /* Carosello (§5.3): immagine piena, barra con indicatore + frecce +
        toggle. Occhi sull'immagine, mano sulla tastiera. */
     .dk-carousel-bar { display: flex; align-items: center; gap: 6px; padding: 8px 0; }
@@ -435,6 +465,10 @@
                 <button class="dk-car-btn" id="carouselClose" title="Chiudi (Esc)"
                         aria-label="Chiudi il carosello">✕</button>
               </div>
+              <!-- Stesso box modulare della preview (§5.2): tasto destro per
+                   scegliere il modulo, vale anche qui nel carosello. -->
+              <div class="dk-detail-module" id="carouselModule"
+                   title="Tasto destro per scegliere il modulo"></div>
               <p class="dk-carousel-hint">←/→ scorri · Invio o Spazio aggiungi/rimuovi · Esc chiudi</p>
             </div>
           </div>

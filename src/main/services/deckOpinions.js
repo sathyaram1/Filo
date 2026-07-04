@@ -68,14 +68,25 @@
     }).join('\n');
   }
 
-  // Calcola (o ricalcola) i pareri per gli id dati. UNA chiamata LLM per i soli
-  // id mancanti/stantii (o tutti, con force). Ritorna
-  // { opinions: { cardId → {text, versione, stale} }, sintesi, computed }.
-  async function computeOpinions({ deck, cards, cardIds, force = false, wantSintesi = false, handleAIRequest }) {
+  // Calcola (o ricalcola) i pareri per gli id dati. UNA chiamata LLM per i
+  // soli id da (ri)fare secondo `mode`:
+  //   'missing' (default) — solo i pareri ASSENTI: uno stantio resta com'è,
+  //                         visibile e marcato (§6.2: refresh mai automatico);
+  //   'stale'             — assenti + stantii (il "batch completo su
+  //                         richiesta": "valuta il mazzo");
+  //   'force'             — tutti (refresh esplicito della singola carta).
+  // Ritorna { opinions: { cardId → {text, versione, stale} }, sintesi, computed }.
+  async function computeOpinions({ deck, cards, cardIds, mode = 'missing', wantSintesi = false, handleAIRequest }) {
     const ids = [...new Set((cardIds || []).map(String).filter((id) => cards[id]))].slice(0, MAX_BATCH);
     const all = await readOpinions();
     const byDeck = all[deck.id] || {};
-    const need = ids.filter((id) => force || !byDeck[id] || P.isStale(byDeck[id], deck));
+    const need = ids.filter((id) => {
+      const e = byDeck[id];
+      if (!e) return true;
+      if (mode === 'force') return true;
+      if (mode === 'stale') return P.isStale(e, deck);
+      return false;
+    });
     let sintesi = '';
     if (need.length) {
       const identity = deck.commanderMeta && Array.isArray(deck.commanderMeta.colors)
