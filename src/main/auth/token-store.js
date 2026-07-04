@@ -55,6 +55,7 @@ function load() {
     return null; // file assente = non loggato
   }
   try {
+    const { safeStorage } = require('electron');
     const json = safeStorage.decryptString(raw);
     return JSON.parse(json);
   } catch (e) {
