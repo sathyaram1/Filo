@@ -21,3 +21,6 @@ tests/agent/reports/
 test-results/
 .DS_Store
 *.log
+
+# worktree annidate (mai committare come gitlink)
+.claude/worktrees/
