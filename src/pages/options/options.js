@@ -373,10 +373,16 @@
     populateNicknames(registry);
   }
 
+  // Oltre al registry valido, ritorna le righe DOM scartate (nickname mancante
+  // o duplicato di una riga precedente) così save() può segnalarle sul posto
+  // invece di ignorarle in silenzio dietro un "Salvato" che non le riguarda
+  // (#216: l'utente perdeva la riga senza nessun avviso).
   function collectModelRegistry() {
     const host = $('modelRegistryList');
     const out = {};
     const dups = [];
+    const missingNickRows = [];
+    const dupRows = [];
     let missingNick = false;
     for (const row of host.querySelectorAll('.sn-model-row:not(.sn-model-row-head)')) {
       const nick = row.querySelector('.sn-model-nick').value.trim();
@@ -384,15 +390,39 @@
       const model = row.querySelector('.sn-model-id').value.trim();
       const label = (row.dataset.label || '').trim();
       if (!nick && !model) continue;
-      if (!nick) { missingNick = true; continue; }
-      if (out[nick]) { dups.push(nick); continue; }
+      if (!nick) { missingNick = true; missingNickRows.push(row); continue; }
+      if (out[nick]) { dups.push(nick); dupRows.push({ row, nick }); continue; }
       const entry = { provider, model };
       if (label) entry.label = label;
       // Preserva il risultato di test misurato (latenza/token-sec) tra i salvataggi.
       if (row._test && Object.keys(row._test).length) entry.test = row._test;
       out[nick] = entry;
     }
-    return { registry: out, dups, missingNick };
+    return { registry: out, dups, missingNick, missingNickRows, dupRows };
+  }
+
+  // Evidenzia (bordo + messaggio inline sotto la riga, niente alert bloccante)
+  // le righe scartate dall'ultimo save(); ripulisce tutte le altre.
+  function markRegistryRowIssues(missingNickRows, dupRows) {
+    const host = $('modelRegistryList');
+    for (const row of host.querySelectorAll('.sn-model-row:not(.sn-model-row-head)')) {
+      row.classList.remove('sn-row-invalid');
+      row.querySelector('.sn-model-nick').classList.remove('sn-input-invalid');
+      const msg = row.querySelector('.sn-model-row-msg');
+      if (msg) msg.textContent = '';
+    }
+    for (const row of missingNickRows || []) {
+      row.classList.add('sn-row-invalid');
+      row.querySelector('.sn-model-nick').classList.add('sn-input-invalid');
+      const msg = row.querySelector('.sn-model-row-msg');
+      if (msg) msg.textContent = I18n.t('options_model_nickname_required');
+    }
+    for (const { row, nick } of dupRows || []) {
+      row.classList.add('sn-row-invalid');
+      row.querySelector('.sn-model-nick').classList.add('sn-input-invalid');
+      const msg = row.querySelector('.sn-model-row-msg');
+      if (msg) msg.textContent = I18n.t('options_model_nickname_duplicate', nick);
+    }
   }
 
   async function runRowTest(providerId, modelId, row, btn) {
