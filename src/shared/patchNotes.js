@@ -16,6 +16,15 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.108', date: '2026-07-04',
+      features: [
+        'Nell\'app Mazzi il pannello destro ora mostra le statistiche complete del mazzo: curva di mana con costo medio, mana richiesto e prodotto per colore, composizione per tipo con totale su 100 e i check di legalità Commander (singleton, colori, carte bandite).',
+        'Arriva il budget del mazzo: imposti un tetto in euro dal menu del mazzo o scrivendolo in chat ("budget 40 euro"), e totale speso e residuo restano sempre in vista — con lo sforamento evidenziato in rosso.',
+        'Nuovo calcolatore di probabilità: chiedi "che probabilità ho di avere 2 ramp e 3 terre al turno 10?" in chat, o usa il pannello dentro le statistiche. Le categorie sono i tag delle tue carte (più le terre), e il calcolo è istantaneo e gratuito.',
+      ],
+      fixes: [],
+    },
+    {
       version: '0.2.107', date: '2026-07-03',
       features: [],
       fixes: [
