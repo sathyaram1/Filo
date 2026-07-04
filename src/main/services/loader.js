@@ -43,6 +43,7 @@ require(path.join(SHARED, 'spellLanguages.js'));
 require(path.join(SHARED, 'decks.js'));
 require(path.join(SHARED, 'deckStats.js'));    // dipende da SN_DECKS (tipoOf)
 require(path.join(SHARED, 'scryfallQuery.js'));
+require(path.join(SHARED, 'deckOpinions.js')); // pareri/auto-tag §6-§7 (logica pura)
 require(path.join(SVC, 'providers', 'openrouter.js'));
 require(path.join(SVC, 'providers', 'gemini.js'));
 require(path.join(SVC, 'providers', 'index.js'));
