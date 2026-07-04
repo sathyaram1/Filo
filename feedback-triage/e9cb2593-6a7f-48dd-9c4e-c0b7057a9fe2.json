@@ -1,8 +1,0 @@
-{
-  "id": "e9cb2593-6a7f-48dd-9c4e-c0b7057a9fe2",
-  "status": "revision_capability",
-  "notes": "Ora se aggiungi un modello personalizzato nelle Opzioni ma lasci vuoto il nickname (o ne usi uno già in uso), la riga viene evidenziata in rosso con una spiegazione sotto invece di sparire senza avviso: la conferma di salvataggio non dice più genericamente \"Salvato\" in quel caso, così è chiaro che quella riga specifica non è stata registrata. Le altre righe/impostazioni continuano a salvarsi normalmente. Aggiunto un test automatico che riproduce lo scenario del feedback (nickname vuoto e nickname duplicato) e verifica sia l'evidenziazione sia il fatto che il salvataggio non venga più confermato in modo fuorviante.\n\nNote tecniche: in questo ambiente cloud il download del binario Electron è bloccato dalla policy di rete della sessione (host github.com/electron/electron non abilitato), quindi non è stato possibile lanciare lo spec Playwright end-to-end né test:shoot. Ho verificato la logica di collect/marcatura righe con uno script isolato (stessi scenari del test, senza Electron) che conferma il comportamento corretto, e l'intera suite unit esistente passa (827/830, i 3 falliti sono preesistenti e dovuti alla stessa causa di rete, non toccano il codice modificato). Lo spec Playwright aggiunto va comunque eseguito appena l'ambiente ha Electron disponibile.",
-  "queuedAt": "2026-07-04T19:08:24.098Z",
-  "queuedBy": "routine",
-  "branch": "worker/e9cb2593"
-}
