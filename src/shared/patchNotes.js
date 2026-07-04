@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.111', date: '2026-07-04',
+      features: [],
+      fixes: [
+        'Corretto un problema che poteva far fallire l\'accesso con "Continua con Google" (o altri provider come Microsoft/GitHub) su alcuni siti.',
+      ],
+    },
+    {
       version: '0.2.109', date: '2026-07-04',
       features: [
         'Nell\'app Mazzi il riquadro sotto l\'anteprima della carta è diventato modulare: col tasto destro scegli cosa mostra — dati della carta, mini curva di mana con evidenziato dove cadrebbe la carta, prezzo con ristampe e legalità, o il parere di Filo. Funziona anche nel carosello.',
