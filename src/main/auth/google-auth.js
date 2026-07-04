@@ -14,7 +14,11 @@
 // Tutto vive nel processo main: i token non sono mai esposti alle pagine web.
 
 const http = require('node:http');
-const { shell } = require('electron');
+// Niente require('electron') a livello di modulo: questo file viene richiesto
+// (transitivamente, via defaultsStore/supportModelsStore) anche dagli unit test
+// node:test che girano fuori da Electron. `shell` serve solo dentro signIn(),
+// quindi si richiede lazy lì (vedi CLAUDE.md — pattern usato anche altrove,
+// es. adblock.js/proxyTab.js).
 const cfg = require('./config');
 const pkce = require('./pkce');
 const store = require('./token-store');
