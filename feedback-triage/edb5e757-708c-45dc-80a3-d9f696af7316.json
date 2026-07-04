@@ -1,7 +1,0 @@
-{
-  "id": "edb5e757-708c-45dc-80a3-d9f696af7316",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato e modifiche pubblicate. Nell'app Mazzi il riquadro sotto l'anteprima della carta ora è modulare (tasto destro per scegliere: dati carta, mini curva di mana, prezzo con ristampe e legalità, o parere di Filo, anche nel carosello). Filo può darti un parere sulle carte rispetto al tuo mazzo, con \"valuta il mazzo\" in chat per la sintesi completa, e taggare le carte automaticamente con \"tagga il mazzo con ramp, draw, removal\". Verificato con audit del codice riga per riga e l'intera suite di unit test (849 verdi).",
-  "queuedAt": "2026-07-04T12:22:08.670Z",
-  "queuedBy": "routine"
-}
