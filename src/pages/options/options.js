@@ -585,10 +585,13 @@
     const apiKeyTavily = $('apiKeyTavily').value.trim();
 
     // Auto-save: persistiamo solo le righe valide. Le righe incomplete
-    // (nickname mancante) o duplicate vengono semplicemente ignorate finché
-    // non sono complete — niente alert bloccanti che interromperebbero la
-    // digitazione, dato che non c'è più un pulsante "Salva" esplicito.
-    const { registry } = collectModelRegistry();
+    // (nickname mancante) o duplicate vengono ignorate finché non sono
+    // complete — niente alert bloccanti che interromperebbero la digitazione,
+    // dato che non c'è più un pulsante "Salva" esplicito. Vengono però
+    // evidenziate sul posto e la conferma sotto NON dice più "Salvato" senza
+    // qualificarlo, altrimenti l'utente crede (a torto, #216) che sia stato
+    // salvato tutto.
+    const { registry, missingNickRows, dupRows } = collectModelRegistry();
 
     const partial = {
       useDefaultModels: $('useDefaultModels').checked,
@@ -602,10 +605,14 @@
 
     // Aggiorna la datalist dei nickname (per-action) col registry appena salvato.
     populateNicknames(registry);
+    markRegistryRowIssues(missingNickRows, dupRows);
 
+    const hasDiscarded = (missingNickRows && missingNickRows.length) || (dupRows && dupRows.length);
     const hint = $('savedHint');
+    hint.textContent = hasDiscarded ? I18n.t('options_model_row_not_saved') : I18n.t('options_saved');
+    hint.classList.toggle('sn-hint-warn', !!hasDiscarded);
     hint.classList.add('sn-show');
-    setTimeout(() => hint.classList.remove('sn-show'), 1500);
+    setTimeout(() => hint.classList.remove('sn-show'), hasDiscarded ? 3000 : 1500);
   }
 
   async function testProvider(providerId, statusEl, btn) {
