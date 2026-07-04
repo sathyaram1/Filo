@@ -35,6 +35,7 @@ function save(session) {
     return false;
   }
   try {
+    const { safeStorage } = require('electron');
     const enc = safeStorage.encryptString(JSON.stringify(session));
     fs.writeFileSync(filePath(), enc, { mode: 0o600 });
     return true;
