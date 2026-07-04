@@ -2,8 +2,8 @@
   "id": "edb5e757-708c-45dc-80a3-d9f696af7316",
   "branch": "",
   "loopCount": 1,
-  "verifierVerdict": "fail",
-  "verifierCritique": "Il flusso chiave del task 8 si rompe dopo qualsiasi edit del mazzo: cerca carte in chat, aggiungi UNA carta dai risultati, poi passa il mouse su un'ALTRA carta dei risultati (non nel mazzo) — la preview non si apre/aggiorna più: niente parere di Filo in hover, niente mini curva col segmento fantasma 'dove cadrebbe', niente modulo prezzo. Repro deterministico: è il test 'gli altri moduli del box…' dello spec del branch stesso (tests/decks-opinion.spec.mjs) che fallisce a ogni retry (dk-curve-hit resta su data-cmc=1 invece di 4). Causa: a ogni salvataggio del mazzo renderBuilder() → loadDeckCards() SOSTITUISCE integralmente la cache di pagina cardsById con le sole carte del mazzo (src/pages/decks/decks.js, ~riga 275), buttando via le carte dei risultati chat mergiate dopo la ricerca (~riga 631); showPreview() poi esce in silenzio perché cardsById[id] non c'è. Fix atteso: preservare/ri-mergiare le carte dei risultati chat in cardsById quando si ricaricano le carte del mazzo (e ricontrollare renderCarousel, che legge la stessa cache). Il resto regge: gli altri 3 test dello spec (parere in hover+stantio+refresh, batch 'valuta il mazzo' con cache, auto-tag con riuso cross-mazzo), tutte le altre suite decks (49 test) e 849 unit test passano.",
+  "verifierVerdict": null,
+  "verifierCritique": "",
   "secauditDone": false,
   "secauditVerdict": null
 }
