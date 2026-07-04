@@ -1,0 +1,9 @@
+{
+  "id": "iSLQGZeo9U6J6KDK9a4O",
+  "branch": "",
+  "loopCount": 1,
+  "verifierVerdict": "fail",
+  "verifierCritique": "Il fix e' troppo largo: isIdentityProviderHref() in src/main/services/fingerprint.js chiama globalThis.SN_AUTH_POPUP.isAuthPopup() per intero (host list + AUTH_PATH_RE sui path + euristica query client_id/redirect_uri), non solo la lista host come dice il commento. Risultato riprodotto con node -e su fingerprint.js: configForHref('https://esempio-qualsiasi.com/login') e configForHref('https://evil.com/track?client_id=1&redirect_uri=2') tornano entrambi {level:0, seed:0} (protezione anti-fingerprint disattivata) anche se questi host NON sono provider di identita' noti (non in AUTH_HOSTS/AUTH_HOST_SUFFIXES). Qualunque sito puo' quindi disattivare la protezione anti-tracciamento di Filo su se stesso solo scegliendo un path tipo /login, /signin, /auth, /sso, /saml, /openid, oppure aggiungendo client_id+redirect_uri in query — cosa che un tracker puo' fare deliberatamente. Gli unit test aggiunti (tests/unit/fingerprintAuthExempt.test.mjs) non coprono questo caso: testano solo host noti + una pagina normale senza 'login' nel path, quindi non lo intercettano. Il fix dovrebbe esentare solo gli host noti (match esatto su AUTH_HOSTS/AUTH_HOST_SUFFIXES), non l'intera euristica path/query pensata per altro (decidere se un popup e' probabilmente OAuth, contesto a basso rischio se sbaglia).",
+  "secauditDone": false,
+  "secauditVerdict": null
+}
