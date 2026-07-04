@@ -48,7 +48,6 @@ test('una pagina normale di claude.ai (non di login/auth) resta protetta normalm
   const cfg = FP.configForHref('https://claude.ai/chat/abc123');
   assert.equal(cfg.level, 1);
 });
-<<<<<<< HEAD
 
 // Regressione: l'esenzione deve valere SOLO per gli host noti (stessa lista di
 // authPopup.js), non per l'euristica "questo path/query somiglia a un login
@@ -69,5 +68,3 @@ test('un host sconosciuto con client_id+redirect_uri in query NON è esente', ()
   assert.equal(cfg.level, 1, 'un host non elencato non deve poter disattivare la protezione via query');
   assert.notEqual(cfg.seed, 0);
 });
-=======
->>>>>>> origin/claude/eloquent-pasteur-tkpsdy
