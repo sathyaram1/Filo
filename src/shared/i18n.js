@@ -216,6 +216,7 @@
     options_model_no_id: 'Inserisci la stringa del modello',
     options_model_nickname_required: 'Il nickname è obbligatorio',
     options_model_nickname_duplicate: 'Nickname duplicato: %s',
+    options_model_row_not_saved: 'Salvato — una riga evidenziata sotto non è stata salvata',
     options_action_help_intent_guess: 'Aiuto — sintesi intento (anonimizzazione)',
     options_action_help_intent_judge: 'Aiuto — giudice intento (anonimizzazione)',
     options_action_tab_triage: 'Riordino/archiviazione automatica delle schede',
