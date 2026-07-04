@@ -112,6 +112,26 @@ function seedForOrigin(origin) {
   return h.readUInt32BE(0) >>> 0;
 }
 
+// Pagine di provider di identità (Google, Microsoft, GitHub, …): il rumore
+// anti-fingerprint su canvas/WebGL/audio, per quanto impercettibile per un
+// umano, altera esattamente i segnali che questi provider usano nei loro
+// motori antifrode per riconoscere un browser genuino da uno automatizzato/
+// manomesso. Su un sito normale è innocuo; su un login Google può far scattare
+// il blocco "Si è verificato un errore durante l'accesso" — riproducibile
+// solo con un vero tentativo di accesso, quindi difficile da diagnosticare
+// dai soli log. Riusiamo la stessa lista host di src/shared/authPopup.js (già
+// usata per non bloccare i popup OAuth come popup pubblicitari, #209): stessi
+// host, stesso motivo — sono endpoint di autenticazione, non vanno alterati.
+function isIdentityProviderHref(href) {
+  try {
+    require('../../shared/authPopup');
+    const mod = globalThis.SN_AUTH_POPUP;
+    return !!(mod && mod.isAuthPopup(href));
+  } catch (_) {
+    return false;
+  }
+}
+
 // Config { level, seed } per la pagina identificata da href. Solo http/https
 // vengono protette (filo://, file://, about: → off).
 function configForHref(href) {
@@ -126,6 +146,7 @@ function configForHref(href) {
     return { level: 0, seed: 0 };
   }
   if (!host) return { level: 0, seed: 0 };
+  if (isIdentityProviderHref(href)) return { level: 0, seed: 0 };
   return { level, seed: seedForOrigin(etld1(host)) };
 }
 
