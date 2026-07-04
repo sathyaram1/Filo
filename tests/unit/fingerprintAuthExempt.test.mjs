@@ -48,3 +48,23 @@ test('una pagina normale di claude.ai (non di login/auth) resta protetta normalm
   const cfg = FP.configForHref('https://claude.ai/chat/abc123');
   assert.equal(cfg.level, 1);
 });
+
+// Regressione: l'esenzione deve valere SOLO per gli host noti (stessa lista di
+// authPopup.js), non per l'euristica "questo path/query somiglia a un login
+// OAuth". Quell'euristica va bene per decidere se consentire un popup (un falso
+// positivo è innocuo), ma qui un falso positivo spegnerebbe la protezione
+// anti-fingerprint su un host qualunque — un tracker potrebbe attivarlo apposta
+// scegliendo un path "/login" o aggiungendo client_id/redirect_uri in query.
+test('un host sconosciuto con path "/login" NON è esente (solo gli host noti lo sono)', () => {
+  FP.setMode({ security: { fingerprint: { mode: 'default' } } });
+  const cfg = FP.configForHref('https://esempio-qualsiasi.com/login');
+  assert.equal(cfg.level, 1, 'un host non elencato non deve poter disattivare la protezione via path');
+  assert.notEqual(cfg.seed, 0);
+});
+
+test('un host sconosciuto con client_id+redirect_uri in query NON è esente', () => {
+  FP.setMode({ security: { fingerprint: { mode: 'default' } } });
+  const cfg = FP.configForHref('https://evil.com/track?client_id=1&redirect_uri=2');
+  assert.equal(cfg.level, 1, 'un host non elencato non deve poter disattivare la protezione via query');
+  assert.notEqual(cfg.seed, 0);
+});
