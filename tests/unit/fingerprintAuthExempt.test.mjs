@@ -68,10 +68,3 @@ test('un host sconosciuto con client_id+redirect_uri in query NON è esente', ()
   assert.equal(cfg.level, 1, 'un host non elencato non deve poter disattivare la protezione via query');
   assert.notEqual(cfg.seed, 0);
 });
-=======
-test('claude.ai stesso (non è un provider di identità, solo chi lo usa) resta protetto normalmente', () => {
-  FP.setMode({ security: { fingerprint: { mode: 'default' } } });
-  const cfg = FP.configForHref('https://claude.ai/login');
-  assert.equal(cfg.level, 1);
-});
->>>>>>> b328c521 (auto: tests/unit/fingerprintAuthExempt.test.mjs)
