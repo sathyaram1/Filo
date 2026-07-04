@@ -535,6 +535,21 @@ section:has(#dictList) .sn-spell-add-row {
   margin-bottom: 2px;
 }
 
+/* Riga scartata dal salvataggio (nickname mancante o duplicato, #216): bordo +
+   messaggio inline a tutta larghezza, niente alert bloccante. */
+.sn-model-row.sn-row-invalid { border-color: var(--sn-error); }
+.sn-model-row input.sn-input-invalid { border-color: var(--sn-error); }
+.sn-model-row-msg {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  color: var(--sn-error);
+}
+.sn-model-row-msg:empty { display: none; }
+/* Indicatore "Salvato" quando una riga è stata scartata: stesso posto, colore
+   d'allerta invece del verde/accento, per non affermare un salvataggio totale
+   che non c'è stato. */
+.sn-page .sn-saved-indicator.sn-hint-warn { color: var(--sn-error); }
+
 /* Lista read-only dei modelli predefiniti: 4 colonne (nickname, provider,
    stringa modello, Prova) — senza Rimuovi né input editabili. */
 .sn-default-model-row {
