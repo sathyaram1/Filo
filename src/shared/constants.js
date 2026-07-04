@@ -963,6 +963,42 @@
       `- CONVERSAZIONE (domanda, parere, chiacchiera sul mazzo): solo "reply", niente "query" né "cards".\n` +
       `- Nella "reply", marca SEMPRE ogni nome di carta con [[Nome Carta]] (nome inglese ufficiale), es. "Per stappare il commander guarda [[Seedborn Muse]]".\n` +
       `- Non inventare scryfall_id: usa solo quelli presenti nelle liste qui sopra.`,
+
+    // Parere contestuale carta-vs-mazzo (§6): batch di pareri brevi. Usato sia
+    // per la singola carta in hover (batch di 1) sia per "valuta il mazzo".
+    // Output JSON tipizzato: pareri per id + sintesi complessiva opzionale.
+    decksOpinion: ({ deckName, commanderName, identity, deckList, cards, wantSintesi }) =>
+      `Sei un esperto di Magic: The Gathering, formato Commander. Giudichi quanto una carta serve a QUESTO mazzo (sinergia col commander, ruolo nel piano di gioco, curva, ridondanza), non quanto è forte in assoluto.\n\n` +
+      `MAZZO: "${deckName || '(senza nome)'}"\n` +
+      `Commander: ${commanderName || '(non impostato)'}\n` +
+      `Color identity: ${identity || '(nessun vincolo)'}\n` +
+      `Carte nel mazzo (nome — tag):\n${deckList || '(vuoto)'}\n\n` +
+      `CARTE DA VALUTARE (alcune possono già essere nel mazzo, altre sono candidate):\n${cards}\n\n` +
+      `Rispondi con UN SOLO JSON valido (niente markdown, niente \`\`\`):\n` +
+      `{${wantSintesi ? '"sintesi": "<2-4 frasi in italiano sul mazzo nel suo insieme: punti forti, buchi evidenti>", ' : ''}"pareri": [{"id": "<scryfall_id>", "parere": "<2-3 frasi in italiano>"}, ...]}\n\n` +
+      `Regole:\n` +
+      `- Un parere per OGNI carta della lista da valutare, con il suo id ESATTO (mai inventare id).\n` +
+      `- Parere concreto e onesto: cosa fa per questo mazzo, quando è meglio/peggio di ciò che c'è già. Niente giri di parole.\n` +
+      `- Se la carta è fuori dai colori del commander o bandita, dillo subito.\n` +
+      `- Marca i nomi di ALTRE carte citate con [[Nome Carta]].`,
+
+    // Auto-tag (§7): giudizio booleano carta-per-tag in batch. L'output è una
+    // mappa id → tag pertinenti: un id con lista vuota è "giudicata, nessun
+    // tag" (informazione cacheabile), un id omesso è "non giudicata".
+    decksAutoTag: ({ deckName, commanderName, tags, cards }) =>
+      `Sei un esperto di Magic: The Gathering, formato Commander. Per ogni carta elencata decidi QUALI dei tag richiesti le si applicano, in base a ciò che la carta fa davvero (testo, tipo, costo).\n\n` +
+      `MAZZO: "${deckName || '(senza nome)'}"\n` +
+      `Commander: ${commanderName || '(non impostato)'}\n` +
+      `TAG RICHIESTI: ${tags}\n\n` +
+      `CARTE DA GIUDICARE:\n${cards}\n\n` +
+      `Rispondi con UN SOLO JSON valido (niente markdown, niente \`\`\`): una mappa che associa OGNI id carta alla lista dei tag pertinenti (lista vuota [] se nessun tag si applica):\n` +
+      `{"<scryfall_id>": ["<tag>", ...], ...}\n\n` +
+      `Regole:\n` +
+      `- Includi TUTTE le carte elencate, anche quelle senza tag pertinenti (con []).\n` +
+      `- Usa i tag ESATTAMENTE come scritti nella lista dei tag richiesti (minuscolo).\n` +
+      `- Un tag si applica solo se la carta svolge davvero quella funzione (es. "ramp" = accelera il mana; "draw" = pesca carte; "removal" = rimuove permanenti o creature).\n` +
+      `- Per i tag che citano il commander o le sinergie del mazzo, giudica nel contesto di QUESTO mazzo.\n` +
+      `- Mai inventare id: usa solo quelli elencati.`,
   };
 
   const DEFAULT_SETTINGS = {
