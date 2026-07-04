@@ -22,6 +22,16 @@
     // mappa dei simboli di mana (permanente). Vedi services/scryfall.js.
     SCRYFALL_CARDS: 'scryfallCards',
     SCRYFALL_SYMBOLS: 'scryfallSymbols',
+    // Conteggio ristampe per nome carta (modulo "Prezzo e dati" del detail,
+    // §5.2): cache permanente nome → numero di stampe. Vedi services/scryfall.js.
+    SCRYFALL_PRINTS: 'scryfallPrints',
+    // Pareri LLM del deck builder (§6.2): { deckId → { cardId → { text,
+    // versione, at } } }. Un parere stantio resta visibile (marcato), mai
+    // cancellato in automatico. Vedi src/main/services/deckOpinions.js.
+    DECK_OPINIONS: 'deckOpinions',
+    // Cache auto-tag (§7): { cardId → { tag → bool } }, SOLO tag context-free.
+    // Permanente e cross-mazzo. Vedi src/main/services/deckOpinions.js.
+    DECK_TAG_CACHE: 'deckTagCache',
     COSTS: 'costs',
     // Crediti (gamification): saldo, refill giornaliero, consumo aggregato per
     // tipo d'uso e log ricompense. Cache locale del doc Firestore `credits/<uid>`.
@@ -142,6 +152,13 @@
     // Traduce query secche/frasi conversazionali in query Scryfall o seleziona
     // carte da un altro mazzo (query cross-mazzo). Output JSON tipizzato.
     DECKS_CHAT: 'decks_chat_ai',
+    // Parere contestuale carta-vs-mazzo (§6): batch di pareri brevi calcolati
+    // su richiesta (hover col modulo attivo, aggiunta al mazzo, "valuta il
+    // mazzo"). Cache per (carta, versione mazzo) in deckOpinions.js.
+    DECKS_OPINION: 'decks_opinion_ai',
+    // Auto-tag del mazzo (§7): LLM economico giudica carta-per-tag in batch.
+    // Cache (carta, tag) permanente cross-mazzo per i tag context-free.
+    DECKS_AUTOTAG: 'decks_autotag_ai',
   };
 
   // === Crediti (gamification) ===
@@ -292,6 +309,10 @@
     [ACTIONS.FILO_COMPACT]: 'flash, flash-or',
     // Chat del deck builder: traduzione NL→query Scryfall + risposte brevi.
     [ACTIONS.DECKS_CHAT]: 'flash, flash-or',
+    // Parere carta-vs-mazzo (§6): giudizio breve ma sensato → flash.
+    [ACTIONS.DECKS_OPINION]: 'flash, flash-or',
+    // Auto-tag (§7): giudizio booleano carta-per-tag → modello economico.
+    [ACTIONS.DECKS_AUTOTAG]: 'flash-lite-3, flash-lite-3-or',
     // Triage tab: decisione economica e frequente → lite va bene.
     [ACTIONS.FILO_TAB_TRIAGE]: 'flash-lite-3, flash-lite-3-or',
     // Riassunto pagina alla chiusura: economico (gira spesso).
@@ -930,16 +951,54 @@
       `Carte nel mazzo (nome — tag):\n${deckCards || '(vuoto)'}\n\n` +
       `ALTRI MAZZI DELL'UTENTE (per le richieste che citano un altro mazzo):\n${otherDecks || '(nessuno)'}\n\n` +
       `Decidi la natura del messaggio e rispondi con UN SOLO JSON valido (niente markdown, niente \`\`\`):\n` +
-      `{"reply": "<testo breve in italiano, opzionale>", "query": "<query Scryfall, opzionale>", "cards": ["<scryfall_id>", ...] (opzionale), "budget": <numero | null> (opzionale), "prob": {"turn": <N>, "needs": {"<categoria>": <quante>}} (opzionale)}\n\n` +
+      `{"reply": "<testo breve in italiano, opzionale>", "query": "<query Scryfall, opzionale>", "cards": ["<scryfall_id>", ...] (opzionale), "budget": <numero | null> (opzionale), "prob": {"turn": <N>, "needs": {"<categoria>": <quante>}} (opzionale), "evaluate": "deck" | "results" (opzionale), "tagWith": ["<tag>", ...] (opzionale)}\n\n` +
       `Regole:\n` +
       `- RICERCA (query secca o frase che chiede carte): produci "query" in sintassi Scryfall (termini in inglese: o:, t:, cmc, kw:, ecc.). NON aggiungere vincoli di color identity (id/id<=): li aggiunge il sistema automaticamente. "reply" può restare vuota o contenere UNA frase di contesto.\n` +
       `- SINTASSI ESPLICITA: se il messaggio contiene già sintassi Scryfall (es. "o:haste cmc<=2", "t:dragon"), quelle parti passano INVARIATE nella query; traduci solo l'eventuale parte in linguaggio naturale attorno.\n` +
       `- CROSS-MAZZO ("il ramp di mazzo X", "le terre del mio mazzo Y"): NON fare una query. Seleziona dalla lista dell'altro mazzo le carte pertinenti (usa nomi e tag) e metti i loro scryfall_id in "cards", nell'ordine della lista. In "reply" una frase breve su cosa hai selezionato.\n` +
       `- BUDGET ("budget 40 euro", "metti un tetto di 25€", "togli il budget"): metti in "budget" il numero in euro, oppure null per rimuovere il tetto. Il sistema lo applica e conferma da solo: "reply" può restare vuota.\n` +
       `- PROBABILITÀ ("che probabilità ho di avere 2 ramp e 3 terre al turno 10?"): compila "prob" con "turn" e "needs" (chiavi = categorie richieste, valori = quante carte). Le categorie valide sono i tag del mazzo elencati sopra, più "terre" (le terre del mazzo). Il sistema esegue la simulazione e aggiunge il risultato: "reply" può restare vuota. Se l'utente usa una categoria che non esiste tra i tag, dillo in "reply" e non compilare "prob".\n` +
+      `- VALUTAZIONE BATCH ("valuta il mazzo", "dammi un parere su tutto il mazzo"): metti "evaluate": "deck". ("valuta questi risultati", "valuta queste carte"): metti "evaluate": "results". Il sistema calcola i pareri carta per carta e risponde da solo: "reply" può restare vuota. NON usare "evaluate" per una domanda su una singola carta (quella è CONVERSAZIONE).\n` +
+      `- AUTO-TAG ("tagga il mazzo con ramp, draw, removal", "dividi le carte in ramp e removal"): metti in "tagWith" la lista dei tag richiesti, così come l'utente li ha nominati. Il sistema giudica carta per carta e applica i tag da solo: "reply" può restare vuota.\n` +
       `- CONVERSAZIONE (domanda, parere, chiacchiera sul mazzo): solo "reply", niente "query" né "cards".\n` +
       `- Nella "reply", marca SEMPRE ogni nome di carta con [[Nome Carta]] (nome inglese ufficiale), es. "Per stappare il commander guarda [[Seedborn Muse]]".\n` +
       `- Non inventare scryfall_id: usa solo quelli presenti nelle liste qui sopra.`,
+
+    // Parere contestuale carta-vs-mazzo (§6): batch di pareri brevi. Usato sia
+    // per la singola carta in hover (batch di 1) sia per "valuta il mazzo".
+    // Output JSON tipizzato: pareri per id + sintesi complessiva opzionale.
+    decksOpinion: ({ deckName, commanderName, identity, deckList, cards, wantSintesi }) =>
+      `Sei un esperto di Magic: The Gathering, formato Commander. Giudichi quanto una carta serve a QUESTO mazzo (sinergia col commander, ruolo nel piano di gioco, curva, ridondanza), non quanto è forte in assoluto.\n\n` +
+      `MAZZO: "${deckName || '(senza nome)'}"\n` +
+      `Commander: ${commanderName || '(non impostato)'}\n` +
+      `Color identity: ${identity || '(nessun vincolo)'}\n` +
+      `Carte nel mazzo (nome — tag):\n${deckList || '(vuoto)'}\n\n` +
+      `CARTE DA VALUTARE (alcune possono già essere nel mazzo, altre sono candidate):\n${cards}\n\n` +
+      `Rispondi con UN SOLO JSON valido (niente markdown, niente \`\`\`):\n` +
+      `{${wantSintesi ? '"sintesi": "<2-4 frasi in italiano sul mazzo nel suo insieme: punti forti, buchi evidenti>", ' : ''}"pareri": [{"id": "<scryfall_id>", "parere": "<2-3 frasi in italiano>"}, ...]}\n\n` +
+      `Regole:\n` +
+      `- Un parere per OGNI carta della lista da valutare, con il suo id ESATTO (mai inventare id).\n` +
+      `- Parere concreto e onesto: cosa fa per questo mazzo, quando è meglio/peggio di ciò che c'è già. Niente giri di parole.\n` +
+      `- Se la carta è fuori dai colori del commander o bandita, dillo subito.\n` +
+      `- Marca i nomi di ALTRE carte citate con [[Nome Carta]].`,
+
+    // Auto-tag (§7): giudizio booleano carta-per-tag in batch. L'output è una
+    // mappa id → tag pertinenti: un id con lista vuota è "giudicata, nessun
+    // tag" (informazione cacheabile), un id omesso è "non giudicata".
+    decksAutoTag: ({ deckName, commanderName, tags, cards }) =>
+      `Sei un esperto di Magic: The Gathering, formato Commander. Per ogni carta elencata decidi QUALI dei tag richiesti le si applicano, in base a ciò che la carta fa davvero (testo, tipo, costo).\n\n` +
+      `MAZZO: "${deckName || '(senza nome)'}"\n` +
+      `Commander: ${commanderName || '(non impostato)'}\n` +
+      `TAG RICHIESTI: ${tags}\n\n` +
+      `CARTE DA GIUDICARE:\n${cards}\n\n` +
+      `Rispondi con UN SOLO JSON valido (niente markdown, niente \`\`\`): una mappa che associa OGNI id carta alla lista dei tag pertinenti (lista vuota [] se nessun tag si applica):\n` +
+      `{"<scryfall_id>": ["<tag>", ...], ...}\n\n` +
+      `Regole:\n` +
+      `- Includi TUTTE le carte elencate, anche quelle senza tag pertinenti (con []).\n` +
+      `- Usa i tag ESATTAMENTE come scritti nella lista dei tag richiesti (minuscolo).\n` +
+      `- Un tag si applica solo se la carta svolge davvero quella funzione (es. "ramp" = accelera il mana; "draw" = pesca carte; "removal" = rimuove permanenti o creature).\n` +
+      `- Per i tag che citano il commander o le sinergie del mazzo, giudica nel contesto di QUESTO mazzo.\n` +
+      `- Mai inventare id: usa solo quelli elencati.`,
   };
 
   const DEFAULT_SETTINGS = {

@@ -119,7 +119,7 @@ test('isFresh: dentro il TTL sì, oltre no, timestamp rotto no', () => {
 
 // ── parseAgentReply (chat unificata §3): JSON tollerante ─────────────────────
 
-const NONE = { reply: '', query: '', cards: [], hasBudget: false, budget: null, prob: null };
+const NONE = { reply: '', query: '', cards: [], hasBudget: false, budget: null, prob: null, evaluate: '', tagWith: [] };
 
 test('parseAgentReply: JSON pulito → campi normalizzati', () => {
   const r = Q.parseAgentReply('{"reply":"Ecco","query":"o:haste","cards":["a","b"]}');
@@ -160,6 +160,19 @@ test('parseAgentReply: prob — needs come oggetto o array, tag normalizzati, in
   assert.equal(Q.parseAgentReply('{"prob":{"turn":0,"needs":{"a":1}}}').prob, null);
   assert.equal(Q.parseAgentReply('{"prob":{"turn":5,"needs":{"a":0}}}').prob, null);
   assert.equal(Q.parseAgentReply('{"prob":"domani"}').prob, null);
+});
+
+test('parseAgentReply: evaluate — "deck"/"results" passano, true legacy → deck, altro si scarta', () => {
+  assert.equal(Q.parseAgentReply('{"evaluate":"deck"}').evaluate, 'deck');
+  assert.equal(Q.parseAgentReply('{"evaluate":"results"}').evaluate, 'results');
+  assert.equal(Q.parseAgentReply('{"evaluate":true}').evaluate, 'deck');
+  assert.equal(Q.parseAgentReply('{"evaluate":"tutto"}').evaluate, '');
+  assert.equal(Q.parseAgentReply('{}').evaluate, '');
+});
+
+test('parseAgentReply: tagWith — tag normalizzati minuscoli, spazzatura scartata', () => {
+  assert.deepEqual(Q.parseAgentReply('{"tagWith":["Ramp"," DRAW ",""]}').tagWith, ['ramp', 'draw']);
+  assert.deepEqual(Q.parseAgentReply('{"tagWith":"ramp"}').tagWith, []);
 });
 
 // ── proseSegments ([[Nome Carta]] §3.5) ──────────────────────────────────────

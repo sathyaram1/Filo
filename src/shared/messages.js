@@ -60,14 +60,20 @@
     // Scryfall e scrive commander + commanderMeta (nome, identity, art crop).
     DECKS_SET_COMMANDER: 'decks_set_commander', // { id, scryfallId }
     // Chat unificata del Builder (§3-§4): NL → query Scryfall / carte
-    // cross-mazzo via LLM. { deckId, text, history? } →
-    // { ok, reply, cardIds, cards, query }.
+    // cross-mazzo via LLM. { deckId, text, history?, lastResults? } →
+    // { ok, reply, cardIds, cards, query, deck? }. `lastResults` sono gli id
+    // dell'ultima CardList mostrata (per "valuta questi risultati", §6.1).
     DECKS_CHAT: 'decks_chat',
+    // Parere LLM carta-vs-mazzo (§6). { deckId, cardIds, compute?, refresh? } →
+    // { ok, opinions: { cardId → { text, versione, stale } } }.
+    // compute=false: solo cache (mai LLM). refresh=true: ricalcola anche i freschi.
+    DECKS_OPINION: 'decks_opinion',
     // Client Scryfall (§13.2), tutto nel main (rate limit + cache condivisi).
     SCRYFALL_SEARCH: 'scryfall_search',   // { query, deckId? } → identity auto dal commander
     SCRYFALL_NAMED: 'scryfall_named',     // { name } (risoluzione fuzzy)
     SCRYFALL_CARDS: 'scryfall_cards',     // { ids, freshPrices? } → mappa id → carta
     SCRYFALL_SYMBOLS: 'scryfall_symbols', // {} → mappa '{U}' → svg_uri
+    SCRYFALL_PRINTS: 'scryfall_prints',   // { name } → { ok, prints } (n. stampe, cache permanente)
     GET_COSTS: 'get_costs',
     // Crediti (gamification): saldo + consumo aggregato per tipo d'uso, per la
     // pagina Crediti del profilo. NON espone mai il costo in €. Vedi creditStore.

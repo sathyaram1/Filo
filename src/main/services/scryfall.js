@@ -101,9 +101,10 @@
     const missing = [];
     for (const id of wanted) {
       const e = map[id];
-      // `producedMana === undefined` = entry scritta prima che il campo
-      // esistesse (schema vecchio): si rifetcha per avere il mana prodotto.
-      if (e && Q.isFresh(e.fetchedAt, maxAgeMs) && e.card && e.card.producedMana !== undefined) out[id] = e.card;
+      // `producedMana`/`oracleText === undefined` = entry scritta prima che il
+      // campo esistesse (schema vecchio): si rifetcha per avere il dato nuovo.
+      if (e && Q.isFresh(e.fetchedAt, maxAgeMs) && e.card
+          && e.card.producedMana !== undefined && e.card.oracleText !== undefined) out[id] = e.card;
       else missing.push(id);
     }
     const fetched = [];
@@ -126,6 +127,24 @@
     return map[String(id)] || null;
   }
 
+  // ── Conteggio ristampe per nome (modulo "Prezzo e dati", §5.2) ───────────
+  // `unique=prints` conta tutte le stampe della carta; il numero cambia solo
+  // quando esce un set nuovo → cache permanente per nome (minuscolo).
+  async function prints(name) {
+    const n = String(name || '').trim();
+    if (!n) return null;
+    const key = n.toLowerCase();
+    const res = await chrome.storage.local.get(STORAGE_KEYS.SCRYFALL_PRINTS);
+    const map = (res[STORAGE_KEYS.SCRYFALL_PRINTS] && typeof res[STORAGE_KEYS.SCRYFALL_PRINTS] === 'object')
+      ? res[STORAGE_KEYS.SCRYFALL_PRINTS] : {};
+    if (map[key] && Number.isFinite(Number(map[key].n))) return Number(map[key].n);
+    const data = await apiGet(`/cards/search?q=${encodeURIComponent(`!"${n}"`)}&unique=prints`);
+    const count = data ? (Number(data.total_cards) || (data.data || []).length) : 0;
+    map[key] = { n: count, fetchedAt: Date.now() };
+    await chrome.storage.local.set({ [STORAGE_KEYS.SCRYFALL_PRINTS]: map });
+    return count;
+  }
+
   // ── Simboli di mana (symbology): symbol → svg_uri, cache permanente ──────
   async function symbols() {
     const res = await chrome.storage.local.get(STORAGE_KEYS.SCRYFALL_SYMBOLS);
@@ -142,5 +161,5 @@
     return map;
   }
 
-  global.SN_SCRYFALL = { search, named, card, cards, symbols, PRICE_TTL_MS, _setFetch };
+  global.SN_SCRYFALL = { search, named, card, cards, symbols, prints, PRICE_TTL_MS, _setFetch };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
