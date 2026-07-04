@@ -269,10 +269,14 @@
   async function loadDeckCards() {
     const ids = current.carte.map((c) => c.scryfall_id);
     if (current.commander) ids.push(current.commander);
-    if (!ids.length) { cardsById = {}; return; }
+    if (!ids.length) return;
     // freshPrices: il budget (§9.2) vuole prezzi EUR con TTL, non eterni.
     const r = await send({ type: MSG.SCRYFALL_CARDS, ids, freshPrices: true });
-    cardsById = (r && r.ok && r.cards) || {};
+    // MERGE, mai sostituzione: la cache di pagina contiene anche le carte dei
+    // risultati chat (sendChat) e dei nomi in prosa risolti (resolveProseCard).
+    // Le bolle chat vivono per tutta la pagina (chatByDeck): dopo un edit del
+    // mazzo l'hover su quei risultati deve continuare ad aprire la preview.
+    Object.assign(cardsById, (r && r.ok && r.cards) || {});
   }
 
   function manaHtml(cost) {
