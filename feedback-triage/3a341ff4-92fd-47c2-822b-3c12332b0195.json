@@ -1,9 +1,0 @@
-{
-  "id": "3a341ff4-92fd-47c2-822b-3c12332b0195",
-  "status": "design",
-  "notes": "secaudit L4: FAIL non per contenuto malevolo (le modifiche a firestore.rules/storage.rules viste sono un irrigidimento legittimo, no backdoor/segreti in chiaro trovati), ma per anomalia strutturale grave: worker/3a341ff4 non ha merge-base con main (git merge-base fallisce, root commit orfano che contiene uno snapshot completo del repo, ~522 file). Il diff main...worker/3a341ff4 richiesto dal protocollo fallisce silenziosamente (dispatch.mjs lo cattura e restituisce stringa vuota) e anche merge-gate.mjs userebbe lo stesso diff a 3 puntini: rischio che L5 (file sensibili) non veda correttamente i file toccati perche il diff calcolato e in realta il messaggio di errore git, non un diff vero. git merge fallirebbe comunque per unrelated histories, quindi nessun push accidentale, ma non e sicuro ne corretto affidarsi a quel percorso. Stesso pattern di root orfano visto anche su altri 2 worker branch: sembra un problema di provisioning del worktree/sandbox, non un attacco. Serve intervento umano per ricreare il branch da main prima di qualunque merge.",
-  "queuedAt": "2026-07-04T18:42:30.654Z",
-  "queuedBy": "routine",
-  "branch": "worker/3a341ff4",
-  "reason": "loop"
-}
