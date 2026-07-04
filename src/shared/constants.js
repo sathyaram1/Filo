@@ -152,6 +152,13 @@
     // Traduce query secche/frasi conversazionali in query Scryfall o seleziona
     // carte da un altro mazzo (query cross-mazzo). Output JSON tipizzato.
     DECKS_CHAT: 'decks_chat_ai',
+    // Parere contestuale carta-vs-mazzo (§6): batch di pareri brevi calcolati
+    // su richiesta (hover col modulo attivo, aggiunta al mazzo, "valuta il
+    // mazzo"). Cache per (carta, versione mazzo) in deckOpinions.js.
+    DECKS_OPINION: 'decks_opinion_ai',
+    // Auto-tag del mazzo (§7): LLM economico giudica carta-per-tag in batch.
+    // Cache (carta, tag) permanente cross-mazzo per i tag context-free.
+    DECKS_AUTOTAG: 'decks_autotag_ai',
   };
 
   // === Crediti (gamification) ===
