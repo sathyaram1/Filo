@@ -43,8 +43,8 @@ test('un sito normale (non provider di identità) continua a ricevere il rumore'
   assert.notEqual(cfg.seed, 0);
 });
 
-test('claude.ai stesso (non è un provider di identità, solo chi lo usa) resta protetto normalmente', () => {
+test('una pagina normale di claude.ai (non di login/auth) resta protetta normalmente', () => {
   FP.setMode({ security: { fingerprint: { mode: 'default' } } });
-  const cfg = FP.configForHref('https://claude.ai/login');
+  const cfg = FP.configForHref('https://claude.ai/chat/abc123');
   assert.equal(cfg.level, 1);
 });
