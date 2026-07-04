@@ -20,6 +20,7 @@
       features: [],
       fixes: [
         'Corretto un problema che poteva far fallire l\'accesso con "Continua con Google" (o altri provider come Microsoft/GitHub) su alcuni siti.',
+        'Nelle Opzioni, aggiungere un modello senza nickname (o con un nickname già usato) non fa più sparire la riga in silenzio: ora viene evidenziata con una spiegazione, e la conferma di salvataggio lo segnala invece di dare un falso "Salvato".',
       ],
     },
     {
