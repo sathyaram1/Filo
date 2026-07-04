@@ -1,8 +1,0 @@
-{
-  "id": "3a341ff4-92fd-47c2-822b-3c12332b0195",
-  "status": "revision_capability",
-  "notes": "Corretto: sull'avviso a schermo intero \"Sito pericoloso\", cliccare \"Torna indietro\" su una scheda nuova (senza pagina precedente) ora chiude davvero l'avviso senza confermare il sito. Prima, in quel caso, Filo trattava silenziosamente il click come se l'utente avesse scritto \"confermo\" e premuto \"Procedi comunque\": il sito restava marcato come sicuro per quella scheda, quindi se ricompariva (redirect, link) l'avviso di pericolo non si vedeva più.\n\nNon ho potuto verificare aprendo l'app impacchettata: in questo ambiente cloud il download del componente Electron è bloccato dalla policy di rete (stesso limite già incontrato da una sessione precedente). Ho verificato il fix eseguendo il vero codice dell'avviso in un ambiente browser simulato: prima della modifica, cliccare \"Torna indietro\" su una scheda nuova invia davvero il messaggio di conferma al posto di quello di rifiuto (bug riprodotto); dopo la modifica lo stesso click non invia alcuna conferma e la pagina viene lasciata. Ho aggiunto anche uno spec Playwright mirato (tests/safebrowse.spec.mjs) che verifica lo stesso comportamento tramite l'app vera, da far girare a chi ha Electron disponibile.\n\nNessuna aggiunta oltre al fix richiesto.",
-  "queuedAt": "2026-07-04T18:31:24.945Z",
-  "queuedBy": "routine",
-  "branch": "worker/3a341ff4"
-}
