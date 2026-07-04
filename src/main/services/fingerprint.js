@@ -122,11 +122,19 @@ function seedForOrigin(origin) {
 // dai soli log. Riusiamo la stessa lista host di src/shared/authPopup.js (già
 // usata per non bloccare i popup OAuth come popup pubblicitari, #209): stessi
 // host, stesso motivo — sono endpoint di autenticazione, non vanno alterati.
+//
+// Usiamo SOLO il match su host noto (isKnownIdentityHost), NON l'euristica
+// isAuthPopup() completa (path /login|/auth|/sso… o query client_id+redirect_uri):
+// quell'euristica è pensata per riconoscere popup OAuth generici, dove un falso
+// positivo è innocuo (al massimo si consente un popup in più). Qui un falso
+// positivo spegnerebbe la protezione anti-fingerprint su un sito qualunque —
+// un tracker potrebbe disattivarla deliberatamente scegliendo un path "/login"
+// o aggiungendo client_id/redirect_uri in query.
 function isIdentityProviderHref(href) {
   try {
     require('../../shared/authPopup');
     const mod = globalThis.SN_AUTH_POPUP;
-    return !!(mod && mod.isAuthPopup(href));
+    return !!(mod && mod.isKnownIdentityHost(href));
   } catch (_) {
     return false;
   }
