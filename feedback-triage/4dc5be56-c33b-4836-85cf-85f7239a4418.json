@@ -1,0 +1,8 @@
+{
+  "id": "4dc5be56-c33b-4836-85cf-85f7239a4418",
+  "status": "revision_capability",
+  "notes": "Corretti i due test rapidi che si bloccavano: ora la suite npm run test:unit passa tutta senza errori.",
+  "queuedAt": "2026-07-04T19:27:01.092Z",
+  "queuedBy": "routine",
+  "branch": "worker/4dc5be56-c33b-4836-85cf-85f7239a4418"
+}
