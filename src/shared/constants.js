@@ -22,6 +22,16 @@
     // mappa dei simboli di mana (permanente). Vedi services/scryfall.js.
     SCRYFALL_CARDS: 'scryfallCards',
     SCRYFALL_SYMBOLS: 'scryfallSymbols',
+    // Conteggio ristampe per nome carta (modulo "Prezzo e dati" del detail,
+    // §5.2): cache permanente nome → numero di stampe. Vedi services/scryfall.js.
+    SCRYFALL_PRINTS: 'scryfallPrints',
+    // Pareri LLM del deck builder (§6.2): { deckId → { cardId → { text,
+    // versione, at } } }. Un parere stantio resta visibile (marcato), mai
+    // cancellato in automatico. Vedi src/main/services/deckOpinions.js.
+    DECK_OPINIONS: 'deckOpinions',
+    // Cache auto-tag (§7): { cardId → { tag → bool } }, SOLO tag context-free.
+    // Permanente e cross-mazzo. Vedi src/main/services/deckOpinions.js.
+    DECK_TAG_CACHE: 'deckTagCache',
     COSTS: 'costs',
     // Crediti (gamification): saldo, refill giornaliero, consumo aggregato per
     // tipo d'uso e log ricompense. Cache locale del doc Firestore `credits/<uid>`.
