@@ -81,5 +81,20 @@
     return false;
   }
 
-  global.SN_AUTH_POPUP = { isAuthPopup };
+  // True se l'host è un provider di identità NOTO (match esatto host o
+  // sottodominio su AUTH_HOSTS/AUTH_HOST_SUFFIXES). A differenza di
+  // isAuthPopup() non usa l'euristica su path/query (pensata per riconoscere
+  // popup OAuth generici, contesto a basso rischio se sbaglia): qui serve un
+  // criterio stretto perché un falso positivo esenta un sito qualunque dalla
+  // protezione anti-fingerprint (basterebbe un path "/login" o dei parametri
+  // client_id/redirect_uri per disattivarla deliberatamente).
+  function isKnownIdentityHost(url) {
+    if (!url || typeof url !== 'string') return false;
+    let u;
+    try { u = new URL(url); } catch (_) { return false; }
+    if (!/^https?:$/.test(u.protocol)) return false;
+    return hostMatches(u.host);
+  }
+
+  global.SN_AUTH_POPUP = { isAuthPopup, isKnownIdentityHost };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
