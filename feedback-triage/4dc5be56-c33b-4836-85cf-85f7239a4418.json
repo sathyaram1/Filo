@@ -1,7 +1,0 @@
-{
-  "id": "4dc5be56-c33b-4836-85cf-85f7239a4418",
-  "status": "done",
-  "notes": "Secaudit: branch worker/4dc5be56-c33b-4836-85cf-85f7239a4418 gia' interamente fuso in main (single-worktree, auto-commit hook). Diff vuoto, nessun rischio di sicurezza. Gate eseguito, chiuso.",
-  "queuedAt": "2026-07-04T19:34:20.626Z",
-  "queuedBy": "routine"
-}
