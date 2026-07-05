@@ -115,7 +115,10 @@
   }
 
   function parseAgentReply(text) {
-    const none = { reply: '', query: '', cards: [], hasBudget: false, budget: null, prob: null, evaluate: '', tagWith: [] };
+    const none = {
+      reply: '', query: '', cards: [], hasBudget: false, budget: null, prob: null, evaluate: '', tagWith: [],
+      import: [], commanderName: '',
+    };
     const raw = String(text || '').trim();
     if (!raw) return none;
     // Candidati: contenuto dei fence ```…```, testo intero, primo blocco {...}.
