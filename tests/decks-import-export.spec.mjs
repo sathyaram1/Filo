@@ -1,0 +1,103 @@
+// Import/Export testuale del deck builder (task 9, DECK-BUILDER-SPEC.md §11),
+// via switcher (§8.2): "Importa…" incolla una lista, il parser RIGIDO risolve
+// ogni nome su Scryfall (mockato) e mostra un'anteprima di conferma PRIMA di
+// scrivere nel mazzo — mai un'importazione "a scatola chiusa". "Esporta…"
+// genera lo stesso formato testuale, pronto da copiare. Si asserisce il
+// SUCCESSO: le carte compaiono davvero nella colonna del mazzo con la qty
+// giusta, non solo che l'overlay "non dà errore".
+
+import { test, expect } from './fixtures/electron.mjs';
+
+async function mockScryfall(app) {
+  await app.evaluate(() => {
+    const SOL_RING = {
+      id: 'sol-ring', name: 'Sol Ring', mana_cost: '{1}', cmc: 1,
+      type_line: 'Artifact', colors: [], color_identity: [],
+      image_uris: { normal: 'https://cards.test/sol.jpg' },
+      prices: { eur: '1.50' }, legalities: { commander: 'legal' },
+      scryfall_uri: 'https://scryfall.com/card/sol',
+    };
+    const FOREST = {
+      id: 'forest', name: 'Forest', mana_cost: '', cmc: 0,
+      type_line: 'Basic Land — Forest', colors: [], color_identity: ['G'],
+      produced_mana: ['G'],
+      image_uris: { normal: 'https://cards.test/forest.jpg' },
+      prices: { eur: '0.10' }, legalities: { commander: 'legal' },
+      scryfall_uri: 'https://scryfall.com/card/forest',
+    };
+    const BY_NAME = { 'sol ring': SOL_RING, forest: FOREST };
+    const BY_ID = { 'sol-ring': SOL_RING, forest: FOREST };
+    globalThis.SN_SCRYFALL._setFetch(async (url) => {
+      const u = new URL(String(url));
+      let body = null;
+      if (u.pathname === '/cards/named') {
+        const fuzzy = String(u.searchParams.get('fuzzy') || '').toLowerCase();
+        body = BY_NAME[fuzzy] || null;
+      } else if (BY_ID[u.pathname.replace('/cards/', '')]) {
+        body = BY_ID[u.pathname.replace('/cards/', '')];
+      } else if (u.pathname === '/symbology') {
+        body = { data: [{ symbol: '{1}', svg_uri: 'https://svgs.test/1.svg' }] };
+      }
+      if (!body) return { ok: false, status: 404, json: async () => ({}) };
+      return { ok: true, status: 200, json: async () => body };
+    });
+  });
+}
+
+async function newDeck(page) {
+  await page.click('#newDeck');
+  await expect(page.locator('#screenBuilder')).toBeVisible();
+}
+
+test('Importa dallo switcher: anteprima segnala non-trovati/sporchi, la conferma scrive le carte nel mazzo', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await mockScryfall(app);
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await newDeck(page);
+
+  await page.click('#deckName');
+  await page.locator('.dk-switcher .sn-select-option', { hasText: 'Importa…' }).click();
+  await expect(page.locator('.dk-io-box')).toBeVisible();
+
+  await page.fill('.dk-io-textarea', '1 Sol Ring\n10 Forest\n1 Carta Che Non Esiste\nriga senza quantità');
+  await page.locator('[data-io="parse"]').click();
+
+  // Anteprima: 3 righe ben formate su 4 (una carta non trovata resta "3 su 4",
+  // non è una riga sporca), 1 riga sporca segnalata separatamente.
+  await expect(page.locator('.dk-io-note').first()).toContainText('3 carte riconosciute su 4');
+  await expect(page.locator('.dk-io-dirty li')).toHaveCount(2); // "Carta Che Non Esiste" (non risolta) + la riga sporca
+  await expect(page.locator('.dk-io-dirty')).toContainText('riga senza quantità');
+
+  const applyBtn = page.locator('[data-io="apply"]');
+  await expect(applyBtn).toHaveText('Importa 2 carte');
+  await applyBtn.click();
+
+  // L'overlay si chiude e le carte compaiono DAVVERO nella colonna centrale,
+  // con la quantità giusta per le basic land (§11.1).
+  await expect(page.locator('.dk-io-box')).toHaveCount(0);
+  await expect(page.locator('#deckList .dk-row[data-card-id="sol-ring"]')).toBeVisible();
+  await expect(page.locator('#deckList .dk-row[data-card-id="forest"]')).toBeVisible();
+  await expect(page.locator('#deckCount')).toHaveText('11/100 carte');
+});
+
+test('Esporta dallo switcher: stesso formato testuale, con la carta e la quantità reali', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await mockScryfall(app);
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await newDeck(page);
+
+  // Importa prima due carte così l'export ha qualcosa da mostrare.
+  await page.click('#deckName');
+  await page.locator('.dk-switcher .sn-select-option', { hasText: 'Importa…' }).click();
+  await page.fill('.dk-io-textarea', '1 Sol Ring\n10 Forest');
+  await page.locator('[data-io="parse"]').click();
+  await page.locator('[data-io="apply"]').click();
+  await expect(page.locator('.dk-io-box')).toHaveCount(0);
+
+  await page.click('#deckName');
+  await page.locator('.dk-switcher .sn-select-option', { hasText: 'Esporta…' }).click();
+  const ta = page.locator('.dk-io-textarea');
+  await expect(ta).toHaveValue('Deck\n10 Forest\n1 Sol Ring');
+});
