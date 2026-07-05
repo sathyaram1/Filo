@@ -155,6 +155,17 @@
           // Auto-tag (§7): tag richiesti, normalizzati minuscoli.
           tagWith: Array.isArray(o.tagWith)
             ? o.tagWith.map((t) => String(t).trim().toLowerCase()).filter(Boolean) : [],
+          // Import via chat (§11.2): lista grezza incollata → nomi indovinati
+          // dal modello (typo/italiano/formati strani tollerati) + quantità.
+          // MAI scryfall_id qui: la risoluzione la fa il sistema via fuzzy
+          // match (mai fidarsi di un id inventato dal modello, §11.2).
+          import: Array.isArray(o.import)
+            ? o.import.map((it) => ({
+                name: typeof (it && it.name) === 'string' ? it.name.trim() : '',
+                qty: Math.max(1, Math.floor(Number(it && it.qty)) || 1),
+              })).filter((it) => it.name)
+            : [],
+          commanderName: typeof o.commander === 'string' ? o.commander.trim() : '',
         };
       } catch (_) { /* prova il prossimo candidato */ }
     }
