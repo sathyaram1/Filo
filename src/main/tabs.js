@@ -1501,8 +1501,35 @@ class TabManager {
       // pubblicità: vanno consentiti come VERA finestra popup (action 'allow'),
       // così la relazione opener↔popup che l'OAuth usa per restituire l'esito
       // resta intatta. Una nuova scheda (deny+openTab) la spezzerebbe.
+      //
+      // #209 (giro successivo) — 'allow' da solo NON basta: senza
+      // overrideBrowserWindowOptions Electron crea il popup con un
+      // BrowserWindow "nudo", senza ALCUN preload (il preload non è fra le
+      // security webPreferences ereditate dall'opener). Il popup nasce quindi
+      // SENZA page-preload.js: né l'esenzione anti-fingerprint per i login
+      // (services/fingerprint.js → isIdentityProviderHref) né nessun altro
+      // pezzo di quel preload raggiungono MAI la pagina di Google/Microsoft/…
+      // dentro il popup — solo la scheda opener (claude.ai) lo aveva. Diamo al
+      // popup le stesse webPreferences di una scheda esterna normale (vedi
+      // _makeView) così il preload gira anche lì, e la stessa partizione che
+      // avrebbe una scheda aperta su quella URL (Cookies.MODES.PRIVACY →
+      // partizione per-sito; altrimenti null = sessione condivisa), per non
+      // spezzare un eventuale login Google già presente in Filo.
       if (tab.isInternal === false && isAuthPopup(url)) {
-        return { action: 'allow' };
+        const popupPartition = this._partitionFor(url);
+        return {
+          action: 'allow',
+          overrideBrowserWindowOptions: {
+            webPreferences: {
+              preload: PAGE_PRELOAD,
+              contextIsolation: true,
+              sandbox: false,
+              nodeIntegration: false,
+              webSecurity: true,
+              ...(popupPartition ? { partition: popupPartition } : {}),
+            },
+          },
+        };
       }
       const isAdLikePopup = disposition === 'new-window';
       if (tab.isInternal === false && this.security.blockPopups && isAdLikePopup) {
