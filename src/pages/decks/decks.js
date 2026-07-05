@@ -1111,6 +1111,8 @@
       const r = await send({ type: MSG.DECKS_DUPLICATE, id: current.id });
       if (r && r.ok) location.hash = `#/deck/${encodeURIComponent(r.deck.id)}`;
     });
+    add('Importa…', () => openImportDialog(), 'dk-sw-sep');
+    add('Esporta…', () => openExportDialog());
     add('Rinomina…', () => startEdit('deckNameEdit', current.nome, async (v) => {
       await saveDeck(Decks.renameDeck(current, v));
     }));
