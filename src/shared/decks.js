@@ -92,6 +92,31 @@
     return { deck: touch({ ...deck, carte }), removed: true };
   }
 
+  // Import bulk (§11): merge di entries [{scryfall_id, qty}] nel mazzo. Le
+  // carte già presenti aggiornano la qty (utile per re-importare lo stesso
+  // mazzo dopo una modifica esterna, i tag esistenti restano); le nuove si
+  // aggiungono con tags:[]. UN solo touch se c'è almeno una modifica reale.
+  function importCards(deck, entries) {
+    const list = Array.isArray(entries) ? entries : [];
+    const byId = new Map(deck.carte.map((c) => [c.scryfall_id, c]));
+    let addedCount = 0;
+    let updatedCount = 0;
+    for (const e of list) {
+      const id = String((e && e.scryfall_id) || '').trim();
+      if (!id) continue;
+      const qty = Math.max(1, Number(e.qty) || 1);
+      const existing = byId.get(id);
+      if (existing) {
+        if (existing.qty !== qty) { byId.set(id, { ...existing, qty }); updatedCount++; }
+      } else {
+        byId.set(id, { scryfall_id: id, qty, tags: [] });
+        addedCount++;
+      }
+    }
+    if (!addedCount && !updatedCount) return { deck, addedCount: 0, updatedCount: 0 };
+    return { deck: touch({ ...deck, carte: [...byId.values()] }), addedCount, updatedCount };
+  }
+
   function renameDeck(deck, nome) {
     const n = String(nome || '').trim();
     if (!n || n === deck.nome) return deck;
