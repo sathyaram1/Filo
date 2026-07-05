@@ -176,7 +176,6 @@ test('DECKS_CHAT: una lista incollata risolta dall\'LLM torna come CardList di c
   assert.equal(r.importPending.commanderId, 'niv-1');
   assert.equal(r.importPending.qtyById['sol-ring'], 1);
   // Il mazzo NON è stato toccato: l'aggiunta è un'azione esplicita dell'utente.
-  const stillEmpty = await call(MSG.DECKS_GET_UNUSED_PLACEHOLDER || 'noop', {}).catch(() => null);
   const raw = await globalThis.SN_DECK_STORE.get(deck.id);
   assert.equal(raw.carte.length, 0);
   assert.equal(raw.commander, '');
