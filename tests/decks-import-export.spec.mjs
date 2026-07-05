@@ -63,11 +63,15 @@ test('Importa dallo switcher: anteprima segnala non-trovati/sporchi, la conferma
   await page.fill('.dk-io-textarea', '1 Sol Ring\n10 Forest\n1 Carta Che Non Esiste\nriga senza quantità');
   await page.locator('[data-io="parse"]').click();
 
-  // Anteprima: 3 righe ben formate su 4 (una carta non trovata resta "3 su 4",
-  // non è una riga sporca), 1 riga sporca segnalata separatamente.
-  await expect(page.locator('.dk-io-note').first()).toContainText('3 carte riconosciute su 4');
+  // Il parser rigido riconosce 3 righe ben formate ("1 Sol Ring", "10 Forest",
+  // "1 Carta Che Non Esiste": ha qty+nome, è sintatticamente valida) su 4; di
+  // quelle 3, solo 2 si risolvono davvero su Scryfall. La riga senza quantità
+  // è sporca fin dal parsing. Le due segnalazioni restano DISTINTE:
+  // "non trovata" ≠ "riga illeggibile", non si mescolano nel messaggio.
+  await expect(page.locator('.dk-io-note').first()).toContainText('2 carte riconosciute su 3');
   await expect(page.locator('.dk-io-dirty li')).toHaveCount(2); // "Carta Che Non Esiste" (non risolta) + la riga sporca
   await expect(page.locator('.dk-io-dirty')).toContainText('riga senza quantità');
+  await expect(page.locator('.dk-io-dirty')).toContainText('Carta Che Non Esiste');
 
   const applyBtn = page.locator('[data-io="apply"]');
   await expect(applyBtn).toHaveText('Importa 2 carte');
