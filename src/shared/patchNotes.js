@@ -16,6 +16,14 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.113', date: '2026-07-05',
+      features: [
+        'Nell\'app Mazzi puoi importare/esportare un mazzo come lista di testo (dal menu del mazzo): incolli una lista tipo "1 Sol Ring" per riga, Filo mostra un\'anteprima di conferma con le carte riconosciute prima di aggiungerle, segnalando quelle che non ha capito. L\'export genera lo stesso formato, pronto da copiare.',
+        'Puoi anche incollare una lista di carte direttamente in chat, anche scritta male o con nomi in italiano: Filo la riconosce, propone l\'elenco da confermare e un tasto per aggiungerle tutte al mazzo in un colpo solo.',
+      ],
+      fixes: [],
+    },
+    {
       version: '0.2.111', date: '2026-07-04',
       features: [],
       fixes: [
