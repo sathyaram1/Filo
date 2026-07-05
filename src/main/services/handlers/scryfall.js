@@ -8,6 +8,7 @@ module.exports = function register(on, ctx) {
   const Decks = globalThis.SN_DECKS;
   const Store = globalThis.SN_DECK_STORE;
   const Q = globalThis.SN_SCRYFALL_Q;
+  const IE = globalThis.SN_DECK_IMPORT_EXPORT;
   const { ACTIONS, PROMPTS } = globalThis.SN_CONST;
 
   // Identity del mazzo per il filtro automatico (§4): dai colori del
