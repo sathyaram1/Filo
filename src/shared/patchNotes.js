@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.112', date: '2026-07-05',
+      features: [],
+      fixes: [
+        'Risolto un altro tassello del blocco su "Continua con Google" (o altri provider): la finestra di accesso separata ora riceve davvero le stesse protezioni della pagina che l\'ha aperta, invece di restare priva di qualunque impostazione di sicurezza/privacy.',
+      ],
+    },
+    {
       version: '0.2.111', date: '2026-07-04',
       features: [],
       fixes: [
