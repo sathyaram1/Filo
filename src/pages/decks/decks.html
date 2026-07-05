@@ -324,6 +324,69 @@
     .dk-prob-actions .sn-btn { font-size: 12px; padding: 4px 10px; }
     .dk-prob-result { font-weight: 600; }
 
+    /* Import via chat (§11.2): bottone "aggiungi tutte" in testa alla CardList,
+       affianca (non sostituisce) il toggle per riga già esistente. */
+    .dk-import-all {
+      display: block; width: 100%; margin-bottom: 6px; padding: 6px 8px;
+      font: inherit; font-size: 12px; border: 1px solid var(--sn-border);
+      border-radius: 6px; background: var(--sn-hover); color: var(--sn-fg);
+      cursor: pointer;
+    }
+    .dk-import-all:hover { border-color: var(--sn-accent); }
+    .dk-import-all[disabled] { opacity: 0.6; cursor: default; }
+
+    /* ── Import/Export rigido (§11), via switcher: overlay minimale, stesso
+       linguaggio visivo dei popup di conferma (SN_CONFIRM_UI). ── */
+    .dk-io-overlay {
+      position: fixed; inset: 0; z-index: 2147483000;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(0, 0, 0, 0.35);
+    }
+    .dk-io-box {
+      width: min(560px, calc(100vw - 48px));
+      max-height: calc(100vh - 80px); overflow: auto;
+      padding: 20px; background: var(--sn-overlay-bg, var(--sn-bg));
+      color: var(--sn-fg); border: 1px solid var(--sn-border);
+      border-radius: var(--sn-radius, 8px); box-shadow: var(--sn-shadow);
+    }
+    .dk-io-title { font-size: 14px; font-weight: 600; margin-bottom: 10px; }
+    .dk-io-textarea {
+      width: 100%; box-sizing: border-box; font-family: monospace;
+      font-size: 12px; line-height: 1.5; padding: 8px 10px;
+      border: 1px solid var(--sn-border); border-radius: var(--sn-radius, 6px);
+      background: var(--sn-bg); color: var(--sn-fg); resize: vertical;
+      margin-bottom: 12px;
+    }
+    .dk-io-textarea:focus { outline: none; border-color: var(--sn-accent); }
+    .dk-io-row { display: flex; gap: 8px; justify-content: flex-end; }
+    .dk-io-note { font-size: 12px; color: var(--sn-muted); margin-bottom: 8px; }
+    .dk-io-warn { color: var(--sn-danger, #c0392b); }
+    .dk-io-dirty { margin: 4px 0 0; padding-left: 18px; max-height: 120px; overflow: auto; }
+    .dk-io-btn {
+      all: unset; box-sizing: border-box; padding: 8px 14px; font-size: 13px;
+      border-radius: var(--sn-radius, 6px); cursor: pointer; text-align: center;
+      border: 1px solid var(--sn-border); color: var(--sn-fg);
+    }
+    .dk-io-btn:hover { background: var(--sn-hover); }
+    .dk-io-btn-ok {
+      background: var(--sn-btn-bg, var(--sn-fg)); color: var(--sn-btn-fg, var(--sn-bg));
+      border-color: transparent;
+    }
+    .dk-io-btn-ok:hover { opacity: 0.85; }
+    .dk-io-btn[disabled] { opacity: 0.5; cursor: default; }
+
+    /* Toast discreto (conferme non bloccanti di import/export). */
+    .dk-toast {
+      position: fixed; right: 18px; bottom: 18px; max-width: 320px;
+      background: var(--sn-bg); border: 1px solid var(--sn-border);
+      border-left: 3px solid var(--sn-accent); border-radius: 10px;
+      box-shadow: var(--sn-shadow); padding: 12px 14px; font-size: 13px;
+      line-height: 1.4; color: var(--sn-fg); opacity: 0; transform: translateY(8px);
+      transition: opacity 0.18s ease, transform 0.18s ease;
+      pointer-events: none; z-index: 2147483001;
+    }
+    .dk-toast.show { opacity: 1; transform: translateY(0); }
+
     .dk-back { margin-bottom: 12px; }
   </style>
 </head>
