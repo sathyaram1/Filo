@@ -178,6 +178,22 @@ test('parseAgentReply: tagWith — tag normalizzati minuscoli, spazzatura scarta
   assert.deepEqual(Q.parseAgentReply('{"tagWith":"ramp"}').tagWith, []);
 });
 
+test('parseAgentReply: import — nomi/quantità normalizzati, voci senza nome scartate', () => {
+  const r = Q.parseAgentReply('{"import":[{"name":"Sol Ring","qty":1},{"name":" Forest ","qty":"10"},{"qty":2},{"name":""}]}');
+  assert.deepEqual(r.import, [{ name: 'Sol Ring', qty: 1 }, { name: 'Forest', qty: 10 }]);
+});
+
+test('parseAgentReply: import — qty mancante/non valida default a 1', () => {
+  assert.deepEqual(Q.parseAgentReply('{"import":[{"name":"Sol Ring"}]}').import, [{ name: 'Sol Ring', qty: 1 }]);
+  assert.deepEqual(Q.parseAgentReply('{"import":[{"name":"Sol Ring","qty":"boh"}]}').import, [{ name: 'Sol Ring', qty: 1 }]);
+});
+
+test('parseAgentReply: commander — stringa non vuota si accetta, tipi sbagliati scartati', () => {
+  assert.equal(Q.parseAgentReply('{"commander":" Niv-Mizzet, Parun "}').commanderName, 'Niv-Mizzet, Parun');
+  assert.equal(Q.parseAgentReply('{"commander":42}').commanderName, '');
+  assert.equal(Q.parseAgentReply('{}').commanderName, '');
+});
+
 // ── proseSegments ([[Nome Carta]] §3.5) ──────────────────────────────────────
 
 test('proseSegments: spezza la prosa sui marcatori [[...]]', () => {
