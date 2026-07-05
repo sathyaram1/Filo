@@ -68,6 +68,13 @@
     // { ok, opinions: { cardId → { text, versione, stale } } }.
     // compute=false: solo cache (mai LLM). refresh=true: ricalcola anche i freschi.
     DECKS_OPINION: 'decks_opinion',
+    // Import/Export (§11): parser rigido testo↔carte (MAI l'LLM, quello vive
+    // nella chat) per lo switcher. PREVIEW risolve ogni nome via Scryfall
+    // fuzzy PRIMA di applicare (mai un import "a scatola chiusa"): l'utente
+    // conferma cosa entrerà nel mazzo. APPLY scrive le carte confermate.
+    DECKS_IMPORT_PREVIEW: 'decks_import_preview', // { id, text } → { ok, entries:[{name,qty,card}], commander:{name,card}|null, dirtyLines }
+    DECKS_IMPORT_APPLY: 'decks_import_apply',     // { id, entries:[{scryfallId,qty}], commanderId? } → { ok, deck, addedCount, updatedCount }
+    DECKS_EXPORT: 'decks_export',                 // { id } → { ok, text } (stesso formato testuale dell'import)
     // Client Scryfall (§13.2), tutto nel main (rate limit + cache condivisi).
     SCRYFALL_SEARCH: 'scryfall_search',   // { query, deckId? } → identity auto dal commander
     SCRYFALL_NAMED: 'scryfall_named',     // { name } (risoluzione fuzzy)
