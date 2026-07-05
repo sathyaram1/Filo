@@ -1398,8 +1398,10 @@
     });
     const log = $('chatLog');
     log.addEventListener('click', (e) => {
+      const impAll = e.target.closest('[data-import-all]');
+      if (impAll) { importAllFromBubble(impAll.closest('[data-msg-i]')); return; }
       const add = e.target.closest('[data-add]');
-      if (add) { toggleCard(add.dataset.add); return; }
+      if (add) { toggleCard(add.dataset.add, Number(add.dataset.qty) || 1); return; }
       const sum = e.target.closest('[data-toggle-list]');
       if (sum) {
         const bubble = sum.closest('[data-msg-i]');
