@@ -581,12 +581,19 @@
         return ca - cb;
       });
       const open = isLast || m.expanded;
+      // Import via chat (§11.2): oltre al toggle per riga, un bottone che
+      // aggiunge/aggiorna TUTTE le carte riconosciute in un colpo solo — con
+      // 100 carte di una lista incollata, cliccare riga per riga è attrito
+      // puro. Resta comunque una conferma esplicita, mai automatica.
+      const importAllHtml = m.importQty
+        ? `<button class="dk-import-all" data-import-all="1" ${m.imported ? 'disabled' : ''}>${m.imported ? 'Aggiunte ✓' : 'Aggiungi tutte al mazzo'}</button>`
+        : '';
       parts.push(`
         <button class="dk-list-summary" data-toggle-list="1" aria-expanded="${open ? 'true' : 'false'}">
           <span>${open ? '▾' : '▸'}</span>
           <span>${n} risultat${n === 1 ? 'o' : 'i'} ${esc(label)}</span>
         </button>
-        <div class="dk-cardlist" ${open ? '' : 'hidden'}>${ids.map(chatRowHtml).join('')}</div>`);
+        <div class="dk-cardlist" ${open ? '' : 'hidden'}>${importAllHtml}${ids.map((id) => chatRowHtml(id, m.importQty && m.importQty[id])).join('')}</div>`);
     } else if (!m.reply) {
       parts.push(`<p class="dk-msg-text dk-msg-pending">Nessun risultato${m.query ? ` per "${esc(m.query)}"` : ''}.</p>`);
     }
