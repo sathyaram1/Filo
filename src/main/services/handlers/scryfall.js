@@ -250,7 +250,11 @@ module.exports = function register(on, ctx) {
         }
       }
 
-      return { ok: true, reply, cardIds, cards, query, ...(deckOut ? { deck: deckOut } : {}) };
+      return {
+        ok: true, reply, cardIds, cards, query,
+        ...(deckOut ? { deck: deckOut } : {}),
+        ...(importPending ? { importPending } : {}),
+      };
     } catch (e) {
       return { ok: false, error: e?.message || 'chat fallita' };
     }
