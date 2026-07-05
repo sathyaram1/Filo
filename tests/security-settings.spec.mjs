@@ -179,6 +179,25 @@ test('popup blocker: i popup di login (OAuth) restano consentiti col blocco atti
   const snap = await shell.evaluate(() => window.filoShell.tabs.snapshot());
   const asTab = snap.tabs.find((t) => (t.url || '').includes('client_id=abc'));
   expect(asTab, 'il popup di login non deve diventare una scheda').toBeFalsy();
+
+  // Prova diretta che il popup ha DAVVERO il preload della pagina (non solo che
+  // si apre come finestra): senza overrideBrowserWindowOptions su
+  // setWindowOpenHandler, Electron crea il popup "nudo" e page-preload.js non
+  // gira mai lì dentro — l'esenzione anti-fingerprint per i login (o qualunque
+  // altra cosa in quel preload) resterebbe morta anche col popup consentito.
+  // `data-filo-ready` lo mette page-preload.js a fine avvio dei content script;
+  // `window.__filoFpGuard` lo installa la guardia anti-fingerprint SOLO se il
+  // preload ha girato E la pagina non è esentata — qui l'URL è un host
+  // qualunque (non un provider di identità noto), quindi in modalità
+  // anti-fingerprint di default (livello 1) la guardia deve installarsi.
+  // Prima del fix (popup senza preload) questi due assert erano entrambi falsi.
+  await popupWin.waitForFunction(
+    () => document.documentElement.dataset.filoReady === '1',
+    null,
+    { timeout: 8_000 },
+  );
+  const fpGuardInstalled = await popupWin.evaluate(() => window.__filoFpGuard === true);
+  expect(fpGuardInstalled, 'il preload (e con lui la logica anti-fingerprint) deve girare anche dentro il popup di login').toBe(true);
 });
 
 test('popup blocker disattivato: window.open() passa', async ({ openTab, testServer, shell }) => {
