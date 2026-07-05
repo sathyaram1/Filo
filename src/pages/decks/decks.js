@@ -642,6 +642,13 @@
         bot.reply = r.reply || '';
         bot.cardIds = r.cardIds || [];
         bot.query = r.query || '';
+        // Import via chat (§11.2): quantità reali per riga (basics tipo
+        // "37 Forest") + eventuale commander candidato, per il bottone
+        // "Aggiungi tutte" e per il toggle per riga.
+        if (r.importPending) {
+          bot.importQty = r.importPending.qtyById || {};
+          bot.importCommanderId = r.importPending.commanderId || '';
+        }
         Object.assign(cardsById, r.cards || {});
         // La chat può aver calcolato pareri nuovi ("valuta il mazzo", §6.1):
         // la cache di pagina si svuota così il prossimo hover legge dal main
