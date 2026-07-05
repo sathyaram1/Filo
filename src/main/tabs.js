@@ -365,6 +365,21 @@ class TabManager {
   }
 
   openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null, suppressAutoplay = false } = {}) {
+    // SICUREZZA (#247) — will-navigate e setWindowOpenHandler bloccano solo le
+    // navigazioni che Electron origina da sé (click, window.open): un
+    // loadURL() PROGRAMMATICO come questo NON emette will-navigate, quindi
+    // quel gate non protegge questo percorso. Qui convergono TUTTI gli
+    // handler IPC che aprono una scheda (content script via MSG.OPEN_URL /
+    // MSG.OPEN_NEW_TAB / chrome.tabs.create → _tabs:create, l'archivio, la
+    // shell): un controllo unico qui chiude ogni percorso presente e futuro,
+    // invece di doverlo ripetere in ciascun chiamante (e rischiare di
+    // dimenticarne uno, come accaduto). I chiamanti che filtrano già a monte
+    // (es. setWindowOpenHandler, l'azione NAVIGA dell'agente) restano
+    // corretti: qui il controllo è semplicemente ridondante per loro.
+    if (isWebUnsafeNav(url)) {
+      openExternalScheme(url); // mailto:/tel:/sms: → consegnati all'OS, il resto bloccato
+      return null;
+    }
     const id = randomUUID();
     const isInternal = url.startsWith('filo://');
     const partition = this._partitionFor(url);
