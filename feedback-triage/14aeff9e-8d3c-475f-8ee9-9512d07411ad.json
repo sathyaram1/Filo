@@ -1,0 +1,7 @@
+{
+  "id": "14aeff9e-8d3c-475f-8ee9-9512d07411ad",
+  "status": "done",
+  "notes": "App Mazzi Commander completata: libreria mazzi, banco di lavoro a tre colonne con divisori regolabili, elenco carte raggruppabile (tipo/tag/costo/colore) con commander e avvisi di legalita, client Scryfall con cache. Chat unificata che fa anche da ricerca (linguaggio naturale -> carte, filtrate sui colori del commander), con pannello destro che mostra anteprima al passaggio del mouse e un carosello per sfogliare le carte con la tastiera. Sotto l'anteprima un riquadro modulare a scelta: dati carta, mini curva di mana, prezzo/ristampe/legalita, o il parere di Filo sulla carta per QUEL mazzo (calcolato su richiesta e ricordato). Auto-tag delle carte via chat, statistiche complete (curva, mana per colore, composizione, legalita), budget in euro e calcolatore di probabilita di pescata. Ultimo pezzo (questo): import/export come lista di testo dal menu del mazzo (con anteprima di conferma prima di scrivere) e import anche dalla chat incollando una lista grezza, tollerante a typo/italiano, sempre con conferma prima di aggiungere le carte. Patch notes e manifesto capacita aggiornati per l'intera app.",
+  "queuedAt": "2026-07-05T13:25:17.923Z",
+  "queuedBy": "routine"
+}
