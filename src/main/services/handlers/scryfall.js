@@ -281,4 +281,79 @@ module.exports = function register(on, ctx) {
       return { ok: false, error: e?.message || 'set commander fallito' };
     }
   });
+
+  // ── Import/Export testuale (§11), via switcher ─────────────────────────────
+  // Parser RIGIDO e deterministico (IE = SN_DECK_IMPORT_EXPORT, logica pura,
+  // MAI l'LLM — quello è il cammino della chat sopra). PREVIEW risolve ogni
+  // nome via Scryfall fuzzy PRIMA di scrivere qualunque cosa: l'utente vede
+  // cosa entrerà nel mazzo (e cosa non si è capito) e conferma con APPLY.
+  on(MSG.DECKS_IMPORT_PREVIEW, async (msg) => {
+    try {
+      const deck = await Store.get(String(msg?.id || ''));
+      if (!deck) return { ok: false, error: 'not_found' };
+      const parsed = IE.parseDecklist(String(msg?.text || ''));
+
+      const entries = [];
+      for (const e of parsed.entries) {
+        const card = await Scry.named(e.name).catch(() => null);
+        entries.push({ name: e.name, qty: e.qty, card });
+      }
+      let commander = null;
+      if (parsed.commanderName) {
+        const card = await Scry.named(parsed.commanderName).catch(() => null);
+        commander = { name: parsed.commanderName, card };
+      }
+      return { ok: true, entries, commander, dirtyLines: parsed.dirtyLines };
+    } catch (e) {
+      return { ok: false, error: e?.message || 'analisi fallita' };
+    }
+  });
+
+  // Applica un import già confermato dall'utente (§11.1): merge delle carte
+  // già risolte (mai un nome libero qui — solo scryfall_id già verificati
+  // dalla preview) + commander opzionale, SOLO se il mazzo non ne ha già uno
+  // (non sovrascrive mai una scelta esistente senza un'azione dedicata).
+  on(MSG.DECKS_IMPORT_APPLY, async (msg) => {
+    try {
+      const deck = await Store.get(String(msg?.id || ''));
+      if (!deck) return { ok: false, error: 'not_found' };
+      const rawEntries = Array.isArray(msg?.entries) ? msg.entries : [];
+      const entries = rawEntries
+        .map((e) => ({ scryfall_id: String((e && e.scryfallId) || ''), qty: Math.max(1, Number(e && e.qty) || 1) }))
+        .filter((e) => e.scryfall_id);
+      const { deck: merged, addedCount, updatedCount } = Decks.importCards(deck, entries);
+
+      let next = merged;
+      const commanderId = String(msg?.commanderId || '');
+      if (commanderId && !deck.commander) {
+        const card = await Scry.card(commanderId).catch(() => null);
+        if (card) {
+          next = Decks.setCommander(next, card.id, {
+            name: card.name, colors: card.colorIdentity, artCrop: card.artCrop,
+          });
+        }
+      }
+      const saved = await Store.put(next);
+      return saved ? { ok: true, deck: saved, addedCount, updatedCount } : { ok: false, error: 'save_failed' };
+    } catch (e) {
+      return { ok: false, error: e?.message || 'import fallito' };
+    }
+  });
+
+  // Esporta il mazzo nello STESSO formato testuale dell'import (§11.1).
+  on(MSG.DECKS_EXPORT, async (msg) => {
+    try {
+      const deck = await Store.get(String(msg?.id || ''));
+      if (!deck) return { ok: false, error: 'not_found' };
+      const known = await Scry.cards(deck.carte.map((c) => c.scryfall_id)).catch(() => ({}));
+      const entries = deck.carte
+        .map((c) => ({ name: (known[c.scryfall_id] && known[c.scryfall_id].name) || c.scryfall_id, qty: c.qty }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      const commanderName = (deck.commanderMeta && deck.commanderMeta.name) || '';
+      const text = IE.formatDecklist({ commanderName, entries });
+      return { ok: true, text };
+    } catch (e) {
+      return { ok: false, error: e?.message || 'export fallito' };
+    }
+  });
 };
