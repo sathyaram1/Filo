@@ -1,9 +1,9 @@
 {
   "id": "iSLQGZeo9U6J6KDK9a4O",
   "branch": "",
-  "loopCount": 1,
-  "verifierVerdict": null,
-  "verifierCritique": "",
+  "loopCount": 2,
+  "verifierVerdict": "fail",
+  "verifierCritique": "L'esenzione in src/main/services/fingerprint.js (isIdentityProviderHref/configForHref) dipende dall'iniezione di src/preload/page-preload.js, che pero' NON viene MAI attaccato al popup OAuth di Google: in src/main/tabs.js il branch isAuthPopup (setWindowOpenHandler) ritorna solo { action: 'allow' } senza overrideBrowserWindowOptions, quindi Electron crea il popup senza alcun preload (confermato sulla sorgente Electron 33.2.0, lib/browser/guest-window-manager.ts: 'preload' non e' fra le securityWebPreferences ereditate dal parent, e nel repo non esiste nessun session.setPreloads globale che lo compensi). Risultato: il rumore anti-fingerprint non ha MAI toccato la pagina di login Google dentro il popup, ne' prima ne' dopo questa modifica -- la diagnosi ('il rumore fa scattare l'antifrode Google') e' quindi verificata sbagliata per il flusso reale (che e' un popup: lo conferma lo stesso codice del giro precedente su #209, che ha dovuto smettere di bloccarlo come popup pubblicitario). Il fix e' inerte per il caso che doveva risolvere: il problema di login dell'utente resta verosimilmente non risolto. Il test unitario nuovo (tests/unit/fingerprintAuthExempt.test.mjs) copre solo la funzione pura configForHref, non il fatto che quel percorso non viene mai eseguito nel popup reale, quindi da' falsa sicurezza. Servirebbe capire cosa succede DAVVERO dentro la finestra popup (es. via overrideBrowserWindowOptions/did-create-window, o le 4 domande diagnostiche gia' poste all'utente nelle note precedenti: si apre una finestra separata di Google o l'errore compare senza aprirla; redirect o popup) prima di un altro giro di fix sul fingerprint.",
   "secauditDone": false,
   "secauditVerdict": null
 }
