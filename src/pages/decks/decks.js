@@ -538,17 +538,20 @@
 
   // Riga della CardList (§3.4): nome + costo mana destro-allineato + toggle
   // aggiungi-al-mazzo. Niente immagini finché non c'è hover (task 6).
-  function chatRowHtml(id) {
+  // `qty` arriva dall'import (§11.2, es. "37 Forest"): il toggle la userà
+  // come quantità reale invece del default 1 delle ricerche normali.
+  function chatRowHtml(id, qty) {
     const card = cardsById[id];
     const name = card ? card.name : id;
     const mana = card ? manaHtml(card.manaCost) : '';
     const added = inDeck(id);
+    const q = Number(qty) > 1 ? Number(qty) : 0;
     return `
       <div class="dk-row" data-card-id="${esc(id)}">
-        <button class="dk-add" data-add="${esc(id)}" data-in="${added ? 1 : 0}"
+        <button class="dk-add" data-add="${esc(id)}" data-qty="${q || 1}" data-in="${added ? 1 : 0}"
                 title="${added ? 'Rimuovi dal mazzo' : 'Aggiungi al mazzo'}"
                 aria-label="${added ? `Rimuovi ${esc(name)} dal mazzo` : `Aggiungi ${esc(name)} al mazzo`}">${added ? '✓' : '+'}</button>
-        <span class="dk-row-name">${esc(name)}</span>
+        <span class="dk-row-name">${esc(name)}${q ? ` <span class="dk-row-qty">×${q}</span>` : ''}</span>
         <span class="dk-row-mana">${mana}</span>
       </div>`;
   }
