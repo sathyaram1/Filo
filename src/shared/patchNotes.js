@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.114', date: '2026-07-05',
+      features: [],
+      fixes: [
+        'Rafforzata la sicurezza: alcune azioni interne di Filo (menu del tasto destro, apertura di nuove schede) ora bloccano i tentativi di aprire percorsi di file locali o altri schemi non sicuri, invece di lasciarli passare.',
+      ],
+    },
+    {
       version: '0.2.113', date: '2026-07-05',
       features: [
         'Nell\'app Mazzi puoi importare/esportare un mazzo come lista di testo (dal menu del mazzo): incolli una lista tipo "1 Sol Ring" per riga, Filo mostra un\'anteprima di conferma con le carte riconosciute prima di aggiungerle, segnalando quelle che non ha capito. L\'export genera lo stesso formato, pronto da copiare.',
