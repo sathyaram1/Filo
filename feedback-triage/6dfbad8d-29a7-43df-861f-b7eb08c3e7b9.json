@@ -1,0 +1,8 @@
+{
+  "id": "6dfbad8d-29a7-43df-861f-b7eb08c3e7b9",
+  "status": "revision_capability",
+  "notes": "Nell'app Mazzi ora puoi importare o esportare un mazzo come lista di testo (menu del mazzo -> Importa/Esporta, formato tipo Moxfield/Archidekt, una carta per riga: es. '1 Sol Ring'): l'import mostra un'anteprima con le carte riconosciute (segnalando quelle che non ha capito) prima di scrivere qualunque cosa nel mazzo, l'export genera la stessa lista pronta da copiare. In alternativa puoi incollare la lista direttamente in chat, anche scritta male o con nomi in italiano: Filo la riconosce, propone l'elenco da confermare (per singola carta o tutte insieme con un tasto dedicato) e risolve i nomi su Scryfall prima di aggiungerli. Ho verificato con test automatici la logica di analisi/quantità/righe sporche e l'intera catena fino al salvataggio del mazzo (tutti passano); lo scenario nell'interfaccia grafica (aprire il menu, incollare, confermare) è scritto come test end-to-end ma non ho potuto eseguirlo in questa sessione perché l'ambiente cloud non riesce a scaricare il componente grafico (Electron) -- va controllato dal vivo alla prossima passata.",
+  "queuedAt": "2026-07-05T13:25:03.487Z",
+  "queuedBy": "routine",
+  "branch": "worker/6dfbad8d-29a7-43df-861f-b7eb08c3e7b9"
+}
