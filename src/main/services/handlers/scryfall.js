@@ -127,6 +127,10 @@ module.exports = function register(on, ctx) {
       let cardIds = [];
       let cards = {};
       let query = '';
+      // Budget/reply/deck di uscita dichiarati qui (prima dell'import, sotto)
+      // perché sia la ricerca sia l'import possono accodare testo alla reply.
+      let reply = parsed.reply;
+      let deckOut = null;
       if (parsed.query) {
         // Filtro identity AUTOMATICO (§4): lo aggiunge search/buildSearchQuery;
         // se l'utente/LLM ha già un vincolo id esplicito, quello vince.
