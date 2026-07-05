@@ -67,6 +67,41 @@ test('removeCard rimuove e incrementa; su carta assente non incrementa', () => {
   assert.equal(d3.versione, d2.versione);
 });
 
+// ── importCards (§11): merge bulk usato dall'import testuale/chat ───────────
+
+test('importCards: carte nuove si aggiungono con tags vuoti', () => {
+  const d = D.newDeck();
+  const { deck, addedCount, updatedCount } = D.importCards(d, [
+    { scryfall_id: 'scry-1', qty: 1 },
+    { scryfall_id: 'scry-2', qty: 10 },
+  ]);
+  assert.equal(addedCount, 2);
+  assert.equal(updatedCount, 0);
+  assert.equal(deck.carte.length, 2);
+  assert.deepEqual(deck.carte.find((c) => c.scryfall_id === 'scry-2'), { scryfall_id: 'scry-2', qty: 10, tags: [] });
+  assert.equal(deck.versione, d.versione + 1);
+});
+
+test('importCards: carte già presenti aggiornano SOLO la qty, i tag restano', () => {
+  const { deck: d1 } = D.addCard(D.newDeck(), 'scry-1', { qty: 1, tags: ['ramp'] });
+  const { deck: d2, addedCount, updatedCount } = D.importCards(d1, [{ scryfall_id: 'scry-1', qty: 5 }]);
+  assert.equal(addedCount, 0);
+  assert.equal(updatedCount, 1);
+  const entry = d2.carte.find((c) => c.scryfall_id === 'scry-1');
+  assert.equal(entry.qty, 5);
+  assert.deepEqual(entry.tags, ['ramp']);
+  assert.equal(d2.versione, d1.versione + 1);
+});
+
+test('importCards: nessuna modifica reale (stessa qty, id vuoti) NON tocca la versione', () => {
+  const { deck: d1 } = D.addCard(D.newDeck(), 'scry-1', { qty: 3 });
+  const { deck: d2, addedCount, updatedCount } = D.importCards(d1, [{ scryfall_id: 'scry-1', qty: 3 }, { scryfall_id: '' }]);
+  assert.equal(addedCount, 0);
+  assert.equal(updatedCount, 0);
+  assert.equal(d2, d1);
+  assert.equal(d2.versione, d1.versione);
+});
+
 test('renameDeck: nome nuovo incrementa, nome uguale/vuoto no', () => {
   const d = D.newDeck({ nome: 'A' });
   const r1 = D.renameDeck(d, 'B');
