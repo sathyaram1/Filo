@@ -141,6 +141,38 @@ module.exports = function register(on, ctx) {
         cardIds = parsed.cards.filter((id) => cards[id]);
       }
 
+      // Import via chat (§11.2): l'utente incolla una lista grezza, l'LLM la
+      // interpreta (typo/italiano/formati strani) in nomi+quantità sopra —
+      // qui il SISTEMA risolve ogni nome su Scryfall (fuzzy match, MAI si
+      // fida di un id inventato dal modello) e propone la stessa CardList di
+      // conferma della ricerca: l'aggiunta al mazzo resta un'azione esplicita
+      // dell'utente (toggle riga o "Aggiungi tutte"), mai automatica.
+      let importPending = null;
+      if (parsed.import.length || parsed.commanderName) {
+        const qtyById = {};
+        const notFound = [];
+        for (const entry of parsed.import) {
+          const found = await Scry.named(entry.name).catch(() => null);
+          if (found) { cardIds.push(found.id); cards[found.id] = found; qtyById[found.id] = entry.qty; }
+          else notFound.push(entry.name);
+        }
+        let commanderId = '';
+        if (parsed.commanderName) {
+          const found = await Scry.named(parsed.commanderName).catch(() => null);
+          if (found) {
+            commanderId = found.id;
+            cardIds.unshift(found.id);
+            cards[found.id] = found;
+            qtyById[found.id] = 1;
+          } else notFound.push(parsed.commanderName);
+        }
+        importPending = { qtyById, commanderId };
+        const n = cardIds.length;
+        reply = [reply, n ? `Ho riconosciuto ${n} cart${n === 1 ? 'a' : 'e'}: conferma qui sotto quali aggiungere.` : '',
+          notFound.length ? `Non ho trovato su Scryfall: ${notFound.join(', ')}.` : '']
+          .filter(Boolean).join('\n');
+      }
+
       // Budget via chat (§9.2): l'LLM estrae il numero, il tetto lo applica IL
       // SISTEMA (mai fidarsi che il modello "abbia già fatto"). Il mazzo
       // aggiornato torna alla pagina, che rinfresca header e statistiche.
