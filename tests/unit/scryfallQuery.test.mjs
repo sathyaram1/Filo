@@ -119,7 +119,10 @@ test('isFresh: dentro il TTL sì, oltre no, timestamp rotto no', () => {
 
 // ── parseAgentReply (chat unificata §3): JSON tollerante ─────────────────────
 
-const NONE = { reply: '', query: '', cards: [], hasBudget: false, budget: null, prob: null, evaluate: '', tagWith: [] };
+const NONE = {
+  reply: '', query: '', cards: [], hasBudget: false, budget: null, prob: null, evaluate: '', tagWith: [],
+  import: [], commanderName: '',
+};
 
 test('parseAgentReply: JSON pulito → campi normalizzati', () => {
   const r = Q.parseAgentReply('{"reply":"Ecco","query":"o:haste","cards":["a","b"]}');
