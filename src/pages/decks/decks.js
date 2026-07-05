@@ -668,11 +668,13 @@
   }
 
   // Toggle aggiungi/rimuovi dalla riga della CardList (§3.4): la carta entra
-  // nel gruppo giusto della colonna centrale, feedback immediato.
-  async function toggleCard(cardId) {
+  // nel gruppo giusto della colonna centrale, feedback immediato. `qty` arriva
+  // dall'import via chat (§11.2, es. basics con "×37"): default 1 per le
+  // ricerche normali.
+  async function toggleCard(cardId, qty = 1) {
     const adding = !inDeck(cardId);
     const { deck, added } = adding
-      ? Decks.addCard(current, cardId)
+      ? Decks.addCard(current, cardId, { qty })
       : (() => { const r = Decks.removeCard(current, cardId); return { deck: r.deck, added: r.removed }; })();
     if (added) {
       await saveDeck(deck); // renderBuilder → renderDeckList + renderChat
@@ -680,6 +682,173 @@
       // sulla versione nuova del mazzo, pronto in cache al prossimo hover.
       if (adding) requestOpinions([cardId], { refresh: true }).catch(() => {});
     }
+  }
+
+  // "Aggiungi tutte al mazzo" (§11.2): merge in un colpo solo di tutte le
+  // carte riconosciute dall'import via chat (rispettando la qty per riga) +
+  // il commander candidato, MA SOLO se il mazzo non ne ha già uno (mai
+  // sovrascrivere una scelta esistente senza un'azione dedicata, §8.4).
+  async function importAllFromBubble(bubbleEl) {
+    const m = chatMsgs()[Number(bubbleEl.dataset.msgI)];
+    if (!m || m.imported || !m.cardIds || !m.cardIds.length) return;
+    const entries = m.cardIds
+      .filter((id) => id !== m.importCommanderId)
+      .map((id) => ({ scryfall_id: id, qty: (m.importQty && m.importQty[id]) || 1 }));
+    const { deck: merged, addedCount, updatedCount } = Decks.importCards(current, entries);
+    const saved = merged !== current ? await send({ type: MSG.DECKS_UPDATE, deck: merged }) : { ok: true, deck: current };
+    if (saved && saved.ok) current = saved.deck;
+    let commanderSet = false;
+    if (m.importCommanderId && !current.commander) {
+      const r = await send({ type: MSG.DECKS_SET_COMMANDER, id: current.id, scryfallId: m.importCommanderId });
+      if (r && r.ok) { current = r.deck; commanderSet = true; }
+    }
+    m.imported = true;
+    await renderBuilder();
+    const total = addedCount + updatedCount + (commanderSet ? 1 : 0);
+    showToast(total ? `Aggiunte ${total} cart${total === 1 ? 'a' : 'e'} al mazzo.` : 'Nessuna carta nuova da aggiungere.');
+  }
+
+  // Toast discreto in basso a destra (conferme di import/export non
+  // bloccanti): stesso pattern del toast dell'editor.
+  let dkToastTimer = null;
+  function showToast(text) {
+    let el = document.getElementById('dkToast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'dkToast';
+      el.className = 'dk-toast';
+      el.setAttribute('role', 'status');
+      document.body.appendChild(el);
+    }
+    el.textContent = text;
+    void el.offsetWidth;
+    el.classList.add('show');
+    clearTimeout(dkToastTimer);
+    dkToastTimer = setTimeout(() => el.classList.remove('show'), 3400);
+  }
+
+  // ── Import/Export rigido (§11), via switcher ────────────────────────────────
+  // Dialog minimale (overlay + box, stesso linguaggio visivo dei confirm):
+  // il parser è DETERMINISTICO (mai LLM). L'import mostra sempre un'anteprima
+  // con conferma prima di scrivere nel mazzo; righe non riconosciute sono
+  // segnalate, mai indovinate.
+  let ioOverlayEl = null;
+  function closeIoOverlay() {
+    if (ioOverlayEl) { ioOverlayEl.remove(); ioOverlayEl = null; }
+    document.removeEventListener('keydown', ioOverlayKey, true);
+  }
+  function ioOverlayKey(e) { if (e.key === 'Escape') closeIoOverlay(); }
+
+  function buildIoOverlay(title) {
+    closeIoOverlay();
+    const overlay = document.createElement('div');
+    overlay.className = 'dk-io-overlay';
+    const box = document.createElement('div');
+    box.className = 'dk-io-box';
+    box.innerHTML = `<div class="dk-io-title">${esc(title)}</div><div class="dk-io-body"></div>`;
+    overlay.appendChild(box);
+    overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) closeIoOverlay(); });
+    document.body.appendChild(overlay);
+    ioOverlayEl = overlay;
+    document.addEventListener('keydown', ioOverlayKey, true);
+    return box.querySelector('.dk-io-body');
+  }
+
+  function openExportDialog() {
+    const body = buildIoOverlay('Esporta mazzo');
+    body.innerHTML = `
+      <textarea class="dk-io-textarea" readonly rows="14">(generazione…)</textarea>
+      <div class="dk-io-row">
+        <button class="dk-io-btn" data-io="close">Chiudi</button>
+        <button class="dk-io-btn dk-io-btn-ok" data-io="copy">Copia</button>
+      </div>`;
+    const ta = body.querySelector('textarea');
+    send({ type: MSG.DECKS_EXPORT, id: current.id }).then((r) => {
+      ta.value = (r && r.ok) ? r.text : 'Non riuscito a generare la lista.';
+      ta.focus();
+      ta.select();
+    });
+    body.querySelector('[data-io="close"]').addEventListener('click', closeIoOverlay);
+    body.querySelector('[data-io="copy"]').addEventListener('click', async (e) => {
+      try {
+        await navigator.clipboard.writeText(ta.value);
+      } catch (_) {
+        ta.focus();
+        ta.select();
+        try { document.execCommand('copy'); } catch (_) { /* copia manuale, il testo resta selezionato */ }
+      }
+      const btn = e.currentTarget;
+      const prev = btn.textContent;
+      btn.textContent = 'Copiata ✓';
+      setTimeout(() => { if (btn.isConnected) btn.textContent = prev; }, 1400);
+    });
+  }
+
+  function openImportDialog() {
+    const body = buildIoOverlay('Importa mazzo');
+    body.innerHTML = `
+      <textarea class="dk-io-textarea" rows="14" placeholder="Incolla qui la lista (una carta per riga, es. «1 Sol Ring»)…"></textarea>
+      <div class="dk-io-row">
+        <button class="dk-io-btn" data-io="cancel">Annulla</button>
+        <button class="dk-io-btn dk-io-btn-ok" data-io="parse">Analizza</button>
+      </div>`;
+    body.querySelector('[data-io="cancel"]').addEventListener('click', closeIoOverlay);
+    body.querySelector('[data-io="parse"]').addEventListener('click', async () => {
+      const ta = body.querySelector('textarea');
+      const text = ta.value;
+      if (!text.trim()) return;
+      const btn = body.querySelector('[data-io="parse"]');
+      btn.disabled = true;
+      btn.textContent = 'Analizzo…';
+      const r = await send({ type: MSG.DECKS_IMPORT_PREVIEW, id: current.id, text });
+      if (!r || !r.ok) {
+        btn.disabled = false;
+        btn.textContent = 'Analizza';
+        showToast('Analisi non riuscita.');
+        return;
+      }
+      renderImportPreview(body, r);
+    });
+  }
+
+  function renderImportPreview(body, r) {
+    const resolved = r.entries.filter((e) => e.card);
+    const unresolved = r.entries.filter((e) => !e.card).map((e) => e.name);
+    const dirty = [...unresolved, ...r.dirtyLines];
+    const commanderNote = r.commander
+      ? (r.commander.card
+        ? `<div class="dk-io-note">Commander riconosciuto: ${esc(r.commander.card.name)}${current.commander ? ' — il mazzo ha già un commander, resterà quello attuale.' : '.'}</div>`
+        : `<div class="dk-io-note dk-io-warn">Commander «${esc(r.commander.name)}» non trovato su Scryfall.</div>`)
+      : '';
+    body.innerHTML = `
+      ${commanderNote}
+      <div class="dk-io-note">${resolved.length} cart${resolved.length === 1 ? 'a' : 'e'} riconosciut${resolved.length === 1 ? 'a' : 'e'} su ${r.entries.length}.</div>
+      ${dirty.length ? `<div class="dk-io-note dk-io-warn">${dirty.length} riga/righe non riconosciut${dirty.length === 1 ? 'a' : 'e'}:<ul class="dk-io-dirty">${dirty.map((l) => `<li>${esc(l)}</li>`).join('')}</ul></div>` : ''}
+      <div class="dk-io-row">
+        <button class="dk-io-btn" data-io="cancel">Annulla</button>
+        <button class="dk-io-btn dk-io-btn-ok" data-io="apply" ${resolved.length ? '' : 'disabled'}>Importa ${resolved.length} cart${resolved.length === 1 ? 'a' : 'e'}</button>
+      </div>`;
+    body.querySelector('[data-io="cancel"]').addEventListener('click', closeIoOverlay);
+    const applyBtn = body.querySelector('[data-io="apply"]');
+    if (!applyBtn) return;
+    applyBtn.addEventListener('click', async () => {
+      applyBtn.disabled = true;
+      applyBtn.textContent = 'Importo…';
+      const entries = resolved.map((e) => ({ scryfallId: e.card.id, qty: e.qty }));
+      const commanderId = (r.commander && r.commander.card && !current.commander) ? r.commander.card.id : '';
+      const res = await send({ type: MSG.DECKS_IMPORT_APPLY, id: current.id, entries, commanderId });
+      if (res && res.ok) {
+        current = res.deck;
+        closeIoOverlay();
+        await renderBuilder();
+        const total = res.addedCount + res.updatedCount;
+        showToast(`Importate ${total} cart${total === 1 ? 'a' : 'e'}${res.updatedCount ? ` (${res.updatedCount} aggiornate)` : ''}.`);
+      } else {
+        showToast('Import non riuscito.');
+        applyBtn.disabled = false;
+        applyBtn.textContent = `Importa ${resolved.length} cart${resolved.length === 1 ? 'a' : 'e'}`;
+      }
+    });
   }
 
   // Hover su un nome in prosa: risoluzione fuzzy una-tantum (§3.5); l'id
