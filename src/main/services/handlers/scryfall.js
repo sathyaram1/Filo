@@ -180,8 +180,6 @@ module.exports = function register(on, ctx) {
       // Budget via chat (§9.2): l'LLM estrae il numero, il tetto lo applica IL
       // SISTEMA (mai fidarsi che il modello "abbia già fatto"). Il mazzo
       // aggiornato torna alla pagina, che rinfresca header e statistiche.
-      let reply = parsed.reply;
-      let deckOut = null;
       if (parsed.hasBudget) {
         const saved = await Store.put(Decks.setBudget(deck, parsed.budget));
         if (saved) {
