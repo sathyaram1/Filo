@@ -551,7 +551,7 @@
         <button class="dk-add" data-add="${esc(id)}" data-qty="${q || 1}" data-in="${added ? 1 : 0}"
                 title="${added ? 'Rimuovi dal mazzo' : 'Aggiungi al mazzo'}"
                 aria-label="${added ? `Rimuovi ${esc(name)} dal mazzo` : `Aggiungi ${esc(name)} al mazzo`}">${added ? '✓' : '+'}</button>
-        <span class="dk-row-name">${esc(name)}${q ? ` <span class="dk-row-qty">×${q}</span>` : ''}</span>
+        <span class="dk-row-name">${q ? `<span class="dk-row-qty">${q}×</span> ` : ''}${esc(name)}</span>
         <span class="dk-row-mana">${mana}</span>
       </div>`;
   }
