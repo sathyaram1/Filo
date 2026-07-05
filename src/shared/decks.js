@@ -327,6 +327,7 @@
     touch,
     addCard,
     removeCard,
+    importCards,
     renameDeck,
     setCommander,
     setBudget,
