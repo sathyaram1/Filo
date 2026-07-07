@@ -302,7 +302,25 @@ function tryGit(args) {
 
 function diffForBranch(branch) {
   if (!branch) return '';
-  const r = tryGit(['diff', `${MAIN_BRANCH}...${branch}`]);
+  // La base del confronto DEVE essere lo stato REMOTO di main. In cloud il clone
+  // è shallow e il ref locale `main` non viene mai aggiornato (l'orchestratore fa
+  // `pull --rebase origin main` sul branch driver `claude/*`, non fa avanzare il
+  // ref `main`), quindi un `git diff main...branch` userebbe un main vecchio di
+  // decine di versioni: il diff si gonfia con modifiche GIÀ in main e fa scattare
+  // falsi positivi L5/secaudit (file sensibili "toccati" che in realtà erano già
+  // su main). merge-gate.mjs infatti fetcha origin e confronta con origin/target;
+  // qui allineiamo la stessa logica per il diff che alimenta il secaudit.
+  tryGit(['fetch', 'origin', MAIN_BRANCH]);
+  const base = tryGit(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${MAIN_BRANCH}`]).ok
+    ? `origin/${MAIN_BRANCH}`
+    : MAIN_BRANCH;
+  // Il branch può esistere solo su origin (worker/* pushato ma non in locale).
+  const ref = tryGit(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`]).ok
+    ? branch
+    : (tryGit(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${branch}`]).ok
+        ? `origin/${branch}`
+        : branch);
+  const r = tryGit(['diff', `${base}...${ref}`]);
   return r.ok ? r.out : '';
 }
 
