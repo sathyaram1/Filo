@@ -1,9 +1,0 @@
-{
-  "id": "6dfbad8d-29a7-43df-861f-b7eb08c3e7b9",
-  "status": "design",
-  "notes": "secaudit FAIL: impossibile calcolare il diff main...worker/6dfbad8d (nessun merge-base, clone shallow con storie disgiunte). Diff manuale (due punti) mostra 101 file / 27 commit che toccano 6 path sensibili da SENSITIVE_PATTERNS (firestore.rules, storage.rules, scripts/apply-triage.mjs, scripts/queue-triage.mjs, src/main/services/handlers/auth.js, src/shared/feedback.js) — L5 li avrebbe bloccati se il diff fosse stato calcolabile. Contenuto delle regole/rules e degli handler sembra coerente (hardening storage.rules, nuovi campi macchina a stati in firestore.rules, callable con controllo isAdmin), ma l'ampiezza (feature decks + refactor state machine + auth) è anomala per un branch worker singolo: serve occhio umano su target di merge (main vs feature/N) e sui file sensibili prima di procedere.",
-  "queuedAt": "2026-07-07T13:54:50.142Z",
-  "queuedBy": "routine",
-  "branch": "worker/6dfbad8d-29a7-43df-861f-b7eb08c3e7b9",
-  "reason": "loop"
-}
