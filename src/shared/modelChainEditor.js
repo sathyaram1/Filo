@@ -17,13 +17,20 @@
     return global.SN_I18N ? global.SN_I18N.t(key, ...args) : key;
   }
 
-  // Le azioni esposte nell'editor (sottoinsieme di ACTIONS) con la rispettiva
-  // chiave i18n per l'etichetta. Calcolate al volo così SN_CONST è già caricato.
+  // Le azioni esposte nell'editor con la rispettiva chiave i18n per
+  // l'etichetta. Calcolate al volo così SN_CONST è già caricato.
+  // DEVE coprire TUTTE le azioni di DEFAULT_MODELS: un'azione assente qui è
+  // un'azione il cui modello NON è impostabile né dalle Opzioni né dalla
+  // pagina admin "Modelli predefiniti" (e che sparisce dalla config salvata
+  // dall'admin, restando inchiodata ai default hardcoded). L'unit test
+  // tests/unit/modelChainActions.test.mjs diventa rosso se una nuova azione
+  // viene aggiunta a DEFAULT_MODELS senza comparire qui.
   function actionLabels() {
     const A = global.SN_CONST.ACTIONS;
     return [
       [A.EXPLAIN, 'options_action_explain'],
       [A.EXPLAIN_DEEP, 'options_action_explain_deep'],
+      [A.EXPLAIN_LINK, 'options_action_explain_link'],
       [A.TRANSLATE_SELECTION, 'options_action_translate_sel'],
       [A.TRANSLATE_PAGE, 'options_action_translate_page'],
       [A.HELP, 'options_action_help'],
@@ -34,6 +41,7 @@
       [A.TTS, 'options_action_tts'],
       [A.SPELLCHECK_SEMANTIC, 'spell_action_semantic_label'],
       [A.SPELLCHECK_WORD, 'spell_action_word_label'],
+      [A.EDIT_TEXT, 'options_action_edit_text'],
       [A.HELP_INTENT_GUESS, 'options_action_help_intent_guess'],
       [A.HELP_INTENT_JUDGE, 'options_action_help_intent_judge'],
       [A.FILO_TAB_TRIAGE, 'options_action_tab_triage'],
@@ -41,6 +49,11 @@
       [A.FILO_TAB_SEARCH, 'options_action_tab_search'],
       [A.FILO_DASHBOARD, 'options_action_filo_dashboard'],
       [A.FILO_CHAT, 'options_action_filo_chat'],
+      [A.FILO_LESSON, 'options_action_filo_lesson'],
+      [A.FILO_COMPACT, 'options_action_filo_compact'],
+      [A.DECKS_CHAT, 'options_action_decks_chat'],
+      [A.DECKS_OPINION, 'options_action_decks_opinion'],
+      [A.DECKS_AUTOTAG, 'options_action_decks_autotag'],
     ];
   }
 
