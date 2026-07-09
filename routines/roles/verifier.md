@@ -57,22 +57,27 @@ Convenzioni (tono, sintomo-vs-causa): `CLAUDE.md`.
 
 ## Come riporti
 
-Una riga sola, una delle due forme:
+Scrivi la tua critica in una delle due forme:
 
 ```
-PASS — <1-2 frasi su cosa hai testato e perché funziona>
+PASS — <cosa hai testato e perché funziona, inclusi gli stress test provati>
 ```
 
 ```
 FAIL — <cosa si rompe, con i passi esatti per riprodurlo>
 ```
 
-Poi registra l'esito nello stato del branch (lo legge il prossimo dispatch per
-instradare a secaudit su PASS o a fixer su FAIL):
+Poi registra l'esito nello stato del branch **passando SEMPRE la critica come
+terzo argomento** (lo legge il prossimo dispatch per instradare a secaudit su
+PASS o a fixer su FAIL; la critica finisce ANCHE nella chat del feedback in
+dashboard, dove l'owner la legge — senza, il tuo lavoro è invisibile):
 
 ```bash
-node scripts/dispatch.mjs --record-verifier <id> <pass|fail>
+node scripts/dispatch.mjs --record-verifier <id> <pass|fail> "PASS — ho testato…"
 ```
+
+La critica è per l'owner: descrivi cosa hai provato e cosa succede in termini di
+comportamento dell'app, senza nomi di file/funzioni.
 
 Infine **rilascia il claim** (dispatch lo ha acquisito per consegnarti il lavoro;
 se resta vivo, il prossimo giro NON può instradare secaudit/fixer su questo
