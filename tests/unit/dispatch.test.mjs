@@ -285,7 +285,7 @@ test('verifierNoteText: fail con critica → incipit NON superato + passi', () =
   assert.ok(!/FAIL:/.test(n));
 });
 
-test('verifierNoteText: senza critica → solo l'esito (mai nota vuota)', () => {
+test("verifierNoteText: senza critica → solo l'esito (mai nota vuota)", () => {
   assert.equal(verifierNoteText('pass'), 'Controllo funzionalità superato.');
   assert.equal(verifierNoteText('fail'), 'Controllo funzionalità NON superato.');
 });
