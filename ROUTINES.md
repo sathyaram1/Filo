@@ -66,11 +66,15 @@ Ripeti finché il budget è quasi pieno:
      pesante ~$6–8 ≈ 20–25% del cap). Se `costUSD ≥ 0.70 × CAP_5H` → **non
      spawnare**: checkpoint, rilascia i claim, **termina** pulito finché hai
      ancora budget per farlo.
-   - **`CAP_5H` (da tarare con l'owner):** empiricamente questa sessione è stata
-     tagliata con `costUSD ≈ $28–33` nel blocco attivo → stima di lavoro
-     **`CAP_5H ≈ $32`**, quindi **soglia di spawn ≈ $22**. (Con questa regola il
-     giro 8 — spawnato a $28 — non sarebbe mai partito.) Aggiorna il numero se
-     l'owner fissa il valore reale.
+   - **`CAP_5H` è solo una stima euristica — non esiste un numero ufficiale.**
+     Piano **Pro (€20/mese)**; Anthropic non pubblica il limite 5h, e `costUSD` è
+     un *equivalente-API calcolato* da `ccusage`, non la bolletta (che è fissa).
+     Il valore si tara **osservando la percentuale d'uso vs la spesa** dopo alcuni
+     task. Empiricamente questa sessione è stata tagliata con `costUSD ≈ $28–33`
+     nel blocco attivo → stima di lavoro **`CAP_5H ≈ $32`**, quindi **soglia di
+     spawn ≈ $22**. (Con questa regola il giro 8 — spawnato a $28 — non sarebbe
+     mai partito.) Ritara il numero se osservi un taglio a un costo diverso; non
+     aspettarti conferme ufficiali.
    - **Non** inseguire "un altro giro" sotto soglia-limite: un worker tagliato a
      metà lascia **claim appeso + stato scritto a metà** (nessun `--record-*`,
      nessun rilascio claim) e sporca la pipeline per la sessione dopo.
