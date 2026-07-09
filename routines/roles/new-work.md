@@ -81,3 +81,19 @@ Se il feedback è ambiguo / richiede una decisione di design / mancano
 informazioni → `design` con `--reason clarify` e le TUE DOMANDE nella nota
 (finiscono nella chat del feedback, l'owner risponde da lì). Non usarlo come
 scappatoia.
+## Riga finale per l'orchestratore (contratto DURO)
+
+L'orchestratore è **cieco** e legge **solo la tua ultima riga** — è un *dato di
+controllo* (continua/fermati), non un canale di report. Tutto ciò che vuoi dire
+all'utente va nelle `notes` del feedback (via `queue-triage.mjs`), NON nella riga
+di ritorno.
+
+La tua **ultima riga** deve essere **ESATTAMENTE** una di queste, senza
+nient'altro dopo (niente id, nomi di file, diff, spiegazioni, report):
+
+- `fatto <X>` — hai chiuso il tuo compito (X = 1-4 parole, es. `fatto verifica #209`)
+- `niente da fare` — non c'era lavoro per questo ruolo
+- `budget pieno`
+
+Se ci infili un report, l'orchestratore riceve dettagli specifici che per design
+deve ignorare: è un bug del ruolo, non un extra utile.

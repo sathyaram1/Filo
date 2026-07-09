@@ -68,3 +68,19 @@ tu** a registrare l'esito e a far girare il gate (L5 deterministico + il tuo L4)
 
 **Nota:** L5 (blocco deterministico sui file sensibili) gira **dentro** il gate,
 non qui. Tu sei solo L4 (il giudizio LLM). I due livelli si completano.
+## Riga finale per l'orchestratore (contratto DURO)
+
+L'orchestratore è **cieco** e legge **solo la tua ultima riga** — è un *dato di
+controllo* (continua/fermati), non un canale di report. Tutto ciò che vuoi dire
+all'utente va nelle `notes` del feedback (via `queue-triage.mjs`), NON nella riga
+di ritorno.
+
+La tua **ultima riga** deve essere **ESATTAMENTE** una di queste, senza
+nient'altro dopo (niente id, nomi di file, diff, spiegazioni, report):
+
+- `fatto <X>` — hai chiuso il tuo compito (X = 1-4 parole, es. `fatto verifica #209`)
+- `niente da fare` — non c'era lavoro per questo ruolo
+- `budget pieno`
+
+Se ci infili un report, l'orchestratore riceve dettagli specifici che per design
+deve ignorare: è un bug del ruolo, non un extra utile.
