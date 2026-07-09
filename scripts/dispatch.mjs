@@ -424,12 +424,14 @@ function recordVerifier(id, verdict, critique) {
     verifierNoteText(verdict, critique));
   return next;
 }
-function recordFixed(id) {
+function recordFixed(id, report = '') {
   const next = applyFixed({ ...(readState(id) || defaultState(id, '')), id });
   next.id = id;
   writeState(next);
-  // Fix ri-applicato → torna in attesa della verifica comportamentale.
-  queueStatus(id, 'revision_capability');
+  // Fix ri-applicato → torna in attesa della verifica comportamentale. Il
+  // report del fixer (cosa ha corretto e come) va nella chat del feedback,
+  // come per verifier e new-work: senza, la correzione è invisibile all'owner.
+  queueStatus(id, 'revision_capability', String(report || ''));
   return next;
 }
 function recordSecaudit(id, verdict) {
