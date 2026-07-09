@@ -1,8 +1,0 @@
-{
-  "id": "6y3yiQOIYRzEATDS7OYQ",
-  "status": "revision_capability",
-  "notes": "Ora nella griglia dei modelli (sia nelle Opzioni sia in Modelli predefiniti) compaiono anche le funzioni dei Mazzi — chat e ricerca carte, parere sulle carte, tag automatici — così puoi scegliere il modello per ciascuna dal menu. Oltre al chiesto: ho aggiunto alla griglia anche le altre funzioni che ne erano rimaste fuori (memoria di Filo, riscrittura del testo, Spiega link) e una rete di sicurezza per l'errore dello screenshot: se la configurazione salvata non conosce un modello citato da una funzione, Filo ripiega sul modello predefinito invece di fallire con l'errore criptico di OpenRouter. Verificato con unit test dedicati (rossi senza la modifica, verdi con) e l'intera suite unit; non verificato visivamente in Electron perché l'ambiente cloud non può scaricarne il binario. Note tecniche: la griglia azioni ora è vincolata da un test a coprire tutte le azioni con un modello di default — una nuova azione AI aggiunta senza voce nel menu fa diventare rosso npm run test:unit.",
-  "queuedAt": "2026-07-09T11:02:24.534Z",
-  "queuedBy": "routine",
-  "branch": "worker/6y3yiQOIYRzEATDS7OYQ"
-}
