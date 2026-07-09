@@ -45,6 +45,7 @@
   const mgDetail      = document.getElementById('mgDetail');
   const mgDetailHead  = document.getElementById('mgDetailHead');
   const mgJudgesRow   = document.getElementById('mgJudgesRow');
+  const mgWorkState   = document.getElementById('mgWorkState');
   const mgThread      = document.getElementById('mgThread');
 
   // Revisione — pannello laterale
