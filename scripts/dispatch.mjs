@@ -402,7 +402,9 @@ function queueStatus(id, status, note = '', reason = '') {
  * finisce nelle note, così la conversazione del feedback racconta l'intero iter.
  */
 export function verifierNoteText(verdict, critique = '') {
-  const c = String(critique || '').trim().slice(0, 4000);
+  // Il ruolo scrive la critica come "PASS — …"/"FAIL — …": il prefisso è
+  // ridondante col nostro incipit, toglilo (resta solo la sostanza).
+  const c = String(critique || '').trim().replace(/^(PASS|FAIL)\s*[—–:\-]\s*/i, '').slice(0, 4000);
   if (verdict === 'pass') {
     return c ? `Controllo funzionalità superato. ${c}` : 'Controllo funzionalità superato.';
   }
