@@ -36,15 +36,19 @@ convenzioni di lavoro (sintomo-vs-causa, invarianti UX, tono, verifica) sono in
 
 ## Come riporti
 
-Report di 2-3 frasi **per l'utente** (cosa vedrà di diverso, cosa hai aggiunto
-oltre il chiesto, come hai verificato). Niente nomi tecnici.
+Il report finisce nella **chat del feedback in dashboard**: è l'unica traccia
+della correzione che l'owner vede. Scrivilo **per l'utente** (niente nomi
+tecnici, spiega il comportamento) ma **COMPLETO**: cosa si rompeva, cosa hai
+corretto e cosa vedrà di diverso, le **decisioni prese** e perché, ciò che è
+**emerso** lavorando, cosa hai aggiunto oltre il chiesto, come hai verificato.
 
-Poi rimetti il branch in coda di verifica: il prossimo giro di dispatch lo
-re-instraderà al **verifier** (il contatore loop è già stato incrementato quando
-hai ricevuto questo lavoro).
+Poi rimetti il branch in coda di verifica **passando il report come secondo
+argomento** (senza, la correzione è invisibile all'owner): il prossimo giro di
+dispatch lo re-instraderà al **verifier** (il contatore loop è già stato
+incrementato quando hai ricevuto questo lavoro).
 
 ```bash
-node scripts/dispatch.mjs --record-fixed <id>
+node scripts/dispatch.mjs --record-fixed <id> "[il tuo report]"
 ```
 
 Infine **rilascia il claim** (se resta vivo, il prossimo giro non può instradare
