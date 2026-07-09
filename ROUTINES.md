@@ -27,18 +27,31 @@ Le routine schedulate su claude.ai partono con un prompt minimo
    Fallo **una volta qui nell'orchestratore**: così TUTTI i worker ereditano il
    binario pronto (non è compito dei ruoli reinstallarlo). In cloud i test poi
    vanno lanciati con `ELECTRON_DISABLE_SANDBOX=1` e `xvfb-run -a`.
-   - ⚠️ **Se `ensure-electron.mjs` fallisce con 403** (`curl ... 403 Forbidden`):
-     la **policy di egress** dell'ambiente sta bloccando i download di asset da
-     `github.com` (osservato 2026-07-09 — giorni prima lo stesso `curl` faceva
-     200). Non è aggirabile lato codice (anche `objects.githubusercontent.com` non
-     è raggiungibile con l'URL firmato perché `github.com` risponde 403 prima del
-     redirect). In questo stato la flotta gira **senza Electron**: verifica solo
-     con `npm run test:unit` (gira senza Electron) e `node -e "require('./src/…')"`,
-     e ogni verifica visiva va dichiarata "non eseguibile in questo ambiente".
-     **Fix duraturo (owner):** mettere in allowlist il download di Electron nella
-     *network policy* dell'ambiente, oppure pre-scaricare il binario nello *setup
-     script* del container (vedi code.claude.com/docs). Finché non è fatto, i ruoli
-     che richiedono avvio app non possono chiudere il giro visivo.
+
+   `ensure-electron.mjs` prova le sorgenti in ordine (prima quelle SENZA rete
+   esterna): (1) già installato; (2) `FILO_ELECTRON_ZIP=/path/…zip`; (3) vendored
+   nel repo `vendor/electron/electron-v<ver>-linux-x64.zip`; (4)
+   `FILO_ELECTRON_URL=<mirror>`; (5) github.com via curl.
+   - ⚠️ **In questo ambiente il download in-sessione è IMPOSSIBILE** (ricerca
+     2026-07-09): la network policy blocca **github.com** (403 anche con curl),
+     **npmmirror**, **jsdelivr/unpkg**, **playwright CDN**, **jsr.io**; gli unici
+     host permessi (npm registry, PyPI, crates, go-proxy) **non** ospitano il
+     binario Electron, non c'è pacchetto npm/PyPI che lo impacchetti, né apt né
+     cache locale. Quindi le sorgenti (4)/(5) falliscono e restano solo le locali.
+   - **Fix duraturo (owner, fuori sessione) — scegli UNO:**
+     - **a) Vendoring via git (consigliato):** dal tuo PC (dove il download
+       funziona) scarica lo zip `linux-x64` e committalo in
+       `vendor/electron/electron-v<ver>-linux-x64.zip`. Il git remote scoped È
+       raggiungibile in cloud → arriva col fetch, zero rete esterna. (Pesa ~100 MB:
+       valuta un branch dedicato o accetta il peso in history; git-lfs qui non c'è.)
+     - **b) Allowlist** di `github.com`/`objects.githubusercontent.com` nella
+       *network policy* dell'ambiente → torna a funzionare la sorgente (5).
+     - **c) `FILO_ELECTRON_URL`/`FILO_ELECTRON_ZIP`** verso un mirror/artefatto che
+       hai messo in allowlist o pre-scaricato nel *setup script* del container
+       (vedi code.claude.com/docs).
+   - **Finché nessuna è attiva la flotta gira SENZA Electron:** verifica solo con
+     `npm run test:unit` e `node -e "require('./src/…')"`, e ogni verifica visiva
+     va dichiarata "non eseguibile in questo ambiente" (mai fingerla).
 2. `git pull --rebase origin main`.
 
 ### Loop principale
