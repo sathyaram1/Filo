@@ -78,14 +78,47 @@ if (isInstalled()) {
   process.exit(0);
 }
 
-const url = `https://github.com/electron/electron/releases/download/v${version}/electron-v${version}-linux-x64.zip`;
-const zip = join(os.tmpdir(), `electron-${version}-linux-x64.zip`);
+const ZIP_NAME = `electron-v${version}-linux-x64.zip`;
+const tmpZip = join(os.tmpdir(), ZIP_NAME);
 
-log(`scarico Electron v${version} con curl (l'installer nativo abortisce dietro il proxy)…`);
-try {
-  execFileSync('curl', ['-sSL', '--fail', '--max-time', '300', '-o', zip, url], { stdio: ['ignore', 'ignore', 'inherit'] });
-} catch (e) {
-  log('download via curl fallito: ' + (e && e.message ? e.message : e));
+function curlTo(url, dest, label) {
+  log(`scarico Electron v${version} da ${label} con curl…`);
+  try {
+    execFileSync('curl', ['-sSL', '--fail', '--max-time', '300', '-o', dest, url], { stdio: ['ignore', 'ignore', 'inherit'] });
+    return dest;
+  } catch (e) {
+    log(`  download da ${label} fallito: ${e && e.message ? e.message : e}`);
+    return null;
+  }
+}
+
+// Prova le sorgenti in ordine: prima quelle locali (nessuna rete esterna, le
+// uniche affidabili quando la policy blocca github), poi quelle di rete.
+function resolveZip() {
+  const envZip = process.env.FILO_ELECTRON_ZIP;
+  if (envZip) {
+    if (existsSync(envZip)) { log(`uso lo zip da FILO_ELECTRON_ZIP: ${envZip}`); return envZip; }
+    log(`FILO_ELECTRON_ZIP="${envZip}" non esiste — provo le altre sorgenti.`);
+  }
+  const vendored = join(ROOT, 'vendor', 'electron', ZIP_NAME);
+  if (existsSync(vendored)) { log(`uso lo zip vendored nel repo: ${vendored}`); return vendored; }
+  if (process.env.FILO_ELECTRON_URL) {
+    const got = curlTo(process.env.FILO_ELECTRON_URL, tmpZip, 'FILO_ELECTRON_URL');
+    if (got) return got;
+  }
+  const ghUrl = `https://github.com/electron/electron/releases/download/v${version}/${ZIP_NAME}`;
+  return curlTo(ghUrl, tmpZip, 'github.com');
+}
+
+const zip = resolveZip();
+if (!zip) {
+  log('IMPOSSIBILE procurare il binario Electron da nessuna sorgente.');
+  log("La network policy dell'ambiente blocca il download da github (403) e non");
+  log('esiste uno zip locale/vendored. Opzioni per l\'owner (fuori sessione):');
+  log('  a) allowlist di github.com / objects.githubusercontent.com nella network policy;');
+  log(`  b) vendoring: committa lo zip in vendor/electron/${ZIP_NAME} dal tuo PC (arriva col fetch git);`);
+  log('  c) esporta FILO_ELECTRON_ZIP=/path/…zip oppure FILO_ELECTRON_URL=<mirror allowlistato>.');
+  log('Finché non è fatto la flotta gira SENZA Electron: verifica solo con `npm run test:unit`.');
   process.exit(1);
 }
 
