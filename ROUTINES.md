@@ -182,11 +182,16 @@ claim: ogni iterazione è un worker fresco, lo stato dev'essere persistito). I
 ruoli lo aggiornano coi sotto-comandi:
 
 ```bash
-node scripts/dispatch.mjs --record-verifier <id> <pass|fail> ["critica"]
-node scripts/dispatch.mjs --record-fixed <id>
+node scripts/dispatch.mjs --record-verifier <id> <pass|fail> "critica"
+node scripts/dispatch.mjs --record-fixed <id> "report"
 node scripts/dispatch.mjs --record-secaudit <id> <pass|fail>
 node scripts/dispatch.mjs --clear-state <id>
 ```
+
+La **critica del verifier** e il **report del fixer** non sono opzionali di
+fatto: oltre allo stato su git, finiscono nelle `notes` del feedback su
+Firestore (via coda triage) e compaiono nella **chat del feedback in
+dashboard** — sono l'unica traccia dell'iter che l'owner vede.
 
 ---
 
