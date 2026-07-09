@@ -605,3 +605,78 @@ test('REEVAL_WASTE_LIMIT: soglia bassa e positiva (basta poco per capire che i g
   assert.equal(typeof MR.REEVAL_WASTE_LIMIT, 'number');
   assert.ok(MR.REEVAL_WASTE_LIMIT >= 1 && MR.REEVAL_WASTE_LIMIT <= 5);
 });
+
+// ── workProgress: avanzamento dell'iter di lavorazione (card pinnata) ───────
+
+test('workProgress: null fuori dall\'iter (todo/done/inbox)', () => {
+  assert.equal(MR.workProgress({ status: 'todo' }), null);
+  assert.equal(MR.workProgress({ status: 'done' }), null);
+  assert.equal(MR.workProgress({ status: 'attack' }), null);
+  assert.equal(MR.workProgress(null), null);
+});
+
+test('workProgress: working → implementazione in corso, resto da fare', () => {
+  const now = Date.parse('2026-07-09T12:00:00Z');
+  const p = MR.workProgress({ status: 'working', workingSince: '2026-07-09T11:50:00Z' }, { now });
+  assert.equal(p.status, 'working');
+  assert.deepEqual(p.steps.map((s) => s.state), ['current', 'pending', 'pending']);
+  assert.equal(p.current.key, 'impl');
+  // workingSince fresco (10 min < TTL 60) → un'istanza è al lavoro anche senza claim.
+  assert.equal(p.active, true);
+});
+
+test('workProgress: working con workingSince scaduto e senza claim → NON attivo', () => {
+  const now = Date.parse('2026-07-09T12:00:00Z');
+  const p = MR.workProgress({ status: 'working', workingSince: '2026-07-09T09:00:00Z' }, { now });
+  assert.equal(p.active, false);
+});
+
+test('workProgress: revision_capability → impl fatta, controllo funzionalità in corso', () => {
+  const now = Date.parse('2026-07-09T12:00:00Z');
+  const p = MR.workProgress({ status: 'revision_capability' }, { now });
+  assert.deepEqual(p.steps.map((s) => s.state), ['done', 'current', 'pending']);
+  assert.equal(p.current.key, 'verify');
+  assert.equal(p.active, false); // nessun claim vivo → in attesa
+});
+
+test('workProgress: revision_security con claim vivo → sicurezza in corso, istanza attiva', () => {
+  const now = Date.parse('2026-07-09T12:00:00Z');
+  const p = MR.workProgress({
+    status: 'revision_security',
+    claimedBy: 'vm-123',
+    claimExpiresAt: '2026-07-09T12:30:00Z',
+  }, { now });
+  assert.deepEqual(p.steps.map((s) => s.state), ['done', 'done', 'current']);
+  assert.equal(p.current.key, 'security');
+  assert.equal(p.active, true);
+  assert.equal(p.by, 'vm-123');
+});
+
+test('workProgress: claim SCADUTO non conta come istanza attiva', () => {
+  const now = Date.parse('2026-07-09T12:00:00Z');
+  const p = MR.workProgress({
+    status: 'revision_capability',
+    claimExpiresAt: '2026-07-09T11:00:00Z',
+  }, { now });
+  assert.equal(p.active, false);
+});
+
+test('workProgress: status legacy review → normalizzato a revision_capability', () => {
+  const p = MR.workProgress({ status: 'review' });
+  assert.equal(p.status, 'revision_capability');
+});
+
+test('listForManageTab queue: gli in-lavorazione sono PINNATI in cima, attivi prima', () => {
+  const now = Date.parse('2026-07-09T12:00:00Z');
+  const items = [
+    { _id: 'a', status: 'todo', priority: 3, createdAt: '2026-07-01T00:00:00Z' },
+    { _id: 'b', status: 'revision_capability', createdAt: '2026-06-01T00:00:00Z' },
+    { _id: 'c', status: 'working', workingSince: '2026-07-09T11:55:00Z', createdAt: '2026-05-01T00:00:00Z' },
+    { _id: 'd', status: 'todo', priority: 1, createdAt: '2026-07-02T00:00:00Z' },
+  ];
+  const list = MR.listForManageTab(items, 'queue', { now });
+  const ids = list.map((f) => f._id);
+  // c è ATTIVO (workingSince fresco) → primo; b è in iter ma in attesa → secondo;
+  // poi i todo per priorità (a=3 prima di d=1).
+  assert.deepEqual(ids, ['c', 'b', 'a', 'd']);
+});
