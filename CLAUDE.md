@@ -152,13 +152,17 @@ hai aggiunto oltre il chiesto**. Senza elenco esplicito è invisibile e si accum
 ## Tono dei report e delle notes
 
 I report finali (chat) e le `notes` su Firestore sono **per l'utente**, non per
-un altro Claude:
+un altro Claude. Le `notes` compaiono come conversazione nella dashboard di
+gestione: sono l'unica traccia della lavorazione che l'owner vede.
 
 - Niente nomi di variabili, funzioni, file con percorso assoluto. Spiega cosa
   l'utente vedrà di diverso, non come l'hai codato.
 - Niente paragrafoni "Causa / Fix / Test" in stile diff review.
-- Sintesi breve di **cosa hai fatto** (1-3 frasi), **cosa hai aggiunto oltre il
-  chiesto** (se qualcosa), **come l'hai verificato**.
+- **Completo, non telegrafico**: cosa hai fatto, **le decisioni che hai preso e
+  perché** (scelte tra alternative, compromessi, cose lasciate fuori apposta),
+  **tutto ciò che è emerso** lavorando (vincoli scoperti, dubbi rimasti), **cosa
+  hai aggiunto oltre il chiesto**, **come l'hai verificato**. Un report di una
+  riga rende il lavoro invisibile e non valutabile.
 - Se serve memoria tecnica per la prossima passata (un vincolo non ovvio che
   potrebbe rompersi), aggiungi in fondo una sezione "Note tecniche" separata. Se
   non serve, **non scriverla**.
