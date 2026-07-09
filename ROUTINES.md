@@ -86,8 +86,10 @@ Ripeti finché il budget è quasi pieno:
    - Costo per giro con `fable` molto più variabile che con Sonnet: i giri
      verifier/secaudit "leggeri" ~$2, ma new-work e prober "pesanti" **$6–8 a
      giro** (100–140k token). Il blocco attivo era a **~$28 costUSD** dopo 7 giri
-     quando la finestra 5h ha tagliato: il costo in dollari da solo NON segnalava
-     lo stop imminente — solo i minuti alla `endTime` del blocco lo facevano.
+     quando la finestra 5h ha tagliato → è esattamente il numero che tara
+     `CAP_5H ≈ $32` / soglia di spawn ≈ $22 nella regola qui sopra. La finestra si
+     è esaurita per **uso** in ~1h (burn rate ~$100/h), non per tempo: guardare i
+     minuti a `endTime` sarebbe stato fuorviante, il segnale giusto è `costUSD`.
    - Contratto della riga singola dei worker **spesso violato**: i worker hanno
      restituito report interi invece di `"fatto X"|"niente da fare"|"budget pieno"`,
      facendo trapelare all'orchestratore dettagli specifici che dovrebbe ignorare.
