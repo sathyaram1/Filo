@@ -27,7 +27,7 @@
 // USO
 //   node scripts/dispatch.mjs                          # sceglie e stampa il JSON
 //   node scripts/dispatch.mjs --record-verifier <id> <pass|fail> ["critica"]
-//   node scripts/dispatch.mjs --record-fixed <id>
+//   node scripts/dispatch.mjs --record-fixed <id> ["report"]
 //   node scripts/dispatch.mjs --record-secaudit <id> <pass|fail>
 //   node scripts/dispatch.mjs --clear-state <id>
 //
