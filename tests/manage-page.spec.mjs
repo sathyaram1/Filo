@@ -392,11 +392,12 @@ test('un blocco per LOOP (blocked + blockReason=loop) è design VERDE con reason
   await expect(page.locator('.mg-item')).toHaveCount(1);
   await expect(page.locator('.mg-item-title')).toHaveText('Test blocco loop');
 
-  // Border-left NERO (#111111 → rgb(17, 17, 17)), distinto dal rosso/arancio/blu.
+  // Border-left VERDE design (#2e9e5b → rgb(46, 158, 91)): il loop è una
+  // decisione owner come gli altri design, NON nero (riservato a suspicious_file).
   const borderColor = await page.locator('.mg-item').evaluate(
     (el) => getComputedStyle(el).borderLeftColor
   );
-  expect(borderColor).toBe('rgb(17, 17, 17)');
+  expect(borderColor).toBe('rgb(46, 158, 91)');
 });
 
 // Panel parziale "non filtrato": almeno un giudice non ha votato. Bianco, nei
