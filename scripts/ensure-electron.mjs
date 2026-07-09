@@ -3,17 +3,26 @@
 //
 // PERCHÉ ESISTE
 //   Nell'ambiente cloud delle routine l'installer nativo di Electron
-//   (@electron/get → got) ABORTISCE il download del binario attraverso il proxy
-//   ("server aborted pending request"), quindi il postinstall di `electron`
-//   fallisce e `npm install` esce con errore. Ma lo stesso file (≈106 MB) si
-//   scarica PERFETTAMENTE con `curl` (verificato: HTTP 200, download completo).
-//   Questo script, idempotente, scarica il binario con curl e lo estrae dove
-//   Electron lo cerca, così `require('electron')` e Playwright (`_electron.launch`)
-//   funzionano senza toccare l'installer rotto.
+//   (@electron/get → got) ABORTISCE il download del binario attraverso il proxy,
+//   quindi il postinstall di `electron` fallisce e `npm install` esce con errore.
+//   Questo script, idempotente, procura lo zip del binario da una delle sorgenti
+//   qui sotto e lo estrae dove Electron lo cerca, così `require('electron')` e
+//   Playwright (`_electron.launch`) funzionano senza toccare l'installer rotto.
 //
 //   Va lanciato DOPO `npm install`. Per non far fallire l'install in partenza,
 //   installa con ELECTRON_SKIP_BINARY_DOWNLOAD=1 e poi lancia questo script:
 //     ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install && node scripts/ensure-electron.mjs
+//
+// SORGENTI DEL BINARIO (provate in quest'ordine — prima quelle SENZA rete esterna,
+// che sono le uniche affidabili quando la policy di egress blocca github):
+//   1. Già installato (isInstalled()) → niente da fare.
+//   2. `FILO_ELECTRON_ZIP=/path/…zip` — uno zip già presente sul filesystem.
+//   3. Vendored nel repo: `vendor/electron/electron-v<ver>-linux-x64.zip`
+//      (committato dall'owner dal suo PC; in cloud arriva col fetch git → nessun
+//      download esterno). È la via consigliata quando la network policy blocca
+//      github (osservato 2026-07-09: github.com/releases → 403 anche con curl).
+//   4. `FILO_ELECTRON_URL=https://…` — un mirror che l'owner ha messo in allowlist.
+//   5. URL ufficiale su github.com (curl). Funziona SOLO se la policy lo consente.
 //
 //   Il criterio di "già installato" replica isInstalled() di
 //   node_modules/electron/install.js: dist/version == versione del package,
