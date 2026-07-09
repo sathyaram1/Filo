@@ -30,26 +30,39 @@ Ripeti finché il budget è quasi pieno:
    ```bash
    npx ccusage@latest blocks --active --json   # leggi costUSD + i tempi del blocco
    ```
-   - **Finestra a 5 ore del piano (gate di PRIMA classe).** Il piano Claude ha un
-     limite a finestra mobile di **5 ore**: quando si esaurisce, il prossimo
-     worker viene **tagliato a metà lavoro** con `session limit · resets <ora>`.
-     Il blocco attivo di `ccusage` (`startTime`/`endTime`, ~5h) è proprio questa
-     finestra: guarda `costUSD` **e** i minuti rimanenti. Ferma lo spawn **con
-     margine** — se `costUSD` sta salendo ripido verso il tetto del piano o
-     manca poco a `endTime`, NON lanciare un altro worker: fai checkpoint e
-     rilascia i claim finché hai ancora budget per farlo pulito. **Non** inseguire
-     "un altro giro": un worker tagliato a metà lascia **claim appeso + stato
-     scritto a metà** (nessun `--record-*`, nessun rilascio claim) e sporca la
-     pipeline per la sessione dopo.
-   - Se una soglia ALTA in dollari è fissata dall'owner e `costUSD` ≥ soglia →
-     checkpoint, rilascia i claim, **termina**.
-   - Se `ccusage` non gira → ripiega sul **budget di contesto** (non iniziare un
-     task nuovo oltre ~150-200k token).
+   - **Il gate PRIMARIO è il limite a 5 ore del piano, stimato dal costo.** Il
+     piano ha un budget d'uso fisso per **finestra mobile di 5 ore**; quando si
+     esaurisce, il prossimo worker viene **tagliato a metà lavoro**
+     (`session limit · resets <ora>`). La routine parte **ogni 6 ore** su un
+     account **dedicato** (nient'altro lo consuma), e 6h > 5h ⇒ all'avvio la
+     finestra è **sempre azzerata**: quindi il `costUSD` del blocco attivo di
+     `ccusage` misura **pulito** quanta parte del budget 5h ha bruciato QUESTA
+     sessione. È il segnale da usare — non i minuti alla `endTime` (la finestra si
+     esaurisce per *uso*, non per tempo trascorso: questa sessione è stata tagliata
+     a ~1h su 5, non allo scadere).
+   - **Regola di spawn (30% di margine).** Sia `CAP_5H` la stima in dollari del
+     limite 5h. Prima di rispawnare leggi `costUSD` e lancia un nuovo worker
+     **solo se `costUSD < 0.70 × CAP_5H`**. Il 30% che resta è il cuscino perché
+     il worker che stai per lanciare **finisca** senza essere tagliato (un worker
+     pesante ~$6–8 ≈ 20–25% del cap). Se `costUSD ≥ 0.70 × CAP_5H` → **non
+     spawnare**: checkpoint, rilascia i claim, **termina** pulito finché hai
+     ancora budget per farlo.
+   - **`CAP_5H` (da tarare con l'owner):** empiricamente questa sessione è stata
+     tagliata con `costUSD ≈ $28–33` nel blocco attivo → stima di lavoro
+     **`CAP_5H ≈ $32`**, quindi **soglia di spawn ≈ $22**. (Con questa regola il
+     giro 8 — spawnato a $28 — non sarebbe mai partito.) Aggiorna il numero se
+     l'owner fissa il valore reale.
+   - **Non** inseguire "un altro giro" sotto soglia-limite: un worker tagliato a
+     metà lascia **claim appeso + stato scritto a metà** (nessun `--record-*`,
+     nessun rilascio claim) e sporca la pipeline per la sessione dopo.
+   - Se `ccusage` **non gira** → ripiega sul gate secondario di **contesto** (non
+     iniziare un task nuovo oltre ~150-200k token).
    - Rete di sicurezza: a un **429** o a un **`session limit`** su un worker →
      checkpoint + rilascio claim + termina. Se un worker è morto tagliato,
      **bonifica prima di terminare**: `git status` pulito, claim orfano rilasciato
-     (`node scripts/dispatch.mjs --clear-state <id>` / rilascio claim), stato del
-     branch coerente col vero verdetto raggiunto.
+     (`node scripts/claim-feedback.mjs release <id>` e/o
+     `node scripts/dispatch.mjs --clear-state <id>`), stato del branch coerente col
+     vero verdetto raggiunto.
 
    **Calibrazione osservata (sessione 2026-07-02, 5 giri prober):**
    - `ccusage` **gira** in cloud e riporta `costUSD` correttamente.
