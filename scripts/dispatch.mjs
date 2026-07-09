@@ -555,9 +555,9 @@ if (isMainModule) {
       console.log(`stato ${id}: verifier=${s.verifierVerdict} loop=${s.loopCount}`);
       process.exit(0);
     } else if (flag === '--record-fixed') {
-      const id = argv[1];
-      if (!id) { console.error('Uso: --record-fixed <id>'); process.exit(1); }
-      const s = recordFixed(id);
+      const [, id, ...rest] = argv;
+      if (!id) { console.error('Uso: --record-fixed <id> ["report"]'); process.exit(1); }
+      const s = recordFixed(id, rest.join(' '));
       console.log(`stato ${id}: ri-messo in coda verifier (loop=${s.loopCount})`);
       process.exit(0);
     } else if (flag === '--record-secaudit') {
