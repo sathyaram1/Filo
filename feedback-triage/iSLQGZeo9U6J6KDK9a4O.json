@@ -1,0 +1,9 @@
+{
+  "id": "iSLQGZeo9U6J6KDK9a4O",
+  "status": "design",
+  "notes": "Audit di sicurezza NON superato: il branch, oltre al fix del popup di login, RIMUOVE (tramite un revert incluso nel branch) la protezione che impedisce di aprire da una scheda indirizzi pericolosi come file:// (furto credenziali Windows), data: e javascript: attraverso i percorsi interni di apertura schede — protezione introdotta con il fix #247. La parte sul popup di login sembra a posto, ma cosi' com'e' il merge riaprirebbe quella falla: serve una decisione dell'owner (ripristinare il controllo rimosso in cima a openTab in src/main/tabs.js, tolto dal commit da660251 'Revert auto: src/main/tabs.js', poi rifare il giro di verifica).",
+  "queuedAt": "2026-07-09T10:46:31.893Z",
+  "queuedBy": "routine",
+  "branch": "claude/eloquent-pasteur-tkpsdy",
+  "reason": "loop"
+}
