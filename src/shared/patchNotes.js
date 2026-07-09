@@ -16,6 +16,15 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.116', date: '2026-07-09',
+      features: [
+        'Ora puoi scegliere il modello AI anche per le funzioni dei Mazzi (chat e ricerca carte, parere sulle carte, tag automatici), per la memoria di Filo, per la riscrittura del testo e per "Spiega link": le trovi tutte nella griglia dei modelli, sia nelle Opzioni sia in "Modelli predefiniti".',
+      ],
+      fixes: [
+        'La chat dell\'app Mazzi non fallisce più con un errore criptico sul modello quando la configurazione dei modelli predefiniti non copre le funzioni dei Mazzi: Filo ora ripiega da solo su un modello valido.',
+      ],
+    },
+    {
       version: '0.2.114', date: '2026-07-05',
       features: [],
       fixes: [
