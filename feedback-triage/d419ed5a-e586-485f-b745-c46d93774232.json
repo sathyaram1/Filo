@@ -1,8 +1,7 @@
 {
   "id": "d419ed5a-e586-485f-b745-c46d93774232",
-  "status": "revision_capability",
-  "notes": "Chiusa una falla di sicurezza: alcune azioni interne (aprire un link dal menu del tasto destro, o una nuova scheda) potevano essere usate per aprire un percorso di file locale o uno schema non sicuro invece di una vera pagina web, aggirando i controlli già esistenti. Il blocco ora è centralizzato nello stesso punto che apre qualunque scheda, quindi copre anche un paio di percorsi non elencati nella segnalazione originale (riapertura di una scheda archiviata, apertura da barra/scorciatoie), non solo i tre citati. Verificato leggendo il codice e con i test automatici che non richiedono l'avvio dell'app (tutti passano); il test dedicato che apre davvero l'app per simulare l'attacco non ha potuto girare in questo ambiente cloud (l'installazione dell'app è bloccata qui) — resta da confermare con un avvio reale.",
-  "queuedAt": "2026-07-05T14:05:49.957Z",
-  "queuedBy": "routine",
-  "branch": "worker/d419ed5a-e586-485f-b745-c46d93774232"
+  "status": "revision_security",
+  "notes": "",
+  "queuedAt": "2026-07-09T10:13:13.873Z",
+  "queuedBy": "routine"
 }
