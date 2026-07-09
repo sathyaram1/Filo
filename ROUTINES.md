@@ -19,39 +19,34 @@ Le routine schedulate su claude.ai partono con un prompt minimo
 ### Avvio
 
 1. Sei nella root del repo Filo. Installa **saltando il binario Electron** e poi
-   scaricalo con lo script dedicato (l'installer nativo `@electron/get` abortisce
+   procuralo con lo script dedicato (l'installer nativo `@electron/get` abortisce
    dietro il proxy):
    ```bash
    ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install && node scripts/ensure-electron.mjs
    ```
    Fallo **una volta qui nell'orchestratore**: così TUTTI i worker ereditano il
-   binario pronto (non è compito dei ruoli reinstallarlo). In cloud i test poi
-   vanno lanciati con `ELECTRON_DISABLE_SANDBOX=1` e `xvfb-run -a`.
+   binario pronto (non è compito dei ruoli reinstallarlo). I test da root vanno
+   lanciati con `ELECTRON_DISABLE_SANDBOX=1` e `xvfb-run -a` (verificato
+   2026-07-09: `xvfb-run -a npm run test:smoke` avvia la app reale e cattura
+   screenshot compositi).
 
-   `ensure-electron.mjs` prova le sorgenti in ordine (prima quelle SENZA rete
-   esterna): (1) già installato; (2) `FILO_ELECTRON_ZIP=/path/…zip`; (3) vendored
-   nel repo `vendor/electron/electron-v<ver>-linux-x64.zip`; (4)
-   `FILO_ELECTRON_URL=<mirror>`; (5) github.com via curl.
-   - ⚠️ **In questo ambiente il download in-sessione è IMPOSSIBILE** (ricerca
-     2026-07-09): la network policy blocca **github.com** (403 anche con curl),
-     **npmmirror**, **jsdelivr/unpkg**, **playwright CDN**, **jsr.io**; gli unici
-     host permessi (npm registry, PyPI, crates, go-proxy) **non** ospitano il
-     binario Electron, non c'è pacchetto npm/PyPI che lo impacchetti, né apt né
-     cache locale. Quindi le sorgenti (4)/(5) falliscono e restano solo le locali.
-   - **Fix duraturo (owner, fuori sessione) — scegli UNO:**
-     - **a) Vendoring via git (consigliato):** dal tuo PC (dove il download
-       funziona) scarica lo zip `linux-x64` e committalo in
-       `vendor/electron/electron-v<ver>-linux-x64.zip`. Il git remote scoped È
-       raggiungibile in cloud → arriva col fetch, zero rete esterna. (Pesa ~100 MB:
-       valuta un branch dedicato o accetta il peso in history; git-lfs qui non c'è.)
-     - **b) Allowlist** di `github.com`/`objects.githubusercontent.com` nella
-       *network policy* dell'ambiente → torna a funzionare la sorgente (5).
-     - **c) `FILO_ELECTRON_URL`/`FILO_ELECTRON_ZIP`** verso un mirror/artefatto che
-       hai messo in allowlist o pre-scaricato nel *setup script* del container
-       (vedi code.claude.com/docs).
-   - **Finché nessuna è attiva la flotta gira SENZA Electron:** verifica solo con
-     `npm run test:unit` e `node -e "require('./src/…')"`, e ogni verifica visiva
-     va dichiarata "non eseguibile in questo ambiente" (mai fingerla).
+   `ensure-electron.mjs` prova le sorgenti in ordine (prima quelle SENZA rete):
+   (1) già installato; (2) `FILO_ELECTRON_ZIP=/path/…zip`; (3) vendored nel repo
+   `vendor/electron/electron-v<ver>-linux-x64.zip`; (4) `FILO_ELECTRON_URL=<url>`;
+   (5) **mirror npmmirror** (default di rete); (6) github.com.
+   - ✅ **Con accesso di rete pieno il download IN-SESSIONE FUNZIONA** (verificato
+     2026-07-09) tramite il mirror **npmmirror** (`npmmirror.com/mirrors/electron/`,
+     mirror ufficiale supportato da `@electron/get`) — è la sorgente (5), default.
+     Nota: `github.com/releases/download` qui dà **403** non per la rete ma per lo
+     **scope GitHub** della sessione (limitato a `sathyaram1/filo`); npmmirror non
+     passa da GitHub e scarica il binario reale (~102 MB) senza problemi.
+   - ⚠️ **Se l'ambiente ha rete ristretta** e npmmirror/github falliscono, restano
+     solo le sorgenti locali (2)/(3): l'owner mette lo zip in
+     `vendor/electron/electron-v<ver>-linux-x64.zip` (committato dal suo PC, arriva
+     col fetch git) oppure esporta `FILO_ELECTRON_ZIP`/`ELECTRON_MIRROR`. Se
+     nessuna sorgente è disponibile la flotta gira **senza Electron**: verifica solo
+     con `npm run test:unit` e `node -e "require('./src/…')"`, e ogni verifica
+     visiva va dichiarata "non eseguibile in questo ambiente" (mai fingerla).
 2. `git pull --rebase origin main`.
 
 ### Loop principale
