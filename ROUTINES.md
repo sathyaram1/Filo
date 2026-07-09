@@ -18,8 +18,27 @@ Le routine schedulate su claude.ai partono con un prompt minimo
 
 ### Avvio
 
-1. Sei nella root del repo Filo. `npm install` se non già fatto (se il binario
-   Electron non si scarica: `node node_modules/electron/install.js`).
+1. Sei nella root del repo Filo. Installa **saltando il binario Electron** e poi
+   scaricalo con lo script dedicato (l'installer nativo `@electron/get` abortisce
+   dietro il proxy):
+   ```bash
+   ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install && node scripts/ensure-electron.mjs
+   ```
+   Fallo **una volta qui nell'orchestratore**: così TUTTI i worker ereditano il
+   binario pronto (non è compito dei ruoli reinstallarlo). In cloud i test poi
+   vanno lanciati con `ELECTRON_DISABLE_SANDBOX=1` e `xvfb-run -a`.
+   - ⚠️ **Se `ensure-electron.mjs` fallisce con 403** (`curl ... 403 Forbidden`):
+     la **policy di egress** dell'ambiente sta bloccando i download di asset da
+     `github.com` (osservato 2026-07-09 — giorni prima lo stesso `curl` faceva
+     200). Non è aggirabile lato codice (anche `objects.githubusercontent.com` non
+     è raggiungibile con l'URL firmato perché `github.com` risponde 403 prima del
+     redirect). In questo stato la flotta gira **senza Electron**: verifica solo
+     con `npm run test:unit` (gira senza Electron) e `node -e "require('./src/…')"`,
+     e ogni verifica visiva va dichiarata "non eseguibile in questo ambiente".
+     **Fix duraturo (owner):** mettere in allowlist il download di Electron nella
+     *network policy* dell'ambiente, oppure pre-scaricare il binario nello *setup
+     script* del container (vedi code.claude.com/docs). Finché non è fatto, i ruoli
+     che richiedono avvio app non possono chiudere il giro visivo.
 2. `git pull --rebase origin main`.
 
 ### Loop principale
