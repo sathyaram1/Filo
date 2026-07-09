@@ -71,10 +71,11 @@ Ripeti finché il budget è quasi pieno:
    - Contesto dell'orchestratore: cresce di **~5–6% del window a giro** →
      dopo 5 giri era solo al ~34%. Il contesto sostiene **~10–12 giri** per
      sessione prima di avvicinarsi alla soglia dei ~150-200k token.
-   - Quindi: finché la soglia ALTA in dollari non è fissata dall'owner, **il
-     gate operativo è il contesto** — continua il loop finché un worker torna
-     «niente da fare» o il contesto supera ~70-75%; NON fermarti prima per
-     "rendimenti decrescenti" o per il solo costo in dollari.
+   - ⚠️ *(nota superata — vedi la regola di spawn qui sopra)* Questa calibrazione
+     concludeva "il gate operativo è il contesto, il 70-75% è del contesto". Era
+     una **deriva**: il 70% andava applicato al **budget 5h stimato dal costo**,
+     non al contesto. Il contesto resta solo il gate *secondario* (quando
+     `ccusage` non gira).
 
    **Calibrazione osservata (sessione 2026-07-09, worker `fable`, 7 giri +1 tagliato):**
    - Il gate reale che ci ha fermati **non** è stato né i dollari né il contesto:
