@@ -395,14 +395,31 @@ function queueStatus(id, status, note = '', reason = '') {
   } catch (_) { /* best-effort */ }
 }
 
+/**
+ * Nota per la chat del feedback con l'esito del verifier. PURA (testata in
+ * tests/unit/dispatch.test.mjs). Prima l'esito viveva SOLO nel file di stato su
+ * git e l'owner non lo vedeva mai in dashboard: ora ogni verdetto (pass e fail)
+ * finisce nelle note, così la conversazione del feedback racconta l'intero iter.
+ */
+export function verifierNoteText(verdict, critique = '') {
+  const c = String(critique || '').trim().slice(0, 4000);
+  if (verdict === 'pass') {
+    return c ? `Controllo funzionalità superato. ${c}` : 'Controllo funzionalità superato.';
+  }
+  return c ? `Controllo funzionalità NON superato: ${c}` : 'Controllo funzionalità NON superato.';
+}
+
 function recordVerifier(id, verdict, critique) {
   const next = applyVerifierVerdict({ ...defaultState(id, ''), ...(readState(id) || {}), id }, verdict, critique);
   next.id = id;
   writeState(next);
   // PASS → aspetta l'audit di sicurezza; FAIL → resta/torna in verifica fix
   // (il caso 3° FAIL → design lo gestisce il giro dopo: chooseBucket →
-  // blocked-loop). Idempotente se lo status è già quello.
-  queueStatus(id, verdict === 'pass' ? 'revision_security' : 'revision_capability');
+  // blocked-loop). Idempotente se lo status è già quello. La nota con l'esito
+  // va nella chat del feedback (apply-triage la appende come turno, senza
+  // sovrascrivere lo storico).
+  queueStatus(id, verdict === 'pass' ? 'revision_security' : 'revision_capability',
+    verifierNoteText(verdict, critique));
   return next;
 }
 function recordFixed(id) {
