@@ -315,21 +315,80 @@
     return p >= 1 && p <= 3 ? p : 0;
   }
 
+  // ── Avanzamento della lavorazione (card pinnata in "In coda") ─────────────
+  // L'iter di un fix ha tre passaggi, nell'ordine: implementazione (working),
+  // controllo funzionalità (revision_capability = aspetta il verifier),
+  // controllo sicurezza (revision_security = aspetta l'audit). Lo status dice
+  // QUAL È il passaggio corrente; i campi claim* (specchiati su Firestore dalla
+  // riconciliazione dei claim git) e workingSince dicono se un'istanza ci sta
+  // lavorando ORA.
+  const WORK_STAGES = ['working', 'revision_capability', 'revision_security'];
+  const WORK_STEPS = [
+    { key: 'impl',     label: 'Implementazione' },
+    { key: 'verify',   label: 'Controllo funzionalità' },
+    { key: 'security', label: 'Controllo sicurezza' },
+  ];
+
+  /**
+   * Stato di avanzamento di un feedback nell'iter di lavorazione, o null se
+   * non è in lavorazione. PURA (opts.now iniettabile nei test). Ritorna:
+   *   { status, steps: [{key,label,state:'done'|'current'|'pending'}],
+   *     current: <step corrente>, active: bool, by: string }
+   * `active` = un'istanza ci sta lavorando in questo momento: claim vivo
+   * (claimExpiresAt nel futuro) in qualunque fase, oppure — solo per `working`,
+   * l'unica fase con un lock a TTL suo — un workingSince fresco.
+   */
+  function workProgress(fb, opts) {
+    const { status } = normalizeStatus(fb);
+    const idx = WORK_STAGES.indexOf(status);
+    if (idx < 0) return null;
+    const steps = WORK_STEPS.map((s, i) => ({
+      key: s.key, label: s.label,
+      state: i < idx ? 'done' : (i === idx ? 'current' : 'pending'),
+    }));
+    const now = (opts && opts.now) != null ? opts.now : Date.now();
+    const claimExp = new Date((fb && fb.claimExpiresAt) || 0).getTime();
+    const claimLive = !!(claimExp && claimExp > now);
+    const workingFresh = status === 'working'
+      && !FS().isWorkingExpired({ status: 'working', workingSince: fb && fb.workingSince }, now);
+    return {
+      status,
+      steps,
+      current: steps[idx],
+      active: claimLive || workingFresh,
+      by: String((fb && fb.claimedBy) || ''),
+    };
+  }
+
   // Feedback di una singola tab, già ordinati:
   //   "Ricevuti" → severità del blocco poi recenza (come la Revisione): i
   //                non-filtrati (bianchi) e i bloccati gravi salgono in cima.
-  //   "In coda"  → priorità DESC (Claude affronta prima le alte), poi severità
-  //                del blocco, poi recenza. La priorità qui detta l'ordine di
-  //                lavoro, quindi è il criterio primario.
+  //   "In coda"  → i feedback IN LAVORAZIONE (working/revision_*) pinnati in
+  //                cima — prima quelli con un'istanza attiva ora, poi per fase
+  //                più avanzata — così l'owner vede subito a che punto è l'iter;
+  //                sotto, il resto per priorità DESC (Claude affronta prima le
+  //                alte), poi severità del blocco, poi recenza.
   //   altre      → createdAt DESC.
   // `opts.releasedVersion` (DB3) è passato a manageTabFor per il gate "Risolti".
   function listForManageTab(feedbacks, tab, opts) {
     const items = (feedbacks || []).filter((f) => manageTabFor(f, opts) === tab);
     if (tab === 'inbox') return sortReview(items);
-    // In coda: priorità DESC come criterio primario. `sort` è stabile, quindi a
-    // parità di priorità si conserva l'ordine di sortReview (severità poi recenza).
+    // In coda: priorità DESC come criterio primario tra i non-in-lavorazione.
+    // `sort` è stabile, quindi a parità di priorità si conserva l'ordine di
+    // sortReview (severità poi recenza), e il pinning finale conserva a sua
+    // volta l'ordine per priorità dentro ogni gruppo.
     if (tab === 'queue') {
-      return sortReview(items).sort((a, b) => priorityOf(b) - priorityOf(a));
+      const now = (opts && opts.now) != null ? opts.now : Date.now();
+      // Rango di pinning: istanza attiva ora > fase più avanzata > non in
+      // lavorazione (-1). Il +10 separa nettamente gli attivi dagli inattivi.
+      const rank = (f) => {
+        const p = workProgress(f, { now });
+        if (!p) return -1;
+        return (p.active ? 10 : 0) + WORK_STAGES.indexOf(p.status);
+      };
+      return sortReview(items)
+        .sort((a, b) => priorityOf(b) - priorityOf(a))
+        .sort((a, b) => rank(b) - rank(a));
     }
     return items.slice().sort((a, b) => {
       const ta = new Date(a.createdAt || 0).getTime();
