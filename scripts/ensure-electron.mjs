@@ -106,6 +106,14 @@ function resolveZip() {
     const got = curlTo(process.env.FILO_ELECTRON_URL, tmpZip, 'FILO_ELECTRON_URL');
     if (got) return got;
   }
+  // 5. Mirror npmmirror (Alibaba) — mirror ufficiale supportato da @electron/get,
+  //    ed è il default di RETE qui: github.com/releases/download è negato dallo
+  //    *scope GitHub* della sessione (non dalla rete), mentre npmmirror è
+  //    raggiungibile con accesso di rete pieno. Override con ELECTRON_MIRROR.
+  const mirror = (process.env.ELECTRON_MIRROR || 'https://npmmirror.com/mirrors/electron/').replace(/\/*$/, '/');
+  const mirrorGot = curlTo(`${mirror}v${version}/${ZIP_NAME}`, tmpZip, 'npmmirror');
+  if (mirrorGot) return mirrorGot;
+  // 6. URL ufficiale github (solo se lo scope/policy lo consente).
   const ghUrl = `https://github.com/electron/electron/releases/download/v${version}/${ZIP_NAME}`;
   return curlTo(ghUrl, tmpZip, 'github.com');
 }
