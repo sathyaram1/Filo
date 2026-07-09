@@ -1501,20 +1501,7 @@ class TabManager {
       // partizione per-sito; altrimenti null = sessione condivisa), per non
       // spezzare un eventuale login Google già presente in Filo.
       if (tab.isInternal === false && isAuthPopup(url)) {
-        const popupPartition = this._partitionFor(url);
-        return {
-          action: 'allow',
-          overrideBrowserWindowOptions: {
-            webPreferences: {
-              preload: PAGE_PRELOAD,
-              contextIsolation: true,
-              sandbox: false,
-              nodeIntegration: false,
-              webSecurity: true,
-              ...(popupPartition ? { partition: popupPartition } : {}),
-            },
-          },
-        };
+        return this._allowAuthPopup(url);
       }
       const isAdLikePopup = disposition === 'new-window';
       if (tab.isInternal === false && this.security.blockPopups && isAdLikePopup) {
