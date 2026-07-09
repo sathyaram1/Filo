@@ -67,8 +67,22 @@ NON implementare tutto in una volta.
 
 ## Come riporti
 
-Report di 2-3 frasi **per l'utente** (cosa vedrà di diverso, cosa hai aggiunto
-oltre il chiesto, come hai verificato). Senza nomi tecnici.
+Il report finisce nella **chat del feedback in dashboard**: è l'unica traccia
+della lavorazione che l'owner vede. Scrivilo **per l'utente** (niente nomi di
+file/funzioni/variabili, spiega il comportamento) ma **COMPLETO** — deve
+contenere:
+
+- **cosa hai fatto** e cosa l'utente vedrà di diverso;
+- **le decisioni che hai preso** e perché (scelte tra alternative, compromessi,
+  cose lasciate fuori apposta);
+- **tutto ciò che è emerso** lavorando (vincoli scoperti, comportamenti
+  collegati, dubbi rimasti);
+- **cosa hai aggiunto oltre il chiesto** (invarianti UX, regola d'oro anti
+  scope-creep);
+- **come hai verificato**.
+
+Un report di una riga che dice solo "fatto" è un bug del ruolo: senza decisioni
+e scoperte, l'owner non può valutare il lavoro né correggerlo.
 
 Poi metti il feedback in `revision_capability` col branch — il prossimo giro di
 dispatch lo instraderà al **verifier**:
