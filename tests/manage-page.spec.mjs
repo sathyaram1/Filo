@@ -1066,10 +1066,13 @@ test('un feedback in `clarify` mostra il box risposta dell owner sotto Ricevuti 
   await expect(page.locator('#mgListHead')).toHaveText('Ricevuti');
   await expect(page.locator('.mg-item')).toHaveCount(1);
 
-  // Apri il dettaglio: il box risposta chiarimenti è visibile, lo sblocco no.
+  // Apri il dettaglio: il box risposta chiarimenti è visibile. Con la macchina
+  // a stati `clarify` normalizza a `design` (bloccato, decide l'owner), quindi
+  // ANCHE "Accetta e sblocca" è legittimamente visibile accanto al box.
   await page.evaluate((id) => window.__mgTest.openDetail(id), CLARIFY_FB._id);
   await expect(page.locator('#mgClarify')).toBeVisible();
-  await expect(page.locator('#mgActions')).toBeHidden();
+  await expect(page.locator('#mgActions')).toBeVisible();
+  await expect(page.locator('#mgAcceptBtn')).toHaveText('Accetta e sblocca');
   // Niente riga giudici per un feedback mai passato dal pipeline.
   await expect(page.locator('#mgJudgesRow')).toBeHidden();
 
