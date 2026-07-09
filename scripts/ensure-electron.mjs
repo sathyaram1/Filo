@@ -21,8 +21,11 @@
 //      (committato dall'owner dal suo PC; in cloud arriva col fetch git → nessun
 //      download esterno). È la via consigliata quando la network policy blocca
 //      github (osservato 2026-07-09: github.com/releases → 403 anche con curl).
-//   4. `FILO_ELECTRON_URL=https://…` — un mirror che l'owner ha messo in allowlist.
-//   5. URL ufficiale su github.com (curl). Funziona SOLO se la policy lo consente.
+//   4. `FILO_ELECTRON_URL=https://…` — un mirror esplicito dell'owner.
+//   5. Mirror npmmirror (Alibaba, default di rete; override con ELECTRON_MIRROR):
+//      github.com/releases/download è negato dallo *scope GitHub* della sessione,
+//      npmmirror invece è raggiungibile con accesso di rete pieno.
+//   6. URL ufficiale su github.com (curl). Funziona SOLO se scope/policy lo consentono.
 //
 //   Il criterio di "già installato" replica isInstalled() di
 //   node_modules/electron/install.js: dist/version == versione del package,
