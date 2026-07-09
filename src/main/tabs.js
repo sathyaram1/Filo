@@ -1518,6 +1518,82 @@ class TabManager {
       this.openTab(url, { activate: true });
       return { action: 'deny' };
     });
+
+    // #209 — hardening del popup di login appena consentito. La finestra creata
+    // da action:'allow' NON passa da _wireEvents (non è una tab): senza questo
+    // hook resterebbe senza le difese che ogni scheda ha. Qui arrivano SOLO i
+    // popup di login (ogni altro percorso del handler qui sopra ritorna 'deny').
+    wc.on('did-create-window', (child) => {
+      this._hardenAuthPopup(child);
+    });
+  }
+
+  // #209 — risposta 'allow' per un popup di login, con le webPreferences
+  // esplicite. Senza overrideBrowserWindowOptions Electron creerebbe il popup
+  // con un BrowserWindow "nudo", senza ALCUN preload (il preload non è fra le
+  // security webPreferences ereditate dall'opener): né l'esenzione
+  // anti-fingerprint per i login (services/fingerprint.js →
+  // isIdentityProviderHref) né nessun altro pezzo di page-preload.js
+  // raggiungerebbero MAI la pagina di Google/Microsoft/… dentro il popup —
+  // solo la scheda opener (es. claude.ai) lo aveva. Diamo al popup le stesse
+  // webPreferences di una scheda esterna normale (vedi _makeView) così il
+  // preload gira anche lì, e la stessa partizione che avrebbe una scheda
+  // aperta su quella URL (Cookies.MODES.PRIVACY → partizione per-sito;
+  // altrimenti null = sessione condivisa), per non spezzare un eventuale
+  // login Google già presente in Filo.
+  _allowAuthPopup(url) {
+    const popupPartition = this._partitionFor(url);
+    return {
+      action: 'allow',
+      overrideBrowserWindowOptions: {
+        webPreferences: {
+          preload: PAGE_PRELOAD,
+          contextIsolation: true,
+          sandbox: false,
+          nodeIntegration: false,
+          webSecurity: true,
+          ...(popupPartition ? { partition: popupPartition } : {}),
+        },
+      },
+    };
+  }
+
+  // #209 — applica al popup di login le STESSE difese di una scheda normale.
+  // La finestra nasce fuori da _wireEvents, quindi va cablata qui:
+  //   - policy WebRTC anti IP-leak (come _applySecurity sulle tab);
+  //   - blocco navigazioni verso schemi non-web (file:// → leak hash NTLM via
+  //     SMB su Windows, data:/javascript: → phishing), come il will-navigate
+  //     delle tab; mailto:/tel:/sms: consegnati all'OS;
+  //   - gate sulle aperture di ULTERIORI finestre dal popup: un secondo popup
+  //     di login concatenato (es. scelta account → verifica) resta una vera
+  //     finestra (ricorsivamente hardened), tutto il resto torna dentro Filo
+  //     come scheda normale — mai finestre libere non gestite.
+  _hardenAuthPopup(win) {
+    if (!win || !win.webContents) return;
+    const pwc = win.webContents;
+    try {
+      pwc.setWebRTCIPHandlingPolicy(
+        this.security.protectIpLeak ? 'default_public_interface_only' : 'default',
+      );
+    } catch (_) { /* policy non supportata in qualche build */ }
+    pwc.on('will-navigate', (event, url) => {
+      if (isWebUnsafeNav(url)) {
+        event.preventDefault();
+        openExternalScheme(url);
+      }
+    });
+    pwc.setWindowOpenHandler(({ url }) => {
+      if (isWebUnsafeNav(url)) {
+        openExternalScheme(url);
+        return { action: 'deny' };
+      }
+      if (isAuthPopup(url)) {
+        return this._allowAuthPopup(url);
+      }
+      this.openTab(url, { activate: true });
+      return { action: 'deny' };
+    });
+    pwc.on('did-create-window', (child) => this._hardenAuthPopup(child));
   }
 
   // Notifica la shell che un popup è stato bloccato sul tab `tabId`. La shell
