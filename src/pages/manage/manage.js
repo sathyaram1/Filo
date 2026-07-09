@@ -488,10 +488,16 @@
       // Allineato (tutti i giudici d'accordo, nessun blocco) → bordo BLU.
       const aligned = !cl && MR.isAligned(fb);
       const alignedCls = aligned ? ' mg-item--aligned' : '';
+      // In lavorazione (working/revision_*): la card mostra una seconda riga con
+      // il passaggio corrente dell'iter e se un'istanza ci lavora ORA. Solo
+      // nella tab "In coda" (dove queste card sono pinnate in cima).
+      const progress = currentTab === 'queue' ? MR.workProgress(fb) : null;
       item.className = 'mg-item'
         + (fb._id === selectedId ? ' mg-item--selected' : '')
         + unfilteredCls
-        + alignedCls;
+        + alignedCls
+        + (progress ? ' mg-item--staged' : '')
+        + (progress && progress.active ? ' mg-item--active-work' : '');
       item.dataset.id = fb._id;
       item.style.borderLeftColor = cl ? cl.color : (aligned ? MR.ALIGNED_COLOR : 'transparent');
       // Una riga sola: #N · titolo (ellissi). Il motivo (attacco/spam/…) resta
@@ -500,11 +506,14 @@
       const norm = MR.normalizeStatus(fb);
       item.title = (num ? `#${num} · ` : '') + title
         + (norm.statusReason ? ` — ${norm.statusReason}` : '');
-      item.innerHTML = `
+      const rowHtml = `
         ${num ? `<span class="mg-item-num">#${esc(num)}</span>` : ''}
         <span class="mg-item-title">${esc(title)}</span>
         ${priorityDotsHtml(fb)}
       `;
+      item.innerHTML = progress
+        ? `<div class="mg-item-row">${rowHtml}</div>${workStateHtml(progress)}`
+        : rowHtml;
       item.addEventListener('click', (e) => {
         // Il click su un pallino priorità non apre il dettaglio (lo gestisce il
         // listener delegato di mgList).
@@ -513,6 +522,25 @@
       });
       mgList.appendChild(item);
     }
+  }
+
+  // ── Riga di stato della lavorazione (card pinnate + dettaglio) ────────────
+  // Traduce l'avanzamento (MR.workProgress) in una riga leggibile: i tre
+  // passaggi dell'iter come spunte (✓ fatto · ● in corso · ○ da fare) e se
+  // un'istanza ci sta lavorando in questo momento.
+  function workStateHtml(progress) {
+    const marks = { done: '✓', current: '●', pending: '○' };
+    const steps = progress.steps.map((s) =>
+      `<span class="mg-step mg-step--${s.state}" title="${esc(s.label)}: ${
+        s.state === 'done' ? 'fatto' : s.state === 'current' ? 'in corso' : 'da fare'
+      }">${marks[s.state]} ${esc(s.label)}</span>`
+    ).join('<span class="mg-step-sep">·</span>');
+    const who = progress.active
+      ? `<span class="mg-work-live"><i></i>Un'istanza ci sta lavorando ora</span>`
+      : `<span class="mg-work-idle">Nessuna istanza al lavoro: in attesa di ${
+          progress.current.key === 'impl' ? 'ripresa' : 'un verificatore'
+        }</span>`;
+    return `<div class="mg-item-state">${steps}${who}</div>`;
   }
 
   // ── Ri-valutazione dei feedback "non filtrati" (panel parziale) ───────────
