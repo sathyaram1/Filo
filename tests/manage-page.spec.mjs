@@ -358,8 +358,10 @@ test('con dati finti: un elemento su UNA riga (#N + titolo, niente label motivo)
   expect(borderColor).not.toBe('rgba(0, 0, 0, 0)'); // non trasparente
 });
 
-// Redesign routine: un feedback bloccato per LOOP (3 verifiche fallite di fila)
-// deve avere il bordo NERO, distinto dai blocchi del pipeline di sicurezza.
+// Macchina a stati (FEEDBACK-STATES.md): un feedback bloccato per LOOP
+// (3 verifiche fallite di fila, legacy blocked+blockReason=loop) si normalizza
+// a `design` con statusReason `loop` → bordo VERDE design. Il NERO è riservato
+// a `suspicious_file`.
 const FAKE_FB_LOOP = {
   _id: 'test-fb-loop',
   text: 'Fix bloccato dopo tre verifiche avversariali fallite.',
