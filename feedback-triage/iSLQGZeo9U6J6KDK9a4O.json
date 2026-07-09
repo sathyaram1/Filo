@@ -1,0 +1,9 @@
+{
+  "id": "iSLQGZeo9U6J6KDK9a4O",
+  "status": "design",
+  "notes": "Audit di sicurezza NON superato, ma con rimedio gia' applicato. Il branch del fix popup di login conteneva anche, per un revert accidentale dei merge automatici tra worktree, la RIMOZIONE della protezione (#247) che impedisce di aprire indirizzi pericolosi (file://, javascript:, data:) dai percorsi interni di apertura schede. Punto importante: quel contenuto era GIA' arrivato su main PRIMA del gate di sicurezza (i push automatici lo avevano portato su main il 5/7), quindi la falla era gia' live. Ho ripristinato subito la protezione su main (tutti gli 882 unit test passano; il test completo e' lo spec audit-opentab-scheme che girera' alla prossima regressione cloud). La parte popup di login e' a posto dal punto di vista sicurezza. Resta a te decidere: 1) verifica umana del fix popup login (#209); 2) il problema di processo per cui i merge automatici dei worktree hanno fatto ping-pong di revert su tabs.js il 5/7 e portato su main codice mai passato dal gate.",
+  "queuedAt": "2026-07-09T10:50:36.911Z",
+  "queuedBy": "routine",
+  "branch": "claude/eloquent-pasteur-tkpsdy",
+  "reason": "loop"
+}
