@@ -333,9 +333,17 @@
   // come id raw stile OpenRouter e applichiamo la stessa logica di prima
   // (toGeminiModelId per gemini). Così settings pre-refactor continuano a
   // funzionare anche se la migrazione non parte.
+  //
+  // Rete di sicurezza (simmetrica al fallback di modelForAction sui DEFAULT
+  // MODELS): se il nickname non è nel registry attivo (es. la config salvata
+  // dall'admin/utente è più vecchia dell'azione e non contiene 'flash-or'),
+  // prima di trattarlo come id raw lo cerchiamo nel registry PREDEFINITO.
+  // Senza questa rete un'azione la cui catena di default cita un nickname
+  // rimosso mandava il nickname nudo a OpenRouter → errore 400 criptico
+  // ("flash-or is not a valid model ID") e feature morta.
   function resolveModel(ref, providerName, registry) {
     if (!ref) return null;
-    const entry = registry && registry[ref];
+    const entry = (registry && registry[ref]) || DEFAULT_MODEL_REGISTRY[ref];
     if (entry) {
       // Nuovo schema: un solo provider per modello ({ provider, model }).
       // Il modello è servibile solo dal SUO provider; per gli altri ritorna
