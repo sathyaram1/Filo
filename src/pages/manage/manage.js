@@ -729,6 +729,14 @@
     // pallino apre QUEL giudice (nome + classe + reasoning) nel pannello destro.
     renderJudgesRow(fb);
 
+    // Striscia "a che punto è la lavorazione" (solo per i feedback nell'iter
+    // working/revision_*): stessi contenuti della card pinnata in lista.
+    if (mgWorkState) {
+      const progress = MR.workProgress(fb);
+      mgWorkState.hidden = !progress;
+      mgWorkState.innerHTML = progress ? workStateHtml(progress) : '';
+    }
+
     // Bolle chat
     renderThread(fb);
 
