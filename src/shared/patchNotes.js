@@ -16,6 +16,14 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.117', date: '2026-07-09',
+      features: [
+        'Nella dashboard di gestione ogni feedback ora mostra la conversazione completa: il testo originale, il tuo eventuale commento di approvazione, i report di chi ha implementato e l\'esito dei controlli di verifica, ognuno nella sua bolla.',
+        'I feedback in lavorazione salgono in cima alla lista "In coda" e mostrano a che punto sono: implementazione, controllo funzionalità e controllo sicurezza, con l\'indicazione se un\'istanza ci sta lavorando in quel momento.',
+      ],
+      fixes: [],
+    },
+    {
       version: '0.2.114', date: '2026-07-05',
       features: [],
       fixes: [
