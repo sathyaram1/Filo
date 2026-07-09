@@ -1084,10 +1084,12 @@ test('un feedback in `clarify` mostra il box risposta dell owner sotto Ricevuti 
   const patch = await page.evaluate(() => window.__updates[0]);
   expect(patch.status).toBe('todo');
   expect(patch.notes).toContain('Intendo il pulsante in alto a destra');
-  // Risposto: il dettaglio si chiude. Il feedback torna `todo` ma NON è ancora
-  // approvato → resta nei Ricevuti (in attesa di approvazione/ri-giudizio),
-  // senza più il box chiarimenti.
+  // Risposto: il dettaglio si chiude. Macchina a stati: `todo` = già in coda
+  // (le tab sono una lookup pura sullo status) → il feedback ESCE dai Ricevuti
+  // e ricompare sotto "In coda".
   await expect(page.locator('#mgDetail')).toBeHidden();
+  await expect(page.locator('.mg-item').filter({ hasText: 'Pulsante X' })).toHaveCount(0);
+  await page.locator('.mg-tab[data-tab="queue"]').click();
   await expect(page.locator('.mg-item').filter({ hasText: 'Pulsante X' })).toHaveCount(1);
 });
 
