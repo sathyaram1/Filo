@@ -28,12 +28,28 @@ Ripeti finché il budget è quasi pieno:
 
 1. **Controllo budget (R4)** — prima di rispawnare:
    ```bash
-   npx ccusage@latest blocks --active --json   # leggi costUSD
+   npx ccusage@latest blocks --active --json   # leggi costUSD + i tempi del blocco
    ```
-   - Se gira e `costUSD` ≥ soglia ALTA → checkpoint, rilascia i claim, **termina**.
+   - **Finestra a 5 ore del piano (gate di PRIMA classe).** Il piano Claude ha un
+     limite a finestra mobile di **5 ore**: quando si esaurisce, il prossimo
+     worker viene **tagliato a metà lavoro** con `session limit · resets <ora>`.
+     Il blocco attivo di `ccusage` (`startTime`/`endTime`, ~5h) è proprio questa
+     finestra: guarda `costUSD` **e** i minuti rimanenti. Ferma lo spawn **con
+     margine** — se `costUSD` sta salendo ripido verso il tetto del piano o
+     manca poco a `endTime`, NON lanciare un altro worker: fai checkpoint e
+     rilascia i claim finché hai ancora budget per farlo pulito. **Non** inseguire
+     "un altro giro": un worker tagliato a metà lascia **claim appeso + stato
+     scritto a metà** (nessun `--record-*`, nessun rilascio claim) e sporca la
+     pipeline per la sessione dopo.
+   - Se una soglia ALTA in dollari è fissata dall'owner e `costUSD` ≥ soglia →
+     checkpoint, rilascia i claim, **termina**.
    - Se `ccusage` non gira → ripiega sul **budget di contesto** (non iniziare un
      task nuovo oltre ~150-200k token).
-   - Rete di sicurezza: a un **429** → checkpoint + rilascio claim + termina.
+   - Rete di sicurezza: a un **429** o a un **`session limit`** su un worker →
+     checkpoint + rilascio claim + termina. Se un worker è morto tagliato,
+     **bonifica prima di terminare**: `git status` pulito, claim orfano rilasciato
+     (`node scripts/dispatch.mjs --clear-state <id>` / rilascio claim), stato del
+     branch coerente col vero verdetto raggiunto.
 
    **Calibrazione osservata (sessione 2026-07-02, 5 giri prober):**
    - `ccusage` **gira** in cloud e riporta `costUSD` correttamente.
