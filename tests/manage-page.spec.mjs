@@ -375,16 +375,16 @@ const FAKE_FB_LOOP = {
   blockReason: 'loop',
 };
 
-test('un blocco per LOOP (blocked + blockReason=loop) ha il border-left NERO', async ({ openTab }) => {
+test('un blocco per LOOP (blocked + blockReason=loop) è design VERDE con reason loop', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_MANAGE_REVIEW);
 
-  // Verifica la logica pura: classifyBlock → reason 'loop', colore nero.
+  // Verifica la logica pura: classifyBlock → reason 'loop', colore verde design.
   const cl = await page.evaluate((fb) => window.SN_MANAGE_REVIEW.classifyBlock(fb), FAKE_FB_LOOP);
   expect(cl).not.toBeNull();
   expect(cl.reason).toBe('loop');
-  expect(cl.color).toBe('#111111');
+  expect(cl.color).toBe('#2e9e5b');
 
   // Esercita il VERO renderList: il blocco loop non è approvato → "Ricevuti".
   await page.evaluate((fb) => { window.__mgTest.setData([fb]); window.__mgTest.setTab('inbox'); }, FAKE_FB_LOOP);
