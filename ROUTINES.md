@@ -63,6 +63,22 @@ Ripeti finché il budget è quasi pieno:
      «niente da fare» o il contesto supera ~70-75%; NON fermarti prima per
      "rendimenti decrescenti" o per il solo costo in dollari.
 
+   **Calibrazione osservata (sessione 2026-07-09, worker `fable`, 7 giri +1 tagliato):**
+   - Il gate reale che ci ha fermati **non** è stato né i dollari né il contesto:
+     è stata la **finestra a 5 ore del piano** (`session limit · resets 3pm`), che
+     ha ucciso il giro 8 **a metà** lasciando un claim appeso e lo stato del branch
+     scritto a metà. → per questo la finestra 5h è ora un gate di PRIMA classe qui
+     sopra: fermarsi **con margine**, non farsi tagliare.
+   - Costo per giro con `fable` molto più variabile che con Sonnet: i giri
+     verifier/secaudit "leggeri" ~$2, ma new-work e prober "pesanti" **$6–8 a
+     giro** (100–140k token). Il blocco attivo era a **~$28 costUSD** dopo 7 giri
+     quando la finestra 5h ha tagliato: il costo in dollari da solo NON segnalava
+     lo stop imminente — solo i minuti alla `endTime` del blocco lo facevano.
+   - Contratto della riga singola dei worker **spesso violato**: i worker hanno
+     restituito report interi invece di `"fatto X"|"niente da fare"|"budget pieno"`,
+     facendo trapelare all'orchestratore dettagli specifici che dovrebbe ignorare.
+     → i file-ruolo devono ribadire: **ultima riga = solo il verdetto**.
+
 2. **Spawna UN worker generico** (tool Agent, `subagent_type: general-purpose`,
    `model: "sonnet"`) con un prompt minimo:
 
