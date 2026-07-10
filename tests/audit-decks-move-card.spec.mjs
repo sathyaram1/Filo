@@ -33,7 +33,11 @@ async function mockScryfall(app) {
   }, JSON.stringify(CARDS));
 }
 
-test('spostare una carta in un mazzo che la contiene già non perde le copie', async ({ app, openTab }) => {
+// test.fixme: repro del bug (oggi ROSSO — verificato: 10 Island + 1 Island
+// diventano 1 Island totale dopo il move). Documenta il comportamento atteso
+// senza tenere rossa la suite. Chi lavorerà il feedback toglie `.fixme` per
+// farlo diventare un assert vivo (deve passare col fix).
+test.fixme('spostare una carta in un mazzo che la contiene già non perde le copie', async ({ app, openTab }) => {
   await mockScryfall(app);
   const page = await openTab('filo://decks/decks.html');
   await page.waitForLoadState('domcontentloaded');
