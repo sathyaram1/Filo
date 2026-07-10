@@ -81,3 +81,22 @@ test.fixme('titoli collassabili: dopo una digitazione UN click sulla freccia ria
   await page.locator('#doc h1 .ed-collapse-toggle').click();
   await expect(par).toBeVisible();
 });
+
+// Check di contorno (VERDE anche col bug): il contenuto collassato non è perso
+// in modo permanente — dopo salvataggio e reload della pagina ricompare
+// visibile (lo stato di collasso non viene persistito, e va bene così).
+test('titoli collassabili: dopo salvataggio e reload il contenuto nascosto ricompare', async ({ openTab }) => {
+  const page = await openTab(EDITOR);
+  await setupDoc(page);
+
+  await page.locator('#doc h1 .ed-collapse-toggle').click();
+  await expect(page.locator('#doc #par')).toBeHidden();
+
+  await page.keyboard.press('Control+s');
+  await page.waitForTimeout(500);
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+
+  const par = page.locator('#doc p', { hasText: 'contenuto della sezione' });
+  await expect(par).toBeVisible();
+});
