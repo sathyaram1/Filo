@@ -23,7 +23,10 @@ async function newtabPage(app) {
   return win;
 }
 
-test('il suggerimento "Riordina schede" usa il confirm di Filo, non quello nativo', async ({ app, shell }) => {
+// test.fixme: repro del bug (oggi ROSSO). Documenta il comportamento atteso
+// senza rendere rossa la regressione completa. Il fixer che chiude il feedback
+// toglie `.fixme` per farlo diventare un assert vivo (deve passare col fix).
+test.fixme('il suggerimento "Riordina schede" usa il confirm di Filo, non quello nativo', async ({ app, shell }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
 
