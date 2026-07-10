@@ -13,6 +13,11 @@
 //
 // Gli assert descrivono il comportamento ATTESO (freccia coerente, un solo
 // click per riaprire): se il bug c'è sono rossi.
+//
+// test.fixme: repro VERIFICATA ROSSA (2026-07-10, senza fixme): dopo la
+// digitazione la freccia perde `is-collapsed` (test 1) e il primo click non
+// riapre la sezione (test 2, il paragrafo resta `ed-hidden-by-collapse`).
+// Chi lavora il fix toglie `.fixme`.
 
 import { test, expect } from './fixtures/electron.mjs';
 
