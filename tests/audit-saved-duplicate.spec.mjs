@@ -21,18 +21,21 @@ test('salvare due volte la stessa pagina crea due card identiche', async ({ open
      <body style="padding:40px"><h1>Contenuto di prova</h1></body></html>`,
   );
 
-  // 1° salvataggio: stesso codice invocato dal bottone "Salva per dopo" del
-  // menu (tasto destro). Dopo il salvataggio la tab si chiude da sola (~600ms).
-  let page = await openTab(url);
-  await page.waitForLoadState('domcontentloaded');
-  await page.evaluate(() => window.SN_ACTIONS.savePage());
-  await page.waitForTimeout(1500);
+  // Salva via il flusso utente REALE: tasto destro → icona "Salva per dopo"
+  // nella riga del menu. Dopo il salvataggio la tab si chiude da sola (~600ms).
+  async function saveViaMenu() {
+    const page = await openTab(url);
+    await page.waitForLoadState('domcontentloaded');
+    await page.click('body', { button: 'right' });
+    const btn = page.locator('.sn-menu [data-sn-icon-id="saveForLater"]');
+    await expect(btn).toBeVisible();
+    await btn.click();
+    // Toast di conferma + auto-chiusura della tab.
+    await page.waitForTimeout(1500);
+  }
 
-  // 2° salvataggio della STESSA pagina, riaperta.
-  page = await openTab(url);
-  await page.waitForLoadState('domcontentloaded');
-  await page.evaluate(() => window.SN_ACTIONS.savePage());
-  await page.waitForTimeout(1500);
+  await saveViaMenu(); // 1° salvataggio
+  await saveViaMenu(); // 2° salvataggio della STESSA pagina, riaperta
 
   // "Aperti per dopo": la pagina compare due volte.
   const home = await openTab(HOME);
