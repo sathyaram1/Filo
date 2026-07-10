@@ -80,6 +80,7 @@ test('il suggerimento "Riordina schede" usa il confirm di Filo, non quello nativ
     native: !!window.__nativeConfirmCalled,
   }));
 
+  console.log(`[audit] styledConfirm=${styled} nativeConfirm=${native} nativeDialog=${nativeDialogFired}`);
   // Assert di SUCCESSO: il popup di Filo deve essere usato.
   expect(styled, 'il suggerimento dovrebbe usare il confirm di Filo (SN_CONFIRM_UI)').toBe(true);
   // E il nativo NON deve essere usato.
