@@ -35,7 +35,7 @@ const FB_WITH_FILE = {
 // test.fixme: repro del bug (oggi ROSSO). Documenta il comportamento atteso
 // senza rendere rossa la regressione completa. Il fixer che chiude il feedback
 // toglie `.fixme` per farlo diventare un assert vivo (deve passare col fix).
-test.fixme('il dettaglio di manage mostra anche i FILE allegati alla segnalazione, non solo le immagini', async ({ openTab }) => {
+test('il dettaglio di manage mostra anche i FILE allegati alla segnalazione, non solo le immagini', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => !!window.__mgTest);
