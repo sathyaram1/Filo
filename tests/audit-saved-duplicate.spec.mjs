@@ -30,8 +30,10 @@ test('salvare due volte la stessa pagina crea due card identiche', async ({ open
     const btn = page.locator('.sn-menu [data-sn-icon-id="saveForLater"]');
     await expect(btn).toBeVisible();
     await btn.click();
-    // Toast di conferma + auto-chiusura della tab.
-    await page.waitForTimeout(1500);
+    // Toast di conferma + auto-chiusura della tab (che invalida `page`:
+    // l'attesa può quindi terminare con "target closed" — è il segnale
+    // che il salvataggio è andato a buon fine).
+    await page.waitForTimeout(1500).catch(() => {});
   }
 
   await saveViaMenu(); // 1° salvataggio
