@@ -26,7 +26,7 @@ async function setBudgetViaSwitcher(page, text) {
 
 // test.fixme: repro del bug — vedi sotto l'esito osservato. Chi lavorerà il
 // feedback toglie `.fixme` per farne un assert vivo (deve passare col fix).
-test.fixme('budget scritto con la virgola italiana (40,50) non viene perso né gonfiato', async ({ openTab }) => {
+test('budget scritto con la virgola italiana (40,50) non viene perso né gonfiato', async ({ openTab }) => {
   const page = await openTab('filo://decks/decks.html');
   await page.waitForLoadState('domcontentloaded');
 
