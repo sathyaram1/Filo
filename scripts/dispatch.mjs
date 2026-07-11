@@ -294,11 +294,7 @@ export function clearState(id) {
 // committa e pusha il PROPRIO file di stato su origin/main, esattamente come i
 // claim (che infatti atterrano puliti su main). Best-effort: un guasto git non
 // deve mai far fallire il record (lo stato locale resta scritto comunque).
-function tryGit(args) {
-  try { return { ok: true, out: execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' }).trim() }; }
-  catch (e) { return { ok: false, out: `${e.stdout || ''}${e.stderr || ''}`.trim() || e.message }; }
-}
-
+// Nota: `tryGit` è definita più sotto (§ git) e riusata qui.
 export function persistStateToGit(id, message) {
   // Nei test la STATE_DIR è sovrascritta (FILO_DISPATCH_STATE_DIR): lì non si
   // tocca git — lo stato è un file temporaneo, non il repo reale.
