@@ -1,9 +1,9 @@
 {
   "id": "6dfbad8d-29a7-43df-861f-b7eb08c3e7b9",
-  "branch": "",
+  "branch": "worker/6dfbad8d-29a7-43df-861f-b7eb08c3e7b9",
   "loopCount": 0,
-  "verifierVerdict": "pass",
+  "verifierVerdict": null,
   "verifierCritique": "",
-  "secauditDone": true,
-  "secauditVerdict": "fail"
+  "secauditDone": false,
+  "secauditVerdict": null
 }
