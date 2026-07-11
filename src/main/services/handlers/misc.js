@@ -49,6 +49,89 @@ module.exports = function register(on, ctx) {
     return { ok: true, dataUrl: img.toDataURL() };
   });
 
+  // "Salva immagine come…" (#274). Il vecchio cammino era un <a download>
+  // creato dal content script: Chromium onora l'attributo `download` SOLO per
+  // URL same-origin/blob:/data: — per un'immagine su un ALTRO dominio (la
+  // stragrande maggioranza) lo ignorava e la scheda navigava sull'immagine
+  // senza scaricare nulla. Qui il salvataggio parte dal main con
+  // webContents.downloadURL, che scarica sempre, a prescindere dall'origine.
+  // Nessun handler will-download era registrato sulle session delle tab
+  // normali: ne agganciamo uno usa-e-getta filtrato sul nostro URL, così i
+  // download nati altrove (es. <a download> same-origin delle pagine) tengono
+  // il comportamento di default.
+  on(MSG.DOWNLOAD_IMAGE, (msg, sender) => {
+    const url = String(msg.url || '').trim();
+    if (!/^https?:/i.test(url)) return { ok: false, error: 'URL non scaricabile' };
+    const wc = sender && sender.wc;
+    if (!wc || wc.isDestroyed?.()) return { ok: false, error: 'no sender' };
+    const path = require('node:path');
+    const ses = wc.session;
+
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = (r) => { if (!settled) { settled = true; resolve(r); } };
+
+      const onWillDownload = (_e, item) => {
+        // Sulla stessa session possono partire altri download: agganciamo solo
+        // il nostro (l'URL richiesto è il primo della catena redirect).
+        let chain = [];
+        try { chain = item.getURLChain() || []; } catch (_) {}
+        if (item.getURL() !== url && chain[0] !== url) return;
+        ses.removeListener('will-download', onWillDownload);
+        clearTimeout(startTimer);
+
+        // Nome file: lo decide Chromium (Content-Disposition → URL → mime),
+        // molto più affidabile del parsing dell'URL lato pagina.
+        const filename = item.getFilename() || 'immagine';
+        const testDir = process.env.FILO_DOWNLOAD_DIR;
+        if (testDir) {
+          // Hook per i test/headless: salvataggio diretto senza dialogo.
+          try { require('node:fs').mkdirSync(testDir, { recursive: true }); } catch (_) {}
+          item.setSavePath(path.join(testDir, filename));
+        } else {
+          // Dialogo "Salva come…" (il default di Electron quando savePath non è
+          // impostato), pre-compilato con la cartella Download e il nome dedotto
+          // — stesso comportamento che il salvataggio same-origin aveva già.
+          try {
+            const { app } = require('electron');
+            item.setSaveDialogOptions({ defaultPath: path.join(app.getPath('downloads'), filename) });
+          } catch (_) {}
+        }
+        item.once('done', (_ev, state) => {
+          if (state === 'completed') {
+            const p = item.getSavePath() || '';
+            finish({ ok: true, path: p, filename: p ? path.basename(p) : filename });
+          } else {
+            // 'cancelled' = l'utente ha chiuso il dialogo: non è un errore.
+            finish({ ok: false, cancelled: state === 'cancelled', error: state });
+          }
+        });
+      };
+      ses.on('will-download', onWillDownload);
+
+      // Se il download non parte affatto (URL irraggiungibile / bloccato) non
+      // lasciamo né listener orfani né la risposta appesa. Il timer copre SOLO
+      // l'avvio: una volta partito, l'attesa del dialogo/download è illimitata.
+      const startTimer = setTimeout(() => {
+        ses.removeListener('will-download', onWillDownload);
+        finish({ ok: false, error: 'download non partito' });
+      }, 30000);
+
+      try {
+        // Referer della pagina: alcuni CDN rifiutano il hotlink senza referrer.
+        const referrer = String(sender?.tab?.url || sender?.url || '');
+        if (/^https?:/i.test(referrer)) wc.downloadURL(url, { headers: { Referer: referrer } });
+        else wc.downloadURL(url);
+      } catch (_) {
+        try { wc.downloadURL(url); } catch (e2) {
+          ses.removeListener('will-download', onWillDownload);
+          clearTimeout(startTimer);
+          finish({ ok: false, error: e2?.message || String(e2) });
+        }
+      }
+    });
+  });
+
   on(MSG.FEEDBACK_ANNOTATE, async (msg, sender) => {
     // Il box feedback è appena entrato/uscito dalla modalità annotazione.
     // Inoltriamo alla shell (barra in alto) così l'ombra copre TUTTO Filo,
