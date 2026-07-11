@@ -34,6 +34,8 @@ const {
   clearState,
   resolveLoopCap,
   verifierNoteText,
+  reconcileState,
+  withRetry,
 } = await import('../../scripts/dispatch.mjs');
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
