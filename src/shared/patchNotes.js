@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.122', date: '2026-07-11',
+      features: [],
+      fixes: [
+        'Nell\'app Mazzi, quando incolli una lista in chat, il tasto + sulla riga del commander ora lo imposta davvero come commander del mazzo (prima lo aggiungeva come carta qualunque); la sua riga mostra la spunta e il commander non può più finire duplicato tra le carte normali.',
+      ],
+    },
+    {
       version: '0.2.117', date: '2026-07-09',
       features: [
         'Nella dashboard di gestione ogni feedback ora mostra la conversazione completa: il testo originale, il tuo eventuale commento di approvazione, i report di chi ha implementato e l\'esito dei controlli di verifica, ognuno nella sua bolla.',
