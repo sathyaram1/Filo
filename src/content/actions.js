@@ -769,12 +769,33 @@
     } catch (_) {}
   }
 
-  function downloadImage(imgEl) {
-    const a = document.createElement('a');
-    a.href = imgEl.currentSrc || imgEl.src;
-    const name = (a.href.split('/').pop() || 'image').split('?')[0] || 'image';
-    a.download = name;
-    document.body.appendChild(a); a.click(); a.remove();
+  async function downloadImage(imgEl) {
+    const src = imgEl.currentSrc || imgEl.src;
+    if (!src) return;
+    // data:/blob: nascono nella pagina stessa (canvas, object URL): lì
+    // l'attributo download di un <a> è onorato da Chromium e il main non
+    // saprebbe risolverli — restano sul cammino anchor.
+    if (/^(data:|blob:)/i.test(src)) {
+      const a = document.createElement('a');
+      a.href = src;
+      const m = /^data:image\/([a-z0-9.+-]+)/i.exec(src);
+      a.download = 'image.' + (m ? m[1].replace(/[^a-z0-9]/gi, '') : 'png');
+      document.body.appendChild(a); a.click(); a.remove();
+      return;
+    }
+    // Immagini http(s) — quasi sempre su un ALTRO dominio rispetto alla pagina:
+    // Chromium ignora l'attributo download cross-origin e la scheda NAVIGAVA
+    // sull'URL dell'immagine senza scaricare nulla (#274). Il salvataggio passa
+    // dal main process, che scarica a prescindere dall'origine. La risposta
+    // arriva a download concluso: toast di conferma (o di errore; nessun toast
+    // se l'utente annulla il dialogo di salvataggio).
+    try {
+      const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_IMAGE, url: src });
+      if (res?.ok) Popup.showToast(I18n.t('toast_image_saved'));
+      else if (!res?.cancelled) Popup.showToast(I18n.t('toast_image_save_failed'));
+    } catch (_) {
+      Popup.showToast(I18n.t('toast_image_save_failed'));
+    }
   }
 
   function toggleFullscreen() {
