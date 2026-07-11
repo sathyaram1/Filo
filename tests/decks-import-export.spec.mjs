@@ -57,6 +57,30 @@ async function newDeck(page) {
   await expect(page.locator('#screenBuilder')).toBeVisible();
 }
 
+// Provider LLM finto per l'import via chat (§11.2): qualunque messaggio viene
+// "interpretato" come la stessa lista incollata — nomi + quantità + commander.
+// La risoluzione su Scryfall resta compito del SISTEMA (mock sopra), mai del
+// modello: qui non compare nessun id.
+async function mockImportProvider(app) {
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { gemini: 'k-test' },
+      models: { [C.ACTIONS.DECKS_CHAT]: 'flash-lite-3' },
+      modelRegistry: C.DEFAULT_MODEL_REGISTRY,
+    });
+    globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts }) => ({
+      text: JSON.stringify({
+        reply: 'Ho letto la tua lista.',
+        import: [{ name: 'Sol Ring', qty: 1 }, { name: 'Forest', qty: 10 }],
+        commander: "Atraxa, Praetors' Voice",
+      }),
+      model: attempts[0].model, provider: attempts[0].provider, usage: {},
+    });
+  });
+}
+
 test('Importa dallo switcher: anteprima segnala non-trovati/sporchi, la conferma scrive le carte nel mazzo', async ({ app, openTab }) => {
   test.setTimeout(60_000);
   await mockScryfall(app);
