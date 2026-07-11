@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.125', date: '2026-07-11',
+      features: [],
+      fixes: [
+        '"Salva immagine come…" ora scarica davvero l\'immagine anche quando è ospitata su un altro sito (prima la scheda finiva sull\'immagine a schermo intero senza salvare nulla). A salvataggio completato compare una conferma.',
+      ],
+    },
+    {
       version: '0.2.124', date: '2026-07-11',
       features: [],
       fixes: [
