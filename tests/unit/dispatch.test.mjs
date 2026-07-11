@@ -33,6 +33,7 @@ const {
   writeState,
   clearState,
   resolveLoopCap,
+  verifierNoteText,
 } = await import('../../scripts/dispatch.mjs');
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
@@ -266,6 +267,27 @@ test('resolveLoopCap: clamp nel range [1, 10] sia env sia remoto', () => {
 
 test('resolveLoopCap: valori non numerici → default', () => {
   assert.equal(resolveLoopCap({ envRaw: 'abc', remote: 'xyz' }), 3);
+});
+
+// ─── verifierNoteText: l'esito del verifier nella chat del feedback ──────────
+
+test('verifierNoteText: pass con critica → incipit + sostanza (senza prefisso PASS)', () => {
+  const n = verifierNoteText('pass', "PASS — ho provato l'incolla immagine e arriva al destinatario");
+  assert.match(n, /^Controllo funzionalità superato\./);
+  assert.match(n, /incolla immagine/);
+  assert.ok(!/PASS —/.test(n)); // il prefisso ridondante viene tolto
+});
+
+test('verifierNoteText: fail con critica → incipit NON superato + passi', () => {
+  const n = verifierNoteText('fail', 'FAIL: il bottone resta disabilitato dopo il primo click');
+  assert.match(n, /^Controllo funzionalità NON superato:/);
+  assert.match(n, /bottone resta disabilitato/);
+  assert.ok(!/FAIL:/.test(n));
+});
+
+test("verifierNoteText: senza critica → solo l'esito (mai nota vuota)", () => {
+  assert.equal(verifierNoteText('pass'), 'Controllo funzionalità superato.');
+  assert.equal(verifierNoteText('fail'), 'Controllo funzionalità NON superato.');
 });
 
 // ─── teardown ─────────────────────────────────────────────────────────────────

@@ -365,6 +365,24 @@ class TabManager {
   }
 
   openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null, suppressAutoplay = false } = {}) {
+    // SICUREZZA (#247) — will-navigate e setWindowOpenHandler bloccano solo le
+    // navigazioni che Electron origina da sé (click, window.open): un
+    // loadURL() PROGRAMMATICO come questo NON emette will-navigate, quindi
+    // quel gate non protegge questo percorso. Qui convergono TUTTI gli
+    // handler IPC che aprono una scheda (content script via MSG.OPEN_URL /
+    // MSG.OPEN_NEW_TAB / chrome.tabs.create → _tabs:create, l'archivio, la
+    // shell): un controllo unico qui chiude ogni percorso presente e futuro,
+    // invece di doverlo ripetere in ciascun chiamante (e rischiare di
+    // dimenticarne uno, come accaduto). I chiamanti che filtrano già a monte
+    // (es. setWindowOpenHandler, l'azione NAVIGA dell'agente) restano
+    // corretti: qui il controllo è semplicemente ridondante per loro.
+    // NB: questo blocco è già stato perso una volta per un revert accidentale
+    // dei merge automatici tra worktree (commit da660251) — se lo tocchi,
+    // assicurati che il percorso IPC → openTab(file://) resti bloccato.
+    if (isWebUnsafeNav(url)) {
+      openExternalScheme(url); // mailto:/tel:/sms: → consegnati all'OS, il resto bloccato
+      return null;
+    }
     const id = randomUUID();
     const isInternal = url.startsWith('filo://');
     const partition = this._partitionFor(url);
@@ -1486,8 +1504,22 @@ class TabManager {
       // pubblicità: vanno consentiti come VERA finestra popup (action 'allow'),
       // così la relazione opener↔popup che l'OAuth usa per restituire l'esito
       // resta intatta. Una nuova scheda (deny+openTab) la spezzerebbe.
+      //
+      // #209 (giro successivo) — 'allow' da solo NON basta: senza
+      // overrideBrowserWindowOptions Electron crea il popup con un
+      // BrowserWindow "nudo", senza ALCUN preload (il preload non è fra le
+      // security webPreferences ereditate dall'opener). Il popup nasce quindi
+      // SENZA page-preload.js: né l'esenzione anti-fingerprint per i login
+      // (services/fingerprint.js → isIdentityProviderHref) né nessun altro
+      // pezzo di quel preload raggiungono MAI la pagina di Google/Microsoft/…
+      // dentro il popup — solo la scheda opener (claude.ai) lo aveva. Diamo al
+      // popup le stesse webPreferences di una scheda esterna normale (vedi
+      // _makeView) così il preload gira anche lì, e la stessa partizione che
+      // avrebbe una scheda aperta su quella URL (Cookies.MODES.PRIVACY →
+      // partizione per-sito; altrimenti null = sessione condivisa), per non
+      // spezzare un eventuale login Google già presente in Filo.
       if (tab.isInternal === false && isAuthPopup(url)) {
-        return { action: 'allow' };
+        return this._allowAuthPopup(url);
       }
       const isAdLikePopup = disposition === 'new-window';
       if (tab.isInternal === false && this.security.blockPopups && isAdLikePopup) {
@@ -1504,6 +1536,82 @@ class TabManager {
       this.openTab(url, { activate: true });
       return { action: 'deny' };
     });
+
+    // #209 — hardening del popup di login appena consentito. La finestra creata
+    // da action:'allow' NON passa da _wireEvents (non è una tab): senza questo
+    // hook resterebbe senza le difese che ogni scheda ha. Qui arrivano SOLO i
+    // popup di login (ogni altro percorso del handler qui sopra ritorna 'deny').
+    wc.on('did-create-window', (child) => {
+      this._hardenAuthPopup(child);
+    });
+  }
+
+  // #209 — risposta 'allow' per un popup di login, con le webPreferences
+  // esplicite. Senza overrideBrowserWindowOptions Electron creerebbe il popup
+  // con un BrowserWindow "nudo", senza ALCUN preload (il preload non è fra le
+  // security webPreferences ereditate dall'opener): né l'esenzione
+  // anti-fingerprint per i login (services/fingerprint.js →
+  // isIdentityProviderHref) né nessun altro pezzo di page-preload.js
+  // raggiungerebbero MAI la pagina di Google/Microsoft/… dentro il popup —
+  // solo la scheda opener (es. claude.ai) lo aveva. Diamo al popup le stesse
+  // webPreferences di una scheda esterna normale (vedi _makeView) così il
+  // preload gira anche lì, e la stessa partizione che avrebbe una scheda
+  // aperta su quella URL (Cookies.MODES.PRIVACY → partizione per-sito;
+  // altrimenti null = sessione condivisa), per non spezzare un eventuale
+  // login Google già presente in Filo.
+  _allowAuthPopup(url) {
+    const popupPartition = this._partitionFor(url);
+    return {
+      action: 'allow',
+      overrideBrowserWindowOptions: {
+        webPreferences: {
+          preload: PAGE_PRELOAD,
+          contextIsolation: true,
+          sandbox: false,
+          nodeIntegration: false,
+          webSecurity: true,
+          ...(popupPartition ? { partition: popupPartition } : {}),
+        },
+      },
+    };
+  }
+
+  // #209 — applica al popup di login le STESSE difese di una scheda normale.
+  // La finestra nasce fuori da _wireEvents, quindi va cablata qui:
+  //   - policy WebRTC anti IP-leak (come _applySecurity sulle tab);
+  //   - blocco navigazioni verso schemi non-web (file:// → leak hash NTLM via
+  //     SMB su Windows, data:/javascript: → phishing), come il will-navigate
+  //     delle tab; mailto:/tel:/sms: consegnati all'OS;
+  //   - gate sulle aperture di ULTERIORI finestre dal popup: un secondo popup
+  //     di login concatenato (es. scelta account → verifica) resta una vera
+  //     finestra (ricorsivamente hardened), tutto il resto torna dentro Filo
+  //     come scheda normale — mai finestre libere non gestite.
+  _hardenAuthPopup(win) {
+    if (!win || !win.webContents) return;
+    const pwc = win.webContents;
+    try {
+      pwc.setWebRTCIPHandlingPolicy(
+        this.security.protectIpLeak ? 'default_public_interface_only' : 'default',
+      );
+    } catch (_) { /* policy non supportata in qualche build */ }
+    pwc.on('will-navigate', (event, url) => {
+      if (isWebUnsafeNav(url)) {
+        event.preventDefault();
+        openExternalScheme(url);
+      }
+    });
+    pwc.setWindowOpenHandler(({ url }) => {
+      if (isWebUnsafeNav(url)) {
+        openExternalScheme(url);
+        return { action: 'deny' };
+      }
+      if (isAuthPopup(url)) {
+        return this._allowAuthPopup(url);
+      }
+      this.openTab(url, { activate: true });
+      return { action: 'deny' };
+    });
+    pwc.on('did-create-window', (child) => this._hardenAuthPopup(child));
   }
 
   // Notifica la shell che un popup è stato bloccato sul tab `tabId`. La shell

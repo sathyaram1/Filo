@@ -60,7 +60,10 @@ tu** a registrare l'esito e a far girare il gate (L5 deterministico + il tuo L4)
    FILO_L4_VERDICT=pass FILO_L4_REASON="..." node scripts/merge-gate.mjs <branch>
    # feature spezzata: ... node scripts/merge-gate.mjs <branch> --into feature/N
    ```
-3. Chiudi in base all'exit del gate:
+3. Chiudi in base all'exit del gate (la nota finisce nella **chat del feedback
+   in dashboard**: scrivi per l'owner — es. "Controllo di sicurezza superato,
+   la modifica è stata pubblicata" + eventuali osservazioni — mai frammenti di
+   diff):
    - `0` → fuso sul target → `node scripts/queue-triage.mjs <id> done "<report>"` + `node scripts/dispatch.mjs --clear-state <id>`
    - `10` → BLOCCATO (L5 o L4) → `node scripts/queue-triage.mjs <id> design "<nota del gate>" --branch <branch> --reason secaudit`
    - `20` → conflitto → risolvi o accoda `design` (come sopra).
@@ -68,3 +71,19 @@ tu** a registrare l'esito e a far girare il gate (L5 deterministico + il tuo L4)
 
 **Nota:** L5 (blocco deterministico sui file sensibili) gira **dentro** il gate,
 non qui. Tu sei solo L4 (il giudizio LLM). I due livelli si completano.
+## Riga finale per l'orchestratore (contratto DURO)
+
+L'orchestratore è **cieco** e legge **solo la tua ultima riga** — è un *dato di
+controllo* (continua/fermati), non un canale di report. Tutto ciò che vuoi dire
+all'utente va nelle `notes` del feedback (via `queue-triage.mjs`), NON nella riga
+di ritorno.
+
+La tua **ultima riga** deve essere **ESATTAMENTE** una di queste, senza
+nient'altro dopo (niente id, nomi di file, diff, spiegazioni, report):
+
+- `fatto <X>` — hai chiuso il tuo compito (X = 1-4 parole, es. `fatto verifica #209`)
+- `niente da fare` — non c'era lavoro per questo ruolo
+- `budget pieno`
+
+Se ci infili un report, l'orchestratore riceve dettagli specifici che per design
+deve ignorare: è un bug del ruolo, non un extra utile.

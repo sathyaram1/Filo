@@ -22,10 +22,13 @@ Convenzioni (tono, sintomo-vs-causa): `CLAUDE.md`.
 1. Il feedback decifrato è nel payload (`feedback.text`, `feedback.images`,
    `feedback.num`, `feedback.id`). Capisci il **sintomo**: cosa voleva fare
    l'utente e cosa lamentava.
-2. `git checkout <branch>`. Se devi installare: in cloud l'installer di Electron
-   abortisce dietro il proxy, quindi usa
-   `ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install && node scripts/ensure-electron.mjs`
-   (idempotente). I test da root: `ELECTRON_DISABLE_SANDBOX=1 xvfb-run -a ...`.
+2. `git checkout <branch>`. Electron di norma lo prepara l'orchestratore una volta
+   (`ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install && node scripts/ensure-electron.mjs`,
+   idempotente; test da root con `ELECTRON_DISABLE_SANDBOX=1 xvfb-run -a ...`). **Se
+   Electron NON è disponibile** (in certi ambienti la network policy blocca il
+   download del binario — vedi ROUTINES.md §Avvio): verifica per **ispezione del
+   codice + `npm run test:unit`**, e dichiara che l'E2E/visivo non è eseguibile
+   qui. NON è un motivo di FAIL: giudica la correttezza sul codice e sui test puri.
 3. **Riproduci la lamentela** esattamente come la descriverebbe l'utente: esegui
    i suoi passi e verifica che la feature risponda correttamente. Asserisci il
    **successo** (la cosa che l'utente voleva accade), non l'assenza di un certo
@@ -54,22 +57,27 @@ Convenzioni (tono, sintomo-vs-causa): `CLAUDE.md`.
 
 ## Come riporti
 
-Una riga sola, una delle due forme:
+Scrivi la tua critica in una delle due forme:
 
 ```
-PASS — <1-2 frasi su cosa hai testato e perché funziona>
+PASS — <cosa hai testato e perché funziona, inclusi gli stress test provati>
 ```
 
 ```
 FAIL — <cosa si rompe, con i passi esatti per riprodurlo>
 ```
 
-Poi registra l'esito nello stato del branch (lo legge il prossimo dispatch per
-instradare a secaudit su PASS o a fixer su FAIL):
+Poi registra l'esito nello stato del branch **passando SEMPRE la critica come
+terzo argomento** (lo legge il prossimo dispatch per instradare a secaudit su
+PASS o a fixer su FAIL; la critica finisce ANCHE nella chat del feedback in
+dashboard, dove l'owner la legge — senza, il tuo lavoro è invisibile):
 
 ```bash
-node scripts/dispatch.mjs --record-verifier <id> <pass|fail>
+node scripts/dispatch.mjs --record-verifier <id> <pass|fail> "PASS — ho testato…"
 ```
+
+La critica è per l'owner: descrivi cosa hai provato e cosa succede in termini di
+comportamento dell'app, senza nomi di file/funzioni.
 
 Infine **rilascia il claim** (dispatch lo ha acquisito per consegnarti il lavoro;
 se resta vivo, il prossimo giro NON può instradare secaudit/fixer su questo
@@ -86,3 +94,19 @@ node scripts/claim-feedback.mjs release <id>
   Il contatore loop si incrementa; dopo il **3° FAIL** dispatch mette il
   feedback in `design` con motivo `loop` (decide l'owner) invece di richiamare
   fixer.
+## Riga finale per l'orchestratore (contratto DURO)
+
+L'orchestratore è **cieco** e legge **solo la tua ultima riga** — è un *dato di
+controllo* (continua/fermati), non un canale di report. Tutto ciò che vuoi dire
+all'utente va nelle `notes` del feedback (via `queue-triage.mjs`), NON nella riga
+di ritorno.
+
+La tua **ultima riga** deve essere **ESATTAMENTE** una di queste, senza
+nient'altro dopo (niente id, nomi di file, diff, spiegazioni, report):
+
+- `fatto <X>` — hai chiuso il tuo compito (X = 1-4 parole, es. `fatto verifica #209`)
+- `niente da fare` — non c'era lavoro per questo ruolo
+- `budget pieno`
+
+Se ci infili un report, l'orchestratore riceve dettagli specifici che per design
+deve ignorare: è un bug del ruolo, non un extra utile.

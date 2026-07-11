@@ -17,6 +17,7 @@
   <script src="filo://shared/icons.js"></script>
   <script src="filo://shared/feedback.js"></script>
   <script src="filo://shared/feedbackStatus.js"></script>
+  <script src="filo://shared/feedbackThread.js"></script>
   <script src="filo://shared/manageReview.js"></script>
   <script src="filo://shared/boardArchive.js"></script>
   <style>
@@ -202,6 +203,45 @@
     }
     .mg-priority .mg-dot:hover { border-color: var(--sn-accent); }
     .mg-priority .mg-dot--on { background: var(--sn-accent); border-color: var(--sn-accent); }
+
+    /* ── Card "in lavorazione" (pinnata in cima a In coda) ─────────────────
+       Due righe: la riga normale (#N · titolo · priorità) sopra, lo stato
+       dell'iter sotto (✓ Implementazione · ● Controllo funzionalità · ○
+       Controllo sicurezza + istanza attiva/in attesa). */
+    .mg-item--staged { flex-direction: column; align-items: stretch; gap: 4px; }
+    .mg-item--staged .mg-item-row {
+      display: flex; flex-direction: row; align-items: baseline; gap: 6px;
+      min-width: 0;
+    }
+    .mg-item--active-work { border-left-color: var(--sn-accent) !important; }
+    .mg-item-state {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px;
+      font-size: 11px; color: var(--sn-muted); line-height: 1.4;
+    }
+    .mg-step { white-space: nowrap; }
+    .mg-step--done    { color: #2e9e5b; }
+    .mg-step--current { color: var(--sn-fg); font-weight: 600; }
+    .mg-step--pending { opacity: 0.65; }
+    .mg-step-sep { opacity: 0.5; }
+    .mg-work-live {
+      display: inline-flex; align-items: center; gap: 5px;
+      color: var(--sn-accent); font-weight: 600; flex-basis: 100%;
+    }
+    .mg-work-live i {
+      width: 7px; height: 7px; border-radius: 50%; background: var(--sn-accent);
+      animation: mg-eval-bounce 1s ease-in-out infinite;
+    }
+    .mg-work-idle { flex-basis: 100%; font-style: italic; }
+    @media (prefers-reduced-motion: reduce) {
+      .mg-work-live i { animation: none; }
+    }
+    /* Striscia di stato nel dettaglio: stessa riga, sotto la riga giudici. */
+    .mg-work-state {
+      padding: 8px 12px; border-bottom: 1px solid var(--sn-border);
+      flex: 0 0 auto;
+    }
+    .mg-work-state[hidden] { display: none; }
+
     .mg-list-empty {
       color: var(--sn-muted); font-size: 13px;
       text-align: center; padding: 30px 8px;
@@ -301,6 +341,10 @@
       max-width: 200px; max-height: 200px; border-radius: 6px;
       border: 1px solid var(--sn-border); cursor: zoom-in; object-fit: cover;
     }
+    /* Allegato-file di un turno (le note ancorano gli allegati al commento). */
+    .mg-bubble-file { margin-top: 8px; font-size: 13px; }
+    .mg-bubble-file a { color: var(--sn-accent); text-decoration: none; }
+    .mg-bubble-file a:hover { text-decoration: underline; }
 
     /* ── Lightbox ────────────────────────────────────────────────────────── */
     .mg-lightbox {
@@ -598,6 +642,9 @@
             <div class="mg-judges-row" id="mgJudgesRow">
               <span class="mg-judge-label">Giudici:</span>
             </div>
+            <!-- Avanzamento della lavorazione (solo working/revision_*): i tre
+                 passaggi dell'iter + se un'istanza ci lavora in questo momento. -->
+            <div class="mg-work-state" id="mgWorkState" hidden></div>
             <div class="mg-thread" id="mgThread"></div>
             <!-- Azioni di revisione (owner-only): sblocca il feedback con un
                  commento opzionale; rientra nella coda di lavoro (todo).

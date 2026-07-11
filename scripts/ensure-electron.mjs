@@ -3,17 +3,29 @@
 //
 // PERCHÉ ESISTE
 //   Nell'ambiente cloud delle routine l'installer nativo di Electron
-//   (@electron/get → got) ABORTISCE il download del binario attraverso il proxy
-//   ("server aborted pending request"), quindi il postinstall di `electron`
-//   fallisce e `npm install` esce con errore. Ma lo stesso file (≈106 MB) si
-//   scarica PERFETTAMENTE con `curl` (verificato: HTTP 200, download completo).
-//   Questo script, idempotente, scarica il binario con curl e lo estrae dove
-//   Electron lo cerca, così `require('electron')` e Playwright (`_electron.launch`)
-//   funzionano senza toccare l'installer rotto.
+//   (@electron/get → got) ABORTISCE il download del binario attraverso il proxy,
+//   quindi il postinstall di `electron` fallisce e `npm install` esce con errore.
+//   Questo script, idempotente, procura lo zip del binario da una delle sorgenti
+//   qui sotto e lo estrae dove Electron lo cerca, così `require('electron')` e
+//   Playwright (`_electron.launch`) funzionano senza toccare l'installer rotto.
 //
 //   Va lanciato DOPO `npm install`. Per non far fallire l'install in partenza,
 //   installa con ELECTRON_SKIP_BINARY_DOWNLOAD=1 e poi lancia questo script:
 //     ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install && node scripts/ensure-electron.mjs
+//
+// SORGENTI DEL BINARIO (provate in quest'ordine — prima quelle SENZA rete esterna,
+// che sono le uniche affidabili quando la policy di egress blocca github):
+//   1. Già installato (isInstalled()) → niente da fare.
+//   2. `FILO_ELECTRON_ZIP=/path/…zip` — uno zip già presente sul filesystem.
+//   3. Vendored nel repo: `vendor/electron/electron-v<ver>-linux-x64.zip`
+//      (committato dall'owner dal suo PC; in cloud arriva col fetch git → nessun
+//      download esterno). È la via consigliata quando la network policy blocca
+//      github (osservato 2026-07-09: github.com/releases → 403 anche con curl).
+//   4. `FILO_ELECTRON_URL=https://…` — un mirror esplicito dell'owner.
+//   5. Mirror npmmirror (Alibaba, default di rete; override con ELECTRON_MIRROR):
+//      github.com/releases/download è negato dallo *scope GitHub* della sessione,
+//      npmmirror invece è raggiungibile con accesso di rete pieno.
+//   6. URL ufficiale su github.com (curl). Funziona SOLO se scope/policy lo consentono.
 //
 //   Il criterio di "già installato" replica isInstalled() di
 //   node_modules/electron/install.js: dist/version == versione del package,
@@ -69,14 +81,55 @@ if (isInstalled()) {
   process.exit(0);
 }
 
-const url = `https://github.com/electron/electron/releases/download/v${version}/electron-v${version}-linux-x64.zip`;
-const zip = join(os.tmpdir(), `electron-${version}-linux-x64.zip`);
+const ZIP_NAME = `electron-v${version}-linux-x64.zip`;
+const tmpZip = join(os.tmpdir(), ZIP_NAME);
 
-log(`scarico Electron v${version} con curl (l'installer nativo abortisce dietro il proxy)…`);
-try {
-  execFileSync('curl', ['-sSL', '--fail', '--max-time', '300', '-o', zip, url], { stdio: ['ignore', 'ignore', 'inherit'] });
-} catch (e) {
-  log('download via curl fallito: ' + (e && e.message ? e.message : e));
+function curlTo(url, dest, label) {
+  log(`scarico Electron v${version} da ${label} con curl…`);
+  try {
+    execFileSync('curl', ['-sSL', '--fail', '--max-time', '300', '-o', dest, url], { stdio: ['ignore', 'ignore', 'inherit'] });
+    return dest;
+  } catch (e) {
+    log(`  download da ${label} fallito: ${e && e.message ? e.message : e}`);
+    return null;
+  }
+}
+
+// Prova le sorgenti in ordine: prima quelle locali (nessuna rete esterna, le
+// uniche affidabili quando la policy blocca github), poi quelle di rete.
+function resolveZip() {
+  const envZip = process.env.FILO_ELECTRON_ZIP;
+  if (envZip) {
+    if (existsSync(envZip)) { log(`uso lo zip da FILO_ELECTRON_ZIP: ${envZip}`); return envZip; }
+    log(`FILO_ELECTRON_ZIP="${envZip}" non esiste — provo le altre sorgenti.`);
+  }
+  const vendored = join(ROOT, 'vendor', 'electron', ZIP_NAME);
+  if (existsSync(vendored)) { log(`uso lo zip vendored nel repo: ${vendored}`); return vendored; }
+  if (process.env.FILO_ELECTRON_URL) {
+    const got = curlTo(process.env.FILO_ELECTRON_URL, tmpZip, 'FILO_ELECTRON_URL');
+    if (got) return got;
+  }
+  // 5. Mirror npmmirror (Alibaba) — mirror ufficiale supportato da @electron/get,
+  //    ed è il default di RETE qui: github.com/releases/download è negato dallo
+  //    *scope GitHub* della sessione (non dalla rete), mentre npmmirror è
+  //    raggiungibile con accesso di rete pieno. Override con ELECTRON_MIRROR.
+  const mirror = (process.env.ELECTRON_MIRROR || 'https://npmmirror.com/mirrors/electron/').replace(/\/*$/, '/');
+  const mirrorGot = curlTo(`${mirror}v${version}/${ZIP_NAME}`, tmpZip, 'npmmirror');
+  if (mirrorGot) return mirrorGot;
+  // 6. URL ufficiale github (solo se lo scope/policy lo consente).
+  const ghUrl = `https://github.com/electron/electron/releases/download/v${version}/${ZIP_NAME}`;
+  return curlTo(ghUrl, tmpZip, 'github.com');
+}
+
+const zip = resolveZip();
+if (!zip) {
+  log('IMPOSSIBILE procurare il binario Electron da nessuna sorgente.');
+  log("La network policy dell'ambiente blocca il download da github (403) e non");
+  log('esiste uno zip locale/vendored. Opzioni per l\'owner (fuori sessione):');
+  log('  a) allowlist di github.com / objects.githubusercontent.com nella network policy;');
+  log(`  b) vendoring: committa lo zip in vendor/electron/${ZIP_NAME} dal tuo PC (arriva col fetch git);`);
+  log('  c) esporta FILO_ELECTRON_ZIP=/path/…zip oppure FILO_ELECTRON_URL=<mirror allowlistato>.');
+  log('Finché non è fatto la flotta gira SENZA Electron: verifica solo con `npm run test:unit`.');
   process.exit(1);
 }
 

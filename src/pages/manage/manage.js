@@ -45,6 +45,7 @@
   const mgDetail      = document.getElementById('mgDetail');
   const mgDetailHead  = document.getElementById('mgDetailHead');
   const mgJudgesRow   = document.getElementById('mgJudgesRow');
+  const mgWorkState   = document.getElementById('mgWorkState');
   const mgThread      = document.getElementById('mgThread');
 
   // Revisione — pannello laterale
@@ -488,10 +489,16 @@
       // Allineato (tutti i giudici d'accordo, nessun blocco) → bordo BLU.
       const aligned = !cl && MR.isAligned(fb);
       const alignedCls = aligned ? ' mg-item--aligned' : '';
+      // In lavorazione (working/revision_*): la card mostra una seconda riga con
+      // il passaggio corrente dell'iter e se un'istanza ci lavora ORA. Solo
+      // nella tab "In coda" (dove queste card sono pinnate in cima).
+      const progress = currentTab === 'queue' ? MR.workProgress(fb) : null;
       item.className = 'mg-item'
         + (fb._id === selectedId ? ' mg-item--selected' : '')
         + unfilteredCls
-        + alignedCls;
+        + alignedCls
+        + (progress ? ' mg-item--staged' : '')
+        + (progress && progress.active ? ' mg-item--active-work' : '');
       item.dataset.id = fb._id;
       item.style.borderLeftColor = cl ? cl.color : (aligned ? MR.ALIGNED_COLOR : 'transparent');
       // Una riga sola: #N · titolo (ellissi). Il motivo (attacco/spam/…) resta
@@ -500,11 +507,14 @@
       const norm = MR.normalizeStatus(fb);
       item.title = (num ? `#${num} · ` : '') + title
         + (norm.statusReason ? ` — ${norm.statusReason}` : '');
-      item.innerHTML = `
+      const rowHtml = `
         ${num ? `<span class="mg-item-num">#${esc(num)}</span>` : ''}
         <span class="mg-item-title">${esc(title)}</span>
         ${priorityDotsHtml(fb)}
       `;
+      item.innerHTML = progress
+        ? `<div class="mg-item-row">${rowHtml}</div>${workStateHtml(progress)}`
+        : rowHtml;
       item.addEventListener('click', (e) => {
         // Il click su un pallino priorità non apre il dettaglio (lo gestisce il
         // listener delegato di mgList).
@@ -513,6 +523,25 @@
       });
       mgList.appendChild(item);
     }
+  }
+
+  // ── Riga di stato della lavorazione (card pinnate + dettaglio) ────────────
+  // Traduce l'avanzamento (MR.workProgress) in una riga leggibile: i tre
+  // passaggi dell'iter come spunte (✓ fatto · ● in corso · ○ da fare) e se
+  // un'istanza ci sta lavorando in questo momento.
+  function workStateHtml(progress) {
+    const marks = { done: '✓', current: '●', pending: '○' };
+    const steps = progress.steps.map((s) =>
+      `<span class="mg-step mg-step--${s.state}" title="${esc(s.label)}: ${
+        s.state === 'done' ? 'fatto' : s.state === 'current' ? 'in corso' : 'da fare'
+      }">${marks[s.state]} ${esc(s.label)}</span>`
+    ).join('<span class="mg-step-sep">·</span>');
+    const who = progress.active
+      ? `<span class="mg-work-live"><i></i>Un'istanza ci sta lavorando ora</span>`
+      : `<span class="mg-work-idle">Nessuna istanza al lavoro: in attesa di ${
+          progress.current.key === 'impl' ? 'ripresa' : 'un verificatore'
+        }</span>`;
+    return `<div class="mg-item-state">${steps}${who}</div>`;
   }
 
   // ── Ri-valutazione dei feedback "non filtrati" (panel parziale) ───────────
@@ -700,6 +729,14 @@
     // Riga giudici (4 pallini, riassunto a colpo d'occhio). Il click su un
     // pallino apre QUEL giudice (nome + classe + reasoning) nel pannello destro.
     renderJudgesRow(fb);
+
+    // Striscia "a che punto è la lavorazione" (solo per i feedback nell'iter
+    // working/revision_*): stessi contenuti della card pinnata in lista.
+    if (mgWorkState) {
+      const progress = MR.workProgress(fb);
+      mgWorkState.hidden = !progress;
+      mgWorkState.innerHTML = progress ? workStateHtml(progress) : '';
+    }
 
     // Bolle chat
     renderThread(fb);
@@ -1045,44 +1082,77 @@
     return v.find((x) => x && x.judge === name) || null;
   }
 
-  function renderThread(fb) {
-    mgThread.innerHTML = '';
-
-    // Bolla 1: il feedback dell'utente
-    const bUser = document.createElement('div');
-    bUser.className = 'mg-bubble mg-bubble--user';
-    let bodyHtml = `<div class="mg-bubble-who">Utente</div>`;
-    bodyHtml += `<div class="mg-bubble-body">${esc(fb.text || '')}</div>`;
-
-    const imgs = Array.isArray(fb.images) ? fb.images : [];
+  // Crea e appende una bolla della conversazione. `side` decide il lato
+  // ('user' = destra, 'model' = sinistra), `who` è l'etichetta sopra il testo,
+  // `bodyHtml` è GIÀ escapato dal chiamante. Gli allegati (immagini + file) si
+  // aggiungono sotto il corpo; le immagini aprono il lightbox.
+  function appendBubble(side, who, bodyHtml, attachments) {
+    const b = document.createElement('div');
+    b.className = `mg-bubble mg-bubble--${side}`;
+    let html = `<div class="mg-bubble-who">${esc(who)}</div>`;
+    html += `<div class="mg-bubble-body">${bodyHtml}</div>`;
+    const atts = Array.isArray(attachments) ? attachments : [];
+    const imgs = atts.filter((a) => a && a.kind !== 'file' && a.url);
+    const files = atts.filter((a) => a && a.kind === 'file' && a.url);
     if (imgs.length) {
-      bodyHtml += `<div class="mg-bubble-imgs">`;
-      for (const url of imgs) {
-        bodyHtml += `<img src="${esc(url)}" alt="allegato" data-src="${esc(url)}" loading="lazy">`;
+      html += `<div class="mg-bubble-imgs">`;
+      for (const a of imgs) {
+        html += `<img src="${esc(a.url)}" alt="allegato" data-src="${esc(a.url)}" loading="lazy">`;
       }
-      bodyHtml += `</div>`;
+      html += `</div>`;
     }
-    bUser.innerHTML = bodyHtml;
-
-    // Click sulle immagini → lightbox
-    bUser.querySelectorAll('.mg-bubble-imgs img').forEach((img) => {
+    for (const f of files) {
+      html += `<div class="mg-bubble-file"><a href="${esc(f.url)}" target="_blank" rel="noopener">📎 ${esc(f.name || 'allegato')}</a></div>`;
+    }
+    b.innerHTML = html;
+    b.querySelectorAll('.mg-bubble-imgs img').forEach((img) => {
       img.addEventListener('click', () => openLightbox(img.dataset.src || img.src));
     });
-    mgThread.appendChild(bUser);
+    mgThread.appendChild(b);
+    return b;
+  }
 
-    // Bolla 2: commento di Filo
-    const bModel = document.createElement('div');
-    bModel.className = 'mg-bubble mg-bubble--model';
+  // La conversazione COMPLETA del feedback, un turno per bolla: segnalazione
+  // originale → parere di Filo (giudici) → commento dell'owner alla revisione →
+  // tutti i turni della lavorazione (report delle istanze, esiti del verifier,
+  // risposte dell'owner) parsati dalle note col modulo condiviso dei thread.
+  function renderThread(fb) {
+    mgThread.innerHTML = '';
+    const TH = window.SN_FEEDBACK_THREAD;
+
+    // Bolla 1: la segnalazione originale (+ allegati piatti images[]).
+    const fromModel = TH ? TH.isFromModel(fb.clientId) : false;
+    const imgs = (Array.isArray(fb.images) ? fb.images : []).map((url) => ({ kind: 'img', url }));
+    appendBubble(fromModel ? 'model' : 'user', fromModel ? 'Filo (segnalazione automatica)' : 'Utente',
+      esc(fb.text || ''), imgs);
+
+    // Bolla 2: parere di Filo (riassunto dei giudici).
     const summary = fb.pipeline && fb.pipeline.filoSummary;
-    bModel.innerHTML = `
-      <div class="mg-bubble-who">Filo</div>
-      <div class="mg-bubble-body">${
-        summary
-          ? esc(summary)
-          : '<em>Filo non ha ancora un parere su questo feedback (giudici non attivi).</em>'
-      }</div>
-    `;
-    mgThread.appendChild(bModel);
+    appendBubble('model', 'Filo',
+      summary ? esc(summary)
+              : '<em>Filo non ha ancora un parere su questo feedback (giudici non attivi).</em>');
+
+    // Bolla 3: il commento dell'owner alla revisione (approvazione/sblocco/
+    // conferma). Prima era scritto ma non mostrato da nessuna parte.
+    if (String(fb.reviewComment || '').trim()) {
+      const when = fb.reviewedAt ? ` — ${formatDate(fb.reviewedAt)}` : '';
+      appendBubble('user', `Tu (revisione${when})`, esc(fb.reviewComment));
+    }
+
+    // Turni della lavorazione: le note contengono i report delle istanze che
+    // hanno implementato, gli esiti del controllo funzionalità e le risposte
+    // dell'owner ai chiarimenti, in ordine. Il parser condiviso li separa.
+    const notes = String(fb.notes || '');
+    if (!TH) {
+      // Fallback senza parser: mostra il blob intero come un turno unico.
+      if (notes.trim()) appendBubble('model', 'Filo (lavorazione)', esc(notes));
+      return;
+    }
+    for (const seg of TH.splitNotes(notes)) {
+      const when = seg.ts ? ` — ${seg.ts}` : '';
+      const who = seg.role === 'user' ? `Tu${when}` : `Filo (lavorazione${when})`;
+      appendBubble(seg.role === 'user' ? 'user' : 'model', who, esc(seg.body), seg.attachments);
+    }
   }
 
   // ── Pannello laterale ─────────────────────────────────────────────────────

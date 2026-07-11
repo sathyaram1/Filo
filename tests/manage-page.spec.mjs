@@ -358,8 +358,10 @@ test('con dati finti: un elemento su UNA riga (#N + titolo, niente label motivo)
   expect(borderColor).not.toBe('rgba(0, 0, 0, 0)'); // non trasparente
 });
 
-// Redesign routine: un feedback bloccato per LOOP (3 verifiche fallite di fila)
-// deve avere il bordo NERO, distinto dai blocchi del pipeline di sicurezza.
+// Macchina a stati (FEEDBACK-STATES.md): un feedback bloccato per LOOP
+// (3 verifiche fallite di fila, legacy blocked+blockReason=loop) si normalizza
+// a `design` con statusReason `loop` → bordo VERDE design. Il NERO è riservato
+// a `suspicious_file`.
 const FAKE_FB_LOOP = {
   _id: 'test-fb-loop',
   text: 'Fix bloccato dopo tre verifiche avversariali fallite.',
@@ -373,16 +375,16 @@ const FAKE_FB_LOOP = {
   blockReason: 'loop',
 };
 
-test('un blocco per LOOP (blocked + blockReason=loop) ha il border-left NERO', async ({ openTab }) => {
+test('un blocco per LOOP (blocked + blockReason=loop) è design VERDE con reason loop', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_MANAGE_REVIEW);
 
-  // Verifica la logica pura: classifyBlock → reason 'loop', colore nero.
+  // Verifica la logica pura: classifyBlock → reason 'loop', colore verde design.
   const cl = await page.evaluate((fb) => window.SN_MANAGE_REVIEW.classifyBlock(fb), FAKE_FB_LOOP);
   expect(cl).not.toBeNull();
   expect(cl.reason).toBe('loop');
-  expect(cl.color).toBe('#111111');
+  expect(cl.color).toBe('#2e9e5b');
 
   // Esercita il VERO renderList: il blocco loop non è approvato → "Ricevuti".
   await page.evaluate((fb) => { window.__mgTest.setData([fb]); window.__mgTest.setTab('inbox'); }, FAKE_FB_LOOP);
@@ -390,11 +392,12 @@ test('un blocco per LOOP (blocked + blockReason=loop) ha il border-left NERO', a
   await expect(page.locator('.mg-item')).toHaveCount(1);
   await expect(page.locator('.mg-item-title')).toHaveText('Test blocco loop');
 
-  // Border-left NERO (#111111 → rgb(17, 17, 17)), distinto dal rosso/arancio/blu.
+  // Border-left VERDE design (#2e9e5b → rgb(46, 158, 91)): il loop è una
+  // decisione owner come gli altri design, NON nero (riservato a suspicious_file).
   const borderColor = await page.locator('.mg-item').evaluate(
     (el) => getComputedStyle(el).borderLeftColor
   );
-  expect(borderColor).toBe('rgb(17, 17, 17)');
+  expect(borderColor).toBe('rgb(46, 158, 91)');
 });
 
 // Panel parziale "non filtrato": almeno un giudice non ha votato. Bianco, nei
@@ -1063,10 +1066,13 @@ test('un feedback in `clarify` mostra il box risposta dell owner sotto Ricevuti 
   await expect(page.locator('#mgListHead')).toHaveText('Ricevuti');
   await expect(page.locator('.mg-item')).toHaveCount(1);
 
-  // Apri il dettaglio: il box risposta chiarimenti è visibile, lo sblocco no.
+  // Apri il dettaglio: il box risposta chiarimenti è visibile. Con la macchina
+  // a stati `clarify` normalizza a `design` (bloccato, decide l'owner), quindi
+  // ANCHE "Accetta e sblocca" è legittimamente visibile accanto al box.
   await page.evaluate((id) => window.__mgTest.openDetail(id), CLARIFY_FB._id);
   await expect(page.locator('#mgClarify')).toBeVisible();
-  await expect(page.locator('#mgActions')).toBeHidden();
+  await expect(page.locator('#mgActions')).toBeVisible();
+  await expect(page.locator('#mgAcceptBtn')).toHaveText('Accetta e sblocca');
   // Niente riga giudici per un feedback mai passato dal pipeline.
   await expect(page.locator('#mgJudgesRow')).toBeHidden();
 
@@ -1078,10 +1084,12 @@ test('un feedback in `clarify` mostra il box risposta dell owner sotto Ricevuti 
   const patch = await page.evaluate(() => window.__updates[0]);
   expect(patch.status).toBe('todo');
   expect(patch.notes).toContain('Intendo il pulsante in alto a destra');
-  // Risposto: il dettaglio si chiude. Il feedback torna `todo` ma NON è ancora
-  // approvato → resta nei Ricevuti (in attesa di approvazione/ri-giudizio),
-  // senza più il box chiarimenti.
+  // Risposto: il dettaglio si chiude. Macchina a stati: `todo` = già in coda
+  // (le tab sono una lookup pura sullo status) → il feedback ESCE dai Ricevuti
+  // e ricompare sotto "In coda".
   await expect(page.locator('#mgDetail')).toBeHidden();
+  await expect(page.locator('.mg-item').filter({ hasText: 'Pulsante X' })).toHaveCount(0);
+  await page.locator('.mg-tab[data-tab="queue"]').click();
   await expect(page.locator('.mg-item').filter({ hasText: 'Pulsante X' })).toHaveCount(1);
 });
 
@@ -1527,4 +1535,104 @@ test('DD1: per i non-admin la sezione mostra il messaggio di accesso negato', as
   // Aspetta che il caricamento finisca (il denied appare subito dopo la risposta).
   await expect(page.locator('#mgSmDenied')).toBeVisible({ timeout: 5000 });
   await expect(page.locator('#mgSmEditor')).toBeHidden();
+});
+
+// ── Conversazione completa del feedback + iter di lavorazione ──────────────
+// Il dettaglio deve mostrare TUTTI i commenti: la segnalazione, il commento
+// dell'owner alla revisione, i report delle istanze che hanno lavorato e gli
+// esiti del controllo funzionalità (prima erano invisibili in dashboard).
+
+const FAKE_FB_WORKED = {
+  _id: 'test-fb-worked',
+  text: 'Il copia-incolla delle immagini non funziona.',
+  name: 'Copia-incolla immagini',
+  seq: 120, subSeq: 0,
+  clientId: 'tester@example.com',
+  createdAt: '2026-07-01T10:00:00Z',
+  images: [],
+  status: 'revision_capability',
+  branch: 'worker/test-fb-worked',
+  reviewComment: 'Approvo, ma occhio al tema scuro.',
+  reviewedAt: '2026-07-02T09:00:00Z',
+  pipeline: { filoSummary: 'Richiesta legittima di fix.', verdicts: [] },
+  notes: [
+    'Ho sistemato l\'incolla delle immagini: ora arrivano al destinatario. Decisione presa: le immagini troppo grandi vengono ridotte.',
+    '',
+    '--- La tua risposta del 05/07/2026, 10:00 ---',
+    'Sul tema scuro ancora non si vede.',
+    '',
+    "--- Aggiornamento dell'agente del 06/07/2026, 11:00 ---",
+    'Controllo funzionalità NON superato: sul tema scuro l\'anteprima resta invisibile.',
+  ].join('\n'),
+};
+
+test('il dettaglio mostra la conversazione completa: report, esito verifica e commento owner', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK_THREAD);
+
+  await page.evaluate((fb) => {
+    window.__mgTest.setData([fb]);
+    window.__mgTest.setTab('queue');
+    window.__mgTest.openDetail(fb._id);
+  }, FAKE_FB_WORKED);
+
+  const bubbles = page.locator('#mgThread .mg-bubble');
+  // 6 bolle: segnalazione, parere Filo, commento owner, report istanza,
+  // risposta owner, esito verifier.
+  await expect(bubbles).toHaveCount(6);
+
+  // La segnalazione originale.
+  await expect(bubbles.nth(0)).toContainText('copia-incolla delle immagini');
+  // Il commento dell'owner alla revisione (prima non compariva da nessuna parte).
+  await expect(bubbles.nth(2)).toContainText('Approvo, ma occhio al tema scuro.');
+  await expect(bubbles.nth(2).locator('.mg-bubble-who')).toContainText('Tu');
+  // Il report dell'istanza che ha implementato, con le decisioni prese.
+  await expect(bubbles.nth(3)).toContainText('Decisione presa');
+  // La risposta dell'owner è un turno utente separato.
+  await expect(bubbles.nth(4)).toContainText('tema scuro ancora non si vede');
+  await expect(bubbles.nth(4).locator('.mg-bubble-who')).toContainText('Tu');
+  // L'esito del verifier è visibile nella conversazione.
+  await expect(bubbles.nth(5)).toContainText('Controllo funzionalità NON superato');
+
+  // La striscia di avanzamento del dettaglio: implementazione fatta, controllo
+  // funzionalità in corso, nessuna istanza al lavoro (nessun claim vivo).
+  await expect(page.locator('#mgWorkState')).toBeVisible();
+  await expect(page.locator('#mgWorkState')).toContainText('Controllo funzionalità');
+  await expect(page.locator('#mgWorkState')).toContainText('Nessuna istanza al lavoro');
+});
+
+test('in "In coda" il feedback in lavorazione è pinnato in cima con lo stato dell\'iter', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_MANAGE_REVIEW);
+
+  await page.evaluate(() => {
+    const fbs = [
+      // todo ad alta priorità: senza pinning starebbe primo.
+      { _id: 'q-todo', text: 'todo prioritario', name: 'Todo', seq: 1, subSeq: 0,
+        status: 'todo', priority: 3, createdAt: '2026-07-08T10:00:00Z' },
+      // working con istanza ATTIVA (workingSince fresco + claim vivo).
+      { _id: 'q-working', text: 'in lavorazione', name: 'Working', seq: 2, subSeq: 0,
+        status: 'working', priority: 0,
+        workingSince: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+        claimedBy: 'vm-test', claimExpiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+        createdAt: '2026-07-01T10:00:00Z' },
+    ];
+    window.__mgTest.setData(fbs);
+    window.__mgTest.setTab('queue');
+  });
+
+  const items = page.locator('#mgList .mg-item');
+  await expect(items).toHaveCount(2);
+  // Il working è PRIMO nonostante la priorità più bassa del todo.
+  await expect(items.nth(0)).toHaveAttribute('data-id', 'q-working');
+  // La card pinnata mostra i tre passaggi dell'iter e l'istanza attiva.
+  const state = items.nth(0).locator('.mg-item-state');
+  await expect(state).toContainText('Implementazione');
+  await expect(state).toContainText('Controllo funzionalità');
+  await expect(state).toContainText('Controllo sicurezza');
+  await expect(state).toContainText("Un'istanza ci sta lavorando ora");
+  // Il todo normale non ha la riga di stato.
+  await expect(items.nth(1).locator('.mg-item-state')).toHaveCount(0);
 });

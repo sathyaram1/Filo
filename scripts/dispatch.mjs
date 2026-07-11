@@ -27,7 +27,7 @@
 // USO
 //   node scripts/dispatch.mjs                          # sceglie e stampa il JSON
 //   node scripts/dispatch.mjs --record-verifier <id> <pass|fail> ["critica"]
-//   node scripts/dispatch.mjs --record-fixed <id>
+//   node scripts/dispatch.mjs --record-fixed <id> ["report"]
 //   node scripts/dispatch.mjs --record-secaudit <id> <pass|fail>
 //   node scripts/dispatch.mjs --clear-state <id>
 //
@@ -302,7 +302,25 @@ function tryGit(args) {
 
 function diffForBranch(branch) {
   if (!branch) return '';
-  const r = tryGit(['diff', `${MAIN_BRANCH}...${branch}`]);
+  // La base del confronto DEVE essere lo stato REMOTO di main. In cloud il clone
+  // è shallow e il ref locale `main` non viene mai aggiornato (l'orchestratore fa
+  // `pull --rebase origin main` sul branch driver `claude/*`, non fa avanzare il
+  // ref `main`), quindi un `git diff main...branch` userebbe un main vecchio di
+  // decine di versioni: il diff si gonfia con modifiche GIÀ in main e fa scattare
+  // falsi positivi L5/secaudit (file sensibili "toccati" che in realtà erano già
+  // su main). merge-gate.mjs infatti fetcha origin e confronta con origin/target;
+  // qui allineiamo la stessa logica per il diff che alimenta il secaudit.
+  tryGit(['fetch', 'origin', MAIN_BRANCH]);
+  const base = tryGit(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${MAIN_BRANCH}`]).ok
+    ? `origin/${MAIN_BRANCH}`
+    : MAIN_BRANCH;
+  // Il branch può esistere solo su origin (worker/* pushato ma non in locale).
+  const ref = tryGit(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`]).ok
+    ? branch
+    : (tryGit(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${branch}`]).ok
+        ? `origin/${branch}`
+        : branch);
+  const r = tryGit(['diff', `${base}...${ref}`]);
   return r.ok ? r.out : '';
 }
 
@@ -377,22 +395,43 @@ function queueStatus(id, status, note = '', reason = '') {
   } catch (_) { /* best-effort */ }
 }
 
+/**
+ * Nota per la chat del feedback con l'esito del verifier. PURA (testata in
+ * tests/unit/dispatch.test.mjs). Prima l'esito viveva SOLO nel file di stato su
+ * git e l'owner non lo vedeva mai in dashboard: ora ogni verdetto (pass e fail)
+ * finisce nelle note, così la conversazione del feedback racconta l'intero iter.
+ */
+export function verifierNoteText(verdict, critique = '') {
+  // Il ruolo scrive la critica come "PASS — …"/"FAIL — …": il prefisso è
+  // ridondante col nostro incipit, toglilo (resta solo la sostanza).
+  const c = String(critique || '').trim().replace(/^(PASS|FAIL)\s*[—–:\-]\s*/i, '').slice(0, 4000);
+  if (verdict === 'pass') {
+    return c ? `Controllo funzionalità superato. ${c}` : 'Controllo funzionalità superato.';
+  }
+  return c ? `Controllo funzionalità NON superato: ${c}` : 'Controllo funzionalità NON superato.';
+}
+
 function recordVerifier(id, verdict, critique) {
   const next = applyVerifierVerdict({ ...defaultState(id, ''), ...(readState(id) || {}), id }, verdict, critique);
   next.id = id;
   writeState(next);
   // PASS → aspetta l'audit di sicurezza; FAIL → resta/torna in verifica fix
   // (il caso 3° FAIL → design lo gestisce il giro dopo: chooseBucket →
-  // blocked-loop). Idempotente se lo status è già quello.
-  queueStatus(id, verdict === 'pass' ? 'revision_security' : 'revision_capability');
+  // blocked-loop). Idempotente se lo status è già quello. La nota con l'esito
+  // va nella chat del feedback (apply-triage la appende come turno, senza
+  // sovrascrivere lo storico).
+  queueStatus(id, verdict === 'pass' ? 'revision_security' : 'revision_capability',
+    verifierNoteText(verdict, critique));
   return next;
 }
-function recordFixed(id) {
+function recordFixed(id, report = '') {
   const next = applyFixed({ ...(readState(id) || defaultState(id, '')), id });
   next.id = id;
   writeState(next);
-  // Fix ri-applicato → torna in attesa della verifica comportamentale.
-  queueStatus(id, 'revision_capability');
+  // Fix ri-applicato → torna in attesa della verifica comportamentale. Il
+  // report del fixer (cosa ha corretto e come) va nella chat del feedback,
+  // come per verifier e new-work: senza, la correzione è invisibile all'owner.
+  queueStatus(id, 'revision_capability', String(report || ''));
   return next;
 }
 function recordSecaudit(id, verdict) {
@@ -516,9 +555,9 @@ if (isMainModule) {
       console.log(`stato ${id}: verifier=${s.verifierVerdict} loop=${s.loopCount}`);
       process.exit(0);
     } else if (flag === '--record-fixed') {
-      const id = argv[1];
-      if (!id) { console.error('Uso: --record-fixed <id>'); process.exit(1); }
-      const s = recordFixed(id);
+      const [, id, ...rest] = argv;
+      if (!id) { console.error('Uso: --record-fixed <id> ["report"]'); process.exit(1); }
+      const s = recordFixed(id, rest.join(' '));
       console.log(`stato ${id}: ri-messo in coda verifier (loop=${s.loopCount})`);
       process.exit(0);
     } else if (flag === '--record-secaudit') {

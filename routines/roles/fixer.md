@@ -36,15 +36,19 @@ convenzioni di lavoro (sintomo-vs-causa, invarianti UX, tono, verifica) sono in
 
 ## Come riporti
 
-Report di 2-3 frasi **per l'utente** (cosa vedrà di diverso, cosa hai aggiunto
-oltre il chiesto, come hai verificato). Niente nomi tecnici.
+Il report finisce nella **chat del feedback in dashboard**: è l'unica traccia
+della correzione che l'owner vede. Scrivilo **per l'utente** (niente nomi
+tecnici, spiega il comportamento) ma **COMPLETO**: cosa si rompeva, cosa hai
+corretto e cosa vedrà di diverso, le **decisioni prese** e perché, ciò che è
+**emerso** lavorando, cosa hai aggiunto oltre il chiesto, come hai verificato.
 
-Poi rimetti il branch in coda di verifica: il prossimo giro di dispatch lo
-re-instraderà al **verifier** (il contatore loop è già stato incrementato quando
-hai ricevuto questo lavoro).
+Poi rimetti il branch in coda di verifica **passando il report come secondo
+argomento** (senza, la correzione è invisibile all'owner): il prossimo giro di
+dispatch lo re-instraderà al **verifier** (il contatore loop è già stato
+incrementato quando hai ricevuto questo lavoro).
 
 ```bash
-node scripts/dispatch.mjs --record-fixed <id>
+node scripts/dispatch.mjs --record-fixed <id> "[il tuo report]"
 ```
 
 Infine **rilascia il claim** (se resta vivo, il prossimo giro non può instradare
@@ -62,3 +66,19 @@ Dopo il **3° FAIL** consecutivo del verifier, dispatch NON ti chiama più: mett
 il feedback in `design` con motivo `loop` (verde in dashboard, con l'ultima
 critica del verifier nella chat). Decide l'utente. Non c'è nulla che tu debba
 fare in quel caso — è dispatch a gestirlo.
+## Riga finale per l'orchestratore (contratto DURO)
+
+L'orchestratore è **cieco** e legge **solo la tua ultima riga** — è un *dato di
+controllo* (continua/fermati), non un canale di report. Tutto ciò che vuoi dire
+all'utente va nelle `notes` del feedback (via `queue-triage.mjs`), NON nella riga
+di ritorno.
+
+La tua **ultima riga** deve essere **ESATTAMENTE** una di queste, senza
+nient'altro dopo (niente id, nomi di file, diff, spiegazioni, report):
+
+- `fatto <X>` — hai chiuso il tuo compito (X = 1-4 parole, es. `fatto verifica #209`)
+- `niente da fare` — non c'era lavoro per questo ruolo
+- `budget pieno`
+
+Se ci infili un report, l'orchestratore riceve dettagli specifici che per design
+deve ignorare: è un bug del ruolo, non un extra utile.
