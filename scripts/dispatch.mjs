@@ -568,6 +568,7 @@ function recordSecaudit(id, verdict) {
   const next = applySecaudit({ ...(readState(id) || defaultState(id, '')), id }, verdict);
   next.id = id;
   writeState(next);
+  persistStateToGit(id, `feedback: secaudit ${verdict} ${id}`);
   return next;
 }
 
