@@ -79,7 +79,10 @@ function readPrivKey() {
   return null;
 }
 
-const PLACEHOLDER = '[cifrato — chiave privata non configurata]';
+// Esportato: i chiamanti (dispatch/next-feedback) lo usano per DISTINGUERE
+// "campo davvero con questo valore" da "campo illeggibile per chiave assente"
+// — senza distinzione, una chiave mancante fa sembrare vuota una coda piena.
+export const PLACEHOLDER = '[cifrato — chiave privata non configurata]';
 
 /**
  * Decifra i campi sensibili di un oggetto feedback.
