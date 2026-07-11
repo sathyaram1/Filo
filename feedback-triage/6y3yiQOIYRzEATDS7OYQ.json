@@ -1,0 +1,7 @@
+{
+  "id": "6y3yiQOIYRzEATDS7OYQ",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la modifica è stata pubblicata. Ho verificato in particolare che la nuova conversazione a bolle nella dashboard non possa essere sfruttata da contenuti malevoli (tutto il testo mostrato viene neutralizzato e gli allegati accettano solo indirizzi web normali, niente link eseguibili), e che le modifiche al flusso di lavorazione si limitino a rendere visibili i report delle istanze senza toccare i controlli di sicurezza esistenti. Nessuna osservazione: la troverai attiva dal prossimo aggiornamento.",
+  "queuedAt": "2026-07-11T00:23:47.584Z",
+  "queuedBy": "routine"
+}
