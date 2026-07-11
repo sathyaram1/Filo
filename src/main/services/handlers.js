@@ -331,6 +331,9 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, si
           attempts, messages, signal,
           onDelta: (d) => { acc += d; },
           onReasoning: (t) => { try { onReasoning(t); } catch (_) {} },
+          // Provider caduto a metà stream → il buffer contiene testo parziale
+          // del tentativo fallito: azzeralo prima del tentativo successivo (#273).
+          onReset: () => { acc = ''; },
         });
         return { ...r, text: r.text != null ? r.text : acc };
       })()
