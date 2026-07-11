@@ -146,6 +146,14 @@
     // (#210.4). { amount } → la home mostra un popup una volta sola.
     GIFT_NOTICE: 'gift_notice',
     CAPTURE_VISIBLE_TAB: 'capture_visible_tab',
+    // "Salva immagine come…" dal menu contestuale. Instradato dal main
+    // (session download + will-download) perché l'attributo `download` di un
+    // <a> lato pagina è onorato da Chromium SOLO per URL same-origin/blob:/
+    // data:: per un'immagine su un altro dominio (la stragrande maggioranza)
+    // veniva ignorato e la scheda NAVIGAVA sull'immagine senza scaricare nulla
+    // (#274). { url } → { ok, path?, filename? } | { ok:false, cancelled?, error? }
+    // (la risposta arriva a download concluso/annullato).
+    DOWNLOAD_IMAGE: 'download_image',
     // Test provider: misura latenza al primo token e token al secondo
     // su un piccolo prompt fisso. Usato dalla pagina Opzioni.
     TEST_PROVIDER: 'test_provider',                 // { provider, apiKey, model? }
