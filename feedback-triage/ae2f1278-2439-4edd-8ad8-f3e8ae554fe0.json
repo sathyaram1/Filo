@@ -1,7 +1,0 @@
-{
-  "id": "ae2f1278-2439-4edd-8ad8-f3e8ae554fe0",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica non tocca file protetti, non introduce input non controllati e resta nel perimetro del problema segnalato. È stata pubblicata e arriverà con il prossimo aggiornamento automatico. In pratica: quando il servizio AI si interrompe a metà risposta e Filo riparte con quello di riserva, la risposta che vedi ora è solo quella pulita del servizio che riesce, senza il pezzo troncato del tentativo fallito incollato davanti.",
-  "queuedAt": "2026-07-11T12:41:28.944Z",
-  "queuedBy": "routine"
-}
