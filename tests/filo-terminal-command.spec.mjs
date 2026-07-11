@@ -12,6 +12,7 @@
 //   • il livello è deciso dal main sul comando effettivo, mai dall'LLM.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { CONFIRM_HOST, confirmState, clickConfirm, fillConfirmInput } from './helpers/confirm.mjs';
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -140,13 +141,12 @@ test('UI livello 3: digitando "conferma" il comando esegue e l’output compare 
   await expect(btn).toContainText('echo confermato');
   await btn.click();
 
-  const overlay = page.locator('.sn-confirm-overlay');
-  await expect(overlay).toBeVisible();
-  const ok = overlay.locator('.sn-confirm-btn-danger');
-  await expect(ok).toBeDisabled();           // bloccato finché non si digita "conferma"
-  await overlay.locator('.sn-confirm-input').fill('conferma');
-  await expect(ok).toBeEnabled();
-  await ok.click();
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible();
+  // bloccato finché non si digita "conferma"
+  await expect.poll(async () => (await confirmState(page)).okDisabled).toBe(true);
+  await fillConfirmInput(page, 'conferma');
+  await expect.poll(async () => (await confirmState(page)).okDisabled).toBe(false);
+  await clickConfirm(page, 'danger');
 
   // Successo: l'output del comando appena eseguito compare nella bolla.
   await expect(page.locator('#test-actions .dash-cmd-output')).toContainText('confermato');

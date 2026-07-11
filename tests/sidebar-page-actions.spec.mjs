@@ -14,6 +14,7 @@
 // window.open / SN_ACTIONS nello stesso mondo del content script.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { CONFIRM_HOST, clickConfirm } from './helpers/confirm.mjs';
 
 const NEWTAB = 'filo://newtab/';
 
@@ -83,7 +84,7 @@ test('testo: copia è immediata (niente conferma) e copia il testo indicato', as
   expect(ok).toBe(true);
   expect(await page.evaluate(() => window.__calls.copy)).toEqual(['frase da copiare']);
   // Nessun popup di conferma per un'azione locale.
-  await expect(page.locator('.sn-confirm-overlay')).toHaveCount(0);
+  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
   await expect(page.locator('.sn-sidebar-log').last()).toContainText('fatto');
 });
 
@@ -101,18 +102,18 @@ test('testo: cerca sul web chiede conferma; Annulla non cerca, OK apre la ricerc
 
   // 1) Annulla → nessuna ricerca.
   await page.evaluate(() => { window.__filoSidebarTest.runPageAction({ op: 'search_text', text: 'gatti buffi' }); });
-  const overlay = page.locator('.sn-confirm-overlay');
-  await expect(overlay).toBeVisible();
-  await overlay.locator('.sn-confirm-btn-cancel').click();
-  await expect(overlay).toHaveCount(0);
+  const host = page.locator(CONFIRM_HOST);
+  await expect(host).toBeVisible();
+  await clickConfirm(page, 'cancel');
+  await expect(host).toHaveCount(0);
   expect(await page.evaluate(() => window.__opened.length)).toBe(0);
   await expect(page.locator('.sn-sidebar-log').last()).toContainText('annullata');
 
   // 2) OK → apre la ricerca Google con il testo.
   await page.evaluate(() => { window.__filoSidebarTest.runPageAction({ op: 'search_text', text: 'gatti buffi' }); });
-  await expect(overlay).toBeVisible();
-  await overlay.locator('.sn-confirm-btn-ok').click();
-  await expect(overlay).toHaveCount(0);
+  await expect(host).toBeVisible();
+  await clickConfirm(page, 'ok');
+  await expect(host).toHaveCount(0);
   await expect.poll(() => page.evaluate(() => window.__opened.length)).toBe(1);
   const url = await page.evaluate(() => window.__opened[0]);
   expect(url).toContain('google.com/search');
@@ -123,9 +124,8 @@ test('immagine: cerca immagine risolve il selettore, chiede conferma e apre Lens
   const page = await openTab(NEWTAB);
   await prep(page);
   await page.evaluate(() => { window.__filoSidebarTest.runPageAction({ op: 'search_image', selector: '#pic' }); });
-  const overlay = page.locator('.sn-confirm-overlay');
-  await expect(overlay).toBeVisible();
-  await overlay.locator('.sn-confirm-btn-ok').click();
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible();
+  await clickConfirm(page, 'ok');
   await expect.poll(() => page.evaluate(() => window.__opened.length)).toBe(1);
   const url = await page.evaluate(() => window.__opened[0]);
   expect(url).toContain('lens.google.com');
@@ -138,7 +138,7 @@ test('immagine: salva immagine è immediata e agisce sull\'immagine indicata', a
   const ok = await page.evaluate(() => window.__filoSidebarTest.runPageAction({ op: 'save_image', selector: '#pic' }));
   expect(ok).toBe(true);
   expect(await page.evaluate(() => window.__calls.download)).toEqual(['https://example.com/cat.png']);
-  await expect(page.locator('.sn-confirm-overlay')).toHaveCount(0);
+  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
 });
 
 test('link: copia link risolve il selettore e copia l\'href', async ({ openTab }) => {
@@ -156,7 +156,7 @@ test('link: salva link per dopo è immediato e salva l\'href indicato', async ({
   expect(ok).toBe(true);
   expect(await page.evaluate(() => window.__calls.saveLink)).toEqual(['https://example.com/article']);
   // "Salva per dopo" è locale: nessun popup di conferma.
-  await expect(page.locator('.sn-confirm-overlay')).toHaveCount(0);
+  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
   await expect(page.locator('.sn-sidebar-log').last()).toContainText('fatto');
 });
 
@@ -164,9 +164,8 @@ test('link: condividi link chiede conferma; OK invoca la condivisione sull\'href
   const page = await openTab(NEWTAB);
   await prep(page);
   await page.evaluate(() => { window.__filoSidebarTest.runPageAction({ op: 'share_link', selector: '#lnk' }); });
-  const overlay = page.locator('.sn-confirm-overlay');
-  await expect(overlay).toBeVisible();
-  await overlay.locator('.sn-confirm-btn-ok').click();
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible();
+  await clickConfirm(page, 'ok');
   await expect.poll(() => page.evaluate(() => window.__calls.shareLink.length)).toBe(1);
   expect(await page.evaluate(() => window.__calls.shareLink[0])).toBe('https://example.com/article');
 });

@@ -8,6 +8,7 @@
 // trattato come comando shell/sconosciuto e nessuna conferma comparirebbe.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { CONFIRM_HOST, confirmState } from './helpers/confirm.mjs';
 
 const NEWTAB = 'filo://newtab/';
 
@@ -32,8 +33,8 @@ test('"/pulisci" è un comando Filo e apre la conferma di riordino delle schede'
 
   // All'invio compare il popup di conferma Filo del riordino.
   await submit(page, '/pulisci');
-  await expect(page.locator('.sn-confirm-overlay')).toBeVisible({ timeout: 8_000 });
-  await expect(page.locator('.sn-confirm-title')).toHaveText('Riordino delle schede');
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 8_000 });
+  await expect.poll(async () => (await confirmState(page)).title).toBe('Riordino delle schede');
 });
 
 test('"/pulizia" è un alias dello stesso comando', async ({ openTab }) => {
@@ -43,5 +44,5 @@ test('"/pulizia" è un alias dello stesso comando', async ({ openTab }) => {
   await input.fill('/pulizia');
   await expect(input).toHaveClass(/is-cmd-filo/);
   await submit(page, '/pulizia');
-  await expect(page.locator('.sn-confirm-overlay')).toBeVisible({ timeout: 8_000 });
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 8_000 });
 });
