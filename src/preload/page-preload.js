@@ -138,6 +138,9 @@ const chromeShim = {
           const requestId = `s${Date.now()}_${++streamCounter}`;
           const offMeta = (_e, data) => onMessage && onMessage({ type: 'meta', ...data });
           const offDelta = (_e, data) => onMessage && onMessage({ type: 'delta', delta: data.delta });
+          // reset = provider caduto a metà stream, il main riparte col fallback:
+          // il consumer deve buttare i delta accumulati finora (#273).
+          const offReset = () => onMessage && onMessage({ type: 'reset' });
           const offDone = (_e, data) => {
             cleanup();
             if (onMessage) onMessage({ type: 'done', ...data });
