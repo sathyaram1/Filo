@@ -634,6 +634,11 @@
               el.querySelector('.sn-menu-link-body')?.remove();
               txt.className = 'sn-menu-link-body';
               el.appendChild(txt);
+            } else if (m.type === 'reset') {
+              // Provider caduto a metà risposta, si riparte col fallback:
+              // butta il testo parziale (l'avviso sicurezza resta).
+              buf = '';
+              el.querySelector('.sn-menu-link-body')?.remove();
             } else if (m.type === 'error') {
               el.classList.remove('sn-menu-inline-loading');
               el.classList.add('sn-menu-inline-error');
