@@ -9,16 +9,26 @@
 //     finché l'utente non digita espressamente la parola ("conferma").
 //
 // Esc o click fuori dal box = annulla. Una sola conferma alla volta.
+//
+// SICUREZZA (#249): il dialogo vive in uno Shadow DOM in modalità CLOSED,
+// agganciato a un host neutro (.sn-confirm-host). Il DOM del documento è
+// condiviso tra il mondo isolato del preload (dove gira questo codice sulle
+// pagine web esterne) e il mondo principale della pagina: senza shadow root
+// chiuso, uno script ostile della pagina poteva trovare il bottone OK via
+// querySelector/MutationObserver e auto-cliccarlo, confermando azioni di
+// livello 2 senza alcun consenso reale. Con lo shadow root chiuso i nodi
+// interni (bottoni, testo, input) NON sono raggiungibili da fuori: la pagina
+// vede solo l'host vuoto. Il riferimento al root resta privato di questo
+// modulo (e degli hook _test, che sulle pagine esterne vivono anch'essi nel
+// mondo isolato, quindi fuori dalla portata della pagina).
 
 (function (global) {
   'use strict';
 
-  const STYLE_ID = 'sn-confirm-ui-style';
   const CSS = `
 .sn-confirm-overlay {
   position: fixed;
   inset: 0;
-  z-index: 2147483647;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -99,31 +109,40 @@
 }
 `;
 
-  function ensureStyle(doc) {
-    if (doc.getElementById(STYLE_ID)) return;
-    const el = doc.createElement('style');
-    el.id = STYLE_ID;
-    el.textContent = CSS;
-    (doc.head || doc.documentElement).appendChild(el);
-  }
+  // Dialogo attivo (uno alla volta): il root CHIUSO è raggiungibile solo da
+  // questo modulo. `active` serve a done() e agli hook di test qui sotto.
+  let active = null; // { host, root }
 
-  // Costruisce overlay+box e ritorna { overlay, box, done } dove done(result)
-  // smonta tutto e risolve la Promise una sola volta.
+  // Costruisce host+shadow(closed)+overlay+box e ritorna { overlay, box, done }
+  // dove done(result) smonta tutto e risolve la Promise una sola volta.
   function buildOverlay(resolve) {
     const doc = global.document;
-    ensureStyle(doc);
+
+    // L'host è l'UNICO nodo visibile dal documento: nessun contenuto, solo il
+    // posizionamento a tutto viewport (inline, così non serve CSS nel documento).
+    const host = doc.createElement('div');
+    host.className = 'sn-confirm-host';
+    host.style.cssText = 'position:fixed;inset:0;z-index:2147483647;';
+
+    const root = host.attachShadow({ mode: 'closed' });
+    const style = doc.createElement('style');
+    style.textContent = CSS;
+    root.appendChild(style);
+
     const overlay = doc.createElement('div');
     overlay.className = 'sn-confirm-overlay';
     const box = doc.createElement('div');
     box.className = 'sn-confirm-box';
     overlay.appendChild(box);
+    root.appendChild(overlay);
 
     let settled = false;
     function done(result) {
       if (settled) return;
       settled = true;
       doc.removeEventListener('keydown', onKey, true);
-      overlay.remove();
+      host.remove();
+      if (active && active.root === root) active = null;
       resolve(result);
     }
     function onKey(e) {
@@ -132,7 +151,8 @@
     doc.addEventListener('keydown', onKey, true);
     overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) done(false); });
 
-    doc.body.appendChild(overlay);
+    doc.body.appendChild(host);
+    active = { host, root };
     return { overlay, box, done };
   }
 
@@ -225,5 +245,44 @@
     });
   }
 
-  global.SN_CONFIRM_UI = { confirm, confirmTyped, notify };
+  // ── Hook di TEST (tests/helpers/confirm.mjs) ─────────────────────────────
+  // Il root chiuso rende il dialogo invisibile ai locator Playwright: gli spec
+  // sulle pagine filo:// (contextIsolation:false) passano da qui via
+  // page.evaluate. Sulle pagine web esterne SN_CONFIRM_UI vive nel mondo
+  // isolato del preload: la pagina NON può chiamare questi hook, quindi non
+  // riaprono la falla del feedback #249.
+  const _test = {
+    // Stato del dialogo aperto, o null se non ce n'è uno.
+    state() {
+      if (!active) return null;
+      const q = (s) => active.root.querySelector(s);
+      const okBtn = q('.sn-confirm-btn-ok') || q('.sn-confirm-btn-danger');
+      return {
+        title: (q('.sn-confirm-title') && q('.sn-confirm-title').textContent) || '',
+        text: (q('.sn-confirm-text') && q('.sn-confirm-text').textContent) || '',
+        okDisabled: !!(okBtn && okBtn.disabled),
+        hasInput: !!q('.sn-confirm-input'),
+      };
+    },
+    // Clicca un bottone: which = 'ok' | 'cancel' | 'danger'.
+    // Ritorna false se non c'è dialogo, bottone assente o disabilitato.
+    click(which) {
+      if (!active) return false;
+      const btn = active.root.querySelector('.sn-confirm-btn-' + which);
+      if (!btn || btn.disabled) return false;
+      btn.click();
+      return true;
+    },
+    // Scrive nel campo del dialogo livello 3 (dispatch dell'evento input).
+    fill(value) {
+      if (!active) return false;
+      const input = active.root.querySelector('.sn-confirm-input');
+      if (!input) return false;
+      input.value = String(value);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      return true;
+    },
+  };
+
+  global.SN_CONFIRM_UI = { confirm, confirmTyped, notify, _test };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
