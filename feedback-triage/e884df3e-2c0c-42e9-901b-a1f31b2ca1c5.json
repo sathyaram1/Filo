@@ -1,7 +1,0 @@
-{
-  "id": "e884df3e-2c0c-42e9-901b-a1f31b2ca1c5",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho riprodotto esattamente l'attacco descritto: uno script della pagina che spia la comparsa del popup di conferma di Filo e preme OK da solo, senza che tu tocchi nulla. Ora il contenuto del popup vive in un contenitore sigillato invisibile alla pagina: lo script ostile non trova più i bottoni e non può cliccarli, e una ricerca dei bottoni dalla pagina non restituisce nulla. Ho verificato che il test non sia 'a vuoto': togliendo temporaneamente il sigillo i due test d'attacco tornano a riuscire (il bypass funziona di nuovo), rimettendolo falliscono — quindi il test difende davvero la feature. Stress test: la pagina non riesce a raggiungere il contenuto sigillato né leggendo la proprietà del contenitore né scorrendo i figli dell'involucro (che nel documento è vuoto); aperture e chiusure ripetute con Esc non lasciano popup residui. Ho controllato anche lo scenario reale: sulle pagine web esterne il codice del popup gira in un mondo isolato, quindi persino una pagina che manomette il meccanismo di sigillatura non riesce a forzarlo. Infine ho eseguito tutti i 52 flussi dell'app che passano dal popup di conferma (invio feedback dalla sidebar, comandi da terminale di livello 2 e livello 3 con parola da digitare, eliminazione mazzi, reset preferenze, avviso crediti in regalo): tutti verdi, aspetto invariato.",
-  "queuedAt": "2026-07-11T06:41:01.773Z",
-  "queuedBy": "routine"
-}
