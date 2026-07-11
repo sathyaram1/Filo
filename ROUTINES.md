@@ -129,14 +129,27 @@ Ripeti finché il budget è quasi pieno:
 2. **Spawna UN worker generico** (tool Agent, `subagent_type: general-purpose`,
    `model: "fable"` — vedi § Sequenziale) con un prompt minimo:
 
-   > «Esegui `node scripts/dispatch.mjs`. Ti stampa un JSON
-   > `{ role, payload, claim, loopCount, instructions }`. Diventa quel ruolo:
-   > le `instructions` sono il tuo file-ruolo, il `payload` è ciò su cui lavori.
-   > Esegui il compito fino in fondo (report per l'utente → nelle `notes` del
-   > feedback su Firestore, NON a me). **La tua ULTIMA riga è l'UNICA cosa che
-   > leggo, e deve essere ESATTAMENTE una di queste, senza nient'altro dopo:**
-   > `fatto <X>` | `niente da fare` | `budget pieno`. Niente report, diff, id,
-   > nomi di file o spiegazioni nella riga finale: io sono cieco per design.»
+   > «Esporta SUBITO nell'ambiente la chiave che ti incollo qui sotto, e
+   > prefissala a OGNI invocazione degli script di routine:
+   > `FILO_FEEDBACK_PRIVKEY=<chiave> node scripts/dispatch.mjs`. Ti stampa un
+   > JSON `{ role, payload, claim, loopCount, instructions }`. Diventa quel
+   > ruolo: le `instructions` sono il tuo file-ruolo, il `payload` è ciò su cui
+   > lavori. Esegui il compito fino in fondo (report per l'utente → nelle
+   > `notes` del feedback su Firestore, NON a me). **La tua ULTIMA riga è
+   > l'UNICA cosa che leggo, e deve essere ESATTAMENTE una di queste, senza
+   > nient'altro dopo:** `fatto <X>` | `niente da fare` | `budget pieno`.
+   > Niente report, diff, id, nomi di file o spiegazioni nella riga finale: io
+   > sono cieco per design.»
+
+   ⚠️ **La chiave è OBBLIGATORIA in ogni invocazione** (incident 2026-07-09/11,
+   feedback #310+): arriva all'orchestratore nel prompt della schedulazione e va
+   passata a OGNI worker, che la mette in `FILO_FEEDBACK_PRIVKEY` per OGNI
+   comando `node scripts/…` (dispatch, next-feedback, queue-*). Senza, gli
+   status cifrati non si leggono e la coda piena "sembra vuota": il giro finisce
+   in audit invece di lavorare i feedback. Attenzione ai passaggi che PERDONO
+   l'ambiente (`su tester -c`, nuove shell): lì la chiave va ri-prefissata
+   esplicitamente. Il sintomo nei log è `ATTENZIONE: N/N status non
+   decifrabili`.
 
    **Perché conta** (sessione 2026-07-09): i worker hanno restituito report interi
    invece della riga secca → l'orchestratore ha ricevuto dettagli specifici che
