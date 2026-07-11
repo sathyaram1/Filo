@@ -1,7 +1,7 @@
 {
   "id": "6dfbad8d-29a7-43df-861f-b7eb08c3e7b9",
-  "status": "working",
-  "notes": "",
-  "queuedAt": "2026-07-11T00:24:58.493Z",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho verificato l'import/export dei mazzi partendo da zero, come lo userebbe un utente. Import dal menu del mazzo: incollata una lista in formato standard (una carta per riga, es. '1 Sol Ring'), l'anteprima conta correttamente le carte riconosciute, distingue le righe illeggibili dalle carte non trovate su Scryfall (elencate entrambe prima di scrivere qualsiasi cosa) e la conferma inserisce davvero le carte nel mazzo con le quantità giuste; il contatore e le statistiche si aggiornano. Export: genera la stessa lista testuale, pronta da copiare, e un mazzo vuoto esporta senza errori. Import via chat: la lista incollata produce la bolla di conferma con le carte risolte, il click sul commander candidato lo imposta davvero come commander (senza duplicarlo tra le carte normali, senza sovrascrivere un commander esistente) e 'Aggiungi tutte' completa l'import con le quantità reali. Stress test miei, oltre ai test già presenti: markup ostile (script e tag HTML) nelle righe della lista resta testo innocuo, niente si esegue; input vuoto o di soli spazi non fa nulla e non blocca la finestra; una lista di 3000 righe (~40KB) viene analizzata in un paio di secondi con tutte le 2999 righe sporche segnalate; re-importare la stessa lista aggiorna le quantità invece di creare doppioni. Tutta la batteria di test dell'app Mazzi (29 scenari) e gli 893 test di logica pura passano; changelog e manifesto delle capacità includono l'import/export. Ho salvato gli screenshot dell'anteprima e del post-import come traccia. Unica osservazione, non bloccante e accodata come suggerimento: due micro-sgrammaticature nei messaggi (es. 'Importate 1 carta' e '2 riga/righe non riconosciute').",
+  "queuedAt": "2026-07-11T18:16:48.612Z",
   "queuedBy": "routine"
 }
