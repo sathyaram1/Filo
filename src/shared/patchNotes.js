@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.124', date: '2026-07-11',
+      features: [],
+      fixes: [
+        'Se il servizio AI si interrompe a metà risposta (spiegazioni, traduzioni, spiegazione link), Filo ora riparte da zero con quello di riserva: niente più risposte "incollate" con un pezzo troncato seguito dalla risposta completa.',
+      ],
+    },
+    {
       version: '0.2.123', date: '2026-07-11',
       features: [],
       fixes: [

@@ -138,6 +138,9 @@ const chromeShim = {
           const requestId = `s${Date.now()}_${++streamCounter}`;
           const offMeta = (_e, data) => onMessage && onMessage({ type: 'meta', ...data });
           const offDelta = (_e, data) => onMessage && onMessage({ type: 'delta', delta: data.delta });
+          // reset = provider caduto a metà stream, il main riparte col fallback:
+          // il consumer deve buttare i delta accumulati finora (#273).
+          const offReset = () => onMessage && onMessage({ type: 'reset' });
           const offDone = (_e, data) => {
             cleanup();
             if (onMessage) onMessage({ type: 'done', ...data });
@@ -151,11 +154,13 @@ const chromeShim = {
           const cleanup = () => {
             ipcRenderer.removeListener(`ai-stream:${requestId}:meta`, offMeta);
             ipcRenderer.removeListener(`ai-stream:${requestId}:delta`, offDelta);
+            ipcRenderer.removeListener(`ai-stream:${requestId}:reset`, offReset);
             ipcRenderer.removeListener(`ai-stream:${requestId}:done`, offDone);
             ipcRenderer.removeListener(`ai-stream:${requestId}:error`, offError);
           };
           ipcRenderer.on(`ai-stream:${requestId}:meta`, offMeta);
           ipcRenderer.on(`ai-stream:${requestId}:delta`, offDelta);
+          ipcRenderer.on(`ai-stream:${requestId}:reset`, offReset);
           ipcRenderer.on(`ai-stream:${requestId}:done`, offDone);
           ipcRenderer.on(`ai-stream:${requestId}:error`, offError);
           ipcRenderer.invoke('ai-stream:start', { requestId, action: msg.action, payload: msg.payload });

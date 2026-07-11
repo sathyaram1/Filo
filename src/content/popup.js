@@ -531,6 +531,17 @@
         buf += m.delta;
         bubble.text.innerHTML = renderMarkdown(resolveCalcMarkers(buf));
         popup.bodyEl.scrollTop = popup.bodyEl.scrollHeight;
+      } else if (m.type === 'reset') {
+        // Il provider è caduto a metà risposta e il sistema riparte da zero su
+        // un fallback: butta il testo parziale e torna allo stato "in attesa",
+        // così il messaggio finale è SOLO la risposta del provider che riesce.
+        buf = '';
+        firstDelta = true;
+        bubble.text.innerHTML = '';
+        const retry = document.createElement('span');
+        retry.className = 'sn-msg-loading';
+        retry.textContent = I18n.t('popup_loading');
+        bubble.text.appendChild(retry);
       } else if (m.type === 'done') {
         if (firstDelta) {
           // nessun delta arrivato (es. cache vuota errore)
