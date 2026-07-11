@@ -544,13 +544,22 @@
     const card = cardsById[id];
     const name = card ? card.name : id;
     const mana = card ? manaHtml(card.manaCost) : '';
-    const added = inDeck(id);
+    // Il commander conta come "già nel mazzo" (§8.4: è un parametro del mazzo,
+    // non una riga dell'elenco — ma nel mazzo c'è eccome, come in renderDetailCtx).
+    const isCmd = id === current.commander;
+    const added = inDeck(id) || isCmd;
     const q = Number(qty) > 1 ? Number(qty) : 0;
+    const title = isCmd
+      ? 'Commander del mazzo (per cambiarlo: tasto destro su una carta del mazzo)'
+      : (added ? 'Rimuovi dal mazzo' : 'Aggiungi al mazzo');
+    const aria = isCmd
+      ? `${esc(name)} è il commander del mazzo`
+      : (added ? `Rimuovi ${esc(name)} dal mazzo` : `Aggiungi ${esc(name)} al mazzo`);
     return `
       <div class="dk-row" data-card-id="${esc(id)}">
         <button class="dk-add" data-add="${esc(id)}" data-qty="${q || 1}" data-in="${added ? 1 : 0}"
-                title="${added ? 'Rimuovi dal mazzo' : 'Aggiungi al mazzo'}"
-                aria-label="${added ? `Rimuovi ${esc(name)} dal mazzo` : `Aggiungi ${esc(name)} al mazzo`}">${added ? '✓' : '+'}</button>
+                title="${title}"
+                aria-label="${aria}">${added ? '✓' : '+'}</button>
         <span class="dk-row-name">${q ? `<span class="dk-row-qty">${q}×</span> ` : ''}${esc(name)}</span>
         <span class="dk-row-mana">${mana}</span>
       </div>`;
