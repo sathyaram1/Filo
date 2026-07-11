@@ -147,6 +147,7 @@ const chromeShim = {
             action: msg.action, payload: msg.payload,
             onMeta: (m) => onMessage && onMessage({ type: 'meta', ...m }),
             onDelta: (delta) => onMessage && onMessage({ type: 'delta', delta }),
+            onReset: () => onMessage && onMessage({ type: 'reset' }),
             onDone: (d) => {
               if (onMessage) onMessage({ type: 'done', ...d });
               if (onDisconnect) onDisconnect();
