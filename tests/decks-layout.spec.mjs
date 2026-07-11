@@ -3,6 +3,7 @@
 // mazzo nell'header (§8.2): cambia mazzo, nuovo, duplica, budget, elimina.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { clickConfirm } from './helpers/confirm.mjs';
 
 async function newDeck(page) {
   await page.click('#newDeck');
@@ -88,7 +89,7 @@ test('switcher: budget impostato e persistito; elimina torna alla libreria', asy
   // Elimina… → conferma → si torna alla libreria, senza più il mazzo.
   await page.click('#deckName');
   await page.locator('.dk-switcher .sn-select-option', { hasText: 'Elimina' }).click();
-  await page.locator('.sn-confirm-btn-ok').click();
+  await clickConfirm(page, 'ok');
   await expect(page.locator('#screenLibrary')).toBeVisible();
   await expect(page.locator(`[data-deck-id="${deckId}"]`)).toHaveCount(0);
 });

@@ -8,6 +8,7 @@
 // predefiniti nello storage reale; le chiavi API si preservano.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { clickConfirm } from './helpers/confirm.mjs';
 
 const storedSettings = (page) =>
   page.evaluate(async () => {
@@ -42,8 +43,7 @@ test('un solo bottone riporta token, colore tab, tema e testo ai predefiniti', a
 
   // Ripristina tutto → conferma.
   await page.click('#resetAllSettings');
-  await page.waitForSelector('.sn-confirm-btn-ok');
-  await page.click('.sn-confirm-btn-ok');
+  await clickConfirm(page, 'ok');
 
   // Ogni area è tornata ai predefiniti (themeTokens svuotato, colore tab,
   // tema 'system', testo 1×), in un colpo solo.

@@ -10,6 +10,7 @@
 // livello 2 → popup di conferma con anteprima, invio solo dopo l'OK).
 
 import { test, expect } from './fixtures/electron.mjs';
+import { CONFIRM_HOST, confirmText, clickConfirm } from './helpers/confirm.mjs';
 
 const NEWTAB = 'filo://newtab/';
 
@@ -65,19 +66,19 @@ test('dalla sidebar: il popup di conferma compare; Annulla NON invia; OK invia d
 
   // 1) Annulla → nessun invio.
   await page.evaluate((a) => { window.__filoSidebarTest.runFiloAction(a); }, action);
-  const overlay = page.locator('.sn-confirm-overlay');
-  await expect(overlay).toBeVisible();
-  await expect(overlay).toContainText('feedback');
-  await overlay.locator('.sn-confirm-btn-cancel').click();
-  await expect(overlay).toHaveCount(0);
+  const host = page.locator(CONFIRM_HOST);
+  await expect(host).toBeVisible();
+  await expect.poll(() => confirmText(page)).toContain('feedback');
+  await clickConfirm(page, 'cancel');
+  await expect(host).toHaveCount(0);
   expect(await app.evaluate(() => globalThis.__fbCalls.length)).toBe(0);
   await expect(page.locator('.sn-sidebar-log').last()).toContainText('annullata');
 
   // 2) OK → il feedback parte davvero (lo stub registra il testo).
   await page.evaluate((a) => { window.__filoSidebarTest.runFiloAction(a); }, action);
-  await expect(overlay).toBeVisible();
-  await overlay.locator('.sn-confirm-btn-ok').click();
-  await expect(overlay).toHaveCount(0);
+  await expect(host).toBeVisible();
+  await clickConfirm(page, 'ok');
+  await expect(host).toHaveCount(0);
   await expect.poll(() => app.evaluate(() => globalThis.__fbCalls.length)).toBe(1);
   const sent = await app.evaluate(() => globalThis.__fbCalls[0]);
   expect(sent.text).toContain('schermo intero');

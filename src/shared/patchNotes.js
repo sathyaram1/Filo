@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.123', date: '2026-07-11',
+      features: [],
+      fixes: [
+        'Il popup con cui Filo ti chiede conferma per le azioni sensibili è ora blindato: gli script delle pagine web non possono più vederlo né premere "OK" al posto tuo.',
+      ],
+    },
+    {
       version: '0.2.122', date: '2026-07-11',
       features: [],
       fixes: [

@@ -10,6 +10,7 @@
 // da solo; il chip ha un'etichetta leggibile), non l'assenza di un errore.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { CONFIRM_HOST, confirmText } from './helpers/confirm.mjs';
 
 const NEWTAB = 'filo://newtab/';
 
@@ -73,9 +74,8 @@ test('#159 — un\'impostazione di livello 2 apre il popup di conferma da SOLA',
   }, action);
 
   // Il popup compare DA SOLO (nessun click sul bottone).
-  const overlay = page.locator('.sn-confirm-overlay');
-  await expect(overlay).toBeVisible({ timeout: 4_000 });
-  await expect(overlay).toContainText('Gestione cookie');
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 4_000 });
+  await expect.poll(() => confirmText(page)).toContain('Gestione cookie');
 });
 
 test('#159 — le azioni distruttive (livello 3) e i comandi NON si auto-confermano', async ({ openTab }) => {
@@ -95,5 +95,5 @@ test('#159 — le azioni distruttive (livello 3) e i comandi NON si auto-conferm
 
   // Niente popup automatico.
   await page.waitForTimeout(300);
-  await expect(page.locator('.sn-confirm-overlay')).toHaveCount(0);
+  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
 });

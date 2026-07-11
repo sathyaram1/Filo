@@ -6,6 +6,7 @@
 // dispatch (anche se arrivano già "confermate" dal client).
 
 import { test, expect } from './fixtures/electron.mjs';
+import { CONFIRM_HOST, confirmState, confirmText, clickConfirm, fillConfirmInput } from './helpers/confirm.mjs';
 
 const NEWTAB = 'filo://newtab/';
 
@@ -83,16 +84,16 @@ test('il bottone in chat apre il popup di conferma: Annulla non applica, OK appl
 
   // Annulla → nessuna modifica.
   await btn.click();
-  const overlay = page.locator('.sn-confirm-overlay');
-  await expect(overlay).toBeVisible();
-  await expect(overlay).toContainText('Modalità terminale');
-  await overlay.locator('.sn-confirm-btn-cancel').click();
-  await expect(overlay).toHaveCount(0);
+  const host = page.locator(CONFIRM_HOST);
+  await expect(host).toBeVisible();
+  await expect.poll(() => confirmText(page)).toContain('Modalità terminale');
+  await clickConfirm(page, 'cancel');
+  await expect(host).toHaveCount(0);
   expect((await getSettings(page)).terminal?.enabled || false).toBe(false);
 
   // OK → la preferenza cambia davvero.
   await btn.click();
-  await page.locator('.sn-confirm-overlay .sn-confirm-btn-ok').click();
+  await clickConfirm(page, 'ok');
   await expect.poll(async () => (await getSettings(page)).terminal?.enabled).toBe(true);
   await expect(btn).toContainText('✓');
 });
@@ -128,18 +129,18 @@ test('#183: più impostazioni di livello 2 in una risposta → i popup si aprono
     window.__filoDashActions.renderActions(host, acts, { autoConfirm: true });
   }, actions);
 
-  const overlay = page.locator('.sn-confirm-overlay');
+  const host = page.locator(CONFIRM_HOST);
 
   // Il PRIMO popup si apre DA SOLO (nessun click manuale) e spiega cosa fa + il rischio.
-  await expect(overlay).toBeVisible();
-  await expect(overlay).toContainText('Modalità terminale');
-  await expect(overlay).toContainText('shell');
-  await overlay.locator('.sn-confirm-btn-ok').click();
+  await expect(host).toBeVisible();
+  await expect.poll(() => confirmText(page)).toContain('Modalità terminale');
+  expect(await confirmText(page)).toContain('shell');
+  await clickConfirm(page, 'ok');
 
   // Chiuso il primo, si apre DA SOLO il SECONDO (sequenziale: niente stacking).
-  await expect(overlay).toContainText('Gestione cookie');
-  await overlay.locator('.sn-confirm-btn-ok').click();
-  await expect(overlay).toHaveCount(0);
+  await expect.poll(() => confirmText(page)).toContain('Gestione cookie');
+  await clickConfirm(page, 'ok');
+  await expect(host).toHaveCount(0);
 
   // Entrambe applicate davvero (asserisce il SUCCESSO, non l'assenza di errore).
   await expect.poll(async () => (await getSettings(page)).terminal?.enabled).toBe(true);
@@ -155,20 +156,19 @@ test('livello 3: il bottone resta bloccato finché non si digita "conferma"', as
       .then((r) => { window.__typedResult = r; });
   });
 
-  const overlay = page.locator('.sn-confirm-overlay');
-  const ok = overlay.locator('.sn-confirm-btn-danger');
-  const input = overlay.locator('.sn-confirm-input');
-  await expect(ok).toBeDisabled();
+  const host = page.locator(CONFIRM_HOST);
+  await expect(host).toBeVisible();
+  await expect.poll(async () => (await confirmState(page)).okDisabled).toBe(true);
 
   // Parola sbagliata → ancora bloccato.
-  await input.fill('confermo');
-  await expect(ok).toBeDisabled();
+  await fillConfirmInput(page, 'confermo');
+  await expect.poll(async () => (await confirmState(page)).okDisabled).toBe(true);
 
   // Parola giusta → si sblocca ed esegue.
-  await input.fill('conferma');
-  await expect(ok).toBeEnabled();
-  await ok.click();
-  await expect(overlay).toHaveCount(0);
+  await fillConfirmInput(page, 'conferma');
+  await expect.poll(async () => (await confirmState(page)).okDisabled).toBe(false);
+  await clickConfirm(page, 'danger');
+  await expect(host).toHaveCount(0);
   expect(await page.evaluate(() => window.__typedResult)).toBe(true);
 });
 
@@ -179,8 +179,8 @@ test('Esc annulla il popup di conferma', async ({ openTab }) => {
     window.SN_CONFIRM_UI.confirm({ text: 'Procedo?' })
       .then((r) => { window.__confirmResult = r; });
   });
-  await expect(page.locator('.sn-confirm-overlay')).toBeVisible();
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible();
   await page.keyboard.press('Escape');
-  await expect(page.locator('.sn-confirm-overlay')).toHaveCount(0);
+  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
   expect(await page.evaluate(() => window.__confirmResult)).toBe(false);
 });

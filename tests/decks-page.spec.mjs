@@ -5,6 +5,7 @@
 // contestuale. Senza l'app, il test fallisce già all'apertura di filo://decks.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { clickConfirm } from './helpers/confirm.mjs';
 
 // Rinomina il mazzo aperto nel Builder passando dallo switcher (§8.2):
 // click sul nome → "Rinomina…" → campo di modifica → Invio.
@@ -48,7 +49,7 @@ test('creare, rinominare, duplicare ed eliminare un mazzo dalla libreria', async
   // Elimina la copia (conferma nel popup di Filo, mai window.confirm nativo).
   await page.locator('[data-deck-id]', { hasText: '(copia)' }).click({ button: 'right' });
   await page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'Elimina' }).click();
-  await page.locator('.sn-confirm-btn-ok').click();
+  await clickConfirm(page, 'ok');
   await expect(page.locator('[data-deck-id]')).toHaveCount(1);
 });
 

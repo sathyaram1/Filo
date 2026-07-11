@@ -15,6 +15,7 @@
 // delle regole: vedi le note del feedback.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { CONFIRM_HOST, confirmText, clickConfirm } from './helpers/confirm.mjs';
 
 const NEWTAB = 'filo://newtab/';
 
@@ -95,11 +96,11 @@ test('il broadcast GIFT_NOTICE mostra il popup "crediti in regalo" una volta sol
   await sendNotice(50);
 
   // Compare il popup con l'importo regalato.
-  const overlay = page.locator('.sn-confirm-overlay');
-  await expect(overlay).toHaveCount(1, { timeout: 8_000 });
-  await expect(overlay).toContainText('50 crediti');
+  const host = page.locator(CONFIRM_HOST);
+  await expect(host).toHaveCount(1, { timeout: 8_000 });
+  await expect.poll(() => confirmText(page)).toContain('50 crediti');
 
   // Chiudendolo sparisce.
-  await page.locator('.sn-confirm-overlay .sn-confirm-btn-ok').click();
-  await expect(page.locator('.sn-confirm-overlay')).toHaveCount(0, { timeout: 8_000 });
+  await clickConfirm(page, 'ok');
+  await expect(host).toHaveCount(0, { timeout: 8_000 });
 });
