@@ -1,7 +1,7 @@
 {
   "id": "0089ed8f-6251-4c8e-8741-03d156750b76",
-  "status": "working",
-  "notes": "",
-  "queuedAt": "2026-07-11T12:07:52.735Z",
+  "status": "done",
+  "notes": "Buone notizie: questa vulnerabilità era già stata corretta da una segnalazione precedente che descriveva lo stesso identico problema, e la correzione è già attiva. Ho quindi verificato a fondo che la protezione funzioni davvero, invece di rifare un lavoro già fatto.\n\nCosa ho controllato: tutti i percorsi interni con cui si può aprire una nuova scheda (menu del tasto destro, azioni dell'agente, scorciatoie, comandi delle pagine interne, riapertura dall'archivio) convergono in un unico punto, e proprio lì c'è ora un controllo di sicurezza che blocca gli indirizzi con schemi pericolosi — percorsi di file locali, script, dati incorporati. Gli unici schemi non-web che passano sono quelli innocui consegnati al sistema operativo (posta, telefono, SMS), come fa qualsiasi browser completo. La scelta di mettere il controllo nel punto di convergenza (invece che ripeterlo in ogni singolo comando) è voluta: così anche i percorsi futuri che apriranno schede saranno protetti automaticamente, senza rischiare di dimenticarne uno.\n\nCome ho verificato: ho eseguito i tre test di sicurezza citati nella segnalazione (apertura scheda con percorso di file locale tramite ciascuno dei tre comandi interni) più altri tre test correlati che coprono anche il cambio di indirizzo di una scheda già aperta. Tutti e sei passano: il tentativo di aprire un file locale viene bloccato e nessuna finestra con contenuto di file compare. Nel codice c'è anche una nota che ricorda che questa protezione era andata persa una volta per un errore di fusione automatica: i test di sicurezza ora presenti fanno da sentinella, se qualcuno la togliesse di nuovo diventerebbero rossi.\n\nNon ho modificato nulla: il comportamento richiesto è già quello giusto, l'avviso agli utenti era già nel recap aggiornamenti, e aggiungere codice ridondante avrebbe solo aumentato la confusione.",
+  "queuedAt": "2026-07-11T12:10:01.995Z",
   "queuedBy": "routine"
 }
