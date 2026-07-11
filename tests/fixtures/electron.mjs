@@ -33,6 +33,10 @@ export const test = base.extend({
       env: {
         ...process.env,
         FILO_USER_DATA: userData,
+        // I download ("Salva immagine come…") finiscono qui SENZA dialogo
+        // nativo (impossibile da automatizzare headless). Vive dentro
+        // userData così viene ripulito insieme al resto.
+        FILO_DOWNLOAD_DIR: join(userData, 'downloads'),
         NODE_ENV: 'test',
       },
     });
