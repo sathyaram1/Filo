@@ -281,6 +281,42 @@ export function clearState(id) {
   if (existsSync(f)) rmSync(f, { force: true });
 }
 
+// ─── Persistenza su git del file di stato (mirror di claim-feedback.mjs) ──────
+//
+// I record-* scrivono il file di stato con writeState (fs), ma NON lo committano:
+// prima si affidavano all'hook di auto-commit. Quell'hook però scatta SOLO su
+// Edit|Write|NotebookEdit, MAI su Bash (vedi .claude/settings.local.json). Un
+// verifier/secaudit è di sola lettura: non fa alcun Edit/Write, lancia
+// `--record-*` via Bash, e la sua scrittura resta NON committata → il primo
+// `git reset`/rebase la cancella. Risultato: il verdetto va perso e dispatch
+// re-instrada all'infinito lo STESSO feedback al verifier (incident #289,
+// 2026-07-11: due verifier PASS di fila mai persistiti). Quindi ogni record-*
+// committa e pusha il PROPRIO file di stato su origin/main, esattamente come i
+// claim (che infatti atterrano puliti su main). Best-effort: un guasto git non
+// deve mai far fallire il record (lo stato locale resta scritto comunque).
+function tryGit(args) {
+  try { return { ok: true, out: execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' }).trim() }; }
+  catch (e) { return { ok: false, out: `${e.stdout || ''}${e.stderr || ''}`.trim() || e.message }; }
+}
+
+export function persistStateToGit(id, message) {
+  // Nei test la STATE_DIR è sovrascritta (FILO_DISPATCH_STATE_DIR): lì non si
+  // tocca git — lo stato è un file temporaneo, non il repo reale.
+  if (process.env.FILO_DISPATCH_STATE_DIR) return;
+  const rel = relative(ROOT, stateFile(id)).split(sep).join('/');
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (!tryGit(['add', '--', rel]).ok) return;
+    // Niente in stage per questo file → già allineato, nulla da pushare.
+    if (tryGit(['diff', '--cached', '--quiet', '--', rel]).ok) return;
+    if (!tryGit(['commit', '-q', '-m', message, '--', rel]).ok) return;
+    // Push ff-only su origin/main, come i claim. Se rifiutato, main è avanzato:
+    // riconcilio con un rebase (tocca solo questo file → nessun conflitto) e
+    // ritento. Se il rebase fallisce, abortisco e mollo: il commit locale resta.
+    if (tryGit(['push', 'origin', `HEAD:${MAIN_BRANCH}`]).ok) return;
+    if (!tryGit(['pull', '--rebase', 'origin', MAIN_BRANCH]).ok) { tryGit(['rebase', '--abort']); return; }
+  }
+}
+
 // ─── Payload per-ruolo + inlining del file-ruolo ──────────────────────────────
 
 const ROLE_FILE = {
