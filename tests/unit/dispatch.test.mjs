@@ -36,6 +36,7 @@ const {
   verifierNoteText,
   reconcileState,
   withRetry,
+  persistStateToGit,
 } = await import('../../scripts/dispatch.mjs');
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
