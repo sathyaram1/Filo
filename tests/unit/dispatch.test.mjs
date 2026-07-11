@@ -245,6 +245,18 @@ test('readState: id inesistente → null', () => {
   assert.equal(readState('NOPE-NOPE'), null);
 });
 
+// I record-* persistono il file di stato su git da soli (l'hook di auto-commit
+// scatta solo su Edit/Write, non su Bash): senza, un verifier di sola lettura
+// perdeva il verdetto e dispatch re-instradava all'infinito lo stesso feedback.
+// Sotto FILO_DISPATCH_STATE_DIR (test) la persistenza deve essere un NO-OP: mai
+// toccare git col repo reale mentre gira la suite.
+test('persistStateToGit: no-op sotto FILO_DISPATCH_STATE_DIR (non tocca git)', () => {
+  const before = process.env.FILO_DISPATCH_STATE_DIR;
+  assert.ok(before, 'la STATE_DIR di test deve essere impostata');
+  // Non deve lanciare né eseguire alcun comando git: ritorna senza effetti.
+  assert.doesNotThrow(() => persistStateToGit('DISK-GIT', 'test: no-op'));
+});
+
 // ─── resolveLoopCap: precedenza env > remoto > default, con clamp ─────────────
 
 test('resolveLoopCap: niente env né remoto → default 3', () => {
