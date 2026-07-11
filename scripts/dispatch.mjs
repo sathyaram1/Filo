@@ -543,6 +543,7 @@ function recordVerifier(id, verdict, critique) {
   const next = applyVerifierVerdict({ ...defaultState(id, ''), ...(readState(id) || {}), id }, verdict, critique);
   next.id = id;
   writeState(next);
+  persistStateToGit(id, `feedback: verifier ${verdict} ${id}`);
   // PASS → aspetta l'audit di sicurezza; FAIL → resta/torna in verifica fix
   // (il caso 3° FAIL → design lo gestisce il giro dopo: chooseBucket →
   // blocked-loop). Idempotente se lo status è già quello. La nota con l'esito
