@@ -1417,7 +1417,21 @@
       const impAll = e.target.closest('[data-import-all]');
       if (impAll) { importAllFromBubble(impAll.closest('[data-msg-i]')); return; }
       const add = e.target.closest('[data-add]');
-      if (add) { toggleCard(add.dataset.add, Number(add.dataset.qty) || 1); return; }
+      if (add) {
+        const id = add.dataset.add;
+        // Import via chat (§11.2): il candidato commander della bolla diventa
+        // il COMMANDER del mazzo (parametro, §8.4), non una carta qualunque —
+        // stessa semantica del bottone "Aggiungi tutte". Mai sovrascrivere un
+        // commander già scelto: in quel caso la carta entra come carta normale.
+        const bubble = add.closest('[data-msg-i]');
+        const m = bubble && chatMsgs()[Number(bubble.dataset.msgI)];
+        if (m && m.importCommanderId === id && !current.commander && !inDeck(id)) {
+          makeCommander(id);
+          return;
+        }
+        toggleCard(id, Number(add.dataset.qty) || 1);
+        return;
+      }
       const sum = e.target.closest('[data-toggle-list]');
       if (sum) {
         const bubble = sum.closest('[data-msg-i]');
