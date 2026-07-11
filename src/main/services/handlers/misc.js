@@ -1,5 +1,5 @@
-// Handler di dominio: cattura schermo, box feedback (annotazione/invio) e
-// fetch dei metadati Open Graph di un link.
+// Handler di dominio: cattura schermo, salvataggio immagini su disco, box
+// feedback (annotazione/invio) e fetch dei metadati Open Graph di un link.
 
 const { safeFetch } = require('../safe-fetch');
 const auth = require('../../auth/google-auth');
