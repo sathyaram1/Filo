@@ -44,20 +44,25 @@ const filoApi = {
     ipcRenderer.on('filo:reasoning', wrapped);
     return () => ipcRenderer.removeListener('filo:reasoning', wrapped);
   },
-  aiStream: ({ action, payload, onMeta, onDelta, onDone, onError }) => {
+  aiStream: ({ action, payload, onMeta, onDelta, onReset, onDone, onError }) => {
     const requestId = `s${Date.now()}_${++streamCounter}`;
     const offMeta = (_e, data) => onMeta && onMeta(data);
     const offDelta = (_e, data) => onDelta && onDelta(data.delta);
+    // reset = il provider è caduto a metà stream e il main riparte col fallback:
+    // il chiamante deve buttare i delta accumulati finora (#273).
+    const offReset = (_e, data) => onReset && onReset(data);
     const offDone = (_e, data) => { cleanup(); onDone && onDone(data); };
     const offError = (_e, data) => { cleanup(); onError && onError(data); };
     const cleanup = () => {
       ipcRenderer.removeListener(`ai-stream:${requestId}:meta`, offMeta);
       ipcRenderer.removeListener(`ai-stream:${requestId}:delta`, offDelta);
+      ipcRenderer.removeListener(`ai-stream:${requestId}:reset`, offReset);
       ipcRenderer.removeListener(`ai-stream:${requestId}:done`, offDone);
       ipcRenderer.removeListener(`ai-stream:${requestId}:error`, offError);
     };
     ipcRenderer.on(`ai-stream:${requestId}:meta`, offMeta);
     ipcRenderer.on(`ai-stream:${requestId}:delta`, offDelta);
+    ipcRenderer.on(`ai-stream:${requestId}:reset`, offReset);
     ipcRenderer.on(`ai-stream:${requestId}:done`, offDone);
     ipcRenderer.on(`ai-stream:${requestId}:error`, offError);
     ipcRenderer.invoke('ai-stream:start', { requestId, action, payload });
