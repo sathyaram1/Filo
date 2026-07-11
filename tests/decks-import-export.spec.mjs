@@ -137,3 +137,51 @@ test('Esporta dallo switcher: stesso formato testuale, con la carta e la quantit
   const ta = page.locator('.dk-io-textarea');
   await expect(ta).toHaveValue('Deck\n10 Forest\n1 Sol Ring');
 });
+
+test('Import via chat: il click sul candidato commander lo imposta come commander, non come carta normale', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await mockScryfall(app);
+  await mockImportProvider(app);
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await newDeck(page);
+
+  // Lista grezza incollata in chat → bolla di conferma con le carte risolte
+  // (commander in testa) e il bottone "Aggiungi tutte" (§11.2). Niente viene
+  // scritto nel mazzo finché l'utente non conferma.
+  await page.fill('#chatInput', "1 sol ring\n10 foresta\natraxa voce dei pretori");
+  await page.press('#chatInput', 'Enter');
+  const bubble = page.locator('.dk-msg-bot').last();
+  await expect(bubble.locator('.dk-cardlist .dk-row')).toHaveCount(3);
+  await expect(bubble.locator('.dk-import-all')).toBeVisible();
+  await expect(page.locator('#deckCount')).toHaveText('0/100 carte');
+
+  // FIX (#289.9): il toggle sulla riga del commander candidato lo IMPOSTA come
+  // commander del mazzo (parametro, §8.4) — prima lo aggiungeva come carta
+  // normale e il mazzo restava senza commander.
+  await bubble.locator('[data-add="atraxa"]').click();
+  await expect(page.locator('#commanderLine')).toContainText("Commander: Atraxa, Praetors' Voice");
+  await expect(page.locator('#deckList .dk-row[data-card-id="atraxa"]')).toHaveCount(0);
+  await expect(page.locator('#deckCount')).toHaveText('0/100 carte');
+  // La riga ora mostra lo stato "già nel mazzo" (il commander nel mazzo c'è).
+  const cmdToggle = page.locator('.dk-msg-bot').last().locator('[data-add="atraxa"]');
+  await expect(cmdToggle).toHaveAttribute('data-in', '1');
+
+  // Un secondo click NON deve degenerare in "aggiungi come carta normale":
+  // il commander non si duplica e non si rimuove da qui.
+  await cmdToggle.click();
+  await expect(page.locator('#deckList .dk-row[data-card-id="atraxa"]')).toHaveCount(0);
+  await expect(page.locator('#commanderLine')).toContainText('Commander: Atraxa');
+  await expect(page.locator('#deckCount')).toHaveText('0/100 carte');
+
+  // Le righe non-commander continuano a comportarsi da toggle normale.
+  await page.locator('.dk-msg-bot').last().locator('[data-add="sol-ring"]').click();
+  await expect(page.locator('#deckList .dk-row[data-card-id="sol-ring"]')).toBeVisible();
+  await expect(page.locator('#deckCount')).toHaveText('1/100 carte');
+
+  // "Aggiungi tutte" completa l'import (qty reali, commander già impostato
+  // resta quello): 1 Sol Ring (già dentro) + 10 Forest.
+  await page.locator('.dk-msg-bot').last().locator('.dk-import-all').click();
+  await expect(page.locator('#deckList .dk-row[data-card-id="forest"]')).toBeVisible();
+  await expect(page.locator('#deckCount')).toHaveText('11/100 carte');
+});
