@@ -1,7 +1,0 @@
-{
-  "id": "6dfbad8d-29a7-43df-861f-b7eb08c3e7b9",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. import/export mazzi verificato a fondo: import da lista con anteprima e distinzione tra righe illeggibili e carte non trovate, scrittura reale nel mazzo con quantità corrette, reimport senza doppioni, export/roundtrip senza perdite, gestione del commander. Stress test superati (payload XSS inerte, input vuoti, liste enormi).",
-  "queuedAt": "2026-07-11T18:39:46.525Z",
-  "queuedBy": "routine"
-}
