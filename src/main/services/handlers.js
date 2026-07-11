@@ -331,6 +331,9 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, si
           attempts, messages, signal,
           onDelta: (d) => { acc += d; },
           onReasoning: (t) => { try { onReasoning(t); } catch (_) {} },
+          // Provider caduto a metà stream → il buffer contiene testo parziale
+          // del tentativo fallito: azzeralo prima del tentativo successivo (#273).
+          onReset: () => { acc = ''; },
         });
         return { ...r, text: r.text != null ? r.text : acc };
       })()
@@ -363,7 +366,7 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, si
 // e riceve delta/done/error via ipcRenderer.on('ai-stream:<requestId>', ...).
 // Il main side è in src/main/ipc.js, qui esponiamo handleStream.
 
-async function handleStream({ action, payload, origin, onDelta, onMeta, signal }) {
+async function handleStream({ action, payload, origin, onDelta, onMeta, onReset, signal }) {
   const settings = await getEffectiveSettings();
   const model = modelForAction(settings, action);
   let messages = await buildMessages(action, payload);
@@ -382,6 +385,9 @@ async function handleStream({ action, payload, origin, onDelta, onMeta, signal }
   const result = await Providers.streamCompleteWithFallback({
     attempts, messages, signal,
     onDelta: (delta) => { if (onDelta) onDelta(delta); },
+    // Il provider è caduto DOPO aver già streamato dei delta: avvisa il
+    // renderer di buttare il testo parziale prima che arrivi il fallback (#273).
+    onReset: (info) => { if (onReset) onReset(info); },
   });
   const usedProvider = result.provider || attempts[0].provider;
   const concreteModel = result.model || attempts[0].model;

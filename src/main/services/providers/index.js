@@ -53,20 +53,33 @@
     throw lastErr || new Error('Nessun provider disponibile');
   }
 
-  async function streamCompleteWithFallback({ attempts, model, messages, signal, onDelta, onReasoning, onFallback }) {
+  // In streaming un attempt può fallire DOPO aver già emesso dei delta (es. il
+  // reader SSE si interrompe a metà risposta): in quel caso il chiamante ha già
+  // accumulato testo parziale del tentativo fallito. Prima di ripartire col
+  // provider successivo emettiamo `onReset` così il chiamante butta il buffer
+  // parziale e riparte pulito (#273). onReset viene chiamato SOLO se l'attempt
+  // fallito aveva già emesso qualcosa (delta o reasoning) e c'è un attempt dopo.
+  async function streamCompleteWithFallback({ attempts, model, messages, signal, onDelta, onReasoning, onFallback, onReset }) {
     let lastErr = null;
     for (let i = 0; i < attempts.length; i++) {
       const a = attempts[i];
       const aModel = a.model || model;
+      let emitted = false;
       try {
         const r = await getProvider(a.provider).streamComplete({
-          apiKey: a.apiKey, model: aModel, messages, signal, onDelta, onReasoning,
+          apiKey: a.apiKey, model: aModel, messages, signal,
+          onDelta: onDelta ? (d) => { emitted = true; onDelta(d); } : onDelta,
+          onReasoning: onReasoning ? (t) => { emitted = true; onReasoning(t); } : onReasoning,
         });
         return { ...r, provider: a.provider, model: aModel };
       } catch (err) {
         lastErr = err;
         console.warn(`[SN] provider ${a.provider} streaming fallito (${i + 1}/${attempts.length}):`, err.message || err);
-        if (onFallback && i + 1 < attempts.length) {
+        const hasNext = i + 1 < attempts.length;
+        if (onReset && hasNext && emitted) {
+          try { onReset({ failed: a.provider, next: attempts[i + 1].provider }); } catch (_) {}
+        }
+        if (onFallback && hasNext) {
           try { onFallback({ failed: a.provider, next: attempts[i + 1].provider, error: err }); } catch (_) {}
         }
       }
