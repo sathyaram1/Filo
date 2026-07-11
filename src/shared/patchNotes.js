@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.122', date: '2026-07-11',
+      features: [],
+      fixes: [
+        'Rafforzata ancora la sicurezza: anche quando un\'azione interna di Filo cambia l\'indirizzo di una scheda già aperta, ora vengono bloccati i tentativi di caricare percorsi di file locali o altri schemi non sicuri.',
+      ],
+    },
+    {
       version: '0.2.117', date: '2026-07-09',
       features: [
         'Nella dashboard di gestione ogni feedback ora mostra la conversazione completa: il testo originale, il tuo eventuale commento di approvazione, i report di chi ha implementato e l\'esito dei controlli di verifica, ognuno nella sua bolla.',

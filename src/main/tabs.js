@@ -1041,6 +1041,18 @@ class TabManager {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
     const target = normalizeUrl(url);
+    // SICUREZZA (#248) — come openTab: questo è un loadURL() PROGRAMMATICO, non
+    // emette will-navigate, quindi quel gate non protegge questo percorso.
+    // Qui convergono TUTTI gli handler IPC che rinavigano una scheda esistente
+    // (tabs:navigate dalla shell, e qualunque chiamante futuro): un controllo
+    // unico blocca gli schemi non-web (file:// → leak hash NTLM via SMB su
+    // Windows + esposizione file locali; data:/javascript: → phishing/script)
+    // prima che loadURL() possa toccarli. mailto:/tel:/sms: vengono consegnati
+    // all'OS invece di caricare una scheda, come nel gate di will-navigate.
+    if (isWebUnsafeNav(target)) {
+      openExternalScheme(target);
+      return;
+    }
     // La WebContentsView va RICREATA (non basta un loadURL) quando cambia la
     // partizione (privacy, fra siti diversi) oppure quando si attraversa il
     // confine di fiducia interno↔esterno: il preload e contextIsolation sono
