@@ -95,7 +95,15 @@ il livello non viene eseguito.
 - **UI:** le conferme usano i componenti riusabili `SN_CONFIRM_UI.confirm`
   (livello 2) e `SN_CONFIRM_UI.confirmTyped` (livello 3) in
   `src/shared/confirmUi.js` — mai `window.confirm` nativo.
-- **Test:** `tests/unit/actionLevels.test.mjs`, `tests/filo-action-levels.spec.mjs`.
+- **Sicurezza (#249):** il dialogo vive in uno **Shadow DOM chiuso** agganciato
+  a un host neutro `.sn-confirm-host`: gli script della pagina non possono
+  trovarne i bottoni (querySelector/MutationObserver) né auto-cliccare OK. NON
+  tornare mai ad appendere i bottoni al DOM del documento. Nei test Playwright
+  i locator non attraversano il root chiuso: usa `tests/helpers/confirm.mjs`
+  (presenza → host `.sn-confirm-host`; contenuto/click/input → hook
+  `SN_CONFIRM_UI._test` via `page.evaluate`, disponibili sulle pagine filo://).
+- **Test:** `tests/unit/actionLevels.test.mjs`, `tests/filo-action-levels.spec.mjs`,
+  `tests/audit-confirm-dom-bypass.spec.mjs`.
 
 **Filo ESEGUE, non mostra bottoni inerti (#162/#159).** Quando l'utente chiede
 un'azione, Filo la compie — non lascia un bottone "da cliccare per davvero":
