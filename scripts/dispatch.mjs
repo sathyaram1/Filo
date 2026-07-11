@@ -139,6 +139,7 @@ export function defaultState(id, branch) {
  *
  *   verifierVerdict null              → 'verifier'   (mai verificato, o ri-coda dopo fix)
  *   'pass' && !secauditDone           → 'secaudit'   (passato verifier, attende L4)
+ *   'pass' && secauditDone && 'fail'  → 'blocked-secaudit' (bocciato ma mai scalato)
  *   'pass' && secauditDone            → null         (gate in mano all'orchestratore)
  *   'fail' && loopCount  < cap        → 'fixer'
  *   'fail' && loopCount >= cap        → 'blocked-loop'
@@ -147,13 +148,44 @@ export function classifyReview(state, loopCap = LOOP_CAP) {
   const s = state || {};
   const v = s.verifierVerdict ?? null;
   if (v === null) return 'verifier';
-  if (v === 'pass') return s.secauditDone ? null : 'secaudit';
+  if (v === 'pass') {
+    if (!s.secauditDone) return 'secaudit';
+    // Rete di sicurezza: dopo un FAIL del secaudit il ruolo deve scalare a
+    // `design` (decide l'owner), ma se il worker se lo dimentica il feedback
+    // resterebbe incagliato PER SEMPRE (nessun ruolo lo riprenderebbe: è il
+    // caso reale del #289.9, fermo dal 2026-07-07). Lo scala dispatch stesso.
+    return s.secauditVerdict === 'fail' ? 'blocked-secaudit' : null;
+  }
   if (v === 'fail') return (Number(s.loopCount) || 0) >= loopCap ? 'blocked-loop' : 'fixer';
   return null;
 }
 
+/**
+ * Riconcilia il file di stato locale con lo STATUS persistito su Firestore (la
+ * verità che vede l'owner in dashboard). Caso reale (#289.9): il secaudit
+ * boccia, un fixer rilavora il branch e ri-accoda `revision_capability`, ma
+ * dimentica `--record-fixed` → lo stato dice ancora "verificato e bocciato" e
+ * dispatch salterebbe il feedback per sempre, mentre la dashboard mostra
+ * "in attesa di un verificatore". Se lo status dice che il feedback aspetta il
+ * verifier ma lo stato è rimasto a un ciclo GIÀ CONCLUSO (secaudit fatto), si
+ * riparte come dopo un fix registrato: verdetti azzerati, loopCount conservato.
+ * Pura e idempotente: il reset non va persistito, ogni run lo ricalcola.
+ * NB: status `revision_capability` + stato {pass, secauditDone:false} NON è
+ * divergenza, è il normale lag della coda triage (verifier appena passato):
+ * lo stato è più avanti dello status e comanda lui → 'secaudit'.
+ */
+export function reconcileState(state, status) {
+  if (!state) return state;
+  if (status === 'revision_capability' && state.verifierVerdict === 'pass' && state.secauditDone) {
+    return applyFixed(state);
+  }
+  return state;
+}
+
 // Rango di precedenza tra i ruoli "review" (più alto = scelto prima).
-const REVIEW_RANK = { secaudit: 4, verifier: 3, fixer: 2, 'blocked-loop': 1 };
+// `blocked-*` sono escalation gestite INLINE da dispatch (nessun worker):
+// costano zero, quindi si sbrigano per prime.
+const REVIEW_RANK = { 'blocked-secaudit': 5, secaudit: 4, verifier: 3, fixer: 2, 'blocked-loop': 1 };
 
 /**
  * Sceglie il bucket dato uno snapshot dello STATO. Funzione pura.
