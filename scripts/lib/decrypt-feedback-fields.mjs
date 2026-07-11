@@ -60,6 +60,19 @@ function loadCrypto() {
   }
 }
 
+// Estrae FILO_FEEDBACK_PRIVKEY da un file .env (null se assente/illeggibile).
+function privKeyFromEnvFile(envFile) {
+  if (!existsSync(envFile)) return null;
+  try {
+    const lines = readFileSync(envFile, 'utf8').split('\n');
+    for (const line of lines) {
+      const m = line.match(/^FILO_FEEDBACK_PRIVKEY\s*=\s*(.+)$/);
+      if (m) return m[1].trim().replace(/^["']|["']$/g, '');
+    }
+  } catch (_) {}
+  return null;
+}
+
 // Legge la chiave privata da FILO_FEEDBACK_PRIVKEY (env) oppure da
 // `tests/agent/.env` nella root del repo (in locale). Ritorna null se assente.
 function readPrivKey() {
@@ -67,16 +80,22 @@ function readPrivKey() {
   if (process.env.FILO_FEEDBACK_PRIVKEY) return process.env.FILO_FEEDBACK_PRIVKEY.trim();
 
   // 2. File .env locale (solo in locale, il file è gitignorato).
-  const envFile = join(ROOT, 'tests', 'agent', '.env');
-  if (existsSync(envFile)) {
-    try {
-      const lines = readFileSync(envFile, 'utf8').split('\n');
-      for (const line of lines) {
-        const m = line.match(/^FILO_FEEDBACK_PRIVKEY\s*=\s*(.+)$/);
-        if (m) return m[1].trim().replace(/^["']|["']$/g, '');
-      }
-    } catch (_) {}
-  }
+  const local = privKeyFromEnvFile(join(ROOT, 'tests', 'agent', '.env'));
+  if (local) return local;
+
+  // 3. In un WORKTREE git il file .env (gitignorato) esiste solo nel checkout
+  //    principale: risali lì via git-common-dir. Senza questo passo, ogni run
+  //    da un worktree non decifrava nessuno status e la coda piena "sembrava
+  //    vuota" → il giro delle routine finiva in audit (i feedback #310+).
+  try {
+    const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'],
+      { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    if (common) {
+      const fromMain = privKeyFromEnvFile(join(resolve(common, '..'), 'tests', 'agent', '.env'));
+      if (fromMain) return fromMain;
+    }
+  } catch (_) { /* niente git / repo nudo: pazienza */ }
+
   return null;
 }
 
