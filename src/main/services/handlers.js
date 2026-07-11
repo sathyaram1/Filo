@@ -366,7 +366,7 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, si
 // e riceve delta/done/error via ipcRenderer.on('ai-stream:<requestId>', ...).
 // Il main side è in src/main/ipc.js, qui esponiamo handleStream.
 
-async function handleStream({ action, payload, origin, onDelta, onMeta, signal }) {
+async function handleStream({ action, payload, origin, onDelta, onMeta, onReset, signal }) {
   const settings = await getEffectiveSettings();
   const model = modelForAction(settings, action);
   let messages = await buildMessages(action, payload);
