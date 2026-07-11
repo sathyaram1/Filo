@@ -717,6 +717,7 @@ if (isMainModule) {
       const id = argv[1];
       if (!id) { console.error('Uso: --clear-state <id>'); process.exit(1); }
       clearState(id);
+      persistStateToGit(id, `feedback: clear-state ${id}`);
       console.log(`stato ${id}: rimosso`);
       process.exit(0);
     } else {
