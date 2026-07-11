@@ -536,28 +536,44 @@ function recordSecaudit(id, verdict) {
 // ─── run() — il comando di default ────────────────────────────────────────────
 
 export async function run() {
-  const snapshot = await buildSnapshot();
+  let snapshot;
+  try {
+    snapshot = await buildSnapshot();
+  } catch (e) {
+    // Lo stato è illeggibile anche dopo i retry. Per scelta dell'owner NON ci
+    // si ferma (un giro a vuoto non risolve nulla): si ripiega sull'audit,
+    // lasciando in stderr la traccia del guasto vero per il debugging.
+    process.stderr.write(`[dispatch] stato illeggibile anche dopo i retry (${e?.message || e}) → fallback prober\n`);
+    emit({ role: 'prober' }, {});
+    return { exit: 0 };
+  }
   // Cap EFFETTIVO: env > config/automation (scelto dall'owner) > default.
   const cap = resolveLoopCap({ envRaw: process.env.FILO_LOOP_CAP, remote: await fetchRemoteLoopCap() });
-  const bucket = chooseBucket(snapshot, cap);
+  let bucket = chooseBucket(snapshot, cap);
 
-  // blocked-loop: dispatch stesso accoda `design` con motivo loop (spec §5:
-  // il fix fallito 3× è uno dei sotto-casi di design — decide l'owner), pulisce
-  // lo stato, e ri-sceglie il prossimo bucket (non c'è un worker per questo).
-  if (bucket.role === 'blocked-loop') {
-    // Il motivo `loop` viaggia sia nel testo della nota (leggibile dall'owner,
-    // con l'ultima critica del verifier come chiede la spec) sia come campo
-    // strutturato `--reason loop` → `statusReason` sul doc (sottotesto in
-    // dashboard).
-    const note = `Fix fermato dopo ${bucket.loopCount} verifiche fallite (loop). Ultima critica: ${bucket.state?.verifierCritique || '—'}`;
+  // Escalation gestite inline da dispatch (nessun worker da spawnare): accodano
+  // `design` (decide l'owner), puliscono lo stato e si ri-sceglie. In loop:
+  // possono essercene più d'una in attesa nello stesso snapshot.
+  //   - blocked-loop: fix fallito `cap` volte (spec §5). Motivo `loop` sia nella
+  //     nota (con l'ultima critica del verifier) sia come `--reason` strutturato
+  //     → `statusReason` sul doc (sottotesto in dashboard).
+  //   - blocked-secaudit: il controllo di sicurezza ha bocciato ma il worker
+  //     non ha scalato a `design` come da recipe → lo fa dispatch (senza, il
+  //     feedback resta incagliato per sempre).
+  let guard = 0;
+  while ((bucket.role === 'blocked-loop' || bucket.role === 'blocked-secaudit') && guard++ < 50) {
+    const isLoop = bucket.role === 'blocked-loop';
+    const note = isLoop
+      ? `Fix fermato dopo ${bucket.loopCount} verifiche fallite (loop). Ultima critica: ${bucket.state?.verifierCritique || '—'}`
+      : 'Il controllo di sicurezza ha bocciato questa modifica e la pratica era rimasta in sospeso senza che nessuno la portasse alla tua attenzione: serve una tua decisione su come procedere.';
     try {
-      execFileSync('node', [resolve(ROOT, 'scripts', 'queue-triage.mjs'), bucket.id, 'design', note, '--branch', bucket.branch, '--reason', 'loop'],
+      execFileSync('node', [resolve(ROOT, 'scripts', 'queue-triage.mjs'), bucket.id, 'design', note, '--branch', bucket.branch || '', '--reason', isLoop ? 'loop' : 'secaudit'],
         { cwd: ROOT, encoding: 'utf8', stdio: 'ignore' });
     } catch (_) { /* la nota resta in coda al prossimo giro */ }
     clearState(bucket.id);
     // Ricostruisci lo snapshot senza questo feedback e ri-scegli.
-    const next = { reviews: snapshot.reviews.filter((r) => r.id !== bucket.id), todoWinner: snapshot.todoWinner };
-    return finalizeBucket(chooseBucket(next, cap), next, cap);
+    snapshot = { reviews: snapshot.reviews.filter((r) => r.id !== bucket.id), todoWinner: snapshot.todoWinner };
+    bucket = chooseBucket(snapshot, cap);
   }
 
   return finalizeBucket(bucket, snapshot, cap);
