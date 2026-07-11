@@ -1,7 +1,0 @@
-{
-  "id": "f1f084ae-4971-4a3e-854c-145cc041a6f1",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho verificato il buco di sicurezza sul controllo delle schede partendo dal sintomo segnalato, senza guardare la correzione. Ho provato ad aprire e a rinaviogare schede verso indirizzi pericolosi (percorsi di file locali file:///etc/passwd e file:///C:/..., un percorso di rete Windows file://server-ostile/share che farebbe trapelare l'impronta della password, oltre a javascript: e data:) usando tutti e tre i cammini interni citati: apertura nuova scheda, rinavigazione di una scheda gia' aperta, e creazione scheda in stile estensione. In tutti i casi il tentativo viene scartato: nessuna scheda finisce su quegli indirizzi. Ho anche controllato che gli indirizzi normali continuino a funzionare (un sito web servito in locale, le pagine interne di Filo): si aprono e navigano regolarmente, quindi la protezione non blocca per sbaglio l'uso legittimo. I link di sistema innocui (mailto:) vengono passati al sistema operativo invece di diventare una scheda, come farebbe un browser normale. Per essere sicuro che i test 'sentano' davvero il buco ho tolto temporaneamente la protezione sulla rinavigazione: i test diventano rossi (la scheda finiva davvero su file://), rimettendola tornano verdi. Tutte le difese di sicurezza gia' presenti sul controllo schede restano verdi. Nessun problema trovato.",
-  "queuedAt": "2026-07-11T00:52:16.390Z",
-  "queuedBy": "routine"
-}
