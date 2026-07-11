@@ -154,11 +154,13 @@ const chromeShim = {
           const cleanup = () => {
             ipcRenderer.removeListener(`ai-stream:${requestId}:meta`, offMeta);
             ipcRenderer.removeListener(`ai-stream:${requestId}:delta`, offDelta);
+            ipcRenderer.removeListener(`ai-stream:${requestId}:reset`, offReset);
             ipcRenderer.removeListener(`ai-stream:${requestId}:done`, offDone);
             ipcRenderer.removeListener(`ai-stream:${requestId}:error`, offError);
           };
           ipcRenderer.on(`ai-stream:${requestId}:meta`, offMeta);
           ipcRenderer.on(`ai-stream:${requestId}:delta`, offDelta);
+          ipcRenderer.on(`ai-stream:${requestId}:reset`, offReset);
           ipcRenderer.on(`ai-stream:${requestId}:done`, offDone);
           ipcRenderer.on(`ai-stream:${requestId}:error`, offError);
           ipcRenderer.invoke('ai-stream:start', { requestId, action: msg.action, payload: msg.payload });
