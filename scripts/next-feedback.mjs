@@ -323,6 +323,16 @@ export async function run() {
   // Decifra in parallelo i campi minimi di tutti i candidati.
   const minimal = await Promise.all(rawCandidates.map(decryptMinimal));
 
+  // Diagnostica anti "coda fantasma": se gli status non si DECIFRANO (chiave
+  // privata assente/rotta) i feedback spariscono dal filtro qui sotto e la coda
+  // sembra vuota anche se è piena — e il giro delle routine finisce in audit.
+  // Il segnale distingue "coda vuota" da "coda illeggibile" nei log.
+  const { PLACEHOLDER } = await import('./lib/decrypt-feedback-fields.mjs');
+  const unreadable = minimal.filter((fb) => fb.status === PLACEHOLDER || fb.status === null).length;
+  if (unreadable) {
+    process.stderr.write(`[next-feedback] ATTENZIONE: ${unreadable}/${minimal.length} status non decifrabili (chiave privata assente o rotta?): la coda può sembrare vuota per errore\n`);
+  }
+
   // 4. Filtra: solo status == 'todo', non claimati.
   const todoFree = minimal.filter((fb) => fb.status === 'todo' && !fb.claimed);
 
