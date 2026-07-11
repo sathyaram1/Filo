@@ -557,6 +557,7 @@ function recordFixed(id, report = '') {
   const next = applyFixed({ ...(readState(id) || defaultState(id, '')), id });
   next.id = id;
   writeState(next);
+  persistStateToGit(id, `feedback: fixed ${id}`);
   // Fix ri-applicato → torna in attesa della verifica comportamentale. Il
   // report del fixer (cosa ha corretto e come) va nella chat del feedback,
   // come per verifier e new-work: senza, la correzione è invisibile all'owner.
