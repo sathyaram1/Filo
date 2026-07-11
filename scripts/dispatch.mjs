@@ -9,12 +9,21 @@
 //   quel ruolo.
 //
 // PRECEDENZA DEI BUCKET (dallo stato, mai dal testo del feedback):
+//   0. secaudit FAIL mai scalato a `design`                     → design (inline)
 //   1. branch passato dal verifier ma senza secaudit            → secaudit
 //   2. feedback `review` con branch, non ancora verificato      → verifier
 //   3. branch con FAIL del verifier in attesa (loop < 3)        → fixer
 //      └─ se loop ≥ 3 → blocca con motivo `loop` (no fixer)
 //   4. c'è un todo (vincitore di next-feedback)                 → new-work
 //   5. niente                                                   → prober (audit)
+//
+// ROBUSTEZZA (2026-07-11, feedback owner sui #310+): un guasto transitorio nella
+// lettura dello stato (rete Firestore, next-feedback morto) NON deve far
+// "sembrare vuota" una coda piena: si ritenta più volte prima di ripiegare su
+// prober. Il prober resta il fallback finale (scelta owner: meglio un audit di
+// un giro a vuoto), ma solo dopo aver provato davvero a trovare lavoro. Inoltre
+// lo stato locale viene RICONCILIATO con lo status persistito (vedi
+// reconcileState): un file di stato stantio non incaglia più il feedback.
 //
 // STATO PER BRANCH (routines/state/<id>.json):
 //   { id, branch, loopCount, verifierVerdict: 'pass'|'fail'|null,
