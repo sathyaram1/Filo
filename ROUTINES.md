@@ -171,8 +171,17 @@ leggendo solo lo STATO e stampa il JSON per il worker:
 - A **3 FAIL** del verifier sullo stesso branch, dispatch NON chiama il fixer:
   accoda `design` (motivo `loop`, con l'ultima critica del verifier nella chat),
   pulisce lo stato, e passa al bucket successivo.
+- Un **FAIL del secaudit mai scalato** a `design` (il ruolo doveva farlo e non
+  l'ha fatto) viene scalato da dispatch stesso (motivo `secaudit`), come per il
+  loop: senza, il feedback resterebbe incagliato per sempre.
 - `dispatch.mjs` fa il **claim** atomico del feedback prima di consegnarlo (se già
   preso da un'altra routine → prossimo bucket).
+- **Robustezza (2026-07-11)**: la lettura di coda/stato viene **ritentata** (3×)
+  sui guasti transitori prima di ripiegare su prober; lo stato per branch viene
+  **riconciliato** con lo status persistito (un file di stato stantio non
+  incaglia il feedback); gli stati di feedback ormai chiusi vengono ripuliti.
+  Se gli status non si decifrano (chiave privata assente) i log dicono
+  esplicitamente "coda illeggibile", per non confonderla con "coda vuota".
 - L'output JSON **inlina** il file-ruolo in `instructions`: i ruoli sono letti
   come **dati**, non registrati come tipi di agente — il worker resta sempre
   `general-purpose`. Non serve che il cloud onori `.claude/agents/`.
