@@ -681,6 +681,13 @@
   // dall'import via chat (§11.2, es. basics con "×37"): default 1 per le
   // ricerche normali.
   async function toggleCard(cardId, qty = 1) {
+    // Il commander è un parametro del mazzo (§8.4), non una riga dell'elenco:
+    // il toggle non deve né duplicarlo come carta normale né "rimuoverlo" da
+    // qui — si cambia col tasto destro su un'altra carta del mazzo.
+    if (cardId === current.commander && !inDeck(cardId)) {
+      showToast('È già il commander del mazzo.');
+      return;
+    }
     const adding = !inDeck(cardId);
     const { deck, added } = adding
       ? Decks.addCard(current, cardId, { qty })
