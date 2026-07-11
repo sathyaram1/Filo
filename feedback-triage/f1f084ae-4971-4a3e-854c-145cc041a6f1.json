@@ -1,7 +1,0 @@
-{
-  "id": "f1f084ae-4971-4a3e-854c-145cc041a6f1",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato e modifica pubblicata. La correzione chiude una falla residua: anche quando è un comando interno di Filo (non un click su un link) a cambiare l'indirizzo di una scheda già aperta, ora i tentativi di caricare file locali o altri schemi pericolosi vengono bloccati, mentre i link di posta/telefono/SMS vengono passati al sistema come prima. Ho verificato che il blocco riusa la stessa lista di schemi sicuri già in vigore negli altri punti dell'app, quindi il comportamento è uniforme ovunque; la protezione è coperta anche da un test automatico che fallirebbe se la falla si riaprisse, e il changelog per gli utenti è stato aggiornato. Nessuna osservazione ulteriore: il perimetro della modifica è pulito, senza tocchi a file di configurazione o permessi.",
-  "queuedAt": "2026-07-11T00:56:17.192Z",
-  "queuedBy": "routine"
-}
