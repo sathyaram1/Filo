@@ -25,8 +25,16 @@ async function mockScryfall(app) {
       prices: { eur: '0.10' }, legalities: { commander: 'legal' },
       scryfall_uri: 'https://scryfall.com/card/forest',
     };
-    const BY_NAME = { 'sol ring': SOL_RING, forest: FOREST };
-    const BY_ID = { 'sol-ring': SOL_RING, forest: FOREST };
+    const ATRAXA = {
+      id: 'atraxa', name: "Atraxa, Praetors' Voice", mana_cost: '{G}{W}{U}{B}', cmc: 4,
+      type_line: 'Legendary Creature — Phyrexian Angel',
+      colors: ['G', 'W', 'U', 'B'], color_identity: ['G', 'W', 'U', 'B'],
+      image_uris: { normal: 'https://cards.test/atraxa.jpg', art_crop: 'https://cards.test/atraxa-art.jpg' },
+      prices: { eur: '18.00' }, legalities: { commander: 'legal' },
+      scryfall_uri: 'https://scryfall.com/card/atraxa',
+    };
+    const BY_NAME = { 'sol ring': SOL_RING, forest: FOREST, "atraxa, praetors' voice": ATRAXA };
+    const BY_ID = { 'sol-ring': SOL_RING, forest: FOREST, atraxa: ATRAXA };
     globalThis.SN_SCRYFALL._setFetch(async (url) => {
       const u = new URL(String(url));
       let body = null;
