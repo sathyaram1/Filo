@@ -385,6 +385,9 @@ async function handleStream({ action, payload, origin, onDelta, onMeta, onReset,
   const result = await Providers.streamCompleteWithFallback({
     attempts, messages, signal,
     onDelta: (delta) => { if (onDelta) onDelta(delta); },
+    // Il provider è caduto DOPO aver già streamato dei delta: avvisa il
+    // renderer di buttare il testo parziale prima che arrivi il fallback (#273).
+    onReset: (info) => { if (onReset) onReset(info); },
   });
   const usedProvider = result.provider || attempts[0].provider;
   const concreteModel = result.model || attempts[0].model;
