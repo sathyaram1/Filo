@@ -409,38 +409,66 @@ async function buildSnapshot() {
   } catch (_) { /* best-effort */ }
 
   const { fetchOpenCandidates } = await import('./next-feedback.mjs');
-  const { decryptFeedbackFields } = await import('./lib/decrypt-feedback-fields.mjs');
+  const { decryptFeedbackFields, PLACEHOLDER } = await import('./lib/decrypt-feedback-fields.mjs');
   const C = globalThis.SN_FEEDBACK_CRYPTO;
 
-  const raw = await fetchOpenCandidates();
+  // Retry: un errore transitorio qui azzererebbe reviews E todo insieme,
+  // mandando il giro in prober con la coda piena (il pattern dei #310+).
+  const raw = await withRetry(() => fetchOpenCandidates(), 'fetch dei feedback aperti');
+
+  // Pulizia appunti orfani: un file di stato il cui feedback non è più aperto
+  // (chiuso/archiviato) è spazzatura che può solo generare divergenze (vedi
+  // reconcileState). Il feedback su Firestore NON viene toccato.
+  if (raw.length) {
+    try {
+      const openIds = new Set(raw.map((fb) => fb._id));
+      for (const f of readdirSync(STATE_DIR)) {
+        if (!f.endsWith('.json')) continue;
+        const id = f.slice(0, -'.json'.length);
+        if (!openIds.has(id)) clearState(id);
+      }
+    } catch (_) { /* STATE_DIR assente: niente da pulire */ }
+  }
 
   // Partiziona i 'review' con branch. Decifra solo lo status.
   const reviews = [];
+  let unreadable = 0;
   for (const fb of raw) {
     let status = fb.status;
     if (C?.isEncrypted?.(status)) {
       try { status = (await decryptFeedbackFields({ _id: fb._id, status })).status; }
       catch (_) { status = null; }
+      if (status === PLACEHOLDER) { unreadable++; status = null; }
     }
     // Macchina a stati: l'iter di revisione vive in `revision_capability`
     // (aspetta il verifier) e `revision_security` (aspetta il secaudit).
     // `review` è il nome RITIRATO: accettato finché lo storico non è migrato.
     if (['revision_capability', 'revision_security', 'review'].includes(status)
         && typeof fb.branch === 'string' && fb.branch) {
-      reviews.push({ id: fb._id, num: fb.num || fb.seq || '', branch: fb.branch, state: readState(fb._id), status });
+      reviews.push({ id: fb._id, num: fb.num || fb.seq || '', branch: fb.branch, state: reconcileState(readState(fb._id), status), status });
     }
+  }
+  if (unreadable) {
+    process.stderr.write(`[dispatch] ATTENZIONE: ${unreadable} status non decifrabili (chiave privata assente o rotta?): la coda può sembrare vuota per errore, non perché lo sia\n`);
   }
 
   // Vincitore todo: riusa next-feedback (exit 0 = JSON vincitore, 2 = vuoto).
+  // Retry sugli errori VERI (exit 1, crash): senza, un guasto momentaneo
+  // scarta l'intera coda todo. Exit 2 = coda davvero vuota → nessun retry.
   let todoWinner = null;
-  try {
-    const out = execFileSync('node', [resolve(ROOT, 'scripts', 'next-feedback.mjs')], {
-      cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
-    });
-    const winner = JSON.parse(out);
-    todoWinner = { id: winner._id, num: winner.num || winner.seq || '', _full: winner };
-  } catch (_) {
-    todoWinner = null; // exit !=0 → coda vuota o errore: trattato come "nessun todo"
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const out = execFileSync('node', [resolve(ROOT, 'scripts', 'next-feedback.mjs')], {
+        cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
+      });
+      const winner = JSON.parse(out);
+      todoWinner = { id: winner._id, num: winner.num || winner.seq || '', _full: winner };
+      break;
+    } catch (e) {
+      if (e?.status === 2) break; // coda todo legittimamente vuota
+      process.stderr.write(`[dispatch] next-feedback fallito (tentativo ${attempt}/3): ${e?.message || e}\n`);
+      if (attempt < 3) await new Promise((r) => setTimeout(r, 2000 * attempt));
+    }
   }
 
   return { reviews, todoWinner };
