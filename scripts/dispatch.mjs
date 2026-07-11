@@ -365,6 +365,29 @@ function diffForBranch(branch) {
   return r.ok ? r.out : '';
 }
 
+// ─── Retry (esportato, testato in tests/unit/dispatch.test.mjs) ───────────────
+
+/**
+ * Ritenta `fn` fino a `attempts` volte con backoff lineare. Un guasto
+ * transitorio (rete verso Firestore, sottoprocesso morto) non deve far
+ * "sembrare vuota" una coda piena: prima dei #310+ un singolo errore
+ * inghiottito bastava a saltare decine di todo e mandare il giro in audit.
+ * Dopo l'ultimo tentativo rilancia l'errore: decide il CHIAMANTE il fallback.
+ */
+export async function withRetry(fn, label = 'operazione', { attempts = 3, baseDelayMs = 2000 } = {}) {
+  let lastErr;
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      lastErr = e;
+      process.stderr.write(`[dispatch] ${label} fallita (tentativo ${i}/${attempts}): ${e?.message || e}\n`);
+      if (i < attempts) await new Promise((r) => setTimeout(r, baseDelayMs * i));
+    }
+  }
+  throw lastErr;
+}
+
 // ─── Snapshot dello stato (parte di rete, thin) ───────────────────────────────
 
 /**
