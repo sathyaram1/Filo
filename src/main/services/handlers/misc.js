@@ -67,9 +67,31 @@ module.exports = function register(on, ctx) {
     const path = require('node:path');
     const ses = wc.session;
 
+    // Referer della pagina: molti CDN con protezione hotlink rifiutano (403) le
+    // richieste "anonime" anche per immagini che nella pagina si vedono
+    // benissimo. downloadURL({ headers }) NON basta: Chromium ignora un header
+    // extra chiamato Referer (verificato: la richiesta arrivava sempre anonima).
+    // L'unico punto dove il motore lo lascia impostare è onBeforeSendHeaders:
+    // registriamo l'URL nel registro download-referrer, consultato dall'unico
+    // listener per sessione (services/cookies.js), che copre anche i redirect e
+    // gli eventuali resume.
+    let releaseReferrer = () => {};
+    try {
+      const referrer = String(sender?.tab?.url || sender?.url || '');
+      if (/^https?:/i.test(referrer)) {
+        require('../cookies').ensureHeaderHook(ses);
+        releaseReferrer = require('../download-referrer').expect(url, referrer);
+      }
+    } catch (_) {}
+
     return new Promise((resolve) => {
       let settled = false;
-      const finish = (r) => { if (!settled) { settled = true; resolve(r); } };
+      const finish = (r) => {
+        if (settled) return;
+        settled = true;
+        try { releaseReferrer(); } catch (_) {}
+        resolve(r);
+      };
 
       const onWillDownload = (_e, item) => {
         // Sulla stessa session possono partire altri download: agganciamo solo
