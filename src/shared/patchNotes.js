@@ -16,6 +16,14 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.126', date: '2026-07-12',
+      features: [],
+      fixes: [
+        '"Salva immagine come…" ora funziona anche sulle immagini dei siti che rifiutano i download "anonimi" (protezione hotlink): la richiesta presenta la pagina di provenienza, come farebbe un browser normale.',
+        'Se il salvataggio di un\'immagine si interrompe a metà (connessione instabile o server che tronca il file), ora ricevi un messaggio d\'errore invece di nessun riscontro.',
+      ],
+    },
+    {
       version: '0.2.125', date: '2026-07-11',
       features: [],
       fixes: [
