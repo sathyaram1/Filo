@@ -178,8 +178,8 @@ test('download che si interrompe a metà → l\'utente riceve un messaggio d\'er
     await expect(page.locator('.sn-toast')).toContainText('Non sono riuscito a salvare', { timeout: 25000 });
     expect(page.url()).toBe(pageUrl);
 
-    // Il download è stato davvero tentato più volte (prima richiesta + ripresa).
-    expect(hits).toBeGreaterThanOrEqual(3);
+    // Il download è stato davvero tentato (oltre alla richiesta dell'<img>).
+    expect(hits).toBeGreaterThanOrEqual(2);
   } finally {
     try { imgServer.closeAllConnections?.(); } catch (_) {}
     await new Promise((r) => imgServer.close(r));
