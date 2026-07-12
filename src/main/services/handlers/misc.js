@@ -119,13 +119,37 @@ module.exports = function register(on, ctx) {
             item.setSaveDialogOptions({ defaultPath: path.join(app.getPath('downloads'), filename) });
           } catch (_) {}
         }
+        // Download troncato a metà (connessione chiusa dal server): se Chromium
+        // lo considera riprendibile NON emette 'done' — l'item resta in stato
+        // 'interrupted' per sempre e l'utente non riceverebbe MAI un riscontro
+        // (né file né errore). Un tentativo di ripresa, poi annulliamo noi così
+        // 'done' arriva e l'errore raggiunge l'utente.
+        let resumeTried = false;
+        let forcedError = null;
+        item.on('updated', (_ev, state) => {
+          if (state !== 'interrupted') return;
+          if (!resumeTried && item.canResume()) {
+            resumeTried = true;
+            setTimeout(() => {
+              try { if (item.canResume()) { item.resume(); return; } } catch (_) {}
+              forcedError = 'interrupted';
+              try { item.cancel(); } catch (_) { finish({ ok: false, error: 'interrupted' }); }
+            }, 500);
+          } else {
+            forcedError = 'interrupted';
+            try { item.cancel(); } catch (_) { finish({ ok: false, error: 'interrupted' }); }
+          }
+        });
         item.once('done', (_ev, state) => {
           if (state === 'completed') {
             const p = item.getSavePath() || '';
             finish({ ok: true, path: p, filename: p ? path.basename(p) : filename });
           } else {
             // 'cancelled' = l'utente ha chiuso il dialogo: non è un errore.
-            finish({ ok: false, cancelled: state === 'cancelled', error: state });
+            // Se però l'abbiamo annullato NOI dopo un'interruzione irrecuperabile
+            // (forcedError), per l'utente È un errore e il toast deve dirlo.
+            const cancelledByUser = !forcedError && state === 'cancelled';
+            finish({ ok: false, cancelled: cancelledByUser, error: forcedError || state });
           }
         });
       };
