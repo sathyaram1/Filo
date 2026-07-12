@@ -341,6 +341,7 @@ module.exports = {
   isTrackerUrl,
   partitionForUrl,
   partitionForTab,
+  ensureHeaderHook,
   applyGpc,
   applyTrackerBlocking,
   ensureSiteSession,
