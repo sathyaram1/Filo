@@ -164,16 +164,14 @@ module.exports = function register(on, ctx) {
       }, 30000);
 
       try {
-        // Referer della pagina: alcuni CDN rifiutano il hotlink senza referrer.
-        const referrer = String(sender?.tab?.url || sender?.url || '');
-        if (/^https?:/i.test(referrer)) wc.downloadURL(url, { headers: { Referer: referrer } });
-        else wc.downloadURL(url);
-      } catch (_) {
-        try { wc.downloadURL(url); } catch (e2) {
-          ses.removeListener('will-download', onWillDownload);
-          clearTimeout(startTimer);
-          finish({ ok: false, error: e2?.message || String(e2) });
-        }
+        // Il Referer viaggia via onBeforeSendHeaders (registro download-referrer,
+        // registrato sopra): l'opzione { headers } di downloadURL NON funziona
+        // per quel header, Chromium la ignora.
+        wc.downloadURL(url);
+      } catch (e2) {
+        ses.removeListener('will-download', onWillDownload);
+        clearTimeout(startTimer);
+        finish({ ok: false, error: e2?.message || String(e2) });
       }
     });
   });
