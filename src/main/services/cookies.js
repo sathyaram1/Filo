@@ -154,29 +154,44 @@ function partitionForUrl(url, trusted) {
 // ─── GPC: header Sec-GPC: 1 ───────────────────────────────────────────────
 //
 // Una sola registrazione onBeforeSendHeaders per sessione (Electron consente un
-// solo listener per evento/sessione). Il flag enabled è in una mappa così
-// possiamo accendere/spegnere GPC senza ri-registrare.
+// solo listener per evento/sessione: una seconda registrazione SOSTITUISCE la
+// prima). Questo è quindi l'UNICO choke point per riscrivere gli header in
+// uscita, e ci convivono due usi indipendenti:
+//   - GPC (Sec-GPC: 1), gated dal flag enabled nella mappa (accendi/spegni
+//     senza ri-registrare);
+//   - il Referer dei download avviati dal main ("Salva immagine come…", #274):
+//     downloadURL non può impostare il Referer (Chromium ignora un header extra
+//     con quel nome), quindi lo inietta qui il registro download-referrer
+//     (require lazy, stesso pattern dell'ad-blocking in onBeforeRequest).
 
 const gpcState = new WeakMap(); // session → { enabled }
 
-function applyGpc(ses, enabled) {
-  if (!ses || !ses.webRequest) return;
+// Registra (se manca) l'unico listener onBeforeSendHeaders della sessione,
+// SENZA toccare lo stato GPC. Usato anche da chi avvia download con Referer
+// (services/handlers/misc.js) su sessioni dove GPC non è mai stato configurato
+// (incognito, partizioni proxy).
+function ensureHeaderHook(ses) {
+  if (!ses || !ses.webRequest) return null;
   let state = gpcState.get(ses);
   if (!state) {
-    state = { enabled: !!enabled };
+    state = { enabled: false };
     gpcState.set(ses, state);
     ses.webRequest.onBeforeSendHeaders((details, callback) => {
       const s = gpcState.get(ses);
-      if (s && s.enabled) {
-        const headers = { ...details.requestHeaders, 'Sec-GPC': '1' };
-        callback({ requestHeaders: headers });
-      } else {
-        callback({ requestHeaders: details.requestHeaders });
-      }
+      let headers = details.requestHeaders;
+      if (s && s.enabled) headers = { ...headers, 'Sec-GPC': '1' };
+      let ref = null;
+      try { ref = require('./download-referrer').referrerFor(details); } catch (_) {}
+      if (ref) headers = { ...headers, Referer: ref };
+      callback({ requestHeaders: headers });
     });
-  } else {
-    state.enabled = !!enabled;
   }
+  return state;
+}
+
+function applyGpc(ses, enabled) {
+  const state = ensureHeaderHook(ses);
+  if (state) state.enabled = !!enabled;
 }
 
 // ─── blocco tracker: cancella le richieste ai tracker noti ──────────────────
