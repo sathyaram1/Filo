@@ -1,7 +1,0 @@
-{
-  "id": "4817da42-4aed-4103-8d50-5dcdce317ffb",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica e stata pubblicata. In modalita terminale, i comandi che impostano l'orologio di sistema (date -s) o rinominano il computer (hostname <nome>) ora chiedono conferma prima di partire, invece di essere eseguiti al volo come una semplice lettura. Le forme di sola lettura (date, date +%F, hostname -f, ecc.) continuano a funzionare senza conferma.",
-  "queuedAt": "2026-07-13T19:29:15.223Z",
-  "queuedBy": "routine"
-}
