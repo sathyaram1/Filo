@@ -231,7 +231,13 @@
     // di versione/help è lettura → 1 (es. `node --version`, `go version`).
     if (ARBITRARY_CODE.has(prog)) return isVersionQuery(trimmed) ? 1 : 3;
 
-    if (LEVEL1.has(prog)) return 1; // sola lettura: i flag non la rendono distruttiva
+    if (LEVEL1.has(prog)) {
+      // Quasi tutti i LEVEL1 restano 1 anche con flag (la lettura non diventa
+      // distruttiva). Eccezione: i pochi comandi che con certi argomenti
+      // IMPOSTANO lo stato (date -s, hostname <nome>) salgono a 2 (conferma).
+      const mutates = LEVEL1_MUTATES[prog];
+      return mutates && mutates(trimmed) ? 2 : 1;
+    }
     // Anche un comando LEVEL2 ridotto a `--version`/`--help` è sola lettura → 1.
     if (LEVEL2.has(prog)) {
       if (isVersionQuery(trimmed)) return 1;
