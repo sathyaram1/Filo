@@ -1,7 +1,0 @@
-{
-  "id": "8de22c9d-c66d-4e0b-95d8-6304224fda2e",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho verificato la falla di sicurezza partendo dal sintomo: quando chiedi a Filo di cambiare l'aspetto di una pagina, il CSS generato passa da un controllo che deve impedire richieste di rete nascoste. Ho ricreato esattamente l'attacco descritto (la scritta url camuffata con la sintassi di escape, es. \\75rl(...) e ur\\6c(...), sia a 2 che a 6 cifre) e ora viene correttamente scartata: nessun CSS viene applicato, quindi nessuna richiesta di rete parte. Ho provato anche altre varianti dello stesso trucco (import ed indirizzi javascript camuffati con escape, backslash nascosto nel bersaglio della regola): tutte bloccate. Sotto stress (campi vuoti, solo spazi, testo enorme oltre il limite, byte di controllo, parentesi con spazi, maiuscole/minuscole miste, tentativi di uscire dalla regola con parentesi graffe) il filtro regge e non applica nulla. Fondamentale: le richieste legittime continuano a funzionare identiche — 'titoli in grassetto', 'link in rosso', 'testo più grande', regole multiple — vengono applicate regolarmente. Tutti i test automatici dell'app (916) restano verdi. La verifica visiva/E2E con Electron non è necessaria qui perché il controllo è logica pura, interamente esercitabile e verificata a monte.",
-  "queuedAt": "2026-07-13T19:18:14.516Z",
-  "queuedBy": "routine"
-}
