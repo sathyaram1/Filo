@@ -118,7 +118,9 @@
     // nulla. Nota: qui `-s` = "short" (lettura), NON "set".
     hostname: (cmd) => {
       const rest = tokens(cmd).slice(1);
-      return rest.some((t) => /^(-F|--file)$/i.test(t) || !t.startsWith('-'));
+      // `-F`/`--file` (imposta il nome da file) è case-sensitive: `-f` = fqdn
+      // è lettura, NON deve combaciare.
+      return rest.some((t) => /^(-F|--file)$/.test(t) || !t.startsWith('-'));
     },
   };
 
