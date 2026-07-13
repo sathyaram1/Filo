@@ -161,8 +161,17 @@ function scheduleFlush() {
   STATE.flushTimer = setTimeout(flush, 100);
 }
 
+// I flush sono SERIALIZZATI: due flush concorrenti condividono lo stesso file
+// .tmp, e la rename del secondo trova il tmp già consumato dal primo (ENOENT).
+// Con uno storage grande la scrittura async dura abbastanza da far scattare un
+// nuovo timer di debounce mentre la precedente è ancora in volo.
 async function flush() {
   STATE.flushTimer = null;
+  STATE.flushChain = (STATE.flushChain || Promise.resolve()).then(doFlush);
+  return STATE.flushChain;
+}
+
+async function doFlush() {
   const target = filePath();
   const tmp = target + '.tmp';
   try {
