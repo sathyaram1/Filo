@@ -21,6 +21,8 @@
 //     caricare fogli di stile esterni o vecchie expression IE;
 //   - niente url( : nessuna richiesta di rete dal CSS iniettato (font/img
 //     remoti, beacon); l'estetica del testo non ne ha bisogno;
+//   - niente backslash: gli escape CSS (\75rl( , ur\6c( ) verrebbero decodificati
+//     dal browser in un token vietato (es. url(), aggirando i divieti qui sopra;
 //   - limiti di lunghezza su selettore, dichiarazioni e numero di regole.
 // Una regola che non supera la sanificazione viene SCARTATA (non "aggiustata"):
 //   meglio non applicare nulla che applicare qualcosa di inatteso.
