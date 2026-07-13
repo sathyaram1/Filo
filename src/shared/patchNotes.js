@@ -22,6 +22,7 @@
       ],
       fixes: [
         'Risolto un errore («flash is not a valid model ID») che poteva bloccare le funzioni AI senza modello personalizzato: ora tornano a usare correttamente i modelli integrati di riserva.',
+        'Il salvataggio delle impostazioni e della sessione su disco non va più in errore quando molte modifiche arrivano ravvicinate: prima alcune scritture potevano andare perse.',
       ],
     },
     {
