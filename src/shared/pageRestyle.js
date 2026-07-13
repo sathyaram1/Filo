@@ -34,7 +34,13 @@
 
   // Token vietati ovunque (selettore o dichiarazioni): aprirebbero un vettore
   // di iniezione o una richiesta di rete. Case-insensitive.
-  const FORBIDDEN_RE = /[<>{}]|@import|@charset|@namespace|expression\s*\(|url\s*\(|javascript:/i;
+  //
+  // Il backslash e' vietato di per se': gli escape CSS (\75rl( , ur\6c( ,
+  // @\69mport , javascript\3a ) verrebbero decodificati dal browser in un token
+  // vietato, aggirando i controlli letterali qui sotto. L'estetica del testo non
+  // ha bisogno di sequenze di escape, quindi qualunque backslash fa scartare la
+  // regola: chiude l'intera classe di bypass senza dover normalizzare gli escape.
+  const FORBIDDEN_RE = /[<>{}\\]|@import|@charset|@namespace|expression\s*\(|url\s*\(|javascript:/i;
   // Caratteri di controllo (NUL..0x1f, DEL): costruiti via stringa per non
   // mettere byte di controllo nel sorgente.
   const CONTROL_RE = new RegExp('[\\u0000-\\u001f\\u007f]');
