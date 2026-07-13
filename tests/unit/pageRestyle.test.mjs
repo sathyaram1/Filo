@@ -72,6 +72,27 @@ test('SICUREZZA: scarta url() (richiesta di rete dal CSS)', () => {
   assert.equal(R.normalizeRules({ selettore: 'body', css: 'background: url(http://evil/beacon.gif)' }).length, 0);
 });
 
+test('SICUREZZA: scarta url() camuffato con escape CSS (\\75rl, ur\\6c) — bypass del filtro', () => {
+  // Il browser decodifica gli escape CSS: "\75rl(" e "ur\6c(" diventano "url(",
+  // quindi partirebbe comunque una richiesta di rete verso l'attaccante. Se il
+  // filtro cercasse solo la sottostringa letterale "url(", queste passerebbero.
+  // Devono essere scartate (né in normalizeRules né nel CSS finale di buildCss).
+  const a = R.normalizeRules({ selettore: 'body', css: 'background: \\75rl(https://evil.example/beacon.gif)' });
+  assert.equal(a.length, 0);
+  assert.equal(R.buildCss(a), '');
+  const b = R.normalizeRules({ selettore: 'body', css: 'background: ur\\6c(https://evil.example/beacon.gif)' });
+  assert.equal(b.length, 0);
+  // escape a 6 cifre + eventuale spazio di terminazione
+  const c = R.normalizeRules({ selettore: 'body', css: 'background: \\000075rl(https://evil.example/x.gif)' });
+  assert.equal(c.length, 0);
+  // anche altri token vietati camuffati con escape (@import, javascript:) via backslash
+  assert.equal(R.normalizeRules({ selettore: 'a', css: 'behavior: \\6a\\61vascript:alert(1)' }).length, 0);
+});
+
+test('SICUREZZA: un backslash qualunque nel selettore fa scartare la regola', () => {
+  assert.equal(R.normalizeRules({ selettore: 'body\\75', css: 'color: red' }).length, 0);
+});
+
 test('SICUREZZA: scarta selettori con markup o graffe', () => {
   assert.equal(R.normalizeRules({ selettore: 'h1 <script>', css: 'color:red' }).length, 0);
   assert.equal(R.normalizeRules({ selettore: 'h1 { x', css: 'color:red' }).length, 0);
