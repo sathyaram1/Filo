@@ -20,6 +20,7 @@
       features: [],
       fixes: [
         'Rafforzata la protezione quando chiedi a Filo di modificare l\'aspetto di una pagina: il controllo che impedisce al CSS generato di avviare richieste di rete nascoste non è più aggirabile con sintassi camuffate.',
+        'In modalità terminale, i comandi che cambiano lo stato del sistema (come impostare l\'orologio o rinominare il computer) ora chiedono conferma prima di partire, invece di essere eseguiti al volo come una semplice lettura.',
       ],
     },
     {

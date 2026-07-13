@@ -210,6 +210,34 @@ test('livello 1 — comandi di diagnostica di sola lettura aggiunti', () => {
   }
 });
 
+test('livello 1 — date/hostname senza argomenti mutanti restano lettura', () => {
+  for (const cmd of [
+    'date', 'date +%Y-%m-%d', 'date -u', 'date -R', 'date -d "yesterday"',
+    'date --date=@1700000000', 'date +%s',
+    'hostname', 'hostname -f', 'hostname -I', 'hostname -i', 'hostname -d',
+    'hostname -s', 'hostname -A',
+  ]) {
+    assert.equal(lvl(cmd), 1, `"${cmd}" (lettura) dovrebbe essere livello 1`);
+  }
+});
+
+test('livello 2 — date -s / hostname <nome> modificano lo stato → conferma', () => {
+  // Feedback #311: comandi che cambiano orologio o nome host venivano eseguiti
+  // subito perché trattati come sola lettura; ora chiedono conferma.
+  for (const cmd of [
+    'date -s "2020-01-01 00:00:00"', 'date --set="2020-01-01 00:00:00"',
+    'date --set 2020-01-01', 'date -s 010100002020',
+    'hostname nuovonome', 'hostname test', 'hostname -F /etc/hostname',
+  ]) {
+    assert.equal(lvl(cmd), 2, `"${cmd}" (modifica stato) dovrebbe essere livello 2`);
+  }
+});
+
+test('sequenza — date -s dentro una catena alza il livello a 2', () => {
+  assert.equal(lvl('cd /tmp && date -s "2020-01-01 00:00:00"'), 2);
+  assert.equal(lvl('hostname evil && ls'), 2);
+});
+
 test('"criterio di fatto" della spec — gli esempi citati', () => {
   assert.equal(lvl('ls'), 1, 'ls esegue subito');
   assert.equal(lvl('git push'), 2, 'git push → popup');

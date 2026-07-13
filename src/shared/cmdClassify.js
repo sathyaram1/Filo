@@ -103,6 +103,27 @@
     'md5sum', 'sha1sum', 'sha256sum', 'cksum',
   ]);
 
+  // Alcuni programmi LEVEL1 sono di sola lettura SOLO finché non ricevono gli
+  // argomenti che ne cambiano il senso: `date` legge l'orologio ma `date -s`/
+  // `--set` lo IMPOSTA, `hostname` stampa il nome ma `hostname <nome>` lo
+  // CAMBIA. Senza tali argomenti restano livello 1; con essi salgono a livello 2
+  // (conferma), perché modificano lo stato del sistema in modo recuperabile.
+  // Ogni predicato riceve il comando intero e ritorna true se MODIFICA lo stato.
+  const LEVEL1_MUTATES = {
+    // `date -s "..."` / `date --set=...` imposta l'orologio; le altre forme
+    // (`date`, `date +%F`, `date -u`, `date -d "ieri"`) sono letture.
+    date: (cmd) => /(^|\s)(-s|--set)(=|\s|$)/i.test(cmd),
+    // `hostname <nome>` (un operando non-flag) o `hostname -F file` imposta il
+    // nome host; i flag di lettura (-f, -I, -i, -d, -s, -A, -a…) non cambiano
+    // nulla. Nota: qui `-s` = "short" (lettura), NON "set".
+    hostname: (cmd) => {
+      const rest = tokens(cmd).slice(1);
+      // `-F`/`--file` (imposta il nome da file) è case-sensitive: `-f` = fqdn
+      // è lettura, NON deve combaciare.
+      return rest.some((t) => /^(-F|--file)$/.test(t) || !t.startsWith('-'));
+    },
+  };
+
   // Modifica lo stato ma in modo recuperabile: livello 2.
   const LEVEL2 = new Set([
     'mkdir', 'md', 'touch', 'cp', 'copy', 'xcopy', 'robocopy', 'move', 'mv',
@@ -212,7 +233,13 @@
     // di versione/help è lettura → 1 (es. `node --version`, `go version`).
     if (ARBITRARY_CODE.has(prog)) return isVersionQuery(trimmed) ? 1 : 3;
 
-    if (LEVEL1.has(prog)) return 1; // sola lettura: i flag non la rendono distruttiva
+    if (LEVEL1.has(prog)) {
+      // Quasi tutti i LEVEL1 restano 1 anche con flag (la lettura non diventa
+      // distruttiva). Eccezione: i pochi comandi che con certi argomenti
+      // IMPOSTANO lo stato (date -s, hostname <nome>) salgono a 2 (conferma).
+      const mutates = LEVEL1_MUTATES[prog];
+      return mutates && mutates(trimmed) ? 2 : 1;
+    }
     // Anche un comando LEVEL2 ridotto a `--version`/`--help` è sola lettura → 1.
     if (LEVEL2.has(prog)) {
       if (isVersionQuery(trimmed)) return 1;
