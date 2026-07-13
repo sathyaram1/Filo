@@ -16,6 +16,15 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.127', date: '2026-07-13',
+      features: [
+        'Ora puoi scegliere il modello AI anche per le funzioni dei mazzi (chat di ricerca carte, parere su una carta, etichette automatiche), sia nelle Opzioni sia nei modelli predefiniti condivisi.',
+      ],
+      fixes: [
+        'Risolto un errore («flash is not a valid model ID») che poteva bloccare le funzioni AI senza modello personalizzato: ora tornano a usare correttamente i modelli integrati di riserva.',
+      ],
+    },
+    {
       version: '0.2.126', date: '2026-07-12',
       features: [],
       fixes: [
