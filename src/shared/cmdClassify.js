@@ -103,6 +103,25 @@
     'md5sum', 'sha1sum', 'sha256sum', 'cksum',
   ]);
 
+  // Alcuni programmi LEVEL1 sono di sola lettura SOLO finché non ricevono gli
+  // argomenti che ne cambiano il senso: `date` legge l'orologio ma `date -s`/
+  // `--set` lo IMPOSTA, `hostname` stampa il nome ma `hostname <nome>` lo
+  // CAMBIA. Senza tali argomenti restano livello 1; con essi salgono a livello 2
+  // (conferma), perché modificano lo stato del sistema in modo recuperabile.
+  // Ogni predicato riceve il comando intero e ritorna true se MODIFICA lo stato.
+  const LEVEL1_MUTATES = {
+    // `date -s "..."` / `date --set=...` imposta l'orologio; le altre forme
+    // (`date`, `date +%F`, `date -u`, `date -d "ieri"`) sono letture.
+    date: (cmd) => /(^|\s)(-s|--set)(=|\s|$)/i.test(cmd),
+    // `hostname <nome>` (un operando non-flag) o `hostname -F file` imposta il
+    // nome host; i flag di lettura (-f, -I, -i, -d, -s, -A, -a…) non cambiano
+    // nulla. Nota: qui `-s` = "short" (lettura), NON "set".
+    hostname: (cmd) => {
+      const rest = tokens(cmd).slice(1);
+      return rest.some((t) => /^(-F|--file)$/i.test(t) || !t.startsWith('-'));
+    },
+  };
+
   // Modifica lo stato ma in modo recuperabile: livello 2.
   const LEVEL2 = new Set([
     'mkdir', 'md', 'touch', 'cp', 'copy', 'xcopy', 'robocopy', 'move', 'mv',
