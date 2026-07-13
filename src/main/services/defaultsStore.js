@@ -139,9 +139,13 @@ function get() {
       out.models = { ...out.models, ...remoteModels.models };
     }
     if (remoteModels.modelRegistry && typeof remoteModels.modelRegistry === 'object') {
-      // Il registry remoto sostituisce interamente quello locale (contratto:
-      // "questa è la lista completa", come nelle Opzioni).
-      out.modelRegistry = { ...remoteModels.modelRegistry };
+      // Il registry remoto si SOVRAPPONE a quello di build invece di
+      // sostituirlo: i nickname integrati (flash, flash-or, tts, …) devono
+      // restare risolvibili anche se il doc remoto non li elenca, perché le
+      // azioni assenti dal doc remoto ricadono sulle catene di default che li
+      // citano. Un nickname irrisolvibile finirebbe GREZZO al provider
+      // (OpenRouter 400 "flash is not a valid model ID").
+      out.modelRegistry = { ...out.modelRegistry, ...remoteModels.modelRegistry };
     }
   }
 
