@@ -275,7 +275,11 @@ async function applyLimitToChain(settings, attempts) {
 }
 
 function buildAttemptChain(settings, modelRef) {
-  const registry = settings.modelRegistry || SN_CONST.DEFAULT_MODEL_REGISTRY;
+  // I nickname integrati fanno sempre da base: un registry utente/remoto che
+  // non li elenca non deve renderli irrisolvibili, perché le azioni senza
+  // catena esplicita ricadono sui default (es. 'flash, flash-or') e un
+  // nickname non risolto finirebbe grezzo a OpenRouter (400 garantito).
+  const registry = { ...SN_CONST.DEFAULT_MODEL_REGISTRY, ...(settings.modelRegistry || {}) };
   // Il campo di un'azione può contenere più nickname separati da virgola: il
   // primo è il primario, gli altri fallback in ordine. Per ciascuno proviamo i
   // provider disponibili (Gemini diretto → provider scelto → OpenRouter).
