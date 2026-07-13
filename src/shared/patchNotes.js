@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.128', date: '2026-07-13',
+      features: [],
+      fixes: [
+        'Rafforzata la protezione quando chiedi a Filo di modificare l\'aspetto di una pagina: il controllo che impedisce al CSS generato di avviare richieste di rete nascoste non è più aggirabile con sintassi camuffate.',
+      ],
+    },
+    {
       version: '0.2.127', date: '2026-07-13',
       features: [
         'Ora puoi scegliere il modello AI anche per le funzioni dei mazzi (chat di ricerca carte, parere su una carta, etichette automatiche), sia nelle Opzioni sia nei modelli predefiniti condivisi.',
