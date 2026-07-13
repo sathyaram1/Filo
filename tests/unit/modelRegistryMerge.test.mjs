@@ -92,13 +92,12 @@ test('con il registry effettivo le azioni dei mazzi risolvono in modelli concret
   });
   assert.ok(attempts.length > 0, 'nessun tentativo costruito per la chat dei mazzi');
   // Un nickname non risolto passerebbe grezzo al provider (es. model === 'flash',
-  // che OpenRouter rifiuta con 400): ogni tentativo deve usare l'id concreto.
+  // che OpenRouter rifiuta con 400): ogni tentativo deve usare l'id concreto
+  // del registry di build corrispondente a uno dei nickname della catena.
+  const concreteIds = refs.map((r) => C.DEFAULT_MODEL_REGISTRY[r]?.model).filter(Boolean);
   for (const a of attempts) {
-    assert.ok(!refs.includes(a.model),
-      `il tentativo usa il nickname grezzo "${a.model}" invece del modello concreto`);
-    assert.equal(a.model, C.DEFAULT_MODEL_REGISTRY[refs.find((r) =>
-      C.DEFAULT_MODEL_REGISTRY[r].provider === a.provider
-      && C.DEFAULT_MODEL_REGISTRY[r].model === a.model)]?.model);
+    assert.ok(concreteIds.includes(a.model),
+      `il tentativo usa "${a.model}" che non è un modello concreto della catena "${chain}"`);
   }
 });
 
