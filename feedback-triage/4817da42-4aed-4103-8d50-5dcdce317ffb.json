@@ -1,7 +1,0 @@
-{
-  "id": "4817da42-4aed-4103-8d50-5dcdce317ffb",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho riprodotto esattamente la segnalazione in modalita terminale: ora impostare l'orologio (date -s \"...\" e date --set=...) e rinominare il computer (hostname nuovonome, e anche hostname -F da file) chiedono conferma prima di partire, invece di essere lanciati subito come letture. Ho controllato che le vere letture restino immediate e senza attrito: date da solo, date con formato (+%Y-%m-%d, +%s), date -u, date -d \"ieri\", hostname da solo e con i flag di lettura (-f fqdn, -I, -i, -d, -s short). Stress test: la conferma scatta anche quando i comandi sono concatenati (es. cd /tmp && date -s ..., cd /tmp ; hostname test) e a prescindere da maiuscole/minuscole; il tranello -F (imposta da file, chiede conferma) vs -f (fqdn, resta lettura) e gestito correttamente. Tutti i 24 casi provati danno l'esito atteso e l'intera batteria di test della logica passa senza regressioni. Nota: alcune forme obsolete e ambigue di impostazione dell'ora (data numerica posizionale senza -s) restano trattate come lettura; e una scelta consapevole per non introdurre conferme su usi comuni, non un difetto.",
-  "queuedAt": "2026-07-13T19:27:48.399Z",
-  "queuedBy": "routine"
-}
