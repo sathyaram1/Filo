@@ -41,6 +41,9 @@
       [A.FILO_TAB_SEARCH, 'options_action_tab_search'],
       [A.FILO_DASHBOARD, 'options_action_filo_dashboard'],
       [A.FILO_CHAT, 'options_action_filo_chat'],
+      [A.DECKS_CHAT, 'options_action_decks_chat'],
+      [A.DECKS_OPINION, 'options_action_decks_opinion'],
+      [A.DECKS_AUTOTAG, 'options_action_decks_autotag'],
     ];
   }
 
