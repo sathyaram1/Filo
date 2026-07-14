@@ -238,6 +238,59 @@ test('sequenza — date -s dentro una catena alza il livello a 2', () => {
   assert.equal(lvl('hostname evil && ls'), 2);
 });
 
+test('livello 2 — git tag/branch con un nome CREANO (feedback #285) → conferma', () => {
+  // Feedback #285: `git tag v1.0` e `git branch nuovo-branch` modificano la repo
+  // (creano tag/branch) ma partivano subito, come una lettura. Ora chiedono
+  // conferma perché hanno un operando dopo il sotto-comando.
+  for (const cmd of [
+    'git tag v1.0', 'git tag release-2', 'git tag -a v1.0 -m "rilascio"',
+    'git branch nuovo-branch', 'git branch feature/x', 'git branch -m vecchio nuovo',
+  ]) {
+    assert.equal(lvl(cmd), 2, `"${cmd}" (crea/rinomina) dovrebbe essere livello 2`);
+  }
+});
+
+test('livello 1 — git tag/branch NUDI o con soli flag di lettura ELENCANO', () => {
+  // La forma senza operando è pura lettura (elenca): resta livello 1.
+  for (const cmd of [
+    'git tag', 'git tag -l', 'git tag --list',
+    'git branch', 'git branch -a', 'git branch -r', 'git branch -v',
+    'git branch --list', 'git branch --show-current',
+  ]) {
+    assert.equal(lvl(cmd), 1, `"${cmd}" (elenca) dovrebbe essere livello 1`);
+  }
+});
+
+test('livello 3 — git tag -d / branch -D (cancellazioni) restano conferma-testo', () => {
+  for (const cmd of ['git tag -d v1.0', 'git branch -d feature', 'git branch -D feature']) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" (cancella) dovrebbe essere livello 3`);
+  }
+});
+
+test('git config — legge (1), imposta (2), cancella (3) secondo gli argomenti', () => {
+  for (const cmd of ['git config --list', 'git config -l', 'git config --get user.name', 'git config user.name']) {
+    assert.equal(lvl(cmd), 1, `"${cmd}" (legge) dovrebbe essere livello 1`);
+  }
+  for (const cmd of ['git config user.name "Mario"', 'git config --global user.email a@b.c', 'git config --add safe.directory /x', 'git config --replace-all k v']) {
+    assert.equal(lvl(cmd), 2, `"${cmd}" (imposta) dovrebbe essere livello 2`);
+  }
+  for (const cmd of ['git config --unset user.name', 'git config --unset-all k', 'git config --remove-section branch.x']) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" (cancella) dovrebbe essere livello 3`);
+  }
+});
+
+test('git remote — elenca/mostra (1), aggiunge/rinomina (2), rimuove (3)', () => {
+  for (const cmd of ['git remote', 'git remote -v', 'git remote show origin', 'git remote get-url origin']) {
+    assert.equal(lvl(cmd), 1, `"${cmd}" (legge) dovrebbe essere livello 1`);
+  }
+  for (const cmd of ['git remote add origin http://x/y.git', 'git remote rename origin upstream', 'git remote set-url origin http://z']) {
+    assert.equal(lvl(cmd), 2, `"${cmd}" (modifica) dovrebbe essere livello 2`);
+  }
+  for (const cmd of ['git remote remove origin', 'git remote rm origin', 'git remote prune origin']) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" (rimuove) dovrebbe essere livello 3`);
+  }
+});
+
 test('"criterio di fatto" della spec — gli esempi citati', () => {
   assert.equal(lvl('ls'), 1, 'ls esegue subito');
   assert.equal(lvl('git push'), 2, 'git push → popup');
