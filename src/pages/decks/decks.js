@@ -1527,6 +1527,14 @@
     });
 
     window.addEventListener('hashchange', route);
+
+    // La finestra che si rimpicciolisce (o cambia schermo) deve ri-adattare le
+    // larghezze: senza questo, con larghezze salvate più grandi dello spazio
+    // disponibile la colonna centrale del mazzo spariva. Ri-applichiamo solo
+    // quando il builder è visibile.
+    window.addEventListener('resize', () => {
+      if (!$('screenBuilder').hidden) applyLayout();
+    });
   }
 
   async function init() {
