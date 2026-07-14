@@ -16,11 +16,17 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.131', date: '2026-07-14',
+      features: [],
+      fixes: [
+        'L\'etichetta "in lavorazione" sui feedback ora resta accesa per tutta la durata effettiva del lavoro (prima si spegneva quasi subito), e un feedback la cui lavorazione si interrompe a metà torna da solo in coda invece di restare bloccato.',
+      ],
+    },
+    {
       version: '0.2.130', date: '2026-07-14',
       features: [],
       fixes: [
         'In modalità terminale, quando l\'assistente scarica un file scegliendo dove salvarlo (con comandi come curl o wget verso un percorso preciso), ora ti viene chiesta la conferma più rigorosa — quella in cui devi digitare "conferma" — perché un download del genere può sovrascrivere file delicati del tuo computer, non solo un file qualsiasi.',
-        'L\'etichetta "in lavorazione" sui feedback ora resta accesa per tutta la durata effettiva del lavoro (prima si spegneva quasi subito), e un feedback la cui lavorazione si interrompe a metà torna da solo in coda invece di restare bloccato.',
       ],
     },
     {
