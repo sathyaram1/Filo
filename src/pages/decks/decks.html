@@ -51,13 +51,21 @@
        di Filo, posizionato fixed alle coordinate del click (come in archivio). */
     .dk-ctxmenu { position: fixed; right: auto; top: auto; min-width: 140px; }
 
-    /* ── Builder (§2): tre colonne a larghezza FISSA, mai resize automatico.
-       L'UNICO resize ammesso è il trascinamento A MANO dei due divisori
-       (deliberato, mai su hover/click); le larghezze sono persistite e le
-       imposta il JS in grid-template-columns. Default: sinistra media,
-       centro ~300px, destra il resto. ── */
+    /* Il builder è un'app a piena larghezza: esce dal max-width di .sn-page
+       (pensato per le pagine di impostazioni, non per un'area di lavoro) così
+       da usare TUTTO lo spazio orizzontale della finestra. La classe è messa
+       sul body dal JS solo mentre il builder è a schermo. */
+    body.dk-full .sn-page { max-width: none; }
+
+    /* ── Builder (§2): tre colonne con due divisori trascinabili A MANO
+       (deliberato, mai su hover/click); le larghezze persistono e le imposta
+       il JS in grid-template-columns. Le due colonne esterne (chat e dettaglio)
+       hanno larghezza fissa; la colonna centrale del MAZZO è quella flessibile
+       che assorbe lo spazio in più (è l'artefatto centrale dell'app, come nei
+       deck builder reali) — così il dettaglio resta di dimensione sana e la
+       carta in anteprima non esplode oltre l'altezza dello schermo. ── */
     .dk-builder {
-      display: grid; grid-template-columns: 340px 6px 300px 6px 1fr;
+      display: grid; grid-template-columns: 340px 6px 1fr 6px 340px;
       gap: 0; height: calc(100vh - 96px); min-height: 320px;
       border: 1px solid var(--sn-border); border-radius: 10px; overflow: hidden;
     }
@@ -73,6 +81,21 @@
     .dk-col-head {
       padding: 10px 12px; border-bottom: 1px solid var(--sn-border);
       font-size: 13px; font-weight: 600;
+    }
+    /* Testata della colonna chat: il ritorno ai Mazzi è un'icona SULLO STESSO
+       livello del titolo di colonna (niente più riga-bottone sopra il builder,
+       che sprecava spazio verticale e stava nel margine vuoto a sinistra). */
+    .dk-col-head-chat { display: flex; align-items: center; gap: 8px; }
+    .dk-head-back {
+      flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+      width: 22px; height: 22px; padding: 0; margin: -2px 0;
+      border: 1px solid transparent; border-radius: 6px;
+      background: transparent; color: var(--sn-muted);
+      font: inherit; font-size: 16px; line-height: 1; cursor: pointer;
+    }
+    .dk-head-back:hover, .dk-head-back:focus-visible {
+      border-color: var(--sn-border); color: var(--sn-text); background: var(--sn-hover);
+      outline: none;
     }
     .dk-col-body { flex: 1; overflow: auto; padding: 12px; }
     .dk-placeholder { color: var(--sn-muted); font-size: 13px; }
@@ -407,12 +430,13 @@
 
     <!-- ── Schermata Builder (§2) ────────────────────────────────────────── -->
     <section id="screenBuilder" class="dk-screen" hidden>
-      <div class="dk-back">
-        <button class="sn-btn sn-btn-secondary" id="backToLibrary">← Mazzi</button>
-      </div>
       <div class="dk-builder" id="builderGrid">
         <div class="dk-col" id="colChat">
-          <div class="dk-col-head">Chat e ricerca</div>
+          <div class="dk-col-head dk-col-head-chat">
+            <button class="dk-head-back" id="backToLibrary"
+                    title="Torna ai mazzi" aria-label="Torna ai mazzi">←</button>
+            <span>Chat e ricerca</span>
+          </div>
           <div class="dk-col-body dk-chat-body" id="chatLog" aria-live="polite">
             <p class="dk-placeholder" id="chatEmpty">
               Cerca carte o parla con Filo del tuo mazzo: una query secca

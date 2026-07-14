@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.129', date: '2026-07-14',
+      features: [],
+      fixes: [
+        'La costruzione mazzi ora usa tutta la larghezza della finestra invece di restare stretta al centro, e il ritorno ai Mazzi è un\'icona accanto al titolo della colonna: layout più pulito e più spazio per lavorare.',
+      ],
+    },
+    {
       version: '0.2.128', date: '2026-07-13',
       features: [],
       fixes: [
