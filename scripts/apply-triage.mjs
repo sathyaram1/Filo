@@ -529,9 +529,20 @@ async function reconcileClaims(bearer, resolvedIds = new Set()) {
     const ws = d.fields?.workingSince?.stringValue || '';
     if (!id || !ws) continue;
     if (!FS || !FS.isWorkingExpired({ status: 'working', workingSince: ws })) continue;
-    const r = await patchFeedback({ id, status: 'todo', queuedBy: 'routine:reconcile' }, bearer);
-    if (r.ok) console.log(`  ✓ working scaduto su ${id} → todo`);
-    else if (r.status !== 404) console.warn(`  ! reset working ${id}: ${r.body || `HTTP ${r.status}`}`);
+    // Contatore delle interruzioni consecutive: le prime volte il feedback
+    // torna in coda; alla soglia si arrende → design/loop + nota all'owner
+    // (vedi expiryOutcome). Senza soglia, un'istanza che muore sempre (es.
+    // crediti finiti) farebbe ping-pong todo↔working all'infinito.
+    const out = expiryOutcome(intField(d, 'workingResets'));
+    const entry = { id, status: out.status, queuedBy: 'routine:reconcile' };
+    if (out.reason) entry.reason = out.reason;
+    if (out.notes) entry.notes = out.notes;
+    const r = await patchFeedback(entry, bearer);
+    if (r.ok) {
+      const c = await patchFields(id, { workingResets: out.workingResets }, bearer);
+      if (!c.ok && c.status !== 404) console.warn(`  ! contatore interruzioni ${id}: HTTP ${c.status}`);
+      console.log(`  ✓ working scaduto su ${id} → ${out.status}${out.status === 'todo' ? ` (interruzione n.${out.workingResets})` : ' (soglia interruzioni raggiunta)'}`);
+    } else if (r.status !== 404) console.warn(`  ! reset working ${id}: ${r.body || `HTTP ${r.status}`}`);
   }
 }
 
