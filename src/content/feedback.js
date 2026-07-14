@@ -13,6 +13,23 @@
   const Popup = global.SN_POPUP;
   const Feedback = global.SN_FEEDBACK;
   const Icons = global.SN_ICONS || {};
+  // Allowlist condivisa dei tipi di allegato (stessa lista di storage.rules).
+  const AttachTypes = global.SN_FEEDBACK_ATTACH;
+
+  // Testo del rifiuto quando un file non è tra i tipi ammessi (immagini raster,
+  // PDF, testo, markdown, CSV, JSON). Vale sia per "Allega" sia per drag & drop.
+  const ATTACH_REJECT_MSG =
+    'Tipo di file non supportato. Ammessi: immagini, PDF, testo, markdown, CSV e JSON.';
+
+  // Classifica un file secondo l'allowlist condivisa. Fallback prudente se il
+  // modulo shared non fosse caricato: consenti solo le immagini raster note.
+  function classifyAttachment(file) {
+    if (AttachTypes && typeof AttachTypes.classify === 'function') {
+      return AttachTypes.classify(file);
+    }
+    const t = String(file?.type || '').toLowerCase();
+    return /^image\/(png|jpe?g|gif|webp|bmp)$/.test(t) ? 'image' : null;
+  }
 
   // Chiave storage per la bozza di testo: sopravvive a chiusura/riapertura del
   // box e al riavvio di Filo (chrome.storage.local → storage.json).
