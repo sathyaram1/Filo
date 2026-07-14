@@ -113,8 +113,17 @@ clarify`); (3) fix fallito 3× (dispatch appende l'ultima critica del verifier +
   `working` è il riflesso persistito per dashboard e istanze non-routine.
 - Se un'istanza trova `working` fresco: NON aspetta, passa al prossimo `todo`; se non
   c'è altro, termina con "niente da fare".
-- L'Action apply-triage **riconcilia**: rilascia claim orfani (già lo fa) e resetta i
-  `working` scaduti (da estendere).
+- L'Action apply-triage **riconcilia**: rilascia claim orfani e resetta i `working`
+  scaduti. Estensioni 2026-07-14 (recupero istanze morte, es. crediti esauriti):
+  - il claim **sopravvive** all'applicazione dell'entry `working` (è la presa in
+    carico: l'istanza sta ancora lavorando) e viene rilasciato solo alle consegne;
+  - ogni reset `working`→`todo` incrementa il contatore `workingResets`; alla **3ª
+    interruzione consecutiva** il feedback va in `design` (`statusReason: loop`) con
+    nota in chat, invece di fare ping-pong todo↔working all'infinito. Una consegna
+    reale (revision_*/done/design) azzera il contatore;
+  - la riconciliazione gira anche **a orologio** (cron ogni 30 min del workflow),
+    non solo ai push: un'istanza morta non pusha niente, senza cron nessun trigger
+    resetterebbe mai il suo `working`.
 
 ## 7. Dove si implementa
 
