@@ -19,6 +19,7 @@
       version: '0.2.129', date: '2026-07-14',
       features: [],
       fixes: [
+        'In modalità terminale, i comandi Git che modificano il repository (creare un tag o un branch, impostare o rimuovere una configurazione, aggiungere o togliere un remote) ora chiedono conferma prima di partire, invece di essere eseguiti al volo come una semplice lettura.',
         'La costruzione mazzi ora usa tutta la larghezza della finestra invece di restare stretta al centro, e il ritorno ai Mazzi è un\'icona accanto al titolo della colonna: layout più pulito e più spazio per lavorare.',
         'Nella costruzione mazzi le colonne regolabili si adattano ora alla dimensione della finestra: rimpicciolendo la finestra o riaprendo un mazzo su uno schermo più piccolo l\'area centrale del mazzo non sparisce più e il pannello statistiche non si sovrappone.',
         'Nel box "Invia feedback" ora trascinare un file applica gli stessi limiti di tipo del pulsante "Allega": vengono accettate solo immagini, PDF, testo, markdown, CSV e JSON, così non è più possibile allegare file potenzialmente pericolosi (come pagine HTML).',
