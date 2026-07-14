@@ -248,6 +248,7 @@ function loadContentScripts() {
   safe(path.join(CONTENT, 'spellcheck.js'));
   safe(path.join(SHARED, 'feedback.js'));
   safe(path.join(SHARED, 'feedbackClientIdHash.js')); // S1.F2.2
+  safe(path.join(SHARED, 'feedbackAttachTypes.js')); // allowlist tipi allegato
   safe(path.join(CONTENT, 'feedback.js'));
   safe(path.join(CONTENT, 'redteamAttack.js'));
   safe(path.join(SHARED, 'tabColor.js'));
