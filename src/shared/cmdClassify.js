@@ -147,8 +147,13 @@
   // innocuo: è inaffidabile (path relativi, ~, symlink, differenze OS) e un
   // falso negativo qui = il buco di sicurezza; l'over-cautela costa solo attrito.
   // Check curl/wget-specifico (come GIT_DANGER_RE): un `-o` globale su `tar`/`zip`
-  // significherebbe altro.
-  const CURL_WGET_OUTPUT_RE = /(^|\s)(--output|--remote-name|--remote-header-name|-[a-z]*[ojJ])/i;
+  // significherebbe altro. In un bundle di short-flag l'unico modo di avere una
+  // `o`/`O` è che sia il flag di output (curl -o/-O, wget -o=logfile/-O): gli
+  // altri short-flag di curl/wget non contengono `o`, quindi `-[a-z]*o` non ha
+  // falsi positivi qui. `-J`/--remote-header-name senza -O è inerte, e con -O è
+  // già coperto da -O: non serve intercettare la `j` (che confliggerebbe con
+  // curl -j = --junk-session-cookies, innocuo).
+  const CURL_WGET_OUTPUT_RE = /(^|\s)(--output|--remote-name|--remote-header-name|-[a-z]*o)/i;
 
   // git: il livello dipende dal sotto-comando. I sotto-comandi "duali"
   // (tag, branch, config, remote) NON stanno qui: leggono da soli ma scrivono
