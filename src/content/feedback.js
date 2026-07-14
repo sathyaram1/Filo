@@ -481,7 +481,15 @@
     // annotazione), gli altri tipi (pdf, txt, md, json…) diventano allegati.
     async function addAttachment(file) {
       if (!file) return;
-      if (file.type && file.type.startsWith('image/')) { await addImageFromBlob(file); return; }
+      // Gate condiviso: stesso filtro per "Allega" e per drag & drop. L'attributo
+      // `accept` del picker NON vincola il drop (né la scelta "Tutti i file"),
+      // quindi la whitelist va applicata qui, sul tipo reale del file.
+      const kind = classifyAttachment(file);
+      if (!kind) {
+        statusEl.textContent = ATTACH_REJECT_MSG;
+        return;
+      }
+      if (kind === 'image') { await addImageFromBlob(file); return; }
       if (files.length >= MAX_FILES) {
         statusEl.textContent = `Massimo ${MAX_FILES} file.`;
         return;
