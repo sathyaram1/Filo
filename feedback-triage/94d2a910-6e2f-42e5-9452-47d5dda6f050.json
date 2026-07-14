@@ -1,0 +1,7 @@
+{
+  "id": "94d2a910-6e2f-42e5-9452-47d5dda6f050",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la modifica e stata pubblicata. Ora nel box Invia feedback anche trascinare un file applica gli stessi limiti di tipo del pulsante Allega, quindi non e piu possibile allegare file potenzialmente pericolosi (come pagine HTML o SVG con codice). Vengono accettate solo immagini, PDF, testo, markdown, CSV e JSON. Non ho rilevato problemi di sicurezza.",
+  "queuedAt": "2026-07-14T01:11:13.046Z",
+  "queuedBy": "routine"
+}
