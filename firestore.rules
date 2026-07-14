@@ -208,6 +208,12 @@ service cloud.firestore {
         && request.resource.data.get('statusReason', '').size() <= 60
         && request.resource.data.get('workingSince', '') is string
         && request.resource.data.get('workingSince', '').size() <= 40
+        // `workingResets`: contatore delle lavorazioni interrotte di fila
+        // (working scaduto → todo); alla soglia la riconciliazione passa a
+        // design/loop. Piccolo per costruzione.
+        && request.resource.data.get('workingResets', 0) is int
+        && request.resource.data.get('workingResets', 0) >= 0
+        && request.resource.data.get('workingResets', 0) <= 100
         && request.resource.data.get('notes', '') is string
         && request.resource.data.get('notes', '').size() <= 10000
         // S1.priority: priority accetta int 0-3 (legacy in chiaro) OPPURE
