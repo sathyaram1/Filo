@@ -710,4 +710,7 @@ async function main() {
   if (failures) process.exit(1);
 }
 
-main().catch((e) => { console.error('Errore:', e.message); process.exit(1); });
+// Guardia da modulo principale (stesso pattern di claim-feedback.mjs): gli
+// unit test importano le funzioni pure esportate senza far partire la run.
+const isMainModule = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
+if (isMainModule) main().catch((e) => { console.error('Errore:', e.message); process.exit(1); });
