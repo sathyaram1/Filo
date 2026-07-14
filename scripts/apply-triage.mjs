@@ -401,6 +401,15 @@ async function patchFeedback(entry, bearer) {
   // `starred` (DB2): flag ⭐ "preferito". Booleano; scritto solo se la coda lo
   // porta, così non si azzera per chi non lo tocca.
   if (typeof entry.starred === 'boolean') { fields.starred = toFsValue(entry.starred); mask.push('starred'); }
+  // `workingResets` (recupero lavorazioni interrotte): una CONSEGNA reale
+  // (l'istanza ha prodotto qualcosa: fix su branch, chiusura, domande) azzera
+  // il contatore delle interruzioni. `working` e `todo` NON azzerano: sono i
+  // due status del ciclo presa-in-carico/ripristino che il contatore misura
+  // (il todo della riconciliazione arriva da qui, e azzerarlo qui vanificherebbe
+  // l'incremento fatto subito dopo da reconcileClaims).
+  if (!['working', 'todo'].includes(entry.status)) {
+    fields.workingResets = toFsValue(0); mask.push('workingResets');
+  }
   if (entry.status === 'done') {
     fields.resolvedAt = { timestampValue: new Date().toISOString() }; mask.push('resolvedAt');
     // DB3: registra la versione in cui il fix è confluito (= package.json
