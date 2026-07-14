@@ -134,6 +134,22 @@
   // Flag che alzano a 3 un comando altrimenti ≤2.
   const DANGEROUS_FLAG_RE = /(^|\s)(--force|--hard|--delete|--prune|--no-preserve-root|-[a-z]*f[a-z]*r[a-z]*|-[a-z]*r[a-z]*f[a-z]*)(\s|$)/i;
 
+  // curl/wget con un flag di OUTPUT-SU-FILE scrivono i byte scaricati in un
+  // percorso scelto da chi lancia il comando (l'LLM, potenzialmente pilotato da
+  // una pagina ostile): può SOVRASCRIVERE qualsiasi file — chiavi SSH
+  // (~/.ssh/authorized_keys), script d'avvio della shell (~/.bashrc, ~/.profile)
+  // — trasformando un "download" in una backdoor. È qualitativamente più grave
+  // del semplice download (che scrive su stdout o al più nella cwd): alza a 3
+  // (digita "conferma"), come i flag distruttivi di git. Coperti (anche in
+  // bundle di short-flag tipo `-sLo`): -o/--output(-dir/-document),
+  // -O/--remote-name(-all), -J/--remote-header-name (nome del file scelto dal
+  // server). Non tentiamo di distinguere il percorso "sensibile" da quello
+  // innocuo: è inaffidabile (path relativi, ~, symlink, differenze OS) e un
+  // falso negativo qui = il buco di sicurezza; l'over-cautela costa solo attrito.
+  // Check curl/wget-specifico (come GIT_DANGER_RE): un `-o` globale su `tar`/`zip`
+  // significherebbe altro.
+  const CURL_WGET_OUTPUT_RE = /(^|\s)(--output|--remote-name|--remote-header-name|-[a-z]*[ojJ])/i;
+
   // git: il livello dipende dal sotto-comando. I sotto-comandi "duali"
   // (tag, branch, config, remote) NON stanno qui: leggono da soli ma scrivono
   // con un operando, quindi li classifica GIT_DUAL guardando gli argomenti.
