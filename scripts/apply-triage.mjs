@@ -78,6 +78,45 @@ const LEGACY_INPUT = {
   blocked: { status: 'design', reason: 'loop' },
 };
 
+// ─── Recupero delle lavorazioni interrotte (logica pura, unit-testata) ───────
+// Un'istanza può morire a metà implementazione senza lasciare traccia (es.
+// crediti/budget esauriti): il feedback resta `working` e nessuno lo riprende.
+// Queste due funzioni decidono (a) quando il claim git sopravvive a un'entry
+// applicata e (b) cosa fare di un `working` scaduto.
+
+// Il claim sopravvive SOLO all'entry `working`: quella entry È la presa in
+// carico — l'istanza sta ancora lavorando, il claim è il suo lock e la spia
+// "in lavorazione" della dashboard. Rilasciarlo lì (com'era prima) spegneva il
+// semaforo pochi secondi dopo l'acquisizione. Ogni altro status è una consegna:
+// il lavoro su quel feedback è finito e il claim va rilasciato.
+export function claimOutlivesEntry(status) {
+  return status === 'working';
+}
+
+// Quante interruzioni consecutive (working scaduto → todo) tollerare prima di
+// arrendersi e chiedere all'owner. Stessa soglia del loop verifier→fixer.
+export const EXPIRY_RESET_LIMIT = 3;
+
+// Esito di un `working` scaduto (TTL): le prime volte torna in coda con il
+// contatore `workingResets` incrementato; alla EXPIRY_RESET_LIMIT-esima
+// interruzione consecutiva si passa a `design` (statusReason `loop`) con una
+// nota che spiega all'owner cosa è successo — altrimenti il ping-pong
+// claim→morte→todo→claim brucerebbe crediti all'infinito senza che nessuno
+// se ne accorga. Il contatore si azzera a ogni consegna reale (vedi
+// patchFeedback) e all'escalation stessa.
+export function expiryOutcome(prevResets) {
+  const resets = (Number.isInteger(prevResets) && prevResets > 0 ? prevResets : 0) + 1;
+  if (resets >= EXPIRY_RESET_LIMIT) {
+    return {
+      status: 'design',
+      reason: 'loop',
+      workingResets: 0,
+      notes: `L'implementazione di questo feedback si è interrotta ${resets} volte di seguito senza consegnare nulla: l'istanza che l'aveva preso in carico è sparita ogni volta (causa tipica: crediti o budget esauriti). Sospendo i tentativi automatici per non sprecare altri crediti. Quando il problema è risolto, rimetti il feedback in coda e la lavorazione ripartirà.`,
+    };
+  }
+  return { status: 'todo', workingResets: resets };
+}
+
 // DB3: la versione in cui un fix confluisce = quella corrente di package.json
 // (è la release in costruzione, la "prossima" che uscirà). Stampata su
 // `resolvedInVersion` al passaggio a `done`, serve alla dashboard `manage` per
