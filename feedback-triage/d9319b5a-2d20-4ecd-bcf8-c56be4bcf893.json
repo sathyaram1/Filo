@@ -1,0 +1,9 @@
+{
+  "id": "d9319b5a-2d20-4ecd-bcf8-c56be4bcf893",
+  "status": "design",
+  "notes": "Il controllo di sicurezza sulla modifica e' stato superato: nessun problema rilevato (la gestione dei link e dei download resta protetta e i testi mostrati nella dashboard restano al sicuro). Non e' pero' stato possibile pubblicarla in automatico: il ramo su cui e' stata sviluppata parte da una versione dell'app ormai molto distante da quella attuale, tanto che le due storie non hanno piu' un punto in comune. Fondere cosi' com'e' cancellerebbe lavoro piu' recente gia' pubblicato. Serve riapplicare queste modifiche sulla versione corrente prima di poterle rilasciare.",
+  "queuedAt": "2026-07-14T06:28:03.686Z",
+  "queuedBy": "routine",
+  "branch": "worker/d9319b5a-2d20-4ecd-bcf8-c56be4bcf893",
+  "reason": "secaudit"
+}
