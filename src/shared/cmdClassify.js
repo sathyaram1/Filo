@@ -134,9 +134,11 @@
   // Flag che alzano a 3 un comando altrimenti ≤2.
   const DANGEROUS_FLAG_RE = /(^|\s)(--force|--hard|--delete|--prune|--no-preserve-root|-[a-z]*f[a-z]*r[a-z]*|-[a-z]*r[a-z]*f[a-z]*)(\s|$)/i;
 
-  // git: il livello dipende dal sotto-comando.
+  // git: il livello dipende dal sotto-comando. I sotto-comandi "duali"
+  // (tag, branch, config, remote) NON stanno qui: leggono da soli ma scrivono
+  // con un operando, quindi li classifica GIT_DUAL guardando gli argomenti.
   const GIT_READ = new Set([
-    'status', 'log', 'diff', 'show', 'branch', 'remote', 'config', 'tag',
+    'status', 'log', 'diff', 'show',
     'rev-parse', 'describe', 'blame', 'ls-files', 'ls-tree', 'shortlog',
     'reflog', 'whatchanged', 'cat-file', 'name-rev', 'symbolic-ref',
     'version', 'help', 'grep', 'count-objects',
@@ -144,7 +146,7 @@
   const GIT_WRITE = new Set([
     'add', 'commit', 'push', 'pull', 'fetch', 'checkout', 'switch', 'merge',
     'rebase', 'cherry-pick', 'revert', 'stash', 'init', 'clone', 'mv',
-    'apply', 'am', 'pop', 'worktree', 'submodule', 'tag',
+    'apply', 'am', 'pop', 'worktree', 'submodule',
   ]);
   // I distruttivi di git (reset --hard, clean, branch -D, push --force…)
   // li intercetta DANGEROUS_FLAG_RE o il fatto che siano fuori dalle due liste.
