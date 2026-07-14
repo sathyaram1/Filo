@@ -186,11 +186,52 @@
   // su comandi come `tar -f` significherebbe altro) → alza a 3.
   const GIT_DANGER_RE = /(^|\s)(--force(-with-lease)?|--hard|--delete|--prune|-f|-d|-D|-[a-z]*f[a-z]*d[a-z]*|-[a-z]*d[a-z]*f[a-z]*)(\s|$)/i;
 
+  // Argomenti che seguono il sotto-comando git (esclusi programma e
+  // sotto-comando stesso). `git tag v1.0` → ['v1.0']; `git branch` → [];
+  // `git config --get user.name` → ['--get', 'user.name'].
+  function gitArgsAfterSub(cmd) {
+    const t = tokens(cmd).slice(1); // via il programma `git`
+    const i = t.findIndex((x) => !x.startsWith('-')); // posizione del sotto-comando
+    return i < 0 ? [] : t.slice(i + 1);
+  }
+  const hasOperand = (args) => args.some((a) => !a.startsWith('-'));
+
+  // Sotto-comandi "duali": ELENCANO (lettura, livello 1) se invocati nudi o con
+  // soli flag, ma CREANO/IMPOSTANO (scrittura, livello 2) quando ricevono un
+  // operando. `git tag` elenca i tag / `git tag v1.0` ne crea uno; `git branch`
+  // elenca i branch / `git branch nuovo` lo crea; `git config --list` legge /
+  // `git config user.name "X"` scrive; `git remote -v` elenca / `git remote add`
+  // aggiunge. Le forme distruttive (branch -D, tag -d, config --unset, remote
+  // remove/prune) tornano 3 — quelle a flag sono già intercettate prima da
+  // GIT_DANGER_RE, le altre le gestiamo qui.
+  const GIT_DUAL = {
+    tag: (cmd) => (hasOperand(gitArgsAfterSub(cmd)) ? 2 : 1),
+    branch: (cmd) => (hasOperand(gitArgsAfterSub(cmd)) ? 2 : 1),
+    config: (cmd) => {
+      const args = gitArgsAfterSub(cmd);
+      const low = args.map((a) => a.toLowerCase());
+      if (low.some((a) => a === '--unset' || a === '--unset-all' || a === '--remove-section')) return 3;
+      if (low.some((a) => a === '--add' || a === '--replace-all' || a === '--rename-section' || a === '-e' || a === '--edit')) return 2;
+      // `chiave valore` (≥2 operandi) imposta; `--list`/`--get`/`chiave` (≤1) legge.
+      return args.filter((a) => !a.startsWith('-')).length >= 2 ? 2 : 1;
+    },
+    remote: (cmd) => {
+      const ops = gitArgsAfterSub(cmd).filter((a) => !a.startsWith('-'));
+      if (!ops.length) return 1; // `git remote`, `git remote -v`
+      const action = ops[0].toLowerCase();
+      if (action === 'show' || action === 'get-url') return 1;
+      if (action === 'remove' || action === 'rm' || action === 'prune') return 3; // cancellazioni
+      return 2; // add, rename, set-url, set-head, set-branches, update…
+    },
+  };
+
   function classifyGit(cmd) {
     const sub = subcommandOf(cmd);
     if (!sub) return 1; // `git` da solo stampa l'help → lettura
     if (GIT_DESTROY.has(sub)) return 3;
-    if (GIT_DANGER_RE.test(cmd)) return 3; // es. push --force, checkout -f, branch -D
+    if (GIT_DANGER_RE.test(cmd)) return 3; // es. push --force, checkout -f, branch -D, tag -d
+    const dual = GIT_DUAL[sub];
+    if (dual) return dual(cmd); // tag/branch/config/remote: dipende dagli argomenti
     if (GIT_READ.has(sub)) return 1;
     if (GIT_WRITE.has(sub)) return 2;
     return 3; // sotto-comando git sconosciuto → cautela
