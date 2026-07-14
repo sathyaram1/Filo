@@ -42,9 +42,50 @@
   const CENTER_MIN = 260; // il mazzo (colonna flessibile) non deve sparire
   let layout = { ...LAYOUT_DEFAULT };
 
+  // Larghezze EFFETTIVE da mettere nel grid: partono dalle preferenze salvate
+  // (`layout`) ma vengono ristrette allo spazio realmente disponibile, così la
+  // colonna centrale del mazzo mantiene sempre almeno CENTER_MIN anche quando
+  // la finestra si rimpicciolisce o si riapre un mazzo con larghezze salvate
+  // più grandi dello schermo corrente. NON tocca `layout` (le preferenze
+  // restano intatte): allargando di nuovo la finestra tornano le misure scelte.
+  function effectiveWidths() {
+    const grid = $('builderGrid');
+    const avail = (grid && grid.clientWidth) || window.innerWidth || 0;
+    let leftW = Math.max(LAYOUT_MIN.leftW, layout.leftW);
+    let rightW = Math.max(LAYOUT_MIN.rightW, layout.rightW);
+    if (avail <= 0) return { leftW, rightW };
+    // Spazio massimo per le due colonne esterne, lasciando i due divisori (12px)
+    // e il minimo del mazzo al centro.
+    const budget = avail - 12 - CENTER_MIN;
+    let excess = (leftW + rightW) - budget;
+    if (excess > 0) {
+      // Riduci le due colonne proporzionalmente a quanto sono comprimibili
+      // sopra il loro minimo, senza mai scendere sotto quel minimo.
+      const shrinkL = leftW - LAYOUT_MIN.leftW;
+      const shrinkR = rightW - LAYOUT_MIN.rightW;
+      const total = shrinkL + shrinkR;
+      if (total > 0) {
+        const cut = Math.min(excess, total);
+        const cutL = Math.round(cut * (shrinkL / total));
+        leftW = Math.max(LAYOUT_MIN.leftW, leftW - cutL);
+        rightW = Math.max(LAYOUT_MIN.rightW, rightW - (cut - cutL));
+      }
+      // Se persino ai minimi non c'entrano (finestra minuscola), restano ai
+      // minimi: il mazzo si stringe sotto CENTER_MIN ma nessuna colonna esce
+      // dal riquadro sovrapponendosi.
+    }
+    return { leftW, rightW };
+  }
+
   function applyLayout() {
-    $('builderGrid').style.gridTemplateColumns =
-      `${layout.leftW}px 6px 1fr 6px ${layout.rightW}px`;
+    const grid = $('builderGrid');
+    if (!grid) return;
+    const { leftW, rightW } = effectiveWidths();
+    // minmax(0, 1fr) sul centro: la colonna del mazzo può stringersi fino a 0
+    // invece di forzare la larghezza minima del contenuto e far traboccare le
+    // colonne laterali fuori dal riquadro (testo sovrapposto).
+    grid.style.gridTemplateColumns =
+      `${leftW}px 6px minmax(0, 1fr) 6px ${rightW}px`;
   }
 
   async function loadLayout() {
