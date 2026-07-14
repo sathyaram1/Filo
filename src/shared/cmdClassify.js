@@ -30,6 +30,9 @@
 //   • un backstop di programmi distruttivi (rm/del/format/…) resta 3 anche se
 //     per errore comparisse in una whitelist.
 //   • flag pericolosi (--force, --hard, -rf…) alzano un livello ≤2 a 3.
+//   • curl/wget con un flag di output-su-file (-o/-O/--output/--remote-name…)
+//     scrivono in un percorso arbitrario e possono sovrascrivere file sensibili
+//     (chiavi SSH, script d'avvio): salgono da 2 a 3.
 
 (function (global) {
   'use strict';
