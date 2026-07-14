@@ -1,0 +1,7 @@
+{
+  "id": "d8d9104a-f0a7-4449-a56b-979bae408c89",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la modifica e stata pubblicata. In modalita terminale i comandi Git che modificano il repository (creare un tag o un branch, impostare o rimuovere una configurazione, aggiungere o togliere un remote) ora chiedono conferma prima di partire, mentre le forme di sola lettura (elencare tag/branch, git config --list, git remote -v) continuano a partire subito.",
+  "queuedAt": "2026-07-14T01:22:55.483Z",
+  "queuedBy": "routine"
+}
