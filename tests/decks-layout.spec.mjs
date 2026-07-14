@@ -43,6 +43,37 @@ test('i divisori si trascinano e la posizione sopravvive alla riapertura', async
   expect(Math.abs(reopened - after)).toBeLessThan(3);
 });
 
+test('il builder usa tutta la larghezza della finestra (non è incassato a 960px)', async ({ openTab }) => {
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await newDeck(page);
+
+  const { builderW, viewportW } = await page.evaluate(() => ({
+    builderW: document.getElementById('builderGrid').getBoundingClientRect().width,
+    viewportW: window.innerWidth,
+  }));
+  // Prima del fix .sn-page era capped a 960px → builder ≤ ~912px. Ora esce dal
+  // cage e riempie quasi tutta la finestra (larga 1280 nei test).
+  expect(builderW).toBeGreaterThan(1000);
+  // Riempie davvero: resta solo il padding laterale della pagina (24px * 2).
+  expect(viewportW - builderW).toBeLessThan(80);
+});
+
+test('il ritorno ai Mazzi è un\'icona nella testata di colonna e riporta alla libreria', async ({ openTab }) => {
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await newDeck(page);
+
+  // L'azione "torna ai mazzi" vive DENTRO la testata della colonna chat
+  // (stesso livello del titolo), non più in una riga-bottone sopra il builder.
+  const back = page.locator('.dk-col-head-chat #backToLibrary');
+  await expect(back).toBeVisible();
+
+  await back.click();
+  await expect(page.locator('#screenLibrary')).toBeVisible();
+  await expect(page.locator('#screenBuilder')).toBeHidden();
+});
+
 test('switcher: nuovo, cambia mazzo, duplica', async ({ openTab }) => {
   const page = await openTab('filo://decks/decks.html');
   await page.waitForLoadState('domcontentloaded');

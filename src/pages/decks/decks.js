@@ -32,13 +32,19 @@
   // resize ammesso è il trascinamento deliberato dei due divisori; le larghezze
   // finiscono in chrome.storage.local e sopravvivono alla riapertura.
   const LAYOUT_KEY = window.SN_CONST.STORAGE_KEYS.DECKS_UI;
-  const LAYOUT_DEFAULT = { leftW: 340, centerW: 300, module: 'default' };
-  const LAYOUT_MIN = { leftW: 220, centerW: 220 };
+  // Colonne esterne FISSE (chat a sinistra, dettaglio a destra), colonna del
+  // MAZZO al centro flessibile (assorbe lo spazio in più). `rightW` sostituisce
+  // il vecchio `centerW`: prima il centro era il mazzo a larghezza fissa e la
+  // destra il "resto"; ora è il contrario, così il dettaglio (anteprima carta)
+  // resta di dimensione sana anche a piena larghezza.
+  const LAYOUT_DEFAULT = { leftW: 340, rightW: 340, module: 'default' };
+  const LAYOUT_MIN = { leftW: 260, rightW: 280 };
+  const CENTER_MIN = 260; // il mazzo (colonna flessibile) non deve sparire
   let layout = { ...LAYOUT_DEFAULT };
 
   function applyLayout() {
     $('builderGrid').style.gridTemplateColumns =
-      `${layout.leftW}px 6px ${layout.centerW}px 6px 1fr`;
+      `${layout.leftW}px 6px 1fr 6px ${layout.rightW}px`;
   }
 
   async function loadLayout() {
@@ -47,7 +53,9 @@
       const saved = res && res[LAYOUT_KEY];
       if (saved && typeof saved === 'object') {
         layout.leftW = Math.max(LAYOUT_MIN.leftW, Number(saved.leftW) || LAYOUT_DEFAULT.leftW);
-        layout.centerW = Math.max(LAYOUT_MIN.centerW, Number(saved.centerW) || LAYOUT_DEFAULT.centerW);
+        // Migrazione: i layout salvati prima avevano `centerW` (larghezza del
+        // mazzo, ora flessibile). Se manca `rightW`, riparti dal default.
+        layout.rightW = Math.max(LAYOUT_MIN.rightW, Number(saved.rightW) || LAYOUT_DEFAULT.rightW);
         if (DETAIL_MODULES[saved.module]) layout.module = saved.module;
       }
     } catch (_) {}
@@ -59,12 +67,19 @@
   }
 
   // Trascinamento dei divisori: aggiorna la larghezza live, persiste al rilascio.
-  function wireDivider(el, prop, originOf) {
+  // `computeW(ev)` ritorna la larghezza desiderata della colonna dal cursore;
+  // oltre al minimo della colonna, si clampa perché il mazzo (colonna centrale
+  // flessibile) mantenga sempre almeno CENTER_MIN.
+  function wireDivider(el, prop, computeW) {
     el.addEventListener('mousedown', (e) => {
       e.preventDefault();
       el.classList.add('dragging');
       const move = (ev) => {
-        const w = Math.max(LAYOUT_MIN[prop], Math.round(ev.clientX - originOf()));
+        const rect = $('builderGrid').getBoundingClientRect();
+        const other = prop === 'leftW' ? layout.rightW : layout.leftW;
+        const maxW = Math.max(LAYOUT_MIN[prop], rect.width - 12 - other - CENTER_MIN);
+        let w = Math.round(computeW(ev, rect));
+        w = Math.min(maxW, Math.max(LAYOUT_MIN[prop], w));
         if (w !== layout[prop]) { layout[prop] = w; applyLayout(); }
       };
       const up = () => {
@@ -79,11 +94,11 @@
   }
 
   function wireDividers() {
-    const gridLeft = () => $('builderGrid').getBoundingClientRect().left;
-    // Colonna sinistra: dal bordo del grid al cursore.
-    wireDivider($('dividerLeft'), 'leftW', gridLeft);
-    // Colonna centrale: dal bordo destro del primo divisore al cursore.
-    wireDivider($('dividerRight'), 'centerW', () => gridLeft() + layout.leftW + 6);
+    // Colonna sinistra (chat): dal bordo sinistro del grid al cursore.
+    wireDivider($('dividerLeft'), 'leftW', (ev, rect) => ev.clientX - rect.left);
+    // Colonna destra (dettaglio): dal cursore al bordo destro del grid,
+    // meno la larghezza del divisore.
+    wireDivider($('dividerRight'), 'rightW', (ev, rect) => rect.right - ev.clientX - 6);
   }
 
   // ── Routing ────────────────────────────────────────────────────────────────
@@ -100,6 +115,9 @@
     $('screenLibrary').hidden = screen !== 'library';
     $('screenBuilder').hidden = screen !== 'builder';
     $('screenGame').hidden = screen !== 'game';
+    // Solo il builder esce dal max-width di .sn-page per usare tutta la
+    // larghezza; libreria e partita restano centrate e leggibili.
+    document.body.classList.toggle('dk-full', screen === 'builder');
   }
 
   async function route() {
