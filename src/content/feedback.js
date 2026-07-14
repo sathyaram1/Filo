@@ -461,7 +461,9 @@
     }
 
     async function addImageFromBlob(blob) {
-      if (!blob || !blob.type?.startsWith('image/')) return;
+      // Solo immagini raster note: esclude image/svg+xml (documento attivo) e
+      // qualsiasi altro tipo che si spacci per immagine.
+      if (!blob || classifyAttachment(blob) !== 'image') return;
       if (images.length >= MAX_IMAGES) {
         statusEl.textContent = `Massimo ${MAX_IMAGES} immagini.`;
         return;
