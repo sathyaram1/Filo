@@ -1,0 +1,7 @@
+{
+  "id": "d2a23f28-7bef-482a-92a6-10259c957835",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato e modifica pubblicata. Filo ora riconosce come rischiosi (chiedendo conferma esplicita) anche i comandi di download che scelgono la cartella di destinazione o che salvano dati su un file scelto liberamente, oltre a quelli gia' coperti che scrivono direttamente su un file. Nessun impatto sui comandi innocui, verificato con la suite di test.",
+  "queuedAt": "2026-07-14T06:59:17.562Z",
+  "queuedBy": "routine"
+}
