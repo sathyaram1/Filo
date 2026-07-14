@@ -307,6 +307,9 @@
     // Anche un comando LEVEL2 ridotto a `--version`/`--help` è sola lettura → 1.
     if (LEVEL2.has(prog)) {
       if (isVersionQuery(trimmed)) return 1;
+      // curl/wget che scrivono un file di output a un percorso arbitrario possono
+      // sovrascrivere qualsiasi file (chiavi SSH, script d'avvio) → 3.
+      if ((prog === 'curl' || prog === 'wget') && CURL_WGET_OUTPUT_RE.test(trimmed)) return 3;
       return DANGEROUS_FLAG_RE.test(trimmed) ? 3 : 2;
     }
 
