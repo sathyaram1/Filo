@@ -43,6 +43,44 @@ test('i divisori si trascinano e la posizione sopravvive alla riapertura', async
   expect(Math.abs(reopened - after)).toBeLessThan(3);
 });
 
+test('riaprendo un mazzo con larghezze salvate più grandi dello schermo la colonna del mazzo NON sparisce', async ({ openTab }) => {
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await newDeck(page);
+
+  // Simula lo stato "colonna chat allargata a finestra grande, poi finestra
+  // rimpicciolita": salva una larghezza chat enorme (più larga della finestra).
+  await page.evaluate(async () => {
+    const key = window.SN_CONST.STORAGE_KEYS.DECKS_UI;
+    await chrome.storage.local.set({ [key]: { leftW: 5000, rightW: 340, module: 'default' } });
+  });
+
+  // Riapre il mazzo: con le larghezze salvate applicate alla lettera la colonna
+  // centrale collasserebbe a 0. Devono invece essere ri-adattate alla finestra.
+  await page.goto('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await page.click('[data-deck-id]');
+  await expect(page.locator('#screenBuilder')).toBeVisible();
+
+  const m = await page.evaluate(() => ({
+    grid: document.getElementById('builderGrid').getBoundingClientRect().width,
+    left: document.getElementById('colChat').getBoundingClientRect().width,
+    deck: document.getElementById('colDeck').getBoundingClientRect().width,
+    detail: document.getElementById('colDetail').getBoundingClientRect().width,
+  }));
+
+  // La colonna centrale del mazzo resta usabile (non sparisce): almeno ~260px.
+  expect(m.deck).toBeGreaterThan(240);
+  // Il pannello destro non viene schiacciato sotto il suo minimo (~280px):
+  // era il sintomo del testo sovrapposto.
+  expect(m.detail).toBeGreaterThan(260);
+  // Nessuna colonna trabocca fuori dal riquadro: le tre colonne + i due
+  // divisori (12px) stanno dentro la larghezza del grid.
+  expect(m.left + m.deck + m.detail).toBeLessThanOrEqual(m.grid + 4);
+  // La chat è stata davvero ri-adattata, non lasciata a 5000px.
+  expect(m.left).toBeLessThan(m.grid);
+});
+
 test('il builder usa tutta la larghezza della finestra (non è incassato a 960px)', async ({ openTab }) => {
   const page = await openTab('filo://decks/decks.html');
   await page.waitForLoadState('domcontentloaded');
