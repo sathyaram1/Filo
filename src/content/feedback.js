@@ -228,7 +228,7 @@
           <button type="button" class="sn-fb-clear" aria-pressed="false">Allega screenshot</button>
           <button type="button" class="sn-fb-btn sn-fb-send">Invia</button>
         </div>
-        <input type="file" class="sn-fb-file" accept="image/*,application/pdf,application/json,text/*,.pdf,.txt,.md,.markdown,.json,.csv,.log,.yml,.yaml" multiple hidden />
+        <input type="file" class="sn-fb-file" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp,application/pdf,application/json,text/plain,text/markdown,text/csv,.png,.jpg,.jpeg,.gif,.webp,.bmp,.pdf,.txt,.md,.markdown,.json,.csv,.log,.yml,.yaml" multiple hidden />
       </div>
     `;
     document.documentElement.appendChild(root);
