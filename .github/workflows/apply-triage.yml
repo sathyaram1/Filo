@@ -29,6 +29,14 @@ on:
       - 'feedback-triage/*.json'
       - 'feedback-triage/claims/*.json'   # push di claim/release dei semafori routine
   workflow_dispatch: {}   # pulsante "Run workflow" manuale (svuota la coda ora)
+  # Riconciliazione periodica: un'istanza che muore a metà lavorazione (es.
+  # crediti esauriti) non pusha più niente, quindi senza questo cron nessun
+  # trigger farebbe mai scattare il reset dei `working` scaduti (TTL 60 min) e
+  # il feedback resterebbe appeso finché un'altra routine non passa di lì.
+  # Ogni 30 minuti: latenza massima di recupero ≈ TTL + 30' (+ il ritardo che
+  # GitHub può aggiungere agli schedule nei momenti di carico).
+  schedule:
+    - cron: '*/30 * * * *'
 
 permissions:
   contents: write          # committare/pushare la rimozione dei file applicati
