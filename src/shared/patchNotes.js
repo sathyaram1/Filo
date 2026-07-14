@@ -21,6 +21,7 @@
       fixes: [
         'La costruzione mazzi ora usa tutta la larghezza della finestra invece di restare stretta al centro, e il ritorno ai Mazzi è un\'icona accanto al titolo della colonna: layout più pulito e più spazio per lavorare.',
         'Nella costruzione mazzi le colonne regolabili si adattano ora alla dimensione della finestra: rimpicciolendo la finestra o riaprendo un mazzo su uno schermo più piccolo l\'area centrale del mazzo non sparisce più e il pannello statistiche non si sovrappone.',
+        'Nel box "Invia feedback" ora trascinare un file applica gli stessi limiti di tipo del pulsante "Allega": vengono accettate solo immagini, PDF, testo, markdown, CSV e JSON, così non è più possibile allegare file potenzialmente pericolosi (come pagine HTML).',
       ],
     },
     {
