@@ -339,6 +339,12 @@
       // curl/wget che scrivono un file di output a un percorso arbitrario possono
       // sovrascrivere qualsiasi file (chiavi SSH, script d'avvio) → 3.
       if ((prog === 'curl' || prog === 'wget') && CURL_WGET_OUTPUT_RE.test(trimmed)) return 3;
+      // wget -P/--directory-prefix: sceglie la dir, il nome file arriva dall'URL
+      // (server) → stessa scrittura arbitraria di -O → 3.
+      if (prog === 'wget' && WGET_PREFIX_RE.test(trimmed)) return 3;
+      // curl -D/--dump-header: scrive gli header (contenuto del server) in un
+      // percorso arbitrario → 3.
+      if (prog === 'curl' && CURL_DUMP_RE.test(trimmed)) return 3;
       return DANGEROUS_FLAG_RE.test(trimmed) ? 3 : 2;
     }
 
