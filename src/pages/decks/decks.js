@@ -159,6 +159,10 @@
     // Solo il builder esce dal max-width di .sn-page per usare tutta la
     // larghezza; libreria e partita restano centrate e leggibili.
     document.body.classList.toggle('dk-full', screen === 'builder');
+    // Il grid ha larghezza reale solo da visibile: ri-clampa ora, così un mazzo
+    // riaperto con larghezze salvate più grandi dello spazio corrente non fa
+    // sparire la colonna centrale.
+    if (screen === 'builder') applyLayout();
   }
 
   async function route() {
