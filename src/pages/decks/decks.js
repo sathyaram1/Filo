@@ -1528,6 +1528,13 @@
       const span = e.target.closest('.dk-prose-card');
       if (span && span.dataset.cardId) openCarousel([span.dataset.cardId], 0);
     });
+    log.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      if (e.target && e.target.matches && e.target.matches('[data-toggle-cot]')) {
+        e.preventDefault();
+        toggleCot(e.target);
+      }
+    });
     log.addEventListener('mouseover', (e) => {
       const span = e.target.closest('.dk-prose-card');
       if (span) resolveProseCard(span);
