@@ -1498,7 +1498,18 @@
       sendChat(text);
     });
     const log = $('chatLog');
+    // Toggle del blocco Ragionamento (#331): click (o Invio/Spazio) apre e
+    // chiude. Vale per bolle normali, pending e d'errore.
+    const toggleCot = (target) => {
+      const cot = target.closest && target.closest('[data-toggle-cot]');
+      if (!cot) return false;
+      const bubble = cot.closest('[data-msg-i]');
+      const m = bubble && chatMsgs()[Number(bubble.dataset.msgI)];
+      if (m) { m.cotOpen = cot.dataset.open !== '1'; renderChat(); }
+      return true;
+    };
     log.addEventListener('click', (e) => {
+      if (toggleCot(e.target)) return;
       const impAll = e.target.closest('[data-import-all]');
       if (impAll) { importAllFromBubble(impAll.closest('[data-msg-i]')); return; }
       const add = e.target.closest('[data-add]');
