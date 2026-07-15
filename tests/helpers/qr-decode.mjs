@@ -67,7 +67,7 @@ const LEVEL_INDEX = { L: 0, M: 1, Q: 2, H: 3 };
 // Indicatore di livello nei format info (2 bit): L=01, M=00, Q=11, H=10.
 const FORMAT_LEVEL = { 1: 'L', 0: 'M', 3: 'Q', 2: 'H' };
 
-function refBlocks(typeNumber, eccLabel) {
+export function refBlocks(typeNumber, eccLabel) {
   const row = RS_REF[(typeNumber - 1) * 4 + LEVEL_INDEX[eccLabel]];
   const blocks = [];
   for (let i = 0; i < row.length; i += 3) {
