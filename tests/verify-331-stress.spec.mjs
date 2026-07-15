@@ -1,7 +1,12 @@
 // Stress test avversariale (verifica #331): CoT con payload XSS, provider che
 // fallisce con codici HTTP grezzi, doppio invio rapido, preferenza utente sul
-// blocco Ragionamento, ragionamento su bolla d'errore. TEMPORANEO della run di
-// verifica — non resta nel repo.
+// blocco Ragionamento, ragionamento su bolla d'errore.
+//
+// ⚠️ NOTA per il fixer: il test «provider KO con codice HTTP grezzo» è ROSSO
+// di proposito — documenta il gap trovato in verifica: quando è il PROVIDER
+// AI (non Scryfall) a fallire con un errore HTTP, in chat compare ancora il
+// codice grezzo («Non ha funzionato: OpenRouter 400: …»). Deve diventare
+// verde col fix, senza ammorbidire gli assert.
 
 import { test, expect } from './fixtures/electron.mjs';
 
