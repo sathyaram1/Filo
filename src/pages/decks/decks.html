@@ -178,6 +178,22 @@
     .dk-msg-text { white-space: pre-wrap; overflow-wrap: break-word; margin: 0 0 4px; }
     .dk-msg-pending, .dk-msg-error { color: var(--sn-muted); font-size: 12px; }
     .dk-msg-error { color: var(--sn-danger, #c0392b); }
+    /* Ragionamento del modello (CoT, #331): blocco collassabile cliccabile in
+       testa alla bolla. Aperto mentre Filo pensa (scorre in diretta), poi
+       collassato a una riga discreta riespandibile. */
+    .dk-cot {
+      display: block; font-size: 12px; color: var(--sn-muted);
+      border-left: 2px solid var(--sn-border);
+      padding: 2px 8px; margin: 0 0 4px; border-radius: 4px;
+      cursor: pointer; user-select: none;
+    }
+    .dk-cot:hover { background: var(--sn-hover); }
+    .dk-cot-head { display: inline-flex; align-items: center; gap: 5px; }
+    .dk-cot-body {
+      margin-top: 3px; max-height: 180px; overflow: auto;
+      white-space: pre-wrap; overflow-wrap: break-word;
+      font-style: italic; user-select: text;
+    }
     /* Nomi carta in prosa [[...]] (§3.5): span hoverable. */
     .dk-prose-card {
       color: var(--sn-accent); cursor: default;
