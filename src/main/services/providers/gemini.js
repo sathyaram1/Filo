@@ -121,7 +121,7 @@
 
   async function complete({ apiKey, model, messages, signal }) {
     const geminiModel = toGeminiModelId(model);
-    if (!geminiModel) throw new Error(`Gemini: modello non Google (${model})`);
+    if (!geminiModel) { const err = new Error(`Gemini: modello non Google (${model})`); err.provider = 'gemini'; throw err; }
     const url = `${BASE}/models/${encodeURIComponent(geminiModel)}:generateContent?key=${encodeURIComponent(apiKey)}`;
     const body = toGeminiRequest(messages);
     const res = await fetch(url, {
@@ -145,7 +145,7 @@
 
   async function streamComplete({ apiKey, model, messages, onDelta, onReasoning, signal }) {
     const geminiModel = toGeminiModelId(model);
-    if (!geminiModel) throw new Error(`Gemini: modello non Google (${model})`);
+    if (!geminiModel) { const err = new Error(`Gemini: modello non Google (${model})`); err.provider = 'gemini'; throw err; }
     const url = `${BASE}/models/${encodeURIComponent(geminiModel)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(apiKey)}`;
     const body = toGeminiRequest(messages);
     // Reasoning "vero": chiediamo a Gemini i thought summary in streaming. Il
@@ -216,7 +216,7 @@
   // Ritorna { audioBase64, mimeType } — il chiamante lo incapsula in WAV.
   async function synthesizeSpeech({ apiKey, model, text, voice, signal }) {
     const geminiModel = toGeminiModelId(model);
-    if (!geminiModel) throw new Error(`Gemini: modello non Google (${model})`);
+    if (!geminiModel) { const err = new Error(`Gemini: modello non Google (${model})`); err.provider = 'gemini'; throw err; }
     const clean = String(text == null ? '' : text).trim();
     if (!clean) throw new Error('Gemini TTS: testo vuoto');
     const url = `${BASE}/models/${encodeURIComponent(geminiModel)}:generateContent?key=${encodeURIComponent(apiKey)}`;
