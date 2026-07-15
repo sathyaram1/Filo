@@ -366,6 +366,8 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       // Mai il codice grezzo in chat (#331): l'errore diventa una frase per
       // l'utente, e il ragionamento raccolto fin lì resta comunque visibile.
+      // Il dettaglio tecnico resta nei log per la diagnosi.
+      console.warn('[SN] decks chat fallita:', (e && e.message) || e);
       return {
         ok: false,
         error: friendlyChatError(e) || 'chat fallita',
