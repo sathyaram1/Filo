@@ -283,8 +283,14 @@
     return { type: 'doc', content };
   }
 
+  // Escapa anche le virgolette (doppie e singole): escapeHtml è usata pure
+  // dentro attributi delimitati da virgolette (style="font-family:…",
+  // value="…"). I nomi di font composti ("Times New Roman", Times, serif)
+  // contengono virgolette doppie letterali: senza &quot; l'attributo style si
+  // chiuderebbe alla prima virgoletta e la formattazione andrebbe persa al
+  // round-trip salva→render.
   function escapeHtml(s) {
-    return String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+    return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
   function inlineToHtml(nodes) {
     if (!Array.isArray(nodes)) return '';
@@ -309,7 +315,7 @@
     if (!content || !Array.isArray(content.content)) return '<p></p>';
     return content.content.map((b) => {
       const inner = inlineToHtml(b.content) || '';
-      const alignStyle = b.attrs?.align ? ` style="text-align:${b.attrs.align}"` : '';
+      const alignStyle = b.attrs?.align ? ` style="text-align:${escapeHtml(b.attrs.align)}"` : '';
       switch (b.type) {
         case 'heading': {
           const lvl = b.attrs?.level || 1;
