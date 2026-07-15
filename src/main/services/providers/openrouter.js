@@ -76,7 +76,10 @@
     });
     if (!res.ok || !res.body) {
       const errText = await res.text().catch(() => '');
-      throw new Error(`OpenRouter ${res.status}: ${errText.slice(0, 300)}`);
+      const err = new Error(`OpenRouter ${res.status}: ${errText.slice(0, 300)}`);
+      err.status = res.status;
+      err.provider = 'openrouter';
+      throw err;
     }
 
     const reader = res.body.getReader();
