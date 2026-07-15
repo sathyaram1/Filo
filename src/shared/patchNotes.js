@@ -22,6 +22,7 @@
       ],
       fixes: [
         'Se una ricerca di carte scritta da Filo viene rifiutata dall\'archivio (il vecchio errore "400"), ora Filo riprova da solo correggendo la ricerca; se non ci riesce ti spiega il problema in italiano e ti invita a riformulare, invece di fermarsi con un codice incomprensibile.',
+        'Nella chat dei mazzi anche i problemi del servizio AI (sovraccarico, chiave non valida, modello non disponibile) ora vengono spiegati in italiano con un suggerimento su cosa fare, invece di mostrare un codice tecnico.',
       ],
     },
     {
