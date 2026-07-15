@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.135', date: '2026-07-15',
+      features: [],
+      fixes: [
+        'Nell\'Editor, i font con nome composto da più parole (Times New Roman, Comic Sans, Courier New…) ora restano applicati anche dopo aver chiuso e riaperto il documento: prima la scelta del font si perdeva silenziosamente al salvataggio.',
+      ],
+    },
+    {
       version: '0.2.133', date: '2026-07-15',
       features: [
         'Nella chat dei mazzi ora puoi vedere il ragionamento di Filo: mentre pensa scorre in diretta nella bolla, e a risposta arrivata resta disponibile in un blocco "Ragionamento" che si apre e si chiude con un click.',
