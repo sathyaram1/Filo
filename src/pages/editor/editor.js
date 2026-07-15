@@ -283,8 +283,14 @@
     return { type: 'doc', content };
   }
 
+  // Escapa anche le virgolette (doppie e singole): escapeHtml è usata pure
+  // dentro attributi delimitati da virgolette (style="font-family:…",
+  // value="…"). I nomi di font composti ("Times New Roman", Times, serif)
+  // contengono virgolette doppie letterali: senza &quot; l'attributo style si
+  // chiuderebbe alla prima virgoletta e la formattazione andrebbe persa al
+  // round-trip salva→render.
   function escapeHtml(s) {
-    return String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+    return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
   function inlineToHtml(nodes) {
     if (!Array.isArray(nodes)) return '';
