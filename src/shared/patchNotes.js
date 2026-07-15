@@ -20,6 +20,7 @@
       features: [],
       fixes: [
         'Nell\'Editor, i font con nome composto da più parole (Times New Roman, Comic Sans, Courier New…) ora restano applicati anche dopo aver chiuso e riaperto il documento: prima la scelta del font si perdeva silenziosamente al salvataggio.',
+        'Il QR code della pagina (tasto destro → "QR code della pagina") ora è davvero leggibile: inquadrandolo con la fotocamera del telefono si apre il link. Prima l\'immagine compariva ma nessun lettore riusciva a riconoscerla.',
       ],
     },
     {
