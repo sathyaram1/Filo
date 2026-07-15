@@ -199,8 +199,20 @@ module.exports = function register(on, ctx) {
                 onReasoning,
               });
               const p2 = Q.parseAgentReply(r2.text);
-              if (p2.reply) { reply = [reply, p2.reply].filter(Boolean).join('\n'); explained = true; }
-              if (p2.query) sr = await Scry.search(p2.query, { identity: identityColors });
+              // La reply del retry si accoda solo se aggiunge qualcosa (il
+              // modello a volte ripete la stessa frase del primo tentativo).
+              if (p2.reply && p2.reply !== parsed.reply) {
+                reply = [reply, p2.reply].filter(Boolean).join('\n');
+              }
+              if (p2.query) {
+                // Il modello ha riprovato: se anche questa fallisce si passa
+                // alla spiegazione generica qui sotto.
+                sr = await Scry.search(p2.query, { identity: identityColors });
+              } else if (p2.reply) {
+                // Niente query: il modello ha SPIEGATO il problema — è la
+                // risposta per l'utente, il messaggio generico non serve.
+                explained = true;
+              }
             } catch (_) { sr = null; }
           }
           if (!sr && !explained) {
