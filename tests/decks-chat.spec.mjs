@@ -330,7 +330,6 @@ test('doppio fallimento Scryfall → spiegazione chiara, niente codice 400', asy
       };
     };
     // Scryfall: /cards/search risponde SEMPRE 400.
-    const prevFetchTargets = null; void prevFetchTargets;
     globalThis.SN_SCRYFALL._setFetch(async (url) => {
       const u = new URL(String(url));
       if (u.pathname === '/cards/search') {
