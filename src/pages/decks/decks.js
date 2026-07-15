@@ -628,11 +628,27 @@
     )).join('');
   }
 
+  // Ragionamento del modello (CoT, #331): blocco collassabile in testa alla
+  // bolla — un click lo apre, un click lo richiude. Mentre Filo "pensa" resta
+  // aperto (si vede il ragionamento scorrere in diretta); a risposta arrivata
+  // torna collassato, salvo scelta esplicita dell'utente (m.cotOpen).
+  function cotHtml(m) {
+    if (!m.reasoning) return '';
+    const open = m.cotOpen !== undefined ? m.cotOpen : !!m.pending;
+    return `
+      <div class="dk-cot" data-toggle-cot="1" data-open="${open ? 1 : 0}" role="button" tabindex="0"
+           aria-expanded="${open ? 'true' : 'false'}"
+           title="${open ? 'Clicca per nascondere il ragionamento' : 'Clicca per vedere il ragionamento'}">
+        <span class="dk-cot-head"><span>${open ? '▾' : '▸'}</span><span>Ragionamento</span></span>
+        ${open ? `<div class="dk-cot-body">${esc(m.reasoning)}</div>` : ''}
+      </div>`;
+  }
+
   function chatBubbleHtml(m, isLast) {
     if (m.who === 'user') return `<div class="dk-msg dk-msg-user">${esc(m.text)}</div>`;
-    if (m.pending) return `<div class="dk-msg dk-msg-bot dk-msg-pending">Filo sta pensando…</div>`;
-    if (m.error) return `<div class="dk-msg dk-msg-bot dk-msg-error">Non ha funzionato: ${esc(m.error)}</div>`;
-    const parts = [];
+    if (m.pending) return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-pending">Filo sta pensando…</div></div>`;
+    if (m.error) return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-error">Non ha funzionato: ${esc(m.error)}</div></div>`;
+    const parts = [cotHtml(m)];
     if (m.reply) parts.push(`<p class="dk-msg-text">${proseHtml(m.reply)}</p>`);
     if (m.cardIds && m.cardIds.length) {
       const n = m.cardIds.length;
