@@ -71,6 +71,13 @@ async function mockProvider(app) {
       text: JSON.stringify({ reply: 'Ecco qualche opzione.', query: 'o:haste' }),
       model: attempts[0].model, provider: attempts[0].provider, usage: {},
     });
+    // La chat dei mazzi chiede il reasoning → cammino streaming: delega al
+    // mock non-streaming qui sopra.
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, onDelta }) => {
+      const r = await globalThis.SN_PROVIDERS.completeWithFallback({ attempts, messages });
+      if (onDelta) onDelta(r.text);
+      return r;
+    };
   });
 }
 
