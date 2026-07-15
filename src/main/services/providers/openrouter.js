@@ -42,7 +42,12 @@
     });
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
-      throw new Error(`OpenRouter ${res.status}: ${errText.slice(0, 300)}`);
+      // status/provider strutturati sull'errore: chi lo mostra all'utente può
+      // tradurlo in una frase comprensibile invece del codice HTTP nudo (#331).
+      const err = new Error(`OpenRouter ${res.status}: ${errText.slice(0, 300)}`);
+      err.status = res.status;
+      err.provider = 'openrouter';
+      throw err;
     }
     const data = await res.json();
     const text = data.choices?.[0]?.message?.content || '';
