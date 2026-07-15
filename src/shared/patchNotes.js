@@ -16,6 +16,15 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.133', date: '2026-07-15',
+      features: [
+        'Nella chat dei mazzi ora puoi vedere il ragionamento di Filo: mentre pensa scorre in diretta nella bolla, e a risposta arrivata resta disponibile in un blocco "Ragionamento" che si apre e si chiude con un click.',
+      ],
+      fixes: [
+        'Se una ricerca di carte scritta da Filo viene rifiutata dall\'archivio (il vecchio errore "400"), ora Filo riprova da solo correggendo la ricerca; se non ci riesce ti spiega il problema in italiano e ti invita a riformulare, invece di fermarsi con un codice incomprensibile.',
+      ],
+    },
+    {
       version: '0.2.131', date: '2026-07-14',
       features: [],
       fixes: [
