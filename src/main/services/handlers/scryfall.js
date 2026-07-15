@@ -141,10 +141,22 @@ module.exports = function register(on, ctx) {
         : [];
       const messages = [{ role: 'system', content: sys }, ...history, { role: 'user', content: text }];
 
+      // Canale del ragionamento: accumulo sempre (torna nella risposta) +
+      // inoltro live alla scheda che ha chiesto il turno, se c'è un reqId.
+      const wc = sender && sender.wc;
+      const reasoningReqId = msg?.reasoningReqId ? String(msg.reasoningReqId) : '';
+      const onReasoning = (t) => {
+        reasoning += t;
+        if (reasoningReqId && wc && !wc.isDestroyed?.()) {
+          try { wc.send('filo:reasoning', { reqId: reasoningReqId, text: t }); } catch (_) {}
+        }
+      };
+
       const r = await handleAIRequest({
         action: ACTIONS.DECKS_CHAT,
         payload: { messages },
         origin: 'filo://decks',
+        onReasoning,
       });
       const parsed = Q.parseAgentReply(r.text);
 
@@ -158,10 +170,50 @@ module.exports = function register(on, ctx) {
       if (parsed.query) {
         // Filtro identity AUTOMATICO (§4): lo aggiunge search/buildSearchQuery;
         // se l'utente/LLM ha già un vincolo id esplicito, quello vince.
-        const sr = await Scry.search(parsed.query, { identity: identityColors });
-        cardIds = sr.cards.map((c) => c.id);
-        for (const c of sr.cards) cards[c.id] = c;
-        query = sr.query;
+        // La query la scrive il MODELLO e può essere sintatticamente invalida
+        // (Scryfall risponde 400): non buttare l'intero turno (#331) — si
+        // riprova UNA volta facendo correggere la query al modello stesso, e
+        // se non ne esce si spiega il problema in chiaro nella reply.
+        let sr = null;
+        try {
+          sr = await Scry.search(parsed.query, { identity: identityColors });
+        } catch (e1) {
+          const status = Number(e1 && e1.status);
+          const detail = String((e1 && e1.details) || '');
+          let explained = false;
+          if (Number.isFinite(status) && status >= 400 && status < 500 && status !== 429) {
+            // Query rifiutata (sintassi): il modello la corregge o spiega.
+            try {
+              const retryMessages = [...messages,
+                { role: 'assistant', content: r.text },
+                { role: 'user', content:
+                  `(Sistema) La ricerca Scryfall con la query «${parsed.query}» è stata rifiutata` +
+                  `${detail ? ` con questo errore: ${detail}` : ' (sintassi non valida)'}. ` +
+                  'Correggi la sintassi e rispondi di nuovo con il SOLO JSON {"reply": "...", "query": "<query corretta>"}. ' +
+                  'Se la richiesta non è esprimibile in sintassi Scryfall, spiega il problema all\'utente in "reply" (in italiano, senza codici tecnici) e ometti "query".' },
+              ];
+              const r2 = await handleAIRequest({
+                action: ACTIONS.DECKS_CHAT,
+                payload: { messages: retryMessages },
+                origin: 'filo://decks',
+                onReasoning,
+              });
+              const p2 = Q.parseAgentReply(r2.text);
+              if (p2.reply) { reply = [reply, p2.reply].filter(Boolean).join('\n'); explained = true; }
+              if (p2.query) sr = await Scry.search(p2.query, { identity: identityColors });
+            } catch (_) { sr = null; }
+          }
+          if (!sr && !explained) {
+            reply = [reply,
+              `Ho provato a cercare su Scryfall ma la ricerca non è andata a buon fine (la query «${parsed.query}» non è stata accettata${Number.isFinite(status) && (status >= 500 || status === 429) ? ' perché il servizio al momento non risponde' : ''}). Prova a riformulare la richiesta con parole diverse, o riprova tra poco.`,
+            ].filter(Boolean).join('\n');
+          }
+        }
+        if (sr) {
+          cardIds = sr.cards.map((c) => c.id);
+          for (const c of sr.cards) cards[c.id] = c;
+          query = sr.query;
+        }
       } else if (parsed.cards.length) {
         // Cross-mazzo: gli id vengono dal contesto (mai inventati) → risolti
         // dalla cache; quelli ignoti si scartano.
