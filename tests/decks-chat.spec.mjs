@@ -231,6 +231,8 @@ test('il ragionamento del modello è visibile e collassabile al click', async ({
   const body = page.locator('.dk-msg-bot').last().locator('.dk-cot-body');
   await expect(body).toBeVisible();
   await expect(body).toHaveText('Sto valutando le carte con haste nel formato Commander.');
+  // Traccia visiva ispezionabile (gitignorata).
+  await page.screenshot({ path: 'tests/.shots/decks-chat-cot-aperto.png' });
 
   // Click di nuovo (sul blocco aperto) → si richiude.
   await page.locator('.dk-msg-bot').last().locator('.dk-cot').click();
