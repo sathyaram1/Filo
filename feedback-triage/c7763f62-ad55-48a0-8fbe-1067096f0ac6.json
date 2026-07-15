@@ -1,7 +1,0 @@
-{
-  "id": "c7763f62-ad55-48a0-8fbe-1067096f0ac6",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho rifatto da capo il percorso della segnalazione, come lo farebbe l'utente: testo scritto a tastiera, selezione, scelta di un font con nome composto dal modulo Font (tendina reale, usando anche la ricerca), attesa del salvataggio automatico, chiusura/ricarica del documento. Il font resta applicato — provato con Comic Sans, Times New Roman, Courier New e Book Antiqua — e nel foglio non compaiono residui o attributi spuri. Stress test superati: due font composti diversi nello stesso documento sopravvivono entrambi alla riapertura; doppio ciclo salva-e-riapri con modifiche in mezzo, senza accumulo di codifiche strane; grassetto e font insieme sopravvivono entrambi; un testo contenente '<script>alert(1)</script>' resta testo semplice e non viene mai eseguito, nemmeno dopo la riapertura. Ho anche verificato che il mio scenario riproduce davvero il bug sul codice precedente al fix (falliva) e passa solo col fix. Regressione: tutti i test dell'editor (36) e gli unit test (947) passano; un test non correlato sulla dimensione della griglia è risultato instabile ma passa al secondo tentativo, non c'entra col fix. Screenshot della pagina dopo la riapertura ispezionato: layout pulito, testo integro.",
-  "queuedAt": "2026-07-15T18:38:38.033Z",
-  "queuedBy": "routine"
-}
