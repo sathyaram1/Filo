@@ -1,7 +1,0 @@
-{
-  "id": "c7763f62-ad55-48a0-8fbe-1067096f0ac6",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato e modifica pubblicata. Il fix riguarda l'Editor: i font con nome composto da più parole (Times New Roman, Comic Sans, Courier New…) ora restano applicati anche dopo aver salvato, chiuso e riaperto il documento — prima la scelta si perdeva silenziosamente alla riapertura. In più, la correzione rende più robusta la gestione del testo formattato in generale, evitando che caratteri speciali nei nomi dei font o negli stili possano corrompere il documento. La verifica include un test automatico che salva e riapre un documento con Times New Roman e controlla che il font sia ancora quello scelto.",
-  "queuedAt": "2026-07-15T18:40:19.322Z",
-  "queuedBy": "routine"
-}
