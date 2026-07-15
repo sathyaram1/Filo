@@ -41,6 +41,9 @@ async function baseMocks(app) {
       for (const t of (globalThis.__reasoningChunks || [])) {
         try { onReasoning && onReasoning(t); } catch (_) {}
       }
+      if (globalThis.__streamDelay) {
+        await new Promise((res) => setTimeout(res, globalThis.__streamDelay));
+      }
       if (globalThis.__streamThrow) {
         const spec = globalThis.__streamThrow;
         const e = new Error(spec.message);
