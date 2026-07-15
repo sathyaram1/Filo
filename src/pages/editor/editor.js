@@ -315,7 +315,7 @@
     if (!content || !Array.isArray(content.content)) return '<p></p>';
     return content.content.map((b) => {
       const inner = inlineToHtml(b.content) || '';
-      const alignStyle = b.attrs?.align ? ` style="text-align:${b.attrs.align}"` : '';
+      const alignStyle = b.attrs?.align ? ` style="text-align:${escapeHtml(b.attrs.align)}"` : '';
       switch (b.type) {
         case 'heading': {
           const lvl = b.attrs?.level || 1;
