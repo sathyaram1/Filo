@@ -328,11 +328,18 @@ module.exports = function register(on, ctx) {
 
       return {
         ok: true, reply, cardIds, cards, query,
+        ...(reasoning ? { reasoning } : {}),
         ...(deckOut ? { deck: deckOut } : {}),
         ...(importPending ? { importPending } : {}),
       };
     } catch (e) {
-      return { ok: false, error: e?.message || 'chat fallita' };
+      // Mai il codice grezzo in chat (#331): l'errore diventa una frase per
+      // l'utente, e il ragionamento raccolto fin lì resta comunque visibile.
+      return {
+        ok: false,
+        error: friendlyChatError(e) || 'chat fallita',
+        ...(reasoning ? { reasoning } : {}),
+      };
     }
   });
 
