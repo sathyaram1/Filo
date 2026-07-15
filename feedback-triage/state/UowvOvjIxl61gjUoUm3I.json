@@ -2,8 +2,8 @@
   "id": "UowvOvjIxl61gjUoUm3I",
   "branch": "",
   "loopCount": 1,
-  "verifierVerdict": "fail",
-  "verifierCritique": "FAIL — Ho rifatto esattamente i passi dell'utente (la stessa ricerca sui dinosauri dello screenshot) e stressato la chat dei mazzi con input ostili. Due dei tre problemi sono risolti bene: 1) il blocco «Ragionamento» compare nella bolla, si apre e si chiude col click (e con Invio/Spazio da tastiera), scorre in diretta mentre Filo pensa, la scelta di aprirlo/chiuderlo viene ricordata, e resta visibile anche quando il turno fallisce; ho provato a iniettarci dentro codice HTML/script maligno e resta testo innocuo. 3) quando l'archivio carte rifiuta la ricerca scritta male, il sistema la fa correggere al modello e i risultati arrivano lo stesso; se fallisce anche il secondo tentativo arriva una spiegazione in italiano con la risposta già scritta preservata, senza bolla rossa né codici. Anche doppio invio rapido, testi da 10.000 caratteri, errori di rete e limite di spesa raggiunto sono gestiti con frasi comprensibili. MA il punto 2 è coperto solo a metà: se a fallire è il MODELLO stesso (il servizio AI che risponde con un errore HTTP — chiave non valida, modello inesistente, servizio in difficoltà), in chat ricompare il codice grezzo, ad esempio «Non ha funzionato: OpenRouter 400: Bad Request — invalid model». Per riprodurre: aprire un mazzo e mandare un messaggio qualsiasi mentre il servizio AI risponde con un errore 400 → bolla d'errore col codice tecnico, turno perso, nessuna spiegazione né via alternativa. È la stessa lamentela dell'utente («il modello ha incontrato un errore, non so cosa significhi 400»), risolta per l'archivio carte ma non per il modello. Ho lasciato sul branch un test automatico apposta rosso che riproduce questo caso: deve diventare verde col fix.",
+  "verifierVerdict": null,
+  "verifierCritique": "",
   "secauditDone": false,
   "secauditVerdict": null
 }
