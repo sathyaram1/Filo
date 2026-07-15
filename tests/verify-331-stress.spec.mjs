@@ -159,7 +159,10 @@ test('limite di spesa raggiunto → messaggio i18n invariato, con ragionamento r
 test('doppio Enter rapido → un solo turno; la scelta utente sul CoT persiste', async ({ app, openTab }) => {
   test.setTimeout(60_000);
   await baseMocks(app);
-  await app.evaluate(() => { globalThis.__reasoningChunks = ['Ragiono.']; });
+  await app.evaluate(() => {
+    globalThis.__reasoningChunks = ['Ragiono.'];
+    globalThis.__streamDelay = 1200; // il primo turno resta pending abbastanza
+  });
   const page = await openTab('filo://decks/decks.html');
   await page.waitForLoadState('domcontentloaded');
   await deckWithCommander(page);
@@ -171,7 +174,9 @@ test('doppio Enter rapido → un solo turno; la scelta utente sul CoT persiste',
   await page.press('#chatInput', 'Enter');
   await expect(page.locator('.dk-msg-user')).toHaveCount(1);
   const bubble = page.locator('.dk-msg-bot').last();
-  await expect(bubble).toContainText('Ok.');
+  await expect(bubble).toContainText('Ok.', { timeout: 10_000 });
+  await expect(page.locator('.dk-msg-user')).toHaveCount(1);
+  await app.evaluate(() => { globalThis.__streamDelay = 0; });
 
   // Apro il CoT della prima bolla, mando un nuovo messaggio: resta aperto.
   await bubble.locator('.dk-cot').click();
