@@ -761,6 +761,8 @@
       bot.pending = false;
       bot.error = (e && e.message) || 'errore di rete';
     }
+    if (offReasoning) offReasoning();
+    if (cotRenderTimer) { clearTimeout(cotRenderTimer); cotRenderTimer = 0; }
     chatBusy = false;
     if (deckChanged) await renderBuilder();
     else renderChat();
