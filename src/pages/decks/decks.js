@@ -711,10 +711,30 @@
     const bot = { who: 'bot', pending: true };
     msgs.push(bot);
     renderChat();
+    // Ragionamento in diretta (#331): mentre il modello pensa, i chunk di CoT
+    // arrivano sul canale filo:reasoning e riempiono la bolla "sta pensando"
+    // (render con throttle: i chunk possono essere fitti).
+    const reasoningReqId = `dk${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    let cotRenderTimer = 0;
+    const offReasoning = (window.filo && window.filo.onReasoning)
+      ? window.filo.onReasoning((data) => {
+          if (!data || data.reqId !== reasoningReqId || !data.text || !bot.pending) return;
+          bot.reasoning = (bot.reasoning || '') + data.text;
+          if (!cotRenderTimer) {
+            cotRenderTimer = setTimeout(() => {
+              cotRenderTimer = 0;
+              if (bot.pending) renderChat();
+            }, 250);
+          }
+        })
+      : null;
     let deckChanged = false;
     try {
-      const r = await send({ type: MSG.DECKS_CHAT, deckId: current.id, text, history, lastResults });
+      const r = await send({ type: MSG.DECKS_CHAT, deckId: current.id, text, history, lastResults, reasoningReqId });
       bot.pending = false;
+      // Il testo completo del ragionamento torna con la risposta (anche in
+      // caso d'errore): è la versione autoritativa rispetto ai chunk live.
+      if (r && r.reasoning) bot.reasoning = r.reasoning;
       if (!r || !r.ok) {
         bot.error = (r && r.error) || 'nessuna risposta';
       } else {
