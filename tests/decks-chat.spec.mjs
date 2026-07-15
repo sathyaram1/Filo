@@ -201,3 +201,190 @@ test('le bolle precedenti collassano a riga di sintesi riespandibile', async ({ 
   expect(calls.length).toBe(2);
   expect(calls[1]).toBeGreaterThan(calls[0]);
 });
+
+// #331.1 — il ragionamento del modello (CoT) è visibile nella bolla come
+// blocco collassabile: un click lo apre (testo completo), un click lo chiude.
+test('il ragionamento del modello è visibile e collassabile al click', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  await app.evaluate(() => {
+    globalThis.__reasoningChunks = ['Sto valutando ', 'le carte con haste nel formato Commander.'];
+  });
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await deckWithCommander(page);
+
+  await page.fill('#chatInput', 'che ne pensi del mazzo?');
+  await page.press('#chatInput', 'Enter');
+  const bubble = page.locator('.dk-msg-bot').last();
+  await expect(bubble).toContainText('a buon punto');
+
+  // A risposta arrivata il blocco c'è, collassato: il testo NON è visibile.
+  const cot = bubble.locator('.dk-cot');
+  await expect(cot).toBeVisible();
+  await expect(cot).toContainText('Ragionamento');
+  await expect(bubble.locator('.dk-cot-body')).toHaveCount(0);
+
+  // Click → si apre col testo completo del ragionamento (chunk concatenati).
+  await cot.click();
+  const body = page.locator('.dk-msg-bot').last().locator('.dk-cot-body');
+  await expect(body).toBeVisible();
+  await expect(body).toHaveText('Sto valutando le carte con haste nel formato Commander.');
+
+  // Click di nuovo (sul blocco aperto) → si richiude.
+  await page.locator('.dk-msg-bot').last().locator('.dk-cot').click();
+  await expect(page.locator('.dk-msg-bot').last().locator('.dk-cot-body')).toHaveCount(0);
+});
+
+// #331.3 — una query Scryfall invalida (400) NON butta il turno: il sistema fa
+// correggere la query al modello e riprova. SUCCESSO = la CardList arriva
+// comunque, senza bolla d'errore.
+test('query Scryfall rifiutata (400) → il modello la corregge e i risultati arrivano', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await mockScryfall(app);
+  // Scryfall: la query rotta risponde 400 con details, quella corretta va.
+  await app.evaluate(() => {
+    const orig = globalThis.SN_SCRYFALL; // già mockato da _setFetch sopra
+    const prevRequests = globalThis.__scryRequests;
+    const BOLT = {
+      id: 'bolt-1', name: 'Lightning Bolt', mana_cost: '{R}', cmc: 1,
+      type_line: 'Instant', colors: ['R'], color_identity: ['R'],
+      image_uris: { normal: 'https://cards.test/bolt.jpg' },
+      prices: { eur: '1.10' }, legalities: { commander: 'legal' },
+      scryfall_uri: 'https://scryfall.com/card/bolt',
+    };
+    void orig; void prevRequests; void BOLT;
+  });
+  await app.evaluate(() => {
+    // Reinstalla il fetch finto: /cards/search fallisce 400 se la query
+    // contiene la parentesi orfana, funziona se è stata corretta.
+    const old = globalThis.__scryFetchBodies || null;
+    void old;
+    const prev = globalThis.__scryRequests || [];
+    globalThis.__scryRequests = prev;
+    const realFetch = globalThis.SN_SCRYFALL;
+    void realFetch;
+  });
+  await mockProvider(app);
+  await app.evaluate(() => {
+    // LLM: primo turno → query ROTTA; il messaggio di sistema di correzione
+    // ("(Sistema) La ricerca Scryfall…") → query corretta.
+    globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
+      globalThis.__chatCalls.push(messages);
+      const last = String(messages[messages.length - 1].content || '');
+      const text = /\(Sistema\) La ricerca Scryfall/.test(last)
+        ? JSON.stringify({ reply: 'Query sistemata.', query: 'o:haste' })
+        : JSON.stringify({ reply: 'Cerco carte con haste.', query: 't:dinosaur (o:"deal' });
+      return { text, model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+    };
+    // Il fetch Scryfall: 400 con details sulla query rotta.
+    globalThis.SN_SCRYFALL._setFetch(async (url) => {
+      globalThis.__scryRequests.push(String(url));
+      const u = new URL(String(url));
+      if (u.pathname === '/cards/search') {
+        const q = u.searchParams.get('q') || '';
+        if (q.includes('(')) {
+          return { ok: false, status: 400, json: async () => ({ object: 'error', details: 'Unmatched parenthesis in search expression.' }) };
+        }
+        return { ok: true, status: 200, json: async () => ({ data: [{
+          id: 'bolt-1', name: 'Lightning Bolt', mana_cost: '{R}', cmc: 1,
+          type_line: 'Instant', colors: ['R'], color_identity: ['R'],
+          image_uris: { normal: 'https://cards.test/bolt.jpg' },
+          prices: { eur: '1.10' }, legalities: { commander: 'legal' },
+          scryfall_uri: 'https://scryfall.com/card/bolt',
+        }], has_more: false }) };
+      }
+      if (u.pathname === '/cards/niv-1') {
+        return { ok: true, status: 200, json: async () => ({
+          id: 'niv-1', name: 'Niv-Mizzet, Parun', mana_cost: '{U}{U}{U}{R}{R}{R}', cmc: 6,
+          type_line: 'Legendary Creature — Dragon Wizard', colors: ['U', 'R'], color_identity: ['U', 'R'],
+          image_uris: { normal: 'https://cards.test/niv.jpg', art_crop: 'https://cards.test/niv-art.jpg' },
+          prices: { eur: '3.21' }, legalities: { commander: 'legal' },
+          scryfall_uri: 'https://scryfall.com/card/niv',
+        }) };
+      }
+      if (u.pathname === '/symbology') {
+        return { ok: true, status: 200, json: async () => ({ data: [
+          { symbol: '{U}', svg_uri: 'https://svgs.test/U.svg' },
+          { symbol: '{R}', svg_uri: 'https://svgs.test/R.svg' },
+        ] }) };
+      }
+      return { ok: false, status: 404, json: async () => ({}) };
+    });
+  });
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await deckWithCommander(page);
+
+  await page.fill('#chatInput', 'dinosauri che fanno danni');
+  await page.press('#chatInput', 'Enter');
+  const bubble = page.locator('.dk-msg-bot').last();
+  // SUCCESSO: i risultati arrivano nonostante il 400 sulla prima query.
+  await expect(bubble.locator('.dk-cardlist .dk-row')).toHaveCount(1);
+  await expect(bubble.locator('.dk-row-name').first()).toHaveText('Lightning Bolt');
+  // Nessuna bolla d'errore e nessun codice tecnico in chat.
+  await expect(page.locator('.dk-msg-error')).toHaveCount(0);
+  await expect(page.locator('#chatLog')).not.toContainText('400');
+  // Il retry è partito con il dettaglio dell'errore Scryfall nel prompt.
+  const retryCall = await app.evaluate(() => globalThis.__chatCalls
+    .map((ms) => String(ms[ms.length - 1].content || ''))
+    .find((c) => c.includes('(Sistema) La ricerca Scryfall')));
+  expect(retryCall).toBeTruthy();
+  expect(retryCall).toContain('Unmatched parenthesis');
+});
+
+// #331.2 — se anche il retry fallisce, l'utente riceve una SPIEGAZIONE in
+// italiano nella bolla normale (con la reply originale preservata), non una
+// bolla d'errore con un codice HTTP.
+test('doppio fallimento Scryfall → spiegazione chiara, niente codice 400', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  await app.evaluate(() => {
+    // LLM: risponde SEMPRE con la stessa query rotta (anche al retry).
+    globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
+      globalThis.__chatCalls.push(messages);
+      return {
+        text: JSON.stringify({ reply: 'Provo a cercare i dinosauri.', query: 't:dinosaur (o:"deal' }),
+        model: attempts[0].model, provider: attempts[0].provider, usage: {},
+      };
+    };
+    // Scryfall: /cards/search risponde SEMPRE 400.
+    const prevFetchTargets = null; void prevFetchTargets;
+    globalThis.SN_SCRYFALL._setFetch(async (url) => {
+      const u = new URL(String(url));
+      if (u.pathname === '/cards/search') {
+        return { ok: false, status: 400, json: async () => ({ object: 'error', details: 'Unmatched parenthesis in search expression.' }) };
+      }
+      if (u.pathname === '/cards/niv-1') {
+        return { ok: true, status: 200, json: async () => ({
+          id: 'niv-1', name: 'Niv-Mizzet, Parun', mana_cost: '{U}{U}{U}{R}{R}{R}', cmc: 6,
+          type_line: 'Legendary Creature — Dragon Wizard', colors: ['U', 'R'], color_identity: ['U', 'R'],
+          image_uris: { normal: 'https://cards.test/niv.jpg', art_crop: 'https://cards.test/niv-art.jpg' },
+          prices: { eur: '3.21' }, legalities: { commander: 'legal' },
+          scryfall_uri: 'https://scryfall.com/card/niv',
+        }) };
+      }
+      if (u.pathname === '/symbology') {
+        return { ok: true, status: 200, json: async () => ({ data: [] }) };
+      }
+      return { ok: false, status: 404, json: async () => ({}) };
+    });
+  });
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await deckWithCommander(page);
+
+  await page.fill('#chatInput', 'dinosauri che fanno danni');
+  await page.press('#chatInput', 'Enter');
+  const bubble = page.locator('.dk-msg-bot').last();
+  // La bolla è NORMALE (niente classe errore), la reply del modello resta
+  // visibile e la spiegazione invita a riformulare — mai "400" nudo.
+  await expect(bubble).toContainText('Provo a cercare i dinosauri.');
+  await expect(bubble).toContainText(/riformulare/i);
+  await expect(page.locator('.dk-msg-error')).toHaveCount(0);
+  await expect(page.locator('#chatLog')).not.toContainText('Scryfall 400');
+  // Il retry è stato tentato (2 chiamate LLM), poi il sistema ha spiegato.
+  expect(await app.evaluate(() => globalThis.__chatCalls.length)).toBe(2);
+});
