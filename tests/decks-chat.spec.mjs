@@ -96,6 +96,17 @@ async function mockProvider(app) {
         : JSON.stringify({ reply: 'Il mazzo mi sembra a buon punto.' });
       return { text, model: attempts[0].model, provider: attempts[0].provider, usage: {} };
     };
+    // La chat dei mazzi vuole il reasoning → passa dal cammino streaming:
+    // emette i chunk di CoT impostati dal test e delega la risposta al mock
+    // non-streaming qui sopra.
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, onDelta, onReasoning }) => {
+      for (const t of (globalThis.__reasoningChunks || [])) {
+        try { onReasoning && onReasoning(t); } catch (_) {}
+      }
+      const r = await globalThis.SN_PROVIDERS.completeWithFallback({ attempts, messages });
+      if (onDelta) onDelta(r.text);
+      return r;
+    };
   });
 }
 
