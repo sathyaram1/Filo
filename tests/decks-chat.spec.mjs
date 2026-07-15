@@ -243,30 +243,9 @@ test('il ragionamento del modello è visibile e collassabile al click', async ({
 test('query Scryfall rifiutata (400) → il modello la corregge e i risultati arrivano', async ({ app, openTab }) => {
   test.setTimeout(60_000);
   await mockScryfall(app);
-  // Scryfall: la query rotta risponde 400 con details, quella corretta va.
-  await app.evaluate(() => {
-    const orig = globalThis.SN_SCRYFALL; // già mockato da _setFetch sopra
-    const prevRequests = globalThis.__scryRequests;
-    const BOLT = {
-      id: 'bolt-1', name: 'Lightning Bolt', mana_cost: '{R}', cmc: 1,
-      type_line: 'Instant', colors: ['R'], color_identity: ['R'],
-      image_uris: { normal: 'https://cards.test/bolt.jpg' },
-      prices: { eur: '1.10' }, legalities: { commander: 'legal' },
-      scryfall_uri: 'https://scryfall.com/card/bolt',
-    };
-    void orig; void prevRequests; void BOLT;
-  });
-  await app.evaluate(() => {
-    // Reinstalla il fetch finto: /cards/search fallisce 400 se la query
-    // contiene la parentesi orfana, funziona se è stata corretta.
-    const old = globalThis.__scryFetchBodies || null;
-    void old;
-    const prev = globalThis.__scryRequests || [];
-    globalThis.__scryRequests = prev;
-    const realFetch = globalThis.SN_SCRYFALL;
-    void realFetch;
-  });
   await mockProvider(app);
+  // Sovrascrive LLM e Scryfall: la query ROTTA (parentesi orfana) risponde
+  // 400 con details; quella corretta dal retry funziona.
   await app.evaluate(() => {
     // LLM: primo turno → query ROTTA; il messaggio di sistema di correzione
     // ("(Sistema) La ricerca Scryfall…") → query corretta.
