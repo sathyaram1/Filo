@@ -132,7 +132,12 @@
     });
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
-      throw new Error(`Gemini ${res.status}: ${errText.slice(0, 300)}`);
+      // status/provider strutturati sull'errore: chi lo mostra all'utente può
+      // tradurlo in una frase comprensibile invece del codice HTTP nudo (#331).
+      const err = new Error(`Gemini ${res.status}: ${errText.slice(0, 300)}`);
+      err.status = res.status;
+      err.provider = 'gemini';
+      throw err;
     }
     const data = await res.json();
     return { text: extractText(data), usage: extractUsage(data) };
