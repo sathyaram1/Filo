@@ -81,7 +81,31 @@ module.exports = function register(on, ctx) {
     return withId ? `  - ${name} [id: ${entry.scryfall_id}]${tags}` : `  - ${name}${tags}`;
   }
 
-  on(MSG.DECKS_CHAT, async (msg) => {
+  // Errore → frase per l'utente (#331): mai un codice HTTP nudo in chat.
+  // Gli errori con `code` (NO_API_KEY, LIMIT_REACHED) portano già un messaggio
+  // i18n pensato per l'utente e passano invariati.
+  function friendlyChatError(e) {
+    const m = String((e && e.message) || '');
+    if (e && (e.code === 'NO_API_KEY' || e.code === 'LIMIT_REACHED')) return m;
+    const status = Number(e && e.status);
+    if (Number.isFinite(status) && status > 0) {
+      return status >= 500 || status === 429
+        ? 'Scryfall (l\'archivio delle carte) al momento non risponde. Riprova tra qualche minuto.'
+        : 'Scryfall (l\'archivio delle carte) ha rifiutato la ricerca. Riprova riformulando la richiesta con parole diverse.';
+    }
+    if (/fetch failed|network|ENOTFOUND|ECONN|ETIMEDOUT|timeout/i.test(m)) {
+      return 'problema di rete: controlla la connessione e riprova.';
+    }
+    return m || 'qualcosa è andato storto. Riprova.';
+  }
+
+  on(MSG.DECKS_CHAT, async (msg, sender) => {
+    // Ragionamento del modello (CoT, #331): accumulato qui e ritornato alla
+    // pagina (che lo mostra in un blocco collassabile); se la pagina ha aperto
+    // un canale live (reasoningReqId) ogni chunk viene anche inoltrato subito,
+    // così si vede "pensare" in diretta. Dichiarato fuori dal try: anche un
+    // turno fallito ritorna il ragionamento raccolto fin lì.
+    let reasoning = '';
     try {
       const text = String(msg?.text || '').trim();
       if (!text) return { ok: false, error: 'empty' };
