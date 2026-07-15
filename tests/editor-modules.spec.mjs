@@ -262,6 +262,57 @@ test.describe('font picker e drag dei moduli', () => {
     expect(html).toMatch(/font-family\s*:\s*[^;"']*Garamond/i);
   });
 
+  test('un font con nome composto (Times New Roman) sopravvive a salvataggio e riapertura', async () => {
+    const page = await openTab(EDITOR);
+    await page.waitForSelector('.ed-grid');
+    await addFontModule(page);
+    await selectParagraph(page);
+
+    // Applica un font il cui valore CSS contiene virgolette doppie letterali
+    // ("Times New Roman", Times, serif): è il caso che rompeva il round-trip.
+    const sel = page.locator('.ed-module[data-type="font"] .ed-font-select');
+    await sel.dispatchEvent('mousedown'); // salva la selezione corrente
+    await sel.selectOption('"Times New Roman", Times, serif');
+
+    // Helper: computed font-family dell'elemento che contiene il testo.
+    const familyOf = () => page.evaluate(() => {
+      const walker = document.createTreeWalker(document.getElementById('doc'), NodeFilter.SHOW_TEXT);
+      let n;
+      while ((n = walker.nextNode())) {
+        if (n.nodeValue && n.nodeValue.includes('cambia font')) {
+          return getComputedStyle(n.parentElement).fontFamily;
+        }
+      }
+      return '';
+    });
+
+    // Applicato subito (comportamento già corretto prima del fix).
+    await expect.poll(familyOf).toMatch(/Times New Roman/i);
+
+    // Salva e verifica che la marca sia persistita.
+    await page.keyboard.press('Control+s');
+    await expect.poll(() => page.evaluate(() => localStorage.getItem('filo.editor.doc') || ''))
+      .toContain('Times New Roman');
+
+    // Riapri il documento (reload → il body viene ri-renderizzato dal JSON
+    // salvato): il font deve essere ancora quello scelto, non il default.
+    await page.reload();
+    await page.waitForSelector('#doc');
+    await expect.poll(familyOf).toMatch(/Times New Roman/i);
+
+    // Nessun attributo spurio generato da virgolette non escapate nello style.
+    const spurious = await page.evaluate(() => {
+      const bad = [];
+      for (const el of document.querySelectorAll('#doc *')) {
+        for (const a of el.attributes) {
+          if (/^(times|new|roman|serif)/i.test(a.name)) bad.push(a.name);
+        }
+      }
+      return bad.join(',');
+    });
+    expect(spurious).toBe('');
+  });
+
   test('il dropdown del font si chiude con un click fuori da esso', async () => {
     const page = await openTab(EDITOR);
     await page.waitForSelector('.ed-grid');
