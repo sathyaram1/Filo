@@ -76,6 +76,13 @@ async function mockProvider(app) {
       await new Promise((r) => setTimeout(r, 50));
       return { text: String(globalThis.__nextReply), model: attempts[0].model, provider: attempts[0].provider, usage: {} };
     };
+    // La chat dei mazzi chiede il reasoning → cammino streaming: delega al
+    // mock non-streaming qui sopra (nessun chunk di CoT in questi test).
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, onDelta }) => {
+      const r = await globalThis.SN_PROVIDERS.completeWithFallback({ attempts, messages });
+      if (onDelta) onDelta(r.text);
+      return r;
+    };
   });
 }
 
