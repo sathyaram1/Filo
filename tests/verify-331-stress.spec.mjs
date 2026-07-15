@@ -117,8 +117,40 @@ test('provider KO con codice HTTP grezzo → in chat nessun codice tecnico', asy
   // Deve comparire QUALCOSA (non restare "sta pensando" per sempre)…
   await expect(page.locator('.dk-msg-pending')).toHaveCount(0, { timeout: 10_000 });
   await page.screenshot({ path: 'tests/.shots/verify-331-provider-400.png' });
-  // …e non deve contenere il codice tecnico "400" (lamentela #331.2).
+  // …e non deve contenere il codice tecnico "400" (lamentela #331.2)…
   await expect(page.locator('#chatLog')).not.toContainText('400');
+  await expect(page.locator('#chatLog')).not.toContainText('Bad Request');
+  await expect(page.locator('#chatLog')).not.toContainText('OpenRouter');
+  // …ma una spiegazione comprensibile di cosa non ha funzionato e cosa fare.
+  await expect(page.locator('#chatLog')).toContainText(/servizio AI/i);
+  await expect(page.locator('#chatLog')).toContainText(/riprova/i);
+});
+
+test('provider KO 401 → invito a controllare la chiave, senza codici', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await baseMocks(app);
+  await app.evaluate(() => {
+    const e = { message: 'OpenRouter 401: Unauthorized' };
+    globalThis.__streamThrow = e;
+    // Il provider vero attacca status/provider all'errore HTTP: qui simuliamo
+    // quel contratto (vedi unit test providers-errors) per verificare che la
+    // chat lo traduca nel consiglio giusto (chiave, non modello).
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async () => {
+      const err = new Error(e.message);
+      err.status = 401;
+      err.provider = 'openrouter';
+      throw err;
+    };
+  });
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await deckWithCommander(page);
+
+  await page.fill('#chatInput', 'ciao');
+  await page.press('#chatInput', 'Enter');
+  await expect(page.locator('.dk-msg-pending')).toHaveCount(0, { timeout: 10_000 });
+  await expect(page.locator('#chatLog')).not.toContainText('401');
+  await expect(page.locator('#chatLog')).toContainText(/chiave/i);
 });
 
 test('provider KO di rete → frase comprensibile', async ({ app, openTab }) => {
