@@ -167,7 +167,10 @@
     });
     if (!res.ok || !res.body) {
       const errText = await res.text().catch(() => '');
-      throw new Error(`Gemini ${res.status}: ${errText.slice(0, 300)}`);
+      const err = new Error(`Gemini ${res.status}: ${errText.slice(0, 300)}`);
+      err.status = res.status;
+      err.provider = 'gemini';
+      throw err;
     }
 
     const reader = res.body.getReader();
