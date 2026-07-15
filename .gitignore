@@ -1,4 +1,4 @@
-node_modules/
+node_modules
 dist/
 # Chiavi di default incastonate dalla CI nel build (contiene segreti veri):
 # non deve mai tornare nel repo pubblico. La scrive scripts/bake-default-config.mjs.
