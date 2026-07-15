@@ -1,7 +1,0 @@
-{
-  "id": "UowvOvjIxl61gjUoUm3I",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica è stata pubblicata. Ho esaminato tutte le modifiche di questa lavorazione: riguardano solo la traduzione in italiano dei messaggi d'errore del servizio AI nella chat dei mazzi (chiave rifiutata, servizio sovraccarico, modello non disponibile), più i test relativi. Nessun accesso a file sensibili, nessuna chiave o segreto esposto, nessun comportamento sospetto. I dettagli tecnici degli errori ora restano nei log interni invece di comparire in chat, il che riduce anche le informazioni tecniche esposte all'utente.",
-  "queuedAt": "2026-07-15T18:25:17.369Z",
-  "queuedBy": "routine"
-}
