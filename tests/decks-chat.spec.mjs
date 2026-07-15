@@ -365,6 +365,8 @@ test('doppio fallimento Scryfall → spiegazione chiara, niente codice 400', asy
   await expect(bubble).toContainText(/riformulare/i);
   await expect(page.locator('.dk-msg-error')).toHaveCount(0);
   await expect(page.locator('#chatLog')).not.toContainText('Scryfall 400');
+  // Traccia visiva ispezionabile (gitignorata).
+  await page.screenshot({ path: 'tests/.shots/decks-chat-scryfall-fallito.png' });
   // Il retry è stato tentato (2 chiamate LLM), poi il sistema ha spiegato.
   expect(await app.evaluate(() => globalThis.__chatCalls.length)).toBe(2);
 });
