@@ -303,3 +303,45 @@ test('mergeCard con id vuoto è un no-op esplicito', () => {
   assert.equal(merged, false);
   assert.equal(deck, d);
 });
+
+// ── Budget con la virgola decimale italiana (#315) ──────────────────────────
+// L'app mostra i prezzi come «12,50 €»: il tetto scritto allo stesso modo va
+// parsato, non stravolto (prima «40,50» diventava 4050, x100 in silenzio).
+
+test('parseBudgetInput accetta virgola e punto come separatore decimale', () => {
+  assert.deepEqual(D.parseBudgetInput('40,50'), { ok: true, value: 40.5 });
+  assert.deepEqual(D.parseBudgetInput('40.50'), { ok: true, value: 40.5 });
+  assert.deepEqual(D.parseBudgetInput('100'), { ok: true, value: 100 });
+  assert.deepEqual(D.parseBudgetInput('0'), { ok: true, value: 0 });
+});
+
+test('parseBudgetInput tollera €, spazi e separatore delle migliaia', () => {
+  assert.deepEqual(D.parseBudgetInput(' 40,50 € '), { ok: true, value: 40.5 });
+  assert.deepEqual(D.parseBudgetInput('1.234,56'), { ok: true, value: 1234.56 });
+  assert.deepEqual(D.parseBudgetInput('1,234.56'), { ok: true, value: 1234.56 });
+});
+
+test('parseBudgetInput: vuoto/null = nessun tetto (rimozione esplicita)', () => {
+  assert.deepEqual(D.parseBudgetInput(''), { ok: true, value: null });
+  assert.deepEqual(D.parseBudgetInput('   '), { ok: true, value: null });
+  assert.deepEqual(D.parseBudgetInput(null), { ok: true, value: null });
+  assert.deepEqual(D.parseBudgetInput(undefined), { ok: true, value: null });
+});
+
+test('parseBudgetInput rifiuta il testo non numerico (mai ok con valore stravolto)', () => {
+  for (const bad of ['abc', '40,5,0', '4a0', '-5', '40..5', '..', ',']) {
+    assert.deepEqual(D.parseBudgetInput(bad), { ok: false }, `«${bad}» deve essere rifiutato`);
+  }
+});
+
+test('setBudget con stringa passa dal parser: virgola ok, testo invalido = mazzo INVARIATO', () => {
+  const d = D.setBudget(D.newDeck(), 100);
+  assert.equal(d.budget, 100);
+  const conVirgola = D.setBudget(d, '40,50');
+  assert.equal(conVirgola.budget, 40.5, 'la virgola è un decimale, non va scartata');
+  const invalido = D.setBudget(d, 'abc');
+  assert.equal(invalido, d, 'input non numerico: nessuna modifica silenziosa');
+  assert.equal(invalido.budget, 100, 'il tetto precedente sopravvive');
+  const rimosso = D.setBudget(d, '');
+  assert.equal(rimosso.budget, null, 'stringa vuota = rimozione del tetto');
+});

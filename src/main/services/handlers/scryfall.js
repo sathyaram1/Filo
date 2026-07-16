@@ -293,7 +293,8 @@ module.exports = function register(on, ctx) {
           deckOut = saved;
           reply = [reply, parsed.budget === null
             ? 'Budget rimosso.'
-            : `Budget impostato a ${parsed.budget} €.`].filter(Boolean).join('\n');
+            // Formato italiano come il resto dei prezzi («40,50 €»).
+            : `Budget impostato a ${String(parsed.budget).replace('.', ',')} €.`].filter(Boolean).join('\n');
         }
       }
 

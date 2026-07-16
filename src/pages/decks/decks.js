@@ -286,13 +286,23 @@
 
   // ── Builder: identità del documento + switcher (§8.2) ──────────────────────
 
+  // Budget nell'intestazione e nel campo di modifica: formato italiano come
+  // tutti gli altri prezzi dell'app (virgola decimale), interi senza decimali
+  // («100», «40,50» — non «40.5»).
+  function fmtBudgetShort(n) {
+    return Number.isInteger(n) ? String(n) : n.toFixed(2).replace('.', ',');
+  }
+  function fmtBudgetInput(b) {
+    return (b === null || b === undefined) ? '' : fmtBudgetShort(b);
+  }
+
   async function renderBuilder() {
     $('deckNameText').textContent = current.nome;
     const commander = (current.commanderMeta && current.commanderMeta.name)
       ? `Commander: ${current.commanderMeta.name}`
       : 'Nessun commander — impostalo col tasto destro su una carta del mazzo.';
     const budget = (current.budget !== null && current.budget !== undefined)
-      ? ` · Budget: ${current.budget} €` : '';
+      ? ` · Budget: ${fmtBudgetShort(current.budget)} €` : '';
     $('commanderLine').textContent = commander + budget;
     $('deckCount').textContent = `${Decks.deckCount(current)}/100 carte`;
     await Promise.all([ensureSymbols(), loadDeckCards()]);
@@ -1420,8 +1430,15 @@
     add('Rinomina…', () => startEdit('deckNameEdit', current.nome, async (v) => {
       await saveDeck(Decks.renameDeck(current, v));
     }));
-    add('Budget…', () => startEdit('deckBudgetEdit', current.budget ?? '', async (v) => {
-      await saveDeck(Decks.setBudget(current, v === '' ? null : v));
+    add('Budget…', () => startEdit('deckBudgetEdit', fmtBudgetInput(current.budget), async (v) => {
+      // Virgola decimale italiana accettata (l'app mostra i prezzi come
+      // «12,50 €»); testo non numerico → il tetto resta com'era, con avviso.
+      const parsed = Decks.parseBudgetInput(v);
+      if (!parsed.ok) {
+        showToast(`Budget non valido: «${v}» non è un numero. Il tetto resta invariato.`);
+        return;
+      }
+      await saveDeck(Decks.setBudget(current, parsed.value));
     }));
     add('Elimina…', async () => {
       const ok = await window.SN_CONFIRM_UI.confirm({

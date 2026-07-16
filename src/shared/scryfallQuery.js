@@ -133,12 +133,15 @@
         const o = JSON.parse(c);
         if (!o || typeof o !== 'object' || Array.isArray(o)) continue;
         // Budget: presente = intenzione esplicita. null lo rimuove; un numero
-        // valido lo imposta; qualsiasi altro valore si ignora.
+        // valido lo imposta; qualsiasi altro valore si ignora. Se il modello
+        // riporta il numero come lo scrive l'utente italiano («40,50»), la
+        // virgola decimale è valida (stessa tolleranza del campo Budget…).
         let hasBudget = false; let budget = null;
         if ('budget' in o) {
+          const rawB = typeof o.budget === 'string' ? o.budget.trim().replace(',', '.') : o.budget;
           if (o.budget === null) { hasBudget = true; budget = null; }
-          else if (Number.isFinite(Number(o.budget)) && Number(o.budget) >= 0) {
-            hasBudget = true; budget = Number(o.budget);
+          else if (Number.isFinite(Number(rawB)) && Number(rawB) >= 0) {
+            hasBudget = true; budget = Number(rawB);
           }
         }
         return {
