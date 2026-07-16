@@ -343,7 +343,12 @@ module.exports = function register(on, ctx) {
         if (!matched) continue; // solo i feedback DI questo install
         const fid = f._id;
         if (!fid || rewarded[fid]) continue;            // già premiato: niente doppio premio
-        const priority = Math.max(0, Math.min(3, Math.round(Number(f.priority) || 0)));
+        // S1.priority: dal cutover cifratura `priority` può essere un ciphertext
+        // FENC1 illeggibile qui (la macchina utente non ha la chiave privata):
+        // Number(ciphertext) darebbe NaN → 0 → premio sempre minimo. La priorità
+        // leggibile è il mirror in chiaro `priorityPublic` (stesso pattern di
+        // statusPublic); fallback sul numero in chiaro per i feedback storici.
+        const priority = Credits.feedbackRewardPriority(f);
         const credits = Credits.rewardForPriority(priority);
         // Accredita e marca questo feedback come premiato (state.rewardedFeedback),
         // così alla prossima apertura non ricompare.
