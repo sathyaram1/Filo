@@ -226,6 +226,13 @@ service cloud.firestore {
              || (request.resource.data.get('priority', '') is string
                  && request.resource.data.get('priority', '').matches('^FENC1:.*'))
            )
+        // S1.priority: `priorityPublic` — mirror in chiaro (0-3) della priority
+        // (eventualmente cifrata). Serve al popup ricompense (C5) sulla macchina
+        // utente, che non ha la chiave privata. La fascia di premio non è un
+        // segreto: l'utente la vede comunque alla risoluzione.
+        && request.resource.data.get('priorityPublic', 0) is int
+        && request.resource.data.get('priorityPublic', 0) >= 0
+        && request.resource.data.get('priorityPublic', 0) <= 3
         && request.resource.data.get('name', '') is string
         && request.resource.data.get('name', '').size() <= 200
         && request.resource.data.get('seq', 0) is int
