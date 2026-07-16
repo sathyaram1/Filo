@@ -475,7 +475,11 @@
               <span class="dk-caret">▾</span>
             </button>
             <input id="deckNameEdit" type="text" aria-label="Rinomina il mazzo" hidden />
-            <input id="deckBudgetEdit" type="number" min="0" step="1"
+            <!-- type=text + inputmode=decimal, NON type=number: l'input numerico
+                 di Chromium scarta la virgola alla digitazione («40,50»→«4050»,
+                 tetto gonfiato x100 in silenzio). Il parse con virgola/punto
+                 sta in SN_DECKS.parseBudgetInput. -->
+            <input id="deckBudgetEdit" type="text" inputmode="decimal"
                    aria-label="Budget del mazzo in euro" placeholder="Budget in € (vuoto = nessuno)" hidden />
             <div class="dk-commander-line" id="commanderLine"></div>
           </div>
