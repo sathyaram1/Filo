@@ -88,6 +88,32 @@ test('aggrega più feedback risolti e somma la ricompensa', async ({ app, openTa
   await expect.poll(() => balanceOf(app)).toBe(1350);
 });
 
+test('priority cifrata (FENC1) + mirror priorityPublic: premia la fascia giusta, non il minimo', async ({ app, openTab }) => {
+  // Feedback #307: dal cutover cifratura `priority` su Firestore è un ciphertext
+  // FENC1 che la macchina utente non può decifrare. Il premio deve venire dal
+  // mirror in chiaro `priorityPublic` (qui 3 → +300). Senza il fix il calcolo fa
+  // Number(ciphertext)=NaN → fascia 0 → +50, e questo test diventa rosso.
+  const page = await openTab('filo://newtab/');
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForTimeout(500);
+
+  await seed(app, [
+    {
+      _id: 'fbEnc', clientId: CLIENT_ID, statusPublic: 'closed',
+      status: 'FENC1:status-cifrato-opaco',
+      priority: 'FENC1:priority-cifrata-opaca', priorityPublic: 3,
+      name: 'Bug importante', seq: 99, subSeq: 0, notes: 'Risolto il bug importante.',
+    },
+  ]);
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+
+  await expect(page.locator('#thanksOverlay')).toBeVisible();
+  // Priorità (dal mirror) 3 → +300 crediti, NON i 50 della fascia minima.
+  await expect(page.locator('.dash-thanks-total')).toContainText('+300');
+  await expect.poll(() => balanceOf(app)).toBe(1300);
+});
+
 test('anti doppio-premio: alla riapertura non ricompare né ri-accredita', async ({ app, openTab }) => {
   const page = await openTab('filo://newtab/');
   await page.waitForLoadState('domcontentloaded');
