@@ -1625,6 +1625,15 @@ class TabManager {
         openExternalScheme(url);
       }
     });
+    // SICUREZZA (#309) — come per le tab: will-navigate non copre i redirect
+    // lato server, e un IdP compromesso/ostile potrebbe rimbalzare il popup
+    // verso file:// (leak hash NTLM) o data:/javascript:. Stesso gate esplicito.
+    pwc.on('will-redirect', (event, url) => {
+      if (isWebUnsafeNav(url)) {
+        event.preventDefault();
+        openExternalScheme(url);
+      }
+    });
     pwc.setWindowOpenHandler(({ url }) => {
       if (isWebUnsafeNav(url)) {
         openExternalScheme(url);
