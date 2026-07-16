@@ -155,8 +155,16 @@
     if (!state.timers.length) lines.push('(nessuno)');
     else {
       state.timers.forEach((t) => {
-        const rem = t.paused ? '(in pausa)' : `${Math.floor(t.remainingSec / 60)}m ${t.remainingSec % 60}s rimanenti`;
-        lines.push(`- Timer "${t.label}": ${rem}`);
+        if (t.kind === 'alarm') {
+          // #322 — le sveglie si descrivono con l'orario assoluto, non col
+          // countdown (che per una sveglia a ore di distanza confonderebbe).
+          const d = new Date(t.endsAt);
+          const hhmm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+          lines.push(`- Sveglia${t.label ? ` "${t.label}"` : ''}: suona alle ${hhmm}`);
+        } else {
+          const rem = t.paused ? '(in pausa)' : `${Math.floor(t.remainingSec / 60)}m ${t.remainingSec % 60}s rimanenti`;
+          lines.push(`- Timer "${t.label}": ${rem}`);
+        }
       });
     }
     lines.push('');
