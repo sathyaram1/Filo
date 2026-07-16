@@ -737,7 +737,7 @@
 
   async function savePage() {
     try {
-      const cap = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB });
+      const cap = await captureVisibleTab();
       const thumbnail = cap?.dataUrl || '';
       const base = buildSavePayload();
       const res = await chrome.runtime.sendMessage({
