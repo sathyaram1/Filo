@@ -373,7 +373,19 @@
     }
   }
 
-  // Card speciale per un timer che sta suonando: bordo animato + pulsante "Ferma".
+  // Orario "umano" di una sveglia: HH:MM, con l'indicazione del giorno solo se
+  // non è oggi (#322).
+  function fmtAlarmTime(iso) {
+    const d = new Date(iso);
+    const hhmm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    const now = new Date();
+    if (d.toDateString() === now.toDateString()) return hhmm;
+    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    if (d.toDateString() === tomorrow.toDateString()) return `${hhmm} di domani`;
+    return `${hhmm} del ${d.getDate()}/${d.getMonth() + 1}`;
+  }
+
+  // Card speciale per un timer/sveglia che sta suonando: bordo animato + "Ferma".
   function renderRingingCard(t) {
     const div = document.createElement('div');
     div.className = 'dash-live-card';
@@ -382,7 +394,9 @@
 
     const textEl = document.createElement('div');
     textEl.className = 'dash-live-text';
-    textEl.textContent = `⏰ ${t.label} — scaduto`;
+    textEl.textContent = t.kind === 'alarm'
+      ? `⏰ Sveglia${t.label ? ` — ${t.label}` : ''}`
+      : `⏰ ${t.label} — scaduto`;
     div.appendChild(textEl);
 
     const stopBtn = document.createElement('button');
