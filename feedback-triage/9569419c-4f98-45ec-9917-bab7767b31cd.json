@@ -1,0 +1,9 @@
+{
+  "id": "9569419c-4f98-45ec-9917-bab7767b31cd",
+  "status": "design",
+  "notes": "Controllo di sicurezza (revisione del codice) superato: la modifica che ripristina i premi in crediti proporzionati all'importanza del feedback non presenta problemi — il valore pubblico della priorità è scrivibile solo dall'amministratore, resta limitato alla fascia 0-3 e non espone nulla che l'utente non veda già. Il cancello automatico ha però BLOCCATO la pubblicazione perché la modifica tocca file protetti che richiedono la tua approvazione manuale: le regole del database e gli script di pubblicazione dei feedback. Serve il tuo ok per fondere il branch; inclusa nel pacchetto c'è anche una coda di aggiornamenti retroattivi (77 feedback esistenti) che riallinea i premi sulle segnalazioni già archiviate.",
+  "queuedAt": "2026-07-16T06:10:40.547Z",
+  "queuedBy": "routine",
+  "branch": "worker/9569419c-4f98-45ec-9917-bab7767b31cd",
+  "reason": "secaudit"
+}
