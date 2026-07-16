@@ -17,8 +17,11 @@
     // ↓ Nuove versioni in cima.
     {
       version: '0.2.138', date: '2026-07-16',
-      features: [],
+      features: [
+        'Timer e sveglie ora mostrano anche una notifica di sistema quando scattano: l\'avviso ti raggiunge pure se stai guardando un\'altra scheda o hai Filo ridotto a icona.',
+      ],
       fixes: [
+        'Le sveglie chieste a Filo ("mettimi una sveglia alle 7") ora suonano davvero all\'orario stabilito, come i timer: prima compariva solo un\'etichetta e all\'ora fissata non succedeva nulla. La sveglia programmata si vede in alto nella nuova scheda con il suo orario e puoi toglierla con la ×; se l\'orario è già passato oggi, viene messa per domani.',
         'Nel deck builder, il tetto di budget scritto con la virgola (es. "40,50", come tutti i prezzi dell\'app) ora viene capito correttamente: prima diventava cento volte più grande senza nessun avviso. Se scrivi qualcosa che non è un numero, il tetto resta com\'era e compare un avviso. Anche il budget mostrato nell\'intestazione del mazzo ora usa la virgola, come il resto dei prezzi.',
       ],
     },

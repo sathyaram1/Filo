@@ -291,9 +291,15 @@
     },
     {
       id: 'filo-timers', title: 'Timer', category: 'assistant',
-      desc: 'Chiedi a Filo di farti da timer ("timer di 10 minuti per la pasta"): il conto alla rovescia compare in alto nella nuova scheda e, allo scadere, parte un avviso sonoro che puoi fermare.',
+      desc: 'Chiedi a Filo di farti da timer ("timer di 10 minuti per la pasta"): il conto alla rovescia compare in alto nella nuova scheda e, allo scadere, parte un avviso sonoro che puoi fermare, più una notifica di sistema.',
       invoke: 'Chiedi un timer all’assistente; i timer attivi e quelli che stanno suonando si vedono in alto nella nuova scheda.',
-      doesNot: 'La suoneria si sente quando Filo è aperto.',
+      doesNot: 'La suoneria si sente quando la nuova scheda è aperta; la notifica di sistema arriva comunque finché Filo è in esecuzione, anche ridotto a icona. Con Filo completamente chiuso non suona nulla.',
+    },
+    {
+      id: 'filo-alarms', title: 'Sveglie', category: 'assistant',
+      desc: 'Chiedi a Filo una sveglia ("mettimi una sveglia alle 7 per lavoro", "sveglia tra 3 ore"): all’orario stabilito parte un avviso sonoro nella nuova scheda e una notifica di sistema. Se l’orario è già passato oggi, la sveglia viene messa per domani.',
+      invoke: 'Chiedi la sveglia all’assistente; le sveglie programmate compaiono in alto nella nuova scheda con il loro orario e puoi rimuoverle con la ×.',
+      doesNot: 'Non suona se Filo è completamente chiuso: il browser deve restare in esecuzione (va bene anche ridotto a icona). Per svegliarti al mattino affidati anche a una sveglia vera.',
     },
     {
       id: 'filo-notifications', title: 'Avvisi di Filo', category: 'assistant',
