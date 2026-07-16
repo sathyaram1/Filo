@@ -892,7 +892,7 @@
   // Risolve con null se l'utente annulla (Esc / clic senza drag / rettangolo
   // troppo piccolo). Non logga eccezioni: gli errori bubble-up come reject.
   async function selectScreenRegion() {
-    const cap = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB });
+    const cap = await captureVisibleTab();
     if (!cap?.dataUrl) throw new Error('capture failed');
 
     // L'immagine catturata è in pixel del device; l'overlay è in pixel CSS.
