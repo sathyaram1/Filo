@@ -183,6 +183,7 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys()
           // S1.F2.1: aggiunto statusPublic (enum grossolano in chiaro) e resolvedInVersion.
           .hasOnly(['status', 'statusPublic', 'notes', 'resolvedAt', 'verifiedAt', 'priority',
+                    'priorityPublic', // S1.priority: mirror in chiaro della priorità (fascia premio C5)
                     'priorityManual', // P6: flag manuale owner (il giudice auto non sovrascrive)
                     // Macchina a stati (FEEDBACK-STATES.md): statusReason = sottotesto
                     // dello status (loop/clarify/…), workingSince = timestamp del lock,
