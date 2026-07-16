@@ -646,6 +646,21 @@ async function main() {
       } catch (e) { console.error(`  ✗ delete ${it.entry.id}: ${e.message}`); failures++; }
       continue;
     }
+    if (it.entry.op === 'priority-public') {
+      // Backfill del mirror in chiaro della priorità (S1.priority): PATCH del
+      // solo campo priorityPublic. 404 = doc sparito: entry rimossa senza errore.
+      try {
+        const r = await patchFields(it.entry.id, { priorityPublic: Number(it.entry.priorityPublic) }, bearer);
+        if (r.ok) {
+          console.log(`  ✓ priorityPublic=${it.entry.priorityPublic} su ${it.entry.id}`);
+          unlinkSync(it.file); applied.push(it.file);
+        } else if (r.status === 404) {
+          console.warn(`  ! priority-public ${it.entry.id}: feedback inesistente (404) — rimuovo dalla coda`);
+          unlinkSync(it.file); applied.push(it.file);
+        } else { console.error(`  ✗ priority-public ${it.entry.id}: HTTP ${r.status} ${r.body}`); failures++; }
+      } catch (e) { console.error(`  ✗ priority-public ${it.entry.id}: ${e.message}`); failures++; }
+      continue;
+    }
     if (it.entry.op === 'create') {
       try {
         const num = await allocateNumber(it.entry);
