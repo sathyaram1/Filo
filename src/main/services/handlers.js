@@ -725,10 +725,18 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         if (entry) broadcastLiveUpdate();
         return { executed: !!entry, kept: false };
       }
-      case 'SVEGLIA':
-        await FiloMem.addNotification({ kind: 'process', text: `Sveglia: ${action.time || action.orario || ''} ${action.label || action.etichetta || ''}`.trim() });
-        broadcastLiveUpdate();
-        return { executed: true, kept: false };
+      case 'SVEGLIA': {
+        // #322 — prima qui c'era solo una notifica statica ("Sveglia: 07:00")
+        // che non suonava mai. Ora la sveglia viene programmata DAVVERO: entra
+        // nella lista dei timer con scadenza assoluta e riusa lo stesso flusso
+        // ringing/suoneria dei timer (+ notifica di sistema dal watcher main).
+        const entry = await FiloMem.addAlarm({
+          label: String(action.label ?? action.etichetta ?? '').trim(),
+          time: action.time ?? action.orario ?? action.at ?? '',
+        });
+        if (entry) broadcastLiveUpdate();
+        return { executed: !!entry, kept: false };
+      }
       case 'SALVA_APPUNTO': {
         const text = action.text || action.testo;
         if (text) await FiloMem.addNote({ text, context: action.context || action.contesto });
