@@ -1420,8 +1420,15 @@
     add('Rinomina…', () => startEdit('deckNameEdit', current.nome, async (v) => {
       await saveDeck(Decks.renameDeck(current, v));
     }));
-    add('Budget…', () => startEdit('deckBudgetEdit', current.budget ?? '', async (v) => {
-      await saveDeck(Decks.setBudget(current, v === '' ? null : v));
+    add('Budget…', () => startEdit('deckBudgetEdit', fmtBudgetInput(current.budget), async (v) => {
+      // Virgola decimale italiana accettata (l'app mostra i prezzi come
+      // «12,50 €»); testo non numerico → il tetto resta com'era, con avviso.
+      const parsed = Decks.parseBudgetInput(v);
+      if (!parsed.ok) {
+        showToast(`Budget non valido: «${v}» non è un numero. Il tetto resta invariato.`);
+        return;
+      }
+      await saveDeck(Decks.setBudget(current, parsed.value));
     }));
     add('Elimina…', async () => {
       const ok = await window.SN_CONFIRM_UI.confirm({
