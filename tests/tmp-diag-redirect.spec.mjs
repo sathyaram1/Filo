@@ -30,10 +30,8 @@ test('diag redirect events', async ({ app, openTab }) => {
     }
   });
 
-  await page.evaluate(() => { window.location.href = '/to-file'; });
-  await new Promise((r) => setTimeout(r, 1200));
-  await page.evaluate(() => { window.location.href = '/to-mailto'; }).catch(() => {});
-  await new Promise((r) => setTimeout(r, 1200));
+  await page.evaluate(() => { window.location.href = '/to-mailto'; });
+  await new Promise((r) => setTimeout(r, 1500));
 
   const diag = await app.evaluate(() => globalThis.__diag);
   console.log('DIAG:', JSON.stringify(diag, null, 1));
