@@ -1284,6 +1284,19 @@ class TabManager {
       // se il proxy non è configurato la pagina resta semplicemente diretta.
       this._maybeApplyDomainRule(tab, url);
     });
+    // SICUREZZA (#309) — will-navigate NON scatta sui redirect lato server
+    // (301/302/meta-refresh gestiti dal network layer): senza questo gate un
+    // sito potrebbe rimbalzare la scheda verso uno schema non-web affidandosi
+    // solo al blocco implicito di Chromium, fuori dall'invariante esplicita del
+    // #247 ("nessuno schema non-web da NESSUN cammino"). Stessa difesa del
+    // will-navigate qui sopra: blocco + delega all'OS dei soli mailto:/tel:/sms:.
+    // I redirect legittimi http(s)→http(s) non entrano nel ramo e proseguono.
+    wc.on('will-redirect', (event, url) => {
+      if (isWebUnsafeNav(url)) {
+        event.preventDefault();
+        openExternalScheme(url);
+      }
+    });
     // Debug helper: in dev relay i log della pagina al main.
     if (process.env.NODE_ENV !== 'production') {
       wc.on('console-message', (_e, level, message, line, source) => {
