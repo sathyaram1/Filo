@@ -14,12 +14,12 @@ test('la miniatura salvata dal menu tasto destro non contiene il menu', async ({
   const page = await testServer.openReady(
     openTab,
     `<!doctype html><html><head><title>Pagina bianca</title></head>
-     <body style="margin:0;background:#fff"></body></html>`,
+     <body style="margin:0;height:100vh;background:#fff"></body></html>`,
   );
 
   // Apre il menu del tasto destro al centro della pagina e salva con l'icona
   // "Salva per dopo" nella fila in alto (il cammino principale dell'utente).
-  await page.click('body', { button: 'right' });
+  await page.click('body', { button: 'right', position: { x: 400, y: 300 } });
   const btn = page.locator('.sn-menu [data-sn-icon-id="saveForLater"]');
   await expect(btn).toBeVisible();
   await btn.click();
