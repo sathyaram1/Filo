@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.138', date: '2026-07-16',
+      features: [],
+      fixes: [
+        'Nel deck builder, il tetto di budget scritto con la virgola (es. "40,50", come tutti i prezzi dell\'app) ora viene capito correttamente: prima diventava cento volte più grande senza nessun avviso. Se scrivi qualcosa che non è un numero, il tetto resta com\'era e compare un avviso. Anche il budget mostrato nell\'intestazione del mazzo ora usa la virgola, come il resto dei prezzi.',
+      ],
+    },
+    {
       version: '0.2.137', date: '2026-07-16',
       features: [],
       fixes: [
