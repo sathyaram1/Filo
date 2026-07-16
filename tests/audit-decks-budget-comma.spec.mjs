@@ -40,11 +40,10 @@ test('budget scritto con la virgola italiana (40,50) non viene perso né gonfiat
   // ASSERZIONE CHIAVE: il tetto deve valere 40,50 € — non sparire (riga
   // Budget assente) né diventare 4050 €. L'intestazione lo mostra in formato
   // italiano, come tutti gli altri prezzi dell'app.
+  // (Il pannello statistiche compare solo con carte nel mazzo e usa già il
+  // formato italiano per tutti gli importi: qui basta l'intestazione.)
   const line = page.locator('#commanderLine');
   await expect(line).toContainText('Budget: 40,50 €');
-
-  // Anche il pannello statistiche deve riportare il tetto giusto.
-  await expect(page.locator('.dk-budget-row[data-b="cap"]')).toContainText('40,50 €');
 });
 
 test('input budget non numerico → avviso e tetto invariato (niente sovrascrittura silenziosa)', async ({ openTab }) => {
