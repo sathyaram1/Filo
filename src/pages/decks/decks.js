@@ -548,23 +548,40 @@
   }
 
   // "Copia/Sposta in un altro mazzo": secondo livello con l'elenco dei mazzi.
+  // Se la destinazione contiene GIÀ la carta le quantità si SOMMANO (mergeCard)
+  // — mai un no-op silenzioso, che nel "move" faceva sparire le copie. La
+  // rimozione dall'origine avviene SOLO dopo che la destinazione è stata
+  // salvata con successo: se qualcosa fallisce, l'origine resta intatta.
+  // Ogni esito (successo o errore) è comunicato con un toast.
   async function chooseDeck(x, y, cardId, move) {
     const res = await send({ type: MSG.DECKS_LIST });
     const others = Decks.sortForLibrary((res && res.decks) || [])
       .filter((d) => d.id !== current.id);
     if (!others.length) return;
     const entry = current.carte.find((c) => c.scryfall_id === cardId);
+    const cardName = (cardsById[cardId] && cardsById[cardId].name) || 'Carta';
     openCtx(x, y, others.map((d) => ({
       label: d.nome,
       run: async () => {
+        const verb = move ? 'Spostare' : 'Copiare';
         const t = await send({ type: MSG.DECKS_GET, id: d.id });
-        if (t && t.ok) {
-          const { deck: target, added } = Decks.addCard(t.deck, cardId, {
-            qty: entry ? entry.qty : 1, tags: entry ? entry.tags : [],
-          });
-          if (added) await send({ type: MSG.DECKS_UPDATE, deck: target });
+        if (!t || !t.ok) {
+          showToast(`${verb} non riuscito: mazzo "${d.nome}" non raggiungibile.`);
+          return;
+        }
+        const { deck: target, merged } = Decks.mergeCard(t.deck, cardId, {
+          qty: entry ? entry.qty : 1, tags: entry ? entry.tags : [],
+        });
+        const up = await send({ type: MSG.DECKS_UPDATE, deck: target });
+        if (!up || !up.ok) {
+          showToast(`${verb} non riuscito: "${d.nome}" non è stato aggiornato.`);
+          return;
         }
         if (move) await removeFromDeck(cardId);
+        const done = move ? 'spostata' : 'copiata';
+        showToast(merged
+          ? `${cardName} ${done} in "${d.nome}" (copie sommate a quelle già presenti).`
+          : `${cardName} ${done} in "${d.nome}".`);
       },
     })));
   }
