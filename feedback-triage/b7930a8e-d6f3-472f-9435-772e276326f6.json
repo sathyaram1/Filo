@@ -1,0 +1,7 @@
+{
+  "id": "b7930a8e-d6f3-472f-9435-772e276326f6",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato e modifica pubblicata. La protezione che impedisce ai siti di portarti su indirizzi pericolosi ora copre anche i reindirizzamenti automatici delle pagine (prima valeva solo per click e popup): se un sito prova a rimbalzarti verso un indirizzo non web, Filo lo blocca; solo i link di posta, telefono e SMS vengono passati all'app giusta del sistema, come già avviene per i click. Ho verificato che il filtro ricontrolla sempre la lista dei tipi consentiti prima di aprire qualsiasi cosa fuori da Filo, che i reindirizzamenti normali tra pagine web continuano a funzionare e che la modifica non tocca nessun file di configurazione sensibile. La modifica include anche test automatici che coprono i tre casi (reindirizzamento pericoloso bloccato, indirizzo di posta consegnato correttamente, reindirizzamento normale intatto).",
+  "queuedAt": "2026-07-16T06:27:08.547Z",
+  "queuedBy": "routine"
+}
