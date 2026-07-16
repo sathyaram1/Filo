@@ -398,6 +398,7 @@
     importCards,
     renameDeck,
     setCommander,
+    parseBudgetInput,
     setBudget,
     deckCount,
     duplicateDeck,
