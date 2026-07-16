@@ -85,6 +85,31 @@
     return { deck: next, added: true };
   }
 
+  // Copia/sposta VERSO un altro mazzo: se la carta manca si aggiunge (come
+  // addCard), se c'è già le quantità si SOMMANO e i tag si uniscono — mai un
+  // no-op silenzioso che farebbe sparire copie (il chiamante "move" rimuove
+  // dall'origine solo dopo che questo merge è stato salvato con successo).
+  // Ritorna { deck, added:true } se la carta era nuova, { deck, merged:true }
+  // se le copie sono state sommate a quelle esistenti.
+  function mergeCard(deck, scryfallId, { qty = 1, tags = [] } = {}) {
+    const id = String(scryfallId || '').trim();
+    if (!id) return { deck, added: false, merged: false };
+    const existing = deck.carte.find((c) => c.scryfall_id === id);
+    if (!existing) {
+      const { deck: next, added } = addCard(deck, id, { qty, tags });
+      return { deck: next, added, merged: false };
+    }
+    const addQty = Math.max(1, Number(qty) || 1);
+    const mergedTags = [...existing.tags];
+    for (const t of (tags || []).map(String)) {
+      if (!mergedTags.includes(t)) mergedTags.push(t);
+    }
+    const carte = deck.carte.map((c) => (c === existing
+      ? { ...c, qty: c.qty + addQty, tags: mergedTags }
+      : c));
+    return { deck: touch({ ...deck, carte }), added: false, merged: true };
+  }
+
   function removeCard(deck, scryfallId) {
     const id = String(scryfallId || '').trim();
     const carte = deck.carte.filter((c) => c.scryfall_id !== id);
