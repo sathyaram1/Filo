@@ -38,7 +38,15 @@ test('la pagina Crediti mostra saldo e una fetta per tipo d\'uso', async ({ app,
   await expect(page.locator('#legend li[data-group="Correttore ortografico"] .sn-credits-value')).toHaveText('100');
 });
 
-test('senza consumo la pagina Crediti mostra lo stato vuoto', async ({ openTab }) => {
+test('senza consumo la pagina Crediti mostra lo stato vuoto', async ({ app, openTab }) => {
+  // Bonus giornaliero auto-feedback (F4) già riscosso oggi (vedi sopra: senza
+  // questo il saldo mostrato sarebbe 1.010, non 1.000).
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CREDITS;
+    const fresh = C.freshState();
+    fresh.lastAutoFeedbackBonusDate = new Date().toISOString().slice(0, 10);
+    await C.writeState(fresh);
+  });
   const page = await openTab('filo://credits/credits.html');
   await page.waitForLoadState('domcontentloaded');
 
