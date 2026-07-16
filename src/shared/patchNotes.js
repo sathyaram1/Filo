@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.139', date: '2026-07-16',
+      features: [],
+      fixes: [
+        'Le miniature di "Salva per dopo" ora mostrano la pagina pulita: il menu del tasto destro non finisce più fotografato dentro l\'anteprima. Lo stesso vale per gli screenshot e i ritagli fatti dal menu: il menu non compare più nell\'immagine catturata.',
+      ],
+    },
+    {
       version: '0.2.138', date: '2026-07-16',
       features: [
         'Timer e sveglie ora mostrano anche una notifica di sistema quando scattano: l\'avviso ti raggiunge pure se stai guardando un\'altra scheda o hai Filo ridotto a icona.',
