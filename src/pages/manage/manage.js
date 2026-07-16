@@ -1120,11 +1120,18 @@
     mgThread.innerHTML = '';
     const TH = window.SN_FEEDBACK_THREAD;
 
-    // Bolla 1: la segnalazione originale (+ allegati piatti images[]).
+    // Bolla 1: la segnalazione originale (+ allegati piatti images[] e files[]).
+    // I file non-immagine (log, pdf, txt caricati dal tester col box feedback)
+    // vivono nel campo piatto files[] ({ name, url, type }): senza mapparli qui
+    // l'allegato del tester era invisibile nella dashboard unificata (la vecchia
+    // pagina feedback li mostra — parità tra superfici equivalenti).
     const fromModel = TH ? TH.isFromModel(fb.clientId) : false;
     const imgs = (Array.isArray(fb.images) ? fb.images : []).map((url) => ({ kind: 'img', url }));
+    const files = (Array.isArray(fb.files) ? fb.files : [])
+      .filter((f) => f && typeof f.url === 'string' && f.url)
+      .map((f) => ({ kind: 'file', url: f.url, name: f.name }));
     appendBubble(fromModel ? 'model' : 'user', fromModel ? 'Filo (segnalazione automatica)' : 'Utente',
-      esc(fb.text || ''), imgs);
+      esc(fb.text || ''), imgs.concat(files));
 
     // Bolla 2: parere di Filo (riassunto dei giudici).
     const summary = fb.pipeline && fb.pipeline.filoSummary;
