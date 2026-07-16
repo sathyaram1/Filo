@@ -1,7 +1,0 @@
-{
-  "id": "d7dea865-dc6a-4ccd-a913-1c192d5bd645",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato e modifica pubblicata. Ora nel deck builder puoi scrivere il tetto di budget con la virgola (es. 40,50), come tutti gli altri prezzi dell'app: prima veniva interpretato come un numero cento volte più grande senza nessun avviso. Se scrivi qualcosa che non è un numero compare un avviso e il tetto resta com'era, e il budget nell'intestazione del mazzo ora è mostrato con la virgola come il resto dei prezzi. Ho verificato in particolare che il messaggio di avviso non possa essere usato per iniettare contenuti nella pagina e che la modifica non tocchi nulla al di fuori della gestione del budget.",
-  "queuedAt": "2026-07-16T12:35:42.014Z",
-  "queuedBy": "routine"
-}
