@@ -1,0 +1,7 @@
+{
+  "id": "abda84e5-22a7-45b1-a90c-6e4698d914d8",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato e modifica pubblicata. Ho esaminato l'intera modifica sulle sveglie e i timer: l'orario che chiedi viene interpretato con regole strette (se non è comprensibile la sveglia semplicemente non viene creata, senza fingere il contrario), i testi che scrivi tu (l'etichetta della sveglia) vengono mostrati in modo sicuro sia nella nuova scheda sia nella notifica di sistema, e la modifica non tocca nulla di sensibile (regole di accesso, script di pubblicazione, chiavi). Nessun problema rilevato, quindi ho eseguito la pubblicazione: la sveglia ora fa parte della versione corrente.",
+  "queuedAt": "2026-07-16T18:08:26.106Z",
+  "queuedBy": "routine"
+}
