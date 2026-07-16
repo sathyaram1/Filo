@@ -1469,9 +1469,21 @@
   function replaceOne(replacement) {
     const cur = findState.hits[findState.idx];
     if (!cur) return;
+    // Sostituisce SOLO la corrispondenza corrente e avanza alla successiva
+    // senza ri-eseguire la ricerca: una ri-scansione ripartirebbe dalla prima
+    // corrispondenza e ri-troverebbe il termine dentro il testo appena
+    // inserito (es. cerca "cat", sostituisci "cats" → loop sulla stessa parola).
+    const parent = cur.parentNode;
     cur.replaceWith(document.createTextNode(replacement));
+    if (parent) parent.normalize();
+    findState.hits.splice(findState.idx, 1);
+    if (!findState.hits.length) {
+      findState.idx = -1;
+    } else {
+      findState.idx = findState.idx % findState.hits.length; // wrap se era l'ultima
+      highlightCurrent();
+    }
     onDocInput();
-    runFind(findState.term);
   }
   function replaceAll(term, replacement) {
     if (!term) return;
