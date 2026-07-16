@@ -218,6 +218,58 @@
     return filtered;
   }
 
+  // ===== Sveglie (#322) =====
+  //
+  // Una sveglia è un timer con scadenza ASSOLUTA: vive nella STESSA lista dei
+  // timer (kind: 'alarm') così eredita gratis tutto il flusso già rodato —
+  // gcTimers → ringing → suoneria + card "Ferma" nella dashboard. Prima
+  // l'azione SVEGLIA creava solo una notifica statica che non suonava mai.
+
+  // Converte l'orario richiesto in un timestamp assoluto (ms). Regole:
+  //   - "HH:MM" / "H:MM" / "H" (anche col punto: "7.30"): la PROSSIMA
+  //     occorrenza — oggi se ancora futura, altrimenti domani (chi chiede
+  //     "sveglia alle 7" alle 23 intende domattina).
+  //   - stringa ISO / data completa: quel momento esatto; se è già passato
+  //     → null (non ha senso una sveglia nel passato).
+  // Ritorna null se non interpretabile: meglio "non ho capito l'orario" che
+  // fingere di aver programmato qualcosa.
+  function resolveAlarmTime(raw, nowMs = Date.now()) {
+    const s = String(raw ?? '').trim();
+    if (!s) return null;
+    const m = /^(\d{1,2})(?:[:.](\d{2}))?$/.exec(s);
+    if (m) {
+      const h = Number(m[1]);
+      const min = Number(m[2] || 0);
+      if (h > 23 || min > 59) return null;
+      const d = new Date(nowMs);
+      d.setHours(h, min, 0, 0);
+      let t = d.getTime();
+      if (t <= nowMs) t += 24 * 60 * 60 * 1000;
+      return t;
+    }
+    const t = Date.parse(s);
+    if (Number.isFinite(t) && t > nowMs) return t;
+    return null;
+  }
+
+  async function addAlarm({ label, time, nowMs }) {
+    const now = Number.isFinite(nowMs) ? nowMs : Date.now();
+    const at = resolveAlarmTime(time, now);
+    if (!at) return null;
+    const list = await listTimers();
+    const entry = {
+      id: uuid(),
+      kind: 'alarm',
+      label: String(label || '').trim().slice(0, 60),
+      startedAt: new Date(now).toISOString(),
+      endsAt: new Date(at).toISOString(),
+      paused: false,
+    };
+    list.unshift(entry);
+    await setRaw(KEYS.FILO_TIMERS, list);
+    return entry;
+  }
+
   // Pulizia: i timer scaduti (endsAt <= now) e non in pausa vengono marcati
   // `ringing: true` invece di essere eliminati, così la UI può far suonare la
   // suoneria e mostrare un controllo "Ferma". I timer in stato `ringing` restano
