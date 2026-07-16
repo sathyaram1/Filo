@@ -153,8 +153,50 @@
     return touch({ ...deck, commander: id, commanderMeta: meta || null });
   }
 
+  // Parsa il testo del campo budget come lo scrive l'utente. L'app mostra
+  // TUTTI i prezzi in formato italiano («12,50 €»), quindi il tetto scritto
+  // con la virgola decimale è l'input più naturale: qui la virgola è un
+  // separatore decimale valido, insieme al punto. Tollerati anche il simbolo
+  // €, gli spazi e il separatore delle migliaia («1.234,56» / «1,234.56»).
+  // Ritorna { ok:true, value:<number|null> } (null = nessun tetto) oppure
+  // { ok:false } se il testo NON è un numero: in quel caso il chiamante non
+  // deve salvare nulla (mai stravolgere o cancellare il tetto in silenzio).
+  function parseBudgetInput(text) {
+    if (text === null || text === undefined) return { ok: true, value: null };
+    let s = String(text).replace(/€/g, '').replace(/\s+/g, '');
+    if (s === '') return { ok: true, value: null };
+    const lastDot = s.lastIndexOf('.');
+    const lastComma = s.lastIndexOf(',');
+    if (lastDot !== -1 && lastComma !== -1) {
+      // Entrambi i separatori: il più a destra è quello decimale, l'altro è
+      // il separatore delle migliaia («1.234,56» oppure «1,234.56»).
+      const dec = lastDot > lastComma ? '.' : ',';
+      const thou = dec === '.' ? ',' : '.';
+      s = s.split(thou).join('');
+      if (dec === ',') s = s.replace(',', '.');
+    } else if (lastComma !== -1) {
+      // Solo virgole: una sola è il decimale italiano; più d'una non è un numero.
+      if (s.indexOf(',') !== lastComma) return { ok: false };
+      s = s.replace(',', '.');
+    }
+    if (!/^\d+(\.\d+)?$/.test(s)) return { ok: false };
+    const n = Number(s);
+    if (!Number.isFinite(n)) return { ok: false };
+    return { ok: true, value: n };
+  }
+
   function setBudget(deck, budget) {
-    const b = (budget === null || budget === undefined || budget === '') ? null : Math.max(0, Number(budget) || 0);
+    let b;
+    if (typeof budget === 'string') {
+      // Difesa in profondità: se arriva la stringa grezza dell'input, passa
+      // dal parser (virgola inclusa); testo non numerico → mazzo INVARIATO,
+      // mai un Number()||0 che azzererebbe il tetto in silenzio.
+      const p = parseBudgetInput(budget);
+      if (!p.ok) return deck;
+      b = p.value;
+    } else {
+      b = (budget === null || budget === undefined) ? null : Math.max(0, Number(budget) || 0);
+    }
     return touch({ ...deck, budget: b });
   }
 
