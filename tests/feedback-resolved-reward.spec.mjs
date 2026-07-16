@@ -20,6 +20,9 @@ async function seed(app, feedback) {
   await app.evaluate(async (_electron, { clientId, feedback }) => {
     await globalThis.chrome.storage.local.set({ sn_feedback_client_id: clientId });
     const fresh = globalThis.SN_CREDITS.freshState();
+    // Bonus giornaliero auto-feedback (F4) già riscosso oggi: senza questo il
+    // +10 scatta al load e sposta tutti gli assert sul saldo (es. 1210 ≠ 1200).
+    fresh.lastAutoFeedbackBonusDate = new Date().toISOString().slice(0, 10);
     await globalThis.SN_CREDITS.writeState(fresh);
     // Niente rete: la lista è quella che passiamo noi.
     globalThis.SN_FEEDBACK.list = async () => feedback;
