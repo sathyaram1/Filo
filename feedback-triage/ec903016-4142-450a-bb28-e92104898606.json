@@ -1,7 +1,0 @@
-{
-  "id": "ec903016-4142-450a-bb28-e92104898606",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica è stata pubblicata. Nell'Editor, il pulsante \"Sostituisci\" di Cerca e sostituisci ora passa alla corrispondenza successiva dopo ogni sostituzione invece di ripartire dall'inizio del documento, e non resta più bloccato sulla stessa parola quando il testo sostitutivo contiene la parola cercata. La correzione è coperta da test automatici che simulano sostituzioni una per una e a metà documento, e il recap aggiornamenti della prossima versione ne dà notizia. Dal punto di vista della sicurezza non è emerso nulla di rilevante: la sostituzione inserisce sempre testo semplice, quindi nessun rischio di contenuti attivi indesiderati.",
-  "queuedAt": "2026-07-16T06:40:32.979Z",
-  "queuedBy": "routine"
-}
