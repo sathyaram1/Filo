@@ -1,0 +1,7 @@
+{
+  "id": "81989985-9e61-4c7a-91a0-33c74273c042",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato e modifica pubblicata. Nella dashboard di gestione dei feedback ora si vedono anche i file allegati alla segnalazione (log, PDF, documenti), con nome e link per aprirli — prima comparivano solo le immagini, in linea con quanto già mostrava la vecchia pagina dei feedback. Ho verificato che i nomi e i link degli allegati vengono mostrati in modo sicuro anche se contengono caratteri particolari. Il test automatico che riproduceva il problema ora è attivo e passa.",
+  "queuedAt": "2026-07-16T06:52:46.468Z",
+  "queuedBy": "routine"
+}
