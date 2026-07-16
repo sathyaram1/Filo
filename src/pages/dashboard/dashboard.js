@@ -326,6 +326,15 @@
     for (const t of timers) {
       if (t.ringing) {
         liveEl.appendChild(renderRingingCard(t));
+      } else if (t.kind === 'alarm') {
+        // #322 — la sveglia mostra l'ORARIO programmato, non un countdown
+        // mm:ss (un conto alla rovescia di ore sarebbe illeggibile). La × la
+        // rimuove, come per i timer.
+        liveEl.appendChild(renderLiveCard({
+          kind: 'process',
+          text: `⏰ Sveglia ${fmtAlarmTime(t.endsAt)}${t.label ? `\n${t.label}` : ''}`,
+          onDismiss: () => send({ type: MSG.FILO_DELETE_TIMER, id: t.id }).then(refreshLive),
+        }));
       } else {
         const remaining = Math.max(0, Math.round((new Date(t.endsAt).getTime() - Date.now()) / 1000));
         const mm = Math.floor(remaining / 60);
