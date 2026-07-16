@@ -106,6 +106,13 @@ export function buildCreateEntry({ text, name, parentId, priority, status, notes
     parentId: parentId || '',
     status: st,
     priority: prio,
+    // S1.priority: mirror in chiaro della priorità (stesso pattern di
+    // statusPublic). `priority` può venire cifrata (FENC1:) prima di finire
+    // nello spool, ma il popup ricompense (C5) gira sulla macchina utente
+    // SENZA chiave privata: senza mirror il premio cadrebbe sempre a 50.
+    // La fascia di premio non è un segreto (l'utente la vede comunque nel
+    // popup), quindi il mirror non indebolisce la cifratura del contenuto.
+    priorityPublic: prio,
     notes: typeof notes === 'string' ? notes : '',
     images: imgs,
     queuedAt: new Date().toISOString(),
