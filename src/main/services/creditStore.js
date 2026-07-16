@@ -115,6 +115,28 @@
     return Number(table[p]) || Number(table[0]) || 0;
   }
 
+  // Priorità EFFETTIVA (0-3) di un documento feedback ai fini della ricompensa.
+  // Dal cutover cifratura (S1.priority) il campo `priority` su Firestore può
+  // essere un ciphertext FENC1 (stringa) che la macchina UTENTE non può
+  // decifrare: fare Number() sul ciphertext dà NaN → 0 → premio sempre minimo.
+  // Il valore leggibile lato utente è il mirror in chiaro `priorityPublic`
+  // (stesso pattern di statusPublic/clientIdHash). Ordine di risoluzione:
+  //   1. priorityPublic (numero in chiaro, scritto accanto alla priority cifrata)
+  //   2. priority in chiaro (numero — feedback storici pre-cutover)
+  //   3. 0 (priority cifrata senza mirror, o assente: non si può sapere)
+  // PURA e testabile headless (tests/unit/creditStore.test.mjs).
+  function feedbackRewardPriority(fb) {
+    const clamp = (n) => Math.max(0, Math.min(3, Math.round(n)));
+    if (fb && fb.priorityPublic !== undefined && fb.priorityPublic !== null) {
+      const pub = Number(fb.priorityPublic);
+      if (Number.isFinite(pub)) return clamp(pub);
+    }
+    const raw = fb ? fb.priority : undefined;
+    if (typeof raw === 'string' && raw.startsWith('FENC1:')) return 0; // cifrata, illeggibile qui
+    const n = Number(raw);
+    return Number.isFinite(n) ? clamp(n) : 0;
+  }
+
   // Sottrae i crediti corrispondenti al costo € e aggrega per uso. Il saldo non
   // scende sotto 0. Ritorna { state, credits }.
   function applyConsumption(state, { action, costEur = 0, calls = 1 }) {
