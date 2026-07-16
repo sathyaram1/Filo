@@ -1,7 +1,0 @@
-{
-  "id": "30c5a9c3-0ba9-4044-8565-2c0aeda784e1",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica è stata pubblicata. La correzione riguarda il QR code della pagina: ora il codice generato rispetta lo standard ed è leggibile dai lettori reali (fotocamera del telefono). Ho verificato che la modifica tocca solo la generazione del QR, i relativi test automatici e il changelog — niente di anomalo o fuori posto. I nuovi test rileggono il QR come farebbe un vero scanner, quindi se in futuro la generazione dovesse rompersi di nuovo ce ne accorgeremmo subito in automatico.",
-  "queuedAt": "2026-07-16T00:21:53.975Z",
-  "queuedBy": "routine"
-}
