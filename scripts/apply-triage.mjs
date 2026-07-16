@@ -288,6 +288,16 @@ async function createFeedback(entry, num, bearer) {
     const prio = Number(entry.priority);
     if (Number.isInteger(prio) && prio >= 1 && prio <= 3) fields.priority = toFsValue(prio);
   }
+  // S1.priority: mirror in chiaro `priorityPublic` (stesso pattern di
+  // statusPublic). Serve al popup ricompense (C5) sulla macchina utente, che
+  // non ha la chiave privata per leggere la priority cifrata. L'entry lo porta
+  // già in chiaro (queue-feedback.mjs lo calcola PRIMA di cifrare priority);
+  // fallback: se manca (entry accodata da versioni vecchie) e priority è un
+  // intero in chiaro, specchiala. 0 = nessuna priorità: non scrivere (come priority).
+  {
+    const pubRaw = Number(entry.priorityPublic !== undefined ? entry.priorityPublic : entry.priority);
+    if (Number.isInteger(pubRaw) && pubRaw >= 1 && pubRaw <= 3) fields.priorityPublic = toFsValue(pubRaw);
+  }
   // Idempotenza: se l'entry porta una `uid` (le crea queue-feedback.mjs), la uso
   // come ID del documento via ?documentId=. Così se questa stessa entry viene
   // applicata due volte — tipicamente due run concorrenti della GitHub Action
