@@ -100,6 +100,7 @@
       timers: timers
         .map((t) => ({
           id: t.id,
+          kind: t.kind || 'timer', // 'alarm' per le sveglie (#322)
           label: t.label,
           endsAt: t.endsAt,
           paused: !!t.paused,
