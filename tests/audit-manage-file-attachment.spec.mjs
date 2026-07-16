@@ -32,10 +32,9 @@ const FB_WITH_FILE = {
   files: [{ name: 'crash-log.txt', url: 'https://example.com/crash-log.txt', type: 'text/plain' }],
 };
 
-// test.fixme: repro del bug (oggi ROSSO). Documenta il comportamento atteso
-// senza rendere rossa la regressione completa. Il fixer che chiude il feedback
-// toglie `.fixme` per farlo diventare un assert vivo (deve passare col fix).
-test.fixme('il dettaglio di manage mostra anche i FILE allegati alla segnalazione, non solo le immagini', async ({ openTab }) => {
+// Assert vivo: la bolla della segnalazione in manage mostra sia le immagini
+// sia i file allegati (parità con la vecchia dashboard filo://feedback).
+test('il dettaglio di manage mostra anche i FILE allegati alla segnalazione, non solo le immagini', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => !!window.__mgTest);
