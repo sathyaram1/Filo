@@ -1403,13 +1403,17 @@
     const replInput = pad.querySelector('[data-sr="repl"]');
     const countEl = pad.querySelector('[data-sr="count"]');
     cell._srFocus = () => findInput.focus();
-    const run = () => { runFind(findInput.value); countEl.textContent = findState.hits.length ? `${findState.idx + 1}/${findState.hits.length}` : (findInput.value ? 'nessun risultato' : ''); };
+    const updateCount = () => { countEl.textContent = findState.hits.length ? `${findState.idx + 1}/${findState.hits.length}` : (findInput.value ? 'nessun risultato' : ''); };
+    const run = () => { runFind(findInput.value); updateCount(); };
     findInput.addEventListener('input', run);
     findInput.addEventListener('click', (e) => e.stopPropagation());
     replInput.addEventListener('click', (e) => e.stopPropagation());
-    pad.querySelector('[data-sr="next"]').addEventListener('click', (e) => { e.stopPropagation(); stepFind(1); countEl.textContent = `${findState.idx + 1}/${findState.hits.length}`; });
-    pad.querySelector('[data-sr="prev"]').addEventListener('click', (e) => { e.stopPropagation(); stepFind(-1); countEl.textContent = `${findState.idx + 1}/${findState.hits.length}`; });
-    pad.querySelector('[data-sr="one"]').addEventListener('click', (e) => { e.stopPropagation(); replaceOne(replInput.value); run(); });
+    pad.querySelector('[data-sr="next"]').addEventListener('click', (e) => { e.stopPropagation(); stepFind(1); updateCount(); });
+    pad.querySelector('[data-sr="prev"]').addEventListener('click', (e) => { e.stopPropagation(); stepFind(-1); updateCount(); });
+    // NB: dopo replaceOne NON si rilancia run(): ri-eseguire la ricerca
+    // azzererebbe l'indice alla prima corrispondenza e ri-matcherebbe dentro
+    // il testo appena inserito (feedback #310). replaceOne avanza da sé.
+    pad.querySelector('[data-sr="one"]').addEventListener('click', (e) => { e.stopPropagation(); replaceOne(replInput.value); updateCount(); });
     pad.querySelector('[data-sr="all"]').addEventListener('click', (e) => { e.stopPropagation(); replaceAll(findInput.value, replInput.value); run(); });
   }
   function clearFind() {
@@ -1465,9 +1469,21 @@
   function replaceOne(replacement) {
     const cur = findState.hits[findState.idx];
     if (!cur) return;
+    // Sostituisce SOLO la corrispondenza corrente e avanza alla successiva
+    // senza ri-eseguire la ricerca: una ri-scansione ripartirebbe dalla prima
+    // corrispondenza e ri-troverebbe il termine dentro il testo appena
+    // inserito (es. cerca "cat", sostituisci "cats" → loop sulla stessa parola).
+    const parent = cur.parentNode;
     cur.replaceWith(document.createTextNode(replacement));
+    if (parent) parent.normalize();
+    findState.hits.splice(findState.idx, 1);
+    if (!findState.hits.length) {
+      findState.idx = -1;
+    } else {
+      findState.idx = findState.idx % findState.hits.length; // wrap se era l'ultima
+      highlightCurrent();
+    }
     onDocInput();
-    runFind(findState.term);
   }
   function replaceAll(term, replacement) {
     if (!term) return;

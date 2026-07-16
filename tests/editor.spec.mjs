@@ -68,3 +68,66 @@ test('cambio pagina via switch mostra moduli della pagina 1', async ({ openTab }
   await expect(page.locator('.ed-module[data-type="chat"]')).toHaveCount(1);
   await expect(page.locator('.ed-module[data-type="search-replace"]')).toHaveCount(1);
 });
+
+// Feedback #310: "Sostituisci" (uno) deve avanzare alla corrispondenza
+// successiva e NON ri-matchare dentro il testo appena inserito. Prima del fix
+// la ricerca veniva rilanciata da capo dopo ogni sostituzione: con cerca "cat"
+// e sostituisci "cats" tre click producevano "catsss cat cat" invece di
+// "cats cats cats".
+test('Sostituisci (uno) avanza alla successiva e non ri-matcha la sostituzione', async ({ openTab }) => {
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('#doc');
+  await page.evaluate(() => {
+    const doc = document.getElementById('doc');
+    doc.innerHTML = '<p>cat cat cat</p>';
+    doc.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  // Pagina Revisione (seconda icona dello switch) → modulo cerca e sostituisci.
+  await page.locator('.ed-switch-icon').nth(1).click();
+  await page.waitForSelector('[data-sr="find"]');
+  await page.fill('[data-sr="find"]', 'cat');
+  await page.fill('[data-sr="repl"]', 'cats');
+  await expect(page.locator('[data-sr="count"]')).toHaveText('1/3');
+
+  // 1° click: sostituita la prima, la selezione avanza alla successiva
+  // (2 rimaste, corrente è la prima delle rimaste) — niente reset né re-match.
+  await page.click('[data-sr="one"]');
+  await expect(page.locator('[data-sr="count"]')).toHaveText('1/2');
+  await page.click('[data-sr="one"]');
+  await expect(page.locator('[data-sr="count"]')).toHaveText('1/1');
+  await page.click('[data-sr="one"]');
+  await expect(page.locator('[data-sr="count"]')).toHaveText('nessun risultato');
+
+  // Successo: tutte e tre le occorrenze sostituite una per volta.
+  await expect(page.locator('#doc')).toHaveText('cats cats cats');
+});
+
+// Sostituendo una corrispondenza a metà documento la posizione non torna in
+// cima: la corrente diventa quella subito dopo la sostituita.
+test('Sostituisci (uno) a metà documento mantiene la posizione', async ({ openTab }) => {
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('#doc');
+  await page.evaluate(() => {
+    const doc = document.getElementById('doc');
+    doc.innerHTML = '<p>foo uno foo due foo tre</p>';
+    doc.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.locator('.ed-switch-icon').nth(1).click();
+  await page.waitForSelector('[data-sr="find"]');
+  await page.fill('[data-sr="find"]', 'foo');
+  await page.fill('[data-sr="repl"]', 'bar');
+  await expect(page.locator('[data-sr="count"]')).toHaveText('1/3');
+  // Avanza alla seconda corrispondenza e sostituisci quella.
+  await page.click('[data-sr="next"]');
+  await expect(page.locator('[data-sr="count"]')).toHaveText('2/3');
+  await page.click('[data-sr="one"]');
+  // La corrente ora è la (ex) terza: contatore 2/2, non 1/2 (reset in cima).
+  await expect(page.locator('[data-sr="count"]')).toHaveText('2/2');
+  await expect(page.locator('#doc')).toHaveText('foo uno bar due foo tre');
+  // La corrispondenza evidenziata come corrente è l'ultima ("foo tre").
+  const currentIsLast = await page.evaluate(() => {
+    const hits = [...document.querySelectorAll('mark.ed-find-hit')];
+    return hits.length === 2 && hits[1].classList.contains('current');
+  });
+  expect(currentIsLast).toBe(true);
+});

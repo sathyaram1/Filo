@@ -21,6 +21,7 @@
       fixes: [
         'La protezione che impedisce ai siti di aprire indirizzi pericolosi ora copre anche i reindirizzamenti automatici delle pagine, non solo i click e i popup.',
         'Se una pagina ti reindirizza automaticamente verso un indirizzo di posta o di telefono (mailto:, tel:), ora si apre l\'app corrispondente invece di non succedere nulla.',
+        'Nell\'Editor, il pulsante "Sostituisci" di Cerca e sostituisci ora passa alla corrispondenza successiva dopo ogni sostituzione, invece di tornare in cima al documento; e se il testo sostitutivo contiene la parola cercata non resta più bloccato sulla stessa parola.',
       ],
     },
     {
