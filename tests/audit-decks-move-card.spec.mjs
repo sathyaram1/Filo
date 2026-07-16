@@ -72,10 +72,9 @@ test('spostare una carta in un mazzo che la contiene già non perde le copie', a
   // La riga esce dal mazzo di origine (il "move" è avvenuto).
   await expect(page.locator('.dk-row', { hasText: 'Island' })).toHaveCount(0);
 
-  // ASSERZIONE CHIAVE: le 10 copie spostate devono esistere da qualche parte.
-  // Somma delle Island su TUTTI i mazzi: prima del move erano 10+1=11; dopo un
-  // move corretto devono restarne ALMENO 10 (le copie spostate). Se il bug
-  // c'è, ne resta 1 sola (le altre 9/10 sono sparite).
+  // ASSERZIONE CHIAVE: le copie si conservano. Prima del move erano 10+1=11;
+  // dopo un move corretto la destinazione somma le quantità → Mazzo B ha 11
+  // Island e il totale resta 11. Se il bug c'è, ne resta 1 sola.
   const totals = await page.evaluate(async () => {
     const { MSG } = window.SN_MSG;
     const r = await chrome.runtime.sendMessage({ type: MSG.DECKS_LIST });
@@ -88,5 +87,9 @@ test('spostare una carta in un mazzo che la contiene già non perde le copie', a
   });
   const totalCopies = Object.values(totals).reduce((a, b) => a + b, 0);
   expect(totalCopies, `copie totali di Island dopo il move: ${JSON.stringify(totals)}`)
-    .toBeGreaterThanOrEqual(10);
+    .toBe(11);
+  expect(totals['Mazzo B'], `Island in Mazzo B: ${JSON.stringify(totals)}`).toBe(11);
+
+  // Esito comunicato all'utente: toast di conferma con le copie sommate.
+  await expect(page.locator('#dkToast')).toContainText('sommate');
 });
