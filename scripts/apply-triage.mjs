@@ -461,6 +461,18 @@ function readSpool() {
         if (!['new', 'todo', 'clarify'].includes(entry.status)) return { file, error: `status non valido per create: "${entry.status}"` };
         return { file, entry };
       }
+      // op 'priority-public' (S1.priority): scrive SOLO il mirror in chiaro
+      // `priorityPublic` su un feedback esistente. Usata dal backfill
+      // (scripts/backfill-priority-public.mjs): i doc con priority cifrata
+      // PRIMA dell'introduzione del mirror non ne hanno uno, e senza mirror il
+      // premio alla risoluzione (C5) cade sempre alla fascia minima. Non tocca
+      // status/notes: nessuna transizione da validare.
+      if (entry && entry.op === 'priority-public') {
+        if (!entry.id) return { file, error: 'priority-public senza id' };
+        const p = Number(entry.priorityPublic);
+        if (!Number.isInteger(p) || p < 0 || p > 3) return { file, error: `priorityPublic non valida: "${entry.priorityPublic}" (intero 0-3)` };
+        return { file, entry };
+      }
       if (!entry || !entry.id) return { file, error: 'manca il campo id' };
       // Rimappa i nomi ritirati (file accodati prima del cambio di vocabolario).
       const legacy = LEGACY_INPUT[entry.status];
