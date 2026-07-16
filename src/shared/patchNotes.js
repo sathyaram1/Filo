@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.136', date: '2026-07-16',
+      features: [],
+      fixes: [
+        'I crediti che ricevi quando un tuo feedback viene risolto ora rispettano di nuovo l\'importanza della segnalazione (50/100/200/300): da fine giugno il premio usciva sempre al minimo, qualunque fosse la priorità assegnata.',
+      ],
+    },
+    {
       version: '0.2.135', date: '2026-07-15',
       features: [],
       fixes: [
