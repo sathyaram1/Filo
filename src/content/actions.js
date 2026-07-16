@@ -706,6 +706,24 @@
   // ------------------------------------------------------------
   // Salva / condividi / cerca / immagini
   // ------------------------------------------------------------
+
+  // Cattura del tab visibile SOLO dopo che il compositor ha ripresentato la
+  // pagina. Le azioni di cattura partono quasi sempre da un click nel menu del
+  // tasto destro: il menu viene rimosso dal DOM in modo sincrono, ma
+  // capturePage nel main fotografa il frame del compositor, che in quel
+  // momento non è ancora stato ridisegnato — e il menu finiva "stampato"
+  // dentro l'immagine (miniatura di "Salva per dopo", screenshot, ritagli).
+  // Doppio requestAnimationFrame: il primo callback apre il frame che
+  // incorpora la rimozione, il secondo gira quando quel frame è stato
+  // committato; il piccolo timeout copre la presentazione fuori processo del
+  // compositor prima che il main scatti la foto.
+  async function captureVisibleTab() {
+    await new Promise((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, 50)));
+    });
+    return chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB });
+  }
+
   function buildSavePayload() {
     const meta = Extract.pageMeta();
     return {
