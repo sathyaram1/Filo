@@ -351,6 +351,7 @@
     sanitizeDeck,
     touch,
     addCard,
+    mergeCard,
     removeCard,
     importCards,
     renameDeck,
