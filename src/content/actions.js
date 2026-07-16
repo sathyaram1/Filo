@@ -856,7 +856,7 @@
   // ------------------------------------------------------------
   async function takeScreenshot() {
     try {
-      const cap = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB });
+      const cap = await captureVisibleTab();
       if (!cap?.dataUrl) {
         Popup.showToast(I18n.t('err_provider_failed'));
         return;
