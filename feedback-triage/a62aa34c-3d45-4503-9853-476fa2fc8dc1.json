@@ -1,7 +1,0 @@
-{
-  "id": "a62aa34c-3d45-4503-9853-476fa2fc8dc1",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato e modifica pubblicata. Il fix riguarda il deck builder: spostare o copiare una carta in un mazzo che la contiene già ora somma le copie a quelle esistenti (prima le copie potevano sparire nello spostamento, o la copia non faceva nulla), e ogni azione mostra sempre una conferma di esito, anche in caso di errore. Ho verificato che i nomi di mazzi e carte mostrati nei messaggi sono gestiti in modo sicuro e che la modifica non tocca nulla al di fuori dell'area del deck builder.",
-  "queuedAt": "2026-07-16T12:16:17.138Z",
-  "queuedBy": "routine"
-}
