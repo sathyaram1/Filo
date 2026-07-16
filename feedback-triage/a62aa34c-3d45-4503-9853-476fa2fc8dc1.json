@@ -1,7 +1,0 @@
-{
-  "id": "a62aa34c-3d45-4503-9853-476fa2fc8dc1",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho rifatto da utente i passi esatti della segnalazione: mazzo con 10 Island, tasto destro sulla riga, 'Sposta in un altro mazzo' verso un mazzo che ne aveva già 1. Le copie non spariscono più: la destinazione arriva a 11 Island, l'origine si svuota e compare il messaggio di conferma che spiega che le copie sono state sommate a quelle già presenti. Stress test provati e superati: 'Copia in un altro mazzo' verso un mazzo che ha già la carta ora somma davvero (10+1=11) lasciando intatta l'origine, e ripetere la copia somma di nuovo (21) come promesso dal messaggio; i tag della carta si conservano e si uniscono a quelli già presenti sulla destinazione; se il mazzo di destinazione viene eliminato un attimo prima della scelta nel menu, le 10 copie restano al loro posto nell'origine e appare un avviso di errore (niente perdite nemmeno nel caso limite); un mazzo con HTML ostile nel nome compare nel menu come testo innocuo, senza eseguire nulla, e lo spostamento verso di esso funziona normalmente. Regressione: creazione/rinomina/duplica/elimina mazzi, import/export e menu contestuale della colonna tutti verdi, più l'intera batteria di test unitari (952 verdi). Controllo visivo con screenshot: toast leggibile e coerente col tema, destinazione che mostra 11 copie, nessun difetto di layout.",
-  "queuedAt": "2026-07-16T12:12:49.392Z",
-  "queuedBy": "routine"
-}
