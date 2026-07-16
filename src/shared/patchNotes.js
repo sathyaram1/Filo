@@ -16,6 +16,14 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.137', date: '2026-07-16',
+      features: [],
+      fixes: [
+        'La protezione che impedisce ai siti di aprire indirizzi pericolosi ora copre anche i reindirizzamenti automatici delle pagine, non solo i click e i popup.',
+        'Se una pagina ti reindirizza automaticamente verso un indirizzo di posta o di telefono (mailto:, tel:), ora si apre l\'app corrispondente invece di non succedere nulla.',
+      ],
+    },
+    {
       version: '0.2.135', date: '2026-07-15',
       features: [],
       fixes: [
