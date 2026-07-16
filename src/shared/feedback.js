@@ -501,15 +501,23 @@
       fields.verifiedAt = { timestampValue: new Date().toISOString() };
       mask.push('verifiedAt');
     }
-    const qs = mask.map((m) => `updateMask.fieldPaths=${encodeURIComponent(m)}`).join('&');
-    const endpoint = `${FIRESTORE_BASE}/${COLLECTION}/${encodeURIComponent(id)}?${qs}&key=${API_KEY}`;
     const headers = { 'Content-Type': 'application/json' };
     if (idToken) headers.Authorization = `Bearer ${idToken}`;
-    const res = await fetch(endpoint, {
-      method: 'PATCH',
-      headers,
-      body: JSON.stringify({ fields }),
-    });
+    async function doPatch(maskList, fieldMap) {
+      const qs = maskList.map((m) => `updateMask.fieldPaths=${encodeURIComponent(m)}`).join('&');
+      const endpoint = `${FIRESTORE_BASE}/${COLLECTION}/${encodeURIComponent(id)}?${qs}&key=${API_KEY}`;
+      return fetch(endpoint, { method: 'PATCH', headers, body: JSON.stringify({ fields: fieldMap }) });
+    }
+    let res = await doPatch(mask, fields);
+    if (res.status === 403 && mask.includes('priorityPublic')) {
+      // Rules non ancora aggiornate al mirror `priorityPublic` (stesso pattern
+      // del retry di submit): meglio salvare la priorità senza mirror che
+      // perdere l'aggiornamento. Il backfill lo scriverà in un secondo momento.
+      const mask2 = mask.filter((m) => m !== 'priorityPublic');
+      const fields2 = { ...fields };
+      delete fields2.priorityPublic;
+      res = await doPatch(mask2, fields2);
+    }
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
       throw new Error(`firestore update fallito (${res.status}): ${errText.slice(0, 300)}`);
