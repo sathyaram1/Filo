@@ -1,7 +1,0 @@
-{
-  "id": "d7dea865-dc6a-4ccd-a913-1c192d5bd645",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho rifatto i passi dell'utente: nuovo mazzo, «Budget…» dallo switcher, digitato 40,50 e Invio → l'intestazione mostra «Budget: 40,50 €» (non più 4050 €), e il tetto precedente di 100 € viene sostituito col valore giusto invece di sparire. Stress test superati: «40.50» col punto, «1.234,56» col separatore delle migliaia, «40,50 €» con simbolo e spazi vengono tutti capiti; input non numerici (lettere, «40,5,6», «,5», «40,», «-5», «1e3», testo di 10.000 caratteri) producono un avviso discreto e NON toccano il tetto esistente; il campo vuoto rimuove il tetto in modo pulito; il valore sopravvive alla ricarica della pagina; un doppio Invio rapido non rompe nulla. Sicurezza: ho provato a iniettare HTML/JS nell'avviso (che ripete il testo digitato) — compare come semplice testo, nessuno script eseguito. Visivamente l'intestazione usa il formato italiano coerente col resto dell'app e anche l'avviso con input lunghissimo resta contenuto senza rompere il layout. Regressione: passano tutti i test esistenti su pagina Mazzi, statistiche, layout e budget via chat (18 scenari) più l'intera batteria rapida (957 test). Nota minore non bloccante: digitando «0» il tetto diventa «Budget: 0 €» invece di essere rimosso — difendibile, visto che il campo vuoto serve già a toglierlo.",
-  "queuedAt": "2026-07-16T12:33:33.651Z",
-  "queuedBy": "routine"
-}
