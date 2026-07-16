@@ -13,6 +13,11 @@ test('la pagina Crediti mostra saldo e una fetta per tipo d\'uso', async ({ app,
   // 0.08€ → 100 crediti (correttore), 0.16€ → 200 crediti (chat). Saldo 1000-300.
   await app.evaluate(async () => {
     const C = globalThis.SN_CREDITS;
+    // Bonus giornaliero auto-feedback (F4) già riscosso oggi: senza questo il
+    // +10 scatta al load e sposta gli assert sul saldo (710 ≠ 700).
+    const fresh = C.freshState();
+    fresh.lastAutoFeedbackBonusDate = new Date().toISOString().slice(0, 10);
+    await C.writeState(fresh);
     await C.recordConsumption({ action: 'spellcheck_word', costEur: 0.08 });
     await C.recordConsumption({ action: 'filo_chat', costEur: 0.16 });
   });
