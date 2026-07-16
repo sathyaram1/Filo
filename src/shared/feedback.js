@@ -478,6 +478,13 @@
         fields.priority = { integerValue: String(p) };
       }
       mask.push('priority');
+      // Mirror in chiaro `priorityPublic` (stesso pattern di statusPublic):
+      // la macchina UTENTE non ha la chiave privata e non può leggere la
+      // priority cifrata, ma il popup ricompense (C5) deve conoscere la fascia
+      // (50/100/200/300 crediti). Scritto SEMPRE accanto alla priority, così i
+      // lettori senza chiave hanno un'unica fonte in chiaro.
+      fields.priorityPublic = { integerValue: String(p) };
+      mask.push('priorityPublic');
     }
     // priorityManual: flag booleano, non cifrato (indica che l'owner ha fissato
     // la priorità a mano — il backend di sicurezza lo usa per saltare l'override
