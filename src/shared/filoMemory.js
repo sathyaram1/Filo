@@ -447,8 +447,8 @@
     getMemory, setMemory, patchMemory, parseCompactorOutput, renderMemoryForPrompt,
     // notes
     listNotes, addNote, deleteNote,
-    // timer
-    listTimers, addTimer, deleteTimer, gcTimers, stopTimerAlarm,
+    // timer + sveglie (#322)
+    listTimers, addTimer, addAlarm, resolveAlarmTime, deleteTimer, gcTimers, stopTimerAlarm,
     // notifications
     listNotifications, addNotification, dismissNotification,
     // dashboard cache
