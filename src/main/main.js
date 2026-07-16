@@ -137,6 +137,11 @@ app.whenReady().then(async () => {
   mainWindow = createMainWindow();
   registerShortcuts(mainWindow);
 
+  // Sveglie e timer (#322): controlla nel main le scadenze arrivate, mostra la
+  // notifica di sistema e avvisa le dashboard aperte (che fanno partire la
+  // suoneria). Senza questo, una sveglia scatta solo se la newtab è aperta.
+  try { require('./services/alarmWatcher').start(); } catch (_) {}
+
   // Auto-update: controlla le GitHub Releases e applica la nuova versione
   // al riavvio (no-op in dev/test — vedi updater.js).
   initAutoUpdater();
