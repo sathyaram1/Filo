@@ -271,3 +271,35 @@ test('setRaggruppamento cambia vista e versione; vista invalida ignorata', () =>
   assert.equal(D.setRaggruppamento(deck, 'boh'), deck);
   assert.equal(D.setRaggruppamento(deck, 'tipo'), deck, 'stessa vista: nessun edit');
 });
+
+// mergeCard — copia/sposta verso un altro mazzo: mai un no-op silenzioso.
+// Se la carta manca si comporta come addCard; se c'è già SOMMA le quantità
+// (10 Island spostate su un mazzo con 1 Island → 11, non 1) e unisce i tag.
+test('mergeCard su carta assente aggiunge come addCard', () => {
+  const d = D.newDeck();
+  const { deck, added, merged } = D.mergeCard(d, 'c-island', { qty: 10, tags: ['mana'] });
+  assert.equal(added, true);
+  assert.equal(merged, false);
+  assert.equal(deck.carte[0].qty, 10);
+  assert.deepEqual(deck.carte[0].tags, ['mana']);
+  assert.equal(deck.versione, d.versione + 1);
+});
+
+test('mergeCard su carta già presente SOMMA le quantità e unisce i tag', () => {
+  const { deck: d1 } = D.addCard(D.newDeck(), 'c-island', { qty: 1, tags: ['base'] });
+  const { deck: d2, added, merged } = D.mergeCard(d1, 'c-island', { qty: 10, tags: ['mana', 'base'] });
+  assert.equal(added, false);
+  assert.equal(merged, true);
+  assert.equal(d2.carte.length, 1, 'nessun doppione');
+  assert.equal(d2.carte[0].qty, 11, 'le copie si conservano: 1 + 10');
+  assert.deepEqual(d2.carte[0].tags, ['base', 'mana'], 'union senza duplicati');
+  assert.equal(d2.versione, d1.versione + 1);
+});
+
+test('mergeCard con id vuoto è un no-op esplicito', () => {
+  const d = D.newDeck();
+  const { deck, added, merged } = D.mergeCard(d, '  ');
+  assert.equal(added, false);
+  assert.equal(merged, false);
+  assert.equal(deck, d);
+});

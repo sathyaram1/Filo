@@ -19,6 +19,7 @@
       version: '0.2.137', date: '2026-07-16',
       features: [],
       fixes: [
+        'Nel deck builder, "Sposta in un altro mazzo" non fa più sparire le copie quando il mazzo di destinazione contiene già quella carta: ora le quantità si sommano (10 Island spostate su un mazzo con 1 Island → 11). Lo stesso vale per "Copia in un altro mazzo", che prima non faceva nulla in quel caso. Inoltre entrambe le azioni ora mostrano sempre una conferma di esito, anche in caso di errore.',
         'Nella dashboard di gestione dei feedback ora compaiono anche i file allegati alla segnalazione (log, PDF, documenti), con nome e link per aprirli — prima si vedevano solo le immagini.',
         'La protezione che impedisce ai siti di aprire indirizzi pericolosi ora copre anche i reindirizzamenti automatici delle pagine, non solo i click e i popup.',
         'Se una pagina ti reindirizza automaticamente verso un indirizzo di posta o di telefono (mailto:, tel:), ora si apre l\'app corrispondente invece di non succedere nulla.',
