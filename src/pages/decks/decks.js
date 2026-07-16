@@ -286,13 +286,23 @@
 
   // ── Builder: identità del documento + switcher (§8.2) ──────────────────────
 
+  // Budget nell'intestazione e nel campo di modifica: formato italiano come
+  // tutti gli altri prezzi dell'app (virgola decimale), interi senza decimali
+  // («100», «40,50» — non «40.5»).
+  function fmtBudgetShort(n) {
+    return Number.isInteger(n) ? String(n) : n.toFixed(2).replace('.', ',');
+  }
+  function fmtBudgetInput(b) {
+    return (b === null || b === undefined) ? '' : fmtBudgetShort(b);
+  }
+
   async function renderBuilder() {
     $('deckNameText').textContent = current.nome;
     const commander = (current.commanderMeta && current.commanderMeta.name)
       ? `Commander: ${current.commanderMeta.name}`
       : 'Nessun commander — impostalo col tasto destro su una carta del mazzo.';
     const budget = (current.budget !== null && current.budget !== undefined)
-      ? ` · Budget: ${current.budget} €` : '';
+      ? ` · Budget: ${fmtBudgetShort(current.budget)} €` : '';
     $('commanderLine').textContent = commander + budget;
     $('deckCount').textContent = `${Decks.deckCount(current)}/100 carte`;
     await Promise.all([ensureSymbols(), loadDeckCards()]);
