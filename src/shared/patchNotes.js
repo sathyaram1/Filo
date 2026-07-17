@@ -16,6 +16,14 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.143', date: '2026-07-17',
+      features: [],
+      fixes: [
+        'Il deck builder ora raggiunge davvero l\'archivio delle carte: la ricerca in chat trova le carte, i nomi citati nelle risposte (es. [[Sol Ring]]) mostrano l\'anteprima passandoci sopra il mouse, e impostare il commander o importare una lista funziona. Prima ogni richiesta all\'archivio veniva rifiutata e la chat rispondeva "problema tecnico di accesso al database".',
+        'Chiedere in chat un commander con certe caratteristiche ("un commander izzet che costa 4…") ora fa partire una vera ricerca tra le carte leggendarie, invece di una risposta che si scusa di non poter cercare.',
+      ],
+    },
+    {
       version: '0.2.142', date: '2026-07-17',
       features: [],
       fixes: [
