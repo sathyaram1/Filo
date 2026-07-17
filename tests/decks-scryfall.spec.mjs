@@ -25,8 +25,10 @@ async function mockScryfall(app) {
       scryfall_uri: 'https://scryfall.com/card/niv',
     };
     globalThis.__scryRequests = [];
-    globalThis.SN_SCRYFALL._setFetch(async (url) => {
+    globalThis.__scryHeaders = [];
+    globalThis.SN_SCRYFALL._setFetch(async (url, opts) => {
       globalThis.__scryRequests.push(String(url));
+      globalThis.__scryHeaders.push((opts && opts.headers) || {});
       const u = new URL(String(url));
       let body = null;
       if (u.pathname === '/cards/search') body = { data: [CARD], has_more: false };
