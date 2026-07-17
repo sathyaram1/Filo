@@ -101,6 +101,7 @@
     '-7':   { title: 'Il sito non risponde', hint: 'Il caricamento ha superato il tempo massimo. Riprova.' }, // ERR_TIMED_OUT
     '-21':  { title: 'La rete è cambiata', hint: 'La connessione è cambiata durante il caricamento (es. da Wi-Fi a cavo). Riprova.' }, // ERR_NETWORK_CHANGED
     '-130': { title: 'Il proxy non risponde', hint: 'La scheda passa da un proxy che non è raggiungibile. Riprova, o togli l’instradamento da un altro paese.' }, // ERR_PROXY_CONNECTION_FAILED
+    '-111': { title: 'Impossibile raggiungere il sito', hint: 'La connessione attraverso il proxy non è riuscita: il sito potrebbe non esistere o non essere raggiungibile in questo momento.' }, // ERR_TUNNEL_CONNECTION_FAILED
     '-20':  { title: 'Pagina bloccata', hint: 'Il caricamento è stato bloccato da una protezione attiva (es. blocco contenuti).' }, // ERR_BLOCKED_BY_CLIENT
     '-501': { title: 'Connessione non sicura', hint: 'Il sito ha risposto in modo non sicuro e il caricamento è stato interrotto per proteggerti.' }, // ERR_INSECURE_RESPONSE
     '-324': { title: 'Il sito non ha risposto', hint: 'Il server ha chiuso la connessione senza inviare dati. Riprova.' }, // ERR_EMPTY_RESPONSE
