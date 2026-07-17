@@ -473,6 +473,7 @@ html, body {
 }
 .sn-spell-row input[type="text"] {
   width: 100%;
+  min-width: 0;
 }
 .sn-spell-arrow {
   color: var(--sn-muted);
