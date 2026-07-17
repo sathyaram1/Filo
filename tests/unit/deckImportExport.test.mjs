@@ -78,6 +78,39 @@ test('parseDecklist: sezione "Sideboard" è ignorata (fuori scope alpha), non sp
   assert.deepEqual(r.dirtyLines, []);
 });
 
+test('parseDecklist: intestazioni con conteggio "(N)" (Archidekt/TappedOut) riconosciute', () => {
+  const r = IE.parseDecklist(
+    'Commander (1)\n1 Atraxa, Praetors\' Voice\n\nDeck (2)\n1 Sol Ring\n1 Arcane Signet\n\nMaybeboard (1)\n1 Some Maybe Card'
+  );
+  assert.equal(r.commanderName, 'Atraxa, Praetors\' Voice');
+  assert.deepEqual(r.entries, [
+    { name: 'Sol Ring', qty: 1 },
+    { name: 'Arcane Signet', qty: 1 },
+  ]);
+  assert.deepEqual(r.dirtyLines, []);
+});
+
+test('parseDecklist: conteggio "(N)" combinato col ":" finale, in entrambi gli ordini', () => {
+  const a = IE.parseDecklist('Commander (1):\n1 Korvold, Fae-Cursed King');
+  assert.equal(a.commanderName, 'Korvold, Fae-Cursed King');
+  const b = IE.parseDecklist('Sideboard: (3)\n1 Some Card\nDeck\n1 Sol Ring');
+  assert.deepEqual(b.entries, [{ name: 'Sol Ring', qty: 1 }]);
+  assert.deepEqual(b.dirtyLines, []);
+});
+
+test('parseDecklist: riga vuota DENTRO Sideboard/Maybeboard non riapre il mazzo', () => {
+  const r = IE.parseDecklist(
+    '1 Sol Ring\n\nMaybeboard (2)\n1 Some Card\n\n1 Other Card\n\nDeck (1)\n1 Arcane Signet'
+  );
+  // Le carte dopo la riga vuota nel maybeboard restano FUORI; si rientra nel
+  // mazzo solo con un'intestazione esplicita.
+  assert.deepEqual(r.entries, [
+    { name: 'Sol Ring', qty: 1 },
+    { name: 'Arcane Signet', qty: 1 },
+  ]);
+  assert.deepEqual(r.dirtyLines, []);
+});
+
 test('parseDecklist: testo vuoto → tutto vuoto, nessun crash', () => {
   assert.deepEqual(IE.parseDecklist(''), { commanderName: null, entries: [], dirtyLines: [] });
   assert.deepEqual(IE.parseDecklist(null), { commanderName: null, entries: [], dirtyLines: [] });

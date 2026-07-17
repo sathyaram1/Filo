@@ -14,9 +14,14 @@
 (function (global) {
   'use strict';
 
-  // Intestazioni riconosciute (case-insensitive, ":" finale opzionale). Una
-  // riga vuota chiude qualunque sezione e riporta il parser alla modalità
-  // "mazzo" di default (così un file senza intestazioni resta tutto mazzo).
+  // Intestazioni riconosciute (case-insensitive, ":" finale opzionale, conteggio
+  // finale "(N)" opzionale — formato Archidekt/TappedOut, es. "Commander (1)",
+  // "Deck (99)", "Maybeboard (2)"). Una riga vuota chiude le sezioni "commander"
+  // e "mazzo" riportando alla modalità "mazzo" di default (così un file senza
+  // intestazioni resta tutto mazzo), ma NON una sezione da saltare
+  // (Sideboard/Maybeboard): quella resta attiva finché non arriva una nuova
+  // intestazione esplicita, altrimenti una riga vuota dentro il maybeboard
+  // farebbe rientrare nel mazzo le carte successive.
   const COMMANDER_HEADERS = ['commander', 'commanders'];
   const DECK_HEADERS = ['deck', 'mainboard', 'maindeck', 'main', 'library'];
   const SKIP_HEADERS = ['sideboard', 'maybeboard', 'considering', 'considerations'];
@@ -51,10 +56,17 @@
 
     for (const raw of lines) {
       const line = raw.trim();
-      if (!line) { mode = 'deck'; continue; }
+      if (!line) { if (mode !== 'skip') mode = 'deck'; continue; }
       if (/^(#|\/\/)/.test(line)) continue;
 
-      const key = line.toLowerCase().replace(/:\s*$/, '');
+      // Normalizza la candidata-intestazione: via il ":" finale e l'eventuale
+      // conteggio "(N)" in coda (Archidekt/TappedOut). Le carte vere non
+      // rischiano nulla: il confronto resta sull'elenco chiuso di intestazioni.
+      const key = line.toLowerCase()
+        .replace(/:\s*$/, '')
+        .replace(/\s*\(\d+\)\s*$/, '')
+        .replace(/:\s*$/, '')
+        .trim();
       if (COMMANDER_HEADERS.includes(key)) { mode = 'commander'; continue; }
       if (DECK_HEADERS.includes(key)) { mode = 'deck'; continue; }
       if (SKIP_HEADERS.includes(key)) { mode = 'skip'; continue; }
