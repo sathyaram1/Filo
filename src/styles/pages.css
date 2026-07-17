@@ -412,6 +412,9 @@ html, body {
   color: var(--sn-muted);
   margin-bottom: 12px;
 }
+/* 'all: unset' riazzera anche display, che vincerebbe sull'attributo hidden
+   (basato su display:none): ripristinato esplicitamente. */
+.sn-back-btn[hidden] { display: none; }
 .sn-back-btn:hover { color: var(--sn-fg); }
 
 /* Pannello gestione categorie nelle opzioni */
