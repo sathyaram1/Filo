@@ -64,6 +64,17 @@
     return new Date(iso).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
   }
 
+  // Stato vuoto: il testo di default vale solo per "archivio realmente vuoto".
+  // Quando c'è una ricerca attiva senza risultati mostriamo un messaggio
+  // dedicato, altrimenti l'elenco svuotato sembra un archivio cancellato.
+  const EMPTY_DEFAULT = 'Nessuna tab archiviata, per ora.';
+  function showEmpty() {
+    const rawQ = ($('search').value || '').trim();
+    const el = $('empty');
+    el.textContent = tabs.length && rawQ ? `Nessun risultato per "${rawQ}".` : EMPTY_DEFAULT;
+    el.hidden = false;
+  }
+
   // Ricerca semantica: embeddizza la query e ordina per pertinenza (lato main).
   async function runSemanticSearch() {
     const q = ($('search').value || '').trim();
