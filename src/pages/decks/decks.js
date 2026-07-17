@@ -982,21 +982,39 @@
     });
   }
 
-  // Hover su un nome in prosa: risoluzione fuzzy una-tantum (§3.5); l'id
-  // risolto resta nel dataset e, se il mouse è ancora lì, parte la preview.
-  async function resolveProseCard(el) {
-    if (el.dataset.cardId || el.dataset.resolving) return;
-    el.dataset.resolving = '1';
-    const r = await send({ type: MSG.SCRYFALL_NAMED, name: el.dataset.cardName });
-    delete el.dataset.resolving;
-    if (r && r.ok && r.card) {
+  // Hover/click su un nome in prosa: risoluzione fuzzy una-tantum (§3.5).
+  // Ritorna una Promise dell'id risolto (o null): il carosello dal testo
+  // libero (#343) la attende per costruire la lista di navigazione. La cache
+  // per nome sopravvive ai rerender della chat (gli span si rigenerano).
+  const proseIdByName = new Map();    // nome (lowercase) → scryfall id
+  const proseResolving = new WeakMap(); // span → Promise in corso
+
+  function resolveProseCard(el) {
+    if (el.dataset.cardId) return Promise.resolve(el.dataset.cardId);
+    const key = String(el.dataset.cardName || '').toLowerCase();
+    if (proseIdByName.has(key)) {
+      const id = proseIdByName.get(key);
+      el.dataset.cardId = id;
+      const card = cardsById[id];
+      if (card) el.title = `${card.name} — ${card.typeLine}`;
+      return Promise.resolve(id);
+    }
+    if (proseResolving.has(el)) return proseResolving.get(el);
+    const p = (async () => {
+      const r = await send({ type: MSG.SCRYFALL_NAMED, name: el.dataset.cardName });
+      proseResolving.delete(el);
+      if (!(r && r.ok && r.card)) return null;
       el.dataset.cardId = r.card.id;
+      proseIdByName.set(key, r.card.id);
       cardsById[r.card.id] = r.card;
       el.title = `${r.card.name} — ${r.card.typeLine}`;
       // La risoluzione è arrivata DOPO il mouseover: se il puntatore è ancora
       // sul nome non ci sarà un nuovo evento — la preview parte da qui.
       if (el.matches(':hover')) hoverEnter(r.card.id);
-    }
+      return r.card.id;
+    })();
+    proseResolving.set(el, p);
+    return p;
   }
 
   // ── Pannello destro a tre stati (§5): statistiche / preview / carosello ────
