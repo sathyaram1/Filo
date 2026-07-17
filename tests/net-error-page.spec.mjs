@@ -96,10 +96,16 @@ test('renderer crashato: pagina d\'errore "scheda bloccata" invece del bianco', 
   const url = testServer.html('<!DOCTYPE html><title>viva</title><p>contenuto</p>');
   await openTab(url);
 
-  // Ammazza il renderer della scheda dal main process.
-  await app.evaluate(({ webContents }, target) => {
-    const wc = webContents.getAllWebContents().find((w) => w.getURL() === target);
-    if (!wc) throw new Error('webContents non trovato');
+  // Ammazza il renderer della SCHEDA dal main process. Attenzione: altri
+  // servizi di Filo aprono lo stesso URL in finestre nascoste — la scheda è
+  // il webContents che appartiene alla finestra principale (quella visibile,
+  // che ospita anche la shell).
+  await app.evaluate(({ webContents, BrowserWindow }, target) => {
+    const shellWc = webContents.getAllWebContents().find((w) => w.getURL().startsWith('filo://shell/'));
+    const mainWin = BrowserWindow.fromWebContents(shellWc);
+    const wc = webContents.getAllWebContents().find((w) =>
+      w.getURL() === target && BrowserWindow.fromWebContents(w) === mainWin);
+    if (!wc) throw new Error('webContents della scheda non trovato');
     wc.forcefullyCrashRenderer();
   }, url);
 
