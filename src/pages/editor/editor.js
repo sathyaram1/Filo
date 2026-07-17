@@ -1623,15 +1623,23 @@
   function highlightComment(c) {
     const a = c.anchor;
     if (!a || !a.text) return false;
+    // Ancore salvate da versioni precedenti possono contenere le interruzioni
+    // di riga della selezione multi-paragrafo: il testo puro del documento non
+    // ne ha mai, quindi si confronta sempre la forma normalizzata. `a.from`
+    // resta valido (pmOffsets lavora già sul testo puro); la lunghezza si
+    // riprende dal testo normalizzato, non da `a.to` (che per le ancore legacy
+    // contava anche i newline).
+    const aText = String(a.text).replace(/\r?\n/g, '');
+    if (!aText) return false;
     const text = commentDocText();
     let from = -1, to = -1;
-    if (Number.isFinite(a.from) && Number.isFinite(a.to) && a.to > a.from && text.slice(a.from, a.to) === a.text) {
-      from = a.from; to = a.to;
+    if (Number.isFinite(a.from) && a.from >= 0 && text.slice(a.from, a.from + aText.length) === aText) {
+      from = a.from; to = a.from + aText.length;
     } else {
-      const i = text.indexOf(a.text);
-      if (i >= 0) { from = i; to = i + a.text.length; }
+      const i = text.indexOf(aText);
+      if (i >= 0) { from = i; to = i + aText.length; }
     }
-    if (from < 0) return false;
+    if (from < 0 || to <= from) return false;
     return wrapCommentRange(c, from, to);
   }
   function removeCommentSpans(id) {
