@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.141', date: '2026-07-17',
+      features: [],
+      fixes: [
+        'Importare un mazzo copiato da Archidekt o TappedOut ora funziona anche quando i titoli delle sezioni hanno il numero di carte fra parentesi (es. "Commander (1)", "Deck (99)"): il comandante viene riconosciuto come tale, le carte di Maybeboard e Sideboard restano fuori dal mazzo e i titoli non compaiono più fra le righe non riconosciute. Inoltre una riga vuota dentro il Maybeboard non fa più rientrare nel mazzo le carte che la seguono.',
+      ],
+    },
+    {
       version: '0.2.140', date: '2026-07-17',
       features: [],
       fixes: [
