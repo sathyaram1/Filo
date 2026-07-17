@@ -1349,9 +1349,13 @@ class TabManager {
       if (!NE || reason === 'clean-exit') return;
       const current = tab.url || '';
       if (!NE.isRetriableTarget(current) || NE.isErrorPageUrl(current)) return;
-      try {
-        if (!wc.isDestroyed()) wc.loadURL(NE.buildUrl(current, NE.CRASH_CODE, reason));
-      } catch (_) {}
+      // Fuori dall'evento: un loadURL DENTRO render-process-gone può cadere sul
+      // frame appena disposto. Al giro dopo il webContents rilancia un renderer.
+      setImmediate(() => {
+        try {
+          if (!wc.isDestroyed()) wc.loadURL(NE.buildUrl(current, NE.CRASH_CODE, reason));
+        } catch (_) {}
+      });
     });
     // Colore selezione testo coerente con Filo sui siti esterni. insertCSS
     // ignora la CSP della pagina (che invece blocca il <link filo://> del
