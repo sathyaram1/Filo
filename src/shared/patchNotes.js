@@ -22,6 +22,7 @@
         'Nella pagina "Aperti per dopo" il link "← Tutte le categorie" non compare più quando la categorizzazione automatica è disattivata: si vede solo quando stai guardando dentro una categoria e serve davvero per tornare indietro.',
         'Nella gestione del correttore, una parola molto lunga senza spazi aggiunta al dizionario personale non allarga più la pagina: ora va a capo dentro la sua riga e il pulsante "Rimuovi" resta sempre visibile e cliccabile.',
         'Il comando timer della barra di Filo ora rifiuta le durate scritte a metà (es. "5:" o ":30") invece di avviare un timer con una durata diversa da quella che intendevi: in quei casi risponde con l\'uso corretto, come già faceva per le durate non numeriche.',
+        'Quando una ricerca non trova nulla, le pagine "Tab archiviate", "Cronologia AI", "Aperti per dopo" e la dashboard dei feedback ora dicono chiaramente "Nessun risultato per la ricerca" invece di mostrare il messaggio di archivio vuoto: niente più impressione di aver perso i propri dati.',
       ],
     },
     {
