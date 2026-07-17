@@ -507,6 +507,13 @@
     if (!items.length) {
       listEl.innerHTML = '';
       emptyEl.hidden = false;
+      // Se il vuoto dipende dalla ricerca (e non dal tab davvero vuoto),
+      // dillo: il testo "Nessun feedback…" sembrerebbe un tab svuotato.
+      const q = (searchEl.value || '').trim();
+      if (q && all.some((f) => statusOf(f) === currentTab)) {
+        emptyEl.textContent = `Nessun risultato per "${q}".`;
+        return;
+      }
       emptyEl.textContent = {
         inbox: 'Nessun feedback in arrivo.',
         agent: 'Nessun ritrovamento automatico (agente esploratore o audit delle routine).',
