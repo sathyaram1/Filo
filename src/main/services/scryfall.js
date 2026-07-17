@@ -53,7 +53,9 @@
 
   async function apiGet(path) {
     return throttled(async () => {
-      const res = await _fetch(BASE + path, { headers: { Accept: 'application/json' } });
+      const res = await _fetch(BASE + path, {
+        headers: { Accept: 'application/json', 'User-Agent': USER_AGENT },
+      });
       if (res.status === 404) return null; // "nessun risultato" per Scryfall
       if (!res.ok) {
         // Scryfall spiega gli errori nel body JSON (`details`, es. la sintassi
