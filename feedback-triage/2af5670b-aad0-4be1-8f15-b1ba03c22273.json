@@ -1,7 +1,0 @@
-{
-  "id": "2af5670b-aad0-4be1-8f15-b1ba03c22273",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho rifatto da zero i passi dell'utente: aggiunta al dizionario personale una parola di oltre 200 caratteri senza spazi. La pagina non ha più scroll orizzontale, la parola va a capo dentro la sua riga restando leggibile per intero, e il pulsante Rimuovi resta sempre visibile e cliccabile: cliccandolo la parola viene davvero tolta dal dizionario (verificato anche nei dati salvati, non solo a schermo). Stress test superati: parola di 1000 caratteri (la riga si allunga in verticale ma Rimuovi resta al suo posto e funziona), sequenza di emoji lunghissima, tentativo di iniezione di codice HTML (viene mostrato come semplice testo, non eseguito — nessun rischio XSS), aggiunta doppia della stessa parola (niente duplicati), e correzioni automatiche con parola e correzione da 300 caratteri (nessuno sforamento, Rimuovi raggiungibile e funzionante). Ho confermato che i miei controlli misurano il bug reale: sulla versione senza la correzione gli stessi passi falliscono (pagina larga 12.500px su una finestra da 1.270px). Ispezionati anche gli screenshot: layout pulito, parola contenuta nella riga, bottoni allineati, tema coerente.",
-  "queuedAt": "2026-07-17T12:31:11.966Z",
-  "queuedBy": "routine"
-}
