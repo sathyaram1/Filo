@@ -16,6 +16,14 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.144', date: '2026-07-17',
+      features: [],
+      fixes: [
+        'Nel deck builder, cliccando un nome di carta citato nel testo di una risposta il carosello ora sfoglia con le frecce tutte le carte nominate in quel messaggio (come già faceva per gli elenchi di risultati), invece di restare bloccato su una sola. Il click funziona anche al primo colpo, senza dover prima passare il mouse sul nome.',
+        'Nel deck builder, la carta attualmente mostrata nel carosello è ora evidenziata ovunque appaia: il suo nome nel testo perde la sottolineatura e prende uno sfondo colorato, e lo stesso vale per la sua riga nei risultati e nell\'elenco del mazzo — a colpo d\'occhio si vede a che punto della lista sei.',
+      ],
+    },
+    {
       version: '0.2.143', date: '2026-07-17',
       features: [],
       fixes: [
