@@ -177,6 +177,76 @@ test.describe('commenti: evidenziazione persistente', () => {
     expect(await highlightTexts(page)).toEqual(['parte importante']);
   });
 
+  test('un commento su una selezione che attraversa due paragrafi è evidenziato subito e dopo il reload', async () => {
+    const page = await openTab(EDITOR);
+    await setupDocOnReviewPage(page, '<p>primo paragrafo che finisce qui</p><p>secondo inizia qua e prosegue</p>');
+
+    // Seleziona dalla fine del primo paragrafo all'inizio del secondo, come
+    // farebbe l'utente col mouse (Selection.toString() inserisce un newline al
+    // confine di blocco: prima del fix il commento nasceva orfano — nessuna
+    // evidenziazione né alla creazione né dopo il reload).
+    await page.locator('.ed-module[data-type="comment"] .ed-mod-pad').click();
+    await page.evaluate(() => {
+      const doc = document.getElementById('doc');
+      const walker = document.createTreeWalker(doc, NodeFilter.SHOW_TEXT);
+      const nodes = [];
+      let n; while ((n = walker.nextNode())) nodes.push(n);
+      const first = nodes.find((x) => x.nodeValue.includes('finisce qui'));
+      const second = nodes.find((x) => x.nodeValue.includes('inizia qua'));
+      const range = document.createRange();
+      range.setStart(first, first.nodeValue.indexOf('finisce qui'));
+      range.setEnd(second, second.nodeValue.indexOf('inizia qua') + 'inizia qua'.length);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      if (!sel.toString().includes('\n')) throw new Error('precondizione: la selezione multi-blocco deve contenere un newline');
+      doc.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    });
+    await page.waitForSelector('#cmText');
+    await page.fill('#cmText', 'commento a cavallo di due paragrafi');
+    await page.click('#cmSave');
+
+    // Alla creazione: evidenziazione presente in ENTRAMBI i paragrafi.
+    const expected = ['finisce qui', 'secondo inizia qua'];
+    expect(await highlightTexts(page)).toEqual(expected);
+    await expect(page.locator('.ed-module[data-type="comment"] .cm-count')).toHaveText('1');
+
+    // L'ancora salvata vive nel testo puro (niente newline dentro).
+    await page.keyboard.press('Control+s');
+    const anchor = await page.evaluate(() => {
+      const raw = JSON.parse(localStorage.getItem('filo.editor.doc'));
+      return raw.comments[0] && raw.comments[0].anchor;
+    });
+    expect(anchor.text).not.toContain('\n');
+    expect(anchor.to).toBeGreaterThan(anchor.from);
+
+    // Dopo il reload l'evidenziazione torna su entrambi i pezzi e resta cliccabile.
+    await page.reload();
+    await page.waitForSelector('#doc .ed-commented', { timeout: 8_000 });
+    expect(await highlightTexts(page)).toEqual(expected);
+    await page.screenshot({ path: 'tests/.shots/editor-comment-multiblock-after-reload.png' }).catch(() => {});
+    await page.click('#doc .ed-commented');
+    await expect(page.locator('.ed-overlay')).toContainText('commento a cavallo di due paragrafi');
+  });
+
+  test('un\'ancora salvata con i newline della selezione (formato vecchio) viene comunque ri-evidenziata', async () => {
+    const page = await openTab(EDITOR);
+    await setupDocOnReviewPage(page, '<p>coda del primo blocco</p><p>testa del secondo blocco</p>');
+    await addComment(page, 'coda del primo', 'nota di compatibilità');
+    await page.keyboard.press('Control+s');
+
+    // Simula un documento salvato PRIMA del fix: ancora multi-paragrafo con il
+    // newline della selezione dentro `text` (e `to` che lo conta).
+    await page.evaluate(() => {
+      const raw = JSON.parse(localStorage.getItem('filo.editor.doc'));
+      raw.comments[0].anchor = { from: 8, to: 8 + 'primo blocco\ntesta del secondo'.length, text: 'primo blocco\ntesta del secondo' };
+      localStorage.setItem('filo.editor.doc', JSON.stringify(raw));
+    });
+    await page.reload();
+    await page.waitForSelector('#doc .ed-commented', { timeout: 8_000 });
+    expect((await highlightTexts(page)).join('')).toBe('primo bloccotesta del secondo');
+  });
+
   test('eliminare un commento rimuove l\'evidenziazione (anche dopo un reload)', async () => {
     const page = await openTab(EDITOR);
     await setupDocOnReviewPage(page, '<p>frase con un commento da eliminare subito</p>');
