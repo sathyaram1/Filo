@@ -126,3 +126,47 @@ test('rinominare trigger autocorrect su una chiave già esistente mostra avviso 
   const saporeRowAfter = rowsAfter.nth(1);
   await expect(saporeRowAfter.locator('input').first()).toHaveValue('sapore');
 });
+
+// ---------------------------------------------------------------------------
+// Feedback #214: parola lunghissima senza spazi nel dizionario personale
+// sforava la riga e spingeva il bottone "Rimuovi" fuori dal viewport
+// (scroll orizzontale). La parola deve andare a capo dentro la cella e
+// "Rimuovi" deve restare cliccabile.
+// ---------------------------------------------------------------------------
+test('parola lunga senza spazi nel dizionario: niente scroll orizzontale, "Rimuovi" resta visibile e funziona', async ({ openTab }) => {
+  const page = await openSpellcheckPage(openTab);
+
+  // Token lungo senza spazi (tipo indirizzo/codice incollato dall'utente)
+  const longWord = 'https-esempio-molto-lungo-' + 'abcdefghij0123456789'.repeat(8);
+  await page.fill('#newDictWord', longWord);
+  await page.click('#addDict');
+
+  await page.waitForFunction(() => {
+    return document.getElementById('dictList')?.querySelectorAll('.sn-spell-word').length > 0;
+  }, null, { timeout: 4_000 });
+
+  // ASSERISCE IL SUCCESSO 1: la pagina NON deve avere scroll orizzontale
+  // (senza fix: la parola sfora la griglia → scrollWidth > clientWidth).
+  const overflow = await page.evaluate(() => {
+    const doc = document.documentElement;
+    return { scrollWidth: doc.scrollWidth, clientWidth: doc.clientWidth };
+  });
+  expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth);
+
+  // ASSERISCE IL SUCCESSO 2: il bottone "Rimuovi" della riga sta DENTRO il
+  // viewport orizzontale (senza fix veniva spinto oltre il bordo destro).
+  const row = page.locator('#dictList .sn-spell-row-dict').first();
+  const btnInViewport = await row.locator('button').evaluate((btn) => {
+    const r = btn.getBoundingClientRect();
+    return r.right <= window.innerWidth && r.left >= 0 && r.width > 0;
+  });
+  expect(btnInViewport).toBe(true);
+
+  // ASSERISCE IL SUCCESSO 3: cliccare "Rimuovi" toglie davvero la parola.
+  await row.locator('button').click();
+  await page.waitForFunction(() => {
+    return document.getElementById('dictList')?.querySelectorAll('.sn-spell-word').length === 0;
+  }, null, { timeout: 4_000 });
+  const emptyVisible = await page.evaluate(() => !document.getElementById('dictEmpty').hidden);
+  expect(emptyVisible).toBe(true);
+});
