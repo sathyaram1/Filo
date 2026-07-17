@@ -404,6 +404,7 @@
     home_title: 'Aperti per dopo',
     home_search_placeholder: 'Cerca per titolo o URL…',
     home_empty: 'Nessuna scheda salvata. Click destro su una pagina → "Salva per dopo".',
+    home_no_results: 'Nessun risultato per la ricerca.',
     home_remove: 'Rimuovi',
 
     // History
