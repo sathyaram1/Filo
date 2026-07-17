@@ -1,7 +1,0 @@
-{
-  "id": "3ba31454-e6f6-46b4-b5a4-2e4b07bf7c4a",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato e modifica pubblicata: arriverà con il prossimo aggiornamento. Nella pagina Revisione dell'Editor i commenti ora restano evidenziati anche dopo aver chiuso e riaperto il documento, ritrovano la frase giusta anche se hai modificato il testo intorno, e funzionano anche su selezioni che attraversano più paragrafi. Il controllo ha verificato che la modifica resta nel perimetro dell'editor, senza toccare parti sensibili dell'app e senza introdurre rischi.",
-  "queuedAt": "2026-07-17T12:10:35.730Z",
-  "queuedBy": "routine"
-}
