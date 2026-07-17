@@ -1316,6 +1316,7 @@
         .map((j) => carousel.ids[j]).filter(Boolean);
       requestOpinions(near).catch(() => {});
     }
+    syncCarouselHighlight();
   }
 
   function carouselNav(delta) {
