@@ -14,9 +14,14 @@
 (function (global) {
   'use strict';
 
-  // Intestazioni riconosciute (case-insensitive, ":" finale opzionale). Una
-  // riga vuota chiude qualunque sezione e riporta il parser alla modalità
-  // "mazzo" di default (così un file senza intestazioni resta tutto mazzo).
+  // Intestazioni riconosciute (case-insensitive, ":" finale opzionale, conteggio
+  // finale "(N)" opzionale — formato Archidekt/TappedOut, es. "Commander (1)",
+  // "Deck (99)", "Maybeboard (2)"). Una riga vuota chiude le sezioni "commander"
+  // e "mazzo" riportando alla modalità "mazzo" di default (così un file senza
+  // intestazioni resta tutto mazzo), ma NON una sezione da saltare
+  // (Sideboard/Maybeboard): quella resta attiva finché non arriva una nuova
+  // intestazione esplicita, altrimenti una riga vuota dentro il maybeboard
+  // farebbe rientrare nel mazzo le carte successive.
   const COMMANDER_HEADERS = ['commander', 'commanders'];
   const DECK_HEADERS = ['deck', 'mainboard', 'maindeck', 'main', 'library'];
   const SKIP_HEADERS = ['sideboard', 'maybeboard', 'considering', 'considerations'];
