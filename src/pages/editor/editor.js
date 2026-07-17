@@ -1531,23 +1531,20 @@
         <button class="ed-btn" id="cmCancel">Annulla</button>
         <button class="ed-btn primary" id="cmSave">Aggiungi</button>
       </div>`);
-    // avvolgi la selezione in uno span commentato
+    // calcola subito l'ancora (il range può invalidarsi mentre l'overlay è aperto)
     const range = sel.getRangeAt(0);
+    const offsets = pmOffsets(range);
     const id = newId('comment');
     $('cmCancel').addEventListener('click', closeOverlay);
     $('cmSave').addEventListener('click', () => {
       const text = $('cmText').value.trim();
       if (!text) { closeOverlay(); return; }
-      try {
-        const span = document.createElement('span');
-        span.className = 'ed-commented';
-        span.dataset.commentId = id;
-        span.title = text;
-        range.surroundContents(span);
-        span.addEventListener('click', () => showCommentsList(id));
-      } catch (_) { /* selezione su più blocchi: salva comunque */ }
-      const offsets = pmOffsets(range);
-      doc.comments.push({ id, text, anchor: offsets, created: new Date().toISOString(), resolved: false });
+      const anchor = { from: offsets ? offsets.from : -1, to: offsets ? offsets.to : -1, text: selectedText };
+      const c = { id, text, anchor, created: new Date().toISOString(), resolved: false };
+      doc.comments.push(c);
+      // Stesso cammino del re-ancoraggio al reload: evidenzia anche selezioni
+      // multi-blocco (dove surroundContents fallirebbe).
+      highlightComment(c);
       closeOverlay();
       onDocInput();
       renderGrid();
