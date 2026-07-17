@@ -393,6 +393,7 @@
       </div>`;
     }).join('');
     renderLegality();
+    syncCarouselHighlight();
   }
 
   // Riepilogo di legalità (§8.4) sotto il conteggio: compare SOLO quando c'è
@@ -647,12 +648,15 @@
   }
 
   // Prosa con [[Nome Carta]] → span hoverable (§3.5), risolti fuzzy all'hover.
+  // I nomi già risolti in questa sessione (proseIdByName) rinascono col loro
+  // data-card-id anche dopo un rerender della chat: senza, ogni rerender
+  // "smemorava" gli span e click/evidenziazione smettevano di funzionare.
   function proseHtml(text) {
-    return window.SN_SCRYFALL_Q.proseSegments(text).map((seg) => (
-      seg.type === 'card'
-        ? `<span class="dk-prose-card" data-card-name="${esc(seg.name)}">${esc(seg.name)}</span>`
-        : esc(seg.text)
-    )).join('');
+    return window.SN_SCRYFALL_Q.proseSegments(text).map((seg) => {
+      if (seg.type !== 'card') return esc(seg.text);
+      const known = proseIdByName.get(String(seg.name).toLowerCase());
+      return `<span class="dk-prose-card" data-card-name="${esc(seg.name)}"${known ? ` data-card-id="${esc(known)}"` : ''}>${esc(seg.name)}</span>`;
+    }).join('');
   }
 
   // Ragionamento del modello (CoT, #331): blocco collassabile in testa alla
@@ -716,6 +720,7 @@
     $('chatEmpty').insertAdjacentHTML('afterend',
       msgs.map((m, i) => chatBubbleHtml(m, i === msgs.length - 1)).join(''));
     log.scrollTop = log.scrollHeight;
+    syncCarouselHighlight();
   }
 
   async function sendChat(text) {
@@ -979,21 +984,39 @@
     });
   }
 
-  // Hover su un nome in prosa: risoluzione fuzzy una-tantum (§3.5); l'id
-  // risolto resta nel dataset e, se il mouse è ancora lì, parte la preview.
-  async function resolveProseCard(el) {
-    if (el.dataset.cardId || el.dataset.resolving) return;
-    el.dataset.resolving = '1';
-    const r = await send({ type: MSG.SCRYFALL_NAMED, name: el.dataset.cardName });
-    delete el.dataset.resolving;
-    if (r && r.ok && r.card) {
+  // Hover/click su un nome in prosa: risoluzione fuzzy una-tantum (§3.5).
+  // Ritorna una Promise dell'id risolto (o null): il carosello dal testo
+  // libero (#343) la attende per costruire la lista di navigazione. La cache
+  // per nome sopravvive ai rerender della chat (gli span si rigenerano).
+  const proseIdByName = new Map();    // nome (lowercase) → scryfall id
+  const proseResolving = new WeakMap(); // span → Promise in corso
+
+  function resolveProseCard(el) {
+    if (el.dataset.cardId) return Promise.resolve(el.dataset.cardId);
+    const key = String(el.dataset.cardName || '').toLowerCase();
+    if (proseIdByName.has(key)) {
+      const id = proseIdByName.get(key);
+      el.dataset.cardId = id;
+      const card = cardsById[id];
+      if (card) el.title = `${card.name} — ${card.typeLine}`;
+      return Promise.resolve(id);
+    }
+    if (proseResolving.has(el)) return proseResolving.get(el);
+    const p = (async () => {
+      const r = await send({ type: MSG.SCRYFALL_NAMED, name: el.dataset.cardName });
+      proseResolving.delete(el);
+      if (!(r && r.ok && r.card)) return null;
       el.dataset.cardId = r.card.id;
+      proseIdByName.set(key, r.card.id);
       cardsById[r.card.id] = r.card;
       el.title = `${r.card.name} — ${r.card.typeLine}`;
       // La risoluzione è arrivata DOPO il mouseover: se il puntatore è ancora
       // sul nome non ci sarà un nuovo evento — la preview parte da qui.
       if (el.matches(':hover')) hoverEnter(r.card.id);
-    }
+      return r.card.id;
+    })();
+    proseResolving.set(el, p);
+    return p;
   }
 
   // ── Pannello destro a tre stati (§5): statistiche / preview / carosello ────
@@ -1019,6 +1042,8 @@
     $('stateStats').hidden = s !== 'stats';
     $('statePreview').hidden = s !== 'preview';
     $('stateCarousel').hidden = s !== 'carousel';
+    // Uscendo dal carosello l'evidenziazione della carta corrente sparisce.
+    if (s !== 'carousel') syncCarouselHighlight();
   }
 
   // Box modulare del detail (§5.2): SLOT del sistema moduli — tasto destro sul
@@ -1295,6 +1320,7 @@
         .map((j) => carousel.ids[j]).filter(Boolean);
       requestOpinions(near).catch(() => {});
     }
+    syncCarouselHighlight();
   }
 
   function carouselNav(delta) {
@@ -1320,6 +1346,47 @@
     if (!box) return;
     const ids = [...box.querySelectorAll('.dk-row[data-card-id]')].map((r) => r.dataset.cardId);
     openCarousel(ids, ids.indexOf(row.dataset.cardId));
+  }
+
+  // Carosello dal testo libero (#343): il click su un nome in prosa naviga
+  // TUTTE le carte citate nella stessa bolla (parità con le CardList), non
+  // solo quella cliccata. Apre subito sulla carta cliccata (risolvendola se
+  // il click è arrivato prima dell'hover — prima non succedeva nulla) e
+  // completa la lista appena gli altri nomi sono risolti.
+  async function openCarouselFromProse(span) {
+    const bubble = span.closest('.dk-msg');
+    const spans = bubble ? [...bubble.querySelectorAll('.dk-prose-card')] : [span];
+    const clickedId = await resolveProseCard(span).catch(() => null);
+    if (!clickedId) return;
+    openCarousel([clickedId], 0);
+    const mine = carousel;
+    await Promise.all(spans.map((s) => resolveProseCard(s).catch(() => null)));
+    // Nel frattempo il carosello può essere stato chiuso o riaperto altrove.
+    if (carousel !== mine) return;
+    const ids = [];
+    for (const s of spans) {
+      const id = s.dataset.cardId;
+      if (id && !ids.includes(id)) ids.push(id);
+    }
+    if (ids.length <= mine.ids.length) return;
+    carousel = { ids, i: Math.max(0, ids.indexOf(mine.ids[mine.i])) };
+    renderCarousel();
+  }
+
+  // Evidenzia ovunque (nomi in prosa e righe carta) la carta ATTUALMENTE
+  // mostrata nel carosello (#343): il nome nel testo perde la sottolineatura
+  // e prende un fondo d'accento, così si vede a colpo d'occhio dove sei.
+  // Chiamata a ogni cambio del carosello E a ogni rerender di chat/mazzo
+  // (che rigenerano il DOM e perderebbero la classe).
+  function syncCarouselHighlight() {
+    const activeId = (detailState === 'carousel' && carousel)
+      ? carousel.ids[carousel.i] : '';
+    for (const el of document.querySelectorAll('.dk-carousel-current')) {
+      if (!activeId || el.dataset.cardId !== activeId) el.classList.remove('dk-carousel-current');
+    }
+    if (!activeId) return;
+    const sel = `.dk-prose-card[data-card-id="${CSS.escape(activeId)}"], .dk-row[data-card-id="${CSS.escape(activeId)}"]`;
+    for (const el of document.querySelectorAll(sel)) el.classList.add('dk-carousel-current');
   }
 
   function wireDetailPanel() {
@@ -1558,9 +1625,10 @@
       // Click su una riga risultato → carosello sulla lista di QUELLA bolla (§5.3).
       const row = e.target.closest('.dk-row[data-card-id]');
       if (row) { openCarouselFromRow(row, '.dk-cardlist'); return; }
-      // Click su un nome in prosa risolto → carosello su quella sola carta.
+      // Click su un nome in prosa → carosello su TUTTE le carte della bolla
+      // (#343); risolve da sé anche i nomi su cui non c'è stato hover.
       const span = e.target.closest('.dk-prose-card');
-      if (span && span.dataset.cardId) openCarousel([span.dataset.cardId], 0);
+      if (span) openCarouselFromProse(span);
     });
     log.addEventListener('keydown', (e) => {
       if (e.key !== 'Enter' && e.key !== ' ') return;
