@@ -1,7 +1,0 @@
-{
-  "id": "wsBf3D61dDuolXN6nIC0",
-  "status": "done",
-  "notes": "Ho verificato la segnalazione sull'ambiente attuale: i due test indicati non falliscono più. Nel frattempo (la segnalazione era di un mese fa) altri interventi hanno già risolto entrambe le cause vere, e i test stessi lo documentano: 1) per lo spellcheck, il suggerimento di correzione poteva andare perso per una corsa all'apertura della scheda — il suggerimento veniva inviato prima che la pagina fosse pronta a riceverlo, o al duplicato sbagliato della scheda; ora l'invio aspetta la pagina davvero pronta e raggiunge tutte le istanze. 2) per la tendina dei font, il click 'fuori' del test cadeva su un'area della barra strumenti che lascia passare i click al documento sottostante, un'ambiguita' solo dell'ambiente di test; il test ora clicca un controllo reale. Nota: i file di test citati nella segnalazione nel frattempo sono stati accorpati in una suite unica dell'editor, per questo i nomi non corrispondono piu'. Come ho verificato: ho rieseguito su Linux headless (stesso ambiente della segnalazione) l'intera suite editor + spellcheck (20 test, tutti verdi) e poi, per escludere instabilita' residua, ho ripetuto 5 volte di fila sia i due test di spellcheck (10 esecuzioni su 10 verdi) sia il test di chiusura della tendina font (5 su 5 verdi). Nessuna modifica al codice era necessaria: chiudo senza intervento. Non ho aggiunto nulla oltre il richiesto.",
-  "queuedAt": "2026-07-17T06:31:11.038Z",
-  "queuedBy": "routine"
-}
