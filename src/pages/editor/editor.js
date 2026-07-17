@@ -152,6 +152,7 @@
     // Il titolo non è più editabile dall'UI: si conserva quello del modello.
     if (!doc.meta.title) doc.meta.title = 'Documento senza titolo';
     doc.meta.modified = new Date().toISOString();
+    refreshCommentAnchors(); // ancore allineate al testo corrente prima del persist
     doc.content = htmlToPM(docEl);
     return {
       meta: doc.meta,
