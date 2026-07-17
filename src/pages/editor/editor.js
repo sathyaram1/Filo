@@ -152,6 +152,7 @@
     // Il titolo non è più editabile dall'UI: si conserva quello del modello.
     if (!doc.meta.title) doc.meta.title = 'Documento senza titolo';
     doc.meta.modified = new Date().toISOString();
+    refreshCommentAnchors(); // ancore allineate al testo corrente prima del persist
     doc.content = htmlToPM(docEl);
     return {
       meta: doc.meta,
@@ -1531,36 +1532,152 @@
         <button class="ed-btn" id="cmCancel">Annulla</button>
         <button class="ed-btn primary" id="cmSave">Aggiungi</button>
       </div>`);
-    // avvolgi la selezione in uno span commentato
+    // calcola subito l'ancora (il range può invalidarsi mentre l'overlay è aperto)
     const range = sel.getRangeAt(0);
+    const offsets = pmOffsets(range);
+    // Il testo dell'ancora vive nello spazio del "testo puro" del documento:
+    // Selection.toString() inserisce interruzioni di riga tra i blocchi, ma il
+    // testo puro (concatenazione dei nodi testo) non ne contiene mai — senza
+    // questa normalizzazione una selezione multi-paragrafo non matcherebbe mai
+    // (commento orfano fin dalla creazione).
+    const anchorText = offsets
+      ? commentDocText().slice(offsets.from, offsets.to)
+      : selectedText.replace(/\r?\n/g, '');
     const id = newId('comment');
     $('cmCancel').addEventListener('click', closeOverlay);
     $('cmSave').addEventListener('click', () => {
       const text = $('cmText').value.trim();
       if (!text) { closeOverlay(); return; }
-      try {
-        const span = document.createElement('span');
-        span.className = 'ed-commented';
-        span.dataset.commentId = id;
-        span.title = text;
-        range.surroundContents(span);
-        span.addEventListener('click', () => showCommentsList(id));
-      } catch (_) { /* selezione su più blocchi: salva comunque */ }
-      const offsets = pmOffsets(range);
-      doc.comments.push({ id, text, anchor: offsets, created: new Date().toISOString(), resolved: false });
+      const anchor = { from: offsets ? offsets.from : -1, to: offsets ? offsets.to : -1, text: anchorText };
+      const c = { id, text, anchor, created: new Date().toISOString(), resolved: false };
+      doc.comments.push(c);
+      // Stesso cammino del re-ancoraggio al reload: evidenzia anche selezioni
+      // multi-blocco (dove surroundContents fallirebbe).
+      highlightComment(c);
       closeOverlay();
       onDocInput();
       renderGrid();
     });
   }
-  function pmOffsets() {
-    // offset approssimativi sul testo grezzo (le ancore precise PM richiedono
-    // un mapping completo; per il prototipo salviamo l'indice nel testo).
-    return { from: 0, to: 0 };
+  // ── Ancoraggio commenti ────────────────────────────────────────────────
+  // L'ancora di un commento è { from, to, text }: offset sul testo puro del
+  // documento (concatenazione dei nodi testo, esclusi i toggle di collasso che
+  // sono UI iniettata) + il testo selezionato come fallback. Al reload il
+  // documento viene ri-renderizzato da JSON: gli offset restano validi perché
+  // il testo puro è identico; se il testo è cambiato (edit senza ri-salvataggio
+  // dell'ancora) si ripiega sulla ricerca di `text`.
+  function commentTextNodes() {
+    const walker = document.createTreeWalker(docEl, NodeFilter.SHOW_TEXT, {
+      acceptNode: (n) => n.parentElement && n.parentElement.closest('.ed-collapse-toggle') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
+    });
+    const nodes = [];
+    let n; while ((n = walker.nextNode())) nodes.push(n);
+    return nodes;
+  }
+  function commentDocText(nodes) {
+    return (nodes || commentTextNodes()).map((n) => n.nodeValue).join('');
+  }
+  // Offset {from,to} di un Range sul testo puro. Ritorna null se i confini non
+  // cadono in nodi testo del documento (es. selezione anomala): in quel caso
+  // l'ancora vive solo di `text`.
+  function pmOffsets(range) {
+    if (!range) return null;
+    let cum = 0, from = -1, to = -1;
+    for (const tn of commentTextNodes()) {
+      if (from < 0 && tn === range.startContainer) from = cum + range.startOffset;
+      if (to < 0 && tn === range.endContainer) to = cum + range.endOffset;
+      cum += tn.nodeValue.length;
+      if (from >= 0 && to >= 0) break;
+    }
+    return (from >= 0 && to >= 0 && to > from) ? { from, to } : null;
+  }
+  // Avvolge l'intervallo [from,to) del testo puro in span .ed-commented (uno
+  // per nodo testo intersecato: funziona anche su selezioni multi-blocco, dove
+  // surroundContents fallirebbe). Ritorna true se ha evidenziato qualcosa.
+  function wrapCommentRange(c, from, to) {
+    const nodes = commentTextNodes();
+    let cum = 0, wrapped = false;
+    for (const tn of nodes) {
+      const len = tn.nodeValue.length;
+      const s = Math.max(from - cum, 0);
+      const e = Math.min(to - cum, len);
+      cum += len;
+      if (e <= s) continue;
+      let target = tn;
+      if (s > 0) target = target.splitText(s);
+      if (e - s < target.nodeValue.length) target.splitText(e - s);
+      const span = document.createElement('span');
+      span.className = 'ed-commented';
+      span.dataset.commentId = c.id;
+      span.title = c.text;
+      target.parentNode.insertBefore(span, target);
+      span.appendChild(target);
+      span.addEventListener('click', () => showCommentsList(c.id));
+      wrapped = true;
+      if (cum >= to) break;
+    }
+    return wrapped;
+  }
+  // Evidenzia un singolo commento a partire dalla sua ancora. Preferisce gli
+  // offset (se il testo lì sotto coincide ancora), altrimenti cerca il testo.
+  function highlightComment(c) {
+    const a = c.anchor;
+    if (!a || !a.text) return false;
+    // Ancore salvate da versioni precedenti possono contenere le interruzioni
+    // di riga della selezione multi-paragrafo: il testo puro del documento non
+    // ne ha mai, quindi si confronta sempre la forma normalizzata. `a.from`
+    // resta valido (pmOffsets lavora già sul testo puro); la lunghezza si
+    // riprende dal testo normalizzato, non da `a.to` (che per le ancore legacy
+    // contava anche i newline).
+    const aText = String(a.text).replace(/\r?\n/g, '');
+    if (!aText) return false;
+    const text = commentDocText();
+    let from = -1, to = -1;
+    if (Number.isFinite(a.from) && a.from >= 0 && text.slice(a.from, a.from + aText.length) === aText) {
+      from = a.from; to = a.from + aText.length;
+    } else {
+      const i = text.indexOf(aText);
+      if (i >= 0) { from = i; to = i + aText.length; }
+    }
+    if (from < 0 || to <= from) return false;
+    return wrapCommentRange(c, from, to);
+  }
+  function removeCommentSpans(id) {
+    const sel = id ? `[data-comment-id="${id}"]` : '.ed-commented';
+    docEl.querySelectorAll(sel).forEach((span) => {
+      const parent = span.parentNode;
+      while (span.firstChild) parent.insertBefore(span.firstChild, span);
+      span.remove();
+      parent.normalize();
+    });
   }
   function applyCommentHighlights() {
-    // i commenti vengono riassociati al testo solo durante la sessione di
-    // creazione; alla ricarica restano nel JSON ma non sono ri-ancorati.
+    removeCommentSpans();
+    doc.comments.forEach((c) => highlightComment(c));
+  }
+  // Prima del salvataggio ri-calcola le ancore dagli span presenti nel DOM: se
+  // l'utente ha editato il testo attorno, gli offset salvati restano allineati.
+  function refreshCommentAnchors() {
+    const nodes = commentTextNodes();
+    const starts = new Map();
+    let cum = 0;
+    for (const tn of nodes) { starts.set(tn, cum); cum += tn.nodeValue.length; }
+    doc.comments.forEach((c) => {
+      const spans = docEl.querySelectorAll(`[data-comment-id="${c.id}"]`);
+      if (!spans.length) return; // span perso (es. testo cancellato): tieni l'ancora vecchia
+      let from = Infinity, to = -Infinity, text = '';
+      spans.forEach((span) => {
+        const inner = document.createTreeWalker(span, NodeFilter.SHOW_TEXT);
+        let n; while ((n = inner.nextNode())) {
+          const s = starts.get(n);
+          if (s == null) continue;
+          from = Math.min(from, s);
+          to = Math.max(to, s + n.nodeValue.length);
+        }
+        text += span.textContent;
+      });
+      if (from < to && text) c.anchor = { from, to, text };
+    });
   }
   function showCommentsList(focusId) {
     if (!doc.comments.length) { flashOverlayMsg('Nessun commento.'); return; }
@@ -1581,8 +1698,7 @@
     }));
     overlayBox.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', () => {
       doc.comments = doc.comments.filter((x) => x.id !== b.dataset.del);
-      const span = docEl.querySelector(`[data-comment-id="${b.dataset.del}"]`);
-      if (span) { while (span.firstChild) span.parentNode.insertBefore(span.firstChild, span); span.remove(); }
+      removeCommentSpans(b.dataset.del); // tutti gli span (multi-blocco compreso)
       markDirty(); renderGrid();
       if (doc.comments.length) showCommentsList(); else closeOverlay();
     }));

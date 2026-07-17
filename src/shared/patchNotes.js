@@ -19,6 +19,7 @@
       version: '0.2.141', date: '2026-07-17',
       features: [],
       fixes: [
+        'Nell\'Editor, i commenti della pagina "Revisione" non perdono più l\'evidenziazione quando chiudi e riapri il documento: la frase commentata resta segnata e cliccandola si apre il commento. L\'evidenziazione ritrova la frase giusta anche se nel frattempo hai modificato il testo intorno, e ora funziona anche quando selezioni un testo che attraversa più paragrafi.',
         'Importare un mazzo copiato da Archidekt o TappedOut ora funziona anche quando i titoli delle sezioni hanno il numero di carte fra parentesi (es. "Commander (1)", "Deck (99)"): il comandante viene riconosciuto come tale, le carte di Maybeboard e Sideboard restano fuori dal mazzo e i titoli non compaiono più fra le righe non riconosciute. Inoltre una riga vuota dentro il Maybeboard non fa più rientrare nel mazzo le carte che la seguono.',
       ],
     },
