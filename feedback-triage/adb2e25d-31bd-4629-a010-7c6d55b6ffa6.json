@@ -1,0 +1,7 @@
+{
+  "id": "adb2e25d-31bd-4629-a010-7c6d55b6ffa6",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho rifatto i passi dell'utente su una build pulita: archiviata una scheda vera, aperta 'Tab archiviate', cercato 'zzzznomatch' → ora compare «Nessun risultato per \"zzzznomatch\".» invece di 'Nessuna tab archiviata, per ora.', e cancellando la ricerca le schede ricompaiono intatte. Stesso esito in 'Cronologia AI' con voci reali: la ricerca senza risultati dice 'Nessun risultato per la ricerca.' e il filtro per tipo (es. Aiuto) senza corrispondenze ha il suo messaggio dedicato; svuotando ricerca e filtro tutto ricompare. Verificato anche il percorso Invio/'Cerca nei contenuti' senza risultati: niente più testo di archivio vuoto sotto la notina di ricerca. Quando archivio o cronologia sono DAVVERO vuoti restano i testi originali, come giusto. Stress test: ricerca di soli spazi (lista intatta), query di 10.000 caratteri con emoji (nessun crash, messaggio corretto e pagina ancora reattiva), payload HTML/script nella casella di ricerca mostrato come semplice testo senza esecuzione (nessun XSS, importante perché il messaggio ripete la parola cercata). Regressione: passano i test esistenti di archivio e ricerca semantica, i 4 nuovi (incluso 'Aperti per dopo'), i miei 6 indipendenti e tutti i 978 unit test. Controllo visivo con screenshot: messaggio centrato, tema coerente, elenco che ricompare togliendo la ricerca.",
+  "queuedAt": "2026-07-17T19:33:32.585Z",
+  "queuedBy": "routine"
+}
