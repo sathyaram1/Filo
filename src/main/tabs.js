@@ -1102,7 +1102,10 @@ class TabManager {
   // NOTA: la cronologia avanti/indietro è per-WebContents, quindi attraversare
   // un confine di sito in privacy riparte con cronologia pulita (è il prezzo
   // dell'isolamento per-sito; resta intatta entro lo stesso sito).
-  _recreateView(tab, url) {
+  // `opts.loadUrl` (#327): URL da caricare al posto di `url` — la view resta
+  // configurata (preload/partition/isInternal) per `url`. Usato dal recupero
+  // crash per mostrare la pagina d'errore in una view pronta a ritentare il sito.
+  _recreateView(tab, url, opts = {}) {
     const wasActive = tab.id === this.activeId;
     const partition = this._partitionForTab(tab, url);
     try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
