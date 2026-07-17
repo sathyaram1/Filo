@@ -1349,13 +1349,20 @@ class TabManager {
       if (!NE || reason === 'clean-exit') return;
       const current = tab.url || '';
       if (!NE.isRetriableTarget(current) || NE.isErrorPageUrl(current)) return;
-      // Fuori dall'evento: un loadURL DENTRO render-process-gone può cadere sul
-      // frame appena disposto. Al giro dopo il webContents rilancia un renderer.
-      setImmediate(() => {
+      // Anti-loop: se il renderer muore di nuovo mentre stiamo già recuperando
+      // (o il recupero stesso crasha), non insistere a raffica.
+      const now = Date.now();
+      if (tab._crashRecoveryAt && now - tab._crashRecoveryAt < 2000) return;
+      tab._crashRecoveryAt = now;
+      // Fuori dall'evento e con un attimo di respiro: un loadURL immediato
+      // dentro/appena dopo render-process-gone cade nel cleanup del processo
+      // crashato e il renderer nuovo muore a sua volta (verificato: con
+      // setImmediate si entra in un loop di crash; con ~300ms carica).
+      setTimeout(() => {
         try {
           if (!wc.isDestroyed()) wc.loadURL(NE.buildUrl(current, NE.CRASH_CODE, reason));
         } catch (_) {}
-      });
+      }, 300);
     });
     // Colore selezione testo coerente con Filo sui siti esterni. insertCSS
     // ignora la CSP della pagina (che invece blocca il <link filo://> del
