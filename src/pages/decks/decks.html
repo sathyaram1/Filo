@@ -199,6 +199,21 @@
       color: var(--sn-accent); cursor: default;
       text-decoration: underline dotted; text-underline-offset: 2px;
     }
+    /* Carta ATTUALMENTE nel carosello (#343): evidenziata ovunque appaia.
+       Il nome in prosa perde la sottolineatura e prende un fondo d'accento;
+       le righe carta (chat e mazzo) lo stesso fondo, più tenue. */
+    .dk-prose-card.dk-carousel-current {
+      text-decoration: none;
+      background: color-mix(in srgb, var(--sn-accent) 22%, transparent);
+      border-radius: 4px; padding: 0 3px;
+    }
+    .dk-row.dk-carousel-current {
+      background: color-mix(in srgb, var(--sn-accent) 14%, transparent);
+    }
+    .dk-row.dk-carousel-current:hover,
+    .dk-row.dk-carousel-current:focus-visible {
+      background: color-mix(in srgb, var(--sn-accent) 20%, transparent);
+    }
     /* CardList (§3.2-§3.4): ultima bolla ~10 righe con scroll interno; le
        precedenti collassate a una riga di sintesi riespandibile (§3.3). */
     .dk-cardlist { max-height: 232px; overflow: auto; }
