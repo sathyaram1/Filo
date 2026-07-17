@@ -1304,13 +1304,44 @@ class TabManager {
         const src = source ? ` (${source}:${line})` : '';
         console.log(`[tab:${tab.id.slice(0, 6)}:${tag}] ${message}${src}`);
       });
-      wc.on('render-process-gone', (_e, details) => {
-        console.error(`[tab:${tab.id.slice(0, 6)}] render-process-gone`, details);
-      });
-      wc.on('did-fail-load', (_e, code, desc, url) => {
-        console.error(`[tab:${tab.id.slice(0, 6)}] did-fail-load`, code, desc, url);
-      });
     }
+    // #327 — navigazione fallita (dominio inesistente, server giù, offline):
+    // senza gestione il frame resta su chrome-error://chromewebdata/ con body
+    // vuoto → scheda completamente bianca e muta. Simmetria con gli errori di
+    // certificato (che hanno già il loro percorso, mapCertError → safebrowse):
+    // qui carichiamo la pagina d'errore interna con motivo tradotto e "Riprova".
+    // -3 (ERR_ABORTED: stop utente, redirect, nostre _recreateView) si ignora.
+    wc.on('did-fail-load', (_e, code, desc, failedUrl, isMainFrame) => {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error(`[tab:${tab.id.slice(0, 6)}] did-fail-load`, code, desc, failedUrl);
+      }
+      const NE = globalThis.SN_NET_ERROR;
+      if (!NE) return;
+      const failed = failedUrl || tab.url || '';
+      if (!NE.shouldShowErrorPage({ code, failedUrl: failed, isMainFrame })) return;
+      // Per l'utente la scheda resta "sul" sito fallito (titolo/sessione/riprova):
+      // la pagina d'errore è solo la faccia del fallimento, come negli altri browser.
+      tab.url = failed;
+      try {
+        if (!wc.isDestroyed()) wc.loadURL(NE.buildUrl(failed, code, desc));
+      } catch (_) {}
+    });
+    // #327 — renderer morto (crash/oom): stessa scheda bianca, stessa cura.
+    // loadURL su un webContents col renderer morto ne rilancia uno nuovo.
+    wc.on('render-process-gone', (_e, details) => {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error(`[tab:${tab.id.slice(0, 6)}] render-process-gone`, details);
+      }
+      const NE = globalThis.SN_NET_ERROR;
+      const reason = (details && details.reason) || '';
+      // clean-exit = chiusura ordinata (nostre close/_recreateView): non è un crash.
+      if (!NE || reason === 'clean-exit') return;
+      const current = tab.url || '';
+      if (!NE.isRetriableTarget(current) || NE.isErrorPageUrl(current)) return;
+      try {
+        if (!wc.isDestroyed()) wc.loadURL(NE.buildUrl(current, NE.CRASH_CODE, reason));
+      } catch (_) {}
+    });
     // Colore selezione testo coerente con Filo sui siti esterni. insertCSS
     // ignora la CSP della pagina (che invece blocca il <link filo://> del
     // content script). Reiniettiamo a ogni dom-ready perché lo stylesheet
