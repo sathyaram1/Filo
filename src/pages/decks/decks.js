@@ -1040,6 +1040,8 @@
     $('stateStats').hidden = s !== 'stats';
     $('statePreview').hidden = s !== 'preview';
     $('stateCarousel').hidden = s !== 'carousel';
+    // Uscendo dal carosello l'evidenziazione della carta corrente sparisce.
+    if (s !== 'carousel') syncCarouselHighlight();
   }
 
   // Box modulare del detail (§5.2): SLOT del sistema moduli — tasto destro sul
