@@ -647,12 +647,15 @@
   }
 
   // Prosa con [[Nome Carta]] → span hoverable (§3.5), risolti fuzzy all'hover.
+  // I nomi già risolti in questa sessione (proseIdByName) rinascono col loro
+  // data-card-id anche dopo un rerender della chat: senza, ogni rerender
+  // "smemorava" gli span e click/evidenziazione smettevano di funzionare.
   function proseHtml(text) {
-    return window.SN_SCRYFALL_Q.proseSegments(text).map((seg) => (
-      seg.type === 'card'
-        ? `<span class="dk-prose-card" data-card-name="${esc(seg.name)}">${esc(seg.name)}</span>`
-        : esc(seg.text)
-    )).join('');
+    return window.SN_SCRYFALL_Q.proseSegments(text).map((seg) => {
+      if (seg.type !== 'card') return esc(seg.text);
+      const known = proseIdByName.get(String(seg.name).toLowerCase());
+      return `<span class="dk-prose-card" data-card-name="${esc(seg.name)}"${known ? ` data-card-id="${esc(known)}"` : ''}>${esc(seg.name)}</span>`;
+    }).join('');
   }
 
   // Ragionamento del modello (CoT, #331): blocco collassabile in testa alla
