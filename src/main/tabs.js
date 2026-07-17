@@ -1469,7 +1469,7 @@ class TabManager {
         }
       }
     });
-    wc.on('did-navigate-in-page', (_e, url) => update({ url, canBack: canGoBack(wc), canFwd: canGoFwd(wc) }));
+    wc.on('did-navigate-in-page', (_e, url) => update({ url: userUrl(url), canBack: canGoBack(wc), canFwd: canGoFwd(wc) }));
     // Redirect main-frame verso URL "di blocco" (/geo, /not-available,
     // /region-block, … — lista curata in geoBlock.js): il match viene
     // memorizzato e diventa segnale al did-navigate dell'URL finale.
