@@ -448,7 +448,7 @@ test.describe('comandi extra (timer/incognito/no-flicker)', () => {
     // "5:" (secondi mancanti), ":30" (minuti mancanti) e "5: 30" (spazio
     // interno) sono durate scritte a metà: nessuna deve avviare un timer,
     // ognuna deve produrre la risposta con l'uso corretto.
-    const bubbles = page.locator('.dash-bubble');
+    const bubbles = page.locator('.dash-bubble-filo');
     for (const bad of ['5:', ':30', '5: 30']) {
       const before = await bubbles.count();
       await submit(page, `/set timer ${bad}`);
