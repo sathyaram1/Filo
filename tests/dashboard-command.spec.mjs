@@ -440,6 +440,26 @@ test.describe('comandi extra (timer/incognito/no-flicker)', () => {
     await expect(page.locator('.dash-bubble')).toContainText(/set timer/i, { timeout: 8_000 });
   });
 
+  test('"/set timer" con durata malformata coi due punti non crea timer', async () => {
+    const page = await openTab(NEWTAB);
+    const input = page.locator('#input');
+    await expect(input).toBeVisible({ timeout: 8_000 });
+
+    // "5:" (secondi mancanti), ":30" (minuti mancanti) e "5: 30" (spazio
+    // interno) sono durate scritte a metà: nessuna deve avviare un timer,
+    // ognuna deve produrre la risposta con l'uso corretto.
+    const bubbles = page.locator('.dash-bubble');
+    for (const bad of ['5:', ':30', '5: 30']) {
+      const before = await bubbles.count();
+      await submit(page, `/set timer ${bad}`);
+      // Filo risponde con l'uso corretto nel thread (nuova bolla)…
+      await expect.poll(() => bubbles.count(), { timeout: 8_000 }).toBeGreaterThan(before);
+      await expect(bubbles.last()).toContainText(/set timer/i);
+      // …e nessun timer compare nell'area live.
+      await expect(page.locator('#live .dash-live-card')).toHaveCount(0);
+    }
+  });
+
   test('"/incognito" apre una finestra in incognito', async () => {
     const page = await openTab(NEWTAB);
     const input = page.locator('#input');
