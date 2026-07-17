@@ -26,13 +26,22 @@ test('BACK button in home: all:unset annulla [hidden]{display:none} — il botto
 
   await page.screenshot({ path: 'tests/.shots/audit-back-btn-css.png', fullPage: false }).catch(() => {});
 
-  // Se l'attributo hidden è presente, il display computed DEVE essere 'none'.
-  // Se è 'inline' o qualsiasi altro valore, il bug è confermato.
-  if (info.hiddenAttr) {
-    expect(
-      info.displayValue,
-      `BUG CONFERMATO: .sn-back-btn ha hidden=${info.hiddenAttr} ma display="${info.displayValue}" — all:unset nel CSS ha annullato [hidden]{display:none}`,
-    ).toBe('none');
-  }
-  // Se hidden è false, il test passa (categorize è attivo, il bottone deve essere visibile).
+  expect(info.found).toBe(true);
+  // Con categorize disattivato (default) home.js imposta back.hidden = true.
+  expect(info.hiddenAttr, 'con categorize OFF il bottone deve avere hidden=true').toBe(true);
+  // E il display computed DEVE essere 'none': se è 'inline' (o altro) il bug è
+  // confermato — all:unset nel CSS ha annullato [hidden]{display:none}.
+  expect(
+    info.displayValue,
+    `BUG CONFERMATO: .sn-back-btn ha hidden=true ma display="${info.displayValue}" — all:unset nel CSS ha annullato [hidden]{display:none}`,
+  ).toBe('none');
+
+  // Simmetria: senza l'attributo hidden il bottone deve tornare visibile
+  // (la regola [hidden]{display:none} non deve nasconderlo sempre).
+  const displayWhenShown = await page.evaluate(() => {
+    const btn = document.getElementById('back');
+    btn.hidden = false;
+    return getComputedStyle(btn).display;
+  });
+  expect(displayWhenShown, 'senza hidden il bottone deve essere visibile').not.toBe('none');
 });
