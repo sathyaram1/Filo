@@ -122,6 +122,9 @@ test('click su un nome in prosa: il carosello naviga tutte le carte citate e la 
   const decoOther = await dragonSpan.evaluate((el) => getComputedStyle(el).textDecorationLine);
   expect(decoOther).toBe('underline');
 
+  // Traccia visiva (tests/.shots/, gitignorata): evidenziazione sul nome.
+  await page.screenshot({ path: 'tests/.shots/decks-prose-carousel-highlight.png' }).catch(() => {});
+
   // La freccia → FUNZIONA anche dal testo libero: passa a Shivan Dragon e
   // l'evidenziazione lo segue.
   await page.click('#carouselNext');
