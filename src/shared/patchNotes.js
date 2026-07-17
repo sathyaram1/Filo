@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.142', date: '2026-07-17',
+      features: [],
+      fixes: [
+        'Nella pagina "Aperti per dopo" il link "← Tutte le categorie" non compare più quando la categorizzazione automatica è disattivata: si vede solo quando stai guardando dentro una categoria e serve davvero per tornare indietro.',
+      ],
+    },
+    {
       version: '0.2.141', date: '2026-07-17',
       features: [],
       fixes: [
