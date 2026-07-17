@@ -28,6 +28,7 @@ require(path.join(SHARED, 'manageReview.js'));
 require(path.join(SHARED, 'preferences.js'));
 require(path.join(SHARED, 'cmdClassify.js'));
 require(path.join(SHARED, 'urlExfil.js'));
+require(path.join(SHARED, 'netError.js'));  // #327 — pagina d'errore di rete (tabs.js + filo://error)
 require(path.join(SHARED, 'actionLevels.js'));
 require(path.join(SHARED, 'pageRestyle.js'));
 require(path.join(SHARED, 'ttsChunk.js'));
