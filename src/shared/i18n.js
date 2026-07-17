@@ -413,6 +413,8 @@
     history_clear: 'Cancella tutto',
     history_clear_confirm: 'Cancellare definitivamente tutta la cronologia AI?',
     history_empty: 'Nessuna interazione AI registrata.',
+    history_no_results: 'Nessun risultato per la ricerca.',
+    history_no_results_filter: 'Nessuna interazione per il filtro selezionato.',
 
     // Spellcheck
     spell_correct: 'Correggi',
