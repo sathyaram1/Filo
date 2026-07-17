@@ -238,8 +238,14 @@ test.describe('commenti: evidenziazione persistente', () => {
     // Simula un documento salvato PRIMA del fix: ancora multi-paragrafo con il
     // newline della selezione dentro `text` (e `to` che lo conta).
     await page.evaluate(() => {
+      const doc = document.getElementById('doc');
+      const walker = document.createTreeWalker(doc, NodeFilter.SHOW_TEXT);
+      let pure = '';
+      let n; while ((n = walker.nextNode())) pure += n.nodeValue;
+      const from = pure.indexOf('primo blocco');
+      const legacyText = 'primo blocco\ntesta del secondo';
       const raw = JSON.parse(localStorage.getItem('filo.editor.doc'));
-      raw.comments[0].anchor = { from: 8, to: 8 + 'primo blocco\ntesta del secondo'.length, text: 'primo blocco\ntesta del secondo' };
+      raw.comments[0].anchor = { from, to: from + legacyText.length, text: legacyText };
       localStorage.setItem('filo.editor.doc', JSON.stringify(raw));
     });
     await page.reload();
