@@ -1620,9 +1620,10 @@
       // Click su una riga risultato → carosello sulla lista di QUELLA bolla (§5.3).
       const row = e.target.closest('.dk-row[data-card-id]');
       if (row) { openCarouselFromRow(row, '.dk-cardlist'); return; }
-      // Click su un nome in prosa risolto → carosello su quella sola carta.
+      // Click su un nome in prosa → carosello su TUTTE le carte della bolla
+      // (#343); risolve da sé anche i nomi su cui non c'è stato hover.
       const span = e.target.closest('.dk-prose-card');
-      if (span && span.dataset.cardId) openCarousel([span.dataset.cardId], 0);
+      if (span) openCarouselFromProse(span);
     });
     log.addEventListener('keydown', (e) => {
       if (e.key !== 'Enter' && e.key !== ' ') return;
