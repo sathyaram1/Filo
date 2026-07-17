@@ -1,7 +1,0 @@
-{
-  "id": "020dbee6-6815-4658-93a5-44e069b68ab2",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato e modifica pubblicata. Il comando timer della barra di Filo ora rifiuta le durate scritte a metà (per esempio \"5:\" o \":30\") invece di avviare un timer con una durata diversa da quella voluta: in quei casi risponde mostrando l'uso corretto del comando. La correzione è coperta da un test automatico che prova le durate incomplete e verifica che nessun timer parta, e il recap di aggiornamento della nuova versione la menziona.",
-  "queuedAt": "2026-07-17T12:44:53.886Z",
-  "queuedBy": "routine"
-}
