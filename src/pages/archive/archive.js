@@ -102,7 +102,7 @@
   function renderSemantic() {
     const list = $('list');
     list.innerHTML = '';
-    if (!semanticResults.length) { $('empty').hidden = false; return; }
+    if (!semanticResults.length) { showEmpty(); return; }
     $('empty').hidden = true;
     const wrap = document.createElement('div');
     wrap.className = 'arc-tabs';
