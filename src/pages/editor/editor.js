@@ -1682,8 +1682,7 @@
     }));
     overlayBox.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', () => {
       doc.comments = doc.comments.filter((x) => x.id !== b.dataset.del);
-      const span = docEl.querySelector(`[data-comment-id="${b.dataset.del}"]`);
-      if (span) { while (span.firstChild) span.parentNode.insertBefore(span.firstChild, span); span.remove(); }
+      removeCommentSpans(b.dataset.del); // tutti gli span (multi-blocco compreso)
       markDirty(); renderGrid();
       if (doc.comments.length) showCommentsList(); else closeOverlay();
     }));
