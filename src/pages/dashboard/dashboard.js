@@ -1350,10 +1350,12 @@
     if (s.includes(':')) {
       const parts = s.split(':');
       if (parts.length !== 2) return null;
+      // Ogni parte deve essere un intero esplicito: "5:", ":30" o "5: 30" non
+      // sono durate valide (Number('') === 0 le farebbe passare in silenzio).
+      if (!/^\d+$/.test(parts[0]) || !/^\d+$/.test(parts[1])) return null;
       const mm = Number(parts[0]);
       const ss = Number(parts[1]);
-      if (!Number.isInteger(mm) || !Number.isInteger(ss)) return null;
-      if (mm < 0 || ss < 0 || ss > 59) return null;
+      if (ss > 59) return null;
       const total = mm * 60 + ss;
       return total > 0 ? total : null;
     }
