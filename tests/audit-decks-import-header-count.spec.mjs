@@ -1,16 +1,15 @@
-// AUDIT (prober): l'import del deck builder non riconosce le intestazioni di
-// sezione con il conteggio fra parentesi — il formato tipico di Archidekt/
-// TappedOut, es. "Commander (1)", "Deck (99)", "Maybeboard (2)". Conseguenze
-// per l'utente che incolla una lista copiata da quei siti:
-//   1) il comandante NON viene riconosciuto (finisce fra le carte del mazzo,
-//      il mazzo resta senza commander);
-//   2) le carte del "Maybeboard"/"Sideboard" FINISCONO nel mazzo (l'intestazione
-//      non viene vista come "sezione da saltare");
-//   3) le righe di intestazione compaiono come "righe non riconosciute".
+// Regressione (da audit/prober, poi fix): l'import del deck builder deve
+// riconoscere le intestazioni di sezione con il conteggio fra parentesi — il
+// formato tipico di Archidekt/TappedOut, es. "Commander (1)", "Deck (99)",
+// "Maybeboard (2)". Comportamento atteso per l'utente che incolla una lista
+// copiata da quei siti:
+//   1) il comandante VIENE riconosciuto come tale;
+//   2) le carte del "Maybeboard"/"Sideboard" restano FUORI dal mazzo;
+//   3) le righe di intestazione NON compaiono fra le "righe non riconosciute".
 //
-// Riproduzione dal cammino UI reale (import dialog → DECKS_IMPORT_PREVIEW →
-// parseDecklist), Scryfall mockato. Si ASSERISCE il sintomo che l'utente vede:
-// nessun "Commander riconosciuto" e la carta del maybeboard risolta come deck.
+// Esercita il cammino UI reale (import dialog → DECKS_IMPORT_PREVIEW →
+// parseDecklist), Scryfall mockato. Prima del fix questo spec era il prober
+// che ASSERIVA i sintomi; ora asserisce il successo (fallirebbe senza fix).
 
 import { test, expect } from './fixtures/electron.mjs';
 
@@ -50,8 +49,9 @@ async function mockScryfall(app) {
   });
 }
 
-// Formato tipico di Archidekt "Export → Text" con categorie: ogni sezione ha
-// un titolo con il numero di carte fra parentesi.
+// Formato tipico di Archidekt "Export → Text": ogni sezione ha un titolo con il
+// numero di carte fra parentesi. La riga vuota extra dentro il Maybeboard copre
+// anche il caso collaterale (non deve far rientrare la carta nel mazzo).
 const ARCHIDEKT = `Commander (1)
 1 Atraxa, Praetors' Voice
 
@@ -60,9 +60,10 @@ Deck (2)
 1 Arcane Signet
 
 Maybeboard (1)
+
 1 Some Maybe Card`;
 
-test('import: intestazioni con conteggio (Archidekt) rompono commander e sezioni', async ({ app, openTab }) => {
+test('import: intestazioni con conteggio (Archidekt) → commander e maybeboard gestiti', async ({ app, openTab }) => {
   test.setTimeout(60_000);
   await mockScryfall(app);
   const page = await openTab('filo://decks/decks.html');
@@ -81,19 +82,15 @@ test('import: intestazioni con conteggio (Archidekt) rompono commander e sezioni
   await expect(page.locator('.dk-io-note').first()).toBeVisible();
   await page.screenshot({ path: 'tests/.shots/audit-decks-import-header-count.png' });
 
-  const noteText = await page.locator('.dk-io-box').innerText();
-  console.log('--- ANTEPRIMA IMPORT ---\n' + noteText + '\n------------------------');
+  // 1) Il comandante È riconosciuto come tale.
+  await expect(page.locator('.dk-io-box')).toContainText('Commander riconosciuto: Atraxa, Praetors\' Voice');
 
-  // SINTOMO 1: il comandante NON è riconosciuto → nessuna nota "Commander riconosciuto".
-  await expect(page.locator('.dk-io-box')).not.toContainText('Commander riconosciuto');
+  // 3) Le intestazioni con conteggio NON sono "righe non riconosciute".
+  await expect(page.locator('.dk-io-dirty')).toHaveCount(0);
 
-  // SINTOMO 3: le intestazioni con conteggio finiscono fra le righe "non riconosciute".
-  await expect(page.locator('.dk-io-dirty')).toContainText('Commander (1)');
-  await expect(page.locator('.dk-io-dirty')).toContainText('Maybeboard (1)');
-
-  // SINTOMO 1+2: vengono "riconosciute" 4 carte (Atraxa + Sol Ring + Arcane
-  // Signet + la carta del Maybeboard), cioè il comandante e il maybeboard sono
-  // stati trattati come normali carte da mazzo. In un parser corretto sarebbero
-  // 2 (solo Sol Ring + Arcane Signet), con Atraxa come commander e il maybeboard saltato.
-  await expect(page.locator('.dk-io-note').first()).toContainText('4 carte riconosciute su 4');
+  // 1+2) Solo le 2 carte del mazzo vero (Sol Ring + Arcane Signet): il
+  // comandante è a parte e il maybeboard è saltato — anche la carta dopo la
+  // riga vuota dentro il Maybeboard.
+  await expect(page.locator('.dk-io-note').first()).toContainText('2 carte riconosciute su 2');
+  await expect(page.locator('.dk-io-box')).not.toContainText('Some Maybe Card');
 });
