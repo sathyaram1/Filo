@@ -2,8 +2,8 @@
   "id": "3ba31454-e6f6-46b4-b5a4-2e4b07bf7c4a",
   "branch": "",
   "loopCount": 1,
-  "verifierVerdict": "fail",
-  "verifierCritique": "FAIL — Il caso segnalato in sé è risolto: ho rifatto i passi dell'utente (frase scritta, commento creato dalla pagina Revisione, ricarica della scheda) e l'evidenziazione ora ritorna dopo il reload, cliccarla riapre il commento giusto, e il tutto regge anche un doppio ricaricamento, testo aggiunto prima della frase commentata (l'evidenziazione segue la frase), cancellazione totale del testo commentato (il commento resta contato e leggibile, nessun errore) e tentativi di iniettare script tramite il testo selezionato o il corpo del commento (nessuno script eseguito). MA uno stress test rompe la funzione: se il commento nasce da una selezione che attraversa DUE paragrafi, l'evidenziazione non compare né alla creazione né dopo la ricarica — il contatore segna 1 ma nel testo non c'è nulla, cioè lo stesso identico sintomo del feedback originale, con il commento orfano fin dall'inizio. Per riprodurre: scrivi due paragrafi, vai su Revisione, clicca Commenta, seleziona dalla fine del primo paragrafo all'inizio del secondo, scrivi il commento e salva: nessuna evidenziazione appare. Il motivo, in termini di comportamento: la copia della frase memorizzata col commento contiene le interruzioni di riga della selezione, mentre il testo del documento in cui viene ricercata non ne contiene mai, quindi il ripristino non trova mai la corrispondenza.",
+  "verifierVerdict": null,
+  "verifierCritique": "",
   "secauditDone": false,
   "secauditVerdict": null
 }
