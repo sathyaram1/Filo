@@ -1535,12 +1535,20 @@
     // calcola subito l'ancora (il range può invalidarsi mentre l'overlay è aperto)
     const range = sel.getRangeAt(0);
     const offsets = pmOffsets(range);
+    // Il testo dell'ancora vive nello spazio del "testo puro" del documento:
+    // Selection.toString() inserisce interruzioni di riga tra i blocchi, ma il
+    // testo puro (concatenazione dei nodi testo) non ne contiene mai — senza
+    // questa normalizzazione una selezione multi-paragrafo non matcherebbe mai
+    // (commento orfano fin dalla creazione).
+    const anchorText = offsets
+      ? commentDocText().slice(offsets.from, offsets.to)
+      : selectedText.replace(/\r?\n/g, '');
     const id = newId('comment');
     $('cmCancel').addEventListener('click', closeOverlay);
     $('cmSave').addEventListener('click', () => {
       const text = $('cmText').value.trim();
       if (!text) { closeOverlay(); return; }
-      const anchor = { from: offsets ? offsets.from : -1, to: offsets ? offsets.to : -1, text: selectedText };
+      const anchor = { from: offsets ? offsets.from : -1, to: offsets ? offsets.to : -1, text: anchorText };
       const c = { id, text, anchor, created: new Date().toISOString(), resolved: false };
       doc.comments.push(c);
       // Stesso cammino del re-ancoraggio al reload: evidenzia anche selezioni
