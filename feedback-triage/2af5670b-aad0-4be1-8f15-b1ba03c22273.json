@@ -1,7 +1,0 @@
-{
-  "id": "2af5670b-aad0-4be1-8f15-b1ba03c22273",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica non tocca nulla di sensibile (solo aspetto della pagina, changelog e un test automatico) ed è coerente col problema segnalato. La correzione è stata pubblicata: ora una parola molto lunga aggiunta al dizionario personale va a capo nella sua riga invece di allargare la pagina, e il pulsante Rimuovi resta sempre visibile e funzionante. La disponibilità arriverà con il prossimo aggiornamento dell'app.",
-  "queuedAt": "2026-07-17T12:32:45.604Z",
-  "queuedBy": "routine"
-}
