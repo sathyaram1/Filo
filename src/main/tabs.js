@@ -1442,7 +1442,7 @@ class TabManager {
       // che il content script lo ricalcoli per il nuovo sito.
       const cachedIdentity = this._identityColorCache.get(hostOf(url)) || null;
       update({
-        url,
+        url: userUrl(url),
         color: null,
         identityColor: cachedIdentity,
         canBack: canGoBack(wc),
