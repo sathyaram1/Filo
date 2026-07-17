@@ -1,0 +1,7 @@
+{
+  "id": "adb4b415-b197-4c7c-8fa2-98df897eede9",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la modifica è stata pubblicata. Ho esaminato tutto il lavoro riga per riga prima di dare il via libera. La nuova pagina che compare quando un sito non si carica (o una scheda si blocca) è costruita in modo sicuro: il tasto \"Riprova\" può riportare solo verso normali indirizzi web (tentativi di infilarci comandi o file locali vengono scartati), i testi mostrati non possono essere usati per iniettare codice nella pagina, e c'è una protezione che evita cicli infiniti di ricaricamento se anche la pagina d'errore avesse problemi. Ci sono test dedicati proprio su questi punti. Un'osservazione non bloccante che lascio agli atti: un sito malintenzionato potrebbe aprire da solo la pagina d'errore facendo comparire in barra l'indirizzo di un altro sito; il contenuto della pagina resta però quello fisso di Filo (solo una piccola riga di dettaglio tecnico è influenzabile, come puro testo) e \"Riprova\" porta comunque al sito vero, quindi il rischio è basso — ma in futuro si potrebbe irrobustire mostrando l'indirizzo del sito fallito solo quando è Filo stesso ad aver aperto la pagina d'errore.",
+  "queuedAt": "2026-07-17T06:11:05.939Z",
+  "queuedBy": "routine"
+}
