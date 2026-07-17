@@ -1,7 +1,0 @@
-{
-  "id": "083aae32-0a0a-43e6-a9c1-c3394f7c8015",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato e modifica pubblicata. Il fix fa sì che nella pagina \"Aperti per dopo\" il link \"← Tutte le categorie\" resti nascosto quando la categorizzazione automatica è disattivata, e ricompaia solo quando serve davvero (cioè quando stai guardando dentro una categoria). Alla revisione non è emerso nulla di sospetto: la modifica riguarda solo l'aspetto della pagina, la voce del recap aggiornamento e il test che tiene d'occhio il comportamento del link, incluso il caso in cui deve tornare visibile.",
-  "queuedAt": "2026-07-17T12:21:39.656Z",
-  "queuedBy": "routine"
-}
