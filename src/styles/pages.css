@@ -473,6 +473,7 @@ html, body {
 }
 .sn-spell-row input[type="text"] {
   width: 100%;
+  min-width: 0;
 }
 .sn-spell-arrow {
   color: var(--sn-muted);
@@ -483,6 +484,13 @@ html, body {
 .sn-spell-word {
   font-size: 13px;
   padding: 6px 4px;
+  /* Token lunghi senza spazi (indirizzi, codici) devono andare a capo dentro
+     la cella della griglia invece di sforare e spingere "Rimuovi" fuori dal
+     viewport (feedback #214). min-width:0 permette alla cella 1fr di
+     restringersi sotto la min-content del contenuto. */
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .sn-spell-add-row {
   display: grid;

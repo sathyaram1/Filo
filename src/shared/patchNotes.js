@@ -20,6 +20,7 @@
       features: [],
       fixes: [
         'Nella pagina "Aperti per dopo" il link "← Tutte le categorie" non compare più quando la categorizzazione automatica è disattivata: si vede solo quando stai guardando dentro una categoria e serve davvero per tornare indietro.',
+        'Nella gestione del correttore, una parola molto lunga senza spazi aggiunta al dizionario personale non allarga più la pagina: ora va a capo dentro la sua riga e il pulsante "Rimuovi" resta sempre visibile e cliccabile.',
       ],
     },
     {
