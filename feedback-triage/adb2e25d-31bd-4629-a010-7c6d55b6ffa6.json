@@ -1,0 +1,7 @@
+{
+  "id": "adb2e25d-31bd-4629-a010-7c6d55b6ffa6",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato e modifica pubblicata. Ho esaminato tutta la modifica riga per riga: riguarda solo i messaggi che le pagine mostrano quando una ricerca non trova nulla (ora dicono chiaramente \"Nessun risultato\" invece del messaggio di archivio vuoto, con un test automatico che copre archivio, cronologia e pagine salvate). Nessun dato inserito senza protezioni, nessun file di configurazione o di sicurezza toccato, nessuna incoerenza rispetto allo scopo del fix. Il controllo automatico finale sui file sensibili è anch'esso passato e la modifica è stata fusa nella versione principale dell'app: sarà inclusa nel prossimo aggiornamento.",
+  "queuedAt": "2026-07-17T19:36:49.617Z",
+  "queuedBy": "routine"
+}
