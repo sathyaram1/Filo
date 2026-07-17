@@ -131,3 +131,22 @@ test('la cache carte evita richieste ripetute; la symbology si scarica una volta
   expect(sym2).toBe('https://svgs.test/R.svg');
   expect(card.priceEur).toBe(3.21);
 });
+
+test('ogni richiesta Scryfall porta uno User-Agent identificativo (Filo/<versione>)', async ({ app }) => {
+  await mockScryfall(app);
+
+  const headers = await app.evaluate(async () => {
+    const Scry = globalThis.SN_SCRYFALL;
+    await Scry.card('niv-1');
+    await Scry.search('t:dragon');
+    return globalThis.__scryHeaders;
+  });
+
+  // Scryfall risponde 400 `generic_user_agent` alle richieste con la UA di
+  // default della libreria HTTP: senza header identificativo l'app è cieca
+  // sul database carte (ricerca in chat, hover, commander…).
+  expect(headers.length).toBeGreaterThan(0);
+  for (const h of headers) {
+    expect(h['User-Agent']).toMatch(/^Filo\/\d+\.\d+\.\d+ \(.+\)$/);
+  }
+});
