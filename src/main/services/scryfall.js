@@ -23,6 +23,15 @@
   const MIN_GAP_MS = 110;               // ~9 req/s, sotto il tetto di cortesia
   const PRICE_TTL_MS = 6 * 60 * 60 * 1000; // prezzi: stantii dopo 6 ore
 
+  // User-Agent identificativo, OBBLIGATORIO: l'API Scryfall risponde
+  // 400 `generic_user_agent` alle richieste con la UA di default della
+  // libreria HTTP (il fetch di Node/Electron nel main) — senza questo header
+  // OGNI chiamata fallisce in produzione (ricerca in chat, hover sui nomi…).
+  let USER_AGENT = 'Filo/0.0.0 (https://singolarita.com)';
+  try {
+    USER_AGENT = `Filo/${require('../../../package.json').version} (https://singolarita.com)`;
+  } catch (_) { /* fallback senza versione */ }
+
   // Fetch sostituibile nei TEST (niente rete): SN_SCRYFALL._setFetch(fake).
   let _fetch = (...args) => fetch(...args);
   function _setFetch(fn) { _fetch = fn || ((...args) => fetch(...args)); }
