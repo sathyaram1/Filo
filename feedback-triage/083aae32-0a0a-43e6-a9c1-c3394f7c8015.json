@@ -1,7 +1,0 @@
-{
-  "id": "083aae32-0a0a-43e6-a9c1-c3394f7c8015",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho rifatto da zero i passi dell'utente sull'app reale: con la categorizzazione automatica disattivata (com'è di default) il link '← Tutte le categorie' in 'Aperti per dopo' non compare più, né a pagina vuota né con schede salvate — non è solo 'marcato nascosto', è proprio invisibile e non occupa spazio: la barra di ricerca risale subito sotto il titolo. Controprova: rimettendo temporaneamente il difetto il mio test torna rosso, quindi la verifica morde davvero. Ho poi provato a romperla: attivando la categorizzazione il link resta nascosto nella vista a riquadri, compare solo entrando in una categoria (con il nome giusto, es. '← Da vedere'), un doppio clic rapido su di esso riporta ai riquadri senza glitch, e rispegnendo la categorizzazione sparisce di nuovo. Verificato anche che il link 'indietro' della pagina del correttore, che condivide lo stesso stile, resta visibile e intatto. Screenshot ispezionati a occhio: layout pulito in tutti gli stati. I 978 unit test passano tutti.",
-  "queuedAt": "2026-07-17T12:20:07.229Z",
-  "queuedBy": "routine"
-}
