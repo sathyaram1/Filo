@@ -97,6 +97,8 @@
     tiles.sort((a, b) => (b.recency || '').localeCompare(a.recency || ''));
 
     if (!tiles.length) {
+      // Reset del testo: potremmo arrivare qui dopo un "nessun risultato".
+      $('empty').textContent = I18n.t('home_empty');
       $('empty').hidden = false;
       return;
     }
