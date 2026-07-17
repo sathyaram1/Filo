@@ -140,7 +140,7 @@
     },
     {
       id: 'editor', title: 'Editor di testo', category: 'writing',
-      desc: 'Un editor per scrivere e impaginare testo con moduli a blocchi; il contenuto viene salvato da solo.',
+      desc: 'Un editor per scrivere e impaginare testo con moduli a blocchi; il contenuto viene salvato da solo. Nella pagina "Revisione" puoi attaccare commenti a frasi selezionate: il testo commentato resta evidenziato anche dopo aver chiuso e riaperto il documento, e cliccandolo riapri il commento.',
       invoke: 'Menu del tasto destro → "Editor", oppure filo://editor/editor.html.',
     },
     {
