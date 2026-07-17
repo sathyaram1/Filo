@@ -146,6 +146,8 @@ test.describe('commenti: evidenziazione persistente', () => {
     await page.reload();
     await page.waitForSelector('#doc .ed-commented', { timeout: 8_000 });
     expect(await highlightTexts(page)).toEqual(['frase da commentare']);
+    // Traccia visiva della run (cartella gitignorata).
+    await page.screenshot({ path: 'tests/.shots/editor-comment-after-reload.png' }).catch(() => {});
 
     // Cliccando l'evidenziazione ri-applicata si apre la lista commenti.
     await page.click('#doc .ed-commented');
