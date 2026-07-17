@@ -195,9 +195,11 @@ test('stress: mention singola, nome irrisolvibile, doppio click rapido, testo lu
   await spans.nth(1).click();
   await expect(page.locator('#stateCarousel')).toBeVisible();
   await expect(page.locator('#carouselImg')).toHaveAttribute('src', 'https://cards.test/bolt.jpg', { timeout: 10_000 });
+  // Le risoluzioni dei nomi partono in background: l'indicatore deve
+  // CONVERGERE a "su 2" (le due carte risolvibili; l'irrisolvibile esclusa)
+  // anche se il click è arrivato prima della fine delle risoluzioni.
   const pos = await page.locator('#carouselPos').textContent();
-  // Non impongo COME viene contata la carta irrisolvibile, ma le due risolte
-  // devono esserci entrambe: dalla prima si arriva alla seconda con la freccia.
+  await expect(page.locator('#carouselPos')).toHaveText(/\/2$/, { timeout: 10_000 });
   await page.click('#carouselNext');
   await expect(page.locator('#carouselImg')).toHaveAttribute('src', 'https://cards.test/dragon.jpg');
 

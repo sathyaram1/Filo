@@ -121,3 +121,46 @@ test('B: nessun irrisolvibile, doppio click rapido', async ({ app, openTab }) =>
   console.log('POS-B dopo next:', await page.locator('#carouselPos').textContent(), 'src:', src);
   expect(src).toBe('https://cards.test/dragon.jpg');
 });
+
+test('C: testo lungo 10k + irrisolvibile, doppio click rapido', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  const filler = 'parole '.repeat(1500);
+  const { page, bubble } = await setup(app, openTab,
+    `${filler} Considera [[Carta Inesistente Xyz]], poi [[Lightning Bolt]] e [[Shivan Dragon]].`);
+  const spans = bubble.locator('.dk-prose-card');
+  await expect(spans).toHaveCount(3);
+
+  await spans.nth(1).click();
+  await spans.nth(1).click();
+  await expect(page.locator('#stateCarousel')).toBeVisible();
+  await expect(page.locator('#carouselImg')).toHaveAttribute('src', 'https://cards.test/bolt.jpg', { timeout: 10_000 });
+  await page.waitForTimeout(2000);
+  const pos = await page.locator('#carouselPos').textContent();
+  console.log('POS-C dopo doppio click:', pos);
+  await page.click('#carouselNext');
+  await page.waitForTimeout(500);
+  const src = await page.locator('#carouselImg').getAttribute('src');
+  console.log('POS-C dopo next:', await page.locator('#carouselPos').textContent(), 'src:', src);
+  expect(src).toBe('https://cards.test/dragon.jpg');
+});
+
+test('D: testo lungo 10k + irrisolvibile, click singolo', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  const filler = 'parole '.repeat(1500);
+  const { page, bubble } = await setup(app, openTab,
+    `${filler} Considera [[Carta Inesistente Xyz]], poi [[Lightning Bolt]] e [[Shivan Dragon]].`);
+  const spans = bubble.locator('.dk-prose-card');
+  await expect(spans).toHaveCount(3);
+
+  await spans.nth(1).click();
+  await expect(page.locator('#stateCarousel')).toBeVisible();
+  await expect(page.locator('#carouselImg')).toHaveAttribute('src', 'https://cards.test/bolt.jpg', { timeout: 10_000 });
+  await page.waitForTimeout(2000);
+  const pos = await page.locator('#carouselPos').textContent();
+  console.log('POS-D dopo click singolo:', pos);
+  await page.click('#carouselNext');
+  await page.waitForTimeout(500);
+  const src = await page.locator('#carouselImg').getAttribute('src');
+  console.log('POS-D dopo next:', await page.locator('#carouselPos').textContent(), 'src:', src);
+  expect(src).toBe('https://cards.test/dragon.jpg');
+});
