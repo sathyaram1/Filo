@@ -86,6 +86,12 @@
       invoke: 'Menu del tasto destro → "Schermo intero" / "Esci da schermo intero".',
     },
     {
+      id: 'network-error-page', title: 'Pagina d’errore quando un sito non si carica', category: 'navigation',
+      desc: 'Se un sito non è raggiungibile (indirizzo sbagliato, server spento, sei offline) o una scheda si blocca, compare una pagina che spiega il problema in italiano con un tasto "Riprova". Se eri offline, riprova da sola appena torni in rete.',
+      invoke: 'Automatico quando un caricamento fallisce; "Riprova" sulla pagina o "Ricarica" dal menu ritentano il sito.',
+      doesNot: 'Non aggira i blocchi di sicurezza: i siti segnalati come pericolosi restano gestiti dagli avvisi dedicati.',
+    },
+    {
       id: 'auto-archive', title: 'Archiviazione automatica delle schede', category: 'navigation',
       desc: 'Le schede lasciate inattive a lungo vengono archiviate da sole, per tenere pulita la barra.',
       invoke: 'Automatico; soglia e attivazione si regolano in Preferenze.',

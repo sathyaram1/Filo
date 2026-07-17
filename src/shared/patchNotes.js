@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.140', date: '2026-07-17',
+      features: [],
+      fixes: [
+        'Quando un sito non si carica (indirizzo con un refuso, server spento, connessione assente) la scheda non resta più completamente bianca: ora compare una pagina che spiega cosa è andato storto in italiano, mostra il sito che hai cercato di aprire e offre un tasto "Riprova". Se eri offline, la pagina si ricarica da sola appena torni in rete. Anche "Ricarica" dal menu della scheda ritenta il sito. Lo stesso vale se una scheda si blocca all\'improvviso: invece del bianco compare la spiegazione con il tasto per ricaricarla.',
+      ],
+    },
+    {
       version: '0.2.139', date: '2026-07-16',
       features: [],
       fixes: [

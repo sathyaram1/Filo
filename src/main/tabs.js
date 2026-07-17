@@ -1102,7 +1102,10 @@ class TabManager {
   // NOTA: la cronologia avanti/indietro è per-WebContents, quindi attraversare
   // un confine di sito in privacy riparte con cronologia pulita (è il prezzo
   // dell'isolamento per-sito; resta intatta entro lo stesso sito).
-  _recreateView(tab, url) {
+  // `opts.loadUrl` (#327): URL da caricare al posto di `url` — la view resta
+  // configurata (preload/partition/isInternal) per `url`. Usato dal recupero
+  // crash per mostrare la pagina d'errore in una view pronta a ritentare il sito.
+  _recreateView(tab, url, opts = {}) {
     const wasActive = tab.id === this.activeId;
     const partition = this._partitionForTab(tab, url);
     try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
@@ -1124,7 +1127,7 @@ class TabManager {
     // appena creata avrebbe altrimenti bounds di default e potrebbe disegnarsi
     // sopra la scheda attiva.
     this.layout();
-    view.webContents.loadURL(url);
+    view.webContents.loadURL(opts.loadUrl || url);
     // Visibilità coerente con lo stato attivo: solo la scheda attiva è visibile,
     // le altre (inclusa la view appena ricreata se non attiva) restano nascoste.
     for (const t of this.tabs) t.view.setVisible?.(t.id === this.activeId);
@@ -1154,6 +1157,17 @@ class TabManager {
   reload(id) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
+    // #327 — parità di cammini: ricaricare una scheda che mostra la pagina
+    // d'errore deve RITENTARE il sito fallito (come il bottone "Riprova"),
+    // non ricaricare la pagina d'errore stessa.
+    const NE = globalThis.SN_NET_ERROR;
+    let current = '';
+    try { current = tab.view.webContents.getURL() || ''; } catch (_) {}
+    const target = NE && NE.targetOf(current);
+    if (target) {
+      try { tab.view.webContents.loadURL(target); } catch (_) {}
+      return;
+    }
     tab.view.webContents.reload();
   }
 
@@ -1304,13 +1318,58 @@ class TabManager {
         const src = source ? ` (${source}:${line})` : '';
         console.log(`[tab:${tab.id.slice(0, 6)}:${tag}] ${message}${src}`);
       });
-      wc.on('render-process-gone', (_e, details) => {
-        console.error(`[tab:${tab.id.slice(0, 6)}] render-process-gone`, details);
-      });
-      wc.on('did-fail-load', (_e, code, desc, url) => {
-        console.error(`[tab:${tab.id.slice(0, 6)}] did-fail-load`, code, desc, url);
-      });
     }
+    // #327 — navigazione fallita (dominio inesistente, server giù, offline):
+    // senza gestione il frame resta su chrome-error://chromewebdata/ con body
+    // vuoto → scheda completamente bianca e muta. Simmetria con gli errori di
+    // certificato (che hanno già il loro percorso, mapCertError → safebrowse):
+    // qui carichiamo la pagina d'errore interna con motivo tradotto e "Riprova".
+    // -3 (ERR_ABORTED: stop utente, redirect, nostre _recreateView) si ignora.
+    wc.on('did-fail-load', (_e, code, desc, failedUrl, isMainFrame) => {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error(`[tab:${tab.id.slice(0, 6)}] did-fail-load`, code, desc, failedUrl);
+      }
+      const NE = globalThis.SN_NET_ERROR;
+      if (!NE) return;
+      const failed = failedUrl || tab.url || '';
+      if (!NE.shouldShowErrorPage({ code, failedUrl: failed, isMainFrame })) return;
+      // Per l'utente la scheda resta "sul" sito fallito (titolo/sessione/riprova):
+      // la pagina d'errore è solo la faccia del fallimento, come negli altri browser.
+      tab.url = failed;
+      try {
+        if (!wc.isDestroyed()) wc.loadURL(NE.buildUrl(failed, code, desc));
+      } catch (_) {}
+    });
+    // #327 — renderer morto (crash/oom): stessa scheda bianca, stessa cura.
+    // loadURL su un webContents col renderer morto ne rilancia uno nuovo.
+    wc.on('render-process-gone', (_e, details) => {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error(`[tab:${tab.id.slice(0, 6)}] render-process-gone`, details);
+      }
+      const NE = globalThis.SN_NET_ERROR;
+      const reason = (details && details.reason) || '';
+      // clean-exit = chiusura ordinata (nostre close/_recreateView): non è un crash.
+      if (!NE || reason === 'clean-exit') return;
+      const current = tab.url || '';
+      if (!NE.isRetriableTarget(current) || NE.isErrorPageUrl(current)) return;
+      // Anti-loop: se il renderer muore di nuovo mentre stiamo già recuperando
+      // (o il recupero stesso crasha), non insistere a raffica.
+      const now = Date.now();
+      if (tab._crashRecoveryAt && now - tab._crashRecoveryAt < 2000) return;
+      tab._crashRecoveryAt = now;
+      // RICREA la view invece di riusare il webContents crashato: un loadURL
+      // sul processo appena morto fa crashare anche il renderer respawnato
+      // quando c'è un preload (verificato con forcefullyCrashRenderer: loop di
+      // 'render-process-gone' finché non si passa a una view nuova). La view
+      // nuova è configurata per l'URL BERSAGLIO (preload/partition giusti per
+      // il "Riprova") ma parte dalla pagina d'errore.
+      setTimeout(() => {
+        try {
+          if (!this.tabs.some((t) => t.id === tab.id)) return; // scheda chiusa nel frattempo
+          this._recreateView(tab, current, { loadUrl: NE.buildUrl(current, NE.CRASH_CODE, reason) });
+        } catch (_) {}
+      }, 300);
+    });
     // Colore selezione testo coerente con Filo sui siti esterni. insertCSS
     // ignora la CSP della pagina (che invece blocca il <link filo://> del
     // content script). Reiniettiamo a ogni dom-ready perché lo stylesheet
@@ -1374,11 +1433,19 @@ class TabManager {
       setTimeout(() => this._geoTextCheck(tab), 2000);
     });
 
+    // #327 — URL "per l'utente" della scheda: se il webContents mostra la
+    // pagina d'errore interna, la scheda per l'utente è ancora sull'URL fallito
+    // (titolo, sessione salvata, ricarica = riprova) — come negli altri browser.
+    const userUrl = (raw) => {
+      const NE = globalThis.SN_NET_ERROR;
+      const target = NE && NE.targetOf(raw);
+      return target || raw;
+    };
     wc.on('did-start-loading', () => update({ loading: true }));
     wc.on('did-stop-loading', () => {
       update({
         loading: false,
-        url: wc.getURL(),
+        url: userUrl(wc.getURL()),
         canBack: canGoBack(wc),
         canFwd: canGoFwd(wc),
       });
@@ -1403,7 +1470,7 @@ class TabManager {
       // che il content script lo ricalcoli per il nuovo sito.
       const cachedIdentity = this._identityColorCache.get(hostOf(url)) || null;
       update({
-        url,
+        url: userUrl(url),
         color: null,
         identityColor: cachedIdentity,
         canBack: canGoBack(wc),
@@ -1430,7 +1497,7 @@ class TabManager {
         }
       }
     });
-    wc.on('did-navigate-in-page', (_e, url) => update({ url, canBack: canGoBack(wc), canFwd: canGoFwd(wc) }));
+    wc.on('did-navigate-in-page', (_e, url) => update({ url: userUrl(url), canBack: canGoBack(wc), canFwd: canGoFwd(wc) }));
     // Redirect main-frame verso URL "di blocco" (/geo, /not-available,
     // /region-block, … — lista curata in geoBlock.js): il match viene
     // memorizzato e diventa segnale al did-navigate dell'URL finale.
