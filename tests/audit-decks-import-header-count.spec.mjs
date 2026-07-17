@@ -91,6 +91,6 @@ test('import: intestazioni con conteggio (Archidekt) → commander e maybeboard 
   // 1+2) Solo le 2 carte del mazzo vero (Sol Ring + Arcane Signet): il
   // comandante è a parte e il maybeboard è saltato — anche la carta dopo la
   // riga vuota dentro il Maybeboard.
-  await expect(page.locator('.dk-io-note').first()).toContainText('2 carte riconosciute su 2');
+  await expect(page.locator('.dk-io-box')).toContainText('2 carte riconosciute su 2');
   await expect(page.locator('.dk-io-box')).not.toContainText('Some Maybe Card');
 });
