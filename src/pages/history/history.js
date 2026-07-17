@@ -48,7 +48,14 @@
     }
 
     if (!filtered.length) {
-      $('empty').hidden = false;
+      // Distingui "cronologia realmente vuota" da "nessun risultato per la
+      // ricerca/filtro": mostrare il testo di vuoto assoluto durante una
+      // ricerca fa credere che la cronologia sia stata cancellata.
+      const empty = $('empty');
+      if (items.length && q) empty.textContent = I18n.t('history_no_results');
+      else if (items.length && filter) empty.textContent = I18n.t('history_no_results_filter');
+      else empty.textContent = I18n.t('history_empty');
+      empty.hidden = false;
       return;
     }
     $('empty').hidden = true;
