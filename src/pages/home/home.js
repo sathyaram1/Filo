@@ -156,6 +156,11 @@
       : pages;
 
     if (!filtered.length) {
+      // "Nessun risultato" solo se il vuoto dipende dalla ricerca: il testo di
+      // vuoto assoluto durante un filtro sembra una lista cancellata.
+      $('empty').textContent = q && pages.length
+        ? I18n.t('home_no_results')
+        : I18n.t('home_empty');
       $('empty').hidden = false;
       return;
     }
