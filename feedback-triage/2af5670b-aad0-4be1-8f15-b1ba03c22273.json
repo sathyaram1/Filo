@@ -1,0 +1,8 @@
+{
+  "id": "2af5670b-aad0-4be1-8f15-b1ba03c22273",
+  "status": "revision_capability",
+  "notes": "Sistemato il problema del dizionario personale del correttore: una parola molto lunga e senza spazi (un indirizzo, un codice) non allarga più la pagina oltre il bordo. Ora la parola va a capo dentro la sua riga, occupando più righe se serve, e il pulsante Rimuovi resta sempre visibile e cliccabile — quindi qualsiasi parola aggiunta si può sempre togliere.\n\nDecisione presa: ho scelto di mandare la parola a capo invece di troncarla con i puntini. Con i puntini due codici lunghi simili sarebbero indistinguibili e non sapresti quale stai rimuovendo; a capo vedi sempre la parola intera. Il compromesso è che la riga diventa più alta per parole estreme, che mi sembra il male minore.\n\nOltre il chiesto: ho applicato la stessa protezione preventiva anche ai campi delle correzioni automatiche (parola e correzione), così un testo lunghissimo lì non può spingere i bottoni fuori dallo schermo — era la stessa mancanza segnalata come probabile nella parte tecnica del feedback. Aggiunta anche la voce nel recap aggiornamenti.\n\nVerifica: test automatico che aggiunge al dizionario una parola di quasi 200 caratteri e controlla tre cose — la pagina non ha scroll orizzontale, il pulsante Rimuovi sta dentro lo schermo, e cliccandolo la parola viene davvero rimossa dal dizionario. Ho controllato che senza la correzione il test fallisce (quindi misura davvero il bug) e con la correzione passa. Ho anche ispezionato uno screenshot reale della finestra con una parola lunga aggiunta: la riga la contiene e Rimuovi è al suo posto.",
+  "queuedAt": "2026-07-17T12:26:38.331Z",
+  "queuedBy": "routine",
+  "branch": "worker/2af5670b-aad0-4be1-8f15-b1ba03c22273"
+}
