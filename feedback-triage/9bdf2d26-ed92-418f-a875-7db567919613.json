@@ -1,7 +1,0 @@
-{
-  "id": "9bdf2d26-ed92-418f-a875-7db567919613",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica è stata pubblicata. Ho esaminato tutto il cambiamento riga per riga: è un intervento circoscritto (la cattura della pagina ora aspetta che il menu del tasto destro sia davvero sparito dallo schermo prima di scattare la foto, così miniature, screenshot e ritagli escono puliti), con un test automatico che verifica il risultato e la voce di changelog per gli utenti. Nessun accesso a dati sensibili, nessuna modifica a permessi, regole o script di sistema, nessun segreto in chiaro. Durante la lavorazione è stato anche segnalato in coda un possibile problema correlato (il salvataggio che si perde se la pagina cambia subito dopo il click), che verrà trattato come feedback separato.",
-  "queuedAt": "2026-07-17T00:08:38.075Z",
-  "queuedBy": "routine"
-}
