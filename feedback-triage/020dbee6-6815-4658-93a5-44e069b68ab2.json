@@ -1,0 +1,7 @@
+{
+  "id": "020dbee6-6815-4658-93a5-44e069b68ab2",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho riprodotto esattamente i passi della segnalazione su una scheda nuova: scrivendo '/set timer 5:' e '/set timer :30' non parte più nessun timer, e Filo risponde con l'uso corretto (stesso comportamento già previsto per 'abc'). Ho poi provato a rompere il comando con una dozzina di durate limite — '5: 30' con lo spazio, ':' da solo, '1:2:3', secondi negativi, decimali ('5.5' e '5,5'), '-5', parti miste tipo '05:6a', durata vuota — e in tutti i casi: zero timer creati, risposta d'aiuto puntuale. Controprova: ho eseguito gli stessi test sul codice precedente al fix e lì fallivano (il timer partiva davvero), quindi la correzione cambia il comportamento in modo reale, non cosmetico. Le durate valide restano intatte: '/set timer 1', '/set timer 5:00' e anche '/set timer 0:30' (zero minuti espliciti) creano il timer col conto alla rovescia giusto. Due invii rapidi consecutivi di durate malformate non producono timer fantasma. Siccome il messaggio d'aiuto riecheggia la durata scritta dall'utente, ho verificato anche che inserire HTML/script nella durata non venga eseguito: compare come testo letterale, nessuna iniezione. Infine ho rilanciato l'intera suite dei comandi della barra (14 test, tutti verdi), gli unit test (978 verdi) e ispezionato uno screenshot della risposta d'aiuto: layout e tema regolari.",
+  "queuedAt": "2026-07-17T12:43:03.727Z",
+  "queuedBy": "routine"
+}
