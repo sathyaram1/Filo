@@ -1343,6 +1343,47 @@
     openCarousel(ids, ids.indexOf(row.dataset.cardId));
   }
 
+  // Carosello dal testo libero (#343): il click su un nome in prosa naviga
+  // TUTTE le carte citate nella stessa bolla (parità con le CardList), non
+  // solo quella cliccata. Apre subito sulla carta cliccata (risolvendola se
+  // il click è arrivato prima dell'hover — prima non succedeva nulla) e
+  // completa la lista appena gli altri nomi sono risolti.
+  async function openCarouselFromProse(span) {
+    const bubble = span.closest('.dk-msg');
+    const spans = bubble ? [...bubble.querySelectorAll('.dk-prose-card')] : [span];
+    const clickedId = await resolveProseCard(span).catch(() => null);
+    if (!clickedId) return;
+    openCarousel([clickedId], 0);
+    const mine = carousel;
+    await Promise.all(spans.map((s) => resolveProseCard(s).catch(() => null)));
+    // Nel frattempo il carosello può essere stato chiuso o riaperto altrove.
+    if (carousel !== mine) return;
+    const ids = [];
+    for (const s of spans) {
+      const id = s.dataset.cardId;
+      if (id && !ids.includes(id)) ids.push(id);
+    }
+    if (ids.length <= mine.ids.length) return;
+    carousel = { ids, i: Math.max(0, ids.indexOf(mine.ids[mine.i])) };
+    renderCarousel();
+  }
+
+  // Evidenzia ovunque (nomi in prosa e righe carta) la carta ATTUALMENTE
+  // mostrata nel carosello (#343): il nome nel testo perde la sottolineatura
+  // e prende un fondo d'accento, così si vede a colpo d'occhio dove sei.
+  // Chiamata a ogni cambio del carosello E a ogni rerender di chat/mazzo
+  // (che rigenerano il DOM e perderebbero la classe).
+  function syncCarouselHighlight() {
+    const activeId = (detailState === 'carousel' && carousel)
+      ? carousel.ids[carousel.i] : '';
+    for (const el of document.querySelectorAll('.dk-carousel-current')) {
+      if (!activeId || el.dataset.cardId !== activeId) el.classList.remove('dk-carousel-current');
+    }
+    if (!activeId) return;
+    const sel = `.dk-prose-card[data-card-id="${CSS.escape(activeId)}"], .dk-row[data-card-id="${CSS.escape(activeId)}"]`;
+    for (const el of document.querySelectorAll(sel)) el.classList.add('dk-carousel-current');
+  }
+
   function wireDetailPanel() {
     // Hover unificato (§5.1), in delega sul documento: un mouseover su una
     // riga carta apre/aggiorna; su qualsiasi altra cosa fa partire il linger.
