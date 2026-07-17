@@ -1,0 +1,7 @@
+{
+  "id": "7ikJE6f7kJc4BTayo3oy",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la modifica è stata pubblicata. Nel deck builder, cliccando un nome di carta citato nel testo di una risposta il carosello ora sfoglia tutte le carte nominate in quel messaggio (come già faceva per gli elenchi di risultati), e il click funziona anche senza passare prima il mouse sul nome. In più, la carta attualmente mostrata nel carosello è evidenziata ovunque appaia: nel testo, nei risultati e nell'elenco del mazzo. Ho verificato che la modifica non introduce rischi (i nomi delle carte, anche quando arrivano dalle risposte del modello, vengono sempre mostrati in modo sicuro) e non tocca nulla al di fuori della funzionalità richiesta.",
+  "queuedAt": "2026-07-17T20:05:33.078Z",
+  "queuedBy": "routine"
+}
