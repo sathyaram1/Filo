@@ -123,7 +123,7 @@
     }
 
     if (!filtered.length) {
-      $('empty').hidden = false;
+      showEmpty();
       return;
     }
     $('empty').hidden = true;
