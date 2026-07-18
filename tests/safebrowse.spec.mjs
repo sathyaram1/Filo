@@ -232,8 +232,7 @@ test('interstitial "pericoloso": "Torna indietro" su scheda nuova NON conferma i
   // pericoloso si ripresentasse, l'avviso ricomparirebbe. Prima del fix qui il
   // dominio era presente (stesso effetto di "Procedi comunque").
   const bypassed = await app.evaluate(
-    ({ id, dom }) => {
-      const { BrowserWindow } = require('electron');
+    ({ BrowserWindow }, { id, dom }) => {
       for (const w of BrowserWindow.getAllWindows()) {
         if (!w._filoTabs) continue;
         const t = w._filoTabs.tabs.find((x) => x.id === id);
