@@ -163,8 +163,13 @@
 
     const doProceed = () => { send({ type: T_PROCEED, url }); clear(); };
     proceed.addEventListener('click', doProceed);
+    // "Torna indietro" = RIFIUTO: non deve MAI confermare il sito. Se c'è una
+    // pagina precedente ci si torna; altrimenti (scheda nuova, history.length===1)
+    // si esce e basta verso about:blank, SENZA registrare alcun bypass — inviare
+    // T_PROCEED qui equivarrebbe a "Procedi comunque" e marcherebbe il dominio
+    // come confermato per tutta la vita della scheda.
     back.addEventListener('click', () => {
-      try { if (history.length > 1) history.back(); else send({ type: T_PROCEED, url }, () => location.replace('about:blank')); }
+      try { if (history.length > 1) history.back(); else location.replace('about:blank'); }
       catch (_) {}
     });
 
