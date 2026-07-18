@@ -510,7 +510,7 @@
       // Se il vuoto dipende dalla ricerca (e non dal tab davvero vuoto),
       // dillo: il testo "Nessun feedback…" sembrerebbe un tab svuotato.
       const q = (searchEl.value || '').trim();
-      if (false && q && all.some((f) => statusOf(f) === currentTab)) {
+      if (q && all.some((f) => statusOf(f) === currentTab)) {
         emptyEl.textContent = `Nessun risultato per "${q}".`;
         return;
       }
