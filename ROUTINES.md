@@ -94,6 +94,22 @@ Ripeti finché il budget è quasi pieno:
      (`node scripts/claim-feedback.mjs release <id>` e/o
      `node scripts/dispatch.mjs --clear-state <id>`), stato del branch coerente col
      vero verdetto raggiunto.
+   - **REGOLA DURA — un `session limit` CHIUDE il run, niente ripresa.** Appena un
+     worker (o l'orchestratore stesso) viene tagliato da un `session limit`, quel
+     run è **finito**: bonifica e **termina**. **NON** rispawnare, **NON** riprendere
+     il loop, nemmeno se:
+     - l'orchestratore viene **risvegliato** (`"Continua da dove eri rimasto"`, chat
+       riaperta dall'owner, resume automatico) — un resume dopo un taglio è solo per
+       bonificare e chiudere, mai per ripartire;
+     - `ccusage` mostra un **blocco attivo fresco / `costUSD` basso** — l'apparente
+       "finestra azzerata" è ingannevole: il limite del piano si è appena esaurito e
+       riprendere **brucia la finestra della sessione SUCCESSIVA** (le routine girano
+       ogni 6h: il prossimo giro schedulato raccoglie da solo il lavoro rimasto).
+     Il segnale che conta è **l'evento di taglio**, non ciò che `ccusage` riporta
+     dopo. Incident 2026-07-18: dopo un taglio, l'orchestratore è stato risvegliato,
+     ha visto `costUSD ≈ $1` in un blocco fresco e ha rilanciato 4 worker — esattamente
+     ciò da NON fare. Se hai il minimo dubbio che ci sia stato un taglio in questa
+     sessione: **non spawnare**, bonifica e chiudi.
 
    **Calibrazione osservata (sessione 2026-07-02, 5 giri prober):**
    - `ccusage` **gira** in cloud e riporta `costUSD` correttamente.
