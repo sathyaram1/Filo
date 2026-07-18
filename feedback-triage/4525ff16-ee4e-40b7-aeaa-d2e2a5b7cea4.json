@@ -1,7 +1,0 @@
-{
-  "id": "4525ff16-ee4e-40b7-aeaa-d2e2a5b7cea4",
-  "status": "done",
-  "notes": "Questa segnalazione riguardava un test automatico che falliva sempre e faceva risultare 'rossa' la verifica completa, senza essere un problema di sicurezza vero (le chiavi restano cifrate correttamente): il test partiva troppo presto, mentre l'app era ancora in fase di avvio, e per questo si interrompeva prima ancora di controllare la cifratura.\n\nVerificando oggi, ho trovato che la correzione suggerita era GIA' stata applicata in un intervento del 17 luglio: ora il test aspetta che l'app abbia finito l'avvio prima di iniziare i controlli, esattamente come gli altri test dello stesso gruppo. Quindi non c'era nuovo codice da scrivere.\n\nHo comunque verificato che funzioni davvero, non mi sono fidato del solo diff: ho eseguito l'intero gruppo di test di sicurezza (tutti e 4 verdi) e in particolare il test incriminato l'ho lanciato 3 volte di fila, sempre verde. Il difetto di tempistica che lo faceva fallire in modo deterministico non si presenta piu': la verifica completa non e' piu' bloccata da questo falso rosso.\n\nChiudo come risolto perche' la correzione e' gia' su main e confermata funzionante. Non ho aggiunto altro: si tratta di infrastruttura di test, nulla di visibile per te nell'app.",
-  "queuedAt": "2026-07-18T09:37:57.483Z",
-  "queuedBy": "routine"
-}
