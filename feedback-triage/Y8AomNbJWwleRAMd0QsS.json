@@ -1,0 +1,7 @@
+{
+  "id": "Y8AomNbJWwleRAMd0QsS",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho riprodotto la tua segnalazione aprendo il costruttore di mazzi e riempiendo di contenuto le tre colonne (chat a sinistra, mazzo al centro, statistiche a destra) fino a superare l'altezza della finestra. Prima: le colonne si allungavano oltre il bordo, lo scroll interno non partiva mai e la barra per scrivere in fondo alla chat finiva sotto il bordo (ecco perché 'non vedi dove scrivere'). Ora: ogni colonna scorre correttamente al proprio interno e la barra di scrittura resta sempre visibile e raggiungibile in fondo alla chat. Ho verificato tutte e tre le colonne, inclusa quella centrale del mazzo. Ho anche controllato che la correzione sia davvero quella che risolve il problema: disattivandola il difetto ritorna esattamente com'era (barra fuori schermo, niente scroll). Verifica fatta sull'app reale con schermata di controllo: tutto a posto.",
+  "queuedAt": "2026-07-18T16:19:26.834Z",
+  "queuedBy": "routine"
+}
