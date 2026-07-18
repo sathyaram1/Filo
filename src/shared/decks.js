@@ -12,6 +12,16 @@
 
   const RAGGRUPPAMENTI = ['tipo', 'tag', 'cmc', 'colore'];
 
+  // Nomi segnaposto che l'app assegna a un mazzo senza nome scelto dall'utente.
+  // Un mazzo con uno di questi nomi (o marcato `nomeAuto`) può essere
+  // ri-nominato automaticamente dal commander senza calpestare una scelta reale.
+  const NOME_DEFAULT = 'Nuovo mazzo';
+  const NOMI_SEGNAPOSTO = [NOME_DEFAULT, 'Mazzo senza nome'];
+
+  function isNomeSegnaposto(nome) {
+    return NOMI_SEGNAPOSTO.includes(String(nome || '').trim());
+  }
+
   function uuid() {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
     return Date.now().toString(36) + Math.random().toString(36).slice(2);
