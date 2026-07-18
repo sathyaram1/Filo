@@ -161,15 +161,25 @@
     return { deck: touch({ ...deck, carte: [...byId.values()] }), addedCount, updatedCount };
   }
 
+  // Rinomina esplicita dell'utente: fissa il nome e marca `nomeAuto:false`, così
+  // un commander impostato/cambiato in seguito NON lo sovrascrive più.
   function renameDeck(deck, nome) {
     const n = String(nome || '').trim();
-    if (!n || n === deck.nome) return deck;
-    return touch({ ...deck, nome: n });
+    if (!n || (n === deck.nome && deck.nomeAuto === false)) return deck;
+    return touch({ ...deck, nome: n, nomeAuto: false });
   }
 
+  // Imposta il commander. Se il mazzo ha ancora un nome automatico/segnaposto e
+  // il commander ha un nome, il mazzo prende quel nome (resta `nomeAuto:true`,
+  // così segue anche un eventuale cambio di commander). Un nome scelto a mano
+  // dall'utente non viene mai toccato.
   function setCommander(deck, scryfallId, meta = null) {
     const id = String(scryfallId || '').trim();
-    return touch({ ...deck, commander: id, commanderMeta: meta || null });
+    const m = meta || null;
+    const next = { ...deck, commander: id, commanderMeta: m };
+    const autoName = deck.nomeAuto && id && m && String(m.name || '').trim();
+    if (autoName) { next.nome = String(m.name).trim(); next.nomeAuto = true; }
+    return touch(next);
   }
 
   // Parsa il testo del campo budget come lo scrive l'utente. L'app mostra
