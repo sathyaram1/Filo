@@ -36,9 +36,14 @@
   // (task 2): la libreria la usa senza rifare lookup a ogni render.
   function newDeck({ nome } = {}) {
     const t = nowIso();
+    const nomeScelto = String(nome || '').trim();
     return {
       id: uuid(),
-      nome: String(nome || '').trim() || 'Nuovo mazzo',
+      nome: nomeScelto || NOME_DEFAULT,
+      // `nomeAuto` = il nome è segnaposto/derivato, non scelto dall'utente:
+      // quando true, impostare un commander rinomina il mazzo col suo nome.
+      // Una rinomina manuale lo azzera (mai calpestare una scelta esplicita).
+      nomeAuto: !nomeScelto,
       commander: '',
       commanderMeta: null,
       carte: [],
