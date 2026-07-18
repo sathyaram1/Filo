@@ -12,6 +12,16 @@
 
   const RAGGRUPPAMENTI = ['tipo', 'tag', 'cmc', 'colore'];
 
+  // Nomi segnaposto che l'app assegna a un mazzo senza nome scelto dall'utente.
+  // Un mazzo con uno di questi nomi (o marcato `nomeAuto`) può essere
+  // ri-nominato automaticamente dal commander senza calpestare una scelta reale.
+  const NOME_DEFAULT = 'Nuovo mazzo';
+  const NOMI_SEGNAPOSTO = [NOME_DEFAULT, 'Mazzo senza nome'];
+
+  function isNomeSegnaposto(nome) {
+    return NOMI_SEGNAPOSTO.includes(String(nome || '').trim());
+  }
+
   function uuid() {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
     return Date.now().toString(36) + Math.random().toString(36).slice(2);
@@ -26,9 +36,14 @@
   // (task 2): la libreria la usa senza rifare lookup a ogni render.
   function newDeck({ nome } = {}) {
     const t = nowIso();
+    const nomeScelto = String(nome || '').trim();
     return {
       id: uuid(),
-      nome: String(nome || '').trim() || 'Nuovo mazzo',
+      nome: nomeScelto || NOME_DEFAULT,
+      // `nomeAuto` = il nome è segnaposto/derivato, non scelto dall'utente:
+      // quando true, impostare un commander rinomina il mazzo col suo nome.
+      // Una rinomina manuale lo azzera (mai calpestare una scelta esplicita).
+      nomeAuto: !nomeScelto,
       commander: '',
       commanderMeta: null,
       carte: [],
@@ -45,9 +60,13 @@
   function sanitizeDeck(raw) {
     if (!raw || typeof raw !== 'object' || !raw.id) return null;
     const carte = Array.isArray(raw.carte) ? raw.carte : [];
+    const nome = String(raw.nome || '').trim() || 'Mazzo senza nome';
     return {
       id: String(raw.id),
-      nome: String(raw.nome || '').trim() || 'Mazzo senza nome',
+      nome,
+      // Mazzi salvati prima di questa feature non hanno il flag: lo deduciamo
+      // dal nome (un segnaposto è auto-nominabile; un nome vero è dell'utente).
+      nomeAuto: typeof raw.nomeAuto === 'boolean' ? raw.nomeAuto : isNomeSegnaposto(nome),
       commander: String(raw.commander || ''),
       commanderMeta: (raw.commanderMeta && typeof raw.commanderMeta === 'object') ? raw.commanderMeta : null,
       carte: carte
@@ -142,15 +161,25 @@
     return { deck: touch({ ...deck, carte: [...byId.values()] }), addedCount, updatedCount };
   }
 
+  // Rinomina esplicita dell'utente: fissa il nome e marca `nomeAuto:false`, così
+  // un commander impostato/cambiato in seguito NON lo sovrascrive più.
   function renameDeck(deck, nome) {
     const n = String(nome || '').trim();
-    if (!n || n === deck.nome) return deck;
-    return touch({ ...deck, nome: n });
+    if (!n || (n === deck.nome && deck.nomeAuto === false)) return deck;
+    return touch({ ...deck, nome: n, nomeAuto: false });
   }
 
+  // Imposta il commander. Se il mazzo ha ancora un nome automatico/segnaposto e
+  // il commander ha un nome, il mazzo prende quel nome (resta `nomeAuto:true`,
+  // così segue anche un eventuale cambio di commander). Un nome scelto a mano
+  // dall'utente non viene mai toccato.
   function setCommander(deck, scryfallId, meta = null) {
     const id = String(scryfallId || '').trim();
-    return touch({ ...deck, commander: id, commanderMeta: meta || null });
+    const m = meta || null;
+    const next = { ...deck, commander: id, commanderMeta: m };
+    const autoName = deck.nomeAuto && id && m && String(m.name || '').trim();
+    if (autoName) { next.nome = String(m.name).trim(); next.nomeAuto = true; }
+    return touch(next);
   }
 
   // Parsa il testo del campo budget come lo scrive l'utente. L'app mostra
@@ -214,6 +243,9 @@
       ...deck,
       id: uuid(),
       nome: `${deck.nome} (copia)`,
+      // La copia ha un nome derivato deliberato: non farlo inseguire da un
+      // eventuale cambio di commander sulla copia.
+      nomeAuto: false,
       carte: deck.carte.map((c) => ({ ...c, tags: [...c.tags] })),
       versione: 1,
       created_at: t,
