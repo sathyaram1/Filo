@@ -1,0 +1,7 @@
+{
+  "id": "0b3c92d4-38b6-4950-a7ee-60a5a09d29a9",
+  "status": "todo",
+  "notes": "Precisazione dell'owner (2026-07-18): il problema principale non sono le schede web ma le PAGINE INTERNE di Filo (menu/nuova scheda, dashboard, editor mazzi) che il triage non chiude MAI. Oggi le pagine interne sono escluse in blocco dai candidati al triage: l'LLM non le vede nemmeno, quindi si accumulano a ogni riapertura (la sessione le ripristina tutte). Sono proprio quelle che andrebbero chiuse: sono sempre raggiungibili dal menu, chiuderle non perde nulla (attenzione solo a eventuale lavoro non salvato, es. editor mazzi con modifiche in corso). Le schede web invece vanno trattate con piu' rispetto di quanto scritto sopra: una serie in streaming a meta' e' 'mantenibile' perche' l'utente potrebbe volerla riprendere — l'archiviazione resta comunque non distruttiva (riapribile dalla cronologia). Quindi: includere le pagine interne tra i candidati (o chiuderle con regola deterministica senza LLM: duplicate/non attive alla riapertura), mantenendo la salvaguardia su scheda attiva e lavoro non salvato.",
+  "queuedAt": "2026-07-18T20:10:33.288Z",
+  "queuedBy": "routine"
+}
