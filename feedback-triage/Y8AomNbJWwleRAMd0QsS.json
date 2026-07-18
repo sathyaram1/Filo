@@ -1,7 +1,0 @@
-{
-  "id": "Y8AomNbJWwleRAMd0QsS",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato e correzione pubblicata. Nel deck builder, quando una colonna si riempie di contenuto (chat con molte risposte, mazzo con tante carte, o le statistiche) ora la colonna scorre correttamente al suo interno invece di allungarsi oltre lo schermo. In particolare la barra per scrivere in fondo alla chat resta sempre visibile: prima, con abbastanza contenuto, veniva spinta fuori dallo schermo e sembrava non ci fosse dove scrivere. Ho unito la modifica alla versione piu recente dell'app risolvendo una piccola sovrapposizione con un'altra correzione gia pubblicata; entrambe restano presenti nel recap aggiornamenti.",
-  "queuedAt": "2026-07-18T16:22:27.916Z",
-  "queuedBy": "routine"
-}
