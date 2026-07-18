@@ -1690,8 +1690,16 @@
         </div>
       </div>`).join('');
     openOverlay(`<h3>Commenti</h3>${rows}
-      <div class="ed-overlay-actions"><button class="ed-btn primary" id="ovClose">Chiudi</button></div>`);
+      <div class="ed-overlay-actions">
+        <button class="ed-btn" id="ovNew">Nuovo commento</button>
+        <button class="ed-btn primary" id="ovClose">Chiudi</button>
+      </div>`);
     $('ovClose').addEventListener('click', closeOverlay);
+    // Invariante UX: se dal modulo si crea il PRIMO commento con un click, dalla
+    // lista si deve poter avviare anche il secondo (prima l'unica via era la
+    // scorciatoia, di default non impostata, o svuotare tutti i commenti).
+    // startCommenting() rimpiazza l'overlay con l'invito a selezionare il testo.
+    $('ovNew').addEventListener('click', startCommenting);
     overlayBox.querySelectorAll('[data-resolve]').forEach((b) => b.addEventListener('click', () => {
       const c = doc.comments.find((x) => x.id === b.dataset.resolve); if (c) c.resolved = !c.resolved;
       markDirty(); renderGrid(); showCommentsList();
