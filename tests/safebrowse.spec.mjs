@@ -163,6 +163,90 @@ test('interstitial "pericoloso": copre la pagina e si toglie solo con "confermo"
   await expect(page.getByText('Sito pericoloso')).toHaveCount(0, { timeout: 6_000 });
 });
 
+test('interstitial "pericoloso": "Torna indietro" su scheda nuova NON conferma il sito (#288)', async ({ app, openTab, testServer }) => {
+  // Scheda aperta la prima volta su un URL: cronologia vuota (history.length===1).
+  // Cliccare "Torna indietro" sull'avviso "pericoloso" deve RIFIUTARE il sito,
+  // NON confermarlo: il dominio non deve finire fra i domini bypassati del tab
+  // (altrimenti l'avviso non ricomparirebbe più se il sito si ripresenta).
+  const page = await testServer.openReady(openTab, '<title>SB_BACK</title><p>contenuto pagina</p>');
+
+  // Pre-condizione del bug: la scheda è nuova, senza pagina precedente.
+  expect(await page.evaluate(() => history.length)).toBe(1);
+
+  await app.evaluate(({ BrowserWindow }) => {
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (!w._filoTabs) continue;
+      for (const t of w._filoTabs.tabs) {
+        const u = t.view?.webContents?.getURL?.() || '';
+        if (!/^https?:/.test(u)) continue;
+        t.view.webContents.send('filo:broadcast', {
+          type: 'safebrowse_update',
+          level: 'pericoloso',
+          message: { title: 'Sito pericoloso', body: 'Questo non è PayPal. Ti sta chiedendo la password.' },
+        });
+      }
+    }
+  });
+
+  await expect(page.getByText('Sito pericoloso')).toBeVisible({ timeout: 6_000 });
+
+  // Registra id + dominio della scheda esterna PRIMA che navighi via.
+  const { tabId, domain } = await app.evaluate(({ BrowserWindow }) => {
+    const SB = globalThis.SN_SAFEBROWSE;
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (!w._filoTabs) continue;
+      for (const t of w._filoTabs.tabs) {
+        const u = t.view?.webContents?.getURL?.() || '';
+        if (!/^https?:/.test(u)) continue;
+        const norm = SB && SB.normalize(u);
+        return { tabId: t.id, domain: norm ? norm.registrable : null };
+      }
+    }
+    return { tabId: null, domain: null };
+  });
+  expect(domain).toBeTruthy();
+
+  // Clic su "Torna indietro": senza cronologia, la scheda deve solo uscire
+  // (about:blank) senza inviare alcuna conferma al main.
+  await page.getByRole('button', { name: 'Torna indietro' }).click();
+
+  // Aspetta che l'handler sia arrivato in fondo: la scheda naviga ad about:blank
+  // in entrambi i casi (bug e fix), quindi è un punto di sincronizzazione sicuro.
+  // Nel caso bug, la conferma (bypass) è già stata registrata PRIMA della replace.
+  await expect
+    .poll(
+      async () =>
+        app.evaluate((id) => {
+          const { BrowserWindow } = require('electron');
+          for (const w of BrowserWindow.getAllWindows()) {
+            if (!w._filoTabs) continue;
+            const t = w._filoTabs.tabs.find((x) => x.id === id);
+            if (t) return t.view?.webContents?.getURL?.() || '';
+          }
+          return '';
+        }, tabId),
+      { timeout: 6_000 },
+    )
+    .toMatch(/^about:blank$|^$/);
+
+  // ASSERT del successo: il dominio NON è stato bypassato → se il verdetto
+  // pericoloso si ripresentasse, l'avviso ricomparirebbe. Prima del fix qui il
+  // dominio era presente (stesso effetto di "Procedi comunque").
+  const bypassed = await app.evaluate(
+    ({ id, dom }) => {
+      const { BrowserWindow } = require('electron');
+      for (const w of BrowserWindow.getAllWindows()) {
+        if (!w._filoTabs) continue;
+        const t = w._filoTabs.tabs.find((x) => x.id === id);
+        if (t) return !!(t.sbBypass && t.sbBypass.has(dom));
+      }
+      return false;
+    },
+    { id: tabId, dom: domain },
+  );
+  expect(bypassed).toBe(false);
+});
+
 test('popup "sospetto": è un popup di conferma e si chiude solo con "Continua" (#176)', async ({ app, openTab, testServer }) => {
   // Pagina esterna reale: di per sé "safe". Iniettiamo il verdetto "sospetto"
   // come fa il main dopo l'analisi (es. il sito casinò del feedback #176).
