@@ -1,0 +1,7 @@
+{
+  "id": "c5877d09-d706-4f36-a484-be3fc4c6b792",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la modifica e stata pubblicata. La ricerca senza risultati nella dashboard dei feedback ora mostra un messaggio chiaro (Nessun risultato per la parola cercata) invece del testo del tab vuoto, e il conteggio del tab resta corretto.",
+  "queuedAt": "2026-07-18T09:35:01.754Z",
+  "queuedBy": "routine"
+}
