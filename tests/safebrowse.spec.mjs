@@ -216,8 +216,7 @@ test('interstitial "pericoloso": "Torna indietro" su scheda nuova NON conferma i
   await expect
     .poll(
       async () =>
-        app.evaluate((id) => {
-          const { BrowserWindow } = require('electron');
+        app.evaluate(({ BrowserWindow }, id) => {
           for (const w of BrowserWindow.getAllWindows()) {
             if (!w._filoTabs) continue;
             const t = w._filoTabs.tabs.find((x) => x.id === id);
