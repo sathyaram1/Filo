@@ -253,6 +253,56 @@ test.describe('commenti: evidenziazione persistente', () => {
     expect((await highlightTexts(page)).join('')).toBe('primo bloccotesta del secondo');
   });
 
+  // Feedback #335: col PRIMO commento già presente, cliccare il modulo apre la
+  // lista (Risolvi/Elimina/Chiudi) e non c'era alcun modo di crearne un secondo
+  // dalla GUI (solo la scorciatoia, di default non impostata, o svuotare tutto).
+  // Invariante UX: se puoi aggiungere il primo con un click, devi poter aggiungere
+  // anche il secondo. Il test ASSERISCE il successo: il secondo commento arriva
+  // davvero (contatore a 2, entrambe le frasi evidenziate). Senza il bottone
+  // "Nuovo commento" nella lista, la selezione del secondo testo non partirebbe
+  // mai e l'assert su cm-count='2' resta rosso.
+  test('dalla lista si può aggiungere un SECONDO commento (bottone "Nuovo commento")', async () => {
+    const page = await openTab(EDITOR);
+    await setupDocOnReviewPage(page, '<p>prima frase da commentare e poi la seconda frase da commentare</p>');
+    await addComment(page, 'prima frase', 'primo commento');
+    await expect(page.locator('.ed-module[data-type="comment"] .cm-count')).toHaveText('1');
+
+    // Con un commento presente, cliccare il modulo apre la LISTA: deve esporre
+    // il bottone per crearne uno nuovo.
+    await page.locator('.ed-module[data-type="comment"] .ed-mod-pad').click();
+    await expect(page.locator('.ed-overlay')).toContainText('Nuovo commento');
+    await page.click('#ovNew');
+
+    // Da qui il flusso è identico alla creazione del primo: seleziona il testo e
+    // salva dal prompt.
+    await page.evaluate(() => {
+      const doc = document.getElementById('doc');
+      const walker = document.createTreeWalker(doc, NodeFilter.SHOW_TEXT);
+      let n;
+      while ((n = walker.nextNode())) {
+        const i = n.nodeValue.indexOf('seconda frase');
+        if (i < 0) continue;
+        const range = document.createRange();
+        range.setStart(n, i);
+        range.setEnd(n, i + 'seconda frase'.length);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        doc.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+        return;
+      }
+      throw new Error('testo non trovato: seconda frase');
+    });
+    await page.waitForSelector('#cmText');
+    await page.fill('#cmText', 'secondo commento');
+    await page.click('#cmSave');
+
+    // Successo: due commenti, entrambe le frasi evidenziate.
+    await expect(page.locator('.ed-module[data-type="comment"] .cm-count')).toHaveText('2');
+    expect(await highlightTexts(page)).toEqual(['prima frase', 'seconda frase']);
+    await page.screenshot({ path: 'tests/.shots/editor-comment-second.png' }).catch(() => {});
+  });
+
   test('eliminare un commento rimuove l\'evidenziazione (anche dopo un reload)', async () => {
     const page = await openTab(EDITOR);
     await setupDocOnReviewPage(page, '<p>frase con un commento da eliminare subito</p>');

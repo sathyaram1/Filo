@@ -333,7 +333,11 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 /* word-count */
 .ed-wc { align-items: center; justify-content: center; text-align: center; cursor: pointer; }
 .ed-wc .wc-num { font-size: 26px; font-weight: 700; line-height: 1; }
-.ed-wc .wc-cap { font-size: 11px; color: var(--sn-muted); margin-top: 4px; }
+/* La didascalia (parole/commenti) vale ovunque compaia, non solo nel word-count:
+   il modulo Commenta la riusa e senza questa regola ereditava il font del corpo
+   (più grande), tanto che alla larghezza minima "commenti" veniva tagliato a
+   "comment". A 11px con line-height ridotto rientra nella cella più stretta. */
+.wc-cap { font-size: 11px; color: var(--sn-muted); margin-top: 4px; line-height: 1.1; }
 
 /* switch */
 .ed-switch { flex-direction: row; align-items: stretch; gap: 0; padding: 0; }
