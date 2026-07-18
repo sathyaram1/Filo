@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.145', date: '2026-07-18',
+      features: [],
+      fixes: [
+        'Sull\'avviso a schermo intero di sito pericoloso, il pulsante "Torna indietro" ora ti fa davvero uscire dal sito anche quando l\'avviso compare in una scheda appena aperta (senza pagina precedente). Prima, in quel caso, il click veniva scambiato per una conferma: il sito restava sbloccato per tutta la scheda e, se si ripresentava, l\'avviso di pericolo non ricompariva più.',
+      ],
+    },
+    {
       version: '0.2.144', date: '2026-07-17',
       features: [],
       fixes: [
