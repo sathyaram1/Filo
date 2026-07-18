@@ -1,0 +1,7 @@
+{
+  "id": "jRbGrkwSpTedBrScuf8h",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la modifica è stata pubblicata. Ora, quando imposti il commander di un mazzo che non ha ancora un nome scelto da te, il mazzo prende automaticamente il nome del commander (e lo aggiorna se cambi commander); se invece avevi già dato un nome tuo al mazzo, quello resta intatto.",
+  "queuedAt": "2026-07-18T16:28:46.253Z",
+  "queuedBy": "routine"
+}
