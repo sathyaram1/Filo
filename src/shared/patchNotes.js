@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.145', date: '2026-07-18',
+      features: [],
+      fixes: [
+        'Nel deck builder, quando una colonna si riempie (chat con tante risposte, mazzo con tante carte, statistiche) ora scorre correttamente al suo interno invece di allungarsi oltre lo schermo. In particolare la barra per scrivere in fondo alla chat resta sempre visibile: prima, con abbastanza contenuto, veniva spinta fuori dallo schermo e sembrava non ci fosse dove scrivere.',
+      ],
+    },
+    {
       version: '0.2.144', date: '2026-07-17',
       features: [],
       fixes: [
