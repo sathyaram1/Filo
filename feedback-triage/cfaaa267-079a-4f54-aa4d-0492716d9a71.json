@@ -1,0 +1,7 @@
+{
+  "id": "cfaaa267-079a-4f54-aa4d-0492716d9a71",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la modifica e' stata verificata e pubblicata. Ora, nella pagina 'Aperti per dopo', cercare una parola che non corrisponde a nessuna pagina salvata mostra il messaggio 'Nessun risultato per la ricerca.' invece del testo di archivio vuoto, che poteva far credere di aver perso le pagine salvate. Azzerando la ricerca le schede ricompaiono.",
+  "queuedAt": "2026-07-18T09:25:05.906Z",
+  "queuedBy": "routine"
+}
