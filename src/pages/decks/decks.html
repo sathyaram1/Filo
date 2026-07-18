@@ -69,7 +69,13 @@
       gap: 0; height: calc(100vh - 96px); min-height: 320px;
       border: 1px solid var(--sn-border); border-radius: 10px; overflow: hidden;
     }
-    .dk-col { display: flex; flex-direction: column; min-width: 0; }
+    /* min-height: 0 è OBBLIGATORIO: senza, questo flex/grid item eredita
+       min-height: auto e NON si comprime sotto l'altezza del contenuto — così
+       il .dk-col-body qui sotto (flex:1 + overflow:auto) cresce fino al
+       contenuto invece di scrollare, la colonna sfonda l'altezza fissa del
+       builder (clippata da overflow:hidden) e in chat l'input in fondo finisce
+       fuori dal riquadro ("non vedo dove scrivere", scroll rotto). */
+    .dk-col { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
     /* Divisore: linea sottile al centro, zona di presa larga 6px. */
     .dk-divider {
       cursor: col-resize;
