@@ -1,0 +1,7 @@
+{
+  "id": "cfaaa267-079a-4f54-aa4d-0492716d9a71",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho riprodotto esattamente i tuoi passi: ho messo una pagina da parte con 'Salva per dopo', ho aperto 'Aperti per dopo' (la pagina compare regolarmente) e ho cercato una parola che non corrisponde a nulla (es. 'zzzznomatch'). Ora appare il messaggio corretto 'Nessun risultato per la ricerca.' e NON piu' 'Nessuna scheda salvata...': niente piu' sensazione di aver perso le pagine. Cancellando cio' che ho scritto nella barra, la pagina salvata ricompare subito: la ricerca e' solo un filtro. Ho anche stressato i casi limite: ricerca fatta di soli spazi (mostra di nuovo tutte le pagine, non il vuoto), archivio davvero vuoto durante una ricerca (mostra 'nessuna scheda salvata', onesto), e ricerca con caratteri speciali/emoji/testo lunghissimo (mostra 'nessun risultato', nessun comportamento anomalo). Verificato su app reale con controllo visivo dello schermo. Funziona.",
+  "queuedAt": "2026-07-18T09:23:42.148Z",
+  "queuedBy": "routine"
+}
