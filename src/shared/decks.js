@@ -243,6 +243,9 @@
       ...deck,
       id: uuid(),
       nome: `${deck.nome} (copia)`,
+      // La copia ha un nome derivato deliberato: non farlo inseguire da un
+      // eventuale cambio di commander sulla copia.
+      nomeAuto: false,
       carte: deck.carte.map((c) => ({ ...c, tags: [...c.tags] })),
       versione: 1,
       created_at: t,
