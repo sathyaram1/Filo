@@ -120,6 +120,52 @@ test('setCommander salva id + meta e incrementa la versione', () => {
   assert.equal(r.versione, d.versione + 1);
 });
 
+// ── Auto-nome dal commander (feedback #345) ────────────────────────────────
+test('newDeck: nomeAuto è true senza nome, false con nome scelto', () => {
+  assert.equal(D.newDeck().nomeAuto, true);
+  assert.equal(D.newDeck({ nome: 'Mono Blu' }).nomeAuto, false);
+});
+
+test('setCommander su mazzo con nome automatico lo rinomina col commander', () => {
+  const d = D.newDeck(); // nome segnaposto, nomeAuto:true
+  const r = D.setCommander(d, 'scry-niv', { name: 'Niv-Mizzet, Parun', colors: ['U', 'R'] });
+  assert.equal(r.nome, 'Niv-Mizzet, Parun');
+  assert.equal(r.nomeAuto, true, 'resta auto: deve seguire un cambio di commander');
+});
+
+test('setCommander NON tocca un nome scelto dall\'utente', () => {
+  const d = D.renameDeck(D.newDeck(), 'Il mio mazzone'); // nomeAuto:false
+  const r = D.setCommander(d, 'scry-niv', { name: 'Niv-Mizzet, Parun', colors: ['U', 'R'] });
+  assert.equal(r.nome, 'Il mio mazzone');
+  assert.equal(r.nomeAuto, false);
+});
+
+test('cambiare commander su mazzo auto-nominato segue il nuovo commander', () => {
+  let d = D.setCommander(D.newDeck(), 'scry-a', { name: 'Atraxa', colors: ['W', 'U', 'B', 'G'] });
+  assert.equal(d.nome, 'Atraxa');
+  d = D.setCommander(d, 'scry-b', { name: 'Krenko', colors: ['R'] });
+  assert.equal(d.nome, 'Krenko');
+});
+
+test('renameDeck marca il nome come scelto dall\'utente (nomeAuto:false)', () => {
+  const r = D.renameDeck(D.newDeck(), 'Custom');
+  assert.equal(r.nome, 'Custom');
+  assert.equal(r.nomeAuto, false);
+});
+
+test('sanitizeDeck deduce nomeAuto dai mazzi vecchi senza il flag', () => {
+  assert.equal(D.sanitizeDeck({ id: 'x', nome: 'Nuovo mazzo' }).nomeAuto, true);
+  assert.equal(D.sanitizeDeck({ id: 'x', nome: 'Il mio mazzo' }).nomeAuto, false);
+  assert.equal(D.sanitizeDeck({ id: 'x', nome: 'Qualsiasi', nomeAuto: true }).nomeAuto, true);
+});
+
+test('duplicateDeck: la copia ha un nome deliberato (nomeAuto:false)', () => {
+  const d = D.setCommander(D.newDeck(), 'scry-a', { name: 'Atraxa', colors: ['G'] });
+  const copy = D.duplicateDeck(d);
+  assert.equal(copy.nome, 'Atraxa (copia)');
+  assert.equal(copy.nomeAuto, false);
+});
+
 test('deckCount somma le qty (basics con qty > 1)', () => {
   let { deck } = D.addCard(D.newDeck(), 'scry-1');
   ({ deck } = D.addCard(deck, 'scry-island', { qty: 30 }));
