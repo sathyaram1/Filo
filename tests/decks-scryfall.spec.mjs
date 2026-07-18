@@ -80,6 +80,38 @@ test('impostare il commander porta art crop e pip reali nella libreria', async (
   // Nel builder l'header mostra il nome del commander (identità del documento).
   await card.click();
   await expect(page.locator('#commanderLine')).toHaveText(/Niv-Mizzet, Parun/);
+
+  // Feedback #345: un mazzo senza nome scelto prende automaticamente il nome del
+  // commander (nell'header e nella card di libreria).
+  await expect(page.locator('#deckNameText')).toHaveText('Niv-Mizzet, Parun');
+  await expect(card.locator('.sn-card-title')).toHaveText('Niv-Mizzet, Parun');
+});
+
+test('l\'auto-nome dal commander NON sovrascrive un nome scelto dall\'utente', async ({ app, openTab }) => {
+  await mockScryfall(app);
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+
+  await page.click('#newDeck');
+  await expect(page.locator('#screenBuilder')).toBeVisible();
+  const deckId = await page.evaluate(() => decodeURIComponent(location.hash.replace('#/deck/', '')));
+
+  // L'utente rinomina il mazzo a mano (stesso cammino della voce "Rinomina…").
+  await page.evaluate(async (id) => {
+    const { MSG } = window.SN_MSG;
+    const g = await chrome.runtime.sendMessage({ type: MSG.DECKS_GET, id });
+    const renamed = window.SN_DECKS.renameDeck(g.deck, 'Il mio mazzone');
+    await chrome.runtime.sendMessage({ type: MSG.DECKS_UPDATE, deck: renamed });
+  }, deckId);
+
+  // Poi imposta un commander: il nome scelto deve restare intatto.
+  const r = await page.evaluate(async (id) => {
+    const { MSG } = window.SN_MSG;
+    return chrome.runtime.sendMessage({ type: MSG.DECKS_SET_COMMANDER, id, scryfallId: 'niv-1' });
+  }, deckId);
+  expect(r && r.ok).toBe(true);
+  expect(r.deck.nome).toBe('Il mio mazzone');
+  expect(r.deck.commanderMeta && r.deck.commanderMeta.name).toBe('Niv-Mizzet, Parun');
 });
 
 test('la ricerca è vincolata all\'identity del commander; sintassi esplicita passa invariata', async ({ app, openTab }) => {
