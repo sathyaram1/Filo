@@ -60,9 +60,13 @@
   function sanitizeDeck(raw) {
     if (!raw || typeof raw !== 'object' || !raw.id) return null;
     const carte = Array.isArray(raw.carte) ? raw.carte : [];
+    const nome = String(raw.nome || '').trim() || 'Mazzo senza nome';
     return {
       id: String(raw.id),
-      nome: String(raw.nome || '').trim() || 'Mazzo senza nome',
+      nome,
+      // Mazzi salvati prima di questa feature non hanno il flag: lo deduciamo
+      // dal nome (un segnaposto è auto-nominabile; un nome vero è dell'utente).
+      nomeAuto: typeof raw.nomeAuto === 'boolean' ? raw.nomeAuto : isNomeSegnaposto(nome),
       commander: String(raw.commander || ''),
       commanderMeta: (raw.commanderMeta && typeof raw.commanderMeta === 'object') ? raw.commanderMeta : null,
       carte: carte
