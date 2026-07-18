@@ -1,7 +1,0 @@
-{
-  "id": "c5877d09-d706-4f36-a484-be3fc4c6b792",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho riprodotto la segnalazione dalla pagina 'Feedback alpha': con due feedback presenti nella cartella 'Ricevuti', ho scritto nella casella di ricerca una parola inesistente (es. 'zzzqqq'). Ora al centro compare 'Nessun risultato per \"zzzqqq\".' e NON piu' 'Nessun feedback in arrivo', mentre la linguetta in alto continua giustamente a dire 'Ricevuti (2)': non sembra piu' che la cartella sia vuota. Svuotando la ricerca le due schede ricompaiono subito, e una ricerca che invece corrisponde ('finestra') filtra correttamente lasciando una sola scheda. Controprova fatta: disattivando la correzione il messaggio torna a essere quello da cartella vuota, quindi la correzione e' davvero cio' che risolve il problema. Stress test: parole con caratteri speciali, HTML e simboli non causano problemi (il testo cercato viene mostrato come testo puro, niente esecuzione di codice); ricerche che non corrispondono a nulla, campi svuotati e cambi rapidi di ricerca si comportano tutti correttamente. Ho anche controllato le altre due pagine con la ricerca citate nella segnalazione (Archivio/Cronologia e la gestione schede): mostrano gia' lo stesso messaggio 'Nessun risultato', quindi il comportamento e' ora coerente ovunque.",
-  "queuedAt": "2026-07-18T09:33:27.256Z",
-  "queuedBy": "routine"
-}
