@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.145', date: '2026-07-18',
+      features: [],
+      fixes: [
+        'Nell\'editor, pagina "Revisione", il modulo Commenta ora ha un pulsante "Nuovo commento" nella lista dei commenti: puoi aggiungerne un secondo (e altri) con un click, senza dover per forza usare la scorciatoia da tastiera o cancellare quelli esistenti. Corretta anche la didascalia del modulo che alla larghezza minima appariva tagliata ("comment" invece di "commenti").',
+      ],
+    },
+    {
       version: '0.2.144', date: '2026-07-17',
       features: [],
       fixes: [
