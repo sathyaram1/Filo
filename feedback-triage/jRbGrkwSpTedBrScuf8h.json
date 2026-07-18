@@ -1,0 +1,7 @@
+{
+  "id": "jRbGrkwSpTedBrScuf8h",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho verificato che il nome del mazzo si genera automaticamente dal commander. Partendo da un mazzo appena creato (nome segnaposto \"Nuovo mazzo\"), appena gli imposto un commander il mazzo prende il nome del commander, e questo si vede sia nell'intestazione del banco di lavoro sia sulla card nella libreria dei mazzi. Ho provato anche: cambiare commander (il nome segue il nuovo commander); rinominare il mazzo a mano e poi impostare/cambiare il commander (il nome scelto resta intatto, mai sovrascritto); mazzi creati già con un nome scelto (non vengono toccati); mazzi vecchi salvati prima della feature (riconosce correttamente se il nome era un segnaposto o una scelta vera). Stress test superati: commander senza nome o con nome di soli spazi non azzera mai il nome del mazzo lasciandolo vuoto; nomi lunghissimi accettati; un nome tipo codice HTML/script viene mostrato come testo semplice e non viene mai eseguito, né nell'intestazione né sulla card. La suite completa dei test automatici passa e nessuna funzione esistente del deck builder risulta rotta.",
+  "queuedAt": "2026-07-18T16:27:23.180Z",
+  "queuedBy": "routine"
+}
