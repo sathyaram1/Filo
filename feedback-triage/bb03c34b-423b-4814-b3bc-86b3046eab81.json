@@ -1,0 +1,7 @@
+{
+  "id": "bb03c34b-423b-4814-b3bc-86b3046eab81",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho riprodotto il problema partendo dallo scenario dell'utente: nella pagina Revisione dell'editor, con gia' un commento presente, cliccando il modulo Commenta si apre la lista dei commenti e ora compare un pulsante 'Nuovo commento' accanto a 'Chiudi'. Cliccandolo riparte esattamente lo stesso flusso del primo commento (seleziona il testo, scrivi la nota, salva) e il secondo commento viene creato davvero: il contatore passa a 2 ed entrambe le frasi restano evidenziate nel documento. Prima l'unico modo era la scorciatoia da tastiera (di default non impostata) o cancellare tutti i commenti: quell'attrito e' sparito. Verificato anche il difetto cosmetico collegato: alla larghezza minima del modulo la didascalia mostra 'commenti' per intero, non piu' troncata a 'comment' (controllato su schermata reale). Stress test: un commento con codice ostile tipo <script> e onerror non viene eseguito (nessun popup, niente codice iniettato) — il testo viene mostrato in chiaro come innocuo. Un commento vuoto o con soli spazi non crea nulla e chiude il prompt, e Annulla non aggiunge commenti: il contatore resta corretto. Tutti i test dei commenti dell'editor passano end-to-end.",
+  "queuedAt": "2026-07-18T09:14:13.077Z",
+  "queuedBy": "routine"
+}
