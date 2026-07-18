@@ -1,9 +1,0 @@
-{
-  "id": "3a341ff4-92fd-47c2-822b-3c12332b0195",
-  "status": "design",
-  "notes": "Il controllo di sicurezza ha bocciato questa modifica e la pratica era rimasta in sospeso senza che nessuno la portasse alla tua attenzione: serve una tua decisione su come procedere.",
-  "queuedAt": "2026-07-18T09:00:54.477Z",
-  "queuedBy": "routine",
-  "branch": "worker/3a341ff4",
-  "reason": "secaudit"
-}
