@@ -143,8 +143,8 @@ Ripeti finché il budget è quasi pieno:
      → i file-ruolo devono ribadire: **ultima riga = solo il verdetto**.
 
 2. **Spawna UN worker generico** (tool Agent, `subagent_type: general-purpose`,
-   `model: "fable"`; se i crediti specifici di Fable sono esauriti ripiega su
-   `model: "opus"` — vedi § Sequenziale) con un prompt minimo:
+   `model: "opus"` — sempre Opus, mai Fable: consuma crediti — vedi
+   § Sequenziale) con un prompt minimo:
 
    > «Esporta SUBITO nell'ambiente la chiave che ti incollo qui sotto, e
    > prefissala a OGNI invocazione degli script di routine:
