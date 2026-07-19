@@ -16,6 +16,22 @@ Questo file raccoglie le **convenzioni del repo valide per QUALSIASI agente**
 
 In entrambi i casi valgono le convenzioni di questo file.
 
+## Filosofia e design — lettura obbligatoria prima di codice/revisioni
+
+Nella root del repo vivono due documenti dell'owner:
+
+- **`filo_filosofia.txt`** — la filosofia generale di Filo (cos'è, mindset,
+  decisioni ad alto livello);
+- **`filo_design.txt`** — i principi di design concreti (interattività, attesa,
+  gestione modelli, personalizzazione, estetica).
+
+**Qualsiasi istanza che lavora sul codice o fa revisioni** (sessione locale,
+routine cloud, ruoli fixer/new-work/verifier…) **deve leggerli ENTRAMBI** prima
+di iniziare. I giudici L2 (filo-security) usano solo `filo_filosofia.txt`, come
+copia incorporata nei loro prompt: se modifichi `filo_filosofia.txt`, riallinea
+la copia in `filo-security/functions/src/l2/principles.js` e rideploya le
+functions.
+
 ## PRIMA DI TUTTO: sync con `origin/main`
 
 Routine remote pushano su `origin/main` durante la giornata. Prima di iniziare
