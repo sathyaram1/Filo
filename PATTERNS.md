@@ -13,6 +13,10 @@ appunto monouso.
 Formato di una voce: titolo breve → la regola in una frase → il perché → eventuale
 riferimento al codice dove vive il pattern.
 
+I principi a monte di questi pattern stanno in **`filo_filosofia.txt`** (filosofia
+generale) e **`filo_design.txt`** (principi di design concreti): leggili insieme a
+questo file prima di lavorare su codice o revisioni.
+
 ---
 
 ## Filosofia: Filo è minimale
