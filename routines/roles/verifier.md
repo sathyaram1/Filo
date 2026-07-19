@@ -49,7 +49,8 @@ Convenzioni (tono, sintomo-vs-causa): `CLAUDE.md`.
    - in locale (Windows): visivo pieno via `npm run test:shoot`.
    Guarda layout, troncamenti, colori coerenti col tema, animazioni.
 7. **Si può fare meglio?** Oltre a "funziona", chiediti se è l'esperienza ottimale
-   per ciò che l'utente voleva (bussola: `filo.txt`). Se noti un'invariante UX
+   per ciò che l'utente voleva (bussola: `filo_filosofia.txt` +
+   `filo_design.txt`). Se noti un'invariante UX
    mancante o un miglioramento logico (es. un campo libero servirebbe meglio di un
    menù a tendina), **non implementarlo** — resti black-box: accodalo come
    suggerimento con `node scripts/queue-feedback.mjs --status new` così l'owner lo
