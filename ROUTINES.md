@@ -267,12 +267,11 @@ itera su tutte le worktree, le committa e (per i branch non gattati) le mergia s
 `main`. Due worker in parallelo si pestano sull'`.git` (`index.lock`, merge
 abortiti). **Un solo worker per volta. Sempre.**
 
-**Modelli:** usa sempre Fable 5 (`model: "fable"`). **Fallback**: se lo spawn
-con `fable` fallisce perché i crediti specifici di Fable sono esauriti (errore
-di limite/quota sul modello, non la finestra 5h del piano), ripiega su
-**Opus 4.8** (`model: "opus"`) per i worker successivi della sessione. Non
-degradare oltre (niente Sonnet/Haiku) e non usare opus preventivamente: prova
-prima fable a ogni nuova sessione.
+**Modelli:** usa sempre **Opus, ultima versione disponibile** (`model: "opus"` —
+l'alias punta sempre all'ultimo Opus, oggi 4.8). **Mai `model: "fable"`**: da
+2026-07-19 Fable 5 consuma crediti a parte e non va usato nelle routine. Non
+degradare nemmeno verso il basso (niente Sonnet/Haiku): se lo spawn con `opus`
+fallisce per limiti, fermati e chiudi la sessione invece di cambiare modello.
 
 ### `npm test` completo: quando
 
