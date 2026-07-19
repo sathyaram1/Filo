@@ -1,0 +1,45 @@
+nel file filo_filosofia.txt è descritta la filosofia generale di filo, qui è spiegata più concretamente.
+
+INTERATTIVITA
+per ogni nuovo elemento (un elemento può essere un titolo, una voce, un'icona, un elemento cliccabile...) che crei chiediti cosa l'utente ci potrebbe voler fare. pensa espressamente ad ogni tipo di azione, ovviamente non sempre serviranno tutte le azioni.
+
+tasto destro:
+sarà la più comune, molto probabilmente ci sarà qualcosa di specifico che l'utente vorrebbe fare con quell'elemento. pensaci accuratamente e crea un box personalizzato per quel tipo di componente, il box può contenere sia informazioni (possono essere statiche o dinamiche (generate ad un LLM in base a delle info) come ad esempio la spiegazione di una voce delle impostazioni, o la traduzione/conversione di una parola o unità di misura straniera quando selezionata) o voci (con azioni puntuali o che aprono un altro box per azioni più complesse se necessario).
+gli elementi del box devono avere sempre un'animazione hover (guarda un altro box per lo stile usato).
+
+drag:
+la maggior parte degli elementi deve essere trascinabile ed adattarsi a luogo in cui è stata trascianata. deve essere possibile trascinarala fra una tab e l'altra (quando faccio hover su un altra tab tenendo un elemento apro la nuova tab e posso poi trascinare il cursore dove voglio rilasciare ciò che ho preso).
+in aprticolare tutto deve essere trascinabile in una chat con filo (che sia una chat di un app di filo la chat nella home o altro).
+esempio: trascinando il titolo di una sezione/modulo in una chat voglio che venga scritto in grassetto e con un hover possa vedere il contenuto (quando faccio hover su quel testo compare un box con il contenuto della sezione/modulo), anche filo deve sempre vedere il contenuto (passa sia il testo che un immagine se solo il testo non sarebbe appropriato).
+trascinado un icona/modulo su un'altra icona/modulo analoghi devo spostarli. 
+
+hover:
+metti un hover con una o due parole su ogni icona cliccabile. usa hover anche più corposi dove serve. evita di usare hover su componenti grosse e usate frequentemente. in generale su un pagina visitata sporadicamente (es un menu) un hover è quasi sempre una buona idea se serve comunicare altre informazioni mentre in una pagina visitata spesso o di uso (editor di testo) un hover può risultare fastidioso e va usato solo se il contenuto è dinamico, o sia l'elemento che l'hover sono piccoli (es hover di una parola su un icona).
+
+
+L'ATTESA è ATTRITO
+minimizza l'attesa il più possibile: pre calcola/carica tutto ciò che puoi: se degli elementi hanno delle immagini o testo di un LLM (o qualunque altra cosa richieda tempo) come hover/click appena gli elementi sono visibili filo deve iniziare a caricarli iniziando da quello che più probabilmente l'utente cliccherà (in una lista scrollabile l'utente vorrà presumibilmente vedere prima il primo elemento). 
+mostra il caricamento: se ci sono dati di progresso mostrabili mostrali il più fedelmente possibile (es percentuale e barra per un download). se ci sono progressi mostrabili di una task aperta mostrali (es: il reasoning di un modello in una sezione compressa espandibile, le azioni di un agente). se il caricamento è molto rapito o è impossibile stimare il tempo e vedere dei progressi usa una rotella di caricamento.
+
+GESTIONE DEI MODELLI
+ogni modello deve essere modificabile sia dall'utente finale che dal owner nella schermata modelli predefiniti. 
+usa chiamate parallele quando possibile. se una chiamata fallisce gestisci i vari casi e se ha senso riprova dopo un delay (riducendo ad esempio il grado di parallelismo se l'errore è di troppe richieste). in caso di errore irrisolvibile (crediti finiti, modello inesistente...) notifica all'utente con una notifica toast.
+non assumere che il prezzo sia un problema prima di fare i calcoli. un buon modello con capacità agentiche minime e reasoning discreto come deepseekV4PRO (1.6T parametri totali) costa 0.4$ (0.04$ cache)/0.8$ (impu/output per milione di token), un modello più piccolo (come deep seek 4 flash) costa significativamente di meno. un modello con imput visivo e buone capacità costa poco più del doppio (kimi k2.6).
+usa questi modelli come default (semplicemente come modello impostato quando crei la feature che lo usa non come default in caso il modello impostato non come ripiego, cioè questo default che scegli non ha nulla di diverso da una scelta dell'owner nei modelli predefiniti, è solo la prima scelta fatta).
+er stimare i costi: stima di numero di utilizzi mensili della funzionalità* numero di chiamate per utilizzo* costo chiamata (contesto (usando cache se possibile)+output). non c'è budget rigido (puoi usare il tuo giudizio in base alla feature) ma solitamente mendo di un dollaro al mese vale quasi sempre la pena.
+le il costo lo ritieni potenzialmente non giustificato puoi provare a ridurlo (ad esempio non facendo partire subito tutte le chiamate parallele) o decidere di renderlo una feature non di default. in impostazioni/preferenze fai in modo che sia possibili attivare tutte le feature che migliorano l'esperienza ma potenzialmente aumentando il costo (es in una feature il pre calcolo automatico potrebbe essere disattivato per evitare costi in chiamate mai lette come default ma attivabile per gli utenti che preferiscono pagare di più per eliminare l'attesa).
+ 
+
+PERSONALIZZAZIONE
+ogni scelta che fai deve essere modificabile dall'utente: la tonalità, l'opacità, il colore del bordo, il font, i suoni, i tempi di animazione…
+in un'app normale questo sarebbe inutile in quanto l'utente non può scartabellare 20 pagine di menu ma in filo dove può semplicemente chiedere "uno stile più retrò" ha senso che sia possibile. tutto deve essere modificabile sia in preferenze (nella sezione apposita "avanzate") che da filo stesso su richiesta.
+
+
+ESTETICA
+l'obiettivo principale è la chiarezza e l'intuitività. quindi la cosa migliore è uno stile minimale con meno elementi superflui possibili. non mettere sottotitoli o spiegazioni dell'ui dell' UI stessa.
+Ogni azione dell'utente deve ricevere feedback, quando clicco o faccio hover su un elemento se è possibile deve succedere qualcosa (nulla di fastidioso o appariscente ma l'utente deve avere conferma che il sistema risponde).
+una sempre tutto lo spazio a disposizione, non mettere il contenuto della pagina in un box, non usare tutta la riga in alto per 2 icone sulla destra… 
+puoi essere creativo e coraggioso nel fare design non convenzionali pur rimanendo coerente con i principi di filo. 
+personalizzazione: ogni scelta che fai deve essere modificabile dall'utente: la tonalità, l'opacità, il colore del bordo, il font, i suoni, i tempi di animazione…
+in un'app normale questo sarebbe inutile in quanto l'utente non può scartabellarsi 20 pagine di menu ma in filo dove può semplicemente chiedere "uno stile più retrò" ha senso che sia possibile. tutto deve essere modificabile sia in preferenze (nella sezione apposita "avanzate") che da filo stesso su richiesta.
+
