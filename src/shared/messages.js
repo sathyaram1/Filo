@@ -252,6 +252,13 @@
     // (Il batch serve alle dashboard che caricano centinaia di feedback: una sola
     //  IPC per tutta la lista invece di N.)
     FEEDBACK_DECRYPT_FIELDS: 'feedback_decrypt_fields',
+    // S1.2: decifratura di UN allegato immagine lato main (la chiave privata NON
+    // lascia mai il main). Le immagini dei feedback sono cifrate come byte opachi
+    // su Storage (application/octet-stream): un <img src=URL> diretto mostra un
+    // allegato rotto. Il main scarica i byte, li decifra se cifrati, indovina il
+    // MIME dai magic byte e torna un data URL mostrabile. Owner-only.
+    //   { url } → { ok, dataUrl } | { ok:false, error }
+    FEEDBACK_DECRYPT_IMAGE: 'feedback_decrypt_image',
     // Config "modelli predefiniti" condivisa (admin-only, propaga a tutti via
     // Firestore). GET ritorna la config senza esporre le chiavi vere (solo se
     // presenti); UPDATE scrive provider/models/modelRegistry/apiKeys.
