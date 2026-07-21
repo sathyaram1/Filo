@@ -238,6 +238,52 @@ module.exports = function register(on, ctx) {
     }
   });
 
+  // S1.2: decifratura di UN allegato immagine. Le immagini dei feedback sono
+  // cifrate come byte opachi su Storage (octet-stream): un <img src=URL> diretto
+  // mostra un allegato rotto. Qui il main le scarica, le decifra con la chiave
+  // privata (che NON esce mai dal main), ne indovina il MIME e torna un data URL
+  // mostrabile. Owner-only. Retrocompat: immagini NON cifrate (storiche) passano
+  // invariate (data URL dei byte grezzi). Fail-safe: ogni errore → { ok:false }.
+  on(MSG.FEEDBACK_DECRYPT_IMAGE, async (msg) => {
+    try {
+      if (!auth.isAdmin()) {
+        return { ok: false, error: 'Operazione riservata agli amministratori.' };
+      }
+      const url = String((msg && msg.url) || '');
+      // Solo URL https del bucket feedback: evita che questo canale diventi un
+      // fetch arbitrario (SSRF) pilotato dal renderer.
+      if (!/^https:\/\/(firebasestorage\.googleapis\.com|storage\.googleapis\.com)\//.test(url)) {
+        return { ok: false, error: 'url allegato non valido' };
+      }
+      const res = await fetch(url);
+      if (!res.ok) return { ok: false, error: `download allegato fallito (${res.status})` };
+      const raw = new Uint8Array(await res.arrayBuffer());
+
+      const C = globalThis.SN_FEEDBACK_CRYPTO;
+      const IMG = globalThis.SN_FEEDBACK_IMAGE;
+      if (!IMG) throw new Error('SN_FEEDBACK_IMAGE non caricato nel main process');
+
+      let bytes = raw;
+      if (C && C.isEncryptedBytes && C.isEncryptedBytes(raw)) {
+        const priv = await getPrivateKey();
+        if (!priv) {
+          return { ok: false, error: 'Immagine cifrata ma chiave privata non configurata.' };
+        }
+        try {
+          bytes = await C.decryptBytes(raw, priv);
+        } catch (e) {
+          // I byte iniziano come un ciphertext valido ma la decifratura fallisce
+          // (chiave sbagliata, dato corrotto): non ripiegare sui byte cifrati
+          // (sarebbero comunque illeggibili) — dichiara l'errore.
+          return { ok: false, error: 'decifratura immagine fallita' };
+        }
+      }
+      return { ok: true, dataUrl: IMG.bytesToDataUrl(bytes) };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  });
+
   // Config "modelli predefiniti" condivisa. La lettura (per l'editor admin)
   // NON espone le chiavi vere, solo se sono configurate. La scrittura è
   // riservata agli admin (Firebase ID token come Bearer): le regole Firestore
