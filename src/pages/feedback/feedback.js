@@ -187,10 +187,27 @@
   }
 
   // Griglia di immagini (riusata da segnalazione e turni della conversazione).
+  // Nessun src iniziale: gli allegati sono CIFRATI su Storage (byte opachi), un
+  // <img src=URL> diretto mostra un allegato rotto. Il main li decifra (S1.2) e
+  // resolveFbImages riempie src col data URL mostrabile.
   function imagesGridHtml(urls) {
     const imgs = (urls || []).filter((u) => typeof u === 'string' && u);
     if (!imgs.length) return '';
-    return `<div class="fb-imgs">${imgs.map((u) => `<img src="${escapeHtml(u)}" data-full="${escapeHtml(u)}" loading="lazy" alt="">`).join('')}</div>`;
+    return `<div class="fb-imgs">${imgs.map((u) => `<img class="fb-img-loading" data-url="${escapeHtml(u)}" loading="lazy" alt="">`).join('')}</div>`;
+  }
+
+  // Decifratura lazy degli allegati immagine (S1.2), con cache url → dataUrl|null.
+  const fbImgCache = new Map();
+  async function resolveImageSrc(url) {
+    if (!url) return null;
+    if (fbImgCache.has(url)) return fbImgCache.get(url);
+    let dataUrl = null;
+    try {
+      const r = await sendToMain({ type: 'feedback_decrypt_image', url });
+      if (r && r.ok && r.dataUrl) dataUrl = r.dataUrl;
+    } catch (_) { /* non disponibile */ }
+    fbImgCache.set(url, dataUrl);
+    return dataUrl;
   }
 
   // Lista di allegati non-immagine come link scaricabili (nome originale).
