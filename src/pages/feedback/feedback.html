@@ -23,6 +23,13 @@
     .fb-text { white-space: pre-wrap; word-break: break-word; font-size: 14px; line-height: 1.5; }
     .fb-imgs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
     .fb-imgs img { max-width: 220px; max-height: 220px; border: 1px solid var(--sn-border); border-radius: 6px; cursor: zoom-in; object-fit: cover; }
+    /* Segnaposto mentre il main decifra l'allegato (S1.2). */
+    .fb-imgs img.fb-img-loading {
+      width: 140px; height: 100px; object-fit: contain; cursor: default;
+      background: var(--sn-surface-2, rgba(127,127,127,.08));
+      animation: fbImgPulse 1.2s ease-in-out infinite;
+    }
+    @keyframes fbImgPulse { 0%,100% { opacity: .55; } 50% { opacity: .85; } }
     .fb-img-broken {
       width: 220px; height: 80px;
       border: 1px dashed var(--sn-border); border-radius: 6px;
