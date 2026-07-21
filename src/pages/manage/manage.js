@@ -349,6 +349,48 @@
     });
   }
 
+  // ── Allegati immagine cifrati (S1.2) ──────────────────────────────────────
+  // Le immagini dei feedback sono cifrate come byte opachi su Storage: un
+  // <img src=URL> diretto mostra un allegato rotto. Il main le scarica, decifra
+  // (la chiave privata non esce da lì) e torna un data URL mostrabile. Cache
+  // per non ri-decifrare la stessa immagine riaprendo il feedback (mappa
+  // url → dataUrl | null; null = fallita, non si ritenta).
+  const imgCache = new Map();
+  async function resolveImageSrc(url) {
+    if (!url) return null;
+    if (imgCache.has(url)) return imgCache.get(url);
+    let dataUrl = null;
+    try {
+      const r = await sendToMain({ type: 'feedback_decrypt_image', url });
+      if (r && r.ok && r.dataUrl) dataUrl = r.dataUrl;
+    } catch (_) { /* rete/canale: trattala come non disponibile */ }
+    imgCache.set(url, dataUrl);
+    return dataUrl;
+  }
+
+  // Sostituisce il segnaposto di ogni <img> di una bolla con l'immagine
+  // decifrata (o lo stato "non disponibile"). Il click apre il lightbox con
+  // l'immagine GIÀ decifrata (`data-full`), mai con l'URL cifrato.
+  function resolveBubbleImages(bubble) {
+    bubble.querySelectorAll('.mg-bubble-imgs img').forEach((img) => {
+      const url = img.dataset.url || '';
+      img.addEventListener('click', () => {
+        const full = img.dataset.full;
+        if (full) openLightbox(full);
+      });
+      resolveImageSrc(url).then((dataUrl) => {
+        img.classList.remove('mg-img-loading');
+        if (dataUrl) {
+          img.src = dataUrl;
+          img.dataset.full = dataUrl;
+        } else {
+          img.classList.add('mg-img-failed');
+          img.alt = 'immagine non disponibile';
+        }
+      });
+    });
+  }
+
   // ── Lightbox ──────────────────────────────────────────────────────────────
   function openLightbox(src) {
     mgLightboxImg.src = src;
