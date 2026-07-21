@@ -1139,7 +1139,9 @@
     if (imgs.length) {
       html += `<div class="mg-bubble-imgs">`;
       for (const a of imgs) {
-        html += `<img src="${esc(a.url)}" alt="allegato" data-src="${esc(a.url)}" loading="lazy">`;
+        // Nessun src iniziale: l'URL punta a byte CIFRATI (allegato rotto). Il
+        // main lo decifra e resolveBubbleImages riempie src col data URL.
+        html += `<img class="mg-img-loading" alt="allegato" data-url="${esc(a.url)}" loading="lazy">`;
       }
       html += `</div>`;
     }
@@ -1147,9 +1149,7 @@
       html += `<div class="mg-bubble-file"><a href="${esc(f.url)}" target="_blank" rel="noopener">📎 ${esc(f.name || 'allegato')}</a></div>`;
     }
     b.innerHTML = html;
-    b.querySelectorAll('.mg-bubble-imgs img').forEach((img) => {
-      img.addEventListener('click', () => openLightbox(img.dataset.src || img.src));
-    });
+    resolveBubbleImages(b);
     mgThread.appendChild(b);
     return b;
   }
