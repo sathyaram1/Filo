@@ -699,18 +699,25 @@
     }).join('');
 
     listEl.querySelectorAll('.fb-imgs img').forEach((img) => {
-      img.addEventListener('error', () => {
-        // Sostituisce il box vuoto con un placeholder testuale; senza, l'utente
-        // vede una griglia di rettangoli rotti e non capisce.
-        const ph = document.createElement('div');
-        ph.className = 'fb-img-broken';
-        ph.textContent = '(immagine non disponibile)';
-        ph.title = img.dataset.full || '';
-        img.replaceWith(ph);
-      });
       img.addEventListener('click', () => {
-        lightboxImg.src = img.dataset.full;
-        lightbox.classList.add('open');
+        if (img.dataset.full) {
+          lightboxImg.src = img.dataset.full;
+          lightbox.classList.add('open');
+        }
+      });
+      // Decifra e riempi il src (o mostra il segnaposto testuale se non arriva).
+      resolveImageSrc(img.dataset.url || '').then((dataUrl) => {
+        img.classList.remove('fb-img-loading');
+        if (dataUrl) {
+          img.src = dataUrl;
+          img.dataset.full = dataUrl;
+        } else {
+          const ph = document.createElement('div');
+          ph.className = 'fb-img-broken';
+          ph.textContent = '(immagine non disponibile)';
+          ph.title = img.dataset.url || '';
+          img.replaceWith(ph);
+        }
       });
     });
 
