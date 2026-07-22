@@ -493,5 +493,7 @@
     legalityChecks,
     setGroupOverride,
     setRaggruppamento,
+    addTagToCard,
+    replaceCardTags,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
