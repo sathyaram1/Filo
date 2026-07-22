@@ -16,6 +16,7 @@
   const homeBtn = document.getElementById('nav-home');
   const settingsBtn = document.getElementById('nav-settings');
   const appsBtn = document.getElementById('nav-apps');
+  const manageBtn = document.getElementById('nav-manage');
   const accountBtn = document.getElementById('nav-account');
   const winMinBtn = document.getElementById('win-min');
   const winMaxBtn = document.getElementById('win-max');
