@@ -159,6 +159,11 @@
     // Auto-tag del mazzo (§7): LLM economico giudica carta-per-tag in batch.
     // Cache (carta, tag) permanente cross-mazzo per i tag context-free.
     DECKS_AUTOTAG: 'decks_autotag_ai',
+    // Filtro semantico dei risultati di ricerca (§4.1): la chat produce una
+    // query Scryfall VOLUTAMENTE LARGA (con sinonimi) per non perdere carte; poi
+    // questo LLM economico giudica carta-per-carta se rispetta davvero l'intento
+    // dell'utente, in batch. Cache (carta, criterio) permanente cross-ricerca.
+    DECKS_SEARCH_FILTER: 'decks_search_filter_ai',
   };
 
   // === Crediti (gamification) ===
