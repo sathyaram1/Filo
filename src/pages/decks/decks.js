@@ -368,7 +368,7 @@
       ? `${card.priceEur.toFixed(2).replace('.', ',')} €` : '';
     const mana = card ? manaHtml(card.manaCost) : '';
     return `
-      <div class="dk-row" data-card-id="${esc(entry.scryfall_id)}" tabindex="0">
+      <div class="dk-row" data-card-id="${esc(entry.scryfall_id)}" tabindex="0" draggable="true">
         ${qty}<span class="dk-row-name">${esc(name)}</span>
         <span class="dk-row-price">${esc(price)}</span>
         <span class="dk-row-mana">${mana}</span>
