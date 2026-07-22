@@ -1572,6 +1572,11 @@
     // Ri-legge il timeout dei giudici (IPC) — usato dai test dopo lo stub.
     loadJudgeTimeout,
     setTab(tab) { selectTab(tab); },
+    // Ordinamento della lista (menu tasto destro): impostalo e rirender.
+    setSortMode(mode) { if (SORT_MODES[mode]) { sortMode = mode; reflectSortBtn(); renderList(); } },
+    getSortMode() { return sortMode; },
+    // Ordine corrente dei numeri (#N) mostrati in lista — per asserire il sort.
+    currentOrder() { return currentList.map((f) => f._id); },
     // DB3: imposta la "versione rilasciata" usata dal gate "Risolti" e rirende.
     setReleasedVersion(v) { releasedVersion = v || ''; renderList(); },
     openDetail,
