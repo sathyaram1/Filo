@@ -1972,6 +1972,11 @@
     if (isOwner !== _controlsOwner) renderControls();
   }
 
+  // Hook di test: permette a uno spec Playwright di ridisegnare i controlli dopo
+  // aver stubbato la risposta auth (owner sì/no), così può verificare che l'icona
+  // Gestione compaia solo all'owner. Stesso spirito di window.__mgTest.
+  window.__dashTest = Object.assign(window.__dashTest || {}, { renderControls });
+
   // ===== Recap aggiornamento (C4) =====
   // Popup all'avvio dopo un update: il main (che ha sia app.getVersion() sia le
   // note curate in src/shared/patchNotes.js) calcola quali versioni l'utente ha
