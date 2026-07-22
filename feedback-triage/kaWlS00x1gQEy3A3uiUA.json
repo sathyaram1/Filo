@@ -1,0 +1,7 @@
+{
+  "id": "kaWlS00x1gQEy3A3uiUA",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la modifica è stata pubblicata. Ora nel deck builder puoi trascinare una carta su una categoria per spostarla. In vista per tag il rilascio su un tag chiede se aggiungerlo a quelli esistenti o sostituirli tutti (solo quando c'è davvero una scelta da fare), e 'Senza tag' rimuove tutti i tag; nelle viste per tipo/costo/colore il trascinamento sposta la carta nel gruppo scelto.",
+  "queuedAt": "2026-07-22T21:28:03.660Z",
+  "queuedBy": "routine"
+}
