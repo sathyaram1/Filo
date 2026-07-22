@@ -37,6 +37,27 @@ test('originOf: classifica l’origine dal prefisso del clientId', () => {
   assert.equal(TH.originOf(null), 'user');
 });
 
+test('authorKind: riduce il clientId alle 4 categorie d’autore della dashboard', () => {
+  // owner: invio manuale dell'admin loggato.
+  assert.equal(TH.authorKind('owner:caf22093'), 'owner');
+  // auto: Filo che segnala in automatico per conto dell'utente (capacità
+  // mancante o errore) → 'filo'. È la categoria che senza il fix non esisteva.
+  assert.equal(TH.authorKind('auto:complaint'), 'filo');
+  assert.equal(TH.authorKind('auto:capability-gap:qualcosa'), 'filo');
+  // agent:/routine: sono istanze AI → 'claude'.
+  assert.equal(TH.authorKind('agent:gemini-3-flash'), 'claude');
+  assert.equal(TH.authorKind('routine:nightly'), 'claude');
+  // Qualunque altro clientId è un utente esterno.
+  assert.equal(TH.authorKind('tester@example.com'), 'user');
+  assert.equal(TH.authorKind('caf22093-uuid'), 'user');
+  assert.equal(TH.authorKind(''), 'user');
+  assert.equal(TH.authorKind(null), 'user');
+  // 'auto:' vince su un ipotetico 'owner:' annidato (auto bypassa ownerize,
+  // ma l'ordine resta robusto).
+  assert.equal(TH.authorKind('owner:auto:complaint'), 'owner');
+  assert.equal(TH.authorKind('auto:owner:x'), 'filo');
+});
+
 test('isFromOwner: vero solo per il prefisso owner:', () => {
   assert.equal(TH.isFromOwner('owner:abc'), true);
   assert.equal(TH.isFromOwner('routine:x'), false);
