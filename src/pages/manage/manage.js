@@ -617,6 +617,7 @@
       item.title = (num ? `#${num} · ` : '') + title
         + (norm.statusReason ? ` — ${norm.statusReason}` : '');
       const rowHtml = `
+        ${authorIconHtml(fb)}
         ${num ? `<span class="mg-item-num">#${esc(num)}</span>` : ''}
         <span class="mg-item-title">${esc(title)}</span>
         ${priorityDotsHtml(fb)}
