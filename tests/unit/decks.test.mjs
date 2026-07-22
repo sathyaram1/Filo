@@ -18,7 +18,7 @@ const D = globalThis.SN_DECKS;
 
 test('decks si registra su globalThis con la sua API', () => {
   assert.ok(D);
-  for (const fn of ['newDeck', 'sanitizeDeck', 'addCard', 'removeCard', 'importCards', 'renameDeck', 'setCommander', 'duplicateDeck', 'deckCount', 'sortForLibrary']) {
+  for (const fn of ['newDeck', 'sanitizeDeck', 'addCard', 'removeCard', 'importCards', 'renameDeck', 'setCommander', 'duplicateDeck', 'deckCount', 'sortForLibrary', 'setGroupOverride', 'addTagToCard', 'replaceCardTags']) {
     assert.equal(typeof D[fn], 'function', `manca ${fn}`);
   }
 });
