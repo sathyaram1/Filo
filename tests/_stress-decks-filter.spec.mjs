@@ -83,7 +83,7 @@ async function mockScryfallAndProvider(app, mode) {
       },
       modelRegistry: C.DEFAULT_MODEL_REGISTRY,
     });
-  }, { mode, cards: mkCards() });
+  }, mode);
 }
 
 async function deckWithCommander(page) {
