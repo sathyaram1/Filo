@@ -147,6 +147,23 @@ function get() {
       // (OpenRouter 400 "flash is not a valid model ID").
       out.modelRegistry = { ...out.modelRegistry, ...remoteModels.modelRegistry };
     }
+    // Tombstone: nickname integrati che l'admin ha ESPLICITAMENTE rimosso
+    // dall'editor. Senza questo, il merge qui sopra (build sotto, remoto sopra)
+    // ri-inietterebbe ogni modello integrato cancellato: l'admin lo elimina,
+    // salva, ma alla riapertura riappare (non poteva mai davvero eliminarne uno
+    // di build). La cancellazione di un nickname NON di build funzionava già,
+    // perché non c'era nulla a re-iniettarlo. Distinguiamo "mai elencato dal
+    // doc remoto" (→ resta, invariante flash) da "cancellato apposta" (→ sparisce):
+    // solo il secondo caso finisce nella lista tombstone, quindi l'invariante
+    // dei nickname integrati non toccati resta intatta. Un nickname ridefinito
+    // dal doc remoto vince comunque (auto-guarigione se l'admin lo ri-aggiunge).
+    if (Array.isArray(remoteModels.modelRegistryDeleted)) {
+      for (const nick of remoteModels.modelRegistryDeleted) {
+        if (typeof nick !== 'string' || !nick) continue;
+        if (remoteModels.modelRegistry && nick in remoteModels.modelRegistry) continue;
+        delete out.modelRegistry[nick];
+      }
+    }
   }
 
   if (remoteSecrets) {
