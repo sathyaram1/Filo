@@ -229,6 +229,7 @@
     options_action_decks_chat: 'Mazzi — chat di ricerca carte',
     options_action_decks_opinion: 'Mazzi — parere su una carta',
     options_action_decks_autotag: 'Mazzi — etichette automatiche',
+    options_action_decks_search_filter: 'Mazzi — filtro dei risultati di ricerca',
     options_open_chrome_shortcuts: 'Modifica le scorciatoie nella pagina Chrome',
     options_feature_help: 'Aiuto (sidebar AI con visione)',
     options_feature_categorize: 'Categorizzazione automatica',
