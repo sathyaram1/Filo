@@ -1,7 +1,0 @@
-{
-  "id": "HqX723uOwMPFgdaTkJrD",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica e stata pubblicata. Ora nella dashboard di gestione ogni feedback mostra un'icona di chi l'ha scritto (owner, utente, Claude o Filo automatico) e puoi riordinare la lista per numero, priorita o creatore col tasto destro (o il glifo) sull'intestazione.",
-  "queuedAt": "2026-07-22T12:34:50.190Z",
-  "queuedBy": "routine"
-}
