@@ -110,8 +110,18 @@
     { type: 'separator' },
     { label: 'Feedback', icon: 'feedback', url: 'filo://feedback/feedback.html' },
     { label: 'Bacheca', icon: 'share', url: 'filo://board/board.html' },
-    { label: 'Gestione', icon: 'feedback', url: 'filo://manage/manage.html' },
   ];
+  // Voci del menu "Gestione" (icona riservata all'owner). Raccoglie le pagine di
+  // sola-amministrazione, un tempo sparse tra i menu App (Gestione) e
+  // Impostazioni (Modelli predefiniti). Ricostruita ad ogni apertura del menu,
+  // così riflette lo stato auth corrente. Lista pensata per crescere (in futuro
+  // ospiterà anche "Crediti (gestione)"): basta accodare una voce owner qui.
+  function buildManage() {
+    return [
+      { label: 'Gestione', icon: 'options', url: 'filo://manage/manage.html' },
+      { label: 'Modelli predefiniti', icon: 'models', url: 'filo://admin-defaults/admin-defaults.html' },
+    ];
+  }
   // Voci del menu Impostazioni (ingranaggio): Modelli, Sicurezza, Preferenze —
   // tre pagine interne dedicate. La voce "Modelli predefiniti" appare SOLO agli
   // admin (gli utenti comuni non la vedono affatto). `buildSettings()` ricostruisce
