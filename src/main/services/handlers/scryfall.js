@@ -244,6 +244,23 @@ module.exports = function register(on, ctx) {
           cardIds = sr.cards.map((c) => c.id);
           for (const c of sr.cards) cards[c.id] = c;
           query = sr.query;
+          // Filtro semantico (§4.1): la query era LARGA apposta (sinonimi, per
+          // non perdere carte). Se il modello ha dato un "filter", un LLM
+          // economico giudica carta-per-carta se rispetta l'intento, in batch,
+          // con cache (carta, criterio). Best-effort: un errore o un filtro che
+          // svuota TUTTO non deve lasciare l'utente a mani vuote → si ricade
+          // sui risultati larghi.
+          if (parsed.filter && cardIds.length) {
+            try {
+              const Opinions = globalThis.SN_DECK_OPINIONS_SVC;
+              const fr = await Opinions.filterSearch({
+                criterion: parsed.filter, cardIds, cards, handleAIRequest,
+              });
+              if (fr && Array.isArray(fr.keepIds) && fr.keepIds.length) {
+                cardIds = fr.keepIds;
+              }
+            } catch (_) { /* filtro fallito: si tengono i risultati larghi */ }
+          }
         }
       } else if (parsed.cards.length) {
         // Cross-mazzo: gli id vengono dal contesto (mai inventati) → risolti
