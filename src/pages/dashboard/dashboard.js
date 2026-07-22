@@ -1962,6 +1962,11 @@
       isOwner = false;
       applyAccountProfile(null);
     }
+    // Lo stato auth arriva in modo asincrono dopo il primo render: se il gate
+    // owner è cambiato, ridisegna la barra così l'icona Gestione compare/sparisce
+    // (il re-render richiama refreshAccountControl, ma il gate ora combacia →
+    // niente ricorsione infinita).
+    if (isOwner !== _controlsOwner) renderControls();
   }
 
   // ===== Recap aggiornamento (C4) =====
