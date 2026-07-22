@@ -1009,6 +1009,22 @@
       `- Un tag si applica solo se la carta svolge davvero quella funzione (es. "ramp" = accelera il mana; "draw" = pesca carte; "removal" = rimuove permanenti o creature).\n` +
       `- Per i tag che citano il commander o le sinergie del mazzo, giudica nel contesto di QUESTO mazzo.\n` +
       `- Mai inventare id: usa solo quelli elencati.`,
+
+    // Filtro semantico dei risultati di ricerca (§4.1): decide, carta per
+    // carta, se rispetta l'intento dell'utente. La query Scryfall era larga
+    // apposta (per non perdere sinonimi), qui si tiene solo il pertinente.
+    // Output JSON tipizzato: la LISTA degli id che superano il filtro.
+    decksSearchFilter: ({ criterion, cards }) =>
+      `Sei un esperto di Magic: The Gathering. L'utente ha cercato carte con questo criterio, in italiano:\n"${criterion}"\n\n` +
+      `Qui sotto una lista di carte candidate (già filtrate per colore). Per OGNI carta decidi se rispetta DAVVERO il criterio, guardando cosa fa la carta (testo Oracle, tipo, costo) — non basta che contenga una parola simile.\n\n` +
+      `CARTE CANDIDATE:\n${cards}\n\n` +
+      `Rispondi con UN SOLO JSON valido (niente markdown, niente \`\`\`): la lista degli id delle carte che rispettano il criterio:\n` +
+      `{"keep": ["<scryfall_id>", ...]}\n\n` +
+      `Regole:\n` +
+      `- Metti in "keep" SOLO le carte che rispettano il criterio; ometti le altre.\n` +
+      `- Sii generoso ma onesto: se una carta è chiaramente pertinente all'intento (anche se descritta con parole diverse), tienila; se non c'entra, scartala.\n` +
+      `- Usa gli id ESATTAMENTE come scritti; mai inventarne.\n` +
+      `- Se NESSUNA carta è pertinente, rispondi {"keep": []}.`,
   };
 
   const DEFAULT_SETTINGS = {
