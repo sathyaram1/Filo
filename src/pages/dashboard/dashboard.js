@@ -1014,6 +1014,9 @@
     if (!cmd && Array.isArray(actions) && actions.some((a) => isType(a, 'CAPACITA_DETTAGLIO') && a._output)) {
       return AUTO_CONTINUE_CAPABILITY;
     }
+    if (!cmd && Array.isArray(actions) && actions.some((a) => isType(a, 'CERCA_WEB') && a._output)) {
+      return AUTO_CONTINUE_WEB;
+    }
     return AUTO_CONTINUE_PROMPT;
   }
 
