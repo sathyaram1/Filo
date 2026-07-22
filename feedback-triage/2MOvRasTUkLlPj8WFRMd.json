@@ -1,7 +1,0 @@
-{
-  "id": "2MOvRasTUkLlPj8WFRMd",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica e' stata pubblicata. Ora nei Modelli predefiniti i modelli che elimini restano eliminati anche dopo aver riaperto il menu; se li riaggiungi tornano disponibili come prima.",
-  "queuedAt": "2026-07-22T12:33:03.325Z",
-  "queuedBy": "routine"
-}
