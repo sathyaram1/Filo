@@ -32,6 +32,10 @@
     // Cache auto-tag (§7): { cardId → { tag → bool } }, SOLO tag context-free.
     // Permanente e cross-mazzo. Vedi src/main/services/deckOpinions.js.
     DECK_TAG_CACHE: 'deckTagCache',
+    // Cache filtro ricerca (§4.1): { cardId → { criterio → bool } }. Il giudizio
+    // "questa carta rispetta il criterio di ricerca" dipende solo da carta +
+    // criterio → permanente e cross-ricerca. Vedi src/main/services/deckOpinions.js.
+    DECK_SEARCH_CACHE: 'deckSearchCache',
     COSTS: 'costs',
     // Crediti (gamification): saldo, refill giornaliero, consumo aggregato per
     // tipo d'uso e log ricompense. Cache locale del doc Firestore `credits/<uid>`.
@@ -159,6 +163,11 @@
     // Auto-tag del mazzo (§7): LLM economico giudica carta-per-tag in batch.
     // Cache (carta, tag) permanente cross-mazzo per i tag context-free.
     DECKS_AUTOTAG: 'decks_autotag_ai',
+    // Filtro semantico dei risultati di ricerca (§4.1): la chat produce una
+    // query Scryfall VOLUTAMENTE LARGA (con sinonimi) per non perdere carte; poi
+    // questo LLM economico giudica carta-per-carta se rispetta davvero l'intento
+    // dell'utente, in batch. Cache (carta, criterio) permanente cross-ricerca.
+    DECKS_SEARCH_FILTER: 'decks_search_filter_ai',
   };
 
   // === Crediti (gamification) ===
@@ -313,6 +322,9 @@
     [ACTIONS.DECKS_OPINION]: 'flash, flash-or',
     // Auto-tag (§7): giudizio booleano carta-per-tag → modello economico.
     [ACTIONS.DECKS_AUTOTAG]: 'flash-lite-3, flash-lite-3-or',
+    // Filtro ricerca (§4.1): giudizio booleano carta-vs-criterio in batch →
+    // modello piccolo ed economico (gira su molte carte, con cache).
+    [ACTIONS.DECKS_SEARCH_FILTER]: 'flash-lite-3, flash-lite-3-or',
     // Triage tab: decisione economica e frequente → lite va bene.
     [ACTIONS.FILO_TAB_TRIAGE]: 'flash-lite-3, flash-lite-3-or',
     // Riassunto pagina alla chiusura: economico (gira spesso).
@@ -951,9 +963,10 @@
       `Carte nel mazzo (nome — tag):\n${deckCards || '(vuoto)'}\n\n` +
       `ALTRI MAZZI DELL'UTENTE (per le richieste che citano un altro mazzo):\n${otherDecks || '(nessuno)'}\n\n` +
       `Decidi la natura del messaggio e rispondi con UN SOLO JSON valido (niente markdown, niente \`\`\`):\n` +
-      `{"reply": "<testo breve in italiano, opzionale>", "query": "<query Scryfall, opzionale>", "cards": ["<scryfall_id>", ...] (opzionale), "budget": <numero | null> (opzionale), "prob": {"turn": <N>, "needs": {"<categoria>": <quante>}} (opzionale), "evaluate": "deck" | "results" (opzionale), "tagWith": ["<tag>", ...] (opzionale), "import": [{"name": "<nome carta>", "qty": <N>}, ...] (opzionale), "commander": "<nome carta>" (opzionale)}\n\n` +
+      `{"reply": "<testo breve in italiano, opzionale>", "query": "<query Scryfall, opzionale>", "filter": "<criterio in italiano, opzionale>", "cards": ["<scryfall_id>", ...] (opzionale), "budget": <numero | null> (opzionale), "prob": {"turn": <N>, "needs": {"<categoria>": <quante>}} (opzionale), "evaluate": "deck" | "results" (opzionale), "tagWith": ["<tag>", ...] (opzionale), "import": [{"name": "<nome carta>", "qty": <N>}, ...] (opzionale), "commander": "<nome carta>" (opzionale)}\n\n` +
       `Regole:\n` +
       `- RICERCA (query secca o frase che chiede carte): produci "query" in sintassi Scryfall (termini in inglese: o:, t:, cmc, kw:, ecc.). NON aggiungere vincoli di color identity (id/id<=): li aggiunge il sistema automaticamente. "reply" può restare vuota o contenere UNA frase di contesto. La ricerca la ESEGUE IL SISTEMA con la tua query: hai quindi pieno accesso al database delle carte — non dire mai il contrario. Anche cercare un commander da zero ("un commander izzet che costa 4 e crea elementali") è una RICERCA: query con is:commander e i vincoli richiesti (per i colori del commander cercato usa id:, es. is:commander id:UR).\n` +
+      `- QUERY LARGA + FILTRO: quando la richiesta è concettuale/fuzzy (un EFFETTO, un TEMA, un RUOLO descritti a parole — es. "carte che fanno tornare creature dal cimitero", "pedine che si moltiplicano", "protezione per il commander"), NON restringere troppo la query: scrivi una query VOLUTAMENTE LARGA e generosa, includendo SINONIMI e formulazioni alternative del testo Oracle in OR (usa la sintassi "(o:parola1 or o:parola2 or o:parola3)"), così non perdi carte scritte con parole diverse. In quei casi aggiungi ANCHE "filter": una frase in italiano che descrive CON PRECISIONE cosa deve fare la carta per andare bene. Un secondo modello userà "filter" per tenere solo le carte davvero pertinenti. Se invece la ricerca è già MECCANICA ed esatta (tipo/costo/keyword precisi, es. "t:dragon cmc<=3", "creature volanti a 2 mana"), NON serve "filter": ometterlo.\n` +
       `- SINTASSI ESPLICITA: se il messaggio contiene già sintassi Scryfall (es. "o:haste cmc<=2", "t:dragon"), quelle parti passano INVARIATE nella query; traduci solo l'eventuale parte in linguaggio naturale attorno.\n` +
       `- CROSS-MAZZO ("il ramp di mazzo X", "le terre del mio mazzo Y"): NON fare una query. Seleziona dalla lista dell'altro mazzo le carte pertinenti (usa nomi e tag) e metti i loro scryfall_id in "cards", nell'ordine della lista. In "reply" una frase breve su cosa hai selezionato.\n` +
       `- BUDGET ("budget 40 euro", "metti un tetto di 25€", "togli il budget"): metti in "budget" il numero in euro, oppure null per rimuovere il tetto. Il sistema lo applica e conferma da solo: "reply" può restare vuota.\n` +
@@ -1000,6 +1013,22 @@
       `- Un tag si applica solo se la carta svolge davvero quella funzione (es. "ramp" = accelera il mana; "draw" = pesca carte; "removal" = rimuove permanenti o creature).\n` +
       `- Per i tag che citano il commander o le sinergie del mazzo, giudica nel contesto di QUESTO mazzo.\n` +
       `- Mai inventare id: usa solo quelli elencati.`,
+
+    // Filtro semantico dei risultati di ricerca (§4.1): decide, carta per
+    // carta, se rispetta l'intento dell'utente. La query Scryfall era larga
+    // apposta (per non perdere sinonimi), qui si tiene solo il pertinente.
+    // Output JSON tipizzato: la LISTA degli id che superano il filtro.
+    decksSearchFilter: ({ criterion, cards }) =>
+      `Sei un esperto di Magic: The Gathering. L'utente ha cercato carte con questo criterio, in italiano:\n"${criterion}"\n\n` +
+      `Qui sotto una lista di carte candidate (già filtrate per colore). Per OGNI carta decidi se rispetta DAVVERO il criterio, guardando cosa fa la carta (testo Oracle, tipo, costo) — non basta che contenga una parola simile.\n\n` +
+      `CARTE CANDIDATE:\n${cards}\n\n` +
+      `Rispondi con UN SOLO JSON valido (niente markdown, niente \`\`\`): la lista degli id delle carte che rispettano il criterio:\n` +
+      `{"keep": ["<scryfall_id>", ...]}\n\n` +
+      `Regole:\n` +
+      `- Metti in "keep" SOLO le carte che rispettano il criterio; ometti le altre.\n` +
+      `- Sii generoso ma onesto: se una carta è chiaramente pertinente all'intento (anche se descritta con parole diverse), tienila; se non c'entra, scartala.\n` +
+      `- Usa gli id ESATTAMENTE come scritti; mai inventarne.\n` +
+      `- Se NESSUNA carta è pertinente, rispondi {"keep": []}.`,
   };
 
   const DEFAULT_SETTINGS = {

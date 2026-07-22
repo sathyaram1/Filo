@@ -120,13 +120,22 @@ test('isFresh: dentro il TTL sì, oltre no, timestamp rotto no', () => {
 // ── parseAgentReply (chat unificata §3): JSON tollerante ─────────────────────
 
 const NONE = {
-  reply: '', query: '', cards: [], hasBudget: false, budget: null, prob: null, evaluate: '', tagWith: [],
+  reply: '', query: '', filter: '', cards: [], hasBudget: false, budget: null, prob: null, evaluate: '', tagWith: [],
   import: [], commanderName: '',
 };
 
 test('parseAgentReply: JSON pulito → campi normalizzati', () => {
   const r = Q.parseAgentReply('{"reply":"Ecco","query":"o:haste","cards":["a","b"]}');
   assert.deepEqual(r, { ...NONE, reply: 'Ecco', query: 'o:haste', cards: ['a', 'b'] });
+});
+
+test('parseAgentReply: filter — criterio semantico estratto, stringa vuota/assente ignorata', () => {
+  const r = Q.parseAgentReply('{"query":"(o:return or o:reanimate)","filter":"riporta creature dal cimitero"}');
+  assert.equal(r.query, '(o:return or o:reanimate)');
+  assert.equal(r.filter, 'riporta creature dal cimitero');
+  // Filter assente o non-stringa → resta stringa vuota (nessun filtro).
+  assert.equal(Q.parseAgentReply('{"query":"t:dragon"}').filter, '');
+  assert.equal(Q.parseAgentReply('{"query":"t:dragon","filter":42}').filter, '');
 });
 
 test('parseAgentReply: tollera fence ```json e testo attorno', () => {

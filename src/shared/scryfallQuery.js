@@ -116,7 +116,7 @@
 
   function parseAgentReply(text) {
     const none = {
-      reply: '', query: '', cards: [], hasBudget: false, budget: null, prob: null, evaluate: '', tagWith: [],
+      reply: '', query: '', filter: '', cards: [], hasBudget: false, budget: null, prob: null, evaluate: '', tagWith: [],
       import: [], commanderName: '',
     };
     const raw = String(text || '').trim();
@@ -147,6 +147,9 @@
         return {
           reply: typeof o.reply === 'string' ? o.reply.trim() : '',
           query: typeof o.query === 'string' ? o.query.trim() : '',
+          // Criterio del filtro semantico (§4.1): quando presente, il sistema
+          // usa un LLM economico per tenere solo le carte che lo rispettano.
+          filter: typeof o.filter === 'string' ? o.filter.trim() : '',
           cards: Array.isArray(o.cards) ? o.cards.map(String).filter(Boolean) : [],
           hasBudget,
           budget,

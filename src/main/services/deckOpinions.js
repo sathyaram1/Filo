@@ -36,6 +36,12 @@
     return map && typeof map === 'object' ? map : {};
   }
 
+  async function readSearchCache() {
+    const r = await chrome.storage.local.get(STORAGE_KEYS.DECK_SEARCH_CACHE);
+    const map = r[STORAGE_KEYS.DECK_SEARCH_CACHE];
+    return map && typeof map === 'object' ? map : {};
+  }
+
   function withStale(entry, deck) {
     return { text: entry.text, versione: entry.versione, stale: P.isStale(entry, deck) };
   }
@@ -175,5 +181,51 @@
     };
   }
 
-  global.SN_DECK_OPINIONS_SVC = { getOpinions, computeOpinions, autoTag, dropDeck };
+  // Filtro semantico dei risultati di ricerca (§4.1): dato l'ordine dei
+  // candidati (già filtrati per colore da Scryfall) e un criterio in
+  // linguaggio naturale, tiene solo le carte che lo rispettano. UNA sola
+  // chiamata LLM per i soli id NON ancora in cache per quel criterio; il
+  // giudizio (carta, criterio) → bool è cacheato permanentemente cross-ricerca.
+  // `cards` è la mappa id → card (per il testo Oracle nel prompt).
+  // Ritorna { keepIds, judgedCount, fromCacheCount }: keepIds preserva l'ordine
+  // dei candidati. Se il criterio è vuoto, non filtra (tiene tutto).
+  async function filterSearch({ criterion, cardIds, cards, handleAIRequest }) {
+    const ids = (cardIds || []).map(String).filter((id) => cards && cards[id]);
+    const crit = P.normCriterion(criterion);
+    if (!crit || !ids.length) return { keepIds: ids, judgedCount: 0, fromCacheCount: 0 };
+
+    const cache = await readSearchCache();
+    const plan = P.planSearchFilter({ cardIds: ids, criterion: crit, searchCache: cache });
+
+    let judged = {};
+    let keptFresh = new Set();
+    if (plan.judgeIds.length) {
+      const toJudge = plan.judgeIds.slice(0, MAX_BATCH);
+      const sys = PROMPTS.decksSearchFilter({
+        criterion,
+        cards: toJudge.map((id) => cardPromptLine(cards[id])).join('\n'),
+      });
+      const r = await handleAIRequest({
+        action: ACTIONS.DECKS_SEARCH_FILTER,
+        payload: { messages: [{ role: 'user', content: sys }] },
+        origin: 'filo://decks',
+      });
+      keptFresh = P.parseSearchKeep(r.text, toJudge);
+      for (const id of toJudge) judged[id] = keptFresh.has(id);
+      await chrome.storage.local.set({
+        [STORAGE_KEYS.DECK_SEARCH_CACHE]: P.updateSearchCache(cache, crit, judged),
+      });
+    }
+
+    const keepSet = new Set([...plan.keepFromCache, ...Object.keys(judged).filter((id) => judged[id])]);
+    // Preserva l'ordine originale dei candidati.
+    const keepIds = ids.filter((id) => keepSet.has(id));
+    return {
+      keepIds,
+      judgedCount: plan.judgeIds.length,
+      fromCacheCount: plan.keepFromCache.length + (ids.length - plan.judgeIds.length - plan.keepFromCache.length),
+    };
+  }
+
+  global.SN_DECK_OPINIONS_SVC = { getOpinions, computeOpinions, autoTag, dropDeck, filterSearch };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -179,6 +179,73 @@
     return { deck: touched, changed: true, taggedCount };
   }
 
+  // ── Filtro semantico dei risultati di ricerca (§4.1) ───────────────────────
+  // La chat produce una query Scryfall LARGA (con sinonimi) + un "criterio" in
+  // linguaggio naturale; il sistema tiene solo le carte che, giudicate da un
+  // LLM economico, rispettano quel criterio. Il giudizio (carta, criterio) →
+  // bool è cacheabile PERMANENTEMENTE cross-ricerca: dipende solo dal testo
+  // della carta e dal criterio, mai dal mazzo. Cache: { cardId → { critKey → bool } }.
+
+  // Chiave di cache di un criterio: minuscolo, spazi normalizzati. Due ricerche
+  // scritte uguale (a meno di spazi/maiuscole) condividono i giudizi in cache.
+  function normCriterion(s) {
+    return String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  }
+
+  // Risposta del batch filtro (§4.1): { "keep": ["id", ...] } oppure un array
+  // nudo di id. Ritorna un Set degli id "keep" RISTRETTO a quelli davvero
+  // giudicati (mai id inventati dal modello). Gli id giudicati e non presenti in
+  // "keep" sono "scartati" (bool false), informazione cacheabile dal chiamante.
+  function parseSearchKeep(text, judgeIds) {
+    const allow = new Set((judgeIds || []).map(String));
+    const o = firstJson(text);
+    const out = new Set();
+    if (!o) return out;
+    const list = Array.isArray(o) ? o : (Array.isArray(o.keep) ? o.keep : []);
+    for (const it of list) {
+      const id = String(it || '').trim();
+      if (id && allow.has(id)) out.add(id);
+    }
+    return out;
+  }
+
+  // Piano del filtro con cache: per gli id candidati (nell'ORDINE dato) separa
+  // quelli già decisi in cache per QUESTO criterio (keepFromCache = solo i true)
+  // da quelli ancora da giudicare (judgeIds). searchCache: { cardId → { critKey → bool } }.
+  // Ritorna { judgeIds, keepFromCache } — keepFromCache preserva l'ordine.
+  function planSearchFilter({ cardIds, criterion, searchCache }) {
+    const key = normCriterion(criterion);
+    const cache = searchCache && typeof searchCache === 'object' ? searchCache : {};
+    const judgeIds = [];
+    const keepFromCache = [];
+    for (const rawId of cardIds || []) {
+      const id = String(rawId);
+      const entry = cache[id] && typeof cache[id] === 'object' ? cache[id] : {};
+      if (typeof entry[key] === 'boolean') {
+        if (entry[key]) keepFromCache.push(id);
+      } else {
+        judgeIds.push(id);
+      }
+    }
+    return { judgeIds, keepFromCache };
+  }
+
+  // Aggiorna la cache coi giudizi freschi (id → bool) per un criterio. Ritorna
+  // una NUOVA mappa (mai mutare l'input). Solo gli id davvero giudicati.
+  function updateSearchCache(searchCache, criterion, judged) {
+    const key = normCriterion(criterion);
+    if (!key) return searchCache && typeof searchCache === 'object' ? searchCache : {};
+    const next = {};
+    for (const [id, e] of Object.entries(searchCache && typeof searchCache === 'object' ? searchCache : {})) {
+      next[id] = { ...e };
+    }
+    for (const [id, matched] of Object.entries(judged || {})) {
+      if (!next[id]) next[id] = {};
+      next[id][key] = !!matched;
+    }
+    return next;
+  }
+
   global.SN_DECK_OPINIONS = {
     normTag,
     isContextFreeTag,
@@ -188,5 +255,9 @@
     planTagJudgments,
     updateTagCache,
     applyTagMembership,
+    normCriterion,
+    parseSearchKeep,
+    planSearchFilter,
+    updateSearchCache,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

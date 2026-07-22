@@ -113,7 +113,7 @@ test('ogni nickname citato dalle catene di default esiste nel registry di build'
 test("l'editor dei modelli per azione espone anche le azioni dei mazzi", () => {
   require(join(ROOT, 'src', 'shared', 'modelChainEditor.js'));
   const labels = globalThis.SN_MODEL_CHAIN.actionLabels().map(([action]) => action);
-  for (const a of [C.ACTIONS.DECKS_CHAT, C.ACTIONS.DECKS_OPINION, C.ACTIONS.DECKS_AUTOTAG]) {
+  for (const a of [C.ACTIONS.DECKS_CHAT, C.ACTIONS.DECKS_OPINION, C.ACTIONS.DECKS_AUTOTAG, C.ACTIONS.DECKS_SEARCH_FILTER]) {
     assert.ok(labels.includes(a), `azione mazzi "${a}" assente dall'editor modelli per azione`);
   }
 });
