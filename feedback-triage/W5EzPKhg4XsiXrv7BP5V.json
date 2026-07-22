@@ -1,7 +1,0 @@
-{
-  "id": "W5EzPKhg4XsiXrv7BP5V",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho verificato la ricerca a parole nel deck builder partendo dal sintomo: cercando un effetto descritto a parole (es. carte che fanno danni), la chat costruisce davvero una ricerca ampia con sinonimi in OR e poi un secondo modello, più piccolo, filtra le carte tenendo solo quelle pertinenti. Il modello del filtro è impostabile nelle Opzioni tra i «modelli per azione» (voce «Mazzi — filtro dei risultati di ricerca»), con catena e fallback come le altre azioni, di default un modello piccolo. Ho stressato i casi limite: quando il filtro scarta TUTTE le carte, o quando il modello risponde in modo non valido, l'utente NON resta a mani vuote — vede comunque i risultati della ricerca ampia. Le ricerche già meccaniche ed esatte saltano il filtro (nessun costo né attesa in più). Una seconda ricerca identica riusa la cache e non richiama il modello. Un nome carta malevolo con codice HTML viene mostrato come testo, senza eseguirsi. Tutti gli unit test e gli spec di mazzi/opzioni restano verdi.",
-  "queuedAt": "2026-07-22T11:54:18.462Z",
-  "queuedBy": "routine"
-}
