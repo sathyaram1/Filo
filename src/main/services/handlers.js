@@ -1015,6 +1015,35 @@ function capabilityDetailsForPrompt(actions) {
   return blocks.join('\n\n').trim();
 }
 
+// Re-immissione dei RISULTATI di una CERCA_WEB eseguita in un turno precedente
+// (#368): l'agente vede titoli, URL e snippet REALI e può rispondere con link
+// veri (o aprirne uno con NAVIGA usando l'URL esatto). Sono DATI di sistema
+// affidabili, non istruzioni dell'utente.
+function webSearchResultsForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const blocks = [];
+  for (const a of actions) {
+    if (!a || String(a.type || '').toUpperCase() !== 'CERCA_WEB') continue;
+    const out = a._output;
+    if (!out || !('search' in out)) continue;
+    const query = String(out.search || a.query || '').trim();
+    const results = Array.isArray(out.results) ? out.results : [];
+    if (!results.length) {
+      const why = out.error || out.reason || 'nessun risultato';
+      blocks.push(`[Ricerca web "${query}" — nessun risultato (${why})]`);
+      continue;
+    }
+    const lines = results.map((r, i) => {
+      const title = String(r.title || r.url || '').trim();
+      const url = String(r.url || '').trim();
+      const snippet = String(r.snippet || '').trim();
+      return `${i + 1}. ${title}\n   ${url}${snippet ? `\n   ${snippet}` : ''}`;
+    });
+    blocks.push(`[Risultati della ricerca web "${query}"]\n${lines.join('\n')}`);
+  }
+  return blocks.join('\n\n').trim();
+}
+
 // F4 — invia un feedback autonomo in background se la risposta segnala un gap
 // di capacità o una lamentela. Non blocca mai il flusso della chat.
 // Privacy: invia solo una descrizione GENERICA (nessun URL, nessun testo utente).
