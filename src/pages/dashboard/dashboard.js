@@ -1874,10 +1874,16 @@
   // alto a destra, oppure naviga (Home). Nessuna logica di menu duplicata qui.
   let accountCtrlBtn = null; // riferimento all'icona profilo (mostra l'avatar)
 
+  // Stato owner usato per l'ultimo render dei controlli: serve a ridisegnare la
+  // barra (per far comparire/sparire l'icona Gestione) solo quando il gate owner
+  // cambia, evitando ridisegni inutili.
+  let _controlsOwner = false;
+
   function renderControls() {
     const host = $('dashControls');
     if (!host) return;
     const ICONS = self.SN_ICONS || {};
+    _controlsOwner = isOwner;
     const items = [
       // Red-team: apre direttamente la pagina interna (è solo una navigazione,
       // non un menu nativo). Tenuto per primo (più a sinistra) e in rosso (vedi
@@ -1891,6 +1897,10 @@
       { command: 'history', icon: 'history', label: 'Cronologia', url: 'filo://history/history.html' },
       { command: 'settings', icon: 'options', label: 'Impostazioni' },
       { command: 'apps', icon: 'apps', label: 'App' },
+      // Gestione: punto d'accesso unico alle pagine di sola-amministrazione
+      // dell'owner (triage feedback, modelli predefiniti). Compare SOLO
+      // all'owner; il click aziona il menu nativo Gestione nella shell.
+      ...(isOwner ? [{ command: 'manage', icon: 'options', label: 'Gestione' }] : []),
       { command: 'account', icon: 'user', label: 'Profilo' },
     ];
     host.replaceChildren();
