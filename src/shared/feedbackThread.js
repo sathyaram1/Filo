@@ -312,6 +312,7 @@
     isFromModel,
     isFromOwner,
     originOf,
+    authorKind,
     ownerize,
     userTurnMarker,
     appendUserTurn,
