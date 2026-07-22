@@ -118,6 +118,24 @@
     return 'user';
   }
 
+  // Categoria d'AUTORE, user-facing, per l'icona "chi l'ha scritto" della
+  // dashboard di gestione. Riduce i prefissi tecnici del clientId alle quattro
+  // categorie che l'owner riconosce a colpo d'occhio:
+  //   auto:<…>              → 'filo'   Filo, in AUTOMATICO per conto dell'utente
+  //                                    (capacità mancante o errore incontrato)
+  //   owner:<id>            → 'owner'  l'owner (invio manuale dell'admin loggato)
+  //   agent:/routine:<…>    → 'claude' un'istanza AI (esploratore o routine cloud)
+  //   <altro>               → 'user'   un utente / alpha tester esterno
+  // `auto:` va controllato PRIMA di `owner:`: gli auto-feedback bypassano
+  // ownerize(), ma l'ordine tiene anche se un domani venissero marcati owner.
+  function authorKind(clientId) {
+    const c = String(clientId || '');
+    if (c.startsWith('auto:')) return 'filo';
+    if (c.startsWith('owner:')) return 'owner';
+    if (c.startsWith('agent:') || c.startsWith('routine:')) return 'claude';
+    return 'user';
+  }
+
   // Marca un clientId come invio dell'owner. Idempotente: non raddoppia il
   // prefisso e NON marca i feedback già di origine modello (agent:/routine:),
   // che owner non sono. Cap a 100 char = limite `clientId` delle Firestore rules.
