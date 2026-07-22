@@ -1838,6 +1838,7 @@
     await refreshAuth();
     applyAutoModeGate();
     await loadAutoMode();
+    await loadSortMode();
     await loadLoopCap();
     await loadJudgeTimeout();
     await loadData();
