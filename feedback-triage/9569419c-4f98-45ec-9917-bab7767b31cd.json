@@ -1,7 +1,0 @@
-{
-  "id": "9569419c-4f98-45ec-9917-bab7767b31cd",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho riprodotto da zero il percorso dell'utente su un'app reale: un feedback risolto la cui priorità è salvata in forma protetta (cifrata) ora fa comparire il popup di ringraziamento con il premio corretto secondo l'importanza della segnalazione — verificato +300 per priorità 3, +200 per priorità 2, +100 per priorità 1, +50 senza priorità — non più i 50 fissi di prima. Ho confermato che rimuovendo il fix lo stesso caso tornerebbe a premiare 50. Stress test superati: una priorità protetta senza la copia leggibile ricade in sicurezza sul minimo senza mandare in errore il popup; valori sporchi o assenti (testo non numerico, priorità mancante, fuori scala) non gonfiano mai il premio e restano entro il tetto massimo; un lotto misto di feedback somma correttamente le fasce ed esclude quelli non ancora risolti o inviati da altri utenti; il premio non viene mai erogato due volte alla riapertura. Verificato anche che un utente non può gonfiarsi il premio da solo: la copia leggibile della priorità è scrivibile solo dall'owner (le regole del database la accettano soltanto dal percorso amministratore e la limitano alla fascia 0-3), mentre i normali percorsi di voto/riapertura e le routine automatiche non possono toccarla. Regressione della logica pura tutta verde (955 controlli) e i quattro controlli end-to-end sul popup delle ricompense tutti verdi.",
-  "queuedAt": "2026-07-22T19:08:22.271Z",
-  "queuedBy": "routine"
-}
