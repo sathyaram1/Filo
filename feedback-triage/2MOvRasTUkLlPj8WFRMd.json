@@ -1,0 +1,7 @@
+{
+  "id": "2MOvRasTUkLlPj8WFRMd",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho riprodotto esattamente il problema che avevi segnalato: eliminare dei modelli dalla lista dei \"Modelli predefiniti\", salvare e riaprire. Ora l'eliminazione resta effettiva, i modelli non tornano più. Ho testato diversi casi oltre al tuo: eliminare più modelli in una volta sola (restano tutti eliminati), eliminarne uno e poi fare un salvataggio successivo per tutt'altro motivo (quello eliminato non ricompare comunque), ri-aggiungere un modello eliminato (torna disponibile come prima), svuotare completamente la lista (spariscono tutti senza errori) ed eliminare un modello ancora usato come predefinito da qualche funzione (viene rimosso, resta una tua scelta esplicita). Ho anche provato nomi strani con emoji e caratteri speciali per accertarmi che non intacchino i modelli di serie: tutto regolare. Nota: questa pagina è riservata all'amministratore e dialoga con il sistema condiviso, quindi non è riproducibile dall'interfaccia normale in ambiente di test; l'ho verificata simulando fedelmente lo stesso ciclo salva-e-riapri, che è il cuore del problema. Tutti i controlli automatici passano.",
+  "queuedAt": "2026-07-22T12:29:51.570Z",
+  "queuedBy": "routine"
+}
