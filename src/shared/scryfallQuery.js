@@ -27,6 +27,21 @@
     return `${q} id<=${identityCode(identity)}`.trim();
   }
 
+  // Una carta è DENTRO l'identità di colore del commander se OGNI colore della
+  // sua color identity è tra i colori del commander (regola Commander §8.4, la
+  // stessa del check di legalità). Le incolori (identity vuota) sono sempre
+  // ammesse. `commanderColors` null/non-array = nessun commander → nessun
+  // vincolo, tutto ammesso. È il filtro DURO sui DATI reali della carta: a
+  // differenza di `buildSearchQuery` (che agisce sulla stringa di query e cede
+  // a un vincolo `id` esplicito) qui nessuna sintassi può far passare una carta
+  // fuori identità — è la rete di sicurezza sui risultati proposti dall'agente.
+  function withinIdentity(cardColorIdentity, commanderColors) {
+    if (!Array.isArray(commanderColors)) return true;
+    const allowed = new Set(commanderColors.map((c) => String(c).toUpperCase()));
+    const ci = Array.isArray(cardColorIdentity) ? cardColorIdentity : [];
+    return ci.every((c) => allowed.has(String(c).toUpperCase()));
+  }
+
   // '{2}{U}{R}' → ['2','U','R']; stringa vuota/null → [].
   function parseManaCost(cost) {
     if (!cost) return [];
