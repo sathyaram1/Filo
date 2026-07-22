@@ -993,6 +993,15 @@
     'Ora hai i dettagli delle capacità di Filo qui sopra. Rispondi all’utente: ' +
     'se la capacità esiste spiega con parole tue cosa fa e come si usa; se NON ' +
     'esiste, dillo con onestà senza inventare. Non emettere altre azioni CAPACITA_DETTAGLIO.';
+  // Nudge interno dopo una CERCA_WEB: ora l'agente ha i risultati REALI qui
+  // sopra (titolo, URL, snippet) e deve rispondere all'utente. Se deve aprire un
+  // risultato usa NAVIGA con l'URL ESATTO tra i risultati, mai inventato (#368).
+  const AUTO_CONTINUE_WEB =
+    'Ora hai i risultati della ricerca web qui sopra (titolo, URL, snippet reali). ' +
+    'Rispondi all’utente usando questi risultati: se ha chiesto di aprire qualcosa, ' +
+    'emetti NAVIGA con l’URL ESATTO preso dai risultati (non inventarne uno); ' +
+    'altrimenti riporta i link pertinenti nel testo. Se i risultati non contengono ' +
+    'ciò che serve, dillo con onestà. Non emettere un’altra CERCA_WEB per la stessa richiesta.';
 
   function isType(a, t) {
     return a && String(a.type || '').toUpperCase() === t;
