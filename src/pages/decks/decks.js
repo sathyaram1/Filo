@@ -1729,6 +1729,50 @@
       }
       openCtx(e.clientX, e.clientY, items);
     });
+    // Trascina una carta su una categoria (#344). La riga è draggable; il drop
+    // avviene su un intero gruppo (intestazione o righe): rilasciare ovunque
+    // dentro il gruppo di destinazione conta. Un evidenziatore d'accento segue
+    // il gruppo sotto il cursore (feedback: ogni azione risponde).
+    let dragCardId = null;
+    const clearDropHint = () => {
+      for (const g of list.querySelectorAll('.dk-group.dk-drop-target')) g.classList.remove('dk-drop-target');
+    };
+    list.addEventListener('dragstart', (e) => {
+      const row = e.target.closest && e.target.closest('.dk-row[data-card-id]');
+      if (!row) return;
+      dragCardId = row.dataset.cardId;
+      row.classList.add('dk-dragging');
+      if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = 'move';
+        try { e.dataTransfer.setData('text/plain', dragCardId); } catch (_) { /* alcuni browser lo vietano fuori da user gesture */ }
+      }
+    });
+    list.addEventListener('dragend', (e) => {
+      const row = e.target.closest && e.target.closest('.dk-row');
+      if (row) row.classList.remove('dk-dragging');
+      dragCardId = null;
+      clearDropHint();
+    });
+    list.addEventListener('dragover', (e) => {
+      if (!dragCardId) return;
+      const group = e.target.closest && e.target.closest('.dk-group[data-group]');
+      if (!group) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+      if (!group.classList.contains('dk-drop-target')) { clearDropHint(); group.classList.add('dk-drop-target'); }
+    });
+    list.addEventListener('drop', (e) => {
+      if (!dragCardId) return;
+      const group = e.target.closest && e.target.closest('.dk-group[data-group]');
+      if (!group) return;
+      e.preventDefault();
+      const id = dragCardId;
+      const groupName = group.dataset.group;
+      dragCardId = null;
+      clearDropHint();
+      dropCardOnGroup(id, groupName, e.clientX, e.clientY);
+    });
+
     // Cambio di raggruppamento (vista, non dato: §8.1).
     $('groupBy').addEventListener('click', (e) => {
       e.stopPropagation();
