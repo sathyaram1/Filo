@@ -44,6 +44,7 @@
       [A.DECKS_CHAT, 'options_action_decks_chat'],
       [A.DECKS_OPINION, 'options_action_decks_opinion'],
       [A.DECKS_AUTOTAG, 'options_action_decks_autotag'],
+      [A.DECKS_SEARCH_FILTER, 'options_action_decks_search_filter'],
     ];
   }
 
