@@ -534,6 +534,110 @@
     setPriorityFromDot(dot.dataset.prioId, Number(dot.dataset.prioN));
   });
 
+  // ── Menu di ordinamento della lista (tasto destro sull'intestazione) ──────
+  // "il tasto destro è centrale" (filo_filosofia): il tasto destro sull'header
+  // della colonna apre un box per riordinare i feedback (numero/priorità/
+  // creatore). Il glifo ⇅ accanto al titolo è la scorciatoia GUI (click) allo
+  // stesso menu, così l'azione è scopribile senza dover indovinare il tasto
+  // destro. Riusa le classi .sn-select-pop/.sn-select-option (PATTERNS.md).
+  const mgSortBtn = document.getElementById('mgSortBtn');
+  const mgListHeadRow = document.getElementById('mgListHeadRow');
+  let sortMenu = null;
+  function closeSortMenu() {
+    if (!sortMenu) return;
+    sortMenu.remove();
+    sortMenu = null;
+    document.removeEventListener('mousedown', onSortOutside, true);
+    document.removeEventListener('keydown', onSortKeydown, true);
+    window.removeEventListener('scroll', closeSortMenu, true);
+    window.removeEventListener('resize', closeSortMenu);
+  }
+  function onSortOutside(e) {
+    if (sortMenu && !sortMenu.contains(e.target)) closeSortMenu();
+  }
+  function onSortKeydown(e) {
+    if (e.key === 'Escape') closeSortMenu();
+  }
+  function chooseSort(mode) {
+    closeSortMenu();
+    if (!SORT_MODES[mode] || mode === sortMode) return;
+    sortMode = mode;
+    reflectSortBtn();
+    renderList();
+    chrome.storage.local.set({ [SORT_MODE_KEY]: mode }).catch(() => {});
+  }
+  // Riflette l'ordinamento attivo sul glifo dell'intestazione (tooltip + stato
+  // "non predefinito" evidenziato), così l'owner vede a colpo d'occhio se la
+  // lista è riordinata.
+  function reflectSortBtn() {
+    if (!mgSortBtn) return;
+    const active = sortMode !== 'smart';
+    mgSortBtn.classList.toggle('mg-sort-btn--active', active);
+    mgSortBtn.title = active
+      ? `Ordinamento: ${SORT_MODES[sortMode]} — clic o tasto destro per cambiare`
+      : 'Riordina i feedback — clic o tasto destro';
+  }
+  function openSortMenu(x, y) {
+    closeSortMenu();
+    const menu = document.createElement('div');
+    menu.className = 'sn-select-pop mg-ctxmenu';
+    menu.setAttribute('role', 'menu');
+    for (const mode of ['num', 'priority', 'creator', 'smart']) {
+      const opt = document.createElement('div');
+      opt.className = 'sn-select-option';
+      opt.setAttribute('role', 'menuitemradio');
+      const on = mode === sortMode;
+      opt.setAttribute('aria-checked', on ? 'true' : 'false');
+      if (on) opt.classList.add('sn-selected');
+      // ✓ sull'ordinamento attivo; spazio allineato sugli altri.
+      opt.textContent = `${on ? '✓ ' : ' '}${SORT_MODES[mode]}`;
+      opt.addEventListener('click', () => chooseSort(mode));
+      menu.appendChild(opt);
+    }
+    document.body.appendChild(menu);
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const w = menu.offsetWidth, h = menu.offsetHeight;
+    menu.style.left = `${Math.max(4, Math.min(x, vw - w - 4))}px`;
+    menu.style.top = `${Math.max(4, Math.min(y, vh - h - 4))}px`;
+    sortMenu = menu;
+    setTimeout(() => {
+      document.addEventListener('mousedown', onSortOutside, true);
+      document.addEventListener('keydown', onSortKeydown, true);
+      window.addEventListener('scroll', closeSortMenu, true);
+      window.addEventListener('resize', closeSortMenu);
+    }, 0);
+  }
+  // Tasto destro ovunque sull'intestazione della lista → menu di ordinamento.
+  if (mgListHeadRow) {
+    mgListHeadRow.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      openSortMenu(e.clientX, e.clientY);
+    });
+  }
+  // Click (o Invio/Spazio) sul glifo ⇅ → stesso menu, ancorato al glifo.
+  if (mgSortBtn) {
+    mgSortBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const r = mgSortBtn.getBoundingClientRect();
+      openSortMenu(r.left, r.bottom + 4);
+    });
+    mgSortBtn.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        const r = mgSortBtn.getBoundingClientRect();
+        openSortMenu(r.left, r.bottom + 4);
+      }
+    });
+  }
+  async function loadSortMode() {
+    try {
+      const data = await chrome.storage.local.get(SORT_MODE_KEY);
+      const v = data && data[SORT_MODE_KEY];
+      if (v && SORT_MODES[v]) sortMode = v;
+    } catch (_) { /* ripiego sull'ordine predefinito */ }
+    reflectSortBtn();
+  }
+
   // ── Rendering colonna sinistra ────────────────────────────────────────────
   function renderList() {
     mgListLoading.hidden = true;
