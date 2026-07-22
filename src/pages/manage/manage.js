@@ -107,7 +107,70 @@
 
   const FB  = window.SN_FEEDBACK;
   const MR  = window.SN_MANAGE_REVIEW;
+  const TH  = window.SN_FEEDBACK_THREAD;
   const AUTO_MODE_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTO_MODE) || 'filo_auto_mode';
+  const SORT_MODE_KEY = 'filo_manage_sort';
+
+  // ── Icona d'autore su ogni card (chi ha scritto il feedback) ──────────────
+  // Riduce il clientId alle 4 categorie riconoscibili a colpo d'occhio. La
+  // CLASSIFICAZIONE (prefissi → categoria) è pura e condivisa in
+  // SN_FEEDBACK_THREAD.authorKind; qui vive solo la resa visiva (icona+etichetta).
+  const AUTHOR_META = {
+    owner:  { icon: '👑', label: 'Owner' },
+    user:   { icon: '👤', label: 'Utente' },
+    claude: { icon: '🤖', label: 'Claude' },
+    filo:   { icon: '🧵', label: 'Filo (automatico)' },
+  };
+  function authorKindOf(fb) {
+    return (TH && TH.authorKind) ? TH.authorKind(fb && fb.clientId) : 'user';
+  }
+  function authorIconHtml(fb) {
+    const m = AUTHOR_META[authorKindOf(fb)] || AUTHOR_META.user;
+    return `<span class="mg-item-author" title="Scritto da: ${esc(m.label)}" aria-label="Scritto da ${esc(m.label)}">${m.icon}</span>`;
+  }
+
+  // ── Ordinamento della lista (menu tasto destro sull'intestazione) ─────────
+  // 'smart' = ordine predefinito per-tab (severità/priorità/recenza, come prima).
+  // Gli altri sono override globali richiesti dall'owner dal menu contestuale.
+  const SORT_MODES = {
+    smart:    'Ordine predefinito',
+    num:      'Per numero (recenti prima)',
+    priority: 'Per priorità',
+    creator:  'Per creatore',
+  };
+  let sortMode = 'smart';
+
+  // Chiave numerica di un feedback per l'ordinamento "per numero": seq.subSeq
+  // (#12.3 → 12003). Senza numero → in fondo (con l'ordine decrescente).
+  function seqKey(fb) {
+    const s = Number(fb && fb.seq);
+    if (!Number.isFinite(s)) return -Infinity;
+    const sub = Number(fb && fb.subSeq) || 0;
+    return s * 1000 + Math.min(999, Math.max(0, sub));
+  }
+  // Rango di categoria per l'ordinamento "per creatore" (raggruppa gli autori
+  // dello stesso tipo, poi per clientId così lo stesso mittente resta unito).
+  const AUTHOR_RANK = { owner: 0, user: 1, claude: 2, filo: 3 };
+  // Applica l'override di ordinamento scelto dall'owner. `list` arriva GIÀ
+  // ordinata col criterio predefinito della tab: in 'smart' la lasciamo intatta.
+  // `sort` è stabile → a parità di chiave si conserva l'ordine predefinito.
+  function applySortMode(list) {
+    if (sortMode === 'smart') return list;
+    const arr = list.slice();
+    if (sortMode === 'num') {
+      arr.sort((a, b) => seqKey(b) - seqKey(a));
+    } else if (sortMode === 'priority') {
+      arr.sort((a, b) => MR.priorityOf(b) - MR.priorityOf(a));
+    } else if (sortMode === 'creator') {
+      arr.sort((a, b) => {
+        const ra = AUTHOR_RANK[authorKindOf(a)] ?? 9;
+        const rb = AUTHOR_RANK[authorKindOf(b)] ?? 9;
+        if (ra !== rb) return ra - rb;
+        return String(a.clientId || '').localeCompare(String(b.clientId || ''));
+      });
+    }
+    return arr;
+  }
   const LOOP_CAP_KEY  = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_LOOP_CAP) || 'filo_automation_loop_cap';
   const AUTOMATION = window.SN_CONST?.AUTOMATION || { LOOP_CAP_DEFAULT: 3, LOOP_CAP_MIN: 1, LOOP_CAP_MAX: 10 };
 
