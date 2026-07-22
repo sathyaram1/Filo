@@ -862,11 +862,16 @@
       return btn;
     }
     if (type === 'CERCA_WEB') {
+      // Chip di stato inerte (come "📖 Verifico cosa so fare"): rende trasparente
+      // che Filo sta cercando sul web. La ricerca è già partita nel main e i
+      // risultati rientrano nel turno successivo (auto-continue), dove compare la
+      // risposta con i link REALI. Non è un bottone cliccabile — prima sembrava
+      // un "link che non funziona" (#368).
       const btn = document.createElement('button');
       btn.className = 'dash-action-btn';
       btn.type = 'button';
       btn.disabled = true;
-      btn.textContent = `🔎 ${a.query}`;
+      btn.textContent = `🔎 Cerco sul web: ${a.query || ''}`.trim();
       return btn;
     }
     if (type === 'CAPACITA_DETTAGLIO') {
