@@ -368,7 +368,7 @@
       ? `${card.priceEur.toFixed(2).replace('.', ',')} €` : '';
     const mana = card ? manaHtml(card.manaCost) : '';
     return `
-      <div class="dk-row" data-card-id="${esc(entry.scryfall_id)}" tabindex="0">
+      <div class="dk-row" data-card-id="${esc(entry.scryfall_id)}" tabindex="0" draggable="true">
         ${qty}<span class="dk-row-name">${esc(name)}</span>
         <span class="dk-row-price">${esc(price)}</span>
         <span class="dk-row-mana">${mana}</span>
@@ -556,6 +556,59 @@
       run: () => saveDeck(Decks.setGroupOverride(current, cardId, null)),
     });
     openCtx(x, y, items);
+  }
+
+  // Rilascio di una carta su una categoria (#344). La categoria è il gruppo
+  // della vista corrente. Nella vista "per tag" la categoria È un tag, quindi
+  // c'è la scelta aggiungi-vs-sostituisci del feedback; nelle altre viste le
+  // categorie sono proprietà intrinseche della carta (tipo/costo/colore), che
+  // non si possono riscrivere: lì il trascinamento forza il gruppo, come già fa
+  // il menu "Sposta in gruppo…" (parità tra cammini equivalenti).
+  //
+  // Filo indovina quando può (meno attrito): il popup di scelta compare SOLO
+  // quando "aggiungi" e "sostituisci" darebbero risultati diversi. Se la carta
+  // non ha tag (le due opzioni coincidono) o ha già solo quel tag (nessun
+  // cambiamento reale) non c'è ambiguità → niente popup.
+  function dropCardOnGroup(cardId, groupName, x, y) {
+    const entry = current.carte.find((c) => c.scryfall_id === cardId);
+    if (!entry) return;
+    const name = (cardsById[cardId] && cardsById[cardId].name) || 'La carta';
+    const view = current.raggruppamento || 'tipo';
+
+    if (view !== 'tag') {
+      const next = Decks.setGroupOverride(current, cardId, groupName);
+      if (next !== current) { saveDeck(next); showToast(`${name} spostata in "${groupName}".`); }
+      return;
+    }
+
+    // Vista "per tag": la pseudo-categoria "Senza tag" raccoglie le carte senza
+    // tag → rilasciarci sopra significa togliere ogni tag (l'inverso del drag).
+    if (groupName === 'Senza tag') {
+      const next = Decks.replaceCardTags(current, cardId, []);
+      if (next !== current) { saveDeck(next); showToast(`Tag rimossi da ${name}.`); }
+      return;
+    }
+
+    const tags = entry.tags || [];
+    const trivial = tags.length === 0 || (tags.length === 1 && tags[0] === groupName);
+    if (trivial) {
+      const next = Decks.addTagToCard(current, cardId, groupName);
+      if (next === current) showToast(`${name} ha già il tag "${groupName}".`);
+      else { saveDeck(next); showToast(`Aggiunto tag "${groupName}" a ${name}.`); }
+      return;
+    }
+
+    // Ambiguità reale (la carta ha già altri tag): il popup richiesto dal feedback.
+    openCtx(x, y, [
+      {
+        label: `Aggiungi tag "${groupName}"`,
+        run: () => { saveDeck(Decks.addTagToCard(current, cardId, groupName)); showToast(`Aggiunto tag "${groupName}" a ${name}.`); },
+      },
+      {
+        label: `Sostituisci con "${groupName}"`,
+        run: () => { saveDeck(Decks.replaceCardTags(current, cardId, [groupName])); showToast(`Tag di ${name} sostituiti con "${groupName}".`); },
+      },
+    ]);
   }
 
   // "Copia/Sposta in un altro mazzo": secondo livello con l'elenco dei mazzi.
@@ -1676,6 +1729,50 @@
       }
       openCtx(e.clientX, e.clientY, items);
     });
+    // Trascina una carta su una categoria (#344). La riga è draggable; il drop
+    // avviene su un intero gruppo (intestazione o righe): rilasciare ovunque
+    // dentro il gruppo di destinazione conta. Un evidenziatore d'accento segue
+    // il gruppo sotto il cursore (feedback: ogni azione risponde).
+    let dragCardId = null;
+    const clearDropHint = () => {
+      for (const g of list.querySelectorAll('.dk-group.dk-drop-target')) g.classList.remove('dk-drop-target');
+    };
+    list.addEventListener('dragstart', (e) => {
+      const row = e.target.closest && e.target.closest('.dk-row[data-card-id]');
+      if (!row) return;
+      dragCardId = row.dataset.cardId;
+      row.classList.add('dk-dragging');
+      if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = 'move';
+        try { e.dataTransfer.setData('text/plain', dragCardId); } catch (_) { /* alcuni browser lo vietano fuori da user gesture */ }
+      }
+    });
+    list.addEventListener('dragend', (e) => {
+      const row = e.target.closest && e.target.closest('.dk-row');
+      if (row) row.classList.remove('dk-dragging');
+      dragCardId = null;
+      clearDropHint();
+    });
+    list.addEventListener('dragover', (e) => {
+      if (!dragCardId) return;
+      const group = e.target.closest && e.target.closest('.dk-group[data-group]');
+      if (!group) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+      if (!group.classList.contains('dk-drop-target')) { clearDropHint(); group.classList.add('dk-drop-target'); }
+    });
+    list.addEventListener('drop', (e) => {
+      if (!dragCardId) return;
+      const group = e.target.closest && e.target.closest('.dk-group[data-group]');
+      if (!group) return;
+      e.preventDefault();
+      const id = dragCardId;
+      const groupName = group.dataset.group;
+      dragCardId = null;
+      clearDropHint();
+      dropCardOnGroup(id, groupName, e.clientX, e.clientY);
+    });
+
     // Cambio di raggruppamento (vista, non dato: §8.1).
     $('groupBy').addEventListener('click', (e) => {
       e.stopPropagation();
