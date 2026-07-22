@@ -120,6 +120,24 @@
       border-bottom: 1px solid var(--sn-border);
       flex: 0 0 auto;
     }
+    /* Intestazione della lista: titolo a sinistra, glifo di ordinamento a
+       destra. Il tasto destro sull'intera riga apre il menu di riordino. */
+    .mg-list-head-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    }
+    .mg-sort-btn {
+      flex: 0 0 auto;
+      border: none; background: transparent; cursor: pointer;
+      color: var(--sn-muted); font-size: 14px; line-height: 1;
+      padding: 2px 4px; border-radius: 4px;
+      transition: background 0.1s, color 0.1s;
+    }
+    .mg-sort-btn:hover { background: var(--sn-hover); color: var(--sn-fg); }
+    /* Ordinamento non predefinito attivo: il glifo si tinge d'accento così è
+       chiaro che la lista è riordinata. */
+    .mg-sort-btn--active { color: var(--sn-accent); }
+    /* Menu contestuale di ordinamento (sn-select-pop appeso al body). */
+    .mg-ctxmenu { position: fixed; right: auto; top: auto; min-width: 180px; }
     .mg-col-body {
       flex: 1 1 0; overflow-y: auto; padding: 8px;
     }
