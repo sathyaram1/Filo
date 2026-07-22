@@ -123,22 +123,17 @@
     ];
   }
   // Voci del menu Impostazioni (ingranaggio): Modelli, Sicurezza, Preferenze —
-  // tre pagine interne dedicate. La voce "Modelli predefiniti" appare SOLO agli
-  // admin (gli utenti comuni non la vedono affatto). `buildSettings()` ricostruisce
-  // la lista ad ogni apertura del menu, così riflette lo stato auth corrente.
+  // tre pagine interne dedicate, uguali per tutti. Le pagine di sola-gestione
+  // dell'owner ("Modelli predefiniti") vivono ora nel menu Gestione (icona
+  // riservata all'owner), non più qui.
   function buildSettings() {
-    const entries = [
+    return [
       { label: 'Modelli', icon: 'models', url: 'filo://options/options.html' },
       { label: 'Altro', icon: 'options', url: 'filo://options/altro.html' },
       { label: 'Sicurezza', icon: 'lock', url: 'filo://security/security.html' },
       { type: 'separator' },
       { label: 'Preferenze', icon: 'colorPicker', url: 'filo://preferences/preferences.html' },
     ];
-    if (isAdmin) {
-      entries.push({ type: 'separator' });
-      entries.push({ label: 'Modelli predefiniti', icon: 'models', url: 'filo://admin-defaults/admin-defaults.html' });
-    }
-    return entries;
   }
 
   // Popup menu custom: BrowserWindow frameless che appare sopra le
