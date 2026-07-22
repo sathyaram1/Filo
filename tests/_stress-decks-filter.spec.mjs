@@ -7,33 +7,27 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 
-function mkCards() {
-  const COMMANDER = {
-    id: 'niv-1', name: 'Niv-Mizzet, Parun', mana_cost: '{U}{U}{U}{R}{R}{R}', cmc: 6,
-    type_line: 'Legendary Creature — Dragon Wizard', colors: ['U', 'R'], color_identity: ['U', 'R'],
-    image_uris: { normal: 'https://cards.test/niv.jpg', art_crop: 'https://cards.test/niv-art.jpg' },
-    prices: { eur: '3.21' }, legalities: { commander: 'legal' }, scryfall_uri: 'https://scryfall.com/card/niv',
-  };
-  const BOLT = {
-    id: 'bolt-1', name: 'Lightning Bolt', mana_cost: '{R}', cmc: 1, type_line: 'Instant',
-    oracle_text: 'Lightning Bolt deals 3 damage to any target.',
-    colors: ['R'], color_identity: ['R'], image_uris: { normal: 'https://cards.test/bolt.jpg' },
-    prices: { eur: '1.10' }, legalities: { commander: 'legal' }, scryfall_uri: 'https://scryfall.com/card/bolt',
-  };
-  // Nome con payload XSS: se non escapato eseguirebbe/romperebbe il markup.
-  const XSS = {
-    id: 'xss-1', name: '<img src=x onerror=window.__pwned=1>Zap', mana_cost: '{R}', cmc: 1, type_line: 'Instant',
-    oracle_text: 'Zap deals 1 damage.',
-    colors: ['R'], color_identity: ['R'], image_uris: { normal: 'https://cards.test/zap.jpg' },
-    prices: { eur: '0.10' }, legalities: { commander: 'legal' }, scryfall_uri: 'https://scryfall.com/card/zap',
-  };
-  return { COMMANDER, BOLT, XSS };
-}
-
 // mode: 'empty' → keep:[]; 'garbage' → testo non-JSON; 'ok' → keep bolt-1
 async function mockScryfallAndProvider(app, mode) {
-  await app.evaluate(({ mode, cards }) => {
-    const { COMMANDER, BOLT, XSS } = cards;
+  await app.evaluate((mode) => {
+    const COMMANDER = {
+      id: 'niv-1', name: 'Niv-Mizzet, Parun', mana_cost: '{U}{U}{U}{R}{R}{R}', cmc: 6,
+      type_line: 'Legendary Creature — Dragon Wizard', colors: ['U', 'R'], color_identity: ['U', 'R'],
+      image_uris: { normal: 'https://cards.test/niv.jpg', art_crop: 'https://cards.test/niv-art.jpg' },
+      prices: { eur: '3.21' }, legalities: { commander: 'legal' }, scryfall_uri: 'https://scryfall.com/card/niv',
+    };
+    const BOLT = {
+      id: 'bolt-1', name: 'Lightning Bolt', mana_cost: '{R}', cmc: 1, type_line: 'Instant',
+      oracle_text: 'Lightning Bolt deals 3 damage to any target.',
+      colors: ['R'], color_identity: ['R'], image_uris: { normal: 'https://cards.test/bolt.jpg' },
+      prices: { eur: '1.10' }, legalities: { commander: 'legal' }, scryfall_uri: 'https://scryfall.com/card/bolt',
+    };
+    const XSS = {
+      id: 'xss-1', name: '<img src=x onerror=window.__pwned=1>Zap', mana_cost: '{R}', cmc: 1, type_line: 'Instant',
+      oracle_text: 'Zap deals 1 damage.',
+      colors: ['R'], color_identity: ['R'], image_uris: { normal: 'https://cards.test/zap.jpg' },
+      prices: { eur: '0.10' }, legalities: { commander: 'legal' }, scryfall_uri: 'https://scryfall.com/card/zap',
+    };
     const BY_ID = { 'niv-1': COMMANDER, 'bolt-1': BOLT, 'xss-1': XSS };
     globalThis.__scryRequests = [];
     globalThis.SN_SCRYFALL._setFetch(async (url) => {
