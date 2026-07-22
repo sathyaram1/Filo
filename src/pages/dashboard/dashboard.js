@@ -1849,9 +1849,12 @@
         _timerRingTone = msg.settings.timerRingtone;
       }
     } else if (msg?.type === MSG.AUTH_CHANGED) {
-      // Login/logout fatto altrove (es. dal menu profilo): aggiorna l'avatar.
+      // Login/logout fatto altrove (es. dal menu profilo): aggiorna l'avatar e,
+      // se il gate owner è cambiato, ridisegna la barra così l'icona Gestione
+      // compare/sparisce dal vivo.
       isOwner = !!(msg.signedIn && msg.isAdmin);
       applyAccountProfile(msg.signedIn ? msg.profile : null);
+      if (isOwner !== _controlsOwner) renderControls();
     } else if (msg?.type === MSG.GIFT_NOTICE) {
       // L'owner ci ha regalato dei crediti (#210.4): avviso una volta sola.
       const n = Math.round(Number(msg.amount) || 0);
