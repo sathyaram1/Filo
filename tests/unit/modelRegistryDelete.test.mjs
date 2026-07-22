@@ -29,7 +29,7 @@ const Defaults = require(join(ROOT, 'src', 'main', 'services', 'defaultsStore.js
 const C = globalThis.SN_CONST;
 
 // Stubba l'auth (nessun login reale nei test): un id token finto qualsiasi.
-const auth = require(join(ROOT, 'src', 'main', 'services', 'auth', 'google-auth.js'));
+const auth = require(join(ROOT, 'src', 'main', 'auth', 'google-auth.js'));
 const realGetIdToken = auth.getIdToken;
 
 // FS Value → JS (specular a fromFsValue nello store): serve per decodificare il
