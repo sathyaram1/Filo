@@ -315,6 +315,76 @@ test('query Scryfall rifiutata (400) → il modello la corregge e i risultati ar
   expect(retryCall).toContain('Unmatched parenthesis');
 });
 
+// #351 — l'agente NON deve MAI proporre carte fuori dai colori del commander,
+// nemmeno se il modello si scrive da solo un vincolo `id:` sbagliato nella query
+// (che il filtro sulla stringa lascia passare per rispettare l'override manuale).
+// SUCCESSO = la carta fuori identità NON compare nella CardList; resta solo
+// quella legale, e la bolla avvisa che una carta è stata esclusa.
+test('carte fuori dai colori del commander vengono filtrate dai risultati dell\'agente', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  await app.evaluate(() => {
+    // Il modello, "aiutando", aggiunge un vincolo id:B esplicito → Scryfall
+    // restituisce anche una carta NERA, fuori dall'identità Izzet (U/R).
+    globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
+      globalThis.__chatCalls.push(messages);
+      return {
+        text: JSON.stringify({ reply: 'Ecco qualche pescata.', query: 'o:draw id:B' }),
+        model: attempts[0].model, provider: attempts[0].provider, usage: {},
+      };
+    };
+    globalThis.SN_SCRYFALL._setFetch(async (url) => {
+      globalThis.__scryRequests.push(String(url));
+      const u = new URL(String(url));
+      if (u.pathname === '/cards/search') {
+        return { ok: true, status: 200, json: async () => ({ data: [
+          // Legale (blu, dentro U/R).
+          { id: 'ponder-1', name: 'Ponder', mana_cost: '{U}', cmc: 1, type_line: 'Sorcery',
+            colors: ['U'], color_identity: ['U'], image_uris: { normal: 'https://cards.test/ponder.jpg' },
+            prices: { eur: '0.50' }, legalities: { commander: 'legal' }, scryfall_uri: 'https://scryfall.com/card/ponder' },
+          // FUORI identità (nera): deve sparire dai risultati proposti.
+          { id: 'sign-1', name: 'Sign in Blood', mana_cost: '{B}{B}', cmc: 2, type_line: 'Sorcery',
+            colors: ['B'], color_identity: ['B'], image_uris: { normal: 'https://cards.test/sign.jpg' },
+            prices: { eur: '0.40' }, legalities: { commander: 'legal' }, scryfall_uri: 'https://scryfall.com/card/sign' },
+        ], has_more: false }) };
+      }
+      if (u.pathname === '/cards/niv-1') {
+        return { ok: true, status: 200, json: async () => ({
+          id: 'niv-1', name: 'Niv-Mizzet, Parun', mana_cost: '{U}{U}{U}{R}{R}{R}', cmc: 6,
+          type_line: 'Legendary Creature — Dragon Wizard', colors: ['U', 'R'], color_identity: ['U', 'R'],
+          image_uris: { normal: 'https://cards.test/niv.jpg', art_crop: 'https://cards.test/niv-art.jpg' },
+          prices: { eur: '3.21' }, legalities: { commander: 'legal' },
+          scryfall_uri: 'https://scryfall.com/card/niv',
+        }) };
+      }
+      if (u.pathname === '/symbology') {
+        return { ok: true, status: 200, json: async () => ({ data: [
+          { symbol: '{U}', svg_uri: 'https://svgs.test/U.svg' },
+          { symbol: '{B}', svg_uri: 'https://svgs.test/B.svg' },
+        ] }) };
+      }
+      return { ok: false, status: 404, json: async () => ({}) };
+    });
+  });
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await deckWithCommander(page);
+
+  await page.fill('#chatInput', 'dammi delle pescate');
+  await page.press('#chatInput', 'Enter');
+  const bubble = page.locator('.dk-msg-bot').last();
+  // Solo la carta legale sopravvive: una riga, ed è Ponder — la nera sparisce.
+  await expect(bubble.locator('.dk-cardlist .dk-row')).toHaveCount(1);
+  await expect(bubble.locator('.dk-row-name').first()).toHaveText('Ponder');
+  await expect(page.locator('#chatLog')).not.toContainText('Sign in Blood');
+  // Nessun modo di aggiungere la carta nera: la sua riga/bottone non esiste.
+  await expect(bubble.locator('[data-add="sign-1"]')).toHaveCount(0);
+  // Trasparenza: la bolla avvisa dell'esclusione.
+  await expect(bubble).toContainText(/fuori dai colori del commander/i);
+  await page.screenshot({ path: 'tests/.shots/decks-chat-identity-filter.png' });
+});
+
 // #331.2 — se anche il retry fallisce, l'utente riceve una SPIEGAZIONE in
 // italiano nella bolla normale (con la reply originale preservata), non una
 // bolla d'errore con un codice HTTP.
