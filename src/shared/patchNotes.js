@@ -20,7 +20,9 @@
       features: [
         'Nel deck builder puoi trascinare una carta su una categoria per spostarla: quando sei raggruppato per tag, rilasciandola su un tag ti chiede se aggiungerlo a quelli che ha già o sostituirli tutti (e non ti chiede nulla quando non c\'è ambiguità); trascinandola su "Senza tag" le togli tutti i tag. Nelle altre viste (tipo, costo, colore) il trascinamento sposta la carta nel gruppo scelto.',
       ],
-      fixes: [],
+      fixes: [
+        'Quando chiedi a Filo di cercare qualcosa sul web (es. "trova il video di X"), ora la ricerca viene eseguita davvero e Filo ti risponde con i risultati e i link reali: prima compariva solo un riquadro "Cerco..." che non portava a nulla.',
+      ],
     },
     {
       version: '0.2.151', date: '2026-07-22',
