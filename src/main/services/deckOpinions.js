@@ -36,6 +36,12 @@
     return map && typeof map === 'object' ? map : {};
   }
 
+  async function readSearchCache() {
+    const r = await chrome.storage.local.get(STORAGE_KEYS.DECK_SEARCH_CACHE);
+    const map = r[STORAGE_KEYS.DECK_SEARCH_CACHE];
+    return map && typeof map === 'object' ? map : {};
+  }
+
   function withStale(entry, deck) {
     return { text: entry.text, versione: entry.versione, stale: P.isStale(entry, deck) };
   }
