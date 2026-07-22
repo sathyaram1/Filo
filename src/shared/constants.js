@@ -32,6 +32,10 @@
     // Cache auto-tag (§7): { cardId → { tag → bool } }, SOLO tag context-free.
     // Permanente e cross-mazzo. Vedi src/main/services/deckOpinions.js.
     DECK_TAG_CACHE: 'deckTagCache',
+    // Cache filtro ricerca (§4.1): { cardId → { criterio → bool } }. Il giudizio
+    // "questa carta rispetta il criterio di ricerca" dipende solo da carta +
+    // criterio → permanente e cross-ricerca. Vedi src/main/services/deckOpinions.js.
+    DECK_SEARCH_CACHE: 'deckSearchCache',
     COSTS: 'costs',
     // Crediti (gamification): saldo, refill giornaliero, consumo aggregato per
     // tipo d'uso e log ricompense. Cache locale del doc Firestore `credits/<uid>`.
