@@ -172,3 +172,65 @@ test('applyTagMembership: carte non giudicate e giudizi identici non toccano il 
   assert.equal(r.deck.versione, v0, 'la versione NON avanza (i pareri non si invalidano a vuoto)');
   assert.deepEqual(r.deck.carte[1].tags, ['x'], 'carta non giudicata intatta');
 });
+
+// ── Filtro semantico dei risultati di ricerca (§4.1) ────────────────────────
+// La query Scryfall è larga (sinonimi); un LLM economico decide carta-per-carta
+// se rispetta il criterio, con cache (carta, criterio) permanente cross-ricerca.
+
+test('search filter: API registrata su globalThis', () => {
+  for (const fn of ['normCriterion', 'parseSearchKeep', 'planSearchFilter', 'updateSearchCache']) {
+    assert.equal(typeof O[fn], 'function', `manca ${fn}`);
+  }
+});
+
+test('normCriterion: minuscolo, trim e spazi normalizzati (chiavi di cache stabili)', () => {
+  assert.equal(O.normCriterion('  Riporta  Creature  dal Cimitero '), 'riporta creature dal cimitero');
+  assert.equal(O.normCriterion('Riporta creature dal cimitero'), O.normCriterion('riporta   creature dal cimitero'));
+});
+
+test('parseSearchKeep: tiene solo gli id keep davvero giudicati, tollera fence e array nudo', () => {
+  const judge = ['a', 'b', 'c'];
+  // Oggetto { keep: [...] } dentro un fence, con un id inventato ('z') scartato.
+  const r1 = O.parseSearchKeep('```json\n{"keep":["a","c","z"]}\n```', judge);
+  assert.deepEqual([...r1].sort(), ['a', 'c']);
+  // Array nudo di id.
+  const r2 = O.parseSearchKeep('["b"]', judge);
+  assert.deepEqual([...r2], ['b']);
+  // Risposta non-JSON → nessun keep (non si inventa nulla).
+  assert.equal(O.parseSearchKeep('boh', judge).size, 0);
+});
+
+test('planSearchFilter: separa cache-hit da giudicare, preserva ordine, keepFromCache solo i true', () => {
+  const cache = {
+    a: { 'x y': true },
+    b: { 'x y': false },
+    // c non in cache → da giudicare
+  };
+  const plan = O.planSearchFilter({ cardIds: ['a', 'b', 'c'], criterion: 'X Y', searchCache: cache });
+  assert.deepEqual(plan.judgeIds, ['c'], 'solo c va giudicata (a,b già decise)');
+  assert.deepEqual(plan.keepFromCache, ['a'], 'a passa da cache (true); b scartata (false)');
+});
+
+test('updateSearchCache: scrive i giudizi freschi senza mutare l\'input, chiave normalizzata', () => {
+  const before = { a: { 'vecchio': true } };
+  const after = O.updateSearchCache(before, '  Riporta Creature ', { a: true, b: false });
+  // Input non mutato.
+  assert.deepEqual(before, { a: { 'vecchio': true } });
+  // Nuovo giudizio sotto la chiave normalizzata, vecchio preservato.
+  assert.equal(after.a['riporta creature'], true);
+  assert.equal(after.a['vecchio'], true);
+  assert.equal(after.b['riporta creature'], false);
+});
+
+test('planSearchFilter + updateSearchCache: seconda ricerca uguale non rigiudica nulla', () => {
+  const ids = ['a', 'b', 'c'];
+  // Prima ricerca: tutto da giudicare, il modello tiene a e c.
+  const plan1 = O.planSearchFilter({ cardIds: ids, criterion: 'ramp veloce', searchCache: {} });
+  assert.deepEqual(plan1.judgeIds, ids);
+  const judged = { a: true, b: false, c: true };
+  const cache = O.updateSearchCache({}, 'ramp veloce', judged);
+  // Seconda ricerca identica: zero chiamate LLM, keep ricostruito da cache.
+  const plan2 = O.planSearchFilter({ cardIds: ids, criterion: 'RAMP  veloce', searchCache: cache });
+  assert.deepEqual(plan2.judgeIds, [], 'niente da rigiudicare');
+  assert.deepEqual(plan2.keepFromCache, ['a', 'c']);
+});
