@@ -565,6 +565,10 @@
       currentList = MR.listForManageTab(allFeedbacks, currentTab, { releasedVersion });
     }
 
+    // Override di ordinamento scelto dall'owner dal menu contestuale (tasto
+    // destro sull'intestazione). In 'smart' resta l'ordine predefinito sopra.
+    currentList = applySortMode(currentList);
+
     // Barra "Ri-valuta i non filtrati": compare solo nei Ricevuti quando c'è
     // almeno un feedback bianco (panel parziale) da ri-valutare.
     updateReevalBar();
