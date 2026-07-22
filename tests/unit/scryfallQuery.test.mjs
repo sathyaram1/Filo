@@ -129,6 +129,15 @@ test('parseAgentReply: JSON pulito → campi normalizzati', () => {
   assert.deepEqual(r, { ...NONE, reply: 'Ecco', query: 'o:haste', cards: ['a', 'b'] });
 });
 
+test('parseAgentReply: filter — criterio semantico estratto, stringa vuota/assente ignorata', () => {
+  const r = Q.parseAgentReply('{"query":"(o:return or o:reanimate)","filter":"riporta creature dal cimitero"}');
+  assert.equal(r.query, '(o:return or o:reanimate)');
+  assert.equal(r.filter, 'riporta creature dal cimitero');
+  // Filter assente o non-stringa → resta stringa vuota (nessun filtro).
+  assert.equal(Q.parseAgentReply('{"query":"t:dragon"}').filter, '');
+  assert.equal(Q.parseAgentReply('{"query":"t:dragon","filter":42}').filter, '');
+});
+
 test('parseAgentReply: tollera fence ```json e testo attorno', () => {
   const fenced = 'Certo!\n```json\n{"query":"t:dragon"}\n```\ngrazie';
   assert.equal(Q.parseAgentReply(fenced).query, 't:dragon');
