@@ -26,6 +26,13 @@
       ],
     },
     {
+      version: '0.2.150', date: '2026-07-21',
+      features: [],
+      fixes: [
+        'I feedback che invii con un\'immagine allegata ora vengono valutati tenendo conto anche di ciò che l\'immagine mostra: prima veniva considerato solo il testo scritto, così una segnalazione fatta soprattutto con uno screenshot poteva essere fraintesa.',
+      ],
+    },
+    {
       version: '0.2.146', date: '2026-07-18',
       features: [],
       fixes: [
