@@ -139,7 +139,7 @@ module.exports = function register(on, ctx) {
     // in alto). "close" è ESCLUSO di proposito: l'AI non chiude finestra né
     // schede. Inoltriamo alla shell, che clicca il bottone reale, così si
     // riusa tutto il comportamento esistente (menu ancorati, toggle finestra…).
-    const allowed = ['home', 'settings', 'apps', 'account', 'fullscreen', 'minimize'];
+    const allowed = ['home', 'settings', 'apps', 'manage', 'account', 'fullscreen', 'minimize'];
     const command = String(msg.command || '').trim().toLowerCase();
     if (!allowed.includes(command)) {
       return { ok: false, error: `comando shell non consentito: "${command}"` };
