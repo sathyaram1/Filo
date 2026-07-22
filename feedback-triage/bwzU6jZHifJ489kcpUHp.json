@@ -1,7 +1,0 @@
-{
-  "id": "bwzU6jZHifJ489kcpUHp",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica e stata pubblicata. Il filtro che tiene le carte fuori dai colori del commander fuori dalle proposte in chat e attivo. In fase di pubblicazione ho trovato solo un piccolo intoppo di allineamento sulla scheda di lavorazione (non sul codice della funzione), l'ho risolto e il rilascio e andato a buon fine. Tutti i test automatici della logica restano verdi.",
-  "queuedAt": "2026-07-22T12:17:04.141Z",
-  "queuedBy": "routine"
-}
