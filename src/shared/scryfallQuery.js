@@ -116,7 +116,7 @@
 
   function parseAgentReply(text) {
     const none = {
-      reply: '', query: '', cards: [], hasBudget: false, budget: null, prob: null, evaluate: '', tagWith: [],
+      reply: '', query: '', filter: '', cards: [], hasBudget: false, budget: null, prob: null, evaluate: '', tagWith: [],
       import: [], commanderName: '',
     };
     const raw = String(text || '').trim();
