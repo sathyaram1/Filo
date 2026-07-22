@@ -39,6 +39,30 @@ test('buildSearchQuery: senza identity (nessun commander) la query resta libera'
   assert.equal(Q.buildSearchQuery('sol ring', undefined), 'sol ring');
 });
 
+// ── withinIdentity (filtro DURO sui dati carta, §4/§8.4) ─────────────────────
+
+test('withinIdentity: dentro se colorIdentity ⊆ colori commander', () => {
+  // Commander Izzet (U/R): mono-R e mono-U dentro, B fuori, UR dentro.
+  assert.equal(Q.withinIdentity(['R'], ['U', 'R']), true);
+  assert.equal(Q.withinIdentity(['U'], ['U', 'R']), true);
+  assert.equal(Q.withinIdentity(['U', 'R'], ['U', 'R']), true);
+  assert.equal(Q.withinIdentity(['B'], ['U', 'R']), false);
+  assert.equal(Q.withinIdentity(['U', 'B'], ['U', 'R']), false, 'un solo colore fuori basta a escludere');
+});
+
+test('withinIdentity: incolori sempre ammesse; case-insensitive', () => {
+  assert.equal(Q.withinIdentity([], ['U', 'R']), true, 'artefatti incolori sempre dentro');
+  assert.equal(Q.withinIdentity([], []), true, 'commander incolore accetta le incolori');
+  assert.equal(Q.withinIdentity(['R'], []), false, 'commander incolore esclude le colorate');
+  assert.equal(Q.withinIdentity(['r'], ['U', 'R']), true, 'confronto senza distinzione di maiuscole');
+});
+
+test('withinIdentity: senza commander (null/non-array) nessun vincolo', () => {
+  assert.equal(Q.withinIdentity(['B'], null), true);
+  assert.equal(Q.withinIdentity(['B'], undefined), true);
+  assert.equal(Q.withinIdentity(null, ['U']), true, 'colorIdentity mancante trattata come incolore');
+});
+
 // ── parseManaCost ────────────────────────────────────────────────────────────
 
 test('parseManaCost: {2}{U}{R} → [2, U, R]; ibridi e X inclusi', () => {
