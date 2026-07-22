@@ -309,6 +309,7 @@
       home: homeBtn,
       settings: settingsBtn,
       apps: appsBtn,
+      manage: manageBtn,
       account: accountBtn,
       minimize: winMinBtn,
       fullscreen: winMaxBtn,
