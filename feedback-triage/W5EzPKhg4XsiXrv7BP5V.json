@@ -1,7 +1,0 @@
-{
-  "id": "W5EzPKhg4XsiXrv7BP5V",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato e modifica pubblicata. Nel deck builder la ricerca in chat ora capisce meglio le richieste 'a parole': quando cerchi un effetto o un tema getta una rete piu ampia (sinonimi e modi diversi di dire la stessa cosa) e poi passa i risultati al setaccio, tenendo solo le carte che fanno davvero quello che chiedevi. Le ricerche ripetute sono piu veloci perche il giudizio sulle carte gia viste viene riutilizzato.",
-  "queuedAt": "2026-07-22T11:56:10.416Z",
-  "queuedBy": "routine"
-}
