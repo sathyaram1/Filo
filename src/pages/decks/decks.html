@@ -156,6 +156,14 @@
       font-size: 13px;
     }
     .dk-row:hover, .dk-row:focus-visible { background: var(--sn-hover); }
+    /* Trascinamento di una carta su una categoria (#344): la riga presa si
+       affievolisce, il gruppo sotto il cursore prende un fondo d'accento. */
+    .dk-row[draggable="true"] { cursor: grab; }
+    .dk-row.dk-dragging { opacity: 0.45; cursor: grabbing; }
+    .dk-group.dk-drop-target {
+      background: color-mix(in srgb, var(--sn-accent) 12%, transparent);
+      border-radius: 6px;
+    }
     .dk-row-qty { color: var(--sn-muted); font-size: 12px; flex: 0 0 auto; }
     .dk-row-name {
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
