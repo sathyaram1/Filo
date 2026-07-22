@@ -22,6 +22,7 @@
       ],
       fixes: [
         'Nel deck builder, la chat con Filo non propone più carte fuori dai colori del commander: anche quando la ricerca o il suggerimento dovrebbero pescarle, ora vengono scartate prima di arrivare tra i risultati (e Filo ti avvisa se ne ha esclusa qualcuna).',
+        'Nei "Modelli predefiniti", i modelli che elimini ora restano eliminati: prima, cancellando un modello di serie e salvando, questo riappariva alla riapertura del menu. Se poi lo riaggiungi, torna disponibile come prima.',
       ],
     },
     {
