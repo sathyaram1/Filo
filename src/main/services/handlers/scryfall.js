@@ -269,6 +269,34 @@ module.exports = function register(on, ctx) {
         cardIds = parsed.cards.filter((id) => cards[id]);
       }
 
+      // Invariante DURA di color identity (§4/§8.4): l'agente non deve MAI
+      // proporre carte fuori dai colori del commander. Il filtro sulla QUERY
+      // (buildSearchQuery, `id<=`) copre il caso normale, ma il modello può
+      // scriversi un vincolo `id:` esplicito sbagliato (che quel filtro lascia
+      // passare, per rispettare l'override manuale dell'utente) o pescare da un
+      // altro mazzo carte fuori identità: qui si applica il filtro sui DATI
+      // reali della carta (colorIdentity ⊆ colori commander), che nessuna
+      // sintassi di query può aggirare. L'import via chat (lista incollata
+      // dall'utente, più sotto) resta fuori: è una scelta esplicita dell'utente,
+      // non una proposta dell'agente, e la riga di legalità la segnala comunque.
+      let identityDropped = 0;
+      if (identityColors && cardIds.length) {
+        const kept = cardIds.filter((id) => {
+          const c = cards[id];
+          // Dato carta mancante: non scartare per un dubbio (meglio mostrarla).
+          if (!c) return true;
+          if (Q.withinIdentity(c.colorIdentity, identityColors)) return true;
+          identityDropped += 1;
+          return false;
+        });
+        cardIds = kept;
+      }
+      if (identityDropped > 0) {
+        reply = [reply,
+          `Ho escluso ${identityDropped} cart${identityDropped === 1 ? 'a' : 'e'} fuori dai colori del commander.`]
+          .filter(Boolean).join('\n');
+      }
+
       // Import via chat (§11.2): l'utente incolla una lista grezza, l'LLM la
       // interpreta (typo/italiano/formati strani) in nomi+quantità sopra —
       // qui il SISTEMA risolve ogni nome su Scryfall (fuzzy match, MAI si
