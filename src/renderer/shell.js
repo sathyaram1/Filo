@@ -296,6 +296,15 @@
     }
     refreshAuth();
   }
+
+  // Hook di test: forza lo stato admin nella shell così uno spec Playwright può
+  // esercitare il menu Gestione (riservato all'owner) senza una sessione Google
+  // reale. Stesso pattern degli altri hook di pagina (es. window.__mgTest).
+  window.__shellTest = {
+    setAdmin(v) { isAdmin = !!v; },
+    isAdmin: () => isAdmin,
+  };
+
   setIcon(winMinBtn, 'minimize', 16);
   setIcon(winMaxBtn, 'maximize', 14);
   setIcon(winCloseBtn, 'close', 16);
