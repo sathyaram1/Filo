@@ -260,6 +260,52 @@ test('groupDeck: l\'override esplicito vince sul raggruppamento naturale', () =>
   assert.deepEqual(D.groupDeck(deck, CARDS).map((g) => g.name), ['Istantanei']);
 });
 
+// ─── #344: trascina una carta su una categoria → aggiungi/sostituisci tag ─────
+
+test('addTagToCard aggiunge il tag e incrementa la versione; il doppione è no-op', () => {
+  const deck = deckWith([{ scryfall_id: 'c-bolt', qty: 1, tags: ['removal'] }], { raggruppamento: 'tag' });
+  const v0 = deck.versione;
+  const d1 = D.addTagToCard(deck, 'c-bolt', 'burn');
+  assert.deepEqual(d1.carte[0].tags, ['removal', 'burn'], 'il nuovo tag si aggiunge in coda');
+  assert.equal(d1.versione, v0 + 1, 'una modifica reale avanza la versione');
+  // Ora la carta compare anche sotto il nuovo tag se ci si raggruppa: prova groupDeck.
+  const d2 = D.addTagToCard(d1, 'c-bolt', 'burn');
+  assert.equal(d2, d1, 'aggiungere un tag già presente non tocca il mazzo');
+});
+
+test('replaceCardTags sostituisce tutti i tag; [] li rimuove tutti', () => {
+  const deck = deckWith([{ scryfall_id: 'c-bolt', qty: 1, tags: ['removal', 'burn'] }], { raggruppamento: 'tag' });
+  const rep = D.replaceCardTags(deck, 'c-bolt', ['ramp']);
+  assert.deepEqual(rep.carte[0].tags, ['ramp'], 'i vecchi tag spariscono, resta solo il nuovo');
+  const cleared = D.replaceCardTags(rep, 'c-bolt', []);
+  assert.deepEqual(cleared.carte[0].tags, [], 'insieme vuoto = nessun tag');
+  const noop = D.replaceCardTags(cleared, 'c-bolt', []);
+  assert.equal(noop, cleared, 'sostituire con un insieme identico è no-op');
+});
+
+test('replaceCardTags normalizza (trim) e rende unici i tag', () => {
+  const deck = deckWith([{ scryfall_id: 'c-bolt', qty: 1, tags: [] }], { raggruppamento: 'tag' });
+  const rep = D.replaceCardTags(deck, 'c-bolt', [' ramp ', 'ramp', '', 'draw']);
+  assert.deepEqual(rep.carte[0].tags, ['ramp', 'draw']);
+});
+
+test('addTagToCard/replaceCardTags rimuovono l\'override di gruppo: in vista tag la carta compare sotto il nuovo tag', () => {
+  let deck = deckWith([{ scryfall_id: 'c-bolt', qty: 1, tags: ['removal'] }], { raggruppamento: 'tag' });
+  deck = D.setGroupOverride(deck, 'c-bolt', 'Forzato');
+  assert.deepEqual(D.groupDeck(deck, CARDS).map((g) => g.name), ['Forzato'], 'l\'override forza il gruppo');
+  // Trascinandola su un tag l\'override cede e la carta finisce sotto quel tag.
+  const dropped = D.addTagToCard(deck, 'c-bolt', 'burn');
+  assert.equal(dropped.carte[0].gruppo_override, undefined, 'l\'override manuale viene rimosso');
+  assert.ok(D.groupDeck(dropped, CARDS).some((g) => g.name === 'removal'), 'la carta torna raggruppata per tag');
+});
+
+test('addTagToCard/replaceCardTags su carta inesistente = mazzo INVARIATO', () => {
+  const deck = deckWith([{ scryfall_id: 'c-bolt', qty: 1, tags: ['removal'] }], { raggruppamento: 'tag' });
+  assert.equal(D.addTagToCard(deck, 'ignoto', 'x'), deck);
+  assert.equal(D.replaceCardTags(deck, 'ignoto', ['x']), deck);
+  assert.equal(D.addTagToCard(deck, 'c-bolt', '   '), deck, 'tag vuoto = niente da fare');
+});
+
 test('groupDeck per cmc e per colore', () => {
   const deck = deckWith([
     { scryfall_id: 'c-bolt', qty: 1, tags: [] },
