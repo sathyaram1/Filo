@@ -156,6 +156,17 @@
 
   settingsBtn.addEventListener('click', () => showNativeMenu(settingsBtn, buildSettings()));
   appsBtn.addEventListener('click', () => showNativeMenu(appsBtn, APPS));
+  // Menu "Gestione": solo per l'owner. L'icona che lo aziona compare unicamente
+  // all'owner (gate nella home), ma ricontrolliamo isAdmin anche qui come rete
+  // di sicurezza — se un trigger arrivasse senza sessione admin, non apriamo un
+  // menu di pagine riservate. La garanzia forte resta comunque nel main
+  // (handler DEFAULTS_*) e nelle regole Firestore.
+  if (manageBtn) {
+    manageBtn.addEventListener('click', () => {
+      if (!isAdmin) return;
+      showNativeMenu(manageBtn, buildManage());
+    });
+  }
 
   // "Nuova finestra incognito" vive ora nel menu dell'account (icona profilo),
   // non più nel menu Impostazioni → apre la finestra incognito nel main.
