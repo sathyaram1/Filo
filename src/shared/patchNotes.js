@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.151', date: '2026-07-22',
+      features: [
+        'Nel deck builder la ricerca in chat capisce meglio le richieste "a parole": quando cerchi un effetto o un tema (es. "carte che riportano creature dal cimitero", "pedine che si moltiplicano") ora getta una rete più ampia, includendo sinonimi e modi diversi di dire la stessa cosa, e poi passa i risultati al setaccio tenendo solo le carte che fanno davvero quello che chiedevi. Le stesse ricerche ripetute sono più veloci perché il giudizio sulle carte già viste viene riutilizzato.',
+      ],
+      fixes: [],
+    },
+    {
       version: '0.2.146', date: '2026-07-18',
       features: [],
       fixes: [
