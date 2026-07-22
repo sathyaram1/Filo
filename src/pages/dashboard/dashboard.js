@@ -1031,7 +1031,8 @@
     // (#F2) → prosegui per rispondere all'utente coi dettagli appena ottenuti.
     return actions.some((a) =>
       (isType(a, 'ESEGUI_COMANDO') && a._output && !a._output.blocked)
-      || (isType(a, 'CAPACITA_DETTAGLIO') && a._output));
+      || (isType(a, 'CAPACITA_DETTAGLIO') && a._output)
+      || (isType(a, 'CERCA_WEB') && a._output));
   }
 
   // Un singolo turno del modello: bolla "sta pensando" + reasoning live, invio
