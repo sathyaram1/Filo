@@ -318,6 +318,9 @@
     [ACTIONS.DECKS_OPINION]: 'flash, flash-or',
     // Auto-tag (§7): giudizio booleano carta-per-tag → modello economico.
     [ACTIONS.DECKS_AUTOTAG]: 'flash-lite-3, flash-lite-3-or',
+    // Filtro ricerca (§4.1): giudizio booleano carta-vs-criterio in batch →
+    // modello piccolo ed economico (gira su molte carte, con cache).
+    [ACTIONS.DECKS_SEARCH_FILTER]: 'flash-lite-3, flash-lite-3-or',
     // Triage tab: decisione economica e frequente → lite va bene.
     [ACTIONS.FILO_TAB_TRIAGE]: 'flash-lite-3, flash-lite-3-or',
     // Riassunto pagina alla chiusura: economico (gira spesso).
