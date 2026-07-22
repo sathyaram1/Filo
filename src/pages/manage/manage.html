@@ -631,7 +631,13 @@
 
         <!-- Colonna sinistra: lista feedback della tab corrente -->
         <div class="mg-col" id="mgListCol">
-          <div class="mg-col-head" id="mgListHead">Ricevuti</div>
+          <!-- Intestazione: il tasto destro (o il glifo ⇅) apre il menu di
+               riordino dei feedback (numero / priorità / creatore). -->
+          <div class="mg-col-head mg-list-head-row" id="mgListHeadRow">
+            <div id="mgListHead">Ricevuti</div>
+            <button type="button" class="mg-sort-btn" id="mgSortBtn"
+              title="Riordina i feedback — clic o tasto destro" aria-label="Riordina i feedback">⇅</button>
+          </div>
           <!-- Filtro ⭐ della tab Archiviati (DB2): OFF = solo gli archiviati,
                ON = tutti i preferiti di qualunque stato. Nascosto sulle altre tab. -->
           <div class="mg-list-filter" id="mgArchiveFilter" hidden>
