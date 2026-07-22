@@ -418,6 +418,55 @@
     return touch({ ...deck, raggruppamento: view });
   }
 
+  // Aggiunge UN tag a UNA carta (#344: trascina la carta su una categoria della
+  // vista "per tag"). Il tag già presente è un no-op (versione ferma). Un
+  // eventuale override di gruppo manuale viene rimosso: trascinare una carta su
+  // una categoria è un gesto di raggruppamento esplicito e diretto che deve
+  // vincere sull'override precedente — altrimenti in vista "tag" la carta
+  // resterebbe bloccata nel vecchio gruppo forzato invece di comparire sotto il
+  // nuovo tag. Ritorna il mazzo INVARIATO (stesso riferimento) se nulla cambia.
+  function addTagToCard(deck, scryfallId, tag) {
+    const id = String(scryfallId || '');
+    const t = String(tag || '').trim();
+    if (!t) return deck;
+    let changed = false;
+    const carte = deck.carte.map((c) => {
+      if (c.scryfall_id !== id) return c;
+      const has = c.tags.includes(t);
+      if (has && !c.gruppo_override) return c;
+      changed = true;
+      const next = { ...c, tags: has ? [...c.tags] : [...c.tags, t] };
+      delete next.gruppo_override;
+      return next;
+    });
+    return changed ? touch({ ...deck, carte }) : deck;
+  }
+
+  // Sostituisce TUTTI i tag di una carta con l'insieme dato (#344: opzione
+  // "sostituisci" del popup al rilascio). Passa [] per togliere ogni tag (drop
+  // sulla categoria "Senza tag"). I tag vengono normalizzati (trim) e resi unici
+  // conservando l'ordine. Come addTagToCard rimuove l'override manuale. Ritorna
+  // il mazzo INVARIATO se l'insieme risultante è già quello attuale.
+  function replaceCardTags(deck, scryfallId, tags) {
+    const id = String(scryfallId || '');
+    const uniq = [];
+    for (const raw of (Array.isArray(tags) ? tags : [])) {
+      const t = String(raw).trim();
+      if (t && !uniq.includes(t)) uniq.push(t);
+    }
+    let changed = false;
+    const carte = deck.carte.map((c) => {
+      if (c.scryfall_id !== id) return c;
+      const same = c.tags.length === uniq.length && c.tags.every((t, i) => t === uniq[i]);
+      if (same && !c.gruppo_override) return c;
+      changed = true;
+      const next = { ...c, tags: [...uniq] };
+      delete next.gruppo_override;
+      return next;
+    });
+    return changed ? touch({ ...deck, carte }) : deck;
+  }
+
   global.SN_DECKS = {
     RAGGRUPPAMENTI,
     TIPO_ORDINE,
