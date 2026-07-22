@@ -794,7 +794,28 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         // kept:true → il client renderizza il bottone di raffinamento (GUI).
         return { executed: true, kept: true };
       }
-      case 'CERCA_WEB':
+      case 'CERCA_WEB': {
+        // #368 — la ricerca web ora viene ESEGUITA DAVVERO qui e i risultati
+        // tornano come `output`, che il client re-immette nel contesto
+        // (auto-continue) così l'agente risponde con link REALI. Prima questo
+        // ramo non faceva nulla: il chip "🔎 ..." restava inerte e nessun
+        // risultato arrivava mai — l'utente vedeva un "link" che non funziona.
+        const query = String(action.query ?? action.q ?? action.testo ?? action.text ?? '').trim();
+        if (!query) return { executed: false, kept: true };
+        const WS = globalThis.SN_WEB_SEARCH;
+        if (!WS || typeof WS.search !== 'function') {
+          return { executed: false, kept: true, output: { search: query, results: [], error: 'ricerca non disponibile' } };
+        }
+        try {
+          const settings = await getEffectiveSettings();
+          const tavilyKey = settings.apiKeys?.tavily || '';
+          const r = await WS.search({ query, tavilyKey, maxResults: 5 });
+          const results = Array.isArray(r?.results) ? r.results : [];
+          return { executed: results.length > 0, kept: true, output: { search: query, results, provider: r?.provider || '', reason: r?.reason || '' } };
+        } catch (e) {
+          return { executed: false, kept: true, output: { search: query, results: [], error: e?.message || String(e) } };
+        }
+      }
       case 'EVENTO_CALENDARIO':
         return { executed: false, kept: true };
       case 'CAPACITA_DETTAGLIO': {
