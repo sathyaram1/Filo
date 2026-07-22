@@ -229,7 +229,22 @@ async function update(partial, idToken) {
   const modelMask = [];
   if (typeof partial.provider === 'string') { modelFields.provider = toFsValue(partial.provider); modelMask.push('provider'); }
   if (partial.models && typeof partial.models === 'object') { modelFields.models = toFsValue(partial.models); modelMask.push('models'); }
-  if (partial.modelRegistry && typeof partial.modelRegistry === 'object') { modelFields.modelRegistry = toFsValue(partial.modelRegistry); modelMask.push('modelRegistry'); }
+  if (partial.modelRegistry && typeof partial.modelRegistry === 'object') {
+    modelFields.modelRegistry = toFsValue(partial.modelRegistry);
+    modelMask.push('modelRegistry');
+    // Tombstone dei nickname integrati che l'admin ha rimosso: i nickname di
+    // build ASSENTI dal registry inviato. Serve perché get() rifonde sempre il
+    // registry di build sotto il remoto: senza la lista dei cancellati, un
+    // modello integrato eliminato riapparirebbe alla riapertura. La lista è
+    // ricalcolata a ogni salvataggio dallo stato completo dell'editor (che
+    // mostra build+remoto fusi), quindi ri-aggiungere un modello lo toglie dai
+    // tombstone → auto-guarigione. Solo i nickname di BUILD possono finire qui:
+    // quelli custom, se rimossi, sono già assenti dal doc e non serve marcarli.
+    const buildReg = (globalThis.SN_CONST && globalThis.SN_CONST.DEFAULT_MODEL_REGISTRY) || {};
+    const deleted = Object.keys(buildReg).filter((k) => !(k in partial.modelRegistry));
+    modelFields.modelRegistryDeleted = toFsValue(deleted);
+    modelMask.push('modelRegistryDeleted');
+  }
   if (modelMask.length) await patchDoc(MODELS_DOC, modelFields, modelMask, idToken);
 
   // Doc segreti (chiavi). Scriviamo solo i campi presenti come stringa.
