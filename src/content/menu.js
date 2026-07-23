@@ -512,10 +512,49 @@
         (entry.type === 'image' ? (entry.description || 'Immagine') : (entry.text || ''))
           .replace(/\s+/g, ' ').trim();
 
+      // Messaggi di stato (creati prima così i gestori possono riferirli):
+      // - noResults: nessuna corrispondenza nella ricerca;
+      // - emptyMsg: l'utente ha rimosso tutte le voci a mano.
+      const noResults = document.createElement('div');
+      noResults.className = 'sn-menu-empty';
+      noResults.textContent = I18n.t('menu_paste_no_results');
+      noResults.style.display = 'none';
+      const emptyMsg = document.createElement('div');
+      emptyMsg.className = 'sn-menu-empty';
+      emptyMsg.textContent = I18n.t('toast_clipboard_empty');
+      emptyMsg.style.display = 'none';
+
+      // Footer: barra di ricerca + (se supportato) svuota cronologia.
+      const searchWrap = document.createElement('div');
+      searchWrap.className = 'sn-menu-history-search';
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'sn-menu-history-search-input';
+      input.placeholder = I18n.t('menu_paste_search');
+      input.setAttribute('aria-label', input.placeholder);
+
+      let clearWrap = null;
+
+      // Quando l'utente rimuove l'ultima voce: mostra lo stato vuoto e nascondi
+      // ricerca/svuota (non c'è più nulla da cercare o svuotare).
+      const refreshEmptyState = () => {
+        if (list.querySelector('.sn-menu-history-item')) return;
+        noResults.style.display = 'none';
+        emptyMsg.style.display = '';
+        searchWrap.style.display = 'none';
+        if (clearWrap) clearWrap.style.display = 'none';
+      };
+
       entries.forEach((entry) => {
+        // Riga = zona "incolla" (a sinistra) + "×" rimuovi (a destra). Sono due
+        // bottoni fratelli, non annidati: il "×" non fa scattare l'incolla.
+        const row = document.createElement('div');
+        row.className = 'sn-menu-history-item';
+        row.dataset.snSearch = searchTextOf(entry).toLowerCase();
+
         const b = document.createElement('button');
         b.type = 'button';
-        b.className = 'sn-menu-item sn-menu-history-item';
+        b.className = 'sn-menu-item sn-menu-history-paste';
         if (entry.type === 'image') {
           const icon = document.createElement('span');
           icon.className = 'sn-menu-history-icon';
@@ -534,29 +573,33 @@
           lbl.textContent = text.length > 40 ? text.slice(0, 40) + '…' : text;
           b.appendChild(lbl);
         }
-        b.dataset.snSearch = searchTextOf(entry).toLowerCase();
         b.addEventListener('click', () => {
           close();
           try { onPick && onPick(entry); } catch (e) { console.error(e); }
         });
-        list.appendChild(b);
+        row.appendChild(b);
+
+        if (onRemove) {
+          const rm = document.createElement('button');
+          rm.type = 'button';
+          rm.className = 'sn-menu-history-remove';
+          rm.textContent = '×';
+          rm.title = I18n.t('menu_paste_remove');
+          rm.setAttribute('aria-label', I18n.t('menu_paste_remove'));
+          rm.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            try { onRemove(entry); } catch (e) { console.error(e); }
+            row.remove();
+            refreshEmptyState();
+          });
+          row.appendChild(rm);
+        }
+        list.appendChild(row);
       });
+      list.appendChild(noResults);
+      list.appendChild(emptyMsg);
       sub.appendChild(list);
 
-      // Barra di ricerca in basso: filtra fra le cose incollate.
-      const noResults = document.createElement('div');
-      noResults.className = 'sn-menu-empty';
-      noResults.textContent = I18n.t('menu_paste_no_results');
-      noResults.style.display = 'none';
-      list.appendChild(noResults);
-
-      const searchWrap = document.createElement('div');
-      searchWrap.className = 'sn-menu-history-search';
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.className = 'sn-menu-history-search-input';
-      input.placeholder = I18n.t('menu_paste_search');
-      input.setAttribute('aria-label', input.placeholder);
       // Mentre l'utente cerca, non far chiudere il sotto-menu (mouse fuori).
       input.addEventListener('focus', () => {
         if (activeMenu) activeMenu.subLocked = true;
@@ -575,6 +618,47 @@
       });
       searchWrap.appendChild(input);
       sub.appendChild(searchWrap);
+
+      // Svuota cronologia: azione distruttiva → conferma prima di eseguire.
+      if (onClear) {
+        clearWrap = document.createElement('div');
+        clearWrap.className = 'sn-menu-history-clear';
+        const clearBtn = document.createElement('button');
+        clearBtn.type = 'button';
+        clearBtn.className = 'sn-menu-item sn-menu-history-clear-btn';
+        const trashIcon = global.SN_ICONS?.trash;
+        if (trashIcon) {
+          const ic = document.createElement('span');
+          ic.className = 'sn-menu-item-icon';
+          ic.innerHTML = trashIcon(16);
+          clearBtn.appendChild(ic);
+        }
+        const cl = document.createElement('span');
+        cl.className = 'sn-menu-label';
+        cl.textContent = I18n.t('menu_paste_clear');
+        clearBtn.appendChild(cl);
+        // Non chiudere il sotto-menu mentre è aperto il popup di conferma.
+        clearBtn.addEventListener('mousedown', () => {
+          if (activeMenu) activeMenu.subLocked = true;
+          clearSubCloseTimer();
+        });
+        clearBtn.addEventListener('click', async () => {
+          const Ui = global.SN_CONFIRM_UI;
+          let ok = true;
+          try {
+            ok = Ui
+              ? await Ui.confirm({ title: I18n.t('menu_paste_clear'), text: I18n.t('menu_paste_clear_confirm') })
+              : true;
+          } catch (_) { ok = false; }
+          if (activeMenu) activeMenu.subLocked = false;
+          if (!ok) return;
+          try { onClear(); } catch (e) { console.error(e); }
+          close();
+        });
+        clearWrap.appendChild(clearBtn);
+        sub.appendChild(clearWrap);
+      }
+
       // Focus immediato così si può digitare subito.
       setTimeout(() => { try { input.focus({ preventScroll: true }); } catch (_) {} }, 0);
     }
