@@ -656,6 +656,7 @@
 
     // Notifiche: durata + suono.
     $('notifDuration').addEventListener('change', persist);
+    $('notifDuration').addEventListener('blur', canonNotifDuration);
     $('notifSoundEnabled').addEventListener('change', persist);
     $('notifSound').addEventListener('change', persist);
     $('notifSoundPreview').addEventListener('click', previewNotifSound);
