@@ -136,14 +136,7 @@
   }
 
   function formatActionLabel(a) {
-    return ({
-      explain: 'Spiega',
-      explain_deep: 'Approfondisci',
-      translate_selection: 'Traduci selezione',
-      translate_page: 'Traduci pagina',
-      help: 'Aiuto',
-      categorize: 'Categorizza',
-    })[a] || a;
+    return Const.actionLabel(a);
   }
 
   function formatInput(input) {
