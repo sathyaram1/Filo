@@ -223,6 +223,45 @@
     return filtered;
   }
 
+  // Mette in pausa un countdown: congela il tempo rimanente in `remainingMs` e
+  // marca `paused: true`. Da quel momento `endsAt` non è più affidabile per il
+  // rendering (il "now" avanza mentre il timer è fermo) — chi mostra un timer in
+  // pausa DEVE usare `remainingMs`. Le sveglie (kind:'alarm') hanno un orario
+  // assoluto: metterle in pausa non ha senso, quindi le ignoriamo. Un timer che
+  // sta già suonando (`ringing`) o già in pausa resta invariato.
+  async function pauseTimer(id) {
+    const list = await listTimers();
+    const idx = list.findIndex((t) => t.id === id);
+    if (idx < 0) return list;
+    const t = list[idx];
+    if (t.paused || t.ringing || t.kind === 'alarm') return list;
+    const remainingMs = Math.max(0, new Date(t.endsAt).getTime() - Date.now());
+    list[idx] = { ...t, paused: true, remainingMs };
+    await setRaw(KEYS.FILO_TIMERS, list);
+    await setRaw(KEYS.FILO_DASHBOARD_CACHE, null);
+    return list;
+  }
+
+  // Riprende un timer in pausa: ricalcola `endsAt = adesso + remainingMs` così il
+  // conto alla rovescia riparte esattamente da dove era stato fermato, e rimuove
+  // il campo temporaneo. No-op su un timer non in pausa.
+  async function resumeTimer(id) {
+    const list = await listTimers();
+    const idx = list.findIndex((t) => t.id === id);
+    if (idx < 0) return list;
+    const t = list[idx];
+    if (!t.paused) return list;
+    const remainingMs = Number.isFinite(t.remainingMs)
+      ? t.remainingMs
+      : Math.max(0, new Date(t.endsAt).getTime() - Date.now());
+    const next = { ...t, paused: false, endsAt: new Date(Date.now() + remainingMs).toISOString() };
+    delete next.remainingMs;
+    list[idx] = next;
+    await setRaw(KEYS.FILO_TIMERS, list);
+    await setRaw(KEYS.FILO_DASHBOARD_CACHE, null);
+    return list;
+  }
+
   // ===== Sveglie (#322) =====
   //
   // Una sveglia è un timer con scadenza ASSOLUTA: vive nella STESSA lista dei
