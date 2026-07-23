@@ -76,15 +76,17 @@ test('stress: XSS non esegue, rimuovere ultima voce mostra stato vuoto, annulla 
       await sub.locator('.sn-menu-history-remove').first().click();
     }
     await expect(sub.locator('.sn-menu-history-item')).toHaveCount(0);
-    await expect(sub.locator('.sn-menu-empty')).toBeVisible();
+    await expect(sub.getByText('Cronologia appunti vuota')).toBeVisible();
     // La barra di ricerca e "Svuota" spariscono quando non c'è più nulla.
-    await expect(sub.locator('.sn-menu-history-clear-btn')).toHaveCount(0);
+    await expect(sub.locator('.sn-menu-history-search')).toBeHidden();
+    await expect(sub.locator('.sn-menu-history-clear')).toBeHidden();
 
-    // Persistenza: riaprendo, la cronologia è davvero vuota.
+    // Persistenza: riaprendo, la cronologia è davvero vuota (lo stato vuoto
+    // usa lo stesso testo del sotto-menu appena svuotato).
     await page.keyboard.press('Escape');
     await expect(page.locator('.sn-menu')).toHaveCount(0);
     sub = await openHistorySubmenu(page);
-    await expect(sub.locator('.sn-menu-empty')).toBeVisible();
+    await expect(sub.getByText('Cronologia appunti vuota')).toBeVisible();
     await expect(sub.locator('.sn-menu-history-item')).toHaveCount(0);
   } finally {
     try { await app.close(); } catch (_) {}
