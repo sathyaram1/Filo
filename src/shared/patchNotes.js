@@ -18,6 +18,7 @@
     {
       version: '0.2.157', date: '2026-07-23',
       fixes: [
+        'Quando chiedi a Filo di impostare un valore numerico scrivendolo all’italiana con il punto delle migliaia (es. «imposta il limite di spesa mensile a 2.500 euro»), ora capisce 2500 e non più 2,50: il punto delle migliaia non viene più scambiato per la virgola dei decimali.',
         'Trascinando una scheda per riordinarla, se in quell’istante una scheda cambiava stato (finiva di caricare, cambiava titolo, partiva o si fermava un audio, arrivava l’icona del sito) poteva comparire per un attimo una copia doppia della scheda trascinata e il riordino finiva in un punto diverso da dove l’avevi rilasciata: ora la scheda resta una sola e si ferma esattamente dove la lasci.',
         'Quando molte notifiche arrivano insieme (ad esempio una pagina che apre tanti popup bloccati, o il riavvio con più schede su siti bloccati) non si accatastano più fino a coprire lo schermo e a spingere le prime fuori dalla finestra: ora restano al massimo le più recenti, sempre visibili e con la «×» per chiuderle a portata di mano.',
       ],
