@@ -190,7 +190,7 @@
     {
       keys: ['tono_voce', 'tono voce', 'tono lettura', 'ttspitch'],
       build(v) {
-        let n = parseFloat(String(v == null ? '' : v).replace(',', '.').replace(/[^0-9.]/g, ''));
+        let n = parseItalianNumber(v);
         if (!Number.isFinite(n)) return null;
         n = Math.max(0, Math.min(2, n));
         return { partial: { tts: { pitch: n } }, label: `Tono lettura → ${n.toFixed(1)}` };
