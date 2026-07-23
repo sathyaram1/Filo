@@ -22,6 +22,7 @@
         'Nella cronologia degli appunti (la freccia accanto a "Incolla") ora puoi rimuovere una singola voce con la "×" o svuotare tutta la cronologia: utile se hai copiato una password o un testo privato e non vuoi lasciarlo tra le cose incollabili.',
       ],
       fixes: [
+        'Ora puoi mettere in pausa e riprendere un timer: sulla sua scheda in alto nella nuova scheda trovi il pulsante ⏸ per fermarlo e ▶ per farlo ripartire da dove era.',
         'In Preferenze, i campi "Archivia dopo questo periodo di inattività (ore)" e "Durata" delle notifiche ora mostrano subito il valore realmente in uso: se scrivi un numero fuori scala (troppo grande o negativo) e lasci il campo, questo si riallinea al valore effettivamente salvato invece di continuare a mostrare il numero digitato.',
         'La barra degli indirizzi ora apre correttamente gli indirizzi con una porta (es. "localhost:3000", "127.0.0.1:8080", "example.com:8443/admin") e i nomi locali come "localhost": prima venivano scambiati per una ricerca su Google. Per i server locali e gli indirizzi di rete privata (router, dispositivi su IP privato) usa "http", per i siti pubblici "https".',
       ],
