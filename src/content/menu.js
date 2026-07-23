@@ -280,7 +280,11 @@
         arrow.className = 'sn-menu-paste-arrow';
         arrow.title = I18n.t('menu_paste_history');
         arrow.textContent = '▾';
-        setupArrowSubmenu(arrow, () => openSubmenu(arrow, it.history || [], it.onPickHistory), cleanups);
+        setupArrowSubmenu(arrow, () => openSubmenu(arrow, it.history || [], {
+          onPick: it.onPickHistory,
+          onRemove: it.onRemoveHistory,
+          onClear: it.onClearHistory,
+        }), cleanups);
 
         wrap.appendChild(main);
         wrap.appendChild(arrow);
