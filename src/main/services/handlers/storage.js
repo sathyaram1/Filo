@@ -197,22 +197,41 @@ module.exports = function register(on, ctx) {
     return { ok: true, items: arr };
   });
 
-  on(MSG.CLEAR_CLIPBOARD_HISTORY, async () => {
+  // Svuotare TUTTA la cronologia appunti è un'operazione "tutto o niente" che
+  // solo l'UI interna innesca; i content script delle pagine web salvano/leggono
+  // singole voci (PUSH/GET/UPDATE_DESCRIPTION, non guardati apposta: vedi sotto)
+  // ma non hanno motivo legittimo di azzerarla. Difesa-in-profondità: solo filo://.
+  on(MSG.CLEAR_CLIPBOARD_HISTORY, async (msg, sender, origin) => {
+    if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
     await Storage.setRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []);
     return { ok: true };
   });
 
-  on(MSG.GET_HISTORY, async () => ({ ok: true, items: await History.list() }));
+  // ── Cronologia interazioni AI + costi ─────────────────────────────────
+  // Questi tre canali sono usati SOLO dalle pagine interne (cronologia AI,
+  // opzioni): in produzione le voci AI le scrive il main da sé mentre esegue la
+  // richiesta, non un content script. La cronologia AI può contenere testi
+  // selezionati/tradotti dall'utente e i costi sono un dato riservato: nessuna
+  // pagina web deve poterli leggere, scrivere o cancellare. Solo filo://.
+  on(MSG.GET_HISTORY, async (msg, sender, origin) => {
+    if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
+    return { ok: true, items: await History.list() };
+  });
 
-  on(MSG.APPEND_HISTORY, async (msg) => {
+  on(MSG.APPEND_HISTORY, async (msg, sender, origin) => {
+    if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
     const item = await History.append(msg.entry);
     return { ok: true, item };
   });
 
-  on(MSG.CLEAR_HISTORY, async () => {
+  on(MSG.CLEAR_HISTORY, async (msg, sender, origin) => {
+    if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
     await History.clear();
     return { ok: true };
   });
 
-  on(MSG.GET_COSTS, async () => ({ ok: true, monthly: await Costs.getMonthly(), state: await Costs.getState() }));
+  on(MSG.GET_COSTS, async (msg, sender, origin) => {
+    if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
+    return { ok: true, monthly: await Costs.getMonthly(), state: await Costs.getState() };
+  });
 };
