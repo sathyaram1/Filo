@@ -375,6 +375,16 @@
     if (!drag) return;
     if (!drag.moved && Math.abs(e.clientX - drag.startX) < 4) return;
     drag.moved = true;
+    // Difesa in profondità: se per qualsiasi motivo il nodo trascinato non è più
+    // attaccato al DOM (un ridisegno l'ha rigenerato), NON reinserire l'orfano —
+    // creerebbe un duplicato con lo stesso id. Riaggancia il nodo vivo per questo
+    // id prima di manipolarlo. Con la sospensione del render in drag questo non
+    // dovrebbe mai scattare, ma tiene l'invariante "mai due .tab con lo stesso id"
+    // vera comunque cambi la logica di render.
+    if (!drag.el.isConnected) {
+      const live = tabsEl.querySelector(`.tab[data-id="${drag.id}"]`);
+      if (live) drag.el = live;
+    }
     drag.el.classList.add('dragging');
     const after = tabDragAfter(e.clientX);
     if (after == null) tabsEl.appendChild(drag.el);
@@ -391,8 +401,14 @@
     if (!d.moved) return;
     // Il click che segue il mouseup non deve riattivare/spostare la tab.
     suppressClickId = d.id;
-    const ids = [...tabsEl.querySelectorAll('.tab')].map((x) => x.dataset.id);
-    const toIndex = ids.indexOf(d.id);
+    // La posizione di rilascio è quella del NODO effettivamente trascinato, non
+    // la prima occorrenza dell'id: usare l'identità del nodo (indexOf(d.el)) è
+    // robusto anche se in barra esistesse un secondo .tab con lo stesso id, dove
+    // indexOf(id) prenderebbe la posizione sbagliata. Se il nodo non è in barra
+    // (non dovrebbe capitare), ripiego sull'id.
+    const nodes = [...tabsEl.querySelectorAll('.tab')];
+    let toIndex = nodes.indexOf(d.el);
+    if (toIndex < 0) toIndex = nodes.map((x) => x.dataset.id).indexOf(d.id);
     if (toIndex >= 0) api.tabs.move(d.id, toIndex);
   }
 
@@ -588,7 +604,16 @@
     // Durante una trascinata non ridisegnare: cancellare i nodi farebbe perdere
     // il riferimento alla tab trascinata e interromperebbe il drag. Il riordino
     // viene confermato dal broadcast successivo al rilascio (api.tabs.move).
-    if (drag && drag.moved) return;
+    // NB: si sospende NON appena il drag è armato (mousedown), non solo dopo aver
+    // superato la soglia di 4px. Nella finestra tra mousedown e soglia `drag`
+    // esiste ma `moved` è ancora false: un broadcast `tabs:updated` che arriva lì
+    // (cambio titolo/favicon/loading/audio: frequentissimo) ricreerebbe tutti i
+    // nodi .tab, ORFANIZZANDO `drag.el`. Quando poi si supera la soglia, l'orfano
+    // verrebbe reinserito accanto al nodo rigenerato con lo stesso id → due schede
+    // fantasma affiancate e indice di rilascio sbagliato. Sospendere già da armato
+    // costa solo un frame di lag visivo mentre il tasto è premuto (ridisegnato al
+    // rilascio dal broadcast successivo).
+    if (drag) return;
     // tabs
     tabsEl.innerHTML = '';
     for (const t of state.tabs) {
