@@ -1883,6 +1883,169 @@
     }
   });
 
+  // ===== Appunti di Filo (pannello) =====
+  // Filo accumula gli appunti che gli chiedi di prendere ("prendi nota che…") e
+  // li riusa come contesto. Questo pannello li rende VISIBILI e cancellabili:
+  // senza di esso l'utente non sa cosa Filo ricorda né può gestirlo (invariante
+  // UX "se l'app salva N cose, l'utente deve poterle vedere tutte").
+  let notesOverlayOpen = false;
+
+  function fmtNoteDate(iso) {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    const now = new Date();
+    const hhmm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    if (d.toDateString() === now.toDateString()) return `oggi ${hhmm}`;
+    const yst = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    if (d.toDateString() === yst.toDateString()) return `ieri ${hhmm}`;
+    return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()} ${hhmm}`;
+  }
+
+  async function openNotesPanel() {
+    if (notesOverlayOpen) return;
+    notesOverlayOpen = true;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'dash-notes-overlay';
+    overlay.id = 'notesOverlay';
+    const box = document.createElement('div');
+    box.className = 'dash-notes-box';
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-modal', 'true');
+    box.setAttribute('aria-label', 'Appunti di Filo');
+    overlay.appendChild(box);
+
+    function close() {
+      if (!notesOverlayOpen) return;
+      notesOverlayOpen = false;
+      document.removeEventListener('keydown', onKey, true);
+      overlay.remove();
+    }
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); }
+    }
+    document.addEventListener('keydown', onKey, true);
+    overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) close(); });
+
+    // Header
+    const header = document.createElement('div');
+    header.className = 'dash-notes-header';
+    const title = document.createElement('div');
+    title.className = 'dash-notes-title';
+    title.textContent = 'Appunti di Filo';
+    const sub = document.createElement('div');
+    sub.className = 'dash-notes-sub';
+    sub.id = 'notesSub';
+    header.append(title, sub);
+    box.appendChild(header);
+
+    const xBtn = document.createElement('button');
+    xBtn.type = 'button';
+    xBtn.className = 'dash-notes-x';
+    xBtn.setAttribute('aria-label', 'Chiudi');
+    xBtn.innerHTML = self.SN_ICONS?.close?.(16) || '✕';
+    xBtn.addEventListener('click', close);
+    box.appendChild(xBtn);
+
+    const bodyEl = document.createElement('div');
+    bodyEl.className = 'dash-notes-body';
+    box.appendChild(bodyEl);
+
+    const footer = document.createElement('div');
+    footer.className = 'dash-notes-footer';
+    footer.hidden = true;
+    const clearBtn = document.createElement('button');
+    clearBtn.type = 'button';
+    clearBtn.className = 'dash-notes-clear';
+    clearBtn.textContent = 'Cancella tutti';
+    footer.appendChild(clearBtn);
+    box.appendChild(footer);
+
+    document.body.appendChild(overlay);
+
+    // Riempie il corpo con la lista aggiornata degli appunti.
+    async function render() {
+      const r = await send({ type: MSG.FILO_GET_NOTES });
+      const notes = (r?.ok && Array.isArray(r.notes)) ? r.notes : [];
+      bodyEl.replaceChildren();
+      sub.textContent = notes.length
+        ? `${notes.length} ${notes.length === 1 ? 'appunto salvato' : 'appunti salvati'}`
+        : '';
+      footer.hidden = notes.length === 0;
+
+      if (!notes.length) {
+        const empty = document.createElement('div');
+        empty.className = 'dash-notes-empty';
+        empty.textContent = 'Nessun appunto salvato.';
+        const hint = document.createElement('div');
+        hint.className = 'dash-notes-empty-hint';
+        hint.textContent = 'Chiedi a Filo di “prendere nota” di qualcosa e comparirà qui.';
+        bodyEl.append(empty, hint);
+        return;
+      }
+
+      const ul = document.createElement('ul');
+      ul.className = 'dash-notes-list';
+      for (const n of notes) {
+        const li = document.createElement('li');
+        li.className = 'dash-notes-item';
+        li.dataset.id = n.id;
+
+        const main = document.createElement('div');
+        main.className = 'dash-notes-item-main';
+        const txt = document.createElement('div');
+        txt.className = 'dash-notes-text';
+        txt.textContent = n.text || '';
+        main.appendChild(txt);
+        if (n.context) {
+          const ctx = document.createElement('div');
+          ctx.className = 'dash-notes-ctx';
+          ctx.textContent = n.context;
+          main.appendChild(ctx);
+        }
+        const meta = document.createElement('div');
+        meta.className = 'dash-notes-meta';
+        meta.textContent = fmtNoteDate(n.ts);
+        main.appendChild(meta);
+        li.appendChild(main);
+
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'dash-notes-del';
+        del.setAttribute('aria-label', 'Elimina appunto');
+        del.title = 'Elimina appunto';
+        del.textContent = '×';
+        del.addEventListener('click', async () => {
+          if (del.disabled) return;
+          del.disabled = true;
+          await send({ type: MSG.FILO_DELETE_NOTE, id: n.id });
+          await render();
+        });
+        li.appendChild(del);
+        ul.appendChild(li);
+      }
+      bodyEl.appendChild(ul);
+    }
+
+    clearBtn.addEventListener('click', async () => {
+      // Rimozione in blocco = azione distruttiva → conferma esplicita (popup di
+      // Filo, non window.confirm nativo, come da PATTERNS.md).
+      const ok = window.SN_CONFIRM_UI
+        ? await window.SN_CONFIRM_UI.confirm({
+            title: 'Cancellare tutti gli appunti',
+            text: 'Filo dimenticherà tutti gli appunti salvati. Non potrà più usarli come contesto. L’operazione non è reversibile.',
+            okLabel: 'Cancella tutti',
+          })
+        : window.confirm('Cancellare tutti gli appunti? L’operazione non è reversibile.');
+      if (!ok) return;
+      await send({ type: MSG.FILO_CLEAR_NOTES });
+      await render();
+    });
+
+    await render();
+    xBtn.focus();
+  }
+
   // ===== Bootstrap =====
   // ===== Controlli del browser dentro la home (in alto a destra) =====
   // Le icone home/impostazioni/app/profilo (un tempo nella barra in alto, ora
