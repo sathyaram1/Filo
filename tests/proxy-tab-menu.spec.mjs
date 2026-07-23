@@ -216,25 +216,15 @@ test('la freccia apre la lista paesi e "Francia" proxa da fr', async ({ app, she
     await configureProvider(app, socks.port);
 
     await rightClickTab(shell);
-    const menu = await findMenuPopup(app, 'Apri da un altro paese');
-    // La freccia del submenu è presente sulla voce.
-    await menu.evaluate(() => {
-      const arrow = document.querySelector('button.subarrow');
-      if (!arrow) throw new Error('freccia submenu assente');
-      arrow.click();
-    });
+    // La freccia del submenu è presente sulla voce → apre il secondo livello.
+    await clickMenuArrow(app, 'Apri da un altro paese');
 
     // Secondo livello: la lista curata delle location.
-    const picker = await findMenuPopup(app, 'Francia');
-    const text = await picker.evaluate(() => document.body.innerText);
+    const text = await readMenuText(app, 'Francia');
     expect(text).toMatch(/Stati Uniti/);
     expect(text).toMatch(/Francia/);
     expect(text).not.toMatch(/vpn|proxy/i);
-    await picker.evaluate(() => {
-      const btn = [...document.querySelectorAll('button.item')]
-        .find((b) => /Francia/.test(b.textContent));
-      btn.click();
-    });
+    await clickMenuItem(app, 'Francia', 'Francia');
 
     await expect.poll(() => socks.connections.length, { timeout: 15_000 }).toBeGreaterThan(0);
     await expect(shell.locator('.tab .proxy-ind .cc')).toHaveText('FR', { timeout: 10_000 });
