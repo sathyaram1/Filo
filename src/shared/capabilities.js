@@ -216,8 +216,8 @@
     // ────────────────────────────── Appunti ──────────────────────────────────
     {
       id: 'paste-clipboard', title: 'Incolla con cronologia', category: 'clipboard',
-      desc: 'Incolla testo o immagini dagli appunti; puoi anche scegliere da una cronologia ricercabile di ciò che hai copiato di recente.',
-      invoke: 'In un campo modificabile, menu del tasto destro → "Incolla"; la freccia apre la cronologia.',
+      desc: 'Incolla testo o immagini dagli appunti; puoi scegliere da una cronologia ricercabile di ciò che hai copiato di recente, rimuovere una singola voce (es. una password copiata per sbaglio) o svuotare tutta la cronologia.',
+      invoke: 'In un campo modificabile, menu del tasto destro → "Incolla"; la freccia apre la cronologia. Nella cronologia: "×" accanto a una voce per rimuoverla, "Svuota cronologia" in fondo per cancellarle tutte.',
     },
     {
       id: 'copy-cut', title: 'Copia e taglia', category: 'clipboard',
