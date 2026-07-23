@@ -250,32 +250,20 @@ test('su tab già instradata "Cambia paese" apre la lista e cambia paese senza t
 
     // Proxa col default (USA).
     await rightClickTab(shell);
-    const menu = await findMenuPopup(app, 'Apri da un altro paese');
-    await menu.evaluate(() => {
-      [...document.querySelectorAll('button.item')]
-        .find((b) => /Apri da un altro paese/.test(b.textContent)).click();
-    });
+    await clickMenuItem(app, 'Apri da un altro paese', 'Apri da un altro paese');
     await expect(shell.locator('.tab .proxy-ind .cc')).toHaveText('US', { timeout: 10_000 });
 
     // Su tab proxata il menu offre "Cambia paese" (oltre a "Torna in Italia"),
     // senza obbligare a tornare diretti prima di re-instradare.
     await rightClickTab(shell);
-    const menu2 = await findMenuPopup(app, 'Cambia paese');
-    const text2 = await menu2.evaluate(() => document.body.innerText);
+    const text2 = await readMenuText(app, 'Cambia paese');
     expect(text2).toMatch(/Cambia paese/);
     expect(text2).toMatch(/Torna in Italia/);
     expect(text2).not.toMatch(/vpn|proxy/i);
 
     // "Cambia paese" apre la lista delle location.
-    await menu2.evaluate(() => {
-      [...document.querySelectorAll('button.item')]
-        .find((b) => /Cambia paese/.test(b.textContent)).click();
-    });
-    const picker = await findMenuPopup(app, 'Francia');
-    await picker.evaluate(() => {
-      [...document.querySelectorAll('button.item')]
-        .find((b) => /Francia/.test(b.textContent)).click();
-    });
+    await clickMenuItem(app, 'Cambia paese', 'Cambia paese');
+    await clickMenuItem(app, 'Francia', 'Francia');
 
     // La tab è re-instradata da fr (mai passata per l'Italia: resta proxata).
     await expect(shell.locator('.tab .proxy-ind .cc')).toHaveText('FR', { timeout: 10_000 });
