@@ -73,77 +73,78 @@ async function rightClickTab(shell) {
   });
 }
 
-// Il popup del menu è una BrowserWindow frameless che si chiude DA SOLA sul blur
-// (comportamento voluto: cliccare altrove chiude il menu). Su headless, senza
-// window manager, il focus è ballerino: il popup può perdere il focus e chiudersi
-// nel breve intervallo fra quando lo si individua e quando lo si clicca. Un handle
-// catturato prima diventa quindi stale ("Target page … closed"). Per non essere
-// fragili, questi helper NON conservano un riferimento: ri-acquisiscono la
-// finestra viva a ogni tentativo e — dove serve — leggono+cliccano nella STESSA
-// evaluate, così non esiste finestra temporale in cui il popup possa sparire fra
-// le due operazioni.
+// ── Interazione robusta col popup-menu ─────────────────────────────────────
+// Il popup del menu è una BrowserWindow frameless che si chiude DA SOLA in due
+// casi: (1) sul blur (cliccare altrove chiude il menu — voluto); (2) come effetto
+// del click su una voce (la voce seleziona e il menu si chiude). Su headless,
+// senza window manager, il focus è ballerino e questi eventi possono cadere in
+// mezzo alle interazioni del test: un handle catturato prima diventa stale e,
+// soprattutto, l'evaluate che ESEGUE il click può morire ("Target page closed")
+// pur avendo GIÀ cliccato — quindi il valore di ritorno del click è inaffidabile.
+// Regola d'oro (come da convenzioni: asserire il successo, non l'assenza di
+// errore): non ci si fida del ritorno del click ma dell'ESITO osservabile, e si
+// ripete (ri)aprendo il menu finché l'esito non si verifica.
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// Ritorna il testo del popup che contiene `needle`, ri-acquisendo la finestra.
-async function readMenuText(app, needle, timeout = 8_000) {
-  let text = '';
+// Lettura non bloccante: testo del popup che contiene `needle`, o null se assente.
+async function readMenuOnce(app, needle) {
+  for (const w of app.windows()) {
+    try {
+      const t = await w.evaluate((n) =>
+        (document.body && document.body.innerText.includes(n)) ? document.body.innerText : null, needle);
+      if (t != null) return t;
+    } catch (_) {}
+  }
+  return null;
+}
+
+// (Ri)apre il menu con `doOpen()` finché compare il popup che contiene `needle`,
+// poi ne ritorna il testo. Robusto anche se il primo tentativo di apertura si
+// chiude prima di poter leggere.
+async function openAndRead(app, doOpen, needle, timeout = 15_000) {
+  let text = null;
   await expect.poll(async () => {
-    for (const w of app.windows()) {
-      try {
-        const t = await w.evaluate((n) =>
-          (document.body && document.body.innerText.includes(n)) ? document.body.innerText : null, needle);
-        if (t != null) { text = t; return true; }
-      } catch (_) {}
-    }
-    return false;
-  }, { timeout }).toBe(true);
+    text = await readMenuOnce(app, needle);
+    if (text != null) return true;
+    await doOpen();
+    await sleep(120);
+    text = await readMenuOnce(app, needle);
+    return text != null;
+  }, { timeout, intervals: [120, 200, 300, 400, 600, 800, 1000, 1200] }).toBe(true);
   return text;
 }
 
-// Clicca ATOMICAMENTE la voce (button.item) il cui testo matcha `labelSource`
-// nel popup che contiene `needle`: individuare la finestra e cliccare avvengono
-// nella stessa evaluate, senza gap in cui il popup possa chiudersi. Se la
-// finestra muore a metà, il tick successivo del poll ri-acquisisce quella viva.
-async function clickMenuItem(app, needle, labelSource, timeout = 8_000) {
-  let tick = 0;
-  await expect.poll(async () => {
-    tick++;
-    const dbg = [];
-    for (const w of app.windows()) {
-      try {
-        const r = await w.evaluate(({ n, label }) => {
-          const body = document.body ? document.body.innerText : '(nobody)';
-          const hasNeedle = document.body && document.body.innerText.includes(n);
-          const re = new RegExp(label);
-          const btn = hasNeedle ? [...document.querySelectorAll('button.item')].find((b) => re.test(b.textContent)) : null;
-          if (hasNeedle && btn) { btn.click(); return { clicked: true }; }
-          return { clicked: false, hasNeedle: !!hasNeedle, nBtn: document.querySelectorAll('button.item').length, snippet: body.slice(0,40).replace(/\n/g,'|') };
-        }, { n: needle, label: labelSource });
-        if (r.clicked) return true;
-        dbg.push(JSON.stringify(r));
-      } catch (e) { dbg.push('ERR:'+String(e.message).slice(0,30)); }
-    }
-    process.stderr.write(`\n[clickMenuItem ${needle} tick${tick}] wins=${app.windows().length} ${dbg.join(' ')}`);
-    return false;
-  }, { timeout }).toBe(true);
+// Best-effort: clicca `sel` (opzionalmente con testo che matcha `labelRe`) nel
+// popup che contiene `needle`, se presente ORA. Ritorna true se ha cliccato o se
+// una finestra candidata si è chiusa durante il click (il click potrebbe essere
+// andato a segno). L'esito reale lo verifica il chiamante.
+async function tryClick(app, needle, sel, labelRe) {
+  for (const w of app.windows()) {
+    try {
+      const r = await w.evaluate(({ n, s, l }) => {
+        if (!document.body || !document.body.innerText.includes(n)) return 'no';
+        const nodes = [...document.querySelectorAll(s)];
+        const btn = l ? nodes.find((b) => new RegExp(l).test(b.textContent)) : nodes[0];
+        if (!btn) return 'no';
+        btn.click();
+        return 'yes';
+      }, { n: needle, s: sel, l: labelRe || null });
+      if (r === 'yes') return true;
+    } catch (_) { return true; } // popup chiuso durante il click: forse è andato a segno
+  }
+  return false;
 }
 
-// Come clickMenuItem ma clicca la freccia del submenu (button.subarrow).
-async function clickMenuArrow(app, needle, timeout = 8_000) {
+// Ripete `open()` (che porta il menu giusto in vista) e il click su
+// needle/sel/labelRe finché `until()` (l'esito osservabile) non è vero.
+async function clickUntil(app, { open, needle, sel = 'button.item', labelRe, until, timeout = 25_000 }) {
   await expect.poll(async () => {
-    for (const w of app.windows()) {
-      try {
-        const clicked = await w.evaluate((n) => {
-          if (!document.body || !document.body.innerText.includes(n)) return false;
-          const arrow = document.querySelector('button.subarrow');
-          if (!arrow) return false;
-          arrow.click();
-          return true;
-        }, needle);
-        if (clicked) return true;
-      } catch (_) {}
-    }
-    return false;
-  }, { timeout }).toBe(true);
+    if (await until()) return true;
+    await open();
+    for (let i = 0; i < 15; i++) { if (await tryClick(app, needle, sel, labelRe)) break; await sleep(40); }
+    await sleep(150);
+    return await until();
+  }, { timeout, intervals: [150, 200, 250, 350, 450, 600, 800, 1000, 1200] }).toBe(true);
 }
 
 async function configureProvider(app, port) {
