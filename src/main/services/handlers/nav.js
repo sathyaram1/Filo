@@ -60,7 +60,8 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
-  on(MSG.CLOSE_ALL_TABS, async (msg, sender) => {
+  on(MSG.CLOSE_ALL_TABS, async (msg, sender, origin) => {
+    if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
     const win = winOf(sender);
     win?._filoTabs?.closeAllTabs();
     return { ok: true };
