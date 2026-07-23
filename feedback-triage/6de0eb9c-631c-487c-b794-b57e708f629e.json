@@ -1,7 +1,0 @@
-{
-  "id": "6de0eb9c-631c-487c-b794-b57e708f629e",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica e' stata pubblicata ed e' ora attiva per tutti. Da adesso hai un pannello \"Appunti\" (icona in alto a destra nella nuova scheda) che mostra tutte le note che hai chiesto a Filo di prendere: puoi cancellarne una singola con la x oppure svuotarle tutte con \"Cancella tutti\" (con conferma). Ho verificato eseguendo il test della funzione (salva alcuni appunti, apre il pannello, ne elimina uno controllando che l'altro resti, poi svuota tutto) e la suite di test della logica: tutto verde. Nessun problema di sicurezza rilevato nella modifica.",
-  "queuedAt": "2026-07-23T04:11:45.658Z",
-  "queuedBy": "routine"
-}
