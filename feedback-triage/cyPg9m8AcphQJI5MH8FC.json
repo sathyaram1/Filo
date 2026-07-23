@@ -1,0 +1,7 @@
+{
+  "id": "cyPg9m8AcphQJI5MH8FC",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho rifatto la tua richiesta esatta (\"video di antropic su j space\") e ora funziona davvero: Filo mostra l'etichetta \"Cerco sul web…\" e subito sotto, da solo e senza che tu riscriva nulla, arriva la risposta con i link veri. La ricerca reale restituisce proprio i video giusti, in cima lo stesso \"Anthropic Just Found J-Space\" su YouTube, seguito dalla ricerca ufficiale di Anthropic. Funziona anche senza configurare nessuna chiave (usa un motore gratuito di ripiego), quindi vale per tutti da subito. L'etichetta con la lente non è più un pulsante che sembra rotto: è solo un indicatore che Filo sta lavorando, la risposta vera compare sotto. Ho provato a romperla: ricerca vuota o di soli spazi non fa nulla di brutto (nessun risultato, nessun crash); testo lunghissimo, emoji, caratteri strani e tentativi di codice malevolo non causano errori né si eseguono; la richiesta viene semplicemente gestita. Ho anche verificato che le altre funzioni che rispondono da sole (chat, comandi a catena, la scheda 'cosa so fare') non si siano rotte: tutto a posto. Unica rifinitura possibile in futuro, minima e non bloccante: nei titoli dei risultati compaiono a volte codici tipo &quot; al posto delle virgolette; è solo estetico e non impedisce nulla.",
+  "queuedAt": "2026-07-23T00:12:12.346Z",
+  "queuedBy": "routine"
+}
