@@ -1,17 +1,14 @@
-// Audit prober — appunti (note) di Filo: salvati ma non visibili.
+// Appunti di Filo: visibili e cancellabili dalla dashboard (#240).
 //
-// Filo salva appunti tramite l'azione SALVA_APPUNTO (ad es. "prendi nota che…"),
-// e li usa come contesto nel prompt della dashboard. Ma non esiste alcun pannello
-// UI che mostri all'utente quali appunti ha accumulato, né un modo per cancellarli.
+// Filo salva appunti tramite l'azione SALVA_APPUNTO ("prendi nota che…") e li
+// usa come contesto. Questo spec verifica che ora esista una UI per vederli e
+// gestirli: l'icona "Appunti" in alto a destra apre un pannello con tutte le
+// note, ciascuna cancellabile con la ×, più "Cancella tutti".
 //
-// Questo test verifica che:
-// (a) Un appunto si possa salvare via IPC (FILO_ADD_NOTE) — il meccanismo funziona.
-// (b) L'appunto NON compare da nessuna parte nella dashboard (né nella colonna
-//     sinistra, né in quella destra, né nella home): la mancanza di visibilità è
-//     confermata.
-// (c) FILO_GET_NOTES restituisce l'appunto salvato — i dati ci sono, manca solo la UI.
+// Prima del fix questo test falliva: non c'era né l'icona né il pannello.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { clickConfirm } from './helpers/confirm.mjs';
 
 // Trova la Page della newtab (dashboard), aspettando fino a 10s.
 async function newtabPage(app) {
@@ -27,52 +24,61 @@ async function newtabPage(app) {
   return null;
 }
 
-test('appunti salvati via SALVA_APPUNTO non sono visibili nella dashboard', async ({ app, shell }) => {
+async function addNote(page, text, context) {
+  return page.evaluate(([t, c]) => new Promise((resolve) => {
+    chrome.runtime.sendMessage(
+      { type: window.SN_MSG.MSG.FILO_ADD_NOTE, text: t, context: c },
+      (r) => resolve(r),
+    );
+  }), [text, context]);
+}
+
+test('gli appunti salvati sono visibili nel pannello e cancellabili', async ({ app, shell }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   expect(page, 'newtab deve essere aperta').toBeTruthy();
 
-  // (a) Salva un appunto tramite il canale IPC diretto.
-  const NOTE_TEXT = 'AUDIT_TEST_NOTE_CONTENUTO_UNIVOCO_12345';
-  const addResult = await page.evaluate(async (text) => {
-    return new Promise((resolve) => {
-      chrome.runtime.sendMessage(
-        { type: window.SN_MSG.MSG.FILO_ADD_NOTE, text, context: 'test-audit' },
-        (r) => resolve(r),
-      );
-    });
-  }, NOTE_TEXT);
+  const NOTE_A = 'AUDIT_NOTE_A_riunione_alle_10';
+  const NOTE_B = 'AUDIT_NOTE_B_comprare_il_latte';
+  const addA = await addNote(page, NOTE_A, 'test-audit');
+  const addB = await addNote(page, NOTE_B, '');
+  expect(addA?.ok && addB?.ok, 'i due appunti si devono salvare').toBe(true);
 
-  expect(addResult?.ok, 'FILO_ADD_NOTE deve rispondere ok:true').toBe(true);
-  expect(addResult?.note?.text, 'il testo dell\'appunto deve essere salvato').toBe(NOTE_TEXT);
+  // Il pulsante "Appunti" esiste tra i controlli in alto a destra.
+  const notesBtn = page.locator('.dash-ctrl[data-command="notes"]');
+  await expect(notesBtn).toHaveCount(1);
 
-  // (c) FILO_GET_NOTES restituisce l'appunto (i dati ci sono).
-  const getResult = await page.evaluate(async () => {
-    return new Promise((resolve) => {
-      chrome.runtime.sendMessage(
-        { type: window.SN_MSG.MSG.FILO_GET_NOTES },
-        (r) => resolve(r),
-      );
-    });
-  });
-  expect(getResult?.ok, 'FILO_GET_NOTES deve rispondere ok:true').toBe(true);
-  const saved = getResult?.notes || [];
-  const found = saved.find((n) => n.text === NOTE_TEXT);
-  expect(found, 'l\'appunto deve essere recuperabile via FILO_GET_NOTES').toBeTruthy();
+  // Aprendo il pannello, entrambi gli appunti sono visibili.
+  await notesBtn.click();
+  const panel = page.locator('.dash-notes-box');
+  await expect(panel).toBeVisible();
+  const list = page.locator('.dash-notes-list .dash-notes-item');
+  await expect(list).toHaveCount(2);
+  await expect(panel).toContainText(NOTE_A);
+  await expect(panel).toContainText(NOTE_B);
 
-  // (b) L'appunto NON è visibile da nessuna parte nella dashboard.
-  // Aspettiamo un po' per dare tempo alla dashboard di aggiornarsi.
-  await page.waitForTimeout(1000);
+  // Cancellazione di UN appunto: sparisce, l'altro resta.
+  const itemA = page.locator(`.dash-notes-item:has-text("${NOTE_A}")`);
+  await itemA.locator('.dash-notes-del').click();
+  await expect(list).toHaveCount(1);
+  await expect(panel).not.toContainText(NOTE_A);
+  await expect(panel).toContainText(NOTE_B);
 
-  // Cerca il testo dell'appunto ovunque nel DOM della dashboard.
-  const visibleInDom = await page.evaluate((text) => {
-    return document.body.textContent.includes(text);
-  }, NOTE_TEXT);
+  // Verifica lato dati: FILO_GET_NOTES non contiene più NOTE_A.
+  const afterDel = await page.evaluate(() => new Promise((resolve) => {
+    chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.FILO_GET_NOTES }, (r) => resolve(r));
+  }));
+  expect((afterDel?.notes || []).some((n) => n.text === NOTE_A)).toBe(false);
+  expect((afterDel?.notes || []).some((n) => n.text === NOTE_B)).toBe(true);
 
-  // Il test DOCUMENTA il comportamento attuale: l'appunto NON è visibile.
-  // Quando il bug viene fixato questo test dovrà essere aggiornato.
-  expect(visibleInDom,
-    'BUG CONFERMATO: gli appunti salvati tramite SALVA_APPUNTO non sono visibili nella dashboard — ' +
-    'l\'utente non può vedere né cancellare i propri appunti'
-  ).toBe(false);
+  // "Cancella tutti" (con conferma) svuota gli appunti → stato vuoto.
+  await page.locator('.dash-notes-clear').click();
+  await clickConfirm(page, 'ok');
+  await expect(page.locator('.dash-notes-empty')).toBeVisible();
+  await expect(list).toHaveCount(0);
+
+  const afterClear = await page.evaluate(() => new Promise((resolve) => {
+    chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.FILO_GET_NOTES }, (r) => resolve(r));
+  }));
+  expect((afterClear?.notes || []).length).toBe(0);
 });
