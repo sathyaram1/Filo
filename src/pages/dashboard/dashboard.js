@@ -432,7 +432,7 @@
     return div;
   }
 
-  function renderLiveCard({ kind, text, onDismiss }) {
+  function renderLiveCard({ kind, text, paused, onToggle, onDismiss }) {
     const div = document.createElement('div');
     div.className = 'dash-live-card';
     div.dataset.kind = kind;
@@ -440,6 +440,18 @@
     t.className = 'dash-live-text';
     t.textContent = text;
     div.appendChild(t);
+    // Pausa/ripresa: solo per i countdown (chi passa onToggle). Il pulsante sta
+    // accanto alla × e cambia icona/etichetta in base allo stato.
+    if (onToggle) {
+      const pb = document.createElement('button');
+      pb.className = 'dash-live-pause';
+      pb.type = 'button';
+      pb.setAttribute('aria-label', paused ? 'Riprendi' : 'Pausa');
+      pb.title = paused ? 'Riprendi' : 'Pausa';
+      pb.textContent = paused ? '▶' : '⏸';
+      pb.addEventListener('click', onToggle);
+      div.appendChild(pb);
+    }
     if (onDismiss) {
       const btn = document.createElement('button');
       btn.className = 'dash-live-dismiss';
