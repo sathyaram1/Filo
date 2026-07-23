@@ -37,6 +37,49 @@ test('notifica infinita resta e si chiude solo con la X', async ({ shell }) => {
   await expect(shell.locator('.shell-notif')).toHaveCount(0, { timeout: 4000 });
 });
 
+test('una raffica di notifiche non straripa fuori schermo e resta chiudibile', async ({ shell }) => {
+  // Simula il caso del feedback #282: tante notifiche infinite (durata 0) in
+  // rapida successione, come una tempesta di blocchi sito o un ripristino con
+  // molte schede in blacklist. Senza tetto/overflow lo stack cresceva oltre la
+  // finestra e le più vecchie finivano fuori dallo schermo in alto, con la loro
+  // X irraggiungibile.
+  await shell.evaluate(() => {
+    for (let i = 0; i < 21; i++) {
+      window.filoNotify('Sito bloccato #' + i, {
+        durationSec: 0,
+        actions: [{ label: 'Apri comunque', onClick: () => {} }],
+      });
+    }
+  });
+
+  // 1) Lo stack è limitato: non si accumulano 21 card senza fine.
+  const count = await shell.locator('.shell-notif').count();
+  expect(count).toBeGreaterThan(0);
+  expect(count).toBeLessThanOrEqual(5);
+
+  // 2) COMPORTAMENTO: ogni notifica rimasta è dentro la finestra e la sua X è
+  //    davvero raggiungibile (rettangolo interamente nel viewport, non spinto
+  //    oltre il bordo alto). È questo l'assert che diventa rosso senza il fix.
+  const offscreen = await shell.evaluate(() => {
+    const h = window.innerHeight;
+    const w = window.innerWidth;
+    const bad = [];
+    for (const x of document.querySelectorAll('.shell-notif-close')) {
+      const r = x.getBoundingClientRect();
+      if (r.top < 0 || r.bottom > h || r.left < 0 || r.right > w) {
+        bad.push({ top: r.top, bottom: r.bottom });
+      }
+    }
+    return bad;
+  });
+  expect(offscreen).toEqual([]);
+
+  // 3) La X dell'ultima notifica visibile la chiude davvero (è cliccabile).
+  const before = await shell.locator('.shell-notif').count();
+  await shell.locator('.shell-notif').last().locator('.shell-notif-close').click();
+  await expect(shell.locator('.shell-notif')).toHaveCount(before - 1, { timeout: 4000 });
+});
+
 test('Preferenze: i controlli notifiche esistono e persistono', async ({ openTab }) => {
   const page = await openTab('filo://preferences/preferences.html');
   await page.waitForSelector('#notifDuration', { timeout: 8_000 });
