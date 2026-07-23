@@ -22,6 +22,34 @@ import { test, expect } from './fixtures/electron.mjs';
 
 test.setTimeout(30_000);
 
+// Gate d'origine deterministico direttamente sul dispatch del main (#250): un
+// mittente con origine web esterna riceve `forbidden` da CLOSE_ALL_TABS e
+// QUIT_APP; un mittente filo:// passa. Non dipende dalla disponibilità di
+// chrome.runtime nella pagina esterna: esercita l'handler reale col mittente
+// sintetico. Se qualcuno togliesse il check isFilo, questo test diventa rosso.
+const dispatch = (app, msg, sender) =>
+  app.evaluate((_electron, { msg, sender }) =>
+    globalThis.SN_HANDLE_MESSAGE(msg, sender), { msg, sender });
+
+test('CLOSE_ALL_TABS / QUIT_APP: origine web esterna → forbidden, origine filo:// → consentita', async ({ app }) => {
+  const web = { tab: { id: 7, url: 'http://evil.example/' }, url: 'http://evil.example/' };
+  const filo = { tab: { id: 8, url: 'filo://newtab/' }, url: 'filo://newtab/' };
+
+  // Esterna → rifiutata (l'app NON esegue né chiude nulla).
+  const closeWeb = await dispatch(app, { type: 'close_all_tabs' }, web);
+  expect(closeWeb.ok).toBe(false);
+  expect(closeWeb.error).toBe('forbidden');
+  const quitWeb = await dispatch(app, { type: 'quit_app' }, web);
+  expect(quitWeb.ok).toBe(false);
+  expect(quitWeb.error).toBe('forbidden');
+
+  // filo:// → il gate lascia passare (winOf è nullo col mittente sintetico, quindi
+  // non chiude davvero le schede: asseriamo solo che il gate NON blocca).
+  const closeFilo = await dispatch(app, { type: 'close_all_tabs' }, filo);
+  expect(closeFilo.ok).toBe(true);
+  // QUIT_APP da filo:// non lo invochiamo qui: abbatterebbe l'app di test.
+});
+
 test('CLOSE_ALL_TABS da pagina web esterna non chiude tutte le schede', async ({ app, shell, openTab, testServer }) => {
   // Apriamo una scheda filo:// (la newtab) — questa deve sopravvivere.
   const newtab = await openTab('filo://newtab/');
