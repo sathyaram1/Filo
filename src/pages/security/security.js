@@ -308,9 +308,44 @@
     $('sec-siteblock-blacklist').disabled = !on;
   }
 
+  // Mostra (o nasconde, con lista vuota) un avviso inline sotto la blacklist
+  // che nomina le righe scartate perché non sono domini validi. Senza questo,
+  // una voce tipo "facebook" veniva salvata muta ma non bloccava mai il sito.
+  function setBlacklistError(invalidRows) {
+    const el = $('sec-siteblock-blacklist-error');
+    if (!el) return;
+    if (invalidRows && invalidRows.length) {
+      el.textContent = I18n.t('options_security_siteblock_blacklist_invalid', invalidRows.join(', '));
+      el.style.display = 'block';
+    } else {
+      el.textContent = '';
+      el.style.display = 'none';
+    }
+  }
+
+  // Normalizza e valida ogni riga della blacklist come il campo "siti fidati":
+  // scarta schema/path/www, minuscolo, e tiene solo domini con estensione
+  // (niente IP o nomi a etichetta singola come "facebook"). Ritorna i domini
+  // validi (deduplicati) e le righe scartate così com'erano, per l'avviso.
+  function parseBlacklist(raw) {
+    const valid = [];
+    const seen = new Set();
+    const invalid = [];
+    for (const line of String(raw || '').split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      const domain = cleanDomain(trimmed);
+      if (!domain) { invalid.push(trimmed); continue; }
+      if (seen.has(domain)) continue;
+      seen.add(domain);
+      valid.push(domain);
+    }
+    return { valid, invalid };
+  }
+
   async function save() {
-    const blacklist = $('sec-siteblock-blacklist').value
-      .split('\n').map((s) => s.trim()).filter(Boolean);
+    const { valid: blacklist, invalid } = parseBlacklist($('sec-siteblock-blacklist').value);
+    setBlacklistError(invalid);
     const partial = {
       security: {
         protectIpLeak: !!$('sec-protect-ip').checked,
