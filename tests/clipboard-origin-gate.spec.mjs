@@ -15,39 +15,81 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 
-const WEB = { url: 'https://evil.example/page' };
-const FILO = { url: 'filo://options/options.html' };
+const SENDERS = {
+  web: { url: 'https://evil.example/page' },
+  filo: { url: 'filo://options/options.html' },
+};
 
-test('#246 i canali riservati (svuota appunti, cronologia AI, costi) sono negati da origine web e ammessi da filo://', async ({ app, shell }) => {
+test('#246 i canali riservati sono negati da origine web e ammessi da filo://', async ({ app, shell }) => {
   void shell; // attende il boot: SN_HANDLE_MESSAGE dev'essere già montato
-  const out = await app.evaluate(async () => {
+  const out = await app.evaluate(async (_electron, S) => {
     const MSG = globalThis.SN_MSG.MSG;
     const send = (type, sender, extra = {}) =>
       globalThis.SN_HANDLE_MESSAGE({ type, ...extra }, sender);
 
-    // Da origine web: ogni canale riservato deve rispondere forbidden.
-    const webClearClip = await send(MSG.CLEAR_CLIPBOARD_HISTORY, WEB_SENDER);
-    const webGetHist = await send(MSG.GET_HISTORY, WEB_SENDER);
-    const webAppendHist = await send(MSG.APPEND_HISTORY, WEB_SENDER, {
-      entry: { action: 'explain', input: { selection: 'x' }, output: 'y', model: 'm' },
-    });
-    const webClearHist = await send(MSG.CLEAR_HISTORY, WEB_SENDER);
-    const webCosts = await send(MSG.GET_COSTS, WEB_SENDER);
-
-    // Da origine filo://: gli stessi canali devono funzionare (ok: true).
-    const filoGetHist = await send(MSG.GET_HISTORY, FILO_SENDER);
-    const filoCosts = await send(MSG.GET_COSTS, FILO_SENDER);
-    const filoClearClip = await send(MSG.CLEAR_CLIPBOARD_HISTORY, FILO_SENDER);
-    const filoClearHist = await send(MSG.CLEAR_HISTORY, FILO_SENDER);
-
     return {
-      webClearClip, webGetHist, webAppendHist, webClearHist, webCosts,
-      filoGetHist, filoCosts, filoClearClip, filoClearHist,
+      // Da origine web: ogni canale riservato deve rispondere forbidden.
+      webClearClip: await send(MSG.CLEAR_CLIPBOARD_HISTORY, S.web),
+      webGetHist: await send(MSG.GET_HISTORY, S.web),
+      webAppendHist: await send(MSG.APPEND_HISTORY, S.web, {
+        entry: { action: 'explain', input: { selection: 'x' }, output: 'y', model: 'm' },
+      }),
+      webClearHist: await send(MSG.CLEAR_HISTORY, S.web),
+      webCosts: await send(MSG.GET_COSTS, S.web),
+      // Da origine filo://: gli stessi canali devono funzionare (ok: true).
+      filoGetHist: await send(MSG.GET_HISTORY, S.filo),
+      filoCosts: await send(MSG.GET_COSTS, S.filo),
+      filoClearClip: await send(MSG.CLEAR_CLIPBOARD_HISTORY, S.filo),
+      filoClearHist: await send(MSG.CLEAR_HISTORY, S.filo),
     };
-  }).catch(async () => {
-    // app.evaluate non chiude sui riferimenti liberi WEB_SENDER/FILO_SENDER:
-    // li iniettiamo come costanti serializzate. (fallback se il primo modo fallisce)
-    return null;
-  });
-  expect(out, 'app.evaluate deve produrre un risultato').toBeTruthy();
+  }, SENDERS);
+
+  // Difesa: negato da origine web.
+  expect(out.webClearClip).toEqual({ ok: false, error: 'forbidden' });
+  expect(out.webGetHist).toEqual({ ok: false, error: 'forbidden' });
+  expect(out.webAppendHist).toEqual({ ok: false, error: 'forbidden' });
+  expect(out.webClearHist).toEqual({ ok: false, error: 'forbidden' });
+  expect(out.webCosts).toEqual({ ok: false, error: 'forbidden' });
+
+  // Feature: da filo:// funzionano.
+  expect(out.filoGetHist.ok).toBe(true);
+  expect(Array.isArray(out.filoGetHist.items)).toBe(true);
+  expect(out.filoCosts.ok).toBe(true);
+  expect(out.filoClearClip.ok).toBe(true);
+  expect(out.filoClearHist.ok).toBe(true);
+});
+
+test('#246 la cronologia appunti resta usabile da un\'origine web (menu Incolla su qualunque pagina)', async ({ app, shell }) => {
+  void shell;
+  const SENTINEL = 'CLIP_246_' + Date.now();
+  const out = await app.evaluate(async (_electron, arg) => {
+    const MSG = globalThis.SN_MSG.MSG;
+    const web = arg.senders.web;
+    const send = (type, extra = {}) =>
+      globalThis.SN_HANDLE_MESSAGE({ type, ...extra }, web);
+
+    // Aggiungi una voce da origine web (come fa il content script su copia/incolla).
+    const pushed = await send(MSG.PUSH_CLIPBOARD_ENTRY, {
+      entry: { type: 'text', text: arg.sentinel },
+    });
+    // Rileggi la cronologia da origine web (come fa il menu Incolla).
+    const got = await send(MSG.GET_CLIPBOARD_HISTORY);
+    // Aggiungi e aggiorna la descrizione di un'immagine da origine web.
+    const dataUrl = 'data:image/png;base64,AAAA';
+    await send(MSG.PUSH_CLIPBOARD_ENTRY, { entry: { type: 'image', dataUrl } });
+    const updated = await send(MSG.UPDATE_CLIPBOARD_DESCRIPTION, {
+      dataUrl, description: 'descr web',
+    });
+    const after = await send(MSG.GET_CLIPBOARD_HISTORY);
+    return { pushed, got, updated, after };
+  }, { sentinel: SENTINEL, senders: SENDERS });
+
+  // Push da web è consentito e restituisce la lista aggiornata.
+  expect(out.pushed.ok).toBe(true);
+  // La lettura da web vede la voce appena inserita (feature: menu Incolla).
+  expect(out.got.ok).toBe(true);
+  expect(out.got.items.some((i) => i.type === 'text' && i.text === SENTINEL)).toBe(true);
+  // La descrizione immagine, aggiornata da web, è persistita.
+  expect(out.updated.ok).toBe(true);
+  expect(out.after.items.some((i) => i.type === 'image' && i.description === 'descr web')).toBe(true);
 });
