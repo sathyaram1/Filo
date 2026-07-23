@@ -100,7 +100,7 @@
         const byLabel = { piccolo: 0.9, normale: 1, medio: 1, grande: 1.1, 'molto grande': 1.25, enorme: 1.5, grandissimo: 1.5 };
         let scale = byLabel[s];
         if (scale === undefined) {
-          let n = parseFloat(s.replace('%', '').replace(',', '.'));
+          let n = parseItalianNumber(s.replace('%', ''));
           if (Number.isFinite(n)) {
             if (n > 3) n = n / 100; // "110" → 1.1
             const allowed = [0.9, 1, 1.1, 1.25, 1.5];
