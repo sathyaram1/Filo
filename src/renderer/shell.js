@@ -588,7 +588,16 @@
     // Durante una trascinata non ridisegnare: cancellare i nodi farebbe perdere
     // il riferimento alla tab trascinata e interromperebbe il drag. Il riordino
     // viene confermato dal broadcast successivo al rilascio (api.tabs.move).
-    if (drag && drag.moved) return;
+    // NB: si sospende NON appena il drag è armato (mousedown), non solo dopo aver
+    // superato la soglia di 4px. Nella finestra tra mousedown e soglia `drag`
+    // esiste ma `moved` è ancora false: un broadcast `tabs:updated` che arriva lì
+    // (cambio titolo/favicon/loading/audio: frequentissimo) ricreerebbe tutti i
+    // nodi .tab, ORFANIZZANDO `drag.el`. Quando poi si supera la soglia, l'orfano
+    // verrebbe reinserito accanto al nodo rigenerato con lo stesso id → due schede
+    // fantasma affiancate e indice di rilascio sbagliato. Sospendere già da armato
+    // costa solo un frame di lag visivo mentre il tasto è premuto (ridisegnato al
+    // rilascio dal broadcast successivo).
+    if (drag) return;
     // tabs
     tabsEl.innerHTML = '';
     for (const t of state.tabs) {
