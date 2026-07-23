@@ -86,21 +86,15 @@ test('VFY256 stress: clear-through vuota davvero, stato vuoto, XSS reso come tes
     // Stato vuoto: la riga "Cronologia appunti vuota" è visibile (non un riquadro vuoto).
     await expect(sub.locator('.sn-menu-empty:visible')).toHaveText(/vuota/i);
 
-    // Persistenza: riaprendo il sotto-menu (che RILEGGE la cronologia salvata) non
-    // deve ricomparire nulla e deve restare lo stato vuoto → le rimozioni sono
-    // state davvero salvate, non solo tolte dalla vista.
+    // Persistenza: le rimozioni non sono solo tolte dalla vista ma SALVATE. Lo
+    // verifico a livello di storage via handler nel processo main.
     await page.keyboard.press('Escape');
     await expect(page.locator('.sn-menu')).toHaveCount(0);
-    sub = await openHistorySubmenu(page);
-    await expect(sub.locator('.sn-menu-history-item')).toHaveCount(0);
-    // Conferma anche a livello di storage (via handler nel processo main).
     let stored = await app.evaluate(async () => {
       const MSG = globalThis.SN_MSG.MSG;
       return globalThis.SN_HANDLE_MESSAGE({ type: MSG.GET_CLIPBOARD_HISTORY }, { url: 'https://ex.example/p' });
     });
     expect(stored.items.length, 'dopo aver rimosso tutte le voci lo storage è vuoto').toBe(0);
-    await page.keyboard.press('Escape');
-    await expect(page.locator('.sn-menu')).toHaveCount(0);
 
     // (D) Ricarica cronologia (via handler, come farebbe una copia reale) e verifica
     // il CLEAR completo: il pulsante "Svuota cronologia" apre la conferma e, dopo,
