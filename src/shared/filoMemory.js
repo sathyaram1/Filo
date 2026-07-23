@@ -326,7 +326,7 @@
     const entry = {
       id: uuid(),
       kind: 'alarm',
-      label: String(label || '').trim().slice(0, 60),
+      label: truncateSafe(String(label || '').trim(), 60),
       startedAt: new Date(now).toISOString(),
       endsAt: new Date(at).toISOString(),
       paused: false,
