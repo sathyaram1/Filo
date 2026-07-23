@@ -1,0 +1,7 @@
+{
+  "id": "7ea47c73-c289-4d0c-902c-d7339468db6c",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho riprodotto la lamentela aprendo le Preferenze e mettendo alla prova i due campi. Nel campo 'Archivia dopo questo periodo di inattivita (ore)' ho scritto 999 e ho spostato il focus: ora il campo si riallinea da solo a 168 (il massimo) e quello che vedo coincide con quello che viene davvero salvato. Nel campo 'Durata' delle notifiche ho provato -5 (torna a 5) e 999 (torna a 120), sempre col numero a schermo pari al valore in uso. Niente piu numero fuori scala che mente sul valore effettivo. Ho poi stressato i limiti: campo vuoto (torna al predefinito 6 ore / 5 secondi), numeri con la virgola (5.7 diventa 5), numeri enormi (un milione si ferma al massimo), valori negativi (ripiegano sul predefinito) e i valori di confine (1 e 168 ore, 0 e 120 secondi restano invariati). In ogni singolo caso il numero mostrato dopo aver lasciato il campo e esattamente quello salvato. Ho verificato apposta che lo 0 nella durata resti 0 (la notifica resta finche non la chiudi) e non venga trasformato: e corretto. Non ho trovato modi per far divergere di nuovo cio che si vede da cio che e in uso. Verifica eseguita con test automatici che aprono davvero le Preferenze in Filo (4 test del fix + una batteria di casi limite aggiuntivi), tutti superati.",
+  "queuedAt": "2026-07-23T03:32:59.859Z",
+  "queuedBy": "routine"
+}
