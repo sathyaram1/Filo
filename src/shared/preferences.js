@@ -377,7 +377,7 @@
       risk: 'Imposta il tetto di spesa mensile per le richieste AI. Alzarlo può far aumentare i '
         + 'costi; abbassarlo può bloccare le richieste una volta raggiunto il limite.',
       build(v) {
-        let n = parseFloat(String(v == null ? '' : v).replace(',', '.').replace(/[^0-9.]/g, ''));
+        let n = parseItalianNumber(v);
         if (!Number.isFinite(n) || n < 0) return null;
         n = Math.min(10000, n);
         const eur = Number.isInteger(n) ? String(n) : n.toFixed(2);
