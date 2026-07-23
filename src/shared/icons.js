@@ -326,6 +326,14 @@
     `<rect x="8" y="5" width="10" height="14" rx="1.5"/>` +
     `<path d="M6.5 7.2l-2.9.8 3.1 11 3.4-.9"/>`;
 
+  // --- Appunti di Filo: un foglio con l'angolo piegato e due righe di testo —
+  //     il gesto di "prendere nota". Coerente con la famiglia outline.
+  const note =
+    `<path d="M6 3.5h8l4 4v13H6z"/>` +
+    `<path d="M14 3.5v4h4"/>` +
+    `<path d="M9 12.5h6"/>` +
+    `<path d="M9 15.8h4"/>`;
+
   // Esposizione: ciascuna icona è una FUNZIONE (size) => stringa SVG.
   // Permette ai consumer di chiedere taglie diverse (es. 16 per la riga,
   // 20 per la griglia overflow) senza ricreare manualmente il wrapper.
