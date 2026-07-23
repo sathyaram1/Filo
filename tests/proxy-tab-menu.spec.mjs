@@ -138,12 +138,17 @@ async function tryClick(app, needle, sel, labelRe) {
 // Ripete `open()` (che porta il menu giusto in vista) e il click su
 // needle/sel/labelRe finché `until()` (l'esito osservabile) non è vero.
 async function clickUntil(app, { open, needle, sel = 'button.item', labelRe, until, timeout = 25_000 }) {
+  let tk = 0;
   await expect.poll(async () => {
+    tk++;
     if (await until()) return true;
     await open();
-    for (let i = 0; i < 15; i++) { if (await tryClick(app, needle, sel, labelRe)) break; await sleep(40); }
+    let clicked = false;
+    for (let i = 0; i < 15; i++) { if (await tryClick(app, needle, sel, labelRe)) { clicked = true; break; } await sleep(40); }
     await sleep(150);
-    return await until();
+    const done = await until();
+    process.stderr.write(`\n[clickUntil ${needle} tk${tk}] wins=${app.windows().length} clicked=${clicked} done=${done}`);
+    return done;
   }, { timeout, intervals: [150, 200, 250, 350, 450, 600, 800, 1000, 1200] }).toBe(true);
 }
 
