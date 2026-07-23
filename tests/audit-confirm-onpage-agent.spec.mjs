@@ -6,19 +6,31 @@
 // legittimo RUN → popup di conferma → CONFIRM. Solo il CONFIRM "a freddo" (senza
 // il RUN che lo precede) da un'origine esterna viene rifiutato.
 //
-// Questo spec asserisce il SUCCESSO del cammino legittimo: da un'origine esterna,
-// FILO_RUN_ACTION (livello 2 → needsConfirm, niente esecuzione) seguito da
-// FILO_CONFIRM_ACTION della STESSA azione esegue davvero. E verifica che la
-// conferma è ONE-TIME: un secondo CONFIRM senza un nuovo RUN è rifiutato.
+// Esercitiamo il dispatch reale nel main (SN_EXECUTE_FILO_ACTION) con mittenti
+// sintetici — perché sulle pagine web esterne chrome.runtime.sendMessage NON è
+// esposto al mondo principale (è proprio l'isolamento su cui poggia la barriera),
+// quindi non è pilotabile via page.evaluate. Qui verifichiamo la LOGICA del gate:
+//   • CONFIRM a freddo da origine esterna → rifiutato (nessuna esecuzione);
+//   • RUN (livello 2) → needsConfirm, niente esecuzione, registra il pending;
+//   • CONFIRM dopo il RUN dallo STESSO mittente → esegue davvero;
+//   • la conferma è ONE-TIME: un secondo CONFIRM senza nuovo RUN → rifiutato.
 //
-// Se qualcuno "semplificasse" il gate a un semplice isFilo(origin), questo test
-// diventerebbe rosso (l'agente on-page smetterebbe di funzionare sulle pagine web).
+// Se qualcuno "semplificasse" il gate a un semplice isFilo(origin), i passi 2-3
+// diventerebbero rossi (l'agente on-page smetterebbe di funzionare sulle pagine
+// web). Gli assert verificano il SUCCESSO del cammino legittimo, non l'assenza
+// di un errore.
 
 import { test, expect } from './fixtures/electron.mjs';
 
 test.setTimeout(30_000);
 
-test('on-page agent (origine esterna): RUN→CONFIRM esegue un\'azione livello 2; il CONFIRM a freddo no', async ({ app, openTab, testServer }) => {
+const exec = (app, action, opts) =>
+  app.evaluate((_electron, { action, opts }) =>
+    globalThis.SN_EXECUTE_FILO_ACTION(action, opts), { action, opts });
+
+const fbCalls = (app) => app.evaluate(() => globalThis.__fbCalls.length);
+
+test('on-page agent (origine esterna): RUN→CONFIRM esegue livello 2; il CONFIRM a freddo no', async ({ app }) => {
   // Stub del submit feedback nel main: registra le chiamate senza toccare la rete.
   await app.evaluate(() => {
     const FB = globalThis.SN_FEEDBACK;
@@ -27,39 +39,31 @@ test('on-page agent (origine esterna): RUN→CONFIRM esegue un\'azione livello 2
     FB.submit = async (payload) => { globalThis.__fbCalls.push(payload); return { id: 'test-fb' }; };
   });
 
-  const page = await testServer.openReady(openTab, `
-    <!DOCTYPE html>
-    <html><body>On-page agent host</body></html>
-  `);
-  await page.waitForLoadState('domcontentloaded');
-
+  // Mittente sintetico: una pagina web esterna (origine http://, non filo://).
+  const extSender = { tab: { id: 4242, url: 'http://evil.example/' }, url: 'http://evil.example/' };
   const action = { type: 'INVIA_FEEDBACK', testo: 'Segnalazione dall\'agente on-page', titolo: 'Test on-page' };
 
-  // 1) CONFIRM a FREDDO (nessun RUN precedente) da origine esterna → rifiutato,
-  //    nessun feedback inviato.
-  const cold = await page.evaluate(async (a) =>
-    chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.FILO_CONFIRM_ACTION, action: a }), action);
+  // 1) CONFIRM a FREDDO da origine esterna (nessun RUN prima) → rifiutato.
+  const cold = await exec(app, action, { confirmed: true, sender: extSender });
   expect(cold.executed).toBe(false);
-  expect(await app.evaluate(() => globalThis.__fbCalls.length)).toBe(0);
+  expect(cold.rejected).toBe(true);
+  expect(await fbCalls(app)).toBe(0);
 
   // 2) RUN legittimo: livello 2 → il main non esegue, chiede conferma.
-  const run = await page.evaluate(async (a) =>
-    chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.FILO_RUN_ACTION, action: a }), action);
+  const run = await exec(app, action, { sender: extSender });
   expect(run.executed).toBe(false);
   expect(run.needsConfirm).toBe(2);
-  expect(await app.evaluate(() => globalThis.__fbCalls.length)).toBe(0);
+  expect(await fbCalls(app)).toBe(0);
 
-  // 3) CONFIRM dopo il RUN → esegue davvero (il feedback parte).
-  const ok = await page.evaluate(async (a) =>
-    chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.FILO_CONFIRM_ACTION, action: a }), action);
+  // 3) CONFIRM dopo il RUN, STESSO mittente → esegue davvero (il feedback parte).
+  const ok = await exec(app, action, { confirmed: true, sender: extSender });
   expect(ok.executed).toBe(true);
-  await expect.poll(() => app.evaluate(() => globalThis.__fbCalls.length)).toBe(1);
+  expect(await fbCalls(app)).toBe(1);
 
-  // 4) La conferma è ONE-TIME: un secondo CONFIRM senza un nuovo RUN è rifiutato.
-  const replay = await page.evaluate(async (a) =>
-    chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.FILO_CONFIRM_ACTION, action: a }), action);
+  // 4) ONE-TIME: un secondo CONFIRM senza un nuovo RUN → rifiutato.
+  const replay = await exec(app, action, { confirmed: true, sender: extSender });
   expect(replay.executed).toBe(false);
-  expect(await app.evaluate(() => globalThis.__fbCalls.length)).toBe(1);
+  expect(await fbCalls(app)).toBe(1);
 
   await app.evaluate(() => { globalThis.SN_FEEDBACK.submit = globalThis.__origFbSubmit; });
 });
