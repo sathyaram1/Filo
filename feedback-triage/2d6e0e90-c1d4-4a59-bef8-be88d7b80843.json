@@ -1,0 +1,7 @@
+{
+  "id": "2d6e0e90-c1d4-4a59-bef8-be88d7b80843",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho verificato in modo avversariale l'instabilità segnalata (il test automatico del menu tasto destro sulla scheda, flusso 'Cambia paese'). Primo ho RIPRODOTTO il difetto sulla versione precedente: rilanciando l'intero gruppo 8 volte di fila, 3 volte su 8 uno dei test cadeva con l'errore 'finestra chiusa' — esattamente il sintomo descritto, e ho visto fallire proprio il test 'Cambia paese' segnalato. Poi ho verificato la correzione: il test segnalato, rilanciato 15 volte di fila da solo, è passato tutte e 15; l'intero gruppo (4 test) rilanciato 9 volte di fila è passato tutte e 9. La correzione è solo sui test (nessuna riga dell'app toccata), quindi non cambia nulla per l'utente: il menu continua a chiudersi correttamente quando scegli una voce o clicchi fuori. Il nuovo approccio non si fida più del 'clic riuscito' ma verifica il risultato reale sulla scheda (l'indicatore del paese US/FR) e riprova riaprendo il menu finché l'esito non c'è: robusto anche col fuoco-finestra ballerino dell'ambiente di test headless. Stabilità confermata su tutti e quattro i test del gruppo, non solo quello segnalato.",
+  "queuedAt": "2026-07-23T01:25:59.313Z",
+  "queuedBy": "routine"
+}
