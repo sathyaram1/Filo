@@ -36,6 +36,11 @@ function dispatch(command, window) {
   if (!active) return;
 
   if (command === 'save-for-later') {
+    // "Salva per dopo" ha senso solo per pagine web da rileggere: le pagine
+    // interne di Filo (filo://) non vanno salvate né chiuse. Early-return
+    // simmetrico agli altri 3 comandi, che su una pagina interna sono già
+    // no-op (nessun content script in ascolto).
+    if (isInternalTab(active)) return;
     // Comportamento speciale: salva via servizio + chiude il tab.
     saveForLater(win, active).catch((e) => console.warn('[Filo] save-for-later failed', e));
     return;
