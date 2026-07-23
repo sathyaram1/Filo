@@ -23,6 +23,7 @@
       fixes: [
         'Quando chiedi a Filo di cercare qualcosa sul web (es. "trova il video di X"), ora la ricerca viene eseguita davvero e Filo ti risponde con i risultati e i link reali: prima compariva solo un riquadro "Cerco..." che non portava a nulla.',
         'In Impostazioni → Sicurezza, il campo "Domini in blacklist" ora controlla ciò che scrivi come già faceva il campo "Siti fidati": una voce senza estensione (es. "facebook" invece di "facebook.com") o un indirizzo intero incollato viene sistemata o segnalata, così non credi più di aver bloccato un sito che invece resta apribile.',
+        'Il blocco dei siti in blacklist non si aggira più passando da una pagina il cui indirizzo comincia per "google.", "yahoo." o "yandex." (es. "yahoo.qualcosa.com"): prima queste venivano scambiate per motori di ricerca e lasciavano aprire il sito bloccato. I motori di ricerca veri continuano a funzionare come eccezione.',
       ],
     },
     {
