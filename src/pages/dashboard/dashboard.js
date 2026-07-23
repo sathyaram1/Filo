@@ -336,13 +336,23 @@
           onDismiss: () => send({ type: MSG.FILO_DELETE_TIMER, id: t.id }).then(refreshLive),
         }));
       } else {
-        const remaining = Math.max(0, Math.round((new Date(t.endsAt).getTime() - Date.now()) / 1000));
+        // Timer in pausa: il countdown è congelato, `endsAt` non è più
+        // affidabile (il "now" avanza mentre il timer è fermo) → usa il tempo
+        // rimanente salvato al momento della pausa.
+        const remaining = (t.paused && Number.isFinite(t.remainingMs))
+          ? Math.max(0, Math.round(t.remainingMs / 1000))
+          : Math.max(0, Math.round((new Date(t.endsAt).getTime() - Date.now()) / 1000));
         const mm = Math.floor(remaining / 60);
         const ss = remaining % 60;
         const txt = `${t.label}\n${mm}:${String(ss).padStart(2, '0')}${t.paused ? ' (in pausa)' : ''}`;
         liveEl.appendChild(renderLiveCard({
           kind: 'process',
           text: txt,
+          paused: !!t.paused,
+          onToggle: () => send({
+            type: t.paused ? MSG.FILO_RESUME_TIMER : MSG.FILO_PAUSE_TIMER,
+            id: t.id,
+          }).then(refreshLive),
           onDismiss: () => send({ type: MSG.FILO_DELETE_TIMER, id: t.id }).then(refreshLive),
         }));
       }
