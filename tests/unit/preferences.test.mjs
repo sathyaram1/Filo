@@ -73,6 +73,43 @@ test('modelli / provider / chiavi / costi → livello 2', () => {
   assert.deepEqual(limit.partial, { monthlyLimitEur: 12 });
 });
 
+// ── Numeri in formato italiano: il punto delle migliaia NON è un decimale ────
+// Bug reale: "imposta il limite di spesa mensile a 2.500 euro" veniva letto come
+// 2,50 € perché il punto (separatore delle migliaia in italiano) faceva da
+// separatore decimale. Questi assert diventano ROSSI se si rimuove il fix:
+// senza parseItalianNumber, "2.500 euro" → 2.5 e "1.000 euro" → 1.
+test('limite_spesa: il punto delle migliaia (formato italiano) NON diventa decimale', () => {
+  assert.deepEqual(build('limite_spesa', '2.500 euro').partial, { monthlyLimitEur: 2500 });
+  assert.deepEqual(build('limite_spesa', '1.000').partial, { monthlyLimitEur: 1000 });
+  assert.deepEqual(build('limite_spesa', '10.000 €').partial, { monthlyLimitEur: 10000 });
+  // Migliaia + decimale insieme (formato italiano completo): 2.500,50 → 2500.50
+  assert.deepEqual(build('limite_spesa', '2.500,50 euro').partial, { monthlyLimitEur: 2500.5 });
+  // Solo virgola decimale resta un decimale: 2,50 → 2.5
+  assert.deepEqual(build('limite_spesa', '2,50').partial, { monthlyLimitEur: 2.5 });
+  // Punto decimale all'inglese con 1-2 cifre resta decimale: 12.50 → 12.5
+  assert.deepEqual(build('limite_spesa', '12.50 euro').partial, { monthlyLimitEur: 12.5 });
+});
+
+test("velocità/tono di lettura: i decimali all'inglese restano decimali", () => {
+  // Qui il punto è un decimale legittimo e NON deve diventare migliaia.
+  assert.deepEqual(build('velocita_voce', '1.5').partial, { tts: { rate: 1.5 } });
+  assert.deepEqual(build('tono_voce', '0.8').partial, { tts: { pitch: 0.8 } });
+});
+
+test('parseItalianNumber: disambigua migliaia vs decimale', () => {
+  const p = P.parseItalianNumber;
+  assert.equal(p('2.500'), 2500);
+  assert.equal(p('1.000'), 1000);
+  assert.equal(p('1.234.567'), 1234567);
+  assert.equal(p('2.500,50'), 2500.5);
+  assert.equal(p('2,50'), 2.5);
+  assert.equal(p('1.5'), 1.5);      // decimale inglese (1 cifra dopo il punto)
+  assert.equal(p('2.50'), 2.5);     // decimale inglese (2 cifre dopo il punto)
+  assert.equal(p('42'), 42);
+  assert.ok(Number.isNaN(p('tanto')));
+  assert.ok(Number.isNaN(p('')));
+});
+
 test('valori non validi → null (niente scrittura accidentale)', () => {
   assert.equal(build('provider', 'inesistente'), null);
   assert.equal(build('gestione_cookie', 'boh'), null);
