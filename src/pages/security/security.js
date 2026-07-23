@@ -131,6 +131,9 @@
     $('sec-siteblock').checked = sblk.enabled !== false;
     $('sec-siteblock-lists').checked = sblk.useAdblockLists !== false;
     $('sec-siteblock-blacklist').value = (Array.isArray(sblk.blacklist) ? sblk.blacklist : []).join('\n');
+    // Se ci sono voci salvate da prima del controllo (o non valide), avvisa
+    // subito che non bloccheranno nulla invece di lasciarle passare mute.
+    setBlacklistError(parseBlacklist($('sec-siteblock-blacklist').value).invalid);
     syncSiteBlockEnabled();
     const sb = sec.safeBrowse || {};
     $('sec-safebrowse').checked = sb.enabled !== false;
