@@ -125,7 +125,7 @@
       level: 2,
       describe: (a) => {
         const testo = String(a.testo ?? a.text ?? a.messaggio ?? '').trim();
-        const short = testo.length > 160 ? `${testo.slice(0, 160)}…` : testo;
+        const short = testo.length > 160 ? `${truncateSafe(testo, 160)}…` : testo;
         return `Inviare questo feedback agli sviluppatori di Filo a tuo nome:\n“${short || '(vuoto)'}”`;
       },
     },
