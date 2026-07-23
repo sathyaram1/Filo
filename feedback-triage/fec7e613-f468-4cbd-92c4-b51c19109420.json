@@ -1,7 +1,0 @@
-{
-  "id": "fec7e613-f468-4cbd-92c4-b51c19109420",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica e' stata pubblicata. Ora la barra degli indirizzi apre correttamente gli indirizzi con una porta (es. localhost:3000, 127.0.0.1:8080, example.com:8443/admin) e i nomi locali come localhost, invece di trattarli come una ricerca su Google. Per i server locali e gli indirizzi di rete privata viene usato http, per i siti pubblici https.",
-  "queuedAt": "2026-07-23T03:51:44.865Z",
-  "queuedBy": "routine"
-}
