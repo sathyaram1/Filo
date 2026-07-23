@@ -76,7 +76,11 @@
 
       const m = CARD_LINE_RE.exec(line);
       if (!m) { dirtyLines.push(raw); continue; }
-      const qty = Math.max(1, parseInt(m[1], 10) || 1);
+      // NB: 0 è falsy — un vecchio `parseInt || 1` avrebbe trasformato
+      // "0 Sol Ring" in 1 copia. Una quantità 0 (o negativa/illeggibile)
+      // vuol dire "non includere": va segnalata come riga non valida.
+      const qty = parseInt(m[1], 10);
+      if (!Number.isFinite(qty) || qty <= 0) { dirtyLines.push(raw); continue; }
       const name = cleanCardName(m[2]);
       if (!name) { dirtyLines.push(raw); continue; }
 
