@@ -147,7 +147,9 @@ async function clickUntil(app, { open, needle, sel = 'button.item', labelRe, unt
     for (let i = 0; i < 15; i++) { if (await tryClick(app, needle, sel, labelRe)) { clicked = true; break; } await sleep(40); }
     await sleep(150);
     const done = await until();
-    process.stderr.write(`\n[clickUntil ${needle} tk${tk}] wins=${app.windows().length} clicked=${clicked} done=${done}`);
+    const snaps = [];
+    for (const w of app.windows()) { try { snaps.push(await w.evaluate(() => (document.body?document.body.innerText:'').replace(/\n/g,'|').slice(0,50))); } catch(_){ snaps.push('CLOSED'); } }
+    process.stderr.write(`\n[clickUntil ${needle} tk${tk}] wins=${app.windows().length} clicked=${clicked} done=${done} :: ${snaps.join(' # ')}`);
     return done;
   }, { timeout, intervals: [150, 200, 250, 350, 450, 600, 800, 1000, 1200] }).toBe(true);
 }
