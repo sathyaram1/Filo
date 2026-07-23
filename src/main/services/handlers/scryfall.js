@@ -480,9 +480,12 @@ module.exports = function register(on, ctx) {
       const deck = await Store.get(String(msg?.id || ''));
       if (!deck) return { ok: false, error: 'not_found' };
       const rawEntries = Array.isArray(msg?.entries) ? msg.entries : [];
+      // Una qty <= 0 (o non numerica) significa "non includere": si scarta,
+      // NON si forza a 1 (0 è falsy — il vecchio `Number(...) || 1` la
+      // trasformava in una copia fantasma).
       const entries = rawEntries
-        .map((e) => ({ scryfall_id: String((e && e.scryfallId) || ''), qty: Math.max(1, Number(e && e.qty) || 1) }))
-        .filter((e) => e.scryfall_id);
+        .map((e) => ({ scryfall_id: String((e && e.scryfallId) || ''), qty: Math.floor(Number(e && e.qty)) }))
+        .filter((e) => e.scryfall_id && Number.isFinite(e.qty) && e.qty > 0);
       const { deck: merged, addedCount, updatedCount } = Decks.importCards(deck, entries);
 
       let next = merged;
