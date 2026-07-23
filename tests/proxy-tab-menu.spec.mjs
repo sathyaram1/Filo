@@ -310,9 +310,8 @@ test('senza endpoint configurato la voce non compare', async ({ app, shell, open
   const url = testServer.html('<title>MENU_NOCFG</title><p id="p">ok</p>');
   const page = await openTab(url);
   await page.waitForSelector('#p');
-  await rightClickTab(shell);
   // Il menu standard si apre (Duplica c'è) ma la voce paese no.
-  const text = await readMenuText(app, 'Duplica');
+  const text = await openAndRead(app, () => rightClickTab(shell), 'Duplica');
   expect(text).not.toMatch(/Apri da un altro paese/);
   expect(text).toMatch(/Chiudi/);
 });
