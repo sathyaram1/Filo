@@ -260,22 +260,38 @@ test('su tab già instradata "Cambia paese" apre la lista e cambia paese senza t
     await page.waitForSelector('#ok');
     await configureProvider(app, socks.port);
 
+    const cc = () => shell.evaluate(() => {
+      const e = document.querySelector('.tab .proxy-ind .cc'); return e ? e.textContent : null;
+    });
+
     // Proxa col default (USA).
-    await rightClickTab(shell);
-    await clickMenuItem(app, 'Apri da un altro paese', 'Apri da un altro paese');
+    await clickUntil(app, {
+      open: () => rightClickTab(shell),
+      needle: 'Apri da un altro paese', labelRe: 'Apri da un altro paese',
+      until: async () => (await cc()) === 'US',
+    });
     await expect(shell.locator('.tab .proxy-ind .cc')).toHaveText('US', { timeout: 10_000 });
 
     // Su tab proxata il menu offre "Cambia paese" (oltre a "Torna in Italia"),
     // senza obbligare a tornare diretti prima di re-instradare.
-    await rightClickTab(shell);
-    const text2 = await readMenuText(app, 'Cambia paese');
+    const text2 = await openAndRead(app, () => rightClickTab(shell), 'Cambia paese');
     expect(text2).toMatch(/Cambia paese/);
     expect(text2).toMatch(/Torna in Italia/);
     expect(text2).not.toMatch(/vpn|proxy/i);
 
-    // "Cambia paese" apre la lista delle location.
-    await clickMenuItem(app, 'Cambia paese', 'Cambia paese');
-    await clickMenuItem(app, 'Francia', 'Francia');
+    // "Cambia paese" apre la lista delle location; poi "Francia" re-instrada.
+    // Riapriamo la lista (via "Cambia paese") a ogni tentativo finché la tab non
+    // risulta instradata da fr (mai passando per l'Italia: resta proxata).
+    const openPicker = async () => {
+      await rightClickTab(shell);
+      for (let i = 0; i < 15; i++) { if (await tryClick(app, 'Cambia paese', 'button.item', 'Cambia paese')) break; await sleep(40); }
+      await sleep(80);
+    };
+    await clickUntil(app, {
+      open: openPicker,
+      needle: 'Francia', labelRe: 'Francia',
+      until: async () => (await cc()) === 'FR',
+    });
 
     // La tab è re-instradata da fr (mai passata per l'Italia: resta proxata).
     await expect(shell.locator('.tab .proxy-ind .cc')).toHaveText('FR', { timeout: 10_000 });
