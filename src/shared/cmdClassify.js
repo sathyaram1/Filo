@@ -139,6 +139,19 @@
   // Flag che alzano a 3 un comando altrimenti ≤2.
   const DANGEROUS_FLAG_RE = /(^|\s)(--force|--hard|--delete|--prune|--no-preserve-root|-[a-z]*f[a-z]*r[a-z]*|-[a-z]*r[a-z]*f[a-z]*)(\s|$)/i;
 
+  // robocopy: i flag distruttivi Windows usano lo slash, non il trattino, quindi
+  // DANGEROUS_FLAG_RE (stile Unix) NON li vede. `robocopy SRC DST /MIR` e
+  // `/PURGE` CANCELLANO in modo permanente (bypassando il Cestino) i file nella
+  // destinazione che non esistono nella sorgente — un `rm -rf` mirato mascherato
+  // da "copia" → devono chiedere di digitare "conferma" (3), non un semplice OK
+  // (2). `/MOVE` e `/MOV` spostano cancellando i file dalla SORGENTE dopo la
+  // copia: se la sorgente è quella sbagliata (o pilotata da una pagina ostile) si
+  // svuota una cartella non voluta → stessa classe distruttiva. Check
+  // robocopy-specifico e case-insensitive (i flag Windows lo sono): applicarlo a
+  // ogni comando globalmente rischierebbe falsi positivi con path Unix tipo
+  // `cp /mir file` (una cartella chiamata "mir"); solo robocopy usa questi flag.
+  const ROBOCOPY_DESTRUCTIVE_RE = /(^|\s)\/(MIR|PURGE|MOVE|MOV)(\s|$)/i;
+
   // curl/wget con un flag di OUTPUT-SU-FILE scrivono i byte scaricati in un
   // percorso scelto da chi lancia il comando (l'LLM, potenzialmente pilotato da
   // una pagina ostile): può SOVRASCRIVERE qualsiasi file — chiavi SSH
