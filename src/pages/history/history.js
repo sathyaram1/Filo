@@ -6,6 +6,7 @@
   const { MSG } = window.SN_MSG;
   const I18n = window.SN_I18N;
   const Storage = window.SN_STORAGE;
+  const Const = window.SN_CONST;
 
   function $(id) { return document.getElementById(id); }
 
