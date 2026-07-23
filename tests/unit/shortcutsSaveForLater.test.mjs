@@ -54,12 +54,13 @@ Module._load = function patched(request, parent, isMain) {
   return origLoad.call(this, request, parent, isMain);
 };
 
-let dispatch;
-try {
-  ({ dispatch } = require(join(ROOT, 'src', 'main', 'shortcuts.js')));
-} finally {
-  Module._load = origLoad;
-}
+// Lo stub resta installato per tutta la vita del file: saveForLater fa un
+// require('./services/handlers') LAZY (a runtime, dopo che dispatch è tornato),
+// quindi non possiamo ripristinare Module._load subito. Lo ripristiniamo alla
+// chiusura del processo. Intercetta solo 'electron' e './services/handlers'.
+process.on('exit', () => { Module._load = origLoad; });
+
+const { dispatch } = require(join(ROOT, 'src', 'main', 'shortcuts.js'));
 
 // Costruisce una finta finestra con una sola tab attiva.
 function makeWin(tab) {
