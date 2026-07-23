@@ -109,16 +109,21 @@ test('cronologia appunti: XSS-safe, troncamento, immagine, stato vuoto finale', 
       await sub.locator('.sn-menu-history-remove').first().click();
     }
     await expect(sub.locator('.sn-menu-history-item')).toHaveCount(0);
-    await expect(sub.locator('.sn-menu-empty')).toBeVisible();
+    await expect(sub.getByText('Cronologia appunti vuota')).toBeVisible();
     await expect(sub.locator('.sn-menu-history-search')).toBeHidden();
     await expect(sub.locator('.sn-menu-history-clear')).toBeHidden();
 
     // (E) Persistenza dello svuotamento a mano: riaprendo, cronologia vuota.
+    // Quando è vuota il sotto-menu mostra solo lo stato "vuoto" (senza lista),
+    // quindi apriamo genericamente e verifichiamo il messaggio.
     await page.keyboard.press('Escape');
     await expect(page.locator('.sn-menu')).toHaveCount(0);
-    sub = await openHistorySubmenu(page);
-    await expect(sub.locator('.sn-menu-history-item')).toHaveCount(0);
-    await expect(sub.locator('.sn-menu-empty')).toBeVisible();
+    await page.locator('#ta').click({ button: 'right' });
+    await expect(page.locator('.sn-menu')).toBeVisible();
+    await page.locator('.sn-menu-paste-arrow').click();
+    await expect(page.locator('.sn-menu-sub')).toBeVisible();
+    await expect(page.locator('.sn-menu-sub .sn-menu-history-item')).toHaveCount(0);
+    await expect(page.locator('.sn-menu-sub').getByText('Cronologia appunti vuota')).toBeVisible();
 
     await page.screenshot({ path: 'tests/.shots/vfy256-adv.png' });
   } finally {
