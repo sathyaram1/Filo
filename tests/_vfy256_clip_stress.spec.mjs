@@ -111,10 +111,13 @@ test('VFY256 stress: clear-through vuota davvero, stato vuoto, XSS reso come tes
     await expect(sub.locator('.sn-menu-history-item')).toHaveCount(3);
     const clearBtn = sub.locator('.sn-menu-history-clear-btn');
     await expect(clearBtn).toBeVisible();
+    // Traccia visiva: sotto-menu con "×" su ogni voce + "Svuota cronologia".
+    await page.screenshot({ path: 'tests/.shots/vfy256-submenu.png' });
     await clearBtn.click();
     // Azione distruttiva: DEVE comparire il dialogo di conferma (guardia anti-perdita).
     const confirmHost = page.locator(CONFIRM_HOST);
     await expect(confirmHost).toBeVisible();
+    await page.screenshot({ path: 'tests/.shots/vfy256-confirm.png' });
     // (Il dialogo vive in uno shadow DOM chiuso, non cliccabile dalla pagina web: la
     // conferma→clear end-to-end la copre lo spec interno. Qui verifico che
     // l'operazione di svuotamento, una volta confermata, azzeri DAVVERO lo storage —
