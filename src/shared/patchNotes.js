@@ -16,6 +16,12 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.154', date: '2026-07-23',
+      fixes: [
+        'In Preferenze, i campi "Archivia dopo questo periodo di inattività (ore)" e "Durata" delle notifiche ora mostrano subito il valore realmente in uso: se scrivi un numero fuori scala (troppo grande o negativo) e lasci il campo, questo si riallinea al valore effettivamente salvato invece di continuare a mostrare il numero digitato.',
+      ],
+    },
+    {
       version: '0.2.153', date: '2026-07-22',
       features: [
         'Nel deck builder puoi trascinare una carta su una categoria per spostarla: quando sei raggruppato per tag, rilasciandola su un tag ti chiede se aggiungerlo a quelli che ha già o sostituirli tutti (e non ti chiede nulla quando non c\'è ambiguità); trascinandola su "Senza tag" le togli tutti i tag. Nelle altre viste (tipo, costo, colore) il trascinamento sposta la carta nel gruppo scelto.',
