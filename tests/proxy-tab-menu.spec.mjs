@@ -73,7 +73,17 @@ async function rightClickTab(shell) {
   });
 }
 
-// Trova la finestra-popup del menu che contiene `needle` nel testo.
+// Il popup del menu è una BrowserWindow frameless che si chiude DA SOLA sul blur
+// (comportamento voluto: cliccare altrove chiude il menu). Su headless, senza
+// window manager, il focus è ballerino: il popup può perdere il focus e chiudersi
+// nel breve intervallo fra quando lo si individua e quando lo si clicca. Un handle
+// catturato prima diventa quindi stale ("Target page … closed"). Per non essere
+// fragili, questi helper NON conservano un riferimento: ri-acquisiscono la
+// finestra viva a ogni tentativo e — dove serve — leggono+cliccano nella STESSA
+// evaluate, così non esiste finestra temporale in cui il popup possa sparire fra
+// le due operazioni.
+
+// Attende che compaia il popup che contiene `needle` (solo presenza).
 async function findMenuPopup(app, needle, timeout = 8_000) {
   let popup = null;
   await expect.poll(async () => {
@@ -87,6 +97,64 @@ async function findMenuPopup(app, needle, timeout = 8_000) {
     return false;
   }, { timeout }).toBe(true);
   return popup;
+}
+
+// Ritorna il testo del popup che contiene `needle`, ri-acquisendo la finestra.
+async function readMenuText(app, needle, timeout = 8_000) {
+  let text = '';
+  await expect.poll(async () => {
+    for (const w of app.windows()) {
+      try {
+        const t = await w.evaluate((n) =>
+          (document.body && document.body.innerText.includes(n)) ? document.body.innerText : null, needle);
+        if (t != null) { text = t; return true; }
+      } catch (_) {}
+    }
+    return false;
+  }, { timeout }).toBe(true);
+  return text;
+}
+
+// Clicca ATOMICAMENTE la voce (button.item) il cui testo matcha `labelSource`
+// nel popup che contiene `needle`: individuare la finestra e cliccare avvengono
+// nella stessa evaluate, senza gap in cui il popup possa chiudersi. Se la
+// finestra muore a metà, il tick successivo del poll ri-acquisisce quella viva.
+async function clickMenuItem(app, needle, labelSource, timeout = 8_000) {
+  await expect.poll(async () => {
+    for (const w of app.windows()) {
+      try {
+        const clicked = await w.evaluate(({ n, label }) => {
+          if (!document.body || !document.body.innerText.includes(n)) return false;
+          const re = new RegExp(label);
+          const btn = [...document.querySelectorAll('button.item')].find((b) => re.test(b.textContent));
+          if (!btn) return false;
+          btn.click();
+          return true;
+        }, { n: needle, label: labelSource });
+        if (clicked) return true;
+      } catch (_) {}
+    }
+    return false;
+  }, { timeout }).toBe(true);
+}
+
+// Come clickMenuItem ma clicca la freccia del submenu (button.subarrow).
+async function clickMenuArrow(app, needle, timeout = 8_000) {
+  await expect.poll(async () => {
+    for (const w of app.windows()) {
+      try {
+        const clicked = await w.evaluate((n) => {
+          if (!document.body || !document.body.innerText.includes(n)) return false;
+          const arrow = document.querySelector('button.subarrow');
+          if (!arrow) return false;
+          arrow.click();
+          return true;
+        }, needle);
+        if (clicked) return true;
+      } catch (_) {}
+    }
+    return false;
+  }, { timeout }).toBe(true);
 }
 
 async function configureProvider(app, port) {
