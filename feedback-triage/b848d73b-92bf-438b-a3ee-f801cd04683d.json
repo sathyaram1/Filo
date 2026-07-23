@@ -1,7 +1,0 @@
-{
-  "id": "b848d73b-92bf-438b-a3ee-f801cd04683d",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato e modifica pubblicata. Ora la cronologia delle interazioni con l'AI, i dati sui costi e lo svuotamento completo della cronologia appunti sono accessibili solo dalle pagine interne di Filo, non da un sito web esterno. La normale cronologia appunti (per il menu Incolla) continua a funzionare su qualunque pagina, come prima.",
-  "queuedAt": "2026-07-23T06:14:49.751Z",
-  "queuedBy": "routine"
-}
