@@ -77,8 +77,9 @@ test('cronologia appunti: XSS-safe, troncamento, immagine, stato vuoto finale', 
     await expect(sub.locator('.sn-menu-history-list img')).toHaveCount(0);
     const pwned = await page.evaluate(() => window.__pwned || null);
     expect(pwned, 'lo script della voce ostile NON deve eseguirsi').toBe(null);
-    // Il payload testuale è comunque leggibile come testo (troncato).
-    await expect(sub).toContainText('payload');
+    // Il markup ostile è mostrato come testo letterale (le parentesi angolari
+    // compaiono nell'etichetta, non vengono interpretate come tag).
+    await expect(sub).toContainText('<img src=x');
 
     // (B) Troncamento: la voce lunga 10k non deborda; l'etichetta mostra "…" e
     // resta corta.
