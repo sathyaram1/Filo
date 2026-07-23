@@ -457,5 +457,5 @@
     return null;
   }
 
-  global.SN_PREF = { buildPreferencePartial, parsePrefBool, PREF_SETTERS };
+  global.SN_PREF = { buildPreferencePartial, parsePrefBool, parseItalianNumber, PREF_SETTERS };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
