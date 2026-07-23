@@ -456,6 +456,33 @@
     if (Sounds) Sounds.play($('notifSound').value);
   }
 
+  // Clamp dei due campi numerici "liberi" (li usano sia il salvataggio sia il
+  // riallineamento visivo al blur, così ciò che si vede è sempre ciò che è
+  // salvato). idleHours: 1..168 (0/negativo/vuoto → 6 predefinito).
+  function clampIdleHours(raw) {
+    return Number.isFinite(raw) && raw > 0 ? Math.min(168, raw) : 6;
+  }
+  // durata notifica in secondi: 0..120 (0 = resta finché non la chiudi;
+  // negativo/vuoto → 5 predefinito).
+  function clampNotifDurationSec(raw) {
+    return Number.isFinite(raw) && raw >= 0 ? Math.min(120, raw) : 5;
+  }
+
+  // Riallinea un campo numerico al valore realmente salvato (clampato al
+  // range), come fa renderTabColorRow per i parametri del colore delle tab:
+  // appena si lascia il campo, sparisce il numero fuori scala digitato e
+  // compare il valore in uso.
+  function canonAutoArchiveIdle() {
+    const input = $('autoArchiveIdleHours');
+    if (!input) return;
+    input.value = String(clampIdleHours(parseInt(input.value, 10)));
+  }
+  function canonNotifDuration() {
+    const input = $('notifDuration');
+    if (!input) return;
+    input.value = String(clampNotifDurationSec(parseInt(input.value, 10)));
+  }
+
   async function persist() {
     const theme = $('theme').value;
     const textScale = parseFloat($('textScale').value) || 1;
