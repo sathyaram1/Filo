@@ -1,0 +1,7 @@
+{
+  "id": "d51dfa95-092d-48c0-8a29-e3cda096df80",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la modifica è stata pubblicata. Ora, quando Filo esegue comandi nel terminale, le copie di cartelle Windows con robocopy che cancellano file in modo permanente (i flag /MIR, /PURGE, /MOVE, /MOV) richiedono la conferma scritta riservata alle azioni irreversibili, invece del semplice clic: così una copia che può svuotare una cartella non parte per sbaglio. Le normali copie robocopy restano al livello con conferma rapida. Nessun problema di sicurezza rilevato nella modifica.",
+  "queuedAt": "2026-07-23T18:44:07.427Z",
+  "queuedBy": "routine"
+}
