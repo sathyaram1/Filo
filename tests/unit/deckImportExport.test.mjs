@@ -41,6 +41,16 @@ test('parseDecklist: righe senza quantità o illeggibili → sporche, MAI indovi
   assert.deepEqual(r.dirtyLines, ['Sol Ring', 'qualcosa di strano ###']);
 });
 
+test('parseDecklist: quantità 0 → NON inclusa, segnalata come sporca (0 non diventa 1)', () => {
+  const r = IE.parseDecklist('Deck\n0 Sol Ring\n1 Arcane Signet');
+  // La carta a quantità 0 NON deve entrare nel mazzo (né come 1 copia).
+  assert.deepEqual(r.entries, [{ name: 'Arcane Signet', qty: 1 }]);
+  // Deve comparire tra le righe segnalate all'utente, non sparire in silenzio.
+  assert.deepEqual(r.dirtyLines, ['0 Sol Ring']);
+  // Nessuna entry può avere qty <= 0.
+  assert.ok(r.entries.every((e) => e.qty >= 1));
+});
+
 test('parseDecklist: righe vuote e commenti ignorati, non contano come sporchi', () => {
   const r = IE.parseDecklist('// commento\n1 Sol Ring\n\n# altro commento\n1 Arcane Signet\n');
   assert.equal(r.entries.length, 2);
