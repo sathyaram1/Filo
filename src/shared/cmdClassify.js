@@ -358,6 +358,9 @@
       // curl -D/--dump-header: scrive gli header (contenuto del server) in un
       // percorso arbitrario → 3.
       if (prog === 'curl' && CURL_DUMP_RE.test(trimmed)) return 3;
+      // robocopy /MIR /PURGE (cancellano la destinazione) / /MOVE /MOV
+      // (cancellano la sorgente): distruzione permanente → 3.
+      if (prog === 'robocopy' && ROBOCOPY_DESTRUCTIVE_RE.test(trimmed)) return 3;
       return DANGEROUS_FLAG_RE.test(trimmed) ? 3 : 2;
     }
 
