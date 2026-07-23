@@ -1,7 +1,0 @@
-{
-  "id": "7ff9a640-b02e-4099-9b14-8cd49b2bc802",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho riprodotto esattamente il caso segnalato: un feedback fatto di sole emoji (una quarantina di fila) senza titolo scritto a mano. Con il comportamento vecchio il titolo di ripiego si spezzava a metà di un'emoji e compariva il carattere rotto; ora il titolo esce sempre pulito, con emoji intere e i puntini di sospensione in fondo quando serve accorciare. Ho spinto oltre con casi limite: 80 e 10.000 emoji di fila, emoji miste a testo, e soprattutto emoji composte (bandiere, pollice con tono di pelle, emoji di famiglia): restano sempre intere, mai spezzate. Ho provato testo vuoto, solo spazi, valore assente e una parola lunghissima di lettere: tutto corretto. Ho verificato anche le etichette di timer e sveglie, che avevano lo stesso problema quando lunghe e piene di emoji: ora anche lì l'etichetta accorciata resta pulita, incluse le emoji composte. Nessun carattere rotto in nessuno dei casi. La batteria completa di controlli rapidi (1035) passa senza regressioni, e il nuovo controllo che riproduce il bug fallisce col vecchio comportamento e passa con la correzione.",
-  "queuedAt": "2026-07-23T16:09:33.098Z",
-  "queuedBy": "routine"
-}
