@@ -19,6 +19,7 @@
       version: '0.2.156', date: '2026-07-23',
       fixes: [
         'I titoli generati in automatico per i feedback pieni di emoji, e le etichette di timer e sveglie con emoji, non mostrano più un carattere rotto (il rettangolino o il punto interrogativo) quando il testo viene accorciato: ora l’emoji resta intera.',
+        'Il pulsante «Ancora rotto?» nella Bacheca è più robusto quando la connessione ha un intoppo: non crea più segnalazioni doppie dello stesso miglioramento.',
       ],
     },
     {
