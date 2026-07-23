@@ -385,6 +385,9 @@
     $('sec-siteblock').addEventListener('change', () => { syncSiteBlockEnabled(); save(); });
     $('sec-siteblock-lists').addEventListener('change', save);
     $('sec-siteblock-blacklist').addEventListener('change', save);
+    // Mentre l'utente corregge le righe, togli l'avviso precedente (rivalutato
+    // al prossimo salvataggio su blur).
+    $('sec-siteblock-blacklist').addEventListener('input', () => setBlacklistError([]));
     $('sec-safebrowse').addEventListener('change', () => { syncSafebrowseEnabled(); save(); });
     $('sec-safebrowse-network').addEventListener('change', save);
     $('sec-safebrowse-llm').addEventListener('change', save);
