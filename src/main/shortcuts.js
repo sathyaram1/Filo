@@ -85,4 +85,4 @@ async function saveForLater(win, tab) {
   try { win._filoTabs.closeTab(tab.id); } catch (_) {}
 }
 
-module.exports = { registerShortcuts };
+module.exports = { registerShortcuts, dispatch, saveForLater, isInternalTab };
