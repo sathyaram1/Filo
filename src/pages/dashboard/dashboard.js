@@ -1907,6 +1907,11 @@
       // shell come gli altri, che ancorano un menu nativo) — è solo una
       // navigazione. Risponde al feedback "metti la cronologia in alto a destra".
       { command: 'history', icon: 'history', label: 'Cronologia', url: 'filo://history/history.html' },
+      // Appunti di Filo: apre un pannello in-pagina con tutte le note salvate,
+      // ciascuna cancellabile (invariante UX: se Filo salva N appunti, devi
+      // poterli vedere tutti e rimuoverli). Non è una navigazione né un menu
+      // nativo → azione locale.
+      { command: 'notes', icon: 'note', label: 'Appunti', action: openNotesPanel },
       { command: 'settings', icon: 'options', label: 'Impostazioni' },
       { command: 'apps', icon: 'apps', label: 'App' },
       { command: 'account', icon: 'user', label: 'Profilo' },
