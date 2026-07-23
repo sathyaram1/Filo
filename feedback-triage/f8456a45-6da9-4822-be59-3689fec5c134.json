@@ -1,0 +1,7 @@
+{
+  "id": "f8456a45-6da9-4822-be59-3689fec5c134",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la correzione e stata pubblicata. Il blocco dei siti in blacklist non si aggira piu passando da una pagina il cui indirizzo comincia per google./yahoo./yandex. seguito da un altro dominio (es. yahoo.qualcosa.com): prima queste pagine venivano scambiate per motori di ricerca e lasciavano aprire il sito bloccato. I motori di ricerca veri (google.com, google.co.uk, yahoo.co.jp, yandex.com.tr, ecc.) continuano a funzionare come eccezione. Verificato eseguendo gli unit test dedicati: sia i domini-civetta che vengono ora correttamente bloccati, sia i motori legittimi che restano riconosciuti.",
+  "queuedAt": "2026-07-23T03:15:22.120Z",
+  "queuedBy": "routine"
+}
