@@ -1,7 +1,0 @@
-{
-  "id": "edecda11-75ac-4162-ae8d-36bf68d35239",
-  "status": "done",
-  "notes": "Il pulsante '← Tutte le categorie' nella pagina 'Aperti per dopo' non compare più quando la categorizzazione è disattivata (impostazione predefinita): resta visibile solo quando stai guardando dentro una categoria, dove serve davvero per tornare indietro.\n\nVerificando la segnalazione ho trovato che il problema era già stato corretto e rilasciato in una versione precedente (0.2.142): l'app che hai adesso contiene già la correzione. Non restava altro codice da toccare. Ho comunque riprodotto il difetto esatto descritto nella segnalazione per essere sicuro che la correzione fosse quella giusta e reggesse: togliendo la riga di stile che nasconde il pulsante, questo ricompare occupando spazio proprio come segnalato; rimettendola, sparisce correttamente quando le categorie sono spente e torna a mostrarsi quando entri in una categoria. Il controllo automatico che protegge da questo difetto passa.\n\nChiudo quindi la segnalazione come risolta: era rimasta in coda pur essendo già sistemata. Se nella tua versione vedessi ancora il pulsante, faccelo sapere con la versione esatta dell'app.",
-  "queuedAt": "2026-07-23T06:44:24.309Z",
-  "queuedBy": "routine"
-}
