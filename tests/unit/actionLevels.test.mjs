@@ -91,6 +91,21 @@ test('INVIA_FEEDBACK è livello 2 e descrive il testo nel popup', () => {
   assert.match(d, /la ricerca è lenta/);
 });
 
+test('INVIA_FEEDBACK: il taglio del testo lungo non spezza un\'emoji a metà', () => {
+  // Testo oltre i 160 caratteri con un'emoji (coppia surrogata UTF-16) proprio
+  // a cavallo del punto di taglio: un `slice` per indice lascerebbe un surrogato
+  // solitario, che diventa un carattere corrotto (�) appena il testo viene
+  // mostrato/salvato. La describe deve tenere l'emoji intera o scartarla del tutto.
+  const testo = 'x'.repeat(159) + '😀' + ' altre parole di coda che eccedono il limite';
+  const d = AL.describe({ type: 'INVIA_FEEDBACK', testo });
+  // Nessun surrogato alto isolato nel risultato.
+  assert.doesNotMatch(d, /[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
+  // E nessun U+FFFD dopo un round-trip UTF-8 (invio a Firestore / scrittura su disco).
+  assert.ok(!Buffer.from(d, 'utf8').toString('utf8').includes('�'));
+  // L'emoji cade esattamente sul confine di taglio e viene preservata intera.
+  assert.ok(d.includes('😀'));
+});
+
 test('IMPOSTA_ESTETICA: livello 1 di norma, 2 se rende il testo illeggibile', () => {
   // Cambio estetico normale → si applica subito (livello 1).
   assert.equal(AL.levelFor({ type: 'IMPOSTA_ESTETICA', token: 'button.bg', valore: '#3a7d44' }), 1);
