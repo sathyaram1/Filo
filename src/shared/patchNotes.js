@@ -23,6 +23,7 @@
         'Il pulsante «Ancora rotto?» nella Bacheca è più robusto quando la connessione ha un intoppo: non crea più segnalazioni doppie dello stesso miglioramento.',
         'Quando Filo esegue comandi nel terminale, le copie di cartelle Windows che cancellano file in modo permanente (robocopy con /MIR, /PURGE, /MOVE) ora richiedono la conferma scritta riservata alle azioni irreversibili, non più il semplice clic: così una copia che svuota una cartella non parte per sbaglio.',
         'Nella pagina Cronologia AI ogni voce ora ha un nome leggibile anche per «Descrivi immagine», dettatura, trascrizione OCR di una regione, «Modifica» del testo selezionato e «Spiega» un link, dove prima compariva un codice interno; e il menu «filtra per tipo» ora elenca tutte le azioni davvero presenti, così puoi filtrare la cronologia anche per queste.',
+        'La scorciatoia «Salva per dopo» (Alt+S) ora funziona solo sulle pagine web: se la premi mentre sei su una schermata di Filo (Nuova scheda, Opzioni, Cronologia, Bacheca…) non chiude più la scheda di colpo né aggiunge una voce inutile in «Aperti per dopo».',
       ],
     },
     {
