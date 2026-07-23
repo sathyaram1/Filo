@@ -1,0 +1,7 @@
+{
+  "id": "deffa059-3e0b-43e4-9387-0fdac9866bbe",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho aperto la pagina Crediti reale nell'app dopo aver simulato una ricompensa di ogni tipo che l'app produce davvero: invio feedback, feedback risolto, voto in Bacheca, rimborso «Ancora rotto?» e bonus giornaliero della segnalazione automatica. Nei «Movimenti recenti» ognuna mostra ora la sua etichetta specifica e nessuna resta come il generico «Ricompensa»; le etichette combaciano con i nomi che l'utente vede già altrove (il pulsante «Ancora rotto?» e la voce «Segnalazione automatica dei problemi»), quindi è immediato capire da dove arriva ogni credito. Stress test: una ricompensa di tipo sconosciuto/futuro ricade con grazia sull'etichetta generica senza rompere la lista; le uscite di crediti (la spesa quando riapri con «Ancora rotto?») restano correttamente escluse dai movimenti, che mostrano solo le entrate; con nessuna ricompensa la sezione movimenti resta nascosta. Le etichette sono testi fissi, non input dell'utente, quindi nessun rischio di contenuto iniettato. Nota emersa (già segnalata e indipendente da questa correzione): due controlli automatici della pagina risultano rossi perché il saldo iniziale in test è 1.010 invece di 1.000 — è il bonus della segnalazione automatica, attiva di default, accreditato subito; quella logica esiste già da prima ed è fuori dallo scopo di questa correzione, che tocca solo le etichette mostrate.",
+  "queuedAt": "2026-07-23T18:56:44.576Z",
+  "queuedBy": "routine"
+}
