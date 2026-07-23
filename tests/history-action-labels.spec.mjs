@@ -40,8 +40,8 @@ test('history page shows readable labels and filter options for all action types
     action,
     provider: 'gemini',
     model: 'gemini-2.0-flash',
-    input: { selection: `input di prova per ${action}` },
-    output: `output di prova per ${action}`,
+    input: { selection: `testo di prova numero ${i}` },
+    output: `risposta di prova numero ${i}`,
     origin: 'https://example.com',
     costEur: 0.0001,
   }));
