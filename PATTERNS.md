@@ -359,3 +359,29 @@ ringraziamento feedback risolto C5). Mostrarli insieme li impila e confonde.
   l'init iniziale (es. `waitForTimeout`) prima di seminare, poi `reload`.
 - **Dove:** `dashboard.js` (`renderFeedbackRewards`, `maybeShowFeedbackRewards`).
   Test `tests/feedback-resolved-reward.spec.mjs`.
+
+## Stack di overlay impilati: limita il numero e non superare mai il viewport
+
+Qualsiasi contenitore che **impila elementi nell'angolo** (toast/notifiche in
+basso a destra, e in futuro simili) deve avere **due argini**, altrimenti una
+raffica di eventi (es. una tempesta di popup bloccati, o il ripristino con molte
+schede su siti in blacklist) lo fa crescere all'infinito: le card più vecchie
+finiscono **fuori dal viewport** insieme al loro tasto di chiusura, diventando
+irraggiungibili.
+
+- **Tetto al numero** di card vive contemporaneamente: quando ne arriva una che
+  sfora, rimuovi subito la più vecchia (non aspettare il suo timeout). Tieni le
+  **più recenti** (le più rilevanti in una raffica). In una raffica estrema le
+  azioni delle notifiche più vecchie (es. «Apri comunque») si perdono: è un
+  compromesso accettabile — l'utente può rifare l'azione, e il contrario
+  (schermo coperto, X fuori campo) è peggio.
+- **Tetto all'altezza:** `max-height: calc(100vh - margini)` + `overflow-y:auto`
+  come rete di sicurezza per finestre molto basse, dove anche il piccolo gruppo
+  non entrerebbe. Quando c'è overflow, tieni in vista la card più recente
+  (`scrollTop = scrollHeight`) e attiva `pointer-events` sul contenitore (con
+  `pointer-events:none` di base non si potrebbe afferrare la scrollbar; una
+  classe `.scrolling` la riabilita solo quando serve, così le aree vuote
+  continuano a lasciar passare i click al contenuto sotto).
+- **Dove:** `NOTIFS` (`enforceCap`/`syncOverflow`) in `src/renderer/shell.js`;
+  `.shell-notifs` in `src/renderer/shell.css`. Test
+  `tests/notifications.spec.mjs` (la raffica non straripa e resta chiudibile).

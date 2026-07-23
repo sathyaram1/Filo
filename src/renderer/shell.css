@@ -108,6 +108,22 @@ html[data-chrome-compact="1"] .addr {
   gap: 8px;
   z-index: 9999;
   pointer-events: none;
+  /* Non superare mai l'altezza della finestra: se lo stack cresce troppo
+     (finestra bassa) il contenitore scrolla invece di spingere le card più
+     vecchie fuori schermo, dove la loro X sparirebbe con loro. */
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+}
+/* Attivo solo quando c'è davvero overflow (vedi syncOverflow): serve a poter
+   afferrare la scrollbar; senza overflow il contenitore resta "trasparente" ai
+   click così le aree vuote lasciano passare al contenuto sotto. */
+.shell-notifs.scrolling { pointer-events: auto; padding-right: 4px; }
+.shell-notifs::-webkit-scrollbar { width: 6px; }
+.shell-notifs::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
 }
 .shell-notif {
   position: relative;

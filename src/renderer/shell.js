@@ -870,6 +870,13 @@
   // È la base che i blocchi (#170.2/#170.3) usano per segnalare gli eventi.
   const NOTIFS = (() => {
     let host = null;
+    // Tetto al numero di card impilate insieme. Senza limite una raffica di
+    // eventi (es. tempesta di popup bloccati, o ripristino con molte schede su
+    // siti in blacklist) fa crescere lo stack oltre l'altezza della finestra e
+    // spinge le più vecchie fuori schermo, dove non si possono più chiudere.
+    // Con un tetto teniamo solo le più recenti (le più rilevanti); le eccedenti
+    // vengono rimosse subito, senza attendere il timeout.
+    const MAX_STACK = 5;
     function hostEl() {
       if (!host) {
         host = document.getElementById('shell-notifs');
@@ -882,13 +889,34 @@
       }
       return host;
     }
+    // Rimuove immediatamente (senza animazione) le card più vecchie oltre il
+    // tetto, così lo stack non supera mai MAX_STACK elementi vivi.
+    function enforceCap() {
+      const h = hostEl();
+      const live = Array.from(h.children).filter((c) => c.dataset.closing !== '1');
+      const over = live.length - MAX_STACK;
+      for (let i = 0; i < over; i++) {
+        const c = live[i]; // le più vecchie sono in cima (append in coda)
+        if (c._timer) clearTimeout(c._timer);
+        try { c.remove(); } catch (_) {}
+      }
+    }
+    // Se anche col tetto lo stack eccede l'altezza della finestra (finestra
+    // molto bassa), il contenitore diventa scrollabile: attiviamo i pointer
+    // events per poter afferrare la scrollbar e teniamo in vista la più recente.
+    function syncOverflow() {
+      const h = hostEl();
+      const scrollable = h.scrollHeight > h.clientHeight + 1;
+      h.classList.toggle('scrolling', scrollable);
+      if (scrollable) h.scrollTop = h.scrollHeight;
+    }
     function dismiss(card) {
       if (!card || card.dataset.closing === '1') return;
       card.dataset.closing = '1';
       if (card._timer) clearTimeout(card._timer);
       card.classList.remove('show');
       // attende la transizione prima di rimuovere dal DOM
-      setTimeout(() => { try { card.remove(); } catch (_) {} }, 220);
+      setTimeout(() => { try { card.remove(); } catch (_) {} syncOverflow(); }, 220);
     }
     // showNotification(text, opts?) — opts: { durationSec, sound (toneId|false),
     // actions: [{ label, onClick }] }. Senza opts usa la config delle Preferenze.
@@ -938,10 +966,14 @@
       card.appendChild(close);
 
       hostEl().appendChild(card);
+      // Applica subito il tetto: se questa card sfora, la più vecchia sparisce.
+      enforceCap();
       // forza reflow così la transizione di entrata parte
       // eslint-disable-next-line no-unused-expressions
       card.offsetHeight;
       card.classList.add('show');
+      // Finestra molto bassa: rendi scrollabile e mostra la più recente.
+      syncOverflow();
 
       // Suono opzionale alla comparsa.
       const wantSound = opts.sound !== undefined
