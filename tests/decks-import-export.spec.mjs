@@ -85,6 +85,38 @@ test('Importa dallo switcher: anteprima segnala non-trovati/sporchi, la conferma
   await expect(page.locator('#deckCount')).toHaveText('11/100 carte');
 });
 
+test('Importa: una riga con quantità 0 NON entra nel mazzo, è segnalata come non valida', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await mockScryfall(app);
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await newDeck(page);
+
+  await page.click('#deckName');
+  await page.locator('.dk-switcher .sn-select-option', { hasText: 'Importa…' }).click();
+  await expect(page.locator('.dk-io-box')).toBeVisible();
+
+  // "0 Sol Ring" = "non includere questa carta" (export corretto a mano / foglio
+  // di calcolo). Non deve diventare 1 copia fantasma: va segnalata, non importata.
+  await page.fill('.dk-io-textarea', 'Deck\n0 Sol Ring\n1 Forest');
+  await page.locator('[data-io="parse"]').click();
+
+  // Solo Forest è un'entry valida; Sol Ring a quantità 0 finisce tra le righe segnalate.
+  await expect(page.locator('.dk-io-note').first()).toContainText('1 carta riconosciuta su 1');
+  await expect(page.locator('.dk-io-dirty li')).toHaveCount(1);
+  await expect(page.locator('.dk-io-dirty')).toContainText('0 Sol Ring');
+
+  const applyBtn = page.locator('[data-io="apply"]');
+  await expect(applyBtn).toHaveText('Importa 1 carta');
+  await applyBtn.click();
+
+  // Forest entra; Sol Ring NON deve comparire nel mazzo (né con 1 copia).
+  await expect(page.locator('.dk-io-box')).toHaveCount(0);
+  await expect(page.locator('#deckList .dk-row[data-card-id="forest"]')).toBeVisible();
+  await expect(page.locator('#deckList .dk-row[data-card-id="sol-ring"]')).toHaveCount(0);
+  await expect(page.locator('#deckCount')).toHaveText('1/100 carte');
+});
+
 test('Esporta dallo switcher: stesso formato testuale, con la carta e la quantità reali', async ({ app, openTab }) => {
   test.setTimeout(60_000);
   await mockScryfall(app);
