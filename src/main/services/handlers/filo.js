@@ -89,6 +89,18 @@ module.exports = function register(on, ctx) {
     return { ok: true, timers: list };
   });
 
+  on(MSG.FILO_PAUSE_TIMER, async (msg) => {
+    const list = await FiloMem.pauseTimer(msg.id);
+    broadcastLiveUpdate();
+    return { ok: true, timers: list };
+  });
+
+  on(MSG.FILO_RESUME_TIMER, async (msg) => {
+    const list = await FiloMem.resumeTimer(msg.id);
+    broadcastLiveUpdate();
+    return { ok: true, timers: list };
+  });
+
   on(MSG.FILO_STOP_TIMER_ALARM, async (msg) => {
     const list = await FiloMem.stopTimerAlarm(msg.id);
     broadcastLiveUpdate();
