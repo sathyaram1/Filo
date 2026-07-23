@@ -64,17 +64,28 @@ module.exports = function register(on, ctx) {
   });
 
   // Riapertura a pagamento (DC4): l'utente loggato segnala che un fix
-  // "Risolti" è ancora rotto. Tre passi atomici-quanto-possibile:
+  // "Risolti" è ancora rotto. Passi atomici-quanto-possibile:
   //   1. verifica idoneità (è davvero in Risolti, nessuno l'ha già riaperto);
   //   2. scala CREDIT.BOARD_REOPEN (anti-spam — rifiuta senza scrivere nulla
   //      se il saldo non basta, applyConsumptionIfAffordable in creditStore.js);
-  //   3. crea il feedback collegato (parentId) + marca `reopenRequests.<uid>`
-  //      sull'originale (segnale per il triage: un utente normale non può
-  //      scrivere `status`, quindi il flip fuori da "Risolti" resta al
-  //      percorso fidato — vedi nota in messages.js).
-  // Se il passo 3 fallisce DOPO aver già scalato i crediti al passo 2, li
-  // restituiamo (compensazione best-effort) invece di lasciare l'utente
-  // scalato senza nulla in cambio.
+  //   3. marca `reopenRequests.<uid>` sull'originale (il GUARD anti-doppia-
+  //      riapertura — segnale per il triage: un utente normale non può scrivere
+  //      `status`, quindi il flip fuori da "Risolti" resta al percorso fidato —
+  //      vedi nota in messages.js);
+  //   4. crea il feedback collegato (parentId).
+  //
+  // ORDINE DELIBERATO (guard PRIMA del feedback): i passi 3 e 4 sono due
+  // scritture REST Firestore separate e NON atomiche. Se creassimo il feedback
+  // (4) prima di marcare il guard (3) e la rete cadesse fra le due, resteremmo
+  // con un feedback figlio orfano E il guard MAI marcato: canReopen()
+  // continuerebbe a dire "riapribile" e l'utente potrebbe ripetere all'infinito,
+  // creando ogni volta un nuovo feedback duplicato (crediti sempre rimborsati) —
+  // la coda si riempirebbe di segnalazioni gratis, bypassando l'anti-spam.
+  // Marcando il guard PER PRIMO: se (3) fallisce, non abbiamo ancora creato
+  // nulla (retry pulito, nessun orfano); se (3) riesce ma (4) fallisce, il guard
+  // blocca comunque ogni tentativo successivo → al più UN feedback figlio per
+  // utente, mai duplicati. In entrambi i rami di fallimento dopo aver scalato,
+  // restituiamo i crediti (compensazione best-effort).
   on(MSG.BOARD_REOPEN, async (msg) => {
     try {
       if (!auth.isSignedIn()) {
