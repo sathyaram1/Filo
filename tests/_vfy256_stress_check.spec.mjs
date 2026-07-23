@@ -87,7 +87,7 @@ test('stress: XSS, emoji, testo lungo, immagine, ultima voce -> stato vuoto, svu
       await sub.locator('.sn-menu-history-item').first().locator('.sn-menu-history-remove').click();
     }
     await expect(sub.locator('.sn-menu-history-item')).toHaveCount(0);
-    await expect(sub.locator('.sn-menu-empty')).toContainText('Cronologia appunti vuota');
+    await expect(sub.locator('.sn-menu-empty:visible')).toHaveText('Cronologia appunti vuota');
 
     // Persistenza: riapri -> resta tutto vuoto (rimozioni salvate).
     await page.keyboard.press('Escape');
