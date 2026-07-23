@@ -601,6 +601,55 @@ async function navExfilCorpus() {
   } catch (_) { return ''; }
 }
 
+// ── Difesa in profondità sulle azioni confermate (#250) ─────────────────────
+// FILO_CONFIRM_ACTION esegue un'azione con `confirmed:true`, saltando la
+// sospensione dei livelli ≥ 2. È legittimo SOLO dopo il giro di conferma
+// (RUN → popup di Filo → CONFIRM). Il canale è però raggiungibile anche dai
+// content script delle pagine web esterne: oggi contextIsolation lo blocca, ma
+// se quell'unico strato cadesse una pagina ostile potrebbe forgiare un
+// FILO_CONFIRM_ACTION "a freddo" per attivare un'impostazione sensibile (es. la
+// modalità terminale) SENZA che il popup sia mai apparso.
+//
+// Barriera: un'azione confermata da un'origine NON filo:// viene eseguita solo
+// se quello stesso mittente ha PRIMA ricevuto la richiesta di conferma per la
+// stessa azione (l'agente on-page: FILO_RUN_ACTION → popup → FILO_CONFIRM_ACTION).
+// Le pagine interne filo:// (chat della dashboard) restano fidate per origine e
+// non hanno bisogno del pending. Un CONFIRM forgiato senza il RUN corrispondente
+// non ha un pending e viene rifiutato.
+const pendingConfirms = new Map(); // key → scadenza (ms)
+const PENDING_CONFIRM_TTL = 5 * 60 * 1000;
+// Firma stabile dell'azione: ignora i campi iniettati dal main (prefissati con
+// `_`, es. `_illegible`/`_exfil`/`_confirm`) così RUN e CONFIRM combaciano.
+function actionSignature(action) {
+  try {
+    const clean = {};
+    for (const k of Object.keys(action).sort()) {
+      if (k.startsWith('_')) continue;
+      clean[k] = action[k];
+    }
+    return JSON.stringify(clean);
+  } catch (_) { return String(action && action.type || ''); }
+}
+function senderKey(sender) {
+  return String(sender?.tab?.id ?? sender?.url ?? sender?.origin ?? '?');
+}
+function pendingConfirmKey(sender, action) {
+  return `${senderKey(sender)}::${actionSignature(action)}`;
+}
+function recordPendingConfirm(sender, action) {
+  const now = Date.now();
+  // Purga opportunistica delle scadute (la mappa resta piccola).
+  for (const [k, exp] of pendingConfirms) if (exp <= now) pendingConfirms.delete(k);
+  pendingConfirms.set(pendingConfirmKey(sender, action), now + PENDING_CONFIRM_TTL);
+}
+function consumePendingConfirm(sender, action) {
+  const key = pendingConfirmKey(sender, action);
+  const exp = pendingConfirms.get(key);
+  if (!exp) return false;
+  pendingConfirms.delete(key); // one-time
+  return exp > Date.now();
+}
+
 async function executeFiloAction(action, { confirmed = false, sender = null } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
