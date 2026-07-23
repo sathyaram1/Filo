@@ -291,8 +291,8 @@
     },
     {
       id: 'filo-notes', title: 'Appunti di Filo', category: 'assistant',
-      desc: 'Puoi chiedere a Filo di prendere nota di qualcosa ("prendi nota che…"): lo salva tra i suoi appunti e può riusarlo nelle conversazioni successive.',
-      invoke: 'Chiedi all’assistente di salvare un appunto.',
+      desc: 'Puoi chiedere a Filo di prendere nota di qualcosa ("prendi nota che…"): lo salva tra i suoi appunti e può riusarlo nelle conversazioni successive. Dall’icona degli appunti in alto a destra nella nuova scheda li vedi tutti e puoi cancellarne uno o svuotarli.',
+      invoke: 'Chiedi all’assistente di salvare un appunto, oppure apri il pannello degli appunti dall’icona in alto a destra nella nuova scheda per vederli e gestirli.',
       doesNot: 'Gli appunti sono salvati solo in locale; tiene gli ultimi e i più vecchi vengono scartati.',
     },
     {
