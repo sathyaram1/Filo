@@ -118,6 +118,8 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     FILO_GET_TIMERS: 'filo-timers',
     FILO_ADD_TIMER: 'filo-timers',
     FILO_DELETE_TIMER: 'filo-timers',
+    FILO_PAUSE_TIMER: 'filo-timers',
+    FILO_RESUME_TIMER: 'filo-timers',
     FILO_STOP_TIMER_ALARM: 'filo-timers',
     FILO_GET_NOTIFICATIONS: 'filo-notifications',
     FILO_DISMISS_NOTIFICATION: 'filo-notifications',
