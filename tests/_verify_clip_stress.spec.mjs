@@ -121,9 +121,12 @@ test('stress: annulla nel dialogo "Svuota" NON cancella la cronologia', async ({
     await sub.locator('.sn-menu-history-clear-btn').click();
     const confirm = page.locator(CONFIRM_HOST);
     await expect(confirm).toBeVisible();
-    // Annulla.
-    await page.locator(`${CONFIRM_HOST} button`, { hasText: 'Annulla' }).click();
-    // La cronologia resta intatta: riapri e conta 2.
+    // Annulla via Escape (il dialogo vive in shadow DOM chiuso: Escape = annulla).
+    await page.keyboard.press('Escape');
+    await expect(confirm).toHaveCount(0);
+    // Il menu resta aperto e la cronologia NON è stata svuotata: 2 voci ancora lì.
+    await expect(sub.locator('.sn-menu-history-item')).toHaveCount(2);
+    // Riapri da zero per confermare la persistenza (nulla è stato cancellato).
     await page.keyboard.press('Escape');
     await expect(page.locator('.sn-menu')).toHaveCount(0);
     sub = await openHistorySubmenu(page);
