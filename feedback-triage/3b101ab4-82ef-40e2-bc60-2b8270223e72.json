@@ -1,7 +1,0 @@
-{
-  "id": "3b101ab4-82ef-40e2-bc60-2b8270223e72",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica e' stata pubblicata. Il campo 'Domini in blacklist' in Impostazioni -> Sicurezza ora controlla cio' che scrivi come gia' faceva 'Siti fidati': le voci senza estensione (es. 'facebook') o gli indirizzi interi incollati vengono sistemati o segnalati con un avviso, cosi' non credi piu' di aver bloccato un sito che invece resta apribile.",
-  "queuedAt": "2026-07-23T00:31:43.772Z",
-  "queuedBy": "routine"
-}
