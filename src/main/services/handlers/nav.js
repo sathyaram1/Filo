@@ -7,6 +7,15 @@ const { app } = require('electron');
 module.exports = function register(on, ctx) {
   const { MSG, winOf } = ctx;
 
+  // SICUREZZA (#250): confine d'origine sui comandi distruttivi. Il canale
+  // 'filo:message' è raggiungibile sia dalle pagine interne filo:// sia dai
+  // content script delle pagine web esterne. Oggi contextIsolation impedisce
+  // alla pagina esterna di chiamarli, ma far poggiare TUTTA la barriera sul
+  // solo isolamento è fragile: chiudere tutte le schede o l'intera app non è
+  // mai un'operazione legittima per una pagina web. Difesa in profondità come
+  // già fatto su _storage:clear / RESET_SETTINGS / EXPORT_DATA.
+  const isFilo = (origin) => String(origin || '').startsWith('filo://');
+
   on(MSG.OPEN_HOME, async (msg, sender) => {
     const win = winOf(sender);
     if (win?._filoTabs) win._filoTabs.openTab('filo://home/home.html');
