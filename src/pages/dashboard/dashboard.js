@@ -1928,7 +1928,8 @@
       const svg = typeof ICONS[it.icon] === 'function' ? ICONS[it.icon](18) : '';
       btn.innerHTML = svg || it.label.charAt(0);
       btn.addEventListener('click', () => {
-        if (it.url) send({ type: MSG.OPEN_URL, url: it.url });
+        if (typeof it.action === 'function') it.action();
+        else if (it.url) send({ type: MSG.OPEN_URL, url: it.url });
         else send({ type: MSG.SHELL_ACTION, command: it.command });
       });
       host.appendChild(btn);
