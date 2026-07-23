@@ -1,7 +1,0 @@
-{
-  "id": "aec7f2c5-b3e6-4d24-8f26-a1ea4581ffe4",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho riprodotto il problema esattamente come segnalato: eseguendo il controllo rapido di avvio (lo smoke) come utente root in ambiente headless, l'app non partiva e dopo 20 secondi il controllo andava in errore, con il motore grafico che rifiuta di avviarsi come root. Con la modifica, lo stesso controllo nelle identiche condizioni (root, headless) ora avvia l'app correttamente, apre la nuova scheda attesa e cattura gli screenshot: torna 'OK'. Punto chiave della verifica: ho eseguito la prova SENZA attivare la scorciatoia d'ambiente che aggira la sandbox a prescindere, così la prova dimostra che è la modifica a far partire l'app e non l'ambiente. Prima della modifica falliva, dopo passa. Il cambiamento è circoscritto allo strumento di test e non tocca l'app né l'esperienza dell'utente finale, quindi nessun rischio funzionale introdotto.",
-  "queuedAt": "2026-07-23T03:22:23.769Z",
-  "queuedBy": "routine"
-}
