@@ -228,7 +228,7 @@
     const list = await listTimers();
     const entry = {
       id: uuid(),
-      label: String(label || 'Timer').trim().slice(0, 60),
+      label: truncateSafe(String(label || 'Timer').trim(), 60),
       startedAt: new Date().toISOString(),
       endsAt: new Date(Date.now() + sec * 1000).toISOString(),
       paused: false,
