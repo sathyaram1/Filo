@@ -1,0 +1,7 @@
+{
+  "id": "2d6e0e90-c1d4-4a59-bef8-be88d7b80843",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la modifica e' stata pubblicata. Riguardava solo la robustezza dei test automatici del menu (tasto destro sulla scheda), senza toccare funzioni visibili nell'app.",
+  "queuedAt": "2026-07-23T01:36:45.662Z",
+  "queuedBy": "routine"
+}
