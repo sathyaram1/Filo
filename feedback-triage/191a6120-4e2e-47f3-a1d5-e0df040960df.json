@@ -1,7 +1,0 @@
-{
-  "id": "191a6120-4e2e-47f3-a1d5-e0df040960df",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho verificato il caso segnalato: quando Filo crea un titolo di ripiego per un feedback (le prime parole del testo, usato quando il titolo automatico dell'AI non e' disponibile) e il testo contiene un'emoji proprio nel punto in cui il titolo viene accorciato, ora l'emoji resta intera e non compare piu' il carattere rotto (il quadratino con punto interrogativo), ne' in dashboard ne' una volta salvato o inviato. Ho provato molte lunghezze diverse in modo che l'emoji cadesse esattamente sul confine di taglio, incluse emoji composte come famiglie e toni di pelle: in tutti i casi il titolo e' pulito. Ho verificato anche l'altra area indicata per completezza: l'anteprima nel riquadro di conferma quando chiedi a Filo di inviare un feedback agli sviluppatori a tuo nome; anche li' il testo lungo veniva accorciato spezzando l'emoji, e ora resta integra (comprese le emoji composte). Ho confermato che con il vecchio modo di accorciare quel testo produceva davvero il carattere corrotto, mentre adesso no: il test di non-regressione fallisce senza la correzione e passa con essa. L'intera batteria di controlli sulla logica (oltre mille) e' verde. La verifica e' puramente logica: per questo caso non c'e' una parte grafica da eseguire, quindi niente E2E/visivo.",
-  "queuedAt": "2026-07-23T22:10:49.773Z",
-  "queuedBy": "routine"
-}
