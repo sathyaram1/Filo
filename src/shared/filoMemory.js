@@ -492,7 +492,7 @@
     // notes
     listNotes, addNote, deleteNote, clearNotes,
     // timer + sveglie (#322)
-    listTimers, addTimer, addAlarm, resolveAlarmTime, deleteTimer, gcTimers, stopTimerAlarm,
+    listTimers, addTimer, addAlarm, resolveAlarmTime, deleteTimer, pauseTimer, resumeTimer, gcTimers, stopTimerAlarm,
     // notifications
     listNotifications, addNotification, dismissNotification,
     // dashboard cache
