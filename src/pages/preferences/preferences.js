@@ -633,6 +633,9 @@
     $('autoArchiveEnabled').addEventListener('change', persist);
     $('autoArchiveOnClose').addEventListener('change', persist);
     $('autoArchiveIdleHours').addEventListener('change', persist);
+    // Al blur riallinea il campo al valore realmente salvato (clampato), così
+    // un numero fuori scala non resta a schermo a mentire sul valore in uso.
+    $('autoArchiveIdleHours').addEventListener('blur', canonAutoArchiveIdle);
     $('terminalEnabled').addEventListener('change', persist);
     $('terminalShell').addEventListener('change', persist);
 
