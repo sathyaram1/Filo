@@ -626,13 +626,6 @@
         const clearBtn = document.createElement('button');
         clearBtn.type = 'button';
         clearBtn.className = 'sn-menu-item sn-menu-history-clear-btn';
-        const trashIcon = global.SN_ICONS?.trash;
-        if (trashIcon) {
-          const ic = document.createElement('span');
-          ic.className = 'sn-menu-item-icon';
-          ic.innerHTML = trashIcon(16);
-          clearBtn.appendChild(ic);
-        }
         const cl = document.createElement('span');
         cl.className = 'sn-menu-label';
         cl.textContent = I18n.t('menu_paste_clear');
