@@ -723,12 +723,28 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
   // `kept` come prima e la conferma la gestisce la loro UI specifica.
   const hasBespokeConfirm = type === 'PULISCI_TAB' || type === 'CANCELLA_ARCHIVIO';
   if (level >= 2 && !confirmed && !hasBespokeConfirm) {
+    // Da qui in poi QUESTO mittente potrà confermare questa stessa azione
+    // (difesa in profondità #250): registriamo il pending prima di sospendere.
+    recordPendingConfirm(sender, action);
     return {
       executed: false,
       kept: true,
       needsConfirm: level,
       describe: Levels ? Levels.describe(action) : '',
     };
+  }
+  // #250 — Un'azione che RICHIEDE conferma non può arrivare `confirmed` da una
+  // pagina web esterna a meno che quel mittente non sia PRIMA passato per la
+  // richiesta di conferma (RUN → popup → CONFIRM). Le pagine interne filo://
+  // sono fidate per origine. Un FILO_CONFIRM_ACTION forgiato "a freddo" da fuori
+  // non ha un pending corrispondente → rifiutato (l'azione non si esegue).
+  if (level >= 2 && confirmed && !hasBespokeConfirm) {
+    const origin = sender?.tab?.url || sender?.url || '';
+    const trusted = String(origin).startsWith('filo://');
+    if (!trusted && !consumePendingConfirm(sender, action)) {
+      console.warn('[Filo] FILO_CONFIRM_ACTION senza conferma legittima: rifiutata', type);
+      return { executed: false, kept: false, rejected: true };
+    }
   }
 
   try {
