@@ -1,7 +1,0 @@
-{
-  "id": "191a6120-4e2e-47f3-a1d5-e0df040960df",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica e stata pubblicata. Ora, quando chiedi a Filo di inviare un feedback lungo agli sviluppatori a tuo nome, l'anteprima nel riquadro di conferma non mostra piu un carattere rotto se un'emoji cade nel punto in cui il testo viene accorciato: l'emoji resta intera. La revisione non ha rilevato alcun problema di sicurezza.",
-  "queuedAt": "2026-07-23T22:12:17.519Z",
-  "queuedBy": "routine"
-}
