@@ -1993,9 +1993,9 @@ function normalizeUrl(input) {
     // (>65535) non è un indirizzo valido → resta ricerca.
     if (validPort && (hasDot || local || port !== null)) {
       // http per gli host locali/loopback e per gli host a etichetta singola
-      // (senza punto, tipicamente intranet/dev che parlano in chiaro); https
-      // per i domini pubblici.
-      const scheme = (local || !hasDot) ? 'http://' : 'https://';
+      // (senza punto e non IPv6, tipicamente intranet/dev che parlano in
+      // chiaro); https per i domini pubblici e gli IP letterali.
+      const scheme = (local || (!hasDot && !bracketed)) ? 'http://' : 'https://';
       return scheme + raw;
     }
   }
