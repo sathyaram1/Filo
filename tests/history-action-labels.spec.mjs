@@ -66,14 +66,15 @@ test('history page shows readable labels and filter options for all action types
     // Le voci sono renderizzate.
     await expect(page.locator('.sn-history-item')).toHaveCount(RAW_CODES.length);
 
-    // Nessun codice grezzo compare nel testo della lista.
-    const listText = await page.locator('#list').innerText();
+    // La riga-etichetta di ogni voce mostra il nome leggibile, MAI il codice
+    // grezzo (l'etichetta è nella meta, prima del "•").
+    const metaText = (await page.locator('.sn-history-meta').allInnerTexts()).join('\n');
     for (const code of RAW_CODES) {
-      expect(listText, `il codice grezzo ${code} non deve comparire`).not.toContain(code);
+      expect(metaText, `il codice grezzo ${code} non deve comparire nell'etichetta`).not.toContain(code);
     }
     // Le etichette leggibili attese ci sono.
     for (const label of ['Descrivi immagine', 'Trascrivi immagine (OCR)', 'Dettatura', 'Modifica testo', 'Spiega link']) {
-      expect(listText).toContain(label);
+      expect(metaText).toContain(label);
     }
 
     // Il menu filtro contiene un'opzione per ogni tipo presente (value = codice,
