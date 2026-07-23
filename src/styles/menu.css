@@ -381,6 +381,51 @@
 .sn-menu-history-search-input:focus {
   border-color: var(--sn-accent);
 }
+/* Voce della cronologia: riga con zona "incolla" (flessibile) + "×" rimuovi. */
+.sn-menu-history-item {
+  display: flex;
+  align-items: stretch;
+}
+.sn-menu-history-paste {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.sn-menu-history-paste .sn-menu-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* "×" per rimuovere una singola voce. Sempre visibile (scopribile anche al
+   tocco), attenuato, si accende in hover. */
+.sn-menu-history-remove {
+  all: unset;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  cursor: pointer;
+  color: var(--sn-muted);
+  font-size: 16px;
+  line-height: 1;
+}
+.sn-menu-history-remove:hover {
+  color: var(--sn-fg);
+  background: rgba(var(--sn-accent-rgb), 0.35);
+}
+/* Footer "Svuota cronologia": azione distruttiva, separata da un bordo. */
+.sn-menu-history-clear {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--sn-border);
+}
+.sn-menu-history-clear-btn {
+  width: 100%;
+  color: var(--sn-muted);
+}
+.sn-menu-history-clear-btn:hover:not(.sn-disabled) {
+  color: var(--sn-fg);
+}
 .sn-menu-empty {
   padding: 8px 12px;
   color: var(--sn-muted);
