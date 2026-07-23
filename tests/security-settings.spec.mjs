@@ -123,6 +123,33 @@ test('siti fidati: un dominio non valido mostra un avviso e NON sparisce in sile
   await expect(page.locator('#cookie-wl-input')).toHaveValue('');
 });
 
+test('blacklist siti: una voce senza estensione avvisa e NON viene salvata (#225)', async ({ openTab }) => {
+  const page = await openTab('filo://security/');
+  await page.waitForSelector('#sec-siteblock-blacklist', { timeout: 8_000 });
+  // Il blocco siti è ON di default → la textarea è attiva.
+  await expect(page.locator('#sec-siteblock-blacklist')).toBeEnabled();
+
+  // Voce senza estensione + un URL intero da normalizzare, su righe separate.
+  await page.locator('#sec-siteblock-blacklist').fill('facebook\nhttps://www.facebook.com/feed');
+  await page.locator('#sec-siteblock-blacklist').blur();
+  await expect(page.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 4_000 });
+
+  // SUCCESSO = compare un avviso che nomina la riga scartata ("facebook").
+  await expect(page.locator('#sec-siteblock-blacklist-error')).toBeVisible();
+  await expect(page.locator('#sec-siteblock-blacklist-error')).toContainText(/facebook/);
+  await expect(page.locator('#sec-siteblock-blacklist-error')).toContainText(/non sono domini validi/i);
+
+  // Alla riapertura: la voce non valida NON è persistita, quella valida sì e
+  // normalizzata a bare host (niente schema/path/www).
+  await page.reload();
+  await page.waitForSelector('#sec-siteblock-blacklist', { timeout: 8_000 });
+  const saved = await page.locator('#sec-siteblock-blacklist').inputValue();
+  const lines = saved.split('\n').map((s) => s.trim()).filter(Boolean);
+  expect(lines).toEqual(['facebook.com']);
+  // Senza voci invalide residue, l'avviso non compare al caricamento.
+  await expect(page.locator('#sec-siteblock-blacklist-error')).toBeHidden();
+});
+
 test('popup blocker: window.open() automatico viene bloccato', async ({ openTab, testServer, shell }) => {
   // Pagina che chiama window.open() AL CARICAMENTO (no gesto utente) — è il
   // pattern degli ad popup. Disposition 'new-window' (per via di features=popup)
