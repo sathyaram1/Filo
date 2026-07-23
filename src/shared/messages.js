@@ -368,6 +368,8 @@
     FILO_GET_TIMERS: 'filo_get_timers',
     FILO_ADD_TIMER: 'filo_add_timer',              // { label, seconds }
     FILO_DELETE_TIMER: 'filo_delete_timer',        // { id }
+    FILO_PAUSE_TIMER: 'filo_pause_timer',          // { id } — mette in pausa un timer (congela il conto alla rovescia)
+    FILO_RESUME_TIMER: 'filo_resume_timer',        // { id } — riprende un timer in pausa
     FILO_STOP_TIMER_ALARM: 'filo_stop_timer_alarm', // { id } — silenzia/rimuove un timer che sta suonando
     FILO_GET_NOTIFICATIONS: 'filo_get_notifications',
     FILO_DISMISS_NOTIFICATION: 'filo_dismiss_notification', // { id }
