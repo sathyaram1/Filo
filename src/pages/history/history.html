@@ -19,12 +19,10 @@
 
     <div class="sn-toolbar">
       <input type="search" id="search" />
+      <!-- Le opzioni sono popolate a runtime da history.js in base ai tipi di
+           azione realmente presenti in cronologia (vedi buildFilterOptions). -->
       <select id="filter">
         <option value="">Tutte</option>
-        <option value="explain">Spiega</option>
-        <option value="translate_selection">Traduci selezione</option>
-        <option value="translate_page">Traduci pagina</option>
-        <option value="help">Aiuto</option>
       </select>
       <button class="sn-btn sn-btn-secondary" id="clear"></button>
       <button class="sn-btn sn-btn-secondary" id="openArchive">Tab archiviate</button>
