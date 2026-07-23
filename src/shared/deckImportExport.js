@@ -46,7 +46,9 @@
   //     entries normali (non si perdono, es. commander in coppia/partner).
   //   entries        — [{ name, qty }] nell'ordine di apparizione.
   //   dirtyLines     — righe non vuote/non intestazione che NON rispettano lo
-  //     schema "<qty> <nome>": segnalate all'utente, mai importate a caso.
+  //     schema "<qty> <nome>", O con quantità <= 0 (es. "0 Sol Ring", che
+  //     significa "non includere questa carta"): segnalate all'utente, mai
+  //     importate a caso né normalizzate silenziosamente a 1 copia.
   function parseDecklist(text) {
     const lines = String(text || '').split(/\r?\n/);
     let mode = 'deck'; // 'deck' | 'commander' | 'skip'
