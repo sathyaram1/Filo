@@ -16,6 +16,12 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.156', date: '2026-07-23',
+      fixes: [
+        'I titoli generati in automatico per i feedback pieni di emoji, e le etichette di timer e sveglie con emoji, non mostrano più un carattere rotto (il rettangolino o il punto interrogativo) quando il testo viene accorciato: ora l’emoji resta intera.',
+      ],
+    },
+    {
       version: '0.2.154', date: '2026-07-23',
       features: [
         'Ora puoi vedere e gestire gli appunti di Filo: dall’icona degli appunti in alto a destra nella nuova scheda si apre un pannello con tutte le note che gli hai chiesto di prendere, e da lì puoi cancellarne una singola o svuotarle tutte.',
