@@ -19,6 +19,7 @@
       version: '0.2.154', date: '2026-07-23',
       features: [
         'Ora puoi vedere e gestire gli appunti di Filo: dall’icona degli appunti in alto a destra nella nuova scheda si apre un pannello con tutte le note che gli hai chiesto di prendere, e da lì puoi cancellarne una singola o svuotarle tutte.',
+        'Nella cronologia degli appunti (la freccia accanto a "Incolla") ora puoi rimuovere una singola voce con la "×" o svuotare tutta la cronologia: utile se hai copiato una password o un testo privato e non vuoi lasciarlo tra le cose incollabili.',
       ],
       fixes: [
         'In Preferenze, i campi "Archivia dopo questo periodo di inattività (ore)" e "Durata" delle notifiche ora mostrano subito il valore realmente in uso: se scrivi un numero fuori scala (troppo grande o negativo) e lasci il campo, questo si riallinea al valore effettivamente salvato invece di continuare a mostrare il numero digitato.',
