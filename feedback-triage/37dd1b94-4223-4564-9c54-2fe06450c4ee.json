@@ -1,7 +1,0 @@
-{
-  "id": "37dd1b94-4223-4564-9c54-2fe06450c4ee",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho riprodotto esattamente la lamentela chiedendo a Filo di impostare il limite di spesa mensile con i numeri scritti all'italiana. Ora \"2.500 euro\" viene capito come 2500 (prima diventava 2,50), \"1.000\" come 1000, \"10.000\" come 10000, e la conferma mostra il valore giusto. Funziona anche il formato italiano completo con migliaia e decimali insieme: \"2.500,50\" diventa 2500,50. I decimali scritti bene restano intatti: \"2,50\" resta 2,50 e \"12.50\" all'inglese resta 12,50. Ho controllato che la stessa correzione non abbia rotto i campi dove il punto e un decimale vero e proprio: la velocita e il tono di lettura leggono ancora \"1.5\" come 1,5 e non come 15. Stress test: input vuoti, soli spazi, testo lunghissimo, emoji o simboli davanti al numero, tentativi di codice tra i caratteri, valori non numerici (\"abc\", \"Infinity\") — nessun crash, i valori non validi vengono rifiutati e quelli validi letti correttamente, senza eseguire nulla di pericoloso. L'intera suite di controlli automatici sulla logica passa (oltre mille verifiche) e include ora i casi del feedback. Nota: essendo in ambiente headless non ho potuto pilotare a mano la chat dentro l'app, ma ho eseguito direttamente la logica che quell'azione usa, sui passi esatti descritti dall'utente.",
-  "queuedAt": "2026-07-23T21:59:22.853Z",
-  "queuedBy": "routine"
-}
