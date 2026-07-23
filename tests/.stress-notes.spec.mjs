@@ -64,10 +64,11 @@ test('emoji, testo lungo 10k, doppio-click elimina: robusto', async ({ app, shel
   await expect(page.locator('.dash-notes-item')).toHaveCount(2);
   await expect(page.locator('.dash-notes-box')).toContainText('emoji');
 
-  // Doppio click rapido sul × di un item: non deve rompere né cancellare l'altro.
-  const del = page.locator('.dash-notes-item').first().locator('.dash-notes-del');
-  await del.click();
-  await del.click({ force: true }).catch(() => {});
+  // Doppio click rapido sullo STESSO × (stesso elemento fisico prima del
+  // re-render): il bottone si disabilita → un solo appunto eliminato, l'altro resta.
+  const firstItem = page.locator('.dash-notes-item').first();
+  const del = firstItem.locator('.dash-notes-del');
+  await del.dblclick();
   await expect(page.locator('.dash-notes-item')).toHaveCount(1);
 
   // Cancella tutti → vuoto
