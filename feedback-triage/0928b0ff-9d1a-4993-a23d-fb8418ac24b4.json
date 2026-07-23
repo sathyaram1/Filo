@@ -1,0 +1,9 @@
+{
+  "id": "0928b0ff-9d1a-4993-a23d-fb8418ac24b4",
+  "status": "design",
+  "notes": "Controllo di sicurezza non superato: la modifica NON e' stata pubblicata e nulla e' stato fuso. Il ramo di lavoro di questo feedback risulta ormai separato dalla versione attuale dell'app: pubblicarlo cosi' com'e' non aggiungerebbe nulla, anzi rimuoverebbe aggiornamenti gia' usciti di recente (tra cui la correzione delle emoji che venivano troncate lasciando un carattere rotto, e la possibilita' di mettere in pausa e riprendere i timer), oltre ad alcuni controlli automatici. In piu' il confronto automatico che uso per la verifica di sicurezza non riesce ad allineare questo ramo con la versione attuale, quindi la verifica non puo' considerarsi affidabile. Per prudenza ho bloccato tutto e passo a te la decisione: con ogni probabilita' il lavoro di questo feedback va rifatto ripartendo dalla versione aggiornata dell'app.",
+  "queuedAt": "2026-07-23T18:28:34.304Z",
+  "queuedBy": "routine",
+  "branch": "worker/0928b0ff",
+  "reason": "loop"
+}
