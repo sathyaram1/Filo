@@ -102,3 +102,34 @@ test('isSearchEngineUrl riconosce i motori e ignora gli altri', () => {
   assert.equal(SB.isSearchEngineUrl('https://www.google.com/search?q=a'), true);
   assert.equal(SB.isSearchEngineUrl('https://example.com/'), false);
 });
+
+test('voci senza estensione (es. "facebook") non entrano nella blacklist e non fingono di bloccare', () => {
+  // Pre-condizione: senza validazione, "facebook" entrava nel Set ma non
+  // matchava mai un host reale (facebook.com/com), dando falsa sicurezza.
+  SB.setForTest({ enabled: true, useAdblockLists: false, blacklist: ['facebook'] });
+  assert.equal(SB.status().blacklistSize, 0, '"facebook" non deve entrare nel Set');
+  assert.equal(SB.shouldBlockNavigation('https://www.facebook.com/feed').block, false);
+});
+
+test('un URL intero in blacklist viene normalizzato a dominio e blocca davvero', () => {
+  SB.setForTest({ enabled: true, useAdblockLists: false, blacklist: ['https://www.facebook.com/feed'] });
+  assert.equal(SB.status().blacklistSize, 1);
+  assert.equal(SB.shouldBlockNavigation('https://www.facebook.com/feed').block, true);
+  assert.equal(SB.shouldBlockNavigation('https://m.facebook.com/x').block, true);
+});
+
+test('un IP non entra nella blacklist (non è un host per suffisso)', () => {
+  SB.setForTest({ enabled: true, useAdblockLists: false, blacklist: ['192.168.1.1'] });
+  assert.equal(SB.status().blacklistSize, 0);
+});
+
+test('configureFromSettings scarta le voci non valide dalla blacklist salvata', () => {
+  SB.configureFromSettings({
+    security: { siteBlock: { enabled: true, useAdblockLists: false,
+      blacklist: ['facebook', 'evil.example', 'localhost', 'ADS.test/path'] } },
+  });
+  // Solo evil.example e ads.test sono domini validi.
+  assert.equal(SB.status().blacklistSize, 2);
+  assert.equal(SB.shouldBlockNavigation('https://evil.example/').block, true);
+  assert.equal(SB.shouldBlockNavigation('https://ads.test/').block, true);
+});
