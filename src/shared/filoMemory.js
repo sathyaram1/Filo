@@ -189,6 +189,11 @@
     return filtered;
   }
 
+  async function clearNotes() {
+    await setRaw(KEYS.FILO_NOTES, []);
+    return [];
+  }
+
   // ===== Timer =====
 
   async function listTimers() {
@@ -446,7 +451,7 @@
     // moduli
     getMemory, setMemory, patchMemory, parseCompactorOutput, renderMemoryForPrompt,
     // notes
-    listNotes, addNote, deleteNote,
+    listNotes, addNote, deleteNote, clearNotes,
     // timer + sveglie (#322)
     listTimers, addTimer, addAlarm, resolveAlarmTime, deleteTimer, gcTimers, stopTimerAlarm,
     // notifications

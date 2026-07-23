@@ -363,6 +363,7 @@
     FILO_GET_NOTES: 'filo_get_notes',
     FILO_ADD_NOTE: 'filo_add_note',                // { text, context? }
     FILO_DELETE_NOTE: 'filo_delete_note',          // { id }
+    FILO_CLEAR_NOTES: 'filo_clear_notes',          // svuota tutti gli appunti
     FILO_GET_TIMERS: 'filo_get_timers',
     FILO_ADD_TIMER: 'filo_add_timer',              // { label, seconds }
     FILO_DELETE_TIMER: 'filo_delete_timer',        // { id }
