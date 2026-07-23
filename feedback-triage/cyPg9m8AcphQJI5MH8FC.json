@@ -1,7 +1,0 @@
-{
-  "id": "cyPg9m8AcphQJI5MH8FC",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica alla ricerca web e' stata verificata e pubblicata. Ho controllato che non introduca rischi (nessun comando di sistema, nessuna chiave o dato sensibile esposto, il riquadro '🔎 Cerco sul web' mostra il testo in modo sicuro). Ora quando chiedi a Filo di cercare qualcosa online la ricerca parte davvero e ti risponde con i risultati e i link reali.",
-  "queuedAt": "2026-07-23T00:16:27.462Z",
-  "queuedBy": "routine"
-}
