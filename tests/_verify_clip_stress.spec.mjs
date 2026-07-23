@@ -31,6 +31,20 @@ async function openHistorySubmenu(page) {
   return sub;
 }
 
+// Riapre il sotto-menu quando la cronologia è VUOTA: in quel caso non c'è la
+// classe .sn-menu-history-sub (aggiunta solo con voci), solo un .sn-menu-sub
+// con il messaggio di stato vuoto.
+async function openEmptySubmenu(page) {
+  await page.locator('#ta').click({ button: 'right' });
+  await expect(page.locator('.sn-menu')).toBeVisible();
+  const arrow = page.locator('.sn-menu-paste-arrow');
+  await expect(arrow).toBeVisible();
+  await arrow.click();
+  const sub = page.locator('.sn-menu-sub');
+  await expect(sub).toBeVisible();
+  return sub;
+}
+
 test('stress: XSS non esegue, rimuovere ultima voce mostra stato vuoto, annulla svuota mantiene', async ({ testServer }) => {
   const XSS = '<img src=x onerror="window.__xss=1"><script>window.__xss=1<\/script>';
   const LONG = 'A'.repeat(10000);
