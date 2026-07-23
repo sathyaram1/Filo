@@ -164,24 +164,34 @@ test('dal menu si proxa col default, l\'indicatore appare, "Torna in Italia" lo 
     await page.waitForSelector('#ok');
     await configureProvider(app, socks.port);
 
+    const cc = () => shell.evaluate(() => {
+      const e = document.querySelector('.tab .proxy-ind .cc'); return e ? e.textContent : null;
+    });
+
     // ── Menu: la voce c'è, col wording giusto (mai VPN/proxy) ──
-    await rightClickTab(shell);
-    const text = await readMenuText(app, 'Apri da un altro paese');
+    const text = await openAndRead(app, () => rightClickTab(shell), 'Apri da un altro paese');
     expect(text).toMatch(/Apri da un altro paese/);
     expect(text).not.toMatch(/vpn|proxy/i); // mai gergo da security tool
 
     // ── Click diretto → proxa col default (USA) ──
-    await clickMenuItem(app, 'Apri da un altro paese', 'Apri da un altro paese');
+    await clickUntil(app, {
+      open: () => rightClickTab(shell),
+      needle: 'Apri da un altro paese', labelRe: 'Apri da un altro paese',
+      until: async () => (await cc()) === 'US',
+    });
     // La tab è DAVVERO proxata: il SOCKS vede il traffico…
     await expect.poll(() => socks.connections.length, { timeout: 15_000 }).toBeGreaterThan(0);
     // …e l'indicatore col codice paese compare sulla tab.
     await expect(shell.locator('.tab .proxy-ind .cc')).toHaveText('US', { timeout: 10_000 });
 
     // ── Su tab proxata la voce diventa "Torna in Italia" ──
-    await rightClickTab(shell);
-    const text2 = await readMenuText(app, 'Torna in Italia');
+    const text2 = await openAndRead(app, () => rightClickTab(shell), 'Torna in Italia');
     expect(text2).not.toMatch(/Apri da un altro paese/);
-    await clickMenuItem(app, 'Torna in Italia', 'Torna in Italia');
+    await clickUntil(app, {
+      open: () => rightClickTab(shell),
+      needle: 'Torna in Italia', labelRe: 'Torna in Italia',
+      until: () => shell.evaluate(() => !document.querySelector('.tab .proxy-ind')),
+    });
     // L'indicatore scompare e la tab torna diretta.
     await expect(shell.locator('.tab .proxy-ind')).toHaveCount(0, { timeout: 10_000 });
     const info = await app.evaluate(({ BrowserWindow }) => {
