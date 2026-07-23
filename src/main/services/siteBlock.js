@@ -29,18 +29,32 @@ let enabled = true;
 let useAdblockLists = true;
 let userBlacklist = new Set(); // domini extra inseriti dall'utente
 
+// Second-level public suffix usati dai motori multi-TLD (co.uk, com.au,
+// co.jp, com.tr, …): la label del motore può stare subito prima di questi.
+const PUB_SLD = '(?:co|com|net|org|gov|edu|ac|ne|or|go|nom|nic)';
+
+// Ancora il nome di un motore multi-TLD (google/yahoo/yandex) al DOMINIO
+// REGISTRABILE: lo riconosce solo se <name> è la label subito prima del
+// suffisso pubblico (google.com, google.co.uk, search.yahoo.com, yandex.com.tr),
+// NON se è una label iniziale qualsiasi (google.evil.com, yahoo.phishing.io).
+// Il suffisso è un TLD singolo, eventualmente preceduto da un SLD pubblico;
+// nessuno dei due può contenere una label registrabile arbitraria (#230).
+function engineOnPublicSuffix(name) {
+  return new RegExp(`(^|\\.)${name}\\.(?:${PUB_SLD}\\.)?[a-z]{2,}$`);
+}
+
 // Motori di ricerca il cui referrer rende lecita l'apertura di un sito in
 // blacklist. Riconoscimento per pattern sul dominio registrabile, robusto ai
 // molti TLD di Google/Yandex e ai sottodomini (www., search., ecc.).
 const SEARCH_ENGINE_PATTERNS = [
-  /(^|\.)google\.[a-z.]+$/, // google.com, google.it, google.co.uk, …
+  engineOnPublicSuffix('google'), // google.com, google.it, google.co.uk, …
   /(^|\.)bing\.com$/,
   /(^|\.)duckduckgo\.com$/,
   /(^|\.)ecosia\.org$/,
   /(^|\.)startpage\.com$/,
   /(^|\.)qwant\.com$/,
-  /(^|\.)yahoo\.[a-z.]+$/, // search.yahoo.com, yahoo.com, …
-  /(^|\.)yandex\.[a-z.]+$/,
+  engineOnPublicSuffix('yahoo'), // search.yahoo.com, yahoo.com, yahoo.co.jp, …
+  engineOnPublicSuffix('yandex'), // yandex.com, yandex.ru, yandex.com.tr, …
   /(^|\.)baidu\.com$/,
   /(^|\.)brave\.com$/, // search.brave.com
   /(^|\.)kagi\.com$/,
