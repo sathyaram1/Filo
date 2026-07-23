@@ -129,6 +129,10 @@ module.exports = function register(on, ctx) {
 
       let created;
       try {
+        // Guard PRIMA (vedi nota d'ordine sopra): marcare reopenRequests.<uid>
+        // chiude la porta a duplicati anche se la creazione del feedback qui
+        // sotto fallisce a metà.
+        await FB.castReopenRequest(id, uid, { idToken });
         created = await FB.submit({
           text: `[Riapertura #${original.seq || id}] ${text}`,
           url: original.url || '',
@@ -138,7 +142,6 @@ module.exports = function register(on, ctx) {
           parentId: id,
           name: '',
         });
-        await FB.castReopenRequest(id, uid, { idToken });
       } catch (e) {
         // Compensazione best-effort: il segnale/feedback non è andato a buon
         // fine dopo aver già scalato — restituiamo i crediti invece di
