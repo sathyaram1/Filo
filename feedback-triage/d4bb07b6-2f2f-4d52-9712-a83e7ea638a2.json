@@ -1,7 +1,0 @@
-{
-  "id": "d4bb07b6-2f2f-4d52-9712-a83e7ea638a2",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica è stata pubblicata. Rafforza le protezioni contro le pagine web che provassero a far compiere a Filo azioni delicate senza il tuo consenso: ora i comandi per chiudere tutte le schede o uscire dall'app funzionano solo dall'interno di Filo, e le azioni che richiedono una conferma non possono essere eseguite da una pagina esterna se prima non è comparso davvero il messaggio di conferma. Sono barriere aggiuntive di sicurezza, non cambiano nulla nell'uso normale.",
-  "queuedAt": "2026-07-23T06:39:37.825Z",
-  "queuedBy": "routine"
-}
