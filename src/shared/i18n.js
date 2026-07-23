@@ -21,6 +21,9 @@
     menu_paste_history: 'Cronologia incolla',
     menu_paste_search: 'Cerca…',
     menu_paste_no_results: 'Nessun risultato',
+    menu_paste_remove: 'Rimuovi dalla cronologia',
+    menu_paste_clear: 'Svuota cronologia',
+    menu_paste_clear_confirm: 'Vuoi svuotare tutta la cronologia degli appunti? Le voci copiate finora verranno eliminate.',
     menu_explain_loading: 'Spiegazione…',
 
     // Menu — pagina
