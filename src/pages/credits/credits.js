@@ -123,6 +123,9 @@
   const REWARD_LABELS = {
     feedback_sent: 'Feedback inviato',
     feedback_resolved: 'Feedback risolto',
+    feedback_voted: 'Voto in Bacheca',
+    board_reopen_refund: 'Rimborso «Ancora rotto?»',
+    auto_feedback_bonus: 'Bonus segnalazione automatica',
   };
 
   function renderMoves(rewards) {

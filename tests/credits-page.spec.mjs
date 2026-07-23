@@ -33,6 +33,38 @@ test('la pagina Crediti mostra saldo e una fetta per tipo d\'uso', async ({ app,
   await expect(page.locator('#legend li[data-group="Correttore ortografico"] .sn-credits-value')).toHaveText('100');
 });
 
+test('i movimenti recenti mostrano etichette specifiche per ogni tipo di ricompensa', async ({ app, openTab }) => {
+  // Seed di ricompense di ogni tipo prodotto in produzione. Senza le etichette
+  // mancanti, voto/rimborso/bonus cadrebbero tutti nel generico 'Ricompensa'.
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CREDITS;
+    await C.award({ kind: 'feedback_sent', credits: 5 });
+    await C.award({ kind: 'feedback_resolved', credits: 200, ref: 'fb-1' });
+    await C.award({ kind: 'feedback_voted', credits: 10, ref: 'fb-board-1' });
+    await C.award({ kind: 'board_reopen_refund', credits: 5, ref: 'fb-2' });
+    await C.award({ kind: 'auto_feedback_bonus', credits: 10 });
+  });
+
+  const page = await openTab('filo://credits/credits.html');
+  await page.waitForLoadState('domcontentloaded');
+
+  const labels = page.locator('#moves .sn-credits-move-label');
+  // Almeno le 5 ricompense seminate (l'ambiente di test può aggiungere il bonus
+  // giornaliero della segnalazione automatica, che ha comunque la sua etichetta).
+  await expect(async () => {
+    expect(await labels.count()).toBeGreaterThanOrEqual(5);
+  }).toPass();
+
+  // Ogni tipo ha la sua etichetta specifica: nessuno cade nel generico 'Ricompensa'.
+  const texts = await labels.allTextContents();
+  expect(texts).toContain('Feedback inviato');
+  expect(texts).toContain('Feedback risolto');
+  expect(texts).toContain('Voto in Bacheca');
+  expect(texts).toContain('Rimborso «Ancora rotto?»');
+  expect(texts).toContain('Bonus segnalazione automatica');
+  expect(texts).not.toContain('Ricompensa');
+});
+
 test('senza consumo la pagina Crediti mostra lo stato vuoto', async ({ openTab }) => {
   const page = await openTab('filo://credits/credits.html');
   await page.waitForLoadState('domcontentloaded');
