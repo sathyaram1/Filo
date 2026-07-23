@@ -104,20 +104,25 @@ async function readMenuText(app, needle, timeout = 8_000) {
 // nella stessa evaluate, senza gap in cui il popup possa chiudersi. Se la
 // finestra muore a metà, il tick successivo del poll ri-acquisisce quella viva.
 async function clickMenuItem(app, needle, labelSource, timeout = 8_000) {
+  let tick = 0;
   await expect.poll(async () => {
+    tick++;
+    const dbg = [];
     for (const w of app.windows()) {
       try {
-        const clicked = await w.evaluate(({ n, label }) => {
-          if (!document.body || !document.body.innerText.includes(n)) return false;
+        const r = await w.evaluate(({ n, label }) => {
+          const body = document.body ? document.body.innerText : '(nobody)';
+          const hasNeedle = document.body && document.body.innerText.includes(n);
           const re = new RegExp(label);
-          const btn = [...document.querySelectorAll('button.item')].find((b) => re.test(b.textContent));
-          if (!btn) return false;
-          btn.click();
-          return true;
+          const btn = hasNeedle ? [...document.querySelectorAll('button.item')].find((b) => re.test(b.textContent)) : null;
+          if (hasNeedle && btn) { btn.click(); return { clicked: true }; }
+          return { clicked: false, hasNeedle: !!hasNeedle, nBtn: document.querySelectorAll('button.item').length, snippet: body.slice(0,40).replace(/\n/g,'|') };
         }, { n: needle, label: labelSource });
-        if (clicked) return true;
-      } catch (_) {}
+        if (r.clicked) return true;
+        dbg.push(JSON.stringify(r));
+      } catch (e) { dbg.push('ERR:'+String(e.message).slice(0,30)); }
     }
+    process.stderr.write(`\n[clickMenuItem ${needle} tick${tick}] wins=${app.windows().length} ${dbg.join(' ')}`);
     return false;
   }, { timeout }).toBe(true);
 }
