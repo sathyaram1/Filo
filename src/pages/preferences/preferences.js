@@ -498,16 +498,14 @@
       rate: parseFloat($('ttsRate').value) || 1,
       pitch: parseFloat($('ttsPitch').value) || 1,
     };
-    const idleHoursRaw = parseInt($('autoArchiveIdleHours').value, 10);
     const autoArchive = {
       enabled: $('autoArchiveEnabled').checked,
       onIdle: true,
-      idleHours: Number.isFinite(idleHoursRaw) && idleHoursRaw > 0 ? Math.min(168, idleHoursRaw) : 6,
+      idleHours: clampIdleHours(parseInt($('autoArchiveIdleHours').value, 10)),
       onClose: $('autoArchiveOnClose').checked,
     };
-    const durRaw = parseInt($('notifDuration').value, 10);
     const notifications = {
-      durationSec: Number.isFinite(durRaw) && durRaw >= 0 ? Math.min(120, durRaw) : 5,
+      durationSec: clampNotifDurationSec(parseInt($('notifDuration').value, 10)),
       soundEnabled: $('notifSoundEnabled').checked,
       sound: $('notifSound').value || 'default',
     };
