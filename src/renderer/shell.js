@@ -966,10 +966,14 @@
       card.appendChild(close);
 
       hostEl().appendChild(card);
+      // Applica subito il tetto: se questa card sfora, la più vecchia sparisce.
+      enforceCap();
       // forza reflow così la transizione di entrata parte
       // eslint-disable-next-line no-unused-expressions
       card.offsetHeight;
       card.classList.add('show');
+      // Finestra molto bassa: rendi scrollabile e mostra la più recente.
+      syncOverflow();
 
       // Suono opzionale alla comparsa.
       const wantSound = opts.sound !== undefined
