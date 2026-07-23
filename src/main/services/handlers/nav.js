@@ -73,7 +73,8 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
-  on(MSG.QUIT_APP, async () => {
+  on(MSG.QUIT_APP, async (msg, sender, origin) => {
+    if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
     app.quit();
     return { ok: true };
   });
