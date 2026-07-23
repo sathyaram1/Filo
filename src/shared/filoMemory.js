@@ -189,6 +189,11 @@
     return filtered;
   }
 
+  async function clearNotes() {
+    await setRaw(KEYS.FILO_NOTES, []);
+    return [];
+  }
+
   // ===== Timer =====
 
   async function listTimers() {
