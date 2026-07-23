@@ -55,3 +55,28 @@ test('fallbackName: testo vuoto → stringa vuota; parole lunghissime troncate a
   assert.ok(long.length <= 60, `titolo troppo lungo: ${long.length}`);
   assert.ok(long.endsWith('…'));
 });
+
+// Una stringa contiene un surrogato solitario (mezza emoji) se, dopo aver
+// rimosso le coppie surrogate valide, resta un code unit nel range surrogati.
+function hasLoneSurrogate(s) {
+  const noPairs = String(s).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '');
+  return /[\uD800-\uDFFF]/.test(noPairs);
+}
+
+test('fallbackName: testo di sole emoji non produce caratteri rotti (nessun surrogato solitario)', () => {
+  // 40 emoji consecutive: senza troncamento per grafema, slice(0,57) su unità
+  // UTF-16 cadrebbe a metà di una coppia surrogata e lascerebbe mezza emoji.
+  const title = FB.fallbackName('😀'.repeat(40));
+  assert.ok(title.endsWith('…'), 'manca ellissi sul titolo troncato');
+  assert.ok(!hasLoneSurrogate(title), `titolo con carattere rotto: ${JSON.stringify(title)}`);
+  // Ogni unità visibile prima dell'ellissi deve essere un'emoji intera.
+  const emojiPart = title.slice(0, -1);
+  for (const ch of emojiPart) assert.equal(ch, '😀', 'emoji spezzata nel titolo');
+
+  // Emoji composte (ZWJ e modificatore tono pelle): niente ZWJ/ modificatori
+  // penzolanti né surrogati soli.
+  const family = FB.fallbackName('👨‍👩‍👧 '.repeat(30).trim());
+  assert.ok(!hasLoneSurrogate(family), 'surrogato solitario con emoji ZWJ');
+  const thumbs = FB.fallbackName('👍🏽'.repeat(40));
+  assert.ok(!hasLoneSurrogate(thumbs), 'surrogato solitario con modificatore tono pelle');
+});
