@@ -71,6 +71,19 @@ function normalizeDomain(raw) {
   return s;
 }
 
+// Un dominio è valido come voce di blacklist solo se ha un'estensione (almeno
+// un punto + TLD alfabetico). Allineato al campo "siti fidati": una voce come
+// "facebook" o un IP non è mai un host reale, quindi non deve entrare nel Set
+// (matcherebbe "facebook.com/com", non "facebook") dando falsa sicurezza.
+function isValidDomain(host) {
+  return /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(host);
+}
+
+// Da lista grezza (settings) → Set di domini normalizzati E validi.
+function toBlacklistSet(list) {
+  return new Set(list.map(normalizeDomain).filter(isValidDomain));
+}
+
 // Match per suffisso di dominio: "a.b.example.com" matcha "example.com".
 function matchesSuffix(host, set) {
   if (!host || !set || !set.size) return false;
