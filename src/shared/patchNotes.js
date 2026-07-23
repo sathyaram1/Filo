@@ -18,6 +18,7 @@
     {
       version: '0.2.156', date: '2026-07-23',
       fixes: [
+        'Nella pagina Crediti, i movimenti recenti ora spiegano da dove arriva ogni ricompensa: il voto in Bacheca, il rimborso di «Ancora rotto?» e il bonus della segnalazione automatica non compaiono più come un generico «Ricompensa».',
         'I titoli generati in automatico per i feedback pieni di emoji, e le etichette di timer e sveglie con emoji, non mostrano più un carattere rotto (il rettangolino o il punto interrogativo) quando il testo viene accorciato: ora l’emoji resta intera.',
         'Il pulsante «Ancora rotto?» nella Bacheca è più robusto quando la connessione ha un intoppo: non crea più segnalazioni doppie dello stesso miglioramento.',
         'Quando Filo esegue comandi nel terminale, le copie di cartelle Windows che cancellano file in modo permanente (robocopy con /MIR, /PURGE, /MOVE) ora richiedono la conferma scritta riservata alle azioni irreversibili, non più il semplice clic: così una copia che svuota una cartella non parte per sbaglio.',
