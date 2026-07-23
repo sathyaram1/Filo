@@ -284,8 +284,7 @@ test('senza endpoint configurato la voce non compare', async ({ app, shell, open
   await page.waitForSelector('#p');
   await rightClickTab(shell);
   // Il menu standard si apre (Duplica c'è) ma la voce paese no.
-  const menu = await findMenuPopup(app, 'Duplica');
-  const text = await menu.evaluate(() => document.body.innerText);
+  const text = await readMenuText(app, 'Duplica');
   expect(text).not.toMatch(/Apri da un altro paese/);
   expect(text).toMatch(/Chiudi/);
 });
