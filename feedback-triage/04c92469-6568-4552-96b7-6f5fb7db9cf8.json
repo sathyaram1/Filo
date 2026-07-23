@@ -1,7 +1,0 @@
-{
-  "id": "04c92469-6568-4552-96b7-6f5fb7db9cf8",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho verificato il flusso completo di pausa e ripresa di un timer, sia nella logica sia nell'app vera. Prima il timer non si poteva fermare: ora sulla card del timer, accanto alla ×, c'è un pulsante che lo mette in pausa (il conto alla rovescia si congela e compare '(in pausa)') e, ripremendolo, lo fa ripartire esattamente dal tempo che era rimasto. Ho controllato che durante la pausa il tempo NON scorra 'di nascosto' (restando in pausa oltre la scadenza originale il timer non suona e alla ripresa riparte dal tempo congelato, non da zero). Stress test superati: mettere in pausa due volte di fila non azzera il tempo residuo; premere 'riprendi' su un timer già attivo non fa nulla; un timer che sta già suonando non si può mettere in pausa (lì si usa 'Ferma'); le sveglie a orario fisso non sono mettibili in pausa (giustamente); azioni su un timer inesistente non danno errori. Ho anche controllato a vista le schede: layout pulito, testo non troncato, il pulsante cambia icona tra pausa e ripresa, colori coerenti col tema. Nessuna regressione: suoneria, sveglie e visualizzazione dei timer lunghi continuano a funzionare. Nota: la pausa si attiva solo dal pulsante, non ancora chiedendola a voce a Filo — è una scelta dichiarata dal risolutore, non un difetto, e non blocca l'approvazione.",
-  "queuedAt": "2026-07-23T15:45:49.804Z",
-  "queuedBy": "routine"
-}
