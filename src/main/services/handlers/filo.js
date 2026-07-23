@@ -70,6 +70,11 @@ module.exports = function register(on, ctx) {
     return { ok: true, notes: list };
   });
 
+  on(MSG.FILO_CLEAR_NOTES, async () => {
+    const list = await FiloMem.clearNotes();
+    return { ok: true, notes: list };
+  });
+
   on(MSG.FILO_GET_TIMERS, async () => ({ ok: true, timers: await FiloMem.gcTimers() }));
 
   on(MSG.FILO_ADD_TIMER, async (msg) => {
