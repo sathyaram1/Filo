@@ -481,7 +481,12 @@
   }
 
   // Sotto-menu cronologia incolla. Si ancora alla freccetta.
-  function openSubmenu(anchorEl, entries, onPick) {
+  // `handlers` può essere una funzione (retrocompat: solo onPick) o un oggetto
+  // { onPick, onRemove, onClear }.
+  function openSubmenu(anchorEl, entries, handlers) {
+    const onPick = typeof handlers === 'function' ? handlers : (handlers && handlers.onPick);
+    const onRemove = handlers && typeof handlers === 'object' ? handlers.onRemove : null;
+    const onClear = handlers && typeof handlers === 'object' ? handlers.onClear : null;
     if (!activeMenu) return;
     if (activeMenu.subRoot) {
       activeMenu.subRoot.remove();
