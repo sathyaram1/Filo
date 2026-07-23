@@ -25,7 +25,38 @@
 
     const r = await chrome.runtime.sendMessage({ type: MSG.GET_HISTORY });
     items = r?.items || [];
+    buildFilterOptions();
     render();
+  }
+
+  // Popola il menu "filtra per tipo" con SOLO i tipi di azione realmente
+  // presenti in cronologia (niente opzioni per funzioni mai usate), ciascuno con
+  // la sua etichetta leggibile. Così il filtro copre da sé ogni azione — comprese
+  // quelle nuove — senza restare disallineato da una lista hard-coded.
+  function buildFilterOptions() {
+    const sel = $('filter');
+    const current = sel.value;
+    const seen = new Set();
+    for (const it of items) {
+      if (it && it.action) seen.add(it.action);
+    }
+    const opts = [...seen]
+      .map((a) => ({ value: a, label: formatActionLabel(a) }))
+      .sort((x, y) => x.label.localeCompare(y.label, 'it'));
+
+    sel.innerHTML = '';
+    const all = document.createElement('option');
+    all.value = '';
+    all.textContent = I18n.t('history_filter_all');
+    sel.appendChild(all);
+    for (const o of opts) {
+      const opt = document.createElement('option');
+      opt.value = o.value;
+      opt.textContent = o.label;
+      sel.appendChild(opt);
+    }
+    // Mantieni la scelta corrente se ancora valida (es. dopo un reload dati).
+    sel.value = seen.has(current) ? current : '';
   }
 
   function render() {
