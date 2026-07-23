@@ -176,17 +176,12 @@ test('dal menu si proxa col default, l\'indicatore appare, "Torna in Italia" lo 
 
     // ── Menu: la voce c'è, col wording giusto (mai VPN/proxy) ──
     await rightClickTab(shell);
-    const menu = await findMenuPopup(app, 'Apri da un altro paese');
-    const text = await menu.evaluate(() => document.body.innerText);
+    const text = await readMenuText(app, 'Apri da un altro paese');
     expect(text).toMatch(/Apri da un altro paese/);
     expect(text).not.toMatch(/vpn|proxy/i); // mai gergo da security tool
 
     // ── Click diretto → proxa col default (USA) ──
-    await menu.evaluate(() => {
-      const btn = [...document.querySelectorAll('button.item')]
-        .find((b) => /Apri da un altro paese/.test(b.textContent));
-      btn.click();
-    });
+    await clickMenuItem(app, 'Apri da un altro paese', 'Apri da un altro paese');
     // La tab è DAVVERO proxata: il SOCKS vede il traffico…
     await expect.poll(() => socks.connections.length, { timeout: 15_000 }).toBeGreaterThan(0);
     // …e l'indicatore col codice paese compare sulla tab.
