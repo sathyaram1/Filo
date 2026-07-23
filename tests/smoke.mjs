@@ -25,7 +25,14 @@ const sentinel = path.join(outDir, 'sentinel.json');
 const electronModule = path.join(ROOT, 'node_modules', 'electron');
 const electronExe = path.join(electronModule, 'dist', process.platform === 'win32' ? 'electron.exe' : 'electron');
 
-const proc = spawn(electronExe, ['.'], {
+// Chromium si rifiuta di partire come root senza --no-sandbox (crbug.com/638180),
+// cosa che rompe questo smoke in ogni container/routine cloud che gira come root.
+// Playwright (`_electron.launch`) passa già --no-sandbox in automatico: allineiamoci.
+// Lo smoke è solo un harness di boot (scrive un sentinel e chiude), quindi il
+// sandbox non serve mai: lo passiamo sempre, così gira identico in locale e in cloud.
+const electronArgs = ['--no-sandbox', '.'];
+
+const proc = spawn(electronExe, electronArgs, {
   cwd: ROOT,
   env: { ...process.env, FILO_SMOKE: sentinel, NODE_ENV: 'test' },
   stdio: ['ignore', 'pipe', 'pipe'],
