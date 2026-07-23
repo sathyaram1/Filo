@@ -159,7 +159,7 @@ function configureFromSettings(settings) {
   enabled = sb.enabled !== false;
   useAdblockLists = sb.useAdblockLists !== false;
   const list = Array.isArray(sb.blacklist) ? sb.blacklist : [];
-  userBlacklist = new Set(list.map(normalizeDomain).filter(Boolean));
+  userBlacklist = toBlacklistSet(list);
 }
 
 // Per i test: imposta stato senza passare da settings.
