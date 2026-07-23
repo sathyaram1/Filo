@@ -1,0 +1,9 @@
+{
+  "id": "7ff9a640-b02e-4099-9b14-8cd49b2bc802",
+  "status": "design",
+  "notes": "Il controllo di sicurezza a giudizio (il mio) non ha trovato problemi: la modifica aggiunge solo un accorciamento del testo che tiene intere le emoji, e non tocca nulla di delicato dal punto di vista logico. Tuttavia il cancello di sicurezza automatico ha fermato la pubblicazione perche' la correzione modifica un file considerato sensibile (quello che contiene anche le credenziali di accesso ai feedback): per questo tipo di file la fusione automatica e' bloccata di proposito e serve il tuo via libera manuale. In pratica: la correzione e' pronta e verificata, ma resta in attesa di una tua conferma prima di essere pubblicata.",
+  "queuedAt": "2026-07-23T16:11:17.224Z",
+  "queuedBy": "routine",
+  "branch": "worker/7ff9a640",
+  "reason": "secaudit"
+}
