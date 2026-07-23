@@ -312,7 +312,17 @@
       history: clipboardHistory,
       onClick: () => pasteFromClipboard(),
       onPickHistory: (entry) => pasteHistoryEntry(entry),
+      onRemoveHistory: (entry) => removeClipboardEntry(entry),
+      onClearHistory: () => clearClipboardHistory(),
     };
+  }
+
+  function removeClipboardEntry(entry) {
+    chrome.runtime.sendMessage({ type: MSG.REMOVE_CLIPBOARD_ENTRY, entry }).catch(() => {});
+  }
+
+  function clearClipboardHistory() {
+    chrome.runtime.sendMessage({ type: MSG.CLEAR_CLIPBOARD_HISTORY }).catch(() => {});
   }
 
   // ------------------------------------------------------------
