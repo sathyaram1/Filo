@@ -1,7 +1,0 @@
-{
-  "id": "b848d73b-92bf-438b-a3ee-f801cd04683d",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho verificato che le operazioni riservate (svuotare la cronologia appunti, e leggere/aggiungere/svuotare la cronologia delle interazioni con l'AI, e leggere i costi mensili) ora vengono rifiutate quando la richiesta arriva da una pagina web esterna, mentre funzionano regolarmente dalle pagine interne di Filo. Ho controllato in modo indipendente la scelta di lasciare invece aperte le tre operazioni della cronologia appunti (leggere le voci, aggiungerne una, aggiornare la descrizione di un'immagine): il menu 'Incolla' con la cronologia appunti gira davvero dentro le pagine web di qualsiasi sito e usa proprio quelle chiamate, quindi bloccarle avrebbe spento la cronologia appunti su tutti i siti — la scelta di tenerle aperte è corretta, non un buco. Ho confermato che le operazioni ora bloccate sono richieste solo dalle schermate interne (impostazioni e cronologia), quindi il blocco non rompe nessun flusso reale. La barriera si comporta in modo prudente anche con un'origine assente. Stress test su origine web/interna e sul mantenimento della funzione appunti: tutti verdi, inclusi i test di sicurezza e isolamento già esistenti.",
-  "queuedAt": "2026-07-23T06:11:57.005Z",
-  "queuedBy": "routine"
-}
