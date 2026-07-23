@@ -59,6 +59,42 @@ test('referrer di ricerca robusto su TLD e sottodomini diversi', () => {
   }
 });
 
+test('#230: referrer che INIZIA per google./yahoo./yandex. ma NON è il motore → NON concede eccezione', () => {
+  reset();
+  // Domini-civetta: 'google'/'yahoo'/'yandex' sono solo una sottodominio-label,
+  // il dominio registrabile è un altro. Prima del fix passavano per motori di
+  // ricerca e il sito in blacklist si apriva lo stesso.
+  for (const ref of [
+    'https://yahoo.phishing.io/',
+    'https://google.evil.com/',
+    'https://yandex.bad.net/',
+    'https://google.com.evil.com/',
+    'https://www.google.co.evil.com/',
+  ]) {
+    const d = SB.shouldBlockNavigation('https://evil.example/', { fromUrl: ref });
+    assert.equal(d.block, true, `dovrebbe BLOCCARE con referrer-civetta ${ref}`);
+    assert.equal(SB.isSearchEngineUrl(ref), false, `${ref} non è un motore`);
+  }
+});
+
+test('#230: i motori multi-TLD legittimi restano riconosciuti', () => {
+  reset();
+  for (const ref of [
+    'https://www.google.com/search?q=x',
+    'https://google.co.uk/search?q=x',
+    'https://www.google.com.au/search?q=x',
+    'https://search.yahoo.com/search?p=x',
+    'https://es.search.yahoo.com/search?p=x',
+    'https://yahoo.co.jp/',
+    'https://yandex.ru/search/?text=x',
+    'https://yandex.com.tr/search/?text=x',
+  ]) {
+    assert.equal(SB.isSearchEngineUrl(ref), true, `${ref} è un motore`);
+    const d = SB.shouldBlockNavigation('https://evil.example/', { fromUrl: ref });
+    assert.equal(d.block, false, `dovrebbe consentire da ${ref}`);
+  }
+});
+
 test('referrer NON di ricerca non concede eccezioni', () => {
   reset();
   const d = SB.shouldBlockNavigation('https://evil.example/', {
