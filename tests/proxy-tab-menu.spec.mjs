@@ -189,14 +189,9 @@ test('dal menu si proxa col default, l\'indicatore appare, "Torna in Italia" lo 
 
     // ── Su tab proxata la voce diventa "Torna in Italia" ──
     await rightClickTab(shell);
-    const menu2 = await findMenuPopup(app, 'Torna in Italia');
-    const text2 = await menu2.evaluate(() => document.body.innerText);
+    const text2 = await readMenuText(app, 'Torna in Italia');
     expect(text2).not.toMatch(/Apri da un altro paese/);
-    await menu2.evaluate(() => {
-      const btn = [...document.querySelectorAll('button.item')]
-        .find((b) => /Torna in Italia/.test(b.textContent));
-      btn.click();
-    });
+    await clickMenuItem(app, 'Torna in Italia', 'Torna in Italia');
     // L'indicatore scompare e la tab torna diretta.
     await expect(shell.locator('.tab .proxy-ind')).toHaveCount(0, { timeout: 10_000 });
     const info = await app.evaluate(({ BrowserWindow }) => {
