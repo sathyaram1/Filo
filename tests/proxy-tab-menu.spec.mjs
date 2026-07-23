@@ -83,22 +83,6 @@ async function rightClickTab(shell) {
 // evaluate, così non esiste finestra temporale in cui il popup possa sparire fra
 // le due operazioni.
 
-// Attende che compaia il popup che contiene `needle` (solo presenza).
-async function findMenuPopup(app, needle, timeout = 8_000) {
-  let popup = null;
-  await expect.poll(async () => {
-    for (const w of app.windows()) {
-      try {
-        const has = await w.evaluate(
-          (n) => !!document.body && document.body.innerText.includes(n), needle);
-        if (has) { popup = w; return true; }
-      } catch (_) {}
-    }
-    return false;
-  }, { timeout }).toBe(true);
-  return popup;
-}
-
 // Ritorna il testo del popup che contiene `needle`, ri-acquisendo la finestra.
 async function readMenuText(app, needle, timeout = 8_000) {
   let text = '';
