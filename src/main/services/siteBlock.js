@@ -167,7 +167,7 @@ function setForTest({ enabled: en, useAdblockLists: ual, blacklist } = {}) {
   if (en !== undefined) enabled = !!en;
   if (ual !== undefined) useAdblockLists = !!ual;
   if (Array.isArray(blacklist)) {
-    userBlacklist = new Set(blacklist.map(normalizeDomain).filter(Boolean));
+    userBlacklist = toBlacklistSet(blacklist);
   }
 }
 
