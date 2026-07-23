@@ -215,16 +215,28 @@ test('la freccia apre la lista paesi e "Francia" proxa da fr', async ({ app, she
     await page.waitForSelector('#ok');
     await configureProvider(app, socks.port);
 
-    await rightClickTab(shell);
-    // La freccia del submenu è presente sulla voce → apre il secondo livello.
-    await clickMenuArrow(app, 'Apri da un altro paese');
-
-    // Secondo livello: la lista curata delle location.
-    const text = await readMenuText(app, 'Francia');
+    const cc = () => shell.evaluate(() => {
+      const e = document.querySelector('.tab .proxy-ind .cc'); return e ? e.textContent : null;
+    });
+    // La freccia del submenu apre il secondo livello: la lista curata delle
+    // location (contiene "Stati Uniti", unica del picker). L'apertura via freccia
+    // è ripetuta finché il picker compare (il menu di primo livello può chiudersi).
+    const openPicker = async () => {
+      await rightClickTab(shell);
+      for (let i = 0; i < 15; i++) { if (await tryClick(app, 'Apri da un altro paese', 'button.subarrow')) break; await sleep(40); }
+      await sleep(80);
+    };
+    const text = await openAndRead(app, openPicker, 'Stati Uniti');
     expect(text).toMatch(/Stati Uniti/);
     expect(text).toMatch(/Francia/);
     expect(text).not.toMatch(/vpn|proxy/i);
-    await clickMenuItem(app, 'Francia', 'Francia');
+
+    // "Francia" instrada da fr; se il picker si è chiuso, lo riapriamo via freccia.
+    await clickUntil(app, {
+      open: openPicker,
+      needle: 'Francia', labelRe: 'Francia',
+      until: async () => (await cc()) === 'FR',
+    });
 
     await expect.poll(() => socks.connections.length, { timeout: 15_000 }).toBeGreaterThan(0);
     await expect(shell.locator('.tab .proxy-ind .cc')).toHaveText('FR', { timeout: 10_000 });
