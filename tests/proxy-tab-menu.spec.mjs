@@ -115,9 +115,12 @@ async function openAndRead(app, doOpen, needle, timeout = 15_000) {
 }
 
 // Best-effort: clicca `sel` (opzionalmente con testo che matcha `labelRe`) nel
-// popup che contiene `needle`, se presente ORA. Ritorna true se ha cliccato o se
-// una finestra candidata si è chiusa durante il click (il click potrebbe essere
-// andato a segno). L'esito reale lo verifica il chiamante.
+// popup che contiene `needle`, se presente ORA. Ritorna true SOLO se ha cliccato
+// pulito. Se una finestra si chiude a metà evaluate, non è un successo garantito
+// (il click potrebbe non essere partito): NON lo trattiamo come tale — sarebbe un
+// falso positivo che farebbe saltare il click vero. L'unico giudice del successo
+// è l'ESITO osservabile che verifica il chiamante (`until`), che rileva comunque
+// il caso "click andato a segno ma evaluate morto subito dopo".
 async function tryClick(app, needle, sel, labelRe) {
   for (const w of app.windows()) {
     try {
@@ -130,7 +133,7 @@ async function tryClick(app, needle, sel, labelRe) {
         return 'yes';
       }, { n: needle, s: sel, l: labelRe || null });
       if (r === 'yes') return true;
-    } catch (_) { return true; } // popup chiuso durante il click: forse è andato a segno
+    } catch (_) { /* finestra chiusa a metà: prova la prossima, decide `until` */ }
   }
   return false;
 }
