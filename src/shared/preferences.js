@@ -181,7 +181,7 @@
     {
       keys: ['velocita_voce', 'velocità voce', 'velocita voce', 'velocità lettura', 'velocita lettura', 'ttsrate'],
       build(v) {
-        let n = parseFloat(String(v == null ? '' : v).replace(',', '.').replace(/[^0-9.]/g, ''));
+        let n = parseItalianNumber(v);
         if (!Number.isFinite(n)) return null;
         n = Math.max(0.5, Math.min(2, n));
         return { partial: { tts: { rate: n } }, label: `Velocità lettura → ${n.toFixed(1)}×` };
