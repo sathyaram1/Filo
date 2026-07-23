@@ -42,6 +42,33 @@
     return `${s.slice(0, 4)}…${s.slice(-4)}`;
   }
 
+  // Interpreta un numero scritto in linguaggio naturale tollerando il formato
+  // italiano (punto = separatore delle migliaia, virgola = decimale) SENZA
+  // rompere il formato inglese (punto decimale). Nasce dal bug: "2.500 euro"
+  // veniva letto come 2,50 perché il punto delle migliaia finiva per fare da
+  // separatore decimale. Regole di disambiguazione (nell'ordine):
+  //   • se c'è una virgola → è SEMPRE il decimale, e ogni punto è migliaia:
+  //       "2.500,50" → 2500.50   "1.234,5" → 1234.5   "2,50" → 2.5
+  //   • se ci sono SOLO punti e la stringa è fatta di gruppi da 3 cifre
+  //     (es. "2.500", "1.000", "1.234.567") → sono separatori di migliaia:
+  //       "2.500" → 2500   "1.000" → 1000
+  //   • altrimenti il punto è decimale (formato inglese), invariato:
+  //       "1.5" → 1.5   "2.50" → 2.5   "0.9" → 0.9
+  // Ritorna un numero finito oppure NaN.
+  function parseItalianNumber(raw) {
+    let s = String(raw == null ? '' : raw).trim().replace(/[^0-9.,-]/g, '');
+    if (!s) return NaN;
+    if (s.includes(',')) {
+      // virgola = decimale, punto = migliaia (formato italiano completo)
+      s = s.replace(/\./g, '').replace(',', '.');
+    } else if (/^-?\d{1,3}(\.\d{3})+$/.test(s)) {
+      // solo punti come raggruppamento delle migliaia (gruppi esatti da 3)
+      s = s.replace(/\./g, '');
+    }
+    const n = parseFloat(s);
+    return Number.isFinite(n) ? n : NaN;
+  }
+
   // Ogni voce: sinonimi di chiave + build(valore) → { partial, label }.
   // `partial` è il pezzo di settings da fondere (deepMerge preserva i campi
   // annidati vicini); `label` è la conferma leggibile per l'utente.
