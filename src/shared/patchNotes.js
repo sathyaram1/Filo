@@ -19,6 +19,7 @@
       version: '0.2.154', date: '2026-07-23',
       fixes: [
         'In Preferenze, i campi "Archivia dopo questo periodo di inattività (ore)" e "Durata" delle notifiche ora mostrano subito il valore realmente in uso: se scrivi un numero fuori scala (troppo grande o negativo) e lasci il campo, questo si riallinea al valore effettivamente salvato invece di continuare a mostrare il numero digitato.',
+        'La barra degli indirizzi ora apre correttamente gli indirizzi con una porta (es. "localhost:3000", "127.0.0.1:8080", "example.com:8443/admin") e i nomi locali come "localhost": prima venivano scambiati per una ricerca su Google. Per i server locali e gli indirizzi di rete privata (router, dispositivi su IP privato) usa "http", per i siti pubblici "https".',
       ],
     },
     {
