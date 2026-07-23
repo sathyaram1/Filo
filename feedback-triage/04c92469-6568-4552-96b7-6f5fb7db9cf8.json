@@ -1,7 +1,0 @@
-{
-  "id": "04c92469-6568-4552-96b7-6f5fb7db9cf8",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica e stata pubblicata. Ora puoi mettere in pausa un timer e riprenderlo quando vuoi: sulla scheda del timer, in alto nella nuova scheda, trovi il pulsante di pausa e quello di ripresa. Il conto alla rovescia si congela quando lo fermi e riparte esattamente da dove era rimasto. Le sveglie (che hanno un orario fisso) non sono mettibili in pausa, e un timer che sta gia suonando non viene toccato. Verificato eseguendo i test automatici della funzione (tutti superati), inclusi i casi limite.",
-  "queuedAt": "2026-07-23T15:54:33.164Z",
-  "queuedBy": "routine"
-}
