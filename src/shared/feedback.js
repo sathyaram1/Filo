@@ -208,12 +208,35 @@
     return Number.isInteger(sub) && sub > 0 ? `${s}.${sub}` : String(s);
   }
 
+  // Tronca una stringa a `max` unità visibili senza mai spezzare un carattere
+  // a metà. `String.slice` lavora su unità UTF-16: tagliare in mezzo a un'emoji
+  // (coppia surrogata) lascerebbe un surrogato solitario che si vede come
+  // rettangolino/glifo rotto. Contiamo per grafema (Intl.Segmenter, quando
+  // disponibile, tiene insieme anche le emoji composte da più code point come
+  // 👨‍👩‍👧 o le emoji col modificatore di tono pelle) con ripiego a code point.
+  function truncateSafe(str, max) {
+    const s = String(str == null ? '' : str);
+    let units;
+    try {
+      if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+        const seg = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+        units = Array.from(seg.segment(s), (g) => g.segment);
+      } else {
+        units = Array.from(s); // iteratore stringa → per code point, no surrogati soli
+      }
+    } catch {
+      units = Array.from(s);
+    }
+    if (units.length <= max) return s;
+    return units.slice(0, max).join('');
+  }
+
   // Titolo di ripiego quando l'LLM non è disponibile: prime parole del testo.
   function fallbackName(text, maxWords = 6) {
     const words = String(text || '').trim().replace(/\s+/g, ' ').split(' ').filter(Boolean);
     if (!words.length) return '';
     let out = words.slice(0, maxWords).join(' ');
-    if (out.length > 60) return out.slice(0, 57).trimEnd() + '…';
+    if (out.length > 60) return truncateSafe(out, 57).trimEnd() + '…';
     return words.length > maxWords ? out + '…' : out;
   }
 
