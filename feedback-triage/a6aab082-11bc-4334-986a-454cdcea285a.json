@@ -1,0 +1,7 @@
+{
+  "id": "a6aab082-11bc-4334-986a-454cdcea285a",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho riprodotto esattamente la situazione segnalata: premo e tengo il tasto su una scheda senza muoverla, faccio arrivare in quell'istante un cambio di stato di un'altra scheda (audio/titolo/icona), poi trascino oltre l'ultima scheda e rilascio. Prima della correzione, in quel momento comparivano davvero due schede identiche affiancate e il riordino finiva nel punto sbagliato (l'ho verificato togliendo temporaneamente la correzione: la barra mostrava la scheda duplicata). Con la correzione la scheda trascinata resta sempre una sola e si ferma esattamente dove la rilascio. Ho poi provato a romperla con casi limite: una raffica di sei cambi di stato tutti insieme mentre tengo premuto (nessun doppione, riordino corretto); la chiusura di un'altra scheda mentre trascino (la scheda chiusa sparisce, quella in mano resta intatta, nessun doppione, nessun blocco); e persino la chiusura della scheda che sto trascinando mentre la tengo premuta (nessun crash, la barra si ricompone correttamente). In tutti i casi la regola \"mai due schede uguali nella barra\" ha retto e il rilascio è sempre finito nella posizione giusta. Il piccolo effetto collaterale voluto — mentre tieni premuto, gli aggiornamenti di titolo/icona/audio delle altre schede si vedono solo al rilascio — è impercettibile e sparisce appena lasci il tasto. Nessun problema riscontrato.",
+  "queuedAt": "2026-07-23T21:29:02.640Z",
+  "queuedBy": "routine"
+}
