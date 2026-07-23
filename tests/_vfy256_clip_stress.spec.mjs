@@ -83,7 +83,8 @@ test('VFY256 stress: clear-through vuota davvero, stato vuoto, XSS reso come tes
       await sub.locator('.sn-menu-history-remove').first().click();
     }
     await expect(sub.locator('.sn-menu-history-item')).toHaveCount(0);
-    await expect(sub.locator('.sn-menu-empty')).toBeVisible();
+    // Stato vuoto: la riga "Cronologia appunti vuota" è visibile (non un riquadro vuoto).
+    await expect(sub.locator('.sn-menu-empty:visible')).toHaveText(/vuota/i);
 
     // Persistenza: riaprendo, la cronologia è vuota (le rimozioni sono state salvate).
     await page.keyboard.press('Escape');
