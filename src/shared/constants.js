@@ -227,6 +227,46 @@
     return CREDIT_USAGE_GROUPS[action] || 'Altro';
   }
 
+  // Etichetta leggibile per azione, mostrata nella Cronologia AI (voci della
+  // lista + menu "filtra per tipo"). UNICA sorgente di verità: ogni azione di
+  // ACTIONS che può finire in cronologia deve avere qui la sua etichetta,
+  // altrimenti la Cronologia mostra il codice interno grezzo (es.
+  // 'describe_image'). Testo breve, per l'utente, coerente con i nomi usati nei
+  // menu del tasto destro / nelle Opzioni.
+  const ACTION_LABELS = {
+    [ACTIONS.EXPLAIN]: 'Spiega',
+    [ACTIONS.EXPLAIN_DEEP]: 'Approfondisci',
+    [ACTIONS.TRANSLATE_SELECTION]: 'Traduci selezione',
+    [ACTIONS.TRANSLATE_PAGE]: 'Traduci pagina',
+    [ACTIONS.HELP]: 'Aiuto',
+    [ACTIONS.CATEGORIZE]: 'Categorizza',
+    [ACTIONS.DESCRIBE_IMAGE]: 'Descrivi immagine',
+    [ACTIONS.TRANSCRIBE_IMAGE]: 'Trascrivi immagine (OCR)',
+    [ACTIONS.TRANSCRIBE_AUDIO]: 'Dettatura',
+    [ACTIONS.TTS]: 'Lettura ad alta voce',
+    [ACTIONS.SPELLCHECK_SEMANTIC]: 'Correttore ortografico',
+    [ACTIONS.SPELLCHECK_WORD]: 'Correttore ortografico',
+    [ACTIONS.EDIT_TEXT]: 'Modifica testo',
+    [ACTIONS.EXPLAIN_LINK]: 'Spiega link',
+    [ACTIONS.HELP_INTENT_GUESS]: 'Aiuto',
+    [ACTIONS.HELP_INTENT_JUDGE]: 'Aiuto',
+    [ACTIONS.FILO_CHAT]: 'Chat con Filo',
+    [ACTIONS.FILO_DASHBOARD]: 'Dashboard Filo',
+    [ACTIONS.FILO_LESSON]: 'Memoria di Filo',
+    [ACTIONS.FILO_COMPACT]: 'Memoria di Filo',
+    [ACTIONS.FILO_TAB_TRIAGE]: 'Gestione schede',
+    [ACTIONS.FILO_TAB_SUMMARY]: 'Riassunto scheda',
+    [ACTIONS.FILO_TAB_SEARCH]: 'Ricerca schede',
+    [ACTIONS.DECKS_CHAT]: 'Mazzi — ricerca carte',
+    [ACTIONS.DECKS_OPINION]: 'Mazzi — parere carta',
+    [ACTIONS.DECKS_AUTOTAG]: 'Mazzi — etichette',
+    [ACTIONS.DECKS_SEARCH_FILTER]: 'Mazzi — filtro ricerca',
+  };
+
+  function actionLabel(action) {
+    return ACTION_LABELS[action] || action;
+  }
+
   // Registry di modelli "logici" indicizzati per nickname.
   // Ogni modello ha UN SOLO provider e il nome concreto da usare per chiamarlo
   // (campo `model`). Per avere un fallback su un altro provider basta creare un
