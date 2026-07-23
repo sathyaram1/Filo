@@ -1389,6 +1389,8 @@
     CREDIT,
     CREDIT_USAGE_GROUPS,
     creditUsageGroup,
+    ACTION_LABELS,
+    actionLabel,
     DEFAULT_MODELS,
     DEFAULT_MODEL_REGISTRY,
     resolveModel,
