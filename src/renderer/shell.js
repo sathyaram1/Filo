@@ -375,6 +375,16 @@
     if (!drag) return;
     if (!drag.moved && Math.abs(e.clientX - drag.startX) < 4) return;
     drag.moved = true;
+    // Difesa in profondità: se per qualsiasi motivo il nodo trascinato non è più
+    // attaccato al DOM (un ridisegno l'ha rigenerato), NON reinserire l'orfano —
+    // creerebbe un duplicato con lo stesso id. Riaggancia il nodo vivo per questo
+    // id prima di manipolarlo. Con la sospensione del render in drag questo non
+    // dovrebbe mai scattare, ma tiene l'invariante "mai due .tab con lo stesso id"
+    // vera comunque cambi la logica di render.
+    if (!drag.el.isConnected) {
+      const live = tabsEl.querySelector(`.tab[data-id="${drag.id}"]`);
+      if (live) drag.el = live;
+    }
     drag.el.classList.add('dragging');
     const after = tabDragAfter(e.clientX);
     if (after == null) tabsEl.appendChild(drag.el);
