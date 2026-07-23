@@ -99,7 +99,7 @@ test('stress: XSS non esegue, rimuovere ultima voce mostra stato vuoto, annulla 
     // usa lo stesso testo del sotto-menu appena svuotato).
     await page.keyboard.press('Escape');
     await expect(page.locator('.sn-menu')).toHaveCount(0);
-    sub = await openHistorySubmenu(page);
+    sub = await openEmptySubmenu(page);
     await expect(sub.getByText('Cronologia appunti vuota')).toBeVisible();
     await expect(sub.locator('.sn-menu-history-item')).toHaveCount(0);
   } finally {
