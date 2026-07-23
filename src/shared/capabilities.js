@@ -297,8 +297,8 @@
     },
     {
       id: 'filo-timers', title: 'Timer', category: 'assistant',
-      desc: 'Chiedi a Filo di farti da timer ("timer di 10 minuti per la pasta"): il conto alla rovescia compare in alto nella nuova scheda e, allo scadere, parte un avviso sonoro che puoi fermare, più una notifica di sistema.',
-      invoke: 'Chiedi un timer all’assistente; i timer attivi e quelli che stanno suonando si vedono in alto nella nuova scheda.',
+      desc: 'Chiedi a Filo di farti da timer ("timer di 10 minuti per la pasta"): il conto alla rovescia compare in alto nella nuova scheda e, allo scadere, parte un avviso sonoro che puoi fermare, più una notifica di sistema. Puoi mettere in pausa un timer e riprenderlo quando vuoi.',
+      invoke: 'Chiedi un timer all’assistente; i timer attivi e quelli che stanno suonando si vedono in alto nella nuova scheda. Sulla scheda del timer trovi ⏸ per metterlo in pausa e ▶ per riprenderlo.',
       doesNot: 'La suoneria si sente quando la nuova scheda è aperta; la notifica di sistema arriva comunque finché Filo è in esecuzione, anche ridotto a icona. Con Filo completamente chiuso non suona nulla.',
     },
     {
