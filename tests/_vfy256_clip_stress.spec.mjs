@@ -86,19 +86,32 @@ test('VFY256 stress: clear-through vuota davvero, stato vuoto, XSS reso come tes
     // Stato vuoto: la riga "Cronologia appunti vuota" è visibile (non un riquadro vuoto).
     await expect(sub.locator('.sn-menu-empty:visible')).toHaveText(/vuota/i);
 
-    // Persistenza: riaprendo, la cronologia è vuota (le rimozioni sono state salvate).
+    // Persistenza: riaprendo il sotto-menu (che RILEGGE la cronologia salvata) non
+    // deve ricomparire nulla e deve restare lo stato vuoto → le rimozioni sono
+    // state davvero salvate, non solo tolte dalla vista.
     await page.keyboard.press('Escape');
     await expect(page.locator('.sn-menu')).toHaveCount(0);
-    let stored = await page.evaluate(async () => {
-      const r = await chrome.runtime.sendMessage({ type: 'get_clipboard_history' });
-      return r.items.length;
+    sub = await openHistorySubmenu(page);
+    await expect(sub.locator('.sn-menu-history-item')).toHaveCount(0);
+    // Conferma anche a livello di storage (via handler nel processo main).
+    let stored = await app.evaluate(async () => {
+      const MSG = globalThis.SN_MSG.MSG;
+      return globalThis.SN_HANDLE_MESSAGE({ type: MSG.GET_CLIPBOARD_HISTORY }, { url: 'https://ex.example/p' });
     });
-    expect(stored, 'dopo aver rimosso tutte le voci lo storage è vuoto').toBe(0);
+    expect(stored.items.length, 'dopo aver rimosso tutte le voci lo storage è vuoto').toBe(0);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.sn-menu')).toHaveCount(0);
 
-    // (D) Ricarica cronologia e verifica il CLEAR completo (conferma → svuota davvero).
-    await page.evaluate(async (h) => {
-      for (const e of h) await chrome.runtime.sendMessage({ type: 'push_clipboard_entry', entry: e });
-    }, [{ type: 'text', text: 'uno' }, { type: 'text', text: 'due' }, { type: 'text', text: 'tre' }]);
+    // (D) Ricarica cronologia (via handler, come farebbe una copia reale) e verifica
+    // il CLEAR completo: il pulsante "Svuota cronologia" apre la conferma e, dopo,
+    // lo storage è davvero azzerato.
+    await app.evaluate(async () => {
+      const MSG = globalThis.SN_MSG.MSG;
+      const s = { url: 'https://ex.example/p' };
+      await globalThis.SN_HANDLE_MESSAGE({ type: MSG.PUSH_CLIPBOARD_ENTRY, entry: { type: 'text', text: 'uno' } }, s);
+      await globalThis.SN_HANDLE_MESSAGE({ type: MSG.PUSH_CLIPBOARD_ENTRY, entry: { type: 'text', text: 'due' } }, s);
+      await globalThis.SN_HANDLE_MESSAGE({ type: MSG.PUSH_CLIPBOARD_ENTRY, entry: { type: 'text', text: 'tre' } }, s);
+    });
 
     sub = await openHistorySubmenu(page);
     await expect(sub.locator('.sn-menu-history-item')).toHaveCount(3);
@@ -108,14 +121,16 @@ test('VFY256 stress: clear-through vuota davvero, stato vuoto, XSS reso come tes
     // Azione distruttiva: DEVE comparire il dialogo di conferma (guardia anti-perdita).
     const confirmHost = page.locator(CONFIRM_HOST);
     await expect(confirmHost).toBeVisible();
-    // (Il dialogo è in shadow DOM chiuso, non cliccabile dalla pagina web: la
+    // (Il dialogo vive in uno shadow DOM chiuso, non cliccabile dalla pagina web: la
     // conferma→clear end-to-end la copre lo spec interno. Qui verifico che
-    // l'operazione di svuotamento, una volta confermata, azzeri DAVVERO lo storage
-    // — è la cosa che l'utente voleva: la cronologia sparisce sul serio.)
+    // l'operazione di svuotamento, una volta confermata, azzeri DAVVERO lo storage —
+    // è la cosa che l'utente voleva: la cronologia sparisce sul serio.)
     await page.keyboard.press('Escape');
-    const clearedLen = await page.evaluate(async () => {
-      await chrome.runtime.sendMessage({ type: 'clear_clipboard_history' });
-      const r = await chrome.runtime.sendMessage({ type: 'get_clipboard_history' });
+    const clearedLen = await app.evaluate(async () => {
+      const MSG = globalThis.SN_MSG.MSG;
+      const s = { url: 'https://ex.example/p' };
+      await globalThis.SN_HANDLE_MESSAGE({ type: MSG.CLEAR_CLIPBOARD_HISTORY }, s);
+      const r = await globalThis.SN_HANDLE_MESSAGE({ type: MSG.GET_CLIPBOARD_HISTORY }, s);
       return r.items.length;
     });
     expect(clearedLen, 'svuota cronologia azzera davvero lo storage').toBe(0);
