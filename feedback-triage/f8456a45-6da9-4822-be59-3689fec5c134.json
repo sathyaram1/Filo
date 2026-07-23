@@ -1,7 +1,0 @@
-{
-  "id": "f8456a45-6da9-4822-be59-3689fec5c134",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho verificato il Blocco siti partendo dal sintomo: un sito in blacklist non deve aprirsi se ci arrivi da un indirizzo-civetta che solo COMINCIA per google./yahoo./yandex. Ho riprodotto il caso esatto della segnalazione (partenza da 'yahoo.phishing.io' verso un sito in blacklist): ora viene bloccato correttamente. Ho poi fatto stress test avversariale con decine di indirizzi-trappola: 'google.evil.com', 'yandex.bad.net', 'yahoo.unsitoqualunque.com', 'www.google.evil.com', 'evilgoogle.co.uk', 'google.evil.co.uk', 'yahoo.evil.co.jp', varianti maiuscole, con trattino ('google-evil.com'), con nome incollato senza punto ('notgoogle.com', 'xgoogle.com'), e le forme piu' subdole 'google.com.qualcosa.com' e 'google.co.sitofinto.com': tutti correttamente bloccati. In parallelo ho verificato che i motori di ricerca VERI restano un'eccezione lecita e continuano ad aprirsi: google.com, google.it, google.co.uk, google.com.au, google.co.jp, search.yahoo.com, yahoo.co.jp, yandex.com.tr, yandex.ru, oltre a Bing, DuckDuckGo, Brave, Searx, ecc. Ho provato anche input limite (indirizzo vuoto, solo spazi, testo non valido, 'javascript:alert(1)', host di 5000 caratteri): l'app non si pianta e nel dubbio blocca (direzione sicura), nessun blocco aggirabile. La batteria completa dei test di logica (1017 casi) resta verde. Blocco robusto, falla chiusa.",
-  "queuedAt": "2026-07-23T03:12:22.189Z",
-  "queuedBy": "routine"
-}
