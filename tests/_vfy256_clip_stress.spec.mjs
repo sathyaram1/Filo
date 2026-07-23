@@ -89,14 +89,14 @@ test('VFY256 stress: clear-through vuota davvero, stato vuoto, XSS reso come tes
     // Persistenza: riaprendo, la cronologia è vuota (le rimozioni sono state salvate).
     await page.keyboard.press('Escape');
     await expect(page.locator('.sn-menu')).toHaveCount(0);
-    let stored = await shell.evaluate(async () => {
+    let stored = await page.evaluate(async () => {
       const r = await chrome.runtime.sendMessage({ type: 'get_clipboard_history' });
       return r.items.length;
     });
     expect(stored, 'dopo aver rimosso tutte le voci lo storage è vuoto').toBe(0);
 
     // (D) Ricarica cronologia e verifica il CLEAR completo (conferma → svuota davvero).
-    await shell.evaluate(async (h) => {
+    await page.evaluate(async (h) => {
       for (const e of h) await chrome.runtime.sendMessage({ type: 'push_clipboard_entry', entry: e });
     }, [{ type: 'text', text: 'uno' }, { type: 'text', text: 'due' }, { type: 'text', text: 'tre' }]);
 
@@ -113,7 +113,7 @@ test('VFY256 stress: clear-through vuota davvero, stato vuoto, XSS reso come tes
     // l'operazione di svuotamento, una volta confermata, azzeri DAVVERO lo storage
     // — è la cosa che l'utente voleva: la cronologia sparisce sul serio.)
     await page.keyboard.press('Escape');
-    const clearedLen = await shell.evaluate(async () => {
+    const clearedLen = await page.evaluate(async () => {
       await chrome.runtime.sendMessage({ type: 'clear_clipboard_history' });
       const r = await chrome.runtime.sendMessage({ type: 'get_clipboard_history' });
       return r.items.length;
