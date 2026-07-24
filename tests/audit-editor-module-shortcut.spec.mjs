@@ -157,7 +157,9 @@ test('lo switch non è aggiungibile una seconda volta (resta unico)', async ({ o
   await expect(page.locator('#overlay')).toBeVisible();
   await expect(page.locator('[data-add="switch"]')).toHaveCount(0);
   await expect(page.locator('[data-add="word-count"]')).toHaveCount(1);
-  await page.click('#cfgCancel');
+  // Il box "Aggiungi modulo" si chiude cliccando sullo sfondo (backdrop).
+  await page.locator('#overlay').click({ position: { x: 5, y: 5 } });
+  await expect(page.locator('#overlay')).toBeHidden();
 
   // 2) Palette laterale della vista modifica: nessun elemento trascinabile Switch.
   const paletteLabels = await page.locator('#palette .pi-title').allInnerTexts();
