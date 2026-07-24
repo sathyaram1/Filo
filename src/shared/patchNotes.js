@@ -16,6 +16,12 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.161', date: '2026-07-24',
+      fixes: [
+        'Nel Deck builder MTG, dentro il calcolatore di probabilità i nomi delle categorie ora si leggono per intero: il campo dove scrivi quante carte ti servono occupa uno spazio più contenuto e lascia il posto all’etichetta, anche quando allarghi il pannello delle statistiche.',
+      ],
+    },
+    {
       version: '0.2.160', date: '2026-07-24',
       features: [
         'Nella dashboard di gestione c’è una nuova ricerca «a senso»: la lente in alto a destra apre un campo dove descrivere con parole tue il feedback che cerchi, anche con un ricordo vago e non con le parole esatte usate all’epoca. Filo capisce il significato e ti mostra i feedback più pertinenti, ordinati per rilevanza e presi da qualunque scheda (Ricevuti, In coda, Risolti, Archiviati). Cliccando un risultato si apre la conversazione; con la «×» o il tasto Esc chiudi la ricerca e torni alla lista. Se il modello non è disponibile, la ricerca ripiega automaticamente sulle parole così trovi comunque qualcosa.',

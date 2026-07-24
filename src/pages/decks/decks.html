@@ -380,14 +380,24 @@
       display: flex; align-items: center; justify-content: space-between;
       gap: 8px; padding: 2px 0;
     }
-    .dk-prob-row label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-    .dk-prob-row input {
-      width: 56px; font: inherit; font-size: 12px; text-align: right;
+    /* L'etichetta (categoria/tag) prende lo spazio della riga; se troppo lunga
+       si tronca con l'ellissi su UNA riga. La casella numerica resta piccola. */
+    .dk-prob-row label {
+      flex: 1 1 auto; min-width: 0;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    /* Il selettore [type="number"] alza la specificità sopra la regola generica
+       `.sn-page input[type="number"] { width: 100% }` di pages.css: senza questo
+       la casella si gonfiava a tutta la riga e schiacciava il nome della
+       categoria fino a renderlo illeggibile. Max 2 cifre → basta un campo fisso. */
+    .dk-prob-row input[type="number"] {
+      flex: 0 0 auto; width: 56px; box-sizing: border-box;
+      font: inherit; font-size: 12px; text-align: right;
       color: var(--sn-text); background: transparent;
       border: 1px solid var(--sn-border); border-radius: 6px;
       padding: 3px 6px; outline: none;
     }
-    .dk-prob-row input:focus { border-color: var(--sn-accent); }
+    .dk-prob-row input[type="number"]:focus { border-color: var(--sn-accent); }
     .dk-prob-actions { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
     .dk-prob-actions .sn-btn { font-size: 12px; padding: 4px 10px; }
     .dk-prob-result { font-weight: 600; }
