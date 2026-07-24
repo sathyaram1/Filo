@@ -224,6 +224,7 @@
     [ACTIONS.FILO_TAB_TRIAGE]: 'Gestione schede',
     [ACTIONS.FILO_TAB_SUMMARY]: 'Gestione schede',
     [ACTIONS.FILO_TAB_SEARCH]: 'Gestione schede',
+    [ACTIONS.FILO_FEEDBACK_SEARCH]: 'Ricerca feedback',
   };
 
   function creditUsageGroup(action) {
