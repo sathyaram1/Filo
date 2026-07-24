@@ -1,0 +1,7 @@
+{
+  "id": "WSyxvzzovRyKDzsUskTv",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la modifica anti-doppioni dell'invio feedback è stata pubblicata. Nessun rischio rilevato: l'identificativo dell'invio viene ripulito e validato prima dell'uso, non tocca file sensibili e resta coerente con la funzionalità.",
+  "queuedAt": "2026-07-24T15:27:29.236Z",
+  "queuedBy": "routine"
+}
