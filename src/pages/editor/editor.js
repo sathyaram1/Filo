@@ -2110,8 +2110,24 @@
       doc.modules = doc.modules.filter((x) => x.id !== m.id);
       closeOverlay(); renderGrid(); markDirty();
     });
+    const cfgShortcut = $('cfgShortcut');
+    const cfgShortcutHint = $('cfgShortcutHint');
+    cfgShortcut.addEventListener('input', () => {
+      cfgShortcut.classList.remove('ed-field-invalid');
+      cfgShortcutHint.hidden = true;
+    });
     $('cfgSave').addEventListener('click', () => {
-      m.data.shortcut = $('cfgShortcut').value.trim();
+      const rawShortcut = cfgShortcut.value.trim();
+      // Una scorciatoia senza modificatore (es. la lettera "b") verrebbe premuta
+      // di continuo mentre si scrive: la rifiutiamo e mostriamo come correggerla,
+      // invece di salvarla e rubare quel tasto in tutto l'editor.
+      if (rawShortcut && !isValidShortcut(rawShortcut)) {
+        cfgShortcut.classList.add('ed-field-invalid');
+        cfgShortcutHint.hidden = false;
+        cfgShortcut.focus();
+        return;
+      }
+      m.data.shortcut = rawShortcut;
       if (m.type === 'word-count') m.data.count = $('cfgCount').value;
       if (m.type === 'switch') {
         overlayBox.querySelectorAll('[data-pname]').forEach((inp) => { m.data.pages[Number(inp.dataset.pname)].name = inp.value; });
