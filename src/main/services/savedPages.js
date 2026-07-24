@@ -21,6 +21,24 @@
 
   async function save(page) {
     const pages = await list();
+
+    // Dedupe per URL: salvare di nuovo una pagina già in "Aperti per dopo"
+    // NON deve creare un doppione. Aggiorna la voce esistente (rinfresca titolo,
+    // favicon, anteprima e data) e la riporta in cima, preservando id e categoria
+    // già assegnata. Così ri-salvare = "aggiorna e riporta su", senza attrito.
+    const idx = pages.findIndex((p) => p.url === page.url);
+    if (idx >= 0) {
+      const existing = pages[idx];
+      existing.title = page.title || existing.title || page.url;
+      if (page.favicon) existing.favicon = page.favicon;
+      if (page.thumbnail) existing.thumbnail = page.thumbnail;
+      existing.savedAt = new Date().toISOString();
+      pages.splice(idx, 1);
+      pages.unshift(existing);
+      await chrome.storage.local.set({ [STORAGE_KEYS.SAVED_PAGES]: pages });
+      return existing;
+    }
+
     const entry = {
       id: uuid(),
       url: page.url,
