@@ -280,6 +280,15 @@
     // dashboard passa gli id dei feedback bianchi; il backend ri-esegue SOLO i
     // giudici mancanti e riscrive il pipeline. Owner-only.
     FEEDBACK_REEVALUATE: 'feedback_reevaluate',    // { feedbackIds:[...] } → { ok, reevaluated, results } | { ok:false, error }
+    // Ricerca semantica dei feedback nella dashboard di gestione (owner-only): il
+    // renderer manda un catalogo compatto (id + numero + titolo + testo troncato)
+    // e una query in linguaggio naturale; il main la fa ordinare da un LLM per
+    // pertinenza e ritorna gli id in ordine (+ una breve motivazione per ciascuno).
+    // Se l'LLM non è disponibile torna { ok:true, results:null } così la pagina
+    // ripiega sul filtro per sottostringa.
+    //   { query, items:[{id,num,title,text}] }
+    //   → { ok, results:[{id,why}] } | { ok:true, results:null } | { ok:false, error }
+    FEEDBACK_SEARCH: 'feedback_search',
     // Interruttore master dell'auto-miglioramento (doc config/automation, campo
     // `enabled`). Owner-only. Vedi filo-security DESIGN §2.
     AUTOMATION_GET: 'automation_get',              // → { ok, enabled } | { ok:false, error }
