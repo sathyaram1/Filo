@@ -20,6 +20,7 @@
       fixes: [
         'Il riordino delle schede ora chiude anche le pagine interne di troppo, non solo i siti: le schede «Nuova scheda»/home aperte più volte vengono collassate in una sola e le pagine di impostazioni che non stai più usando vengono chiuse (restano sempre raggiungibili). Prima venivano toccati solo i siti web, quindi capitava che chiudesse un sito lasciando aperte home doppie e impostazioni.',
         'Nella pagina Crediti un uso leggero di Filo ora si vede: se hai consumato solo frazioni di credito, il grafico e il saldo lo mostrano (es. «0,3» crediti) invece di dire «Non hai ancora consumato crediti» e lasciare il saldo fermo.',
+        'Nel menu App le voci «Deck builder MTG» (prima «Mazzi») e «Bacheca» hanno di nuovo la loro icona, come tutte le altre voci: prima comparivano senza simbolo. La «Bacheca» ha un\'icona a lavagna, coerente con quello che è.',
       ],
     },
     {
