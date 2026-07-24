@@ -109,6 +109,9 @@
       color: var(--sn-fg);
     }
     .mg-search-input:focus-visible { outline: none; border-color: var(--sn-accent); }
+    /* Niente pulsante di cancellazione nativo (blu di sistema) del type="search":
+       forniamo la nostra «×» tematizzata, coerente con Filo (PATTERNS.md). */
+    .mg-search-input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
     .mg-search-clear {
       all: unset; cursor: pointer; font-size: 18px; color: var(--sn-muted);
       width: 28px; height: 28px; flex: 0 0 auto;
