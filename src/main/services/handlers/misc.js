@@ -76,15 +76,8 @@ module.exports = function register(on, ctx) {
     // listener per sessione (services/cookies.js), che copre anche i redirect e
     // gli eventuali resume.
     let releaseReferrer = () => {};
-    try {
-      const referrer = String(sender?.tab?.url || sender?.url || '');
-      if (process.env.FILO_DBG_REF) require('node:fs').appendFileSync(process.env.FILO_DBG_REF, `[dl handler] url=${url} referrer=${referrer} ses=${!!ses}\n`);
-      if (/^https?:/i.test(referrer)) {
-        require('../cookies').ensureHeaderHook(ses);
-        releaseReferrer = require('../download-referrer').expect(url, referrer);
-        if (process.env.FILO_DBG_REF) require('node:fs').appendFileSync(process.env.FILO_DBG_REF, `[dl handler] hook+expect registered sessId=${ses?.getStoragePath?.()||'default'}\n`);
-      }
-    } catch (e) { if (process.env.FILO_DBG_REF) require('node:fs').appendFileSync(process.env.FILO_DBG_REF, `[dl handler] ERR ${e}\n`); }
+    const referrer = String(sender?.tab?.url || sender?.url || '');
+    const dbgRef = /^https?:/i.test(referrer) ? referrer : '';
 
     return new Promise((resolve) => {
       let settled = false;
