@@ -1,7 +1,0 @@
-{
-  "id": "3ONpuIZbo1mjSa0yPJ5r",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho riprodotto la situazione descritta: un uso leggero di Filo che consuma solo frazioni di credito. Ora nella pagina Crediti il consumo si vede correttamente: il grafico a torta compare con una fetta per ogni tipo d'uso anche quando ciascuno vale meno di un credito, la legenda mostra i valori frazionari con la virgola all'italiana (per esempio 0,3 e 0,4) e il saldo in alto scala con la virgola (per esempio 999,3 invece di restare fermo a 1000). Ho anche verificato i casi vicini: con un uso più consistente il saldo e le fette per tipo d'uso restano corretti (saldo 700, fette Chat e Correttore con i rispettivi crediti); senza alcun consumo la pagina mostra ancora lo stato vuoto con «1.000» e il messaggio «non hai ancora consumato crediti»; i movimenti recenti mostrano l'etichetta giusta per ogni tipo di ricompensa. Controllo di genuinità: rimettendo il vecchio arrotondamento all'intero, il consumo frazionario torna a sparire (mostra 0 e torta vuota), quindi il controllo coglie davvero il problema segnalato. Nessun input dell'utente finisce a schermo senza controllo (le etichette sono fisse), quindi niente rischi di testo malevolo. Unico limite di design, non bloccante: un consumo davvero minuscolo (sotto circa mezzo decimo di credito) viene comunque arrotondato a zero e non appare — ma è ben oltre la soglia dell'uso leggero descritto.",
-  "queuedAt": "2026-07-24T12:51:57.152Z",
-  "queuedBy": "routine"
-}
