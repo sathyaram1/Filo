@@ -134,3 +134,38 @@ test('lo switch di pagina non è eliminabile e le altre pagine restano raggiungi
   await page.locator('.ed-switch-icon').nth(1).click();
   await expect(page.locator('.ed-module[data-type="search-replace"]')).toBeVisible();
 });
+
+// Lo switch è un modulo UNICO: dato che è protetto dalla cancellazione, poterne
+// aggiungere un secondo lascerebbe l'utente con un doppione ingombrante e non
+// eliminabile — lo stesso stato bloccato, raggiunto al contrario. Quindi lo
+// switch NON deve comparire tra i moduli aggiungibili quando ne esiste già uno
+// (né nel box "Aggiungi modulo" da cella vuota, né nella palette laterale),
+// esattamente come già avviene per l'ingranaggio impostazioni.
+test('lo switch non è aggiungibile una seconda volta (resta unico)', async ({ openTab }) => {
+  const page = await openTab(EDITOR);
+  await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator('.ed-module[data-type="switch"]')).toBeVisible();
+
+  // Precondizione: esiste già esattamente uno switch nel layout di partenza.
+  await expect(page.locator('.ed-module[data-type="switch"]')).toHaveCount(1);
+
+  await enterSettingsMode(page);
+
+  // 1) Box "Aggiungi modulo" da una cella vuota: NIENTE opzione Switch, ma i
+  //    moduli normali (es. conteggio parole) restano aggiungibili.
+  await page.locator('.ed-cell-empty').first().click();
+  await expect(page.locator('#overlay')).toBeVisible();
+  await expect(page.locator('[data-add="switch"]')).toHaveCount(0);
+  await expect(page.locator('[data-add="word-count"]')).toHaveCount(1);
+  await page.click('#cfgCancel');
+
+  // 2) Palette laterale della vista modifica: nessun elemento trascinabile Switch.
+  const paletteLabels = await page.locator('#palette .pi-title').allInnerTexts();
+  expect(paletteLabels.some((t) => /switch/i.test(t))).toBe(false);
+
+  await exitSettingsMode(page);
+  await page.screenshot({ path: 'tests/.shots/audit-editor-switch-unique.png' });
+
+  // Resta un solo switch: nessun doppione è stato creato.
+  await expect(page.locator('.ed-module[data-type="switch"]')).toHaveCount(1);
+});
