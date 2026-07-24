@@ -134,6 +134,7 @@
 
     // Toast
     toast_saved: 'Salvata in: %s',
+    toast_save_failed: 'Salvataggio non riuscito',
     toast_link_saved: 'Link salvato',
     toast_copied: 'Copiato negli appunti',
     toast_copied_saving: 'Copiato negli appunti, salvataggio in corso…',
