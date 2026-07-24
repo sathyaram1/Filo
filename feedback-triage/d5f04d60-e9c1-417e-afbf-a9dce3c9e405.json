@@ -1,0 +1,7 @@
+{
+  "id": "d5f04d60-e9c1-417e-afbf-a9dce3c9e405",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la modifica e' stata pubblicata. Nell'Editor ora non e' piu' possibile assegnare a un modulo una scorciatoia fatta da una sola lettera senza un tasto modificatore (Ctrl o Alt): il campo lo segnala e non la salva, cosi' quella lettera non viene piu' rubata mentre scrivi. Le eventuali scorciatoie di questo tipo gia' salvate vengono comunque ignorate mentre stai scrivendo.",
+  "queuedAt": "2026-07-24T03:27:56.240Z",
+  "queuedBy": "routine"
+}
