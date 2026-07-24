@@ -164,7 +164,11 @@
     const doProceed = () => { send({ type: T_PROCEED, url }); clear(); };
     proceed.addEventListener('click', doProceed);
     back.addEventListener('click', () => {
-      try { if (history.length > 1) history.back(); else send({ type: T_PROCEED, url }, () => location.replace('about:blank')); }
+      // "Torna indietro" NON deve MAI confermare il sito pericoloso. Se c'è una
+      // pagina precedente ci torniamo; se la scheda è nuova (nessuna cronologia)
+      // usciamo e basta, SENZA inviare T_PROCEED (che registrerebbe il bypass,
+      // trattando l'uscita come "confermo" → "Procedi comunque").
+      try { if (history.length > 1) history.back(); else location.replace('about:blank'); }
       catch (_) {}
     });
 
