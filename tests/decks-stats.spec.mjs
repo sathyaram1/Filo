@@ -199,6 +199,53 @@ test('il calcolatore di probabilità nel sotto-pannello: caso deterministico al 
   await expect(page.locator('#probResult')).toHaveText('≈ 0,0%');
 });
 
+// Feedback #353: nel calcolatore di probabilità il campo numerico si gonfiava a
+// tutta la riga (colpa della regola generica input→width:100%) schiacciando il
+// nome della categoria fino a renderlo illeggibile. Il nome della categoria deve
+// avere lo spazio; il numero (max 2 cifre) resta in una casella piccola. Si
+// asserisce il layout: etichetta molto più larga del campo, campo piccolo,
+// etichetta non troncata anche a colonna larga.
+test('il calcolatore di probabilità: la categoria è leggibile, il numero sta in una casella piccola (#353)', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await mockScryfall(app);
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  const deckId = await seedDeck(page);
+
+  // Tagga una carta con un nome di categoria lungo (come nel feedback reale).
+  await page.evaluate(async (id) => {
+    const { MSG } = window.SN_MSG;
+    const r = await chrome.runtime.sendMessage({ type: MSG.DECKS_GET, id });
+    const deck = window.SN_DECKS.addTagToCard(r.deck, 'c-bolt', 'ragionamento');
+    await chrome.runtime.sendMessage({ type: MSG.DECKS_UPDATE, deck });
+  }, deckId);
+  await page.evaluate(() => location.reload());
+  await page.waitForLoadState('domcontentloaded');
+
+  // Colonna destra larga come quando l'utente la trascina ad allargarsi: è lì
+  // che il bug era più evidente (più spazio → il campo si allargava di più).
+  await page.evaluate(() => {
+    const grid = document.getElementById('builderGrid');
+    grid.style.gridTemplateColumns = '340px 6px minmax(0,1fr) 6px 640px';
+  });
+  await page.waitForTimeout(100);
+
+  const row = page.locator('#probNeeds .dk-prob-row', { has: page.locator('input[data-tag="ragionamento"]') });
+  const label = row.locator('label');
+  const input = row.locator('input');
+  const lb = await label.boundingBox();
+  const ib = await input.boundingBox();
+
+  // Il campo numerico è piccolo (2 cifre), non un box a tutta riga.
+  expect(ib.width).toBeLessThanOrEqual(70);
+  // L'etichetta-categoria prende lo spazio: molto più larga del numero.
+  expect(lb.width).toBeGreaterThan(ib.width * 3);
+  // Con quella larghezza il nome ci sta tutto: nessun troncamento.
+  const clipped = await label.evaluate((el) => el.scrollWidth > el.clientWidth + 1);
+  expect(clipped).toBe(false);
+  await expect(label).toHaveText('ragionamento');
+});
+
 test('budget e probabilità via chat: il sistema applica il tetto e risponde con la simulazione', async ({ app, openTab }) => {
   test.setTimeout(60_000);
   await mockScryfall(app);
