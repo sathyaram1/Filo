@@ -645,9 +645,156 @@
     reflectSortBtn();
   }
 
+  // ── Ricerca semantica dei feedback ────────────────────────────────────────
+  // Un'icona a fine barra tab apre un campo di ricerca "a senso" su TUTTI i
+  // feedback. La query in linguaggio naturale va al main, che la fa ordinare da
+  // un LLM per pertinenza; i risultati popolano la lista a sinistra. Se l'LLM non
+  // è disponibile ripieghiamo sul filtro per sottostringa (logica pura condivisa
+  // in SN_MANAGE_REVIEW) così la ricerca resta comunque usabile.
+  const mgSearchToggle = document.getElementById('mgSearchToggle');
+  const mgSearchBar    = document.getElementById('mgSearchBar');
+  const mgSearchInput  = document.getElementById('mgSearchInput');
+  const mgSearchBtn    = document.getElementById('mgSearchBtn');
+  const mgSearchClear  = document.getElementById('mgSearchClear');
+  const mgSearchNote   = document.getElementById('mgSearchNote');
+
+  function setSearchNote(text, kind) {
+    if (!mgSearchNote) return;
+    mgSearchNote.textContent = text || '';
+    mgSearchNote.className = 'mg-search-note' + (kind ? ` mg-${kind}` : '');
+  }
+
+  // Apre/chiude la barra di ricerca. Aprendola porta il focus sul campo; NON
+  // lancia nulla finché l'utente non invia una query.
+  function openSearchBar() {
+    if (!mgSearchBar) return;
+    mgSearchBar.hidden = false;
+    if (mgSearchToggle) mgSearchToggle.setAttribute('aria-expanded', 'true');
+    if (mgSearchInput) { mgSearchInput.focus(); mgSearchInput.select(); }
+  }
+  function closeSearchBar() {
+    if (mgSearchBar) mgSearchBar.hidden = true;
+    if (mgSearchToggle) mgSearchToggle.setAttribute('aria-expanded', 'false');
+    exitSearchMode();
+  }
+  function toggleSearchBar() {
+    if (mgSearchBar && mgSearchBar.hidden) openSearchBar();
+    else closeSearchBar();
+  }
+
+  // Esce dalla modalità risultati e torna alla lista della tab corrente.
+  function exitSearchMode() {
+    if (!searchActive && !searchQuery) return;
+    searchActive = false;
+    searchQuery = '';
+    searchList = [];
+    searchReasons = {};
+    setSearchNote('', '');
+    if (mgSearchClear) mgSearchClear.hidden = true;
+    renderList();
+  }
+
+  // Catalogo compatto mandato al main: id + numero + titolo + testo (troncato lo
+  // fa il main). Include TUTTI i feedback caricati, di ogni tab.
+  function buildSearchCatalog() {
+    return allFeedbacks.filter((f) => f && f._id).map((f) => ({
+      id: f._id,
+      num: FB.formatNum(f.seq, f.subSeq) || '',
+      title: f.name || FB.fallbackName(f.text) || '',
+      text: String(f.text || ''),
+    }));
+  }
+
+  // Ripiego locale per sottostringa (nessun LLM): riusa la logica pura condivisa.
+  function applyFallbackSearch(q, note) {
+    searchList = MR.searchFeedbackFallback(allFeedbacks, q);
+    searchReasons = {};
+    searchActive = true;
+    searchQuery = q;
+    if (mgSearchClear) mgSearchClear.hidden = false;
+    renderList();
+    setSearchNote(
+      (note ? note + ' · ' : '')
+        + (searchList.length ? `${searchList.length} risultati per testo` : `Nessun risultato per "${q}"`),
+      searchList.length ? '' : 'err',
+    );
+  }
+
+  async function runSearch() {
+    const q = (mgSearchInput && mgSearchInput.value || '').trim();
+    if (!q) { exitSearchMode(); return; }
+    const seq = ++searchSeq;
+    setSearchNote('Cerco…', '');
+    if (mgSearchBtn) mgSearchBtn.disabled = true;
+
+    let r = null;
+    try {
+      r = await sendToMain({ type: window.SN_MSG?.MSG?.FEEDBACK_SEARCH || 'feedback_search',
+        query: q, items: buildSearchCatalog() });
+    } catch (_) { r = null; }
+    if (seq !== searchSeq) return; // una ricerca più recente ha vinto
+
+    if (mgSearchBtn) mgSearchBtn.disabled = false;
+
+    // LLM non disponibile / non parsabile → ripiego per sottostringa.
+    if (!r || r.ok === false || !Array.isArray(r.results)) {
+      applyFallbackSearch(q, 'Ricerca a senso non disponibile: mostro i risultati per testo');
+      return;
+    }
+
+    // Mappa gli id ordinati dal main sugli oggetti feedback locali (in ordine).
+    const byId = new Map(allFeedbacks.map((f) => [f._id, f]));
+    searchReasons = {};
+    searchList = [];
+    for (const res of r.results) {
+      const fb = res && byId.get(res.id);
+      if (!fb) continue;
+      searchList.push(fb);
+      if (res.why) searchReasons[fb._id] = res.why;
+    }
+    searchActive = true;
+    searchQuery = q;
+    if (mgSearchClear) mgSearchClear.hidden = false;
+    renderList();
+    setSearchNote(
+      searchList.length ? `${searchList.length} risultati per pertinenza · "${q}"` : `Nessun risultato per "${q}"`,
+      searchList.length ? '' : 'err',
+    );
+  }
+
+  if (mgSearchToggle) mgSearchToggle.addEventListener('click', toggleSearchBar);
+  if (mgSearchBtn) mgSearchBtn.addEventListener('click', runSearch);
+  if (mgSearchClear) mgSearchClear.addEventListener('click', () => {
+    if (mgSearchInput) mgSearchInput.value = '';
+    exitSearchMode();
+    if (mgSearchInput) mgSearchInput.focus();
+  });
+  if (mgSearchInput) {
+    mgSearchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); runSearch(); }
+      else if (e.key === 'Escape') { closeSearchBar(); }
+    });
+  }
+
   // ── Rendering colonna sinistra ────────────────────────────────────────────
   function renderList() {
     mgListLoading.hidden = true;
+
+    // Modalità risultati di ricerca: la lista mostra i feedback trovati (di ogni
+    // tab), già ordinati per pertinenza. Niente filtri/barre della tab corrente.
+    if (searchActive) {
+      if (mgListHead) mgListHead.textContent = 'Risultati';
+      mgListEmpty.textContent = searchQuery
+        ? `Nessun feedback per "${searchQuery}".`
+        : 'Scrivi cosa cerchi e premi Invio.';
+      if (mgArchiveFilter) mgArchiveFilter.hidden = true;
+      if (mgReevalBar) mgReevalBar.hidden = true;
+      if (mgAlignedBar) mgAlignedBar.hidden = true;
+      currentList = searchList.slice();
+      renderListItems();
+      return;
+    }
+
     if (mgListHead) mgListHead.textContent = TAB_LABELS[currentTab] || '';
     mgListEmpty.textContent = TAB_EMPTY[currentTab] || 'Nessun feedback.';
 
