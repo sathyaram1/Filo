@@ -96,10 +96,11 @@ test('una scorciatoia senza modificatore GIÀ salvata non ruba la lettera mentre
   expect(await page.locator('#doc').innerText()).toContain('banana');
 });
 
-// test.fixme: BUG SEPARATO, non coperto da questo fix. "Elimina" nella
-// configurazione dello switch lo rimuove davvero; la griglia resta sulla
-// pagina 0 e i moduli delle altre pagine diventano irraggiungibili senza avviso.
-test.fixme('lo switch di pagina non deve essere eliminabile (le altre pagine diventano irraggiungibili)', async ({ openTab }) => {
+// Lo switch è l'UNICO modo per navigare fra le pagine della griglia: eliminarlo
+// bloccherebbe l'utente sulla prima pagina rendendo irraggiungibili i moduli
+// delle altre. Come l'ingranaggio impostazioni, dev'essere protetto — il suo
+// pannello di configurazione (rinomina pagine/icone) NON offre "Elimina".
+test('lo switch di pagina non è eliminabile e le altre pagine restano raggiungibili', async ({ openTab }) => {
   const page = await openTab(EDITOR);
   await page.waitForLoadState('domcontentloaded');
   await expect(page.locator('.ed-module[data-type="switch"]')).toBeVisible();
@@ -110,17 +111,25 @@ test.fixme('lo switch di pagina non deve essere eliminabile (le altre pagine div
   await expect(page.locator('.ed-module[data-type="search-replace"]')).toBeVisible();
   await page.locator('.ed-switch-icon').nth(0).click();
 
-  // Elimina lo switch dal suo pannello di configurazione.
   await enterSettingsMode(page);
-  await page.locator('.ed-module[data-type="switch"]').click();
+
+  // Un modulo NORMALE (conteggio parole) offre "Elimina": prova che il pannello
+  // di configurazione è aperto e che il bottone esiste per i moduli eliminabili.
+  await page.locator('.ed-module[data-type="word-count"]').click();
+  await expect(page.locator('#cfgShortcut')).toBeVisible();
   await expect(page.locator('#cfgDelete')).toBeVisible();
-  await page.click('#cfgDelete');
+  await page.click('#cfgCancel');
+
+  // Lo switch apre la SUA configurazione (rinomina pagine) ma NON offre "Elimina".
+  await page.locator('.ed-module[data-type="switch"]').click();
+  await expect(page.locator('#cfgShortcut')).toBeVisible();
+  await expect(page.locator('#cfgDelete')).toHaveCount(0);
+  await page.click('#cfgCancel');
+
   await exitSettingsMode(page);
+  await page.screenshot({ path: 'tests/.shots/audit-editor-switch-protected.png' });
 
-  await page.screenshot({ path: 'tests/.shots/audit-editor-switch-deleted.png' });
-
-  // ATTESO: lo switch è ancora lì (modulo di sistema, come l'ingranaggio) e la
-  // pagina Revisione resta raggiungibile.
+  // Lo switch è ancora lì e la pagina Revisione resta raggiungibile.
   await expect(page.locator('.ed-module[data-type="switch"]')).toBeVisible();
   await page.locator('.ed-switch-icon').nth(1).click();
   await expect(page.locator('.ed-module[data-type="search-replace"]')).toBeVisible();
