@@ -834,6 +834,13 @@
     // blocco i blu (scrive `todo` su ciascuno).
     updateAlignedBar();
 
+    renderListItems();
+  }
+
+  // Costruisce le card della lista da `currentList` (già filtrata e ordinata dal
+  // chiamante: sottoinsieme della tab OPPURE risultati di ricerca). In modalità
+  // ricerca aggiunge il motivo del match al tooltip della card.
+  function renderListItems() {
     // Svuota SEMPRE: se la lista torna vuota (es. dopo uno sblocco) non deve
     // restare la card vecchia in un contenitore nascosto.
     mgList.innerHTML = '';
