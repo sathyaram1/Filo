@@ -523,6 +523,7 @@
         size: file.size || 0,
         dataUrl,
       });
+      bumpSubmissionId();
       statusEl.textContent = '';
       renderThumbs();
     }
