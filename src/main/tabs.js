@@ -801,14 +801,18 @@ class TabManager {
     this._lastAppInteractionAt = Date.now();
   }
 
-  // Candidati archiviabili: tab web, non attiva, non in riproduzione audio, non
-  // interne. (Incognito è escluso a monte: niente timer in incognito.)
+  // Candidati archiviabili: schede web + pagine interne EFFIMERE (home/nuova
+  // scheda, impostazioni), non attiva, non in riproduzione audio. Prima erano
+  // esclusi TUTTI i filo:// interni, quindi il riordino poteva chiudere un sito
+  // (es. YouTube) ma mai le impostazioni aperte o le home duplicate. (Incognito
+  // è escluso a monte: niente timer in incognito.)
   _triageCandidates() {
-    return this.tabs.filter((t) =>
-      t.id !== this.activeId
-      && !t.audible
-      && !t.isInternal
-      && /^https?:\/\//i.test(t.url || ''));
+    const T = globalThis.SN_TAB_TRIAGE;
+    return this.tabs.filter((t) => {
+      if (t.id === this.activeId || t.audible) return false;
+      if (T) return T.isTriageableUrl(t.url);
+      return !t.isInternal && /^https?:\/\//i.test(t.url || '');
+    });
   }
 
   async _gatherTriageInput(cands) {
