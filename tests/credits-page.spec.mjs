@@ -46,6 +46,7 @@ test('un consumo sotto il credito resta visibile (torta + saldo), non sparisce a
   // Uso leggero: due tipi d'uso che costano FRAZIONI di credito (0,3 e 0,4).
   // Prima del fix la pagina arrotondava all'intero ogni gruppo → entrambi a 0 →
   // torta vuota e "Non hai ancora consumato crediti", pur avendo usato Filo.
+  await app.evaluate(disableAutoFeedbackBonus);
   await app.evaluate(async () => {
     const C = globalThis.SN_CREDITS;
     // costEur/0,0008 = crediti. 0,00024€ → 0,3 crediti; 0,00032€ → 0,4 crediti.
