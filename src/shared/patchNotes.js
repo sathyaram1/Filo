@@ -18,6 +18,7 @@
     {
       version: '0.2.157', date: '2026-07-23',
       fixes: [
+        'Le scorciatoie da tastiera per spiegare (Alt+E) e tradurre (Alt+T) il testo selezionato e per aprire la barra Aiuto (Alt+H) ora funzionano anche sulle schermate interne di Filo (Editor, Preferenze, Opzioni, Cronologia, Feedback, Bacheca…), dove prima restavano mute; anche la voce «Aiuto» del menu tasto destro sulla linguetta di una scheda interna ora apre la barra Aiuto.',
         'Importando un mazzo nel deck builder, una carta scritta con quantità 0 nella lista (es. «0 Sol Ring») non viene più aggiunta di nascosto con una copia: ora l’anteprima la segnala tra le righe non valide e la esclude dall’import.',
         'Quando chiedi a Filo di impostare un valore numerico scrivendolo all’italiana con il punto delle migliaia (es. «imposta il limite di spesa mensile a 2.500 euro»), ora capisce 2500 e non più 2,50: il punto delle migliaia non viene più scambiato per la virgola dei decimali.',
         'Trascinando una scheda per riordinarla, se in quell’istante una scheda cambiava stato (finiva di caricare, cambiava titolo, partiva o si fermava un audio, arrivava l’icona del sito) poteva comparire per un attimo una copia doppia della scheda trascinata e il riordino finiva in un punto diverso da dove l’avevi rilasciata: ora la scheda resta una sola e si ferma esattamente dove la lasci.',

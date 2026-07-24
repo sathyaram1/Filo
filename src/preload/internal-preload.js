@@ -210,6 +210,26 @@ const chromeShim = {
   contextMenus: { create: () => {}, onClicked: { addListener: () => {} } },
 };
 
+// ─── shortcut hook ─────────────────────────────────────────────────────────
+// Gemello dell'adattatore in page-preload.js. Lo shortcut globale (Alt+E/Alt+T/
+// Alt+H in shortcuts.js) e la voce "Aiuto" del menu tasto destro sulla linguetta
+// (TabManager.openHelp in tabs.js) fanno webContents.send('shortcut:triggered')
+// sul tab attivo. Il content script (content.js) ascolta MSG.SHORTCUT_TRIGGERED
+// via chrome.runtime.onMessage: qui traduco l'evento IPC grezzo nel messaggio del
+// catalogo e lo consegno ai listener del nostro shim. Senza questo adattatore le
+// scorciatoie erano mute sulle pagine filo:// (i content script c'erano ma non
+// ricevevano l'evento — asimmetria vs pagine web). `context` è opzionale (lo usa
+// la voce "Aiuto" per dire all'agente da dove è stato invocato). Solo su origine
+// filo://, dove lo shim e i content script sono davvero installati.
+if (IS_FILO_ORIGIN) {
+  ipcRenderer.on('shortcut:triggered', (_event, { command, context } = {}) => {
+    const t = globalThis.SN_MSG?.MSG?.SHORTCUT_TRIGGERED || 'shortcut_triggered';
+    for (const fn of chromeShim.runtime.onMessage._listeners) {
+      try { fn({ type: t, command, context }, { id: 'filo-desktop' }, () => {}); } catch (_) {}
+    }
+  });
+}
+
 // Inietta i content script (menu, popup, sidebar, highlight, spellcheck,
 // feedback) su tutte le pagine filo:// — il tasto destro Filo deve funzionare
 // ovunque, come richiesto dall'utente.

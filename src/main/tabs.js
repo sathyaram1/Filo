@@ -981,8 +981,9 @@ class TabManager {
   // Voce "Aiuto" del menu tasto destro su tab: apre la sidebar Aiuto (l'agente
   // con visione) SU quella scheda, passandole il contesto "invocata da click
   // sulla tab" (url + titolo) così l'agente sa da dove parte. Riusa lo stesso
-  // canale degli shortcut (page-preload → MSG.SHORTCUT_TRIGGERED). Sulle pagine
-  // interne senza content script non succede nulla, come per Alt+H.
+  // canale degli shortcut (page-preload / internal-preload → MSG.SHORTCUT_TRIGGERED).
+  // Anche le pagine interne filo:// lo gestiscono (adattatore in internal-preload.js),
+  // esattamente come Alt+H.
   openHelp(id) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
