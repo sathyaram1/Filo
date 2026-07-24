@@ -929,6 +929,176 @@
   }
   if (mgReevalBtn) mgReevalBtn.addEventListener('click', reevaluateUnfiltered);
 
+  // ── Ricerca "a senso" (semantica) ─────────────────────────────────────────
+  // La lente in fondo alla barra delle schede apre un campo dove descrivere, con
+  // parole proprie (anche un ricordo vago), il feedback da ritrovare. Un modello
+  // legge titolo+testo di TUTTI i feedback (qualunque scheda) e li ordina per
+  // pertinenza al significato della richiesta. I risultati rimpiazzano la lista a
+  // sinistra; il dettaglio al centro si apre come al solito. Se il modello non è
+  // disponibile o risponde male, si RIPIEGA su una ricerca per parole (la ricerca
+  // non si rompe mai). La logica pura (candidati, prompt, parsing, ripiego) vive
+  // in SN_MANAGE_SEARCH per essere testabile senza aprire Electron.
+  function toggleSearchIcon(on) {
+    if (!mgSearchToggle) return;
+    mgSearchToggle.classList.toggle('mg-search-toggle--active', on);
+    mgSearchToggle.setAttribute('aria-expanded', on ? 'true' : 'false');
+  }
+
+  function setSearchMsg(text, kind) {
+    if (!mgSearchMsg) return;
+    mgSearchMsg.textContent = text || '';
+    mgSearchMsg.classList.toggle('mg-err', kind === 'err');
+  }
+
+  // Nasconde le barre specifiche della scheda (filtro archivio, ri-valuta,
+  // approva allineati): durante la ricerca la lista è "trasversale" alle schede.
+  function hideTabBars() {
+    if (mgArchiveFilter) mgArchiveFilter.hidden = true;
+    if (mgReevalBar)     mgReevalBar.hidden = true;
+    if (mgAlignedBar)    mgAlignedBar.hidden = true;
+  }
+
+  function openSearch() {
+    searchMode = true;
+    if (mgSearchBar) mgSearchBar.hidden = false;
+    toggleSearchIcon(true);
+    setSearchMsg('', null);
+    // La lista mostra un invito finché non si cerca davvero.
+    if (mgListHead) mgListHead.textContent = 'Ricerca';
+    hideTabBars();
+    mgListLoading.hidden = true;
+    mgList.hidden = true;
+    mgList.innerHTML = '';
+    mgListEmpty.hidden = false;
+    mgListEmpty.textContent = 'Scrivi cosa cerchi e premi Invio.';
+    if (mgSearchInput) { try { mgSearchInput.focus(); } catch (_) {} }
+  }
+
+  // keepList=true quando è il chiamante a ridisegnare subito la lista (es. il
+  // cambio scheda): evita un doppio renderList.
+  function closeSearch(opts) {
+    const keepList = !!(opts && opts.keepList);
+    searchSeq++;               // invalida ricerche eventualmente in volo
+    searchMode = false;
+    if (mgSearchBar) mgSearchBar.hidden = true;
+    if (mgSearchInput) mgSearchInput.value = '';
+    toggleSearchIcon(false);
+    setSearchMsg('', null);
+    if (!keepList) renderList();
+  }
+
+  // Disegna i risultati (ordinati per pertinenza) al posto della lista. `reason`
+  // (il perché è pertinente) vive nel tooltip, non nel colore del bordo.
+  function renderSearchResults(results, opts) {
+    const fallback = !!(opts && opts.fallback);
+    if (mgListHead) mgListHead.textContent = 'Ricerca';
+    hideTabBars();
+    mgListLoading.hidden = true;
+    mgList.innerHTML = '';
+    setSearchMsg(fallback ? 'Modello non disponibile: mostro i risultati per testo.' : '', null);
+
+    if (!results.length) {
+      mgList.hidden = true;
+      mgListEmpty.hidden = false;
+      mgListEmpty.textContent = 'Nessun feedback pertinente.';
+      return;
+    }
+    mgListEmpty.hidden = true;
+    mgList.hidden = false;
+    for (const res of results) {
+      const fb = allFeedbacks.find((f) => f._id === res.id);
+      if (!fb) continue;
+      const num = FB.formatNum(fb.seq, fb.subSeq);
+      const title = fb.name || FB.fallbackName(fb.text) || '(senza titolo)';
+      const item = document.createElement('div');
+      item.className = 'mg-item mg-item--result' + (fb._id === selectedId ? ' mg-item--selected' : '');
+      item.dataset.id = fb._id;
+      const reason = String(res.reason || '').trim();
+      item.title = (num ? `#${num} · ` : '') + title + (reason ? ` — ${reason}` : '');
+      item.innerHTML = `
+        ${authorIconHtml(fb)}
+        ${num ? `<span class="mg-item-num">#${esc(num)}</span>` : ''}
+        <span class="mg-item-title">${esc(title)}</span>
+      `;
+      item.addEventListener('click', () => openDetail(fb._id));
+      mgList.appendChild(item);
+    }
+  }
+
+  async function runSearch(rawQuery) {
+    if (!searchMode || !SRCH) return;
+    const query = String(rawQuery || '').trim();
+    if (!query) {
+      // Campo svuotato: torna all'invito.
+      mgList.hidden = true; mgList.innerHTML = '';
+      mgListEmpty.hidden = false; mgListEmpty.textContent = 'Scrivi cosa cerchi e premi Invio.';
+      setSearchMsg('', null);
+      return;
+    }
+    const my = ++searchSeq;
+    const candidates = SRCH.buildCandidates(allFeedbacks);
+    if (!candidates.length) {
+      renderSearchResults([], { fallback: false });
+      setSearchMsg('Nessun feedback da cercare.', null);
+      return;
+    }
+
+    // Stato "sto cercando".
+    hideTabBars();
+    mgListLoading.hidden = true;
+    mgList.hidden = true; mgList.innerHTML = '';
+    mgListEmpty.hidden = false; mgListEmpty.textContent = 'Cerco…';
+    setSearchMsg('', null);
+
+    const validIds = new Set(candidates.map((c) => c.id));
+    let ranked = null;
+    try {
+      const r = await sendToMain({
+        type: (window.SN_MSG && window.SN_MSG.MSG && window.SN_MSG.MSG.AI_REQUEST) || 'ai_request',
+        // CATEGORIZE: azione NON "style-aware" (il prompt JSON non viene inquinato
+        // dallo stile di scrittura) e fuori dalla cronologia; il suo modello è
+        // impostabile dalle Opzioni come le altre funzioni AI.
+        action: (window.SN_CONST && window.SN_CONST.ACTIONS && window.SN_CONST.ACTIONS.CATEGORIZE) || 'categorize',
+        payload: { messages: SRCH.buildMessages(query, candidates) },
+      });
+      if (r && r.ok && typeof r.text === 'string') {
+        const parsed = SRCH.parseRanking(r.text, validIds);
+        if (parsed.length) ranked = parsed;
+      }
+    } catch (_) { /* ripiego per parole qui sotto */ }
+
+    // Superata da una ricerca più recente o chiusa nel frattempo: non toccare la UI.
+    if (my !== searchSeq || !searchMode) return;
+
+    if (ranked) {
+      renderSearchResults(ranked, { fallback: false });
+    } else {
+      // Ripiego per parole: la ricerca trova comunque qualcosa.
+      renderSearchResults(SRCH.keywordSearch(allFeedbacks, query), { fallback: true });
+    }
+  }
+
+  if (mgSearchToggle) {
+    mgSearchToggle.addEventListener('click', () => {
+      if (searchMode) closeSearch();
+      else openSearch();
+    });
+  }
+  if (mgSearchClose) mgSearchClose.addEventListener('click', () => closeSearch());
+  if (mgSearchInput) {
+    mgSearchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); runSearch(mgSearchInput.value); }
+      else if (e.key === 'Escape') { e.preventDefault(); closeSearch(); }
+    });
+  }
+  // Esc chiude la ricerca anche quando il focus non è nel campo (es. dopo aver
+  // cliccato un risultato). Idempotente: se la ricerca è già chiusa non fa nulla.
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && searchMode && (!mgSearchInput || document.activeElement !== mgSearchInput)) {
+      closeSearch();
+    }
+  });
+
   // ── Rendering pannello centrale ───────────────────────────────────────────
   function openDetail(id) {
     selectedId = id;
