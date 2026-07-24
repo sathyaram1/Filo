@@ -203,17 +203,14 @@ function applyTrackerBlocking(ses, enabled) {
     // devono convivere qui dentro. I due hanno gate indipendenti: il tracker è
     // legato alla modalità cookie (s.enabled), l'ad-blocking ha il suo toggle.
     ses.webRequest.onBeforeRequest((details, callback) => {
-      if (process.env.FILO_DBG_REF && /cat\.png|protected\.png/.test(details.url)) { try { require('node:fs').appendFileSync(process.env.FILO_DBG_REF, `[onBeforeRequest] type=${details.resourceType} url=${details.url}\n`); } catch (_) {} }
       const s = blockState.get(ses);
       if (s && s.enabled && isTrackerUrl(details.url)) {
-        if (process.env.FILO_DBG_REF && /cat\.png|protected\.png/.test(details.url)) { try { require('node:fs').appendFileSync(process.env.FILO_DBG_REF, `[block TRACKER] ${details.resourceType} ${details.url}\n`); } catch (_) {} }
         callback({ cancel: true });
         return;
       }
       let ad = null;
       try { ad = require('./adblock'); } catch (_) {}
       if (ad && ad.shouldBlock && ad.shouldBlock(details.url)) {
-        if (process.env.FILO_DBG_REF && /cat\.png|protected\.png/.test(details.url)) { try { require('node:fs').appendFileSync(process.env.FILO_DBG_REF, `[block ADBLOCK] ${details.resourceType} ${details.url}\n`); } catch (_) {} }
         callback({ cancel: true });
         return;
       }
