@@ -233,8 +233,12 @@ module.exports = function register(on, ctx) {
       });
       payload.name = await generateFeedbackName(payload.text);
       const submitP = globalThis.SN_FEEDBACK.submit(payload);
+      // Timeout generoso (#370): un upload lento ma riuscito deve poter riportare
+      // il VERO esito, invece di un falso errore che spinge l'utente a re-inviare.
+      // Anche se scatta, il re-invio è ormai idempotente (submissionId → dedup
+      // lato server), quindi non crea comunque duplicati.
       const timeoutP = new Promise((_, rej) =>
-        setTimeout(() => rej(new Error('timeout (20s) — controlla la rete')), 20000));
+        setTimeout(() => rej(new Error('timeout (45s) — controlla la rete')), 45000));
       const r = await Promise.race([submitP, timeoutP]);
       console.log('[Filo feedback] submit ok', r);
       return { ok: true, ...r };
