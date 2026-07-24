@@ -2074,7 +2074,7 @@
   function renderPalette() {
     paletteEl.innerHTML = '';
     for (const [type, meta] of Object.entries(MODULE_TYPES)) {
-      if (meta.fixed) continue;
+      if (!canAddType(type)) continue;
       const item = document.createElement('div');
       item.className = 'ed-palette-item';
       item.setAttribute('draggable', 'true');
