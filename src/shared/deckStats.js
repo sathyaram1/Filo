@@ -219,6 +219,11 @@
   //   keep       [{ tag, n }] — regola di keep della mano iniziale (default:
   //              si tiene tutto; ha senso solo con mulligans > 0)
   //   iterations default 10000; seed per run riproducibili.
+  //
+  // Ritorna { probability, hits, iterations, seen }. `hits`/`iterations` sono
+  // ESATTI e sommabili: la UI raffina in continuo lanciando più batch con seed
+  // diversi e accumulando hits/iterations (probabilità = Σhits/Σiterations),
+  // così la stima converge verso il valore vero senza ricalcoli manuali.
   function simulate({ library, want, turn, onDraw = false, extraDraws = 0, mulligans = 0, keep = null, iterations = 10000, seed } = {}) {
     const lib = Array.isArray(library) ? library : [];
     const reqs = (Array.isArray(want) ? want : [])
