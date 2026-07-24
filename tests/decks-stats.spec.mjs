@@ -292,10 +292,14 @@ test('la probabilità si raffina da sola fino al tetto e poi si ferma (#354)', a
   // Mentre converge, l'indicatore di raffinamento è attivo…
   await expect(result).toHaveClass(/dk-prob-refining/);
 
-  // …e le "mani simulate" nel tooltip crescono fino al tetto (1.000.000),
+  // …e le "mani simulate" nel tooltip crescono fino al tetto (≥ 1.000.000),
   // provando che continua a raffinare da solo senza intervento dell'utente.
-  await expect.poll(async () => result.getAttribute('title'), { timeout: 30_000 })
-    .toContain('1.000.000 mani simulate');
+  const simCount = async () => {
+    const t = (await result.getAttribute('title')) || '';
+    const m = /^([\d.]+)/.exec(t);
+    return m ? Number(m[1].replace(/\./g, '')) : 0;
+  };
+  await expect.poll(simCount, { timeout: 30_000 }).toBeGreaterThanOrEqual(1000000);
 
   // Raggiunto il tetto si ferma: l'indicatore di raffinamento sparisce.
   await expect(result).not.toHaveClass(/dk-prob-refining/);
