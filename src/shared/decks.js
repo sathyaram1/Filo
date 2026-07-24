@@ -334,9 +334,13 @@
 
   // Gruppo di UNA entry secondo la vista corrente. `tagOrder` = ordine dei
   // gruppi-tag definito (per la regola "primo gruppo che matcha", §8.1).
-  // L'override esplicito dell'utente (tasto destro → sposta in gruppo) vince.
+  // L'override esplicito dell'utente (tasto destro → sposta in gruppo) vince,
+  // ma SOLO nella vista in cui è stato fatto: è una mappa per-vista
+  // { <raggruppamento>: <gruppo> } (feedback #316), non un valore unico che
+  // seguirebbe la carta in ogni vista.
   function groupOf(entry, card, raggruppamento, tagOrder = []) {
-    if (entry && entry.gruppo_override) return entry.gruppo_override;
+    const ov = entry && entry.gruppo_override;
+    if (ov && typeof ov === 'object' && ov[raggruppamento]) return ov[raggruppamento];
     if (raggruppamento === 'tag') {
       const tags = (entry && entry.tags) || [];
       for (const t of tagOrder) if (tags.includes(t)) return t;
