@@ -1,0 +1,7 @@
+{
+  "id": "632b17e1-cf52-4e8e-a4af-304d3c64bce1",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la modifica e stata pubblicata. Ora, importando un mazzo, una carta scritta con quantita 0 (es. «0 Sol Ring») non viene piu aggiunta di nascosto con una copia: l'anteprima la segnala tra le righe non valide e la esclude dall'import.",
+  "queuedAt": "2026-07-24T00:19:17.329Z",
+  "queuedBy": "routine"
+}
