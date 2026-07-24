@@ -873,8 +873,11 @@
       btn.type = 'button';
       btn.disabled = true;
       const sec = Number(a.seconds || a.secondi || 0);
-      const mins = Math.round(sec / 60);
-      btn.textContent = `⏱ ${a.label || a.etichetta || 'Timer'} · ${mins} min`;
+      // #323 — durata umana fedele all'intento: "30 sec", "2 h", "1 h 30 min".
+      // Niente arrotondamento ai minuti (un timer di 30 secondi non è "0 min").
+      const dur = (self.SN_TIME ? self.SN_TIME.fmtDurationLabel(sec)
+        : `${Math.round(sec / 60)} min`);
+      btn.textContent = `⏱ ${a.label || a.etichetta || 'Timer'} · ${dur}`;
       return btn;
     }
     if (type === 'SALVA_APPUNTO') {
