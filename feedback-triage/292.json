@@ -1,7 +1,0 @@
-{
-  "id": "292",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica e stata pubblicata. Nel menu App le voci ora mostrano tutte la loro icona (in particolare 'Deck builder MTG', prima 'Mazzi', e 'Bacheca', che comparivano senza simbolo). La 'Bacheca' ha un'icona a lavagna, coerente con quello che rappresenta.",
-  "queuedAt": "2026-07-24T13:09:40.629Z",
-  "queuedBy": "routine"
-}
