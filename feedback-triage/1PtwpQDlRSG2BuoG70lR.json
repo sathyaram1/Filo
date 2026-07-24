@@ -1,7 +1,0 @@
-{
-  "id": "1PtwpQDlRSG2BuoG70lR",
-  "status": "revision_capability",
-  "notes": "Controllo funzionalità NON superato: La funzione richiesta non e presente. Ho aperto la pagina di gestione cercando l'icona a lente per la ricerca a senso descritta: nella barra delle schede (Ricevuti / In coda / Risolti / Archiviati / Statistiche / Modelli / Automazioni) non c'e nessuna icona di ricerca, non c'e nessun campo dove scrivere cosa cerchi, e non succede nulla che permetta di ritrovare un vecchio feedback per significato. Il codice della pagina non contiene alcuna ricerca (ne semantica ne per parole): la feature semplicemente non e stata realizzata su questo branch. Riproduzione: apri Gestione, guarda in alto la barra delle schede -> manca la lente; non c'e modo di cercare il feedback (es. quello in cui chiedevi di raggruppare le sezioni per owner). Serve implementare davvero l'icona, il campo di ricerca e la ricerca a senso su tutte le schede, con il ripiego per parole quando il modello non e disponibile.",
-  "queuedAt": "2026-07-24T15:49:46.461Z",
-  "queuedBy": "routine"
-}
