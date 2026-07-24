@@ -753,6 +753,18 @@
   function headingLevel(el) {
     return /^H([1-3])$/.test(el.tagName) ? Number(el.tagName[1]) : 0;
   }
+  // Nasconde/mostra i fratelli di un titolo fino al prossimo titolo di pari o
+  // superiore livello.
+  function applyCollapseToSiblings(h, collapsing) {
+    const lvl = headingLevel(h);
+    let sib = h.nextElementSibling;
+    while (sib) {
+      const sl = headingLevel(sib);
+      if (sl > 0 && sl <= lvl) break;
+      sib.classList.toggle('ed-hidden-by-collapse', collapsing);
+      sib = sib.nextElementSibling;
+    }
+  }
   function refreshCollapseToggles() {
     docEl.querySelectorAll('.ed-collapse-toggle').forEach((b) => b.remove());
     docEl.querySelectorAll('h1, h2, h3').forEach((h) => {
@@ -762,19 +774,23 @@
       btn.innerHTML = ICONS.caretDown ? ICONS.caretDown(14) : '▾';
       btn.addEventListener('click', (e) => { e.preventDefault(); toggleCollapse(h, btn); });
       h.insertBefore(btn, h.firstChild);
+      // Lo stato di collasso vive sul titolo (`data-collapsed`), non sul
+      // bottone: ogni digitazione ricrea i bottoni, ma il titolo sopravvive.
+      // Ripristina la freccia e ri-nascondi i fratelli, così una sezione chiusa
+      // resta chiusa e coerente anche dopo aver scritto un carattere (e nuovo
+      // contenuto in una sezione chiusa nasce nascosto, non "sbucato").
+      if (h.dataset.collapsed === '1') {
+        btn.classList.add('is-collapsed');
+        applyCollapseToSiblings(h, true);
+      }
     });
   }
   function toggleCollapse(h, btn) {
-    const lvl = headingLevel(h);
     const collapsing = !btn.classList.contains('is-collapsed');
     btn.classList.toggle('is-collapsed', collapsing);
-    let sib = h.nextElementSibling;
-    while (sib) {
-      const sl = headingLevel(sib);
-      if (sl > 0 && sl <= lvl) break;
-      sib.classList.toggle('ed-hidden-by-collapse', collapsing);
-      sib = sib.nextElementSibling;
-    }
+    if (collapsing) h.dataset.collapsed = '1';
+    else delete h.dataset.collapsed;
+    applyCollapseToSiblings(h, collapsing);
   }
 
   function onDocInput() {
