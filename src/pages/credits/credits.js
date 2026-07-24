@@ -123,7 +123,7 @@
 
       const value = document.createElement('span');
       value.className = 'sn-credits-value';
-      value.textContent = formatInt(g.credits);
+      value.textContent = formatCredits(g.credits);
 
       li.append(sw, label, value);
       legend.appendChild(li);
