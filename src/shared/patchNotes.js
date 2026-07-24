@@ -16,6 +16,12 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.158', date: '2026-07-24',
+      fixes: [
+        'Nell’Editor, assegnando una scorciatoia da tastiera a un modulo della griglia non è più possibile impostare una lettera singola senza un tasto modificatore (Ctrl o Alt): il campo ora lo segnala e non la salva, così quella lettera non viene più «rubata» mentre scrivi nel documento, in chat o nella casella cerca/sostituisci. Le scorciatoie di questo tipo eventualmente già salvate vengono comunque ignorate mentre stai scrivendo.',
+      ],
+    },
+    {
       version: '0.2.157', date: '2026-07-23',
       fixes: [
         'Le scorciatoie da tastiera per spiegare (Alt+E) e tradurre (Alt+T) il testo selezionato e per aprire la barra Aiuto (Alt+H) ora funzionano anche sulle schermate interne di Filo (Editor, Preferenze, Opzioni, Cronologia, Feedback, Bacheca…), dove prima restavano mute; anche la voce «Aiuto» del menu tasto destro sulla linguetta di una scheda interna ora apre la barra Aiuto.',
