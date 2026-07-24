@@ -491,6 +491,7 @@
       }
       const dataUrl = await blobToDataUrl(blob);
       images.push({ dataUrl });
+      bumpSubmissionId();
       renderThumbs();
     }
 
