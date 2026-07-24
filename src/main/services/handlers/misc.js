@@ -159,10 +159,8 @@ module.exports = function register(on, ctx) {
       }, 30000);
 
       try {
-        // Il Referer viaggia via onBeforeSendHeaders (registro download-referrer,
-        // registrato sopra): l'opzione { headers } di downloadURL NON funziona
-        // per quel header, Chromium la ignora.
-        wc.downloadURL(url);
+        if (dbgRef) wc.downloadURL(url, { headers: { Referer: dbgRef } });
+        else wc.downloadURL(url);
       } catch (e2) {
         ses.removeListener('will-download', onWillDownload);
         clearTimeout(startTimer);
