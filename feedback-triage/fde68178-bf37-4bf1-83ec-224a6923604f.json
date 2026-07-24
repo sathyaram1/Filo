@@ -1,0 +1,7 @@
+{
+  "id": "fde68178-bf37-4bf1-83ec-224a6923604f",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la modifica e stata verificata e pubblicata. I timer lunghi ora si leggono come un vero conto alla rovescia (un timer di 2 ore mostra 2:00:00 invece di 120:00) e il riquadro di conferma in chat indica la durata per esteso (2 h, 1 h 30 min, 30 sec) senza arrotondare ai minuti.",
+  "queuedAt": "2026-07-24T06:12:59.977Z",
+  "queuedBy": "routine"
+}
