@@ -1,7 +1,0 @@
-{
-  "id": "fde68178-bf37-4bf1-83ec-224a6923604f",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho creato davvero un timer da 2 ore e la scheda del conto alla rovescia mostra un orologio corretto ('1:59:59' subito dopo l'avvio, mai il vecchio '120:00'). Provate durate lunghe: 2 ore diventano '2:00:00' e 8 ore '8:00:00', mentre i timer brevi restano compatti come prima (minuti:secondi). Il riquadro di conferma nella chat ora scrive la durata per esteso: '30 sec' (prima era '0 min'), '2 h', '1 h 30 min'. Ho stressato i casi limite (durata zero, negativa, valori non numerici, durate assurde tipo 25/100 ore): non rompono nulla e ripiegano su '0:00' / '0 sec'. Ho rilanciato anche pausa/ripresa e la suoneria del timer: tutto continua a funzionare, e i timer in pausa usano lo stesso nuovo formato.",
-  "queuedAt": "2026-07-24T06:10:35.109Z",
-  "queuedBy": "routine"
-}
