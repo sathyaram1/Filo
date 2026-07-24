@@ -18,6 +18,7 @@
     {
       version: '0.2.159', date: '2026-07-24',
       fixes: [
+        'Inviare un feedback non crea più doppioni: se l’invio sembrava fallito (es. connessione lenta) ma in realtà era andato a buon fine, ripremere «Invia» non aggiunge più una seconda, terza o quarta copia dello stesso messaggio. Se invece modifichi il testo o gli allegati prima di reinviare, resta un messaggio distinto. In più, ora l’app attende più a lungo prima di segnalare un problema di rete, così un invio lento ma riuscito ti mostra il vero esito.',
         'Il riordino delle schede ora chiude anche le pagine interne di troppo, non solo i siti: le schede «Nuova scheda»/home aperte più volte vengono collassate in una sola e le pagine di impostazioni che non stai più usando vengono chiuse (restano sempre raggiungibili). Prima venivano toccati solo i siti web, quindi capitava che chiudesse un sito lasciando aperte home doppie e impostazioni.',
         'Nella pagina Crediti un uso leggero di Filo ora si vede: se hai consumato solo frazioni di credito, il grafico e il saldo lo mostrano (es. «0,3» crediti) invece di dire «Non hai ancora consumato crediti» e lasciare il saldo fermo.',
         'Nel menu App le voci «Deck builder MTG» (prima «Mazzi») e «Bacheca» hanno di nuovo la loro icona, come tutte le altre voci: prima comparivano senza simbolo. La «Bacheca» ha un\'icona a lavagna, coerente con quello che è.',
