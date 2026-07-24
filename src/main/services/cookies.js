@@ -155,21 +155,13 @@ function partitionForUrl(url, trusted) {
 //
 // Una sola registrazione onBeforeSendHeaders per sessione (Electron consente un
 // solo listener per evento/sessione: una seconda registrazione SOSTITUISCE la
-// prima). Questo è quindi l'UNICO choke point per riscrivere gli header in
-// uscita, e ci convivono due usi indipendenti:
-//   - GPC (Sec-GPC: 1), gated dal flag enabled nella mappa (accendi/spegni
-//     senza ri-registrare);
-//   - il Referer dei download avviati dal main ("Salva immagine come…", #274):
-//     downloadURL non può impostare il Referer (Chromium ignora un header extra
-//     con quel nome), quindi lo inietta qui il registro download-referrer
-//     (require lazy, stesso pattern dell'ad-blocking in onBeforeRequest).
+// prima). Emette l'header Sec-GPC: 1, gated dal flag enabled nella mappa
+// (accendi/spegni senza ri-registrare).
 
 const gpcState = new WeakMap(); // session → { enabled }
 
 // Registra (se manca) l'unico listener onBeforeSendHeaders della sessione,
-// SENZA toccare lo stato GPC. Usato anche da chi avvia download con Referer
-// (services/handlers/misc.js) su sessioni dove GPC non è mai stato configurato
-// (incognito, partizioni proxy).
+// SENZA toccare lo stato GPC.
 function ensureHeaderHook(ses) {
   if (!ses || !ses.webRequest) return null;
   let state = gpcState.get(ses);
