@@ -277,7 +277,7 @@
       if (handSatisfies(drawn, reqs)) hits++;
     }
 
-    return { probability: hits / iters, iterations: iters, seen };
+    return { probability: hits / iters, hits, iterations: iters, seen };
   }
 
   global.SN_DECK_STATS = {
