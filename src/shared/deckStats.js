@@ -229,8 +229,8 @@
     const totalWanted = reqs.reduce((s, w) => s + w.n, 0);
     const laterDraws = (t - 1) + (onDraw ? 1 : 0) + Math.max(0, Math.floor(Number(extraDraws) || 0));
 
-    if (!reqs.length) return { probability: 1, iterations: iters, seen: Math.min(lib.length, 7 + laterDraws) };
-    if (!lib.length || totalWanted > lib.length) return { probability: 0, iterations: iters, seen: 0 };
+    if (!reqs.length) return { probability: 1, hits: iters, iterations: iters, seen: Math.min(lib.length, 7 + laterDraws) };
+    if (!lib.length || totalWanted > lib.length) return { probability: 0, hits: 0, iterations: iters, seen: 0 };
 
     const rng = mulberry32(Number.isFinite(Number(seed)) ? Number(seed) : (Date.now() & 0xffffffff));
     const keepReqs = (Array.isArray(keep) ? keep : [])
