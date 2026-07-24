@@ -247,6 +247,7 @@ mazzo {
   id, nome,
   commander: scryfall_id,
   carte: [{ scryfall_id, qty (=1 salvo basics), tags[], gruppo_override? }],
+          // gruppo_override: mappa PER-VISTA { "tipo"|"tag"|"cmc"|"colore": <gruppo> } (#316)
   raggruppamento: "tipo" | "tag" | "cmc" | "colore",
   budget?: number,
   versione: int,            // incrementa a ogni edit → invalidazione pareri
