@@ -1,0 +1,7 @@
+{
+  "id": "WSyxvzzovRyKDzsUskTv",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho verificato dal sintomo: ho riprodotto lo scenario del feedback (un invio che sembra fallire, es. connessione lenta, e l'utente ripreme «Invia»). Ora ripremendo «Invia» sulla stessa segnalazione NON nasce piu una seconda copia: la ripetizione viene riconosciuta come lo stesso messaggio e trattata come invio riuscito, senza doppioni, anche premendo piu volte di fila o cliccando due volte rapidamente. Se invece modifico il testo (o cambio gli allegati) prima di reinviare, resta una segnalazione distinta, com'e giusto. Ho anche verificato i casi limite: testo vuoto o solo spazi, testo molto lungo, caratteri speciali e simboli strani nell'identificativo dell'invio (vengono ripuliti e non causano errori), e la nuova attesa piu lunga prima di segnalare un problema di rete, cosi un invio lento ma riuscito mostra l'esito vero e non spinge a riprovare. Non emergono regressioni: allegare file/immagini, la ricompensa in crediti, il salvataggio della bozza tra chiusura e riapertura e la riapertura di una segnalazione risolta continuano a funzionare. Nota: i doppioni gia presenti in archivio restano (il fix impedisce che ne nascano di nuovi, non cancella quelli storici) — coerente con quanto indicato. Verifica fatta eseguendo davvero il codice: test della logica di invio e prova end-to-end dell'intero flusso del box feedback, piu i flussi adiacenti, tutti superati.",
+  "queuedAt": "2026-07-24T15:23:44.352Z",
+  "queuedBy": "routine"
+}
