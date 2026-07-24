@@ -383,6 +383,14 @@
     });
     if (isList) {
       currentTab = tab;
+      // Cambiando tab si esce dalla modalità risultati di ricerca: l'utente ha
+      // scelto una tab, mostragliela (la barra di ricerca resta aperta se lo era,
+      // così può rilanciare una ricerca). renderList più sotto ridisegna la lista.
+      if (searchActive) {
+        searchActive = false; searchQuery = ''; searchList = []; searchReasons = {};
+        setSearchNote('', '');
+        if (mgSearchClear) mgSearchClear.hidden = true;
+      }
       // Cambiando tab si azzera la selezione: il feedback aperto potrebbe non
       // appartenere alla nuova lista.
       selectedId = null;
