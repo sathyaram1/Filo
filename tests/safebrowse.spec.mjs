@@ -163,6 +163,54 @@ test('interstitial "pericoloso": copre la pagina e si toglie solo con "confermo"
   await expect(page.getByText('Sito pericoloso')).toHaveCount(0, { timeout: 6_000 });
 });
 
+test('interstitial "pericoloso": "Torna indietro" su scheda NUOVA esce SENZA confermare il sito (#288)', async ({ app, openTab, testServer }) => {
+  // Scheda appena aperta su un URL: cronologia vuota (history.length === 1), il
+  // caso del bug. "Torna indietro" deve solo uscire (about:blank), MAI registrare
+  // il bypass del dominio come farebbe "Procedi comunque".
+  const page = await testServer.openReady(openTab, '<title>SB_BACK</title><p>contenuto pagina</p>');
+
+  // Sanity: la scheda è davvero senza cronologia (altrimenti il ramo del bug non
+  // verrebbe esercitato e il test sarebbe inutile).
+  expect(await page.evaluate(() => history.length)).toBe(1);
+
+  await app.evaluate(({ BrowserWindow }) => {
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (!w._filoTabs) continue;
+      for (const t of w._filoTabs.tabs) {
+        const u = t.view?.webContents?.getURL?.() || '';
+        if (!/^https?:/.test(u)) continue;
+        t.view.webContents.send('filo:broadcast', {
+          type: 'safebrowse_update',
+          level: 'pericoloso',
+          message: { title: 'Sito pericoloso', body: 'Questo non è PayPal. Ti sta chiedendo la password.' },
+        });
+      }
+    }
+  });
+
+  await expect(page.getByText('Sito pericoloso')).toBeVisible({ timeout: 6_000 });
+
+  // Clic su "Torna indietro": la pagina esce verso about:blank.
+  await page.getByRole('button', { name: 'Torna indietro' }).click();
+  await page.waitForFunction(() => location.href === 'about:blank', null, { timeout: 6_000 });
+
+  // COMPORTAMENTO ATTESO: nessun dominio è stato confermato in ALCUN tab. Col
+  // bug, "Torna indietro" inviava T_PROCEED → safebrowseProceed aggiungeva il
+  // registrable a tab.sbBypass (size 1): il sito restava "confermato" per la
+  // scheda. Dopo il fix nessun bypass viene mai registrato.
+  const bypassed = await app.evaluate(({ BrowserWindow }) => {
+    const all = [];
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (!w._filoTabs) continue;
+      for (const t of w._filoTabs.tabs) {
+        if (t.sbBypass && t.sbBypass.size) all.push(...t.sbBypass);
+      }
+    }
+    return all;
+  });
+  expect(bypassed).toEqual([]);
+});
+
 test('popup "sospetto": è un popup di conferma e si chiude solo con "Continua" (#176)', async ({ app, openTab, testServer }) => {
   // Pagina esterna reale: di per sé "safe". Iniettiamo il verdetto "sospetto"
   // come fa il main dopo l'analisi (es. il sito casinò del feedback #176).
