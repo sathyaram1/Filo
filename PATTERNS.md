@@ -291,6 +291,32 @@ veloce, ma l'utente smette di aspettarlo tutto.
 - **Dove:** pipeline in `src/content/tts.js` (`readAloud`), cache+hash
   nell'handler `MSG.TTS_SYNTH` in `src/main/services/handlers/ai.js`.
 
+## Ricerca "a senso" su una lista: LLM che ordina + ripiego per sottostringa
+
+Per una ricerca semantica su una collezione che **non ha embedding precalcolati**
+(es. i feedback nella dashboard di gestione), non serve costruire l'infrastruttura
+di embedding: si manda al main un **catalogo compatto** (id + titolo + testo
+troncato) e un LLM economico lo **ordina per pertinenza** alla query in linguaggio
+naturale, scartando i non pertinenti e restituendo gli id in ordine (`runOneShot`
++ un'azione dedicata in `ACTIONS`/`DEFAULT_MODELS`). È il gemello, senza vettori,
+del re-rank della ricerca archivio (`searchArchivedTabs`/`rerankResults`).
+
+- **Degrada SEMPRE con grazia:** se il modello non è disponibile o la risposta non
+  è parsabile, il main torna `{ ok:true, results:null }` e la pagina ripiega su un
+  **filtro per sottostringa** (logica pura, unit-testata) così la ricerca resta
+  usabile senza chiave. Stesso contratto della ricerca archivio (`results:null` →
+  fallback per testo).
+- **La logica di ripiego è pura e condivisa** (`SN_MANAGE_REVIEW.searchFeedbackFallback`):
+  niente rete, unit-testabile; punteggio per parola con il titolo che pesa più del
+  testo, tie-break per recenza.
+- **Owner-only + rara → costo trascurabile:** una singola chiamata su qualche
+  centinaio di righe corte con un modello capace (`flash`) sta largamente sotto la
+  soglia di `filo_design.txt`; nessun bisogno di precalcolo/cache.
+- **Dove:** motore in `src/main/services/handlers.js` (`searchFeedbackSemantic`,
+  esposto su `globalThis.SN_FEEDBACK_SEARCH`), gate admin in `handlers/auth.js`
+  (`MSG.FEEDBACK_SEARCH`); UI in `src/pages/manage/`. Test:
+  `tests/unit/feedbackSearchFallback.test.mjs`, `tests/manage-search.spec.mjs`.
+
 ## Grafici/chart: SVG generato a mano, niente librerie esterne
 
 I grafici (es. la torta del consumo nella pagina Crediti) si disegnano come
