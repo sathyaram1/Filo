@@ -31,7 +31,12 @@
 
   function render(r) {
     const credits = r.credits || {};
-    $('balance').textContent = formatInt(credits.balance || 0);
+    // Saldo con precisione fino a 1 decimale: un uso leggero consuma frazioni di
+    // credito, e arrotondare all'intero le nasconderebbe (il saldo resterebbe
+    // fermo a 1000 pur avendo l'utente usato Filo). balanceExact conserva la
+    // frazione; ripiego su balance per retrocompatibilità.
+    const bal = credits.balanceExact != null ? credits.balanceExact : (credits.balance || 0);
+    $('balance').textContent = formatCredits(bal);
     $('offlineHint').hidden = !!r.signedIn;
 
     renderUsage(credits.byUsage || {});
