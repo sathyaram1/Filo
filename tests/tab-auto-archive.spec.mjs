@@ -99,18 +99,19 @@ test('il riordino collassa le home duplicate e chiude le impostazioni (feedback 
   // un sito. Prima il riordino toccava solo i siti web (chiudeva YouTube ma mai
   // home/impostazioni). Ora: le home duplicate si collassano da sole e
   // l'impostazione la archivia l'LLM; il sito web resta se l'LLM dice "keep".
+  // (Al boot Filo apre già una home; qui ne aggiungiamo altre → home duplicate.)
   await testServer.openReady(openTab, mk('Sito', 'rgb(40,80,200)'));
-  await openTab('filo://newtab/');            // home #1
+  await openTab('filo://newtab/');            // home extra
   await openTab('filo://options/options.html'); // impostazioni
-  await openTab('filo://newtab/');            // home #2 (diventa attiva)
+  await openTab('filo://newtab/');            // home extra (diventa attiva)
 
-  // Assestamento: due home, una pagina options, un sito, e una home attiva.
+  // Assestamento: più home duplicate, una pagina options, un sito, home attiva.
   await expect.poll(async () => shell.evaluate(async () => {
     const s = await window.filoShell.tabs.snapshot();
     const newtabs = s.tabs.filter((t) => /filo:\/\/newtab/.test(t.url || ''));
     const opts = s.tabs.filter((t) => /filo:\/\/options/.test(t.url || ''));
     const active = s.tabs.find((t) => t.id === s.activeId);
-    return newtabs.length === 2 && opts.length === 1 && !!active
+    return newtabs.length >= 2 && opts.length === 1 && !!active
       && /filo:\/\/newtab/.test(active.url || '');
   }), { timeout: 8_000 }).toBe(true);
 
