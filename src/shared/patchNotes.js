@@ -267,10 +267,10 @@
       fixes: [],
     },
     {
-      version: '0.2.114', date: '2026-07-05',
+      version: '0.2.115', date: '2026-07-05',
       features: [],
       fixes: [
-        'Rafforzata la sicurezza: alcune azioni interne di Filo (menu del tasto destro, apertura di nuove schede) ora bloccano i tentativi di aprire percorsi di file locali o altri schemi non sicuri, invece di lasciarli passare.',
+        'Rafforzata la sicurezza: qualsiasi azione interna di Filo che apre una scheda (menu del tasto destro, apertura di nuove schede, riapertura dall\'archivio) ora blocca i tentativi di aprire percorsi di file locali o altri schemi non sicuri, invece di lasciarli passare.',
       ],
     },
     {
