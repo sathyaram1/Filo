@@ -364,7 +364,7 @@ test('livello 2 — i flag curl/wget di LETTURA simili ai write accessori restan
   // --cookie/-b e --load-cookies (LEGGONO i cookie), --etag-compare, --cacert/
   // --cert (leggono un certificato), --trace-time/--trace-ids (modificatori).
   for (const cmd of [
-    'curl -C - -O http://x',                     // -C maiuscolo (resume): non è cookie-jar
+    'curl -C 0 http://x',                        // -C maiuscolo (resume): non è cookie-jar
     'curl --continue-at 100 http://x',
     'curl -b cookies.txt http://x',              // -b = legge i cookie
     'curl --cookie cookies.txt http://x',
