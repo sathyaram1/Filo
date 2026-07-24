@@ -260,6 +260,78 @@ test('groupDeck: l\'override esplicito vince sul raggruppamento naturale', () =>
   assert.deepEqual(D.groupDeck(deck, CARDS).map((g) => g.name), ['Istantanei']);
 });
 
+// ─── #316: l'override di gruppo è PER-VISTA, non un valore unico globale ──────
+
+test('setGroupOverride è per-vista: l\'override di una vista non inquina le altre', () => {
+  let deck = deckWith([
+    { scryfall_id: 'c-sol', qty: 1, tags: [] },     // Artefatti, cmc 1, Incolore
+    { scryfall_id: 'c-island', qty: 1, tags: [] },  // Terre, cmc 0
+  ], { raggruppamento: 'tipo' });
+  // Sposto Sol Ring nel gruppo "Terre" nella vista PER TIPO.
+  deck = D.setGroupOverride(deck, 'c-sol', 'Terre', 'tipo');
+  const byType = D.groupDeck(deck, CARDS);
+  assert.ok(byType.find((g) => g.name === 'Terre').entries.some((e) => e.entry.scryfall_id === 'c-sol'),
+    'nella vista per tipo l\'override vale: Sol Ring è in Terre');
+  // Passando alla vista PER COSTO DI MANA Sol Ring torna nel bucket del suo
+  // costo (1), NON nel gruppo alieno "Terre" (il bug del feedback #316).
+  const byCmc = D.groupDeck({ ...deck, raggruppamento: 'cmc' }, CARDS);
+  assert.ok(byCmc.find((g) => g.name === '1').entries.some((e) => e.entry.scryfall_id === 'c-sol'),
+    'nella vista per costo Sol Ring è nel bucket 1');
+  assert.ok(!byCmc.some((g) => g.name === 'Terre'), 'nessun gruppo alieno "Terre" tra i bucket numerici');
+  // Tornando alla vista per tipo l'override è ancora lì (per-vista, non perso).
+  const back = D.groupDeck({ ...deck, raggruppamento: 'tipo' }, CARDS);
+  assert.ok(back.find((g) => g.name === 'Terre').entries.some((e) => e.entry.scryfall_id === 'c-sol'),
+    'l\'override della vista per tipo sopravvive al giro tra le viste');
+});
+
+test('setGroupOverride: viste diverse hanno override indipendenti; reset per-vista', () => {
+  let deck = deckWith([{ scryfall_id: 'c-sol', qty: 1, tags: [] }], { raggruppamento: 'tipo' });
+  deck = D.setGroupOverride(deck, 'c-sol', 'Terre', 'tipo');
+  deck = D.setGroupOverride(deck, 'c-sol', 'Rampa', 'cmc');
+  assert.deepEqual(deck.carte[0].gruppo_override, { tipo: 'Terre', cmc: 'Rampa' });
+  // Il reset di UNA vista lascia intatte le altre.
+  deck = D.setGroupOverride(deck, 'c-sol', null, 'tipo');
+  assert.deepEqual(deck.carte[0].gruppo_override, { cmc: 'Rampa' });
+  // Rimosso anche l'ultimo, il campo sparisce (storage pulito).
+  deck = D.setGroupOverride(deck, 'c-sol', null, 'cmc');
+  assert.equal(deck.carte[0].gruppo_override, undefined);
+});
+
+test('setGroupOverride: stesso override due volte è no-op (versione ferma)', () => {
+  let deck = deckWith([{ scryfall_id: 'c-sol', qty: 1, tags: [] }], { raggruppamento: 'tipo' });
+  deck = D.setGroupOverride(deck, 'c-sol', 'Terre', 'tipo');
+  const v = deck.versione;
+  const again = D.setGroupOverride(deck, 'c-sol', 'Terre', 'tipo');
+  assert.equal(again, deck, 'stesso riferimento: nessun edit');
+  assert.equal(again.versione, v);
+  // Anche il reset di una vista senza override è un no-op.
+  const noReset = D.setGroupOverride(deck, 'c-sol', null, 'colore');
+  assert.equal(noReset, deck);
+});
+
+test('setGroupOverride senza vista esplicita usa il raggruppamento corrente del mazzo', () => {
+  let deck = deckWith([{ scryfall_id: 'c-sol', qty: 1, tags: [] }], { raggruppamento: 'colore' });
+  deck = D.setGroupOverride(deck, 'c-sol', 'Speciale');
+  assert.deepEqual(deck.carte[0].gruppo_override, { colore: 'Speciale' });
+});
+
+test('sanitizeDeck migra un override legacy (stringa) alla vista corrente del mazzo', () => {
+  const d = D.sanitizeDeck({
+    id: 'x', raggruppamento: 'cmc',
+    carte: [{ scryfall_id: 'a', qty: 1, gruppo_override: 'Terre' }],
+  });
+  assert.deepEqual(d.carte[0].gruppo_override, { cmc: 'Terre' },
+    'la stringa legacy diventa una mappa per la vista corrente, non inquina le altre');
+});
+
+test('sanitizeDeck ripulisce una mappa override da chiavi/valori spuri', () => {
+  const d = D.sanitizeDeck({
+    id: 'x', raggruppamento: 'tipo',
+    carte: [{ scryfall_id: 'a', qty: 1, gruppo_override: { tipo: 'Terre', boh: 'X', cmc: '  ' } }],
+  });
+  assert.deepEqual(d.carte[0].gruppo_override, { tipo: 'Terre' });
+});
+
 // ─── #344: trascina una carta su una categoria → aggiungi/sostituisci tag ─────
 
 test('addTagToCard aggiunge il tag e incrementa la versione; il doppione è no-op', () => {

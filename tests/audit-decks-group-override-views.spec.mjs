@@ -45,11 +45,11 @@ async function mockScryfall(app) {
   }, JSON.stringify(CARDS));
 }
 
-// test.fixme: repro del bug (verificato ROSSO senza fixme: l'override "Terre"
-// fatto nella vista per tipo resta appiccicato alla carta anche nella vista
-// per costo di mana, che mostra un gruppo alieno "Terre" tra i bucket 0-7+).
-// Chi lavorerà il feedback toglie `.fixme` per farne un assert vivo.
-test.fixme('l\'override di gruppo non inquina le altre viste (per costo di mana)', async ({ app, openTab }) => {
+// Fix #316: l'override di gruppo è ora PER-VISTA — "Terre" fatto nella vista per
+// tipo vale solo lì; passando a "per costo di mana" Sol Ring torna nel bucket
+// del suo costo (1). Questo assert era ROSSO prima del fix (Sol Ring compariva
+// in un gruppo alieno "Terre" tra i bucket 0-7+), ora è VERDE.
+test('l\'override di gruppo non inquina le altre viste (per costo di mana)', async ({ app, openTab }) => {
   await mockScryfall(app);
   const page = await openTab('filo://decks/decks.html');
   await page.waitForLoadState('domcontentloaded');

@@ -22,6 +22,41 @@
     return NOMI_SEGNAPOSTO.includes(String(nome || '').trim());
   }
 
+  // Normalizza l'override di gruppo (tasto destro → "sposta in gruppo") al
+  // modello PER-VISTA: una mappa { <raggruppamento>: <gruppo> }, così un
+  // override fatto "per tipo" vale solo nella vista per tipo e non inquina le
+  // altre (feedback #316). Accetta anche il vecchio formato a stringa unica
+  // (mazzi salvati prima di questa feature): non sapendo in quale vista fu
+  // creato, lo si assegna alla vista corrente del mazzo (`defaultView`) — così
+  // la carta resta dove l'utente la vede aprendo il mazzo, ma smette di seguire
+  // ogni altra vista. Ritorna la mappa pulita o null se non c'è nulla di valido.
+  function normalizeOverride(raw, defaultView) {
+    if (!raw) return null;
+    if (typeof raw === 'string') {
+      const g = raw.trim();
+      return g ? { [defaultView]: g } : null;
+    }
+    if (typeof raw === 'object') {
+      const out = {};
+      for (const v of RAGGRUPPAMENTI) {
+        const g = raw[v];
+        if (g && String(g).trim()) out[v] = String(g).trim();
+      }
+      return Object.keys(out).length ? out : null;
+    }
+    return null;
+  }
+
+  // Toglie l'override di UNA vista dalla mappa, immutabile. Ritorna la nuova
+  // mappa, o undefined se resta vuota (così il campo sparisce dall'entry).
+  function overrideWithoutView(ov, view) {
+    if (!ov || typeof ov !== 'object') return undefined;
+    if (!(view in ov)) return ov;
+    const next = { ...ov };
+    delete next[view];
+    return Object.keys(next).length ? next : undefined;
+  }
+
   function uuid() {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
     return Date.now().toString(36) + Math.random().toString(36).slice(2);
@@ -61,6 +96,7 @@
     if (!raw || typeof raw !== 'object' || !raw.id) return null;
     const carte = Array.isArray(raw.carte) ? raw.carte : [];
     const nome = String(raw.nome || '').trim() || 'Mazzo senza nome';
+    const view = RAGGRUPPAMENTI.includes(raw.raggruppamento) ? raw.raggruppamento : 'tipo';
     return {
       id: String(raw.id),
       nome,
@@ -71,13 +107,16 @@
       commanderMeta: (raw.commanderMeta && typeof raw.commanderMeta === 'object') ? raw.commanderMeta : null,
       carte: carte
         .filter((c) => c && c.scryfall_id)
-        .map((c) => ({
-          scryfall_id: String(c.scryfall_id),
-          qty: Math.max(1, Number(c.qty) || 1),
-          tags: Array.isArray(c.tags) ? c.tags.map(String) : [],
-          ...(c.gruppo_override ? { gruppo_override: String(c.gruppo_override) } : {}),
-        })),
-      raggruppamento: RAGGRUPPAMENTI.includes(raw.raggruppamento) ? raw.raggruppamento : 'tipo',
+        .map((c) => {
+          const ov = normalizeOverride(c.gruppo_override, view);
+          return {
+            scryfall_id: String(c.scryfall_id),
+            qty: Math.max(1, Number(c.qty) || 1),
+            tags: Array.isArray(c.tags) ? c.tags.map(String) : [],
+            ...(ov ? { gruppo_override: ov } : {}),
+          };
+        }),
+      raggruppamento: view,
       budget: (raw.budget === null || raw.budget === undefined || raw.budget === '') ? null : Math.max(0, Number(raw.budget) || 0),
       versione: Math.max(1, Number(raw.versione) || 1),
       created_at: raw.created_at || nowIso(),
@@ -295,9 +334,13 @@
 
   // Gruppo di UNA entry secondo la vista corrente. `tagOrder` = ordine dei
   // gruppi-tag definito (per la regola "primo gruppo che matcha", §8.1).
-  // L'override esplicito dell'utente (tasto destro → sposta in gruppo) vince.
+  // L'override esplicito dell'utente (tasto destro → sposta in gruppo) vince,
+  // ma SOLO nella vista in cui è stato fatto: è una mappa per-vista
+  // { <raggruppamento>: <gruppo> } (feedback #316), non un valore unico che
+  // seguirebbe la carta in ogni vista.
   function groupOf(entry, card, raggruppamento, tagOrder = []) {
-    if (entry && entry.gruppo_override) return entry.gruppo_override;
+    const ov = entry && entry.gruppo_override;
+    if (ov && typeof ov === 'object' && ov[raggruppamento]) return ov[raggruppamento];
     if (raggruppamento === 'tag') {
       const tags = (entry && entry.tags) || [];
       for (const t of tagOrder) if (tags.includes(t)) return t;
@@ -397,16 +440,29 @@
     };
   }
 
-  // Override di gruppo (tasto destro → "sposta in gruppo", §8.1). Gruppo
-  // vuoto/null rimuove l'override (si torna al raggruppamento naturale).
-  function setGroupOverride(deck, scryfallId, gruppo) {
+  // Override di gruppo (tasto destro → "sposta in gruppo", §8.1). L'override è
+  // PER-VISTA (feedback #316): agisce solo sulla vista `view` in cui l'utente lo
+  // fa, senza toccare gli override eventualmente fatti in altre viste. Gruppo
+  // vuoto/null rimuove l'override di QUELLA vista (la carta torna al
+  // raggruppamento naturale lì). Se `view` non è una vista valida ci si basa sul
+  // raggruppamento corrente del mazzo. Impostare lo stesso override due volte è
+  // un no-op (versione ferma): mazzo INVARIATO (stesso riferimento).
+  function setGroupOverride(deck, scryfallId, gruppo, view) {
     const id = String(scryfallId || '');
+    const v = RAGGRUPPAMENTI.includes(view) ? view : (deck.raggruppamento || 'tipo');
+    const g = gruppo ? String(gruppo) : null;
     let changed = false;
     const carte = deck.carte.map((c) => {
       if (c.scryfall_id !== id) return c;
+      const cur = (c.gruppo_override && typeof c.gruppo_override === 'object') ? c.gruppo_override : null;
+      const before = cur ? cur[v] : undefined;
+      if ((before || undefined) === (g || undefined)) return c; // nessun cambiamento reale
       changed = true;
+      const nextOv = g
+        ? { ...(cur || {}), [v]: g }
+        : overrideWithoutView(cur, v);
       const next = { ...c, tags: [...c.tags] };
-      if (gruppo) next.gruppo_override = String(gruppo);
+      if (nextOv && Object.keys(nextOv).length) next.gruppo_override = nextOv;
       else delete next.gruppo_override;
       return next;
     });
@@ -420,11 +476,13 @@
 
   // Aggiunge UN tag a UNA carta (#344: trascina la carta su una categoria della
   // vista "per tag"). Il tag già presente è un no-op (versione ferma). Un
-  // eventuale override di gruppo manuale viene rimosso: trascinare una carta su
-  // una categoria è un gesto di raggruppamento esplicito e diretto che deve
-  // vincere sull'override precedente — altrimenti in vista "tag" la carta
-  // resterebbe bloccata nel vecchio gruppo forzato invece di comparire sotto il
-  // nuovo tag. Ritorna il mazzo INVARIATO (stesso riferimento) se nulla cambia.
+  // eventuale override di gruppo manuale della VISTA TAG viene rimosso:
+  // trascinare una carta su una categoria è un gesto di raggruppamento esplicito
+  // e diretto che deve vincere sull'override precedente — altrimenti in vista
+  // "tag" la carta resterebbe bloccata nel vecchio gruppo forzato invece di
+  // comparire sotto il nuovo tag. Gli override di ALTRE viste (feedback #316)
+  // restano intatti: sono indipendenti e non c'entrano con i tag. Ritorna il
+  // mazzo INVARIATO (stesso riferimento) se nulla cambia.
   function addTagToCard(deck, scryfallId, tag) {
     const id = String(scryfallId || '');
     const t = String(tag || '').trim();
@@ -433,10 +491,12 @@
     const carte = deck.carte.map((c) => {
       if (c.scryfall_id !== id) return c;
       const has = c.tags.includes(t);
-      if (has && !c.gruppo_override) return c;
+      const strippedOv = overrideWithoutView(c.gruppo_override, 'tag');
+      if (has && strippedOv === c.gruppo_override) return c;
       changed = true;
       const next = { ...c, tags: has ? [...c.tags] : [...c.tags, t] };
-      delete next.gruppo_override;
+      if (strippedOv) next.gruppo_override = strippedOv;
+      else delete next.gruppo_override;
       return next;
     });
     return changed ? touch({ ...deck, carte }) : deck;
@@ -445,8 +505,9 @@
   // Sostituisce TUTTI i tag di una carta con l'insieme dato (#344: opzione
   // "sostituisci" del popup al rilascio). Passa [] per togliere ogni tag (drop
   // sulla categoria "Senza tag"). I tag vengono normalizzati (trim) e resi unici
-  // conservando l'ordine. Come addTagToCard rimuove l'override manuale. Ritorna
-  // il mazzo INVARIATO se l'insieme risultante è già quello attuale.
+  // conservando l'ordine. Come addTagToCard rimuove l'override manuale della
+  // sola VISTA TAG (gli override di altre viste restano, feedback #316).
+  // Ritorna il mazzo INVARIATO se l'insieme risultante è già quello attuale.
   function replaceCardTags(deck, scryfallId, tags) {
     const id = String(scryfallId || '');
     const uniq = [];
@@ -458,10 +519,12 @@
     const carte = deck.carte.map((c) => {
       if (c.scryfall_id !== id) return c;
       const same = c.tags.length === uniq.length && c.tags.every((t, i) => t === uniq[i]);
-      if (same && !c.gruppo_override) return c;
+      const strippedOv = overrideWithoutView(c.gruppo_override, 'tag');
+      if (same && strippedOv === c.gruppo_override) return c;
       changed = true;
       const next = { ...c, tags: [...uniq] };
-      delete next.gruppo_override;
+      if (strippedOv) next.gruppo_override = strippedOv;
+      else delete next.gruppo_override;
       return next;
     });
     return changed ? touch({ ...deck, carte }) : deck;
