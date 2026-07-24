@@ -386,6 +386,11 @@
       // curl -D/--dump-header: scrive gli header (contenuto del server) in un
       // percorso arbitrario → 3.
       if (prog === 'curl' && CURL_DUMP_RE.test(trimmed)) return 3;
+      // curl -c/--cookie-jar, --etag-save, --trace/--trace-ascii, --stderr:
+      // salvano dati accessori influenzati dal server in un percorso scelto → 3.
+      if (prog === 'curl' && CURL_ACCESSORY_WRITE_RE.test(trimmed)) return 3;
+      // wget --save-cookies: scrive i cookie del sito in un percorso scelto → 3.
+      if (prog === 'wget' && WGET_SAVE_COOKIES_RE.test(trimmed)) return 3;
       // robocopy /MIR /PURGE (cancellano la destinazione) / /MOVE /MOV
       // (cancellano la sorgente): distruzione permanente → 3.
       if (prog === 'robocopy' && ROBOCOPY_DESTRUCTIVE_RE.test(trimmed)) return 3;
