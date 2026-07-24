@@ -586,7 +586,7 @@
     const view = current.raggruppamento || 'tipo';
 
     if (view !== 'tag') {
-      const next = Decks.setGroupOverride(current, cardId, groupName);
+      const next = Decks.setGroupOverride(current, cardId, groupName, view);
       if (next !== current) { saveDeck(next); showToast(`${name} spostata in "${groupName}".`); }
       return;
     }
