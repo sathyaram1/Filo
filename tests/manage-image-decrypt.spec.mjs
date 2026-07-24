@@ -83,10 +83,13 @@ test('gli allegati immagine cifrati vengono decifrati e mostrati (con fallback)'
   const okSrc = await okImg.evaluate((el) => el.getAttribute('src'));
   expect(okSrc.startsWith('data:image/png')).toBe(true);
 
-  // 2ª immagine: decifratura fallita → stato "non disponibile".
+  // 2ª immagine: decifratura fallita → stato "non disponibile" + il MOTIVO
+  // preciso del main finisce nel title (hover), così l'owner sa PERCHÉ non la
+  // vede invece di un segnaposto muto.
   const failImg = imgs.nth(1);
   await expect(failImg).toHaveClass(/mg-img-failed/);
   await expect(failImg).toHaveAttribute('alt', 'immagine non disponibile');
+  await expect(failImg).toHaveAttribute('title', 'decifratura immagine fallita');
 
   // L'IPC è stato chiamato per entrambe.
   const calls = await page.evaluate(() => window.__decryptCalls);
