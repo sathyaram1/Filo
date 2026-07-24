@@ -265,6 +265,21 @@
     const MAX_FILES = 5;
     const MAX_ATTACH_BYTES = 4 * 1024 * 1024;
 
+    // Anti-duplicati (#370): id STABILE di questa composizione. Tutti i tentativi
+    // di invio della stessa bozza condividono l'id, così se un invio va in timeout
+    // lato UI ma riesce comunque sul server, ripremere "Invia" NON crea un
+    // duplicato (il server rifiuta un secondo doc con lo stesso id). Cambia solo
+    // quando l'utente modifica il contenuto (testo o allegati): un messaggio
+    // diverso è un feedback diverso e deve poter essere inviato a parte.
+    function newSubmissionId() {
+      try {
+        if (global.crypto?.randomUUID) return global.crypto.randomUUID();
+      } catch (_) {}
+      return 'sub-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+    }
+    let submissionId = newSubmissionId();
+    function bumpSubmissionId() { submissionId = newSubmissionId(); }
+
     // ---- bozza di testo persistente ----
     let saveTimer = null;
     function saveDraft() {
