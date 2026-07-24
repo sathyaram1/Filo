@@ -28,6 +28,7 @@
         'Nell’Editor, una sezione chiusa con la freccetta accanto al titolo ora resta chiusa mentre scrivi: prima, digitando un carattere qualsiasi, la freccia scattava in posizione «aperta» ma il testo restava nascosto e servivano due click per rivederlo. Ora la freccia dice sempre la verità e un solo click riapre la sezione; se aggiungi testo a una sezione chiusa, resta nascosto in modo coerente finché non la riapri.',
         'Quando Filo esegue comandi nel terminale, anche le opzioni meno comuni di scaricamento che salvano dati accessori su un file scelto (i cookie del sito, l’identificativo della risposta, una traccia di debug o il log dell’operazione) ora richiedono la conferma scritta riservata alle azioni delicate, non più il semplice clic: così un sito remoto non può far scrivere di nascosto in un file sensibile con una conferma leggera.',
         'Nella dashboard di gestione, un allegato con un nome file molto lungo senza spazi ora va a capo dentro la bolla invece di sbordare e far comparire una barra di scorrimento orizzontale nella conversazione.',
+        '«Salva per dopo» ora registra la pagina all’istante: prima, se il sito si ricaricava o faceva un redirect nel decimo di secondo subito dopo il click, il salvataggio poteva perdersi in silenzio (nessuna conferma, nessuna scheda in «Aperti per dopo»). Ora la scheda viene salvata subito e l’anteprima si aggiunge dopo; se qualcosa va storto compare un avviso invece del silenzio.',
       ],
     },
     {
