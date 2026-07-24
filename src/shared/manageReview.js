@@ -528,6 +528,44 @@
   // resto della lista. Basso di proposito (il segnale arriva subito).
   const REEVAL_WASTE_LIMIT = 3;
 
+  // ── Ricerca feedback: ripiego per sottostringa (senza LLM) ────────────────
+  // Quando la ricerca semantica non è disponibile (nessuna chiave, LLM non
+  // parsabile) la dashboard deve comunque poter cercare: filtro per parola su
+  // titolo + testo della segnalazione. PURA e unit-testabile: nessuna rete.
+  //
+  // Punteggio: ogni parola della query (≥2 caratteri) trovata nel TITOLO vale 2,
+  // nel TESTO vale 1. Restano solo i feedback con almeno una parola trovata,
+  // ordinati per punteggio decrescente e, a parità, per recenza. `title` prende
+  // `name` col ripiego sulle prime parole del testo (come la lista).
+  function feedbackTitleOf(fb) {
+    if (fb && fb.name) return String(fb.name);
+    const FBmod = global.SN_FEEDBACK;
+    if (FBmod && typeof FBmod.fallbackName === 'function') {
+      const n = FBmod.fallbackName(fb && fb.text);
+      if (n) return String(n);
+    }
+    return '';
+  }
+  function searchFeedbackFallback(feedbacks, query) {
+    const q = String(query == null ? '' : query).toLowerCase();
+    const tokens = q.split(/[^\p{L}\p{N}]+/u).filter((t) => t.length >= 2);
+    if (!tokens.length) return [];
+    const scored = [];
+    for (const fb of (feedbacks || [])) {
+      if (!fb) continue;
+      const title = feedbackTitleOf(fb).toLowerCase();
+      const text = String(fb.text || '').toLowerCase();
+      let score = 0;
+      for (const tok of tokens) {
+        if (title.includes(tok)) score += 2;
+        else if (text.includes(tok)) score += 1;
+      }
+      if (score > 0) scored.push({ fb, score, t: new Date(fb.createdAt || 0).getTime() });
+    }
+    scored.sort((a, b) => (b.score - a.score) || (b.t - a.t));
+    return scored.map((s) => s.fb);
+  }
+
   global.SN_MANAGE_REVIEW = {
     normalizeStatus,
     classifyBlock, sortReview, REASONS, manageTabFor, listForManageTab, priorityOf,
