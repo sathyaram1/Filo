@@ -100,6 +100,8 @@
   // pipeline: sicuro+ON → todo, sicuro+OFF → aligned). NON è più una lente
   // sulle liste: le tab derivano solo dallo status (macchina a stati).
   let autoModeOn    = false;
+  let searchMode    = false;      // true = la lista mostra i risultati di ricerca
+  let searchSeq     = 0;          // guardia anti-race tra ricerche concorrenti
 
   // Etichette/testi vuoto per le tab-lista (DB1).
   const TAB_LABELS = {
