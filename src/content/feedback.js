@@ -750,6 +750,7 @@
           clientIdHash, // S1.F2.2: hash deterministico in chiaro per match C5
           images: outImages,
           files: files.slice(), // allegati non-immagine (pdf, txt, md, json…)
+          submissionId, // #370: id stabile → il server deduplica i re-invii
         };
         const res = await chrome.runtime.sendMessage({ type: MSG.SUBMIT_FEEDBACK, payload });
         if (!res?.ok) throw new Error(res?.error || 'invio fallito');
