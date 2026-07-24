@@ -104,7 +104,8 @@ test('i movimenti recenti mostrano etichette specifiche per ogni tipo di ricompe
   expect(texts).not.toContain('Ricompensa');
 });
 
-test('senza consumo la pagina Crediti mostra lo stato vuoto', async ({ openTab }) => {
+test('senza consumo la pagina Crediti mostra lo stato vuoto', async ({ app, openTab }) => {
+  await app.evaluate(disableAutoFeedbackBonus);
   const page = await openTab('filo://credits/credits.html');
   await page.waitForLoadState('domcontentloaded');
 
