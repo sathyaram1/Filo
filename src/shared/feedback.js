@@ -405,7 +405,13 @@
       doc.fields.capabilityGapId = toFsValue(String(capabilityGapId).slice(0, 100));
     }
 
-    const endpoint = `${FIRESTORE_BASE}/${COLLECTION}?key=${API_KEY}`;
+    // Idempotenza anti-duplicati (#370): con un submissionId stabile creiamo il
+    // documento con QUELL'id (Firestore: `?documentId=`). Così se un invio va in
+    // timeout lato UI ma è comunque riuscito sul server, un secondo invio della
+    // stessa bozza non crea un duplicato — il server rifiuta il doc già presente.
+    const docId = sanitizeDocId(submissionId);
+    const idParam = docId ? `documentId=${encodeURIComponent(docId)}&` : '';
+    const endpoint = `${FIRESTORE_BASE}/${COLLECTION}?${idParam}key=${API_KEY}`;
     let res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -426,6 +432,12 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(doc),
       });
+    }
+    // 409 ALREADY_EXISTS con documentId → il feedback è già stato scritto da un
+    // tentativo precedente (identico submissionId). Non è un errore: successo
+    // idempotente, nessun duplicato creato.
+    if (docId && res.status === 409) {
+      return { id: docId, seq: null, images: uploaded, files: uploadedFiles, failed, deduped: true };
     }
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
