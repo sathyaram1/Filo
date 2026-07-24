@@ -228,7 +228,7 @@
     // ──────────────────────── Salva per dopo e archivio ──────────────────────
     {
       id: 'save-for-later', title: 'Salva la pagina per dopo', category: 'save',
-      desc: 'Mette da parte la pagina corrente (titolo, indirizzo, anteprima) e chiude la scheda, per riprenderla quando vuoi.',
+      desc: 'Mette da parte la pagina corrente (titolo, indirizzo, anteprima) e chiude la scheda, per riprenderla quando vuoi. Se salvi una pagina che avevi già messo da parte, aggiorna la voce esistente e la riporta in cima invece di crearne un doppione.',
       invoke: 'Alt+S, oppure menu del tasto destro → "Salva per dopo".',
       doesNot: 'Salva i riferimenti e un’anteprima, non lo stato della pagina (moduli compilati, sessione). Vale solo per le pagine web: sulle schermate interne di Filo non fa nulla.',
     },
