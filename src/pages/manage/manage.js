@@ -377,6 +377,8 @@
   // `panel-list`: cambia solo quale sottoinsieme di feedback popola la lista a
   // sinistra. Le tab segnaposto (stats/models) hanno il loro pannello.
   function selectTab(tab) {
+    // Cambiando scheda la ricerca si chiude da sola: vedi la scheda scelta.
+    if (searchMode) closeSearch({ keepList: true });
     document.querySelectorAll('.mg-tab').forEach((t) => {
       t.classList.toggle('mg-tab--active', t.dataset.tab === tab);
     });
