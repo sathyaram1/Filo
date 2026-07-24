@@ -116,6 +116,7 @@
   const FB  = window.SN_FEEDBACK;
   const MR  = window.SN_MANAGE_REVIEW;
   const TH  = window.SN_FEEDBACK_THREAD;
+  const SRCH = window.SN_MANAGE_SEARCH;
   const AUTO_MODE_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTO_MODE) || 'filo_auto_mode';
   const SORT_MODE_KEY = 'filo_manage_sort';
 
