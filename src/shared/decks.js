@@ -96,6 +96,7 @@
     if (!raw || typeof raw !== 'object' || !raw.id) return null;
     const carte = Array.isArray(raw.carte) ? raw.carte : [];
     const nome = String(raw.nome || '').trim() || 'Mazzo senza nome';
+    const view = RAGGRUPPAMENTI.includes(raw.raggruppamento) ? raw.raggruppamento : 'tipo';
     return {
       id: String(raw.id),
       nome,
@@ -106,13 +107,16 @@
       commanderMeta: (raw.commanderMeta && typeof raw.commanderMeta === 'object') ? raw.commanderMeta : null,
       carte: carte
         .filter((c) => c && c.scryfall_id)
-        .map((c) => ({
-          scryfall_id: String(c.scryfall_id),
-          qty: Math.max(1, Number(c.qty) || 1),
-          tags: Array.isArray(c.tags) ? c.tags.map(String) : [],
-          ...(c.gruppo_override ? { gruppo_override: String(c.gruppo_override) } : {}),
-        })),
-      raggruppamento: RAGGRUPPAMENTI.includes(raw.raggruppamento) ? raw.raggruppamento : 'tipo',
+        .map((c) => {
+          const ov = normalizeOverride(c.gruppo_override, view);
+          return {
+            scryfall_id: String(c.scryfall_id),
+            qty: Math.max(1, Number(c.qty) || 1),
+            tags: Array.isArray(c.tags) ? c.tags.map(String) : [],
+            ...(ov ? { gruppo_override: ov } : {}),
+          };
+        }),
+      raggruppamento: view,
       budget: (raw.budget === null || raw.budget === undefined || raw.budget === '') ? null : Math.max(0, Number(raw.budget) || 0),
       versione: Math.max(1, Number(raw.versione) || 1),
       created_at: raw.created_at || nowIso(),
