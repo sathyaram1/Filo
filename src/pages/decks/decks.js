@@ -1525,13 +1525,11 @@
       else if (e.key === 'Escape') { e.preventDefault(); closeCarousel(); }
     });
 
-    // Calcolatore di probabilità (§9.3): Invio su un campo = Calcola.
-    $('probRun').addEventListener('click', runProb);
-    $('stateStats').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && e.target && e.target.matches('#probTurn, #probNeeds input')) {
-        e.preventDefault();
-        runProb();
-      }
+    // Calcolatore di probabilità (§9.3): si aggiorna DA SOLO appena cambia una
+    // condizione (feedback #354). Delego l'ascolto a #stateStats perché le righe
+    // categoria (#probNeeds) sono ricostruite a ogni rerender delle statistiche.
+    $('stateStats').addEventListener('input', (e) => {
+      if (e.target && e.target.matches('#probTurn, #probNeeds input')) scheduleProb();
     });
 
     $('carouselPrev').addEventListener('click', () => carouselNav(-1));
