@@ -350,9 +350,11 @@
         const remaining = (t.paused && Number.isFinite(t.remainingMs))
           ? Math.max(0, Math.round(t.remainingMs / 1000))
           : Math.max(0, Math.round((new Date(t.endsAt).getTime() - Date.now()) / 1000));
-        const mm = Math.floor(remaining / 60);
-        const ss = remaining % 60;
-        const txt = `${t.label}\n${mm}:${String(ss).padStart(2, '0')}${t.paused ? ' (in pausa)' : ''}`;
+        // #323 — countdown "da orologio": M:SS sotto l'ora, H:MM:SS oltre, così
+        // un timer di 2 ore mostra "2:00:00" e non "120:00".
+        const clock = (self.SN_TIME ? self.SN_TIME.fmtCountdown(remaining)
+          : `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`);
+        const txt = `${t.label}\n${clock}${t.paused ? ' (in pausa)' : ''}`;
         liveEl.appendChild(renderLiveCard({
           kind: 'process',
           text: txt,
