@@ -128,5 +128,5 @@
     return { changed: false };
   }
 
-  global.SN_HISTORY = { list, append, clear, cleanupScreenshots };
+  global.SN_HISTORY = { list, append, remove, clear, cleanupScreenshots };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
