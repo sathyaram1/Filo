@@ -69,8 +69,8 @@
        carta in anteprima non esplode oltre l'altezza dello schermo. ── */
     .dk-builder {
       display: grid; grid-template-columns: 340px 6px 1fr 6px 340px;
-      gap: 0; height: calc(100vh - 96px); min-height: 320px;
-      border: 1px solid var(--sn-border); border-radius: 10px; overflow: hidden;
+      gap: 0; height: 100vh; min-height: 320px;
+      overflow: hidden;
     }
     /* min-height: 0 è OBBLIGATORIO: senza, questo flex/grid item eredita
        min-height: auto e NON si comprime sotto l'altezza del contenuto — così
