@@ -376,6 +376,10 @@
     [ACTIONS.FILO_TAB_SUMMARY]: 'flash-lite-3, flash-lite-3-or',
     // Re-rank ricerca semantica: legge i top-K riassunti → lite va bene.
     [ACTIONS.FILO_TAB_SEARCH]: 'flash-lite-3, flash-lite-3-or',
+    // Ricerca semantica dei feedback: legge titolo+testo di tutti i feedback e
+    // li ordina per pertinenza. Owner-only e rara → un modello capace ma
+    // economico (flash) tiene la qualità del ranking senza costi rilevanti.
+    [ACTIONS.FILO_FEEDBACK_SEARCH]: 'flash, flash-or',
     // Lettura ad alta voce: modello TTS Gemini. Se fallisce/è assente, la voce
     // del browser (Web Speech) fa da fallback finale lato content script.
     [ACTIONS.TTS]: 'tts',
