@@ -1,0 +1,7 @@
+{
+  "id": "d9319b5a-2d20-4ecd-bcf8-c56be4bcf893",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la modifica e' stata verificata e pubblicata. Nessun problema di sicurezza rilevato. La lavorazione era gia' stata integrata nell'app, quindi non restava altro da fondere.",
+  "queuedAt": "2026-07-24T19:00:19.047Z",
+  "queuedBy": "routine"
+}
