@@ -2334,7 +2334,13 @@
     }
     // scorciatoie personalizzate dei moduli
     for (const m of doc.modules) {
-      if (m.data && m.data.shortcut && matchShortcut(e, m.data.shortcut)) { e.preventDefault(); triggerModuleShortcut(m); return; }
+      if (m.data && m.data.shortcut && matchShortcut(e, m.data.shortcut)) {
+        // Difesa per le scorciatoie senza modificatore già salvate (prima della
+        // validazione): mentre si scrive nel documento o in un campo di testo NON
+        // devono rubare il tasto — lascia digitare normalmente la lettera.
+        if (!shortcutHasRealModifier(m.data.shortcut) && isEditableTarget(e.target)) continue;
+        e.preventDefault(); triggerModuleShortcut(m); return;
+      }
     }
   });
 
