@@ -60,6 +60,18 @@
   // qualunque vista — lo modifica per tutte (è un unico modulo condiviso).
   const isPinned = (m) => isFixed(m) || (!!m && m.type === 'switch');
 
+  // Un tipo "singleton" può esistere in una sola copia (lo switch: è l'UNICO
+  // modo per navigare le pagine, averne due lascia un doppione ingombrante e non
+  // eliminabile — dato che lo switch è protetto dalla cancellazione). Un tipo è
+  // aggiungibile dalla palette / dal box "Aggiungi modulo" solo se non è fisso e,
+  // se singleton, non ne esiste già uno.
+  const canAddType = (type) => {
+    const meta = MODULE_TYPES[type];
+    if (!meta || meta.fixed) return false;
+    if (meta.singleton && doc.modules.some((mm) => mm.type === type)) return false;
+    return true;
+  };
+
   // Icone-preset per lo switch (estetiche, non vincolano i moduli).
   const SWITCH_PRESETS = {
     pen:  ICONS.editor,
