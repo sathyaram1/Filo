@@ -1,7 +1,0 @@
-{
-  "id": "6653ffe1-af1b-4e6e-be78-c36ff618bf80",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho riprodotto esattamente la lamentela: aperta la Cronologia AI con più richieste salvate, ora ogni voce mostra il tasto Rimuovi (compare passando il mouse sulla voce, accanto al costo). Cliccandolo la voce sparisce subito, le altre restano intatte e — cosa importante — la rimozione è definitiva: riaprendo/ricaricando la pagina (che rilegge lo storico salvato) la voce tolta non ricompare. Ho verificato anche il caso in cui volevi togliere qualcosa di privato: la voce con il dato sensibile sparisce dalla lista e dallo storico. Stress test superati: rimozione con doppio clic rapido sulla stessa voce (nessun crash, la voce viene tolta una volta sola); rimozione di TUTTE le voci una a una fino a lista vuota (compare correttamente il messaggio di cronologia vuota, nessun errore); contenuti con emoji, testo lunghissimo e finti tag HTML/script nel testo di una richiesta — il testo viene mostrato come semplice testo e non viene eseguito nulla (nessun rischio di codice iniettato). Ho controllato anche il menu 'filtra per tipo': quando rimuovi l'ultima richiesta di un certo tipo, quel tipo scompare da sé dal filtro, coerente. La conferma è richiesta solo su 'Cancella tutto' e non sul singolo Rimuovi: giusto così, in linea con le altre liste di Filo dove la rimozione puntuale è a un clic. La suite di test automatici della pagina è verde.",
-  "queuedAt": "2026-07-24T03:58:15.776Z",
-  "queuedBy": "routine"
-}
