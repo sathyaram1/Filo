@@ -621,7 +621,30 @@
       <button type="button" class="mg-tab" data-tab="stats" role="tab">Statistiche Red Team</button>
       <button type="button" class="mg-tab" data-tab="models" role="tab">Modelli di supporto</button>
       <button type="button" class="mg-tab" data-tab="automation" role="tab">Automazioni</button>
+      <!-- Ricerca semantica dei feedback: un'icona a fine barra apre un campo di
+           ricerca "a senso" su TUTTI i feedback (di ogni tab). -->
+      <button type="button" class="mg-tab-search" id="mgSearchToggle"
+        title="Cerca nei feedback" aria-label="Cerca nei feedback" aria-expanded="false">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+      </button>
     </nav>
+
+    <!-- Barra di ricerca semantica (compare al clic sull'icona). Cerca a senso su
+         tutti i feedback: la query è in linguaggio naturale, anche il ricordo
+         vago di un vecchio feedback. I risultati popolano la lista a sinistra,
+         ordinati per pertinenza. -->
+    <div class="mg-search" id="mgSearchBar" hidden>
+      <input type="search" id="mgSearchInput" class="mg-search-input"
+        placeholder="Cerca un feedback a senso… (es. dividere le sezioni per l'owner in un'unica icona)"
+        autocomplete="off" spellcheck="false" />
+      <button type="button" class="sn-btn" id="mgSearchBtn">Cerca</button>
+      <button type="button" class="mg-search-clear" id="mgSearchClear"
+        title="Chiudi la ricerca" aria-label="Chiudi la ricerca" hidden>×</button>
+      <span class="mg-search-note" id="mgSearchNote" role="status"></span>
+    </div>
 
     <!-- ═══ TAB LISTA (Ricevuti / In coda / Risolti / Archiviati) ════════ -->
     <!-- Layout condiviso a 3 colonne: la lista a sinistra è filtrata per tab,
