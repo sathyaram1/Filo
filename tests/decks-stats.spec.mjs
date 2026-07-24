@@ -188,14 +188,13 @@ test('il calcolatore di probabilità nel sotto-pannello: caso deterministico al 
 
   // Turno 1 con 3 carte in libreria: si vede TUTTA la libreria (mano da 7),
   // quindi "1 terre" è certo → il Monte Carlo deve dire esattamente 100%.
+  // Feedback #354: la stima si calcola DA SOLA appena si digita, senza bottone.
   await page.fill('#probTurn', '1');
   await terreInput.fill('1');
-  await page.click('#probRun');
   await expect(page.locator('#probResult')).toHaveText('≈ 100,0%');
 
   // Chiedere 2 terre quando in libreria ce n'è UNA sola → impossibile: 0%.
   await terreInput.fill('2');
-  await page.click('#probRun');
   await expect(page.locator('#probResult')).toHaveText('≈ 0,0%');
 });
 
