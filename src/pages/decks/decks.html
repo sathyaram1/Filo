@@ -402,8 +402,19 @@
     }
     .dk-prob-row input[type="number"]:focus { border-color: var(--sn-accent); }
     .dk-prob-actions { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
-    .dk-prob-actions .sn-btn { font-size: 12px; padding: 4px 10px; }
     .dk-prob-result { font-weight: 600; }
+    /* Mentre la stima si sta ancora raffinando (feedback #354) un puntino accanto
+       al risultato pulsa piano: segnala "sto convergendo", sparisce a fine. */
+    .dk-prob-result.dk-prob-refining::after {
+      content: ''; display: inline-block; margin-left: 6px;
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--sn-accent); vertical-align: middle;
+      animation: dk-prob-pulse 0.9s ease-in-out infinite;
+    }
+    @keyframes dk-prob-pulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) {
+      .dk-prob-result.dk-prob-refining::after { animation: none; opacity: 0.6; }
+    }
 
     /* Import via chat (§11.2): bottone "aggiungi tutte" in testa alla CardList,
        affianca (non sostituisce) il toggle per riga già esistente. */
