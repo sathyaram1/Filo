@@ -228,6 +228,7 @@
     options_action_tab_triage: 'Riordino/archiviazione automatica delle schede',
     options_action_tab_summary: 'Riassunto delle schede archiviate',
     options_action_tab_search: 'Ricerca semantica nell’archivio (re-rank)',
+    options_action_feedback_search: 'Ricerca semantica dei feedback (gestione)',
     options_action_filo_dashboard: 'Home — generazione della dashboard',
     options_action_filo_chat: 'Home — chat con Filo',
     options_action_decks_chat: 'Mazzi — chat di ricerca carte',
