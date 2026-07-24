@@ -93,8 +93,47 @@ test('il builder usa tutta la larghezza della finestra (non è incassato a 960px
   // Prima del fix .sn-page era capped a 960px → builder ≤ ~912px. Ora esce dal
   // cage e riempie quasi tutta la finestra (larga 1280 nei test).
   expect(builderW).toBeGreaterThan(1000);
-  // Riempie davvero: resta solo il padding laterale della pagina (24px * 2).
-  expect(viewportW - builderW).toBeLessThan(80);
+  // Full-bleed (feedback #342): niente più padding laterale della pagina, il
+  // builder tocca i bordi. Prima del fix restavano 24px per lato (~48 totali).
+  expect(viewportW - builderW).toBeLessThan(4);
+});
+
+test('il builder è a tutta pagina, senza box né spazio vuoto ai bordi (feedback #342)', async ({ openTab }) => {
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await newDeck(page);
+
+  const geom = await page.evaluate(() => {
+    const el = document.getElementById('builderGrid');
+    const r = el.getBoundingClientRect();
+    const cs = getComputedStyle(el);
+    return {
+      left: r.left, top: r.top,
+      width: r.width, height: r.height,
+      right: window.innerWidth - r.right,
+      vw: window.innerWidth, vh: window.innerHeight,
+      borderTop: parseFloat(cs.borderTopWidth),
+      borderLeft: parseFloat(cs.borderLeftWidth),
+      radius: parseFloat(cs.borderTopLeftRadius),
+    };
+  });
+
+  // Il contenuto vive direttamente nella pagina: nessun margine vuoto ai bordi.
+  // Prima del fix la pagina aveva padding 32px in alto e 24px ai lati.
+  expect(geom.left).toBeLessThan(2);
+  expect(geom.top).toBeLessThan(2);
+  expect(geom.right).toBeLessThan(2);
+  // Riempie l'intera altezza della finestra (prima: 100vh - 96px di padding).
+  expect(Math.abs(geom.height - geom.vh)).toBeLessThan(4);
+  // Non è più un box: niente bordo esterno né angoli arrotondati, restano solo
+  // i divisori verticali fra le colonne (asseriti dagli altri test del file).
+  expect(geom.borderTop).toBe(0);
+  expect(geom.borderLeft).toBe(0);
+  expect(geom.radius).toBe(0);
+
+  // I due divisori verticali sopravvivono (sono ciò che l'utente voleva tenere).
+  await expect(page.locator('#dividerLeft')).toBeVisible();
+  await expect(page.locator('#dividerRight')).toBeVisible();
 });
 
 test('il ritorno ai Mazzi è un\'icona nella testata di colonna e riporta alla libreria', async ({ openTab }) => {

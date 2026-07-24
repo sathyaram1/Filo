@@ -51,11 +51,14 @@
        di Filo, posizionato fixed alle coordinate del click (come in archivio). */
     .dk-ctxmenu { position: fixed; right: auto; top: auto; min-width: 140px; }
 
-    /* Il builder è un'app a piena larghezza: esce dal max-width di .sn-page
-       (pensato per le pagine di impostazioni, non per un'area di lavoro) così
-       da usare TUTTO lo spazio orizzontale della finestra. La classe è messa
-       sul body dal JS solo mentre il builder è a schermo. */
-    body.dk-full .sn-page { max-width: none; }
+    /* Il builder è un'app a piena larghezza E a piena pagina: esce dal max-width
+       di .sn-page (pensato per le pagine di impostazioni, non per un'area di
+       lavoro) e ne azzera anche il padding, così usa TUTTO lo spazio della
+       finestra senza box né margini vuoti ai bordi (feedback #342: il contenuto
+       vive direttamente nella pagina, gli unici divisori sono quelli verticali
+       fra le colonne). La classe è messa sul body dal JS solo mentre il builder
+       è a schermo. */
+    body.dk-full .sn-page { max-width: none; padding: 0; }
 
     /* ── Builder (§2): tre colonne con due divisori trascinabili A MANO
        (deliberato, mai su hover/click); le larghezze persistono e le imposta
@@ -66,8 +69,8 @@
        carta in anteprima non esplode oltre l'altezza dello schermo. ── */
     .dk-builder {
       display: grid; grid-template-columns: 340px 6px 1fr 6px 340px;
-      gap: 0; height: calc(100vh - 96px); min-height: 320px;
-      border: 1px solid var(--sn-border); border-radius: 10px; overflow: hidden;
+      gap: 0; height: 100vh; min-height: 320px;
+      overflow: hidden;
     }
     /* min-height: 0 è OBBLIGATORIO: senza, questo flex/grid item eredita
        min-height: auto e NON si comprime sotto l'altezza del contenuto — così
