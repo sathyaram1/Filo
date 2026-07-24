@@ -385,7 +385,7 @@
       <div class="dk-group" data-group="${esc(g.name)}">
         <div class="dk-group-head" data-g="${esc(g.name)}">
           <span>${closed ? '▸' : '▾'}</span><span>${esc(g.name)}</span>
-          <span class="dk-group-n">${g.entries.length}</span>
+          <span class="dk-group-n">${g.entries.reduce((n, x) => n + Math.max(1, Number(x.entry && x.entry.qty) || 1), 0)}</span>
         </div>
         <div class="dk-group-rows" ${closed ? 'hidden' : ''}>
           ${g.entries.map(rowHtml).join('')}
