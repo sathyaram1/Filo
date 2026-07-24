@@ -1,7 +1,0 @@
-{
-  "id": "51d6380b-f053-467d-809e-c87193db415f",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica è stata pubblicata. Ora nel deck builder il numero accanto all'intestazione di ogni gruppo conta le copie totali delle carte (non più le righe distinte): con 10 terre uguali il gruppo «Terre» mostra 10, in linea con il pannello Composizione e con il totale in alto.",
-  "queuedAt": "2026-07-24T01:23:03.399Z",
-  "queuedBy": "routine"
-}
