@@ -431,22 +431,37 @@
   // (la chiave privata non esce da lì) e torna un data URL mostrabile. Cache
   // per non ri-decifrare la stessa immagine riaprendo il feedback (mappa
   // url → dataUrl | null; null = fallita, non si ritenta).
+  // Cache url → { dataUrl, error }: `dataUrl` valorizzato = immagine mostrabile;
+  // altrimenti `error` porta il MOTIVO preciso del fallimento (dal main) così il
+  // segnaposto può spiegare all'owner perché non la vede (chiave non
+  // configurata, decifratura fallita, download non riuscito…) invece di un muto
+  // "non disponibile". null = fallita, non si ritenta.
   const imgCache = new Map();
   async function resolveImageSrc(url) {
-    if (!url) return null;
+    if (!url) return { dataUrl: null, error: '' };
     if (imgCache.has(url)) return imgCache.get(url);
     let dataUrl = null;
+    let error = '';
     try {
       const r = await sendToMain({ type: 'feedback_decrypt_image', url });
       if (r && r.ok && r.dataUrl) dataUrl = r.dataUrl;
-    } catch (_) { /* rete/canale: trattala come non disponibile */ }
-    imgCache.set(url, dataUrl);
-    return dataUrl;
+      else if (r && r.error) error = String(r.error);
+      else error = 'immagine non disponibile';
+    } catch (_) {
+      // rete/canale: trattala come non disponibile
+      error = 'immagine non raggiungibile';
+    }
+    const res = { dataUrl, error };
+    imgCache.set(url, res);
+    return res;
   }
 
   // Sostituisce il segnaposto di ogni <img> di una bolla con l'immagine
   // decifrata (o lo stato "non disponibile"). Il click apre il lightbox con
-  // l'immagine GIÀ decifrata (`data-full`), mai con l'URL cifrato.
+  // l'immagine GIÀ decifrata (`data-full`), mai con l'URL cifrato. Se la
+  // decifratura fallisce, il MOTIVO preciso finisce nel `title` (hover) del
+  // segnaposto: un'immagine muta che non si apre non dice all'owner se manca
+  // la chiave privata o se il file è corrotto.
   function resolveBubbleImages(bubble) {
     bubble.querySelectorAll('.mg-bubble-imgs img').forEach((img) => {
       const url = img.dataset.url || '';
@@ -454,7 +469,7 @@
         const full = img.dataset.full;
         if (full) openLightbox(full);
       });
-      resolveImageSrc(url).then((dataUrl) => {
+      resolveImageSrc(url).then(({ dataUrl, error }) => {
         img.classList.remove('mg-img-loading');
         if (dataUrl) {
           img.src = dataUrl;
@@ -462,6 +477,7 @@
         } else {
           img.classList.add('mg-img-failed');
           img.alt = 'immagine non disponibile';
+          if (error) img.title = error;
         }
       });
     });
