@@ -746,21 +746,48 @@
   }
 
   async function savePage() {
+    // Committa il salvataggio SUBITO, prima di qualsiasi attesa. La cattura
+    // della miniatura (captureVisibleTab) attende ~120ms che il menu sparisca
+    // dal compositor: se in quella finestra la pagina fa un redirect o si
+    // ricarica, il contesto del content script viene distrutto e il messaggio
+    // di salvataggio non partirebbe mai — l'utente crederebbe di aver salvato
+    // ma non ci sarebbe nulla, senza alcun avviso (#334). Raccogliamo i dati e
+    // inviamo SAVE_PAGE in modo sincrono al click (l'IPC parte prima di ogni
+    // await): la miniatura arriva dopo, ed è best-effort.
+    const base = buildSavePayload();
+    let entry = null;
+    try {
+      const res = await chrome.runtime.sendMessage({ type: MSG.SAVE_PAGE, page: base });
+      if (!res?.ok) {
+        Popup.showToast(I18n.t('toast_save_failed'));
+        return;
+      }
+      entry = res.entry;
+      Popup.showToast(I18n.t('toast_saved', I18n.t('category_default')));
+    } catch (e) {
+      // Contesto distrutto da un redirect immediato o errore IPC: avvisa
+      // invece di fallire in silenzio.
+      console.error('[SN] savePage', e);
+      Popup.showToast(I18n.t('toast_save_failed'));
+      return;
+    }
+
+    // Miniatura best-effort: catturala dopo che il menu è sparito dal
+    // compositor e aggiorna la scheda salvata. Se la pagina è già cambiata la
+    // cattura può fallire: il salvataggio resta valido, solo senza anteprima.
     try {
       const cap = await captureVisibleTab();
       const thumbnail = cap?.dataUrl || '';
-      const base = buildSavePayload();
-      const res = await chrome.runtime.sendMessage({
-        type: MSG.SAVE_PAGE,
-        page: { ...base, thumbnail },
-      });
-      if (res?.ok) {
-        Popup.showToast(I18n.t('toast_saved', I18n.t('category_default')));
-        setTimeout(() => chrome.runtime.sendMessage({ type: MSG.CLOSE_TAB }), 600);
+      if (thumbnail && entry?.id) {
+        await chrome.runtime.sendMessage({
+          type: MSG.SET_SAVED_PAGE_THUMB,
+          id: entry.id,
+          thumbnail,
+        });
       }
-    } catch (e) {
-      console.error('[SN] savePage', e);
-    }
+    } catch (_) { /* miniatura opzionale: il salvataggio è già andato a buon fine */ }
+
+    setTimeout(() => chrome.runtime.sendMessage({ type: MSG.CLOSE_TAB }), 600);
   }
 
   async function saveLink(linkEl) {
