@@ -59,6 +59,13 @@ function dispatch(command, window) {
 
 async function saveForLater(win, tab) {
   const { handleMessage } = require('./services/handlers');
+  // Fotografiamo SUBITO i dati identificativi della scheda, prima di qualsiasi
+  // attesa: se la pagina naviga/redirect mentre raccogliamo metadata e
+  // miniatura, tab.url/tab.title potrebbero già puntare alla nuova pagina e
+  // finiremmo per salvare quella sbagliata (#334, cammino da scorciatoia).
+  const url = tab.url;
+  const title = tab.title;
+  const favicon = tab.favicon || '';
   // Chiediamo metadata al content script (best-effort), poi catturiamo thumbnail.
   let extra = {};
   try {
@@ -75,8 +82,8 @@ async function saveForLater(win, tab) {
   await handleMessage({
     type: globalThis.SN_MSG.MSG.SAVE_PAGE,
     page: {
-      url: tab.url, title: tab.title,
-      favicon: tab.favicon || extra.favicon,
+      url, title,
+      favicon: favicon || extra.favicon,
       thumbnail,
       description: extra.description,
       excerpt: extra.excerpt,
