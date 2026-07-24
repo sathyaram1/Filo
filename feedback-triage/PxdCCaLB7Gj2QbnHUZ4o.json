@@ -1,0 +1,7 @@
+{
+  "id": "PxdCCaLB7Gj2QbnHUZ4o",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: nessun problema rilevato. La lavorazione è stata chiusa e pubblicata. Nota: il branch non conteneva modifiche al codice (era gia allineato alla versione pubblicata), quindi il gate non ha dovuto fondere nulla di nuovo.",
+  "queuedAt": "2026-07-24T21:59:08.903Z",
+  "queuedBy": "routine"
+}
