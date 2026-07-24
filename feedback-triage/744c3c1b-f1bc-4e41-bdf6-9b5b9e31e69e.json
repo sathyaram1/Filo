@@ -1,7 +1,0 @@
-{
-  "id": "744c3c1b-f1bc-4e41-bdf6-9b5b9e31e69e",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho riprodotto il caso limite che avevi notato: nel dettaglio di una segnalazione in gestione ho caricato un allegato con un nome di oltre 300 caratteri tutti attaccati (senza spazi), la situazione peggiore possibile. Prima il nome usciva oltre il bordo della bolla e faceva comparire la barra di scorrimento orizzontale che sporcava tutto il pannello della conversazione; ora il nome va a capo su piu righe restando dentro il riquadro, e il pannello non scorre piu lateralmente. Ho verificato che il fix vale sia per gli allegati della segnalazione originale sia per quelli agganciati alle note di lavorazione (usano lo stesso identico modo di mostrarsi, quindi la correzione copre entrambi con un solo intervento, la simmetria che avevi segnalato). Ho anche controllato che gli allegati-immagine restino a posto come prima. Verifica fatta eseguendo davvero la pagina: senza la correzione il contenuto sbordava fino a piu del triplo della larghezza del pannello e il controllo diventava rosso; con la correzione il pannello resta pulito e passa. Nessun problema visivo residuo.",
-  "queuedAt": "2026-07-24T07:06:36.315Z",
-  "queuedBy": "routine"
-}
