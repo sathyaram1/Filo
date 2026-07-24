@@ -1750,6 +1750,14 @@
     // DB3: imposta la "versione rilasciata" usata dal gate "Risolti" e rirende.
     setReleasedVersion(v) { releasedVersion = v || ''; renderList(); },
     openDetail,
+    // Ricerca semantica: apri la barra, imposta la query e lancia (ritorna la
+    // Promise così il test può attendere l'esito prima di asserire).
+    async runSearch(q) {
+      openSearchBar();
+      if (mgSearchInput) mgSearchInput.value = q || '';
+      await runSearch();
+    },
+    isSearchActive() { return searchActive; },
   };
 
   // ── Sezione "Modelli di supporto" (DD1) ──────────────────────────────────
