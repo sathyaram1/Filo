@@ -334,6 +334,11 @@
     `<path d="M9 12.5h6"/>` +
     `<path d="M9 15.8h4"/>`;
 
+  // --- Ricerca: la classica lente d'ingrandimento (cerchio + manico).
+  const search =
+    `<circle cx="11" cy="11" r="6"/>` +
+    `<path d="M20 20l-4.3-4.3"/>`;
+
   // Esposizione: ciascuna icona è una FUNZIONE (size) => stringa SVG.
   // Permette ai consumer di chiedere taglie diverse (es. 16 per la riga,
   // 20 per la griglia overflow) senza ricreare manualmente il wrapper.
