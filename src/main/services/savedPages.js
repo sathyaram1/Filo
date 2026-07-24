@@ -55,6 +55,20 @@
     return entry;
   }
 
+  // Aggiorna SOLO la miniatura di una scheda già salvata (per id). Serve al
+  // flusso "Salva per dopo": il salvataggio viene committato subito col testo,
+  // la miniatura arriva dopo (cattura ~120ms) ed è opzionale. Se la scheda non
+  // esiste più (rimossa nel frattempo) l'update è un no-op.
+  async function setThumbnail(id, thumbnail) {
+    if (!id || !thumbnail) return null;
+    const pages = await list();
+    const entry = pages.find((p) => p.id === id);
+    if (!entry) return null;
+    entry.thumbnail = thumbnail;
+    await chrome.storage.local.set({ [STORAGE_KEYS.SAVED_PAGES]: pages });
+    return entry;
+  }
+
   async function remove(id) {
     const pages = await list();
     const filtered = pages.filter((p) => p.id !== id);
