@@ -152,6 +152,9 @@
     FILO_TAB_SUMMARY: 'filo_tab_summary',
     // §3.2 — re-rank LLM dei top-K risultati della ricerca semantica.
     FILO_TAB_SEARCH: 'filo_tab_search',
+    // Ricerca semantica dei feedback nella dashboard di gestione (owner-only):
+    // l'LLM ordina i feedback per pertinenza a una query in linguaggio naturale.
+    FILO_FEEDBACK_SEARCH: 'filo_feedback_search',
     // Deck builder (DECK-BUILDER-SPEC.md §3-§4): chat unificata del Builder.
     // Traduce query secche/frasi conversazionali in query Scryfall o seleziona
     // carte da un altro mazzo (query cross-mazzo). Output JSON tipizzato.
