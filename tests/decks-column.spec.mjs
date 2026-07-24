@@ -104,6 +104,26 @@ test('l\'elenco raggruppa per tipo, mostra i simboli di mana e collassa i gruppi
   await expect(page.locator('.dk-row:visible')).toHaveCount(3);
 });
 
+// Il numero a destra dell'intestazione di ogni gruppo deve contare le COPIE
+// (somma delle qty), non le righe distinte — coerente con la card Composizione
+// e col totale in alto. Con 10× Island il gruppo "Terre" deve dire 10, non 1.
+// Prima del fix questo assert era rosso (mostrava "1").
+test('il numero del gruppo conta le copie, non le righe', async ({ app, openTab }) => {
+  await mockScryfall(app);
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await seedDeck(page);
+
+  // 10× Island in "Terre" → l'intestazione conta 10 copie.
+  await expect(page.locator('.dk-group[data-group="Terre"] .dk-group-n')).toHaveText('10');
+  // Gruppi con una sola copia restano a 1.
+  await expect(page.locator('.dk-group[data-group="Istantanei"] .dk-group-n')).toHaveText('1');
+  await expect(page.locator('.dk-group[data-group="Creature"] .dk-group-n')).toHaveText('1');
+
+  // Coerenza con la card Composizione delle statistiche: "Terre" dice 10 lì e 10 qui.
+  await expect(page.locator('#statTypes .dk-type-row', { hasText: 'Terre' })).toContainText('10');
+});
+
 test('cambio vista (per costo) e override di gruppo dal tasto destro', async ({ app, openTab }) => {
   await mockScryfall(app);
   const page = await openTab('filo://decks/decks.html');
