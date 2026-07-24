@@ -16,6 +16,12 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.160', date: '2026-07-24',
+      features: [
+        'Nella dashboard di gestione ora c’è una ricerca «a senso»: l’icona a lente in alto a destra apre un campo dove puoi descrivere il feedback che cerchi con parole tue (anche un ricordo vago, non le parole esatte usate) e Filo ti mostra i feedback più pertinenti, di qualunque scheda (Ricevuti, In coda, Risolti, Archiviati), ordinati per rilevanza. Se il modello non è disponibile, ripiega su una ricerca per parole così trovi comunque qualcosa.',
+      ],
+    },
+    {
       version: '0.2.159', date: '2026-07-24',
       fixes: [
         'Inviare un feedback non crea più doppioni: se l’invio sembrava fallito (es. connessione lenta) ma in realtà era andato a buon fine, ripremere «Invia» non aggiunge più una seconda, terza o quarta copia dello stesso messaggio. Se invece modifichi il testo o gli allegati prima di reinviare, resta un messaggio distinto. In più, ora l’app attende più a lungo prima di segnalare un problema di rete, così un invio lento ma riuscito ti mostra il vero esito.',
