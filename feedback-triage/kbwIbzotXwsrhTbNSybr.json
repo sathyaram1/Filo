@@ -1,7 +1,0 @@
-{
-  "id": "kbwIbzotXwsrhTbNSybr",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho aperto un mazzo e verificato proprio quello che chiedevi: il contenuto ora vive direttamente nella pagina, senza più la cornice/box con gli angoli arrotondati e senza spazio vuoto ai bordi. Le tre colonne (chat e ricerca / mazzo / statistiche) arrivano fino al bordo sinistro, destro e in fondo, e riempiono tutta l'altezza della finestra; restano solo i divisori verticali fra le colonne, ancora trascinabili. Ho controllato anche i casi limite: uscendo dal mazzo e tornando alla lista dei mazzi la pagina torna al suo aspetto normale (il 'tutto schermo' vale solo dentro un mazzo, non altrove) e passando avanti e indietro più volte non resta 'incastrato'; riaprendo un mazzo con colonne salvate più larghe dello schermo la colonna centrale non sparisce. Ho anche guardato uno screenshot reale della finestra per conferma visiva: nessuna box, contenuto a filo dei bordi. Tutto a posto.",
-  "queuedAt": "2026-07-24T21:39:48.607Z",
-  "queuedBy": "routine"
-}
