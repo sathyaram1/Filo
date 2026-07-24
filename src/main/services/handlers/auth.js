@@ -284,6 +284,23 @@ module.exports = function register(on, ctx) {
     }
   });
 
+  // Ricerca semantica dei feedback (dashboard di gestione, owner-only). Il
+  // renderer manda un catalogo compatto già decifrato + la query; il main la fa
+  // ordinare da un LLM. Il vero motore vive in handlers.js (dove sono i provider
+  // AI) ed è esposto su globalThis; qui applichiamo solo il gate admin.
+  on(MSG.FEEDBACK_SEARCH, async (msg) => {
+    try {
+      if (!auth.isAdmin()) {
+        return { ok: false, error: 'Operazione riservata agli amministratori.' };
+      }
+      const fn = globalThis.SN_FEEDBACK_SEARCH;
+      if (typeof fn !== 'function') return { ok: true, results: null };
+      return await fn(msg && msg.query, (msg && msg.items) || []);
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  });
+
   // Config "modelli predefiniti" condivisa. La lettura (per l'editor admin)
   // NON espone le chiavi vere, solo se sono configurate. La scrittura è
   // riservata agli admin (Firebase ID token come Bearer): le regole Firestore
