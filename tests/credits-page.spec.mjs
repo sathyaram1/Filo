@@ -33,6 +33,35 @@ test('la pagina Crediti mostra saldo e una fetta per tipo d\'uso', async ({ app,
   await expect(page.locator('#legend li[data-group="Correttore ortografico"] .sn-credits-value')).toHaveText('100');
 });
 
+test('un consumo sotto il credito resta visibile (torta + saldo), non sparisce arrotondato', async ({ app, openTab }) => {
+  // Uso leggero: due tipi d'uso che costano FRAZIONI di credito (0,3 e 0,4).
+  // Prima del fix la pagina arrotondava all'intero ogni gruppo → entrambi a 0 →
+  // torta vuota e "Non hai ancora consumato crediti", pur avendo usato Filo.
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CREDITS;
+    // costEur/0,0008 = crediti. 0,00024€ → 0,3 crediti; 0,00032€ → 0,4 crediti.
+    await C.recordConsumption({ action: 'spellcheck_word', costEur: 0.00024 });
+    await C.recordConsumption({ action: 'filo_chat', costEur: 0.00032 });
+  });
+
+  const page = await openTab('filo://credits/credits.html');
+  await page.waitForLoadState('domcontentloaded');
+
+  // La sezione consumo è visibile e lo stato vuoto è nascosto: il consumo c'è.
+  await expect(page.locator('#usageSection')).toBeVisible();
+  await expect(page.locator('#usageEmpty')).toBeHidden();
+
+  // Una fetta per ciascun tipo d'uso, anche se sotto il credito.
+  await expect(page.locator('#chart [data-group]')).toHaveCount(2);
+
+  // La legenda mostra i crediti frazionari (formato italiano con la virgola).
+  await expect(page.locator('#legend li[data-group="Correttore ortografico"] .sn-credits-value')).toHaveText('0,3');
+  await expect(page.locator('#legend li[data-group="Chat con Filo"] .sn-credits-value')).toHaveText('0,4');
+
+  // Il saldo riflette il consumo frazionario: 1000 - 0,7 = 999,3.
+  await expect(page.locator('#balance')).toHaveText('999,3');
+});
+
 test('i movimenti recenti mostrano etichette specifiche per ogni tipo di ricompensa', async ({ app, openTab }) => {
   // Seed di ricompense di ogni tipo prodotto in produzione. Senza le etichette
   // mancanti, voto/rimborso/bonus cadrebbero tutti nel generico 'Ricompensa'.
