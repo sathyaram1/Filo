@@ -31,7 +31,12 @@
 
   function render(r) {
     const credits = r.credits || {};
-    $('balance').textContent = formatInt(credits.balance || 0);
+    // Saldo con precisione fino a 1 decimale: un uso leggero consuma frazioni di
+    // credito, e arrotondare all'intero le nasconderebbe (il saldo resterebbe
+    // fermo a 1000 pur avendo l'utente usato Filo). balanceExact conserva la
+    // frazione; ripiego su balance per retrocompatibilità.
+    const bal = credits.balanceExact != null ? credits.balanceExact : (credits.balance || 0);
+    $('balance').textContent = formatCredits(bal);
     $('offlineHint').hidden = !!r.signedIn;
 
     renderUsage(credits.byUsage || {});
@@ -39,9 +44,14 @@
   }
 
   function renderUsage(byUsage) {
-    // Solo i gruppi con consumo > 0, in ordine decrescente.
+    // Solo i gruppi con consumo > 0, in ordine decrescente. NON arrotondare
+    // all'intero: il motore fornisce già i crediti per gruppo con precisione al
+    // decimo (round1 in publicView), apposta per non perdere il consumo sotto
+    // il credito. Arrotondando qui, un uso leggero (frazioni di credito per
+    // gruppo) sparirebbe dalla torta e la pagina direbbe "non hai ancora
+    // consumato crediti" pur avendo l'utente usato Filo.
     const groups = Object.entries(byUsage)
-      .map(([label, v]) => ({ label, credits: Math.round((v && v.credits) || 0), calls: (v && v.calls) || 0 }))
+      .map(([label, v]) => ({ label, credits: (v && v.credits) || 0, calls: (v && v.calls) || 0 }))
       .filter((g) => g.credits > 0)
       .sort((a, b) => b.credits - a.credits);
 
@@ -113,7 +123,7 @@
 
       const value = document.createElement('span');
       value.className = 'sn-credits-value';
-      value.textContent = formatInt(g.credits);
+      value.textContent = formatCredits(g.credits);
 
       li.append(sw, label, value);
       legend.appendChild(li);
@@ -158,6 +168,13 @@
 
   function formatInt(n) {
     return new Intl.NumberFormat('it-IT').format(Math.round(Number(n) || 0));
+  }
+  // Crediti con al più un decimale: mostra "137" per un valore intero e "0,3"
+  // per una frazione, così un consumo sotto il credito resta visibile invece di
+  // sparire arrotondato a zero. Il decimale sparisce se il valore è intero.
+  function formatCredits(n) {
+    const v = Math.round((Number(n) || 0) * 10) / 10;
+    return new Intl.NumberFormat('it-IT', { maximumFractionDigits: 1 }).format(v);
   }
   function formatDate(ts) {
     if (!ts) return '';

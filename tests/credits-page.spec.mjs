@@ -8,9 +8,18 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 
+// Il bonus giornaliero "feedback autonomo" (+10) è ON di default e viene
+// applicato quando la pagina Crediti chiede il saldo: sballerebbe i saldi attesi
+// di questi test (1000 → 1010, ecc.). Lo disattiviamo nel seed così i saldi sono
+// deterministici e riflettono SOLO il consumo che stiamo verificando.
+async function disableAutoFeedbackBonus() {
+  await globalThis.SN_STORAGE.updateSettings({ security: { autoFeedback: false } });
+}
+
 test('la pagina Crediti mostra saldo e una fetta per tipo d\'uso', async ({ app, openTab }) => {
   // Seed di consumo nel motore crediti (processo main): due tipi d'uso distinti.
   // 0.08€ → 100 crediti (correttore), 0.16€ → 200 crediti (chat). Saldo 1000-300.
+  await app.evaluate(disableAutoFeedbackBonus);
   await app.evaluate(async () => {
     const C = globalThis.SN_CREDITS;
     await C.recordConsumption({ action: 'spellcheck_word', costEur: 0.08 });
@@ -31,6 +40,36 @@ test('la pagina Crediti mostra saldo e una fetta per tipo d\'uso', async ({ app,
   // La legenda elenca gli stessi gruppi con i crediti spesi.
   await expect(page.locator('#legend li[data-group="Chat con Filo"] .sn-credits-value')).toHaveText('200');
   await expect(page.locator('#legend li[data-group="Correttore ortografico"] .sn-credits-value')).toHaveText('100');
+});
+
+test('un consumo sotto il credito resta visibile (torta + saldo), non sparisce arrotondato', async ({ app, openTab }) => {
+  // Uso leggero: due tipi d'uso che costano FRAZIONI di credito (0,3 e 0,4).
+  // Prima del fix la pagina arrotondava all'intero ogni gruppo → entrambi a 0 →
+  // torta vuota e "Non hai ancora consumato crediti", pur avendo usato Filo.
+  await app.evaluate(disableAutoFeedbackBonus);
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CREDITS;
+    // costEur/0,0008 = crediti. 0,00024€ → 0,3 crediti; 0,00032€ → 0,4 crediti.
+    await C.recordConsumption({ action: 'spellcheck_word', costEur: 0.00024 });
+    await C.recordConsumption({ action: 'filo_chat', costEur: 0.00032 });
+  });
+
+  const page = await openTab('filo://credits/credits.html');
+  await page.waitForLoadState('domcontentloaded');
+
+  // La sezione consumo è visibile e lo stato vuoto è nascosto: il consumo c'è.
+  await expect(page.locator('#usageSection')).toBeVisible();
+  await expect(page.locator('#usageEmpty')).toBeHidden();
+
+  // Una fetta per ciascun tipo d'uso, anche se sotto il credito.
+  await expect(page.locator('#chart [data-group]')).toHaveCount(2);
+
+  // La legenda mostra i crediti frazionari (formato italiano con la virgola).
+  await expect(page.locator('#legend li[data-group="Correttore ortografico"] .sn-credits-value')).toHaveText('0,3');
+  await expect(page.locator('#legend li[data-group="Chat con Filo"] .sn-credits-value')).toHaveText('0,4');
+
+  // Il saldo riflette il consumo frazionario: 1000 - 0,7 = 999,3.
+  await expect(page.locator('#balance')).toHaveText('999,3');
 });
 
 test('i movimenti recenti mostrano etichette specifiche per ogni tipo di ricompensa', async ({ app, openTab }) => {
@@ -65,7 +104,8 @@ test('i movimenti recenti mostrano etichette specifiche per ogni tipo di ricompe
   expect(texts).not.toContain('Ricompensa');
 });
 
-test('senza consumo la pagina Crediti mostra lo stato vuoto', async ({ openTab }) => {
+test('senza consumo la pagina Crediti mostra lo stato vuoto', async ({ app, openTab }) => {
+  await app.evaluate(disableAutoFeedbackBonus);
   const page = await openTab('filo://credits/credits.html');
   await page.waitForLoadState('domcontentloaded');
 
