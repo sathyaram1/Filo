@@ -26,6 +26,7 @@
         'Quando chiedi a Filo di inviare un feedback lungo agli sviluppatori a tuo nome, l’anteprima nel riquadro di conferma non mostra più un carattere rotto se un’emoji cade nel punto in cui il testo viene accorciato: ora l’emoji resta intera.',
         'Cliccando il suggerimento «Riordina e archivia le schede» nella schermata iniziale ora compare il popup di conferma di Filo, come già accade dal pulsante nella chat, e non più l’avviso grigio di sistema del browser.',
         'Nel deck builder, quando sposti a mano una carta in un altro gruppo (tasto destro → «Sposta in gruppo…»), lo spostamento ora vale solo nella vista in cui l’hai fatto: cambiando raggruppamento (per costo di mana, per colore…) la carta torna nel gruppo giusto di quella vista invece di trascinarsi dietro il gruppo forzato altrove.',
+        'Nel deck builder, il numero accanto all’intestazione di ogni gruppo ora conta le copie totali di carte e non più le righe distinte: con 10 terre uguali il gruppo «Terre» dice 10, in linea con il pannello Composizione e con il totale in alto.',
       ],
     },
     {
