@@ -1,7 +1,0 @@
-{
-  "id": "CAgnQLEfJbMCCVNkShsF",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho aperto il menu App (l'icona App in alto a destra nella Nuova scheda), che era il punto esatto del problema: prima 'Mazzi' e 'Bacheca' erano le uniche due voci senza icona, tutte le altre ce l'avevano. Ora tutte e cinque le voci mostrano la loro icona: Editor, Deck builder MTG (carte a ventaglio), Feedback, Bacheca (una lavagna a colonne, coerente con quello che e') e Gestione. La voce 'Mazzi' e' stata rinominata in 'Deck builder MTG' in tutti i punti in cui la si legge (voce del menu, titolo della scheda e intestazione della pagina) e aprendola si arriva comunque alla stessa app. Verificato in due modi: un test automatico che apre davvero il menu e conta le icone (diventa rosso se anche una sola voce resta muta o se ricompare 'Mazzi'), e uno screenshot reale del menu guardato a occhio. Provato ad aprire e chiudere il menu ripetutamente senza problemi; le etichette sono fisse e non contengono testo scritto dall'utente, quindi nessun rischio di contenuti indesiderati. Nota minore che NON blocca l'approvazione: dentro l'app, la schermata-libreria e il pulsante 'torna indietro' si chiamano ancora 'Mazzi' — e' un nome interno sensato (la tua collezione di mazzi) piu' che la voce rinominata, ma se vuoi uniformita' totale si potrebbe allineare anche li'.",
-  "queuedAt": "2026-07-24T13:08:13.289Z",
-  "queuedBy": "routine"
-}
