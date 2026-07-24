@@ -244,8 +244,8 @@
     },
     {
       id: 'history', title: 'Cronologia delle richieste AI', category: 'save',
-      desc: 'L’elenco delle richieste fatte all’AI (spiegazioni, traduzioni, aiuto…), filtrabile e ricercabile, con possibilità di svuotarla.',
-      invoke: 'Pagina filo://history/history.html.',
+      desc: 'L’elenco delle richieste fatte all’AI (spiegazioni, traduzioni, aiuto…), filtrabile e ricercabile; puoi rimuovere una singola voce oppure svuotarla del tutto.',
+      invoke: 'Pagina filo://history/history.html. Passa il mouse su una voce e clicca «Rimuovi» per toglierla; «Cancella tutto» svuota l’intera cronologia.',
     },
 
     // ──────────────────── Assistente e agente di pagina ──────────────────────
