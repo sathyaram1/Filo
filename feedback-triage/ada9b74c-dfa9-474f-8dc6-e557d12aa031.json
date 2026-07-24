@@ -1,0 +1,7 @@
+{
+  "id": "ada9b74c-dfa9-474f-8dc6-e557d12aa031",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la modifica e stata pubblicata. Ora il salvataggio con Salva per dopo viene registrato all'istante al momento del click, cosi non si perde piu in silenzio se la pagina si ricarica o fa un redirect subito dopo; l'anteprima si aggiunge dopo ed e opzionale, e se qualcosa va storto compare un avviso invece del silenzio.",
+  "queuedAt": "2026-07-24T07:25:52.586Z",
+  "queuedBy": "routine"
+}
