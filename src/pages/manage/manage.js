@@ -880,7 +880,8 @@
       // col sottotesto dello stato (statusReason: loop, clarify, …) se presente.
       const norm = MR.normalizeStatus(fb);
       item.title = (num ? `#${num} · ` : '') + title
-        + (norm.statusReason ? ` — ${norm.statusReason}` : '');
+        + (norm.statusReason ? ` — ${norm.statusReason}` : '')
+        + (searchActive && searchReasons[fb._id] ? ` — ${searchReasons[fb._id]}` : '');
       const rowHtml = `
         ${authorIconHtml(fb)}
         ${num ? `<span class="mg-item-num">#${esc(num)}</span>` : ''}
