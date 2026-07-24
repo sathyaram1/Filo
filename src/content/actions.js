@@ -763,7 +763,6 @@
         return;
       }
       entry = res.entry;
-      Popup.showToast(I18n.t('toast_saved', I18n.t('category_default')));
     } catch (e) {
       // Contesto distrutto da un redirect immediato o errore IPC: avvisa
       // invece di fallire in silenzio.
@@ -773,19 +772,26 @@
     }
 
     // Miniatura best-effort: catturala dopo che il menu è sparito dal
-    // compositor e aggiorna la scheda salvata. Se la pagina è già cambiata la
-    // cattura può fallire: il salvataggio resta valido, solo senza anteprima.
+    // compositor. La cattura DEVE precedere il toast di conferma, altrimenti il
+    // toast finisce dentro la miniatura (#325). Se la pagina è già cambiata la
+    // cattura può fallire: il salvataggio resta comunque valido, solo senza
+    // anteprima.
+    let thumbnail = '';
     try {
       const cap = await captureVisibleTab();
-      const thumbnail = cap?.dataUrl || '';
-      if (thumbnail && entry?.id) {
-        await chrome.runtime.sendMessage({
-          type: MSG.SET_SAVED_PAGE_THUMB,
-          id: entry.id,
-          thumbnail,
-        });
-      }
-    } catch (_) { /* miniatura opzionale: il salvataggio è già andato a buon fine */ }
+      thumbnail = cap?.dataUrl || '';
+    } catch (_) { /* miniatura opzionale */ }
+
+    // Conferma all'utente (dopo la cattura, così non sporca la miniatura).
+    Popup.showToast(I18n.t('toast_saved', I18n.t('category_default')));
+
+    if (thumbnail && entry?.id) {
+      chrome.runtime.sendMessage({
+        type: MSG.SET_SAVED_PAGE_THUMB,
+        id: entry.id,
+        thumbnail,
+      }).catch(() => {});
+    }
 
     setTimeout(() => chrome.runtime.sendMessage({ type: MSG.CLOSE_TAB }), 600);
   }
