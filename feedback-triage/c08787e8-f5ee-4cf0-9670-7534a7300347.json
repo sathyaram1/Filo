@@ -1,7 +1,0 @@
-{
-  "id": "c08787e8-f5ee-4cf0-9670-7534a7300347",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho riprodotto il sintomo su piu' schermate interne di Filo (Opzioni, Cronologia, Editor). Prima le scorciatoie e la voce 'Aiuto' della linguetta restavano mute; ora il segnale interno che quelle azioni mandano alla scheda viene finalmente raccolto e tradotto nell'azione giusta anche sulle pagine interne, esattamente come gia' accadeva sui siti web. Verificato in modo diretto che invocare l'Aiuto su una pagina interna apre davvero la barra Aiuto su quella pagina, marcata come 'aperta dalla linguetta': e' lo stesso identico canale usato da Alt+E (spiega), Alt+T (traduci) e Alt+H, che quindi tornano a rispondere. Prova che e' un fix reale: ho temporaneamente rimosso la correzione e il controllo diventa rosso (la barra non compare), col fix torna verde. Nessuna regressione: l'Aiuto dalle schede dei siti web esterni e dal menu in pagina continua a funzionare, e passano tutti i controlli automatici di base. Sul piano sicurezza il collegamento si attiva solo sulle vere pagine interne, non su documenti esterni, quindi non allarga i permessi.",
-  "queuedAt": "2026-07-24T00:31:36.583Z",
-  "queuedBy": "routine"
-}
