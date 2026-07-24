@@ -587,6 +587,9 @@
     renderStatLegality();
     renderBudget();
     renderProbForm();
+    // Il mazzo è cambiato (carte, quantità, tag): riraffina la probabilità con
+    // le categorie richieste correnti, senza che l'utente debba ricalcolare.
+    scheduleProb();
   }
 
   async function removeFromDeck(cardId) {
