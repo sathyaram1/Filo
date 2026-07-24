@@ -78,13 +78,13 @@ module.exports = function register(on, ctx) {
     let releaseReferrer = () => {};
     try {
       const referrer = String(sender?.tab?.url || sender?.url || '');
-      if (process.env.FILO_DBG_REF) console.error('[DBG dl handler] url=', url, 'referrer=', referrer, 'ses=', !!ses);
+      if (process.env.FILO_DBG_REF) require('node:fs').appendFileSync(process.env.FILO_DBG_REF, `[dl handler] url=${url} referrer=${referrer} ses=${!!ses}\n`);
       if (/^https?:/i.test(referrer)) {
         require('../cookies').ensureHeaderHook(ses);
         releaseReferrer = require('../download-referrer').expect(url, referrer);
-        if (process.env.FILO_DBG_REF) console.error('[DBG dl handler] hook+expect registered');
+        if (process.env.FILO_DBG_REF) require('node:fs').appendFileSync(process.env.FILO_DBG_REF, `[dl handler] hook+expect registered sessId=${ses?.getStoragePath?.()||'default'}\n`);
       }
-    } catch (e) { if (process.env.FILO_DBG_REF) console.error('[DBG dl handler] ERR', e); }
+    } catch (e) { if (process.env.FILO_DBG_REF) require('node:fs').appendFileSync(process.env.FILO_DBG_REF, `[dl handler] ERR ${e}\n`); }
 
     return new Promise((resolve) => {
       let settled = false;

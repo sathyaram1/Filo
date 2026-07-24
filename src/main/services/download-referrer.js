@@ -55,7 +55,7 @@ function expect(url, referrer) {
 // per OGNI richiesta: ritorna il Referer da impostare, o null se la richiesta
 // non è un download registrato (il caso normale: costo O(1) su mappe vuote).
 function referrerFor(details) {
-  if (process.env.FILO_DBG_REF) console.error('[DBG referrerFor]', details.resourceType, details.url, 'pending=', [...pending.keys()]);
+  if (process.env.FILO_DBG_REF) require('node:fs').appendFileSync(process.env.FILO_DBG_REF, `[referrerFor] ${details.resourceType} ${details.url} pending=${[...pending.keys()]}\n`);
   if (!pending.size && !byRequestId.size) return null;
   prune();
   const followed = byRequestId.get(details.id);
@@ -63,7 +63,7 @@ function referrerFor(details) {
   const entry = pending.get(details.url);
   if (!entry) return null;
   byRequestId.set(details.id, entry);
-  if (process.env.FILO_DBG_REF) console.error('[DBG referrerFor] MATCH ->', entry.referrer);
+  if (process.env.FILO_DBG_REF) require('node:fs').appendFileSync(process.env.FILO_DBG_REF, `[referrerFor] MATCH -> ${entry.referrer}\n`);
   return entry.referrer;
 }
 

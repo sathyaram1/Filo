@@ -183,6 +183,7 @@ function ensureHeaderHook(ses) {
       let ref = null;
       try { ref = require('./download-referrer').referrerFor(details); } catch (_) {}
       if (ref) headers = { ...headers, Referer: ref };
+      if (ref && process.env.FILO_DBG_REF) { try { require('node:fs').appendFileSync(process.env.FILO_DBG_REF, `[hook-final] ${details.url} existingKeys=${Object.keys(details.requestHeaders).join(',')} -> Referer=${ref}\n`); } catch (_) {} }
       callback({ requestHeaders: headers });
     });
   }
