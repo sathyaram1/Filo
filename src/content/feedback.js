@@ -289,6 +289,8 @@
       try { chrome.storage.local.remove([DRAFT_KEY]); } catch (_) {}
     }
     textEl.addEventListener('input', () => {
+      // Contenuto cambiato → nuova composizione (id di invio fresco).
+      bumpSubmissionId();
       clearTimeout(saveTimer);
       saveTimer = setTimeout(saveDraft, 250);
     });
