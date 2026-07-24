@@ -34,7 +34,10 @@
 //     wget con un flag di cartella di destinazione (-P/--directory-prefix) o curl
 //     con un dump degli header su file (-D/--dump-header) scrivono in un percorso
 //     arbitrario e possono sovrascrivere file sensibili (chiavi SSH, script
-//     d'avvio): salgono da 2 a 3.
+//     d'avvio): salgono da 2 a 3. Stessa classe (scrittura in un percorso scelto
+//     di DATI ACCESSORI il cui contenuto è influenzato dal server) le opzioni più
+//     di nicchia di curl -c/--cookie-jar, --etag-save, --trace/--trace-ascii,
+//     --stderr e l'analoga wget --save-cookies: salgono anch'esse a 3.
 
 (function (global) {
   'use strict';
