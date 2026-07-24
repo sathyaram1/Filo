@@ -240,7 +240,7 @@
     {
       id: 'archive', title: 'Archivio delle schede chiuse', category: 'save',
       desc: 'Ritrova le schede chiuse, raggruppate per giorno; puoi cercarle anche per contenuto e riaprirle.',
-      invoke: 'Pagina filo://archive/archive.html (dalla home → "Tab archiviate").',
+      invoke: 'Pagina filo://archive/archive.html (dalla home → "Tab archiviate"). Clicca una scheda per riaprirla; tasto destro per il menu Riapri/Elimina.',
     },
     {
       id: 'history', title: 'Cronologia delle richieste AI', category: 'save',

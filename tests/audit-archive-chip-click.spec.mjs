@@ -1,24 +1,21 @@
-// AUDIT (routine, riproduzione): archivio tab — il click sinistro sulla chip
-// non fa nulla, mentre Invio da tastiera apre il menu Riapri/Elimina.
+// Archivio tab — parità mouse/tastiera sulla chip di una scheda archiviata.
 //
-// Flusso utente riprodotto:
-//   1. chiudi una scheda (finisce nell'archivio);
-//   2. apri "Tab archiviate" e clicca (sinistro) sulla chip della scheda:
-//      non succede NULLA — né riapertura né menu. La chip però ha l'aspetto di
-//      un bottone (hover evidenziato, role=button) e con Invio/Spazio da
-//      tastiera il menu si apre: il mouse e la tastiera non sono alla pari.
+// La chip ha role=button e ne ha l'aspetto (hover evidenziato). Deve rispondere
+// come un bottone:
+//   - click sinistro / Invio / Spazio  → azione primaria "Riapri" (la scheda
+//     torna aperta), come le card di "Aperti per dopo";
+//   - tasto destro / Shift+F10         → menu contestuale Riapri/Elimina.
 //
-// Il test asserisce lo stato ATTUALE (click sinistro inerte, Invio apre il
-// menu): documenta l'incoerenza restando verde. Il fix atteso (click sinistro
-// che apre il menu o riapre la scheda) lo farà fallire, e a quel punto va
-// aggiornato per asserire il comportamento nuovo.
+// Prima del fix il click sinistro era inerte (nessuna riapertura, nessun menu):
+// questi assert diventerebbero rossi. Asseriscono il SUCCESSO (la scheda si
+// riapre davvero), non l'assenza di un errore.
 
 import { test, expect } from './fixtures/electron.mjs';
 
 const PAGE = `<!doctype html><html><head><title>Sito Chip Click</title></head>
 <body style="margin:0"><div style="height:600px">contenuto</div></body></html>`;
 
-test('archivio: click sinistro sulla chip inerte, Invio apre il menu', async ({ shell, openTab, testServer }) => {
+async function archiveOneTab({ shell, openTab, testServer }) {
   await testServer.openReady(openTab, PAGE);
   const tabId = await shell.evaluate(async () => {
     const snap = await window.filoShell.tabs.snapshot();
@@ -30,20 +27,41 @@ test('archivio: click sinistro sulla chip inerte, Invio apre il menu', async ({ 
   await archive.waitForLoadState('domcontentloaded');
   const row = archive.locator('.arc-tab', { hasText: 'Sito Chip Click' });
   await expect(row).toBeVisible({ timeout: 8_000 });
+  return { archive, row };
+}
 
-  // Stato ATTUALE (il bug): il click sinistro non produce niente.
-  await row.click();
-  await archive.waitForTimeout(600);
-  expect(await archive.locator('.arc-ctxmenu').isVisible().catch(() => false)).toBe(false);
-  const tabsAfterClick = await shell.evaluate(async () => {
-    const snap = await window.filoShell.tabs.snapshot();
-    return snap.tabs.map((t) => t.url);
+async function reopenedHost(shell) {
+  const snap = await shell.evaluate(async () => {
+    const s = await window.filoShell.tabs.snapshot();
+    return s.tabs.map((t) => t.url);
   });
-  expect(tabsAfterClick.some((u) => /127\.0\.0\.1/.test(u || ''))).toBe(false);
+  return snap.some((u) => /127\.0\.0\.1/.test(u || ''));
+}
 
-  // …mentre l'attivazione da tastiera (Invio) apre il menu contestuale:
-  // i due cammini equivalenti divergono.
+test('archivio: click sinistro sulla chip riapre la scheda', async ({ shell, openTab, testServer }) => {
+  const { archive, row } = await archiveOneTab({ shell, openTab, testServer });
+
+  await row.click();
+  await expect.poll(() => reopenedHost(shell), { timeout: 8_000 }).toBe(true);
+  // Il click primario riapre e basta: non deve comparire il menu contestuale.
+  expect(await archive.locator('.arc-ctxmenu').isVisible().catch(() => false)).toBe(false);
+});
+
+test('archivio: Invio da tastiera riapre la scheda (parità col click)', async ({ shell, openTab, testServer }) => {
+  const { row } = await archiveOneTab({ shell, openTab, testServer });
+
   await row.focus();
-  await archive.keyboard.press('Enter');
-  await expect(archive.locator('.arc-ctxmenu')).toBeVisible();
+  await row.press('Enter');
+  await expect.poll(() => reopenedHost(shell), { timeout: 8_000 }).toBe(true);
+});
+
+test('archivio: Shift+F10 apre il menu contestuale Riapri/Elimina', async ({ shell, openTab, testServer }) => {
+  const { archive, row } = await archiveOneTab({ shell, openTab, testServer });
+
+  await row.focus();
+  await row.press('Shift+F10');
+  const menu = archive.locator('.arc-ctxmenu');
+  await expect(menu).toBeVisible();
+  await expect(menu.getByText('Riapri', { exact: true })).toBeVisible();
+  await expect(menu.getByText('Elimina', { exact: true })).toBeVisible();
 });
