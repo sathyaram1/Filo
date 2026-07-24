@@ -261,6 +261,7 @@
     [ACTIONS.FILO_TAB_TRIAGE]: 'Gestione schede',
     [ACTIONS.FILO_TAB_SUMMARY]: 'Riassunto scheda',
     [ACTIONS.FILO_TAB_SEARCH]: 'Ricerca schede',
+    [ACTIONS.FILO_FEEDBACK_SEARCH]: 'Ricerca feedback',
     [ACTIONS.DECKS_CHAT]: 'Mazzi — ricerca carte',
     [ACTIONS.DECKS_OPINION]: 'Mazzi — parere carta',
     [ACTIONS.DECKS_AUTOTAG]: 'Mazzi — etichette',
