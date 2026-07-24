@@ -376,8 +376,8 @@
     }
     @keyframes mgImgPulse { 0%,100% { opacity: .55; } 50% { opacity: .85; } }
     /* Allegato-file di un turno (le note ancorano gli allegati al commento). */
-    .mg-bubble-file { margin-top: 8px; font-size: 13px; }
-    .mg-bubble-file a { color: var(--sn-accent); text-decoration: none; }
+    .mg-bubble-file { margin-top: 8px; font-size: 13px; overflow-wrap: anywhere; }
+    .mg-bubble-file a { color: var(--sn-accent); text-decoration: none; overflow-wrap: anywhere; word-break: break-word; }
     .mg-bubble-file a:hover { text-decoration: underline; }
 
     /* ── Lightbox ────────────────────────────────────────────────────────── */
