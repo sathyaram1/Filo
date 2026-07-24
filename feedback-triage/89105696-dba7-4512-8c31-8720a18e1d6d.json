@@ -1,7 +1,0 @@
-{
-  "id": "89105696-dba7-4512-8c31-8720a18e1d6d",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica e' stata pubblicata. Nella pagina «Tab archiviate» ora il click sinistro su una scheda la riapre subito e lo stesso fa Invio da tastiera, mentre il tasto destro (o Shift+F10) apre come prima il menu Riapri/Elimina.",
-  "queuedAt": "2026-07-24T06:44:42.939Z",
-  "queuedBy": "routine"
-}
