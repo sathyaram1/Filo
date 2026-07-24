@@ -56,6 +56,20 @@
     return full;
   }
 
+  // Rimuove UNA sola voce dalla cronologia AI per id. Simmetrica a append:
+  // se l'utente può aggiungere una voce (di fatto ogni richiesta AI) deve poter
+  // togliere quella singola voce senza svuotare tutto lo storico (es. contiene
+  // testo privato o un risultato sbagliato). Restituisce la lista aggiornata,
+  // così il chiamante riallinea la vista senza una seconda lettura.
+  async function remove(id) {
+    const items = await list();
+    const next = items.filter((it) => it && it.id !== id);
+    if (next.length !== items.length) {
+      await chrome.storage.local.set({ [STORAGE_KEYS.HISTORY]: next });
+    }
+    return next;
+  }
+
   async function clear() {
     await chrome.storage.local.set({ [STORAGE_KEYS.HISTORY]: [] });
   }
@@ -114,5 +128,5 @@
     return { changed: false };
   }
 
-  global.SN_HISTORY = { list, append, clear, cleanupScreenshots };
+  global.SN_HISTORY = { list, append, remove, clear, cleanupScreenshots };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

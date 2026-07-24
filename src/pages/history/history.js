@@ -107,8 +107,29 @@
     left.textContent = `${formatActionLabel(it.action)} • ${it.model || ''} • ${formatDate(it.timestamp)}`;
     meta.appendChild(left);
     const right = document.createElement('span');
-    const cost = it.costEur ? `€${it.costEur.toFixed(4)}` : '—';
-    right.textContent = cost;
+    right.className = 'sn-history-meta-right';
+    const cost = document.createElement('span');
+    cost.textContent = it.costEur ? `€${it.costEur.toFixed(4)}` : '—';
+    right.appendChild(cost);
+
+    // Rimozione puntuale della singola voce: simmetrica alle altre liste di Filo
+    // ("Aperti per dopo", cronologia appunti) che hanno il tasto Rimuovi per
+    // elemento. Compare all'hover sulla voce per non appesantire la lista.
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'sn-history-remove';
+    remove.textContent = I18n.t('history_remove');
+    remove.title = I18n.t('history_remove_title');
+    remove.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const r = await chrome.runtime.sendMessage({ type: MSG.REMOVE_HISTORY_ENTRY, id: it.id });
+      items = r?.items || items.filter((x) => x.id !== it.id);
+      // Un tipo d'azione può essere scomparso del tutto: riallinea il filtro.
+      buildFilterOptions();
+      render();
+    });
+    right.appendChild(remove);
+
     meta.appendChild(right);
     wrap.appendChild(meta);
 

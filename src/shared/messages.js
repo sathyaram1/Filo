@@ -30,6 +30,7 @@
     EXPORT_DATA: 'export_data',                   // → salva tutti i dati come .zip
     GET_HISTORY: 'get_history',
     APPEND_HISTORY: 'append_history',             // { entry }
+    REMOVE_HISTORY_ENTRY: 'remove_history_entry', // { id }
     CLEAR_HISTORY: 'clear_history',
     GET_SAVED_PAGES: 'get_saved_pages',
     REMOVE_SAVED_PAGE: 'remove_saved_page',       // { id }

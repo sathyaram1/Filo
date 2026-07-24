@@ -269,6 +269,16 @@ module.exports = function register(on, ctx) {
     return { ok: true, item };
   });
 
+  // Rimuovi una singola voce della cronologia AI. Stesso confine delle altre
+  // operazioni sulla cronologia AI: solo pagine interne filo:// (la cronologia AI
+  // può contenere testi selezionati/tradotti dall'utente, nessuna pagina web deve
+  // toccarla). Restituisce la lista aggiornata per riallineare la vista.
+  on(MSG.REMOVE_HISTORY_ENTRY, async (msg, sender, origin) => {
+    if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
+    const items = await History.remove(msg.id);
+    return { ok: true, items };
+  });
+
   on(MSG.CLEAR_HISTORY, async (msg, sender, origin) => {
     if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
     await History.clear();
