@@ -44,9 +44,14 @@
   }
 
   function renderUsage(byUsage) {
-    // Solo i gruppi con consumo > 0, in ordine decrescente.
+    // Solo i gruppi con consumo > 0, in ordine decrescente. NON arrotondare
+    // all'intero: il motore fornisce già i crediti per gruppo con precisione al
+    // decimo (round1 in publicView), apposta per non perdere il consumo sotto
+    // il credito. Arrotondando qui, un uso leggero (frazioni di credito per
+    // gruppo) sparirebbe dalla torta e la pagina direbbe "non hai ancora
+    // consumato crediti" pur avendo l'utente usato Filo.
     const groups = Object.entries(byUsage)
-      .map(([label, v]) => ({ label, credits: Math.round((v && v.credits) || 0), calls: (v && v.calls) || 0 }))
+      .map(([label, v]) => ({ label, credits: (v && v.credits) || 0, calls: (v && v.calls) || 0 }))
       .filter((g) => g.credits > 0)
       .sort((a, b) => b.credits - a.credits);
 
