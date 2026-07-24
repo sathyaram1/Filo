@@ -7,6 +7,101 @@ const auth = require('../../auth/google-auth');
 // marcare gli invii dell'owner. Idempotente se già caricato dal loader.
 require('../../../shared/feedbackThread.js');
 
+// ── "Salva immagine come…" (#274): scarico byte nel main ────────────────────
+
+const IMG_DOWNLOAD_MAX = 64 * 1024 * 1024; // tetto anti-OOM (64MB)
+
+// Scarica i byte di un'immagine via net.request usando la session del tab
+// (cookie/auth) e presentando il Referer della pagina — l'unico modo, in
+// Electron 33, di far arrivare il Referer a valle (i download via downloadURL
+// lo perdono sempre). Risolve { buffer, filename } o rigetta con un errore
+// leggibile (HTTP 4xx/5xx, connessione troncata, immagine vuota/troppo grande).
+function fetchImageBytes({ net, url, referrer, session }) {
+  return new Promise((resolve, reject) => {
+    let req;
+    try {
+      req = net.request({ url, session, useSessionCookies: true, redirect: 'follow' });
+    } catch (e) { reject(e); return; }
+    if (/^https?:/i.test(referrer)) {
+      try { req.setHeader('Referer', referrer); } catch (_) {}
+    }
+    req.on('response', (response) => {
+      const status = response.statusCode || 0;
+      if (status >= 400) {
+        try { response.on('data', () => {}); response.on('end', () => {}); } catch (_) {}
+        reject(new Error('HTTP ' + status));
+        return;
+      }
+      const clRaw = response.headers && response.headers['content-length'];
+      const expected = parseInt(Array.isArray(clRaw) ? clRaw[0] : clRaw, 10);
+      const chunks = [];
+      let total = 0;
+      let aborted = false;
+      response.on('data', (chunk) => {
+        if (aborted) return;
+        total += chunk.length;
+        if (total > IMG_DOWNLOAD_MAX) {
+          aborted = true;
+          try { req.abort(); } catch (_) {}
+          reject(new Error('immagine troppo grande'));
+          return;
+        }
+        chunks.push(chunk);
+      });
+      response.on('end', () => {
+        if (aborted) return;
+        // Content-Length dichiarato ma non raggiunto ⇒ risposta troncata dal
+        // server (connessione chiusa a metà): è un errore, non un file valido.
+        if (Number.isFinite(expected) && total < expected) {
+          reject(new Error('download interrotto'));
+          return;
+        }
+        const buffer = Buffer.concat(chunks);
+        if (!buffer.length) { reject(new Error('immagine vuota')); return; }
+        resolve({ buffer, filename: filenameFromResponse(response, url) });
+      });
+      response.on('error', (e) => { if (!aborted) reject(e || new Error('errore risposta')); });
+      response.on('aborted', () => { if (!aborted) reject(new Error('download interrotto')); });
+    });
+    req.on('error', (e) => reject(e || new Error('richiesta fallita')));
+    req.on('abort', () => reject(new Error('download interrotto')));
+    try { req.end(); } catch (e) { reject(e); }
+  });
+}
+
+// Nome file dal Content-Disposition (se presente), altrimenti dal path dell'URL.
+function filenameFromResponse(response, url) {
+  try {
+    const cdRaw = response.headers && response.headers['content-disposition'];
+    const cd = Array.isArray(cdRaw) ? cdRaw[0] : cdRaw;
+    if (cd) {
+      // filename*=UTF-8''… (RFC 5987) ha priorità su filename=…
+      let m = /filename\*=(?:UTF-8'')?([^;]+)/i.exec(cd);
+      if (m) { try { return decodeURIComponent(m[1].trim().replace(/^["']|["']$/g, '')); } catch (_) { return m[1]; } }
+      m = /filename=("?)([^";]+)\1/i.exec(cd);
+      if (m) return m[2].trim();
+    }
+  } catch (_) {}
+  return filenameFromUrl(url);
+}
+
+function filenameFromUrl(url) {
+  try {
+    const u = new URL(url);
+    const base = decodeURIComponent((u.pathname || '').split('/').filter(Boolean).pop() || '');
+    return base || '';
+  } catch (_) { return ''; }
+}
+
+// Neutralizza separatori di percorso, caratteri di controllo e traversal: il
+// nome del server è dato ostile e non deve poter uscire dalla cartella scelta.
+function safeImageFilename(name) {
+  let n = require('node:path').basename(String(name || ''));
+  n = n.replace(/[\x00-\x1f<>:"/\\|?*]/g, '').replace(/\.{2,}/g, '.').replace(/^\.+/, '').trim();
+  if (!n) n = 'immagine';
+  return n.slice(0, 200);
+}
+
 module.exports = function register(on, ctx) {
   const { MSG, winOf, getEffectiveSettings, buildAttemptChain } = ctx;
 
