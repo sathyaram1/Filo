@@ -221,6 +221,8 @@ test('il calcolatore di probabilità: la categoria è leggibile, il numero sta i
   }, deckId);
   await page.evaluate(() => location.reload());
   await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator('#deckList .dk-row')).toHaveCount(3);
+  await expect(page.locator('#probNeeds input[data-tag="ragionamento"]')).toBeVisible();
 
   // Colonna destra larga come quando l'utente la trascina ad allargarsi: è lì
   // che il bug era più evidente (più spazio → il campo si allargava di più).
