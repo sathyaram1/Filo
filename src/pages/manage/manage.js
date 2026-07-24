@@ -2021,8 +2021,18 @@
   window.__mgTest.renderSupportModelsEditor = (models) => { renderSupportModelsEditor(models); smLoaded = true; };
   window.__mgTest.collectJudgeRegistry = collectJudgeRegistry;
 
+  // Icone della ricerca (lente): iniettate da JS così restano nel tema di Filo
+  // (SVG outline, currentColor) invece di un glifo emoji.
+  function injectSearchIcons() {
+    const ICONS = window.SN_ICONS;
+    if (!ICONS || !ICONS.search) return;
+    if (mgSearchToggle) mgSearchToggle.innerHTML = ICONS.search(18);
+    if (mgSearchIco)    mgSearchIco.innerHTML = ICONS.search(16);
+  }
+
   // ── Init ──────────────────────────────────────────────────────────────────
   async function init() {
+    injectSearchIcons();
     await refreshAuth();
     applyAutoModeGate();
     await loadAutoMode();
