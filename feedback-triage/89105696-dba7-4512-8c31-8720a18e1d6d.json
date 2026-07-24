@@ -1,0 +1,7 @@
+{
+  "id": "89105696-dba7-4512-8c31-8720a18e1d6d",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho riprodotto esattamente la lamentela: chiudo una scheda, apro «Tab archiviate» e faccio click sinistro sulla sua chip. Ora la scheda torna aperta davvero (verifico la riapertura, non l'assenza di un errore), e il menu contestuale NON compare al click primario. Ho anche controllato la parità di tutti i percorsi: Invio da tastiera riapre come il click; tasto destro e Shift+F10 aprono il menu Riapri/Elimina. Per essere sicuro che non fosse un test compiacente ho rimosso il fix e il test è tornato rosso (la scheda non si riapriva), poi l'ho ripristinato e torna verde: la verifica coglie il bug vero. Ho infine rilanciato tutti gli altri test dell'archivio (archiviazione alla chiusura, Elimina dal menu, tab proxate, pulizia automatica, ripristino dello scroll): tutti verdi, nessuna regressione. Nota minore, non bloccante: un doppio click sulla chip riapre due copie della stessa scheda, e la chip resta nell'archivio dopo la riapertura — comportamento coerente con la richiesta, segnalo solo come possibile rifinitura futura.",
+  "queuedAt": "2026-07-24T06:43:16.189Z",
+  "queuedBy": "routine"
+}
