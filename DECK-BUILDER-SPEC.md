@@ -169,7 +169,7 @@ Con margine 20% del sistema crediti, operazione vendibile senza attrito. Downgra
 
 - Righe: nome + costo mana (come §3.4). Con **focus sulla colonna**: info extra per riga (prezzo).
 - **Divisori di gruppo collassabili**. Il raggruppamento è una funzione di visualizzazione: per tipo (default) / per tag / per CMC / per colore. "Dividi in questi tag" via chat cambia la vista.
-- Con tag multipli, la carta appare **una sola volta**, nel primo gruppo che matcha (ordine dei gruppi definito); il conteggio 100 resta leggibile. Tasto destro → "sposta in gruppo" fa override.
+- Con tag multipli, la carta appare **una sola volta**, nel primo gruppo che matcha (ordine dei gruppi definito); il conteggio 100 resta leggibile. Tasto destro → "sposta in gruppo" fa override. L'override è **per-vista** (#316): vale solo nella vista di raggruppamento in cui è stato fatto — cambiando raggruppamento la carta torna al criterio naturale di quella vista, senza trascinarsi dietro il gruppo forzato altrove. Override in viste diverse sono indipendenti.
 - Dentro ogni gruppo, ordinamento default per CMC.
 
 ### 8.2 Header della colonna = identità del documento
