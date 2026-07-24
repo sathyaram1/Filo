@@ -74,6 +74,14 @@
   const mgArchiveBtn = document.getElementById('mgArchiveBtn');
   const mgManageMsg  = document.getElementById('mgManageMsg');
 
+  // Ricerca "a senso" (semantica)
+  const mgSearchToggle = document.getElementById('mgSearchToggle');
+  const mgSearchBar    = document.getElementById('mgSearchBar');
+  const mgSearchIco    = document.getElementById('mgSearchIco');
+  const mgSearchInput  = document.getElementById('mgSearchInput');
+  const mgSearchMsg    = document.getElementById('mgSearchMsg');
+  const mgSearchClose  = document.getElementById('mgSearchClose');
+
   // Lightbox
   const mgLightbox    = document.getElementById('mgLightbox');
   const mgLightboxImg = document.getElementById('mgLightboxImg');
