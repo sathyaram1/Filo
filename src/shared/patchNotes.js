@@ -19,7 +19,7 @@
       version: '0.2.158', date: '2026-07-24',
       fixes: [
         'Nell’Editor, assegnando una scorciatoia da tastiera a un modulo della griglia non è più possibile impostare una lettera singola senza un tasto modificatore (Ctrl o Alt): il campo ora lo segnala e non la salva, così quella lettera non viene più «rubata» mentre scrivi nel documento, in chat o nella casella cerca/sostituisci. Le scorciatoie di questo tipo eventualmente già salvate vengono comunque ignorate mentre stai scrivendo.',
-        'Nell’Editor, il modulo che cambia pagina della griglia (le frecce ‹ ›) non si può più eliminare per sbaglio dalla modalità modifica: essendo l’unico modo per raggiungere le altre pagine, ora è protetto come l’ingranaggio delle impostazioni, così non resti più bloccato sulla prima pagina con i moduli delle altre irraggiungibili.',
+        'Nell’Editor, il modulo che cambia pagina della griglia (le frecce ‹ ›) è ora un modulo unico e protetto: essendo l’unico modo per raggiungere le altre pagine, non si può più eliminare per sbaglio dalla modalità modifica né aggiungerne un secondo dalla lista dei moduli, così non resti bloccato né sulla prima pagina né con un doppione ingombrante che non puoi togliere.',
       ],
     },
     {
