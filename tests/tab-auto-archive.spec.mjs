@@ -152,10 +152,13 @@ test('il riordino collassa le home duplicate e chiude le impostazioni (feedback 
 test('l’agente può lanciare la pulizia su richiesta (RUN_TAB_TRIAGE)', async ({ app, shell, openTab, testServer }) => {
   await testServer.openReady(openTab, mk('Uno', 'rgb(200,40,40)'));
   await testServer.openReady(openTab, mk('Due', 'rgb(40,80,200)'));
-  // La pagina dalla quale parte la richiesta (dashboard) diventa attiva e interna.
-  const dash = await openTab('filo://newtab/');
+  // La pagina dalla quale parte la richiesta (impostazioni) diventa attiva e
+  // interna. Usiamo options (istanza unica, non la home che al boot è già aperta
+  // e verrebbe collassata come duplicata): la pagina attiva è sempre protetta,
+  // così l'handle resta vivo per tutta la chiamata.
+  const dash = await openTab('filo://options/options.html');
 
-  // Stub: archivia tutti i candidati (le due tab web).
+  // Stub: archivia tutti i candidati (le due tab web + eventuali home duplicate).
   await app.evaluate(async () => {
     globalThis.SN_TAB_TRIAGE_DECIDE = async ({ tabs }) => ({
       decisions: tabs.map((t, i) => ({ i, action: 'archive', reason: 'pulizia' })),
@@ -168,11 +171,13 @@ test('l’agente può lanciare la pulizia su richiesta (RUN_TAB_TRIAGE)', async 
   expect(res.ok).toBe(true);
   expect(res.archived).toBeGreaterThanOrEqual(2);
 
-  // Le due tab web non ci sono più; la dashboard (attiva, interna) resta.
-  const titles = await shell.evaluate(async () => {
+  // Le due tab web non ci sono più; la pagina attiva (interna) resta aperta.
+  const state = await shell.evaluate(async () => {
     const s = await window.filoShell.tabs.snapshot();
-    return s.tabs.map((t) => t.title);
+    const active = s.tabs.find((t) => t.id === s.activeId);
+    return { titles: s.tabs.map((t) => t.title), activeUrl: active ? active.url : null };
   });
-  expect(titles).not.toContain('Uno');
-  expect(titles).not.toContain('Due');
+  expect(state.titles).not.toContain('Uno');
+  expect(state.titles).not.toContain('Due');
+  expect(/filo:\/\/options/.test(state.activeUrl || '')).toBe(true);
 });
