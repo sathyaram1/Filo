@@ -16,6 +16,12 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.159', date: '2026-07-24',
+      fixes: [
+        'Il riordino delle schede ora chiude anche le pagine interne di troppo, non solo i siti: le schede «Nuova scheda»/home aperte più volte vengono collassate in una sola e le pagine di impostazioni che non stai più usando vengono chiuse (restano sempre raggiungibili). Prima venivano toccati solo i siti web, quindi capitava che chiudesse un sito lasciando aperte home doppie e impostazioni.',
+      ],
+    },
+    {
       version: '0.2.158', date: '2026-07-24',
       fixes: [
         'In «Tab archiviate» il click sinistro su una scheda archiviata ora la riapre subito (come le card di «Aperti per dopo»); Invio da tastiera fa lo stesso, mentre il tasto destro (o Shift+F10) apre come prima il menu Riapri/Elimina.',

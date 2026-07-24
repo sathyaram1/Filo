@@ -94,13 +94,71 @@ test('riaprire una scheda dall’archivio ripristina la posizione di scroll', as
   }, { timeout: 10_000 }).toBeGreaterThan(100);
 });
 
+test('il riordino collassa le home duplicate e chiude le impostazioni (feedback #239)', async ({ app, shell, openTab, testServer }) => {
+  // Scenario del feedback: home aperta più volte + una pagina impostazioni +
+  // un sito. Prima il riordino toccava solo i siti web (chiudeva YouTube ma mai
+  // home/impostazioni). Ora: le home duplicate si collassano da sole e
+  // l'impostazione la archivia l'LLM; il sito web resta se l'LLM dice "keep".
+  // (Al boot Filo apre già una home; qui ne aggiungiamo altre → home duplicate.)
+  await testServer.openReady(openTab, mk('Sito', 'rgb(40,80,200)'));
+  await openTab('filo://newtab/');            // home extra
+  await openTab('filo://options/options.html'); // impostazioni
+  await openTab('filo://newtab/');            // home extra (diventa attiva)
+
+  // Assestamento: più home duplicate, una pagina options, un sito, home attiva.
+  await expect.poll(async () => shell.evaluate(async () => {
+    const s = await window.filoShell.tabs.snapshot();
+    const newtabs = s.tabs.filter((t) => /filo:\/\/newtab/.test(t.url || ''));
+    const opts = s.tabs.filter((t) => /filo:\/\/options/.test(t.url || ''));
+    const active = s.tabs.find((t) => t.id === s.activeId);
+    return newtabs.length >= 2 && opts.length === 1 && !!active
+      && /filo:\/\/newtab/.test(active.url || '');
+  }), { timeout: 8_000 }).toBe(true);
+
+  // LLM: tiene il sito, archivia la pagina impostazioni. Le home duplicate NON
+  // dipendono dall'LLM (dedup deterministico): qui l'LLM le lascia "keep" apposta
+  // per provare che vengono chiuse comunque.
+  const res = await app.evaluate(async ({ BrowserWindow }) => {
+    globalThis.SN_TAB_TRIAGE_DECIDE = async ({ tabs }) => ({
+      decisions: tabs.map((t, i) => ({
+        i,
+        action: /filo:\/\/options/.test(t.url || '') ? 'archive' : 'keep',
+        reason: 'test',
+      })),
+    });
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    return win._filoTabs.runAutoTriage({ trigger: 'manual' });
+  });
+  // Almeno 2 chiuse: la home duplicata (non attiva) + la pagina impostazioni.
+  expect(res.archived).toBeGreaterThanOrEqual(2);
+
+  const after = await shell.evaluate(async () => {
+    const s = await window.filoShell.tabs.snapshot();
+    const active = s.tabs.find((t) => t.id === s.activeId);
+    return {
+      urls: s.tabs.map((t) => t.url),
+      activeUrl: active ? active.url : null,
+    };
+  });
+  // Resta UNA sola home (l'attiva); la duplicata è stata chiusa.
+  expect(after.urls.filter((u) => /filo:\/\/newtab/.test(u || '')).length).toBe(1);
+  // La pagina impostazioni non c'è più.
+  expect(after.urls.some((u) => /filo:\/\/options/.test(u || ''))).toBe(false);
+  // La home attiva è ancora aperta e il sito web (keep) è rimasto.
+  expect(/filo:\/\/newtab/.test(after.activeUrl || '')).toBe(true);
+  expect(after.urls.some((u) => /^https?:/.test(u || ''))).toBe(true);
+});
+
 test('l’agente può lanciare la pulizia su richiesta (RUN_TAB_TRIAGE)', async ({ app, shell, openTab, testServer }) => {
   await testServer.openReady(openTab, mk('Uno', 'rgb(200,40,40)'));
   await testServer.openReady(openTab, mk('Due', 'rgb(40,80,200)'));
-  // La pagina dalla quale parte la richiesta (dashboard) diventa attiva e interna.
-  const dash = await openTab('filo://newtab/');
+  // La pagina dalla quale parte la richiesta (impostazioni) diventa attiva e
+  // interna. Usiamo options (istanza unica, non la home che al boot è già aperta
+  // e verrebbe collassata come duplicata): la pagina attiva è sempre protetta,
+  // così l'handle resta vivo per tutta la chiamata.
+  const dash = await openTab('filo://options/options.html');
 
-  // Stub: archivia tutti i candidati (le due tab web).
+  // Stub: archivia tutti i candidati (le due tab web + eventuali home duplicate).
   await app.evaluate(async () => {
     globalThis.SN_TAB_TRIAGE_DECIDE = async ({ tabs }) => ({
       decisions: tabs.map((t, i) => ({ i, action: 'archive', reason: 'pulizia' })),
@@ -113,11 +171,13 @@ test('l’agente può lanciare la pulizia su richiesta (RUN_TAB_TRIAGE)', async 
   expect(res.ok).toBe(true);
   expect(res.archived).toBeGreaterThanOrEqual(2);
 
-  // Le due tab web non ci sono più; la dashboard (attiva, interna) resta.
-  const titles = await shell.evaluate(async () => {
+  // Le due tab web non ci sono più; la pagina attiva (interna) resta aperta.
+  const state = await shell.evaluate(async () => {
     const s = await window.filoShell.tabs.snapshot();
-    return s.tabs.map((t) => t.title);
+    const active = s.tabs.find((t) => t.id === s.activeId);
+    return { titles: s.tabs.map((t) => t.title), activeUrl: active ? active.url : null };
   });
-  expect(titles).not.toContain('Uno');
-  expect(titles).not.toContain('Due');
+  expect(state.titles).not.toContain('Uno');
+  expect(state.titles).not.toContain('Due');
+  expect(/filo:\/\/options/.test(state.activeUrl || '')).toBe(true);
 });

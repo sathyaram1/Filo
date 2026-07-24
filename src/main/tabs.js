@@ -801,14 +801,18 @@ class TabManager {
     this._lastAppInteractionAt = Date.now();
   }
 
-  // Candidati archiviabili: tab web, non attiva, non in riproduzione audio, non
-  // interne. (Incognito è escluso a monte: niente timer in incognito.)
+  // Candidati archiviabili: schede web + pagine interne EFFIMERE (home/nuova
+  // scheda, impostazioni), non attiva, non in riproduzione audio. Prima erano
+  // esclusi TUTTI i filo:// interni, quindi il riordino poteva chiudere un sito
+  // (es. YouTube) ma mai le impostazioni aperte o le home duplicate. (Incognito
+  // è escluso a monte: niente timer in incognito.)
   _triageCandidates() {
-    return this.tabs.filter((t) =>
-      t.id !== this.activeId
-      && !t.audible
-      && !t.isInternal
-      && /^https?:\/\//i.test(t.url || ''));
+    const T = globalThis.SN_TAB_TRIAGE;
+    return this.tabs.filter((t) => {
+      if (t.id === this.activeId || t.audible) return false;
+      if (T) return T.isTriageableUrl(t.url);
+      return !t.isInternal && /^https?:\/\//i.test(t.url || '');
+    });
   }
 
   async _gatherTriageInput(cands) {
@@ -839,24 +843,52 @@ class TabManager {
     return out;
   }
 
-  // Esegue un giro di triage: raccoglie i candidati, chiede all'LLM (batch su
-  // tutte le tab) e applica le decisioni. Se manca la chiave o l'LLM fallisce,
-  // è un no-op silenzioso (non tocca le tab).
+  // Esegue un giro di triage: raccoglie i candidati, collassa i DUPLICATI esatti
+  // in modo deterministico (home duplicate / doppioni — mai lasciato al giudizio
+  // dell'LLM), poi chiede all'LLM (batch su tutte le tab) per i casi di giudizio
+  // (feed consumati, dead-end, impostazioni ormai chiuse) e applica le decisioni.
+  // Se l'LLM manca o fallisce, i duplicati vengono comunque collassati.
   async runAutoTriage({ trigger = 'idle' } = {}) {
     if (this.incognito || this._triageRunning) return { archived: 0 };
-    const decide = globalThis.SN_TAB_TRIAGE_DECIDE;
-    if (typeof decide !== 'function') return { archived: 0 };
     const cands = this._triageCandidates();
     if (!cands.length) return { archived: 0 };
     this._triageRunning = true;
     try {
-      const input = await this._gatherTriageInput(cands);
+      // 1) Duplicati esatti: decisione deterministica e affidabile.
+      const T = globalThis.SN_TAB_TRIAGE;
+      let dupIdx = new Set();
+      if (T) {
+        const activeUrl = (this.tabs.find((t) => t.id === this.activeId) || {}).url || '';
+        dupIdx = T.findDuplicateIndices(
+          cands.map((t) => ({
+            url: t.url,
+            formDirty: !!t.formDirty,
+            lastInteractionAt: t.lastInteractionAt || 0,
+          })),
+          activeUrl,
+        );
+      }
+
+      // 2) LLM per il resto (giudizio). No-op sui duplicati (già decisi sopra).
+      const decide = globalThis.SN_TAB_TRIAGE_DECIDE;
       let decisions = [];
-      try {
-        const r = await decide({ tabs: input, trigger });
-        decisions = Array.isArray(r && r.decisions) ? r.decisions : [];
-      } catch (_) { return { archived: 0 }; }
-      return this.applyTriageDecisions(cands, decisions);
+      if (typeof decide === 'function') {
+        try {
+          const input = await this._gatherTriageInput(cands);
+          const r = await decide({ tabs: input, trigger });
+          decisions = Array.isArray(r && r.decisions) ? r.decisions : [];
+        } catch (_) { decisions = []; }
+      }
+
+      // 3) Fondi: i duplicati deterministici vincono sempre su "keep".
+      const byIndex = new Map();
+      for (const d of decisions) {
+        if (d && typeof d.i === 'number') byIndex.set(d.i, d);
+      }
+      for (const i of dupIdx) {
+        byIndex.set(i, { i, action: 'archive', reason: 'duplicato' });
+      }
+      return this.applyTriageDecisions(cands, [...byIndex.values()]);
     } finally {
       this._triageRunning = false;
     }
