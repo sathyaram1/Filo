@@ -180,6 +180,7 @@ module.exports = function register(on, ctx) {
       buffer = r.buffer;
       suggested = r.filename;
     } catch (e) {
+      if (process.env.FILO_DBG_REF) { try { require('node:fs').appendFileSync(process.env.FILO_DBG_REF, `[fetch ERR] ${url} :: ${e && e.stack || e}\n`); } catch (_) {} }
       return { ok: false, error: e?.message || 'download fallito' };
     }
 
