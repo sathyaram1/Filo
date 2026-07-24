@@ -382,6 +382,7 @@
     redteam:      (size) => wrap(redteam, { size }),
     decks:        (size) => wrap(decks, { size }),
     note:         (size) => wrap(note, { size }),
+    search:       (size) => wrap(search, { size }),
   };
 
   // Heuristica che il menu usa per capire se una stringa di "icona" è SVG
