@@ -1,7 +1,0 @@
-{
-  "id": "632b17e1-cf52-4e8e-a4af-304d3c64bce1",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho riprodotto esattamente il caso segnalato: nell'import di un mazzo ho incollato una lista con una riga a quantità 0 (0 Sol Ring) più una carta normale, e la carta a quantità 0 ora NON entra più nel mazzo. L'anteprima non dice più falsamente 'riconosciute tutte': conta solo le carte valide e mostra la riga con lo 0 in un riquadro di avviso tra le righe non valide, così vedi che è stata scartata di proposito e non sparisce in silenzio. Confermando l'import entra solo la carta valida; la carta a quantità 0 non compare nel mazzo, nemmeno come copia fantasma da 1. Ho verificato che la protezione regge anche al passaggio finale che scrive nel mazzo: anche forzando una quantità 0 fino in fondo, la riga viene scartata, non trasformata in 1 copia. Stress test superati: quantità negative, '00', '0x', valori non numerici o illeggibili vengono tutti trattati come 'non includere' (riga segnalata, non importata); quantità grandi e liste vuote/con soli spazi non causano problemi; una riga a quantità 0 sotto l'intestazione Commander non diventa il comandante. Nessun rischio di codice iniettato: eventuali righe strane incollate vengono mostrate come testo innocuo nell'avviso. Il test automatico dell'intero flusso reale dell'app e l'intera suite di unit test sono verdi.",
-  "queuedAt": "2026-07-24T00:17:31.964Z",
-  "queuedBy": "routine"
-}
