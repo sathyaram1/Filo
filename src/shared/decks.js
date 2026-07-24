@@ -476,11 +476,13 @@
 
   // Aggiunge UN tag a UNA carta (#344: trascina la carta su una categoria della
   // vista "per tag"). Il tag già presente è un no-op (versione ferma). Un
-  // eventuale override di gruppo manuale viene rimosso: trascinare una carta su
-  // una categoria è un gesto di raggruppamento esplicito e diretto che deve
-  // vincere sull'override precedente — altrimenti in vista "tag" la carta
-  // resterebbe bloccata nel vecchio gruppo forzato invece di comparire sotto il
-  // nuovo tag. Ritorna il mazzo INVARIATO (stesso riferimento) se nulla cambia.
+  // eventuale override di gruppo manuale della VISTA TAG viene rimosso:
+  // trascinare una carta su una categoria è un gesto di raggruppamento esplicito
+  // e diretto che deve vincere sull'override precedente — altrimenti in vista
+  // "tag" la carta resterebbe bloccata nel vecchio gruppo forzato invece di
+  // comparire sotto il nuovo tag. Gli override di ALTRE viste (feedback #316)
+  // restano intatti: sono indipendenti e non c'entrano con i tag. Ritorna il
+  // mazzo INVARIATO (stesso riferimento) se nulla cambia.
   function addTagToCard(deck, scryfallId, tag) {
     const id = String(scryfallId || '');
     const t = String(tag || '').trim();
@@ -489,10 +491,12 @@
     const carte = deck.carte.map((c) => {
       if (c.scryfall_id !== id) return c;
       const has = c.tags.includes(t);
-      if (has && !c.gruppo_override) return c;
+      const strippedOv = overrideWithoutView(c.gruppo_override, 'tag');
+      if (has && strippedOv === c.gruppo_override) return c;
       changed = true;
       const next = { ...c, tags: has ? [...c.tags] : [...c.tags, t] };
-      delete next.gruppo_override;
+      if (strippedOv) next.gruppo_override = strippedOv;
+      else delete next.gruppo_override;
       return next;
     });
     return changed ? touch({ ...deck, carte }) : deck;
