@@ -78,11 +78,13 @@ module.exports = function register(on, ctx) {
     let releaseReferrer = () => {};
     try {
       const referrer = String(sender?.tab?.url || sender?.url || '');
+      if (process.env.FILO_DBG_REF) console.error('[DBG dl handler] url=', url, 'referrer=', referrer, 'ses=', !!ses);
       if (/^https?:/i.test(referrer)) {
         require('../cookies').ensureHeaderHook(ses);
         releaseReferrer = require('../download-referrer').expect(url, referrer);
+        if (process.env.FILO_DBG_REF) console.error('[DBG dl handler] hook+expect registered');
       }
-    } catch (_) {}
+    } catch (e) { if (process.env.FILO_DBG_REF) console.error('[DBG dl handler] ERR', e); }
 
     return new Promise((resolve) => {
       let settled = false;
