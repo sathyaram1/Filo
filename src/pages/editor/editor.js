@@ -32,7 +32,7 @@
 
   // ── Metadati tipi di modulo ───────────────────────────────────────────
   const MODULE_TYPES = {
-    switch:           { label: 'Switch', icon: 'apps', defaultW: 2, defaultH: 1, minW: 2, minH: 1, desc: 'Cambia pagina/workspace della griglia.' },
+    switch:           { label: 'Switch', icon: 'apps', defaultW: 2, defaultH: 1, minW: 2, minH: 1, desc: 'Cambia pagina/workspace della griglia.', singleton: true },
     'word-count':     { label: 'Conteggio parole', icon: 'transcribe', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: 'Numero di parole, aggiornato in tempo reale.' },
     'search-replace': { label: 'Cerca e sostituisci', icon: 'reload', defaultW: 2, defaultH: 2, minW: 2, minH: 2, desc: 'Trova ed evidenzia, sostituisci nel testo.' },
     comment:          { label: 'Commenta', icon: 'share', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: 'Seleziona testo e aggiungi commenti.' },
@@ -59,6 +59,18 @@
   // OGNI pagina, così l'utente può sempre cambiare pagina e — modificandolo da una
   // qualunque vista — lo modifica per tutte (è un unico modulo condiviso).
   const isPinned = (m) => isFixed(m) || (!!m && m.type === 'switch');
+
+  // Un tipo "singleton" può esistere in una sola copia (lo switch: è l'UNICO
+  // modo per navigare le pagine, averne due lascia un doppione ingombrante e non
+  // eliminabile — dato che lo switch è protetto dalla cancellazione). Un tipo è
+  // aggiungibile dalla palette / dal box "Aggiungi modulo" solo se non è fisso e,
+  // se singleton, non ne esiste già uno.
+  const canAddType = (type) => {
+    const meta = MODULE_TYPES[type];
+    if (!meta || meta.fixed) return false;
+    if (meta.singleton && doc.modules.some((mm) => mm.type === type)) return false;
+    return true;
+  };
 
   // Icone-preset per lo switch (estetiche, non vincolano i moduli).
   const SWITCH_PRESETS = {
@@ -1114,7 +1126,9 @@
 
   function addModule(type, x, y, z) {
     const meta = MODULE_TYPES[type];
-    if (!meta || meta.fixed) return;
+    // Guardia difensiva: non si aggiunge un modulo fisso né un secondo singleton
+    // (es. un secondo switch), anche se un payload di drag arrivasse comunque qui.
+    if (!meta || !canAddType(type)) return;
     let w = meta.defaultW, h = meta.defaultH;
     // riduci se non entra
     while (w > meta.minW && !fits({ x, y, w, h }, z)) w--;
@@ -1129,7 +1143,7 @@
   }
 
   function openAddModule(x, y, z) {
-    const items = Object.entries(MODULE_TYPES).filter(([, meta]) => !meta.fixed).map(([type, meta]) => `
+    const items = Object.entries(MODULE_TYPES).filter(([type]) => canAddType(type)).map(([type, meta]) => `
       <button class="ed-btn" data-add="${type}" style="display:flex;justify-content:flex-start;gap:10px;width:100%;margin-bottom:6px">
         <span style="color:var(--sn-accent);display:inline-flex">${meta.glyph || (ICONS[meta.icon] ? ICONS[meta.icon](18) : '')}</span>
         <span>${meta.label} <span style="color:var(--sn-muted);font-size:11px">${meta.defaultW}×${meta.defaultH}</span></span>
@@ -2062,7 +2076,7 @@
   function renderPalette() {
     paletteEl.innerHTML = '';
     for (const [type, meta] of Object.entries(MODULE_TYPES)) {
-      if (meta.fixed) continue;
+      if (!canAddType(type)) continue;
       const item = document.createElement('div');
       item.className = 'ed-palette-item';
       item.setAttribute('draggable', 'true');
@@ -2095,18 +2109,26 @@
           </select>
         </div>`).join('') + '</div>';
     }
+    // Lo switch è un modulo di sistema (appuntato): è l'UNICO modo per navigare
+    // fra le pagine della griglia. Eliminarlo lascerebbe l'utente bloccato sulla
+    // prima pagina, con i moduli delle altre pagine irraggiungibili. Come
+    // l'ingranaggio impostazioni, non offriamo il bottone "Elimina" — per ridurre
+    // le pagine si rimpicciolisce lo switch (che avverte pagina per pagina).
+    const deletable = !isPinned(m);
     openOverlay(`<h3>${meta.label}</h3>
       <div class="ed-field"><label>Scorciatoia da tastiera</label>
         <input type="text" id="cfgShortcut" placeholder="es. Ctrl+Shift+1" value="${escapeHtml(m.data.shortcut || '')}" />
         <div class="ed-field-hint" id="cfgShortcutHint" hidden>Usa almeno un modificatore (Ctrl o Alt), es. Ctrl+Shift+1 — così non ruba una lettera mentre scrivi.</div></div>
       ${specific}
       <div class="ed-overlay-actions">
-        <button class="ed-btn danger" id="cfgDelete">Elimina</button>
+        ${deletable ? '<button class="ed-btn danger" id="cfgDelete">Elimina</button>' : ''}
         <button class="ed-btn" id="cfgCancel">Annulla</button>
         <button class="ed-btn primary" id="cfgSave">Salva</button>
       </div>`);
     $('cfgCancel').addEventListener('click', closeOverlay);
-    $('cfgDelete').addEventListener('click', () => {
+    if (deletable) $('cfgDelete').addEventListener('click', () => {
+      // Guardia difensiva: un modulo appuntato non è mai eliminabile.
+      if (isPinned(m)) { closeOverlay(); return; }
       doc.modules = doc.modules.filter((x) => x.id !== m.id);
       closeOverlay(); renderGrid(); markDirty();
     });

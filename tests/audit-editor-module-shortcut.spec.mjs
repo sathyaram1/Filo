@@ -96,10 +96,11 @@ test('una scorciatoia senza modificatore GIÀ salvata non ruba la lettera mentre
   expect(await page.locator('#doc').innerText()).toContain('banana');
 });
 
-// test.fixme: BUG SEPARATO, non coperto da questo fix. "Elimina" nella
-// configurazione dello switch lo rimuove davvero; la griglia resta sulla
-// pagina 0 e i moduli delle altre pagine diventano irraggiungibili senza avviso.
-test.fixme('lo switch di pagina non deve essere eliminabile (le altre pagine diventano irraggiungibili)', async ({ openTab }) => {
+// Lo switch è l'UNICO modo per navigare fra le pagine della griglia: eliminarlo
+// bloccherebbe l'utente sulla prima pagina rendendo irraggiungibili i moduli
+// delle altre. Come l'ingranaggio impostazioni, dev'essere protetto — il suo
+// pannello di configurazione (rinomina pagine/icone) NON offre "Elimina".
+test('lo switch di pagina non è eliminabile e le altre pagine restano raggiungibili', async ({ openTab }) => {
   const page = await openTab(EDITOR);
   await page.waitForLoadState('domcontentloaded');
   await expect(page.locator('.ed-module[data-type="switch"]')).toBeVisible();
@@ -110,18 +111,63 @@ test.fixme('lo switch di pagina non deve essere eliminabile (le altre pagine div
   await expect(page.locator('.ed-module[data-type="search-replace"]')).toBeVisible();
   await page.locator('.ed-switch-icon').nth(0).click();
 
-  // Elimina lo switch dal suo pannello di configurazione.
   await enterSettingsMode(page);
-  await page.locator('.ed-module[data-type="switch"]').click();
+
+  // Un modulo NORMALE (conteggio parole) offre "Elimina": prova che il pannello
+  // di configurazione è aperto e che il bottone esiste per i moduli eliminabili.
+  await page.locator('.ed-module[data-type="word-count"]').click();
+  await expect(page.locator('#cfgShortcut')).toBeVisible();
   await expect(page.locator('#cfgDelete')).toBeVisible();
-  await page.click('#cfgDelete');
+  await page.click('#cfgCancel');
+
+  // Lo switch apre la SUA configurazione (rinomina pagine) ma NON offre "Elimina".
+  await page.locator('.ed-module[data-type="switch"]').click();
+  await expect(page.locator('#cfgShortcut')).toBeVisible();
+  await expect(page.locator('#cfgDelete')).toHaveCount(0);
+  await page.click('#cfgCancel');
+
   await exitSettingsMode(page);
+  await page.screenshot({ path: 'tests/.shots/audit-editor-switch-protected.png' });
 
-  await page.screenshot({ path: 'tests/.shots/audit-editor-switch-deleted.png' });
-
-  // ATTESO: lo switch è ancora lì (modulo di sistema, come l'ingranaggio) e la
-  // pagina Revisione resta raggiungibile.
+  // Lo switch è ancora lì e la pagina Revisione resta raggiungibile.
   await expect(page.locator('.ed-module[data-type="switch"]')).toBeVisible();
   await page.locator('.ed-switch-icon').nth(1).click();
   await expect(page.locator('.ed-module[data-type="search-replace"]')).toBeVisible();
+});
+
+// Lo switch è un modulo UNICO: dato che è protetto dalla cancellazione, poterne
+// aggiungere un secondo lascerebbe l'utente con un doppione ingombrante e non
+// eliminabile — lo stesso stato bloccato, raggiunto al contrario. Quindi lo
+// switch NON deve comparire tra i moduli aggiungibili quando ne esiste già uno
+// (né nel box "Aggiungi modulo" da cella vuota, né nella palette laterale),
+// esattamente come già avviene per l'ingranaggio impostazioni.
+test('lo switch non è aggiungibile una seconda volta (resta unico)', async ({ openTab }) => {
+  const page = await openTab(EDITOR);
+  await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator('.ed-module[data-type="switch"]')).toBeVisible();
+
+  // Precondizione: esiste già esattamente uno switch nel layout di partenza.
+  await expect(page.locator('.ed-module[data-type="switch"]')).toHaveCount(1);
+
+  await enterSettingsMode(page);
+
+  // 1) Box "Aggiungi modulo" da una cella vuota: NIENTE opzione Switch, ma i
+  //    moduli normali (es. conteggio parole) restano aggiungibili.
+  await page.locator('.ed-cell-empty').first().click();
+  await expect(page.locator('#overlay')).toBeVisible();
+  await expect(page.locator('[data-add="switch"]')).toHaveCount(0);
+  await expect(page.locator('[data-add="word-count"]')).toHaveCount(1);
+  // Il box "Aggiungi modulo" si chiude cliccando sullo sfondo (backdrop).
+  await page.locator('#overlay').click({ position: { x: 5, y: 5 } });
+  await expect(page.locator('#overlay')).toBeHidden();
+
+  // 2) Palette laterale della vista modifica: nessun elemento trascinabile Switch.
+  const paletteLabels = await page.locator('#palette .pi-title').allInnerTexts();
+  expect(paletteLabels.some((t) => /switch/i.test(t))).toBe(false);
+
+  await exitSettingsMode(page);
+  await page.screenshot({ path: 'tests/.shots/audit-editor-switch-unique.png' });
+
+  // Resta un solo switch: nessun doppione è stato creato.
+  await expect(page.locator('.ed-module[data-type="switch"]')).toHaveCount(1);
 });
