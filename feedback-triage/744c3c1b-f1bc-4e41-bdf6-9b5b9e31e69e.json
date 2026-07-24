@@ -1,7 +1,0 @@
-{
-  "id": "744c3c1b-f1bc-4e41-bdf6-9b5b9e31e69e",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica e stata pubblicata. Ora, nella dashboard di gestione, un allegato con un nome file molto lungo e senza spazi va a capo dentro la bolla della conversazione invece di sbordare e generare una barra di scorrimento orizzontale.",
-  "queuedAt": "2026-07-24T07:08:16.738Z",
-  "queuedBy": "routine"
-}
