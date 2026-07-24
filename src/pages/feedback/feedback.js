@@ -196,18 +196,24 @@
     return `<div class="fb-imgs">${imgs.map((u) => `<img class="fb-img-loading" data-url="${escapeHtml(u)}" loading="lazy" alt="">`).join('')}</div>`;
   }
 
-  // Decifratura lazy degli allegati immagine (S1.2), con cache url → dataUrl|null.
+  // Decifratura lazy degli allegati immagine (S1.2), con cache
+  // url → { dataUrl, error }. Su fallimento `error` porta il MOTIVO preciso
+  // (dal main) così il segnaposto lo spiega in hover invece di restare muto.
   const fbImgCache = new Map();
   async function resolveImageSrc(url) {
-    if (!url) return null;
+    if (!url) return { dataUrl: null, error: '' };
     if (fbImgCache.has(url)) return fbImgCache.get(url);
     let dataUrl = null;
+    let error = '';
     try {
       const r = await sendToMain({ type: 'feedback_decrypt_image', url });
       if (r && r.ok && r.dataUrl) dataUrl = r.dataUrl;
-    } catch (_) { /* non disponibile */ }
-    fbImgCache.set(url, dataUrl);
-    return dataUrl;
+      else if (r && r.error) error = String(r.error);
+      else error = 'immagine non disponibile';
+    } catch (_) { error = 'immagine non raggiungibile'; }
+    const res = { dataUrl, error };
+    fbImgCache.set(url, res);
+    return res;
   }
 
   // Lista di allegati non-immagine come link scaricabili (nome originale).
