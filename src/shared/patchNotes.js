@@ -20,6 +20,9 @@
       features: [
         'Nella dashboard di gestione c’è una nuova ricerca «a senso»: la lente in alto a destra apre un campo dove descrivere con parole tue il feedback che cerchi, anche con un ricordo vago e non con le parole esatte usate all’epoca. Filo capisce il significato e ti mostra i feedback più pertinenti, ordinati per rilevanza e presi da qualunque scheda (Ricevuti, In coda, Risolti, Archiviati). Cliccando un risultato si apre la conversazione; con la «×» o il tasto Esc chiudi la ricerca e torni alla lista. Se il modello non è disponibile, la ricerca ripiega automaticamente sulle parole così trovi comunque qualcosa.',
       ],
+      fixes: [
+        'Salvare un’immagine da una pagina web ora funziona davvero: con «Salva immagine come…» dal clic destro il file viene scaricato e si apre la finestra per scegliere dove metterlo, con una conferma a salvataggio riuscito. Prima, per le immagini ospitate su un sito diverso da quello della pagina (cioè quasi tutte), la scheda abbandonava la pagina e mostrava solo l’immagine, senza scaricare nulla. Ora vengono salvate anche le immagini dei siti che le proteggono dal collegamento esterno, e se il download non riesce (immagine irraggiungibile o connessione interrotta) te lo dice invece di restare in silenzio.',
+      ],
     },
     {
       version: '0.2.159', date: '2026-07-24',
