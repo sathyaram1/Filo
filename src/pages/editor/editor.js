@@ -1126,7 +1126,9 @@
 
   function addModule(type, x, y, z) {
     const meta = MODULE_TYPES[type];
-    if (!meta || meta.fixed) return;
+    // Guardia difensiva: non si aggiunge un modulo fisso né un secondo singleton
+    // (es. un secondo switch), anche se un payload di drag arrivasse comunque qui.
+    if (!meta || !canAddType(type)) return;
     let w = meta.defaultW, h = meta.defaultH;
     // riduci se non entra
     while (w > meta.minW && !fits({ x, y, w, h }, z)) w--;
