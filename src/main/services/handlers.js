@@ -1714,6 +1714,63 @@ async function searchArchivedTabs(query, { topK = 40 } = {}) {
   return { ok: true, results };
 }
 
+// Ricerca semantica dei feedback (dashboard di gestione, owner-only). A
+// differenza della ricerca schede NON usa embedding precalcolati (i feedback non
+// li hanno): l'LLM legge un catalogo compatto (numero + titolo + testo troncato)
+// di TUTTI i feedback e li ordina per pertinenza a una query in linguaggio
+// naturale, scartando i non pertinenti. È owner-only e rara → il costo di una
+// singola chiamata su qualche centinaio di righe corte è trascurabile.
+//
+// `items` = [{ id, num, title, text }] arriva dal renderer (che ha già la lista
+// decifrata). Ritorna { ok:true, results:[{id, why}] } in ordine di pertinenza,
+// oppure { ok:true, results:null } se l'LLM non è disponibile/parsabile — così
+// la pagina ripiega sul filtro per sottostringa (la ricerca resta usabile).
+async function searchFeedbackSemantic(query, items) {
+  const q = String(query == null ? '' : query).trim();
+  const list = Array.isArray(items) ? items.filter((it) => it && it.id) : [];
+  if (!q || !list.length) return { ok: true, results: null };
+
+  // Catalogo compatto: indice → numero + titolo + estratto del testo. Il testo
+  // è troncato (la segnalazione originale basta a riconoscere il feedback; le
+  // note della lavorazione gonfierebbero il contesto senza aiutare il match).
+  const lines = list.map((it, i) => {
+    const num = it.num ? `#${it.num} ` : '';
+    const title = String(it.title || '').replace(/\s+/g, ' ').trim();
+    const text = String(it.text || '').replace(/\s+/g, ' ').trim().slice(0, 300);
+    return `[${i}] ${num}${title}${text ? `\n${text}` : ''}`;
+  }).join('\n\n');
+
+  const messages = [
+    { role: 'system', content:
+      'Sei il motore di ricerca semantica dei feedback di Filo. Ricevi una query in '
+      + 'linguaggio naturale (spesso il ricordo vago di un feedback passato) e una lista '
+      + 'di feedback (indice + numero + titolo + estratto). Restituisci SOLO i feedback '
+      + 'davvero PERTINENTI all\'intento della query, dal più pertinente al meno, '
+      + 'ragionando sul SIGNIFICATO e non solo sulle parole esatte. Scarta i non '
+      + 'pertinenti. Per ognuno aggiungi un motivo brevissimo (max ~8 parole). Rispondi '
+      + 'SOLO con JSON: {"results":[{"i":<indice>,"why":"<motivo>"}]}.' },
+    { role: 'user', content: `Query: ${q}\n\nFeedback:\n${lines}` },
+  ];
+
+  let parsed = null;
+  try { parsed = extractJson(await runOneShot(ACTIONS.FILO_FEEDBACK_SEARCH, messages)); }
+  catch (_) { return { ok: true, results: null }; }
+
+  const raw = parsed && Array.isArray(parsed.results) ? parsed.results : null;
+  if (!raw) return { ok: true, results: null };
+
+  const seen = new Set();
+  const results = [];
+  for (const r of raw) {
+    const i = Number(r && r.i);
+    if (!Number.isInteger(i) || i < 0 || i >= list.length || seen.has(i)) continue;
+    seen.add(i);
+    results.push({ id: list[i].id, why: String((r && r.why) || '').trim().slice(0, 120) });
+  }
+  return { ok: true, results };
+}
+globalThis.SN_FEEDBACK_SEARCH = searchFeedbackSemantic;
+
 function broadcastToTabs(message) {
   try {
     for (const win of BrowserWindow.getAllWindows()) {
