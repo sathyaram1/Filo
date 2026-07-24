@@ -505,17 +505,67 @@
     $('probCard').hidden = !cats.length;
   }
 
-  function runProb() {
-    const want = [...$('probNeeds').querySelectorAll('input[data-tag]')]
+  // Calcolatore di probabilità (§9.3): la stima si raffina DA SOLA (feedback
+  // #354). Appena cambiano le condizioni (turno, categorie richieste, o il mazzo
+  // stesso) riparte una simulazione progressiva: un primo batch dà subito una
+  // stima, i batch successivi si accumulano e la fanno convergere verso il vero
+  // valore, poi si ferma. Niente più bottone "Calcola" né oscillazione del
+  // risultato tra un ricalcolo e l'altro.
+  //
+  //   PROB_BATCH  simulazioni per giro (~15k = pochi ms, non blocca la UI)
+  //   PROB_CAP    tetto totale = 100× le 10.000 di prima. A 1.000.000 di mani
+  //               l'errore statistico è ~0,05 punti percentuali (ben sotto
+  //               l'oscillazione di ~1 punto segnalata): salire oltre non
+  //               cambierebbe la cifra mostrata, costerebbe solo CPU.
+  const PROB_BATCH = 15000;
+  const PROB_CAP = 1000000;
+  let probRunId = 0;         // invalida i batch di run precedenti
+  let probDebounce = null;
+
+  function probWants() {
+    return [...$('probNeeds').querySelectorAll('input[data-tag]')]
       .map((inp) => ({ tag: inp.dataset.tag, n: Number(inp.value) || 0 }))
       .filter((w) => w.n > 0);
+  }
+
+  function runProb() {
+    const runId = ++probRunId; // ogni run nuova cancella i batch di quella vecchia
     const out = $('probResult');
-    if (!want.length) { out.textContent = 'Scegli almeno una categoria.'; return; }
+    const want = probWants();
+    if (!want.length) {
+      out.textContent = 'Scegli almeno una categoria.';
+      out.classList.remove('dk-prob-refining');
+      out.removeAttribute('title');
+      return;
+    }
     const turn = Math.max(1, Number($('probTurn').value) || 1);
     const library = Stats.buildLibrary(current, cardsById);
-    const r = Stats.simulate({ library, want, turn });
-    out.textContent = `≈ ${(r.probability * 100).toFixed(1).replace('.', ',')}%`;
-    out.title = `${r.iterations.toLocaleString('it-IT')} mani simulate, ${r.seen} carte viste`;
+    let hits = 0; let iters = 0; let batchSeed = 1; let seen = 0;
+    out.classList.add('dk-prob-refining');
+
+    const step = () => {
+      if (runId !== probRunId) return; // le condizioni sono cambiate: molla
+      const r = Stats.simulate({ library, want, turn, iterations: PROB_BATCH, seed: batchSeed++ });
+      hits += r.hits; iters += r.iterations; seen = r.seen;
+      const p = hits / iters;
+      out.textContent = `≈ ${(p * 100).toFixed(1).replace('.', ',')}%`;
+      out.title = `${iters.toLocaleString('it-IT')} mani simulate, ${seen} carte viste`;
+      // Converge finché non tocca il tetto; un risultato esattamente 0 o 100%
+      // è deterministico (caso certo/impossibile) → inutile insistere.
+      if (iters < PROB_CAP && hits > 0 && hits < iters) {
+        setTimeout(step, 0);
+      } else {
+        out.classList.remove('dk-prob-refining');
+      }
+    };
+    step();
+  }
+
+  // Riavvia la stima quando cambiano le condizioni, con un piccolo debounce così
+  // digitare più cifre o una raffica di rerender del mazzo non lancia mille run.
+  function scheduleProb() {
+    clearTimeout(probDebounce);
+    probDebounce = setTimeout(runProb, 120);
   }
 
   function renderStats() {
