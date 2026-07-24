@@ -440,16 +440,29 @@
     };
   }
 
-  // Override di gruppo (tasto destro → "sposta in gruppo", §8.1). Gruppo
-  // vuoto/null rimuove l'override (si torna al raggruppamento naturale).
-  function setGroupOverride(deck, scryfallId, gruppo) {
+  // Override di gruppo (tasto destro → "sposta in gruppo", §8.1). L'override è
+  // PER-VISTA (feedback #316): agisce solo sulla vista `view` in cui l'utente lo
+  // fa, senza toccare gli override eventualmente fatti in altre viste. Gruppo
+  // vuoto/null rimuove l'override di QUELLA vista (la carta torna al
+  // raggruppamento naturale lì). Se `view` non è una vista valida ci si basa sul
+  // raggruppamento corrente del mazzo. Impostare lo stesso override due volte è
+  // un no-op (versione ferma): mazzo INVARIATO (stesso riferimento).
+  function setGroupOverride(deck, scryfallId, gruppo, view) {
     const id = String(scryfallId || '');
+    const v = RAGGRUPPAMENTI.includes(view) ? view : (deck.raggruppamento || 'tipo');
+    const g = gruppo ? String(gruppo) : null;
     let changed = false;
     const carte = deck.carte.map((c) => {
       if (c.scryfall_id !== id) return c;
+      const cur = (c.gruppo_override && typeof c.gruppo_override === 'object') ? c.gruppo_override : null;
+      const before = cur ? cur[v] : undefined;
+      if ((before || undefined) === (g || undefined)) return c; // nessun cambiamento reale
       changed = true;
+      const nextOv = g
+        ? { ...(cur || {}), [v]: g }
+        : overrideWithoutView(cur, v);
       const next = { ...c, tags: [...c.tags] };
-      if (gruppo) next.gruppo_override = String(gruppo);
+      if (nextOv && Object.keys(nextOv).length) next.gruppo_override = nextOv;
       else delete next.gruppo_override;
       return next;
     });
