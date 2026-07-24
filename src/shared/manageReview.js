@@ -574,6 +574,7 @@
     hasReopenRequest, canReopen, isApproved, isAligned, ALIGNED, ALIGNED_COLOR: ALIGNED.color,
     panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE, isTrustedClient,
     classifyReevalResult, reevalErrorHint, REEVAL_WASTE_LIMIT,
+    searchFeedbackFallback,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
