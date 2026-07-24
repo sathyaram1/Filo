@@ -1,0 +1,7 @@
+{
+  "id": "ada9b74c-dfa9-474f-8dc6-e557d12aa031",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho riprodotto esattamente la lamentela: salvo una pagina con 'Salva per dopo' dal menu del tasto destro e faccio reindirizzare/ricaricare il sito nell'istante immediatamente successivo al click. Con il codice corretto la scheda compare regolarmente in 'Aperti per dopo' con l'indirizzo e il titolo giusti; il salvataggio non si perde più in silenzio. Ho confermato che il caso era davvero rotto prima: rimettendo l'ordine vecchio (attendere la miniatura prima di registrare il salvataggio) lo stesso scenario non salva nulla (zero schede) — quindi il test cattura sul serio il bug, non un dettaglio cosmetico. Stress test superati: salvare due volte la stessa pagina non crea doppioni; titoli enormi, indirizzi malformati e dati anomali non rompono l'elenco dei salvati; la miniatura resta pulita (niente menu né messaggio di conferma stampati dentro l'anteprima). Ho verificato anche la rete di sicurezza: se il salvataggio non riesce ora compare l'avviso 'Salvataggio non riuscito' invece del silenzio. Controllato inoltre che il salvataggio da scorciatoia da tastiera fotografi indirizzo e titolo nell'istante del comando, così un redirect immediato non fa più salvare la pagina sbagliata. I redirect di sicurezza (mailto:/file://) restano bloccati correttamente e tutta la logica di base è verde.",
+  "queuedAt": "2026-07-24T07:24:07.861Z",
+  "queuedBy": "routine"
+}
