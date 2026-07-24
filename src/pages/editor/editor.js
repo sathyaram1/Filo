@@ -2138,6 +2138,31 @@
   }
 
   // ── Scorciatoie modulo personalizzate ──────────────────────────────────
+  const SHORTCUT_MODIFIERS = ['ctrl', 'cmd', 'meta', 'alt', 'shift'];
+  function shortcutParts(sc) {
+    return String(sc || '').toLowerCase().split('+').map((s) => s.trim()).filter(Boolean);
+  }
+  // Un modificatore "reale" cambia il carattere prodotto: Ctrl/Cmd/Alt. Shift da
+  // solo NON basta (Shift+b digita comunque "B"), quindi non conta come reale.
+  function shortcutHasRealModifier(sc) {
+    const parts = shortcutParts(sc);
+    return parts.includes('ctrl') || parts.includes('cmd') || parts.includes('meta') || parts.includes('alt');
+  }
+  // Una scorciatoia è valida solo se ha un modificatore reale + un tasto finale:
+  // così non può coincidere con la normale digitazione di una lettera.
+  function isValidShortcut(sc) {
+    const parts = shortcutParts(sc);
+    if (parts.length < 2) return false;
+    const key = parts[parts.length - 1];
+    if (SHORTCUT_MODIFIERS.includes(key)) return false; // manca il tasto finale
+    return shortcutHasRealModifier(sc);
+  }
+  function isEditableTarget(t) {
+    if (!t) return false;
+    if (t.isContentEditable) return true;
+    const tag = t.tagName;
+    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+  }
   function matchShortcut(e, sc) {
     if (!sc) return false;
     const parts = sc.toLowerCase().split('+').map((s) => s.trim());
