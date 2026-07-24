@@ -92,6 +92,13 @@
   // pipeline: sicuro+ON → todo, sicuro+OFF → aligned). NON è più una lente
   // sulle liste: le tab derivano solo dallo status (macchina a stati).
   let autoModeOn    = false;
+  // Ricerca semantica: quando attiva, la lista a sinistra mostra i risultati
+  // (di QUALUNQUE tab) ordinati per pertinenza invece del sottoinsieme della tab.
+  let searchActive  = false;   // barra di ricerca aperta con una query lanciata
+  let searchQuery   = '';      // ultima query lanciata (per i messaggi di stato)
+  let searchList    = [];      // feedback risultato, già ordinati per pertinenza
+  let searchReasons = {};      // id → motivo breve del match (tooltip sulla card)
+  let searchSeq     = 0;       // anti-corsa: ignora le risposte di ricerche superate
 
   // Etichette/testi vuoto per le tab-lista (DB1).
   const TAB_LABELS = {
