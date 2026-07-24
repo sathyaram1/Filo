@@ -247,6 +247,64 @@ test('il calcolatore di probabilità: la categoria è leggibile, il numero sta i
   await expect(label).toHaveText('ragionamento');
 });
 
+// Feedback #354: la probabilità si calcola DA SOLA e continua a raffinarsi (più
+// mani simulate) finché non converge, poi si ferma — niente più bottone né
+// oscillazione a ogni ricalcolo. Si asserisce il COMPORTAMENTO: per un caso a
+// probabilità intermedia (non 0/100) il conteggio delle "mani simulate" cresce
+// oltre il primo batch e arriva al tetto, mentre pulsa l'indicatore di
+// raffinamento che poi sparisce a convergenza avvenuta.
+test('la probabilità si raffina da sola fino al tetto e poi si ferma (#354)', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await mockScryfall(app);
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  const deckId = await seedDeck(page);
+
+  // Mazzo grande a probabilità intermedia: 40 terre su 99 carte. A turno 1
+  // (7 carte) la probabilità di 3+ terre è ~25%, ben lontana da 0 e da 100.
+  await page.evaluate(async (id) => {
+    const { MSG } = window.SN_MSG;
+    const r = await chrome.runtime.sendMessage({ type: MSG.DECKS_GET, id });
+    const deck = r.deck;
+    deck.carte = [
+      { scryfall_id: 'c-mountain', qty: 40 },
+      { scryfall_id: 'c-bolt', qty: 30 },
+      { scryfall_id: 'c-dragon', qty: 29 },
+    ];
+    await chrome.runtime.sendMessage({ type: MSG.DECKS_UPDATE, deck });
+  }, deckId);
+  await page.evaluate(() => location.reload());
+  await page.waitForLoadState('domcontentloaded');
+
+  const terreInput = page.locator('#probNeeds input[data-tag="terre"]');
+  await expect(terreInput).toBeVisible();
+  await page.fill('#probTurn', '1');
+  await terreInput.fill('3');
+
+  const result = page.locator('#probResult');
+  // Parte subito con una stima (il primo batch appare quasi istantaneo).
+  await expect(result).toHaveText(/≈ \d/);
+  const first = await result.textContent();
+  const firstPct = Number(first.replace(/[^\d,]/g, '').replace(',', '.'));
+  expect(firstPct).toBeGreaterThan(1);
+  expect(firstPct).toBeLessThan(99); // caso intermedio: davvero un Monte Carlo
+
+  // Mentre converge, l'indicatore di raffinamento è attivo…
+  await expect(result).toHaveClass(/dk-prob-refining/);
+
+  // …e le "mani simulate" nel tooltip crescono fino al tetto (1.000.000),
+  // provando che continua a raffinare da solo senza intervento dell'utente.
+  await expect.poll(async () => result.getAttribute('title'), { timeout: 30_000 })
+    .toContain('1.000.000 mani simulate');
+
+  // Raggiunto il tetto si ferma: l'indicatore di raffinamento sparisce.
+  await expect(result).not.toHaveClass(/dk-prob-refining/);
+
+  // Cambiare condizione (il turno) fa ripartire il raffinamento da solo.
+  await page.fill('#probTurn', '2');
+  await expect(result).toHaveClass(/dk-prob-refining/);
+});
+
 test('budget e probabilità via chat: il sistema applica il tetto e risponde con la simulazione', async ({ app, openTab }) => {
   test.setTimeout(60_000);
   await mockScryfall(app);
