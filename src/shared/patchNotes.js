@@ -18,6 +18,7 @@
     {
       version: '0.2.158', date: '2026-07-24',
       fixes: [
+        'Salvando con «Salva per dopo» una pagina che avevi già salvato (e non ancora riaperto) non compaiono più due schede identiche in «Aperti per dopo»: la voce esistente viene aggiornata (con titolo e anteprima più recenti) e riportata in cima, senza doppioni da rimuovere a mano.',
         'I timer lunghi ora si leggono come un vero conto alla rovescia: un timer di 2 ore mostra «2:00:00» invece di «120:00», e uno di 8 ore «8:00:00» invece di «480:00». Anche il riquadro di conferma in chat indica la durata per esteso (es. «2 h», «1 h 30 min», «30 sec») invece di arrotondare ai minuti, così un timer di 30 secondi non appare più come «0 min».',
         'Nella Cronologia AI la casella «Cerca» ora cerca solo tra i testi che vedi davvero nelle voci (richiesta, risposta, tipo di azione, modello e indirizzo): non trova più parole «fantasma» come «selection», «title» o «url» che comparivano da nessuna parte e facevano restare visibili quasi tutte le voci.',
         'Nella Cronologia AI ora puoi rimuovere una singola voce: passando il mouse su una richiesta compare il tasto «Rimuovi», così puoi togliere un elemento privato o sbagliato senza dover svuotare tutto lo storico.',
