@@ -501,6 +501,8 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
   font-size: 13px; font-family: inherit; outline: none;
 }
 .ed-field input:focus, .ed-field textarea:focus { border-color: var(--sn-accent); }
+.ed-field input.ed-field-invalid { border-color: var(--sn-error); }
+.ed-field-hint { margin-top: 6px; font-size: 12px; line-height: 1.35; color: var(--sn-error); }
 .ed-overlay-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 .ed-btn {
   padding: 8px 14px; border-radius: 8px; font-size: 13px; cursor: pointer;
