@@ -1,7 +1,0 @@
-{
-  "id": "51d6380b-f053-467d-809e-c87193db415f",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho riprodotto esattamente la situazione del feedback: nel deck builder ho creato un mazzo con 10 copie della stessa terra base (Island) più due carte in singola copia. Prima il numero accanto all'intestazione del gruppo «Terre» diceva 1 (contava le carte diverse, cioè le righe); ora dice correttamente 10 (le copie), perfettamente allineato con la card Composizione a destra (che dice «Terre 10») e con il totale in alto. I gruppi con una sola copia continuano a mostrare 1, come giusto. Ho anche incrociato il numero del gruppo con quello della card Composizione nella stessa schermata: adesso danno la stessa risposta alla domanda «quante terre ho?». Stress test superati: quantità a zero, negative, mancanti o non numeriche non mandano in tilt il conteggio (una riga vale sempre almeno 1, esattamente come fa il resto della pagina), un gruppo vuoto mostra 0, e il numero resta corretto anche cambiando modo di raggruppamento (per tipo, per costo, per colore, per tag) perché somma sempre le copie presenti nel gruppo. Nessuna regressione: collasso dei gruppi, spostamento carte fra gruppi, pannello statistiche e layout continuano a funzionare.",
-  "queuedAt": "2026-07-24T01:21:36.392Z",
-  "queuedBy": "routine"
-}
