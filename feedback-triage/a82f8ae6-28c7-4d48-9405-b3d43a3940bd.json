@@ -1,7 +1,0 @@
-{
-  "id": "a82f8ae6-28c7-4d48-9405-b3d43a3940bd",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica e' stata pubblicata. Ho verificato che l'intervento rende Filo piu' prudente quando esegue comandi nel terminale: anche le opzioni di scaricamento meno comuni che salvano dati accessori (cookie del sito, identificativo della risposta, tracce di debug o log) su un file scelto ora richiedono la conferma scritta riservata alle azioni delicate, non piu' il semplice clic. Cosi' una pagina remota non puo' far scrivere di nascosto in un file sensibile con una conferma leggera. Nessun problema di sicurezza rilevato: la modifica rende il controllo piu' restrittivo e tocca solo la logica di classificazione dei comandi, il suo test e la nota di aggiornamento.",
-  "queuedAt": "2026-07-24T06:58:11.419Z",
-  "queuedBy": "routine"
-}
