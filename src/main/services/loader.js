@@ -14,6 +14,7 @@ const SVC = __dirname;
 require(path.join(SHARED, 'constants.js'));
 require(path.join(SHARED, 'messages.js'));
 require(path.join(SHARED, 'i18n.js'));
+require(path.join(SHARED, 'timeFormat.js')); // formattazione durate/countdown (#323)
 require(path.join(SHARED, 'modelCaps.js'));
 require(path.join(SHARED, 'storage.js'));
 require(path.join(SHARED, 'themeTokens.js'));
