@@ -220,7 +220,7 @@ test('simulate: hits è esatto e accumulare batch converge (feedback #354)', () 
   assert.ok(Number.isInteger(one.hits) && one.hits >= 0 && one.hits <= one.iterations);
 
   // Oracolo ipergeometrico: 3+ terre viste su 40/99 al turno 4 (10 carte).
-  const oracle = 1 - hyperAtMost(2, 99, 40, 10);
+  const oracle = hyperAtLeast(99, 40, 10, 3);
 
   // Un singolo batch da 15k vs 40 batch accumulati (600k mani): l'accumulato
   // dev'essere almeno buono quanto il singolo, e molto vicino all'oracolo.
