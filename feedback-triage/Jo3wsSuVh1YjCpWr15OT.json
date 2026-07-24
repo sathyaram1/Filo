@@ -1,0 +1,7 @@
+{
+  "id": "Jo3wsSuVh1YjCpWr15OT",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho verificato il problema che segnalavi nel calcolatore di probabilità del deck: prima la casella del numero si allargava fino a occupare quasi tutta la riga e schiacciava il nome della categoria rendendolo illeggibile, e peggiorava allargando la colonna. Ora, misurando il pannello reale a colonna stretta e a colonna larga, la casella del numero resta sempre piccola (giusto lo spazio per due cifre, allineata a destra) mentre il nome della categoria prende tutto lo spazio della riga e si legge per intero. L'ho provato con nomi normali (ragionamento, rimozione, terre) e con un nome volutamente lunghissimo: i nomi normali si leggono completi, quello estremo viene troncato in modo pulito con i puntini di sospensione su una sola riga senza rompere il layout. Ho controllato anche con uno screenshot reale del pannello: numeri piccoli a destra, nomi leggibili a sinistra. Nessun problema di sicurezza: se un tag contenesse codice HTML viene mostrato come testo, non eseguito. Promosso.",
+  "queuedAt": "2026-07-24T21:28:06.265Z",
+  "queuedBy": "routine"
+}
