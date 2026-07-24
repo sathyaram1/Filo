@@ -2,7 +2,7 @@
   "id": "1PtwpQDlRSG2BuoG70lR",
   "branch": "",
   "loopCount": 1,
-  "verifierVerdict": null,
+  "verifierVerdict": "pass",
   "verifierCritique": "",
   "secauditDone": false,
   "secauditVerdict": null
