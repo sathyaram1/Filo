@@ -23,6 +23,7 @@
         'Nella Cronologia AI ora puoi rimuovere una singola voce: passando il mouse su una richiesta compare il tasto «Rimuovi», così puoi togliere un elemento privato o sbagliato senza dover svuotare tutto lo storico.',
         'Nell’Editor, assegnando una scorciatoia da tastiera a un modulo della griglia non è più possibile impostare una lettera singola senza un tasto modificatore (Ctrl o Alt): il campo ora lo segnala e non la salva, così quella lettera non viene più «rubata» mentre scrivi nel documento, in chat o nella casella cerca/sostituisci. Le scorciatoie di questo tipo eventualmente già salvate vengono comunque ignorate mentre stai scrivendo.',
         'Nell’Editor, il modulo che cambia pagina della griglia (le frecce ‹ ›) è ora un modulo unico e protetto: essendo l’unico modo per raggiungere le altre pagine, non si può più eliminare per sbaglio dalla modalità modifica né aggiungerne un secondo dalla lista dei moduli, così non resti bloccato né sulla prima pagina né con un doppione ingombrante che non puoi togliere.',
+        'Nell’Editor, una sezione chiusa con la freccetta accanto al titolo ora resta chiusa mentre scrivi: prima, digitando un carattere qualsiasi, la freccia scattava in posizione «aperta» ma il testo restava nascosto e servivano due click per rivederlo. Ora la freccia dice sempre la verità e un solo click riapre la sezione; se aggiungi testo a una sezione chiusa, resta nascosto in modo coerente finché non la riapri.',
       ],
     },
     {
