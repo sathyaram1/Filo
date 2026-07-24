@@ -202,18 +202,17 @@ module.exports = function register(on, ctx) {
     if (!wc || wc.isDestroyed?.()) return { ok: false, error: 'no sender' };
     const path = require('node:path');
     const fs = require('node:fs');
-    const { net, dialog, app, BrowserWindow } = require('electron');
+    const { dialog, app, BrowserWindow } = require('electron');
     const ses = wc.session;
     const referrer = String(sender?.tab?.url || sender?.url || '');
 
     // 1) Scarica i byte (con Referer della pagina + cookie della session).
     let buffer, suggested;
     try {
-      const r = await fetchImageBytes({ net, url, referrer, session: ses });
+      const r = await fetchImageBytes({ url, referrer, session: ses });
       buffer = r.buffer;
       suggested = r.filename;
     } catch (e) {
-      if (process.env.FILO_DBG_REF) { try { require('node:fs').appendFileSync(process.env.FILO_DBG_REF, `[fetch ERR] ${url} :: ${e && e.stack || e}\n`); } catch (_) {} }
       return { ok: false, error: e?.message || 'download fallito' };
     }
 
