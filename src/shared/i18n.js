@@ -419,6 +419,8 @@
     history_search_placeholder: 'Cerca…',
     history_filter_all: 'Tutte',
     history_clear: 'Cancella tutto',
+    history_remove: 'Rimuovi',
+    history_remove_title: 'Rimuovi questa voce dalla cronologia',
     history_clear_confirm: 'Cancellare definitivamente tutta la cronologia AI?',
     history_empty: 'Nessuna interazione AI registrata.',
     history_no_results: 'Nessun risultato per la ricerca.',
