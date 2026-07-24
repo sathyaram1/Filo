@@ -41,8 +41,9 @@ test('trova anche per parole del titolo e pesa il titolo più del testo', () => 
   assert.equal(res[0]._id, 'a');
 });
 
-test('query senza parole utili (troppo corte) → nessun risultato', () => {
-  assert.deepEqual(MR.searchFeedbackFallback(FBS, 'a di'), []);
+test('query di soli caratteri singoli (nessun token utile) → nessun risultato', () => {
+  assert.deepEqual(MR.searchFeedbackFallback(FBS, 'a e o'), []);
+  assert.deepEqual(MR.searchFeedbackFallback(FBS, ''), []);
 });
 
 test('nessuna corrispondenza → lista vuota (non l\'intera lista)', () => {
