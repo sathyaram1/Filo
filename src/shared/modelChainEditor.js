@@ -39,6 +39,7 @@
       [A.FILO_TAB_TRIAGE, 'options_action_tab_triage'],
       [A.FILO_TAB_SUMMARY, 'options_action_tab_summary'],
       [A.FILO_TAB_SEARCH, 'options_action_tab_search'],
+      [A.FILO_FEEDBACK_SEARCH, 'options_action_feedback_search'],
       [A.FILO_DASHBOARD, 'options_action_filo_dashboard'],
       [A.FILO_CHAT, 'options_action_filo_chat'],
       [A.DECKS_CHAT, 'options_action_decks_chat'],
