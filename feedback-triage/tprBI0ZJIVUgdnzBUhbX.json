@@ -1,7 +1,0 @@
-{
-  "id": "tprBI0ZJIVUgdnzBUhbX",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica è stata pubblicata. Ora il riordino delle schede non tocca più solo i siti web ma chiude anche le pagine interne di troppo: le schede «Nuova scheda»/home aperte più volte vengono collassate in una sola e le pagine di impostazioni che non stai più usando vengono chiuse (restano sempre raggiungibili). La scheda attiva, le schede con audio in riproduzione e quelle con un modulo compilato non inviato restano sempre protette.",
-  "queuedAt": "2026-07-24T12:35:08.920Z",
-  "queuedBy": "routine"
-}
