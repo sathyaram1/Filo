@@ -1,21 +1,20 @@
-// AUDIT (routine, riproduzione): "Salva per dopo" non deduplica — salvare due
-// volte la stessa pagina crea due card identiche in "Aperti per dopo".
+// "Salva per dopo" deduplica per URL: salvare due volte la STESSA pagina non
+// crea due card identiche in "Aperti per dopo" — la voce esistente viene
+// aggiornata e riportata in cima.
 //
 // Flusso utente riprodotto:
 //   1. apri una pagina, salvala con "Salva per dopo" (la tab si chiude da sola);
 //   2. riapri la stessa pagina (es. il giorno dopo) e risalvala;
-//   3. apri "Aperti per dopo": la stessa pagina compare DUE volte, senza alcun
-//      avviso né unione delle voci.
+//   3. apri "Aperti per dopo": la pagina compare UNA SOLA volta.
 //
-// Il test asserisce lo stato ATTUALE (2 card identiche): documenta il problema
-// restando verde. Il fix atteso (dedupe per URL o avviso "già salvata") lo farà
-// fallire, e a quel punto va aggiornato per asserire il comportamento nuovo.
+// Pre-fix questo test falliva (comparivano 2 card): asserisce il comportamento
+// corretto e diventa rosso se la dedupe regredisce.
 
 import { test, expect } from './fixtures/electron.mjs';
 
 const HOME = 'filo://home/home.html';
 
-test('salvare due volte la stessa pagina crea due card identiche', async ({ openTab, testServer }) => {
+test('salvare due volte la stessa pagina non crea doppioni', async ({ openTab, testServer }) => {
   const url = testServer.html(
     `<!doctype html><html><head><title>Pagina di prova duplicati</title></head>
      <body style="padding:40px"><h1>Contenuto di prova</h1></body></html>`,
@@ -39,7 +38,7 @@ test('salvare due volte la stessa pagina crea due card identiche', async ({ open
   await saveViaMenu(); // 1° salvataggio
   await saveViaMenu(); // 2° salvataggio della STESSA pagina, riaperta
 
-  // "Aperti per dopo": la pagina compare due volte.
+  // "Aperti per dopo": la pagina compare una sola volta.
   const home = await openTab(HOME);
   await home.waitForLoadState('domcontentloaded');
   await home.waitForTimeout(800);
@@ -50,6 +49,6 @@ test('salvare due volte la stessa pagina crea due card identiche', async ({ open
 
   await home.screenshot({ path: 'tests/.shots/audit-saved-duplicate.png', fullPage: true }).catch(() => {});
 
-  // Stato attuale (bug): due card identiche, nessuna dedupe né avviso.
-  expect(dupes).toBe(2);
+  // Comportamento corretto: dedupe per URL → una sola card.
+  expect(dupes).toBe(1);
 });
