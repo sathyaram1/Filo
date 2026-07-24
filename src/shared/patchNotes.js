@@ -18,6 +18,7 @@
     {
       version: '0.2.158', date: '2026-07-24',
       fixes: [
+        'I timer lunghi ora si leggono come un vero conto alla rovescia: un timer di 2 ore mostra «2:00:00» invece di «120:00», e uno di 8 ore «8:00:00» invece di «480:00». Anche il riquadro di conferma in chat indica la durata per esteso (es. «2 h», «1 h 30 min», «30 sec») invece di arrotondare ai minuti, così un timer di 30 secondi non appare più come «0 min».',
         'Nella Cronologia AI la casella «Cerca» ora cerca solo tra i testi che vedi davvero nelle voci (richiesta, risposta, tipo di azione, modello e indirizzo): non trova più parole «fantasma» come «selection», «title» o «url» che comparivano da nessuna parte e facevano restare visibili quasi tutte le voci.',
         'Nella Cronologia AI ora puoi rimuovere una singola voce: passando il mouse su una richiesta compare il tasto «Rimuovi», così puoi togliere un elemento privato o sbagliato senza dover svuotare tutto lo storico.',
         'Nell’Editor, assegnando una scorciatoia da tastiera a un modulo della griglia non è più possibile impostare una lettera singola senza un tasto modificatore (Ctrl o Alt): il campo ora lo segnala e non la salva, così quella lettera non viene più «rubata» mentre scrivi nel documento, in chat o nella casella cerca/sostituisci. Le scorciatoie di questo tipo eventualmente già salvate vengono comunque ignorate mentre stai scrivendo.',
