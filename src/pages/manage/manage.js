@@ -1763,6 +1763,10 @@
     // DB3: imposta la "versione rilasciata" usata dal gate "Risolti" e rirende.
     setReleasedVersion(v) { releasedVersion = v || ''; renderList(); },
     openDetail,
+    // Ricerca "a senso": stato e trigger per gli spec (che comunque possono
+    // esercitare il codice reale cliccando la lente e digitando nel campo).
+    isSearchMode() { return searchMode; },
+    runSearch(q) { return runSearch(q); },
   };
 
   // ── Sezione "Modelli di supporto" (DD1) ──────────────────────────────────
