@@ -205,12 +205,14 @@ function applyTrackerBlocking(ses, enabled) {
     ses.webRequest.onBeforeRequest((details, callback) => {
       const s = blockState.get(ses);
       if (s && s.enabled && isTrackerUrl(details.url)) {
+        if (process.env.FILO_DBG_REF && /cat\.png|protected\.png/.test(details.url)) { try { require('node:fs').appendFileSync(process.env.FILO_DBG_REF, `[block TRACKER] ${details.resourceType} ${details.url}\n`); } catch (_) {} }
         callback({ cancel: true });
         return;
       }
       let ad = null;
       try { ad = require('./adblock'); } catch (_) {}
       if (ad && ad.shouldBlock && ad.shouldBlock(details.url)) {
+        if (process.env.FILO_DBG_REF && /cat\.png|protected\.png/.test(details.url)) { try { require('node:fs').appendFileSync(process.env.FILO_DBG_REF, `[block ADBLOCK] ${details.resourceType} ${details.url}\n`); } catch (_) {} }
         callback({ cancel: true });
         return;
       }
