@@ -200,6 +200,31 @@
   // `--dump-header`) alza, anche in bundle (`-sD file`).
   const CURL_DUMP_RE = /(^|\s)(--dump-header|-[a-zA-Z]*D)/;
 
+  // curl con flag che SALVANO DATI ACCESSORI in un percorso scelto da chi lancia
+  // il comando, con un contenuto comunque INFLUENZATO dal server (quindi da una
+  // pagina ostile che pilota l'assistente): -c/--cookie-jar (i cookie del sito),
+  // --etag-save (l'ETag della risposta), --trace/--trace-ascii (la traccia di
+  // debug della richiesta/risposta), --stderr (log/diagnostica di curl). Sono la
+  // stessa classe logica di -D/--dump-header — scrittura-su-file arbitraria di
+  // roba decisa dal remoto — solo più di nicchia e col contenuto più vincolato
+  // (formato cookie netscape, ETag quotato, dump esadecimale): l'iniezione è meno
+  // pulita ma il primitivo di scrittura resta, quindi salgono a 3 (digita
+  // "conferma") per simmetria col resto dei download. Check curl-specifico e
+  // case-SENSITIVE sulla `c`: `-c` (minuscolo, in curl SOLO --cookie-jar, scrive)
+  // alza anche in bundle (`-sc`, `-cs`); `-C`/--continue-at (MAIUSCOLO, riprende
+  // un download normale) NON deve salire. I long-flag di sola lettura simili
+  // (--cookie/-b legge i cookie, --etag-compare li confronta, --cacert/--cert
+  // leggono un certificato, --trace-time/--trace-ids sono modificatori senza
+  // file) NON combaciano: la parte long è ancorata con `(=|\s|$)` e il ramo short
+  // matcha solo la `c` minuscola in un bundle a trattino singolo.
+  const CURL_ACCESSORY_WRITE_RE = /(^|\s)(--cookie-jar|--etag-save|--trace(-ascii)?|--stderr)(=|\s|$)|(^|\s)-[a-zA-Z]*c/;
+
+  // wget con `--save-cookies <file>` scrive i cookie del sito (contenuto
+  // influenzato dal server) in un percorso arbitrario: stessa classe di
+  // curl --cookie-jar → 3. `--load-cookies` (LEGGE i cookie) è innocuo e, essendo
+  // esplicito il nome, NON combacia.
+  const WGET_SAVE_COOKIES_RE = /(^|\s)--save-cookies(=|\s|$)/;
+
   // git: il livello dipende dal sotto-comando. I sotto-comandi "duali"
   // (tag, branch, config, remote) NON stanno qui: leggono da soli ma scrivono
   // con un operando, quindi li classifica GIT_DUAL guardando gli argomenti.
