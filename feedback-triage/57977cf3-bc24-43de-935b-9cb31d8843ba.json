@@ -1,7 +1,0 @@
-{
-  "id": "57977cf3-bc24-43de-935b-9cb31d8843ba",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica al deck builder e stata pubblicata. Ora quando sposti a mano una carta in un altro gruppo (tasto destro, «Sposta in gruppo»), lo spostamento vale solo nella vista in cui l'hai fatto: cambiando raggruppamento (per costo di mana, per colore...) la carta torna nel gruppo giusto di quella vista, senza trascinarsi dietro il gruppo forzato altrove. Gli spostamenti fatti in viste diverse restano indipendenti.",
-  "queuedAt": "2026-07-24T01:12:40.432Z",
-  "queuedBy": "routine"
-}
