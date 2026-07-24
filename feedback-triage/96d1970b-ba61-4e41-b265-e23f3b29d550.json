@@ -1,0 +1,7 @@
+{
+  "id": "96d1970b-ba61-4e41-b265-e23f3b29d550",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la modifica alla ricerca nella Cronologia AI è stata pubblicata. Ora la casella Cerca lavora solo sui testi che vedi davvero nelle voci (richiesta, risposta, tipo di azione, modello e indirizzo), quindi non trova più parole 'fantasma' come selection, title o url.",
+  "queuedAt": "2026-07-24T04:10:01.714Z",
+  "queuedBy": "routine"
+}
