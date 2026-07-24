@@ -461,7 +461,7 @@
         xBtn.className = 'sn-fb-file-x';
         xBtn.setAttribute('aria-label', 'Rimuovi');
         xBtn.textContent = '×';
-        xBtn.addEventListener('click', () => { files.splice(i, 1); renderThumbs(); });
+        xBtn.addEventListener('click', () => { files.splice(i, 1); bumpSubmissionId(); renderThumbs(); });
         chip.appendChild(ic);
         chip.appendChild(nameEl);
         chip.appendChild(sizeEl);
