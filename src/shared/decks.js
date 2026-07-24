@@ -22,6 +22,41 @@
     return NOMI_SEGNAPOSTO.includes(String(nome || '').trim());
   }
 
+  // Normalizza l'override di gruppo (tasto destro → "sposta in gruppo") al
+  // modello PER-VISTA: una mappa { <raggruppamento>: <gruppo> }, così un
+  // override fatto "per tipo" vale solo nella vista per tipo e non inquina le
+  // altre (feedback #316). Accetta anche il vecchio formato a stringa unica
+  // (mazzi salvati prima di questa feature): non sapendo in quale vista fu
+  // creato, lo si assegna alla vista corrente del mazzo (`defaultView`) — così
+  // la carta resta dove l'utente la vede aprendo il mazzo, ma smette di seguire
+  // ogni altra vista. Ritorna la mappa pulita o null se non c'è nulla di valido.
+  function normalizeOverride(raw, defaultView) {
+    if (!raw) return null;
+    if (typeof raw === 'string') {
+      const g = raw.trim();
+      return g ? { [defaultView]: g } : null;
+    }
+    if (typeof raw === 'object') {
+      const out = {};
+      for (const v of RAGGRUPPAMENTI) {
+        const g = raw[v];
+        if (g && String(g).trim()) out[v] = String(g).trim();
+      }
+      return Object.keys(out).length ? out : null;
+    }
+    return null;
+  }
+
+  // Toglie l'override di UNA vista dalla mappa, immutabile. Ritorna la nuova
+  // mappa, o undefined se resta vuota (così il campo sparisce dall'entry).
+  function overrideWithoutView(ov, view) {
+    if (!ov || typeof ov !== 'object') return undefined;
+    if (!(view in ov)) return ov;
+    const next = { ...ov };
+    delete next[view];
+    return Object.keys(next).length ? next : undefined;
+  }
+
   function uuid() {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
     return Date.now().toString(36) + Math.random().toString(36).slice(2);
