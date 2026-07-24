@@ -1,7 +1,0 @@
-{
-  "id": "d1042c73-62cf-4825-802a-7391f122f2ab",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica e stata pubblicata. Ora, quando salvi con «Salva per dopo» una pagina che avevi gia messo da parte (e non ancora riaperto), non compaiono piu due schede identiche in «Aperti per dopo»: la voce esistente viene aggiornata con titolo e anteprima piu recenti e riportata in cima, senza doppioni da rimuovere a mano.",
-  "queuedAt": "2026-07-24T06:34:34.079Z",
-  "queuedBy": "routine"
-}
