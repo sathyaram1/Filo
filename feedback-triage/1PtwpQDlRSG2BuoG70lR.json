@@ -1,9 +1,0 @@
-{
-  "id": "1PtwpQDlRSG2BuoG70lR",
-  "status": "design",
-  "notes": "Il controllo di sicurezza sul merito e' stato superato: la nuova ricerca dei feedback nella dashboard e' riservata all'owner, non tocca aree delicate e i risultati del modello vengono sempre ricontrollati prima di essere mostrati. Il merge automatico e' pero' stato bloccato dal cancello di sicurezza perche' la modifica interviene anche sul modulo che decide chi e' amministratore: per policy ogni cambiamento a quell'area richiede la tua approvazione manuale prima della pubblicazione. Dai un'occhiata e, se sei d'accordo, fondi tu il ramo.",
-  "queuedAt": "2026-07-24T18:14:35.489Z",
-  "queuedBy": "routine",
-  "branch": "worker/1PtwpQDlRSG2BuoG70lR",
-  "reason": "secaudit"
-}
