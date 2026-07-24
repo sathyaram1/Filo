@@ -271,14 +271,23 @@
       row.appendChild(sc);
     }
 
+    // Click sinistro = azione primaria "Riapri" (la chip ha role=button e ne
+    // ha l'aspetto: deve rispondere al click come le card di "Aperti per dopo").
+    row.addEventListener('click', () => { reopenTab(t); });
+    // Tasto destro = menu contestuale (Riapri/Elimina), coerente con la
+    // centralità del tasto destro in Filo.
     row.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       openCtxMenu(e.clientX, e.clientY, t);
     });
-    // Tastiera: Invio/Spazio apre lo stesso menu (parità con l'uso da mouse,
-    // dato che le azioni non hanno più bottoni sempre visibili e focus-abili).
+    // Tastiera, parità piena con il mouse:
+    //  - Invio/Spazio = azione primaria "Riapri" (come il click sinistro);
+    //  - Shift+F10 o il tasto Menu = menu contestuale (come il tasto destro).
     row.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        reopenTab(t);
+      } else if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
         e.preventDefault();
         const r = row.getBoundingClientRect();
         openCtxMenu(r.left, r.bottom, t);
