@@ -1,0 +1,7 @@
+{
+  "id": "d1042c73-62cf-4825-802a-7391f122f2ab",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho riprodotto il problema esattamente come descritto: apro una pagina, la salvo con 'Salva per dopo' (la scheda si chiude da sola), riapro la stessa pagina e la risalvo, poi apro 'Aperti per dopo'. Ora compare UNA SOLA scheda invece delle due gemelle di prima: il doppione non si crea piu' e non c'e' nulla da rimuovere a mano. La voce esistente viene aggiornata (titolo e anteprima piu' recenti) e riportata in cima, come se l'avessi appena salvata. Ho stressato il caso: risalvando la stessa pagina 10 volte di fila resta sempre una sola scheda; due pagine con indirizzo diverso (anche solo per un parametro nell'URL) restano correttamente due voci separate; se risalvo una pagina gia' categorizzata la categoria non si perde; se la risalvo come semplice link l'anteprima gia' presente non viene cancellata. Verificato anche a vista dallo screenshot della lista: una card pulita, con anteprima, data e pulsante Rimuovi, layout coerente. La correzione vale sia per il salvataggio delle pagine sia per quello dei link. Tutto a posto.",
+  "queuedAt": "2026-07-24T06:32:48.944Z",
+  "queuedBy": "routine"
+}
