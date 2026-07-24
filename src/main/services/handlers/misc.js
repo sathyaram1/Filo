@@ -11,69 +11,102 @@ require('../../../shared/feedbackThread.js');
 
 const IMG_DOWNLOAD_MAX = 64 * 1024 * 1024; // tetto anti-OOM (64MB)
 
-// Scarica i byte di un'immagine via net.request usando la session del tab
-// (cookie/auth) e presentando il Referer della pagina — l'unico modo, in
-// Electron 33, di far arrivare il Referer a valle (i download via downloadURL
-// lo perdono sempre). Risolve { buffer, filename } o rigetta con un errore
-// leggibile (HTTP 4xx/5xx, connessione troncata, immagine vuota/troppo grande).
-function fetchImageBytes({ net, url, referrer, session }) {
-  return new Promise((resolve, reject) => {
-    let req;
-    try {
-      req = net.request({ url, session, useSessionCookies: true, redirect: 'follow' });
-    } catch (e) { reject(e); return; }
-    if (/^https?:/i.test(referrer)) {
-      try { req.setHeader('Referer', referrer); } catch (_) {}
+// Scarica i byte di un'immagine presentando il Referer della pagina e i cookie
+// della session — l'unico modo, in Electron 33, di far arrivare il Referer a
+// valle (i download via webContents.downloadURL lo perdono SEMPRE, sia con
+// l'opzione { headers } sia riscrivendolo in onBeforeSendHeaders: verificato).
+// Usiamo http/https di Node invece di net.request perché la richiesta di un
+// download partita dal main viene bloccata (ERR_BLOCKED_BY_CLIENT) dal
+// webRequest della session; il salvataggio esplicito di un'immagine che l'utente
+// già vede non deve passare per l'ad/tracker-blocking. Risolve { buffer,
+// filename } o rigetta con un errore leggibile (HTTP 4xx/5xx, connessione
+// troncata, immagine vuota/troppo grande). Segue i redirect (max 5) ricalcolando
+// i cookie per l'host di destinazione, come farebbe un browser.
+async function fetchImageBytes({ url, referrer, session }) {
+  const MAX_REDIRECTS = 5;
+  let target = url;
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    const res = await httpGetImage(target, referrer, session); // eslint-disable-line no-await-in-loop
+    if (res.redirect) {
+      try { target = new URL(res.location, target).href; } catch (_) { throw new Error('redirect non valido'); }
+      if (!/^https?:/i.test(target)) throw new Error('redirect non http');
+      continue;
     }
-    req.on('response', (response) => {
-      const status = response.statusCode || 0;
-      if (status >= 400) {
-        try { response.on('data', () => {}); response.on('end', () => {}); } catch (_) {}
-        reject(new Error('HTTP ' + status));
+    return res;
+  }
+  throw new Error('troppi redirect');
+}
+
+// Una singola richiesta GET. Risolve { redirect:true, location } su 3xx, oppure
+// { buffer, filename } sul body completo; rigetta su errore/troncamento.
+async function httpGetImage(target, referrer, session) {
+  let u;
+  try { u = new URL(target); } catch (_) { throw new Error('URL non valido'); }
+  const mod = u.protocol === 'https:' ? require('node:https') : require('node:http');
+
+  // Cookie della session per QUESTO host (immagini dietro login), come un browser.
+  let cookieHeader = '';
+  try {
+    const cookies = await session.cookies.get({ url: target });
+    cookieHeader = (cookies || []).map((c) => `${c.name}=${c.value}`).join('; ');
+  } catch (_) {}
+
+  const headers = {
+    'User-Agent': 'Mozilla/5.0',
+    Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+  };
+  if (/^https?:/i.test(referrer)) headers.Referer = referrer;
+  if (cookieHeader) headers.Cookie = cookieHeader;
+
+  return new Promise((resolve, reject) => {
+    const req = mod.get(target, { headers }, (res) => {
+      const status = res.statusCode || 0;
+      if (status >= 300 && status < 400 && res.headers.location) {
+        res.resume(); // scarta il body del redirect
+        resolve({ redirect: true, location: res.headers.location });
         return;
       }
-      const clRaw = response.headers && response.headers['content-length'];
-      const expected = parseInt(Array.isArray(clRaw) ? clRaw[0] : clRaw, 10);
+      if (status >= 400) { res.resume(); reject(new Error('HTTP ' + status)); return; }
+      const expected = parseInt(res.headers['content-length'], 10);
       const chunks = [];
       let total = 0;
       let aborted = false;
-      response.on('data', (chunk) => {
+      res.on('data', (chunk) => {
         if (aborted) return;
         total += chunk.length;
         if (total > IMG_DOWNLOAD_MAX) {
           aborted = true;
-          try { req.abort(); } catch (_) {}
+          try { req.destroy(); } catch (_) {}
           reject(new Error('immagine troppo grande'));
-          return;
+        } else {
+          chunks.push(chunk);
         }
-        chunks.push(chunk);
       });
-      response.on('end', () => {
+      res.on('end', () => {
         if (aborted) return;
-        // Content-Length dichiarato ma non raggiunto ⇒ risposta troncata dal
-        // server (connessione chiusa a metà): è un errore, non un file valido.
-        if (Number.isFinite(expected) && total < expected) {
+        // Connessione chiusa prima della fine del body (res.complete=false) o
+        // Content-Length dichiarato ma non raggiunto ⇒ risposta troncata: è un
+        // errore, non un file valido (niente più silenzio sul download a metà).
+        if (!res.complete || (Number.isFinite(expected) && total < expected)) {
           reject(new Error('download interrotto'));
           return;
         }
         const buffer = Buffer.concat(chunks);
         if (!buffer.length) { reject(new Error('immagine vuota')); return; }
-        resolve({ buffer, filename: filenameFromResponse(response, url) });
+        resolve({ buffer, filename: filenameFromHeaders(res.headers, target) });
       });
-      response.on('error', (e) => { if (!aborted) reject(e || new Error('errore risposta')); });
-      response.on('aborted', () => { if (!aborted) reject(new Error('download interrotto')); });
+      res.on('error', (e) => { if (!aborted) reject(e || new Error('errore risposta')); });
+      res.on('aborted', () => { if (!aborted) reject(new Error('download interrotto')); });
     });
     req.on('error', (e) => reject(e || new Error('richiesta fallita')));
-    req.on('abort', () => reject(new Error('download interrotto')));
-    try { req.end(); } catch (e) { reject(e); }
+    req.setTimeout(30000, () => { try { req.destroy(new Error('timeout')); } catch (_) {} });
   });
 }
 
 // Nome file dal Content-Disposition (se presente), altrimenti dal path dell'URL.
-function filenameFromResponse(response, url) {
+function filenameFromHeaders(hdrs, url) {
   try {
-    const cdRaw = response.headers && response.headers['content-disposition'];
-    const cd = Array.isArray(cdRaw) ? cdRaw[0] : cdRaw;
+    const cd = hdrs && hdrs['content-disposition'];
     if (cd) {
       // filename*=UTF-8''… (RFC 5987) ha priorità su filename=…
       let m = /filename\*=(?:UTF-8'')?([^;]+)/i.exec(cd);
