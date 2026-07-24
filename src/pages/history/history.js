@@ -69,8 +69,15 @@
     if (filter) filtered = filtered.filter((it) => it.action === filter);
     if (q) {
       filtered = filtered.filter((it) => {
+        // Cerca SOLO sui testi che la voce mostra davvero — non su
+        // JSON.stringify(it.input), che infilava nell'ago i NOMI dei campi
+        // interni del payload (selection, userMessage, title, url…) e la
+        // punteggiatura JSON, facendo "trovare" parole che l'utente non vede
+        // da nessuna parte. Qui usiamo l'input formattato come in lista,
+        // l'etichetta dell'azione, il modello, l'output e l'origine.
         const haystack = [
-          JSON.stringify(it.input || {}),
+          formatActionLabel(it.action),
+          formatInput(it.input),
           it.output || '',
           it.origin || '',
           it.model || '',
