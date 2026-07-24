@@ -173,8 +173,7 @@
   // per una frazione, così un consumo sotto il credito resta visibile invece di
   // sparire arrotondato a zero. Il decimale sparisce se il valore è intero.
   function formatCredits(n) {
-    const v = Math.round((Number(n) || 0) * 10) / 10;
-    return new Intl.NumberFormat('it-IT', { maximumFractionDigits: 1 }).format(v);
+    return formatInt(n);
   }
   function formatDate(ts) {
     if (!ts) return '';
