@@ -201,3 +201,39 @@ test('simulate: deterministico a parità di seed', () => {
   const b = S.simulate({ library, want: [{ tag: 'terre', n: 3 }], turn: 4, iterations: 2000, seed: 5 });
   assert.equal(a.probability, b.probability);
 });
+
+// Feedback #354: la stima si raffina accumulando più batch con seed diversi
+// (Σhits/Σiterations). Verifica che `hits` sia esatto (hits/iterations ===
+// probability) e che accumulare tanti batch converga verso l'oracolo
+// ipergeometrico MEGLIO di un singolo batch piccolo — è il cuore del "converge
+// verso la vera probabilità" chiesto dall'utente.
+test('simulate: hits è esatto e accumulare batch converge (feedback #354)', () => {
+  const library = [
+    ...Array.from({ length: 40 }, () => ['terre']),
+    ...Array.from({ length: 59 }, () => []),
+  ];
+  const want = [{ tag: 'terre', n: 3 }];
+
+  // hits/iterations coincide con probability (i due campi sono sommabili).
+  const one = S.simulate({ library, want, turn: 4, iterations: 5000, seed: 1 });
+  assert.equal(one.hits / one.iterations, one.probability);
+  assert.ok(Number.isInteger(one.hits) && one.hits >= 0 && one.hits <= one.iterations);
+
+  // Oracolo ipergeometrico: 3+ terre viste su 40/99 al turno 4 (10 carte).
+  const oracle = 1 - hyperAtMost(2, 99, 40, 10);
+
+  // Un singolo batch da 15k vs 40 batch accumulati (600k mani): l'accumulato
+  // dev'essere almeno buono quanto il singolo, e molto vicino all'oracolo.
+  const small = S.simulate({ library, want, turn: 4, iterations: 15000, seed: 1 });
+  let hits = 0; let iters = 0;
+  for (let s = 1; s <= 40; s++) {
+    const r = S.simulate({ library, want, turn: 4, iterations: 15000, seed: s });
+    hits += r.hits; iters += r.iterations;
+  }
+  const converged = hits / iters;
+  assert.equal(iters, 600000);
+  assert.ok(Math.abs(converged - oracle) < 0.003,
+    `accumulato ${converged} vs oracolo ${oracle.toFixed(4)}`);
+  assert.ok(Math.abs(converged - oracle) <= Math.abs(small.probability - oracle) + 1e-9,
+    `accumulato (${converged}) non più lontano del singolo batch (${small.probability})`);
+});
