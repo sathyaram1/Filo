@@ -81,5 +81,5 @@
     return remove(id);
   }
 
-  global.SN_SAVED_PAGES = { list, save, remove, consume };
+  global.SN_SAVED_PAGES = { list, save, setThumbnail, remove, consume };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
