@@ -670,7 +670,22 @@
       <button type="button" class="mg-tab" data-tab="stats" role="tab">Statistiche Red Team</button>
       <button type="button" class="mg-tab" data-tab="models" role="tab">Modelli di supporto</button>
       <button type="button" class="mg-tab" data-tab="automation" role="tab">Automazioni</button>
+      <!-- Lente di ricerca "a senso": in fondo alla barra, spinta a destra.
+           Cerca un feedback per SIGNIFICATO tra TUTTE le schede. -->
+      <button type="button" class="mg-search-toggle" id="mgSearchToggle"
+        title="Cerca un feedback a senso" aria-label="Cerca un feedback" aria-expanded="false"></button>
     </nav>
+
+    <!-- Barra di ricerca semantica (nascosta finché non apri la lente). -->
+    <div class="mg-searchbar" id="mgSearchBar" hidden>
+      <span class="mg-search-ico" id="mgSearchIco" aria-hidden="true"></span>
+      <input type="search" class="mg-search-input" id="mgSearchInput"
+        placeholder="Descrivi il feedback che cerchi, anche a senso…"
+        autocomplete="off" spellcheck="false" />
+      <span class="mg-search-msg" id="mgSearchMsg" role="status"></span>
+      <button type="button" class="mg-search-close" id="mgSearchClose"
+        title="Chiudi ricerca" aria-label="Chiudi ricerca">×</button>
+    </div>
 
     <!-- ═══ TAB LISTA (Ricevuti / In coda / Risolti / Archiviati) ════════ -->
     <!-- Layout condiviso a 3 colonne: la lista a sinistra è filtrata per tab,
