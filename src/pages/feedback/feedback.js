@@ -712,7 +712,7 @@
         }
       });
       // Decifra e riempi il src (o mostra il segnaposto testuale se non arriva).
-      resolveImageSrc(img.dataset.url || '').then((dataUrl) => {
+      resolveImageSrc(img.dataset.url || '').then(({ dataUrl, error }) => {
         img.classList.remove('fb-img-loading');
         if (dataUrl) {
           img.src = dataUrl;
@@ -721,7 +721,8 @@
           const ph = document.createElement('div');
           ph.className = 'fb-img-broken';
           ph.textContent = '(immagine non disponibile)';
-          ph.title = img.dataset.url || '';
+          // Hover col MOTIVO preciso del fallimento (ripiega sull'URL cifrato).
+          ph.title = error || img.dataset.url || '';
           img.replaceWith(ph);
         }
       });
