@@ -332,9 +332,39 @@ html, body {
 .sn-history-meta {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   font-size: 11px;
   color: var(--sn-muted);
   margin-bottom: 6px;
+}
+
+.sn-history-meta-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sn-history-remove {
+  border: none;
+  background: none;
+  color: var(--sn-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: var(--sn-radius);
+  opacity: 0;
+  transition: opacity 0.12s ease, color 0.12s ease, background 0.12s ease;
+}
+
+.sn-history-item:hover .sn-history-remove,
+.sn-history-remove:focus-visible {
+  opacity: 1;
+}
+
+.sn-history-remove:hover {
+  color: var(--sn-fg);
+  background: var(--sn-hover);
 }
 
 .sn-history-input {
