@@ -1,0 +1,7 @@
+{
+  "id": "CAgnQLEfJbMCCVNkShsF",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho aperto il menu App (l'icona App in alto a destra nella Nuova scheda), che era esattamente il punto segnalato: prima 'Mazzi' e 'Bacheca' erano le uniche due voci senza simbolo. Ora tutte e cinque le voci mostrano la loro icona: Editor, Deck builder MTG (le carte a ventaglio), Feedback, Bacheca e Gestione. La voce 'Mazzi' è stata rinominata in 'Deck builder MTG' e non compare più da nessuna parte nel menu. La Bacheca mostra ora un'icona a lavagna a colonne, coerente con quello che è, e non più l'aeroplanino di 'condividi'. Verificato in due modi: aprendo davvero il menu e controllando a una a una che ogni voce abbia la sua icona, e guardando a occhio uno screenshot reale del menu (le cinque icone ci sono tutte e sono coerenti con lo stile a linee del resto di Filo). Le etichette sono fisse e non contengono testo scritto dall'utente, quindi non c'è modo di iniettarci contenuti; ho aperto e chiuso il menu più volte senza problemi. Nota minore che NON blocca l'approvazione, già segnalata: dentro l'app la schermata-libreria dei mazzi e il pulsante 'indietro' si chiamano ancora 'Mazzi' (nome interno sensato), volendo si potrebbe uniformare anche lì.",
+  "queuedAt": "2026-07-24T15:13:50.018Z",
+  "queuedBy": "routine"
+}
