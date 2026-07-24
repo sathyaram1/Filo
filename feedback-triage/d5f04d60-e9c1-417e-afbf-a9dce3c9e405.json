@@ -1,0 +1,7 @@
+{
+  "id": "d5f04d60-e9c1-417e-afbf-a9dce3c9e405",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho riprodotto il problema segnalato e provato a romperlo. Assegnando a un modulo una scorciatoia fatta di una lettera singola (es. \"b\"), ora l'app la rifiuta al salvataggio mostrando un avviso, e scrivendo \"banana\" nel documento la parola resta intera senza aprire il popup delle statistiche. Ho verificato anche il caso di un documento che aveva GIA' salvato una scorciatoia simile da prima della correzione: ora quella lettera si digita normalmente mentre scrivi e il modulo non si apre piu' da solo. Ho controllato che anche \"Shift+lettera\" (es. Shift+b) venga rifiutata, giustamente, perche' produce comunque un carattere. Le scorciatoie vere con Ctrl/Alt (es. Ctrl+1) continuano a funzionare ovunque, anche mentre stai scrivendo nel documento, come deve essere. Nota a margine (non e' questo bug, e' cosa vecchia): l'esempio mostrato nel campo, \"Ctrl+Shift+1\", in pratica non si attiva perche' Shift+1 sulla tastiera produce il simbolo, non il numero; conviene cambiare l'esempio suggerito o gestire i numeri con Shift. Lo lascio come segnalazione separata.",
+  "queuedAt": "2026-07-24T03:24:11.029Z",
+  "queuedBy": "routine"
+}
