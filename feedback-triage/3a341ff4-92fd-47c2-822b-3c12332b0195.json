@@ -1,7 +1,0 @@
-{
-  "id": "3a341ff4-92fd-47c2-822b-3c12332b0195",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica e stata pubblicata. Ora, sull'avviso a schermo intero 'Sito pericoloso', il pulsante 'Torna indietro' ti fa davvero uscire dal sito anche quando l'avviso compare in una scheda appena aperta. Prima, in quel caso, premere 'Torna indietro' finiva per avere lo stesso effetto di confermare il sito, che restava trattato come sicuro per quella scheda.",
-  "queuedAt": "2026-07-24T19:11:50.112Z",
-  "queuedBy": "routine"
-}
