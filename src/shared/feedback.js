@@ -25,6 +25,21 @@
     });
   }
 
+  // Anti-duplicati (#370): id documento STABILE per una singola composizione di
+  // feedback. Se il chiamante fornisce un submissionId, il documento viene creato
+  // con quell'id; un secondo invio con lo stesso id (es. un tentativo andato in
+  // timeout lato UI ma riuscito sul server, poi ripetuto dall'utente) viene
+  // rifiutato dal server (409 ALREADY_EXISTS) invece di creare un duplicato.
+  // Ripulisce l'id ai caratteri ammessi da Firestore per un documentId e scarta
+  // i pattern vietati ('.', '..', __*__): in quei casi torna '' → creazione
+  // normale con id auto-generato (retrocompat, nessuna idempotenza).
+  function sanitizeDocId(id) {
+    if (!id) return '';
+    const s = String(id).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 200);
+    if (!s || s === '.' || s === '..' || /^__.*__$/.test(s)) return '';
+    return s;
+  }
+
   function dataUrlToBlob(dataUrl) {
     const [head, b64] = dataUrl.split(',');
     const mime = /data:([^;]+)/.exec(head)?.[1] || 'application/octet-stream';
