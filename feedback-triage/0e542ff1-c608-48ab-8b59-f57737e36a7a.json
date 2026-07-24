@@ -1,7 +1,0 @@
-{
-  "id": "0e542ff1-c608-48ab-8b59-f57737e36a7a",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho riprodotto esattamente la segnalazione: nella schermata iniziale ho fatto comparire il suggerimento «Riordina e archivia le schede» nella colonna di sinistra e l'ho cliccato. Ora compare il popup di conferma scuro in stile Filo (titolo «Riordino delle schede», testo che spiega cosa succederà e pulsanti «Annulla» / «Procedi»), esattamente come quando si preme il pulsante equivalente nella chat: niente più avviso grigio di sistema del browser. Ho verificato che i due cammini mostrano ora lo stesso identico avviso. Ho anche controllato che premendo «Procedi» il riordino delle schede parte davvero (non solo che il popup è bello), e che premendo fuori o «Annulla» non parte nulla. Stress test: doppio/triplo clic rapido sul suggerimento continua a mostrare il popup di Filo senza mai far comparire quello di sistema. Ho inoltre confermato che il controllo automatico che scatta su questo problema diventa rosso se si ripristina il vecchio comportamento e verde col nuovo, quindi cattura davvero la regressione. Verifica fatta eseguendo l'app reale (screenshot ispezionato: popup corretto e coerente col tema).",
-  "queuedAt": "2026-07-24T00:55:35.637Z",
-  "queuedBy": "routine"
-}
