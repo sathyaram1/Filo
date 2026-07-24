@@ -53,120 +53,73 @@ module.exports = function register(on, ctx) {
   // creato dal content script: Chromium onora l'attributo `download` SOLO per
   // URL same-origin/blob:/data: — per un'immagine su un ALTRO dominio (la
   // stragrande maggioranza) lo ignorava e la scheda navigava sull'immagine
-  // senza scaricare nulla. Qui il salvataggio parte dal main con
-  // webContents.downloadURL, che scarica sempre, a prescindere dall'origine.
-  // Nessun handler will-download era registrato sulle session delle tab
-  // normali: ne agganciamo uno usa-e-getta filtrato sul nostro URL, così i
-  // download nati altrove (es. <a download> same-origin delle pagine) tengono
-  // il comportamento di default.
-  on(MSG.DOWNLOAD_IMAGE, (msg, sender) => {
+  // senza scaricare nulla.
+  //
+  // Scarichiamo i byte QUI nel main con net.request, poi li scriviamo su disco.
+  // Perché non webContents.downloadURL: molti CDN con protezione hotlink
+  // rispondono 403 alle richieste "anonime" (senza Referer) anche per immagini
+  // che nella pagina si vedono benissimo — e NON c'è modo di presentare il
+  // Referer a un download di Electron 33: né l'opzione { headers } di
+  // downloadURL né una riscrittura in onBeforeSendHeaders vengono onorate per
+  // la richiesta di download (verificato: la richiesta arriva sempre senza
+  // Referer). net.request invece lascia impostare qualsiasi header e usa i
+  // cookie/auth della session del tab, così il salvataggio riesce a prescindere
+  // dall'origine E sui siti con hotlink protection. Un fetch che si interrompe
+  // a metà diventa naturalmente un errore (niente più silenzio), e l'utente
+  // sceglie dove salvare col dialogo nativo "Salva come…".
+  on(MSG.DOWNLOAD_IMAGE, async (msg, sender) => {
     const url = String(msg.url || '').trim();
     if (!/^https?:/i.test(url)) return { ok: false, error: 'URL non scaricabile' };
     const wc = sender && sender.wc;
     if (!wc || wc.isDestroyed?.()) return { ok: false, error: 'no sender' };
     const path = require('node:path');
+    const fs = require('node:fs');
+    const { net, dialog, app, BrowserWindow } = require('electron');
     const ses = wc.session;
-
-    // Referer della pagina: molti CDN con protezione hotlink rifiutano (403) le
-    // richieste "anonime" anche per immagini che nella pagina si vedono
-    // benissimo. downloadURL({ headers }) NON basta: Chromium ignora un header
-    // extra chiamato Referer (verificato: la richiesta arrivava sempre anonima).
-    // L'unico punto dove il motore lo lascia impostare è onBeforeSendHeaders:
-    // registriamo l'URL nel registro download-referrer, consultato dall'unico
-    // listener per sessione (services/cookies.js), che copre anche i redirect e
-    // gli eventuali resume.
-    let releaseReferrer = () => {};
     const referrer = String(sender?.tab?.url || sender?.url || '');
-    const dbgRef = /^https?:/i.test(referrer) ? referrer : '';
 
-    return new Promise((resolve) => {
-      let settled = false;
-      const finish = (r) => {
-        if (settled) return;
-        settled = true;
-        try { releaseReferrer(); } catch (_) {}
-        resolve(r);
-      };
+    // 1) Scarica i byte (con Referer della pagina + cookie della session).
+    let buffer, suggested;
+    try {
+      const r = await fetchImageBytes({ net, url, referrer, session: ses });
+      buffer = r.buffer;
+      suggested = r.filename;
+    } catch (e) {
+      return { ok: false, error: e?.message || 'download fallito' };
+    }
 
-      const onWillDownload = (_e, item) => {
-        // Sulla stessa session possono partire altri download: agganciamo solo
-        // il nostro (l'URL richiesto è il primo della catena redirect).
-        let chain = [];
-        try { chain = item.getURLChain() || []; } catch (_) {}
-        if (item.getURL() !== url && chain[0] !== url) return;
-        ses.removeListener('will-download', onWillDownload);
-        clearTimeout(startTimer);
+    // 2) Nome file sicuro: preferisci il Content-Disposition del server, poi il
+    // path dell'URL; neutralizza separatori e tentativi di traversal.
+    const filename = safeImageFilename(suggested || filenameFromUrl(url) || 'immagine');
 
-        // Nome file: lo decide Chromium (Content-Disposition → URL → mime),
-        // molto più affidabile del parsing dell'URL lato pagina.
-        const filename = item.getFilename() || 'immagine';
-        const testDir = process.env.FILO_DOWNLOAD_DIR;
-        if (testDir) {
-          // Hook per i test/headless: salvataggio diretto senza dialogo.
-          try { require('node:fs').mkdirSync(testDir, { recursive: true }); } catch (_) {}
-          item.setSavePath(path.join(testDir, filename));
-        } else {
-          // Dialogo "Salva come…" (il default di Electron quando savePath non è
-          // impostato), pre-compilato con la cartella Download e il nome dedotto
-          // — stesso comportamento che il salvataggio same-origin aveva già.
-          try {
-            const { app } = require('electron');
-            item.setSaveDialogOptions({ defaultPath: path.join(app.getPath('downloads'), filename) });
-          } catch (_) {}
-        }
-        // Download troncato a metà (connessione chiusa dal server): se Chromium
-        // lo considera riprendibile NON emette 'done' — l'item resta in stato
-        // 'interrupted' per sempre e l'utente non riceverebbe MAI un riscontro
-        // (né file né errore). Un tentativo di ripresa, poi annulliamo noi così
-        // 'done' arriva e l'errore raggiunge l'utente.
-        let resumeTried = false;
-        let forcedError = null;
-        item.on('updated', (_ev, state) => {
-          if (state !== 'interrupted') return;
-          if (!resumeTried && item.canResume()) {
-            resumeTried = true;
-            setTimeout(() => {
-              try { if (item.canResume()) { item.resume(); return; } } catch (_) {}
-              forcedError = 'interrupted';
-              try { item.cancel(); } catch (_) { finish({ ok: false, error: 'interrupted' }); }
-            }, 500);
-          } else {
-            forcedError = 'interrupted';
-            try { item.cancel(); } catch (_) { finish({ ok: false, error: 'interrupted' }); }
-          }
-        });
-        item.once('done', (_ev, state) => {
-          if (state === 'completed') {
-            const p = item.getSavePath() || '';
-            finish({ ok: true, path: p, filename: p ? path.basename(p) : filename });
-          } else {
-            // 'cancelled' = l'utente ha chiuso il dialogo: non è un errore.
-            // Se però l'abbiamo annullato NOI dopo un'interruzione irrecuperabile
-            // (forcedError), per l'utente È un errore e il toast deve dirlo.
-            const cancelledByUser = !forcedError && state === 'cancelled';
-            finish({ ok: false, cancelled: cancelledByUser, error: forcedError || state });
-          }
-        });
-      };
-      ses.on('will-download', onWillDownload);
-
-      // Se il download non parte affatto (URL irraggiungibile / bloccato) non
-      // lasciamo né listener orfani né la risposta appesa. Il timer copre SOLO
-      // l'avvio: una volta partito, l'attesa del dialogo/download è illimitata.
-      const startTimer = setTimeout(() => {
-        ses.removeListener('will-download', onWillDownload);
-        finish({ ok: false, error: 'download non partito' });
-      }, 30000);
-
+    // 3) Scegli il percorso e scrivi.
+    const testDir = process.env.FILO_DOWNLOAD_DIR;
+    let savePath;
+    if (testDir) {
+      // Hook per i test/headless: salvataggio diretto senza dialogo nativo.
+      try { fs.mkdirSync(testDir, { recursive: true }); } catch (_) {}
+      savePath = path.join(testDir, filename);
+    } else {
+      // Dialogo "Salva come…" pre-compilato con la cartella Download e il nome
+      // dedotto — stesso comportamento che il salvataggio same-origin aveva già.
       try {
-        if (dbgRef) wc.downloadURL(url, { headers: { Referer: dbgRef } });
-        else wc.downloadURL(url);
-      } catch (e2) {
-        ses.removeListener('will-download', onWillDownload);
-        clearTimeout(startTimer);
-        finish({ ok: false, error: e2?.message || String(e2) });
+        const win = BrowserWindow.fromWebContents(wc) || winOf(sender) || null;
+        const opts = { defaultPath: path.join(app.getPath('downloads'), filename) };
+        const res = win ? await dialog.showSaveDialog(win, opts) : await dialog.showSaveDialog(opts);
+        // Annullato dall'utente: non è un errore, nessun toast.
+        if (res.canceled || !res.filePath) return { ok: false, cancelled: true };
+        savePath = res.filePath;
+      } catch (e) {
+        return { ok: false, error: e?.message || 'dialogo non disponibile' };
       }
-    });
+    }
+
+    try {
+      await fs.promises.writeFile(savePath, buffer);
+      return { ok: true, path: savePath, filename: path.basename(savePath) };
+    } catch (e) {
+      return { ok: false, error: e?.message || 'scrittura fallita' };
+    }
   });
 
   on(MSG.FEEDBACK_ANNOTATE, async (msg, sender) => {
