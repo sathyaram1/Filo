@@ -8,9 +8,18 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 
+// Il bonus giornaliero "feedback autonomo" (+10) è ON di default e viene
+// applicato quando la pagina Crediti chiede il saldo: sballerebbe i saldi attesi
+// di questi test (1000 → 1010, ecc.). Lo disattiviamo nel seed così i saldi sono
+// deterministici e riflettono SOLO il consumo che stiamo verificando.
+async function disableAutoFeedbackBonus() {
+  await globalThis.SN_STORAGE.updateSettings({ security: { autoFeedback: false } });
+}
+
 test('la pagina Crediti mostra saldo e una fetta per tipo d\'uso', async ({ app, openTab }) => {
   // Seed di consumo nel motore crediti (processo main): due tipi d'uso distinti.
   // 0.08€ → 100 crediti (correttore), 0.16€ → 200 crediti (chat). Saldo 1000-300.
+  await app.evaluate(disableAutoFeedbackBonus);
   await app.evaluate(async () => {
     const C = globalThis.SN_CREDITS;
     await C.recordConsumption({ action: 'spellcheck_word', costEur: 0.08 });
