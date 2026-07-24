@@ -1,0 +1,7 @@
+{
+  "id": "96d1970b-ba61-4e41-b265-e23f3b29d550",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho riprodotto esattamente la lamentela: aperta la Cronologia AI con più voci dentro e cercato le parole 'fantasma' segnalate ('selection', 'title', 'url', 'userMessage'). Prima uscivano quasi tutte le voci; ora nessuna, perché quelle parole non compaiono davvero nei testi mostrati. Ho confermato che la ricerca trova solo ciò che si vede: una parola presente nel testo della richiesta ('melanzana') o nella risposta ('deserto') mostra solo la voce giusta, e il nome del modello resta cercabile. Stress test superati: ricerca vuota o di soli spazi mostra tutte le voci; caratteri speciali ed emoji non fanno crashare e semplicemente non trovano nulla; un testo con codice tipo <script> viene mostrato come testo e non viene eseguito; anche altre parole tecniche interne (input, provider, timestamp e la punteggiatura del formato dati) non restituiscono più falsi risultati. Come piccolo di più coerente, ora è cercabile anche il tipo di azione: cercando 'traduci' compaiono le traduzioni. Unico limite onesto, coerente col 'cerco ciò che vedo': l'estratto della richiesta è troncato, quindi una parola oltre quel punto non viene trovata — ma non produce risultati falsi.",
+  "queuedAt": "2026-07-24T04:08:38.278Z",
+  "queuedBy": "routine"
+}
