@@ -545,16 +545,26 @@
   }
 
   // "Sposta in gruppo": secondo livello del menu — i gruppi esistenti della
-  // vista corrente + il ritorno al gruppo naturale (toglie l'override).
+  // vista corrente + il ritorno al gruppo naturale (toglie l'override). Lo
+  // spostamento è PER-VISTA (feedback #316): vale solo nella vista corrente,
+  // così cambiando raggruppamento la carta torna a raggrupparsi secondo il
+  // nuovo criterio invece di trascinarsi dietro il gruppo forzato altrove.
   function chooseGroup(x, y, cardId) {
+    const view = current.raggruppamento || 'tipo';
     const items = Decks.groupDeck(current, cardsById).map((g) => ({
       label: g.name,
-      run: () => saveDeck(Decks.setGroupOverride(current, cardId, g.name)),
+      run: () => saveDeck(Decks.setGroupOverride(current, cardId, g.name, view)),
     }));
-    items.push({
-      label: '(gruppo naturale)',
-      run: () => saveDeck(Decks.setGroupOverride(current, cardId, null)),
-    });
+    // "(gruppo naturale)" resetta l'override della vista corrente: mostralo solo
+    // se un override in questa vista c'è davvero (altrimenti sarebbe un no-op).
+    const entry = current.carte.find((c) => c.scryfall_id === cardId);
+    const ov = entry && entry.gruppo_override;
+    if (ov && typeof ov === 'object' && ov[view]) {
+      items.push({
+        label: '(gruppo naturale)',
+        run: () => saveDeck(Decks.setGroupOverride(current, cardId, null, view)),
+      });
+    }
     openCtx(x, y, items);
   }
 
