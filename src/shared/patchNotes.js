@@ -18,6 +18,7 @@
     {
       version: '0.2.161', date: '2026-07-24',
       fixes: [
+        'Nel Deck builder MTG il calcolatore di probabilità si aggiorna da solo: appena cambi il turno, le categorie richieste o il mazzo, la stima parte subito e continua a raffinarsi per un istante convergendo verso il valore vero, poi si ferma. Non c’è più il bottone «Calcola» e la percentuale non oscilla più a ogni ricalcolo. Un puntino accanto al risultato pulsa mentre la stima si sta ancora affinando.',
         'Nel Deck builder MTG, dentro il calcolatore di probabilità i nomi delle categorie ora si leggono per intero: il campo dove scrivi quante carte ti servono occupa uno spazio più contenuto e lascia il posto all’etichetta, anche quando allarghi il pannello delle statistiche.',
         'Il Deck builder MTG ora riempie tutta la pagina: sparita la cornice che lo racchiudeva e lo spazio vuoto ai bordi, le tre colonne (chat, mazzo, statistiche) arrivano fino ai margini dello schermo, separate solo dai divisori verticali che puoi ancora trascinare.',
       ],
