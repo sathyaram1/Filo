@@ -1,7 +1,0 @@
-{
-  "id": "05fe8c83-2a2a-4405-8885-9c6537dbe7b1",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho verificato partendo dal sintomo: chi aggiornava da 0.2.114 non vedeva comparire alcun recap delle novità e la correzione di sicurezza uscita in mezzo (blocco dell'apertura di percorsi di file locali dalle azioni interne) risultava introvabile nel registro aggiornamenti. Ora, simulando esattamente quell'aggiornamento, il recap compare e mostra correttamente quella correzione, attribuita alla versione giusta. Ho controllato che il registro sia allineato alla versione dell'app, che non ci siano versioni elencate senza alcuna voce (che nel popup lascerebbero una sezione vuota), né versioni duplicate o fuori ordine. Ho confermato che la correzione descritta è reale e non solo annunciata: l'apertura di percorsi di file locali viene davvero bloccata su tutte le strade con cui Filo apre una scheda (menu tasto destro, nuove schede, riapertura dall'archivio). Stress test: registro nella sua interezza (58 versioni) senza anomalie; primissimo avvio non mostra nulla a sorpresa; alla chiusura il recap non riappare. Il popup vero e proprio, aperto in avvio simulato, elenca novità in alto e correzioni in basso con l'intestazione vecchia→nuova. Correttamente NON è stata inventata una voce per la 0.2.116, che non conteneva nulla di visibile all'utente.",
-  "queuedAt": "2026-07-24T00:45:22.132Z",
-  "queuedBy": "routine"
-}
