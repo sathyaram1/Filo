@@ -34,6 +34,28 @@ test('403 con email non verificata → avvisa del requisito email verificata', (
   expect(msg).toMatch(/verificat/i); // "email NON verificata"
 });
 
+// Secondo sintomo (stesso 403, causa opposta): l'account È amministratore, ma
+// il feedback ha una conversazione più lunga del tetto delle regole — e allora
+// il server rifiuta QUALUNQUE modifica su quel feedback, anche il solo cambio di
+// stato. Il messaggio vecchio mandava l'owner a creare un documento admins che
+// esisteva già. Pre-condizione che senza il fix fallirebbe: prima l'helper
+// ignorava `serverAdmin` e rispondeva sempre "non sei admin".
+test('403 con admin confermato dal server → parla del contenuto, non dei permessi', () => {
+  const raw = 'firestore update fallito (403): PERMISSION_DENIED';
+  const msg = permissionDeniedHelp(raw, { email: 'owner@example.com', email_verified: true }, { serverAdmin: true });
+
+  expect(msg).toMatch(/note|conversazione/i);       // indica la causa vera
+  expect(msg).not.toMatch(/console Firebase/i);     // niente caccia al tesoro inutile
+  expect(msg).not.toMatch(/non risulta amministratore/i);
+});
+
+test('403 con esito admin sconosciuto → cita entrambe le cause possibili', () => {
+  const raw = 'firestore update fallito (403): PERMISSION_DENIED';
+  const msg = permissionDeniedHelp(raw, { email: 'owner@example.com', email_verified: true }, { serverAdmin: null });
+  expect(msg).toMatch(/admins/i);
+  expect(msg).toMatch(/conversazione troppo lunga/i);
+});
+
 test('errori non-403 passano invariati (nessun falso positivo)', () => {
   const raw = 'Sessione scaduta: rifai l\'accesso.';
   const msg = permissionDeniedHelp(raw, { email: 'x@example.com', email_verified: true });
