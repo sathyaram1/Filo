@@ -16,6 +16,12 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.162', date: '2026-07-25',
+      features: [
+        'Nell’editor, ogni volta che Filo modifica da solo un documento (per esempio quando chiedi alla chat di formattare il testo) crea un punto di ripristino: compare un breve avviso con «Annulla» per tornare subito com’era. Ogni documento tiene il suo storico, che resta disponibile anche dopo aver chiuso e riaperto Filo, così una modifica automatica è sempre reversibile.',
+      ],
+    },
+    {
       version: '0.2.161', date: '2026-07-24',
       features: [
         'L’editor ora gestisce più documenti separati invece di uno solo: dal selettore in alto a sinistra puoi creare un nuovo documento, passare dall’uno all’altro, rinominarli ed eliminarli. Ogni documento tiene il suo testo, i suoi commenti e i suoi moduli, e alla riapertura ritrovi l’ultimo su cui stavi lavorando. Il documento che avevi finora diventa automaticamente il primo della lista, senza perdere nulla.',

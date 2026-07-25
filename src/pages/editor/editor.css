@@ -529,6 +529,21 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
   pointer-events: none; z-index: 200;
 }
 .ed-toast.show { opacity: 1; transform: translateY(0); }
+/* Toast con azione (es. "Annulla"): testo + bottone in riga. Il bottone deve
+   restare cliccabile anche se il toast di suo ha pointer-events: none. */
+.ed-toast:has(.ed-toast-action) { display: flex; align-items: center; gap: 12px; }
+.ed-toast-action {
+  pointer-events: auto;
+  flex: none;
+  background: transparent;
+  border: 1px solid var(--sn-border);
+  border-radius: 8px;
+  padding: 5px 12px;
+  font-size: 13px; font-weight: 600; color: var(--sn-accent, var(--sn-fg));
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.ed-toast-action:hover { background: var(--sn-hover, rgba(127,127,127,0.12)); border-color: var(--sn-accent, var(--sn-border)); }
 .ed-check-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 13px; }
 .ed-check-row input { width: auto; }
 .ed-icon-choice { display: flex; gap: 8px; flex-wrap: wrap; }

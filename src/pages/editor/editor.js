@@ -25,7 +25,13 @@
   // versione — dati "freddi", scritti di rado — a spostarsi su storage.json/file
   // dedicati, tenendo su localStorage solo l'indice e il file corrente ("caldi").
   const COLLECTION_KEY = 'filo.editor.collection';
+  // Storico versioni: dati "freddi" (scritti solo a ogni modifica automatica di
+  // Filo o snapshot), tenuti FUORI da localStorage — vivono sull'archivio file
+  // dell'app (storage.json, via chrome.storage.local) così possono crescere
+  // illimitati senza saturare la persistenza calda. Vedi editorVersions.js.
+  const VERSIONS_KEY = 'filo.editor.versions';
   const STORE = window.SN_EDITOR_STORE;
+  const VERS = window.SN_EDITOR_VERSIONS;
   const MSG = (window.SN_MSG && window.SN_MSG.MSG) || {};
   const ACTIONS = (window.SN_CONST && window.SN_CONST.ACTIONS) || {};
   const ICONS = window.SN_ICONS || {};
@@ -98,6 +104,8 @@
 
   // ── Stato ─────────────────────────────────────────────────────────────
   let collection = null; // { version, activeId, files:[...] } — vedi editorStore.js
+  let versions = {};     // { [fileId]: { versions:[...] } } — storico, su archivio app
+  let versionsReady = Promise.resolve(); // risolta quando lo storico è caricato
   let doc = null;        // documento ATTIVO in memoria (vedi activateFile/blankDoc)
   let dirty = false;
   let settingsMode = false;
@@ -295,6 +303,98 @@
     saveTimer = setTimeout(() => save(false), 1200);
   }
 
+  // ── Storico versioni: persistenza sull'archivio app (storage.json) ────────
+  // Carica lo storico all'avvio. Asincrono e tollerante: se manca o è corrotto,
+  // si parte da uno storico vuoto (nessuna versione = nessun ripristino, ma la
+  // prima modifica di Filo ne creerà una).
+  function loadVersions() {
+    versionsReady = Promise.resolve()
+      .then(() => (window.chrome && chrome.storage && chrome.storage.local
+        ? chrome.storage.local.get(VERSIONS_KEY) : {}))
+      .then((r) => {
+        const v = r && r[VERSIONS_KEY];
+        versions = (v && typeof v === 'object') ? v : {};
+      })
+      .catch(() => { versions = {}; });
+    return versionsReady;
+  }
+  // Scrittura "fredda": fire-and-forget, non blocca la digitazione. Lo storico è
+  // testo e cresce piano, quindi riscrivere l'intero blob a ogni versione è
+  // sostenibile (le versioni si creano solo alle modifiche di Filo/agli snapshot).
+  function persistVersions() {
+    try {
+      if (window.chrome && chrome.storage && chrome.storage.local) {
+        return Promise.resolve(chrome.storage.local.set({ [VERSIONS_KEY]: versions })).catch(() => {});
+      }
+    } catch (_) { /* archivio non disponibile: lo storico resta in memoria */ }
+    return Promise.resolve();
+  }
+
+  function fmtVersionWhen(ts) {
+    try {
+      const d = new Date(ts);
+      const day = d.toLocaleDateString('it-IT');
+      const time = d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+      return `${day} ${time}`;
+    } catch (_) { return ''; }
+  }
+
+  // Registra un punto di ripristino con il contenuto PRE-modifica di Filo: così
+  // ripristinandolo si torna a com'era il file prima che l'AI lo toccasse.
+  // Ritorna la versione creata (o null se identica all'ultima → nessun rumore).
+  function recordFiloVersion(preContent) {
+    if (!doc || !VERS) return null;
+    const ts = Date.now();
+    const res = VERS.record(versions, doc.id, {
+      content: preContent,
+      source: 'filo',
+      label: `Modifica di Filo · ${fmtVersionWhen(ts)}`,
+      ts,
+    }, () => newId('ver'));
+    versions = res.store;
+    if (res.created) persistVersions();
+    return res.created ? res.version : null;
+  }
+
+  // Ripristina una versione: prima salva lo stato corrente come versione (così
+  // anche il ripristino è annullabile e non si perde nulla), poi rimpiazza il
+  // contenuto del file con quello scelto e ri-renderizza se è il file attivo.
+  function restoreVersion(fileId, versionId) {
+    if (!VERS) return false;
+    const v = VERS.get(versions, fileId, versionId);
+    if (!v) return false;
+    const target = STORE.findFile(collection, fileId);
+    if (!target) return false;
+    const curContent = (doc && doc.id === fileId) ? serialize() : target;
+    const cres = VERS.record(versions, fileId, {
+      content: curContent,
+      source: 'restore',
+      label: `Prima del ripristino · ${fmtVersionWhen(Date.now())}`,
+      ts: Date.now(),
+    }, () => newId('ver'));
+    versions = cres.store;
+    persistVersions();
+    const restored = JSON.parse(JSON.stringify(v.content || {}));
+    restored.id = fileId;
+    STORE.replaceFile(collection, fileId, restored);
+    if (doc && doc.id === fileId) {
+      activateFile(STORE.findFile(collection, fileId));
+    }
+    writeCollection();
+    showEditorToast('Versione ripristinata.');
+    return true;
+  }
+
+  // Offre l'annullamento immediato dell'ultima modifica automatica di Filo con un
+  // toast "Annulla". Lo storico completo (sfogliabile) è una feature a parte; qui
+  // garantiamo l'invariante minima: una modifica di Filo è SEMPRE annullabile.
+  function offerUndoFilo(versionId, fileId) {
+    showEditorToast('Filo ha modificato il documento.', {
+      label: 'Annulla',
+      onClick: () => restoreVersion(fileId, versionId),
+    });
+  }
+
   // ════════════════════════════════════════════════════════════════════
   //  COLLEZIONE DI FILE: attiva/crea/elimina/rinomina + menu documenti
   // ════════════════════════════════════════════════════════════════════
@@ -351,6 +451,8 @@
     } else {
       renderDocSwitcher(); // era un altro file: la lista basta aggiornarla
     }
+    // Lo storico del file cancellato non serve più: liberalo dall'archivio.
+    if (VERS) { versions = VERS.dropFile(versions, id); persistVersions(); }
     writeCollection();
   }
 
@@ -2187,6 +2289,9 @@
   // di blocchi toccati (0 = niente da fare, es. target senza corrispondenze).
   function applyFormatActions(actions) {
     if (!Array.isArray(actions)) return 0;
+    // Cattura lo stato PRIMA di mutare il DOM: se la modifica automatica di Filo
+    // cambia davvero qualcosa, questo diventa il punto di ripristino annullabile.
+    const preContent = doc ? serialize() : null;
     let touched = 0;
     for (const a of actions) {
       if (!a || typeof a !== 'object') continue;
@@ -2205,7 +2310,12 @@
         }
       }
     }
-    if (touched) { refreshCollapseToggles(); onDocInput(); }
+    if (touched) {
+      const v = preContent ? recordFiloVersion(preContent) : null;
+      refreshCollapseToggles();
+      onDocInput();
+      if (v) offerUndoFilo(v.id, doc.id);
+    }
     return touched;
   }
 
@@ -2508,7 +2618,9 @@
   // switch che non si può allargare per mancanza di spazio). Stile coerente con
   // le notifiche d'errore (bordo accent rosso), come il fallimento di un'azione.
   let edToastTimer = null;
-  function showEditorToast(text) {
+  // `action` opzionale = { label, onClick }: aggiunge un bottone cliccabile nel
+  // toast (es. "Annulla" dopo una modifica automatica di Filo).
+  function showEditorToast(text, action) {
     let el = document.getElementById('edToast');
     if (!el) {
       el = document.createElement('div');
@@ -2517,12 +2629,29 @@
       el.setAttribute('role', 'status');
       document.body.appendChild(el);
     }
-    el.textContent = text;
+    el.textContent = '';
+    const span = document.createElement('span');
+    span.textContent = text;
+    el.appendChild(span);
+    const hasAction = action && action.label && typeof action.onClick === 'function';
+    if (hasAction) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'ed-toast-action';
+      btn.textContent = action.label;
+      btn.addEventListener('click', () => {
+        el.classList.remove('show');
+        clearTimeout(edToastTimer);
+        try { action.onClick(); } catch (_) {}
+      });
+      el.appendChild(btn);
+    }
     // Forza un reflow così la transizione riparte anche se il toast è già visibile.
     void el.offsetWidth;
     el.classList.add('show');
     clearTimeout(edToastTimer);
-    edToastTimer = setTimeout(() => el.classList.remove('show'), 3400);
+    // Con un'azione lascio più tempo per cliccarla.
+    edToastTimer = setTimeout(() => el.classList.remove('show'), hasAction ? 7000 : 3400);
   }
 
   // ════════════════════════════════════════════════════════════════════
@@ -2679,8 +2808,19 @@
     });
   } catch (_) {}
 
+  // Hook di test/integrazione per lo storico versioni (usato dagli spec e da chi
+  // costruirà la UI di storico sopra a questo). Espone la lista e il ripristino.
+  window.__filoEditorVersions = {
+    list: (fileId) => (VERS ? VERS.listFor(versions, fileId || (doc && doc.id)) : []),
+    restore: (fileId, versionId) => restoreVersion(fileId, versionId),
+    activeId: () => (doc && doc.id),
+    ready: () => versionsReady,
+    flush: () => persistVersions(),
+  };
+
   // Boot
   applySavedTheme();
+  loadVersions();                           // storico dall'archivio app (async)
   loadCollection();                         // migra il vecchio doc singolo se serve
   activateFile(STORE.activeFile(collection)); // apre l'ultimo file attivo
 })();
