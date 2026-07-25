@@ -161,20 +161,22 @@
     return { text: extractText(data), usage: extractUsage(data) };
   }
 
-  async function streamComplete({ apiKey, model, messages, onDelta, onReasoning, signal }) {
+  async function streamComplete({ apiKey, model, messages, reasoning, onDelta, onReasoning, signal }) {
     const geminiModel = toGeminiModelId(model);
     if (!geminiModel) { const err = new Error(`Gemini: modello non Google (${model})`); err.provider = 'gemini'; throw err; }
     const url = `${BASE}/models/${encodeURIComponent(geminiModel)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(apiKey)}`;
     const body = toGeminiRequest(messages);
-    // Reasoning "vero": chiediamo a Gemini i thought summary in streaming. Il
-    // modello li manda come parti con thought:true (separate dalla risposta).
-    // Best-effort: se il modello non supporta i pensieri, l'API ignora il flag
-    // e semplicemente non arrivano parti thought (cademo sulle frasi indicative
-    // lato dashboard). Lo attiviamo solo se il caller vuole il reasoning.
-    if (onReasoning) {
+    // Reasoning: unisce il livello dell'owner (#369, thinkingBudget) e la
+    // richiesta del caller di includere i thought summary in streaming
+    // (includeThoughts). Il modello manda i pensieri come parti con thought:true
+    // (separate dalla risposta). Best-effort: se il modello non pensa, l'API
+    // ignora il flag e non arrivano parti thought (cadiamo sulle frasi
+    // indicative lato dashboard).
+    const tc = thinkingConfigFor(reasoning, !!onReasoning);
+    if (tc) {
       body.generationConfig = {
         ...(body.generationConfig || {}),
-        thinkingConfig: { includeThoughts: true },
+        thinkingConfig: tc,
       };
     }
     const res = await fetch(url, {
