@@ -67,7 +67,7 @@
       let emitted = false;
       try {
         const r = await getProvider(a.provider).streamComplete({
-          apiKey: a.apiKey, model: aModel, messages, signal,
+          apiKey: a.apiKey, model: aModel, reasoning: a.reasoning, messages, signal,
           onDelta: onDelta ? (d) => { emitted = true; onDelta(d); } : onDelta,
           onReasoning: onReasoning ? (t) => { emitted = true; onReasoning(t); } : onReasoning,
         });
