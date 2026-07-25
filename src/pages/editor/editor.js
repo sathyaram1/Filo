@@ -897,6 +897,22 @@
       e.stopPropagation();
       docPopEl.hidden ? openDocPop() : closeDocPop();
     });
+    // Tastiera, parità col tasto destro: Shift+F10 / tasto Menu apre il menu
+    // contestuale del titolo ancorato alla docbar.
+    docSwitchBtn.addEventListener('keydown', (e) => {
+      if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
+        e.preventDefault();
+        const r = docSwitchBtn.getBoundingClientRect();
+        openTitleMenu(r.left, r.bottom);
+      }
+    });
+  }
+  // Tasto destro sul titolo (o su tutta la docbar): menu contestuale del file.
+  if (docbarEl) {
+    docbarEl.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      openTitleMenu(e.clientX, e.clientY);
+    });
   }
 
   // ════════════════════════════════════════════════════════════════════
