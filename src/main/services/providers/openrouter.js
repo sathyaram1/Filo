@@ -80,12 +80,13 @@
   }
 
   // Streaming SSE — onDelta(textChunk) chiamato per ogni delta. Ritorna { text, usage } finale.
-  async function streamComplete({ apiKey, model, messages, onDelta, onReasoning, signal }) {
+  async function streamComplete({ apiKey, model, messages, reasoning, onDelta, onReasoning, signal }) {
     const reqBody = { model, messages, stream: true };
-    // Reasoning "vero": se il caller lo vuole, chiediamo a OpenRouter di
-    // includere i token di ragionamento (delta.reasoning nei chunk). I modelli
-    // che non ragionano semplicemente non ne emettono — best-effort.
-    if (onReasoning) reqBody.reasoning = { enabled: true };
+    // Reasoning: unisce il livello scelto dall'owner (#369) e la richiesta del
+    // caller di STREAMARE i token di ragionamento (onReasoning). I modelli che
+    // non ragionano semplicemente non ne emettono — best-effort.
+    const r = reasoningField(reasoning, !!onReasoning);
+    if (r) reqBody.reasoning = r;
     const res = await fetch(ENDPOINT, {
       method: 'POST',
       headers: buildHeaders(apiKey),
