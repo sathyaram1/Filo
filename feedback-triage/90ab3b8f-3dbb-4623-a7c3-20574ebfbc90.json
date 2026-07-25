@@ -1,7 +1,0 @@
-{
-  "id": "90ab3b8f-3dbb-4623-a7c3-20574ebfbc90",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho verificato la scorciatoia da tastiera dei moduli dell'editor riproducendo esattamente il caso segnalato. Ho impostato un modulo con la scorciatoia d'esempio Ctrl+Shift+1 e ho premuto davvero quella combinazione: ora il modulo si attiva (prima restava inerte perché con Shift il tasto 1 produce il simbolo '!'). Ho controllato anche il caso più realistico, cioè premere la scorciatoia mentre si sta scrivendo con il cursore dentro al documento: funziona lo stesso. Stress test superati: la stessa robustezza vale per le lettere con Shift (es. Ctrl+Shift+B); digitando il carattere '!' nel testo (Shift+1 senza Ctrl) la scorciatoia NON scatta e il '!' si scrive normalmente, quindi non ruba tasti mentre si scrive; una combinazione più stretta come Ctrl+1 senza Shift non attiva per errore una scorciatoia che invece richiede Shift; e le scorciatoie base senza Shift (es. Ctrl+1) continuano a funzionare. Ho anche confermato che senza la correzione la scorciatoia d'esempio resterebbe morta (controllo di controprova). Tutti i controlli sulla logica interna dell'app restano verdi. Nessuna regressione riscontrata.",
-  "queuedAt": "2026-07-25T00:54:47.343Z",
-  "queuedBy": "routine"
-}
