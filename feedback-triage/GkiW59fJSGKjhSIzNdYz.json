@@ -1,0 +1,7 @@
+{
+  "id": "GkiW59fJSGKjhSIzNdYz",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho verificato la richiesta partendo dal sintomo: premere Ctrl+Z per tornare alla pagina precedente. Funziona: fuori da un campo di testo Ctrl+Z riporta alla pagina precedente esattamente come la freccia Indietro, sia sui siti web esterni sia sulle pagine interne di Filo (l'ho provato aprendo la Cronologia e tornando alla nuova scheda). Stress test superati: (1) mentre scrivi in una casella, in un'area di testo o in un contenuto modificabile Ctrl+Z resta 'annulla' e NON naviga, quindi scrivere non perde mai l'undo; (2) Shift+Ctrl+Z non torna indietro (resta 'ripeti'); (3) su una scheda appena aperta senza pagina precedente Ctrl+Z non fa nulla e non causa errori. Nota per te: come gia' segnalato, alcune web-app usano Ctrl+Z come loro 'annulla' anche fuori dai campi di testo (es. editor grafici): in quei casi, se non stai scrivendo, verra' interpretato come 'torna indietro'. Non e' un difetto del fix, e' il compromesso della scorciatoia; se ti da' fastidio si puo' limitare o rendere disattivabile.",
+  "queuedAt": "2026-07-25T06:36:32.944Z",
+  "queuedBy": "routine"
+}
