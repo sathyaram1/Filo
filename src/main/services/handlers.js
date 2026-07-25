@@ -1305,7 +1305,7 @@ function buildNoKeyDashboard(settings, saved) {
   }));
   const message = settings.apiKeys?.openrouter || settings.apiKeys?.gemini
     ? 'Buongiorno. Filo è qui.'
-    : 'Imposta una chiave API nelle Opzioni per attivare Filo. Intanto, le tue pagine salvate sono qui.';
+    : 'Accedi con un profilo per attivare Filo: è gratis e non serve nessuna chiave (icona del profilo in alto a destra). In alternativa, se preferisci, puoi usare una tua chiave API dalle Opzioni. Intanto, le tue pagine salvate sono qui.';
   return { message, suggestions };
 }
 
