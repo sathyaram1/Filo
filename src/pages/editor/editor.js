@@ -42,6 +42,10 @@
   const paletteEl = $('palette');
   const overlay = $('overlay');
   const overlayBox = $('overlayBox');
+  const docbarEl = $('docbar');
+  const docSwitchBtn = $('docSwitch');
+  const docTitleEl = $('docTitle');
+  const docPopEl = $('docPop');
 
   // ── Metadati tipi di modulo ───────────────────────────────────────────
   const MODULE_TYPES = {
