@@ -65,11 +65,13 @@
   }
 
   // File di appunti vuoto, serializzato (stesso schema dei file dell'editor).
+  // `meta.created/modified` sono ISO come nel resto dell'editor (blankDoc), così
+  // il confronto "chi è più fresco" in fase di merge resta omogeneo.
   function blankNotesFile(id, title, now) {
-    const ts = Number.isFinite(now) ? now : Date.now();
+    const iso = new Date(Number.isFinite(now) ? now : Date.now()).toISOString();
     return {
       id: id || defaultFileId(),
-      meta: { title: title || DEFAULT_TITLE, created: ts, modified: ts, version: 1 },
+      meta: { title: title || DEFAULT_TITLE, created: iso, modified: iso, version: 1 },
       content: { type: 'doc', content: [] },
       comments: [],
       modules: [],
