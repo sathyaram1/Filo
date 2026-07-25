@@ -66,8 +66,8 @@ test('un appunto di Filo compare come testo in un file dell’editor (e l’edit
   await waitCollectionMirrored(app);
 
   const NOTE = 'AUDIT_appunto_riunione_alle_10';
-  const r = await filoWritesNote(app, { text: NOTE, topic: 'lavoro' });
-  expect(r?.wrote, 'l’appunto deve essere scritto').toBe(true);
+  const r = await filoWritesNote(page, { text: NOTE, topic: 'lavoro' });
+  expect(r?.executed, 'l’appunto deve essere eseguito e scritto').toBe(true);
 
   // L'editor aperto ricarica da solo: compare un file "Lavoro" col testo.
   await expect.poll(async () => {
@@ -88,8 +88,8 @@ test('stesso argomento → stesso file; argomento diverso → file nuovo', async
   const B = 'AUDIT_progetto_idea_due';
   const C = 'AUDIT_spesa_comprare_latte';
 
-  await filoWritesNote(app, { text: A, topic: 'progetto alfa' });
-  await filoWritesNote(app, { text: B, topic: 'progetto alfa' });
+  await filoWritesNote(page, { text: A, topic: 'progetto alfa' });
+  await filoWritesNote(page, { text: B, topic: 'progetto alfa' });
 
   // I due appunti dello stesso argomento stanno in UN solo file, entrambi.
   await expect.poll(async () => {
@@ -104,7 +104,7 @@ test('stesso argomento → stesso file; argomento diverso → file nuovo', async
   const projFile = colBefore.files.find((f) => fileText(f).includes(A));
 
   // Argomento diverso → un file DIVERSO col nuovo testo.
-  await filoWritesNote(app, { text: C, topic: 'spesa' });
+  await filoWritesNote(page, { text: C, topic: 'spesa' });
   await expect.poll(async () => {
     const col = await readCollection(page);
     if (!col) return null;
