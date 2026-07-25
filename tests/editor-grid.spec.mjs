@@ -159,7 +159,8 @@ test.describe('personalizzazione griglia + moduli', () => {
     await page.keyboard.press('Control+s');
 
     const saved = await page.evaluate(() => {
-      const raw = JSON.parse(localStorage.getItem('filo.editor.doc'));
+      const __c = JSON.parse(localStorage.getItem('filo.editor.collection'));
+      const raw = __c && __c.files ? (__c.files.find((f) => f.id === __c.activeId) || __c.files[0]) : null;
       return raw.meta && raw.meta.grid ? raw.meta.grid : null;
     });
     expect(saved).toMatchObject({ cols: 6, rows: 10 });
@@ -198,7 +199,8 @@ test.describe('personalizzazione griglia + moduli', () => {
     // persistenza: la marca fontFamily deve sopravvivere al salvataggio
     await page.keyboard.press('Control+s');
     const hasFontFamily = await page.evaluate(() => {
-      const raw = JSON.parse(localStorage.getItem('filo.editor.doc'));
+      const __c = JSON.parse(localStorage.getItem('filo.editor.collection'));
+      const raw = __c && __c.files ? (__c.files.find((f) => f.id === __c.activeId) || __c.files[0]) : null;
       return JSON.stringify(raw.content).includes('fontFamily');
     });
     expect(hasFontFamily).toBe(true);
