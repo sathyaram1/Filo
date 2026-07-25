@@ -28,6 +28,19 @@ async function filoWritesNote(app, { text, topic, forceNew }) {
   }, { text, topic, forceNew: !!forceNew });
 }
 
+// Aspetta che l'editor abbia rispecchiato la sua collezione sull'archivio
+// condiviso (storage.json) — così la scrittura di Filo, che legge di lì, parte
+// da uno stato stabile e non viene poi sovrascritta dal mirror di boot.
+async function waitCollectionMirrored(app) {
+  await expect.poll(async () => app.evaluate(async () => {
+    try {
+      const r = await chrome.storage.local.get('filo.editor.collection');
+      const c = r && r['filo.editor.collection'];
+      return !!(c && Array.isArray(c.files) && c.files.length);
+    } catch (_) { return false; }
+  }), { timeout: 8_000 }).toBe(true);
+}
+
 // Legge la collezione dei file come la vede l'editor (dopo il merge locale↔archivio).
 async function readCollection(page) {
   return page.evaluate(() => {
