@@ -302,12 +302,10 @@
   function activateFile(raw) {
     doc = parseStoredDoc(raw) || parseStoredDoc(blankFileSerialized());
     collection.activeId = doc.id;
-    // Stato di vista che non deve "trascinarsi" da un file all'altro.
-    settingsMode = false;
+    // Stato di vista che non deve "trascinarsi" da un file all'altro: torna
+    // sempre alla vista testo (fuori dalla modalità modifica moduli).
     commenting = false;
-    if (settingsView) settingsView.hidden = true;
-    if (docWrap) docWrap.hidden = false;
-    root.classList.remove('settings-open');
+    toggleSettingsMode(false);
     ensureSettingsModule();
     loadGridSize();
     renderDocBody();
