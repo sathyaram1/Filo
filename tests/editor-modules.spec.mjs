@@ -293,8 +293,12 @@ test.describe('font picker e drag dei moduli', () => {
 
     // Salva e verifica che la marca sia persistita.
     await page.keyboard.press('Control+s');
-    await expect.poll(() => page.evaluate(() => localStorage.getItem('filo.editor.doc') || ''))
-      .toContain('Times New Roman');
+    await expect.poll(() => page.evaluate(() => {
+      const c = JSON.parse(localStorage.getItem('filo.editor.collection'));
+      if (!c || !c.files) return '';
+      const f = c.files.find((x) => x.id === c.activeId) || c.files[0];
+      return JSON.stringify(f);
+    })).toContain('Times New Roman');
 
     // Riapri il documento (reload → il body viene ri-renderizzato dal JSON
     // salvato): il font deve essere ancora quello scelto, non il default.
