@@ -140,8 +140,8 @@
     },
     {
       id: 'editor', title: 'Editor di testo', category: 'writing',
-      desc: 'Un editor per scrivere e impaginare testo con moduli a blocchi; il contenuto viene salvato da solo. Nella pagina "Revisione" puoi attaccare commenti a frasi selezionate: il testo commentato resta evidenziato anche dopo aver chiuso e riaperto il documento, e cliccandolo riapri il commento.',
-      invoke: 'Menu del tasto destro → "Editor", oppure filo://editor/editor.html.',
+      desc: 'Un editor per scrivere e impaginare testo con moduli a blocchi; il contenuto viene salvato da solo. Puoi tenere più documenti separati: il selettore in alto a sinistra mostra il nome del file aperto e apre l\'elenco dei documenti, da cui crei un nuovo file, passi da uno all\'altro, li rinomini ed elimini; alla riapertura ritrovi l\'ultimo documento su cui stavi lavorando. Nella pagina "Revisione" puoi attaccare commenti a frasi selezionate: il testo commentato resta evidenziato anche dopo aver chiuso e riaperto il documento, e cliccandolo riapri il commento.',
+      invoke: 'Menu del tasto destro → "Editor", oppure filo://editor/editor.html. Il selettore documenti è in alto a sinistra.',
     },
     {
       id: 'deck-builder', title: 'Deck builder MTG (Commander)', category: 'writing',
