@@ -89,16 +89,14 @@ test('elimina: rimuove il file; eliminare l\'ultimo lascia comunque un foglio vu
   await page.click('#docNew');
   await setDocText(page, 'resto io');
 
-  // Elimina il primo file dal menu.
+  // Elimina il primo file dal menu. Il menu resta aperto per gestirne altri.
   await page.click('#docSwitch');
   await expect(page.locator('.ed-doc-item')).toHaveCount(2);
   await page.locator('.ed-doc-item').nth(0).locator('.ed-doc-del').click();
-  await page.click('#docSwitch');
   await expect(page.locator('.ed-doc-item')).toHaveCount(1);
 
   // Elimina anche l'ultimo: invariante → resta un foglio vuoto, non zero file.
   await page.locator('.ed-doc-item').nth(0).locator('.ed-doc-del').click();
-  await page.click('#docSwitch');
   await expect(page.locator('.ed-doc-item')).toHaveCount(1);
   await expect(page.locator('#doc')).not.toContainText('resto io');
 });
