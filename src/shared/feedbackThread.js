@@ -360,9 +360,11 @@
       const candidate = `${TRIM_MARK}\n\n${blocks.join('\n').replace(/^\n+/, '')}`;
       if (candidate.length <= limit) return candidate;
     }
-    // Un turno solo, più lungo del tetto: taglia la coda del testo.
+    // Un turno solo, più lungo del tetto: tiene l'inizio (marcatore compreso) e
+    // taglia la coda.
     const head = `${TRIM_MARK}\n\n`;
-    return head + blocks.join('\n').slice(-(limit - head.length - 1)) ;
+    const body = blocks.join('\n').replace(/^\n+/, '');
+    return head + body.slice(0, Math.max(0, limit - head.length - 1)) + '…';
   }
 
   global.SN_FEEDBACK_THREAD = {
