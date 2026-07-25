@@ -17,6 +17,9 @@
     // ↓ Nuove versioni in cima.
     {
       version: '0.2.161', date: '2026-07-24',
+      features: [
+        'Nella pagina «Modelli predefiniti» ogni modello ha ora un livello di ragionamento regolabile: puoi lasciarlo su «Auto» (decide il modello, come prima), chiedere «Nessuno» per risposte più rapide ed economiche, oppure «Basso/Medio/Alto» per uno sforzo di ragionamento crescente sui modelli che lo supportano.',
+      ],
       fixes: [
         'Quando Filo non è ancora attivo, il messaggio nella home ora ti invita prima di tutto ad accedere con un profilo (è gratis e non richiede alcuna chiave), lasciando la chiave API personale come alternativa per chi la preferisce. Prima suggeriva solo di impostare una chiave, un passaggio tecnico che la maggior parte delle persone non desidera.',
         'Nella dashboard di gestione le immagini allegate ai feedback ora si vedono: la conversazione le mostra come anteprime cliccabili (il clic le apre a schermo intero) invece di lasciare un riquadro vuoto. Se un’immagine non può essere mostrata, passandoci sopra col mouse compare il motivo.',
