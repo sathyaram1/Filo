@@ -370,7 +370,9 @@
     home:         (size) => wrap(home, { size }),
     apps:         (size) => wrap(apps, { size }),
     caretDown:    (size) => wrap(caretDown, { size }),
-    editor:       (size) => wrap(editor, { size }),
+    // L'editor usa l'SVG degli appunti (foglio con angolo piegato): ora che
+    // l'editor È anche il posto degli appunti, è l'icona più riconoscibile.
+    editor:       (size) => wrap(note, { size }),
     models:       (size) => wrap(models, { size }),
     openForLater: (size) => wrap(openForLater, { size }),
     qrCode:       (size) => wrap(qrCode, { size }),
