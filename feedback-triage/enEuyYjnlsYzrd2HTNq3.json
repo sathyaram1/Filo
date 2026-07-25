@@ -1,7 +1,0 @@
-{
-  "id": "enEuyYjnlsYzrd2HTNq3",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho riprodotto la situazione del feedback: Filo non ancora attivo (nessun accesso e nessuna chiave). Il messaggio che compare ora invita PRIMA di tutto ad accedere con un profilo, spiegando che è gratis e non serve nessuna chiave, e indica dove farlo (icona del profilo in alto a destra); la chiave API personale resta citata solo come alternativa per chi la preferisce. Ho verificato che il profilo venga sempre proposto prima della chiave, sia nel messaggio della home sia nel messaggio d'errore che appare quando si prova a usare una funzione senza accesso. Ho controllato che la vecchia frase che spingeva la chiave come unico modo di attivare Filo non ricompaia. Test eseguiti davvero: l'intero gruppo di test della home (6, tutti verdi) e i test di logica pura (tutti verdi). Ho anche letto il testo esatto che l'app produce e corrisponde a quanto richiesto. Non ci sono input utente coinvolti, quindi nessun rischio di caratteri speciali o testo malformato: è un miglioramento di testo, coerente e completo rispetto al feedback.",
-  "queuedAt": "2026-07-25T00:25:23.609Z",
-  "queuedBy": "routine"
-}
