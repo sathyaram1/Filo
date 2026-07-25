@@ -136,9 +136,11 @@ test('ogni scrittura è reversibile: un punto di ripristino riporta il file com�
   });
   const history = V.listFor(r.versions, r.fileId);
   assert.ok(history.length >= 2, 'devono esserci punti di ripristino');
-  // il penultimo punto è lo stato PRIMA dell’ultimo append: contiene 'a' ma non 'b'
+  // Ogni punto di ripristino conserva l’INTERO file serializzato in `.content`
+  // (stessa convenzione dell’editor: al ripristino il file viene rimpiazzato con
+  // quello). Il penultimo punto è lo stato PRIMA dell’ultimo append: ha 'a', non 'b'.
   const beforeLast = history[history.length - 2];
-  const beforeTxt = fileText(beforeLast);
+  const beforeTxt = fileText(beforeLast.content);
   assert.match(beforeTxt, /a/);
   assert.doesNotMatch(beforeTxt, /b/);
   // lo stato attuale contiene entrambi
