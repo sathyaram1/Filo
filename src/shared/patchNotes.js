@@ -16,6 +16,12 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.164', date: '2026-07-25',
+      fixes: [
+        'Nella dashboard di gestione i feedback con una conversazione molto lunga tornano a essere gestibili: prima, superata una certa lunghezza, il server rifiutava qualsiasi modifica e il feedback restava bloccato — non lo si poteva spostare di stato, commentare né archiviare, e l’errore dava la colpa ai permessi di amministratore. Ora la conversazione ha un tetto molto più alto, i turni più vecchi vengono accorciati automaticamente quando serve (con una riga che lo dichiara) e, se una modifica viene comunque rifiutata, il messaggio dice il motivo giusto.',
+      ],
+    },
+    {
       version: '0.2.163', date: '2026-07-25',
       features: [
         'Gli appunti ora vivono nell’editor invece che in un elenco a parte: quando chiedi a Filo di prendere nota, lo scrive lui stesso in un file di testo. Continua sullo stesso file finché resti sull’argomento e ne apre uno nuovo quando l’argomento cambia (o se dici «apri un nuovo appunto»). Così gli appunti diventano testo vero, che puoi rileggere, modificare e riordinare come qualsiasi documento, e ogni scrittura automatica è annullabile. I tuoi appunti già salvati vengono spostati in un file «Appunti» dell’editor, senza perderli.',
