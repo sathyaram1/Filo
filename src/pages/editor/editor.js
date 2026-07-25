@@ -25,7 +25,13 @@
   // versione — dati "freddi", scritti di rado — a spostarsi su storage.json/file
   // dedicati, tenendo su localStorage solo l'indice e il file corrente ("caldi").
   const COLLECTION_KEY = 'filo.editor.collection';
+  // Storico versioni: dati "freddi" (scritti solo a ogni modifica automatica di
+  // Filo o snapshot), tenuti FUORI da localStorage — vivono sull'archivio file
+  // dell'app (storage.json, via chrome.storage.local) così possono crescere
+  // illimitati senza saturare la persistenza calda. Vedi editorVersions.js.
+  const VERSIONS_KEY = 'filo.editor.versions';
   const STORE = window.SN_EDITOR_STORE;
+  const VERS = window.SN_EDITOR_VERSIONS;
   const MSG = (window.SN_MSG && window.SN_MSG.MSG) || {};
   const ACTIONS = (window.SN_CONST && window.SN_CONST.ACTIONS) || {};
   const ICONS = window.SN_ICONS || {};
