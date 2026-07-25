@@ -19,6 +19,7 @@
       version: '0.2.162', date: '2026-07-25',
       features: [
         'Nell’editor, ogni volta che Filo modifica da solo un documento (per esempio quando chiedi alla chat di formattare il testo) crea un punto di ripristino: compare un breve avviso con «Annulla» per tornare subito com’era. Ogni documento tiene il suo storico, che resta disponibile anche dopo aver chiuso e riaperto Filo, così una modifica automatica è sempre reversibile.',
+        'Ora puoi tornare alla pagina precedente premendo Ctrl+Z, come alternativa alla freccia «Indietro». Mentre scrivi in un campo di testo Ctrl+Z resta «annulla», così non perdi mai la possibilità di correggere ciò che stai scrivendo.',
       ],
     },
     {
