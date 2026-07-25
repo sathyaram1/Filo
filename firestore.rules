@@ -353,8 +353,11 @@ service cloud.firestore {
         && request.resource.data.get('workingSince', '').size() <= 40
         && request.resource.data.get('branch', '') is string
         && request.resource.data.get('branch', '').size() <= 200
+        // Stesso tetto del ramo admin (SN_FEEDBACK_THREAD.NOTES_MAX): i due
+        // rami devono restare allineati, o una routine potrebbe scrivere note
+        // che poi bloccano l'owner.
         && request.resource.data.get('notes', '') is string
-        && request.resource.data.get('notes', '').size() <= 10000;
+        && request.resource.data.get('notes', '').size() <= 60000;
 
       // Cancellazione: solo admin.
       allow delete: if isAdmin();
