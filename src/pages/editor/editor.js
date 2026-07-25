@@ -12,7 +12,20 @@
   let GRID_ROWS = 10;
   const GRID_MIN_COLS = 3, GRID_MAX_COLS = 12;
   const GRID_MIN_ROWS = 4, GRID_MAX_ROWS = 16;
+  const GRID_DEFAULT_COLS = 7, GRID_DEFAULT_ROWS = 10;
+  // Chiave legacy: il vecchio documento singolo. Resta come sorgente di
+  // migrazione (letta una volta) e come backup; non viene più scritta.
   const STORAGE_KEY = 'filo.editor.doc';
+  // Nuova chiave: la COLLEZIONE di file { version, activeId, files:[...] }.
+  // Scelta di storage (vedi report): la collezione resta su localStorage — l'I/O
+  // di autosalvataggio dev'essere sincrono e veloce (ogni ~1.2s mentre si scrive)
+  // e deve poter scrivere anche su `beforeunload`, dove un archivio asincrono
+  // (storage.json) non farebbe in tempo a scaricare. Quando il versionamento
+  // illimitato (feedback fratello) farà crescere i dati, saranno gli SNAPSHOT di
+  // versione — dati "freddi", scritti di rado — a spostarsi su storage.json/file
+  // dedicati, tenendo su localStorage solo l'indice e il file corrente ("caldi").
+  const COLLECTION_KEY = 'filo.editor.collection';
+  const STORE = window.SN_EDITOR_STORE;
   const MSG = (window.SN_MSG && window.SN_MSG.MSG) || {};
   const ACTIONS = (window.SN_CONST && window.SN_CONST.ACTIONS) || {};
   const ICONS = window.SN_ICONS || {};
