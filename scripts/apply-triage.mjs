@@ -384,7 +384,12 @@ async function patchFeedback(entry, bearer) {
   // cancellare la conversazione).
   if (typeof entry.notes === 'string' && String(entry.notes).trim()) {
     const existing = doc?.fields?.notes?.stringValue || '';
-    const notes = THREAD ? THREAD.mergeModelReport(existing, entry.notes) : entry.notes;
+    const merged = THREAD ? THREAD.mergeModelReport(existing, entry.notes) : entry.notes;
+    // Tetto alla conversazione: questo cammino gira anche con un service
+    // account, che BYPASSA le Firestore rules — senza taglio potrebbe gonfiare
+    // le note oltre il limite e rendere il feedback immobile per la dashboard
+    // (che passa dalle regole). Vedi SN_FEEDBACK_THREAD.capNotes.
+    const notes = THREAD && THREAD.capNotes ? THREAD.capNotes(merged) : merged;
     fields.notes = toFsValue(notes); mask.push('notes');
   }
   // `branch`: il nome del branch git su cui vive il fix (da revision_* in poi).
