@@ -306,6 +306,65 @@
     return appendModelTurn(existing, incoming, opts);
   }
 
+  // ── Tetto alla lunghezza della conversazione ────────────────────────────────
+  // Le Firestore rules limitano la dimensione del campo `notes`. Il limite non è
+  // cosmetico: se le note SUPERANO il tetto, ogni successiva scrittura sul
+  // feedback viene respinta dal server — anche una che non tocca le note (le
+  // regole validano il documento RISULTANTE, non solo i campi cambiati). Il
+  // feedback diventa quindi immobile: non lo si può più spostare di stato, né
+  // commentare, né archiviare.
+  //
+  // Ci si arriva perché la conversazione CRESCE (report delle routine + risposte
+  // dell'owner + righe-allegato) e perché uno dei cammini di scrittura (la
+  // GitHub Action, che usa un service account) BYPASSA le regole: può gonfiare
+  // le note oltre il tetto senza accorgersene, e a quel punto la dashboard —
+  // che passa dalle regole — resta fuori.
+  //
+  // Difesa: TUTTI i cammini di scrittura passano da qui e tagliano i turni PIÙ
+  // VECCHI finché il blob rientra, lasciando una riga che dichiara il taglio
+  // (meglio perdere i turni antichi che perdere il feedback). Il tetto sta anche
+  // nelle regole: se cambi NOTES_MAX qui, riallinea `firestore.rules` (ramo
+  // update admin E ramo routine) e rideploya.
+  const NOTES_MAX = 60000;
+  const TRIM_MARK = '--- (i turni più vecchi sono stati rimossi: conversazione troppo lunga) ---';
+
+  // Spezza il blob in blocchi grezzi: il primo è il testo prima di qualsiasi
+  // marcatore, poi un blocco per ogni marcatore di turno (marcatore incluso).
+  // Diverso da splitNotes(): qui NON si perde nulla (marcatori, righe vuote,
+  // allegati restano dove sono) perché il risultato torna su Firestore.
+  function rawBlocks(notes) {
+    const lines = String(notes || '').split('\n');
+    const blocks = [];
+    let current = [];
+    for (const line of lines) {
+      if (USER_TURN_RE.test(line) || MODEL_TURN_RE.test(line)) {
+        blocks.push(current.join('\n'));
+        current = [line];
+      } else {
+        current.push(line);
+      }
+    }
+    blocks.push(current.join('\n'));
+    return blocks.filter((b, i) => i === 0 || b.length > 0);
+  }
+
+  function capNotes(notes, max) {
+    const limit = Number(max) > 0 ? Number(max) : NOTES_MAX;
+    const s = String(notes == null ? '' : notes);
+    if (s.length <= limit) return s;
+    const blocks = rawBlocks(s);
+    // Toglie i blocchi più vecchi finché il resto (+ la riga che dichiara il
+    // taglio) rientra nel tetto. Tiene sempre almeno l'ultimo turno.
+    while (blocks.length > 1) {
+      blocks.shift();
+      const candidate = `${TRIM_MARK}\n\n${blocks.join('\n').replace(/^\n+/, '')}`;
+      if (candidate.length <= limit) return candidate;
+    }
+    // Un turno solo, più lungo del tetto: taglia la coda del testo.
+    const head = `${TRIM_MARK}\n\n`;
+    return head + blocks.join('\n').slice(-(limit - head.length - 1)) ;
+  }
+
   global.SN_FEEDBACK_THREAD = {
     parse,
     splitNotes,
