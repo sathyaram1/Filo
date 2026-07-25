@@ -97,7 +97,8 @@
   };
 
   // ── Stato ─────────────────────────────────────────────────────────────
-  let doc = null;        // documento corrente (vedi loadDoc/blankDoc)
+  let collection = null; // { version, activeId, files:[...] } — vedi editorStore.js
+  let doc = null;        // documento ATTIVO in memoria (vedi activateFile/blankDoc)
   let dirty = false;
   let settingsMode = false;
   let commenting = false;
