@@ -45,11 +45,19 @@ test('la dashboard renderizza le tre zone + barra input', async ({ app, shell })
   await expect(page.locator('#threadView')).toBeHidden();
 });
 
-test('senza API key la dashboard invita a registrarsi con un profilo (non a mettere una chiave)', async ({ app, shell }) => {
+test('senza API key la home invita a registrarsi con un profilo (non a mettere una chiave)', async ({ app, shell }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
-  await expect(page.locator('#homeMessage')).not.toHaveClass(/dash-home-msg-loading/, { timeout: 8_000 });
-  const txt = (await page.locator('#homeMessage').textContent()) || '';
+  // Il messaggio "Filo non è attivo" è quello prodotto dal main quando non c'è
+  // nessuna chiave risolvibile (test isolato: né chiavi utente né default) — è
+  // la parte che il feedback #356 riguarda. Lo leggiamo direttamente dall'IPC,
+  // non dal DOM, perché alla primissima apertura la home mostra il messaggio di
+  // benvenuto e non il messaggio della dashboard.
+  const r = await page.evaluate(() => new Promise((resolve) => {
+    chrome.runtime.sendMessage({ type: 'filo_generate_dashboard', force: true }, (res) => resolve(res));
+  }));
+  expect(r?.ok).toBe(true);
+  const txt = String(r.message || '');
   expect(txt.length).toBeGreaterThan(0);
   // Feedback #356: l'opzione consigliata deve essere registrarsi con un profilo
   // (gratis, senza chiavi), non "imposta una chiave API" come prima scelta. Il
