@@ -1,7 +1,0 @@
-{
-  "id": "Oat0gu4g6WSHtKHN8eN6",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica e stata pubblicata. Ora nella pagina Modelli predefiniti ogni modello ha un livello di ragionamento regolabile (Auto, Nessuno, Basso, Medio, Alto), che viene chiesto al modello quando lo supporta.",
-  "queuedAt": "2026-07-25T00:44:31.927Z",
-  "queuedBy": "routine"
-}
