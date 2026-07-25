@@ -1,0 +1,7 @@
+{
+  "id": "90ab3b8f-3dbb-4623-a7c3-20574ebfbc90",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la modifica e stata pubblicata. Ora nell'editor le scorciatoie dei moduli con i tasti numerici funzionano anche tenendo premuto Shift (per esempio Ctrl+Shift+1 attiva davvero il modulo).",
+  "queuedAt": "2026-07-25T00:56:02.518Z",
+  "queuedBy": "routine"
+}
