@@ -15,18 +15,16 @@ import { test, expect } from './fixtures/electron.mjs';
 
 const EDITOR = 'filo://editor/editor.html';
 
-// Scrive un appunto passando dal MAIN, esattamente come fa l'azione SALVA_APPUNTO
-// della chat: scrive nel file dell'editor e avvisa le superfici aperte.
-async function filoWritesNote(app, { text, topic, forceNew }) {
-  return app.evaluate(async (_electron, args) => {
-    // `require` non è un global nel processo main: passiamo dal modulo d'ingresso.
-    const req = process.mainModule.require.bind(process.mainModule);
-    const EF = req('./services/editorFiles.js');
-    const H = req('./services/handlers.js');
-    const r = await EF.writeNote(args);
-    if (r && r.wrote) H.broadcastLiveUpdate();
-    return r;
-  }, { text, topic, forceNew: !!forceNew });
+// Scrive un appunto passando dal VERO percorso di runtime: l'azione SALVA_APPUNTO
+// (come la emette la chat) inviata al main, che la esegue scrivendo nel file
+// dell'editor e avvisa le superfici aperte. Restituisce la risposta del main.
+async function filoWritesNote(page, { text, topic, forceNew }) {
+  return page.evaluate(([t, c, n]) => new Promise((resolve) => {
+    chrome.runtime.sendMessage({
+      type: window.SN_MSG.MSG.FILO_RUN_ACTION,
+      action: { type: 'SALVA_APPUNTO', text: t, context: c, nuovo: n },
+    }, (r) => resolve(r));
+  }), [text, topic, !!forceNew]);
 }
 
 // Aspetta che l'editor abbia rispecchiato la sua collezione sull'archivio
