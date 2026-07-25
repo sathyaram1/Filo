@@ -18,6 +18,7 @@
     {
       version: '0.2.161', date: '2026-07-24',
       fixes: [
+        'Quando Filo non è ancora attivo, il messaggio nella home ora ti invita prima di tutto ad accedere con un profilo (è gratis e non richiede alcuna chiave), lasciando la chiave API personale come alternativa per chi la preferisce. Prima suggeriva solo di impostare una chiave, un passaggio tecnico che la maggior parte delle persone non desidera.',
         'Nella dashboard di gestione le immagini allegate ai feedback ora si vedono: la conversazione le mostra come anteprime cliccabili (il clic le apre a schermo intero) invece di lasciare un riquadro vuoto. Se un’immagine non può essere mostrata, passandoci sopra col mouse compare il motivo.',
         'Nel Deck builder MTG il calcolatore di probabilità si aggiorna da solo: appena cambi il turno, le categorie richieste o il mazzo, la stima parte subito e continua a raffinarsi per un istante convergendo verso il valore vero, poi si ferma. Non c’è più il bottone «Calcola» e la percentuale non oscilla più a ogni ricalcolo. Un puntino accanto al risultato pulsa mentre la stima si sta ancora affinando.',
         'Nel Deck builder MTG, dentro il calcolatore di probabilità i nomi delle categorie ora si leggono per intero: il campo dove scrivi quante carte ti servono occupa uno spazio più contenuto e lascia il posto all’etichetta, anche quando allarghi il pannello delle statistiche.',
