@@ -50,14 +50,11 @@ test('una modifica automatica di Filo è annullabile: il contenuto torna identic
   expect(afterVers[afterVers.length - 1].source).toBe('filo');
   expect(afterVers[afterVers.length - 1].label).toMatch(/Filo/);
 
-  // Ripristina la versione pre-modifica: il documento torna IDENTICO a prima
-  // (testo invariato, grassetto sparito).
-  await page.evaluate(() => {
-    const v = window.__filoEditorVersions;
-    const id = v.activeId();
-    const list = v.list(id);
-    v.restore(id, list[0].id); // la prima versione = stato prima della modifica di Filo
-  });
+  // Percorso utente reale: compare l'avviso "Annulla" e cliccandolo il documento
+  // torna IDENTICO a prima (testo invariato, grassetto sparito).
+  const undoBtn = page.locator('#edToast .ed-toast-action');
+  await expect(undoBtn).toHaveText('Annulla');
+  await undoBtn.click();
   await expect(page.locator('#doc strong')).toHaveCount(0);
   await expect(page.locator('#doc')).toHaveText(before.trim());
 });
