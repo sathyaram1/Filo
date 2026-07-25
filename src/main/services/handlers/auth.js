@@ -143,6 +143,31 @@ async function decryptFeedbackObject(fields) {
   return out;
 }
 
+// Il server considera admin questo account? La collezione `admins` è leggibile
+// SOLO da un admin (firestore.rules), quindi: 200 = admin, 403 = non admin.
+// Ritorna null se la risposta non è concludente (rete giù, token assente…):
+// il chiamante mostrerà entrambe le ipotesi invece di affermare il falso.
+async function probeServerAdmin(claims) {
+  try {
+    const email = claims && claims.email;
+    const rest = globalThis.SN_FEEDBACK && globalThis.SN_FEEDBACK.rest;
+    if (!email || !rest) return null;
+    const idToken = await auth.getIdToken();
+    if (!idToken) return null;
+    const url = `${rest.FIRESTORE_BASE}/admins/${encodeURIComponent(email)}?key=${rest.API_KEY}`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${idToken}` } });
+    if (res.status === 200) return true;
+    if (res.status === 403) return false;
+    // 404 = admin (la lettura è passata, il documento non c'è) — ma con le
+    // regole attuali un non-admin prende 403 prima del 404: trattiamolo come
+    // "non admin" per prudenza, senza affermare nulla di più.
+    if (res.status === 404) return false;
+    return null;
+  } catch (_) {
+    return null;
+  }
+}
+
 module.exports = function register(on, ctx) {
   const { MSG, broadcastToTabs } = ctx;
 
