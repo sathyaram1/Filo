@@ -79,6 +79,7 @@ test('Ctrl+Z senza pagina precedente non crasha e non naviga', async ({ openTab,
   await page.keyboard.press('Control+z');
   await page.waitForTimeout(400);
   await expect(page.locator('#only')).toBeVisible();
+  expect(page.url()).toBe(startUrl); // non è navigata via
   // La pagina risponde ancora al JS (non è crashata).
   expect(await page.evaluate(() => 1 + 1)).toBe(2);
 });
