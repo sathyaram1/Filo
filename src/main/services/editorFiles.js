@@ -29,12 +29,15 @@ async function setKeys(obj) {
   try { await chrome.storage.local.set(obj); } catch (_) { /* archivio non disponibile */ }
 }
 
-// Carica la collezione dall'archivio, migrandola/normalizzandola se serve così
-// che ci sia SEMPRE almeno un file valido su cui scrivere.
+// Carica la collezione dall'archivio. Se non esiste ancora (l'editor non è mai
+// stato aperto), ritorna una collezione VUOTA — NON sintetizza un file bianco:
+// lo farebbe l'editor stesso all'apertura, e un bianco creato qui apparirebbe
+// come file fantasma accanto ai documenti reali dell'utente dopo il merge.
 async function loadCollection() {
   const Store = STORE();
   const raw = await getKey(COLLECTION_KEY, null);
-  return Store.migrateToCollection({ collection: raw });
+  if (raw && Array.isArray(raw.files)) return Store.migrateToCollection({ collection: raw });
+  return { version: Store.COLLECTION_VERSION, activeId: null, files: [] };
 }
 
 // Scrive un appunto in un file dell'editor (crea/append secondo l'argomento).
