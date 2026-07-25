@@ -96,6 +96,46 @@ test('una scorciatoia senza modificatore GIÀ salvata non ruba la lettera mentre
   expect(await page.locator('#doc').innerText()).toContain('banana');
 });
 
+// La scorciatoia consigliata come esempio ("Ctrl+Shift+1") DEVE attivare il
+// modulo. Prima del fix il match confrontava solo il carattere PRODOTTO da
+// `e.key`: premendo Shift+1 la tastiera genera "!" (non "1"), quindi la
+// combinazione non corrispondeva mai. Ora il match usa anche il tasto FISICO
+// (Digit1), così Shift non spezza più la scorciatoia.
+test('la scorciatoia Ctrl+Shift+1 di un modulo si attiva davvero', async ({ openTab }) => {
+  const page = await openTab(EDITOR);
+  await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator('#doc')).toBeVisible();
+
+  // Un modulo conteggio parole con la scorciatoia d'esempio "Ctrl+Shift+1".
+  // Attivarla deve aprire l'overlay delle statistiche.
+  await page.evaluate(() => {
+    const now = new Date().toISOString();
+    const raw = {
+      meta: { title: 'Scut', created: now, modified: now, version: 1 },
+      content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'ciao mondo' }] }] },
+      comments: [],
+      modules: [
+        { id: 'wc-scut', type: 'word-count', cells: [{ x: 0, y: 0 }], data: { count: 'words', shortcut: 'Ctrl+Shift+1' } },
+        { id: 'set-scut', type: 'settings', cells: [{ x: 11, y: 7 }], data: {} },
+      ],
+    };
+    localStorage.setItem('filo.editor.doc', JSON.stringify(raw));
+  });
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator('#doc')).toBeVisible();
+  await expect(page.locator('#overlay')).toBeHidden();
+
+  // Premi la scorciatoia d'esempio: Ctrl+Shift+1 (il tasto fisico "1").
+  await page.keyboard.press('Control+Shift+Digit1');
+
+  await page.screenshot({ path: 'tests/.shots/audit-editor-shortcut-ctrl-shift-1.png' });
+
+  // ATTESO: l'overlay statistiche del conteggio parole si apre → la scorciatoia
+  // ha attivato il modulo. Senza il fix resterebbe nascosto.
+  await expect(page.locator('#overlay')).toBeVisible();
+});
+
 // Lo switch è l'UNICO modo per navigare fra le pagine della griglia: eliminarlo
 // bloccherebbe l'utente sulla prima pagina rendendo irraggiungibili i moduli
 // delle altre. Come l'ingranaggio impostazioni, dev'essere protetto — il suo
