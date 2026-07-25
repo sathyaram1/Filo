@@ -120,6 +120,37 @@ test('la stringa modello è un combobox: datalist per provider popolata dal cata
   await expect(pop.locator('.sn-select-option', { hasText: 'nvidia/nemotron-3-ultra-550b-a55b:free' })).toHaveCount(0);
 });
 
+test('livello di reasoning per-modello: mostra il valore salvato e lo ripropaga al salvataggio (#369)', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab);
+
+  // La riga già salvata riflette il livello 'medium' della config.
+  const row = page.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head)').first();
+  const reason = row.locator('.sn-model-reason');
+  await expect(reason).toBeVisible();
+  await expect(reason).toHaveValue('medium');
+
+  // L'owner lo alza ad "Alto" (high) e salva.
+  await reason.selectOption('high');
+
+  // Una seconda riga lasciata su Auto NON deve salvare alcun livello.
+  await page.click('#addModelRow');
+  const row2 = page.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head)').last();
+  await row2.locator('.sn-model-nick').fill('senza');
+  await row2.locator('.sn-model-provider').selectOption('openrouter');
+  await row2.locator('.sn-model-id').fill('vendor/plain');
+  await expect(row2.locator('.sn-model-reason')).toHaveValue('auto');
+
+  await page.click('#saveBtn');
+
+  const upd = await page.evaluate(() => window.__sent.filter((m) => m.type === 'defaults_update').pop());
+  // Il modello con livello alto lo porta nella config propagata…
+  expect(upd?.config?.modelRegistry?.esistente?.reasoning).toBe('high');
+  // …quello su Auto resta pulito (nessun campo reasoning nel doc condiviso).
+  expect('reasoning' in (upd?.config?.modelRegistry?.senza || {})).toBe(false);
+
+  await page.screenshot({ path: 'tests/.shots/admin-defaults-reasoning.png', fullPage: true }).catch(() => {});
+});
+
 test('il main rifiuta test espliciti e catalogo ai non admin (gate reale, senza stub)', async ({ openTab }) => {
   const page = await openTab(ADMIN_URL);
   await page.waitForSelector('#title', { timeout: 8_000 });
