@@ -81,6 +81,27 @@
       }
     }, { capture: true });
 
+    // Ctrl/Cmd+Z → torna alla pagina precedente (feedback #267). Ecceziona un
+    // solo caso, ma cruciale: dentro un campo di testo (input/textarea/
+    // contenteditable) Ctrl+Z resta "annulla", il significato universale — così
+    // scrivere non perde mai l'undo. Shift esclusa (Shift+Ctrl+Z = ripeti), Alt
+    // esclusa. Registrato in capture e ANCHE su pagine "bloccate": tornare
+    // indietro è una funzione di navigazione del browser, non una feature di
+    // Filo, quindi deve valere ovunque si navighi. Riusa lo stesso comando della
+    // freccia "Indietro" della barra e del menu (MSG.NAV_BACK): se non c'è una
+    // pagina precedente nella cronologia della scheda, il main è un no-op.
+    window.addEventListener('keydown', (e) => {
+      if ((e.key !== 'z' && e.key !== 'Z') || e.shiftKey || e.altKey) return;
+      if (!(e.ctrlKey || e.metaKey)) return;
+      // composedPath()[0] vede oltre lo shadow DOM; controlliamo anche
+      // activeElement nel caso il keydown arrivi sul body con un campo a fuoco.
+      const target = (typeof e.composedPath === 'function' && e.composedPath()[0]) || e.target;
+      if (isEditable(target) || isEditable(document.activeElement)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      chrome.runtime.sendMessage({ type: MSG.NAV_BACK }).catch(() => {});
+    }, { capture: true });
+
     if (isBlocked()) return;
 
     SpellCheck.init(settings);
