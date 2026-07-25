@@ -2900,10 +2900,7 @@
   // Boot
   applySavedTheme();
   loadVersions();                           // storico dall'archivio app (async)
-  // La collezione ora si carica in modo asincrono (fonde localStorage con
-  // l'archivio dell'app dove Filo scrive gli appunti). Finché non è pronta non
-  // c'è nulla da mostrare, quindi apriamo il file attivo appena disponibile.
-  loadCollection().then(() => {
-    activateFile(STORE.activeFile(collection)); // apre l'ultimo file attivo
-  });
+  loadCollection();                         // da localStorage (sincrono)
+  activateFile(STORE.activeFile(collection)); // apre l'ultimo file attivo
+  reloadFromArchive();                      // fonde i file scritti da Filo (appunti/migrazione)
 })();
