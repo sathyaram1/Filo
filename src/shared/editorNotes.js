@@ -156,7 +156,7 @@
     const updated = {
       ...target,
       content: appendToContent(target.content, paras),
-      meta: { ...(target.meta || {}), modified: now },
+      meta: { ...(target.meta || {}), modified: new Date(now).toISOString() },
     };
     STORE.replaceFile(collection, target.id, updated);
     collection.activeId = target.id;
