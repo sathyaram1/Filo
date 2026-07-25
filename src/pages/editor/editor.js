@@ -303,6 +303,97 @@
     saveTimer = setTimeout(() => save(false), 1200);
   }
 
+  // ── Storico versioni: persistenza sull'archivio app (storage.json) ────────
+  // Carica lo storico all'avvio. Asincrono e tollerante: se manca o è corrotto,
+  // si parte da uno storico vuoto (nessuna versione = nessun ripristino, ma la
+  // prima modifica di Filo ne creerà una).
+  function loadVersions() {
+    versionsReady = Promise.resolve()
+      .then(() => (window.chrome && chrome.storage && chrome.storage.local
+        ? chrome.storage.local.get(VERSIONS_KEY) : {}))
+      .then((r) => {
+        const v = r && r[VERSIONS_KEY];
+        versions = (v && typeof v === 'object') ? v : {};
+      })
+      .catch(() => { versions = {}; });
+    return versionsReady;
+  }
+  // Scrittura "fredda": fire-and-forget, non blocca la digitazione. Lo storico è
+  // testo e cresce piano, quindi riscrivere l'intero blob a ogni versione è
+  // sostenibile (le versioni si creano solo alle modifiche di Filo/agli snapshot).
+  function persistVersions() {
+    try {
+      if (window.chrome && chrome.storage && chrome.storage.local) {
+        Promise.resolve(chrome.storage.local.set({ [VERSIONS_KEY]: versions })).catch(() => {});
+      }
+    } catch (_) { /* archivio non disponibile: lo storico resta in memoria */ }
+  }
+
+  function fmtVersionWhen(ts) {
+    try {
+      const d = new Date(ts);
+      const day = d.toLocaleDateString('it-IT');
+      const time = d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+      return `${day} ${time}`;
+    } catch (_) { return ''; }
+  }
+
+  // Registra un punto di ripristino con il contenuto PRE-modifica di Filo: così
+  // ripristinandolo si torna a com'era il file prima che l'AI lo toccasse.
+  // Ritorna la versione creata (o null se identica all'ultima → nessun rumore).
+  function recordFiloVersion(preContent) {
+    if (!doc || !VERS) return null;
+    const ts = Date.now();
+    const res = VERS.record(versions, doc.id, {
+      content: preContent,
+      source: 'filo',
+      label: `Modifica di Filo · ${fmtVersionWhen(ts)}`,
+      ts,
+    }, () => newId('ver'));
+    versions = res.store;
+    if (res.created) persistVersions();
+    return res.created ? res.version : null;
+  }
+
+  // Ripristina una versione: prima salva lo stato corrente come versione (così
+  // anche il ripristino è annullabile e non si perde nulla), poi rimpiazza il
+  // contenuto del file con quello scelto e ri-renderizza se è il file attivo.
+  function restoreVersion(fileId, versionId) {
+    if (!VERS) return false;
+    const v = VERS.get(versions, fileId, versionId);
+    if (!v) return false;
+    const target = STORE.findFile(collection, fileId);
+    if (!target) return false;
+    const curContent = (doc && doc.id === fileId) ? serialize() : target;
+    const cres = VERS.record(versions, fileId, {
+      content: curContent,
+      source: 'restore',
+      label: `Prima del ripristino · ${fmtVersionWhen(Date.now())}`,
+      ts: Date.now(),
+    }, () => newId('ver'));
+    versions = cres.store;
+    persistVersions();
+    const restored = JSON.parse(JSON.stringify(v.content || {}));
+    restored.id = fileId;
+    STORE.replaceFile(collection, fileId, restored);
+    if (doc && doc.id === fileId) {
+      activateFile(STORE.findFile(collection, fileId));
+    }
+    writeCollection();
+    showEditorToast('Versione ripristinata.');
+    return true;
+  }
+
+  // Offre l'annullamento immediato dell'ultima modifica automatica di Filo con un
+  // toast "Annulla". Lo storico completo (sfogliabile) è una feature a parte; qui
+  // garantiamo l'invariante minima: una modifica di Filo è SEMPRE annullabile.
+  function offerUndoFilo(versionId, fileId) {
+    showEditorToast('Filo ha modificato il documento.', {
+      label: 'Annulla',
+      onClick: () => restoreVersion(fileId, versionId),
+    });
+  }
+
   // ════════════════════════════════════════════════════════════════════
   //  COLLEZIONE DI FILE: attiva/crea/elimina/rinomina + menu documenti
   // ════════════════════════════════════════════════════════════════════
