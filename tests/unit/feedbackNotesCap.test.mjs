@@ -73,6 +73,30 @@ test('tetto piccolo su misura: il testo tagliato resta una conversazione leggibi
   assert.ok(turns.length >= 1);
 });
 
+// Il taglio deve stare sul CAMMINO DI SCRITTURA, non solo nella funzione: è
+// quello che impedisce al feedback di diventare immobile. Qui si intercetta la
+// richiesta che parte verso Firestore e si guarda cosa contiene davvero.
+test('il salvataggio dalla dashboard non spedisce mai note oltre il tetto', async () => {
+  require(join(ROOT, 'src', 'shared', 'feedback.js'));
+  const FB = globalThis.SN_FEEDBACK;
+
+  let sent = null;
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, opts) => {
+    sent = JSON.parse(opts.body);
+    return { ok: true, status: 200, text: async () => '', json: async () => ({}) };
+  };
+  try {
+    await FB.updateStatus('doc-1', { notes: conversation(20, 5000) }, { idToken: 'x' });
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+
+  const notes = sent.fields.notes.stringValue;
+  assert.ok(notes.length <= TH.NOTES_MAX, `spedite ${notes.length} char, tetto ${TH.NOTES_MAX}`);
+  assert.ok(notes.includes('risposta 19'), 'l’ultimo turno deve arrivare a destinazione');
+});
+
 test('il tetto del codice combacia con quello dichiarato nelle Firestore rules', async () => {
   const { readFileSync } = await import('node:fs');
   const rules = readFileSync(join(ROOT, 'firestore.rules'), 'utf8');
