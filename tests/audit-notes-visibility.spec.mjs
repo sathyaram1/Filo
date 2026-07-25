@@ -18,10 +18,11 @@ const EDITOR = 'filo://editor/editor.html';
 // Scrive un appunto passando dal MAIN, esattamente come fa l'azione SALVA_APPUNTO
 // della chat: scrive nel file dell'editor e avvisa le superfici aperte.
 async function filoWritesNote(app, { text, topic, forceNew }) {
-  return app.evaluate(async ({ app: electronApp }, args) => {
-    const path = require('path');
-    const EF = require(path.join(electronApp.getAppPath(), 'src', 'main', 'services', 'editorFiles.js'));
-    const H = require(path.join(electronApp.getAppPath(), 'src', 'main', 'services', 'handlers.js'));
+  return app.evaluate(async (_electron, args) => {
+    // `require` non è un global nel processo main: passiamo dal modulo d'ingresso.
+    const req = process.mainModule.require.bind(process.mainModule);
+    const EF = req('./services/editorFiles.js');
+    const H = req('./services/handlers.js');
     const r = await EF.writeNote(args);
     if (r && r.wrote) H.broadcastLiveUpdate();
     return r;
@@ -64,6 +65,7 @@ test('un appunto di Filo compare come testo in un file dell’editor (e l’edit
   const page = await openTab(EDITOR);
   await page.waitForSelector('#doc');
   await page.evaluate(() => window.__filoEditorVersions.ready());
+  await waitCollectionMirrored(app);
 
   const NOTE = 'AUDIT_appunto_riunione_alle_10';
   const r = await filoWritesNote(app, { text: NOTE, topic: 'lavoro' });
@@ -82,6 +84,7 @@ test('stesso argomento → stesso file; argomento diverso → file nuovo', async
   const page = await openTab(EDITOR);
   await page.waitForSelector('#doc');
   await page.evaluate(() => window.__filoEditorVersions.ready());
+  await waitCollectionMirrored(app);
 
   const A = 'AUDIT_progetto_idea_uno';
   const B = 'AUDIT_progetto_idea_due';
