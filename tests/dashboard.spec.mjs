@@ -45,12 +45,21 @@ test('la dashboard renderizza le tre zone + barra input', async ({ app, shell })
   await expect(page.locator('#threadView')).toBeHidden();
 });
 
-test('senza API key la dashboard mostra il messaggio di fallback', async ({ app, shell }) => {
+test('senza API key la dashboard invita a registrarsi con un profilo (non a mettere una chiave)', async ({ app, shell }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await expect(page.locator('#homeMessage')).not.toHaveClass(/dash-home-msg-loading/, { timeout: 8_000 });
-  const txt = await page.locator('#homeMessage').textContent();
-  expect(txt && txt.length).toBeGreaterThan(0);
+  const txt = (await page.locator('#homeMessage').textContent()) || '';
+  expect(txt.length).toBeGreaterThan(0);
+  // Feedback #356: l'opzione consigliata deve essere registrarsi con un profilo
+  // (gratis, senza chiavi), non "imposta una chiave API" come prima scelta. Il
+  // profilo deve comparire PRIMA di qualsiasi menzione della chiave.
+  expect(txt.toLowerCase()).toContain('profilo');
+  const iProfilo = txt.toLowerCase().indexOf('profilo');
+  const iChiave = txt.toLowerCase().indexOf('chiave');
+  if (iChiave !== -1) expect(iProfilo).toBeLessThan(iChiave);
+  // La vecchia formulazione che spingeva la chiave come attivazione non deve tornare.
+  expect(txt).not.toContain('Imposta una chiave API nelle Opzioni per attivare Filo');
 });
 
 test('FILO_GET_STATE risponde con tab e tempo via runtime.sendMessage', async ({ app, shell }) => {
