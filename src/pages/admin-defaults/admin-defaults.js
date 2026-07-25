@@ -174,6 +174,20 @@
       ensureProviderModels(provSel.value);
     });
 
+    // Livello di reasoning per QUESTO modello (#369): l'owner può forzarlo quando
+    // il modello lo supporta. Native select come il provider accanto → coerente
+    // coi controlli fratelli della riga (PATTERNS: controlli custom coerenti).
+    const reasonSel = document.createElement('select');
+    reasonSel.className = 'sn-model-reason';
+    reasonSel.title = I18n.t('admin_defaults_reasoning_desc');
+    for (const lvl of REASONING_LEVELS) {
+      const opt = document.createElement('option');
+      opt.value = lvl;
+      opt.textContent = I18n.t('reasoning_' + lvl);
+      reasonSel.appendChild(opt);
+    }
+    reasonSel.value = normReasoning(entry && entry.reasoning) || 'auto';
+
     const del = document.createElement('button');
     del.type = 'button';
     del.className = 'sn-btn sn-btn-secondary';
