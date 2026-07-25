@@ -96,7 +96,10 @@ test.describe('switch pagine (resize via handle)', () => {
         comments: [],
         modules: mods,
       };
-      localStorage.setItem('filo.editor.doc', JSON.stringify(doc));
+      if (!doc.id) doc.id = 'file-inj';
+      if (!doc.meta) doc.meta = {};
+      if (!doc.meta.title) doc.meta.title = 'Documento senza titolo';
+      localStorage.setItem('filo.editor.collection', JSON.stringify({ version: 2, activeId: doc.id, files: [doc] }));
     }, modules);
     await page.reload();
     await page.waitForSelector('.ed-grid');
@@ -311,7 +314,10 @@ test.describe('switch resize (drag end-to-end + arrow)', () => {
           { id: 'set', type: 'settings', cells: [{ x: 6, y: 9, z: 0 }], data: {} },
         ],
       };
-      localStorage.setItem('filo.editor.doc', JSON.stringify(doc));
+      if (!doc.id) doc.id = 'file-inj';
+      if (!doc.meta) doc.meta = {};
+      if (!doc.meta.title) doc.meta.title = 'Documento senza titolo';
+      localStorage.setItem('filo.editor.collection', JSON.stringify({ version: 2, activeId: doc.id, files: [doc] }));
       return true;
     });
     expect(blocked).toBe(true);
