@@ -114,9 +114,22 @@
     return { provider: 'openrouter', model: '' };
   }
 
+  // Livelli di reasoning esposti nel dropdown (fonte di verità: SN_CONST).
+  // 'auto' = nessun override (default, valore assente nella voce salvata).
+  const REASONING_LEVELS = (window.SN_CONST && window.SN_CONST.REASONING_LEVELS)
+    || ['auto', 'off', 'low', 'medium', 'high'];
+
+  function normReasoning(v) {
+    if (window.SN_CONST && window.SN_CONST.normalizeReasoning) {
+      return window.SN_CONST.normalizeReasoning(v);
+    }
+    const s = String(v == null ? '' : v).toLowerCase().trim();
+    return s && s !== 'auto' && REASONING_LEVELS.includes(s) ? s : null;
+  }
+
   function makeModelRow(nick, entry) {
     const row = document.createElement('div');
-    row.className = 'sn-model-row';
+    row.className = 'sn-model-row sn-model-row-reason';
     const single = entryToSingle(entry);
     row.dataset.label = (entry && entry.label) || '';
 
@@ -161,6 +174,20 @@
       ensureProviderModels(provSel.value);
     });
 
+    // Livello di reasoning per QUESTO modello (#369): l'owner può forzarlo quando
+    // il modello lo supporta. Native select come il provider accanto → coerente
+    // coi controlli fratelli della riga (PATTERNS: controlli custom coerenti).
+    const reasonSel = document.createElement('select');
+    reasonSel.className = 'sn-model-reason';
+    reasonSel.title = I18n.t('admin_defaults_reasoning_desc');
+    for (const lvl of REASONING_LEVELS) {
+      const opt = document.createElement('option');
+      opt.value = lvl;
+      opt.textContent = I18n.t('reasoning_' + lvl);
+      reasonSel.appendChild(opt);
+    }
+    reasonSel.value = normReasoning(entry && entry.reasoning) || 'auto';
+
     const del = document.createElement('button');
     del.type = 'button';
     del.className = 'sn-btn sn-btn-secondary';
@@ -179,6 +206,7 @@
     row.appendChild(nickIn);
     row.appendChild(provSel);
     row.appendChild(idWrap);
+    row.appendChild(reasonSel);
     row.appendChild(del);
     row.appendChild(test);
     row.appendChild(status);
@@ -222,8 +250,14 @@
     const host = $('modelRegistryList');
     host.innerHTML = '';
     const head = document.createElement('div');
-    head.className = 'sn-model-row sn-model-row-head';
-    [I18n.t('options_model_nickname'), I18n.t('options_model_provider'), I18n.t('options_model_id'), '', ''].forEach((label) => {
+    head.className = 'sn-model-row sn-model-row-head sn-model-row-reason';
+    [
+      I18n.t('options_model_nickname'),
+      I18n.t('options_model_provider'),
+      I18n.t('options_model_id'),
+      I18n.t('admin_defaults_reasoning'),
+      '', '',
+    ].forEach((label) => {
       const c = document.createElement('div'); c.textContent = label; head.appendChild(c);
     });
     host.appendChild(head);
@@ -245,11 +279,16 @@
       const provider = row.querySelector('.sn-model-provider').value;
       const model = row.querySelector('.sn-model-id').value.trim();
       const label = (row.dataset.label || '').trim();
+      const reasonEl = row.querySelector('.sn-model-reason');
+      const reasoning = normReasoning(reasonEl && reasonEl.value);
       if (!nick && !model) continue;
       if (!nick) continue;
       if (out[nick]) continue;
       const entry = { provider, model };
       if (label) entry.label = label;
+      // Salviamo il livello solo se diverso da 'auto' (default): così le voci
+      // integrate restano pulite e "auto" non gonfia il doc condiviso.
+      if (reasoning) entry.reasoning = reasoning;
       out[nick] = entry;
     }
     return out;

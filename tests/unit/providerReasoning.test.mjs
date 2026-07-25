@@ -107,3 +107,62 @@ test('OpenRouter: delta.reasoning va su onReasoning, delta.content su onDelta', 
   assert.equal(res.text, 'La risposta è 42.');
   assert.equal(answer.join(''), 'La risposta è 42.');
 });
+
+// ── Livello di reasoning forzato dall'owner (#369) ───────────────────────────
+// La feature: nella pagina "Modelli predefiniti" l'owner sceglie un livello di
+// reasoning per un modello; quel livello deve arrivare nel body della chiamata
+// (effort per OpenRouter, thinkingBudget per Gemini). Senza il fix il livello
+// non uscirebbe dalla UI e il body non conterrebbe nulla.
+
+test('OpenRouter: mapping puro livello → campo reasoning', () => {
+  const r = OpenRouter.reasoningField;
+  assert.equal(r(undefined, false), null);        // auto senza streaming = niente
+  assert.deepEqual(r('off', false), { enabled: false });
+  assert.deepEqual(r('low', false), { effort: 'low' });
+  assert.deepEqual(r('medium', false), { effort: 'medium' });
+  assert.deepEqual(r('high', false), { effort: 'high' });
+  // 'off' vince anche se il caller vuole i pensieri: l'owner ha detto "non ragionare".
+  assert.deepEqual(r('off', true), { enabled: false });
+  // livello + streaming → effort E enabled (i pensieri vanno inclusi).
+  assert.deepEqual(r('high', true), { effort: 'high', enabled: true });
+});
+
+test('OpenRouter: il livello alto arriva nel body come effort', async () => {
+  const chunks = ['data: ' + JSON.stringify({ choices: [{ delta: { content: 'ok' } }] }) + '\n\n', 'data: [DONE]\n\n'];
+  const sentBody = {};
+  await withFetch(
+    (url, opts) => { Object.assign(sentBody, JSON.parse(opts.body)); return Promise.resolve(sseResponse(chunks)); },
+    () => OpenRouter.streamComplete({ apiKey: 'k', model: 'x/y', reasoning: 'high', messages: [{ role: 'user', content: 'x' }], onDelta: () => {} }),
+  );
+  assert.equal(sentBody.reasoning?.effort, 'high');
+});
+
+test('OpenRouter: livello "off" chiede di non ragionare (non-streaming)', async () => {
+  const sentBody = {};
+  await withFetch(
+    (url, opts) => { Object.assign(sentBody, JSON.parse(opts.body)); return Promise.resolve({ ok: true, status: 200, json: async () => ({ choices: [{ message: { content: 'ok' } }], usage: {} }), text: async () => '' }); },
+    () => OpenRouter.complete({ apiKey: 'k', model: 'x/y', reasoning: 'off', messages: [{ role: 'user', content: 'x' }] }),
+  );
+  assert.deepEqual(sentBody.reasoning, { enabled: false });
+});
+
+test('Gemini: mapping puro livello → thinkingConfig', () => {
+  const t = Gemini.thinkingConfigFor;
+  assert.equal(t(undefined, false), null);
+  assert.deepEqual(t('off', false), { thinkingBudget: 0 });
+  assert.deepEqual(t('low', false), { thinkingBudget: 1024 });
+  assert.deepEqual(t('medium', false), { thinkingBudget: 8192 });
+  assert.deepEqual(t('high', false), { thinkingBudget: 24576 });
+  // livello + streaming → budget E includeThoughts.
+  assert.deepEqual(t('high', true), { thinkingBudget: 24576, includeThoughts: true });
+});
+
+test('Gemini: il livello arriva nel body come thinkingBudget', async () => {
+  const chunks = ['data: ' + JSON.stringify({ candidates: [{ content: { parts: [{ text: 'ok' }] } }] }) + '\n\n'];
+  const sentBody = {};
+  await withFetch(
+    (url, opts) => { Object.assign(sentBody, JSON.parse(opts.body)); return Promise.resolve(sseResponse(chunks)); },
+    () => Gemini.streamComplete({ apiKey: 'k', model: 'gemini-3.1-flash-lite', reasoning: 'low', messages: [{ role: 'user', content: 'x' }], onDelta: () => {} }),
+  );
+  assert.equal(sentBody.generationConfig?.thinkingConfig?.thinkingBudget, 1024);
+});

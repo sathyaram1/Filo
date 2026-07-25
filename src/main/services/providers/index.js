@@ -16,12 +16,12 @@
     throw new Error(`Provider non supportato: ${name}`);
   }
 
-  async function complete({ provider, apiKey, model, messages, signal }) {
-    return getProvider(provider).complete({ apiKey, model, messages, signal });
+  async function complete({ provider, apiKey, model, messages, reasoning, signal }) {
+    return getProvider(provider).complete({ apiKey, model, messages, reasoning, signal });
   }
 
-  async function streamComplete({ provider, apiKey, model, messages, onDelta, onReasoning, signal }) {
-    return getProvider(provider).streamComplete({ apiKey, model, messages, onDelta, onReasoning, signal });
+  async function streamComplete({ provider, apiKey, model, messages, reasoning, onDelta, onReasoning, signal }) {
+    return getProvider(provider).streamComplete({ apiKey, model, messages, reasoning, onDelta, onReasoning, signal });
   }
 
   async function listModels({ provider, apiKey }) {
@@ -39,7 +39,7 @@
       const aModel = a.model || model;
       try {
         const r = await getProvider(a.provider).complete({
-          apiKey: a.apiKey, model: aModel, messages, signal,
+          apiKey: a.apiKey, model: aModel, reasoning: a.reasoning, messages, signal,
         });
         return { ...r, provider: a.provider, model: aModel };
       } catch (err) {
@@ -67,7 +67,7 @@
       let emitted = false;
       try {
         const r = await getProvider(a.provider).streamComplete({
-          apiKey: a.apiKey, model: aModel, messages, signal,
+          apiKey: a.apiKey, model: aModel, reasoning: a.reasoning, messages, signal,
           onDelta: onDelta ? (d) => { emitted = true; onDelta(d); } : onDelta,
           onReasoning: onReasoning ? (t) => { emitted = true; onReasoning(t); } : onReasoning,
         });
