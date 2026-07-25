@@ -129,7 +129,10 @@
         mkModule('comment', 2, 0, 1, 1, 1, {}),
         mkModule('chat', 0, 3, 3, 3, 1, {}),
         // Ingranaggio impostazioni: modulo fisso, angolo in basso a destra.
-        mkModule('settings', GRID_COLS - 1, GRID_ROWS - 1, 1, 1, 0, {}),
+        // Un doc vuoto è sempre alla griglia di default (non ha meta.grid): usa
+        // le costanti di default, non GRID_COLS/ROWS correnti (che potrebbero
+        // riflettere un ALTRO file più grande aperto un attimo prima).
+        mkModule('settings', GRID_DEFAULT_COLS - 1, GRID_DEFAULT_ROWS - 1, 1, 1, 0, {}),
       ],
     };
   }
