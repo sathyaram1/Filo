@@ -250,8 +250,14 @@
     const host = $('modelRegistryList');
     host.innerHTML = '';
     const head = document.createElement('div');
-    head.className = 'sn-model-row sn-model-row-head';
-    [I18n.t('options_model_nickname'), I18n.t('options_model_provider'), I18n.t('options_model_id'), '', ''].forEach((label) => {
+    head.className = 'sn-model-row sn-model-row-head sn-model-row-reason';
+    [
+      I18n.t('options_model_nickname'),
+      I18n.t('options_model_provider'),
+      I18n.t('options_model_id'),
+      I18n.t('admin_defaults_reasoning'),
+      '', '',
+    ].forEach((label) => {
       const c = document.createElement('div'); c.textContent = label; head.appendChild(c);
     });
     host.appendChild(head);
