@@ -231,15 +231,6 @@
   const caretDown =
     `<path d="M6 9l6 6 6-6"/>`;
 
-  // --- Editor: foglio con penna che scrive (documento + pennino diagonale).
-  // Il documento è un rettangolo chiuso con l'angolo in alto a destra tagliato
-  // (dog-ear), così l'icona non sembra incompleta accanto al pennino diagonale.
-  const editor =
-    `<path d="M5 4h7l5 5v11h-12z"/>` +
-    `<path d="M12 4v5h5"/>` +
-    `<path d="M8 13h3"/>` +
-    `<path d="M19.5 14.5l-6 6L11 21l.5-2.5 6-6a1.4 1.4 0 0 1 2 2z"/>`;
-
   // --- Modelli AI: tre nodi connessi (rete neurale stilizzata).
   //     Un nodo in alto, due in basso, collegati a coppie. Da distinguere
   //     visivamente dall'ingranaggio "Impostazioni".
@@ -370,7 +361,9 @@
     home:         (size) => wrap(home, { size }),
     apps:         (size) => wrap(apps, { size }),
     caretDown:    (size) => wrap(caretDown, { size }),
-    editor:       (size) => wrap(editor, { size }),
+    // L'editor usa l'SVG degli appunti (foglio con angolo piegato): ora che
+    // l'editor È anche il posto degli appunti, è l'icona più riconoscibile.
+    editor:       (size) => wrap(note, { size }),
     models:       (size) => wrap(models, { size }),
     openForLater: (size) => wrap(openForLater, { size }),
     qrCode:       (size) => wrap(qrCode, { size }),

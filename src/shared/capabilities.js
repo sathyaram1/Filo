@@ -140,7 +140,7 @@
     },
     {
       id: 'editor', title: 'Editor di testo', category: 'writing',
-      desc: 'Un editor per scrivere e impaginare testo con moduli a blocchi; il contenuto viene salvato da solo. Puoi tenere più documenti separati: il selettore in alto a sinistra mostra il nome del file aperto e apre l\'elenco dei documenti, da cui crei un nuovo file, passi da uno all\'altro, li rinomini ed elimini; alla riapertura ritrovi l\'ultimo documento su cui stavi lavorando. Nella pagina "Revisione" puoi attaccare commenti a frasi selezionate: il testo commentato resta evidenziato anche dopo aver chiuso e riaperto il documento, e cliccandolo riapri il commento. Ogni modifica che Filo fa da solo al documento (per esempio formattare il testo su richiesta della chat) crea un punto di ripristino: subito dopo compare un avviso con "Annulla" per tornare com\'era, e lo storico di ogni documento resta disponibile anche dopo aver chiuso e riaperto Filo, così una modifica automatica è sempre reversibile.',
+      desc: 'Un editor per scrivere e impaginare testo con moduli a blocchi; il contenuto viene salvato da solo. È anche il posto degli appunti: quando chiedi a Filo di prendere nota, scrive lui stesso in un file qui dentro. Puoi tenere più documenti separati: il selettore in alto a sinistra mostra il nome del file aperto e apre l\'elenco dei documenti, da cui crei un nuovo file, passi da uno all\'altro, li rinomini ed elimini; alla riapertura ritrovi l\'ultimo documento su cui stavi lavorando. Nella pagina "Revisione" puoi attaccare commenti a frasi selezionate: il testo commentato resta evidenziato anche dopo aver chiuso e riaperto il documento, e cliccandolo riapri il commento. Ogni modifica che Filo fa da solo al documento (formattare il testo su richiesta della chat, oppure scrivere un appunto) crea un punto di ripristino: subito dopo compare un avviso con "Annulla" per tornare com\'era, e lo storico di ogni documento resta disponibile anche dopo aver chiuso e riaperto Filo, così una modifica automatica è sempre reversibile.',
       invoke: 'Menu del tasto destro → "Editor", oppure filo://editor/editor.html. Il selettore documenti è in alto a sinistra. Dopo una modifica automatica di Filo, l\'avviso "Annulla" in basso a destra la annulla.',
       doesNot: 'Per ora l\'annullamento di una modifica automatica avviene dall\'avviso "Annulla" subito dopo la modifica; non c\'è ancora una schermata per sfogliare e ripristinare a mano una qualunque versione passata dallo storico.',
     },
@@ -292,9 +292,9 @@
     },
     {
       id: 'filo-notes', title: 'Appunti di Filo', category: 'assistant',
-      desc: 'Puoi chiedere a Filo di prendere nota di qualcosa ("prendi nota che…"): lo salva tra i suoi appunti e può riusarlo nelle conversazioni successive. Dall’icona degli appunti in alto a destra nella nuova scheda li vedi tutti e puoi cancellarne uno o svuotarli.',
-      invoke: 'Chiedi all’assistente di salvare un appunto, oppure apri il pannello degli appunti dall’icona in alto a destra nella nuova scheda per vederli e gestirli.',
-      doesNot: 'Gli appunti sono salvati solo in locale; tiene gli ultimi e i più vecchi vengono scartati.',
+      desc: 'Puoi chiedere a Filo di prendere nota di qualcosa ("prendi nota che…"): lo scrive direttamente in un file dell’editor. Continua sullo stesso file finché resti sull’argomento e ne apre uno nuovo quando l’argomento cambia (o se chiedi "apri un nuovo appunto"). Gli appunti diventano così testo vero, che puoi rileggere, modificare e riordinare insieme agli altri documenti. Ogni volta che Filo scrive crea un punto di ripristino, quindi la modifica è sempre annullabile.',
+      invoke: 'Chiedi all’assistente di prendere nota di qualcosa; per rivederli o modificarli apri l’Editor (l’icona con il foglio degli appunti) e scegli il file nel selettore documenti in alto a sinistra.',
+      doesNot: 'Non esiste più un archivio appunti separato: vivono nei file dell’editor, sul tuo computer.',
     },
     {
       id: 'filo-timers', title: 'Timer', category: 'assistant',

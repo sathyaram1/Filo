@@ -49,6 +49,9 @@ require(path.join(SHARED, 'deckStats.js'));    // dipende da SN_DECKS (tipoOf)
 require(path.join(SHARED, 'scryfallQuery.js'));
 require(path.join(SHARED, 'deckOpinions.js')); // pareri/auto-tag §6-§7 (logica pura)
 require(path.join(SHARED, 'deckImportExport.js')); // parser rigido testo↔carte §11 (logica pura)
+require(path.join(SHARED, 'editorStore.js'));   // collezione file editor (logica pura)
+require(path.join(SHARED, 'editorVersions.js')); // storico/punti di ripristino (logica pura)
+require(path.join(SHARED, 'editorNotes.js'));   // appunti di Filo dentro i file editor (dipende dai due sopra)
 require(path.join(SVC, 'providers', 'openrouter.js'));
 require(path.join(SVC, 'providers', 'gemini.js'));
 require(path.join(SVC, 'providers', 'index.js'));

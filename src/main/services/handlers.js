@@ -803,9 +803,27 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         return { executed: !!entry, kept: false };
       }
       case 'SALVA_APPUNTO': {
+        // Filo scrive l'appunto DIRETTAMENTE in un file dell'editor (fine
+        // dell'archivio appunti separato): accoda al file di appunti attivo
+        // finché resta sullo stesso argomento, apre un file nuovo quando
+        // l'argomento cambia o quando è richiesto esplicitamente ("nuovo
+        // appunto"). Ogni scrittura crea punti di ripristino prima/dopo, quindi
+        // è sempre annullabile. Un editor aperto ricarica e mostra il testo.
         const text = action.text || action.testo;
-        if (text) await FiloMem.addNote({ text, context: action.context || action.contesto });
-        return { executed: !!text, kept: false };
+        const topic = action.context || action.contesto || action.argomento || '';
+        const forceNew = !!(action.nuovo || action.new || action.newFile || action.nuovoAppunto);
+        let wrote = false;
+        if (text) {
+          try {
+            const EF = require('./editorFiles');
+            const r = await EF.writeNote({ text, topic, forceNew });
+            wrote = !!(r && r.wrote);
+          } catch (e) {
+            console.warn('[Filo] salvataggio appunto fallito', e?.message || e);
+          }
+        }
+        if (wrote) broadcastLiveUpdate();
+        return { executed: wrote, kept: false };
       }
       case 'INVIA_FEEDBACK': {
         // Filo invia un feedback a nome dell'utente (#146.5). Livello 2: a

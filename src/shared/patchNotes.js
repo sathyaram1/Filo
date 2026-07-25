@@ -16,6 +16,12 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.163', date: '2026-07-25',
+      features: [
+        'Gli appunti ora vivono nell’editor invece che in un elenco a parte: quando chiedi a Filo di prendere nota, lo scrive lui stesso in un file di testo. Continua sullo stesso file finché resti sull’argomento e ne apre uno nuovo quando l’argomento cambia (o se dici «apri un nuovo appunto»). Così gli appunti diventano testo vero, che puoi rileggere, modificare e riordinare come qualsiasi documento, e ogni scrittura automatica è annullabile. I tuoi appunti già salvati vengono spostati in un file «Appunti» dell’editor, senza perderli.',
+      ],
+    },
+    {
       version: '0.2.162', date: '2026-07-25',
       features: [
         'Nell’editor, ogni volta che Filo modifica da solo un documento (per esempio quando chiedi alla chat di formattare il testo) crea un punto di ripristino: compare un breve avviso con «Annulla» per tornare subito com’era. Ogni documento tiene il suo storico, che resta disponibile anche dopo aver chiuso e riaperto Filo, così una modifica automatica è sempre reversibile.',

@@ -246,12 +246,58 @@
     };
   }
 
-  // ── Collezione: persistenza (localStorage) ────────────────────────────
+  // ── Collezione: persistenza ───────────────────────────────────────────
+  // localStorage resta la persistenza "calda" (sincrona, scrivibile anche su
+  // beforeunload). In PIÙ rispecchiamo la collezione sull'archivio dell'app
+  // (storage.json, via chrome.storage.local): è così che Filo, dal main, vede i
+  // file dell'editor e ci scrive gli appunti in autonomia. Il mirror è
+  // fire-and-forget: non deve rallentare la digitazione.
   function readCollectionRaw() {
     try { return JSON.parse(localStorage.getItem(COLLECTION_KEY)); } catch (_) { return null; }
   }
+  function readArchivedCollection() {
+    try {
+      if (window.chrome && chrome.storage && chrome.storage.local) {
+        return Promise.resolve(chrome.storage.local.get(COLLECTION_KEY))
+          .then((r) => (r && r[COLLECTION_KEY]) || null)
+          .catch(() => null);
+      }
+    } catch (_) { /* archivio non disponibile */ }
+    return Promise.resolve(null);
+  }
   function writeCollection() {
     localStorage.setItem(COLLECTION_KEY, JSON.stringify(collection));
+    try {
+      if (window.chrome && chrome.storage && chrome.storage.local) {
+        Promise.resolve(chrome.storage.local.set({ [COLLECTION_KEY]: collection })).catch(() => {});
+      }
+    } catch (_) { /* mirror best-effort */ }
+  }
+  // Confronto "chi è più fresco" fra due versioni dello stesso file (per il
+  // merge locale↔archivio). meta.modified è ISO ovunque; fallback a 0.
+  function fileTs(f) {
+    const m = f && f.meta && f.meta.modified;
+    const d = m != null ? Date.parse(m) : NaN;
+    return Number.isFinite(d) ? d : (typeof m === 'number' ? m : 0);
+  }
+  // Fonde due collezioni: unione dei file per id, tenendo per gli id in comune
+  // quello più recente (così un appunto scritto da Filo mentre l'editor era
+  // chiuso non va perso, e un'eventuale modifica locale più recente vince).
+  // `keepLocalId` forza a tenere la versione LOCALE di quel file (usato per il
+  // file attivo con modifiche non ancora salvate).
+  function mergeCollections(local, remote, keepLocalId) {
+    const byId = new Map();
+    for (const f of (remote && remote.files) || []) byId.set(f.id, f);
+    for (const f of (local && local.files) || []) {
+      if (f.id === keepLocalId) { byId.set(f.id, f); continue; }
+      const other = byId.get(f.id);
+      byId.set(f.id, other ? (fileTs(f) >= fileTs(other) ? f : other) : f);
+    }
+    const files = Array.from(byId.values());
+    let activeId = (local && local.activeId) || null;
+    if (!files.some((f) => f.id === activeId)) activeId = (remote && remote.activeId) || null;
+    if (!files.some((f) => f.id === activeId)) activeId = files[0] && files[0].id;
+    return { version: STORE.COLLECTION_VERSION, activeId, files };
   }
   // Un file vuoto pronto per la collezione (formato serializzato).
   function blankFileSerialized() {
@@ -260,8 +306,11 @@
     return serializeDocModel(model);
   }
 
-  // Carica (o migra) la collezione. Alla prima esecuzione con la nuova versione
-  // il vecchio documento singolo diventa il primo file, senza perdere nulla.
+  // Carica (o migra) la collezione da localStorage (persistenza calda), come
+  // sempre e in modo SINCRONO: così il primo render è immediato e deterministico
+  // (nessun cambio di timing rispetto a prima). I file che Filo ha scritto
+  // nell'archivio dell'app (appunti, migrazione) vengono fusi subito dopo, in
+  // modo asincrono, da `reloadFromArchive()`.
   function loadCollection() {
     collection = STORE.migrateToCollection({
       collection: readCollectionRaw(),
@@ -270,6 +319,32 @@
       blankFactory: blankFileSerialized,
     });
     writeCollection();
+  }
+
+  // Ricarica la collezione dall'archivio quando Filo (main) ci ha scritto un
+  // appunto: fonde i file nuovi/aggiornati senza perdere le modifiche locali in
+  // corso, aggiorna il selettore documenti e, se il file attivo è cambiato sotto
+  // e non ci sono modifiche in sospeso, lo riapre per mostrare il nuovo testo.
+  // Nota: se l'utente sta modificando PROPRIO il file su cui Filo scrive senza
+  // aver salvato, vincono le modifiche locali; l'appunto di Filo resta comunque
+  // nello storico versioni del file (source "filo"), quindi è recuperabile.
+  async function reloadFromArchive() {
+    const remoteRaw = await readArchivedCollection();
+    if (!remoteRaw || !Array.isArray(remoteRaw.files)) return;
+    if (doc) syncActiveIntoCollection();
+    const remoteCol = STORE.migrateToCollection({ collection: remoteRaw });
+    collection = mergeCollections(collection, remoteCol, dirty ? (doc && doc.id) : null);
+    const activeStored = STORE.findFile(collection, doc && doc.id) || STORE.activeFile(collection);
+    if (activeStored && !dirty && doc
+      && JSON.stringify(activeStored.content) !== JSON.stringify(doc.content)) {
+      activateFile(activeStored);
+    } else {
+      renderDocSwitcher();
+    }
+    writeCollection();
+    // Ricarica anche lo storico versioni: Filo vi ha aggiunto i punti di
+    // ripristino della sua scrittura (così l'utente può annullarla).
+    loadVersions();
   }
   function readLegacyDoc() {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch (_) { return null; }
@@ -2804,7 +2879,11 @@
   }
   try {
     chrome.runtime.onMessage.addListener((msg) => {
-      if (msg && msg.type === MSG.SETTINGS_UPDATED) applySavedTheme();
+      if (!msg) return;
+      if (msg.type === MSG.SETTINGS_UPDATED) applySavedTheme();
+      // Filo ha aggiornato dati vivi (fra cui gli appunti scritti nell'editor):
+      // ricarica la collezione dall'archivio per mostrare subito il nuovo file.
+      else if (msg.type === MSG.FILO_LIVE_UPDATED) { reloadFromArchive(); }
     });
   } catch (_) {}
 
@@ -2821,6 +2900,7 @@
   // Boot
   applySavedTheme();
   loadVersions();                           // storico dall'archivio app (async)
-  loadCollection();                         // migra il vecchio doc singolo se serve
+  loadCollection();                         // da localStorage (sincrono)
   activateFile(STORE.activeFile(collection)); // apre l'ultimo file attivo
+  reloadFromArchive();                      // fonde i file scritti da Filo (appunti/migrazione)
 })();
