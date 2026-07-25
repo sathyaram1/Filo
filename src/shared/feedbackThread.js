@@ -380,6 +380,10 @@
     modelTurnMarker,
     appendModelTurn,
     mergeModelReport,
+    // Tetto alla conversazione (deve restare allineato a firestore.rules)
+    capNotes,
+    NOTES_MAX,
+    TRIM_MARK,
     // Allegati per-turno (#190.3)
     serializeAttachment,
     parseAttachmentLine,
