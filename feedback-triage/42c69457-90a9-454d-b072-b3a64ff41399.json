@@ -1,7 +1,0 @@
-{
-  "id": "42c69457-90a9-454d-b072-b3a64ff41399",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica e' stata pubblicata. Ora nell'editor, ogni volta che Filo modifica da solo un documento viene creato un punto di ripristino con un avviso «Annulla», e lo storico di ogni documento resta disponibile anche dopo aver chiuso e riaperto Filo.",
-  "queuedAt": "2026-07-25T04:12:46.840Z",
-  "queuedBy": "routine"
-}
