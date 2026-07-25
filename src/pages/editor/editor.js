@@ -12,7 +12,20 @@
   let GRID_ROWS = 10;
   const GRID_MIN_COLS = 3, GRID_MAX_COLS = 12;
   const GRID_MIN_ROWS = 4, GRID_MAX_ROWS = 16;
+  const GRID_DEFAULT_COLS = 7, GRID_DEFAULT_ROWS = 10;
+  // Chiave legacy: il vecchio documento singolo. Resta come sorgente di
+  // migrazione (letta una volta) e come backup; non viene più scritta.
   const STORAGE_KEY = 'filo.editor.doc';
+  // Nuova chiave: la COLLEZIONE di file { version, activeId, files:[...] }.
+  // Scelta di storage (vedi report): la collezione resta su localStorage — l'I/O
+  // di autosalvataggio dev'essere sincrono e veloce (ogni ~1.2s mentre si scrive)
+  // e deve poter scrivere anche su `beforeunload`, dove un archivio asincrono
+  // (storage.json) non farebbe in tempo a scaricare. Quando il versionamento
+  // illimitato (feedback fratello) farà crescere i dati, saranno gli SNAPSHOT di
+  // versione — dati "freddi", scritti di rado — a spostarsi su storage.json/file
+  // dedicati, tenendo su localStorage solo l'indice e il file corrente ("caldi").
+  const COLLECTION_KEY = 'filo.editor.collection';
+  const STORE = window.SN_EDITOR_STORE;
   const MSG = (window.SN_MSG && window.SN_MSG.MSG) || {};
   const ACTIONS = (window.SN_CONST && window.SN_CONST.ACTIONS) || {};
   const ICONS = window.SN_ICONS || {};
@@ -29,6 +42,10 @@
   const paletteEl = $('palette');
   const overlay = $('overlay');
   const overlayBox = $('overlayBox');
+  const docbarEl = $('docbar');
+  const docSwitchBtn = $('docSwitch');
+  const docTitleEl = $('docTitle');
+  const docPopEl = $('docPop');
 
   // ── Metadati tipi di modulo ───────────────────────────────────────────
   const MODULE_TYPES = {
@@ -80,7 +97,8 @@
   };
 
   // ── Stato ─────────────────────────────────────────────────────────────
-  let doc = null;        // documento corrente (vedi loadDoc/blankDoc)
+  let collection = null; // { version, activeId, files:[...] } — vedi editorStore.js
+  let doc = null;        // documento ATTIVO in memoria (vedi activateFile/blankDoc)
   let dirty = false;
   let settingsMode = false;
   let commenting = false;
@@ -111,7 +129,10 @@
         mkModule('comment', 2, 0, 1, 1, 1, {}),
         mkModule('chat', 0, 3, 3, 3, 1, {}),
         // Ingranaggio impostazioni: modulo fisso, angolo in basso a destra.
-        mkModule('settings', GRID_COLS - 1, GRID_ROWS - 1, 1, 1, 0, {}),
+        // Un doc vuoto è sempre alla griglia di default (non ha meta.grid): usa
+        // le costanti di default, non GRID_COLS/ROWS correnti (che potrebbero
+        // riflettere un ALTRO file più grande aperto un attimo prima).
+        mkModule('settings', GRID_DEFAULT_COLS - 1, GRID_DEFAULT_ROWS - 1, 1, 1, 0, {}),
       ],
     };
   }
@@ -160,25 +181,40 @@
     };
   }
 
-  function serialize() {
-    // Il titolo non è più editabile dall'UI: si conserva quello del modello.
-    if (!doc.meta.title) doc.meta.title = 'Documento senza titolo';
-    doc.meta.modified = new Date().toISOString();
-    refreshCommentAnchors(); // ancore allineate al testo corrente prima del persist
-    doc.content = htmlToPM(docEl);
+  // Serializza un MODELLO doc (in memoria) nel formato di storage, SENZA toccare
+  // il DOM: usato per creare file vuoti e per snapshot generici. Il file attivo
+  // passa da serialize(), che prima allinea il modello al DOM.
+  function serializeDocModel(d) {
+    const meta = { ...(d.meta || {}) };
+    if (!meta.title) meta.title = 'Documento senza titolo';
     return {
-      meta: doc.meta,
-      content: doc.content,
-      comments: doc.comments,
-      modules: doc.modules.map((m) => ({
+      id: d.id,
+      meta,
+      content: d.content || { type: 'doc', content: [{ type: 'paragraph', content: [] }] },
+      comments: Array.isArray(d.comments) ? d.comments : [],
+      modules: (d.modules || []).map((m) => ({
         id: m.id, type: m.type, cells: rectToCells(m), data: m.data,
       })),
     };
   }
 
-  // Applica al modello la dimensione griglia salvata (clamp nei limiti). I doc
-  // privi di `meta.grid` restano al default 7×10.
+  function serialize() {
+    // Il titolo non è più editabile dall'UI dell'editor: si conserva quello del
+    // modello (la rinomina avviene dal menu documenti).
+    if (!doc.meta.title) doc.meta.title = 'Documento senza titolo';
+    doc.meta.modified = new Date().toISOString();
+    refreshCommentAnchors(); // ancore allineate al testo corrente prima del persist
+    doc.content = htmlToPM(docEl);
+    return serializeDocModel(doc);
+  }
+
+  // Applica al modello la dimensione griglia salvata (clamp nei limiti). Riparte
+  // SEMPRE dal default 7×10 e poi applica l'eventuale `meta.grid`: così passando
+  // da un file con griglia grande a uno senza, la griglia torna al default (con
+  // un solo documento non capitava mai, ora sì).
   function loadGridSize() {
+    GRID_COLS = GRID_DEFAULT_COLS;
+    GRID_ROWS = GRID_DEFAULT_ROWS;
     const g = doc && doc.meta && doc.meta.grid;
     if (g && Number.isFinite(g.cols) && Number.isFinite(g.rows)) {
       GRID_COLS = Math.max(GRID_MIN_COLS, Math.min(GRID_MAX_COLS, g.cols));
@@ -186,11 +222,12 @@
     }
   }
 
-  function loadDoc() {
-    let raw = null;
-    try { raw = JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch (_) {}
-    if (!raw || !raw.meta) { doc = blankDoc(); loadGridSize(); return; }
-    doc = {
+  // Costruisce il modello doc in memoria (moduli come rettangoli) da un file
+  // serializzato della collezione. Era il corpo del vecchio loadDoc().
+  function parseStoredDoc(raw) {
+    if (!raw || !raw.meta) return null;
+    return {
+      id: raw.id,
       meta: raw.meta,
       content: raw.content || { type: 'doc', content: [] },
       comments: Array.isArray(raw.comments) ? raw.comments : [],
@@ -199,12 +236,48 @@
         return { id: m.id || newId('mod'), type: m.type, ...rect, data: m.data || {} };
       }),
     };
-    loadGridSize();
+  }
+
+  // ── Collezione: persistenza (localStorage) ────────────────────────────
+  function readCollectionRaw() {
+    try { return JSON.parse(localStorage.getItem(COLLECTION_KEY)); } catch (_) { return null; }
+  }
+  function writeCollection() {
+    localStorage.setItem(COLLECTION_KEY, JSON.stringify(collection));
+  }
+  // Un file vuoto pronto per la collezione (formato serializzato).
+  function blankFileSerialized() {
+    const model = blankDoc();
+    model.id = newId('file');
+    return serializeDocModel(model);
+  }
+
+  // Carica (o migra) la collezione. Alla prima esecuzione con la nuova versione
+  // il vecchio documento singolo diventa il primo file, senza perdere nulla.
+  function loadCollection() {
+    collection = STORE.migrateToCollection({
+      collection: readCollectionRaw(),
+      legacyDoc: readLegacyDoc(),
+      idFactory: () => newId('file'),
+      blankFactory: blankFileSerialized,
+    });
+    writeCollection();
+  }
+  function readLegacyDoc() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch (_) { return null; }
+  }
+
+  // Copia lo stato del file attivo (dal DOM/modello) dentro la collezione.
+  function syncActiveIntoCollection() {
+    if (!doc) return;
+    STORE.replaceFile(collection, doc.id, serialize());
+    collection.activeId = doc.id;
   }
 
   function save(flash) {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(serialize()));
+      syncActiveIntoCollection();
+      writeCollection();
       dirty = false;
       saveStateEl.textContent = flash ? 'Salvato' : '';
       saveStateEl.classList.remove('dirty');
@@ -220,6 +293,192 @@
     saveStateEl.classList.add('dirty');
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => save(false), 1200);
+  }
+
+  // ════════════════════════════════════════════════════════════════════
+  //  COLLEZIONE DI FILE: attiva/crea/elimina/rinomina + menu documenti
+  // ════════════════════════════════════════════════════════════════════
+
+  // Rende attivo un file serializzato: costruisce il modello, azzera lo stato
+  // transitorio della vista e ri-renderizza tutto. NON persiste (chi chiama
+  // decide quando scrivere).
+  function activateFile(raw) {
+    doc = parseStoredDoc(raw) || parseStoredDoc(blankFileSerialized());
+    collection.activeId = doc.id;
+    // Stato di vista che non deve "trascinarsi" da un file all'altro: torna
+    // sempre alla vista testo (fuori dalla modalità modifica moduli).
+    commenting = false;
+    toggleSettingsMode(false);
+    ensureSettingsModule();
+    loadGridSize();
+    renderDocBody();
+    renderGrid();
+    updateWordCountModules();
+    renderDocSwitcher();
+  }
+
+  // Passa a un altro file: salva prima quello corrente, poi attiva il target.
+  function switchToFile(id) {
+    if (!doc || id === doc.id) { closeDocPop(); return; }
+    const target = STORE.findFile(collection, id);
+    if (!target) return;
+    syncActiveIntoCollection();
+    activateFile(target);
+    writeCollection();
+    closeDocPop();
+  }
+
+  // Crea un nuovo documento vuoto e lo apre.
+  function createFile() {
+    if (doc) syncActiveIntoCollection();
+    const file = STORE.addFile(collection, blankFileSerialized(), () => newId('file'));
+    activateFile(file);
+    writeCollection();
+    closeDocPop();
+  }
+
+  // Elimina un documento. Invariante: resta sempre almeno un file — se si
+  // cancella l'ultimo, se ne crea uno vuoto al suo posto.
+  function deleteFile(id) {
+    const wasActive = doc && doc.id === id;
+    const res = STORE.removeFile(collection, id);
+    if (!res.removed) return;
+    if (res.emptied) {
+      const file = STORE.addFile(collection, blankFileSerialized(), () => newId('file'));
+      activateFile(file);
+    } else if (wasActive) {
+      activateFile(STORE.activeFile(collection));
+    } else {
+      renderDocSwitcher(); // era un altro file: la lista basta aggiornarla
+    }
+    writeCollection();
+  }
+
+  // Rinomina un documento (il nome mostrato nel menu e nel selettore).
+  function renameFileAction(id, title) {
+    STORE.renameFile(collection, id, title);
+    if (doc && doc.id === id && doc.meta) {
+      doc.meta.title = STORE.findFile(collection, id).meta.title;
+    }
+    writeCollection();
+    renderDocSwitcher();
+  }
+
+  // ── Menu documenti (selettore in alto a sinistra) ─────────────────────
+  function activeTitle() {
+    const f = STORE.activeFile(collection);
+    return (f && f.meta && f.meta.title) || 'Documento senza titolo';
+  }
+
+  function renderDocSwitcher() {
+    if (docTitleEl) docTitleEl.textContent = activeTitle();
+    if (docSwitchBtn) docSwitchBtn.title = activeTitle();
+    if (!docPopEl || docPopEl.hidden) return;
+    buildDocPop();
+  }
+
+  function buildDocPop() {
+    docPopEl.innerHTML = '';
+    for (const f of collection.files) {
+      const item = document.createElement('div');
+      item.className = 'ed-doc-item' + (f.id === collection.activeId ? ' active' : '');
+      item.setAttribute('role', 'option');
+      item.dataset.id = f.id;
+
+      const name = document.createElement('span');
+      name.className = 'ed-doc-item-name';
+      name.textContent = (f.meta && f.meta.title) || 'Documento senza titolo';
+      item.appendChild(name);
+
+      // Apri il file cliccando la riga (ma non le azioni).
+      item.addEventListener('click', (e) => {
+        if (e.target.closest('.ed-doc-act') || e.target.closest('.ed-doc-item-input')) return;
+        switchToFile(f.id);
+      });
+
+      // Rinomina (matita). Doppio click sul nome apre lo stesso editor inline.
+      const renBtn = actButton('✎', 'Rinomina', () => startInlineRename(item, f));
+      renBtn.classList.add('ed-doc-rename');
+      name.addEventListener('dblclick', (e) => { e.stopPropagation(); startInlineRename(item, f); });
+      item.appendChild(renBtn);
+
+      // Elimina (×). Con un solo file l'elimina crea un nuovo foglio vuoto.
+      const delBtn = actButton(ICONS.close ? ICONS.close(14) : '×', 'Elimina', () => deleteFile(f.id));
+      delBtn.classList.add('ed-doc-del');
+      item.appendChild(delBtn);
+
+      docPopEl.appendChild(item);
+    }
+    const sep = document.createElement('div');
+    sep.className = 'ed-doc-sep';
+    docPopEl.appendChild(sep);
+    const nu = document.createElement('button');
+    nu.type = 'button';
+    nu.className = 'ed-doc-new';
+    nu.id = 'docNew';
+    nu.innerHTML = `${ICONS.plus ? ICONS.plus(14) : '+'}<span>Nuovo documento</span>`;
+    nu.addEventListener('click', createFile);
+    docPopEl.appendChild(nu);
+  }
+
+  function actButton(glyph, title, onAct) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'ed-doc-act';
+    b.title = title;
+    b.setAttribute('aria-label', title);
+    b.innerHTML = glyph;
+    b.addEventListener('click', (e) => { e.stopPropagation(); onAct(); });
+    return b;
+  }
+
+  function startInlineRename(item, f) {
+    const name = item.querySelector('.ed-doc-item-name');
+    if (!name) return;
+    const input = document.createElement('input');
+    input.className = 'ed-doc-item-input';
+    input.type = 'text';
+    input.value = (f.meta && f.meta.title) || '';
+    input.setAttribute('aria-label', 'Nuovo nome del documento');
+    let done = false;
+    const commit = (save) => {
+      if (done) return;
+      done = true;
+      if (save) renameFileAction(f.id, input.value);
+      else renderDocSwitcher();
+    };
+    input.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') { e.preventDefault(); commit(true); }
+      else if (e.key === 'Escape') { e.preventDefault(); commit(false); }
+    });
+    input.addEventListener('blur', () => commit(true));
+    name.replaceWith(input);
+    input.focus();
+    input.select();
+  }
+
+  function openDocPop() {
+    if (!docPopEl || !docPopEl.hidden) return;
+    buildDocPop();
+    docPopEl.hidden = false;
+    docSwitchBtn.setAttribute('aria-expanded', 'true');
+    document.addEventListener('mousedown', onDocPopOutside, true);
+  }
+  function closeDocPop() {
+    if (!docPopEl || docPopEl.hidden) return;
+    docPopEl.hidden = true;
+    if (docSwitchBtn) docSwitchBtn.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('mousedown', onDocPopOutside, true);
+  }
+  function onDocPopOutside(e) {
+    if (docbarEl && !docbarEl.contains(e.target)) closeDocPop();
+  }
+  if (docSwitchBtn) {
+    docSwitchBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      docPopEl.hidden ? openDocPop() : closeDocPop();
+    });
   }
 
   // ════════════════════════════════════════════════════════════════════
@@ -2422,9 +2681,6 @@
 
   // Boot
   applySavedTheme();
-  loadDoc();
-  ensureSettingsModule(); // garantisce l'ingranaggio anche su documenti pre-esistenti
-  renderDocBody();
-  renderGrid();
-  updateWordCountModules();
+  loadCollection();                         // migra il vecchio doc singolo se serve
+  activateFile(STORE.activeFile(collection)); // apre l'ultimo file attivo
 })();

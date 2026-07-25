@@ -69,7 +69,7 @@ async function openTab(url) {
 // documento di default (blankDoc), come con un'app appena lanciata.
 test.beforeEach(async () => {
   const page = await openTab(EDITOR);
-  await page.evaluate(() => { try { localStorage.removeItem('filo.editor.doc'); } catch (_) {} });
+  await page.evaluate(() => { try { localStorage.removeItem('filo.editor.doc'); localStorage.removeItem('filo.editor.collection'); } catch (_) {} });
   await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
     if (!w || !w._filoTabs) return;
@@ -158,7 +158,8 @@ test.describe('moduli di formattazione', () => {
     // sopravvivere al round-trip (attrs.align sul blocco).
     await page.keyboard.press('Control+s');
     const align = await page.evaluate(() => {
-      const raw = JSON.parse(localStorage.getItem('filo.editor.doc'));
+      const __c = JSON.parse(localStorage.getItem('filo.editor.collection'));
+      const raw = __c && __c.files ? (__c.files.find((f) => f.id === __c.activeId) || __c.files[0]) : null;
       const block = (raw.content.content || []).find((b) => b.attrs && b.attrs.align);
       return block ? block.attrs.align : '';
     });
@@ -178,7 +179,8 @@ test.describe('moduli di formattazione', () => {
     // La dimensione deve sopravvivere al salvataggio (marca fontSize inline).
     await page.keyboard.press('Control+s');
     const hasFontSize = await page.evaluate(() => {
-      const raw = JSON.parse(localStorage.getItem('filo.editor.doc'));
+      const __c = JSON.parse(localStorage.getItem('filo.editor.collection'));
+      const raw = __c && __c.files ? (__c.files.find((f) => f.id === __c.activeId) || __c.files[0]) : null;
       const json = JSON.stringify(raw.content);
       return json.includes('fontSize');
     });
@@ -291,8 +293,12 @@ test.describe('font picker e drag dei moduli', () => {
 
     // Salva e verifica che la marca sia persistita.
     await page.keyboard.press('Control+s');
-    await expect.poll(() => page.evaluate(() => localStorage.getItem('filo.editor.doc') || ''))
-      .toContain('Times New Roman');
+    await expect.poll(() => page.evaluate(() => {
+      const c = JSON.parse(localStorage.getItem('filo.editor.collection'));
+      if (!c || !c.files) return '';
+      const f = c.files.find((x) => x.id === c.activeId) || c.files[0];
+      return JSON.stringify(f);
+    })).toContain('Times New Roman');
 
     // Riapri il documento (reload → il body viene ri-renderizzato dal JSON
     // salvato): il font deve essere ancora quello scelto, non il default.
@@ -551,7 +557,8 @@ test.describe('chat che formatta il documento', () => {
     // Il grassetto sopravvive al salvataggio (marca bold nel JSON dei titoli).
     await page.keyboard.press('Control+s');
     const headingBold = await page.evaluate(() => {
-      const raw = JSON.parse(localStorage.getItem('filo.editor.doc'));
+      const __c = JSON.parse(localStorage.getItem('filo.editor.collection'));
+      const raw = __c && __c.files ? (__c.files.find((f) => f.id === __c.activeId) || __c.files[0]) : null;
       const headings = (raw.content.content || []).filter((b) => b.type === 'heading');
       return headings.length > 0 && headings.every((h) => (h.content || []).some((n) => (n.marks || []).some((mk) => mk.type === 'bold')));
     });

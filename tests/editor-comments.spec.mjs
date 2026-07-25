@@ -62,7 +62,7 @@ async function openTab(url) {
 // le tab della stessa origine), va azzerato; poi chiudi le tab residue.
 test.beforeEach(async () => {
   const page = await openTab(EDITOR);
-  await page.evaluate(() => { try { localStorage.removeItem('filo.editor.doc'); } catch (_) {} });
+  await page.evaluate(() => { try { localStorage.removeItem('filo.editor.doc'); localStorage.removeItem('filo.editor.collection'); } catch (_) {} });
   await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
     if (!w || !w._filoTabs) return;
@@ -134,7 +134,8 @@ test.describe('commenti: evidenziazione persistente', () => {
     // L'ancora salvata è reale (offset nel testo + frase), non {0,0}.
     await page.keyboard.press('Control+s');
     const anchor = await page.evaluate(() => {
-      const raw = JSON.parse(localStorage.getItem('filo.editor.doc'));
+      const __c = JSON.parse(localStorage.getItem('filo.editor.collection'));
+      const raw = __c && __c.files ? (__c.files.find((f) => f.id === __c.activeId) || __c.files[0]) : null;
       return raw.comments[0] && raw.comments[0].anchor;
     });
     expect(anchor.text).toBe('frase da commentare');
@@ -214,7 +215,8 @@ test.describe('commenti: evidenziazione persistente', () => {
     // L'ancora salvata vive nel testo puro (niente newline dentro).
     await page.keyboard.press('Control+s');
     const anchor = await page.evaluate(() => {
-      const raw = JSON.parse(localStorage.getItem('filo.editor.doc'));
+      const __c = JSON.parse(localStorage.getItem('filo.editor.collection'));
+      const raw = __c && __c.files ? (__c.files.find((f) => f.id === __c.activeId) || __c.files[0]) : null;
       return raw.comments[0] && raw.comments[0].anchor;
     });
     expect(anchor.text).not.toContain('\n');
@@ -244,9 +246,11 @@ test.describe('commenti: evidenziazione persistente', () => {
       let n; while ((n = walker.nextNode())) pure += n.nodeValue;
       const from = pure.indexOf('primo blocco');
       const legacyText = 'primo blocco\ntesta del secondo';
-      const raw = JSON.parse(localStorage.getItem('filo.editor.doc'));
+      const __c = JSON.parse(localStorage.getItem('filo.editor.collection'));
+      const raw = __c && __c.files ? (__c.files.find((f) => f.id === __c.activeId) || __c.files[0]) : null;
       raw.comments[0].anchor = { from, to: from + legacyText.length, text: legacyText };
-      localStorage.setItem('filo.editor.doc', JSON.stringify(raw));
+      if (!raw.id) raw.id = 'file-inj';
+      localStorage.setItem('filo.editor.collection', JSON.stringify({ version: 2, activeId: raw.id, files: [raw] }));
     });
     await page.reload();
     await page.waitForSelector('#doc .ed-commented', { timeout: 8_000 });

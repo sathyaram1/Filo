@@ -80,7 +80,10 @@ test('una scorciatoia senza modificatore GIÀ salvata non ruba la lettera mentre
         { id: 'legacy-set', type: 'settings', cells: [{ x: 11, y: 7 }], data: {} },
       ],
     };
-    localStorage.setItem('filo.editor.doc', JSON.stringify(raw));
+    if (!raw.id) raw.id = 'file-inj';
+    if (!raw.meta) raw.meta = {};
+    if (!raw.meta.title) raw.meta.title = 'Documento senza titolo';
+    localStorage.setItem('filo.editor.collection', JSON.stringify({ version: 2, activeId: raw.id, files: [raw] }));
   });
   await page.reload();
   await page.waitForLoadState('domcontentloaded');
@@ -119,7 +122,10 @@ test('la scorciatoia Ctrl+Shift+1 di un modulo si attiva davvero', async ({ open
         { id: 'set-scut', type: 'settings', cells: [{ x: 11, y: 7 }], data: {} },
       ],
     };
-    localStorage.setItem('filo.editor.doc', JSON.stringify(raw));
+    if (!raw.id) raw.id = 'file-inj';
+    if (!raw.meta) raw.meta = {};
+    if (!raw.meta.title) raw.meta.title = 'Documento senza titolo';
+    localStorage.setItem('filo.editor.collection', JSON.stringify({ version: 2, activeId: raw.id, files: [raw] }));
   });
   await page.reload();
   await page.waitForLoadState('domcontentloaded');

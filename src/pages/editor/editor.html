@@ -13,11 +13,22 @@
   <script src="filo://shared/i18n.js"></script>
   <script src="filo://shared/icons.js"></script>
   <script src="filo://shared/storage.js"></script>
+  <script src="filo://shared/editorStore.js"></script>
 </head>
 <body>
   <div class="ed-root" id="root">
     <!-- ── Pannello testo ─────────────────────────────────────────── -->
     <section class="ed-text-pane" id="textPane">
+      <!-- Selettore documento: nome del file attivo + menu per creare, aprire,
+           rinominare ed eliminare i file della collezione. -->
+      <div class="ed-docbar" id="docbar">
+        <button class="ed-doc-switch" id="docSwitch" aria-haspopup="listbox" aria-expanded="false" title="Documenti">
+          <span class="ed-doc-title" id="docTitle">Documento senza titolo</span>
+          <span class="ed-doc-chevron" aria-hidden="true">▾</span>
+        </button>
+        <div class="ed-doc-pop" id="docPop" role="listbox" hidden></div>
+      </div>
+
       <header class="ed-topbar">
         <div class="ed-topbar-spacer"></div>
         <span class="ed-save-state" id="saveState" title="Stato salvataggio"></span>
