@@ -67,7 +67,7 @@ async function openTab(url) {
 // e chiudi le tab residue, così ogni test riparte dal documento di default.
 test.beforeEach(async () => {
   const page = await openTab(EDITOR);
-  await page.evaluate(() => { try { localStorage.removeItem('filo.editor.doc'); } catch (_) {} });
+  await page.evaluate(() => { try { localStorage.removeItem('filo.editor.doc'); localStorage.removeItem('filo.editor.collection'); } catch (_) {} });
   await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
     if (!w || !w._filoTabs) return;
