@@ -670,3 +670,32 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
   text-align: left;
 }
 .ed-doc-new:hover { background: var(--sn-hover); }
+
+/* Menu contestuale del titolo (tasto destro): ancorato alle coordinate del
+   click, quindi position:fixed (le .sn-select-pop di default sono absolute). */
+.ed-title-ctxmenu {
+  position: fixed;
+  left: 0;
+  right: auto;
+  top: 0;
+  min-width: 180px;
+}
+
+/* Rinomina inline dalla docbar: sostituisce il selettore documento. */
+.ed-doc-title-input {
+  max-width: 240px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--sn-fg);
+  background: var(--sn-bg);
+  border: 1px solid var(--sn-accent);
+  border-radius: 6px;
+  padding: 5px 10px;
+}
+
+/* Titolo in fase di (ri)generazione: leggero pulsare per dare feedback. */
+.ed-doc-generating { opacity: 0.6; animation: ed-title-pulse 1s ease-in-out infinite; }
+@keyframes ed-title-pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.75; } }
+@media (prefers-reduced-motion: reduce) {
+  .ed-doc-generating { animation: none; }
+}
