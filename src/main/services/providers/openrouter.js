@@ -48,11 +48,14 @@
     }));
   }
 
-  async function complete({ apiKey, model, messages, signal }) {
+  async function complete({ apiKey, model, messages, reasoning, signal }) {
+    const body = { model, messages, stream: false };
+    const r = reasoningField(reasoning, false);
+    if (r) body.reasoning = r;
     const res = await fetch(ENDPOINT, {
       method: 'POST',
       headers: buildHeaders(apiKey),
-      body: JSON.stringify({ model, messages, stream: false }),
+      body: JSON.stringify(body),
       signal,
     });
     if (!res.ok) {
