@@ -2286,6 +2286,9 @@
   // di blocchi toccati (0 = niente da fare, es. target senza corrispondenze).
   function applyFormatActions(actions) {
     if (!Array.isArray(actions)) return 0;
+    // Cattura lo stato PRIMA di mutare il DOM: se la modifica automatica di Filo
+    // cambia davvero qualcosa, questo diventa il punto di ripristino annullabile.
+    const preContent = doc ? serialize() : null;
     let touched = 0;
     for (const a of actions) {
       if (!a || typeof a !== 'object') continue;
