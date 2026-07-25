@@ -119,11 +119,29 @@
     };
   }
 
-  async function complete({ apiKey, model, messages, signal }) {
+  // Livello di reasoning scelto dall'owner (#369) → thinkingConfig di Gemini.
+  // thinkingBudget è in token: 0 disabilita il "pensiero" (sui modelli flash/lite),
+  // valori crescenti danno più sforzo. `wantThoughts` = includi i thought summary
+  // in streaming (onReasoning). Ritorna null se non c'è nulla da configurare
+  // (auto senza streaming = comportamento di prima). I modelli che non pensano
+  // ignorano il campo — best-effort, coerente con "quando possibile".
+  function thinkingConfigFor(level, wantThoughts) {
+    const cfg = {};
+    if (level === 'off') cfg.thinkingBudget = 0;
+    else if (level === 'low') cfg.thinkingBudget = 1024;
+    else if (level === 'medium') cfg.thinkingBudget = 8192;
+    else if (level === 'high') cfg.thinkingBudget = 24576;
+    if (wantThoughts) cfg.includeThoughts = true;
+    return Object.keys(cfg).length ? cfg : null;
+  }
+
+  async function complete({ apiKey, model, messages, reasoning, signal }) {
     const geminiModel = toGeminiModelId(model);
     if (!geminiModel) { const err = new Error(`Gemini: modello non Google (${model})`); err.provider = 'gemini'; throw err; }
     const url = `${BASE}/models/${encodeURIComponent(geminiModel)}:generateContent?key=${encodeURIComponent(apiKey)}`;
     const body = toGeminiRequest(messages);
+    const tc = thinkingConfigFor(reasoning, false);
+    if (tc) body.generationConfig = { ...(body.generationConfig || {}), thinkingConfig: tc };
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
