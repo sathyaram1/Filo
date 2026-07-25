@@ -1,0 +1,7 @@
+{
+  "id": "db561229-2bc3-4797-806a-1a5926b3fcb2",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho verificato la generazione automatica del titolo dell'editor partendo dal comportamento chiesto dall'utente, non dal codice. Cosa ho provato e cosa succede: (1) scrivendo oltre cento parole in un documento senza nome, Filo propone da solo un titolo coerente col contenuto e lo fa una volta sola: continuando a scrivere non lo cambia più; (2) col tasto destro sul titolo si apre il menu con Rigenera titolo, Rinomina, Duplica file ed Elimina file, e Rigenera cambia davvero il titolo anche sotto le cento parole. Stress test superati: un titolo dato a mano NON viene mai sovrascritto dall'automatismo (nessuna chiamata all'AI dopo la rinomina manuale); un titolo che il modello restituisse con codice HTML o script viene mostrato come semplice testo, senza eseguire nulla; se la generazione automatica fallisce (rete assente) resta il titolo di default, non ci sono ritentativi a raffica e la voce Rigenera dal menu resta comunque disponibile e funziona; una risposta vuota o di soli spazi non azzera il titolo; Duplica file crea una copia col suffisso (copia) che non viene rigenerata da sola. Tutti i test dell'editor esistenti continuano a passare: nessuna regressione.",
+  "queuedAt": "2026-07-25T15:17:34.353Z",
+  "queuedBy": "routine"
+}
