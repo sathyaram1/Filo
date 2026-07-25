@@ -550,6 +550,12 @@ section:has(#dictList) .sn-spell-add-row {
 }
 .sn-model-row input[type="text"],
 .sn-model-row select { width: 100%; font-size: 12px; }
+/* Righe dei "Modelli predefiniti" (admin): colonna extra per il livello di
+   reasoning per-modello (#369). Solo qui, non nelle righe registry delle
+   Opzioni utente (che restano a 5 colonne). */
+.sn-model-row.sn-model-row-reason {
+  grid-template-columns: 110px 130px 1fr 92px auto auto;
+}
 /* Campo "stringa modello": wrapper position:relative perché il popup custom
    (.sn-select-pop) si ancora lì sotto, al posto della datalist nativa. */
 .sn-model-id-wrap { position: relative; }
