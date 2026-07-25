@@ -158,7 +158,8 @@ test.describe('moduli di formattazione', () => {
     // sopravvivere al round-trip (attrs.align sul blocco).
     await page.keyboard.press('Control+s');
     const align = await page.evaluate(() => {
-      const raw = JSON.parse(localStorage.getItem('filo.editor.doc'));
+      const __c = JSON.parse(localStorage.getItem('filo.editor.collection'));
+      const raw = __c && __c.files ? (__c.files.find((f) => f.id === __c.activeId) || __c.files[0]) : null;
       const block = (raw.content.content || []).find((b) => b.attrs && b.attrs.align);
       return block ? block.attrs.align : '';
     });
@@ -178,7 +179,8 @@ test.describe('moduli di formattazione', () => {
     // La dimensione deve sopravvivere al salvataggio (marca fontSize inline).
     await page.keyboard.press('Control+s');
     const hasFontSize = await page.evaluate(() => {
-      const raw = JSON.parse(localStorage.getItem('filo.editor.doc'));
+      const __c = JSON.parse(localStorage.getItem('filo.editor.collection'));
+      const raw = __c && __c.files ? (__c.files.find((f) => f.id === __c.activeId) || __c.files[0]) : null;
       const json = JSON.stringify(raw.content);
       return json.includes('fontSize');
     });
@@ -551,7 +553,8 @@ test.describe('chat che formatta il documento', () => {
     // Il grassetto sopravvive al salvataggio (marca bold nel JSON dei titoli).
     await page.keyboard.press('Control+s');
     const headingBold = await page.evaluate(() => {
-      const raw = JSON.parse(localStorage.getItem('filo.editor.doc'));
+      const __c = JSON.parse(localStorage.getItem('filo.editor.collection'));
+      const raw = __c && __c.files ? (__c.files.find((f) => f.id === __c.activeId) || __c.files[0]) : null;
       const headings = (raw.content.content || []).filter((b) => b.type === 'heading');
       return headings.length > 0 && headings.every((h) => (h.content || []).some((n) => (n.marks || []).some((mk) => mk.type === 'bold')));
     });
