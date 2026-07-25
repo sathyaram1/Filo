@@ -119,6 +119,9 @@ app.whenReady().then(async () => {
     // Blocco apertura siti in blacklist (#170.3): legge la config dalle
     // impostazioni (riusa le liste dell'ad-blocker + la blacklist dell'utente).
     try { require('./services/siteBlock').configureFromSettings(s); } catch (_) {}
+    // Appunti → editor: sposta una-tantum i vecchi appunti dell'archivio in un
+    // file "Appunti" dell'editor (fine dell'archivio separato). Idempotente.
+    try { await require('./services/editorFiles').migrateNotesToEditor(); } catch (_) {}
   } catch (_) {}
 
   // Ripristina la sessione "Accedi con Google" persistita (non fa rete: l'ID
