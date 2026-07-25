@@ -178,25 +178,40 @@
     };
   }
 
-  function serialize() {
-    // Il titolo non è più editabile dall'UI: si conserva quello del modello.
-    if (!doc.meta.title) doc.meta.title = 'Documento senza titolo';
-    doc.meta.modified = new Date().toISOString();
-    refreshCommentAnchors(); // ancore allineate al testo corrente prima del persist
-    doc.content = htmlToPM(docEl);
+  // Serializza un MODELLO doc (in memoria) nel formato di storage, SENZA toccare
+  // il DOM: usato per creare file vuoti e per snapshot generici. Il file attivo
+  // passa da serialize(), che prima allinea il modello al DOM.
+  function serializeDocModel(d) {
+    const meta = { ...(d.meta || {}) };
+    if (!meta.title) meta.title = 'Documento senza titolo';
     return {
-      meta: doc.meta,
-      content: doc.content,
-      comments: doc.comments,
-      modules: doc.modules.map((m) => ({
+      id: d.id,
+      meta,
+      content: d.content || { type: 'doc', content: [{ type: 'paragraph', content: [] }] },
+      comments: Array.isArray(d.comments) ? d.comments : [],
+      modules: (d.modules || []).map((m) => ({
         id: m.id, type: m.type, cells: rectToCells(m), data: m.data,
       })),
     };
   }
 
-  // Applica al modello la dimensione griglia salvata (clamp nei limiti). I doc
-  // privi di `meta.grid` restano al default 7×10.
+  function serialize() {
+    // Il titolo non è più editabile dall'UI dell'editor: si conserva quello del
+    // modello (la rinomina avviene dal menu documenti).
+    if (!doc.meta.title) doc.meta.title = 'Documento senza titolo';
+    doc.meta.modified = new Date().toISOString();
+    refreshCommentAnchors(); // ancore allineate al testo corrente prima del persist
+    doc.content = htmlToPM(docEl);
+    return serializeDocModel(doc);
+  }
+
+  // Applica al modello la dimensione griglia salvata (clamp nei limiti). Riparte
+  // SEMPRE dal default 7×10 e poi applica l'eventuale `meta.grid`: così passando
+  // da un file con griglia grande a uno senza, la griglia torna al default (con
+  // un solo documento non capitava mai, ora sì).
   function loadGridSize() {
+    GRID_COLS = GRID_DEFAULT_COLS;
+    GRID_ROWS = GRID_DEFAULT_ROWS;
     const g = doc && doc.meta && doc.meta.grid;
     if (g && Number.isFinite(g.cols) && Number.isFinite(g.rows)) {
       GRID_COLS = Math.max(GRID_MIN_COLS, Math.min(GRID_MAX_COLS, g.cols));
@@ -204,11 +219,12 @@
     }
   }
 
-  function loadDoc() {
-    let raw = null;
-    try { raw = JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch (_) {}
-    if (!raw || !raw.meta) { doc = blankDoc(); loadGridSize(); return; }
-    doc = {
+  // Costruisce il modello doc in memoria (moduli come rettangoli) da un file
+  // serializzato della collezione. Era il corpo del vecchio loadDoc().
+  function parseStoredDoc(raw) {
+    if (!raw || !raw.meta) return null;
+    return {
+      id: raw.id,
       meta: raw.meta,
       content: raw.content || { type: 'doc', content: [] },
       comments: Array.isArray(raw.comments) ? raw.comments : [],
@@ -217,12 +233,48 @@
         return { id: m.id || newId('mod'), type: m.type, ...rect, data: m.data || {} };
       }),
     };
-    loadGridSize();
+  }
+
+  // ── Collezione: persistenza (localStorage) ────────────────────────────
+  function readCollectionRaw() {
+    try { return JSON.parse(localStorage.getItem(COLLECTION_KEY)); } catch (_) { return null; }
+  }
+  function writeCollection() {
+    localStorage.setItem(COLLECTION_KEY, JSON.stringify(collection));
+  }
+  // Un file vuoto pronto per la collezione (formato serializzato).
+  function blankFileSerialized() {
+    const model = blankDoc();
+    model.id = newId('file');
+    return serializeDocModel(model);
+  }
+
+  // Carica (o migra) la collezione. Alla prima esecuzione con la nuova versione
+  // il vecchio documento singolo diventa il primo file, senza perdere nulla.
+  function loadCollection() {
+    collection = STORE.migrateToCollection({
+      collection: readCollectionRaw(),
+      legacyDoc: readLegacyDoc(),
+      idFactory: () => newId('file'),
+      blankFactory: blankFileSerialized,
+    });
+    writeCollection();
+  }
+  function readLegacyDoc() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch (_) { return null; }
+  }
+
+  // Copia lo stato del file attivo (dal DOM/modello) dentro la collezione.
+  function syncActiveIntoCollection() {
+    if (!doc) return;
+    STORE.replaceFile(collection, doc.id, serialize());
+    collection.activeId = doc.id;
   }
 
   function save(flash) {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(serialize()));
+      syncActiveIntoCollection();
+      writeCollection();
       dirty = false;
       saveStateEl.textContent = flash ? 'Salvato' : '';
       saveStateEl.classList.remove('dirty');
