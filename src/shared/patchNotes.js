@@ -18,6 +18,7 @@
     {
       version: '0.2.161', date: '2026-07-24',
       features: [
+        'L’editor ora gestisce più documenti separati invece di uno solo: dal selettore in alto a sinistra puoi creare un nuovo documento, passare dall’uno all’altro, rinominarli ed eliminarli. Ogni documento tiene il suo testo, i suoi commenti e i suoi moduli, e alla riapertura ritrovi l’ultimo su cui stavi lavorando. Il documento che avevi finora diventa automaticamente il primo della lista, senza perdere nulla.',
         'Nella pagina «Modelli predefiniti» ogni modello ha ora un livello di ragionamento regolabile: puoi lasciarlo su «Auto» (decide il modello, come prima), chiedere «Nessuno» per risposte più rapide ed economiche, oppure «Basso/Medio/Alto» per uno sforzo di ragionamento crescente sui modelli che lo supportano.',
       ],
       fixes: [
