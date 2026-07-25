@@ -157,11 +157,9 @@ async function probeServerAdmin(claims) {
     const url = `${rest.FIRESTORE_BASE}/admins/${encodeURIComponent(email)}?key=${rest.API_KEY}`;
     const res = await fetch(url, { headers: { Authorization: `Bearer ${idToken}` } });
     if (res.status === 200) return true;
-    if (res.status === 403) return false;
-    // 404 = admin (la lettura è passata, il documento non c'è) — ma con le
-    // regole attuali un non-admin prende 403 prima del 404: trattiamolo come
-    // "non admin" per prudenza, senza affermare nulla di più.
-    if (res.status === 404) return false;
+    // Senza il documento admins/<email> la regola nega la lettura stessa: chi
+    // non è admin vede 403, mai 404.
+    if (res.status === 403 || res.status === 404) return false;
     return null;
   } catch (_) {
     return null;
