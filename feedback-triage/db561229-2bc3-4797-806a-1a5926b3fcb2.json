@@ -1,7 +1,0 @@
-{
-  "id": "db561229-2bc3-4797-806a-1a5926b3fcb2",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica e stata pubblicata. Il titolo automatico dei documenti viene sempre mostrato come semplice testo, quindi anche se il modello restituisse codice non verrebbe mai eseguito; non ci sono altri rischi. In fase di pubblicazione ho ricomposto la modifica sopra le ultime novita gia uscite (una piccola sovrapposizione tecnica di contabilita interna, senza effetti su quello che vedi) e ho riverificato che tutto funzioni.",
-  "queuedAt": "2026-07-25T15:21:12.094Z",
-  "queuedBy": "routine"
-}
