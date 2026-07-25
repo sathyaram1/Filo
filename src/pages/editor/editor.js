@@ -1490,6 +1490,7 @@
     refreshCollapseToggles();
     markDirty();
     updateWordCountModules();
+    maybeAutoTitle();
   }
 
   docEl.addEventListener('input', () => {
