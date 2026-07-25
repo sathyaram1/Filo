@@ -144,5 +144,5 @@
     return { text: fullText, usage };
   }
 
-  global.SN_PROVIDER_OPENROUTER = { listModels, complete, streamComplete, ENDPOINT };
+  global.SN_PROVIDER_OPENROUTER = { listModels, complete, streamComplete, reasoningField, ENDPOINT };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
