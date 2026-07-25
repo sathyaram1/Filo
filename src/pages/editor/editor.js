@@ -306,28 +306,18 @@
     return serializeDocModel(model);
   }
 
-  // Carica (o migra) la collezione. Alla prima esecuzione con la nuova versione
-  // il vecchio documento singolo diventa il primo file, senza perdere nulla.
-  // Legge SIA localStorage (persistenza calda) SIA l'archivio dell'app (dove Filo
-  // scrive gli appunti e dove atterra la migrazione dei vecchi appunti) e le
-  // fonde, così all'apertura si vedono anche i file creati/aggiornati da Filo.
-  async function loadCollection() {
-    const localRaw = readCollectionRaw();
-    const remoteRaw = await readArchivedCollection();
-    const localCol = (localRaw && Array.isArray(localRaw.files) && localRaw.files.length)
-      ? STORE.migrateToCollection({ collection: localRaw }) : null;
-    const remoteCol = (remoteRaw && Array.isArray(remoteRaw.files) && remoteRaw.files.length)
-      ? STORE.migrateToCollection({ collection: remoteRaw }) : null;
-    if (localCol && remoteCol) {
-      collection = mergeCollections(localCol, remoteCol);
-    } else {
-      collection = STORE.migrateToCollection({
-        collection: localRaw || remoteRaw,
-        legacyDoc: readLegacyDoc(),
-        idFactory: () => newId('file'),
-        blankFactory: blankFileSerialized,
-      });
-    }
+  // Carica (o migra) la collezione da localStorage (persistenza calda), come
+  // sempre e in modo SINCRONO: così il primo render è immediato e deterministico
+  // (nessun cambio di timing rispetto a prima). I file che Filo ha scritto
+  // nell'archivio dell'app (appunti, migrazione) vengono fusi subito dopo, in
+  // modo asincrono, da `reloadFromArchive()`.
+  function loadCollection() {
+    collection = STORE.migrateToCollection({
+      collection: readCollectionRaw(),
+      legacyDoc: readLegacyDoc(),
+      idFactory: () => newId('file'),
+      blankFactory: blankFileSerialized,
+    });
     writeCollection();
   }
 
