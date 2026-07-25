@@ -204,7 +204,12 @@ module.exports = function register(on, ctx) {
       const raw = e?.message || String(e);
       let claims = null;
       try { claims = auth.getTokenClaims(); } catch (_) {}
-      return { ok: false, error: permissionDeniedHelp(raw, claims) };
+      // Un 403 può voler dire "non sei admin" oppure "sei admin ma il contenuto
+      // del feedback sfora i limiti". Chiediamolo al server invece di tirare a
+      // indovinare: la lettura di `admins/<email>` è consentita SOLO agli admin,
+      // quindi il suo esito distingue i due casi.
+      const serverAdmin = await probeServerAdmin(claims);
+      return { ok: false, error: permissionDeniedHelp(raw, claims, { serverAdmin }) };
     }
   });
 
