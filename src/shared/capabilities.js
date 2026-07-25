@@ -292,9 +292,9 @@
     },
     {
       id: 'filo-notes', title: 'Appunti di Filo', category: 'assistant',
-      desc: 'Puoi chiedere a Filo di prendere nota di qualcosa ("prendi nota che…"): lo salva tra i suoi appunti e può riusarlo nelle conversazioni successive. Dall’icona degli appunti in alto a destra nella nuova scheda li vedi tutti e puoi cancellarne uno o svuotarli.',
-      invoke: 'Chiedi all’assistente di salvare un appunto, oppure apri il pannello degli appunti dall’icona in alto a destra nella nuova scheda per vederli e gestirli.',
-      doesNot: 'Gli appunti sono salvati solo in locale; tiene gli ultimi e i più vecchi vengono scartati.',
+      desc: 'Puoi chiedere a Filo di prendere nota di qualcosa ("prendi nota che…"): lo scrive direttamente in un file dell’editor. Continua sullo stesso file finché resti sull’argomento e ne apre uno nuovo quando l’argomento cambia (o se chiedi "apri un nuovo appunto"). Gli appunti diventano così testo vero, che puoi rileggere, modificare e riordinare insieme agli altri documenti. Ogni volta che Filo scrive crea un punto di ripristino, quindi la modifica è sempre annullabile.',
+      invoke: 'Chiedi all’assistente di prendere nota di qualcosa; per rivederli o modificarli apri l’Editor (l’icona con il foglio degli appunti) e scegli il file nel selettore documenti in alto a sinistra.',
+      doesNot: 'Non esiste più un archivio appunti separato: vivono nei file dell’editor, sul tuo computer.',
     },
     {
       id: 'filo-timers', title: 'Timer', category: 'assistant',
