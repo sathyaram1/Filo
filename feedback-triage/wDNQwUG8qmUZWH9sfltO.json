@@ -1,0 +1,7 @@
+{
+  "id": "wDNQwUG8qmUZWH9sfltO",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato e modifica pubblicata. Quando un'immagine allegata a un feedback non riesce a essere mostrata, ora passandoci sopra col mouse compare il motivo preciso (chiave non configurata, decifratura fallita, download non riuscito) invece di un riquadro muto: vale sia nella conversazione dei feedback sia nella dashboard di gestione. Nessun problema di sicurezza rilevato nella revisione.",
+  "queuedAt": "2026-07-25T00:13:45.264Z",
+  "queuedBy": "routine"
+}
