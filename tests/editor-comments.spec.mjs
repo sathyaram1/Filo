@@ -249,7 +249,8 @@ test.describe('commenti: evidenziazione persistente', () => {
       const __c = JSON.parse(localStorage.getItem('filo.editor.collection'));
       const raw = __c && __c.files ? (__c.files.find((f) => f.id === __c.activeId) || __c.files[0]) : null;
       raw.comments[0].anchor = { from, to: from + legacyText.length, text: legacyText };
-      localStorage.setItem('filo.editor.doc', JSON.stringify(raw));
+      if (!raw.id) raw.id = 'file-inj';
+      localStorage.setItem('filo.editor.collection', JSON.stringify({ version: 2, activeId: raw.id, files: [raw] }));
     });
     await page.reload();
     await page.waitForSelector('#doc .ed-commented', { timeout: 8_000 });
