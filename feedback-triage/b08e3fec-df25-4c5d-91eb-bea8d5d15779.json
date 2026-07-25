@@ -1,0 +1,7 @@
+{
+  "id": "b08e3fec-df25-4c5d-91eb-bea8d5d15779",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato e modifica pubblicata. Da ora quando chiedi a Filo di prendere nota, l'appunto viene scritto direttamente in un file dell'editor invece che in un elenco separato: Filo continua sullo stesso file finché resti sull'argomento e ne apre uno nuovo quando cambia (o se chiedi «apri un nuovo appunto»). Gli appunti diventano così testo vero, che puoi rileggere, modificare e riordinare come qualsiasi documento, e ogni scrittura automatica è annullabile. I tuoi appunti già salvati sono stati spostati in un file «Appunti» dell'editor, senza perderne nessuno.",
+  "queuedAt": "2026-07-25T09:59:16.834Z",
+  "queuedBy": "routine"
+}
