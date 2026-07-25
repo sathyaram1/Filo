@@ -214,8 +214,15 @@ service cloud.firestore {
         && request.resource.data.get('workingResets', 0) is int
         && request.resource.data.get('workingResets', 0) >= 0
         && request.resource.data.get('workingResets', 0) <= 100
+        // `notes` = CONVERSAZIONE del feedback (report delle routine + risposte
+        // dell'owner + righe-allegato): cresce a ogni turno. Il tetto vale per
+        // il documento RISULTANTE, quindi note oltre il limite bloccherebbero
+        // QUALUNQUE scrittura sul feedback (anche il solo cambio di stato) —
+        // il feedback diventerebbe immobile. Tenere allineato a
+        // SN_FEEDBACK_THREAD.NOTES_MAX (src/shared/feedbackThread.js), che
+        // taglia i turni più vecchi lato scrittura.
         && request.resource.data.get('notes', '') is string
-        && request.resource.data.get('notes', '').size() <= 10000
+        && request.resource.data.get('notes', '').size() <= 60000
         // S1.priority: priority accetta int 0-3 (legacy in chiaro) OPPURE
         // una stringa ciphertext FENC1: (gate on). Retrocompatibile.
         && (
