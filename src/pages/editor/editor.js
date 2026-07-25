@@ -2615,7 +2615,9 @@
   // switch che non si può allargare per mancanza di spazio). Stile coerente con
   // le notifiche d'errore (bordo accent rosso), come il fallimento di un'azione.
   let edToastTimer = null;
-  function showEditorToast(text) {
+  // `action` opzionale = { label, onClick }: aggiunge un bottone cliccabile nel
+  // toast (es. "Annulla" dopo una modifica automatica di Filo).
+  function showEditorToast(text, action) {
     let el = document.getElementById('edToast');
     if (!el) {
       el = document.createElement('div');
@@ -2624,12 +2626,29 @@
       el.setAttribute('role', 'status');
       document.body.appendChild(el);
     }
-    el.textContent = text;
+    el.textContent = '';
+    const span = document.createElement('span');
+    span.textContent = text;
+    el.appendChild(span);
+    const hasAction = action && action.label && typeof action.onClick === 'function';
+    if (hasAction) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'ed-toast-action';
+      btn.textContent = action.label;
+      btn.addEventListener('click', () => {
+        el.classList.remove('show');
+        clearTimeout(edToastTimer);
+        try { action.onClick(); } catch (_) {}
+      });
+      el.appendChild(btn);
+    }
     // Forza un reflow così la transizione riparte anche se il toast è già visibile.
     void el.offsetWidth;
     el.classList.add('show');
     clearTimeout(edToastTimer);
-    edToastTimer = setTimeout(() => el.classList.remove('show'), 3400);
+    // Con un'azione lascio più tempo per cliccarla.
+    edToastTimer = setTimeout(() => el.classList.remove('show'), hasAction ? 7000 : 3400);
   }
 
   // ════════════════════════════════════════════════════════════════════
