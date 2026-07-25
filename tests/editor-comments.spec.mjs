@@ -134,7 +134,8 @@ test.describe('commenti: evidenziazione persistente', () => {
     // L'ancora salvata è reale (offset nel testo + frase), non {0,0}.
     await page.keyboard.press('Control+s');
     const anchor = await page.evaluate(() => {
-      const raw = JSON.parse(localStorage.getItem('filo.editor.doc'));
+      const __c = JSON.parse(localStorage.getItem('filo.editor.collection'));
+      const raw = __c && __c.files ? (__c.files.find((f) => f.id === __c.activeId) || __c.files[0]) : null;
       return raw.comments[0] && raw.comments[0].anchor;
     });
     expect(anchor.text).toBe('frase da commentare');
@@ -214,7 +215,8 @@ test.describe('commenti: evidenziazione persistente', () => {
     // L'ancora salvata vive nel testo puro (niente newline dentro).
     await page.keyboard.press('Control+s');
     const anchor = await page.evaluate(() => {
-      const raw = JSON.parse(localStorage.getItem('filo.editor.doc'));
+      const __c = JSON.parse(localStorage.getItem('filo.editor.collection'));
+      const raw = __c && __c.files ? (__c.files.find((f) => f.id === __c.activeId) || __c.files[0]) : null;
       return raw.comments[0] && raw.comments[0].anchor;
     });
     expect(anchor.text).not.toContain('\n');
@@ -244,7 +246,8 @@ test.describe('commenti: evidenziazione persistente', () => {
       let n; while ((n = walker.nextNode())) pure += n.nodeValue;
       const from = pure.indexOf('primo blocco');
       const legacyText = 'primo blocco\ntesta del secondo';
-      const raw = JSON.parse(localStorage.getItem('filo.editor.doc'));
+      const __c = JSON.parse(localStorage.getItem('filo.editor.collection'));
+      const raw = __c && __c.files ? (__c.files.find((f) => f.id === __c.activeId) || __c.files[0]) : null;
       raw.comments[0].anchor = { from, to: from + legacyText.length, text: legacyText };
       localStorage.setItem('filo.editor.doc', JSON.stringify(raw));
     });
