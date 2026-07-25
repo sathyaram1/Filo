@@ -2201,12 +2201,28 @@
     const tag = t.tagName;
     return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
   }
+  // Il tasto finale premuto può presentarsi in più forme: `e.key` è il carattere
+  // PRODOTTO (con Shift+1 diventa "!", non "1"), mentre `e.code` è il tasto FISICO
+  // (Digit1, KeyB) indipendente da Shift e dal layout. Confrontiamo la scorciatoia
+  // contro entrambe le forme, così "Ctrl+Shift+1" combacia anche se il layout
+  // trasforma Shift+1 in un simbolo. Fallback su `e.key` per i tasti non
+  // alfanumerici (frecce, ecc.).
+  function eventKeyCandidates(e) {
+    const out = new Set();
+    if (e.key) out.add(e.key.toLowerCase());
+    const code = e.code || '';
+    let m;
+    if ((m = /^Digit(\d)$/.exec(code))) out.add(m[1]);
+    else if ((m = /^Numpad(\d)$/.exec(code))) out.add(m[1]);
+    else if ((m = /^Key([A-Z])$/.exec(code))) out.add(m[1].toLowerCase());
+    return out;
+  }
   function matchShortcut(e, sc) {
     if (!sc) return false;
     const parts = sc.toLowerCase().split('+').map((s) => s.trim());
     const need = { ctrl: parts.includes('ctrl'), shift: parts.includes('shift'), alt: parts.includes('alt') };
     const key = parts[parts.length - 1];
-    return (e.ctrlKey || e.metaKey) === need.ctrl && e.shiftKey === need.shift && e.altKey === need.alt && e.key.toLowerCase() === key;
+    return (e.ctrlKey || e.metaKey) === need.ctrl && e.shiftKey === need.shift && e.altKey === need.alt && eventKeyCandidates(e).has(key);
   }
   function triggerModuleShortcut(m) {
     setActivePage(m.z);
