@@ -279,11 +279,16 @@
       const provider = row.querySelector('.sn-model-provider').value;
       const model = row.querySelector('.sn-model-id').value.trim();
       const label = (row.dataset.label || '').trim();
+      const reasonEl = row.querySelector('.sn-model-reason');
+      const reasoning = normReasoning(reasonEl && reasonEl.value);
       if (!nick && !model) continue;
       if (!nick) continue;
       if (out[nick]) continue;
       const entry = { provider, model };
       if (label) entry.label = label;
+      // Salviamo il livello solo se diverso da 'auto' (default): così le voci
+      // integrate restano pulite e "auto" non gonfia il doc condiviso.
+      if (reasoning) entry.reasoning = reasoning;
       out[nick] = entry;
     }
     return out;
