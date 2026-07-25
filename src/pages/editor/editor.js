@@ -293,6 +293,194 @@
   }
 
   // ════════════════════════════════════════════════════════════════════
+  //  COLLEZIONE DI FILE: attiva/crea/elimina/rinomina + menu documenti
+  // ════════════════════════════════════════════════════════════════════
+
+  // Rende attivo un file serializzato: costruisce il modello, azzera lo stato
+  // transitorio della vista e ri-renderizza tutto. NON persiste (chi chiama
+  // decide quando scrivere).
+  function activateFile(raw) {
+    doc = parseStoredDoc(raw) || parseStoredDoc(blankFileSerialized());
+    collection.activeId = doc.id;
+    // Stato di vista che non deve "trascinarsi" da un file all'altro.
+    settingsMode = false;
+    commenting = false;
+    if (settingsView) settingsView.hidden = true;
+    if (docWrap) docWrap.hidden = false;
+    root.classList.remove('settings-open');
+    ensureSettingsModule();
+    loadGridSize();
+    renderDocBody();
+    renderGrid();
+    updateWordCountModules();
+    renderDocSwitcher();
+  }
+
+  // Passa a un altro file: salva prima quello corrente, poi attiva il target.
+  function switchToFile(id) {
+    if (!doc || id === doc.id) { closeDocPop(); return; }
+    const target = STORE.findFile(collection, id);
+    if (!target) return;
+    syncActiveIntoCollection();
+    activateFile(target);
+    writeCollection();
+    closeDocPop();
+  }
+
+  // Crea un nuovo documento vuoto e lo apre.
+  function createFile() {
+    if (doc) syncActiveIntoCollection();
+    const file = STORE.addFile(collection, blankFileSerialized(), () => newId('file'));
+    activateFile(file);
+    writeCollection();
+    closeDocPop();
+  }
+
+  // Elimina un documento. Invariante: resta sempre almeno un file — se si
+  // cancella l'ultimo, se ne crea uno vuoto al suo posto.
+  function deleteFile(id) {
+    const wasActive = doc && doc.id === id;
+    const res = STORE.removeFile(collection, id);
+    if (!res.removed) return;
+    if (res.emptied) {
+      const file = STORE.addFile(collection, blankFileSerialized(), () => newId('file'));
+      activateFile(file);
+    } else if (wasActive) {
+      activateFile(STORE.activeFile(collection));
+    } else {
+      renderDocSwitcher(); // era un altro file: la lista basta aggiornarla
+    }
+    writeCollection();
+  }
+
+  // Rinomina un documento (il nome mostrato nel menu e nel selettore).
+  function renameFileAction(id, title) {
+    STORE.renameFile(collection, id, title);
+    if (doc && doc.id === id && doc.meta) {
+      doc.meta.title = STORE.findFile(collection, id).meta.title;
+    }
+    writeCollection();
+    renderDocSwitcher();
+  }
+
+  // ── Menu documenti (selettore in alto a sinistra) ─────────────────────
+  function activeTitle() {
+    const f = STORE.activeFile(collection);
+    return (f && f.meta && f.meta.title) || 'Documento senza titolo';
+  }
+
+  function renderDocSwitcher() {
+    if (docTitleEl) docTitleEl.textContent = activeTitle();
+    if (docSwitchBtn) docSwitchBtn.title = activeTitle();
+    if (!docPopEl || docPopEl.hidden) return;
+    buildDocPop();
+  }
+
+  function buildDocPop() {
+    docPopEl.innerHTML = '';
+    for (const f of collection.files) {
+      const item = document.createElement('div');
+      item.className = 'ed-doc-item' + (f.id === collection.activeId ? ' active' : '');
+      item.setAttribute('role', 'option');
+      item.dataset.id = f.id;
+
+      const name = document.createElement('span');
+      name.className = 'ed-doc-item-name';
+      name.textContent = (f.meta && f.meta.title) || 'Documento senza titolo';
+      item.appendChild(name);
+
+      // Apri il file cliccando la riga (ma non le azioni).
+      item.addEventListener('click', (e) => {
+        if (e.target.closest('.ed-doc-act') || e.target.closest('.ed-doc-item-input')) return;
+        switchToFile(f.id);
+      });
+
+      // Rinomina (matita). Doppio click sul nome apre lo stesso editor inline.
+      const renBtn = actButton('✎', 'Rinomina', () => startInlineRename(item, f));
+      renBtn.classList.add('ed-doc-rename');
+      name.addEventListener('dblclick', (e) => { e.stopPropagation(); startInlineRename(item, f); });
+      item.appendChild(renBtn);
+
+      // Elimina (×). Con un solo file l'elimina crea un nuovo foglio vuoto.
+      const delBtn = actButton(ICONS.close ? ICONS.close(14) : '×', 'Elimina', () => deleteFile(f.id));
+      delBtn.classList.add('ed-doc-del');
+      item.appendChild(delBtn);
+
+      docPopEl.appendChild(item);
+    }
+    const sep = document.createElement('div');
+    sep.className = 'ed-doc-sep';
+    docPopEl.appendChild(sep);
+    const nu = document.createElement('button');
+    nu.type = 'button';
+    nu.className = 'ed-doc-new';
+    nu.id = 'docNew';
+    nu.innerHTML = `${ICONS.plus ? ICONS.plus(14) : '+'}<span>Nuovo documento</span>`;
+    nu.addEventListener('click', createFile);
+    docPopEl.appendChild(nu);
+  }
+
+  function actButton(glyph, title, onAct) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'ed-doc-act';
+    b.title = title;
+    b.setAttribute('aria-label', title);
+    b.innerHTML = glyph;
+    b.addEventListener('click', (e) => { e.stopPropagation(); onAct(); });
+    return b;
+  }
+
+  function startInlineRename(item, f) {
+    const name = item.querySelector('.ed-doc-item-name');
+    if (!name) return;
+    const input = document.createElement('input');
+    input.className = 'ed-doc-item-input';
+    input.type = 'text';
+    input.value = (f.meta && f.meta.title) || '';
+    input.setAttribute('aria-label', 'Nuovo nome del documento');
+    let done = false;
+    const commit = (save) => {
+      if (done) return;
+      done = true;
+      if (save) renameFileAction(f.id, input.value);
+      else renderDocSwitcher();
+    };
+    input.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') { e.preventDefault(); commit(true); }
+      else if (e.key === 'Escape') { e.preventDefault(); commit(false); }
+    });
+    input.addEventListener('blur', () => commit(true));
+    name.replaceWith(input);
+    input.focus();
+    input.select();
+  }
+
+  function openDocPop() {
+    if (!docPopEl || !docPopEl.hidden) return;
+    buildDocPop();
+    docPopEl.hidden = false;
+    docSwitchBtn.setAttribute('aria-expanded', 'true');
+    document.addEventListener('mousedown', onDocPopOutside, true);
+  }
+  function closeDocPop() {
+    if (!docPopEl || docPopEl.hidden) return;
+    docPopEl.hidden = true;
+    if (docSwitchBtn) docSwitchBtn.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('mousedown', onDocPopOutside, true);
+  }
+  function onDocPopOutside(e) {
+    if (docbarEl && !docbarEl.contains(e.target)) closeDocPop();
+  }
+  if (docSwitchBtn) {
+    docSwitchBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      docPopEl.hidden ? openDocPop() : closeDocPop();
+    });
+  }
+
+  // ════════════════════════════════════════════════════════════════════
   //  EDITOR DI TESTO (contenteditable ↔ JSON ProseMirror)
   // ════════════════════════════════════════════════════════════════════
 
