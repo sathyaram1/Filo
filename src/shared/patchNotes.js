@@ -25,6 +25,7 @@
       version: '0.2.163', date: '2026-07-25',
       features: [
         'Gli appunti ora vivono nell’editor invece che in un elenco a parte: quando chiedi a Filo di prendere nota, lo scrive lui stesso in un file di testo. Continua sullo stesso file finché resti sull’argomento e ne apre uno nuovo quando l’argomento cambia (o se dici «apri un nuovo appunto»). Così gli appunti diventano testo vero, che puoi rileggere, modificare e riordinare come qualsiasi documento, e ogni scrittura automatica è annullabile. I tuoi appunti già salvati vengono spostati in un file «Appunti» dell’editor, senza perderli.',
+        'Nell’editor i documenti senza nome prendono un titolo da soli: quando il testo supera un centinaio di parole, Filo propone un titolo basato sul contenuto. Il titolo resta modificabile a mano, e col tasto destro sul titolo apri un menu per rigenerarlo, rinominarlo, duplicare o eliminare il documento.',
       ],
     },
     {

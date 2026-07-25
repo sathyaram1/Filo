@@ -532,13 +532,254 @@
   }
 
   // Rinomina un documento (il nome mostrato nel menu e nel selettore).
-  function renameFileAction(id, title) {
+  // `manual` (default true) segna che il titolo l'ha scelto l'utente: così la
+  // generazione automatica del titolo (a ~100 parole) non lo sovrascrive mai.
+  function renameFileAction(id, title, { manual = true } = {}) {
     STORE.renameFile(collection, id, title);
+    const f = STORE.findFile(collection, id);
+    if (f && f.meta && manual) f.meta.titleManual = true;
     if (doc && doc.id === id && doc.meta) {
-      doc.meta.title = STORE.findFile(collection, id).meta.title;
+      doc.meta.title = f.meta.title;
+      if (manual) doc.meta.titleManual = true;
     }
     writeCollection();
     renderDocSwitcher();
+  }
+
+  // ── Titolo automatico dal contenuto (#379.4) ──────────────────────────
+  // Quando un documento senza nome raggiunge ~100 parole, Filo gli propone UNA
+  // VOLTA SOLA un titolo generato dal contenuto (più la conversazione del modulo
+  // chat e la memoria di Filo come contesto). Il titolo resta modificabile a
+  // mano e rigenerabile dal menu contestuale (tasto destro sul titolo).
+  const AUTO_TITLE_WORDS = 100;
+  let autoTitleBusy = false;
+
+  const TITLE_SYSTEM_PROMPT =
+    'Sei l\'assistente di Filo. Genera un TITOLO molto breve (2-6 parole) per il '
+    + 'documento qui sotto, nella STESSA lingua del testo. Il titolo deve '
+    + 'descrivere il contenuto del documento. Usa l\'eventuale conversazione e la '
+    + 'memoria SOLO come contesto per capire meglio l\'argomento, non come oggetto '
+    + 'del titolo. Rispondi SOLO col titolo: niente virgolette, niente punto '
+    + 'finale, niente spiegazioni.';
+
+  // Normalizza l'output del modello in un titolo pulito (prima riga, senza
+  // virgolette/punteggiatura di contorno, lunghezza limitata).
+  function cleanTitle(raw) {
+    let t = String(raw == null ? '' : raw).trim();
+    t = t.split(/\r?\n/)[0].trim();
+    t = t.replace(/^["'«»“”`]+|["'«»“”`]+$/g, '').trim();
+    t = t.replace(/^titolo\s*[:\-–—]\s*/i, '').trim();
+    t = t.replace(/[.。·]+$/, '').trim();
+    if (t.length > 80) t = t.slice(0, 80).trim();
+    return t;
+  }
+
+  // Messaggi della/e chat dell'editor del file attivo (contesto per il titolo).
+  function editorChatMessages() {
+    const out = [];
+    if (!doc || !Array.isArray(doc.modules)) return out;
+    for (const m of doc.modules) {
+      if (m.type !== 'chat' || !m.data || !Array.isArray(m.data.messages)) continue;
+      for (const msg of m.data.messages) {
+        const c = msg && typeof msg.content === 'string' ? msg.content.trim() : '';
+        if (!c || c === '…') continue;
+        out.push({ role: msg.role === 'user' ? 'user' : 'assistant', content: c.slice(0, 1000) });
+      }
+    }
+    return out.slice(-12);
+  }
+
+  // Estratto della memoria di Filo (profilo + preferenze) come contesto.
+  async function filoMemoryText() {
+    try {
+      const r = await sendMessage({ type: MSG.FILO_GET_MEMORY });
+      const mem = r && r.ok ? r.memory : null;
+      if (!mem || typeof mem !== 'object') return '';
+      const parts = [];
+      if (mem.PROFILO && String(mem.PROFILO).trim()) parts.push('Profilo: ' + String(mem.PROFILO).trim());
+      if (mem.PREFERENZE && String(mem.PREFERENZE).trim()) parts.push('Preferenze: ' + String(mem.PREFERENZE).trim());
+      return parts.join('\n').slice(0, 1500);
+    } catch (_) { return ''; }
+  }
+
+  // Applica un titolo generato dall'AI al file `id`: segna che è automatico (così
+  // conta come "già generato" e non viene più riproposto in automatico) e toglie
+  // il flag manuale (ora il titolo è dell'AI).
+  function applyGeneratedTitle(id, raw) {
+    const clean = cleanTitle(raw);
+    if (!clean) return false;
+    STORE.renameFile(collection, id, clean);
+    const f = STORE.findFile(collection, id);
+    if (f && f.meta) { f.meta.titleAuto = true; f.meta.titleManual = false; }
+    if (doc && doc.id === id && doc.meta) {
+      doc.meta.title = f.meta.title;
+      doc.meta.titleAuto = true;
+      doc.meta.titleManual = false;
+    }
+    writeCollection();
+    renderDocSwitcher();
+    return true;
+  }
+
+  // Genera (o rigenera) il titolo del file ATTIVO via il canale AI della chat.
+  //  - auto:true  → tiro automatico a 100 parole, silenzioso, UNA VOLTA SOLA.
+  //  - auto:false → rigenerazione esplicita dal menu (con feedback a video).
+  async function generateTitleForActive({ auto } = {}) {
+    if (!doc || !doc.meta) return false;
+    const id = doc.id;
+    if (auto) {
+      // Segna SUBITO come "già tentato" così non si ripete a ogni battitura né si
+      // moltiplicano le chiamate: la generazione automatica è una sola. In caso
+      // di errore l'utente ha comunque "Rigenera titolo" nel menu contestuale.
+      doc.meta.titleAuto = true;
+      const f0 = STORE.findFile(collection, id);
+      if (f0 && f0.meta) f0.meta.titleAuto = true;
+      writeCollection();
+    }
+    const text = (docPlainText() || '').trim().slice(0, 6000);
+    if (!text) { if (!auto) showEditorToast('Scrivi qualcosa prima di generare un titolo.'); return false; }
+    const chat = editorChatMessages();
+    const memory = await filoMemoryText();
+    const parts = [`DOCUMENTO:\n${text}`];
+    if (chat.length) {
+      parts.push('CONVERSAZIONE COL DOCUMENTO (contesto):\n'
+        + chat.map((m) => `${m.role === 'user' ? 'Utente' : 'Filo'}: ${m.content}`).join('\n'));
+    }
+    if (memory) parts.push('MEMORIA DI FILO (contesto su chi scrive):\n' + memory);
+    const messages = [
+      { role: 'system', content: TITLE_SYSTEM_PROMPT },
+      { role: 'user', content: parts.join('\n\n') },
+    ];
+    if (!auto && docSwitchBtn) docSwitchBtn.classList.add('ed-doc-generating');
+    try {
+      const r = await sendMessage({ type: MSG.AI_REQUEST, action: ACTIONS.EXPLAIN || 'explain', payload: { messages } });
+      const rawText = (r && r.ok && typeof r.text === 'string') ? r.text : null;
+      if (rawText == null) { if (!auto) showEditorToast('Non sono riuscito a generare il titolo.'); return false; }
+      const ok = applyGeneratedTitle(id, rawText);
+      if (!ok && !auto) showEditorToast('Non sono riuscito a generare il titolo.');
+      return ok;
+    } catch (_) {
+      if (!auto) showEditorToast('Non sono riuscito a generare il titolo.');
+      return false;
+    } finally {
+      if (docSwitchBtn) docSwitchBtn.classList.remove('ed-doc-generating');
+    }
+  }
+
+  // Tiro automatico: parte dall'input del testo, una sola volta, e solo se il
+  // file non ha già un titolo scelto a mano.
+  function maybeAutoTitle() {
+    if (!doc || !doc.meta) return;
+    if (doc.meta.titleAuto || doc.meta.titleManual) return;
+    if (autoTitleBusy) return;
+    if (textStats().words < AUTO_TITLE_WORDS) return;
+    autoTitleBusy = true;
+    Promise.resolve(generateTitleForActive({ auto: true })).finally(() => { autoTitleBusy = false; });
+  }
+
+  // Duplica il file attivo (contenuto, moduli e commenti); il titolo derivato è
+  // segnato come "a mano" così non viene rigenerato in automatico.
+  function duplicateActiveFile() {
+    if (!doc) return;
+    syncActiveIntoCollection();
+    const src = STORE.findFile(collection, doc.id);
+    if (!src) return;
+    const copy = JSON.parse(JSON.stringify(src));
+    delete copy.id;
+    if (!copy.meta) copy.meta = {};
+    copy.meta.title = ((src.meta && src.meta.title) || STORE.DEFAULT_TITLE) + ' (copia)';
+    copy.meta.titleManual = true;
+    copy.meta.titleAuto = true;
+    const file = STORE.addFile(collection, copy, () => newId('file'));
+    activateFile(file);
+    writeCollection();
+    closeDocPop();
+  }
+
+  // ── Menu contestuale sul titolo (tasto destro) ────────────────────────
+  // Coerente con PATTERNS.md § "Menu contestuale proprio nelle pagine filo://":
+  // preventDefault + popup con le classi .sn-select-pop/.sn-select-option.
+  let titleMenuEl = null;
+  function closeTitleMenu() {
+    if (!titleMenuEl) return;
+    titleMenuEl.remove();
+    titleMenuEl = null;
+    document.removeEventListener('mousedown', onTitleMenuOutside, true);
+    document.removeEventListener('keydown', onTitleMenuKeydown, true);
+    window.removeEventListener('scroll', closeTitleMenu, true);
+    window.removeEventListener('resize', closeTitleMenu);
+  }
+  function onTitleMenuOutside(e) {
+    if (titleMenuEl && !titleMenuEl.contains(e.target)) closeTitleMenu();
+  }
+  function onTitleMenuKeydown(e) {
+    if (e.key === 'Escape') closeTitleMenu();
+  }
+  function openTitleMenu(x, y) {
+    closeTitleMenu();
+    closeDocPop();
+    const menu = document.createElement('div');
+    menu.className = 'sn-select-pop ed-title-ctxmenu';
+    menu.setAttribute('role', 'menu');
+    const add = (label, onClick) => {
+      const o = document.createElement('div');
+      o.className = 'sn-select-option';
+      o.setAttribute('role', 'menuitem');
+      o.textContent = label;
+      o.addEventListener('click', () => { closeTitleMenu(); onClick(); });
+      menu.appendChild(o);
+    };
+    add('Rigenera titolo', () => generateTitleForActive({ auto: false }));
+    add('Rinomina', () => startDocTitleRename());
+    add('Duplica file', () => duplicateActiveFile());
+    add('Elimina file', () => { if (doc) deleteFile(doc.id); });
+    document.body.appendChild(menu);
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const w = menu.offsetWidth, h = menu.offsetHeight;
+    menu.style.left = `${Math.max(4, Math.min(x, vw - w - 4))}px`;
+    menu.style.top = `${Math.max(4, Math.min(y, vh - h - 4))}px`;
+    titleMenuEl = menu;
+    setTimeout(() => {
+      document.addEventListener('mousedown', onTitleMenuOutside, true);
+      document.addEventListener('keydown', onTitleMenuKeydown, true);
+      window.addEventListener('scroll', closeTitleMenu, true);
+      window.addEventListener('resize', closeTitleMenu);
+    }, 0);
+  }
+
+  // Rinomina inline dalla docbar (senza aprire il menu documenti): mostra un
+  // input al posto del titolo e conferma su Invio/blur.
+  function startDocTitleRename() {
+    if (!doc || !docbarEl) return;
+    closeDocPop();
+    if (docbarEl.querySelector('.ed-doc-title-input')) return;
+    const cur = (doc.meta && doc.meta.title && doc.meta.title !== STORE.DEFAULT_TITLE) ? doc.meta.title : '';
+    const input = document.createElement('input');
+    input.className = 'ed-doc-title-input';
+    input.type = 'text';
+    input.value = cur;
+    input.placeholder = STORE.DEFAULT_TITLE;
+    input.setAttribute('aria-label', 'Nuovo nome del documento');
+    if (docSwitchBtn) docSwitchBtn.style.display = 'none';
+    docbarEl.appendChild(input);
+    input.focus();
+    input.select();
+    let done = false;
+    const finish = (save) => {
+      if (done) return;
+      done = true;
+      const val = input.value;
+      if (docSwitchBtn) docSwitchBtn.style.display = '';
+      input.remove();
+      if (save) renameFileAction(doc.id, val, { manual: true });
+      else renderDocSwitcher();
+    };
+    input.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+      else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+    });
+    input.addEventListener('blur', () => finish(true));
   }
 
   // ── Menu documenti (selettore in alto a sinistra) ─────────────────────
@@ -655,6 +896,22 @@
     docSwitchBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       docPopEl.hidden ? openDocPop() : closeDocPop();
+    });
+    // Tastiera, parità col tasto destro: Shift+F10 / tasto Menu apre il menu
+    // contestuale del titolo ancorato alla docbar.
+    docSwitchBtn.addEventListener('keydown', (e) => {
+      if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
+        e.preventDefault();
+        const r = docSwitchBtn.getBoundingClientRect();
+        openTitleMenu(r.left, r.bottom);
+      }
+    });
+  }
+  // Tasto destro sul titolo (o su tutta la docbar): menu contestuale del file.
+  if (docbarEl) {
+    docbarEl.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      openTitleMenu(e.clientX, e.clientY);
     });
   }
 
@@ -1233,6 +1490,7 @@
     refreshCollapseToggles();
     markDirty();
     updateWordCountModules();
+    maybeAutoTitle();
   }
 
   docEl.addEventListener('input', () => {
