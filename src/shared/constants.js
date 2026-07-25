@@ -1415,6 +1415,8 @@
     resolveModel,
     parseModelRefs,
     buildModelAttempts,
+    REASONING_LEVELS,
+    normalizeReasoning,
     DEPRECATED_MODELS,
     DEFAULT_PROVIDER,
     DEFAULT_SETTINGS,
