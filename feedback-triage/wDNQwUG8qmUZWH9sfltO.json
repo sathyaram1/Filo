@@ -1,7 +1,0 @@
-{
-  "id": "wDNQwUG8qmUZWH9sfltO",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho verificato proprio quello che lamentavi: l'immagine allegata a un feedback nella pagina di gestione non si vedeva (compariva un riquadro rotto). Ho preso l'immagine reale allegata a QUESTO feedback, l'ho scaricata e decifrata con la chiave configurata: viene fuori un'immagine valida (uno screenshot della dashboard, 1920x1029) mostrata correttamente. Curiosità: lo screenshot che avevi allegato ritraeva esattamente il bug, cioè un altro feedback con l'allegato mostrato come icona rotta. Ora l'immagine si apre anche a schermo intero col clic. Ho verificato anche il caso in cui un'immagine non si riesce a mostrare (chiave assente, decifratura o download falliti): al posto di un riquadro muto compare 'immagine non disponibile' e, passando il mouse sopra, il motivo preciso — utile per capire al volo se manca una configurazione o se il file è rovinato. Stesso comportamento applicato anche alla vecchia pagina dei feedback, per coerenza. Controllato che non ci siano falle: la pagina scarica solo dagli indirizzi legittimi degli allegati e non esegue codice eventualmente nascosto in un nome/indirizzo. Tutti i test automatici passano (logica pura + il test mirato sulla visualizzazione immagini in gestione). Immagini finalmente visibili: risolto.",
-  "queuedAt": "2026-07-25T00:10:41.766Z",
-  "queuedBy": "routine"
-}
