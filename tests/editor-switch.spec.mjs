@@ -68,7 +68,7 @@ async function openTab(url) {
 // documento di default (blankDoc), come con un'app appena lanciata.
 test.beforeEach(async () => {
   const page = await openTab(EDITOR);
-  await page.evaluate(() => { try { localStorage.removeItem('filo.editor.doc'); } catch (_) {} });
+  await page.evaluate(() => { try { localStorage.removeItem('filo.editor.doc'); localStorage.removeItem('filo.editor.collection'); } catch (_) {} });
   // Chiudi tutte le tab editor/residue: il TabManager riapre una newtab fresca.
   await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
