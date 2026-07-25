@@ -324,9 +324,10 @@
   function persistVersions() {
     try {
       if (window.chrome && chrome.storage && chrome.storage.local) {
-        Promise.resolve(chrome.storage.local.set({ [VERSIONS_KEY]: versions })).catch(() => {});
+        return Promise.resolve(chrome.storage.local.set({ [VERSIONS_KEY]: versions })).catch(() => {});
       }
     } catch (_) { /* archivio non disponibile: lo storico resta in memoria */ }
+    return Promise.resolve();
   }
 
   function fmtVersionWhen(ts) {
