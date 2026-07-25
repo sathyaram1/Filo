@@ -308,14 +308,53 @@
 
   // Carica (o migra) la collezione. Alla prima esecuzione con la nuova versione
   // il vecchio documento singolo diventa il primo file, senza perdere nulla.
-  function loadCollection() {
-    collection = STORE.migrateToCollection({
-      collection: readCollectionRaw(),
-      legacyDoc: readLegacyDoc(),
-      idFactory: () => newId('file'),
-      blankFactory: blankFileSerialized,
-    });
+  // Legge SIA localStorage (persistenza calda) SIA l'archivio dell'app (dove Filo
+  // scrive gli appunti e dove atterra la migrazione dei vecchi appunti) e le
+  // fonde, così all'apertura si vedono anche i file creati/aggiornati da Filo.
+  async function loadCollection() {
+    const localRaw = readCollectionRaw();
+    const remoteRaw = await readArchivedCollection();
+    const localCol = (localRaw && Array.isArray(localRaw.files) && localRaw.files.length)
+      ? STORE.migrateToCollection({ collection: localRaw }) : null;
+    const remoteCol = (remoteRaw && Array.isArray(remoteRaw.files) && remoteRaw.files.length)
+      ? STORE.migrateToCollection({ collection: remoteRaw }) : null;
+    if (localCol && remoteCol) {
+      collection = mergeCollections(localCol, remoteCol);
+    } else {
+      collection = STORE.migrateToCollection({
+        collection: localRaw || remoteRaw,
+        legacyDoc: readLegacyDoc(),
+        idFactory: () => newId('file'),
+        blankFactory: blankFileSerialized,
+      });
+    }
     writeCollection();
+  }
+
+  // Ricarica la collezione dall'archivio quando Filo (main) ci ha scritto un
+  // appunto: fonde i file nuovi/aggiornati senza perdere le modifiche locali in
+  // corso, aggiorna il selettore documenti e, se il file attivo è cambiato sotto
+  // e non ci sono modifiche in sospeso, lo riapre per mostrare il nuovo testo.
+  // Nota: se l'utente sta modificando PROPRIO il file su cui Filo scrive senza
+  // aver salvato, vincono le modifiche locali; l'appunto di Filo resta comunque
+  // nello storico versioni del file (source "filo"), quindi è recuperabile.
+  async function reloadFromArchive() {
+    const remoteRaw = await readArchivedCollection();
+    if (!remoteRaw || !Array.isArray(remoteRaw.files)) return;
+    if (doc) syncActiveIntoCollection();
+    const remoteCol = STORE.migrateToCollection({ collection: remoteRaw });
+    collection = mergeCollections(collection, remoteCol, dirty ? (doc && doc.id) : null);
+    const activeStored = STORE.findFile(collection, doc && doc.id) || STORE.activeFile(collection);
+    if (activeStored && !dirty && doc
+      && JSON.stringify(activeStored.content) !== JSON.stringify(doc.content)) {
+      activateFile(activeStored);
+    } else {
+      renderDocSwitcher();
+    }
+    writeCollection();
+    // Ricarica anche lo storico versioni: Filo vi ha aggiunto i punti di
+    // ripristino della sua scrittura (così l'utente può annullarla).
+    loadVersions();
   }
   function readLegacyDoc() {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch (_) { return null; }
