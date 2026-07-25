@@ -206,6 +206,7 @@
     row.appendChild(nickIn);
     row.appendChild(provSel);
     row.appendChild(idWrap);
+    row.appendChild(reasonSel);
     row.appendChild(del);
     row.appendChild(test);
     row.appendChild(status);
