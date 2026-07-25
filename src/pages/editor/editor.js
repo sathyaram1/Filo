@@ -2807,8 +2807,18 @@
     });
   } catch (_) {}
 
+  // Hook di test/integrazione per lo storico versioni (usato dagli spec e da chi
+  // costruirà la UI di storico sopra a questo). Espone la lista e il ripristino.
+  window.__filoEditorVersions = {
+    list: (fileId) => (VERS ? VERS.listFor(versions, fileId || (doc && doc.id)) : []),
+    restore: (fileId, versionId) => restoreVersion(fileId, versionId),
+    activeId: () => (doc && doc.id),
+    ready: () => versionsReady,
+  };
+
   // Boot
   applySavedTheme();
+  loadVersions();                           // storico dall'archivio app (async)
   loadCollection();                         // migra il vecchio doc singolo se serve
   activateFile(STORE.activeFile(collection)); // apre l'ultimo file attivo
 })();
