@@ -317,6 +317,7 @@
     listModels,
     complete,
     streamComplete,
+    thinkingConfigFor,
     synthesizeSpeech,
     embed,
     toGeminiModelId,
