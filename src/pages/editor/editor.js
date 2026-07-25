@@ -2678,9 +2678,6 @@
 
   // Boot
   applySavedTheme();
-  loadDoc();
-  ensureSettingsModule(); // garantisce l'ingranaggio anche su documenti pre-esistenti
-  renderDocBody();
-  renderGrid();
-  updateWordCountModules();
+  loadCollection();                         // migra il vecchio doc singolo se serve
+  activateFile(STORE.activeFile(collection)); // apre l'ultimo file attivo
 })();
