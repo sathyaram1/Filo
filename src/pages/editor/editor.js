@@ -450,6 +450,8 @@
     } else {
       renderDocSwitcher(); // era un altro file: la lista basta aggiornarla
     }
+    // Lo storico del file cancellato non serve più: liberalo dall'archivio.
+    if (VERS) { versions = VERS.dropFile(versions, id); persistVersions(); }
     writeCollection();
   }
 
