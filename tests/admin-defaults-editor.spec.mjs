@@ -22,7 +22,7 @@ async function openStubbedEditor(openTab) {
     const fakeConfig = {
       apiKeysPresent: { openrouter: true, gemini: false, tavily: false },
       safeBrowsingKeyPresent: false,
-      modelRegistry: { esistente: { provider: 'openrouter', model: 'vendor/gia-salvato' } },
+      modelRegistry: { esistente: { provider: 'openrouter', model: 'vendor/gia-salvato', reasoning: 'medium' } },
       models: {},
     };
     window.__sent = [];
