@@ -2307,7 +2307,12 @@
         }
       }
     }
-    if (touched) { refreshCollapseToggles(); onDocInput(); }
+    if (touched) {
+      const v = preContent ? recordFiloVersion(preContent) : null;
+      refreshCollapseToggles();
+      onDocInput();
+      if (v) offerUndoFilo(v.id, doc.id);
+    }
     return touched;
   }
 
