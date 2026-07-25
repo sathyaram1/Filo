@@ -2815,6 +2815,7 @@
     restore: (fileId, versionId) => restoreVersion(fileId, versionId),
     activeId: () => (doc && doc.id),
     ready: () => versionsReady,
+    flush: () => persistVersions(),
   };
 
   // Boot
