@@ -69,12 +69,10 @@ test('Shift+Ctrl+Z NON naviga (resta redo)', async ({ openTab, testServer }) => 
 });
 
 test('Ctrl+Z senza pagina precedente non crasha e non naviga', async ({ openTab, testServer }) => {
-  // Apro una singola pagina: nessuna cronologia indietro nella scheda.
-  const only = testServer.html('<!doctype html><title>ONLY</title><h1 id="only">unica</h1>');
-  const page = await testServer.openReady(openTab, '<!doctype html><h1>seed</h1>');
-  await page.evaluate((x) => { window.location.href = x; }, only);
-  await page.waitForURL(only, { timeout: 10_000 });
-  await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
+  // Scheda FRESCA aperta direttamente sulla pagina: nessuna cronologia indietro.
+  const page = await testServer.openReady(openTab,
+    '<!doctype html><title>ONLY</title><h1 id="only">unica</h1>');
+  const startUrl = page.url();
   await page.locator('#only').click();
   // Premo Ctrl+Z ripetutamente: no-op, la pagina resta viva e reattiva.
   await page.keyboard.press('Control+z');
