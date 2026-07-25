@@ -16,6 +16,21 @@
     };
   }
 
+  // Traduce il livello di reasoning scelto dall'owner (#369) nel campo
+  // `reasoning` che OpenRouter capisce. `wantThoughts` = il caller vuole anche i
+  // token di ragionamento in streaming (onReasoning). Ritorna null se non c'è
+  // nulla da chiedere (auto senza streaming = comportamento di prima).
+  //   - 'off'  → { enabled: false }         (chiede al modello di non ragionare)
+  //   - low/medium/high → { effort: <lvl> } (sforzo esplicito, quando supportato)
+  // I modelli che non ragionano ignorano il campo: è best-effort.
+  function reasoningField(level, wantThoughts) {
+    if (level === 'off') return { enabled: false };
+    const out = {};
+    if (level === 'low' || level === 'medium' || level === 'high') out.effort = level;
+    if (wantThoughts) out.enabled = true;
+    return Object.keys(out).length ? out : null;
+  }
+
   async function listModels(apiKey) {
     const res = await fetch(MODELS_ENDPOINT, {
       headers: { Authorization: `Bearer ${apiKey}` },
