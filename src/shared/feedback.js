@@ -499,7 +499,15 @@
     // popup ricompense (C5) sulla sua macchina, che non ha la chiave privata.
     // Cifrarlo (insieme a status/verdetti) è Fase 2, con una proiezione
     // sanitizzata user-facing separata.
-    if (notes !== undefined) { fields.notes = toFsValue(notes); mask.push('notes'); }
+    // La conversazione ha un tetto (SN_FEEDBACK_THREAD.capNotes): oltre quello
+    // le regole respingono OGNI scrittura successiva sul feedback, non solo
+    // quella sulle note — il feedback resterebbe immobile. Tagliamo i turni più
+    // vecchi qui, così il caso non si presenta mai da questo cammino.
+    if (notes !== undefined) {
+      const T = global.SN_FEEDBACK_THREAD;
+      const capped = T && T.capNotes ? T.capNotes(notes) : notes;
+      fields.notes = toFsValue(capped); mask.push('notes');
+    }
     // Override di revisione (owner sblocca un feedback fermato dalla sicurezza).
     if (reviewDecision !== undefined) { fields.reviewDecision = toFsValue(reviewDecision); mask.push('reviewDecision'); }
     if (reviewComment !== undefined) { fields.reviewComment = toFsValue(reviewComment); mask.push('reviewComment'); }
