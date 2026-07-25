@@ -443,10 +443,27 @@
   // l'ordine reale di fallback: prima tutti i provider del modello primario,
   // poi quelli del secondo modello, e così via. I duplicati esatti
   // (stesso provider + stesso id concreto) vengono saltati.
+  // Livelli di reasoning che l'owner può forzare per un modello nel registry dei
+  // "Modelli predefiniti" (#369). 'auto' (o assente) = nessun override, resta il
+  // comportamento best-effort del provider di prima. Gli altri chiedono al modello
+  // uno sforzo di ragionamento esplicito QUANDO il modello lo supporta: i modelli
+  // che non ragionano ignorano semplicemente il parametro.
+  const REASONING_LEVELS = ['auto', 'off', 'low', 'medium', 'high'];
+
+  function normalizeReasoning(v) {
+    const s = String(v == null ? '' : v).toLowerCase().trim();
+    if (!s || s === 'auto') return null; // nessun override
+    return REASONING_LEVELS.includes(s) ? s : null;
+  }
+
   function buildModelAttempts(refs, registry, providerOrder, apiKeys) {
     const out = [];
     const seen = new Set();
     for (const ref of refs || []) {
+      // Il livello di reasoning è una proprietà del MODELLO (voce del registry),
+      // non del provider: lo stesso nickname lo porta su tutti i suoi tentativi.
+      const entry = registry && registry[ref];
+      const reasoning = normalizeReasoning(entry && entry.reasoning);
       for (const provider of providerOrder || []) {
         const apiKey = apiKeys && apiKeys[provider];
         if (!apiKey) continue;
@@ -455,7 +472,9 @@
         const key = `${provider}::${concrete}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        out.push({ provider, apiKey, model: concrete });
+        const attempt = { provider, apiKey, model: concrete };
+        if (reasoning) attempt.reasoning = reasoning;
+        out.push(attempt);
       }
     }
     return out;
