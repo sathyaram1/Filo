@@ -114,9 +114,22 @@
     return { provider: 'openrouter', model: '' };
   }
 
+  // Livelli di reasoning esposti nel dropdown (fonte di verità: SN_CONST).
+  // 'auto' = nessun override (default, valore assente nella voce salvata).
+  const REASONING_LEVELS = (window.SN_CONST && window.SN_CONST.REASONING_LEVELS)
+    || ['auto', 'off', 'low', 'medium', 'high'];
+
+  function normReasoning(v) {
+    if (window.SN_CONST && window.SN_CONST.normalizeReasoning) {
+      return window.SN_CONST.normalizeReasoning(v);
+    }
+    const s = String(v == null ? '' : v).toLowerCase().trim();
+    return s && s !== 'auto' && REASONING_LEVELS.includes(s) ? s : null;
+  }
+
   function makeModelRow(nick, entry) {
     const row = document.createElement('div');
-    row.className = 'sn-model-row';
+    row.className = 'sn-model-row sn-model-row-reason';
     const single = entryToSingle(entry);
     row.dataset.label = (entry && entry.label) || '';
 
