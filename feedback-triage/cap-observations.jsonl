@@ -4,3 +4,4 @@
 {"ts":"2026-07-23T04:22:38Z","event":"StopFailure","error_type":null,"error_message":null,"stop_reason":null,"agent_type":"general-purpose","last_msg":"You've hit your session limit · resets 8am (UTC)"}
 {"ts":"2026-07-23T22:18:54Z","event":"StopFailure","error_type":null,"error_message":null,"stop_reason":null,"agent_type":"general-purpose","last_msg":"You've hit your session limit · resets 2am (UTC)"}
 {"ts":"2026-07-24T13:28:38Z","event":"StopFailure","error_type":null,"error_message":null,"stop_reason":null,"agent_type":null,"last_msg":"You've hit your session limit · resets 5:10pm (UTC)"}
+{"ts":"2026-07-26T07:18:44Z","event":"StopFailure","error_type":null,"error_message":null,"stop_reason":null,"agent_type":null,"last_msg":"You've hit your weekly limit · resets Jul 29, 7am (UTC)"}
