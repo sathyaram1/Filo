@@ -62,15 +62,33 @@
     return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())} ${days[dt.getDay()]} ${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
   }
 
+  // Saldo crediti corrente: così Filo può rispondere in chat a "quanti crediti
+  // mi restano?" senza che l'utente debba aprire la pagina Crediti (#359). Legge
+  // il motore crediti a runtime (non è disponibile in tutti i contesti in cui
+  // SN_FILO_STATE potrebbe caricarsi → guardia difensiva). getPublic() applica il
+  // refill di mezzanotte e ritorna la vista SENZA il costo € (che resta privato).
+  async function readCredits() {
+    try {
+      const Credits = global.SN_CREDITS;
+      if (!Credits || typeof Credits.getPublic !== 'function') return null;
+      const pub = await Credits.getPublic();
+      if (!pub || typeof pub.balance !== 'number') return null;
+      return { balance: pub.balance };
+    } catch (_) {
+      return null;
+    }
+  }
+
   async function assemble() {
     const now = new Date();
-    const [tabs, session, timers, notifications, dashboardCache, rawLog] = await Promise.all([
+    const [tabs, session, timers, notifications, dashboardCache, rawLog, credits] = await Promise.all([
       listTabs(),
       Mem.getSession(),
       Mem.listTimers(),
       Mem.listNotifications(),
       Mem.getDashboardCache(),
       Mem.listRaw({ since: new Date(Date.now() - 24 * 3600 * 1000).toISOString(), limit: 50 }),
+      readCredits(),
     ]);
 
     const sessionInfo = session.sessionStartedAt
@@ -116,6 +134,7 @@
       })),
       recentActions: rawLog,
       dashboard: dashboardCache,
+      credits,
     };
 
     const stateText = renderForPrompt(state);
@@ -136,6 +155,13 @@
       lines.push(`Inizio sessione: ${formatDate(state.time.session.startedAt)} (${state.time.session.ageMin} min fa, ${state.time.session.count} interazioni)`);
     }
     lines.push('');
+    // CREDITI — se l'utente chiede quanti crediti gli restano, rispondi con
+    // questo saldo (si ricarica di 100 ogni giorno a mezzanotte).
+    if (state.credits) {
+      lines.push('CREDITI');
+      lines.push(`Saldo: ${state.credits.balance} crediti (si ricaricano di 100 ogni giorno a mezzanotte)`);
+      lines.push('');
+    }
     // TAB APERTE
     lines.push('TAB APERTE');
     if (!state.tabs.length) lines.push('(nessuna)');
