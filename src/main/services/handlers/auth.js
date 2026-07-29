@@ -405,6 +405,24 @@ module.exports = function register(on, ctx) {
     }
   });
 
+  // Log dei worker delle routine (config/automation, campo `workerLog`). Owner-
+  // only, SOLA LETTURA dal client: chi spawna i worker (scripts/dispatch.mjs) lo
+  // scrive lato routine con le proprie credenziali. Qui lo esponiamo alla tab
+  // "Log" della dashboard.
+  on(MSG.WORKER_LOG_GET, async () => {
+    try {
+      if (!auth.isAdmin()) {
+        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
+      }
+      const idToken = await auth.getIdToken();
+      if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
+      const entries = await Defaults.getWorkerLog(idToken);
+      return { ok: true, entries };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  });
+
   // Config "modelli di supporto" (doc config/supportModels). Owner-only.
   // GET legge i 4 slot; UPDATE scrive solo i campi passati (per-campo PATCH).
   on(MSG.SUPPORT_MODELS_GET, async () => {
