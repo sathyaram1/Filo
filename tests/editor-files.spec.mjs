@@ -121,7 +121,9 @@ test('annulla eliminazione: il file cancellato torna col suo contenuto', async (
   await expect(page.locator('.ed-doc-item')).toHaveCount(1);
 
   // Il toast offre "Annulla": cliccandolo il file torna, alla sua posizione.
+  // (Il click sul toast chiude il menu documenti: lo riapriamo per contarli.)
   await page.click('.ed-toast-action');
+  await page.click('#docSwitch');
   await expect(page.locator('.ed-doc-item')).toHaveCount(2);
 
   // Il file ripristinato ha ancora ALFA; il file attivo BETA non è stato perso.
