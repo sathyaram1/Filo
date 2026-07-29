@@ -426,6 +426,7 @@
     }).join('');
     renderLegality();
     syncCarouselHighlight();
+    preloadVisibleCards();
   }
 
   // Riepilogo di legalità (§8.4) sotto il conteggio: compare SOLO quando c'è
