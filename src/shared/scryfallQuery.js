@@ -81,6 +81,10 @@
       colors: Array.isArray(api.colors) ? api.colors : (Array.isArray(front.colors) ? front.colors : []),
       colorIdentity: Array.isArray(api.color_identity) ? api.color_identity : [],
       image: String(img.normal || img.large || ''),
+      // Immagine del retro per le bifronte: alimenta il tasto "gira la carta" nel
+      // pannello di dettaglio (preview e carosello). Vuota = carta a faccia unica.
+      backImage: backImg ? String(backImg.normal || backImg.large || '') : '',
+      backName: backFace ? String(backFace.name || '') : '',
       artCrop: String(img.art_crop || ''),
       priceEur: Number.isFinite(price) ? price : null,
       // Mana prodotto dalla carta (terre/rock/dork): alimenta "mana prodotto
