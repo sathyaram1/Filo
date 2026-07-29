@@ -16,6 +16,12 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.168', date: '2026-07-29',
+      fixes: [
+        'Le statistiche dell’editor ora sono corrette su un documento vuoto: parole, caratteri, frasi, paragrafi e tempo di lettura sono tutti a zero (prima segnava «Paragrafi: 1» e «~1 min» anche a foglio bianco). Inoltre i segni di sola punteggiatura non vengono più contati come parole.',
+      ],
+    },
+    {
       version: '0.2.167', date: '2026-07-29',
       features: [
         'Nell’editor lo «Storico versioni» ora salva un punto di ripristino anche quando sei tu a scrivere o cancellare molto a mano, non solo quando è Filo a modificare il documento. Il salvataggio avviene da solo quando ti fermi un momento o quando cambi documento, e resta invisibile: le piccole correzioni non intasano lo storico, ma se scrivi tanto e poi vuoi tornare a un punto precedente, ora lo ritrovi.',
