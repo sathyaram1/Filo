@@ -2503,46 +2503,122 @@
     });
     findState = { hits: [], idx: -1, term: '' };
   }
+  // Blocco (p/div/h/li/blockquote) più interno che contiene un nodo testo, o
+  // docEl come fallback. La ricerca lavora sul testo CONCATENATO di un blocco,
+  // non nodo per nodo: così trova le parole spezzate da un tag inline
+  // (grassetto/corsivo/sottolineato) — che il browser rappresenta come più nodi
+  // testo ("al" + "fa") — senza però matchare a cavallo di due paragrafi
+  // (feedback #228).
+  function findBlockOf(node) {
+    let el = node.parentElement;
+    while (el && el !== docEl) {
+      if (/^(P|DIV|H1|H2|H3|LI|BLOCKQUOTE)$/.test(el.tagName)) return el;
+      el = el.parentElement;
+    }
+    return docEl;
+  }
+  // Nodi testo del blocco `block`, in ordine, escludendo: i toggle di collasso
+  // (UI iniettata), il testo già dentro un mark di ricerca (per non ri-matcharlo)
+  // e il testo appartenente a un blocco annidato (processato a parte).
+  function findTextNodesOfBlock(block) {
+    const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT, {
+      acceptNode: (n) => {
+        if (!n.parentElement) return NodeFilter.FILTER_REJECT;
+        if (n.parentElement.closest('.ed-collapse-toggle')) return NodeFilter.FILTER_REJECT;
+        if (n.parentElement.closest('mark.ed-find-hit')) return NodeFilter.FILTER_REJECT;
+        if (findBlockOf(n) !== block) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      },
+    });
+    const nodes = [];
+    let n; while ((n = walker.nextNode())) nodes.push(n);
+    return nodes;
+  }
+  // Avvolge l'intervallo [from,to) del testo concatenato di un blocco (dato come
+  // lista ordinata di nodi testo) in uno o più <mark.ed-find-hit> — uno per nodo
+  // testo intersecato. Una singola occorrenza può quindi vivere in più mark
+  // (parte normale + parte in grassetto): il chiamante li raggruppa in UN hit.
+  function wrapFindRange(nodes, from, to) {
+    const marks = [];
+    let cum = 0;
+    for (const tn of nodes) {
+      const len = tn.nodeValue.length;
+      const s = Math.max(from - cum, 0);
+      const e = Math.min(to - cum, len);
+      cum += len;
+      if (e <= s) { if (cum >= to) break; continue; }
+      let target = tn;
+      if (s > 0) target = target.splitText(s);
+      if (e - s < target.nodeValue.length) target.splitText(e - s);
+      const mk = document.createElement('mark');
+      mk.className = 'ed-find-hit';
+      const parent = target.parentNode;
+      parent.insertBefore(mk, target);
+      mk.appendChild(target);
+      marks.push(mk);
+      if (cum >= to) break;
+    }
+    return marks;
+  }
   function runFind(term) {
     clearFind();
     if (!term) return;
     findState.term = term;
+    // Elenco (in ordine documento) dei blocchi che contengono testo cercabile.
     const walker = document.createTreeWalker(docEl, NodeFilter.SHOW_TEXT, {
-      acceptNode: (n) => n.parentElement.closest('.ed-collapse-toggle') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
+      acceptNode: (n) => n.parentElement && n.parentElement.closest('.ed-collapse-toggle') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
     });
-    const textNodes = [];
-    let n; while ((n = walker.nextNode())) textNodes.push(n);
+    const blocks = [];
+    const seen = new Set();
+    let n; while ((n = walker.nextNode())) {
+      const b = findBlockOf(n);
+      if (!seen.has(b)) { seen.add(b); blocks.push(b); }
+    }
     const lc = term.toLowerCase();
-    for (const tn of textNodes) {
-      const txt = tn.nodeValue;
-      let i = txt.toLowerCase().indexOf(lc);
-      if (i < 0) continue;
-      const frag = document.createDocumentFragment();
-      let last = 0;
-      while (i >= 0) {
-        if (i > last) frag.appendChild(document.createTextNode(txt.slice(last, i)));
-        const mk = document.createElement('mark');
-        mk.className = 'ed-find-hit';
-        mk.textContent = txt.slice(i, i + term.length);
-        frag.appendChild(mk);
-        findState.hits.push(mk);
-        last = i + term.length;
-        i = txt.toLowerCase().indexOf(lc, last);
+    for (const block of blocks) {
+      // Cerca sul testo concatenato del blocco; a ogni match lo avvolge (i suoi
+      // nodi escono dall'haystack alla passata dopo, perché già dentro un mark),
+      // così il match successivo si trova e gli offset restano validi.
+      while (true) {
+        const nodes = findTextNodesOfBlock(block);
+        const text = nodes.map((t) => t.nodeValue).join('');
+        const i = text.toLowerCase().indexOf(lc);
+        if (i < 0) break;
+        const marks = wrapFindRange(nodes, i, i + term.length);
+        if (!marks.length) break; // difesa: mai loop infinito
+        findState.hits.push({ marks });
       }
-      if (last < txt.length) frag.appendChild(document.createTextNode(txt.slice(last)));
-      tn.parentNode.replaceChild(frag, tn);
     }
     if (findState.hits.length) { findState.idx = 0; highlightCurrent(); }
   }
   function highlightCurrent() {
-    findState.hits.forEach((h, i) => h.classList.toggle('current', i === findState.idx));
+    findState.hits.forEach((h, i) => h.marks.forEach((mk) => mk.classList.toggle('current', i === findState.idx)));
     const cur = findState.hits[findState.idx];
-    if (cur) cur.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    if (cur && cur.marks[0]) cur.marks[0].scrollIntoView({ block: 'center', behavior: 'smooth' });
   }
   function stepFind(dir) {
     if (!findState.hits.length) return;
     findState.idx = (findState.idx + dir + findState.hits.length) % findState.hits.length;
     highlightCurrent();
+  }
+  // Rimpiazza tutti i mark di un hit col testo di sostituzione (nel primo mark;
+  // gli altri — le altre porzioni di una parola formattata — vengono rimossi,
+  // insieme ai wrapper di formattazione rimasti vuoti, es. <strong></strong>).
+  function replaceHitMarks(hit, replacement) {
+    const marks = hit.marks;
+    const first = marks[0];
+    const firstParent = first.parentNode;
+    first.replaceWith(document.createTextNode(replacement));
+    for (let k = marks.length - 1; k >= 1; k--) {
+      const p = marks[k].parentNode;
+      marks[k].remove();
+      let anc = p;
+      while (anc && anc !== docEl && anc.nodeType === 1 && !anc.textContent && /^(STRONG|B|EM|I|U|S|SPAN)$/.test(anc.tagName)) {
+        const up = anc.parentNode; anc.remove(); anc = up;
+      }
+      if (p && p.isConnected) p.normalize();
+    }
+    if (firstParent) firstParent.normalize();
   }
   function replaceOne(replacement) {
     const cur = findState.hits[findState.idx];
@@ -2551,9 +2627,7 @@
     // senza ri-eseguire la ricerca: una ri-scansione ripartirebbe dalla prima
     // corrispondenza e ri-troverebbe il termine dentro il testo appena
     // inserito (es. cerca "cat", sostituisci "cats" → loop sulla stessa parola).
-    const parent = cur.parentNode;
-    cur.replaceWith(document.createTextNode(replacement));
-    if (parent) parent.normalize();
+    replaceHitMarks(cur, replacement);
     findState.hits.splice(findState.idx, 1);
     if (!findState.hits.length) {
       findState.idx = -1;
@@ -2566,7 +2640,7 @@
   function replaceAll(term, replacement) {
     if (!term) return;
     runFind(term);
-    findState.hits.forEach((mk) => mk.replaceWith(document.createTextNode(replacement)));
+    findState.hits.forEach((hit) => replaceHitMarks(hit, replacement));
     clearFind();
     onDocInput();
   }
