@@ -1,7 +1,0 @@
-{
-  "id": "nybO79oCpQKA2qA4HbRT",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica e' stata pubblicata. L'invio del feedback ora e' immediato e a prova di rete assente (viene messo in coda e spedito da solo appena torni online, anche dopo aver chiuso l'app), senza rischi lato sicurezza.",
-  "queuedAt": "2026-07-29T09:28:14.602Z",
-  "queuedBy": "routine"
-}
