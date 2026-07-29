@@ -218,6 +218,10 @@
     // Invio feedback alpha → Firestore/Storage. Va instradato dal main process
     // perché le CSP delle pagine ospiti bloccano fetch diretti dal preload.
     SUBMIT_FEEDBACK: 'submit_feedback',           // { text, url, title, userAgent, clientId, images: [{dataUrl}] }
+    // Broadcast main→content per mostrare un toast di sistema (es. esito
+    // differito dell'invio di un feedback, #341). Lo mostra solo la scheda in
+    // primo piano. { text, duration? }
+    SHOW_TOAST: 'show_toast',                      // { text, duration? }
     // F4 — Annulla un auto-feedback appena inviato (undo dal toast). Marca il
     // feedback come `ignored` così non compare nel triage. { id } → { ok }
     CANCEL_AUTO_FEEDBACK: 'cancel_auto_feedback', // { id }
