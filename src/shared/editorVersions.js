@@ -34,6 +34,60 @@
     try { return JSON.stringify(a) === JSON.stringify(b); } catch (_) { return false; }
   }
 
+  // ── Snapshot manuali: quanto è cambiato il documento ──────────────────────
+  // Le modifiche AUTOMATICHE di Filo creano sempre un punto di ripristino; le
+  // modifiche MANUALI dell'utente no (versionare a ogni battuta sarebbe rumore).
+  // La politica è: creare uno snapshot 'manual' solo quando il testo è cambiato
+  // in modo SIGNIFICATIVO rispetto all'ultimo stato di riferimento. Serve un
+  // proxy CHEAP dell'entità della modifica (niente edit-distance O(n·m)): questa
+  // logica pura la misura, ed è unit-testabile senza aprire l'editor.
+
+  // Testo semplice dal contenuto di una versione (o dal modello serializzato di
+  // un documento): cammina i nodi ProseMirror aggiungendo un a-capo ai confini
+  // di blocco. Unica sorgente per l'anteprima nello storico E per la soglia.
+  function plainText(content) {
+    const pm = content && content.content ? content.content : content;
+    if (!pm || typeof pm !== 'object') return '';
+    let out = '';
+    const walk = (n) => {
+      if (!n || typeof n !== 'object') return;
+      if (n.type === 'text' && typeof n.text === 'string') { out += n.text; return; }
+      if (n.type === 'hardBreak') { out += '\n'; return; }
+      if (Array.isArray(n.content)) n.content.forEach(walk);
+      if (/^(paragraph|heading|blockquote|listItem|codeBlock)$/.test(n.type)) out += '\n';
+    };
+    walk(pm);
+    return out.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  }
+
+  // Quanti caratteri sono cambiati fra due testi: si tolgono il prefisso e il
+  // suffisso comuni e si misura la regione centrale diversa. Cattura sia le
+  // aggiunte/cancellazioni (un blocco scritto o tolto) sia le sostituzioni (un
+  // pezzo riscritto della stessa lunghezza) restando O(n).
+  function textChangeSize(prevContent, nextContent) {
+    const a = plainText(prevContent);
+    const b = plainText(nextContent);
+    if (a === b) return 0;
+    const n = Math.min(a.length, b.length);
+    let p = 0;
+    while (p < n && a.charCodeAt(p) === b.charCodeAt(p)) p++;
+    let s = 0;
+    // Il suffisso comune non deve sovrapporsi al prefisso già contato.
+    while (s < n - p && a.charCodeAt(a.length - 1 - s) === b.charCodeAt(b.length - 1 - s)) s++;
+    return Math.max(a.length, b.length) - p - s;
+  }
+
+  // Soglia di default (caratteri di testo cambiati) oltre cui una modifica
+  // manuale merita un punto di ripristino. ~140 = un paio di frasi: sotto è
+  // "ho aggiustato una parola", non un punto a cui l'utente vorrà tornare.
+  const MANUAL_SNAPSHOT_MIN_CHARS = 140;
+
+  // La modifica manuale rispetto a `prevContent` è abbastanza grande da salvare?
+  function isSignificantManualChange(prevContent, nextContent, minChars) {
+    const min = Number.isFinite(minChars) && minChars > 0 ? minChars : MANUAL_SNAPSHOT_MIN_CHARS;
+    return textChangeSize(prevContent, nextContent) >= min;
+  }
+
   function normalizeStore(store) {
     return store && typeof store === 'object' ? store : {};
   }
