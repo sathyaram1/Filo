@@ -67,6 +67,14 @@ test('la fascia oraria grossolana (partOfDay) fa cambiare la firma', () => {
   assert.notEqual(m, s);
 });
 
+test('il tipo di giorno grossolano (dayType feriale/weekend) fa cambiare la firma', () => {
+  // Il tono di una mattina lavorativa ≠ quello di un weekend: al passaggio
+  // feriale↔weekend la home deve potersi rigenerare (una volta, non di continuo).
+  const feriale = D.computeSignature({ ...baseInputs, partOfDay: 'mattina', dayType: 'feriale' });
+  const weekend = D.computeSignature({ ...baseInputs, partOfDay: 'mattina', dayType: 'weekend' });
+  assert.notEqual(feriale, weekend);
+});
+
 test('campi temporali NON fanno parte della firma (niente ricalcoli a vuoto)', () => {
   // computeSignature ignora qualunque chiave non elencata: passare un "ora" che
   // cambia non deve cambiare la firma.
