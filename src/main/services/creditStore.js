@@ -363,6 +363,11 @@
     freshState, ensure, applyRefill, costEurToCredits, rewardForPriority,
     applyConsumption, applyAward, isVoteRewardPending, applyConsumptionIfAffordable,
     publicView, dateKey, daysBetween,
+    // config importi (owner-configurabile, #366.2)
+    setActiveConfig, getActiveConfig, resolveConfig,
+    // config() = config effettiva risolta (attiva > CREDIT), per gli importi
+    // accreditati fuori dalle funzioni pure (feedbackSend, boardVote, boardReopen).
+    config: () => resolveConfig(null),
     // async (runtime)
     load, getPublic, recordConsumption, award, wasFeedbackRewarded,
     wasVoteRewarded, awardVoteOnce, spendIfAffordable,
