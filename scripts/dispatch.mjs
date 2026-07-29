@@ -766,6 +766,7 @@ async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP) {
   }
 
   emit(bucket, ctx);
+  await recordWorkerSpawn(bucket);
   return { exit: 0 };
 }
 
