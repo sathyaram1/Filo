@@ -1,0 +1,7 @@
+{
+  "id": "sSsvPluqJDQggVK07MTP",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho verificato il sintomo: prima le immagini delle carte comparivano con un ritardo al primo passaggio del mouse perche' venivano scaricate solo in quel momento. Ora, appena apri un mazzo, le immagini di tutte le carte visibili vengono scaldate subito, in ordine di lettura (la prima carta per prima) e a bassa priorita' di rete: al primo hover l'anteprima compare all'istante. Verificato che il precarico avviene PRIMA di qualsiasi passaggio del mouse e che, tolto il precarico, la verifica diventerebbe rossa. Vale anche per le liste di risultati in chat quando aperte. Stress test superati: carte a doppia faccia (si scalda il fronte), carte senza immagine (nessun crash, nessuna richiesta a vuoto), stessa carta in piu' copie (scaricata una sola volta, niente doppioni), raffica di hover rapidi su piu' righe (nessun crash, l'anteprima mostra sempre l'immagine giusta), mazzo vuoto (nessun errore). L'anteprima al hover e il carosello al click continuano a funzionare correttamente.",
+  "queuedAt": "2026-07-29T09:41:01.917Z",
+  "queuedBy": "routine"
+}
