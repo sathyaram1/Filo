@@ -2411,11 +2411,18 @@
   }
   function textStats() {
     const text = (docPlainText() || '').replace(/ /g, ' ').trim();
-    const words = text ? text.split(/\s+/).filter(Boolean).length : 0;
+    // Una "parola" ha almeno un carattere alfanumerico: i token di sola
+    // punteggiatura (",,,", "...") non contano come parole.
+    const words = text ? text.split(/\s+/).filter((t) => /[\p{L}\p{N}]/u.test(t)).length : 0;
     const chars = text.length;
-    const sentences = text ? (text.match(/[.!?]+(\s|$)/g) || []).length || 1 : 0;
-    const paragraphs = docEl.querySelectorAll('p, h1, h2, h3, li, blockquote').length;
-    const readingMin = Math.max(1, Math.round(words / 200));
+    // Le frasi hanno senso solo se c'è almeno una parola reale.
+    const sentences = words ? (text.match(/[.!?]+(\s|$)/g) || []).length || 1 : 0;
+    // Conta solo i blocchi con contenuto reale: il <p> vuoto iniziale del
+    // contenteditable non è un paragrafo.
+    const paragraphs = Array.from(docEl.querySelectorAll('p, h1, h2, h3, li, blockquote'))
+      .filter((el) => (el.textContent || '').trim()).length;
+    // Nessuna parola → nessun tempo di lettura (niente minimo forzato a 1 min).
+    const readingMin = words ? Math.max(1, Math.round(words / 200)) : 0;
     return { words, chars, sentences, paragraphs, readingMin };
   }
   function renderWordCount(cell, m) {
