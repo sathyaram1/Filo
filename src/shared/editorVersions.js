@@ -148,12 +148,16 @@
 
   global.SN_EDITOR_VERSIONS = {
     MAX_LABEL,
+    MANUAL_SNAPSHOT_MIN_CHARS,
     record,
     listFor,
     get,
     latest,
     dropFile,
     sameContent,
+    plainText,
+    textChangeSize,
+    isSignificantManualChange,
     defaultIdFactory,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
