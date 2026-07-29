@@ -826,6 +826,13 @@
       menu.appendChild(o);
     };
     add('Rigenera titolo', () => generateTitleForActive({ auto: false }));
+    add('Rigenera riassunto', () => {
+      if (autoSummaryBusy) return;
+      autoSummaryBusy = true;
+      Promise.resolve(generateSummaryForActive())
+        .then((ok) => { if (!ok) showEditorToast('Scrivi qualcosa prima di generare un riassunto.'); })
+        .finally(() => { autoSummaryBusy = false; });
+    });
     add('Rinomina', () => startDocTitleRename());
     add('Duplica file', () => duplicateActiveFile());
     add('Elimina file', () => { if (doc) deleteFile(doc.id); });
