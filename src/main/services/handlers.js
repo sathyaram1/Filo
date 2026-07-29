@@ -1244,7 +1244,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
 
   const r = await handleAIRequest({
     action: ACTIONS.FILO_CHAT,
-    payload: { profilo, preferenze, espansioni, lezioni, stato: stateText, threadMessages, capacita },
+    payload: { profilo, preferenze, espansioni, lezioni, stato: stateText, threadMessages, capacita, files: fileSummaries },
     origin: 'filo:chat',
     onReasoning,
   });
