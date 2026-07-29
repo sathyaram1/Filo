@@ -73,6 +73,22 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isAdmin();
     }
+
+    // config/credits → importi crediti configurabili dall'owner (#366.2):
+    // initial (saldo di benvenuto), dailyRefill (ricarica giornaliera),
+    // feedbackSend, feedbackResolveByPriority{0..3}, boardVote, boardReopen,
+    // maxRefillDays. NON è segreto (sono numeri di crediti, MAI il costo EUR che
+    // resta dietro le quinte): lettura PUBBLICA come config/models, così il nuovo
+    // valore raggiunge OGNI installazione — anche non loggata — e vale per TUTTI
+    // gli utenti. Scrittura riservata all'owner (isAdmin): un utente qualsiasi
+    // non può ritoccarsi gli importi (il saldo per-utente resta il caveat noto di
+    // credits/{uid}, ma la tabella degli importi è owner-only). Le regole NON
+    // enumerano i campi: aggiungere un importo non richiede un redeploy. Il
+    // motore crediti ricade sui default CREDIT quando il doc è assente.
+    match /config/credits {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
     match /config/secrets {
       allow read: if request.auth != null
         && request.auth.token.email_verified == true;
