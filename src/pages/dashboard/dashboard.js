@@ -1054,6 +1054,12 @@
     'emetti NAVIGA con l’URL ESATTO preso dai risultati (non inventarne uno); ' +
     'altrimenti riporta i link pertinenti nel testo. Se i risultati non contengono ' +
     'ciò che serve, dillo con onestà. Non emettere un’altra CERCA_WEB per la stessa richiesta.';
+  // Nudge interno dopo un LEGGI_FILE (#379.5): ora l'agente ha il testo completo
+  // del file qui sopra e deve rispondere all'utente usandolo, senza richiederlo
+  // di nuovo.
+  const AUTO_CONTINUE_FILE =
+    'Ora hai il contenuto completo del file qui sopra. Rispondi all’utente usando ' +
+    'quel testo. Non emettere un’altra LEGGI_FILE per lo stesso file.';
 
   function isType(a, t) {
     return a && String(a.type || '').toUpperCase() === t;
