@@ -1,9 +1,0 @@
-{
-  "id": "b0bb9784-3f32-4ebd-93d3-67cf359f8086",
-  "status": "design",
-  "notes": "Controllo di sicurezza superato: la modifica (importi crediti configurabili da te dal doc di configurazione) e' pulita e le regole di accesso sono corrette — chi non e' owner puo' solo leggere gli importi (numeri non segreti, mai i costi in euro), la scrittura resta riservata a te. Non l'ho pero' pubblicata da sola per due motivi che richiedono la tua mano: (1) tocca le regole di accesso del database, che per policy vanno approvate direttamente da te prima di andare live; (2) il branch di lavoro ha una storia git scollegata dal ramo della feature (e trascina qualche file di servizio finito per errore nei commit), quindi non e' fondibile in automatico senza rischiare di sporcare il ramo. Cosa fare: rivedi e applica tu le modifiche degli importi crediti sul ramo della feature, poi pubblica le regole del database. Il contenuto e' pronto sul branch worker/366.2.",
-  "queuedAt": "2026-07-29T03:41:00.503Z",
-  "queuedBy": "routine",
-  "branch": "worker/366.2",
-  "reason": "secaudit"
-}
