@@ -686,7 +686,9 @@ export async function run() {
     // si ferma (un giro a vuoto non risolve nulla): si ripiega sull'audit,
     // lasciando in stderr la traccia del guasto vero per il debugging.
     process.stderr.write(`[dispatch] stato illeggibile anche dopo i retry (${e?.message || e}) → fallback prober\n`);
-    emit({ role: 'prober' }, {});
+    const proberBucket = { role: 'prober' };
+    emit(proberBucket, {});
+    await recordWorkerSpawn(proberBucket);
     return { exit: 0 };
   }
   // Cap EFFETTIVO: env > config/automation (scelto dall'owner) > default.
