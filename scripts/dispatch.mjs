@@ -727,6 +727,10 @@ export async function run() {
 async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP) {
   if (bucket.role === 'prober') {
     emit(bucket, {});
+    // Log del worker spawnato (best-effort): stdout è già stato scritto, quindi
+    // l'orchestratore ha già il suo JSON; qui aspettiamo solo la scrittura del
+    // log (cappata da un timeout) prima che il processo esca.
+    await recordWorkerSpawn(bucket);
     return { exit: 0 };
   }
 
