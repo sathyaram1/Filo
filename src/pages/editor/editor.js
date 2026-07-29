@@ -3003,6 +3003,9 @@
       const v = preContent ? recordFiloVersion(preContent) : null;
       refreshCollapseToggles();
       onDocInput();
+      // Filo ha appena creato il suo punto di ripristino: da qui la deriva
+      // manuale riparte dallo stato POST-modifica, non da prima.
+      setManualBaseline(serialize());
       if (v) offerUndoFilo(v.id, doc.id);
     }
     return touched;
