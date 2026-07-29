@@ -120,13 +120,17 @@
   // fino a MAX_REFILL_DAYS. Se autoFeedbackEnabled è true, aggiunge anche
   // il bonus giornaliero +10 (una sola volta al giorno, idempotente).
   // Ritorna { state, added, bonusAdded }.
-  function applyRefill(state, today = dateKey(), autoFeedbackEnabled = false) {
-    const s = ensure(state);
+  function applyRefill(state, today = dateKey(), autoFeedbackEnabled = false, config) {
+    const cfg = resolveConfig(config);
+    const s = ensure(state, config);
     const missed = daysBetween(s.lastRefillDate, today);
     let added = 0;
     if (missed > 0) {
-      const days = Math.min(missed, CREDIT.MAX_REFILL_DAYS);
-      added = days * CREDIT.DAILY_REFILL;
+      // Accredita i giorni non ancora accreditati col valore CORRENTE della
+      // config: se l'owner ha cambiato dailyRefill, i giorni mancati valgono il
+      // NUOVO importo (comportamento naturale, nessuna retroattivita' strana).
+      const days = Math.min(missed, cfg.maxRefillDays);
+      added = days * cfg.dailyRefill;
       s.balance += added;
       s.lastRefillDate = today;
     }
