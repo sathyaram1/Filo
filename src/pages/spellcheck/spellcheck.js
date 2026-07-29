@@ -43,24 +43,33 @@
   }
 
   // ----------------------------------------------------------------------
-  // Avvisi inline (conflitto autocorrect, ecc.)
+  // Avvisi inline (conflitto autocorrect, duplicato dizionario, ecc.)
   // ----------------------------------------------------------------------
-  let conflictTimer = null;
-  function showConflictMessage(conflictKey) {
-    let el = $('autocorrectConflict');
+  const inlineTimers = Object.create(null);
+  // Mostra un avviso inline (rosso) sopra una lista, auto-nascosto dopo 3.5s.
+  function showInlineMessage(id, anchorId, text) {
+    let el = $(id);
     if (!el) {
       el = document.createElement('p');
-      el.id = 'autocorrectConflict';
+      el.id = id;
       el.className = 'sn-muted';
       el.style.cssText = 'color:var(--sn-danger,#c0392b);margin:4px 0 0';
-      // Inserisce dopo l'header h2 e la descrizione, prima della tabella.
-      const section = $('autocorrectList').parentElement;
-      section.insertBefore(el, $('autocorrectList'));
+      // Inserisce dopo l'header h2 e la descrizione, prima della tabella/lista.
+      const anchor = $(anchorId);
+      anchor.parentElement.insertBefore(el, anchor);
     }
-    el.textContent = I18n.t('spell_page_conflict', conflictKey);
+    el.textContent = text;
     el.hidden = false;
-    clearTimeout(conflictTimer);
-    conflictTimer = setTimeout(() => { el.hidden = true; }, 3500);
+    clearTimeout(inlineTimers[id]);
+    inlineTimers[id] = setTimeout(() => { el.hidden = true; }, 3500);
+  }
+
+  function showConflictMessage(conflictKey) {
+    showInlineMessage('autocorrectConflict', 'autocorrectList', I18n.t('spell_page_conflict', conflictKey));
+  }
+
+  function showDictConflictMessage(word) {
+    showInlineMessage('dictConflict', 'dictList', I18n.t('spell_page_dict_conflict', word));
   }
 
   // ----------------------------------------------------------------------
@@ -243,9 +252,14 @@
     const existing = data[STORAGE_KEYS.PERSONAL_DICT] || [];
     // Dedup case-insensitive: se esiste già una parola con lo stesso casing diverso, non aggiungerla.
     const alreadyExists = existing.some((x) => String(x).toLowerCase() === w.toLowerCase());
-    if (!alreadyExists) {
-      existing.push(w); // preserva il casing originale
+    if (alreadyExists) {
+      // Simmetria con la sezione autocorrect: avvisa invece di ingoiare l'input
+      // in silenzio. Non svuotiamo il campo così l'utente vede cosa aveva digitato.
+      showDictConflictMessage(w);
+      $('newDictWord').select();
+      return;
     }
+    existing.push(w); // preserva il casing originale
     await chrome.storage.local.set({ [STORAGE_KEYS.PERSONAL_DICT]: existing });
     renderDict(existing);
     $('newDictWord').value = '';

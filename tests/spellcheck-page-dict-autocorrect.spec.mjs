@@ -128,6 +128,41 @@ test('rinominare trigger autocorrect su una chiave già esistente mostra avviso 
 });
 
 // ---------------------------------------------------------------------------
+// Feedback #227: aggiungere una parola già nel dizionario (anche con casing
+// diverso) mostrava di svuotare il campo in silenzio, senza alcun avviso.
+// Deve invece comparire un messaggio "già nel dizionario", in simmetria con
+// la sezione "Correzioni automatiche".
+// ---------------------------------------------------------------------------
+test('dizionario personale: aggiungere una parola già presente (casing diverso) mostra un avviso, non ingoia l\'input', async ({ openTab }) => {
+  const page = await openSpellcheckPage(openTab);
+
+  // Aggiungi "casa"
+  await page.fill('#newDictWord', 'casa');
+  await page.click('#addDict');
+  await page.waitForFunction(() => {
+    return document.getElementById('dictList')?.querySelectorAll('.sn-spell-word').length > 0;
+  }, null, { timeout: 4_000 });
+
+  // Riprova con "Casa" (stesso significato, casing diverso)
+  await page.fill('#newDictWord', 'Casa');
+  await page.click('#addDict');
+
+  // ASSERISCE IL SUCCESSO 1: compare un avviso inline di duplicato che nomina la parola
+  const conflictMsg = page.locator('#dictConflict');
+  await expect(conflictMsg).toBeVisible({ timeout: 3_000 });
+  await expect(conflictMsg).toContainText('Casa');
+
+  // ASSERISCE IL SUCCESSO 2: nessun duplicato aggiunto (resta una sola parola)
+  const wordSpans = page.locator('#dictList .sn-spell-word');
+  await expect(wordSpans).toHaveCount(1);
+  await expect(wordSpans.first()).toHaveText('casa');
+
+  // ASSERISCE IL SUCCESSO 3: l'input NON viene ingoiato in silenzio — il testo
+  // digitato resta visibile così l'utente capisce cosa è successo.
+  await expect(page.locator('#newDictWord')).toHaveValue('Casa');
+});
+
+// ---------------------------------------------------------------------------
 // Feedback #214: parola lunghissima senza spazi nel dizionario personale
 // sforava la riga e spingeva il bottone "Rimuovi" fuori dal viewport
 // (scroll orizzontale). La parola deve andare a capo dentro la cella e

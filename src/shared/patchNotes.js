@@ -19,6 +19,7 @@
       version: '0.2.168', date: '2026-07-29',
       fixes: [
         'Le statistiche dell’editor ora sono corrette su un documento vuoto: parole, caratteri, frasi, paragrafi e tempo di lettura sono tutti a zero (prima segnava «Paragrafi: 1» e «~1 min» anche a foglio bianco). Inoltre i segni di sola punteggiatura non vengono più contati come parole.',
+        'Nella pagina del correttore, se provi ad aggiungere al dizionario personale una parola che c’è già (anche solo con maiuscole diverse), ora compare un avviso «già nel dizionario» e la parola digitata resta nel campo, invece di sparire in silenzio senza spiegazioni.',
       ],
     },
     {
