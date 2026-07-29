@@ -441,6 +441,46 @@
     return res.created ? res.version : null;
   }
 
+  // ── Snapshot MANUALI: versionare anche le modifiche a mano significative ──
+  // Le modifiche di Filo creano sempre un punto di ripristino; quelle a mano no
+  // — versionare a ogni battuta sarebbe rumore. Politica (invisibile all'utente):
+  //   • soglia — snapshot solo se, dall'ultimo riferimento, l'utente ha
+  //     scritto/cancellato abbastanza testo (logica pura in editorVersions.js);
+  //   • pausa — si valuta dopo che l'utente smette di scrivere (debounce), non
+  //     durante la digitazione;
+  //   • confine — si valuta anche quando si cambia/chiude documento (punto
+  //     naturale in cui il file si sincronizza), così un blocco scritto e poi
+  //     abbandonato senza pausa non va perso.
+  // `manualBaseline` è lo stato da cui si misura la deriva; ogni snapshot (o
+  // modifica di Filo, o ripristino) lo riallinea allo stato corrente.
+
+  // Riallinea il riferimento: dopo, serve nuova deriva significativa per un altro
+  // snapshot. Passa un contenuto esplicito, o lascia che lo prenda dal modello.
+  function setManualBaseline(content) {
+    manualBaseline = content || (doc ? serializeDocModel(doc) : null);
+  }
+
+  // Crea uno snapshot 'manual' del documento CORRENTE se la deriva dall'ultimo
+  // riferimento supera la soglia. Silenzioso (nessun toast: il versionamento
+  // manuale è invisibile finché non serve). Ritorna la versione creata o null.
+  function maybeRecordManualVersion() {
+    clearTimeout(manualSnapTimer);
+    if (!doc || !VERS) return null;
+    const cur = serialize();
+    if (!manualBaseline) { manualBaseline = cur; return null; } // primo riferimento
+    if (!VERS.isSignificantManualChange(manualBaseline, cur)) return null;
+    const ts = Date.now();
+    const res = VERS.record(versions, doc.id, {
+      content: cur,
+      source: 'manual',
+      label: `Modifica manuale · ${fmtVersionWhen(ts)}`,
+      ts,
+    }, () => newId('ver'));
+    versions = res.store;
+    if (res.created) { persistVersions(); manualBaseline = cur; }
+    return res.created ? res.version : null;
+  }
+
   // Ripristina una versione: prima salva lo stato corrente come versione (così
   // anche il ripristino è annullabile e non si perde nulla), poi rimpiazza il
   // contenuto del file con quello scelto e ri-renderizza se è il file attivo.
