@@ -215,5 +215,6 @@ module.exports = {
   isoWeekId,
   seedForOrigin,
   isIdentityProviderHref,
+  isGoogleAppSurface,
   configForHref,
 };
