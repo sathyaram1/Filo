@@ -1,7 +1,0 @@
-{
-  "id": "fVynCHYjjOGiiiYgAk6L",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato e modifica pubblicata. Ora, quando accedi alle app Google in cui sei loggato (Documenti, Fogli, Presentazioni, Drive, Gmail, Calendar, Meet e simili), Filo non applica più il suo disturbo anti-tracciamento: su quelle pagine quel disturbo non ti proteggeva da nulla (sei già identificato dal tuo account Google) ma poteva far comparire il blocco «questo browser o questa app potrebbero non essere sicuri». La protezione anti-tracciamento resta piena su tutto il resto, ricerca Google compresa, e i siti-esca che imitano un indirizzo Google restano protetti.",
-  "queuedAt": "2026-07-29T07:39:07.873Z",
-  "queuedBy": "routine"
-}
