@@ -1,7 +1,0 @@
-{
-  "id": "83f84429-830a-45ae-b992-080816d3955f",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica e stata pubblicata. Ora, nella pagina del correttore, se aggiungi al dizionario personale una parola gia presente (anche solo con maiuscole diverse) compare un avviso \"gia nel dizionario\" e la parola digitata resta nel campo, invece di sparire senza spiegazioni.",
-  "queuedAt": "2026-07-29T21:36:22.136Z",
-  "queuedBy": "routine"
-}
