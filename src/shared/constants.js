@@ -816,7 +816,7 @@
     // Agente conversazionale principale. Riceve memoria, stato e cronologia del
     // thread; risponde con una bolla di chat e opzionalmente azioni strutturate
     // che il client esegue (NAVIGA, TIMER, SALVA_APPUNTO, ecc.).
-    filoChat: ({ profilo, preferenze, espansioni, lezioni, stato, history, modelName, capacita }) =>
+    filoChat: ({ profilo, preferenze, espansioni, lezioni, stato, history, modelName, capacita, files }) =>
       `Sei Filo, un assistente personale. L'utente interagisce con te attraverso un campo di testo nella dashboard del browser.\n\n` +
       (modelName
         ? `Il modello che ti sta eseguendo è ${modelName}. Se l'utente ti chiede quale modello o IA sei, rispondi con questo nome esatto — è il nome con cui il codice ti invoca — senza inventarne altri né dare soprannomi.\n\n`
@@ -826,6 +826,8 @@
       (espansioni ? `${espansioni}\n\n` : '') +
       (lezioni ? `LEZIONI RECENTI:\n${lezioni}\n\n` : '') +
       `STATO:\n${stato || '(vuoto)'}\n\n` +
+      `FILE DELL'EDITOR (riassunti — gli appunti sono file come gli altri):\n${files || '(nessuno)'}\n` +
+      `Ogni riga è \`[id] Titolo: riassunto\`. Vedi solo i RIASSUNTI, non il testo intero. Se per rispondere ti serve DAVVERO il contenuto completo di un file, emetti l'azione LEGGI_FILE con il suo id PRIMA di rispondere: il testo integrale ti rientra nel contesto e SOLO ALLORA rispondi. Non chiedere un file se il riassunto basta.\n\n` +
       (history ? `CONVERSAZIONE:\n${history}\n\n` : '') +
       `═══ COME RISPONDI ═══\n` +
       `Ogni tua risposta è una bolla di chat. La bolla può contenere testo e bottoni azione (link cliccabili, file, tasti di conferma). L'utente può sempre fare follow-up.\n` +
@@ -864,6 +866,7 @@
       `INVIA_FEEDBACK: {testo, titolo}  — invia un feedback agli sviluppatori di Filo a nome dell'utente. \`testo\` è la segnalazione completa, \`titolo\` un riassunto di 2-6 parole. Il sistema chiede conferma all'utente (con anteprima) prima di inviare.\n` +
       `CERCA_WEB: {query}  — cerca sul web (i risultati ti torneranno).\n` +
       `CAPACITA_DETTAGLIO: {ids}  — chiede il dettaglio (cosa fa / come si attiva / limiti) di una o più capacità di Filo per id, presi dall'elenco "COSA SA FARE FILO". \`ids\` è un array di id (es. ["save-for-later","translate-page"]). Il dettaglio ti rientra nel contesto e poi rispondi all'utente. Usalo solo per rispondere a domande su cosa sa fare Filo, non per agire.\n` +
+      `LEGGI_FILE: {fileId}  — chiede il CONTENUTO COMPLETO di un file dell'editor per id (preso dall'elenco FILE DELL'EDITOR sopra). Usalo quando il riassunto non basta per rispondere: il testo integrale ti rientra nel contesto e poi rispondi. Sola lettura, nessuna modifica al file.\n` +
       `EVENTO_CALENDARIO: {data, ora, titolo, dettagli}\n` +
       `APRI_FILE: {percorso, etichetta}\n` +
       `PULISCI_TAB: {}  — mostra un bottone "Riordina e archivia le schede"; l'utente conferma e Filo archivia le tab non più utili (riapribili dalla cronologia).\n` +
@@ -918,6 +921,7 @@
       `    {"type": "INVIA_FEEDBACK", "testo": "...", "titolo": "..."},\n` +
       `    {"type": "CERCA_WEB", "query": "..."},\n` +
       `    {"type": "CAPACITA_DETTAGLIO", "ids": ["save-for-later"]},\n` +
+      `    {"type": "LEGGI_FILE", "fileId": "file-abc123"},\n` +
       `    {"type": "EVENTO_CALENDARIO", "date": "YYYY-MM-DD", "time": "HH:MM", "title": "...", "details": "..."},\n` +
       `    {"type": "APRI_FILE", "path": "...", "label": "..."},\n` +
       `    {"type": "PULISCI_TAB"},\n` +
@@ -943,7 +947,7 @@
       (lezioni ? `LEZIONI RECENTI:\n${lezioni}\n\n` : '') +
       `FILO STATE:\n${stato || '(vuoto)'}\n\n` +
       `NOTIFICHE IN CODA:\n${notifiche || '(nessuna)'}\n\n` +
-      `APPUNTI RECENTI:\n${appunti || '(nessuno)'}\n\n` +
+      `FILE DELL'EDITOR (riassunti, appunti inclusi):\n${appunti || '(nessuno)'}\n\n` +
       `SALVATI PER DOPO:\n${salvati || '(nessuno)'}\n\n` +
       `MESSAGGIO PRECEDENTE: "${ultimoMessaggio || ''}"\n\n` +
       `SCHEDE WEB APERTE ADESSO: ${typeof tabAperte === 'number' ? tabAperte : 0}\n\n` +

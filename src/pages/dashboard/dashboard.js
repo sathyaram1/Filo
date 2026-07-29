@@ -919,6 +919,18 @@
       btn.textContent = '📖 Verifico cosa so fare';
       return btn;
     }
+    if (type === 'LEGGI_FILE') {
+      // Chip inerte: rende trasparente che Filo sta aprendo un file dell'editor
+      // per leggerlo per intero (#379.5). Il contenuto rientra nel turno
+      // successivo (auto-continue), dove compare la risposta.
+      const btn = document.createElement('button');
+      btn.className = 'dash-action-btn';
+      btn.type = 'button';
+      btn.disabled = true;
+      const title = (a._output && a._output.title) || '';
+      btn.textContent = title ? `📄 Leggo: ${title}` : '📄 Leggo un file';
+      return btn;
+    }
     if (type === 'EVENTO_CALENDARIO') {
       const btn = document.createElement('button');
       btn.className = 'dash-action-btn';
@@ -1042,6 +1054,12 @@
     'emetti NAVIGA con l’URL ESATTO preso dai risultati (non inventarne uno); ' +
     'altrimenti riporta i link pertinenti nel testo. Se i risultati non contengono ' +
     'ciò che serve, dillo con onestà. Non emettere un’altra CERCA_WEB per la stessa richiesta.';
+  // Nudge interno dopo un LEGGI_FILE (#379.5): ora l'agente ha il testo completo
+  // del file qui sopra e deve rispondere all'utente usandolo, senza richiederlo
+  // di nuovo.
+  const AUTO_CONTINUE_FILE =
+    'Ora hai il contenuto completo del file qui sopra. Rispondi all’utente usando ' +
+    'quel testo. Non emettere un’altra LEGGI_FILE per lo stesso file.';
 
   function isType(a, t) {
     return a && String(a.type || '').toUpperCase() === t;
@@ -1056,6 +1074,9 @@
     }
     if (!cmd && Array.isArray(actions) && actions.some((a) => isType(a, 'CERCA_WEB') && a._output)) {
       return AUTO_CONTINUE_WEB;
+    }
+    if (!cmd && Array.isArray(actions) && actions.some((a) => isType(a, 'LEGGI_FILE') && a._output)) {
+      return AUTO_CONTINUE_FILE;
     }
     return AUTO_CONTINUE_PROMPT;
   }
@@ -1072,7 +1093,8 @@
     return actions.some((a) =>
       (isType(a, 'ESEGUI_COMANDO') && a._output && !a._output.blocked)
       || (isType(a, 'CAPACITA_DETTAGLIO') && a._output)
-      || (isType(a, 'CERCA_WEB') && a._output));
+      || (isType(a, 'CERCA_WEB') && a._output)
+      || (isType(a, 'LEGGI_FILE') && a._output));
   }
 
   // Un singolo turno del modello: bolla "sta pensando" + reasoning live, invio

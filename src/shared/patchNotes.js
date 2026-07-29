@@ -17,6 +17,9 @@
     // ↓ Nuove versioni in cima.
     {
       version: '0.2.165', date: '2026-07-29',
+      features: [
+        'Ora Filo conosce i tuoi documenti dell’editor senza doverli avere tutti sotto gli occhi: ogni file tiene un riassunto di un paio di righe che si scrive da solo dal contenuto e resta aggiornato mentre lavori. Quando parli con Filo, lui vede il riassunto di ogni file (appunti inclusi) e, se per risponderti gli serve davvero un documento per intero, se lo apre e lo legge al momento. Col tasto destro sul titolo di un documento puoi anche rigenerare il riassunto quando vuoi.',
+      ],
       fixes: [
         'Accedere alle app Google in cui sei loggato (Documenti, Fogli, Drive, Gmail, Calendar…) è più affidabile: su queste pagine Filo non applica più il proprio disturbo anti-tracciamento, che lì non ti protegge da nulla (sei già identificato dal tuo account Google) ma poteva far scattare il blocco «questo browser o questa app potrebbero non essere sicuri». La protezione anti-tracciamento resta piena su tutto il resto, ricerca Google compresa.',
       ],

@@ -677,6 +677,102 @@
     Promise.resolve(generateTitleForActive({ auto: true })).finally(() => { autoTitleBusy = false; });
   }
 
+  // ── Riassunto per file, mantenuto aggiornato (#379.5) ─────────────────────
+  // Ogni file porta un RIASSUNTO di un paio di righe (`meta.summary`), generato
+  // dallo stesso canale AI del titolo (testo + chat del documento + memoria).
+  // A differenza del titolo (una-tantum) il riassunto si RIGENERA quando il file
+  // cambia in modo significativo. Il riassunto entra nel contesto di Filo al
+  // posto del testo integrale (lato main): qui lo produciamo e lo salviamo nella
+  // collezione (rispecchiata su storage.json), così il main lo legge.
+  const SUMMARY = window.SN_EDITOR_SUMMARY || null;
+  const SUMMARY_DEBOUNCE_MS = 7000;
+  let autoSummaryBusy = false;
+  let summaryTimer = null;
+
+  const SUMMARY_SYSTEM_PROMPT =
+    'Sei l\'assistente di Filo. Scrivi un RIASSUNTO di 1-2 frasi (massimo due '
+    + 'righe) che spieghi COSA CONTIENE il documento qui sotto, nella STESSA '
+    + 'lingua del testo. Serve a orientarsi tra più file senza aprirli: descrivi '
+    + 'l\'argomento e il tipo di contenuto, non i dettagli. Usa l\'eventuale '
+    + 'conversazione e la memoria SOLO come contesto. Rispondi SOLO col riassunto: '
+    + 'niente virgolette, niente preamboli, niente elenco.';
+
+  function cleanSummary(raw) {
+    let t = String(raw == null ? '' : raw).trim();
+    t = t.replace(/^["'«»“”`]+|["'«»“”`]+$/g, '').trim();
+    t = t.replace(/^riassunto\s*[:\-–—]\s*/i, '').trim();
+    if (t.length > 400) t = t.slice(0, 400).trim() + '…';
+    return t;
+  }
+
+  // Applica un riassunto generato al file `id`: lo salva e registra la "firma"
+  // (numero di parole di adesso) per capire in futuro se il file è cambiato
+  // abbastanza da giustificare una rigenerazione.
+  function applyGeneratedSummary(id, raw) {
+    const clean = cleanSummary(raw);
+    if (!clean) return false;
+    const f = STORE.findFile(collection, id);
+    if (!f) return false;
+    if (!f.meta) f.meta = {};
+    f.meta.summary = clean;
+    f.meta.summarySig = SUMMARY ? SUMMARY.makeSig(f) : { words: 0, at: Date.now() };
+    f.meta.summaryAt = new Date().toISOString();
+    if (doc && doc.id === id && doc.meta) {
+      doc.meta.summary = clean;
+      doc.meta.summarySig = f.meta.summarySig;
+      doc.meta.summaryAt = f.meta.summaryAt;
+    }
+    writeCollection();
+    return true;
+  }
+
+  // Genera (o rigenera) il riassunto del file ATTIVO via il canale AI della chat.
+  async function generateSummaryForActive() {
+    if (!doc || !doc.meta) return false;
+    syncActiveIntoCollection();
+    const id = doc.id;
+    const text = (docPlainText() || '').trim().slice(0, 6000);
+    if (!text) return false;
+    const chat = editorChatMessages();
+    const memory = await filoMemoryText();
+    const parts = [`DOCUMENTO:\n${text}`];
+    if (chat.length) {
+      parts.push('CONVERSAZIONE COL DOCUMENTO (contesto):\n'
+        + chat.map((m) => `${m.role === 'user' ? 'Utente' : 'Filo'}: ${m.content}`).join('\n'));
+    }
+    if (memory) parts.push('MEMORIA DI FILO (contesto su chi scrive):\n' + memory);
+    const messages = [
+      { role: 'system', content: SUMMARY_SYSTEM_PROMPT },
+      { role: 'user', content: parts.join('\n\n') },
+    ];
+    try {
+      const r = await sendMessage({ type: MSG.AI_REQUEST, action: ACTIONS.EXPLAIN || 'explain', payload: { messages } });
+      const rawText = (r && r.ok && typeof r.text === 'string') ? r.text : null;
+      if (rawText == null) return false;
+      return applyGeneratedSummary(id, rawText);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // Tiro automatico: dopo una pausa nella scrittura, (ri)genera il riassunto del
+  // file attivo se serve (abbastanza testo e riassunto assente o stantìo). Il
+  // debounce evita chiamate a ogni battitura; la firma evita rigenerazioni
+  // inutili quando il contenuto è cambiato poco.
+  function maybeAutoSummary() {
+    if (!SUMMARY || !doc) return;
+    if (summaryTimer) { clearTimeout(summaryTimer); summaryTimer = null; }
+    summaryTimer = setTimeout(() => {
+      summaryTimer = null;
+      if (autoSummaryBusy || !doc) return;
+      syncActiveIntoCollection();
+      const f = STORE.findFile(collection, doc.id);
+      if (!f || !SUMMARY.needsSummary(f)) return;
+      autoSummaryBusy = true;
+      Promise.resolve(generateSummaryForActive()).finally(() => { autoSummaryBusy = false; });
+    }, SUMMARY_DEBOUNCE_MS);
+  }
+
   // Duplica il file attivo (contenuto, moduli e commenti); il titolo derivato è
   // segnato come "a mano" così non viene rigenerato in automatico.
   function duplicateActiveFile() {
@@ -730,6 +826,13 @@
       menu.appendChild(o);
     };
     add('Rigenera titolo', () => generateTitleForActive({ auto: false }));
+    add('Rigenera riassunto', () => {
+      if (autoSummaryBusy) return;
+      autoSummaryBusy = true;
+      Promise.resolve(generateSummaryForActive())
+        .then((ok) => { if (!ok) showEditorToast('Scrivi qualcosa prima di generare un riassunto.'); })
+        .finally(() => { autoSummaryBusy = false; });
+    });
     add('Rinomina', () => startDocTitleRename());
     add('Duplica file', () => duplicateActiveFile());
     add('Elimina file', () => { if (doc) deleteFile(doc.id); });
@@ -1491,6 +1594,7 @@
     markDirty();
     updateWordCountModules();
     maybeAutoTitle();
+    maybeAutoSummary();
   }
 
   docEl.addEventListener('input', () => {

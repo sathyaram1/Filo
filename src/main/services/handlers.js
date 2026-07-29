@@ -913,6 +913,27 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         const detail = Caps ? Caps.renderDetailForPrompt(ids) : '';
         return { executed: true, kept: true, output: { capabilities: ids, detail } };
       }
+      case 'LEGGI_FILE': {
+        // #379.5 — lettura ON-DEMAND del contenuto completo di un file
+        // dell'editor. Filo vede solo i riassunti; quando decide che vale la pena
+        // leggerne uno per intero, emette LEGGI_FILE con l'id preso dall'elenco
+        // FILE. Il contenuto torna come `output`, che il client re-immette nel
+        // contesto (auto-continue) così l'agente risponde col testo davanti.
+        // Sola lettura: nessun effetto collaterale.
+        const fileId = action.fileId ?? action.id ?? action.file ?? action.percorso ?? action.path;
+        let r = { ok: false };
+        try {
+          const EF = require('./editorFiles');
+          r = await EF.readFile(fileId);
+        } catch (e) {
+          console.warn('[Filo] lettura file editor fallita', e?.message || e);
+        }
+        return {
+          executed: !!(r && r.ok),
+          kept: true,
+          output: { fileRead: String(fileId == null ? '' : fileId), found: !!(r && r.ok), title: (r && r.title) || '', text: (r && r.text) || '' },
+        };
+      }
       case 'PULISCI_TAB':
         // Non eseguiamo subito: il client mostra un bottone di conferma; al
         // click manda RUN_TAB_TRIAGE. Teniamo il bottone nella bolla.
@@ -1127,6 +1148,28 @@ function webSearchResultsForPrompt(actions) {
   return blocks.join('\n\n').trim();
 }
 
+// Re-immissione del CONTENUTO di un file letto con LEGGI_FILE in un turno
+// precedente (#379.5): l'agente vede il testo completo del file che ha chiesto e
+// risponde con quello davanti (prima vedeva solo il riassunto). Sono DATI di
+// sistema affidabili, non istruzioni dell'utente.
+function fileReadsForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const blocks = [];
+  for (const a of actions) {
+    if (!a || String(a.type || '').toUpperCase() !== 'LEGGI_FILE') continue;
+    const out = a._output;
+    if (!out || !('fileRead' in out)) continue;
+    if (!out.found) {
+      blocks.push(`[File "${out.fileRead}" non trovato: non esiste (più) nell'editor]`);
+      continue;
+    }
+    let body = String(out.text || '');
+    if (body.length > 8000) body = body.slice(0, 8000) + '\n…(contenuto troncato)';
+    blocks.push(`[Contenuto completo del file "${out.title || out.fileRead}"]\n${body || '(vuoto)'}`);
+  }
+  return blocks.join('\n\n').trim();
+}
+
 // F4 — invia un feedback autonomo in background se la risposta segnala un gap
 // di capacità o una lamentela. Non blocca mai il flusso della chat.
 // Privacy: invia solo una descrizione GENERICA (nessun URL, nessun testo utente).
@@ -1189,6 +1232,26 @@ async function maybeAutoFeedback({ textReply, rawActions, userMessage, sender })
   }
 }
 
+// #379.5 — riassunti dei file dell'editor, resi come blocco di testo pronto per
+// il prompt (una riga per file: `[id] Titolo: riassunto`). Sostituisce la
+// vecchia iniezione degli appunti: gli appunti ora SONO file dell'editor e i
+// loro riassunti entrano qui come tutti gli altri. Best-effort: se qualcosa non
+// è disponibile ritorna '' e il prompt mostra "(nessuno)".
+async function editorFileSummariesList() {
+  try {
+    const EF = require('./editorFiles');
+    return await EF.listFileSummaries();
+  } catch (_) { return []; }
+}
+async function editorFileSummaries() {
+  try {
+    const Summary = globalThis.SN_EDITOR_SUMMARY;
+    if (!Summary) return '';
+    const list = await editorFileSummariesList();
+    return Summary.renderForPrompt(list);
+  } catch (_) { return ''; }
+}
+
 async function handleFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, sender = null }) {
   await FiloMem.touchSession();
   await FiloMem.appendRaw({ type: 'chat_user', summary: String(userMessage || '').slice(0, 200) });
@@ -1196,6 +1259,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   const { profilo, preferenze, espansioni } = FiloMem.renderMemoryForPrompt(memory);
   const lezioni = await lessonsBufferText();
   const { stateText } = await FiloState.assemble();
+  // #379.5 — i file dell'editor entrano nel contesto come RIASSUNTI (uno per
+  // file), non come testo integrale: economico e sempre presente. Filo, se serve,
+  // chiede il contenuto completo di un file con l'azione LEGGI_FILE.
+  const fileSummaries = await editorFileSummaries();
   const cleanHistory = Array.isArray(threadHistory) ? threadHistory.slice(-20) : [];
   // Re-immissione dell'output dei comandi nel contesto del modello: l'output di
   // un ESEGUI_COMANDO eseguito in un turno precedente viene accodato al
@@ -1207,7 +1274,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     const role = m.role === 'filo' ? 'assistant' : 'user';
     let content = String(m.text || '');
     if (role === 'assistant') {
-      const obs = [commandOutputsForPrompt(m.actions), capabilityDetailsForPrompt(m.actions), webSearchResultsForPrompt(m.actions)]
+      const obs = [commandOutputsForPrompt(m.actions), capabilityDetailsForPrompt(m.actions), webSearchResultsForPrompt(m.actions), fileReadsForPrompt(m.actions)]
         .filter(Boolean).join('\n\n');
       if (obs) content = content ? `${content}\n\n${obs}` : obs;
     }
@@ -1240,7 +1307,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
 
   const r = await handleAIRequest({
     action: ACTIONS.FILO_CHAT,
-    payload: { profilo, preferenze, espansioni, lezioni, stato: stateText, threadMessages, capacita },
+    payload: { profilo, preferenze, espansioni, lezioni, stato: stateText, threadMessages, capacita, files: fileSummaries },
     origin: 'filo:chat',
     onReasoning,
   });
@@ -1284,7 +1351,11 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
   const { profilo, preferenze, espansioni } = FiloMem.renderMemoryForPrompt(memory);
   const lezioni = await lessonsBufferText();
   const { stateText } = await FiloState.assemble();
-  const notesList = await FiloMem.listNotes();
+  // #379.5 — i "file" dell'editor (appunti inclusi: sono file come gli altri)
+  // entrano nel contesto come riassunti, non come testo integrale. Sostituisce
+  // la vecchia iniezione degli appunti dall'archivio (silo ormai vuoto dopo la
+  // migrazione appunti→file dell'editor).
+  const filesList = await editorFileSummariesList();
   const notiList = await FiloMem.listNotifications();
   const timersList = await FiloMem.listTimers();
   const saved = await SavedPages.list();
@@ -1292,7 +1363,9 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
   const payload = {
     profilo, preferenze, espansioni, lezioni, stato: stateText,
     notifiche: notiList.length ? notiList.map((n) => `- [${n.ts}] ${n.kind}: ${n.text}`).join('\n') : '(nessuna)',
-    appunti: notesList.length ? notesList.slice(0, 20).map((n) => `- [${n.ts}] ${n.text}`).join('\n') : '(nessuno)',
+    appunti: filesList.length
+      ? filesList.map((f) => `- [${f.id}] ${f.title}: ${f.summary}`).join('\n')
+      : '(nessuno)',
     salvati: saved.length ? saved.slice(0, 20).map((p) => `- ${p.title || p.url} (${p.url})`).join('\n') : '(nessuno)',
     tabAperte: openTabsCount,
   };
@@ -1304,7 +1377,9 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
 
   const signature = DashboardRefresh.computeSignature({
     profilo, preferenze, espansioni, lezioni,
-    noteIds: notesList.map((n) => n.id || n.text),
+    // La firma include id + riassunto di ogni file: la dashboard si rigenera
+    // quando un file cambia titolo/riassunto (non più sugli appunti dell'archivio).
+    noteIds: filesList.map((f) => `${f.id}:${f.summary}`),
     notificaIds: notiList.map((n) => n.id || n.text),
     salvatiUrls: saved.map((p) => p.url),
     timerIds: timersList.map((t) => `${t.id}:${t.label}:${t.paused ? 1 : 0}`),

@@ -117,4 +117,35 @@ async function migrateNotesToEditor() {
   }
 }
 
-module.exports = { writeNote, migrateNotesToEditor };
+// Riassunti dei file per il contesto di Filo (#379.5): ritorna
+// [{ id, title, summary, source }] per OGNI file della collezione — il riassunto
+// AI se c'è, altrimenti un estratto grezzo. È ciò che entra nel contesto di Filo
+// al posto del testo integrale.
+async function listFileSummaries() {
+  const Summary = globalThis.SN_EDITOR_SUMMARY;
+  if (!Summary) return [];
+  try {
+    const collection = await loadCollection();
+    return Summary.buildContextFiles(collection);
+  } catch (_) { return []; }
+}
+
+// Lettura ON-DEMAND del contenuto completo di UN file (azione LEGGI_FILE): Filo
+// vede solo i riassunti e, quando decide che vale la pena leggere un file per
+// intero, ne chiede il testo con l'id. Ritorna { ok, id, title, text }.
+async function readFile(fileId) {
+  const Summary = globalThis.SN_EDITOR_SUMMARY;
+  const Store = STORE();
+  if (!Summary || !Store) return { ok: false };
+  const id = String(fileId == null ? '' : fileId).trim();
+  if (!id) return { ok: false };
+  try {
+    const collection = await loadCollection();
+    const file = Store.findFile(collection, id);
+    if (!file) return { ok: false, id };
+    const title = (file.meta && file.meta.title) || 'Documento senza titolo';
+    return { ok: true, id, title, text: Summary.fileText(file) };
+  } catch (_) { return { ok: false, id }; }
+}
+
+module.exports = { writeNote, migrateNotesToEditor, listFileSummaries, readFile };
