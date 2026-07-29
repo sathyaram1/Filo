@@ -1189,6 +1189,21 @@ async function maybeAutoFeedback({ textReply, rawActions, userMessage, sender })
   }
 }
 
+// #379.5 — riassunti dei file dell'editor, resi come blocco di testo pronto per
+// il prompt (una riga per file: `[id] Titolo: riassunto`). Sostituisce la
+// vecchia iniezione degli appunti: gli appunti ora SONO file dell'editor e i
+// loro riassunti entrano qui come tutti gli altri. Best-effort: se qualcosa non
+// è disponibile ritorna '' e il prompt mostra "(nessuno)".
+async function editorFileSummaries() {
+  try {
+    const Summary = globalThis.SN_EDITOR_SUMMARY;
+    if (!Summary) return '';
+    const EF = require('./editorFiles');
+    const list = await EF.listFileSummaries();
+    return Summary.renderForPrompt(list);
+  } catch (_) { return ''; }
+}
+
 async function handleFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, sender = null }) {
   await FiloMem.touchSession();
   await FiloMem.appendRaw({ type: 'chat_user', summary: String(userMessage || '').slice(0, 200) });
