@@ -1,0 +1,7 @@
+{
+  "id": "027a2f73-f87a-4de6-bfa7-eede1e4e0b99",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho riprodotto esattamente il caso del feedback: 'Nome: alfa, alfa e alfa.' con la fine dell'ultima 'alfa' in grassetto. Ora la ricerca conta tutte e tre le occorrenze (1/3, non piu' 1/2) e 'Sostituisci tutto' con 'OMEGA' produce 'Nome: OMEGA, OMEGA e OMEGA.', senza lasciare parole indietro in silenzio. Ho poi fatto una serie di prove al limite, tutte superate: parola spezzata proprio nel mezzo da una singola lettera formattata; parola intera in grassetto; occorrenza divisa su tre frammenti con formattazioni diverse; sostituzione singola su una parola a formattazione mista (sostituisce l'intera parola e non lascia in giro pezzi di formattazione vuoti); navigazione Successivo/Precedente che attraversa correttamente l'occorrenza formattata; campo di ricerca vuoto (nessun errore, contatore semplicemente vuoto). Ho verificato anche la simmetria importante: due paragrafi separati che finiscono/iniziano con 'al' e 'fa' NON vengono uniti in un finto 'alfa' — la ricerca resta confinata al singolo paragrafo, come deve. Il conteggio, l'evidenziazione, sostituzione singola e sostituzione totale si comportano ora tutti allo stesso modo anche sulle parole con formattazione mista.",
+  "queuedAt": "2026-07-29T21:51:23.681Z",
+  "queuedBy": "routine"
+}
