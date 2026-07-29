@@ -1849,7 +1849,7 @@
       shell: terminalShell,
       onData: ({ chunk, stream }) => appendOut(chunk, stream === 'stderr'),
       onExit: ({ code, cwd }) => {
-        if (cwd) { currentCwd = cwd; updateDirLine(); applyTerminalMode(); }
+        if (cwd) setCwd(cwd);
         finish(code === 0 ? null : `(uscita con codice ${code})`);
       },
       onError: ({ message }) => {
