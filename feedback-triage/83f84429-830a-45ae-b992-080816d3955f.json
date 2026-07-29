@@ -1,7 +1,0 @@
-{
-  "id": "83f84429-830a-45ae-b992-080816d3955f",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho riprodotto esattamente la segnalazione: in 'Gestisci correttore', riquadro 'Dizionario personale', ho aggiunto 'casa' (compare in lista) e poi ho riprovato con 'Casa'. Ora compare un avviso chiaro sopra la lista — «\"Casa\" è già nel dizionario.» — che sparisce da solo dopo qualche secondo, esattamente come già succede nella sezione 'Correzioni automatiche' per un duplicato. Non viene creato nessun doppione e, in più, il campo di testo NON si svuota più: resta la parola che avevi digitato (selezionata), così vedi subito cos'era e puoi correggerla o cancellarla. Stress test superati: parola identica ripetuta senza cambio di maiuscole (avvisa lo stesso), parola con accento + emoji ('café☕' poi 'CAFÉ☕' → riconosciuta come duplicato, avvisa, niente doppione), campo con soli spazi (non aggiunge nulla, nessun errore), e testo malevolo tipo '<script>' incollato come parola (viene mostrato come testo semplice nell'avviso, non viene eseguito, nessun doppione). L'avviso usa lo stesso stile visivo (rosso, sopra la lista) degli altri avvisi della pagina, quindi è coerente. Comportamento corretto e completo.",
-  "queuedAt": "2026-07-29T21:34:52.672Z",
-  "queuedBy": "routine"
-}
