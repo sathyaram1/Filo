@@ -41,6 +41,11 @@
     // tipo d'uso e log ricompense. Cache locale del doc Firestore `credits/<uid>`.
     // Vedi src/main/services/creditStore.js.
     CREDITS: 'credits',
+    // Coda d'invio del feedback (#341): feedback premuti "Invia" ma non ancora
+    // arrivati al server (offline / rete assente). Il main li ritenta in
+    // background finché riescono; persistiti così sopravvivono al riavvio.
+    // Array di { id, payload, name, prepared, queuedAt, attempts }.
+    FEEDBACK_OUTBOX: 'feedbackOutbox',
     CATEGORIES: 'categories',
     BLOCKLIST: 'blocklist',
     AI_CACHE: 'aiCache',
