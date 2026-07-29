@@ -22,9 +22,11 @@ require(join(SHARED, 'editorStore.js'));
 require(join(SHARED, 'editorVersions.js'));
 require(join(SHARED, 'editorNotes.js'));
 require(join(SHARED, 'editorSummary.js'));
+require(join(SHARED, 'constants.js'));
 
 const STORE = globalThis.SN_EDITOR_STORE;
 const SUM = globalThis.SN_EDITOR_SUMMARY;
+const PROMPTS = globalThis.SN_CONST.PROMPTS;
 
 // Costruisce un content serializzato (albero PM-like) da righe di testo.
 function contentFromLines(lines) {
