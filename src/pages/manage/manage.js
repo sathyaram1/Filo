@@ -378,6 +378,98 @@
   if (mgJudgeTimeoutSave) mgJudgeTimeoutSave.addEventListener('click', saveJudgeTimeout);
   if (mgJudgeTimeout) mgJudgeTimeout.addEventListener('input', () => setJudgeTimeoutMsg('', null));
 
+  // ── Tab "Log" (worker delle routine) ──────────────────────────────────────
+  // Elenco degli ultimi worker spawnati (ruolo + istante d'avvio). Fonte:
+  // config/automation.workerLog, scritto dalle routine (scripts/dispatch.mjs) a
+  // ogni spawn; qui è di sola lettura via il canale main (owner-gated).
+  const WORKER_LOG_GET = (window.SN_MSG?.MSG?.WORKER_LOG_GET) || 'worker_log_get';
+  // Etichette amichevoli per i ruoli del dispatcher (mai l'id grezzo).
+  const ROLE_LABELS = {
+    'new-work': 'Nuovo lavoro',
+    verifier:   'Verifica',
+    fixer:      'Correzione',
+    secaudit:   'Audit sicurezza',
+    prober:     'Esplorazione',
+  };
+  function roleLabel(role) {
+    const r = String(role || '').trim();
+    return ROLE_LABELS[r] || (r || 'Sconosciuto');
+  }
+  let logLoaded  = false;   // true dopo il primo caricamento riuscito
+  let logLoading = false;
+
+  // Tempo trascorso "umano" (adesso / N min / N ore / N giorni fa). Più fine di
+  // daysAgo: uno spawn recente si misura in minuti, non in "oggi".
+  function timeAgo(iso) {
+    if (!iso) return '—';
+    const t = new Date(iso).getTime();
+    if (isNaN(t)) return '—';
+    const s = Math.max(0, Math.round((Date.now() - t) / 1000));
+    if (s < 45) return 'adesso';
+    const m = Math.round(s / 60);
+    if (m < 60) return `${m} min fa`;
+    const h = Math.round(m / 60);
+    if (h < 24) return h === 1 ? '1 ora fa' : `${h} ore fa`;
+    const d = Math.round(h / 24);
+    return d === 1 ? 'ieri' : `${d} giorni fa`;
+  }
+  // Data+ora assolute (per il sottotono a destra e il title di ogni riga).
+  function formatDateTime(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    const p = (n) => String(n).padStart(2, '0');
+    return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
+
+  function setLogView(which) {
+    // which ∈ 'loading' | 'denied' | 'empty' | 'list'
+    if (mgLogLoading) mgLogLoading.hidden = which !== 'loading';
+    if (mgLogDenied)  mgLogDenied.hidden  = which !== 'denied';
+    if (mgLogEmpty)   mgLogEmpty.hidden   = which !== 'empty';
+    if (mgLogList)    mgLogList.hidden     = which !== 'list';
+  }
+
+  function renderWorkerLog(entries) {
+    if (!mgLogList) return;
+    const list = Array.isArray(entries) ? entries : [];
+    if (!list.length) { setLogView('empty'); mgLogList.innerHTML = ''; return; }
+    mgLogList.innerHTML = list.map((e) => {
+      const role = roleLabel(e && e.role);
+      const num  = e && e.num ? ` · #${esc(String(e.num))}` : '';
+      const rel  = timeAgo(e && e.startedAt);
+      const abs  = formatDateTime(e && e.startedAt);
+      return `<li class="mg-log-row" title="${esc(abs)}">`
+        + `<span class="mg-log-role">${esc(role)}</span>`
+        + `<span class="mg-log-when">${esc(rel)}${num}</span>`
+        + (abs ? `<span class="mg-log-abs">${esc(abs)}</span>` : '')
+        + `</li>`;
+    }).join('');
+    setLogView('list');
+  }
+
+  async function loadWorkerLog() {
+    if (logLoading) return;
+    logLoading = true;
+    if (!isAdmin) { setLogView('denied'); logLoading = false; return; }
+    setLogView('loading');
+    try {
+      const r = await sendToMain({ type: WORKER_LOG_GET });
+      if (!r || r.ok === false) {
+        // Non-admin o sessione scaduta lato main → sezione riservata.
+        setLogView('denied');
+        logLoading = false;
+        return;
+      }
+      renderWorkerLog(r.entries || []);
+      logLoaded = true;
+    } catch (err) {
+      console.error('[manage] caricamento log worker fallito:', err);
+      setLogView('empty');
+    }
+    logLoading = false;
+  }
+
   // ── Tab bar ───────────────────────────────────────────────────────────────
   // Le tab-lista (inbox/queue/resolved/archived) condividono il pannello
   // `panel-list`: cambia solo quale sottoinsieme di feedback popola la lista a
