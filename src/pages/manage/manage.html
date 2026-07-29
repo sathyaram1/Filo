@@ -1009,6 +1009,28 @@
       </div>
     </section>
 
+    <!-- ═══ TAB LOG (worker delle routine) ══════════════════════════════ -->
+    <!-- Elenco degli ultimi worker spawnati dalle routine cloud: per ciascuno
+         il ruolo e quando è partito. Sola lettura; la fonte è config/automation
+         (campo workerLog), scritto da scripts/dispatch.mjs a ogni spawn. -->
+    <section class="mg-panel" id="panel-log" data-panel="log">
+      <div class="mg-log">
+        <h2>Log dei worker</h2>
+        <p class="mg-log-intro">
+          Ogni worker avviato dalle routine automatiche, dal più recente. Per
+          ciascuno vedi il ruolo che ha assunto e quando è partito.
+        </p>
+        <div class="mg-log-loading" id="mgLogLoading">Caricamento…</div>
+        <div class="mg-log-denied" id="mgLogDenied" hidden>
+          Questa sezione è riservata all'owner.
+        </div>
+        <div class="mg-log-empty" id="mgLogEmpty" hidden>
+          Nessun worker registrato finora.
+        </div>
+        <ul class="mg-log-list" id="mgLogList" hidden></ul>
+      </div>
+    </section>
+
   </main>
 
   <!-- Lightbox -->
