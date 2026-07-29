@@ -1,0 +1,7 @@
+{
+  "id": "8svLvL46wIJ17rSozjZE",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho riprodotto esattamente la lamentela: in modalità terminale sono entrato in una cartella con un cd, poi ho simulato 'esci e rientra' riaprendo Filo. Prima la cartella tornava a quella iniziale (la home); ora resta quella in cui ero, mostrata correttamente nella riga grigia sopra la barra di scrittura. Ho confermato che è davvero questa la correzione a fare la differenza: disattivandola, alla riapertura la cartella torna alla home (il vecchio comportamento), riattivandola resta quella giusta. Stress test superati: se la cartella salvata nel frattempo viene cancellata o rinominata, alla riapertura Filo non va in errore e non blocca la shell, ma riparte in automatico dalla cartella base correggendo il valore salvato; se non c'è nulla di salvato (primo avvio) parte dalla home come prima. La cartella mostrata è testo semplice, quindi anche un percorso con caratteri strani non crea problemi di sicurezza. Unico limite (già atteso e accettabile): la cartella ricordata è una sola e condivisa, quindi con più schede aperte su cartelle diverse alla riapertura ripartono tutte dall'ultima usata, non ognuna dalla propria. Tutti i test della modalità terminale e i test di logica passano.",
+  "queuedAt": "2026-07-29T22:19:03.983Z",
+  "queuedBy": "routine"
+}
