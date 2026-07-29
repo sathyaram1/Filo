@@ -100,3 +100,54 @@ test('elimina: rimuove il file; eliminare l\'ultimo lascia comunque un foglio vu
   await expect(page.locator('.ed-doc-item')).toHaveCount(1);
   await expect(page.locator('#doc')).not.toContainText('resto io');
 });
+
+test('annulla eliminazione: il file cancellato torna col suo contenuto', async ({ openTab }) => {
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('#doc');
+
+  // File 1 = ALFA.
+  await page.click('#doc');
+  await setDocText(page, 'contenuto ALFA');
+
+  // File 2 = BETA (attivo).
+  await page.click('#docSwitch');
+  await page.click('#docNew');
+  await setDocText(page, 'contenuto BETA');
+
+  // Elimina il file NON attivo (ALFA) dal menu.
+  await page.click('#docSwitch');
+  await expect(page.locator('.ed-doc-item')).toHaveCount(2);
+  await page.locator('.ed-doc-item').nth(0).locator('.ed-doc-del').click();
+  await expect(page.locator('.ed-doc-item')).toHaveCount(1);
+
+  // Il toast offre "Annulla": cliccandolo il file torna, alla sua posizione.
+  // (Il click sul toast chiude il menu documenti: lo riapriamo per contarli.)
+  await page.click('.ed-toast-action');
+  await page.click('#docSwitch');
+  await expect(page.locator('.ed-doc-item')).toHaveCount(2);
+
+  // Il file ripristinato ha ancora ALFA; il file attivo BETA non è stato perso.
+  await page.locator('.ed-doc-item').nth(0).click();
+  await expect(page.locator('#doc')).toHaveText('contenuto ALFA');
+  await page.click('#docSwitch');
+  await page.locator('.ed-doc-item').nth(1).click();
+  await expect(page.locator('#doc')).toHaveText('contenuto BETA');
+});
+
+test('annulla eliminazione dell\'ultimo file: torna il documento, non il foglio vuoto', async ({ openTab }) => {
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('#doc');
+  await page.click('#doc');
+  await setDocText(page, 'unico documento');
+
+  // Elimina l'unico file: invariante → compare un foglio vuoto al suo posto.
+  await page.click('#docSwitch');
+  await page.locator('.ed-doc-item').nth(0).locator('.ed-doc-del').click();
+  await expect(page.locator('#doc')).not.toContainText('unico documento');
+
+  // Annulla: il foglio vuoto viene tolto e torna il documento originale.
+  await page.click('.ed-toast-action');
+  await expect(page.locator('#doc')).toHaveText('unico documento');
+  await page.click('#docSwitch');
+  await expect(page.locator('.ed-doc-item')).toHaveCount(1);
+});
