@@ -376,6 +376,37 @@
       </div>`;
   }
 
+  // Precarico immagini (§5.1 / "L'ATTESA è ATTRITO"): appena le righe carta sono
+  // visibili scaldiamo la cache HTTP del browser con le loro immagini, così il
+  // primo hover mostra la carta all'istante invece di attendere la rete. Warm
+  // via `new Image()` a priorità bassa (non ruba banda ad altro); l'ordine di
+  // assegnazione = ordine di lettura, quindi la prima riga — quella che l'utente
+  // più probabilmente aprirà — parte per prima. Dedup per URL: mai due fetch.
+  function preloadImage(url) {
+    if (!url || preloadedImgs.has(url)) return;
+    preloadedImgs.add(url);
+    const img = new Image();
+    try { img.fetchPriority = 'low'; } catch { /* non supportato: irrilevante */ }
+    img.decoding = 'async';
+    img.src = url;
+  }
+  function preloadCardImages(ids) {
+    for (const id of ids) {
+      const card = cardsById[id];
+      if (card && card.image) preloadImage(card.image);
+    }
+  }
+  // Le righe carta VISIBILI ora: tutto il mazzo (elenco limitato, ~100 carte) +
+  // solo le liste risultati APERTE (una lista incollata può avere centinaia di
+  // righe collassate: si scaldano quando l'utente le espande, non prima).
+  function preloadVisibleCards() {
+    const rows = [
+      ...document.querySelectorAll('#deckList .dk-row[data-card-id]'),
+      ...document.querySelectorAll('.dk-cardlist:not([hidden]) .dk-row[data-card-id]'),
+    ];
+    preloadCardImages(rows.map((r) => r.dataset.cardId));
+  }
+
   function renderDeckList() {
     $('deckListEmpty').hidden = current.carte.length > 0;
     $('groupBy').textContent = `per ${VIEW_LABEL[current.raggruppamento] || 'tipo'} ▾`;
