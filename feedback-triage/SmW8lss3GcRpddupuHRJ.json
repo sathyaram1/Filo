@@ -1,7 +1,0 @@
-{
-  "id": "SmW8lss3GcRpddupuHRJ",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica al conteggio dei crediti e stata pubblicata. Non ho rilevato problemi di sicurezza e la modifica e coerente con il suo scopo, senza toccare parti sensibili dell'app.",
-  "queuedAt": "2026-07-29T10:02:37.488Z",
-  "queuedBy": "routine"
-}
