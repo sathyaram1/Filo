@@ -1,0 +1,7 @@
+{
+  "id": "3a705e24-3110-4810-8a2f-04e8934baa29",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho aperto davvero l'editor e riprodotto il problema segnalato. Su un foglio completamente vuoto la finestra «Statistiche documento» ora mostra tutto a zero: Parole 0, Caratteri 0, Frasi 0, Paragrafi 0 e Tempo di lettura ~0 min (prima segnava Paragrafi 1 e ~1 min). Ho verificato anche il caso della sola punteggiatura: scrivendo ',,, ... !!! ??? ;;;' il conteggio parole resta 0, le frasi restano 0 e il tempo di lettura ~0 min. Stress test superati: solo spazi e ' ' (spazi unificatori) = tutto zero; solo emoji ('😀 🎉 🚀') = 0 parole; testo misto 'ciao , mondo ... ! come 3 stai' conta correttamente 5 parole (i numeri contano come parole, la punteggiatura no); documento lungo di 600 parole = ~3 min (il tempo di lettura scala ancora correttamente, non è stato appiattito togliendo il minimo forzato); cancellando tutto il testo dopo averlo scritto le statistiche tornano a zero. Nessuna regressione: l'intero gruppo di test dell'editor passa (9/9). Piccola osservazione non bloccante: un paragrafo che contiene solo punteggiatura o solo emoji viene ancora contato come 1 paragrafo (è un blocco con contenuto visibile), coerente e non è il problema segnalato dall'utente, che riguardava il foglio vuoto.",
+  "queuedAt": "2026-07-29T21:19:03.776Z",
+  "queuedBy": "routine"
+}
