@@ -79,6 +79,10 @@
     // Flag "primo avvio mostrato": true dopo che il messaggio di benvenuto di
     // Filo è stato presentato la prima volta che l'utente apre l'app.
     FILO_WELCOMED: 'filo_welcomed',
+    // Ultima cartella (cwd) in cui si trovava il terminale della dashboard.
+    // Persiste tra le sessioni così, riaprendo Filo, si riparte dalla stessa
+    // cartella invece di tornare alla home (#259). La aggiorna ogni `cd`.
+    FILO_TERMINAL_CWD: 'filo_terminal_cwd',
     // Ultima versione di cui l'utente ha visto il recap aggiornamento (popup
     // all'avvio). All'avvio si confronta con app.getVersion(): se è più vecchia
     // e ci sono note (src/shared/patchNotes.js), mostra il recap. Vedi C4.

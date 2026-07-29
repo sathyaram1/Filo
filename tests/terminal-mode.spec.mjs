@@ -13,6 +13,9 @@
 // attivano), non solo l'assenza di errori. shell.js fuori da Windows usa
 // /bin/sh, quindi `/echo …` è eseguibile anche nel cloud Linux headless.
 
+import os from 'node:os';
+import fs from 'node:fs';
+import path from 'node:path';
 import { test, expect } from './fixtures/electron.mjs';
 
 async function newtabPage(app) {
@@ -111,6 +114,36 @@ test('la shell è PERSISTENTE per scheda: una variabile impostata sopravvive al 
   await submitInput(page, readCmd);
   await expect(page.locator('.dash-term-out').last())
     .toContainText('persist=vivo-5566', { timeout: 12_000 });
+});
+
+test('la cartella del terminale sopravvive alla riapertura (#259): riaprendo si resta dove si era, non alla home', async ({ app, shell }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible({ timeout: 8_000 });
+  await setTerminal(page, true);
+  await expect(page.locator('#dashDir')).toBeVisible({ timeout: 8_000 });
+
+  // Cartella temporanea reale, distinta dalla home, in cui spostarsi con `cd`.
+  // Il processo di test gira sulla stessa macchina della shell: ne prendiamo il
+  // path canonico, quello che la shell riporterà come $PWD / %cd% dopo il cd.
+  const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'filo-cwd-')));
+  const home = await page.evaluate(async () => {
+    const r = await window.filo?.shellHome?.();
+    return r?.cwd || '';
+  });
+  expect(dir).not.toBe(home); // la temp dir NON deve coincidere con la home
+
+  // Spostati nella cartella: la riga grigia deve mostrarla.
+  await submitInput(page, `/cd ${dir}`);
+  await expect(page.locator('#dashDir')).toHaveText(dir, { timeout: 12_000 });
+
+  // "Esci e rientra": ricarica la dashboard (rilancia l'init, la stessa via che
+  // prima resettava la cartella alla home). Ora la cartella salvata va
+  // ripristinata: la riga grigia deve mostrare ANCORA la temp dir, non la home.
+  await page.reload();
+  await expect(page.locator('#dashDir')).toBeVisible({ timeout: 8_000 });
+  await expect(page.locator('#dashDir')).toHaveText(dir, { timeout: 8_000 });
+  await expect(page.locator('#dashDir')).not.toHaveText(home);
 });
 
 test('i colori ANSI vengono resi (niente codici grezzi nel testo visibile)', async ({ app, shell }) => {
