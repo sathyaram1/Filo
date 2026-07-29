@@ -52,6 +52,7 @@ require(path.join(SHARED, 'deckImportExport.js')); // parser rigido testo↔cart
 require(path.join(SHARED, 'editorStore.js'));   // collezione file editor (logica pura)
 require(path.join(SHARED, 'editorVersions.js')); // storico/punti di ripristino (logica pura)
 require(path.join(SHARED, 'editorNotes.js'));   // appunti di Filo dentro i file editor (dipende dai due sopra)
+require(path.join(SHARED, 'editorSummary.js')); // riassunto per file + estrazione testo (logica pura, #379.5)
 require(path.join(SVC, 'providers', 'openrouter.js'));
 require(path.join(SVC, 'providers', 'gemini.js'));
 require(path.join(SVC, 'providers', 'index.js'));
