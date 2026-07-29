@@ -1640,6 +1640,18 @@
     dashDir.textContent = currentCwd || '';
   }
 
+  // Aggiorna la cartella corrente e la RENDE PERSISTENTE tra le sessioni (#259):
+  // riaprendo Filo si riparte da qui, non dalla home. Un solo punto di verità per
+  // ogni cambio di `cwd`, così barra mostrata, cartella reale e valore salvato
+  // restano allineati.
+  function setCwd(cwd) {
+    if (!cwd || cwd === currentCwd) return;
+    currentCwd = cwd;
+    updateDirLine();
+    applyTerminalMode();
+    try { self.SN_STORAGE?.setRaw?.(STORAGE_KEYS.FILO_TERMINAL_CWD, cwd); } catch (_) {}
+  }
+
   // L'assistente ha eseguito uno o più comandi: se l'ultimo ha cambiato cartella
   // (un `cd`, ora persistente), il main ce la riporta in _output.cwd. Aggiorniamo
   // la barra del percorso così "percorso mostrato" e cartella reale coincidono.
@@ -1650,7 +1662,7 @@
       const out = a && a._output;
       if (out && out.cwd) cwd = out.cwd;
     }
-    if (cwd && cwd !== currentCwd) { currentCwd = cwd; updateDirLine(); applyTerminalMode(); }
+    if (cwd) setCwd(cwd);
   }
 
   function applyTerminalMode() {
