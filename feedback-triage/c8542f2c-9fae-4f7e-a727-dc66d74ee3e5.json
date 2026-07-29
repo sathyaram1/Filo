@@ -1,0 +1,7 @@
+{
+  "id": "c8542f2c-9fae-4f7e-a727-dc66d74ee3e5",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la correzione e stata pubblicata. Ora quando la durata di un timer non e comprensibile o non e positiva, Filo non crea piu un timer fasullo che suona subito, ma segnala semplicemente di non aver capito la durata.",
+  "queuedAt": "2026-07-29T22:03:51.906Z",
+  "queuedBy": "routine"
+}
