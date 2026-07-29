@@ -268,7 +268,7 @@
     },
     {
       id: 'filo-assistant', title: 'Chiedi a Filo (assistente)', category: 'assistant',
-      desc: 'L’assistente conversazionale di Filo: gli scrivi a parole cosa ti serve e ti risponde, tenendo conto di ciò che gli hai detto in passato. Oltre a rispondere può fare cose per te — aprire pagine, cercare sul web, impostare timer, prendere appunti, regolare preferenze — chiedendoti conferma per le azioni delicate.',
+      desc: 'L’assistente conversazionale di Filo: gli scrivi a parole cosa ti serve e ti risponde, tenendo conto di ciò che gli hai detto in passato. Conosce anche i tuoi documenti dell’editor (appunti inclusi) tramite un breve riassunto di ciascuno, sempre aggiornato: così sa di cosa parlano senza doverli tenere tutti aperti, e quando per risponderti gli serve un documento per intero lo legge al momento. Oltre a rispondere può fare cose per te — aprire pagine, cercare sul web, impostare timer, prendere appunti, regolare preferenze — chiedendoti conferma per le azioni delicate.',
       invoke: 'Apri una nuova scheda (la sua pagina iniziale è l’assistente) e scrivi nel campo "Chiedi qualsiasi cosa"; in alternativa filo://dashboard/dashboard.html.',
       doesNot: 'Non interviene sulla pagina web che stai guardando: per farti assistere SU una pagina aperta usa l’assistente laterale (Alt+H). Le risposte si basano sui tuoi dati locali, non condivide nulla all’esterno senza chiedertelo.',
     },
