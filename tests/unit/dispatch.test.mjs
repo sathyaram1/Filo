@@ -387,6 +387,37 @@ test('withRetry: nessun retry se il primo tentativo riesce', async () => {
   assert.equal(calls, 1);
 });
 
+// ─── appendWorkerLog: accoda + cap sulle più recenti ──────────────────────────
+
+test('appendWorkerLog: accoda in coda e conserva l ordine cronologico', () => {
+  const a = { role: 'new-work', startedAt: '2026-07-29T10:00:00.000Z', num: '374' };
+  const b = { role: 'verifier', startedAt: '2026-07-29T10:05:00.000Z', num: '374' };
+  const out = appendWorkerLog([a], b, 200);
+  assert.deepEqual(out, [a, b]); // append in coda, il più recente per ultimo
+});
+
+test('appendWorkerLog: taglia le voci più VECCHIE quando supera il cap', () => {
+  const mk = (i) => ({ role: 'prober', startedAt: `t${i}`, num: '' });
+  const seed = [mk(1), mk(2), mk(3)];
+  const out = appendWorkerLog(seed, mk(4), 3);
+  assert.equal(out.length, 3);
+  // Restano le 3 più recenti: la testa (mk(1)) è stata tagliata.
+  assert.deepEqual(out.map((e) => e.startedAt), ['t2', 't3', 't4']);
+});
+
+test('appendWorkerLog: ignora voci malformate e senza ruolo', () => {
+  const good = { role: 'fixer', startedAt: 't1', num: '' };
+  // Voce senza ruolo → non aggiunta; input sporco → filtrato.
+  const out = appendWorkerLog([null, good, 'x', 5], { startedAt: 't2' }, 200);
+  assert.deepEqual(out, [good]);
+});
+
+test('appendWorkerLog: input non-array → parte da lista vuota', () => {
+  const e = { role: 'secaudit', startedAt: 't1', num: '' };
+  assert.deepEqual(appendWorkerLog(undefined, e, 200), [e]);
+  assert.deepEqual(appendWorkerLog(null, null, 200), []);
+});
+
 // ─── teardown ─────────────────────────────────────────────────────────────────
 
 test('cleanup STATE_DIR temporanea', () => {
