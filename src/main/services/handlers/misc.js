@@ -136,7 +136,7 @@ function safeImageFilename(name) {
 }
 
 module.exports = function register(on, ctx) {
-  const { MSG, winOf, getEffectiveSettings, buildAttemptChain } = ctx;
+  const { MSG, winOf, getEffectiveSettings, buildAttemptChain, broadcastToTabs } = ctx;
 
   // Titolo breve del feedback, generato da un LLM economico al momento
   // dell'invio (es. "gestione segreti"). Best-effort: se la catena modelli non
