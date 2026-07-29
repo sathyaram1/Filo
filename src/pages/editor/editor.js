@@ -1012,6 +1012,7 @@
         .then((ok) => { if (!ok) showEditorToast('Scrivi qualcosa prima di generare un riassunto.'); })
         .finally(() => { autoSummaryBusy = false; });
     });
+    add('Storico versioni', () => openVersionHistory());
     add('Rinomina', () => startDocTitleRename());
     add('Duplica file', () => duplicateActiveFile());
     add('Elimina file', () => { if (doc) deleteFile(doc.id); });
