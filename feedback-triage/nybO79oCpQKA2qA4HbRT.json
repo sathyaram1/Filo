@@ -1,0 +1,7 @@
+{
+  "id": "nybO79oCpQKA2qA4HbRT",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho riprodotto proprio il caso della tua segnalazione: ho scritto un feedback mentre ero senza connessione e premuto Invia. Il box si chiude subito, senza restare bloccato sull'errore di rete che avevi in foto, e il feedback non va perso: Filo lo tiene da parte e lo spedisce da solo appena la connessione torna. Ho verificato anche che, se chiudi e riapri l'app con un feedback ancora in attesa, riparte comunque al riavvio, e che premere Invia più volte o ritentare non crea copie doppie. Ho ricontrollato che il resto del box feedback continui a funzionare: crediti accreditati all'invio con l'animazione delle monete, allegati (immagini e file), disegno/annotazione sullo schermo, salvataggio della bozza e aspetto del box — tutto a posto. Invio vuoto ancora bloccato con l'avviso, e nessun doppio invio col doppio clic.",
+  "queuedAt": "2026-07-29T08:21:16.868Z",
+  "queuedBy": "routine"
+}
