@@ -140,6 +140,52 @@ function isIdentityProviderHref(href) {
   }
 }
 
+// Superfici "prodotto" di Google in cui l'utente è AUTENTICATO col proprio
+// account (Documenti/Fogli/Presentazioni, Drive, Gmail, Calendar, Meet…). Qui
+// il rumore anti-fingerprint non offre ALCUNA protezione privacy — sei comunque
+// identificato dal cookie del tuo account Google, che ti segue su tutte le sue
+// app — ma altera gli stessi segnali canvas/WebGL/audio che i controlli di
+// sicurezza antifrode di Google campionano lungo il flusso di accesso, facendo
+// scattare il blocco "questo browser o questa app potrebbero non essere sicuri"
+// (feedback #299: accesso a Google Documenti). È lo stesso ragionamento
+// dell'esenzione del login (accounts.google.com, via isIdentityProviderHref),
+// esteso alle app in cui quel login sfocia: costo privacy nullo, elimina un
+// possibile attrito reale.
+//
+// Lista CURATA (come AUTH_HOSTS), NON l'eTLD+1 google.com: esentare tutto
+// "google.com" spegnerebbe la protezione anche sulla ricerca (www.google.com),
+// dove l'utente può NON essere loggato e il rumore ha un valore reale. Match su
+// host esatto o suo sottodominio.
+const GOOGLE_APP_HOSTS = [
+  'docs.google.com',        // Documenti, Fogli, Presentazioni, Moduli
+  'drive.google.com',
+  'mail.google.com',        // Gmail
+  'calendar.google.com',
+  'keep.google.com',
+  'meet.google.com',
+  'chat.google.com',
+  'contacts.google.com',
+  'photos.google.com',
+  'sites.google.com',
+  'script.google.com',      // Apps Script
+  'classroom.google.com',
+  'myaccount.google.com',
+  'admin.google.com',       // Workspace admin
+];
+
+function isGoogleAppSurface(href) {
+  let host;
+  try {
+    const u = new URL(href);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+    host = u.hostname.toLowerCase().replace(/\.$/, '');
+  } catch (_) {
+    return false;
+  }
+  if (!host) return false;
+  return GOOGLE_APP_HOSTS.some((h) => host === h || host.endsWith('.' + h));
+}
+
 // Config { level, seed } per la pagina identificata da href. Solo http/https
 // vengono protette (filo://, file://, about: → off).
 function configForHref(href) {
