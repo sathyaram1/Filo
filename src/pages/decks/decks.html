@@ -272,6 +272,24 @@
       object-fit: cover; border-radius: 4.75% / 3.5%;
       background: var(--sn-hover);
     }
+    /* Cornice della carta: ospita l'immagine e il tasto "gira" delle bifronte
+       (transform / modal DFC). Il tasto compare solo se la carta ha un retro. */
+    .dk-card-frame { position: relative; }
+    .dk-card-frame.dk-has-back .dk-card-img { cursor: pointer; }
+    .dk-flip {
+      position: absolute; top: 7px; right: 7px;
+      width: 30px; height: 30px; border-radius: 50%;
+      border: 1px solid var(--sn-border);
+      background: color-mix(in srgb, var(--sn-bg) 82%, transparent);
+      color: var(--sn-text); font-size: 15px; line-height: 1;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: transform .18s ease, border-color .18s ease, color .18s ease;
+      backdrop-filter: blur(2px);
+    }
+    .dk-flip[hidden] { display: none; }
+    .dk-flip:hover { border-color: var(--sn-accent); color: var(--sn-accent); }
+    .dk-flip:active { transform: rotate(180deg); }
+    .dk-card-frame.dk-flipped .dk-flip { border-color: var(--sn-accent); color: var(--sn-accent); }
     /* Riga di contesto del detail (§5.2): prezzo + tag + "già nel mazzo". */
     .dk-detail-ctx {
       display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
