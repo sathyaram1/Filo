@@ -368,4 +368,5 @@ module.exports = {
   setAutomationGate,
   getAutomationLoopCap,
   setAutomationLoopCap,
+  getWorkerLog,
 };
