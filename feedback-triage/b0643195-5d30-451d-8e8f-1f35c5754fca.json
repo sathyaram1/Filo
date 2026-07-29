@@ -1,7 +1,0 @@
-{
-  "id": "b0643195-5d30-451d-8e8f-1f35c5754fca",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica e' stata pubblicata. Ora Filo conosce i tuoi documenti dell'editor tramite un breve riassunto di ciascuno, che si aggiorna da solo mentre lavori; quando gli serve un documento per intero se lo apre e lo legge al momento. Nessun problema di sicurezza rilevato nella revisione.",
-  "queuedAt": "2026-07-29T07:29:18.099Z",
-  "queuedBy": "routine"
-}
