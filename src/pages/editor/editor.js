@@ -3447,6 +3447,7 @@
     activeId: () => (doc && doc.id),
     ready: () => versionsReady,
     flush: () => persistVersions(),
+    openHistory: () => openVersionHistory(),
   };
 
   // Boot
