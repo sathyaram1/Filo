@@ -777,7 +777,8 @@
   }
 
   // Riga della CardList (§3.4): nome + costo mana destro-allineato + toggle
-  // aggiungi-al-mazzo. Niente immagini finché non c'è hover (task 6).
+  // aggiungi-al-mazzo. L'immagine non è nella riga: si mostra nella preview del
+  // detail all'hover, ma è già precaricata (preloadVisibleCards) così è istantanea.
   // `qty` arriva dall'import (§11.2, es. "37 Forest"): il toggle la userà
   // come quantità reale invece del default 1 delle ricerche normali.
   function chatRowHtml(id, qty) {
