@@ -1,7 +1,0 @@
-{
-  "id": "0ac11982-1a9b-45e1-b049-73d2de078fe7",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica è stata pubblicata ed è ora attiva per tutti. Ho verificato che l'intervento riguarda solo l'editor (i tuoi documenti vengono ora rispecchiati nell'archivio dell'app, così Filo può leggerli e scriverci, e l'editor si aggiorna da solo quando arriva una modifica esterna se non stai già scrivendo). Nessun rischio rilevato: il testo mostrato viene sempre ripulito prima di essere visualizzato e non vengono toccate aree sensibili come accessi, regole del database o segreti.",
-  "queuedAt": "2026-07-29T16:17:08.860Z",
-  "queuedBy": "routine"
-}
