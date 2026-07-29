@@ -1093,7 +1093,8 @@
     return actions.some((a) =>
       (isType(a, 'ESEGUI_COMANDO') && a._output && !a._output.blocked)
       || (isType(a, 'CAPACITA_DETTAGLIO') && a._output)
-      || (isType(a, 'CERCA_WEB') && a._output));
+      || (isType(a, 'CERCA_WEB') && a._output)
+      || (isType(a, 'LEGGI_FILE') && a._output));
   }
 
   // Un singolo turno del modello: bolla "sta pensando" + reasoning live, invio
