@@ -16,6 +16,12 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.165', date: '2026-07-29',
+      fixes: [
+        'Accedere alle app Google in cui sei loggato (Documenti, Fogli, Drive, Gmail, Calendar…) è più affidabile: su queste pagine Filo non applica più il proprio disturbo anti-tracciamento, che lì non ti protegge da nulla (sei già identificato dal tuo account Google) ma poteva far scattare il blocco «questo browser o questa app potrebbero non essere sicuri». La protezione anti-tracciamento resta piena su tutto il resto, ricerca Google compresa.',
+      ],
+    },
+    {
       version: '0.2.164', date: '2026-07-25',
       fixes: [
         'Nella dashboard di gestione i feedback con una conversazione molto lunga tornano a essere gestibili: prima, superata una certa lunghezza, il server rifiutava qualsiasi modifica e il feedback restava bloccato — non lo si poteva spostare di stato, commentare né archiviare, e l’errore dava la colpa ai permessi di amministratore. Ora la conversazione ha un tetto molto più alto, i turni più vecchi vengono accorciati automaticamente quando serve (con una riga che lo dichiara) e, se una modifica viene comunque rifiutata, il messaggio dice il motivo giusto.',
