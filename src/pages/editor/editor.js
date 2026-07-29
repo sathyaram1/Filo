@@ -1120,6 +1120,16 @@
     nu.innerHTML = `${ICONS.plus ? ICONS.plus(14) : '+'}<span>Nuovo documento</span>`;
     nu.addEventListener('click', createFile);
     docPopEl.appendChild(nu);
+    // Storico versioni del documento attivo: stessa affordance del "Nuovo
+    // documento", così la si trova dal menu in alto a sinistra (oltre che dal
+    // tasto destro sul foglio). Parità di cammini.
+    const hist = document.createElement('button');
+    hist.type = 'button';
+    hist.className = 'ed-doc-new ed-doc-history';
+    hist.id = 'docHistory';
+    hist.innerHTML = `${ICONS.history ? ICONS.history(14) : '⟲'}<span>Storico versioni</span>`;
+    hist.addEventListener('click', () => { closeDocPop(); openVersionHistory(); });
+    docPopEl.appendChild(hist);
   }
 
   function actButton(glyph, title, onAct) {
