@@ -63,6 +63,10 @@ globalThis.SN_CREDITS = {
     return { ok: true, balance: 100 - amount };
   },
   award: async (entry) => { refunds.push(entry); return { balance: 100 }; },
+  // #366.2: l'handler legge il costo di riapertura dalla config crediti
+  // (owner-configurabile, fallback CREDIT.BOARD_REOPEN). Lo stub rispecchia il
+  // default storico.
+  config: () => ({ boardReopen: SN_CONST.CREDIT.BOARD_REOPEN, boardVote: SN_CONST.CREDIT.BOARD_VOTE }),
 };
 
 let seq = 0;
