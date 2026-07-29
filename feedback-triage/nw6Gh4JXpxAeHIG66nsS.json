@@ -1,0 +1,7 @@
+{
+  "id": "nw6Gh4JXpxAeHIG66nsS",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho verificato il saluto al centro della nuova scheda. Prima il messaggio non sapeva che ora fosse e poteva restare su un saluto sbagliato (un buonasera alle 10 di mattina); ricaricare non lo cambiava perche' veniva riservito dalla memoria. Ora, quando Filo compone il messaggio, riceve la fascia della giornata (mattina/pomeriggio/sera/notte) e se e' un giorno feriale o il weekend, con l'istruzione esplicita di salutare di conseguenza e di non citare l'orario preciso. Ho controllato che questa informazione entri davvero nel testo che Filo compone e che il messaggio venga considerato da rifare quando cambia la fascia oraria o si passa da feriale a weekend: aprendo la nuova scheda in un momento diverso, il saluto vecchio viene mostrato subito (la scheda resta istantanea) e poi si aggiorna da solo con quello giusto, senza dover ricaricare a mano. Ho provato i casi limite (cambi di fascia e feriale/weekend) e la logica risponde bene, senza rigenerare inutilmente durante la giornata (nessun costo sprecato). Tutti i controlli automatici passano, inclusi quelli nuovi dedicati proprio a questo caso. Nota: la frase esatta del saluto la scrive il modello AI, che nell'ambiente di test non e' collegato, quindi il testo finale lo vedrai all'uso reale; tutta la logica che fornisce a Filo l'ora della giornata e che fa aggiornare il messaggio e' pero' verificata.",
+  "queuedAt": "2026-07-29T09:23:56.965Z",
+  "queuedBy": "routine"
+}
