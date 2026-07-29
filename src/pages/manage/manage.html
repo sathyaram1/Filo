@@ -149,6 +149,31 @@
     }
     .mg-coming-icon { font-size: 32px; opacity: 0.4; }
 
+    /* ── Tab Log (worker delle routine) ───────────────────────────────── */
+    .mg-log { max-width: 720px; }
+    .mg-log h2 { font-size: 18px; margin: 0 0 4px; }
+    .mg-log-intro { font-size: 13px; color: var(--sn-muted); margin: 0 0 16px; }
+    .mg-log-loading, .mg-log-denied, .mg-log-empty {
+      font-size: 13px; color: var(--sn-muted); padding: 24px 0;
+    }
+    .mg-log-list { list-style: none; margin: 0; padding: 0; }
+    /* Una riga = un worker. Ruolo a sinistra (colonna fissa, allineamento a
+       colpo d'occhio), poi l'istante d'avvio: relativo in evidenza, assoluto
+       in sottotono. */
+    .mg-log-row {
+      display: flex; align-items: baseline; gap: 12px;
+      padding: 9px 4px;
+      border-bottom: 1px solid var(--sn-border);
+      font-size: 13px;
+    }
+    .mg-log-row:last-child { border-bottom: none; }
+    .mg-log-role {
+      flex: 0 0 auto; min-width: 96px;
+      font-weight: 600; color: var(--sn-fg);
+    }
+    .mg-log-when { color: var(--sn-fg); }
+    .mg-log-abs { margin-left: auto; color: var(--sn-muted); font-size: 12px; }
+
     /* ── Layout 3 colonne della sezione Revisione ──────────────────────── */
     .mg-review {
       display: grid;
