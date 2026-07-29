@@ -1,7 +1,0 @@
-{
-  "id": "8svLvL46wIJ17rSozjZE",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica e stata pubblicata. Ora il terminale della dashboard ricorda l'ultima cartella in cui ti trovavi e, riaprendo Filo, riparte da li invece di tornare alla home. Se quella cartella nel frattempo non esiste piu, si riparte in sicurezza dalla home.",
-  "queuedAt": "2026-07-29T22:20:40.472Z",
-  "queuedBy": "routine"
-}
