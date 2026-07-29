@@ -1587,6 +1587,7 @@
     markDirty();
     updateWordCountModules();
     maybeAutoTitle();
+    maybeAutoSummary();
   }
 
   docEl.addEventListener('input', () => {
