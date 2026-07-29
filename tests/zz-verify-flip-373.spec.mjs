@@ -86,16 +86,24 @@ test('verify #373: edge cases + screenshot', async ({ app, openTab }) => {
   await page.click('#previewFlip');
   await expect(page.locator('#previewImg')).toHaveAttribute('src', 'https://cards.test/delver-front.jpg');
 
-  // Edge 3: gira su retro, poi passa ad un'altra carta e TORNA → riparte dal fronte.
+  // Edge 3a (SLOW, invariante "cambio carta"): gira su retro, poi passa a un'ALTRA
+  // carta lasciando che la preview dipinga davvero, poi TORNA → deve ripartire dal fronte.
   await page.click('#previewFlip');
   await expect(page.locator('#previewImg')).toHaveAttribute('src', 'https://cards.test/delver-back.jpg');
   await page.locator('#deckList .dk-row', { hasText: 'Lightning Bolt' }).hover();
+  await expect(page.locator('#previewImg')).toHaveAttribute('src', 'https://cards.test/bolt.jpg'); // Bolt DAVVERO dipinta
   await page.locator('#deckList .dk-row', { hasText: 'Delver of Secrets' }).hover();
   await expect(page.locator('#previewImg')).toHaveAttribute('src', 'https://cards.test/delver-front.jpg');
 
-  // Screenshot: fronte con tasto gira, e stato girato (retro).
-  await page.screenshot({ path: 'tests/.shots/flip-373-front.png' });
+  // Edge 3b (STESSA carta, preview chiusa e riaperta): gira su retro, muovi il
+  // mouse fuori dalla lista finché la preview si chiude (torna alle statistiche),
+  // poi ri-hover la STESSA riga → cosa mostra?
   await page.click('#previewFlip');
   await expect(page.locator('#previewImg')).toHaveAttribute('src', 'https://cards.test/delver-back.jpg');
-  await page.screenshot({ path: 'tests/.shots/flip-373-back.png' });
+  await page.mouse.move(5, 5);
+  await expect(page.locator('#stateStats')).toBeVisible({ timeout: 4000 }); // preview chiusa
+  await page.locator('#deckList .dk-row', { hasText: 'Delver of Secrets' }).hover();
+  await expect(page.locator('#statePreview')).toBeVisible();
+  await page.screenshot({ path: 'tests/.shots/flip-373-revisit.png' });
+  await expect(page.locator('#previewImg')).toHaveAttribute('src', 'https://cards.test/delver-front.jpg');
 });
