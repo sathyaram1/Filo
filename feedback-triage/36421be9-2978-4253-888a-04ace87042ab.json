@@ -1,0 +1,7 @@
+{
+  "id": "36421be9-2978-4253-888a-04ace87042ab",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la modifica è stata pubblicata. Ho verificato che la novità tocca solo l'editor e la logica dei punti di ripristino, senza toccare nulla di sensibile (regole di accesso, impostazioni, chiavi o script interni). Il testo salvato nelle anteprime dello storico resta sempre semplice testo, mai eseguito. Da ora, quando scrivi o cancelli molto a mano e poi ti fermi un momento (o cambi documento), l'editor salva da solo un punto di ripristino nello Storico versioni; le piccole correzioni non lo intasano. La modifica è live.",
+  "queuedAt": "2026-07-29T15:51:06.939Z",
+  "queuedBy": "routine"
+}
