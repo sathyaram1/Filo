@@ -1597,6 +1597,14 @@
     $('carouselToggle').addEventListener('click', () => carouselToggle());
     $('carouselClose').addEventListener('click', () => closeCarousel());
 
+    // Gira la carta bifronte (feedback #373): tasto dedicato sopra l'immagine, e
+    // — gesto fisico naturale — anche il click sull'immagine stessa la volta.
+    // Vale in entrambi gli slot (preview e carosello): parità tra i due cammini.
+    $('previewFlip').addEventListener('click', (e) => { e.stopPropagation(); flipCardImage($('previewImg')); });
+    $('carouselFlip').addEventListener('click', (e) => { e.stopPropagation(); flipCardImage($('carouselImg')); });
+    $('previewImg').addEventListener('click', () => flipCardImage($('previewImg')));
+    $('carouselImg').addEventListener('click', () => flipCardImage($('carouselImg')));
+
     // Tasto destro sul box modulare (§5.2): scelta del modulo dello slot —
     // vale sia per la preview sia per il carosello (stesso sistema moduli).
     const openModuleMenu = (e) => {
