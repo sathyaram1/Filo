@@ -1387,14 +1387,41 @@
     const card = cardsById[cardId];
     if (!card) return;
     const img = $('previewImg');
-    if (img.dataset.cardId !== card.id) {
-      img.src = card.image || '';
-      img.alt = card.name;
-      img.dataset.cardId = card.id;
-    }
+    if (img.dataset.cardId !== card.id) paintCardImage(img, card);
     renderDetailCtx(card);
     renderDetailModule(card);
     if (detailState !== 'preview') setDetailState('preview');
+  }
+
+  // Dipinge una carta in uno slot immagine del detail (preview o carosello):
+  // riparte SEMPRE dalla faccia frontale e mostra il tasto "gira" solo per le
+  // bifronte (transform / modal DFC). Il retro è già precaricato → flip istantaneo.
+  function paintCardImage(img, card) {
+    const frame = img.closest('.dk-card-frame');
+    const flip = frame ? frame.querySelector('.dk-flip') : null;
+    const hasBack = !!(card && card.backImage);
+    img.src = (card && card.image) || '';
+    img.alt = (card && card.name) || '';
+    img.dataset.cardId = card ? card.id : '';
+    img.dataset.face = 'front';
+    if (frame) {
+      frame.classList.toggle('dk-has-back', hasBack);
+      frame.classList.remove('dk-flipped');
+    }
+    if (flip) flip.hidden = !hasBack;
+  }
+
+  // Gira la carta mostrata nello slot: alterna fronte/retro SUL POSTO. No-op se
+  // la carta non ha un retro (carta a faccia unica).
+  function flipCardImage(img) {
+    const card = cardsById[img.dataset.cardId];
+    if (!card || !card.backImage) return;
+    const frame = img.closest('.dk-card-frame');
+    const toBack = img.dataset.face !== 'back';
+    img.dataset.face = toBack ? 'back' : 'front';
+    img.src = toBack ? card.backImage : card.image;
+    img.alt = (toBack ? (card.backName || card.name) : card.name) || '';
+    if (frame) frame.classList.toggle('dk-flipped', toBack);
   }
 
   // L'id carta sotto il puntatore, qualunque sia il consumatore (§5.1):
