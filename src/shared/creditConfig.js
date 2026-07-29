@@ -26,6 +26,11 @@
   // non hanno mai senso negativi; un valore sballato nel doc non deve rompere
   // il motore ne' azzerare i premi.)
   function num(v, fallback) {
+    // null/undefined/'' = campo assente → fallback. Uno 0 ESPLICITO resta 0
+    // (importo valido: es. disattivare un premio). Number(null) sarebbe 0: lo
+    // escludiamo prima, altrimenti un campo assente diventerebbe 0 anziche' il
+    // default.
+    if (v === null || v === undefined || v === '') return fallback;
     const n = Number(v);
     return Number.isFinite(n) && n >= 0 ? n : fallback;
   }
