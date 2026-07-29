@@ -531,20 +531,10 @@
   // sopravvivono al reload; qui le mostriamo dalla più recente alla più vecchia.
 
   // Testo semplice da una versione (il contenuto ProseMirror serializzato), per
-  // l'anteprima. Cammina i nodi aggiungendo un a-capo ai confini di blocco.
+  // l'anteprima. Delega alla logica pura in editorVersions.js — stessa estrazione
+  // usata dalla soglia degli snapshot manuali: una sorgente sola, niente deriva.
   function versionPlainText(v) {
-    const pm = v && v.content && v.content.content ? v.content.content : (v && v.content);
-    if (!pm || typeof pm !== 'object') return '';
-    let out = '';
-    const walk = (n) => {
-      if (!n || typeof n !== 'object') return;
-      if (n.type === 'text' && typeof n.text === 'string') { out += n.text; return; }
-      if (n.type === 'hardBreak') { out += '\n'; return; }
-      if (Array.isArray(n.content)) n.content.forEach(walk);
-      if (/^(paragraph|heading|blockquote|listItem|codeBlock)$/.test(n.type)) out += '\n';
-    };
-    walk(pm);
-    return out.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+    return VERS && v ? VERS.plainText(v.content) : '';
   }
 
   // Etichetta + classe del badge in base alla sorgente della versione.
