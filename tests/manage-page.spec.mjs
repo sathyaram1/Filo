@@ -1,7 +1,7 @@
 // Spec Playwright per la pagina di gestione (filo://manage/).
 //
 // Assert di COMPORTAMENTO:
-//   - dashboard unificata (DB1): 7 tab, "Ricevuti" attiva di default; le tab
+//   - dashboard unificata (DB1): 8 tab, "Ricevuti" attiva di default; le tab
 //     lista (Ricevuti/In coda/Risolti/Archiviati) condividono panel-list;
 //     stats/models sono segnaposto; "Automazioni" raccoglie le impostazioni;
 //   - lo switch "Modalità automatica" vive nella tab "Automazioni",
