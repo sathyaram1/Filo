@@ -130,7 +130,25 @@ async function fetchRemoteLoopCap() {
   }
 }
 
+// Quante voci del log dei worker conservare (le più recenti). Deve restare
+// allineato a SN_CONST.AUTOMATION.WORKER_LOG_CAP (src/shared/constants.js): il
+// log vive come campo del doc config/automation, cappato per non gonfiarlo.
+const WORKER_LOG_CAP = 200;
+
 // ─── Logica pura (esportata, testata in tests/unit/dispatch.test.mjs) ─────────
+
+/**
+ * Accoda una voce al log dei worker e tiene solo le `cap` PIÙ RECENTI. Pura
+ * (testata in tests/unit/dispatch.test.mjs). Le voci arrivano in ordine
+ * cronologico (append in coda); il cap taglia le più vecchie dalla testa, così
+ * il documento non cresce all'infinito. Ignora voci malformate.
+ */
+export function appendWorkerLog(entries, entry, cap = WORKER_LOG_CAP) {
+  const list = Array.isArray(entries) ? entries.filter((e) => e && typeof e === 'object') : [];
+  if (entry && typeof entry === 'object' && entry.role) list.push(entry);
+  const n = Number.isFinite(cap) && cap > 0 ? Math.floor(cap) : WORKER_LOG_CAP;
+  return list.length > n ? list.slice(list.length - n) : list;
+}
 
 /** Stato di default per un branch in `review` senza file di stato. */
 export function defaultState(id, branch) {
