@@ -470,6 +470,129 @@
     });
   }
 
+  // ── Pannello "Storico versioni": sfoglia e ripristina QUALSIASI versione ──
+  // Il toast "Annulla" copre solo l'ultima modifica di Filo; questo pannello dà
+  // accesso all'intero storico (invariante UX: se salviamo N versioni, l'utente
+  // deve poterle vedere tutte). Le versioni stanno sull'archivio app e
+  // sopravvivono al reload; qui le mostriamo dalla più recente alla più vecchia.
+
+  // Testo semplice da una versione (il contenuto ProseMirror serializzato), per
+  // l'anteprima. Cammina i nodi aggiungendo un a-capo ai confini di blocco.
+  function versionPlainText(v) {
+    const pm = v && v.content && v.content.content ? v.content.content : (v && v.content);
+    if (!pm || typeof pm !== 'object') return '';
+    let out = '';
+    const walk = (n) => {
+      if (!n || typeof n !== 'object') return;
+      if (n.type === 'text' && typeof n.text === 'string') { out += n.text; return; }
+      if (n.type === 'hardBreak') { out += '\n'; return; }
+      if (Array.isArray(n.content)) n.content.forEach(walk);
+      if (/^(paragraph|heading|blockquote|listItem|codeBlock)$/.test(n.type)) out += '\n';
+    };
+    walk(pm);
+    return out.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  }
+
+  // Etichetta + classe del badge in base alla sorgente della versione.
+  function versionSourceMeta(v) {
+    const src = v && v.source;
+    if (src === 'filo') return { tag: 'Modifica di Filo', cls: 'filo' };
+    if (src === 'restore') return { tag: 'Prima di un ripristino', cls: 'restore' };
+    return { tag: 'Modifica manuale', cls: 'manual' };
+  }
+
+  // Anteprima corta (prime righe non vuote) per la riga della lista.
+  function versionPreviewShort(v) {
+    const text = versionPlainText(v);
+    if (!text) return '';
+    const line = text.split('\n').map((l) => l.trim()).filter(Boolean).slice(0, 3).join(' · ');
+    return line.length > 180 ? line.slice(0, 179).trimEnd() + '…' : line;
+  }
+
+  // Quante versioni sono renderizzate al momento (paginazione anti-raffica per
+  // storie molto lunghe: si parte da un lotto e si carica il resto su richiesta).
+  const VERS_HISTORY_BATCH = 40;
+  let versHistoryShown = VERS_HISTORY_BATCH;
+
+  function openVersionHistory() {
+    closeDocPop();
+    closeTitleMenu();
+    if (!doc) return;
+    versHistoryShown = VERS_HISTORY_BATCH;
+    renderVersionHistory(doc.id);
+  }
+
+  function renderVersionHistory(fileId) {
+    const all = VERS ? VERS.listFor(versions, fileId).slice().reverse() : []; // recente → vecchia
+    if (!all.length) {
+      openOverlay(`<h3>Storico versioni</h3>
+        <p class="ed-vh-empty">Nessuna versione ancora. Filo salva un punto di ripristino ogni volta che modifica il documento; da lì potrai tornare indietro.</p>
+        <div class="ed-overlay-actions"><button class="ed-btn primary" id="ovClose">Chiudi</button></div>`);
+      $('ovClose').addEventListener('click', closeOverlay);
+      return;
+    }
+    const shown = all.slice(0, versHistoryShown);
+    const rows = shown.map((v) => {
+      const meta = versionSourceMeta(v);
+      const prev = versionPreviewShort(v);
+      const prevHtml = prev ? escapeHtml(prev) : '<span class="ed-vh-noprev">(documento vuoto)</span>';
+      return `<div class="ed-vh-item" data-id="${escapeHtml(v.id)}" role="button" tabindex="0" title="Vedi l'anteprima di questa versione">
+        <div class="ed-vh-head">
+          <span class="ed-vh-badge ${meta.cls}">${escapeHtml(meta.tag)}</span>
+          <span class="ed-vh-when">${escapeHtml(fmtVersionWhen(v.ts))}</span>
+        </div>
+        <div class="ed-vh-prev">${prevHtml}</div>
+        <div class="ed-vh-actions">
+          <button class="ed-btn ed-vh-restore" data-id="${escapeHtml(v.id)}">Ripristina</button>
+        </div>
+      </div>`;
+    }).join('');
+    const more = all.length > versHistoryShown
+      ? `<button class="ed-btn ed-vh-more" id="vhMore">Mostra le versioni più vecchie (${all.length - versHistoryShown})</button>`
+      : '';
+    openOverlay(`<h3>Storico versioni</h3>
+      <div class="ed-vh-list">${rows}</div>
+      ${more}
+      <div class="ed-overlay-actions"><button class="ed-btn primary" id="ovClose">Chiudi</button></div>`);
+    $('ovClose').addEventListener('click', closeOverlay);
+    const moreBtn = $('vhMore');
+    if (moreBtn) moreBtn.addEventListener('click', () => { versHistoryShown += VERS_HISTORY_BATCH; renderVersionHistory(fileId); });
+    overlayBox.querySelectorAll('.ed-vh-restore').forEach((b) => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (restoreVersion(fileId, b.dataset.id)) renderVersionHistory(fileId);
+    }));
+    // Click/Invio sulla riga (fuori dal bottone): apri l'anteprima ampia prima
+    // di decidere, così "Ripristina" non è mai una sorpresa a scatola chiusa.
+    overlayBox.querySelectorAll('.ed-vh-item').forEach((it) => {
+      const open = (e) => { if (e.target.closest('.ed-vh-restore')) return; showVersionPreview(fileId, it.dataset.id); };
+      it.addEventListener('click', open);
+      it.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(e); } });
+    });
+  }
+
+  // Anteprima ampia di una singola versione, con conferma di ripristino.
+  function showVersionPreview(fileId, versionId) {
+    const v = VERS ? VERS.get(versions, fileId, versionId) : null;
+    if (!v) return;
+    const meta = versionSourceMeta(v);
+    const full = versionPlainText(v);
+    const body = full ? escapeHtml(full).replace(/\n/g, '<br>') : '<span class="ed-vh-noprev">(documento vuoto)</span>';
+    openOverlay(`<h3>Anteprima versione</h3>
+      <div class="ed-vh-head">
+        <span class="ed-vh-badge ${meta.cls}">${escapeHtml(meta.tag)}</span>
+        <span class="ed-vh-when">${escapeHtml(fmtVersionWhen(v.ts))}</span>
+      </div>
+      <div class="ed-vh-fulltext">${body}</div>
+      <div class="ed-overlay-actions">
+        <button class="ed-btn" id="vhBack">Indietro</button>
+        <button class="ed-btn primary" id="vhRestore">Ripristina questa versione</button>
+      </div>`);
+    $('vhBack').addEventListener('click', () => renderVersionHistory(fileId));
+    $('vhRestore').addEventListener('click', () => {
+      if (restoreVersion(fileId, versionId)) renderVersionHistory(fileId);
+    });
+  }
+
   // ════════════════════════════════════════════════════════════════════
   //  COLLEZIONE DI FILE: attiva/crea/elimina/rinomina + menu documenti
   // ════════════════════════════════════════════════════════════════════
