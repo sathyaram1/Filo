@@ -23,6 +23,7 @@
       fixes: [
         'Accedere alle app Google in cui sei loggato (Documenti, Fogli, Drive, Gmail, Calendar…) è più affidabile: su queste pagine Filo non applica più il proprio disturbo anti-tracciamento, che lì non ti protegge da nulla (sei già identificato dal tuo account Google) ma poteva far scattare il blocco «questo browser o questa app potrebbero non essere sicuri». La protezione anti-tracciamento resta piena su tutto il resto, ricerca Google compresa.',
         'Nell’editor, eliminare un documento non è più definitivo per sbaglio: dopo la cancellazione compare un breve avviso con «Annulla» che riporta indietro il documento — testo, commenti, moduli e storico — esattamente al suo posto. L’eliminazione resta immediata, ma un tocco per errore non ti fa più perdere il file.',
+        'Inviare un feedback ora è immediato: appena premi «Invia» il box si chiude, senza attese e senza errori di rete. Se in quel momento sei senza connessione Filo tiene da parte il feedback e lo spedisce da solo appena la rete torna — anche se nel frattempo chiudi e riapri l’app.',
       ],
     },
     {
