@@ -116,7 +116,7 @@ function shellConfig(shell, sid, startCwd) {
 function createSession({ shell, cwd } = {}) {
   const sid = randSid();
   const wantShell = process.platform !== 'win32' ? 'sh' : (shell || 'powershell');
-  const startCwd = cwd || defaultCwd();
+  const startCwd = usableCwd(cwd);
   const cfg = shellConfig(wantShell, sid, startCwd);
 
   const session = {
