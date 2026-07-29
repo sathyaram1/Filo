@@ -512,6 +512,51 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 .ed-btn.danger { color: var(--sn-error); border-color: var(--sn-error); background: transparent; }
 .ed-btn[disabled] { opacity: 0.45; cursor: not-allowed; }
 
+/* ── Storico versioni (pannello overlay) ──────────────────────────────── */
+.ed-vh-empty { font-size: 13px; line-height: 1.5; color: var(--sn-muted); margin: 0; }
+.ed-vh-list { display: flex; flex-direction: column; gap: 8px; }
+.ed-vh-item {
+  border: 1px solid var(--sn-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: background 0.14s ease, border-color 0.14s ease;
+}
+.ed-vh-item:hover { background: var(--sn-hover); border-color: var(--sn-accent); }
+.ed-vh-item:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 1px; }
+.ed-vh-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.ed-vh-badge {
+  flex: 0 0 auto;
+  font-size: 11px; font-weight: 600;
+  padding: 2px 8px; border-radius: 999px;
+  background: var(--sn-hover); color: var(--sn-muted);
+  border: 1px solid var(--sn-border);
+}
+/* La modifica automatica di Filo è la sorgente da evidenziare. */
+.ed-vh-badge.filo {
+  background: rgba(var(--sn-accent-rgb), 0.12);
+  color: var(--sn-accent);
+  border-color: rgba(var(--sn-accent-rgb), 0.35);
+}
+.ed-vh-when { font-size: 12px; color: var(--sn-muted); margin-left: auto; }
+.ed-vh-prev {
+  font-size: 13px; line-height: 1.4; color: var(--sn-fg);
+  overflow: hidden; text-overflow: ellipsis;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+.ed-vh-noprev { color: var(--sn-muted); font-style: italic; }
+.ed-vh-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
+.ed-vh-more { width: 100%; margin-top: 10px; }
+.ed-vh-fulltext {
+  margin: 12px 0 2px;
+  max-height: 46vh; overflow-y: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--sn-border); border-radius: 10px;
+  background: var(--sn-hover);
+  font-size: 13px; line-height: 1.5; color: var(--sn-fg);
+  white-space: normal; word-break: break-word;
+}
+
 /* Toast discreto in basso a destra (fallimenti non bloccanti, es. switch che
    non può allargarsi). Stile coerente con una notifica d'errore. */
 .ed-toast {
