@@ -34,6 +34,9 @@
   function getActiveConfig() { return activeConfig; }
 
   function pickNum(v, fallback) {
+    // null/undefined/'' → fallback (Number(null) sarebbe 0: un campo assente
+    // NON deve diventare 0). Uno 0 esplicito resta valido.
+    if (v === null || v === undefined || v === '') return fallback;
     const n = Number(v);
     return Number.isFinite(n) && n >= 0 ? n : fallback;
   }
