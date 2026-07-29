@@ -127,9 +127,10 @@ test('storico versioni: si sfoglia dal menu e ripristina una versione più vecch
   // Sorgente evidenziata: tutte create da una modifica di Filo.
   await expect(page.locator('.ed-vh-badge.filo')).toHaveCount(3);
   await expect(items.first()).toContainText('Modifica di Filo');
-  // Ordine cronologico inverso: in cima l'ultimo stato salvato (pre-"Charlie"),
-  // in fondo il più vecchio (pre-"Alpha").
-  await expect(items.first().locator('.ed-vh-prev')).toContainText('Bravo');
+  // Ordine cronologico inverso: in cima l'ultimo stato salvato (il contenuto
+  // catturato prima dell'ultima modifica di Filo = "Charlie"), in fondo il più
+  // vecchio (= "Alpha").
+  await expect(items.first().locator('.ed-vh-prev')).toContainText('Charlie');
   await expect(items.last().locator('.ed-vh-prev')).toContainText('Alpha');
 
   // Ripristina la versione PIÙ VECCHIA (in fondo): il documento deve tornare
