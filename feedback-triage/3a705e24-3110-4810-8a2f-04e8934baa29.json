@@ -1,7 +1,0 @@
-{
-  "id": "3a705e24-3110-4810-8a2f-04e8934baa29",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la correzione alle statistiche dell'editor è stata pubblicata. Su un documento vuoto ora parole, caratteri, frasi, paragrafi e tempo di lettura sono tutti a zero (prima segnava «Paragrafi: 1» e «~1 min» anche a foglio bianco), e i segni di sola punteggiatura non vengono più contati come parole.",
-  "queuedAt": "2026-07-29T21:20:43.264Z",
-  "queuedBy": "routine"
-}
