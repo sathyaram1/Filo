@@ -1148,6 +1148,28 @@ function webSearchResultsForPrompt(actions) {
   return blocks.join('\n\n').trim();
 }
 
+// Re-immissione del CONTENUTO di un file letto con LEGGI_FILE in un turno
+// precedente (#379.5): l'agente vede il testo completo del file che ha chiesto e
+// risponde con quello davanti (prima vedeva solo il riassunto). Sono DATI di
+// sistema affidabili, non istruzioni dell'utente.
+function fileReadsForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const blocks = [];
+  for (const a of actions) {
+    if (!a || String(a.type || '').toUpperCase() !== 'LEGGI_FILE') continue;
+    const out = a._output;
+    if (!out || !('fileRead' in out)) continue;
+    if (!out.found) {
+      blocks.push(`[File "${out.fileRead}" non trovato: non esiste (più) nell'editor]`);
+      continue;
+    }
+    let body = String(out.text || '');
+    if (body.length > 8000) body = body.slice(0, 8000) + '\n…(contenuto troncato)';
+    blocks.push(`[Contenuto completo del file "${out.title || out.fileRead}"]\n${body || '(vuoto)'}`);
+  }
+  return blocks.join('\n\n').trim();
+}
+
 // F4 — invia un feedback autonomo in background se la risposta segnala un gap
 // di capacità o una lamentela. Non blocca mai il flusso della chat.
 // Privacy: invia solo una descrizione GENERICA (nessun URL, nessun testo utente).
