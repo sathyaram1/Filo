@@ -394,6 +394,8 @@
     for (const id of ids) {
       const card = cardsById[id];
       if (card && card.image) preloadImage(card.image);
+      // Retro delle bifronte: scaldato insieme al fronte → il flip è istantaneo.
+      if (card && card.backImage) preloadImage(card.backImage);
     }
   }
   // Le righe carta VISIBILI ora: tutto il mazzo (elenco limitato, ~100 carte) +
