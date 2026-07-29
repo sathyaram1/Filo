@@ -1075,6 +1075,9 @@
     if (!cmd && Array.isArray(actions) && actions.some((a) => isType(a, 'CERCA_WEB') && a._output)) {
       return AUTO_CONTINUE_WEB;
     }
+    if (!cmd && Array.isArray(actions) && actions.some((a) => isType(a, 'LEGGI_FILE') && a._output)) {
+      return AUTO_CONTINUE_FILE;
+    }
     return AUTO_CONTINUE_PROMPT;
   }
 
