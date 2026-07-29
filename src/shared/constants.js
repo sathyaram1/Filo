@@ -921,6 +921,7 @@
       `    {"type": "INVIA_FEEDBACK", "testo": "...", "titolo": "..."},\n` +
       `    {"type": "CERCA_WEB", "query": "..."},\n` +
       `    {"type": "CAPACITA_DETTAGLIO", "ids": ["save-for-later"]},\n` +
+      `    {"type": "LEGGI_FILE", "fileId": "file-abc123"},\n` +
       `    {"type": "EVENTO_CALENDARIO", "date": "YYYY-MM-DD", "time": "HH:MM", "title": "...", "details": "..."},\n` +
       `    {"type": "APRI_FILE", "path": "...", "label": "..."},\n` +
       `    {"type": "PULISCI_TAB"},\n` +
