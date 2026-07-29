@@ -1,0 +1,7 @@
+{
+  "id": "S5yMK4QigtkFQ0JFD8xV",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la modifica non tocca nulla di sensibile ed e stata pubblicata. Nel deck builder ora le carte bifronte (quelle che si trasformano) si possono girare per vedere il retro: c'e un tasto sull'immagine e basta anche un clic sulla carta, sia nell'anteprima al passaggio del mouse sia nel carosello. Girando la carta cambia anche il nome mostrato con quello della faccia retro; navigando tra le carte del carosello si riparte sempre dal fronte. Le carte a faccia singola non mostrano il tasto.",
+  "queuedAt": "2026-07-29T13:39:36.136Z",
+  "queuedBy": "routine"
+}
