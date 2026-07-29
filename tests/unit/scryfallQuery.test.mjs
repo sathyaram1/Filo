@@ -119,7 +119,34 @@ test('simplifyCard: carta a due facce — immagini e costo dalle card_faces', ()
   assert.equal(c.typeLine, 'Creature — Human Wizard');
   assert.equal(c.image, 'https://cards/front.jpg');
   assert.equal(c.artCrop, 'https://cards/front-art.jpg');
+  assert.equal(c.backImage, 'https://cards/back.jpg', 'il retro alimenta il tasto "gira"');
+  assert.equal(c.backName, 'Insectile Aberration');
   assert.equal(c.priceEur, null, 'prezzo assente → null, non NaN');
+});
+
+test('simplifyCard: carta a faccia unica → nessun retro da girare', () => {
+  const c = Q.simplifyCard(API_CARD);
+  assert.equal(c.backImage, '', 'senza card_faces non c\'è retro');
+  assert.equal(c.backName, '');
+});
+
+test('simplifyCard: split/adventure (immagine unica in radice) → nessun retro', () => {
+  // Le carte split/adventure hanno DUE facce ma UNA sola immagine (image_uris
+  // sulla radice): non si "girano", quindi backImage deve restare vuoto.
+  const c = Q.simplifyCard({
+    id: 'split-1',
+    name: 'Fire // Ice',
+    cmc: 2,
+    image_uris: { normal: 'https://cards/fireice.jpg' },
+    card_faces: [
+      { name: 'Fire', mana_cost: '{1}{R}', type_line: 'Instant' },
+      { name: 'Ice', mana_cost: '{1}{U}', type_line: 'Instant' },
+    ],
+    prices: {},
+    legalities: { commander: 'legal' },
+  });
+  assert.equal(c.image, 'https://cards/fireice.jpg');
+  assert.equal(c.backImage, '', 'immagine unica in radice → niente retro');
 });
 
 test('simplifyCard: banned/non legale → legalCommander false; input rotto → null', () => {
