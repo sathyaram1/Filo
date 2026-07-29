@@ -365,8 +365,8 @@
     // ────────────────────────────── Crediti ──────────────────────────────────
     {
       id: 'credits', title: 'Crediti e consumi', category: 'credits',
-      desc: 'Mostra il saldo dei crediti, quando si ricaricano e un grafico di come li hai spesi tra le varie azioni.',
-      invoke: 'Pagina filo://credits/credits.html.',
+      desc: 'Mostra il saldo dei crediti, quando si ricaricano e un grafico di come li hai spesi tra le varie azioni. Puoi anche chiedere a Filo in chat quanti crediti ti restano: te lo dice al volo, senza aprire la pagina.',
+      invoke: 'Chiedendolo a Filo in chat ("quanti crediti mi restano?"), oppure dalla pagina filo://credits/credits.html per il dettaglio e il grafico.',
     },
   ];
 
