@@ -663,6 +663,11 @@
     renderGrid();
     updateWordCountModules();
     renderDocSwitcher();
+    // Nuovo file attivo → nuovo riferimento per gli snapshot manuali: il testo
+    // già presente al caricamento non conta come "modifica a mano" (misuriamo la
+    // deriva DA QUI). Annulla anche l'eventuale valutazione in sospeso del vecchio.
+    clearTimeout(manualSnapTimer);
+    setManualBaseline(serializeDocModel(doc));
   }
 
   // Passa a un altro file: salva prima quello corrente, poi attiva il target.
@@ -670,6 +675,9 @@
     if (!doc || id === doc.id) { closeDocPop(); return; }
     const target = STORE.findFile(collection, id);
     if (!target) return;
+    // Confine naturale: se lasciando il file l'utente ha scritto a mano
+    // abbastanza, salva un punto di ripristino prima di cambiare documento.
+    maybeRecordManualVersion();
     syncActiveIntoCollection();
     activateFile(target);
     writeCollection();
@@ -678,7 +686,7 @@
 
   // Crea un nuovo documento vuoto e lo apre.
   function createFile() {
-    if (doc) syncActiveIntoCollection();
+    if (doc) { maybeRecordManualVersion(); syncActiveIntoCollection(); }
     const file = STORE.addFile(collection, blankFileSerialized(), () => newId('file'));
     activateFile(file);
     writeCollection();
