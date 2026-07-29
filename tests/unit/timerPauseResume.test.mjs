@@ -96,6 +96,26 @@ test('gcTimers non fa scattare (ringing) un timer in pausa anche se la scadenza 
   assert.ok(!g.ringing, 'un timer in pausa non suona');
 });
 
+test('addTimer rifiuta una durata non positiva o non interpretabile e non crea nulla', async () => {
+  // Regressione #245: prima un Math.max(1, …) forzava il minimo a 1s, rendendo la
+  // guardia `if (sec <= 0) return null` irraggiungibile — un input malformato
+  // creava un timer di 1s che suonava subito, invece di essere scartato.
+  for (const bad of [0, -5, NaN, undefined, null, 'ciao', {}]) {
+    const t = await M.addTimer({ label: 'x', seconds: bad });
+    assert.equal(t, null, `seconds=${JSON.stringify(bad)} non deve creare un timer`);
+    assert.deepEqual(await M.listTimers(), [], 'nessun timer fasullo salvato in storage');
+  }
+});
+
+test('addTimer crea il timer per una durata valida (>= 1s)', async () => {
+  const t = await M.addTimer({ label: 'Pasta', seconds: 90 });
+  assert.ok(t && t.id, 'una durata valida produce un timer');
+  const remaining = new Date(t.endsAt).getTime() - Date.now();
+  assert.ok(remaining > 88_000 && remaining <= 90_000, `~90s residui (${Math.round(remaining / 1000)}s)`);
+  const [stored] = await M.listTimers();
+  assert.equal(stored.id, t.id, 'il timer è persistito');
+});
+
 test('le sveglie (kind alarm) non sono mettibili in pausa', async () => {
   const a = await M.addAlarm({ label: 'sveglia', time: '23:59' });
   assert.ok(a && a.kind === 'alarm');

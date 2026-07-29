@@ -223,7 +223,13 @@
   }
 
   async function addTimer({ label, seconds }) {
-    const sec = Math.max(1, Math.round(Number(seconds) || 0));
+    // Una durata non interpretabile o non positiva (0, negativa, NaN) NON crea un
+    // timer: torniamo null e i chiamanti non lo trasmettono né lo segnano eseguito
+    // (`if (t) broadcastLiveUpdate()`, `executed: !!entry`). Stessa filosofia di
+    // addAlarm: meglio "non ho capito la durata" che programmare un timer fasullo.
+    // (Prima un `Math.max(1, …)` forzava il minimo a 1s e rendeva questa guardia
+    // irraggiungibile: un input malformato creava un timer di 1s che suonava subito.)
+    const sec = Math.round(Number(seconds) || 0);
     if (sec <= 0) return null;
     const list = await listTimers();
     const entry = {
