@@ -90,6 +90,28 @@ test('con più file il contesto ha UN riassunto per file e NON il testo integral
   assert.ok(!prompt.includes('BETA0'), 'il corpo del file 2 non entra nel contesto');
 });
 
+test('il prompt di chat di Filo inietta i riassunti dei file, non il testo integrale', () => {
+  const collection = {
+    version: STORE.COLLECTION_VERSION,
+    activeId: 'f1',
+    files: [
+      fileWith({ id: 'f1', title: 'Romanzo', lines: [longBody('ALFA')], summary: 'Un racconto di fantasia su un viaggio.' }),
+      fileWith({ id: 'f2', title: 'Ricette', lines: [longBody('BETA')], summary: 'Elenco di ricette di cucina italiana.' }),
+    ],
+  };
+  const files = SUM.renderForPrompt(SUM.buildContextFiles(collection));
+  const prompt = PROMPTS.filoChat({ profilo: '', preferenze: '', stato: '', files });
+  // Il prompt annuncia la sezione FILE e contiene i riassunti dei due file…
+  assert.ok(prompt.includes("FILE DELL'EDITOR"));
+  assert.ok(prompt.includes('Un racconto di fantasia su un viaggio.'));
+  assert.ok(prompt.includes('Elenco di ricette di cucina italiana.'));
+  // …e descrive l'azione LEGGI_FILE per leggere un file per intero on-demand.
+  assert.ok(prompt.includes('LEGGI_FILE'));
+  // Ma NON il testo integrale dei documenti.
+  assert.ok(!prompt.includes('ALFA0'));
+  assert.ok(!prompt.includes('BETA0'));
+});
+
 test('un file senza riassunto AI ripiega su un estratto (contesto mai vuoto)', () => {
   const collection = {
     version: STORE.COLLECTION_VERSION,
