@@ -12,6 +12,7 @@ const SVC = __dirname;
 
 // Ordine identico al vecchio background.js importScripts(...).
 require(path.join(SHARED, 'constants.js'));
+require(path.join(SHARED, 'creditConfig.js')); // #366.2 — importi crediti configurabili (default = CREDIT), dopo constants
 require(path.join(SHARED, 'messages.js'));
 require(path.join(SHARED, 'i18n.js'));
 require(path.join(SHARED, 'timeFormat.js')); // formattazione durate/countdown (#323)
