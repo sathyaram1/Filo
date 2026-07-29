@@ -58,6 +58,42 @@ test('conteggio parole non fonde parole a cavallo dei blocchi', async ({ openTab
   await expect(page.locator('.ed-module[data-type="word-count"] .wc-num')).toHaveText('6');
 });
 
+test('statistiche di un documento vuoto sono tutte a zero', async ({ openTab }) => {
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('.ed-module[data-type="word-count"] .wc-num');
+  // Documento vuoto: apri "Statistiche documento" cliccando il conteggio.
+  await page.click('.ed-module[data-type="word-count"] .ed-mod-pad');
+  const rows = page.locator('.ed-stat-row');
+  await expect(rows).toHaveCount(5);
+  // Ogni metrica è 0 — incluso Paragrafi (prima mostrava 1 per il <p> vuoto)
+  // e Tempo di lettura (prima forzato a ~1 min).
+  await expect(page.locator('.ed-stat-row', { hasText: 'Parole' }).locator('.v')).toHaveText('0');
+  await expect(page.locator('.ed-stat-row', { hasText: 'Caratteri' }).locator('.v')).toHaveText('0');
+  await expect(page.locator('.ed-stat-row', { hasText: 'Frasi' }).locator('.v')).toHaveText('0');
+  await expect(page.locator('.ed-stat-row', { hasText: 'Paragrafi' }).locator('.v')).toHaveText('0');
+  await expect(page.locator('.ed-stat-row', { hasText: 'Tempo di lettura' }).locator('.v')).toHaveText('~0 min');
+});
+
+test('token di sola punteggiatura non contano come parole', async ({ openTab }) => {
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('.ed-module[data-type="word-count"] .wc-num');
+  await page.click('#doc');
+  // Solo punteggiatura: prima del fix ",,, ..." contava 2 parole.
+  await page.evaluate(() => {
+    const doc = document.getElementById('doc');
+    doc.innerHTML = '<p>,,, ...</p>';
+    doc.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await expect(page.locator('.ed-module[data-type="word-count"] .wc-num')).toHaveText('0');
+  // Mescolando parole e punteggiatura conta solo le parole reali.
+  await page.evaluate(() => {
+    const doc = document.getElementById('doc');
+    doc.innerHTML = '<p>ciao , mondo ... !</p>';
+    doc.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await expect(page.locator('.ed-module[data-type="word-count"] .wc-num')).toHaveText('2');
+});
+
 test('cambio pagina via switch mostra moduli della pagina 1', async ({ openTab }) => {
   const page = await openTab('filo://editor/editor.html');
   await page.waitForSelector('.ed-module[data-type="switch"]');
