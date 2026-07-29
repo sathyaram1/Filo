@@ -2130,6 +2130,15 @@
     if (!smLoaded && !smLoading) loadSupportModels();
   });
 
+  // Tab "Log": ricarica il log dei worker a OGNI apertura (non solo la prima) —
+  // vogliamo vedere gli spawn nuovi dall'ultima volta. È una singola lettura di
+  // documento, quindi rileggerla a ogni click è a costo trascurabile.
+  mgTabs.addEventListener('click', (e) => {
+    const btn = e.target.closest('.mg-tab');
+    if (!btn || btn.dataset.tab !== 'log') return;
+    loadWorkerLog();
+  });
+
   // Esponi per gli spec Playwright (hook di test).
   window.__mgTest.loadSupportModels = loadSupportModels;
   window.__mgTest.getSmChains = () => smChains;
