@@ -1194,12 +1194,17 @@ async function maybeAutoFeedback({ textReply, rawActions, userMessage, sender })
 // vecchia iniezione degli appunti: gli appunti ora SONO file dell'editor e i
 // loro riassunti entrano qui come tutti gli altri. Best-effort: se qualcosa non
 // è disponibile ritorna '' e il prompt mostra "(nessuno)".
+async function editorFileSummariesList() {
+  try {
+    const EF = require('./editorFiles');
+    return await EF.listFileSummaries();
+  } catch (_) { return []; }
+}
 async function editorFileSummaries() {
   try {
     const Summary = globalThis.SN_EDITOR_SUMMARY;
     if (!Summary) return '';
-    const EF = require('./editorFiles');
-    const list = await EF.listFileSummaries();
+    const list = await editorFileSummariesList();
     return Summary.renderForPrompt(list);
   } catch (_) { return ''; }
 }
