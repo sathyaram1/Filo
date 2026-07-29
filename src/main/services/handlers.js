@@ -913,6 +913,27 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         const detail = Caps ? Caps.renderDetailForPrompt(ids) : '';
         return { executed: true, kept: true, output: { capabilities: ids, detail } };
       }
+      case 'LEGGI_FILE': {
+        // #379.5 — lettura ON-DEMAND del contenuto completo di un file
+        // dell'editor. Filo vede solo i riassunti; quando decide che vale la pena
+        // leggerne uno per intero, emette LEGGI_FILE con l'id preso dall'elenco
+        // FILE. Il contenuto torna come `output`, che il client re-immette nel
+        // contesto (auto-continue) così l'agente risponde col testo davanti.
+        // Sola lettura: nessun effetto collaterale.
+        const fileId = action.fileId ?? action.id ?? action.file ?? action.percorso ?? action.path;
+        let r = { ok: false };
+        try {
+          const EF = require('./editorFiles');
+          r = await EF.readFile(fileId);
+        } catch (e) {
+          console.warn('[Filo] lettura file editor fallita', e?.message || e);
+        }
+        return {
+          executed: !!(r && r.ok),
+          kept: true,
+          output: { fileRead: String(fileId == null ? '' : fileId), found: !!(r && r.ok), title: (r && r.title) || '', text: (r && r.text) || '' },
+        };
+      }
       case 'PULISCI_TAB':
         // Non eseguiamo subito: il client mostra un bottone di conferma; al
         // click manda RUN_TAB_TRIAGE. Teniamo il bottone nella bolla.
