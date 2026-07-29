@@ -1,0 +1,7 @@
+{
+  "id": "b0643195-5d30-451d-8e8f-1f35c5754fca",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho verificato che ogni documento tiene un breve riassunto scritto in automatico quando c'e abbastanza testo, che si aggiorna da solo quando il documento cambia molto e resta fermo per modifiche piccole, e che dal menu del tasto destro sul titolo si puo rigenerare a mano: tutti confermati provando l'app reale. Ho verificato il punto centrale chiesto: parlando con Filo, nel contesto entra il riassunto di OGNI file (appunti inclusi) e NON il testo integrale dei documenti, cosi resta economico; quando gli serve davvero un documento per intero, Filo lo apre e lo legge sul momento e la lettura restituisce il contenuto giusto del file richiesto. Se il file chiesto e stato eliminato, glielo diciamo invece di lasciarlo a vuoto. Prove di robustezza superate: documenti vuoti, riassunti molto lunghi (tagliati), titoli con emoji o codice tra parentesi (trattati come testo, non eseguiti), nessuno stato che manda in errore, e il testo completo dei file non trapela mai dove deve entrare solo il riassunto. La vecchia iniezione degli appunti nel contesto e correttamente sostituita dai riassunti.",
+  "queuedAt": "2026-07-29T07:18:20.164Z",
+  "queuedBy": "routine"
+}
