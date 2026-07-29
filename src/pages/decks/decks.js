@@ -1458,10 +1458,8 @@
     btn.textContent = added ? '✓ nel mazzo' : '+ aggiungi';
     btn.title = added ? 'Rimuovi dal mazzo (Invio)' : 'Aggiungi al mazzo (Invio)';
     // Prefetch di precedente e successiva (§5.1): la navigazione non aspetta.
-    for (const j of [carousel.i - 1, carousel.i + 1]) {
-      const c = cardsById[carousel.ids[j]];
-      if (c && c.image) { const pre = new Image(); pre.src = c.image; }
-    }
+    // Stesso warm-up (dedup) del precarico delle righe visibili.
+    preloadCardImages([carousel.ids[carousel.i - 1], carousel.ids[carousel.i + 1]].filter(Boolean));
     // Il box modulare vive anche nel carosello (§5.2): stesso slot, stesso menu.
     if (card) renderDetailModule(card, 'carouselModule');
     // Parere di Filo attivo → prefetch dei pareri delle carte VICINE (§6.1):
