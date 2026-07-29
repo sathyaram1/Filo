@@ -22,14 +22,19 @@ test('storico: contenuto <script>/onerror non esegue XSS nel pannello', async ({
   page.on('dialog', async (d) => { alerted = true; await d.dismiss(); });
 
   await page.click('#doc');
-  // Testo con tentativo di XSS. In un contenteditable il markup viene per lo più
-  // neutralizzato, ma verifichiamo comunque che il pannello non introduca img/script.
+  // Il documento contiene, come TESTO, un payload XSS: il paragrafo ha un nodo di
+  // testo con la stringa letterale "<script>…<img onerror=…>". Se il pannello
+  // storico reinietta il contenuto come HTML invece di come testo, lo script gira.
   await page.evaluate(() => {
     const doc = document.getElementById('doc');
-    doc.innerText = '<script>window.__xss=1<\/script><img src=x onerror=alert(1)> ciao';
+    const p = document.createElement('p');
+    p.textContent = '<script>window.__xss=1<\/script><img src=x onerror="window.__xss=2"> ciao';
+    doc.innerHTML = '';
+    doc.appendChild(p);
     doc.dispatchEvent(new Event('input', { bubbles: true }));
   });
-  await filoAutoEdit(page);
+  const touched = await filoAutoEdit(page);
+  expect(touched).toBeGreaterThan(0);
 
   await page.click('#docSwitch');
   await page.click('#docHistory');
