@@ -201,6 +201,7 @@ function configForHref(href) {
   }
   if (!host) return { level: 0, seed: 0 };
   if (isIdentityProviderHref(href)) return { level: 0, seed: 0 };
+  if (isGoogleAppSurface(href)) return { level: 0, seed: 0 };
   return { level, seed: seedForOrigin(etld1(host)) };
 }
 
