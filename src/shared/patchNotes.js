@@ -20,6 +20,7 @@
       fixes: [
         'Le statistiche dell’editor ora sono corrette su un documento vuoto: parole, caratteri, frasi, paragrafi e tempo di lettura sono tutti a zero (prima segnava «Paragrafi: 1» e «~1 min» anche a foglio bianco). Inoltre i segni di sola punteggiatura non vengono più contati come parole.',
         'Nella pagina del correttore, se provi ad aggiungere al dizionario personale una parola che c’è già (anche solo con maiuscole diverse), ora compare un avviso «già nel dizionario» e la parola digitata resta nel campo, invece di sparire in silenzio senza spiegazioni.',
+        'Nell’editor, «Cerca e sostituisci» ora trova anche le parole in cui solo una parte ha una formattazione diversa (una sillaba in grassetto, corsivo o sottolineato). Prima queste occorrenze venivano saltate: il contatore ne mostrava meno del reale e «Sostituisci tutto» lasciava alcune parole nel testo senza avvisare.',
       ],
     },
     {
