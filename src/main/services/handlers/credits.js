@@ -198,6 +198,10 @@ module.exports = function register(on, ctx) {
   let syncing = null;
   async function ensureAccountSync() {
     const uid = await currentUid();
+    // Prima di load() (che applica il refill): assicura che il motore usi gli
+    // importi correnti dalla config owner. Cosi' un cambio di dailyRefill/initial
+    // vale gia' dal prossimo refill/primo accesso.
+    await syncCreditConfig();
     const autoFeedbackEnabled = await getAutoFeedbackEnabled().catch(() => false);
     const state = await Credits.load({ autoFeedbackEnabled });
     // Non loggato: la cache locale resta com'è (modalità offline/anonima).
