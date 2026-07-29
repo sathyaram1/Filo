@@ -17,6 +17,20 @@ module.exports = function register(on, ctx) {
   const Credits = globalThis.SN_CREDITS;
   const FB = globalThis.SN_FEEDBACK;
 
+  // ── config importi crediti (owner-configurabile, #366.2) ────────────────────
+  // Legge config/credits (cache in memoria + refresh pigro in defaultsStore) e
+  // la registra sul motore, che poi usa quegli importi al posto delle costanti
+  // CREDIT. Best-effort: offline o doc assente → il motore ricade sui default
+  // CREDIT (comportamento storico). Non lancia mai.
+  async function syncCreditConfig() {
+    try {
+      await Defaults.refreshIfStale();
+      Credits.setActiveConfig(Defaults.getCreditConfig());
+    } catch (_) { /* il motore resta sui default CREDIT */ }
+  }
+  // Registra subito la config all'avvio (non attende la prima GET_CREDITS).
+  syncCreditConfig();
+
   // ── uid dell'utente loggato (claim dell'ID token Firebase) ──────────────────
   // Centralizzato in google-auth.js (getUid): lo riusa anche l'handler board.js
   // (DC2) per lo stesso scopo (votes.<uid> richiede l'uid Firebase, non l'email).
