@@ -617,7 +617,11 @@
             </div>
             <!-- Carosello su click (§5.3): flusso di triage, pinnato. -->
             <div class="dk-detail-state" id="stateCarousel" hidden>
-              <img class="dk-card-img" id="carouselImg" alt="" />
+              <div class="dk-card-frame">
+                <img class="dk-card-img" id="carouselImg" alt="" />
+                <button class="dk-flip" id="carouselFlip" type="button"
+                        title="Gira la carta" aria-label="Gira la carta" hidden>⟳</button>
+              </div>
               <div class="dk-carousel-bar">
                 <span class="dk-carousel-pos" id="carouselPos"></span>
                 <button class="dk-car-btn" id="carouselPrev" title="Carta precedente (←)"
