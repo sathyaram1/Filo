@@ -1,0 +1,7 @@
+{
+  "id": "63ee31f3-5e25-46e7-b4b1-adf59adf7bf6",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho verificato dal punto di vista dell'utente il problema segnalato: la cancellazione accidentale di un documento. Ora eliminare un documento resta immediato ma è sempre recuperabile: subito dopo la cancellazione compare in basso un avviso \"Annulla\" che rimette il documento esattamente com'era e dov'era (testo, posizione nell'elenco, storico delle versioni). Ho provato i casi: eliminare un documento fra due e annullare (torna al suo posto, e l'altro documento aperto non perde ciò che ci stavo scrivendo); eliminare il documento APERTO (dopo la cancellazione ne resta aperto un altro senza lasciarmi a mani vuote, e l'annulla riporta indietro quello cancellato e lo riapre); eliminare l'UNICO documento rimasto (al suo posto compare un foglio vuoto, e l'annulla rimette l'originale togliendo il foglio vuoto); eliminare sia dalla ✕ nell'elenco documenti sia dalla voce \"Elimina file\" del menu del tasto destro (l'annulla funziona identico da entrambi i punti). Ho anche controllato che un documento lungo e con caratteri speciali (emoji, simboli, accenti) torni identico dopo l'annulla. Non ho trovato nessun caso in cui un tocco per sbaglio faccia perdere il documento per sempre.",
+  "queuedAt": "2026-07-29T07:54:00.403Z",
+  "queuedBy": "routine"
+}
