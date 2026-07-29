@@ -266,3 +266,43 @@ test('dai risultati della chat: click apre il carosello su quella lista e Invio 
   await expect(page.locator('#carouselToggle')).toHaveAttribute('data-in', '1');
   await expect(page.locator('#deckCount')).toHaveText('2/100 carte');
 });
+
+// Carte bifronte (feedback #373): il tasto "gira" mostra il retro, sia nella
+// preview su hover sia nel carosello; il click sull'immagine fa lo stesso. Le
+// carte a faccia unica NON hanno il tasto. Si asserisce il SUCCESSO (l'immagine
+// del retro compare davvero), non l'assenza di errori.
+test('carta bifronte: il tasto gira mostra il retro in preview e carosello; carta singola non ha il tasto', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await mockScryfall(app);
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await seedDeck(page, [['c-delver', 1], ['c-bolt', 1]]);
+
+  // Hover sulla riga bifronte → preview col FRONTE e il tasto "gira" visibile.
+  await page.locator('#deckList .dk-row', { hasText: 'Delver of Secrets' }).hover();
+  await expect(page.locator('#statePreview')).toBeVisible();
+  await expect(page.locator('#previewImg')).toHaveAttribute('src', 'https://cards.test/delver-front.jpg');
+  await expect(page.locator('#previewFlip')).toBeVisible();
+
+  // Click sul tasto → compare il RETRO (senza il fix il tasto non esiste e
+  // l'immagine resterebbe il fronte: asserzione ROSSA).
+  await page.click('#previewFlip');
+  await expect(page.locator('#previewImg')).toHaveAttribute('src', 'https://cards.test/delver-back.jpg');
+  // Ri-cliccando il tasto torna il fronte.
+  await page.click('#previewFlip');
+  await expect(page.locator('#previewImg')).toHaveAttribute('src', 'https://cards.test/delver-front.jpg');
+
+  // Hover su una carta a faccia unica → nessun tasto "gira".
+  await page.locator('#deckList .dk-row', { hasText: 'Lightning Bolt' }).hover();
+  await expect(page.locator('#previewImg')).toHaveAttribute('src', 'https://cards.test/bolt.jpg');
+  await expect(page.locator('#previewFlip')).toBeHidden();
+
+  // Nel carosello: click sulla riga bifronte → fronte + tasto gira; il click
+  // sull'IMMAGINE stessa la volta (gesto fisico), e navigare resetta al fronte.
+  await page.locator('#deckList .dk-row', { hasText: 'Delver of Secrets' }).click();
+  await expect(page.locator('#stateCarousel')).toBeVisible();
+  await expect(page.locator('#carouselImg')).toHaveAttribute('src', 'https://cards.test/delver-front.jpg');
+  await expect(page.locator('#carouselFlip')).toBeVisible();
+  await page.click('#carouselImg');
+  await expect(page.locator('#carouselImg')).toHaveAttribute('src', 'https://cards.test/delver-back.jpg');
+});
