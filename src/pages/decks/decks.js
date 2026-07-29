@@ -1378,9 +1378,9 @@
     $('previewCtx').innerHTML = parts.join('');
   }
 
-  // Mostra/aggiorna la preview SUL POSTO: immagine (caricata solo ora — mai
-  // prima dell'hover, §5.1; la cachea l'HTTP cache del browser), contesto,
-  // modulo. Se lo stato era già preview non si passa dalle statistiche.
+  // Mostra/aggiorna la preview SUL POSTO: immagine (già scaldata in cache da
+  // preloadVisibleCards appena la riga è comparsa, §5.1 → hover istantaneo),
+  // contesto, modulo. Se lo stato era già preview non si passa dalle statistiche.
   function showPreview(cardId) {
     const card = cardsById[cardId];
     if (!card) return;
