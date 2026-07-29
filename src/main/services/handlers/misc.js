@@ -285,10 +285,43 @@ module.exports = function register(on, ctx) {
     }
   });
 
+  // Coda d'invio del feedback (#341): "Invia" NON aspetta più la rete. Il box
+  // sparisce subito e il main si fa carico di consegnare il feedback in
+  // background, ritentando da solo finché la connessione torna. L'invio è
+  // idempotente (submissionId → dedup lato server), quindi i ritentativi non
+  // creano duplicati. La coda è persistita: un feedback accodato offline
+  // sopravvive anche alla chiusura dell'app e riparte al riavvio.
+  const Outbox = globalThis.SN_FEEDBACK_OUTBOX;
+  if (Outbox?.init) {
+    Outbox.init({
+      // Titolo breve generato al momento reale dell'invio (offline → fallback).
+      prepare: (payload) => generateFeedbackName(payload?.text),
+      // A invio riuscito: se qualche allegato non è stato caricato, avvisa
+      // l'utente (l'unico canale disponibile dal main verso le pagine è il
+      // broadcast di un toast). Il feedback è comunque partito col resto.
+      onDone: (_item, result) => {
+        const failed = Array.isArray(result?.failed) ? result.failed : [];
+        if (!failed.length) return;
+        const names = failed.map((f) => f?.name || 'allegato').join(', ');
+        try {
+          broadcastToTabs({
+            type: MSG.SHOW_TOAST,
+            text: `Feedback inviato, ma non sono riuscito a caricare: ${names}`,
+            duration: 6000,
+          });
+        } catch (_) {}
+      },
+      log: (...a) => { try { console.log('[Filo feedback]', ...a); } catch (_) {} },
+    });
+  }
+
   on(MSG.SUBMIT_FEEDBACK, async (msg) => {
     try {
       if (!globalThis.SN_FEEDBACK?.submit) {
         throw new Error('SN_FEEDBACK non caricato nel main process');
+      }
+      if (!Outbox?.enqueue) {
+        throw new Error('SN_FEEDBACK_OUTBOX non caricato nel main process');
       }
       const payload = msg.payload || {};
       // Se l'utente è loggato come admin (l'owner), marca il suo invio come
@@ -305,17 +338,11 @@ module.exports = function register(on, ctx) {
         images: (payload.images || []).length,
         url: payload.url,
       });
-      payload.name = await generateFeedbackName(payload.text);
-      const submitP = globalThis.SN_FEEDBACK.submit(payload);
-      // Timeout generoso (#370): un upload lento ma riuscito deve poter riportare
-      // il VERO esito, invece di un falso errore che spinge l'utente a re-inviare.
-      // Anche se scatta, il re-invio è ormai idempotente (submissionId → dedup
-      // lato server), quindi non crea comunque duplicati.
-      const timeoutP = new Promise((_, rej) =>
-        setTimeout(() => rej(new Error('timeout (45s) — controlla la rete')), 45000));
-      const r = await Promise.race([submitP, timeoutP]);
-      console.log('[Filo feedback] submit ok', r);
-      return { ok: true, ...r };
+      // Accoda e prova a inviare subito, ma NON aspettare la rete: l'ack torna
+      // appena il feedback è al sicuro in coda (persistito). Il titolo lo genera
+      // la coda al momento dell'invio (anche offline, col fallback).
+      const r = await Outbox.enqueue(payload);
+      return { ok: true, queued: true, id: r?.id };
     } catch (e) {
       console.error('[Filo feedback] submit failed', e);
       return { ok: false, error: e?.message || String(e) };
