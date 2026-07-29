@@ -514,12 +514,30 @@
 
   // Elimina un documento. Invariante: resta sempre almeno un file — se si
   // cancella l'ultimo, se ne crea uno vuoto al suo posto.
+  //
+  // L'eliminazione è ISTANTANEA (nessuna conferma: l'attrito su un'azione
+  // frequente è negativo) ma REVERSIBILE — coerente col principio di Filo "il
+  // software deve poter essere usato male": un tocco per sbaglio non deve poter
+  // cancellare per sempre un documento. Subito dopo la cancellazione compare un
+  // toast "… eliminato" con "Annulla" che ripristina file, posizione e storico.
   function deleteFile(id) {
+    const target = STORE.findFile(collection, id);
+    if (!target) return;
     const wasActive = doc && doc.id === id;
+    // Se cancello il file ATTIVO catturo la sua versione FRESCA (con le
+    // modifiche in memoria non ancora salvate), non quella su disco.
+    if (wasActive) syncActiveIntoCollection();
+    const idx = collection.files.findIndex((f) => f.id === id);
+    const snapFile = cloneJson(STORE.findFile(collection, id));
+    const snapVersions = (VERS && versions && versions[id]) ? cloneJson(versions[id]) : null;
+    const title = (snapFile && snapFile.meta && snapFile.meta.title) || STORE.DEFAULT_TITLE;
+
     const res = STORE.removeFile(collection, id);
     if (!res.removed) return;
+    let createdBlankId = null;
     if (res.emptied) {
       const file = STORE.addFile(collection, blankFileSerialized(), () => newId('file'));
+      createdBlankId = file.id; // il foglio vuoto va tolto se l'utente annulla
       activateFile(file);
     } else if (wasActive) {
       activateFile(STORE.activeFile(collection));
@@ -529,6 +547,33 @@
     // Lo storico del file cancellato non serve più: liberalo dall'archivio.
     if (VERS) { versions = VERS.dropFile(versions, id); persistVersions(); }
     writeCollection();
+
+    showEditorToast(`"${ellipsize(title, 40)}" eliminato.`, {
+      label: 'Annulla',
+      onClick: () => restoreDeletedFile({ file: snapFile, index: idx, wasActive, createdBlankId, fileVersions: snapVersions }),
+    });
+  }
+
+  // Ripristina un file appena eliminato (undo dal toast): lo reinserisce alla
+  // sua posizione, ne ripristina lo storico e, se era il file aperto, lo riapre.
+  function restoreDeletedFile({ file, index, wasActive, createdBlankId, fileVersions }) {
+    if (!file || !file.id) return;
+    if (STORE.findFile(collection, file.id)) return; // già presente: niente da fare
+    // Non perdere ciò che l'utente sta scrivendo su un ALTRO file nel frattempo.
+    syncActiveIntoCollection();
+    // Se avevo creato un foglio vuoto perché era l'ultimo file, toglilo.
+    if (createdBlankId) STORE.removeFile(collection, createdBlankId);
+    const at = Math.max(0, Math.min(index, collection.files.length));
+    collection.files.splice(at, 0, file);
+    if (fileVersions && VERS) { versions[file.id] = fileVersions; persistVersions(); }
+    if (wasActive) {
+      collection.activeId = file.id;
+      activateFile(file);
+    } else {
+      renderDocSwitcher();
+    }
+    writeCollection();
+    showEditorToast('Documento ripristinato.');
   }
 
   // Rinomina un documento (il nome mostrato nel menu e nel selettore).
