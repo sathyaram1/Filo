@@ -31,6 +31,19 @@ const CARDS = {
     prices: { eur: '2.10' }, legalities: { commander: 'legal' },
     scryfall_uri: 'https://scryfall.com/card/goblin',
   },
+  // Bifronte (transform): niente image_uris in radice, ogni faccia ha la sua.
+  'c-delver': {
+    id: 'c-delver', name: 'Delver of Secrets // Insectile Aberration',
+    cmc: 1, color_identity: ['U'],
+    card_faces: [
+      { name: 'Delver of Secrets', mana_cost: '{U}', type_line: 'Creature — Human Wizard',
+        colors: ['U'], image_uris: { normal: 'https://cards.test/delver-front.jpg', art_crop: 'https://cards.test/delver-art.jpg' } },
+      { name: 'Insectile Aberration', mana_cost: '', type_line: 'Creature — Human Insect',
+        image_uris: { normal: 'https://cards.test/delver-back.jpg' } },
+    ],
+    prices: { eur: '0.30' }, legalities: { commander: 'legal' },
+    scryfall_uri: 'https://scryfall.com/card/delver',
+  },
 };
 
 async function mockScryfall(app) {
