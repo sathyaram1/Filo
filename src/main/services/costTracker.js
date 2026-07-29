@@ -49,8 +49,22 @@
     // Conteggio crediti (gamification): 1 credito = 0,08 centesimi. Il costo €
     // resta qui dietro le quinte; il motore crediti converte e scala il saldo.
     // Coperti così TUTTI i call site AI senza ritoccarli uno per uno.
+    //
+    // I crediti usano un costo NOZIONALE, non `eur`: `eur` è 0 quando la chiamata
+    // è servita gratis (Gemini via chiave diretta, free tier), e col setup di
+    // default quasi tutto passa da Gemini → il saldo non calerebbe MAI. Il prezzo
+    // nozionale (listino del modello) fa scendere i crediti anche sulle chiamate
+    // gratuite, senza toccare il limite di spesa REALE qui sopra (che resta su
+    // `eur`). Precedenza: prezzo reale passato → listino nozionale del modello →
+    // ripiego, così una chiamata reale non costa mai 0 crediti.
+    const C = global.SN_CONST || {};
+    const creditPricing = pricing
+      || (C.notionalPricingFor && C.notionalPricingFor(model))
+      || C.NOTIONAL_PRICING_FALLBACK
+      || null;
+    const creditEur = estimateCostEur({ usage, pricing: creditPricing, usdToEur });
     try {
-      await global.SN_CREDITS?.recordConsumption({ action, costEur: eur, provider, model, usage });
+      await global.SN_CREDITS?.recordConsumption({ action, costEur: creditEur, provider, model, usage });
     } catch (_) { /* i crediti non devono mai far fallire una chiamata AI */ }
     return eur;
   }
