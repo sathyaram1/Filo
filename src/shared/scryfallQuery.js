@@ -59,6 +59,11 @@
     const faces = Array.isArray(api.card_faces) ? api.card_faces : [];
     const front = faces[0] || {};
     const img = api.image_uris || front.image_uris || {};
+    // Retro delle carte bifronte (transform / modal DFC): la faccia 2 ha una sua
+    // immagine SOLO quando la radice non ha `image_uris` (le split/adventure hanno
+    // un'immagine unica e non vanno "girate"). Vuoto per le carte a faccia singola.
+    const backFace = faces[1] || null;
+    const backImg = (!api.image_uris && backFace && backFace.image_uris) ? backFace.image_uris : null;
     const manaCost = api.mana_cost != null && api.mana_cost !== ''
       ? api.mana_cost
       : faces.map((f) => f.mana_cost).filter(Boolean).join(' // ');
