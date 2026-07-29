@@ -1329,7 +1329,9 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
 
   const signature = DashboardRefresh.computeSignature({
     profilo, preferenze, espansioni, lezioni,
-    noteIds: notesList.map((n) => n.id || n.text),
+    // La firma include id + riassunto di ogni file: la dashboard si rigenera
+    // quando un file cambia titolo/riassunto (non più sugli appunti dell'archivio).
+    noteIds: filesList.map((f) => `${f.id}:${f.summary}`),
     notificaIds: notiList.map((n) => n.id || n.text),
     salvatiUrls: saved.map((p) => p.url),
     timerIds: timersList.map((t) => `${t.id}:${t.label}:${t.paused ? 1 : 0}`),
