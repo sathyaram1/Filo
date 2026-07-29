@@ -124,15 +124,9 @@ test('la cartella del terminale sopravvive alla riapertura (#259): riaprendo si 
   await expect(page.locator('#dashDir')).toBeVisible({ timeout: 8_000 });
 
   // Cartella temporanea reale, distinta dalla home, in cui spostarsi con `cd`.
-  // La creiamo nel main (Node) e ne prendiamo il path canonico: è quello che la
-  // shell riporterà come $PWD / %cd% dopo il cd.
-  const dir = await app.evaluate(() => {
-    const os = require('node:os');
-    const fs = require('node:fs');
-    const path = require('node:path');
-    const d = fs.mkdtempSync(path.join(os.tmpdir(), 'filo-cwd-'));
-    return fs.realpathSync(d);
-  });
+  // Il processo di test gira sulla stessa macchina della shell: ne prendiamo il
+  // path canonico, quello che la shell riporterà come $PWD / %cd% dopo il cd.
+  const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'filo-cwd-')));
   const home = await page.evaluate(async () => {
     const r = await window.filo?.shellHome?.();
     return r?.cwd || '';
