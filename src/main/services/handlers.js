@@ -595,8 +595,11 @@ async function navExfilCorpus() {
   try {
     const mem = await FiloMem.getMemory();
     const { profilo, preferenze, espansioni } = FiloMem.renderMemoryForPrompt(mem);
+    // Gli appunti ora SONO file dell'editor (#379.10): il materiale personale da
+    // proteggere è il loro CONTENUTO, letto dalla collezione dell'editor — non più
+    // dal vecchio archivio `filo_notes`, che dopo la migrazione resta vuoto.
     let notes = '';
-    try { notes = (await FiloMem.listNotes()).map((n) => n && n.text).filter(Boolean).join('\n'); } catch (_) {}
+    try { const EF = require('./editorFiles'); notes = await EF.notesCorpusText(); } catch (_) {}
     return [profilo, preferenze, espansioni, notes].filter(Boolean).join('\n');
   } catch (_) { return ''; }
 }
