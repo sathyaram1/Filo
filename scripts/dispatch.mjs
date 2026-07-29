@@ -130,6 +130,82 @@ async function fetchRemoteLoopCap() {
   }
 }
 
+// Encoder minimale JS → valore Firestore REST (solo i tipi che ci servono).
+function toFsValue(v) {
+  if (v === null || v === undefined) return { nullValue: null };
+  if (typeof v === 'string') return { stringValue: v };
+  if (typeof v === 'boolean') return { booleanValue: v };
+  if (Number.isInteger(v)) return { integerValue: String(v) };
+  if (typeof v === 'number') return { doubleValue: v };
+  if (Array.isArray(v)) return { arrayValue: { values: v.map(toFsValue) } };
+  if (typeof v === 'object') {
+    const fields = {};
+    for (const [k, vv] of Object.entries(v)) fields[k] = toFsValue(vv);
+    return { mapValue: { fields } };
+  }
+  return { stringValue: String(v) };
+}
+
+/**
+ * Registra un worker appena spawnato nel log (config/automation.workerLog).
+ * BEST-EFFORT: un guasto (nessuna credenziale, rete giù, Firestore lento) NON
+ * deve mai far fallire né rallentare oltre soglia il dispatch — il log è pura
+ * osservabilità per la dashboard dell'owner. Legge il log corrente, accoda
+ * { role, startedAt, num } e ri-scrive cappato a WORKER_LOG_CAP. Timeout duro
+ * così una rete impiccata non tiene in vita il processo del worker.
+ * NB: i worker delle routine girano UNO alla volta (l'orchestratore ne spawna
+ * uno per giro), quindi il read-modify-write qui è privo di corse.
+ */
+async function recordWorkerSpawn(bucket, timeoutMs = 4000) {
+  try {
+    const entry = {
+      role: String(bucket?.role || ''),
+      startedAt: new Date().toISOString(),
+      num: bucket?.num != null ? String(bucket.num) : '',
+    };
+    if (!entry.role) return;
+    const work = (async () => {
+      const { fa, bearer } = await acquireBearerSilent();
+      if (!bearer) return; // nessuna credenziale admin → niente log (best-effort)
+      const auth = { Authorization: `Bearer ${bearer}` };
+      // Leggi il log corrente (best-effort: 404/mancante ⇒ lista vuota).
+      let current = [];
+      try {
+        const getUrl = `${fa.FIRESTORE_BASE}/config/automation?key=${fa.FIREBASE_API_KEY}`;
+        const res = await fetch(getUrl, { headers: auth });
+        if (res.ok) {
+          const json = await res.json();
+          const arr = json?.fields?.workerLog?.arrayValue?.values;
+          if (Array.isArray(arr)) {
+            current = arr.map((v) => {
+              const f = v?.mapValue?.fields || {};
+              return {
+                role: f.role?.stringValue || '',
+                startedAt: f.startedAt?.stringValue || '',
+                num: f.num?.stringValue || '',
+              };
+            });
+          }
+        }
+      } catch (_) { /* niente log precedente → riparti da vuoto */ }
+      const next = appendWorkerLog(current, entry, WORKER_LOG_CAP);
+      // PATCH solo il campo workerLog (updateMask): non tocca enabled/loopCap.
+      const patchUrl = `${fa.FIRESTORE_BASE}/config/automation?updateMask.fieldPaths=workerLog&key=${fa.FIREBASE_API_KEY}`;
+      await fetch(patchUrl, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...auth },
+        body: JSON.stringify({ fields: { workerLog: toFsValue(next) } }),
+      });
+    })();
+    let timer;
+    const guard = new Promise((resolve) => { timer = setTimeout(resolve, timeoutMs); });
+    await Promise.race([work, guard]);
+    clearTimeout(timer);
+  } catch (_) {
+    // best-effort assoluto: qualunque errore è silenzioso.
+  }
+}
+
 // Quante voci del log dei worker conservare (le più recenti). Deve restare
 // allineato a SN_CONST.AUTOMATION.WORKER_LOG_CAP (src/shared/constants.js): il
 // log vive come campo del doc config/automation, cappato per non gonfiarlo.
