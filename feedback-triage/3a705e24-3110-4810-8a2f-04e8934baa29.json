@@ -1,7 +1,8 @@
 {
   "id": "3a705e24-3110-4810-8a2f-04e8934baa29",
-  "status": "working",
-  "notes": "",
-  "queuedAt": "2026-07-29T21:10:39.616Z",
-  "queuedBy": "routine"
+  "status": "revision_capability",
+  "notes": "Ho corretto le statistiche del documento nell'editor.\n\nCosa cambia per te: su un foglio completamente vuoto la finestra «Statistiche documento» ora mostra tutto a zero — Parole 0, Caratteri 0, Frasi 0, Paragrafi 0 e Tempo di lettura ~0 min. Prima segnava «Paragrafi: 1» e «~1 min» anche senza aver scritto niente. Inoltre i segni di sola punteggiatura non vengono più contati come parole: scrivendo ',,, ...' ora il conteggio resta 0, e in una frase mista come 'ciao , mondo ... !' vengono contate solo le 2 parole vere.\n\nLe decisioni prese:\n- Per il conteggio parole ho adottato la regola «una parola ha almeno una lettera o una cifra». È più solida del semplice separare per spazi (che contava anche virgole e puntini) e funziona anche con lingue non latine, non solo con l'alfabeto inglese.\n- Per i paragrafi ora conto solo i blocchi che contengono davvero del testo, così il paragrafo vuoto iniziale del foglio non viene più conteggiato.\n- Per il tempo di lettura ho tolto il minimo forzato di 1 minuto: se non ci sono parole, è 0.\n- Ho esteso l'azzeramento anche alle Frasi: senza nemmeno una parola reale il conteggio frasi è 0 (prima un testo di sola punteggiatura poteva risultare «1 frase»). L'ho aggiunto perché è la stessa incoerenza — un documento senza parole non ha frasi — e lasciarlo fuori avrebbe dato di nuovo un numero non-zero su un foglio di fatto senza contenuto.\n\nCosa ho aggiunto oltre al chiesto: l'azzeramento delle Frasi (spiegato sopra) e, come effetto collaterale, ho allineato il changelog interno alla versione dell'app (era rimasto indietro).\n\nCome ho verificato: ho aperto davvero l'editor e cliccato sul conteggio parole con il foglio vuoto, controllando che tutte e cinque le voci fossero a zero; ho poi scritto solo punteggiatura e testo misto verificando il conteggio corretto. Ho aggiunto due test automatici che riproducono esattamente questi due casi (foglio vuoto tutto a zero, e punteggiatura non contata come parole): entrambi passano, e passa l'intero gruppo di test dell'editor.",
+  "queuedAt": "2026-07-29T21:14:51.071Z",
+  "queuedBy": "routine",
+  "branch": "worker/3a705e24"
 }
