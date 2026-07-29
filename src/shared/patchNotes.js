@@ -16,6 +16,12 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.165', date: '2026-07-29',
+      features: [
+        'Ora Filo conosce i tuoi documenti dell’editor senza doverli avere tutti sotto gli occhi: ogni file tiene un riassunto di un paio di righe che si scrive da solo dal contenuto e resta aggiornato mentre lavori. Quando parli con Filo, lui vede il riassunto di ogni file (appunti inclusi) e, se per risponderti gli serve davvero un documento per intero, se lo apre e lo legge al momento. Col tasto destro sul titolo di un documento puoi anche rigenerare il riassunto quando vuoi.',
+      ],
+    },
+    {
       version: '0.2.164', date: '2026-07-25',
       fixes: [
         'Nella dashboard di gestione i feedback con una conversazione molto lunga tornano a essere gestibili: prima, superata una certa lunghezza, il server rifiutava qualsiasi modifica e il feedback restava bloccato — non lo si poteva spostare di stato, commentare né archiviare, e l’errore dava la colpa ai permessi di amministratore. Ora la conversazione ha un tetto molto più alto, i turni più vecchi vengono accorciati automaticamente quando serve (con una riga che lo dichiara) e, se una modifica viene comunque rifiutata, il messaggio dice il motivo giusto.',
