@@ -23,9 +23,24 @@
 
 const { spawn } = require('node:child_process');
 const os = require('node:os');
+const fs = require('node:fs');
 
 function defaultCwd() {
   return os.homedir();
+}
+
+// La cartella iniziale può arrivare da uno stato persistito (#259: "riparti da
+// dove eri"): se nel frattempo è stata cancellata/rinominata, spawnare con una
+// cwd inesistente farebbe morire la shell. Ripieghiamo sulla home. I path in
+// stile Linux passati a WSL (bash su Windows) non sono verificabili con `fs`
+// dell'host Windows: li lasciamo passare (li validerà WSL).
+function usableCwd(cwd) {
+  if (!cwd) return defaultCwd();
+  if (process.platform === 'win32' && /^\//.test(cwd)) return cwd;
+  try {
+    if (fs.statSync(cwd).isDirectory()) return cwd;
+  } catch (_) {}
+  return defaultCwd();
 }
 
 // Identificativo di sessione, improbabile in output reale. Entra nei marcatori.
