@@ -90,3 +90,74 @@ test('source sconosciuta ricade su "manual"', () => {
   const r = V.record({}, 'f', { content: content('m'), source: 'boh' });
   assert.equal(r.version.source, 'manual');
 });
+
+// ── Snapshot manuali (#379): la soglia che decide se una modifica a mano merita
+// un punto di ripristino. Contenuto realistico: un doc ProseMirror con paragrafi.
+function doc(...paragraphs) {
+  return {
+    meta: { title: 'Doc' },
+    content: {
+      type: 'doc',
+      content: paragraphs.map((t) => ({ type: 'paragraph', content: t ? [{ type: 'text', text: t }] : [] })),
+    },
+    comments: [], modules: [],
+  };
+}
+
+test('plainText estrae il testo dei paragrafi con a-capo ai confini di blocco', () => {
+  assert.equal(V.plainText(doc('Prima riga', 'Seconda riga')), 'Prima riga\nSeconda riga');
+  assert.equal(V.plainText(doc()), '');
+  assert.equal(V.plainText(null), '');
+});
+
+test('textChangeSize: contenuto identico = 0 (nessuna modifica)', () => {
+  assert.equal(V.textChangeSize(doc('Cappuccetto Rosso'), doc('Cappuccetto Rosso')), 0);
+});
+
+test('textChangeSize misura la regione centrale cambiata, non l\'intero testo', () => {
+  // Prefisso e suffisso comuni identici, cambia solo una parola in mezzo.
+  const a = doc('Il gatto nero salta il muro');
+  const b = doc('Il gatto bianco salta il muro');
+  // "nero"→"bianco": la regione diversa è piccola, non l'intera frase.
+  assert.ok(V.textChangeSize(a, b) <= 6, 'solo la parola cambiata conta');
+});
+
+test('textChangeSize conta un blocco di testo aggiunto in fondo', () => {
+  const a = doc('Inizio.');
+  const added = 'x'.repeat(200);
+  const b = doc('Inizio.', added);
+  assert.ok(V.textChangeSize(a, b) >= 200, 'il blocco aggiunto pesa per la sua lunghezza');
+});
+
+test('isSignificantManualChange: sotto soglia = no, sopra soglia = sì', () => {
+  const base = doc('Testo di partenza.');
+  // Piccola correzione: una manciata di caratteri → NON significativa.
+  const small = doc('Testo di partenza!!');
+  assert.equal(V.isSignificantManualChange(base, small), false);
+  // Blocco lungo scritto a mano → significativa (oltre i 140 char di default).
+  const big = doc('Testo di partenza.', 'a'.repeat(200));
+  assert.equal(V.isSignificantManualChange(base, big), true);
+});
+
+test('isSignificantManualChange rispetta una soglia personalizzata', () => {
+  const a = doc('abc');
+  const b = doc('abc', 'de'); // ~3 char cambiati
+  assert.equal(V.isSignificantManualChange(a, b, 2), true, 'soglia 2: 3 char bastano');
+  assert.equal(V.isSignificantManualChange(a, b, 50), false, 'soglia 50: 3 char no');
+});
+
+test('un percorso completo di snapshot manuale: sopra soglia crea, sotto no', () => {
+  let store = {};
+  const base = doc('Bozza.');
+  // Prima registriamo un riferimento (come farebbe l'editor sul file caricato)…
+  // poi una modifica manuale grande → snapshot 'manual'.
+  const bigEdit = doc('Bozza.', 'Un lungo paragrafo scritto a mano dall\'utente. ' + 'parola '.repeat(30));
+  assert.equal(V.isSignificantManualChange(base, bigEdit), true);
+  const r = V.record(store, 'f', { content: bigEdit, source: 'manual', label: 'Modifica manuale', ts: 1 });
+  store = r.store;
+  assert.equal(r.created, true);
+  assert.equal(V.latest(store, 'f').source, 'manual');
+  // Una micro-correzione successiva NON sarebbe significativa rispetto a bigEdit.
+  const tweak = doc('Bozza!', 'Un lungo paragrafo scritto a mano dall\'utente. ' + 'parola '.repeat(30));
+  assert.equal(V.isSignificantManualChange(bigEdit, tweak), false);
+});
