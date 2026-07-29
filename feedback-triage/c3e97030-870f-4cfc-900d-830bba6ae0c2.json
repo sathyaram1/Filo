@@ -1,7 +1,0 @@
-{
-  "id": "c3e97030-870f-4cfc-900d-830bba6ae0c2",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica e' stata pubblicata. Ora nell'editor c'e' lo Storico versioni, che apri dal menu documenti in alto a sinistra o col tasto destro sul titolo: mostra tutte le versioni salvate del documento dalla piu' recente alla piu' vecchia, con data, sorgente (le modifiche fatte da Filo sono evidenziate) e un'anteprima del testo. Cliccando una versione ne vedi l'anteprima completa e puoi ripristinarla; anche il ripristino resta annullabile perche' prima salva lo stato attuale.",
-  "queuedAt": "2026-07-29T15:20:49.058Z",
-  "queuedBy": "routine"
-}
