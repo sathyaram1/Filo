@@ -43,24 +43,33 @@
   }
 
   // ----------------------------------------------------------------------
-  // Avvisi inline (conflitto autocorrect, ecc.)
+  // Avvisi inline (conflitto autocorrect, duplicato dizionario, ecc.)
   // ----------------------------------------------------------------------
-  let conflictTimer = null;
-  function showConflictMessage(conflictKey) {
-    let el = $('autocorrectConflict');
+  const inlineTimers = Object.create(null);
+  // Mostra un avviso inline (rosso) sopra una lista, auto-nascosto dopo 3.5s.
+  function showInlineMessage(id, anchorId, text) {
+    let el = $(id);
     if (!el) {
       el = document.createElement('p');
-      el.id = 'autocorrectConflict';
+      el.id = id;
       el.className = 'sn-muted';
       el.style.cssText = 'color:var(--sn-danger,#c0392b);margin:4px 0 0';
-      // Inserisce dopo l'header h2 e la descrizione, prima della tabella.
-      const section = $('autocorrectList').parentElement;
-      section.insertBefore(el, $('autocorrectList'));
+      // Inserisce dopo l'header h2 e la descrizione, prima della tabella/lista.
+      const anchor = $(anchorId);
+      anchor.parentElement.insertBefore(el, anchor);
     }
-    el.textContent = I18n.t('spell_page_conflict', conflictKey);
+    el.textContent = text;
     el.hidden = false;
-    clearTimeout(conflictTimer);
-    conflictTimer = setTimeout(() => { el.hidden = true; }, 3500);
+    clearTimeout(inlineTimers[id]);
+    inlineTimers[id] = setTimeout(() => { el.hidden = true; }, 3500);
+  }
+
+  function showConflictMessage(conflictKey) {
+    showInlineMessage('autocorrectConflict', 'autocorrectList', I18n.t('spell_page_conflict', conflictKey));
+  }
+
+  function showDictConflictMessage(word) {
+    showInlineMessage('dictConflict', 'dictList', I18n.t('spell_page_dict_conflict', word));
   }
 
   // ----------------------------------------------------------------------
