@@ -130,6 +130,24 @@ async function listFileSummaries() {
   } catch (_) { return []; }
 }
 
+// Testo dei file dell'editor per il CORPUS anti-esfiltrazione (#379.10). Gli
+// appunti non vivono più in un archivio separato: sono file dell'editor come gli
+// altri, e Filo li "vede" (via riassunti, e può leggerli per intero on-demand).
+// Quindi il materiale personale-persistente da proteggere quando NAVIGA forgia un
+// URL è ora il CONTENUTO di questi file — non più il vecchio silo `filo_notes`,
+// che dopo la migrazione è vuoto. Ritorna il testo concatenato di TUTTI i file
+// (appunti inclusi) o '' se non c'è nulla. Best-effort: non lancia mai.
+async function notesCorpusText() {
+  const Summary = globalThis.SN_EDITOR_SUMMARY;
+  const Store = STORE();
+  if (!Summary || !Store) return '';
+  try {
+    const collection = await loadCollection();
+    const files = (collection && Array.isArray(collection.files)) ? collection.files : [];
+    return files.map((f) => Summary.fileText(f)).filter(Boolean).join('\n');
+  } catch (_) { return ''; }
+}
+
 // Lettura ON-DEMAND del contenuto completo di UN file (azione LEGGI_FILE): Filo
 // vede solo i riassunti e, quando decide che vale la pena leggere un file per
 // intero, ne chiede il testo con l'id. Ritorna { ok, id, title, text }.
