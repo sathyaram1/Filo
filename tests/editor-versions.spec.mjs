@@ -94,3 +94,74 @@ test('lo storico delle versioni sopravvive al reload', async ({ openTab }) => {
   await expect(page.locator('#doc strong')).toHaveCount(0);
   await expect(page.locator('#doc')).toContainText('Bianca come il latte');
 });
+
+// La SCHERMATA storico versioni (feedback #379): dal menu documenti in alto a
+// sinistra si apre il pannello con TUTTE le versioni salvate (recente → vecchia),
+// con la sorgente giusta e un'anteprima; ripristinando a mano una versione più
+// vecchia il documento torna ESATTAMENTE a quel contenuto. Senza il pannello il
+// menu non avrebbe la voce, la lista non comparirebbe e il ripristino "a mano"
+// dalla UI non riporterebbe lo stato pre-modifica → rosso.
+test('storico versioni: si sfoglia dal menu e ripristina una versione più vecchia', async ({ openTab }) => {
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('#doc');
+  await page.evaluate(() => window.__filoEditorVersions.ready());
+
+  // Tre modifiche automatiche di Filo, ciascuna su un testo diverso: ogni edit
+  // salva come punto di ripristino il contenuto PRE-modifica (testo semplice).
+  await page.click('#doc');
+  for (const word of ['Alpha', 'Bravo', 'Charlie']) {
+    await setDocText(page, word);
+    await filoAutoEdit(page);
+  }
+  const total = await page.evaluate(() => window.__filoEditorVersions.list().length);
+  expect(total).toBe(3);
+
+  // Percorso utente reale: apri il selettore documenti (in alto a sinistra) e la
+  // voce "Storico versioni".
+  await page.click('#docSwitch');
+  await page.click('#docHistory');
+
+  // Il pannello mostra TUTTE e tre le versioni, dalla più recente in alto.
+  const items = page.locator('.ed-vh-item');
+  await expect(items).toHaveCount(3);
+  // Sorgente evidenziata: tutte create da una modifica di Filo.
+  await expect(page.locator('.ed-vh-badge.filo')).toHaveCount(3);
+  await expect(items.first()).toContainText('Modifica di Filo');
+  // Ordine cronologico inverso: in cima l'ultimo stato salvato (pre-"Charlie"),
+  // in fondo il più vecchio (pre-"Alpha").
+  await expect(items.first().locator('.ed-vh-prev')).toContainText('Bravo');
+  await expect(items.last().locator('.ed-vh-prev')).toContainText('Alpha');
+
+  // Ripristina la versione PIÙ VECCHIA (in fondo): il documento deve tornare
+  // ESATTAMENTE a quel contenuto — testo "Alpha", senza il grassetto di Filo.
+  await items.last().locator('.ed-vh-restore').click();
+  await expect(page.locator('#doc')).toHaveText('Alpha');
+  await expect(page.locator('#doc strong')).toHaveCount(0);
+});
+
+// L'anteprima ampia prima di ripristinare: clic su una riga apre l'anteprima
+// della versione e da lì la si ripristina. Prova che il cammino "guardo poi
+// ripristino" porta al contenuto giusto.
+test('storico versioni: anteprima di una versione e ripristino dall\'anteprima', async ({ openTab }) => {
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('#doc');
+  await page.evaluate(() => window.__filoEditorVersions.ready());
+
+  await page.click('#doc');
+  await setDocText(page, 'Testo originale da ritrovare');
+  await filoAutoEdit(page);
+  await setDocText(page, 'Testo cambiato dopo');
+  await filoAutoEdit(page);
+
+  await page.click('#docSwitch');
+  await page.click('#docHistory');
+
+  // Apri l'anteprima della versione più vecchia (il testo originale).
+  await page.locator('.ed-vh-item').last().click();
+  await expect(page.locator('.ed-vh-fulltext')).toContainText('Testo originale da ritrovare');
+
+  // Ripristina dalla schermata di anteprima: il documento torna a quel testo.
+  await page.click('#vhRestore');
+  await expect(page.locator('#doc')).toContainText('Testo originale da ritrovare');
+  await expect(page.locator('#doc strong')).toHaveCount(0);
+});
