@@ -134,6 +134,7 @@
       })),
       recentActions: rawLog,
       dashboard: dashboardCache,
+      credits,
     };
 
     const stateText = renderForPrompt(state);
