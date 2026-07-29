@@ -3478,7 +3478,14 @@
     }
   });
 
-  window.addEventListener('beforeunload', () => { if (dirty) save(false); });
+  window.addEventListener('beforeunload', () => {
+    // Ultimo confine "chiusura": prova a fissare un punto di ripristino se
+    // l'utente ha scritto molto e sta chiudendo senza pausa. Best-effort — la
+    // scrittura dello storico è asincrona, quindi su una chiusura brusca può non
+    // fare in tempo; i confini affidabili sono la pausa e il cambio documento.
+    maybeRecordManualVersion();
+    if (dirty) save(false);
+  });
 
   // ── Tema ────────────────────────────────────────────────────────────
   // pageBootstrap applica solo il tema di SISTEMA; come le altre pagine
