@@ -19,6 +19,7 @@
       version: '0.2.166', date: '2026-07-29',
       fixes: [
         'Il messaggio al centro della nuova scheda ora saluta in base all’ora reale: la mattina ti dà il buongiorno, la sera il buonasera, e cambia tono tra un giorno feriale e il weekend. Prima poteva restare fermo su un saluto che non corrispondeva al momento della giornata.',
+        'Nei mazzi le immagini delle carte compaiono all’istante: appena apri un mazzo (o una lista di risultati) Filo scalda in anticipo le immagini di tutte le carte visibili, così l’anteprima al passaggio del mouse non deve più aspettare il caricamento.',
       ],
     },
     {
