@@ -1,0 +1,7 @@
+{
+  "id": "SmW8lss3GcRpddupuHRJ",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho riprodotto esattamente la tua situazione: usare le funzioni AI servite dal canale gratuito ora fa scendere davvero il saldo dei crediti (partito da 1000, dopo un singolo uso e sceso a 998,3; con piu usi il calo diventa nettamente visibile). Ho controllato che il conto separato del limite di spesa reale in euro resti a zero per le chiamate gratuite (giusto: non stai pagando nulla) e che invece si muova solo sulle chiamate a pagamento, che continuano a scalare sia i crediti sia la spesa reale. Casi limite provati: modelli personalizzati senza un prezzo di listino scalano comunque i crediti (con un prezzo medio di ripiego, mai a costo zero); una chiamata che non produce nulla non scala per sbaglio; il grafico a torta dei consumi ora si popola anche solo con usi gratuiti, mentre prima restava vuoto. Verificato che il saldo mostra i decimali, cosi un uso leggero (frazioni di credito) resta visibile invece di sparire arrotondato, e che la pagina Crediti si aggiorna da sola a ogni utilizzo senza bisogno di ricaricarla. Tutta la suite dei test di logica passa (1161) e i test della pagina Crediti passano, incluso quello che verifica che un consumo sotto il credito resti visibile.",
+  "queuedAt": "2026-07-29T09:59:52.379Z",
+  "queuedBy": "routine"
+}
