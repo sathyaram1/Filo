@@ -85,6 +85,28 @@ export function resolveLoopCap({ envRaw, remote } = {}) {
 }
 
 /**
+ * Ricava SILENZIOSAMENTE un bearer admin (service account o refresh token
+ * dell'owner) senza stampare nulla né uscire dal processo — diversamente da
+ * `firestore-auth.acquireBearer`, che logga ed esce se manca la credenziale.
+ * Ritorna { fa, bearer } (bearer null se nessuna credenziale/errore). Best-
+ * effort: non deve MAI far fallire il dispatch. Riusato dalla lettura del loop
+ * cap e dalla scrittura del log dei worker.
+ */
+async function acquireBearerSilent() {
+  const fa = await import('./lib/firestore-auth.mjs');
+  let bearer = null;
+  try {
+    const sa = fa.loadServiceAccount();
+    if (sa) bearer = await fa.mintAccessTokenFromSA(sa);
+  } catch (_) { /* prova il refresh token */ }
+  if (!bearer) {
+    const rt = fa.findAdminRefreshToken();
+    if (rt) { try { bearer = await fa.mintIdToken(rt); } catch (_) {} }
+  }
+  return { fa, bearer };
+}
+
+/**
  * Legge config/automation.loopCap da Firestore in modo BEST-EFFORT: serve un
  * bearer admin (il doc è admin-only), che si ricava da service account o refresh
  * token dell'owner. Se manca la credenziale o la rete fallisce, ritorna null
@@ -92,16 +114,7 @@ export function resolveLoopCap({ envRaw, remote } = {}) {
  */
 async function fetchRemoteLoopCap() {
   try {
-    const fa = await import('./lib/firestore-auth.mjs');
-    let bearer = null;
-    try {
-      const sa = fa.loadServiceAccount();
-      if (sa) bearer = await fa.mintAccessTokenFromSA(sa);
-    } catch (_) { /* prova il refresh token */ }
-    if (!bearer) {
-      const rt = fa.findAdminRefreshToken();
-      if (rt) { try { bearer = await fa.mintIdToken(rt); } catch (_) {} }
-    }
+    const { fa, bearer } = await acquireBearerSilent();
     if (!bearer) return null; // nessuna credenziale → default
     const url = `${fa.FIRESTORE_BASE}/config/automation?key=${fa.FIREBASE_API_KEY}`;
     const res = await fetch(url, { headers: { Authorization: `Bearer ${bearer}` } });
