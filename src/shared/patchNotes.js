@@ -16,6 +16,12 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.166', date: '2026-07-29',
+      fixes: [
+        'Il messaggio al centro della nuova scheda ora saluta in base all’ora reale: la mattina ti dà il buongiorno, la sera il buonasera, e cambia tono tra un giorno feriale e il weekend. Prima poteva restare fermo su un saluto che non corrispondeva al momento della giornata.',
+      ],
+    },
+    {
       version: '0.2.165', date: '2026-07-29',
       features: [
         'Ora Filo conosce i tuoi documenti dell’editor senza doverli avere tutti sotto gli occhi: ogni file tiene un riassunto di un paio di righe che si scrive da solo dal contenuto e resta aggiornato mentre lavori. Quando parli con Filo, lui vede il riassunto di ogni file (appunti inclusi) e, se per risponderti gli serve davvero un documento per intero, se lo apre e lo legge al momento. Col tasto destro sul titolo di un documento puoi anche rigenerare il riassunto quando vuoi.',

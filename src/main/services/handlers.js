@@ -1360,6 +1360,20 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
   const timersList = await FiloMem.listTimers();
   const saved = await SavedPages.list();
 
+  // Momento della giornata — GROSSOLANO di proposito. Il prompt chiede all'LLM
+  // di adattare saluto e tono "al momento", ma finora non gli passavamo MAI il
+  // momento: senza orologio l'LLM tirava a indovinare e il saluto poteva non
+  // combaciare con l'ora reale (es. restava "buonasera" alle 10 di mattina).
+  // Passiamo solo la fascia (mattina/pomeriggio/sera/notte) + feriale/weekend,
+  // NON l'ora esatta: il messaggio è in cache per tutta la fascia, quindi deve
+  // restare valido per tutta la fascia (citare "ore 10:07" diventerebbe stale).
+  const now = new Date();
+  const h = now.getHours();
+  const partOfDay = h < 6 ? 'notte' : h < 12 ? 'mattina' : h < 18 ? 'pomeriggio' : 'sera';
+  const isWeekend = now.getDay() === 0 || now.getDay() === 6;
+  const dayType = isWeekend ? 'weekend' : 'feriale';
+  const momento = `${partOfDay}, giorno ${isWeekend ? 'di weekend' : 'feriale'}`;
+
   const payload = {
     profilo, preferenze, espansioni, lezioni, stato: stateText,
     notifiche: notiList.length ? notiList.map((n) => `- [${n.ts}] ${n.kind}: ${n.text}`).join('\n') : '(nessuna)',
@@ -1368,12 +1382,8 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
       : '(nessuno)',
     salvati: saved.length ? saved.slice(0, 20).map((p) => `- ${p.title || p.url} (${p.url})`).join('\n') : '(nessuno)',
     tabAperte: openTabsCount,
+    momento,
   };
-
-  // Fascia oraria grossolana per rinfrescare il saluto col passare della giornata
-  // (mattina/pomeriggio/sera/notte) senza ricalcoli al minuto.
-  const h = new Date().getHours();
-  const partOfDay = h < 6 ? 'notte' : h < 12 ? 'mattina' : h < 18 ? 'pomeriggio' : 'sera';
 
   const signature = DashboardRefresh.computeSignature({
     profilo, preferenze, espansioni, lezioni,
@@ -1383,7 +1393,9 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
     notificaIds: notiList.map((n) => n.id || n.text),
     salvatiUrls: saved.map((p) => p.url),
     timerIds: timersList.map((t) => `${t.id}:${t.label}:${t.paused ? 1 : 0}`),
-    openTabsCount, partOfDay,
+    // partOfDay + dayType: quando cambia la fascia oraria O si passa
+    // feriale↔weekend, la firma cambia e la home si rigenera col saluto giusto.
+    openTabsCount, partOfDay, dayType,
   });
 
   return { settings, hasKey, payload, signature, saved };

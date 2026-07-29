@@ -42,6 +42,10 @@
       // della home si rinfresca col passare della giornata, ma SENZA churn (al
       // massimo un cambio per fascia). NON usare l'ora/minuto esatti qui.
       `part:${inputs.partOfDay || ''}`,
+      // Tipo di giorno GROSSOLANO (feriale/weekend): il tono cambia tra una
+      // mattina lavorativa e un weekend, quindi la home si rigenera anche al
+      // passaggio feriale↔weekend. Sempre coarse: nessun churn nella giornata.
+      `day:${inputs.dayType || ''}`,
     ];
     return hash(parts.join('\n##\n'));
   }
