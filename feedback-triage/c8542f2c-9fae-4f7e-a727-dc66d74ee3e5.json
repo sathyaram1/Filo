@@ -1,7 +1,0 @@
-{
-  "id": "c8542f2c-9fae-4f7e-a727-dc66d74ee3e5",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho verificato il comportamento della creazione dei timer partendo dal sintomo (una guardia che sembrava non servire a nulla). Ho provato a creare timer con durate non valide in ogni forma: zero, negativa, testo non numerico, campo vuoto, solo spazi, valore mancante, emoji, arrotondamenti a zero (es. 0.4s). In tutti questi casi ora NON viene creato alcun timer: niente più timer-fantasma da 1 secondo che suona subito. Con durate valide (60s, 90s, 1s, 10000s, stringhe numeriche) il timer viene creato correttamente con la durata giusta. Stress test superati: etichetta lunghissima (10.000 caratteri) viene troncata senza crash, etichetta con codice tipo <script> non rompe la logica, etichetta mancante usa un nome di default, venti creazioni rapide in sequenza risultano tutte presenti. Ho anche controllato che chi crea il timer si comporti bene quando non viene creato nulla (non lo annuncia e non lo segna come eseguito). Nessuna modifica visiva, quindi niente controllo a schermo. Regressione completa della logica pura tutta verde (1180 test).",
-  "queuedAt": "2026-07-29T22:02:17.544Z",
-  "queuedBy": "routine"
-}
