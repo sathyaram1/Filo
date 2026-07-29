@@ -1,0 +1,7 @@
+{
+  "id": "63ee31f3-5e25-46e7-b4b1-adf59adf7bf6",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la modifica è stata pubblicata. Ora nell'editor eliminare un documento non è più definitivo per sbaglio: subito dopo la cancellazione compare un breve avviso con «Annulla» che riporta indietro il documento al suo posto, con tutto il suo contenuto — testo, commenti, moduli e storico. L'eliminazione resta immediata (nessuna conferma che rallenta un'azione frequente), ma un tocco per errore non ti fa più perdere il file. Vale anche quando cancelli l'ultimo documento rimasto: annullando torna quello vero al posto del foglio vuoto creato automaticamente.",
+  "queuedAt": "2026-07-29T07:56:03.526Z",
+  "queuedBy": "routine"
+}
