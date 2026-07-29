@@ -114,6 +114,11 @@
     JUDGE_TIMEOUT_DEFAULT_S: 60,
     JUDGE_TIMEOUT_MIN_S: 10,
     JUDGE_TIMEOUT_MAX_S: 120,
+    // Quante voci del log dei worker tenere (le più recenti). Il log vive come
+    // campo `workerLog` del doc config/automation: cappato per non gonfiare il
+    // documento. Scritto da scripts/dispatch.mjs a ogni worker spawnato, letto
+    // dalla tab "Log" della dashboard Gestione.
+    WORKER_LOG_CAP: 200,
   };
 
   const ACTIONS = {
