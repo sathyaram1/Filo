@@ -512,6 +512,17 @@
     closeDocPop();
   }
 
+  // Clone profondo JSON-safe (i file/serializzati sono già JSON puri).
+  function cloneJson(v) {
+    try { return v == null ? v : JSON.parse(JSON.stringify(v)); }
+    catch (_) { return v; }
+  }
+  // Accorcia un testo aggiungendo un'ellissi (per il nome nel toast).
+  function ellipsize(s, max) {
+    const t = String(s == null ? '' : s);
+    return t.length > max ? t.slice(0, Math.max(0, max - 1)).trimEnd() + '…' : t;
+  }
+
   // Elimina un documento. Invariante: resta sempre almeno un file — se si
   // cancella l'ultimo, se ne crea uno vuoto al suo posto.
   //
