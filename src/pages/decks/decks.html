@@ -606,7 +606,11 @@
             </div>
             <!-- Preview su hover (§5.1-§5.2): carta nel contesto del mazzo. -->
             <div class="dk-detail-state" id="statePreview" hidden>
-              <img class="dk-card-img" id="previewImg" alt="" />
+              <div class="dk-card-frame">
+                <img class="dk-card-img" id="previewImg" alt="" />
+                <button class="dk-flip" id="previewFlip" type="button"
+                        title="Gira la carta" aria-label="Gira la carta" hidden>⟳</button>
+              </div>
               <div class="dk-detail-ctx" id="previewCtx"></div>
               <div class="dk-detail-module" id="previewModule"
                    title="Tasto destro per scegliere il modulo"></div>
