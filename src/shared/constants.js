@@ -947,7 +947,7 @@
       (lezioni ? `LEZIONI RECENTI:\n${lezioni}\n\n` : '') +
       `FILO STATE:\n${stato || '(vuoto)'}\n\n` +
       `NOTIFICHE IN CODA:\n${notifiche || '(nessuna)'}\n\n` +
-      `APPUNTI RECENTI:\n${appunti || '(nessuno)'}\n\n` +
+      `FILE DELL'EDITOR (riassunti, appunti inclusi):\n${appunti || '(nessuno)'}\n\n` +
       `SALVATI PER DOPO:\n${salvati || '(nessuno)'}\n\n` +
       `MESSAGGIO PRECEDENTE: "${ultimoMessaggio || ''}"\n\n` +
       `SCHEDE WEB APERTE ADESSO: ${typeof tabAperte === 'number' ? tabAperte : 0}\n\n` +
