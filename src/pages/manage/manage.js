@@ -25,6 +25,12 @@
   const mgJudgeTimeoutSave = document.getElementById('mgJudgeTimeoutSave');
   const mgJudgeTimeoutMsg  = document.getElementById('mgJudgeTimeoutMsg');
 
+  // Tab "Log" (owner-only): elenco dei worker spawnati dalle routine.
+  const mgLogLoading = document.getElementById('mgLogLoading');
+  const mgLogDenied  = document.getElementById('mgLogDenied');
+  const mgLogEmpty   = document.getElementById('mgLogEmpty');
+  const mgLogList    = document.getElementById('mgLogList');
+
   // Lista (tab corrente)
   const mgListHead     = document.getElementById('mgListHead');
   const mgListLoading  = document.getElementById('mgListLoading');
