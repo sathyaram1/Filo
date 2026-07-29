@@ -1,8 +1,0 @@
-{
-  "id": "21RL5oow27cBH9uHPPDM",
-  "status": "design",
-  "notes": "Ho preso in carico questo feedback ma non riesco a capire cosa vorresti che Filo facesse, quindi ti giro qualche domanda prima di intervenire.\n\nIl messaggio contiene solo la frase \"oggi è martedì\", senza una richiesta, una segnalazione di problema o un contesto: da sola non mi dice quale comportamento di Filo migliorare. L'immagine che avevi allegato non sono riuscito ad aprirla: il file arrivato non è un'immagine valida (è un blocco di dati illeggibile, probabilmente l'upload dello screenshot è andato storto), quindi non ha aggiunto informazioni.\n\nPer procedere mi servirebbe capire cosa avevi in mente. Alcune ipotesi:\n- Volevi che Filo riconoscesse o mostrasse la data / il giorno della settimana (per esempio nella pagina Nuova scheda)?\n- Stavi provando l'interazione in linguaggio naturale e ti aspettavi che Filo rispondesse a una frase come questa?\n- L'allegato doveva essere uno screenshot che spiegava la richiesta? In quel caso riprovare a caricarlo aiuterebbe.\n\nSe mi dici in una riga cosa ti aspettavi che succedesse, lo lavoro subito.",
-  "queuedAt": "2026-07-29T10:18:28.712Z",
-  "queuedBy": "routine",
-  "reason": "clarify"
-}
