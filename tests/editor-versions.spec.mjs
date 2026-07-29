@@ -166,3 +166,92 @@ test('storico versioni: anteprima di una versione e ripristino dall\'anteprima',
   await expect(page.locator('#doc')).toContainText('Testo originale da ritrovare');
   await expect(page.locator('#doc strong')).toHaveCount(0);
 });
+
+// Snapshot MANUALI (#379): anche una modifica a mano SIGNIFICATIVA deve creare un
+// punto di ripristino, così l'utente che scrive/cancella molto e poi vuole
+// tornare indietro trova qualcosa nello storico — senza però versionare ogni
+// battuta. Questi test asseriscono il SUCCESSO: la versione 'manual' compare col
+// contenuto giusto ed è ripristinabile; e una modifica minima NON crea rumore.
+async function textLen(page) {
+  return page.evaluate(() => (document.getElementById('doc').textContent || '').length);
+}
+
+test('una modifica manuale significativa crea un punto di ripristino ripristinabile', async ({ openTab }) => {
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('#doc');
+  await page.evaluate(() => window.__filoEditorVersions.ready());
+
+  await page.click('#doc');
+  // Stato iniziale a mano: una prima stesura. Nessuna versione ancora.
+  await setDocText(page, 'Prima stesura del racconto.');
+  expect(await page.evaluate(() => window.__filoEditorVersions.list().length)).toBe(0);
+
+  // L'utente scrive a mano un blocco lungo (ben oltre la soglia anti-rumore) e si
+  // ferma: alla pausa (qui forzata dall'hook, come farebbe il debounce) scatta uno
+  // snapshot 'manual' che cattura ESATTAMENTE quel contenuto.
+  const longText = 'C\'era una volta, in un bosco fitto e silenzioso, una bambina che portava sempre un mantello rosso cucito dalla nonna, e ogni mattina attraversava il sentiero.';
+  await setDocText(page, longText);
+  const created = await page.evaluate(() => window.__filoEditorVersions.snapshotManual());
+  expect(created).not.toBeNull();
+
+  const list = await page.evaluate(() => window.__filoEditorVersions.list());
+  expect(list.length).toBe(1);
+  expect(list[0].source).toBe('manual');
+  expect(list[0].label).toMatch(/manuale/i);
+
+  // Ora l'utente continua a scrivere altro a mano (cambia molto il testo), poi
+  // vuole tornare al punto precedente: ripristinando la versione manuale il
+  // documento torna ESATTAMENTE a quel contenuto.
+  await setDocText(page, 'Testo completamente diverso, molto più corto.');
+  await page.evaluate(() => {
+    const v = window.__filoEditorVersions;
+    const l = v.list();
+    v.restore(v.activeId(), l[0].id);
+  });
+  await expect(page.locator('#doc')).toHaveText(longText);
+});
+
+test('micro-modifiche a mano NON creano una raffica di versioni', async ({ openTab }) => {
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('#doc');
+  await page.evaluate(() => window.__filoEditorVersions.ready());
+
+  await page.click('#doc');
+  await setDocText(page, 'Una riga di testo che resta quasi uguale.');
+
+  // Tante piccole correzioni con valutazione dello snapshot dopo ognuna: nessuna
+  // supera la soglia → lo storico resta vuoto (niente rumore).
+  for (const t of [
+    'Una riga di testo che resta quasi uguale!',
+    'Una riga di testo che resta quasi uguale!!',
+    'Una riga di testo che resta quasi uguale.',
+    'Una riga di testo che resta quasi uguales.',
+  ]) {
+    await setDocText(page, t);
+    await page.evaluate(() => window.__filoEditorVersions.snapshotManual());
+  }
+  expect(await page.evaluate(() => window.__filoEditorVersions.list().length)).toBe(0);
+});
+
+test('cambiando documento si salva la modifica manuale significativa del file lasciato', async ({ openTab }) => {
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('#doc');
+  await page.evaluate(() => window.__filoEditorVersions.ready());
+
+  await page.click('#doc');
+  const firstId = await page.evaluate(() => window.__filoEditorVersions.activeId());
+  const big = 'Appunti di viaggio: partiti all\'alba, abbiamo percorso la costa fino al promontorio, poi ci siamo fermati a mangiare del pane e formaggio guardando il mare aperto.';
+  await setDocText(page, big);
+
+  // Cambio documento dal selettore in alto a sinistra: creo un nuovo file. È il
+  // confine naturale in cui va salvato un punto di ripristino del file lasciato.
+  await page.click('#docSwitch');
+  await page.click('#docNew');
+  // Sono su un nuovo documento vuoto…
+  await expect(page.locator('#doc')).toHaveText('');
+
+  // …e il file precedente ha ora una versione 'manual' con quel contenuto.
+  const prev = await page.evaluate((id) => window.__filoEditorVersions.list(id), firstId);
+  expect(prev.length).toBe(1);
+  expect(prev[0].source).toBe('manual');
+});
