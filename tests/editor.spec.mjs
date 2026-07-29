@@ -167,3 +167,30 @@ test('Sostituisci (uno) a metà documento mantiene la posizione', async ({ openT
   });
   expect(currentIsLast).toBe(true);
 });
+
+// Feedback #228: una parola spezzata da formattazione inline (una parte in
+// grassetto) vive in più nodi testo ("al" + "fa"). Prima del fix la ricerca
+// scorreva nodo per nodo: nessun nodo conteneva la parola intera, quindi quella
+// occorrenza non veniva né contata né sostituita — "Sostituisci tutto" lasciava
+// parole nel testo senza avvisare. Ora la ricerca lavora sul testo concatenato
+// del blocco e mappa gli offset ai nodi.
+test('Cerca e sostituisci trova le parole con formattazione mista (#228)', async ({ openTab }) => {
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('#doc');
+  await page.evaluate(() => {
+    const doc = document.getElementById('doc');
+    // "Nome: alfa, alfa e alfa." con la SOLA parte "fa" dell'ultima "alfa" in grassetto.
+    doc.innerHTML = '<p>Nome: alfa, alfa e al<strong>fa</strong>.</p>';
+    doc.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.locator('.ed-switch-icon').nth(1).click();
+  await page.waitForSelector('[data-sr="find"]');
+  await page.fill('[data-sr="find"]', 'alfa');
+  // Tutte e tre le occorrenze trovate, compresa quella spezzata dal grassetto.
+  await expect(page.locator('[data-sr="count"]')).toHaveText('1/3');
+  // "Sostituisci tutto" non deve lasciare nessuna "alfa" nel testo.
+  await page.fill('[data-sr="repl"]', 'OMEGA');
+  await page.click('[data-sr="all"]');
+  await expect(page.locator('#doc')).toHaveText('Nome: OMEGA, OMEGA e OMEGA.');
+  await expect(page.locator('[data-sr="count"]')).toHaveText('nessun risultato');
+});
