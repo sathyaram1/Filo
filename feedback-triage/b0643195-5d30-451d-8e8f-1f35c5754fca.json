@@ -1,7 +1,0 @@
-{
-  "id": "b0643195-5d30-451d-8e8f-1f35c5754fca",
-  "status": "revision_security",
-  "notes": "Nota sull'iter (attenzione, per te): la modifica di questo lavoro e gia finita nell'app pubblica PRIMA del controllo di sicurezza, in anticipo rispetto al normale cancello. La funzione l'ho verificata e funziona, ma e diventata raggiungibile dagli aggiornamenti automatici senza che il controllo di sicurezza sia ancora stato fatto. E successo perche il passo che registra l'esito della verifica viene eseguito mentre si e posizionati sul ramo di lavoro, e cosi finisce per spingere l'INTERO ramo (non solo la piccola annotazione di stato) nell'app pubblica. Due cose da tenere d'occhio: 1) se il controllo di sicurezza dovesse bocciare qualcosa, l'app pubblica va ripulita a mano da questa modifica (in particolare resta aperto il punto gia segnalato: i riassunti dei file e, su richiesta, il loro testo completo entrano nel contesto ma non sono nell'elenco dei dati protetti contro l'esfiltrazione tramite link); 2) conviene correggere quel passo di registrazione perche non spinga mai l'intero ramo nell'app pubblica, altrimenti ogni verifica ripetera questo scavalcamento del cancello.",
-  "queuedAt": "2026-07-29T07:26:50.337Z",
-  "queuedBy": "routine"
-}
