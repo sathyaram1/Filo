@@ -155,6 +155,13 @@
       lines.push(`Inizio sessione: ${formatDate(state.time.session.startedAt)} (${state.time.session.ageMin} min fa, ${state.time.session.count} interazioni)`);
     }
     lines.push('');
+    // CREDITI — se l'utente chiede quanti crediti gli restano, rispondi con
+    // questo saldo (si ricarica di 100 ogni giorno a mezzanotte).
+    if (state.credits) {
+      lines.push('CREDITI');
+      lines.push(`Saldo: ${state.credits.balance} crediti (si ricaricano di 100 ogni giorno a mezzanotte)`);
+      lines.push('');
+    }
     // TAB APERTE
     lines.push('TAB APERTE');
     if (!state.tabs.length) lines.push('(nessuna)');
