@@ -966,6 +966,17 @@
       contentFullscreen = !!msg.fullscreen;
       return;
     }
+    // Toast di sistema inviato dal main (es. esito differito dell'invio di un
+    // feedback, #341). Il broadcast arriva a TUTTE le schede: lo mostra solo
+    // quella in primo piano, per non moltiplicare lo stesso avviso.
+    if (msg?.type === MSG.SHOW_TOAST) {
+      try {
+        if (document.visibilityState === 'visible' && document.hasFocus()) {
+          Popup?.showToast?.(String(msg.text || ''), { duration: Number(msg.duration) || 2800 });
+        }
+      } catch (_) {}
+      return;
+    }
     // Stato lettura ad alta voce condiviso tra le schede: aggiorna il flag
     // globale (per mostrare "Interrompi lettura" anche se legge un'altra scheda)
     // o ferma la lettura locale quando un'altra scheda chiede lo stop globale.
