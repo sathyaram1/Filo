@@ -1303,7 +1303,11 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
   const { profilo, preferenze, espansioni } = FiloMem.renderMemoryForPrompt(memory);
   const lezioni = await lessonsBufferText();
   const { stateText } = await FiloState.assemble();
-  const notesList = await FiloMem.listNotes();
+  // #379.5 — i "file" dell'editor (appunti inclusi: sono file come gli altri)
+  // entrano nel contesto come riassunti, non come testo integrale. Sostituisce
+  // la vecchia iniezione degli appunti dall'archivio (silo ormai vuoto dopo la
+  // migrazione appunti→file dell'editor).
+  const filesList = await editorFileSummariesList();
   const notiList = await FiloMem.listNotifications();
   const timersList = await FiloMem.listTimers();
   const saved = await SavedPages.list();
@@ -1311,7 +1315,9 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
   const payload = {
     profilo, preferenze, espansioni, lezioni, stato: stateText,
     notifiche: notiList.length ? notiList.map((n) => `- [${n.ts}] ${n.kind}: ${n.text}`).join('\n') : '(nessuna)',
-    appunti: notesList.length ? notesList.slice(0, 20).map((n) => `- [${n.ts}] ${n.text}`).join('\n') : '(nessuno)',
+    appunti: filesList.length
+      ? filesList.map((f) => `- [${f.id}] ${f.title}: ${f.summary}`).join('\n')
+      : '(nessuno)',
     salvati: saved.length ? saved.slice(0, 20).map((p) => `- ${p.title || p.url} (${p.url})`).join('\n') : '(nessuno)',
     tabAperte: openTabsCount,
   };
