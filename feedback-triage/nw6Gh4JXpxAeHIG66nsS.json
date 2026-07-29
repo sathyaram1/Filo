@@ -1,7 +1,0 @@
-{
-  "id": "nw6Gh4JXpxAeHIG66nsS",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato e modifica pubblicata. Il saluto al centro della nuova scheda ora tiene conto dell'ora reale e del tipo di giornata (feriale o weekend), così cambia tono col passare della giornata invece di restare fermo. Nessun rischio di sicurezza nella modifica.",
-  "queuedAt": "2026-07-29T09:25:40.876Z",
-  "queuedBy": "routine"
-}
