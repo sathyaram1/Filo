@@ -141,6 +141,43 @@ test('hover su una riga apre la preview, riga→riga aggiorna sul posto, il ling
   await expect(page.locator('#statePreview')).toBeHidden();
 });
 
+// Spia che registra ogni assegnazione JS di `img.src` (le immagini scritte via
+// innerHTML NON passano di qui: cattura SOLO i precarichi `new Image().src` e la
+// preview). Va installata come init script, così sopravvive al reload di seedDeck.
+async function spyImageSrc(page) {
+  await page.addInitScript(() => {
+    window.__imgSrcs = [];
+    const d = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
+    Object.defineProperty(HTMLImageElement.prototype, 'src', {
+      configurable: true, enumerable: d.enumerable,
+      get() { return d.get.call(this); },
+      set(v) { try { window.__imgSrcs.push(String(v)); } catch { /* noop */ } d.set.call(this, v); },
+    });
+  });
+}
+
+test('le immagini delle carte del mazzo sono precaricate appena il mazzo appare, PRIMA di qualsiasi hover', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await mockScryfall(app);
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await spyImageSrc(page);
+  await seedDeck(page); // reload interno → l'init script è attivo al render
+
+  // Il mazzo è renderizzato ma nessuna riga è stata toccata: senza precarico le
+  // immagini si scalderebbero solo all'hover (asserzione ROSSA senza il fix).
+  await expect(page.locator('#deckList .dk-row')).toHaveCount(2);
+  await page.waitForFunction(
+    () => window.__imgSrcs
+      && window.__imgSrcs.includes('https://cards.test/bolt.jpg')
+      && window.__imgSrcs.includes('https://cards.test/dragon.jpg'),
+    null, { timeout: 5000 },
+  );
+
+  // La preview non è mai stata aperta: il precarico è avvenuto da solo.
+  await expect(page.locator('#statePreview')).toBeHidden();
+});
+
 test('click su una riga del mazzo apre il carosello: tastiera per navigare, rimuovere e riaggiungere, Esc chiude', async ({ app, openTab }) => {
   test.setTimeout(60_000);
   await mockScryfall(app);
