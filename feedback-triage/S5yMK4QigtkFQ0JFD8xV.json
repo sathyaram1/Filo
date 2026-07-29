@@ -1,7 +1,0 @@
-{
-  "id": "S5yMK4QigtkFQ0JFD8xV",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho verificato il tasto per girare le carte bifronte nel banco di lavoro dei mazzi. Funziona come chiesto: sulle carte che si trasformano (es. Delver of Secrets) compare un tasto tondo in alto a destra dell'immagine; premendolo si vede il retro, ripremendolo torna il fronte. Si puo' anche cliccare direttamente sull'immagine per girarla. Sulle carte normali, e su quelle con due nomi ma un'unica illustrazione (tipo Fuoco//Ghiaccio o le avventure), il tasto NON compare, correttamente. Ho fatto anche stress test: doppio click rapido (torna al fronte), carta con due facce ma senza illustrazione sul retro (nessun tasto e il click non fa nulla), cambio carta (riparte dal fronte). Tutto a posto, sia nell'anteprima al passaggio del mouse sia nel carosello, e il tasto e' esteticamente coerente col resto. Ho notato solo una piccola rifinitura, che ho segnalato a parte e NON blocca: se giri una carta, allontani il mouse cosi' l'anteprima si chiude, e poi torni sulla STESSA carta, si riapre ancora sul retro invece che sul fronte.",
-  "queuedAt": "2026-07-29T13:35:07.332Z",
-  "queuedBy": "routine"
-}
