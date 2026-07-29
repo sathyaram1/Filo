@@ -17,6 +17,9 @@
     // ↓ Nuove versioni in cima.
     {
       version: '0.2.166', date: '2026-07-29',
+      features: [
+        'Ora puoi chiedere a Filo in chat quanti crediti ti restano: te lo dice subito, senza uscire dalla conversazione per aprire la pagina Crediti.',
+      ],
       fixes: [
         'I crediti ora scendono davvero quando usi Filo: prima, per la maggior parte delle funzioni, il saldo restava fermo anche dopo averle usate. Ora ogni uso dell’AI si riflette subito nel saldo e nel grafico dei consumi della pagina Crediti.',
         'Il messaggio al centro della nuova scheda ora saluta in base all’ora reale: la mattina ti dà il buongiorno, la sera il buonasera, e cambia tono tra un giorno feriale e il weekend. Prima poteva restare fermo su un saluto che non corrispondeva al momento della giornata.',
