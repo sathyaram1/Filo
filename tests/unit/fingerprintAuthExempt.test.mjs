@@ -68,3 +68,47 @@ test('un host sconosciuto con client_id+redirect_uri in query NON è esente', ()
   assert.equal(cfg.level, 1, 'un host non elencato non deve poter disattivare la protezione via query');
   assert.notEqual(cfg.seed, 0);
 });
+
+// Feedback #299: le app Google in cui l'utente è loggato (Documenti, Drive,
+// Gmail…) sono esenti dal rumore anti-fingerprint. Lì il rumore non protegge
+// nulla (sei identificato dall'account) ma può alterare i segnali che i
+// controlli di sicurezza di Google campionano, facendo scattare il blocco
+// "questo browser potrebbe non essere sicuro". Precondizione di regressione:
+// senza l'esenzione questi host tornerebbero { level: 1, seed: ≠0 }.
+test('Google Documenti (docs.google.com) è esente dal rumore anti-fingerprint', () => {
+  FP.setMode({ security: { fingerprint: { mode: 'default' } } });
+  const cfg = FP.configForHref('https://docs.google.com/document/d/abc123/edit');
+  assert.equal(cfg.level, 0, 'Google Documenti deve avere livello 0 (nessun rumore)');
+  assert.equal(cfg.seed, 0);
+});
+
+test('Drive, Gmail, Calendar sono esenti (stesse app Google loggate)', () => {
+  FP.setMode({ security: { fingerprint: { mode: 'default' } } });
+  assert.equal(FP.configForHref('https://drive.google.com/drive/my-drive').level, 0);
+  assert.equal(FP.configForHref('https://mail.google.com/mail/u/0/#inbox').level, 0);
+  assert.equal(FP.configForHref('https://calendar.google.com/calendar/u/0/r').level, 0);
+});
+
+test('le app Google sono esenti anche in modalità privacy (livello 2)', () => {
+  FP.setMode({ security: { fingerprint: { mode: 'privacy' } } });
+  assert.equal(FP.configForHref('https://docs.google.com/spreadsheets/d/xyz/edit').level, 0);
+});
+
+// Regressione: l'esenzione vale SOLO per le app-prodotto elencate, NON per tutto
+// il dominio google.com. La ricerca (www.google.com), dove l'utente può NON
+// essere loggato, deve restare protetta col rumore.
+test('la ricerca Google (www.google.com) NON è esente: resta protetta', () => {
+  FP.setMode({ security: { fingerprint: { mode: 'default' } } });
+  const cfg = FP.configForHref('https://www.google.com/search?q=filo');
+  assert.equal(cfg.level, 1, 'la ricerca Google non deve perdere la protezione anti-fingerprint');
+  assert.notEqual(cfg.seed, 0);
+});
+
+// Regressione: un host che finge di essere un sottodominio (docs.google.com.evil.com)
+// NON deve essere esente. Il match per suffisso è ancorato al punto ('.docs.google.com').
+test('un host che imita docs.google.com come sottodominio-esca NON è esente', () => {
+  FP.setMode({ security: { fingerprint: { mode: 'default' } } });
+  const cfg = FP.configForHref('https://docs.google.com.evil.com/');
+  assert.equal(cfg.level, 1, 'un host-esca non deve poter disattivare la protezione');
+  assert.notEqual(cfg.seed, 0);
+});
