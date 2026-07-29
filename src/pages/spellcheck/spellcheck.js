@@ -252,9 +252,14 @@
     const existing = data[STORAGE_KEYS.PERSONAL_DICT] || [];
     // Dedup case-insensitive: se esiste già una parola con lo stesso casing diverso, non aggiungerla.
     const alreadyExists = existing.some((x) => String(x).toLowerCase() === w.toLowerCase());
-    if (!alreadyExists) {
-      existing.push(w); // preserva il casing originale
+    if (alreadyExists) {
+      // Simmetria con la sezione autocorrect: avvisa invece di ingoiare l'input
+      // in silenzio. Non svuotiamo il campo così l'utente vede cosa aveva digitato.
+      showDictConflictMessage(w);
+      $('newDictWord').select();
+      return;
     }
+    existing.push(w); // preserva il casing originale
     await chrome.storage.local.set({ [STORAGE_KEYS.PERSONAL_DICT]: existing });
     renderDict(existing);
     $('newDictWord').value = '';
