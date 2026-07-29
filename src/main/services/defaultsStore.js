@@ -337,6 +337,27 @@ async function setAutomationLoopCap(loopCap, idToken) {
   return v;
 }
 
+// Log dei worker delle routine (config/automation, campo `workerLog`): elenco
+// delle ultime esecuzioni di scripts/dispatch.mjs, ciascuna { role, startedAt,
+// num }. Lo scrive dispatch a ogni worker spawnato; qui lo LEGGIAMO soltanto
+// (owner-gated) per la tab "Log" della dashboard. Ritorna le voci più recenti
+// PRIMA (ordine decrescente per istante d'avvio), già normalizzate. Documento o
+// campo assente / lettura fallita ⇒ lista vuota (mai un errore per un log).
+async function getWorkerLog(idToken) {
+  const doc = await fetchDoc(AUTOMATION_DOC, idToken);
+  const raw = doc && Array.isArray(doc.workerLog) ? doc.workerLog : [];
+  const entries = raw
+    .filter((e) => e && typeof e === 'object')
+    .map((e) => ({
+      role: typeof e.role === 'string' ? e.role : '',
+      startedAt: typeof e.startedAt === 'string' ? e.startedAt : '',
+      num: e.num == null ? '' : String(e.num),
+    }))
+    // Più recenti prima: dispatch le accoda in ordine cronologico.
+    .sort((a, b) => String(b.startedAt).localeCompare(String(a.startedAt)));
+  return entries;
+}
+
 module.exports = {
   get,
   getPublicForAdmin,
