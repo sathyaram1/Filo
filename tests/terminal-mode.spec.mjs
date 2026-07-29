@@ -113,6 +113,42 @@ test('la shell è PERSISTENTE per scheda: una variabile impostata sopravvive al 
     .toContainText('persist=vivo-5566', { timeout: 12_000 });
 });
 
+test('la cartella del terminale sopravvive alla riapertura (#259): riaprendo si resta dove si era, non alla home', async ({ app, shell }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible({ timeout: 8_000 });
+  await setTerminal(page, true);
+  await expect(page.locator('#dashDir')).toBeVisible({ timeout: 8_000 });
+
+  // Cartella temporanea reale, distinta dalla home, in cui spostarsi con `cd`.
+  // La creiamo nel main (Node) e ne prendiamo il path canonico: è quello che la
+  // shell riporterà come $PWD / %cd% dopo il cd.
+  const dir = await app.evaluate(() => {
+    const os = require('node:os');
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const d = fs.mkdtempSync(path.join(os.tmpdir(), 'filo-cwd-'));
+    return fs.realpathSync(d);
+  });
+  const home = await page.evaluate(async () => {
+    const r = await window.filo?.shellHome?.();
+    return r?.cwd || '';
+  });
+  expect(dir).not.toBe(home); // la temp dir NON deve coincidere con la home
+
+  // Spostati nella cartella: la riga grigia deve mostrarla.
+  await submitInput(page, `/cd ${dir}`);
+  await expect(page.locator('#dashDir')).toHaveText(dir, { timeout: 12_000 });
+
+  // "Esci e rientra": ricarica la dashboard (rilancia l'init, la stessa via che
+  // prima resettava la cartella alla home). Ora la cartella salvata va
+  // ripristinata: la riga grigia deve mostrare ANCORA la temp dir, non la home.
+  await page.reload();
+  await expect(page.locator('#dashDir')).toBeVisible({ timeout: 8_000 });
+  await expect(page.locator('#dashDir')).toHaveText(dir, { timeout: 8_000 });
+  await expect(page.locator('#dashDir')).not.toHaveText(home);
+});
+
 test('i colori ANSI vengono resi (niente codici grezzi nel testo visibile)', async ({ app, shell }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
