@@ -330,6 +330,7 @@
 
   let cardsById = {};      // scryfall_id → carta semplificata (cache di pagina)
   let symbolsMap = null;   // '{U}' → svg_uri (symbology, chiesta una volta)
+  const preloadedImgs = new Set(); // URL immagini già scaldate nella cache HTTP
   const collapsedGroups = new Set();
   const VIEW_LABEL = { tipo: 'tipo', tag: 'tag', cmc: 'costo', colore: 'colore' };
 
