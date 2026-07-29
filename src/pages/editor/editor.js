@@ -111,6 +111,16 @@
   let settingsMode = false;
   let commenting = false;
   let saveTimer = null;
+  // Snapshot manuali: `manualBaseline` è lo stato di riferimento (contenuto
+  // serializzato) da cui misurare quanto l'utente ha scritto/cancellato a mano
+  // prima di decidere se salvare un punto di ripristino. `manualSnapTimer` è la
+  // pausa di scrittura oltre cui si valuta lo snapshot (vedi maybeRecordManualVersion).
+  let manualBaseline = null;
+  let manualSnapTimer = null;
+  // Pausa di scrittura (ms) dopo l'ultima battuta prima di valutare uno snapshot
+  // manuale. Più lunga dell'autosalvataggio (1.2s): uno snapshot è un checkpoint,
+  // non un salvataggio, e deve scattare solo quando ci si ferma davvero.
+  const MANUAL_SNAPSHOT_IDLE = 3500;
   let uid = 0;
   const newId = (p) => `${p}-${Date.now().toString(36)}-${(uid++).toString(36)}`;
 
