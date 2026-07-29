@@ -1,0 +1,7 @@
+{
+  "id": "fVynCHYjjOGiiiYgAk6L",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho verificato l'accesso alle app Google in cui sei loggato (Documenti, Fogli, Presentazioni, Drive, Gmail, Calendar, Meet, ecc.). Su queste pagine Filo ora presenta a Google i segnali tecnici del browser senza alcuna alterazione: è proprio l'alterazione di quei segnali una delle cause note del blocco «questo browser o questa app potrebbero non essere sicuri». Contemporaneamente ho controllato che dove la protezione anti-tracciamento serve davvero resti attiva: sulla ricerca Google (dove potresti non essere loggato) e su tutti i siti normali il disturbo è ancora acceso. Ho anche provato i casi limite: un sito-esca che imita il nome (es. docs.google.com.qualcosa-di-malevolo.com) NON viene scambiato per Google e resta protetto, e lo stesso vale per varianti come maiuscole, punto finale o porta esplicita nell'indirizzo — tutte gestite correttamente. Tutti i controlli automatici passano. Limite onesto: il blocco «browser non sicuro» Google lo mostra solo durante un vero accesso con le tue credenziali, e nell'ambiente dove verifico non posso raggiungere i server di Google né fare un login reale, quindi non posso confermare dal vivo la sparizione dell'errore: la logica che lo causava è però neutralizzata sulle pagine giuste. Riprova sull'ultima versione e, se il blocco persistesse, segnala su quale indirizzo esatto compare.",
+  "queuedAt": "2026-07-29T07:33:56.057Z",
+  "queuedBy": "routine"
+}
