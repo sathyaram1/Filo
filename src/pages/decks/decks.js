@@ -1477,9 +1477,7 @@
     if (!carousel) return;
     const id = carousel.ids[carousel.i];
     const card = cardsById[id];
-    const img = $('carouselImg');
-    img.src = (card && card.image) || '';
-    img.alt = (card && card.name) || '';
+    paintCardImage($('carouselImg'), card || null);
     $('carouselPos').textContent = `${carousel.i + 1}/${carousel.ids.length}`;
     const added = inDeck(id);
     const btn = $('carouselToggle');
