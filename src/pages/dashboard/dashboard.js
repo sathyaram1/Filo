@@ -919,6 +919,18 @@
       btn.textContent = '📖 Verifico cosa so fare';
       return btn;
     }
+    if (type === 'LEGGI_FILE') {
+      // Chip inerte: rende trasparente che Filo sta aprendo un file dell'editor
+      // per leggerlo per intero (#379.5). Il contenuto rientra nel turno
+      // successivo (auto-continue), dove compare la risposta.
+      const btn = document.createElement('button');
+      btn.className = 'dash-action-btn';
+      btn.type = 'button';
+      btn.disabled = true;
+      const title = (a._output && a._output.title) || '';
+      btn.textContent = title ? `📄 Leggo: ${title}` : '📄 Leggo un file';
+      return btn;
+    }
     if (type === 'EVENTO_CALENDARIO') {
       const btn = document.createElement('button');
       btn.className = 'dash-action-btn';
