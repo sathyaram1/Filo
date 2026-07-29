@@ -37,6 +37,7 @@ const {
   reconcileState,
   withRetry,
   persistStateToGit,
+  appendWorkerLog,
 } = await import('../../scripts/dispatch.mjs');
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
