@@ -386,6 +386,10 @@
     saveStateEl.classList.add('dirty');
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => save(false), 1200);
+    // Snapshot manuale "a pausa": dopo che l'utente smette di scrivere, valuta
+    // se la deriva è abbastanza grande da meritare un punto di ripristino.
+    clearTimeout(manualSnapTimer);
+    manualSnapTimer = setTimeout(() => maybeRecordManualVersion(), MANUAL_SNAPSHOT_IDLE);
   }
 
   // ── Storico versioni: persistenza sull'archivio app (storage.json) ────────
