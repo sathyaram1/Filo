@@ -7,6 +7,7 @@
 // trasporto: IPC verso la UI + REST Firestore autenticato con l'ID token utente.
 
 const auth = require('../../auth/google-auth');
+const Defaults = require('../defaultsStore'); // #366.2 — legge config/credits (importi owner-configurabili)
 // SN_FEEDBACK_THREAD: ci serve splitNotes() per estrarre la spiegazione non
 // tecnica dalle note del feedback risolto (C5). Idempotente se già caricato.
 require('../../../shared/feedbackThread.js');
