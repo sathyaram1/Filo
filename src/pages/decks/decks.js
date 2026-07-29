@@ -870,6 +870,7 @@
       msgs.map((m, i) => chatBubbleHtml(m, i === msgs.length - 1)).join(''));
     log.scrollTop = log.scrollHeight;
     syncCarouselHighlight();
+    preloadVisibleCards();
   }
 
   async function sendChat(text) {
