@@ -16,6 +16,12 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.167', date: '2026-07-29',
+      features: [
+        'Nell’editor lo «Storico versioni» ora salva un punto di ripristino anche quando sei tu a scrivere o cancellare molto a mano, non solo quando è Filo a modificare il documento. Il salvataggio avviene da solo quando ti fermi un momento o quando cambi documento, e resta invisibile: le piccole correzioni non intasano lo storico, ma se scrivi tanto e poi vuoi tornare a un punto precedente, ora lo ritrovi.',
+      ],
+    },
+    {
       version: '0.2.166', date: '2026-07-29',
       features: [
         'Nell’editor arriva lo «Storico versioni»: dal menu documenti in alto a sinistra (o col tasto destro sul titolo) apri l’elenco di tutte le versioni salvate del documento, dalla più recente alla più vecchia, con data, sorgente della modifica (quelle fatte da Filo sono evidenziate) e un’anteprima del testo. Clicchi una versione per vederne l’anteprima completa e la ripristini quando vuoi — anche il ripristino è annullabile.',
