@@ -293,6 +293,11 @@
     // (scripts/dispatch.mjs). Owner-only.
     AUTOMATION_LOOP_CAP_GET: 'automation_loop_cap_get', // → { ok, loopCap } | { ok:false, error }
     AUTOMATION_LOOP_CAP_SET: 'automation_loop_cap_set', // { loopCap } → { ok, loopCap } | { ok:false, error }
+    // Log dei worker delle routine (doc config/automation, campo `workerLog`):
+    // elenco degli ultimi worker spawnati, con ruolo e istante di avvio. Lo
+    // scrive scripts/dispatch.mjs a ogni spawn; lo legge la tab "Log" della
+    // dashboard Gestione. Owner-only, sola lettura dal client.
+    WORKER_LOG_GET: 'worker_log_get',              // → { ok, entries:[{role,startedAt,num}] } | { ok:false, error }
     WEB_SEARCH: 'web_search',                      // { query } → { ok, results: [{title,url,snippet}], provider }
 
     // === Rilevamento siti pericolosi (src/main/services/safebrowse/) ===
