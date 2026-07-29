@@ -200,6 +200,42 @@
     BOARD_REOPEN: 5,
   };
 
+  // Prezzo NOZIONALE per 1M token (USD input/output) usato SOLO per il conteggio
+  // dei crediti (gamification). È SEPARATO da `settings.pricing`, che governa il
+  // limite di spesa REALE: quello resta a 0 per i modelli serviti gratis (Gemini
+  // via chiave diretta, free tier), così una chiamata gratuita non intacca il
+  // budget in euro. I crediti però devono calare anche quando la chiamata è
+  // gratis — altrimenti col setup di default (quasi tutto su Gemini) il saldo non
+  // si muoverebbe mai e la pagina Crediti sembrerebbe rotta. Qui ogni modello di
+  // default ha un prezzo di listino, sia nella forma "diretta" Gemini sia nel
+  // gemello OpenRouter, così `estimateCostEur` produce un costo > 0 su cui il
+  // motore crediti scala il saldo. I valori sono indicativi (allineati a
+  // DEFAULT_SETTINGS.pricing dove esiste il gemello).
+  const NOTIONAL_PRICING = {
+    // Gemini serviti diretti (provider 'gemini').
+    'gemini-2.0-flash': { input: 0.10, output: 0.40 },
+    'gemini-2.0-flash-lite': { input: 0.075, output: 0.30 },
+    'gemini-3.1-flash-lite': { input: 0.25, output: 1.50 },
+    'gemini-2.5-flash-preview-tts': { input: 0.50, output: 2.00 },
+    // Gemelli OpenRouter (stesso listino).
+    'google/gemini-2.0-flash-001': { input: 0.10, output: 0.40 },
+    'google/gemini-2.0-flash-lite-001': { input: 0.075, output: 0.30 },
+    'google/gemini-3.1-flash-lite-preview': { input: 0.25, output: 1.50 },
+    'anthropic/claude-3.5-haiku': { input: 0.80, output: 4.00 },
+  };
+  // Prezzo di ripiego quando il modello concreto non è nella tabella (config
+  // personalizzata dell'utente): un modello "flash" medio, così una chiamata AI
+  // reale non costa MAI 0 crediti pur senza un listino noto.
+  const NOTIONAL_PRICING_FALLBACK = { input: 0.10, output: 0.40 };
+
+  // Prezzo nozionale (per i crediti) di un modello concreto. Ritorna null se il
+  // modello non è in tabella, così il chiamante può decidere il ripiego (prezzo
+  // reale se disponibile, altrimenti NOTIONAL_PRICING_FALLBACK). PURA.
+  function notionalPricingFor(model) {
+    if (!model) return null;
+    return NOTIONAL_PRICING[model] || null;
+  }
+
   // Raggruppamento azione → "tipo d'uso" mostrato nel grafico a torta dei crediti
   // (per UTILIZZO, non per modello). Le azioni non mappate ricadono in "Altro".
   const CREDIT_USAGE_GROUPS = {
