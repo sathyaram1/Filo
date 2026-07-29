@@ -166,4 +166,4 @@ async function readFile(fileId) {
   } catch (_) { return { ok: false, id }; }
 }
 
-module.exports = { writeNote, migrateNotesToEditor, listFileSummaries, readFile };
+module.exports = { writeNote, migrateNotesToEditor, listFileSummaries, readFile, notesCorpusText };
