@@ -3520,6 +3520,9 @@
     ready: () => versionsReady,
     flush: () => persistVersions(),
     openHistory: () => openVersionHistory(),
+    // Valuta subito uno snapshot manuale (stesso codice della pausa di scrittura
+    // e del cambio documento), senza aspettare il debounce: usato dagli spec.
+    snapshotManual: () => maybeRecordManualVersion(),
   };
 
   // Boot
