@@ -19,6 +19,7 @@
       version: '0.2.166', date: '2026-07-29',
       features: [
         'Ora puoi chiedere a Filo in chat quanti crediti ti restano: te lo dice subito, senza uscire dalla conversazione per aprire la pagina Crediti.',
+        'Nei mazzi le carte bifronte (quelle che si trasformano) ora si girano: un tasto sull’immagine — o un clic sulla carta stessa — mostra il retro, sia nell’anteprima al passaggio del mouse sia nel carosello.',
       ],
       fixes: [
         'I crediti ora scendono davvero quando usi Filo: prima, per la maggior parte delle funzioni, il saldo restava fermo anche dopo averle usate. Ora ogni uso dell’AI si riflette subito nel saldo e nel grafico dei consumi della pagina Crediti.',
