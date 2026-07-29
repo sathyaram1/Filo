@@ -1,7 +1,0 @@
-{
-  "id": "4K9y8FLCCgOY2qNnELMN",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho verificato la richiesta partendo dal sintomo: prima bisognava uscire dalla chat e andare su Opzioni per sapere quanti crediti restavano. Ho controllato che ora, quando chatti con Filo, il saldo crediti aggiornato sia davvero presente tra le informazioni che Filo riceve. Ho simulato un consumo reale di crediti e verificato che il nuovo saldo compaia subito nel contesto della conversazione (test sul percorso vero, non su un valore finto): funziona. Stress test superati: con saldo a zero mostra correttamente 'zero crediti' (non un numero negativo o la sezione mancante), e quando l'informazione crediti non è disponibile la sezione sparisce senza rompere nulla. Ho verificato anche la privacy: il costo reale in euro NON trapela nel contesto della chat, viene passato solo il saldo in crediti e la nota che si ricarica di 100 al giorno a mezzanotte. Tutti i test automatici (oltre mille) restano verdi. Nota: non ho potuto simulare la risposta testuale vera del modello (serve una chiamata AI reale), ma il pezzo che prima mancava — il saldo che arriva a Filo durante la chat — ora c'è ed è verificato end-to-end.",
-  "queuedAt": "2026-07-29T10:13:59.659Z",
-  "queuedBy": "routine"
-}
