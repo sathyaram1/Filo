@@ -263,7 +263,7 @@
     },
     {
       id: 'feedback', title: 'Manda un feedback', category: 'assistant',
-      desc: 'Segnala un problema o una richiesta a chi sviluppa Filo, anche con immagini allegate, e segui le risposte in un thread.',
+      desc: 'Segnala un problema o una richiesta a chi sviluppa Filo, anche con immagini allegate, e segui le risposte in un thread. L’invio è immediato: se sei senza connessione Filo tiene da parte il feedback e lo spedisce da solo appena la rete torna, anche dopo aver chiuso e riaperto l’app.',
       invoke: 'Menu del tasto destro → "Feedback", oppure filo://feedback/feedback.html.',
     },
     {
