@@ -2147,6 +2147,10 @@
   // non hanno una sessione admin né Firestore).
   window.__mgTest.renderSupportModelsEditor = (models) => { renderSupportModelsEditor(models); smLoaded = true; };
   window.__mgTest.collectJudgeRegistry = collectJudgeRegistry;
+  // Tab "Log": render diretto con voci finte (bypassa il canale main), e
+  // ri-lettura via IPC per gli spec che stubbano la risposta.
+  window.__mgTest.renderWorkerLog = (entries) => { renderWorkerLog(entries); logLoaded = true; };
+  window.__mgTest.loadWorkerLog = loadWorkerLog;
 
   // Icone della ricerca (lente): iniettate da JS così restano nel tema di Filo
   // (SVG outline, currentColor) invece di un glifo emoji.
