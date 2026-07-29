@@ -18,6 +18,7 @@
     {
       version: '0.2.166', date: '2026-07-29',
       features: [
+        'Nell’editor arriva lo «Storico versioni»: dal menu documenti in alto a sinistra (o col tasto destro sul titolo) apri l’elenco di tutte le versioni salvate del documento, dalla più recente alla più vecchia, con data, sorgente della modifica (quelle fatte da Filo sono evidenziate) e un’anteprima del testo. Clicchi una versione per vederne l’anteprima completa e la ripristini quando vuoi — anche il ripristino è annullabile.',
         'Ora puoi chiedere a Filo in chat quanti crediti ti restano: te lo dice subito, senza uscire dalla conversazione per aprire la pagina Crediti.',
         'Nei mazzi le carte bifronte (quelle che si trasformano) ora si girano: un tasto sull’immagine — o un clic sulla carta stessa — mostra il retro, sia nell’anteprima al passaggio del mouse sia nel carosello.',
         'Nella dashboard di gestione arriva la scheda «Log»: l’elenco dei processi automatici avviati di recente, dal più recente, con il tipo di lavoro svolto e quando è partito.',
