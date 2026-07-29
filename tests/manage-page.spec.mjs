@@ -39,12 +39,12 @@ const FAKE_FB = {
   },
 };
 
-test('le 7 tab esistono col testo corretto e "Ricevuti" e\' attiva di default (DB1)', async ({ openTab }) => {
+test('le 8 tab esistono col testo corretto e "Ricevuti" e\' attiva di default (DB1)', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
-  // 7 tab della dashboard unificata.
-  await expect(page.locator('.mg-tab')).toHaveCount(7);
+  // 8 tab della dashboard unificata.
+  await expect(page.locator('.mg-tab')).toHaveCount(8);
   await expect(page.locator('.mg-tab[data-tab="inbox"]')).toHaveText('Ricevuti');
   await expect(page.locator('.mg-tab[data-tab="queue"]')).toHaveText('In coda');
   await expect(page.locator('.mg-tab[data-tab="resolved"]')).toHaveText('Risolti');
@@ -52,6 +52,7 @@ test('le 7 tab esistono col testo corretto e "Ricevuti" e\' attiva di default (D
   await expect(page.locator('.mg-tab[data-tab="stats"]')).toHaveText('Statistiche Red Team');
   await expect(page.locator('.mg-tab[data-tab="models"]')).toHaveText('Modelli di supporto');
   await expect(page.locator('.mg-tab[data-tab="automation"]')).toHaveText('Automazioni');
+  await expect(page.locator('.mg-tab[data-tab="log"]')).toHaveText('Log');
 
   // La vecchia tab "Revisione" non esiste più (assorbita in "In coda").
   await expect(page.locator('.mg-tab[data-tab="review"]')).toHaveCount(0);
