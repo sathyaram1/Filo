@@ -1675,10 +1675,21 @@
 
   async function initCwd() {
     if (currentCwd) return;
+    // Ripristina l'ultima cartella in cui era il terminale (#259): riaprendo Filo
+    // non si torna alla home. Se non c'è nulla di salvato (primo avvio) si parte
+    // dalla home come prima. Se la cartella salvata non esiste più, il main la
+    // riporta alla home al primo comando (shell.js valida la cwd) e il valore si
+    // auto-corregge.
     try {
-      const r = await window.filo?.shellHome?.();
-      if (r?.cwd) currentCwd = r.cwd;
+      const saved = await self.SN_STORAGE?.getRaw?.(STORAGE_KEYS.FILO_TERMINAL_CWD, '');
+      if (saved && typeof saved === 'string') currentCwd = saved;
     } catch (_) {}
+    if (!currentCwd) {
+      try {
+        const r = await window.filo?.shellHome?.();
+        if (r?.cwd) currentCwd = r.cwd;
+      } catch (_) {}
+    }
     updateDirLine();
   }
 
