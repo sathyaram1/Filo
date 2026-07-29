@@ -41,6 +41,8 @@ function setup() {
   const OB = globalThis.SN_FEEDBACK_OUTBOX;
   OB._reset();
   OB._setAuto(false); // niente timer automatici: pilotiamo flush() a mano
+  // Titolo generato al momento dell'invio (come in produzione dal main).
+  OB.init({ prepare: (p) => globalThis.SN_FEEDBACK.fallbackName(p && p.text), backoffMin: 999999 });
   return { OB, state, store };
 }
 
