@@ -20,6 +20,44 @@
 
   const { STORAGE_KEYS, CREDIT, creditUsageGroup } = global.SN_CONST;
 
+  // ── config importi (owner-configurabile, #366.2) ────────────────────────────
+  // Gli importi crediti possono essere sovrascritti globalmente dall'owner (doc
+  // Firestore config/credits). L'handler credits.js legge la config remota e la
+  // registra qui con setActiveConfig(); i wrapper async (load/award/…) la usano
+  // come default. Le funzioni PURE accettano invece un `config` ESPLICITO come
+  // ultimo parametro (per i test e per chi passa una config al volo). In assenza
+  // di config — esplicita o attiva — si ricade sui default CREDIT: comportamento
+  // identico a prima di #366.2 (offline / non loggato / test legacy).
+  let activeConfig = null;
+
+  function setActiveConfig(cfg) { activeConfig = cfg && typeof cfg === 'object' ? cfg : null; }
+  function getActiveConfig() { return activeConfig; }
+
+  function pickNum(v, fallback) {
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 0 ? n : fallback;
+  }
+
+  // Config effettiva per una chiamata: `config` esplicito > config attiva
+  // (owner) > costanti CREDIT. Ogni campo ricade sul default CREDIT se assente
+  // o invalido, quindi anche una config parziale e' sicura.
+  function resolveConfig(config) {
+    const c = (config && typeof config === 'object') ? config
+      : (activeConfig || null);
+    const table = (c && c.feedbackResolveByPriority && typeof c.feedbackResolveByPriority === 'object')
+      ? c.feedbackResolveByPriority
+      : (CREDIT.FEEDBACK_RESOLVE_BY_PRIORITY || {});
+    return {
+      initial: pickNum(c && c.initial, CREDIT.INITIAL),
+      dailyRefill: pickNum(c && c.dailyRefill, CREDIT.DAILY_REFILL),
+      maxRefillDays: pickNum(c && c.maxRefillDays, CREDIT.MAX_REFILL_DAYS),
+      feedbackSend: pickNum(c && c.feedbackSend, CREDIT.FEEDBACK_SEND),
+      feedbackResolveByPriority: table,
+      boardVote: pickNum(c && c.boardVote, CREDIT.BOARD_VOTE),
+      boardReopen: pickNum(c && c.boardReopen, CREDIT.BOARD_REOPEN),
+    };
+  }
+
   // ── helper data/tempo (LOCALE: l'utente pensa alla SUA mezzanotte) ──────────
 
   function dateKey(d = new Date()) {
