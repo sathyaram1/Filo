@@ -208,7 +208,4 @@ test('#376 — i passi intermedi di Filo non sono bottoni (una sola cosa cliccab
   // risultato vero (prima erano due pill affiancate: la ricerca e il link).
   await expect(page.locator('#bubbles .dash-action-btn')).toHaveCount(1);
   await expect(page.locator('#bubbles .dash-action-btn')).toContainText('Giorgio Gaber');
-
-  // Traccia visiva ispezionabile della scena (cartella gitignorata).
-  await page.screenshot({ path: 'tests/.shots/376-chat-passi.png' });
 });
