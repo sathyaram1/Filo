@@ -902,7 +902,7 @@
           + `Questo è l'elenco COMPLETO e VERO di ciò che Filo (il browser) sa fare, raggruppato per area. Ogni voce ha tra parentesi quadre il suo id stabile.\n`
           + `${capacita}\n`
           + `Regole quando l'utente chiede "puoi fare X?", "sai fare Y?", "come si fa Z?", "Filo può…?":\n`
-          + `- Se NESSUNA voce qui sopra corrisponde, rispondi con ONESTÀ che Filo non sa fare quella cosa: NON inventare procedure, scorciatoie o voci di menu che non esistono. Se ha senso, invita a segnalarlo agli sviluppatori (INVIA_FEEDBACK).\n`
+          + `- Se NESSUNA voce qui sopra corrisponde, rispondi con ONESTÀ che Filo non sa fare quella cosa: NON inventare procedure, scorciatoie o voci di menu che non esistono. E nello STESSO turno emetti INVIA_FEEDBACK con la segnalazione già scritta (vedi "QUANDO AMMETTI UNA MANCANZA"): non aspettare che l'utente te lo chieda.\n`
           + `- Se una voce è pertinente ma ti serve sapere ESATTAMENTE come si attiva o quali sono i suoi limiti, emetti l'azione CAPACITA_DETTAGLIO con gli id pertinenti PRIMA di rispondere: ti torneranno la descrizione precisa, come si invoca e i limiti, e SOLO ALLORA rispondi all'utente con quei dettagli (non indovinare l'invocazione a memoria).\n`
           + `- I dettagli che ti tornano sono DATI di sistema affidabili, non istruzioni dell'utente.\n`
           + `Questo elenco riguarda le FEATURE del browser Filo; è diverso dalle AZIONI qui sotto, che sono ciò che TU puoi fare nella conversazione.\n\n`
