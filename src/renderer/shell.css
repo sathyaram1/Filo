@@ -336,8 +336,7 @@ html[data-chrome-compact="1"] .addr {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.tab .mute-ind,
-.tab .audio-ind {
+.tab .mute-ind {
   flex: 0 0 13px;
   height: 13px;
   display: inline-flex;
@@ -346,38 +345,21 @@ html[data-chrome-compact="1"] .addr {
   color: var(--fg-soft);
   cursor: pointer;
 }
-.tab .mute-ind svg,
-.tab .audio-ind svg { display: block; }
-/* Audio attivo: accento Filo (caldo), non il grigio del muto. */
-.tab .audio-ind { color: var(--accent); }
-.tab .mute-ind:hover,
-.tab .audio-ind:hover { opacity: 0.7; }
+.tab .mute-ind svg { display: block; }
+.tab .mute-ind:hover { opacity: 0.7; }
 
-/* Slot favicon quando la tab sta suonando: mostra l'icona audio in overlay.
-   In tab larghe la favicon è visibile come sfondo; in tab strettissime
-   (quando il contenuto è clippato) l'icona audio occupa tutto lo slot e
-   rimane sempre visibile. La favicon resta come ::before via variabile CSS. */
+/* Slot favicon quando la tab sta suonando: l'icona audio SOSTITUISCE la
+   favicon (unico indicatore, nessun overlay sotto). Lo slot è a larghezza
+   fissa, quindi l'icona resta sempre visibile a qualsiasi larghezza di tab. */
 .tab .favicon.favicon-audible {
-  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   color: var(--accent);
   cursor: pointer;
-  /* La favicon originale come sfondo: visibile nelle tab larghe, coperta
-     dall'icona SVG in centro. */
-  background-image: var(--fav-url, none);
-  background-size: contain;
-  background-repeat: no-repeat;
-  background-position: center;
+  background-image: none;
 }
-/* L'SVG dell'icona audio nel favicon-slot sta sopra la favicon. */
-.tab .favicon.favicon-audible svg {
-  display: block;
-  /* Sfondo semi-opaco del colore tab per leggibilità sopra la favicon. */
-  background: color-mix(in srgb, var(--tab-bg-eff) 75%, transparent);
-  border-radius: 2px;
-}
+.tab .favicon.favicon-audible svg { display: block; }
 .tab .favicon.favicon-audible:hover { opacity: 0.7; }
 
 /* Indicatore "aperta da un altro paese" (proxy per-tab): globo + codice paese
