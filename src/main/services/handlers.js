@@ -1295,7 +1295,7 @@ async function editorFileSummaries() {
   } catch (_) { return ''; }
 }
 
-async function handleFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, sender = null }) {
+async function handleFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, sender = null }) {
   await FiloMem.touchSession();
   await FiloMem.appendRaw({ type: 'chat_user', summary: String(userMessage || '').slice(0, 200) });
   const memory = await FiloMem.getMemory();
