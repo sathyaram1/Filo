@@ -128,7 +128,7 @@ module.exports = function register(on, ctx) {
       try {
         attempts = buildAttemptChain(settings, model);
       } catch (_) {
-        return { ok: false, error: 'no_tts_model' };
+        return ttsFallback('no_tts_model');
       }
       const voice = (settings && settings.tts && settings.tts.modelVoice) || '';
       const text = String(msg.text == null ? '' : msg.text);
