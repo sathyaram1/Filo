@@ -141,7 +141,10 @@ module.exports = function register(on, ctx) {
       for (const d of [deck, ...others]) for (const c of d.carte) allIds.push(c.scryfall_id);
       const known = await Scry.cards(allIds).catch(() => ({}));
 
-      const identityColors = (deck.commanderMeta && Array.isArray(deck.commanderMeta.colors))
+      // `let`, non `const`: se in questo stesso turno l'utente stabilisce il
+      // commander (build-around, sotto), va ricalcolato PRIMA della ricerca, così
+      // la query e il filtro duro restano nei colori del commander appena scelto.
+      let identityColors = (deck.commanderMeta && Array.isArray(deck.commanderMeta.colors))
         ? deck.commanderMeta.colors : null;
       const sys = PROMPTS.decksChat({
         deckName: deck.nome,
