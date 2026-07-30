@@ -82,40 +82,16 @@ module.exports = function register(on, ctx) {
   }
 
   // Errore → frase per l'utente (#331): mai un codice HTTP nudo in chat.
-  // Gli errori con `code` (NO_API_KEY, LIMIT_REACHED) portano già un messaggio
-  // i18n pensato per l'utente e passano invariati. Tutto il resto viene
-  // TRADOTTO, mai passato grezzo: il messaggio grezzo (con codici, endpoint,
-  // stack) resta nei log del main, non in chat.
+  // La traduzione vive in `shared/chatErrors.js` (#360): è la STESSA per tutte
+  // le chat di Filo — prima era solo qui e la chat della home mostrava ancora
+  // "fetch failed" nudo. Qui passiamo solo l'archivio esterno che questa chat
+  // interroga oltre al servizio AI, così un errore HTTP senza marcatore di
+  // provider viene attribuito a lui.
+  const SCRYFALL_SOURCE = 'Scryfall (l\'archivio delle carte)';
   function friendlyChatError(e) {
-    const m = String((e && e.message) || '');
-    if (e && (e.code === 'NO_API_KEY' || e.code === 'LIMIT_REACHED')) return m;
-    // Errore del SERVIZIO AI (il modello, non Scryfall): riconosciuto dal
-    // marcatore strutturato che i provider attaccano ai loro errori HTTP
-    // (err.provider) o — rete di sicurezza per errori non marcati — dalla
-    // forma del messaggio ("OpenRouter 400: …", "Gemini 503: …").
-    const pm = /^(OpenRouter|Gemini)(?:\s+\S+)?\s+(\d{3})\b/.exec(m);
-    if ((e && e.provider) || pm) {
-      const st = Number(e && e.status) || (pm ? Number(pm[2]) : 0);
-      if (st === 401 || st === 403) {
-        return 'il servizio AI ha rifiutato la chiave API: controlla che sia giusta (e ancora valida) nelle Impostazioni.';
-      }
-      if (st === 429 || st >= 500) {
-        return 'il servizio AI è momentaneamente sovraccarico o non disponibile. Riprova tra qualche minuto.';
-      }
-      return 'il servizio AI non è riuscito a rispondere: potrebbe esserci un problema con il modello scelto nelle Impostazioni. Riprova, o prova con un altro modello.';
-    }
-    const status = Number(e && e.status);
-    if (Number.isFinite(status) && status > 0) {
-      return status >= 500 || status === 429
-        ? 'Scryfall (l\'archivio delle carte) al momento non risponde. Riprova tra qualche minuto.'
-        : 'Scryfall (l\'archivio delle carte) ha rifiutato la ricerca. Riprova riformulando la richiesta con parole diverse.';
-    }
-    if (/fetch failed|network|ENOTFOUND|ECONN|ETIMEDOUT|timeout/i.test(m)) {
-      return 'problema di rete: controlla la connessione e riprova.';
-    }
-    // Qualsiasi altro errore è tecnico e non aiuterebbe l'utente: frase
-    // generica in chat, dettaglio nei log.
-    return 'qualcosa è andato storto. Riprova.';
+    const CE = globalThis.SN_CHAT_ERRORS;
+    if (!CE) return 'qualcosa è andato storto. Riprova.';
+    return CE.friendly(e, { dataSource: SCRYFALL_SOURCE });
   }
 
   on(MSG.DECKS_CHAT, async (msg, sender) => {
