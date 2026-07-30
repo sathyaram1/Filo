@@ -1,7 +1,0 @@
-{
-  "id": "ce25cd68-1454-4cc7-a289-a5b0c106b42b",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho riprodotto la lamentela: in Opzioni → Altro, premendo «Elimina» su una categoria ora compare il popup di conferma nello stile di Filo (coerente col tema chiaro/scuro, bottoni stondati) e NON la finestrella grezza del sistema. Confermando dal popup la categoria viene davvero rimossa; annullando resta al suo posto. Ho messo alla prova i casi limite: nome categoria con codice HTML e emoji (il testo compare così com'è scritto, senza eseguire nulla), annullamento, e riapertura ripetuta del popup: in nessun caso ricompare la finestrella del sistema. Ho anche controllato che in tutta l'app le altre conferme prima di azioni distruttive (svuota archivio, cancella cronologia AI, ecc.) passino ormai tutte dal popup di Filo, con ritorno alla finestrella di sistema solo come rete di sicurezza se il componente non fosse caricato. Funziona.",
-  "queuedAt": "2026-07-30T00:54:16.553Z",
-  "queuedBy": "routine"
-}
