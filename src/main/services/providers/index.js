@@ -16,6 +16,45 @@
     throw new Error(`Provider non supportato: ${name}`);
   }
 
+  // #360 — un buco di rete di un istante (WiFi che salta, DNS lento) non deve
+  // diventare un errore in faccia all'utente: prima di ripiegare sul provider
+  // successivo ritentiamo LO STESSO tentativo dopo una breve pausa. Solo per i
+  // guasti PASSEGGERI (nessuna risposta HTTP arrivata): un 400 o un 401
+  // ritornerebbero identici, ritentarli sarebbe solo attesa buttata.
+  const RETRY_NETWORK_MAX = 1;      // ritentativi extra per tentativo
+  const RETRY_NETWORK_DELAY_MS = 700;
+
+  function isTransientNetwork(err) {
+    const CE = global.SN_CHAT_ERRORS;
+    if (CE && typeof CE.isTransientNetwork === 'function') return CE.isTransientNetwork(err);
+    // Ripiego se il modulo condiviso non è caricato (contesti di test isolati).
+    const m = String((err && err.message) || '');
+    return !Number(err && err.status) && /fetch failed|ENOTFOUND|ECONN|ETIMEDOUT|socket hang up/i.test(m);
+  }
+
+  const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+
+  // Esegue `once()` ritentandolo sui guasti di rete passeggeri. `canRetry()`
+  // decide se il ritentativo è ancora lecito (in streaming non lo è più una
+  // volta che dei delta sono usciti, se il chiamante non sa azzerare il buffer).
+  async function withNetworkRetry(once, canRetry) {
+    let lastErr = null;
+    for (let t = 0; t <= RETRY_NETWORK_MAX; t++) {
+      try {
+        return await once();
+      } catch (err) {
+        lastErr = err;
+        const again = t < RETRY_NETWORK_MAX
+          && isTransientNetwork(err)
+          && (!canRetry || canRetry());
+        if (!again) throw err;
+        console.warn('[SN] guasto di rete passeggero, ritento tra', RETRY_NETWORK_DELAY_MS, 'ms:', err.message || err);
+        await sleep(RETRY_NETWORK_DELAY_MS);
+      }
+    }
+    throw lastErr;
+  }
+
   async function complete({ provider, apiKey, model, messages, reasoning, signal }) {
     return getProvider(provider).complete({ apiKey, model, messages, reasoning, signal });
   }
