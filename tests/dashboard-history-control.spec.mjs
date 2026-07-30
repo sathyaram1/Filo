@@ -34,9 +34,9 @@ test('la home ha un pulsante Cronologia in alto a destra che apre la cronologia 
   const deadline = Date.now() + 10_000;
   let opened = null;
   while (Date.now() < deadline) {
-    opened = app.windows().find((w) => w.url().includes('filo://history/'));
+    opened = app.windows().find((w) => w.url().includes('filo://archive/'));
     if (opened) break;
     await new Promise((r) => setTimeout(r, 100));
   }
-  expect(opened, 'la pagina cronologia non si è aperta dopo il click').toBeTruthy();
+  expect(opened, 'la pagina cronologia schede non si è aperta dopo il click').toBeTruthy();
 });
