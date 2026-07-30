@@ -194,6 +194,9 @@ test('#376 — i passi intermedi di Filo non sono bottoni (una sola cosa cliccab
     ]);
   });
 
+  // Traccia visiva ispezionabile della scena (cartella gitignorata).
+  await page.screenshot({ path: 'tests/.shots/376-chat-passi.png' });
+
   // La traccia del passo intermedio resta LEGGIBILE (trasparenza, #368)…
   const trace = page.locator('#test-steps .dash-action-step');
   await expect(trace).toHaveCount(1);
