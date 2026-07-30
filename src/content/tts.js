@@ -314,6 +314,19 @@
     });
   }
 
+  // Avvisa (una sola volta per sessione dell'app — la deduplica vive nel main,
+  // via `firstFallback`) che la lettura a voce naturale del modello non è
+  // disponibile e sta subentrando la voce del browser. Serve a spiegare
+  // "modello impostato ma lettura automatica": il ripiego resta silenzioso e
+  // grazioso (la lettura parte comunque), ma la PRIMA volta diciamo perché, così
+  // l'utente sa se deve intervenire (es. manca la chiave per la voce a modello).
+  function notifyModelFallback(res) {
+    if (!res || !res.firstFallback) return;      // deduplicato dal main
+    if (!ttsSupported()) return;                 // playBrowserChunk mostrerà già tts_not_supported
+    const key = res.error === 'no_tts_model' ? 'tts_model_fallback_nokey' : 'tts_model_fallback';
+    try { Popup.showToast(I18n.t(key)); } catch (_) {}
+  }
+
   // Lettura ad alta voce. Strategia anti-attesa: il testo viene spezzato in
   // frasi (chunk); la prima — corta — viene sintetizzata e suonata subito,
   // mentre le successive si preparano in parallelo. Così il tempo prima della
