@@ -905,7 +905,7 @@
     renderGrid, renderLeaderboard, renderRules, applyState,
     renderReveal, renderSummary, renderBadges, renderGenCodes,
     renderHistory, formatRelativeTime, renderCodesTable,
-    redeemStatusMessage,
+    redeemStatusMessage, renderAttemptDetail,
   };
 
   // ====================== WIRING (tab, IPC, polling) ======================
