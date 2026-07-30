@@ -671,20 +671,18 @@
         }
       }
 
-      // Slot favicon / spinner. Quando la tab suona e lo slot è stretto,
-      // mostriamo l'icona audio al posto della favicon (sempre visibile).
-      // Lo slot ha sempre class "favicon-slot" così il CSS può puntarlo.
+      // Slot favicon / spinner. Quando la tab suona, l'icona audio SOSTITUISCE
+      // la favicon in questo slot: un unico indicatore, sempre visibile a
+      // qualsiasi larghezza (lo slot è a larghezza fissa), che non si sovrappone
+      // mai alla favicon né viene duplicato altrove nella tab.
       const ico = document.createElement('div');
       if (t.loading) {
         ico.className = 'spinner';
       } else if (isAudible) {
-        // Classe speciale: mostra l'icona audio sopra la favicon con CSS.
-        // In tab larghe la favicon resta visibile in background; in tab
-        // strettissime (<min-width di sicurezza) l'icona prende tutto lo slot.
+        // L'icona audio prende il posto della favicon (nessun overlay sotto).
         ico.className = 'favicon favicon-audible';
-        if (t.favicon) ico.style.setProperty('--fav-url', `url("${t.favicon}")`);
         ico.innerHTML = AUDIO_IND_SVG;
-        // Clic sullo slot favicon-audible muta la tab (come l'audio-ind finale).
+        // Clic sullo slot favicon-audible muta la tab.
         ico.setAttribute('role', 'button');
         ico.title = 'Silenzia';
         ico.setAttribute('aria-label', 'Audio in riproduzione — clicca per silenziare');
