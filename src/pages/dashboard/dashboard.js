@@ -1190,7 +1190,7 @@
       // dipende da cosa Filo ha appena fatto (comando vs lookup di capacità).
       const nudge = autoContinueNudge(r.actions);
       threadHistory.push({ role: 'user', text: nudge });
-      r = await runFiloTurn({ userMessage: nudge });
+      r = await runFiloTurn({ userMessage: nudge, internal: true });
     }
 
     sending = false;
