@@ -36,6 +36,51 @@ test('login.microsoftonline.com e github.com/login sono esenti (stessi provider 
   assert.equal(FP.configForHref('https://github.com/login').level, 0);
 });
 
+// #209 (rifinitura): per gli host DEDICATI all'autenticazione (accounts.google.com,
+// login.microsoftonline.com, appleid.apple.com, auth.openai.com…) l'esenzione
+// copre l'INTERO host, perché non c'è navigazione generica: tutto è login/account.
+test('un host dedicato al login (auth.openai.com) è esente su qualunque path', () => {
+  FP.setMode({ security: { fingerprint: { mode: 'default' } } });
+  assert.equal(FP.configForHref('https://auth.openai.com/authorize?client_id=x').level, 0);
+  // Anche un path che NON somiglia a un login: l'intero host resta esente.
+  assert.equal(FP.configForHref('https://accounts.google.com/ManageAccount').level, 0);
+  assert.equal(FP.configForHref('https://login.microsoftonline.com/tenant/v2.0/.well-known/openid-configuration').level, 0);
+});
+
+// #209 (rifinitura): per gli host PRODOTTO che sono anche provider di identità
+// (github.com, x.com, discord.com, facebook.com…) l'esenzione vale SOLO sulla
+// superficie di accesso (login/OAuth). Il resto del sito torna protetto.
+test('la navigazione pubblica di github.com (non login) torna protetta dal rumore', () => {
+  FP.setMode({ security: { fingerprint: { mode: 'default' } } });
+  const cfg = FP.configForHref('https://github.com/torvalds/linux');
+  assert.equal(cfg.level, 1, 'una pagina di repo su github.com deve restare protetta');
+  assert.notEqual(cfg.seed, 0);
+});
+
+test('login/OAuth di github.com restano esenti (accesso non alterato)', () => {
+  FP.setMode({ security: { fingerprint: { mode: 'default' } } });
+  assert.equal(FP.configForHref('https://github.com/login').level, 0);
+  assert.equal(FP.configForHref('https://github.com/login/oauth/authorize?client_id=x&redirect_uri=y').level, 0);
+});
+
+test('x.com, discord.com, facebook.com: home protetta, accesso esente', () => {
+  FP.setMode({ security: { fingerprint: { mode: 'default' } } });
+  // Navigazione pubblica → protetta.
+  assert.equal(FP.configForHref('https://x.com/home').level, 1);
+  assert.equal(FP.configForHref('https://discord.com/channels/@me').level, 1);
+  assert.equal(FP.configForHref('https://www.facebook.com/marketplace').level, 1);
+  // Superfici di accesso → esenti.
+  assert.equal(FP.configForHref('https://x.com/i/flow/login').level, 0);
+  assert.equal(FP.configForHref('https://discord.com/oauth2/authorize?client_id=1&redirect_uri=2').level, 0);
+  assert.equal(FP.configForHref('https://www.facebook.com/dialog/oauth?client_id=1&redirect_uri=2').level, 0);
+});
+
+test('le app Google restano esenti su tutto il flusso anche dopo la rifinitura #209', () => {
+  FP.setMode({ security: { fingerprint: { mode: 'default' } } });
+  // (invariato: docs/drive/gmail restano esenti per intero, vedi #299)
+  assert.equal(FP.configForHref('https://docs.google.com/document/d/x/edit').level, 0);
+});
+
 test('un sito normale (non provider di identità) continua a ricevere il rumore', () => {
   FP.setMode({ security: { fingerprint: { mode: 'default' } } });
   const cfg = FP.configForHref('https://example.com/');
