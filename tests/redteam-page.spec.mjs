@@ -462,6 +462,17 @@ test('storico: cliccando un tentativo si vedono attacco, spiegazione e motivazio
   await expect(detail).toContainText('Il tentativo è trasparente');
   await expect(detail).toContainText('Ripetitivo e poco credibile');
 
+  // Il dettaglio occupa TUTTA la larghezza della riga (feedback #295, 2ª
+  // revisione): il colspan deve reggere, così il testo non si schiaccia in una
+  // colonnina a sinistra. Se il flex finisse sulla cella <td> stessa, questa
+  // smetterebbe di essere table-cell, il colspan verrebbe ignorato e la cella
+  // collasserebbe alla prima colonna (~1/8 della riga): l'assert diventa rosso.
+  const widths = await detail.evaluate((td) => {
+    const tr = td.closest('tr').previousElementSibling; // riga dati sopra
+    return { td: td.getBoundingClientRect().width, row: tr.getBoundingClientRect().width };
+  });
+  expect(widths.td).toBeGreaterThan(widths.row * 0.9);
+
   // Ri-click → si richiude.
   await row.click();
   await expect(row).toHaveAttribute('aria-expanded', 'false');
