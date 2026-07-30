@@ -33,7 +33,7 @@
   TTS.init({
     getSettings: () => settings,
     restorePasteContext: () => restorePasteContext(),
-    insertTextAtSelection: (text) => Actions.insertTextAtSelection(text),
+    insertDictatedText: (text) => Actions.insertDictatedText(text),
     blobToDataUrl: (blob) => Actions.blobToDataUrl(blob),
   });
   EditBox.init({
