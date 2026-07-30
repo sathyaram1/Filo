@@ -313,7 +313,7 @@
     await Promise.all([ensureSymbols(), loadDeckCards()]);
     refreshOpinionStaleness();
     renderDeckList();
-    renderChat();
+    renderChat(stickChat);
     renderStats();
   }
 
