@@ -1,7 +1,0 @@
-{
-  "id": "GRWkPgKaCr6xItB2O8x7",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica è stata pubblicata. Il dettaglio dei tentativi mostra il testo e le motivazioni come contenuto puro (un attacco che contiene codice resta scritto e non viene eseguito), e nessuna parte sensibile dell'app è stata toccata.",
-  "queuedAt": "2026-07-30T06:23:47.227Z",
-  "queuedBy": "routine"
-}
