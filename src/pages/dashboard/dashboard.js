@@ -1328,6 +1328,7 @@
     '/incognito': () => { send({ type: MSG.OPEN_INCOGNITO }); },
     '/pulisci': () => { runTabCleanup(); },
     '/pulizia': () => { runTabCleanup(); },
+    '/riordina': () => { runTabReorder(); },
     '/set': (text) => { handleSetCommand(text); },
     '/users': () => { handleUsersCommand(); },
     '/gift': (text) => { handleGiftCommand(text); },
