@@ -1,9 +1,9 @@
 {
   "id": "GRWkPgKaCr6xItB2O8x7",
   "branch": "",
-  "loopCount": 1,
-  "verifierVerdict": "fail",
-  "verifierCritique": "FAIL — Ho testato cliccando su un tentativo nello Storico tentativi: la riga si apre davvero (con click e da tastiera con Invio/Spazio) e mostra tutto ciò che il feedback chiedeva — il testo dell'attacco, la spiegazione, il giudizio di validità con la sua motivazione e la motivazione di ogni giudice. Anche gli stress test funzionano: tentativo senza dati mostra 'dettagli non ancora disponibili', testi lunghissimi ed emoji reggono, e un attacco che contiene codice resta scritto come testo senza eseguire nulla. Il problema è come appare: quando la riga si espande, tutto il dettaglio viene schiacciato in una colonna sottile sul lato sinistro (larga più o meno come la colonna dell'ora), lasciando vuoto circa il 90% della larghezza della riga. Le motivazioni dei giudici, che possono essere lunghe, vanno a capo dopo una o due parole e diventano una colonnina quasi illeggibile. Per riprodurre: apri la pagina Red Team da account verificato, vai in Statistiche > Storico tentativi e clicca un tentativo qualsiasi — il testo compare tutto ammassato a sinistra invece di usare l'intera larghezza. Il dettaglio dovrebbe occupare tutta la larghezza della riga, come fa la tabella sopra.",
+  "loopCount": 0,
+  "verifierVerdict": null,
+  "verifierCritique": "",
   "secauditDone": false,
   "secauditVerdict": null
 }
