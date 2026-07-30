@@ -493,3 +493,39 @@ resto. È l'applicazione diretta di "la GUI è personalizzabile" (`filo_filosofi
 - **Dove:** `src/pages/decks/decks.js`, `src/pages/manage/manage.js`. Test
   `tests/decks-layout.spec.mjs`, `tests/manage-layout.spec.mjs`,
   `tests/unit/paneLayout.test.mjs`.
+
+## In chat: i passi intermedi sono TRACCE, i risultati sono bottoni
+
+Nella conversazione di Filo ha la forma di bottone (pill `.dash-action-btn`)
+**solo ciò su cui l'utente può agire**: il link aperto, la conferma, il pannello.
+I passi che Filo compie per arrivarci — la ricerca sul web, la lettura di un
+file, la consultazione del manifesto capacità — sono **tracce scritte**
+(`.dash-action-step`: riga in corsivo, tenue, senza bordo né pill).
+
+- **Perché:** i chip inerti erano `<button disabled>` con la stessa pill dei
+  bottoni veri; una singola azione ("mettimi questa canzone") lasciava così due
+  pill affiancate e l'utente contava "due bottoni" per una cosa sola (#376).
+  Restano visibili — la trasparenza sui passi (#368) è un valore — ma non
+  competono col risultato.
+- **Regola pratica:** se cliccarlo non fa niente, non deve *sembrare* cliccabile.
+- **Dove:** `stepTrace()` in `src/pages/dashboard/dashboard.js`, stile in
+  `dashboard.css`. Test `tests/filo-open-background-tab.spec.mjs`.
+
+## Aprire una scheda: primo piano solo se l'utente vuole ARRIVARCI
+
+`TabManager.openTab(url, { activate })` decide se la nuova scheda passa davanti.
+Attivarla è il default (chi chiede "apri X" vuole vedere X), ma **non è sempre
+giusto**: la musica che Filo mette per te, il Ctrl+click su un link mentre stai
+leggendo, le schede ripristinate all'avvio non devono strapparti da dove sei.
+
+- **Agente:** l'azione `NAVIGA` accetta `background: true` (il prompt gli spiega
+  quando usarlo: ciò che si ascolta e basta, o "senza cambiare scheda").
+- **Gesti del browser:** `setWindowOpenHandler` apre dietro quando la
+  `disposition` è `background-tab` (Ctrl+click, click centrale).
+- **Vincolo tecnico da non rompere:** una scheda di sottofondo NON va nascosta
+  con `setVisible(false)` — per Chromium diventerebbe una scheda "hidden" e i
+  media potrebbero non partire. Si lascia visibile con bounds `{0,0,0,0}`
+  (`layout()` lo fa da sé per ogni scheda non attiva).
+- **Invariante UX:** se Filo apre qualcosa dietro, il riferimento che lascia in
+  chat deve **portare a quella scheda** (messaggio `FOCUS_TAB`), non aprirne un
+  doppione sullo stesso indirizzo.
