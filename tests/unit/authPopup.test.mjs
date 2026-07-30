@@ -11,7 +11,7 @@ const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 require(join(__dirname, '..', '..', 'src', 'shared', 'authPopup.js'));
 
-const { isAuthPopup } = globalThis.SN_AUTH_POPUP;
+const { isAuthPopup, isIdentityAuthSurface } = globalThis.SN_AUTH_POPUP;
 
 test('riconosce i popup dei provider di identità noti', () => {
   // È il caso esatto del feedback: claude.ai apre accounts.google.com.
