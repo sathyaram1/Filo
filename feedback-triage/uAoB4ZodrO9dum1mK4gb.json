@@ -1,0 +1,7 @@
+{
+  "id": "uAoB4ZodrO9dum1mK4gb",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho verificato il comando /riordina partendo da come lo useresti tu. Ho aperto tre siti con colori diversi in ordine sparso, ho scritto /riordina nella barra della nuova scheda e la striscia si è riordinata per colore (schede dello stesso sito/tinta vicine), esattamente come quando chiudi e riapri Filo. Fondamentale: tutte e tre le schede sono rimaste aperte, nessuna chiusa o archiviata. Alla fine compare la conferma «Schede riordinate per colore». Stress test superati: con una sola scheda (niente da spostare) parte senza errori e risponde «Le schede erano già in ordine»; lanciandolo due volte di fila il secondo giro è correttamente un no-op («già in ordine»); la scheda che stavi guardando resta quella attiva anche dopo il riordino, il focus non salta; scrivendo /riordina con del testo dietro resta comunque riconosciuto come comando di Filo (arancione), non come comando sconosciuto. Ho controllato anche che il nuovo ordine venga salvato, così resta anche riaprendo l'app, e che /riordina compaia sia nella lista di /help sia tra le cose che Filo sa fare. Nulla di rotto negli altri comandi. Nota di design: tre giudici automatici avevano segnalato un possibile attrito col principio «Filo non ordina mai da solo», ma qui il riordino non è automatico né invadente: parte solo quando lo chiedi tu, non perde nulla ed è ripetibile, quindi resta pienamente in mano all'utente.",
+  "queuedAt": "2026-07-30T10:15:50.541Z",
+  "queuedBy": "routine"
+}
