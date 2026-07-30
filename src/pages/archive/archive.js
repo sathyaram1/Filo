@@ -150,7 +150,9 @@
     if (!semanticResults.length) { showEmpty(); return; }
     $('empty').hidden = true;
     const wrap = document.createElement('div');
-    wrap.className = 'arc-tabs';
+    // Risultati per pertinenza: chip compatte che vanno a capo (classe dedicata),
+    // non la riga singola scorrevole usata per il raggruppamento per giorno.
+    wrap.className = 'arc-results';
     for (const t of semanticResults) wrap.appendChild(renderTab(t, { showScore: true }));
     list.appendChild(wrap);
   }
