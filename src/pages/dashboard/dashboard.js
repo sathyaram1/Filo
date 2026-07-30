@@ -1123,6 +1123,7 @@
       userMessage,
       threadHistory: threadHistory.slice(0, -1),
       reasoningReqId,
+      internal,
     };
     if (images.length) {
       msg.image = images[0]; // retrocompatibilità (provider mono-immagine)
