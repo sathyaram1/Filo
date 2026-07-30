@@ -76,6 +76,58 @@ test('#376 — senza il flag, NAVIGA continua a portare l’utente sulla pagina 
   expect(after.activeId).not.toBe(before.activeId);
 });
 
+// Pagina che prova a suonare da sola: un WAV di silenzio generato al volo (non
+// serve un file multimediale nel repo) con autoplay. Se il media parte, la
+// pagina lo espone in #stato — è la prova che "la canzone suona anche se la
+// scheda non è in primo piano", cioè il senso della richiesta.
+const AUTOPLAY_PAGE = `<!doctype html><title>Brano</title><div id="stato">fermo</div>
+<script>
+  // WAV 8 kHz mono, 2 secondi di silenzio: header + campioni a zero.
+  const dur = 2, rate = 8000, n = dur * rate;
+  const buf = new ArrayBuffer(44 + n * 2), dv = new DataView(buf);
+  const str = (o, s) => { for (let i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)); };
+  str(0, 'RIFF'); dv.setUint32(4, 36 + n * 2, true); str(8, 'WAVEfmt ');
+  dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+  dv.setUint32(24, rate, true); dv.setUint32(28, rate * 2, true);
+  dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
+  str(36, 'data'); dv.setUint32(40, n * 2, true);
+  let bin = ''; const bytes = new Uint8Array(buf);
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  const a = new Audio('data:audio/wav;base64,' + btoa(bin));
+  a.autoplay = true;
+  a.play().then(() => { document.getElementById('stato').textContent = 'suona'; })
+          .catch((e) => { document.getElementById('stato').textContent = 'bloccato: ' + e.name; });
+  window.__statoAudio = () => ({ testo: document.getElementById('stato').textContent, tempo: a.currentTime, pausa: a.paused });
+</script>`;
+
+test('#376 — il brano parte DAVVERO nella scheda aperta in secondo piano', async ({ app, testServer, openTab }) => {
+  await openTab(NEWTAB);
+  const url = testServer.html(AUTOPLAY_PAGE);
+
+  const before = await tabsState(app, url);
+  await execAction(app, { type: 'NAVIGA', url, label: 'Brano', background: true });
+  await expect.poll(async () => (await tabsState(app, url)).matching.length, { timeout: 8_000 }).toBe(1);
+
+  // La scheda non è quella attiva…
+  const after = await tabsState(app, url);
+  expect(after.activeId).toBe(before.activeId);
+
+  // …eppure il media è partito lì dentro (è il punto della richiesta: la musica
+  // parte senza che l'utente debba andarci).
+  const bgPage = await expect.poll(
+    () => app.windows().find((w) => { try { return w.url() === url; } catch (_) { return false; } }) || null,
+    { timeout: 8_000 },
+  ).not.toBe(null).then(() => app.windows().find((w) => { try { return w.url() === url; } catch (_) { return false; } }));
+
+  await expect.poll(async () => {
+    try { return await bgPage.evaluate(() => window.__statoAudio && window.__statoAudio().testo); } catch (_) { return null; }
+  }, { timeout: 10_000 }).toBe('suona');
+
+  await expect.poll(async () => {
+    try { return await bgPage.evaluate(() => window.__statoAudio().pausa); } catch (_) { return true; }
+  }, { timeout: 5_000 }).toBe(false);
+});
+
 test('#376 — il riferimento in chat PORTA alla scheda aperta in secondo piano (niente doppione)', async ({ app, testServer, openTab }) => {
   const page = await openTab(NEWTAB);
   const url = testServer.html('<!doctype html><title>Radio</title><h1>radio</h1>');
