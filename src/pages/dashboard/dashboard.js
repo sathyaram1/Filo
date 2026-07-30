@@ -839,12 +839,25 @@
       if (!label) {
         try { label = new URL(a.url).hostname.replace(/^www\./, ''); } catch (_) { label = a.url || 'Apri'; }
       }
-      const btn = document.createElement('a');
-      btn.href = a.url || '#';
-      btn.target = '_blank';
-      btn.rel = 'noopener';
+      // #376 — aperto in SECONDO PIANO: la scheda esiste già e sta suonando
+      // dietro. Il chip allora non è più "riapri" ma "portami lì": attiva
+      // QUELLA scheda invece di aprirne un doppione sullo stesso indirizzo.
+      const bgTabId = (a._output && a._output.background && a._output.tabId) || '';
+      const btn = document.createElement(bgTabId ? 'button' : 'a');
+      if (bgTabId) {
+        btn.type = 'button';
+        btn.dataset.bgTab = bgTabId;
+        btn.title = `Vai alla scheda — ${label} è aperta in secondo piano`;
+        btn.addEventListener('click', () => {
+          send({ type: MSG.FOCUS_TAB, id: bgTabId });
+        });
+      } else {
+        btn.href = a.url || '#';
+        btn.target = '_blank';
+        btn.rel = 'noopener';
+        btn.title = `Riapri ${label}`;
+      }
       btn.className = 'dash-action-btn dash-action-link-chip';
-      btn.title = `Riapri ${label}`;
       const favUrl = faviconUrl(a.url);
       if (favUrl) {
         const img = document.createElement('img');
@@ -855,7 +868,7 @@
         img.onerror = () => img.remove();
         btn.appendChild(img);
       }
-      btn.appendChild(document.createTextNode(`↗ ${label}`));
+      btn.appendChild(document.createTextNode(bgTabId ? `▸ ${label}` : `↗ ${label}`));
       return btn;
     }
     if (type === 'APRI_FILE') {
