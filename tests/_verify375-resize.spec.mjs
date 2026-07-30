@@ -184,7 +184,7 @@ test('STRESS: preferenze salvate assurde/corrotte non rompono il layout', async 
     const list = await box(p, '#mgListCol');
     const detail = await box(p, '#mgDetailCol');
     const side = await box(p, '#mgSideCol');
-    console.log('pref', JSON.stringify(v), '→ lista', Math.round(list.width), 'dettaglio', Math.round(detail.width), 'laterale', Math.round(side.width), 'grid', Math.round(grid.width));
+    console.log('pref', JSON.stringify(bad), '→ lista', Math.round(list.width), 'dettaglio', Math.round(detail.width), 'laterale', Math.round(side.width), 'grid', Math.round(grid.width));
     expect(list.width).toBeGreaterThan(80);
     expect(side.width).toBeGreaterThan(80);
     expect(detail.width).toBeGreaterThan(100);
