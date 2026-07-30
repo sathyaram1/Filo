@@ -1,0 +1,7 @@
+{
+  "id": "0LmxxqCQwUISED0FjXw1",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho verificato partendo da cio che avevi chiesto, senza guardare come e stato realizzato, provando davvero l'app.\n\n1) La pagina delle schede visitate/chiuse e ora la Cronologia principale: si chiama 'Cronologia' e il pulsante Cronologia in alto a destra nella home apre proprio questa pagina. Il registro delle azioni dell'assistente non si perde: resta raggiungibile da qui come 'Cronologia AI'.\n\n2) Ogni giorno sta su UNA sola riga. Le schede del giorno sono rese come le tab in alto: sfondo tinto col colore del sito, disposte in ordine cromatico (dal rosso al verde all'azzurro), larghezza variabile che riempie tutta la larghezza disponibile. Quando sono troppe per starci, la riga scorre di lato invece di andare a capo o allungare la pagina: provato con 20 schede nello stesso giorno, restano tutte su un'unica riga scorrevole. Lo screenshot reale corrisponde al disegno che avevi allegato.\n\nStress test superati: archivio vuoto mostra un messaggio pulito ('Nessuna tab archiviata'); un titolo con codice ostile (tag script e img con onerror) viene mostrato come semplice testo e non esegue nulla; un titolo lunghissimo (10.000 caratteri) non rompe il layout e resta su una riga con testo troncato. Riapertura della scheda (click) ed Elimina/Riapri dal tasto destro funzionano; lo 'Svuota archivio' usa il popup in stile Filo, non quello di sistema.",
+  "queuedAt": "2026-07-30T03:18:24.771Z",
+  "queuedBy": "cloud-verifier-session"
+}
