@@ -13,24 +13,20 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 
-// Tante carte rosse (dentro l'identità U/R del commander) così la CardList finale
-// è alta e la colonna chat resta scrollabile anche a generazione finita.
-function manyRedCards(n) {
-  const out = [];
-  for (let i = 1; i <= n; i++) {
-    out.push({
-      id: `c${i}`, name: `Carta Rossa ${i}`, mana_cost: '{R}', cmc: (i % 7),
-      type_line: 'Creature — Goblin', colors: ['R'], color_identity: ['R'],
-      image_uris: { normal: `https://cards.test/c${i}.jpg` },
-      prices: { eur: '0.10' }, legalities: { commander: 'legal' },
-      scryfall_uri: `https://scryfall.com/card/c${i}`,
-    });
-  }
-  return out;
-}
-
 async function mockScryfall(app) {
-  await app.evaluate((cards) => {
+  await app.evaluate(() => {
+    // Tante carte rosse (dentro l'identità U/R del commander) così la CardList
+    // finale è alta e la colonna chat resta scrollabile a generazione finita.
+    const cards = [];
+    for (let i = 1; i <= 40; i++) {
+      cards.push({
+        id: `c${i}`, name: `Carta Rossa ${i}`, mana_cost: '{R}', cmc: (i % 7),
+        type_line: 'Creature — Goblin', colors: ['R'], color_identity: ['R'],
+        image_uris: { normal: `https://cards.test/c${i}.jpg` },
+        prices: { eur: '0.10' }, legalities: { commander: 'legal' },
+        scryfall_uri: `https://scryfall.com/card/c${i}`,
+      });
+    }
     const NIV = {
       id: 'niv-1', name: 'Niv-Mizzet, Parun', mana_cost: '{U}{U}{U}{R}{R}{R}', cmc: 6,
       type_line: 'Legendary Creature — Dragon Wizard', colors: ['U', 'R'], color_identity: ['U', 'R'],
