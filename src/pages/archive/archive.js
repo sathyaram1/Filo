@@ -314,7 +314,9 @@
       if (!tabs.length) return;
       const text = 'Cancella per sempre tutte le tab archiviate. '
         + 'L’operazione non si può annullare.';
-      const ok = window.confirm(`${text} Procedo?`); // MUTATION: forza confirm nativo
+      const ok = window.SN_CONFIRM_UI
+        ? await window.SN_CONFIRM_UI.confirm({ title: 'Svuota archivio', text, okLabel: 'Svuota' })
+        : window.confirm(`${text} Procedo?`); // fallback se il modulo non è caricato
       if (!ok) return;
       await chrome.runtime.sendMessage({ type: MSG.CLEAR_ARCHIVED_TABS });
       tabs = [];
