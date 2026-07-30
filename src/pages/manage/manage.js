@@ -1623,6 +1623,40 @@
     return b;
   }
 
+  // Un riassunto è "completo" se finisce con una punteggiatura di chiusura
+  // frase. Il backend che giudica i feedback sintetizza il parere di Filo
+  // (filoSummary) con un limite di lunghezza che a volte lo TRONCA a metà
+  // frase (è il "la frase si interrompe" segnalato): l'ultima parola resta
+  // appesa senza punto. In quel caso non mostriamo il frammento spezzato ma
+  // ripieghiamo sul parere COMPLETO ricostruito dai verdetti dei giudici, che
+  // sono sempre archiviati per intero.
+  function isCompleteSummary(s) {
+    const t = String(s || '').trim();
+    if (!t) return false;
+    return /[.!?…»)\]"'’”:]$/.test(t);
+  }
+
+  // Parere di Filo ricostruito dai verdetti completi dei giudici. Fallback per
+  // quando il riassunto sintetico manca o è troncato: ogni giudice contribuisce
+  // classe + ragionamento (entrambi archiviati per intero). Ritorna '' se non
+  // c'è nessun verdetto con ragionamento da mostrare.
+  function filoOpinionFromVerdicts(fb) {
+    const p = (fb && fb.pipeline) || {};
+    const verdicts = Array.isArray(p.verdicts) ? p.verdicts : [];
+    const withReason = verdicts.filter((v) => v && String(v.reasoning || '').trim());
+    if (!withReason.length) return '';
+    const letters = ['A', 'B', 'C', 'D', 'E'];
+    // All'owner mostriamo il modello reale (come il pannello destro); ai
+    // non-owner l'etichetta posizionale anonima. La pagina è comunque
+    // owner-only, ma teniamo la stessa regola di anonimizzazione dei pallini.
+    return withReason.map((v, i) => {
+      const model = v.model || v.judgeModel;
+      const who = (isAdmin && model) ? String(model) : `Giudice ${letters[i] || i + 1}`;
+      const cls = v.class ? ` — ${v.class}` : '';
+      return `<strong>${esc(who)}${esc(cls)}</strong>\n${esc(String(v.reasoning).trim())}`;
+    }).join('\n\n');
+  }
+
   // La conversazione COMPLETA del feedback, un turno per bolla: segnalazione
   // originale → parere di Filo (giudici) → commento dell'owner alla revisione →
   // tutti i turni della lavorazione (report delle istanze, esiti del verifier,
