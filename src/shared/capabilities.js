@@ -103,6 +103,12 @@
       invoke: 'Comando /riordina dalla nuova scheda.',
       doesNot: 'Non chiude né archivia nessuna scheda: le riordina soltanto (per chiudere quelle non più utili c’è /pulisci).',
     },
+    {
+      id: 'open-in-background', title: 'Apri una scheda in secondo piano', category: 'navigation',
+      desc: 'Filo può aprire una pagina senza portartici davanti: tu resti dove sei e quello che hai chiesto — un brano, una radio, un podcast — parte lo stesso nella scheda dietro.',
+      invoke: 'Chiedilo a parole all’assistente ("mettimi questa canzone", "apri senza cambiare scheda"): quando ciò che apre serve solo da ascoltare, la scheda nasce in secondo piano. Il riferimento che resta nella conversazione ti porta a quella scheda quando vuoi.',
+      doesNot: 'Se chiedi di guardare o leggere qualcosa, la scheda si apre davanti come sempre.',
+    },
 
     // ─────────────────────── Azioni sul testo selezionato ────────────────────
     {
