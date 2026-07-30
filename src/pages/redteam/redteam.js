@@ -743,6 +743,20 @@
         summaryEl.hidden = true;
       }
     }
+
+    // Dettaglio (feedback #295): attacco, spiegazione e motivazioni dei giudici.
+    // Compact: mostra solo i blocchi con contenuto reale, così durante la
+    // rivelazione live (quando dal backend non arriva ancora nessuna
+    // motivazione) l'area resta vuota e nascosta, senza duplicare gli slot.
+    let detailEl = $('revealDetail');
+    if (!detailEl) {
+      detailEl = document.createElement('div');
+      detailEl.id = 'revealDetail';
+      section.appendChild(detailEl);
+    }
+    renderAttemptDetail(detailEl, a, { compact: true });
+    detailEl.classList.add('rt-reveal-detail');
+    detailEl.hidden = detailEl.childElementCount === 0;
   }
 
   // ---- Stato complessivo: decide quali gate/sezioni mostrare. -------------
