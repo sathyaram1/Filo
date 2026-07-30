@@ -1,0 +1,7 @@
+{
+  "id": "OvNWnLB9475mKN7YZLtS",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la modifica e stata pubblicata. Ora la chat della nuova scheda, quando non riesce a rispondere, ti spiega cosa non ha funzionato e cosa fare invece di mostrare un messaggio tecnico, e se la connessione salta per un istante riprova da sola. La risposta non riuscita ha un tasto Riprova che rimanda lo stesso messaggio. Inoltre, quando Filo ti dice che non sa fare una cosa o che non ha un dato che gli hai chiesto, ti prepara lui la segnalazione gia scritta, con un tasto per confermarla (una sola volta per conversazione, e niente parte senza il tuo OK).",
+  "queuedAt": "2026-07-30T15:18:53.780Z",
+  "queuedBy": "routine"
+}
