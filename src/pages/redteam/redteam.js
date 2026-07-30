@@ -327,8 +327,166 @@
       }
       tr.appendChild(valid);
 
+      // Riga espandibile (feedback #295): click / Enter / Spazio mostra il
+      // dettaglio del tentativo (attacco, spiegazione, motivazioni dei giudici,
+      // giudizio di validità). Il dettaglio si costruisce pigramente alla prima
+      // apertura. Il caret è un pseudo-elemento CSS → NON entra nel textContent
+      // (gli assert sul tempo relativo restano validi).
+      tr.classList.add('rt-hist-row--expandable');
+      tr.tabIndex = 0;
+      tr.setAttribute('aria-expanded', 'false');
+      tr.title = 'Mostra i dettagli del tentativo';
+
+      const detailRow = document.createElement('tr');
+      detailRow.className = 'rt-hist-detail';
+      detailRow.hidden = true;
+      const detailCell = document.createElement('td');
+      detailCell.colSpan = 5;
+      detailRow.appendChild(detailCell);
+
+      let built = false;
+      const toggle = () => {
+        const willOpen = detailRow.hidden;
+        if (willOpen && !built) { renderAttemptDetail(detailCell, at); built = true; }
+        detailRow.hidden = !willOpen;
+        tr.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+        tr.classList.toggle('rt-hist-row--open', willOpen);
+      };
+      tr.addEventListener('click', toggle);
+      tr.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); toggle(); }
+      });
+
       body.appendChild(tr);
+      body.appendChild(detailRow);
     });
+  }
+
+  // Dettaglio di un tentativo (feedback #295): il testo dell'attacco, la sua
+  // spiegazione, il giudizio di validità (con motivazione) e cosa ha detto ogni
+  // giudice. Usato sia dallo storico (riga espandibile) sia dalla rivelazione
+  // live. Ogni stringa (input utente / output di modello) va in textContent:
+  // nessuna interpolazione HTML, come il resto della pagina.
+  //   opts.compact (rivelazione live): mostra SOLO i blocchi con contenuto reale
+  //   e salta i giudici senza motivazione, per non duplicare gli slot a schermo.
+  // Retrocompatibile con i nomi di campo del backend: prova più chiavi plausibili
+  // (il testo/descrizione usano gli stessi nomi dell'invio: attackText/description).
+  function firstText(obj, keys) {
+    for (const k of keys) {
+      const v = obj && obj[k];
+      if (typeof v === 'string' && v.trim()) return v.trim();
+    }
+    return '';
+  }
+  function verdictReasoning(v) {
+    return firstText(v || {}, ['reasoning', 'reason', 'rationale', 'motivazione']);
+  }
+  function detailText(text, cls) {
+    const p = document.createElement('p');
+    p.className = 'rt-detail-text' + (cls ? ' ' + cls : '');
+    p.textContent = text;
+    return p;
+  }
+  function detailBlock(title, node) {
+    const b = document.createElement('div');
+    b.className = 'rt-detail-block';
+    const h = document.createElement('h4');
+    h.className = 'rt-detail-h';
+    h.textContent = title;
+    b.append(h, node);
+    return b;
+  }
+  function renderAttemptDetail(host, attempt, opts) {
+    if (!host) return host;
+    host.textContent = '';
+    host.className = 'rt-detail';
+    const a = attempt || {};
+    const compact = !!(opts && opts.compact);
+
+    const attack = firstText(a, ['attackText', 'attack', 'text']);
+    const desc = firstText(a, ['description', 'desc', 'explanation']);
+    let validReason = firstText(a, ['validityReasoning', 'validityReason', 'validReason', 'validationReasoning']);
+    if (!validReason && a.validity && typeof a.validity === 'object') {
+      validReason = firstText(a.validity, ['reasoning', 'reason', 'rationale']);
+    }
+
+    const verdicts = a.verdicts || {};
+    const judgeItems = [];
+    JUDGES.forEach((j) => {
+      const v = verdicts[j];
+      const reason = verdictReasoning(v);
+      const hasVerdict = !!(v && (v.class || typeof v.points === 'number' || v.error));
+      if (compact && !reason) return;                 // live: solo giudici con motivazione
+      if (!compact && !hasVerdict && !reason) return; // storico: salta i mai risposti
+      judgeItems.push({ j, v: v || {}, reason });
+    });
+
+    let hasAny = false;
+
+    if (attack) { host.appendChild(detailBlock('Attacco', detailText(attack))); hasAny = true; }
+    if (desc) { host.appendChild(detailBlock('Spiegazione', detailText(desc))); hasAny = true; }
+
+    if (validReason) {
+      const p = detailText(validReason, 'rt-detail-validity');
+      if (a.isValidAttack === true) p.dataset.valid = 'true';
+      else if (a.isValidAttack === false) p.dataset.valid = 'false';
+      host.appendChild(detailBlock('Giudizio di validità', p));
+      hasAny = true;
+    }
+
+    if (judgeItems.length) {
+      const ul = document.createElement('ul');
+      ul.className = 'rt-detail-judges';
+      judgeItems.forEach(({ j, v, reason }) => {
+        const li = document.createElement('li');
+        li.className = 'rt-detail-judge';
+        li.dataset.judge = j;
+
+        const head = document.createElement('div');
+        head.className = 'rt-detail-judge-head';
+        const lbl = document.createElement('span');
+        lbl.className = 'rt-detail-judge-lbl';
+        lbl.textContent = judgeLabel(j);
+        head.appendChild(lbl);
+
+        if (v.error) {
+          const meta = document.createElement('span');
+          meta.className = 'rt-detail-judge-meta';
+          meta.textContent = 'errore';
+          head.appendChild(meta);
+        } else if (v.class || typeof v.points === 'number') {
+          const m = LEVELS[v.class] || pointsMeta(v.points);
+          const ic = document.createElement('span');
+          ic.className = 'rt-detail-judge-icon';
+          ic.textContent = m.icon;
+          ic.style.setProperty('--rt-judge-color', m.color);
+          const nm = document.createElement('span');
+          nm.className = 'rt-detail-judge-meta';
+          nm.textContent = m.label;
+          head.append(ic, nm);
+        }
+        li.appendChild(head);
+
+        const body = document.createElement('p');
+        body.className = 'rt-detail-judge-reason';
+        if (reason) {
+          body.textContent = reason;
+        } else {
+          body.textContent = 'Nessuna motivazione disponibile.';
+          body.classList.add('rt-detail-muted');
+        }
+        li.appendChild(body);
+
+        ul.appendChild(li);
+      });
+      host.appendChild(detailBlock('Cosa hanno detto i giudici', ul));
+      hasAny = true;
+    }
+
+    if (!hasAny && !compact) {
+      host.appendChild(detailText('Dettagli non ancora disponibili per questo tentativo.', 'rt-detail-muted'));
+    }
+    return host;
   }
 
   // Leaderboard: tabella. entries già ordinate dal backend.
