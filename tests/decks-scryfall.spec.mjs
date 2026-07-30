@@ -91,7 +91,11 @@ test('si può rimuovere il commander e la sua carta torna nel mazzo (feedback #3
   await mockScryfall(app);
   const page = await openTab('filo://decks/decks.html');
   await page.waitForLoadState('domcontentloaded');
-  await deckWithCommander(page);
+  const deckId = await deckWithCommander(page);
+  // deckWithCommander imposta il commander via IPC (la UI di scelta arriva coi
+  // task 4/5): ricarica il builder così la vista riflette il commander salvato.
+  await page.click('#backToLibrary');
+  await page.locator(`[data-deck-id="${deckId}"]`).click();
 
   // Precondizione: il commander è impostato (senza il fix non c'è modo di tornare indietro).
   await expect(page.locator('#commanderLine')).toHaveText(/Niv-Mizzet, Parun/);
