@@ -1366,7 +1366,9 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // #360 — Filo ha ammesso una mancanza e non ha proposto niente: la proposta di
   // segnalazione entra tra le azioni di QUESTO turno, così l'utente la trova già
   // scritta nella stessa bolla invece di doverla chiedere.
-  const proposal = maybeProposeFeedbackAction({ textReply, rawActions, userMessage, threadHistory: cleanHistory });
+  const proposal = internal
+    ? null // turno di prosecuzione automatica: il "messaggio utente" è un nudge nostro
+    : maybeProposeFeedbackAction({ textReply, rawActions, userMessage, threadHistory: cleanHistory });
   const actionsToRun = proposal ? [...rawActions, proposal] : rawActions;
   const renderedActions = [];
   for (const a of actionsToRun) {
