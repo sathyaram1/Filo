@@ -1,7 +1,0 @@
-{
-  "id": "0LmxxqCQwUISED0FjXw1",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica è stata pubblicata. La pagina «Cronologia» (schede visitate e chiuse, raggruppate per giorno, con le schede colorate come le tab in alto) è ora quella richiamata dal pulsante in alto a destra; la cronologia delle azioni AI resta raggiungibile da lì come «Cronologia AI». Nessun rischio rilevato: sono cambiate solo interfaccia e navigazione tra pagine interne, nessun dato sensibile coinvolto.",
-  "queuedAt": "2026-07-30T03:20:50.022Z",
-  "queuedBy": "routine-20260730-opus"
-}
