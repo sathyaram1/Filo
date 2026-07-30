@@ -18,6 +18,10 @@
     // Preferenze UI del deck builder (posizione dei divisori del Builder, §2):
     // persistite perché il layout scelto a mano deve sopravvivere alla riapertura.
     DECKS_UI: 'decksUi',
+    // Preferenze UI della dashboard di gestione (larghezza delle colonne del
+    // pannello lista, scelte trascinando i divisori): persistite perché il
+    // layout deciso a mano deve sopravvivere alla riapertura della pagina.
+    MANAGE_UI: 'manageUi',
     // Cache Scryfall (§13.3): dati carta per id (prezzo con TTL logico) e
     // mappa dei simboli di mana (permanente). Vedi services/scryfall.js.
     SCRYFALL_CARDS: 'scryfallCards',
