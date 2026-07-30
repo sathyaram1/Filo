@@ -1,7 +1,0 @@
-{
-  "id": "55ba8292-57d4-4bd9-a3b8-3292c5c6b301",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica al deck builder è stata pubblicata. Ora quando apri un mazzo le carte compaiono subito, senza attesa, e i prezzi si aggiornano da soli poco dopo in secondo piano.",
-  "queuedAt": "2026-07-30T21:47:57.907Z",
-  "queuedBy": "routine"
-}
