@@ -1,0 +1,7 @@
+{
+  "id": "55ba8292-57d4-4bd9-a3b8-3292c5c6b301",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho riprodotto esattamente la situazione che hai segnalato: riapro un mazzo gia' usato in precedenza mentre i prezzi salvati sono ormai vecchi e il controllo dei prezzi online e' volutamente bloccato (come se la rete fosse lentissima). Prima le carte non comparivano finche' quel controllo non finiva; ora l'elenco compare subito, completo di nomi veri, costi di mana, quantita' (es. 10x delle terre) e raggruppamenti per tipo, e resta pienamente utilizzabile mentre i prezzi si aggiornano da soli poco dopo in secondo piano. Ho verificato che senza la correzione la lista resta vuota, quindi il miglioramento e' reale e non cosmetico. Ho controllato che non si sia rotto nient'altro del costruttore di mazzi: elenco, statistiche, curva, colori, budget, anteprima carte, carosello, chat, commander e riapertura della pagina funzionano tutti. Ho anche verificato il caso in cui cambi mazzo mentre l'aggiornamento dei prezzi e' ancora in corso: quello vecchio viene abbandonato e non altera il mazzo nuovo. Unico limite gia' noto e inevitabile: la primissima apertura di un mazzo di cui non si e' mai scaricato nulla dipende comunque dalla rete, ma non peggiora rispetto a prima. Verifica visiva coperta dagli elementi reali dell'elenco (nomi, gruppi, quantita').",
+  "queuedAt": "2026-07-30T21:46:39.715Z",
+  "queuedBy": "routine"
+}
