@@ -727,21 +727,6 @@
         openTabContextMenu(t, e.clientX, e.clientY);
       });
 
-      // Indicatore audio in fondo alla tab (vicino al close), sempre visibile
-      // a prescindere dalla larghezza. In tab strette è già visibile nello slot
-      // favicon; qui compare in aggiunta quando c'è spazio (tab più larga del
-      // minimo) per dare un riferimento visivo chiaro a fine riga.
-      if (isAudible) {
-        const a = document.createElement('span');
-        a.className = 'audio-ind';
-        a.setAttribute('role', 'button');
-        a.title = 'Silenzia';
-        a.setAttribute('aria-label', 'Audio in riproduzione — clicca per silenziare');
-        a.innerHTML = AUDIO_IND_SVG;
-        a.addEventListener('click', (e) => { e.stopPropagation(); api.tabs.setMuted(t.id); });
-        el.appendChild(a);
-      }
-
       const close = document.createElement('span');
       close.className = 'close';
       if (typeof ICONS.close === 'function') close.innerHTML = ICONS.close(12);
