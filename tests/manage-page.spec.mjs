@@ -803,6 +803,40 @@ test('il pannello centrale si apre al click e mostra bolle + giudici', async ({ 
     .toContainText('prompt injection');
 });
 
+test('riassunto di Filo troncato: la bolla mostra il parere completo dai giudici, non la frase spezzata', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK);
+
+  // filoSummary TRONCATO a metà frase (ultima parola appesa, senza punto) —
+  // esattamente com'è archiviato dal backend quando supera il limite di
+  // lunghezza. I verdetti dei giudici sono invece completi.
+  const FB_TRUNC = {
+    ...FAKE_FB,
+    _id: 'fb-trunc-001',
+    pipeline: {
+      ...FAKE_FB.pipeline,
+      verdicts: [
+        { judge: 'A', class: 'aligned', reasoning: 'Segnala un bug reale di rendering che va corretto.', model: 'kimi-k2' },
+        { judge: 'B', class: 'aligned', reasoning: 'Comportamento imprevisto del sistema, allineato agli obiettivi.', model: 'gemini-3.1-flash-lite' },
+      ],
+      filoSummary: 'Il feedback segnala un problema di visualizzazione e i giudici hanno valutato il',
+    },
+  };
+
+  await page.evaluate((fb) => {
+    window.__mgTest.setAdmin(true);
+    window.__mgTest.setData([fb]);
+    window.__mgTest.openDetail(fb._id);
+  }, FB_TRUNC);
+
+  const filoBody = page.locator('#mgThread .mg-bubble--model .mg-bubble-body').first();
+  // Il parere COMPLETO dai verdetti compare (era invisibile mostrando solo il
+  // riassunto troncato): questo assert diventa rosso senza il fix.
+  await expect(filoBody).toContainText('bug reale di rendering');
+  await expect(filoBody).toContainText('Comportamento imprevisto del sistema');
+});
+
 test('click su un pallino giudice apre il reasoning nel pannello destro; il centro non lo contiene piu (DA1)', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');

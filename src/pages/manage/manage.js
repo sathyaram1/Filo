@@ -1623,6 +1623,40 @@
     return b;
   }
 
+  // Un riassunto è "completo" se finisce con una punteggiatura di chiusura
+  // frase. Il backend che giudica i feedback sintetizza il parere di Filo
+  // (filoSummary) con un limite di lunghezza che a volte lo TRONCA a metà
+  // frase (è il "la frase si interrompe" segnalato): l'ultima parola resta
+  // appesa senza punto. In quel caso non mostriamo il frammento spezzato ma
+  // ripieghiamo sul parere COMPLETO ricostruito dai verdetti dei giudici, che
+  // sono sempre archiviati per intero.
+  function isCompleteSummary(s) {
+    const t = String(s || '').trim();
+    if (!t) return false;
+    return /[.!?…»)\]"'’”:]$/.test(t);
+  }
+
+  // Parere di Filo ricostruito dai verdetti completi dei giudici. Fallback per
+  // quando il riassunto sintetico manca o è troncato: ogni giudice contribuisce
+  // classe + ragionamento (entrambi archiviati per intero). Ritorna '' se non
+  // c'è nessun verdetto con ragionamento da mostrare.
+  function filoOpinionFromVerdicts(fb) {
+    const p = (fb && fb.pipeline) || {};
+    const verdicts = Array.isArray(p.verdicts) ? p.verdicts : [];
+    const withReason = verdicts.filter((v) => v && String(v.reasoning || '').trim());
+    if (!withReason.length) return '';
+    const letters = ['A', 'B', 'C', 'D', 'E'];
+    // All'owner mostriamo il modello reale (come il pannello destro); ai
+    // non-owner l'etichetta posizionale anonima. La pagina è comunque
+    // owner-only, ma teniamo la stessa regola di anonimizzazione dei pallini.
+    return withReason.map((v, i) => {
+      const model = v.model || v.judgeModel;
+      const who = (isAdmin && model) ? String(model) : `Giudice ${letters[i] || i + 1}`;
+      const cls = v.class ? ` — ${v.class}` : '';
+      return `<strong>${esc(who)}${esc(cls)}</strong>\n${esc(String(v.reasoning).trim())}`;
+    }).join('\n\n');
+  }
+
   // La conversazione COMPLETA del feedback, un turno per bolla: segnalazione
   // originale → parere di Filo (giudici) → commento dell'owner alla revisione →
   // tutti i turni della lavorazione (report delle istanze, esiti del verifier,
@@ -1644,11 +1678,23 @@
     appendBubble(fromModel ? 'model' : 'user', fromModel ? 'Filo (segnalazione automatica)' : 'Utente',
       esc(fb.text || ''), imgs.concat(files));
 
-    // Bolla 2: parere di Filo (riassunto dei giudici).
-    const summary = fb.pipeline && fb.pipeline.filoSummary;
-    appendBubble('model', 'Filo',
-      summary ? esc(summary)
-              : '<em>Filo non ha ancora un parere su questo feedback (giudici non attivi).</em>');
+    // Bolla 2: parere di Filo. Il riassunto sintetico (filoSummary) può
+    // arrivare troncato a metà frase dal backend; se manca o è troncato,
+    // ripieghiamo sul parere completo ricostruito dai verdetti dei giudici,
+    // così Filo non mostra mai una frase spezzata a metà né un falso "non ha
+    // ancora un parere" quando in realtà ha già giudicato.
+    const summary = (fb.pipeline && fb.pipeline.filoSummary)
+      ? String(fb.pipeline.filoSummary).trim() : '';
+    let opinionHtml;
+    if (summary && isCompleteSummary(summary)) {
+      opinionHtml = esc(summary);
+    } else {
+      const fromVerdicts = filoOpinionFromVerdicts(fb);
+      if (fromVerdicts) opinionHtml = fromVerdicts;         // parere completo dai giudici
+      else if (summary) opinionHtml = esc(summary);          // troncato ma è l'unica cosa che c'è
+      else opinionHtml = '<em>Filo non ha ancora un parere su questo feedback (giudici non attivi).</em>';
+    }
+    appendBubble('model', 'Filo', opinionHtml);
 
     // Bolla 3: il commento dell'owner alla revisione (approvazione/sblocco/
     // conferma). Prima era scritto ma non mostrato da nessuna parte.
