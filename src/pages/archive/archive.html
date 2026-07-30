@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8" />
-  <title>Filo — Tab archiviate</title>
+  <title>Filo — Cronologia</title>
   <link rel="icon" href="filo://asset/icons/icon-32.png" />
   <link rel="stylesheet" href="filo://style/theme.css" />
   <link rel="stylesheet" href="filo://style/pages.css" />
@@ -14,35 +14,58 @@
   <script src="filo://shared/storage.js"></script>
   <script src="filo://shared/confirmUi.js"></script>
   <style>
-    /* §3.3 — archivio come "diario visivo": un giorno per riga, dentro ogni
-       giorno le tab in ordine cromatico, mostrate come chip orizzontali
-       (righe che si accumulano per giorno, non un elenco verticale). Le
-       azioni (riapri/elimina) stanno nel menu contestuale (tasto destro),
-       non in bottoni sempre visibili — coerente con l'estetica minimale. */
+    /* §3.3 — la cronologia come "diario visivo": UN giorno per RIGA (mai a capo),
+       dentro ogni giorno le schede in ordine cromatico rese come le tab in alto —
+       sfondo tinto col colore identità del sito, larghezza variabile che riempie
+       tutta la riga; se sono troppe per starci al minimo la riga SCORRE in
+       orizzontale (come la barra delle tab) invece di andare a capo. Le azioni
+       (riapri/elimina) stanno nel menu contestuale (tasto destro), non in bottoni
+       sempre visibili — coerente con l'estetica minimale. */
     .arc-day { margin: 22px 0 8px; }
     .arc-day-label {
       font-size: 13px; font-weight: 600; color: var(--sn-muted);
       text-transform: capitalize; padding-bottom: 6px;
       border-bottom: 1px solid var(--sn-border);
     }
-    .arc-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    /* Una sola riga per giorno: niente wrap. Le chip crescono (flex:1) per
+       riempire la larghezza; quando sono troppe scorrono in orizzontale con la
+       scrollbar nascosta — stessa logica della barra delle tab in alto. */
+    .arc-tabs {
+      display: flex; flex-wrap: nowrap; gap: 3px; margin-top: 10px;
+      overflow-x: auto; overflow-y: hidden;
+      scrollbar-width: none;
+    }
+    .arc-tabs::-webkit-scrollbar { height: 0; width: 0; display: none; }
     .arc-tab {
       display: inline-flex; align-items: center; gap: 7px;
-      max-width: 260px;
-      padding: 6px 12px; border-radius: 999px;
-      border: 1px solid var(--arc-color, var(--sn-border));
-      background: var(--sn-surface);
-      cursor: context-menu;
+      /* Larghezza variabile che sfrutta tutta la riga (nessun max-width qui:
+         poche schede si allargano fino a riempire lo spazio disponibile). */
+      flex: 1 1 0; min-width: 46px;
+      padding: 7px 12px; border-radius: var(--sn-radius);
+      border: 1px solid color-mix(in srgb, var(--arc-color, var(--sn-border)) 40%, var(--sn-border));
+      /* Sfondo = tinta identità del sito (attenuata, calcolata in JS) mescolata
+         al neutro di superficie, come le tab in alto (§1.2). Le schede senza
+         colore ricadono sul solo neutro. */
+      background: color-mix(in srgb, var(--arc-tint, var(--sn-hover)) 55%, var(--sn-hover));
+      color: var(--sn-fg);
+      cursor: pointer;
+      transition: background 0.1s ease;
     }
-    .arc-tab:hover, .arc-tab:focus-visible { background: var(--sn-hover); }
+    .arc-tab:hover, .arc-tab:focus-visible {
+      background: color-mix(in srgb, var(--arc-tint, var(--sn-hover)) 55%, var(--sn-bg));
+    }
     .arc-tab:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 1px; }
+    /* Risultati della ricerca semantica: lista piatta ordinata per pertinenza →
+       chip compatte che vanno a capo (non una riga infinita da scorrere). */
+    .arc-results { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .arc-results .arc-tab { flex: 0 0 auto; max-width: 320px; }
     .arc-fav {
       width: 14px; height: 14px; flex: 0 0 14px; border-radius: 3px;
       background-size: cover; background-position: center;
       background-color: var(--arc-color, var(--sn-border));
     }
     .arc-title {
-      font-size: 13px; color: var(--sn-text);
+      font-size: 13px; color: var(--sn-fg);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .arc-score {
@@ -57,7 +80,7 @@
 </head>
 <body>
   <main class="sn-page">
-    <h1>Tab archiviate</h1>
+    <h1>Cronologia</h1>
 
     <div class="sn-toolbar">
       <input type="search" id="search" placeholder="Cerca… (Invio = cerca nei contenuti)" />
