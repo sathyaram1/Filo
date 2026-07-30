@@ -1,0 +1,7 @@
+{
+  "id": "bgH51AC4jqsUeAlx2cRf",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato e modifica pubblicata. Ora quando chiedi a Filo di farti ascoltare qualcosa (una canzone, una radio, un podcast) la scheda si apre in secondo piano e la musica parte lo stesso: resti dove sei, e il riferimento che rimane nella conversazione ti porta a quella scheda quando vuoi. Vale anche quando chiedi di aprire qualcosa senza cambiare scheda, e il Ctrl+click su un link apre la pagina dietro senza strapparti da quella che stai leggendo. Inoltre, nella chat i passaggi che Filo compie per arrivare al risultato (la ricerca sul web, la lettura di un file) non hanno piu la forma di un bottone: restano scritti come traccia di cosa sta facendo, cosi l'unica cosa da cliccare e il risultato vero, e non conti piu due bottoni per una sola azione. Non ho rilevato problemi di sicurezza.",
+  "queuedAt": "2026-07-30T21:18:26.151Z",
+  "queuedBy": "routine"
+}
