@@ -1,0 +1,7 @@
+{
+  "id": "ce25cd68-1454-4cc7-a289-a5b0c106b42b",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la modifica è stata pubblicata. La conferma prima di eliminare una categoria in Opzioni → Altro ora usa il popup nello stile di Filo, coerente col tema, senza più la finestrella grezza del sistema. Ho verificato eseguendo i test: il popup compare, la categoria viene rimossa solo se confermi (annullando resta), e un nome categoria che contiene codice HTML viene mostrato come testo senza essere eseguito. Tutto a posto.",
+  "queuedAt": "2026-07-30T01:01:42.004Z",
+  "queuedBy": "routine"
+}
