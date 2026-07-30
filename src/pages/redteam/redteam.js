@@ -342,12 +342,19 @@
       detailRow.hidden = true;
       const detailCell = document.createElement('td');
       detailCell.colSpan = 5;
+      // Il dettaglio (flex column) va in un wrapper INTERNO, non sul <td>: se il
+      // `display:flex` finisce sulla cella, questa smette di essere una table-cell
+      // e il colspan viene ignorato → la cella collassa alla larghezza della prima
+      // colonna (feedback #295, 2ª revisione). Con il wrapper la cella resta una
+      // vera cella che copre tutte e 5 le colonne e il dettaglio usa l'intera riga.
+      const detailInner = document.createElement('div');
+      detailCell.appendChild(detailInner);
       detailRow.appendChild(detailCell);
 
       let built = false;
       const toggle = () => {
         const willOpen = detailRow.hidden;
-        if (willOpen && !built) { renderAttemptDetail(detailCell, at); built = true; }
+        if (willOpen && !built) { renderAttemptDetail(detailInner, at); built = true; }
         detailRow.hidden = !willOpen;
         tr.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
         tr.classList.toggle('rt-hist-row--open', willOpen);
