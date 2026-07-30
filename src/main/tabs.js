@@ -924,25 +924,35 @@ class TabManager {
     if (!this.tabs.length) this.openTab('filo://newtab/');
     else if (!this.tabs.some((t) => t.id === this.activeId)) this.activate(this.tabs[0].id);
 
-    if (toArchive.length) {
-      this.reorderTabsByColor();
-      this._broadcast();
-      this._showTriageToast(toArchive.length);
-    }
+    // §1.3 — riordino cromatico della striscia. Avviene a OGNI giro di triage
+    // (riapertura di Filo, inattività, richiesta manuale), NON solo quando
+    // qualcosa è stato archiviato: all'apertura l'utente si aspetta comunque la
+    // barra riordinata per colore anche se non c'era nulla da chiudere. Se
+    // l'ordine non cambia (tab senza identità, una sola tab) è un no-op e non
+    // ribroadcastiamo inutilmente.
+    const reordered = this.reorderTabsByColor();
+    if (toArchive.length || reordered) this._broadcast();
+    if (toArchive.length) this._showTriageToast(toArchive.length);
     return { archived: toArchive.length };
   }
 
   // §1.3 — riordina la striscia per colore (arcobaleno) in base all'identityColor.
   // Le tab senza colore (interne, identità ignota) restano in coda nell'ordine.
+  // Ritorna true se l'ordine è effettivamente cambiato (per decidere se
+  // ribroadcastare alla shell).
   reorderTabsByColor() {
-    const withIdx = this.tabs.map((t, i) => ({ t, i }));
+    const before = this.tabs;
+    const withIdx = before.map((t, i) => ({ t, i }));
     withIdx.sort((a, b) => {
       const ha = hueOf(a.t.identityColor);
       const hb = hueOf(b.t.identityColor);
       if (ha !== hb) return ha - hb;
       return a.i - b.i; // stabile
     });
-    this.tabs = withIdx.map((x) => x.t);
+    const next = withIdx.map((x) => x.t);
+    const changed = next.some((t, i) => t !== before[i]);
+    this.tabs = next;
+    return changed;
   }
 
   _showTriageToast(_n) {
