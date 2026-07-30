@@ -212,6 +212,78 @@
     return null;
   }
 
+  // ── Proposta di segnalazione da mostrare in chat (#360) ─────────────────────
+  // Quando Filo ammette una mancanza, l'utente non deve chiedergli "mandane una
+  // segnalazione": la segnalazione compare GIÀ SCRITTA con il tasto di conferma.
+  // Qui componiamo il contenuto dell'azione INVIA_FEEDBACK; è il sistema che poi
+  // mostra l'anteprima e chiede l'OK (livello 2), quindi niente parte da solo.
+  //
+  // A differenza di compose() questo testo CITA la richiesta dell'utente: la
+  // legge prima di autorizzare l'invio, ed è ciò che rende la segnalazione utile.
+
+  // Prima frase "sensata" di un testo, per citare l'ammissione di Filo senza
+  // trascinarsi dietro tutta la risposta.
+  function firstSentence(s, max) {
+    const t = String(s || '').replace(/\s+/g, ' ').trim();
+    if (!t) return '';
+    const m = /^(.{20,}?[.!?])(\s|$)/.exec(t);
+    const out = m ? m[1] : t;
+    return out.length > max ? `${out.slice(0, max - 1).trimEnd()}…` : out;
+  }
+
+  // Titolo breve (2-6 parole) ricavato dalla richiesta dell'utente.
+  function shortTitle(userMessage, fallback) {
+    const words = String(userMessage || '')
+      .replace(/\s+/g, ' ')
+      .replace(/["“”'`]/g, '')
+      .trim()
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 6);
+    if (!words.length) return fallback;
+    let t = words.join(' ').replace(/[,;:.!?]+$/, '');
+    if (t.length > 60) t = `${t.slice(0, 59).trimEnd()}…`;
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  }
+
+  function composeProposal(analysis, options) {
+    if (!analysis || !analysis.kind) return null;
+    const opts = options || {};
+    const userMessage = String(opts.userMessage || '').replace(/\s+/g, ' ').trim();
+    // Senza la richiesta dell'utente la segnalazione non dice nulla di
+    // azionabile: meglio nessuna proposta che una proposta vuota.
+    if (!userMessage) return null;
+    const asked = userMessage.length > 400 ? `${userMessage.slice(0, 399).trimEnd()}…` : userMessage;
+    const admitted = firstSentence(opts.textReply, 260);
+
+    if (analysis.kind === 'capability-gap') {
+      const parts = [`Ho chiesto a Filo: "${asked}"`];
+      parts.push(admitted
+        ? `Filo mi ha risposto che non può farlo: "${admitted}"`
+        : 'Filo mi ha risposto che non può farlo.');
+      parts.push('Mi piacerebbe che Filo sapesse fare questa cosa.');
+      return {
+        type: 'INVIA_FEEDBACK',
+        testo: parts.join('\n').slice(0, 1500),
+        titolo: shortTitle(userMessage, 'Funzione mancante'),
+      };
+    }
+
+    if (analysis.kind === 'complaint') {
+      const parts = [`Stavo facendo questo in Filo: "${asked}"`];
+      parts.push(admitted
+        ? `Qualcosa non ha funzionato: "${admitted}"`
+        : 'Qualcosa non ha funzionato.');
+      return {
+        type: 'INVIA_FEEDBACK',
+        testo: parts.join('\n').slice(0, 1500),
+        titolo: shortTitle(userMessage, 'Qualcosa non funziona'),
+      };
+    }
+
+    return null;
+  }
+
   // ── Bonus giornaliero crediti (puro) ────────────────────────────────────────
   // Ritorna +AUTO_FEEDBACK_BONUS se il setting è ON e il bonus non è già stato
   // concesso OGGI. Idempotente: un secondo refill nello stesso giorno non ripaga.
