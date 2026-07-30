@@ -136,16 +136,17 @@ test('scrollando su mentre genera, la vista NON torna in fondo', async ({ app, o
   const page = await openTab('filo://decks/decks.html');
   await page.waitForLoadState('domcontentloaded');
   await deckWithCommander(page);
+  await warmUp(page); // prosa lunga: la colonna chat va in overflow e ci resta
+  await expect.poll(async () => { const s = await scrollInfo(page); return s.height - s.client; },
+    { timeout: 10_000, message: 'la chat deve andare in overflow' }).toBeGreaterThan(80);
 
-  // Parte la generazione (non attendo il completamento: si ferma sul gate).
+  // Parte la generazione "vera" (non attendo il completamento: si ferma sul gate).
   await page.fill('#chatInput', 'modi per dare haste alle creature');
   await page.press('#chatInput', 'Enter');
 
-  // Il ragionamento in diretta riempie la bolla → la colonna va in overflow.
+  // Compare la bolla in generazione col ragionamento in diretta.
   const cotBody = page.locator('.dk-msg-bot').last().locator('.dk-cot-body');
   await expect(cotBody).toBeVisible();
-  await expect.poll(async () => (await scrollInfo(page)).height - (await scrollInfo(page)).client,
-    { timeout: 10_000, message: 'la chat deve andare in overflow mentre pensa' }).toBeGreaterThan(60);
 
   // L'utente scrolla in cima per rileggere mentre Filo genera.
   await page.evaluate(() => { document.getElementById('chatLog').scrollTop = 0; });
