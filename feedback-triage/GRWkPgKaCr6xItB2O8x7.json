@@ -1,7 +1,0 @@
-{
-  "id": "GRWkPgKaCr6xItB2O8x7",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho verificato partendo dal sintomo: nel Red Team, in Statistiche > Storico tentativi, ho cliccato un tentativo e la riga si apre mostrando tutto ciò che chiedevi — il testo dell'attacco, la sua spiegazione, il giudizio di validità con la motivazione (perché è o non è riconosciuto come attacco reale) e, giudice per giudice, la sua motivazione. Si apre e chiude anche da tastiera (Invio/Spazio). Ho controllato in particolare il difetto d'aspetto segnalato prima: ora il dettaglio si distende su TUTTA la larghezza della riga (misurato: occupa il 100% della riga, le motivazioni dei giudici il 96%), non più schiacciato in una colonnina a sinistra — verificato anche a schermo con motivazioni lunghe, che ora vanno a capo naturalmente a riga piena. Stress test superati: un attacco che contiene codice resta scritto come testo e non esegue nulla (nessuna immagine/script iniettati), un tentativo senza dati mostra 'dettagli non ancora disponibili', la rivelazione in diretta mostra i dettagli quando ci sono e resta nascosta quando mancano. Tutti i controlli della pagina passano (12/12).",
-  "queuedAt": "2026-07-30T06:21:44.311Z",
-  "queuedBy": "routine"
-}
