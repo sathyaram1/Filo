@@ -77,9 +77,9 @@
       const a = attempts[i];
       const aModel = a.model || model;
       try {
-        const r = await getProvider(a.provider).complete({
+        const r = await withNetworkRetry(() => getProvider(a.provider).complete({
           apiKey: a.apiKey, model: aModel, reasoning: a.reasoning, messages, signal,
-        });
+        }));
         return { ...r, provider: a.provider, model: aModel };
       } catch (err) {
         lastErr = err;
