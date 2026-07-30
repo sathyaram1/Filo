@@ -59,6 +59,23 @@ module.exports = function register(on, ctx) {
     return { ok: false, reordered: false };
   });
 
+  // #376 — porta in primo piano una scheda già aperta. La usa il riferimento in
+  // chat quando Filo ha aperto qualcosa in secondo piano (un brano da
+  // ascoltare): cliccarlo deve PORTARCI, non aprire un doppione.
+  // Confine d'origine come su nav.js: solo le pagine interne filo:// possono
+  // spostare il primo piano — per un sito esterno non è mai legittimo.
+  on(MSG.FOCUS_TAB, async (msg, sender, origin) => {
+    if (!String(origin || '').startsWith('filo://')) return { ok: false };
+    const win = winOf(sender);
+    const tm = win && win._filoTabs;
+    const id = String(msg?.id || '');
+    if (!tm || !id) return { ok: false };
+    const exists = (tm.tabs || []).some((t) => t.id === id);
+    if (!exists) return { ok: false };
+    tm.activate(id);
+    return { ok: true };
+  });
+
   on(MSG.TAB_ACTIVITY, async (msg, sender) => {
     // Segnali di attività della tab (§2.1) → merge sullo snapshot.
     const win = winOf(sender);
