@@ -353,13 +353,13 @@ module.exports = function register(on, ctx) {
         }
         let commanderId = '';
         if (importCommanderName) {
-          const found = await Scry.named(parsed.commanderName).catch(() => null);
+          const found = await Scry.named(importCommanderName).catch(() => null);
           if (found) {
             commanderId = found.id;
             cardIds.unshift(found.id);
             cards[found.id] = found;
             qtyById[found.id] = 1;
-          } else notFound.push(parsed.commanderName);
+          } else notFound.push(importCommanderName);
         }
         importPending = { qtyById, commanderId };
         const n = cardIds.length;
