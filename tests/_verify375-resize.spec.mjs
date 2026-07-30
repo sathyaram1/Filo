@@ -178,9 +178,10 @@ test('STRESS: preferenze salvate assurde/corrotte non rompono il layout', async 
     await page.evaluate(async (v) => {
       await chrome.storage.local.set({ manageUi: v });
     }, bad);
-    const p = await openTab(URL);
+    const p = page;
+    await p.reload();
     await p.waitForLoadState('domcontentloaded');
-    await p.waitForTimeout(350);
+    await p.waitForTimeout(500);
     const grid = await box(p, '#mgReviewGrid');
     const list = await box(p, '#mgListCol');
     const detail = await box(p, '#mgDetailCol');
