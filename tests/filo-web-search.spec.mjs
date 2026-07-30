@@ -85,8 +85,9 @@ test('Filo esegue la ricerca web e risponde con i risultati reali', async ({ app
   expect(await turnCount(app)).toBe(2);
   await expect(page.locator('.dash-bubble-user')).toHaveCount(1);
 
-  // Il chip di trasparenza della ricerca è comparso.
-  await expect(page.locator('.dash-action-btn', { hasText: 'Cerco sul web' }))
+  // La traccia di trasparenza della ricerca è comparsa (#376: è una traccia
+  // scritta, non più un bottone — vedi filo-open-background-tab.spec.mjs).
+  await expect(page.locator('.dash-action-step', { hasText: 'Cerco sul web' }))
     .toBeVisible();
 
   // PROVA CHIAVE: al secondo turno il contesto contiene i RISULTATI VERI della
