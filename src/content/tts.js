@@ -24,7 +24,7 @@
   let deps = {
     getSettings: () => null,
     restorePasteContext: () => false,
-    insertTextAtSelection: () => {},
+    insertDictatedText: () => {},
     blobToDataUrl: () => Promise.reject(new Error('SN_TTS non inizializzato')),
   };
 
