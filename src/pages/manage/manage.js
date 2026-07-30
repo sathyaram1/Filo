@@ -2207,9 +2207,125 @@
     if (mgSearchIco)    mgSearchIco.innerHTML = ICONS.search(16);
   }
 
+  // ── Larghezza delle colonne (divisori trascinabili) ───────────────────────
+  // Le tre colonne del pannello lista sono ridimensionabili a mano: le due
+  // esterne hanno larghezza fissa scelta dall'utente, il dettaglio al centro
+  // assorbe il resto. Nessun ridimensionamento automatico: l'unica cosa che
+  // muove le colonne è il trascinamento dei divisori (o la finestra che si
+  // stringe troppo, e in quel caso le preferenze salvate restano intatte).
+  const mgReviewGrid   = document.getElementById('mgReviewGrid');
+  const mgDividerLeft  = document.getElementById('mgDividerLeft');
+  const mgDividerRight = document.getElementById('mgDividerRight');
+
+  const LAYOUT_KEY = (window.SN_CONST?.STORAGE_KEYS?.MANAGE_UI) || 'manageUi';
+  const LAYOUT_DEFAULT = { leftW: 220, rightW: 280 };
+  const LAYOUT_MIN = { leftW: 150, rightW: 180 };
+  const CENTER_MIN = 320;   // il dettaglio (la conversazione) non deve sparire
+  const DIVIDER_W  = 12;    // deve combaciare con la .mg-review in manage.html
+  const KEY_STEP   = 16;    // px per pressione delle frecce sul divisore
+  let layout = { ...LAYOUT_DEFAULT };
+
+  // Larghezze EFFETTIVE: partono dalle preferenze salvate ma vengono ristrette
+  // allo spazio davvero disponibile (logica pura condivisa col deck builder).
+  function effectiveWidths() {
+    const avail = (mgReviewGrid && mgReviewGrid.clientWidth) || 0;
+    const PL = window.SN_PANE_LAYOUT;
+    if (!PL) return { left: layout.leftW, right: layout.rightW };
+    return PL.fitWidths({
+      avail, gutters: DIVIDER_W * 2,
+      left: layout.leftW, right: layout.rightW,
+      minLeft: LAYOUT_MIN.leftW, minRight: LAYOUT_MIN.rightW, minCenter: CENTER_MIN,
+    });
+  }
+
+  function applyLayout() {
+    if (!mgReviewGrid) return;
+    const { left, right } = effectiveWidths();
+    mgReviewGrid.style.gridTemplateColumns =
+      `${left}px ${DIVIDER_W}px minmax(0, 1fr) ${DIVIDER_W}px ${right}px`;
+  }
+
+  async function loadLayout() {
+    try {
+      const res = await chrome.storage.local.get(LAYOUT_KEY);
+      const saved = res && res[LAYOUT_KEY];
+      if (saved && typeof saved === 'object') {
+        layout.leftW  = Math.max(LAYOUT_MIN.leftW,  Number(saved.leftW)  || LAYOUT_DEFAULT.leftW);
+        layout.rightW = Math.max(LAYOUT_MIN.rightW, Number(saved.rightW) || LAYOUT_DEFAULT.rightW);
+      }
+    } catch (_) {}
+    applyLayout();
+  }
+
+  function persistLayout() {
+    try { chrome.storage.local.set({ [LAYOUT_KEY]: { ...layout } })?.catch?.(() => {}); } catch (_) {}
+  }
+
+  // Imposta una larghezza clampata al minimo della colonna e a quanto resta
+  // lasciando al dettaglio centrale il suo minimo. Ritorna true se è cambiata.
+  function setColWidth(prop, w) {
+    const rect = mgReviewGrid.getBoundingClientRect();
+    const other = prop === 'leftW' ? layout.rightW : layout.leftW;
+    const maxW = Math.max(LAYOUT_MIN[prop], rect.width - DIVIDER_W * 2 - other - CENTER_MIN);
+    const next = Math.min(maxW, Math.max(LAYOUT_MIN[prop], Math.round(w)));
+    if (next === layout[prop]) return false;
+    layout[prop] = next;
+    applyLayout();
+    return true;
+  }
+
+  // Trascinamento: aggiorna live, persiste al rilascio. Doppio clic: torna alla
+  // misura iniziale (se si può allargare, si deve poter tornare indietro).
+  // Frecce ←/→ con il divisore a fuoco: stessa cosa da tastiera.
+  function wireDivider(el, prop, computeW) {
+    if (!el || !mgReviewGrid) return;
+    el.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      el.classList.add('mg-divider--dragging');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      const move = (ev) => setColWidth(prop, computeW(ev, mgReviewGrid.getBoundingClientRect()));
+      const up = () => {
+        el.classList.remove('mg-divider--dragging');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        document.removeEventListener('mousemove', move);
+        document.removeEventListener('mouseup', up);
+        persistLayout();
+      };
+      document.addEventListener('mousemove', move);
+      document.addEventListener('mouseup', up);
+    });
+    el.addEventListener('dblclick', () => {
+      if (setColWidth(prop, LAYOUT_DEFAULT[prop])) persistLayout();
+    });
+    el.addEventListener('keydown', (e) => {
+      let delta = 0;
+      if (e.key === 'ArrowLeft')  delta = -KEY_STEP;
+      else if (e.key === 'ArrowRight') delta = KEY_STEP;
+      else if (e.key === 'Home') { e.preventDefault(); if (setColWidth(prop, LAYOUT_DEFAULT[prop])) persistLayout(); return; }
+      else return;
+      e.preventDefault();
+      // Sulla colonna destra le frecce sono speculari: ← la allarga.
+      const signed = prop === 'leftW' ? delta : -delta;
+      if (setColWidth(prop, layout[prop] + signed)) persistLayout();
+    });
+  }
+
+  // Sinistra (lista): dal bordo sinistro del riquadro al centro della presa.
+  wireDivider(mgDividerLeft, 'leftW', (ev, rect) => ev.clientX - rect.left - DIVIDER_W / 2);
+  // Destra (pannello laterale): dal centro della presa al bordo destro.
+  wireDivider(mgDividerRight, 'rightW', (ev, rect) => rect.right - ev.clientX - DIVIDER_W / 2);
+
+  // La finestra che si rimpicciolisce deve ri-adattare le larghezze: senza,
+  // con misure salvate più grandi dello spazio disponibile il dettaglio
+  // centrale collasserebbe. Le preferenze salvate NON vengono toccate.
+  window.addEventListener('resize', applyLayout);
+
   // ── Init ──────────────────────────────────────────────────────────────────
   async function init() {
     injectSearchIcons();
+    await loadLayout();
     await refreshAuth();
     applyAutoModeGate();
     await loadAutoMode();
