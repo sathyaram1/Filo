@@ -1,7 +1,0 @@
-{
-  "id": "lpQzHBPnSwMjyLi1CzWZ",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho riprodotto il caso da capo: alla riapertura di Filo, con piu' schede aperte in ordine non cromatico e simulando la scelta 'tieni tutto' (nessuna scheda da archiviare), la barra viene comunque riordinata per colore. Prima il riordino scattava solo se veniva chiusa almeno una scheda, quindi con 'niente da chiudere' sembrava che non facesse nulla: e' proprio il sintomo segnalato, ora risolto. Ho verificato anche il caso senza modello AI configurato: Filo riordina lo stesso (e continua a collassare i doppioni esatti), mentre prima senza modello non faceva praticamente niente. Ho controllato che le schede ripartano gia' colorate con la tinta del loro sito invece di comparire grigie: il colore viene salvato con la sessione e rimesso subito alla riapertura, cosi' il riordino ha i dati pronti. Stress test superati: colori non validi o assenti non mandano in errore ne' spostano nulla (resta tutto fermo, nessun crash); una sessione salvata da una versione precedente, che non conserva i colori, viene ripristinata senza problemi (schede tutte neutre, come prima). Regressioni a posto: la chiusura automatica continua a rispettare la scheda attiva e quelle con audio, i doppioni delle home vengono collassati, e l'intera batteria di controlli su schede/sessione e la logica interna sono tutti verdi. Nessun problema visivo o funzionale trovato.",
-  "queuedAt": "2026-07-30T00:28:24.058Z",
-  "queuedBy": "routine"
-}
