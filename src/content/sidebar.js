@@ -1098,9 +1098,13 @@
     } catch (err) {
       if (thinking) { thinking.stop(); thinking.el.remove(); }
       const raw = err?.message || String(err);
+      // #360 — anche qui la chat non è un log: il messaggio grezzo ("fetch
+      // failed", "OpenRouter 400: …") non dice niente all'utente. Stessa
+      // traduzione della chat della home e di quella dei mazzi.
+      const CE = globalThis.SN_CHAT_ERRORS;
       const errText = /context invalidated/i.test(raw)
         ? 'L\'estensione è stata ricaricata. Aggiorna la pagina (F5) per ricollegare la sidebar.'
-        : raw;
+        : (CE ? CE.sentence(err) : raw);
       assistantEl = appendChatMessage('assistant', errText);
       assistantEl.classList.add('sn-sidebar-msg-error');
       // In caso d'errore, se l'utente aveva la chat collassata e questo è
