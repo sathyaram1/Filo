@@ -123,18 +123,24 @@ function seedForOrigin(origin) {
 // usata per non bloccare i popup OAuth come popup pubblicitari, #209): stessi
 // host, stesso motivo — sono endpoint di autenticazione, non vanno alterati.
 //
-// Usiamo SOLO il match su host noto (isKnownIdentityHost), NON l'euristica
-// isAuthPopup() completa (path /login|/auth|/sso… o query client_id+redirect_uri):
-// quell'euristica è pensata per riconoscere popup OAuth generici, dove un falso
-// positivo è innocuo (al massimo si consente un popup in più). Qui un falso
-// positivo spegnerebbe la protezione anti-fingerprint su un sito qualunque —
-// un tracker potrebbe disattivarla deliberatamente scegliendo un path "/login"
-// o aggiungendo client_id/redirect_uri in query.
+// Ambito dell'esenzione (#209, rifinitura): NON esentiamo l'intero sito di ogni
+// provider. Per gli host DEDICATI all'autenticazione (accounts.google.com,
+// login.microsoftonline.com, appleid.apple.com, auth.openai.com, Auth0/Okta…)
+// l'intero host È la superficie di accesso, quindi resta esente per intero. Per
+// gli host PRODOTTO che sono anche provider (github.com, x.com, discord.com,
+// facebook.com, linkedin.com, slack.com, dropbox.com…) esentiamo SOLO la
+// superficie di accesso (path/query di login/OAuth): la navigazione pubblica di
+// quei siti — dove l'utente può non essere loggato e il rumore protegge davvero
+// — torna coperta. La distinzione vive in authPopup.js (isIdentityAuthSurface).
+//
+// L'euristica su path/query è sicura perché applicata SOLO a host già nella
+// lista fidata dei provider: un tracker arbitrario non può auto-esentarsi
+// scegliendo un path "/login" (il suo host non è noto e resta protetto).
 function isIdentityProviderHref(href) {
   try {
     require('../../shared/authPopup');
     const mod = globalThis.SN_AUTH_POPUP;
-    return !!(mod && mod.isKnownIdentityHost(href));
+    return !!(mod && mod.isIdentityAuthSurface(href));
   } catch (_) {
     return false;
   }
