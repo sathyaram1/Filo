@@ -6,6 +6,7 @@
 // Senza il fix la tab chiusa spariva del tutto.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { CONFIRM_HOST, clickConfirm } from './helpers/confirm.mjs';
 
 const PAGE = `<!doctype html><html><head><title>Sito Archivio</title>
   <meta name="theme-color" content="rgb(200, 40, 60)">
@@ -83,4 +84,34 @@ test('menu contestuale: "Elimina" rimuove la tab dall\'archivio', async ({ shell
 
   // La chip sparisce dalla pagina: la tab è stata rimossa dall'archivio.
   await expect(archive.locator('.arc-tab', { hasText: 'Sito Archivio' })).toHaveCount(0, { timeout: 8_000 });
+});
+
+test('"Svuota archivio" usa il popup stilizzato di Filo, non il confirm nativo', async ({ shell, openTab, testServer }) => {
+  await testServer.openReady(openTab, PAGE);
+  const tabId = await shell.evaluate(async () => {
+    const snap = await window.filoShell.tabs.snapshot();
+    return snap.activeId;
+  });
+  await shell.evaluate(async (id) => window.filoShell.tabs.close(id), tabId);
+
+  const archive = await openTab('filo://archive/archive.html');
+  await archive.waitForLoadState('domcontentloaded');
+  const row = archive.locator('.arc-tab', { hasText: 'Sito Archivio' });
+  await expect(row).toBeVisible({ timeout: 8_000 });
+
+  // Se ricomparisse il confirm nativo, Playwright lo intercetterebbe qui:
+  // lo registriamo per far FALLIRE il test (il fix serve proprio a evitarlo).
+  let nativeDialog = false;
+  archive.on('dialog', async (d) => { nativeDialog = true; await d.dismiss().catch(() => {}); });
+
+  await archive.getByRole('button', { name: 'Svuota archivio' }).click();
+
+  // Compare il popup stilizzato (host in shadow DOM), NON un dialogo di sistema.
+  await expect(archive.locator(CONFIRM_HOST)).toBeVisible({ timeout: 5_000 });
+  expect(nativeDialog, 'nessun confirm nativo del browser deve comparire').toBe(false);
+
+  // Confermando, l'archivio si svuota davvero (la chip sparisce).
+  await clickConfirm(archive, 'ok');
+  await expect(archive.locator('.arc-tab')).toHaveCount(0, { timeout: 8_000 });
+  await expect(archive.locator('#empty')).toBeVisible();
 });
