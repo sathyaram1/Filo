@@ -304,6 +304,9 @@
     const budget = (current.budget !== null && current.budget !== undefined)
       ? ` · Budget: ${fmtBudgetShort(current.budget)} €` : '';
     $('commanderLine').textContent = commander + budget;
+    // Suggerisce, senza ingombrare, come tornare indietro (feedback #302).
+    $('commanderLine').title = current.commander
+      ? 'Tasto destro per rimuovere il commander' : '';
     $('deckCount').textContent = `${Decks.deckCount(current)}/100 carte`;
     await Promise.all([ensureSymbols(), loadDeckCards()]);
     refreshOpinionStaleness();
@@ -756,6 +759,21 @@
     current = r.deck;
     const { deck, removed } = Decks.removeCard(current, cardId);
     if (removed) await saveDeck(deck);
+    else await renderBuilder();
+  }
+
+  // Inverso di makeCommander (feedback #302): torna a "nessun commander". Poiché
+  // impostare un commander ne toglie la carta dall'elenco, rimuoverlo la RIMETTE
+  // nel mazzo come carta normale — così non si perde la carta scelta per sbaglio
+  // (il software deve reggere gli errori, non costringere a rifare il mazzo).
+  async function removeCommander() {
+    const prevId = current.commander;
+    if (!prevId) return;
+    const r = await send({ type: MSG.DECKS_SET_COMMANDER, id: current.id, scryfallId: '' });
+    if (!r || !r.ok) return;
+    current = r.deck;
+    const { deck, added } = Decks.addCard(current, prevId);
+    if (added) await saveDeck(deck);
     else await renderBuilder();
   }
 
@@ -1689,6 +1707,9 @@
       }
       await saveDeck(Decks.setBudget(current, parsed.value));
     }));
+    // Solo se c'è un commander da togliere (feedback #302): l'inverso di
+    // "Imposta come commander", altrimenti non c'è modo di annullarlo.
+    if (current.commander) add('Rimuovi commander', () => removeCommander());
     add('Elimina…', async () => {
       const ok = await window.SN_CONFIRM_UI.confirm({
         title: 'Eliminare il mazzo?',
@@ -1767,6 +1788,16 @@
     });
 
     $('deckName').addEventListener('click', (e) => { e.stopPropagation(); openSwitcher(); });
+    // Tasto destro sulla riga del commander (§ "il tasto destro è centrale"):
+    // quando un commander è impostato, offre di rimuoverlo direttamente da lì
+    // (feedback #302). Senza commander il menu non ha nulla da offrire.
+    $('commanderLine').addEventListener('contextmenu', (e) => {
+      if (!current || !current.commander) return;
+      e.preventDefault();
+      openCtx(e.clientX, e.clientY, [
+        { label: 'Rimuovi commander', run: () => removeCommander() },
+      ]);
+    });
     wireDividers();
     wireDetailPanel();
 

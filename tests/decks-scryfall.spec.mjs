@@ -87,6 +87,37 @@ test('impostare il commander porta art crop e pip reali nella libreria', async (
   await expect(card.locator('.sn-card-title')).toHaveText('Niv-Mizzet, Parun');
 });
 
+test('si può rimuovere il commander e la sua carta torna nel mazzo (feedback #302)', async ({ app, openTab }) => {
+  await mockScryfall(app);
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  const deckId = await deckWithCommander(page);
+  // deckWithCommander imposta il commander via IPC (la UI di scelta arriva coi
+  // task 4/5): ricarica il builder così la vista riflette il commander salvato.
+  await page.click('#backToLibrary');
+  await page.locator(`[data-deck-id="${deckId}"]`).click();
+
+  // Precondizione: il commander è impostato (senza il fix non c'è modo di tornare indietro).
+  await expect(page.locator('#commanderLine')).toHaveText(/Niv-Mizzet, Parun/);
+
+  // Dal menu del mazzo (click sul nome) scegli "Rimuovi commander".
+  await page.click('#deckName');
+  await page.locator('#deckHead .sn-select-option', { hasText: 'Rimuovi commander' }).click();
+
+  // Successo: il mazzo torna a "nessun commander"…
+  await expect(page.locator('#commanderLine')).toHaveText(/Nessun commander/);
+  // …e la carta che era commander NON è persa: è di nuovo una carta del mazzo.
+  await expect(page.locator('#deckList .dk-row[data-card-id="niv-1"]')).toHaveCount(1);
+
+  // Impostato di nuovo un commander, il menu offre ancora la rimozione (idempotente).
+  const r = await page.evaluate(async () => {
+    const { MSG } = window.SN_MSG;
+    const id = decodeURIComponent(location.hash.replace('#/deck/', ''));
+    return chrome.runtime.sendMessage({ type: MSG.DECKS_SET_COMMANDER, id, scryfallId: 'niv-1' });
+  });
+  expect(r && r.ok).toBe(true);
+});
+
 test('l\'auto-nome dal commander NON sovrascrive un nome scelto dall\'utente', async ({ app, openTab }) => {
   await mockScryfall(app);
   const page = await openTab('filo://decks/decks.html');
