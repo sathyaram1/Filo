@@ -336,7 +336,7 @@
   // dettatura arriva molto dopo. Prima di inserire riallineiamo la posizione
   // a dove il cursore si trova ADESSO, poi inseriamo.
   function insertDictatedText(text) {
-    refreshPasteContextLive();
+    // TEMP-PRECOND-CHECK: refresh disabilitato
     deps.restorePasteContext();
     insertTextAtSelection(text);
   }
