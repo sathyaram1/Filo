@@ -317,6 +317,7 @@
   global.SN_AUTO_FEEDBACK = {
     analyzeReply,
     compose,
+    composeProposal,
     calcAutoFeedbackBonus,
     applyAutoFeedbackBonus,
     // Esposti per i test
