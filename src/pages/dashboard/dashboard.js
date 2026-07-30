@@ -1418,6 +1418,18 @@
       : '✓ Nessuna scheda da archiviare.');
   }
 
+  // "/riordina": riordina la striscia delle schede per colore, esattamente come
+  // succede alla riapertura di Filo, ma SENZA chiudere/archiviare nulla (a
+  // differenza di /pulisci). Immediato: è deterministico e non tocca i contenuti,
+  // quindi niente popup di conferma — l'utente può sempre rifarlo o riaprire una
+  // scheda. Diamo comunque un feedback esplicito (spec: ogni azione ha un esito).
+  async function runTabReorder() {
+    const r = await send({ type: MSG.REORDER_TABS });
+    showFiloLine(r && r.reordered
+      ? '✓ Schede riordinate per colore.'
+      : '✓ Le schede erano già in ordine.');
+  }
+
   // Converte l'argomento di "/set timer" in secondi.
   //   "5:00" → 5 minuti 0 secondi → 300 ; "8" → 8 minuti → 480.
   // Ritorna null se non è una durata valida.
