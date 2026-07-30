@@ -924,25 +924,35 @@ class TabManager {
     if (!this.tabs.length) this.openTab('filo://newtab/');
     else if (!this.tabs.some((t) => t.id === this.activeId)) this.activate(this.tabs[0].id);
 
-    if (toArchive.length) {
-      this.reorderTabsByColor();
-      this._broadcast();
-      this._showTriageToast(toArchive.length);
-    }
+    // §1.3 — riordino cromatico della striscia. Avviene a OGNI giro di triage
+    // (riapertura di Filo, inattività, richiesta manuale), NON solo quando
+    // qualcosa è stato archiviato: all'apertura l'utente si aspetta comunque la
+    // barra riordinata per colore anche se non c'era nulla da chiudere. Se
+    // l'ordine non cambia (tab senza identità, una sola tab) è un no-op e non
+    // ribroadcastiamo inutilmente.
+    const reordered = this.reorderTabsByColor();
+    if (toArchive.length || reordered) this._broadcast();
+    if (toArchive.length) this._showTriageToast(toArchive.length);
     return { archived: toArchive.length };
   }
 
   // §1.3 — riordina la striscia per colore (arcobaleno) in base all'identityColor.
   // Le tab senza colore (interne, identità ignota) restano in coda nell'ordine.
+  // Ritorna true se l'ordine è effettivamente cambiato (per decidere se
+  // ribroadcastare alla shell).
   reorderTabsByColor() {
-    const withIdx = this.tabs.map((t, i) => ({ t, i }));
+    const before = this.tabs;
+    const withIdx = before.map((t, i) => ({ t, i }));
     withIdx.sort((a, b) => {
       const ha = hueOf(a.t.identityColor);
       const hb = hueOf(b.t.identityColor);
       if (ha !== hb) return ha - hb;
       return a.i - b.i; // stabile
     });
-    this.tabs = withIdx.map((x) => x.t);
+    const next = withIdx.map((x) => x.t);
+    const changed = next.some((t, i) => t !== before[i]);
+    this.tabs = next;
+    return changed;
   }
 
   _showTriageToast(_n) {
@@ -1849,14 +1859,20 @@ class TabManager {
 
   // ─── persistenza sessione (riapri i tab alla riapertura di Filo) ──────────
 
-  // Stato minimale da salvare/ripristinare: gli URL dei tab e quale era attivo.
+  // Stato minimale da salvare/ripristinare: gli URL dei tab, quale era attivo e
+  // il colore identità di ciascuno. `colors` è allineato indice-per-indice a
+  // `tabs`: serve a far ripartire la barra già tinta (§1.2) e a dare al riordino
+  // cromatico della riapertura (§1.3) i dati subito, senza aspettare che i
+  // content script ricalcolino il colore di ogni sito. Campo aggiuntivo: un
+  // ripristino vecchio senza `colors` continua a funzionare (viene ignorato).
   sessionState() {
-    const tabs = this.tabs
-      .map((t) => t.url)
-      .filter((u) => typeof u === 'string' && u && u !== 'about:blank');
+    const kept = this.tabs
+      .filter((t) => typeof t.url === 'string' && t.url && t.url !== 'about:blank');
+    const tabs = kept.map((t) => t.url);
+    const colors = kept.map((t) => t.identityColor || null);
     let activeIndex = this.tabs.findIndex((t) => t.id === this.activeId);
     if (activeIndex < 0) activeIndex = 0;
-    return { tabs, activeIndex };
+    return { tabs, colors, activeIndex };
   }
 
   _sessionKey() {
@@ -1882,11 +1898,21 @@ class TabManager {
   async restoreSession() {
     if (this.incognito) return false; // incognito: nessuna sessione da ripristinare
     let urls = [];
+    let colors = [];
     let activeIndex = 0;
     try {
       const saved = await globalThis.SN_STORAGE?.getRaw?.(this._sessionKey(), null);
       if (saved && Array.isArray(saved.tabs)) {
-        urls = saved.tabs.filter((u) => typeof u === 'string' && u);
+        // Filtro url + colori in lockstep così `colors[i]` resta allineato al
+        // tab ripristinato in posizione i (un ripristino vecchio senza `colors`
+        // dà semplicemente colori tutti null).
+        const savedColors = Array.isArray(saved.colors) ? saved.colors : [];
+        saved.tabs.forEach((u, i) => {
+          if (typeof u === 'string' && u) {
+            urls.push(u);
+            colors.push(savedColors[i] || null);
+          }
+        });
         if (Number.isInteger(saved.activeIndex)) activeIndex = saved.activeIndex;
       }
     } catch (_) {}
@@ -1896,7 +1922,14 @@ class TabManager {
     try {
       // #145 — suppressAutoplay: i media delle tab ripristinate restano in pausa
       // al boot (niente più video YouTube che ripartono tutti insieme).
-      for (const url of urls) this.openTab(url, { activate: false, suppressAutoplay: true });
+      urls.forEach((url, i) => {
+        const id = this.openTab(url, { activate: false, suppressAutoplay: true });
+        // §1.2/§1.3 — ripristina subito il colore identità salvato: la barra
+        // riparte già tinta e il riordino cromatico alla riapertura ha i dati
+        // pronti senza attendere il ricalcolo dei content script. Seeda anche la
+        // cache per host, così una did-navigate sullo stesso dominio lo conserva.
+        if (id && colors[i]) this.setTabIdentityColor(id, colors[i]);
+      });
       if (activeIndex < 0 || activeIndex >= this.tabs.length) activeIndex = this.tabs.length - 1;
       const target = this.tabs[activeIndex];
       if (target) this.activate(target.id);
