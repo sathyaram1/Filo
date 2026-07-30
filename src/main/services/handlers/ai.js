@@ -142,6 +142,7 @@ module.exports = function register(on, ctx) {
         if (key) {
           const hit = ttsCache.get(key);
           if (hit) {
+            ttsFallbackAnnounced = false; // sintesi disponibile: riarma l'avviso
             return {
               ok: true,
               audioBase64: hit.audioBase64,
