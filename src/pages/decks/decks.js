@@ -178,7 +178,7 @@
       carousel = null;
       setDetailState('stats');
       show('builder');
-      await renderBuilder();
+      await renderBuilder(true); // apertura: la chat parte dall'ultimo scambio
       return;
     }
     if (r.screen === 'game') { show('game'); return; }
