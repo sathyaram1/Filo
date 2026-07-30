@@ -446,7 +446,7 @@ test('storico: cliccando un tentativo si vedono attacco, spiegazione e motivazio
   await expect(detail).toBeVisible();
 
   // Attacco: testo LETTERALE (nessuna <img> creata, handler onerror non scattato).
-  await expect(detail.locator('.rt-detail-block[ ] , .rt-detail-text')).not.toHaveCount(0);
+  await expect(detail.locator('.rt-detail-text')).not.toHaveCount(0);
   await expect(detail.getByText(evilAttack, { exact: false })).toBeVisible();
   await expect(page.locator('#historyBody img')).toHaveCount(0);
   expect(await page.evaluate(() => window.__attXss)).toBe(0);
