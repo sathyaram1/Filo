@@ -1678,11 +1678,23 @@
     appendBubble(fromModel ? 'model' : 'user', fromModel ? 'Filo (segnalazione automatica)' : 'Utente',
       esc(fb.text || ''), imgs.concat(files));
 
-    // Bolla 2: parere di Filo (riassunto dei giudici).
-    const summary = fb.pipeline && fb.pipeline.filoSummary;
-    appendBubble('model', 'Filo',
-      summary ? esc(summary)
-              : '<em>Filo non ha ancora un parere su questo feedback (giudici non attivi).</em>');
+    // Bolla 2: parere di Filo. Il riassunto sintetico (filoSummary) può
+    // arrivare troncato a metà frase dal backend; se manca o è troncato,
+    // ripieghiamo sul parere completo ricostruito dai verdetti dei giudici,
+    // così Filo non mostra mai una frase spezzata a metà né un falso "non ha
+    // ancora un parere" quando in realtà ha già giudicato.
+    const summary = (fb.pipeline && fb.pipeline.filoSummary)
+      ? String(fb.pipeline.filoSummary).trim() : '';
+    let opinionHtml;
+    if (summary && isCompleteSummary(summary)) {
+      opinionHtml = esc(summary);
+    } else {
+      const fromVerdicts = filoOpinionFromVerdicts(fb);
+      if (fromVerdicts) opinionHtml = fromVerdicts;         // parere completo dai giudici
+      else if (summary) opinionHtml = esc(summary);          // troncato ma è l'unica cosa che c'è
+      else opinionHtml = '<em>Filo non ha ancora un parere su questo feedback (giudici non attivi).</em>';
+    }
+    appendBubble('model', 'Filo', opinionHtml);
 
     // Bolla 3: il commento dell'owner alla revisione (approvazione/sblocco/
     // conferma). Prima era scritto ma non mostrato da nessuna parte.
