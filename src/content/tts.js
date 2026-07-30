@@ -562,6 +562,11 @@
     pill.type = 'button';
     pill.className = 'sn-dictate-pill';
     pill.textContent = I18n.t('menu_dictate_listening');
+    // Non rubare il focus/caret al campo quando l'utente clicca la pill per
+    // fermare: così il cursore resta dove l'utente stava scrivendo e il testo
+    // dettato ci atterra sopra (vale soprattutto per gli editor contenteditable,
+    // dove la selezione viva va persa se il focus passa a un bottone).
+    pill.addEventListener('mousedown', (e) => e.preventDefault());
     document.documentElement.appendChild(pill);
 
     const cleanup = () => {
