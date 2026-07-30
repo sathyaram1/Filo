@@ -239,9 +239,9 @@
       invoke: 'Menu del tasto destro → "Aperti per dopo".',
     },
     {
-      id: 'archive', title: 'Archivio delle schede chiuse', category: 'save',
-      desc: 'Ritrova le schede chiuse, raggruppate per giorno; puoi cercarle anche per contenuto e riaprirle.',
-      invoke: 'Pagina filo://archive/archive.html (dalla home → "Tab archiviate"). Clicca una scheda per riaprirla; tasto destro per il menu Riapri/Elimina.',
+      id: 'archive', title: 'Cronologia delle schede', category: 'save',
+      desc: 'La cronologia principale: le schede chiuse raggruppate per giorno, una riga per giorno, colorate come le tab in alto; puoi cercarle anche per contenuto e riaprirle.',
+      invoke: 'Icona «Cronologia» in alto a destra nella home (o dalla home → "Cronologia"), pagina filo://archive/archive.html. Clicca una scheda per riaprirla; tasto destro per il menu Riapri/Elimina.',
     },
     {
       id: 'history', title: 'Cronologia delle richieste AI', category: 'save',

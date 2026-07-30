@@ -1984,10 +1984,12 @@
       // browser. Spec §2: punto d'accesso in alto a destra nella home.
       { command: 'redteam', icon: 'redteam', label: 'Red-team', url: 'filo://redteam/redteam.html' },
       { command: 'home', icon: 'home', label: 'Home' },
-      // Cronologia AI: apre direttamente la pagina interna (non passa dalla
-      // shell come gli altri, che ancorano un menu nativo) — è solo una
+      // Cronologia: la pagina principale è quella delle schede visitate/chiuse
+      // (raggruppate per giorno), non il log delle azioni AI (raggiungibile da lì
+      // come "Cronologia AI"). Apre direttamente la pagina interna (non passa
+      // dalla shell come gli altri, che ancorano un menu nativo) — è solo una
       // navigazione. Risponde al feedback "metti la cronologia in alto a destra".
-      { command: 'history', icon: 'history', label: 'Cronologia', url: 'filo://history/history.html' },
+      { command: 'history', icon: 'history', label: 'Cronologia', url: 'filo://archive/archive.html' },
       // Gli appunti non hanno più un pannello separato: Filo li scrive nei file
       // dell'editor (icona Editor, che ora usa proprio l'SVG degli appunti).
       { command: 'settings', icon: 'options', label: 'Impostazioni' },

@@ -17,6 +17,10 @@
     // ↓ Nuove versioni in cima.
     {
       version: '0.2.168', date: '2026-07-29',
+      features: [
+        'La «Cronologia» in alto a destra è ora quella delle schede che hai visitato e chiuso, raggruppate per giorno: la pagina delle azioni AI resta raggiungibile da lì come «Cronologia AI».',
+        'Nella cronologia ogni giorno sta su una sola riga e le schede sono colorate come le tab in alto, con la tinta del sito, larghezza variabile e sfruttando tutta la larghezza disponibile; se un giorno ne ha tante, la riga scorre di lato invece di allungare la pagina.',
+      ],
       fixes: [
         'La dettatura vocale (menu del tasto destro → «Detta») ora inserisce il testo trascritto dove hai il cursore in quel momento, non più dove avevi aperto il menu: se mentre parli continui a scrivere o sposti il cursore nello stesso campo, il testo dettato ti atterra nel punto giusto invece di infilarsi indietro spaccando ciò che avevi appena digitato.',
         'In modalità terminale, la cartella in cui ti trovi ora resta la stessa quando chiudi e riapri Filo: prima tornava sempre a quella iniziale.',

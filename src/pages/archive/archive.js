@@ -44,6 +44,51 @@
     return (h / 6) * 360;
   }
 
+  // Tinta identità ATTENUATA per lo sfondo della chip: stessa logica delle tab
+  // in alto (§1.2, shell.js) — riduciamo la saturazione al ~18% dell'originale
+  // e lasciamo che il CSS (color-mix col neutro di superficie) sposti la
+  // luminosità verso il tema. Così una scheda molto satura (es. YouTube rosso)
+  // non diventa un blocco acceso ma una tinta sobria e riconoscibile. Ritorna
+  // null per grigi/valori non parsabili → la chip usa il neutro.
+  function tintOf(rgbStr) {
+    const m = /rgba?\(([^)]+)\)/.exec(rgbStr || '');
+    if (!m) return null;
+    const p = m[1].split(',').map((s) => parseFloat(s.trim()));
+    if (p.length < 3 || p.some((n) => Number.isNaN(n))) return null;
+    const r = p[0] / 255, g = p[1] / 255, b = p[2] / 255;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    const l = (mx + mn) / 2;
+    let h = 0, s = 0;
+    if (mx !== mn) {
+      const d = mx - mn;
+      s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+      if (mx === r) h = (g - b) / d + (g < b ? 6 : 0);
+      else if (mx === g) h = (b - r) / d + 2;
+      else h = (r - g) / d + 4;
+      h /= 6;
+    }
+    s *= 0.18; // saturazione ridotta al ~18% dell'originale (come §1.2)
+    const hue2rgb = (pp, qq, t) => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1 / 6) return pp + (qq - pp) * 6 * t;
+      if (t < 1 / 2) return qq;
+      if (t < 2 / 3) return pp + (qq - pp) * (2 / 3 - t) * 6;
+      return pp;
+    };
+    let nr, ng, nb;
+    if (s === 0) {
+      nr = ng = nb = l;
+    } else {
+      const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+      const pq = 2 * l - q;
+      nr = hue2rgb(pq, q, h + 1 / 3);
+      ng = hue2rgb(pq, q, h);
+      nb = hue2rgb(pq, q, h - 1 / 3);
+    }
+    return `rgb(${Math.round(nr * 255)}, ${Math.round(ng * 255)}, ${Math.round(nb * 255)})`;
+  }
+
   function dayKey(iso) {
     const d = iso ? new Date(iso) : new Date();
     // Chiave locale YYYY-MM-DD per raggruppare per giorno nel fuso dell'utente.
@@ -105,7 +150,9 @@
     if (!semanticResults.length) { showEmpty(); return; }
     $('empty').hidden = true;
     const wrap = document.createElement('div');
-    wrap.className = 'arc-tabs';
+    // Risultati per pertinenza: chip compatte che vanno a capo (classe dedicata),
+    // non la riga singola scorrevole usata per il raggruppamento per giorno.
+    wrap.className = 'arc-results';
     for (const t of semanticResults) wrap.appendChild(renderTab(t, { showScore: true }));
     list.appendChild(wrap);
   }
@@ -245,7 +292,12 @@
     row.className = 'arc-tab';
     row.tabIndex = 0;
     row.setAttribute('role', 'button');
-    if (t.identityColor) row.style.setProperty('--arc-color', t.identityColor);
+    if (t.identityColor) {
+      row.style.setProperty('--arc-color', t.identityColor);
+      // Sfondo della chip = tinta identità attenuata, come le tab in alto.
+      const tint = tintOf(t.identityColor);
+      if (tint) row.style.setProperty('--arc-tint', tint);
+    }
 
     const titleText = t.title || t.url || '';
     // Tooltip: conserva URL/orario/snippet, non più sempre visibili nella

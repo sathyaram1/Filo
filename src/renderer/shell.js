@@ -802,8 +802,8 @@
     'admin-defaults/admin-defaults.html': 'Modelli predefiniti',
     'editor/editor.html': 'Editor',
     'feedback/feedback.html': 'Feedback',
-    'history/history.html': 'Cronologia',
-    'archive/archive.html': 'Tab archiviate',
+    'history/history.html': 'Cronologia AI',
+    'archive/archive.html': 'Cronologia',
     'home/home.html': 'Aperti per dopo',
     'spellcheck/spellcheck.html': 'Correttore',
   };
