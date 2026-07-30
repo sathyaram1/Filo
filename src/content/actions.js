@@ -1460,6 +1460,7 @@
     pasteFromClipboard,
     pasteHistoryEntry,
     insertTextAtSelection,
+    insertDictatedText,
     buildPasteItem,
     getClipboardHistory,
     getNavState,
