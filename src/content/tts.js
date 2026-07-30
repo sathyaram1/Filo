@@ -314,6 +314,19 @@
     });
   }
 
+  // Avvisa (una sola volta per sessione dell'app — la deduplica vive nel main,
+  // via `firstFallback`) che la lettura a voce naturale del modello non è
+  // disponibile e sta subentrando la voce del browser. Serve a spiegare
+  // "modello impostato ma lettura automatica": il ripiego resta silenzioso e
+  // grazioso (la lettura parte comunque), ma la PRIMA volta diciamo perché, così
+  // l'utente sa se deve intervenire (es. manca la chiave per la voce a modello).
+  function notifyModelFallback(res) {
+    if (!res || !res.firstFallback) return;      // deduplicato dal main
+    if (!ttsSupported()) return;                 // playBrowserChunk mostrerà già tts_not_supported
+    const key = res.error === 'no_tts_model' ? 'tts_model_fallback_nokey' : 'tts_model_fallback';
+    try { Popup.showToast(I18n.t(key)); } catch (_) {}
+  }
+
   // Lettura ad alta voce. Strategia anti-attesa: il testo viene spezzato in
   // frasi (chunk); la prima — corta — viene sintetizzata e suonata subito,
   // mentre le successive si preparano in parallelo. Così il tempo prima della
@@ -350,8 +363,11 @@
       if (ci < 0 || ci >= chunks.length || fetches[ci]) return;
       const c = chunks[ci];
       const ctext = full.slice(c.start, c.end);
+      // Teniamo l'intero esito (non solo null): quando il modello non è
+      // disponibile ci serve `error`/`firstFallback` per spiegare all'utente
+      // perché la lettura passa alla voce del browser (vedi notifyModelFallback).
       fetches[ci] = chrome.runtime.sendMessage({ type: MSG.TTS_SYNTH, text: ctext })
-        .then((res) => (res && res.ok && res.audioBase64 ? res : null))
+        .then((res) => res || null)
         .catch(() => null);
     };
 
@@ -361,13 +377,16 @@
       startFetch(ci + 1);
       const res = await fetches[ci];
       if (!sessionAlive(s)) return;
-      if (res) {
+      if (res && res.ok && res.audioBase64) {
         startFetch(ci + 1); // mantieni il successivo in volo mentre si suona
         await playModelChunk(s, res, chunks[ci]);
         if (!sessionAlive(s)) return;
       } else {
         // Modello non disponibile/fallito da qui in poi → voce del browser per
-        // tutto il testo rimanente (un'unica utterance con onboundary).
+        // tutto il testo rimanente (un'unica utterance con onboundary). Se
+        // l'utente aveva un modello di lettura impostato, glielo diciamo: senza
+        // avviso "modello impostato ma lettura automatica" resta un mistero.
+        notifyModelFallback(res);
         playBrowserChunk(s, full.slice(chunks[ci].start), chunks[ci].start);
         return;
       }

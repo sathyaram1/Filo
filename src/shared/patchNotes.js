@@ -16,6 +16,12 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.169', date: '2026-07-30',
+      fixes: [
+        'La lettura ad alta voce ora ti dice quando ripiega sulla voce del browser: se avevi in mente una voce più naturale (a modello) ma non è disponibile — per esempio perché manca la chiave abilitata — Filo te lo segnala invece di leggere con la voce automatica senza spiegazioni. L’avviso compare una sola volta.',
+      ],
+    },
+    {
       version: '0.2.168', date: '2026-07-29',
       features: [
         'La «Cronologia» in alto a destra è ora quella delle schede che hai visitato e chiuso, raggruppate per giorno: la pagina delle azioni AI resta raggiungibile da lì come «Cronologia AI».',

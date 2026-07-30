@@ -50,6 +50,8 @@
     menu_read_aloud: 'Leggi',
     menu_stop_reading: 'Interrompi lettura',
     tts_not_supported: 'Lettura ad alta voce non supportata in questo browser',
+    tts_model_fallback: 'Voce del modello non disponibile ora: leggo con la voce del browser.',
+    tts_model_fallback_nokey: 'La lettura a voce naturale richiede una chiave Gemini abilitata alla sintesi vocale. Per ora leggo con la voce del browser.',
     menu_dictate: 'Detta',
     menu_screenshot: 'Screenshot',
     menu_screenshot_crop: 'Screenshot di una parte',

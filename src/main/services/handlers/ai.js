@@ -90,6 +90,17 @@ module.exports = function register(on, ctx) {
     return { ok: true, ...r };
   });
 
+  // Dedup dell'avviso "lettura a modello non disponibile → voce del browser":
+  // lo segnaliamo al content script (firstFallback:true) solo la PRIMA volta che
+  // ripieghiamo in una sessione dell'app. Torna false appena una sintesi riesce,
+  // così se il modello torna a funzionare e poi ricasca l'utente è di nuovo avvisato.
+  let ttsFallbackAnnounced = false;
+  const ttsFallback = (error) => {
+    const firstFallback = !ttsFallbackAnnounced;
+    ttsFallbackAnnounced = true;
+    return { ok: false, error, firstFallback };
+  };
+
   on(MSG.TTS_SYNTH, async (msg) => {
     // Sintesi vocale via modello. Costruisce la catena per l'azione TTS e
     // prova i provider che la implementano (oggi: Gemini). Se nessuno è
@@ -117,7 +128,7 @@ module.exports = function register(on, ctx) {
       try {
         attempts = buildAttemptChain(settings, model);
       } catch (_) {
-        return { ok: false, error: 'no_tts_model' };
+        return ttsFallback('no_tts_model');
       }
       const voice = (settings && settings.tts && settings.tts.modelVoice) || '';
       const text = String(msg.text == null ? '' : msg.text);
@@ -131,6 +142,7 @@ module.exports = function register(on, ctx) {
         if (key) {
           const hit = ttsCache.get(key);
           if (hit) {
+            ttsFallbackAnnounced = false; // sintesi disponibile: riarma l'avviso
             return {
               ok: true,
               audioBase64: hit.audioBase64,
@@ -146,6 +158,7 @@ module.exports = function register(on, ctx) {
             apiKey: a.apiKey, model: a.model, text, voice,
           });
           if (key) ttsCache.set(key, { audioBase64: r.audioBase64, mimeType: r.mimeType });
+          ttsFallbackAnnounced = false; // sintesi riuscita: riarma l'avviso
           return {
             ok: true,
             audioBase64: r.audioBase64,
@@ -158,9 +171,9 @@ module.exports = function register(on, ctx) {
           console.warn('[SN] TTS gemini fallito:', e.message || e);
         }
       }
-      return { ok: false, error: (lastErr && lastErr.message) || 'tts_failed' };
+      return ttsFallback((lastErr && lastErr.message) || 'tts_failed');
     } catch (e) {
-      return { ok: false, error: e?.message || String(e) };
+      return ttsFallback(e?.message || String(e));
     }
   });
 

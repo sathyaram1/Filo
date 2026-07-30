@@ -126,3 +126,28 @@ test('TTS: l\'azione di sintesi vocale degrada con grazia senza chiave (fallback
   expect(res).toBeTruthy();
   expect(res.ok).toBe(false);
 });
+
+test('TTS: il ripiego alla voce del browser è annunciato una volta sola (firstFallback)', async ({ openTab }) => {
+  // L'utente lamenta "modello impostato ma lettura automatica": senza chiave il
+  // main non può usare la voce a modello e la lettura ripiega su quella del
+  // browser. Il content script deve poter AVVISARE l'utente del perché — ma una
+  // volta sola per sessione. Il main marca solo il PRIMO ripiego con
+  // firstFallback:true; i successivi con false (deduplica), finché una sintesi
+  // non riesce. Qui (nessuna chiave Gemini) ogni tentativo ripiega.
+  const page = await openTab(OPTIONS_URL);
+  const synth = () => page.evaluate(() =>
+    chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.TTS_SYNTH, text: 'ciao mondo' }));
+
+  const first = await synth();
+  const second = await synth();
+
+  // Primo ripiego: annunciato, con il motivo "manca il modello/chiave" così il
+  // content script può dire all'utente cosa fare.
+  expect(first.ok).toBe(false);
+  expect(first.firstFallback).toBe(true);
+  expect(first.error).toBe('no_tts_model');
+
+  // Secondo ripiego consecutivo: NON riannunciato (niente avvisi ripetuti).
+  expect(second.ok).toBe(false);
+  expect(second.firstFallback).toBe(false);
+});
