@@ -340,7 +340,10 @@ module.exports = function register(on, ctx) {
       // conferma della ricerca: l'aggiunta al mazzo resta un'azione esplicita
       // dell'utente (toggle riga o "Aggiungi tutte"), mai automatica.
       let importPending = null;
-      if (parsed.import.length || parsed.commanderName) {
+      // `commanderJustSet` esclude il commander già consumato sopra (build-around):
+      // qui resta solo il commander-CANDIDATO dell'import di una lista incollata.
+      const importCommanderName = commanderJustSet ? '' : parsed.commanderName;
+      if (parsed.import.length || importCommanderName) {
         const qtyById = {};
         const notFound = [];
         for (const entry of parsed.import) {
@@ -349,7 +352,7 @@ module.exports = function register(on, ctx) {
           else notFound.push(entry.name);
         }
         let commanderId = '';
-        if (parsed.commanderName) {
+        if (importCommanderName) {
           const found = await Scry.named(parsed.commanderName).catch(() => null);
           if (found) {
             commanderId = found.id;
