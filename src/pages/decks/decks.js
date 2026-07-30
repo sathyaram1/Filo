@@ -759,6 +759,21 @@
     else await renderBuilder();
   }
 
+  // Inverso di makeCommander (feedback #302): torna a "nessun commander". Poiché
+  // impostare un commander ne toglie la carta dall'elenco, rimuoverlo la RIMETTE
+  // nel mazzo come carta normale — così non si perde la carta scelta per sbaglio
+  // (il software deve reggere gli errori, non costringere a rifare il mazzo).
+  async function removeCommander() {
+    const prevId = current.commander;
+    if (!prevId) return;
+    const r = await send({ type: MSG.DECKS_SET_COMMANDER, id: current.id, scryfallId: '' });
+    if (!r || !r.ok) return;
+    current = r.deck;
+    const { deck, added } = Decks.addCard(current, prevId);
+    if (added) await saveDeck(deck);
+    else await renderBuilder();
+  }
+
   // ── Colonna Chat / Risultati (§3): la ricerca È la chat ────────────────────
   // Messaggi TIPIZZATI (§3.2): una bolla utente è testo; una bolla di Filo può
   // avere testo (con [[Nome Carta]] resi span hoverable, §3.5) e/o una CardList
