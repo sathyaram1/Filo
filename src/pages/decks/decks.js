@@ -298,11 +298,12 @@
     // Cache-first: l'elenco compare SUBITO coi campi statici già in cache (le
     // carte del mazzo sono state risolte quando sono entrate). I prezzi freschi
     // arrivano dopo, in background, senza far aspettare le carte (feedback #380).
-    await Promise.all([ensureSymbols(), loadDeckCards({ freshPrices: true })]);
+    await Promise.all([ensureSymbols(), loadDeckCards()]);
     refreshOpinionStaleness();
     renderDeckList();
     renderChat(stickChat);
     renderStats();
+    refreshPrices();
   }
 
   async function saveDeck(next) {
