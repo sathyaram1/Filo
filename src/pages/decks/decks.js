@@ -904,7 +904,7 @@
     // Lo svuotamento sopra fa collassare scrollHeight → il browser clampa
     // scrollTop a 0: se non seguiamo il fondo va ripristinata la posizione, o la
     // vista salterebbe in cima (il sintomo segnalato).
-    log.scrollTop = log.scrollHeight; void follow; void prevTop; // TEMP pre-fix
+    log.scrollTop = follow ? log.scrollHeight : prevTop;
     syncCarouselHighlight();
     preloadVisibleCards();
   }
