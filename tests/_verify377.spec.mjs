@@ -21,19 +21,20 @@ test('377: molte tab strette, una suona -> un solo indicatore, nessun overlay/du
   }, favData);
 
   await expect(shell.locator('.tab.audible')).toHaveCount(1, { timeout: 10_000 });
+  fs.mkdirSync('tests/.shots', { recursive: true });
+  await shell.screenshot({ path: 'tests/.shots/verify377-narrow-tabs.png' });
+
   // Esattamente UN indicatore audio in tutta la barra, zero duplicati a fine riga.
   await expect(shell.locator('.tab .favicon-audible')).toHaveCount(1);
   await expect(shell.locator('.tab .audio-ind')).toHaveCount(0);
-  const svgCount = await shell.locator('.tab .favicon-audible svg').count();
-  expect(svgCount).toBe(1);
-  // Nessuna favicon di sfondo dietro l'icona (niente sovrapposizione).
-  const bg = await shell.locator('.tab .favicon-audible').evaluate((el) => getComputedStyle(el).backgroundImage);
-  expect(bg).toBe('none');
+  await expect(shell.locator('.tab .favicon-audible svg')).toHaveCount(1);
+  // Nessuna favicon di sfondo dietro l'icona (niente sovrapposizione). Poll per
+  // tollerare il ri-render della barra (nodo staccato -> stringa vuota transitoria).
+  await expect.poll(async () => shell.locator('.tab .favicon-audible')
+    .evaluate((el) => getComputedStyle(el).backgroundImage), { timeout: 10_000 })
+    .toBe('none');
   // L'icona resta visibile pur con tab strette.
   const box = await shell.locator('.tab .favicon-audible').boundingBox();
   expect(box.width).toBeGreaterThan(8);
   expect(box.height).toBeGreaterThan(8);
-
-  fs.mkdirSync('tests/.shots', { recursive: true });
-  await shell.screenshot({ path: 'tests/.shots/verify377-narrow-tabs.png' });
 });
