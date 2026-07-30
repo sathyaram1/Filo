@@ -163,6 +163,36 @@ test('#376 — il riferimento in chat PORTA alla scheda aperta in secondo piano 
   expect((await tabsState(app, url)).matching).toHaveLength(1);
 });
 
+test('#376 — se la scheda di sottofondo è stata chiusa, il riferimento riapre il link', async ({ app, testServer, openTab }) => {
+  const page = await openTab(NEWTAB);
+  const url = testServer.html('<!doctype html><title>Podcast</title><h1>podcast</h1>');
+
+  const r = await execAction(app, { type: 'NAVIGA', url, label: 'Podcast', background: true });
+  const tabId = r.output.tabId;
+  await expect.poll(async () => (await tabsState(app, url)).matching.length, { timeout: 8_000 }).toBe(1);
+
+  // L'utente chiude la scheda che suonava dietro.
+  await app.evaluate(({ BrowserWindow }, { id }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoTabs.incognito);
+    win._filoTabs.closeTab(id);
+  }, { id: tabId });
+  await expect.poll(async () => (await tabsState(app, url)).matching.length, { timeout: 6_000 }).toBe(0);
+
+  await page.evaluate(({ url, tabId }) => {
+    const host = document.createElement('div');
+    host.id = 'test-bg-chip-orfano';
+    document.body.appendChild(host);
+    window.__filoDashActions.renderActions(host, [{
+      type: 'NAVIGA', url, label: 'Podcast', _output: { background: true, tabId },
+    }]);
+  }, { url, tabId });
+
+  await page.locator('#test-bg-chip-orfano .dash-action-link-chip').click();
+
+  // SUCCESSO: il riferimento non è morto — riapre il podcast.
+  await expect.poll(async () => (await tabsState(app, url)).matching.length, { timeout: 8_000 }).toBe(1);
+});
+
 test('#376 — Ctrl+click su un link apre la scheda DIETRO (resto dove sto leggendo)', async ({ app, testServer, openTab }) => {
   const target = testServer.html('<!doctype html><title>Approfondimento</title><h1>dietro</h1>');
   const source = testServer.html(`<!doctype html><title>Articolo</title><a id="l" href="${target}">approfondisci</a>`);
