@@ -430,7 +430,16 @@ module.exports = function register(on, ctx) {
     const deck = await Store.get(String(msg?.id || ''));
     if (!deck) return { ok: false, error: 'not_found' };
     try {
-      const card = await Scry.card(String(msg?.scryfallId || ''));
+      // scryfallId vuoto = RIMUOVI il commander (torna a "nessun commander").
+      // È l'inverso di "imposta come commander": senza questo ramo un mazzo
+      // resterebbe bloccato col commander impostato per sbaglio (feedback #302).
+      const wantId = String(msg?.scryfallId || '').trim();
+      if (!wantId) {
+        const cleared = Decks.setCommander(deck, '', null);
+        const saved = await Store.put(cleared);
+        return saved ? { ok: true, deck: saved } : { ok: false, error: 'save_failed' };
+      }
+      const card = await Scry.card(wantId);
       if (!card) return { ok: false, error: 'card_not_found' };
       const next = Decks.setCommander(deck, card.id, {
         name: card.name,
