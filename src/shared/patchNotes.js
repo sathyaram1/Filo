@@ -17,6 +17,9 @@
     // ↓ Nuove versioni in cima.
     {
       version: '0.2.169', date: '2026-07-30',
+      features: [
+        'Nel Red Team ora puoi cliccare un tentativo per aprirne i dettagli: vedi il testo dell’attacco, la sua spiegazione, il giudizio di validità con la motivazione e cosa ha detto ogni giudice.',
+      ],
       fixes: [
         'La lettura ad alta voce ora ti dice quando ripiega sulla voce del browser: se avevi in mente una voce più naturale (a modello) ma non è disponibile — per esempio perché manca la chiave abilitata — Filo te lo segnala invece di leggere con la voce automatica senza spiegazioni. L’avviso compare una sola volta.',
       ],
