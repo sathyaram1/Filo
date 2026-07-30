@@ -1,0 +1,7 @@
+{
+  "id": "6d9415a9-8f1d-439d-a75b-55aec6da6a4c",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la modifica e stata pubblicata. Ora nel deck builder puoi togliere il commander da un mazzo e tornare a «Nessun commander», dal menu del mazzo o col tasto destro sulla riga del commander; la carta che avevi scelto come commander rientra nel mazzo come carta normale, cosi non la perdi.",
+  "queuedAt": "2026-07-30T07:05:44.636Z",
+  "queuedBy": "routine"
+}
