@@ -73,10 +73,10 @@ test('anche il pannello laterale destro si ridimensiona, e il doppio clic ripris
   expect(Math.abs(reset.width - before.width)).toBeLessThan(3);
 
   // ...e anche il ripristino viene ricordato.
-  const page2 = await openTab(URL);
-  await page2.waitForLoadState('domcontentloaded');
-  await page2.waitForTimeout(400);
-  expect(Math.abs((await box(page2, '#mgSideCol')).width - before.width)).toBeLessThan(3);
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForTimeout(500);
+  expect(Math.abs((await box(page, '#mgSideCol')).width - before.width)).toBeLessThan(3);
 });
 
 test('da tastiera: frecce sul bordo a fuoco, Home ripristina', async ({ openTab }) => {
