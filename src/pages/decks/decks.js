@@ -1785,6 +1785,16 @@
     });
 
     $('deckName').addEventListener('click', (e) => { e.stopPropagation(); openSwitcher(); });
+    // Tasto destro sulla riga del commander (§ "il tasto destro è centrale"):
+    // quando un commander è impostato, offre di rimuoverlo direttamente da lì
+    // (feedback #302). Senza commander il menu non ha nulla da offrire.
+    $('commanderLine').addEventListener('contextmenu', (e) => {
+      if (!current || !current.commander) return;
+      e.preventDefault();
+      openCtx(e.clientX, e.clientY, [
+        { label: 'Rimuovi commander', run: () => removeCommander() },
+      ]);
+    });
     wireDividers();
     wireDetailPanel();
 
