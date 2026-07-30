@@ -105,11 +105,24 @@
       const aModel = a.model || model;
       let emitted = false;
       try {
-        const r = await getProvider(a.provider).streamComplete({
-          apiKey: a.apiKey, model: aModel, reasoning: a.reasoning, messages, signal,
-          onDelta: onDelta ? (d) => { emitted = true; onDelta(d); } : onDelta,
-          onReasoning: onReasoning ? (t) => { emitted = true; onReasoning(t); } : onReasoning,
-        });
+        // Ritentativo sui guasti di rete passeggeri (#360). Se lo stream era già
+        // partito (delta o reasoning usciti) il buffer del chiamante va azzerato
+        // prima di ricominciare, esattamente come nel ripiego su un altro
+        // provider (#273): se non sa farlo, non ritentiamo.
+        const r = await withNetworkRetry(
+          () => getProvider(a.provider).streamComplete({
+            apiKey: a.apiKey, model: aModel, reasoning: a.reasoning, messages, signal,
+            onDelta: onDelta ? (d) => { emitted = true; onDelta(d); } : onDelta,
+            onReasoning: onReasoning ? (t) => { emitted = true; onReasoning(t); } : onReasoning,
+          }),
+          () => {
+            if (!emitted) return true;
+            if (!onReset) return false;
+            try { onReset({ failed: a.provider, next: a.provider }); } catch (_) {}
+            emitted = false;
+            return true;
+          },
+        );
         return { ...r, provider: a.provider, model: aModel };
       } catch (err) {
         lastErr = err;
