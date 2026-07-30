@@ -48,6 +48,17 @@ module.exports = function register(on, ctx) {
     return { ok: false, archived: 0 };
   });
 
+  on(MSG.REORDER_TABS, async (msg, sender) => {
+    // "/riordina": riordino cromatico esplicito della striscia, senza archiviare
+    // nulla (a differenza di RUN_TAB_TRIAGE). Gira sul TabManager della finestra.
+    const win = winOf(sender);
+    if (win && win._filoTabs) {
+      const res = win._filoTabs.reorderTabs();
+      return { ok: true, reordered: !!(res && res.reordered) };
+    }
+    return { ok: false, reordered: false };
+  });
+
   on(MSG.TAB_ACTIVITY, async (msg, sender) => {
     // Segnali di attività della tab (§2.1) → merge sullo snapshot.
     const win = winOf(sender);
