@@ -11,7 +11,12 @@
 //
 // API
 //   SN_CHAT_ERRORS.friendly(err, { dataSource })
-//     → stringa pronta da mostrare in chat.
+//     → PROPOSIZIONE con iniziale minuscola, pensata per essere incastonata in
+//       una frase ("Non ha funzionato: <…>"), come fa la chat dei mazzi.
+//   SN_CHAT_ERRORS.sentence(err, { dataSource })
+//     → la stessa cosa come FRASE A SÉ (iniziale maiuscola), per chi mostra
+//       l'errore da solo nella bolla, come la chat della home.
+//
 //   `dataSource` è il nome (per l'utente) dell'archivio esterno che quella chat
 //   interroga oltre al servizio AI, es. { dataSource: 'Scryfall (l\'archivio
 //   delle carte)' }. Serve per attribuire correttamente un errore HTTP "nudo"
@@ -31,7 +36,7 @@
   // ritentare la stessa chiamata ha senso (a differenza di un 400, che
   // ritornerebbe identico).
   const TRANSIENT_NETWORK_RE =
-    /fetch failed|network error|networkerror|ENOTFOUND|EAI_AGAIN|ECONNRESET|ECONNREFUSED|ECONNABORTED|EPIPE|ETIMEDOUT|ETIMEOUT|EHOSTUNREACH|ENETUNREACH|ENETDOWN|socket hang up|other side closed|terminated|timed? ?out|timeout/i;
+    /fetch failed|network error|networkerror|ENOTFOUND|EAI_AGAIN|ECONNRESET|ECONNREFUSED|ECONNABORTED|EPIPE|ETIMEDOUT|EHOSTUNREACH|ENETUNREACH|ENETDOWN|socket hang up|other side closed|timed out|timeout/i;
 
   function messageOf(e) {
     if (!e) return '';
@@ -45,16 +50,18 @@
 
   function isTransientNetwork(e) {
     if (!e) return false;
+    // Annullato da noi (l'utente ha cambiato pagina, nuovo invio): non è un
+    // guasto, e ritentare sarebbe sbagliato.
+    if (e.name === 'AbortError' || e.code === 'ABORT_ERR') return false;
     // Un errore con status HTTP è una RISPOSTA del server: non è un guasto di
     // rete, ritentarlo alla cieca non serve.
     if (Number(e.status) > 0) return false;
     const code = String(e.code || (e.cause && e.cause.code) || '');
     if (code && TRANSIENT_NETWORK_RE.test(code)) return true;
-    if (e.name === 'AbortError') return false; // annullato da noi: mai ritentare
     return TRANSIENT_NETWORK_RE.test(messageOf(e));
   }
 
-  // Errore → frase per l'utente. Mai un codice HTTP nudo, mai un nome di
+  // Errore → proposizione per l'utente. Mai un codice HTTP nudo, mai un nome di
   // endpoint: gli errori con `code` applicativo (NO_API_KEY, LIMIT_REACHED)
   // portano già un messaggio i18n scritto per l'utente e passano invariati.
   function friendly(e, opts) {
@@ -65,7 +72,7 @@
     // Guasto di rete: la prima cosa da controllare è la connessione. Va PRIMA
     // dell'analisi HTTP perché qui non c'è nessuna risposta da interpretare.
     if (isTransientNetwork(e)) {
-      return 'Problema di rete: non sono riuscito a raggiungere il servizio. Controlla la connessione e riprova.';
+      return 'problema di rete: non sono riuscito a raggiungere il servizio. Controlla la connessione e riprova.';
     }
 
     // Errore del SERVIZIO AI (il modello): riconosciuto dal marcatore
@@ -95,15 +102,22 @@
           : `${src} ha rifiutato la ricerca. Riprova riformulando la richiesta con parole diverse.`;
       }
       return status >= 500 || status === 429
-        ? 'Il servizio non risponde al momento. Riprova tra qualche minuto.'
-        : 'La richiesta non è stata accettata. Riprova riformulandola con parole diverse.';
+        ? 'il servizio non risponde al momento. Riprova tra qualche minuto.'
+        : 'la richiesta non è stata accettata. Riprova riformulandola con parole diverse.';
     }
 
     // Qualsiasi altro errore è tecnico e non aiuterebbe l'utente: frase
     // generica in chat, dettaglio nei log.
-    return 'Qualcosa è andato storto. Riprova.';
+    return 'qualcosa è andato storto. Riprova.';
   }
 
-  global.SN_CHAT_ERRORS = { friendly, isTransientNetwork };
+  // Frase a sé stante: la proposizione con l'iniziale maiuscola. Per chi mostra
+  // l'errore da solo nella bolla (chat della home) invece di incastonarlo.
+  function sentence(e, opts) {
+    const s = friendly(e, opts);
+    return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+  }
+
+  global.SN_CHAT_ERRORS = { friendly, sentence, isTransientNetwork };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
