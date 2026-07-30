@@ -1188,7 +1188,14 @@
     });
     bubblesEl.appendChild(userBubble);
 
-    let r = await runFiloTurn({ userMessage: text || 'Descrivi questa immagine.', images: imagesToSend });
+    await runTurnAndContinue({ userMessage: text || 'Descrivi questa immagine.', images: imagesToSend });
+  }
+
+  // Un turno + la sua eventuale prosecuzione autonoma, e il rilascio della barra
+  // di invio. Condiviso tra il primo invio e il "Riprova" della bolla d'errore:
+  // riprovare deve comportarsi ESATTAMENTE come inviare.
+  async function runTurnAndContinue(args) {
+    let r = await runFiloTurn(args);
 
     // Esecuzione autonoma in sequenza: finché Filo ha appena eseguito un comando
     // (e non c'è una conferma in sospeso), gli rimostriamo l'output e lo
@@ -1212,6 +1219,18 @@
 
     // Aggiorna live (potrebbe esserci un timer/sveglia appena creato).
     refreshLive().catch(() => {});
+    return r;
+  }
+
+  // #360 — "Riprova" dalla bolla d'errore: rimanda lo stesso messaggio senza
+  // farlo riscrivere. La bolla d'errore sparisce (il tentativo è ricominciato) e
+  // lo storico è già a posto: un turno fallito non ci ha lasciato niente dentro.
+  async function retryTurn(errBubble, args) {
+    if (sending) return;
+    sending = true;
+    sendBtn.disabled = true;
+    try { errBubble.remove(); } catch (_) {}
+    await runTurnAndContinue(args);
   }
 
   // ===== Image paste / drop (multi-immagine) =====
