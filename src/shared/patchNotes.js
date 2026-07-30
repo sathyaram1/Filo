@@ -20,10 +20,6 @@
       features: [
         'Nuovo comando «/riordina» dalla nuova scheda: riordina al volo tutte le schede aperte per colore, come succede quando riapri Filo, ma senza chiuderne o archiviarne nessuna.',
         'Nel deck builder puoi partire dal commander a parole: se in chat dici che vuoi costruire attorno a un commander (o qual è il commander del mazzo) e il mazzo non ne ha ancora uno, Filo lo imposta da solo e da quel momento le ricerche restano nei suoi colori. Se il mazzo ha già un commander non lo tocca.',
-      ],
-      features: [
-        'Nuovo comando «/riordina» dalla nuova scheda: riordina al volo tutte le schede aperte per colore, come succede quando riapri Filo, ma senza chiuderne o archiviarne nessuna.',
-        'Nel deck builder puoi partire dal commander a parole: se in chat dici che vuoi costruire attorno a un commander (o qual è il commander del mazzo) e il mazzo non ne ha ancora uno, Filo lo imposta da solo e da quel momento le ricerche restano nei suoi colori. Se il mazzo ha già un commander non lo tocca.',
         'Quando Filo ti dice che una cosa non sa farla, o che non ha un dato che gli hai chiesto, ora ti prepara lui la segnalazione per chi sviluppa Filo: la trovi già scritta nella sua risposta, ti basta confermarla (o ignorarla).',
       ],
       fixes: [
