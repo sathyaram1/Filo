@@ -758,6 +758,18 @@
     return wrap;
   }
 
+  // #376 — traccia di un PASSO INTERMEDIO (cerco sul web, leggo un file,
+  // verifico cosa so fare). Racconta cosa sta facendo Filo, ma non è un bottone:
+  // niente pill né bordo, così l'unica cosa cliccabile nella conversazione resta
+  // il risultato vero (il link aperto). Prima queste tracce avevano la stessa
+  // forma dei bottoni e l'utente ne contava due per una singola azione.
+  function stepTrace(text) {
+    const el = document.createElement('div');
+    el.className = 'dash-action-step';
+    el.textContent = String(text || '').trim();
+    return el;
+  }
+
   function renderActionButton(a, { onAck } = {}) {
     const type = String(a.type || '').toUpperCase();
     // Azione sospesa in attesa di conferma (#146.2): il main non l'ha eseguita
