@@ -304,6 +304,9 @@
     const budget = (current.budget !== null && current.budget !== undefined)
       ? ` · Budget: ${fmtBudgetShort(current.budget)} €` : '';
     $('commanderLine').textContent = commander + budget;
+    // Suggerisce, senza ingombrare, come tornare indietro (feedback #302).
+    $('commanderLine').title = current.commander
+      ? 'Tasto destro per rimuovere il commander' : '';
     $('deckCount').textContent = `${Decks.deckCount(current)}/100 carte`;
     await Promise.all([ensureSymbols(), loadDeckCards()]);
     refreshOpinionStaleness();
