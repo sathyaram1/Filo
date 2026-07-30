@@ -1187,8 +1187,11 @@ function maybeProposeFeedbackAction({ textReply, rawActions, userMessage, thread
     const AF = globalThis.SN_AUTO_FEEDBACK;
     if (!AF || typeof AF.composeProposal !== 'function') return null;
     const isFeedbackAction = (a) => a && String(a.type || '').toUpperCase() === 'INVIA_FEEDBACK';
-    // Filo l'ha già proposta di suo in questo turno: niente da aggiungere.
-    if (Array.isArray(rawActions) && rawActions.some(isFeedbackAction)) return null;
+    // Un turno in cui Filo AGISCE non è un turno in cui ammette una mancanza: la
+    // proposta va solo sulle risposte "a mani vuote". Serve anche a non
+    // interrompere le sequenze automatiche — un'azione in attesa di conferma
+    // mette in pausa la prosecuzione (comando → output → comando successivo).
+    if (Array.isArray(rawActions) && rawActions.length) return null;
     // Una proposta per conversazione: se in un turno precedente è già comparsa,
     // insistere trasformerebbe la chat in un modulo di reclami.
     const prior = Array.isArray(threadHistory) ? threadHistory : [];
