@@ -103,7 +103,11 @@
     deleteBtn.type = 'button';
     deleteBtn.textContent = I18n.t('options_category_delete');
     deleteBtn.addEventListener('click', async () => {
-      if (!confirm(I18n.t('options_category_delete_confirm', cat.name))) return;
+      const text = I18n.t('options_category_delete_confirm', cat.name);
+      const ok = window.SN_CONFIRM_UI
+        ? await window.SN_CONFIRM_UI.confirm({ title: I18n.t('options_category_delete'), text, okLabel: I18n.t('options_category_delete') })
+        : window.confirm(text); // fallback se il modulo non è caricato
+      if (!ok) return;
       await chrome.runtime.sendMessage({ type: MSG.DELETE_CATEGORY, id: cat.id });
       await renderCategories();
     });
