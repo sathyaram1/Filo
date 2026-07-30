@@ -16,6 +16,12 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.170', date: '2026-07-30',
+      features: [
+        'Nel deck builder puoi partire dal commander a parole: se in chat dici che vuoi costruire attorno a un commander (o qual è il commander del mazzo) e il mazzo non ne ha ancora uno, Filo lo imposta da solo e da quel momento le ricerche restano nei suoi colori. Se il mazzo ha già un commander non lo tocca.',
+      ],
+    },
+    {
       version: '0.2.169', date: '2026-07-30',
       features: [
         'Nel Red Team ora puoi cliccare un tentativo per aprirne i dettagli: vedi il testo dell’attacco, la sua spiegazione, il giudizio di validità con la motivazione e cosa ha detto ogni giudice.',
