@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.171', date: '2026-07-30',
+      features: [
+        'Nella dashboard di gestione le tre colonne (elenco, conversazione, pannello laterale) ora si ridimensionano a piacere: trascina la linea che le separa per dare più spazio a quella che ti serve. La disposizione scelta viene ricordata, un doppio clic sulla stessa linea riporta la colonna alla misura iniziale e con le frecce della tastiera la regoli senza mouse.',
+      ],
+      fixes: [],
+    },
+    {
       version: '0.2.170', date: '2026-07-30',
       features: [
         'Nuovo comando «/riordina» dalla nuova scheda: riordina al volo tutte le schede aperte per colore, come succede quando riapri Filo, ma senza chiuderne o archiviarne nessuna.',
