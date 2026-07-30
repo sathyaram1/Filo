@@ -19,8 +19,11 @@
       version: '0.2.171', date: '2026-07-30',
       features: [
         'Nella dashboard di gestione le tre colonne (elenco, conversazione, pannello laterale) ora si ridimensionano a piacere: trascina la linea che le separa per dare più spazio a quella che ti serve. La disposizione scelta viene ricordata, un doppio clic sulla stessa linea riporta la colonna alla misura iniziale e con le frecce della tastiera la regoli senza mouse.',
+        'Quando chiedi a Filo di farti ascoltare qualcosa (una canzone, una radio, un podcast) la scheda si apre in secondo piano e la musica parte lo stesso: resti dove sei, e il riferimento nella conversazione ti porta a quella scheda quando vuoi. Vale anche se chiedi di aprire qualcosa "senza cambiare scheda".',
       ],
-      fixes: [],
+      fixes: [
+        'Nella chat della nuova scheda i passaggi intermedi di Filo (la ricerca sul web, la lettura di un file) non hanno più la forma di un bottone: restano scritti come traccia di cosa sta facendo, così l’unica cosa da cliccare è il risultato vero.',
+      ],
     },
     {
       version: '0.2.170', date: '2026-07-30',
