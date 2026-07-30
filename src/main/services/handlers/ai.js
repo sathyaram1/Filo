@@ -158,6 +158,7 @@ module.exports = function register(on, ctx) {
             apiKey: a.apiKey, model: a.model, text, voice,
           });
           if (key) ttsCache.set(key, { audioBase64: r.audioBase64, mimeType: r.mimeType });
+          ttsFallbackAnnounced = false; // sintesi riuscita: riarma l'avviso
           return {
             ok: true,
             audioBase64: r.audioBase64,
@@ -170,9 +171,9 @@ module.exports = function register(on, ctx) {
           console.warn('[SN] TTS gemini fallito:', e.message || e);
         }
       }
-      return { ok: false, error: (lastErr && lastErr.message) || 'tts_failed' };
+      return ttsFallback((lastErr && lastErr.message) || 'tts_failed');
     } catch (e) {
-      return { ok: false, error: e?.message || String(e) };
+      return ttsFallback(e?.message || String(e));
     }
   });
 
