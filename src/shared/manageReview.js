@@ -268,24 +268,64 @@
     return status; // attack | spam | design | suspicious_file
   }
 
+  // ── Sicurezza-conservativa: la categoria PIÙ ALTA, non la maggioritaria ────
+  // I giudici possono dissentire: alcuni vedono un attacco, la maggioranza no.
+  // La dashboard NON deve seguire la maggioranza — deve far emergere la categoria
+  // di sicurezza più alta segnalata anche da UN SOLO giudice, perché un falso
+  // negativo (attacco mostrato come allineato/design) è molto più costoso di un
+  // falso positivo (che finisce comunque in revisione umana, non blocca nessuno).
+  // Stesso spirito del guard red-team di listBoardTab, che legge APPOSTA i
+  // verdetti grezzi (non lo status) per non dare mai visibilità a materiale
+  // segnalato. Solo attack/spam/design sono categorie di verdetto di rischio:
+  // `unfiltered`/`loop`/`suspicious_file` vengono dallo status/gate-file, non da
+  // un singolo giudice, e restano più severi (severità 4-5 > attack 3).
+  const VERDICT_RISK = { attack: 'attack', spam: 'spam', design: 'design' };
+  function worstVerdictBlock(fb) {
+    const p = fb && fb.pipeline;
+    const verdicts = (p && Array.isArray(p.verdicts)) ? p.verdicts : [];
+    let worst = null;
+    for (const v of verdicts) {
+      const reason = v && VERDICT_RISK[v.class];
+      if (!reason) continue;
+      const info = REASONS[reason];
+      if (!worst || info.severity > worst.severity) worst = { reason, ...info };
+    }
+    return worst;
+  }
+
   /**
-   * Classifica un feedback per la colonna Revisione/Ricevuti. Deriva SOLO dallo
-   * status normalizzato (lookup sul vocabolario): torna { reason, color,
-   * severity, label } per gli stati di revisione umana, null per tutto il resto
-   * (aligned incluso: non è una segnalazione di rischio, ha il suo badge blu).
+   * Classifica un feedback per la colonna Revisione/Ricevuti. Deriva dallo status
+   * normalizzato (lookup sul vocabolario), poi applica l'escalation
+   * sicurezza-conservativa: se un singolo giudice ha votato una categoria di
+   * rischio PIÙ ALTA dell'aggregato, la dashboard mostra QUELLA. Torna
+   * { reason, color, severity, label } per gli stati di revisione umana, null per
+   * tutto il resto. `aligned` di per sé non è una segnalazione (badge blu), MA se
+   * un giudice ha segnalato un rischio va mostrato con quella categoria: un
+   * "allineato" con un voto di attacco resta da guardare, non è approvabile in blocco.
+   *
+   * L'escalation vale SOLO per gli stati "Ricevuti" (in revisione umana): un
+   * feedback già accettato dall'owner (todo/…) o chiuso non si ri-segnala — la
+   * decisione umana/di lavorazione ha superato i verdetti dei giudici.
    */
   function classifyBlock(fb) {
     const fs = FS();
     const { status, statusReason } = normalizeStatus(fb);
-    if (status === 'aligned') return null;
+    if (status === 'aligned') return worstVerdictBlock(fb);
     const info = fs.STATUSES[status];
     if (!info || info.tab !== 'inbox') return null;
-    return { reason: reasonOf(status, statusReason), color: info.color, severity: info.severity, label: info.label };
+    const base = { reason: reasonOf(status, statusReason), color: info.color, severity: info.severity, label: info.label };
+    const worst = worstVerdictBlock(fb);
+    if (worst && worst.severity > base.severity) return worst;
+    return base;
   }
 
   // "Allineato" = status normalizzato `aligned` (badge blu, aspetta approvazione).
+  // Ma se anche un solo giudice ha segnalato un rischio (attack/spam/design), NON
+  // è allineato: non deve finire nell'approvazione in blocco degli allineati —
+  // resta da esaminare (classifyBlock lo mostra con la sua categoria di rischio).
   function isAligned(fb) {
-    return normalizeStatus(fb).status === 'aligned';
+    if (normalizeStatus(fb).status !== 'aligned') return false;
+    return !worstVerdictBlock(fb);
   }
 
   // ── Approvazione: cosa può stare "In coda" ────────────────────────────────

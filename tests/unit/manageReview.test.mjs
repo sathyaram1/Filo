@@ -164,6 +164,77 @@ test('classifyBlock: spam vince su design', () => {
   assert.notEqual(r.reason, 'design');
 });
 
+// ── Sicurezza-conservativa: categoria PIÙ ALTA, non maggioritaria ───────────
+
+test('classifyBlock: un solo giudice attacco tra tanti allineati → attacco (non maggioranza)', () => {
+  // 3 allineati + 1 attacco: l'aggregato del backend dice "aligned", ma la
+  // dashboard deve segnalarlo ROSSO (categoria di sicurezza più alta).
+  const verdicts = [
+    { judge: 'fixed_1', class: 'aligned' },
+    { judge: 'fixed_2', class: 'aligned' },
+    { judge: 'fixed_3', class: 'aligned' },
+    { judge: 'dynamic', class: 'attack' },
+  ];
+  const r = MR.classifyBlock({ status: 'aligned', pipeline: { l2Class: 'aligned', verdicts } });
+  assert.equal(r.reason, 'attack');
+  assert.equal(r.color, '#c0392b');
+  assert.equal(r.severity, 3);
+});
+
+test('classifyBlock: aggregato design ma un giudice attacco → escala ad attacco', () => {
+  const verdicts = [
+    { judge: 'fixed_1', class: 'design' },
+    { judge: 'fixed_2', class: 'design' },
+    { judge: 'fixed_3', class: 'design' },
+    { judge: 'dynamic', class: 'attack' },
+  ];
+  const r = MR.classifyBlock({ pipeline: { l2Class: 'design', verdicts } });
+  assert.equal(r.reason, 'attack');
+});
+
+test('classifyBlock: aggregato design ma un giudice spam → escala a spam (non oltre)', () => {
+  const verdicts = [
+    { judge: 'fixed_1', class: 'design' },
+    { judge: 'fixed_2', class: 'design' },
+    { judge: 'fixed_3', class: 'spam' },
+    { judge: 'dynamic', class: 'design' },
+  ];
+  const r = MR.classifyBlock({ pipeline: { l2Class: 'design', verdicts } });
+  assert.equal(r.reason, 'spam');
+});
+
+test('classifyBlock: nessun dissenso di rischio → resta la categoria dell aggregato', () => {
+  const verdicts = ['fixed_1', 'fixed_2', 'fixed_3', 'dynamic'].map((j) => ({ judge: j, class: 'design' }));
+  const r = MR.classifyBlock({ pipeline: { l2Class: 'design', verdicts } });
+  assert.equal(r.reason, 'design'); // nessun voto più severo
+});
+
+test('classifyBlock: non-filtrato (bianco) resta bianco anche con un voto attacco', () => {
+  // unfiltered (sev 4) > attack (sev 3): il filtraggio inaffidabile ha priorità,
+  // l escalation non lo declassa.
+  const verdicts = [{ judge: 'fixed_1', class: 'attack' }];
+  const r = MR.classifyBlock({ pipeline: { l2Unfiltered: true, l2Class: 'aligned', verdicts } });
+  assert.equal(r.reason, 'unfiltered');
+});
+
+test('classifyBlock: dissenso di rischio NON ri-segnala un feedback già accettato (todo)', () => {
+  // L owner ha accettato → todo (In coda). I verdetti dei giudici non lo
+  // riportano tra i Ricevuti: la decisione umana ha superato il panel.
+  const verdicts = [{ judge: 'dynamic', class: 'attack' }];
+  assert.equal(MR.classifyBlock({ status: 'todo', pipeline: { verdicts } }), null);
+  assert.equal(MR.classifyBlock({ reviewDecision: 'accepted', pipeline: { action: 'block_attack', verdicts } }), null);
+});
+
+test('isAligned: allineato con un voto di attacco → NON allineato (fuori dal bulk-approve)', () => {
+  const verdicts = [
+    { judge: 'fixed_1', class: 'aligned' },
+    { judge: 'fixed_2', class: 'aligned' },
+    { judge: 'fixed_3', class: 'aligned' },
+    { judge: 'dynamic', class: 'attack' },
+  ];
+  assert.equal(MR.isAligned({ status: 'aligned', pipeline: { l2Class: 'aligned', verdicts } }), false);
+});
+
 test('classifyBlock: reviewDecision=accepted → null anche con pipeline di blocco', () => {
   // L'override dell'owner vince su qualsiasi verdetto: il feedback esce dai bloccati.
   assert.equal(MR.classifyBlock({ reviewDecision: 'accepted', pipeline: { action: 'block_attack' } }), null);
