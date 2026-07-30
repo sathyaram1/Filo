@@ -17,6 +17,9 @@
     // ↓ Nuove versioni in cima.
     {
       version: '0.2.170', date: '2026-07-30',
+      features: [
+        'Nuovo comando «/riordina» dalla nuova scheda: riordina al volo tutte le schede aperte per colore, come succede quando riapri Filo, ma senza chiuderne o archiviarne nessuna.',
+      ],
       fixes: [
         'Nel deck builder ora puoi scorrere la chat mentre Filo sta generando: la vista non torna più da sola in fondo (o in cima) a ogni aggiornamento, così puoi leggere con calma il ragionamento e i risultati man mano che arrivano. Se invece resti in fondo, la chat continua a seguire i nuovi contenuti da sola.',
       ],
