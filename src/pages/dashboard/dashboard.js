@@ -1135,6 +1135,19 @@
     pending.remove();
     if (!r?.ok) {
       const err = makeBubble({ role: 'filo', text: r?.error || 'Errore.' });
+      // #360 — la bolla d'errore dice "riprova": darglielo da fare a mano
+      // (riscrivere la domanda) è attrito inutile. Il tasto rimanda LO STESSO
+      // messaggio, come il "Riprova" della pagina d'errore di una scheda.
+      const row = document.createElement('div');
+      row.className = 'dash-bubble-actions';
+      const retry = document.createElement('button');
+      retry.type = 'button';
+      retry.className = 'dash-action-btn dash-action-btn-primary';
+      retry.textContent = '↻ Riprova';
+      retry.title = 'Rimanda lo stesso messaggio';
+      retry.addEventListener('click', () => retryTurn(err, { userMessage, images, internal }));
+      row.appendChild(retry);
+      err.appendChild(row);
       bubblesEl.appendChild(err);
     } else {
       const filoBubble = makeBubble({ role: 'filo', text: r.text || '' });
