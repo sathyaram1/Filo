@@ -189,7 +189,7 @@ test('STRESS: preferenze salvate assurde/corrotte non rompono il layout', async 
     console.log('pref', JSON.stringify(bad), '→ lista', Math.round(list.width), 'dettaglio', Math.round(detail.width), 'laterale', Math.round(side.width), 'grid', Math.round(grid.width));
     expect(list.width).toBeGreaterThan(80);
     expect(side.width).toBeGreaterThan(80);
-    expect(detail.width).toBeGreaterThan(100);
+    expect(detail.width).toBeGreaterThan(250);
     expect(list.x + list.width).toBeLessThanOrEqual(detail.x + 1);
     expect(detail.x + detail.width).toBeLessThanOrEqual(side.x + 1);
     expect(side.x + side.width).toBeLessThanOrEqual(grid.x + grid.width + 2);
