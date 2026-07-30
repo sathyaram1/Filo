@@ -23,6 +23,7 @@
       fixes: [
         'La lettura ad alta voce ora ti dice quando ripiega sulla voce del browser: se avevi in mente una voce più naturale (a modello) ma non è disponibile — per esempio perché manca la chiave abilitata — Filo te lo segnala invece di leggere con la voce automatica senza spiegazioni. L’avviso compare una sola volta.',
         'Nel deck builder ora puoi togliere il commander da un mazzo e tornare a «Nessun commander»: lo trovi nel menu del mazzo e col tasto destro sulla riga del commander. La carta che avevi scelto rientra nel mazzo, così non la perdi.',
+        'La protezione anti-tracciamento ora resta attiva mentre navighi su siti come GitHub, X, Discord o Facebook, e si sospende solo sulle loro pagine di accesso: prima veniva disattivata sull’intero sito.',
       ],
     },
     {
