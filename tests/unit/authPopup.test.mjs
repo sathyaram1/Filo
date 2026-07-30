@@ -45,3 +45,49 @@ test('input non validi → false (nessun crash, nessun falso positivo)', () => {
   assert.equal(isAuthPopup('javascript:alert(1)'), false);
   assert.equal(isAuthPopup('about:blank'), false);
 });
+
+// isIdentityAuthSurface — decide COSA esentare dal rumore anti-fingerprint (#209).
+// A differenza di isAuthPopup, sugli host PRODOTTO (github, x, discord, facebook…)
+// esenta solo la superficie di accesso; sugli host dedicati esenta l'intero host.
+
+test('host dedicati all\'autenticazione: intero host è superficie di accesso', () => {
+  assert.equal(isIdentityAuthSurface('https://accounts.google.com/o/oauth2/v2/auth?client_id=x'), true);
+  assert.equal(isIdentityAuthSurface('https://accounts.google.com/ManageAccount'), true);
+  assert.equal(isIdentityAuthSurface('https://login.microsoftonline.com/common/oauth2/authorize'), true);
+  assert.equal(isIdentityAuthSurface('https://appleid.apple.com/'), true);
+  assert.equal(isIdentityAuthSurface('https://auth.openai.com/log-in'), true);
+  // Infra auth via suffisso (Auth0/Okta/…): intero host esente.
+  assert.equal(isIdentityAuthSurface('https://acme.auth0.com/u/login'), true);
+  assert.equal(isIdentityAuthSurface('https://tenant.b2clogin.com/anything'), true);
+});
+
+test('host prodotto: esente SOLO sulla superficie di accesso (login/OAuth)', () => {
+  // Accesso → esente.
+  assert.equal(isIdentityAuthSurface('https://github.com/login'), true);
+  assert.equal(isIdentityAuthSurface('https://github.com/login/oauth/authorize?client_id=x'), true);
+  assert.equal(isIdentityAuthSurface('https://x.com/i/flow/login'), true);
+  assert.equal(isIdentityAuthSurface('https://discord.com/oauth2/authorize?client_id=1&redirect_uri=2'), true);
+  assert.equal(isIdentityAuthSurface('https://slack.com/signin'), true);
+  assert.equal(isIdentityAuthSurface('https://gitlab.com/users/sign_in'), true);
+  // Navigazione pubblica → NON esente (torna protetta dal rumore).
+  assert.equal(isIdentityAuthSurface('https://github.com/torvalds/linux'), false);
+  assert.equal(isIdentityAuthSurface('https://x.com/home'), false);
+  assert.equal(isIdentityAuthSurface('https://discord.com/channels/@me'), false);
+  assert.equal(isIdentityAuthSurface('https://www.facebook.com/marketplace'), false);
+});
+
+test('host prodotto: parametri OAuth in query bastano a esentare la superficie di accesso', () => {
+  assert.equal(isIdentityAuthSurface('https://github.com/x?client_id=1&redirect_uri=2'), true);
+});
+
+test('host sconosciuti non sono mai esenti, nemmeno con path/query da login', () => {
+  assert.equal(isIdentityAuthSurface('https://esempio-qualsiasi.com/login'), false);
+  assert.equal(isIdentityAuthSurface('https://evil.com/track?client_id=1&redirect_uri=2'), false);
+});
+
+test('isIdentityAuthSurface: input non validi → false', () => {
+  assert.equal(isIdentityAuthSurface(''), false);
+  assert.equal(isIdentityAuthSurface(null), false);
+  assert.equal(isIdentityAuthSurface('javascript:alert(1)'), false);
+  assert.equal(isIdentityAuthSurface('about:blank'), false);
+});
