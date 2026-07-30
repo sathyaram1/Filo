@@ -1,7 +1,0 @@
-{
-  "id": "Hp0XforkRQvwpZCMTXly",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica e stata pubblicata. Ora, quando una scheda sta riproducendo audio, l'icona dell'altoparlante prende semplicemente il posto dell'icona del sito invece di comparirci sopra o ripetersi due volte. Resta un unico indicatore, chiaro e sempre visibile anche con molte schede aperte e poco spazio.",
-  "queuedAt": "2026-07-30T21:31:37.324Z",
-  "queuedBy": "routine"
-}
