@@ -926,7 +926,7 @@
     msgs.push({ who: 'user', text });
     const bot = { who: 'bot', pending: true };
     msgs.push(bot);
-    renderChat();
+    renderChat(true); // nuovo turno: porta la vista in fondo per mostrarlo
     // Ragionamento in diretta (#331): mentre il modello pensa, i chunk di CoT
     // arrivano sul canale filo:reasoning e riempiono la bolla "sta pensando"
     // (render con throttle: i chunk possono essere fitti).
