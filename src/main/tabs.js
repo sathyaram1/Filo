@@ -1898,11 +1898,21 @@ class TabManager {
   async restoreSession() {
     if (this.incognito) return false; // incognito: nessuna sessione da ripristinare
     let urls = [];
+    let colors = [];
     let activeIndex = 0;
     try {
       const saved = await globalThis.SN_STORAGE?.getRaw?.(this._sessionKey(), null);
       if (saved && Array.isArray(saved.tabs)) {
-        urls = saved.tabs.filter((u) => typeof u === 'string' && u);
+        // Filtro url + colori in lockstep così `colors[i]` resta allineato al
+        // tab ripristinato in posizione i (un ripristino vecchio senza `colors`
+        // dà semplicemente colori tutti null).
+        const savedColors = Array.isArray(saved.colors) ? saved.colors : [];
+        saved.tabs.forEach((u, i) => {
+          if (typeof u === 'string' && u) {
+            urls.push(u);
+            colors.push(savedColors[i] || null);
+          }
+        });
         if (Number.isInteger(saved.activeIndex)) activeIndex = saved.activeIndex;
       }
     } catch (_) {}
@@ -1912,7 +1922,14 @@ class TabManager {
     try {
       // #145 — suppressAutoplay: i media delle tab ripristinate restano in pausa
       // al boot (niente più video YouTube che ripartono tutti insieme).
-      for (const url of urls) this.openTab(url, { activate: false, suppressAutoplay: true });
+      urls.forEach((url, i) => {
+        const id = this.openTab(url, { activate: false, suppressAutoplay: true });
+        // §1.2/§1.3 — ripristina subito il colore identità salvato: la barra
+        // riparte già tinta e il riordino cromatico alla riapertura ha i dati
+        // pronti senza attendere il ricalcolo dei content script. Seeda anche la
+        // cache per host, così una did-navigate sullo stesso dominio lo conserva.
+        if (id && colors[i]) this.setTabIdentityColor(id, colors[i]);
+      });
       if (activeIndex < 0 || activeIndex >= this.tabs.length) activeIndex = this.tabs.length - 1;
       const target = this.tabs[activeIndex];
       if (target) this.activate(target.id);
