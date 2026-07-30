@@ -163,6 +163,26 @@ test('#376 — il riferimento in chat PORTA alla scheda aperta in secondo piano 
   expect((await tabsState(app, url)).matching).toHaveLength(1);
 });
 
+test('#376 — Ctrl+click su un link apre la scheda DIETRO (resto dove sto leggendo)', async ({ app, testServer, openTab }) => {
+  const target = testServer.html('<!doctype html><title>Approfondimento</title><h1>dietro</h1>');
+  const source = testServer.html(`<!doctype html><title>Articolo</title><a id="l" href="${target}">approfondisci</a>`);
+  const page = await openTab(source);
+  await page.waitForSelector('#l');
+
+  const before = await tabsState(app, target);
+  expect(before.matching).toHaveLength(0);
+
+  // Ctrl+click = "aprilo dietro": è il gesto universale del browser.
+  await page.click('#l', { modifiers: ['Control'] });
+
+  // SUCCESSO: la scheda nasce (il link è stato aperto)…
+  await expect.poll(async () => (await tabsState(app, target)).matching.length, { timeout: 8_000 }).toBe(1);
+  // …ma l'utente è rimasto sull'articolo che stava leggendo.
+  const after = await tabsState(app, target);
+  expect(after.activeId).toBe(before.activeId);
+  expect(after.activeUrl).toBe(source);
+});
+
 test('#376 — i passi intermedi di Filo non sono bottoni (una sola cosa cliccabile)', async ({ openTab }) => {
   const page = await openTab(NEWTAB);
 
