@@ -1,7 +1,0 @@
-{
-  "id": "lmj8Zv698Pq9KxLycMNg",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica e stata pubblicata. Ora la dashboard fa emergere sempre la categoria di rischio piu alta segnalata anche da un solo giudice: un feedback etichettato come allineato dall'aggregato, ma con un voto di attacco/spam, viene mostrato con quella segnalazione e resta fuori dall'approvazione in blocco, cosi nulla di potenzialmente pericoloso passa inosservato.",
-  "queuedAt": "2026-07-30T16:12:32.434Z",
-  "queuedBy": "routine"
-}
