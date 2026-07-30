@@ -19,6 +19,7 @@
       version: '0.2.172', date: '2026-07-30',
       fixes: [
         'Quando una scheda sta riproducendo audio, l’icona dell’altoparlante prende semplicemente il posto della sua icona del sito, invece di comparirci sopra o di ripetersi due volte: resta un solo indicatore, chiaro e sempre visibile anche con molte schede aperte e poco spazio.',
+        'Nel deck builder le carte del mazzo compaiono subito quando apri un mazzo, senza dover aspettare: i prezzi si aggiornano da soli poco dopo, in secondo piano.',
       ],
     },
     {
