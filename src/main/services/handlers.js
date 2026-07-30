@@ -1173,12 +1173,52 @@ function fileReadsForPrompt(actions) {
   return blocks.join('\n\n').trim();
 }
 
+// #360 — Filo propone LUI la segnalazione quando ammette una mancanza.
+// Prima toccava all'utente accorgersene e chiedere ("mandane una segnalazione"):
+// se non lo faceva, il buco non arrivava a nessuno. Ora, quando la risposta dice
+// "non posso / non ho accesso a…" e Filo NON ha già emesso una segnalazione di
+// suo, gliela mettiamo in bocca noi: l'azione arriva in chat come segnalazione
+// già scritta col tasto di conferma (livello 2 → niente parte senza l'OK).
+//
+// Deterministico di proposito: il prompt chiede al modello di farlo da sé, ma un
+// invariante come questo non può dipendere dall'umore di un LLM.
+function maybeProposeFeedbackAction({ textReply, rawActions, userMessage, threadHistory }) {
+  try {
+    const AF = globalThis.SN_AUTO_FEEDBACK;
+    if (!AF || typeof AF.composeProposal !== 'function') return null;
+    const isFeedbackAction = (a) => a && String(a.type || '').toUpperCase() === 'INVIA_FEEDBACK';
+    // Filo l'ha già proposta di suo in questo turno: niente da aggiungere.
+    if (Array.isArray(rawActions) && rawActions.some(isFeedbackAction)) return null;
+    // Una proposta per conversazione: se in un turno precedente è già comparsa,
+    // insistere trasformerebbe la chat in un modulo di reclami.
+    const prior = Array.isArray(threadHistory) ? threadHistory : [];
+    if (prior.some((m) => Array.isArray(m && m.actions) && m.actions.some(isFeedbackAction))) return null;
+    // L'utente ha appena chiesto lui una segnalazione: il turno normale la
+    // gestisce già, non ne serve una seconda.
+    if (/feedback|segnala/i.test(String(userMessage || ''))) return null;
+
+    const Caps = globalThis.SN_CAPABILITIES;
+    const analysis = AF.analyzeReply(textReply, rawActions, userMessage, Caps ? Caps.all() : []);
+    if (!analysis || !analysis.kind) return null;
+    return AF.composeProposal(analysis, { userMessage, textReply });
+  } catch (e) {
+    console.warn('[#360] proposta di segnalazione non composta:', e?.message || e);
+    return null;
+  }
+}
+
 // F4 — invia un feedback autonomo in background se la risposta segnala un gap
 // di capacità o una lamentela. Non blocca mai il flusso della chat.
 // Privacy: invia solo una descrizione GENERICA (nessun URL, nessun testo utente).
 // Undo: manda un toast con azione "Annulla" che cancella il feedback appena creato.
-async function maybeAutoFeedback({ textReply, rawActions, userMessage, sender }) {
+//
+// `proposed`: in questo turno Filo ha già messo in chat una segnalazione da
+// confermare (#360). In quel caso NON mandiamo anche quella anonima: sarebbero
+// due segnalazioni per lo stesso buco, e quella che l'utente autorizza è più
+// utile (dice cosa aveva chiesto) di quella generica.
+async function maybeAutoFeedback({ textReply, rawActions, userMessage, sender, proposed = false }) {
   try {
+    if (proposed) return;
     const AF = globalThis.SN_AUTO_FEEDBACK;
     const FB = globalThis.SN_FEEDBACK;
     if (!AF || !FB || typeof FB.submit !== 'function') return;
