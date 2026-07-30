@@ -1,0 +1,7 @@
+{
+  "id": "E5fL8wKSg3rpaMY1HgVj",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la modifica è stata pubblicata. Ora, quando il parere di Filo su un feedback risultava interrotto a metà frase, viene mostrato il parere completo ricostruito dai giudizi, senza più frasi tronche.",
+  "queuedAt": "2026-07-30T06:49:56.655Z",
+  "queuedBy": "routine"
+}
