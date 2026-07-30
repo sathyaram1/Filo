@@ -114,10 +114,11 @@ test('#376 — il brano parte DAVVERO nella scheda aperta in secondo piano', asy
 
   // …eppure il media è partito lì dentro (è il punto della richiesta: la musica
   // parte senza che l'utente debba andarci).
-  const bgPage = await expect.poll(
-    () => app.windows().find((w) => { try { return w.url() === url; } catch (_) { return false; } }) || null,
-    { timeout: 8_000 },
-  ).not.toBe(null).then(() => app.windows().find((w) => { try { return w.url() === url; } catch (_) { return false; } }));
+  let bgPage = null;
+  await expect.poll(() => {
+    bgPage = app.windows().find((w) => { try { return w.url() === url; } catch (_) { return false; } }) || null;
+    return !!bgPage;
+  }, { timeout: 8_000 }).toBe(true);
 
   await expect.poll(async () => {
     try { return await bgPage.evaluate(() => window.__statoAudio && window.__statoAudio().testo); } catch (_) { return null; }
