@@ -1,8 +1,9 @@
-// Feedback #2: la cronologia AI era raggiungibile solo dalla griglia "App",
-// quindi sembrava "non funzionare". L'utente ha chiesto di metterla come
-// pulsante in alto a destra nella home. Questo test ASSERISCE che:
+// Feedback #2 + #281: la cronologia dev'essere un pulsante in alto a destra nella
+// home. Con #281 la pagina PRINCIPALE di cronologia è quella delle schede
+// visitate/chiuse (filo://archive), non più il log delle azioni AI (che resta
+// raggiungibile da lì come "Cronologia AI"). Questo test ASSERISCE che:
 //   1) tra i controlli in alto a destra della home esiste un pulsante Cronologia;
-//   2) cliccandolo si apre davvero la pagina filo://history/history.html.
+//   2) cliccandolo si apre davvero la pagina della cronologia schede (filo://archive).
 // Senza il pulsante (o se aprisse altro), il test è rosso.
 
 import { test, expect } from './fixtures/electron.mjs';
