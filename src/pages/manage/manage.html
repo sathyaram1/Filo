@@ -175,10 +175,14 @@
     .mg-log-abs { margin-left: auto; color: var(--sn-muted); font-size: 12px; }
 
     /* ── Layout 3 colonne della sezione Revisione ──────────────────────── */
+    /* Le due colonne esterne hanno larghezza fissa, decisa dall'utente
+       trascinando i divisori (JS riscrive grid-template-columns e persiste le
+       misure); la colonna centrale assorbe il resto. I 12px dei divisori
+       fanno anche da spaziatura fra le colonne → gap: 0. */
     .mg-review {
       display: grid;
-      grid-template-columns: 220px 1fr 280px;
-      gap: 12px;
+      grid-template-columns: 220px 12px minmax(0, 1fr) 12px 280px;
+      gap: 0;
       height: calc(100vh - 180px);
       min-height: 300px;
     }
@@ -186,6 +190,24 @@
       display: flex; flex-direction: column;
       border: 1px solid var(--sn-border); border-radius: 8px;
       overflow: hidden;
+      min-width: 0;
+    }
+    /* Divisore trascinabile: invisibile a riposo (le colonne hanno già il loro
+       bordo, una terza linea sarebbe rumore) e tinto d'accento all'hover o
+       mentre lo si trascina, così l'utente vede che è una presa. */
+    .mg-divider {
+      cursor: col-resize;
+      background: transparent;
+      border-radius: 2px;
+      transition: background 0.1s;
+    }
+    .mg-divider:hover, .mg-divider.mg-divider--dragging {
+      background: var(--sn-accent);
+      opacity: 0.4;
+    }
+    .mg-divider:focus-visible {
+      outline: 2px solid var(--sn-accent);
+      outline-offset: -2px;
     }
     .mg-col-head {
       padding: 10px 12px 8px;
