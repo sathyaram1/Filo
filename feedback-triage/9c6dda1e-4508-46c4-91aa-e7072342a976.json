@@ -1,0 +1,7 @@
+{
+  "id": "9c6dda1e-4508-46c4-91aa-e7072342a976",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho riprodotto la lamentela eseguendo davvero l'app: ho chiuso una scheda perché finisse in archivio, aperto la pagina Tab archiviate e cliccato Svuota archivio. Ora compare il popup scuro nello stile di Filo (con la spiegazione della conseguenza e il pulsante Svuota), NON più il dialogo grigio di sistema; confermando, l'archivio si svuota davvero. Ho verificato che non compaia alcun dialogo nativo del browser. Per essere sicuro che il controllo sia serio e non passi per caso, ho rimesso temporaneamente la vecchia versione col dialogo di sistema: la verifica torna a fallire esattamente sul punto giusto (il popup di Filo non appare) e passa solo con la correzione. Ho controllato anche gli altri due punti sistemati per coerenza: Cancella tutto nella Cronologia AI mostra anch'esso il popup di Filo (verificato eseguendo l'app), e la conferma di eliminazione di una categoria nelle impostazioni usa lo stesso identico meccanismo e la pagina ora carica il modulo dei popup. Casi limite: con archivio vuoto il pulsante non fa nulla (nessun popup), comportamento corretto. La scelta di usare il popup di livello 2 (spiegazione + Conferma/Annulla) è coerente con le altre azioni irreversibili come Ripristina tutte le impostazioni. Nessun problema riscontrato.",
+  "queuedAt": "2026-07-30T00:44:33.038Z",
+  "queuedBy": "routine"
+}
