@@ -64,6 +64,48 @@ test('chiudere una scheda la archivia e la pagina archivio la mostra', async ({ 
   }), { timeout: 8_000 }).toBe(true);
 });
 
+test('la pagina è "Cronologia", un giorno per riga, con chip colorate come le tab in alto (#281)', async ({ shell, openTab, testServer }) => {
+  await testServer.openReady(openTab, PAGE);
+
+  // Aspetta il colore identità (serve per la tinta di sfondo della chip).
+  const tabId = await shell.evaluate(async () => {
+    const snap = await window.filoShell.tabs.snapshot();
+    return snap.activeId;
+  });
+  await expect.poll(async () => shell.evaluate(async (id) => {
+    const snap = await window.filoShell.tabs.snapshot();
+    const t = snap.tabs.find((x) => x.id === id);
+    return (t && t.identityColor) || null;
+  }, tabId), { timeout: 8_000 }).toMatch(/rgb\(200, 40, 60\)/);
+
+  await shell.evaluate(async (id) => window.filoShell.tabs.close(id), tabId);
+
+  const archive = await openTab('filo://archive/archive.html');
+  await archive.waitForLoadState('domcontentloaded');
+
+  // (1) È la pagina principale di cronologia: il titolo lo dice.
+  await expect(archive.locator('h1')).toHaveText('Cronologia');
+
+  const row = archive.locator('.arc-tab', { hasText: 'Sito Archivio' });
+  await expect(row).toBeVisible({ timeout: 8_000 });
+
+  // (2) Un giorno per riga: il contenitore del giorno NON va a capo (nowrap).
+  //     Prima del fix era flex-wrap:wrap → più righe per giorno.
+  const wrap = await row.evaluate((el) => {
+    const cont = el.closest('.arc-tabs');
+    return getComputedStyle(cont).flexWrap;
+  });
+  expect(wrap).toBe('nowrap');
+
+  // (3) Chip colorata come le tab in alto: la tinta identità (attenuata) è
+  //     impostata come variabile di sfondo e il fondo NON è trasparente.
+  const tint = await row.evaluate((el) => el.style.getPropertyValue('--arc-tint'));
+  expect(tint.trim()).toMatch(/^rgb\(/);
+  const bg = await row.evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(bg).not.toBe('rgba(0, 0, 0, 0)');
+  expect(bg).not.toBe('transparent');
+});
+
 test('menu contestuale: "Elimina" rimuove la tab dall\'archivio', async ({ shell, openTab, testServer }) => {
   await testServer.openReady(openTab, PAGE);
   const tabId = await shell.evaluate(async () => {
