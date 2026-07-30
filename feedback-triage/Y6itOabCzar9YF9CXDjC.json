@@ -1,7 +1,0 @@
-{
-  "id": "Y6itOabCzar9YF9CXDjC",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho ripercorso esattamente la situazione che segnalavi: parto da un mazzo nuovo, senza commander, e in chat scrivo di voler costruire il mazzo attorno a un commander (es. «costruiamo un mazzo con Niv-Mizzet»). Verifico che (1) Filo imposti davvero quel commander da solo — compare nell'intestazione del mazzo e resta salvato — e che (2) la ricerca fatta nello stesso messaggio resti vincolata ai colori di quel commander: una carta fuori colore (una verde, con un commander blu-rosso) sparisce dai risultati, mentre quella nei colori giusti resta. Prima della correzione la ricerca partiva senza vincolo e la carta fuori colore restava: era proprio l'attrito che descrivevi. Ho anche stressato i casi limite: se il mazzo ha GIÀ un commander, un nome buttato in chat non lo sovrascrive (giusto, resta un'azione esplicita); se il nome del commander non esiste, Filo te lo dice e non imposta nulla; incollare una lista di mazzo con un'intestazione «Commander» continua a trattarlo come candidato da confermare, non come impostazione automatica. Testato anche che il messaggio di conferma e i nomi delle carte in chat non permettono l'esecuzione di codice ostile (restano testo). La rimozione del commander funziona ancora. Tutto verde, inclusi i controlli sulle ricerche, sull'import e sulla logica interna.",
-  "queuedAt": "2026-07-30T09:30:01.562Z",
-  "queuedBy": "routine"
-}
