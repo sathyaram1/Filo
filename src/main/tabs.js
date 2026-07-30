@@ -1689,7 +1689,13 @@ class TabManager {
       if (this._maybeBlockNavigation(tab, url, { fromUrl })) {
         return { action: 'deny' };
       }
-      this.openTab(url, { activate: true });
+      // #376 — parità con qualsiasi browser: Ctrl+click / click centrale su un
+      // link ("aprilo dietro, io continuo a leggere qui") arriva con
+      // disposition 'background-tab' e NON deve rubare il primo piano. Prima
+      // ogni apertura veniva attivata, quindi l'utente veniva strappato dalla
+      // pagina che stava leggendo — lo stesso attrito della musica che passava
+      // davanti da sola.
+      this.openTab(url, { activate: disposition !== 'background-tab' });
       return { action: 'deny' };
     });
 
