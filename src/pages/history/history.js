@@ -189,7 +189,11 @@
     $('search').addEventListener('input', render);
     $('filter').addEventListener('change', render);
     $('clear').addEventListener('click', async () => {
-      if (!confirm(I18n.t('history_clear_confirm'))) return;
+      const text = I18n.t('history_clear_confirm');
+      const ok = window.SN_CONFIRM_UI
+        ? await window.SN_CONFIRM_UI.confirm({ title: I18n.t('history_clear'), text, okLabel: I18n.t('history_clear') })
+        : window.confirm(text); // fallback se il modulo non è caricato
+      if (!ok) return;
       await chrome.runtime.sendMessage({ type: MSG.CLEAR_HISTORY });
       items = [];
       render();
