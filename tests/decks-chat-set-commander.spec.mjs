@@ -153,13 +153,13 @@ test('mazzo con commander già impostato: un nome in chat non lo sovrascrive', a
   await page.click('#newDeck');
   await expect(page.locator('#screenBuilder')).toBeVisible();
   const deckId = await page.evaluate(() => decodeURIComponent(location.hash.replace('#/deck/', '')));
-  // Commander già presente (rosso mono: identità R).
+  // Commander già presente (rosso mono: identità R) — persistito nello store,
+  // che è la verità che rilegge l'handler della chat a ogni turno.
   const r0 = await page.evaluate(async (id) => {
     const { MSG } = window.SN_MSG;
     return chrome.runtime.sendMessage({ type: MSG.DECKS_SET_COMMANDER, id, scryfallId: 'bolt-1' });
   }, deckId);
-  expect(r0 && r0.ok).toBe(true);
-  await expect(page.locator('#commanderLine')).toContainText('Lightning Bolt');
+  expect(r0 && r0.ok && r0.deck.commander).toBe('bolt-1');
 
   // Anche se il modello torna "commander", il mazzo NE HA GIÀ uno → non cambia.
   await page.fill('#chatInput', 'costruiamo un mazzo con Niv-Mizzet, Parun');
