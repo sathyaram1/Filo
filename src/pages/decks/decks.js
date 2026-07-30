@@ -295,11 +295,15 @@
     $('commanderLine').title = current.commander
       ? 'Tasto destro per rimuovere il commander' : '';
     $('deckCount').textContent = `${Decks.deckCount(current)}/100 carte`;
+    // Cache-first: l'elenco compare SUBITO coi campi statici già in cache (le
+    // carte del mazzo sono state risolte quando sono entrate). I prezzi freschi
+    // arrivano dopo, in background, senza far aspettare le carte (feedback #380).
     await Promise.all([ensureSymbols(), loadDeckCards()]);
     refreshOpinionStaleness();
     renderDeckList();
     renderChat(stickChat);
     renderStats();
+    refreshPrices();
   }
 
   async function saveDeck(next) {
@@ -330,17 +334,41 @@
     symbolsMap = (r && r.ok && r.symbols) || {};
   }
 
-  async function loadDeckCards() {
+  // Carica i dati carta del mazzo. DUE modalità, per azzerare l'attesa
+  // all'apertura ("L'ATTESA è ATTRITO"):
+  //   - default (cache-first): chiede solo dalla cache i campi STATICI (nomi,
+  //     tipi, costi, colori — non scadono mai), così l'elenco del mazzo compare
+  //     SUBITO senza aspettare la rete. È il primo giro all'apertura.
+  //   - freshPrices: rifetcha i PREZZI stantii (TTL 6h, §9.2) — serializzato e
+  //     lento su un mazzo intero, quindi gira in BACKGROUND (refreshPrices),
+  //     mai bloccando la comparsa delle carte.
+  async function loadDeckCards({ freshPrices = false } = {}) {
     const ids = current.carte.map((c) => c.scryfall_id);
     if (current.commander) ids.push(current.commander);
     if (!ids.length) return;
-    // freshPrices: il budget (§9.2) vuole prezzi EUR con TTL, non eterni.
-    const r = await send({ type: MSG.SCRYFALL_CARDS, ids, freshPrices: true });
+    const r = await send({ type: MSG.SCRYFALL_CARDS, ids, freshPrices });
     // MERGE, mai sostituzione: la cache di pagina contiene anche le carte dei
     // risultati chat (sendChat) e dei nomi in prosa risolti (resolveProseCard).
     // Le bolle chat vivono per tutta la pagina (chatByDeck): dopo un edit del
     // mazzo l'hover su quei risultati deve continuare ad aprire la preview.
     Object.assign(cardsById, (r && r.ok && r.cards) || {});
+  }
+
+  // Refresh dei prezzi in background (§9.2): sull'apertura il mazzo compare
+  // subito coi dati di cache (prezzi eventualmente stantii); qui si rifetchano
+  // i prezzi freschi SENZA bloccare e, quando arrivano, si riaggiornano le
+  // sole parti che dipendono dal prezzo (righe del mazzo, budget/statistiche).
+  // Il token invalida un refresh in corso se nel frattempo si è cambiato mazzo
+  // (altra apertura), così non si sovrascrive una vista diversa.
+  let priceRefreshToken = 0;
+  async function refreshPrices() {
+    if (!current || !current.carte.length) return;
+    const token = ++priceRefreshToken;
+    const deckId = current.id;
+    await loadDeckCards({ freshPrices: true });
+    if (token !== priceRefreshToken || !current || current.id !== deckId) return;
+    renderDeckList();
+    renderStats();
   }
 
   function manaHtml(cost) {
