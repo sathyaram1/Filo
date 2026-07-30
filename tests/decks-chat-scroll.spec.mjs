@@ -175,6 +175,9 @@ test('restando in fondo, la vista SEGUE i nuovi contenuti mentre genera', async 
   const page = await openTab('filo://decks/decks.html');
   await page.waitForLoadState('domcontentloaded');
   await deckWithCommander(page);
+  await warmUp(page);
+  await expect.poll(async () => { const s = await scrollInfo(page); return s.height - s.client; },
+    { timeout: 10_000 }).toBeGreaterThan(80);
 
   await page.fill('#chatInput', 'modi per dare haste alle creature');
   await page.press('#chatInput', 'Enter');
