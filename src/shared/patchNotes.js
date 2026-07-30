@@ -21,8 +21,16 @@
         'Nuovo comando «/riordina» dalla nuova scheda: riordina al volo tutte le schede aperte per colore, come succede quando riapri Filo, ma senza chiuderne o archiviarne nessuna.',
         'Nel deck builder puoi partire dal commander a parole: se in chat dici che vuoi costruire attorno a un commander (o qual è il commander del mazzo) e il mazzo non ne ha ancora uno, Filo lo imposta da solo e da quel momento le ricerche restano nei suoi colori. Se il mazzo ha già un commander non lo tocca.',
       ],
+      features: [
+        'Nuovo comando «/riordina» dalla nuova scheda: riordina al volo tutte le schede aperte per colore, come succede quando riapri Filo, ma senza chiuderne o archiviarne nessuna.',
+        'Nel deck builder puoi partire dal commander a parole: se in chat dici che vuoi costruire attorno a un commander (o qual è il commander del mazzo) e il mazzo non ne ha ancora uno, Filo lo imposta da solo e da quel momento le ricerche restano nei suoi colori. Se il mazzo ha già un commander non lo tocca.',
+        'Quando Filo ti dice che una cosa non sa farla, o che non ha un dato che gli hai chiesto, ora ti prepara lui la segnalazione per chi sviluppa Filo: la trovi già scritta nella sua risposta, ti basta confermarla (o ignorarla).',
+      ],
       fixes: [
         'Nel deck builder ora puoi scorrere la chat mentre Filo sta generando: la vista non torna più da sola in fondo (o in cima) a ogni aggiornamento, così puoi leggere con calma il ragionamento e i risultati man mano che arrivano. Se invece resti in fondo, la chat continua a seguire i nuovi contenuti da sola.',
+        'Quando la chat della nuova scheda non riesce a rispondere, ora ti spiega cosa non ha funzionato e cosa fare, invece di mostrare un messaggio tecnico incomprensibile.',
+        'Se la connessione salta per un istante mentre Filo sta rispondendo, riprova da solo prima di dirti che qualcosa è andato storto.',
+        'Nella chat della nuova scheda la risposta non riuscita ha ora un tasto «Riprova» che rimanda lo stesso messaggio, senza doverlo riscrivere.',
       ],
     },
     {
