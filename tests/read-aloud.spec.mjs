@@ -53,4 +53,12 @@ test('selezionando testo, il menu mostra "Leggi" e cliccarlo avvia la lettura de
   await expect
     .poll(() => page.evaluate(() => window.__filoReadAloud || []), { timeout: 4000 })
     .toEqual(['Questo è il testo che Filo deve leggere ad alta voce.']);
+
+  // Nei test non c'è una chiave Gemini, quindi la voce a modello non è
+  // disponibile e la lettura ripiega su quella del browser. Prima questo ripiego
+  // era MUTO ("modello impostato ma lettura automatica" restava un mistero):
+  // ora Filo lo dice con un toast. Asseriamo che l'avviso compaia davvero.
+  await expect(
+    page.locator('.sn-toast', { hasText: 'voce del browser' })
+  ).toBeVisible({ timeout: 4000 });
 });
