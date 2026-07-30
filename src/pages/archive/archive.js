@@ -290,7 +290,12 @@
     row.className = 'arc-tab';
     row.tabIndex = 0;
     row.setAttribute('role', 'button');
-    if (t.identityColor) row.style.setProperty('--arc-color', t.identityColor);
+    if (t.identityColor) {
+      row.style.setProperty('--arc-color', t.identityColor);
+      // Sfondo della chip = tinta identità attenuata, come le tab in alto.
+      const tint = tintOf(t.identityColor);
+      if (tint) row.style.setProperty('--arc-tint', tint);
+    }
 
     const titleText = t.title || t.url || '';
     // Tooltip: conserva URL/orario/snippet, non più sempre visibili nella
