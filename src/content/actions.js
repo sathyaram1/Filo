@@ -303,6 +303,44 @@
     }
   }
 
+  // Riallinea il contesto di incolla salvato all'apertura del menu alla
+  // posizione CORRENTE del cursore nello stesso campo. Serve alla dettatura:
+  // la registrazione può durare a lungo (fino a ~60s + trascrizione) e nel
+  // frattempo l'utente continua a scrivere o sposta il cursore nello stesso
+  // campo. Senza questo, il testo trascritto atterrerebbe dove il menu era
+  // stato aperto, spaccando in due ciò che l'utente ha digitato nel frattempo.
+  function refreshPasteContextLive() {
+    const ctx = deps.getPasteContext();
+    if (!ctx) return;
+    const { kind, el } = ctx;
+    if (!el || !el.isConnected) return;
+    if (kind === 'input') {
+      // selectionStart/End di input/textarea persistono anche dopo il blur:
+      // riflettono l'ultima posizione scelta dall'utente nel campo.
+      const start = el.selectionStart;
+      const end = el.selectionEnd;
+      if (start != null && end != null) { ctx.start = start; ctx.end = end; }
+    } else if (kind === 'ce') {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        const r = sel.getRangeAt(0);
+        // Solo se la selezione viva è ancora dentro il nostro campo: se il
+        // focus è finito altrove, teniamo il range catturato come fallback.
+        if (el.contains(r.startContainer)) ctx.range = r.cloneRange();
+      }
+    }
+  }
+
+  // Inserimento del testo dettato: a differenza di "Incolla" (che avviene
+  // subito dopo il click, quando la posizione catturata è ancora attuale), la
+  // dettatura arriva molto dopo. Prima di inserire riallineiamo la posizione
+  // a dove il cursore si trova ADESSO, poi inseriamo.
+  function insertDictatedText(text) {
+    refreshPasteContextLive();
+    deps.restorePasteContext();
+    insertTextAtSelection(text);
+  }
+
   // Costruisce l'item del menu "Incolla" con freccetta cronologia.
   function buildPasteItem(clipboardHistory) {
     return {
