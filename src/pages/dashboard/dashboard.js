@@ -1100,7 +1100,11 @@
   // Un singolo turno del modello: bolla "sta pensando" + reasoning live, invio
   // FILO_CHAT, render della bolla di Filo con le sue azioni e registrazione del
   // turno nello storico. Ritorna la risposta grezza per decidere se proseguire.
-  async function runFiloTurn({ userMessage, images = [] }) {
+  // `internal: true` per i turni di prosecuzione automatica: il "messaggio
+  // utente" è un nudge scritto da noi, non una richiesta reale. Il main lo usa
+  // per non trattarlo come parole dell'utente (#360: una segnalazione proposta
+  // da Filo non deve citare un nudge interno).
+  async function runFiloTurn({ userMessage, images = [], internal = false }) {
     // Bolla Filo "sta pensando": 3 righe di reasoning che scorrono e svaniscono.
     const pending = appendThinking();
     // Canale per il reasoning VERO in diretta: apriamo una sottoscrizione
