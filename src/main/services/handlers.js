@@ -1222,6 +1222,10 @@ function maybeProposeFeedbackAction({ textReply, rawActions, userMessage, thread
 async function maybeAutoFeedback({ textReply, rawActions, userMessage, sender, proposed = false }) {
   try {
     if (proposed) return;
+    // Stessa ragione: se Filo ha emesso LUI una segnalazione da confermare, è
+    // quella la segnalazione di questo turno. Non ne serve una seconda anonima.
+    if (Array.isArray(rawActions)
+      && rawActions.some((a) => a && String(a.type || '').toUpperCase() === 'INVIA_FEEDBACK')) return;
     const AF = globalThis.SN_AUTO_FEEDBACK;
     const FB = globalThis.SN_FEEDBACK;
     if (!AF || !FB || typeof FB.submit !== 'function') return;
