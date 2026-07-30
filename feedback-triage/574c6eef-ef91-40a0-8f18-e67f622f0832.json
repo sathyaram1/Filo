@@ -1,7 +1,0 @@
-{
-  "id": "574c6eef-ef91-40a0-8f18-e67f622f0832",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato e modifica pubblicata. La verifica precedente era passata; il controllo finale non ha rilevato alcun problema di sicurezza e l'aggiornamento è stato integrato nella versione principale.",
-  "queuedAt": "2026-07-30T01:20:11.237Z",
-  "queuedBy": "routine"
-}
