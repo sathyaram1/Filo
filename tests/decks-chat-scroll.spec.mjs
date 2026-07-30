@@ -68,24 +68,47 @@ async function mockGatedProvider(app) {
       modelRegistry: C.DEFAULT_MODEL_REGISTRY,
     });
     globalThis.__gate = new Promise((res) => { globalThis.__releaseGate = res; });
-    globalThis.__bigReasoning = Array.from({ length: 400 },
+    globalThis.__callN = 0;
+    globalThis.__bigReasoning = Array.from({ length: 60 },
       (_, i) => `Passo ${i}: valuto una carta rossa con haste per il mazzo Izzet.`).join('\n');
+    // Risposta di "riscaldamento": prosa MOLTO lunga (non ha tetto d'altezza,
+    // resta sempre visibile) → la colonna chat va in overflow e ci resta, così
+    // scrollare ha senso sia mentre Filo pensa sia a generazione finita. La
+    // CardList e il ragionamento hanno invece uno scroll INTERNO (tetto CSS), da
+    // soli non fanno traboccare la colonna.
+    globalThis.__warmProse = Array.from({ length: 120 },
+      (_, i) => `Riga ${i} di contesto sul mazzo Izzet e sulle sue linee di gioco.`).join('\n');
     globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => ({
       text: JSON.stringify({ reply: 'Ecco delle carte rosse con haste.', query: 'o:haste' }),
       model: attempts[0].model, provider: attempts[0].provider, usage: {},
     });
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, onDelta, onReasoning }) => {
-      // Fase 1: ragionamento lungo → la bolla "sta pensando" diventa alta.
+      globalThis.__callN++;
+      if (globalThis.__callN === 1) {
+        // Turno di riscaldamento: nessun gate, solo prosa alta per l'overflow.
+        const r = { text: JSON.stringify({ reply: globalThis.__warmProse }),
+          model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+        if (onDelta) onDelta(r.text);
+        return r;
+      }
+      // Turno "vero", messo in pausa a metà: Fase 1 ragionamento in diretta…
       if (onReasoning) onReasoning(globalThis.__bigReasoning);
-      // Aspetta che il test scrolli su, imitando l'utente che legge a metà.
+      // …attende che il test scrolli su, imitando l'utente che legge a metà…
       await globalThis.__gate;
-      // Fase 2: altro ragionamento + risposta (che innescano altri rerender).
+      // …Fase 2: altro ragionamento + risposta (che innescano altri rerender).
       if (onReasoning) onReasoning('\nConcludo la selezione.');
       const r = await globalThis.SN_PROVIDERS.completeWithFallback({ attempts, messages });
       if (onDelta) onDelta(r.text);
       return r;
     };
   });
+}
+
+// Turno di riscaldamento: una prosa lunga che fa (e tiene) la chat in overflow.
+async function warmUp(page) {
+  await page.fill('#chatInput', 'raccontami del mazzo');
+  await page.press('#chatInput', 'Enter');
+  await expect(page.locator('.dk-msg-bot').last().locator('.dk-msg-text')).toBeVisible();
 }
 
 async function deckWithCommander(page) {
