@@ -1,0 +1,13 @@
+{
+  "op": "create",
+  "uid": "f02a7263-209c-4ed3-9c1a-29247a8d0876",
+  "text": "FENC1:AQT09ZrWkmzfFXfBuzv86WBgxXEStDsE7vomLRgy4ec7JVLYvQ-5ammLqomX4yfCi004u5LvrvXA2wPSUbEck5o081IzS7vVMSzLEXv-Trg76oIyW3uN-Ai8FmOvqERGPUsTIDBAp1YJzkEy8XHXCbCmozjmBiydqtq0GP-QtSpbRWk10ze864rXljK_Zu2X-4TNvGOSIhggkLZn8YzwfA840Jtc_s26POo2r_iOJbLe03catTgKCQgIbXYp233n-PGOowEIT9zLa0GhGK5idDaQR2se0FhglD6FC-mZXkwfqcu44Vm_dvm25JSN4uiy-fY6WtinZFTm9hM324VFNg-nYvvJzbeGUrKmQrrmKazRMHdqT2o0ZBCYwj98wTFswx7fyR5WqaduIOZ0hysLlMzX3SH2f7DHnEe1D6LxaM2Mr7kGFU3aDM5lCqKgh6W-AdN9CLu1JTWVIYh44PMr6mF9MK2YiK_v8yEuC7FlDZb0x96XukULrQ5r-AgZd4SgYPspp7hO0IDRIDU78VACwQp7KcNquJd2gBPY6GCWVOFGrbw1ADhwXQOysRpBegYD95Nu2OlJuGf8mQWmsqztkeKo8URtZp3DRWcLOrXF7nttqF_MALv1sFdzKph9-HFxhqbrACNTli7DzEa2BXYpOwKIIUN8Je4iyzJCLYTU_FVOlPNgUT8kg3L_kHimzjexoOLq-bBKou8_yDPXdA",
+  "name": "Tasto destro sul bordo fra le colonne della gestione",
+  "parentId": "",
+  "status": "new",
+  "priority": "FENC1:AQQAy0-RtFnd-rb1e0OrDJQVCEqTigzlaIDNTnzeDGiHsaSgd7hDCURs5Wa-O_u61Q5qX9eCiwlOWfe6sqdfEJl-DD4hUM7b_wGa3IpStDmoHoT9Ai2T3-X2x2q8xeE",
+  "notes": "Suggerimento emerso durante la verifica della richiesta di ridimensionare le colonne della dashboard di gestione: la funzione c'e' e funziona, questa e' solo una rifinitura da valutare.",
+  "images": [],
+  "queuedAt": "2026-07-30T18:34:45.154Z",
+  "queuedBy": "routine"
+}
