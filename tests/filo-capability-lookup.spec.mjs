@@ -88,8 +88,9 @@ test('Filo consulta il manifesto e risponde col dettaglio reale della capacità'
   // E l'utente ha inviato un solo messaggio.
   await expect(page.locator('.dash-bubble-user')).toHaveCount(1);
 
-  // Il chip di trasparenza del lookup è comparso.
-  await expect(page.locator('.dash-action-btn', { hasText: 'Verifico cosa so fare' }))
+  // La traccia di trasparenza del lookup è comparsa (#376: traccia scritta, non
+  // più un bottone).
+  await expect(page.locator('.dash-action-step', { hasText: 'Verifico cosa so fare' }))
     .toBeVisible();
 
   // PROVA CHIAVE: al secondo turno il contesto contiene il DETTAGLIO VERO della
