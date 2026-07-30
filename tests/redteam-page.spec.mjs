@@ -467,9 +467,10 @@ test('storico: cliccando un tentativo si vedono attacco, spiegazione e motivazio
   // colonnina a sinistra. Se il flex finisse sulla cella <td> stessa, questa
   // smetterebbe di essere table-cell, il colspan verrebbe ignorato e la cella
   // collasserebbe alla prima colonna (~1/8 della riga): l'assert diventa rosso.
-  const widths = await detail.evaluate((td) => {
-    const tr = td.closest('tr').previousElementSibling; // riga dati sopra
-    return { td: td.getBoundingClientRect().width, row: tr.getBoundingClientRect().width };
+  const widths = await detail.evaluate((tr) => {
+    const td = tr.querySelector('td');            // cella colspan del dettaglio
+    const dataRow = tr.previousElementSibling;    // riga dati sopra
+    return { td: td.getBoundingClientRect().width, row: dataRow.getBoundingClientRect().width };
   });
   expect(widths.td).toBeGreaterThan(widths.row * 0.9);
 
