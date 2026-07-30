@@ -1382,10 +1382,12 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     if (res.output) rendered._output = res.output;
     renderedActions.push(rendered);
   }
-  await FiloMem.appendRaw({ type: 'chat_filo', summary: textReply.slice(0, 200), extra: { actions: rawActions } });
+  await FiloMem.appendRaw({ type: 'chat_filo', summary: textReply.slice(0, 200), extra: { actions: actionsToRun } });
   maybeRunLessonAgent({ userMessage, filoReply: textReply, stateText }).catch(() => {});
   // F4 — Feedback autonomo: fire-and-forget, non blocca la risposta all'utente.
-  maybeAutoFeedback({ textReply, rawActions, userMessage, sender }).catch(() => {});
+  // Se in questo turno abbiamo già proposto la segnalazione all'utente (#360),
+  // quella anonima non parte: una sola segnalazione per lo stesso buco.
+  maybeAutoFeedback({ textReply, rawActions, userMessage, sender, proposed: !!proposal }).catch(() => {});
   return { text: textReply, actions: renderedActions, model: r.model, provider: r.provider, costEur: r.costEur };
 }
 
