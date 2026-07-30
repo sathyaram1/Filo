@@ -120,6 +120,15 @@ test('setCommander salva id + meta e incrementa la versione', () => {
   assert.equal(r.versione, d.versione + 1);
 });
 
+test('setCommander con id vuoto RIMUOVE il commander (feedback #302)', () => {
+  const d = D.setCommander(D.newDeck(), 'scry-niv', { name: 'Niv-Mizzet', colors: ['U', 'R'] });
+  assert.equal(d.commander, 'scry-niv', 'precondizione: commander impostato');
+  const r = D.setCommander(d, '', null);
+  assert.equal(r.commander, '', 'torna a nessun commander');
+  assert.equal(r.commanderMeta, null, 'la cache di presentazione è azzerata');
+  assert.equal(r.versione, d.versione + 1, 'la versione avanza (edit reale)');
+});
+
 // ── Auto-nome dal commander (feedback #345) ────────────────────────────────
 test('newDeck: nomeAuto è true senza nome, false con nome scelto', () => {
   assert.equal(D.newDeck().nomeAuto, true);
