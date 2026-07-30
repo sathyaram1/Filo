@@ -52,7 +52,7 @@ async function mockScryfall(app) {
       if (!body) return { ok: false, status: 404, json: async () => ({}) };
       return { ok: true, status: 200, json: async () => body };
     });
-  }, manyRedCards(40));
+  });
 }
 
 // Provider con "gate": emette un blocco DI RAGIONAMENTO lungo (così la colonna
