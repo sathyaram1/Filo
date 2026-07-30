@@ -1363,8 +1363,13 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // Il fallback "(vuoto)" resta SOLO per la risposta davvero vuota (niente
   // testo E niente azioni), che sarebbe altrimenti una bolla muta.
   const textReply = String(parsed.text || '').trim() || (rawActions.length ? '' : '(vuoto)');
+  // #360 — Filo ha ammesso una mancanza e non ha proposto niente: la proposta di
+  // segnalazione entra tra le azioni di QUESTO turno, così l'utente la trova già
+  // scritta nella stessa bolla invece di doverla chiedere.
+  const proposal = maybeProposeFeedbackAction({ textReply, rawActions, userMessage, threadHistory: cleanHistory });
+  const actionsToRun = proposal ? [...rawActions, proposal] : rawActions;
   const renderedActions = [];
-  for (const a of rawActions) {
+  for (const a of actionsToRun) {
     const res = await executeFiloAction(a, { sender });
     if (!res.kept) continue;
     // Azione sospesa in attesa di conferma (#146.2): il client renderizza il
