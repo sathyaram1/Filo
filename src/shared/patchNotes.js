@@ -16,6 +16,12 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.170', date: '2026-07-30',
+      fixes: [
+        'Nel deck builder ora puoi scorrere la chat mentre Filo sta generando: la vista non torna più da sola in fondo (o in cima) a ogni aggiornamento, così puoi leggere con calma il ragionamento e i risultati man mano che arrivano. Se invece resti in fondo, la chat continua a seguire i nuovi contenuti da sola.',
+      ],
+    },
+    {
       version: '0.2.169', date: '2026-07-30',
       features: [
         'Nel Red Team ora puoi cliccare un tentativo per aprirne i dettagli: vedi il testo dell’attacco, la sua spiegazione, il giudizio di validità con la motivazione e cosa ha detto ogni giudice.',

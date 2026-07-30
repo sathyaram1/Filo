@@ -178,7 +178,7 @@
       carousel = null;
       setDetailState('stats');
       show('builder');
-      await renderBuilder();
+      await renderBuilder(true); // apertura: la chat parte dall'ultimo scambio
       return;
     }
     if (r.screen === 'game') { show('game'); return; }
@@ -296,7 +296,9 @@
     return (b === null || b === undefined) ? '' : fmtBudgetShort(b);
   }
 
-  async function renderBuilder() {
+  // `stickChat`: all'apertura del mazzo la chat mostra l'ultimo scambio (fondo);
+  // nei refresh dopo una modifica si rispetta invece la posizione dell'utente.
+  async function renderBuilder(stickChat) {
     $('deckNameText').textContent = current.nome;
     const commander = (current.commanderMeta && current.commanderMeta.name)
       ? `Commander: ${current.commanderMeta.name}`
@@ -311,7 +313,7 @@
     await Promise.all([ensureSymbols(), loadDeckCards()]);
     refreshOpinionStaleness();
     renderDeckList();
-    renderChat();
+    renderChat(stickChat);
     renderStats();
   }
 
@@ -880,8 +882,18 @@
     return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${parts.join('')}</div>`;
   }
 
-  function renderChat() {
+  // `stickBottom` = "porta comunque la vista in fondo" (nuovo turno dell'utente:
+  // vuole vedere il messaggio appena inviato). Negli altri casi si segue il fondo
+  // SOLO se l'utente era già in fondo: durante la generazione renderChat gira in
+  // continuazione (i chunk di ragionamento, ~ogni 250ms) e — svuotando e
+  // ricostruendo le bolle — strappava la vista in fondo/in cima a ogni giro,
+  // impedendo di scrollare per leggere mentre Filo genera (#336). Se invece
+  // l'utente ha scrollato su, gli si conserva la posizione.
+  function renderChat(stickBottom) {
     const log = $('chatLog');
+    const prevTop = log.scrollTop;
+    // "vicino al fondo" con tolleranza: seguire anche se manca qualche px.
+    const follow = stickBottom || (log.scrollHeight - prevTop - log.clientHeight < 48);
     const msgs = chatMsgs();
     msgs.forEach((m, i) => { m._i = i; });
     $('chatEmpty').hidden = msgs.length > 0;
@@ -889,7 +901,10 @@
     for (const el of [...log.querySelectorAll('.dk-msg')]) el.remove();
     $('chatEmpty').insertAdjacentHTML('afterend',
       msgs.map((m, i) => chatBubbleHtml(m, i === msgs.length - 1)).join(''));
-    log.scrollTop = log.scrollHeight;
+    // Lo svuotamento sopra fa collassare scrollHeight → il browser clampa
+    // scrollTop a 0: se non seguiamo il fondo va ripristinata la posizione, o la
+    // vista salterebbe in cima (il sintomo segnalato).
+    log.scrollTop = follow ? log.scrollHeight : prevTop;
     syncCarouselHighlight();
     preloadVisibleCards();
   }
@@ -913,7 +928,7 @@
     msgs.push({ who: 'user', text });
     const bot = { who: 'bot', pending: true };
     msgs.push(bot);
-    renderChat();
+    renderChat(true); // nuovo turno: porta la vista in fondo per mostrarlo
     // Ragionamento in diretta (#331): mentre il modello pensa, i chunk di CoT
     // arrivano sul canale filo:reasoning e riempiono la bolla "sta pensando"
     // (render con throttle: i chunk possono essere fitti).
