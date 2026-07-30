@@ -10,8 +10,20 @@ module.exports = function register(on, ctx) {
   const FiloState = globalThis.SN_FILO_STATE;
 
   on(MSG.FILO_CHAT, async (msg, sender) => {
-    const r = await handleFiloChat({ userMessage: msg.userMessage, threadHistory: msg.threadHistory, image: msg.image, images: msg.images, reasoningReqId: msg.reasoningReqId, sender });
-    return { ok: true, ...r };
+    try {
+      const r = await handleFiloChat({ userMessage: msg.userMessage, threadHistory: msg.threadHistory, image: msg.image, images: msg.images, reasoningReqId: msg.reasoningReqId, sender });
+      return { ok: true, ...r };
+    } catch (e) {
+      // #360 — la chat non è un log: se il turno fallisce (rete assente, provider
+      // KO, chiave rifiutata) l'utente deve leggere COSA non ha funzionato e cosa
+      // fare, non il messaggio grezzo dell'eccezione ("fetch failed"). Il
+      // dettaglio tecnico resta qui nei log del main. Senza questo catch l'errore
+      // arrivava al gestore IPC generico, che rimanda `e.message` così com'è.
+      console.error('[Filo] turno di chat fallito', e);
+      const CE = globalThis.SN_CHAT_ERRORS;
+      const error = CE ? CE.sentence(e) : 'Qualcosa è andato storto. Riprova.';
+      return { ok: false, error, code: (e && e.code) || 'UNKNOWN' };
+    }
   });
 
   // L'utente ha confermato dal client (popup livello 2 / "conferma" digitata
