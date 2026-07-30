@@ -18,6 +18,7 @@
     {
       version: '0.2.168', date: '2026-07-29',
       fixes: [
+        'La dettatura vocale (menu del tasto destro → «Detta») ora inserisce il testo trascritto dove hai il cursore in quel momento, non più dove avevi aperto il menu: se mentre parli continui a scrivere o sposti il cursore nello stesso campo, il testo dettato ti atterra nel punto giusto invece di infilarsi indietro spaccando ciò che avevi appena digitato.',
         'In modalità terminale, la cartella in cui ti trovi ora resta la stessa quando chiudi e riapri Filo: prima tornava sempre a quella iniziale.',
         'Le statistiche dell’editor ora sono corrette su un documento vuoto: parole, caratteri, frasi, paragrafi e tempo di lettura sono tutti a zero (prima segnava «Paragrafi: 1» e «~1 min» anche a foglio bianco). Inoltre i segni di sola punteggiatura non vengono più contati come parole.',
         'Nella pagina del correttore, se provi ad aggiungere al dizionario personale una parola che c’è già (anche solo con maiuscole diverse), ora compare un avviso «già nel dizionario» e la parola digitata resta nel campo, invece di sparire in silenzio senza spiegazioni.',
