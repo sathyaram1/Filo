@@ -860,8 +860,11 @@
         btn.type = 'button';
         btn.dataset.bgTab = bgTabId;
         btn.title = `Vai alla scheda — ${label} è aperta in secondo piano`;
-        btn.addEventListener('click', () => {
-          send({ type: MSG.FOCUS_TAB, id: bgTabId });
+        btn.addEventListener('click', async () => {
+          const r = await send({ type: MSG.FOCUS_TAB, id: bgTabId });
+          // Se quella scheda nel frattempo è stata chiusa, il riferimento deve
+          // comunque funzionare: riapre il link invece di non fare nulla.
+          if (!r || !r.ok) send({ type: MSG.OPEN_URL, url: a.url || '' });
         });
       } else {
         btn.href = a.url || '#';
