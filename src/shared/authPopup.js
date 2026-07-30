@@ -38,6 +38,30 @@
     'slack.com',
   ];
 
+  // Host "prodotto" che sono ANCHE provider di identità: oltre al login hanno
+  // una vasta navigazione pubblica (repository, feed, canali, profili…) su cui
+  // l'utente può NON essere loggato. Per questi l'esenzione anti-fingerprint va
+  // ristretta alle sole superfici di accesso (login/OAuth), così il resto del
+  // sito resta protetto (#209). Gli altri host di AUTH_HOSTS sono invece host
+  // dedicati all'autenticazione (accounts.google.com, login.microsoftonline.com,
+  // appleid.apple.com, auth.openai.com…): lì l'intero host È la superficie di
+  // accesso, quindi resta esente per intero.
+  const IDENTITY_PRODUCT_HOSTS = new Set([
+    'github.com',
+    'gitlab.com',
+    'discord.com',
+    'www.facebook.com',
+    'm.facebook.com',
+    'facebook.com',
+    'api.twitter.com',
+    'twitter.com',
+    'x.com',
+    'www.linkedin.com',
+    'linkedin.com',
+    'www.dropbox.com',
+    'slack.com',
+  ]);
+
   // Sottostringhe di host che indicano un servizio di identità generico
   // (Auth0, Okta, Firebase, Amazon Cognito, …).
   const AUTH_HOST_SUFFIXES = [
@@ -63,14 +87,10 @@
     return false;
   }
 
-  // True se l'URL del popup è verosimilmente un flusso di autenticazione.
-  function isAuthPopup(url) {
-    if (!url || typeof url !== 'string') return false;
-    let u;
-    try { u = new URL(url); } catch (_) { return false; }
-    if (!/^https?:$/.test(u.protocol)) return false;
-    if (hostMatches(u.host)) return true;
-    // Path OAuth/SSO su qualunque host (es. provider self-hosted).
+  // True se path/query dell'URL somigliano a un endpoint di autenticazione
+  // (OAuth authorize, signin, login, SSO…). Firma condivisa da isAuthPopup e
+  // dalla restrizione dell'esenzione anti-fingerprint sugli host prodotto.
+  function looksLikeAuthPath(u) {
     if (AUTH_PATH_RE.test(u.pathname)) return true;
     // Alcuni provider mettono i parametri OAuth solo in query (response_type,
     // client_id, redirect_uri): è una firma forte di un endpoint di autorizzazione.
@@ -79,6 +99,17 @@
       return true;
     }
     return false;
+  }
+
+  // True se l'URL del popup è verosimilmente un flusso di autenticazione.
+  function isAuthPopup(url) {
+    if (!url || typeof url !== 'string') return false;
+    let u;
+    try { u = new URL(url); } catch (_) { return false; }
+    if (!/^https?:$/.test(u.protocol)) return false;
+    if (hostMatches(u.host)) return true;
+    // Path OAuth/SSO su qualunque host (es. provider self-hosted).
+    return looksLikeAuthPath(u);
   }
 
   // True se l'host è un provider di identità NOTO (match esatto host o
@@ -96,5 +127,34 @@
     return hostMatches(u.host);
   }
 
-  global.SN_AUTH_POPUP = { isAuthPopup, isKnownIdentityHost };
+  // True se l'URL è una SUPERFICIE DI ACCESSO di un provider di identità noto,
+  // cioè ciò che va esentato dal rumore anti-fingerprint (#209). Regole:
+  //   - host dedicato all'autenticazione (in AUTH_HOSTS ma NON in
+  //     IDENTITY_PRODUCT_HOSTS, oppure suffisso Auth0/Okta/…): l'intero host è
+  //     esente — lì non c'è navigazione generica, tutto è login/account.
+  //   - host prodotto (github.com, x.com, discord.com, facebook.com…): esente
+  //     SOLO se path/query somigliano a un accesso (login/OAuth). Il resto del
+  //     sito torna protetto dal rumore.
+  // Nota sicurezza: l'euristica su path/query qui è applicata SOLO a host già
+  // nella lista fidata dei provider — un tracker arbitrario non può auto-esentarsi
+  // scegliendo un path "/login" (resta escluso perché il suo host non è noto).
+  function isIdentityAuthSurface(url) {
+    if (!url || typeof url !== 'string') return false;
+    let u;
+    try { u = new URL(url); } catch (_) { return false; }
+    if (!/^https?:$/.test(u.protocol)) return false;
+    const host = (u.host || '').toLowerCase();
+    if (!host) return false;
+    // Host di infrastruttura auth (Auth0, Okta, Cognito, …): l'intero host è auth.
+    for (const suf of AUTH_HOST_SUFFIXES) {
+      if (host.endsWith(suf)) return true;
+    }
+    if (!AUTH_HOSTS.includes(host)) return false;
+    // Host dedicato all'autenticazione → intero host esente.
+    if (!IDENTITY_PRODUCT_HOSTS.has(host)) return true;
+    // Host prodotto → esente solo sulla superficie di accesso.
+    return looksLikeAuthPath(u);
+  }
+
+  global.SN_AUTH_POPUP = { isAuthPopup, isKnownIdentityHost, isIdentityAuthSurface };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
