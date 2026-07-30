@@ -48,33 +48,18 @@
   // la finestra si rimpicciolisce o si riapre un mazzo con larghezze salvate
   // più grandi dello schermo corrente. NON tocca `layout` (le preferenze
   // restano intatte): allargando di nuovo la finestra tornano le misure scelte.
+  // Il calcolo (restringi le esterne, salva il minimo del centro, mai sotto i
+  // minimi) è lo STESSO della dashboard di gestione: vive in SN_PANE_LAYOUT,
+  // logica pura con unit test.
   function effectiveWidths() {
     const grid = $('builderGrid');
     const avail = (grid && grid.clientWidth) || window.innerWidth || 0;
-    let leftW = Math.max(LAYOUT_MIN.leftW, layout.leftW);
-    let rightW = Math.max(LAYOUT_MIN.rightW, layout.rightW);
-    if (avail <= 0) return { leftW, rightW };
-    // Spazio massimo per le due colonne esterne, lasciando i due divisori (12px)
-    // e il minimo del mazzo al centro.
-    const budget = avail - 12 - CENTER_MIN;
-    let excess = (leftW + rightW) - budget;
-    if (excess > 0) {
-      // Riduci le due colonne proporzionalmente a quanto sono comprimibili
-      // sopra il loro minimo, senza mai scendere sotto quel minimo.
-      const shrinkL = leftW - LAYOUT_MIN.leftW;
-      const shrinkR = rightW - LAYOUT_MIN.rightW;
-      const total = shrinkL + shrinkR;
-      if (total > 0) {
-        const cut = Math.min(excess, total);
-        const cutL = Math.round(cut * (shrinkL / total));
-        leftW = Math.max(LAYOUT_MIN.leftW, leftW - cutL);
-        rightW = Math.max(LAYOUT_MIN.rightW, rightW - (cut - cutL));
-      }
-      // Se persino ai minimi non c'entrano (finestra minuscola), restano ai
-      // minimi: il mazzo si stringe sotto CENTER_MIN ma nessuna colonna esce
-      // dal riquadro sovrapponendosi.
-    }
-    return { leftW, rightW };
+    const { left, right } = window.SN_PANE_LAYOUT.fitWidths({
+      avail, gutters: 12,
+      left: layout.leftW, right: layout.rightW,
+      minLeft: LAYOUT_MIN.leftW, minRight: LAYOUT_MIN.rightW, minCenter: CENTER_MIN,
+    });
+    return { leftW: left, rightW: right };
   }
 
   function applyLayout() {

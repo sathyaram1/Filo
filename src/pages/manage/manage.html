@@ -15,6 +15,7 @@
   <script src="filo://shared/comboBox.js"></script>
   <script src="filo://shared/modelChainEditor.js"></script>
   <script src="filo://shared/icons.js"></script>
+  <script src="filo://shared/paneLayout.js"></script>
   <script src="filo://shared/feedback.js"></script>
   <script src="filo://shared/feedbackStatus.js"></script>
   <script src="filo://shared/feedbackThread.js"></script>
@@ -175,10 +176,14 @@
     .mg-log-abs { margin-left: auto; color: var(--sn-muted); font-size: 12px; }
 
     /* ── Layout 3 colonne della sezione Revisione ──────────────────────── */
+    /* Le due colonne esterne hanno larghezza fissa, decisa dall'utente
+       trascinando i divisori (JS riscrive grid-template-columns e persiste le
+       misure); la colonna centrale assorbe il resto. I 12px dei divisori
+       fanno anche da spaziatura fra le colonne → gap: 0. */
     .mg-review {
       display: grid;
-      grid-template-columns: 220px 1fr 280px;
-      gap: 12px;
+      grid-template-columns: 220px 12px minmax(0, 1fr) 12px 280px;
+      gap: 0;
       height: calc(100vh - 180px);
       min-height: 300px;
     }
@@ -186,6 +191,24 @@
       display: flex; flex-direction: column;
       border: 1px solid var(--sn-border); border-radius: 8px;
       overflow: hidden;
+      min-width: 0;
+    }
+    /* Divisore trascinabile: invisibile a riposo (le colonne hanno già il loro
+       bordo, una terza linea sarebbe rumore) e tinto d'accento all'hover o
+       mentre lo si trascina, così l'utente vede che è una presa. */
+    .mg-divider {
+      cursor: col-resize;
+      background: transparent;
+      border-radius: 2px;
+      transition: background 0.1s;
+    }
+    .mg-divider:hover, .mg-divider.mg-divider--dragging {
+      background: var(--sn-accent);
+      opacity: 0.4;
+    }
+    .mg-divider:focus-visible {
+      outline: 2px solid var(--sn-accent);
+      outline-offset: -2px;
     }
     .mg-col-head {
       padding: 10px 12px 8px;
@@ -717,7 +740,9 @@
     <!-- Layout condiviso a 3 colonne: la lista a sinistra è filtrata per tab,
          il dettaglio al centro e il pannello laterale a destra sono comuni. -->
     <section class="mg-panel mg-panel--active" id="panel-list" data-panel="list">
-      <div class="mg-review">
+      <!-- Le larghezze delle colonne si trascinano dai due divisori e vengono
+           ricordate; doppio clic su un divisore ripristina la misura iniziale. -->
+      <div class="mg-review" id="mgReviewGrid">
 
         <!-- Colonna sinistra: lista feedback della tab corrente -->
         <div class="mg-col" id="mgListCol">
@@ -761,6 +786,11 @@
             <div class="mg-list-empty" id="mgListEmpty" hidden>Nessun feedback bloccato.</div>
           </div>
         </div>
+
+        <div class="mg-divider" id="mgDividerLeft" role="separator"
+             aria-orientation="vertical" tabindex="0"
+             title="Trascina per ridimensionare — doppio clic per la misura iniziale"
+             aria-label="Ridimensiona lista e dettaglio"></div>
 
         <!-- Colonna centrale: dettaglio -->
         <div class="mg-col" id="mgDetailCol">
@@ -817,6 +847,11 @@
             </div>
           </div>
         </div>
+
+        <div class="mg-divider" id="mgDividerRight" role="separator"
+             aria-orientation="vertical" tabindex="0"
+             title="Trascina per ridimensionare — doppio clic per la misura iniziale"
+             aria-label="Ridimensiona dettaglio e pannello laterale"></div>
 
         <!-- Colonna destra: pannello variabile -->
         <div class="mg-col" id="mgSideCol">
