@@ -189,6 +189,39 @@ module.exports = function register(on, ctx) {
       // perché sia la ricerca sia l'import possono accodare testo alla reply.
       let reply = parsed.reply;
       let deckOut = null;
+
+      // Imposta il commander AUTOMATICAMENTE (feedback #337). Quando l'utente
+      // vuole costruire attorno a un commander preciso, o dichiara qual è il
+      // commander di QUESTO mazzo (es. "facciamo un mazzo con Krenko", "il mio
+      // commander è Atraxa"), l'agente torna "commander" SENZA una lista da
+      // importare. Filo lo imposta subito e — se nello stesso turno c'è anche una
+      // ricerca — la filtra sui colori del commander appena scelto: senza questo,
+      // la ricerca partirebbe con "(nessun vincolo)" e proporrebbe carte fuori
+      // colore, cioè l'esatto attrito segnalato. NON tocca un commander già
+      // impostato (serve un'azione esplicita/dedicata, §8.4) e resta reversibile
+      // ("Rimuovi commander", feedback #302). L'import di una lista incollata
+      // (parsed.import) è il ramo SEPARATO più sotto, dove il commander è invece
+      // un CANDIDATO da confermare insieme alle carte, mai scritto in automatico.
+      let commanderJustSet = false;
+      if (parsed.commanderName && !parsed.import.length && !deck.commander) {
+        const found = await Scry.named(parsed.commanderName).catch(() => null);
+        if (found) {
+          const saved = await Store.put(Decks.setCommander(deck, found.id, {
+            name: found.name, colors: found.colorIdentity, artCrop: found.artCrop,
+          }));
+          if (saved) {
+            deckOut = saved;
+            identityColors = (saved.commanderMeta && Array.isArray(saved.commanderMeta.colors))
+              ? saved.commanderMeta.colors : identityColors;
+            commanderJustSet = true;
+            reply = [reply, `Ho impostato ${found.name} come commander: le ricerche ora restano nei suoi colori.`]
+              .filter(Boolean).join('\n');
+          }
+        } else {
+          reply = [reply, `Non ho trovato su Scryfall il commander «${parsed.commanderName}», quindi non l'ho impostato.`]
+            .filter(Boolean).join('\n');
+        }
+      }
       if (parsed.query) {
         // Filtro identity AUTOMATICO (§4): lo aggiunge search/buildSearchQuery;
         // se l'utente/LLM ha già un vincolo id esplicito, quello vince.
