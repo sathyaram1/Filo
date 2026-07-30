@@ -265,6 +265,77 @@
 /* Tentativo non valido: punteggio/punti in grigio (non contano, spec §6.1). */
 .rt-hist-muted { color: var(--sn-muted); }
 
+/* ---- Dettaglio tentativo: attacco, spiegazione, motivazioni (#295) ------- */
+/* Riga dello storico espandibile: cursore + evidenziazione, caret rotante. Il
+   caret è un pseudo-elemento (non entra nel testo della cella). */
+.rt-hist-row--expandable { cursor: pointer; }
+.rt-hist-row--expandable:hover td,
+.rt-hist-row--open td { background: color-mix(in srgb, var(--sn-accent) 8%, transparent); }
+.rt-hist-row--expandable:focus-visible {
+  outline: 2px solid var(--sn-accent);
+  outline-offset: -2px;
+}
+.rt-hist-row--expandable .rt-hist-when { position: relative; padding-left: 22px; }
+.rt-hist-row--expandable .rt-hist-when::before {
+  content: '▸';
+  position: absolute;
+  left: 8px;
+  color: var(--sn-muted);
+  display: inline-block;
+  transition: transform 120ms ease;
+}
+.rt-hist-row--open .rt-hist-when::before { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) {
+  .rt-hist-row--expandable .rt-hist-when::before { transition: none; }
+}
+.rt-hist-detail > td {
+  padding: 2px 12px 16px 22px;
+  background: color-mix(in srgb, var(--sn-accent) 4%, transparent);
+}
+
+/* Blocco dettaglio condiviso (storico + rivelazione live). */
+.rt-detail { display: flex; flex-direction: column; gap: 14px; }
+.rt-reveal-detail { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--sn-border); }
+.rt-reveal-detail[hidden] { display: none; }
+.rt-detail-h {
+  margin: 0 0 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--sn-muted);
+  font-weight: 600;
+}
+.rt-detail-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.rt-detail-validity[data-valid="true"] { color: #2e9e5b; }
+.rt-detail-validity[data-valid="false"] { color: var(--sn-muted); }
+.rt-detail-muted { color: var(--sn-muted); font-style: italic; }
+.rt-detail-judges {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.rt-detail-judge { display: flex; flex-direction: column; gap: 3px; }
+.rt-detail-judge-head { display: flex; align-items: center; gap: 6px; }
+.rt-detail-judge-lbl { font-weight: 700; min-width: 1.4em; }
+.rt-detail-judge-icon { font-size: 15px; color: var(--rt-judge-color, inherit); }
+.rt-detail-judge-meta { color: var(--sn-muted); font-size: 12px; }
+.rt-detail-judge-reason {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 /* ---- Pannello owner: gestione codici ------------------------------------ */
 .rt-owner-gen .sn-row { margin-top: 8px; align-items: center; }
 .rt-owner-gen #genCount { width: 90px; }
