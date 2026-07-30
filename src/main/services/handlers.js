@@ -757,7 +757,8 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         // limitarsi a mostrare un bottone che l'utente deve cliccare. La chat di
         // Filo vive nella dashboard (scheda interna): apriamo nel TabManager
         // della finestra, attivando la nuova scheda (l'utente ha chiesto di
-        // aprire → vuole arrivarci). La bolla conserva comunque un riferimento
+        // aprire → vuole arrivarci) — a meno che l'azione chieda il SECONDO
+        // PIANO (#376, vedi sotto). La bolla conserva comunque un riferimento
         // cliccabile per riaprirlo (kept:true).
         const url = String(action.url ?? action.href ?? action.link ?? '').trim();
         if (!url) return { executed: false, kept: false };
