@@ -19,6 +19,7 @@
       version: '0.2.170', date: '2026-07-30',
       features: [
         'Nuovo comando «/riordina» dalla nuova scheda: riordina al volo tutte le schede aperte per colore, come succede quando riapri Filo, ma senza chiuderne o archiviarne nessuna.',
+        'Nel deck builder puoi partire dal commander a parole: se in chat dici che vuoi costruire attorno a un commander (o qual è il commander del mazzo) e il mazzo non ne ha ancora uno, Filo lo imposta da solo e da quel momento le ricerche restano nei suoi colori. Se il mazzo ha già un commander non lo tocca.',
       ],
       fixes: [
         'Nel deck builder ora puoi scorrere la chat mentre Filo sta generando: la vista non torna più da sola in fondo (o in cima) a ogni aggiornamento, così puoi leggere con calma il ragionamento e i risultati man mano che arrivano. Se invece resti in fondo, la chat continua a seguire i nuovi contenuti da sola.',

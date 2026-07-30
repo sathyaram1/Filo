@@ -141,7 +141,10 @@ module.exports = function register(on, ctx) {
       for (const d of [deck, ...others]) for (const c of d.carte) allIds.push(c.scryfall_id);
       const known = await Scry.cards(allIds).catch(() => ({}));
 
-      const identityColors = (deck.commanderMeta && Array.isArray(deck.commanderMeta.colors))
+      // `let`, non `const`: se in questo stesso turno l'utente stabilisce il
+      // commander (build-around, sotto), va ricalcolato PRIMA della ricerca, così
+      // la query e il filtro duro restano nei colori del commander appena scelto.
+      let identityColors = (deck.commanderMeta && Array.isArray(deck.commanderMeta.colors))
         ? deck.commanderMeta.colors : null;
       const sys = PROMPTS.decksChat({
         deckName: deck.nome,
@@ -186,6 +189,39 @@ module.exports = function register(on, ctx) {
       // perché sia la ricerca sia l'import possono accodare testo alla reply.
       let reply = parsed.reply;
       let deckOut = null;
+
+      // Imposta il commander AUTOMATICAMENTE (feedback #337). Quando l'utente
+      // vuole costruire attorno a un commander preciso, o dichiara qual è il
+      // commander di QUESTO mazzo (es. "facciamo un mazzo con Krenko", "il mio
+      // commander è Atraxa"), l'agente torna "commander" SENZA una lista da
+      // importare. Filo lo imposta subito e — se nello stesso turno c'è anche una
+      // ricerca — la filtra sui colori del commander appena scelto: senza questo,
+      // la ricerca partirebbe con "(nessun vincolo)" e proporrebbe carte fuori
+      // colore, cioè l'esatto attrito segnalato. NON tocca un commander già
+      // impostato (serve un'azione esplicita/dedicata, §8.4) e resta reversibile
+      // ("Rimuovi commander", feedback #302). L'import di una lista incollata
+      // (parsed.import) è il ramo SEPARATO più sotto, dove il commander è invece
+      // un CANDIDATO da confermare insieme alle carte, mai scritto in automatico.
+      let commanderJustSet = false;
+      if (parsed.commanderName && !parsed.import.length && !deck.commander) {
+        const found = await Scry.named(parsed.commanderName).catch(() => null);
+        if (found) {
+          const saved = await Store.put(Decks.setCommander(deck, found.id, {
+            name: found.name, colors: found.colorIdentity, artCrop: found.artCrop,
+          }));
+          if (saved) {
+            deckOut = saved;
+            identityColors = (saved.commanderMeta && Array.isArray(saved.commanderMeta.colors))
+              ? saved.commanderMeta.colors : identityColors;
+            commanderJustSet = true;
+            reply = [reply, `Ho impostato ${found.name} come commander: le ricerche ora restano nei suoi colori.`]
+              .filter(Boolean).join('\n');
+          }
+        } else {
+          reply = [reply, `Non ho trovato su Scryfall il commander «${parsed.commanderName}», quindi non l'ho impostato.`]
+            .filter(Boolean).join('\n');
+        }
+      }
       if (parsed.query) {
         // Filtro identity AUTOMATICO (§4): lo aggiunge search/buildSearchQuery;
         // se l'utente/LLM ha già un vincolo id esplicito, quello vince.
@@ -304,7 +340,10 @@ module.exports = function register(on, ctx) {
       // conferma della ricerca: l'aggiunta al mazzo resta un'azione esplicita
       // dell'utente (toggle riga o "Aggiungi tutte"), mai automatica.
       let importPending = null;
-      if (parsed.import.length || parsed.commanderName) {
+      // `commanderJustSet` esclude il commander già consumato sopra (build-around):
+      // qui resta solo il commander-CANDIDATO dell'import di una lista incollata.
+      const importCommanderName = commanderJustSet ? '' : parsed.commanderName;
+      if (parsed.import.length || importCommanderName) {
         const qtyById = {};
         const notFound = [];
         for (const entry of parsed.import) {
@@ -313,14 +352,14 @@ module.exports = function register(on, ctx) {
           else notFound.push(entry.name);
         }
         let commanderId = '';
-        if (parsed.commanderName) {
-          const found = await Scry.named(parsed.commanderName).catch(() => null);
+        if (importCommanderName) {
+          const found = await Scry.named(importCommanderName).catch(() => null);
           if (found) {
             commanderId = found.id;
             cardIds.unshift(found.id);
             cards[found.id] = found;
             qtyById[found.id] = 1;
-          } else notFound.push(parsed.commanderName);
+          } else notFound.push(importCommanderName);
         }
         importPending = { qtyById, commanderId };
         const n = cardIds.length;
