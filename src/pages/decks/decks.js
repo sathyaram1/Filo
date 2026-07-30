@@ -1704,6 +1704,9 @@
       }
       await saveDeck(Decks.setBudget(current, parsed.value));
     }));
+    // Solo se c'è un commander da togliere (feedback #302): l'inverso di
+    // "Imposta come commander", altrimenti non c'è modo di annullarlo.
+    if (current.commander) add('Rimuovi commander', () => removeCommander());
     add('Elimina…', async () => {
       const ok = await window.SN_CONFIRM_UI.confirm({
         title: 'Eliminare il mazzo?',
