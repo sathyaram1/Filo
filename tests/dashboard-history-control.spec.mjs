@@ -21,7 +21,7 @@ async function newtabPage(app) {
   return win;
 }
 
-test('la home ha un pulsante Cronologia in alto a destra che apre la cronologia', async ({ app, shell }) => {
+test('la home ha un pulsante Cronologia in alto a destra che apre la cronologia schede', async ({ app, shell }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
 
