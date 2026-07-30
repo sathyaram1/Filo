@@ -437,6 +437,16 @@ class TabManager {
       this.activeId = id;
       tab.activateSeq = this._nextActivationSeq();
       this.layout();
+    } else {
+      // Scheda in SECONDO PIANO (#376): non ruba il primo piano. layout() le dà
+      // bounds {0,0,0,0} — senza questa chiamata la view appena creata resta con
+      // i bounds di default e può disegnarsi sopra la scheda attiva (stesso
+      // motivo per cui _recreateView chiama layout() anche sulle non attive).
+      // NB: NON chiamiamo setVisible(false): per Chromium la scheda resta
+      // "visibile" (grande 0×0) e può quindi far partire i media da sola — è
+      // ciò che rende utile aprire in sottofondo un brano o una radio. La
+      // visibilità viene poi normalizzata al primo cambio di scheda (activate).
+      this.layout();
     }
     view.webContents.loadURL(url);
     if (activate) {
