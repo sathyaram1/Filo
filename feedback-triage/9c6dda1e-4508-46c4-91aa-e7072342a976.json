@@ -1,0 +1,7 @@
+{
+  "id": "9c6dda1e-4508-46c4-91aa-e7072342a976",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la modifica è stata pubblicata. Le conferme prima delle azioni distruttive (svuotare l'archivio delle tab, cancellare la cronologia AI, eliminare una categoria) ora usano il popup nello stile di Filo invece della finestrella grigia di sistema, in modo coerente con il resto dell'app.",
+  "queuedAt": "2026-07-30T00:46:10.157Z",
+  "queuedBy": "routine"
+}
