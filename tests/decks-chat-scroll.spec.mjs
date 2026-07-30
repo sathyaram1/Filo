@@ -1,0 +1,174 @@
+// #336 — scroll durante la generazione. Mentre Filo genera (ragionamento in
+// streaming + risultati), la chat si ricostruisce di continuo; prima del fix ogni
+// ricostruzione strappava la vista in fondo (e, per via dello svuotamento, un
+// istante in cima), rendendo impossibile scrollare per leggere mentre genera.
+//
+// SUCCESSO che si asserisce: se l'utente ha scrollato SU durante la generazione,
+// la sua posizione viene conservata (non torna in fondo). E — invariante da non
+// regredire — se resta in fondo, la vista continua a SEGUIRE i nuovi contenuti.
+//
+// Il provider LLM e Scryfall sono mockati nel main (niente rete); la generazione
+// è messa in pausa su un "gate" così il test può scrollare a metà strada, come
+// farebbe l'utente, e poi lasciarla proseguire.
+
+import { test, expect } from './fixtures/electron.mjs';
+
+// Tante carte rosse (dentro l'identità U/R del commander) così la CardList finale
+// è alta e la colonna chat resta scrollabile anche a generazione finita.
+function manyRedCards(n) {
+  const out = [];
+  for (let i = 1; i <= n; i++) {
+    out.push({
+      id: `c${i}`, name: `Carta Rossa ${i}`, mana_cost: '{R}', cmc: (i % 7),
+      type_line: 'Creature — Goblin', colors: ['R'], color_identity: ['R'],
+      image_uris: { normal: `https://cards.test/c${i}.jpg` },
+      prices: { eur: '0.10' }, legalities: { commander: 'legal' },
+      scryfall_uri: `https://scryfall.com/card/c${i}`,
+    });
+  }
+  return out;
+}
+
+async function mockScryfall(app) {
+  await app.evaluate((cards) => {
+    const NIV = {
+      id: 'niv-1', name: 'Niv-Mizzet, Parun', mana_cost: '{U}{U}{U}{R}{R}{R}', cmc: 6,
+      type_line: 'Legendary Creature — Dragon Wizard', colors: ['U', 'R'], color_identity: ['U', 'R'],
+      image_uris: { normal: 'https://cards.test/niv.jpg', art_crop: 'https://cards.test/niv-art.jpg' },
+      prices: { eur: '3.21' }, legalities: { commander: 'legal' },
+      scryfall_uri: 'https://scryfall.com/card/niv',
+    };
+    const BY_ID = { 'niv-1': NIV };
+    for (const c of cards) BY_ID[c.id] = c;
+    globalThis.__scryRequests = [];
+    globalThis.SN_SCRYFALL._setFetch(async (url) => {
+      globalThis.__scryRequests.push(String(url));
+      const u = new URL(String(url));
+      let body = null;
+      if (u.pathname === '/cards/search') body = { data: cards, has_more: false };
+      else if (BY_ID[u.pathname.replace('/cards/', '')]) body = BY_ID[u.pathname.replace('/cards/', '')];
+      else if (u.pathname === '/symbology') {
+        body = { data: [
+          { symbol: '{U}', svg_uri: 'https://svgs.test/U.svg' },
+          { symbol: '{R}', svg_uri: 'https://svgs.test/R.svg' },
+        ] };
+      }
+      if (!body) return { ok: false, status: 404, json: async () => ({}) };
+      return { ok: true, status: 200, json: async () => body };
+    });
+  }, manyRedCards(40));
+}
+
+// Provider con "gate": emette un blocco DI RAGIONAMENTO lungo (così la colonna
+// chat va in overflow mentre Filo "pensa"), poi si ferma sulla promise finché il
+// test non la rilascia, quindi torna la risposta con una query → CardList.
+async function mockGatedProvider(app) {
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { gemini: 'k-test' },
+      models: { [C.ACTIONS.DECKS_CHAT]: 'flash-lite-3' },
+      modelRegistry: C.DEFAULT_MODEL_REGISTRY,
+    });
+    globalThis.__gate = new Promise((res) => { globalThis.__releaseGate = res; });
+    globalThis.__bigReasoning = Array.from({ length: 400 },
+      (_, i) => `Passo ${i}: valuto una carta rossa con haste per il mazzo Izzet.`).join('\n');
+    globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => ({
+      text: JSON.stringify({ reply: 'Ecco delle carte rosse con haste.', query: 'o:haste' }),
+      model: attempts[0].model, provider: attempts[0].provider, usage: {},
+    });
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, onDelta, onReasoning }) => {
+      // Fase 1: ragionamento lungo → la bolla "sta pensando" diventa alta.
+      if (onReasoning) onReasoning(globalThis.__bigReasoning);
+      // Aspetta che il test scrolli su, imitando l'utente che legge a metà.
+      await globalThis.__gate;
+      // Fase 2: altro ragionamento + risposta (che innescano altri rerender).
+      if (onReasoning) onReasoning('\nConcludo la selezione.');
+      const r = await globalThis.SN_PROVIDERS.completeWithFallback({ attempts, messages });
+      if (onDelta) onDelta(r.text);
+      return r;
+    };
+  });
+}
+
+async function deckWithCommander(page) {
+  await page.click('#newDeck');
+  await expect(page.locator('#screenBuilder')).toBeVisible();
+  const hash = await page.evaluate(() => location.hash);
+  const deckId = decodeURIComponent(hash.replace('#/deck/', ''));
+  const r = await page.evaluate(async (id) => {
+    const { MSG } = window.SN_MSG;
+    return chrome.runtime.sendMessage({ type: MSG.DECKS_SET_COMMANDER, id, scryfallId: 'niv-1' });
+  }, deckId);
+  expect(r && r.ok, 'set commander deve riuscire: ' + JSON.stringify(r)).toBe(true);
+  return deckId;
+}
+
+const scrollInfo = (page) => page.evaluate(() => {
+  const el = document.getElementById('chatLog');
+  return { top: el.scrollTop, height: el.scrollHeight, client: el.clientHeight };
+});
+
+test('scrollando su mentre genera, la vista NON torna in fondo', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await mockScryfall(app);
+  await mockGatedProvider(app);
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await deckWithCommander(page);
+
+  // Parte la generazione (non attendo il completamento: si ferma sul gate).
+  await page.fill('#chatInput', 'modi per dare haste alle creature');
+  await page.press('#chatInput', 'Enter');
+
+  // Il ragionamento in diretta riempie la bolla → la colonna va in overflow.
+  const cotBody = page.locator('.dk-msg-bot').last().locator('.dk-cot-body');
+  await expect(cotBody).toBeVisible();
+  await expect.poll(async () => (await scrollInfo(page)).height - (await scrollInfo(page)).client,
+    { timeout: 10_000, message: 'la chat deve andare in overflow mentre pensa' }).toBeGreaterThan(60);
+
+  // L'utente scrolla in cima per rileggere mentre Filo genera.
+  await page.evaluate(() => { document.getElementById('chatLog').scrollTop = 0; });
+  await expect.poll(async () => (await scrollInfo(page)).top).toBeLessThan(20);
+
+  // La generazione prosegue: arrivano altro ragionamento e i risultati.
+  await app.evaluate(() => globalThis.__releaseGate());
+  const list = page.locator('.dk-msg-bot').last().locator('.dk-cardlist .dk-row');
+  await expect(list.first()).toBeVisible();
+  await expect(list).toHaveCount(40);
+
+  // La colonna è ancora scrollabile (CardList alta) e — QUI il fix — la vista è
+  // rimasta dove l'utente l'aveva lasciata (in cima), non è stata strappata in
+  // fondo a ogni rerender.
+  const s = await scrollInfo(page);
+  expect(s.height - s.client, 'la chat resta scrollabile a fine generazione').toBeGreaterThan(60);
+  expect(s.top, 'la posizione di scroll dell\'utente va conservata, non riportata in fondo')
+    .toBeLessThan(60);
+  await page.screenshot({ path: 'tests/.shots/decks-chat-scroll-preservato.png' });
+});
+
+test('restando in fondo, la vista SEGUE i nuovi contenuti mentre genera', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await mockScryfall(app);
+  await mockGatedProvider(app);
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await deckWithCommander(page);
+
+  await page.fill('#chatInput', 'modi per dare haste alle creature');
+  await page.press('#chatInput', 'Enter');
+
+  const cotBody = page.locator('.dk-msg-bot').last().locator('.dk-cot-body');
+  await expect(cotBody).toBeVisible();
+  // NON scrollo: l'utente resta in fondo. Rilascio e lascio finire.
+  await app.evaluate(() => globalThis.__releaseGate());
+  const list = page.locator('.dk-msg-bot').last().locator('.dk-cardlist .dk-row');
+  await expect(list).toHaveCount(40);
+
+  // Resta scrollabile e la vista è in fondo (auto-follow non regredito).
+  const s = await scrollInfo(page);
+  expect(s.height - s.client).toBeGreaterThan(60);
+  expect(s.height - s.top - s.client, 'chi resta in fondo continua a seguire i contenuti')
+    .toBeLessThan(60);
+});
