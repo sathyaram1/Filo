@@ -1,7 +1,0 @@
-{
-  "id": "a58a2454-30c9-4cc2-a6ed-4896f7ea1257",
-  "status": "done",
-  "notes": "Il pulsante 'Svuota' della pagina Cronologia AI ora apre la finestra di conferma disegnata da Filo (coerente col tema chiaro/scuro, stessi font e stile del resto dell'app), non piu' il popup grigio nativo del sistema.\n\nCosa e' emerso: quando ho preso in carico la segnalazione, la correzione era gia' presente nel codice. Era stata applicata insieme alla sistemazione gemella di 'Svuota archivio' (feedback #275): quel lavoro aveva esteso la stessa finestra di conferma stilizzata anche alla Cronologia, caricando in pagina il componente di conferma di Filo e sostituendo la chiamata al popup nativo. Le tre pagine citate nella segnalazione (Tab archiviate, Opzioni->Altro, Cronologia) risultano ora tutte allineate allo stesso dialogo coerente.\n\nNon ho quindi dovuto scrivere nuovo codice: la pagina era gia' corretta. Mi sono limitato a verificare che funzioni davvero.\n\nCome ho verificato: ho eseguito il test automatico dedicato che apre la Cronologia, clicca 'Svuota' e controlla due cose insieme - che compaia il dialogo stilizzato di Filo e che NON venga generato alcun popup nativo del browser. Il test passa: la conferma mostrata e' quella dell'app, non quella di sistema.\n\nNulla lasciato fuori: la segnalazione riguardava solo questo pulsante e questa incoerenza, ora risolta e coperta da test.",
-  "queuedAt": "2026-07-30T06:27:10.885Z",
-  "queuedBy": "routine"
-}
