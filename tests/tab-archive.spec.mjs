@@ -6,6 +6,7 @@
 // Senza il fix la tab chiusa spariva del tutto.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { CONFIRM_HOST, clickConfirm } from './helpers/confirm.mjs';
 
 const PAGE = `<!doctype html><html><head><title>Sito Archivio</title>
   <meta name="theme-color" content="rgb(200, 40, 60)">
