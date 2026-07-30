@@ -915,7 +915,7 @@
         : '') +
       `═══ AZIONI DISPONIBILI ═══\n` +
       `Includi nel tuo output le azioni necessarie. Il sistema le esegue.\n` +
-      `NAVIGA: {url, etichetta}  — APRE SUBITO il sito in una nuova scheda. Usalo quando l'utente chiede di aprire qualcosa; lascia "text" vuoto se non hai altro da dire.\n` +
+      `NAVIGA: {url, etichetta, background?}  — APRE SUBITO il sito in una nuova scheda. Usalo quando l'utente chiede di aprire qualcosa; lascia "text" vuoto se non hai altro da dire. Con \`background: true\` la scheda si apre in SECONDO PIANO (l'utente resta dov'è, la musica parte lo stesso): usalo per ciò che si ascolta e basta, o quando l'utente chiede di non cambiare scheda.\n` +
       `TIMER: {secondi, etichetta}  — crea timer nella colonna destra.\n` +
       `SVEGLIA: {time, label}  — programma una sveglia che SUONA all'orario indicato (avviso sonoro + notifica). \`time\` è "HH:MM" (prossima occorrenza: oggi se l'orario deve ancora arrivare, altrimenti domani) oppure una data-ora ISO per un giorno preciso. Richieste relative ("sveglia tra 3 ore", "domani alle 7") → calcola TU l'orario a partire dalla sezione TEMPO e passalo in \`time\`.\n` +
       `SALVA_APPUNTO: {testo, contesto, nuovo?}  — scrive un appunto in un file dell'editor. \`contesto\` è l'argomento: accoda al file di appunti corrente finché l'argomento resta lo stesso, apre un file NUOVO quando cambia. Metti \`nuovo: true\` se l'utente chiede esplicitamente un appunto separato ("apri un nuovo appunto", "in un file a parte").\n` +
