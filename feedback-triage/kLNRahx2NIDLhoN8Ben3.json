@@ -1,0 +1,7 @@
+{
+  "id": "kLNRahx2NIDLhoN8Ben3",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato e modifica pubblicata. Ora nel deck builder puoi scorrere la chat mentre Filo sta generando: la vista non torna piu' da sola in fondo (ne' salta in cima) a ogni aggiornamento, cosi' leggi con calma il ragionamento e i risultati mentre arrivano. Se invece resti in fondo, la chat continua a seguire da sola i nuovi contenuti.",
+  "queuedAt": "2026-07-30T09:57:20.094Z",
+  "queuedBy": "routine"
+}
