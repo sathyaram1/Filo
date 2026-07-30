@@ -19,6 +19,16 @@
 //
 // I campi ritornati da compose() vanno passati direttamente a SN_FEEDBACK.submit()
 // nel main process.
+//
+//   SN_AUTO_FEEDBACK.composeProposal(analysis, { userMessage, textReply })
+//     → { type: 'INVIA_FEEDBACK', testo, titolo } | null      (#360)
+//
+// La PROPOSTA è l'altra faccia del feedback autonomo: invece di partire di
+// nascosto (compose, generico), Filo mette in chat una segnalazione GIÀ SCRITTA
+// con il tasto di conferma — l'utente la legge e decide. Siccome la vede prima
+// che parta, qui il testo dell'utente può essere citato per intero: è la stessa
+// cosa che scriverebbe a mano nel box feedback, e senza la sua richiesta la
+// segnalazione sarebbe inutile per chi sviluppa.
 
 (function (global) {
   'use strict';
