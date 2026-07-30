@@ -97,6 +97,12 @@
       invoke: 'Automatico (soglia e attivazione in Preferenze); a richiesta con il comando /pulisci o il pulsante «Riordina e archivia le schede» nella home.',
       doesNot: 'Non tocca le finestre in incognito, la scheda attiva, le schede con audio in riproduzione o con un modulo compilato non inviato, né le pagine di lavoro interne di Filo (Editor, Bacheca, Mazzi, Cronologia).',
     },
+    {
+      id: 'reorder-tabs', title: 'Riordina le schede per colore', category: 'navigation',
+      desc: 'Riordina al volo tutte le schede aperte per colore, come succede quando riapri Filo, mettendo vicine quelle dello stesso sito o tinta.',
+      invoke: 'Comando /riordina dalla nuova scheda.',
+      doesNot: 'Non chiude né archivia nessuna scheda: le riordina soltanto (per chiudere quelle non più utili c’è /pulisci).',
+    },
 
     // ─────────────────────── Azioni sul testo selezionato ────────────────────
     {
