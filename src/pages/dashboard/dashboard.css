@@ -315,6 +315,20 @@ body[data-state="thread"] .dash-suggestion { justify-content: flex-start; paddin
   font-family: inherit;
 }
 .dash-action-btn:hover { background: var(--dash-ink); color: var(--dash-paper); }
+/* #376 — traccia di un passo intermedio (cerco sul web, leggo un file…): è un
+   racconto di cosa sta facendo Filo, non un bottone. Niente pill né bordo: così
+   nella conversazione resta cliccabile solo il risultato vero. */
+.dash-action-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--dash-ink);
+  opacity: 0.55;
+  font-style: italic;
+}
 .dash-action-favicon {
   width: 28px;
   height: 28px;
