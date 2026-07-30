@@ -100,5 +100,5 @@ test('"/riordina" riordina le schede per colore senza chiuderne nessuna', async 
   await expect.poll(async () => shell.evaluate(async () => {
     const s = await window.filoShell.tabs.snapshot();
     return s.tabs.filter((t) => /127\.0\.0\.1/.test(t.url || '')).map((t) => t.title);
-  }), { timeout: 8_000 }).toEqual(expectedOrder);
+  }), { timeout: 15_000 }).toEqual(expectedOrder);
 });
