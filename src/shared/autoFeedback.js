@@ -54,6 +54,31 @@
     'al momento non è possibile',
     'per ora non è possibile',
     'questa funzionalità non è disponibile',
+    // #360 — "quanti crediti ho?": Filo ha ammesso di non saperlo, ma con parole
+    // che nessuna frase qui sopra intercettava ("non ho accesso al saldo"), così
+    // il gap è passato inosservato e nessuna segnalazione è stata proposta.
+    // Queste sono le formulazioni con cui ammette di non AVERE un dato o un
+    // canale per ottenerlo: tenute strette (serve il "non ho/non posso/non
+    // riesco" attaccato) per non scattare su una frase qualunque.
+    'non ho accesso',
+    'non posso accedere',
+    'non ho modo di',
+    'non ho la possibilità di',
+    'non ho a disposizione',
+    'non ho visibilità',
+    'non ho questa informazione',
+    'non ho informazioni su',
+    'non riesco a vedere',
+    'non riesco a recuperare',
+    'non posso vedere',
+    'non posso mostrarti',
+    'non posso mostrare',
+    'non posso recuperare',
+    'non posso leggere',
+    'non posso controllare',
+    'non sono in possesso',
+    'non mi è possibile',
+    'non è previsto',
   ];
 
   // Segnali di lamentela: l'utente o l'agente usa queste frasi per indicare
