@@ -1,7 +1,0 @@
-{
-  "id": "Hp0XforkRQvwpZCMTXly",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho riprodotto esattamente la situazione che segnalavi: molte schede aperte tutte strettissime, con una che sta suonando (come YouTube). Ora quella scheda mostra un solo indicatore audio, l'altoparlante, che prende il posto dell'icona del sito nello stesso identico punto (all'inizio della scheda). Non c'è più nessuna sovrapposizione tra altoparlante e favicon e non c'è più il secondo altoparlante duplicato a fine scheda: un unico segnale, sempre visibile anche quando le schede sono ridotte al minimo. Ho verificato che dietro l'icona audio non resti più disegnata la favicon del sito (era proprio quella la sovrapposizione), e che cliccando sull'altoparlante la scheda venga silenziata davvero e, riattivandola mentre suona ancora, ricompaia un solo indicatore. Ho controllato anche i casi limite: con 12+ schede compresse l'indicatore non si moltiplica e non sparisce, resta sempre uno e leggibile. Verifica fatta eseguendo l'app reale (test automatici del comportamento delle schede + screenshot della barra composita ispezionato a occhio). Tutto a posto.",
-  "queuedAt": "2026-07-30T21:30:08.127Z",
-  "queuedBy": "routine"
-}
