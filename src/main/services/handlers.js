@@ -778,7 +778,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         // GUARDATO adesso (un brano da ascoltare, una radio, una pagina messa
         // da parte), la scheda nasce senza rubare il primo piano. Il flag
         // arriva dal modello (background/secondo_piano/sfondo) e accetta anche
-        // la stringa "true" — i modelli piccoli a volta la mandano così.
+        // la stringa "true" — i modelli piccoli a volte la mandano così.
         const truthy = (v) => v === true || v === 1 || /^(true|1|si|sì|yes)$/i.test(String(v ?? ''));
         const background = truthy(action.background ?? action.secondoPiano
           ?? action.secondo_piano ?? action.sfondo ?? action.inBackground);
