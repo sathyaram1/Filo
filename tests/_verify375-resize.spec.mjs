@@ -43,11 +43,12 @@ test('l\'utente allarga la lista trascinando il bordo, e la misura viene ricorda
   // Il dettaglio centrale assorbe: si stringe di altrettanto.
   expect(detailAfter.width).toBeLessThan(detailBefore.width - 90);
 
-  // Riapro la pagina: la misura scelta deve essere ancora lì.
-  const page2 = await openTab(URL);
-  await page2.waitForLoadState('domcontentloaded');
-  await page2.waitForTimeout(400);
-  const reopened = await box(page2, '#mgListCol');
+  // Riapro la pagina (ricarica vera: la pagina si re-inizializza e rilegge le
+  // preferenze salvate): la misura scelta deve essere ancora lì.
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForTimeout(500);
+  const reopened = await box(page, '#mgListCol');
   console.log('dopo riapertura', reopened.width);
   expect(Math.abs(reopened.width - after.width)).toBeLessThan(3);
 });
