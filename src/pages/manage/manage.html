@@ -739,7 +739,9 @@
     <!-- Layout condiviso a 3 colonne: la lista a sinistra è filtrata per tab,
          il dettaglio al centro e il pannello laterale a destra sono comuni. -->
     <section class="mg-panel mg-panel--active" id="panel-list" data-panel="list">
-      <div class="mg-review">
+      <!-- Le larghezze delle colonne si trascinano dai due divisori e vengono
+           ricordate; doppio clic su un divisore ripristina la misura iniziale. -->
+      <div class="mg-review" id="mgReviewGrid">
 
         <!-- Colonna sinistra: lista feedback della tab corrente -->
         <div class="mg-col" id="mgListCol">
