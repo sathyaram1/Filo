@@ -216,6 +216,12 @@
     // (a differenza di RUN_TAB_TRIAGE). Nessuna scheda viene chiusa. → { reordered }
     REORDER_TABS: 'reorder_tabs',
 
+    // #376 — porta in primo piano una scheda già aperta (per id). Serve ai
+    // riferimenti in chat quando Filo ha aperto qualcosa in SECONDO PIANO: il
+    // chip ci porta sopra invece di aprire una seconda scheda sullo stesso
+    // indirizzo. → { ok }
+    FOCUS_TAB: 'focus_tab',                        // { id }
+
     // Aiuto: invio percorso completato a fine sessione (passa per la pipeline
     // di sanitizzazione 2-LLM in pathsCollector.js prima di toccare Firestore).
     SAVE_PATH: 'save_path',                        // { path: { domain, initialUrl, sanitizedSteps, rawUserMessages, success } }
