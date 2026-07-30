@@ -1,7 +1,0 @@
-{
-  "id": "uAoB4ZodrO9dum1mK4gb",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica e' stata pubblicata. Non ho rilevato problemi di sicurezza. La verifica ha coperto i casi limite del riordino schede (stato gia' in ordine, singola scheda, scheda attiva che resta attiva dopo il riordino, e comando riconosciuto anche con argomenti in piu').",
-  "queuedAt": "2026-07-30T10:18:41.662Z",
-  "queuedBy": "routine"
-}
