@@ -590,8 +590,10 @@
         if (!res?.ok) { Popup.showToast(I18n.t('err_provider_failed')); return; }
         const text = (res.text || '').trim();
         if (!text) { Popup.showToast(I18n.t('menu_dictate_empty')); return; }
-        deps.restorePasteContext();
-        deps.insertTextAtSelection(text + ' ');
+        // Inserisci dove il cursore si trova ADESSO, non dove era all'apertura
+        // del menu: durante la registrazione (fino a ~60s) l'utente può aver
+        // continuato a scrivere o spostato il cursore nello stesso campo.
+        deps.insertDictatedText(text + ' ');
       } catch (_) {
         Popup.showToast(I18n.t('err_provider_failed'));
         cleanup();
