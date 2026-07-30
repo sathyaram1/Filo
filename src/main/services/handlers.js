@@ -773,18 +773,31 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
             return { executed: false, kept: true, output: { blocked: 'scheme' } };
           }
         } catch (_) { /* URL non assoluto: lo normalizza openTab */ }
+        // #376 — apertura in SECONDO PIANO: quando ciò che Filo apre non va
+        // GUARDATO adesso (un brano da ascoltare, una radio, una pagina messa
+        // da parte), la scheda nasce senza rubare il primo piano. Il flag
+        // arriva dal modello (background/secondo_piano/sfondo) e accetta anche
+        // la stringa "true" — i modelli piccoli a volta la mandano così.
+        const truthy = (v) => v === true || v === 1 || /^(true|1|si|sì|yes)$/i.test(String(v ?? ''));
+        const background = truthy(action.background ?? action.secondoPiano
+          ?? action.secondo_piano ?? action.sfondo ?? action.inBackground);
         let opened = false;
+        let tabId = null;
         try {
           const win = winOf(sender);
           const tm = win && win._filoTabs;
           if (tm && typeof tm.openTab === 'function') {
-            tm.openTab(url, { activate: true });
+            tabId = tm.openTab(url, { activate: !background });
             opened = true;
           }
         } catch (e) {
           console.warn('[Filo] apertura link fallita', e?.message || e);
         }
-        return { executed: opened, kept: true, opened };
+        // In secondo piano l'apertura è quasi invisibile: passiamo al client
+        // l'id della scheda, così il chip in chat ci PORTA (non ne apre una
+        // seconda) e può dire che sta suonando lì dietro.
+        const output = (opened && background) ? { background: true, tabId } : null;
+        return { executed: opened, kept: true, opened, background, ...(output ? { output } : {}) };
       }
       case 'TIMER': {
         const seconds = Number(action.seconds || action.secondi || 0);
