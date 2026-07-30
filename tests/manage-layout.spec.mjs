@@ -29,6 +29,8 @@ test('trascinando il divisore sinistro la lista si allarga e la misura è ricord
   await dragDivider(page, '#mgDividerLeft', 140);
   const after = await colWidth(page, '#mgListCol');
   expect(Math.round(after - before)).toBeGreaterThan(110);
+  // Traccia visiva ispezionabile della nuova disposizione (cartella gitignorata).
+  await page.screenshot({ path: 'tests/.shots/manage-cols-resized.png' });
 
   // Riapertura della pagina: la larghezza scelta non torna al default.
   await page.goto(URL);
