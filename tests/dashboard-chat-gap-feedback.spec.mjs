@@ -73,6 +73,29 @@ test('rete assente: la chat spiega il problema invece di mostrare "fetch failed"
   await expect(page.locator('#bubbles')).not.toContainText('fetch failed');
 
   await page.screenshot({ path: 'tests/.shots/360-rete-assente.png' }).catch(() => {});
+
+  // La bolla dice "riprova": il tasto deve esserci, altrimenti l'utente
+  // dovrebbe riscrivere tutto a mano (stesso "Riprova" della pagina d'errore
+  // di una scheda).
+  const retry = bubble.locator('.dash-action-btn', { hasText: /Riprova/i });
+  await expect(retry).toBeVisible({ timeout: 5_000 });
+
+  // Tornata la rete, "Riprova" rimanda lo STESSO messaggio e la risposta arriva.
+  await app.evaluate(() => {
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, onDelta }) => {
+      const text = JSON.stringify({ text: 'Rete tornata: eccomi.', actions: [] });
+      try { onDelta && onDelta(text); } catch (_) {}
+      return { text, model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+    };
+  });
+  await retry.click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Rete tornata: eccomi.' }))
+    .toBeVisible({ timeout: 20_000 });
+  // La bolla d'errore sparisce: il tentativo è ricominciato, non accumulato.
+  await expect(page.locator('#bubbles')).not.toContainText(/Problema di rete/i);
+  // Il messaggio è stato rimandato una sola volta, non duplicato in chat.
+  await expect(page.locator('.dash-bubble-user', { hasText: 'quanti crediti ho?' })).toHaveCount(1);
+
   await app.evaluate(() => { try { globalThis.__restoreNet?.(); } catch (_) {} });
 });
 
