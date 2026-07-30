@@ -201,7 +201,11 @@ test('#376 — i passi intermedi di Filo non sono bottoni (una sola cosa cliccab
   // …ma non ha più la forma di un bottone/pill.
   await expect(page.locator('#test-steps .dash-action-step.dash-action-btn')).toHaveCount(0);
 
-  // SUCCESSO: nella bolla c'è UNA sola cosa cliccabile — il risultato vero.
-  await expect(page.locator('#test-steps .dash-action-btn')).toHaveCount(1);
-  await expect(page.locator('#test-steps .dash-action-btn')).toContainText('Giorgio Gaber');
+  // SUCCESSO: in tutta la conversazione resta UNA sola cosa cliccabile — il
+  // risultato vero (prima erano due pill affiancate: la ricerca e il link).
+  await expect(page.locator('#bubbles .dash-action-btn')).toHaveCount(1);
+  await expect(page.locator('#bubbles .dash-action-btn')).toContainText('Giorgio Gaber');
+
+  // Traccia visiva ispezionabile della scena (cartella gitignorata).
+  await page.screenshot({ path: 'tests/.shots/376-chat-passi.png' });
 });
