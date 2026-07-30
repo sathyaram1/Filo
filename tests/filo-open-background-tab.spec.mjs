@@ -166,14 +166,31 @@ test('#376 — il riferimento in chat PORTA alla scheda aperta in secondo piano 
 test('#376 — i passi intermedi di Filo non sono bottoni (una sola cosa cliccabile)', async ({ openTab }) => {
   const page = await openTab(NEWTAB);
 
-  // La stessa scena del feedback: Filo cerca sul web e poi apre il risultato.
+  // La stessa scena del feedback, dentro bolle vere: Filo cerca sul web e poi
+  // apre il risultato in secondo piano.
   await page.evaluate(() => {
-    const host = document.createElement('div');
-    host.id = 'test-steps';
-    document.body.appendChild(host);
-    window.__filoDashActions.renderActions(host, [
+    const bubbles = document.getElementById('bubbles');
+    const mk = (cls, text) => {
+      const d = document.createElement('div');
+      d.className = cls;
+      if (text) d.textContent = text;
+      bubbles.appendChild(d);
+      return d;
+    };
+    mk('dash-bubble dash-bubble-user', 'voglio ascoltarla');
+    const step = mk('dash-bubble dash-bubble-filo', 'Cerco una versione audio o video disponibile.');
+    step.id = 'test-steps';
+    window.__filoDashActions.renderActions(step, [
       { type: 'CERCA_WEB', query: 'Il conformista Gaber audio video YouTube' },
-      { type: 'NAVIGA', url: 'https://www.youtube.com/watch?v=x', label: 'Il conformista - Giorgio Gaber' },
+    ]);
+    const out = mk('dash-bubble dash-bubble-filo dash-bubble-actions-only');
+    out.id = 'test-result';
+    window.__filoDashActions.renderActions(out, [
+      {
+        type: 'NAVIGA', url: 'https://www.youtube.com/watch?v=x',
+        label: 'Il conformista - Giorgio Gaber',
+        _output: { background: true, tabId: 'tab-finto' },
+      },
     ]);
   });
 
