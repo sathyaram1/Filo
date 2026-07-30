@@ -296,7 +296,9 @@
     return (b === null || b === undefined) ? '' : fmtBudgetShort(b);
   }
 
-  async function renderBuilder() {
+  // `stickChat`: all'apertura del mazzo la chat mostra l'ultimo scambio (fondo);
+  // nei refresh dopo una modifica si rispetta invece la posizione dell'utente.
+  async function renderBuilder(stickChat) {
     $('deckNameText').textContent = current.nome;
     const commander = (current.commanderMeta && current.commanderMeta.name)
       ? `Commander: ${current.commanderMeta.name}`
