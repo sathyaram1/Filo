@@ -910,39 +910,24 @@
       return btn;
     }
     if (type === 'CERCA_WEB') {
-      // Chip di stato inerte (come "📖 Verifico cosa so fare"): rende trasparente
-      // che Filo sta cercando sul web. La ricerca è già partita nel main e i
-      // risultati rientrano nel turno successivo (auto-continue), dove compare la
-      // risposta con i link REALI. Non è un bottone cliccabile — prima sembrava
-      // un "link che non funziona" (#368).
-      const btn = document.createElement('button');
-      btn.className = 'dash-action-btn';
-      btn.type = 'button';
-      btn.disabled = true;
-      btn.textContent = `🔎 Cerco sul web: ${a.query || ''}`.trim();
-      return btn;
+      // Traccia del passo intermedio: rende trasparente che Filo sta cercando sul
+      // web (#368). La ricerca è già partita nel main e i risultati rientrano nel
+      // turno successivo (auto-continue), dove compare la risposta con i link
+      // REALI. NON è un bottone: prima aveva la forma di una pill e l'utente si
+      // ritrovava "due bottoni" per una cosa sola (#376).
+      return stepTrace(`🔎 Cerco sul web: ${a.query || ''}`.trim());
     }
     if (type === 'CAPACITA_DETTAGLIO') {
-      // Chip inerte: rende trasparente che Filo sta consultando il proprio
-      // manifesto delle capacità (#F2) prima di rispondere.
-      const btn = document.createElement('button');
-      btn.className = 'dash-action-btn';
-      btn.type = 'button';
-      btn.disabled = true;
-      btn.textContent = '📖 Verifico cosa so fare';
-      return btn;
+      // Traccia del passo intermedio: Filo sta consultando il proprio manifesto
+      // delle capacità (#F2) prima di rispondere.
+      return stepTrace('📖 Verifico cosa so fare');
     }
     if (type === 'LEGGI_FILE') {
-      // Chip inerte: rende trasparente che Filo sta aprendo un file dell'editor
-      // per leggerlo per intero (#379.5). Il contenuto rientra nel turno
-      // successivo (auto-continue), dove compare la risposta.
-      const btn = document.createElement('button');
-      btn.className = 'dash-action-btn';
-      btn.type = 'button';
-      btn.disabled = true;
+      // Traccia del passo intermedio: Filo apre un file dell'editor per leggerlo
+      // per intero (#379.5). Il contenuto rientra nel turno successivo
+      // (auto-continue), dove compare la risposta.
       const title = (a._output && a._output.title) || '';
-      btn.textContent = title ? `📄 Leggo: ${title}` : '📄 Leggo un file';
-      return btn;
+      return stepTrace(title ? `📄 Leggo: ${title}` : '📄 Leggo un file');
     }
     if (type === 'EVENTO_CALENDARIO') {
       const btn = document.createElement('button');
