@@ -1,7 +1,0 @@
-{
-  "id": "kLNRahx2NIDLhoN8Ben3",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho riprodotto esattamente la tua situazione: nel costruttore di mazzi, mentre Filo genera (ragionamento in diretta + risultati), ho scrollato in cima per rileggere e ho controllato che la vista NON venisse più strappata in fondo/in alto. Ora la posizione resta ferma dove la lasci finché generi; se invece resti in fondo, la chat continua a seguire i nuovi contenuti man mano che arrivano. Ho stressato il flusso: invii rapidi ripetuti, input vuoto o di soli spazi, testo lunghissimo (10k caratteri), reply/query ostili con tag script (restano testo, nessuno script eseguito), provider giù e JSON malformato, ricerca senza risultati — la chat resta sempre usabile e lo scroll si comporta bene. Ho anche verificato che aprendo/chiudendo il ragionamento o la lista di una bolla mentre genera la vista non salta più. Controprova: disattivando la correzione, scrollando su durante la generazione la vista tornava di forza in fondo (il tuo sintomo); con la correzione resta al suo posto. Controllo visivo: screenshot con la chat ferma in cima durante la generazione, layout e input a posto.",
-  "queuedAt": "2026-07-30T09:54:48.340Z",
-  "queuedBy": "routine"
-}
