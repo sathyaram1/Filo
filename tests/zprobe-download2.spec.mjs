@@ -30,10 +30,14 @@ test('link di download con target=_blank: resta una scheda vuota?', async ({ app
   const page = await openTab(`http://127.0.0.1:${port}/p`);
   await page.waitForTimeout(800);
 
-  const tabsBefore = await shell.evaluate(() => Array.from(document.querySelectorAll('.tab')).map((t) => (t.innerText || '').trim()));
+  const dump = () => app.evaluate(() => {
+    const tm = globalThis.__filoTabs || null;
+    return null;
+  }).catch(() => null);
+  const tabsBefore = await shell.evaluate(() => Array.from(document.querySelectorAll('.tab')).map((t) => ({ text: (t.innerText || '').trim(), id: t.dataset.id || t.getAttribute('data-tab-id') || '' })));
   await page.click('#dl');
   await page.waitForTimeout(4000);
-  const tabsAfter = await shell.evaluate(() => Array.from(document.querySelectorAll('.tab')).map((t) => (t.innerText || '').trim()));
+  const tabsAfter = await shell.evaluate(() => Array.from(document.querySelectorAll('.tab')).map((t) => ({ text: (t.innerText || '').trim(), id: t.dataset.id || t.getAttribute('data-tab-id') || '' })));
   const dl = await app.evaluate(() => globalThis.__dl);
 
   console.log('TABS PRIMA:', JSON.stringify(tabsBefore));
