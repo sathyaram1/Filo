@@ -41,7 +41,8 @@ test('probe A: ripristinare una vecchia versione riporta indietro anche il NOME'
   console.log('PROBE titolo dopo rename 2:', await page.locator('.ed-doc-title').textContent());
 
   // Apri lo storico versioni.
-  await page.click('#docSwitch');
+  const popOpen = await page.locator('#docPop').isVisible().catch(() => false);
+  if (!popOpen) await page.click('#docSwitch');
   await page.click('#docHistory');
   await page.waitForTimeout(400);
   const items = page.locator('.ed-vh-item');
