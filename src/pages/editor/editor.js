@@ -202,10 +202,16 @@
   // Serializza un MODELLO doc (in memoria) nel formato di storage, SENZA toccare
   // il DOM: usato per creare file vuoti e per snapshot generici. Il file attivo
   // passa da serialize(), che prima allinea il modello al DOM.
+  //
+  // Il risultato è una COPIA PROFONDA, mai un alias del modello vivo: questo
+  // serializzato finisce sia nella collezione sia negli snapshot dello storico
+  // versioni, e uno snapshot che continua a cambiare insieme al documento non è
+  // uno snapshot (era la causa dell'incoerenza prima/dopo il riavvio: in memoria
+  // la chat di un modulo "seguiva" le modifiche, su disco no).
   function serializeDocModel(d) {
     const meta = { ...(d.meta || {}) };
     if (!meta.title) meta.title = 'Documento senza titolo';
-    return {
+    return cloneJson({
       id: d.id,
       meta,
       content: d.content || { type: 'doc', content: [{ type: 'paragraph', content: [] }] },
@@ -213,7 +219,7 @@
       modules: (d.modules || []).map((m) => ({
         id: m.id, type: m.type, cells: rectToCells(m), data: m.data,
       })),
-    };
+    });
   }
 
   function serialize() {
