@@ -492,8 +492,11 @@
   }
 
   // Ripristina una versione: prima salva lo stato corrente come versione (così
-  // anche il ripristino è annullabile e non si perde nulla), poi rimpiazza il
-  // contenuto del file con quello scelto e ri-renderizza se è il file attivo.
+  // anche il ripristino è annullabile e non si perde nulla), poi riporta il
+  // CORPO del documento (testo + commenti) a quello scelto e ri-renderizza se è
+  // il file attivo. Nome del documento, conversazione con Filo e disposizione
+  // dei riquadri NON tornano indietro: appartengono al documento di adesso, non
+  // al testo di allora (vedi SN_EDITOR_VERSIONS.composeRestored).
   function restoreVersion(fileId, versionId) {
     if (!VERS) return false;
     const v = VERS.get(versions, fileId, versionId);
