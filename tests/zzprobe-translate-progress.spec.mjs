@@ -47,7 +47,7 @@ test('pagina lunga: durante la traduzione non c\'è nessun indicatore di avanzam
   });
 
   const page = await testServer.openReady(openTab, LONG);
-  await page.locator('main').click({ button: 'right' });
+  await page.locator('p').first().click({ button: 'right' });
   const menu = page.locator('.sn-menu').first();
   await expect(menu).toBeVisible();
   await menu.locator('.sn-menu-row-btn[data-sn-icon-id="translate"]').click();
