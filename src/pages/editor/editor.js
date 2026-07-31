@@ -1569,6 +1569,12 @@
         content.push({ type: tag === 'UL' ? 'bulletList' : 'orderedList', content: items });
       } else if (tag === 'DIV' || tag === 'P') {
         content.push({ type: 'paragraph', ...(align ? { attrs: { align } } : {}), content: inlineToPM(el, []) });
+      } else if (tag === 'IMG') {
+        // Immagine incollata come figlia diretta del foglio (contenteditable la
+        // lascia spesso fuori da qualsiasi paragrafo): incapsulala in un
+        // paragrafo così ha un blocco che la contiene nel modello.
+        const img = imgToPM(el);
+        if (img) content.push({ type: 'paragraph', content: [img] });
       }
     });
     if (!content.length) content.push({ type: 'paragraph', content: [] });
