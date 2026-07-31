@@ -755,9 +755,16 @@
     const i = trash.findIndex((e) => e.id === entryId);
     if (i < 0) return null;
     const [entry] = trash.splice(i, 1);
-    if (VERS && entry && entry.file && versions[entry.file.id]) {
-      versions = VERS.dropFile(versions, entry.file.id);
-      persistVersions();
+    // Lo storico arriva dall'archivio in modo asincrono: aspetta che sia
+    // caricato, altrimenti una pulizia fatta troppo presto verrebbe riscritta
+    // dal caricamento e lascerebbe lo storico di un file che non esiste più.
+    if (VERS && entry && entry.file) {
+      const fid = entry.file.id;
+      Promise.resolve(versionsReady).then(() => {
+        if (!versions[fid]) return;
+        versions = VERS.dropFile(versions, fid);
+        persistVersions();
+      }).catch(() => {});
     }
     return entry;
   }
