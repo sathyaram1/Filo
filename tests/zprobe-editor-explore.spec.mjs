@@ -10,84 +10,86 @@ async function setDocText(page, text) {
   }, text);
 }
 
-// Apre il menu documenti in modo idempotente (il click su #docSwitch fa toggle).
 async function openPop(page) {
   const hidden = await page.locator('#docPop').evaluate((el) => el.hidden);
   if (hidden) await page.click('#docSwitch');
   await expect(page.locator('#docPop')).toBeVisible();
 }
 
-test('probe: due eliminazioni ravvicinate — quante si possono annullare?', async ({ openTab }) => {
+async function rename(page, idx, name) {
+  await openPop(page);
+  await page.locator('.ed-doc-item').nth(idx).locator('.ed-doc-rename').click();
+  await page.locator('.ed-doc-item-input').fill(name);
+  await page.keyboard.press('Enter');
+}
+
+test('REPRO: due eliminazioni ravvicinate — il primo documento è perso per sempre', async ({ openTab }) => {
   const page = await openTab('filo://editor/editor.html');
   await page.waitForSelector('#doc');
 
-  await setDocText(page, 'AAA');
+  await setDocText(page, 'TESTO DELLA TESI');
+  await rename(page, 0, 'Tesi');
+
   await openPop(page);
   await page.click('#docNew');
-  await setDocText(page, 'BBB');
+  await setDocText(page, 'TESTO DELLA SPESA');
+  await rename(page, 1, 'Spesa');
+
   await openPop(page);
   await page.click('#docNew');
-  await setDocText(page, 'CCC');
+  await setDocText(page, 'TESTO DEGLI APPUNTI');
+  await rename(page, 2, 'Appunti');
 
   await openPop(page);
   await expect(page.locator('.ed-doc-item')).toHaveCount(3);
 
-  await page.locator('.ed-doc-item').nth(0).locator('.ed-doc-del').click();
+  // L'utente elimina due documenti di fila (uno per sbaglio).
+  await page.locator('.ed-doc-item').nth(0).locator('.ed-doc-del').click();  // Tesi
+  await page.waitForTimeout(200);
+  await page.screenshot({ path: 'tests/.shots/probe-del1.png' });
   await openPop(page);
-  await expect(page.locator('.ed-doc-item')).toHaveCount(2);
-  await page.locator('.ed-doc-item').nth(0).locator('.ed-doc-del').click();
+  await page.locator('.ed-doc-item').nth(0).locator('.ed-doc-del').click();  // Spesa
+  await page.waitForTimeout(200);
 
-  const toastText = await page.locator('#edToast').innerText().catch(() => '(nessun toast)');
-  console.log('TOAST DOPO 2 ELIMINAZIONI:', JSON.stringify(toastText));
+  // Il toast parla solo dell'ULTIMO eliminato.
+  console.log('TOAST:', JSON.stringify(await page.locator('#edToast').innerText()));
+  await page.screenshot({ path: 'tests/.shots/probe-editor-doppia-eliminazione.png' });
 
+  // Annulla → torna solo "Spesa". "Tesi" non è più recuperabile in nessun modo.
   await page.locator('.ed-toast-action').click();
+  await page.waitForTimeout(300);
   await openPop(page);
-  const names = await page.locator('.ed-doc-item-name').allInnerTexts();
-  console.log('DOPO UN ANNULLA — file:', names.length, JSON.stringify(names));
-  const stillToast = await page.locator('.ed-toast-action').count();
-  console.log('altri pulsanti Annulla disponibili:', stillToast);
-  await page.screenshot({ path: 'tests/.shots/probe-editor-2del.png' });
-});
+  let names = await page.locator('.ed-doc-item-name').allInnerTexts();
+  console.log('DOPO ANNULLA:', JSON.stringify(names));
+  console.log('altri Annulla:', await page.locator('.ed-toast-action').count());
 
-test('probe: nome documento lunghissimo', async ({ openTab }) => {
-  const page = await openTab('filo://editor/editor.html');
-  await page.waitForSelector('#doc');
-  await setDocText(page, 'testo');
-
-  const longName = 'Appunti di lavoro molto molto lunghi ' + 'X'.repeat(300);
-  await openPop(page);
-  await page.locator('.ed-doc-item').nth(0).locator('.ed-doc-rename').click();
-  await page.locator('.ed-doc-item-input').fill(longName);
-  await page.keyboard.press('Enter');
-
-  const titleTxt = await page.locator('#docTitle').innerText();
-  console.log('docTitle len:', titleTxt.length);
-  const titleBox = await page.locator('#docTitle').boundingBox();
-  const barBox = await page.locator('#docbar').boundingBox();
-  console.log('docTitle box:', titleBox, 'docbar box:', barBox);
-
-  await openPop(page);
-  const popBox = await page.locator('#docPop').boundingBox();
-  const itemBox = await page.locator('.ed-doc-item').nth(0).boundingBox();
-  const delBox = await page.locator('.ed-doc-item').nth(0).locator('.ed-doc-del').boundingBox();
-  const vw = await page.evaluate(() => window.innerWidth);
-  console.log('popBox:', popBox, 'itemBox:', itemBox, 'delBox:', delBox, 'vw:', vw);
-  await page.screenshot({ path: 'tests/.shots/probe-editor-longname.png' });
-
-  // Il tasto Elimina è ancora cliccabile con un nome enorme?
-  await page.locator('.ed-doc-item').nth(0).locator('.ed-doc-del').click({ timeout: 5000 });
-  console.log('elimina cliccabile: OK');
-});
-
-test('probe: storico versioni — sfoglia e ripristina', async ({ openTab }) => {
-  const page = await openTab('filo://editor/editor.html');
-  await page.waitForSelector('#doc');
-  await setDocText(page, 'versione uno');
+  // Anche dopo un reload: "Tesi" e il suo testo sono spariti.
   await page.keyboard.press('Control+s');
+  await page.reload();
+  await page.waitForSelector('#doc');
   await openPop(page);
-  await page.click('#docHistory');
-  await page.waitForTimeout(500);
-  const html = await page.locator('#overlayBox').innerText().catch(() => '(no overlay)');
-  console.log('STORICO (doc appena creato):', JSON.stringify(html.slice(0, 400)));
-  await page.screenshot({ path: 'tests/.shots/probe-editor-history.png' });
+  names = await page.locator('.ed-doc-item-name').allInnerTexts();
+  console.log('DOPO RELOAD:', JSON.stringify(names));
+  const all = await page.evaluate(() => {
+    const raw = localStorage.getItem('sn_editor_collection') || localStorage.getItem('snEditorCollection');
+    return raw ? raw.slice(0, 600) : Object.keys(localStorage);
+  });
+  console.log('STORAGE:', JSON.stringify(all).slice(0, 800));
+  expect(names.join('|')).not.toContain('Tesi');
+});
+
+test('probe: elimina l\'unico documento e annulla', async ({ openTab }) => {
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('#doc');
+  await setDocText(page, 'UNICO');
+  await rename(page, 0, 'Solo');
+  await openPop(page);
+  await page.locator('.ed-doc-item').nth(0).locator('.ed-doc-del').click();
+  await page.waitForTimeout(200);
+  console.log('dopo delete unico, doc:', JSON.stringify(await page.locator('#doc').innerText()));
+  await page.locator('.ed-toast-action').click();
+  await page.waitForTimeout(300);
+  console.log('dopo annulla, doc:', JSON.stringify(await page.locator('#doc').innerText()));
+  await openPop(page);
+  console.log('file:', JSON.stringify(await page.locator('.ed-doc-item-name').allInnerTexts()));
 });
