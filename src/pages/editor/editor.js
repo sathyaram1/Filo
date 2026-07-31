@@ -3450,19 +3450,58 @@
   // Toast discreto in basso a destra per i fallimenti "non bloccanti" (es. uno
   // switch che non si può allargare per mancanza di spazio). Stile coerente con
   // le notifiche d'errore (bordo accent rosso), come il fallimento di un'azione.
-  let edToastTimer = null;
+  //
+  // Gli avvisi si IMPILANO (uno per evento, ciascuno col suo timer): prima ce
+  // n'era uno solo, riusato, e il nuovo avviso distruggeva il precedente insieme
+  // al suo bottone — quindi un "Annulla" poteva sparire prima che l'utente
+  // riuscisse a premerlo, anche a causa di un avviso che arrivava da solo.
+  // Impilandoli l'azione resta raggiungibile finché non scade il SUO tempo.
+  // Come ogni stack nell'angolo (vedi PATTERNS.md § "Stack di overlay
+  // impilati") ha due argini: un tetto al numero di card vive e un tetto
+  // all'altezza col contenitore che scorre.
+  const ED_TOAST_MAX = 4;
+  let edToastHost = null;
+  function edToastHostEl() {
+    if (!edToastHost || !edToastHost.isConnected) {
+      edToastHost = document.getElementById('edToasts');
+      if (!edToastHost) {
+        edToastHost = document.createElement('div');
+        edToastHost.id = 'edToasts';
+        edToastHost.className = 'ed-toasts';
+        edToastHost.setAttribute('role', 'status');
+        edToastHost.setAttribute('aria-live', 'polite');
+        document.body.appendChild(edToastHost);
+      }
+    }
+    return edToastHost;
+  }
+  // Rimuove le card più vecchie oltre il tetto: teniamo le più recenti, come lo
+  // stack di notifiche della shell. Nessun rischio di perdita dati: l'undo di
+  // un'eliminazione resta comunque nel cestino dei documenti.
+  function enforceEdToastCap() {
+    const host = edToastHostEl();
+    const live = Array.from(host.children).filter((c) => c.dataset.closing !== '1');
+    for (let i = 0; i < live.length - ED_TOAST_MAX; i++) removeEdToast(live[i], true);
+  }
+  function syncEdToastOverflow() {
+    const host = edToastHostEl();
+    const scrollable = host.scrollHeight > host.clientHeight + 1;
+    host.classList.toggle('scrolling', scrollable);
+    if (scrollable) host.scrollTop = host.scrollHeight;
+  }
+  function removeEdToast(el, immediate) {
+    if (!el || el.dataset.closing === '1') return;
+    el.dataset.closing = '1';
+    if (el._timer) clearTimeout(el._timer);
+    el.classList.remove('show');
+    if (immediate) { try { el.remove(); } catch (_) {} syncEdToastOverflow(); return; }
+    setTimeout(() => { try { el.remove(); } catch (_) {} syncEdToastOverflow(); }, 220);
+  }
   // `action` opzionale = { label, onClick }: aggiunge un bottone cliccabile nel
   // toast (es. "Annulla" dopo una modifica automatica di Filo).
   function showEditorToast(text, action) {
-    let el = document.getElementById('edToast');
-    if (!el) {
-      el = document.createElement('div');
-      el.id = 'edToast';
-      el.className = 'ed-toast';
-      el.setAttribute('role', 'status');
-      document.body.appendChild(el);
-    }
-    el.textContent = '';
+    const el = document.createElement('div');
+    el.className = 'ed-toast';
     const span = document.createElement('span');
     span.textContent = text;
     el.appendChild(span);
@@ -3473,18 +3512,20 @@
       btn.className = 'ed-toast-action';
       btn.textContent = action.label;
       btn.addEventListener('click', () => {
-        el.classList.remove('show');
-        clearTimeout(edToastTimer);
+        removeEdToast(el);
         try { action.onClick(); } catch (_) {}
       });
       el.appendChild(btn);
     }
-    // Forza un reflow così la transizione riparte anche se il toast è già visibile.
+    edToastHostEl().appendChild(el);
+    enforceEdToastCap();
+    // Forza un reflow così la transizione d'ingresso parte.
     void el.offsetWidth;
     el.classList.add('show');
-    clearTimeout(edToastTimer);
+    syncEdToastOverflow();
     // Con un'azione lascio più tempo per cliccarla.
-    edToastTimer = setTimeout(() => el.classList.remove('show'), hasAction ? 7000 : 3400);
+    el._timer = setTimeout(() => removeEdToast(el), hasAction ? 7000 : 3400);
+    return el;
   }
 
   // ════════════════════════════════════════════════════════════════════
