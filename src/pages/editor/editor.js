@@ -2653,7 +2653,14 @@
   function highlightCurrent() {
     findState.hits.forEach((h, i) => h.marks.forEach((mk) => mk.classList.toggle('current', i === findState.idx)));
     const cur = findState.hits[findState.idx];
-    if (cur && cur.marks[0]) cur.marks[0].scrollIntoView({ block: 'center', behavior: 'smooth' });
+    if (cur && cur.marks[0]) {
+      // Una corrispondenza dentro una sezione chiusa è invisibile: il contatore
+      // direbbe "1/1" mentre sul foglio non si illumina niente e Prec/Succ non
+      // portano da nessuna parte. La sezione si riapre da sé, poi la vista ci
+      // arriva sopra (feedback #385).
+      revealCollapsedFor(cur.marks[0]);
+      cur.marks[0].scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
   }
   function stepFind(dir) {
     if (!findState.hits.length) return;
