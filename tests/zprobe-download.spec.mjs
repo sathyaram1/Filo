@@ -26,7 +26,10 @@ test('scaricare un file da un link: cosa vede l\'utente', async ({ app, shell, o
     globalThis.__dlEvents = [];
     globalThis.__dlListeners = session.defaultSession.listenerCount('will-download');
     session.defaultSession.on('will-download', (e, item) => {
-      globalThis.__dlEvents.push({ url: item.getURL(), filename: item.getFilename(), total: item.getTotalBytes() });
+      const rec = { url: item.getURL(), filename: item.getFilename(), total: item.getTotalBytes(), states: [] };
+      globalThis.__dlEvents.push(rec);
+      item.on('updated', (_e, state) => rec.states.push(state));
+      item.once('done', (_e, state) => { rec.done = state; rec.savePath = item.getSavePath(); });
     });
   });
 
