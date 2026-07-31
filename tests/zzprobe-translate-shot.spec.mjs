@@ -53,7 +53,9 @@ test('articolo misto: solo i paragrafi <p> vengono tradotti, il resto resta in i
       const content = messages[messages.length - 1].content;
       const idx = content.lastIndexOf('Testo:\n\n');
       const chunk = idx >= 0 ? content.slice(idx + 8) : content;
-      const out = chunk.split(/\n?@@@SN_SEP@@@\n?/)
+      const parts = chunk.split(/\n?@@@SN_SEP@@@\n?/);
+      console.log('[stub] parts=' + JSON.stringify(parts));
+      const out = parts
         .map((p) => dict[p.trim()] || p)
         .join('\n@@@SN_SEP@@@\n');
       return { text: out, provider: 'test', model: 'test-model', usage: {} };
