@@ -18,6 +18,8 @@
     {
       version: '0.2.175', date: '2026-07-31',
       fixes: [
+        'Nell’editor, cercando una parola che si trova dentro una sezione chiusa la sezione si apre da sola e la vista arriva sulla parola trovata: il contatore delle corrispondenze e i tasti "Prec"/"Succ" ora portano sempre a qualcosa che vedi. Anche "Sostituisci tutto" apre le sezioni che ha toccato, così nessuna parola viene cambiata di nascosto.',
+        'Nell’editor, riaprire una sezione non fa più sbucare le sotto-sezioni che avevi chiuso: restano chiuse finché non le riapri tu.',
         'Nell’editor, ripristinare una versione dallo "Storico versioni" riporta indietro solo il testo del documento e i suoi commenti: il nome che gli hai dato, la conversazione avuta con Filo nel riquadro chat e la disposizione dei riquadri restano come sono adesso. Il comportamento è lo stesso anche se nel frattempo hai chiuso e riaperto Filo, e il pannello dice in chiaro cosa torna indietro prima che tu prema "Ripristina".',
       ],
     },
