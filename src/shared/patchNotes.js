@@ -16,6 +16,12 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.176', date: '2026-07-31',
+      fixes: [
+        'Nell’editor le immagini incollate nel foglio ora restano: prima comparivano ma sparivano al salvataggio, e riaprendo il documento trovavi solo il testo. Ora l’immagine viene salvata insieme al testo e la ritrovi dove l’avevi messa anche dopo aver chiuso e riaperto Filo.',
+      ],
+    },
+    {
       version: '0.2.175', date: '2026-07-31',
       features: [
         'Nell’editor i documenti eliminati finiscono in un cestino: dal menu documenti (o col tasto destro sul titolo) trovi gli ultimi eliminati con il loro testo e li rimetti al loro posto quando vuoi, anche dopo aver chiuso e riaperto Filo. Da lì puoi anche buttarli via per sempre, con una conferma.',
