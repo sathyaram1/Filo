@@ -9,7 +9,6 @@ async function setDocText(page, text) {
   }, text);
 }
 
-// Rinomina il documento attivo dal menu documenti (matita).
 async function renameActive(page, name) {
   const open = await page.locator('#docPop').isVisible().catch(() => false);
   if (!open) await page.click('#docSwitch');
@@ -24,23 +23,26 @@ test('probe A: ripristinare una vecchia versione riporta indietro anche il NOME'
   test.setTimeout(120000);
   const page = await openTab('filo://editor/editor.html');
   await page.waitForSelector('#doc');
+  await page.evaluate(() => window.__filoEditorVersions.ready());
 
   await page.click('#doc');
-  await setDocText(page, 'prima stesura del testo');
+  await setDocText(page, 'Prima stesura del racconto, ancora molto breve.');
   await renameActive(page, 'Bozza');
   console.log('PROBE titolo dopo rename 1:', await page.locator('.ed-doc-title').textContent());
 
-  // Crea una versione: simuliamo una modifica di Filo registrando lo stato.
-  await page.evaluate(() => window.__edTestHooks && 1);
-  // Snapshot manuale: scrivi molto testo, poi forza una versione cambiando doc.
-  await setDocText(page, 'prima stesura del testo. ' + 'Aggiunta molto lunga di testo per superare la soglia degli snapshot manuali. '.repeat(4));
-  await page.waitForTimeout(2500); // debounce snapshot manuale
+  const longText = "C'era una volta, in un bosco fitto e silenzioso, una bambina che portava sempre un mantello rosso cucito dalla nonna, e ogni mattina attraversava il sentiero.";
+  await setDocText(page, longText);
+  const created = await page.evaluate(() => window.__filoEditorVersions.snapshotManual());
+  console.log('PROBE versione creata:', JSON.stringify(!!created));
 
-  // Rinomina DOPO la versione salvata.
+  // Rinomina DOPO la versione salvata: il nome nuovo non è versionato.
   await renameActive(page, 'Relazione finale');
   console.log('PROBE titolo dopo rename 2:', await page.locator('.ed-doc-title').textContent());
 
-  // Apri lo storico versioni.
+  // Continua a scrivere (così ripristinare ha senso).
+  await setDocText(page, 'Testo completamente diverso, scritto dopo aver rinominato il file.');
+
+  // Apri lo storico versioni dal menu documenti (cammino utente).
   const popOpen = await page.locator('#docPop').isVisible().catch(() => false);
   if (!popOpen) await page.click('#docSwitch');
   await page.click('#docHistory');
@@ -48,14 +50,14 @@ test('probe A: ripristinare una vecchia versione riporta indietro anche il NOME'
   const items = page.locator('.ed-vh-item');
   const n = await items.count();
   console.log('PROBE versioni in storico:', n);
-  if (n) {
-    const previews = await page.locator('.ed-vh-prev').allTextContents();
-    console.log('PROBE preview:', JSON.stringify(previews.map((p) => p.slice(0, 60))));
-    // Ripristina la PIÙ VECCHIA
-    await items.nth(n - 1).locator('.ed-vh-restore').click();
-    await page.waitForTimeout(500);
-    console.log('PROBE titolo DOPO ripristino:', await page.locator('.ed-doc-title').textContent());
-    console.log('PROBE testo DOPO ripristino:', (await page.locator('#doc').textContent()).slice(0, 80));
-    await page.screenshot({ path: 'tests/.shots/probe-restore-title.png' });
-  }
+  const previews = await page.locator('.ed-vh-prev').allTextContents();
+  console.log('PROBE preview:', JSON.stringify(previews.map((p) => p.slice(0, 70))));
+  await page.screenshot({ path: 'tests/.shots/probe-vh-list.png' });
+
+  // Ripristina la più vecchia (quella salvata quando il file si chiamava "Bozza").
+  await items.nth(n - 1).locator('.ed-vh-restore').click();
+  await page.waitForTimeout(600);
+  console.log('PROBE titolo DOPO ripristino:', await page.locator('.ed-doc-title').textContent());
+  console.log('PROBE testo DOPO ripristino:', (await page.locator('#doc').textContent()).slice(0, 90));
+  await page.screenshot({ path: 'tests/.shots/probe-restore-title.png' });
 });
