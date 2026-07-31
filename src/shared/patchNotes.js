@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.176', date: '2026-07-31',
+      fixes: [
+        'Se chiedi a Filo dov’è la home o di aprirla, ora ti porta davvero alla pagina della nuova scheda (con l’assistente e i suggerimenti) invece che alla lista "Aperti per dopo".',
+        'Ora puoi chiedere a Filo cos’è il Red Team o come si partecipa: lo conosce e ti indica lo scudo rosso in alto a destra nella home, invece di dire di non saperlo fare.',
+      ],
+    },
+    {
       version: '0.2.175', date: '2026-07-31',
       features: [
         'Nell’editor i documenti eliminati finiscono in un cestino: dal menu documenti (o col tasto destro sul titolo) trovi gli ultimi eliminati con il loro testo e li rimetti al loro posto quando vuoi, anche dopo aver chiuso e riaperto Filo. Da lì puoi anche buttarli via per sempre, con una conferma.',
