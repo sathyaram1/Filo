@@ -1,0 +1,7 @@
+{
+  "id": "09ed0e5e-6ef2-4db8-8dbc-5c5fa662456b",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la modifica è stata pubblicata ed è ora nella app.\n\nHo esaminato la modifica dal punto di vista della sicurezza, senza leggere il testo della segnalazione (è una scelta voluta: chi fa questo controllo guarda solo cosa cambia nel programma, così nessuna parola scritta in una segnalazione può influenzare il giudizio).\n\nCosa ho verificato: che la modifica non tocchi nulla di delicato — le regole di accesso ai dati, le impostazioni di pubblicazione, gli script che gestiscono le lavorazioni — e che non introduca comandi eseguiti di nascosto, chiavi lasciate in chiaro o testo proveniente dall'esterno inserito nella pagina senza controlli. Nessuno di questi casi è presente.\n\nCosa ho trovato: le modifiche riguardano soltanto l'editor (il comportamento delle sezioni chiuse quando cerchi o sostituisci una parola), il recap degli aggiornamenti, l'elenco delle cose che Filo sa fare, una nota interna sulle convenzioni e un nuovo test. Tutto quello che cambia si spiega con quell'unico intervento: non c'è niente di estraneo o fuori tema, che è l'altro segnale che guardo oltre ai problemi noti.\n\nEsito: via libera, la modifica è stata unita alla versione principale.",
+  "queuedAt": "2026-07-31T19:11:32.874Z",
+  "queuedBy": "routine"
+}
