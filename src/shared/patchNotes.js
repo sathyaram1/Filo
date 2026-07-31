@@ -20,6 +20,7 @@
       fixes: [
         'Se chiedi a Filo dov’è la home o di aprirla, ora ti porta davvero alla pagina della nuova scheda (con l’assistente e i suggerimenti) invece che alla lista "Aperti per dopo".',
         'Ora puoi chiedere a Filo cos’è il Red Team o come si partecipa: lo conosce e ti indica lo scudo rosso in alto a destra nella home, invece di dire di non saperlo fare.',
+        'Nell’editor le immagini incollate nel foglio ora restano: prima comparivano ma sparivano al salvataggio, e riaprendo il documento trovavi solo il testo. Ora l’immagine viene salvata insieme al testo e la ritrovi dove l’avevi messa anche dopo aver chiuso e riaperto Filo.',
       ],
     },
     {
