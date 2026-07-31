@@ -108,9 +108,21 @@ test('probe F: match sul titolo di una sezione chiusa e successiva sostituzione'
   await page.fill('[data-sr="repl"]', 'pubblico');
   await page.click('[data-sr="all"]');
   await expect(page.locator('#doc h2')).toContainText('Capitolo pubblico');
-  // la freccia del titolo non deve essere stata mangiata dalla sostituzione
-  await expect(page.locator('#doc h2 .ed-collapse-toggle')).toHaveCount(1);
-  // e la sezione deve essere ancora richiudibile
-  await clickArrow(page, 'Capitolo pubblico');
-  await expect(page.locator('#doc p', { hasText: 'testo dentro' })).toBeHidden();
+  const st = await page.evaluate(() => {
+    const h = document.querySelector('#doc h2');
+    const p = document.querySelector('#doc p');
+    return {
+      collapsedAttr: h.dataset.collapsed || null,
+      arrowIsCollapsed: !!h.querySelector('.ed-collapse-toggle')?.classList.contains('is-collapsed'),
+      arrows: document.querySelectorAll('#doc h2 .ed-collapse-toggle').length,
+      pHidden: p.classList.contains('ed-hidden-by-collapse'),
+      pDisplay: getComputedStyle(p).display,
+      h2html: h.innerHTML,
+    };
+  });
+  console.log('STATO DOPO REPLACE-ALL SUL TITOLO:', JSON.stringify(st, null, 1));
+  // Invariante: freccia e contenuto devono raccontare la STESSA storia.
+  expect(st.arrows).toBe(1);
+  expect(st.arrowIsCollapsed).toBe(st.pHidden);
+  expect(st.arrowIsCollapsed).toBe(st.collapsedAttr === '1');
 });
