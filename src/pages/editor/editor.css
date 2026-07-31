@@ -560,9 +560,24 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 }
 
 /* Toast discreto in basso a destra (fallimenti non bloccanti, es. switch che
-   non può allargarsi). Stile coerente con una notifica d'errore. */
-.ed-toast {
+   non può allargarsi). Stile coerente con una notifica d'errore.
+   Gli avvisi si IMPILANO nel contenitore: un nuovo avviso non cancella più il
+   precedente (e il suo "Annulla"). Due argini come lo stack della shell: tetto
+   al numero di card (nel JS) e altezza massima col contenitore che scorre. */
+.ed-toasts {
   position: fixed; right: 18px; bottom: 18px;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+  max-height: calc(100vh - 36px);
+  overflow-y: auto; overflow-x: hidden;
+  scrollbar-width: thin;
+  pointer-events: none; z-index: 200;
+}
+/* Attiva i pointer-events solo quando c'è davvero overflow (finestra bassa):
+   serve ad afferrare la scrollbar senza rubare i click al foglio sotto. */
+.ed-toasts.scrolling { pointer-events: auto; padding-right: 4px; }
+.ed-toasts::-webkit-scrollbar { width: 6px; }
+.ed-toasts::-webkit-scrollbar-thumb { background: var(--sn-border); border-radius: 3px; }
+.ed-toast {
   max-width: 320px;
   background: var(--sn-bg);
   border: 1px solid var(--sn-border);
