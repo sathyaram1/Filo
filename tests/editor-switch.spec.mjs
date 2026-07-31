@@ -334,7 +334,7 @@ test.describe('switch resize (drag end-to-end + arrow)', () => {
     const growArrow = page.locator('.ed-module[data-type="switch"] .ed-switch-arrow').nth(1);
     await growArrow.click();
 
-    const toast = page.locator('#edToasts .ed-toast.show').last();
+    const toast = page.locator('.ed-toast.show').last();
     await expect(toast).toBeVisible();
     await expect(toast).toContainText(/spazio insufficiente/i);
     // Nessuna pagina aggiunta: lo switch non si è ridimensionato.

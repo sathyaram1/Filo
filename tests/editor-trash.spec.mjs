@@ -59,9 +59,9 @@ test('due eliminazioni di fila: l\'"Annulla" del PRIMO documento è ancora lì e
   await expect(page.locator('.ed-doc-item')).toHaveCount(1);
 
   // Entrambi gli avvisi sono in piedi, ciascuno col suo "Annulla".
-  const toasts = page.locator('#edToasts .ed-toast.show');
+  const toasts = page.locator('.ed-toast.show');
   await expect(toasts).toHaveCount(2);
-  await expect(page.locator('#edToasts .ed-toast-action')).toHaveCount(2);
+  await expect(page.locator('.ed-toast.show .ed-toast-action')).toHaveCount(2);
   mkdirSync(shotsDir, { recursive: true });
   await page.screenshot({ path: join(shotsDir, 'editor-trash-two-toasts.png') });
 
@@ -100,7 +100,7 @@ test('un documento eliminato resta nel cestino e si recupera anche dopo aver ria
   // documento non è perso.
   await page.reload();
   await page.waitForSelector('#doc');
-  await expect(page.locator('#edToasts .ed-toast')).toHaveCount(0);
+  await expect(page.locator('.ed-toast')).toHaveCount(0);
 
   await page.click('#docSwitch');
   await expect(page.locator('#docTrash')).toContainText('Cestino (1)');

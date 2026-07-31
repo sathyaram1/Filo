@@ -52,7 +52,7 @@ test('una modifica automatica di Filo è annullabile: il contenuto torna identic
 
   // Percorso utente reale: compare l'avviso "Annulla" e cliccandolo il documento
   // torna IDENTICO a prima (testo invariato, grassetto sparito).
-  const undoBtn = page.locator('#edToasts .ed-toast-action').last();
+  const undoBtn = page.locator('.ed-toast .ed-toast-action').last();
   await expect(undoBtn).toHaveText('Annulla');
   await undoBtn.click();
   await expect(page.locator('#doc strong')).toHaveCount(0);
