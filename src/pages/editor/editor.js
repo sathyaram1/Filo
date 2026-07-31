@@ -1268,6 +1268,9 @@
         .finally(() => { autoSummaryBusy = false; });
     });
     add('Storico versioni', () => openVersionHistory());
+    // Parità di cammini col menu documenti: se c'è qualcosa nel cestino lo si
+    // raggiunge anche col tasto destro sul titolo.
+    if (trash.length) add(`Cestino (${trash.length})`, () => openTrashPanel());
     add('Rinomina', () => startDocTitleRename());
     add('Duplica file', () => duplicateActiveFile());
     add('Elimina file', () => { if (doc) deleteFile(doc.id); });
