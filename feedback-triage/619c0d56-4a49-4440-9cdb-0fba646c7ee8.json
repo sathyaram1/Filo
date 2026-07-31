@@ -1,0 +1,7 @@
+{
+  "id": "619c0d56-4a49-4440-9cdb-0fba646c7ee8",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la modifica e stata pubblicata. Ora quando chiedi a Filo dov'e la home (o di aprirla) ti porta davvero alla pagina della nuova scheda con l'assistente e i suggerimenti, e non piu alla lista 'Aperti per dopo'. Inoltre Filo ora conosce il Red Team: se gli chiedi cos'e o come si partecipa te lo spiega e ti indica lo scudo rosso in alto a destra nella home.",
+  "queuedAt": "2026-07-31T21:50:55.429Z",
+  "queuedBy": "routine"
+}
