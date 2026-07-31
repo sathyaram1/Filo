@@ -248,7 +248,7 @@
     {
       id: 'open-for-later', title: 'Aperti per dopo', category: 'save',
       desc: 'La lista delle pagine e dei link che hai messo da parte, pronti da riaprire.',
-      invoke: 'Menu del tasto destro → "Aperti per dopo".',
+      invoke: 'Menu del tasto destro → "Aperti per dopo", oppure indirizzo filo://home/home.html.',
     },
     {
       id: 'archive', title: 'Cronologia delle schede', category: 'save',
