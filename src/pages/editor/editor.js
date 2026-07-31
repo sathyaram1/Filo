@@ -570,6 +570,11 @@
   const VERS_HISTORY_BATCH = 40;
   let versHistoryShown = VERS_HISTORY_BATCH;
 
+  // Che cosa tocca un ripristino: il pannello mostra solo l'anteprima del testo,
+  // quindi il confine va detto una volta, in chiaro, prima di premere.
+  const VH_SCOPE_NOTE = 'Il ripristino riporta indietro il testo e i commenti. '
+    + 'Nome del documento, conversazione con Filo e disposizione dei riquadri restano come sono adesso.';
+
   function openVersionHistory() {
     closeDocPop();
     closeTitleMenu();
