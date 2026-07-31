@@ -77,6 +77,12 @@ test('aprire un PDF inline in una scheda', async ({ app, shell, openTab }) => {
     console.log('PDF DIRETTO:', JSON.stringify(b, null, 2));
     await direct.screenshot({ path: 'tests/.shots/probe-pdf-direct.png' }).catch(() => {});
   }
+  const tabs = await shell.evaluate(() => Array.from(document.querySelectorAll('.tab')).map((t) => ({
+    text: (t.innerText || '').trim(), title: t.getAttribute('title') || '',
+  })));
+  console.log('SHELL TABS:', JSON.stringify(tabs, null, 2));
+  await shell.screenshot({ path: 'tests/.shots/probe-pdf-tabs.png' }).catch(() => {});
+
   const dl2 = await app.evaluate(() => globalThis.__dl);
   console.log('WILL-DOWNLOAD dopo apertura diretta:', JSON.stringify(dl2));
 
