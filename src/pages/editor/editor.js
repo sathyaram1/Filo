@@ -106,6 +106,7 @@
   let collection = null; // { version, activeId, files:[...] } — vedi editorStore.js
   let versions = {};     // { [fileId]: { versions:[...] } } — storico, su archivio app
   let versionsReady = Promise.resolve(); // risolta quando lo storico è caricato
+  let trash = [];        // documenti eliminati recuperabili (più recenti in cima)
   let doc = null;        // documento ATTIVO in memoria (vedi activateFile/blankDoc)
   let dirty = false;
   let settingsMode = false;
@@ -717,14 +718,87 @@
     return t.length > max ? t.slice(0, Math.max(0, max - 1)).trimEnd() + '…' : t;
   }
 
+  // ── Cestino dei documenti eliminati ──────────────────────────────────────
+  // L'avviso "Annulla" copre solo i secondi immediatamente successivi: è comodo
+  // ma non può essere l'UNICA rete (basta chiudere la pagina, o lasciar passare
+  // il tempo, e il documento sarebbe perso per sempre). Ogni eliminazione
+  // finisce quindi anche qui, con il suo testo, i commenti, i riquadri e lo
+  // storico versioni, e resta recuperabile dal menu documenti finché non la si
+  // butta a mano o non esce dagli ultimi TRASH_MAX documenti eliminati.
+  const TRASH_KEY = 'filo.editor.trash';
+  const TRASH_MAX = 12;
+  // Tetto di dimensione: il cestino vive nella persistenza "calda" insieme alla
+  // collezione, che non va saturata. Oltre la soglia si buttano i più vecchi.
+  const TRASH_MAX_BYTES = 1_500_000;
+
+  function readTrashRaw() {
+    try {
+      const v = JSON.parse(localStorage.getItem(TRASH_KEY));
+      return Array.isArray(v) ? v : [];
+    } catch (_) { return []; }
+  }
+  function loadTrash() {
+    trash = readTrashRaw().filter((e) => e && e.file && e.file.id);
+  }
+  function writeTrash() {
+    try { localStorage.setItem(TRASH_KEY, JSON.stringify(trash)); }
+    catch (_) {
+      // Spazio esaurito: tieni solo i più recenti e riprova una volta sola.
+      trash = trash.slice(0, Math.max(1, Math.floor(trash.length / 2)));
+      try { localStorage.setItem(TRASH_KEY, JSON.stringify(trash)); } catch (__) {}
+    }
+  }
+  // Butta davvero via un documento cestinato: via anche il suo storico versioni,
+  // che finché resta nel cestino invece va conservato (un ripristino deve
+  // riportare indietro anche i punti di ripristino).
+  function purgeTrashEntry(entryId) {
+    const i = trash.findIndex((e) => e.id === entryId);
+    if (i < 0) return null;
+    const [entry] = trash.splice(i, 1);
+    // Lo storico arriva dall'archivio in modo asincrono: aspetta che sia
+    // caricato, altrimenti una pulizia fatta troppo presto verrebbe riscritta
+    // dal caricamento e lascerebbe lo storico di un file che non esiste più.
+    if (VERS && entry && entry.file) {
+      const fid = entry.file.id;
+      Promise.resolve(versionsReady).then(() => {
+        if (!versions[fid]) return;
+        versions = VERS.dropFile(versions, fid);
+        persistVersions();
+      }).catch(() => {});
+    }
+    return entry;
+  }
+  // Applica i due tetti (numero e dimensione) buttando i più vecchi.
+  function enforceTrashLimits() {
+    while (trash.length > TRASH_MAX) purgeTrashEntry(trash[trash.length - 1].id);
+    let guard = 0;
+    while (trash.length > 1 && guard++ < TRASH_MAX) {
+      let size = 0;
+      try { size = JSON.stringify(trash).length; } catch (_) { break; }
+      if (size <= TRASH_MAX_BYTES) break;
+      purgeTrashEntry(trash[trash.length - 1].id);
+    }
+  }
+  // Un file è "ancora vuoto"? Serve a non buttare via il foglio bianco creato al
+  // posto dell'ultimo documento eliminato se nel frattempo ci è stato scritto.
+  function fileIsEmpty(file) {
+    if (!file) return false;
+    const txt = VERS ? VERS.plainText(file) : '';
+    if (txt && txt.trim()) return false;
+    if (Array.isArray(file.comments) && file.comments.length) return false;
+    return true;
+  }
+
   // Elimina un documento. Invariante: resta sempre almeno un file — se si
   // cancella l'ultimo, se ne crea uno vuoto al suo posto.
   //
   // L'eliminazione è ISTANTANEA (nessuna conferma: l'attrito su un'azione
   // frequente è negativo) ma REVERSIBILE — coerente col principio di Filo "il
   // software deve poter essere usato male": un tocco per sbaglio non deve poter
-  // cancellare per sempre un documento. Subito dopo la cancellazione compare un
-  // toast "… eliminato" con "Annulla" che ripristina file, posizione e storico.
+  // cancellare per sempre un documento. Subito dopo compare un avviso "…
+  // eliminato" con "Annulla" (ripristina file, posizione e storico) e, in ogni
+  // caso, il documento resta nel cestino: l'avviso è la scorciatoia, il cestino
+  // è la rete di sicurezza che sopravvive anche alla chiusura della pagina.
   function deleteFile(id) {
     const target = STORE.findFile(collection, id);
     if (!target) return;
@@ -734,7 +808,6 @@
     if (wasActive) syncActiveIntoCollection();
     const idx = collection.files.findIndex((f) => f.id === id);
     const snapFile = cloneJson(STORE.findFile(collection, id));
-    const snapVersions = (VERS && versions && versions[id]) ? cloneJson(versions[id]) : null;
     const title = (snapFile && snapFile.meta && snapFile.meta.title) || STORE.DEFAULT_TITLE;
 
     const res = STORE.removeFile(collection, id);
@@ -749,36 +822,154 @@
     } else {
       renderDocSwitcher(); // era un altro file: la lista basta aggiornarla
     }
-    // Lo storico del file cancellato non serve più: liberalo dall'archivio.
-    if (VERS) { versions = VERS.dropFile(versions, id); persistVersions(); }
     writeCollection();
+
+    // Nel cestino (in cima: i più recenti per primi). Lo storico versioni NON
+    // viene buttato: resta nell'archivio finché il documento è recuperabile.
+    const entry = {
+      id: newId('trash'),
+      file: snapFile,
+      index: idx,
+      wasActive,
+      createdBlankId,
+      deletedAt: Date.now(),
+    };
+    trash.unshift(entry);
+    enforceTrashLimits();
+    writeTrash();
+    renderDocSwitcher();
 
     showEditorToast(`"${ellipsize(title, 40)}" eliminato.`, {
       label: 'Annulla',
-      onClick: () => restoreDeletedFile({ file: snapFile, index: idx, wasActive, createdBlankId, fileVersions: snapVersions }),
+      onClick: () => restoreDeletedFile(entry),
     });
   }
 
-  // Ripristina un file appena eliminato (undo dal toast): lo reinserisce alla
-  // sua posizione, ne ripristina lo storico e, se era il file aperto, lo riapre.
-  function restoreDeletedFile({ file, index, wasActive, createdBlankId, fileVersions }) {
-    if (!file || !file.id) return;
-    if (STORE.findFile(collection, file.id)) return; // già presente: niente da fare
+  // Ripristina un file eliminato (dall'avviso "Annulla" o dal cestino): lo
+  // reinserisce alla sua posizione, ne ripristina lo storico e, se era il file
+  // aperto, lo riapre. Idempotente: premere due volte non duplica nulla.
+  function restoreDeletedFile(entry) {
+    if (!entry || !entry.file || !entry.file.id) return false;
+    const file = entry.file;
+    if (STORE.findFile(collection, file.id)) { // già rientrato: solo pulizia
+      const i = trash.findIndex((e) => e.id === entry.id);
+      if (i >= 0) { trash.splice(i, 1); writeTrash(); renderDocSwitcher(); }
+      return false;
+    }
     // Non perdere ciò che l'utente sta scrivendo su un ALTRO file nel frattempo.
     syncActiveIntoCollection();
-    // Se avevo creato un foglio vuoto perché era l'ultimo file, toglilo.
-    if (createdBlankId) STORE.removeFile(collection, createdBlankId);
-    const at = Math.max(0, Math.min(index, collection.files.length));
-    collection.files.splice(at, 0, file);
-    if (fileVersions && VERS) { versions[file.id] = fileVersions; persistVersions(); }
-    if (wasActive) {
+    // Se avevo creato un foglio vuoto perché era l'ultimo file, toglilo — ma
+    // SOLO se è rimasto vuoto: se nel frattempo l'utente ci ha scritto, quel
+    // foglio è un documento vero e buttarlo sarebbe la perdita che vogliamo
+    // evitare (resterebbe comunque nel cestino, ma sparirebbe senza motivo).
+    if (entry.createdBlankId) {
+      const blank = STORE.findFile(collection, entry.createdBlankId);
+      const blankLive = (doc && doc.id === entry.createdBlankId) ? serialize() : blank;
+      if (blank && fileIsEmpty(blankLive)) STORE.removeFile(collection, entry.createdBlankId);
+    }
+    const at = Math.max(0, Math.min(Number.isFinite(entry.index) ? entry.index : collection.files.length, collection.files.length));
+    collection.files.splice(at, 0, cloneJson(file));
+    if (entry.wasActive || !STORE.activeFile(collection)) {
       collection.activeId = file.id;
-      activateFile(file);
-    } else {
-      renderDocSwitcher();
+      activateFile(STORE.findFile(collection, file.id));
     }
     writeCollection();
+    const i = trash.findIndex((e) => e.id === entry.id);
+    if (i >= 0) { trash.splice(i, 1); writeTrash(); }
+    renderDocSwitcher();
     showEditorToast('Documento ripristinato.');
+    return true;
+  }
+
+  // ── Pannello "Cestino": vedi e recupera i documenti eliminati ─────────────
+  // Invariante UX: se l'app conserva N documenti eliminati, l'utente deve
+  // poterli vedere tutti — e poterli anche buttare davvero, se vuole.
+  function trashEntryTitle(entry) {
+    const f = entry && entry.file;
+    return (f && f.meta && f.meta.title) || STORE.DEFAULT_TITLE;
+  }
+  function trashEntryPreview(entry) {
+    const text = (VERS && entry && entry.file) ? VERS.plainText(entry.file) : '';
+    if (!text) return '';
+    const line = text.split('\n').map((l) => l.trim()).filter(Boolean).slice(0, 3).join(' · ');
+    return line.length > 180 ? line.slice(0, 179).trimEnd() + '…' : line;
+  }
+  function openTrashPanel() {
+    closeDocPop();
+    closeTitleMenu();
+    renderTrashPanel();
+  }
+  function renderTrashPanel() {
+    if (!trash.length) {
+      openOverlay(`<h3>Cestino</h3>
+        <p class="ed-vh-empty">Nessun documento eliminato. Quando ne elimini uno resta qui, con il suo testo e il suo storico, finché non lo butti davvero.</p>
+        <div class="ed-overlay-actions"><button class="ed-btn primary" id="ovClose">Chiudi</button></div>`);
+      $('ovClose').addEventListener('click', closeOverlay);
+      return;
+    }
+    const rows = trash.map((e) => {
+      const prev = trashEntryPreview(e);
+      const prevHtml = prev ? escapeHtml(prev) : '<span class="ed-vh-noprev">(documento vuoto)</span>';
+      const nVers = (VERS && versions[e.file.id] && Array.isArray(versions[e.file.id].versions))
+        ? versions[e.file.id].versions.length : 0;
+      const versNote = nVers ? ` · ${nVers} version${nVers === 1 ? 'e' : 'i'} nello storico` : '';
+      return `<div class="ed-vh-item ed-tr-item" data-id="${escapeHtml(e.id)}">
+        <div class="ed-vh-head">
+          <span class="ed-tr-name">${escapeHtml(ellipsize(trashEntryTitle(e), 60))}</span>
+          <span class="ed-vh-when">${escapeHtml(fmtVersionWhen(e.deletedAt))}${versNote}</span>
+        </div>
+        <div class="ed-vh-prev">${prevHtml}</div>
+        <div class="ed-vh-actions">
+          <button class="ed-btn ed-tr-restore" data-id="${escapeHtml(e.id)}">Ripristina</button>
+          <button class="ed-btn ed-tr-purge" data-id="${escapeHtml(e.id)}">Elimina definitivamente</button>
+        </div>
+      </div>`;
+    }).join('');
+    openOverlay(`<h3>Cestino</h3>
+      <p class="ed-vh-scope">I documenti eliminati restano qui (gli ultimi ${TRASH_MAX}) con testo, commenti, riquadri e storico versioni. Ripristinandone uno torna al suo posto nell'elenco.</p>
+      <div class="ed-vh-list">${rows}</div>
+      <div class="ed-overlay-actions">
+        <button class="ed-btn ed-tr-empty" id="trEmpty">Svuota cestino</button>
+        <button class="ed-btn primary" id="ovClose">Chiudi</button>
+      </div>`);
+    $('ovClose').addEventListener('click', closeOverlay);
+    overlayBox.querySelectorAll('.ed-tr-restore').forEach((b) => b.addEventListener('click', () => {
+      const entry = trash.find((e) => e.id === b.dataset.id);
+      if (entry && restoreDeletedFile(entry)) closeOverlay();
+    }));
+    // Eliminare per sempre è l'UNICA azione irreversibile qui: chiede conferma
+    // sul posto (il bottone diventa "Confermi?"), senza finestre di mezzo.
+    overlayBox.querySelectorAll('.ed-tr-purge').forEach((b) => b.addEventListener('click', () => {
+      if (b.dataset.confirm !== '1') {
+        b.dataset.confirm = '1';
+        b.textContent = 'Confermi?';
+        b.classList.add('danger');
+        setTimeout(() => {
+          if (!b.isConnected || b.dataset.confirm !== '1') return;
+          b.dataset.confirm = '';
+          b.textContent = 'Elimina definitivamente';
+          b.classList.remove('danger');
+        }, 4000);
+        return;
+      }
+      purgeTrashEntry(b.dataset.id);
+      writeTrash();
+      renderTrashPanel();
+      renderDocSwitcher();
+    }));
+    const emptyBtn = $('trEmpty');
+    if (emptyBtn) emptyBtn.addEventListener('click', () => {
+      if (emptyBtn.dataset.confirm !== '1') {
+        emptyBtn.dataset.confirm = '1';
+        emptyBtn.textContent = `Confermi? Elimini ${trash.length} document${trash.length === 1 ? 'o' : 'i'} per sempre`;
+        emptyBtn.classList.add('danger');
+        return;
+      }
+      for (const e of trash.slice()) purgeTrashEntry(e.id);
+      writeTrash();
+      renderTrashPanel();
+      renderDocSwitcher();
+    });
   }
 
   // Rinomina un documento (il nome mostrato nel menu e nel selettore).
@@ -1084,6 +1275,9 @@
         .finally(() => { autoSummaryBusy = false; });
     });
     add('Storico versioni', () => openVersionHistory());
+    // Parità di cammini col menu documenti: se c'è qualcosa nel cestino lo si
+    // raggiunge anche col tasto destro sul titolo.
+    if (trash.length) add(`Cestino (${trash.length})`, () => openTrashPanel());
     add('Rinomina', () => startDocTitleRename());
     add('Duplica file', () => duplicateActiveFile());
     add('Elimina file', () => { if (doc) deleteFile(doc.id); });
@@ -1201,6 +1395,18 @@
     hist.innerHTML = `${ICONS.history ? ICONS.history(14) : '⟲'}<span>Storico versioni</span>`;
     hist.addEventListener('click', () => { closeDocPop(); openVersionHistory(); });
     docPopEl.appendChild(hist);
+    // Cestino: compare solo quando c'è qualcosa da recuperare (una voce sempre
+    // presente e sempre vuota sarebbe solo rumore nel menu).
+    if (trash.length) {
+      const bin = document.createElement('button');
+      bin.type = 'button';
+      bin.className = 'ed-doc-new ed-doc-trash';
+      bin.id = 'docTrash';
+      bin.title = 'Recupera un documento eliminato';
+      bin.innerHTML = `${ICONS.reload ? ICONS.reload(14) : '⟲'}<span>Cestino (${trash.length})</span>`;
+      bin.addEventListener('click', openTrashPanel);
+      docPopEl.appendChild(bin);
+    }
   }
 
   function actButton(glyph, title, onAct) {
@@ -3450,19 +3656,67 @@
   // Toast discreto in basso a destra per i fallimenti "non bloccanti" (es. uno
   // switch che non si può allargare per mancanza di spazio). Stile coerente con
   // le notifiche d'errore (bordo accent rosso), come il fallimento di un'azione.
-  let edToastTimer = null;
+  //
+  // Gli avvisi si IMPILANO (uno per evento, ciascuno col suo timer): prima ce
+  // n'era uno solo, riusato, e il nuovo avviso distruggeva il precedente insieme
+  // al suo bottone — quindi un "Annulla" poteva sparire prima che l'utente
+  // riuscisse a premerlo, anche a causa di un avviso che arrivava da solo.
+  // Impilandoli l'azione resta raggiungibile finché non scade il SUO tempo.
+  // Come ogni stack nell'angolo (vedi PATTERNS.md § "Stack di overlay
+  // impilati") ha due argini: un tetto al numero di card vive e un tetto
+  // all'altezza col contenitore che scorre.
+  const ED_TOAST_MAX = 4;
+  let edToastHost = null;
+  function edToastHostEl() {
+    if (!edToastHost || !edToastHost.isConnected) {
+      edToastHost = document.getElementById('edToasts');
+      if (!edToastHost) {
+        edToastHost = document.createElement('div');
+        edToastHost.id = 'edToasts';
+        edToastHost.className = 'ed-toasts';
+        edToastHost.setAttribute('role', 'status');
+        edToastHost.setAttribute('aria-live', 'polite');
+        document.body.appendChild(edToastHost);
+      }
+    }
+    return edToastHost;
+  }
+  // Rimuove le card più vecchie oltre il tetto: teniamo le più recenti, come lo
+  // stack di notifiche della shell. Nessun rischio di perdita dati: l'undo di
+  // un'eliminazione resta comunque nel cestino dei documenti.
+  function enforceEdToastCap() {
+    const host = edToastHostEl();
+    const live = Array.from(host.children).filter((c) => c.dataset.closing !== '1');
+    for (let i = 0; i < live.length - ED_TOAST_MAX; i++) removeEdToast(live[i], true);
+  }
+  // Attenzione: va misurato a transizione FINITA. Durante l'entrata la card è
+  // traslata verso il basso di qualche pixel, e in un contenitore scrollabile
+  // una traslazione allarga l'area scrollabile: misurando subito il contenitore
+  // si crederebbe in overflow e resterebbe con la barra di scorrimento addosso
+  // per sempre (due soli avvisi mostravano la scrollbar).
+  let edToastOverflowTimer = null;
+  function syncEdToastOverflow() {
+    clearTimeout(edToastOverflowTimer);
+    edToastOverflowTimer = setTimeout(() => {
+      const host = edToastHostEl();
+      const scrollable = host.scrollHeight - host.clientHeight > 2;
+      host.classList.toggle('scrolling', scrollable);
+      if (scrollable) host.scrollTop = host.scrollHeight;
+    }, 260); // > della transizione di entrata/uscita (0.18s / 0.22s)
+  }
+  function removeEdToast(el, immediate) {
+    if (!el || el.dataset.closing === '1') return;
+    el.dataset.closing = '1';
+    if (el._timer) clearTimeout(el._timer);
+    el.classList.remove('show');
+    if (immediate) { try { el.remove(); } catch (_) {} syncEdToastOverflow(); return; }
+    setTimeout(() => { try { el.remove(); } catch (_) {} syncEdToastOverflow(); }, 220);
+  }
   // `action` opzionale = { label, onClick }: aggiunge un bottone cliccabile nel
   // toast (es. "Annulla" dopo una modifica automatica di Filo).
   function showEditorToast(text, action) {
-    let el = document.getElementById('edToast');
-    if (!el) {
-      el = document.createElement('div');
-      el.id = 'edToast';
-      el.className = 'ed-toast';
-      el.setAttribute('role', 'status');
-      document.body.appendChild(el);
-    }
-    el.textContent = '';
+    const el = document.createElement('div');
+    el.className = 'ed-toast';
     const span = document.createElement('span');
     span.textContent = text;
     el.appendChild(span);
@@ -3473,18 +3727,20 @@
       btn.className = 'ed-toast-action';
       btn.textContent = action.label;
       btn.addEventListener('click', () => {
-        el.classList.remove('show');
-        clearTimeout(edToastTimer);
+        removeEdToast(el);
         try { action.onClick(); } catch (_) {}
       });
       el.appendChild(btn);
     }
-    // Forza un reflow così la transizione riparte anche se il toast è già visibile.
+    edToastHostEl().appendChild(el);
+    enforceEdToastCap();
+    // Forza un reflow così la transizione d'ingresso parte.
     void el.offsetWidth;
     el.classList.add('show');
-    clearTimeout(edToastTimer);
+    syncEdToastOverflow();
     // Con un'azione lascio più tempo per cliccarla.
-    edToastTimer = setTimeout(() => el.classList.remove('show'), hasAction ? 7000 : 3400);
+    el._timer = setTimeout(() => removeEdToast(el), hasAction ? 7000 : 3400);
+    return el;
   }
 
   // ════════════════════════════════════════════════════════════════════
@@ -3669,6 +3925,7 @@
   // Boot
   applySavedTheme();
   loadVersions();                           // storico dall'archivio app (async)
+  loadTrash();                              // documenti eliminati recuperabili
   loadCollection();                         // da localStorage (sincrono)
   activateFile(STORE.activeFile(collection)); // apre l'ultimo file attivo
   reloadFromArchive();                      // fonde i file scritti da Filo (appunti/migrazione)
