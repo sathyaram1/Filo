@@ -106,6 +106,7 @@
   let collection = null; // { version, activeId, files:[...] } — vedi editorStore.js
   let versions = {};     // { [fileId]: { versions:[...] } } — storico, su archivio app
   let versionsReady = Promise.resolve(); // risolta quando lo storico è caricato
+  let trash = [];        // documenti eliminati recuperabili (più recenti in cima)
   let doc = null;        // documento ATTIVO in memoria (vedi activateFile/blankDoc)
   let dirty = false;
   let settingsMode = false;
