@@ -607,6 +607,7 @@
       ? `<button class="ed-btn ed-vh-more" id="vhMore">Mostra le versioni più vecchie (${all.length - versHistoryShown})</button>`
       : '';
     openOverlay(`<h3>Storico versioni</h3>
+      <p class="ed-vh-scope">${VH_SCOPE_NOTE}</p>
       <div class="ed-vh-list">${rows}</div>
       ${more}
       <div class="ed-overlay-actions"><button class="ed-btn primary" id="ovClose">Chiudi</button></div>`);
