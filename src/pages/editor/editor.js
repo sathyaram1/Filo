@@ -3689,11 +3689,20 @@
     const live = Array.from(host.children).filter((c) => c.dataset.closing !== '1');
     for (let i = 0; i < live.length - ED_TOAST_MAX; i++) removeEdToast(live[i], true);
   }
+  // Attenzione: va misurato a transizione FINITA. Durante l'entrata la card è
+  // traslata verso il basso di qualche pixel, e in un contenitore scrollabile
+  // una traslazione allarga l'area scrollabile: misurando subito il contenitore
+  // si crederebbe in overflow e resterebbe con la barra di scorrimento addosso
+  // per sempre (due soli avvisi mostravano la scrollbar).
+  let edToastOverflowTimer = null;
   function syncEdToastOverflow() {
-    const host = edToastHostEl();
-    const scrollable = host.scrollHeight > host.clientHeight + 1;
-    host.classList.toggle('scrolling', scrollable);
-    if (scrollable) host.scrollTop = host.scrollHeight;
+    clearTimeout(edToastOverflowTimer);
+    edToastOverflowTimer = setTimeout(() => {
+      const host = edToastHostEl();
+      const scrollable = host.scrollHeight - host.clientHeight > 2;
+      host.classList.toggle('scrolling', scrollable);
+      if (scrollable) host.scrollTop = host.scrollHeight;
+    }, 260); // > della transizione di entrata/uscita (0.18s / 0.22s)
   }
   function removeEdToast(el, immediate) {
     if (!el || el.dataset.closing === '1') return;
