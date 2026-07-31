@@ -512,8 +512,9 @@
     }, () => newId('ver'));
     versions = cres.store;
     persistVersions();
-    const restored = JSON.parse(JSON.stringify(v.content || {}));
+    const restored = VERS.composeRestored(curContent, v.content);
     restored.id = fileId;
+    if (restored.meta) restored.meta.modified = new Date().toISOString();
     STORE.replaceFile(collection, fileId, restored);
     if (doc && doc.id === fileId) {
       activateFile(STORE.findFile(collection, fileId));
