@@ -2706,6 +2706,10 @@
   function replaceAll(term, replacement) {
     if (!term) return;
     runFind(term);
+    // Nessuna sostituzione invisibile: prima si riaprono tutte le sezioni chiuse
+    // che contengono una corrispondenza, così l'utente vede cosa è stato
+    // cambiato invece di scoprirlo per caso più tardi (feedback #385).
+    findState.hits.forEach((hit) => revealCollapsedFor(hit.marks[0]));
     findState.hits.forEach((hit) => replaceHitMarks(hit, replacement));
     clearFind();
     onDocInput();
