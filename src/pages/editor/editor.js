@@ -1385,6 +1385,18 @@
     hist.innerHTML = `${ICONS.history ? ICONS.history(14) : '⟲'}<span>Storico versioni</span>`;
     hist.addEventListener('click', () => { closeDocPop(); openVersionHistory(); });
     docPopEl.appendChild(hist);
+    // Cestino: compare solo quando c'è qualcosa da recuperare (una voce sempre
+    // presente e sempre vuota sarebbe solo rumore nel menu).
+    if (trash.length) {
+      const bin = document.createElement('button');
+      bin.type = 'button';
+      bin.className = 'ed-doc-new ed-doc-trash';
+      bin.id = 'docTrash';
+      bin.title = 'Recupera un documento eliminato';
+      bin.innerHTML = `${ICONS.reload ? ICONS.reload(14) : '⟲'}<span>Cestino (${trash.length})</span>`;
+      bin.addEventListener('click', openTrashPanel);
+      docPopEl.appendChild(bin);
+    }
   }
 
   function actButton(glyph, title, onAct) {
