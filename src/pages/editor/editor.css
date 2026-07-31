@@ -578,6 +578,7 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 .ed-toasts::-webkit-scrollbar { width: 6px; }
 .ed-toasts::-webkit-scrollbar-thumb { background: var(--sn-border); border-radius: 3px; }
 .ed-toast {
+  flex: none;
   max-width: 320px;
   background: var(--sn-bg);
   border: 1px solid var(--sn-border);
