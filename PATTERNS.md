@@ -556,3 +556,29 @@ leggendo, le schede ripristinate all'avvio non devono strapparti da dove sei.
 - **Invariante UX:** se Filo apre qualcosa dietro, il riferimento che lascia in
   chat deve **portare a quella scheda** (messaggio `FOCUS_TAB`), non aprirne un
   doppione sullo stesso indirizzo.
+
+## Contenuto nascosto (sezioni chiuse, filtri, collassi): rivelalo, non toccarlo di nascosto
+
+Se una parte del documento/lista è nascosta da un collasso o da un filtro, ogni
+funzione che ci lavora sopra ha solo due comportamenti onesti: **includerlo E
+rivelarlo**, oppure **escluderlo del tutto** (e non contarlo). La terza via —
+contarlo e modificarlo lasciandolo invisibile — è la peggiore: il contatore
+sembra mentire, i tasti di navigazione non portano da nessuna parte e le
+modifiche si scoprono per caso più tardi (editor, Cerca/Sostituisci nelle
+sezioni chiuse — #385).
+
+- **Scelta di default: includere e rivelare.** L'utente ha cercato quella parola,
+  non ha chiesto di limitare la ricerca a ciò che si vede; nascondere una
+  corrispondenza legittima sarebbe attrito. Quindi la sezione si apre da sé e la
+  vista ci arriva sopra. La stessa regola vale per "applica a tutti": ciò che
+  viene toccato deve essere visibile **prima** che cambi.
+- **Rivelare significa risalire la catena.** Un blocco può essere nascosto da un
+  antenato di livello più alto, non dal titolo che gli sta subito sopra: si
+  risale la catena dei titoli che lo governano e si riaprono tutti.
+- **Lo stato "chiuso" vive su una sola fonte di verità e le classi di
+  visibilità si RICALCOLANO da lì** (nell'editor: `data-collapsed` sul titolo →
+  `reapplyCollapseState()`). Togglare le classi in loco all'apertura sembra
+  equivalente ma non lo è: riaprendo una sezione grande farebbe sbucare anche le
+  sotto-sezioni che l'utente aveva chiuso.
+- **Dove:** `revealCollapsedFor` / `reapplyCollapseState` in
+  `src/pages/editor/editor.js`. Test `tests/editor-find-collapsed.spec.mjs`.
