@@ -786,7 +786,23 @@
     const txt = VERS ? VERS.plainText(file) : '';
     if (txt && txt.trim()) return false;
     if (Array.isArray(file.comments) && file.comments.length) return false;
+    // Un foglio con solo un'immagine non ha testo ma NON è vuoto: senza questo
+    // controllo verrebbe scartato come "foglio bianco mai usato".
+    if (contentHasImage(file.content)) return false;
     return true;
+  }
+
+  // Il modello del documento contiene almeno un nodo immagine?
+  function contentHasImage(content) {
+    const root = content && content.content ? content.content : content;
+    let found = false;
+    const walk = (n) => {
+      if (found || !n || typeof n !== 'object') return;
+      if (n.type === 'image') { found = true; return; }
+      if (Array.isArray(n.content)) n.content.forEach(walk);
+    };
+    walk(root);
+    return found;
   }
 
   // Elimina un documento. Invariante: resta sempre almeno un file — se si
