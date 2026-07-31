@@ -35,3 +35,19 @@ test('menu tasto destro su un link a un file scaricabile', async ({ testServer, 
   await page.waitForTimeout(900);
   await page.screenshot({ path: 'tests/.shots/probe-linkmenu.png' });
 });
+
+test('menu tasto destro su un immagine (confronto)', async ({ testServer, openTab }) => {
+  const page = await testServer.openReady(openTab, `
+    <h1>Foto</h1>
+    <img id="img" src="data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==" width="200" height="200" style="background:#ccc">
+  `);
+  await page.locator('#img').click({ button: 'right' });
+  await page.waitForTimeout(900);
+  const entries = await page.evaluate(() => {
+    const root = document.querySelector('.sn-menu, [class*="sn-menu"]');
+    if (!root) return null;
+    return Array.from(root.querySelectorAll('.sn-menu-item, [class*="menu-item"], li, button'))
+      .map((e) => (e.innerText || e.textContent || '').trim()).filter(Boolean);
+  });
+  console.log('--- menu su IMMAGINE:', JSON.stringify(entries));
+});
