@@ -189,6 +189,7 @@
     get,
     latest,
     dropFile,
+    composeRestored,
     sameContent,
     plainText,
     textChangeSize,
