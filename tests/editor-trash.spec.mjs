@@ -62,6 +62,12 @@ test('due eliminazioni di fila: l\'"Annulla" del PRIMO documento è ancora lì e
   const toasts = page.locator('.ed-toast.show');
   await expect(toasts).toHaveCount(2);
   await expect(page.locator('.ed-toast.show .ed-toast-action')).toHaveCount(2);
+  // Due avvisi entrano comodamente nella finestra: la pila non deve mettersi
+  // in modalità "scorri" (barra di scorrimento addosso agli avvisi).
+  await expect.poll(() => page.evaluate(() => {
+    const h = document.getElementById('edToasts');
+    return h ? h.classList.contains('scrolling') : true;
+  })).toBe(false);
   mkdirSync(shotsDir, { recursive: true });
   await page.screenshot({ path: join(shotsDir, 'editor-trash-two-toasts.png') });
 
