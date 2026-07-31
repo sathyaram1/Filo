@@ -553,7 +553,7 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 /* ── Cestino documenti (stessa lista dello storico, righe non cliccabili:
       qui l'azione è nei due bottoni, non nell'apertura di un'anteprima) ── */
 .ed-tr-item { cursor: default; }
-.ed-tr-item:hover { border-color: var(--sn-border); }
+.ed-tr-item:hover { background: transparent; border-color: var(--sn-border); }
 .ed-tr-name { font-size: 13px; font-weight: 600; color: var(--sn-fg); }
 .ed-tr-empty { margin-right: auto; }
 .ed-vh-fulltext {
