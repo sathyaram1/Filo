@@ -1,0 +1,7 @@
+{
+  "id": "067cd89d-19bc-4fc8-904c-2e76b41e2a88",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la modifica e' stata pubblicata. Riguarda il cestino dei documenti dell'editor (recupero dei documenti eliminati) e l'impilamento degli avvisi. Nessun problema di sicurezza rilevato nella revisione del codice.",
+  "queuedAt": "2026-07-31T21:25:19.873Z",
+  "queuedBy": "routine"
+}
