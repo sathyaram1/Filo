@@ -503,7 +503,9 @@
     if (!v) return false;
     const target = STORE.findFile(collection, fileId);
     if (!target) return false;
-    const curContent = (doc && doc.id === fileId) ? serialize() : target;
+    // Snapshot dello stato ATTUALE (mai un alias del file vivo: dev'essere una
+    // fotografia, non un puntatore che continua a cambiare).
+    const curContent = (doc && doc.id === fileId) ? serialize() : cloneJson(target);
     const cres = VERS.record(versions, fileId, {
       content: curContent,
       source: 'restore',
