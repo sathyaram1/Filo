@@ -11,7 +11,8 @@ async function setDocText(page, text) {
 
 // Rinomina il documento attivo dal menu documenti (matita).
 async function renameActive(page, name) {
-  await page.click('#docSwitch');
+  const open = await page.locator('#docPop').isVisible().catch(() => false);
+  if (!open) await page.click('#docSwitch');
   await page.locator('.ed-doc-item.active .ed-doc-rename').click();
   const input = page.locator('.ed-doc-item input');
   await input.fill(name);
