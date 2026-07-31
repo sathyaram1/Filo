@@ -36,6 +36,15 @@ const P_HTML = `<!doctype html><html lang="en"><body style="font:16px sans-serif
 // Stub del provider nel main: qualunque richiesta AI torna il testo di input
 // con ogni blocco prefissato da "[IT] ", preservando il separatore.
 async function stubProvider(app) {
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { gemini: 'k-test' },
+      models: { [C.ACTIONS.TRANSLATE_PAGE]: 'flash-lite-3' },
+      modelRegistry: C.DEFAULT_MODEL_REGISTRY,
+    });
+  });
   await app.evaluate(() => {
     const P = globalThis.SN_PROVIDERS;
     globalThis.__aiCalls = [];
