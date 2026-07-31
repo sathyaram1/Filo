@@ -1,7 +1,0 @@
-{
-  "id": "c1544b02-502e-4527-964c-35d388f8fc41",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho riprodotto la situazione descritta: nell'editor ho messo un'immagine dentro il foglio (sia in mezzo al testo, sia dentro una riga già scritta, sia da sola senza testo), ho salvato e ho ricaricato la pagina. In tutti i casi l'immagine resta esattamente dove l'avevo messa, con la stessa sorgente, e il testo attorno è intatto: prima spariva al primo salvataggio, ora no. Ho verificato anche il caso del foglio con la sola immagine e nessuna parola: non viene più considerato vuoto e quindi non viene azzerato al ricaricamento. Ho poi provato a romperlo con casi ostili: immagini con sorgenti non valide o travestite (indirizzi 'javascript:', 'vbscript:', finte immagini che in realtà sono codice, sorgenti vuote) vengono scartate e non salvate; un'immagine valida a cui era stato agganciato un tentativo di eseguire codice al caricamento viene conservata come immagine ma il tentativo di codice sparisce e non viene eseguito. Ho verificato che i normali link http/https alle immagini si conservano al ricaricamento, e che un foglio con molte immagini le mantiene tutte. Esteticamente il foglio resta pulito e leggibile dopo il ricaricamento. Ho infine rieseguito tutti i controlli esistenti dell'editor (documenti, versioni, cestino, riassunto, titoli, moduli, cerca/sostituisci, conteggio parole): nessuna regressione.",
-  "queuedAt": "2026-07-31T22:00:52.764Z",
-  "queuedBy": "routine"
-}
