@@ -44,7 +44,26 @@ test('link di download con target=_blank: resta una scheda vuota?', async ({ app
   console.log('TABS DOPO :', JSON.stringify(tabsAfter));
   console.log('DOWNLOAD  :', JSON.stringify(dl));
   console.log('URLS      :', JSON.stringify(app.windows().map((w) => w.url())));
+  const snap = await shell.evaluate(() => window.filoShell.tabs.snapshot());
+  console.log('SNAPSHOT  :', JSON.stringify(snap, null, 2).slice(0, 2500));
   await shell.screenshot({ path: 'tests/.shots/probe-download-blanktab.png' });
 
+  await new Promise((r) => srv.close(r));
+});
+
+test('CONTROLLO: target=_blank verso una pagina normale non lascia schede vuote', async ({ app, shell, openTab }) => {
+  const srv = createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    if (req.url.startsWith('/other')) { res.end('<title>Altra pagina</title><h1>Altra</h1>'); return; }
+    res.end('<title>Base</title><p><a id="go" href="/other" target="_blank" rel="noopener">Vai</a></p>');
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const port = srv.address().port;
+  const page = await openTab(`http://127.0.0.1:${port}/p`);
+  await page.waitForTimeout(800);
+  await page.click('#go');
+  await page.waitForTimeout(3000);
+  const snap = await shell.evaluate(() => window.filoShell.tabs.snapshot());
+  console.log('CONTROLLO TABS:', JSON.stringify((snap.tabs || snap).map ? (snap.tabs || snap).map((t) => ({ t: t.title, u: t.url })) : snap));
   await new Promise((r) => srv.close(r));
 });
