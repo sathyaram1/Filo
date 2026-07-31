@@ -1643,8 +1643,10 @@
 
   function renderDocBody() {
     docEl.innerHTML = pmToHtml(doc.content);
-    // Documento vuoto → paragrafo con <br> così il caret ha dove posarsi.
-    if (!docEl.firstChild || !docEl.textContent.trim()) docEl.innerHTML = '<p><br></p>';
+    // Documento vuoto → paragrafo con <br> così il caret ha dove posarsi. Un
+    // foglio con la sola immagine (nessun testo) NON è vuoto: senza il controllo
+    // sull'<img> verrebbe azzerato e l'immagine persa al reload.
+    if (!docEl.firstChild || (!docEl.textContent.trim() && !docEl.querySelector('img'))) docEl.innerHTML = '<p><br></p>';
     refreshCollapseToggles();
     applyCommentHighlights();
   }
