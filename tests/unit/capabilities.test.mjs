@@ -150,3 +150,51 @@ test('ogni pagina filo:// citata nel manifesto esiste davvero', () => {
     assert.ok(existsSync(p), `il manifesto cita filo://${ref} ma ${p} non esiste`);
   }
 });
+
+test('la home e "Aperti per dopo" sono attribuite alla pagina giusta', () => {
+  // Drift #387: la voce "Home di Filo" citava filo://home/home.html, che è
+  // invece la pagina "Aperti per dopo"; la home vera è filo://newtab/ (la
+  // dashboard/nuova scheda). Il controllo "il file esiste" non lo intercettava
+  // perché home.html esiste eccome — solo, non è la home. Qui incrociamo il
+  // TITOLO reale delle due pagine così che una futura inversione ridiventi rossa.
+  const homeHtml = readFileSync(join(ROOT, 'src', 'pages', 'home', 'home.html'), 'utf8');
+  const dashHtml = readFileSync(join(ROOT, 'src', 'pages', 'dashboard', 'dashboard.html'), 'utf8');
+  assert.match(homeHtml, /<title>[^<]*Aperti per dopo/i,
+    'filo://home/home.html non è più la pagina "Aperti per dopo": aggiorna il manifesto e questo test');
+  assert.match(dashHtml, /<title>[^<]*Nuova scheda/i,
+    'la dashboard non è più la nuova scheda/home: aggiorna il manifesto e questo test');
+
+  const home = CAP.get('home-page');
+  assert.ok(home, 'manca la capacità "home-page"');
+  const homeText = `${home.invoke} ${home.desc}`;
+  assert.ok(!/filo:\/\/home\/home\.html/.test(homeText),
+    'la voce "Home di Filo" cita filo://home/home.html, che è invece "Aperti per dopo"');
+  assert.ok(/filo:\/\/newtab\/|filo:\/\/dashboard\//.test(homeText),
+    'la voce "Home di Filo" deve puntare alla home vera (filo://newtab/ o dashboard)');
+
+  // Simmetria: se una voce cita filo://home/home.html, deve riguardare gli
+  // "Aperti per dopo" — altrimenti sta di nuovo scambiando le due pagine.
+  for (const c of CAP.CAPABILITIES) {
+    const text = `${c.title} ${c.invoke} ${c.desc}`.toLowerCase();
+    if (/filo:\/\/home\/home\.html/.test(`${c.invoke} ${c.desc}`)) {
+      assert.match(text, /aperti per dopo|per dopo/,
+        `la voce "${c.id}" cita filo://home/home.html ma non riguarda "Aperti per dopo"`);
+    }
+  }
+});
+
+test('ogni icona fissa della home che apre una pagina filo:// è coperta dal manifesto', () => {
+  // renderControls() in dashboard.js monta le icone fisse in alto a destra nella
+  // home (Red Team, Cronologia, ...). Quelle che navigano a una pagina filo://
+  // devono avere una capacità che cita QUEL indirizzo: drift #387: il Red Team
+  // era a un click dalla home ma non compariva affatto nel manifesto, così
+  // l'agente diceva di non saperlo fare.
+  const dash = readFileSync(join(ROOT, 'src', 'pages', 'dashboard', 'dashboard.js'), 'utf8');
+  const urls = [...dash.matchAll(/url:\s*'(filo:\/\/[a-z-]+\/[a-z-]+\.html)'/g)].map((m) => m[1]);
+  assert.ok(urls.length >= 2, `mi aspetto ≥2 icone della home con url filo://, trovate ${urls.length}`);
+  const manifestText = CAP.CAPABILITIES.map((c) => `${c.invoke} ${c.desc}`).join('\n');
+  for (const url of urls) {
+    assert.ok(manifestText.includes(url),
+      `un'icona della home apre ${url} ma nessuna capacità del manifesto la cita: aggiungi/aggiorna la voce`);
+  }
+});
