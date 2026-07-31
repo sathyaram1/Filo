@@ -89,7 +89,7 @@ test('#385 "Sostituisci tutto" senza mai cercare prima: niente cambi invisibili'
 });
 
 test('#385 Prec/Succ portano davvero sulle corrispondenze nascoste', async ({ openTab }) => {
-  const page = await openTab('filo://editor/elector.html'.replace('electr', 'edit'));
+  const page = await openTab('filo://editor/editor.html');
   await setupDoc(page, '<h2>A</h2><p>zeta uno</p><h2>B</h2><p>zeta due</p><h2>C</h2><p>zeta tre</p>');
   await clickArrow(page, 'B');
   await clickArrow(page, 'C');
