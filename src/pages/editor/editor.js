@@ -1822,6 +1822,20 @@
       sib = sib.nextElementSibling;
     }
   }
+  // Ricalcola DA CAPO chi è nascosto, partendo solo da `data-collapsed` sui
+  // titoli (l'unica fonte di verità dello stato di collasso) e riallinea le
+  // frecce. Ricalcolare invece di "togglare in loco" è ciò che rende corretto
+  // il caso annidato: riaprendo un titolo di livello alto, le sotto-sezioni
+  // ancora chiuse restano chiuse invece di sbucare tutte insieme.
+  function reapplyCollapseState() {
+    docEl.querySelectorAll('.ed-hidden-by-collapse').forEach((el) => el.classList.remove('ed-hidden-by-collapse'));
+    docEl.querySelectorAll('h1, h2, h3').forEach((h) => {
+      const collapsed = h.dataset.collapsed === '1';
+      const btn = h.querySelector('.ed-collapse-toggle');
+      if (btn) btn.classList.toggle('is-collapsed', collapsed);
+      if (collapsed) applyCollapseToSiblings(h, true);
+    });
+  }
   function refreshCollapseToggles() {
     docEl.querySelectorAll('.ed-collapse-toggle').forEach((b) => b.remove());
     docEl.querySelectorAll('h1, h2, h3').forEach((h) => {
@@ -1831,23 +1845,49 @@
       btn.innerHTML = ICONS.caretDown ? ICONS.caretDown(14) : '▾';
       btn.addEventListener('click', (e) => { e.preventDefault(); toggleCollapse(h, btn); });
       h.insertBefore(btn, h.firstChild);
-      // Lo stato di collasso vive sul titolo (`data-collapsed`), non sul
-      // bottone: ogni digitazione ricrea i bottoni, ma il titolo sopravvive.
-      // Ripristina la freccia e ri-nascondi i fratelli, così una sezione chiusa
-      // resta chiusa e coerente anche dopo aver scritto un carattere (e nuovo
-      // contenuto in una sezione chiusa nasce nascosto, non "sbucato").
-      if (h.dataset.collapsed === '1') {
-        btn.classList.add('is-collapsed');
-        applyCollapseToSiblings(h, true);
-      }
     });
+    // Lo stato di collasso vive sul titolo (`data-collapsed`), non sul bottone:
+    // ogni digitazione ricrea i bottoni, ma il titolo sopravvive. Ripristina le
+    // frecce e ri-nascondi i fratelli, così una sezione chiusa resta chiusa e
+    // coerente anche dopo aver scritto un carattere (e nuovo contenuto in una
+    // sezione chiusa nasce nascosto, non "sbucato").
+    reapplyCollapseState();
   }
   function toggleCollapse(h, btn) {
     const collapsing = !btn.classList.contains('is-collapsed');
-    btn.classList.toggle('is-collapsed', collapsing);
     if (collapsing) h.dataset.collapsed = '1';
     else delete h.dataset.collapsed;
-    applyCollapseToSiblings(h, collapsing);
+    reapplyCollapseState();
+  }
+  // Blocco di primo livello (figlio diretto del foglio) che contiene `node`.
+  function topLevelBlockOf(node) {
+    let el = node && node.nodeType === 1 ? node : (node && node.parentElement);
+    while (el && el.parentElement && el.parentElement !== docEl) el = el.parentElement;
+    return el && el.parentElement === docEl ? el : null;
+  }
+  // Riapre le sezioni chiuse che stanno nascondendo `node`, così qualsiasi cosa
+  // ci si voglia fare (portarci la vista, sostituire una parola) avvenga sotto
+  // gli occhi dell'utente. Ritorna true se ha davvero riaperto qualcosa.
+  function revealCollapsedFor(node) {
+    const el = topLevelBlockOf(node);
+    if (!el || !el.classList.contains('ed-hidden-by-collapse')) return false;
+    // Solo i titoli di livello più alto (numero minore) di `el` possono
+    // nasconderlo: risalendo i fratelli precedenti si tiene la catena dei
+    // titoli che lo governano, scendendo di livello.
+    let minLvl = headingLevel(el) || Infinity;
+    let opened = false;
+    let sib = el.previousElementSibling;
+    while (sib) {
+      const lvl = headingLevel(sib);
+      if (lvl > 0 && lvl < minLvl) {
+        minLvl = lvl;
+        if (sib.dataset.collapsed === '1') { delete sib.dataset.collapsed; opened = true; }
+        if (lvl === 1) break;
+      }
+      sib = sib.previousElementSibling;
+    }
+    if (opened) reapplyCollapseState();
+    return opened;
   }
 
   function onDocInput() {
