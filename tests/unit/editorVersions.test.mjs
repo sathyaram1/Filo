@@ -161,3 +161,75 @@ test('un percorso completo di snapshot manuale: sopra soglia crea, sotto no', ()
   const tweak = doc('Bozza!', 'Un lungo paragrafo scritto a mano dall\'utente. ' + 'parola '.repeat(30));
   assert.equal(V.isSignificantManualChange(bigEdit, tweak), false);
 });
+
+// ── Confine del ripristino (#384) ─────────────────────────────────────────
+// Ripristinare una versione deve riportare indietro il CORPO del documento
+// (testo + commenti), non il documento "contenitore": il nome scelto dopo, la
+// conversazione avuta con Filo nel riquadro chat e la disposizione dei riquadri
+// devono restare come sono ADESSO. Senza `composeRestored` il file veniva
+// sostituito in blocco dallo snapshot → nome vecchio e chat cancellata.
+function fileState({ title, text, comments = [], chat = [] }) {
+  return {
+    id: 'file-1',
+    meta: { title, created: '2026-01-01T00:00:00.000Z', modified: '2026-01-02T00:00:00.000Z' },
+    content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] },
+    comments,
+    modules: [
+      { id: 'm-chat', type: 'chat', cells: [{ x: 0, y: 3, z: 1 }], data: { messages: chat } },
+      { id: 'm-wc', type: 'word-count', cells: [{ x: 2, y: 0, z: 0 }], data: { count: 'words' } },
+    ],
+  };
+}
+
+test('composeRestored riporta indietro il testo ma tiene nome, chat e riquadri di adesso', () => {
+  const vecchia = fileState({
+    title: 'Bozza',
+    text: 'Prima stesura',
+    comments: [{ id: 'c1', text: 'nota vecchia', anchor: { from: 0, to: 5, text: 'Prima' } }],
+    chat: [],
+  });
+  const adesso = fileState({
+    title: 'Relazione finale',
+    text: 'Testo molto più avanti',
+    comments: [{ id: 'c2', text: 'nota nuova', anchor: { from: 0, to: 5, text: 'Testo' } }],
+    chat: [{ role: 'user', content: 'Puoi riassumere?' }, { role: 'assistant', content: 'Certo.' }],
+  });
+
+  const out = V.composeRestored(adesso, vecchia);
+
+  // Il testo È tornato a quello della versione…
+  assert.deepEqual(out.content, vecchia.content);
+  // …e con lui i commenti di allora (sono ancorati a quel testo).
+  assert.deepEqual(out.comments, vecchia.comments);
+  // Ma il NOME resta quello attuale: la rinomina non sparisce.
+  assert.equal(out.meta.title, 'Relazione finale');
+  // E la conversazione con Filo è ancora tutta lì.
+  const chatMod = out.modules.find((m) => m.type === 'chat');
+  assert.equal(chatMod.data.messages.length, 2);
+  assert.equal(chatMod.data.messages[1].content, 'Certo.');
+  // Anche la disposizione dei riquadri è quella di adesso.
+  assert.deepEqual(out.modules.map((m) => m.type), ['chat', 'word-count']);
+  assert.equal(out.id, 'file-1');
+});
+
+test('composeRestored produce copie: toccare il risultato non altera la versione salvata', () => {
+  const vecchia = fileState({ title: 'Bozza', text: 'Prima stesura', chat: [] });
+  const adesso = fileState({ title: 'Ora', text: 'Dopo', chat: [{ role: 'user', content: 'ciao' }] });
+  const out = V.composeRestored(adesso, vecchia);
+  out.content.content[0].content[0].text = 'manomesso';
+  out.modules[0].data.messages.push({ role: 'user', content: 'altro' });
+  assert.equal(vecchia.content.content[0].content[0].text, 'Prima stesura', 'la versione salvata è intatta');
+  assert.equal(adesso.modules[0].data.messages.length, 1, 'lo stato attuale è intatto');
+});
+
+test('composeRestored regge versioni parziali o storiche senza campi', () => {
+  const adesso = fileState({ title: 'Ora', text: 'Dopo', chat: [{ role: 'user', content: 'ciao' }] });
+  const out = V.composeRestored(adesso, { content: { type: 'doc', content: [] } });
+  assert.deepEqual(out.comments, [], 'niente commenti nella versione → nessuno');
+  assert.equal(out.meta.title, 'Ora');
+  assert.equal(out.modules.length, 2);
+  // Anche senza stato corrente non esplode: ripiega sulla versione.
+  const solo = V.composeRestored(null, fileState({ title: 'Bozza', text: 'x', chat: [] }));
+  assert.equal(solo.meta.title, 'Bozza');
+  assert.equal(solo.modules.length, 2);
+});
