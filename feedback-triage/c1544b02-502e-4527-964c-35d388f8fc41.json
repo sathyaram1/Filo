@@ -1,0 +1,7 @@
+{
+  "id": "c1544b02-502e-4527-964c-35d388f8fc41",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la modifica che fa restare le immagini incollate nell'editor e stata pubblicata. Ho verificato che le immagini vengono accettate solo da sorgenti sicure (data:image, http/https, blob) e che eventuali attributi pericolosi vengono rimossi, cosi un'immagine incollata non puo eseguire codice quando il documento viene ricostruito.",
+  "queuedAt": "2026-07-31T22:04:12.236Z",
+  "queuedBy": "routine"
+}
