@@ -60,6 +60,7 @@ test('traduzione interrotta a metà: errore + "Pagina tradotta" insieme, e nient
 
   await expect.poll(async () => (await page.evaluate(() => window.__toasts)).length,
     { timeout: 20_000 }).toBeGreaterThan(1);
+  await page.screenshot({ path: 'tests/.shots/probe-translate-fetchfailed.png' });
   await page.waitForTimeout(1500);
 
   const res = await page.evaluate(() => ({
@@ -71,14 +72,11 @@ test('traduzione interrotta a metà: errore + "Pagina tradotta" insieme, e nient
 
   // Riapro il menu: che azione mi offre adesso?
   await page.locator('p').last().click({ button: 'right' });
-  const label = await page.locator('.sn-menu .sn-menu-row-btn[data-sn-icon-id="translate"]')
-    .first().getAttribute('title')
-    .catch(() => null);
   const aria = await page.evaluate(() => {
-    const b = document.querySelector('.sn-menu .sn-menu-row-btn[data-sn-icon-id="translate"]');
-    return b ? (b.getAttribute('aria-label') || b.getAttribute('data-sn-tip') || b.textContent || b.outerHTML.slice(0, 200)) : null;
+    const nodes = Array.from(document.querySelectorAll('[data-sn-icon-id="translate"]'));
+    return nodes.map((b) => b.outerHTML.slice(0, 260));
   });
-  console.log('[probe fail] etichetta icona traduci dopo il fallimento:', JSON.stringify(label), JSON.stringify(aria));
+  console.log('[probe fail] icona traduci dopo il fallimento:', JSON.stringify(aria));
 
   // Invariante attesa: se la traduzione si è interrotta, NON deve dire di aver finito.
   expect(res.toasts.includes('Pagina tradotta'),
