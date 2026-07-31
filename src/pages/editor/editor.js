@@ -1520,6 +1520,7 @@
       const el = node;
       if (el.classList && el.classList.contains('ed-collapse-toggle')) return;
       if (el.tagName === 'BR') { out.push({ type: 'hardBreak' }); return; }
+      if (el.tagName === 'IMG') { const img = imgToPM(el); if (img) out.push(img); return; }
       let next = marks;
       const extra = MARK_TAGS[el.tagName];
       if (extra && !next.some((m) => m.type === extra)) next = [...next, { type: extra }];
