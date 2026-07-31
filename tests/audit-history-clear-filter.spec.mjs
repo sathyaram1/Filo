@@ -61,9 +61,10 @@ test('svuotare la cronologia deve azzerare anche il menu filtro per tipo', async
     let optCount = await page.locator('#filter option').count();
     expect(optCount).toBe(4); // Tutte + 3 tipi
 
-    // Svuota la cronologia (conferma nel modale).
+    // Svuota la cronologia (conferma nel modale, shadow closed → hook _test).
     await page.locator('#clear').click();
-    await page.locator('.sn-confirm-btn-ok').click();
+    await expect.poll(async () => page.evaluate(() => !!window.SN_CONFIRM_UI._test.state())).toBe(true);
+    await page.evaluate(() => window.SN_CONFIRM_UI._test.click('ok'));
 
     // La lista è vuota.
     await expect(page.locator('.sn-history-item')).toHaveCount(0);
