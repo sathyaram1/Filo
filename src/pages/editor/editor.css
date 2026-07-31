@@ -514,6 +514,8 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 
 /* ── Storico versioni (pannello overlay) ──────────────────────────────── */
 .ed-vh-empty { font-size: 13px; line-height: 1.5; color: var(--sn-muted); margin: 0; }
+/* Confine del ripristino: cosa torna indietro e cosa no. */
+.ed-vh-scope { font-size: 12px; line-height: 1.45; color: var(--sn-muted); margin: 0 0 10px; }
 .ed-vh-list { display: flex; flex-direction: column; gap: 8px; }
 .ed-vh-item {
   border: 1px solid var(--sn-border);

@@ -139,6 +139,41 @@
     return list.length ? list[list.length - 1] : null;
   }
 
+  // ── Che cosa riporta indietro un ripristino ───────────────────────────────
+  // Una versione è uno snapshot dell'INTERO file (testo, commenti, nome, moduli
+  // del banco di lavoro con i loro dati — chat inclusa). Ripristinarla in blocco
+  // però riporterebbe indietro anche cose che l'utente NON sta chiedendo di
+  // annullare e che il pannello non gli mostra nemmeno: il nome del documento,
+  // la conversazione avuta con Filo, la disposizione dei riquadri. Sarebbe una
+  // perdita silenziosa.
+  //
+  // Confine scelto: dalla versione torna il CORPO del documento — testo e
+  // commenti (che sono ancorati al testo: separarli lascerebbe commenti appesi a
+  // frasi inesistenti). Restano invece com'erano ADESSO le cose che appartengono
+  // al documento "contenitore" e non a quel testo: nome e metadati, e i moduli
+  // del banco di lavoro con i loro dati (chat, pagine, disposizione).
+  //
+  // Logica pura, così è la stessa prima e dopo un riavvio e si testa senza DOM.
+  function cloneJson(v) {
+    try { return v == null ? v : JSON.parse(JSON.stringify(v)); } catch (_) { return v; }
+  }
+
+  function composeRestored(current, versionContent) {
+    const cur = current && typeof current === 'object' ? current : {};
+    const ver = versionContent && typeof versionContent === 'object' ? versionContent : {};
+    const meta = cloneJson(cur.meta) || cloneJson(ver.meta) || {};
+    const modules = Array.isArray(cur.modules)
+      ? cloneJson(cur.modules)
+      : (Array.isArray(ver.modules) ? cloneJson(ver.modules) : []);
+    return {
+      id: cur.id || ver.id,
+      meta,
+      content: cloneJson(ver.content) || { type: 'doc', content: [] },
+      comments: Array.isArray(ver.comments) ? cloneJson(ver.comments) : [],
+      modules,
+    };
+  }
+
   // Housekeeping: rimuove lo storico di un file cancellato.
   function dropFile(store, fileId) {
     const s = normalizeStore(store);
@@ -154,6 +189,7 @@
     get,
     latest,
     dropFile,
+    composeRestored,
     sameContent,
     plainText,
     textChangeSize,

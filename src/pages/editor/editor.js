@@ -202,10 +202,16 @@
   // Serializza un MODELLO doc (in memoria) nel formato di storage, SENZA toccare
   // il DOM: usato per creare file vuoti e per snapshot generici. Il file attivo
   // passa da serialize(), che prima allinea il modello al DOM.
+  //
+  // Il risultato è una COPIA PROFONDA, mai un alias del modello vivo: questo
+  // serializzato finisce sia nella collezione sia negli snapshot dello storico
+  // versioni, e uno snapshot che continua a cambiare insieme al documento non è
+  // uno snapshot (era la causa dell'incoerenza prima/dopo il riavvio: in memoria
+  // la chat di un modulo "seguiva" le modifiche, su disco no).
   function serializeDocModel(d) {
     const meta = { ...(d.meta || {}) };
     if (!meta.title) meta.title = 'Documento senza titolo';
-    return {
+    return cloneJson({
       id: d.id,
       meta,
       content: d.content || { type: 'doc', content: [{ type: 'paragraph', content: [] }] },
@@ -213,7 +219,7 @@
       modules: (d.modules || []).map((m) => ({
         id: m.id, type: m.type, cells: rectToCells(m), data: m.data,
       })),
-    };
+    });
   }
 
   function serialize() {
@@ -486,15 +492,20 @@
   }
 
   // Ripristina una versione: prima salva lo stato corrente come versione (così
-  // anche il ripristino è annullabile e non si perde nulla), poi rimpiazza il
-  // contenuto del file con quello scelto e ri-renderizza se è il file attivo.
+  // anche il ripristino è annullabile e non si perde nulla), poi riporta il
+  // CORPO del documento (testo + commenti) a quello scelto e ri-renderizza se è
+  // il file attivo. Nome del documento, conversazione con Filo e disposizione
+  // dei riquadri NON tornano indietro: appartengono al documento di adesso, non
+  // al testo di allora (vedi SN_EDITOR_VERSIONS.composeRestored).
   function restoreVersion(fileId, versionId) {
     if (!VERS) return false;
     const v = VERS.get(versions, fileId, versionId);
     if (!v) return false;
     const target = STORE.findFile(collection, fileId);
     if (!target) return false;
-    const curContent = (doc && doc.id === fileId) ? serialize() : target;
+    // Snapshot dello stato ATTUALE (mai un alias del file vivo: dev'essere una
+    // fotografia, non un puntatore che continua a cambiare).
+    const curContent = (doc && doc.id === fileId) ? serialize() : cloneJson(target);
     const cres = VERS.record(versions, fileId, {
       content: curContent,
       source: 'restore',
@@ -503,8 +514,9 @@
     }, () => newId('ver'));
     versions = cres.store;
     persistVersions();
-    const restored = JSON.parse(JSON.stringify(v.content || {}));
+    const restored = VERS.composeRestored(curContent, v.content);
     restored.id = fileId;
+    if (restored.meta) restored.meta.modified = new Date().toISOString();
     STORE.replaceFile(collection, fileId, restored);
     if (doc && doc.id === fileId) {
       activateFile(STORE.findFile(collection, fileId));
@@ -558,6 +570,11 @@
   const VERS_HISTORY_BATCH = 40;
   let versHistoryShown = VERS_HISTORY_BATCH;
 
+  // Che cosa tocca un ripristino: il pannello mostra solo l'anteprima del testo,
+  // quindi il confine va detto una volta, in chiaro, prima di premere.
+  const VH_SCOPE_NOTE = 'Il ripristino riporta indietro il testo e i commenti. '
+    + 'Nome del documento, conversazione con Filo e disposizione dei riquadri restano come sono adesso.';
+
   function openVersionHistory() {
     closeDocPop();
     closeTitleMenu();
@@ -595,6 +612,7 @@
       ? `<button class="ed-btn ed-vh-more" id="vhMore">Mostra le versioni più vecchie (${all.length - versHistoryShown})</button>`
       : '';
     openOverlay(`<h3>Storico versioni</h3>
+      <p class="ed-vh-scope">${VH_SCOPE_NOTE}</p>
       <div class="ed-vh-list">${rows}</div>
       ${more}
       <div class="ed-overlay-actions"><button class="ed-btn primary" id="ovClose">Chiudi</button></div>`);
@@ -627,6 +645,7 @@
         <span class="ed-vh-when">${escapeHtml(fmtVersionWhen(v.ts))}</span>
       </div>
       <div class="ed-vh-fulltext">${body}</div>
+      <p class="ed-vh-scope">${VH_SCOPE_NOTE}</p>
       <div class="ed-overlay-actions">
         <button class="ed-btn" id="vhBack">Indietro</button>
         <button class="ed-btn primary" id="vhRestore">Ripristina questa versione</button>

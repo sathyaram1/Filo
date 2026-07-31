@@ -255,3 +255,101 @@ test('cambiando documento si salva la modifica manuale significativa del file la
   expect(prev.length).toBe(1);
   expect(prev[0].source).toBe('manual');
 });
+
+// ── Il ripristino non deve portarsi via ciò che non è testo (#384) ─────────
+// Ripristinare una versione più vecchia sostituiva il file INTERO: tornavano
+// indietro anche il nome del documento e i moduli del banco di lavoro (chat
+// inclusa), che il pannello non mostra nemmeno. Questi test asseriscono il
+// SUCCESSO del confine giusto: il testo torna a quello della versione, il nome e
+// la conversazione con Filo restano quelli di adesso. Senza il fix il titolo
+// tornerebbe "Bozza" e il riquadro della chat si svuoterebbe → rossi.
+
+// Rinomina il documento attivo dal menu documenti (matita), come farebbe l'utente.
+async function renameActiveDoc(page, title) {
+  await page.click('#docSwitch');
+  await page.locator('.ed-doc-item.active .ed-doc-rename').click();
+  const input = page.locator('.ed-doc-item-input');
+  await input.fill(title);
+  await input.press('Enter');
+  await page.click('#docSwitch'); // richiude il menu
+}
+
+// Ripristina la versione più vecchia dal pannello "Storico versioni".
+async function restoreOldestFromPanel(page) {
+  await page.click('#docSwitch');
+  await page.click('#docHistory');
+  await page.locator('.ed-vh-item').last().locator('.ed-vh-restore').click();
+  await page.click('#ovClose'); // il pannello resta aperto: l'utente lo chiude
+}
+
+const LUNGO = 'C\'era una volta un bosco fitto e silenzioso, attraversato ogni mattina da una bambina con un mantello rosso cucito dalla nonna, che portava il pane.';
+
+test('ripristinare una versione NON riporta indietro il nome del documento', async ({ openTab }) => {
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('#doc');
+  await page.evaluate(() => window.__filoEditorVersions.ready());
+
+  await page.click('#doc');
+  await renameActiveDoc(page, 'Bozza');
+  await expect(page.locator('#docTitle')).toHaveText('Bozza');
+
+  // Punto di ripristino salvato mentre il documento si chiamava "Bozza".
+  await setDocText(page, LUNGO);
+  expect(await page.evaluate(() => window.__filoEditorVersions.snapshotManual())).not.toBeNull();
+
+  // Poi l'utente rinomina e continua a scrivere.
+  await renameActiveDoc(page, 'Relazione finale');
+  await setDocText(page, 'Testo completamente riscritto dopo la rinomina.');
+
+  await restoreOldestFromPanel(page);
+
+  // Il TESTO è tornato a quello della versione…
+  await expect(page.locator('#doc')).toHaveText(LUNGO);
+  // …ma il nome scelto dopo è ancora lì (nessuna perdita silenziosa).
+  await expect(page.locator('#docTitle')).toHaveText('Relazione finale');
+});
+
+test('ripristinare una versione NON cancella la conversazione con Filo, nemmeno dopo un riavvio', async ({ openTab }) => {
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('#doc');
+  await page.evaluate(() => window.__filoEditorVersions.ready());
+
+  // Punto di ripristino salvato QUANDO LA CHAT ERA VUOTA.
+  await page.click('#doc');
+  await setDocText(page, LUNGO);
+  expect(await page.evaluate(() => window.__filoEditorVersions.snapshotManual())).not.toBeNull();
+
+  // L'utente parla con Filo nel riquadro chat del documento (pagina 2 del banco
+  // di lavoro). Senza chiave AI la risposta è un errore: quel che conta è che la
+  // conversazione (domanda + risposta) resti nel documento.
+  await page.locator('.ed-switch-icon').nth(1).click();
+  const chat = page.locator('.ed-module[data-type="chat"]');
+  await chat.locator('[data-chat="input"]').fill('Puoi riassumere il testo?');
+  await chat.locator('[data-chat="send"]').click();
+  await expect(chat.locator('.ed-chat-msg')).toHaveCount(2, { timeout: 30_000 });
+
+  // "Chiudi e riapri Filo": lo storico e il documento si rileggono dal disco —
+  // è qui che prima lo snapshot smetteva di condividere i dati col documento
+  // vivo e il ripristino svuotava la chat.
+  // NIENTE flush dello storico qui: il punto di ripristino è già stato scritto
+  // quando è stato creato. Ri-scriverlo adesso maschererebbe il bug (salverebbe
+  // uno snapshot 'aggiornato' con la chat di adesso).
+  await expect(page.locator('#saveState')).toHaveText('', { timeout: 10_000 });
+  await page.reload();
+  await page.waitForSelector('#doc');
+  await page.evaluate(() => window.__filoEditorVersions.ready());
+  await page.locator('.ed-switch-icon').nth(1).click();
+  await expect(page.locator('.ed-module[data-type="chat"] .ed-chat-msg')).toHaveCount(2);
+
+  // Altro testo, poi ripristino della versione più vecchia.
+  await page.click('#doc');
+  await setDocText(page, 'Un testo nuovo di zecca scritto dopo il riavvio.');
+  await restoreOldestFromPanel(page);
+
+  await expect(page.locator('#doc')).toHaveText(LUNGO);
+  // La conversazione è ancora tutta lì.
+  await page.locator('.ed-switch-icon').nth(1).click();
+  const log = page.locator('.ed-module[data-type="chat"] .ed-chat-msg');
+  await expect(log).toHaveCount(2);
+  await expect(log.first()).toHaveText('Puoi riassumere il testo?');
+});

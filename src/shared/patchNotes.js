@@ -16,6 +16,12 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.175', date: '2026-07-31',
+      fixes: [
+        'Nell’editor, ripristinare una versione dallo "Storico versioni" riporta indietro solo il testo del documento e i suoi commenti: il nome che gli hai dato, la conversazione avuta con Filo nel riquadro chat e la disposizione dei riquadri restano come sono adesso. Il comportamento è lo stesso anche se nel frattempo hai chiuso e riaperto Filo, e il pannello dice in chiaro cosa torna indietro prima che tu prema "Ripristina".',
+      ],
+    },
+    {
       version: '0.2.172', date: '2026-07-30',
       fixes: [
         'Quando una scheda sta riproducendo audio, l’icona dell’altoparlante prende semplicemente il posto della sua icona del sito, invece di comparirci sopra o di ripetersi due volte: resta un solo indicatore, chiaro e sempre visibile anche con molte schede aperte e poco spazio.',
