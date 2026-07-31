@@ -1594,6 +1594,10 @@
     if (!Array.isArray(nodes)) return '';
     return nodes.map((n) => {
       if (n.type === 'hardBreak') return '<br>';
+      if (n.type === 'image' && n.attrs && IMG_SRC_OK.test(String(n.attrs.src || '').trim())) {
+        const alt = n.attrs.alt ? ` alt="${escapeHtml(n.attrs.alt)}"` : '';
+        return `<img src="${escapeHtml(String(n.attrs.src).trim())}"${alt}>`;
+      }
       if (n.type !== 'text') return '';
       let html = escapeHtml(n.text);
       const marks = n.marks || [];
