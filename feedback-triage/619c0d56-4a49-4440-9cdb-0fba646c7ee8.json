@@ -1,7 +1,0 @@
-{
-  "id": "619c0d56-4a49-4440-9cdb-0fba646c7ee8",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho verificato partendo dal sintomo, come lo vive l'utente. Ho chiesto: 'dove trovo la home?' e 'apri la home' — ora la voce Home porta davvero alla pagina della nuova scheda (assistente al centro, suggerimenti, recap aggiornamenti), non più alla lista 'Aperti per dopo'. Quest'ultima resta correttamente descritta come la lista delle pagine messe da parte, con il suo indirizzo giusto. Per il Red Team: ora c'è una voce dedicata, quindi a 'cos'è il Red Team?' o 'come partecipo?' Filo risponde e indica lo scudo rosso in alto a destra nella home, spiegando bene il confine (senza codice di invito leggi regole e classifica ma non fai punti; i codici li crea chi gestisce Filo). Ho controllato che l'indirizzo della home vera, quello di 'Aperti per dopo' e quello del Red Team combacino con le pagine reali guardandone i titoli. Stress: ho rimesso a mano il vecchio errore (home che punta alla lista, Red Team assente) e il controllo automatico di coerenza lo becca subito diventando rosso; con la correzione applicata è verde. Tutti i controlli sulla logica pura passano (oltre milleduecento). Non c'era UI nuova da provare a schermo: le icone in alto a destra esistevano già, il problema era solo nell'elenco interno che Filo consulta.",
-  "queuedAt": "2026-07-31T21:48:51.479Z",
-  "queuedBy": "routine"
-}
