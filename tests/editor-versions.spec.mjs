@@ -331,7 +331,9 @@ test('ripristinare una versione NON cancella la conversazione con Filo, nemmeno 
   // "Chiudi e riapri Filo": lo storico e il documento si rileggono dal disco —
   // è qui che prima lo snapshot smetteva di condividere i dati col documento
   // vivo e il ripristino svuotava la chat.
-  await page.evaluate(() => window.__filoEditorVersions.flush());
+  // NIENTE flush dello storico qui: il punto di ripristino è già stato scritto
+  // quando è stato creato. Ri-scriverlo adesso maschererebbe il bug (salverebbe
+  // uno snapshot 'aggiornato' con la chat di adesso).
   await expect(page.locator('#saveState')).toHaveText('', { timeout: 10_000 });
   await page.reload();
   await page.waitForSelector('#doc');
