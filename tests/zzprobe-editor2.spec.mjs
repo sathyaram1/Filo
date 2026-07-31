@@ -53,3 +53,52 @@ test('probe B: ripristinare una versione cancella la chat del documento?', async
   console.log('PROBE messaggi chat DOPO ripristino:', JSON.stringify(msgsAfter));
   await page.screenshot({ path: 'tests/.shots/probe-chat-after-restore.png' });
 });
+
+test('probe C: stesso scenario ma DOPO un riavvio (reload)', async ({ openTab }) => {
+  test.setTimeout(120000);
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('.ed-module[data-type="switch"]');
+  await page.locator('.ed-switch-icon').nth(1).click();
+  await page.waitForSelector('.ed-module[data-type="chat"]');
+  await page.evaluate(() => window.__filoEditorVersions.ready());
+
+  await setDocText(page, "C'era una volta, in un bosco fitto e silenzioso, una bambina che portava sempre un mantello rosso cucito dalla nonna, e ogni mattina attraversava il sentiero.");
+  await page.evaluate(() => window.__filoEditorVersions.snapshotManual());
+
+  await page.evaluate(() => {
+    window.chrome.runtime.sendMessage = (msg, cb) => {
+      const resp = { ok: true, text: 'Certo, ecco il mio parere sul racconto.' };
+      if (typeof cb === 'function') { Promise.resolve().then(() => cb(resp)); return undefined; }
+      return Promise.resolve(resp);
+    };
+  });
+  const input = page.locator('.ed-module[data-type="chat"] [data-chat="input"]');
+  await input.click();
+  await input.fill('che ne pensi del racconto?');
+  await input.press('Enter');
+  await page.waitForTimeout(800);
+  await page.keyboard.press('Control+s');
+  await page.waitForTimeout(600);
+  console.log('PROBE C chat PRIMA del reload:', JSON.stringify(await page.locator('.ed-chat-msg').allTextContents()));
+
+  // Riavvio (reload della pagina): lo storico viene riletto dall'archivio.
+  await page.reload();
+  await page.waitForSelector('.ed-module[data-type="switch"]');
+  await page.locator('.ed-switch-icon').nth(1).click();
+  await page.waitForSelector('.ed-module[data-type="chat"]');
+  await page.evaluate(() => window.__filoEditorVersions.ready());
+  console.log('PROBE C chat DOPO reload:', JSON.stringify(await page.locator('.ed-chat-msg').allTextContents()));
+
+  await setDocText(page, 'Testo completamente riscritto dopo la chiacchierata con Filo.');
+  await page.evaluate(() => {
+    const V = window.__filoEditorVersions;
+    const l = V.list();
+    V.restore(V.activeId(), l[0].id);
+  });
+  await page.waitForTimeout(600);
+  await page.locator('.ed-switch-icon').nth(1).click().catch(() => {});
+  await page.waitForTimeout(400);
+  console.log('PROBE C chat DOPO ripristino:', JSON.stringify(await page.locator('.ed-chat-msg').allTextContents()));
+  console.log('PROBE C testo DOPO ripristino:', (await page.locator('#doc').textContent()).slice(0, 60));
+  await page.screenshot({ path: 'tests/.shots/probe-chat-lost.png' });
+});
