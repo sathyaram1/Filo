@@ -47,7 +47,7 @@ test('articolo misto: solo i paragrafi <p> vengono tradotti, il resto resta in i
       modelRegistry: C.DEFAULT_MODEL_REGISTRY,
     });
   });
-  await app.evaluate((dict) => {
+  await app.evaluate((_electron, dict) => {
     const P = globalThis.SN_PROVIDERS;
     P.completeWithFallback = async ({ messages }) => {
       const content = messages[messages.length - 1].content;
@@ -81,6 +81,11 @@ test('articolo misto: solo i paragrafi <p> vengono tradotti, il resto resta in i
   await page.waitForTimeout(1200);
   await page.screenshot({ path: 'tests/.shots/probe-translate-partial.png' });
 
+  const marks = await page.evaluate(() => {
+    const p = document.querySelectorAll('p')[0];
+    return p.innerHTML.slice(0, 400);
+  });
+  console.log('[probe innerHTML]', marks);
   const state = await page.evaluate(() => ({
     h1: document.querySelector('h1').textContent.trim(),
     standfirst: document.querySelector('.standfirst').textContent.trim(),
