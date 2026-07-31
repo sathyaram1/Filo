@@ -26,7 +26,7 @@ test('due avvisi ravvicinati si sovrappongono nello stesso angolo', async ({ ope
 
   // 1ª azione: "Copia link" → toast "Copiato negli appunti" (2.2s di vita).
   await page.locator('#lnk').click({ button: 'right' });
-  await (await menuItem(page, 'Copia link')).click();
+  await (await menuItem(page, 'Copia URL')).click();
 
   // 2ª azione a distanza di poco: "Salva link per dopo" → secondo toast.
   await page.waitForTimeout(600);

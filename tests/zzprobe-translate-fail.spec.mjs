@@ -35,7 +35,7 @@ test('traduzione interrotta a metà: errore + "Pagina tradotta" insieme, e nient
       const idx = content.lastIndexOf('Testo:\n\n');
       if (idx < 0) return { text: '', provider: 'test', model: 'm', usage: {} };
       globalThis.__chunks++;
-      if (globalThis.__chunks > 2) throw new TypeError('fetch failed');
+      if (globalThis.__chunks > 2) { await new Promise((r) => setTimeout(r, 2600)); throw new TypeError('fetch failed'); }
       const chunk = content.slice(idx + 8);
       const out = chunk.split(/\n?@@@SN_SEP@@@\n?/)
         .map((s) => `[tradotto] ${s}`).join('\n@@@SN_SEP@@@\n');
@@ -60,6 +60,7 @@ test('traduzione interrotta a metà: errore + "Pagina tradotta" insieme, e nient
 
   await expect.poll(async () => (await page.evaluate(() => window.__toasts)).length,
     { timeout: 20_000 }).toBeGreaterThan(1);
+  await page.waitForTimeout(120);
   await page.screenshot({ path: 'tests/.shots/probe-translate-fetchfailed.png' });
   await page.waitForTimeout(1500);
 
@@ -71,12 +72,18 @@ test('traduzione interrotta a metà: errore + "Pagina tradotta" insieme, e nient
   console.log('[probe fail]', JSON.stringify(res));
 
   // Riapro il menu: che azione mi offre adesso?
-  await page.locator('p').last().click({ button: 'right' });
-  const aria = await page.evaluate(() => {
-    const nodes = Array.from(document.querySelectorAll('[data-sn-icon-id="translate"]'));
-    return nodes.map((b) => b.outerHTML.slice(0, 260));
-  });
-  console.log('[probe fail] icona traduci dopo il fallimento:', JSON.stringify(aria));
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.locator('p').first().click({ button: 'right' });
+  await page.waitForTimeout(500);
+  // Clicco di nuovo l'icona Traduci: ritenta la parte mancante o annulla tutto?
+  await page.locator('.sn-menu .sn-menu-row-btn[data-sn-icon-id="translate"]').first().click();
+  await page.waitForTimeout(1500);
+  const after = await page.evaluate(() => ({
+    translated: document.querySelectorAll('[data-sn-translated="1"]').length,
+    firstP: document.querySelectorAll('p')[0].textContent.slice(0, 40),
+    toasts: window.__toasts,
+  }));
+  console.log('[probe fail] dopo secondo click su Traduci:', JSON.stringify(after));
 
   // Invariante attesa: se la traduzione si è interrotta, NON deve dire di aver finito.
   expect(res.toasts.includes('Pagina tradotta'),
