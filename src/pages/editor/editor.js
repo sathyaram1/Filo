@@ -1491,6 +1491,21 @@
 
   const MARK_TAGS = { B: 'bold', STRONG: 'bold', I: 'italic', EM: 'italic', U: 'underline', S: 'strike', STRIKE: 'strike', DEL: 'strike' };
 
+  // Immagini incollate nel foglio. Il documento è un modello JSON che riconosce
+  // solo blocchi/marche di testo: un <img> senza nodo corrispondente veniva
+  // scartato al primo salvataggio, così l'immagine spariva al reload. Le
+  // trattiamo come nodo inline `image` con solo src (+ alt): nessun handler
+  // (onerror…) né altro attributo sopravvive al round-trip, quindi un <img>
+  // ostile incollato non può eseguire codice quando il foglio si ricostruisce.
+  // Src ammesse: data:image/… (il caso dell'incolla), http(s) e blob:.
+  const IMG_SRC_OK = /^(data:image\/|https?:|blob:)/i;
+  function imgToPM(el) {
+    const src = (el.getAttribute('src') || '').trim();
+    if (!IMG_SRC_OK.test(src)) return null;
+    const alt = el.getAttribute('alt') || '';
+    return { type: 'image', attrs: { src, ...(alt ? { alt } : {}) } };
+  }
+
   // Le marche sono oggetti { type, attrs? }: i tag (B/I/U/S) producono marche
   // semplici; il font-size — applicato come stile inline su uno <span>/<font> —
   // diventa una marca con attrs.size così sopravvive al round-trip.
