@@ -330,8 +330,14 @@
     // ─────────────────────────── Pagine interne ──────────────────────────────
     {
       id: 'home-page', title: 'Home di Filo', category: 'pages',
-      desc: 'La pagina iniziale con azioni suggerite, un messaggio in evidenza e gli aggiornamenti recenti.',
-      invoke: 'filo://home/home.html (pulsante Home o nuova scheda).',
+      desc: 'La pagina della nuova scheda: al centro l’assistente a cui chiedere qualsiasi cosa, azioni e suggerimenti, un messaggio in evidenza e gli aggiornamenti recenti. In alto a destra ci sono le icone per Red Team, Cronologia, Impostazioni, App e Profilo.',
+      invoke: 'Pulsante Home nella barra, apri una nuova scheda, oppure indirizzo filo://newtab/.',
+    },
+    {
+      id: 'red-team', title: 'Red Team', category: 'pages',
+      desc: 'Il programma per mettere alla prova la sicurezza di Filo: provi a farne aggirare le difese e, per i tentativi riconosciuti come attacchi reali, guadagni crediti e sali in classifica. La pagina raccoglie le tue statistiche e i tuoi record, la classifica dei partecipanti e le regole del gioco. Per partecipare davvero serve un codice di invito, che leghi al tuo account e sblocca le statistiche personali.',
+      invoke: 'Icona a scudo rosso in alto a destra nella home (nuova scheda), oppure indirizzo filo://redteam/redteam.html.',
+      doesNot: 'Senza un codice di invito puoi leggere regole e classifica ma non accumulare punteggi. La creazione dei codici di invito è riservata a chi gestisce Filo.',
     },
     {
       id: 'patch-notes', title: 'Recap degli aggiornamenti', category: 'pages',
