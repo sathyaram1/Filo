@@ -645,6 +645,7 @@
         <span class="ed-vh-when">${escapeHtml(fmtVersionWhen(v.ts))}</span>
       </div>
       <div class="ed-vh-fulltext">${body}</div>
+      <p class="ed-vh-scope">${VH_SCOPE_NOTE}</p>
       <div class="ed-overlay-actions">
         <button class="ed-btn" id="vhBack">Indietro</button>
         <button class="ed-btn primary" id="vhRestore">Ripristina questa versione</button>
