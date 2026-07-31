@@ -1,39 +1,36 @@
 import { test, expect } from './fixtures/electron.mjs';
 
-test('il dizionario personale raggiunge il correttore nativo?', async ({ app, openTab, testServer }) => {
-  const langs = await app.evaluate(async ({ session }) => {
-    const ses = session.defaultSession;
-    return {
-      available: (ses.availableSpellCheckerLanguages || []).slice(0, 10),
-      current: ses.getSpellCheckerLanguages ? ses.getSpellCheckerLanguages() : null,
-      enabled: ses.isSpellCheckerEnabled ? ses.isSpellCheckerEnabled() : null,
-      custom: ses.listWordsInSpellCheckerDictionary ? await ses.listWordsInSpellCheckerDictionary() : null,
-    };
-  });
-  console.log('LANGS', JSON.stringify(langs));
+const PAGE = `<!doctype html><html><body style="margin:0">
+  <textarea id="t" spellcheck="true"
+       style="font:16px monospace;padding:8px;width:400px;height:120px">qwertzxcvb ciao</textarea>
+</body></html>`;
 
-  const page = await testServer.openReady(openTab, `
-    <!doctype html><meta charset="utf-8">
-    <body style="font:16px system-ui;padding:20px">
-      <textarea id="t" style="width:500px;height:120px;font-size:18px">Questa e una frase con la parola sbagliatissssima dentro.</textarea>
-    </body>`);
+test('il correttore nativo vede il dizionario personale?', async ({ app, openTab, testServer }) => {
+  const url = testServer.html(PAGE);
+  const page = await openTab(url);
+  await page.waitForFunction(
+    () => document.documentElement.dataset.filoContentReady === '1',
+    null, { timeout: 8000 },
+  );
 
-  // Aggiunge la parola al dizionario personale via l'API del content script
-  // (stessa strada del menu tasto destro "Aggiungi al dizionario").
-  await page.evaluate(async () => {
-    await window.SN_SPELLCHECK.addToDictionary('sbagliatissssima');
+  // Spia gli eventi context-menu del main: cattura params.misspelledWord.
+  await app.evaluate(({ webContents }) => {
+    globalThis.__probeMiss = [];
+    for (const wc of webContents.getAllWebContents()) {
+      wc.on('context-menu', (_e, params) => {
+        globalThis.__probeMiss.push({ word: params.misspelledWord, sugg: params.dictionarySuggestions });
+      });
+    }
   });
-  await page.waitForTimeout(500);
 
-  const stored = await page.evaluate(async () => {
-    const d = await chrome.storage.local.get('sn_personal_dict');
-    return d.sn_personal_dict;
-  });
-  console.log('DICT STORAGE', JSON.stringify(stored));
+  const box = await page.locator('#t').boundingBox();
+  await page.mouse.click(box.x + 30, box.y + 16, { button: 'right' });
+  await page.waitForTimeout(1200);
+  const before = await app.evaluate(() => globalThis.__probeMiss);
+  console.log('MISS PRIMA', JSON.stringify(before));
+  await page.keyboard.press('Escape');
 
-  const after = await app.evaluate(async ({ session }) => {
-    const ses = session.defaultSession;
-    return ses.listWordsInSpellCheckerDictionary ? await ses.listWordsInSpellCheckerDictionary() : null;
-  });
-  console.log('NATIVE CUSTOM DICT AFTER', JSON.stringify(after));
+  // Voci del menu contestuale di Filo su quella parola
+  const items = await page.evaluate(() => Array.from(document.querySelectorAll('.sn-menu .sn-menu-item, .sn-menu > *')).map((e) => e.textContent.trim()).filter(Boolean).slice(0, 30));
+  console.log('MENU', JSON.stringify(items));
 });
