@@ -102,6 +102,9 @@ html, body {
   color: var(--sn-muted);
 }
 .ed-doc ul, .ed-doc ol { margin: 0 0 0.7em; padding-left: 1.4em; }
+/* Immagini incollate nel foglio: non sforare la larghezza del testo e mantenere
+   le proporzioni. Il round-trip salva/ricostruisce le tiene identiche. */
+.ed-doc img { max-width: 100%; height: auto; border-radius: 6px; margin: 0.2em 0; }
 .ed-doc :is(h1,h2,h3).collapsed-heading { opacity: 0.7; }
 .ed-doc [data-collapsed="true"] { /* il contenuto nascosto è gestito via classe sui fratelli */ }
 .ed-hidden-by-collapse { display: none !important; }
