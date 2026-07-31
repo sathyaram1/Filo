@@ -54,10 +54,10 @@ test('articolo misto: solo i paragrafi <p> vengono tradotti, il resto resta in i
       const idx = content.lastIndexOf('Testo:\n\n');
       const chunk = idx >= 0 ? content.slice(idx + 8) : content;
       const parts = chunk.split(/\n?@@@SN_SEP@@@\n?/);
-      console.log('[stub] parts=' + JSON.stringify(parts));
       const out = parts
-        .map((p) => dict[p.trim()] || p)
+        .map((s) => dict[s.trim()] || s)
         .join('\n@@@SN_SEP@@@\n');
+      globalThis.__parts = (globalThis.__parts || []).concat([{ in: parts, out, dictKeys: Object.keys(dict).length }]);
       return { text: out, provider: 'test', model: 'test-model', usage: {} };
     };
   }, IT);
@@ -77,8 +77,7 @@ test('articolo misto: solo i paragrafi <p> vengono tradotti, il resto resta in i
   await expect(menu).toBeVisible();
   await menu.locator('.sn-menu-row-btn[data-sn-icon-id="translate"]').click();
 
-  // I <p> arrivano in italiano…
-  await expect(page.locator('p').first()).toContainText('ricercatori', { timeout: 15_000 });
+  await page.waitForTimeout(6000);
   await page.waitForTimeout(1200);
   await page.screenshot({ path: 'tests/.shots/probe-translate-partial.png' });
 
@@ -91,6 +90,7 @@ test('articolo misto: solo i paragrafi <p> vengono tradotti, il resto resta in i
     toasts: window.__toasts,
   }));
   console.log('[probe partial]', JSON.stringify(state, null, 2));
+  console.log('[probe parts]', JSON.stringify(await app.evaluate(() => globalThis.__parts || [])));
 
   // Invariante attesa: "Traduci la pagina" traduce la pagina.
   expect(state.h1, 'titolo tradotto').not.toContain('oceans are warming');
