@@ -3893,6 +3893,7 @@
   // Boot
   applySavedTheme();
   loadVersions();                           // storico dall'archivio app (async)
+  loadTrash();                              // documenti eliminati recuperabili
   loadCollection();                         // da localStorage (sincrono)
   activateFile(STORE.activeFile(collection)); // apre l'ultimo file attivo
   reloadFromArchive();                      // fonde i file scritti da Filo (appunti/migrazione)
