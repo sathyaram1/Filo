@@ -160,6 +160,7 @@
     toast_cannot_paste_image: 'Qui non si può incollare un\'immagine (campo di solo testo)',
     toast_paste_failed: 'Non riesco a incollare qui (rifocalizza il campo e riprova)',
     clipboard_image_pending: 'Descrizione…',
+    clipboard_image_no_model: 'Immagine (nessun modello per la descrizione)',
 
     // Categorie default
     category_default: 'Da vedere',
