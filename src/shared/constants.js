@@ -186,6 +186,18 @@
     // questo LLM economico giudica carta-per-carta se rispetta davvero l'intento
     // dell'utente, in batch. Cache (carta, criterio) permanente cross-ricerca.
     DECKS_SEARCH_FILTER: 'decks_search_filter_ai',
+    // === Funzioni di supporto ===
+    // Prima erano chiamate con un nickname scritto dentro al codice: nessuno
+    // poteva vedere né cambiare su che modello giravano. Ora hanno uno slot come
+    // tutte le altre, quindi compaiono nell'editor dei modelli e obbediscono
+    // alla configurazione condivisa.
+    // Giudice LLM del rilevatore di siti pericolosi (solo metadati, mai il
+    // contenuto della pagina).
+    SAFEBROWSE_JUDGE: 'safebrowse_judge',
+    // Classificatore della coda ambigua del rilevamento geo-block.
+    GEOBLOCK_CLASSIFY: 'geoblock_classify',
+    // Titolo breve generato all'invio di un feedback.
+    FEEDBACK_TITLE: 'feedback_title',
   };
 
   // === Crediti (gamification) ===
