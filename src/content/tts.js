@@ -323,6 +323,13 @@
   function notifyModelFallback(res) {
     if (!res || !res.firstFallback) return;      // deduplicato dal main
     if (!ttsSupported()) return;                 // playBrowserChunk mostrerà già tts_not_supported
+    // Nessun modello impostato per la lettura (o la scorciatoia citata non
+    // esiste): il messaggio arriva già scritto per l'utente e dice dove si
+    // imposta — mostrarlo com'è vale molto più di una frase generica.
+    if (res.errorCode === 'NO_MODEL_FOR_ACTION' && res.error) {
+      try { Popup.showToast(String(res.error)); } catch (_) {}
+      return;
+    }
     const key = res.error === 'no_tts_model' ? 'tts_model_fallback_nokey' : 'tts_model_fallback';
     try { Popup.showToast(I18n.t(key)); } catch (_) {}
   }
