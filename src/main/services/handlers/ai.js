@@ -265,7 +265,9 @@ module.exports = function register(on, ctx) {
         // personali — il nickname di un default deve trovarsi anche se
         // l'utente gestisce i propri modelli (useDefaultModels OFF).
         if (!nickname) return { ok: false, error: 'Nickname mancante' };
-        const registry = d.modelRegistry || SN_CONST.DEFAULT_MODEL_REGISTRY;
+        // Solo il registry PREDEFINITO effettivo: se un nickname non c'è più, il
+        // tasto "Prova" deve dirlo, non provare un modello scritto nel codice.
+        const registry = d.modelRegistry || {};
         const entry = registry[nickname];
         if (!entry) return { ok: false, error: `Modello "${nickname}" non trovato` };
         const single = registryEntryToSingle(entry);
