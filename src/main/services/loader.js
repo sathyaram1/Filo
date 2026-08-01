@@ -58,6 +58,7 @@ require(path.join(SVC, 'providers', 'openrouter.js'));
 require(path.join(SVC, 'providers', 'gemini.js'));
 require(path.join(SVC, 'providers', 'index.js'));
 require(path.join(SVC, 'feedbackOutbox.js')); // #341 — coda invio feedback offline (dipende da SN_FEEDBACK + SN_STORAGE)
+require(path.join(SHARED, 'creditConfig.js')); // #366.2 — importi crediti owner-configurabili (prima di creditStore)
 require(path.join(SVC, 'creditStore.js'));
 require(path.join(SVC, 'costTracker.js'));
 require(path.join(SVC, 'savedPages.js'));
