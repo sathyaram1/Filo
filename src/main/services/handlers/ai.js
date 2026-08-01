@@ -95,10 +95,13 @@ module.exports = function register(on, ctx) {
   // ripieghiamo in una sessione dell'app. Torna false appena una sintesi riesce,
   // così se il modello torna a funzionare e poi ricasca l'utente è di nuovo avvisato.
   let ttsFallbackAnnounced = false;
-  const ttsFallback = (error) => {
+  const ttsFallback = (error, errorCode) => {
     const firstFallback = !ttsFallbackAnnounced;
     ttsFallbackAnnounced = true;
-    return { ok: false, error, firstFallback };
+    // `errorCode` distingue i guasti tecnici (che il content script traduce in
+    // una frase generica) dagli errori di CONFIGURAZIONE dei modelli, il cui
+    // messaggio è già scritto per l'utente e va mostrato tale e quale.
+    return { ok: false, error, errorCode: errorCode || '', firstFallback };
   };
 
   on(MSG.TTS_SYNTH, async (msg) => {
@@ -132,7 +135,7 @@ module.exports = function register(on, ctx) {
         // non esiste): si legge con la voce del browser, ma il motivo VERO viene
         // passato al content script così l'avviso dice cosa manca invece di un
         // codice interno.
-        return ttsFallback(e?.message || 'no_tts_model');
+        return ttsFallback(e?.message || 'no_tts_model', e?.code);
       }
       const voice = (settings && settings.tts && settings.tts.modelVoice) || '';
       const text = String(msg.text == null ? '' : msg.text);
