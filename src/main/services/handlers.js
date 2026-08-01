@@ -265,8 +265,25 @@ function modelForAction(settings, action) {
 // Errore di CONFIGURAZIONE dei modelli, scritto per l'utente: dice quale
 // funzione non parte, perché, e dove si imposta il modello. Arriva a chi sta
 // usando quella funzione (l'app e le altre funzioni non ne risentono).
+// Nome della funzione da usare NEL MESSAGGIO: quello che l'utente legge nelle
+// Opzioni, dove il messaggio stesso lo manda. L'etichetta breve della cronologia
+// (actionLabel) resta il ripiego per le funzioni che nelle Opzioni non ci sono:
+// mandare l'utente a cercare «Descrivi immagine» dove c'è scritto «Descrizione
+// immagini (cronologia incolla)» è un'indicazione che non porta da nessuna parte.
+function actionLabelForSettings(action) {
+  try {
+    const rows = globalThis.SN_MODEL_CHAIN?.actionLabels?.() || [];
+    const row = rows.find(([a]) => a === action);
+    if (row) {
+      const label = I18n.t(row[1]);
+      if (label && label !== row[1]) return label;
+    }
+  } catch (_) {}
+  return (SN_CONST.actionLabel && SN_CONST.actionLabel(action)) || action || '';
+}
+
 function modelConfigError(settings, action, missingRefs) {
-  const label = (SN_CONST.actionLabel && SN_CONST.actionLabel(action)) || action || '';
+  const label = actionLabelForSettings(action);
   const where = settings && settings.useDefaultModels === false
     ? I18n.t('err_model_where_own')
     : I18n.t('err_model_where_default');
