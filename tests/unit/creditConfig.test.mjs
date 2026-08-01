@@ -286,3 +286,88 @@ test('il saldo di benvenuto NON viene riapplicato a chi ce l\'ha già', () => {
     assert.equal(C.applyRefill(esistente, '2026-06-17').state.balance, 42);
   });
 });
+
+// ── 6. Porta d'ingresso della SCRITTURA (owner) ─────────────────────────────
+// Salvare un importo di tipo sbagliato non deve "quasi funzionare": prima
+// veniva convertito (un si'/no diventava 1 o 0, uno spazio diventava 0) e
+// finiva su TUTTE le installazioni. PRE-CONDIZIONE: senza il fix la PATCH parte
+// lo stesso e questi assert sono rossi.
+
+const Defaults = require(join(ROOT, 'src', 'main', 'services', 'defaultsStore.js'));
+
+// Stuba la rete: cattura le richieste e risponde sempre ok con doc vuoto.
+async function withFakeFetch(fn) {
+  const calls = [];
+  const realFetch = global.fetch;
+  global.fetch = async (url, opts = {}) => {
+    calls.push({ url: String(url), opts });
+    return { ok: true, status: 200, async json() { return { fields: {} }; }, async text() { return ''; } };
+  };
+  try { await fn(calls); } finally { global.fetch = realFetch; }
+}
+
+const patchOf = (calls) => calls.find(
+  (c) => (c.opts.method || '').toUpperCase() === 'PATCH' && c.url.includes('config/credits'),
+);
+
+test('salvataggio: importi validi finiscono davvero sul documento globale', async () => {
+  await withFakeFetch(async (calls) => {
+    await Defaults.updateCreditConfig(
+      { dailyRefill: 250, boardReopen: 0, feedbackResolveByPriority: { 1: 0 } },
+      'fake-id-token',
+    );
+    const patch = patchOf(calls);
+    assert.ok(patch, 'manca la scrittura degli importi crediti');
+    const body = JSON.parse(patch.opts.body);
+    assert.equal(Number(body.fields.dailyRefill.integerValue ?? body.fields.dailyRefill.doubleValue), 250);
+    // Lo zero esplicito si può salvare (disattivare un premio è legittimo).
+    assert.equal(Number(body.fields.boardReopen.integerValue ?? body.fields.boardReopen.doubleValue), 0);
+    // Maschera per-leaf sulla tabella: cambiare una fascia non cancella le altre.
+    assert.match(patch.url, /feedbackResolveByPriority\.1/);
+  });
+});
+
+test('salvataggio: un si\'/no al posto di un importo viene RIFIUTATO, non convertito', async () => {
+  await withFakeFetch(async (calls) => {
+    await assert.rejects(
+      () => Defaults.updateCreditConfig({ boardReopen: false, dailyRefill: 100 }, 'fake-id-token'),
+      /boardReopen/,
+    );
+    assert.equal(patchOf(calls), undefined, 'non deve scrivere NULLA se un importo è di tipo sbagliato');
+  });
+});
+
+test('salvataggio: testo, spazi, elenchi e negativi vengono RIFIUTATI', async () => {
+  const casi = [
+    { initial: 'tanti' },
+    { initial: [] },
+    { initial: -5 },
+    { boardVote: true },
+    { feedbackResolveByPriority: { 2: true } },
+    { feedbackResolveByPriority: [1, 2] },
+  ];
+  for (const bad of casi) {
+    await withFakeFetch(async (calls) => {
+      await assert.rejects(() => Defaults.updateCreditConfig(bad, 'fake-id-token'));
+      assert.equal(patchOf(calls), undefined);
+    });
+  }
+});
+
+test('salvataggio: casella lasciata vuota = "non toccare", non uno zero', async () => {
+  await withFakeFetch(async (calls) => {
+    await Defaults.updateCreditConfig({ dailyRefill: 250, boardVote: '', boardReopen: '  ' }, 'fake-id-token');
+    const patch = patchOf(calls);
+    assert.ok(patch);
+    const body = JSON.parse(patch.opts.body);
+    assert.deepEqual(Object.keys(body.fields), ['dailyRefill']);
+    assert.doesNotMatch(patch.url, /boardVote|boardReopen/);
+  });
+});
+
+test('salvataggio: senza credenziali da proprietario non parte nessuna scrittura', async () => {
+  await withFakeFetch(async (calls) => {
+    await assert.rejects(() => Defaults.updateCreditConfig({ dailyRefill: 250 }, ''));
+    assert.equal(patchOf(calls), undefined);
+  });
+});
