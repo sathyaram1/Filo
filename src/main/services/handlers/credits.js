@@ -199,6 +199,10 @@ module.exports = function register(on, ctx) {
   let syncing = null;
   async function ensureAccountSync() {
     const uid = await currentUid();
+    // Prima di load() (che applica la ricarica): assicura che il motore stia
+    // usando gli importi correnti decisi dall'owner, così un cambio di ricarica
+    // o di saldo di benvenuto vale già dal primo accesso successivo (#366.2).
+    await syncCreditConfig();
     const autoFeedbackEnabled = await getAutoFeedbackEnabled().catch(() => false);
     const state = await Credits.load({ autoFeedbackEnabled });
     // Non loggato: la cache locale resta com'è (modalità offline/anonima).
