@@ -105,8 +105,14 @@ test('una funzione senza modello si ferma e lo dice; le altre continuano a funzi
       globalThis.SN_PROVIDERS.completeWithFallback = origComplete;
     }
 
-    res.labelTranslate = C.actionLabel(C.ACTIONS.TRANSLATE_SELECTION);
-    res.labelLink = C.actionLabel(C.ACTIONS.EXPLAIN_LINK);
+    // Il nome atteso nel messaggio è quello che l'utente legge nelle Opzioni:
+    // il messaggio lo manda lì, quindi deve chiamare la funzione allo stesso modo.
+    const optionLabel = (action) => {
+      const row = globalThis.SN_MODEL_CHAIN.actionLabels().find(([a]) => a === action);
+      return globalThis.SN_I18N.t(row[1]);
+    };
+    res.labelTranslate = optionLabel(C.ACTIONS.TRANSLATE_SELECTION);
+    res.labelLink = optionLabel(C.ACTIONS.EXPLAIN_LINK);
     return res;
   });
 
@@ -223,7 +229,12 @@ test('la descrizione delle immagini non ripiega su un modello scritto nel codice
   const senza = await run(PNG_1X1 + '#b');
   expect(senza.desc).toBe(null);
   expect(await calledModels(), 'nessun modello deve essere chiamato').toEqual([]);
-  const label = await app.evaluate(() => globalThis.SN_CONST.actionLabel(globalThis.SN_CONST.ACTIONS.DESCRIBE_IMAGE));
+  // Il nome nel messaggio è quello mostrato nelle Opzioni (dove il messaggio manda).
+  const label = await app.evaluate(() => {
+    const row = globalThis.SN_MODEL_CHAIN.actionLabels()
+      .find(([a]) => a === globalThis.SN_CONST.ACTIONS.DESCRIBE_IMAGE);
+    return globalThis.SN_I18N.t(row[1]);
+  });
   expect(senza.toasts.join(' | ')).toContain(label);
   expect(senza.toasts.join(' | ')).toMatch(/Opzioni/i);
   expect(senza.entryDescription).not.toBe('Descrizione…');
