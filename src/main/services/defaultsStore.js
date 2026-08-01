@@ -370,6 +370,73 @@ async function getWorkerLog(idToken) {
   return entries;
 }
 
+// ── Importi crediti configurabili dall'owner (config/credits, #366.2) ────────
+// La config effettiva = costanti CREDIT (default) sovrascritte dal doc remoto,
+// normalizzata da SN_CREDIT_CONFIG (ogni campo mancante/invalido ricade sul
+// default). SINCRONA: usa la cache dell'ultimo refresh. L'handler crediti la
+// registra sul motore con SN_CREDITS.setActiveConfig(). Se il doc non è stato
+// letto (offline / mai scritto) ⇒ tutti i default, cioè il comportamento di
+// oggi. Non lancia mai.
+function getCreditConfig() {
+  const CC = globalThis.SN_CREDIT_CONFIG;
+  if (CC && typeof CC.normalize === 'function') return CC.normalize(remoteCredits);
+  // Ripiego difensivo se il modulo shared non è caricato: costanti CREDIT.
+  const K = (globalThis.SN_CONST && globalThis.SN_CONST.CREDIT) || {};
+  return {
+    initial: K.INITIAL,
+    dailyRefill: K.DAILY_REFILL,
+    maxRefillDays: K.MAX_REFILL_DAYS,
+    feedbackSend: K.FEEDBACK_SEND,
+    feedbackResolveByPriority: { ...(K.FEEDBACK_RESOLVE_BY_PRIORITY || {}) },
+    boardVote: K.BOARD_VOTE,
+    boardReopen: K.BOARD_REOPEN,
+  };
+}
+
+// Scrive gli importi crediti su config/credits. Riservato all'owner: richiede un
+// Firebase ID token admin (le regole Firestore rifiutano chiunque altro). Scrive
+// SOLO i campi presenti e validi in `partial`, con maschera per-leaf sulla
+// tabella per priorità — così cambiare una sola fascia non cancella le altre
+// (stessa trappola già vista con apiKeys, vedi update() sopra). La schermata di
+// modifica arriva nella parte 3: qui c'è solo il trasporto.
+async function updateCreditConfig(partial, idToken) {
+  if (!idToken) throw new Error('Serve un ID token admin per modificare gli importi crediti.');
+  partial = partial || {};
+  const CC = globalThis.SN_CREDIT_CONFIG;
+  const numKeys = (CC && CC.NUM_KEYS)
+    || ['initial', 'dailyRefill', 'maxRefillDays', 'feedbackSend', 'boardVote', 'boardReopen'];
+
+  const fields = {};
+  const mask = [];
+  for (const k of numKeys) {
+    if (partial[k] === undefined || partial[k] === null || partial[k] === '') continue;
+    const n = Number(partial[k]);
+    if (!Number.isFinite(n) || n < 0) continue;
+    fields[k] = toFsValue(n);
+    mask.push(k);
+  }
+
+  const t = partial.feedbackResolveByPriority;
+  if (t && typeof t === 'object') {
+    const tableFields = {};
+    for (const p of [0, 1, 2, 3]) {
+      if (t[p] === undefined || t[p] === null || t[p] === '') continue;
+      const n = Number(t[p]);
+      if (!Number.isFinite(n) || n < 0) continue;
+      tableFields[String(p)] = toFsValue(n);
+      mask.push(`feedbackResolveByPriority.${p}`);
+    }
+    if (Object.keys(tableFields).length) {
+      fields.feedbackResolveByPriority = { mapValue: { fields: tableFields } };
+    }
+  }
+
+  if (!mask.length) throw new Error('Nessun importo valido da scrivere.');
+  await patchDoc(CREDITS_DOC, fields, mask, idToken);
+  await refresh();
+  return getCreditConfig();
+}
+
 module.exports = {
   get,
   getPublicForAdmin,
