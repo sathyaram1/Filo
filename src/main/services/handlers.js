@@ -256,8 +256,9 @@ async function getEffectiveSettings() {
 // errore che dice all'utente quale funzione è scoperta e dove si imposta.
 // Il ripiego VOLUTO — quello fra i modelli che qualcuno ha davvero scelto, cioè
 // i nickname elencati nella catena — resta intatto: vive dentro la catena.
-function modelForAction(settings, action, override) {
-  const raw = override || settings.models?.[action] || '';
+// Nessun parametro di scavalcamento: l'unica sorgente è `settings.models`.
+function modelForAction(settings, action) {
+  const raw = settings.models?.[action] || '';
   return SN_CONST.DEPRECATED_MODELS?.[raw] || raw;
 }
 
