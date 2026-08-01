@@ -298,23 +298,39 @@ async function applyLimitToChain(settings, attempts) {
   return free;
 }
 
-function buildAttemptChain(settings, modelRef) {
-  // I nickname integrati fanno sempre da base: un registry utente/remoto che
-  // non li elenca non deve renderli irrisolvibili, perché le azioni senza
-  // catena esplicita ricadono sui default (es. 'flash, flash-or') e un
-  // nickname non risolto finirebbe grezzo a OpenRouter (400 garantito).
-  const registry = { ...SN_CONST.DEFAULT_MODEL_REGISTRY, ...(settings.modelRegistry || {}) };
+// Catena di tentativi per servire una richiesta. L'UNICA sorgente dei modelli è
+// la configurazione effettiva (condivisa o personale): il registry scritto nel
+// codice NON viene più rifuso qui sotto. Rifonderlo significava che un modello
+// cancellato dalla configurazione continuava a girare — scelto dal codice, mai
+// da una persona — e per giunta poteva essere di un fornitore escluso dalla
+// politica sui modelli.
+//
+// Se la funzione non ha nessun modello, o cita solo scorciatoie che non
+// esistono, la richiesta si ferma con un errore leggibile invece di ripiegare in
+// silenzio. La catena di ripiego fra i modelli CONFIGURATI resta intatta.
+function buildAttemptChain(settings, modelRef, action) {
+  const registry = settings.modelRegistry || {};
   // Il campo di un'azione può contenere più nickname separati da virgola: il
-  // primo è il primario, gli altri fallback in ordine. Per ciascuno proviamo i
-  // provider disponibili (Gemini diretto → provider scelto → OpenRouter).
+  // primo è il primario, gli altri fallback in ordine.
   const refs = SN_CONST.parseModelRefs(modelRef);
-  if (!refs.length && modelRef) refs.push(modelRef);
+  if (!refs.length) throw modelConfigError(settings, action, []);
+
+  // Scorciatoie citate ma inesistenti: mai risolte di nascosto. Se ne resta
+  // almeno una valida la richiesta parte con quelle (è la catena che qualcuno ha
+  // scelto); se non ne resta nessuna, la funzione non parte e lo dice.
+  const missing = SN_CONST.missingModelRefs(refs, registry);
+  const usable = SN_CONST.usableModelRefs(refs, registry);
+  if (!usable.length) throw modelConfigError(settings, action, missing);
+  if (missing.length) {
+    console.warn(`[Filo modelli] "${action || modelRef}" cita modelli inesistenti: ${missing.join(', ')}`);
+  }
+
   // Ogni modello del registry porta il proprio provider, quindi l'ordine qui
   // conta solo per i ref "legacy" (id grezzi senza nickname): proviamo prima
   // Gemini (quota free) poi OpenRouter. buildModelAttempts scarta da sé i
   // provider senza chiave o senza un id concreto per quel modello.
   const providerOrder = ['gemini', 'openrouter'];
-  const out = SN_CONST.buildModelAttempts(refs, registry, providerOrder, settings.apiKeys || {});
+  const out = SN_CONST.buildModelAttempts(usable, registry, providerOrder, settings.apiKeys || {});
   if (!out.length) {
     const e = new Error(I18n.t('err_no_api_key'));
     e.code = 'NO_API_KEY';
