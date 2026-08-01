@@ -75,6 +75,23 @@ test('la catena di ripiego fra modelli configurati produce i tentativi in ordine
   ]);
 });
 
+test('i nomi mostrati nel messaggio d\'errore restano leggibili anche se assurdi', () => {
+  // Un nome incollato per sbaglio può essere lunghissimo: il messaggio deve
+  // restare leggibile (prima ripeteva per intero migliaia di caratteri).
+  const mostro = 'x'.repeat(10_000);
+  const testo = C.formatModelRefsForMessage([mostro]);
+  assert.ok(testo.length < 60, `il nome va troncato, invece è lungo ${testo.length}`);
+  assert.ok(testo.startsWith('xxx') && testo.endsWith('…'));
+
+  // Tanti nomi: si mostrano i primi e si dice quanti ne restano.
+  const molti = C.formatModelRefsForMessage(['a', 'b', 'c', 'd', 'e', 'f', 'g']);
+  assert.equal(molti, 'a, b, c, d, e +2');
+
+  // Pochi e corti: invariato rispetto a prima.
+  assert.equal(C.formatModelRefsForMessage(['fantasma']), 'fantasma');
+  assert.equal(C.formatModelRefsForMessage(['uno', 'due']), 'uno, due');
+});
+
 test('ogni funzione che consuma un modello si può impostare dall\'editor', async () => {
   require(join(ROOT, 'src', 'shared', 'modelChainEditor.js'));
   const editable = new Set(globalThis.SN_MODEL_CHAIN.actionLabels().map(([action]) => action));
