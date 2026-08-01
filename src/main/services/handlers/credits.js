@@ -7,6 +7,8 @@
 // trasporto: IPC verso la UI + REST Firestore autenticato con l'ID token utente.
 
 const auth = require('../../auth/google-auth');
+// #366.2 — sorgente degli importi crediti decisi dall'owner (doc config/credits).
+const Defaults = require('../defaultsStore');
 // SN_FEEDBACK_THREAD: ci serve splitNotes() per estrarre la spiegazione non
 // tecnica dalle note del feedback risolto (C5). Idempotente se già caricato.
 require('../../../shared/feedbackThread.js');
@@ -15,6 +17,20 @@ module.exports = function register(on, ctx) {
   const { MSG, broadcastToTabs } = ctx;
   const Credits = globalThis.SN_CREDITS;
   const FB = globalThis.SN_FEEDBACK;
+
+  // ── importi crediti decisi dall'owner (#366.2) ──────────────────────────────
+  // Legge config/credits (cache + refresh pigro in defaultsStore) e la registra
+  // sul motore, che da lì in poi usa quegli importi al posto delle costanti.
+  // Best-effort: offline / doc mai scritto ⇒ il motore resta sui default, cioè
+  // il comportamento storico. Non lancia mai.
+  async function syncCreditConfig() {
+    try {
+      await Defaults.refreshIfStale();
+      Credits.setActiveConfig(Defaults.getCreditConfig());
+    } catch (_) { /* il motore resta sui default CREDIT */ }
+  }
+  // Registra la config all'avvio, senza attendere la prima richiesta della UI.
+  syncCreditConfig();
 
   // ── uid dell'utente loggato (claim dell'ID token Firebase) ──────────────────
   // Centralizzato in google-auth.js (getUid): lo riusa anche l'handler board.js
