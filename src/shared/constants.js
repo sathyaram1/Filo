@@ -443,6 +443,10 @@
     // Lettura ad alta voce: modello TTS Gemini. Se fallisce/è assente, la voce
     // del browser (Web Speech) fa da fallback finale lato content script.
     [ACTIONS.TTS]: 'tts',
+    // Funzioni di supporto: giudizi corti e frequenti → modello economico.
+    [ACTIONS.SAFEBROWSE_JUDGE]: 'flash-lite',
+    [ACTIONS.GEOBLOCK_CLASSIFY]: 'flash-lite',
+    [ACTIONS.FEEDBACK_TITLE]: 'flash-lite',
   };
 
   // Risolve un riferimento a un modello (nickname OPPURE id raw legacy stile
