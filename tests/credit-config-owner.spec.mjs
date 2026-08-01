@@ -23,11 +23,9 @@ const BOARD = 'filo://board/board.html';
 // lo fa adottare dal motore crediti esattamente come farebbe una lettura vera.
 // Ritorna la config EFFETTIVA in vigore + gli importi che il motore userebbe.
 async function applyRemoteConfig(app, doc) {
-  return app.evaluate(async ({ app: electronApp }, fields) => {
-    const path = require('path');
-    const Defaults = require(path.join(
-      electronApp.getAppPath(), 'src', 'main', 'services', 'defaultsStore.js',
-    ));
+  return app.evaluate(async (_electron, fields) => {
+    // `__filoDefaults` è lo STESSO modulo che usa l'app (esposto solo in test).
+    const Defaults = globalThis.__filoDefaults;
 
     const realFetch = global.fetch;
     global.fetch = async (url, opts) => {
@@ -159,11 +157,8 @@ test('la bacheca mostra il costo di riapertura DAVVERO in vigore', async ({ app,
 });
 
 test('salvare un importo di tipo sbagliato viene RIFIUTATO, non convertito', async ({ app }) => {
-  const esito = await app.evaluate(async ({ app: electronApp }) => {
-    const path = require('path');
-    const Defaults = require(path.join(
-      electronApp.getAppPath(), 'src', 'main', 'services', 'defaultsStore.js',
-    ));
+  const esito = await app.evaluate(async () => {
+    const Defaults = globalThis.__filoDefaults;
     const chiamate = [];
     const realFetch = global.fetch;
     global.fetch = async (url, opts = {}) => {
