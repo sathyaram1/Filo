@@ -74,9 +74,10 @@
     });
   }
 
-  // Descrizione provvisoria per un'immagine prima che arrivi quella generata dall'AI.
+  // Descrizione provvisoria per un'immagine prima che arrivi quella generata
+  // dall'AI (o il perché non arriverà: vedi imagePlaceholderLabel).
   async function describeImage(_blob) {
-    return I18n.t('clipboard_image_pending');
+    return imagePlaceholderLabel();
   }
 
   // ------------------------------------------------------------
@@ -985,7 +986,7 @@
       try {
         chrome.runtime.sendMessage({
           type: MSG.PUSH_CLIPBOARD_ENTRY,
-          entry: { type: 'image', dataUrl: cap.dataUrl, description: desc || I18n.t('clipboard_image_pending') },
+          entry: { type: 'image', dataUrl: cap.dataUrl, description: desc || imagePlaceholderLabel() },
         }).catch(() => {});
       } catch (_) {}
       const a = document.createElement('a');
@@ -1175,7 +1176,7 @@
       try {
         chrome.runtime.sendMessage({
           type: MSG.PUSH_CLIPBOARD_ENTRY,
-          entry: { type: 'image', dataUrl, description: desc || I18n.t('clipboard_image_pending') },
+          entry: { type: 'image', dataUrl, description: desc || imagePlaceholderLabel() },
         }).catch(() => {});
       } catch (_) {}
       const a = document.createElement('a');
