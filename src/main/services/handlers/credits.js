@@ -261,6 +261,30 @@ module.exports = function register(on, ctx) {
     return { ok: true, credits: await Credits.getPublic(), signedIn: auth.isSignedIn() };
   });
 
+  // ── Importi crediti in vigore (#366.2) ──────────────────────────────────────
+  // Lettura aperta a qualsiasi pagina: sono i numeri che l'utente vede già (premi,
+  // ricarica, costo di riapertura), mai il costo in €. Serve perché le cifre
+  // MOSTRATE restino uguali a quelle davvero addebitate/accreditate anche dopo
+  // che l'owner le ha cambiate. Non fallisce mai: senza config ⇒ i default.
+  on(MSG.CREDITS_GET_CONFIG, async () => {
+    await syncCreditConfig();
+    return { ok: true, config: Credits.config() };
+  });
+
+  // Scrittura RISERVATA all'owner: doppio cancello — qui (isAdmin) e nelle regole
+  // del database (che sono la garanzia vera: il controllo locale è solo cortesia
+  // per dare un errore chiaro). La schermata di modifica arriva nella parte 3.
+  on(MSG.CREDITS_SET_CONFIG, async (msg) => {
+    if (!auth.isAdmin()) return { ok: false, error: 'Comando riservato al proprietario.' };
+    try {
+      const idToken = await auth.getIdToken();
+      if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
+      const saved = await Defaults.updateCreditConfig(msg?.config || {}, idToken);
+      Credits.setActiveConfig(saved);
+      return { ok: true, config: saved };
+    } catch (e) { return { ok: false, error: e?.message || String(e) }; }
+  });
+
   // ── Comandi proprietario (#210): /users e /gift ─────────────────────────────
   on(MSG.OWNER_LIST_USERS, async () => {
     if (!auth.isAdmin()) return { ok: false, error: 'Comando riservato al proprietario.' };
