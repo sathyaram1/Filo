@@ -120,5 +120,5 @@
   // lista, usata anche da defaultsStore per costruire la PATCH su Firestore.
   const NUM_KEYS = ['initial', 'dailyRefill', 'maxRefillDays', 'feedbackSend', 'boardVote', 'boardReopen'];
 
-  global.SN_CREDIT_CONFIG = { defaults, normalize, normalizeTable, NUM_KEYS };
+  global.SN_CREDIT_CONFIG = { defaults, normalize, normalizeTable, NUM_KEYS, toAmount };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
