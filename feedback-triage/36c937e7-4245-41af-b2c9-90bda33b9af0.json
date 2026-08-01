@@ -1,9 +1,0 @@
-{
-  "id": "36c937e7-4245-41af-b2c9-90bda33b9af0",
-  "status": "design",
-  "notes": "Controllo di sicurezza superato: ho esaminato la modifica riga per riga e non ho trovato nulla di problematico. Nessun dato riservato esposto, nessuna scorciatoia lasciata aperta, e la lista di modelli che ora compare nelle Opzioni contiene soltanto nomi di modelli, che erano gia' informazione pubblica: le chiavi restano dove sono sempre state e non escono mai dall'app. I nomi dei modelli, anche se scritti a mano, vengono sempre mostrati come testo semplice, quindi non possono diventare codice eseguibile.\n\nUn aspetto che migliora la sicurezza rispetto a prima: la modifica toglie la possibilita' che chi chiede un'operazione all'AI si porti dietro il modello da usare, scavalcando le impostazioni. Era una porta di servizio con cui una pagina web esterna avrebbe potuto imporre un modello a sua scelta (e la relativa spesa); ora l'unica sorgente e' la configurazione.\n\nPerche' allora e' ferma qui e non pubblicata: la pubblicazione automatica si blocca da sola, per regola fissa, quando una modifica tocca il file che gestisce accesso e permessi. Qui succede perche' e' li' che e' stata aggiunta la lettura dell'elenco modelli predefiniti mostrato nelle Opzioni. Il blocco e' scattato sulla POSIZIONE della modifica, non su un problema trovato: nel merito l'aggiunta e' solo una lettura di nomi, senza controllo di amministratore perche' non serve, mentre le funzioni riservate all'amministratore che stanno nello stesso file sono rimaste protette esattamente come prima.\n\nServe quindi il tuo via libera per pubblicarla. Se preferisci evitare in futuro questo stop, l'alternativa e' spostare quella lettura fuori dal file dei permessi: e' un piccolo spostamento, non cambia niente di come funziona.",
-  "queuedAt": "2026-08-01T18:11:01.712Z",
-  "queuedBy": "routine",
-  "branch": "worker/36c937e7-4245-41af-b2c9-90bda33b9af0",
-  "reason": "secaudit"
-}
