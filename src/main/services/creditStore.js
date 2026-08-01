@@ -77,10 +77,11 @@
 
   // ── stato + funzioni PURE (nessuna I/O: testabili headless) ─────────────────
 
-  function freshState(today = dateKey()) {
+  // `cfg` (opzionale): importi da usare al posto dei default CREDIT (#366.2).
+  function freshState(today = dateKey(), cfg) {
     return {
       initialized: true,
-      balance: CREDIT.INITIAL,
+      balance: config(cfg).initial,
       lastRefillDate: today,
       byUsage: {},        // { [gruppo]: { credits, calls } }  — per la torta
       byAction: {},       // { [action]: { credits, costEur, calls } } — dettaglio (costEur dietro le quinte)
