@@ -62,8 +62,9 @@
   }
 
   // Errore → proposizione per l'utente. Mai un codice HTTP nudo, mai un nome di
-  // endpoint: gli errori con `code` applicativo (NO_API_KEY, LIMIT_REACHED)
-  // portano già un messaggio i18n scritto per l'utente e passano invariati.
+  // endpoint: gli errori con `code` applicativo (NO_API_KEY, LIMIT_REACHED,
+  // NO_MODEL_FOR_ACTION) portano già un messaggio i18n scritto per l'utente —
+  // dicono anche dove si rimedia — e passano invariati.
   function friendly(e, opts) {
     const o = opts || {};
     const raw = String((e && e.message) || (typeof e === 'string' ? e : ''));
