@@ -144,6 +144,8 @@ test('happy path: guard marcato e UN feedback figlio creato, crediti scalati una
   assert.equal(server.feedbacks.length, 1, 'esattamente un feedback figlio');
   assert.ok(server.reopenRequests[UID], 'il guard è marcato sull\'originale');
   assert.equal(spends.length, 1, 'crediti scalati una sola volta');
+  // #366.2: l'importo addebitato è quello DECISO DALL'OWNER, non la costante.
+  assert.equal(spends[0].amount, REOPEN_COST, 'addebitato il costo configurato');
   assert.equal(refunds.length, 0, 'nessun rimborso nel percorso riuscito');
 });
 
