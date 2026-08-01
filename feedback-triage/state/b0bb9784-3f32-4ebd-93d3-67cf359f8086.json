@@ -4,6 +4,6 @@
   "loopCount": 1,
   "verifierVerdict": "pass",
   "verifierCritique": "",
-  "secauditDone": false,
-  "secauditVerdict": null
+  "secauditDone": true,
+  "secauditVerdict": "pass"
 }
