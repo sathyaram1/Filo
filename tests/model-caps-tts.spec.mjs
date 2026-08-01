@@ -141,13 +141,39 @@ test('TTS: il ripiego alla voce del browser è annunciato una volta sola (firstF
   const first = await synth();
   const second = await synth();
 
-  // Primo ripiego: annunciato, con il motivo "manca il modello/chiave" così il
-  // content script può dire all'utente cosa fare.
+  // Primo ripiego: annunciato, con un motivo NON vuoto così il content script
+  // può dire all'utente cosa fare. Il motivo non è più un codice interno fisso:
+  // quando il problema è la configurazione dei modelli (#416) è già la frase per
+  // l'utente, marcata da `errorCode`.
   expect(first.ok).toBe(false);
   expect(first.firstFallback).toBe(true);
-  expect(first.error).toBe('no_tts_model');
+  expect(String(first.error || '').trim()).not.toBe('');
 
   // Secondo ripiego consecutivo: NON riannunciato (niente avvisi ripetuti).
   expect(second.ok).toBe(false);
   expect(second.firstFallback).toBe(false);
+});
+
+test('TTS: senza un modello di lettura il motivo dice quale funzione manca (#416)', async ({ openTab }) => {
+  // Prima, una lettura senza modello ripiegava in silenzio su un modello scritto
+  // nel codice (o mandava al provider un nickname inesistente): l'utente vedeva
+  // solo "voce del browser" senza sapere perché. Ora il main dice cosa manca, e
+  // il content script mostra quella frase.
+  const page = await openTab(OPTIONS_URL);
+  const res = await page.evaluate(async () => {
+    const C = window.SN_CONST;
+    await window.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { gemini: 'k-test' },
+      modelRegistry: { tts: { provider: 'gemini', model: 'gemini-2.5-flash-preview-tts' } },
+      models: { [C.ACTIONS.TTS]: '' },
+    });
+    return chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.TTS_SYNTH, text: 'ciao' });
+  });
+
+  expect(res.ok).toBe(false);
+  expect(res.errorCode).toBe('NO_MODEL_FOR_ACTION');
+  // Nomina la funzione scoperta e dove si imposta, invece di un codice interno.
+  expect(res.error).toContain('Lettura ad alta voce');
+  expect(res.error).toMatch(/Opzioni/i);
 });
