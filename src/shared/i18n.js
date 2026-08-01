@@ -133,6 +133,13 @@
     err_limit_reached: 'Limite di spesa mensile raggiunto. Alza il limite nelle opzioni o aspetta il prossimo mese.',
     err_blocked_domain: 'Estensione disabilitata su questo dominio.',
     err_no_selection: 'Nessuna selezione di testo.',
+    // Configurazione dei modelli: una funzione senza modello NON parte e lo dice
+    // (niente ripieghi silenziosi su modelli scritti nel codice). %s = nome della
+    // funzione, poi dove si imposta.
+    err_no_model_for_action: 'Nessun modello impostato per «%s»: questa funzione resta ferma finché non ne scegli uno. %s',
+    err_unknown_model_for_action: '«%s» usa un modello che non esiste (%s): forse è stato rinominato o eliminato. %s',
+    err_model_where_own: 'Lo imposti in Opzioni → Modelli per azione.',
+    err_model_where_default: 'Stai usando i modelli predefiniti: apri Opzioni, togli «Usa modelli predefiniti» e scegli il modello per questa funzione.',
 
     // Toast
     toast_saved: 'Salvata in: %s',
