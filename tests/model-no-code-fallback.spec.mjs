@@ -228,6 +228,12 @@ test('la descrizione delle immagini non ripiega su un modello scritto nel codice
   expect(senza.toasts.join(' | ')).toMatch(/Opzioni/i);
   expect(senza.entryDescription).not.toBe('Descrizione…');
 
+  // Traccia visiva del messaggio vero (toast reale, non lo stub): non è il
+  // segnale primario, ma cattura le regressioni estetiche del messaggio.
+  await page.evaluate((msg) => window.SN_POPUP.__origToast(msg, { duration: 7000 }), senza.toasts[0]);
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: 'tests/.shots/416-descrizione-immagini-senza-modello.png' }).catch(() => {});
+
   // 3. Configurata bene ma il modello fallisce: si prova SOLO il configurato.
   await setup('mio', true);
   const rotto = await run(PNG_1X1 + '#c');
