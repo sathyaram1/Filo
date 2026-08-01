@@ -272,7 +272,7 @@ function modelConfigError(settings, action, missingRefs) {
     : I18n.t('err_model_where_default');
   const missing = missingRefs || [];
   const e = new Error(missing.length
-    ? I18n.t('err_unknown_model_for_action', label, missing.join(', '), where)
+    ? I18n.t('err_unknown_model_for_action', label, formatMissingRefs(missing), where)
     : I18n.t('err_no_model_for_action', label, where));
   e.code = 'NO_MODEL_FOR_ACTION';
   e.action = action || '';
