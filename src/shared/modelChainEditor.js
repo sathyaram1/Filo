@@ -45,6 +45,17 @@
       [A.DECKS_OPINION, 'options_action_decks_opinion'],
       [A.DECKS_AUTOTAG, 'options_action_decks_autotag'],
       [A.DECKS_SEARCH_FILTER, 'options_action_decks_search_filter'],
+      // Funzioni che prima non comparivano qui: giravano su un modello scelto
+      // dal codice e nessuno poteva vederlo né cambiarlo. Ora una funzione senza
+      // modello si ferma e lo dice, quindi DEVE esistere il posto dove
+      // impostarlo: questo elenco è quel posto e va tenuto completo.
+      [A.EDIT_TEXT, 'options_action_edit_text'],
+      [A.EXPLAIN_LINK, 'options_action_explain_link'],
+      [A.FILO_LESSON, 'options_action_filo_lesson'],
+      [A.FILO_COMPACT, 'options_action_filo_compact'],
+      [A.SAFEBROWSE_JUDGE, 'options_action_safebrowse_judge'],
+      [A.GEOBLOCK_CLASSIFY, 'options_action_geoblock_classify'],
+      [A.FEEDBACK_TITLE, 'options_action_feedback_title'],
     ];
   }
 
