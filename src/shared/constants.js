@@ -327,6 +327,9 @@
     [ACTIONS.DECKS_OPINION]: 'Mazzi — parere carta',
     [ACTIONS.DECKS_AUTOTAG]: 'Mazzi — etichette',
     [ACTIONS.DECKS_SEARCH_FILTER]: 'Mazzi — filtro ricerca',
+    [ACTIONS.SAFEBROWSE_JUDGE]: 'Siti pericolosi — giudizio',
+    [ACTIONS.GEOBLOCK_CLASSIFY]: 'Blocco geografico — riconoscimento',
+    [ACTIONS.FEEDBACK_TITLE]: 'Titolo del feedback',
   };
 
   function actionLabel(action) {
