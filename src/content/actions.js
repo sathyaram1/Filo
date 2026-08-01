@@ -402,6 +402,14 @@
     try { Popup.showToast(message, { duration: 7000 }); } catch (_) {}
   }
 
+  // Etichetta provvisoria delle immagini in cronologia incolla: «Descrizione…»
+  // finché una descrizione può davvero arrivare, altrimenti dice che manca il
+  // modello (un'attesa che non finirà mai è una bugia).
+  let imageDescNoModel = false;
+  function imagePlaceholderLabel() {
+    return I18n.t(imageDescNoModel ? 'clipboard_image_no_model' : 'clipboard_image_pending');
+  }
+
   async function requestImageDescription(dataUrl) {
     // NIENTE modello di ripiego scritto qui: gli unici modelli ammessi sono
     // quelli configurati per questa funzione (il ripiego VOLUTO fra i modelli
