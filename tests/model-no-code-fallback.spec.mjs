@@ -165,7 +165,9 @@ test('la descrizione delle immagini non ripiega su un modello scritto nel codice
   );
 
   // Spia lato main: registra OGNI modello realmente chiamato.
-  const setup = async (modelsForImage, failAll) => app.evaluate(async ({ modelsForImage, failAll }) => {
+  // NB: in app.evaluate il PRIMO parametro è il modulo Electron; l'argomento
+  // del test arriva come SECONDO.
+  const setup = async (modelsForImage, failAll) => app.evaluate(async (_electron, { modelsForImage, failAll }) => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.setSettings({
       useDefaultModels: false,
