@@ -448,4 +448,6 @@ module.exports = {
   getAutomationLoopCap,
   setAutomationLoopCap,
   getWorkerLog,
+  getCreditConfig,
+  updateCreditConfig,
 };
