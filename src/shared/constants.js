@@ -537,6 +537,21 @@
     return out;
   }
 
+  // Nomi di scorciatoie pronti da MOSTRARE in un messaggio all'utente. Un nome
+  // incollato per sbaglio può essere lunghissimo: ripeterlo per intero rende il
+  // messaggio illeggibile (e sfonda toast e finestre). Tronchiamo ogni nome e ci
+  // fermiamo ai primi pochi, dicendo quanti ne restano. PURA.
+  const MODEL_REF_MAX_CHARS = 40;
+  const MODEL_REFS_MAX_SHOWN = 5;
+  function formatModelRefsForMessage(refs) {
+    const list = (refs || []).map((r) => {
+      const s = String(r == null ? '' : r).replace(/\s+/g, ' ').trim();
+      return s.length > MODEL_REF_MAX_CHARS ? `${s.slice(0, MODEL_REF_MAX_CHARS)}…` : s;
+    });
+    if (list.length <= MODEL_REFS_MAX_SHOWN) return list.join(', ');
+    return `${list.slice(0, MODEL_REFS_MAX_SHOWN).join(', ')} +${list.length - MODEL_REFS_MAX_SHOWN}`;
+  }
+
   // Riferimenti effettivamente utilizzabili: quelli del registry più gli id
   // grezzi legacy, nell'ordine dato (la catena di ripiego VOLUTA fra modelli
   // configurati resta intatta). PURA.
