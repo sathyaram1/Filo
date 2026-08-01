@@ -151,10 +151,24 @@
 
   // Ricompensa (crediti) per la RISOLUZIONE di un feedback in base alla priorità
   // dell'utente (0-3). Priorità mancante/fuori scala → fascia 0. (C5)
+  //
+  // #366.2 — ATTENZIONE allo 0: un premio azzerato è una scelta LEGITTIMA
+  // dell'owner ("questa fascia non paga"), non un valore mancante. Un `||` a
+  // catena qui pagherebbe l'importo di un'ALTRA fascia (né quello scelto né
+  // quello storico), cioè accrediterebbe in silenzio crediti disattivati apposta.
+  // Perciò: si ripiega SOLO se la fascia non è un numero valido, e si ripiega
+  // sul default STORICO DELLA STESSA fascia — mai su una fascia diversa.
   function rewardForPriority(priority, cfg) {
     const table = config(cfg).feedbackResolveByPriority || {};
     const p = Math.max(0, Math.min(3, Math.round(Number(priority) || 0)));
-    return Number(table[p]) || Number(table[0]) || 0;
+    const v = Number(table[p]);
+    if (Number.isFinite(v) && v >= 0) return v;
+    const CC = global.SN_CREDIT_CONFIG;
+    const base = (CC && typeof CC.defaults === 'function')
+      ? CC.defaults().feedbackResolveByPriority
+      : (CREDIT.FEEDBACK_RESOLVE_BY_PRIORITY || {});
+    const d = Number(base && base[p]);
+    return Number.isFinite(d) && d >= 0 ? d : 0;
   }
 
   // Sottrae i crediti corrispondenti al costo € e aggrega per uso. Il saldo non
