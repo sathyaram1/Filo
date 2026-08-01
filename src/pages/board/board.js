@@ -474,8 +474,19 @@
     renderList();
   }
 
+  // #366.2 — allinea il costo di riapertura MOSTRATO a quello davvero addebitato.
+  // Best-effort: se il canale col main non risponde resta la costante integrata.
+  async function refreshCreditConfig() {
+    try {
+      const r = await sendToMain({ type: 'credits_get_config' });
+      const v = Number(r?.config?.boardReopen);
+      if (Number.isFinite(v) && v >= 0) reopenCost = v;
+    } catch (_) { /* resta il valore integrato */ }
+  }
+
   async function init() {
     await refreshAuth();
+    await refreshCreditConfig();
     await loadData();
   }
 
