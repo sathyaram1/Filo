@@ -151,8 +151,8 @@
 
   // Ricompensa (crediti) per la RISOLUZIONE di un feedback in base alla priorità
   // dell'utente (0-3). Priorità mancante/fuori scala → fascia 0. (C5)
-  function rewardForPriority(priority) {
-    const table = CREDIT.FEEDBACK_RESOLVE_BY_PRIORITY || {};
+  function rewardForPriority(priority, cfg) {
+    const table = config(cfg).feedbackResolveByPriority || {};
     const p = Math.max(0, Math.min(3, Math.round(Number(priority) || 0)));
     return Number(table[p]) || Number(table[0]) || 0;
   }
