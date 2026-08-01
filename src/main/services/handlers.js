@@ -250,9 +250,33 @@ async function getEffectiveSettings() {
   return withDefaults(await Storage.getSettings());
 }
 
+// Modello (catena di nickname) configurato per una funzione. NIENTE ripiego su
+// una scelta scritta nel codice: se la configurazione effettiva non ha un
+// modello per questa funzione la stringa torna vuota e buildAttemptChain alza un
+// errore che dice all'utente quale funzione è scoperta e dove si imposta.
+// Il ripiego VOLUTO — quello fra i modelli che qualcuno ha davvero scelto, cioè
+// i nickname elencati nella catena — resta intatto: vive dentro la catena.
 function modelForAction(settings, action, override) {
-  const raw = override || settings.models?.[action] || DEFAULT_SETTINGS.models[action];
+  const raw = override || settings.models?.[action] || '';
   return SN_CONST.DEPRECATED_MODELS?.[raw] || raw;
+}
+
+// Errore di CONFIGURAZIONE dei modelli, scritto per l'utente: dice quale
+// funzione non parte, perché, e dove si imposta il modello. Arriva a chi sta
+// usando quella funzione (l'app e le altre funzioni non ne risentono).
+function modelConfigError(settings, action, missingRefs) {
+  const label = (SN_CONST.actionLabel && SN_CONST.actionLabel(action)) || action || '';
+  const where = settings && settings.useDefaultModels === false
+    ? I18n.t('err_model_where_own')
+    : I18n.t('err_model_where_default');
+  const missing = missingRefs || [];
+  const e = new Error(missing.length
+    ? I18n.t('err_unknown_model_for_action', label, missing.join(', '), where)
+    : I18n.t('err_no_model_for_action', label, where));
+  e.code = 'NO_MODEL_FOR_ACTION';
+  e.action = action || '';
+  e.missingRefs = missing;
+  return e;
 }
 
 async function ensureUnderLimit(settings) {
