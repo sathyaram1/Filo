@@ -262,22 +262,6 @@ function modelForAction(settings, action) {
   return SN_CONST.DEPRECATED_MODELS?.[raw] || raw;
 }
 
-// Nomi delle scorciatoie mancanti, pronti da MOSTRARE: un nome incollato per
-// sbaglio può essere lunghissimo, e un messaggio d'errore di migliaia di
-// caratteri è illeggibile (e sfonda toast e finestre). Tronchiamo ogni nome e
-// ci fermiamo ai primi pochi, dicendo quanti ne restano.
-const MAX_REF_CHARS = 40;
-const MAX_REFS_SHOWN = 5;
-function formatMissingRefs(refs) {
-  const list = (refs || []).map((r) => {
-    const s = String(r == null ? '' : r);
-    return s.length > MAX_REF_CHARS ? `${s.slice(0, MAX_REF_CHARS)}…` : s;
-  });
-  if (list.length <= MAX_REFS_SHOWN) return list.join(', ');
-  const rest = list.length - MAX_REFS_SHOWN;
-  return `${list.slice(0, MAX_REFS_SHOWN).join(', ')} +${rest}`;
-}
-
 // Errore di CONFIGURAZIONE dei modelli, scritto per l'utente: dice quale
 // funzione non parte, perché, e dove si imposta il modello. Arriva a chi sta
 // usando quella funzione (l'app e le altre funzioni non ne risentono).
