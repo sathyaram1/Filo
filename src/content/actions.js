@@ -391,27 +391,46 @@
     }
   }
 
-  async function requestImageDescription(dataUrl) {
-    const FALLBACK_MODEL = 'google/gemini-2.0-flash-001';
-    const tryOnce = async (modelOverride) => {
-      try {
-        return await chrome.runtime.sendMessage({
-          type: MSG.AI_REQUEST,
-          action: ACTIONS.DESCRIBE_IMAGE,
-          payload: modelOverride ? { dataUrl, modelOverride } : { dataUrl },
-        });
-      } catch (e) {
-        return { ok: false, error: e.message || String(e) };
-      }
-    };
+  // Avviso "questa funzione non ha un modello": lo mostriamo una volta sola per
+  // messaggio finché la pagina resta aperta. La descrizione dell'immagine parte
+  // da sola (incolla, copia, screenshot): ripetere lo stesso toast a ogni
+  // immagine sarebbe rumore, tacere del tutto sarebbe il ripiego muto di prima.
+  const modelConfigWarned = new Set();
+  function warnModelConfigOnce(message) {
+    if (!message || modelConfigWarned.has(message)) return;
+    modelConfigWarned.add(message);
+    try { Popup.showToast(message, { duration: 7000 }); } catch (_) {}
+  }
 
-    let res = await tryOnce();
-    if (!res?.ok) {
-      console.warn('[SN] descrizione immagine fallita col modello configurato:', res?.error || 'errore sconosciuto', '— provo con', FALLBACK_MODEL);
-      res = await tryOnce(FALLBACK_MODEL);
+  async function requestImageDescription(dataUrl) {
+    // NIENTE modello di ripiego scritto qui: gli unici modelli ammessi sono
+    // quelli configurati per questa funzione (il ripiego VOLUTO fra i modelli
+    // della catena vive nel main, dentro la catena). Se la funzione non ha un
+    // modello — o cita una scorciatoia che non esiste — la descrizione non si
+    // fa e l'utente lo viene a sapere, invece di riceverla da un modello che
+    // nessuno ha mai scelto.
+    let res;
+    try {
+      res = await chrome.runtime.sendMessage({
+        type: MSG.AI_REQUEST,
+        action: ACTIONS.DESCRIBE_IMAGE,
+        payload: { dataUrl },
+      });
+    } catch (e) {
+      res = { ok: false, error: e.message || String(e) };
     }
     if (!res?.ok) {
-      console.warn('[SN] descrizione immagine fallita anche col fallback:', res?.error || 'errore sconosciuto');
+      if (res?.code === 'NO_MODEL_FOR_ACTION' && res.error) {
+        warnModelConfigOnce(res.error);
+        // La voce in cronologia incolla resterebbe su «Descrizione…» per
+        // sempre: dille la verità invece di far finta che stia arrivando.
+        chrome.runtime.sendMessage({
+          type: MSG.UPDATE_CLIPBOARD_DESCRIPTION,
+          dataUrl,
+          description: I18n.t('clipboard_image_no_model'),
+        }).catch(() => {});
+      }
+      console.warn('[SN] descrizione immagine non eseguita:', res?.error || 'errore sconosciuto');
       return null;
     }
     if (!res.text) {
