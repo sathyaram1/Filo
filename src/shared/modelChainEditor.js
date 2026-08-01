@@ -107,24 +107,15 @@
   }
 
   // Mostra/azzera il messaggio di blocco sotto un segmento (modello non adatto).
-  // Un solo messaggio per segmento. `inline` per gli avvisi CORTI (stanno
-  // accanto al campo senza spezzare la pillola), a blocco per le frasi lunghe.
-  function showSegMsgRaw(seg, text, opts) {
-    const o = opts || {};
+  function showSegMsg(seg, reason) {
     let m = seg.querySelector('.sn-chain-msg');
     if (!m) {
       m = document.createElement('span');
       m.className = 'sn-chain-msg';
+      m.style.cssText = 'display:block;color:var(--sn-danger,#c0392b);font-size:11px;margin-top:2px;';
       seg.appendChild(m);
     }
-    m.style.cssText = o.inline
-      ? 'color:var(--sn-danger,#c0392b);font-size:11px;margin-left:4px;white-space:nowrap;'
-      : 'display:block;color:var(--sn-danger,#c0392b);font-size:11px;margin-top:2px;';
-    m.textContent = text;
-    if (o.title) m.title = o.title; else m.removeAttribute('title');
-  }
-  function showSegMsg(seg, reason) {
-    showSegMsgRaw(seg, t('caps_incompatible', reason || ''));
+    m.textContent = t('caps_incompatible', reason || '');
   }
   function clearSegMsg(seg) {
     const m = seg.querySelector('.sn-chain-msg');
@@ -205,15 +196,17 @@
         // motivo. Così non è possibile SALVARE un abbinamento incompatibile.
         let lastGood = ref;
         // Scorciatoia citata ma inesistente (mai definita, rinominata o
-        // eliminata): la funzione non partirebbe, quindi lo diciamo QUI, mentre
-        // si configura, invece di lasciarlo scoprire a chi la usa. È solo un
-        // avviso: il valore resta scritto e modificabile.
+        // eliminata): la funzione non partirebbe, quindi lo segnaliamo QUI,
+        // mentre si configura, invece di lasciarlo scoprire a chi la usa.
+        // Il segnale è il CAMPO che diventa rosso, con la spiegazione
+        // nell'hover: aggiungere testo sposterebbe i pulsanti «×» e «+» proprio
+        // mentre ci stai cliccando sopra. È solo un avviso: il valore resta
+        // scritto e modificabile.
         const markUnknown = (val) => {
-          if (val && !isKnown(val)) {
-            showSegMsgRaw(seg, t('options_chain_unknown'), {
-              inline: true, title: t('options_chain_unknown_title'),
-            });
-          }
+          const bad = Boolean(val) && !isKnown(val);
+          inp.style.color = bad ? 'var(--sn-danger,#c0392b)' : '';
+          if (bad) inp.title = t('options_chain_unknown_title');
+          else inp.removeAttribute('title');
         };
         const accept = (val) => { clearSegMsg(seg); lastGood = val; refs[i] = val; emit(); markUnknown(val); };
         const reject = (reason) => {
@@ -249,7 +242,7 @@
           });
           seg.appendChild(rm);
         }
-        // Stesso avviso al primo disegno, per i valori che arrivano già salvati.
+        // Stesso segnale al primo disegno, per i valori che arrivano già salvati.
         markUnknown(ref);
         el.appendChild(seg);
       });

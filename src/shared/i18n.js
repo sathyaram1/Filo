@@ -253,9 +253,8 @@
     options_action_safebrowse_judge: 'Rilevamento siti pericolosi — giudizio',
     options_action_geoblock_classify: 'Riconoscimento dei blocchi geografici',
     options_action_feedback_title: 'Titolo automatico dei feedback',
-    // Avviso corto accanto al segmento (lo spazio è quello di una pillola); la
-    // frase intera sta nell'hover.
-    options_chain_unknown: 'non esiste',
+    // Il campo diventa rosso quando il nickname non esiste; la spiegazione sta
+    // nell'hover (aggiungere testo sposterebbe i pulsanti della pillola).
     options_chain_unknown_title: 'Questo modello non è fra quelli configurati qui sopra: la funzione non parte finché non ne scegli uno che esiste.',
     options_open_chrome_shortcuts: 'Modifica le scorciatoie nella pagina Chrome',
     options_feature_help: 'Aiuto (sidebar AI con visione)',
