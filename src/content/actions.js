@@ -429,6 +429,7 @@
     }
     if (!res?.ok) {
       if (res?.code === 'NO_MODEL_FOR_ACTION' && res.error) {
+        imageDescNoModel = true;
         warnModelConfigOnce(res.error);
         // La voce in cronologia incolla resterebbe su «Descrizione…» per
         // sempre: dille la verità invece di far finta che stia arrivando.
@@ -441,6 +442,7 @@
       console.warn('[SN] descrizione immagine non eseguita:', res?.error || 'errore sconosciuto');
       return null;
     }
+    imageDescNoModel = false;
     if (!res.text) {
       console.warn('[SN] descrizione immagine: risposta vuota');
       return null;
