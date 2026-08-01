@@ -281,6 +281,13 @@
     // presenti); UPDATE scrive provider/models/modelRegistry/apiKeys.
     DEFAULTS_GET: 'defaults_get',                  // → { ok, config } | { ok:false, error }
     DEFAULTS_UPDATE: 'defaults_update',            // { config } → { ok, config } | { ok:false, error }
+    // Modelli predefiniti EFFETTIVI (registry + modello per funzione), senza
+    // nessuna chiave. Leggibile da chiunque: serve alla pagina Opzioni per
+    // mostrare i modelli che l'app userà DAVVERO, invece di quelli scritti nel
+    // codice — che possono essere stati cambiati o eliminati dalla config
+    // condivisa. Nessun segreto: sono solo nomi di modelli.
+    //   → { ok, modelRegistry, models } | { ok:false, error }
+    DEFAULT_MODELS_PUBLIC: 'default_models_public',
     // Config "modelli di supporto" (doc Firestore config/supportModels, admin-only).
     // Un campo per slot: sanitizer, judge1, judge2, judge3, judgeDynamic,
     // judgeRedTeam, judgePriority. Valore di ogni slot = stringa catena (es.

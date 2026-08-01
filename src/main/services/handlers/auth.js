@@ -328,6 +328,20 @@ module.exports = function register(on, ctx) {
     }
   });
 
+  // Versione LEGGIBILE DA TUTTI della config modelli: solo i nomi (registry e
+  // modello per funzione), mai una chiave. La pagina Opzioni la usa per elencare
+  // i modelli predefiniti VERI — prima elencava quelli scritti nel codice, che
+  // possono essere stati sostituiti o eliminati dalla configurazione condivisa.
+  on(MSG.DEFAULT_MODELS_PUBLIC, async () => {
+    try {
+      await Defaults.refreshIfStale().catch(() => {});
+      const d = Defaults.get();
+      return { ok: true, modelRegistry: d.modelRegistry || {}, models: d.models || {} };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  });
+
   on(MSG.DEFAULTS_UPDATE, async (msg) => {
     try {
       if (!auth.isAdmin()) {

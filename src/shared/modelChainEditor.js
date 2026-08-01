@@ -80,16 +80,31 @@
       if (!Caps) return { ok: true };
       const nick = String(ref == null ? '' : ref).trim();
       if (!nick) return { ok: true };
-      const reg = (getRegistry && getRegistry())
-        || (global.SN_CONST && global.SN_CONST.DEFAULT_MODEL_REGISTRY) || {};
+      // Solo il registry CONFIGURATO: quello scritto nel codice non deve
+      // decidere niente qui, o l'editor validerebbe contro modelli che a runtime
+      // non esistono.
+      const reg = (getRegistry && getRegistry()) || {};
       const entry = reg[nick];
       if (!entry || !entry.provider || !entry.model) return { ok: true };
       return Caps.modelMatchesAction(entry.provider, entry.model, action);
     };
   }
 
+  // Il nickname citato esiste davvero fra i modelli configurati? Gli id grezzi
+  // stile provider (con '/' o ':') restano ammessi per retro-compatibilità.
+  function makeKnownCheck(getRegistry) {
+    return function (ref) {
+      const nick = String(ref == null ? '' : ref).trim();
+      if (!nick) return true;
+      const C = global.SN_CONST;
+      if (C && C.isRawModelId && C.isRawModelId(nick)) return true;
+      const reg = (getRegistry && getRegistry()) || {};
+      return Boolean(reg[nick]);
+    };
+  }
+
   // Mostra/azzera il messaggio di blocco sotto un segmento (modello non adatto).
-  function showSegMsg(seg, reason) {
+  function showSegMsgRaw(seg, text) {
     let m = seg.querySelector('.sn-chain-msg');
     if (!m) {
       m = document.createElement('span');
@@ -97,7 +112,10 @@
       m.style.cssText = 'display:block;color:var(--sn-danger,#c0392b);font-size:11px;margin-top:2px;';
       seg.appendChild(m);
     }
-    m.textContent = t('caps_incompatible', reason || '');
+    m.textContent = text;
+  }
+  function showSegMsg(seg, reason) {
+    showSegMsgRaw(seg, t('caps_incompatible', reason || ''));
   }
   function clearSegMsg(seg) {
     const m = seg.querySelector('.sn-chain-msg');
@@ -141,6 +159,7 @@
   // Ritorna { el, getValue } dove getValue() torna la stringa "a, b, c".
   function buildChain(value, onChange, ctx) {
     const validate = ctx && ctx.validate;
+    const isKnown = (ctx && ctx.isKnown) || (() => true);
     const el = document.createElement('div');
     el.className = 'sn-chain';
     let refs = splitRefs(value);
@@ -188,6 +207,11 @@
           const v = validate ? validate(val) : { ok: true };
           if (v.ok) accept(val); else reject(v.reason);
         });
+        // Scorciatoia citata ma inesistente (rinominata o eliminata): la
+        // funzione non partirebbe, quindi lo diciamo QUI, mentre si configura,
+        // invece di lasciarlo scoprire a chi la usa. Solo avviso: il valore
+        // resta modificabile, non viene cancellato d'ufficio.
+        if (ref && !isKnown(ref)) showSegMsgRaw(seg, t('options_chain_unknown'));
         seg.appendChild(inp);
         attachDropdown(seg, inp, (value) => {
           const v = validate ? validate(value) : { ok: true };
@@ -249,6 +273,7 @@
       label.textContent = t(key);
       const chain = buildChain(models[action] || '', o.onChange, {
         validate: makeValidator(action, getRegistry),
+        isKnown: makeKnownCheck(getRegistry),
       });
       cell.appendChild(label);
       cell.appendChild(chain.el);
