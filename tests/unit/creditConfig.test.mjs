@@ -207,6 +207,76 @@ test('cambiare la ricarica NON ricalcola i giorni già accreditati', () => {
   });
 });
 
+// ── 4. Lo ZERO di UNA SOLA fascia (regressione: pagava un'altra fascia) ─────
+// PRE-CONDIZIONE: con il vecchio `Number(table[p]) || Number(table[0]) || 0` una
+// fascia azzerata cadeva sulla fascia 0 → questi assert sono ROSSI senza il fix.
+
+test('premio azzerato su UNA fascia: paga 0, non l\'importo di un\'altra fascia', () => {
+  const cfg = { feedbackResolveByPriority: { 0: 50, 1: 0, 2: 0, 3: 0 } };
+  assert.deepEqual([0, 1, 2, 3].map((p) => C.rewardForPriority(p, cfg)), [50, 0, 0, 0]);
+  withActive(cfg, () => {
+    assert.deepEqual([0, 1, 2, 3].map((p) => C.rewardForPriority(p)), [50, 0, 0, 0]);
+  });
+});
+
+test('premio azzerato solo sulla fascia 0: le altre restano ai loro importi', () => {
+  const cfg = { feedbackResolveByPriority: { 0: 0 } };
+  assert.deepEqual([0, 1, 2, 3].map((p) => C.rewardForPriority(p, cfg)), [0, 100, 200, 300]);
+  // Priorità mancante/fuori scala continua a mappare sulla fascia giusta.
+  assert.equal(C.rewardForPriority(undefined, cfg), 0);
+  assert.equal(C.rewardForPriority(99, cfg), 300);
+});
+
+test('mix di fasce azzerate e valorizzate: ognuna paga il SUO importo', () => {
+  const cfg = { feedbackResolveByPriority: { 0: 7, 1: 0, 2: 9, 3: 0 } };
+  assert.deepEqual([0, 1, 2, 3].map((p) => C.rewardForPriority(p, cfg)), [7, 0, 9, 0]);
+});
+
+test('tutte le fasce a zero: nessun premio, e nessun ripiego sugli storici', () => {
+  const cfg = { feedbackResolveByPriority: { 0: 0, 1: 0, 2: 0, 3: 0 } };
+  assert.deepEqual([0, 1, 2, 3].map((p) => C.rewardForPriority(p, cfg)), [0, 0, 0, 0]);
+});
+
+test('fascia con valore assurdo: ripiega sullo storico DELLA STESSA fascia', () => {
+  // 'x' non è un importo: la fascia 3 deve tornare 300 (il suo storico), NON 0
+  // né l'importo della fascia 0.
+  const cfg = { feedbackResolveByPriority: { 0: 0, 3: 'x' } };
+  assert.deepEqual([0, 1, 2, 3].map((p) => C.rewardForPriority(p, cfg)), [0, 100, 200, 300]);
+});
+
+// ── 5. Tipi sbagliati: mai uno ZERO silenzioso ─────────────────────────────
+// PRE-CONDIZIONE: con `Number(v)` alla cieca, `true`→1, `false`/`[]`/'   '→0 →
+// questi assert sono ROSSI senza il fix.
+
+test('si\'/no, elenchi e testi di soli spazi NON diventano importi', () => {
+  const c = CC.normalize({
+    boardReopen: false,          // prima: 0 → riapertura gratis per tutti
+    boardVote: true,             // prima: 1
+    dailyRefill: '   ',          // prima: 0 → ricarica azzerata per tutti
+    initial: [],                 // prima: 0 → saldo di benvenuto azzerato
+    feedbackSend: [7],           // prima: 7
+    maxRefillDays: {},           // prima: NaN → già default, resta default
+  });
+  assert.equal(c.boardReopen, CREDIT.BOARD_REOPEN);
+  assert.equal(c.boardVote, CREDIT.BOARD_VOTE);
+  assert.equal(c.dailyRefill, CREDIT.DAILY_REFILL);
+  assert.equal(c.initial, CREDIT.INITIAL);
+  assert.equal(c.feedbackSend, CREDIT.FEEDBACK_SEND);
+  assert.equal(c.maxRefillDays, CREDIT.MAX_REFILL_DAYS);
+});
+
+test('tipi sbagliati nella tabella per priorità → storico di quella fascia', () => {
+  const c = CC.normalize({ feedbackResolveByPriority: { 0: false, 1: true, 2: '  ', 3: [] } });
+  assert.deepEqual(c.feedbackResolveByPriority, { ...CREDIT.FEEDBACK_RESOLVE_BY_PRIORITY });
+});
+
+test('le stringhe NUMERICHE restano valide (Firestore le consegna così)', () => {
+  const c = CC.normalize({ dailyRefill: '250', boardReopen: ' 0 ', feedbackResolveByPriority: { 1: '0' } });
+  assert.equal(c.dailyRefill, 250);
+  assert.equal(c.boardReopen, 0);
+  assert.equal(c.feedbackResolveByPriority[1], 0);
+});
+
 test('il saldo di benvenuto NON viene riapplicato a chi ce l\'ha già', () => {
   // Stato esistente (già inizializzato): ensure/applyRefill non devono
   // rimpiazzare il saldo col nuovo "initial" della config.
