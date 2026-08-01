@@ -136,7 +136,8 @@ function safeImageFilename(name) {
 }
 
 module.exports = function register(on, ctx) {
-  const { MSG, winOf, getEffectiveSettings, buildAttemptChain, broadcastToTabs } = ctx;
+  const { MSG, winOf, getEffectiveSettings, modelForAction, buildAttemptChain, broadcastToTabs } = ctx;
+  const ACTIONS = globalThis.SN_CONST.ACTIONS;
 
   // Titolo breve del feedback, generato da un LLM economico al momento
   // dell'invio (es. "gestione segreti"). Best-effort: se la catena modelli non
@@ -148,7 +149,9 @@ module.exports = function register(on, ctx) {
     if (!t) return fallback;
     try {
       const settings = await getEffectiveSettings();
-      const attempts = buildAttemptChain(settings, 'flash-lite');
+      const attempts = buildAttemptChain(
+        settings, modelForAction(settings, ACTIONS.FEEDBACK_TITLE), ACTIONS.FEEDBACK_TITLE,
+      );
       const messages = [{
         role: 'user',
         content: 'Genera un titolo brevissimo (2-6 parole, nella stessa lingua del testo) che riassuma questo feedback su un\'app. Rispondi SOLO col titolo, senza virgolette e senza punto finale.\n\nFeedback:\n' + t.slice(0, 1500),

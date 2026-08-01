@@ -126,9 +126,13 @@ module.exports = function register(on, ctx) {
       const model = modelForAction(settings, SN_CONST.ACTIONS.TTS);
       let attempts;
       try {
-        attempts = buildAttemptChain(settings, model);
-      } catch (_) {
-        return ttsFallback('no_tts_model');
+        attempts = buildAttemptChain(settings, model, SN_CONST.ACTIONS.TTS);
+      } catch (e) {
+        // Nessun modello di sintesi vocale configurato (o la scorciatoia citata
+        // non esiste): si legge con la voce del browser, ma il motivo VERO viene
+        // passato al content script così l'avviso dice cosa manca invece di un
+        // codice interno.
+        return ttsFallback(e?.message || 'no_tts_model');
       }
       const voice = (settings && settings.tts && settings.tts.modelVoice) || '';
       const text = String(msg.text == null ? '' : msg.text);
