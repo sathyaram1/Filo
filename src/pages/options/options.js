@@ -80,6 +80,15 @@
   // (costanti o override Firestore) con un pulsante "Prova" che testa il
   // modello usando le chiavi effettive (le predefinite, non quelle dell'utente).
 
+  async function loadDefaultModels() {
+    let registry = {};
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.DEFAULT_MODELS_PUBLIC });
+      if (r && r.ok && r.modelRegistry) registry = r.modelRegistry;
+    } catch (_) {}
+    renderDefaultModels(registry);
+  }
+
   function renderDefaultModels(registry) {
     const host = $('defaultModelsList');
     host.innerHTML = '';
@@ -166,10 +175,13 @@
     window.SN_PAGE_BOOTSTRAP.applyTheme(settings.theme);
 
     $('useDefaultModels').checked = settings.useDefaultModels !== false;
-    // Popola la lista read-only dei modelli predefiniti (visibile solo se ON).
-    const C = window.SN_CONST || {};
-    renderDefaultModels(C.DEFAULT_MODEL_REGISTRY || {});
+    // Lista read-only dei modelli predefiniti. Deve mostrare i modelli che l'app
+    // userà DAVVERO: li chiediamo al main (config condivisa + eventuali
+    // modifiche dell'owner). Se la richiesta non riesce la lista resta vuota
+    // invece di mostrare i modelli scritti nel codice: un elenco inventato è
+    // peggio di nessun elenco, perché non corrisponde a ciò che gira.
     applyDefaultModelsVisibility();
+    loadDefaultModels();
     $('apiKey').value = settings.apiKeys?.openrouter || '';
     $('apiKeyGemini').value = settings.apiKeys?.gemini || '';
     $('apiKeyTavily').value = settings.apiKeys?.tavily || '';

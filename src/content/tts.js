@@ -514,17 +514,21 @@
   function buildDictateModelSubItems() {
     const C = global.SN_CONST;
     const settings = deps.getSettings();
-    const registry = (settings && settings.modelRegistry) || C.DEFAULT_MODEL_REGISTRY;
-    const currentRaw = (settings && settings.models && settings.models[C.ACTIONS.TRANSCRIBE_AUDIO])
-      || C.DEFAULT_MODELS[C.ACTIONS.TRANSCRIBE_AUDIO];
+    // Solo i modelli CONFIGURATI: elencare quelli scritti nel codice
+    // mostrerebbe scelte che l'app non userebbe mai.
+    const registry = (settings && settings.modelRegistry) || {};
+    const currentRaw = (settings && settings.models && settings.models[C.ACTIONS.TRANSCRIBE_AUDIO]) || '';
     // Il campo può contenere più nickname (fallback): il "corrente" mostrato
     // come selezionato è il primario (il primo della lista).
     const current = C.parseModelRefs ? (C.parseModelRefs(currentRaw)[0] || currentRaw) : currentRaw;
     const items = [];
     for (const [nickname, entry] of Object.entries(registry)) {
-      // Solo modelli con un binding Gemini: per ora è l'unico provider che
-      // accetta audio inline tramite la stessa chat completion che usiamo.
-      if (!entry || !entry.gemini) continue;
+      // Solo modelli serviti da Gemini: per ora è l'unico provider che accetta
+      // audio inline tramite la stessa chat completion che usiamo. `entry.gemini`
+      // è la forma vecchia del registry (un nickname per due provider), tenuta
+      // per le configurazioni salvate prima del passaggio a { provider, model }.
+      if (!entry) continue;
+      if (entry.provider ? entry.provider !== 'gemini' : !entry.gemini) continue;
       const checked = nickname === current;
       items.push({
         label: (checked ? '✓ ' : '   ') + (entry.label || nickname),
