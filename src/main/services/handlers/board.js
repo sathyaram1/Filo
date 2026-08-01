@@ -17,7 +17,6 @@ module.exports = function register(on, ctx) {
   const { MSG } = ctx;
   const Credits = globalThis.SN_CREDITS;
   const FB = globalThis.SN_FEEDBACK;
-  const { SN_CONST } = globalThis;
 
   on(MSG.BOARD_CAST_VOTE, async (msg) => {
     try {
