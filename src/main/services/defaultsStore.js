@@ -399,30 +399,55 @@ function getCreditConfig() {
 // tabella per priorità — così cambiare una sola fascia non cancella le altre
 // (stessa trappola già vista con apiKeys, vedi update() sopra). La schermata di
 // modifica arriva nella parte 3: qui c'è solo il trasporto.
+//
+// PORTA D'INGRESSO SEVERA: un valore di tipo sbagliato (si'/no, elenco, testo,
+// numero negativo) NON viene "quasi accettato" convertendolo con Number() — che
+// trasformerebbe `true` in 1 e uno spazio in 0, cioè scriverebbe per TUTTI gli
+// utenti un importo che l'owner non ha mai deciso. Viene RIFIUTATO con un errore
+// che nomina il campo, così chi sbaglia lo scopre subito invece di ritrovarsi la
+// riapertura gratis o la ricarica azzerata. Un campo assente (o lasciato vuoto
+// nel form) significa invece "non toccare": si salta in silenzio.
 async function updateCreditConfig(partial, idToken) {
   if (!idToken) throw new Error('Serve un ID token admin per modificare gli importi crediti.');
   partial = partial || {};
   const CC = globalThis.SN_CREDIT_CONFIG;
   const numKeys = (CC && CC.NUM_KEYS)
     || ['initial', 'dailyRefill', 'maxRefillDays', 'feedbackSend', 'boardVote', 'boardReopen'];
+  // Stessa regola di lettura e scrittura: unica definizione di "importo valido".
+  const toAmount = (CC && CC.toAmount) || ((v) => {
+    if (typeof v === 'number') return Number.isFinite(v) && v >= 0 ? v : null;
+    if (typeof v === 'string') {
+      const s = v.trim();
+      if (s === '') return null;
+      const n = Number(s);
+      return Number.isFinite(n) && n >= 0 ? n : null;
+    }
+    return null;
+  });
+  // "Non fornito" = assente o casella vuota. Tutto il resto DEVE essere un
+  // importo valido, altrimenti è un errore dell'owner e va detto.
+  const omitted = (v) => v === undefined || v === null || (typeof v === 'string' && v.trim() === '');
 
   const fields = {};
   const mask = [];
+  const bad = [];
   for (const k of numKeys) {
-    if (partial[k] === undefined || partial[k] === null || partial[k] === '') continue;
-    const n = Number(partial[k]);
-    if (!Number.isFinite(n) || n < 0) continue;
+    if (omitted(partial[k])) continue;
+    const n = toAmount(partial[k]);
+    if (n === null) { bad.push(k); continue; }
     fields[k] = toFsValue(n);
     mask.push(k);
   }
 
   const t = partial.feedbackResolveByPriority;
-  if (t && typeof t === 'object') {
+  if (t !== undefined && t !== null && (typeof t !== 'object' || Array.isArray(t))) {
+    bad.push('feedbackResolveByPriority');
+  } else if (t && typeof t === 'object') {
     const tableFields = {};
     for (const p of [0, 1, 2, 3]) {
-      if (t[p] === undefined || t[p] === null || t[p] === '') continue;
-      const n = Number(t[p]);
-      if (!Number.isFinite(n) || n < 0) continue;
+      if (omitted(t[p])) continue;
+      const n = toAmount(t[p]);
+      if (n === null) { bad.push(`feedbackResolveByPriority.${p}`); continue; }
       tableFields[String(p)] = toFsValue(n);
       mask.push(`feedbackResolveByPriority.${p}`);
     }
@@ -431,6 +456,11 @@ async function updateCreditConfig(partial, idToken) {
     }
   }
 
+  // Un solo campo sbagliato annulla TUTTA la scrittura: meglio non salvare nulla
+  // che salvarne metà lasciando l'owner convinto di aver cambiato tutto.
+  if (bad.length) {
+    throw new Error(`Importi non validi (servono numeri interi ≥ 0): ${bad.join(', ')}. Non ho salvato nulla.`);
+  }
   if (!mask.length) throw new Error('Nessun importo valido da scrivere.');
   await patchDoc(CREDITS_DOC, fields, mask, idToken);
   await refresh();
