@@ -108,7 +108,7 @@
     if (!Array.isArray(s.rewards)) s.rewards = [];
     if (!s.rewardedFeedback) s.rewardedFeedback = {};
     if (!s.rewardedVotes) s.rewardedVotes = {};
-    if (typeof s.balance !== 'number') s.balance = CREDIT.INITIAL;
+    if (typeof s.balance !== 'number') s.balance = config(cfg).initial;
     if (!s.lastRefillDate) s.lastRefillDate = dateKey();
     // F4: campo bonus auto-feedback (retrocompatibile).
     if (typeof s.lastAutoFeedbackBonusDate !== 'string') s.lastAutoFeedbackBonusDate = '';
