@@ -99,20 +99,29 @@
       const C = global.SN_CONST;
       if (C && C.isRawModelId && C.isRawModelId(nick)) return true;
       const reg = (getRegistry && getRegistry()) || {};
+      // Registry non ancora disponibile: non sappiamo nulla, quindi non
+      // accusiamo nessun nickname di non esistere.
+      if (!Object.keys(reg).length) return true;
       return Boolean(reg[nick]);
     };
   }
 
   // Mostra/azzera il messaggio di blocco sotto un segmento (modello non adatto).
-  function showSegMsgRaw(seg, text) {
+  // Un solo messaggio per segmento. `inline` per gli avvisi CORTI (stanno
+  // accanto al campo senza spezzare la pillola), a blocco per le frasi lunghe.
+  function showSegMsgRaw(seg, text, opts) {
+    const o = opts || {};
     let m = seg.querySelector('.sn-chain-msg');
     if (!m) {
       m = document.createElement('span');
       m.className = 'sn-chain-msg';
-      m.style.cssText = 'display:block;color:var(--sn-danger,#c0392b);font-size:11px;margin-top:2px;';
       seg.appendChild(m);
     }
+    m.style.cssText = o.inline
+      ? 'color:var(--sn-danger,#c0392b);font-size:11px;margin-left:4px;white-space:nowrap;'
+      : 'display:block;color:var(--sn-danger,#c0392b);font-size:11px;margin-top:2px;';
     m.textContent = text;
+    if (o.title) m.title = o.title; else m.removeAttribute('title');
   }
   function showSegMsg(seg, reason) {
     showSegMsgRaw(seg, t('caps_incompatible', reason || ''));
@@ -195,7 +204,18 @@
         // viene rifiutato: si ripristina l'ultimo valore valido e si mostra il
         // motivo. Così non è possibile SALVARE un abbinamento incompatibile.
         let lastGood = ref;
-        const accept = (val) => { clearSegMsg(seg); lastGood = val; refs[i] = val; emit(); };
+        // Scorciatoia citata ma inesistente (mai definita, rinominata o
+        // eliminata): la funzione non partirebbe, quindi lo diciamo QUI, mentre
+        // si configura, invece di lasciarlo scoprire a chi la usa. È solo un
+        // avviso: il valore resta scritto e modificabile.
+        const markUnknown = (val) => {
+          if (val && !isKnown(val)) {
+            showSegMsgRaw(seg, t('options_chain_unknown'), {
+              inline: true, title: t('options_chain_unknown_title'),
+            });
+          }
+        };
+        const accept = (val) => { clearSegMsg(seg); lastGood = val; refs[i] = val; emit(); markUnknown(val); };
         const reject = (reason) => {
           showSegMsg(seg, reason);
           inp.value = lastGood; fit(inp);
@@ -207,11 +227,6 @@
           const v = validate ? validate(val) : { ok: true };
           if (v.ok) accept(val); else reject(v.reason);
         });
-        // Scorciatoia citata ma inesistente (rinominata o eliminata): la
-        // funzione non partirebbe, quindi lo diciamo QUI, mentre si configura,
-        // invece di lasciarlo scoprire a chi la usa. Solo avviso: il valore
-        // resta modificabile, non viene cancellato d'ufficio.
-        if (ref && !isKnown(ref)) showSegMsgRaw(seg, t('options_chain_unknown'));
         seg.appendChild(inp);
         attachDropdown(seg, inp, (value) => {
           const v = validate ? validate(value) : { ok: true };
@@ -234,6 +249,8 @@
           });
           seg.appendChild(rm);
         }
+        // Stesso avviso al primo disegno, per i valori che arrivano già salvati.
+        markUnknown(ref);
         el.appendChild(seg);
       });
 

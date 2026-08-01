@@ -327,7 +327,7 @@
     // esiste): il messaggio arriva già scritto per l'utente e dice dove si
     // imposta — mostrarlo com'è vale molto più di una frase generica.
     if (res.errorCode === 'NO_MODEL_FOR_ACTION' && res.error) {
-      try { Popup.showToast(String(res.error)); } catch (_) {}
+      try { Popup.showToast(I18n.t('tts_model_fallback_reason', String(res.error))); } catch (_) {}
       return;
     }
     const key = res.error === 'no_tts_model' ? 'tts_model_fallback_nokey' : 'tts_model_fallback';

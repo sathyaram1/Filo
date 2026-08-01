@@ -187,6 +187,13 @@
     $('apiKeyTavily').value = settings.apiKeys?.tavily || '';
     $('monthlyLimit').value = settings.monthlyLimitEur ?? 5;
 
+    // Registry modelli PRIMA dell'editor a segmenti: le righe del registry sono
+    // la sorgente dei nickname, e l'editor le legge già al primo render per
+    // segnalare i modelli citati ma inesistenti. Renderizzarlo dopo avrebbe
+    // fatto apparire l'avviso su TUTTI i segmenti (registry ancora vuoto).
+    // Popola anche la datalist dei nickname usata dai segmenti.
+    renderModelRegistry(settings.modelRegistry || {});
+
     // Editor a segmenti "Modelli per azione": una catena di fallback per azione.
     modelChains = ModelChain.renderGrid($('modelsGrid'), {
       models: settings.models || {},
@@ -209,9 +216,6 @@
     seedDatalistsFromRegistry(settings.modelRegistry || {});
     ensureProviderModels('gemini');
     ensureProviderModels('openrouter');
-
-    // Registry modelli (popola anche la datalist dei nickname usata dai segmenti)
-    renderModelRegistry(settings.modelRegistry || {});
   }
 
   // Normalizza una entry del registry (nuovo schema o vecchio duale) in
