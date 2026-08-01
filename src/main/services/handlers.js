@@ -12,7 +12,7 @@ const { BrowserWindow } = require('electron');
 const Defaults = require('./defaultsStore');
 
 const { SN_CONST, SN_MSG } = globalThis;
-const { ACTIONS, PROMPTS, DEFAULT_SETTINGS } = SN_CONST;
+const { ACTIONS, PROMPTS } = SN_CONST;
 const { MSG } = SN_MSG;
 const Storage = globalThis.SN_STORAGE;
 const Providers = globalThis.SN_PROVIDERS;
@@ -349,7 +349,7 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, si
   // lasciamo che sia la richiesta vera, più sotto, a sollevare l'errore.
   let modelName = model;
   try {
-    const ch = buildAttemptChain(settings, model);
+    const ch = buildAttemptChain(settings, model, action);
     if (ch[0] && ch[0].model) modelName = ch[0].model;
   } catch (_) {}
   let messages = await buildMessages(action, { ...payload, modelName });
@@ -360,7 +360,7 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, si
     return { text: cached.text, model, provider: settings.provider, costEur: 0, usage: cached.usage || {}, cached: true };
   }
 
-  const attemptsRaw = buildAttemptChain(settings, model);
+  const attemptsRaw = buildAttemptChain(settings, model, action);
   const attempts = await applyLimitToChain(settings, attemptsRaw);
 
   // Se il caller vuole il RAGIONAMENTO in diretta (es. la chat della home, #priorità1)
@@ -424,7 +424,7 @@ async function handleStream({ action, payload, origin, onDelta, onMeta, onReset,
   }
 
   await ensureUnderLimit(settings);
-  const attempts = buildAttemptChain(settings, model);
+  const attempts = buildAttemptChain(settings, model, action);
 
   const result = await Providers.streamCompleteWithFallback({
     attempts, messages, signal,
@@ -1716,7 +1716,7 @@ async function runTabTriageDecision({ tabs = [], memory = '', trigger = 'idle' }
   if (!Array.isArray(tabs) || !tabs.length) return { decisions: [] };
   const settings = await getEffectiveSettings();
   const model = modelForAction(settings, ACTIONS.FILO_TAB_TRIAGE);
-  const attemptsRaw = buildAttemptChain(settings, model);
+  const attemptsRaw = buildAttemptChain(settings, model, ACTIONS.FILO_TAB_TRIAGE);
   const attempts = await applyLimitToChain(settings, attemptsRaw);
 
   const system = [
@@ -1806,7 +1806,7 @@ function cosineInt(a, b) {
 async function runOneShot(action, messages) {
   const settings = await getEffectiveSettings();
   const model = modelForAction(settings, action);
-  const attempts = await applyLimitToChain(settings, buildAttemptChain(settings, model));
+  const attempts = await applyLimitToChain(settings, buildAttemptChain(settings, model, action));
   const result = await Providers.completeWithFallback({ attempts, messages });
   const usedProvider = result.provider || attempts[0].provider;
   const concreteModel = result.model || attempts[0].model;
@@ -1962,11 +1962,12 @@ async function wireSafebrowse(settingsArg) {
     SB.configure({ gsbKey: '', runLlm: null, enableSandbox: false, enableNetwork: false });
     return;
   }
-  // Giudice LLM: riusa la catena di fallback dei provider con un modello
-  // economico. Solo METADATI (mai contenuto pagina) passano da llm.judge.
+  // Giudice LLM: riusa la catena di fallback dei provider con il modello
+  // configurato per questa funzione (slot proprio, visibile nell'editor dei
+  // modelli). Solo METADATI (mai contenuto pagina) passano da llm.judge.
   const runLlm = sb.llmJudge === false ? null : async (messages) => {
     const s = await getEffectiveSettings();
-    const attempts = buildAttemptChain(s, 'flash-lite');
+    const attempts = buildAttemptChain(s, modelForAction(s, ACTIONS.SAFEBROWSE_JUDGE), ACTIONS.SAFEBROWSE_JUDGE);
     const r = await Providers.completeWithFallback({ attempts, messages });
     return r.text;
   };
@@ -1996,7 +1997,7 @@ globalThis.SN_GEO_CLASSIFY = async function geoClassify(input) {
   if (!geoClassifierCache) geoClassifierCache = Classifier.createCache();
   const complete = async ({ messages, signal }) => {
     const s = await getEffectiveSettings();
-    const attempts = buildAttemptChain(s, 'flash-lite');
+    const attempts = buildAttemptChain(s, modelForAction(s, ACTIONS.GEOBLOCK_CLASSIFY), ACTIONS.GEOBLOCK_CLASSIFY);
     const r = await Providers.completeWithFallback({ attempts, messages, signal });
     return r.text;
   };
