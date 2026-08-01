@@ -1,9 +1,0 @@
-{
-  "id": "36c937e7-4245-41af-b2c9-90bda33b9af0",
-  "status": "design",
-  "notes": "Nota tecnica di servizio, non riguarda la modifica in attesa del tuo via libera (quella l'ho descritta nel messaggio precedente).\n\nIl controllo di sicurezza mi e' arrivato SENZA la modifica da esaminare: il campo era vuoto. Causa: qui la copia del progetto ha la storia troncata e il ramo da controllare non era stato scaricato, quindi il confronto con il ramo principale non trovava un punto di partenza comune e restituiva il vuoto in silenzio. L'ho recuperato a mano e ho controllato la modifica vera, quindi il giudizio del messaggio precedente e' valido e completo.\n\nVale la pena sistemarlo, perche' e' un punto delicato: chi fa il controllo di sicurezza vede SOLO la modifica, per non farsi influenzare da altro. Se quel campo arriva vuoto, il controllo non ha niente da guardare e rischia di approvare qualsiasi cosa senza accorgersene, convinto di aver controllato. Suggerimento: far fallire il controllo in modo esplicito quando la modifica risulta vuota, invece di lasciar passare il vuoto come se volesse dire \"nessuna modifica sospetta\".",
-  "queuedAt": "2026-08-01T18:11:42.643Z",
-  "queuedBy": "routine",
-  "branch": "worker/36c937e7-4245-41af-b2c9-90bda33b9af0",
-  "reason": "secaudit"
-}
