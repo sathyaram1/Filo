@@ -111,6 +111,13 @@ async function refresh() {
   const models = await fetchDoc(MODELS_DOC, idToken);
   if (models) remoteModels = models;
 
+  // config/credits (#366.2): importi crediti decisi dall'owner. NON è segreto
+  // (sono numeri di crediti; il costo EUR non finisce mai qui), quindi la
+  // lettura è pubblica come config/models: il nuovo valore raggiunge OGNI
+  // installazione, anche non loggata. Lettura fallita/offline → null → default.
+  const credits = await fetchDoc(CREDITS_DOC, idToken);
+  if (credits) remoteCredits = credits;
+
   if (idToken) {
     const secrets = await fetchDoc(SECRETS_DOC, idToken);
     if (secrets) remoteSecrets = secrets;
