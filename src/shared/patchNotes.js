@@ -16,6 +16,17 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.177', date: '2026-08-01',
+      fixes: [
+        'Nessuna funzione di Filo gira più su un modello che nessuno ha scelto: se a una funzione manca il modello, o punta a uno che non esiste più, quella funzione si ferma e te lo dice sul momento — con il suo nome e dove impostarlo — mentre tutto il resto continua a funzionare come prima.',
+        'Nelle Opzioni l’elenco dei modelli predefiniti mostra ora i modelli davvero in uso, non quelli scritti nel programma.',
+      ],
+      features: [
+        'Nelle Opzioni puoi scegliere il modello anche per le funzioni che prima non comparivano nell’elenco: riscrittura del testo, spiegazione di un link, memoria di Filo, rilevamento dei siti pericolosi e dei blocchi geografici, titolo automatico dei feedback.',
+        'Mentre scegli i modelli, un avviso segnala subito le voci che non corrispondono a nessun modello configurato, così te ne accorgi lì invece che usando la funzione.',
+      ],
+    },
+    {
       version: '0.2.176', date: '2026-07-31',
       fixes: [
         'Se chiedi a Filo dov’è la home o di aprirla, ora ti porta davvero alla pagina della nuova scheda (con l’assistente e i suggerimenti) invece che alla lista "Aperti per dopo".',
