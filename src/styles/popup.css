@@ -200,6 +200,12 @@
   right: 20px;
   z-index: 2147483647;
   padding: 10px 14px;
+  /* I toast non sono tutti "Copiato": alcuni spiegano cosa manca e dove si
+     imposta. Senza un tetto, una frase lunga diventa una riga sola larga quanto
+     la finestra. Va a capo e resta dentro il viewport. */
+  max-width: min(420px, calc(100vw - 40px));
+  line-height: 1.4;
+  overflow-wrap: anywhere;
   background: var(--sn-overlay-bg);
   color: var(--sn-fg);
   font-family: var(--sn-font);
