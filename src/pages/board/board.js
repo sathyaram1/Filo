@@ -168,7 +168,7 @@
 
     const hint = document.createElement('p');
     hint.className = 'bd-reopen-hint';
-    hint.textContent = `Spiega cosa non funziona ancora. Costa ${SN_CONST.CREDIT.BOARD_REOPEN} crediti, per evitare segnalazioni a caso.`;
+    hint.textContent = `Spiega cosa non funziona ancora. Costa ${reopenCost} crediti, per evitare segnalazioni a caso.`;
 
     const textarea = document.createElement('textarea');
     textarea.className = 'bd-reopen-text';
