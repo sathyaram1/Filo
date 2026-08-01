@@ -490,6 +490,42 @@
       .map((r) => DEPRECATED_MODELS[r] || r);
   }
 
+  // Un riferimento a modello è o un NICKNAME del registry (slug semplice: es.
+  // 'flash', 'claude-haiku') o — retro-compatibilità con le config salvate prima
+  // del refactor — un id GREZZO stile provider, riconoscibile perché contiene
+  // '/' o ':' (es. 'google/gemini-2.0-flash-001').
+  //
+  // La distinzione serve a poter dire con CERTEZZA che un nickname non esiste:
+  // senza di essa uno slug sconosciuto verrebbe spedito grezzo a OpenRouter (400
+  // incomprensibile) oppure — peggio — risolto da un registry scritto nel codice
+  // che nessuno ha mai configurato. PURA.
+  function isRawModelId(ref) {
+    return /[/:]/.test(String(ref == null ? '' : ref));
+  }
+
+  // Riferimenti NON risolvibili con il registry dato: nickname che il registry
+  // non contiene e che non sono nemmeno id grezzi legacy. Sono i "fantasmi":
+  // scorciatoie citate da una funzione ma mai definite (o cancellate dopo). PURA.
+  function missingModelRefs(refs, registry) {
+    const reg = registry || {};
+    const out = [];
+    for (const ref of refs || []) {
+      if (!ref) continue;
+      if (reg[ref]) continue;
+      if (isRawModelId(ref)) continue;
+      out.push(ref);
+    }
+    return out;
+  }
+
+  // Riferimenti effettivamente utilizzabili: quelli del registry più gli id
+  // grezzi legacy, nell'ordine dato (la catena di ripiego VOLUTA fra modelli
+  // configurati resta intatta). PURA.
+  function usableModelRefs(refs, registry) {
+    const missing = new Set(missingModelRefs(refs, registry));
+    return (refs || []).filter((r) => r && !missing.has(r));
+  }
+
   // Costruisce la catena di tentativi per servire una richiesta AI a partire da
   // una lista ordinata di nickname. Per ogni nickname (nell'ordine indicato
   // dall'utente) prova i provider in `providerOrder`, scartando quelli senza
