@@ -28,10 +28,15 @@ const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_I
 const MODELS_DOC = 'config/models';
 const SECRETS_DOC = 'config/secrets';
 const AUTOMATION_DOC = 'config/automation';
+const CREDITS_DOC = 'config/credits';
 
 // Cache degli override remoti dall'ultimo refresh.
 let remoteModels = null;  // { provider?, models?, modelRegistry? }
 let remoteSecrets = null; // { apiKeys?: { openrouter?, gemini?, tavily? }, safeBrowsingKey? }
+// #366.2 — importi crediti decisi dall'owner:
+// { initial?, dailyRefill?, maxRefillDays?, feedbackSend?,
+//   feedbackResolveByPriority?: {0..3}, boardVote?, boardReopen? }
+let remoteCredits = null;
 let lastFetchTs = 0;
 
 // ── Firestore Value <-> JS ───────────────────────────────────────────────────
