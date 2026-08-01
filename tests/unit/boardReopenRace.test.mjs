@@ -57,7 +57,23 @@ beforeEach(() => {
   spends = [];
 });
 
+// Costo di riapertura "deciso dall'owner" (#366.2): diverso da quello integrato,
+// così il test dimostra che l'handler addebita l'importo CONFIGURATO e non la
+// costante di build.
+const REOPEN_COST = SN_CONST.CREDIT.BOARD_REOPEN + 13;
+
 globalThis.SN_CREDITS = {
+  // #366.2: il motore espone gli importi in vigore (config owner con ripiego
+  // sulle costanti). L'handler li legge da qui invece che dalle costanti.
+  config: () => ({
+    initial: SN_CONST.CREDIT.INITIAL,
+    dailyRefill: SN_CONST.CREDIT.DAILY_REFILL,
+    maxRefillDays: SN_CONST.CREDIT.MAX_REFILL_DAYS,
+    feedbackSend: SN_CONST.CREDIT.FEEDBACK_SEND,
+    feedbackResolveByPriority: { ...SN_CONST.CREDIT.FEEDBACK_RESOLVE_BY_PRIORITY },
+    boardVote: SN_CONST.CREDIT.BOARD_VOTE,
+    boardReopen: REOPEN_COST,
+  }),
   spendIfAffordable: async (amount, meta) => {
     spends.push({ amount, meta });
     return { ok: true, balance: 100 - amount };
