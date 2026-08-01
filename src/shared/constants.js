@@ -1551,6 +1551,7 @@
     parseModelRefs,
     isRawModelId,
     missingModelRefs,
+    formatModelRefsForMessage,
     usableModelRefs,
     buildModelAttempts,
     REASONING_LEVELS,
