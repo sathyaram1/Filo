@@ -97,7 +97,9 @@ test('una funzione senza modello si ferma e lo dice; le altre continuano a funzi
         fantasma: await run(C.ACTIONS.EXPLAIN_LINK, { url: 'https://example.com', text: 'x' }),
       };
       globalThis.__failFirst = true;
-      res.ripiego = await run(C.ACTIONS.CATEGORIZE, { url: 'https://example.com', title: 't' });
+      res.ripiego = await run(C.ACTIONS.CATEGORIZE, {
+        url: 'https://example.com', title: 't', existing: [],
+      });
     } finally {
       globalThis.__failFirst = false;
       globalThis.SN_PROVIDERS.completeWithFallback = origComplete;
