@@ -284,11 +284,12 @@ module.exports = function register(on, ctx) {
     } catch (e) { return { ok: false, error: e?.message || String(e) }; }
   });
 
-  // +5 crediti subito all'invio di un feedback (C3). Idempotenza per-invio è del
+  // Premio immediato all'invio di un feedback (C3). Idempotenza per-invio è del
   // chiamante: ogni invio è un evento distinto, quindi premiamo ogni volta.
+  // #366.2: importo dalla config owner (ripiego sulla costante FEEDBACK_SEND).
   on(MSG.CREDITS_AWARD_FEEDBACK, async (msg) => {
-    const { SN_CONST } = globalThis;
-    const amount = (msg && Number(msg.credits)) || SN_CONST.CREDIT.FEEDBACK_SEND;
+    await syncCreditConfig();
+    const amount = (msg && Number(msg.credits)) || Credits.config().feedbackSend;
     const r = await Credits.award({ kind: 'feedback_sent', credits: amount, ref: msg?.ref || null });
     return { ok: true, ...r };
   });
