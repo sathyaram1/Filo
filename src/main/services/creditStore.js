@@ -115,17 +115,22 @@
     return s;
   }
 
-  // Accredita +DAILY_REFILL per ogni mezzanotte passata da lastRefillDate,
-  // fino a MAX_REFILL_DAYS. Se autoFeedbackEnabled è true, aggiunge anche
-  // il bonus giornaliero +10 (una sola volta al giorno, idempotente).
+  // Accredita la ricarica giornaliera per ogni mezzanotte passata da
+  // lastRefillDate, fino al tetto di giorni accumulabili. Se autoFeedbackEnabled
+  // è true, aggiunge anche il bonus giornaliero +10 (una sola volta al giorno,
+  // idempotente). `cfg` (opzionale, #366.2): importi owner-configurabili.
   // Ritorna { state, added, bonusAdded }.
-  function applyRefill(state, today = dateKey(), autoFeedbackEnabled = false) {
-    const s = ensure(state);
+  function applyRefill(state, today = dateKey(), autoFeedbackEnabled = false, cfg) {
+    const c = config(cfg);
+    const s = ensure(state, cfg);
     const missed = daysBetween(s.lastRefillDate, today);
     let added = 0;
     if (missed > 0) {
-      const days = Math.min(missed, CREDIT.MAX_REFILL_DAYS);
-      added = days * CREDIT.DAILY_REFILL;
+      // I giorni NON ancora accreditati valgono l'importo CORRENTE: se l'owner
+      // cambia la ricarica, il nuovo valore parte dalla prossima ricarica senza
+      // ricalcolare nulla all'indietro (i giorni già accreditati restano quelli).
+      const days = Math.min(missed, c.maxRefillDays);
+      added = days * c.dailyRefill;
       s.balance += added;
       s.lastRefillDate = today;
     }
