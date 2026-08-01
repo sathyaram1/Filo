@@ -20,6 +20,7 @@
       fixes: [
         'Nessuna funzione di Filo gira più su un modello che nessuno ha scelto: se a una funzione manca il modello, o punta a uno che non esiste più, quella funzione si ferma e te lo dice sul momento — con il suo nome e dove impostarlo — mentre tutto il resto continua a funzionare come prima.',
         'Nelle Opzioni l’elenco dei modelli predefiniti mostra ora i modelli davvero in uso, non quelli scritti nel programma.',
+        'Anche la descrizione automatica delle immagini che copi segue la stessa regola: niente più descrizioni prodotte da un modello che nessuno ha scelto. Se manca il modello te lo dice, e la voce nella cronologia degli appunti smette di promettere una descrizione che non arriverà.',
       ],
       features: [
         'Nelle Opzioni puoi scegliere il modello anche per le funzioni che prima non comparivano nell’elenco: riscrittura del testo, spiegazione di un link, memoria di Filo, rilevamento dei siti pericolosi e dei blocchi geografici, titolo automatico dei feedback.',
