@@ -101,8 +101,8 @@
     };
   }
 
-  function ensure(state) {
-    const s = state && state.initialized ? state : freshState();
+  function ensure(state, cfg) {
+    const s = state && state.initialized ? state : freshState(dateKey(), cfg);
     if (!s.byUsage) s.byUsage = {};
     if (!s.byAction) s.byAction = {};
     if (!Array.isArray(s.rewards)) s.rewards = [];
