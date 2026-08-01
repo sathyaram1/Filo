@@ -79,6 +79,32 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // config/credits → importi crediti configurabili dall'OWNER (#366.2), validi
+    // per TUTTI gli utenti senza rilasciare una nuova versione: `initial` (saldo
+    // di benvenuto), `dailyRefill` (ricarica di mezzanotte), `maxRefillDays`
+    // (tetto di giorni accumulabili), `feedbackSend`, `feedbackResolveByPriority`
+    // (map 0..3), `boardVote`, `boardReopen`.
+    //
+    // Lettura PUBBLICA come config/models, e per lo stesso motivo: NON è un
+    // segreto (sono i numeri di crediti che l'utente vede già in app; il costo in
+    // € resta dietro le quinte e non finisce MAI in questo documento), e il nuovo
+    // valore deve raggiungere OGNI installazione — anche quelle non loggate, che
+    // altrimenti resterebbero sui vecchi importi.
+    //
+    // Scrittura solo isAdmin(): un utente qualunque non può ritoccarsi gli
+    // importi. (Il saldo per-utente resta client-authoritative — caveat noto e
+    // documentato su credits/{uid} — ma la TABELLA degli importi è owner-only,
+    // quindi non si allarga il blast radius esistente.)
+    //
+    // Le regole NON enumerano i campi: aggiungere un importo in futuro non
+    // richiede un redeploy. La validazione di forma sta lato client (ogni valore
+    // mancante o assurdo viene ignorato e sostituito dal default integrato),
+    // quindi un documento sporco degrada sui default invece di rompere i crediti.
+    match /config/credits {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     // config/judgeSecrets → chiave OpenRouter DEDICATA ai giudici di sicurezza,
     // SEPARATA dalle chiavi del resto di Filo (DESIGN §4/§14). L'owner la imposta
     // dalla schermata "Modelli di supporto"; il backend filo-security la legge via
