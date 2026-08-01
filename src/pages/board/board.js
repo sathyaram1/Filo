@@ -36,6 +36,11 @@
   let releasedVersion = '';
   const pending = new Set();    // id feedback con voto in volo (IPC), per disabilitare i pulsanti
   let openReopenAfterLogin = null; // id del fix il cui form "Ancora rotto?" va riaperto dopo un login riuscito
+  // #366.2 — costo di riapertura EFFETTIVO (l'owner può cambiarlo per tutti senza
+  // rilasciare un aggiornamento). Parte dalla costante integrata così la scritta
+  // c'è comunque al primo render; il valore vero arriva dal main all'avvio. Senza
+  // questo la frase mostrerebbe un prezzo diverso da quello davvero addebitato.
+  let reopenCost = SN_CONST.CREDIT.BOARD_REOPEN;
 
   function sendToMain(msg) {
     if (window.filo?.message)                return window.filo.message(msg);
