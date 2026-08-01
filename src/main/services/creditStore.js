@@ -363,6 +363,8 @@
     freshState, ensure, applyRefill, costEurToCredits, rewardForPriority,
     applyConsumption, applyAward, isVoteRewardPending, applyConsumptionIfAffordable,
     publicView, dateKey, daysBetween,
+    // importi owner-configurabili (#366.2)
+    config, setActiveConfig, getActiveConfig,
     // async (runtime)
     load, getPublic, recordConsumption, award, wasFeedbackRewarded,
     wasVoteRewarded, awardVoteOnce, spendIfAffordable,
