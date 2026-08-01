@@ -121,7 +121,8 @@ module.exports = function register(on, ctx) {
 
       // Anti-spam: scala i crediti SOLO se il saldo basta (nessun saldo
       // negativo, nessun tentativo "gratis" se insufficiente).
-      const amount = SN_CONST.CREDIT.BOARD_REOPEN;
+      // #366.2: costo dalla config owner (ripiego sulla costante BOARD_REOPEN).
+      const amount = Credits.config().boardReopen;
       const spend = await Credits.spendIfAffordable(amount, { kind: 'board_reopen', ref: id });
       if (!spend.ok) {
         return { ok: false, error: `Servono ${amount} crediti per riaprire un fix (saldo: ${spend.balance}).` };
