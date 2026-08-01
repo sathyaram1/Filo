@@ -20,6 +20,42 @@
 
   const { STORAGE_KEYS, CREDIT, creditUsageGroup } = global.SN_CONST;
 
+  // ── importi configurabili dall'owner (#366.2) ───────────────────────────────
+  // Gli importi crediti possono essere sovrascritti GLOBALMENTE dall'owner (doc
+  // Firestore `config/credits`). L'handler crediti legge la config remota e la
+  // registra qui con setActiveConfig(); i wrapper async (load/award/…) la usano.
+  // Le funzioni PURE accettano invece un `config` ESPLICITO come ultimo
+  // parametro (per i test e per chi passa una config al volo). In assenza di
+  // config — esplicita o attiva — si ricade sui default CREDIT: comportamento
+  // identico a prima di #366.2 (offline, non loggato, doc mai scritto).
+  let activeConfig = null;
+
+  function setActiveConfig(cfg) {
+    activeConfig = cfg && typeof cfg === 'object' ? config(cfg) : null;
+  }
+  function getActiveConfig() { return activeConfig; }
+
+  // Config effettiva per una chiamata: `explicit` > config attiva (owner) >
+  // costanti CREDIT. Ogni campo mancante/invalido ricade sul default, quindi
+  // anche una config parziale o sporca è sicura (normalizzazione in
+  // SN_CREDIT_CONFIG, logica pura condivisa).
+  function config(explicit) {
+    const raw = (explicit && typeof explicit === 'object') ? explicit : activeConfig;
+    const CC = global.SN_CREDIT_CONFIG;
+    if (CC && typeof CC.normalize === 'function') return CC.normalize(raw);
+    // Ripiego difensivo se il modulo shared non è caricato (contesto isolato):
+    // i default storici delle costanti, mai valori a zero.
+    return {
+      initial: CREDIT.INITIAL,
+      dailyRefill: CREDIT.DAILY_REFILL,
+      maxRefillDays: CREDIT.MAX_REFILL_DAYS,
+      feedbackSend: CREDIT.FEEDBACK_SEND,
+      feedbackResolveByPriority: { ...(CREDIT.FEEDBACK_RESOLVE_BY_PRIORITY || {}) },
+      boardVote: CREDIT.BOARD_VOTE,
+      boardReopen: CREDIT.BOARD_REOPEN,
+    };
+  }
+
   // ── helper data/tempo (LOCALE: l'utente pensa alla SUA mezzanotte) ──────────
 
   function dateKey(d = new Date()) {
