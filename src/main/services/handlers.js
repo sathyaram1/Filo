@@ -344,14 +344,18 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, si
   const model = modelForAction(settings, action, payload?.modelOverride);
   // Nome CONCRETO del modello primario (es. 'gemini-3.1-flash-lite'), non il
   // nickname: è il nome con cui il codice lo invoca. Lo passiamo al prompt così
-  // l'assistente può dire correttamente che modello è (#158). Best-effort: se la
-  // catena non è risolvibile (nessuna chiave) restiamo sul riferimento grezzo e
-  // lasciamo che sia la richiesta vera, più sotto, a sollevare l'errore.
+  // l'assistente può dire correttamente che modello è (#158). Chiave mancante o
+  // limite di spesa restano best-effort qui (li rialza la richiesta vera, più
+  // sotto); un problema di CONFIGURAZIONE dei modelli invece ferma tutto subito,
+  // perché non ha senso costruire il prompt — né rispondere con una risposta
+  // vecchia in cache — per una funzione che non ha un modello.
   let modelName = model;
   try {
     const ch = buildAttemptChain(settings, model, action);
     if (ch[0] && ch[0].model) modelName = ch[0].model;
-  } catch (_) {}
+  } catch (e) {
+    if (e && e.code === 'NO_MODEL_FOR_ACTION') throw e;
+  }
   let messages = await buildMessages(action, { ...payload, modelName });
   messages = SN_CONST.injectAgentStyle(messages, action, settings.agentStyle);
 

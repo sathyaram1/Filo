@@ -52,6 +52,9 @@
     tts_not_supported: 'Lettura ad alta voce non supportata in questo browser',
     tts_model_fallback: 'Voce del modello non disponibile ora: leggo con la voce del browser.',
     tts_model_fallback_nokey: 'La lettura a voce naturale richiede una chiave Gemini abilitata alla sintesi vocale. Per ora leggo con la voce del browser.',
+    // %s = il motivo vero (nessun modello impostato per la lettura, o modello
+    // inesistente). Dice cosa manca E che intanto la lettura non si ferma.
+    tts_model_fallback_reason: '%s Per ora leggo con la voce del browser.',
     menu_dictate: 'Detta',
     menu_screenshot: 'Screenshot',
     menu_screenshot_crop: 'Screenshot di una parte',
@@ -250,7 +253,10 @@
     options_action_safebrowse_judge: 'Rilevamento siti pericolosi — giudizio',
     options_action_geoblock_classify: 'Riconoscimento dei blocchi geografici',
     options_action_feedback_title: 'Titolo automatico dei feedback',
-    options_chain_unknown: 'Questo modello non esiste fra quelli configurati: la funzione non parte finché non ne scegli uno valido.',
+    // Avviso corto accanto al segmento (lo spazio è quello di una pillola); la
+    // frase intera sta nell'hover.
+    options_chain_unknown: 'non esiste',
+    options_chain_unknown_title: 'Questo modello non è fra quelli configurati qui sopra: la funzione non parte finché non ne scegli uno che esiste.',
     options_open_chrome_shortcuts: 'Modifica le scorciatoie nella pagina Chrome',
     options_feature_help: 'Aiuto (sidebar AI con visione)',
     options_feature_categorize: 'Categorizzazione automatica',
