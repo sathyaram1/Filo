@@ -92,6 +92,20 @@
     CREDITS_CHANGED: 'credits_changed',
     // Ricompensa crediti per un feedback inviato (+5 subito). { } → { ok, credits, balance }
     CREDITS_AWARD_FEEDBACK: 'credits_award_feedback',
+    // #366.2 — importi crediti EFFETTIVI in vigore (saldo di benvenuto, ricarica
+    // giornaliera, premi feedback per priorità, voto/riapertura bacheca). Sono
+    // quelli decisi dall'owner nel doc di configurazione globale, con ripiego
+    // sulle costanti quando la config non è disponibile. NON è segreto (numeri di
+    // crediti; il costo in € non compare mai qui), quindi è leggibile da qualsiasi
+    // pagina: serve a mostrare all'utente cifre COERENTI con quelle addebitate.
+    // { } → { ok, config: { initial, dailyRefill, maxRefillDays, feedbackSend,
+    //          feedbackResolveByPriority:{0..3}, boardVote, boardReopen } }
+    CREDITS_GET_CONFIG: 'credits_get_config',
+    // #366.2 — scrive gli importi crediti sulla configurazione globale. RISERVATO
+    // ALL'OWNER: il main allega il proprio ID token e le regole del database
+    // rifiutano chiunque non sia amministratore. La schermata di modifica arriva
+    // nella parte 3. { config: {...parziale} } → { ok, config } | { ok:false, error }
+    CREDITS_SET_CONFIG: 'credits_set_config',
     // Recap aggiornamento (popup all'avvio): confronta la versione vista
     // l'ultima volta con app.getVersion() e ritorna le note delle versioni
     // saltate. { } → { ok, current, lastSeen, notes:[{version,date,features,fixes}] }.
