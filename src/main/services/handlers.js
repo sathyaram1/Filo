@@ -341,7 +341,11 @@ function buildAttemptChain(settings, modelRef, action) {
 
 async function handleAIRequest({ action, payload, origin, onReasoning = null, signal = null }) {
   const settings = await getEffectiveSettings();
-  const model = modelForAction(settings, action, payload?.modelOverride);
+  // NIENTE `payload.modelOverride`: era la porta di servizio con cui un chiamante
+  // poteva imporre un modello scritto nel codice, scavalcando la configurazione
+  // (era esattamente ciò che faceva la descrizione delle immagini). Il modello di
+  // una funzione viene SOLO dalla configurazione effettiva.
+  const model = modelForAction(settings, action);
   // Nome CONCRETO del modello primario (es. 'gemini-3.1-flash-lite'), non il
   // nickname: è il nome con cui il codice lo invoca. Lo passiamo al prompt così
   // l'assistente può dire correttamente che modello è (#158). Chiave mancante o
