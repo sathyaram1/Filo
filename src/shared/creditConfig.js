@@ -38,17 +38,36 @@
     return (global.SN_CONST && global.SN_CONST.CREDIT) || {};
   }
 
+  // Importo valido → numero finito >= 0; qualsiasi altra cosa → null (= "campo
+  // assente", il chiamante userà il default).
+  //
+  // NON si passa da Number(v) alla cieca: la conversione implicita di JavaScript
+  // trasforma in numeri anche cose che importi non sono — `true`→1, `false`→0,
+  // `[]`→0, `[7]`→7, `'   '`→0. Qui si decide quanto ricevono TUTTI gli utenti:
+  // un si'/no o uno spazio finito per errore nel documento diventerebbe uno ZERO
+  // SILENZIOSO (riapertura gratis per tutti, ricarica giornaliera azzerata).
+  // Meglio ignorare il valore di tipo sbagliato e restare sull'importo storico:
+  // uno 0 deve essere scritto ESPLICITAMENTE come numero per valere.
+  // Ammessi: numeri veri e stringhe numeriche (Firestore può consegnare
+  // `integerValue`/`doubleValue` come stringa).
+  function toAmount(v) {
+    if (typeof v === 'number') return Number.isFinite(v) && v >= 0 ? v : null;
+    if (typeof v === 'string') {
+      const s = v.trim();
+      if (s === '') return null;
+      const n = Number(s);
+      return Number.isFinite(n) && n >= 0 ? n : null;
+    }
+    return null; // boolean, array, oggetto, null, undefined, funzione…
+  }
+
   // Numero valido e non negativo, altrimenti il fallback. (Gli importi crediti
   // non hanno mai senso negativi; un valore sballato nel doc non deve rompere il
-  // motore né azzerare i premi.)
+  // motore né azzerare i premi.) Uno 0 ESPLICITO resta 0: è un importo valido,
+  // l'owner può disattivare un premio.
   function num(v, fallback) {
-    // null/undefined/'' = campo assente → fallback. Uno 0 ESPLICITO resta 0
-    // (importo valido: l'owner può disattivare un premio). Number(null) sarebbe
-    // 0: lo escludiamo prima, altrimenti un campo assente diventerebbe 0 invece
-    // del default.
-    if (v === null || v === undefined || v === '') return fallback;
-    const n = Number(v);
-    return Number.isFinite(n) && n >= 0 ? n : fallback;
+    const n = toAmount(v);
+    return n === null ? fallback : n;
   }
 
   // Tabella premi risoluzione per priorità 0..3. `raw` sovrascrive `base` fascia
