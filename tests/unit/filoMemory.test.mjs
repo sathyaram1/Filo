@@ -87,7 +87,7 @@ test('contenuto multilinea: righe vuote interne preservate, estremi trimmati', (
   const text = 'PROFILO:\n  prima\n\n  seconda\n\n';
   assert.deepEqual(M.parseCompactorOutput(text), {
     // Il trim è sull\'intera stringa: gli spazi interni alle righe restano.
-    PROFILO: '  prima\n\n  seconda',
+    PROFILO: 'prima\n\n  seconda',
   });
 });
 
