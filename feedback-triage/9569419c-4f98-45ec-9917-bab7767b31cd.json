@@ -1,0 +1,9 @@
+{
+  "id": "9569419c-4f98-45ec-9917-bab7767b31cd",
+  "status": "design",
+  "notes": "Controllo di sicurezza superato: la modifica non introduce rischi, la revisione non ha trovato niente di sospetto. La pubblicazione però è ferma in attesa di un tuo via libera, perché il lavoro tocca anche le regole di accesso al database dei feedback e il pezzo che parla con esso: sono file 'sensibili' che, per scelta, non vengono mai pubblicati senza che tu ci abbia messo gli occhi. Cosa fa la modifica: quando un feedback viene chiuso, i crediti che ricevi tornano a rispettare l'importanza della segnalazione (50/100/200/300). Da fine giugno l'importanza viene salvata in forma cifrata e il tuo computer non riesce a leggerla, quindi il premio usciva sempre al minimo. Ora accanto al valore cifrato viene salvata anche una copia leggibile della sola fascia di importanza (un numero da 0 a 3), e sono già pronte le correzioni per tutte le segnalazioni vecchie. Tre cose da sapere prima di dare l'ok: 1) quella copia leggibile è visibile pubblicamente insieme al titolo della segnalazione, che già lo era — se preferisci che l'importanza resti privata la strada va ripensata; 2) al momento della pubblicazione vanno aggiornate a mano le regole del database, altrimenti la copia leggibile non viene scritta (il resto continua a funzionare); 3) il lavoro è fermo da metà luglio, quindi la voce del recap aggiornamento va riscritta sulla versione di oggi e le correzioni sulle segnalazioni vecchie andrebbero ricalcolate se nel frattempo hai cambiato qualche importanza.",
+  "queuedAt": "2026-08-03T10:02:17.980Z",
+  "queuedBy": "routine",
+  "branch": "worker/9569419c-4f98-45ec-9917-bab7767b31cd",
+  "reason": "secaudit"
+}
