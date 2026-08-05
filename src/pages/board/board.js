@@ -456,10 +456,29 @@
   }
 
   // ── Caricamento ─────────────────────────────────────────────────────────
+  // Stato d'errore, DISTINTO dal vuoto: se la fetch fallisce (niente rete, rete
+  // caduta) mostriamo un messaggio comprensibile + "Riprova", invece di ripiegare
+  // su "Nessun miglioramento…" — che direbbe il falso (i miglioramenti ci sono,
+  // solo non scaricati). Riusa SN_CHAT_ERRORS (stesso pattern delle chat): frase
+  // per l'utente, mai il messaggio grezzo dell'eccezione.
+  function showLoadError(err) {
+    bdLoading.hidden = true;
+    bdList.hidden = true;
+    bdEmpty.hidden = true;
+    if (!bdError || !bdErrorMsg) return;
+    const msg = (window.SN_CHAT_ERRORS && SN_CHAT_ERRORS.sentence)
+      ? SN_CHAT_ERRORS.sentence(err)
+      : 'Non è stato possibile caricare i miglioramenti: controlla la connessione e riprova.';
+    bdErrorMsg.textContent = msg;
+    bdError.hidden = false;
+    if (bdRetry) bdRetry.disabled = false;
+  }
+
   async function loadData() {
     bdLoading.hidden = false;
     bdList.hidden = true;
     bdEmpty.hidden = true;
+    if (bdError) bdError.hidden = true;
 
     if (!releasedVersion) {
       try {
@@ -469,14 +488,27 @@
     }
 
     try {
-      allFeedbacks = await FB.list({ pageSize: 500 });
+      allFeedbacks = await FB.list({ pageSize: 500, timeoutMs: LOAD_TIMEOUT_MS });
     } catch (err) {
+      // Il caricamento è FALLITO: non fingere "lista vuota". Mostra l'errore con
+      // il tasto Riprova e fermati qui (renderList mostrerebbe #bdEmpty).
       console.error('[board] errore caricamento:', err);
-      allFeedbacks = [];
+      showLoadError(err);
+      return;
     }
     // renderList nasconde sempre il loader (anche a lista vuota), così la pagina
     // raggiunge uno stato stabile a fine caricamento.
     renderList();
+  }
+
+  // "Riprova": ritenta il caricamento (il tasto si disabilita mentre è in volo,
+  // così un doppio click non lancia due fetch). loadData rimette a posto loader/
+  // stato a ogni giro.
+  if (bdRetry) {
+    bdRetry.addEventListener('click', () => {
+      bdRetry.disabled = true;
+      loadData();
+    });
   }
 
   async function init() {
