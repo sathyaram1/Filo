@@ -478,6 +478,7 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
     : await Providers.completeWithFallback({ attempts, messages, signal });
   const usedProvider = result.provider || attempts[0].provider;
   const concreteModel = result.model || attempts[0].model;
+  const servedBy = noteServedProvider(settings, action, result);
   const pricing = usedProvider === 'gemini' ? null : settings.pricing?.[concreteModel];
   const costEur = await Costs.record({
     action, provider: usedProvider, model: concreteModel,
@@ -490,7 +491,7 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
     && action !== ACTIONS.HELP_INTENT_GUESS && action !== ACTIONS.HELP_INTENT_JUDGE
   ) {
     await History.append({
-      action, provider: usedProvider, model: concreteModel,
+      action, provider: usedProvider, model: concreteModel, servedBy,
       input: payload, output: result.text, origin, costEur, usage: result.usage,
     });
   }
