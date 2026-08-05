@@ -39,6 +39,10 @@
       action: entry.action,
       provider: entry.provider,
       model: entry.model,
+      // Chi ha DAVVERO servito la risposta upstream (#421), quando il provider lo
+      // riporta (OpenRouter). È la controprova della politica sui fornitori: null
+      // per il provider diretto (Gemini) o se il dato non è arrivato.
+      servedBy: entry.servedBy || null,
       input: sanitizeInput(entry.input),
       output: entry.output || '',
       origin: entry.origin || '',
