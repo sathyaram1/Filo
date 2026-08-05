@@ -382,8 +382,9 @@
     },
     {
       id: 'security', title: 'Sicurezza e privacy', category: 'settings',
-      desc: 'Protezione dalla fuga del tuo indirizzo IP, blocco dei popup, gestione dei cookie (manuale / predefinita / privacy massima) e lista dei siti fidati.',
+      desc: 'Protezione dalla fuga del tuo indirizzo IP, blocco dei popup, gestione dei cookie (manuale / predefinita / privacy massima), lista dei siti fidati e lista dei siti da bloccare: i siti che ci metti (per nome, oppure per indirizzo numerico come 192.168.1.1) non si aprono più cliccando un link, e al loro posto compare un avviso con "Apri comunque".',
       invoke: 'Pagina filo://security/security.html.',
+      doesNot: 'Il blocco non scatta quando sei tu ad aprire il sito da Filo o quando ci arrivi da un motore di ricerca: in quei casi l’hai chiesto tu.',
     },
     {
       id: 'auto-feedback', title: 'Segnalazione automatica dei problemi', category: 'settings',
