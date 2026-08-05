@@ -265,7 +265,10 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || 'scrittura fallita' };
     }
-  });
+  };
+
+  on(MSG.DOWNLOAD_IMAGE, handleDownload);
+  on(MSG.DOWNLOAD_MEDIA, handleDownload);
 
   on(MSG.FEEDBACK_ANNOTATE, async (msg, sender) => {
     // Il box feedback è appena entrato/uscito dalla modalità annotazione.
