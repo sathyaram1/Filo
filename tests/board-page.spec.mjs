@@ -124,15 +124,51 @@ test('anonimo: invito ad accedere; loggato (lato renderer): il voto passa dal ma
   // sporco. Questo è il comportamento corretto e verificabile qui; il flusso
   // end-to-end con un account reale è verificato dall'unit test della
   // ricompensa (creditStore) + dalla code review della scrittura idToken.
+  //
+  // Lo stato "in volo" dura quanto il round-trip IPC: qualche millisecondo, meno
+  // di quanto serva a guardarlo. Qui teniamo la risposta sospesa finché non la
+  // rilasciamo noi, così "disabilitato mentre invia" e "ripristinato dopo" sono
+  // due momenti DISTINTI e osservabili invece di una corsa persa in partenza.
+  await page.evaluate(() => {
+    const orig = window.filo.message.bind(window.filo);
+    window.__voteCalls = 0;
+    window.__releaseVote = null;
+    window.filo.message = (msg) => {
+      if (msg && (msg.type === 'board_cast_vote' || msg.type === 'board_clear_vote')) {
+        window.__voteCalls += 1;
+        return new Promise((resolve) => { window.__releaseVote = resolve; });
+      }
+      return orig(msg);
+    };
+  });
+
   const works = page.locator('.bd-card .bd-vote-works');
   await expect(works).toHaveAttribute('aria-pressed', 'false');
   await expect(works.locator('.bd-vote-count')).toHaveText('1');
+
   await works.click();
-  // Mentre la richiesta è in volo il pulsante è disabilitato (anti doppio-click).
+  // Riscontro immediato: il conteggio sale subito (aggiornamento ottimistico).
+  await expect(works.locator('.bd-vote-count')).toHaveText('2');
+  // Mentre la richiesta è in volo il pulsante è disabilitato (anti doppio-click)…
   await expect(works).toBeDisabled();
-  // A risposta arrivata (errore: non autenticato lato main) torna allo stato
-  // precedente — niente voto fantasma, niente crash della pagina.
+  // …e insistere non fa partire una seconda richiesta.
+  await works.click({ force: true }).catch(() => {});
+  expect(await page.evaluate(() => window.__voteCalls)).toBe(1);
+
+  // Risposta negativa dal main (in questo ambiente non esiste una sessione
+  // reale): il voto torna indietro E la bacheca DICE perché — niente voto
+  // fantasma, niente conteggio che si sgonfia in silenzio.
+  await page.evaluate(() => window.__releaseVote({ ok: false, error: 'Accedi per votare i miglioramenti.' }));
   await expect(works).toBeEnabled();
   await expect(works).toHaveAttribute('aria-pressed', 'false');
   await expect(works.locator('.bd-vote-count')).toHaveText('1');
+  await expect(page.locator('.bd-card .bd-vote-msg').first())
+    .toHaveText('Accedi per votare i miglioramenti.');
+
+  // Un nuovo tentativo azzera la spiegazione precedente (non resta appiccicata).
+  await works.click();
+  await expect(page.locator('.bd-vote-msg')).toHaveCount(0);
+  await page.evaluate(() => window.__releaseVote({ ok: false }));
+  await expect(page.locator('.bd-card .bd-vote-msg').first())
+    .toHaveText('Voto non registrato: riprova fra un momento.');
 });
