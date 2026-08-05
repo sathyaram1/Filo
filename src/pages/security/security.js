@@ -214,6 +214,30 @@
     return /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(s) ? s : '';
   }
 
+  // Un IP letterale (IPv4, o IPv6 fra parentesi come lo restituisce URL) è un
+  // host reale: nella blacklist dei siti va accettato, altrimenti l'utente lo
+  // scrive, non vede errori bloccanti e crede di essere protetto senza esserlo.
+  function isIpHost(host) {
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
+      return host.split('.').every((o) => Number(o) <= 255);
+    }
+    return /^\[[0-9a-f:.]+\]$/i.test(host);
+  }
+
+  // Come cleanDomain ma per la blacklist dei siti: accetta anche gli IP.
+  function cleanBlockHost(raw) {
+    const domain = cleanDomain(raw);
+    if (domain) return domain;
+    let s = String(raw || '').trim().toLowerCase();
+    if (!s) return '';
+    try {
+      s = new URL(s.includes('://') ? s : `http://${s}`).hostname;
+    } catch (_) {
+      s = s.split('/')[0].split('?')[0];
+    }
+    return isIpHost(s) ? s : '';
+  }
+
   function renderWhitelist() {
     const list = $('cookie-wl-list');
     list.innerHTML = '';
