@@ -1,0 +1,116 @@
+// SORGENTE UNICA della navigazione "testo → indirizzo" di Filo.
+//
+// Due domande, un solo posto:
+//   1. `looksLikeAddress(raw)` — questo token è un INDIRIZZO da aprire, o un
+//      testo/comando? Usata dal campo comando della dashboard (dopo la "/") per
+//      colorare l'input e per decidere se navigare invece di mandare all'LLM.
+//   2. `normalizeUrl(input)` — dato un indirizzo, qual è l'URL navigabile, con
+//      lo schema giusto (http per i server locali/loopback e gli IP privati,
+//      https per i domini pubblici)?
+//
+// PERCHÉ QUI (#398): la logica corretta viveva SOLO in src/main/tabs.js ed era
+// raggiungibile solo dalla barra indirizzi della shell (oggi nascosta). Il campo
+// "nuova scheda" aveva una copia PIÙ POVERA (pretendeva un TLD alfabetico) che
+// scartava localhost, gli IP e i nomi locali: li mandava all'LLM invece di
+// aprirli. Mettendo la logica in un modulo condiviso, dashboard e main usano la
+// STESSA regola e la simmetria non può più divergere.
+//
+// La distinzione indirizzo-vs-comando DEVE restare stretta: nel campo "/" un
+// `git log v1.2` o `python3.11` NON è un indirizzo. Per questo `looksLikeAddress`
+// è più severa della sola condizione di `normalizeUrl` (che opera sulla barra
+// indirizzi, dove l'ambiguità coi comandi shell non esiste).
+
+(function (global) {
+  'use strict';
+
+  // Host che parlano quasi sempre in chiaro (server di sviluppo locali,
+  // router/IoT su IP privato): loopback, *.localhost e gli IP privati. Per questi
+  // lo schema di default è http:// invece di https://. Accetta anche la forma
+  // IPv6 tra parentesi ([::1]).
+  function isLocalHost(host) {
+    const h = String(host || '').toLowerCase().replace(/^\[|\]$/g, '');
+    if (h === 'localhost' || h.endsWith('.localhost')) return true;
+    if (h === '::1' || h.startsWith('::ffff:127.')) return true;
+    if (/^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h)) return true;       // loopback
+    if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h)) return true;         // privato /8
+    if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(h)) return true;           // privato /16
+    if (/^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/.test(h)) return true; // privato /12
+    return false;
+  }
+
+  // IPv4 dotted-quad con ottetti in range (0-255). Serve a distinguere un IP
+  // letterale (127.0.0.1, 192.168.1.1) da un dominio con "TLD" numerico o da un
+  // token qualsiasi con dei punti: solo un vero IPv4 conta come indirizzo.
+  function isIpv4(host) {
+    const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(String(host || ''));
+    if (!m) return false;
+    return m.slice(1, 5).every((o) => Number(o) <= 255);
+  }
+
+  // Trasforma input dell'utente in un URL navigabile:
+  //   - se ha uno schema esplicito → naviga così com'è;
+  //   - se sembra un indirizzo (dominio con punto, host locale noto, o host
+  //     seguito da ":porta") → naviga, scegliendo http per gli host locali e
+  //     https altrimenti;
+  //   - altrimenti → ricerca Google.
+  // La parte ":porta" è il motivo del fix #233: prima ogni "host:porta"
+  // (localhost:3000, 127.0.0.1:8080, example.com:8443/admin) cadeva in ricerca.
+  function normalizeUrl(input) {
+    const raw = String(input || '').trim();
+    if (!raw) return 'filo://newtab/';
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(raw) || raw.startsWith('filo://')) return raw;
+
+    // Isola la parte host[:porta] = tutto prima del primo separatore di path/query
+    // (/, ?, #). Uno spazio interno significa "non è un indirizzo" → ricerca.
+    const hostPart = raw.split(/[/?#]/, 1)[0];
+    const m = /^([a-z0-9.-]+|\[[0-9a-f:]+\])(?::(\d{1,5}))?$/i.exec(hostPart);
+    if (m) {
+      const host = m[1];
+      const port = m[2] ? Number(m[2]) : null;
+      const bracketed = host.startsWith('[');
+      const hasDot = !bracketed && host.includes('.');
+      const local = isLocalHost(host);
+      const validPort = port === null || (port >= 1 && port <= 65535);
+      // Naviga se: dominio con punto, host locale noto, oppure host + ":porta"
+      // (segnale forte che è un indirizzo, non una ricerca). Una porta fuori range
+      // (>65535) non è un indirizzo valido → resta ricerca.
+      if (validPort && (hasDot || local || port !== null)) {
+        // http per gli host locali/loopback e per gli host a etichetta singola
+        // (senza punto e non IPv6, tipicamente intranet/dev che parlano in
+        // chiaro); https per i domini pubblici e gli IP letterali.
+        const scheme = (local || (!hasDot && !bracketed)) ? 'http://' : 'https://';
+        return scheme + raw;
+      }
+    }
+    return 'https://www.google.com/search?q=' + encodeURIComponent(raw);
+  }
+
+  // Il token digitato (SENZA la "/" iniziale) è un indirizzo da aprire?
+  // Stretta di proposito: deve distinguere un indirizzo da un comando shell.
+  //   - niente spazi;
+  //   - path locali (./x, .\x, ~/x, /usr) → NO (li esegue la shell);
+  //   - http(s):// esplicito → sì;
+  //   - altrimenti host[:porta] con: porta esplicita valida (segnale forte),
+  //     IPv6 letterale, localhost/*.localhost, IP privato, IPv4 letterale,
+  //     oppure dominio con TLD alfabetico (regola storica).
+  // Un host a etichetta singola SENZA porta (git, python3.11) NON è un indirizzo:
+  // resta un comando/testo.
+  function looksLikeAddress(raw) {
+    const s = String(raw || '');
+    if (!s || /\s/.test(s)) return false;
+    if (/^https?:\/\//i.test(s)) return true;
+    if (/^[.\\/~]/.test(s)) return false; // ./script, .\script, ~/x, /usr
+    const hostPart = s.split(/[/?#]/, 1)[0];
+    const m = /^([a-z0-9.-]+|\[[0-9a-f:]+\])(?::(\d{1,5}))?$/i.exec(hostPart);
+    if (!m) return false;
+    const host = m[1];
+    const port = m[2] ? Number(m[2]) : null;
+    if (port !== null) return port >= 1 && port <= 65535; // host:porta valida
+    if (host.startsWith('[')) return true;                // IPv6 letterale [::1]
+    if (isLocalHost(host)) return true;                   // localhost / *.localhost / IP privato
+    if (isIpv4(host)) return true;                        // IP pubblico letterale
+    return /\.[a-z]{2,}$/i.test(host);                    // dominio con TLD alfabetico
+  }
+
+  global.SN_URL_NAV = { isLocalHost, isIpv4, normalizeUrl, looksLikeAddress };
+})(typeof globalThis !== 'undefined' ? globalThis : self);

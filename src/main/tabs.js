@@ -16,6 +16,8 @@ require('../shared/audioState');
 const { audibleFromEvent } = globalThis.SN_AUDIO_STATE;
 require('../shared/authPopup');
 const { isAuthPopup } = globalThis.SN_AUTH_POPUP;
+require('../shared/urlNav'); // #398 — sorgente unica di normalizeUrl/isLocalHost (condivisa con la dashboard)
+const { normalizeUrl } = globalThis.SN_URL_NAV;
 
 const PAGE_PRELOAD = path.join(__dirname, '..', 'preload', 'page-preload.js');
 const INTERNAL_PRELOAD = path.join(__dirname, '..', 'preload', 'internal-preload.js');
@@ -2040,59 +2042,8 @@ function mapCertError(error) {
   return 'untrusted';
 }
 
-// Host che parlano quasi sempre in chiaro (server di sviluppo locali,
-// router/IoT su IP privato): loopback, *.localhost e gli IP privati. Per questi
-// lo schema di default è http:// invece di https://, così "localhost:3000" o
-// "192.168.1.1" non finiscono su un https:// che non risponde. Accetta anche la
-// forma IPv6 tra parentesi ([::1]).
-function isLocalHost(host) {
-  const h = String(host || '').toLowerCase().replace(/^\[|\]$/g, '');
-  if (h === 'localhost' || h.endsWith('.localhost')) return true;
-  if (h === '::1' || h.startsWith('::ffff:127.')) return true;
-  if (/^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h)) return true;       // loopback
-  if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h)) return true;         // privato /8
-  if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(h)) return true;           // privato /16
-  if (/^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/.test(h)) return true; // privato /12
-  return false;
-}
-
-// Trasforma input dell'utente in un URL navigabile:
-//   - se ha uno schema esplicito → naviga così com'è;
-//   - se sembra un indirizzo (dominio con punto, host locale noto, o host
-//     seguito da ":porta") → naviga, scegliendo http per gli host locali e
-//     https altrimenti;
-//   - altrimenti → ricerca Google.
-// La parte ":porta" è il motivo di questo fix (#233): prima ogni "host:porta"
-// (es. localhost:3000, 127.0.0.1:8080, example.com:8443/admin) cadeva in ricerca
-// perché la vecchia regex non ammetteva la porta.
-function normalizeUrl(input) {
-  const raw = String(input || '').trim();
-  if (!raw) return 'filo://newtab/';
-  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(raw) || raw.startsWith('filo://')) return raw;
-
-  // Isola la parte host[:porta] = tutto prima del primo separatore di path/query
-  // (/, ?, #). Uno spazio interno significa "non è un indirizzo" → ricerca.
-  const hostPart = raw.split(/[/?#]/, 1)[0];
-  const m = /^([a-z0-9.-]+|\[[0-9a-f:]+\])(?::(\d{1,5}))?$/i.exec(hostPart);
-  if (m) {
-    const host = m[1];
-    const port = m[2] ? Number(m[2]) : null;
-    const bracketed = host.startsWith('[');
-    const hasDot = !bracketed && host.includes('.');
-    const local = isLocalHost(host);
-    const validPort = port === null || (port >= 1 && port <= 65535);
-    // Naviga se: dominio con punto, host locale noto, oppure host + ":porta"
-    // (segnale forte che è un indirizzo, non una ricerca). Una porta fuori range
-    // (>65535) non è un indirizzo valido → resta ricerca.
-    if (validPort && (hasDot || local || port !== null)) {
-      // http per gli host locali/loopback e per gli host a etichetta singola
-      // (senza punto e non IPv6, tipicamente intranet/dev che parlano in
-      // chiaro); https per i domini pubblici e gli IP letterali.
-      const scheme = (local || (!hasDot && !bracketed)) ? 'http://' : 'https://';
-      return scheme + raw;
-    }
-  }
-  return 'https://www.google.com/search?q=' + encodeURIComponent(raw);
-}
+// normalizeUrl / isLocalHost vivono ora in src/shared/urlNav.js (#398): la stessa
+// logica serve anche al campo "nuova scheda" della dashboard, che prima aveva una
+// copia più povera. Sono importati in cima al file da globalThis.SN_URL_NAV.
 
 module.exports = { TabManager, normalizeUrl, isWebUnsafeNav };
