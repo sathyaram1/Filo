@@ -47,7 +47,7 @@
     {
       id: 'new-tab', title: 'Apri una nuova scheda', category: 'navigation',
       desc: 'Apre una nuova scheda sulla home di Filo.',
-      invoke: 'Pulsante "+" nella barra delle schede, oppure dal menu del tasto destro → "Nuova scheda".',
+      invoke: 'Pulsante "+" nella barra delle schede, il menu del tasto destro → "Nuova scheda", oppure la scorciatoia Ctrl+T (Cmd+T su Mac) — che funziona anche mentre stai guardando un sito.',
     },
     {
       id: 'close-tab', title: 'Chiudi la scheda', category: 'navigation',
