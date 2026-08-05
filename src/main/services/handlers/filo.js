@@ -70,22 +70,9 @@ module.exports = function register(on, ctx) {
 
   on(MSG.FILO_GET_MEMORY, async () => ({ ok: true, memory: await FiloMem.getMemory() }));
 
-  on(MSG.FILO_GET_NOTES, async () => ({ ok: true, notes: await FiloMem.listNotes() }));
-
-  on(MSG.FILO_ADD_NOTE, async (msg) => {
-    const note = await FiloMem.addNote({ text: msg.text, context: msg.context });
-    return { ok: true, note };
-  });
-
-  on(MSG.FILO_DELETE_NOTE, async (msg) => {
-    const list = await FiloMem.deleteNote(msg.id);
-    return { ok: true, notes: list };
-  });
-
-  on(MSG.FILO_CLEAR_NOTES, async () => {
-    const list = await FiloMem.clearNotes();
-    return { ok: true, notes: list };
-  });
+  // Gli appunti non hanno più un archivio proprio (né quindi handler CRUD): sono
+  // file dell'editor, ci scrive l'azione SALVA_APPUNTO e si leggono/modificano
+  // aprendo l'editor come qualsiasi altro documento.
 
   on(MSG.FILO_GET_TIMERS, async () => ({ ok: true, timers: await FiloMem.gcTimers() }));
 
