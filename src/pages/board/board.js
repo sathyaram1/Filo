@@ -522,9 +522,15 @@
     setSignedIn(email) { signedIn = !!email; uid = email || null; reflectAuth(); renderList(); },
     setReleasedVersion(v) { releasedVersion = v || ''; renderList(); },
     // Rilancia il caricamento reale (loadData): usato dai test per esercitare il
-    // cammino d'errore (override di FB.list che rigetta → stato d'errore) e il
-    // retry, senza dover simulare la rete davvero assente.
+    // cammino d'errore (FB.list che rigetta → stato d'errore) e il retry, senza
+    // dover simulare la rete davvero assente.
     reload() { return loadData(); },
+    // Sostituisce la sorgente dati usata da loadData con una funzione di test
+    // (che risolve o rigetta). Va scritta sulla stessa reference `FB` che
+    // loadData usa: su pagine filo:// `window.SN_FEEDBACK` può essere una vista
+    // diversa da quella catturata qui, quindi i test non possono affidarsi a
+    // rimpiazzare `window.SN_FEEDBACK.list`.
+    setList(fn) { if (typeof fn === 'function') FB.list = fn; },
   };
 
   if (document.readyState === 'loading') {
