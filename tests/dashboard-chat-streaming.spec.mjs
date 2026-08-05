@@ -105,14 +105,18 @@ test('risposta di sola azione (text vuoto): niente bolla di testo vuota', async 
     globalThis.__restoreStream2 = () => { globalThis.SN_PROVIDERS.streamCompleteWithFallback = orig; };
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, onDelta }) => {
       await new Promise((r) => setTimeout(r, 300));
-      // Solo azione, nessun testo: un timer (deterministico, niente rete).
-      const full = JSON.stringify({ text: '', actions: [{ type: 'TIMER', seconds: 60, label: 'Pausa' }] });
+      // Solo azione, nessun testo: apre un link (il caso del feedback). URL
+      // interno + secondo piano → deterministico, niente rete e niente focus rubato.
+      const full = JSON.stringify({
+        text: '',
+        actions: [{ type: 'NAVIGA', url: 'filo://newtab/', label: 'Home', background: true }],
+      });
       try { onDelta && onDelta(full); } catch (_) {}
       return { text: full, model: attempts[0].model, provider: attempts[0].provider, usage: {} };
     };
   });
 
-  await page.locator('#input').fill('timer di un minuto');
+  await page.locator('#input').fill('apri la home');
   await page.locator('#sendBtn').click();
 
   // L'azione compare…
