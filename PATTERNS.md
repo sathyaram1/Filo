@@ -180,6 +180,28 @@ il passo se `e.defaultPrevented` è già vero.
 - **Dove:** registrazione in `src/content/content.js` (ramo pagine interne);
   esempi in `src/pages/archive/archive.js` e `src/pages/decks/decks.js`.
 
+## Menu contestuale: se Filo sostituisce il menu nativo, deve coprire OGNI tipo di elemento
+
+Sulle pagine esterne il menu di Filo **rimpiazza** quello di Chromium. Ogni tipo
+di contenuto per cui il menu nativo avrebbe delle voci (testo, immagine, link,
+campo di testo, **video, audio**) deve avere il suo ramo nella matrice
+contestuale: un tipo scoperto non significa "menu più povero", significa che
+l'utente **perde del tutto** quelle azioni, senza alternative (#400).
+
+- **Regola operativa:** quando aggiungi il supporto per un nuovo tipo di
+  elemento, parti dall'elenco di ciò che il menu nativo offriva e completalo con
+  ciò che ha senso in Filo; ogni stato attivabile deve essere disattivabile
+  dalla stessa voce (l'etichetta racconta lo stato: "Ripeti in continuo" ⇄ "Non
+  ripetere"), e le azioni senza riscontro visivo immediato confermano con un toast.
+- **Elemento coperto da overlay:** i player veri stendono i loro comandi sopra al
+  `<video>`, quindi il tasto destro arriva all'overlay e il media **non è tra gli
+  antenati** del target. Il ramo va cercato anche con
+  `document.elementsFromPoint(x, y)`, ma **solo come ripiego** quando non c'è
+  altro contesto (selezione, immagine, link, campo di testo): altrimenti un video
+  di sfondo a tutta pagina ruberebbe il menu al contenuto che gli sta sopra.
+- **Dove:** `buildContextualItems` / `findMedia` in `src/content/content.js`, voci
+  in `src/content/actions.js`. Test: `tests/context-menu-media.spec.mjs`.
+
 ## Popup menu: il "submenu" è una voce a due zone che riapre il menu
 
 Il popup menu custom (`src/main/popup-menu.js`, una BrowserWindow frameless)
