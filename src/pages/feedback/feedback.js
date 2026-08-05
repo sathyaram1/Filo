@@ -947,7 +947,9 @@
     listEl.innerHTML = '<div class="fb-empty">Caricamento…</div>';
     emptyEl.hidden = true;
     try {
-      all = await SN_FEEDBACK.list({ pageSize: 500 });
+      // timeoutMs: offline la fetch resta muta ~13 s prima che il sistema la
+      // lasci cadere. Ci arrendiamo prima e mostriamo l'errore (con Riprova).
+      all = await SN_FEEDBACK.list({ pageSize: 500, timeoutMs: 8000 });
       // S1.3: decifratura batch dei campi FENC1: — una sola IPC per tutta la lista.
       // Graceful fallback: se l'utente non è admin o l'IPC fallisce, i valori
       // restano invariati (la dashboard non si rompe, mostra il ciphertext).
@@ -959,9 +961,27 @@
       }
       applyFilter();
     } catch (e) {
+      // Errore di caricamento: frase per l'utente (mai il "Failed to fetch"
+      // grezzo) + un tasto per riprovare, invece di lasciare l'utente bloccato a
+      // chiudere e riaprire la pagina. Stesso pattern della bacheca (SN_CHAT_ERRORS).
+      console.error('[feedback] errore caricamento:', e);
       listEl.innerHTML = '';
+      countEl.textContent = '';
+      const msg = (window.SN_CHAT_ERRORS && SN_CHAT_ERRORS.sentence)
+        ? SN_CHAT_ERRORS.sentence(e)
+        : 'Non è stato possibile caricare i feedback: controlla la connessione e riprova.';
+      emptyEl.innerHTML = '';
+      const p = document.createElement('p');
+      p.className = 'fb-load-error-msg';
+      p.textContent = msg;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'fb-load-retry';
+      btn.textContent = '↻ Riprova';
+      btn.addEventListener('click', () => load());
+      emptyEl.appendChild(p);
+      emptyEl.appendChild(btn);
       emptyEl.hidden = false;
-      emptyEl.textContent = 'Errore caricamento: ' + (e?.message || e);
     }
   }
 

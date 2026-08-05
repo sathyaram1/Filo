@@ -31,6 +31,26 @@ test('"fetch failed" non arriva mai all\'utente: diventa una frase su rete e rip
   assert.match(out, /riprova/i);
 });
 
+test('"Failed to fetch" (renderer Chromium) è un guasto di rete, non un errore generico', () => {
+  // Le pagine filo:// (bacheca, feedback) girano nel renderer: senza rete il
+  // `fetch` lancia "TypeError: Failed to fetch" (con TO), non "fetch failed".
+  // Deve comunque diventare la frase su connessione + riprova.
+  const e = new TypeError('Failed to fetch');
+  assert.equal(CE.isTransientNetwork(e), true);
+  const out = CE.friendly(e);
+  assert.ok(!/failed to fetch/i.test(out), `il messaggio grezzo è passato: ${out}`);
+  assert.match(out, /connessione/i);
+  assert.match(out, /riprova/i);
+});
+
+test('un timeout di rete (fetch abortita dal nostro timeout) è un guasto di rete', () => {
+  // list() rilancia "firestore list: timeout di rete" quando la fetch supera il
+  // limite: la parola "timeout" lo fa riconoscere come guasto passeggero.
+  const e = new Error('firestore list: timeout di rete');
+  assert.equal(CE.isTransientNetwork(e), true);
+  assert.match(CE.friendly(e), /connessione/i);
+});
+
 test('il motivo vero nella `cause` viene riconosciuto come guasto di rete', () => {
   const e = new TypeError('fetch failed');
   e.cause = Object.assign(new Error('getaddrinfo ENOTFOUND openrouter.ai'), { code: 'ENOTFOUND' });

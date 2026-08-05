@@ -1,0 +1,7 @@
+{
+  "id": "696ba18a-661b-4e11-accd-c19e93686195",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho riprodotto il caso dell'utente: apro la Bacheca simulando la rete assente. Ora la pagina NON dice più il falso: invece di 'Nessun miglioramento da verificare per ora' compare un riquadro con la frase 'Problema di rete: non sono riuscito a raggiungere il servizio. Controlla la connessione e riprova.' e un tasto 'Riprova'. Ho verificato che premendo Riprova, se la rete torna, i miglioramenti compaiono davvero sul posto senza chiudere e riaprire. Durante il caricamento c'è ora la rotellina che gira. La stessa cosa vale per la pagina gemella 'Feedback alpha': davanti allo stesso guasto mostra la stessa frase comprensibile (non più 'Failed to fetch' in inglese) con lo stesso tasto Riprova. Stress test: lo stato vuoto reale continua a mostrare il messaggio giusto (non confuso con l'errore); un doppio clic su Riprova non lancia due caricamenti perché il tasto si disabilita mentre ricarica; il messaggio non mostra mai il testo tecnico grezzo dell'errore. Ho controllato a video il riquadro d'errore: pulito, in tema caldo, leggibile. Nota: nell'ambiente di test headless un vecchio test della Bacheca (quello che controlla che il pulsante di voto si disabiliti per un istante durante l'invio) fallisce per una questione di tempistica, ma fallisce IDENTICO anche senza queste modifiche — l'ho confrontato sul codice precedente: non è una regressione introdotta qui.",
+  "queuedAt": "2026-08-05T16:16:01.923Z",
+  "queuedBy": "routine"
+}

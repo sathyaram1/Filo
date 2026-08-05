@@ -10,6 +10,7 @@
   <script src="filo://shared/pageBootstrap.js"></script>
   <script src="filo://shared/feedback.js"></script>
   <script src="filo://shared/feedbackThread.js"></script>
+  <script src="filo://shared/chatErrors.js"></script>
   <style>
     .fb-list { display: flex; flex-direction: column; gap: 16px; }
     .fb-card {
@@ -48,6 +49,15 @@
     .fb-file svg { flex: 0 0 auto; color: var(--sn-muted); }
     .fb-file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .fb-empty { color: var(--sn-muted); text-align: center; padding: 60px 0; }
+    /* Stato d'errore del caricamento: frase per l'utente (mai il messaggio grezzo
+       dell'eccezione) + un modo per riprovare, invece di "Errore: Failed to fetch". */
+    .fb-load-error-msg { margin: 0 auto 14px; max-width: 420px; color: var(--sn-fg); font-size: 14px; line-height: 1.5; }
+    .fb-load-retry {
+      font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+      border: 1px solid var(--sn-border); border-radius: 8px; padding: 7px 14px;
+      background: var(--sn-card, transparent); color: var(--sn-fg);
+    }
+    .fb-load-retry:hover { border-color: var(--sn-accent); }
     .fb-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
     .fb-search { flex: 1; }
     .fb-count { font-size: 12px; color: var(--sn-muted); }

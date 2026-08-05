@@ -13,6 +13,7 @@
   <script src="filo://shared/icons.js"></script>
   <script src="filo://shared/feedback.js"></script>
   <script src="filo://shared/feedbackStatus.js"></script>
+  <script src="filo://shared/chatErrors.js"></script>
   <script src="filo://shared/manageReview.js"></script>
   <style>
     /* La bacheca è la superficie utente (NON owner): mostra solo i fix già in
@@ -34,6 +35,38 @@
     .bd-auth button:hover { border-color: var(--sn-accent); }
 
     .bd-loading, .bd-empty { color: var(--sn-muted); font-size: 14px; padding: 24px 4px; }
+    /* Segno visibile che il caricamento è in corso (design: quando non si può
+       stimare il tempo, una rotella). Prima la pagina restava muta a "Caricamento…". */
+    .bd-loading { display: flex; align-items: center; gap: 10px; }
+    /* `display: flex` (regola d'autore) vince sull'attributo `hidden` (UA
+       [hidden]{display:none}): senza questo, `el.hidden = true` NON nasconde più
+       il loader/errore. Stesso trucco di .fb-admin-banner[hidden] nella dashboard. */
+    .bd-loading[hidden], .bd-error[hidden] { display: none; }
+    .bd-spinner {
+      width: 16px; height: 16px; flex: 0 0 auto; border-radius: 50%;
+      border: 2px solid var(--sn-border); border-top-color: var(--sn-accent);
+      animation: bdSpin 0.8s linear infinite;
+    }
+    @keyframes bdSpin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .bd-spinner { animation-duration: 2s; } }
+
+    /* Stato d'errore: distinto dal vuoto. Quando il caricamento fallisce (rete
+       assente/caduta) la bacheca lo DICE e offre un modo per riprovare, invece
+       di fingere che non ci sia nulla da votare. */
+    .bd-error {
+      display: flex; flex-direction: column; align-items: flex-start; gap: 12px;
+      padding: 20px; margin-top: 4px;
+      border: 1px solid var(--sn-border); border-radius: 12px; background: var(--sn-card);
+    }
+    .bd-error-msg { margin: 0; color: var(--sn-fg); font-size: 14px; line-height: 1.5; }
+    .bd-retry {
+      font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 6px;
+      border: 1px solid var(--sn-border); border-radius: 8px; padding: 7px 14px;
+      background: var(--sn-card); color: var(--sn-fg);
+    }
+    .bd-retry:hover { border-color: var(--sn-accent); }
+    .bd-retry[disabled] { opacity: .6; cursor: default; }
 
     .bd-list { display: flex; flex-direction: column; gap: 10px; }
 
@@ -113,8 +146,12 @@
       <button id="bdSignIn" type="button">Accedi</button>
     </div>
 
-    <div id="bdLoading" class="bd-loading">Caricamento…</div>
+    <div id="bdLoading" class="bd-loading"><span class="bd-spinner" aria-hidden="true"></span><span>Caricamento…</span></div>
     <div id="bdEmpty" class="bd-empty" hidden>Nessun miglioramento da verificare per ora.</div>
+    <div id="bdError" class="bd-error" hidden>
+      <p id="bdErrorMsg" class="bd-error-msg"></p>
+      <button id="bdRetry" type="button" class="bd-retry">↻ Riprova</button>
+    </div>
     <div id="bdList" class="bd-list" hidden></div>
   </main>
 

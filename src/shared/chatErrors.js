@@ -35,8 +35,12 @@
   // Guasti di rete passeggeri: nessuna risposta HTTP è mai arrivata, quindi
   // ritentare la stessa chiamata ha senso (a differenza di un 400, che
   // ritornerebbe identico).
+  // Nota: "failed to fetch" (con TO) è la forma che lancia il `fetch` del
+  // renderer Chromium quando non c'è rete (le pagine filo://). Il `fetch` di
+  // Node/undici nel main dice invece "fetch failed": qui matchiamo entrambe, così
+  // un guasto di rete è classificato come tale a prescindere dal processo.
   const TRANSIENT_NETWORK_RE =
-    /fetch failed|network error|networkerror|ENOTFOUND|EAI_AGAIN|ECONNRESET|ECONNREFUSED|ECONNABORTED|EPIPE|ETIMEDOUT|EHOSTUNREACH|ENETUNREACH|ENETDOWN|socket hang up|other side closed|timed out|timeout/i;
+    /fetch failed|failed to fetch|load failed|network error|networkerror|ENOTFOUND|EAI_AGAIN|ECONNRESET|ECONNREFUSED|ECONNABORTED|EPIPE|ETIMEDOUT|EHOSTUNREACH|ENETUNREACH|ENETDOWN|socket hang up|other side closed|timed out|timeout/i;
 
   function messageOf(e) {
     if (!e) return '';
