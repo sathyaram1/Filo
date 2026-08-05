@@ -7,9 +7,13 @@ const auth = require('../../auth/google-auth');
 // marcare gli invii dell'owner. Idempotente se già caricato dal loader.
 require('../../../shared/feedbackThread.js');
 
-// ── "Salva immagine come…" (#274): scarico byte nel main ────────────────────
+// ── "Salva immagine/video/audio come…" (#274, #400): byte scaricati nel main ─
 
 const IMG_DOWNLOAD_MAX = 64 * 1024 * 1024; // tetto anti-OOM (64MB)
+// Video e audio sono ordini di grandezza più grandi di un'immagine: col tetto a
+// 64MB un normale filmato di qualche minuto sarebbe stato rifiutato. Il file
+// viene comunque tenuto in memoria prima di scriverlo, quindi il tetto resta.
+const MEDIA_DOWNLOAD_MAX = 512 * 1024 * 1024; // 512MB
 
 // Scarica i byte di un'immagine presentando il Referer della pagina e i cookie
 // della session — l'unico modo, in Electron 33, di far arrivare il Referer a
@@ -22,11 +26,11 @@ const IMG_DOWNLOAD_MAX = 64 * 1024 * 1024; // tetto anti-OOM (64MB)
 // filename } o rigetta con un errore leggibile (HTTP 4xx/5xx, connessione
 // troncata, immagine vuota/troppo grande). Segue i redirect (max 5) ricalcolando
 // i cookie per l'host di destinazione, come farebbe un browser.
-async function fetchImageBytes({ url, referrer, session }) {
+async function fetchImageBytes({ url, referrer, session, kind = 'image' }) {
   const MAX_REDIRECTS = 5;
   let target = url;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-    const res = await httpGetImage(target, referrer, session); // eslint-disable-line no-await-in-loop
+    const res = await httpGetImage(target, referrer, session, kind); // eslint-disable-line no-await-in-loop
     if (res.redirect) {
       try { target = new URL(res.location, target).href; } catch (_) { throw new Error('redirect non valido'); }
       if (!/^https?:/i.test(target)) throw new Error('redirect non http');
@@ -39,7 +43,9 @@ async function fetchImageBytes({ url, referrer, session }) {
 
 // Una singola richiesta GET. Risolve { redirect:true, location } su 3xx, oppure
 // { buffer, filename } sul body completo; rigetta su errore/troncamento.
-async function httpGetImage(target, referrer, session) {
+async function httpGetImage(target, referrer, session, kind = 'image') {
+  const isMedia = kind === 'video' || kind === 'audio';
+  const maxBytes = isMedia ? MEDIA_DOWNLOAD_MAX : IMG_DOWNLOAD_MAX;
   let u;
   try { u = new URL(target); } catch (_) { throw new Error('URL non valido'); }
   const mod = u.protocol === 'https:' ? require('node:https') : require('node:http');
@@ -53,7 +59,9 @@ async function httpGetImage(target, referrer, session) {
 
   const headers = {
     'User-Agent': 'Mozilla/5.0',
-    Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+    // Un Accept che dichiara solo immagini fa rispondere 406 ad alcuni server
+    // quando l'URL è un filmato: per i media chiediamo il tipo giusto.
+    Accept: isMedia ? `${kind}/*,*/*;q=0.8` : 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
   };
   if (/^https?:/i.test(referrer)) headers.Referer = referrer;
   if (cookieHeader) headers.Cookie = cookieHeader;
@@ -74,10 +82,10 @@ async function httpGetImage(target, referrer, session) {
       res.on('data', (chunk) => {
         if (aborted) return;
         total += chunk.length;
-        if (total > IMG_DOWNLOAD_MAX) {
+        if (total > maxBytes) {
           aborted = true;
           try { req.destroy(); } catch (_) {}
-          reject(new Error('immagine troppo grande'));
+          reject(new Error('file troppo grande'));
         } else {
           chunks.push(chunk);
         }
@@ -92,7 +100,7 @@ async function httpGetImage(target, referrer, session) {
           return;
         }
         const buffer = Buffer.concat(chunks);
-        if (!buffer.length) { reject(new Error('immagine vuota')); return; }
+        if (!buffer.length) { reject(new Error('file vuoto')); return; }
         resolve({ buffer, filename: filenameFromHeaders(res.headers, target) });
       });
       res.on('error', (e) => { if (!aborted) reject(e || new Error('errore risposta')); });
@@ -198,9 +206,14 @@ module.exports = function register(on, ctx) {
   // dall'origine E sui siti con hotlink protection. Un fetch che si interrompe
   // a metà diventa naturalmente un errore (niente più silenzio), e l'utente
   // sceglie dove salvare col dialogo nativo "Salva come…".
-  on(MSG.DOWNLOAD_IMAGE, async (msg, sender) => {
+  // Un solo cammino per immagini, video e audio: cambia solo `kind` (nome di
+  // ripiego, header Accept e tetto di dimensione). Registrato su DUE messaggi
+  // perché il chiamante dichiara cosa sta salvando (#400: prima del fix il
+  // menu su un <video> non offriva alcun salvataggio).
+  const handleDownload = async (msg, sender) => {
     const url = String(msg.url || '').trim();
     if (!/^https?:/i.test(url)) return { ok: false, error: 'URL non scaricabile' };
+    const kind = ['image', 'video', 'audio'].includes(msg.kind) ? msg.kind : 'image';
     const wc = sender && sender.wc;
     if (!wc || wc.isDestroyed?.()) return { ok: false, error: 'no sender' };
     const path = require('node:path');
@@ -212,7 +225,7 @@ module.exports = function register(on, ctx) {
     // 1) Scarica i byte (con Referer della pagina + cookie della session).
     let buffer, suggested;
     try {
-      const r = await fetchImageBytes({ url, referrer, session: ses });
+      const r = await fetchImageBytes({ url, referrer, session: ses, kind });
       buffer = r.buffer;
       suggested = r.filename;
     } catch (e) {
@@ -221,7 +234,8 @@ module.exports = function register(on, ctx) {
 
     // 2) Nome file sicuro: preferisci il Content-Disposition del server, poi il
     // path dell'URL; neutralizza separatori e tentativi di traversal.
-    const filename = safeImageFilename(suggested || filenameFromUrl(url) || 'immagine');
+    const fallbackName = kind === 'video' ? 'video' : (kind === 'audio' ? 'audio' : 'immagine');
+    const filename = safeImageFilename(suggested || filenameFromUrl(url) || fallbackName);
 
     // 3) Scegli il percorso e scrivi.
     const testDir = process.env.FILO_DOWNLOAD_DIR;
@@ -251,7 +265,10 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || 'scrittura fallita' };
     }
-  });
+  };
+
+  on(MSG.DOWNLOAD_IMAGE, handleDownload);
+  on(MSG.DOWNLOAD_MEDIA, handleDownload);
 
   on(MSG.FEEDBACK_ANNOTATE, async (msg, sender) => {
     // Il box feedback è appena entrato/uscito dalla modalità annotazione.

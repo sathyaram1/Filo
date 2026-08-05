@@ -156,6 +156,12 @@
     // (#274). { url } → { ok, path?, filename? } | { ok:false, cancelled?, error? }
     // (la risposta arriva a download concluso/annullato).
     DOWNLOAD_IMAGE: 'download_image',
+    // "Salva video/audio come…" dal menu contestuale su <video>/<audio>.
+    // Stesso identico cammino di DOWNLOAD_IMAGE (il download avviene nel main
+    // con Referer + cookie della scheda): cambia solo il tipo di file, che
+    // decide il nome di ripiego e l'header Accept.
+    // { url, kind:'video'|'audio' } → { ok, path?, filename? } | { ok:false, cancelled?, error? }
+    DOWNLOAD_MEDIA: 'download_media',
     // Test provider: misura latenza al primo token e token al secondo
     // su un piccolo prompt fisso. Usato dalla pagina Opzioni.
     TEST_PROVIDER: 'test_provider',                 // { provider, apiKey, model? }

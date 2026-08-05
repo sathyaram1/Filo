@@ -358,6 +358,7 @@
     if (!selInfo) selInfo = getInputSelectionInfo(target);
     const linkEl = target?.closest?.('a[href]');
     const imgEl = target?.tagName === 'IMG' ? target : target?.closest?.('img');
+    const { mediaEl, mediaUnder } = findMedia(target, e.clientX, e.clientY);
     const editable = isEditable(target);
     if (editable) capturePasteContext(target);
     else pasteContext = null;
@@ -365,7 +366,9 @@
       Actions.getClipboardHistory(),
       Actions.getNavState(),
     ]);
-    const items = buildMenuItems({ selInfo, linkEl, imgEl, editable, clipboardHistory, navState });
+    const items = buildMenuItems({
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, editable, clipboardHistory, navState,
+    });
 
     // Slot riservato per la correzione ortografica nativa nei <input>: nascosto
     // finché Electron non ci notifica via broadcast la parola misspelled e i
@@ -466,6 +469,29 @@
     return false;
   }
 
+  // Video/audio sotto il cursore (#400).
+  // - `mediaEl`: il click è ARRIVATO sul media (o su un suo discendente) — è il
+  //   contesto principale, vince su immagine e link.
+  // - `mediaUnder`: nessun media nel cammino degli antenati, ma ce n'è uno sotto
+  //   al punto cliccato. Succede su quasi tutti i player veri, che coprono il
+  //   filmato con overlay di controllo: il tasto destro arriva all'overlay e il
+  //   <video> non compare fra gli antenati. Lo usiamo come ripiego SOLO quando
+  //   non c'è altro contesto (niente selezione, immagine, link, campo di testo),
+  //   così un video di sfondo non ruba il menu a ciò che sta sopra.
+  function findMedia(target, x, y) {
+    const direct = (target?.tagName === 'VIDEO' || target?.tagName === 'AUDIO')
+      ? target
+      : target?.closest?.('video, audio');
+    if (direct) return { mediaEl: direct, mediaUnder: null };
+    let under = null;
+    try {
+      for (const el of document.elementsFromPoint(x, y) || []) {
+        if (el.tagName === 'VIDEO' || el.tagName === 'AUDIO') { under = el; break; }
+      }
+    } catch (_) {}
+    return { mediaEl: null, mediaUnder: under };
+  }
+
   function isEditable(el) {
     if (!el) return false;
     if (el.matches?.('input, textarea')) {
@@ -506,6 +532,7 @@
     if (!selInfo) selInfo = getInputSelectionInfo(target);
     const linkEl = target?.closest?.('a[href]');
     const imgEl = target?.tagName === 'IMG' ? target : target?.closest?.('img');
+    const { mediaEl, mediaUnder } = findMedia(target, mouseEvent.clientX, mouseEvent.clientY);
     const editable = isEditable(target);
     // Cattura il contesto di incolla (elemento + caret/selezione) anche per i
     // menu di correzione: senza questo, l'item "Incolla" del menu spellcheck
@@ -517,7 +544,9 @@
       Actions.getClipboardHistory(),
       Actions.getNavState(),
     ]);
-    return buildMenuItems({ selInfo, linkEl, imgEl, editable, clipboardHistory, navState });
+    return buildMenuItems({
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, editable, clipboardHistory, navState,
+    });
   }
 
   // Sub-menu per una correzione "rosso" (parola): aggiungi al dizionario,
@@ -779,7 +808,9 @@
   // ------------------------------------------------------------
   // Ordine verticale: riga icone globali → Aiuto → zona contestuale → Feedback.
   // La riga globale è stabile (ancora), la zona contestuale varia in base al click.
-  function buildMenuItems({ selInfo, linkEl, imgEl, editable, clipboardHistory, navState }) {
+  function buildMenuItems({
+    selInfo, linkEl, imgEl, mediaEl, mediaUnder, editable, clipboardHistory, navState,
+  }) {
     const items = [];
 
     // 1. Riga icone globali (max 5 + overflow). Tutte mute, etichetta in tooltip.
@@ -801,7 +832,9 @@
     }
 
     // 3. Zona contestuale — assente se non c'è contesto utile.
-    const contextItems = buildContextualItems({ selInfo, linkEl, imgEl, editable, clipboardHistory });
+    const contextItems = buildContextualItems({
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, editable, clipboardHistory,
+    });
     if (contextItems.length > 0) {
       items.push({ type: 'separator' });
       for (const it of contextItems) items.push(it);
@@ -843,8 +876,11 @@
   }
 
   // Costruisce gli item della zona contestuale in base a cosa è stato cliccato.
-  // Matrice: testo / testo+editabile / immagine / link / casella input / niente.
-  function buildContextualItems({ selInfo, linkEl, imgEl, editable, clipboardHistory }) {
+  // Matrice: testo / testo+editabile / video-audio / immagine / link /
+  // casella input / niente.
+  function buildContextualItems({
+    selInfo, linkEl, imgEl, mediaEl, mediaUnder, editable, clipboardHistory,
+  }) {
     const items = [];
 
     if (selInfo && editable) {
@@ -875,6 +911,13 @@
       { const ra = TTS.buildReadAloudItem(selInfo.selection); if (ra) items.push(ra); }
       items.push({ type: 'separator' });
       items.push(Actions.buildInlineExplain(selInfo, { withDeepArrow: true }));
+      return items;
+    }
+
+    // Video/audio cliccato direttamente: le sue azioni vincono su immagine e
+    // link (un filmato dentro una scheda-link resta soprattutto un filmato).
+    if (mediaEl) {
+      for (const it of Actions.buildMediaItems(mediaEl)) items.push(it);
       return items;
     }
 
@@ -926,6 +969,13 @@
       // Casella input senza selezione: incolla + detta.
       items.push(Actions.buildPasteItem(clipboardHistory));
       items.push(TTS.buildDictateItem());
+      return items;
+    }
+
+    // Nessun altro contesto, ma sotto al punto cliccato c'è un filmato coperto
+    // dall'overlay del player: sono comunque le sue azioni che l'utente cerca.
+    if (mediaUnder) {
+      for (const it of Actions.buildMediaItems(mediaUnder)) items.push(it);
       return items;
     }
 

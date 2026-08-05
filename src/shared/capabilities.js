@@ -187,6 +187,23 @@
       invoke: 'Clic destro su un’immagine → cerca immagine.',
     },
     {
+      id: 'video-audio-controls', title: 'Comanda un video o un audio della pagina', category: 'media',
+      desc: 'Sul tasto destro di un filmato o di un audio trovi le sue azioni: riproduci o metti in pausa, togli e rimetti l’audio, cambia velocità (l’etichetta mostra sempre quella attuale; un clic accelera di uno scatto, la freccia apre l’elenco da 0,25× a 2×), ripeti in continuo, mostra o nascondi i controlli del lettore. Funziona anche quando i comandi del player coprono il filmato.',
+      invoke: 'Clic destro sul video o sull’audio → la voce che ti serve.',
+      doesNot: 'Non scarica i sottotitoli, non ritaglia il filmato e non tocca i lettori che non usano un vero video della pagina (per esempio quelli dentro contenuti incorporati protetti).',
+    },
+    {
+      id: 'video-pip', title: 'Guarda un video in finestra mobile', category: 'media',
+      desc: 'Stacca il video dalla pagina in una finestrella che resta in vista mentre navighi altrove.',
+      invoke: 'Clic destro sul video → "Apri in finestra mobile" (la stessa voce lo richiude).',
+    },
+    {
+      id: 'copy-download-video', title: 'Copia l’indirizzo o salva un video/audio', category: 'media',
+      desc: 'Copia l’indirizzo del filmato o dell’audio, oppure lo salva come file sul computer scegliendo dove.',
+      invoke: 'Clic destro sul video o sull’audio → "Copia URL video" / "Salva video come…".',
+      doesNot: 'I contenuti trasmessi in streaming a pezzi (i grandi siti di video) non hanno un file da salvare: in quel caso Filo lo dice invece di salvare un file rotto.',
+    },
+    {
       id: 'screenshot', title: 'Cattura schermo', category: 'media',
       desc: 'Cattura la pagina visibile come immagine. Puoi anche selezionare solo una porzione dello schermo.',
       invoke: 'Menu del tasto destro → "Screenshot" o "Screenshot di una parte".',
