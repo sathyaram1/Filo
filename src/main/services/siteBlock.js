@@ -71,7 +71,20 @@ function hostnameOf(url) {
   }
 }
 
-// Normalizza un dominio inserito dall'utente: toglie schema, path, porta, www.
+// Un IP letterale è un host REALE quanto un dominio: ci sono servizi (router di
+// casa, pannelli su LAN, siti senza dominio) raggiungibili solo così. Se non lo
+// accettassimo, l'utente potrebbe scriverlo in blacklist e restare convinto di
+// essere protetto mentre non lo è — esattamente ciò che una voce di sicurezza
+// non deve mai fare. IPv6 arriva già fra parentesi da URL.hostname ("[::1]").
+function isIpHost(host) {
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
+    return host.split('.').every((o) => Number(o) <= 255);
+  }
+  return /^\[[0-9a-f:.]+\]$/i.test(host);
+}
+
+// Normalizza un host inserito dall'utente: toglie schema, path, porta, www.
+// L'IPv6 fra parentesi va tenuto intero: i suoi ":" non sono una porta.
 function normalizeDomain(raw) {
   if (!raw) return '';
   let s = String(raw).trim().toLowerCase();
@@ -80,27 +93,35 @@ function normalizeDomain(raw) {
   s = s.split('/')[0]; // path
   s = s.split('?')[0];
   s = s.split('#')[0];
+  if (s.startsWith('[')) {
+    const end = s.indexOf(']');
+    if (end > 0) return s.slice(0, end + 1); // [::1]:8080 → [::1]
+    return s;
+  }
   s = s.split(':')[0]; // porta
   s = s.replace(/^www\./, '');
   return s;
 }
 
-// Un dominio è valido come voce di blacklist solo se ha un'estensione (almeno
-// un punto + TLD alfabetico). Allineato al campo "siti fidati": una voce come
-// "facebook" o un IP non è mai un host reale, quindi non deve entrare nel Set
-// (matcherebbe "facebook.com/com", non "facebook") dando falsa sicurezza.
+// Una voce di blacklist è valida se è un dominio con estensione (almeno un
+// punto + TLD alfabetico) oppure un IP letterale. Restano fuori le etichette
+// singole tipo "facebook": non sono host reali e matcherebbero per suffisso
+// tutto e niente, dando falsa sicurezza.
 function isValidDomain(host) {
-  return /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(host);
+  return isIpHost(host) || /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(host);
 }
 
-// Da lista grezza (settings) → Set di domini normalizzati E validi.
+// Da lista grezza (settings) → Set di host normalizzati E validi.
 function toBlacklistSet(list) {
   return new Set(list.map(normalizeDomain).filter(isValidDomain));
 }
 
 // Match per suffisso di dominio: "a.b.example.com" matcha "example.com".
+// Per un IP il match è ESATTO: "127.0.0.1" non ha suffissi di dominio ("0.0.1"
+// non significa nulla) e camminarci sopra creerebbe blocchi a sorpresa.
 function matchesSuffix(host, set) {
   if (!host || !set || !set.size) return false;
+  if (isIpHost(host)) return set.has(host);
   let h = host;
   while (h) {
     if (set.has(h)) return true;
