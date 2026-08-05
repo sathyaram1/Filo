@@ -293,6 +293,83 @@ async function update(partial, idToken) {
   return getPublicForAdmin();
 }
 
+// ── Importi crediti configurabili (config/credits) ───────────────────────────
+// Sorgente centrale degli importi crediti (saldo iniziale, ricarica, premi…).
+// Lettura pubblica; scrittura solo admin (regole Firestore). La VALIDAZIONE e la
+// fusione sui default vivono nel motore crediti (SN_CREDITS.resolveCreditConfig):
+// qui restituiamo la config remota GREZZA e lasciamo che il motore la risolva,
+// così esiste una sola definizione di "importo valido".
+
+// Config remota grezza (parziale) per il motore crediti. {} se mai scritta.
+// Il motore la valida campo per campo e ripiega sui default dove manca/è sballata.
+function getCreditConfig() {
+  return remoteCredits && typeof remoteCredits === 'object' ? remoteCredits : {};
+}
+
+// Config RISOLTA (tutti gli importi, default inclusi) per la dashboard owner
+// (parte 3) e i test end-to-end. Usa il motore per validare/fondere.
+function getCreditConfigPublic() {
+  const C = globalThis.SN_CREDITS;
+  if (C && typeof C.resolveCreditConfig === 'function') return C.resolveCreditConfig(remoteCredits);
+  return remoteCredits || {};
+}
+
+// Campi scalari configurabili (la tabella per priorità è annidata, gestita a parte).
+const CREDIT_SCALAR_FIELDS = ['initial', 'dailyRefill', 'maxRefillDays',
+  'feedbackSend', 'boardVote', 'boardReopen'];
+
+// Scrive gli importi crediti su config/credits. Canale predisposto per la
+// dashboard owner (parte 3): qui c'è solo il backend, nessuna UI. Richiede un ID
+// token admin (le regole rifiutano i non-admin). Semantica dei campi:
+//   - campo ASSENTE / null / '' → "non toccare questo importo" (si salta);
+//   - campo con un importo valido → scritto (per-leaf mask: fonde, non sostituisce);
+//   - campo con un valore NON valido → l'intero salvataggio è RIFIUTATO con un
+//     errore che nomina il campo (un salvataggio a metà è peggio di nessuno:
+//     lascerebbe una config diversa da quella che l'owner crede di aver messo).
+// La definizione di "importo valido" è UNA sola (SN_CREDITS.validAmount), usata
+// sia in lettura sia qui in scrittura: così un refuso non entra mai nella sorgente.
+async function updateCreditConfig(partial, idToken) {
+  if (!idToken) throw new Error('Serve un ID token admin per modificare gli importi crediti.');
+  const C = globalThis.SN_CREDITS;
+  const validAmount = (C && typeof C.validAmount === 'function')
+    ? C.validAmount
+    : (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : null);
+  const p = partial && typeof partial === 'object' ? partial : {};
+
+  const fields = {};
+  const mask = [];
+  const skip = (v) => v === undefined || v === null || v === '';
+
+  for (const k of CREDIT_SCALAR_FIELDS) {
+    if (skip(p[k])) continue;
+    const n = validAmount(p[k]);
+    if (n === null) throw new Error(`Importo non valido per "${k}": usa un numero maggiore o uguale a 0.`);
+    fields[k] = toFsValue(n);
+    mask.push(k);
+  }
+
+  // Tabella premi per priorità: per-leaf (feedbackResolveByPriority.0..3) così
+  // salvare una sola fascia non cancella le altre già presenti.
+  const table = p.feedbackResolveByPriority;
+  if (table && typeof table === 'object') {
+    const inner = {};
+    for (const key of ['0', '1', '2', '3']) {
+      const raw = table[key] !== undefined ? table[key] : table[Number(key)];
+      if (skip(raw)) continue;
+      const n = validAmount(raw);
+      if (n === null) throw new Error(`Importo non valido per la fascia priorità ${key}: usa un numero maggiore o uguale a 0.`);
+      inner[key] = toFsValue(n);
+      mask.push(`feedbackResolveByPriority.${key}`);
+    }
+    if (Object.keys(inner).length) fields.feedbackResolveByPriority = { mapValue: { fields: inner } };
+  }
+
+  if (!mask.length) throw new Error('Nessun importo valido da salvare.');
+  await patchDoc(CREDITS_DOC, fields, mask, idToken);
+  await refresh();
+  return getCreditConfigPublic();
+}
+
 // ── Interruttore master dell'auto-miglioramento (config/automation) ──────────
 // Campo `enabled` (bool). Doc o campo assente ⇒ false = autonomia OFF (stato
 // sicuro di default: ogni feedback passa da revisione umana). Letto dalla
