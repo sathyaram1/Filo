@@ -171,17 +171,46 @@ I report finali (chat) e le `notes` su Firestore sono **per l'utente**, non per
 un altro Claude. Le `notes` compaiono come conversazione nella dashboard di
 gestione: sono l'unica traccia della lavorazione che l'owner vede.
 
-- Niente nomi di variabili, funzioni, file con percorso assoluto. Spiega cosa
-  l'utente vedrà di diverso, non come l'hai codato.
-- Niente paragrafoni "Causa / Fix / Test" in stile diff review.
-- **Completo, non telegrafico**: cosa hai fatto, **le decisioni che hai preso e
-  perché** (scelte tra alternative, compromessi, cose lasciate fuori apposta),
-  **tutto ciò che è emerso** lavorando (vincoli scoperti, dubbi rimasti), **cosa
-  hai aggiunto oltre il chiesto**, **come l'hai verificato**. Un report di una
-  riga rende il lavoro invisibile e non valutabile.
-- Se serve memoria tecnica per la prossima passata (un vincolo non ovvio che
-  potrebbe rompersi), aggiungi in fondo una sezione "Note tecniche" separata. Se
-  non serve, **non scriverla**.
+Il report è **minimo per default**. L'owner ha già scritto il feedback e sa cosa
+aveva chiesto: il report serve solo a dirgli *quello che non può dedurre da solo*.
+
+**Struttura**:
+
+1. **La conferma** — una riga: fatto, e cosa vedrà di diverso.
+2. **Scelte funzionali** — solo se hai deciso qualcosa di diverso o in più
+   rispetto al chiesto (vedi la regola qui sotto). Con il **perché**.
+3. **Scelte tecniche non ovvie** — SOLO quelle che ricadono su di lui: uso di
+   **servizi a pagamento** (quale modello, quante chiamate, quanto costa, perché
+   quello e non un'alternativa più economica), **dati dell'utente** (cosa viene
+   letto/inviato/salvato e dove), o altre **decisioni critiche** difficili da
+   invertire dopo.
+
+**NON scrivere mai**:
+
+- la **ridescrizione del problema** (l'ha scritto lui);
+- **come hai verificato** (test lanciati, spec, screenshot): è il tuo mestiere,
+  non una notizia. Se una verifica NON è stata possibile, *quello* sì va detto;
+- **comportamenti attesi** spacciati per risultati ("l'icona è nello stile di
+  Filo e non un'emoji", "la x chiude", "Esc funziona"): è ovvio e inutile;
+- nomi di variabili, funzioni, file, percorsi. Spiega cosa cambia per lui.
+- paragrafoni "Causa / Fix / Test" in stile diff review.
+
+Se resta un **vincolo tecnico non ovvio** che la prossima passata rischia di
+rompere, mettilo in fondo sotto "Note tecniche". Se non c'è, non scrivere la
+sezione.
+
+**Esempio di report giusto**:
+
+> Fatto. Ho messo la lente in alto a destra della barra delle schede e NON dove
+> l'avevi indicata nell'immagine, perché cerca su tutte le sezioni insieme e non
+> solo su quella aperta: legarla a una sezione avrebbe suggerito il contrario.
+>
+> La ricerca a senso passa il titolo e il testo di tutti i feedback a un modello
+> a ogni ricerca (non usa un indice pre-calcolato): una ricerca = una chiamata a
+> pagamento sul modello di Categorizzazione. Ho scelto così perché questa
+> dashboard la usi solo tu e di rado; costruire un indice sarebbe costato di più
+> di quanto risparmia. Se il modello non risponde, ripiega sulla ricerca per
+> parole e te lo dice.
 
 ## Patch notes: aggiorna il changelog ad OGNI fix/feature visibile all'utente
 
