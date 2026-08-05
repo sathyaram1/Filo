@@ -7,9 +7,13 @@ const auth = require('../../auth/google-auth');
 // marcare gli invii dell'owner. Idempotente se già caricato dal loader.
 require('../../../shared/feedbackThread.js');
 
-// ── "Salva immagine come…" (#274): scarico byte nel main ────────────────────
+// ── "Salva immagine/video/audio come…" (#274, #400): byte scaricati nel main ─
 
 const IMG_DOWNLOAD_MAX = 64 * 1024 * 1024; // tetto anti-OOM (64MB)
+// Video e audio sono ordini di grandezza più grandi di un'immagine: col tetto a
+// 64MB un normale filmato di qualche minuto sarebbe stato rifiutato. Il file
+// viene comunque tenuto in memoria prima di scriverlo, quindi il tetto resta.
+const MEDIA_DOWNLOAD_MAX = 512 * 1024 * 1024; // 512MB
 
 // Scarica i byte di un'immagine presentando il Referer della pagina e i cookie
 // della session — l'unico modo, in Electron 33, di far arrivare il Referer a
