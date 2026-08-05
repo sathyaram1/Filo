@@ -1314,6 +1314,15 @@
     },
     models: { ...DEFAULT_MODELS },
     modelRegistry: { ...DEFAULT_MODEL_REGISTRY },
+    // Politica sui fornitori: elenco (forme base) dei produttori di modelli da
+    // NON usare come host su OpenRouter. Curabile senza codice via Firestore
+    // (config/models.excludedProviders). Vedi DEFAULT_EXCLUDED_PROVIDERS.
+    excludedProviders: [ ...DEFAULT_EXCLUDED_PROVIDERS ],
+    // Ordine con cui OpenRouter sceglie fra i fornitori ammessi: '' = default del
+    // servizio (prezzo), 'latency' = più reattivo, 'throughput' = più veloce a
+    // generare. Effetto collaterale utile: rende la latenza una scelta invece che
+    // qualcosa che cambia da solo.
+    providerSort: '',
     // Costi stimati per 1M token (input/output) in USD. Valori indicativi.
     pricing: {
       'google/gemini-2.0-flash-001': { input: 0.10, output: 0.40 },
