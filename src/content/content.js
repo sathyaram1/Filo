@@ -323,7 +323,7 @@
         // textarea/contenteditable, estraiamo la parola e chiediamo la
         // correzione all'LLM (affidabile a prescindere dal dizionario nativo),
         // tenendo i suggerimenti nativi come base immediata quando ci sono.
-        const inputEl = e.target?.closest?.('input');
+        const inputEl = rt?.closest?.('input');
         if (inputEl && isTextLikeInput(inputEl)) {
           const wordCtx = SpellCheck.getInputWordAt?.(inputEl, e.clientX, e.clientY);
           if (wordCtx && !SpellCheck.isInDictionary(wordCtx.word)) {
