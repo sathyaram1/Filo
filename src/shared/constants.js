@@ -71,8 +71,11 @@
     // Cache dell'ultimo output del Generatore Dashboard:
     // { ts, message: string, suggestions: [{icon,text,action,importance}] }
     FILO_DASHBOARD_CACHE: 'filo_dashboard_cache',
-    // Note salvate dall'agente (azione SALVA_APPUNTO).
-    // Array di {id, ts, text, context}.
+    // STORICO: vecchio archivio appunti (array di {id, ts, text, context}),
+    // usato prima che gli appunti diventassero file dell'editor. Nessuno ci
+    // scrive più: la chiave sopravvive solo perché la migrazione una-tantum
+    // (src/main/services/editorFiles.js) deve poterla leggere e svuotare sui
+    // profili aggiornati da una versione precedente.
     FILO_NOTES: 'filo_notes',
     // Timer attivi: array di {id, label, endsAt, paused?, remainingMs?}.
     FILO_TIMERS: 'filo_timers',
