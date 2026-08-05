@@ -497,6 +497,29 @@ ha funzionato e cosa fare**.
   `tests/unit/providerNetworkRetry.test.mjs`,
   `tests/dashboard-chat-gap-feedback.spec.mjs`, `tests/verify-331-stress.spec.mjs`.
 
+## Aggiornamento ottimistico: se poi fallisce, il ritorno indietro va SPIEGATO
+
+Mostrare subito l'effetto di un'azione e sostituirlo dopo con la risposta vera
+(voto in bacheca, like, toggle) elimina l'attesa — ma il ramo di fallimento è la
+metà che si dimentica: senza un messaggio, l'utente vede il numero salire e
+tornare giù da solo e legge un **glitch**, non un esito. Peggio: crede di aver
+votato quando non ha votato.
+
+- **Chi annulla, dice perché.** Al fallimento ripristina lo stato precedente
+  **e** scrivi accanto all'elemento cosa è andato storto, con la frase che arriva
+  dal main se c'è ("Accedi per votare…") o una generica ("… riprova fra un
+  momento") se non c'è.
+- **Il messaggio vive nello stato, non nel DOM.** Una lista che si ri-renderizza
+  a ogni cambio (`renderList()`) cancella qualunque nodo appeso a mano: tieni
+  l'errore in una mappa `id → messaggio` che il render consulta, e **azzeralo al
+  tentativo successivo** così non resta appiccicato.
+- **Testarlo:** lo stato "in volo" dura un round-trip IPC — troppo poco perché un
+  test lo veda. Sospendi la risposta nel test (una Promise che risolvi tu) invece
+  di rincorrere il transitorio: allora "disabilitato mentre invia" e "ripristinato
+  con spiegazione" diventano due momenti osservabili.
+- **Dove:** `onVote` / `voteErrors` in `src/pages/board/board.js`, stile
+  `.bd-vote-msg` in `board.html`. Test: `tests/board-page.spec.mjs`.
+
 ## Filo ammette una mancanza → propone lui la segnalazione, non la chiede
 
 Quando l'agente risponde "non lo so fare / non ho accesso a quel dato", il buco
