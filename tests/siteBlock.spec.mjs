@@ -106,6 +106,25 @@ test('Sicurezza: il toggle e la blacklist dedicata persistono', async ({ openTab
   await page.reload();
   await page.waitForSelector('#sec-siteblock-blacklist', { timeout: 8000 });
   await expect(page.locator('#sec-siteblock-blacklist')).toHaveValue('cattivo.example\naltro.test');
+
+  // Anche un indirizzo numerico (il pannello del router, un servizio in LAN)
+  // viene ACCETTATO e salvato: è un sito come gli altri. Prima spariva in
+  // silenzio e la protezione sembrava attiva senza esserlo.
+  await page.locator('#sec-siteblock-blacklist').fill('192.168.1.1\nhttp://10.0.0.7:8080/admin');
+  await page.locator('#sec-siteblock-blacklist').dispatchEvent('change');
+  await expect
+    .poll(() => page.evaluate(async () => {
+      const sb = (await window.SN_STORAGE.getSettings()).security?.siteBlock || {};
+      return sb.blacklist || [];
+    }), { timeout: 4000 })
+    .toEqual(['192.168.1.1', '10.0.0.7']);
+  // Nessun avviso "riga non valida" per una voce buona.
+  await expect(page.locator('#sec-siteblock-blacklist-error')).toBeHidden();
+
+  // Una voce che NON è un host reale resta segnalata (non fingiamo di bloccarla).
+  await page.locator('#sec-siteblock-blacklist').fill('facebook');
+  await page.locator('#sec-siteblock-blacklist').dispatchEvent('change');
+  await expect(page.locator('#sec-siteblock-blacklist-error')).toBeVisible();
 });
 
 test('apertura via Filo (programmatica) verso sito in blacklist → consentita', async ({ shell, openTab, testServer }) => {
