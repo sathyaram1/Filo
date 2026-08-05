@@ -192,20 +192,34 @@ La sorgente è **`src/shared/patchNotes.js`** (IIFE su globalThis,
 
 **Regola**: ogni volta che chiudi un fix o aggiungi una feature **visibile
 all'utente** (qualcosa che vedrà o userà — non refactor/test/infra), aggiungi una
-riga al blocco della versione corrente:
+riga al **primo blocco della lista**, quello marcato `unreleased: true` ("in
+lavorazione"):
 
 - novità → `features: [...]`; correzione → `fixes: [...]`.
 - Frase breve, orientata al beneficio, **senza spiegare perché era rotto né come
   l'hai codato**. Esempi giusti: *"Migliorata la visualizzazione delle schede con
   audio attivo"*, *"Ora puoi rimuovere le immagini allegate a un feedback"*.
-- Se la versione corrente non ha ancora un blocco, crealo con `version` = quella
-  in `package.json` e la data di oggi; altrimenti **accoda** alla versione
-  corrente.
+- **MAI creare a mano un blocco con un numero di versione.** La versione in
+  `package.json` è quella dell'**ultima release già pubblicata**: una nota messa
+  sotto quel numero non la vede nessuno (chi ha già quella versione la salta, e
+  la build che la portava è uscita prima che la nota esistesse). È esattamente
+  come si perdevano le note (feedback #308, #393).
+- Ci pensa la release: quando alza la versione,
+  `scripts/stamp-patch-notes.mjs` timbra il blocco "in lavorazione" col numero
+  della versione che sta uscendo e rimette in cima un blocco vuoto.
 - Le voci puramente interne (refactor, test, build, hook) **non** vanno nel
   changelog.
 
 Il file è la **singola sorgente di verità** sia del recap sia del calcolo "quante
-patch sei indietro". Tienilo allineato a `package.json`.
+patch sei indietro".
+
+**`package.json` può essere più avanti dell'ultimo blocco del changelog**: è il
+caso normale di un rilascio di sola manutenzione (nessuna modifica visibile
+all'utente → nessun blocco, nessun popup). Non è un errore e non va "sistemato"
+aggiungendo un blocco finto. Le guardie in `tests/unit/patchNotes.test.mjs`
+verificano invece che il blocco "in lavorazione" ci sia sempre in cima, che
+nessun blocco sia attribuito a una versione non ancora uscita e che il timbro
+della release renda davvero visibili le note nel recap.
 
 ## Manifesto capacità: aggiorna `capabilities.js` ad OGNI capacità che cambia
 
