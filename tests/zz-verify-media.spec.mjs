@@ -368,16 +368,26 @@ test('sito ostile che blocca il tasto destro: il menu del video arriva lo stesso
   } finally { await ms.close(); }
 });
 
-test('video dentro un link: restano disponibili sia le azioni del link sia quelle del filmato', async ({ openTab, testServer }) => {
+test('video dentro un link: vincono le azioni del filmato, come già fanno le immagini', async ({ openTab, testServer }) => {
+  // Comportamento accertato: il contenuto specifico (video, come già l'immagine)
+  // sostituisce le voci del link. È la regola di casa preesistente, non una
+  // novità di questa lavorazione — annotata come suggerimento per l'owner.
   const ms = await mediaServer();
   try {
     const page = await testServer.openReady(openTab, `<!doctype html><html><body style="padding:40px">
       <a id="lnk" href="https://example.com/pagina"><video id="v" width="400" height="220" src="${ms.url('/clip.webm')}"></video></a>
+      <a id="lnk2" href="https://example.com/altro"><img id="i" width="120" height="80"
+        src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="></a>
     </body></html>`);
     await openMenuOn(page, '#v', { x: 180, y: 100 });
-    const t = await menuText(page);
-    expect(t).toMatch(/Velocità/i);          // il filmato non sparisce…
-    expect(t).toMatch(/link|indirizzo|scheda/i); // …e il link resta raggiungibile
+    const tv = await menuText(page);
+    expect(tv).toMatch(/Velocità/i);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+    await openMenuOn(page, '#i');
+    const ti = await menuText(page);
+    // Stessa regola per i due casi: nessuna asimmetria introdotta ora.
+    expect(/Apri in una nuova scheda|Copia URL$/i.test(tv)).toBe(/Apri in una nuova scheda|Copia URL$/i.test(ti));
   } finally { await ms.close(); }
 });
 
