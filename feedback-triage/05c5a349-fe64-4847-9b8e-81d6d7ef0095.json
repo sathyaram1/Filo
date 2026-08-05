@@ -1,0 +1,7 @@
+{
+  "id": "05c5a349-fe64-4847-9b8e-81d6d7ef0095",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la modifica e' stata verificata e pubblicata. Riguardava solo i test automatici (nessun cambiamento visibile nell'app), resi piu' solidi e affidabili.",
+  "queuedAt": "2026-08-05T22:34:48.296Z",
+  "queuedBy": "routine"
+}
