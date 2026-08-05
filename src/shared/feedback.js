@@ -447,8 +447,13 @@
     return { id: json.name?.split('/').pop() || '', seq, images: uploaded, files: uploadedFiles, failed };
   }
 
-  // Lista tutti i feedback (più recenti prima). Usata dalla dashboard.
-  async function list({ pageSize = 200 } = {}) {
+  // Lista tutti i feedback (più recenti prima). Usata dalla dashboard e dalla
+  // bacheca. `timeoutMs` (opzionale): se > 0, la fetch si arrende dopo quel tempo
+  // invece di restare muta finché il sistema operativo non decide di mollare
+  // (offline, un `fetch` del renderer può impiegare ~13 s prima di fallire da
+  // solo). Chi lo passa vuole poter mostrare uno stato d'errore in tempi umani;
+  // chi lo omette mantiene il comportamento storico (nessun timeout).
+  async function list({ pageSize = 200, timeoutMs = 0 } = {}) {
     // structuredQuery via runQuery, ordinamento per createdAt DESC.
     const endpoint = `${FIRESTORE_BASE}:runQuery?key=${API_KEY}`;
     const body = {
@@ -460,11 +465,30 @@
         limit: pageSize,
       },
     };
-    const res = await fetch(endpoint, {
+    const opts = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-    });
+    };
+    // Timeout opzionale via AbortController. Se scatta, rilanciamo un errore con
+    // "timeout" nel messaggio: così SN_CHAT_ERRORS lo riconosce come guasto di
+    // rete (e non come annullamento volontario, che invece non va segnalato).
+    let timer = null;
+    let timedOut = false;
+    if (timeoutMs > 0 && typeof AbortController !== 'undefined') {
+      const controller = new AbortController();
+      opts.signal = controller.signal;
+      timer = setTimeout(() => { timedOut = true; try { controller.abort(); } catch (_) {} }, timeoutMs);
+    }
+    let res;
+    try {
+      res = await fetch(endpoint, opts);
+    } catch (e) {
+      if (timedOut) throw new Error('firestore list: timeout di rete');
+      throw e;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
       throw new Error(`firestore list fallito (${res.status}): ${errText.slice(0, 300)}`);
