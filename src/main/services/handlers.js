@@ -226,8 +226,19 @@ function withDefaults(settings) {
     ? { ...sec, safeBrowse: { ...(sec.safeBrowse || {}), safeBrowsingKey: d.safeBrowsingKey } }
     : sec;
 
+  // Politica sui fornitori (#421): è una regola di Filo, non una preferenza
+  // per-utente, quindi vale SEMPRE (anche con "usa modelli predefiniti" off).
+  // Fonte: i settings se già li portano (retro-compat), altrimenti i default
+  // condivisi (costante o override Firestore). `providerSort` idem.
+  const excludedProviders = Array.isArray(settings.excludedProviders)
+    ? settings.excludedProviders
+    : (d.excludedProviders || []);
+  const providerSort = typeof settings.providerSort === 'string' && settings.providerSort
+    ? settings.providerSort
+    : (d.providerSort || '');
+
   if (settings.useDefaultModels === false) {
-    return security === sec ? settings : { ...settings, security };
+    return { ...settings, excludedProviders, providerSort, security };
   }
   const userKeys = settings.apiKeys || {};
   const apiKeys = {};
@@ -239,6 +250,8 @@ function withDefaults(settings) {
     provider: d.provider,
     models: d.models,
     modelRegistry: d.modelRegistry,
+    excludedProviders,
+    providerSort,
     apiKeys,
     security,
   };
