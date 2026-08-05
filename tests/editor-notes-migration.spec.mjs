@@ -129,6 +129,16 @@ test('gli appunti del vecchio archivio finiscono nel file "Appunti" dell’edito
     expect(txt.indexOf('MIGRA_primo_comprare_il_pane'))
       .toBeLessThan(txt.indexOf('MIGRA_terzo_chiamare_il_dentista'));
 
+    // …e soprattutto: l'UTENTE lo trova. "Appunti" è nell'elenco documenti e
+    // aprendolo il foglio mostra davvero i suoi vecchi appunti.
+    await page.click('#docSwitch');
+    const voce = page.locator('.ed-doc-item', { hasText: 'Appunti' });
+    await expect(voce).toHaveCount(1);
+    await voce.click();
+    for (const n of OLD_NOTES) {
+      await expect(page.locator('#doc')).toContainText(n.text);
+    }
+
     // Il vecchio archivio è stato svuotato: gli appunti vivono in un posto solo.
     await expect.poll(() => readOldNotes(app), { timeout: 10_000 }).toEqual([]);
   } finally {
