@@ -357,7 +357,7 @@ function buildAttemptChain(settings, modelRef, action) {
   return out;
 }
 
-async function handleAIRequest({ action, payload, origin, onReasoning = null, signal = null }) {
+async function handleAIRequest({ action, payload, origin, onReasoning = null, onText = null, signal = null }) {
   const settings = await getEffectiveSettings();
   // NIENTE `payload.modelOverride`: era la porta di servizio con cui un chiamante
   // poteva imporre un modello scritto nel codice, scavalcando la configurazione
