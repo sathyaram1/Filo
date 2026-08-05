@@ -78,8 +78,11 @@
       const aModel = a.model || model;
       try {
         const r = await withNetworkRetry(() => getProvider(a.provider).complete({
-          apiKey: a.apiKey, model: aModel, reasoning: a.reasoning, messages, signal,
+          apiKey: a.apiKey, model: aModel, reasoning: a.reasoning,
+          providerRouting: a.providerRouting, messages, signal,
         }));
+        // `...r` porta con sé `servedBy` (chi ha davvero servito, se il provider
+        // lo riporta): il chiamante lo usa per registrare e verificare la politica.
         return { ...r, provider: a.provider, model: aModel };
       } catch (err) {
         lastErr = err;
