@@ -954,6 +954,225 @@
     window.open(`https://www.google.com/search?q=${q}`, '_blank', 'noopener');
   }
 
+  // ------------------------------------------------------------
+  // Video e audio (#400)
+  // ------------------------------------------------------------
+  // Il menu di Filo prende il posto di quello di Chromium su TUTTE le pagine:
+  // finché qui non c'era nulla, il tasto destro su un filmato toglieva all'utente
+  // ogni azione (salva, copia indirizzo, finestra mobile, ripeti, velocità) senza
+  // rimpiazzarla. Queste sono le azioni sull'elemento media, usate dalla zona
+  // contestuale del menu.
+
+  const MEDIA_SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+
+  function isAudioEl(el) {
+    return !!el && el.tagName === 'AUDIO';
+  }
+
+  // Sorgente effettiva: `currentSrc` è quella che il browser sta davvero
+  // riproducendo (risolve i <source> multipli); se il media non ha ancora
+  // caricato nulla ripieghiamo sull'attributo e sul primo <source>.
+  function mediaSrc(el) {
+    if (!el) return '';
+    const direct = el.currentSrc || el.src || '';
+    if (direct) return direct;
+    try {
+      const s = el.querySelector('source[src]');
+      return s ? s.src : '';
+    } catch (_) { return ''; }
+  }
+
+  function formatSpeed(rate) {
+    const r = Math.round(Number(rate) * 100) / 100;
+    return `${String(r).replace('.', ',')}×`;
+  }
+
+  function toggleMediaPlay(el) {
+    if (!el) return;
+    try {
+      if (el.paused) { const p = el.play(); if (p && p.catch) p.catch(() => {}); }
+      else el.pause();
+    } catch (_) {}
+  }
+
+  function toggleMediaMute(el) {
+    if (!el) return;
+    try { el.muted = !el.muted; } catch (_) {}
+  }
+
+  // Ripetizione e controlli non hanno un riscontro immediato a schermo (il
+  // filmato continua identico): il toast è l'unica conferma che l'azione ha
+  // avuto effetto.
+  function toggleMediaLoop(el) {
+    if (!el) return;
+    try {
+      el.loop = !el.loop;
+      Popup.showToast(I18n.t(el.loop ? 'toast_media_loop_on' : 'toast_media_loop_off'));
+    } catch (_) {}
+  }
+
+  function toggleMediaControls(el) {
+    if (!el) return;
+    try { el.controls = !el.controls; } catch (_) {}
+  }
+
+  function setMediaSpeed(el, rate) {
+    if (!el) return;
+    try {
+      el.playbackRate = rate;
+      Popup.showToast(I18n.t('toast_media_speed', formatSpeed(rate)));
+    } catch (_) {}
+  }
+
+  // Velocità successiva "in su" fra quelle >= 1 (il caso comune è accelerare);
+  // dopo 2× si torna a 1×. Le velocità rallentate restano nel sotto-menu.
+  function nextMediaSpeed(rate) {
+    const up = MEDIA_SPEEDS.filter((s) => s >= 1);
+    for (const s of up) if (s > rate + 0.001) return s;
+    return 1;
+  }
+
+  function mediaPipAvailable(el) {
+    if (!el || el.tagName !== 'VIDEO') return false;
+    try {
+      return !!document.pictureInPictureEnabled && !el.disablePictureInPicture
+        && typeof el.requestPictureInPicture === 'function';
+    } catch (_) { return false; }
+  }
+
+  function isMediaInPip(el) {
+    try { return document.pictureInPictureElement === el; } catch (_) { return false; }
+  }
+
+  async function toggleMediaPip(el) {
+    try {
+      if (isMediaInPip(el)) { await document.exitPictureInPicture(); return; }
+      await el.requestPictureInPicture();
+    } catch (_) {
+      Popup.showToast(I18n.t('toast_pip_failed'));
+    }
+  }
+
+  // "Copia URL video/audio": un blob: (stream MSE, o Blob creata dalla pagina)
+  // non è un indirizzo utilizzabile fuori dalla scheda — dirlo è meglio che
+  // copiare una stringa che altrove non apre nulla.
+  function copyMediaUrl(el) {
+    const src = mediaSrc(el);
+    if (!src || /^blob:/i.test(src)) {
+      Popup.showToast(I18n.t('toast_media_stream_only'));
+      return;
+    }
+    copyToClipboard(src);
+  }
+
+  async function downloadMedia(el) {
+    const audio = isAudioEl(el);
+    const failToast = audio ? 'toast_audio_save_failed' : 'toast_video_save_failed';
+    const src = mediaSrc(el);
+    if (!src) { Popup.showToast(I18n.t(failToast)); return; }
+
+    // blob:/data: nascono nella pagina stessa: l'attributo download di un <a> è
+    // onorato da Chromium e il main non saprebbe risolverli. Attenzione: un
+    // blob: di MediaSource (lo streaming adattivo dei player) NON è leggibile —
+    // fetch fallisce, e in quel caso non esiste alcun file da salvare.
+    if (/^(blob:|data:)/i.test(src)) {
+      try {
+        const r = await fetch(src);
+        if (!r.ok) throw new Error('non leggibile');
+        const blob = await r.blob();
+        if (!blob || !blob.size) throw new Error('vuoto');
+        const objUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = objUrl;
+        const ext = (blob.type.split('/')[1] || (audio ? 'mp3' : 'mp4')).replace(/[^a-z0-9]/gi, '');
+        a.download = (audio ? 'audio.' : 'video.') + ext;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => { try { URL.revokeObjectURL(objUrl); } catch (_) {} }, 20000);
+      } catch (_) {
+        Popup.showToast(I18n.t('toast_media_stream_only'));
+      }
+      return;
+    }
+
+    // http(s): stesso cammino del salvataggio immagini (#274) — scarica il main
+    // presentando Referer e cookie della scheda, così funziona anche cross-origin
+    // e sui server con protezione hotlink.
+    try {
+      const res = await chrome.runtime.sendMessage({
+        type: MSG.DOWNLOAD_MEDIA,
+        url: src,
+        kind: audio ? 'audio' : 'video',
+      });
+      if (res?.ok) Popup.showToast(I18n.t(audio ? 'toast_audio_saved' : 'toast_video_saved'));
+      else if (!res?.cancelled) Popup.showToast(I18n.t(failToast));
+    } catch (_) {
+      Popup.showToast(I18n.t(failToast));
+    }
+  }
+
+  // Voce "Velocità": il corpo accelera di uno scatto (e dopo 2× torna a 1×),
+  // la freccetta apre l'elenco completo, rallentamenti compresi. L'etichetta
+  // porta con sé la velocità corrente, così il menu dice anche in che stato è.
+  function buildMediaSpeedItem(el) {
+    const rate = Number(el.playbackRate) || 1;
+    return {
+      type: 'split',
+      label: `${I18n.t('menu_media_speed')} ${formatSpeed(rate)}`,
+      arrowTitle: I18n.t('menu_media_speed_pick'),
+      onClick: () => setMediaSpeed(el, nextMediaSpeed(rate)),
+      subItems: MEDIA_SPEEDS.map((s) => ({
+        label: `${Math.abs(s - rate) < 0.001 ? '✓ ' : ''}${formatSpeed(s)}${s === 1 ? ` (${I18n.t('menu_media_speed_normal')})` : ''}`,
+        onClick: () => setMediaSpeed(el, s),
+      })),
+    };
+  }
+
+  // Zona contestuale del menu per un <video>/<audio>.
+  function buildMediaItems(el) {
+    const audio = isAudioEl(el);
+    const items = [];
+    items.push({
+      type: 'item',
+      label: I18n.t(el.paused ? 'menu_media_play' : 'menu_media_pause'),
+      onClick: () => toggleMediaPlay(el),
+    });
+    items.push({
+      type: 'item',
+      label: I18n.t(el.muted ? 'menu_media_unmute' : 'menu_media_mute'),
+      onClick: () => toggleMediaMute(el),
+    });
+    items.push(buildMediaSpeedItem(el));
+    items.push({
+      type: 'item',
+      label: I18n.t(el.loop ? 'menu_media_loop_off' : 'menu_media_loop'),
+      onClick: () => toggleMediaLoop(el),
+    });
+    if (mediaPipAvailable(el)) {
+      items.push({
+        type: 'item',
+        label: I18n.t(isMediaInPip(el) ? 'menu_media_pip_exit' : 'menu_media_pip'),
+        onClick: () => toggleMediaPip(el),
+      });
+    }
+    items.push({
+      type: 'item',
+      label: I18n.t(el.controls ? 'menu_media_hide_controls' : 'menu_media_show_controls'),
+      onClick: () => toggleMediaControls(el),
+    });
+    items.push({ type: 'separator' });
+    items.push({
+      type: 'item',
+      label: I18n.t(audio ? 'menu_copy_audio_link' : 'menu_copy_video_link'),
+      onClick: () => copyMediaUrl(el),
+    });
+    items.push({
+      type: 'item',
+      label: I18n.t(audio ? 'menu_save_audio_as' : 'menu_save_video_as'),
+      onClick: () => downloadMedia(el),
+    });
+    return items;
+  }
+
   function searchImageOnWeb(imgEl) {
     const src = imgEl.currentSrc || imgEl.src;
     if (!src) return;
