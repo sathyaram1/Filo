@@ -61,28 +61,33 @@ NON implementare tutto in una volta.
    ```
    Lo spec deve **asserire il successo** (vedi `CLAUDE.md`). Aggiungilo se non
    esiste.
-7. Aggiorna `src/shared/patchNotes.js` (se user-visible) e
-   `src/shared/capabilities.js` (se cambia una capacità utente).
+7. Aggiorna `src/shared/capabilities.js` (se cambia una capacità utente).
 8. **Non fondere su `main`**: l'hook committa e pusha su `worker/<id>`.
 
 ## Come riporti
 
-Il report finisce nella **chat del feedback in dashboard**: è l'unica traccia
-della lavorazione che l'owner vede. Scrivilo **per l'utente** (niente nomi di
-file/funzioni/variabili, spiega il comportamento) ma **COMPLETO** — deve
-contenere:
+Sei tu — non un ruolo a valle — a scrivere **entrambi** i testi che l'owner
+leggerà. Nessuno dopo di te li riscriverà.
 
-- **cosa hai fatto** e cosa l'utente vedrà di diverso;
-- **le decisioni che hai preso** e perché (scelte tra alternative, compromessi,
-  cose lasciate fuori apposta);
-- **tutto ciò che è emerso** lavorando (vincoli scoperti, comportamenti
-  collegati, dubbi rimasti);
-- **cosa hai aggiunto oltre il chiesto** (invarianti UX, regola d'oro anti
-  scope-creep);
-- **come hai verificato**.
+**1. Il report per l'owner** (la nota del feedback in dashboard). È **minimo**:
+struttura, contenuti obbligatori e lista di ciò che NON va scritto sono in
+`CLAUDE.md` § "Tono dei report e delle notes". In sintesi: conferma in una riga,
+scelte funzionali diverse dal chiesto col perché, scelte tecniche non ovvie che
+ricadono sull'owner (servizi a pagamento, dati utente, decisioni difficili da
+invertire). **Non** ridescrivere il problema, **non** elencare come hai
+verificato, **non** vantare comportamenti attesi.
 
-Un report di una riga che dice solo "fatto" è un bug del ruolo: senza decisioni
-e scoperte, l'owner non può valutare il lavoro né correggerlo.
+⚠️ Se hai fatto qualcosa di **diverso da quanto chiesto**, dillo **nella prima
+riga**, col perché. Vale anche per le richieste **implicite**: se il feedback
+aveva uno screenshot che indicava un punto della UI e tu hai scelto un altro
+punto, quella è una deviazione da dichiarare — anche se a parole l'owner non
+aveva scritto dove.
+
+**2. La riga di changelog** in `src/shared/patchNotes.js`. Regole complete in
+`CLAUDE.md` § "Patch notes". Filtro prima di scriverla: *un utente qualsiasi può
+usare questa cosa?* Se tocca solo superfici riservate all'owner (dashboard di
+gestione, statistiche, automazioni, log) o parti interne → **non scrivere
+niente**. Se sì → **una riga sola**, molto più asciutta del report.
 
 Poi metti il feedback in `revision_capability` col branch — il prossimo giro di
 dispatch lo instraderà al **verifier**:
