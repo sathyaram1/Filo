@@ -10,8 +10,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
-import { readdirSync, existsSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { readdirSync, existsSync } from 'node:fs';
 
 // MP4 minimo (non riproducibile, ma serve solo come "file" da scaricare/linkare).
 const MP4 = Buffer.from('AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAAIZnJlZQ==', 'base64');
