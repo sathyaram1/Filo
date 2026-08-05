@@ -358,6 +358,7 @@
     if (!selInfo) selInfo = getInputSelectionInfo(target);
     const linkEl = target?.closest?.('a[href]');
     const imgEl = target?.tagName === 'IMG' ? target : target?.closest?.('img');
+    const { mediaEl, mediaUnder } = findMedia(target, e.clientX, e.clientY);
     const editable = isEditable(target);
     if (editable) capturePasteContext(target);
     else pasteContext = null;
@@ -365,7 +366,9 @@
       Actions.getClipboardHistory(),
       Actions.getNavState(),
     ]);
-    const items = buildMenuItems({ selInfo, linkEl, imgEl, editable, clipboardHistory, navState });
+    const items = buildMenuItems({
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, editable, clipboardHistory, navState,
+    });
 
     // Slot riservato per la correzione ortografica nativa nei <input>: nascosto
     // finché Electron non ci notifica via broadcast la parola misspelled e i
