@@ -73,6 +73,20 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isAdmin();
     }
+
+    // config/credits → importi crediti configurabili dall'owner (saldo iniziale,
+    //   ricarica giornaliera, tetto giorni, premio invio feedback, premi di
+    //   risoluzione per priorità, premio voto e costo riapertura bacheca). NON è
+    //   segreto (sono i numeri di crediti che l'utente vede già in app; il costo €
+    //   reale non ci finisce MAI): lettura PUBBLICA come config/models, così un
+    //   nuovo importo raggiunge OGNI installazione, anche non loggata. Scrittura
+    //   riservata all'owner. Le regole NON enumerano i campi (write admin-only):
+    //   la validazione degli importi è nel motore crediti (client) e nel canale di
+    //   scrittura del main. Doc/campi assenti ⇒ il motore usa i default storici.
+    match /config/credits {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
     match /config/secrets {
       allow read: if request.auth != null
         && request.auth.token.email_verified == true;
