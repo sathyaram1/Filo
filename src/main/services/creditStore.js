@@ -117,10 +117,10 @@
 
   // ── stato + funzioni PURE (nessuna I/O: testabili headless) ─────────────────
 
-  function freshState(today = dateKey()) {
+  function freshState(today = dateKey(), config) {
     return {
       initialized: true,
-      balance: CREDIT.INITIAL,
+      balance: effectiveConfig(config).initial,
       lastRefillDate: today,
       byUsage: {},        // { [gruppo]: { credits, calls } }  — per la torta
       byAction: {},       // { [action]: { credits, costEur, calls } } — dettaglio (costEur dietro le quinte)
