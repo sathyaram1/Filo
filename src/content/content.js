@@ -538,8 +538,8 @@
 
   // Helper: costruisce gli item del menu normale per un determinato evento mouse.
   async function buildBaseItemsAt(mouseEvent) {
-    const target = mouseEvent.target;
-    let selInfo = Extract.getSelectionWithSentence();
+    const target = realTarget(mouseEvent);
+    let selInfo = Extract.getSelectionWithSentence(target);
     if (!selInfo) selInfo = getInputSelectionInfo(target);
     const linkEl = target?.closest?.('a[href]');
     const imgEl = target?.tagName === 'IMG' ? target : target?.closest?.('img');
