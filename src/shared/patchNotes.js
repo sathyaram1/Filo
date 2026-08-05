@@ -18,6 +18,8 @@
     {
       version: '0.2.184', date: '2026-08-05',
       fixes: [
+        'Gli appunti che avevi salvato prima che diventassero documenti dell’editor ora li ritrovi davvero: al primo avvio finiscono in un file "Appunti" nell’editor, in ordine dal più vecchio al più recente, e sono lì nell’elenco documenti insieme agli altri.',
+        'Nell’editor, aprendo la pagina la prima volta su un computer nuovo i documenti che Filo aveva già scritto per conto tuo non vanno più persi: compaiono nell’elenco invece di essere sostituiti da un foglio bianco.',
         'Le richieste ai modelli ora rispettano la politica di Filo sui fornitori: al servizio che le smista viene detto quali produttori NON possono ospitare il modello, e se non resta nessun fornitore ammesso la richiesta si ferma invece di passare da uno escluso.',
         'Nella cronologia delle interazioni AI ora è indicato, quando disponibile, chi ha davvero risposto a ciascuna richiesta, così si può verificare che la politica sia stata rispettata.',
       ],
