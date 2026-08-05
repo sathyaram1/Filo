@@ -107,6 +107,6 @@ function main() {
   console.log(`[patch-notes] ${n} voce/i timbrate come ${version} (${date}).`);
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  main().catch((e) => { console.error('[patch-notes]', e.message); process.exit(1); });
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+  try { main(); } catch (e) { console.error('[patch-notes]', e.message); process.exit(1); }
 }
