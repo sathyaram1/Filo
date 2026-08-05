@@ -301,7 +301,8 @@
     // parola sotto il cursore (zigzag rosso del browser).
     try {
       if (settings?.featureFlags?.spellcheck !== false && SpellCheck) {
-        const editableEl = SpellCheck.findSupportedEditable(e.target);
+        const rt = realTarget(e);
+        const editableEl = SpellCheck.findSupportedEditable(rt);
         if (editableEl) {
           const blueIssue = SpellCheck.getSemanticIssueAt(editableEl, e.clientX, e.clientY);
           if (blueIssue) {
