@@ -1,0 +1,7 @@
+{
+  "id": "70a50a5a-becc-444e-9653-c911f1f42272",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho verificato avviando davvero l'app che i vecchi appunti finiscano nel documento 'Appunti' dell'editor: ho riempito il vecchio archivio con tre appunti, avviato Filo, aperto l'editor e trovato i tre testi nel documento 'Appunti' (dal selettore documenti in alto a sinistra), in ordine cronologico e con data e argomento accanto a ciascuno; il vecchio elenco è rimasto vuoto. Riavviando sullo stesso profilo non si duplica niente: un solo documento 'Appunti', ogni appunto una volta sola. Ho stressato con casi limite: appunto senza testo, testo lunghissimo (10.000 caratteri), emoji, date non valide, e un appunto che contiene del codice (<script>): compare come testo innocuo e non viene eseguito. Con l'archivio assente o corrotto non viene creato nessun documento fantasma e non si blocca nulla. Nessuna perdita: i vecchi appunti vengono cancellati solo dopo che il nuovo documento è stato salvato davvero. Il vecchio elenco separato non è più usato da nessuna parte dell'app. Come controprova ho eseguito la regressione completa dell'editor (40 controlli verdi) e tutta la logica pura (1287 verdi).",
+  "queuedAt": "2026-08-05T15:19:28.851Z",
+  "queuedBy": "routine"
+}
