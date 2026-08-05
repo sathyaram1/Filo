@@ -164,6 +164,8 @@ test('anonimo: invito ad accedere; loggato (lato renderer): il voto passa dal ma
   await expect(works.locator('.bd-vote-count')).toHaveText('1');
   await expect(page.locator('.bd-card .bd-vote-msg').first())
     .toHaveText('Accedi per votare i miglioramenti.');
+  // Traccia ispezionabile del messaggio in pagina (cartella gitignorata).
+  await page.screenshot({ path: 'tests/.shots/board-vote-error.png' }).catch(() => {});
 
   // Un nuovo tentativo azzera la spiegazione precedente (non resta appiccicata).
   await works.click();
