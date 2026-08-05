@@ -7,10 +7,14 @@
 //     di compattazione (svuotato dal Compattatore quando supera 3000 char).
 //   - moduli: PROFILO, PREFERENZE, e N espansioni dinamiche. Sempre persistenti.
 //
-// In aggiunta gestiamo qui anche tre store legati alla dashboard:
-//   - notes: appunti salvati dall'agente (azione SALVA_APPUNTO).
+// In aggiunta gestiamo qui anche due store legati alla dashboard:
 //   - timers: countdown attivi (azione TIMER).
 //   - notifications: voci della colonna destra.
+//
+// Gli appunti NON stanno più qui: l'azione SALVA_APPUNTO li scrive nei file
+// dell'editor (src/main/services/editorFiles.js), che è anche l'unico posto che
+// conosce ancora il vecchio archivio, per svuotarlo una volta sola alla prima
+// partenza dopo l'aggiornamento.
 //
 // Caricato nel service worker via importScripts e nelle pagine via <script>.
 
