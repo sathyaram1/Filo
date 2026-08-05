@@ -120,6 +120,7 @@ test('#398 stress: comandi, path, porte assurde, XSS non diventano indirizzi', a
   await input.fill('/');
   await input.fill('/127.0.0.1:8080');
   await expect(input).toHaveClass(/is-cmd-filo/);
+  await dash.screenshot({ path: 'tests/.shots/verify398-input-stress.png' }).catch(() => {});
 });
 
 // (5) Doppio invio rapido sullo stesso indirizzo: non deve rompere nulla
