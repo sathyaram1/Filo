@@ -144,6 +144,16 @@
     // OWNER_GIFT_CREDITS: regala `amount` crediti all'utente con `email`.
     //   { amount, email } → { ok, email, amount, balance } | { ok:false, error }.
     OWNER_GIFT_CREDITS: 'owner_gift_credits',
+    // OWNER_GET_CREDIT_CONFIG: legge gli importi crediti configurabili (saldo
+    //   iniziale, ricarica, premi…) RISOLTI (default inclusi). Solo owner.
+    //   { } → { ok, config } | { ok:false, error }. Backend per la UI (parte 3).
+    OWNER_GET_CREDIT_CONFIG: 'owner_get_credit_config',
+    // OWNER_UPDATE_CREDIT_CONFIG: scrive gli importi crediti sulla sorgente
+    //   centrale (config/credits), validati; valgono per TUTTI gli utenti. Campi
+    //   assenti/vuoti = "non toccare"; un valore non valido rifiuta tutto il
+    //   salvataggio nominando il campo. Solo owner.
+    //   { config } → { ok, config } | { ok:false, error }.
+    OWNER_UPDATE_CREDIT_CONFIG: 'owner_update_credit_config',
     // Broadcast main→renderer: l'utente corrente ha ricevuto crediti in regalo
     // (#210.4). { amount } → la home mostra un popup una volta sola.
     GIFT_NOTICE: 'gift_notice',
