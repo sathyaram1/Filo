@@ -225,16 +225,18 @@
   }
 
   // Come cleanDomain ma per la blacklist dei siti: accetta anche gli IP.
+  // Un IPv6 scritto a mano senza parentesi ("::1") viene riportato alla forma
+  // con cui gli indirizzi arrivano davvero, invece di essere rifiutato.
   function cleanBlockHost(raw) {
     const domain = cleanDomain(raw);
     if (domain) return domain;
     let s = String(raw || '').trim().toLowerCase();
     if (!s) return '';
+    s = s.replace(/^[a-z]+:\/\//, '').split('/')[0].split('?')[0].split('#')[0];
+    if (!s.startsWith('[') && (s.match(/:/g) || []).length >= 2) s = `[${s}]`;
     try {
-      s = new URL(s.includes('://') ? s : `http://${s}`).hostname;
-    } catch (_) {
-      s = s.split('/')[0].split('?')[0];
-    }
+      s = new URL(`http://${s}`).hostname;
+    } catch (_) { /* non parsabile: resta com'è, sarà scartato sotto */ }
     return isIpHost(s) ? s : '';
   }
 
