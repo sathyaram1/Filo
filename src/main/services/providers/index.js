@@ -55,12 +55,12 @@
     throw lastErr;
   }
 
-  async function complete({ provider, apiKey, model, messages, reasoning, signal }) {
-    return getProvider(provider).complete({ apiKey, model, messages, reasoning, signal });
+  async function complete({ provider, apiKey, model, messages, reasoning, providerRouting, signal }) {
+    return getProvider(provider).complete({ apiKey, model, messages, reasoning, providerRouting, signal });
   }
 
-  async function streamComplete({ provider, apiKey, model, messages, reasoning, onDelta, onReasoning, signal }) {
-    return getProvider(provider).streamComplete({ apiKey, model, messages, reasoning, onDelta, onReasoning, signal });
+  async function streamComplete({ provider, apiKey, model, messages, reasoning, providerRouting, onDelta, onReasoning, signal }) {
+    return getProvider(provider).streamComplete({ apiKey, model, messages, reasoning, providerRouting, onDelta, onReasoning, signal });
   }
 
   async function listModels({ provider, apiKey }) {
