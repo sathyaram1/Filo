@@ -77,10 +77,12 @@
     }));
   }
 
-  async function complete({ apiKey, model, messages, reasoning, signal }) {
+  async function complete({ apiKey, model, messages, reasoning, providerRouting, signal }) {
     const body = { model, messages, stream: false };
     const r = reasoningField(reasoning, false);
     if (r) body.reasoning = r;
+    const pb = providerBlock(providerRouting);
+    if (pb) body.provider = pb;
     const res = await fetch(ENDPOINT, {
       method: 'POST',
       headers: buildHeaders(apiKey),
