@@ -235,9 +235,18 @@ La sorgente è **`src/shared/patchNotes.js`** (IIFE su globalThis,
 `SN_PATCH_NOTES`): lista ordinata di versioni, ciascuna con `features[]` e
 `fixes[]` **scritte in italiano, per l'utente, NON tecniche**.
 
-**Regola**: ogni volta che chiudi un fix o aggiungi una feature **visibile
-all'utente** (qualcosa che vedrà o userà — non refactor/test/infra), aggiungi una
-riga al blocco della versione corrente:
+**Il destinatario è l'UTENTE COMUNE, non l'owner.** Prima di scrivere una voce,
+chiediti: *una persona qualsiasi che ha installato Filo può usare questa cosa?*
+
+- **No** → nessuna voce. Le superfici riservate all'owner (dashboard di gestione,
+  statistiche red team, automazioni, log) e tutto ciò che è interno
+  (refactor, test, build, hook, routine) **non entrano nel changelog**: per chi
+  legge sarebbero il racconto di una funzione che non può nemmeno aprire.
+- **Sì** → **una riga sola**. Non un paragrafo: il recap è un popup che si scorre
+  in dieci secondi, non un report.
+
+**Regola**: ogni volta che chiudi un fix o aggiungi una feature che supera quel
+filtro, aggiungi **una riga** al blocco della versione corrente:
 
 - novità → `features: [...]`; correzione → `fixes: [...]`.
 - Frase breve, orientata al beneficio, **senza spiegare perché era rotto né come
@@ -246,8 +255,6 @@ riga al blocco della versione corrente:
 - Se la versione corrente non ha ancora un blocco, crealo con `version` = quella
   in `package.json` e la data di oggi; altrimenti **accoda** alla versione
   corrente.
-- Le voci puramente interne (refactor, test, build, hook) **non** vanno nel
-  changelog.
 
 Il file è la **singola sorgente di verità** sia del recap sia del calcolo "quante
 patch sei indietro". Tienilo allineato a `package.json`.
