@@ -186,9 +186,11 @@ async function captureCompositeLinux(app, outPath) {
       });
       // xwd emette un formato XWD (X Window Dump), ImageMagick lo converte in PNG.
       const tmpXwd = outPath + '.xwd';
-      require('node:fs').writeFileSync(tmpXwd, xwdData);
+      // NB: questo file è un modulo ES — `require` qui non esiste e il ripiego
+      // moriva con "require is not defined" invece di produrre lo screenshot.
+      writeFileSync(tmpXwd, xwdData);
       execFileSync(convert, [tmpXwd, outPath], { stdio: 'pipe' });
-      try { require('node:fs').unlinkSync(tmpXwd); } catch (_) {}
+      try { unlinkSync(tmpXwd); } catch (_) {}
       return outPath;
     } catch (e) {
       throw new Error('captureCompositeLinux xwd/convert fallita: ' + (e.stderr || e.message));
