@@ -41,7 +41,7 @@ module.exports = function register(on, ctx) {
       // Premio: +10 crediti, una sola volta per feedback per questo utente
       // (idempotente — vedi creditStore.awardVoteOnce). Cambiare idea
       // works↔broken o rivotare lo stesso valore NON ripaga.
-      const amount = SN_CONST.CREDIT.BOARD_VOTE;
+      const amount = Credits.amount('boardVote');
       const reward = await Credits.awardVoteOnce(id, amount);
 
       // Rilegge il documento per tornare il tally REALE (altri voti compresi),
