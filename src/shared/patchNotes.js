@@ -16,6 +16,12 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.186', date: '2026-08-05',
+      fixes: [
+        'Le scorciatoie da tastiera Ctrl+T (nuova scheda), Ctrl+W (chiudi scheda), Ctrl+R (ricarica) e Ctrl+L (vai a scrivere un indirizzo) ora funzionano anche mentre stai guardando un sito, non solo quando il cursore è sulla fila delle schede.',
+      ],
+    },
+    {
       version: '0.2.185', date: '2026-08-05',
       features: [
         'Il tasto destro su un video o su un audio ora offre le azioni di quel contenuto: riproduci o metti in pausa, togli e rimetti l\'audio, cambia velocità (con la velocità attuale sempre in vista), ripeti in continuo, apri il video in finestra mobile, mostra o nascondi i controlli, copia l\'indirizzo e salva il file. Funziona anche quando il filmato è coperto dai comandi del player.',
