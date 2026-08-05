@@ -180,8 +180,8 @@
         }
       }
     }
-    return { text: fullText, usage };
+    return { text: fullText, servedBy, usage };
   }
 
-  global.SN_PROVIDER_OPENROUTER = { listModels, complete, streamComplete, reasoningField, ENDPOINT };
+  global.SN_PROVIDER_OPENROUTER = { listModels, complete, streamComplete, reasoningField, providerBlock, extractServedBy, ENDPOINT };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
