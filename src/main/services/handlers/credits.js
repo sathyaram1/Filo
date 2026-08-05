@@ -280,8 +280,7 @@ module.exports = function register(on, ctx) {
   // +5 crediti subito all'invio di un feedback (C3). Idempotenza per-invio è del
   // chiamante: ogni invio è un evento distinto, quindi premiamo ogni volta.
   on(MSG.CREDITS_AWARD_FEEDBACK, async (msg) => {
-    const { SN_CONST } = globalThis;
-    const amount = (msg && Number(msg.credits)) || SN_CONST.CREDIT.FEEDBACK_SEND;
+    const amount = (msg && Number(msg.credits)) || Credits.amount('feedbackSend');
     const r = await Credits.award({ kind: 'feedback_sent', credits: amount, ref: msg?.ref || null });
     return { ok: true, ...r };
   });
