@@ -182,6 +182,12 @@ test('IPv6 fra parentesi: entra in blacklist intero e blocca', () => {
   assert.equal(SB.shouldBlockNavigation('http://[::1]:9000/x').block, true);
 });
 
+test('IPv6 scritto a mano senza parentesi viene normalizzato e blocca lo stesso', () => {
+  SB.setForTest({ enabled: true, useAdblockLists: false, blacklist: ['::1'] });
+  assert.equal(SB.status().blacklistSize, 1);
+  assert.equal(SB.shouldBlockNavigation('http://[::1]:3000/').block, true);
+});
+
 test('configureFromSettings scarta le voci non valide dalla blacklist salvata', () => {
   SB.configureFromSettings({
     security: { siteBlock: { enabled: true, useAdblockLists: false,
