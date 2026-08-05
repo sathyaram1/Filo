@@ -1731,9 +1731,14 @@
     const handler = SLASH_COMMANDS[text] || SLASH_COMMANDS[firstToken];
     if (handler) { handler(text); inputEl.value = ''; autoGrowInput(); updateInputClass(); return true; }
     // 2) Navigazione diretta a un sito: solo se è un singolo token "tipo sito".
+    //    L'URL (e lo schema: http per i server locali/IP privati, https per i
+    //    domini pubblici) lo compone la stessa logica della vecchia barra
+    //    indirizzi — SN_URL_NAV.normalizeUrl (#398) — così "/localhost:3000" o
+    //    "/192.168.1.1" si aprono davvero invece di partire su un https vuoto.
     if (isSiteToken(text)) {
       const raw = text.slice(1);
-      const url = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+      const url = (self.SN_URL_NAV && self.SN_URL_NAV.normalizeUrl(raw))
+        || (/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
       send({ type: MSG.OPEN_URL, url });
       inputEl.value = '';
       autoGrowInput();
