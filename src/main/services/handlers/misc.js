@@ -43,7 +43,9 @@ async function fetchImageBytes({ url, referrer, session, kind = 'image' }) {
 
 // Una singola richiesta GET. Risolve { redirect:true, location } su 3xx, oppure
 // { buffer, filename } sul body completo; rigetta su errore/troncamento.
-async function httpGetImage(target, referrer, session) {
+async function httpGetImage(target, referrer, session, kind = 'image') {
+  const isMedia = kind === 'video' || kind === 'audio';
+  const maxBytes = isMedia ? MEDIA_DOWNLOAD_MAX : IMG_DOWNLOAD_MAX;
   let u;
   try { u = new URL(target); } catch (_) { throw new Error('URL non valido'); }
   const mod = u.protocol === 'https:' ? require('node:https') : require('node:http');
