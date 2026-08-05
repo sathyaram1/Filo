@@ -25,8 +25,7 @@
   // Quando il buffer di lezioni supera questa soglia in caratteri, il
   // Compattatore va eseguito (vedi spec sezione 4.2).
   const LESSONS_BUFFER_TRIGGER_CHARS = 3000;
-  // Cap difensivo per notifiche/note/timer.
-  const NOTES_CAP = 500;
+  // Cap difensivo per le notifiche.
   const NOTIFICATIONS_CAP = 100;
 
   function uuid() {
