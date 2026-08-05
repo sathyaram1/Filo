@@ -15,6 +15,19 @@ module.exports = function register(on, ctx) {
   const { MSG, broadcastToTabs } = ctx;
   const Credits = globalThis.SN_CREDITS;
   const FB = globalThis.SN_FEEDBACK;
+  const Defaults = require('../defaultsStore');
+
+  // Colleghiamo il motore crediti (logica pura) alla sorgente centrale degli
+  // importi (config/credits, letta e cachata da defaultsStore al refresh). Da qui
+  // in poi refill, saldo iniziale e premi usano gli importi configurati dall'owner
+  // quando presenti, e ripiegano sui default storici quando la sorgente non è
+  // disponibile (offline / non loggato / doc mai scritto). Iniezione SINCRONA:
+  // legge la cache già in memoria, nessuna I/O nel percorso della logica.
+  if (Credits && typeof Credits.setConfigSource === 'function') {
+    Credits.setConfigSource(() => {
+      try { return Defaults.getCreditConfig(); } catch (_) { return null; }
+    });
+  }
 
   // ── uid dell'utente loggato (claim dell'ID token Firebase) ──────────────────
   // Centralizzato in google-auth.js (getUid): lo riusa anche l'handler board.js
