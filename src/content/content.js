@@ -469,6 +469,29 @@
     return false;
   }
 
+  // Video/audio sotto il cursore (#400).
+  // - `mediaEl`: il click è ARRIVATO sul media (o su un suo discendente) — è il
+  //   contesto principale, vince su immagine e link.
+  // - `mediaUnder`: nessun media nel cammino degli antenati, ma ce n'è uno sotto
+  //   al punto cliccato. Succede su quasi tutti i player veri, che coprono il
+  //   filmato con overlay di controllo: il tasto destro arriva all'overlay e il
+  //   <video> non compare fra gli antenati. Lo usiamo come ripiego SOLO quando
+  //   non c'è altro contesto (niente selezione, immagine, link, campo di testo),
+  //   così un video di sfondo non ruba il menu a ciò che sta sopra.
+  function findMedia(target, x, y) {
+    const direct = (target?.tagName === 'VIDEO' || target?.tagName === 'AUDIO')
+      ? target
+      : target?.closest?.('video, audio');
+    if (direct) return { mediaEl: direct, mediaUnder: null };
+    let under = null;
+    try {
+      for (const el of document.elementsFromPoint(x, y) || []) {
+        if (el.tagName === 'VIDEO' || el.tagName === 'AUDIO') { under = el; break; }
+      }
+    } catch (_) {}
+    return { mediaEl: null, mediaUnder: under };
+  }
+
   function isEditable(el) {
     if (!el) return false;
     if (el.matches?.('input, textarea')) {
