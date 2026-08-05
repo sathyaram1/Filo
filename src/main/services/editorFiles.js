@@ -102,15 +102,16 @@ async function migrateNotesToEditor() {
         Store.addFile(collection, file);
         const versions = await getKey(VERSIONS_KEY, {});
         const pointer = { fileId: file.id, topic: '' };
+        // L'archivio vecchio si svuota SOLO dopo che il file è finito
+        // nell'archivio: se qualcosa va storto prima, gli appunti restano dove
+        // sono e la migrazione riparte al prossimo avvio (nessuna perdita).
         await setKeys({
           [COLLECTION_KEY]: collection,
           [VERSIONS_KEY]: versions,
           [POINTER_KEY]: pointer,
           [MIGRATED_KEY]: true,
         });
-        if (FiloMem && typeof FiloMem.clearNotes === 'function') {
-          try { await FiloMem.clearNotes(); } catch (_) {}
-        }
+        await setKeys({ [legacyNotesKey()]: [] });
         return { migrated: true, count: oldNotes.length, fileId: file.id };
       }
     }
