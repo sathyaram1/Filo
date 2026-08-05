@@ -52,7 +52,7 @@
     {
       id: 'close-tab', title: 'Chiudi la scheda', category: 'navigation',
       desc: 'Chiude la scheda corrente; la pagina chiusa finisce nell’archivio, da cui puoi riaprirla.',
-      invoke: 'Pulsante di chiusura sulla scheda, oppure menu del tasto destro → "Chiudi pagina".',
+      invoke: 'Pulsante di chiusura sulla scheda, il menu del tasto destro → "Chiudi pagina", oppure la scorciatoia Ctrl+W (Cmd+W su Mac) — che funziona anche mentre stai guardando un sito.',
       doesNot: 'Le finestre in incognito e le pagine interne di Filo non vengono archiviate.',
     },
     {
