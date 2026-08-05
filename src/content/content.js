@@ -832,7 +832,9 @@
     }
 
     // 3. Zona contestuale — assente se non c'è contesto utile.
-    const contextItems = buildContextualItems({ selInfo, linkEl, imgEl, editable, clipboardHistory });
+    const contextItems = buildContextualItems({
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, editable, clipboardHistory,
+    });
     if (contextItems.length > 0) {
       items.push({ type: 'separator' });
       for (const it of contextItems) items.push(it);
