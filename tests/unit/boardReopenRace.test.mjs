@@ -58,6 +58,14 @@ beforeEach(() => {
 });
 
 globalThis.SN_CREDITS = {
+  // amount(key): importo crediti configurabile risolto (#366.2). Qui, senza una
+  // sorgente config, ripiega sui default storici (SN_CONST.CREDIT), come fa il
+  // motore reale quando la config non è disponibile.
+  amount: (key) => ({
+    boardReopen: SN_CONST.CREDIT.BOARD_REOPEN,
+    boardVote: SN_CONST.CREDIT.BOARD_VOTE,
+    feedbackSend: SN_CONST.CREDIT.FEEDBACK_SEND,
+  }[key]),
   spendIfAffordable: async (amount, meta) => {
     spends.push({ amount, meta });
     return { ok: true, balance: 100 - amount };
