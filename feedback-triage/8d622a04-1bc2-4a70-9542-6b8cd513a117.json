@@ -1,7 +1,0 @@
-{
-  "id": "8d622a04-1bc2-4a70-9542-6b8cd513a117",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: nessun problema rilevato. La lavorazione si e chiusa senza modifiche al codice (era una verifica del comportamento, gia a posto), quindi non ci sono cambiamenti da pubblicare. Segnalazione chiusa.",
-  "queuedAt": "2026-08-05T21:31:13.222Z",
-  "queuedBy": "routine"
-}
