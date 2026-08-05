@@ -14,9 +14,15 @@ test('diag', async ({ openTab }) => {
 
   const diag = await page.evaluate(async (shipped) => {
     window.SN_FEEDBACK.list = () => Promise.resolve([shipped]);
+    let direct = null, directErr = null;
+    try { direct = await window.SN_FEEDBACK.list({ pageSize: 500, timeoutMs: 8000 }); }
+    catch (e) { directErr = String(e); }
     await window.__boardTest.reload();
     const MR = window.SN_MANAGE_REVIEW;
     return {
+      directLen: Array.isArray(direct) ? direct.length : null,
+      directErr,
+      errMsg: document.getElementById('bdErrorMsg').textContent,
       cards: document.querySelectorAll('.bd-card').length,
       listHidden: document.getElementById('bdList').hidden,
       errHidden: document.getElementById('bdError').hidden,
