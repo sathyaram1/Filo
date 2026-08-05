@@ -186,10 +186,13 @@
 
   // Ricompensa (crediti) per la RISOLUZIONE di un feedback in base alla priorità
   // dell'utente (0-3). Priorità mancante/fuori scala → fascia 0. (C5)
-  function rewardForPriority(priority) {
-    const table = CREDIT.FEEDBACK_RESOLVE_BY_PRIORITY || {};
+  function rewardForPriority(priority, config) {
+    const table = effectiveConfig(config).feedbackResolveByPriority;
     const p = Math.max(0, Math.min(3, Math.round(Number(priority) || 0)));
-    return Number(table[p]) || Number(table[0]) || 0;
+    // table[p] è già un importo valido risolto (>= 0): lo 0 esplicito resta 0 e
+    // NON ripiega sulla fascia 0 (era la simmetria mancante che pagava a caso).
+    const v = Number(table[p]);
+    return Number.isFinite(v) && v >= 0 ? v : 0;
   }
 
   // Sottrae i crediti corrispondenti al costo € e aggrega per uso. Il saldo non
