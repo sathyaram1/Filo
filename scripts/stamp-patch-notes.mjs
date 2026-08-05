@@ -48,11 +48,13 @@ function parseArgs(argv) {
   return out;
 }
 
-// Quante voci ha il blocco in lavorazione, senza valutare il file: lo carichiamo
-// come modulo (è un IIFE che si registra su globalThis) e chiediamo a lui.
-async function pendingEntries(file) {
-  const mod = await import(`file://${file}?v=${Date.now()}`);
-  void mod;
+// Quante voci ha il blocco in lavorazione: carichiamo il changelog (è un IIFE
+// che si registra su globalThis) e lo chiediamo a lui, invece di indovinarlo
+// dal testo.
+function pendingEntries(file) {
+  const abs = resolve(file);
+  delete require.cache[abs];
+  require(abs);
   const PN = globalThis.SN_PATCH_NOTES;
   if (!PN || typeof PN.pending !== 'function') {
     throw new Error(`${file} non espone SN_PATCH_NOTES.pending()`);
