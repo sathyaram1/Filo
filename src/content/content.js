@@ -972,6 +972,13 @@
       return items;
     }
 
+    // Nessun altro contesto, ma sotto al punto cliccato c'è un filmato coperto
+    // dall'overlay del player: sono comunque le sue azioni che l'utente cerca.
+    if (mediaUnder) {
+      for (const it of Actions.buildMediaItems(mediaUnder)) items.push(it);
+      return items;
+    }
+
     // Pagina generica senza contesto: nessuna zona contestuale.
     return items;
   }
