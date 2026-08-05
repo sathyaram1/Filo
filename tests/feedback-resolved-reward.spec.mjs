@@ -20,6 +20,14 @@ async function seed(app, feedback) {
   await app.evaluate(async (_electron, { clientId, feedback }) => {
     await globalThis.chrome.storage.local.set({ sn_feedback_client_id: clientId });
     const fresh = globalThis.SN_CREDITS.freshState();
+    // Il saldo cresce anche per altre ragioni legittime (rifornimento di
+    // mezzanotte, bonus giornaliero del feedback autonomo): qui ci interessa
+    // SOLO la ricompensa da feedback risolto, quindi mettiamo quelle fonti a
+    // "già riscosse oggi" e il saldo resta un numero prevedibile.
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    fresh.lastRefillDate = today;
+    fresh.lastAutoFeedbackBonusDate = today;
     await globalThis.SN_CREDITS.writeState(fresh);
     // Niente rete: la lista è quella che passiamo noi.
     globalThis.SN_FEEDBACK.list = async () => feedback;
