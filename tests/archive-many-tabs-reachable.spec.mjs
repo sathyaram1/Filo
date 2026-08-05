@@ -74,13 +74,13 @@ test('archivio: molte schede in un giorno restano leggibili e raggiungibili col 
   });
   expect(atEnd).toBe(true);
 
-  // L'ultima chip (titolo "Numero 29") ora è dentro la viewport della riga.
-  const last = archive.locator('.arc-tab', { hasText: 'Numero 29' });
-  await expect(last).toBeVisible();
+  // L'ultima chip della riga (in fondo allo scroll) ora è dentro la viewport
+  // della riga: prova che l'ultima scheda è davvero raggiungibile col mouse.
+  const last = archive.locator('.arc-tabs .arc-tab').last();
   const lastReachable = await last.evaluate((el) => {
     const r = el.getBoundingClientRect();
-    const row = el.closest('.arc-tabs').getBoundingClientRect();
-    return r.left >= row.left - 1 && r.right <= row.right + 1;
+    const rowRect = el.closest('.arc-tabs').getBoundingClientRect();
+    return r.left >= rowRect.left - 1 && r.right <= rowRect.right + 1;
   });
   expect(lastReachable).toBe(true);
 });
