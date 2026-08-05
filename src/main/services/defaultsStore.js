@@ -163,6 +163,16 @@ function get() {
     // solo il secondo caso finisce nella lista tombstone, quindi l'invariante
     // dei nickname integrati non toccati resta intatta. Un nickname ridefinito
     // dal doc remoto vince comunque (auto-guarigione se l'admin lo ri-aggiunge).
+    // Politica sui fornitori: la lista remota (se presente) sostituisce quella di
+    // build — così l'owner può aggiungere/togliere un produttore senza deploy.
+    if (Array.isArray(remoteModels.excludedProviders)) {
+      out.excludedProviders = remoteModels.excludedProviders
+        .filter((x) => typeof x === 'string' && x.trim())
+        .map((x) => x.trim());
+    }
+    if (typeof remoteModels.providerSort === 'string') {
+      out.providerSort = remoteModels.providerSort.trim();
+    }
     if (Array.isArray(remoteModels.modelRegistryDeleted)) {
       for (const nick of remoteModels.modelRegistryDeleted) {
         if (typeof nick !== 'string' || !nick) continue;
