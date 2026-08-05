@@ -60,10 +60,13 @@ tu** a registrare l'esito e a far girare il gate (L5 deterministico + il tuo L4)
    FILO_L4_VERDICT=pass FILO_L4_REASON="..." node scripts/merge-gate.mjs <branch>
    # feature spezzata: ... node scripts/merge-gate.mjs <branch> --into feature/N
    ```
-3. Chiudi in base all'exit del gate (la nota finisce nella **chat del feedback
-   in dashboard**: scrivi per l'owner — es. "Controllo di sicurezza superato,
-   la modifica è stata pubblicata" + eventuali osservazioni — mai frammenti di
-   diff):
+3. Chiudi in base all'exit del gate. La nota finisce nella **chat del feedback in
+   dashboard**: è **una riga di esito**, non un report. Il report lo ha già
+   scritto chi ha fatto il lavoro e **non va riscritto né riassunto**: tu
+   aggiungi solo cosa è successo al tuo passaggio (es. "Controllo di sicurezza
+   superato, la modifica è stata pubblicata", oppure il motivo del blocco e cosa
+   deve decidere l'owner). Mai frammenti di diff, mai la ridescrizione della
+   feature:
    - `0` → fuso sul target → `node scripts/queue-triage.mjs <id> done "<report>"` + `node scripts/dispatch.mjs --clear-state <id>`
    - `10` → BLOCCATO (L5 o L4) → `node scripts/queue-triage.mjs <id> design "<nota del gate>" --branch <branch> --reason secaudit`
    - `20` → conflitto → risolvi o accoda `design` (come sopra).
