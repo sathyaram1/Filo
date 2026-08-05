@@ -86,9 +86,10 @@ async function writeNote(opts) {
   return { wrote: true, fileId: res.fileId, createdFile: res.createdFile, title: res.title };
 }
 
-// MIGRAZIONE una-tantum: sposta i vecchi appunti dell'archivio (SN_FILO_MEMORY
-// notes) in un file "Appunti" dell'editor, poi svuota l'archivio. Idempotente
-// grazie al flag MIGRATED_KEY. Non lancia mai.
+// MIGRAZIONE una-tantum: sposta i vecchi appunti dell'archivio separato in un
+// file "Appunti" dell'editor, poi svuota l'archivio. Idempotente grazie al flag
+// MIGRATED_KEY. Non lancia mai. È l'ULTIMO punto del codice che conosce la
+// vecchia chiave: nessun altro la legge né la scrive.
 async function migrateNotesToEditor() {
   try {
     if (await getKey(MIGRATED_KEY, false)) return { migrated: false, already: true };
