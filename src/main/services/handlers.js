@@ -1446,8 +1446,15 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // scorrere nelle 3 righe al posto delle frasi indicative. Se il modello non
   // restituisce ragionamento, semplicemente non arriva nulla e restano le frasi.
   const wc = sender?.wc || null;
-  const onReasoning = (reasoningReqId && wc && !wc.isDestroyed?.())
+  const canPush = reasoningReqId && wc && !wc.isDestroyed?.();
+  const onReasoning = canPush
     ? (text) => { try { wc.send('filo:reasoning', { reqId: reasoningReqId, text }); } catch (_) {} }
+    : null;
+  // #420 — la risposta scorre in diretta: inoltriamo alla scheda i delta del
+  // campo "text" (o il segnale di reset dopo un fallback provider). Il client li
+  // mostra nella bolla mano a mano; le azioni restano in coda, invariate.
+  const onText = canPush
+    ? (payload) => { try { wc.send('filo:answer', { reqId: reasoningReqId, ...payload }); } catch (_) {} }
     : null;
 
   // Indice COMPATTO delle capacità di Filo, sempre in contesto: l'agente sa SE
