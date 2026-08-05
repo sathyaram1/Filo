@@ -723,6 +723,10 @@
           ph.textContent = '(immagine non disponibile)';
           // Hover col MOTIVO preciso del fallimento (ripiega sull'URL cifrato).
           ph.title = error || img.dataset.url || '';
+          // L'allegato resta identificabile anche da rotto: senza l'indirizzo
+          // il segnaposto è un buco anonimo e non si sa più a quale file si
+          // riferisse né lo si può recuperare a mano.
+          if (img.dataset.url) ph.dataset.url = img.dataset.url;
           img.replaceWith(ph);
         }
       });
