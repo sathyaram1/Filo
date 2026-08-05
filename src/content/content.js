@@ -257,6 +257,16 @@
     if (reg) reg.applyToDocument(document, tokens || {});
   }
 
+  // Il vero elemento cliccato. Il listener contextmenu vive su window (via il
+  // ponte del page-preload): quando l'evento nasce DENTRO uno shadow root (i
+  // "componenti" web usati dai siti moderni) `e.target` viene ri-targettizzato
+  // all'host del componente, e closest()/tagName non vedono più il link,
+  // l'immagine o il campo davvero cliccati. composedPath()[0] attraversa lo
+  // shadow boundary e restituisce l'elemento reale.
+  function realTarget(e) {
+    return (typeof e?.composedPath === 'function' && e.composedPath()[0]) || e?.target || null;
+  }
+
   // ------------------------------------------------------------
   // Handler contextmenu
   // ------------------------------------------------------------
