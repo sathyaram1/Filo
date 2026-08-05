@@ -401,6 +401,8 @@
     freshState, ensure, applyRefill, costEurToCredits, rewardForPriority,
     applyConsumption, applyAward, isVoteRewardPending, applyConsumptionIfAffordable,
     publicView, dateKey, daysBetween,
+    // config importi (pure + iniezione runtime)
+    validAmount, resolveCreditConfig, effectiveConfig, amount, setConfigSource,
     // async (runtime)
     load, getPublic, recordConsumption, award, wasFeedbackRewarded,
     wasVoteRewarded, awardVoteOnce, spendIfAffordable,
