@@ -263,6 +263,19 @@ async function update(partial, idToken) {
     modelFields.modelRegistryDeleted = toFsValue(deleted);
     modelMask.push('modelRegistryDeleted');
   }
+  // Politica sui fornitori (#421): stesso doc non-segreto. La lista inviata
+  // sostituisce quella remota per intero (l'array è la fonte di verità completa).
+  if (Array.isArray(partial.excludedProviders)) {
+    const clean = partial.excludedProviders
+      .filter((x) => typeof x === 'string' && x.trim())
+      .map((x) => x.trim());
+    modelFields.excludedProviders = toFsValue(clean);
+    modelMask.push('excludedProviders');
+  }
+  if (typeof partial.providerSort === 'string') {
+    modelFields.providerSort = toFsValue(partial.providerSort.trim());
+    modelMask.push('providerSort');
+  }
   if (modelMask.length) await patchDoc(MODELS_DOC, modelFields, modelMask, idToken);
 
   // Doc segreti (chiavi). Scriviamo solo i campi presenti come stringa.
