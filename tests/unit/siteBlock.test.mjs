@@ -154,9 +154,32 @@ test('un URL intero in blacklist viene normalizzato a dominio e blocca davvero',
   assert.equal(SB.shouldBlockNavigation('https://m.facebook.com/x').block, true);
 });
 
-test('un IP non entra nella blacklist (non è un host per suffisso)', () => {
+test('un IP in blacklist blocca davvero (host reale, match esatto)', () => {
+  // Pre-condizione: gli IP venivano scartati in silenzio dalla blacklist —
+  // l'utente scriveva 192.168.1.1, non vedeva nulla di anomalo e credeva di
+  // essere protetto mentre il sito si apriva regolarmente.
   SB.setForTest({ enabled: true, useAdblockLists: false, blacklist: ['192.168.1.1'] });
-  assert.equal(SB.status().blacklistSize, 0);
+  assert.equal(SB.status().blacklistSize, 1);
+  assert.equal(SB.shouldBlockNavigation('http://192.168.1.1/admin').block, true);
+  // Con la porta, e con l'URL intero scritto dall'utente.
+  assert.equal(SB.shouldBlockNavigation('http://192.168.1.1:8080/x').block, true);
+  SB.setForTest({ blacklist: ['http://192.168.1.1:8080/admin'] });
+  assert.equal(SB.status().blacklistSize, 1);
+  assert.equal(SB.shouldBlockNavigation('http://192.168.1.1/').block, true);
+});
+
+test('per un IP il match è esatto: nessun blocco a sorpresa per "suffisso"', () => {
+  SB.setForTest({ enabled: true, useAdblockLists: false, blacklist: ['192.168.1.1'] });
+  assert.equal(SB.shouldBlockNavigation('http://10.0.0.1/').block, false);
+  // "0.1" non è un suffisso di 192.168.1.1: metterlo in lista non blocca l'IP.
+  SB.setForTest({ blacklist: ['1.1'] });
+  assert.equal(SB.shouldBlockNavigation('http://192.168.1.1/').block, false);
+});
+
+test('IPv6 fra parentesi: entra in blacklist intero e blocca', () => {
+  SB.setForTest({ enabled: true, useAdblockLists: false, blacklist: ['[::1]'] });
+  assert.equal(SB.status().blacklistSize, 1);
+  assert.equal(SB.shouldBlockNavigation('http://[::1]:9000/x').block, true);
 });
 
 test('configureFromSettings scarta le voci non valide dalla blacklist salvata', () => {
