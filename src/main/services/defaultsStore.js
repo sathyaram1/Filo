@@ -112,6 +112,12 @@ async function refresh() {
   const models = await fetchDoc(MODELS_DOC, idToken);
   if (models) remoteModels = models;
 
+  // Importi crediti: doc pubblico (nessun token richiesto). {} = 404 (mai
+  // scritto) → nessun override, il motore usa i default. null = lettura fallita
+  // (offline) → teniamo la cache precedente, non azzeriamo.
+  const credits = await fetchDoc(CREDITS_DOC, idToken);
+  if (credits) remoteCredits = credits;
+
   if (idToken) {
     const secrets = await fetchDoc(SECRETS_DOC, idToken);
     if (secrets) remoteSecrets = secrets;
