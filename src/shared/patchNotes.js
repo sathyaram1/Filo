@@ -16,6 +16,12 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.185', date: '2026-08-05',
+      fixes: [
+        'Nella Cronologia, quando in una stessa giornata hai chiuso molte schede, ora le vedi e le raggiungi tutte: le schede restano leggibili (niente più quadratini con una lettera sola) e la riga del giorno scorre in orizzontale con la rotellina del mouse, oltre che con la barra di scorrimento ora visibile.',
+      ],
+    },
+    {
       version: '0.2.184', date: '2026-08-05',
       fixes: [
         'Gli appunti che avevi salvato prima che diventassero documenti dell’editor ora li ritrovi davvero: al primo avvio finiscono in un file "Appunti" nell’editor, in ordine dal più vecchio al più recente, e sono lì nell’elenco documenti insieme agli altri.',
