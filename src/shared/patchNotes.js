@@ -19,6 +19,7 @@
       version: '0.2.186', date: '2026-08-05',
       fixes: [
         'Le scorciatoie da tastiera Ctrl+T (nuova scheda), Ctrl+W (chiudi scheda), Ctrl+R (ricarica) e Ctrl+L (vai a scrivere un indirizzo) ora funzionano anche mentre stai guardando un sito, non solo quando il cursore è sulla fila delle schede.',
+        'Il tasto destro ora offre le stesse azioni ovunque sulla pagina, anche sui blocchi "isolati" che molti siti moderni usano per costruire i loro contenuti: su un link ritrovi Apri in nuova tab, Copia URL, Salva link per dopo, Condividi e Spiega; su un\'immagine Copia, Salva come, Copia indirizzo e Cerca; sul testo selezionato lì dentro Copia, Cerca, Leggi e le risposte di Filo. Prima, dentro quei blocchi, il menu compariva quasi vuoto.',
       ],
     },
     {
