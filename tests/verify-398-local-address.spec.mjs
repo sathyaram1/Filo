@@ -31,6 +31,8 @@ test('#398 /127.0.0.1:porta apre la pagina locale e non finisce in chat', async 
   await input.fill('/' + typed);
   await expect(input).toHaveClass(/is-cmd-filo/);
   await expect(input).not.toHaveClass(/is-cmd-unknown/);
+  // Traccia visiva della colorazione (arancione = riconosciuto).
+  await dash.screenshot({ path: 'tests/.shots/verify398-input-locale.png' }).catch(() => {});
   await input.press('Enter');
 
   const page = await findWindow(app, (u) => u === `http://${typed}`);
