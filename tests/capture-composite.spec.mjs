@@ -34,6 +34,14 @@ test.describe('captureComposite — cattura composita su Linux/xvfb', () => {
   let shell = null;
   let outDir = null;
 
+  // Su una macchina senza `scrot` (né `xwd` + `convert`) questi controlli non
+  // possono dire nulla sull'app: rosso qui significherebbe solo "manca un
+  // pacchetto di sistema", e un rosso che non è un difetto nasconde quelli veri.
+  test.skip(
+    compositeCaptureTool() === null,
+    'nessun tool di cattura schermo installato (scrot, oppure xwd + convert): installa `scrot` per abilitare questi controlli',
+  );
+
   test.beforeAll(async () => {
     mkdirSync(OUT_DIR, { recursive: true });
     outDir = OUT_DIR;
