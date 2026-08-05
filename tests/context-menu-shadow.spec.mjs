@@ -88,19 +88,14 @@ test('immagine dentro uno shadow root: il menu offre le azioni sull\'immagine', 
 test('testo selezionato dentro uno shadow root: il menu offre Copia/Cerca e la risposta inline', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, pageHtml());
 
-  // Seleziona il testo DENTRO lo shadow root. In Chromium la selezione dentro un
-  // componente vive nel root del componente (shadowRoot.getSelection), non in
-  // window.getSelection().
-  await page.evaluate(() => {
-    const host = document.querySelector('isolated-block');
-    const root = host.shadowRoot;
-    const p = root.getElementById('s-text');
-    const range = document.createRange();
-    range.selectNodeContents(p);
-    const sel = (typeof root.getSelection === 'function') ? root.getSelection() : window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(range);
-  });
+  // Selezione VERA (drag del mouse) sul testo dentro lo shadow root: è il gesto
+  // dell'utente. La selezione dentro un componente non è esposta come le altre
+  // (anchor/focus ri-targettizzati all'host → isCollapsed=true pur avendo testo).
+  const box = await page.locator('#s-text').boundingBox();
+  await page.mouse.move(box.x + 4, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width - 4, box.y + box.height / 2, { steps: 8 });
+  await page.mouse.up();
 
   const menu = await openMenuOn(page, '#s-text');
   await page.screenshot({ path: 'tests/.shots/context-menu-shadow-text.png' }).catch(() => {});
