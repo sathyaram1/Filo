@@ -1037,6 +1037,7 @@
       `Caldo e diretto. Mai robotico, mai sycophantic. Breve quando la domanda è semplice, approfondito quando serve. Usa il nome dell'utente con parsimonia. Adatta il tono al momento. Se non sai qualcosa, dillo. Le preferenze dell'utente hanno priorità su queste istruzioni.\n\n` +
       `═══ FORMATO OUTPUT (rigoroso) ═══\n` +
       `Rispondi SOLO con un JSON valido, niente markdown, niente \`\`\`:\n` +
+      `Il campo "text" deve venire SEMPRE per PRIMO, PRIMA di "actions": viene mostrato all'utente MANO A MANO che lo scrivi, quindi scrivilo tutto d'un fiato e lascia le "actions" alla fine. Se la risposta è solo un'azione (es. apri un link) e non hai nulla da dire, "text" è la stringa vuota "" — non scrivere frasi di riempimento.\n` +
       `{\n` +
       `  "text": "<testo della bolla, markdown leggero ammesso>",\n` +
       `  "actions": [\n` +
