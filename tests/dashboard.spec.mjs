@@ -103,22 +103,7 @@ test('FILO_ADD_TIMER crea un timer leggibile via FILO_GET_TIMERS', async ({ app,
   }), created.timer.id);
 });
 
-test('FILO_ADD_NOTE salva una nota e la rilegge', async ({ app, shell }) => {
-  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
-  const page = await newtabPage(app);
-  const added = await page.evaluate(() => new Promise((resolve) => {
-    chrome.runtime.sendMessage({ type: 'filo_add_note', text: 'comprare il pane', context: 'spesa' }, (r) => resolve(r));
-  }));
-  expect(added?.ok).toBe(true);
-  expect(added.note?.text).toBe('comprare il pane');
-
-  const list = await page.evaluate(() => new Promise((resolve) => {
-    chrome.runtime.sendMessage({ type: 'filo_get_notes' }, (r) => resolve(r));
-  }));
-  expect(list?.ok).toBe(true);
-  expect(list.notes.some((n) => n.text === 'comprare il pane')).toBe(true);
-
-  await page.evaluate((id) => new Promise((resolve) => {
-    chrome.runtime.sendMessage({ type: 'filo_delete_note', id }, (r) => resolve(r));
-  }), added.note.id);
-});
+// Gli appunti non hanno più un archivio proprio da leggere/scrivere via
+// messaggi: Filo li scrive nei file dell'editor. Il percorso vero è coperto da
+// audit-notes-visibility.spec.mjs (Filo scrive → il testo compare nell'editor) e
+// da editor-notes-migration.spec.mjs (gli appunti storici finiscono nell'editor).
