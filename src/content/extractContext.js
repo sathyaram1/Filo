@@ -61,7 +61,11 @@
   // pur avendo una range con testo dentro il root. Guardiamo quindi anche la
   // range vera e il testo.
   function selectionHasText(sel) {
-    return !!sel && !sel.isCollapsed && !!sel.rangeCount; /* TEMP-RED-CHECK */
+    if (!sel || !sel.rangeCount) return false;
+    if (!sel.isCollapsed) return true;
+    try { if (!sel.getRangeAt(0).collapsed) return true; } catch (_) {}
+    try { if (sel.toString().trim()) return true; } catch (_) {}
+    return false;
   }
 
   // La selezione "giusta" per un dato bersaglio. window.getSelection() NON espone
