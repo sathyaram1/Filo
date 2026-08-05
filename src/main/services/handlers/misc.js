@@ -26,11 +26,11 @@ const MEDIA_DOWNLOAD_MAX = 512 * 1024 * 1024; // 512MB
 // filename } o rigetta con un errore leggibile (HTTP 4xx/5xx, connessione
 // troncata, immagine vuota/troppo grande). Segue i redirect (max 5) ricalcolando
 // i cookie per l'host di destinazione, come farebbe un browser.
-async function fetchImageBytes({ url, referrer, session }) {
+async function fetchImageBytes({ url, referrer, session, kind = 'image' }) {
   const MAX_REDIRECTS = 5;
   let target = url;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-    const res = await httpGetImage(target, referrer, session); // eslint-disable-line no-await-in-loop
+    const res = await httpGetImage(target, referrer, session, kind); // eslint-disable-line no-await-in-loop
     if (res.redirect) {
       try { target = new URL(res.location, target).href; } catch (_) { throw new Error('redirect non valido'); }
       if (!/^https?:/i.test(target)) throw new Error('redirect non http');
