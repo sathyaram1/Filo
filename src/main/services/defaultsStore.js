@@ -206,6 +206,8 @@ function getPublicForAdmin() {
     provider: eff.provider,
     models: eff.models,
     modelRegistry: eff.modelRegistry,
+    excludedProviders: eff.excludedProviders,
+    providerSort: eff.providerSort,
     apiKeysPresent: {
       openrouter: Boolean(eff.apiKeys.openrouter),
       gemini: Boolean(eff.apiKeys.gemini),
