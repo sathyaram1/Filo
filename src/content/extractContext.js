@@ -55,10 +55,32 @@
     return out;
   }
 
+  // La selezione "giusta" per un dato bersaglio. window.getSelection() NON vede
+  // il testo selezionato dentro uno shadow root (i "componenti" web dei siti
+  // moderni): lì la selezione vive nel root del componente, esposta da
+  // shadowRoot.getSelection() (Chromium). Se il documento non ha una selezione
+  // utile, risaliamo dai root shadow che contengono il bersaglio.
+  function selectionForTarget(target) {
+    const docSel = window.getSelection();
+    if (docSel && !docSel.isCollapsed && docSel.rangeCount) return docSel;
+    let node = target;
+    // Massimo qualche livello per gli shadow annidati (evita loop patologici).
+    for (let i = 0; node && i < 20; i++) {
+      const root = typeof node.getRootNode === 'function' ? node.getRootNode() : null;
+      if (!root || root.nodeType !== 11 /* DOCUMENT_FRAGMENT_NODE (ShadowRoot) */) break;
+      if (typeof root.getSelection === 'function') {
+        const ss = root.getSelection();
+        if (ss && !ss.isCollapsed && ss.rangeCount) return ss;
+      }
+      node = root.host; // sali allo shadow che contiene questo (annidamento)
+    }
+    return docSel;
+  }
+
   // Trova la frase che contiene la selezione, espandendo dal nodo della selezione
   // al nodo testuale completo, e ritagliando alla frase.
-  function getSelectionWithSentence() {
-    const sel = window.getSelection();
+  function getSelectionWithSentence(target) {
+    const sel = selectionForTarget(target);
     if (!sel || sel.isCollapsed || !sel.rangeCount) return null;
     // Solo testo VISIBILE (filtra sr-only, aria-hidden, display:none ecc.)
     const rendered = getRenderedSelectionText(sel).replace(/\s+/g, ' ').trim();
