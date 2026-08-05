@@ -354,8 +354,9 @@ test('doppio clic destro rapido: resta un solo menu', async ({ openTab, testServ
     const page = await testServer.openReady(openTab, `<!doctype html><html><body style="padding:40px">
       <video id="v" width="400" height="220" src="${ms.url('/clip.webm')}"></video>
     </body></html>`);
-    await page.locator('#v').click({ button: 'right', position: { x: 100, y: 60 } });
-    await page.locator('#v').click({ button: 'right', position: { x: 220, y: 140 } });
+    // force: il primo menu copre il video, un utente vero cliccherebbe comunque.
+    await page.locator('#v').click({ button: 'right', force: true, position: { x: 100, y: 60 } });
+    await page.locator('#v').click({ button: 'right', force: true, position: { x: 220, y: 140 } });
     await page.waitForTimeout(400);
     expect(await page.locator('.sn-menu').count()).toBe(1);
   } finally { await ms.close(); }
