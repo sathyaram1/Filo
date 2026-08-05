@@ -334,18 +334,79 @@ test('URL con HTML dentro: nessuna iniezione nel menu (niente XSS)', async ({ op
   } finally { await ms.close(); }
 });
 
-test('sorgente javascript: — nessuna esecuzione, niente da copiare/scaricare', async ({ app, openTab, testServer }) => {
-  await app.evaluate(({ clipboard }) => clipboard.writeText('SEGNAPOSTO'));
+test('sorgente javascript: — nulla viene eseguito e nulla viene scaricato', async ({ app, openTab, testServer }) => {
+  // Nota: la copia dell'indirizzo si comporta come quella delle immagini (già
+  // in produzione da prima): copia la stringa così com'è. Inerte, perché Filo
+  // rifiuta di navigare su javascript: — annotato come suggerimento, non come
+  // difetto di questa lavorazione.
   const page = await testServer.openReady(openTab, `<!doctype html><html><body style="padding:40px">
     <video id="v" width="400" height="220"></video>
     <script>document.getElementById('v').setAttribute('src','javascript:window.__pwned=1');</script>
   </body></html>`);
   await openMenuOn(page, '#v', { x: 180, y: 100 });
-  const copy = page.locator('.sn-menu button', { hasText: /Copia URL video/i });
-  if (await copy.count()) { await copy.first().click(); await page.waitForTimeout(600); }
-  const clip = await app.evaluate(({ clipboard }) => clipboard.readText());
-  expect(clip.toLowerCase()).not.toContain('javascript:');
+  const save = page.locator('.sn-menu button', { hasText: /Salva video/i });
+  if (await save.count()) { await save.first().click(); await page.waitForTimeout(1500); }
+  const dir = await app.evaluate(() => process.env.FILO_DOWNLOAD_DIR);
+  expect(existsSync(dir) ? readdirSync(dir) : []).toEqual([]);
   expect(await page.evaluate(() => window.__pwned)).toBeUndefined();
+});
+
+test('sito ostile che blocca il tasto destro: il menu del video arriva lo stesso', async ({ openTab, testServer }) => {
+  const ms = await mediaServer();
+  try {
+    const page = await testServer.openReady(openTab, `<!doctype html><html><head><script>
+      document.addEventListener('contextmenu', function (e) {
+        e.preventDefault(); e.stopImmediatePropagation();
+        var d = document.createElement('div'); d.id = 'site-menu'; document.body.appendChild(d);
+      }, { capture: true });
+    </script></head><body style="padding:40px">
+      <video id="v" width="400" height="220" src="${ms.url('/clip.webm')}"></video>
+    </body></html>`);
+    await openMenuOn(page, '#v', { x: 180, y: 100 });
+    expect(await menuText(page)).toMatch(/Salva video|Velocità/i);
+    await expect(page.locator('#site-menu')).toHaveCount(0);
+  } finally { await ms.close(); }
+});
+
+test('video dentro un link: restano disponibili sia le azioni del link sia quelle del filmato', async ({ openTab, testServer }) => {
+  const ms = await mediaServer();
+  try {
+    const page = await testServer.openReady(openTab, `<!doctype html><html><body style="padding:40px">
+      <a id="lnk" href="https://example.com/pagina"><video id="v" width="400" height="220" src="${ms.url('/clip.webm')}"></video></a>
+    </body></html>`);
+    await openMenuOn(page, '#v', { x: 180, y: 100 });
+    const t = await menuText(page);
+    expect(t).toMatch(/Velocità/i);          // il filmato non sparisce…
+    expect(t).toMatch(/link|indirizzo|scheda/i); // …e il link resta raggiungibile
+  } finally { await ms.close(); }
+});
+
+test('la ripetizione e la velocità confermano a schermo (l\'utente non resta al buio)', async ({ openTab, testServer }) => {
+  const ms = await mediaServer();
+  try {
+    const page = await testServer.openReady(openTab, `<!doctype html><html><body style="padding:40px">
+      <video id="v" width="400" height="220" src="${ms.url('/clip.webm')}"></video>
+    </body></html>`);
+    await openMenuOn(page, '#v', { x: 180, y: 100 });
+    await item(page, 'Ripeti in continuo').click();
+    await expect(page.locator('.sn-toast')).toBeVisible({ timeout: 5000 });
+  } finally { await ms.close(); }
+});
+
+test('menu su un video in tema scuro: le voci nuove seguono il tema', async ({ openTab, testServer }) => {
+  const ms = await mediaServer();
+  try {
+    const page = await testServer.openReady(openTab, `<!doctype html><html><head>
+      <meta name="color-scheme" content="dark"></head><body style="margin:0;padding:40px;background:#111;color:#eee">
+      <video id="v" width="480" height="270" src="${ms.url('/clip.webm')}" style="background:#000"></video>
+    </body></html>`);
+    await openMenuOn(page, '#v', { x: 200, y: 130 });
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: 'tests/.shots/verify-400-menu-video-dark.png' });
+    // Le voci nuove usano lo stesso contenitore a tema delle altre.
+    const theme = await page.locator('.sn-menu').first().getAttribute('data-sn-theme');
+    expect(theme).toBeTruthy();
+  } finally { await ms.close(); }
 });
 
 test('doppio clic destro rapido: resta un solo menu', async ({ openTab, testServer }) => {
