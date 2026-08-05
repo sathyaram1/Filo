@@ -59,7 +59,9 @@ async function httpGetImage(target, referrer, session, kind = 'image') {
 
   const headers = {
     'User-Agent': 'Mozilla/5.0',
-    Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+    // Un Accept che dichiara solo immagini fa rispondere 406 ad alcuni server
+    // quando l'URL è un filmato: per i media chiediamo il tipo giusto.
+    Accept: isMedia ? `${kind}/*,*/*;q=0.8` : 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
   };
   if (/^https?:/i.test(referrer)) headers.Referer = referrer;
   if (cookieHeader) headers.Cookie = cookieHeader;
