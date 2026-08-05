@@ -521,6 +521,10 @@
     setData(fbs) { allFeedbacks = Array.isArray(fbs) ? fbs : []; renderList(); },
     setSignedIn(email) { signedIn = !!email; uid = email || null; reflectAuth(); renderList(); },
     setReleasedVersion(v) { releasedVersion = v || ''; renderList(); },
+    // Rilancia il caricamento reale (loadData): usato dai test per esercitare il
+    // cammino d'errore (override di FB.list che rigetta → stato d'errore) e il
+    // retry, senza dover simulare la rete davvero assente.
+    reload() { return loadData(); },
   };
 
   if (document.readyState === 'loading') {
