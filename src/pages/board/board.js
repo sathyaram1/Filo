@@ -381,11 +381,15 @@
           if (r.uid) uid = r.uid;
           if (r.awarded && r.credits) flyCreditsFromButton(originRect, r.credits);
         } else {
-          // Errore: torna allo stato precedente al click.
+          // Errore: torna allo stato precedente al click, e spiega perché.
           fb.votes = prevVotes;
+          voteErrors.set(id, (r && r.error) || VOTE_FAIL_MSG);
         }
       })
-      .catch(() => { fb.votes = prevVotes; })
+      .catch(() => {
+        fb.votes = prevVotes;
+        voteErrors.set(id, VOTE_FAIL_MSG);
+      })
       .finally(() => {
         pending.delete(id);
         renderList();
