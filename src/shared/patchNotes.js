@@ -750,11 +750,24 @@
     return 0;
   }
 
+  // Blocchi già RILASCIATI: hanno un numero di versione. Il blocco "in
+  // lavorazione" non ne ha (non esiste ancora una build che lo contenga) e va
+  // escluso da tutto ciò che l'utente vede.
+  function released() {
+    return NOTES.filter((n) => n && !n.unreleased && n.version);
+  }
+
+  // Il blocco "in lavorazione" (note scritte dopo l'ultima release, non ancora
+  // timbrate con un numero di versione), o null se non c'è.
+  function pending() {
+    return NOTES.find((n) => n && n.unreleased) || null;
+  }
+
   // Note delle versioni STRETTAMENTE successive a `lastSeen` (escluso), fino a
   // `current` incluso. Se `lastSeen` è nullo/assente → tutte (primo avvio non
   // mostra nulla a sorpresa: lo decide il chiamante). Ordinate dalla più recente.
   function since(lastSeen, current = latestVersion()) {
-    return NOTES
+    return released()
       .filter((n) => cmpVersion(n.version, current) <= 0
         && (!lastSeen || cmpVersion(n.version, lastSeen) > 0))
       .sort((x, y) => cmpVersion(y.version, x.version));
