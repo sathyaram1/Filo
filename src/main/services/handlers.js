@@ -390,20 +390,40 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
   const attempts = await applyLimitToChain(settings, attemptsRaw);
 
   // Se il caller vuole il RAGIONAMENTO in diretta (es. la chat della home, #priorità1)
-  // usiamo il cammino in streaming, che espone i thought summary del modello via
-  // onReasoning man mano che arrivano. La risposta finale (`text`) è identica al
-  // cammino non-streaming: la accumuliamo dai delta. Senza onReasoning resta tutto
+  // o la RISPOSTA in diretta (#420) usiamo il cammino in streaming, che espone i
+  // thought summary del modello via onReasoning e il testo della risposta via
+  // onText man mano che arrivano. La risposta finale (`text`) è identica al
+  // cammino non-streaming: la accumuliamo dai delta. Senza callback resta tutto
   // come prima (una sola chiamata non-streaming).
-  const result = onReasoning
+  // onText (#420): il JSON di risposta ha "text" come PRIMO campo; estraiamo il
+  // suo valore mano a mano dal buffer grezzo (streamingJson) ed emettiamo solo i
+  // caratteri già sicuri, così la bolla si riempie mentre il modello scrive senza
+  // aspettare le "actions" in coda.
+  const StreamJson = globalThis.SN_STREAM_JSON;
+  const textStreamer = (onText && StreamJson) ? StreamJson.createTextStreamer('text') : null;
+  const result = (onReasoning || onText)
     ? await (async () => {
         let acc = '';
         const r = await Providers.streamCompleteWithFallback({
           attempts, messages, signal,
-          onDelta: (d) => { acc += d; },
-          onReasoning: (t) => { try { onReasoning(t); } catch (_) {} },
+          onDelta: (d) => {
+            acc += d;
+            if (textStreamer) {
+              try {
+                const { delta } = textStreamer.push(d);
+                if (delta) onText({ delta });
+              } catch (_) {}
+            }
+          },
+          onReasoning: (t) => { try { onReasoning && onReasoning(t); } catch (_) {} },
           // Provider caduto a metà stream → il buffer contiene testo parziale
           // del tentativo fallito: azzeralo prima del tentativo successivo (#273).
-          onReset: () => { acc = ''; },
+          // Anche il testo già mostrato in chat va buttato e riscritto dal
+          // tentativo nuovo, non accodato: segnaliamo il reset al client (#420).
+          onReset: () => {
+            acc = '';
+            if (textStreamer) { textStreamer.reset(); try { onText({ reset: true }); } catch (_) {} }
+          },
         });
         return { ...r, text: r.text != null ? r.text : acc };
       })()
