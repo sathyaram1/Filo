@@ -14,9 +14,9 @@
 //   3. "Riprova" rilancia il caricamento: se stavolta va a buon fine, l'errore
 //      sparisce e i miglioramenti compaiono come schede votabili.
 //
-// Esercita il cammino REALE (loadData → FB.list → showLoadError) sostituendo
-// SN_FEEDBACK.list con una funzione che rigetta/risolve, poi chiamando l'hook
-// __boardTest.reload(). Non serve simulare la rete davvero assente.
+// Esercita il cammino REALE (loadData → FB.list → showLoadError) sostituendo la
+// sorgente dati (hook __boardTest.setList) con una funzione che rigetta/risolve,
+// poi rilanciando il caricamento. Non serve simulare la rete davvero assente.
 
 import { test, expect } from './fixtures/electron.mjs';
 
