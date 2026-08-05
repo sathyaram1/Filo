@@ -100,7 +100,7 @@ async function httpGetImage(target, referrer, session, kind = 'image') {
           return;
         }
         const buffer = Buffer.concat(chunks);
-        if (!buffer.length) { reject(new Error('immagine vuota')); return; }
+        if (!buffer.length) { reject(new Error('file vuoto')); return; }
         resolve({ buffer, filename: filenameFromHeaders(res.headers, target) });
       });
       res.on('error', (e) => { if (!aborted) reject(e || new Error('errore risposta')); });
