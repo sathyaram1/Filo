@@ -20,15 +20,15 @@ function pageHtml() {
 
 test('dbg shadow selection', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, pageHtml());
+  // Selezione VERA via drag del mouse dentro lo shadow root.
+  const box = await page.locator('#s-text').boundingBox();
+  await page.mouse.move(box.x + 4, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width - 4, box.y + box.height / 2, { steps: 8 });
+  await page.mouse.up();
   const info = await page.evaluate(() => {
     const host = document.querySelector('isolated-block');
     const root = host.shadowRoot;
-    const p = root.getElementById('s-text');
-    const range = document.createRange();
-    range.selectNodeContents(p);
-    const wsel = window.getSelection();
-    wsel.removeAllRanges();
-    wsel.addRange(range);
     const out = {
       rootHasGetSelection: typeof root.getSelection === 'function',
       winString: window.getSelection().toString(),
