@@ -73,7 +73,7 @@
     {
       id: 'address-bar', title: 'Apri un indirizzo', category: 'navigation',
       desc: 'Scrivi un indirizzo per navigare, o un termine per cercare sul web. Funziona anche con gli indirizzi locali: un server di sviluppo (localhost:3000), un IP (127.0.0.1:8080) o il router di casa (192.168.1.1).',
-      invoke: 'In una nuova scheda scrivi "/" seguito dall\'indirizzo nel campo "Chiedi qualsiasi cosa" (per esempio /example.com o /localhost:3000).',
+      invoke: 'In una nuova scheda scrivi "/" seguito dall\'indirizzo nel campo "Chiedi qualsiasi cosa" (per esempio /example.com o /localhost:3000). Da un sito, Ctrl+L (Cmd+L su Mac) apre la home dove digitare il nuovo indirizzo.',
     },
     {
       id: 'incognito', title: 'Finestra in incognito', category: 'navigation',
