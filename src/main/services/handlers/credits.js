@@ -277,6 +277,28 @@ module.exports = function register(on, ctx) {
     } catch (e) { return { ok: false, error: e?.message || String(e) }; }
   });
 
+  // ── Importi crediti configurabili (backend della futura UI, parte 3) ────────
+  // Legge/scrive la sorgente centrale degli importi. Gate applicativo isAdmin()
+  // qui; la garanzia forte è nelle regole Firestore (write config/credits solo
+  // admin). La UI di modifica arriva nella parte 3: qui c'è solo il canale.
+  on(MSG.OWNER_GET_CREDIT_CONFIG, async () => {
+    if (!auth.isAdmin()) return { ok: false, error: 'Comando riservato al proprietario.' };
+    try {
+      await Defaults.refreshIfStale().catch(() => {});
+      return { ok: true, config: Defaults.getCreditConfigPublic() };
+    } catch (e) { return { ok: false, error: e?.message || String(e) }; }
+  });
+
+  on(MSG.OWNER_UPDATE_CREDIT_CONFIG, async (msg) => {
+    if (!auth.isAdmin()) return { ok: false, error: 'Comando riservato al proprietario.' };
+    try {
+      const idToken = await auth.getIdToken();
+      if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
+      const config = await Defaults.updateCreditConfig(msg?.config || {}, idToken);
+      return { ok: true, config };
+    } catch (e) { return { ok: false, error: e?.message || String(e) }; }
+  });
+
   // +5 crediti subito all'invio di un feedback (C3). Idempotenza per-invio è del
   // chiamante: ogni invio è un evento distinto, quindi premiamo ogni volta.
   on(MSG.CREDITS_AWARD_FEEDBACK, async (msg) => {
