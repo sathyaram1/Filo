@@ -1735,6 +1735,18 @@
     shareLink,
     searchTextOnWeb,
     searchImageOnWeb,
+    // video / audio
+    buildMediaItems,
+    buildMediaSpeedItem,
+    downloadMedia,
+    copyMediaUrl,
+    mediaSrc,
+    toggleMediaPlay,
+    toggleMediaMute,
+    toggleMediaLoop,
+    toggleMediaControls,
+    toggleMediaPip,
+    setMediaSpeed,
     // screenshot / OCR
     takeScreenshot,
     takePartialScreenshot,
