@@ -20,6 +20,7 @@
       fixes: [
         'Nella Cronologia, quando in una stessa giornata hai chiuso molte schede, ora le vedi e le raggiungi tutte: le schede restano leggibili (niente più quadratini con una lettera sola) e la riga del giorno scorre in orizzontale con la rotellina del mouse, oltre che con la barra di scorrimento ora visibile.',
         'La Bacheca e i Feedback ora avvisano quando non riescono a caricare per un problema di connessione, con un messaggio chiaro e un tasto "Riprova", invece di restare in attesa o dire che non c\'è nulla.',
+        'Scrivendo "/" seguito da un indirizzo nel campo della nuova scheda ora si aprono di nuovo anche gli indirizzi locali: un server di sviluppo (localhost:3000), un IP (127.0.0.1:8080) o il router di casa (192.168.1.1). Prima venivano scambiati per testo e finivano in chat.',
       ],
     },
     {
