@@ -103,6 +103,7 @@
     const usage = data.usage || {};
     return {
       text,
+      servedBy: extractServedBy(data),
       usage: {
         promptTokens: usage.prompt_tokens || 0,
         completionTokens: usage.completion_tokens || 0,
