@@ -265,6 +265,25 @@ body[data-state="thread"] .dash-suggestion { justify-content: flex-start; paddin
 }
 .dash-bubble-filo.dash-bubble-pending { color: var(--dash-ink-mute); font-style: italic; }
 
+/* #420 — bolla che si sta scrivendo in diretta: un cursore lampeggiante segnala
+   che la risposta è ancora in arrivo. Sparisce quando lo streaming termina
+   (la classe .dash-bubble-streaming viene tolta a fine turno). */
+.dash-bubble-filo.dash-bubble-streaming::after {
+  content: '';
+  display: inline-block;
+  width: 0.5em;
+  height: 1em;
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  background: currentColor;
+  opacity: 0.55;
+  animation: dash-caret-blink 1s steps(1) infinite;
+}
+@keyframes dash-caret-blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .dash-bubble-filo.dash-bubble-streaming::after { animation: none; }
+}
+
 /* "Filo sta pensando": 3 righe di reasoning che scorrono verso l'alto.
    La riga in cima è quasi trasparente (sta uscendo), quella in basso è piena
    (è appena entrata). Restano al massimo 3 righe visibili; ogni ~900ms le frasi
