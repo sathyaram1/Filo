@@ -335,16 +335,13 @@
   // main) prima che `reloadFromArchive()` faccia in tempo a leggerli. Il mirror
   // lo fa `reloadFromArchive()`, che è l'unico punto che conosce entrambi i lati.
   function loadCollection() {
-    const localRaw = readCollectionRaw();
-    const legacy = readLegacyDoc();
-    bootSynthesized = !(localRaw && Array.isArray(localRaw.files) && localRaw.files.length)
-      && !(legacy && legacy.meta);
     collection = STORE.migrateToCollection({
-      collection: localRaw,
-      legacyDoc: legacy,
+      collection: readCollectionRaw(),
+      legacyDoc: readLegacyDoc(),
       idFactory: () => newId('file'),
       blankFactory: blankFileSerialized,
     });
+    localStorage.setItem(COLLECTION_KEY, JSON.stringify(collection));
   }
 
   // Ricarica la collezione dall'archivio quando Filo (main) ci ha scritto un
