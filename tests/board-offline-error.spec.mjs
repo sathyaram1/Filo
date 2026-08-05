@@ -51,11 +51,12 @@ test('caricamento fallito: stato d\'errore con Riprova, NON "nessun migliorament
   await page.waitForLoadState('domcontentloaded');
   await ready(page);
 
-  // Fissa una versione rilasciata (così un eventuale retric riuscito mostra il
-  // fix) e fai fallire la prossima fetch come farebbe il renderer offline.
+  // Fissa una versione rilasciata (così un eventuale retry riuscito mostra il
+  // fix) e fai fallire la prossima fetch come farebbe il renderer offline
+  // ("Failed to fetch" è proprio ciò che lancia il fetch di Chromium senza rete).
   await page.evaluate(() => {
     window.__boardTest.setReleasedVersion('0.2.71');
-    window.SN_FEEDBACK.list = () => Promise.reject(new TypeError('Failed to fetch'));
+    window.__boardTest.setList(() => Promise.reject(new TypeError('Failed to fetch')));
   });
   await page.evaluate(() => window.__boardTest.reload());
 
