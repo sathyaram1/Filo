@@ -91,11 +91,9 @@ async function migrateNotesToEditor() {
     if (await getKey(MIGRATED_KEY, false)) return { migrated: false, already: true };
     const Notes = NOTES();
     const Store = STORE();
-    const FiloMem = globalThis.SN_FILO_MEMORY;
     if (!Notes || !Store) return { migrated: false };
 
-    const oldNotes = (FiloMem && typeof FiloMem.listNotes === 'function')
-      ? await FiloMem.listNotes() : [];
+    const oldNotes = await getKey(legacyNotesKey(), []);
 
     if (Array.isArray(oldNotes) && oldNotes.length) {
       const collection = await loadCollection();
