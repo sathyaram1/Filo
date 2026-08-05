@@ -15,13 +15,43 @@ import { readdirSync, existsSync } from 'node:fs';
 // MP4 minimo (non riproducibile, ma serve solo come "file" da scaricare/linkare).
 const MP4 = Buffer.from('AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAAIZnJlZQ==', 'base64');
 
-// Pagina con un <video> vero: niente sorgente reale, ci interessa che l'elemento
-// esista e risponda ai comandi (pausa, velocità, ripetizione).
+// WAV di silenzio (1s, 8kHz, 8 bit): un media che Chromium riproduce DAVVERO,
+// necessario per verificare che "Pausa"/"Riproduci" agiscano sulla riproduzione.
+function silentWav() {
+  const sr = 8000;
+  const n = sr; // 1 secondo
+  const data = Buffer.alloc(n, 128);
+  const h = Buffer.alloc(44);
+  h.write('RIFF', 0); h.writeUInt32LE(36 + n, 4); h.write('WAVE', 8);
+  h.write('fmt ', 12); h.writeUInt32LE(16, 16); h.writeUInt16LE(1, 20); h.writeUInt16LE(1, 22);
+  h.writeUInt32LE(sr, 24); h.writeUInt32LE(sr, 28); h.writeUInt16LE(1, 32); h.writeUInt16LE(8, 34);
+  h.write('data', 36); h.writeUInt32LE(n, 40);
+  return Buffer.concat([h, data]);
+}
+
+// Serve un file binario su una porta propria (⇒ altra origine, come i CDN veri).
+async function serveBinary(buffer, contentType) {
+  const srv = createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': contentType, 'Content-Length': buffer.length });
+    res.end(buffer);
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  return {
+    url: (name) => `http://127.0.0.1:${srv.address().port}/${name}`,
+    async close() {
+      try { srv.closeAllConnections?.(); } catch (_) {}
+      await new Promise((r) => srv.close(r));
+    },
+  };
+}
+
+// Pagina con un <video> vero: niente sorgente decodificabile, ci interessa che
+// l'elemento esista e risponda ai comandi (velocità, ripetizione, controlli).
 function pageHtml(videoSrc) {
   return `<!doctype html><html><body style="padding:24px;font:16px sans-serif">
     <h1>Articolo con filmato</h1>
     <video id="v" src="${videoSrc}" width="320" height="180" style="background:#333"></video>
-    <audio id="a" src="${videoSrc}" style="display:block;width:300px;height:40px"></audio>
+    <audio id="a" src="${videoSrc}" controls style="display:block;width:300px"></audio>
     <p id="testo">Un paragrafo qualsiasi sotto al video.</p>
   </body></html>`;
 }
