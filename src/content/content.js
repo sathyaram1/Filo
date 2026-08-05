@@ -532,6 +532,7 @@
     if (!selInfo) selInfo = getInputSelectionInfo(target);
     const linkEl = target?.closest?.('a[href]');
     const imgEl = target?.tagName === 'IMG' ? target : target?.closest?.('img');
+    const { mediaEl, mediaUnder } = findMedia(target, mouseEvent.clientX, mouseEvent.clientY);
     const editable = isEditable(target);
     // Cattura il contesto di incolla (elemento + caret/selezione) anche per i
     // menu di correzione: senza questo, l'item "Incolla" del menu spellcheck
