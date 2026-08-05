@@ -87,13 +87,13 @@ export function stamp(src, version, date) {
   return head + fresh + src.slice(m.index + m[0].length);
 }
 
-async function main() {
+function main() {
   const { version, file, date } = parseArgs(process.argv.slice(2));
   if (!/^\d+\.\d+\.\d+/.test(version)) {
     console.error('uso: node scripts/stamp-patch-notes.mjs <versione> [--file path] [--date YYYY-MM-DD]');
     process.exit(2);
   }
-  const n = await pendingEntries(file);
+  const n = pendingEntries(file);
   if (n < 0) {
     console.error('[patch-notes] nessun blocco "in lavorazione" nel changelog: niente da timbrare.');
     process.exit(1);
