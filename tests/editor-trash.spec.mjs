@@ -85,9 +85,13 @@ test('due eliminazioni di fila: l\'"Annulla" del PRIMO documento è ancora lì e
 test('un documento eliminato resta nel cestino e si recupera anche dopo aver riaperto la pagina', async ({ openTab }) => {
   const page = await openTab('filo://editor/editor.html');
   await page.waitForSelector('#doc');
-  await page.evaluate(() => {
+  // Pulizia: la collezione vive in DUE posti (locale + archivio dell'app, da cui
+  // Filo la legge per scriverci gli appunti). Azzerarne uno solo lascerebbe
+  // l'altro a rifornire i documenti alla riapertura.
+  await page.evaluate(async () => {
     localStorage.removeItem('filo.editor.trash');
     localStorage.removeItem('filo.editor.collection');
+    try { await chrome.storage.local.remove('filo.editor.collection'); } catch (_) {}
   });
   await page.reload();
   await page.waitForSelector('#doc');
@@ -130,9 +134,13 @@ test('un documento eliminato resta nel cestino e si recupera anche dopo aver ria
 test('dal cestino si può anche buttare via per sempre, ma solo confermando', async ({ openTab }) => {
   const page = await openTab('filo://editor/editor.html');
   await page.waitForSelector('#doc');
-  await page.evaluate(() => {
+  // Pulizia: la collezione vive in DUE posti (locale + archivio dell'app, da cui
+  // Filo la legge per scriverci gli appunti). Azzerarne uno solo lascerebbe
+  // l'altro a rifornire i documenti alla riapertura.
+  await page.evaluate(async () => {
     localStorage.removeItem('filo.editor.trash');
     localStorage.removeItem('filo.editor.collection');
+    try { await chrome.storage.local.remove('filo.editor.collection'); } catch (_) {}
   });
   await page.reload();
   await page.waitForSelector('#doc');
