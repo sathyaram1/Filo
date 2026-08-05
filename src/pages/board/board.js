@@ -99,6 +99,7 @@
   function renderList() {
     const items = MR.listBoardTab(allFeedbacks, { releasedVersion });
     bdLoading.hidden = true;
+    if (bdError) bdError.hidden = true;
     bdList.innerHTML = '';
 
     if (!items.length) {
