@@ -74,13 +74,25 @@ test('cronologia AI: ricerca/filtro senza risultati non dicono "nessuna interazi
   await expect(empty).toBeVisible();
   await expect(empty).toHaveText('Nessun risultato per la ricerca.');
 
-  // Filtro per tipo senza risultati (la voce è "explain", filtriamo "help").
+  // Il menu "filtra per tipo" offre SOLO i tipi realmente presenti in
+  // cronologia: con la sola voce "explain" NON esiste un'opzione "help", quindi
+  // l'utente non può nemmeno filtrare fino a svuotare la lista mostrando un
+  // messaggio fuorviante. È proprio questa la garanzia contro lo stato vuoto
+  // ingannevole del filtro.
   await history.fill('#search', '');
-  await history.selectOption('#filter', 'help');
-  await expect(empty).toBeVisible();
-  await expect(empty).toHaveText('Nessuna interazione per il filtro selezionato.');
+  const filterValues = await history.locator('#filter option').evaluateAll(
+    (opts) => opts.map((o) => o.value),
+  );
+  expect(filterValues).toContain('explain');
+  expect(filterValues).not.toContain('help');
 
-  // Rimuovendo il filtro la voce ricompare.
+  // Filtrando per un tipo che ESISTE, la sua voce resta visibile (nessun falso
+  // "cronologia vuota").
+  await history.selectOption('#filter', 'explain');
+  await expect(history.locator('.sn-history-item')).toHaveCount(1);
+  await expect(empty).toBeHidden();
+
+  // Rimuovendo il filtro la voce resta.
   await history.selectOption('#filter', '');
   await expect(history.locator('.sn-history-item')).toHaveCount(1);
   await expect(empty).toBeHidden();

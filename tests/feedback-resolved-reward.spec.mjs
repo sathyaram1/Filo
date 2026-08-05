@@ -20,6 +20,11 @@ async function seed(app, feedback) {
   await app.evaluate(async (_electron, { clientId, feedback }) => {
     await globalThis.chrome.storage.local.set({ sn_feedback_client_id: clientId });
     const fresh = globalThis.SN_CREDITS.freshState();
+    // Isola la ricompensa di RISOLUZIONE (C5) dal bonus giornaliero separato
+    // "feedback autonomo attivo" (+10, F4), che altrimenti scatterebbe al primo
+    // init con il clientId impostato e sporcherebbe il saldo atteso. Lo marchiamo
+    // come già ricevuto oggi: qui misuriamo SOLO il premio per il feedback risolto.
+    fresh.lastAutoFeedbackBonusDate = globalThis.SN_CREDITS.dateKey();
     await globalThis.SN_CREDITS.writeState(fresh);
     // Niente rete: la lista è quella che passiamo noi.
     globalThis.SN_FEEDBACK.list = async () => feedback;

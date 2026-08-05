@@ -47,6 +47,13 @@ async function setupAdmin(app, page, feedback, captureUpdates = false) {
       if (msg && msg.type === 'auth_status') {
         return { ok: true, isAdmin: true, profile: { email: 'sathyarampontillo@gmail.com' } };
       }
+      // Il main decifra/scarica le immagini allegate ed è admin-gated: qui non
+      // c'è una sessione admin REALE lato main (è finta solo lato renderer),
+      // quindi mockiamo il decrypt perché l'immagine si risolva come per un admin
+      // vero. Ritorna un 1×1 PNG deterministico.
+      if (msg && msg.type === 'feedback_decrypt_image') {
+        return { ok: true, dataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==' };
+      }
       return orig(msg);
     };
   }, { fb: feedback, capture: captureUpdates });
@@ -98,19 +105,16 @@ test('un allegato in una RISPOSTA si mostra nella sua bolla, NON nella segnalazi
 
   await page.locator('[data-tab="done"]').click();
 
-  // L'allegato compare nell'area immagini della bolla RISPOSTA (lato utente, non
-  // report). La sorgente del file di test è un URL finto che non si carica:
-  // l'<img> può essere sostituito al volo dal placeholder "(immagine non
-  // disponibile)". In entrambe le forme l'URL è presente (img[src]/[data-full] o
-  // title del placeholder): asseriamo l'URL, non quale dei due nodi sopravvive,
-  // così il test non è in balìa del timing del fallimento di rete.
+  // L'allegato compare — e si RISOLVE come immagine — nell'area immagini della
+  // bolla RISPOSTA (lato utente, non report). Col decrypt mockato (admin vero),
+  // l'<img> resta un'immagine (niente placeholder rotto): il suo URL sorgente
+  // (data-url) è quello dell'allegato della risposta e viene mostrato (src
+  // riempito col contenuto decifrato).
   const replyBubble = page.locator('.fb-bubble--user:not(.fb-bubble--report)');
-  const attEl = replyBubble.locator('.fb-imgs img, .fb-imgs .fb-img-broken');
+  const attEl = replyBubble.locator('.fb-imgs img');
   await expect(attEl).toHaveCount(1);
-  const attUrl = await attEl.first().evaluate(
-    (el) => el.getAttribute('data-full') || el.getAttribute('src') || el.getAttribute('title') || '',
-  );
-  expect(attUrl).toMatch(/shot\.png/);
+  await expect(attEl.first()).toHaveAttribute('data-url', /shot\.png/);
+  await expect(attEl.first()).toHaveAttribute('src', /^data:image\//);
   // …e NON nella bolla della segnalazione (che resta senza immagini).
   await expect(page.locator('.fb-bubble--report .fb-imgs')).toHaveCount(0);
   // La riga-marcatore grezza non deve apparire come testo nella bolla.
