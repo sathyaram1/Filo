@@ -114,7 +114,8 @@
         // provider (#273): se non sa farlo, non ritentiamo.
         const r = await withNetworkRetry(
           () => getProvider(a.provider).streamComplete({
-            apiKey: a.apiKey, model: aModel, reasoning: a.reasoning, messages, signal,
+            apiKey: a.apiKey, model: aModel, reasoning: a.reasoning,
+            providerRouting: a.providerRouting, messages, signal,
             onDelta: onDelta ? (d) => { emitted = true; onDelta(d); } : onDelta,
             onReasoning: onReasoning ? (t) => { emitted = true; onReasoning(t); } : onReasoning,
           }),
