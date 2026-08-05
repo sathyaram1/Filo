@@ -165,6 +165,22 @@ Queste non sono scelte di design — sono completezza. Falle.
 **Regola d'oro anti scope-creep**: nel report finale **elenca esplicitamente cosa
 hai aggiunto oltre il chiesto**. Senza elenco esplicito è invisibile e si accumula nel codice.
 
+### Se fai una cosa DIVERSA da quella chiesta, dillo per primo
+
+Puoi consegnare qualcosa di diverso da quanto chiesto quando è oggettivamente
+meglio — è incoraggiato. Ma **la deviazione va dichiarata in cima al report**, con
+il perché. Non basta descrivere la cosa che hai fatto: se l'utente si aspettava A
+e riceve B, deve leggere "ho fatto B invece di A perché…", non dedurlo usando
+l'app.
+
+Vale anche quando la richiesta era **implicita**: il feedback arriva spesso con
+uno **screenshot** o un riferimento a un punto preciso della UI. Se l'immagine
+indica un posto e tu ne scegli un altro, quella è una deviazione da dichiarare,
+anche se a parole l'utente non aveva scritto dove.
+
+Non dichiararla ha un costo doppio: l'utente non trova la cosa dove se
+l'aspettava, e non può nemmeno valutare se la tua scelta era quella giusta.
+
 ## Tono dei report e delle notes
 
 I report finali (chat) e le `notes` su Firestore sono **per l'utente**, non per
