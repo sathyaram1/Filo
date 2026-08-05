@@ -390,10 +390,8 @@
     FILO_GENERATE_DASHBOARD: 'filo_generate_dashboard',
     // CRUD memoria/contenuti dashboard
     FILO_GET_MEMORY: 'filo_get_memory',
-    FILO_GET_NOTES: 'filo_get_notes',
-    FILO_ADD_NOTE: 'filo_add_note',                // { text, context? }
-    FILO_DELETE_NOTE: 'filo_delete_note',          // { id }
-    FILO_CLEAR_NOTES: 'filo_clear_notes',          // svuota tutti gli appunti
+    // (Gli appunti non hanno più messaggi propri: sono file dell'editor, scritti
+    // dall'azione SALVA_APPUNTO e letti aprendo l'editor.)
     FILO_GET_TIMERS: 'filo_get_timers',
     FILO_ADD_TIMER: 'filo_add_timer',              // { label, seconds }
     FILO_DELETE_TIMER: 'filo_delete_timer',        // { id }
