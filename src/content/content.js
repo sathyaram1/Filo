@@ -544,7 +544,9 @@
       Actions.getClipboardHistory(),
       Actions.getNavState(),
     ]);
-    return buildMenuItems({ selInfo, linkEl, imgEl, editable, clipboardHistory, navState });
+    return buildMenuItems({
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, editable, clipboardHistory, navState,
+    });
   }
 
   // Sub-menu per una correzione "rosso" (parola): aggiungi al dizionario,
