@@ -30,17 +30,28 @@ convenzioni di lavoro (sintomo-vs-causa, invarianti UX, tono, verifica) sono in
    ```
    Lo spec deve **asserire il successo** della feature (non solo che un errore
    non compaia). Aggiungilo/aggiornalo se serve.
-8. Aggiorna `src/shared/patchNotes.js` (se user-visible) e
-   `src/shared/capabilities.js` (se cambia una capacità utente).
+8. Aggiorna `src/shared/capabilities.js` (se cambia una capacità utente).
 9. **Non fondere su `main`**: l'hook committa e pusha sul branch.
 
 ## Come riporti
 
-Il report finisce nella **chat del feedback in dashboard**: è l'unica traccia
-della correzione che l'owner vede. Scrivilo **per l'utente** (niente nomi
-tecnici, spiega il comportamento) ma **COMPLETO**: cosa si rompeva, cosa hai
-corretto e cosa vedrà di diverso, le **decisioni prese** e perché, ciò che è
-**emerso** lavorando, cosa hai aggiunto oltre il chiesto, come hai verificato.
+Sei tu — non un ruolo a valle — a scrivere **entrambi** i testi che l'owner
+leggerà. Nessuno dopo di te li riscriverà.
+
+**1. Il report per l'owner** (la nota del feedback in dashboard). È **minimo**:
+struttura e divieti in `CLAUDE.md` § "Tono dei report e delle notes". Conferma in
+una riga, scelte funzionali diverse dal chiesto col perché, scelte tecniche non
+ovvie che ricadono sull'owner (servizi a pagamento, dati utente, decisioni
+difficili da invertire). **Non** ridescrivere il problema, **non** elencare come
+hai verificato, **non** vantare comportamenti attesi.
+
+⚠️ Se hai consegnato qualcosa di **diverso da quanto chiesto**, dillo **nella
+prima riga**, col perché — comprese le richieste **implicite** (uno screenshot
+che indicava un punto preciso della UI e tu ne hai scelto un altro).
+
+**2. La riga di changelog** in `src/shared/patchNotes.js`, regole in `CLAUDE.md`
+§ "Patch notes". Se il lavoro tocca solo superfici riservate all'owner o parti
+interne → **niente riga**. Altrimenti **una riga sola**, più asciutta del report.
 
 Poi rimetti il branch in coda di verifica **passando il report come secondo
 argomento** (senza, la correzione è invisibile all'owner): il prossimo giro di
