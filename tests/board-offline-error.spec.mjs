@@ -86,14 +86,14 @@ test('Riprova recupera: dopo un caricamento riuscito il fix compare come scheda 
   // Primo giro: fallisce → stato d'errore.
   await page.evaluate(() => {
     window.__boardTest.setReleasedVersion('0.2.71');
-    window.SN_FEEDBACK.list = () => Promise.reject(new TypeError('Failed to fetch'));
+    window.__boardTest.setList(() => Promise.reject(new TypeError('Failed to fetch')));
   });
   await page.evaluate(() => window.__boardTest.reload());
   await expect(page.locator('#bdError')).toBeVisible();
 
   // Ora la rete "torna": la prossima fetch risolve col fix in produzione.
   await page.evaluate((shipped) => {
-    window.SN_FEEDBACK.list = () => Promise.resolve([shipped]);
+    window.__boardTest.setList(() => Promise.resolve([shipped]));
   }, SHIPPED);
 
   // Clic su Riprova → il caricamento riparte e va a buon fine.
