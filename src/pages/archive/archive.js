@@ -349,8 +349,26 @@
     return row;
   }
 
+  // La rotellina verticale del mouse scrolla in orizzontale la riga di un
+  // giorno (le righe .arc-tabs non hanno scroll verticale) — stessa logica
+  // della barra delle tab in alto (shell.js §6). Senza questo, con molte schede
+  // in un giorno le eccedenti restavano irraggiungibili col solo mouse. Handler
+  // delegato su #list: trova la riga sotto il puntatore e scrolla solo se c'è
+  // davvero overflow. I risultati della ricerca (.arc-results) vanno a capo e
+  // non hanno .arc-tabs, quindi non vengono intercettati.
+  function onListWheel(e) {
+    const row = e.target.closest && e.target.closest('.arc-tabs');
+    if (!row) return;
+    if (row.scrollWidth <= row.clientWidth) return;
+    const delta = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+    if (!delta) return;
+    row.scrollLeft += delta;
+    e.preventDefault();
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     load();
+    $('list').addEventListener('wheel', onListWheel, { passive: false });
     // Digitare = filtro testuale immediato (e si esce dalla modalità semantica).
     $('search').addEventListener('input', () => {
       semanticResults = null;
