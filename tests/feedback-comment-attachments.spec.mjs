@@ -47,6 +47,13 @@ async function setupAdmin(app, page, feedback, captureUpdates = false) {
       if (msg && msg.type === 'auth_status') {
         return { ok: true, isAdmin: true, profile: { email: 'sathyarampontillo@gmail.com' } };
       }
+      // Il main decifra/scarica le immagini allegate ed è admin-gated: qui non
+      // c'è una sessione admin REALE lato main (è finta solo lato renderer),
+      // quindi mockiamo il decrypt perché l'immagine si risolva come per un admin
+      // vero. Ritorna un 1×1 PNG deterministico.
+      if (msg && msg.type === 'feedback_decrypt_image') {
+        return { ok: true, dataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==' };
+      }
       return orig(msg);
     };
   }, { fb: feedback, capture: captureUpdates });
