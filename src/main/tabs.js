@@ -1324,6 +1324,27 @@ class TabManager {
           }
         }
       }
+      // #404 — Ctrl/Cmd+T/W/L/R "da browser". La shell (src/renderer/shell.js)
+      // le gestisce nel keydown della barra, ma quel keydown NON riceve eventi
+      // quando il focus è dentro una pagina (WebContentsView): risultato, le
+      // scorciatoie erano morte proprio mentre si naviga un sito — il caso più
+      // comune. Come per Alt+cifra qui sopra, le intercettiamo per-webContents
+      // così valgono anche dalle pagine. In un browser questi tasti sono
+      // riservati alla shell e vincono SEMPRE sulla pagina: preventDefault li
+      // toglie al contenuto (niente doppio reload su Ctrl+R, ecc.). Escludiamo
+      // Alt per non catturare AltGr (Ctrl+Alt su Windows), che sui layout
+      // europei serve a digitare caratteri mentre si scrive nella pagina.
+      // `tab` è la scheda che ha il focus (quella che riceve l'input) = quella
+      // che l'utente sta guardando, quindi è la "scheda corrente" su cui agire.
+      if (input.type === 'keyDown' && (input.control || input.meta) && !input.alt) {
+        const k = String(input.key || '').toLowerCase();
+        if (k === 't') { event.preventDefault(); this.openTab('filo://newtab/'); return; }
+        if (k === 'w') { event.preventDefault(); this.closeTab(tab.id); return; }
+        // L'indirizzo si digita dalla home (la barra indirizzi è stata tolta):
+        // Ctrl+L apre la home di Filo, esattamente come nella shell.
+        if (k === 'l') { event.preventDefault(); this.navigate(tab.id, 'filo://newtab/'); return; }
+        if (k === 'r') { event.preventDefault(); this.reload(tab.id); return; }
+      }
     });
     // Navigazione main-frame iniziata dalla pagina (click su link,
     // window.location). Due casi richiedono di RICREARE la view invece di
