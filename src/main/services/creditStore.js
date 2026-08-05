@@ -140,14 +140,14 @@
     };
   }
 
-  function ensure(state) {
-    const s = state && state.initialized ? state : freshState();
+  function ensure(state, config) {
+    const s = state && state.initialized ? state : freshState(dateKey(), config);
     if (!s.byUsage) s.byUsage = {};
     if (!s.byAction) s.byAction = {};
     if (!Array.isArray(s.rewards)) s.rewards = [];
     if (!s.rewardedFeedback) s.rewardedFeedback = {};
     if (!s.rewardedVotes) s.rewardedVotes = {};
-    if (typeof s.balance !== 'number') s.balance = CREDIT.INITIAL;
+    if (typeof s.balance !== 'number') s.balance = effectiveConfig(config).initial;
     if (!s.lastRefillDate) s.lastRefillDate = dateKey();
     // F4: campo bonus auto-feedback (retrocompatibile).
     if (typeof s.lastAutoFeedbackBonusDate !== 'string') s.lastAutoFeedbackBonusDate = '';
