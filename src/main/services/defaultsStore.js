@@ -28,10 +28,16 @@ const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_I
 const MODELS_DOC = 'config/models';
 const SECRETS_DOC = 'config/secrets';
 const AUTOMATION_DOC = 'config/automation';
+// Importi crediti configurabili dall'owner (gamification). NON è segreto (sono
+// solo i numeri di crediti che l'utente vede già in app; il costo € reale non ci
+// finisce mai): lettura PUBBLICA come config/models, così un nuovo valore
+// raggiunge OGNI installazione, anche non loggata. Scrittura solo admin (regole).
+const CREDITS_DOC = 'config/credits';
 
 // Cache degli override remoti dall'ultimo refresh.
 let remoteModels = null;  // { provider?, models?, modelRegistry? }
 let remoteSecrets = null; // { apiKeys?: { openrouter?, gemini?, tavily? }, safeBrowsingKey? }
+let remoteCredits = null; // { initial?, dailyRefill?, feedbackResolveByPriority?, ... }
 let lastFetchTs = 0;
 
 // ── Firestore Value <-> JS ───────────────────────────────────────────────────
