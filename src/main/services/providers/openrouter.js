@@ -31,6 +31,35 @@
     return Object.keys(out).length ? out : null;
   }
 
+  // Blocco `provider` per il routing (politica sui fornitori, #421). OpenRouter
+  // di suo sceglie l'host col prezzo migliore, che può essere il produttore del
+  // modello — escluso dalla politica di Filo. Con `ignore` gli diciamo quali NON
+  // usare (forme base dei produttori); se dopo l'esclusione non resta nessun host
+  // ammesso OpenRouter risponde con un errore, che risale come un normale errore
+  // provider: la richiesta FALLISCE in modo evidente invece di passare da un host
+  // escluso. `sort` sceglie l'ordine fra gli ammessi (latency/throughput) invece
+  // del prezzo. Non tocchiamo `allow_fallbacks`: vogliamo che, fra gli host
+  // AMMESSI, il ripiego automatico resti attivo.
+  function providerBlock(routing) {
+    if (!routing || typeof routing !== 'object') return null;
+    const p = {};
+    const ignore = Array.isArray(routing.ignore) ? routing.ignore.filter(Boolean) : [];
+    if (ignore.length) p.ignore = ignore;
+    if (routing.sort === 'latency' || routing.sort === 'throughput' || routing.sort === 'price') {
+      p.sort = routing.sort;
+    }
+    if (routing.allowFallbacks === false) p.allow_fallbacks = false;
+    return Object.keys(p).length ? p : null;
+  }
+
+  // Chi ha DAVVERO servito la risposta (#421). OpenRouter lo riporta a livello di
+  // risposta come `provider`; per robustezza guardiamo anche dentro la choice.
+  function extractServedBy(obj) {
+    if (!obj || typeof obj !== 'object') return null;
+    const v = obj.provider || obj.choices?.[0]?.provider || null;
+    return (typeof v === 'string' && v.trim()) ? v.trim() : null;
+  }
+
   async function listModels(apiKey) {
     const res = await fetch(MODELS_ENDPOINT, {
       headers: { Authorization: `Bearer ${apiKey}` },
