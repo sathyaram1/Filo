@@ -1467,6 +1467,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     payload: { profilo, preferenze, espansioni, lezioni, stato: stateText, threadMessages, capacita, files: fileSummaries },
     origin: 'filo:chat',
     onReasoning,
+    onText,
   });
 
   const parsed = extractJson(r.text) || { text: r.text || '', actions: [] };
