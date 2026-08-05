@@ -138,6 +138,9 @@ test('gli appunti del vecchio archivio finiscono nel file "Appunti" dell’edito
     for (const n of OLD_NOTES) {
       await expect(page.locator('#doc')).toContainText(n.text);
     }
+    // Traccia visiva della run (cartella gitignorata): il foglio "Appunti" con
+    // dentro i vecchi appunti, come lo vede l'utente.
+    await page.screenshot({ path: 'tests/.shots/editor-appunti-migrati.png' }).catch(() => {});
 
     // Il vecchio archivio è stato svuotato: gli appunti vivono in un posto solo.
     await expect.poll(() => readOldNotes(app), { timeout: 10_000 }).toEqual([]);
