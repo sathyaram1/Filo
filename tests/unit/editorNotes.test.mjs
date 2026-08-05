@@ -180,3 +180,27 @@ test('MIGRAZIONE senza appunti non produce alcun file', () => {
   assert.equal(NOTES.buildNotesFile([], {}), null);
   assert.equal(NOTES.buildNotesFile(null, {}), null);
 });
+
+test('MIGRAZIONE: data e argomento del vecchio archivio non si perdono', () => {
+  const file = NOTES.buildNotesFile(
+    [{ text: 'comprare il pane', ts: '2026-01-01T10:00:00.000Z', context: 'spesa' }],
+    { id: 'file-appunti', now: 5000 },
+  );
+  const txt = fileText(file);
+  assert.match(txt, /1 gennaio 2026/);
+  assert.match(txt, /spesa/);
+  // L'intestazione precede il testo dell'appunto a cui si riferisce.
+  assert.ok(txt.indexOf('spesa') < txt.indexOf('comprare il pane'));
+});
+
+test('MIGRAZIONE: appunto senza data né argomento non guadagna righe vuote', () => {
+  const file = NOTES.buildNotesFile([{ text: 'solo testo' }], { id: 'f', now: 1 });
+  assert.equal(fileText(file), 'solo testo');
+});
+
+test('MIGRAZIONE: una data illeggibile non finisce nel file come "Invalid Date"', () => {
+  const file = NOTES.buildNotesFile([{ text: 'nota', ts: 'non-una-data', context: 'x' }], { id: 'f', now: 1 });
+  const txt = fileText(file);
+  assert.ok(!/Invalid/i.test(txt), txt);
+  assert.match(txt, /x/);
+});
