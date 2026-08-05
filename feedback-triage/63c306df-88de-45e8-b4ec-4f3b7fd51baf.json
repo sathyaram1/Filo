@@ -1,7 +1,0 @@
-{
-  "id": "63c306df-88de-45e8-b4ec-4f3b7fd51baf",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica e' stata pubblicata. Ho verificato la modifica riga per riga senza rilevare problemi di sicurezza (nessun file sensibile toccato, l'indicazione di chi ha risposto viene mostrata in modo sicuro nella cronologia, la configurazione remota segue lo stesso modello di fiducia gia' in uso). Ora le richieste ai modelli rispettano la politica di Filo sui fornitori e la cronologia mostra chi ha davvero risposto.",
-  "queuedAt": "2026-08-05T09:44:42.194Z",
-  "queuedBy": "routine"
-}
