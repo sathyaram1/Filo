@@ -63,25 +63,43 @@ async function openMenuOn(page, selector) {
   return menu;
 }
 
-test('tasto destro su un video: il menu offre le azioni del video e Pausa mette davvero in pausa', async ({ openTab, testServer }) => {
+test('tasto destro su un video: il menu offre le azioni del video', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, pageHtml('/nonexistent.mp4'));
-
-  // Stato di partenza: in riproduzione (senza sorgente valida play() rigetta, ma
-  // `paused` diventa comunque false: è quello che il menu legge).
-  await page.evaluate(() => { const v = document.getElementById('v'); v.play().catch(() => {}); });
-  await expect.poll(() => page.evaluate(() => document.getElementById('v').paused)).toBe(false);
 
   const menu = await openMenuOn(page, '#v');
   await page.screenshot({ path: 'tests/.shots/context-menu-media.png' }).catch(() => {});
 
-  // Le azioni del video ci sono tutte (prima del fix: solo Aiuto/feedback/red-team).
-  for (const label of ['Pausa', 'Disattiva audio', 'Velocità', 'Ripeti in continuo', 'Mostra i controlli', 'Copia URL video', 'Salva video come']) {
+  // Prima del fix la zona contestuale su un video era VUOTA: solo Aiuto, Invia
+  // feedback e Invia attacco.
+  for (const label of ['Riproduci', 'Disattiva audio', 'Velocità', 'Ripeti in continuo', 'Mostra i controlli', 'Copia URL video', 'Salva video come']) {
     await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
   }
+});
 
-  // SUCCESSO = il comando agisce sul filmato.
-  await menu.locator('button', { hasText: 'Pausa' }).first().click();
-  await expect.poll(() => page.evaluate(() => document.getElementById('v').paused)).toBe(true);
+test('Pausa e Riproduci agiscono davvero sulla riproduzione', async ({ openTab, testServer }) => {
+  // Serve un media DECODIFICABILE: solo così `paused` racconta la verità.
+  const media = await serveBinary(silentWav(), 'audio/wav');
+  try {
+    const src = media.url('suono.wav');
+    const page = await testServer.openReady(openTab, `<!doctype html><html><body style="padding:24px">
+      <audio id="a" src="${src}" muted loop controls style="display:block;width:300px"></audio>
+    </body></html>`);
+    // `muted` perché la politica autoplay di Chromium blocca l'audio udibile
+    // avviato senza un gesto dell'utente.
+    await page.evaluate(() => document.getElementById('a').play().catch(() => {}));
+    await expect.poll(() => page.evaluate(() => document.getElementById('a').paused)).toBe(false);
+
+    let menu = await openMenuOn(page, '#a');
+    await menu.locator('button', { hasText: 'Pausa' }).first().click();
+    await expect.poll(() => page.evaluate(() => document.getElementById('a').paused)).toBe(true);
+
+    // Invariante: la stessa voce ora propone (e fa) l'azione opposta.
+    menu = await openMenuOn(page, '#a');
+    await menu.locator('button', { hasText: 'Riproduci' }).first().click();
+    await expect.poll(() => page.evaluate(() => document.getElementById('a').paused)).toBe(false);
+  } finally {
+    await media.close();
+  }
 });
 
 test('la velocità si cambia davvero (clic accelera, il sotto-menu sceglie il valore esatto)', async ({ openTab, testServer }) => {
