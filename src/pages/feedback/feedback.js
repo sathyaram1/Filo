@@ -961,9 +961,27 @@
       }
       applyFilter();
     } catch (e) {
+      // Errore di caricamento: frase per l'utente (mai il "Failed to fetch"
+      // grezzo) + un tasto per riprovare, invece di lasciare l'utente bloccato a
+      // chiudere e riaprire la pagina. Stesso pattern della bacheca (SN_CHAT_ERRORS).
+      console.error('[feedback] errore caricamento:', e);
       listEl.innerHTML = '';
+      countEl.textContent = '';
+      const msg = (window.SN_CHAT_ERRORS && SN_CHAT_ERRORS.sentence)
+        ? SN_CHAT_ERRORS.sentence(e)
+        : 'Non è stato possibile caricare i feedback: controlla la connessione e riprova.';
+      emptyEl.innerHTML = '';
+      const p = document.createElement('p');
+      p.className = 'fb-load-error-msg';
+      p.textContent = msg;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'fb-load-retry';
+      btn.textContent = '↻ Riprova';
+      btn.addEventListener('click', () => load());
+      emptyEl.appendChild(p);
+      emptyEl.appendChild(btn);
       emptyEl.hidden = false;
-      emptyEl.textContent = 'Errore caricamento: ' + (e?.message || e);
     }
   }
 
