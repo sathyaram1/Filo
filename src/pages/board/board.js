@@ -364,6 +364,7 @@
     }
     fb.votes = optimistic;
     pending.add(id);
+    voteErrors.delete(id); // nuovo tentativo: via il messaggio del precedente
     renderList();
 
     const originRect = btn && btn.getBoundingClientRect ? btn.getBoundingClientRect() : null;
