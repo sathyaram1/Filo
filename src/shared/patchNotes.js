@@ -16,6 +16,12 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.183', date: '2026-08-05',
+      fixes: [
+        'Nella chat della home la risposta ora compare mentre viene scritta, parola per parola, invece di apparire tutta insieme alla fine: l’attesa a schermo fermo sparisce. Eventuali pulsanti e link arrivano in coda, appena la risposta è pronta.',
+      ],
+    },
+    {
       version: '0.2.177', date: '2026-08-01',
       fixes: [
         'Nessuna funzione di Filo gira più su un modello che nessuno ha scelto: se a una funzione manca il modello, o punta a uno che non esiste più, quella funzione si ferma e te lo dice sul momento — con il suo nome e dove impostarlo — mentre tutto il resto continua a funzionare come prima.',
