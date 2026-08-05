@@ -876,8 +876,11 @@
   }
 
   // Costruisce gli item della zona contestuale in base a cosa è stato cliccato.
-  // Matrice: testo / testo+editabile / immagine / link / casella input / niente.
-  function buildContextualItems({ selInfo, linkEl, imgEl, editable, clipboardHistory }) {
+  // Matrice: testo / testo+editabile / video-audio / immagine / link /
+  // casella input / niente.
+  function buildContextualItems({
+    selInfo, linkEl, imgEl, mediaEl, mediaUnder, editable, clipboardHistory,
+  }) {
     const items = [];
 
     if (selInfo && editable) {
