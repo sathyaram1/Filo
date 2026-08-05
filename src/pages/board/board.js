@@ -137,6 +137,18 @@
 
     card.appendChild(renderVote(fb));
 
+    // Voto non riuscito: DILLO. Senza questa riga l'annullamento del voto
+    // ottimistico è un lampo silenzioso — il conteggio sale e torna indietro
+    // e l'utente resta senza sapere né che è fallito né perché.
+    const voteErr = voteErrors.get(fb._id);
+    if (voteErr) {
+      const msg = document.createElement('div');
+      msg.className = 'bd-vote-msg';
+      msg.setAttribute('role', 'alert');
+      msg.textContent = voteErr;
+      card.appendChild(msg);
+    }
+
     const reopen = renderReopen(fb);
     if (reopen) card.appendChild(reopen);
 
