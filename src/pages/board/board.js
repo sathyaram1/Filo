@@ -45,6 +45,7 @@
   let releasedVersion = '';
   const pending = new Set();    // id feedback con voto in volo (IPC), per disabilitare i pulsanti
   const voteErrors = new Map(); // id feedback → perché l'ultimo voto non è andato a buon fine
+  const VOTE_FAIL_MSG = 'Voto non registrato: riprova fra un momento.';
   let openReopenAfterLogin = null; // id del fix il cui form "Ancora rotto?" va riaperto dopo un login riuscito
 
   function sendToMain(msg) {
