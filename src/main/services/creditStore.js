@@ -20,6 +20,82 @@
 
   const { STORAGE_KEYS, CREDIT, creditUsageGroup } = global.SN_CONST;
 
+  // ── Config crediti dinamica (importi modificabili dall'owner) ───────────────
+  // Gli importi (saldo iniziale, ricarica, premi, ecc.) NON sono più costanti
+  // fisse: possono arrivare da una sorgente centrale (doc Firestore config/credits,
+  // vedi defaultsStore.js). Questo motore resta LOGICA PURA: le funzioni accettano
+  // un oggetto `config` come PARAMETRO opzionale (testabile). Al runtime, l'handler
+  // inietta una `configSource` sincrona (setConfigSource) che restituisce l'ultima
+  // config letta; quando il parametro esplicito è omesso, si usa quella. Se non c'è
+  // sorgente (test, offline, non loggato, doc assente) si ricade sui default CREDIT.
+  //
+  // REGOLA "importo valido": conta solo un numero >= 0 (o una stringa che È un
+  // numero — Firestore a volte consegna gli interi come stringa). Lo zero ESPLICITO
+  // è rispettato (puoi azzerare un premio). Tutto il resto — booleani, testo,
+  // spazi, liste, oggetti, negativi, NaN/Infinity — NON è un importo: viene
+  // ignorato e per QUEL campo si usa il default storico. Così un refuso nella
+  // sorgente non azzera in silenzio quanto ricevono tutti gli utenti.
+  function validAmount(v) {
+    if (typeof v === 'boolean') return null;
+    if (typeof v === 'number') return Number.isFinite(v) && v >= 0 ? v : null;
+    if (typeof v === 'string') {
+      const t = v.trim();
+      if (t === '' || !/^[+-]?(?:\d+\.?\d*|\.\d+)$/.test(t)) return null;
+      const n = Number(t);
+      return Number.isFinite(n) && n >= 0 ? n : null;
+    }
+    return null;
+  }
+
+  // Fonde una config parziale sui default CREDIT, validando OGNI campo da solo.
+  // Ritorna sempre un oggetto completo con tutti gli importi risolti.
+  function resolveCreditConfig(config) {
+    const c = config && typeof config === 'object' ? config : {};
+    const pick = (key, def) => {
+      const v = validAmount(c[key]);
+      return v === null ? def : v;
+    };
+    // Tabella premi per priorità: ogni fascia validata da SÉ e con ripiego sulla
+    // PROPRIA fascia di default (mai su un'altra: era il bug delle simmetrie
+    // mancanti — uno 0 in una fascia veniva scambiato per "vuota" e pagava la
+    // fascia 0). Qui lo 0 esplicito resta 0.
+    const defTable = CREDIT.FEEDBACK_RESOLVE_BY_PRIORITY || {};
+    const srcTable = c.feedbackResolveByPriority && typeof c.feedbackResolveByPriority === 'object'
+      ? c.feedbackResolveByPriority : {};
+    const table = {};
+    for (const p of [0, 1, 2, 3]) {
+      const raw = srcTable[p] !== undefined ? srcTable[p] : srcTable[String(p)];
+      const v = validAmount(raw);
+      table[p] = v === null ? (Number(defTable[p]) || 0) : v;
+    }
+    return {
+      initial: pick('initial', CREDIT.INITIAL),
+      dailyRefill: pick('dailyRefill', CREDIT.DAILY_REFILL),
+      maxRefillDays: pick('maxRefillDays', CREDIT.MAX_REFILL_DAYS),
+      feedbackSend: pick('feedbackSend', CREDIT.FEEDBACK_SEND),
+      feedbackResolveByPriority: table,
+      boardVote: pick('boardVote', CREDIT.BOARD_VOTE),
+      boardReopen: pick('boardReopen', CREDIT.BOARD_REOPEN),
+    };
+  }
+
+  // Sorgente config iniettabile dal runtime (sincrona, ritorna una config parziale
+  // o null). Tenuta separata dalla logica pura: i test non la impostano mai e
+  // quindi ottengono i default CREDIT, deterministici.
+  let _configSource = null;
+  function setConfigSource(fn) { _configSource = typeof fn === 'function' ? fn : null; }
+  function currentConfig() {
+    if (!_configSource) return null;
+    try { return _configSource(); } catch (_) { return null; }
+  }
+  // Config effettiva: se il parametro è passato ESPLICITAMENTE (anche null) vince,
+  // altrimenti si usa la sorgente iniettata, altrimenti i default.
+  function effectiveConfig(config) {
+    return resolveCreditConfig(config !== undefined ? config : currentConfig());
+  }
+  // Comodo per gli handler: singolo importo risolto (feedbackSend/boardVote/…).
+  function amount(key, config) { return effectiveConfig(config)[key]; }
+
   // ── helper data/tempo (LOCALE: l'utente pensa alla SUA mezzanotte) ──────────
 
   function dateKey(d = new Date()) {
