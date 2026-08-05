@@ -44,6 +44,15 @@ const filoApi = {
     ipcRenderer.on('filo:reasoning', wrapped);
     return () => ipcRenderer.removeListener('filo:reasoning', wrapped);
   },
+  // #420 — la RISPOSTA in diretta durante una FILO_CHAT. Il main pusha
+  // { reqId, delta } (nuovi caratteri del testo) oppure { reqId, reset: true }
+  // (fallback provider: butta il testo mostrato finora) sul canale 'filo:answer'.
+  // Il chiamante filtra per reqId. Ritorna un unsubscribe.
+  onAnswer: (fn) => {
+    const wrapped = (_event, data) => { try { fn(data); } catch (_) {} };
+    ipcRenderer.on('filo:answer', wrapped);
+    return () => ipcRenderer.removeListener('filo:answer', wrapped);
+  },
   aiStream: ({ action, payload, onMeta, onDelta, onReset, onDone, onError }) => {
     const requestId = `s${Date.now()}_${++streamCounter}`;
     const offMeta = (_e, data) => onMeta && onMeta(data);
