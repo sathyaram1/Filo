@@ -1,0 +1,9 @@
+{
+  "id": "c2bff175-19fd-4404-85ee-2822b01ed311",
+  "status": "design",
+  "notes": "Controllo di sicurezza superato dalla mia parte: ho esaminato la modifica e non ho trovato nulla di pericoloso. È un intervento coerente e circoscritto: cambia il modo in cui vengono scritte le note di aggiornamento (adesso si scrivono in un blocco 'in lavorazione' senza numero di versione, ed è la pubblicazione della nuova versione a dargli il numero giusto), aggiorna le istruzioni interne e le relative verifiche automatiche.\n\nIl merge però è bloccato dal cancello automatico, non da un problema: la modifica include anche una riga nella procedura automatica di pubblicazione delle versioni, e quel tipo di file è fra quelli che nessuna routine può toccare da sola: serve la tua approvazione manuale. È esattamente il punto della modifica (senza quella riga le note non verrebbero mai timbrate con la versione giusta), quindi non è aggirabile spostandola altrove.\n\nCosa devi decidere: se ti va bene che la procedura di pubblicazione esegua quel passaggio in più, approva e fondi tu il ramo; altrimenti dimmelo e riportiamo la parte automatica a mano.\n\nDue osservazioni emerse leggendo la modifica, entrambe minori e non bloccanti: il numero di versione viene inserito nel file delle note senza un controllo strettissimo sul formato (in pratica arriva sempre dalla versione dell'app, quindi non è un rischio reale, ma un controllo più severo costerebbe nulla); e i file temporanei creati durante le verifiche automatiche non vengono ripuliti a fine test, cosa innocua ma che lascia residui.",
+  "queuedAt": "2026-08-05T12:43:30.195Z",
+  "queuedBy": "routine",
+  "branch": "worker/c2bff175-19fd-4404-85ee-2822b01ed311",
+  "reason": "secaudit"
+}
