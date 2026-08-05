@@ -15,8 +15,11 @@ const POINTER_KEY = 'filo.editor.notesPointer';
 const MIGRATED_KEY = 'filo.editor.notesMigrated';
 // Vecchio archivio appunti (pre-editor). Non esiste più codice che ci scriva:
 // l'unico a toccarlo è la migrazione qui sotto, che lo svuota una volta sola.
-// Per questo la chiave la leggiamo direttamente invece di passare da un CRUD.
-const LEGACY_NOTES_KEY = 'filo_notes';
+// Per questo la chiave la leggiamo direttamente invece di tenere in piedi un
+// CRUD di cui nessun altro ha più bisogno.
+function legacyNotesKey() {
+  try { return globalThis.SN_CONST.STORAGE_KEYS.FILO_NOTES; } catch (_) { return 'filo_notes'; }
+}
 
 function NOTES() { return globalThis.SN_EDITOR_NOTES; }
 function STORE() { return globalThis.SN_EDITOR_STORE; }
