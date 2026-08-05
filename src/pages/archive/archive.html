@@ -28,19 +28,26 @@
       border-bottom: 1px solid var(--sn-border);
     }
     /* Una sola riga per giorno: niente wrap. Le chip crescono (flex:1) per
-       riempire la larghezza; quando sono troppe scorrono in orizzontale con la
-       scrollbar nascosta — stessa logica della barra delle tab in alto. */
+       riempire la larghezza; quando sono troppe scorrono in orizzontale —
+       stessa logica della barra delle tab in alto (rotellina verticale →
+       scroll orizzontale, vedi archive.js). A differenza della barra chrome in
+       alto qui la scrollbar NON è nascosta: la Cronologia è una pagina che si
+       consulta, non un elemento di chrome sempre presente, quindi lasciamo la
+       scrollbar sottile globale (theme.css) come affordance trascinabile col
+       mouse — compare solo quando c'è davvero overflow (overflow-x:auto). */
     .arc-tabs {
       display: flex; flex-wrap: nowrap; gap: 3px; margin-top: 10px;
       overflow-x: auto; overflow-y: hidden;
-      scrollbar-width: none;
+      padding-bottom: 2px;
     }
-    .arc-tabs::-webkit-scrollbar { height: 0; width: 0; display: none; }
     .arc-tab {
       display: inline-flex; align-items: center; gap: 7px;
       /* Larghezza variabile che sfrutta tutta la riga (nessun max-width qui:
-         poche schede si allargano fino a riempire lo spazio disponibile). */
-      flex: 1 1 0; min-width: 46px;
+         poche schede si allargano fino a riempire lo spazio disponibile). Il
+         min-width tiene la chip LEGGIBILE anche quando sono tante: sotto questa
+         soglia il titolo si riduceva a una sola lettera ("S…"). Oltre la
+         soglia la riga scorre invece di comprimere ancora. */
+      flex: 1 1 0; min-width: 132px;
       padding: 7px 12px; border-radius: var(--sn-radius);
       border: 1px solid color-mix(in srgb, var(--arc-color, var(--sn-border)) 40%, var(--sn-border));
       /* Sfondo = tinta identità del sito (attenuata, calcolata in JS) mescolata
