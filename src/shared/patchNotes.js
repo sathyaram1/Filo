@@ -1,11 +1,24 @@
 // SINGOLA SORGENTE del recap aggiornamento (popup all'avvio) e del calcolo
 // "quante patch sei indietro". Vedi CLAUDE.md → "Patch notes".
 //
+// COME SI SCRIVE UNA NOTA
 // Ogni volta che chiudi un fix o aggiungi una feature VISIBILE all'utente,
-// aggiungi una riga al blocco della versione corrente (features/fixes), in
-// italiano e NON tecnica. Le voci interne (refactor/test/infra) NON vanno qui.
+// aggiungi una riga al PRIMO blocco della lista — quello marcato
+// `unreleased: true` ("in lavorazione") — in italiano e NON tecnica. Le voci
+// interne (refactor/test/infra) NON vanno qui.
 //
-// Formato (lista ordinata dalla versione PIÙ RECENTE alla più vecchia):
+// NON scrivere MAI a mano un blocco con un numero di versione: la versione in
+// package.json è quella dell'ULTIMA release già pubblicata, quindi una nota
+// messa lì sotto non verrebbe mostrata a nessuno (chi è già su quella versione
+// la salta, e la build che la conteneva è uscita prima che la nota esistesse).
+// Ci pensa la release: quando alza la versione, `scripts/stamp-patch-notes.mjs`
+// timbra il blocco "in lavorazione" col numero della versione che sta uscendo e
+// rimette in cima un blocco vuoto per le note successive. Se non c'era niente in
+// lavorazione, la release non crea nessun blocco (rilascio di manutenzione: il
+// popup non deve mostrare una sezione vuota).
+//
+// Formato (lista ordinata dalla versione PIÙ RECENTE alla più vecchia, con il
+// blocco "in lavorazione" — senza versione — sempre in cima):
 //   { version: '0.2.50', date: '2026-06-18',
 //     features: ['Testo per l’utente…'],
 //     fixes: ['Testo per l’utente…'] }
@@ -14,12 +27,15 @@
   'use strict';
 
   const NOTES = [
-    // ↓ Nuove versioni in cima.
+    // ↓ IN LAVORAZIONE — scrivi qui le note delle modifiche non ancora
+    // rilasciate. La release le timbra con il numero di versione giusto.
     {
-      version: '0.2.184', date: '2026-08-05',
+      unreleased: true,
+      features: [],
       fixes: [
         'Le richieste ai modelli ora rispettano la politica di Filo sui fornitori: al servizio che le smista viene detto quali produttori NON possono ospitare il modello, e se non resta nessun fornitore ammesso la richiesta si ferma invece di passare da uno escluso.',
         'Nella cronologia delle interazioni AI ora è indicato, quando disponibile, chi ha davvero risposto a ciascuna richiesta, così si può verificare che la politica sia stata rispettata.',
+        'Il recap delle novità all’avvio ora elenca davvero le modifiche uscite con la versione appena installata: prima le note venivano attribuite alla versione precedente, già installata, e non comparivano a nessuno.',
       ],
     },
     {
