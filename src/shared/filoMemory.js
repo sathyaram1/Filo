@@ -184,37 +184,11 @@
   }
 
   // ===== Notes / appunti =====
-
-  async function listNotes() {
-    return getRaw(KEYS.FILO_NOTES, []);
-  }
-
-  async function addNote({ text, context }) {
-    if (!text || !String(text).trim()) return null;
-    const list = await listNotes();
-    const entry = {
-      id: uuid(),
-      ts: new Date().toISOString(),
-      text: String(text).trim(),
-      context: String(context || '').trim(),
-    };
-    list.unshift(entry);
-    if (list.length > NOTES_CAP) list.length = NOTES_CAP;
-    await setRaw(KEYS.FILO_NOTES, list);
-    return entry;
-  }
-
-  async function deleteNote(id) {
-    const list = await listNotes();
-    const filtered = list.filter((n) => n.id !== id);
-    await setRaw(KEYS.FILO_NOTES, filtered);
-    return filtered;
-  }
-
-  async function clearNotes() {
-    await setRaw(KEYS.FILO_NOTES, []);
-    return [];
-  }
+  //
+  // Non esistono più qui: gli appunti sono file dell'editor (ci scrive Filo
+  // stesso), non un elenco a parte. Il vecchio archivio è già stato svuotato
+  // dalla migrazione una-tantum in src/main/services/editorFiles.js — l'unico
+  // punto rimasto che conosce quella chiave.
 
   // ===== Timer =====
 
