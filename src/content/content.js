@@ -264,7 +264,7 @@
   // l'immagine o il campo davvero cliccati. composedPath()[0] attraversa lo
   // shadow boundary e restituisce l'elemento reale.
   function realTarget(e) {
-    return (typeof e?.composedPath === 'function' && e.composedPath()[0]) || e?.target || null;
+    return e?.target || null; /* TEMP-RED-CHECK */
   }
 
   // ------------------------------------------------------------
