@@ -19,7 +19,7 @@
 // (con y-SHELL_HEIGHT nelle coordinate della pagina view).
 
 import { _electron as electron } from 'playwright';
-import { mkdtempSync, mkdirSync, rmSync, statSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, statSync, writeFileSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
