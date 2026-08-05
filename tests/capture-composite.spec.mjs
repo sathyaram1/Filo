@@ -16,7 +16,9 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // Importa captureComposite dal driver degli agent-test.
-import { launchFilo, closeFilo, captureComposite, navigate, sleep } from './agent/driver.mjs';
+import {
+  launchFilo, closeFilo, captureComposite, navigate, sleep, compositeCaptureTool,
+} from './agent/driver.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
