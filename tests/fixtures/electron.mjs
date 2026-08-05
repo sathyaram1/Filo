@@ -28,7 +28,11 @@ export const test = base.extend({
   app: async ({}, use) => {
     const userData = mkdtempSync(join(tmpdir(), 'filo-test-'));
     const app = await electron.launch({
-      args: ['.'],
+      // host-resolver-rules: fa risolvere il dominio finto "blocked.test" al
+      // loopback, così l'e2e del blocco siti (siteBlock.spec.mjs) può mettere in
+      // blacklist un DOMINIO REALE (con estensione valida) — non un IP, che l'app
+      // scarta di proposito — e comunque farlo servire dal testServer locale.
+      args: ['--host-resolver-rules=MAP blocked.test 127.0.0.1', '.'],
       cwd: APP_ROOT,
       env: {
         ...process.env,
