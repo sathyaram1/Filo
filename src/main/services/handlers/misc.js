@@ -206,9 +206,14 @@ module.exports = function register(on, ctx) {
   // dall'origine E sui siti con hotlink protection. Un fetch che si interrompe
   // a metà diventa naturalmente un errore (niente più silenzio), e l'utente
   // sceglie dove salvare col dialogo nativo "Salva come…".
-  on(MSG.DOWNLOAD_IMAGE, async (msg, sender) => {
+  // Un solo cammino per immagini, video e audio: cambia solo `kind` (nome di
+  // ripiego, header Accept e tetto di dimensione). Registrato su DUE messaggi
+  // perché il chiamante dichiara cosa sta salvando (#400: prima del fix il
+  // menu su un <video> non offriva alcun salvataggio).
+  const handleDownload = async (msg, sender) => {
     const url = String(msg.url || '').trim();
     if (!/^https?:/i.test(url)) return { ok: false, error: 'URL non scaricabile' };
+    const kind = ['image', 'video', 'audio'].includes(msg.kind) ? msg.kind : 'image';
     const wc = sender && sender.wc;
     if (!wc || wc.isDestroyed?.()) return { ok: false, error: 'no sender' };
     const path = require('node:path');
@@ -220,7 +225,7 @@ module.exports = function register(on, ctx) {
     // 1) Scarica i byte (con Referer della pagina + cookie della session).
     let buffer, suggested;
     try {
-      const r = await fetchImageBytes({ url, referrer, session: ses });
+      const r = await fetchImageBytes({ url, referrer, session: ses, kind });
       buffer = r.buffer;
       suggested = r.filename;
     } catch (e) {
@@ -229,7 +234,8 @@ module.exports = function register(on, ctx) {
 
     // 2) Nome file sicuro: preferisci il Content-Disposition del server, poi il
     // path dell'URL; neutralizza separatori e tentativi di traversal.
-    const filename = safeImageFilename(suggested || filenameFromUrl(url) || 'immagine');
+    const fallbackName = kind === 'video' ? 'video' : (kind === 'audio' ? 'audio' : 'immagine');
+    const filename = safeImageFilename(suggested || filenameFromUrl(url) || fallbackName);
 
     // 3) Scegli il percorso e scrivi.
     const testDir = process.env.FILO_DOWNLOAD_DIR;
