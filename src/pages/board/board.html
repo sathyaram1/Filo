@@ -142,8 +142,12 @@
       <button id="bdSignIn" type="button">Accedi</button>
     </div>
 
-    <div id="bdLoading" class="bd-loading">Caricamento…</div>
+    <div id="bdLoading" class="bd-loading"><span class="bd-spinner" aria-hidden="true"></span><span>Caricamento…</span></div>
     <div id="bdEmpty" class="bd-empty" hidden>Nessun miglioramento da verificare per ora.</div>
+    <div id="bdError" class="bd-error" hidden>
+      <p id="bdErrorMsg" class="bd-error-msg"></p>
+      <button id="bdRetry" type="button" class="bd-retry">↻ Riprova</button>
+    </div>
     <div id="bdList" class="bd-list" hidden></div>
   </main>
 
