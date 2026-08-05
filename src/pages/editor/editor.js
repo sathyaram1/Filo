@@ -323,11 +323,6 @@
     return serializeDocModel(model);
   }
 
-  // Vero finché il boot non ha ancora fuso l'archivio E la collezione corrente è
-  // stata SINTETIZZATA dal nulla (niente collezione né documento legacy in
-  // locale): il suo foglio bianco è un segnaposto, non un documento dell'utente.
-  let bootSynthesized = false;
-
   // Carica (o migra) la collezione da localStorage (persistenza calda), come
   // sempre e in modo SINCRONO: così il primo render è immediato e deterministico
   // (nessun cambio di timing rispetto a prima). I file che Filo ha scritto
