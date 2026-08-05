@@ -82,10 +82,10 @@ async function httpGetImage(target, referrer, session, kind = 'image') {
       res.on('data', (chunk) => {
         if (aborted) return;
         total += chunk.length;
-        if (total > IMG_DOWNLOAD_MAX) {
+        if (total > maxBytes) {
           aborted = true;
           try { req.destroy(); } catch (_) {}
-          reject(new Error('immagine troppo grande'));
+          reject(new Error('file troppo grande'));
         } else {
           chunks.push(chunk);
         }
