@@ -27,7 +27,16 @@
   const bdSignIn  = document.getElementById('bdSignIn');
   const bdLoading = document.getElementById('bdLoading');
   const bdEmpty   = document.getElementById('bdEmpty');
+  const bdError   = document.getElementById('bdError');
+  const bdErrorMsg = document.getElementById('bdErrorMsg');
+  const bdRetry   = document.getElementById('bdRetry');
   const bdList    = document.getElementById('bdList');
+
+  // Timeout della fetch dei miglioramenti: senza limite, offline la richiesta
+  // resta muta ~13 s prima che il sistema la lasci cadere. Arrendersi prima e
+  // mostrare l'errore è meno attrito che aspettare al buio (filo_design: l'attesa
+  // muta è attrito).
+  const LOAD_TIMEOUT_MS = 8000;
 
   // ── Stato ──────────────────────────────────────────────────────────────
   let signedIn = false;
