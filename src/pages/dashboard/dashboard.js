@@ -1131,6 +1131,41 @@
         if (data && data.reqId === reasoningReqId && data.text) pending.pushReasoning(data.text);
       });
     }
+    // #420 — RISPOSTA in diretta: la bolla di Filo si riempie mentre il modello
+    // scrive, invece di comparire tutta insieme a fine turno. Il main estrae il
+    // campo "text" dal JSON di risposta e ci pusha i delta (o un reset dopo un
+    // fallback provider). La bolla NON si crea finché non arriva il PRIMO
+    // carattere: una risposta di sola azione (apri un link, testo vuoto) non
+    // lascia una bolla vuota che poi si riempie. Quando il testo inizia,
+    // l'indicatore di ragionamento si ritira: i due non si accavallano.
+    let streamBubble = null;
+    let streamedText = '';
+    const followBottomIfNear = () => {
+      const nearBottom = bubblesEl.scrollHeight - bubblesEl.scrollTop - bubblesEl.clientHeight < 48;
+      if (nearBottom) bubblesEl.scrollTop = bubblesEl.scrollHeight;
+    };
+    let offAnswer = null;
+    if (window.filo?.onAnswer) {
+      offAnswer = window.filo.onAnswer((data) => {
+        if (!data || data.reqId !== reasoningReqId) return;
+        if (data.reset) {
+          // Fallback provider a metà: butta ciò che era già a schermo, non accodare.
+          streamedText = '';
+          if (streamBubble) streamBubble.textContent = '';
+          return;
+        }
+        if (!data.delta) return;
+        if (!streamBubble) {
+          pending.remove(); // il ragionamento lascia il posto alla risposta
+          streamBubble = document.createElement('div');
+          streamBubble.className = 'dash-bubble dash-bubble-filo dash-bubble-streaming';
+          bubblesEl.appendChild(streamBubble);
+        }
+        streamedText += data.delta;
+        streamBubble.textContent = streamedText;
+        followBottomIfNear();
+      });
+    }
     const msg = {
       type: MSG.FILO_CHAT,
       userMessage,
@@ -1145,8 +1180,12 @@
     const r = await send(msg);
 
     if (offReasoning) { try { offReasoning(); } catch (_) {} }
+    if (offAnswer) { try { offAnswer(); } catch (_) {} }
     pending.remove();
     if (!r?.ok) {
+      // Un turno fallito non deve lasciare a schermo il testo parziale di un
+      // tentativo andato male: scartiamo la bolla in streaming e mostriamo l'errore.
+      if (streamBubble) { streamBubble.remove(); streamBubble = null; }
       const err = makeBubble({ role: 'filo', text: r?.error || 'Errore.' });
       // #360 — la bolla d'errore dice "riprova": darglielo da fare a mano
       // (riscrivere la domanda) è attrito inutile. Il tasto rimanda LO STESSO
@@ -1163,8 +1202,26 @@
       err.appendChild(row);
       bubblesEl.appendChild(err);
     } else {
-      const filoBubble = makeBubble({ role: 'filo', text: r.text || '' });
-      bubblesEl.appendChild(filoBubble);
+      // La risposta finale (r.text) è autorevole: riconcilia la bolla in
+      // streaming con essa (recupera l'eventuale coda non ancora emessa). Se non
+      // c'è testo ma ci sono azioni, la bolla in streaming non esiste (non è mai
+      // arrivato un delta) e cadiamo nel ramo "solo azioni" come prima.
+      let filoBubble;
+      if (streamBubble) {
+        streamBubble.classList.remove('dash-bubble-streaming');
+        if (r.text) {
+          streamBubble.textContent = r.text;
+          filoBubble = streamBubble;
+        } else {
+          // Il testo si è svuotato (es. reset non recuperato): niente bolla vuota.
+          streamBubble.remove();
+          filoBubble = makeBubble({ role: 'filo', text: '' });
+          bubblesEl.appendChild(filoBubble);
+        }
+      } else {
+        filoBubble = makeBubble({ role: 'filo', text: r.text || '' });
+        bubblesEl.appendChild(filoBubble);
+      }
       // #159 — risposta fresca: le impostazioni a livello 2 aprono il loro popup
       // di conferma da sole (autoConfirm). Solo qui (nuova risposta), mai in
       // replay storico.
