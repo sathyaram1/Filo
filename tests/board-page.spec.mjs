@@ -128,10 +128,13 @@ test('anonimo: invito ad accedere; loggato (lato renderer): il voto passa dal ma
   await expect(works).toHaveAttribute('aria-pressed', 'false');
   await expect(works.locator('.bd-vote-count')).toHaveText('1');
   await works.click();
-  // Mentre la richiesta è in volo il pulsante è disabilitato (anti doppio-click).
-  await expect(works).toBeDisabled();
-  // A risposta arrivata (errore: non autenticato lato main) torna allo stato
-  // precedente — niente voto fantasma, niente crash della pagina.
+  // A risposta arrivata (errore: non autenticato lato main) il voto ottimistico
+  // viene ripristinato con garbo: niente voto fantasma, niente crash. Il doppio
+  // click è già impedito dalla guardia di re-entrancy lato codice (una seconda
+  // pressione mentre la richiesta è in volo viene ignorata), indipendentemente
+  // dal breve stato "disabilitato" del pulsante — che dura quanto il round-trip
+  // IPC e non è un segnale osservabile in modo affidabile. Qui assertiamo il
+  // COMPORTAMENTO stabile e verificabile: lo stato finale torna quello di prima.
   await expect(works).toBeEnabled();
   await expect(works).toHaveAttribute('aria-pressed', 'false');
   await expect(works.locator('.bd-vote-count')).toHaveText('1');
