@@ -111,7 +111,11 @@
     const meta = document.createElement('div');
     meta.className = 'sn-history-meta';
     const left = document.createElement('span');
-    left.textContent = `${formatActionLabel(it.action)} • ${it.model || ''} • ${formatDate(it.timestamp)}`;
+    // Chi ha davvero servito la risposta (host upstream via OpenRouter, #421):
+    // mostrato quando disponibile, così la politica sui fornitori è verificabile
+    // a colpo d'occhio dalla cronologia.
+    const via = it.servedBy ? ` • via ${it.servedBy}` : '';
+    left.textContent = `${formatActionLabel(it.action)} • ${it.model || ''}${via} • ${formatDate(it.timestamp)}`;
     meta.appendChild(left);
     const right = document.createElement('span');
     right.className = 'sn-history-meta-right';

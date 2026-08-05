@@ -127,6 +127,12 @@ function get() {
     provider: C.DEFAULT_PROVIDER || 'openrouter',
     models: { ...(C.DEFAULT_MODELS || {}) },
     modelRegistry: { ...(C.DEFAULT_MODEL_REGISTRY || {}) },
+    // Politica sui fornitori (#421): lista di esclusione (forme base dei
+    // produttori di modelli) e ordinamento fra gli host ammessi. Curabili senza
+    // codice dal doc Firestore config/models: la lista remota SOSTITUISCE quella
+    // di build (l'owner deve poterla svuotare o riscrivere per intero).
+    excludedProviders: [ ...(C.DEFAULT_EXCLUDED_PROVIDERS || []) ],
+    providerSort: '',
     apiKeys: getBuildKeys(),
     // Chiave Google Safe Browsing condivisa (rilevamento siti pericolosi).
     // Non è una chiave di build: l'unica fonte è l'override admin via Firestore.
@@ -157,6 +163,16 @@ function get() {
     // solo il secondo caso finisce nella lista tombstone, quindi l'invariante
     // dei nickname integrati non toccati resta intatta. Un nickname ridefinito
     // dal doc remoto vince comunque (auto-guarigione se l'admin lo ri-aggiunge).
+    // Politica sui fornitori: la lista remota (se presente) sostituisce quella di
+    // build — così l'owner può aggiungere/togliere un produttore senza deploy.
+    if (Array.isArray(remoteModels.excludedProviders)) {
+      out.excludedProviders = remoteModels.excludedProviders
+        .filter((x) => typeof x === 'string' && x.trim())
+        .map((x) => x.trim());
+    }
+    if (typeof remoteModels.providerSort === 'string') {
+      out.providerSort = remoteModels.providerSort.trim();
+    }
     if (Array.isArray(remoteModels.modelRegistryDeleted)) {
       for (const nick of remoteModels.modelRegistryDeleted) {
         if (typeof nick !== 'string' || !nick) continue;
@@ -190,6 +206,8 @@ function getPublicForAdmin() {
     provider: eff.provider,
     models: eff.models,
     modelRegistry: eff.modelRegistry,
+    excludedProviders: eff.excludedProviders,
+    providerSort: eff.providerSort,
     apiKeysPresent: {
       openrouter: Boolean(eff.apiKeys.openrouter),
       gemini: Boolean(eff.apiKeys.gemini),
@@ -244,6 +262,19 @@ async function update(partial, idToken) {
     const deleted = Object.keys(buildReg).filter((k) => !(k in partial.modelRegistry));
     modelFields.modelRegistryDeleted = toFsValue(deleted);
     modelMask.push('modelRegistryDeleted');
+  }
+  // Politica sui fornitori (#421): stesso doc non-segreto. La lista inviata
+  // sostituisce quella remota per intero (l'array è la fonte di verità completa).
+  if (Array.isArray(partial.excludedProviders)) {
+    const clean = partial.excludedProviders
+      .filter((x) => typeof x === 'string' && x.trim())
+      .map((x) => x.trim());
+    modelFields.excludedProviders = toFsValue(clean);
+    modelMask.push('excludedProviders');
+  }
+  if (typeof partial.providerSort === 'string') {
+    modelFields.providerSort = toFsValue(partial.providerSort.trim());
+    modelMask.push('providerSort');
   }
   if (modelMask.length) await patchDoc(MODELS_DOC, modelFields, modelMask, idToken);
 

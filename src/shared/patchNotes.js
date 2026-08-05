@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.184', date: '2026-08-05',
+      fixes: [
+        'Le richieste ai modelli ora rispettano la politica di Filo sui fornitori: al servizio che le smista viene detto quali produttori NON possono ospitare il modello, e se non resta nessun fornitore ammesso la richiesta si ferma invece di passare da uno escluso.',
+        'Nella cronologia delle interazioni AI ora è indicato, quando disponibile, chi ha davvero risposto a ciascuna richiesta, così si può verificare che la politica sia stata rispettata.',
+      ],
+    },
+    {
       version: '0.2.183', date: '2026-08-05',
       fixes: [
         'Nella chat della home la risposta ora compare mentre viene scritta, parola per parola, invece di apparire tutta insieme alla fine: l’attesa a schermo fermo sparisce. Eventuali pulsanti e link arrivano in coda, appena la risposta è pronta.',

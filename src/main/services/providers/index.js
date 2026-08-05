@@ -55,12 +55,12 @@
     throw lastErr;
   }
 
-  async function complete({ provider, apiKey, model, messages, reasoning, signal }) {
-    return getProvider(provider).complete({ apiKey, model, messages, reasoning, signal });
+  async function complete({ provider, apiKey, model, messages, reasoning, providerRouting, signal }) {
+    return getProvider(provider).complete({ apiKey, model, messages, reasoning, providerRouting, signal });
   }
 
-  async function streamComplete({ provider, apiKey, model, messages, reasoning, onDelta, onReasoning, signal }) {
-    return getProvider(provider).streamComplete({ apiKey, model, messages, reasoning, onDelta, onReasoning, signal });
+  async function streamComplete({ provider, apiKey, model, messages, reasoning, providerRouting, onDelta, onReasoning, signal }) {
+    return getProvider(provider).streamComplete({ apiKey, model, messages, reasoning, providerRouting, onDelta, onReasoning, signal });
   }
 
   async function listModels({ provider, apiKey }) {
@@ -78,8 +78,11 @@
       const aModel = a.model || model;
       try {
         const r = await withNetworkRetry(() => getProvider(a.provider).complete({
-          apiKey: a.apiKey, model: aModel, reasoning: a.reasoning, messages, signal,
+          apiKey: a.apiKey, model: aModel, reasoning: a.reasoning,
+          providerRouting: a.providerRouting, messages, signal,
         }));
+        // `...r` porta con sé `servedBy` (chi ha davvero servito, se il provider
+        // lo riporta): il chiamante lo usa per registrare e verificare la politica.
         return { ...r, provider: a.provider, model: aModel };
       } catch (err) {
         lastErr = err;
@@ -111,7 +114,8 @@
         // provider (#273): se non sa farlo, non ritentiamo.
         const r = await withNetworkRetry(
           () => getProvider(a.provider).streamComplete({
-            apiKey: a.apiKey, model: aModel, reasoning: a.reasoning, messages, signal,
+            apiKey: a.apiKey, model: aModel, reasoning: a.reasoning,
+            providerRouting: a.providerRouting, messages, signal,
             onDelta: onDelta ? (d) => { emitted = true; onDelta(d); } : onDelta,
             onReasoning: onReasoning ? (t) => { emitted = true; onReasoning(t); } : onReasoning,
           }),

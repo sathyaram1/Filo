@@ -31,6 +31,35 @@
     return Object.keys(out).length ? out : null;
   }
 
+  // Blocco `provider` per il routing (politica sui fornitori, #421). OpenRouter
+  // di suo sceglie l'host col prezzo migliore, che può essere il produttore del
+  // modello — escluso dalla politica di Filo. Con `ignore` gli diciamo quali NON
+  // usare (forme base dei produttori); se dopo l'esclusione non resta nessun host
+  // ammesso OpenRouter risponde con un errore, che risale come un normale errore
+  // provider: la richiesta FALLISCE in modo evidente invece di passare da un host
+  // escluso. `sort` sceglie l'ordine fra gli ammessi (latency/throughput) invece
+  // del prezzo. Non tocchiamo `allow_fallbacks`: vogliamo che, fra gli host
+  // AMMESSI, il ripiego automatico resti attivo.
+  function providerBlock(routing) {
+    if (!routing || typeof routing !== 'object') return null;
+    const p = {};
+    const ignore = Array.isArray(routing.ignore) ? routing.ignore.filter(Boolean) : [];
+    if (ignore.length) p.ignore = ignore;
+    if (routing.sort === 'latency' || routing.sort === 'throughput' || routing.sort === 'price') {
+      p.sort = routing.sort;
+    }
+    if (routing.allowFallbacks === false) p.allow_fallbacks = false;
+    return Object.keys(p).length ? p : null;
+  }
+
+  // Chi ha DAVVERO servito la risposta (#421). OpenRouter lo riporta a livello di
+  // risposta come `provider`; per robustezza guardiamo anche dentro la choice.
+  function extractServedBy(obj) {
+    if (!obj || typeof obj !== 'object') return null;
+    const v = obj.provider || obj.choices?.[0]?.provider || null;
+    return (typeof v === 'string' && v.trim()) ? v.trim() : null;
+  }
+
   async function listModels(apiKey) {
     const res = await fetch(MODELS_ENDPOINT, {
       headers: { Authorization: `Bearer ${apiKey}` },
@@ -48,10 +77,12 @@
     }));
   }
 
-  async function complete({ apiKey, model, messages, reasoning, signal }) {
+  async function complete({ apiKey, model, messages, reasoning, providerRouting, signal }) {
     const body = { model, messages, stream: false };
     const r = reasoningField(reasoning, false);
     if (r) body.reasoning = r;
+    const pb = providerBlock(providerRouting);
+    if (pb) body.provider = pb;
     const res = await fetch(ENDPOINT, {
       method: 'POST',
       headers: buildHeaders(apiKey),
@@ -72,6 +103,7 @@
     const usage = data.usage || {};
     return {
       text,
+      servedBy: extractServedBy(data),
       usage: {
         promptTokens: usage.prompt_tokens || 0,
         completionTokens: usage.completion_tokens || 0,
@@ -80,13 +112,15 @@
   }
 
   // Streaming SSE — onDelta(textChunk) chiamato per ogni delta. Ritorna { text, usage } finale.
-  async function streamComplete({ apiKey, model, messages, reasoning, onDelta, onReasoning, signal }) {
+  async function streamComplete({ apiKey, model, messages, reasoning, providerRouting, onDelta, onReasoning, signal }) {
     const reqBody = { model, messages, stream: true };
     // Reasoning: unisce il livello scelto dall'owner (#369) e la richiesta del
     // caller di STREAMARE i token di ragionamento (onReasoning). I modelli che
     // non ragionano semplicemente non ne emettono — best-effort.
     const r = reasoningField(reasoning, !!onReasoning);
     if (r) reqBody.reasoning = r;
+    const pb = providerBlock(providerRouting);
+    if (pb) reqBody.provider = pb;
     const res = await fetch(ENDPOINT, {
       method: 'POST',
       headers: buildHeaders(apiKey),
@@ -105,6 +139,7 @@
     const decoder = new TextDecoder('utf-8');
     let buffer = '';
     let fullText = '';
+    let servedBy = null;
     let usage = { promptTokens: 0, completionTokens: 0 };
 
     while (true) {
@@ -120,6 +155,10 @@
         if (payload === '[DONE]') continue;
         try {
           const obj = JSON.parse(payload);
+          // Chi ha servito arriva in streaming insieme ai chunk (di norma con
+          // l'ultimo): teniamo l'ultimo valore visto.
+          const sb = extractServedBy(obj);
+          if (sb) servedBy = sb;
           const choiceDelta = obj.choices?.[0]?.delta || {};
           const reasoning = choiceDelta.reasoning;
           if (reasoning) {
@@ -141,8 +180,8 @@
         }
       }
     }
-    return { text: fullText, usage };
+    return { text: fullText, servedBy, usage };
   }
 
-  global.SN_PROVIDER_OPENROUTER = { listModels, complete, streamComplete, reasoningField, ENDPOINT };
+  global.SN_PROVIDER_OPENROUTER = { listModels, complete, streamComplete, reasoningField, providerBlock, extractServedBy, ENDPOINT };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -226,8 +226,15 @@ function withDefaults(settings) {
     ? { ...sec, safeBrowse: { ...(sec.safeBrowse || {}), safeBrowsingKey: d.safeBrowsingKey } }
     : sec;
 
+  // Politica sui fornitori (#421): è una regola di Filo, non una preferenza
+  // per-utente, quindi vale SEMPRE (anche con "usa modelli predefiniti" off) ed è
+  // sourced dai default condivisi (costante ⊕ override Firestore config/models),
+  // MAI dallo storage utente — così l'owner la aggiorna senza rilasciare codice.
+  const excludedProviders = Array.isArray(d.excludedProviders) ? d.excludedProviders : [];
+  const providerSort = typeof d.providerSort === 'string' ? d.providerSort : '';
+
   if (settings.useDefaultModels === false) {
-    return security === sec ? settings : { ...settings, security };
+    return { ...settings, excludedProviders, providerSort, security };
   }
   const userKeys = settings.apiKeys || {};
   const apiKeys = {};
@@ -239,6 +246,8 @@ function withDefaults(settings) {
     provider: d.provider,
     models: d.models,
     modelRegistry: d.modelRegistry,
+    excludedProviders,
+    providerSort,
     apiKeys,
     security,
   };
@@ -354,7 +363,42 @@ function buildAttemptChain(settings, modelRef, action) {
     e.code = 'NO_API_KEY';
     throw e;
   }
+
+  // Politica sui fornitori (#421): ai tentativi OpenRouter alleghiamo la lista di
+  // esclusione (forme base dei produttori) e l'eventuale ordinamento. Il provider
+  // Gemini è DIRETTO (non passa da un router che sceglie l'host) e ignora il
+  // campo. Se dopo l'esclusione OpenRouter non trova un host ammesso, risponde
+  // con un errore: la richiesta fallisce in modo evidente invece di essere
+  // servita da un fornitore escluso.
+  const ignore = SN_CONST.providerIgnoreList(settings.excludedProviders || []);
+  const sort = typeof settings.providerSort === 'string' ? settings.providerSort : '';
+  if (ignore.length || sort) {
+    const routing = {};
+    if (ignore.length) routing.ignore = ignore;
+    if (sort) routing.sort = sort;
+    for (const a of out) {
+      if (a.provider === 'openrouter') a.providerRouting = routing;
+    }
+  }
   return out;
+}
+
+// Registra e verifica CHI ha davvero servito una risposta (#421). Il fornitore
+// upstream (es. "Together", "DeepInfra", oppure — se la politica è stata aggirata
+// — un produttore escluso) è la controprova della lista di esclusione: senza
+// registrarlo, l'esclusione è solo una speranza. Se l'host servito risulta fra
+// gli esclusi (è comparso con un nome che l'ignore non ha intercettato), lo
+// segnaliamo in modo evidente nei log. Ritorna il nome dell'host, o null.
+function noteServedProvider(settings, action, result) {
+  const servedBy = (result && result.servedBy) || null;
+  if (servedBy && SN_CONST.isProviderExcluded(servedBy, settings.excludedProviders || [])) {
+    console.error(
+      `[Filo policy] Richiesta "${action}" servita da un fornitore ESCLUSO: "${servedBy}". `
+      + 'La politica sui modelli è stata aggirata (nome host non intercettato dalla lista di '
+      + 'esclusione): aggiornare excludedProviders in config/models.',
+    );
+  }
+  return servedBy;
 }
 
 async function handleAIRequest({ action, payload, origin, onReasoning = null, onText = null, signal = null }) {
@@ -430,6 +474,7 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
     : await Providers.completeWithFallback({ attempts, messages, signal });
   const usedProvider = result.provider || attempts[0].provider;
   const concreteModel = result.model || attempts[0].model;
+  const servedBy = noteServedProvider(settings, action, result);
   const pricing = usedProvider === 'gemini' ? null : settings.pricing?.[concreteModel];
   const costEur = await Costs.record({
     action, provider: usedProvider, model: concreteModel,
@@ -442,7 +487,7 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
     && action !== ACTIONS.HELP_INTENT_GUESS && action !== ACTIONS.HELP_INTENT_JUDGE
   ) {
     await History.append({
-      action, provider: usedProvider, model: concreteModel,
+      action, provider: usedProvider, model: concreteModel, servedBy,
       input: payload, output: result.text, origin, costEur, usage: result.usage,
     });
   }
@@ -481,6 +526,7 @@ async function handleStream({ action, payload, origin, onDelta, onMeta, onReset,
   });
   const usedProvider = result.provider || attempts[0].provider;
   const concreteModel = result.model || attempts[0].model;
+  const servedBy = noteServedProvider(settings, action, result);
   const pricing = usedProvider === 'gemini' ? null : settings.pricing?.[concreteModel];
   const costEur = await Costs.record({
     action, provider: usedProvider, model: concreteModel,
@@ -488,7 +534,7 @@ async function handleStream({ action, payload, origin, onDelta, onMeta, onReset,
   });
 
   await History.append({
-    action, provider: usedProvider, model: concreteModel,
+    action, provider: usedProvider, model: concreteModel, servedBy,
     input: payload, output: result.text, origin, costEur, usage: result.usage,
   });
 

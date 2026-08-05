@@ -449,6 +449,81 @@
     [ACTIONS.FEEDBACK_TITLE]: 'flash-lite',
   };
 
+  // ── Politica sui fornitori (host upstream) ───────────────────────────────────
+  // La politica sui modelli di Filo ammette i modelli di Anthropic e i modelli a
+  // pesi aperti SOLO se serviti da fornitori INDIPENDENTI, mai dai server di chi
+  // il modello lo ha prodotto. Il servizio che smista le richieste (OpenRouter)
+  // sceglie da sé chi ospita il modello, con criteri di prezzo che cambiano nel
+  // tempo: senza istruzioni può mandarle proprio al produttore, che è escluso.
+  //
+  // Criterio deciso dall'owner: si esclude il PRODUTTORE del modello in quanto
+  // fornitore, a prescindere da quale modello stia servendo (se un'azienda
+  // esclusa ospitasse un modello altrui, resta esclusa lo stesso). È quindi una
+  // LISTA DI ESCLUSIONE (non di ammessi): regge quando esce un fornitore
+  // indipendente nuovo senza doverlo aggiungere a mano. Il rovescio — un'azienda
+  // esclusa che compare con un nome nuovo passerebbe inosservata — è coperto
+  // registrando chi ha DAVVERO servito ogni risposta (vedi handlers): senza quel
+  // riscontro la lista è solo una speranza.
+  //
+  // Forma BASE: usare il nome base del fornitore, che copre le sue varianti
+  // regionali (es. "Google" copre "Google AI Studio" e "Google Vertex") — usare
+  // la variante singola le lascerebbe sfuggire.
+  //
+  // NOTA: è un punto di partenza CURABILE senza toccare il codice. L'owner può
+  // sovrascriverlo interamente dal doc Firestore `config/models`
+  // (campo `excludedProviders`), e l'elenco dei fornitori esistenti su OpenRouter
+  // è interrogabile, quindi la lista va ricontrollata periodicamente. Anthropic
+  // NON è qui: la politica ammette esplicitamente i suoi modelli.
+  const DEFAULT_EXCLUDED_PROVIDERS = [
+    'Google',       // produttore di Gemini (copre Google AI Studio / Vertex)
+    'OpenAI',
+    'xAI',
+    'DeepSeek',
+    'Mistral',      // copre "Mistral AI"
+    'Moonshot AI',
+    'MiniMax',
+    'Qwen',         // Alibaba/Qwen
+    'Cohere',
+    'Meta',         // produttore di Llama
+    'Z.AI',         // Zhipu / GLM
+  ];
+
+  function normalizeProviderName(name) {
+    return String(name == null ? '' : name).toLowerCase().replace(/\s+/g, ' ').trim();
+  }
+
+  // Un fornitore SERVITO è escluso se il suo nome coincide con una forma base
+  // esclusa o ne è una variante (inizia con "base" seguito da uno spazio o da un
+  // separatore): così "Google Vertex" e "Google AI Studio" cadono sotto "Google",
+  // ma "Googleplex-AI" (nome diverso) no.
+  function isProviderExcluded(served, excluded) {
+    const s = normalizeProviderName(served);
+    if (!s) return false;
+    const list = Array.isArray(excluded) ? excluded : [];
+    return list.some((base) => {
+      const b = normalizeProviderName(base);
+      if (!b) return false;
+      return s === b || s.startsWith(b + ' ') || s.startsWith(b + '/')
+        || s.startsWith(b + '-') || s.startsWith(b + ',') || s.startsWith(b + '.');
+    });
+  }
+
+  // Lista pulita (deduplicata, senza vuoti) da passare a OpenRouter come
+  // `provider.ignore` (le forme base). Preserva le maiuscole come nel registry.
+  function providerIgnoreList(excluded) {
+    const seen = new Set();
+    const out = [];
+    for (const x of (Array.isArray(excluded) ? excluded : [])) {
+      const v = String(x == null ? '' : x).trim();
+      if (!v) continue;
+      const k = v.toLowerCase();
+      if (seen.has(k)) continue;
+      seen.add(k);
+      out.push(v);
+    }
+    return out;
+  }
+
   // Risolve un riferimento a un modello (nickname OPPURE id raw legacy stile
   // OpenRouter) nel nome concreto da inviare al provider indicato.
   // Ritorna null se il provider non ha quel modello (es. nickname 'claude-haiku'
@@ -1239,6 +1314,11 @@
     },
     models: { ...DEFAULT_MODELS },
     modelRegistry: { ...DEFAULT_MODEL_REGISTRY },
+    // NB: la politica sui fornitori (excludedProviders / providerSort) NON vive
+    // qui: è una regola di Filo sourced dai default condivisi (costante ⊕
+    // Firestore config/models), applicata in withDefaults. Metterla in
+    // DEFAULT_SETTINGS la congelerebbe nello storage utente, impedendo
+    // l'aggiornamento senza codice. Vedi DEFAULT_EXCLUDED_PROVIDERS.
     // Costi stimati per 1M token (input/output) in USD. Valori indicativi.
     pricing: {
       'google/gemini-2.0-flash-001': { input: 0.10, output: 0.40 },
@@ -1557,6 +1637,10 @@
     buildModelAttempts,
     REASONING_LEVELS,
     normalizeReasoning,
+    DEFAULT_EXCLUDED_PROVIDERS,
+    normalizeProviderName,
+    isProviderExcluded,
+    providerIgnoreList,
     DEPRECATED_MODELS,
     DEFAULT_PROVIDER,
     DEFAULT_SETTINGS,
