@@ -367,7 +367,42 @@ function buildAttemptChain(settings, modelRef, action) {
     e.code = 'NO_API_KEY';
     throw e;
   }
+
+  // Politica sui fornitori (#421): ai tentativi OpenRouter alleghiamo la lista di
+  // esclusione (forme base dei produttori) e l'eventuale ordinamento. Il provider
+  // Gemini è DIRETTO (non passa da un router che sceglie l'host) e ignora il
+  // campo. Se dopo l'esclusione OpenRouter non trova un host ammesso, risponde
+  // con un errore: la richiesta fallisce in modo evidente invece di essere
+  // servita da un fornitore escluso.
+  const ignore = SN_CONST.providerIgnoreList(settings.excludedProviders || []);
+  const sort = typeof settings.providerSort === 'string' ? settings.providerSort : '';
+  if (ignore.length || sort) {
+    const routing = {};
+    if (ignore.length) routing.ignore = ignore;
+    if (sort) routing.sort = sort;
+    for (const a of out) {
+      if (a.provider === 'openrouter') a.providerRouting = routing;
+    }
+  }
   return out;
+}
+
+// Registra e verifica CHI ha davvero servito una risposta (#421). Il fornitore
+// upstream (es. "Together", "DeepInfra", oppure — se la politica è stata aggirata
+// — un produttore escluso) è la controprova della lista di esclusione: senza
+// registrarlo, l'esclusione è solo una speranza. Se l'host servito risulta fra
+// gli esclusi (è comparso con un nome che l'ignore non ha intercettato), lo
+// segnaliamo in modo evidente nei log. Ritorna il nome dell'host, o null.
+function noteServedProvider(settings, action, result) {
+  const servedBy = (result && result.servedBy) || null;
+  if (servedBy && SN_CONST.isProviderExcluded(servedBy, settings.excludedProviders || [])) {
+    console.error(
+      `[Filo policy] Richiesta "${action}" servita da un fornitore ESCLUSO: "${servedBy}". `
+      + 'La politica sui modelli è stata aggirata (nome host non intercettato dalla lista di '
+      + 'esclusione): aggiornare excludedProviders in config/models.',
+    );
+  }
+  return servedBy;
 }
 
 async function handleAIRequest({ action, payload, origin, onReasoning = null, onText = null, signal = null }) {
