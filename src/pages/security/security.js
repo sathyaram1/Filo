@@ -350,10 +350,10 @@
     }
   }
 
-  // Normalizza e valida ogni riga della blacklist come il campo "siti fidati":
-  // scarta schema/path/www, minuscolo, e tiene solo domini con estensione
-  // (niente IP o nomi a etichetta singola come "facebook"). Ritorna i domini
-  // validi (deduplicati) e le righe scartate così com'erano, per l'avviso.
+  // Normalizza e valida ogni riga della blacklist: scarta schema/path/www,
+  // minuscolo, e tiene i domini con estensione e gli IP letterali (niente nomi
+  // a etichetta singola come "facebook", che non sono host reali). Ritorna gli
+  // host validi (deduplicati) e le righe scartate così com'erano, per l'avviso.
   function parseBlacklist(raw) {
     const valid = [];
     const seen = new Set();
@@ -361,7 +361,7 @@
     for (const line of String(raw || '').split('\n')) {
       const trimmed = line.trim();
       if (!trimmed) continue;
-      const domain = cleanDomain(trimmed);
+      const domain = cleanBlockHost(trimmed);
       if (!domain) { invalid.push(trimmed); continue; }
       if (seen.has(domain)) continue;
       seen.add(domain);
