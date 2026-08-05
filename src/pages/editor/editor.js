@@ -361,28 +361,18 @@
   // nello storico versioni del file (source "filo"), quindi è recuperabile.
   async function reloadFromArchive() {
     const remoteRaw = await readArchivedCollection();
-    // Il foglio bianco del boot ha smesso di essere "cedibile" appena l'archivio
-    // è stato letto una volta: da qui in poi le fusioni sono normali.
-    const synthesized = bootSynthesized;
-    bootSynthesized = false;
     const remoteFiles = (remoteRaw && Array.isArray(remoteRaw.files)) ? remoteRaw.files : null;
     if (!remoteFiles || !remoteFiles.length) {
       // Archivio vuoto (o assente): è il locale a doverlo seminare, altrimenti
       // Filo non vedrebbe i documenti dell'utente finché non salva a mano.
+      // (Prima questo mirror lo faceva `loadCollection()`, ma da lì cancellava
+      // l'archivio invece di seminarlo — vedi il commento lassù.)
       writeCollection();
       return;
     }
     if (doc) syncActiveIntoCollection();
     const remoteCol = STORE.migrateToCollection({ collection: remoteRaw });
-    if (synthesized) {
-      // Primo avvio dell'editor su questo profilo, ma l'archivio ha già dei file
-      // (tipicamente gli appunti storici appena migrati): il foglio bianco creato
-      // un attimo fa è un fantasma e cede il posto ai documenti veri, invece di
-      // affiancarli con una pagina vuota che l'utente non ha mai scritto.
-      collection = remoteCol;
-    } else {
-      collection = mergeCollections(collection, remoteCol, dirty ? (doc && doc.id) : null);
-    }
+    collection = mergeCollections(collection, remoteCol, dirty ? (doc && doc.id) : null);
     const activeStored = STORE.findFile(collection, doc && doc.id) || STORE.activeFile(collection);
     if (activeStored && !dirty && doc
       && JSON.stringify(activeStored.content) !== JSON.stringify(doc.content)) {
