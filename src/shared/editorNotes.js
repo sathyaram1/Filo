@@ -184,10 +184,30 @@
     };
   }
 
+  // Intestazione di un appunto migrato: la data e l'argomento che il vecchio
+  // archivio mostrava accanto al testo. Senza, migrando si perderebbe il QUANDO
+  // e il DI-COSA di ogni nota — informazione che l'utente aveva sotto gli occhi.
+  // Ritorna '' se non c'è né l'una né l'altro (niente righe vuote decorative).
+  function noteHeadline(note) {
+    const parts = [];
+    const ts = note && note.ts;
+    if (ts) {
+      const d = new Date(ts);
+      if (!Number.isNaN(d.getTime())) {
+        parts.push(d.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' }));
+      }
+    }
+    const ctx = String((note && note.context) || '').trim();
+    if (ctx) parts.push(ctx);
+    return parts.join(' · ');
+  }
+
   // MIGRAZIONE: dai vecchi appunti dell'archivio a un unico file "Appunti".
   // `notes` è la lista dell'archivio (ordine più-recente-prima, come lo storage):
-  // la invertiamo per avere l'ordine cronologico nel file. Ritorna il file
-  // serializzato pronto per essere aggiunto alla collezione (o null se vuota).
+  // la invertiamo per avere l'ordine cronologico nel file. Ogni appunto diventa
+  // una riga con data e argomento seguita dal suo testo, così nulla di ciò che
+  // l'archivio mostrava va perso. Ritorna il file serializzato pronto per essere
+  // aggiunto alla collezione (o null se vuota).
   function buildNotesFile(notes, opts) {
     const o = opts || {};
     const now = Number.isFinite(o.now) ? o.now : Date.now();
@@ -196,6 +216,8 @@
     if (!list.length) return null;
     const content = [];
     for (const n of list) {
+      const head = noteHeadline(n);
+      if (head) content.push({ type: 'paragraph', content: [{ type: 'text', text: head }] });
       const t = n && (n.text != null ? n.text : '');
       for (const p of textToParagraphs(t)) content.push(p);
     }
