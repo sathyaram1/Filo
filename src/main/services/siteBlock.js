@@ -98,6 +98,10 @@ function normalizeDomain(raw) {
     if (end > 0) return s.slice(0, end + 1); // [::1]:8080 → [::1]
     return s;
   }
+  // IPv6 scritto senza parentesi ("::1"): normalizzalo alla forma con cui gli
+  // indirizzi arrivano davvero (URL.hostname), invece di scartarlo perché
+  // "non è un dominio". Due o più ":" non possono essere una porta.
+  if ((s.match(/:/g) || []).length >= 2) return `[${s}]`;
   s = s.split(':')[0]; // porta
   s = s.replace(/^www\./, '');
   return s;
