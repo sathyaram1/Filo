@@ -74,6 +74,11 @@ jobs:
           git config user.email "release-bot@users.noreply.github.com"
           npm version patch --no-git-tag-version
           VERSION=v$(node -p "require('./package.json').version")
+          # Timbra le note "in lavorazione" del changelog con la versione che sta
+          # uscendo, PRIMA del commit e del build: cosi' la build contiene le note
+          # della versione che e', e chi aggiorna le vede nel recap. Se non c'e'
+          # niente in lavorazione (rilascio di sola manutenzione) non tocca nulla.
+          node scripts/stamp-patch-notes.mjs "${VERSION}"
           git commit -am "release: ${VERSION} [skip ci]"
           # Atterra su main, rifacendo il rebase se nel frattempo la routine ha pushato.
           for i in 1 2 3; do
