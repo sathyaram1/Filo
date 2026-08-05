@@ -323,19 +323,33 @@
     return serializeDocModel(model);
   }
 
+  // Vero finché il boot non ha ancora fuso l'archivio E la collezione corrente è
+  // stata SINTETIZZATA dal nulla (niente collezione né documento legacy in
+  // locale): il suo foglio bianco è un segnaposto, non un documento dell'utente.
+  let bootSynthesized = false;
+
   // Carica (o migra) la collezione da localStorage (persistenza calda), come
   // sempre e in modo SINCRONO: così il primo render è immediato e deterministico
   // (nessun cambio di timing rispetto a prima). I file che Filo ha scritto
   // nell'archivio dell'app (appunti, migrazione) vengono fusi subito dopo, in
   // modo asincrono, da `reloadFromArchive()`.
+  //
+  // NON rispecchia sull'archivio: al primo avvio su un profilo la collezione qui
+  // è un foglio bianco appena inventato, e scriverlo nell'archivio CANCELLEREBBE
+  // i file che Filo ci ha già messo (gli appunti storici migrati all'avvio del
+  // main) prima che `reloadFromArchive()` faccia in tempo a leggerli. Il mirror
+  // lo fa `reloadFromArchive()`, che è l'unico punto che conosce entrambi i lati.
   function loadCollection() {
+    const localRaw = readCollectionRaw();
+    const legacy = readLegacyDoc();
+    bootSynthesized = !(localRaw && Array.isArray(localRaw.files) && localRaw.files.length)
+      && !(legacy && legacy.meta);
     collection = STORE.migrateToCollection({
-      collection: readCollectionRaw(),
-      legacyDoc: readLegacyDoc(),
+      collection: localRaw,
+      legacyDoc: legacy,
       idFactory: () => newId('file'),
       blankFactory: blankFileSerialized,
     });
-    writeCollection();
   }
 
   // Ricarica la collezione dall'archivio quando Filo (main) ci ha scritto un
