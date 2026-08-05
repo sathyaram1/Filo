@@ -80,6 +80,11 @@ node scripts/dispatch.mjs --record-verifier <id> <pass|fail> "PASS — ho testat
 La critica è per l'owner: descrivi cosa hai provato e cosa succede in termini di
 comportamento dell'app, senza nomi di file/funzioni.
 
+**Non riscrivere il report di chi ha fatto il lavoro.** Il report lo ha già
+scritto il `new-work`/`fixer` ed è l'unico attendibile: tu aggiungi **la tua riga
+di esito** in coda, niente di più. Su PASS in particolare, resisti alla tentazione
+di raccontare di nuovo la feature: l'owner l'ha già letta una volta.
+
 Infine **rilascia il claim** (dispatch lo ha acquisito per consegnarti il lavoro;
 se resta vivo, il prossimo giro NON può instradare secaudit/fixer su questo
 feedback finché il TTL non scade — la GitHub Action riconcilia i claim solo
