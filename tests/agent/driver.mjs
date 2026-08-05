@@ -203,6 +203,17 @@ async function captureCompositeLinux(app, outPath) {
   );
 }
 
+// Esiste un tool di cattura schermo utilizzabile su questo Linux? Serve ai test
+// per DISTINGUERE "la cattura è rotta" (regressione da segnalare) da "in questa
+// macchina manca il pacchetto" (nulla da correggere nell'app): il secondo caso
+// va saltato con una spiegazione, non riportato come rosso.
+export function compositeCaptureTool() {
+  if (process.platform !== 'linux') return 'platform';
+  if (resolveExecutable('scrot')) return 'scrot';
+  if (resolveExecutable('xwd') && resolveExecutable('convert')) return 'xwd+convert';
+  return null;
+}
+
 // Risolve il percorso di un eseguibile, restituisce null se non trovato.
 function resolveExecutable(name) {
   try {
