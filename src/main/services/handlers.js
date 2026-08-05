@@ -227,15 +227,11 @@ function withDefaults(settings) {
     : sec;
 
   // Politica sui fornitori (#421): è una regola di Filo, non una preferenza
-  // per-utente, quindi vale SEMPRE (anche con "usa modelli predefiniti" off).
-  // Fonte: i settings se già li portano (retro-compat), altrimenti i default
-  // condivisi (costante o override Firestore). `providerSort` idem.
-  const excludedProviders = Array.isArray(settings.excludedProviders)
-    ? settings.excludedProviders
-    : (d.excludedProviders || []);
-  const providerSort = typeof settings.providerSort === 'string' && settings.providerSort
-    ? settings.providerSort
-    : (d.providerSort || '');
+  // per-utente, quindi vale SEMPRE (anche con "usa modelli predefiniti" off) ed è
+  // sourced dai default condivisi (costante ⊕ override Firestore config/models),
+  // MAI dallo storage utente — così l'owner la aggiorna senza rilasciare codice.
+  const excludedProviders = Array.isArray(d.excludedProviders) ? d.excludedProviders : [];
+  const providerSort = typeof d.providerSort === 'string' ? d.providerSort : '';
 
   if (settings.useDefaultModels === false) {
     return { ...settings, excludedProviders, providerSort, security };
