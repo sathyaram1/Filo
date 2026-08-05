@@ -1583,17 +1583,14 @@
   }
 
   // Riconosce un singolo token "tipo sito" (es. google.com, github.com/x,
-  // http://localhost:3000). DEVE essere preciso: un comando di shell come
-  // `/git log v1.2` o `/cat file.txt` contiene un punto ma NON è un sito.
-  // Quindi: niente spazi, e o è un http(s):// esplicito o un dominio con TLD
-  // alfabetico. Esclude i path locali (./x, .\x) che la shell deve eseguire.
+  // http://localhost:3000, localhost:3000, 127.0.0.1:8080, 192.168.1.1). DEVE
+  // essere preciso: un comando di shell come `/git log v1.2` o `/cat file.txt`
+  // NON è un sito. La logica (e la simmetria con la vecchia barra indirizzi della
+  // shell) vive in src/shared/urlNav.js (#398): qui togliamo la "/" e chiediamo
+  // a SN_URL_NAV.looksLikeAddress — così indirizzi locali e IP sono riconosciuti
+  // come lo erano dalla barra, invece di finire all'LLM.
   function isSiteToken(text) {
-    const raw = text.slice(1);
-    if (!raw || /\s/.test(raw)) return false;
-    if (/^https?:\/\//i.test(raw)) return true;
-    if (/^[.\\/~]/.test(raw)) return false; // ./script, .\script, ~/x, /usr
-    // label.label(.label)* con almeno un TLD alfabetico (.com, .io, ...)
-    return /^[\w-]+(\.[\w-]+)+(:\d+)?(\/\S*)?$/.test(raw) && /\.[a-z]{2,}(:|\/|$)/i.test(raw);
+    return !!(self.SN_URL_NAV && self.SN_URL_NAV.looksLikeAddress(text.slice(1)));
   }
 
   // Estrae l'host da un token "/sito" (toglie "/", lo schema e l'eventuale
