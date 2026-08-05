@@ -362,8 +362,8 @@
     // se il broadcast `_spell:native` arrivato durante l'await sotto è già
     // pertinente a questa apertura del menu (altrimenti lo perdevamo).
     const openedAt = Date.now();
-    const target = e.target;
-    let selInfo = Extract.getSelectionWithSentence();
+    const target = realTarget(e);
+    let selInfo = Extract.getSelectionWithSentence(target);
     // window.getSelection() non vede la selezione dentro <input>/<textarea>:
     // recuperiamola dal nodo stesso così Taglia/Copia compaiono nel menu.
     if (!selInfo) selInfo = getInputSelectionInfo(target);
