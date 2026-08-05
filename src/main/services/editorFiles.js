@@ -105,16 +105,17 @@ async function migrateNotesToEditor() {
         Store.addFile(collection, file);
         const versions = await getKey(VERSIONS_KEY, {});
         const pointer = { fileId: file.id, topic: '' };
-        // L'archivio vecchio si svuota SOLO dopo che il file è finito
-        // nell'archivio: se qualcosa va storto prima, gli appunti restano dove
-        // sono e la migrazione riparte al prossimo avvio (nessuna perdita).
-        await setKeys({
+        // L'archivio vecchio si svuota (e la migrazione si marca fatta) SOLO
+        // dopo che il file "Appunti" è stato scritto davvero: se la scrittura
+        // non riesce, gli appunti restano dove sono e ci si riprova al prossimo
+        // avvio. Nessun percorso porta a perderli.
+        const saved = await setKeys({
           [COLLECTION_KEY]: collection,
           [VERSIONS_KEY]: versions,
           [POINTER_KEY]: pointer,
-          [MIGRATED_KEY]: true,
         });
-        await setKeys({ [legacyNotesKey()]: [] });
+        if (!saved) return { migrated: false, count: oldNotes.length };
+        await setKeys({ [legacyNotesKey()]: [], [MIGRATED_KEY]: true });
         return { migrated: true, count: oldNotes.length, fileId: file.id };
       }
     }
