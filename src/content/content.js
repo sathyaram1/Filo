@@ -914,6 +914,13 @@
       return items;
     }
 
+    // Video/audio cliccato direttamente: le sue azioni vincono su immagine e
+    // link (un filmato dentro una scheda-link resta soprattutto un filmato).
+    if (mediaEl) {
+      for (const it of Actions.buildMediaItems(mediaEl)) items.push(it);
+      return items;
+    }
+
     if (imgEl) {
       items.push({ type: 'item', label: I18n.t('menu_copy_image'), onClick: () => Actions.copyImage(imgEl) });
       items.push({ type: 'item', label: I18n.t('menu_save_image_as'), onClick: () => Actions.downloadImage(imgEl) });
