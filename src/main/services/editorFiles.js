@@ -32,8 +32,11 @@ async function getKey(key, fallback) {
   } catch (_) { return fallback; }
 }
 
+// Ritorna true se la scrittura è andata a buon fine: chi sta per BUTTARE via i
+// dati sorgente (la migrazione degli appunti) deve poter distinguere "salvato"
+// da "archivio non disponibile", altrimenti li perderebbe.
 async function setKeys(obj) {
-  try { await chrome.storage.local.set(obj); } catch (_) { /* archivio non disponibile */ }
+  try { await chrome.storage.local.set(obj); return true; } catch (_) { return false; }
 }
 
 // Carica la collezione dall'archivio. Se non esiste ancora (l'editor non è mai
