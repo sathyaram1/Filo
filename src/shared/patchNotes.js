@@ -778,9 +778,16 @@
     return since(lastSeen, current).length;
   }
 
+  // L'ultima versione RILASCIATA presente nel changelog. Può essere più
+  // vecchia di package.json: succede quando l'ultima release non conteneva
+  // nulla di visibile all'utente (rilascio di manutenzione) e quindi non ha
+  // lasciato nessun blocco. Non è un errore.
   function latestVersion() {
-    return NOTES.length ? NOTES[0].version : '0.0.0';
+    const rel = released();
+    return rel.length ? rel[0].version : '0.0.0';
   }
 
-  global.SN_PATCH_NOTES = { NOTES, cmpVersion, since, countBehind, latestVersion };
+  global.SN_PATCH_NOTES = {
+    NOTES, cmpVersion, since, countBehind, latestVersion, released, pending,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
