@@ -273,9 +273,9 @@
     },
     {
       version: '0.2.160', date: '2026-07-24',
-      features: [
-        'Nella dashboard di gestione c’è una nuova ricerca «a senso»: la lente in alto a destra apre un campo dove descrivere con parole tue il feedback che cerchi, anche con un ricordo vago e non con le parole esatte usate all’epoca. Filo capisce il significato e ti mostra i feedback più pertinenti, ordinati per rilevanza e presi da qualunque scheda (Ricevuti, In coda, Risolti, Archiviati). Cliccando un risultato si apre la conversazione; con la «×» o il tasto Esc chiudi la ricerca e torni alla lista. Se il modello non è disponibile, la ricerca ripiega automaticamente sulle parole così trovi comunque qualcosa.',
-      ],
+      // NB: la ricerca "a senso" della dashboard di gestione aveva una voce qui,
+      // rimossa: quella pagina è riservata all'owner, quindi per l'utente comune
+      // era il racconto di una funzione che non può nemmeno aprire.
       fixes: [
         'Salvare un’immagine da una pagina web ora funziona davvero: con «Salva immagine come…» dal clic destro il file viene scaricato e si apre la finestra per scegliere dove metterlo, con una conferma a salvataggio riuscito. Prima, per le immagini ospitate su un sito diverso da quello della pagina (cioè quasi tutte), la scheda abbandonava la pagina e mostrava solo l’immagine, senza scaricare nulla. Ora vengono salvate anche le immagini dei siti che le proteggono dal collegamento esterno, e se il download non riesce (immagine irraggiungibile o connessione interrotta) te lo dice invece di restare in silenzio.',
         'Sull’avviso a schermo intero «Sito pericoloso», il pulsante «Torna indietro» ora ti fa davvero uscire dal sito anche quando l’avviso compare in una scheda appena aperta (senza una pagina precedente su cui tornare). Prima, in quel caso, premere «Torna indietro» aveva lo stesso effetto di confermare il sito: veniva marcato come sicuro per quella scheda, così se lo stesso dominio si ripresentava (per un redirect o un link) l’avviso di pericolo non compariva più.',
