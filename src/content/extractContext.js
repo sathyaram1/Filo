@@ -55,14 +55,27 @@
     return out;
   }
 
-  // La selezione "giusta" per un dato bersaglio. window.getSelection() NON vede
+  // Una selezione "ha davvero del testo"? Non ci si può fidare del solo
+  // isCollapsed: per una selezione DENTRO uno shadow root Chromium riporta
+  // isCollapsed=true (anchor/focus ri-targettizzati all'host del componente)
+  // pur avendo una range con testo dentro il root. Guardiamo quindi anche la
+  // range vera e il testo.
+  function selectionHasText(sel) {
+    if (!sel || !sel.rangeCount) return false;
+    if (!sel.isCollapsed) return true;
+    try { if (!sel.getRangeAt(0).collapsed) return true; } catch (_) {}
+    try { if (sel.toString().trim()) return true; } catch (_) {}
+    return false;
+  }
+
+  // La selezione "giusta" per un dato bersaglio. window.getSelection() NON espone
   // il testo selezionato dentro uno shadow root (i "componenti" web dei siti
   // moderni): lì la selezione vive nel root del componente, esposta da
   // shadowRoot.getSelection() (Chromium). Se il documento non ha una selezione
   // utile, risaliamo dai root shadow che contengono il bersaglio.
   function selectionForTarget(target) {
     const docSel = window.getSelection();
-    if (docSel && !docSel.isCollapsed && docSel.rangeCount) return docSel;
+    if (selectionHasText(docSel)) return docSel;
     let node = target;
     // Massimo qualche livello per gli shadow annidati (evita loop patologici).
     for (let i = 0; node && i < 20; i++) {
@@ -70,7 +83,7 @@
       if (!root || root.nodeType !== 11 /* DOCUMENT_FRAGMENT_NODE (ShadowRoot) */) break;
       if (typeof root.getSelection === 'function') {
         const ss = root.getSelection();
-        if (ss && !ss.isCollapsed && ss.rangeCount) return ss;
+        if (selectionHasText(ss)) return ss;
       }
       node = root.host; // sali allo shadow che contiene questo (annidamento)
     }
@@ -81,7 +94,7 @@
   // al nodo testuale completo, e ritagliando alla frase.
   function getSelectionWithSentence(target) {
     const sel = selectionForTarget(target);
-    if (!sel || sel.isCollapsed || !sel.rangeCount) return null;
+    if (!selectionHasText(sel)) return null;
     // Solo testo VISIBILE (filtra sr-only, aria-hidden, display:none ecc.)
     const rendered = getRenderedSelectionText(sel).replace(/\s+/g, ' ').trim();
     const fallback = sel.toString().trim();
