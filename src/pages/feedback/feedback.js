@@ -947,7 +947,9 @@
     listEl.innerHTML = '<div class="fb-empty">Caricamento…</div>';
     emptyEl.hidden = true;
     try {
-      all = await SN_FEEDBACK.list({ pageSize: 500 });
+      // timeoutMs: offline la fetch resta muta ~13 s prima che il sistema la
+      // lasci cadere. Ci arrendiamo prima e mostriamo l'errore (con Riprova).
+      all = await SN_FEEDBACK.list({ pageSize: 500, timeoutMs: 8000 });
       // S1.3: decifratura batch dei campi FENC1: — una sola IPC per tutta la lista.
       // Graceful fallback: se l'utente non è admin o l'IPC fallisce, i valori
       // restano invariati (la dashboard non si rompe, mostra il ciphertext).
