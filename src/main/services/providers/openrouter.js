@@ -139,6 +139,7 @@
     const decoder = new TextDecoder('utf-8');
     let buffer = '';
     let fullText = '';
+    let servedBy = null;
     let usage = { promptTokens: 0, completionTokens: 0 };
 
     while (true) {
@@ -154,6 +155,10 @@
         if (payload === '[DONE]') continue;
         try {
           const obj = JSON.parse(payload);
+          // Chi ha servito arriva in streaming insieme ai chunk (di norma con
+          // l'ultimo): teniamo l'ultimo valore visto.
+          const sb = extractServedBy(obj);
+          if (sb) servedBy = sb;
           const choiceDelta = obj.choices?.[0]?.delta || {};
           const reasoning = choiceDelta.reasoning;
           if (reasoning) {
