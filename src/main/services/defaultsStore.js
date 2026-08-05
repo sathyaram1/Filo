@@ -127,6 +127,12 @@ function get() {
     provider: C.DEFAULT_PROVIDER || 'openrouter',
     models: { ...(C.DEFAULT_MODELS || {}) },
     modelRegistry: { ...(C.DEFAULT_MODEL_REGISTRY || {}) },
+    // Politica sui fornitori (#421): lista di esclusione (forme base dei
+    // produttori di modelli) e ordinamento fra gli host ammessi. Curabili senza
+    // codice dal doc Firestore config/models: la lista remota SOSTITUISCE quella
+    // di build (l'owner deve poterla svuotare o riscrivere per intero).
+    excludedProviders: [ ...(C.DEFAULT_EXCLUDED_PROVIDERS || []) ],
+    providerSort: '',
     apiKeys: getBuildKeys(),
     // Chiave Google Safe Browsing condivisa (rilevamento siti pericolosi).
     // Non è una chiave di build: l'unica fonte è l'override admin via Firestore.
