@@ -1,7 +1,0 @@
-{
-  "id": "b41a0fa2-6f05-4053-b0a7-313a6ff5d550",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho riprodotto esattamente il problema segnalato: in Cronologia, con molte schede archiviate nello stesso giorno (ho provato con 30 e con 40), la riga del giorno ora resta usabile col solo mouse e leggibile. Verificato: (1) le schede restano larghe abbastanza da leggere icona e titolo, non piu' un quadratino con una sola lettera; (2) girando la rotellina verticale del mouse sopra la riga le schede scorrono in orizzontale, e continuando ad arrivare si raggiunge davvero l'ultima scheda del giorno; (3) e' ricomparsa la barra di scorrimento sotto la riga, visibile e trascinabile. Ho controllato che senza la correzione il tutto torna a rompersi (schede larghe 72px, rotella inefficace), quindi la prova coglie il difetto vero. Stress test superati: titoli con codice tipo <script> vengono mostrati come testo e non eseguiti; funziona anche lo scorrimento orizzontale da trackpad / Shift+rotella; archivio vuoto nessun errore; i risultati della ricerca nei contenuti continuano ad andare a capo e non vengono dirottati dalla rotella. Nessuna regressione sulle altre funzioni della Cronologia (riapertura scheda, menu tasto destro, svuota archivio, auto-archiviazione, ripristino scroll, schede proxate): tutte le prove esistenti passano. Ho guardato anche lo screenshot reale della pagina con 40 schede: leggibili, colorate, con la barra di scorrimento in vista.",
-  "queuedAt": "2026-08-05T15:36:13.739Z",
-  "queuedBy": "routine"
-}
