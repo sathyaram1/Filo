@@ -228,6 +228,31 @@ sezione.
 > di quanto risparmia. Se il modello non risponde, ripiega sulla ricerca per
 > parole e te lo dice.
 
+### Chi scrive il report: chi ha fatto il lavoro, e nessun altro
+
+Il report lo scrive **l'istanza che ha scritto il codice** (`new-work` o
+`fixer`), nel momento in cui passa il lavoro alla verifica. È l'unica che sa
+quali alternative ha scartato, cosa costa in chiamate a pagamento e cosa ha
+deciso di lasciare fuori: un'istanza successiva quelle cose può solo
+ricostruirle a naso, e in genere le riempie di dettagli inutili.
+
+Nella stessa passata quell'istanza produce **due testi distinti**:
+
+1. **il report per l'owner** — la nota che accompagna il feedback (struttura qui
+   sopra);
+2. **la riga di changelog** — vedi "Patch notes" più sotto. **Una riga**, molto
+   più asciutta del report, e **spesso nessuna**: se il lavoro tocca solo
+   superfici riservate all'owner o parti interne, non si scrive niente.
+
+Non sono lo stesso testo accorciato: il report parla all'owner di scelte, la riga
+di changelog parla a un utente qualunque di cosa può fare adesso.
+
+**I ruoli a valle non riscrivono il report.** `verifier`, `secaudit` e chi chiude
+la pratica aggiungono **al massimo una riga** sull'esito del proprio passaggio
+(es. "bloccato dal cancello di sicurezza: serve la tua approvazione"), in coda a
+quello esistente. Non lo rigenerano da capo: il risultato sarebbe un racconto di
+seconda mano, più lungo e meno vero dell'originale.
+
 ## Patch notes: aggiorna il changelog ad OGNI fix/feature visibile all'utente
 
 Filo mostra un **recap aggiornamento** ad ogni nuova versione (popup all'avvio).
