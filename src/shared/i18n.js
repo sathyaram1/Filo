@@ -179,8 +179,12 @@
     toast_copied: 'Copiato negli appunti',
     toast_copied_saving: 'Copiato negli appunti, salvataggio in corso…',
     toast_translating_page: 'Traduzione pagina in corso…',
+    toast_translating_page_progress: 'Traduzione pagina… %s/%s',
     toast_page_translated: 'Pagina tradotta',
-    toast_page_translated_partial: 'Pagina tradotta solo in parte',
+    // Traduzione interrotta a metà (#408): mai "Pagina tradotta" quando non lo
+    // è. Dice quanto ne manca, perché si è fermata e come riprendere.
+    toast_page_translate_stopped: 'Traduzione interrotta dopo %s blocchi su %s. %s Puoi riprenderla dal tasto destro senza rifare la parte già tradotta.',
+    toast_page_translate_failed: 'Non sono riuscito a tradurre la pagina. %s',
     toast_nothing_to_translate: 'Non ho trovato testo da tradurre in questa pagina',
     toast_original_restored: 'Originale ripristinato',
     toast_clipboard_empty: 'Cronologia appunti vuota',
