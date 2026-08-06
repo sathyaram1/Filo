@@ -52,14 +52,13 @@ test('cliccando un link a un file, Filo lo scarica, lo registra come "completato
 
     // 2) SUCCESSO nella cronologia: una voce "completato" per quel file, con
     //    dimensione e percorso. È ciò che la pagina elenco (#410.3) leggerà.
-    const items = await expect.poll(async () => {
+    await expect.poll(async () => {
       const r = await shell.evaluate(() => window.filoShell.downloads.list());
-      return (r && r.items) || [];
-    }, { timeout: 15000 }).toEqual(expect.any(Array));
+      const e = ((r && r.items) || []).find((it) => it.filename === 'report.pdf');
+      return e ? e.state : null;
+    }, { timeout: 15000 }).toBe('completed');
     const list = (await shell.evaluate(() => window.filoShell.downloads.list())).items;
     const entry = list.find((it) => it.filename === 'report.pdf');
-    expect(entry).toBeTruthy();
-    expect(entry.state).toBe('completed');
     expect(entry.totalBytes).toBe(FILE.length);
     expect(entry.savePath).toContain('report.pdf');
 
