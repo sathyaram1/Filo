@@ -57,13 +57,14 @@
 
       // Per ogni unità: i figli (link, img, span, …) diventano segnaposto [[Lk]],
       // così il modello traduce solo il testo e la struttura resta intatta.
-      // I blocchi GIÀ tradotti (giro precedente interrotto a metà) si saltano
-      // qui, prima del chunking: rimandarli al modello sarebbe testo pagato due
-      // volte e comunque scartato in fase di applicazione (#408).
+      // Blocchi già tradotti da un giro precedente interrotto a metà: NON
+      // tornano dall'estrazione (vengono saltati alla fonte) e non vanno
+      // rimandati al modello — sarebbe testo pagato due volte. Qui servono solo
+      // a dare i totali giusti a chi legge l'avviso (#408).
+      const already = document.querySelectorAll('[data-sn-translated="1"]').length;
       const units = [];
-      let already = 0;
       for (const b of blocks) {
-        if (b.el && b.el.dataset && b.el.dataset.snTranslated) { already++; continue; }
+        if (b.el && b.el.dataset && b.el.dataset.snTranslated) continue;
         const { templated, refs } = templateizeBlock(b.el);
         // Se tolti i segnaposto non resta testo, non c'è nulla da tradurre.
         if (!hasTranslatableText(templated)) continue;
