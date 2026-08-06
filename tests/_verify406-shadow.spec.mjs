@@ -73,6 +73,7 @@ async function closeMenu(page) {
 
 async function rightClickAndRead(page, sel) {
   await closeMenu(page);
+  await page.locator(sel).scrollIntoViewIfNeeded().catch(() => {});
   const box = await page.locator(sel).boundingBox();
   if (!box) throw new Error('no box for ' + sel);
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2, { button: 'right' });
