@@ -31,6 +31,14 @@
 
   let pageTranslating = false;
   let pageHasTranslation = false;
+  // Traduzione arrivata in fondo? Distinguere "completa" da "a metà" è ciò che
+  // permette al menu di offrire "Riprendi traduzione" invece di far ricominciare
+  // tutto da capo (#408). Vale solo se pageHasTranslation è vero.
+  let pageComplete = false;
+  // Quanti blocchi mancano all'ultimo tentativo e quanti erano in tutto: serve
+  // a dire all'utente *quanto* ne manca, non solo che si è interrotta.
+  let missingCount = 0;
+  let totalCount = 0;
   // Unità tradotte in questa sessione, con i NODI originali (non l'HTML): è ciò
   // che "Mostra originale" rimette al suo posto.
   let translatedUnits = [];
@@ -49,8 +57,13 @@
 
       // Per ogni unità: i figli (link, img, span, …) diventano segnaposto [[Lk]],
       // così il modello traduce solo il testo e la struttura resta intatta.
+      // I blocchi GIÀ tradotti (giro precedente interrotto a metà) si saltano
+      // qui, prima del chunking: rimandarli al modello sarebbe testo pagato due
+      // volte e comunque scartato in fase di applicazione (#408).
       const units = [];
+      let already = 0;
       for (const b of blocks) {
+        if (b.el && b.el.dataset && b.el.dataset.snTranslated) { already++; continue; }
         const { templated, refs } = templateizeBlock(b.el);
         // Se tolti i segnaposto non resta testo, non c'è nulla da tradurre.
         if (!hasTranslatableText(templated)) continue;
@@ -59,7 +72,16 @@
 
       if (!units.length) {
         progress.close();
-        Popup.showToast(I18n.t('toast_nothing_to_translate'));
+        if (already) {
+          // Ripresa su una pagina che nel frattempo è già tutta tradotta.
+          pageHasTranslation = true;
+          pageComplete = true;
+          missingCount = 0;
+          totalCount = already;
+          Popup.showToast(I18n.t('toast_page_translated'));
+        } else {
+          Popup.showToast(I18n.t('toast_nothing_to_translate'));
+        }
         return;
       }
 
@@ -79,15 +101,26 @@
       }
       if (cur.length) chunks.push(cur);
 
+      // Avanzamento REALE mentre lavora: i blocchi hanno un totale noto, quindi
+      // l'attesa può essere misurata invece che raccontata ("l'attesa è attrito":
+      // se ci sono dati di progresso si mostrano).
+      const grandTotal = already + units.length;
+      const tick = () => {
+        const applied = already + units.filter((u) => u.applied).length;
+        try { progress.el.textContent = I18n.t('toast_translating_page_progress', applied, grandTotal); } catch (_) {}
+      };
+      tick();
+
       // Le richieste partono a gruppi e i risultati vengono applicati appena
       // arrivano: la pagina si traduce progressivamente sotto gli occhi.
-      let lastError = '';
+      let lastError = null;
       let next = 0;
       const worker = async () => {
         while (next < chunks.length) {
           const chunk = chunks[next++];
           const err = await translateGroup(chunk, 0);
           if (err) lastError = err;
+          tick();
         }
       };
       await Promise.all(
@@ -95,17 +128,43 @@
       );
 
       const done = units.filter((u) => u.applied).length;
+      const applied = already + done;
       progress.close();
-      if (!done) {
-        Popup.showToast(lastError || I18n.t('err_provider_failed'));
+      totalCount = grandTotal;
+      missingCount = grandTotal - applied;
+
+      if (!applied) {
+        // Niente tradotto: né prima né adesso. Nessuno stato da conservare.
+        pageHasTranslation = false;
+        pageComplete = false;
+        Popup.showToast(I18n.t('toast_page_translate_failed', reasonFor(lastError)), { duration: 7000 });
+        return;
+      }
+
+      pageHasTranslation = true;
+      pageComplete = missingCount === 0;
+      if (pageComplete) {
+        Popup.showToast(I18n.t('toast_page_translated'));
       } else {
-        pageHasTranslation = true;
-        Popup.showToast(I18n.t(done < units.length ? 'toast_page_translated_partial' : 'toast_page_translated'));
+        // MAI "Pagina tradotta" quando non lo è: si dice che si è interrotta,
+        // quanto manca e come riprendere (il motivo tecnico grezzo resta fuori).
+        Popup.showToast(
+          I18n.t('toast_page_translate_stopped', applied, grandTotal, reasonFor(lastError)),
+          { duration: 7000 },
+        );
       }
     } finally {
       progress.close();
       pageTranslating = false;
     }
+  }
+
+  // Errore tecnico → frase per l'utente (stessa traduzione delle chat: mai il
+  // messaggio grezzo del provider, sempre cosa non ha funzionato e cosa fare).
+  function reasonFor(err) {
+    const CE = global.SN_CHAT_ERRORS;
+    if (CE && typeof CE.sentence === 'function') return CE.sentence(err || undefined);
+    return I18n.t('err_provider_failed');
   }
 
   // Traduce un gruppo di unità con UNA richiesta. Se il modello restituisce un
