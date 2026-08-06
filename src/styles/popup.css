@@ -129,7 +129,7 @@
 }
 /* Link scritti da Filo (#418): cliccabili, aprono in nuova scheda. */
 .sn-msg-text a.filo-md-link, .sn-menu-inline a.filo-md-link {
-  color: var(--sn-accent, #3b82f6);
+  color: var(--sn-link, var(--sn-accent, #3b82f6));
   text-decoration: underline;
   text-underline-offset: 2px;
   cursor: pointer;
