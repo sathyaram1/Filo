@@ -107,8 +107,6 @@ test('gli altri punti (giudici, sanificatore, punti senza modello) sono elencati
   await expect(list.locator('.sn-usage-row')).toHaveCount(expectedRows);
 });
 
-<<<<<<< HEAD
-=======
 test('il pulsante «Prova» usa il modello configurato, e cambia se cambio la configurazione', async ({ app, openTab }) => {
   // Il campo "Prova di un fornitore" delle Opzioni decide con quale modello si
   // misura una chiave. Prima era un nome scritto nel codice: si provava sempre
@@ -165,7 +163,6 @@ test('il pulsante «Prova» usa il modello configurato, e cambia se cambio la co
   expect(await askedFor('gemini')).toBe('altro-modello-gemini');
 });
 
->>>>>>> worker/b597e31e-428d-42bd-b5ce-24b61419d355
 test('l\'editor genera il titolo con la sua funzione, non con quella di «Spiega»', async ({ openTab }) => {
   const page = await openTab('filo://editor/editor.html');
   await page.waitForSelector('#doc');
