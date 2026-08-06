@@ -169,6 +169,89 @@
     return nodes;
   }
 
+  // ---------------------------------------------------------------------------
+  // Blocchi traducibili — "traduci la pagina" vuol dire TUTTA la pagina.
+  //
+  // extractMainTextNodes() sopra serve a capire di cosa parla la pagina (excerpt
+  // per il categorizer): lì ha senso restringersi all'articolo e ai tag di prosa.
+  // Per la traduzione la regola opposta è quella giusta: qualsiasi elemento che
+  // contiene testo VISIBILE va tradotto, indipendentemente dal tag con cui il
+  // sito lo ha scritto (titoli dentro <header>, sommari e didascalie dentro
+  // <div>/<span>, riquadri "Leggi anche" dentro <aside>, voci di menu, bottoni).
+  //
+  // Unità = elemento che ha almeno un text node come figlio DIRETTO. Così ogni
+  // pezzo di testo appartiene a una sola unità (niente doppie traduzioni) e i
+  // testi annidati dentro elementi inline (tipicamente i link) diventano a loro
+  // volta unità, invece di restare intoccati come segnaposto.
+  // ---------------------------------------------------------------------------
+
+  // Sottoalberi che non si traducono mai: o non contengono prosa (script, media,
+  // grafica) o il testo è codice/valore e tradurlo lo romperebbe.
+  const TRANSLATE_SKIP_TAGS = new Set([
+    'SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'SVG', 'MATH', 'CANVAS',
+    'IFRAME', 'OBJECT', 'EMBED', 'VIDEO', 'AUDIO', 'PRE', 'CODE', 'KBD',
+    'SAMP', 'VAR', 'TEXTAREA', 'INPUT', 'SELECT', 'OPTION', 'OPTGROUP',
+    'DATALIST', 'HEAD', 'TITLE',
+  ]);
+
+  const HAS_LETTER = /\p{L}/u;
+
+  // La UI che Filo inietta nella pagina (menu, toast, popup, sidebar) usa il
+  // prefisso di classe "sn-": non è contenuto del sito e non va tradotta.
+  function isFiloOwnUi(el) {
+    const cl = el.classList;
+    if (!cl || !cl.length) return false;
+    for (const c of cl) if (c.indexOf('sn-') === 0) return true;
+    return false;
+  }
+
+  function skipSubtreeForTranslation(el) {
+    if (TRANSLATE_SKIP_TAGS.has(el.tagName)) return true;
+    if (el.dataset && el.dataset.snTranslated) return true; // già tradotto
+    if (el.isContentEditable) return true;                  // testo dell'utente
+    if (el.hasAttribute && el.hasAttribute('hidden')) return true;
+    if (el.getAttribute && el.getAttribute('translate') === 'no') return true;
+    if (el.getAttribute && el.getAttribute('aria-hidden') === 'true') return true;
+    if (el.classList && el.classList.contains('notranslate')) return true;
+    if (isFiloOwnUi(el)) return true;
+    const cs = window.getComputedStyle(el);
+    if (cs.display === 'none' || cs.visibility === 'hidden' || cs.visibility === 'collapse') return true;
+    return false;
+  }
+
+  // Testo "proprio" dell'elemento: solo i text node figli DIRETTI (quelli più in
+  // profondità appartengono alle loro unità).
+  function ownTextOf(el) {
+    let out = '';
+    for (const c of el.childNodes) {
+      if (c.nodeType === Node.TEXT_NODE) out += c.nodeValue;
+    }
+    return out.replace(/\s+/g, ' ').trim();
+  }
+
+  function extractTranslatableBlocks({ maxBlocks = 2000 } = {}) {
+    const root = document.body || document.documentElement;
+    if (!root) return [];
+    const out = [];
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, {
+      acceptNode(el) {
+        if (skipSubtreeForTranslation(el)) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      },
+    });
+    let cur = walker.currentNode;
+    while (cur) {
+      // Serve almeno una lettera: numeri, bullet e simboli non si traducono.
+      const txt = ownTextOf(cur);
+      if (txt.length >= 2 && HAS_LETTER.test(txt)) {
+        out.push({ el: cur, text: txt });
+        if (out.length >= maxBlocks) break;
+      }
+      cur = walker.nextNode();
+    }
+    return out;
+  }
+
   function pageMeta() {
     const og = (name) => document.querySelector(`meta[property="og:${name}"]`)?.content || '';
     const meta = (name) => document.querySelector(`meta[name="${name}"]`)?.content || '';
