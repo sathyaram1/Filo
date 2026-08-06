@@ -357,6 +357,12 @@
     [ACTIONS.SAFEBROWSE_JUDGE]: 'Siti pericolosi — giudizio',
     [ACTIONS.GEOBLOCK_CLASSIFY]: 'Blocco geografico — riconoscimento',
     [ACTIONS.FEEDBACK_TITLE]: 'Titolo del feedback',
+    [ACTIONS.EDITOR_TITLE]: 'Editor — titolo del documento',
+    [ACTIONS.EDITOR_SUMMARY]: 'Editor — riassunto del documento',
+    [ACTIONS.EDITOR_CHAT]: 'Editor — chat col documento',
+    [ACTIONS.MANAGE_SEARCH]: 'Gestione — ricerca fra i feedback',
+    [ACTIONS.ARCHIVE_EMBED]: 'Archivio schede — indicizzazione',
+    [ACTIONS.PROVIDER_TEST]: 'Prova di un fornitore',
   };
 
   function actionLabel(action) {
