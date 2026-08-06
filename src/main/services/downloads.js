@@ -73,6 +73,18 @@ function safeName(name) {
   return s.slice(0, 180);
 }
 
+// Nome accorciato per gli avvisi: un file può avere un nome lunghissimo (fino a
+// 180 caratteri, vedi safeName) e senza accorciarlo l'avviso di fine
+// scaricamento diventa un riquadro enorme. Tagliamo in MEZZO così restano
+// leggibili sia l'inizio sia l'estensione (che dice di che file si tratta).
+function shortName(name, max = 44) {
+  const s = String(name || '');
+  if (s.length <= max) return s;
+  const ext = path.extname(s).slice(0, 12);
+  const head = s.slice(0, Math.max(4, max - ext.length - 4));
+  return `${head}…${ext}`;
+}
+
 // Cartella Download di sistema (ripiego: home). In test un hook d'ambiente la
 // forza sotto lo userData isolato, così uno spec può far partire un download
 // reale senza il dialogo nativo (impossibile da automatizzare headless) — lo
