@@ -519,8 +519,12 @@
   // testo letterale. I link aperti sono già filtrati da SN_MARKDOWN: nessuno
   // punta alle pagine interne dell'app.
   function setBubbleText(el, text, markdown) {
-    if (markdown && text && self.SN_MARKDOWN) el.innerHTML = self.SN_MARKDOWN.render(text);
-    else el.textContent = text || '';
+    if (markdown && text && self.SN_MARKDOWN) {
+      el.innerHTML = self.SN_MARKDOWN.render(text);
+      el.classList.add('dash-bubble-md');
+    } else {
+      el.textContent = text || '';
+    }
   }
 
   // Un solo listener delegato: i link renderizzati da Filo aprono una NUOVA
