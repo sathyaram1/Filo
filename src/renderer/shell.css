@@ -566,3 +566,146 @@ html[data-feedback-dim="1"] .shell {
   -webkit-app-region: no-drag;
 }
 #feedback-draw[hidden] { display: none; }
+
+/* ── Scaricamenti (#410.1) ─────────────────────────────────────────────────
+   Indicatore nella fila di tab (sempre visibile: la fila non è coperta dalla
+   view nativa della pagina) + pannello espandibile. */
+.dl-indicator {
+  position: relative;
+  align-self: center;
+  flex: 0 0 auto;
+  margin: -8px 6px 0 0;
+  height: 26px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  background: var(--tab-bg);
+  border: 1px solid var(--border);
+  color: var(--fg-soft);
+  cursor: default;
+  overflow: hidden;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+.dl-indicator[hidden] { display: none; }
+.dl-indicator:hover,
+.dl-indicator.open { background: var(--tab-active); color: var(--fg); }
+.dl-ind-icon { display: inline-flex; }
+.dl-ind-icon svg { display: block; }
+.dl-ind-count {
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font: 600 10px/15px system-ui, sans-serif;
+  text-align: center;
+}
+.dl-ind-count[hidden] { display: none; }
+.dl-ind-bar {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 2px;
+  background: transparent;
+  overflow: hidden;
+}
+.dl-indicator.active .dl-ind-bar {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+}
+.dl-ind-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  transition: width 0.2s ease;
+}
+.dl-indicator.indeterminate .dl-ind-fill {
+  width: 40% !important;
+  animation: dlIndet 1.1s ease-in-out infinite;
+}
+@keyframes dlIndet {
+  0%   { transform: translateX(-110%); }
+  100% { transform: translateX(320%); }
+}
+
+.dl-panel {
+  position: fixed;
+  top: 40px;                       /* subito sotto la fila di tab */
+  right: 8px;
+  width: 340px;
+  max-width: calc(100vw - 16px);
+  max-height: 50vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 var(--radius) var(--radius);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.20);
+  z-index: 1000;
+}
+.dl-panel[hidden] { display: none; }
+.dl-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+}
+.dl-panel-title { font: 600 13px/1 system-ui, sans-serif; }
+.dl-panel-clear {
+  background: transparent;
+  border: none;
+  color: var(--fg-soft);
+  font: 12px/1 system-ui, sans-serif;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+.dl-panel-clear:hover { background: var(--border); color: var(--fg); }
+.dl-panel-list { display: flex; flex-direction: column; }
+.dl-empty { padding: 18px 12px; text-align: center; color: var(--fg-soft); font: 12px/1.4 system-ui; }
+.dl-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 9px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+.dl-row:last-child { border-bottom: none; }
+.dl-row-name {
+  font: 500 12px/1.3 system-ui, sans-serif;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dl-row-bar {
+  height: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  overflow: hidden;
+}
+.dl-row-fill { height: 100%; width: 0%; background: var(--accent); transition: width 0.2s ease; }
+.dl-row-bar.indeterminate .dl-row-fill { width: 40%; animation: dlIndet 1.1s ease-in-out infinite; }
+.dl-row-meta { font: 11px/1.2 system-ui, sans-serif; color: var(--fg-soft); }
+.dl-row-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 1px; }
+.dl-row-btn {
+  background: var(--tab-bg);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  font: 11px/1 system-ui, sans-serif;
+  padding: 4px 8px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.dl-row-btn:hover { background: var(--tab-active); }
+.dl-row[data-state="interrupted"] .dl-row-name,
+.dl-row[data-state="cancelled"] .dl-row-name { color: var(--fg-soft); }
