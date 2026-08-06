@@ -250,6 +250,28 @@
       level: 1,
       describe: (a) => `Togliere la regola "apri sempre da un altro paese" per ${proxyDomain(a) || 'questo sito'}`,
     },
+    // ── comandi della finestra / barra di Filo via chat (#419) ────────────────
+    // L'agente della home aziona i controlli del browser stesso (schermo intero,
+    // riduci a icona, menu Impostazioni/App/Account, home) — la stessa cosa che
+    // sa già fare l'assistente di pagina. Tutti livello 1: azionare un controllo
+    // della finestra è benigno e completamente reversibile (uno schermo intero si
+    // toglie, un menu si richiude). "close" è ESCLUSO di proposito: l'AI non
+    // chiude finestra né schede.
+    COMANDO_FINESTRA: {
+      level: 1,
+      describe: (a) => {
+        const cmd = String((a && (a.comando ?? a.command ?? a.cmd)) || '').trim().toLowerCase();
+        const labels = {
+          fullscreen: 'Mettere o togliere lo schermo intero',
+          minimize: 'Ridurre a icona la finestra di Filo',
+          home: 'Aprire la home di Filo',
+          settings: 'Aprire il menu Impostazioni',
+          apps: 'Aprire il menu App',
+          account: 'Aprire il menu Account',
+        };
+        return labels[cmd] || 'Azionare un comando della finestra di Filo';
+      },
+    },
     // ── estetica del CONTENUTO della pagina via chat (#185) ───────────────────
     // Filo cambia l'aspetto del testo della pagina che l'utente sta guardando
     // ("scrivi in grassetto tutti i titoli"). Livello 1: si applica subito, vale
