@@ -17,8 +17,12 @@
     // ↓ Nuove versioni in cima.
     {
       version: '0.2.189', date: '2026-08-06',
+      features: [
+        'Nell\'editor puoi scorrere le corrispondenze del riquadro Cerca con Invio (Maiusc+Invio per tornare indietro) e chiudere la ricerca con Esc.',
+      ],
       fixes: [
         'Quando un pulsante "Scarica" avvia lo scaricamento aprendo una nuova scheda, non resti più con una scheda bianca da chiudere a mano: Filo la chiude da solo e ti riporta alla pagina di partenza mentre il download procede.',
+        'Cercando nell\'editor mentre scrivi la parola non si aprono più le sezioni chiuse di passaggio: si apre solo quella del risultato su cui ti fermi, e quando cambi risultato o svuoti il campo Cerca il documento torna impaginato come l\'avevi lasciato.',
       ],
     },
     {
