@@ -123,6 +123,9 @@ test('traduce tutta la pagina: titolo, sommario, didascalia, riquadro laterale e
   await expect(page.locator('#p2 a#inlink')).toHaveAttribute('href', '#x');
   await expect(page.locator('#p2')).toHaveText(/^IT /);
 
+  // Traccia ispezionabile della resa finale (gitignorata).
+  await page.screenshot({ path: 'tests/.shots/translate-page-article.png' }).catch(() => {});
+
   // Nessun testo perso per strada.
   const t = await toasts(page);
   expect(t).toContain('Pagina tradotta');
