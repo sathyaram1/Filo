@@ -12,6 +12,14 @@
       <button class="tab-new" id="tab-new" data-tip="Nuova scheda (Ctrl+T)" aria-label="Nuova scheda"></button>
       <div class="tab-drag-spacer"></div>
       <span class="incognito-badge" id="incognito-badge" hidden data-tip="Sessione incognito: niente cronologia né dati salvati su questo computer" aria-label="Finestra incognito"></span>
+      <!-- Indicatore scaricamenti (#410.1): compare solo se c'è almeno un
+           download attivo o recente. Icona + contatore + barra di avanzamento
+           aggregata; il click apre il pannello con i singoli download. -->
+      <button class="dl-indicator" id="dl-indicator" hidden data-tip="Scaricamenti" aria-label="Scaricamenti">
+        <span class="dl-ind-icon" id="dl-ind-icon"></span>
+        <span class="dl-ind-count" id="dl-ind-count" hidden></span>
+        <span class="dl-ind-bar"><span class="dl-ind-fill" id="dl-ind-fill"></span></span>
+      </button>
       <div class="window-controls">
         <button class="win-btn" id="win-min" data-tip="Minimizza" aria-label="Minimizza"></button>
         <button class="win-btn" id="win-max" data-tip="Massimizza" aria-label="Massimizza"></button>
