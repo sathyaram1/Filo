@@ -3006,8 +3006,10 @@
         findState.hits.push({ marks });
       }
     }
-    if (findState.hits.length) { findState.idx = 0; highlightCurrent(opts); }
-    else highlightCurrent(opts); // nessun risultato: chiudi i prestiti di prima
+    if (findState.hits.length) findState.idx = 0;
+    // Anche senza risultati si passa di qui: è il momento in cui si richiudono
+    // le sezioni aperte per la ricerca di prima.
+    highlightCurrent(opts);
   }
   // Evidenzia la corrispondenza corrente e programma l'"andarci sopra".
   //
