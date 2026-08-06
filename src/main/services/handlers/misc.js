@@ -273,15 +273,36 @@ module.exports = function register(on, ctx) {
   // ── Download "nativi" della navigazione (#410.1): la shell legge la
   //    cronologia e comanda i singoli scaricamenti. Il tracking vero vive in
   //    services/downloads.js (ascolta will-download della sessione). ──────────
+  //
+  // SICUREZZA — confine d'origine (stesso pattern di handlers/storage.js e
+  // handlers/nav.js). Questi handler sono registrati sul canale generico
+  // `filo:message`, raggiungibile ANCHE dai content script delle pagine web
+  // esterne. Senza gate, un sito qualsiasi potrebbe:
+  //   - leggere l'intera cronologia degli scaricamenti (nomi dei file, URL di
+  //     provenienza e percorso ASSOLUTO su disco, che contiene lo username);
+  //   - far APRIRE al sistema operativo un file appena scaricato (su Windows
+  //     equivale a farlo eseguire) o rivelarne la cartella;
+  //   - annullare un download in corso o svuotare la cronologia.
+  // Nessuna pagina web ha motivo di toccare gli scaricamenti: la cronologia e i
+  // comandi sono UI di Filo. Ammessi solo dalle superfici interne (shell e
+  // pagine filo://), come gli altri canali privilegiati.
   const DL = () => require('../downloads');
-  on(MSG.DOWNLOADS_LIST, async () => ({ ok: true, items: DL().list() }));
-  on(MSG.DOWNLOADS_CLEAR, async () => ({ ok: true, items: DL().clearCompleted() }));
-  on(MSG.DOWNLOAD_REMOVE, async (msg) => ({ ok: true, items: DL().remove(msg.id) }));
-  on(MSG.DOWNLOAD_OPEN_FILE, async (msg) => DL().openFile(msg.id));
-  on(MSG.DOWNLOAD_OPEN_FOLDER, async (msg) => DL().openFolder(msg.id));
-  on(MSG.DOWNLOAD_CANCEL, async (msg) => DL().cancel(msg.id));
-  on(MSG.DOWNLOAD_PAUSE, async (msg) => DL().pause(msg.id));
-  on(MSG.DOWNLOAD_RESUME, async (msg) => DL().resume(msg.id));
+  const isFilo = (origin) => String(origin || '').startsWith('filo://');
+  // La shell (barra in alto) è la finestra stessa: `filo://shell/shell.html`,
+  // quindi isFilo la copre già; `sender.isShell` è la conferma strutturale per
+  // eventuali finestre interne senza URL filo://.
+  const internalOnly = (fn) => async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    return fn(msg, sender, origin);
+  };
+  on(MSG.DOWNLOADS_LIST, internalOnly(async () => ({ ok: true, items: DL().list() })));
+  on(MSG.DOWNLOADS_CLEAR, internalOnly(async () => ({ ok: true, items: DL().clearCompleted() })));
+  on(MSG.DOWNLOAD_REMOVE, internalOnly(async (msg) => ({ ok: true, items: DL().remove(msg.id) })));
+  on(MSG.DOWNLOAD_OPEN_FILE, internalOnly(async (msg) => DL().openFile(msg.id)));
+  on(MSG.DOWNLOAD_OPEN_FOLDER, internalOnly(async (msg) => DL().openFolder(msg.id)));
+  on(MSG.DOWNLOAD_CANCEL, internalOnly(async (msg) => DL().cancel(msg.id)));
+  on(MSG.DOWNLOAD_PAUSE, internalOnly(async (msg) => DL().pause(msg.id)));
+  on(MSG.DOWNLOAD_RESUME, internalOnly(async (msg) => DL().resume(msg.id)));
 
   on(MSG.FEEDBACK_ANNOTATE, async (msg, sender) => {
     // Il box feedback è appena entrato/uscito dalla modalità annotazione.
