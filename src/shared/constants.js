@@ -1149,7 +1149,8 @@
       `    {"type": "ESEGUI_COMANDO", "comando": "git status"},\n` +
       `    {"type": "PROXY_TAB", "country": "fr"},\n` +
       `    {"type": "REGOLA_PROXY_DOMINIO", "country": "us", "dominio": "netflix.com"},\n` +
-      `    {"type": "STILE_PAGINA", "descrizione": "titoli in grassetto", "regole": [{"selettore": "h1,h2,h3", "css": "font-weight:700"}]}\n` +
+      `    {"type": "STILE_PAGINA", "descrizione": "titoli in grassetto", "regole": [{"selettore": "h1,h2,h3", "css": "font-weight:700"}]},\n` +
+      `    {"type": "COMANDO_FINESTRA", "comando": "fullscreen"}\n` +
       `  ]\n` +
       `}\n` +
       `Se non servono azioni, "actions" è un array vuoto. Mantieni "text" breve per i comandi (es. "Fatto, 25 minuti.").`,
