@@ -221,7 +221,6 @@
     // foreign content futuro): non è testo di pagina. Ferma l'intero sottoalbero
     // anche se un domani comparisse un tag radice non previsto nella lista sopra.
     if (el.namespaceURI && el.namespaceURI !== HTML_NS) return true;
-    if (el.dataset && el.dataset.snTranslated) return true; // già tradotto
     if (el.isContentEditable) return true;                  // testo dell'utente
     if (el.hasAttribute && el.hasAttribute('hidden')) return true;
     if (el.getAttribute && el.getAttribute('translate') === 'no') return true;
