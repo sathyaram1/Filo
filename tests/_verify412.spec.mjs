@@ -80,6 +80,7 @@ test('1) SINTOMO: pulsante Scarica con apertura in nuova scheda → il file arri
 
     // (d) L'utente vede che qualcosa è stato scaricato.
     await expect.poll(async () => (await readToasts(shell)).join('|'), { timeout: 20000 }).toContain('rapporto.zip');
+    await shell.screenshot({ path: 'tests/.shots/412-dopo.png' }).catch(() => {});
   } finally { await srv.close(); }
 });
 
