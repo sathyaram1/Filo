@@ -1200,6 +1200,40 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         const r = await tm.clearPageStyle(tab);
         return { executed: !!(r && r.ok), kept: false };
       }
+      case 'COMANDO_FINESTRA': {
+        // #419 — l'agente della home aziona i controlli del browser Filo (schermo
+        // intero, riduci a icona, menu Impostazioni/App/Account, home): prima poteva
+        // solo spiegare a parole come cliccarli. "close" è escluso di proposito.
+        const allowed = ['home', 'settings', 'apps', 'account', 'minimize', 'fullscreen'];
+        const cmd = String(action.comando ?? action.command ?? action.cmd ?? '').trim().toLowerCase();
+        if (!allowed.includes(cmd)) {
+          return { executed: false, kept: false, output: { window: 'invalid', command: cmd } };
+        }
+        const win = winOf(sender);
+        if (!win) return { executed: false, kept: false };
+        if (cmd === 'fullscreen') {
+          // Schermo intero "immersivo": la view attiva copre l'intera finestra e
+          // le barre (schede + indirizzo) spariscono — è ciò che l'utente intende
+          // con "metti a schermo intero" (togliere le barre e far occupare tutta
+          // la finestra), lo stesso del menu tasto destro → Schermo intero. NON
+          // preme il pulsante del lettore video dentro la pagina (Filo non ha
+          // accesso ai comandi del sito): se è quello che l'utente vuole, è una
+          // capacità che non esiste, non un'azione di finestra. Esc esce (tabs.js).
+          if (win._filoTabs && typeof win._filoTabs.toggleContentFullscreen === 'function') {
+            win._filoTabs.toggleContentFullscreen();
+          } else if (typeof win.setFullScreen === 'function') {
+            win.setFullScreen(!win.isFullScreen());
+          }
+          return { executed: true, kept: false, output: { window: 'fullscreen' } };
+        }
+        // home / minimize / settings / apps / account: clicca il bottone REALE
+        // della shell, riusando il canale dei comandi rapidi della barra (stessa
+        // via dell'assistente di pagina, MSG.SHELL_ACTION) così si riusa tutto il
+        // comportamento esistente (menu ancorati, toggle finestra…).
+        try { win.webContents.send('shell:trigger-button', { command: cmd }); }
+        catch (_) { return { executed: false, kept: false }; }
+        return { executed: true, kept: false, output: { window: cmd } };
+      }
       default:
         return { executed: false, kept: false };
     }
