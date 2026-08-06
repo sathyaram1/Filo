@@ -365,15 +365,14 @@ class TabManager {
     }
     const view = new WebContentsView({ webPreferences });
     // #410.1 — segui gli scaricamenti anche sulle sessioni NON predefinite
-    // (privacy per-sito, proxy "apri da un altro paese", incognito): senza
-    // questo, un download partito da una scheda proxata/privacy resterebbe "al
-    // buio". Le sessioni incognito non persistono la cronologia (privacy).
-    try {
-      require('./services/downloads').attachSession(
-        view.webContents.session,
-        { persist: !this.incognito },
-      );
-    } catch (_) {}
+    // (privacy per-sito, proxy "apri da un altro paese"): senza questo, un
+    // download partito da una scheda proxata/privacy resterebbe "al buio".
+    // Le finestre incognito sono ESCLUSE di proposito: "nessuna traccia" vale
+    // anche per i download, che quindi non entrano nella cronologia condivisa
+    // (in incognito il browser usa comunque il suo salvataggio nativo).
+    if (!this.incognito) {
+      try { require('./services/downloads').attachSession(view.webContents.session); } catch (_) {}
+    }
     return view;
   }
 
