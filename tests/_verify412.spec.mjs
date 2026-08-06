@@ -318,3 +318,41 @@ test('10) STRESS: interstiziale con contenuto vero che poi scarica → la pagina
     expect(ghosts(after).length, 'scheda fantasma dopo interstiziale').toBe(0);
   } finally { await srv.close(); }
 });
+
+test('11) STRESS: download LENTO — la scheda-contenitore si chiude mentre scarica, il file arriva INTERO', async ({ app, shell, openTab }) => {
+  const BODY = Buffer.alloc(1024 * 1024, 0x50); // 1MB a fette: la chiusura avviene a download in corso
+  const srv = await attachServer({
+    '/p': (req, res) => { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end('<!doctype html><title>Partenza</title><body><a id="dl" href="/lento.bin" target="_blank">Scarica</a></body>'); },
+    '/lento.bin': (req, res) => {
+      res.writeHead(200, {
+        'Content-Type': 'application/octet-stream',
+        'Content-Length': String(BODY.length),
+        'Content-Disposition': 'attachment; filename="lento.bin"',
+      });
+      let off = 0;
+      const tick = () => {
+        if (res.destroyed) return;
+        if (off >= BODY.length) { res.end(); return; }
+        res.write(BODY.subarray(off, off + 32 * 1024));
+        off += 32 * 1024;
+        setTimeout(tick, 120);
+      };
+      tick();
+    },
+  });
+  try {
+    const page = await openTab(`${srv.origin}/p`);
+    const before = await snap(shell);
+    await page.click('#dl');
+    // La scheda vuota sparisce mentre il download è ancora in corso…
+    await expect.poll(async () => (await snap(shell)).tabs.length, { timeout: 20000 }).toBe(before.tabs.length);
+    // …e il file arriva comunque COMPLETO (chiudere la scheda non lo interrompe).
+    const target = join(await dlDir(app), 'lento.bin');
+    await expect.poll(() => (existsSync(target) ? statSync(target).size : -1), { timeout: 60000 }).toBe(BODY.length);
+    const items = await shell.evaluate(() => window.filoShell.downloads.list());
+    const rec = (items.items || []).find((r) => r.filename === 'lento.bin');
+    console.log('record download lento:', JSON.stringify(rec && { s: rec.state, r: rec.receivedBytes, t: rec.totalBytes }));
+    expect(rec.state).toBe('completed');
+    expect(rec.receivedBytes).toBe(BODY.length);
+  } finally { await srv.close(); }
+});
