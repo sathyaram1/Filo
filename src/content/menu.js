@@ -853,7 +853,8 @@
     if (it.disabled) { b.classList.add('sn-menu-btn-disabled'); b.dataset.snDisabled = '1'; }
     setIconContent(b, it.icon || it.label || '');
     if (it.id) b.dataset.snIconId = it.id;
-    if (it.label) attachTooltip(b, it.label);
+    // Vedi makeRowButton: nome accessibile su un bottone di sola icona.
+    if (it.label) { b.setAttribute('aria-label', it.label); attachTooltip(b, it.label); }
     b.addEventListener('click', (e) => {
       e.stopPropagation();
       if (it.disabled) return;
