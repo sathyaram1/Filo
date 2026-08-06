@@ -38,6 +38,26 @@ contextBridge.exposeInMainWorld('filoShell', {
     clearProxy: (id) => ipcRenderer.invoke('tabs:clear-proxy', { id }),
     proxyStatus: () => ipcRenderer.invoke('tabs:proxy-status'),
   },
+  // Scaricamenti della navigazione (#410.1): la shell legge la cronologia,
+  // comanda i singoli download e riceve gli aggiornamenti di avanzamento dal
+  // main via il canale 'shell:download'. I type dei messaggi corrispondono a
+  // MSG.* in src/shared/messages.js.
+  downloads: {
+    list: () => ipcRenderer.invoke('filo:message', { type: 'downloads_list' }),
+    clear: () => ipcRenderer.invoke('filo:message', { type: 'downloads_clear' }),
+    remove: (id) => ipcRenderer.invoke('filo:message', { type: 'download_remove', id }),
+    openFile: (id) => ipcRenderer.invoke('filo:message', { type: 'download_open_file', id }),
+    openFolder: (id) => ipcRenderer.invoke('filo:message', { type: 'download_open_folder', id }),
+    cancel: (id) => ipcRenderer.invoke('filo:message', { type: 'download_cancel', id }),
+    pause: (id) => ipcRenderer.invoke('filo:message', { type: 'download_pause', id }),
+    resume: (id) => ipcRenderer.invoke('filo:message', { type: 'download_resume', id }),
+    // Aggiornamenti live: { kind:'start'|'progress'|'done'|'error', item }
+    onEvent: (fn) => {
+      const wrapped = (_event, info) => { try { fn(info); } catch (_) {} };
+      ipcRenderer.on('shell:download', wrapped);
+      return () => ipcRenderer.removeListener('shell:download', wrapped);
+    },
+  },
   popupMenu: (entries, x, y) => ipcRenderer.invoke('shell:popup-menu', { entries, x, y }),
   // Scelta di una voce di menu con `action` custom (vedi popup-menu.js).
   onMenuAction: (fn) => {
