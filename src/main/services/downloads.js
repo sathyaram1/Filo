@@ -211,11 +211,23 @@ function onWillDownload(item, persistThis) {
   if (rec._persist) persist();
   broadcast('start', rec);
 
-  // Tempo (ms) dopo cui un download che risulta "interrotto" ma non conclude
-  // (Chromium lo lascia in sospeso "riprendibile" quando il server tronca la
-  // connessione) viene dichiarato fallito: senza questo l'utente resterebbe nel
-  // silenzio per sempre — lo stesso problema di #274 sul salvataggio immagini.
-  const STALL_MS = 2500;
+  // Watchdog anti-silenzio: se il download non fa AVANZAMENTO REALE (i byte
+  // ricevuti non superano il massimo già visto) per STALL_MS, lo dichiariamo
+  // fallito. Serve perché quando il server tronca la connessione Chromium NON
+  // conclude: ritenta all'infinito ricevendo sempre lo stesso pezzo (i byte
+  // rimbalzano 0↔N senza mai crescere) restando in stato 'progressing'. Senza
+  // questo argine l'utente resterebbe nel silenzio — lo stesso problema di #274.
+  const STALL_MS = 6000;
+  let maxRecv = 0;
+  function armWatchdog() {
+    if (rec._stallTimer) clearTimeout(rec._stallTimer);
+    rec._stallTimer = setTimeout(() => {
+      rec._stallTimer = null;
+      if (rec._final || rec.paused) return;
+      try { item.cancel(); } catch (_) {}
+      finalize('interrupted');
+    }, STALL_MS);
+  }
 
   // Chiude UNA volta sola il ciclo di vita del download (successo o fallimento).
   function finalize(state) {
