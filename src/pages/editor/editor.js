@@ -2129,29 +2129,78 @@
     while (el && el.parentElement && el.parentElement !== docEl) el = el.parentElement;
     return el && el.parentElement === docEl ? el : null;
   }
-  // Riapre le sezioni chiuse che stanno nascondendo `node`, così qualsiasi cosa
-  // ci si voglia fare (portarci la vista, sostituire una parola) avvenga sotto
-  // gli occhi dell'utente. Ritorna true se ha davvero riaperto qualcosa.
-  function revealCollapsedFor(node) {
+  // Catena dei titoli che GOVERNANO il blocco di `node`, dal più vicino al più
+  // esterno. Solo i titoli di livello più alto (numero minore) possono
+  // nasconderlo: risalendo i fratelli precedenti si tiene la catena scendendo
+  // di livello, e ci si ferma al primo H1.
+  function governingHeadings(node) {
+    const chain = [];
     const el = topLevelBlockOf(node);
-    if (!el || !el.classList.contains('ed-hidden-by-collapse')) return false;
-    // Solo i titoli di livello più alto (numero minore) di `el` possono
-    // nasconderlo: risalendo i fratelli precedenti si tiene la catena dei
-    // titoli che lo governano, scendendo di livello.
+    if (!el) return chain;
     let minLvl = headingLevel(el) || Infinity;
-    let opened = false;
     let sib = el.previousElementSibling;
     while (sib) {
       const lvl = headingLevel(sib);
       if (lvl > 0 && lvl < minLvl) {
         minLvl = lvl;
-        if (sib.dataset.collapsed === '1') { delete sib.dataset.collapsed; opened = true; }
+        chain.push(sib);
         if (lvl === 1) break;
       }
       sib = sib.previousElementSibling;
     }
+    return chain;
+  }
+  // Riapre le sezioni chiuse che stanno nascondendo `node`, così qualsiasi cosa
+  // ci si voglia fare (portarci la vista, sostituire una parola) avvenga sotto
+  // gli occhi dell'utente. Ritorna true se ha davvero riaperto qualcosa.
+  //
+  // `opts.temporary` marca l'apertura come PRESTITO della ricerca: è
+  // un'apertura di passaggio, non una scelta dell'utente, e si richiude da sé
+  // appena la ricerca si sposta altrove o finisce (feedback #385 bis: cercando
+  // lettera per lettera restavano aperte le sezioni delle corrispondenze
+  // intermedie, e l'impaginazione costruita a mano andava rifatta).
+  function revealCollapsedFor(node, opts) {
+    const el = topLevelBlockOf(node);
+    if (!el || !el.classList.contains('ed-hidden-by-collapse')) return false;
+    let opened = false;
+    for (const h of governingHeadings(node)) {
+      if (h.dataset.collapsed !== '1') continue;
+      delete h.dataset.collapsed;
+      if (opts && opts.temporary) h.dataset.searchOpened = '1';
+      opened = true;
+    }
     if (opened) reapplyCollapseState();
     return opened;
+  }
+  // Le sezioni che nascondevano `node` diventano dell'utente: aperte per una
+  // ragione che resta valida anche quando la ricerca se ne va (ci ha scritto
+  // dentro, o ci è stata sostituita una parola e deve poterla vedere).
+  function keepRevealedFor(node) {
+    governingHeadings(node).forEach((h) => { delete h.dataset.searchOpened; });
+  }
+  // Se il cursore è dentro una sezione aperta in prestito dalla ricerca, quella
+  // sezione smette di essere in prestito: nessun testo sparisce da sotto il
+  // cursore mentre l'utente ci sta lavorando.
+  function keepRevealedAtCaret() {
+    const sel = window.getSelection();
+    if (!sel || !sel.anchorNode || !docEl.contains(sel.anchorNode)) return;
+    keepRevealedFor(sel.anchorNode);
+  }
+  // Richiude tutte le sezioni aperte in prestito dalla ricerca, tranne quelle
+  // che stanno mostrando `keepNode` (la corrispondenza su cui si è adesso).
+  // Le sezioni aperte a mano dall'utente non hanno il marchio e non si toccano.
+  function closeBorrowedSectionsExcept(keepNode) {
+    keepRevealedAtCaret();
+    const keep = new Set(keepNode ? governingHeadings(keepNode) : []);
+    let changed = false;
+    docEl.querySelectorAll('h1[data-search-opened], h2[data-search-opened], h3[data-search-opened]').forEach((h) => {
+      if (keep.has(h)) return;
+      delete h.dataset.searchOpened;
+      h.dataset.collapsed = '1';
+      changed = true;
+    });
+    if (changed) reapplyCollapseState();
+    return changed;
   }
 
   function onDocInput() {
