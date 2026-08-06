@@ -152,9 +152,12 @@ test('stress: url speciali, xss, click ripetuti, campo di testo, root chiuso', a
   const twice = await itemLabels(page);
   for (const l of IMG_ITEMS) expect(twice, `dbl-click img: ${l}`).toContain(l);
 
-  // campo di testo dentro lo shadow: il menu deve offrire Incolla
-  const ta = await rightClickAndRead(page, '#sh-ta');
-  expect(ta, 'textarea in shadow: Incolla').toContain('Incolla');
+  // campo di testo: stesso menu dentro e fuori dal blocco isolato
+  const lightTa = await rightClickAndRead(page, '#light-ta');
+  const shTa = await rightClickAndRead(page, '#sh-ta');
+  console.log('[light textarea]', JSON.stringify(lightTa));
+  console.log('[shadow textarea]', JSON.stringify(shTa));
+  expect(shTa, 'textarea: parità dentro/fuori il blocco').toEqual(lightTa);
 
   // shadow root CHIUSO: il menu deve almeno aprirsi senza rompersi
   const cb = await page.evaluate(() => {
