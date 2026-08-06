@@ -205,6 +205,26 @@
     GEOBLOCK_CLASSIFY: 'geoblock_classify',
     // Titolo breve generato all'invio di un feedback.
     FEEDBACK_TITLE: 'feedback_title',
+    // === Editor ===
+    // Prima queste tre funzioni chiedevano il modello di «Spiega»: chi cambiava
+    // quel modello cambiava senza saperlo anche l'editor, e chi voleva cambiare
+    // l'editor non trovava dove. Ora hanno il loro slot.
+    // Titolo automatico di un documento dell'editor.
+    EDITOR_TITLE: 'editor_title',
+    // Riassunto automatico di un documento dell'editor.
+    EDITOR_SUMMARY: 'editor_summary',
+    // Chat agganciata a un documento dell'editor.
+    EDITOR_CHAT: 'editor_chat',
+    // Ricerca "a senso" fra i feedback nella dashboard di gestione (prima usava
+    // lo slot di «Categorizza»).
+    MANAGE_SEARCH: 'manage_search',
+    // Embedding dei riassunti delle schede archiviate (base della ricerca
+    // semantica nell'archivio). Prima il modello era scritto nel codice.
+    ARCHIVE_EMBED: 'archive_embed',
+    // Modello usato dal pulsante "Prova" delle chiavi/fornitori: una richiesta
+    // brevissima per misurare latenza e velocità. Prima era un id scritto nel
+    // codice, quindi si provava un modello diverso da quelli davvero in uso.
+    PROVIDER_TEST: 'provider_test',
   };
 
   // === Crediti (gamification) ===
