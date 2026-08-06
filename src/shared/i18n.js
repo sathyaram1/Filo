@@ -180,6 +180,8 @@
     toast_copied_saving: 'Copiato negli appunti, salvataggio in corso…',
     toast_translating_page: 'Traduzione pagina in corso…',
     toast_page_translated: 'Pagina tradotta',
+    toast_page_translated_partial: 'Pagina tradotta solo in parte',
+    toast_nothing_to_translate: 'Non ho trovato testo da tradurre in questa pagina',
     toast_original_restored: 'Originale ripristinato',
     toast_clipboard_empty: 'Cronologia appunti vuota',
     toast_pasted_image: 'Immagine incollata',
