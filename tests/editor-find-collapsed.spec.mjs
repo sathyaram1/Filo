@@ -98,6 +98,110 @@ test('Prec/Succ su corrispondenze in sezioni diverse riaprono quella di destinaz
   expect(secondIsCurrent).toBe(true);
 });
 
+// ── #385 bis: la ricerca non deve lasciare aperte le sezioni di passaggio ──
+//
+// Scrivendo "ornitorinco" lettera per lettera la ricerca ripartiva a ogni tasto
+// e "andava" sulla prima corrispondenza del prefisso: con "o" apriva la sezione
+// di "ottimo", con "or" quella di "orso"… e quelle sezioni restavano aperte per
+// sempre. Alla fine tre sezioni aperte invece di una, da richiudere a mano.
+//
+// Comportamento atteso: si apre solo la sezione della corrispondenza su cui ci
+// si ferma davvero; le sezioni aperte di passaggio si richiudono da sé, e
+// quelle aperte a mano dall'utente non si toccano mai.
+
+// Tre sezioni tutte CHIUSE, ognuna con una parola che comincia per "o".
+async function setupThreeClosedSections(page) {
+  await page.waitForSelector('#doc');
+  await page.evaluate(() => {
+    const doc = document.getElementById('doc');
+    doc.innerHTML = '<h2>Uno</h2><p id="s1">un ottimo risultato</p>'
+      + '<h2>Due</h2><p id="s2">un orso bruno</p>'
+      + '<h2>Tre</h2><p id="s3">qui vive un ornitorinco</p>';
+    doc.dispatchEvent(new InputEvent('input', { bubbles: true }));
+  });
+  for (const t of ['Uno', 'Due', 'Tre']) {
+    await page.locator('#doc h2', { hasText: t }).locator('.ed-collapse-toggle').click();
+  }
+  await expect(page.locator('#doc #s1')).toBeHidden();
+  await expect(page.locator('#doc #s2')).toBeHidden();
+  await expect(page.locator('#doc #s3')).toBeHidden();
+  await page.locator('.ed-switch-icon').nth(1).click();
+  await page.waitForSelector('[data-sr="find"]');
+}
+
+test('Cercando lettera per lettera si apre SOLO la sezione della parola cercata (#385)', async ({ openTab }) => {
+  const page = await openTab(EDITOR);
+  await setupThreeClosedSections(page);
+
+  // Digitazione vera, un carattere alla volta (è il gesto che rompeva tutto).
+  await page.locator('[data-sr="find"]').pressSequentially('ornitorinco', { delay: 60 });
+  await expect(page.locator('[data-sr="count"]')).toHaveText('1/1');
+
+  // La sezione della corrispondenza si apre (e la parola si vede evidenziata).
+  await expect(page.locator('#doc #s3')).toBeVisible();
+  await expect(page.locator('#doc mark.ed-find-hit.current')).toHaveText('ornitorinco');
+  // …e le sezioni attraversate dai prefissi ("o" → ottimo, "or" → orso) NON
+  // restano aperte: l'impaginazione dell'utente è intatta.
+  await expect(page.locator('#doc #s1')).toBeHidden();
+  await expect(page.locator('#doc #s2')).toBeHidden();
+
+  await page.screenshot({ path: 'tests/.shots/editor-find-only-target-section.png' });
+});
+
+test('Svuotare il campo Cerca richiude le sezioni aperte dalla ricerca, non le tue (#385)', async ({ openTab }) => {
+  const page = await openTab(EDITOR);
+  await setupThreeClosedSections(page);
+
+  // L'utente riapre a mano la prima sezione: è una sua scelta, va rispettata.
+  await page.locator('#doc h2', { hasText: 'Uno' }).locator('.ed-collapse-toggle').click();
+  await expect(page.locator('#doc #s1')).toBeVisible();
+
+  await page.fill('[data-sr="find"]', 'ornitorinco');
+  await expect(page.locator('#doc #s3')).toBeVisible(); // aperta dalla ricerca
+
+  // Campo svuotato = ricerca finita: torna com'era prima di cercare.
+  await page.fill('[data-sr="find"]', '');
+  await expect(page.locator('#doc #s3')).toBeHidden();
+  await expect(page.locator('#doc h2', { hasText: 'Tre' }).locator('.ed-collapse-toggle'))
+    .toHaveClass(/is-collapsed/);
+  // La sezione aperta a mano resta aperta.
+  await expect(page.locator('#doc #s1')).toBeVisible();
+});
+
+test('Una sostituzione lascia aperta la sezione toccata anche a ricerca finita (#385)', async ({ openTab }) => {
+  const page = await openTab(EDITOR);
+  await setupThreeClosedSections(page);
+
+  await page.fill('[data-sr="find"]', 'ornitorinco');
+  await page.fill('[data-sr="repl"]', 'canguro');
+  await page.click('[data-sr="one"]');
+  await expect(page.locator('#doc #s3')).toHaveText('qui vive un canguro');
+
+  // Svuotare la ricerca NON deve nascondere una modifica appena fatta: quella
+  // sezione è stata aperta per mostrare un cambiamento, non di passaggio.
+  await page.fill('[data-sr="find"]', '');
+  await expect(page.locator('#doc #s3')).toBeVisible();
+  await expect(page.locator('#doc #s3')).toHaveText('qui vive un canguro');
+});
+
+test('Invio nel campo Cerca porta sulla corrispondenza e poi alla successiva (#385)', async ({ openTab }) => {
+  const page = await openTab(EDITOR);
+  await setupThreeClosedSections(page);
+
+  const find = page.locator('[data-sr="find"]');
+  await find.pressSequentially('or', { delay: 20 });
+  // Invio subito, senza aspettare la pausa: va sulla corrispondenza corrente.
+  await find.press('Enter');
+  await expect(page.locator('[data-sr="count"]')).toHaveText('1/2');
+  await expect(page.locator('#doc #s2')).toBeVisible(); // "orso"
+
+  // Invio di nuovo: corrispondenza successiva, e la sezione di prima si richiude.
+  await find.press('Enter');
+  await expect(page.locator('[data-sr="count"]')).toHaveText('2/2');
+  await expect(page.locator('#doc #s3')).toBeVisible(); // "ornitorinco"
+  await expect(page.locator('#doc #s2')).toBeHidden();
+});
+
 // Invariante di contorno sul collasso annidato (stessa causa: lo stato di
 // collasso va RICALCOLATO dai titoli, non togglato in loco). Riaprendo una
 // sezione grande, una sotto-sezione ancora chiusa deve restare chiusa.
