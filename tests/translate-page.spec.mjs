@@ -129,7 +129,7 @@ test('traduce tutta la pagina: titolo, sommario, didascalia, riquadro laterale e
   // Nessun testo perso per strada.
   const t = await toasts(page);
   expect(t).toContain('Pagina tradotta');
-  expect(t).not.toContain('Pagina tradotta solo in parte');
+  expect(t.join(' | ')).not.toContain('Traduzione interrotta');
 });
 
 test('traduce anche le pagine senza <p>, fatte di blocchi generici', async ({ app, openTab, testServer }) => {
