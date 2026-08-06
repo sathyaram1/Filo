@@ -48,7 +48,14 @@ const NOTHING = `<!doctype html><html lang="en"><body style="font:16px sans-seri
 // Finta traduzione nel main: "IT " davanti a ogni blocco, separatori e
 // segnaposto [[Lk]] intatti.
 async function stubTranslationProvider(app) {
-  await app.evaluate(() => {
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { gemini: 'k-test' },
+      models: { [C.ACTIONS.TRANSLATE_PAGE]: 'flash-lite-3' },
+      modelRegistry: C.DEFAULT_MODEL_REGISTRY,
+    });
     const P = globalThis.SN_PROVIDERS;
     globalThis.__filoTranslateCalls = 0;
     P.completeWithFallback = async ({ messages }) => {
