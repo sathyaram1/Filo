@@ -111,7 +111,9 @@ test('un download che si interrompe a metà viene segnalato (toast d\'errore + c
     await page.locator('#dl').click();
 
     // SUCCESSO del fix = il fallimento viene COMUNICATO: toast d'errore…
-    await expect(shell.locator('.shell-notif-msg')).toContainText('non riuscito', { timeout: 25000 });
+    // La finestra di grazia concessa alla ripresa automatica di Chromium
+    // (services/downloads.js) è di 20s: l'attesa qui deve superarla.
+    await expect(shell.locator('.shell-notif-msg')).toContainText('non riuscito', { timeout: 45000 });
 
     // …e la cronologia lo segna "interrotto" (non "completato", non sparito).
     await expect.poll(async () => {
