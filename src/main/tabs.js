@@ -1560,6 +1560,12 @@ class TabManager {
     wc.on('page-title-updated', (_e, title) => update({ title: title || tab.title }));
     wc.on('page-favicon-updated', (_e, favicons) => update({ favicon: favicons?.[0] || '' }));
     wc.on('did-navigate', (_e, url, httpResponseCode) => {
+      // #412 — questa scheda ha committato una vera navigazione main-frame:
+      // NON è più il "contenitore vuoto" di un download (una scheda aperta da un
+      // link Scarica target=_blank che diventa subito scaricamento non committa
+      // MAI, quindi resta a about:blank). Il flag protegge dal chiuderla per
+      // sbaglio se poi parte un download da una pagina che ha già contenuto.
+      tab._everNavigated = true;
       // Nuova pagina → il colore live (§1.1) del sito precedente non vale più: lo
       // azzeriamo (la tab torna al neutro finché il content script non ricampiona).
       // Il colore IDENTITÀ (§1.2) invece dipende dal DOMINIO: se navighiamo su un
@@ -1832,6 +1838,42 @@ class TabManager {
   // legittimo (es. share dialog, OAuth) e va aperto bypassando il blocco.
   openBlockedPopup(url) {
     this.openTab(url, { activate: true });
+  }
+
+  // #412 — un link "Scarica" con target=_blank (o window.open) apre una nuova
+  // scheda che, servita con Content-Disposition:attachment, diventa subito uno
+  // scaricamento: nessuna pagina si committa mai e la scheda resta a about:blank
+  // — bianca, titolo "Nuova scheda", attiva — che l'utente deve chiudere a mano.
+  // Il gestore download (services/downloads.js) ci passa la webContents che ha
+  // originato lo scaricamento: se corrisponde a una scheda che non ha MAI
+  // approdato a una pagina, la chiudiamo e restituiamo il fuoco alla scheda di
+  // partenza. La scheda superflua NON viene archiviata (non è un sito visitato,
+  // è un contenitore mai riempito): per questo non passa da closeTab.
+  handleDownloadStarted(wc) {
+    if (!wc) return;
+    const tab = this.tabs.find((t) => {
+      try { return t.view && t.view.webContents === wc; } catch (_) { return false; }
+    });
+    if (!tab) return;
+    // Solo schede "vuote": mai committato una navigazione (tab._everNavigated),
+    // quindi ferme su about:blank. Una scheda con contenuto reale (es. un
+    // interstiziale "il download partirà a breve") ha già committato e va tenuta.
+    if (tab._everNavigated) return;
+    const idx = this.tabs.findIndex((t) => t.id === tab.id);
+    if (idx < 0) return;
+    try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
+    try { tab.view.webContents.close(); } catch (_) {}
+    ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
+    this.tabs.splice(idx, 1);
+    if (this.activeId === tab.id) {
+      // Torna alla scheda di partenza (la più recente fra le rimaste), come fa
+      // closeTab; se non ne resta nessuna, apri una newtab fresca.
+      const next = this._mostRecentlyActiveTab() || this.tabs[idx] || this.tabs[idx - 1];
+      if (next) this.activate(next.id);
+      else this.openTab('filo://newtab/');
+    } else {
+      this._broadcast();
+    }
   }
 
   // #170.3 — decide se bloccare una navigazione top-level verso un sito in
