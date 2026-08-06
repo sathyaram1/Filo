@@ -399,7 +399,7 @@ function attachSession(ses) {
   if (!ses || attached.has(ses)) return;
   attached.add(ses);
   try {
-    ses.on('will-download', (_e, item) => { onWillDownload(item); });
+    ses.on('will-download', (_e, item, webContents) => { onWillDownload(item, webContents); });
   } catch (_) {}
 }
 
