@@ -320,10 +320,32 @@
     // Rimuovi eventuali note di traduzione (vecchio formato, retrocompatibilità)
     document.querySelectorAll('[data-sn-translation="1"]').forEach((n) => n.remove());
     pageHasTranslation = false;
+    pageComplete = false;
+    missingCount = 0;
+    totalCount = 0;
     Popup.showToast(I18n.t('toast_original_restored'));
   }
 
   function hasTranslation() { return pageHasTranslation; }
+  // Traduzione presente ma incompleta: il menu deve offrire "Riprendi", non
+  // "Mostra originale" (che butterebbe via anche la parte già tradotta e
+  // pagata).
+  function isPartial() { return pageHasTranslation && !pageComplete; }
+  function missing() { return missingCount; }
+  function total() { return totalCount; }
 
-  global.SN_TRANSLATE_PAGE = { translatePage, restoreOriginal, hasTranslation };
+  // Voce etichettata "Mostra originale" da mostrare SOLO quando la traduzione è
+  // a metà: lì l'icona del menu serve per riprendere, ma chi vuole rinunciare
+  // deve comunque poter tornare indietro (se puoi aggiungere, devi poter
+  // togliere). A traduzione completa la voce non serve: la offre già l'icona.
+  function buildRestoreOriginalItem() {
+    const Icons = global.SN_ICONS;
+    const icon = (Icons && typeof Icons.showOriginal === 'function') ? Icons.showOriginal(18) : undefined;
+    return { type: 'item', icon, label: I18n.t('menu_show_original'), onClick: () => restoreOriginal() };
+  }
+
+  global.SN_TRANSLATE_PAGE = {
+    translatePage, restoreOriginal, hasTranslation,
+    isPartial, missing, total, buildRestoreOriginalItem,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
