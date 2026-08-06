@@ -107,7 +107,7 @@ test('3) STRESS: tre clic rapidi sul pulsante Scarica → tre file, zero schede 
   const BODY = Buffer.alloc(64 * 1024, 0x43);
   const srv = await attachServer({
     '/p': (req, res) => { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end('<!doctype html><title>Partenza</title><body><a id="dl" href="/f.bin" target="_blank">Scarica</a></body>'); },
-    '/f.bin': attach(BODY, 'f.bin'),
+    '/f.bin': (req, res) => { srv.onHit?.(); attach(BODY, 'f.bin')(req, res); },
   });
   try {
     const page = await openTab(`${srv.origin}/p`);
