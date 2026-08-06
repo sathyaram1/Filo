@@ -113,6 +113,12 @@
         return { output: M.TEXT, inputs: [M.AUDIO] };
       case A.TTS:
         return { output: M.AUDIO, inputs: [] };
+      // Indicizzazione dell'archivio schede: serve un modello che produca
+      // VETTORI, non parole. Un modello di testo qui non funzionerebbe, e un
+      // modello di indicizzazione non funziona per le funzioni di testo: la
+      // validazione impedisce entrambi gli scambi.
+      case A.ARCHIVE_EMBED:
+        return { output: M.EMBED, inputs: [] };
       default:
         return { output: M.TEXT, inputs: [] };
     }
