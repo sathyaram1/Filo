@@ -214,12 +214,23 @@
           payload: { chunk },
         });
       } catch (e) {
-        res = { ok: false, error: (e && e.message) || '' };
+        res = { ok: false, error: (e && e.message) || '', code: (e && e.code) || '' };
       }
       if (res?.ok && String(res.text || '').trim()) return { ok: true, text: res.text };
-      if (attempt) return { ok: false, error: res?.error || I18n.t('err_provider_failed') };
+      if (attempt) return { ok: false, error: errFrom(res) };
     }
-    return { ok: false, error: I18n.t('err_provider_failed') };
+    return { ok: false, error: errFrom(null) };
+  }
+
+  // La risposta d'errore che arriva dal main è un oggetto piatto
+  // ({ error, code }): lo ricompone nella forma che SN_CHAT_ERRORS sa leggere
+  // (message/code/status), così "chiave rifiutata", "servizio sovraccarico" e
+  // "rete caduta" diventano frasi diverse invece di un unico messaggio generico.
+  function errFrom(res) {
+    const e = new Error(String((res && res.error) || 'translate_failed'));
+    if (res && res.code && res.code !== 'UNKNOWN') e.code = res.code;
+    if (res && Number(res.status) > 0) e.status = Number(res.status);
+    return e;
   }
 
   // Sostituisce il contenuto dell'unità con la traduzione, rimettendo i figli
