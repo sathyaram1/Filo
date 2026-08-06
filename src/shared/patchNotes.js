@@ -18,7 +18,7 @@
     {
       version: '0.2.186', date: '2026-08-05',
       fixes: [
-        '"Traduci la pagina" ora traduce davvero tutta la pagina: titolo, sommario, didascalie delle foto, riquadri "Leggi anche", voci di menu e testo dei link, non più i soli paragrafi. Funziona anche sui siti moderni dove prima non succedeva nulla, la traduzione compare mano a mano che è pronta e, se non c\'è niente da tradurre o è riuscita solo in parte, adesso te lo dice.',
+        '"Traduci la pagina" ora traduce davvero tutta la pagina: titolo, sommario, didascalie delle foto, riquadri "Leggi anche", voci di menu e testo dei link, non più i soli paragrafi. Le illustrazioni, i grafici, i loghi e le formule restano intatti con i loro colori. Funziona anche sui siti moderni dove prima non succedeva nulla, la traduzione compare mano a mano che è pronta e, se non c\'è niente da tradurre o è riuscita solo in parte, adesso te lo dice.',
         'Le scorciatoie da tastiera Ctrl+T (nuova scheda), Ctrl+W (chiudi scheda), Ctrl+R (ricarica) e Ctrl+L (vai a scrivere un indirizzo) ora funzionano anche mentre stai guardando un sito, non solo quando il cursore è sulla fila delle schede.',
         'Il tasto destro ora offre le stesse azioni ovunque sulla pagina, anche sui blocchi "isolati" che molti siti moderni usano per costruire i loro contenuti: su un link ritrovi Apri in nuova tab, Copia URL, Salva link per dopo, Condividi e Spiega; su un\'immagine Copia, Salva come, Copia indirizzo e Cerca; sul testo selezionato lì dentro Copia, Cerca, Leggi e le risposte di Filo. Prima, dentro quei blocchi, il menu compariva quasi vuoto.',
       ],
