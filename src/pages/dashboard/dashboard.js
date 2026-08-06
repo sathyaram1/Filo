@@ -1232,7 +1232,9 @@
       if (streamBubble) {
         streamBubble.classList.remove('dash-bubble-streaming');
         if (r.text) {
-          streamBubble.textContent = r.text;
+          // #418 — a fine turno il testo grezzo dello streaming diventa la
+          // risposta formattata (grassetto, corsivo, elenchi, link cliccabili).
+          setBubbleText(streamBubble, r.text, true);
           filoBubble = streamBubble;
         } else {
           // Il testo si è svuotato (es. reset non recuperato): niente bolla vuota.
@@ -1241,7 +1243,7 @@
           bubblesEl.appendChild(filoBubble);
         }
       } else {
-        filoBubble = makeBubble({ role: 'filo', text: r.text || '' });
+        filoBubble = makeBubble({ role: 'filo', text: r.text || '', markdown: true });
         bubblesEl.appendChild(filoBubble);
       }
       // #159 — risposta fresca: le impostazioni a livello 2 aprono il loro popup
