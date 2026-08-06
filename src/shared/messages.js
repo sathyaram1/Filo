@@ -162,6 +162,27 @@
     // decide il nome di ripiego e l'header Accept.
     // { url, kind:'video'|'audio' } → { ok, path?, filename? } | { ok:false, cancelled?, error? }
     DOWNLOAD_MEDIA: 'download_media',
+    // --- Download "nativi" della navigazione (#410.1) --------------------
+    // Sono i download che partono cliccando un link a un file (PDF, ZIP,
+    // allegato): il main ascolta will-download della sessione di navigazione,
+    // ne segue l'avanzamento e lo mostra nella barra in alto. Distinti da
+    // DOWNLOAD_IMAGE/DOWNLOAD_MEDIA, che scaricano byte "a mano" su richiesta
+    // esplicita del menu. Questi messaggi servono alla shell per leggere la
+    // cronologia e comandare i singoli scaricamenti.
+    // Elenco cronologia (attivi + conclusi, più recenti prima). → { ok, items }
+    DOWNLOADS_LIST: 'downloads_list',
+    // Svuota la cronologia dei download CONCLUSI (gli attivi restano). → { ok, items }
+    DOWNLOADS_CLEAR: 'downloads_clear',
+    // Rimuove UNA voce dalla cronologia. { id } → { ok, items }
+    DOWNLOAD_REMOVE: 'download_remove',
+    // Apre il file scaricato col programma di sistema. { id } → { ok } | { ok:false, error }
+    DOWNLOAD_OPEN_FILE: 'download_open_file',
+    // Mostra il file nella cartella (evidenziato). { id } → { ok } | { ok:false, error }
+    DOWNLOAD_OPEN_FOLDER: 'download_open_folder',
+    // Comandi sul download in corso. { id } → { ok }
+    DOWNLOAD_CANCEL: 'download_cancel',
+    DOWNLOAD_PAUSE: 'download_pause',
+    DOWNLOAD_RESUME: 'download_resume',
     // Test provider: misura latenza al primo token e token al secondo
     // su un piccolo prompt fisso. Usato dalla pagina Opzioni.
     TEST_PROVIDER: 'test_provider',                 // { provider, apiKey, model? }
