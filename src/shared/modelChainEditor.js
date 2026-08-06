@@ -17,9 +17,17 @@
     return global.SN_I18N ? global.SN_I18N.t(key, ...args) : key;
   }
 
-  // Le azioni esposte nell'editor (sottoinsieme di ACTIONS) con la rispettiva
-  // chiave i18n per l'etichetta. Calcolate al volo così SN_CONST è già caricato.
-  function actionLabels() {
+  // Etichetta (chiave i18n) per ogni funzione mostrata nell'editor.
+  //
+  // L'ELENCO delle funzioni NON si decide qui: viene dal censimento
+  // (`modelUsage.js`), che è la sorgente di verità di "dove Filo usa un
+  // modello". Prima le due liste erano scritte a mano una accanto all'altra e
+  // potevano divergere: una funzione dimenticata qui restava senza un posto
+  // dove impostarla, cioè esattamente il problema che il censimento risolve.
+  // Qui restano solo le etichette; l'ordine e la completezza li dà il
+  // censimento, e una funzione senza etichetta ricade sul nome del censimento
+  // invece di sparire.
+  function labelKeys() {
     const A = global.SN_CONST.ACTIONS;
     return [
       [A.EXPLAIN, 'options_action_explain'],
