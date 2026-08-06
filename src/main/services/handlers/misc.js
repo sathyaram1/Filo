@@ -270,6 +270,19 @@ module.exports = function register(on, ctx) {
   on(MSG.DOWNLOAD_IMAGE, handleDownload);
   on(MSG.DOWNLOAD_MEDIA, handleDownload);
 
+  // ── Download "nativi" della navigazione (#410.1): la shell legge la
+  //    cronologia e comanda i singoli scaricamenti. Il tracking vero vive in
+  //    services/downloads.js (ascolta will-download della sessione). ──────────
+  const DL = () => require('../downloads');
+  on(MSG.DOWNLOADS_LIST, async () => ({ ok: true, items: DL().list() }));
+  on(MSG.DOWNLOADS_CLEAR, async () => ({ ok: true, items: DL().clearCompleted() }));
+  on(MSG.DOWNLOAD_REMOVE, async (msg) => ({ ok: true, items: DL().remove(msg.id) }));
+  on(MSG.DOWNLOAD_OPEN_FILE, async (msg) => DL().openFile(msg.id));
+  on(MSG.DOWNLOAD_OPEN_FOLDER, async (msg) => DL().openFolder(msg.id));
+  on(MSG.DOWNLOAD_CANCEL, async (msg) => DL().cancel(msg.id));
+  on(MSG.DOWNLOAD_PAUSE, async (msg) => DL().pause(msg.id));
+  on(MSG.DOWNLOAD_RESUME, async (msg) => DL().resume(msg.id));
+
   on(MSG.FEEDBACK_ANNOTATE, async (msg, sender) => {
     // Il box feedback è appena entrato/uscito dalla modalità annotazione.
     // Inoltriamo alla shell (barra in alto) così l'ombra copre TUTTO Filo,
