@@ -79,10 +79,14 @@ test('link/immagine dentro un blocco isolato: il menu offre le voci giuste', asy
   // Riferimento light DOM
   const lightLink = await rightClickAndRead(page, '#light-link');
   for (const l of LINK_ITEMS) expect(lightLink, `light link: ${l}`).toContain(l);
+  const lightLinkText = await menuText(page);
 
   // Shadow root aperto — LINK
   const shLink = await rightClickAndRead(page, '#sh-link');
   for (const l of LINK_ITEMS) expect(shLink, `shadow link: ${l}`).toContain(l);
+  // parità con il light DOM: anche la sezione inline "Spiega link"
+  expect(await menuText(page), 'parità inline link').toContain('Spiega link');
+  expect(lightLinkText, 'riferimento light: inline link').toContain('Spiega link');
 
   // Shadow root aperto — IMMAGINE
   const shImg = await rightClickAndRead(page, '#sh-img');
