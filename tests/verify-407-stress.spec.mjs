@@ -464,8 +464,14 @@ test('un pezzo non tradotto: l\'avviso dice "solo in parte", non "tradotta"', as
   </body></html>`);
 
   await clickTranslate(page);
+  // #408: l'avviso non si limita più a dire "solo in parte" — dice a che punto
+  // si è fermata, perché, e che si può riprendere. Quello che NON deve mai
+  // succedere resta lo stesso: dichiarare "Pagina tradotta" a traduzione monca.
   await expect.poll(() => toastText(page), { timeout: 120_000 })
-    .toBe('Pagina tradotta solo in parte');
+    .toMatch(/^Traduzione interrotta dopo \d+ blocchi su \d+\./);
+  const toast = await toastText(page);
+  expect(toast).not.toBe('Pagina tradotta');
+  expect(toast).toContain('riprenderla dal tasto destro');
   const bad = await page.evaluate(() => document.getElementById('bad').innerText);
   expect(bad).not.toContain(MARK);
   const g0 = await page.evaluate(() => document.getElementById('g0').innerText);
