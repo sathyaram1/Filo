@@ -174,7 +174,7 @@ function shellToast(text, opts) {
 }
 
 // ─── intercettazione ────────────────────────────────────────────────────
-function onWillDownload(item, persistThis) {
+function onWillDownload(item) {
   const id = uuid();
   const filename = safeName(item.getFilename() || (function () {
     try { return decodeURIComponent(new URL(item.getURL()).pathname.split('/').pop() || ''); }
@@ -203,11 +203,10 @@ function onWillDownload(item, persistThis) {
     endedAt: null,
     paused: false,
     canResume: false,
-    _persist: !!persistThis,
   };
   records.set(id, rec);
   liveItems.set(id, item);
-  if (rec._persist) persist();
+  persist();
   broadcast('start', rec);
 
   // Watchdog anti-silenzio: se il download non fa AVANZAMENTO REALE (i byte
@@ -246,7 +245,7 @@ function onWillDownload(item, persistThis) {
 
     if (state === 'completed') {
       rec.state = 'completed';
-      if (rec._persist) persist();
+      persist();
       broadcast('done', rec);
       // Toast di conferma con azioni: le azioni dichiarative sono tradotte dalla
       // shell in api.downloads.openFile / openFolder (vedi shell.js onToast).
@@ -261,7 +260,7 @@ function onWillDownload(item, persistThis) {
       // 'cancelled' (annullato dall'utente) o 'interrupted' (rete caduta, 4xx/5xx,
       // spazio finito): niente silenzio.
       rec.state = state === 'cancelled' ? 'cancelled' : 'interrupted';
-      if (rec._persist) persist();
+      persist();
       broadcast('error', rec);
       if (rec.state !== 'cancelled') {
         shellToast(`Scaricamento non riuscito: ${rec.filename}`, { durationSec: 8 });
@@ -296,22 +295,18 @@ function onWillDownload(item, persistThis) {
   });
 }
 
-// Aggancia will-download a una sessione (idempotente). `persistThis:false` per
-// le sessioni effimere (incognito), i cui download non devono lasciare traccia.
-function attachSession(ses, { persist: persistThis = true } = {}) {
+// Aggancia will-download a una sessione (idempotente).
+function attachSession(ses) {
   if (!ses || attached.has(ses)) return;
   attached.add(ses);
-  if (!persistThis) ephemeralSessions.add(ses);
   try {
-    ses.on('will-download', (_e, item) => {
-      onWillDownload(item, !ephemeralSessions.has(ses));
-    });
+    ses.on('will-download', (_e, item) => { onWillDownload(item); });
   } catch (_) {}
 }
 
 async function init() {
   await loadHistory();
-  try { attachSession(electron().session.defaultSession, { persist: true }); } catch (_) {}
+  try { attachSession(electron().session.defaultSession); } catch (_) {}
 }
 
 // ─── API per gli handler IPC (comandi dalla shell) ─────────────────────────
