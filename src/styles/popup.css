@@ -127,6 +127,17 @@
   background: transparent;
   padding: 0;
 }
+/* Link scritti da Filo (#418): cliccabili, aprono in nuova scheda. */
+.sn-msg-text a.filo-md-link, .sn-menu-inline a.filo-md-link {
+  color: var(--sn-accent, #3b82f6);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  word-break: break-word;
+}
+.sn-msg-text a.filo-md-link:hover, .sn-menu-inline a.filo-md-link:hover {
+  text-decoration: none;
+}
 
 .sn-popup-footer {
   display: flex;
