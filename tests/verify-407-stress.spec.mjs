@@ -70,7 +70,7 @@ async function stubModel(app) {
 }
 
 async function setMode(app, mode) {
-  await app.evaluate(([m]) => { globalThis.__trMode = m; globalThis.__trCalls = 0; }, [mode]);
+  await app.evaluate((m) => { globalThis.__trMode = m; globalThis.__trCalls = 0; }, mode);
 }
 
 // L'utente: tasto destro sulla pagina, poi clic sull'icona Traduci del menu.
