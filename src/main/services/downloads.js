@@ -305,21 +305,33 @@ function onWillDownload(item) {
   }
 
   armWatchdog();
-  item.on('updated', (_e, _state) => {
+  item.on('updated', (_e, state) => {
     if (rec._final) return;
     const recv = item.getReceivedBytes() || 0;
     rec.receivedBytes = recv;
     if (!rec.totalBytes) rec.totalBytes = item.getTotalBytes() || 0;
     rec.paused = item.isPaused();
     rec.canResume = item.canResume();
+
+    // Terreno guadagnato: il trasferimento sta davvero procedendo. Azzera sia il
+    // cronometro sia il conteggio delle cadute (una ripresa produttiva "perdona"
+    // le interruzioni precedenti: è il caso della rete ballerina).
+    if (recv > maxRecv) { maxRecv = recv; interrupts = 0; armWatchdog(); }
+
     if (rec.paused) {
-      // Pausa volontaria dell'utente: non è un guasto, sospendi il watchdog.
+      // Pausa volontaria dell'utente: non è un guasto, sospendi il cronometro.
       rec.state = 'paused';
       if (rec._stallTimer) { clearTimeout(rec._stallTimer); rec._stallTimer = null; }
+    } else if (state === 'interrupted') {
+      // Chromium segnala la caduta e riproverà da solo. La contiamo: se cade di
+      // nuovo senza mai superare il massimo di byte raggiunto, è un guasto.
+      rec.state = 'progressing';
+      interrupts++;
+      if (interrupts >= MAX_INTERRUPTS) { failAfterInterrupts(); return; }
+      if (!rec._stallTimer) armWatchdog();
     } else {
       rec.state = 'progressing';
-      if (recv > maxRecv) { maxRecv = recv; armWatchdog(); }   // avanzamento reale
-      else if (!rec._stallTimer) armWatchdog();                 // ripreso dopo pausa
+      if (!rec._stallTimer) armWatchdog();   // ripreso dopo una pausa
     }
     broadcast('progress', rec);
   });
