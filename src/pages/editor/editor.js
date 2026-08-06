@@ -3073,17 +3073,18 @@
       findState.idx = -1;
     } else {
       findState.idx = findState.idx % findState.hits.length; // wrap se era l'ultima
-      highlightCurrent();
+      highlightCurrent({ immediate: true });
     }
     onDocInput();
   }
   function replaceAll(term, replacement) {
     if (!term) return;
-    runFind(term);
+    runFind(term, { immediate: true });
     // Nessuna sostituzione invisibile: prima si riaprono tutte le sezioni chiuse
     // che contengono una corrispondenza, così l'utente vede cosa è stato
-    // cambiato invece di scoprirlo per caso più tardi (feedback #385).
-    findState.hits.forEach((hit) => revealCollapsedFor(hit.marks[0]));
+    // cambiato invece di scoprirlo per caso più tardi (feedback #385). Anche
+    // qui l'apertura resta: dentro quelle sezioni il testo è cambiato.
+    findState.hits.forEach((hit) => { revealCollapsedFor(hit.marks[0]); keepRevealedFor(hit.marks[0]); });
     findState.hits.forEach((hit) => replaceHitMarks(hit, replacement));
     clearFind();
     onDocInput();
