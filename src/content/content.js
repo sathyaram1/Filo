@@ -16,6 +16,7 @@
   const EditBox = self.SN_EDITBOX;
   const Actions = self.SN_ACTIONS;
   const MenuIcons = self.SN_MENU_ICONS;
+  const TranslatePage = self.SN_TRANSLATE_PAGE;
 
   // I moduli estratti (actions.js, menuIcons.js, tts.js, editBox.js) hanno
   // bisogno di pezzi che restano qui: settings correnti, gestione del
