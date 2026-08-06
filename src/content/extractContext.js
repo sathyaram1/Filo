@@ -143,7 +143,10 @@
     const nodes = [];
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, {
       acceptNode(el) {
-        if (SKIP.has(el.tagName)) return NodeFilter.FILTER_REJECT;
+        // Fuori dal namespace HTML (grafica SVG, formule MathML): non è prosa,
+        // via l'intero sottoalbero — a prescindere da come i tag sono scritti.
+        if (el.namespaceURI && el.namespaceURI !== 'http://www.w3.org/1999/xhtml') return NodeFilter.FILTER_REJECT;
+        if (SKIP.has((el.tagName || '').toUpperCase())) return NodeFilter.FILTER_REJECT;
         // ignora elementi nascosti
         const cs = window.getComputedStyle(el);
         if (cs.display === 'none' || cs.visibility === 'hidden') return NodeFilter.FILTER_REJECT;
