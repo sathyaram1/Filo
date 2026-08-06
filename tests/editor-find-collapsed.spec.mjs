@@ -189,21 +189,21 @@ test('Invio nel campo Cerca porta sulla corrispondenza e poi alla successiva (#3
   await setupThreeClosedSections(page);
 
   const find = page.locator('[data-sr="find"]');
-  // "or" sta in "orso" (sezione Due) e in "ornitorinco" (sezione Tre).
+  // "or" sta in "orso" (sezione Due) e due volte in "ornitorinco" (sezione Tre).
   await find.fill('or');
-  await expect(page.locator('[data-sr="count"]')).toHaveText('1/2');
+  await expect(page.locator('[data-sr="count"]')).toHaveText('1/3');
   await expect(page.locator('#doc #s2')).toBeVisible(); // ci si ferma su "orso"
 
   // Invio = vai alla corrispondenza successiva: si apre la sezione di
   // destinazione e si richiude quella che la ricerca aveva aperto prima.
   await find.press('Enter');
-  await expect(page.locator('[data-sr="count"]')).toHaveText('2/2');
+  await expect(page.locator('[data-sr="count"]')).toHaveText('2/3');
   await expect(page.locator('#doc #s3')).toBeVisible(); // "ornitorinco"
   await expect(page.locator('#doc #s2')).toBeHidden();
 
   // Shift+Invio torna indietro.
   await find.press('Shift+Enter');
-  await expect(page.locator('[data-sr="count"]')).toHaveText('1/2');
+  await expect(page.locator('[data-sr="count"]')).toHaveText('1/3');
   await expect(page.locator('#doc #s2')).toBeVisible();
   await expect(page.locator('#doc #s3')).toBeHidden();
 });
