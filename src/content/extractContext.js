@@ -196,6 +196,12 @@
 
   const HAS_LETTER = /\p{L}/u;
 
+  // Namespace HTML: solo gli elementi qui dentro sono "testo di pagina". Tutto
+  // ciò che sta in un altro namespace (SVG, MathML e qualsiasi foreign content)
+  // NON è prosa da tradurre — il suo <style>, le sue etichette <text> e le sue
+  // istruzioni interne romperebbero l'illustrazione/formula se rimpiazzate.
+  const HTML_NS = 'http://www.w3.org/1999/xhtml';
+
   // La UI che Filo inietta nella pagina (menu, toast, popup, sidebar) usa il
   // prefisso di classe "sn-": non è contenuto del sito e non va tradotta.
   function isFiloOwnUi(el) {
@@ -206,7 +212,15 @@
   }
 
   function skipSubtreeForTranslation(el) {
-    if (TRANSLATE_SKIP_TAGS.has(el.tagName)) return true;
+    // Barriera 1 — tag noti non-prosa. Confronto INSENSIBILE al maiuscolo/minuscolo:
+    // gli elementi dentro un SVG/MathML inline espongono tagName in minuscolo
+    // (es. 'svg', 'style', 'text'), quindi un confronto secco contro 'SVG'/'STYLE'
+    // non farebbe mai presa e il loro contenuto finirebbe tradotto.
+    if (TRANSLATE_SKIP_TAGS.has((el.tagName || '').toUpperCase())) return true;
+    // Barriera 2 — qualsiasi elemento fuori dal namespace HTML (SVG, MathML,
+    // foreign content futuro): non è testo di pagina. Ferma l'intero sottoalbero
+    // anche se un domani comparisse un tag radice non previsto nella lista sopra.
+    if (el.namespaceURI && el.namespaceURI !== HTML_NS) return true;
     if (el.dataset && el.dataset.snTranslated) return true; // già tradotto
     if (el.isContentEditable) return true;                  // testo dell'utente
     if (el.hasAttribute && el.hasAttribute('hidden')) return true;
