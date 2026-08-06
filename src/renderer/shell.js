@@ -998,6 +998,15 @@
               onClick: () => api.message({ type: 'cancel_auto_feedback', id: fbId }).catch(() => {}),
             };
           }
+          // #410.1 — toast di fine scaricamento: apri il file / mostra in cartella.
+          if (a && a.openDownloadId && !a.onClick && api.downloads) {
+            const id = a.openDownloadId;
+            return { label: a.label, onClick: () => api.downloads.openFile(id).catch(() => {}) };
+          }
+          if (a && a.revealDownloadId && !a.onClick && api.downloads) {
+            const id = a.revealDownloadId;
+            return { label: a.label, onClick: () => api.downloads.openFolder(id).catch(() => {}) };
+          }
           return a;
         }),
       };
