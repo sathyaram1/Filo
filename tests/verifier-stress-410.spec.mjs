@@ -10,9 +10,12 @@ import { join, resolve } from 'node:path';
 function serveAttachment(filename, body, opts = {}) {
   return new Promise((done) => {
     const srv = createServer((req, res) => {
+      // filename* (RFC 5987) permette caratteri non-ASCII: gli header HTTP
+      // grezzi accettano solo latin-1, quindi emoji & co. vanno percent-encoded.
       const headers = {
         'Content-Type': 'application/octet-stream',
-        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Disposition': opts.rawDisposition
+          || `attachment; filename="${filename}"`,
       };
       if (!opts.noLength) headers['Content-Length'] = String(body.length);
       res.writeHead(opts.status || 200, headers);
