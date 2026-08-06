@@ -100,13 +100,11 @@ test('un download che si interrompe a metà viene segnalato (toast d\'errore + c
     await expect(shell.locator('.shell-notif-msg')).toContainText('non riuscito', { timeout: 20000 });
 
     // …e la cronologia lo segna "interrotto" (non "completato", non sparito).
-    const entry = await expect.poll(async () => {
+    await expect.poll(async () => {
       const r = await shell.evaluate(() => window.filoShell.downloads.list());
-      return ((r && r.items) || []).find((it) => it.filename === 'grande.zip') || null;
-    }, { timeout: 15000 }).not.toBeNull();
-    const list = (await shell.evaluate(() => window.filoShell.downloads.list())).items;
-    const rec = list.find((it) => it.filename === 'grande.zip');
-    expect(rec.state).toBe('interrupted');
+      const e = ((r && r.items) || []).find((it) => it.filename === 'grande.zip');
+      return e ? e.state : null;
+    }, { timeout: 15000 }).toBe('interrupted');
   } finally {
     try { fileServer.closeAllConnections?.(); } catch (_) {}
     await new Promise((r) => fileServer.close(r));
