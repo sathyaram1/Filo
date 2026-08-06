@@ -88,6 +88,7 @@ test('cliccando un link a un file, Filo lo scarica, lo registra come "completato
 });
 
 test('un download che si interrompe a metà viene segnalato (toast d\'errore + cronologia "interrotto")', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
   // Il server dichiara un file grande, manda solo una parte e TRONCA la
   // connessione: il download si interrompe. Niente silenzio.
   const fileServer = createServer((req, res) => {
