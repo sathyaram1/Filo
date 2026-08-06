@@ -202,7 +202,9 @@ test('6) STRESS: download interrotto dal server → niente scheda vuota, e l’u
 
 test('7) STRESS: nome file ostile (HTML/emoji/lunghissimo) → nessuno script eseguito, nessuna scheda vuota', async ({ app, shell, openTab }) => {
   const BODY = Buffer.alloc(4096, 0x47);
-  const evil = '<img src=x onerror=alert(1)>😀' + 'A'.repeat(300) + '.bin';
+  // Nome ostile: HTML iniettabile + emoji (via RFC5987, gli header sono latin1) + lunghissimo.
+  const evilAscii = '<img src=x onerror=alert(1)>' + 'A'.repeat(300) + '.bin';
+  const evilUtf8 = encodeURIComponent('<img src=x onerror=alert(1)>😀' + 'A'.repeat(300) + '.bin');
   const srv = await attachServer({
     '/p': (req, res) => { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end('<!doctype html><title>Partenza</title><body><a id="dl" href="/evil" target="_blank">Scarica</a></body>'); },
     '/evil': (req, res) => {
