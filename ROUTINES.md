@@ -23,12 +23,21 @@ Le routine schedulate su claude.ai partono con un prompt minimo
    dietro il proxy):
    ```bash
    ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install && node scripts/ensure-electron.mjs
+   apt-get install -y scrot        # cattura composita (test:shoot, capture-composite)
    ```
    Fallo **una volta qui nell'orchestratore**: così TUTTI i worker ereditano il
    binario pronto (non è compito dei ruoli reinstallarlo). I test da root vanno
    lanciati con `ELECTRON_DISABLE_SANDBOX=1` e `xvfb-run -a` (verificato
    2026-07-09: `xvfb-run -a npm run test:smoke` avvia la app reale e cattura
    screenshot compositi).
+
+   ⚠️ **`scrot` NON è preinstallato** (osservato 2026-08-06): senza, la cattura
+   composita fallisce con *"nessun tool di cattura disponibile"* — `test:shoot` è
+   inutilizzabile e `tests/capture-composite.spec.mjs` va rosso (2 fallimenti che
+   sembrano una regressione ma sono solo ambiente). `apt-get install -y scrot`
+   funziona in questo container e i due spec tornano verdi subito. Installalo
+   **qui nell'orchestratore**, così i worker trovano la verifica visiva pronta
+   invece di dichiararla "non eseguibile in questo ambiente".
 
    `ensure-electron.mjs` prova le sorgenti in ordine (prima quelle SENZA rete):
    (1) già installato; (2) `FILO_ELECTRON_ZIP=/path/…zip`; (3) vendored nel repo
