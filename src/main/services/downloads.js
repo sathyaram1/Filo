@@ -299,6 +299,7 @@ function onWillDownload(item) {
     if (rec._final) return;
     rec._final = true;
     if (rec._stallTimer) { clearTimeout(rec._stallTimer); rec._stallTimer = null; }
+    clearInterruptGrace();
     liveItems.delete(id);
     rec.endedAt = new Date().toISOString();
     rec.paused = false;
