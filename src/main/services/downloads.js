@@ -266,34 +266,27 @@ function onWillDownload(item, persistThis) {
     }
   }
 
-  try { if (process.env.FILO_DOWNLOAD_DIR) fs.appendFileSync('/tmp/dlsvc.log', `willdl ${rec.filename} total=${rec.totalBytes}\n`); } catch (_) {}
-  item.on('updated', (_e, state) => {
-    try { if (process.env.FILO_DOWNLOAD_DIR) fs.appendFileSync('/tmp/dlsvc.log', `updated ${state} recv=${item.getReceivedBytes()} paused=${item.isPaused()} canResume=${item.canResume()}\n`); } catch (_) {}
+  armWatchdog();
+  item.on('updated', (_e, _state) => {
     if (rec._final) return;
-    rec.receivedBytes = item.getReceivedBytes() || rec.receivedBytes;
+    const recv = item.getReceivedBytes() || 0;
+    rec.receivedBytes = recv;
     if (!rec.totalBytes) rec.totalBytes = item.getTotalBytes() || 0;
     rec.paused = item.isPaused();
     rec.canResume = item.canResume();
-    if (state === 'interrupted' && !rec.paused) {
-      // Sospeso: se non riparte entro STALL_MS lo dichiariamo fallito. Se nel
-      // frattempo l'utente lo mette in pausa (rec.paused) NON è un guasto.
-      rec.state = 'progressing';
-      if (!rec._stallTimer) {
-        rec._stallTimer = setTimeout(() => {
-          try { item.cancel(); } catch (_) {}
-          finalize('interrupted');
-        }, STALL_MS);
-      }
-    } else {
-      // Progressi (o pausa volontaria): annulla l'eventuale timer di stallo.
+    if (rec.paused) {
+      // Pausa volontaria dell'utente: non è un guasto, sospendi il watchdog.
+      rec.state = 'paused';
       if (rec._stallTimer) { clearTimeout(rec._stallTimer); rec._stallTimer = null; }
-      rec.state = rec.paused ? 'paused' : 'progressing';
+    } else {
+      rec.state = 'progressing';
+      if (recv > maxRecv) { maxRecv = recv; armWatchdog(); }   // avanzamento reale
+      else if (!rec._stallTimer) armWatchdog();                 // ripreso dopo pausa
     }
     broadcast('progress', rec);
   });
 
   item.once('done', (_e, state) => {
-    try { if (process.env.FILO_DOWNLOAD_DIR) fs.appendFileSync('/tmp/dlsvc.log', `done ${state} recv=${item.getReceivedBytes()}\n`); } catch (_) {}
     rec.receivedBytes = item.getReceivedBytes() || rec.receivedBytes;
     if (!rec.totalBytes) rec.totalBytes = item.getTotalBytes() || rec.receivedBytes;
     finalize(state);
