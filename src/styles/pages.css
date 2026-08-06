@@ -609,6 +609,38 @@ section:has(#dictList) .sn-spell-add-row {
   white-space: nowrap;
 }
 
+/* Censimento (sola lettura) degli altri punti in cui Filo usa un modello:
+   quelli che girano sui suoi server e quelli che un modello non lo usano.
+   Due colonne — cosa è, dove si imposta — senza cornice: è un elenco, non una
+   tabella di controlli. */
+.sn-usage-h {
+  margin: 22px 0 4px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--sn-muted);
+  font-weight: 600;
+}
+.sn-usage-area {
+  margin-top: 12px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--sn-muted);
+}
+.sn-usage-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: baseline;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--sn-border);
+  font-size: 13px;
+}
+.sn-usage-row:last-child { border-bottom: none; }
+.sn-usage-where { color: var(--sn-muted); font-size: 12px; text-align: right; }
+.sn-usage-note { grid-column: 1 / -1; color: var(--sn-muted); font-size: 11px; }
+
 /* Editor a segmenti della catena di modelli per azione (Modelli per azione).
    Una "pillola" con un segmento per modello in ordine di priorità, separati da
    un divisore accentato; "+" aggiunge un fallback, "×" rimuove un segmento. */
