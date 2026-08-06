@@ -239,6 +239,10 @@ function onWillDownload(item, webContents) {
   liveItems.set(id, item);
   persist();
   broadcast('start', rec);
+  // #412 — chiudi la scheda "vuota" aperta apposta da un link Scarica
+  // target=_blank. Deferito così il ciclo di vita del download (già preso in
+  // carico qui sopra) è completamente cablato prima di toccare l'albero delle view.
+  setImmediate(() => notifyDownloadStarted(webContents));
 
   // ── Argine anti-silenzio ────────────────────────────────────────────────
   // Il problema da cui nasce: quando un server tronca la connessione a metà,
