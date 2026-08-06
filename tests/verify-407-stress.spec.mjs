@@ -70,7 +70,11 @@ async function stubModel(app) {
 }
 
 async function setMode(app, mode) {
-  await app.evaluate((m) => { globalThis.__trMode = m; globalThis.__trCalls = 0; }, mode);
+  // NB: in Electron il primo argomento della funzione è il modulo electron,
+  // l'argomento del test arriva come SECONDO.
+  await app.evaluate((_electron, m) => { globalThis.__trMode = m; globalThis.__trCalls = 0; }, mode);
+  const applied = await app.evaluate(() => globalThis.__trMode);
+  if (applied !== mode) throw new Error(`setMode fallito: ${applied}`);
 }
 
 // L'utente: tasto destro sulla pagina, poi clic sull'icona Traduci del menu.
