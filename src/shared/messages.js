@@ -169,6 +169,9 @@
     // DOWNLOAD_IMAGE/DOWNLOAD_MEDIA, che scaricano byte "a mano" su richiesta
     // esplicita del menu. Questi messaggi servono alla shell per leggere la
     // cronologia e comandare i singoli scaricamenti.
+    // RISERVATI alle superfici interne (shell + pagine filo://): la cronologia
+    // espone i percorsi ASSOLUTI su disco e i comandi possono far APRIRE un file
+    // al sistema operativo. Da origine http(s) l'handler risponde 'forbidden'.
     // Elenco cronologia (attivi + conclusi, più recenti prima). → { ok, items }
     DOWNLOADS_LIST: 'downloads_list',
     // Svuota la cronologia dei download CONCLUSI (gli attivi restano). → { ok, items }
