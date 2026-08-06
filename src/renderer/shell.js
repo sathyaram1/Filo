@@ -1016,6 +1016,234 @@
   // Esposta per test e per usi programmatici dalla shell stessa.
   window.filoNotify = (text, opts) => NOTIFS.show(text, opts);
 
+  // ─── Scaricamenti della navigazione (#410.1) ───────────────────────────
+  // Indicatore nella fila di tab (sempre visibile, non coperto dalla view
+  // nativa della pagina) + pannello espandibile con i singoli download. Il
+  // pannello sfrutta reserveTop per rivelarsi SOPRA l'area pagina (che è una
+  // WebContentsView nativa e altrimenti lo occulterebbe).
+  if (api.downloads) {
+    const dlBtn = document.getElementById('dl-indicator');
+    const dlIcon = document.getElementById('dl-ind-icon');
+    const dlCount = document.getElementById('dl-ind-count');
+    const dlFill = document.getElementById('dl-ind-fill');
+    setIcon(dlIcon, 'download', 15);
+
+    // id → record (lo schema pubblico definito nel main).
+    const dls = new Map();
+    let panelOpen = false;
+    let panel = null;
+
+    const ACTIVE = new Set(['progressing', 'paused']);
+    const isActive = (r) => r && ACTIVE.has(r.state);
+
+    function fmtBytes(n) {
+      n = Number(n) || 0;
+      if (n < 1024) return `${n} B`;
+      if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+      if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+      return `${(n / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+    }
+    function pct(r) {
+      if (r.totalBytes > 0) return Math.min(100, Math.round((r.receivedBytes / r.totalBytes) * 100));
+      return null; // indeterminato (server senza Content-Length)
+    }
+    function stateLabel(r) {
+      switch (r.state) {
+        case 'completed': return 'Completato';
+        case 'cancelled': return 'Annullato';
+        case 'interrupted': return 'Interrotto';
+        case 'paused': return 'In pausa';
+        default: return 'In corso';
+      }
+    }
+
+    function renderIndicator() {
+      const all = Array.from(dls.values());
+      if (!all.length) { dlBtn.hidden = true; if (panelOpen) closePanel(); return; }
+      dlBtn.hidden = false;
+      const active = all.filter(isActive);
+      if (active.length) {
+        dlCount.hidden = false;
+        dlCount.textContent = String(active.length);
+        // Avanzamento aggregato: byte ricevuti / totali sui download con totale
+        // noto. Se nessuno ha un totale, barra indeterminata (animata via CSS).
+        let recv = 0; let total = 0; let known = 0;
+        for (const r of active) { if (r.totalBytes > 0) { recv += r.receivedBytes; total += r.totalBytes; known++; } }
+        if (known && total > 0) {
+          dlBtn.classList.remove('indeterminate');
+          dlFill.style.width = `${Math.min(100, Math.round((recv / total) * 100))}%`;
+        } else {
+          dlBtn.classList.add('indeterminate');
+          dlFill.style.width = '40%';
+        }
+        dlBtn.classList.add('active');
+      } else {
+        dlBtn.classList.remove('active', 'indeterminate');
+        dlCount.hidden = true;
+        dlFill.style.width = '0%';
+      }
+      if (panelOpen) renderPanel();
+    }
+
+    function ensurePanel() {
+      if (panel) return panel;
+      panel = document.createElement('div');
+      panel.className = 'dl-panel';
+      panel.id = 'dl-panel';
+      panel.hidden = true;
+      const head = document.createElement('div');
+      head.className = 'dl-panel-head';
+      const title = document.createElement('span');
+      title.className = 'dl-panel-title';
+      title.textContent = 'Scaricamenti';
+      const clearBtn = document.createElement('button');
+      clearBtn.type = 'button';
+      clearBtn.className = 'dl-panel-clear';
+      clearBtn.textContent = 'Svuota';
+      clearBtn.title = 'Rimuovi gli scaricamenti conclusi';
+      clearBtn.addEventListener('click', () => {
+        api.downloads.clear().then((r) => { syncFromList(r && r.items); }).catch(() => {});
+      });
+      head.appendChild(title);
+      head.appendChild(clearBtn);
+      panel.appendChild(head);
+      const list = document.createElement('div');
+      list.className = 'dl-panel-list';
+      list.id = 'dl-panel-list';
+      panel.appendChild(list);
+      document.body.appendChild(panel);
+      return panel;
+    }
+
+    function renderPanel() {
+      ensurePanel();
+      const list = panel.querySelector('#dl-panel-list');
+      list.textContent = '';
+      const all = Array.from(dls.values()).sort((a, b) => {
+        // Attivi in cima, poi per data d'inizio decrescente.
+        const aa = isActive(a) ? 0 : 1; const bb = isActive(b) ? 0 : 1;
+        if (aa !== bb) return aa - bb;
+        return String(b.startedAt || '').localeCompare(String(a.startedAt || ''));
+      });
+      if (!all.length) {
+        const empty = document.createElement('div');
+        empty.className = 'dl-empty';
+        empty.textContent = 'Nessuno scaricamento';
+        list.appendChild(empty);
+      }
+      for (const r of all) list.appendChild(renderRow(r));
+      // Il pannello ha cambiato altezza: aggiorna lo spazio riservato.
+      if (panelOpen) reserveForPanel();
+    }
+
+    function renderRow(r) {
+      const row = document.createElement('div');
+      row.className = 'dl-row';
+      row.dataset.state = r.state;
+
+      const name = document.createElement('div');
+      name.className = 'dl-row-name';
+      name.textContent = r.filename || 'download';
+      name.title = r.filename || '';
+      row.appendChild(name);
+
+      if (isActive(r)) {
+        const bar = document.createElement('div');
+        bar.className = 'dl-row-bar';
+        const fill = document.createElement('div');
+        fill.className = 'dl-row-fill';
+        const p = pct(r);
+        if (p == null) { bar.classList.add('indeterminate'); fill.style.width = '40%'; }
+        else fill.style.width = `${p}%`;
+        bar.appendChild(fill);
+        row.appendChild(bar);
+      }
+
+      const meta = document.createElement('div');
+      meta.className = 'dl-row-meta';
+      const p = pct(r);
+      if (isActive(r)) {
+        meta.textContent = p != null
+          ? `${p}% · ${fmtBytes(r.receivedBytes)} / ${fmtBytes(r.totalBytes)}`
+          : `${fmtBytes(r.receivedBytes)} scaricati`;
+      } else {
+        meta.textContent = `${stateLabel(r)} · ${fmtBytes(r.totalBytes || r.receivedBytes)}`;
+      }
+      row.appendChild(meta);
+
+      const actions = document.createElement('div');
+      actions.className = 'dl-row-actions';
+      const addBtn = (label, fn) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'dl-row-btn';
+        b.textContent = label;
+        b.addEventListener('click', fn);
+        actions.appendChild(b);
+      };
+      if (isActive(r)) {
+        if (r.state === 'paused') addBtn('Riprendi', () => api.downloads.resume(r.id).catch(() => {}));
+        else addBtn('Pausa', () => api.downloads.pause(r.id).catch(() => {}));
+        addBtn('Annulla', () => api.downloads.cancel(r.id).catch(() => {}));
+      } else if (r.state === 'completed') {
+        addBtn('Apri file', () => api.downloads.openFile(r.id).catch(() => {}));
+        addBtn('Apri cartella', () => api.downloads.openFolder(r.id).catch(() => {}));
+        addBtn('Rimuovi', () => api.downloads.remove(r.id).then((res) => syncFromList(res && res.items)).catch(() => {}));
+      } else {
+        addBtn('Rimuovi', () => api.downloads.remove(r.id).then((res) => syncFromList(res && res.items)).catch(() => {}));
+      }
+      row.appendChild(actions);
+      return row;
+    }
+
+    // reserveTop = altezza del pannello (capped) così la view della pagina
+    // scende e il pannello non finisce sotto di essa. Vedi setTopInset in tabs.js.
+    function reserveForPanel() {
+      if (!panelOpen || !panel) return;
+      requestAnimationFrame(() => {
+        const h = Math.ceil(panel.getBoundingClientRect().height);
+        try { api.tabs.reserveTop && api.tabs.reserveTop(h + 6); } catch (_) {}
+      });
+    }
+    function openPanel() {
+      ensurePanel();
+      panelOpen = true;
+      panel.hidden = false;
+      dlBtn.classList.add('open');
+      renderPanel();
+      reserveForPanel();
+    }
+    function closePanel() {
+      panelOpen = false;
+      if (panel) panel.hidden = true;
+      dlBtn.classList.remove('open');
+      try { api.tabs.reserveTop && api.tabs.reserveTop(0); } catch (_) {}
+    }
+    function togglePanel() { panelOpen ? closePanel() : openPanel(); }
+
+    dlBtn.addEventListener('click', togglePanel);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && panelOpen) closePanel(); });
+    window.addEventListener('resize', () => { if (panelOpen) reserveForPanel(); });
+
+    function syncFromList(items) {
+      dls.clear();
+      if (Array.isArray(items)) for (const r of items) dls.set(r.id, r);
+      renderIndicator();
+      if (panelOpen) renderPanel();
+    }
+
+    // Aggiornamenti live dal main (start/progress/done/error).
+    api.downloads.onEvent((info) => {
+      if (!info || !info.item) return;
+      dls.set(info.item.id, info.item);
+      renderIndicator();
+      if (panelOpen) renderPanel();
+    });
+
+    // Cronologia iniziale (sopravvive al riavvio).
+    api.downloads.list().then((r) => { syncFromList(r && r.items); }).catch(() => {});
+  }
+
   newBtn.addEventListener('click', () => api.tabs.open('filo://newtab/'));
   backBtn.addEventListener('click', () => { const a = activeTab(); if (a) api.tabs.back(a.id); });
   fwdBtn.addEventListener('click', () => { const a = activeTab(); if (a) api.tabs.forward(a.id); });
