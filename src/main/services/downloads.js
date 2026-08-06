@@ -222,11 +222,14 @@ function onWillDownload(item, persistThis) {
   function armWatchdog() {
     if (rec._stallTimer) clearTimeout(rec._stallTimer);
     rec._stallTimer = setTimeout(() => {
-      try { if (process.env.FILO_DOWNLOAD_DIR) fs.appendFileSync('/tmp/dlsvc.log', `watchdog fire final=${rec._final} paused=${rec.paused} maxRecv=${maxRecv}\n`); } catch (_) {}
       rec._stallTimer = null;
       if (rec._final || rec.paused) return;
-      try { item.cancel(); } catch (_) {}
+      // finalize PRIMA di cancel(): item.cancel() emette 'done' con stato
+      // 'cancelled' in modo SINCRONO, e senza il flag _final quel 'done'
+      // trasformerebbe l'esito in "annullato" (niente toast d'errore). Marcando
+      // l'interruzione qui, il 'done cancelled' che segue diventa un no-op.
       finalize('interrupted');
+      try { item.cancel(); } catch (_) {}
     }, STALL_MS);
   }
 
