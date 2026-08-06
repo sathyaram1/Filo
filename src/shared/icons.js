@@ -348,6 +348,7 @@
     transcribe:   (size) => wrap(transcribe, { size }),
     image:        (size) => wrap(image, { size }),
     saveForLater: (size) => wrap(saveForLater, { size }),
+    download:     (size) => wrap(download, { size }),
     share:        (size) => wrap(share, { size }),
     translate:    (size) => wrap(translate, { size }),
     showOriginal: (size) => wrap(showOriginal, { size }),
