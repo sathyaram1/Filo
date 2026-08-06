@@ -2988,7 +2988,8 @@
         findState.hits.push({ marks });
       }
     }
-    if (findState.hits.length) { findState.idx = 0; highlightCurrent(); }
+    if (findState.hits.length) { findState.idx = 0; highlightCurrent(opts); }
+    else highlightCurrent(opts); // nessun risultato: chiudi i prestiti di prima
   }
   // Evidenzia la corrispondenza corrente e programma l'"andarci sopra".
   //
