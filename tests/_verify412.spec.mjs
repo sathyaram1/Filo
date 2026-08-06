@@ -211,7 +211,7 @@ test('7) STRESS: nome file ostile (HTML/emoji/lunghissimo) → nessuno script es
       res.writeHead(200, {
         'Content-Type': 'application/octet-stream',
         'Content-Length': String(BODY.length),
-        'Content-Disposition': `attachment; filename="${evil.replace(/"/g, '')}"`,
+        'Content-Disposition': `attachment; filename="${evilAscii}"; filename*=UTF-8''${evilUtf8}`,
       });
       res.end(BODY);
     },
