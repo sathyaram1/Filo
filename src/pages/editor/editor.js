@@ -2875,6 +2875,14 @@
     const run = () => { runFind(findInput.value); updateCount(); };
     findInput.addEventListener('input', run);
     findInput.addEventListener('click', (e) => e.stopPropagation());
+    // Invio = "vai lì" (Shift+Invio: indietro), come in qualsiasi campo di
+    // ricerca: è il modo esplicito di spostarsi senza aspettare la pausa.
+    findInput.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      jumpFind(e.shiftKey ? -1 : 1);
+      updateCount();
+    });
     replInput.addEventListener('click', (e) => e.stopPropagation());
     pad.querySelector('[data-sr="next"]').addEventListener('click', (e) => { e.stopPropagation(); stepFind(1); updateCount(); });
     pad.querySelector('[data-sr="prev"]').addEventListener('click', (e) => { e.stopPropagation(); stepFind(-1); updateCount(); });
