@@ -57,6 +57,7 @@ test('1) SINTOMO: pulsante Scarica con apertura in nuova scheda → il file arri
     const before = await snap(shell);
     const originId = before.activeId;
     expect(ghosts(before).length, 'la pagina di partenza parte pulita').toBe(0);
+    await shell.screenshot({ path: 'tests/.shots/412-prima.png' }).catch(() => {});
 
     await page.click('#dl');
 
