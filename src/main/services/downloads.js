@@ -340,22 +340,22 @@ function onWillDownload(item) {
     rec.paused = item.isPaused();
     rec.canResume = item.canResume();
 
-    // Terreno guadagnato: il trasferimento sta davvero procedendo. Azzera sia il
-    // cronometro sia il conteggio delle cadute (una ripresa produttiva "perdona"
-    // le interruzioni precedenti: è il caso della rete ballerina).
-    if (recv > maxRecv) { maxRecv = recv; interrupts = 0; armWatchdog(); }
+    // Terreno guadagnato: il trasferimento sta davvero procedendo. Ricarica il
+    // cronometro e chiudi l'eventuale finestra di grazia: una ripresa produttiva
+    // "perdona" le cadute precedenti (è il caso della rete ballerina).
+    if (recv > maxRecv) { maxRecv = recv; clearInterruptGrace(); armWatchdog(); }
 
     if (rec.paused) {
-      // Pausa volontaria dell'utente: non è un guasto, sospendi il cronometro.
+      // Pausa volontaria dell'utente: non è un guasto, sospendi ogni timer.
       rec.state = 'paused';
+      clearInterruptGrace();
       if (rec._stallTimer) { clearTimeout(rec._stallTimer); rec._stallTimer = null; }
     } else if (state === 'interrupted') {
-      // Chromium segnala la caduta e riproverà da solo. La contiamo: se cade di
-      // nuovo senza mai superare il massimo di byte raggiunto, è un guasto.
+      // Chromium dichiara caduto il trasferimento: gli concediamo la finestra di
+      // grazia per riprendersi da solo. Per l'utente resta "in corso" — se
+      // riparte davvero non deve vedere allarmi inutili.
       rec.state = 'progressing';
-      interrupts++;
-      if (interrupts >= MAX_INTERRUPTS) { failAfterInterrupts(); return; }
-      if (!rec._stallTimer) armWatchdog();
+      armInterruptGrace();
     } else {
       rec.state = 'progressing';
       if (!rec._stallTimer) armWatchdog();   // ripreso dopo una pausa
