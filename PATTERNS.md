@@ -322,7 +322,10 @@ pagina") valgono due regole imparate a caro prezzo con #407.
 - **Il messaggio finale deve dire la verità**: "fatto" solo se tutte le unità sono
   state sostituite, "solo in parte" se qualcuna è rimasta indietro, e un avviso
   esplicito quando non c'è **niente** da tradurre — il silenzio fa ritentare
-  l'utente all'infinito.
+  l'utente all'infinito. L'avviso "sto lavorando" di un'operazione lunga si apre
+  con `showToast(testo, { duration: 0 })` e si **chiude** con l'handle restituito
+  quando arriva l'esito: i toast delle pagine non si impilano, si sovrapporrebbero
+  nello stesso angolo diventando illeggibili.
 - **Dove:** `extractTranslatableBlocks` in `src/content/extractContext.js`
   (`extractMainTextNodes`, accanto, resta la versione "solo l'articolo" per
   l'excerpt del categorizer: sono due domande diverse); applicazione e ripristino

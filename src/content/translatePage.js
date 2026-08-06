@@ -36,10 +36,9 @@
   let translatedUnits = [];
 
   async function translatePage() {
-    if (pageTranslating) {
-      Popup.showToast(I18n.t('toast_translating_page'));
-      return;
-    }
+    // Riclic mentre traduce: l'avviso "in corso" è già sullo schermo (dura
+    // quanto il lavoro), un secondo riquadro identico sopra sarebbe solo rumore.
+    if (pageTranslating) return;
     pageTranslating = true;
     // L'avviso "sto traducendo" dura quanto la traduzione e viene SOSTITUITO
     // dall'esito: due riquadri sovrapposti nell'angolo sono illeggibili.
@@ -59,6 +58,7 @@
       }
 
       if (!units.length) {
+        progress.close();
         Popup.showToast(I18n.t('toast_nothing_to_translate'));
         return;
       }
@@ -95,6 +95,7 @@
       );
 
       const done = units.filter((u) => u.applied).length;
+      progress.close();
       if (!done) {
         Popup.showToast(lastError || I18n.t('err_provider_failed'));
       } else {
@@ -102,6 +103,7 @@
         Popup.showToast(I18n.t(done < units.length ? 'toast_page_translated_partial' : 'toast_page_translated'));
       }
     } finally {
+      progress.close();
       pageTranslating = false;
     }
   }
