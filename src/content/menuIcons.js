@@ -29,8 +29,16 @@
     // Tutte le icone della riga primaria/griglia sono SVG renderizzate a 18px.
     // Vedi src/shared/icons.js e src/styles/ICONS.md per la guida di stile.
     const I = (name) => Icons[name](18);
-    const translateIcon = Translate.hasTranslation() ? I('showOriginal') : I('translate');
-    const translateLabel = Translate.hasTranslation() ? I18n.t('menu_show_original') : I18n.t('menu_global_translate');
+    // Tre stati, non due (#408): senza traduzione → "Traduci"; con traduzione
+    // COMPLETA → "Mostra originale"; con traduzione interrotta a metà →
+    // "Riprendi traduzione", che completa solo i blocchi mancanti. Nello stato
+    // interrotto il ritorno all'originale resta raggiungibile come voce
+    // etichettata (vedi buildMenuItems in content.js).
+    const partialTranslation = typeof Translate.isPartial === 'function' && Translate.isPartial();
+    const translateIcon = (Translate.hasTranslation() && !partialTranslation) ? I('showOriginal') : I('translate');
+    const translateLabel = partialTranslation
+      ? I18n.t('menu_resume_translation')
+      : (Translate.hasTranslation() ? I18n.t('menu_show_original') : I18n.t('menu_global_translate'));
     const isFs = !!(document.fullscreenElement || deps.isContentFullscreen());
     // Quando navState non è disponibile (es. menu aperto da flussi che non lo
     // calcolano), lascia abilitati: meglio rispetto al falso "disabilitato".
