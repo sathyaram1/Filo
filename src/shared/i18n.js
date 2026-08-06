@@ -16,6 +16,7 @@
     // Menu — AI
     menu_translate_selection: 'Traduci',
     menu_show_original: 'Mostra originale',
+    menu_resume_translation: 'Riprendi traduzione',
     menu_explain: 'Spiegazione',
     menu_explain_deep: 'Approfondisci',
     menu_paste_history: 'Cronologia incolla',
