@@ -625,16 +625,28 @@
   // ----------------------------------------------------------------
   // Toast (per feedback brevi)
   // ----------------------------------------------------------------
+  // `duration: 0` = il toast resta finché non lo chiude il chiamante (operazioni
+  // lunghe: l'avviso "sto lavorando" deve durare quanto il lavoro). Ritorna
+  // sempre un handle con close(), così chi mostra un avviso di avanzamento può
+  // sostituirlo con l'esito invece di impilarci sopra un secondo riquadro.
   function showToast(text, opts = {}) {
     const t = document.createElement('div');
     t.className = 'sn-toast';
     t.textContent = text;
     document.documentElement.appendChild(t);
     requestAnimationFrame(() => t.classList.add('sn-toast-visible'));
-    setTimeout(() => {
+    let closed = false;
+    let timer = null;
+    const close = () => {
+      if (closed) return;
+      closed = true;
+      if (timer) { clearTimeout(timer); timer = null; }
       t.classList.remove('sn-toast-visible');
       setTimeout(() => t.remove(), 250);
-    }, opts.duration || 2200);
+    };
+    const duration = opts.duration === 0 ? 0 : (opts.duration || 2200);
+    if (duration > 0) timer = setTimeout(close, duration);
+    return { close, el: t };
   }
 
   // close API legacy: chiude il topmost (compatibilità con codice che chiamava SN_POPUP.close())
