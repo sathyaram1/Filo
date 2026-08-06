@@ -170,10 +170,11 @@
   // Traduce un gruppo di unità con UNA richiesta. Se il modello restituisce un
   // numero di pezzi diverso dal numero di unità, i testi finirebbero nei blocchi
   // sbagliati: in quel caso si dimezza il gruppo e si riprova (fino a una unità
-  // sola, dove il rischio non esiste). Ritorna '' se ok, il messaggio d'errore
-  // altrimenti.
+  // sola, dove il rischio non esiste). Ritorna null se ok, altrimenti l'errore
+  // (oggetto con message/code/status, non una stringa: serve a SN_CHAT_ERRORS
+  // per scegliere la frase giusta da mostrare all'utente).
   async function translateGroup(units, depth) {
-    if (!units.length) return '';
+    if (!units.length) return null;
     const joined = units.map((u) => u.templated).join(SEPARATOR);
     const res = await requestTranslation(joined);
     if (!res.ok) return res.error;
@@ -182,17 +183,17 @@
     if (units.length === 1) {
       // Separatori spuri nell'output di una singola unità: si ricuce tutto.
       applyTranslation(units[0], parts.join(' ').trim());
-      return '';
+      return null;
     }
     if (parts.length === units.length) {
       for (let i = 0; i < units.length; i++) applyTranslation(units[i], (parts[i] || '').trim());
-      return '';
+      return null;
     }
     if (depth >= MAX_SPLIT_DEPTH) {
       // Ripiego: applica quel che si può, in ordine, senza sfasare oltre.
       const n = Math.min(parts.length, units.length);
       for (let i = 0; i < n; i++) applyTranslation(units[i], (parts[i] || '').trim());
-      return '';
+      return null;
     }
     const mid = Math.ceil(units.length / 2);
     const a = await translateGroup(units.slice(0, mid), depth + 1);
