@@ -1,7 +1,7 @@
 {
   "id": "0f726fa6-3850-4bf3-b398-a734590b89ad",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho verificato partendo dal sintomo: nella chat della home e nel riquadro delle spiegazioni sulle pagine web le risposte di Filo ora mostrano la formattazione (grassetto, corsivo, codice, titoli, elenchi) invece del testo grezzo con asterischi e parentesi quadre, e i link diventano cliccabili. Ho chiesto una risposta che cita una fonte con un link: il link e' cliccabile e apre DAVVERO una nuova scheda sull'indirizzo giusto. La formattazione e' ora identica su tutte le superfici dove Filo scrive (chat della home, popup di risposta, riquadro Spiega, barra laterale): non capita piu' che una mostri il grassetto e un'altra no. Sicurezza (testo trattato come non fidato): diventano cliccabili solo i link normali http/https e gli indirizzi email; un link verso le pagine interne dell'app, oppure link 'trappola' come javascript:/data:/file: o indirizzi relativi, restano semplice testo non cliccabile, a maggior ragione se la risposta nasce da una pagina web letta dal modello. Ho fatto stress test avversariali (tentativi di iniettare codice o di far uscire un link dai suoi confini, caratteri speciali/emoji/byte nulli, testo di 10.000 caratteri, blocchi di codice con HTML dentro): in tutti i casi il testo pericoloso resta neutralizzato e nessun link non sicuro diventa cliccabile. Test automatici tutti verdi, incluso un test end-to-end che apre davvero la nuova scheda, e nessuna regressione su streaming, barra laterale e menu.",
-  "queuedAt": "2026-08-06T22:03:40.562Z",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la lavorazione e' stata completata e pubblicata nell'app.",
+  "queuedAt": "2026-08-06T22:05:50.114Z",
   "queuedBy": "routine"
 }
