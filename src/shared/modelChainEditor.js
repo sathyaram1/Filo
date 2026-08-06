@@ -64,7 +64,36 @@
       [A.SAFEBROWSE_JUDGE, 'options_action_safebrowse_judge'],
       [A.GEOBLOCK_CLASSIFY, 'options_action_geoblock_classify'],
       [A.FEEDBACK_TITLE, 'options_action_feedback_title'],
+      [A.EDITOR_TITLE, 'options_action_editor_title'],
+      [A.EDITOR_SUMMARY, 'options_action_editor_summary'],
+      [A.EDITOR_CHAT, 'options_action_editor_chat'],
+      [A.MANAGE_SEARCH, 'options_action_manage_search'],
+      [A.ARCHIVE_EMBED, 'options_action_archive_embed'],
+      [A.PROVIDER_TEST, 'options_action_provider_test'],
     ];
+  }
+
+  // Le funzioni esposte nell'editor, nell'ordine del censimento, ciascuna con la
+  // chiave i18n della sua etichetta. Se il censimento non fosse caricato (test
+  // isolati, pagine che non lo includono) si ricade sulle etichette scritte qui,
+  // così l'editor funziona comunque.
+  function actionLabels() {
+    const keys = new Map(labelKeys());
+    const Usage = global.SN_MODEL_USAGE;
+    const actions = Usage && typeof Usage.userActions === 'function'
+      ? Usage.userActions().filter(Boolean)
+      : [...keys.keys()];
+    const labelOf = (action) => {
+      if (keys.has(action)) return keys.get(action);
+      // Nessuna chiave i18n: usiamo il nome del censimento come testo. `t()` su
+      // una stringa non tradotta la restituisce identica, quindi la cella mostra
+      // il nome giusto invece del codice interno.
+      const entry = Usage && typeof Usage.list === 'function'
+        ? Usage.list().find((e) => e.ref === action && e.from === 'user')
+        : null;
+      return (entry && entry.label) || action;
+    };
+    return actions.map((action) => [action, labelOf(action)]);
   }
 
   function splitRefs(value) {
