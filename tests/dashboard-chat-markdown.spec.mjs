@@ -48,21 +48,19 @@ test('la risposta di Filo mostra grassetto e link cliccabili; il link interno re
   // Pagina locale reale a cui punterà il link (niente rete esterna).
   const linkUrl = testServer.html('<!doctype html><title>Meta</title><h1>meta</h1>');
   const linkHost = new URL(linkUrl).host;
+  // Grassetto + un link markdown esterno + un link interno filo:// (da scartare).
+  const responseText = `Ecco un punto **importante**. Vedi [la fonte](${linkUrl}) e le [impostazioni](filo://preferences/preferences.html).`;
 
-  await app.evaluate(async ({ linkUrl }) => {
+  await app.evaluate(async (responseText) => {
+    globalThis.__mockText = responseText;
     const orig = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
     globalThis.__restoreMd = () => { globalThis.SN_PROVIDERS.streamCompleteWithFallback = orig; };
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, onDelta }) => {
-      const full = JSON.stringify({
-        // Grassetto + un link markdown esterno + un link interno filo:// (da
-        // scartare) + niente azioni.
-        text: `Ecco un punto **importante**. Vedi [la fonte](${linkUrl}) e le [impostazioni](filo://preferences/preferences.html).`,
-        actions: [],
-      });
+      const full = JSON.stringify({ text: globalThis.__mockText, actions: [] });
       try { onDelta && onDelta(full); } catch (_) {}
       return { text: full, model: attempts[0].model, provider: attempts[0].provider, usage: {} };
     };
-  }, { linkUrl });
+  }, responseText);
 
   await page.locator('#input').fill('spiegami');
   await page.locator('#sendBtn').click();
