@@ -17,8 +17,13 @@
     // ↓ Nuove versioni in cima.
     {
       version: '0.2.189', date: '2026-08-06',
+      features: [
+        'Nelle Opzioni trovi l\'elenco completo di dove Filo usa un modello: accanto alle funzioni che imposti tu, ora sono elencati anche i punti che girano sui server di Filo e quelli che un modello non lo usano affatto, ciascuno con scritto dove si imposta.',
+        'Puoi scegliere il modello di sei funzioni che prima non erano impostabili: l\'indicizzazione delle schede archiviate, il titolo, il riassunto e la chat dell\'editor, la ricerca fra i feedback e il pulsante "Prova" delle chiavi.',
+      ],
       fixes: [
         'Quando un pulsante "Scarica" avvia lo scaricamento aprendo una nuova scheda, non resti più con una scheda bianca da chiudere a mano: Filo la chiude da solo e ti riporta alla pagina di partenza mentre il download procede.',
+        'Cambiare il modello di "Spiega" non cambia più, di nascosto, anche il titolo, il riassunto e la chat dell\'editor: ognuno ha il suo.',
       ],
     },
     {
