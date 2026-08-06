@@ -57,10 +57,11 @@ const listItems = (shell) => shell.evaluate(async () => {
 test('nome file ostile (path traversal + emoji + XSS) non esce dalla cartella né inietta HTML', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(90_000);
   const BODY = Buffer.from('ciao-ostile');
-  // filename che tenta: risalita di cartella, HTML eseguibile, emoji, spazi.
-  const hostile = '../../../../pwned-\\u0000<img src=x onerror=window.__filoPwned=1>-🎉.txt'
-    .replace('\\u0000', '');
-  const s = await serveAttachment(hostile, BODY);
+  // nome che tenta: risalita di cartella, HTML eseguibile, emoji, spazi.
+  const hostile = '../../../../pwned <img src=x onerror=window.__filoPwned=1> 🎉.txt';
+  const s = await serveAttachment(hostile, BODY, {
+    rawDisposition: `attachment; filename*=UTF-8''${encodeURIComponent(hostile)}`,
+  });
   try {
     const page = await testServer.openReady(openTab, linkPage([s.url()]));
     await page.locator('#dl0').click();
