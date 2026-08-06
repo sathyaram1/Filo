@@ -445,3 +445,97 @@ test('pagina lunga: tutti i blocchi finiscono tradotti', async ({ app, openTab, 
   expect(missing).toEqual([]);
   expect(await toastText(page)).toBe('Pagina tradotta');
 });
+
+// ---------------------------------------------------------------------------
+// 10. Stress: avviso onesto quando un pezzo resta indietro davvero.
+// ---------------------------------------------------------------------------
+
+test('un pezzo non tradotto: l\'avviso dice "solo in parte", non "tradotta"', async ({ app, openTab, testServer }) => {
+  test.setTimeout(150_000);
+  await stubModel(app);
+  await setMode(app, 'halfempty');
+  // Blocchi lunghi: superano la soglia del singolo invio, così il pezzo con
+  // ZULU finisce in una richiesta a sé.
+  const filler = 'This is a long english sentence used to fill up the request. ';
+  const good = Array.from({ length: 6 }, (_, i) =>
+    `<p id="g${i}">${filler.repeat(9)} Marker ${i}.</p>`).join('');
+  const page = await testServer.openReady(openTab, `<!doctype html><html lang="en"><body style="padding:20px">
+    ${good}<p id="bad">${filler.repeat(9)} ZULU sentence that the model refuses.</p>
+  </body></html>`);
+
+  await clickTranslate(page);
+  await expect.poll(() => toastText(page), { timeout: 120_000 })
+    .toBe('Pagina tradotta solo in parte');
+  const bad = await page.evaluate(() => document.getElementById('bad').innerText);
+  expect(bad).not.toContain(MARK);
+  const g0 = await page.evaluate(() => document.getElementById('g0').innerText);
+  expect(g0).toContain(MARK);
+});
+
+// ---------------------------------------------------------------------------
+// 11. Stress: sequenza inusuale — traduci, ripristina, traduci di nuovo.
+// ---------------------------------------------------------------------------
+
+test('traduci → mostra originale → traduci di nuovo: funziona ogni volta', async ({ app, openTab, testServer }) => {
+  test.setTimeout(150_000);
+  await stubModel(app);
+  const page = await testServer.openReady(openTab, `<!doctype html><html lang="en"><body style="padding:20px">
+    <h1 id="a">A heading that goes back and forth</h1>
+    <p id="b">A paragraph with a <a id="l" href="https://example.com/x">link inside</a> of it.</p>
+  </body></html>`);
+
+  for (let round = 1; round <= 2; round++) {
+    await clickTranslate(page);
+    await expect.poll(() => toastText(page), { timeout: 60_000 }).toMatch(/^Pagina tradotta/);
+    const t = await page.evaluate(() => ({
+      a: document.getElementById('a').innerText,
+      l: document.getElementById('l').innerText,
+      href: document.getElementById('l').getAttribute('href'),
+    }));
+    expect(t.a, `giro ${round}`).toContain(MARK);
+    expect(t.l, `giro ${round}`).toContain(MARK);
+    expect(t.href).toBe('https://example.com/x');
+    // Un solo marcatore per blocco: niente accumulo fra i giri.
+    expect((t.a.match(/‹IT›/g) || []).length, `giro ${round}`).toBe(1);
+
+    await clickTranslate(page);
+    await expect.poll(() => page.evaluate(() => document.getElementById('a').innerText), { timeout: 20_000 })
+      .toBe('A heading that goes back and forth');
+    const back = await page.evaluate(() => ({
+      b: document.getElementById('b').innerText,
+      href: document.getElementById('l').getAttribute('href'),
+    }));
+    expect(back.b, `giro ${round}`).toBe('A paragraph with a link inside of it.');
+    expect(back.href).toBe('https://example.com/x');
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 12. Stress: la pagina contiene testo che ASSOMIGLIA ai segnaposto interni.
+// ---------------------------------------------------------------------------
+
+test('pagina che contiene [[L0]] nel testo: nessun contenuto perso né crash', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await stubModel(app);
+  const page = await testServer.openReady(openTab, `<!doctype html><html lang="en"><body style="padding:20px">
+    <h1 id="a">A heading about placeholders like [[L0]] and [[L9]] in text</h1>
+    <p id="b">Some text [[L0]] with a <a id="l" href="https://example.com/y">real link</a> after it.</p>
+  </body></html>`);
+
+  await clickTranslate(page);
+  await expect.poll(() => toastText(page), { timeout: 45_000 }).toMatch(/^Pagina tradotta/);
+  const res = await page.evaluate(() => ({
+    linkAlive: !!document.getElementById('l'),
+    href: document.getElementById('l')?.getAttribute('href'),
+    linkText: document.getElementById('l')?.innerText,
+    bText: document.getElementById('b')?.innerText,
+    aText: document.getElementById('a')?.innerText,
+  }));
+  // Il link non deve sparire, né duplicarsi, né perdere la destinazione.
+  expect(res.linkAlive).toBe(true);
+  expect(res.href).toBe('https://example.com/y');
+  expect(res.linkText).toContain(MARK);
+  expect(res.aText).toContain(MARK);
+  expect(res.bText).toContain('Some text');
+  expect(await page.evaluate(() => document.querySelectorAll('#b a').length)).toBe(1);
+});
