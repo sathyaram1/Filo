@@ -730,6 +730,11 @@
     translatePageChunk: ({ chunk }) =>
       `Traduci il seguente testo in italiano mantenendo struttura e punteggiatura. ` +
       `Se è già in italiano, restituiscilo invariato. ` +
+      `IMPORTANTE: il testo è diviso in blocchi separati dalla riga @@@SN_SEP@@@ (sono pezzi diversi della pagina: titoli, ` +
+      `didascalie, voci di menu, paragrafi). Restituisci ESATTAMENTE lo stesso numero di blocchi, nello stesso ordine, ` +
+      `separati dalla stessa riga @@@SN_SEP@@@: un blocco tradotto per ogni blocco originale, anche quando è brevissimo, ` +
+      `è una sola parola o non richiede traduzione (in quel caso ripetilo identico). Non unire, non dividere e non ` +
+      `omettere blocchi, e non aggiungere righe di separazione in più. ` +
       `IMPORTANTE: il testo contiene segnaposto nel formato [[L0]], [[L1]], ecc. ` +
       `Devi mantenere i segnaposto ESATTAMENTE come sono (stessa numerazione, stesse parentesi quadre doppie), ` +
       `senza tradurli, modificarli o rimuoverli, e collocarli nella posizione semanticamente equivalente nella traduzione. ` +
