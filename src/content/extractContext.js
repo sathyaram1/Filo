@@ -526,6 +526,7 @@
     getSelectionWithSentence,
     getRenderedSelectionText,
     extractMainTextNodes,
+    extractTranslatableBlocks,
     pageMeta,
     pageExcerpt,
     extractInteractiveOutline,
