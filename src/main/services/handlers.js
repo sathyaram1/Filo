@@ -485,6 +485,10 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
     action !== ACTIONS.TRANSLATE_PAGE && action !== ACTIONS.CATEGORIZE
     && action !== ACTIONS.SPELLCHECK_SEMANTIC && action !== ACTIONS.SPELLCHECK_WORD
     && action !== ACTIONS.HELP_INTENT_GUESS && action !== ACTIONS.HELP_INTENT_JUDGE
+    // La ricerca fra i feedback è un passaggio interno di una ricerca, non una
+    // richiesta dell'utente: come quando prendeva in prestito «Categorizza»,
+    // resta fuori dalla cronologia.
+    && action !== ACTIONS.MANAGE_SEARCH
   ) {
     await History.append({
       action, provider: usedProvider, model: concreteModel, servedBy,
