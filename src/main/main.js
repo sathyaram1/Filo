@@ -137,6 +137,11 @@ app.whenReady().then(async () => {
   // dalle impostazioni. Non blocca: senza chiavi resta solo l'analisi locale.
   try { require('./services/handlers').wireSafebrowse().catch(() => {}); } catch (_) {}
 
+  // #410.1 — intercetta gli scaricamenti della navigazione (clic su un link a
+  // un file) sulla sessione predefinita: carica la cronologia persistita e
+  // aggancia will-download così la barra in alto ne mostra l'avanzamento.
+  try { require('./services/downloads').init().catch(() => {}); } catch (_) {}
+
   mainWindow = createMainWindow();
   registerShortcuts(mainWindow);
 
