@@ -448,6 +448,13 @@ irraggiungibili.
   un'azione offerta lì (un "Annulla") può sparire prima che l'utente la prema, e
   basta un avviso che arriva da solo per farla evaporare. Ogni avviso è una card
   con il SUO timer; il tetto sopra tiene la crescita sotto controllo.
+- **Tronca i dati che vengono da fuori.** Il testo di un avviso spesso contiene
+  una stringa che decide qualcun altro (il nome file che manda il server, il
+  titolo di una pagina): senza un tetto, una card sola diventa un muro di testo
+  che copre lo schermo — il tetto al *numero* di card non basta. Accorcia **in
+  mezzo** (`inizio…estensione`), così resta leggibile sia l'inizio sia il pezzo
+  che dice di cosa si tratta. Vedi `shortName()` in
+  `src/main/services/downloads.js`, test `tests/unit/downloadNames.test.mjs`.
 - **Dove:** `NOTIFS` (`enforceCap`/`syncOverflow`) in `src/renderer/shell.js`;
   `.shell-notifs` in `src/renderer/shell.css`. Test
   `tests/notifications.spec.mjs` (la raffica non straripa e resta chiudibile).
