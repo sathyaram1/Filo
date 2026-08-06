@@ -32,6 +32,11 @@ async function stubModel(app) {
     globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
       const raw = messages[messages.length - 1]?.content;
       const content = typeof raw === 'string' ? raw : JSON.stringify(raw);
+      // Solo le richieste di "traduci pagina" ci interessano: le altre funzioni
+      // di Filo (categorizzazione, ecc.) passano di qui e falserebbero i conteggi.
+      if (content.indexOf('Traduci il seguente testo in italiano mantenendo struttura') !== 0) {
+        return { text: '{}', model: 'm', provider: 'gemini', usage: {} };
+      }
       const i = content.indexOf('Testo:\n\n');
       const chunk = i >= 0 ? content.slice(i + 'Testo:\n\n'.length) : content;
       globalThis.__trChunks.push(chunk);
