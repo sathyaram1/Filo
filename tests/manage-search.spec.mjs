@@ -83,10 +83,12 @@ test('ricerca semantica: risultati ordinati per pertinenza da QUALUNQUE scheda; 
   await page.locator('#mgSearchInput').fill('quando chiedevo di unire le voci in una sola icona');
   await page.locator('#mgSearchInput').press('Enter');
 
-  // Il modello è stato interrogato con l'azione categorize e dei messaggi custom.
+  // Il modello è stato interrogato con la funzione PROPRIA della ricerca fra i
+  // feedback (prima prendeva in prestito quella di «Categorizza», quindi non
+  // aveva un modello impostabile per conto suo) e con messaggi custom.
   await expect.poll(() => page.evaluate(() => window.__ai.length)).toBe(1);
   const sent = await page.evaluate(() => window.__ai[0]);
-  expect(sent.action).toBe('categorize');
+  expect(sent.action).toBe('manage_search');
   expect(Array.isArray(sent.payload.messages)).toBe(true);
 
   // Due risultati, nell'ORDINE dato dal modello: fb-sezioni prima di fb-x.
