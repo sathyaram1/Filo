@@ -183,7 +183,8 @@ const LONG = `<!doctype html><html lang="en"><body style="font:16px sans-serif;p
 </body></html>`;
 
 async function stubFlakyTranslationProvider(app, failAfter) {
-  await app.evaluate(async (failAfter) => {
+  // NB: il primo parametro di app.evaluate è il modulo electron, non l'arg.
+  await app.evaluate(async (_electron, failAfter) => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
