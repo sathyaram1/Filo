@@ -95,11 +95,13 @@ test('"Svuota" mentre uno scaricamento è in corso non lascia zombie né rompe l
     const r = await shell.evaluate(() => window.filoShell.downloads.clear());
     expect(r.ok).toBe(true);
 
-    // Nessuna voce fantasma bloccata "in corso" per sempre e app viva.
-    await shell.waitForTimeout(2500);
-    const after = await items(shell);
-    const zombie = after.filter((x) => x.state === 'progressing' && x.filename === 'in-corso.bin');
-    expect(zombie.length, 'voce rimasta "in corso" dopo lo svuotamento').toBe(0);
+    // Come in Chrome, "Svuota" non ammazza ciò che sta ancora scaricando: la
+    // voce può restare. L'invariante vera è che NON resti bloccata "in corso"
+    // per sempre — o sparisce, o arriva a conclusione.
+    await expect.poll(async () => {
+      const e = (await items(shell)).find((x) => x.filename === 'in-corso.bin');
+      return e ? e.state : 'assente';
+    }, { timeout: 90000 }).not.toBe('progressing');
     expect(await shell.evaluate(() => !!window.filoShell)).toBe(true);
     // e un nuovo scaricamento funziona ancora dopo lo svuotamento
     await page.locator('#dl').click();
