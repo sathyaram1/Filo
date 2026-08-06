@@ -15,6 +15,7 @@ const HTML = `<!doctype html><html><body style="padding:30px;font:16px sans-seri
   <p><a id="light-link" href="https://example.com/light">link normale</a></p>
   <p><img id="light-img" src="${PNG}" width="64" height="64" alt="img normale"></p>
   <p id="light-text">Frase normale in chiaro abbastanza lunga da poter essere selezionata con il mouse.</p>
+  <p><textarea id="light-ta" rows="2" cols="30">testo modificabile</textarea></p>
 
   <!-- SHADOW ROOT APERTO -->
   <div id="host-open"></div>
