@@ -67,6 +67,20 @@ test('cliccando un link a un file, Filo lo scarica, lo registra come "completato
     await expect(shell.locator('#dl-indicator')).toBeVisible();
     await expect(shell.locator('.shell-notif-msg')).toContainText('Scaricato', { timeout: 8000 });
     await expect(shell.locator('.shell-notif-action', { hasText: 'Apri file' })).toBeVisible();
+
+    // 4) SOPRAVVIVE AL RIAVVIO: la voce è scritta su disco (storage.json, che è
+    //    ciò che l'app rilegge all'avvio). Verifica deterministica della
+    //    persistenza senza dover rilanciare l'app.
+    const userData = await app.evaluate(() => process.env.FILO_USER_DATA);
+    const storageFile = join(userData, 'storage.json');
+    await expect.poll(() => {
+      try {
+        const data = JSON.parse(readFileSync(storageFile, 'utf8'));
+        const arr = data.downloads || [];
+        const e = arr.find((it) => it.filename === 'report.pdf');
+        return e ? e.state : null;
+      } catch (_) { return null; }
+    }, { timeout: 8000 }).toBe('completed');
   } finally {
     try { fileServer.closeAllConnections?.(); } catch (_) {}
     await new Promise((r) => fileServer.close(r));
