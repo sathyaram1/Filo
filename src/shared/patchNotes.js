@@ -19,9 +19,12 @@
       version: '0.2.188', date: '2026-08-06',
       features: [
         'Quando scarichi un file (PDF, ZIP, allegato) ora vedi l\'avanzamento in tempo reale nella barra in alto, con una barra e la percentuale; a fine scaricamento un avviso con "Apri file" e "Apri cartella", e un avviso chiaro se qualcosa va storto. I file scaricati restano in un elenco che sopravvive alla riapertura di Filo.',
+        'Se la traduzione di una pagina si ferma a metà (rete che salta, credito finito) puoi riprenderla dal tasto destro: completa solo i pezzi mancanti, senza rifare — né ripagare — quelli già tradotti.',
+        'Mentre traduci una pagina vedi l\'avanzamento reale, con quanti blocchi sono già stati tradotti sul totale.',
       ],
       fixes: [
         'Quando traduci una pagina, le illustrazioni disegnate al suo interno — grafici, loghi, icone e formule — restano intatte con i loro colori, invece di annerirsi o perdere l\'aspetto.',
+        'Una traduzione di pagina interrotta non dice più "Pagina tradotta" quando non è vero: ora ti dice che si è fermata, a che punto è arrivata e perché, con una spiegazione in italiano invece del messaggio tecnico del servizio.',
         'Uno scaricamento da un sito lento non viene più scambiato per un errore: se il trasferimento si ferma qualche secondo Filo aspetta e lo porta a termine, e ti avvisa di un fallimento solo quando lo scaricamento è davvero caduto.',
         'L\'elenco dei tuoi scaricamenti resta dentro Filo: i siti che visiti non possono più leggerlo né comandarlo.',
         'L\'avviso di fine scaricamento resta un riquadro leggibile anche quando il file ha un nome lunghissimo.',
