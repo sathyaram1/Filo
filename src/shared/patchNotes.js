@@ -16,6 +16,12 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.189', date: '2026-08-06',
+      fixes: [
+        'Quando un pulsante "Scarica" avvia lo scaricamento aprendo una nuova scheda, non resti più con una scheda bianca da chiudere a mano: Filo la chiude da solo e ti riporta alla pagina di partenza mentre il download procede.',
+      ],
+    },
+    {
       version: '0.2.188', date: '2026-08-06',
       features: [
         'Quando scarichi un file (PDF, ZIP, allegato) ora vedi l\'avanzamento in tempo reale nella barra in alto, con una barra e la percentuale; a fine scaricamento un avviso con "Apri file" e "Apri cartella", e un avviso chiaro se qualcosa va storto. I file scaricati restano in un elenco che sopravvive alla riapertura di Filo.',
