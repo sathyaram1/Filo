@@ -191,64 +191,29 @@
   }
 
   // ----------------------------------------------------------------
-  // Renderer Markdown minimale (sicuro: escape HTML prima di trasformare).
+  // Renderer Markdown: delega alla sorgente unica condivisa SN_MARKDOWN (#418),
+  // così popup, riquadro "Spiega", sidebar e chat della home rendono la stessa
+  // formattazione leggera (grassetto/corsivo/codice/elenchi/titoli + LINK).
   // ----------------------------------------------------------------
-  function escapeHtml(s) {
-    return s.replace(/[&<>"']/g, (c) => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-    })[c]);
-  }
-  function inlineMd(s) {
-    return s
-      .replace(/`([^`\n]+)`/g, '<code>$1</code>')
-      .replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/(^|[^*\w])\*(?!\s)([^*\n]+?)\*(?!\*)/g, '$1<em>$2</em>');
-  }
+  const Md = global.SN_MARKDOWN;
   function renderMarkdown(text) {
-    if (!text) return '';
-    const lines = escapeHtml(text).split('\n');
-    const out = [];
-    let listType = null;
-    let para = [];
-    let inCode = false;
-    let codeBuf = [];
-    const flushPara = () => {
-      if (para.length) { out.push(`<p>${para.map(inlineMd).join('<br>')}</p>`); para = []; }
-    };
-    const flushList = () => {
-      if (listType) { out.push(`</${listType}>`); listType = null; }
-    };
-    for (const raw of lines) {
-      if (raw.trim().startsWith('```')) {
-        if (inCode) {
-          out.push(`<pre><code>${codeBuf.join('\n')}</code></pre>`);
-          codeBuf = []; inCode = false;
-        } else { flushPara(); flushList(); inCode = true; }
-        continue;
-      }
-      if (inCode) { codeBuf.push(raw); continue; }
-      const trimmed = raw.trim();
-      if (trimmed === '') { flushPara(); flushList(); continue; }
-      let m;
-      if ((m = trimmed.match(/^(#{1,6})\s+(.+)$/))) {
-        flushPara(); flushList();
-        const level = Math.min(m[1].length + 2, 6);
-        out.push(`<h${level}>${inlineMd(m[2])}</h${level}>`);
-      } else if ((m = trimmed.match(/^[-*]\s+(.+)$/))) {
-        flushPara();
-        if (listType !== 'ul') { flushList(); out.push('<ul>'); listType = 'ul'; }
-        out.push(`<li>${inlineMd(m[1])}</li>`);
-      } else if ((m = trimmed.match(/^\d+\.\s+(.+)$/))) {
-        flushPara();
-        if (listType !== 'ol') { flushList(); out.push('<ol>'); listType = 'ol'; }
-        out.push(`<li>${inlineMd(m[1])}</li>`);
-      } else { flushList(); para.push(trimmed); }
-    }
-    if (inCode) out.push(`<pre><code>${codeBuf.join('\n')}</code></pre>`);
-    flushPara();
-    flushList();
-    return out.join('\n');
+    return Md ? Md.render(text) : (text || '');
   }
+
+  // Un solo listener a livello di documento apre i link renderizzati da Filo
+  // (classe filo-md-link) in una NUOVA SCHEDA — vale per il popup, il riquadro
+  // "Spiega" e la sidebar, che vivono tutti nello stesso documento. I link
+  // non-sicuri (filo://, javascript:, relativi) non arrivano qui: SN_MARKDOWN li
+  // ha già scartati in fase di render.
+  document.addEventListener('click', (e) => {
+    const a = e.target && e.target.closest && e.target.closest('a.filo-md-link');
+    if (!a) return;
+    const url = a.getAttribute('href');
+    if (!url) return;
+    e.preventDefault();
+    e.stopPropagation();
+    try { window.open(url, '_blank', 'noopener'); } catch (_) {}
+  });
 
   // ----------------------------------------------------------------
   // Compensazione zoom (Ctrl+/-, pinch). Identica per popup e menu.
