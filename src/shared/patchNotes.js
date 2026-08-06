@@ -17,6 +17,9 @@
     // ↓ Nuove versioni in cima.
     {
       version: '0.2.188', date: '2026-08-06',
+      features: [
+        'Quando scarichi un file (PDF, ZIP, allegato) ora vedi l\'avanzamento in tempo reale nella barra in alto, con una barra e la percentuale; a fine scaricamento un avviso con "Apri file" e "Apri cartella", e un avviso chiaro se qualcosa va storto. I file scaricati restano in un elenco che sopravvive alla riapertura di Filo.',
+      ],
       fixes: [
         'Quando traduci una pagina, le illustrazioni disegnate al suo interno — grafici, loghi, icone e formule — restano intatte con i loro colori, invece di annerirsi o perdere l\'aspetto.',
       ],
