@@ -300,6 +300,8 @@ test('traduzione interrotta: si può comunque tornare all’originale', async ({
   await page.locator('#p0').click({ button: 'right', position: { x: 5, y: 5 } });
   const menu = page.locator('.sn-menu');
   await expect(menu).toBeVisible();
+  // Traccia ispezionabile: il menu nello stato "traduzione a metà".
+  await page.screenshot({ path: 'tests/.shots/translate-page-partial-menu.png' }).catch(() => {});
   await menu.getByText('Mostra originale', { exact: true }).first().click();
 
   await expect(page.locator('#p0')).toHaveText(/^Paragraph number 0 /);
