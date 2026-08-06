@@ -501,17 +501,39 @@
   }
 
   // ===== Bolle conversazione =====
-  function makeBubble({ role, text, pending = false }) {
+  function makeBubble({ role, text, pending = false, markdown = false }) {
     const div = document.createElement('div');
     div.className = `dash-bubble dash-bubble-${role === 'user' ? 'user' : 'filo'}`;
     if (pending) div.classList.add('dash-bubble-pending');
     // #162 — testo vuoto (Filo ha solo eseguito un'azione, es. aperto un link):
     // niente nodo di testo, la bolla conterrà solo i chip d'azione. Marchiamo
     // la bolla così il CSS può stringere i margini quando è "solo azioni".
-    if (text) div.textContent = text;
+    if (text) setBubbleText(div, text, markdown);
     else div.classList.add('dash-bubble-actions-only');
     return div;
   }
+
+  // #418 — scrive il testo in una bolla. Per le risposte di Filo (markdown=true)
+  // rende la formattazione leggera condivisa (grassetto, corsivo, codice,
+  // elenchi, LINK). Per tutto il resto (testo utente, righe di sistema) resta
+  // testo letterale. I link aperti sono già filtrati da SN_MARKDOWN: nessuno
+  // punta alle pagine interne dell'app.
+  function setBubbleText(el, text, markdown) {
+    if (markdown && text && self.SN_MARKDOWN) el.innerHTML = self.SN_MARKDOWN.render(text);
+    else el.textContent = text || '';
+  }
+
+  // Un solo listener delegato: i link renderizzati da Filo aprono una NUOVA
+  // SCHEDA (come qualsiasi altro link) invece di navigare via la pagina interna.
+  bubblesEl.addEventListener('click', (e) => {
+    const a = e.target && e.target.closest && e.target.closest('a.filo-md-link');
+    if (!a || !bubblesEl.contains(a)) return;
+    const url = a.getAttribute('href');
+    if (!url) return;
+    e.preventDefault();
+    e.stopPropagation();
+    send({ type: MSG.OPEN_URL, url });
+  });
 
   // Indicatore "sta pensando": 3 righe di reasoning che scorrono verso l'alto e
   // svaniscono man mano che salgono (la riga in cima è quasi trasparente, quella
