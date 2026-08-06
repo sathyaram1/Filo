@@ -83,7 +83,8 @@
     {
       id: 'fullscreen', title: 'Schermo intero', category: 'navigation',
       desc: 'Nasconde la barra delle schede e degli indirizzi così la pagina occupa tutta la finestra.',
-      invoke: 'Menu del tasto destro → "Schermo intero" / "Esci da schermo intero".',
+      invoke: 'Menu del tasto destro → "Schermo intero" / "Esci da schermo intero", oppure chiedilo all’assistente ("metti a schermo intero", "togli lo schermo intero"). Esci in ogni momento con Esc.',
+      doesNot: 'Non preme il pulsante di schermo intero del lettore video dentro un sito (es. quello di YouTube): agisce sulla finestra di Filo, non sui comandi della pagina.',
     },
     {
       id: 'network-error-page', title: 'Pagina d’errore quando un sito non si carica', category: 'navigation',
