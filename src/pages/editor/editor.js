@@ -2121,6 +2121,9 @@
     const collapsing = !btn.classList.contains('is-collapsed');
     if (collapsing) h.dataset.collapsed = '1';
     else delete h.dataset.collapsed;
+    // Toccata la freccia, quella sezione è dell'utente: la ricerca non la
+    // richiude più da sé (né la considera più roba sua).
+    delete h.dataset.searchOpened;
     reapplyCollapseState();
   }
   // Blocco di primo livello (figlio diretto del foglio) che contiene `node`.
