@@ -417,6 +417,16 @@
       provider: 'openrouter',
       model: 'anthropic/claude-3.5-haiku',
     },
+    // Indicizzazione (embedding): produce VETTORI da testo, non parole. Usato
+    // SOLO dall'indicizzazione dell'archivio schede (la validazione
+    // modello↔funzione impedisce di assegnarlo a una funzione di testo, e
+    // viceversa). Il provider è Gemini: è l'unico che Filo sa chiamare per
+    // questo tipo di modello.
+    'embed-004': {
+      label: 'Google text-embedding-004',
+      provider: 'gemini',
+      model: 'text-embedding-004',
+    },
     // Sintesi vocale (TTS): producono AUDIO da testo. Usati SOLO dall'azione TTS
     // (la validazione modello↔azione impedisce di assegnarli a funzioni di testo).
     tts: {
