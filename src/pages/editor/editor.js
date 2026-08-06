@@ -2885,6 +2885,9 @@
     pad.querySelector('[data-sr="all"]').addEventListener('click', (e) => { e.stopPropagation(); replaceAll(findInput.value, replInput.value); run(); });
   }
   function clearFind() {
+    // Uno spostamento ancora in attesa punterebbe a evidenziazioni che stiamo
+    // per smontare: si annulla qui e lo ripianifica chi rilancia la ricerca.
+    cancelFindReveal();
     docEl.querySelectorAll('mark.ed-find-hit').forEach((mk) => {
       const parent = mk.parentNode;
       while (mk.firstChild) parent.insertBefore(mk.firstChild, mk);
