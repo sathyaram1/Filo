@@ -184,13 +184,34 @@ module.exports = function register(on, ctx) {
     }
   });
 
+  // Modello con cui provare un fornitore quando la prova non ne indica uno
+  // (pulsante «Prova» accanto alla chiave). Prima era un nome scritto qui: si
+  // finiva per provare un modello che magari nessuno usa, e nessuno poteva
+  // cambiarlo. Ora è la funzione «Prova di un fornitore», impostabile come
+  // tutte le altre; della sua catena si prende il primo modello servito dal
+  // fornitore in prova.
+  async function testModelFor(provider) {
+    const settings = await getEffectiveSettings();
+    const action = SN_CONST.ACTIONS.PROVIDER_TEST;
+    try {
+      const attempts = buildAttemptChain(settings, modelForAction(settings, action), action);
+      const hit = attempts.find((a) => a.provider === provider && a.model);
+      if (hit) return hit.model;
+    } catch (_) { /* funzione non configurata → messaggio sotto */ }
+    return '';
+  }
+
   on(MSG.TEST_PROVIDER, async (msg) => {
     try {
       const provider = msg.provider;
       const apiKey = (msg.apiKey || '').trim();
-      const model = msg.model || (provider === 'gemini'
-        ? 'google/gemini-2.0-flash-lite-001'
-        : 'google/gemini-2.0-flash-001');
+      const model = (msg.model || '').trim() || await testModelFor(provider);
+      if (!model) {
+        return {
+          ok: false,
+          error: `Nessun modello ${provider} impostato per la prova: scegline uno in «Prova di un fornitore», fra le funzioni delle Opzioni.`,
+        };
+      }
       if (!apiKey) return { ok: false, error: 'API key mancante' };
       const messages = [{ role: 'user', content: 'Conta da 1 a 20 separando con virgole, senza testo extra.' }];
       const startMs = performance.now();
