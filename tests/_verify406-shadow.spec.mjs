@@ -52,12 +52,16 @@ const HTML = `<!doctype html><html><body style="padding:30px;font:16px sans-seri
   </script>
 </body></html>`;
 
-const LINK_ITEMS = ['Apri in nuova tab', 'Copia URL', 'Salva link per dopo', 'Condividi link', 'Spiega link'];
+const LINK_ITEMS = ['Apri in nuova tab', 'Copia URL', 'Salva link per dopo', 'Condividi link'];
 const IMG_ITEMS = ['Copia immagine', 'Salva immagine come…', 'Copia URL immagine', 'Cerca immagine'];
 
 async function itemLabels(page) {
   return page.$$eval('.sn-menu .sn-menu-item', (els) =>
     els.map((e) => (e.textContent || '').trim()).filter(Boolean));
+}
+
+async function menuText(page) {
+  return (await page.locator('.sn-menu').textContent()) || '';
 }
 
 async function rightClickAndRead(page, sel) {
