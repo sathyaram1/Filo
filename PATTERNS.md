@@ -292,6 +292,42 @@ dipinge sopra senza toccare l'albero.
 - **Dove:** controller in `src/content/tts.js` (`ensureReadStyle`, `setHighlight`,
   `buildReadModel` tokenizza la selezione in Range-parola).
 
+## Riscrivere il testo di una pagina esterna: niente whitelist di tag, e si spostano i NODI
+
+Quando Filo sostituisce del testo su una pagina che non è sua (oggi: "Traduci la
+pagina") valgono due regole imparate a caro prezzo con #407.
+
+- **Cosa toccare non lo decide il tag.** Una lista di tag "di prosa"
+  (`p/li/h1…/figcaption`) più lo scarto dei sottoalberi `nav/header/aside/form`
+  sembra ragionevole e invece **lascia fuori metà pagina**: sui siti moderni il
+  testo sta in `div`/`span` generici, il titolo è dentro `<header>`, i riquadri
+  "Leggi anche" dentro `<aside>` e le voci di menu sono link. La regola giusta è
+  l'opposta: **prendi ogni elemento che ha un text node come figlio DIRETTO** e
+  scarta solo ciò che non è prosa (script/media/`pre`/`code`, campi di testo,
+  `[translate="no"]`, `.notranslate`, `contenteditable`, elementi nascosti e la
+  UI di Filo stessa, riconoscibile dal prefisso di classe `sn-`). Così ogni
+  pezzo di testo appartiene a **una sola** unità (niente doppie sostituzioni) e
+  anche il testo dentro i link diventa una unità sua invece di restare un
+  segnaposto intoccato.
+- **Rimonta spostando i nodi originali, non re-inserendo HTML.** I figli
+  dell'unità diventano segnaposto `[[Lk]]` nel testo mandato al modello e
+  tornano al loro posto come **nodi vivi**: re-parsare l'`outerHTML` creerebbe
+  nodi nuovi e butterebbe via listener, stato dei componenti e i figli già
+  tradotti. Il testo del modello entra come **text node** (mai `innerHTML`):
+  niente escaping da ricordare, niente HTML del modello nella pagina. Corollari:
+  i figli che il modello "dimentica" di richiamare vanno **riappesi in fondo**
+  (mai perdere contenuto), e l'annullamento (`Mostra originale`) ripristina la
+  **lista di nodi originali** tenuta in memoria, non una stringa HTML salvata in
+  un attributo (che, con unità annidate, conterrebbe già la traduzione dei figli).
+- **Il messaggio finale deve dire la verità**: "fatto" solo se tutte le unità sono
+  state sostituite, "solo in parte" se qualcuna è rimasta indietro, e un avviso
+  esplicito quando non c'è **niente** da tradurre — il silenzio fa ritentare
+  l'utente all'infinito.
+- **Dove:** `extractTranslatableBlocks` in `src/content/extractContext.js`
+  (`extractMainTextNodes`, accanto, resta la versione "solo l'articolo" per
+  l'excerpt del categorizer: sono due domande diverse); applicazione e ripristino
+  in `src/content/translatePage.js`. Test `tests/translate-page.spec.mjs`.
+
 ## Sintesi vocale/operazioni a modello lente: spezza in chunk + cache, non un colpo solo
 
 Il modello TTS (Gemini) sintetizza TUTTO l'audio prima di rispondere: su testo
