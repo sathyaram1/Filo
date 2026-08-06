@@ -363,7 +363,18 @@ class TabManager {
         '--filo-suppress-autoplay',
       ];
     }
-    return new WebContentsView({ webPreferences });
+    const view = new WebContentsView({ webPreferences });
+    // #410.1 — segui gli scaricamenti anche sulle sessioni NON predefinite
+    // (privacy per-sito, proxy "apri da un altro paese", incognito): senza
+    // questo, un download partito da una scheda proxata/privacy resterebbe "al
+    // buio". Le sessioni incognito non persistono la cronologia (privacy).
+    try {
+      require('./services/downloads').attachSession(
+        view.webContents.session,
+        { persist: !this.incognito },
+      );
+    } catch (_) {}
+    return view;
   }
 
   openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null, suppressAutoplay = false } = {}) {
