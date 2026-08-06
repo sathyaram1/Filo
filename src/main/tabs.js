@@ -1850,6 +1850,7 @@ class TabManager {
   // partenza. La scheda superflua NON viene archiviata (non è un sito visitato,
   // è un contenitore mai riempito): per questo non passa da closeTab.
   handleDownloadStarted(wc) {
+    if (wc) return; // TEMP pre-condition check
     if (!wc) return;
     const tab = this.tabs.find((t) => {
       try { return t.view && t.view.webContents === wc; } catch (_) { return false; }
