@@ -291,6 +291,19 @@
     options_action_safebrowse_judge: 'Rilevamento siti pericolosi — giudizio',
     options_action_geoblock_classify: 'Riconoscimento dei blocchi geografici',
     options_action_feedback_title: 'Titolo automatico dei feedback',
+    options_action_editor_title: 'Editor — titolo automatico del documento',
+    options_action_editor_summary: 'Editor — riassunto automatico del documento',
+    options_action_editor_chat: 'Editor — chat col documento',
+    options_action_manage_search: 'Gestione — ricerca fra i feedback',
+    options_action_archive_embed: 'Indicizzazione delle schede archiviate',
+    options_action_provider_test: 'Prova di un fornitore (pulsante «Prova»)',
+    // Elenco (di sola lettura) degli altri punti in cui Filo usa un modello:
+    // quelli che girano sui server di Filo e quelli che un modello non lo usano.
+    options_h_model_usage: 'Dove altro Filo usa un modello',
+    options_model_usage_desc:
+      'Sopra ci sono le funzioni il cui modello scegli tu. Qui sotto ci sono tutti gli altri punti in cui Filo usa (o non usa) un modello, così l\'elenco è completo e niente resta nascosto.',
+    options_model_usage_owner: 'Lo imposta chi gestisce Filo',
+    options_model_usage_none: 'Non usa nessun modello',
     // Il campo diventa rosso quando il nickname non esiste; la spiegazione sta
     // nell'hover (aggiungere testo sposterebbe i pulsanti della pillola).
     options_chain_unknown_title: 'Questo modello non è fra quelli configurati qui sopra: la funzione non parte finché non ne scegli uno che esiste.',
