@@ -58,10 +58,15 @@ async function stubTranslationProvider(app) {
     });
     const P = globalThis.SN_PROVIDERS;
     globalThis.__filoTranslateCalls = 0;
-    P.completeWithFallback = async ({ messages }) => {
-      globalThis.__filoTranslateCalls++;
+    const origComplete = P.completeWithFallback;
+    P.completeWithFallback = async (args) => {
+      const { messages } = args;
       const last = [...messages].reverse().find((m) => typeof m.content === 'string');
       const prompt = (last && last.content) || '';
+      // Nella pagina girano anche altre chiamate AI (es. controllo dominio):
+      // qui ci interessano SOLO quelle di traduzione pagina.
+      if (prompt.indexOf('@@@SN_SEP@@@') < 0) return origComplete(args);
+      globalThis.__filoTranslateCalls++;
       const i = prompt.indexOf('Testo:\n\n');
       const chunk = i >= 0 ? prompt.slice(i + 'Testo:\n\n'.length) : '';
       const SEP = '\n@@@SN_SEP@@@\n';
