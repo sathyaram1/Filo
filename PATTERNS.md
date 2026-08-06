@@ -739,6 +739,22 @@ sezioni chiuse — #385).
 - **Rivelare significa risalire la catena.** Un blocco può essere nascosto da un
   antenato di livello più alto, non dal titolo che gli sta subito sopra: si
   risale la catena dei titoli che lo governano e si riaprono tutti.
+- **Rivelare per NAVIGARE è un prestito; rivelare per MODIFICARE è definitivo.**
+  Aprire una sezione per mostrare dove sei è uno stato di passaggio: va marcato
+  come tale (`data-search-opened` sul titolo) e **ritirato da solo** appena ti
+  sposti su un altro risultato, svuoti il campo o esci. Altrimenti una ricerca
+  incrementale (che riparte a ogni lettera e passa su corrispondenze che non
+  c'entrano) smonta l'impaginazione costruita dall'utente, che deve richiudere
+  tutto a mano (#385 bis). Se invece dentro quella sezione il testo è **cambiato**
+  (Sostituisci / Sostituisci tutto), l'apertura resta: nascondere una modifica
+  appena fatta è la stessa disonestà di prima.
+- **Il prestito non vince mai sull'utente.** Una sezione che l'utente apre o
+  chiude con la freccia, o in cui scrive, smette di essere in prestito e non si
+  richiude più da sola: mai far sparire testo da sotto il cursore.
+- **Una ricerca incrementale "va" sul risultato solo dopo una pausa** (~350ms):
+  evidenziazione e contatore sono immediati (feedback subito), ma aprire sezioni
+  e scorrere il documento a ogni lettera è attrito. La navigazione esplicita
+  (Prec/Succ, Invio, sostituzione) salta la pausa.
 - **Lo stato "chiuso" vive su una sola fonte di verità e le classi di
   visibilità si RICALCOLANO da lì** (nell'editor: `data-collapsed` sul titolo →
   `reapplyCollapseState()`). Togglare le classi in loco all'apertura sembra
