@@ -281,6 +281,7 @@ function onWillDownload(item, persistThis) {
   });
 
   item.once('done', (_e, state) => {
+    try { if (process.env.FILO_DOWNLOAD_DIR) fs.appendFileSync('/tmp/dlsvc.log', `done ${state} recv=${item.getReceivedBytes()}\n`); } catch (_) {}
     rec.receivedBytes = item.getReceivedBytes() || rec.receivedBytes;
     if (!rec.totalBytes) rec.totalBytes = item.getTotalBytes() || rec.receivedBytes;
     finalize(state);
