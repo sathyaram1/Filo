@@ -143,7 +143,7 @@ test('il pulsante «Prova» usa il modello configurato, e cambia se cambio la co
     try {
       await globalThis.SN_HANDLE_MESSAGE(
         { type: globalThis.SN_MSG.MSG.TEST_PROVIDER, provider: prov, apiKey: 'chiave-finta' },
-        {}, 'filo://options/options.html',
+        { url: 'filo://options/options.html' },
       );
     } finally { P.streamComplete = orig; }
     return seen;
