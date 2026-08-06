@@ -22,6 +22,9 @@
       ],
       fixes: [
         'Quando traduci una pagina, le illustrazioni disegnate al suo interno — grafici, loghi, icone e formule — restano intatte con i loro colori, invece di annerirsi o perdere l\'aspetto.',
+        'Uno scaricamento da un sito lento non viene più scambiato per un errore: se il trasferimento si ferma qualche secondo Filo aspetta e lo porta a termine, e ti avvisa di un fallimento solo quando lo scaricamento è davvero caduto.',
+        'L\'elenco dei tuoi scaricamenti resta dentro Filo: i siti che visiti non possono più leggerlo né comandarlo.',
+        'L\'avviso di fine scaricamento resta un riquadro leggibile anche quando il file ha un nome lunghissimo.',
       ],
     },
     {
