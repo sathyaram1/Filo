@@ -51,7 +51,7 @@ test('la risposta di Filo mostra grassetto e link cliccabili; il link interno re
   // Grassetto + un link markdown esterno + un link interno filo:// (da scartare).
   const responseText = `Ecco un punto **importante**. Vedi [la fonte](${linkUrl}) e le [impostazioni](filo://preferences/preferences.html).`;
 
-  await app.evaluate(async (responseText) => {
+  await app.evaluate(async (_e, responseText) => {
     globalThis.__mockText = responseText;
     const orig = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
     globalThis.__restoreMd = () => { globalThis.SN_PROVIDERS.streamCompleteWithFallback = orig; };
