@@ -1,0 +1,7 @@
+{
+  "id": "7ad54dae-ee7c-4040-8952-f42a0fab7f3b",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la modifica e stata pubblicata. Ora la traduzione di una pagina che si interrompe a meta (rete che salta, credito finito) non dice piu 'Pagina tradotta' quando non e vero: ti dice a che punto si e fermata, perche, e puoi riprenderla dal tasto destro completando solo i pezzi mancanti senza rifare quelli gia tradotti. Durante il lavoro vedi l'avanzamento reale (blocchi tradotti sul totale) e puoi comunque tornare all'originale anche nello stato a meta.",
+  "queuedAt": "2026-08-06T15:35:59.539Z",
+  "queuedBy": "routine"
+}
