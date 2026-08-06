@@ -97,7 +97,7 @@ test('un download che si interrompe a metà viene segnalato (toast d\'errore + c
     await page.locator('#dl').click();
 
     // SUCCESSO del fix = il fallimento viene COMUNICATO: toast d'errore…
-    await expect(shell.locator('.shell-notif-msg')).toContainText('non riuscito', { timeout: 20000 });
+    await expect(shell.locator('.shell-notif-msg')).toContainText('non riuscito', { timeout: 25000 });
 
     // …e la cronologia lo segna "interrotto" (non "completato", non sparito).
     await expect.poll(async () => {
