@@ -539,3 +539,45 @@ test('pagina che contiene [[L0]] nel testo: nessun contenuto perso né crash', a
   expect(res.bText).toContain('Some text');
   expect(await page.evaluate(() => document.querySelectorAll('#b a').length)).toBe(1);
 });
+
+// ---------------------------------------------------------------------------
+// 13. Regressione: le illustrazioni SVG con stile proprio NON devono rompersi.
+//
+// Gli elementi dentro un <svg> (e dentro <math>) hanno il nome tag MINUSCOLO
+// anche in una pagina HTML: una lista di esclusioni scritta in MAIUSCOLO non li
+// intercetta. Risultato: il CSS dentro <svg><style> viene spedito al modello e
+// SOSTITUITO con la sua "traduzione" → l'illustrazione perde i colori (nel caso
+// reale diventa un rettangolo nero) mentre l'avviso dice "Pagina tradotta".
+// ---------------------------------------------------------------------------
+
+test('illustrazione SVG con stile proprio: resta intatta dopo la traduzione', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await stubModel(app);
+  const page = await testServer.openReady(openTab, `<!doctype html><html lang="en"><body style="padding:20px;background:#fff">
+    <h1 id="light">A normal heading in english here</h1>
+    <svg id="svg" width="360" height="120" xmlns="http://www.w3.org/2000/svg">
+      <style id="svgstyle">.big { font-size: 26px; fill: rebeccapurple; } .bg { fill: gold; }</style>
+      <rect class="bg" x="0" y="0" width="360" height="120"></rect>
+      <text id="svgtext" class="big" x="10" y="70">Chart label in english</text>
+    </svg>
+  </body></html>`);
+
+  await clickTranslate(page);
+  await expect.poll(() => toastText(page), { timeout: 45_000 }).toMatch(/^(Pagina tradotta|Non ho)/);
+
+  const res = await page.evaluate(() => ({
+    light: document.getElementById('light').innerText,
+    style: document.getElementById('svgstyle').textContent,
+    textFill: getComputedStyle(document.getElementById('svgtext')).fill,
+    bgFill: getComputedStyle(document.querySelector('.bg')).fill,
+  }));
+  // Il testo normale della pagina sì, il foglio di stile dell'illustrazione no.
+  expect(res.light).toContain(MARK);
+  expect(res.style).toBe('.big { font-size: 26px; fill: rebeccapurple; } .bg { fill: gold; }');
+  expect(res.textFill).toBe('rgb(102, 51, 153)');
+  expect(res.bgFill).toBe('rgb(255, 215, 0)');
+
+  // E il CSS non deve nemmeno essere spedito al modello.
+  const chunks = await app.evaluate(() => globalThis.__trChunks.join('\n'));
+  expect(chunks).not.toContain('rebeccapurple');
+});
