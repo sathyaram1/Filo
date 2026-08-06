@@ -1626,6 +1626,12 @@
     ACTIONS.HELP,
     ACTIONS.FILO_CHAT,
     ACTIONS.FILO_DASHBOARD,
+    // L'editor prima chiedeva il modello di «Spiega», quindi ereditava anche lo
+    // stile di scrittura dell'utente. Ora ha slot propri: restano elencati qui
+    // così il comportamento non cambia sotto i piedi a chi lo usa già.
+    ACTIONS.EDITOR_TITLE,
+    ACTIONS.EDITOR_SUMMARY,
+    ACTIONS.EDITOR_CHAT,
   ];
 
   // Inietta lo stile di scrittura dell'utente nei messaggi di una richiesta AI.
