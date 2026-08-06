@@ -2839,6 +2839,18 @@
 
   // ── Modulo: cerca e sostituisci ────────────────────────────────────────
   let findState = { hits: [], idx: -1, term: '' };
+  // Quanto la ricerca aspetta, dopo l'ultimo tasto premuto, prima di "andare"
+  // sulla corrispondenza (aprire la sezione chiusa che la nasconde e portarci
+  // la vista). Scrivendo "ornitorinco" lettera per lettera le corrispondenze
+  // intermedie ("o" → ottimo, "or" → orso) sono di passaggio: senza pausa la
+  // ricerca inseguirebbe ognuna di esse aprendo sezioni che non c'entrano.
+  const FIND_REVEAL_DELAY_MS = 350;
+  let findRevealTimer = null;
+  function cancelFindReveal() {
+    if (!findRevealTimer) return false;
+    clearTimeout(findRevealTimer); findRevealTimer = null;
+    return true;
+  }
   function renderSearchReplace(cell, m) {
     const pad = document.createElement('div');
     pad.className = 'ed-mod-pad ed-sr';
