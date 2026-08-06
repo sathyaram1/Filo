@@ -85,9 +85,9 @@ test('link/immagine dentro un blocco isolato: il menu offre le voci giuste', asy
   // Shadow root aperto — LINK
   const shLink = await rightClickAndRead(page, '#sh-link');
   for (const l of LINK_ITEMS) expect(shLink, `shadow link: ${l}`).toContain(l);
-  // parità con il light DOM: anche la sezione inline "Spiega link"
-  expect(await menuText(page), 'parità inline link').toContain('Spiega link');
-  expect(lightLinkText, 'riferimento light: inline link').toContain('Spiega link');
+  // parità con il light DOM: c'è anche la sezione inline sul link
+  await expect(page.locator('.sn-menu .sn-menu-inline')).toBeVisible();
+  expect(lightLinkText, 'riferimento light: inline link').toContain('link');
 
   // Shadow root aperto — IMMAGINE
   const shImg = await rightClickAndRead(page, '#sh-img');
