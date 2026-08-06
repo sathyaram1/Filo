@@ -234,24 +234,28 @@ function onWillDownload(item) {
   // generare) fa esattamente la stessa cosa, e veniva ucciso con un errore
   // falso — peggio del silenzio, perché prima il file almeno arrivava.
   //
-  // Il segnale giusto non è il TEMPO ma il fatto che il trasferimento CADA
-  // ripetutamente SENZA GUADAGNARE TERRENO. Quindi contiamo le interruzioni
-  // (le segnala Chromium stesso con l'evento 'updated' in stato 'interrupted')
-  // e azzeriamo il contatore ogni volta che i byte ricevuti superano il massimo
-  // mai raggiunto. Così:
-  //   - server lento ma sano  → nessuna interruzione, nessun contatore: attende;
-  //   - rete ballerina che però riprende da dove era → il contatore si azzera
-  //     a ogni ripresa produttiva, lo scaricamento arriva in fondo;
-  //   - server che tronca in loop → 3 cadute senza avanzare ⇒ errore chiaro.
+  // Il segnale giusto non è il TEMPO che passa senza byte, ma il fatto che sia
+  // CHROMIUM STESSO a dichiarare caduto il trasferimento: l'evento 'updated'
+  // arriva con stato 'interrupted'. Un server lento ma sano non lo emette MAI —
+  // la connessione è viva, semplicemente non manda dati — quindi con questo
+  // segnale la lentezza non può più essere scambiata per un guasto.
   //
-  // Il cronometro resta solo come RETE DI SICUREZZA per il caso limite di una
-  // connessione appesa che non emette mai 'interrupted', con una soglia
-  // nell'ordine dei minuti (non dei secondi) e — soprattutto — senza buttare
-  // via i byte già scaricati.
-  const STALL_MS = 3 * 60 * 1000;   // 3 minuti di silenzio assoluto
-  const MAX_INTERRUPTS = 3;         // cadute consecutive senza guadagnare terreno
+  // Osservato dal vivo (server che tronca a metà ignorando le richieste Range):
+  // Chromium ritenta da solo qualche volta, poi si arrende e resta fermo in
+  // stato 'interrupted' SENZA emettere mai 'done' — è esattamente lì che
+  // nasceva il silenzio. Quindi: alla prima caduta segnalata diamo una FINESTRA
+  // DI GRAZIA per la ripresa automatica; se in quella finestra il download non
+  // torna a guadagnare terreno, lo dichiariamo fallito. Se invece riprende (rete
+  // ballerina che si rimette a posto, server che accetta il Range), la finestra
+  // viene annullata e lo scaricamento arriva in fondo come deve.
+  //
+  // Il cronometro puro resta solo come RETE DI SICUREZZA per il caso limite di
+  // una connessione appesa che non emette né progressi né interruzioni: soglia
+  // nell'ordine dei MINUTI (non dei secondi) e — soprattutto — senza buttare via
+  // i byte già scaricati.
+  const STALL_MS = 3 * 60 * 1000;    // 3 minuti di silenzio assoluto
+  const INTERRUPT_GRACE_MS = 20_000; // attesa concessa alla ripresa automatica
   let maxRecv = 0;
-  let interrupts = 0;
 
   function armWatchdog() {
     if (rec._stallTimer) clearTimeout(rec._stallTimer);
@@ -266,17 +270,28 @@ function onWillDownload(item) {
     }, STALL_MS);
   }
 
-  // Il trasferimento è caduto di nuovo senza aver superato il record di byte:
-  // è un guasto vero, non lentezza. Qui annullare è necessario — è l'unico modo
-  // di fermare il ciclo di ritentativi automatici di Chromium — e il pezzo su
-  // disco è comunque inservibile, perché ogni ritentativo è ripartito da zero.
-  function failAfterInterrupts() {
-    // finalize PRIMA di cancel(): item.cancel() emette 'done' con stato
-    // 'cancelled' in modo SINCRONO, e senza il flag _final quel 'done'
-    // trasformerebbe l'esito in "annullato" (niente toast d'errore). Marcando
-    // l'interruzione qui, il 'done cancelled' che segue diventa un no-op.
-    finalize('interrupted');
-    try { item.cancel(); } catch (_) {}
+  // Chromium ha segnalato una caduta: aspettiamo che si riprenda da solo.
+  function armInterruptGrace() {
+    if (rec._resumeTimer) return;   // finestra già aperta: non riavviarla
+    rec._resumeTimer = setTimeout(() => {
+      rec._resumeTimer = null;
+      if (rec._final || rec.paused) return;
+      // Passata la grazia senza riprendersi: è un guasto vero, non lentezza.
+      // Annullare qui è necessario per fermare l'eventuale ciclo di ritentativi
+      // (e il pezzo su disco è comunque inservibile: ogni ritentativo è
+      // ripartito da zero, non ha ripreso da dove era).
+      //
+      // finalize PRIMA di cancel(): item.cancel() emette 'done' con stato
+      // 'cancelled' in modo SINCRONO, e senza il flag _final quel 'done'
+      // trasformerebbe l'esito in "annullato" (niente toast d'errore). Marcando
+      // l'interruzione qui, il 'done cancelled' che segue diventa un no-op.
+      finalize('interrupted');
+      try { item.cancel(); } catch (_) {}
+    }, INTERRUPT_GRACE_MS);
+  }
+
+  function clearInterruptGrace() {
+    if (rec._resumeTimer) { clearTimeout(rec._resumeTimer); rec._resumeTimer = null; }
   }
 
   // Chiude UNA volta sola il ciclo di vita del download (successo o fallimento).
