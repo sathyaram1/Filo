@@ -59,6 +59,12 @@ async function stubModel(app) {
         // Il modello "dimentica" i separatori e restituisce un blocco unico.
         return { text: '‹IT› ' + segs.join(' '), model: 'm', provider: 'gemini', usage: {} };
       }
+      if (mode === 'halfempty') {
+        // Il modello risponde a vuoto SOLO alla prima richiesta: una parte della
+        // pagina resta non tradotta e l'avviso deve dirlo.
+        if (globalThis.__trCalls <= 2) return { text: '', model: 'm', provider: 'gemini', usage: {} };
+        return { text: ok(), model: 'm', provider: 'gemini', usage: {} };
+      }
       if (mode === 'flaky') {
         // Prima richiesta KO, poi ok: il ritentativo deve salvare la pagina.
         if (globalThis.__trCalls === 1) throw new Error('rete');
