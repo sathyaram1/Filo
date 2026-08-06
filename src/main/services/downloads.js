@@ -44,10 +44,9 @@ const records = new Map();
 // serializzabile, quindi vive a parte e non finisce mai nello storage.
 const liveItems = new Map();
 // Sessioni già agganciate (evita doppioni se una session torna più volte).
+// Le sessioni incognito NON vengono mai agganciate (vedi tabs.js _makeView):
+// "nessuna traccia" vale anche per i download.
 const attached = new WeakSet();
-// Sessioni per cui NON persistere la cronologia (incognito): l'invariante di
-// privacy è che nulla della sessione effimera sopravvive al riavvio.
-const ephemeralSessions = new WeakSet();
 
 let loaded = false;
 
