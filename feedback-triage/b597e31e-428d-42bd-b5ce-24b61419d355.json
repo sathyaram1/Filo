@@ -1,0 +1,7 @@
+{
+  "id": "b597e31e-428d-42bd-b5ce-24b61419d355",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: ho riletto tutte le modifiche una per una e non ho trovato nulla di rischioso — nessun accesso a file o impostazioni sensibili, nessun dato riservato, e il nuovo elenco nelle Opzioni mostra i testi in modo sicuro. La modifica e' stata pubblicata.\n\nAl momento di pubblicare erano gia' arrivati altri aggiornamenti (la formattazione delle risposte di Filo e la ricerca nell'editor): ho unito il tuo lavoro con quelli senza perdere niente da nessuna delle due parti, e il recap degli aggiornamenti ora elenca correttamente sia le novita' sui modelli sia quelle gia' presenti. Tutti i controlli automatici passano.",
+  "queuedAt": "2026-08-06T22:22:55.454Z",
+  "queuedBy": "routine"
+}
