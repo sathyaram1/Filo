@@ -2207,6 +2207,9 @@
   }
 
   function onDocInput() {
+    // Scrivere dentro una sezione che aveva aperto la ricerca la rende
+    // dell'utente: non gli si richiuderà sotto le mani.
+    keepRevealedAtCaret();
     refreshCollapseToggles();
     markDirty();
     updateWordCountModules();
