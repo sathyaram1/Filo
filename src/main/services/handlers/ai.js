@@ -190,14 +190,20 @@ module.exports = function register(on, ctx) {
   // cambiarlo. Ora è la funzione «Prova di un fornitore», impostabile come
   // tutte le altre; della sua catena si prende il primo modello servito dal
   // fornitore in prova.
+  // NB: qui NON si passa da buildAttemptChain. Quella scarta i modelli dei
+  // fornitori senza chiave salvata — che è esattamente il caso della prova: la
+  // chiave si sta ancora digitando e arriva nel messaggio, non dalle
+  // impostazioni. Risolviamo quindi il nickname direttamente sul registro
+  // configurato, che resta l'unica sorgente del modello.
   async function testModelFor(provider) {
     const settings = await getEffectiveSettings();
     const action = SN_CONST.ACTIONS.PROVIDER_TEST;
-    try {
-      const attempts = buildAttemptChain(settings, modelForAction(settings, action), action);
-      const hit = attempts.find((a) => a.provider === provider && a.model);
-      if (hit) return hit.model;
-    } catch (_) { /* funzione non configurata → messaggio sotto */ }
+    const registry = settings.modelRegistry || {};
+    const refs = SN_CONST.parseModelRefs(modelForAction(settings, action));
+    for (const ref of refs) {
+      const concrete = SN_CONST.resolveModel(ref, provider, registry);
+      if (concrete) return concrete;
+    }
     return '';
   }
 
