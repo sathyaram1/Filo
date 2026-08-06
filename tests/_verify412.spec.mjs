@@ -247,9 +247,7 @@ test('8) INVARIANTE: la scheda-contenitore chiusa non sporca l’archivio delle 
     const dir = await dlDir(app);
     await expect.poll(() => existsSync(join(dir, 'arch.bin')), { timeout: 30000 }).toBe(true);
     await shell.waitForTimeout(3000);
-    const archived = await shell.evaluate(() => window.filoShell.invoke
-      ? window.filoShell.invoke({ type: 'get_archived_tabs' })
-      : null);
+    const archived = await shell.evaluate(() => window.filoShell.message({ type: 'get_archived_tabs' }));
     console.log('archivio:', JSON.stringify(archived));
     if (archived && Array.isArray(archived.items)) {
       const bad = archived.items.filter((t) => !t.url || t.url === 'about:blank' || (t.title || '').includes('Nuova scheda'));
