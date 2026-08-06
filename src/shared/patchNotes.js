@@ -19,6 +19,7 @@
       version: '0.2.189', date: '2026-08-06',
       features: [
         'Nell\'editor puoi scorrere le corrispondenze del riquadro Cerca con Invio (Maiusc+Invio per tornare indietro) e chiudere la ricerca con Esc.',
+        'Ora puoi chiedere a Filo di mettere o togliere lo schermo intero, ridurre a icona la finestra o aprire i menu Impostazioni, App e Account: prima poteva solo spiegarti dove cliccare, adesso lo fa lui.',
       ],
       fixes: [
         'Quando un pulsante "Scarica" avvia lo scaricamento aprendo una nuova scheda, non resti più con una scheda bianca da chiudere a mano: Filo la chiude da solo e ti riporta alla pagina di partenza mentre il download procede.',
