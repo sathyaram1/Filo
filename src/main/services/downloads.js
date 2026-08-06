@@ -297,7 +297,7 @@ function onWillDownload(item) {
       broadcast('done', rec);
       // Toast di conferma con azioni: le azioni dichiarative sono tradotte dalla
       // shell in api.downloads.openFile / openFolder (vedi shell.js onToast).
-      shellToast(`Scaricato: ${rec.filename}`, {
+      shellToast(`Scaricato: ${shortName(rec.filename)}`, {
         durationSec: 8,
         actions: [
           { label: 'Apri file', openDownloadId: rec.id },
@@ -311,7 +311,7 @@ function onWillDownload(item) {
       persist();
       broadcast('error', rec);
       if (rec.state !== 'cancelled') {
-        shellToast(`Scaricamento non riuscito: ${rec.filename}`, { durationSec: 8 });
+        shellToast(`Scaricamento non riuscito: ${shortName(rec.filename)}`, { durationSec: 8 });
       }
     }
   }
