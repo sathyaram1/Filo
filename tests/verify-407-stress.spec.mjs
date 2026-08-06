@@ -321,7 +321,10 @@ test('provider KO: avviso di errore e pagina lasciata in lingua originale', asyn
   await clickTranslate(page);
   await expect.poll(async () => {
     const t = await toastText(page);
-    return t && t !== 'Traduzione pagina in corso…' ? t : null;
+    // L'avviso "in corso" ora mostra anche l'avanzamento ("Traduzione pagina…
+    // 3/40"): va escluso in entrambe le forme, altrimenti si scambia lo stato
+    // di lavorazione per l'esito.
+    return t && !/^Traduzione pagina/.test(t) ? t : null;
   }, { timeout: 60_000 }).not.toBeNull();
   const t = await toastText(page);
   expect(t).not.toBe('Pagina tradotta');
