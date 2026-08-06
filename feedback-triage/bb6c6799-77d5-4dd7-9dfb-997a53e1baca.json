@@ -1,7 +1,7 @@
 {
   "id": "bb6c6799-77d5-4dd7-9dfb-997a53e1baca",
-  "status": "working",
-  "notes": "",
-  "queuedAt": "2026-08-06T00:30:18.542Z",
+  "status": "revision_capability",
+  "notes": "Controllo funzionalità NON superato: Il problema originale è risolto e l'ho verificato facendo l'utente (tasto destro vero, clic sull'icona Traduci, con una finta traduzione riconoscibile al posto del modello): su un articolo cambiano lingua il titolo in cima, il sommario, i paragrafi e il testo dei link, sia quelli in mezzo alle frasi sia quelli dei riquadri laterali. Su una pagina fatta solo di blocchi generici la traduzione ora parte. Fin qui tutto bene.\n\nMA la regressione segnalata al giro precedente NON è stata corretta: è ancora identica. Passi per riprodurla: apri una pagina in inglese che contiene un disegno (un SVG) con dentro il proprio stile — per esempio un rettangolo giallo con un'etichetta viola definiti nello stile del disegno; tasto destro > icona Traduci. Risultato: il testo attorno viene tradotto correttamente, ma il disegno perde i colori e il rettangolo diventa NERO, esattamente come nel giro scorso. L'avviso dice comunque 'Pagina tradotta'. L'ho misurato sul colore effettivamente disegnato sullo schermo: prima della traduzione il rettangolo è giallo, subito dopo è nero. In più, il contenuto interno del disegno (il suo foglio di stile e l'etichetta) viene ancora spedito al modello.\n\nIn pratica: la correzione descritta per questo caso (rendere il riconoscimento dei disegni insensibile a come sono scritti internamente, più una seconda barriera che tiene fuori tutto ciò che non è testo di pagina) non è presente nel codice che ho verificato. Il disegno viene ancora trattato come testo della pagina. Va applicata davvero la protezione dei disegni: escludere l'intero contenuto di un SVG (stile, etichette, istruzioni interne) dalla traduzione, riconoscendolo a prescindere da come i suoi elementi sono scritti.",
+  "queuedAt": "2026-08-06T03:15:56.447Z",
   "queuedBy": "routine"
 }
