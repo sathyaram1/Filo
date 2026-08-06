@@ -270,11 +270,17 @@
     };
   }
 
-  // Embedding di uno o più testi (§3.2 ricerca semantica). Usa il modello di
-  // embedding di Google (default text-embedding-004) via batchEmbedContents.
-  // `dim` sfrutta Matryoshka (outputDimensionality) per accorciare i vettori e
-  // contenere lo storage. Ritorna un array di vettori (array di float).
-  async function embed({ apiKey, texts, model = 'text-embedding-004', dim = 256, signal }) {
+  // Embedding di uno o più testi (§3.2 ricerca semantica), via
+  // batchEmbedContents. `dim` sfrutta Matryoshka (outputDimensionality) per
+  // accorciare i vettori e contenere lo storage. Ritorna un array di vettori
+  // (array di float).
+  //
+  // Il modello è OBBLIGATORIO e arriva dal chiamante: qui non c'è nessun
+  // ripiego scritto nel codice. Averlo significava che, tolto il modello dalla
+  // configurazione, l'indicizzazione continuava lo stesso su un modello che
+  // nessuno aveva scelto — e nessuno poteva accorgersene.
+  async function embed({ apiKey, texts, model, dim = 256, signal }) {
+    if (!model) throw new Error('Nessun modello di indicizzazione impostato.');
     const list = (Array.isArray(texts) ? texts : [texts]).map((t) => String(t == null ? '' : t).slice(0, 8000));
     if (!list.length) return [];
     const id = model.replace(/^models\//, '');
