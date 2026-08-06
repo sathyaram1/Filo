@@ -41,7 +41,9 @@
       return;
     }
     pageTranslating = true;
-    Popup.showToast(I18n.t('toast_translating_page'), { duration: 1800 });
+    // L'avviso "sto traducendo" dura quanto la traduzione e viene SOSTITUITO
+    // dall'esito: due riquadri sovrapposti nell'angolo sono illeggibili.
+    const progress = Popup.showToast(I18n.t('toast_translating_page'), { duration: 0 });
 
     try {
       const blocks = Extract.extractTranslatableBlocks();
