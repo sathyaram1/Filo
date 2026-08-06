@@ -96,6 +96,39 @@
 .sn-sidebar-msg-loading { color: var(--sn-muted); font-style: italic; }
 .sn-sidebar-msg-error   { color: var(--sn-error); }
 
+/* Markdown leggero nelle risposte di Filo (#418): il contenuto e' HTML, quindi
+   togliamo il pre-wrap (che renderebbe letterali gli a-capo tra i blocchi) e
+   diamo agli elementi la stessa resa delle altre superfici. */
+.sn-sidebar-msg-assistant { white-space: normal; }
+.sn-sidebar-msg-assistant p { margin: 0 0 8px 0; }
+.sn-sidebar-msg-assistant p:last-child { margin-bottom: 0; }
+.sn-sidebar-msg-assistant h3, .sn-sidebar-msg-assistant h4,
+.sn-sidebar-msg-assistant h5, .sn-sidebar-msg-assistant h6 {
+  margin: 8px 0 4px 0; font-weight: 600; font-size: 1em;
+}
+.sn-sidebar-msg-assistant strong { font-weight: 600; }
+.sn-sidebar-msg-assistant em { font-style: italic; }
+.sn-sidebar-msg-assistant ul, .sn-sidebar-msg-assistant ol {
+  margin: 4px 0 8px 0; padding-left: 20px;
+}
+.sn-sidebar-msg-assistant li { margin: 2px 0; }
+.sn-sidebar-msg-assistant code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.92em; background: rgba(127,127,127,0.18);
+  padding: 1px 4px; border-radius: 3px;
+}
+.sn-sidebar-msg-assistant pre {
+  background: rgba(127,127,127,0.18); border-radius: 4px;
+  padding: 8px; overflow-x: auto; margin: 6px 0;
+}
+.sn-sidebar-msg-assistant pre code { background: transparent; padding: 0; }
+.sn-sidebar-msg-assistant a.filo-md-link {
+  color: var(--sn-link, var(--sn-accent, #3b82f6));
+  text-decoration: underline; text-underline-offset: 2px;
+  cursor: pointer; word-break: break-word;
+}
+.sn-sidebar-msg-assistant a.filo-md-link:hover { text-decoration: none; }
+
 /* Bottoni "choices" sotto al messaggio dell'assistente: percorsi alternativi
    che l'utente può cliccare per indirizzare l'AI senza scrivere. */
 .sn-sidebar-choices {
