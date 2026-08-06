@@ -16,6 +16,12 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.188', date: '2026-08-06',
+      fixes: [
+        'Quando traduci una pagina, le illustrazioni disegnate al suo interno — grafici, loghi, icone e formule — restano intatte con i loro colori, invece di annerirsi o perdere l\'aspetto.',
+      ],
+    },
+    {
       version: '0.2.186', date: '2026-08-05',
       fixes: [
         '"Traduci la pagina" ora traduce davvero tutta la pagina: titolo, sommario, didascalie delle foto, riquadri "Leggi anche", voci di menu e testo dei link, non più i soli paragrafi. Funziona anche sui siti moderni dove prima non succedeva nulla, la traduzione compare mano a mano che è pronta e, se non c\'è niente da tradurre o è riuscita solo in parte, adesso te lo dice.',
