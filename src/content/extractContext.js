@@ -219,8 +219,11 @@
     // questa barriera lo ferma. È qui che si taglia l'intero sottoalbero di un
     // <svg> (foglio di stile, etichette, <script> interni): il suo contenuto non
     // è testo dell'articolo e tradurlo rompe l'illustrazione.
-    // VERIFIER PROBE: protezione disattivata di proposito (case-sensitive, no NS)
-    if (TRANSLATE_SKIP_TAGS.has(el.tagName || '')) return true;
+    if (el.namespaceURI && el.namespaceURI !== HTML_NS) return true;
+    // Confronto tag INSENSIBILE al case: dentro SVG/MathML i tag arrivano in
+    // minuscolo (el.tagName === 'style'/'text'/'svg'), quindi il match esatto
+    // contro la lista in MAIUSCOLO fallirebbe e la lista verrebbe ignorata.
+    if (TRANSLATE_SKIP_TAGS.has((el.tagName || '').toUpperCase())) return true;
     if (el.dataset && el.dataset.snTranslated) return true; // già tradotto
     if (el.isContentEditable) return true;                  // testo dell'utente
     if (el.hasAttribute && el.hasAttribute('hidden')) return true;
