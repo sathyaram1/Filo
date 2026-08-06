@@ -2953,9 +2953,15 @@
     }
     return marks;
   }
-  function runFind(term) {
+  function runFind(term, opts) {
     clearFind();
-    if (!term) return;
+    if (!term) {
+      // Campo svuotato: nessuna corrispondenza da mostrare, e le sezioni che la
+      // ricerca aveva aperto in prestito tornano chiuse come le aveva lasciate
+      // l'utente.
+      highlightCurrent(opts);
+      return;
+    }
     findState.term = term;
     // Elenco (in ordine documento) dei blocchi che contengono testo cercabile.
     const walker = document.createTreeWalker(docEl, NodeFilter.SHOW_TEXT, {
