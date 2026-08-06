@@ -490,6 +490,19 @@
     [ACTIONS.SAFEBROWSE_JUDGE]: 'flash-lite',
     [ACTIONS.GEOBLOCK_CLASSIFY]: 'flash-lite',
     [ACTIONS.FEEDBACK_TITLE]: 'flash-lite',
+    // Editor: titolo e riassunto sono automatici e frequenti (girano dopo ogni
+    // pausa nella scrittura) → modello economico. La chat col documento è
+    // conversazionale come le altre chat → stesso modello delle chat.
+    [ACTIONS.EDITOR_TITLE]: 'flash-lite-3, flash-lite-3-or',
+    [ACTIONS.EDITOR_SUMMARY]: 'flash-lite-3, flash-lite-3-or',
+    [ACTIONS.EDITOR_CHAT]: 'flash, flash-or',
+    // Ricerca fra i feedback: classifica una lista corta → modello economico.
+    [ACTIONS.MANAGE_SEARCH]: 'flash-lite-3, flash-lite-3-or',
+    // Indicizzazione dell'archivio: modello di embedding, non di testo.
+    [ACTIONS.ARCHIVE_EMBED]: 'embed-004',
+    // Prova di un fornitore: la catena copre entrambi i fornitori così il
+    // pulsante "Prova" trova un modello sia per Gemini sia per OpenRouter.
+    [ACTIONS.PROVIDER_TEST]: 'flash-lite-3, flash-lite-3-or',
   };
 
   // ── Politica sui fornitori (host upstream) ───────────────────────────────────
