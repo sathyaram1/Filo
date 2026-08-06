@@ -3056,6 +3056,13 @@
   function replaceOne(replacement) {
     const cur = findState.hits[findState.idx];
     if (!cur) return;
+    // Niente sostituzioni invisibili: se la corrispondenza è ancora in una
+    // sezione chiusa (lo spostamento poteva essere in attesa della pausa) la si
+    // apre PRIMA di toccare il testo. Questa apertura NON è in prestito: lì il
+    // testo è cambiato, l'utente deve poterlo vedere e restare aperta.
+    cancelFindReveal();
+    revealCollapsedFor(cur.marks[0]);
+    keepRevealedFor(cur.marks[0]);
     // Sostituisce SOLO la corrispondenza corrente e avanza alla successiva
     // senza ri-eseguire la ricerca: una ri-scansione ripartirebbe dalla prima
     // corrispondenza e ri-troverebbe il termine dentro il testo appena
