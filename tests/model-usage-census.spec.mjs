@@ -107,6 +107,65 @@ test('gli altri punti (giudici, sanificatore, punti senza modello) sono elencati
   await expect(list.locator('.sn-usage-row')).toHaveCount(expectedRows);
 });
 
+<<<<<<< HEAD
+=======
+test('il pulsante «Prova» usa il modello configurato, e cambia se cambio la configurazione', async ({ app, openTab }) => {
+  // Il campo "Prova di un fornitore" delle Opzioni decide con quale modello si
+  // misura una chiave. Prima era un nome scritto nel codice: si provava sempre
+  // lo stesso, qualunque cosa l'utente avesse impostato.
+  const page = await openTab(OPTIONS_URL);
+  await revealAdvanced(page);
+
+  // Registro con due modelli riconoscibili, uno per fornitore, e la funzione
+  // «Prova di un fornitore» impostata su entrambi.
+  await page.evaluate(async () => {
+    const s = await window.SN_STORAGE.getSettings();
+    s.useDefaultModels = false;
+    s.modelRegistry = {
+      ...s.modelRegistry,
+      'prova-g': { label: 'Prova Gemini', provider: 'gemini', model: 'modello-di-prova-gemini' },
+      'prova-o': { label: 'Prova OR', provider: 'openrouter', model: 'vendor/modello-di-prova-or' },
+    };
+    s.models = { ...s.models, [window.SN_CONST.ACTIONS.PROVIDER_TEST]: 'prova-g, prova-o' };
+    // Chiavi NON ancora salvate: è il caso vero del pulsante «Prova», che serve
+    // proprio a misurare una chiave appena digitata.
+    s.apiKeys = { ...s.apiKeys, gemini: '', openrouter: '' };
+    await window.SN_STORAGE.setSettings(s);
+  });
+
+  // Intercetta la chiamata nel processo principale: ci interessa CON QUALE
+  // modello parte la prova, non la risposta del servizio.
+  const askedFor = async (provider) => app.evaluate(async ({ }, prov) => {
+    const P = globalThis.SN_PROVIDERS;
+    const orig = P.streamComplete;
+    let seen = null;
+    P.streamComplete = async ({ model, onDelta }) => {
+      seen = model;
+      if (onDelta) onDelta('1, 2, 3');
+      return { usage: { completionTokens: 3 } };
+    };
+    try {
+      await globalThis.SN_HANDLE_MESSAGE(
+        { type: globalThis.SN_MSG.MSG.TEST_PROVIDER, provider: prov, apiKey: 'chiave-finta' },
+        { url: 'filo://options/options.html' },
+      );
+    } finally { P.streamComplete = orig; }
+    return seen;
+  }, provider);
+
+  expect(await askedFor('gemini')).toBe('modello-di-prova-gemini');
+  expect(await askedFor('openrouter')).toBe('vendor/modello-di-prova-or');
+
+  // Cambio la configurazione → cambia il modello con cui si prova.
+  await page.evaluate(async () => {
+    const s = await window.SN_STORAGE.getSettings();
+    s.modelRegistry['prova-g'].model = 'altro-modello-gemini';
+    await window.SN_STORAGE.setSettings(s);
+  });
+  expect(await askedFor('gemini')).toBe('altro-modello-gemini');
+});
+
+>>>>>>> worker/b597e31e-428d-42bd-b5ce-24b61419d355
 test('l\'editor genera il titolo con la sua funzione, non con quella di «Spiega»', async ({ openTab }) => {
   const page = await openTab('filo://editor/editor.html');
   await page.waitForSelector('#doc');
