@@ -244,7 +244,14 @@
     if (!conv) return null;
     const msg = document.createElement('div');
     msg.className = `sn-sidebar-msg sn-sidebar-msg-${role}`;
-    msg.textContent = text;
+    // #418 — le risposte di Filo (assistant) vanno rese con la stessa
+    // formattazione leggera di popup e chat della home (grassetto, corsivo,
+    // codice, elenchi, LINK cliccabili). Il testo dell'utente resta letterale.
+    if (role === 'assistant' && global.SN_MARKDOWN) {
+      msg.innerHTML = global.SN_MARKDOWN.render(text);
+    } else {
+      msg.textContent = text;
+    }
     conv.appendChild(msg);
     conv.scrollTop = conv.scrollHeight;
     return msg;
