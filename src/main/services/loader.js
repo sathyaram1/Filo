@@ -16,6 +16,10 @@ require(path.join(SHARED, 'messages.js'));
 require(path.join(SHARED, 'i18n.js'));
 require(path.join(SHARED, 'timeFormat.js')); // formattazione durate/countdown (#323)
 require(path.join(SHARED, 'modelCaps.js'));
+// Censimento dei punti in cui Filo usa un modello: è la sorgente di verità
+// dell'elenco di funzioni impostabili, quindi va caricato PRIMA dell'editor
+// delle catene (che da lì prende l'elenco).
+require(path.join(SHARED, 'modelUsage.js'));
 // Elenco delle funzioni impostabili + le loro etichette: serve al main per
 // chiamare una funzione scoperta con lo STESSO nome che l'utente legge nelle
 // Opzioni (il messaggio d'errore gli dice di andare lì). Il modulo tocca il DOM
