@@ -60,9 +60,9 @@ async function stubModel(app) {
         return { text: '‹IT› ' + segs.join(' '), model: 'm', provider: 'gemini', usage: {} };
       }
       if (mode === 'halfempty') {
-        // Il modello risponde a vuoto SOLO alla prima richiesta: una parte della
-        // pagina resta non tradotta e l'avviso deve dirlo.
-        if (globalThis.__trCalls <= 2) return { text: '', model: 'm', provider: 'gemini', usage: {} };
+        // Il modello risponde a vuoto SOLO sul pezzo che contiene ZULU: una
+        // parte della pagina resta non tradotta e l'avviso deve dirlo.
+        if (chunk.indexOf('ZULU') >= 0) return { text: '', model: 'm', provider: 'gemini', usage: {} };
         return { text: ok(), model: 'm', provider: 'gemini', usage: {} };
       }
       if (mode === 'flaky') {
