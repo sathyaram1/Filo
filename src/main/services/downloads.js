@@ -211,25 +211,22 @@ function onWillDownload(item, persistThis) {
   if (rec._persist) persist();
   broadcast('start', rec);
 
-  item.on('updated', (_e, state) => {
-    rec.receivedBytes = item.getReceivedBytes() || 0;
-    if (!rec.totalBytes) rec.totalBytes = item.getTotalBytes() || 0;
-    rec.paused = item.isPaused();
-    rec.canResume = item.canResume();
-    // 'interrupted' qui = sospeso ma potenzialmente riprendibile; 'progressing'
-    // = sta scaricando (o è in pausa, che distinguiamo con rec.paused).
-    rec.state = rec.paused ? 'paused' : (state === 'interrupted' ? 'progressing' : 'progressing');
-    broadcast('progress', rec);
-  });
+  // Tempo (ms) dopo cui un download che risulta "interrotto" ma non conclude
+  // (Chromium lo lascia in sospeso "riprendibile" quando il server tronca la
+  // connessione) viene dichiarato fallito: senza questo l'utente resterebbe nel
+  // silenzio per sempre — lo stesso problema di #274 sul salvataggio immagini.
+  const STALL_MS = 2500;
 
-  item.once('done', (_e, state) => {
+  // Chiude UNA volta sola il ciclo di vita del download (successo o fallimento).
+  function finalize(state) {
+    if (rec._final) return;
+    rec._final = true;
+    if (rec._stallTimer) { clearTimeout(rec._stallTimer); rec._stallTimer = null; }
     liveItems.delete(id);
-    rec.receivedBytes = item.getReceivedBytes() || rec.receivedBytes;
-    if (!rec.totalBytes) rec.totalBytes = item.getTotalBytes() || rec.receivedBytes;
     rec.endedAt = new Date().toISOString();
     rec.paused = false;
     rec.canResume = false;
-    rec.savePath = item.getSavePath() || rec.savePath;
+    try { rec.savePath = item.getSavePath() || rec.savePath; } catch (_) {}
     rec.filename = rec.savePath ? path.basename(rec.savePath) : rec.filename;
 
     if (state === 'completed') {
@@ -251,10 +248,40 @@ function onWillDownload(item, persistThis) {
       rec.state = state === 'cancelled' ? 'cancelled' : 'interrupted';
       if (rec._persist) persist();
       broadcast('error', rec);
-      if (state !== 'cancelled') {
+      if (rec.state !== 'cancelled') {
         shellToast(`Scaricamento non riuscito: ${rec.filename}`, { durationSec: 8 });
       }
     }
+  }
+
+  item.on('updated', (_e, state) => {
+    if (rec._final) return;
+    rec.receivedBytes = item.getReceivedBytes() || rec.receivedBytes;
+    if (!rec.totalBytes) rec.totalBytes = item.getTotalBytes() || 0;
+    rec.paused = item.isPaused();
+    rec.canResume = item.canResume();
+    if (state === 'interrupted' && !rec.paused) {
+      // Sospeso: se non riparte entro STALL_MS lo dichiariamo fallito. Se nel
+      // frattempo l'utente lo mette in pausa (rec.paused) NON è un guasto.
+      rec.state = 'progressing';
+      if (!rec._stallTimer) {
+        rec._stallTimer = setTimeout(() => {
+          try { item.cancel(); } catch (_) {}
+          finalize('interrupted');
+        }, STALL_MS);
+      }
+    } else {
+      // Progressi (o pausa volontaria): annulla l'eventuale timer di stallo.
+      if (rec._stallTimer) { clearTimeout(rec._stallTimer); rec._stallTimer = null; }
+      rec.state = rec.paused ? 'paused' : 'progressing';
+    }
+    broadcast('progress', rec);
+  });
+
+  item.once('done', (_e, state) => {
+    rec.receivedBytes = item.getReceivedBytes() || rec.receivedBytes;
+    if (!rec.totalBytes) rec.totalBytes = item.getTotalBytes() || rec.receivedBytes;
+    finalize(state);
   });
 }
 
