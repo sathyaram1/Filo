@@ -205,8 +205,22 @@
     return false;
   }
 
+  // Namespace HTML: solo gli elementi in questo namespace sono "testo di pagina".
+  const HTML_NS = 'http://www.w3.org/1999/xhtml';
+
   function skipSubtreeForTranslation(el) {
-    if (TRANSLATE_SKIP_TAGS.has(el.tagName)) return true;
+    // Seconda barriera (catch-all): tutto ciò che NON è un elemento HTML —
+    // grafica (SVG), formule (MathML) e qualsiasi altro namespace — resta fuori
+    // PER INTERO, a prescindere da come i suoi tag interni sono scritti. Anche
+    // se domani comparisse un tipo di disegno non previsto nella lista sotto,
+    // questa barriera lo ferma. È qui che si taglia l'intero sottoalbero di un
+    // <svg> (foglio di stile, etichette, <script> interni): il suo contenuto non
+    // è testo dell'articolo e tradurlo rompe l'illustrazione.
+    if (el.namespaceURI && el.namespaceURI !== HTML_NS) return true;
+    // Confronto tag INSENSIBILE al case: dentro SVG/MathML i tag arrivano in
+    // minuscolo (el.tagName === 'style'/'text'/'svg'), quindi il match esatto
+    // contro la lista in MAIUSCOLO fallirebbe e la lista verrebbe ignorata.
+    if (TRANSLATE_SKIP_TAGS.has((el.tagName || '').toUpperCase())) return true;
     if (el.dataset && el.dataset.snTranslated) return true; // già tradotto
     if (el.isContentEditable) return true;                  // testo dell'utente
     if (el.hasAttribute && el.hasAttribute('hidden')) return true;
