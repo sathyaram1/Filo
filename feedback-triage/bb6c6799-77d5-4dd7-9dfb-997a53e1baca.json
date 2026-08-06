@@ -1,0 +1,9 @@
+{
+  "id": "bb6c6799-77d5-4dd7-9dfb-997a53e1baca",
+  "status": "design",
+  "notes": "Il controllo di sicurezza e' a posto: questa lavorazione tocca solo il modo in cui Filo evita di tradurre disegni, grafici e formule dentro le pagine, e non tocca nulla di delicato. C'e' pero' un punto da decidere: questa correzione e' gia' presente e pubblicata nella versione attuale di Filo. Il ramo di lavoro qui e' rimasto indietro rispetto alla versione corrente, quindi non ho potuto pubblicarlo: se lo pubblicassi cosi' com'e' riporterebbe Filo a una versione precedente, perdendo altre novita' gia' uscite. In pratica cio' che chiedevi e' gia' risolto nell'ultima versione e non serve altro lavoro per avere disegni e formule intatti durante la traduzione. Decidi tu: possiamo chiudere questo punto come gia' risolto, oppure, se vuoi, riporto sul ramo aggiornato la piccola rifinitura in piu' presente in questa lavorazione.",
+  "queuedAt": "2026-08-06T09:39:52.907Z",
+  "queuedBy": "routine",
+  "branch": "worker/bb6c6799-77d5-4dd7-9dfb-997a53e1baca",
+  "reason": "secaudit"
+}
