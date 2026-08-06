@@ -789,6 +789,9 @@
     // "Altro…" che altrimenti coprirebbe/preannuncerebbe la stessa cosa.
     if (sub.kind !== 'empty' && sub.kind !== 'overflow' && sub.label) attachTooltip(b, sub.label);
     setIconContent(b, sub.icon || sub.label);
+    // Il bottone contiene solo un disegno: senza nome accessibile è un bottone
+    // muto per chi legge lo schermo (e invisibile a chi lo cerca per etichetta).
+    if (sub.label) b.setAttribute('aria-label', sub.label);
     if (sub.id) b.dataset.snIconId = sub.id;
     if (sub.kind === 'overflow') {
       // L'overflow apre la griglia delle icone secondarie come sotto-menu
