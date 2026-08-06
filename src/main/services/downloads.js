@@ -455,4 +455,6 @@ module.exports = {
   resume,
   // per i test
   _records: records,
+  _shortName: shortName,
+  _safeName: safeName,
 };
