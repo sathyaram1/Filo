@@ -231,6 +231,7 @@ function onWillDownload(item, persistThis) {
 
   // Chiude UNA volta sola il ciclo di vita del download (successo o fallimento).
   function finalize(state) {
+    try { if (process.env.FILO_DOWNLOAD_DIR) fs.appendFileSync('/tmp/dlsvc.log', `finalize ${state} final=${rec._final}\n`); } catch (_) {}
     if (rec._final) return;
     rec._final = true;
     if (rec._stallTimer) { clearTimeout(rec._stallTimer); rec._stallTimer = null; }
