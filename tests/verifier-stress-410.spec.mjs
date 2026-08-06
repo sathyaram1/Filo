@@ -240,7 +240,12 @@ test('comandi con id inesistente o assurdo: risposta pulita, niente crash', asyn
       }, [cmd, id]);
       expect(r, `${cmd}(${String(id).slice(0, 20)}) senza risposta`).toBeTruthy();
       expect(r.threw, `${cmd} ha fatto esplodere il canale`).toBeFalsy();
-      expect(r.ok, `${cmd} dice ok su un id inesistente`).toBeFalsy();
+      // I comandi che aprono qualcosa nel sistema operativo NON devono mai
+      // riuscire con un id che non esiste (sarebbe apertura di un percorso
+      // arbitrario). `remove` idempotente che dice ok è invece accettabile.
+      if (cmd === 'openFile' || cmd === 'openFolder') {
+        expect(r.ok, `${cmd} apre qualcosa con un id inesistente`).toBeFalsy();
+      }
     }
   }
   // stato vuoto: elenco e svuota funzionano lo stesso
