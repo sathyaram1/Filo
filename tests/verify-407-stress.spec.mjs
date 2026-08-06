@@ -325,7 +325,10 @@ test('provider KO: avviso di errore e pagina lasciata in lingua originale', asyn
   }, { timeout: 60_000 }).not.toBeNull();
   const t = await toastText(page);
   expect(t).not.toBe('Pagina tradotta');
-  expect(t).not.toBe('Pagina tradotta solo in parte');
+  // #408: niente messaggio grezzo del provider, una frase in italiano che dice
+  // che la traduzione non è riuscita.
+  expect(t).toContain('Non sono riuscito a tradurre la pagina');
+  expect(t).not.toMatch(/fetch failed|OpenRouter \d|Gemini \d/);
   const txt = await page.evaluate(() => document.getElementById('a').innerText);
   expect(txt).toBe('A heading that stays in english');
 });
