@@ -185,8 +185,27 @@ function shellToast(text, opts) {
   } catch (_) {}
 }
 
+// #412 — dopo aver preso in carico un download, avvisa il gestore schede della
+// finestra che possiede la webContents che l'ha originato. Serve a chiudere una
+// scheda rimasta VUOTA quando un link "Scarica" con target=_blank apre una nuova
+// scheda che si trasforma subito in scaricamento (nessuna pagina si committa
+// mai). Best-effort e non bloccante: se non c'è una scheda da chiudere è un no-op.
+function notifyDownloadStarted(webContents) {
+  if (!webContents) return;
+  try {
+    const { BrowserWindow } = electron();
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win || win.isDestroyed?.()) continue;
+      const tm = win._filoTabs;
+      if (tm && typeof tm.handleDownloadStarted === 'function') {
+        try { tm.handleDownloadStarted(webContents); } catch (_) {}
+      }
+    }
+  } catch (_) {}
+}
+
 // ─── intercettazione ────────────────────────────────────────────────────
-function onWillDownload(item) {
+function onWillDownload(item, webContents) {
   const id = uuid();
   const filename = safeName(item.getFilename() || (function () {
     try { return decodeURIComponent(new URL(item.getURL()).pathname.split('/').pop() || ''); }
