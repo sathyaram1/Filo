@@ -65,8 +65,14 @@ async function menuText(page) {
   return (await page.locator('.sn-menu').textContent()) || '';
 }
 
-async function rightClickAndRead(page, sel) {
+async function closeMenu(page) {
   await page.keyboard.press('Escape').catch(() => {});
+  await page.waitForFunction(() => !document.querySelector('.sn-menu'), null, { timeout: 4000 })
+    .catch(() => {});
+}
+
+async function rightClickAndRead(page, sel) {
+  await closeMenu(page);
   const box = await page.locator(sel).boundingBox();
   if (!box) throw new Error('no box for ' + sel);
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2, { button: 'right' });
