@@ -97,6 +97,12 @@
   const saveForLater =
     `<path d="M7 4h10a1 1 0 0 1 1 1v15.2l-6-3.8-6 3.8V5a1 1 0 0 1 1-1z"/>`;
 
+  // --- Download: freccia verso il basso che entra in un vassoio.
+  const download =
+    `<path d="M12 3v11"/>` +
+    `<path d="M8 10.5l4 4 4-4"/>` +
+    `<path d="M4 19h16"/>`;
+
   // --- Condividi (aeroplanino di carta)
   const share =
     `<path d="M21 3L3 11l7 2.5L13 21l8-18z"/>` +
