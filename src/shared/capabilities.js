@@ -168,7 +168,7 @@
       id: 'translate-page', title: 'Traduci l’intera pagina', category: 'reading',
       desc: 'Traduce tutto il testo visibile della pagina — titolo, sommario, didascalie, riquadri laterali, voci di menu e testo dei link, non solo i paragrafi — mantenendo impaginazione, link e immagini; puoi tornare all’originale.',
       invoke: 'Menu del tasto destro → "Traduci la pagina" / "Mostra originale".',
-      doesNot: 'Non traduce il testo dentro le immagini, i video e i riquadri di codice, e non traduce le pagine dove non trova testo (in quel caso te lo dice).',
+      doesNot: 'Non traduce il testo dentro le immagini, i disegni (grafici, loghi, illustrazioni), le formule, i video e i riquadri di codice — che restano intatti — e non traduce le pagine dove non trova testo (in quel caso te lo dice).',
     },
 
     // ─────────────────── Immagini e cattura schermo ──────────────────────────
