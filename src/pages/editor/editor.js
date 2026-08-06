@@ -2878,10 +2878,20 @@
     // Invio = "vai lì" (Shift+Invio: indietro), come in qualsiasi campo di
     // ricerca: è il modo esplicito di spostarsi senza aspettare la pausa.
     findInput.addEventListener('keydown', (e) => {
-      if (e.key !== 'Enter') return;
-      e.preventDefault();
-      jumpFind(e.shiftKey ? -1 : 1);
-      updateCount();
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        jumpFind(e.shiftKey ? -1 : 1);
+        updateCount();
+        return;
+      }
+      // Esc = "ho finito di cercare": via le evidenziazioni e via le sezioni
+      // aperte solo per mostrare i risultati, il foglio torna com'era.
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        findInput.value = '';
+        runFind('', { immediate: true });
+        updateCount();
+      }
     });
     replInput.addEventListener('click', (e) => e.stopPropagation());
     pad.querySelector('[data-sr="next"]').addEventListener('click', (e) => { e.stopPropagation(); stepFind(1); updateCount(); });
