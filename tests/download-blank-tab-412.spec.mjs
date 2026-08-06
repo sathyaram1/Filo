@@ -63,8 +63,10 @@ test('link "Scarica" target=_blank che avvia un download: nessuna scheda vuota r
     // …e il fuoco è tornato alla scheda di PARTENZA (non a una scheda bianca).
     const after = await shell.evaluate(() => window.filoShell.tabs.snapshot());
     expect(after.activeId).toBe(startTabId);
-    // Nessuna scheda "Nuova scheda" con indirizzo vuoto lasciata in giro.
-    const orphan = after.tabs.find((t) => !t.url || t.title === 'Nuova scheda' && !/^https?:/i.test(t.url || ''));
+    // Nessuna scheda con indirizzo VUOTO lasciata in giro: è il sintomo esatto
+    // del bug (about:blank → url '' nello snapshot). Le newtab legittime hanno
+    // pur sempre url 'filo://newtab/', quindi non falsano il controllo.
+    const orphan = after.tabs.find((t) => !t.url);
     expect(orphan, 'una scheda vuota è rimasta aperta dopo il download').toBeFalsy();
   } finally {
     try { fileServer.closeAllConnections?.(); } catch (_) {}
