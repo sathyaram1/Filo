@@ -362,6 +362,39 @@ pagina") valgono due regole imparate a caro prezzo con #407.
   l'excerpt del categorizer: sono due domande diverse); applicazione e ripristino
   in `src/content/translatePage.js`. Test `tests/translate-page.spec.mjs`.
 
+## Operazione a chunk che può fallire a metà: tre stati, ripresa, avviso onesto
+
+Un lavoro spezzato in N richieste al modello (traduzione di pagina, e in futuro
+qualsiasi elaborazione lunga applicata al DOM) **fallisce quasi sempre a metà**,
+non del tutto: la rete cade al terzo pezzo, il credito finisce a metà strada. Il
+booleano "fatto / non fatto" è quindi il modello di stato sbagliato — mente
+all'utente e gli fa buttare (e ripagare) il lavoro già riuscito.
+
+- **Tre stati, non due**: assente / **parziale** / completa. Il menu offre azioni
+  diverse nei tre casi ("Traduci" / "Riprendi traduzione" / "Mostra originale").
+- **La ripresa non ripaga ciò che è già fatto**: i pezzi conclusi si marcano nel
+  DOM (`data-sn-translated`) e si escludono **prima** di costruire le richieste,
+  non dopo aver ricevuto la risposta. Escluderli dopo significa pagare due volte
+  gli stessi token.
+- **Saltare il pezzo fatto, non il suo sottoalbero**: nel walker di estrazione un
+  elemento già elaborato è `FILTER_SKIP`, mai `FILTER_REJECT`. Con REJECT i
+  blocchi *annidati* che l'interruzione non ha ancora toccato diventano
+  irraggiungibili e nessuna ripresa può più completarli.
+- **L'avviso dice a che punto si è fermato e perché**: "interrotta dopo X di Y" +
+  la frase di `SN_CHAT_ERRORS` (la regola "mai il messaggio grezzo" vale per i
+  toast di pagina esattamente come per le bolle di chat) + come riprendere. Mai
+  un messaggio di successo su un lavoro monco.
+- **Se l'icona cambia mestiere, l'azione che ha lasciato scoperta torna come
+  voce**: nello stato parziale l'icona serve a riprendere, quindi "Mostra
+  originale" compare come voce etichettata del menu (stesso schema di
+  "Interrompi lettura", che appare solo mentre la sintesi è in corso).
+- **Avanzamento reale mentre lavora**: il totale dei pezzi è noto, quindi
+  l'avviso "in corso" mostra `fatti/totale` invece di una frase fissa.
+- **Dove:** `src/content/translatePage.js` (stato + ripresa),
+  `src/content/extractContext.js` (`extractTranslatableBlocks`),
+  `src/content/menuIcons.js` + `src/content/content.js` (menu). Test:
+  `tests/translate-page.spec.mjs`, `tests/verify-407-stress.spec.mjs`.
+
 ## Sintesi vocale/operazioni a modello lente: spezza in chunk + cache, non un colpo solo
 
 Il modello TTS (Gemini) sintetizza TUTTO l'audio prima di rispondere: su testo
