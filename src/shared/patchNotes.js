@@ -23,6 +23,7 @@
       fixes: [
         'Quando un pulsante "Scarica" avvia lo scaricamento aprendo una nuova scheda, non resti più con una scheda bianca da chiudere a mano: Filo la chiude da solo e ti riporta alla pagina di partenza mentre il download procede.',
         'Cercando nell\'editor mentre scrivi la parola non si aprono più le sezioni chiuse di passaggio: si apre solo quella del risultato su cui ti fermi, e quando cambi risultato o svuoti il campo Cerca il documento torna impaginato come l\'avevi lasciato.',
+        'Le risposte di Filo ora mostrano la formattazione invece del testo grezzo: grassetto, corsivo, elenchi e link cliccabili che si aprono in una nuova scheda, sia nella chat della home sia nel riquadro delle spiegazioni sulle pagine web.',
       ],
     },
     {
