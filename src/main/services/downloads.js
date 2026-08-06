@@ -254,7 +254,9 @@ function onWillDownload(item, persistThis) {
     }
   }
 
+  try { if (process.env.FILO_DOWNLOAD_DIR) fs.appendFileSync('/tmp/dlsvc.log', `willdl ${rec.filename} total=${rec.totalBytes}\n`); } catch (_) {}
   item.on('updated', (_e, state) => {
+    try { if (process.env.FILO_DOWNLOAD_DIR) fs.appendFileSync('/tmp/dlsvc.log', `updated ${state} recv=${item.getReceivedBytes()} paused=${item.isPaused()} canResume=${item.canResume()}\n`); } catch (_) {}
     if (rec._final) return;
     rec.receivedBytes = item.getReceivedBytes() || rec.receivedBytes;
     if (!rec.totalBytes) rec.totalBytes = item.getTotalBytes() || 0;
