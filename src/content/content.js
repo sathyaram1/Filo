@@ -842,6 +842,14 @@
       items.push(TTS.buildStopReadingItem());
     }
 
+    // 2c. Mostra originale — solo quando la traduzione di pagina si è interrotta
+    // a metà (#408): in quello stato l'icona serve a RIPRENDERE, quindi il
+    // ritorno all'originale deve restare raggiungibile da qualche parte.
+    // A traduzione completa la voce non compare: la offre già l'icona.
+    if (TranslatePage && typeof TranslatePage.isPartial === 'function' && TranslatePage.isPartial()) {
+      items.push(TranslatePage.buildRestoreOriginalItem());
+    }
+
     // 3. Zona contestuale — assente se non c'è contesto utile.
     const contextItems = buildContextualItems({
       selInfo, linkEl, imgEl, mediaEl, mediaUnder, editable, clipboardHistory,
