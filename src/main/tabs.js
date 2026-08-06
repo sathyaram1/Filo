@@ -1560,6 +1560,12 @@ class TabManager {
     wc.on('page-title-updated', (_e, title) => update({ title: title || tab.title }));
     wc.on('page-favicon-updated', (_e, favicons) => update({ favicon: favicons?.[0] || '' }));
     wc.on('did-navigate', (_e, url, httpResponseCode) => {
+      // #412 — questa scheda ha committato una vera navigazione main-frame:
+      // NON è più il "contenitore vuoto" di un download (una scheda aperta da un
+      // link Scarica target=_blank che diventa subito scaricamento non committa
+      // MAI, quindi resta a about:blank). Il flag protegge dal chiuderla per
+      // sbaglio se poi parte un download da una pagina che ha già contenuto.
+      tab._everNavigated = true;
       // Nuova pagina → il colore live (§1.1) del sito precedente non vale più: lo
       // azzeriamo (la tab torna al neutro finché il content script non ricampiona).
       // Il colore IDENTITÀ (§1.2) invece dipende dal DOMINIO: se navighiamo su un
