@@ -223,8 +223,11 @@ test('4) STRESS: due download con lo STESSO nome in parallelo non si sovrascrivo
   const srv = await attachServer(routes);
   try {
     const page = await openTab(`${srv.origin}/p`);
-    // click ravvicinatissimi: partono nello stesso tick
-    await page.evaluate(() => { document.getElementById('dl0').click(); document.getElementById('dl1').click(); });
+    // Due scaricamenti SOVRAPPOSTI dello stesso nome: il secondo parte mentre il
+    // primo è ancora a metà (nello stesso tick Chromium ne avvia uno solo).
+    await page.click('#dl0');
+    await page.waitForTimeout(120);
+    await page.click('#dl1');
 
     await expect.poll(async () => {
       const r = await shell.evaluate(() => window.filoShell.downloads.list());
@@ -250,15 +253,76 @@ test('4) STRESS: due download con lo STESSO nome in parallelo non si sovrascrivo
   } finally { await srv.close(); }
 });
 
-test('5) SICUREZZA: una pagina web esterna non deve poter leggere/aprire/cancellare gli scaricamenti', async ({ app }) => {
-  const dispatch = (msg, sender) =>
-    app.evaluate((_e, { msg, sender }) => globalThis.SN_HANDLE_MESSAGE(msg, sender), { msg, sender });
-  const web = { tab: { id: 7, url: 'http://evil.example/' }, url: 'http://evil.example/' };
+test('5) SICUREZZA: una pagina web esterna non deve poter elencare/aprire gli scaricamenti', async ({ app, shell, openTab }) => {
+  // Prima facciamo arrivare un download vero, così la cronologia non è vuota.
+  const srv = await attachServer({
+    '/p': (req, res) => { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end(htmlPage(['/segreto.pdf'])); },
+    '/segreto.pdf': (req, res) => {
+      res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Length': '5', 'Content-Disposition': 'attachment; filename="segreto.pdf"' });
+      res.end('%PDF-');
+    },
+  });
+  try {
+    const page = await openTab(`${srv.origin}/p`);
+    await page.click('#dl0');
+    await expect.poll(async () => (await shell.evaluate(() => window.filoShell.downloads.list())).items.length, { timeout: 20000 }).toBeGreaterThan(0);
 
-  const list = await dispatch({ type: 'downloads_list' }, web);
-  console.log('downloads_list da pagina esterna →', JSON.stringify(list).slice(0, 300));
-  expect(list.ok, 'una pagina web esterna può ELENCARE gli scaricamenti (nomi, url e percorsi su disco)').toBe(false);
+    // Stesso schema degli altri audit d'origine del repo: si esercita l'handler
+    // reale con un mittente di origine web esterna.
+    const dispatch = (msg, sender) =>
+      app.evaluate((_e, { msg, sender }) => globalThis.SN_HANDLE_MESSAGE(msg, sender), { msg, sender });
+    const web = { tab: { id: 7, url: 'http://evil.example/' }, url: 'http://evil.example/' };
+    const filo = { tab: { id: 8, url: 'filo://newtab/' }, url: 'filo://newtab/' };
 
-  const open = await dispatch({ type: 'download_open_file', id: 'x' }, web);
-  expect(open.ok || open.error !== 'forbidden' ? 'non gattato' : 'gattato').toBe('gattato');
+    const list = await dispatch({ type: 'downloads_list' }, web);
+    console.log('downloads_list da origine web →', JSON.stringify(list).slice(0, 400));
+    expect(list.error, 'una pagina web esterna può ELENCARE gli scaricamenti: nomi, indirizzi e percorsi completi su disco').toBe('forbidden');
+
+    // Dalla lista si ricava l'id e si può far APRIRE il file al sistema operativo.
+    const id = (await shell.evaluate(() => window.filoShell.downloads.list())).items[0].id;
+    const open = await dispatch({ type: 'download_open_file', id }, web);
+    console.log('download_open_file da origine web →', JSON.stringify(open));
+    expect(open.error, 'una pagina web esterna può far APRIRE al sistema un file scaricato').toBe('forbidden');
+
+    const rm = await dispatch({ type: 'download_remove', id }, web);
+    expect(rm.error, 'una pagina web esterna può cancellare voci dalla cronologia scaricamenti').toBe('forbidden');
+
+    // Da filo:// deve invece passare.
+    const okList = await dispatch({ type: 'downloads_list' }, filo);
+    expect(okList.ok).toBe(true);
+  } finally { await srv.close(); }
+});
+
+test('6) REGRESSIONE: un server LENTO ma sano (pausa di 9s a metà) non deve essere dichiarato fallito', async ({ app, shell, openTab }) => {
+  // Una pausa di alcuni secondi a metà trasferimento è normalissima: rete
+  // congestionata, connessione mobile, file generato lato server. Il download
+  // deve arrivare a destinazione, non essere ucciso e segnalato come errore.
+  const BODY = Buffer.alloc(200 * 1024, 7);
+  const srv = await attachServer({
+    '/p': (req, res) => { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end(htmlPage(['/lento.bin'])); },
+    '/lento.bin': (req, res) => {
+      res.writeHead(200, {
+        'Content-Type': 'application/octet-stream',
+        'Content-Length': String(BODY.length),
+        'Content-Disposition': 'attachment; filename="lento.bin"',
+      });
+      res.write(BODY.subarray(0, 64 * 1024));
+      setTimeout(() => res.end(BODY.subarray(64 * 1024)), 9000);
+    },
+  });
+  try {
+    const page = await openTab(`${srv.origin}/p`);
+    await page.click('#dl0');
+    await expect.poll(async () => {
+      const r = await shell.evaluate(() => window.filoShell.downloads.list());
+      return r.items[0] ? r.items[0].state : '';
+    }, { timeout: 45000 }).not.toBe('progressing');
+
+    const items = (await shell.evaluate(() => window.filoShell.downloads.list())).items;
+    console.log('esito server lento:', JSON.stringify(items.map((i) => ({ f: i.filename, s: i.state, rb: i.receivedBytes, tb: i.totalBytes }))));
+    const dir = await dlDir(app);
+    const target = join(dir, 'lento.bin');
+    expect(items[0].state, 'un server semplicemente lento viene scambiato per un guasto e lo scaricamento viene annullato').toBe('completed');
+    expect(existsSync(target) && statSync(target).size === BODY.length, 'il file di un server lento non arriva su disco').toBe(true);
+  } finally { await srv.close(); }
 });
