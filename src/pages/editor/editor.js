@@ -2981,22 +2981,48 @@
     }
     if (findState.hits.length) { findState.idx = 0; highlightCurrent(); }
   }
-  function highlightCurrent() {
+  // Evidenzia la corrispondenza corrente e programma l'"andarci sopra".
+  //
+  // Evidenziazione e contatore sono SEMPRE immediati (l'utente vede subito che
+  // la ricerca risponde). Ciò che aspetta è lo spostamento: aprire la sezione
+  // chiusa che nasconde la corrispondenza e scorrere fin lì. Mentre si scrive
+  // aspetta una pausa (`FIND_REVEAL_DELAY_MS`); quando la navigazione è
+  // esplicita (Prec/Succ, Invio, Sostituisci) avviene subito.
+  function highlightCurrent(opts) {
     findState.hits.forEach((h, i) => h.marks.forEach((mk) => mk.classList.toggle('current', i === findState.idx)));
+    cancelFindReveal();
     const cur = findState.hits[findState.idx];
-    if (cur && cur.marks[0]) {
+    const node = cur && cur.marks[0] ? cur.marks[0] : null;
+    const go = () => {
+      findRevealTimer = null;
+      // Prima si richiudono le sezioni aperte in prestito per le corrispondenze
+      // di prima: resta aperta solo quella dove ci si è davvero fermati. Se il
+      // campo è stato svuotato (nessuna corrispondenza) si richiudono tutte, e
+      // l'impaginazione dell'utente torna com'era.
+      closeBorrowedSectionsExcept(node);
+      if (!node) return;
       // Una corrispondenza dentro una sezione chiusa è invisibile: il contatore
       // direbbe "1/1" mentre sul foglio non si illumina niente e Prec/Succ non
       // portano da nessuna parte. La sezione si riapre da sé, poi la vista ci
       // arriva sopra (feedback #385).
-      revealCollapsedFor(cur.marks[0]);
-      cur.marks[0].scrollIntoView({ block: 'center', behavior: 'smooth' });
-    }
+      revealCollapsedFor(node, { temporary: true });
+      node.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    };
+    if (opts && opts.immediate) go();
+    else findRevealTimer = setTimeout(go, FIND_REVEAL_DELAY_MS);
   }
   function stepFind(dir) {
     if (!findState.hits.length) return;
     findState.idx = (findState.idx + dir + findState.hits.length) % findState.hits.length;
-    highlightCurrent();
+    highlightCurrent({ immediate: true });
+  }
+  // Invio nel campo Cerca = "portami sulla corrispondenza". Se lo spostamento
+  // era ancora in attesa della pausa di scrittura lo esegue subito su quella
+  // corrente; altrimenti passa alla successiva (Shift+Invio: la precedente).
+  function jumpFind(dir) {
+    if (!findState.hits.length) return;
+    if (cancelFindReveal() && dir > 0) { highlightCurrent({ immediate: true }); return; }
+    stepFind(dir);
   }
   // Rimpiazza tutti i mark di un hit col testo di sostituzione (nel primo mark;
   // gli altri — le altre porzioni di una parola formattata — vengono rimossi,
