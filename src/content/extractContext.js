@@ -249,6 +249,11 @@
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, {
       acceptNode(el) {
         if (skipSubtreeForTranslation(el)) return NodeFilter.FILTER_REJECT;
+        // Già tradotto: si salta QUESTO elemento ma si continua a scendere nei
+        // figli (#408). Scartare tutto il sottoalbero renderebbe irraggiungibili
+        // i blocchi annidati che una traduzione interrotta a metà non ha ancora
+        // toccato — nessuna ripresa potrebbe più completarli.
+        if (el.dataset && el.dataset.snTranslated) return NodeFilter.FILTER_SKIP;
         return NodeFilter.FILTER_ACCEPT;
       },
     });
