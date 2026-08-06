@@ -456,7 +456,7 @@ test('pagina lunga: tutti i blocchi finiscono tradotti', async ({ app, openTab, 
 // 10. Stress: avviso onesto quando un pezzo resta indietro davvero.
 // ---------------------------------------------------------------------------
 
-test('un pezzo non tradotto: l\'avviso dice "solo in parte", non "tradotta"', async ({ app, openTab, testServer }) => {
+test('un pezzo non tradotto: l\'avviso dice che si è interrotta, non "Pagina tradotta"', async ({ app, openTab, testServer }) => {
   test.setTimeout(150_000);
   await stubModel(app);
   await setMode(app, 'halfempty');
