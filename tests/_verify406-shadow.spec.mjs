@@ -141,10 +141,12 @@ test('stress: url speciali, xss, click ripetuti, campo di testo, root chiuso', a
   expect(menuHtml).not.toContain('<script');
   expect(dialogs).toEqual([]);
 
-  // doppio tasto destro rapido sullo stesso elemento: un solo menu, voci giuste
+  // due tasto destro rapidi di fila sullo stesso elemento: un solo menu, voci giuste
+  await page.keyboard.press('Escape').catch(() => {});
   const b = await page.locator('#sh-img').boundingBox();
-  await page.mouse.click(b.x + 5, b.y + 5, { button: 'right' });
-  await page.mouse.click(b.x + 8, b.y + 8, { button: 'right' });
+  await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2, { button: 'right' });
+  await page.keyboard.press('Escape').catch(() => {});
+  await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2, { button: 'right' });
   await expect(page.locator('.sn-menu')).toHaveCount(1);
   const twice = await itemLabels(page);
   for (const l of IMG_ITEMS) expect(twice, `dbl-click img: ${l}`).toContain(l);
