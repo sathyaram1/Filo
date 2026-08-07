@@ -68,6 +68,12 @@
     showInlineMessage('autocorrectConflict', 'autocorrectList', I18n.t('spell_page_conflict', conflictKey));
   }
 
+  // Svuotare il campo parola o correzione non è un salvataggio valido: riusa lo
+  // stesso slot d'avviso del conflitto e indirizza l'utente al bottone «Rimuovi».
+  function showEmptyFieldMessage() {
+    showInlineMessage('autocorrectConflict', 'autocorrectList', I18n.t('spell_page_empty'));
+  }
+
   function showDictConflictMessage(word) {
     showInlineMessage('dictConflict', 'dictList', I18n.t('spell_page_dict_conflict', word));
   }
