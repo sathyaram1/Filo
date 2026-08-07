@@ -1664,7 +1664,10 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
     timerIds: timersList.map((t) => `${t.id}:${t.label}:${t.paused ? 1 : 0}`),
     // partOfDay + dayType: quando cambia la fascia oraria O si passa
     // feriale↔weekend, la firma cambia e la home si rigenera col saluto giusto.
-    openTabsCount, partOfDay, dayType,
+    // dateKey (YYYY-MM-DD): al cambio di giorno la firma cambia e la home si
+    // rigenera, così il riferimento al giorno reale ("oggi è martedì") non
+    // resta stale a cavallo della mezzanotte / alla riapertura il giorno dopo.
+    openTabsCount, partOfDay, dayType, dateKey,
   });
 
   return { settings, hasKey, payload, signature, saved };
