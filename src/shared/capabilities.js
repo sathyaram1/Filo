@@ -68,7 +68,7 @@
     {
       id: 'home', title: 'Vai alla home', category: 'navigation',
       desc: 'Apre la home di Filo nella scheda corrente, con suggerimenti e aggiornamenti.',
-      invoke: 'Pulsante Home nella barra, oppure menu del tasto destro → "Home".',
+      invoke: 'Icona Home in alto a destra nella home (la nuova scheda), oppure menu del tasto destro → "Home".',
     },
     {
       id: 'address-bar', title: 'Apri un indirizzo', category: 'navigation',
