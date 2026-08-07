@@ -30,6 +30,7 @@
         'Nel menu App la voce "Scaricamenti" ha di nuovo la sua icona, come tutte le altre.',
         'La chat della home, l\'assistente di pagina e la chat del deck builder rispondono più in fretta e costano meno: le istruzioni che non cambiano mai non vengono più rielaborate a ogni messaggio.',
         'La pagina Crediti mostra la ricarica giornaliera davvero in vigore invece di una cifra fissa: se l\'importo cambia, la frase lo segue.',
+        'Nella cronologia degli appunti la voce che togli con la "×" ora resta tolta: prima, riaprendo la cronologia dalla stessa freccia senza chiudere il menu, ricompariva come se non l\'avessi mai rimossa.',
       ],
     },
     {
