@@ -15,6 +15,15 @@
   let categories = [];
   let useCategoryView = false;
   let currentCategoryId = null; // null = vista categorie; '' = "non categorizzate"; id = vista categoria
+  // Scheda da evidenziare al primo render (#252): la conferma cliccabile di
+  // "Salva per dopo" apre questa pagina con ?highlight=<id> per far vedere subito
+  // dove è finita la scheda appena salvata. La consumiamo dopo averla mostrata.
+  let highlightId = null;
+
+  function readHighlightId() {
+    try { return new URLSearchParams(window.location.search).get('highlight') || null; }
+    catch (_) { return null; }
+  }
 
   async function load() {
     const settings = await Storage.getSettings();
@@ -33,6 +42,16 @@
     ]);
     allPages = pagesRes?.pages || [];
     categories = catsRes?.categories || [];
+
+    // Se dobbiamo evidenziare una scheda e la vista è per categoria, apriamoci
+    // direttamente DENTRO la categoria (o "non categorizzate") dove vive la
+    // scheda: nella vista a tile la card non sarebbe visibile.
+    highlightId = readHighlightId();
+    if (highlightId && useCategoryView) {
+      const target = allPages.find((p) => p.id === highlightId);
+      if (target) currentCategoryId = target.categoryId || '';
+    }
+
     render();
   }
 
