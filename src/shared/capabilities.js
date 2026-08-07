@@ -148,7 +148,7 @@
     },
     {
       id: 'spellcheck-manage', title: 'Gestisci correttore e dizionario', category: 'writing',
-      desc: 'Gestisci le correzioni automatiche (errore → correzione) e il dizionario personale di parole da non segnalare.',
+      desc: 'Gestisci le correzioni automatiche (da → a, anche su più parole come "x es" → "per esempio", che si espandono mentre scrivi) e il dizionario personale di parole da non segnalare.',
       invoke: 'Pagina filo://spellcheck/spellcheck.html.',
     },
     {
