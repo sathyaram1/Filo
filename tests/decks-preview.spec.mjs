@@ -306,3 +306,35 @@ test('carta bifronte: il tasto gira mostra il retro in preview e carosello; cart
   await page.click('#carouselImg');
   await expect(page.locator('#carouselImg')).toHaveAttribute('src', 'https://cards.test/delver-back.jpg');
 });
+
+// Carta bifronte (feedback #373): ogni RIAPERTURA della preview riparte dal
+// FRONTE, anche tornando sulla STESSA carta. Prima del fix, una carta girata sul
+// retro e ri-hoverata (dopo che l'anteprima si era chiusa tornando alle
+// statistiche) riapriva ancora sul retro, in modo incoerente col cambio carta.
+// Si asserisce il SUCCESSO: alla riapertura compare l'immagine del FRONTE.
+test('carta bifronte: la riapertura della preview riparte dal fronte, anche sulla stessa carta', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await mockScryfall(app);
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await seedDeck(page, [['c-delver', 1], ['c-bolt', 1]]);
+
+  // Hover sulla bifronte → preview col FRONTE; giro sul retro.
+  await page.locator('#deckList .dk-row', { hasText: 'Delver of Secrets' }).hover();
+  await expect(page.locator('#statePreview')).toBeVisible();
+  await expect(page.locator('#previewImg')).toHaveAttribute('src', 'https://cards.test/delver-front.jpg');
+  await page.click('#previewFlip');
+  await expect(page.locator('#previewImg')).toHaveAttribute('src', 'https://cards.test/delver-back.jpg');
+
+  // Allontano il mouse dalle righe → dopo il linger l'anteprima si chiude e
+  // tornano le statistiche (la carta resta "girata sul retro" nello slot).
+  await page.locator('#detailTitle').hover();
+  await expect(page.locator('#stateStats')).toBeVisible({ timeout: 3000 });
+  await expect(page.locator('#statePreview')).toBeHidden();
+
+  // Ri-hover sulla STESSA carta → la preview si riapre dal FRONTE (senza il fix
+  // riaprirebbe ancora sul retro: asserzione ROSSA).
+  await page.locator('#deckList .dk-row', { hasText: 'Delver of Secrets' }).hover();
+  await expect(page.locator('#statePreview')).toBeVisible();
+  await expect(page.locator('#previewImg')).toHaveAttribute('src', 'https://cards.test/delver-front.jpg');
+});
