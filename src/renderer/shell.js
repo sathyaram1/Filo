@@ -921,6 +921,20 @@
       const msg = document.createElement('div');
       msg.className = 'shell-notif-msg';
       msg.textContent = text;
+      // Notifica cliccabile (#252): il corpo del messaggio è un affordance che
+      // porta da qualche parte (es. la conferma di "Salva per dopo" apre la
+      // lista "Aperti per dopo"). La X e le eventuali azioni restano elementi a
+      // sé, quindi il click sul messaggio non le intercetta.
+      if (typeof opts.onClick === 'function') {
+        msg.classList.add('clickable');
+        msg.setAttribute('role', 'button');
+        msg.tabIndex = 0;
+        const fire = () => { try { opts.onClick(); } catch (_) {} dismiss(card); };
+        msg.addEventListener('click', fire);
+        msg.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fire(); }
+        });
+      }
       card.appendChild(msg);
 
       const durationSec = opts.durationSec != null
