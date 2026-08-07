@@ -23,8 +23,11 @@
         'Col clic destro su un link a un file (PDF, ZIP, allegato) trovi "Salva file": lo scarica seguendone l\'avanzamento nella barra in alto, proprio come se lo cliccassi.',
         'Nuova pagina "Scaricamenti" (nel menu App, o da "Vedi tutti" sull\'indicatore in alto) per rivedere tutti i file scaricati: stato, dimensione, data e percorso, con barra e percentuale dal vivo per quelli in corso e, per ogni voce, apri file, apri cartella, copia percorso, ri-scarica o rimuovi.',
         'In Sicurezza, accanto a "Esporta dati", c\'è ora "Importa dati": ricarichi il .zip di un backup e ritrovi memorie, pagine salvate, cronologia, immagini e impostazioni — anche su un altro computer. Prima di scrivere nulla ti viene mostrato cosa contiene il file, e quello che hai già non viene cancellato: le liste si uniscono senza duplicati.',
+        'Nel menu App trovi "Aperti per dopo": le pagine e i link che hai messo da parte sono di nuovo a un click da qualsiasi scheda, senza digitare indirizzi. Ci arrivi anche dal pulsante omonimo nella Cronologia delle schede.',
       ],
       fixes: [
+        'Se chiedi a Filo dove ritrovare le pagine salvate, ora ti indica una strada che esiste davvero invece di una voce del tasto destro che era stata tolta.',
+        'Nel menu App la voce "Scaricamenti" ha di nuovo la sua icona, come tutte le altre.',
         'La chat della home, l\'assistente di pagina e la chat del deck builder rispondono più in fretta e costano meno: le istruzioni che non cambiano mai non vengono più rielaborate a ogni messaggio.',
         'La pagina Crediti mostra la ricarica giornaliera davvero in vigore invece di una cifra fissa: se l\'importo cambia, la frase lo segue.',
       ],
