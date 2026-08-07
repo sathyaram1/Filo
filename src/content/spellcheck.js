@@ -227,6 +227,33 @@
     }
   }
 
+  // Trova la chiave di autocorrect che termina ESATTAMENTE all'offset `end` nel
+  // testo, delimitata a sinistra da un confine di parola. Le chiavi possono
+  // contenere spazi ("x es" → "per esempio"): non basta più risalire al singolo
+  // token prima del confine. A parità di posizione finale vince la chiave più
+  // lunga, così "x es" batte "es" se entrambe esistono. Ritorna { start, key }
+  // (con `key` la chiave lowercased nella mappa) oppure null.
+  function findAutocorrectMatch(text, end) {
+    const lowerRegion = text.slice(0, end).toLowerCase();
+    let best = null;
+    for (const key of Object.keys(autocorrectMap)) {
+      if (!key) continue;
+      const start = end - key.length;
+      if (start < 0) continue;
+      // Il testo che precede il confine deve coincidere con la chiave.
+      if (lowerRegion.slice(start) !== key) continue;
+      // Confine di parola a sinistra: il carattere prima del match non dev'essere
+      // un carattere di parola, così "es" non scatta dentro "mese".
+      if (start > 0 && isWordCharLocal(text[start - 1])) continue;
+      // La chiave deve iniziare con un carattere di parola (le chiavi sono
+      // trim()+lowercase, quindi lo sono sempre): esclude match che partono da
+      // uno spazio interno spurio.
+      if (!isWordCharLocal(text[start])) continue;
+      if (!best || key.length > best.key.length) best = { start, key };
+    }
+    return best;
+  }
+
   // Posiziona il caret all'offset di carattere `target` nell'elemento contenteditable,
   // popolando il Range passato (non lo aggiunge al selection: lascia farlo al chiamante).
   function placeCaretAtOffset(el, target, range) {
