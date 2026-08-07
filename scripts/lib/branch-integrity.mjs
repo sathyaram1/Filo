@@ -123,7 +123,10 @@ export const CHECKPOINT_CAP = 20;
 export function withCheckpoint(state, sha, by = '', nowMs = Date.now(), cap = CHECKPOINT_CAP) {
   const s = { ...(state || {}) };
   const list = Array.isArray(s.checkpoints) ? s.checkpoints.filter((c) => c && c.sha) : [];
-  if (sha) list.push({ sha: String(sha), by: String(by || ''), at: new Date(nowMs).toISOString() });
+  // Un punto fermo identico all'ultimo non aggiunge informazione (verifier e
+  // secaudit non committano nulla): non lo duplichiamo.
+  const prev = list.length ? list[list.length - 1].sha : null;
+  if (sha && sha !== prev) list.push({ sha: String(sha), by: String(by || ''), at: new Date(nowMs).toISOString() });
   s.checkpoints = list.length > cap ? list.slice(list.length - cap) : list;
   return s;
 }
