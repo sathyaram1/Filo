@@ -273,7 +273,7 @@
     {
       id: 'open-for-later', title: 'Aperti per dopo', category: 'save',
       desc: 'La lista delle pagine e dei link che hai messo da parte, pronti da riaprire.',
-      invoke: 'Menu «App» → «Aperti per dopo», oppure Impostazioni → «Altro» → «Aperti per dopo»; indirizzo filo://home/home.html. Clicca una scheda per riaprirla.',
+      invoke: 'Menu «App» → «Aperti per dopo», oppure Impostazioni → «Altro» → «Aperti per dopo»; indirizzo filo://home/home.html. Anche cliccando la conferma che appare dopo «Salva per dopo». Clicca una scheda per riaprirla.',
       doesNot: 'Non è la home: l’icona Home (in alto a destra e nel menu del tasto destro) porta alla nuova scheda, non a questa lista.',
     },
     {

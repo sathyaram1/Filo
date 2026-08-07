@@ -15,6 +15,15 @@
   let categories = [];
   let useCategoryView = false;
   let currentCategoryId = null; // null = vista categorie; '' = "non categorizzate"; id = vista categoria
+  // Scheda da evidenziare al primo render (#252): la conferma cliccabile di
+  // "Salva per dopo" apre questa pagina con ?highlight=<id> per far vedere subito
+  // dove è finita la scheda appena salvata. La consumiamo dopo averla mostrata.
+  let highlightId = null;
+
+  function readHighlightId() {
+    try { return new URLSearchParams(window.location.search).get('highlight') || null; }
+    catch (_) { return null; }
+  }
 
   async function load() {
     const settings = await Storage.getSettings();
@@ -33,6 +42,16 @@
     ]);
     allPages = pagesRes?.pages || [];
     categories = catsRes?.categories || [];
+
+    // Se dobbiamo evidenziare una scheda e la vista è per categoria, apriamoci
+    // direttamente DENTRO la categoria (o "non categorizzate") dove vive la
+    // scheda: nella vista a tile la card non sarebbe visibile.
+    highlightId = readHighlightId();
+    if (highlightId && useCategoryView) {
+      const target = allPages.find((p) => p.id === highlightId);
+      if (target) currentCategoryId = target.categoryId || '';
+    }
+
     render();
   }
 
@@ -174,6 +193,21 @@
   function renderCard(page) {
     const card = document.createElement('div');
     card.className = 'sn-card';
+    if (page.id) card.dataset.pageId = page.id;
+
+    // Evidenziazione una tantum della scheda appena salvata (#252): pulsazione
+    // morbida che sfuma da sola, e la portiamo in vista. Consumiamo l'id così
+    // ricerche/re-render successivi non la ri-evidenziano. Il marcatore
+    // data-highlighted resta (traccia stabile) anche dopo che l'animazione sfuma.
+    if (highlightId && page.id === highlightId) {
+      highlightId = null;
+      card.dataset.highlighted = '1';
+      card.classList.add('sn-card-highlight');
+      requestAnimationFrame(() => {
+        try { card.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (_) {}
+      });
+      card.addEventListener('animationend', () => card.classList.remove('sn-card-highlight'), { once: true });
+    }
 
     const thumb = document.createElement('div');
     thumb.className = 'sn-card-thumb';

@@ -850,9 +850,6 @@
       thumbnail = cap?.dataUrl || '';
     } catch (_) { /* miniatura opzionale */ }
 
-    // Conferma all'utente (dopo la cattura, così non sporca la miniatura).
-    Popup.showToast(I18n.t('toast_saved', I18n.t('category_default')));
-
     if (thumbnail && entry?.id) {
       chrome.runtime.sendMessage({
         type: MSG.SET_SAVED_PAGE_THUMB,
@@ -861,7 +858,54 @@
       }).catch(() => {});
     }
 
-    setTimeout(() => chrome.runtime.sendMessage({ type: MSG.CLOSE_TAB }), 600);
+    // Conferma CLICCABILE che porta alla lista (#252): rimpiazza il vecchio
+    // toast muto + chiusura a 600ms (troppo rapida per farci qualcosa).
+    showSaveConfirm(entry);
+  }
+
+  // Riquadro di conferma di "Salva per dopo" (#252). La scheda salvata sta per
+  // chiudersi: prima di farlo diamo qualche secondo per raggiungere la lista
+  // dove la pagina è finita. Cliccandolo apre "Aperti per dopo" con la scheda
+  // appena messa da parte evidenziata; ignorandolo, la scheda si chiude da sola
+  // come prima. È l'unico modo per far scoprire la lista proprio nel momento in
+  // cui serve, senza aggiungere voci di menu.
+  function showSaveConfirm(entry) {
+    const AUTO_CLOSE_MS = 4000;
+    let done = false;
+    let timer = null;
+
+    const pill = document.createElement('div');
+    pill.className = 'sn-save-confirm';
+    pill.setAttribute('role', 'button');
+    pill.tabIndex = 0;
+    const text = document.createElement('span');
+    text.className = 'sn-save-confirm-text';
+    text.textContent = I18n.t('toast_saved', (entry && entry.category) || I18n.t('category_default'));
+    const cta = document.createElement('span');
+    cta.className = 'sn-save-confirm-cta';
+    cta.textContent = I18n.t('toast_saved_open');
+    pill.appendChild(text);
+    pill.appendChild(cta);
+    document.documentElement.appendChild(pill);
+    requestAnimationFrame(() => pill.classList.add('sn-save-confirm-visible'));
+
+    const finish = (openList) => {
+      if (done) return;
+      done = true;
+      if (timer) { clearTimeout(timer); timer = null; }
+      pill.classList.remove('sn-save-confirm-visible');
+      setTimeout(() => { try { pill.remove(); } catch (_) {} }, 220);
+      if (openList && entry && entry.id) {
+        chrome.runtime.sendMessage({ type: MSG.OPEN_HOME, highlight: entry.id }).catch(() => {});
+      }
+      chrome.runtime.sendMessage({ type: MSG.CLOSE_TAB }).catch(() => {});
+    };
+
+    pill.addEventListener('click', () => finish(true));
+    pill.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); finish(true); }
+    });
+    timer = setTimeout(() => finish(false), AUTO_CLOSE_MS);
   }
 
   async function saveLink(linkEl) {
@@ -1785,6 +1829,7 @@
     // salva / condividi / cerca / immagini
     buildSavePayload,
     savePage,
+    showSaveConfirm,
     saveLink,
     isDownloadableLink,
     downloadLink,

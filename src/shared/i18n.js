@@ -176,6 +176,7 @@
 
     // Toast
     toast_saved: 'Salvata in: %s',
+    toast_saved_open: 'Apri la lista',
     toast_save_failed: 'Salvataggio non riuscito',
     toast_link_saved: 'Link salvato',
     toast_copied: 'Copiato negli appunti',
