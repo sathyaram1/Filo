@@ -1,0 +1,7 @@
+{
+  "id": "86f54373-cb34-4fb8-9e11-7bcae8866dc2",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho riprodotto il sintomo aprendo «Aperti per dopo» dai vari punti d'ingresso e riaprendola più volte. Ora tutti convergono su un solo indirizzo: anche forzando la vecchia forma lunga d'indirizzo si finisce sulla stessa identica scheda, non su una copia. Riaprendo la lista mentre è già aperta Filo riporta sulla scheda esistente invece di duplicarla; salvando una pagina mentre la lista è già aperta, riusa quella scheda e vi evidenzia comunque l'elemento nuovo. Ho verificato che pagine interne diverse restino schede separate e che la Nuova scheda continui a potersi aprire in più copie. La pagina si apre e si vede correttamente. Nessun doppione riprodotto in nessuno scenario.",
+  "queuedAt": "2026-08-07T21:16:32.693Z",
+  "queuedBy": "routine"
+}
