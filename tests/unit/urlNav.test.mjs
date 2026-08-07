@@ -19,7 +19,7 @@ import { dirname, join } from 'node:path';
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 require(join(__dirname, '..', '..', 'src', 'shared', 'urlNav.js'));
-const { looksLikeAddress, normalizeUrl, isLocalHost } = globalThis.SN_URL_NAV;
+const { looksLikeAddress, normalizeUrl, isLocalHost, canonicalizeFiloUrl } = globalThis.SN_URL_NAV;
 
 // ─── il cuore del fix #398: gli indirizzi locali sono INDIRIZZI ──────────────
 
