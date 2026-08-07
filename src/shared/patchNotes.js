@@ -23,6 +23,7 @@
       ],
       fixes: [
         'La chat della home, l\'assistente di pagina e la chat del deck builder rispondono più in fretta e costano meno: le istruzioni che non cambiano mai non vengono più rielaborate a ogni messaggio.',
+        'La pagina Crediti mostra la ricarica giornaliera davvero in vigore invece di una cifra fissa: se l\'importo cambia, la frase lo segue.',
       ],
     },
     {
