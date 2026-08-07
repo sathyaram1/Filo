@@ -1,0 +1,7 @@
+{
+  "id": "995b02c6-71d6-474e-baee-a88a8558ccf2",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la modifica è stata pubblicata.\n\nCosa cambia per te: la lista «Aperti per dopo» — le pagine e i link che metti da parte — ha di nuovo una porta d'ingresso stabile. La trovi nel menu App, accanto a Scaricamenti, e ci arrivi anche da un pulsante nella Cronologia delle schede. Prima, dato che «Salva per dopo» chiude la scheda, quella lista si raggiungeva solo digitando l'indirizzo a mano. Nello stesso menu è stata rimessa anche l'icona che mancava alla voce Scaricamenti.\n\nIn più, se chiedi a Filo dove ritrovare le pagine messe da parte ora ti indica una strada che esiste davvero: la descrizione interna delle sue capacità citava ancora una voce del menu del tasto destro che era stata ritirata. Sono stati aggiunti controlli automatici che si accendono in rosso se in futuro una capacità dovesse promettere un percorso non più raggiungibile, così l'errore non si ripete.\n\nSul fronte sicurezza non ho rilevato nulla di problematico. Le modifiche restano tutte nell'interfaccia — voci di menu, un pulsante, testi e due icone disegnate a mano — e non toccano regole di accesso, credenziali, script di pubblicazione né dati che arrivano da fuori. Gli indirizzi aperti dai nuovi ingressi sono fissi nel codice e non vengono costruiti da qualcosa che l'utente digita, quindi non c'è modo di dirottarli altrove.",
+  "queuedAt": "2026-08-07T07:18:21.848Z",
+  "queuedBy": "routine"
+}
