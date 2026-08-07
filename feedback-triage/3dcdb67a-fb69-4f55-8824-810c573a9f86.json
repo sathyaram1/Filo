@@ -1,0 +1,7 @@
+{
+  "id": "3dcdb67a-fb69-4f55-8824-810c573a9f86",
+  "status": "done",
+  "notes": "Controllo di sicurezza superato: la modifica è stata pubblicata. Non tocca nulla di delicato (nessuna regola di accesso, nessuna chiave, nessun automatismo di sistema) ed è coerente con quello che deve fare — unificare l'icona dell'Editor col foglio degli appunti e rendere cliccabile la conferma «Salvato» in chat perché porti dritti all'Editor. In fase di pubblicazione ho ricomposto a mano la descrizione della capacità «Appunti di Filo», aggiornata anche altrove nel frattempo: ho tenuto entrambe le informazioni utili (la conferma «Salvato» apre l'Editor con un click; gli appunti vecchi si ritrovano nel file «Appunti»).",
+  "queuedAt": "2026-08-07T15:28:12.395Z",
+  "queuedBy": "routine"
+}
