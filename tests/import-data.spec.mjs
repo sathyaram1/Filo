@@ -143,12 +143,13 @@ test('invariante: nella pagina Sicurezza esporta e importa esistono entrambi', a
   await page.locator('#sec-import-row').screenshot({ path: 'tests/.shots/import-data-row.png' });
 });
 
-test('una pagina web non può innescare né applicare un import', async ({ app }) => {
-  const res = await app.evaluate(async ({}) => {
+test('una pagina web non può innescare né applicare un import', async ({ app, shell }) => {
+  void shell; // attende il boot: SN_HANDLE_MESSAGE dev'essere già montato
+  const res = await app.evaluate(async () => {
     const MSG = globalThis.SN_MSG.MSG;
-    const fake = { tab: { url: 'http://sito-ostile.example/' }, url: 'http://sito-ostile.example/' };
-    const preview = await globalThis.SN_HANDLE_MESSAGE({ type: MSG.IMPORT_DATA_PREVIEW }, fake);
-    const apply = await globalThis.SN_HANDLE_MESSAGE({ type: MSG.IMPORT_DATA_APPLY, token: 'x' }, fake);
+    const web = { url: 'https://evil.example/page' };
+    const preview = await globalThis.SN_HANDLE_MESSAGE({ type: MSG.IMPORT_DATA_PREVIEW }, web);
+    const apply = await globalThis.SN_HANDLE_MESSAGE({ type: MSG.IMPORT_DATA_APPLY, token: 'x' }, web);
     return { preview, apply };
   });
   expect(res.preview.ok).toBe(false);
