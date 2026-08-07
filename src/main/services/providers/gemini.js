@@ -203,7 +203,7 @@
     const decoder = new TextDecoder('utf-8');
     let buffer = '';
     let fullText = '';
-    let usage = { promptTokens: 0, completionTokens: 0 };
+    let usage = { promptTokens: 0, completionTokens: 0, cachedPromptTokens: 0 };
 
     while (true) {
       const { done, value } = await reader.read();
