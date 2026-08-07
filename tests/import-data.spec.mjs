@@ -14,7 +14,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { _electron as electron } from '@playwright/test';
 import { clickConfirm, confirmText } from './helpers/confirm.mjs';
 import { createRequire } from 'node:module';
-import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
