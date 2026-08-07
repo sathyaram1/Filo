@@ -201,5 +201,5 @@
     return { text: fullText, servedBy, usage };
   }
 
-  global.SN_PROVIDER_OPENROUTER = { listModels, complete, streamComplete, reasoningField, providerBlock, extractServedBy, ENDPOINT };
+  global.SN_PROVIDER_OPENROUTER = { listModels, complete, streamComplete, reasoningField, providerBlock, extractServedBy, cachedPromptTokens, ENDPOINT };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
