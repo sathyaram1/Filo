@@ -93,7 +93,7 @@ test('pagina Sicurezza: "Importa dati" ripristina davvero i dati di un backup', 
     await expect.poll(() => confirmText(page), { timeout: 10000 })
       .toContain('backup.zip');
     const dialogText = await confirmText(page);
-    expect(dialogText).toContain('3 sezioni');
+    expect(dialogText).toContain('4 sezioni');
     expect(dialogText).toContain('1 immagini');
 
     await page.screenshot({ path: 'tests/.shots/import-data-confirm.png' });
