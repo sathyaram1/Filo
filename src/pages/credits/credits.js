@@ -25,6 +25,15 @@
 
     if (ICONS && ICONS.credits) $('coin').innerHTML = ICONS.credits(48);
 
+    // La ricarica giornaliera è un importo unico (CREDIT.DAILY_REFILL): la frase
+    // lo legge dal valore in vigore invece di scriverlo a mano, così se l'importo
+    // cambia (o l'owner lo configura) il testo resta veritiero. Stessa simmetria
+    // già applicata al costo di riapertura in bacheca.
+    const refill = window.SN_CONST?.CREDIT?.DAILY_REFILL;
+    if (refill != null) {
+      $('refillHint').textContent = `Ricevi +${formatInt(refill)} crediti ogni giorno a mezzanotte.`;
+    }
+
     const r = await chrome.runtime.sendMessage({ type: MSG.GET_CREDITS });
     render(r || {});
   }
