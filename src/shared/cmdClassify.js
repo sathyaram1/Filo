@@ -385,9 +385,9 @@
       // `-b`/`-B`/`--orphan`/`--detach`: crea/sposta un ramo, non tocca i path.
       if (args.some((a) => /^(-b|-B|--orphan|--detach)$/.test(a))) return 2;
       const ops = args.filter((a) => !a.startsWith('-'));
-      if (ops.includes('.')) return 3;         // scarta tutte le modifiche
-      if (ops.length >= 2) return 3;           // `<ref> <path>` senza `--`
-      return 2;                                // cambio ramo (0-1 operando)
+      if (ops.some(looksLikePathspec)) return 3; // scarta le modifiche dei file
+      if (ops.length >= 2) return 3;             // `<ref> <path>` senza `--`
+      return 2;                                  // cambio ramo (0-1 operando)
     },
     // `git stash` SALVA le modifiche (recuperabile con pop → livello 2), ma
     // `git stash drop`/`clear` ELIMINANO stash salvati in modo irreversibile →
