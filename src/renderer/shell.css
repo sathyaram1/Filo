@@ -142,6 +142,11 @@ html[data-chrome-compact="1"] .addr {
 }
 .shell-notif.show { opacity: 1; transform: translateX(0); }
 .shell-notif-msg { line-height: 1.4; word-break: break-word; }
+/* Messaggio cliccabile (#252): affordance discreto — cambia il cursore e, in
+   hover, l'accento del testo, senza urlare. Ogni azione riceve un feedback. */
+.shell-notif-msg.clickable { cursor: pointer; outline: none; }
+.shell-notif-msg.clickable:hover { color: var(--accent, var(--fg)); }
+.shell-notif-msg.clickable:focus-visible { text-decoration: underline; }
 .shell-notif-close {
   position: absolute;
   top: 4px;
