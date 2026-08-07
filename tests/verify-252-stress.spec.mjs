@@ -64,13 +64,8 @@ test('ignorando la conferma la scheda si chiude da sola senza aprire la lista', 
 // 2) Con categorizzazione ATTIVA la lista si apre DENTRO la sotto-vista dove
 //    vive la scheda (qui: "non categorizzate"), non nella griglia categorie
 //    dove la card sarebbe invisibile.
-test('con categorize attivo la conferma apre la sotto-vista con la scheda evidenziata', async ({ app, openTab, testServer, shell }) => {
-  await shell.evaluate(async () => {
-    await chrome.runtime.sendMessage({
-      type: window.SN_MSG.MSG.UPDATE_SETTINGS,
-      settings: { featureFlags: { categorize: true } },
-    });
-  });
+test('con categorize attivo la conferma apre la sotto-vista con la scheda evidenziata', async ({ app, openTab, testServer }) => {
+  await setCategorize(app, true);
 
   const page = await openTab(makePage(testServer, 'Con categorie'));
   await savePage(page);
