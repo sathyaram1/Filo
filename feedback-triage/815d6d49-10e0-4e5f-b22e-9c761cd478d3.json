@@ -1,7 +1,0 @@
-{
-  "id": "815d6d49-10e0-4e5f-b22e-9c761cd478d3",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica e stata pubblicata. Ora la pagina Crediti (e le risposte dell'assistente sul saldo) mostrano la ricarica giornaliera davvero in vigore invece di una cifra fissa: se un giorno l'importo cambia, la frase lo segue automaticamente.",
-  "queuedAt": "2026-08-07T03:34:58.010Z",
-  "queuedBy": "routine"
-}
