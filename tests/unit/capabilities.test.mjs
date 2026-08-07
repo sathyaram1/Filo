@@ -302,6 +302,10 @@ test('nessuna capacità cita la barra in alto / degli indirizzi, rimossa dalla s
   const FORBIDDEN = [
     { re: /barra in alto/i, why: 'la barra in alto (indirizzi/navigazione) è stata rimossa' },
     { re: /barra\s+(degli\s+)?indirizzi/i, why: 'la barra degli indirizzi è sempre nascosta' },
+    // "nella barra" generico, TRANNE la barra delle schede (le linguette, che
+    // esiste) o la barra in basso (chat del deck builder): intercetta formule
+    // come "Pulsante Home nella barra" che rimandano alla barra sparita.
+    { re: /nella barra(?!\s+(delle schede|in basso))/i, why: 'l\'unica barra sopra le schede è quella delle linguette' },
   ];
   for (const c of CAP.CAPABILITIES) {
     const text = `${c.invoke} ${c.desc}${c.doesNot ? ' ' + c.doesNot : ''}`;
