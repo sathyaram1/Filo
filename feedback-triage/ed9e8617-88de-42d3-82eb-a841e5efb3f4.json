@@ -1,8 +1,0 @@
-{
-  "id": "ed9e8617-88de-42d3-82eb-a841e5efb3f4",
-  "status": "revision_capability",
-  "notes": "Fatto. La fila di schede in cima ora va a capo quando la finestra è stretta: restano tutte visibili e la pagina non scorre piu di lato. Ho scelto il ritorno a capo invece dello scorrimento della sola fila (le due strade che indicavi): cosi nessuna scheda finisce dietro una barra di scorrimento, sono tutte a colpo d'occhio.",
-  "queuedAt": "2026-08-07T21:33:28.733Z",
-  "queuedBy": "routine",
-  "branch": "worker/ed9e8617"
-}
