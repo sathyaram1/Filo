@@ -235,10 +235,14 @@
     'version', 'help', 'grep', 'count-objects',
   ]);
   const GIT_WRITE = new Set([
-    'add', 'commit', 'push', 'pull', 'fetch', 'checkout', 'switch', 'merge',
-    'rebase', 'cherry-pick', 'revert', 'stash', 'init', 'clone', 'mv',
+    'add', 'commit', 'push', 'pull', 'fetch', 'switch', 'merge',
+    'rebase', 'cherry-pick', 'revert', 'init', 'clone', 'mv',
     'apply', 'am', 'pop', 'worktree', 'submodule',
   ]);
+  // NB: 'checkout' e 'stash' NON stanno in GIT_WRITE: hanno forme DISTRUTTIVE che
+  // scartano lavoro non salvato (`git checkout .`/`-- <path>`, `git stash drop`/
+  // `clear`) e forme innocue (cambio ramo, salvataggio di uno stash). Il livello
+  // dipende dagli argomenti → li classifica GIT_DUAL qui sotto.
   // I distruttivi di git (reset --hard, clean, branch -D, push --force…)
   // li intercetta DANGEROUS_FLAG_RE o il fatto che siano fuori dalle due liste.
   const GIT_DESTROY = new Set(['reset', 'clean', 'rm', 'gc', 'filter-branch', 'update-ref', 'prune']);
