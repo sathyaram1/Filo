@@ -205,20 +205,21 @@
     const lastChar = text[pos - 1];
     if (!isBoundaryChar(lastChar)) return;
 
-    let end = pos - 1;
-    let s = end - 1;
-    if (s < 0 || !isWordCharLocal(text[s])) return;
-    while (s > 0 && isWordCharLocal(text[s - 1])) s--;
-    const word = text.slice(s, end);
-    if (!word) return;
-    const lowered = word.toLowerCase();
-    if (!Object.prototype.hasOwnProperty.call(autocorrectMap, lowered)) return;
-    const replacement = matchCase(word, autocorrectMap[lowered]);
-    if (!replacement || replacement === word) return;
+    const end = pos - 1;
+    // Serve almeno un carattere di parola prima del confine.
+    if (end <= 0 || !isWordCharLocal(text[end - 1])) return;
+
+    // Cerca la chiave (anche multi-parola, es. "x es") che termina a `end`.
+    const match = findAutocorrectMatch(text, end);
+    if (!match) return;
+    const { start } = match;
+    const original = text.slice(start, end);
+    const replacement = matchCase(original, autocorrectMap[match.key]);
+    if (!replacement || replacement === original) return;
 
     suppressAutocorrect = true;
     try {
-      applyFix(el, { start: s, end }, replacement, { cursor: 'preserve' });
+      applyFix(el, { start, end }, replacement, { cursor: 'preserve' });
     } finally {
       // Resetta la guardia dopo il flush degli eventi sincroni e dell'input event
       // riemesso da setRangeText.
