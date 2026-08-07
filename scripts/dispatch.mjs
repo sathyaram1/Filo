@@ -35,24 +35,36 @@
 //
 // USO
 //   node scripts/dispatch.mjs                          # sceglie e stampa il JSON
+//   node scripts/dispatch.mjs --preflight               # prontezza (prima del setup)
 //   node scripts/dispatch.mjs --record-verifier <id> <pass|fail> ["critica"]
 //   node scripts/dispatch.mjs --record-fixed <id> ["report"]
 //   node scripts/dispatch.mjs --record-secaudit <id> <pass|fail>
 //   node scripts/dispatch.mjs --clear-state <id>
 //
 //   Exit 0 → JSON su stdout (c'è lavoro). Exit 2 → niente da fare. Exit 1 → errore.
+//   Exit 3 → GUASTO: non si può lavorare in sicurezza (vedi ROUTINE-BRANCH-INTEGRITY.md §E).
+//
+// INTEGRITÀ DEL RAMO (2026-08-07, ROUTINE-BRANCH-INTEGRITY.md)
+//   dispatch non si limita più a DIRE su quale branch lavorare: ci mette lui
+//   l'istanza (prepareBranch), con nomi unici per tentativo, fail-closed, e
+//   ripristinando il branch all'ultimo punto fermo se l'istanza precedente è
+//   stata interrotta. Ogni --record-* ricalcola l'identità della directory e
+//   RIFIUTA la transizione se non corrisponde al branch assegnato.
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync } from 'node:fs';
 import { dirname, resolve, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  prepareBranch, newWorkBranch, preferredBase, checkDelivery, withCheckpoint,
+  lastCheckpoint, bumpRejects, clearRejects, headSha, currentBranch,
+  writeExpectation, clearExpectation, stateDir,
+} from './lib/branch-integrity.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = process.env.FILO_REPO_ROOT ? resolve(process.env.FILO_REPO_ROOT) : resolve(__dirname, '..');
 // Lo stato vive accanto ai claim, sotto feedback-triage/state/ (override per i test).
-const STATE_DIR = process.env.FILO_DISPATCH_STATE_DIR
-  ? resolve(process.env.FILO_DISPATCH_STATE_DIR)
-  : resolve(ROOT, 'feedback-triage', 'state');
+const STATE_DIR = stateDir(ROOT);
 const ROLES_DIR = resolve(ROOT, 'routines', 'roles');
 const MAIN_BRANCH = process.env.FILO_MAIN_BRANCH || 'main';
 
