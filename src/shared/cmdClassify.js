@@ -315,11 +315,43 @@
   // sotto-comando stesso). `git tag v1.0` → ['v1.0']; `git branch` → [];
   // `git config --get user.name` → ['--get', 'user.name'].
   function gitArgsAfterSub(cmd) {
-    const t = tokens(cmd).slice(1); // via il programma `git`
+    // Token già "spogliati" delle virgolette (vedi unquote): `git checkout ".."`
+    // e `git checkout ..` devono essere valutati allo stesso modo.
+    const t = tokens(cmd).slice(1).map(unquote).filter(Boolean); // via il programma `git`
     const i = t.findIndex((x) => !x.startsWith('-')); // posizione del sotto-comando
     return i < 0 ? [] : t.slice(i + 1);
   }
   const hasOperand = (args) => args.some((a) => !a.startsWith('-'));
+
+  // Varianti di un operando così come le interpreterebbero le shell supportate
+  // (bash, cmd, powershell): oltre alla forma già senza virgolette, quella con
+  // il backslash letto come ESCAPE (bash: `\.` → `.`) e quella con il backslash
+  // letto come SEPARATORE di percorso (Windows: `.\src` → `./src`). Se anche una
+  // sola lettura risulta distruttiva alziamo il livello: meglio una conferma
+  // forte di troppo che un comando che scarta lavoro con un semplice OK.
+  function argVariants(arg) {
+    const a = String(arg);
+    return [a, a.replace(/\\(.)/g, '$1'), a.replace(/\\/g, '/')];
+  }
+
+  // L'operando prende di mira dei FILE (pathspec) invece di un ramo/commit?
+  // `.`, `./`, `.\`, `..`, `src/`, `*.js`, percorsi assoluti, nomi con
+  // estensione: git li interpreta come percorsi e `git checkout <percorso>`
+  // SCARTA le modifiche non salvate di quei file, esattamente come
+  // `git restore`. I nomi di ramo comuni (`main`, `origin/main`, `v1.0`,
+  // `feature/login`) NON combaciano e restano alla conferma leggera.
+  function looksLikePathspec(arg) {
+    for (const v of argVariants(arg)) {
+      const bare = v.replace(/[\\/]+$/, ''); // `./` → `.`, `src/` → `src`
+      if (bare === '' || bare === '.' || bare === '..') return true; // cartella corrente
+      if (/^\.{1,2}[\\/]/.test(v)) return true;                      // ./x, ../x, .\x
+      if (/[*?[\]]/.test(v)) return true;                            // glob: *.js, src/*
+      if (/^[\\/]/.test(v) || /^[A-Za-z]:[\\/]/.test(v) || v.startsWith('~/')) return true; // assoluti
+      if (/[\\/]$/.test(v)) return true;                             // finisce con separatore = cartella
+      if (/\.[A-Za-z][A-Za-z0-9]{0,7}$/.test(v)) return true;        // file con estensione
+    }
+    return false;
+  }
 
   // Sotto-comandi il cui LIVELLO dipende dagli argomenti. Due famiglie:
   //  • "duali" lettura/scrittura: ELENCANO (livello 1) se nudi o con soli flag,
