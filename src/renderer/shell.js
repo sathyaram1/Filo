@@ -105,6 +105,7 @@
   const APPS = [
     { label: 'Editor', icon: 'editor', url: 'filo://editor/editor.html' },
     { label: 'Deck builder MTG', icon: 'decks', url: 'filo://decks/decks.html' },
+    { label: 'Scaricamenti', icon: 'download', url: 'filo://downloads/downloads.html' },
     { type: 'separator' },
     { label: 'Feedback', icon: 'feedback', url: 'filo://feedback/feedback.html' },
     { label: 'Bacheca', icon: 'board', url: 'filo://board/board.html' },
