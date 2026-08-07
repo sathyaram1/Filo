@@ -392,7 +392,32 @@ class TabManager {
     return view;
   }
 
-  openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null, suppressAutoplay = false } = {}) {
+  openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null, suppressAutoplay = false, allowDuplicate = false } = {}) {
+    // #252 — INDIRIZZO UNICO per le pagine interne: riporta l'eventuale forma
+    // legacy `filo://src/pages/<page>/<file>` (dallo shim getURL) alla forma
+    // canonica `filo://<page>/<file>` che usa il menu. Così tutti i punti di
+    // ingresso convergono su un solo URL, qualunque chiamante li apra.
+    if (typeof url === 'string' && url.startsWith('filo://')) url = canonicalizeFiloUrl(url);
+
+    // #252 — DEDUPLICA le pagine singleton: se la pagina interna è già aperta
+    // in una scheda, riportaci l'utente invece di duplicarla. Solo per aperture
+    // in primo piano volute dall'utente (click su menu/link) e non quando si
+    // chiede esplicitamente una copia (Duplica scheda → allowDuplicate). Le
+    // aperture in background (activate:false) creano schede vere, come prima.
+    if (activate && !allowDuplicate) {
+      const key = filoSingletonKey(url);
+      if (key) {
+        const existing = this.tabs.find((t) => filoSingletonKey(t.url) === key);
+        if (existing) {
+          // URL identico → basta riportare a fuoco. Differisce solo per query/
+          // hash (es. ?highlight=…) → rinaviga la scheda esistente al nuovo URL
+          // così l'intento (evidenziare l'elemento appena salvato) si applica.
+          if (existing.url !== url) this.navigate(existing.id, url);
+          this.activate(existing.id);
+          return existing.id;
+        }
+      }
+    }
     // SICUREZZA (#247) — will-navigate e setWindowOpenHandler bloccano solo le
     // navigazioni che Electron origina da sé (click, window.open): un
     // loadURL() PROGRAMMATICO come questo NON emette will-navigate, quindi
