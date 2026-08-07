@@ -16,12 +16,17 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.190', date: '2026-08-07',
+      features: [
+        'Ora puoi chiedere a Filo di mettere o togliere lo schermo intero, ridurre a icona la finestra o aprire i menu Impostazioni, App e Account: prima poteva solo spiegarti dove cliccare, adesso lo fa lui.',
+      ],
+    },
+    {
       version: '0.2.189', date: '2026-08-06',
       features: [
         'Nell\'editor puoi scorrere le corrispondenze del riquadro Cerca con Invio (Maiusc+Invio per tornare indietro) e chiudere la ricerca con Esc.',
         'Nelle Opzioni trovi l\'elenco completo di dove Filo usa un modello: accanto alle funzioni che imposti tu, ora sono elencati anche i punti che girano sui server di Filo e quelli che un modello non lo usano affatto, ciascuno con scritto dove si imposta.',
         'Puoi scegliere il modello di sei funzioni che prima non erano impostabili: l\'indicizzazione delle schede archiviate, il titolo, il riassunto e la chat dell\'editor, la ricerca fra i feedback e il pulsante "Prova" delle chiavi.',
-        'Ora puoi chiedere a Filo di mettere o togliere lo schermo intero, ridurre a icona la finestra o aprire i menu Impostazioni, App e Account: prima poteva solo spiegarti dove cliccare, adesso lo fa lui.',
       ],
       fixes: [
         'Quando un pulsante "Scarica" avvia lo scaricamento aprendo una nuova scheda, non resti più con una scheda bianca da chiudere a mano: Filo la chiude da solo e ti riporta alla pagina di partenza mentre il download procede.',
