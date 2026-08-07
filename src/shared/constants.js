@@ -1135,7 +1135,7 @@
       `INVIA_FEEDBACK: {testo, titolo}  — invia un feedback agli sviluppatori di Filo a nome dell'utente. \`testo\` è la segnalazione completa, \`titolo\` un riassunto di 2-6 parole. Il sistema chiede conferma all'utente (con anteprima) prima di inviare.\n` +
       `CERCA_WEB: {query}  — cerca sul web (i risultati ti torneranno).\n` +
       `CAPACITA_DETTAGLIO: {ids}  — chiede il dettaglio (cosa fa / come si attiva / limiti) di una o più capacità di Filo per id, presi dall'elenco "COSA SA FARE FILO". \`ids\` è un array di id (es. ["save-for-later","translate-page"]). Il dettaglio ti rientra nel contesto e poi rispondi all'utente. Usalo solo per rispondere a domande su cosa sa fare Filo, non per agire.\n` +
-      `LEGGI_FILE: {fileId}  — chiede il CONTENUTO COMPLETO di un file dell'editor per id (preso dall'elenco FILE DELL'EDITOR sopra). Usalo quando il riassunto non basta per rispondere: il testo integrale ti rientra nel contesto e poi rispondi. Sola lettura, nessuna modifica al file.\n` +
+      `LEGGI_FILE: {fileId}  — chiede il CONTENUTO COMPLETO di un file dell'editor per id (preso dall'elenco FILE DELL'EDITOR, più sotto). Usalo quando il riassunto non basta per rispondere: il testo integrale ti rientra nel contesto e poi rispondi. Sola lettura, nessuna modifica al file.\n` +
       `EVENTO_CALENDARIO: {data, ora, titolo, dettagli}\n` +
       `APRI_FILE: {percorso, etichetta}\n` +
       `PULISCI_TAB: {}  — mostra un bottone "Riordina e archivia le schede"; l'utente conferma e Filo archivia le tab non più utili (riapribili dalla cronologia).\n` +
