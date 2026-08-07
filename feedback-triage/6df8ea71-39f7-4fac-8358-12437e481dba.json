@@ -1,7 +1,0 @@
-{
-  "id": "6df8ea71-39f7-4fac-8358-12437e481dba",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho chiesto a Filo (verificando le voci del suo elenco interno) come aprire un indirizzo, tornare indietro/avanti, ricaricare e andare alla home: ora ogni risposta manda dove il comando sta davvero — indietro/avanti/ricarica nel menu del tasto destro, l'icona Home in alto a destra nella home, l'indirizzo scrivendo \"/\" nella nuova scheda (o Ctrl+L). Nessuna voce rimanda piu a una barra in alto o a una barra degli indirizzi che non esistono. Ho controllato che quei comandi esistano davvero dove ora vengono indicati e che il campo indirizzo resti effettivamente nascosto. Il nuovo controllo automatico contro questa deriva funziona: se una voce tornasse a citare la barra sparita, il controllo diventa rosso (l'ho provato reintroducendo il difetto). Tutti i controlli automatici passano.",
-  "queuedAt": "2026-08-07T22:02:49.455Z",
-  "queuedBy": "routine"
-}
