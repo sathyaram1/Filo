@@ -520,8 +520,11 @@
     if (!trimmed) return 3;
 
     // Sequenza pura di comandi (`&&`/`||`/`;`) → livello = massimo dei pezzi.
+    // Vale anche con UN SOLO pezzo: `git checkout .;` (separatore in coda, forma
+    // che la shell esegue identica a `git checkout .`) deve essere classificato
+    // sul comando vero, non sul token `.;` che non somiglia a nulla di noto.
     const seq = splitSafeSequence(trimmed);
-    if (seq && seq.length > 1) {
+    if (seq && seq.length) {
       return seq.reduce((max, part) => Math.max(max, classifyOne(part)), 1);
     }
     // Pipe / background / redirezioni / sostituzioni: non riconoscibili → 3.
