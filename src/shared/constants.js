@@ -1207,7 +1207,33 @@
       `    {"type": "COMANDO_FINESTRA", "comando": "fullscreen"}\n` +
       `  ]\n` +
       `}\n` +
-      `Se non servono azioni, "actions" è un array vuoto. Mantieni "text" breve per i comandi (es. "Fatto, 25 minuti.").`,
+      `Se non servono azioni, "actions" è un array vuoto. Mantieni "text" breve per i comandi (es. "Fatto, 25 minuti.").\n\n`,
+
+    // Parte VARIABILE del prompt della chat: cambia da un utente all'altro e da
+    // un messaggio all'altro (il nome del modello cambia perfino col ripiego fra
+    // fornitori). Sta SEMPRE dopo `filoChatStatic` — vedi la nota lì sopra: se
+    // finisce prima, il blocco di istruzioni non è più riusabile e va ripagato a
+    // ogni messaggio.
+    filoChatContext: ({ profilo, preferenze, espansioni, lezioni, stato, history, modelName, files }) =>
+      `═══ CONTESTO (cambia a ogni messaggio) ═══\n` +
+      (modelName
+        ? `Il modello che ti sta eseguendo è ${modelName}. Se l'utente ti chiede quale modello o IA sei, rispondi con questo nome esatto — è il nome con cui il codice ti invoca — senza inventarne altri né dare soprannomi.\n\n`
+        : '') +
+      `PROFILO UTENTE:\n${profilo || '(vuoto)'}\n\n` +
+      `PREFERENZE:\n${preferenze || '(vuoto)'}\n\n` +
+      (espansioni ? `${espansioni}\n\n` : '') +
+      (lezioni ? `LEZIONI RECENTI:\n${lezioni}\n\n` : '') +
+      `STATO:\n${stato || '(vuoto)'}\n\n` +
+      `FILE DELL'EDITOR (riassunti — gli appunti sono file come gli altri):\n${files || '(nessuno)'}\n` +
+      `Ogni riga è \`[id] Titolo: riassunto\`. Vedi solo i RIASSUNTI, non il testo intero. Se per rispondere ti serve DAVVERO il contenuto completo di un file, emetti l'azione LEGGI_FILE con il suo id PRIMA di rispondere: il testo integrale ti rientra nel contesto e SOLO ALLORA rispondi. Non chiedere un file se il riassunto basta.\n\n` +
+      (history ? `CONVERSAZIONE:\n${history}\n\n` : '') +
+      // Richiamo finale al formato: le istruzioni ora stanno in testa (lontano
+      // dal punto in cui il modello scrive), e una riga di promemoria costa
+      // pochissimo rispetto al blocco che si risparmia. Sta nella parte
+      // variabile di proposito: deve restare l'ULTIMA cosa letta.
+      `Rispondi SOLO con il JSON descritto sopra: "text" per primo, poi "actions".`,
+
+    filoChat: (payload) => PROMPTS.filoChatStatic(payload || {}) + PROMPTS.filoChatContext(payload || {}),
 
     // Generatore dashboard: produce messaggio centrale + suggerimenti.
     filoDashboard: ({ profilo, preferenze, espansioni, lezioni, stato, notifiche, appunti, salvati, ultimoMessaggio, tabAperte, momento }) =>
