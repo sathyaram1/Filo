@@ -20,6 +20,7 @@
       features: [],
       fixes: [
         'Nella cronologia degli appunti la voce che togli con la "×" ora resta tolta: prima, riaprendo la cronologia dalla stessa freccia senza chiudere il menu del tasto destro, ricompariva come se non l\'avessi mai rimossa.',
+        'Il messaggio della Nuova scheda ora sa che giorno della settimana è: prima conosceva solo la fascia oraria e se era feriale o weekend, adesso tiene conto del giorno esatto e della data (utile per abitudini e scadenze legate a un giorno preciso).',
       ],
     },
     {
