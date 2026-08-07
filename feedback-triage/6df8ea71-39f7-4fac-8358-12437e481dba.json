@@ -1,8 +1,0 @@
-{
-  "id": "6df8ea71-39f7-4fac-8358-12437e481dba",
-  "status": "revision_capability",
-  "notes": "Fatto: quando chiedi a Filo come aprire un indirizzo, tornare indietro, ricaricare o andare alla home, ora ti manda dove quei comandi stanno davvero (menu del tasto destro; icona Home in alto a destra nella home; l'indirizzo scrivendo \"/\" nella nuova scheda), non piu a una barra in alto che non c'e.\n\nOltre alle voci che avevi segnalato ho corretto altri residui della stessa barra sparita, che avresti ritrovato al prossimo giro: la scheda \"Home di Filo\" diceva ancora \"pulsante Home nella barra\", \"Schermo intero\" citava una \"barra degli indirizzi\", e la descrizione degli scaricamenti parlava di \"barra in alto\" (l'indicatore in realta sta in alto tra le linguette). La voce \"Barra degli indirizzi\" era gia corretta, non l'ho toccata.\n\nHo anche aggiunto un controllo automatico che d'ora in poi blocca qualsiasi voce dell'elenco che rimandi a quella barra in alto/degli indirizzi rimossa, cosi questa famiglia di disallineamenti non si ripresenta di nascosto.",
-  "queuedAt": "2026-08-07T21:59:00.873Z",
-  "queuedBy": "routine",
-  "branch": "worker/6df8ea71-39f7-4fac-8358-12437e481dba"
-}
