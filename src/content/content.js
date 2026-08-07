@@ -895,8 +895,67 @@
     };
   }
 
+  // Azioni sull'immagine (senza la sezione "Spiega": la compone il chiamante,
+  // così quando l'immagine è anche un link non firiamo due box AI a ogni apertura).
+  function buildImageActionItems(imgEl) {
+    return [
+      { type: 'item', label: I18n.t('menu_copy_image'), onClick: () => Actions.copyImage(imgEl) },
+      { type: 'item', label: I18n.t('menu_save_image_as'), onClick: () => Actions.downloadImage(imgEl) },
+      {
+        type: 'item',
+        label: I18n.t('menu_copy_image_link'),
+        onClick: () => Actions.copyToClipboard(imgEl.currentSrc || imgEl.src),
+      },
+      {
+        type: 'item',
+        label: I18n.t('menu_search_image'),
+        onClick: () => Actions.searchImageOnWeb(imgEl),
+      },
+    ];
+  }
+
+  // Azioni sul collegamento (senza la sezione "Spiega", come sopra).
+  function buildLinkActionItems(linkEl) {
+    const out = [
+      {
+        type: 'item',
+        label: I18n.t('menu_open_in_new_tab'),
+        onClick: () => window.open(linkEl.href, '_blank', 'noopener'),
+      },
+    ];
+    // "Salva file" — gemello di "Salva immagine come" per i link a un file
+    // (PDF, ZIP, allegato). Compare SOLO quando il link punta davvero a un
+    // file (vedi isDownloadableLink): su un link a un'altra pagina scaricare
+    // l'HTML non avrebbe senso.
+    if (Actions.isDownloadableLink(linkEl)) {
+      out.push({
+        type: 'item',
+        label: I18n.t('menu_save_file'),
+        onClick: () => Actions.downloadLink(linkEl),
+      });
+    }
+    out.push(
+      {
+        type: 'item',
+        label: I18n.t('menu_copy_link'),
+        onClick: () => Actions.copyToClipboard(linkEl.href),
+      },
+      {
+        type: 'item',
+        label: I18n.t('menu_save_link_for_later'),
+        onClick: () => Actions.saveLink(linkEl),
+      },
+      {
+        type: 'item',
+        label: I18n.t('menu_share_link'),
+        onClick: () => Actions.shareLink(linkEl),
+      },
+    );
+    return out;
+  }
+
   // Costruisce gli item della zona contestuale in base a cosa è stato cliccato.
-  // Matrice: testo / testo+editabile / video-audio / immagine / link /
+  // Matrice: testo / testo+editabile / video-audio / immagine (+ link) / link /
   // casella input / niente.
   function buildContextualItems({
     selInfo, linkEl, imgEl, mediaEl, mediaUnder, editable, clipboardHistory,
