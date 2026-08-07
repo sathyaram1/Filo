@@ -622,8 +622,17 @@ async function buildSnapshot() {
       reviews.push({ id: fb._id, num: fb.num || fb.seq || '', branch: fb.branch, state: reconcileState(readState(fb._id), status), status });
     }
   }
+  // Coda vuota ≠ coda illeggibile. Se NESSUNO degli status cifrati si decifra,
+  // la chiave privata manca o è rotta: la coda piena "sembra vuota" e il giro
+  // finisce in audit invece di lavorare (è la causa dell'ondata #310+). Non è
+  // un risultato, è un GUASTO — passeggero, perché la chiave può tornare.
+  // Un solo documento illeggibile fra molti resta un avviso: è corruzione di
+  // quel doc, non un ambiente cieco, e fermare la flotta per sempre sarebbe peggio.
+  if (encrypted && unreadable === encrypted) {
+    throw routineFault('transient', `coda illeggibile: nessuno dei ${encrypted} status cifrati è decifrabile (chiave privata assente o rotta)`);
+  }
   if (unreadable) {
-    process.stderr.write(`[dispatch] ATTENZIONE: ${unreadable} status non decifrabili (chiave privata assente o rotta?): la coda può sembrare vuota per errore, non perché lo sia\n`);
+    process.stderr.write(`[dispatch] ATTENZIONE: ${unreadable}/${encrypted} status non decifrabili: quei feedback sono invisibili a questo giro\n`);
   }
 
   // Vincitore todo: riusa next-feedback (exit 0 = JSON vincitore, 2 = vuoto).
