@@ -224,6 +224,10 @@
       if (!ok) return;
       await chrome.runtime.sendMessage({ type: MSG.CLEAR_HISTORY });
       items = [];
+      // Svuotando la cronologia spariscono tutti i tipi: riallinea il menu
+      // "filtra per tipo" come fa la rimozione della singola voce, altrimenti
+      // resterebbero opzioni per dati che non esistono più.
+      buildFilterOptions();
       render();
     });
     $('openArchive').addEventListener('click', () => {
