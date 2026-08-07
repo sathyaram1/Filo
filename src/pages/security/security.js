@@ -138,11 +138,15 @@
         const d = new Date(prev.exportedAt);
         if (!isNaN(d.getTime())) when = ` (del ${d.toLocaleDateString()})`;
       }
+      const sezioni = prev.sections === 1 ? '1 sezione di dati' : `${prev.sections} sezioni di dati`;
+      const immagini = prev.images === 0
+        ? 'nessuna immagine'
+        : (prev.images === 1 ? '1 immagine' : `${prev.images} immagini`);
       const text = I18n.t('security_import_confirm_text')
         .replace('%1', prev.fileName || '')
         .replace('%2', when)
-        .replace('%3', String(prev.sections))
-        .replace('%4', String(prev.images));
+        .replace('%3', sezioni)
+        .replace('%4', immagini);
 
       const ok = window.SN_CONFIRM_UI
         ? await window.SN_CONFIRM_UI.confirm({
