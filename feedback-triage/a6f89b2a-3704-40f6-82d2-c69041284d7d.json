@@ -1,7 +1,0 @@
-{
-  "id": "a6f89b2a-3704-40f6-82d2-c69041284d7d",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica al Correttore è stata pubblicata. Ora, se svuoti il campo di una correzione automatica, non sembra più cancellata: il campo torna al valore reale e un avviso ti ricorda che per toglierla davvero devi usare «Rimuovi». La verifica di sicurezza non ha rilevato alcun rischio (nessun dato sensibile o segreto toccato, solo interfaccia).",
-  "queuedAt": "2026-08-07T10:09:25.254Z",
-  "queuedBy": "routine"
-}
