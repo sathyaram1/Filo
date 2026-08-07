@@ -252,6 +252,16 @@ html, body {
   transform: translateY(-1px);
   box-shadow: var(--sn-shadow);
 }
+/* Evidenziazione della scheda appena salvata (#252): un alone d'accento che
+   pulsa una volta e sfuma, per dire "è finita qui" senza restare invadente. */
+.sn-card-highlight {
+  animation: sn-card-highlight 2.4s ease-out 1;
+}
+@keyframes sn-card-highlight {
+  0%   { box-shadow: 0 0 0 3px rgba(var(--sn-accent-rgb), 0.55); border-color: var(--sn-accent); }
+  60%  { box-shadow: 0 0 0 3px rgba(var(--sn-accent-rgb), 0.35); border-color: var(--sn-accent); }
+  100% { box-shadow: 0 0 0 0 rgba(var(--sn-accent-rgb), 0); }
+}
 
 .sn-card-thumb {
   aspect-ratio: 16 / 9;
