@@ -97,7 +97,13 @@ test('doppio click rapido sulla conferma apre UNA sola lista', async ({ app, ope
   await savePage(page);
   const pill = page.locator('.sn-save-confirm');
   await expect(pill).toBeVisible({ timeout: 5000 });
-  await pill.dblclick();
+  // Due click sincroni back-to-back: se la conferma non è idempotente
+  // aprirebbe due liste. Sparati insieme prima che il DOM si aggiorni.
+  await page.evaluate(() => {
+    const el = document.querySelector('.sn-save-confirm');
+    el.click();
+    el.click();
+  });
 
   await new Promise((r) => setTimeout(r, 2500));
   const homes = app.windows().filter((w) => {
