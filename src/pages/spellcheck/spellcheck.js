@@ -262,20 +262,35 @@
   }
 
   async function addDictFromInput() {
-    const w = $('newDictWord').value.trim();
-    if (!w) return;
+    const raw = $('newDictWord').value.trim();
+    if (!raw) return;
+    // Il dizionario è confrontato PAROLA PER PAROLA con il testo: una voce con
+    // spazi dentro ("New York") non verrebbe mai confrontata con un singolo token
+    // e resterebbe inerte. Se l'utente scrive più parole le aggiungiamo come voci
+    // separate — così l'input fa davvero qualcosa — invece di salvare una stringa
+    // multi-parola che non scatterebbe mai.
+    const words = raw.split(/\s+/).filter(Boolean);
+    if (!words.length) return;
     const data = await chrome.storage.local.get(STORAGE_KEYS.PERSONAL_DICT);
     const existing = data[STORAGE_KEYS.PERSONAL_DICT] || [];
-    // Dedup case-insensitive: se esiste già una parola con lo stesso casing diverso, non aggiungerla.
-    const alreadyExists = existing.some((x) => String(x).toLowerCase() === w.toLowerCase());
-    if (alreadyExists) {
-      // Simmetria con la sezione autocorrect: avvisa invece di ingoiare l'input
-      // in silenzio. Non svuotiamo il campo così l'utente vede cosa aveva digitato.
-      showDictConflictMessage(w);
+    // Dedup case-insensitive: non aggiungere parole già presenti (anche con casing diverso).
+    const present = new Set(existing.map((x) => String(x).toLowerCase()));
+    const added = [];
+    for (const w of words) {
+      const key = w.toLowerCase();
+      if (present.has(key)) continue;
+      present.add(key);
+      existing.push(w); // preserva il casing originale
+      added.push(w);
+    }
+    if (!added.length) {
+      // Tutte già presenti: avvisa invece di ingoiare l'input in silenzio
+      // (simmetria con la sezione autocorrect). Non svuotiamo il campo così
+      // l'utente vede cosa aveva digitato.
+      showDictConflictMessage(raw);
       $('newDictWord').select();
       return;
     }
-    existing.push(w); // preserva il casing originale
     await chrome.storage.local.set({ [STORAGE_KEYS.PERSONAL_DICT]: existing });
     renderDict(existing);
     $('newDictWord').value = '';
