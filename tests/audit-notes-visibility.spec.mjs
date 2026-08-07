@@ -10,10 +10,26 @@
 //
 // Senza il fix (appunto nell'archivio separato) il testo non comparirebbe in
 // nessun file dell'editor → rosso.
+//
+// #379.12 chiude il cerchio lato UI: l'accesso agli appunti passa SOLO
+// dall'editor (niente più pannello/icona "Appunti" nella home) e l'editor porta
+// proprio l'icona degli appunti, ovunque compaia. Gli ultimi tre test qui sotto
+// asserinscono quell'invariante:
+//   3) i controlli in alto a destra nella home sono ESATTAMENTE quelli del
+//      browser — nessuna voce che apra un elenco appunti separato;
+//   4) la voce Editor del menu App e l'icona Editor del menu tasto destro
+//      disegnano il foglio degli appunti (stesso SVG), non più la penna;
+//   5) da lì l'editor si apre davvero.
 
 import { test, expect } from './fixtures/electron.mjs';
 
 const EDITOR = 'filo://editor/editor.html';
+
+// Tratto distintivo dell'SVG "appunti" (foglio con l'angolo piegato) — vive in
+// src/shared/icons.js (`note`) e, in copia, nel registro del popup del menu App
+// (src/main/popup-menu.js). Se questo path non compare, l'icona disegnata è
+// un'altra.
+const NOTE_PATH = 'M6 3.5h8l4 4v13H6z';
 
 // Scrive un appunto passando dal VERO percorso di runtime: l'azione SALVA_APPUNTO
 // (come la emette la chat) inviata al main, che la esegue scrivendo nel file
