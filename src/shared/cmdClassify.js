@@ -456,7 +456,13 @@
   }
 
   // Livello di un SINGOLO comando (senza metacaratteri di sequenza).
-  function classifyOne(trimmed) {
+  function classifyOne(raw) {
+    // Valuta sempre la forma senza virgolette: `git push "--force"`,
+    // `curl "-o" ~/.ssh/authorized_keys`, `git checkout .""` fanno esattamente
+    // ciò che farebbero senza, e devono ricevere lo stesso livello (vedi
+    // unquote). Le virgolette non possono nascondere neppure i metacaratteri:
+    // quelli sono già stati intercettati prima, sul testo grezzo.
+    const trimmed = dequote(raw);
     const prog = programOf(trimmed);
     if (!prog) return 3;
     if (ALWAYS_3.has(prog)) return 3;
