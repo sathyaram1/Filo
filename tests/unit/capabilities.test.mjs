@@ -279,3 +279,41 @@ test('ogni voce del menu «App» citata dal manifesto esiste davvero nel launche
   }
   assert.ok(cited >= 1, 'mi aspetto almeno una capacità che passi dal menu «App»');
 });
+
+test('nessuna capacità cita la barra in alto / degli indirizzi, rimossa dalla shell', () => {
+  // Drift #399 (stessa famiglia di #387/#252): la shell tiene la barra indirizzi
+  // (<nav class="addr">) SEMPRE nascosta — applyChrome() forza compact=true e
+  // boot.spec.mjs asserisce #addr assente. Sopra le schede ci sono solo le
+  // linguette e i pulsanti finestra: indietro/avanti/ricarica vivono nel menu
+  // del tasto destro, l'icona Home in alto a destra DENTRO la home. Il manifesto
+  // aveva continuato a mandare l'utente a "frecce/pulsante nella barra in alto" e
+  // a "digitare nella barra degli indirizzi", strade che non esistono più.
+  //
+  // Ancora anti-stale: se la barra tornasse davvero visibile, applyChrome() non
+  // forzerebbe più compact=true incondizionatamente — questo test va allora
+  // rivisto INSIEME al manifesto (non basta cancellarlo).
+  const shell = readFileSync(join(ROOT, 'src', 'renderer', 'shell.js'), 'utf8');
+  assert.match(shell, /function applyChrome[\s\S]*?const compact = true;/,
+    'applyChrome() non forza più la barra compatta: la barra indirizzi potrebbe essere tornata visibile — rivedi manifesto e questo test');
+
+  // "barra delle schede" (le linguette in alto) esiste eccome ed è lecita; a
+  // essere sparita è la barra IN ALTO degli indirizzi/navigazione. Vietiamo solo
+  // le formule che promettono quella.
+  const FORBIDDEN = [
+    { re: /barra in alto/i, why: 'la barra in alto (indirizzi/navigazione) è stata rimossa' },
+    { re: /barra\s+(degli\s+)?indirizzi/i, why: 'la barra degli indirizzi è sempre nascosta' },
+    // "nella barra" generico, TRANNE la barra delle schede (le linguette, che
+    // esiste) o la barra in basso (chat del deck builder): intercetta formule
+    // come "Pulsante Home nella barra" che rimandano alla barra sparita.
+    { re: /nella barra(?!\s+(delle schede|in basso))/i, why: 'l\'unica barra sopra le schede è quella delle linguette' },
+  ];
+  for (const c of CAP.CAPABILITIES) {
+    const text = `${c.invoke} ${c.desc}${c.doesNot ? ' ' + c.doesNot : ''}`;
+    for (const { re, why } of FORBIDDEN) {
+      assert.ok(!re.test(text),
+        `la capacità "${c.id}" cita "${(text.match(re) || [''])[0]}", ma ${why}: `
+        + 'aggiorna il manifesto (indietro/avanti/ricarica sono nel menu del tasto destro, '
+        + 'l\'indirizzo si scrive con "/" nella nuova scheda, Home è in alto a destra nella home)');
+    }
+  }
+});
