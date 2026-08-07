@@ -490,6 +490,24 @@
     security_export_btn: 'Esporta dati (.zip)',
     security_export_done: 'Dati esportati',
     security_export_fail: 'Esportazione non riuscita',
+    security_import_title: 'Importa dati Filo',
+    security_import_btn: 'Importa dati (.zip)',
+    security_import_desc:
+      'Ricarica un .zip esportato da Filo: rimette al loro posto memorie, pagine ' +
+      'salvate, cronologia, immagini e impostazioni. Quello che hai già non viene ' +
+      'cancellato — le liste si uniscono e, dove c\'è un conflitto, vince il backup.',
+    security_import_confirm_title: 'Importa dati da backup',
+    // %1 = nome file, %2 = " (del …)" o vuoto, %3/%4 = conteggi già declinati
+    security_import_confirm_text:
+      'Da "%1"%2: %3 e %4.\n\n' +
+      'Nulla di ciò che hai ora viene cancellato: le liste (pagine salvate, ' +
+      'cronologia, appunti) si uniscono senza duplicati e le sezioni che qui non ' +
+      'esistono vengono aggiunte. Dove lo stesso dato esiste in entrambi, vince ' +
+      'quello del backup. Le impostazioni del backup diventano attive subito.',
+    security_import_confirm_ok: 'Importa',
+    security_import_done: 'Dati importati',
+    security_import_invalid: 'Non è un archivio esportato da Filo',
+    security_import_fail: 'Importazione non riuscita',
 
     // Home
     home_title: 'Aperti per dopo',
