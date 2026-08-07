@@ -200,8 +200,14 @@ module.exports = function register(on, ctx) {
     }
   });
 
+  // Il contenuto in attesa di conferma scade: se l'utente apre l'anteprima e
+  // poi se ne dimentica, un dump completo dei suoi dati (chiavi API comprese)
+  // non deve restare in memoria per tutta la sessione.
+  const IMPORT_TTL_MS = 10 * 60 * 1000;
+
   on(MSG.IMPORT_DATA_APPLY, async (msg, sender, origin) => {
     if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
+    if (PENDING_IMPORT && Date.now() - PENDING_IMPORT.at > IMPORT_TTL_MS) PENDING_IMPORT = null;
     if (!PENDING_IMPORT || !msg || msg.token !== PENDING_IMPORT.token) {
       return { ok: false, error: 'expired' };
     }
@@ -219,9 +225,16 @@ module.exports = function register(on, ctx) {
       // backup diventano attivi SUBITO, senza riavviare (la propagazione è la
       // stessa del salvataggio dalle Preferenze). Tutto il resto è una
       // scrittura diretta sullo storage.
+      //
+      // Riscriviamo SOLO le chiavi che l'import cambia davvero: rimettere a
+      // posto valori identici sveglierebbe per niente i listener onChanged
+      // (e i loro effetti collaterali) su tutto lo storage.
       const settings = merged[SETTINGS_KEY];
-      const rest = { ...merged };
-      delete rest[SETTINGS_KEY];
+      const rest = {};
+      for (const k of Object.keys(merged)) {
+        if (k === SETTINGS_KEY) continue;
+        if (JSON.stringify(merged[k]) !== JSON.stringify(current[k])) rest[k] = merged[k];
+      }
       if (Object.keys(rest).length) await DiskStorage.set(rest);
       if (settings && typeof settings === 'object') await applySettingsUpdate(settings);
 
