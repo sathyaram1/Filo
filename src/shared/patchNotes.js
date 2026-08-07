@@ -23,6 +23,7 @@
         'Il messaggio della Nuova scheda ora sa che giorno della settimana è: prima conosceva solo la fascia oraria e se era feriale o weekend, adesso tiene conto del giorno esatto e della data (utile per abitudini e scadenze legate a un giorno preciso).',
         'Nel deck builder, l\'anteprima di una carta bifronte ora riparte sempre dal fronte quando la riapri: prima, se l\'avevi girata sul retro e poi ci tornavi sopra, si riapriva ancora sul retro.',
         'Nel Correttore, svuotare il campo di una correzione automatica non la fa più sembrare cancellata: il campo torna al valore vero e un avviso ricorda che per toglierla si usa «Rimuovi». Prima restava vuoto a video mentre la correzione continuava di nascosto ad agire.',
+        'In modalità terminale, i comandi git che buttano via lavoro non ancora salvato (come "git checkout ." o "git stash clear") ora chiedono la conferma forte, quella in cui devi digitare "conferma": prima bastava un OK distratto, come per un\'azione innocua. Il semplice cambio di ramo continua a chiedere solo l\'OK.',
       ],
     },
     {
