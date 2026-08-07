@@ -1,8 +1,0 @@
-{
-  "id": "36823ab5-fd3c-4e64-a0bc-c6a8293f1239",
-  "status": "revision_capability",
-  "notes": "Fatto. Le correzioni automatiche di più parole ora scattano davvero mentre scrivi (es. \"x es \" diventa \"per esempio \"): non serve più che siano parole singole, e l'elenco che vedevi era quindi corretto — mancava solo il motore che le espandesse.\n\nPer il dizionario personale ho scelto di NON rifiutare l'input con spazi, ma di spezzarlo: se scrivi più parole insieme (es. \"New York\") le salvo come voci separate. Il dizionario confronta il testo parola per parola, quindi una voce con lo spazio dentro non verrebbe mai usata; spezzarla è l'unico modo perché quelle parole contino davvero, e ti risparmia di inserirle una alla volta.",
-  "queuedAt": "2026-08-07T21:45:18.272Z",
-  "queuedBy": "routine",
-  "branch": "worker/36823ab5-fd3c-4e64-a0bc-c6a8293f1239"
-}
