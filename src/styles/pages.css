@@ -344,6 +344,19 @@ html, body {
   gap: 10px;
 }
 
+/* Quota di testo in ingresso riusata da una richiesta precedente (#422).
+   Dato di servizio: resta discreto accanto al costo, si spiega al passaggio del
+   mouse (pagina consultata di rado → l'hover ci sta). */
+.sn-history-reuse {
+  white-space: nowrap;
+  cursor: help;
+  border-bottom: 1px dotted var(--sn-border);
+}
+
+.sn-history-reuse:hover {
+  color: var(--sn-fg);
+}
+
 .sn-history-remove {
   border: none;
   background: none;
