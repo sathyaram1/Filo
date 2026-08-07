@@ -206,6 +206,12 @@
     return new Date(iso).toLocaleString('it-IT');
   }
 
+  // Conteggi di token nel formato dei numeri italiano (1.234), per il
+  // suggerimento del riuso.
+  function formatTokens(n) {
+    return Number(n || 0).toLocaleString('it-IT');
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     load();
     $('search').addEventListener('input', render);
