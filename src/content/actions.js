@@ -1829,6 +1829,7 @@
     // salva / condividi / cerca / immagini
     buildSavePayload,
     savePage,
+    showSaveConfirm,
     saveLink,
     isDownloadableLink,
     downloadLink,
