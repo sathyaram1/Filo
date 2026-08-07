@@ -52,6 +52,18 @@
     return Object.keys(p).length ? p : null;
   }
 
+  // Marcatura esplicita della parte riusabile: NON serve per i modelli che Filo
+  // usa davvero (#422). I modelli Gemini — sia via questo router sia via l'API
+  // diretta — riconoscono da soli il prefisso identico a una richiesta
+  // precedente, e lo stesso vale per OpenAI/DeepSeek/Grok/Moonshot. Fanno
+  // eccezione i modelli Anthropic, che vogliono un marcatore esplicito nel corpo
+  // della richiesta: oggi qui sono configurati solo su funzioni dal prompt corto
+  // (spiegazione approfondita, riscrittura di un testo), dove non ci sarebbe
+  // comunque nulla da riusare. Se un domani si mettesse un modello Anthropic
+  // sulla chat o sull'assistente di pagina, il riordino da solo non basterebbe:
+  // andrebbe aggiunto il marcatore in fondo alla parte immutabile — e si
+  // vedrebbe subito, perché il riuso resterebbe a zero nella cronologia.
+  //
   // Quanta parte del testo in ingresso è stata RIUSATA invece che ricalcolata
   // (#422). OpenRouter riporta i token letti dalla cache del fornitore in
   // `usage.prompt_tokens_details.cached_tokens` (0 o campo assente = nessun
