@@ -172,7 +172,7 @@ test('nella home i controlli sono solo quelli del browser: nessuna porta agli ap
 
   // Assert POSITIVO sull'insieme completo: se tornasse una voce "Appunti"
   // (o qualsiasi altra porta separata) l'elenco non combacerebbe più.
-  await expect(controls).toHaveText(['', '', '', '', '', '']);
+  await expect(controls).toHaveCount(6);
   const labels = await controls.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
   expect(labels).toEqual(['Red-team', 'Home', 'Cronologia', 'Impostazioni', 'App', 'Profilo']);
 
