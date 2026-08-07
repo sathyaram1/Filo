@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.191', date: '2026-08-07',
+      features: [],
+      fixes: [
+        'Nella cronologia degli appunti la voce che togli con la "×" ora resta tolta: prima, riaprendo la cronologia dalla stessa freccia senza chiudere il menu del tasto destro, ricompariva come se non l\'avessi mai rimossa.',
+      ],
+    },
+    {
       version: '0.2.190', date: '2026-08-07',
       features: [
         'Ora puoi chiedere a Filo di mettere o togliere lo schermo intero, ridurre a icona la finestra o aprire i menu Impostazioni, App e Account: prima poteva solo spiegarti dove cliccare, adesso lo fa lui.',
