@@ -196,3 +196,86 @@ test('ogni icona fissa della home che apre una pagina filo:// è coperta dal man
       `un'icona della home apre ${url} ma nessuna capacità del manifesto la cita: aggiungi/aggiorna la voce`);
   }
 });
+
+// ── Anti-stale: il manifesto non può citare strade che non esistono più ──────
+
+// Etichette italiane delle icone del menu del tasto destro, per id, e insieme
+// delle icone che un utente può DAVVERO vedere (registro meno le ritirate,
+// limitato a quelle presenti nel layout di default o aggiunte per migrazione).
+function menuIconLabels() {
+  const src = readFileSync(join(ROOT, 'src', 'content', 'menuIcons.js'), 'utf8');
+  const i18n = readFileSync(join(ROOT, 'src', 'shared', 'i18n.js'), 'utf8');
+  const label = (key) => {
+    const m = i18n.match(new RegExp(`\\b${key}:\\s*'([^']+)'`));
+    return m ? m[1] : null;
+  };
+  // id → etichetta, per le voci del registro con label statica.
+  const byId = new Map();
+  for (const m of src.matchAll(/\bid:\s*'(\w+)'[^\n]*?label:\s*I18n\.t\('([a-z0-9_]+)'\)/g)) {
+    const text = label(m[2]);
+    if (text) byId.set(m[1], text);
+  }
+  const retired = new Set(
+    [...(src.match(/RETIRED_ICONS\s*=\s*new Set\(\[([^\]]*)\]/)?.[1] || '').matchAll(/'(\w+)'/g)].map((m) => m[1]),
+  );
+  // Icone raggiungibili: quelle del layout di default più quelle che la
+  // migrazione aggiunge ai layout già salvati. Un'icona fuori da qui non
+  // compare nel menu di NESSUNO, anche se resta nel registro.
+  const reachable = new Set();
+  const layout = src.match(/DEFAULT_ICON_LAYOUT\s*=\s*\{([\s\S]*?)\n  \};/)?.[1] || '';
+  const additions = src.match(/const additions\s*=\s*\[([^\]]*)\]/)?.[1] || '';
+  for (const m of `${layout}${additions}`.matchAll(/'(\w+)'/g)) {
+    if (!retired.has(m[1])) reachable.add(m[1]);
+  }
+  return { byId, retired, reachable };
+}
+
+test('nessuna capacità promette un\'icona del menu del tasto destro che non c\'è più', () => {
+  // Drift #252: "Aperti per dopo" era stato ritirato dalle icone del menu, ma il
+  // manifesto continuava a dire «Menu del tasto destro → "Aperti per dopo"».
+  // L'agente, che legge il manifesto, dava all'utente istruzioni impossibili.
+  // Qui incrociamo OGNI etichetta citata come voce del tasto destro con le icone
+  // davvero raggiungibili: se una capacità cita un'icona ritirata, il test è rosso.
+  const { byId, reachable } = menuIconLabels();
+  assert.ok(byId.size >= 8, `mi aspetto ≥8 icone con etichetta statica, trovate ${byId.size}`);
+  assert.ok(reachable.size >= 8, `mi aspetto ≥8 icone raggiungibili, trovate ${reachable.size}`);
+
+  // Etichette che NON sono più raggiungibili dal menu del tasto destro.
+  const unreachableLabels = new Map();
+  for (const [id, text] of byId) if (!reachable.has(id)) unreachableLabels.set(text, id);
+
+  for (const c of CAP.CAPABILITIES) {
+    const invoke = String(c.invoke || '');
+    if (!/tasto destro|clic destro/i.test(invoke)) continue;
+    // Le voci citate fra virgolette (dritte o tipografiche) dopo un riferimento
+    // al tasto destro sono la promessa concreta fatta all'utente.
+    const quoted = [...invoke.matchAll(/["“«]([^"”»]+)["”»]/g)].map((m) => m[1].trim());
+    for (const q of quoted) {
+      const id = unreachableLabels.get(q);
+      assert.ok(!id,
+        `la capacità "${c.id}" promette «tasto destro → ${q}», ma quell'icona (${id}) non è più raggiungibile dal menu: `
+        + 'correggi il manifesto (o rimetti l\'icona nel layout)');
+    }
+  }
+});
+
+test('ogni voce del menu «App» citata dal manifesto esiste davvero nel launcher', () => {
+  // Simmetrico al test precedente sul lato "positivo": il manifesto indica il
+  // menu App come strada per alcune pagine (Scaricamenti, Aperti per dopo…).
+  // Se quella voce non è nel launcher, l'indicazione è falsa.
+  const shell = readFileSync(join(ROOT, 'src', 'renderer', 'shell.js'), 'utf8');
+  const appsBlock = shell.match(/const APPS\s*=\s*\[([\s\S]*?)\n  \];/)?.[1];
+  assert.ok(appsBlock, 'non trovo il registro APPS del launcher in shell.js');
+  const appLabels = new Set([...appsBlock.matchAll(/label:\s*'([^']+)'/g)].map((m) => m[1]));
+  assert.ok(appLabels.size >= 5, `mi aspetto ≥5 voci nel menu App, trovate ${appLabels.size}`);
+
+  let cited = 0;
+  for (const c of CAP.CAPABILITIES) {
+    for (const m of String(c.invoke || '').matchAll(/Menu\s+«App»\s*→\s*«([^»]+)»/g)) {
+      cited++;
+      assert.ok(appLabels.has(m[1].trim()),
+        `la capacità "${c.id}" manda l'utente in «App» → «${m[1]}», ma quella voce non esiste nel menu App`);
+    }
+  }
+  assert.ok(cited >= 1, 'mi aspetto almeno una capacità che passi dal menu «App»');
+});
