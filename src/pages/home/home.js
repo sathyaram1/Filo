@@ -194,6 +194,18 @@
     const card = document.createElement('div');
     card.className = 'sn-card';
 
+    // Evidenziazione una tantum della scheda appena salvata (#252): pulsazione
+    // morbida che sfuma da sola, e la portiamo in vista. Consumiamo l'id così
+    // ricerche/re-render successivi non la ri-evidenziano.
+    if (highlightId && page.id === highlightId) {
+      highlightId = null;
+      card.classList.add('sn-card-highlight');
+      requestAnimationFrame(() => {
+        try { card.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (_) {}
+      });
+      card.addEventListener('animationend', () => card.classList.remove('sn-card-highlight'), { once: true });
+    }
+
     const thumb = document.createElement('div');
     thumb.className = 'sn-card-thumb';
     if (page.thumbnail) thumb.style.backgroundImage = `url(${JSON.stringify(page.thumbnail)})`;
