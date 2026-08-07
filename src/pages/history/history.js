@@ -119,6 +119,24 @@
     meta.appendChild(left);
     const right = document.createElement('span');
     right.className = 'sn-history-meta-right';
+    // Riuso del testo in ingresso (#422): quanta parte del prompt il fornitore
+    // ha riusato da una richiesta precedente invece di rielaborarla. È il modo
+    // per vedere se tenere le istruzioni fisse in testa sta funzionando davvero:
+    // se resta a zero, non sta funzionando. Mostrato solo quando conosciamo i
+    // token in ingresso (chiamate servite dalla cache locale non ne hanno).
+    const inTok = Number(it.usage?.promptTokens) || 0;
+    if (inTok > 0) {
+      const reused = Number(it.usage?.cachedPromptTokens) || 0;
+      const pct = Math.round((reused / inTok) * 100);
+      const chip = document.createElement('span');
+      chip.className = 'sn-history-reuse';
+      chip.textContent = I18n.t('history_reuse', String(pct));
+      chip.title = reused > 0
+        ? I18n.t('history_reuse_title', formatTokens(reused), formatTokens(inTok))
+        : I18n.t('history_reuse_none_title', formatTokens(inTok));
+      right.appendChild(chip);
+    }
+
     const cost = document.createElement('span');
     cost.textContent = it.costEur ? `€${it.costEur.toFixed(4)}` : '—';
     right.appendChild(cost);
