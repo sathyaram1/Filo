@@ -393,8 +393,11 @@
     // `git stash drop`/`clear` ELIMINANO stash salvati in modo irreversibile →
     // livello 3. Gli altri sotto-verbi (push/save/pop/apply/list/show) restano 2.
     stash: (cmd) => {
-      const verb = (gitArgsAfterSub(cmd).filter((a) => !a.startsWith('-'))[0] || '').toLowerCase();
-      return verb === 'drop' || verb === 'clear' ? 3 : 2;
+      const raw = gitArgsAfterSub(cmd).filter((a) => !a.startsWith('-'))[0] || '';
+      // Anche qui vale la lettura "come la farebbe la shell": `git stash d\rop`
+      // elimina lo stash tanto quanto `git stash drop`.
+      const verbs = argVariants(raw).map((v) => v.toLowerCase());
+      return verbs.some((v) => v === 'drop' || v === 'clear') ? 3 : 2;
     },
     config: (cmd) => {
       const args = gitArgsAfterSub(cmd);
