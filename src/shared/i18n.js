@@ -497,9 +497,9 @@
       'salvate, cronologia, immagini e impostazioni. Quello che hai già non viene ' +
       'cancellato — le liste si uniscono e, dove c\'è un conflitto, vince il backup.',
     security_import_confirm_title: 'Importa dati da backup',
-    // %1 = nome file, %2 = data del backup (o '—'), %3 = sezioni, %4 = immagini
+    // %1 = nome file, %2 = " (del …)" o vuoto, %3/%4 = conteggi già declinati
     security_import_confirm_text:
-      'Da "%1"%2: %3 sezioni di dati e %4 immagini.\n\n' +
+      'Da "%1"%2: %3 e %4.\n\n' +
       'Nulla di ciò che hai ora viene cancellato: le liste (pagine salvate, ' +
       'cronologia, appunti) si uniscono senza duplicati e le sezioni che qui non ' +
       'esistono vengono aggiunte. Dove lo stesso dato esiste in entrambi, vince ' +
