@@ -1,0 +1,8 @@
+{
+  "id": "d9465e76-2f92-4652-bf95-377d2e8b2e13",
+  "status": "revision_capability",
+  "notes": "Fatto: svuotando la Cronologia AI il menu «filtra per tipo» ora torna vuoto come dopo aver rimosso le voci una a una.\n\nSulla «Traduci» col codice grezzo 'translate' non ho toccato nulla, e lo dico perché ti aspettavi un controllo: 'translate' non è un codice che Filo scrive mai in cronologia. Le traduzioni reali (selezione) vengono registrate come «Traduci selezione», che ha già la sua etichetta. Il codice grezzo lo si vede solo con voci fittizie precaricate a mano (come nella riproduzione): per quello basterebbe qualsiasi stringa inventata. Aggiungere una finta etichetta 'translate' avrebbe fatto promettere all'app un'azione che non esiste, quindi ho lasciato com'è.",
+  "queuedAt": "2026-08-07T21:26:29.715Z",
+  "queuedBy": "routine",
+  "branch": "worker/d9465e76"
+}
