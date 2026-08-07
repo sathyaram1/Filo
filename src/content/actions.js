@@ -927,6 +927,64 @@
     }
   }
 
+  // Un link "a un file" (PDF, ZIP, allegato) merita "Salva file"; un link a
+  // un'altra pagina no (scaricherebbe l'HTML). Non possiamo interrogare il
+  // server — una HEAD a ogni apertura del menu sarebbe attrito e latenza —
+  // quindi decidiamo dagli indizi locali:
+  //  - l'attributo `download` sull'<a> dichiara esplicitamente un file da salvare;
+  //  - altrimenti l'ultimo segmento del percorso ha un'estensione che NON è
+  //    quella di una pagina navigabile (html, php, asp…). Le pagine di solito non
+  //    hanno estensione o ne hanno una "web"; un file scaricabile sì
+  //    (.pdf, .zip, .csv, .docx…).
+  // Solo http/https: data:/blob:/mailto: e altri schemi non offrono la voce.
+  const PAGE_EXTS = new Set([
+    'html', 'htm', 'xhtml', 'shtml', 'php', 'php3', 'php4', 'php5', 'phtml',
+    'asp', 'aspx', 'jsp', 'jspx', 'cgi', 'pl', 'do', 'action', 'cfm',
+  ]);
+  function isDownloadableLink(linkEl) {
+    if (!linkEl) return false;
+    let href = '';
+    try { href = linkEl.href || ''; } catch (_) { return false; }
+    if (!/^https?:/i.test(href)) return false;
+    try { if (linkEl.hasAttribute && linkEl.hasAttribute('download')) return true; } catch (_) {}
+    let pathname = '';
+    try { pathname = new URL(href).pathname || ''; } catch (_) { return false; }
+    const base = pathname.split('/').filter(Boolean).pop() || '';
+    const m = /\.([a-z0-9]{1,8})$/i.exec(base);
+    if (!m) return false;                       // nessuna estensione ⇒ pagina
+    return !PAGE_EXTS.has(m[1].toLowerCase());
+  }
+
+  // "Salva file" (#410.2). A differenza di downloadImage (byte scaricati a mano
+  // nel main con un dialogo "Salva come…"), instradiamo il download NATIVO della
+  // scheda: il main chiama webContents.downloadURL, che passa per
+  // l'intercettazione will-download di #410.1. Così scaricare dal menu e cliccare
+  // il link producono lo STESSO risultato visibile — avanzamento nella barra,
+  // salvataggio in cartella Download, avviso finale, cronologia (parità dei
+  // cammini). Nessun toast qui: la conferma è quella condivisa col clic (barra +
+  // toast finale dalla shell); avvisiamo solo se il download non parte proprio.
+  async function downloadLink(linkEl) {
+    let href = '';
+    try { href = linkEl.href || ''; } catch (_) {}
+    if (!href) return;
+    // data:/blob: nascono nella pagina stessa: lì Chromium onora l'attributo
+    // `download` di un <a> e il main non saprebbe risolverli — restano sul
+    // cammino anchor (stessa scelta di downloadImage).
+    if (/^(data:|blob:)/i.test(href)) {
+      const a = document.createElement('a');
+      a.href = href;
+      a.download = (linkEl.getAttribute && linkEl.getAttribute('download')) || '';
+      document.body.appendChild(a); a.click(); a.remove();
+      return;
+    }
+    try {
+      const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_LINK, url: href });
+      if (res && res.ok === false) Popup.showToast(I18n.t('toast_file_save_failed'));
+    } catch (_) {
+      Popup.showToast(I18n.t('toast_file_save_failed'));
+    }
+  }
+
   function toggleFullscreen() {
     // Demanda al main: requestFullscreen() su una WebContentsView non porta
     // la BrowserWindow in fullscreen OS, resta confinato al bounds della view.
