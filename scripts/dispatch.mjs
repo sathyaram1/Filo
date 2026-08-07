@@ -480,6 +480,9 @@ export function buildPayload(bucket, ctx = {}) {
       };
     case 'new-work':
       return { id: bucket.id, num: bucket.num, feedback: ctx.feedback || null };
+    case 'halt':
+      // Guasto: nessun lavoro, solo il motivo per cui non si può lavorare.
+      return { kind: bucket.kind || 'transient', message: bucket.message || '' };
     case 'prober':
     default:
       return {};
