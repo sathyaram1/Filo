@@ -850,8 +850,10 @@
       thumbnail = cap?.dataUrl || '';
     } catch (_) { /* miniatura opzionale */ }
 
-    // Conferma all'utente (dopo la cattura, così non sporca la miniatura).
-    Popup.showToast(I18n.t('toast_saved', I18n.t('category_default')));
+    // La conferma NON vive più qui (#252): la scheda sta per chiudersi, quindi
+    // un toast in-pagina sparirebbe con lei e non porterebbe da nessuna parte.
+    // La mostra la shell — sopravvive alla chiusura ed è cliccabile per aprire
+    // "Aperti per dopo" con la scheda evidenziata (emessa dal main al SAVE_PAGE).
 
     if (thumbnail && entry?.id) {
       chrome.runtime.sendMessage({
