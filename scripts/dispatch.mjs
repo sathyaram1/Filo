@@ -877,6 +877,33 @@ async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP) {
     }
   }
 
+  // A + D: la directory viene messa sul branch giusto PRIMA di consegnare, e il
+  // lavoro di un'istanza interrotta viene riportato all'ultimo punto fermo.
+  // FAIL CLOSED: se non riesce non si consegna niente.
+  if (bucket.id && bucket.role !== 'prober') {
+    const pos = positionOnBranch(bucket);
+    if (!pos.ok) {
+      const { release } = await import('./claim-feedback.mjs');
+      try { release(bucket.id); } catch (_) { /* best-effort */ }
+      if (pos.kind === 'permanent') {
+        // Riprovare ogni 6h all'infinito è inutile: il feedback esce dal giro
+        // automatico e compare in dashboard, dove l'owner può decidere.
+        try {
+          execFileSync('node', [resolve(ROOT, 'scripts', 'queue-triage.mjs'), bucket.id, 'design',
+            `La lavorazione automatica non può proseguire: il ramo di lavoro di questa modifica non esiste più, quindi non c'è nulla su cui continuare. Serve una tua decisione (rimetterlo in coda per rifarlo da capo, oppure archiviarlo).`,
+            '--reason', 'branch'],
+            { cwd: ROOT, encoding: 'utf8', stdio: 'ignore' });
+        } catch (_) { /* la nota resta in coda al prossimo giro */ }
+        clearState(bucket.id);
+        persistStateToGit(bucket.id, `feedback: clear-state ${bucket.id}`);
+        process.stderr.write(`[dispatch] ${bucket.id}: ${pos.message} → design\n`);
+        const next = { reviews: snapshot.reviews.filter((r) => r.id !== bucket.id), todoWinner: snapshot.todoWinner?.id === bucket.id ? null : snapshot.todoWinner };
+        return finalizeBucket(chooseBucket(next, cap), next, cap);
+      }
+      return emitHalt('transient', pos.message);
+    }
+  }
+
   // Raccogli il contesto specifico del ruolo (rispettando l'isolamento).
   const ctx = {};
   if (bucket.role === 'secaudit') {
