@@ -1,0 +1,8 @@
+{
+  "id": "a44738e8-04ca-402d-8cd4-31f7f23d5aa9",
+  "status": "revision_capability",
+  "notes": "Fatto: il clic destro su una miniatura racchiusa in un link ora mostra prima le azioni sull'immagine e poi, sotto, quelle sul collegamento (Apri in nuova tab, Copia URL, Salva link per dopo, Condividi link, e Salva file quando il link punta a un file).\n\nUna scelta che ricade su di te: quando la miniatura è anche un link, ho lasciato UNA sola sezione 'Spiega' — quella dell'immagine, l'elemento cliccato. Ogni sezione 'Spiega' fa partire una chiamata al modello ogni volta che il menu si apre; tenerne due (immagine + link) avrebbe raddoppiato quel costo su un menu che si apre spesso, per un box che l'utente raramente legge tutto. Le azioni sul link restano tutte, manca solo la loro spiegazione automatica.\n\nNon ho toccato il pannello Aiuto (sidebar): là le azioni su immagine e link vengono già risolte in modo indipendente, quindi non aveva la stessa asimmetria (i sub-feedback #192.2/#192.3 restano a sé).",
+  "queuedAt": "2026-08-07T22:10:32.993Z",
+  "queuedBy": "routine",
+  "branch": "main"
+}
