@@ -1,7 +1,0 @@
-{
-  "id": "7ff9a640-b02e-4099-9b14-8cd49b2bc802",
-  "status": "done",
-  "notes": "Ho chiuso questo feedback: la correzione che avevi approvato e' ora pubblicata. Il titolo di ripiego dei feedback pieni di emoji non si spezza piu' a meta' di un'emoji: ora conta i caratteri davvero visibili e tiene intere anche le emoji composte (bandiere, toni della pelle, emoji di famiglia). La stessa protezione vale per le etichette di timer e sveglie. La correzione toccava un file considerato sensibile (quello con le credenziali di accesso ai feedback), per questo il cancello di sicurezza automatico l'aveva tenuta in attesa del tuo via libera manuale: ricevuta la tua approvazione, l'ho portata a termine. Ho verificato rieseguendo il controllo automatico che riproduce esattamente il caso segnalato (una quarantina di emoji consecutive, piu' i casi con emoji composte, testo vuoto, soli spazi e una parola lunghissima): tutto passa, nessun carattere rotto. L'intera batteria di controlli rapidi (1337) passa senza regressioni.",
-  "queuedAt": "2026-08-07T09:23:01.593Z",
-  "queuedBy": "routine"
-}
