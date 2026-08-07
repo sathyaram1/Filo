@@ -91,13 +91,8 @@ test('con categorize attivo la conferma apre la sotto-vista con la scheda eviden
 });
 
 // 3) Doppio click rapido sulla conferma non deve aprire due liste né esplodere.
-test('doppio click rapido sulla conferma apre UNA sola lista', async ({ app, openTab, testServer, shell }) => {
-  await shell.evaluate(async () => {
-    await chrome.runtime.sendMessage({
-      type: window.SN_MSG.MSG.UPDATE_SETTINGS,
-      settings: { featureFlags: { categorize: false } },
-    });
-  });
+test('doppio click rapido sulla conferma apre UNA sola lista', async ({ app, openTab, testServer }) => {
+  await setCategorize(app, false);
   const page = await openTab(makePage(testServer, 'Doppio click'));
   await savePage(page);
   const pill = page.locator('.sn-save-confirm');
