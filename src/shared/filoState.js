@@ -156,10 +156,12 @@
     }
     lines.push('');
     // CREDITI — se l'utente chiede quanti crediti gli restano, rispondi con
-    // questo saldo (si ricarica di 100 ogni giorno a mezzanotte).
+    // questo saldo (si ricarica di DAILY_REFILL ogni giorno a mezzanotte: letto
+    // dal valore in vigore, non scritto a mano, così resta veritiero se cambia).
     if (state.credits) {
+      const refill = global.SN_CONST?.CREDIT?.DAILY_REFILL ?? 100;
       lines.push('CREDITI');
-      lines.push(`Saldo: ${state.credits.balance} crediti (si ricaricano di 100 ogni giorno a mezzanotte)`);
+      lines.push(`Saldo: ${state.credits.balance} crediti (si ricaricano di ${refill} ogni giorno a mezzanotte)`);
       lines.push('');
     }
     // TAB APERTE
