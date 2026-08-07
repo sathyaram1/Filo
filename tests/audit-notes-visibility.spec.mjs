@@ -219,6 +219,34 @@ test('l’Editor porta l’icona degli appunti nel menu App e nel menu tasto des
   expect(norm(launcherSvg)).toBe(norm(menuSvg));
 });
 
+test('la conferma «Salvato» porta all’editor, non è un vicolo cieco', async ({ app, openTab }) => {
+  const page = await openTab('filo://newtab/');
+  await page.waitForFunction(() => !!window.__filoDashActions, null, { timeout: 8_000 });
+
+  // Renderizza la ricevuta dell'azione come farebbe una bolla di chat.
+  await page.evaluate(() => {
+    const host = document.createElement('div');
+    host.id = 'test-actions';
+    document.body.appendChild(host);
+    window.__filoDashActions.renderActions(host, [{ type: 'SALVA_APPUNTO', text: 'nota di prova' }]);
+  });
+
+  const btn = page.locator('#test-actions .dash-action-btn[data-action="openNotes"]');
+  await expect(btn).toBeVisible();
+  await expect(btn).toBeEnabled(); // prima era un chip inerte: da lì non si andava da nessuna parte
+  await btn.click();
+
+  const deadline = Date.now() + 8_000;
+  let win = null;
+  while (Date.now() < deadline) {
+    win = app.windows().find((w) => w.url().startsWith('filo://editor'));
+    if (win) break;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  expect(win, 'la conferma «Salvato» non apre l’editor').toBeTruthy();
+  await win.waitForSelector('#doc', { timeout: 10_000 });
+});
+
 test('dal menu App l’Editor si apre normalmente', async ({ shell, app }) => {
   const popup = await openLauncherPopup(shell, app);
   await popup.locator('.item', { hasText: 'Editor' }).first().click();
