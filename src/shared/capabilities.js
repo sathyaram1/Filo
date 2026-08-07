@@ -363,7 +363,7 @@
     {
       id: 'home-page', title: 'Home di Filo', category: 'pages',
       desc: 'La pagina della nuova scheda: al centro l’assistente a cui chiedere qualsiasi cosa, azioni e suggerimenti, un messaggio in evidenza e gli aggiornamenti recenti. In alto a destra ci sono le icone per Red Team, Cronologia, Impostazioni, App e Profilo.',
-      invoke: 'Pulsante Home nella barra, apri una nuova scheda, oppure indirizzo filo://newtab/.',
+      invoke: 'Apri una nuova scheda, l\'icona Home in alto a destra nella home, oppure indirizzo filo://newtab/.',
     },
     {
       id: 'red-team', title: 'Red Team', category: 'pages',
