@@ -1,0 +1,7 @@
+{
+  "id": "ed9e8617-88de-42d3-82eb-a841e5efb3f4",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho ristretto la finestra al caso segnalato (circa 720 punti, mezzo schermo) e aperto la pagina dei feedback: la fila di schede in cima ora va a capo su piu righe, tutte e nove restano visibili — inclusa \"Verificati\" — e la pagina non scorre piu di lato. Sono riuscito a passare alla scheda \"Verificati\" con un clic diretto, senza dover scorrere. Provato anche il caso limite senza alcun feedback (liste vuote): il comportamento regge. Verificato che il problema si ripresenta togliendo la correzione, quindi e' proprio quella a risolverlo.",
+  "queuedAt": "2026-08-07T21:36:56.212Z",
+  "queuedBy": "routine"
+}
