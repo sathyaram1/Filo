@@ -294,17 +294,49 @@
   }
   const hasOperand = (args) => args.some((a) => !a.startsWith('-'));
 
-  // Sotto-comandi "duali": ELENCANO (lettura, livello 1) se invocati nudi o con
-  // soli flag, ma CREANO/IMPOSTANO (scrittura, livello 2) quando ricevono un
-  // operando. `git tag` elenca i tag / `git tag v1.0` ne crea uno; `git branch`
-  // elenca i branch / `git branch nuovo` lo crea; `git config --list` legge /
-  // `git config user.name "X"` scrive; `git remote -v` elenca / `git remote add`
-  // aggiunge. Le forme distruttive (branch -D, tag -d, config --unset, remote
-  // remove/prune) tornano 3 — quelle a flag sono già intercettate prima da
-  // GIT_DANGER_RE, le altre le gestiamo qui.
+  // Sotto-comandi il cui LIVELLO dipende dagli argomenti. Due famiglie:
+  //  • "duali" lettura/scrittura: ELENCANO (livello 1) se nudi o con soli flag,
+  //    CREANO/IMPOSTANO (livello 2) con un operando. `git tag` elenca / `git tag
+  //    v1.0` crea; `git branch` elenca / `git branch nuovo` crea; `git config
+  //    --list` legge / `git config user.name "X"` scrive; `git remote -v` elenca
+  //    / `git remote add` aggiunge.
+  //  • "sicuro vs distruttivo": `checkout` e `stash` hanno forme innocue
+  //    (cambio/creazione ramo, salvataggio di uno stash → livello 2) e forme che
+  //    SCARTANO LAVORO NON SALVATO in modo irreversibile (livello 3, digita
+  //    "conferma"), come i loro gemelli `restore`/`reset --hard`/`clean`.
+  // Le forme distruttive a flag (branch -D, tag -d, config --unset, remote
+  // remove/prune, checkout -f/--discard-changes) sono già intercettate prima da
+  // GIT_DANGER_RE; il resto lo discrimina il predicato qui.
   const GIT_DUAL = {
     tag: (cmd) => (hasOperand(gitArgsAfterSub(cmd)) ? 2 : 1),
     branch: (cmd) => (hasOperand(gitArgsAfterSub(cmd)) ? 2 : 1),
+    // `git checkout` è DISTRUTTIVO quando prende di mira un pathspec: `git
+    // checkout .` (scarta TUTTE le modifiche), `git checkout -- <path>`, `git
+    // checkout <ref> -- <path>`, `git checkout <ref> <path>` (ripristina il file
+    // dal ref, buttando via le modifiche locali) → livello 3. Resta livello 2 il
+    // checkout NON distruttivo: cambio ramo (`git checkout main`), creazione
+    // (`git checkout -b nuovo [start]`, `-B`), torna-al-precedente (`git checkout
+    // -`). La discriminante è la presenza di un pathspec; `-b`/`-B` (e le sue
+    // varianti) sono creazione di ramo, MAI scarto di path, anche con 2 operandi.
+    checkout: (cmd) => {
+      const args = gitArgsAfterSub(cmd);
+      // `--` separa esplicitamente i pathspec: tutto ciò che segue è un file da
+      // ripristinare (scarto del working tree).
+      if (args.includes('--')) return 3;
+      // `-b`/`-B`/`--orphan`/`--detach`: crea/sposta un ramo, non tocca i path.
+      if (args.some((a) => /^(-b|-B|--orphan|--detach)$/.test(a))) return 2;
+      const ops = args.filter((a) => !a.startsWith('-'));
+      if (ops.includes('.')) return 3;         // scarta tutte le modifiche
+      if (ops.length >= 2) return 3;           // `<ref> <path>` senza `--`
+      return 2;                                // cambio ramo (0-1 operando)
+    },
+    // `git stash` SALVA le modifiche (recuperabile con pop → livello 2), ma
+    // `git stash drop`/`clear` ELIMINANO stash salvati in modo irreversibile →
+    // livello 3. Gli altri sotto-verbi (push/save/pop/apply/list/show) restano 2.
+    stash: (cmd) => {
+      const verb = (gitArgsAfterSub(cmd).filter((a) => !a.startsWith('-'))[0] || '').toLowerCase();
+      return verb === 'drop' || verb === 'clear' ? 3 : 2;
+    },
     config: (cmd) => {
       const args = gitArgsAfterSub(cmd);
       const low = args.map((a) => a.toLowerCase());
