@@ -75,6 +75,15 @@ test('il tipo di giorno grossolano (dayType feriale/weekend) fa cambiare la firm
   assert.notEqual(feriale, weekend);
 });
 
+test('il giorno reale (dateKey) fa cambiare la firma al cambio di data', () => {
+  // La home cita il giorno reale della settimana ("oggi è martedì"): quando
+  // cambia la data la firma DEVE cambiare, così il messaggio si rigenera e non
+  // resta "martedì" di mercoledì. Cambia una volta al giorno: nessun churn.
+  const mar = D.computeSignature({ ...baseInputs, partOfDay: 'mattina', dayType: 'feriale', dateKey: '2026-08-07' });
+  const mer = D.computeSignature({ ...baseInputs, partOfDay: 'mattina', dayType: 'feriale', dateKey: '2026-08-08' });
+  assert.notEqual(mar, mer);
+});
+
 test('campi temporali NON fanno parte della firma (niente ricalcoli a vuoto)', () => {
   // computeSignature ignora qualunque chiave non elencata: passare un "ora" che
   // cambia non deve cambiare la firma.
