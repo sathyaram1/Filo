@@ -1,0 +1,7 @@
+{
+  "id": "71d5218d-a203-4b70-8f69-d3a545d8cefb",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho riprodotto esattamente la situazione che avevi segnalato sulle carte bifronte nel deck builder: giro una carta per vederne il retro, allontano il mouse finché l'anteprima si chiude e tornano le statistiche, poi torno sulla stessa carta. Ora l'anteprima si riapre sempre dal fronte, come già faceva cambiando carta. Ho anche stressato il caso: con due carte bifronte diverse, girare una non 'sporca' l'altra (ognuna riapre dal proprio fronte); passando da una riga all'altra e tornando indietro senza chiudere l'anteprima la carta torna comunque al fronte; e ripetendo il giro molte volte di fila prima di chiudere, alla riapertura riparte dal fronte lo stesso. Resta rispettato (giustamente) il giro fatto apposta mentre l'anteprima è ancora aperta: solo una vera riapertura riparte dal fronte. Tutti i test dell'anteprima del deck builder passano.",
+  "queuedAt": "2026-08-07T09:52:33.290Z",
+  "queuedBy": "routine"
+}
