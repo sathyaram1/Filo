@@ -565,6 +565,7 @@
     spell_page_placeholder_dict_word: 'parola',
     spell_page_back: '← Opzioni',
     spell_page_conflict: '"%s" esiste già — modifica annullata.',
+    spell_page_empty: 'Un campo vuoto non salva la correzione. Per toglierla usa «Rimuovi».',
     spell_page_dict_conflict: '"%s" è già nel dizionario.',
     toast_added_to_dict: 'Aggiunta al dizionario',
     toast_autocorrect_saved: 'Correzione automatica attiva',

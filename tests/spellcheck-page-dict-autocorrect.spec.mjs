@@ -205,3 +205,75 @@ test('parola lunga senza spazi nel dizionario: niente scroll orizzontale, "Rimuo
   const emptyVisible = await page.evaluate(() => !document.getElementById('dictEmpty').hidden);
   expect(emptyVisible).toBe(true);
 });
+
+// ---------------------------------------------------------------------------
+// Feedback #389: svuotare il campo di una correzione automatica salvata la
+// faceva SEMBRARE cancellata (riga con casella vuota) ma la regola restava
+// intatta in storage e continuava a correggere. Il salvataggio falliva in
+// silenzio, senza avviso, e la UI mostrava uno stato falso.
+// Fix: in simmetria col ramo conflitto, ripristina il valore reale nel campo
+// e mostra un avviso che indirizza al bottone «Rimuovi».
+// ---------------------------------------------------------------------------
+test('correttore: svuotare la correzione ripristina il valore reale e avvisa (regola intatta, niente stato falso)', async ({ openTab }) => {
+  const page = await openSpellcheckPage(openTab);
+
+  // Crea la correzione 'ke' → 'che'
+  await page.fill('#newWord', 'ke');
+  await page.fill('#newCorrection', 'che');
+  await page.click('#addAutocorrect');
+  await page.waitForFunction(() => {
+    return document.getElementById('autocorrectList')?.querySelectorAll('.sn-spell-row:not(.sn-spell-row-head)').length >= 1;
+  }, null, { timeout: 4_000 });
+
+  const row = page.locator('#autocorrectList .sn-spell-row:not(.sn-spell-row-head)').first();
+  const correctionInput = row.locator('input').nth(1);
+  await expect(correctionInput).toHaveValue('che');
+
+  // Svuota il campo correzione e sposta il focus (triggera 'change')
+  await correctionInput.fill('');
+  await correctionInput.press('Tab');
+  await page.waitForTimeout(400);
+
+  // ASSERISCE IL SUCCESSO 1: compare l'avviso (senza fix: nessun avviso)
+  await expect(page.locator('#autocorrectConflict')).toBeVisible({ timeout: 3_000 });
+
+  // ASSERISCE IL SUCCESSO 2: il campo torna a mostrare il valore reale 'che'
+  // (senza fix: il campo restava vuoto, stato falso)
+  await expect(correctionInput).toHaveValue('che');
+
+  // ASSERISCE IL SUCCESSO 3: la regola è ancora salvata in storage come {ke:'che'}
+  const stored = await page.evaluate(async () => {
+    const d = await chrome.storage.local.get('sn_autocorrect');
+    return d.sn_autocorrect || null;
+  });
+  expect(stored).toEqual({ ke: 'che' });
+});
+
+test('correttore: svuotare la parola-trigger ripristina il valore reale e avvisa', async ({ openTab }) => {
+  const page = await openSpellcheckPage(openTab);
+
+  await page.fill('#newWord', 'ke');
+  await page.fill('#newCorrection', 'che');
+  await page.click('#addAutocorrect');
+  await page.waitForFunction(() => {
+    return document.getElementById('autocorrectList')?.querySelectorAll('.sn-spell-row:not(.sn-spell-row-head)').length >= 1;
+  }, null, { timeout: 4_000 });
+
+  const row = page.locator('#autocorrectList .sn-spell-row:not(.sn-spell-row-head)').first();
+  const wordInput = row.locator('input').first();
+  await expect(wordInput).toHaveValue('ke');
+
+  // Svuota il campo parola e sposta il focus
+  await wordInput.fill('');
+  await wordInput.press('Tab');
+  await page.waitForTimeout(400);
+
+  // Avviso + campo ripristinato + regola intatta
+  await expect(page.locator('#autocorrectConflict')).toBeVisible({ timeout: 3_000 });
+  await expect(wordInput).toHaveValue('ke');
+  const stored = await page.evaluate(async () => {
+    const d = await chrome.storage.local.get('sn_autocorrect');
+    return d.sn_autocorrect || null;
+  });
+  expect(stored).toEqual({ ke: 'che' });
+});

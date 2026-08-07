@@ -68,6 +68,12 @@
     showInlineMessage('autocorrectConflict', 'autocorrectList', I18n.t('spell_page_conflict', conflictKey));
   }
 
+  // Svuotare il campo parola o correzione non è un salvataggio valido: riusa lo
+  // stesso slot d'avviso del conflitto e indirizza l'utente al bottone «Rimuovi».
+  function showEmptyFieldMessage() {
+    showInlineMessage('autocorrectConflict', 'autocorrectList', I18n.t('spell_page_empty'));
+  }
+
   function showDictConflictMessage(word) {
     showInlineMessage('dictConflict', 'dictList', I18n.t('spell_page_dict_conflict', word));
   }
@@ -131,7 +137,17 @@
       const oldKey = (wIn.dataset.original || '').toLowerCase();
       const newKey = wIn.value.trim().toLowerCase();
       const newVal = cIn.value.trim();
-      if (!newKey || !newVal) return;
+      if (!newKey || !newVal) {
+        // Campo svuotato: NON è né un salvataggio valido né una rimozione
+        // implicita. In simmetria col ramo conflitto, ripristina i valori reali
+        // (così la UI torna coerente con ciò che è salvato e continua ad agire)
+        // e spiega come rimuovere davvero la regola. Senza questo, il campo
+        // restava vuoto a video mentre la regola era ancora attiva.
+        wIn.value = wIn.dataset.original || oldKey;
+        cIn.value = correction;
+        showEmptyFieldMessage();
+        return;
+      }
       if (oldKey === newKey && correction === newVal) return;
       const ok = await updateAutocorrect(oldKey, newKey, newVal, {
         onConflict: (conflictKey) => {
