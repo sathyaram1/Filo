@@ -755,9 +755,11 @@ function recordVerifier(id, verdict, critique) {
   return next;
 }
 function recordFixed(id, report = '') {
-  const next = applyFixed({ ...(readState(id) || defaultState(id, '')), id });
+  const guard = guardIdentity(id);
+  if (!guard.ok) return { rejected: true, message: guard.message };
+  const next = applyFixed({ ...(guard.state || defaultState(id, '')), id });
   next.id = id;
-  writeState(next);
+  sealTransition(next, 'fixer:consegna');
   persistStateToGit(id, `feedback: fixed ${id}`);
   // Fix ri-applicato → torna in attesa della verifica comportamentale. Il
   // report del fixer (cosa ha corretto e come) va nella chat del feedback,
@@ -766,9 +768,11 @@ function recordFixed(id, report = '') {
   return next;
 }
 function recordSecaudit(id, verdict) {
-  const next = applySecaudit({ ...(readState(id) || defaultState(id, '')), id }, verdict);
+  const guard = guardIdentity(id);
+  if (!guard.ok) return { rejected: true, message: guard.message };
+  const next = applySecaudit({ ...(guard.state || defaultState(id, '')), id }, verdict);
   next.id = id;
-  writeState(next);
+  sealTransition(next, `secaudit:${verdict}`);
   persistStateToGit(id, `feedback: secaudit ${verdict} ${id}`);
   return next;
 }
