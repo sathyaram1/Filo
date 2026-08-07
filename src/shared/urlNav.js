@@ -112,5 +112,27 @@
     return /\.[a-z]{2,}$/i.test(host);                    // dominio con TLD alfabetico
   }
 
-  global.SN_URL_NAV = { isLocalHost, isIpv4, normalizeUrl, looksLikeAddress };
+  // #252 — INDIRIZZO CANONICO di una pagina interna filo://.
+  // Storicamente il codice portato dall'estensione apriva le pagine interne con
+  // `chrome.runtime.getURL('src/pages/<page>/<file>')`, che lo shim traduce in
+  // `filo://src/pages/<page>/<file>`; il menu App/Impostazioni invece usa la
+  // forma corta `filo://<page>/<file>`. Due indirizzi DIVERSI per la STESSA
+  // pagina (entrambi serviti dal protocollo — vedi il ramo host 'src' in
+  // protocol.js): la stessa lista si apriva con due URL a seconda di dove
+  // cliccavi. Qui riportiamo la forma legacy a quella corta, così esiste UN
+  // solo indirizzo per pagina (e la deduplica delle schede può confrontarli).
+  // Query e hash sono preservati (es. filo://home/home.html?highlight=…).
+  function canonicalizeFiloUrl(input) {
+    const raw = String(input || '');
+    if (!raw.startsWith('filo://')) return raw;
+    let u;
+    try { u = new URL(raw); } catch (_) { return raw; }
+    if (u.hostname === 'src') {
+      const m = /^\/pages\/([^/]+)\/(.*)$/.exec(u.pathname);
+      if (m) return `filo://${m[1]}/${m[2]}${u.search}${u.hash}`;
+    }
+    return raw;
+  }
+
+  global.SN_URL_NAV = { isLocalHost, isIpv4, normalizeUrl, looksLikeAddress, canonicalizeFiloUrl };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
