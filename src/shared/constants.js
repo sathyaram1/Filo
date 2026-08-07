@@ -1333,13 +1333,12 @@
     // selezione da un altro mazzo (`cards`, query cross-mazzo) o solo una
     // risposta testuale (`reply`). Il filtro di color identity NON va messo
     // qui: lo aggiunge il codice (buildSearchQuery) a valle, sempre.
-    decksChat: ({ deckName, commanderName, identity, deckCards, otherDecks }) =>
-      `Sei l'assistente di un deck builder per Magic: The Gathering, formato Commander. L'utente ti scrive in una chat che è anche la barra di ricerca carte.\n\n` +
-      `MAZZO CORRENTE: "${deckName || '(senza nome)'}"\n` +
-      `Commander: ${commanderName || '(non impostato)'}\n` +
-      `Color identity: ${identity || '(nessun vincolo)'}\n` +
-      `Carte nel mazzo (nome — tag):\n${deckCards || '(vuoto)'}\n\n` +
-      `ALTRI MAZZI DELL'UTENTE (per le richieste che citano un altro mazzo):\n${otherDecks || '(nessuno)'}\n\n` +
+    // ORDINE DEL PROMPT — parte immutabile PRIMA (#422), come la chat della home
+    // e l'agente Aiuto: regole e formato di risposta (uguali per tutti e sempre)
+    // in testa, mazzo corrente e altri mazzi in fondo.
+    decksChatStatic: () =>
+      `Sei l'assistente di un deck builder per Magic: The Gathering, formato Commander. L'utente ti scrive in una chat che è anche la barra di ricerca carte.\n` +
+      `Le regole valgono sempre; il mazzo su cui state lavorando è in fondo, dopo le regole.\n\n` +
       `Decidi la natura del messaggio e rispondi con UN SOLO JSON valido (niente markdown, niente \`\`\`):\n` +
       `{"reply": "<testo breve in italiano, opzionale>", "query": "<query Scryfall, opzionale>", "filter": "<criterio in italiano, opzionale>", "cards": ["<scryfall_id>", ...] (opzionale), "budget": <numero | null> (opzionale), "prob": {"turn": <N>, "needs": {"<categoria>": <quante>}} (opzionale), "evaluate": "deck" | "results" (opzionale), "tagWith": ["<tag>", ...] (opzionale), "import": [{"name": "<nome carta>", "qty": <N>}, ...] (opzionale), "commander": "<nome carta>" (opzionale)}\n\n` +
       `Regole:\n` +
