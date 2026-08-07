@@ -14,7 +14,7 @@
 // #379.12 chiude il cerchio lato UI: l'accesso agli appunti passa SOLO
 // dall'editor (niente più pannello/icona "Appunti" nella home) e l'editor porta
 // proprio l'icona degli appunti, ovunque compaia. Gli ultimi tre test qui sotto
-// asserinscono quell'invariante:
+// asseriscono quell'invariante:
 //   3) i controlli in alto a destra nella home sono ESATTAMENTE quelli del
 //      browser — nessuna voce che apra un elenco appunti separato;
 //   4) la voce Editor del menu App e l'icona Editor del menu tasto destro
