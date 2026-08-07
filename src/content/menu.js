@@ -668,6 +668,10 @@
           if (activeMenu) activeMenu.subLocked = false;
           if (!ok) return;
           try { onClear(); } catch (e) { console.error(e); }
+          // Stessa ragione di forgetEntry: la lista in mano al menu non deve
+          // sopravvivere allo svuotamento (qui chiudiamo tutto, ma se un domani
+          // il menu restasse aperto mostrerebbe voci che non esistono più).
+          if (Array.isArray(entries)) entries.length = 0;
           close();
         });
         clearWrap.appendChild(clearBtn);
