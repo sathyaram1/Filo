@@ -124,8 +124,7 @@ test('pagina Sicurezza: "Importa dati" ripristina davvero i dati di un backup', 
     // 4) Le impostazioni ripristinate sono ATTIVE, non solo scritte: il tema
     //    del backup ha sostituito quello locale ed è stato propagato ovunque.
     expect(stored.settings.theme).toBe('dark');
-    const live = await app.evaluate(async () => {
-      const { nativeTheme } = require('electron');
+    const live = await app.evaluate(async ({ nativeTheme }) => {
       return {
         theme: (await globalThis.SN_STORAGE.getSettings()).theme,
         native: nativeTheme.themeSource,
