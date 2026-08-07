@@ -618,7 +618,9 @@
           rm.addEventListener('click', (ev) => {
             ev.stopPropagation();
             try { onRemove(entry); } catch (e) { console.error(e); }
+            forgetEntry(entry);
             row.remove();
+            applyFilter();
             refreshEmptyState();
           });
           row.appendChild(rm);
