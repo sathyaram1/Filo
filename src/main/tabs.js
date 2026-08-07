@@ -17,7 +17,23 @@ const { audibleFromEvent } = globalThis.SN_AUDIO_STATE;
 require('../shared/authPopup');
 const { isAuthPopup } = globalThis.SN_AUTH_POPUP;
 require('../shared/urlNav'); // #398 — sorgente unica di normalizeUrl/isLocalHost (condivisa con la dashboard)
-const { normalizeUrl } = globalThis.SN_URL_NAV;
+const { normalizeUrl, canonicalizeFiloUrl } = globalThis.SN_URL_NAV;
+
+// #252 — pagina interna filo:// "singleton": ne ha senso UNA sola scheda alla
+// volta (le liste "Aperti per dopo"/Cronologia/Archivio/Scaricamenti, le
+// pagine Impostazioni, gli editor…). Riaprirla mentre è già aperta deve
+// riportare l'utente sulla scheda esistente, non crearne un doppione. L'unica
+// pagina filo:// NON singleton è la nuova scheda (`filo://newtab/`): di quella
+// se ne vogliono quante se ne aprono. La chiave d'identità è host+path (query
+// e hash esclusi: un ?highlight non rende la pagina "un'altra pagina").
+function filoSingletonKey(url) {
+  const s = String(url || '');
+  if (!s.startsWith('filo://')) return null;
+  let u;
+  try { u = new URL(s); } catch (_) { return null; }
+  if (u.hostname === 'newtab') return null;
+  return u.hostname + u.pathname;
+}
 
 const PAGE_PRELOAD = path.join(__dirname, '..', 'preload', 'page-preload.js');
 const INTERNAL_PRELOAD = path.join(__dirname, '..', 'preload', 'internal-preload.js');
