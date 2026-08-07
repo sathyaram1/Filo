@@ -992,12 +992,6 @@
     // codifichiamo in modo dichiarativo e le traduciamo qui in onClick.
     // - openUrl → apri quel sito bypassando il blocco (#170.3 "Apri comunque").
     let opts = info.opts;
-    // clickOpen (#252): il main manda l'URL interno da aprire quando l'utente
-    // clicca il corpo della notifica; qui diventa l'onClick del messaggio.
-    if (opts && opts.clickOpen && !opts.onClick) {
-      const url = opts.clickOpen;
-      opts = { ...opts, onClick: () => { try { api.tabs.open(url); } catch (_) {} } };
-    }
     if (opts && Array.isArray(opts.actions)) {
       opts = {
         ...opts,
