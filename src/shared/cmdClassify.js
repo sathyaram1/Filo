@@ -259,18 +259,45 @@
     return String(cmd).trim().split(/\s+/).filter(Boolean);
   }
 
+  // Le VIRGOLETTE non cambiano il comando che la shell esegue davvero, ma
+  // possono nascondere ai controlli sia il programma sia il bersaglio: bash,
+  // cmd e powershell collassano tutti `git checkout "."`, `git checkout .""`,
+  // `git checkout ""."` e `git stash d''rop` esattamente in `git checkout .` /
+  // `git stash drop`. Un controllo che guarda il testo grezzo vedrebbe un
+  // token sconosciuto e lascerebbe passare con la sola conferma leggera un
+  // comando che butta via lavoro non salvato (scenario "comando suggerito da
+  // una pagina ostile"). Quindi PRIMA di classificare togliamo TUTTE le
+  // virgolette dai token — non solo quelle che avvolgono il token intero, ma
+  // anche quelle vuote incollate prima/dopo/in mezzo.
+  //
+  // Non è un parser di shell (resta vero il principio del file: niente parsing
+  // del quoting) ed è sicuro per costruzione: togliere le virgolette può solo
+  // far RICONOSCERE più bersagli/flag pericolosi, cioè far salire il livello,
+  // mai scendere sotto quello che si vedrebbe altrimenti. Gli spazi dentro le
+  // virgolette non ci sfuggono: `tokens()` spezza comunque su spazi, e un
+  // comando così finisce nei rami cauti (più operandi = livello 3).
+  function unquote(tok) {
+    return String(tok).replace(/['"]/g, '');
+  }
+
+  // Comando con le virgolette rimosse token per token: la forma su cui girano
+  // tutti i controlli (whitelist di programmi, flag pericolosi, bersagli).
+  function dequote(cmd) {
+    return tokens(cmd).map(unquote).join(' ');
+  }
+
   function programOf(cmd) {
     const first = tokens(cmd)[0] || '';
     // togli quoting, prendi il basename, normalizza, togli estensioni eseguibili
-    const bare = first.replace(/^['"]|['"]$/g, '');
+    const bare = unquote(first);
     return bare.split(/[\\/]/).pop().toLowerCase().replace(/\.(exe|cmd|bat|ps1|com|msi)$/i, '');
   }
 
   // sotto-comando = primo token che non è una flag (dopo il programma)
   function subcommandOf(cmd) {
-    const t = tokens(cmd).slice(1);
+    const t = tokens(cmd).slice(1).map(unquote);
     for (const x of t) {
-      if (!x.startsWith('-')) return x.replace(/^['"]|['"]$/g, '').toLowerCase();
+      if (x && !x.startsWith('-')) return x.toLowerCase();
     }
     return '';
   }
