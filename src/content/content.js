@@ -1001,55 +1001,25 @@
     }
 
     if (imgEl) {
-      items.push({ type: 'item', label: I18n.t('menu_copy_image'), onClick: () => Actions.copyImage(imgEl) });
-      items.push({ type: 'item', label: I18n.t('menu_save_image_as'), onClick: () => Actions.downloadImage(imgEl) });
-      items.push({
-        type: 'item',
-        label: I18n.t('menu_copy_image_link'),
-        onClick: () => Actions.copyToClipboard(imgEl.currentSrc || imgEl.src),
-      });
-      items.push({
-        type: 'item',
-        label: I18n.t('menu_search_image'),
-        onClick: () => Actions.searchImageOnWeb(imgEl),
-      });
+      // Immagine cliccata. Le sue azioni vengono prima…
+      for (const it of buildImageActionItems(imgEl)) items.push(it);
+      // …ma se l'immagine è racchiusa in un <a> (miniature di articoli, schede
+      // prodotto, risultati di ricerca per immagini) è ANCHE un collegamento:
+      // in un browser normale le due famiglie di voci compaiono insieme. Prima
+      // il ramo immagine ritornava subito e le azioni sul link sparivano (#401).
+      if (linkEl) {
+        items.push({ type: 'separator' });
+        for (const it of buildLinkActionItems(linkEl)) items.push(it);
+      }
       items.push({ type: 'separator' });
+      // Una sola sezione "Spiega" (quella dell'immagine, l'elemento cliccato):
+      // aggiungerne una seconda firerebbe una seconda chiamata AI a ogni apertura.
       items.push(Actions.buildInlineExplainImage(imgEl));
       return items;
     }
 
     if (linkEl) {
-      items.push({
-        type: 'item',
-        label: I18n.t('menu_open_in_new_tab'),
-        onClick: () => window.open(linkEl.href, '_blank', 'noopener'),
-      });
-      // "Salva file" — gemello di "Salva immagine come" per i link a un file
-      // (PDF, ZIP, allegato). Compare SOLO quando il link punta davvero a un
-      // file (vedi isDownloadableLink): su un link a un'altra pagina scaricare
-      // l'HTML non avrebbe senso.
-      if (Actions.isDownloadableLink(linkEl)) {
-        items.push({
-          type: 'item',
-          label: I18n.t('menu_save_file'),
-          onClick: () => Actions.downloadLink(linkEl),
-        });
-      }
-      items.push({
-        type: 'item',
-        label: I18n.t('menu_copy_link'),
-        onClick: () => Actions.copyToClipboard(linkEl.href),
-      });
-      items.push({
-        type: 'item',
-        label: I18n.t('menu_save_link_for_later'),
-        onClick: () => Actions.saveLink(linkEl),
-      });
-      items.push({
-        type: 'item',
-        label: I18n.t('menu_share_link'),
-        onClick: () => Actions.shareLink(linkEl),
-      });
+      for (const it of buildLinkActionItems(linkEl)) items.push(it);
       items.push({ type: 'separator' });
       items.push(Actions.buildInlineExplainLink(linkEl));
       return items;
