@@ -20,6 +20,7 @@
       features: [],
       fixes: [
         'Quando salvi una pagina con "Salva per dopo", la conferma che compare è ora cliccabile: aprila per andare dritto a "Aperti per dopo", con la scheda appena messa da parte evidenziata. Così scopri subito dov\'è finita, senza doverla cercare nel menu.',
+        '"Aperti per dopo", la Cronologia AI e le altre pagine interne ora si aprono sempre su un\'unica scheda: se sono già aperte da qualche parte, Filo ti riporta su quella invece di crearne una copia identica, e non importa da dove le apri (menu App, Impostazioni o Cronologia) — la pagina è sempre la stessa.',
       ],
     },
     {
