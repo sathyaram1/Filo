@@ -52,6 +52,22 @@
     return Object.keys(p).length ? p : null;
   }
 
+  // Quanta parte del testo in ingresso è stata RIUSATA invece che ricalcolata
+  // (#422). OpenRouter riporta i token letti dalla cache del fornitore in
+  // `usage.prompt_tokens_details.cached_tokens` (0 o campo assente = nessun
+  // riuso). È la sola prova che il prefisso immutabile dei prompt sta davvero
+  // funzionando: senza questo numero "riuso a zero" e "riuso pieno" sono
+  // indistinguibili.
+  function cachedPromptTokens(usage) {
+    if (!usage || typeof usage !== 'object') return 0;
+    const d = usage.prompt_tokens_details || usage.promptTokensDetails || null;
+    const v = (d && (d.cached_tokens != null ? d.cached_tokens : d.cachedTokens))
+      != null ? (d.cached_tokens != null ? d.cached_tokens : d.cachedTokens)
+      : usage.cached_tokens;
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  }
+
   // Chi ha DAVVERO servito la risposta (#421). OpenRouter lo riporta a livello di
   // risposta come `provider`; per robustezza guardiamo anche dentro la choice.
   function extractServedBy(obj) {
