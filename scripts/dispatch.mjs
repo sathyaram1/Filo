@@ -529,6 +529,23 @@ function diffForBranch(branch) {
  * inghiottito bastava a saltare decine di todo e mandare il giro in audit.
  * Dopo l'ultimo tentativo rilancia l'errore: decide il CHIAMANTE il fallback.
  */
+/**
+ * Guasto dichiarato: "non posso lavorare in sicurezza". `kind`:
+ *   - 'transient'  rete, quota, deposito irraggiungibile, coda illeggibile →
+ *                  la sessione si chiude senza altri tentativi (ci riprova
+ *                  l'orchestratore successivo fra 6h: nessuna logica di retry
+ *                  da scrivere = nessuna logica di retry da sbagliare);
+ *   - 'permanent'  il branch nello stato non esiste più → riprovare ogni 6h è
+ *                  inutile: il feedback esce dal giro automatico (`design`).
+ * Prima esisteva solo il fallback su prober, che traveste un guasto da
+ * "giornata tranquilla" — ed è già costato un'ondata di lavoro fantasma.
+ */
+export function routineFault(kind, message) {
+  const e = new Error(message);
+  e.faultKind = kind === 'permanent' ? 'permanent' : 'transient';
+  return e;
+}
+
 export async function withRetry(fn, label = 'operazione', { attempts = 3, baseDelayMs = 2000 } = {}) {
   let lastErr;
   for (let i = 1; i <= attempts; i++) {
