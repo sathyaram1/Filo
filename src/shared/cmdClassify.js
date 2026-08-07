@@ -27,6 +27,11 @@
 //     "interamente riconoscibile" → 3, sempre. Non proviamo a fare il parsing
 //     del quoting: un falso positivo qui costa solo più attrito (digitare
 //     "conferma"), mai un'esecuzione silenziosa indebita.
+//   • le VIRGOLETTE vengono tolte prima di classificare (vedi `unquote`): tutte
+//     le shell supportate eseguono `git checkout "."`, `git checkout .""` e
+//     `git checkout .` allo stesso identico modo, quindi devono ricevere lo
+//     stesso livello. Non è parsing del quoting — è una normalizzazione che può
+//     solo far riconoscere PIÙ bersagli/flag pericolosi, mai di meno.
 //   • un backstop di programmi distruttivi (rm/del/format/…) resta 3 anche se
 //     per errore comparisse in una whitelist.
 //   • flag pericolosi (--force, --hard, -rf…) alzano un livello ≤2 a 3.
