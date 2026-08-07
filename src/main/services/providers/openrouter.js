@@ -157,7 +157,7 @@
     let buffer = '';
     let fullText = '';
     let servedBy = null;
-    let usage = { promptTokens: 0, completionTokens: 0 };
+    let usage = { promptTokens: 0, completionTokens: 0, cachedPromptTokens: 0 };
 
     while (true) {
       const { done, value } = await reader.read();
