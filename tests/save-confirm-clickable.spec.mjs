@@ -39,14 +39,6 @@ test('la conferma di "Salva per dopo" è cliccabile e apre la lista con la sched
   await expect(page.locator('.sn-save-confirm-cta')).toHaveCount(1);
   try { await page.screenshot({ path: 'tests/.shots/save-confirm-252.png' }); } catch (_) {}
 
-  // Recupera l'id della scheda appena salvata (per verificare l'evidenziazione).
-  const savedId = await page.evaluate(async () => {
-    const r = await chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.GET_SAVED_PAGES });
-    const pages = (r && r.pages) || [];
-    return pages[0]?.id || null;
-  });
-  expect(savedId, 'la pagina non risulta salvata').toBeTruthy();
-
   // 2) Clic sulla conferma → si apre "Aperti per dopo" con ?highlight=<id>.
   await pill.click();
 
@@ -60,9 +52,17 @@ test('la conferma di "Salva per dopo" è cliccabile e apre la lista con la sched
     await new Promise((r) => setTimeout(r, 100));
   }
   expect(home, 'cliccando la conferma non si è aperta la lista "Aperti per dopo"').toBeTruthy();
-  expect(home.url(), 'manca ?highlight=<id> nell\'URL della lista').toContain(`highlight=${savedId}`);
+  expect(home.url(), 'manca ?highlight=<id> nell\'URL della lista').toMatch(/[?&]highlight=[^&]+/);
 
   await home.waitForLoadState('domcontentloaded');
+
+  // La lista filo:// ha la chrome shim: leggiamo l'id della scheda salvata.
+  const savedId = await home.evaluate(async () => {
+    const r = await chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.GET_SAVED_PAGES });
+    return ((r && r.pages) || [])[0]?.id || null;
+  });
+  expect(savedId, 'la pagina non risulta salvata').toBeTruthy();
+  expect(home.url(), 'l\'URL della lista deve puntare alla scheda salvata').toContain(`highlight=${savedId}`);
 
   // 3) La scheda evidenziata è proprio quella salvata.
   const highlighted = home.locator('.sn-card[data-highlighted="1"]');
