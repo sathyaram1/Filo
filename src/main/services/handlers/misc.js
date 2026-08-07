@@ -270,6 +270,30 @@ module.exports = function register(on, ctx) {
   on(MSG.DOWNLOAD_IMAGE, handleDownload);
   on(MSG.DOWNLOAD_MEDIA, handleDownload);
 
+  // "Salva file" su un link a un file (#410.2). A differenza di
+  // DOWNLOAD_IMAGE/MEDIA (byte scaricati a mano nel main), qui facciamo partire
+  // il download NATIVO della scheda: webContents.downloadURL emette
+  // will-download sulla sessione della scheda, che services/downloads.js (#410.1)
+  // già intercetta e segue. Risultato IDENTICO al clic sul link — avanzamento in
+  // barra, salvataggio in cartella Download, toast finale, cronologia — così i
+  // due cammini (menu e clic) producono lo stesso effetto visibile. Il nome-file
+  // ostile del server è neutralizzato a valle da downloads.js (safeName), come
+  // per il salvataggio immagini. Non serve il gate "solo superfici interne": far
+  // partire uno scaricamento di un URL è esattamente ciò che il clic sul link fa
+  // già, e non espone cronologia né percorsi su disco (quelli restano riservati).
+  on(MSG.DOWNLOAD_LINK, async (msg, sender) => {
+    const url = String(msg.url || '').trim();
+    if (!/^https?:/i.test(url)) return { ok: false, error: 'URL non scaricabile' };
+    const wc = sender && sender.wc;
+    if (!wc || wc.isDestroyed?.()) return { ok: false, error: 'no sender' };
+    try {
+      wc.downloadURL(url);
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: e?.message || 'download non avviato' };
+    }
+  });
+
   // ── Download "nativi" della navigazione (#410.1): la shell legge la
   //    cronologia e comanda i singoli scaricamenti. Il tracking vero vive in
   //    services/downloads.js (ascolta will-download della sessione). ──────────
