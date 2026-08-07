@@ -19,7 +19,7 @@
       version: '0.2.167', date: '2026-07-29',
       features: [
         'Nell’editor lo «Storico versioni» ora salva un punto di ripristino anche quando sei tu a scrivere o cancellare molto a mano, non solo quando è Filo a modificare il documento. Il salvataggio avviene da solo quando ti fermi un momento o quando cambi documento, e resta invisibile: le piccole correzioni non intasano lo storico, ma se scrivi tanto e poi vuoi tornare a un punto precedente, ora lo ritrovi.',
-        'Gli appunti hanno un posto solo: l’editor. Nella home sparisce il pannello «Appunti» separato e l’icona dell’Editor diventa il foglio degli appunti — apri quella e ci trovi dentro sia i documenti sia tutto quello che hai chiesto a Filo di annotare.',
+        'Gli appunti hanno un posto solo: l’editor. Nella home sparisce il pannello «Appunti» separato e l’icona dell’Editor diventa il foglio degli appunti — apri quella e ci trovi dentro sia i documenti sia tutto quello che hai chiesto a Filo di annotare. Quando Filo prende nota, la conferma «Salvato» in chat ti porta lì con un click.',
       ],
     },
     {
