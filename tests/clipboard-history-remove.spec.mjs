@@ -44,6 +44,16 @@ async function openHistorySubmenu(page) {
   return sub;
 }
 
+const PAGE_HTML = `<!doctype html><html><body style="padding:40px"><textarea id="ta" rows="5" cols="60"></textarea></body></html>`;
+
+async function launchWithHistory(userData) {
+  return electron.launch({
+    args: ['.'],
+    cwd: APP_ROOT,
+    env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
+  });
+}
+
 test('paste history: rimuovi una singola voce e svuota tutta la cronologia', async ({ testServer }) => {
   const SENSITIVE = 'password-super-segreta-9F3';
   const history = [
