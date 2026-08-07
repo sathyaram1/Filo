@@ -111,11 +111,17 @@
     return { answer, thought };
   }
 
+  // `cachedContentTokenCount` = quanti token del testo in ingresso Gemini ha
+  // RIUSATO dalla cache invece di ricalcolarli (#422). Il riuso è implicito e
+  // automatico, ma vale solo se l'inizio della richiesta è identico a una
+  // precedente: è il numero con cui si verifica che i prompt tengano davvero la
+  // parte immutabile in testa. Assente/0 = nessun riuso.
   function extractUsage(data) {
     const u = data?.usageMetadata || {};
     return {
       promptTokens: u.promptTokenCount || 0,
       completionTokens: u.candidatesTokenCount || 0,
+      cachedPromptTokens: u.cachedContentTokenCount || 0,
     };
   }
 
