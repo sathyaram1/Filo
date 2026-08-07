@@ -90,6 +90,31 @@ test('livello 3: rm, comando inventato e concatenazione richiedono "conferma"', 
   }
 });
 
+test('#390 — i git che scartano lavoro non salvato chiedono la conferma forte, anche mascherati', async ({ app, openTab }) => {
+  const page = await openTab(NEWTAB);
+  await enableTerminal(page);
+  // Il livello lo decide il main sul comando EFFETTIVO: le forme che buttano
+  // via modifiche non salvate devono fermarsi al livello 3 ("conferma"), anche
+  // quando sono riscritte con virgolette/barre che la shell rimuove comunque
+  // (scenario "comando suggerito da una pagina ostile").
+  for (const comando of [
+    'git checkout .', 'git checkout "."', "git checkout '.'",
+    'git checkout .""', "git checkout ''.", 'git checkout ./',
+    'git checkout -- src/app.js', 'git checkout README.md',
+    'git stash drop', 'git stash "drop"', "git stash d''rop", 'git stash clear',
+  ]) {
+    const r = await execAction(app, { type: 'ESEGUI_COMANDO', comando });
+    expect(r.executed, comando).toBe(false);
+    expect(r.needsConfirm, comando).toBe(3);
+  }
+  // Cambio/creazione ramo e salvataggio stash: nessun lavoro perso → popup OK.
+  for (const comando of ['git checkout main', 'git checkout "main"', 'git checkout -b nuovo origin/main', 'git stash', 'git stash pop']) {
+    const r = await execAction(app, { type: 'ESEGUI_COMANDO', comando });
+    expect(r.executed, comando).toBe(false);
+    expect(r.needsConfirm, comando).toBe(2);
+  }
+});
+
 test('#201 — una concatenazione di soli comandi sicuri esegue senza conferma', async ({ app, openTab }) => {
   const page = await openTab(NEWTAB);
   await enableTerminal(page);
