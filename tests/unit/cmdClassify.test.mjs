@@ -221,6 +221,33 @@ test('git checkout: pathspec scritti in altre forme (barra, backslash, glob, est
   }
 });
 
+test('git checkout: flag che prendono di mira i file → livello 3', () => {
+  // Verificato eseguendoli davvero in un repo con modifiche non salvate:
+  // `--pathspec-from-file` legge l'elenco dei file da un altro file e le scarta
+  // comunque, `-p`/`--patch` le scarta a pezzi, `--ours`/`--theirs` sceglie una
+  // versione del file. Nessuno di questi scrive un percorso nel comando: senza
+  // un check dedicato passerebbero come un semplice cambio ramo.
+  for (const cmd of [
+    'git checkout --pathspec-from-file=lista.txt',
+    'git checkout --pathspec-from-file lista.txt',
+    'git checkout -p', 'git checkout --patch',
+    'git checkout --ours file.txt', 'git checkout --theirs',
+  ]) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" scarta modifiche non salvate → livello 3`);
+  }
+});
+
+test('un separatore in coda non abbassa il livello', () => {
+  // `git checkout .;` la shell lo esegue come `git checkout .`: il livello deve
+  // essere lo stesso, non quello del token bizzarro `.;`.
+  assert.equal(lvl('git checkout .;'), 3);
+  assert.equal(lvl('git checkout . ;'), 3);
+  assert.equal(lvl('git stash drop;'), 3);
+  assert.equal(lvl('rm x;'), 3);
+  assert.equal(lvl('echo ciao;'), 1);   // resta una lettura
+  assert.equal(lvl('git checkout main;'), 2);
+});
+
 test('flag pericolosi tra virgolette restano livello 3', () => {
   // Stesso bypass del checkout applicato ai flag: la shell toglie le virgolette
   // e il comando forza/cancella comunque.
