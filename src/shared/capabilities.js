@@ -63,7 +63,7 @@
     {
       id: 'reload', title: 'Ricarica la pagina', category: 'navigation',
       desc: 'Ricarica la pagina corrente.',
-      invoke: 'Pulsante di ricarica nella barra in alto, il menu del tasto destro → "Ricarica", oppure la scorciatoia Ctrl+R (Cmd+R su Mac) — che funziona anche mentre stai guardando un sito.',
+      invoke: 'Menu del tasto destro → "Ricarica", oppure la scorciatoia Ctrl+R (Cmd+R su Mac) — che funziona anche mentre stai guardando un sito.',
     },
     {
       id: 'home', title: 'Vai alla home', category: 'navigation',
