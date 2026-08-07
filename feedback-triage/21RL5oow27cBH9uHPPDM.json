@@ -1,7 +1,0 @@
-{
-  "id": "21RL5oow27cBH9uHPPDM",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: nessun problema rilevato, la modifica è stata pubblicata. Ora il messaggio della Nuova scheda tiene conto del giorno esatto della settimana e della data (oltre alla fascia oraria e a feriale/weekend), utile per abitudini e scadenze legate a un giorno preciso.",
-  "queuedAt": "2026-08-07T09:40:14.251Z",
-  "queuedBy": "routine"
-}
