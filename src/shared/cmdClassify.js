@@ -279,7 +279,10 @@
   // -f (force su push/checkout/add), -d/-D (delete branch/tag, clean -d) e
   // --delete/--prune. Un check git-specifico (più aggressivo del globale, che
   // su comandi come `tar -f` significherebbe altro) → alza a 3.
-  const GIT_DANGER_RE = /(^|\s)(--force(-with-lease)?|--hard|--delete|--prune|-f|-d|-D|-[a-z]*f[a-z]*d[a-z]*|-[a-z]*d[a-z]*f[a-z]*)(\s|$)/i;
+  // `--discard-changes` (checkout/switch) BUTTA VIA le modifiche non salvate del
+  // working tree tanto quanto `reset --hard`: qui perché è un flag che esiste solo
+  // per checkout/switch, entrambi distruttivi quando lo usano → sempre 3.
+  const GIT_DANGER_RE = /(^|\s)(--force(-with-lease)?|--hard|--delete|--prune|--discard-changes|-f|-d|-D|-[a-z]*f[a-z]*d[a-z]*|-[a-z]*d[a-z]*f[a-z]*)(\s|$)/i;
 
   // Argomenti che seguono il sotto-comando git (esclusi programma e
   // sotto-comando stesso). `git tag v1.0` → ['v1.0']; `git branch` → [];
