@@ -688,10 +688,62 @@ export function verifierNoteText(verdict, critique = '') {
   return c ? `Controllo funzionalità NON superato: ${c}` : 'Controllo funzionalità NON superato.';
 }
 
+/**
+ * C — ogni scrittura nella macchina a stati RICALCOLA l'identità della directory
+ * e rifiuta la transizione se non corrisponde al branch assegnato. Non chiede
+ * all'istanza dove si trova: lo guarda.
+ *
+ * Un rifiuto lascia il feedback dov'era (nessuna scrittura di stato, nessuno
+ * status accodato) e lo fa ripescare al giro dopo. Ma un ambiente che produce
+ * disallineamenti a ripetizione non deve girare a vuoto all'infinito: al terzo
+ * rifiuto il feedback va in `design`, come per i reset `working`→`todo`.
+ *
+ * @returns {{ok:true, state:object}|{ok:false, message:string}}
+ */
+function guardIdentity(id) {
+  const prev = readState(id);
+  const assigned = prev?.branch || '';
+  const v = checkDelivery(ROOT, assigned);
+  if (v.ok) return { ok: true, state: prev };
+
+  const b = bumpRejects(prev || defaultState(id, assigned));
+  b.state.id = id;
+  const base = `transizione rifiutata su ${id}: ${v.reason}`;
+  if (b.escalate) {
+    try {
+      execFileSync('node', [resolve(ROOT, 'scripts', 'queue-triage.mjs'), id, 'design',
+        `La lavorazione automatica si è disallineata ${b.count} volte di seguito: chi doveva scrivere l'esito stava guardando un'altra versione del codice, quindi il risultato non sarebbe attendibile. Sospendo i tentativi automatici; serve una tua decisione su come procedere.`,
+        '--reason', 'loop'],
+        { cwd: ROOT, encoding: 'utf8', stdio: 'ignore' });
+    } catch (_) { /* la nota resta in coda al prossimo giro */ }
+    clearState(id);
+    persistStateToGit(id, `feedback: clear-state ${id}`);
+    return { ok: false, message: `${base} — terzo rifiuto consecutivo: feedback portato in design` };
+  }
+  writeState(b.state);
+  persistStateToGit(id, `feedback: identita non corrispondente ${id}`);
+  return { ok: false, message: `${base} (rifiuto ${b.count}/${IDENTITY_REJECT_LIMIT}); il feedback resta dov'era e verrà ripescato` };
+}
+
+/**
+ * Una transizione ACCETTATA lascia un punto fermo: l'identità del contenuto in
+ * quel momento. È il valore a cui D riporta il branch dopo un'interruzione.
+ * Rilascia anche l'identità attesa: dopo la consegna non c'è più niente da
+ * proteggere su questo branch (ed è ciò che lascia lavorare il merge-gate).
+ */
+function sealTransition(state, by) {
+  const sealed = clearRejects(withCheckpoint(state, headSha(ROOT), by));
+  writeState(sealed);
+  clearExpectation(ROOT);
+  return sealed;
+}
+
 function recordVerifier(id, verdict, critique) {
-  const next = applyVerifierVerdict({ ...defaultState(id, ''), ...(readState(id) || {}), id }, verdict, critique);
+  const guard = guardIdentity(id);
+  if (!guard.ok) return { rejected: true, message: guard.message };
+  const next = applyVerifierVerdict({ ...defaultState(id, ''), ...(guard.state || {}), id }, verdict, critique);
   next.id = id;
-  writeState(next);
+  sealTransition(next, `verifier:${verdict}`);
   persistStateToGit(id, `feedback: verifier ${verdict} ${id}`);
   // PASS → aspetta l'audit di sicurezza; FAIL → resta/torna in verifica fix
   // (il caso 3° FAIL → design lo gestisce il giro dopo: chooseBucket →
