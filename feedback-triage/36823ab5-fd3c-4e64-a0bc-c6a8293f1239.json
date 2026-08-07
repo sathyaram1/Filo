@@ -1,7 +1,0 @@
-{
-  "id": "36823ab5-fd3c-4e64-a0bc-c6a8293f1239",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Provato il caso segnalato: digitando \"x es \" in una casella di testo ora compare subito \"per esempio \", e la scorciatoia a parola singola (\"cmq\" → \"comunque\") continua a funzionare anche di seguito. Ho spinto oltre: scorciatoie di tre parole, chiusura con punteggiatura (\"x es.\" → \"per esempio.\"), maiuscole propagate (\"P F \" → \"PER FAVORE \"), e il caso in cui una scorciatoia lunga e una corta si contendono lo stesso testo (vince quella più lunga). Non scatta per errore quando le lettere sono attaccate a un'altra parola. Funziona sia nelle caselle semplici sia negli editor ricchi. Provato anche l'inserimento di una correzione che contiene codice: viene messa come testo, non eseguita. Il dizionario personale con più parole (es. \"New York\") le salva come voci separate, e i campi vuoti o di soli spazi non creano righe fantasma. Tutto verde.",
-  "queuedAt": "2026-08-07T21:50:52.451Z",
-  "queuedBy": "routine"
-}
