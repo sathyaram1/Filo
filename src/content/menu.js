@@ -545,6 +545,21 @@
         if (clearWrap) clearWrap.style.display = 'none';
       };
 
+      // La rimozione deve valere anche per la LISTA che il menu tiene in mano,
+      // non solo per la riga a schermo. `entries` è lo stesso array che il menu
+      // padre ripassa a ogni riapertura del sotto-menu (la cronologia viene
+      // letta una volta sola, quando si apre il menu del tasto destro): se
+      // togliamo solo il nodo dal DOM, basta che il sotto-menu si richiuda
+      // (mouse fuori) e si riapra perché la voce appena rimossa RICOMPAIA — la
+      // rimozione è avvenuta davvero sul disco, ma la UI dice il contrario, e su
+      // una password copiata è la bugia peggiore possibile. Quindi la togliamo
+      // anche di lì, così le due viste restano d'accordo.
+      const forgetEntry = (entry) => {
+        if (!Array.isArray(entries)) return;
+        const i = entries.indexOf(entry);
+        if (i >= 0) entries.splice(i, 1);
+      };
+
       entries.forEach((entry) => {
         // Riga = zona "incolla" (a sinistra) + "×" rimuovi (a destra). Sono due
         // bottoni fratelli, non annidati: il "×" non fa scattare l'incolla.
