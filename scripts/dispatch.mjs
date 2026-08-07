@@ -440,6 +440,7 @@ const ROLE_FILE = {
   fixer: 'fixer.md',
   'new-work': 'new-work.md',
   prober: 'prober.md',
+  halt: 'halt.md',
 };
 
 export function readRoleInstructions(role) {
