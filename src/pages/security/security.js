@@ -105,6 +105,73 @@
     }
   }
 
+  // Metà mancante dell'esportazione: ricarica un .zip esportato da Filo.
+  // Due passi voluti — prima leggiamo il file e diciamo COSA contiene, poi
+  // chiediamo conferma: l'utente sa cosa sta per rimettere dentro prima di
+  // dire sì. Il popup è quello di Filo (SN_CONFIRM_UI), mai il confirm nativo.
+  function showImportHint(text, isError) {
+    const hint = $('sec-import-hint');
+    hint.textContent = text;
+    hint.classList.toggle('sn-error', !!isError);
+    hint.classList.add('sn-show');
+    clearTimeout(importData._t);
+    importData._t = setTimeout(() => hint.classList.remove('sn-show'), 4000);
+  }
+
+  async function importData() {
+    const btn = $('sec-import-btn');
+    btn.disabled = true;
+    try {
+      const prev = await chrome.runtime.sendMessage({ type: MSG.IMPORT_DATA_PREVIEW });
+      if (!prev || !prev.ok) {
+        if (prev && prev.canceled) return; // dialog annullato: nessun messaggio
+        showImportHint(
+          I18n.t(prev && prev.error === 'invalid_file' ? 'security_import_invalid' : 'security_import_fail'),
+          true,
+        );
+        return;
+      }
+
+      // Data del backup in chiaro, quando il file la dichiara.
+      let when = '';
+      if (prev.exportedAt) {
+        const d = new Date(prev.exportedAt);
+        if (!isNaN(d.getTime())) when = ` (del ${d.toLocaleDateString()})`;
+      }
+      const text = I18n.t('security_import_confirm_text')
+        .replace('%1', prev.fileName || '')
+        .replace('%2', when)
+        .replace('%3', String(prev.sections))
+        .replace('%4', String(prev.images));
+
+      const ok = window.SN_CONFIRM_UI
+        ? await window.SN_CONFIRM_UI.confirm({
+          title: I18n.t('security_import_confirm_title'),
+          text,
+          okLabel: I18n.t('security_import_confirm_ok'),
+        })
+        : true;
+      if (!ok) return;
+
+      const res = await chrome.runtime.sendMessage({
+        type: MSG.IMPORT_DATA_APPLY,
+        token: prev.token,
+      });
+      if (res && res.ok) {
+        showImportHint(I18n.t('security_import_done'), false);
+        // I dati appena rimessi dentro devono comparire: la pagina si ricarica
+        // per mostrare le impostazioni importate invece di quelle vecchie.
+        setTimeout(() => location.reload(), 1200);
+      } else {
+        showImportHint(I18n.t('security_import_fail'), true);
+      }
+    } catch (_) {
+      showImportHint(I18n.t('security_import_fail'), true);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
   async function load() {
     fillStaticText();
     const settings = await Storage.getSettings();
