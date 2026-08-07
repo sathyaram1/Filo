@@ -162,6 +162,14 @@
     // decide il nome di ripiego e l'header Accept.
     // { url, kind:'video'|'audio' } → { ok, path?, filename? } | { ok:false, cancelled?, error? }
     DOWNLOAD_MEDIA: 'download_media',
+    // "Salva file" dal menu contestuale su un link a un file (#410.2). NON
+    // scarica byte a mano come DOWNLOAD_IMAGE/MEDIA: fa partire il download
+    // NATIVO della scheda (webContents.downloadURL), così passa per
+    // l'intercettazione will-download di #410.1 e ottiene ESATTAMENTE lo stesso
+    // trattamento del clic sul link — avanzamento in barra, salvataggio in
+    // cartella Download, avviso finale, voce in cronologia (parità dei cammini).
+    // { url } → { ok } | { ok:false, error }
+    DOWNLOAD_LINK: 'download_link',
     // --- Download "nativi" della navigazione (#410.1) --------------------
     // Sono i download che partono cliccando un link a un file (PDF, ZIP,
     // allegato): il main ascolta will-download della sessione di navigazione,
