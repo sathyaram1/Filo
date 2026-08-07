@@ -965,6 +965,17 @@
         label: I18n.t('menu_open_in_new_tab'),
         onClick: () => window.open(linkEl.href, '_blank', 'noopener'),
       });
+      // "Salva file" — gemello di "Salva immagine come" per i link a un file
+      // (PDF, ZIP, allegato). Compare SOLO quando il link punta davvero a un
+      // file (vedi isDownloadableLink): su un link a un'altra pagina scaricare
+      // l'HTML non avrebbe senso.
+      if (Actions.isDownloadableLink(linkEl)) {
+        items.push({
+          type: 'item',
+          label: I18n.t('menu_save_file'),
+          onClick: () => Actions.downloadLink(linkEl),
+        });
+      }
       items.push({
         type: 'item',
         label: I18n.t('menu_copy_link'),
