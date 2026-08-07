@@ -382,6 +382,12 @@
       // `--` separa esplicitamente i pathspec: tutto ciò che segue è un file da
       // ripristinare (scarto del working tree).
       if (args.includes('--')) return 3;
+      // Flag che dichiarano "sto lavorando sui FILE" anche senza scrivere il
+      // percorso nel comando: `--pathspec-from-file=<file>` legge l'elenco dei
+      // file da un altro file (verificato: scarta davvero le modifiche non
+      // salvate), `-p`/`--patch` scarta pezzo per pezzo, `--ours`/`--theirs`
+      // sceglie una versione del file in conflitto.
+      if (args.some((a) => /^(--pathspec-from-file(=|$)|--pathspec-file-nul$|-p$|--patch$|--ours$|--theirs$)/.test(a))) return 3;
       // `-b`/`-B`/`--orphan`/`--detach`: crea/sposta un ramo, non tocca i path.
       if (args.some((a) => /^(-b|-B|--orphan|--detach)$/.test(a))) return 2;
       const ops = args.filter((a) => !a.startsWith('-'));
