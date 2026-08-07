@@ -134,6 +134,46 @@ test('livello 3 — flag pericolosi alzano un comando altrimenti ≤2', () => {
   assert.equal(lvl('git branch -D feature'), 3); // -D = force delete
 });
 
+test('git checkout/stash distruttivi (scartano lavoro non salvato) → livello 3', () => {
+  // Feedback #390: le forme di checkout/stash che buttano via modifiche non
+  // salvate devono chiedere di digitare "conferma" (3), come restore/reset --hard.
+  for (const cmd of [
+    'git checkout .',                 // scarta TUTTE le modifiche del working tree
+    'git checkout -- file.txt',       // scarta un file specifico
+    'git checkout -- .',              // separatore + tutto
+    'git checkout HEAD -- src',       // ripristina path da un ref
+    'git checkout HEAD file.txt',     // <ref> <path> senza `--`
+    'git checkout main src/app.js',   // <ref> <path>
+    'git checkout --discard-changes', // butta via le modifiche (anche per switch)
+    'git switch --discard-changes main',
+    'git stash drop',                 // elimina uno stash salvato
+    'git stash drop stash@{1}',
+    'git stash clear',                // elimina TUTTI gli stash
+  ]) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" (scarta lavoro non salvato) dovrebbe essere livello 3`);
+  }
+});
+
+test('git checkout/stash NON distruttivi restano livello 2 (solo conferma OK)', () => {
+  // La discriminante è il pathspec: cambio/creazione ramo e salvataggio stash
+  // non buttano via nulla di irreversibile → non devono chiedere di digitare
+  // "conferma", solo un OK.
+  for (const cmd of [
+    'git checkout main',              // cambio ramo
+    'git checkout -b nuovo',          // crea ramo
+    'git checkout -b nuovo origin/main', // crea ramo da start-point (2 operandi ma -b)
+    'git checkout -B forza',          // ricrea ramo
+    'git checkout -',                 // torna al ramo precedente
+    'git stash',                      // salva le modifiche (recuperabile con pop)
+    'git stash push -m wip',
+    'git stash pop',                  // riapplica (recuperabile)
+    'git stash apply',
+    'git stash list',
+  ]) {
+    assert.equal(lvl(cmd), 2, `"${cmd}" (non distruttivo) dovrebbe essere livello 2`);
+  }
+});
+
 test('livello 3 — interpreti ed esecutori di codice arbitrario', () => {
   for (const cmd of [
     'node script.js', 'python app.py', 'python3 -c "print(1)"', 'bash run.sh',
