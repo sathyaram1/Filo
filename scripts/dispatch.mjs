@@ -723,16 +723,32 @@ function recordSecaudit(id, verdict) {
 
 // ─── run() — il comando di default ────────────────────────────────────────────
 
+/**
+ * Emette un GUASTO: nessun lavoro consegnato, e il worker lo dice
+ * all'orchestratore con la terza parola del vocabolario (`guasto`), che ferma
+ * il giro senza travestirlo da giornata tranquilla.
+ */
+function emitHalt(kind, message) {
+  process.stderr.write(`[dispatch] GUASTO (${kind}): ${message}\n`);
+  emit({ role: 'halt', kind, message }, {});
+  return { exit: 3 };
+}
+
 export async function run() {
   let snapshot;
   try {
     snapshot = await buildSnapshot();
   } catch (e) {
-    // Lo stato è illeggibile anche dopo i retry. Per scelta dell'owner NON ci
-    // si ferma (un giro a vuoto non risolve nulla): si ripiega sull'audit,
-    // lasciando in stderr la traccia del guasto vero per il debugging.
+    // Guasto dichiarato (coda illeggibile): fermarsi è l'esito giusto — un
+    // audit al posto del lavoro vero è esattamente il travestimento che ha
+    // prodotto l'ondata #310+.
+    if (e?.faultKind) return emitHalt(e.faultKind, e.message);
+    // Guasto generico dopo i retry: per scelta dell'owner NON ci si ferma (un
+    // giro a vuoto non risolve nulla): si ripiega sull'audit, lasciando in
+    // stderr la traccia del guasto vero per il debugging.
     process.stderr.write(`[dispatch] stato illeggibile anche dopo i retry (${e?.message || e}) → fallback prober\n`);
     const proberBucket = { role: 'prober' };
+    prepareForProber();
     emit(proberBucket, {});
     await recordWorkerSpawn(proberBucket);
     return { exit: 0 };
