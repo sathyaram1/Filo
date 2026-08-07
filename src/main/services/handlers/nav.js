@@ -18,7 +18,12 @@ module.exports = function register(on, ctx) {
 
   on(MSG.OPEN_HOME, async (msg, sender) => {
     const win = winOf(sender);
-    if (win?._filoTabs) win._filoTabs.openTab('filo://home/home.html');
+    // #252: la conferma cliccabile di "Salva per dopo" apre la lista chiedendo
+    // di evidenziare la scheda appena salvata (?highlight=<id>), così chi la
+    // apre la prima volta vede subito dove è finita.
+    let url = 'filo://home/home.html';
+    if (msg && msg.highlight) url += `?highlight=${encodeURIComponent(String(msg.highlight))}`;
+    if (win?._filoTabs) win._filoTabs.openTab(url);
     return { ok: true };
   });
 
