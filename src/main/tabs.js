@@ -1091,6 +1091,9 @@ class TabManager {
       activate: true,
       restoreScrollPct: scrollPct,
       restoreZoomLevel: zoomLevel,
+      // "Duplica" chiede ESPLICITAMENTE una copia: salta la deduplica #252 delle
+      // pagine interne, altrimenti riporterebbe solo a fuoco l'originale.
+      allowDuplicate: true,
     });
   }
 
