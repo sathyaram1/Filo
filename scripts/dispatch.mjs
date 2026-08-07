@@ -788,8 +788,66 @@ export async function run() {
 // Raccoglie il payload (diff/feedback), fa il claim per i bucket feedback-bound,
 // e stampa il JSON. Ritorna { exit }. `cap` è il loop cap effettivo (per le
 // ri-scelte dopo un claim già preso).
+// Il prober non lavora su un branch: la directory torna alla LINEA PRINCIPALE
+// e l'identità attesa viene rilasciata. Senza, resteremmo sul branch del
+// compito precedente e le modifiche del prober finirebbero là dentro, dove
+// diventerebbero modifiche di QUEL lavoro nel diff che va al gate.
+function prepareForProber() {
+  clearExpectation(ROOT);
+  const g = (args) => tryGit(args);
+  g(['fetch', 'origin', MAIN_BRANCH]);
+  if (currentBranch(ROOT) === MAIN_BRANCH) return;
+  if (tryGit(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${MAIN_BRANCH}`]).ok) {
+    g(['checkout', '-B', MAIN_BRANCH, `origin/${MAIN_BRANCH}`]);
+  } else {
+    g(['checkout', MAIN_BRANCH]);
+  }
+}
+
+/**
+ * A + D: posiziona la directory sul branch del bucket e registra nello stato
+ * l'identità attesa del contenuto. FAIL CLOSED: se non riesce, il lavoro NON
+ * viene consegnato.
+ *
+ * @returns {{ok:true, branch:string}|{ok:false, kind:string, message:string}}
+ */
+function positionOnBranch(bucket) {
+  const isNew = bucket.role === 'new-work';
+  const prev = readState(bucket.id);
+  const branch = isNew ? newWorkBranch(bucket.id) : (prev?.branch || bucket.branch || '');
+  if (!branch) return { ok: false, kind: 'permanent', message: `nessun branch assegnato per ${bucket.id}` };
+
+  const res = prepareBranch({
+    root: ROOT,
+    branch,
+    create: isNew,
+    base: isNew ? preferredBase(bucket.num, MAIN_BRANCH) : '',
+    mainBranch: MAIN_BRANCH,
+    checkpoint: isNew ? null : lastCheckpoint(prev),
+  });
+  if (!res.ok) return res;
+  if (res.discarded) {
+    process.stderr.write(`[dispatch] ${branch}: lavoro di un'istanza interrotta riportato all'ultimo punto fermo; i commit scartati restano su ${res.discarded}\n`);
+  }
+
+  // Identità attesa del contenuto: è il valore che le transizioni (C) e il
+  // ripristino (D) confronteranno.
+  const state = withCheckpoint(
+    { ...defaultState(bucket.id, branch), ...(prev || {}), id: bucket.id, branch },
+    res.head, `${bucket.role}:checkout`,
+  );
+  writeState(state);
+  persistStateToGit(bucket.id, `feedback: branch ${branch} per ${bucket.id}`);
+  // Esposta alla guardia fuori sessione (.claude/hooks/branch-guard.sh).
+  writeExpectation(ROOT, { branch, id: bucket.id });
+  bucket.branch = branch;
+  bucket.state = state;
+  return { ok: true, branch };
+}
+
 async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP) {
   if (bucket.role === 'prober') {
+    prepareForProber();
     emit(bucket, {});
     // Log del worker spawnato (best-effort): stdout è già stato scritto, quindi
     // l'orchestratore ha già il suo JSON; qui aspettiamo solo la scrittura del
