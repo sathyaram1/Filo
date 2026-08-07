@@ -58,7 +58,7 @@ import { fileURLToPath } from 'node:url';
 import {
   prepareBranch, newWorkBranch, preferredBase, checkDelivery, withCheckpoint,
   lastCheckpoint, bumpRejects, clearRejects, headSha, currentBranch,
-  writeExpectation, clearExpectation, stateDir,
+  writeExpectation, clearExpectation, stateDir, IDENTITY_REJECT_LIMIT,
 } from './lib/branch-integrity.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
