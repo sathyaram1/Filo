@@ -1429,11 +1429,19 @@
   // Mostra/aggiorna la preview SUL POSTO: immagine (già scaldata in cache da
   // preloadVisibleCards appena la riga è comparsa, §5.1 → hover istantaneo),
   // contesto, modulo. Se lo stato era già preview non si passa dalle statistiche.
+  //
+  // OGNI riapertura riparte dal FRONTE (feedback #373): ridipingiamo l'immagine
+  // (→ fronte) sia quando la carta cambia, sia quando la preview era chiusa
+  // (stato ≠ preview), anche se è la STESSA carta di prima. Senza il secondo
+  // caso, una carta girata sul retro, uscita dall'hover (torna alle statistiche)
+  // e ri-hoverata riapriva ancora sul retro, in modo incoerente con il cambio
+  // carta. Se invece la preview è GIÀ aperta sulla stessa carta (re-hover mentre
+  // resta visibile), NON ridipingiamo: un flip volontario dell'utente resta.
   function showPreview(cardId) {
     const card = cardsById[cardId];
     if (!card) return;
     const img = $('previewImg');
-    if (img.dataset.cardId !== card.id) paintCardImage(img, card);
+    if (detailState !== 'preview' || img.dataset.cardId !== card.id) paintCardImage(img, card);
     renderDetailCtx(card);
     renderDetailModule(card);
     if (detailState !== 'preview') setDetailState('preview');
