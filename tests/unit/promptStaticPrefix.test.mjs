@@ -63,8 +63,13 @@ test('chat della home: due richieste diverse condividono tutto il blocco di istr
   const a = C.PROMPTS.filoChat(chatA);
   const b = C.PROMPTS.filoChat(chatB);
   const shared = commonPrefixLen(a, b);
-  // Il prefisso condiviso deve essere l'intera parte statica.
-  assert.equal(shared, C.PROMPTS.filoChatStatic(chatA).length);
+  // La parte statica è davvero il PREFISSO di entrambe le richieste (il pezzo
+  // condiviso può essere anche più lungo: le prime lettere del contesto a volte
+  // coincidono, ed è un di più).
+  const staticLen = C.PROMPTS.filoChatStatic(chatA).length;
+  assert.ok(a.startsWith(C.PROMPTS.filoChatStatic(chatA)), 'la parte fissa non apre il prompt');
+  assert.ok(b.startsWith(C.PROMPTS.filoChatStatic(chatB)), 'la parte fissa non apre il prompt');
+  assert.ok(shared >= staticLen, `condiviso ${shared} < parte fissa ${staticLen}`);
   // …che è la stragrande maggioranza del prompt (prima del fix: 0,6%).
   assert.ok(shared / a.length > 0.85, `prefisso condiviso troppo corto: ${(100 * shared / a.length).toFixed(1)}%`);
   assert.ok(shared > 5000, `prefisso condiviso di soli ${shared} caratteri`);
@@ -104,7 +109,8 @@ test('agente Aiuto: il protocollo sta in testa, la pagina in fondo', () => {
   const a = C.PROMPTS.help(helpA);
   const b = C.PROMPTS.help(helpB);
   const shared = commonPrefixLen(a, b);
-  assert.equal(shared, C.PROMPTS.helpStatic().length);
+  assert.ok(a.startsWith(C.PROMPTS.helpStatic()), 'la parte fissa non apre il prompt');
+  assert.ok(shared >= C.PROMPTS.helpStatic().length);
   assert.ok(shared / a.length > 0.85, `prefisso condiviso troppo corto: ${(100 * shared / a.length).toFixed(1)}%`);
 
   const s = C.PROMPTS.helpStatic();
@@ -125,17 +131,20 @@ test('agente Aiuto: il protocollo sta in testa, la pagina in fondo', () => {
 // --- Chat del deck builder ---------------------------------------------------
 
 test('deck builder: le regole stanno in testa, il mazzo in fondo', () => {
-  const a = C.PROMPTS.decksChat({ deckName: 'Krenko', commanderName: 'Krenko, Mob Boss', identity: 'R', deckCards: 'Sol Ring — ramp' });
-  const b = C.PROMPTS.decksChat({ deckName: 'Atraxa', commanderName: 'Atraxa', identity: 'WUBG', deckCards: 'Cultivate — ramp' });
+  // Nomi che NON compaiono negli esempi delle regole, così un "leak" nella
+  // parte fissa sarebbe davvero un dato del mazzo e non un esempio.
+  const a = C.PROMPTS.decksChat({ deckName: 'Mazzo blu di prova', commanderName: 'Talrand, Sky Summoner', identity: 'U', deckCards: 'Counterspell — controllo' });
+  const b = C.PROMPTS.decksChat({ deckName: 'Mazzo verde', commanderName: 'Azusa, Lost but Seeking', identity: 'G', deckCards: 'Cultivate — ramp' });
   const shared = commonPrefixLen(a, b);
-  assert.equal(shared, C.PROMPTS.decksChatStatic().length);
+  assert.ok(a.startsWith(C.PROMPTS.decksChatStatic()), 'la parte fissa non apre il prompt');
+  assert.ok(shared >= C.PROMPTS.decksChatStatic().length);
   assert.ok(shared / a.length > 0.7, `prefisso condiviso troppo corto: ${(100 * shared / a.length).toFixed(1)}%`);
 
   const s = C.PROMPTS.decksChatStatic();
-  for (const leak of ['Krenko', 'Sol Ring']) {
+  for (const leak of ['Talrand', 'Counterspell', 'Mazzo blu di prova']) {
     assert.ok(!s.includes(leak), `la parte fissa contiene un dato del mazzo: ${leak}`);
   }
-  for (const data of ['MAZZO CORRENTE: "Krenko"', 'Krenko, Mob Boss', 'Sol Ring — ramp']) {
+  for (const data of ['MAZZO CORRENTE: "Mazzo blu di prova"', 'Talrand, Sky Summoner', 'Counterspell — controllo']) {
     assert.ok(a.includes(data), `il prompt completo non contiene più: ${data}`);
   }
 });
