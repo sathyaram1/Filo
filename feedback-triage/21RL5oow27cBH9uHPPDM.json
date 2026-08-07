@@ -1,0 +1,7 @@
+{
+  "id": "21RL5oow27cBH9uHPPDM",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho verificato partendo dal sintomo: sulla pagina Nuova scheda avevi scritto \"oggi è martedì\", cioè Filo non sapeva che giorno fosse. Ora il messaggio della nuova scheda riceve il giorno reale della settimana e la data completa (es. \"martedì 21 luglio 2026\") e viene istruito a usarli quando sono rilevanti (routine settimanali, scadenze, \"è già venerdì\", weekend in arrivo), continuando a NON citare l'ora esatta al minuto. Ho controllato che il giorno e la data prodotti siano corretti e in italiano, incluso il fatto che la data del tuo feedback (21 luglio) cadeva davvero di martedì. Stress test superati: al cambio di giorno il messaggio si rigenera (così non resta \"martedì\" quando è mercoledì) e questo avviene una sola volta al giorno, senza rigenerazioni inutili durante la giornata; è previsto anche un ripiego coi nomi dei giorni in italiano se il sistema non ha il formato locale. Tutta la batteria di test automatici della logica passa, incluso un nuovo test che verifica proprio la rigenerazione al cambio data. Nota: l'effetto finale vive dentro un messaggio generato da un modello AI dal vivo, non avviabile in questo ambiente, quindi ho verificato la logica che prepara il contesto e i test, non lo screenshot del messaggio finale: vale una prova a mano aprendo una nuova scheda.",
+  "queuedAt": "2026-08-07T09:38:19.528Z",
+  "queuedBy": "routine"
+}
