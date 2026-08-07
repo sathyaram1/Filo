@@ -74,6 +74,8 @@
     $('sec-auto-feedback-desc').textContent = I18n.t('options_security_auto_feedback_desc');
     $('sec-export-btn').textContent = I18n.t('security_export_btn');
     $('sec-export-desc').textContent = I18n.t('security_export_desc');
+    $('sec-import-btn').textContent = I18n.t('security_import_btn');
+    $('sec-import-desc').textContent = I18n.t('security_import_desc');
     $('savedHint').textContent = I18n.t('options_saved');
   }
 
