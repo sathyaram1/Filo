@@ -1,7 +1,0 @@
-{
-  "id": "ac4500d7-1702-43f8-8e47-16840e3aeb58",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica e stata pubblicata. La versione riorganizza i prompt lunghi (chat della home, assistente di pagina, deck builder) mettendo davanti la parte di istruzioni che non cambia mai, cosi il modello la riusa invece di rielaborarla ogni volta: risposte piu rapide e costo piu basso. In piu, nella cronologia delle richieste AI ora vedi accanto al costo quanta parte del testo mandato al modello e stata effettivamente riusata. Nessun problema di sicurezza rilevato.",
-  "queuedAt": "2026-08-07T03:18:50.445Z",
-  "queuedBy": "routine"
-}
