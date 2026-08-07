@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <title>Filo — Scaricamenti</title>
+  <link rel="icon" href="filo://asset/icons/icon-32.png" />
+  <link rel="stylesheet" href="filo://style/theme.css" />
+  <link rel="stylesheet" href="filo://style/pages.css" />
+  <script src="filo://shared/themeTokens.js"></script>
+  <script src="filo://shared/pageBootstrap.js"></script>
+  <script src="filo://shared/constants.js"></script>
+  <script src="filo://shared/messages.js"></script>
+  <script src="filo://shared/i18n.js"></script>
+  <script src="filo://shared/storage.js"></script>
+  <script src="filo://shared/confirmUi.js"></script>
+  <script src="filo://shared/icons.js"></script>
+  <style>
+    /* Elenco scaricamenti (#410.3). Un file per RIGA, dal più recente. Ogni riga
+       è un elemento con azioni puntuali: clic sinistro = azione primaria (apri il
+       file se completato), tasto destro = menu contestuale con tutte le azioni —
+       coerente con la centralità del tasto destro in Filo. Gli scaricamenti in
+       corso mostrano barra + percentuale live. */
+    .dl-list { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+
+    .dl-item {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      grid-template-rows: auto auto auto;
+      column-gap: 12px;
+      align-items: center;
+      border: 1px solid var(--sn-border);
+      border-radius: var(--sn-radius);
+      padding: 11px 13px;
+      background: var(--sn-bg);
+      transition: background 0.1s ease, border-color 0.1s ease;
+    }
+    .dl-item:hover { background: var(--sn-hover); }
+    .dl-item:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 1px; }
+    /* La riga completata ha un'azione primaria (apri): mostralo col cursore. */
+    .dl-item[data-state="completed"] { cursor: pointer; }
+
+    .dl-icon {
+      grid-row: 1 / span 2;
+      width: 30px; height: 30px;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--sn-muted);
+      flex: 0 0 30px;
+    }
+    /* Colore dell'icona per stato: interrotto/annullato tenue-rosso, completato
+       accento, in corso neutro (l'attenzione la prende la barra). */
+    .dl-item[data-state="interrupted"] .dl-icon,
+    .dl-item[data-state="cancelled"] .dl-icon { color: #c0392b; }
+    .dl-item[data-state="completed"] .dl-icon { color: var(--sn-accent); }
+
+    .dl-name {
+      grid-column: 2; grid-row: 1;
+      font-size: 14px; color: var(--sn-fg);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .dl-meta {
+      grid-column: 2; grid-row: 2;
+      font-size: 11px; color: var(--sn-muted);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .dl-path {
+      grid-column: 2 / span 2; grid-row: 3;
+      font-size: 11px; color: var(--sn-muted);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      margin-top: 4px; opacity: 0.85;
+    }
+
+    /* Barra di avanzamento per gli scaricamenti in corso: occupa la riga 3 al
+       posto (idealmente sopra) del percorso quando è attivo. */
+    .dl-bar {
+      grid-column: 2 / span 2; grid-row: 3;
+      height: 4px; border-radius: 3px; margin-top: 6px;
+      background: var(--sn-border); overflow: hidden;
+    }
+    .dl-fill {
+      height: 100%; background: var(--sn-accent);
+      width: 0%; transition: width 0.2s ease;
+    }
+    .dl-bar.indeterminate .dl-fill {
+      width: 40%; animation: dl-indet 1.1s ease-in-out infinite;
+    }
+    @keyframes dl-indet {
+      0% { margin-left: -40%; } 100% { margin-left: 100%; }
+    }
+
+    .dl-actions {
+      grid-column: 3; grid-row: 1 / span 2;
+      display: flex; gap: 6px; align-items: center;
+    }
+    .dl-btn {
+      border: 1px solid var(--sn-border);
+      background: none;
+      color: var(--sn-muted);
+      cursor: pointer;
+      font: inherit; font-size: 12px;
+      padding: 4px 9px;
+      border-radius: var(--sn-radius);
+      white-space: nowrap;
+      transition: color 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+    }
+    .dl-btn:hover { color: var(--sn-fg); background: var(--sn-bg); border-color: var(--sn-accent); }
+    .dl-btn:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 1px; }
+
+    /* Menu contestuale: stesse classi del resto di Filo, posizionato "fixed"
+       alle coordinate del click (vedi PATTERNS.md § menu contestuale pagine filo://). */
+    .dl-ctxmenu { position: fixed; right: auto; top: auto; min-width: 160px; }
+    .dl-count { font-size: 12px; color: var(--sn-muted); margin-left: auto; }
+  </style>
+</head>
+<body>
+  <main class="sn-page">
+    <h1>Scaricamenti</h1>
+
+    <div class="sn-toolbar">
+      <input type="search" id="search" placeholder="Cerca tra gli scaricamenti…" />
+      <button class="sn-btn sn-btn-secondary" id="clear">Svuota elenco</button>
+      <span id="count" class="dl-count"></span>
+    </div>
+
+    <div id="list" class="dl-list"></div>
+    <div id="empty" class="sn-empty" hidden>Non hai ancora scaricato nulla.</div>
+  </main>
+
+  <script src="downloads.js"></script>
+</body>
+</html>
