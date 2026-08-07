@@ -285,6 +285,12 @@
       desc: 'L’elenco delle richieste fatte all’AI (spiegazioni, traduzioni, aiuto…), filtrabile e ricercabile, con il costo di ogni richiesta e quanta parte del testo mandato al modello è stata riusata da una richiesta precedente invece di essere rielaborata; puoi rimuovere una singola voce oppure svuotarla del tutto.',
       invoke: 'Pagina filo://history/history.html. Passa il mouse su una voce e clicca «Rimuovi» per toglierla; «Cancella tutto» svuota l’intera cronologia.',
     },
+    {
+      id: 'downloads-list', title: 'Elenco degli scaricamenti', category: 'navigation',
+      desc: 'La lista di tutti i file scaricati, dal più recente: per ciascuno vedi nome, dimensione, stato (completato, interrotto, annullato o in corso), data e dove è stato salvato; gli scaricamenti in corso mostrano barra e percentuale dal vivo. Per ogni voce puoi aprire il file, aprire la cartella che lo contiene, copiarne il percorso, ri-scaricarlo o toglierlo dalla lista; «Svuota elenco» rimuove tutti quelli conclusi. Puoi anche cercare tra gli scaricamenti.',
+      invoke: 'Menu «App» → «Scaricamenti», oppure il pulsante «Vedi tutti» sull’indicatore degli scaricamenti in alto; indirizzo filo://downloads/downloads.html. Clic su una voce completata per aprire il file, tasto destro per il menu con tutte le azioni.',
+      doesNot: 'Non ti fa scegliere dove salvare ogni file (finiscono nella cartella Download di sistema) e non riguarda «Salva immagine/video come…» dal tasto destro.',
+    },
 
     // ──────────────────── Assistente e agente di pagina ──────────────────────
     {

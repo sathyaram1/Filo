@@ -194,6 +194,13 @@
     DOWNLOAD_CANCEL: 'download_cancel',
     DOWNLOAD_PAUSE: 'download_pause',
     DOWNLOAD_RESUME: 'download_resume',
+    // Segnale BROADCAST main→superfici: "la cronologia scaricamenti è cambiata"
+    // (parte/avanza/finisce un download). VOLUTAMENTE contentless (nessun nome
+    // file né percorso): la pagina filo://downloads lo riceve e ri-legge la
+    // lista dal canale DOWNLOADS_LIST (che è gated alle sole superfici interne).
+    // Il broadcast raggiunge anche le schede di siti esterni: mandarci i dati
+    // esporrebbe i percorsi ASSOLUTI su disco, quindi qui viaggia solo il tipo.
+    DOWNLOADS_UPDATED: 'downloads_updated',
     // Test provider: misura latenza al primo token e token al secondo
     // su un piccolo prompt fisso. Usato dalla pagina Opzioni.
     TEST_PROVIDER: 'test_provider',                 // { provider, apiKey, model? }

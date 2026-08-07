@@ -170,7 +170,32 @@ function broadcast(kind, rec) {
     const payload = { kind, item: publicRecord(rec) };
     for (const win of BrowserWindow.getAllWindows()) {
       if (!win || win.isDestroyed?.()) continue;
+      // La barra in alto (shell): riceve il record completo per l'indicatore
+      // e il pannello, come da #410.1.
       try { win.webContents.send('shell:download', payload); } catch (_) {}
+    }
+  } catch (_) {}
+  notifyTabs();
+}
+
+// Segnale CONTENTLESS alle pagine (schede) — serve alla pagina filo://downloads
+// per sapere quando ri-leggere la lista. NON portiamo qui il record: questo
+// canale (`filo:broadcast`) raggiunge ANCHE le schede di siti esterni, e il
+// record contiene il percorso ASSOLUTO su disco (con lo username). La pagina
+// legge i dati veri dal canale DOWNLOADS_LIST, riservato alle superfici interne.
+function notifyTabs() {
+  try {
+    const { BrowserWindow } = electron();
+    const type = (globalThis.SN_MSG && globalThis.SN_MSG.MSG.DOWNLOADS_UPDATED) || 'downloads_updated';
+    const msg = { type };
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win || win.isDestroyed?.()) continue;
+      const tm = win._filoTabs;
+      if (tm && Array.isArray(tm.tabs)) {
+        for (const t of tm.tabs) {
+          try { t.view.webContents.send('filo:broadcast', msg); } catch (_) {}
+        }
+      }
     }
   } catch (_) {}
 }
