@@ -1123,7 +1123,9 @@
     ];
     if (!auto && docSwitchBtn) docSwitchBtn.classList.add('ed-doc-generating');
     try {
-      const r = await sendMessage({ type: MSG.AI_REQUEST, action: ACTIONS.EXPLAIN || 'explain', payload: { messages } });
+      const r = await sendMessage({
+        type: MSG.AI_REQUEST, action: ACTIONS.EDITOR_TITLE || 'editor_title', payload: { messages },
+      });
       const rawText = (r && r.ok && typeof r.text === 'string') ? r.text : null;
       if (rawText == null) { if (!auto) showEditorToast('Non sono riuscito a generare il titolo.'); return false; }
       const ok = applyGeneratedTitle(id, rawText);
@@ -1217,7 +1219,9 @@
       { role: 'user', content: parts.join('\n\n') },
     ];
     try {
-      const r = await sendMessage({ type: MSG.AI_REQUEST, action: ACTIONS.EXPLAIN || 'explain', payload: { messages } });
+      const r = await sendMessage({
+        type: MSG.AI_REQUEST, action: ACTIONS.EDITOR_SUMMARY || 'editor_summary', payload: { messages },
+      });
       const rawText = (r && r.ok && typeof r.text === 'string') ? r.text : null;
       if (rawText == null) return false;
       return applyGeneratedSummary(id, rawText);
@@ -3637,7 +3641,9 @@
         ...m.data.messages.filter((x) => x !== thinking).map((x) => ({ role: x.role, content: x.content })),
       ];
       try {
-        const r = await sendMessage({ type: MSG.AI_REQUEST, action: ACTIONS.EXPLAIN || 'explain', payload: { messages } });
+        const r = await sendMessage({
+          type: MSG.AI_REQUEST, action: ACTIONS.EDITOR_CHAT || 'editor_chat', payload: { messages },
+        });
         const raw = (r && r.ok && typeof r.text === 'string') ? r.text : null;
         if (raw == null) {
           thinking.content = 'Errore: ' + ((r && r.error) || 'nessuna risposta');

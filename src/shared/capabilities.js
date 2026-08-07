@@ -384,6 +384,12 @@
       doesNot: 'Le chiavi sono salvate cifrate in locale. Nessuna funzione usa un modello che non hai impostato: se a una funzione manca il modello, o punta a uno che non esiste, quella funzione si ferma e lo segnala quando la usi — non ne sceglie uno per conto suo.',
     },
     {
+      id: 'model-usage-census', title: 'Dove Filo usa un modello', category: 'settings',
+      desc: 'L’elenco completo dei punti in cui Filo usa un modello, anche quelli che non si vedono: riordino delle schede, riassunti, memoria, etichette dei mazzi, giudizi sui feedback, indicizzazione dell’archivio. Per ognuno c’è scritto se il modello lo scegli tu, se lo sceglie chi gestisce Filo, o se quel punto un modello non lo usa affatto.',
+      invoke: 'Opzioni → sezione dei modelli (l’elenco sta sotto le funzioni impostabili).',
+      doesNot: 'Non esiste un punto in cui Filo usi un modello deciso dal codice e non modificabile da nessuno: se ne comparisse uno, l’elenco non sarebbe più completo.',
+    },
+    {
       id: 'preferences', title: 'Preferenze', category: 'settings',
       desc: 'Tema (chiaro/scuro/sistema), dimensione del testo delle pagine interne, archiviazione automatica delle schede, stile dell’assistente, voce/velocità/tono della lettura, e notifiche.',
       invoke: 'Pagina filo://preferences/preferences.html.',

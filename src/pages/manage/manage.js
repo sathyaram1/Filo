@@ -1169,10 +1169,12 @@
     try {
       const r = await sendToMain({
         type: (window.SN_MSG && window.SN_MSG.MSG && window.SN_MSG.MSG.AI_REQUEST) || 'ai_request',
-        // CATEGORIZE: azione NON "style-aware" (il prompt JSON non viene inquinato
-        // dallo stile di scrittura) e fuori dalla cronologia; il suo modello è
-        // impostabile dalle Opzioni come le altre funzioni AI.
-        action: (window.SN_CONST && window.SN_CONST.ACTIONS && window.SN_CONST.ACTIONS.CATEGORIZE) || 'categorize',
+        // Funzione propria: prima questa ricerca prendeva in prestito il modello
+        // di «Categorizza», quindi cambiarne uno cambiava anche l'altra senza
+        // che si vedesse. Come quella, non è "style-aware" (il prompt JSON non
+        // viene inquinato dallo stile di scrittura) e resta fuori dalla
+        // cronologia.
+        action: (window.SN_CONST && window.SN_CONST.ACTIONS && window.SN_CONST.ACTIONS.MANAGE_SEARCH) || 'manage_search',
         payload: { messages: SRCH.buildMessages(query, candidates) },
       });
       if (r && r.ok && typeof r.text === 'string') {

@@ -60,7 +60,56 @@
     $('model-registry-desc').textContent = I18n.t('options_model_registry_desc');
     $('models-desc').textContent = I18n.t('options_models_desc');
     $('addModelRow').textContent = I18n.t('options_model_add');
+    $('h-model-usage').textContent = I18n.t('options_h_model_usage');
+    $('model-usage-desc').textContent = I18n.t('options_model_usage_desc');
+    renderModelUsage();
+  }
 
+  // Elenco (sola lettura) degli ALTRI punti in cui Filo usa un modello: quelli
+  // che girano sui suoi server (li imposta chi gestisce Filo) e quelli che un
+  // modello non lo usano affatto. Le funzioni impostabili da qui sono già la
+  // griglia qui sopra — ripeterle renderebbe la pagina più piena, non più
+  // chiara. Sorgente: il censimento condiviso, lo stesso da cui esce la griglia.
+  function renderModelUsage() {
+    const host = $('modelUsageList');
+    const Usage = window.SN_MODEL_USAGE;
+    if (!host) return;
+    host.innerHTML = '';
+    if (!Usage || typeof Usage.byArea !== 'function') return;
+
+    for (const group of Usage.byArea()) {
+      const rows = group.entries.filter((e) => e.from !== 'user');
+      if (!rows.length) continue;
+
+      const head = document.createElement('div');
+      head.className = 'sn-usage-area';
+      head.textContent = group.area;
+      host.appendChild(head);
+
+      for (const e of rows) {
+        const row = document.createElement('div');
+        row.className = 'sn-usage-row';
+
+        const name = document.createElement('span');
+        name.textContent = e.label;
+        row.appendChild(name);
+
+        const where = document.createElement('span');
+        where.className = 'sn-usage-where';
+        where.textContent = e.from === 'owner'
+          ? I18n.t('options_model_usage_owner')
+          : I18n.t('options_model_usage_none');
+        row.appendChild(where);
+
+        if (e.note) {
+          const note = document.createElement('span');
+          note.className = 'sn-usage-note';
+          note.textContent = e.note;
+          row.appendChild(note);
+        }
+        host.appendChild(row);
+      }
+    }
   }
 
   // Quando "usa modelli predefiniti" è ON, nasconde le sezioni di config

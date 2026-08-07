@@ -113,6 +113,12 @@
         return { output: M.TEXT, inputs: [M.AUDIO] };
       case A.TTS:
         return { output: M.AUDIO, inputs: [] };
+      // Indicizzazione dell'archivio schede: serve un modello che produca
+      // VETTORI, non parole. Un modello di testo qui non funzionerebbe, e un
+      // modello di indicizzazione non funziona per le funzioni di testo: la
+      // validazione impedisce entrambi gli scambi.
+      case A.ARCHIVE_EMBED:
+        return { output: M.EMBED, inputs: [] };
       default:
         return { output: M.TEXT, inputs: [] };
     }
@@ -132,7 +138,9 @@
     if (caps.uncertain) return { ok: true };
 
     if (!caps.outputs.includes(req.output)) {
-      const key = req.output === M.AUDIO ? 'caps_block_output_audio' : 'caps_block_output_text';
+      const key = req.output === M.AUDIO ? 'caps_block_output_audio'
+        : req.output === M.EMBED ? 'caps_block_output_embedding'
+          : 'caps_block_output_text';
       return { ok: false, reason: t(key) };
     }
     for (const inp of req.inputs) {

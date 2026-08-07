@@ -485,6 +485,10 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
     action !== ACTIONS.TRANSLATE_PAGE && action !== ACTIONS.CATEGORIZE
     && action !== ACTIONS.SPELLCHECK_SEMANTIC && action !== ACTIONS.SPELLCHECK_WORD
     && action !== ACTIONS.HELP_INTENT_GUESS && action !== ACTIONS.HELP_INTENT_JUDGE
+    // La ricerca fra i feedback è un passaggio interno di una ricerca, non una
+    // richiesta dell'utente: come quando prendeva in prestito «Categorizza»,
+    // resta fuori dalla cronologia.
+    && action !== ACTIONS.MANAGE_SEARCH
   ) {
     await History.append({
       action, provider: usedProvider, model: concreteModel, servedBy,
@@ -1968,14 +1972,30 @@ async function summarizeTab(title, content) {
   try { return (await runOneShot(ACTIONS.FILO_TAB_SUMMARY, messages)).trim(); } catch (_) { return ''; }
 }
 
-// Embedding di testi via modello Google (chiave Gemini effettiva). null se manca.
+// Indicizzazione di testi (embedding) per la ricerca fra le schede archiviate.
+// Il modello NON è più scritto nel codice: viene dalla funzione ARCHIVE_EMBED,
+// impostabile come tutte le altre. Ritorna null (senza rumore) se non c'è un
+// modello configurato o manca la chiave: l'indicizzazione è un di più, la
+// ricerca per parole continua a funzionare comunque.
 async function embedTexts(texts) {
   const G = globalThis.SN_PROVIDER_GEMINI;
   if (!G || typeof G.embed !== 'function') return null;
   const settings = await getEffectiveSettings();
   const key = settings.apiKeys && settings.apiKeys.gemini;
   if (!key) return null;
-  return G.embed({ apiKey: key, texts, model: SN_CONST.EMBED_MODEL, dim: SN_CONST.EMBED_DIM });
+  let model = '';
+  try {
+    const attempts = buildAttemptChain(
+      settings, modelForAction(settings, ACTIONS.ARCHIVE_EMBED), ACTIONS.ARCHIVE_EMBED,
+    );
+    // Filo sa chiamare modelli di indicizzazione solo su Gemini: prendiamo il
+    // primo della catena servito da lì. Gli altri restano nella catena per il
+    // giorno in cui un secondo fornitore saprà farlo.
+    const hit = attempts.find((a) => a.provider === 'gemini' && a.model);
+    model = hit ? hit.model : '';
+  } catch (_) { /* nessun modello configurato → niente indicizzazione */ }
+  if (!model) return null;
+  return G.embed({ apiKey: key, texts, model, dim: SN_CONST.EMBED_DIM });
 }
 
 // §3.1/§3.2 — arricchisce una tab archiviata: genera un riassunto LLM, lo

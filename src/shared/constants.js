@@ -205,6 +205,26 @@
     GEOBLOCK_CLASSIFY: 'geoblock_classify',
     // Titolo breve generato all'invio di un feedback.
     FEEDBACK_TITLE: 'feedback_title',
+    // === Editor ===
+    // Prima queste tre funzioni chiedevano il modello di «Spiega»: chi cambiava
+    // quel modello cambiava senza saperlo anche l'editor, e chi voleva cambiare
+    // l'editor non trovava dove. Ora hanno il loro slot.
+    // Titolo automatico di un documento dell'editor.
+    EDITOR_TITLE: 'editor_title',
+    // Riassunto automatico di un documento dell'editor.
+    EDITOR_SUMMARY: 'editor_summary',
+    // Chat agganciata a un documento dell'editor.
+    EDITOR_CHAT: 'editor_chat',
+    // Ricerca "a senso" fra i feedback nella dashboard di gestione (prima usava
+    // lo slot di «Categorizza»).
+    MANAGE_SEARCH: 'manage_search',
+    // Embedding dei riassunti delle schede archiviate (base della ricerca
+    // semantica nell'archivio). Prima il modello era scritto nel codice.
+    ARCHIVE_EMBED: 'archive_embed',
+    // Modello usato dal pulsante "Prova" delle chiavi/fornitori: una richiesta
+    // brevissima per misurare latenza e velocità. Prima era un id scritto nel
+    // codice, quindi si provava un modello diverso da quelli davvero in uso.
+    PROVIDER_TEST: 'provider_test',
   };
 
   // === Crediti (gamification) ===
@@ -337,6 +357,12 @@
     [ACTIONS.SAFEBROWSE_JUDGE]: 'Siti pericolosi — giudizio',
     [ACTIONS.GEOBLOCK_CLASSIFY]: 'Blocco geografico — riconoscimento',
     [ACTIONS.FEEDBACK_TITLE]: 'Titolo del feedback',
+    [ACTIONS.EDITOR_TITLE]: 'Editor — titolo del documento',
+    [ACTIONS.EDITOR_SUMMARY]: 'Editor — riassunto del documento',
+    [ACTIONS.EDITOR_CHAT]: 'Editor — chat col documento',
+    [ACTIONS.MANAGE_SEARCH]: 'Gestione — ricerca fra i feedback',
+    [ACTIONS.ARCHIVE_EMBED]: 'Archivio schede — indicizzazione',
+    [ACTIONS.PROVIDER_TEST]: 'Prova di un fornitore',
   };
 
   function actionLabel(action) {
@@ -390,6 +416,16 @@
       label: 'Claude 3.5 Haiku',
       provider: 'openrouter',
       model: 'anthropic/claude-3.5-haiku',
+    },
+    // Indicizzazione (embedding): produce VETTORI da testo, non parole. Usato
+    // SOLO dall'indicizzazione dell'archivio schede (la validazione
+    // modello↔funzione impedisce di assegnarlo a una funzione di testo, e
+    // viceversa). Il provider è Gemini: è l'unico che Filo sa chiamare per
+    // questo tipo di modello.
+    'embed-004': {
+      label: 'Google text-embedding-004',
+      provider: 'gemini',
+      model: 'text-embedding-004',
     },
     // Sintesi vocale (TTS): producono AUDIO da testo. Usati SOLO dall'azione TTS
     // (la validazione modello↔azione impedisce di assegnarli a funzioni di testo).
@@ -454,6 +490,19 @@
     [ACTIONS.SAFEBROWSE_JUDGE]: 'flash-lite',
     [ACTIONS.GEOBLOCK_CLASSIFY]: 'flash-lite',
     [ACTIONS.FEEDBACK_TITLE]: 'flash-lite',
+    // Editor: titolo e riassunto sono automatici e frequenti (girano dopo ogni
+    // pausa nella scrittura) → modello economico. La chat col documento è
+    // conversazionale come le altre chat → stesso modello delle chat.
+    [ACTIONS.EDITOR_TITLE]: 'flash-lite-3, flash-lite-3-or',
+    [ACTIONS.EDITOR_SUMMARY]: 'flash-lite-3, flash-lite-3-or',
+    [ACTIONS.EDITOR_CHAT]: 'flash, flash-or',
+    // Ricerca fra i feedback: classifica una lista corta → modello economico.
+    [ACTIONS.MANAGE_SEARCH]: 'flash-lite-3, flash-lite-3-or',
+    // Indicizzazione dell'archivio: modello di embedding, non di testo.
+    [ACTIONS.ARCHIVE_EMBED]: 'embed-004',
+    // Prova di un fornitore: la catena copre entrambi i fornitori così il
+    // pulsante "Prova" trova un modello sia per Gemini sia per OpenRouter.
+    [ACTIONS.PROVIDER_TEST]: 'flash-lite-3, flash-lite-3-or',
   };
 
   // ── Politica sui fornitori (host upstream) ───────────────────────────────────
@@ -1581,6 +1630,12 @@
     ACTIONS.HELP,
     ACTIONS.FILO_CHAT,
     ACTIONS.FILO_DASHBOARD,
+    // L'editor prima chiedeva il modello di «Spiega», quindi ereditava anche lo
+    // stile di scrittura dell'utente. Ora ha slot propri: restano elencati qui
+    // così il comportamento non cambia sotto i piedi a chi lo usa già.
+    ACTIONS.EDITOR_TITLE,
+    ACTIONS.EDITOR_SUMMARY,
+    ACTIONS.EDITOR_CHAT,
   ];
 
   // Inietta lo stile di scrittura dell'utente nei messaggi di una richiesta AI.
@@ -1610,11 +1665,13 @@
   // chrome.storage.local è ~10 MB condiviso: teniamo un cap prudente e ruotiamo
   // le più vecchie. (Riassunto/embedding §3.2 sono rimandati: per ora solo metadati.)
   const ARCHIVED_TABS_LIMIT = 5000;
-  // §3.2 ricerca semantica: modello di embedding di Google e dimensione del
-  // vettore (Matryoshka: 256 dim = buon compromesso qualità/peso). I vettori si
+  // §3.2 ricerca semantica: dimensione del vettore di indicizzazione
+  // (Matryoshka: 256 dim = buon compromesso qualità/peso). I vettori si
   // quantizzano a int8 e si tengono solo sulle ultime ARCHIVED_EMBED_LIMIT tab
   // (le più recenti) per non sforare la quota di chrome.storage.
-  const EMBED_MODEL = 'text-embedding-004';
+  // QUALE modello indicizza NON si decide qui: è la funzione ARCHIVE_EMBED,
+  // impostabile come tutte le altre (prima era un nome scritto in questo file,
+  // quindi nessuno poteva vederlo né cambiarlo).
   const EMBED_DIM = 256;
   const ARCHIVED_EMBED_LIMIT = 2000;
   const HISTORY_ITEMS_HARD_CAP = 5000;
@@ -1668,7 +1725,6 @@
     HISTORY_ITEMS_HARD_CAP,
     SAVED_PAGES_LIMIT,
     ARCHIVED_TABS_LIMIT,
-    EMBED_MODEL,
     EMBED_DIM,
     ARCHIVED_EMBED_LIMIT,
     AI_CACHE_MAX_ENTRIES,
