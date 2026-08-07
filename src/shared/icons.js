@@ -363,6 +363,11 @@
     caretDown:    (size) => wrap(caretDown, { size }),
     // L'editor usa l'SVG degli appunti (foglio con angolo piegato): ora che
     // l'editor È anche il posto degli appunti, è l'icona più riconoscibile.
+    // ATTENZIONE: il popup del menu App/tasto destro della shell è una
+    // BrowserWindow a parte e NON carica questo file — tiene una COPIA dei
+    // path in `ICON_PATHS` (src/main/popup-menu.js). Se cambi un'icona qui e
+    // quel nome esiste anche là, aggiorna entrambe o le due superfici
+    // disegneranno icone diverse per la stessa cosa.
     editor:       (size) => wrap(note, { size }),
     models:       (size) => wrap(models, { size }),
     openForLater: (size) => wrap(openForLater, { size }),
