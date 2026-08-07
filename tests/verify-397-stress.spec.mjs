@@ -58,12 +58,13 @@ test('multi-parola: casing, longest-match, boundary sinistro, punteggiatura, 3 p
   await page.type('#ta', 'P F ');
   await expect.poll(() => page.locator('#ta').inputValue(), { timeout: 3000 }).toBe('PER FAVORE ');
 
-  // 3) boundary sinistro: dentro un'altra parola NON scatta
+  // 3) boundary sinistro della chiave multi-parola: "x es" NON deve scattare
+  //    dentro "ax es" (la 'x' è attaccata alla 'a'). La parola standalone "es"
+  //    invece è legittima e diventa "esatto": prova entrambe le cose insieme.
   await page.fill('#ta', '');
   await page.click('#ta');
   await page.type('#ta', 'ax es ');
-  await page.waitForTimeout(400);
-  expect(await page.locator('#ta').inputValue()).toBe('ax es ');
+  await expect.poll(() => page.locator('#ta').inputValue(), { timeout: 3000 }).toBe('ax esatto ');
 
   // 4) confine di punteggiatura (non solo spazio)
   await page.fill('#ta', '');
