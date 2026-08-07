@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.193', date: '2026-08-07',
+      features: [],
+      fixes: [
+        'Nella Cronologia AI, dopo "Cancella tutto" il menu "filtra per tipo" torna vuoto: prima continuava a elencare i tipi delle voci ormai cancellate.',
+      ],
+    },
+    {
       version: '0.2.192', date: '2026-08-07',
       features: [],
       fixes: [
