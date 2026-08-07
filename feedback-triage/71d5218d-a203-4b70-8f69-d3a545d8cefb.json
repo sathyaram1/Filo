@@ -1,7 +1,0 @@
-{
-  "id": "71d5218d-a203-4b70-8f69-d3a545d8cefb",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato: la modifica e' stata pubblicata. Ora nel deck builder l'anteprima di una carta bifronte riparte sempre dal fronte quando la riapri, anche tornando sulla stessa carta che avevi girato sul retro. Resta comunque rispettato il giro fatto apposta mentre l'anteprima e' ancora aperta.",
-  "queuedAt": "2026-08-07T09:55:26.162Z",
-  "queuedBy": "routine"
-}
