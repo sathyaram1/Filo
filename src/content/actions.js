@@ -1786,6 +1786,8 @@
     buildSavePayload,
     savePage,
     saveLink,
+    isDownloadableLink,
+    downloadLink,
     copyImage,
     downloadImage,
     toggleFullscreen,
