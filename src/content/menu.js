@@ -560,6 +560,20 @@
         if (i >= 0) entries.splice(i, 1);
       };
 
+      // Applica il filtro di ricerca corrente. Serve anche DOPO una rimozione:
+      // se stavi cercando "pass" e togli l'unica voce trovata, la lista resta
+      // muta senza dire che ora quella ricerca non ha risultati.
+      const applyFilter = () => {
+        const q = input.value.trim().toLowerCase();
+        let visible = 0;
+        for (const b of list.querySelectorAll('.sn-menu-history-item')) {
+          const match = !q || (b.dataset.snSearch || '').includes(q);
+          b.style.display = match ? '' : 'none';
+          if (match) visible++;
+        }
+        noResults.style.display = visible === 0 ? '' : 'none';
+      };
+
       entries.forEach((entry) => {
         // Riga = zona "incolla" (a sinistra) + "×" rimuovi (a destra). Sono due
         // bottoni fratelli, non annidati: il "×" non fa scattare l'incolla.
