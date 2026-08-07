@@ -1,0 +1,7 @@
+{
+  "id": "a6f89b2a-3704-40f6-82d2-c69041284d7d",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho riprodotto la segnalazione dalla pagina del Correttore: creo la correzione «ke» → «che», cancello il contenuto del campo della correzione e clicco fuori. Ora il campo torna subito a mostrare «che» (prima restava vuoto, uno stato falso) e sopra la lista compare un avviso in rosso che spiega che un campo vuoto non salva e che per togliere davvero la correzione si usa «Rimuovi». La regola resta salvata e attiva, com'era giusto: svuotare non è più scambiato per una cancellazione, e ora ciò che vedi corrisponde a ciò che è salvato anche dopo aver ricaricato la pagina. Stessa cosa svuotando il campo della parola: si comporta in modo identico. Ho stressato il caso: un campo di soli spazi viene trattato come vuoto (avviso + ripristino); svuotare parola e correzione in sequenza rapida non perde la regola; una modifica valida della correzione continua a salvarsi normalmente (nessuna regressione); dopo svuotamento e ricarica il valore reale persiste. Controllo visivo: l'avviso è leggibile, del colore d'allarme coerente col tema, e indirizza chiaramente al pulsante «Rimuovi»; il layout resta pulito. Tutti i test della pagina restano verdi.",
+  "queuedAt": "2026-08-07T10:07:26.056Z",
+  "queuedBy": "routine"
+}
