@@ -283,7 +283,7 @@ l'utente **perde del tutto** quelle azioni, senza alternative (#400).
   quando due contesti coesistono sullo stesso target, **componi** entrambe le
   famiglie (separatore fra loro), a partire da quella dell'elemento cliccato più
   in profondità. Costruisci le voci-azione in helper senza la sezione "Spiega",
-  così il chiamante decide: **una sola** sezione AItile inline (quella
+  così il chiamante decide: **una sola** sezione "Spiega" inline (quella
   dell'elemento primario), perché ogni box `inline` fa una chiamata al modello a
   ogni apertura del menu — due box = doppio costo per un menu che si apre spesso.
 - **Dove:** `buildContextualItems` (+ `buildImageActionItems`/`buildLinkActionItems`)
