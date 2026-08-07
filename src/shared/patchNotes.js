@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.192', date: '2026-08-07',
+      features: [],
+      fixes: [
+        'Quando salvi una pagina con "Salva per dopo", la conferma che compare è ora cliccabile: aprila per andare dritto a "Aperti per dopo", con la scheda appena messa da parte evidenziata. Così scopri subito dov\'è finita, senza doverla cercare nel menu.',
+      ],
+    },
+    {
       version: '0.2.191', date: '2026-08-07',
       features: [],
       fixes: [
