@@ -9,10 +9,17 @@ let activePopup = null;
 
 // ── SVG icon paths (viewBox 0 0 24 24, stroke-based) ──────────────────────
 const ICON_PATHS = {
+  // Editor = foglio con l'angolo piegato e due righe di testo: è la stessa
+  // icona degli appunti (`note` in src/shared/icons.js). Da quando gli appunti
+  // vivono dentro l'editor e non hanno più un pannello a parte, l'editor È il
+  // posto degli appunti: le due icone devono coincidere ovunque. Questo
+  // registro è una COPIA (il popup è una BrowserWindow a parte e non carica
+  // shared/icons.js): se cambi l'una, cambia anche l'altra.
   editor:
-    '<path d="M5 4h7l5 5v11h-12z"/><path d="M12 4v5h5"/>' +
-    '<path d="M8 13h3"/>' +
-    '<path d="M19.5 14.5l-6 6L11 21l.5-2.5 6-6a1.4 1.4 0 0 1 2 2z"/>',
+    '<path d="M6 3.5h8l4 4v13H6z"/>' +
+    '<path d="M14 3.5v4h4"/>' +
+    '<path d="M9 12.5h6"/>' +
+    '<path d="M9 15.8h4"/>',
 
   feedback:
     '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
