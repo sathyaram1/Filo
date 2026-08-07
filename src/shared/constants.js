@@ -1076,19 +1076,24 @@
     // Agente conversazionale principale. Riceve memoria, stato e cronologia del
     // thread; risponde con una bolla di chat e opzionalmente azioni strutturate
     // che il client esegue (NAVIGA, TIMER, SALVA_APPUNTO, ecc.).
-    filoChat: ({ profilo, preferenze, espansioni, lezioni, stato, history, modelName, capacita, files }) =>
+    //
+    // ORDINE DEL PROMPT — la parte IMMUTABILE viene PRIMA (#422).
+    // Istruzioni, elenco delle capacità, azioni, tono e formato di output sono
+    // identici a ogni messaggio e per ogni utente: stanno tutti in
+    // `filoChatStatic`, che apre il prompt. Tutto ciò che cambia (modello che
+    // esegue, profilo, preferenze, lezioni, stato del browser, file,
+    // conversazione) sta in `filoChatContext` e viene DOPO.
+    // Motivo: i fornitori riconoscono che l'INIZIO di una richiesta è identico a
+    // una precedente e non lo ri-elaborano né lo rifatturano (prompt caching:
+    // implicito su Gemini diretto e sui modelli Gemini via OpenRouter, cioè
+    // quelli che Filo usa davvero). Il riuso vale però solo sul PREFISSO: prima
+    // bastava il nome del modello (che cambia col ripiego) o l'ora dentro STATO
+    // per far ricalcolare l'intero blocco di istruzioni a ogni messaggio.
+    // REGOLA per chi tocca questo prompt: sopra la frontiera non va NULLA che
+    // dipenda dall'utente o dalla singola richiesta.
+    filoChatStatic: ({ capacita }) =>
       `Sei Filo, un assistente personale. L'utente interagisce con te attraverso un campo di testo nella dashboard del browser.\n\n` +
-      (modelName
-        ? `Il modello che ti sta eseguendo è ${modelName}. Se l'utente ti chiede quale modello o IA sei, rispondi con questo nome esatto — è il nome con cui il codice ti invoca — senza inventarne altri né dare soprannomi.\n\n`
-        : '') +
-      `PROFILO UTENTE:\n${profilo || '(vuoto)'}\n\n` +
-      `PREFERENZE:\n${preferenze || '(vuoto)'}\n\n` +
-      (espansioni ? `${espansioni}\n\n` : '') +
-      (lezioni ? `LEZIONI RECENTI:\n${lezioni}\n\n` : '') +
-      `STATO:\n${stato || '(vuoto)'}\n\n` +
-      `FILE DELL'EDITOR (riassunti — gli appunti sono file come gli altri):\n${files || '(nessuno)'}\n` +
-      `Ogni riga è \`[id] Titolo: riassunto\`. Vedi solo i RIASSUNTI, non il testo intero. Se per rispondere ti serve DAVVERO il contenuto completo di un file, emetti l'azione LEGGI_FILE con il suo id PRIMA di rispondere: il testo integrale ti rientra nel contesto e SOLO ALLORA rispondi. Non chiedere un file se il riassunto basta.\n\n` +
-      (history ? `CONVERSAZIONE:\n${history}\n\n` : '') +
+      `Prima vengono le istruzioni, che valgono sempre. Il CONTESTO di questa conversazione — chi è l'utente, cosa ha in memoria, cosa sta guardando, che file ha, che modello ti sta eseguendo — arriva più sotto, dopo le istruzioni.\n\n` +
       `═══ COME RISPONDI ═══\n` +
       `Ogni tua risposta è una bolla di chat. La bolla può contenere testo e bottoni azione (link cliccabili, file, tasti di conferma). L'utente può sempre fare follow-up.\n` +
       `Se PROFILO e PREFERENZE qui sopra sono vuoti significa solo che non hai ancora informazioni su questo utente: NON inventare una spiegazione del perché. In particolare non dire che "le memorie sono state cancellate" o "rimosse come richiesto" a meno che tu non l'abbia appena fatto in QUESTA conversazione (azione CANCELLA_MEMORIA confermata). Ogni scheda parte da una conversazione nuova: non puoi sapere cosa è successo in un'altra scheda se non è nel PROFILO/PREFERENZE/LEZIONI qui sopra.\n\n` +
