@@ -173,8 +173,15 @@ test('nella home i controlli sono solo quelli del browser: nessuna porta agli ap
   // Assert POSITIVO sull'insieme completo: se tornasse una voce "Appunti"
   // (o qualsiasi altra porta separata) l'elenco non combacerebbe più.
   await expect(controls).toHaveCount(6);
-  const labels = await controls.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
-  expect(labels).toEqual(['Red-team', 'Home', 'Cronologia', 'Impostazioni', 'App', 'Profilo']);
+  const items = await controls.evaluateAll((els) => els.map((e) => ({
+    command: e.dataset.command,
+    label: e.getAttribute('aria-label') || '',
+  })));
+  expect(items.map((i) => i.command))
+    .toEqual(['redteam', 'home', 'history', 'settings', 'apps', 'account']);
+  // (l'etichetta del profilo cambia con lo stato di accesso: qui basta che
+  //  nessun controllo si presenti come porta agli appunti)
+  expect(items.some((i) => /appunt/i.test(i.label))).toBe(false);
 
   // E nessun overlay appunti può aprirsi: il pannello non esiste più.
   await expect(page.locator('.dash-notes-overlay')).toHaveCount(0);
