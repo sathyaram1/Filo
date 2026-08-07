@@ -28,6 +28,13 @@
     UPDATE_SETTINGS: 'update_settings',           // { settings }
     RESET_SETTINGS: 'reset_settings',             // → riporta TUTTE le impostazioni ai predefiniti
     EXPORT_DATA: 'export_data',                   // → salva tutti i dati come .zip
+    // Reimportazione del .zip di EXPORT_DATA, in due passi: prima si sceglie e
+    // si LEGGE il file (anteprima con quante sezioni/immagini contiene), poi si
+    // APPLICA dopo la conferma dell'utente. Come EXPORT_DATA sono riservati
+    // all'origine filo://: una pagina web non deve poter aprire un file dialog
+    // né riscrivere lo storage (comprese le chiavi API).
+    IMPORT_DATA_PREVIEW: 'import_data_preview',   // → { ok, fileName, exportedAt, sections, images, token }
+    IMPORT_DATA_APPLY: 'import_data_apply',       // { token } → { ok, added, updated, images }
     GET_HISTORY: 'get_history',
     APPEND_HISTORY: 'append_history',             // { entry }
     REMOVE_HISTORY_ENTRY: 'remove_history_entry', // { id }
