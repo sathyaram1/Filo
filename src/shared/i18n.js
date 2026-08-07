@@ -38,6 +38,7 @@
     // Menu — link / immagine
     menu_open_in_new_tab: 'Apri in nuova tab',
     menu_copy_link: 'Copia URL',
+    menu_save_file: 'Salva file',
     menu_save_link_for_later: 'Salva link per dopo',
     menu_copy_image: 'Copia immagine',
     menu_save_image_as: 'Salva immagine come…',
@@ -193,6 +194,7 @@
     toast_pasted_image: 'Immagine incollata',
     toast_image_saved: 'Immagine salvata',
     toast_image_save_failed: 'Non sono riuscito a salvare l\'immagine',
+    toast_file_save_failed: 'Non sono riuscito a scaricare il file',
     toast_cannot_paste_image: 'Qui non si può incollare un\'immagine (campo di solo testo)',
     toast_paste_failed: 'Non riesco a incollare qui (rifocalizza il campo e riprova)',
     clipboard_image_pending: 'Descrizione…',

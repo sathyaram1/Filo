@@ -20,6 +20,7 @@
       features: [
         'Ora puoi chiedere a Filo di mettere o togliere lo schermo intero, ridurre a icona la finestra o aprire i menu Impostazioni, App e Account: prima poteva solo spiegarti dove cliccare, adesso lo fa lui.',
         'Nella cronologia delle richieste AI, accanto al costo, vedi quanta parte del testo mandato al modello è stata riusata da una richiesta precedente invece di essere rielaborata.',
+        'Col clic destro su un link a un file (PDF, ZIP, allegato) trovi "Salva file": lo scarica seguendone l\'avanzamento nella barra in alto, proprio come se lo cliccassi.',
       ],
       fixes: [
         'La chat della home, l\'assistente di pagina e la chat del deck builder rispondono più in fretta e costano meno: le istruzioni che non cambiano mai non vengono più rielaborate a ogni messaggio.',
