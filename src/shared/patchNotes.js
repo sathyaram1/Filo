@@ -22,6 +22,7 @@
         'Nella cronologia degli appunti la voce che togli con la "×" ora resta tolta: prima, riaprendo la cronologia dalla stessa freccia senza chiudere il menu del tasto destro, ricompariva come se non l\'avessi mai rimossa.',
         'Il messaggio della Nuova scheda ora sa che giorno della settimana è: prima conosceva solo la fascia oraria e se era feriale o weekend, adesso tiene conto del giorno esatto e della data (utile per abitudini e scadenze legate a un giorno preciso).',
         'Nel deck builder, l\'anteprima di una carta bifronte ora riparte sempre dal fronte quando la riapri: prima, se l\'avevi girata sul retro e poi ci tornavi sopra, si riapriva ancora sul retro.',
+        'Nel Correttore, svuotare il campo di una correzione automatica non la fa più sembrare cancellata: il campo torna al valore vero e un avviso ricorda che per toglierla si usa «Rimuovi». Prima restava vuoto a video mentre la correzione continuava di nascosto ad agire.',
       ],
     },
     {
