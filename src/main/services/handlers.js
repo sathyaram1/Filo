@@ -1611,19 +1611,37 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
   const timersList = await FiloMem.listTimers();
   const saved = await SavedPages.list();
 
-  // Momento della giornata — GROSSOLANO di proposito. Il prompt chiede all'LLM
-  // di adattare saluto e tono "al momento", ma finora non gli passavamo MAI il
-  // momento: senza orologio l'LLM tirava a indovinare e il saluto poteva non
-  // combaciare con l'ora reale (es. restava "buonasera" alle 10 di mattina).
-  // Passiamo solo la fascia (mattina/pomeriggio/sera/notte) + feriale/weekend,
-  // NON l'ora esatta: il messaggio è in cache per tutta la fascia, quindi deve
-  // restare valido per tutta la fascia (citare "ore 10:07" diventerebbe stale).
+  // Momento della giornata. Il prompt chiede all'LLM di adattare saluto e tono
+  // "al momento": senza orologio l'LLM tirava a indovinare e il saluto poteva
+  // non combaciare con l'ora reale (es. restava "buonasera" alle 10 di mattina).
+  // Passiamo la fascia (mattina/pomeriggio/sera/notte) MA NON l'ora esatta: il
+  // messaggio è in cache per tutta la fascia, quindi deve restare valido per
+  // tutta la fascia (citare "ore 10:07" diventerebbe stale).
+  //
+  // In più passiamo il GIORNO reale (es. "martedì 7 agosto 2026"): al contrario
+  // dell'ora, la data resta valida per l'intera giornata (le fasce non scavalcano
+  // mai la mezzanotte), quindi non diventa stale entro il periodo di cache; e
+  // `dateKey` entra nella firma sotto, così al cambio di giorno la home si
+  // rigenera e non resta un "oggi è martedì" quando è ormai mercoledì. Senza
+  // questo Filo conosceva solo "feriale/weekend" e non sapeva che giorno fosse
+  // (feedback utente: "oggi è martedì").
   const now = new Date();
   const h = now.getHours();
   const partOfDay = h < 6 ? 'notte' : h < 12 ? 'mattina' : h < 18 ? 'pomeriggio' : 'sera';
   const isWeekend = now.getDay() === 0 || now.getDay() === 6;
   const dayType = isWeekend ? 'weekend' : 'feriale';
-  const momento = `${partOfDay}, giorno ${isWeekend ? 'di weekend' : 'feriale'}`;
+  const dateKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  let dataLunga = '';
+  try {
+    dataLunga = now.toLocaleDateString('it-IT', {
+      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+    });
+  } catch (_) {
+    // Fallback se l'ICU/locale non è disponibile: almeno il nome del giorno.
+    const giorni = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
+    dataLunga = `${giorni[now.getDay()]} ${dateKey}`;
+  }
+  const momento = `${dataLunga}, ${partOfDay} (giorno ${isWeekend ? 'di weekend' : 'feriale'})`;
 
   const payload = {
     profilo, preferenze, espansioni, lezioni, stato: stateText,
