@@ -274,8 +274,21 @@ l'utente **perde del tutto** quelle azioni, senza alternative (#400).
   `document.elementsFromPoint(x, y)`, ma **solo come ripiego** quando non c'è
   altro contesto (selezione, immagine, link, campo di testo): altrimenti un video
   di sfondo a tutta pagina ruberebbe il menu al contenuto che gli sta sopra.
-- **Dove:** `buildContextualItems` / `findMedia` in `src/content/content.js`, voci
-  in `src/content/actions.js`. Test: `tests/context-menu-media.spec.mjs`.
+- **Un elemento può appartenere a PIÙ famiglie insieme — i rami non sono
+  mutuamente esclusivi (#401).** Una miniatura racchiusa in un `<a>` (anteprime
+  di articoli, schede prodotto, risultati di ricerca per immagini) è **sia**
+  immagine **sia** link: un browser normale mostra le due famiglie di voci
+  insieme. Con rami a `return` anticipato, quello dell'immagine chiudeva prima di
+  valutare il link e le azioni sul collegamento sparivano del tutto. Regola:
+  quando due contesti coesistono sullo stesso target, **componi** entrambe le
+  famiglie (separatore fra loro), a partire da quella dell'elemento cliccato più
+  in profondità. Costruisci le voci-azione in helper senza la sezione "Spiega",
+  così il chiamante decide: **una sola** sezione AItile inline (quella
+  dell'elemento primario), perché ogni box `inline` fa una chiamata al modello a
+  ogni apertura del menu — due box = doppio costo per un menu che si apre spesso.
+- **Dove:** `buildContextualItems` (+ `buildImageActionItems`/`buildLinkActionItems`)
+  e `findMedia` in `src/content/content.js`, voci in `src/content/actions.js`.
+  Test: `tests/context-menu-media.spec.mjs`, `tests/context-menu-image-link.spec.mjs`.
 
 ## Popup menu: il "submenu" è una voce a due zone che riapre il menu
 
