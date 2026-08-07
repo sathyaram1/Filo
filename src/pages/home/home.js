@@ -193,12 +193,15 @@
   function renderCard(page) {
     const card = document.createElement('div');
     card.className = 'sn-card';
+    if (page.id) card.dataset.pageId = page.id;
 
     // Evidenziazione una tantum della scheda appena salvata (#252): pulsazione
     // morbida che sfuma da sola, e la portiamo in vista. Consumiamo l'id così
-    // ricerche/re-render successivi non la ri-evidenziano.
+    // ricerche/re-render successivi non la ri-evidenziano. Il marcatore
+    // data-highlighted resta (traccia stabile) anche dopo che l'animazione sfuma.
     if (highlightId && page.id === highlightId) {
       highlightId = null;
+      card.dataset.highlighted = '1';
       card.classList.add('sn-card-highlight');
       requestAnimationFrame(() => {
         try { card.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (_) {}
