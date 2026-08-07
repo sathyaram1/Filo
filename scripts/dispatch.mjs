@@ -1012,20 +1012,32 @@ if (isMainModule) {
       const [, id, verdict, ...rest] = argv;
       if (!id || !['pass', 'fail'].includes(verdict)) { console.error('Uso: --record-verifier <id> <pass|fail> ["critica"]'); process.exit(1); }
       const s = recordVerifier(id, verdict, rest.join(' '));
+      if (s.rejected) { console.error(rejectionText(s.message)); process.exit(3); }
       console.log(`stato ${id}: verifier=${s.verifierVerdict} loop=${s.loopCount}`);
       process.exit(0);
     } else if (flag === '--record-fixed') {
       const [, id, ...rest] = argv;
       if (!id) { console.error('Uso: --record-fixed <id> ["report"]'); process.exit(1); }
       const s = recordFixed(id, rest.join(' '));
+      if (s.rejected) { console.error(rejectionText(s.message)); process.exit(3); }
       console.log(`stato ${id}: ri-messo in coda verifier (loop=${s.loopCount})`);
       process.exit(0);
     } else if (flag === '--record-secaudit') {
       const [, id, verdict] = argv;
       if (!id || !['pass', 'fail'].includes(verdict)) { console.error('Uso: --record-secaudit <id> <pass|fail>'); process.exit(1); }
       const s = recordSecaudit(id, verdict);
+      if (s.rejected) { console.error(rejectionText(s.message)); process.exit(3); }
       console.log(`stato ${id}: secaudit=${s.secauditVerdict}`);
       process.exit(0);
+    } else if (flag === '--preflight') {
+      // Prontezza: gira PRIMA del setup dell'ambiente (npm install, binario
+      // Electron ~102MB, scrot). Se il giro deve fermarsi, deve scoprirlo prima
+      // di aver pagato il setup.
+      preflight().then((r) => {
+        if (r.ok) { console.log('[dispatch] prontezza OK'); process.exit(0); }
+        console.error(`[dispatch] GUASTO (${r.kind}): ${r.message}`);
+        process.exit(3);
+      }).catch((e) => { console.error(`[dispatch] GUASTO (transient): ${e?.message || e}`); process.exit(3); });
     } else if (flag === '--clear-state') {
       const id = argv[1];
       if (!id) { console.error('Uso: --clear-state <id>'); process.exit(1); }
