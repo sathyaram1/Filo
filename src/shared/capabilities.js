@@ -58,7 +58,7 @@
     {
       id: 'navigate-back-forward', title: 'Indietro / Avanti', category: 'navigation',
       desc: 'Torna alla pagina precedente o va a quella successiva nella cronologia della scheda.',
-      invoke: 'Frecce nella barra in alto, oppure menu del tasto destro → "Indietro" / "Avanti". Ctrl+Z torna alla pagina precedente (quando non stai scrivendo in un campo di testo).',
+      invoke: 'Menu del tasto destro → "Indietro" / "Avanti" (dentro "Altro…"). Ctrl+Z torna alla pagina precedente (quando non stai scrivendo in un campo di testo).',
     },
     {
       id: 'reload', title: 'Ricarica la pagina', category: 'navigation',
