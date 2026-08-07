@@ -1,0 +1,7 @@
+{
+  "id": "af667f4c-ee2c-4fee-acf5-c2458d0e71c3",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Ho verificato la nuova pagina Scaricamenti partendo da cosa voleva l'utente: dopo aver scaricato un file, ritrovarlo. Ho scaricato per davvero dei file e aperto la pagina: gli scaricamenti compaiono dal più recente con nome, stato (completato/interrotto), dimensione, data e il percorso su disco dove sono finiti. Le azioni per ogni voce ci sono tutte, sia come pulsanti sia col tasto destro (Apri file, Apri cartella, Copia percorso, Ri-scarica, Rimuovi), e cambiano correttamente con lo stato: uno scaricamento interrotto non propone 'Apri file' (il file completo non c'è) ma mantiene 'Apri cartella' e 'Ri-scarica'. 'Rimuovi' toglie davvero la voce e lo stato vuoto ricompare; 'Svuota elenco' chiede conferma e ripulisce i conclusi lasciando gli scaricamenti in corso. La ricerca filtra correttamente. I punti d'accesso funzionano (voce nel menu App e 'Vedi tutti' sull'indicatore in alto). Ho controllato la privacy: una pagina web esterna non riesce a leggere né comandare l'elenco (i percorsi su disco, che contengono il nome utente, non trapelano verso i siti visitati). Nessun rischio di codice iniettato: i nomi dei file sono sempre mostrati come testo. Verificato anche che non ci siano regressioni sugli scaricamenti già esistenti, e la pagina vuota è pulita e coerente con lo stile di Filo.",
+  "queuedAt": "2026-08-07T04:29:50.621Z",
+  "queuedBy": "routine"
+}
