@@ -637,16 +637,7 @@
         clearSubCloseTimer();
       });
       input.addEventListener('blur', () => { if (activeMenu) activeMenu.subLocked = false; });
-      input.addEventListener('input', () => {
-        const q = input.value.trim().toLowerCase();
-        let visible = 0;
-        for (const b of list.querySelectorAll('.sn-menu-history-item')) {
-          const match = !q || (b.dataset.snSearch || '').includes(q);
-          b.style.display = match ? '' : 'none';
-          if (match) visible++;
-        }
-        noResults.style.display = visible === 0 ? '' : 'none';
-      });
+      input.addEventListener('input', applyFilter);
       searchWrap.appendChild(input);
       sub.appendChild(searchWrap);
 
