@@ -475,5 +475,6 @@
     // Mentre l'utente corregge il valore, togli l'avviso d'errore precedente.
     $('cookie-wl-input').addEventListener('input', () => setWhitelistError(''));
     $('sec-export-btn').addEventListener('click', exportData);
+    $('sec-import-btn').addEventListener('click', importData);
   });
 })();
