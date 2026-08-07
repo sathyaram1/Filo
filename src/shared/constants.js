@@ -1354,7 +1354,18 @@
       `- IMPOSTA COMMANDER (l'utente vuole COSTRUIRE un mazzo attorno a un commander preciso, o dichiara qual è il commander di QUESTO mazzo — es. "facciamo un mazzo con Krenko", "il mio commander è Atraxa", "costruiamo intorno a Yuriko"): metti il nome inglese ufficiale del commander in "commander" (SENZA "import": questo NON è una lista incollata). Se il mazzo ha GIÀ un commander non metterlo, a meno che l'utente chieda ESPLICITAMENTE di sostituirlo. Puoi accompagnarlo con una "query" per cercare subito carte adatte: il sistema imposta il commander e filtra la ricerca sui suoi colori da solo — NON aggiungere tu vincoli di identity. Se l'utente nomina un commander solo per fare una domanda o un paragone ("Krenko è meglio di Purphoros?"), NON impostarlo: quella è CONVERSAZIONE.\n` +
       `- CONVERSAZIONE (domanda, parere, chiacchiera sul mazzo): solo "reply", niente "query" né "cards".\n` +
       `- Nella "reply", marca SEMPRE ogni nome di carta con [[Nome Carta]] (nome inglese ufficiale), es. "Per stappare il commander guarda [[Seedborn Muse]]".\n` +
-      `- Non inventare scryfall_id: usa solo quelli presenti nelle liste qui sopra.`,
+      `- Non inventare scryfall_id: usa solo quelli presenti nelle liste del mazzo, qui sotto.\n\n`,
+
+    // Parte VARIABILE del deck builder: il mazzo cambia a ogni carta aggiunta.
+    // Sta SEMPRE dopo `decksChatStatic`.
+    decksChatContext: ({ deckName, commanderName, identity, deckCards, otherDecks }) =>
+      `MAZZO CORRENTE: "${deckName || '(senza nome)'}"\n` +
+      `Commander: ${commanderName || '(non impostato)'}\n` +
+      `Color identity: ${identity || '(nessun vincolo)'}\n` +
+      `Carte nel mazzo (nome — tag):\n${deckCards || '(vuoto)'}\n\n` +
+      `ALTRI MAZZI DELL'UTENTE (per le richieste che citano un altro mazzo):\n${otherDecks || '(nessuno)'}`,
+
+    decksChat: (payload) => PROMPTS.decksChatStatic() + PROMPTS.decksChatContext(payload || {}),
 
     // Parere contestuale carta-vs-mazzo (§6): batch di pareri brevi. Usato sia
     // per la singola carta in hover (batch di 1) sia per "valuta il mazzo".
