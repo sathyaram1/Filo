@@ -635,9 +635,10 @@ async function buildSnapshot() {
     process.stderr.write(`[dispatch] ATTENZIONE: ${unreadable}/${encrypted} status non decifrabili: quei feedback sono invisibili a questo giro\n`);
   }
 
-  // Vincitore todo: riusa next-feedback (exit 0 = JSON vincitore, 2 = vuoto).
-  // Retry sugli errori VERI (exit 1, crash): senza, un guasto momentaneo
-  // scarta l'intera coda todo. Exit 2 = coda davvero vuota → nessun retry.
+  // Vincitore todo: riusa next-feedback (exit 0 = JSON vincitore, 2 = vuoto,
+  // 3 = coda ILLEGGIBILE). Retry sugli errori VERI (exit 1, crash): senza, un
+  // guasto momentaneo scarta l'intera coda todo. Exit 2 = coda davvero vuota →
+  // nessun retry. Exit 3 = guasto dichiarato → si propaga, non si ripiega.
   let todoWinner = null;
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
@@ -649,6 +650,7 @@ async function buildSnapshot() {
       break;
     } catch (e) {
       if (e?.status === 2) break; // coda todo legittimamente vuota
+      if (e?.status === 3) throw routineFault('transient', 'coda illeggibile: next-feedback non riesce a decifrare gli status (chiave privata assente o rotta)');
       process.stderr.write(`[dispatch] next-feedback fallito (tentativo ${attempt}/3): ${e?.message || e}\n`);
       if (attempt < 3) await new Promise((r) => setTimeout(r, 2000 * attempt));
     }
