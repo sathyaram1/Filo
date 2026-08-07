@@ -104,6 +104,35 @@ test('i movimenti recenti mostrano etichette specifiche per ogni tipo di ricompe
   expect(texts).not.toContain('Ricompensa');
 });
 
+test('la frase della ricarica giornaliera segue l\'importo in vigore, non un valore fisso', async ({ app, openTab }) => {
+  // Simmetria col costo di riapertura in bacheca: la frase deve leggere l'importo
+  // davvero accreditato, non una cifra scritta a mano. Con il valore di default
+  // (100) la frase mostra "+100"; se l'importo cambia, la frase deve seguirlo.
+  await app.evaluate(disableAutoFeedbackBonus);
+  const page = await openTab('filo://credits/credits.html');
+  await page.waitForLoadState('domcontentloaded');
+
+  // Default in vigore: la frase riflette DAILY_REFILL letto dal codice, non una
+  // costante nell'HTML.
+  const refill = await page.evaluate(() => window.SN_CONST.CREDIT.DAILY_REFILL);
+  await expect(page.locator('#refillHint')).toHaveText(
+    `Ricevi +${refill} crediti ogni giorno a mezzanotte.`,
+  );
+
+  // Ora "l'owner cambia l'importo a 250": patchiamo il valore in vigore nel
+  // contesto della pagina e forziamo un re-render (una qualsiasi variazione di
+  // saldo ri-scatena il caricamento della pagina). Senza il fix la frase
+  // resterebbe inchiodata a +100 (era scritta a mano nell'HTML): l'assert diventa
+  // rosso. Col fix la frase segue il nuovo importo.
+  await page.evaluate(() => { window.SN_CONST.CREDIT.DAILY_REFILL = 250; });
+  await app.evaluate(async () => {
+    await globalThis.SN_CREDITS.award({ kind: 'feedback_sent', credits: 1 });
+  });
+  await expect(page.locator('#refillHint')).toHaveText(
+    'Ricevi +250 crediti ogni giorno a mezzanotte.',
+  );
+});
+
 test('senza consumo la pagina Crediti mostra lo stato vuoto', async ({ app, openTab }) => {
   await app.evaluate(disableAutoFeedbackBonus);
   const page = await openTab('filo://credits/credits.html');
