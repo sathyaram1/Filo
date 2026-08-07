@@ -46,6 +46,11 @@
       // mattina lavorativa e un weekend, quindi la home si rigenera anche al
       // passaggio feriale↔weekend. Sempre coarse: nessun churn nella giornata.
       `day:${inputs.dayType || ''}`,
+      // Data del giorno (YYYY-MM-DD): la home cita il giorno reale della
+      // settimana, quindi al cambio di giorno la firma deve cambiare e il
+      // messaggio rigenerarsi — altrimenti "oggi è martedì" resterebbe in cache
+      // anche di mercoledì. Cambia UNA volta al giorno: nessun churn.
+      `date:${inputs.dateKey || ''}`,
     ];
     return hash(parts.join('\n##\n'));
   }
