@@ -605,12 +605,14 @@ async function buildSnapshot() {
   // Partiziona i 'review' con branch. Decifra solo lo status.
   const reviews = [];
   let unreadable = 0;
+  let encrypted = 0;
   for (const fb of raw) {
     let status = fb.status;
     if (C?.isEncrypted?.(status)) {
+      encrypted++;
       try { status = (await decryptFeedbackFields({ _id: fb._id, status })).status; }
       catch (_) { status = null; }
-      if (status === PLACEHOLDER) { unreadable++; status = null; }
+      if (status === PLACEHOLDER || status === null) { unreadable++; status = null; }
     }
     // Macchina a stati: l'iter di revisione vive in `revision_capability`
     // (aspetta il verifier) e `revision_security` (aspetta il secaudit).
