@@ -282,7 +282,7 @@
     },
     {
       id: 'history', title: 'Cronologia delle richieste AI', category: 'save',
-      desc: 'L’elenco delle richieste fatte all’AI (spiegazioni, traduzioni, aiuto…), filtrabile e ricercabile; puoi rimuovere una singola voce oppure svuotarla del tutto.',
+      desc: 'L’elenco delle richieste fatte all’AI (spiegazioni, traduzioni, aiuto…), filtrabile e ricercabile, con il costo di ogni richiesta e quanta parte del testo mandato al modello è stata riusata da una richiesta precedente invece di essere rielaborata; puoi rimuovere una singola voce oppure svuotarla del tutto.',
       invoke: 'Pagina filo://history/history.html. Passa il mouse su una voce e clicca «Rimuovi» per toglierla; «Cancella tutto» svuota l’intera cronologia.',
     },
 
