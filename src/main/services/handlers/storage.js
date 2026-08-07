@@ -149,6 +149,89 @@ module.exports = function register(on, ctx) {
     }
   });
 
+  // ── Reimportazione dell'archivio esportato ────────────────────────────
+  // "Esporta dati" prometteva un backup e un trasferimento su un altro
+  // computer, ma senza un import quella promessa era irrealizzabile. L'import
+  // è in DUE passi apposta: il primo legge il file e dice all'utente COSA
+  // contiene, così la conferma è informata (quante sezioni, quante immagini,
+  // di quando è il backup); il secondo scrive, e solo dopo un sì esplicito.
+  // Il contenuto letto resta nel main fra i due passi (PENDING_IMPORT): non
+  // facciamo attraversare l'IPC a un dump completo dei dati utente — chiavi
+  // API comprese — solo per mostrarne il conteggio.
+  let PENDING_IMPORT = null;
+
+  on(MSG.IMPORT_DATA_PREVIEW, async (msg, sender, origin) => {
+    if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
+    try {
+      const { dialog } = require('electron');
+      const fsp = require('node:fs/promises');
+      const path = require('node:path');
+      const { readExportZip } = require('../exportData');
+
+      const win = winOf(sender);
+      const res = await dialog.showOpenDialog(win || undefined, {
+        title: I18n.t('security_import_title'),
+        properties: ['openFile'],
+        filters: [{ name: 'ZIP', extensions: ['zip'] }],
+      });
+      if (res.canceled || !res.filePaths || !res.filePaths[0]) return { ok: false, canceled: true };
+
+      const filePath = res.filePaths[0];
+      const buf = await fsp.readFile(filePath);
+      const parsed = readExportZip(buf); // lancia se non è un export di Filo
+
+      const token = `imp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      PENDING_IMPORT = { token, data: parsed.data, at: Date.now() };
+      return {
+        ok: true,
+        token,
+        fileName: path.basename(filePath),
+        exportedAt: parsed.exportedAt || '',
+        sections: parsed.sectionCount,
+        images: parsed.imageCount,
+      };
+    } catch (e) {
+      // File non riconosciuto: distinguiamo il caso "non è un archivio di Filo"
+      // dall'errore generico, così la pagina può dirlo con parole umane.
+      const code = String(e?.message || e);
+      const invalid = ['not_a_zip', 'no_data_json', 'bad_data_json', 'zip64_unsupported'].includes(code);
+      if (!invalid) console.error('[Filo import] lettura fallita:', e);
+      return { ok: false, error: invalid ? 'invalid_file' : code };
+    }
+  });
+
+  on(MSG.IMPORT_DATA_APPLY, async (msg, sender, origin) => {
+    if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
+    if (!PENDING_IMPORT || !msg || msg.token !== PENDING_IMPORT.token) {
+      return { ok: false, error: 'expired' };
+    }
+    const pending = PENDING_IMPORT;
+    PENDING_IMPORT = null;
+    try {
+      const DiskStorage = require('../../shim/storage');
+      const { mergeImportedData } = require('../exportData');
+
+      const current = await DiskStorage.get(null);
+      const { merged, stats } = mergeImportedData(current, pending.data);
+
+      // Le impostazioni passano da applySettingsUpdate come qualsiasi altra
+      // modifica: così tema, sicurezza, cookie, fingerprint e adblock del
+      // backup diventano attivi SUBITO, senza riavviare (la propagazione è la
+      // stessa del salvataggio dalle Preferenze). Tutto il resto è una
+      // scrittura diretta sullo storage.
+      const settings = merged[SETTINGS_KEY];
+      const rest = { ...merged };
+      delete rest[SETTINGS_KEY];
+      if (Object.keys(rest).length) await DiskStorage.set(rest);
+      if (settings && typeof settings === 'object') await applySettingsUpdate(settings);
+
+      return { ok: true, added: stats.added, updated: stats.updated, unchanged: stats.unchanged };
+    } catch (e) {
+      console.error('[Filo import] scrittura fallita:', e);
+      return { ok: false, error: String(e?.message || e) };
+    }
+  });
+
   // ── Cronologia appunti: NON guardata per origine, di proposito ────────
   // Questi tre canali (leggi/aggiungi/aggiorna-descrizione) sono usati dai
   // content script di Filo sulle pagine web esterne — il menu "Incolla" con la
