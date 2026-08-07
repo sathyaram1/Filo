@@ -120,6 +120,19 @@ test('pagina Sicurezza: "Importa dati" ripristina davvero i dati di un backup', 
     // 3) Sui conflitti vince il backup, ma ciò che il backup non conosce resta.
     expect(stored.filo_memory.PROFILO).toBe('DalBackup');
     expect(stored.filo_memory.PREFERENZE).toBe('caffè');
+
+    // 4) Le impostazioni ripristinate sono ATTIVE, non solo scritte: il tema
+    //    del backup ha sostituito quello locale ed è stato propagato ovunque.
+    expect(stored.settings.theme).toBe('dark');
+    const live = await app.evaluate(async () => {
+      const { nativeTheme } = require('electron');
+      return {
+        theme: (await globalThis.SN_STORAGE.getSettings()).theme,
+        native: nativeTheme.themeSource,
+      };
+    });
+    expect(live.theme).toBe('dark');
+    expect(live.native).toBe('dark');
   } finally {
     try { await app.close(); } catch (_) {}
     rmSync(userData, { recursive: true, force: true });
