@@ -139,6 +139,78 @@ test('pagina Sicurezza: "Importa dati" ripristina davvero i dati di un backup', 
   }
 });
 
+test('"trasferire i dati su un altro computer": esporto da un profilo, importo in uno vuoto', async () => {
+  // La promessa scritta sotto "Esporta dati". Qui la esercitiamo per intero,
+  // dalla UI: nessuno dei due passaggi usa scorciatoie interne.
+  const profiloA = mkdtempSync(join(tmpdir(), 'filo-pcA-'));
+  const profiloB = mkdtempSync(join(tmpdir(), 'filo-pcB-'));
+  const trasferimento = join(profiloA, 'trasferimento.zip');
+
+  const miei = {
+    filo_memory: { PROFILO: 'Mario', PREFERENZE: 'caffè lungo' },
+    savedPages: [{ id: 's1', title: 'Ricetta', thumbnail: RED_PNG_URL }],
+  };
+  writeFileSync(join(profiloA, 'storage.json'), JSON.stringify(miei), 'utf8');
+
+  const launch = (userData) => electron.launch({
+    args: ['.'],
+    cwd: APP_ROOT,
+    env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
+  });
+
+  // --- Computer A: esporto dalla pagina Sicurezza ---------------------------
+  const appA = await launch(profiloA);
+  try {
+    await appA.evaluate(({ dialog }, p) => {
+      dialog.showSaveDialog = async () => ({ canceled: false, filePath: p });
+    }, trasferimento);
+    const shellA = await appA.firstWindow();
+    await shellA.waitForLoadState('domcontentloaded');
+    await shellA.evaluate(() => window.filoShell.tabs.open('filo://security/'));
+    const pageA = await findInternalPage(appA, 'security');
+    expect(pageA).toBeTruthy();
+    await pageA.waitForLoadState('domcontentloaded');
+    await pageA.locator('#sec-export-btn').click();
+    await expect.poll(() => existsSync(trasferimento), { timeout: 10000 }).toBe(true);
+  } finally {
+    try { await appA.close(); } catch (_) {}
+  }
+
+  // --- Computer B: profilo vuoto, importo lo stesso file --------------------
+  const appB = await launch(profiloB);
+  try {
+    await appB.evaluate(({ dialog }, p) => {
+      dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [p] });
+    }, trasferimento);
+    const shellB = await appB.firstWindow();
+    await shellB.waitForLoadState('domcontentloaded');
+    await shellB.evaluate(() => window.filoShell.tabs.open('filo://security/'));
+    const pageB = await findInternalPage(appB, 'security');
+    expect(pageB).toBeTruthy();
+    await pageB.waitForLoadState('domcontentloaded');
+    await pageB.locator('#sec-import-btn').scrollIntoViewIfNeeded();
+    await pageB.locator('#sec-import-btn').click();
+    await clickConfirm(pageB, 'ok', { timeout: 10000 });
+
+    // Sul secondo computer ritrovo i MIEI dati, miniatura compresa.
+    await expect.poll(async () => {
+      try {
+        const d = await appB.evaluate(async () => globalThis.SN_STORAGE.getRaw('filo_memory', null));
+        return d && d.PROFILO;
+      } catch (_) { return null; }
+    }, { timeout: 10000 }).toBe('Mario');
+
+    const pagine = await appB.evaluate(async () => globalThis.SN_STORAGE.getRaw('savedPages', []));
+    expect(pagine).toHaveLength(1);
+    expect(pagine[0].title).toBe('Ricetta');
+    expect(pagine[0].thumbnail).toBe(RED_PNG_URL);
+  } finally {
+    try { await appB.close(); } catch (_) {}
+    rmSync(profiloA, { recursive: true, force: true });
+    rmSync(profiloB, { recursive: true, force: true });
+  }
+});
+
 test('invariante: nella pagina Sicurezza esporta e importa esistono entrambi', async ({ openTab }) => {
   const page = await openTab('filo://security/security.html');
   await page.waitForLoadState('domcontentloaded');
