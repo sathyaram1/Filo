@@ -10,10 +10,26 @@
 //
 // Senza il fix (appunto nell'archivio separato) il testo non comparirebbe in
 // nessun file dell'editor → rosso.
+//
+// #379.12 chiude il cerchio lato UI: l'accesso agli appunti passa SOLO
+// dall'editor (niente più pannello/icona "Appunti" nella home) e l'editor porta
+// proprio l'icona degli appunti, ovunque compaia. Gli ultimi tre test qui sotto
+// asseriscono quell'invariante:
+//   3) i controlli in alto a destra nella home sono ESATTAMENTE quelli del
+//      browser — nessuna voce che apra un elenco appunti separato;
+//   4) la voce Editor del menu App e l'icona Editor del menu tasto destro
+//      disegnano il foglio degli appunti (stesso SVG), non più la penna;
+//   5) da lì l'editor si apre davvero.
 
 import { test, expect } from './fixtures/electron.mjs';
 
 const EDITOR = 'filo://editor/editor.html';
+
+// Tratto distintivo dell'SVG "appunti" (foglio con l'angolo piegato) — vive in
+// src/shared/icons.js (`note`) e, in copia, nel registro del popup del menu App
+// (src/main/popup-menu.js). Se questo path non compare, l'icona disegnata è
+// un'altra.
+const NOTE_PATH = 'M6 3.5h8l4 4v13H6z';
 
 // Scrive un appunto passando dal VERO percorso di runtime: l'azione SALVA_APPUNTO
 // (come la emette la chat) inviata al main, che la esegue scrivendo nel file
@@ -112,4 +128,136 @@ test('stesso argomento → stesso file; argomento diverso → file nuovo', async
     if (!withC) return null;
     return withC.id !== projFile.id ? withC.meta.title : null;
   }, { timeout: 8_000 }).toBe('Spesa');
+});
+
+// ─── #379.12: l'unica porta d'accesso agli appunti è l'editor ───────────────
+
+const PAGE_HTML = `<!doctype html><html><body style="padding:40px;font:16px sans-serif">
+  <h1>Filo test page</h1><p>Click destro qui.</p></body></html>`;
+
+// La newtab (home) è aperta dal main subito dopo il load della shell.
+async function newtabPage(app) {
+  const deadline = Date.now() + 10_000;
+  let win = null;
+  while (Date.now() < deadline) {
+    win = app.windows().find((w) => w.url().startsWith('filo://newtab'));
+    if (win) break;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  expect(win, 'newtab non trovata entro 10s').toBeTruthy();
+  await win.waitForLoadState('domcontentloaded');
+  return win;
+}
+
+// Il menu App del launcher è una BrowserWindow a parte (data:text/html).
+async function openLauncherPopup(shell, app) {
+  await shell.evaluate(() => document.getElementById('nav-apps')?.click());
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    const win = app.windows().find((w) => w.url().startsWith('data:text/html'));
+    if (win) {
+      await win.waitForSelector('.item, .row', { timeout: 2_000 }).catch(() => {});
+      return win;
+    }
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  throw new Error('popup del menu App non aperto');
+}
+
+test('nella home i controlli sono solo quelli del browser: nessuna porta agli appunti', async ({ app, shell }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  const controls = page.locator('#dashControls .dash-ctrl');
+  await expect(controls.first()).toBeVisible({ timeout: 8_000 });
+
+  // Assert POSITIVO sull'insieme completo: se tornasse una voce "Appunti"
+  // (o qualsiasi altra porta separata) l'elenco non combacerebbe più.
+  await expect(controls).toHaveCount(6);
+  const items = await controls.evaluateAll((els) => els.map((e) => ({
+    command: e.dataset.command,
+    label: e.getAttribute('aria-label') || '',
+  })));
+  expect(items.map((i) => i.command))
+    .toEqual(['redteam', 'home', 'history', 'settings', 'apps', 'account']);
+  // (l'etichetta del profilo cambia con lo stato di accesso: qui basta che
+  //  nessun controllo si presenti come porta agli appunti)
+  expect(items.some((i) => /appunt/i.test(i.label))).toBe(false);
+
+  // E nessun overlay appunti può aprirsi: il pannello non esiste più.
+  await expect(page.locator('.dash-notes-overlay')).toHaveCount(0);
+
+  await page.screenshot({ path: 'tests/.shots/379-12-home-controlli.png' }).catch(() => {});
+});
+
+test('l’Editor porta l’icona degli appunti nel menu App e nel menu tasto destro', async ({ shell, app, openTab, testServer }) => {
+  // 1) Menu App (launcher della shell) — registro icone di popup-menu.js.
+  const popup = await openLauncherPopup(shell, app);
+  const item = popup.locator('.item', { hasText: 'Editor' }).first();
+  await expect(item).toBeVisible();
+  const launcherSvg = await item.locator('.ico svg').first().innerHTML();
+  expect(launcherSvg, 'la voce Editor del menu App non disegna il foglio appunti').toContain(NOTE_PATH);
+  await popup.keyboard.press('Escape').catch(() => {});
+
+  // 2) Menu tasto destro su una pagina esterna — registro src/shared/icons.js.
+  const page = await testServer.openReady(openTab, PAGE_HTML);
+  await page.locator('p').click({ button: 'right' });
+  const menu = page.locator('.sn-menu').first();
+  await expect(menu).toBeVisible();
+  const overflow = menu.locator('.sn-menu-row-overflow').first();
+  await expect(overflow).toBeVisible();
+  await overflow.hover();
+  const grid = page.locator('.sn-menu-icon-grid');
+  await expect(grid).toBeVisible({ timeout: 2_000 });
+  const btn = grid.locator('.sn-menu-icon-btn[data-sn-icon-id="editorApp"]');
+  await expect(btn).toBeVisible();
+  const menuSvg = await btn.locator('svg').first().innerHTML();
+  expect(menuSvg, 'l’icona Editor del menu tasto destro non disegna il foglio appunti').toContain(NOTE_PATH);
+
+  // Le due superfici devono disegnare la STESSA icona (registri diversi, un
+  // solo significato): niente editor "penna" da una parte e "foglio" dall'altra.
+  const norm = (s) => s.replace(/\s+/g, ' ').trim();
+  expect(norm(launcherSvg)).toBe(norm(menuSvg));
+});
+
+test('la conferma «Salvato» porta all’editor, non è un vicolo cieco', async ({ app, openTab }) => {
+  const page = await openTab('filo://newtab/');
+  await page.waitForFunction(() => !!window.__filoDashActions, null, { timeout: 8_000 });
+
+  // Renderizza la ricevuta dell'azione come farebbe una bolla di chat.
+  await page.evaluate(() => {
+    const host = document.createElement('div');
+    host.id = 'test-actions';
+    document.body.appendChild(host);
+    window.__filoDashActions.renderActions(host, [{ type: 'SALVA_APPUNTO', text: 'nota di prova' }]);
+  });
+
+  const btn = page.locator('#test-actions .dash-action-btn[data-action="openNotes"]');
+  await expect(btn).toBeVisible();
+  await expect(btn).toBeEnabled(); // prima era un chip inerte: da lì non si andava da nessuna parte
+  await btn.click();
+
+  const deadline = Date.now() + 8_000;
+  let win = null;
+  while (Date.now() < deadline) {
+    win = app.windows().find((w) => w.url().startsWith('filo://editor'));
+    if (win) break;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  expect(win, 'la conferma «Salvato» non apre l’editor').toBeTruthy();
+  await win.waitForSelector('#doc', { timeout: 10_000 });
+});
+
+test('dal menu App l’Editor si apre normalmente', async ({ shell, app }) => {
+  const popup = await openLauncherPopup(shell, app);
+  await popup.locator('.item', { hasText: 'Editor' }).first().click();
+
+  const deadline = Date.now() + 8_000;
+  let win = null;
+  while (Date.now() < deadline) {
+    win = app.windows().find((w) => w.url().startsWith('filo://editor'));
+    if (win) break;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  expect(win, 'l’Editor non si è aperto dal menu App').toBeTruthy();
+  await win.waitForSelector('#doc', { timeout: 10_000 });
 });

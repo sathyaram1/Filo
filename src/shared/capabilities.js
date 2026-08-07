@@ -337,7 +337,7 @@
     {
       id: 'filo-notes', title: 'Appunti di Filo', category: 'assistant',
       desc: 'Puoi chiedere a Filo di prendere nota di qualcosa ("prendi nota che…"): lo scrive direttamente in un file dell’editor. Continua sullo stesso file finché resti sull’argomento e ne apre uno nuovo quando l’argomento cambia (o se chiedi "apri un nuovo appunto"). Gli appunti diventano così testo vero, che puoi rileggere, modificare e riordinare insieme agli altri documenti. Ogni volta che Filo scrive crea un punto di ripristino, quindi la modifica è sempre annullabile.',
-      invoke: 'Chiedi all’assistente di prendere nota di qualcosa; per rivederli o modificarli apri l’Editor (l’icona con il foglio degli appunti) e scegli il file nel selettore documenti in alto a sinistra. Gli appunti presi prima che diventassero documenti si trovano nel file "Appunti", nello stesso elenco.',
+      invoke: 'Chiedi all’assistente di prendere nota di qualcosa; la conferma «Salvato» che compare in chat apre l’Editor con un click. Ci arrivi anche dall’icona con il foglio degli appunti (menu App o menu del tasto destro): il file giusto lo scegli nel selettore documenti in alto a sinistra. Gli appunti presi prima che diventassero documenti si trovano nel file "Appunti", nello stesso elenco.',
       doesNot: 'Non esiste più un archivio appunti separato da cui elencarli, cancellarne uno o svuotarli tutti: sono file dell’editor sul tuo computer, quindi si rileggono, si modificano e si eliminano da lì come qualsiasi altro documento.',
     },
     {

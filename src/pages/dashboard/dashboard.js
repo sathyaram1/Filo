@@ -935,11 +935,18 @@
       return btn;
     }
     if (type === 'SALVA_APPUNTO') {
+      // Ora che gli appunti vivono SOLO nei file dell'editor, la conferma non
+      // può restare un chip inerte: sarebbe un vicolo cieco (l'utente sa che
+      // Filo ha scritto, ma non ha da dove andare a leggere). Il chip resta la
+      // ricevuta dell'azione — già eseguita — e in più apre l'editor, cioè il
+      // posto dove l'appunto è finito.
       const btn = document.createElement('button');
       btn.className = 'dash-action-btn';
       btn.type = 'button';
-      btn.disabled = true;
-      btn.textContent = `✎ Salvato`;
+      btn.dataset.action = 'openNotes';
+      btn.textContent = '✎ Salvato';
+      btn.title = 'Apri l’editor';
+      btn.addEventListener('click', () => send({ type: MSG.OPEN_URL, url: 'filo://editor/editor.html' }));
       return btn;
     }
     if (type === 'SVEGLIA') {
