@@ -207,8 +207,8 @@
     },
     {
       id: 'download-progress', title: 'Scarica file e segui l’avanzamento', category: 'save',
-      desc: 'Quando clicchi un link a un file (PDF, ZIP, allegato) Filo lo scarica mostrando l’avanzamento in tempo reale nella barra in alto — barra e percentuale — e a fine scaricamento ti avvisa con "Apri file" e "Apri cartella"; se qualcosa va storto (rete caduta, errore del server, spazio finito) te lo dice invece di restare in silenzio. I file scaricati restano in un elenco che sopravvive alla riapertura di Filo.',
-      invoke: 'Parte cliccando un link a un file, oppure dal clic destro sul link → "Salva file". L’indicatore nella barra in alto apre l’elenco degli scaricamenti, dove puoi metterli in pausa, riprenderli, annullarli, aprirli o mostrarli nella cartella.',
+      desc: 'Quando clicchi un link a un file (PDF, ZIP, allegato) Filo lo scarica mostrando l’avanzamento in tempo reale con un indicatore in alto, tra le schede — barra e percentuale — e a fine scaricamento ti avvisa con "Apri file" e "Apri cartella"; se qualcosa va storto (rete caduta, errore del server, spazio finito) te lo dice invece di restare in silenzio. I file scaricati restano in un elenco che sopravvive alla riapertura di Filo.',
+      invoke: 'Parte cliccando un link a un file, oppure dal clic destro sul link → "Salva file". L’indicatore in alto tra le schede apre l’elenco degli scaricamenti, dove puoi metterli in pausa, riprenderli, annullarli, aprirli o mostrarli nella cartella.',
       doesNot: 'Salva direttamente nella cartella Download di sistema senza chiederti dove ogni volta. L’elenco degli scaricamenti e i suoi comandi restano dentro Filo: i siti che visiti non possono leggerlo né comandarlo. Le finestre in incognito non ci finiscono.',
     },
     {
