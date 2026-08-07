@@ -1,7 +1,0 @@
-{
-  "id": "d9465e76-2f92-4652-bf95-377d2e8b2e13",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho ripercorso il caso segnalato: cronologia con più tipi di interazione, poi «Svuota tutto» e conferma. Ora la lista si azzera e il menu «filtra per tipo» torna alla sola voce «Tutte», senza più elencare tipi svaniti; combacia col comportamento della rimozione voce per voce. Provato anche selezionando prima un filtro e poi svuotando: il filtro non resta appeso a un tipo inesistente. Sul codice grezzo 'translate' confermo quanto già annotato: è un valore che l'app non registra mai davvero (le traduzioni finiscono in cronologia come «Traduci selezione»/«Traduci pagina», con etichetta leggibile), compare solo con voci fittizie caricate a mano, quindi giustamente non toccato.",
-  "queuedAt": "2026-08-07T21:28:25.225Z",
-  "queuedBy": "routine"
-}
