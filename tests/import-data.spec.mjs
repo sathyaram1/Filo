@@ -46,6 +46,7 @@ test('pagina Sicurezza: "Importa dati" ripristina davvero i dati di un backup', 
 
   // Sul computer di destinazione c'è già qualcosa: deve sopravvivere all'import.
   const preesistente = {
+    settings: { theme: 'light' },
     filo_memory: { PROFILO: 'GiaQui' },
     savedPages: [{ id: 'locale-1', title: 'Pagina mia' }],
   };
@@ -53,6 +54,7 @@ test('pagina Sicurezza: "Importa dati" ripristina davvero i dati di un backup', 
 
   // Il backup da ricaricare: prodotto dallo STESSO esportatore dell'app.
   const backup = {
+    settings: { theme: 'dark' },
     filo_memory: { PROFILO: 'DalBackup', PREFERENZE: 'caffè' },
     savedPages: [{ id: 'backup-1', title: 'Pagina del backup' }],
     clipboardHistory: [{ id: 'c1', type: 'image', description: 'logo', dataUrl: RED_PNG_URL }],
