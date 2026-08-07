@@ -20,6 +20,8 @@
       features: [],
       fixes: [
         'Nella Cronologia AI, dopo "Cancella tutto" il menu "filtra per tipo" torna vuoto: prima continuava a elencare i tipi delle voci ormai cancellate.',
+        'Le correzioni automatiche ora funzionano anche con più parole: puoi salvare abbreviazioni come "x es" → "per esempio" e si espandono mentre scrivi, non solo le parole singole.',
+        'Nel dizionario personale puoi aggiungere più parole in una volta: scrivendone diverse insieme vengono salvate come voci separate, così valgono davvero.',
       ],
     },
     {
