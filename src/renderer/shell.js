@@ -1097,6 +1097,16 @@
       const title = document.createElement('span');
       title.className = 'dl-panel-title';
       title.textContent = 'Scaricamenti';
+      // Punto d'accesso alla pagina completa (cronologia + azioni per voce).
+      const allBtn = document.createElement('button');
+      allBtn.type = 'button';
+      allBtn.className = 'dl-panel-clear';
+      allBtn.textContent = 'Vedi tutti';
+      allBtn.title = 'Apri l’elenco completo degli scaricamenti';
+      allBtn.addEventListener('click', () => {
+        api.tabs.open('filo://downloads/downloads.html');
+        closePanel();
+      });
       const clearBtn = document.createElement('button');
       clearBtn.type = 'button';
       clearBtn.className = 'dl-panel-clear';
@@ -1106,6 +1116,7 @@
         api.downloads.clear().then((r) => { syncFromList(r && r.items); }).catch(() => {});
       });
       head.appendChild(title);
+      head.appendChild(allBtn);
       head.appendChild(clearBtn);
       panel.appendChild(head);
       const list = document.createElement('div');
