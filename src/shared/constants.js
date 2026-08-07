@@ -1699,6 +1699,10 @@
   // Funzione pura (testabile): se `action` è style-aware e `styleText` non è
   // vuoto, aggiunge l'istruzione al primo messaggio di sistema (se presente e
   // testuale), altrimenti la antepone come nuovo messaggio di sistema.
+  // Nota (#422): lo stile viene ACCODATO al messaggio di sistema, quindi finisce
+  // dopo la parte immutabile del prompt e non ne rompe il riuso fra chiamate.
+  // Se un giorno lo si mettesse in testa, ogni utente con uno stile personale
+  // avrebbe un prefisso diverso e il riuso morirebbe per tutti.
   function injectAgentStyle(messages, action, styleText) {
     const style = typeof styleText === 'string' ? styleText.trim() : '';
     if (!Array.isArray(messages) || !style) return messages;
