@@ -102,9 +102,17 @@
   }
 
   // Registro app del launcher. Il Feedback vive qui fra le App.
+  //
+  // "Aperti per dopo" sta qui perché è la CONTROPARTE di "Salva per dopo": il
+  // salvataggio chiude la scheda, quindi senza un ingresso sempre visibile la
+  // lista di ciò che hai messo da parte resta irraggiungibile (l'icona dedicata
+  // del menu del tasto destro è stata ritirata e l'icona Home porta alla nuova
+  // scheda, non lì). È l'analogo di "Scaricamenti": una lista di cose messe da
+  // parte, non un'azione.
   const APPS = [
     { label: 'Editor', icon: 'editor', url: 'filo://editor/editor.html' },
     { label: 'Deck builder MTG', icon: 'decks', url: 'filo://decks/decks.html' },
+    { label: 'Aperti per dopo', icon: 'saveForLater', url: 'filo://home/home.html' },
     { label: 'Scaricamenti', icon: 'download', url: 'filo://downloads/downloads.html' },
     { type: 'separator' },
     { label: 'Feedback', icon: 'feedback', url: 'filo://feedback/feedback.html' },

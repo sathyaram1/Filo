@@ -397,5 +397,11 @@
     $('openHistory').addEventListener('click', () => {
       try { chrome.tabs.create({ url: 'filo://history/history.html' }); } catch (_) {}
     });
+    // Simmetria fra le tre liste sorelle: "Aperti per dopo" e "Cronologia AI"
+    // rimandano già l'una all'altra e a qui; mancava solo la strada di ritorno
+    // da qui verso "Aperti per dopo".
+    $('openHome').addEventListener('click', () => {
+      try { chrome.tabs.create({ url: 'filo://home/home.html' }); } catch (_) {}
+    });
   });
 })();

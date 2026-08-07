@@ -91,6 +91,20 @@ const ICON_PATHS = {
     '<rect x="3.5" y="5" width="17" height="14" rx="1.5"/>' +
     '<path d="M9 5v14"/>' +
     '<path d="M15 5v14"/>',
+
+  // Scaricamenti: freccia verso il basso che entra in un vassoio. Stesso
+  // disegno di src/shared/icons.js (`download`): la voce "Scaricamenti" del
+  // menu App restava senza icona perché qui mancava il glifo.
+  download:
+    '<path d="M12 3v11"/>' +
+    '<path d="M8 10.5l4 4 4-4"/>' +
+    '<path d="M4 19h16"/>',
+
+  // Salva/Aperti per dopo: segnalibro. Stesso disegno di src/shared/icons.js
+  // (`saveForLater`), così la lista "Aperti per dopo" nel menu App porta la
+  // stessa icona con cui la si riempie dal menu del tasto destro.
+  saveForLater:
+    '<path d="M7 4h10a1 1 0 0 1 1 1v15.2l-6-3.8-6 3.8V5a1 1 0 0 1 1-1z"/>',
 };
 
 function iconSvg(name, size) {
