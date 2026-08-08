@@ -163,6 +163,34 @@ if (isMain) {
     console.error('Uso: node scripts/queue-triage.mjs <id> <status:todo|working|revision_capability|revision_security|done|design|archived> "testo note" [--branch <nome>] [--reason <slug>] [--starred|--unstar] [--no-git]');
     process.exit(1);
   }
+  // ── C: le CONSEGNE verificano l'identità come i verdetti ──────────────────
+  //
+  // Spec ROUTINE-BRANCH-INTEGRITY.md §C: non solo i verdetti, ogni transizione.
+  // Se una consegna può essere registrata con la directory sul branch sbagliato,
+  // il PUNTO FERMO che quella consegna registra è fasullo — e il ripristino (D)
+  // riporterebbe a uno stato che contiene il lavoro di un altro feedback. Questo
+  // controllo è il prerequisito di D, non un extra.
+  //
+  // Guardate SOLO le consegne (`revision_*`): `done` lo scrive il secaudit dopo
+  // che il merge-gate ha già spostato la directory sul ramo principale, e
+  // `todo`/`working`/`design`/`archived` sono scritture di servizio del
+  // dispatcher e dell'owner. E scatta solo se per quel feedback esiste un branch
+  // assegnato: senza, non c'è niente da confrontare (owner che lancia a mano,
+  // feedback fuori dalla pipeline).
+  if (status === 'revision_capability' || status === 'revision_security') {
+    const g = guardTransition(ROOT, id, {
+      escalate: (count) => {
+        execFileSync('node', [resolve(ROOT, 'scripts', 'queue-triage.mjs'), id, 'design',
+          escalationNote(count), '--reason', 'loop'], { cwd: ROOT, encoding: 'utf8', stdio: 'ignore' });
+      },
+    });
+    if (!g.ok) {
+      console.error(`[queue-triage] CONSEGNA RIFIUTATA — ${g.message}`);
+      console.error('[queue-triage] Il lavoro NON è stato registrato: la directory non è sul branch assegnato a questo feedback.');
+      process.exit(3);
+    }
+  }
+
   try {
     // S1.2: usa la versione cifrata per proteggere la history git pubblica.
     const file = await queueTriageEncrypted(id, status, noteParts.length ? noteParts.join(' ') : '', undefined, branch, starred, reason);
