@@ -34,6 +34,9 @@ test-results/
 # la scrive il dispatcher quando consegna il lavoro. Versionarla non avrebbe
 # senso — dice "questa directory, adesso".
 .claude/branch-expect.json
+# Esito della verifica indipendente del lavoro locale: riguarda questa macchina
+# e questo momento (ramo + commit verificato), non ha senso versionarlo.
+.claude/verify-local.json
 # Ruolo dell'istanza al lavoro (esplorazione/sviluppo/verifica): stessa natura,
 # lo scrive il dispatcher e lo rilegge chi accoda un feedback per firmarlo.
 .claude/routine-role.json

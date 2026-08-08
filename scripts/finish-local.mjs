@@ -23,7 +23,7 @@
 // USO:
 //   node scripts/finish-local.mjs                 # controlli + fusione + push
 //   node scripts/finish-local.mjs --check         # solo i controlli
-//   node scripts/finish-local.mjs --no-verify     # salta i controlli (sconsigliato)
+//   node scripts/finish-local.mjs --no-verify     # salta controlli E verifica (sconsigliato)
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
