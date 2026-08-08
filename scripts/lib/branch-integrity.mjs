@@ -341,3 +341,45 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
 export function checkDelivery(root, assignedBranch) {
   return identityVerdict(currentBranch(root), assignedBranch);
 }
+
+/**
+ * Guardia COMPLETA di una transizione della macchina a stati: verifica
+ * l'identità, e in caso di rifiuto incrementa il contatore e — alla soglia —
+ * chiede l'escalation all'owner. Condivisa fra i due punti di scrittura
+ * (i verdetti in dispatch.mjs e le consegne in queue-triage.mjs): la stessa
+ * regola scritta due volte diventa due regole diverse al primo ritocco.
+ *
+ * Non chiede all'istanza dove si trova: lo guarda. `escalate` viene invocata
+ * solo alla soglia (porta il feedback in `design`); `persist` salva lo stato
+ * fuori dal processo, se il chiamante ha un modo per farlo.
+ *
+ * @returns {{ok:true, state:object|null} | {ok:false, message:string, escalated:boolean, count:number}}
+ */
+export function guardTransition(root, id, { escalate, persist, clear } = {}) {
+  const prev = readBranchState(root, id);
+  const assigned = prev?.branch || '';
+  const v = checkDelivery(root, assigned);
+  if (v.ok) return { ok: true, state: prev };
+
+  const b = bumpRejects(prev || { id, branch: assigned });
+  b.state.id = id;
+  const base = `transizione rifiutata su ${id}: ${v.reason}`;
+  if (b.escalate) {
+    try { if (typeof escalate === 'function') escalate(b.count); } catch (_) { /* la nota resta in coda */ }
+    try { if (typeof clear === 'function') clear(); } catch (_) {}
+    return { ok: false, escalated: true, count: b.count, message: `${base} — rifiuto ${b.count}: feedback portato in design` };
+  }
+  writeBranchState(root, b.state);
+  try { if (typeof persist === 'function') persist(); } catch (_) {}
+  return { ok: false, escalated: false, count: b.count, message: `${base} (rifiuto ${b.count}/${IDENTITY_REJECT_LIMIT}); il feedback resta dov'era e verrà ripescato` };
+}
+
+/**
+ * Il testo che l'owner legge in dashboard quando la lavorazione automatica
+ * viene sospesa per disallineamento ripetuto. Vive qui perché lo usano
+ * entrambi i punti di scrittura, e perché è per l'OWNER: niente branch, niente
+ * SHA, niente nomi di file (vedi CLAUDE.md § Tono dei report).
+ */
+export function escalationNote(count = IDENTITY_REJECT_LIMIT) {
+  return `La lavorazione automatica si è disallineata ${count} volte di seguito: chi doveva registrare l'esito stava guardando una versione del codice diversa da quella in lavorazione, quindi il risultato non sarebbe attendibile. Ho sospeso i tentativi automatici invece di insistere; serve una tua decisione su come procedere.`;
+}
