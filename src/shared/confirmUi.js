@@ -295,11 +295,21 @@
       if (!active) return null;
       const q = (s) => active.root.querySelector(s);
       const okBtn = q('.sn-confirm-btn-ok') || q('.sn-confirm-btn-danger');
+      const textEl = q('.sn-confirm-text');
+      // Il testo lungo scorre dentro il box invece di essere tagliato, e la sua
+      // selezione usa la palette Filo: entrambe le cose vivono nello shadow root
+      // chiuso, quindi solo da qui sono ispezionabili da uno spec.
+      let selectionBg = '';
+      try {
+        if (textEl) selectionBg = global.getComputedStyle(textEl, '::selection').backgroundColor || '';
+      } catch (_) {}
       return {
         title: (q('.sn-confirm-title') && q('.sn-confirm-title').textContent) || '',
-        text: (q('.sn-confirm-text') && q('.sn-confirm-text').textContent) || '',
+        text: (textEl && textEl.textContent) || '',
         okDisabled: !!(okBtn && okBtn.disabled),
         hasInput: !!q('.sn-confirm-input'),
+        textScrolls: !!(textEl && textEl.scrollHeight > textEl.clientHeight + 1),
+        selectionBg,
       };
     },
     // Clicca un bottone: which = 'ok' | 'cancel' | 'danger'.
