@@ -58,17 +58,17 @@
     {
       id: 'navigate-back-forward', title: 'Indietro / Avanti', category: 'navigation',
       desc: 'Torna alla pagina precedente o va a quella successiva nella cronologia della scheda.',
-      invoke: 'Frecce nella barra in alto, oppure menu del tasto destro → "Indietro" / "Avanti". Ctrl+Z torna alla pagina precedente (quando non stai scrivendo in un campo di testo).',
+      invoke: 'Menu del tasto destro → "Indietro" / "Avanti" (dentro "Altro…"). Ctrl+Z torna alla pagina precedente (quando non stai scrivendo in un campo di testo).',
     },
     {
       id: 'reload', title: 'Ricarica la pagina', category: 'navigation',
       desc: 'Ricarica la pagina corrente.',
-      invoke: 'Pulsante di ricarica nella barra in alto, il menu del tasto destro → "Ricarica", oppure la scorciatoia Ctrl+R (Cmd+R su Mac) — che funziona anche mentre stai guardando un sito.',
+      invoke: 'Menu del tasto destro → "Ricarica", oppure la scorciatoia Ctrl+R (Cmd+R su Mac) — che funziona anche mentre stai guardando un sito.',
     },
     {
       id: 'home', title: 'Vai alla home', category: 'navigation',
       desc: 'Apre la home di Filo nella scheda corrente, con suggerimenti e aggiornamenti.',
-      invoke: 'Pulsante Home nella barra, oppure menu del tasto destro → "Home".',
+      invoke: 'Icona Home in alto a destra nella home (la nuova scheda), oppure menu del tasto destro → "Home".',
     },
     {
       id: 'address-bar', title: 'Apri un indirizzo', category: 'navigation',
@@ -82,7 +82,7 @@
     },
     {
       id: 'fullscreen', title: 'Schermo intero', category: 'navigation',
-      desc: 'Nasconde la barra delle schede e degli indirizzi così la pagina occupa tutta la finestra.',
+      desc: 'Nasconde la barra delle schede così la pagina occupa tutta la finestra.',
       invoke: 'Menu del tasto destro → "Schermo intero" / "Esci da schermo intero", oppure chiedilo all’assistente ("metti a schermo intero", "togli lo schermo intero"). Esci in ogni momento con Esc.',
       doesNot: 'Non preme il pulsante di schermo intero del lettore video dentro un sito (es. quello di YouTube): agisce sulla finestra di Filo, non sui comandi della pagina.',
     },
@@ -148,7 +148,7 @@
     },
     {
       id: 'spellcheck-manage', title: 'Gestisci correttore e dizionario', category: 'writing',
-      desc: 'Gestisci le correzioni automatiche (errore → correzione) e il dizionario personale di parole da non segnalare.',
+      desc: 'Gestisci le correzioni automatiche (da → a, anche su più parole come "x es" → "per esempio", che si espandono mentre scrivi) e il dizionario personale di parole da non segnalare.',
       invoke: 'Pagina filo://spellcheck/spellcheck.html.',
     },
     {
@@ -207,8 +207,8 @@
     },
     {
       id: 'download-progress', title: 'Scarica file e segui l’avanzamento', category: 'save',
-      desc: 'Quando clicchi un link a un file (PDF, ZIP, allegato) Filo lo scarica mostrando l’avanzamento in tempo reale nella barra in alto — barra e percentuale — e a fine scaricamento ti avvisa con "Apri file" e "Apri cartella"; se qualcosa va storto (rete caduta, errore del server, spazio finito) te lo dice invece di restare in silenzio. I file scaricati restano in un elenco che sopravvive alla riapertura di Filo.',
-      invoke: 'Parte cliccando un link a un file, oppure dal clic destro sul link → "Salva file". L’indicatore nella barra in alto apre l’elenco degli scaricamenti, dove puoi metterli in pausa, riprenderli, annullarli, aprirli o mostrarli nella cartella.',
+      desc: 'Quando clicchi un link a un file (PDF, ZIP, allegato) Filo lo scarica mostrando l’avanzamento in tempo reale con un indicatore in alto, tra le schede — barra e percentuale — e a fine scaricamento ti avvisa con "Apri file" e "Apri cartella"; se qualcosa va storto (rete caduta, errore del server, spazio finito) te lo dice invece di restare in silenzio. I file scaricati restano in un elenco che sopravvive alla riapertura di Filo.',
+      invoke: 'Parte cliccando un link a un file, oppure dal clic destro sul link → "Salva file". L’indicatore in alto tra le schede apre l’elenco degli scaricamenti, dove puoi metterli in pausa, riprenderli, annullarli, aprirli o mostrarli nella cartella.',
       doesNot: 'Salva direttamente nella cartella Download di sistema senza chiederti dove ogni volta. L’elenco degli scaricamenti e i suoi comandi restano dentro Filo: i siti che visiti non possono leggerlo né comandarlo. Le finestre in incognito non ci finiscono.',
     },
     {
@@ -363,7 +363,7 @@
     {
       id: 'home-page', title: 'Home di Filo', category: 'pages',
       desc: 'La pagina della nuova scheda: al centro l’assistente a cui chiedere qualsiasi cosa, azioni e suggerimenti, un messaggio in evidenza e gli aggiornamenti recenti. In alto a destra ci sono le icone per Red Team, Cronologia, Impostazioni, App e Profilo.',
-      invoke: 'Pulsante Home nella barra, apri una nuova scheda, oppure indirizzo filo://newtab/.',
+      invoke: 'Apri una nuova scheda, l\'icona Home in alto a destra nella home, oppure indirizzo filo://newtab/.',
     },
     {
       id: 'red-team', title: 'Red Team', category: 'pages',

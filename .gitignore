@@ -14,6 +14,12 @@ tests/.smoke/
 # quindi diventano rosse appena il bug viene fixato). Non vanno mai committate —
 # l'hook auto-commit fa `git add -A`, quindi senza questa regola finivano su main.
 tests/_audit*.spec.mjs
+# Spec temporanee dei verifier/secaudit (prefisso _verify / _vcheck): usa-e-getta
+# per verificare un fix su un branch, ricreate fresche a ogni giro. Stessa ragione
+# delle _audit sopra: senza questa regola l'`git add -A` dell'hook le committa su
+# main, dove si accumulano e diventano flaky nella suite completa.
+tests/_verify*.spec.mjs
+tests/_vcheck*.spec.mjs
 tests/.fb/*.png
 tests/agent/.env
 tests/agent/.out/

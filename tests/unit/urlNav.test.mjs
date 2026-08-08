@@ -19,7 +19,7 @@ import { dirname, join } from 'node:path';
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 require(join(__dirname, '..', '..', 'src', 'shared', 'urlNav.js'));
-const { looksLikeAddress, normalizeUrl, isLocalHost } = globalThis.SN_URL_NAV;
+const { looksLikeAddress, normalizeUrl, isLocalHost, canonicalizeFiloUrl } = globalThis.SN_URL_NAV;
 
 // ─── il cuore del fix #398: gli indirizzi locali sono INDIRIZZI ──────────────
 
@@ -65,6 +65,44 @@ test('comandi shell e testi NON sono indirizzi', () => {
   assert.equal(looksLikeAddress('reddit'), false);         // parola singola
   assert.equal(looksLikeAddress('capitolo:99999'), false); // porta fuori range
   assert.equal(looksLikeAddress(''), false);
+});
+
+// ─── #252: un solo indirizzo canonico per pagina interna ─────────────────────
+
+test('#252 canonicalizeFiloUrl riporta la forma legacy src/pages a quella corta', () => {
+  // La forma prodotta dallo shim getURL('src/pages/X/Y.html') e quella del menu
+  // App devono collassare sullo STESSO indirizzo, altrimenti la stessa pagina si
+  // apre con due URL diversi (il bug segnalato).
+  assert.equal(
+    canonicalizeFiloUrl('filo://src/pages/home/home.html'),
+    'filo://home/home.html',
+  );
+  assert.equal(
+    canonicalizeFiloUrl('filo://src/pages/history/history.html'),
+    'filo://history/history.html',
+  );
+  assert.equal(
+    canonicalizeFiloUrl('filo://src/pages/spellcheck/spellcheck.html'),
+    'filo://spellcheck/spellcheck.html',
+  );
+});
+
+test('#252 canonicalizeFiloUrl preserva query e hash', () => {
+  assert.equal(
+    canonicalizeFiloUrl('filo://src/pages/home/home.html?highlight=abc'),
+    'filo://home/home.html?highlight=abc',
+  );
+  assert.equal(
+    canonicalizeFiloUrl('filo://src/pages/home/home.html#top'),
+    'filo://home/home.html#top',
+  );
+});
+
+test('#252 canonicalizeFiloUrl lascia intatto ciò che è già canonico o non-filo', () => {
+  assert.equal(canonicalizeFiloUrl('filo://home/home.html'), 'filo://home/home.html');
+  assert.equal(canonicalizeFiloUrl('filo://newtab/'), 'filo://newtab/');
+  assert.equal(canonicalizeFiloUrl('https://example.com/'), 'https://example.com/');
+  assert.equal(canonicalizeFiloUrl(''), '');
 });
 
 test('isLocalHost copre loopback, *.localhost e gli IP privati', () => {

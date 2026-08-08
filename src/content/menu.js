@@ -331,12 +331,34 @@
 
     menuHost().appendChild(root);
 
+    // #405 — su una pagina con riquadri incorporati il menu può nascere dentro
+    // il riquadro o fuori, e i clic non attraversano quel confine: chi ha un
+    // menu aperto dall'altra parte non si accorgerebbe mai di doverlo chiudere.
+    // Un avviso agli altri frame della scheda tiene la regola di sempre — un
+    // solo menu alla volta. Nessun costo sulle pagine senza riquadri.
+    try {
+      const nested = window.top !== window.self || (window.frames && window.frames.length > 0);
+      const T = global.SN_MSG?.MSG?.CLOSE_OTHER_MENUS;
+      if (nested && T) Promise.resolve(chrome.runtime.sendMessage({ type: T })).catch(() => {});
+    } catch (_) {}
+
     // Compensazione zoom (così il menu non scala con Ctrl+/-)
     const cleanupZoom = (global.SN_POPUP?.attachZoomCompensation || (() => () => {}))(root);
 
     // Posizionamento: misura, flip se necessario.
-    const w = root.offsetWidth, h = root.offsetHeight;
+    let h = root.offsetHeight;
+    const w = root.offsetWidth;
     const vw = window.innerWidth, vh = window.innerHeight;
+    // #405 — dentro un riquadro incorporato lo spazio verticale può essere meno
+    // dell'altezza del menu (un player alto 200px, un blocco commenti stretto):
+    // senza questo il menu verrebbe tagliato e le voci in fondo — feedback,
+    // aiuto — sarebbero irraggiungibili. Sopra una finestra normale non cambia
+    // nulla: la condizione è falsa.
+    if (h + 16 > vh) {
+      root.style.maxHeight = `${Math.max(96, vh - 16)}px`;
+      root.style.overflowY = 'auto';
+      h = root.offsetHeight;
+    }
     let left = x, top = y;
     if (left + w + 8 > vw) left = vw - w - 8;
     if (top + h + 8 > vh) top = Math.max(8, y - h);

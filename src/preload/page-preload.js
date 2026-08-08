@@ -16,6 +16,28 @@
 const { ipcRenderer, webFrame } = require('electron');
 const path = require('node:path');
 
+// ─── #405 — riquadri incorporati (iframe) ───────────────────────────────────
+//
+// Da quando la scheda usa nodeIntegrationInSubFrames, questo preload gira in
+// OGNI frame: la pagina e ciascun riquadro incorporato (video, mappa, modulo,
+// blocco commenti, post social). Prima girava solo nel frame principale, e
+// dentro il riquadro Filo non esisteva: tasto destro morto, niente correttore,
+// niente Spiegazione/Traduci, niente Incolla con la cronologia.
+//
+// Ma un riquadro NON è una pagina: caricare tutti i content script in ognuno
+// significherebbe pagare decine di volte lo stesso prezzo su una pagina piena
+// di pubblicità e widget, per frame che l'utente non tocca mai. Quindi:
+//   - nel frame principale tutto resta com'era (caricamento al DOMContentLoaded);
+//   - in un riquadro non si carica NIENTE finché l'utente non lo tocca davvero
+//     (tasto destro, clic, tasto premuto, o una scorciatoia globale diretta a
+//     quel frame). Alla prima interazione il riquadro monta l'intero Filo.
+// Le funzioni di PAGINA (colore della scheda, segnali di attività, banner
+// cookie/sito pericoloso, traduzione della pagina) restano appannaggio del
+// frame principale: dentro un riquadro descriverebbero il rettangolo sbagliato.
+const IS_SUBFRAME = (() => {
+  try { return window.top !== window.self; } catch (_) { return true; }
+})();
+
 // ─── #145 — blocco autoplay sulle schede RIPRISTINATE al boot ───────────────
 //
 // Le schede riaperte all'avvio di Filo nascono con il flag
@@ -63,18 +85,63 @@ if (process.argv.includes('--filo-suppress-autoplay')) {
 // primi a ricevere l'evento, su ogni sito. Il vero handler (in content.js, che
 // ha bisogno di settings/spellcheck/Menu) si installa più tardi via
 // __snSetContextMenuHandler; fino ad allora il bridge non fa nulla.
+let contextMenuHandler = null;
 try {
-  let contextMenuHandler = null;
   globalThis.__snSetContextMenuHandler = (fn) => { contextMenuHandler = fn; };
   window.addEventListener('contextmenu', (e) => {
-    if (typeof contextMenuHandler === 'function') contextMenuHandler(e);
+    if (typeof contextMenuHandler === 'function') { contextMenuHandler(e); return; }
+    // #405 — primo tasto destro dentro un riquadro: i content script non sono
+    // ancora montati (li montiamo solo all'uso). Montali ORA e rigioca questo
+    // stesso clic appena l'handler è pronto, così il primo tentativo apre il
+    // menu invece di andare perso — l'utente non deve cliccare due volte.
+    if (!IS_SUBFRAME) return;
+    // Shift resta la via di fuga anche qui: con Shift premuto non tocchiamo
+    // l'evento e lasciamo che il riquadro faccia quello che farebbe da solo.
+    if (e.shiftKey) return;
+    try { e.stopPropagation(); } catch (_) {}
+    replayContextMenu(e);
+    ensureContentScripts();
   }, { capture: true });
 } catch (_) { /* il bridge non deve MAI impedire il caricamento della pagina */ }
+
+// Copia inerte del clic destro da rigiocare quando l'handler vero è pronto.
+// Il vero evento, una volta consegnato, perde composedPath() (torna vuoto):
+// fotografiamo SUBITO l'elemento reale — quello sotto shadow DOM compreso — e
+// i dati che l'handler legge, così il menu si apre sull'elemento giusto.
+function replayContextMenu(e) {
+  let node = null;
+  try { node = (typeof e.composedPath === 'function' && e.composedPath()[0]) || e.target; }
+  catch (_) { node = e.target; }
+  const copy = {
+    target: node,
+    currentTarget: node,
+    clientX: e.clientX, clientY: e.clientY,
+    pageX: e.pageX, pageY: e.pageY,
+    screenX: e.screenX, screenY: e.screenY,
+    button: e.button,
+    shiftKey: e.shiftKey, ctrlKey: e.ctrlKey, altKey: e.altKey, metaKey: e.metaKey,
+    defaultPrevented: false,
+    composedPath: () => (node ? [node] : []),
+    preventDefault() {}, stopPropagation() {}, stopImmediatePropagation() {},
+  };
+  const deadline = Date.now() + 3000;
+  const tick = () => {
+    if (typeof contextMenuHandler === 'function') { try { contextMenuHandler(copy); } catch (_) {} return; }
+    if (Date.now() > deadline) return;
+    setTimeout(tick, 16);
+  };
+  setTimeout(tick, 16);
+}
 
 // Modalità zoom con la rotella attivata dal click centrale (sostituisce
 // l'autoscroll nativo). Sulle pagine web abilitiamo anche lo zoom con Ctrl/Cmd
 // (pinch del trackpad, Ctrl+rotella, Ctrl +/-/0). Vedi wheel-zoom.js.
-try { require('./wheel-zoom.js')(webFrame, { pageZoom: true }); } catch (e) { console.error('[Filo CS] wheel-zoom', e); }
+// Solo nel frame principale: lo zoom e il suo badge valgono per la scheda
+// intera, e un badge dentro un riquadro sarebbe un secondo indicatore che
+// contraddice il primo.
+if (!IS_SUBFRAME) {
+  try { require('./wheel-zoom.js')(webFrame, { pageZoom: true }); } catch (e) { console.error('[Filo CS] wheel-zoom', e); }
+}
 
 // ─── Protezione anti-fingerprinting ────────────────────────────────────────
 //
@@ -83,7 +150,11 @@ try { require('./wheel-zoom.js')(webFrame, { pageZoom: true }); } catch (e) { co
 // ad alta entropia. Il seed arriva SINCRONO dal main (HMAC col master secret),
 // così il secret non tocca mai il mondo non fidato della pagina. Solo http(s);
 // se la protezione è spenta (livello 0) non iniettiamo nulla.
-try {
+// Solo nel frame principale: la protezione si applica alla pagina che l'utente
+// ha aperto. Estenderla a ogni riquadro incorporato cambierebbe i segnali di
+// widget di terze parti (mappe, player) che oggi non tocchiamo — è una scelta
+// a sé, non un effetto collaterale del tasto destro nei riquadri (#405).
+if (!IS_SUBFRAME) try {
   const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
   if (/^https?:/i.test(loc)) {
     const cfg = ipcRenderer.sendSync('filo:fp-config', loc) || { level: 0, seed: 0 };
@@ -212,6 +283,27 @@ const chromeShim = {
 globalThis.chrome = chromeShim;
 globalThis.self = globalThis; // i moduli IIFE controllano `self` come fallback
 
+// ─── #405 — quale frame sta usando l'utente ────────────────────────────────
+//
+// Le scorciatoie globali (Alt+E Spiegazione, Alt+T Traduci) lavorano sul testo
+// selezionato. Con i riquadri incorporati il testo selezionato può stare dentro
+// il riquadro, ma `webContents.send` consegna SOLO al frame principale: la
+// scorciatoia arrivava a chi non aveva nessuna selezione e non succedeva nulla.
+// Ogni frame segnala al main quando l'utente ci sta interagendo (limitato a una
+// segnalazione ogni mezzo secondo), così il main sa a chi consegnare.
+try {
+  let lastClaim = 0;
+  const claim = () => {
+    const now = Date.now();
+    if (now - lastClaim < 500) return;
+    lastClaim = now;
+    try { ipcRenderer.send('filo:frame-active'); } catch (_) {}
+  };
+  for (const ev of ['pointerdown', 'keydown', 'focusin']) {
+    window.addEventListener(ev, claim, { capture: true, passive: true });
+  }
+} catch (_) { /* mai bloccare il caricamento della pagina */ }
+
 // ─── shortcut hook ─────────────────────────────────────────────────────────
 // Lo shortcut globale fa un webContents.send('shortcut:triggered'); il content
 // script registra un listener via chrome.runtime.onMessage su MSG.SHORTCUT_TRIGGERED.
@@ -222,9 +314,20 @@ ipcRenderer.on('shortcut:triggered', (_event, { command, context } = {}) => {
   // `context` è opzionale: lo usa la voce "Aiuto" del menu tasto destro su una
   // tab per dire all'agente da dove è stato invocato (url + titolo della scheda).
   const t = globalThis.SN_MSG?.MSG?.SHORTCUT_TRIGGERED || 'shortcut_triggered';
-  for (const fn of broadcastListeners) {
-    try { fn({ type: t, command, context }, { id: 'filo-desktop' }, () => {}); } catch (_) {}
+  const deliver = () => {
+    for (const fn of broadcastListeners) {
+      try { fn({ type: t, command, context }, { id: 'filo-desktop' }, () => {}); } catch (_) {}
+    }
+  };
+  // #405 — una scorciatoia indirizzata a un riquadro (Alt+E su testo
+  // selezionato dentro un video incorporato) può arrivare prima che il
+  // riquadro abbia montato Filo: montalo e consegna appena è pronto.
+  if (IS_SUBFRAME && !contentScriptsStarted) {
+    ensureContentScripts();
+    waitForContentScripts(deliver);
+    return;
   }
+  deliver();
 });
 
 // ─── inject CSS condivisi + carica content script ──────────────────────────
@@ -259,6 +362,13 @@ const CONTENT_DIR = path.join(__dirname, '..', 'content');
 
 function loadScripts() {
   // Ordine identico a quello del manifest dell'estensione legacy.
+  // `PAGE_ONLY` marca i moduli che descrivono o modificano la SCHEDA nel suo
+  // insieme (banner del sito pericoloso, proposta geografica, banner cookie,
+  // colore della tab): dentro un riquadro incorporato parlerebbero del
+  // rettangolo sbagliato — un avviso "sito pericoloso" disegnato dentro un
+  // video, il colore della scheda preso da una pubblicità — quindi lì non si
+  // caricano affatto (#405).
+  const PAGE_ONLY = !IS_SUBFRAME;
   try { require(path.join(SHARED_DIR, 'constants.js')); } catch (e) { console.error('[Filo CS] constants', e); }
   try { require(path.join(SHARED_DIR, 'i18n.js')); } catch (e) { console.error('[Filo CS] i18n', e); }
   try { require(path.join(SHARED_DIR, 'messages.js')); } catch (e) { console.error('[Filo CS] messages', e); }
@@ -274,16 +384,16 @@ function loadScripts() {
   try { require(path.join(CONTENT_DIR, 'highlight.js')); } catch (e) { console.error('[Filo CS] highlight', e); }
   try { require(path.join(CONTENT_DIR, 'sidebar.js')); } catch (e) { console.error('[Filo CS] sidebar', e); }
   try { require(path.join(CONTENT_DIR, 'spellcheck.js')); } catch (e) { console.error('[Filo CS] spellcheck', e); }
-  try { require(path.join(CONTENT_DIR, 'safebrowse.js')); } catch (e) { console.error('[Filo CS] safebrowse', e); }
-  try { require(path.join(CONTENT_DIR, 'geoProposal.js')); } catch (e) { console.error('[Filo CS] geoProposal', e); }
-  try { require(path.join(CONTENT_DIR, 'cookies.js')); } catch (e) { console.error('[Filo CS] cookies', e); }
+  if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'safebrowse.js')); } catch (e) { console.error('[Filo CS] safebrowse', e); }
+  if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'geoProposal.js')); } catch (e) { console.error('[Filo CS] geoProposal', e); }
+  if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'cookies.js')); } catch (e) { console.error('[Filo CS] cookies', e); }
   try { require(path.join(SHARED_DIR, 'feedback.js')); } catch (e) { console.error('[Filo CS] feedback shared', e); }
   try { require(path.join(SHARED_DIR, 'feedbackClientIdHash.js')); } catch (e) { console.error('[Filo CS] feedbackClientIdHash', e); } // S1.F2.2
   try { require(path.join(SHARED_DIR, 'feedbackAttachTypes.js')); } catch (e) { console.error('[Filo CS] feedbackAttachTypes', e); }
   try { require(path.join(CONTENT_DIR, 'feedback.js')); } catch (e) { console.error('[Filo CS] feedback content', e); }
   try { require(path.join(CONTENT_DIR, 'redteamAttack.js')); } catch (e) { console.error('[Filo CS] redteamAttack content', e); }
   try { require(path.join(SHARED_DIR, 'tabColor.js')); } catch (e) { console.error('[Filo CS] tabColor', e); }
-  try { require(path.join(CONTENT_DIR, 'pageColor.js')); } catch (e) { console.error('[Filo CS] pageColor', e); }
+  if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'pageColor.js')); } catch (e) { console.error('[Filo CS] pageColor', e); }
   try { require(path.join(CONTENT_DIR, 'translatePage.js')); } catch (e) { console.error('[Filo CS] translatePage', e); }
   try { require(path.join(SHARED_DIR, 'ttsChunk.js')); } catch (e) { console.error('[Filo CS] ttsChunk', e); }
   try { require(path.join(CONTENT_DIR, 'tts.js')); } catch (e) { console.error('[Filo CS] tts', e); }
@@ -308,10 +418,45 @@ function start() {
   } catch (_) {}
 }
 
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', start, { once: true });
+// #405 — montaggio dei content script in un riquadro incorporato: una volta
+// sola, alla prima interazione dell'utente con quel riquadro.
+let contentScriptsStarted = false;
+function ensureContentScripts() {
+  if (contentScriptsStarted) return;
+  contentScriptsStarted = true;
+  try { start(); } catch (e) { console.error('[Filo CS] avvio nel riquadro', e); }
+}
+
+// Chiama `fn` quando i content script del riquadro hanno finito di installare i
+// propri listener (content.js marca `filoContentReady` a fine init).
+function waitForContentScripts(fn) {
+  const deadline = Date.now() + 3000;
+  const tick = () => {
+    let ready = false;
+    try { ready = document.documentElement.dataset.filoContentReady === '1'; } catch (_) {}
+    if (ready || Date.now() > deadline) { try { fn(); } catch (_) {} return; }
+    setTimeout(tick, 16);
+  };
+  tick();
+}
+
+if (!IS_SUBFRAME) {
+  contentScriptsStarted = true;
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', start, { once: true });
+  } else {
+    start();
+  }
 } else {
-  start();
+  // Un clic, un tasto premuto o il fuoco su un campo dentro il riquadro dicono
+  // "sto usando questa cosa": da lì in poi il riquadro deve rispondere come il
+  // resto della pagina. Il tasto destro ha il suo cammino (il bridge qui sopra),
+  // che monta e rigioca il clic.
+  for (const ev of ['pointerdown', 'keydown', 'focusin']) {
+    try {
+      window.addEventListener(ev, ensureContentScripts, { capture: true, passive: true, once: true });
+    } catch (_) {}
+  }
 }
 
 // Helper usato dal main per il save-for-later shortcut: estrae metadata

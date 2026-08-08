@@ -205,25 +205,53 @@
     const lastChar = text[pos - 1];
     if (!isBoundaryChar(lastChar)) return;
 
-    let end = pos - 1;
-    let s = end - 1;
-    if (s < 0 || !isWordCharLocal(text[s])) return;
-    while (s > 0 && isWordCharLocal(text[s - 1])) s--;
-    const word = text.slice(s, end);
-    if (!word) return;
-    const lowered = word.toLowerCase();
-    if (!Object.prototype.hasOwnProperty.call(autocorrectMap, lowered)) return;
-    const replacement = matchCase(word, autocorrectMap[lowered]);
-    if (!replacement || replacement === word) return;
+    const end = pos - 1;
+    // Serve almeno un carattere di parola prima del confine.
+    if (end <= 0 || !isWordCharLocal(text[end - 1])) return;
+
+    // Cerca la chiave (anche multi-parola, es. "x es") che termina a `end`.
+    const match = findAutocorrectMatch(text, end);
+    if (!match) return;
+    const { start } = match;
+    const original = text.slice(start, end);
+    const replacement = matchCase(original, autocorrectMap[match.key]);
+    if (!replacement || replacement === original) return;
 
     suppressAutocorrect = true;
     try {
-      applyFix(el, { start: s, end }, replacement, { cursor: 'preserve' });
+      applyFix(el, { start, end }, replacement, { cursor: 'preserve' });
     } finally {
       // Resetta la guardia dopo il flush degli eventi sincroni e dell'input event
       // riemesso da setRangeText.
       setTimeout(() => { suppressAutocorrect = false; }, 0);
     }
+  }
+
+  // Trova la chiave di autocorrect che termina ESATTAMENTE all'offset `end` nel
+  // testo, delimitata a sinistra da un confine di parola. Le chiavi possono
+  // contenere spazi ("x es" → "per esempio"): non basta più risalire al singolo
+  // token prima del confine. A parità di posizione finale vince la chiave più
+  // lunga, così "x es" batte "es" se entrambe esistono. Ritorna { start, key }
+  // (con `key` la chiave lowercased nella mappa) oppure null.
+  function findAutocorrectMatch(text, end) {
+    const lowerRegion = text.slice(0, end).toLowerCase();
+    let best = null;
+    for (const key of Object.keys(autocorrectMap)) {
+      if (!key) continue;
+      const start = end - key.length;
+      if (start < 0) continue;
+      // Il testo che precede il confine deve coincidere con la chiave.
+      if (lowerRegion.slice(start) !== key) continue;
+      // Confine di parola a sinistra: il carattere prima del match non dev'essere
+      // un carattere di parola, così "es" non scatta dentro "mese".
+      if (start > 0 && isWordCharLocal(text[start - 1])) continue;
+      // La chiave deve iniziare con un carattere di parola (le chiavi sono
+      // trim()+lowercase, quindi lo sono sempre): esclude match che partono da
+      // uno spazio interno spurio.
+      if (!isWordCharLocal(text[start])) continue;
+      if (!best || key.length > best.key.length) best = { start, key };
+    }
+    return best;
   }
 
   // Posiziona il caret all'offset di carattere `target` nell'elemento contenteditable,

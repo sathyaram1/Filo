@@ -133,17 +133,20 @@
   document.addEventListener('DOMContentLoaded', () => {
     load();
     $('blocklist').addEventListener('change', saveDebounced);
+    // #252 — indirizzo canonico filo://<page>/<file> (non la forma legacy
+    // filo://src/pages/…): un solo URL per pagina, e la scheda già aperta viene
+    // riportata a fuoco invece di duplicarla.
     $('openHome').addEventListener('click', () => {
-      chrome.tabs.create({ url: chrome.runtime.getURL('src/pages/home/home.html') });
+      chrome.tabs.create({ url: 'filo://home/home.html' });
     });
     $('openHistory').addEventListener('click', () => {
-      chrome.tabs.create({ url: chrome.runtime.getURL('src/pages/history/history.html') });
+      chrome.tabs.create({ url: 'filo://history/history.html' });
     });
     $('openArchive').addEventListener('click', () => {
       chrome.tabs.create({ url: 'filo://archive/archive.html' });
     });
     $('openSpellcheck').addEventListener('click', () => {
-      chrome.tabs.create({ url: chrome.runtime.getURL('src/pages/spellcheck/spellcheck.html') });
+      chrome.tabs.create({ url: 'filo://spellcheck/spellcheck.html' });
     });
   });
 })();

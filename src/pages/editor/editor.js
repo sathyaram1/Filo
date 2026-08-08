@@ -1005,13 +1005,22 @@
   // Rinomina un documento (il nome mostrato nel menu e nel selettore).
   // `manual` (default true) segna che il titolo l'ha scelto l'utente: così la
   // generazione automatica del titolo (a ~100 parole) non lo sovrascrive mai.
+  //
+  // ATTENZIONE: il marchio "l'ha scelto l'utente" vale SOLO se il nome finale è
+  // un nome vero. Aprire la rinomina e confermarla a vuoto (Invio su campo
+  // vuoto, blur, o conferma del titolo di default) lascia il documento SENZA
+  // nome: marcarlo comunque come manuale spegneva per sempre il titolo
+  // automatico di quel documento. Il flag segue quindi il titolo risultante:
+  // nome vero → true, documento di nuovo senza nome → false (auto-titolo di
+  // nuovo possibile).
   function renameFileAction(id, title, { manual = true } = {}) {
     STORE.renameFile(collection, id, title);
     const f = STORE.findFile(collection, id);
-    if (f && f.meta && manual) f.meta.titleManual = true;
-    if (doc && doc.id === id && doc.meta) {
+    const named = !!(f && f.meta && f.meta.title && f.meta.title !== STORE.DEFAULT_TITLE);
+    if (f && f.meta && manual) f.meta.titleManual = named;
+    if (doc && doc.id === id && doc.meta && f && f.meta) {
       doc.meta.title = f.meta.title;
-      if (manual) doc.meta.titleManual = true;
+      if (manual) doc.meta.titleManual = named;
     }
     writeCollection();
     renderDocSwitcher();
@@ -1460,7 +1469,12 @@
     const input = document.createElement('input');
     input.className = 'ed-doc-item-input';
     input.type = 'text';
-    input.value = (f.meta && f.meta.title) || '';
+    // Stessa regola della rinomina dalla docbar: "Documento senza titolo" non è
+    // un nome, è l'assenza di un nome — quindi va come segnaposto, non come
+    // testo già scritto da riscrivere.
+    const curName = (f.meta && f.meta.title) || '';
+    input.value = curName === STORE.DEFAULT_TITLE ? '' : curName;
+    input.placeholder = STORE.DEFAULT_TITLE;
     input.setAttribute('aria-label', 'Nuovo nome del documento');
     let done = false;
     const commit = (save) => {

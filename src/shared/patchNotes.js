@@ -16,10 +16,31 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.195', date: '2026-08-08',
+      features: [],
+      fixes: [
+        'Gli avvisi che Filo mostra dentro le pagine ora si impilano uno sopra l\'altro: se ne arrivano due ravvicinati restano leggibili entrambi, invece di finire uno sopra l\'altro.',
+      ],
+    },
+    {
+      version: '0.2.193', date: '2026-08-07',
+      features: [],
+      fixes: [
+        'Il tasto destro ora funziona anche dentro i riquadri incorporati da altri siti — un video dentro un articolo, una mappa, un blocco commenti, un modulo da compilare — insieme a Copia, Cerca, Leggi, Spiegazione, Traduci, correttore e Incolla con la cronologia.',
+        'Il clic destro su una miniatura cliccabile (le anteprime degli articoli, le schede prodotto, i risultati di una ricerca per immagini) ora mostra sia le azioni sull\'immagine sia quelle sul collegamento — «Apri in nuova tab», «Copia URL», «Salva link per dopo», «Condividi link» — invece delle sole azioni sull\'immagine.',
+        'Se chiedi a Filo come aprire un indirizzo, tornare indietro, ricaricare o andare alla home, ora ti indica dove sono davvero questi comandi (il menu del tasto destro e l\'icona Home nella home) invece di una barra in alto che non esiste più.',
+        'Nella Cronologia AI, dopo "Cancella tutto" il menu "filtra per tipo" torna vuoto: prima continuava a elencare i tipi delle voci ormai cancellate.',
+        'Le correzioni automatiche ora funzionano anche con più parole: puoi salvare abbreviazioni come "x es" → "per esempio" e si espandono mentre scrivi, non solo le parole singole.',
+        'Nel dizionario personale puoi aggiungere più parole in una volta: scrivendone diverse insieme vengono salvate come voci separate, così valgono davvero.',
+        'Nell\'Editor, aprire la rinomina di un documento e confermarla senza scrivere un nome non gli toglie più il titolo automatico: se resta senza nome, appena il testo cresce il titolo arriva comunque.',
+      ],
+    },
+    {
       version: '0.2.192', date: '2026-08-07',
       features: [],
       fixes: [
         'Quando salvi una pagina con "Salva per dopo", la conferma che compare è ora cliccabile: aprila per andare dritto a "Aperti per dopo", con la scheda appena messa da parte evidenziata. Così scopri subito dov\'è finita, senza doverla cercare nel menu.',
+        '"Aperti per dopo", la Cronologia AI e le altre pagine interne ora si aprono sempre su un\'unica scheda: se sono già aperte da qualche parte, Filo ti riporta su quella invece di crearne una copia identica, e non importa da dove le apri (menu App, Impostazioni o Cronologia) — la pagina è sempre la stessa.',
       ],
     },
     {

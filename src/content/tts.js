@@ -597,11 +597,14 @@
     // dettato ci atterra sopra (vale soprattutto per gli editor contenteditable,
     // dove la selezione viva va persa se il focus passa a un bottone).
     pill.addEventListener('mousedown', (e) => e.preventDefault());
-    document.documentElement.appendChild(pill);
+    // Nello stack degli avvisi in pagina (#409), così non finisce sotto o sopra
+    // un toast che arriva nel frattempo. `sticky`: è l'unico comando per
+    // fermare la registrazione, il tetto dello stack non deve poterlo sfrattare.
+    Popup.mountToast(pill, { sticky: true });
 
     const cleanup = () => {
       try { stream.getTracks().forEach((t) => t.stop()); } catch (_) {}
-      if (pill.parentNode) pill.remove();
+      if (pill.parentNode) Popup.unmountToast(pill);
       _dictateState = null;
     };
 
@@ -609,7 +612,7 @@
       try {
         const raw = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
         if (!raw.size) { Popup.showToast(I18n.t('menu_dictate_empty')); cleanup(); return; }
-        if (pill.parentNode) pill.remove();
+        if (pill.parentNode) Popup.unmountToast(pill);
         Popup.showToast(I18n.t('menu_dictate_transcribing'), { duration: 2500 });
         // Gemini accetta wav/mp3/ogg/flac/aac/aiff ma non webm: riencodiamo in
         // WAV mono 16kHz (più che sufficiente per voce, file piccolo).

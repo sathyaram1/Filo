@@ -17,7 +17,23 @@ const { audibleFromEvent } = globalThis.SN_AUDIO_STATE;
 require('../shared/authPopup');
 const { isAuthPopup } = globalThis.SN_AUTH_POPUP;
 require('../shared/urlNav'); // #398 — sorgente unica di normalizeUrl/isLocalHost (condivisa con la dashboard)
-const { normalizeUrl } = globalThis.SN_URL_NAV;
+const { normalizeUrl, canonicalizeFiloUrl } = globalThis.SN_URL_NAV;
+
+// #252 — pagina interna filo:// "singleton": ne ha senso UNA sola scheda alla
+// volta (le liste "Aperti per dopo"/Cronologia/Archivio/Scaricamenti, le
+// pagine Impostazioni, gli editor…). Riaprirla mentre è già aperta deve
+// riportare l'utente sulla scheda esistente, non crearne un doppione. L'unica
+// pagina filo:// NON singleton è la nuova scheda (`filo://newtab/`): di quella
+// se ne vogliono quante se ne aprono. La chiave d'identità è host+path (query
+// e hash esclusi: un ?highlight non rende la pagina "un'altra pagina").
+function filoSingletonKey(url) {
+  const s = String(url || '');
+  if (!s.startsWith('filo://')) return null;
+  let u;
+  try { u = new URL(s); } catch (_) { return null; }
+  if (u.hostname === 'newtab') return null;
+  return u.hostname + u.pathname;
+}
 
 const PAGE_PRELOAD = path.join(__dirname, '..', 'preload', 'page-preload.js');
 const INTERNAL_PRELOAD = path.join(__dirname, '..', 'preload', 'internal-preload.js');
@@ -348,6 +364,18 @@ class TabManager {
       sandbox: false,
       nodeIntegration: false,
       webSecurity: true,
+      // #405 — i riquadri incorporati (video, mappe, commenti, moduli) sono
+      // iframe: senza questo flag il preload — e quindi TUTTO Filo (menu del
+      // tasto destro, correttore, Spiegazione/Traduci, Incolla con cronologia)
+      // — girava solo nel frame principale, e dentro il riquadro il tasto
+      // destro non produceva nulla. Con nodeIntegrationInSubFrames il preload
+      // parte in ogni sottoframe; `nodeIntegration` resta false e
+      // contextIsolation true, quindi il codice della pagina (incluso quello
+      // di terze parti dentro l'iframe) NON guadagna alcun accesso a Node né
+      // allo shim chrome.*, che vivono solo nel mondo isolato del preload.
+      // Il costo si paga solo dove serve: nei sottoframe page-preload.js
+      // carica i content script alla PRIMA interazione, non al caricamento.
+      ...(isInternal ? {} : { nodeIntegrationInSubFrames: true }),
       // partition: incognito (effimera della finestra) o per-sito in privacy.
       ...(partition ? { partition } : {}),
     };
@@ -376,7 +404,32 @@ class TabManager {
     return view;
   }
 
-  openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null, suppressAutoplay = false } = {}) {
+  openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null, suppressAutoplay = false, allowDuplicate = false } = {}) {
+    // #252 — INDIRIZZO UNICO per le pagine interne: riporta l'eventuale forma
+    // legacy `filo://src/pages/<page>/<file>` (dallo shim getURL) alla forma
+    // canonica `filo://<page>/<file>` che usa il menu. Così tutti i punti di
+    // ingresso convergono su un solo URL, qualunque chiamante li apra.
+    if (typeof url === 'string' && url.startsWith('filo://')) url = canonicalizeFiloUrl(url);
+
+    // #252 — DEDUPLICA le pagine singleton: se la pagina interna è già aperta
+    // in una scheda, riportaci l'utente invece di duplicarla. Solo per aperture
+    // in primo piano volute dall'utente (click su menu/link) e non quando si
+    // chiede esplicitamente una copia (Duplica scheda → allowDuplicate). Le
+    // aperture in background (activate:false) creano schede vere, come prima.
+    if (activate && !allowDuplicate) {
+      const key = filoSingletonKey(url);
+      if (key) {
+        const existing = this.tabs.find((t) => filoSingletonKey(t.url) === key);
+        if (existing) {
+          // URL identico → basta riportare a fuoco. Differisce solo per query/
+          // hash (es. ?highlight=…) → rinaviga la scheda esistente al nuovo URL
+          // così l'intento (evidenziare l'elemento appena salvato) si applica.
+          if (existing.url !== url) this.navigate(existing.id, url);
+          this.activate(existing.id);
+          return existing.id;
+        }
+      }
+    }
     // SICUREZZA (#247) — will-navigate e setWindowOpenHandler bloccano solo le
     // navigazioni che Electron origina da sé (click, window.open): un
     // loadURL() PROGRAMMATICO come questo NON emette will-navigate, quindi
@@ -1050,6 +1103,9 @@ class TabManager {
       activate: true,
       restoreScrollPct: scrollPct,
       restoreZoomLevel: zoomLevel,
+      // "Duplica" chiede ESPLICITAMENTE una copia: salta la deduplica #252 delle
+      // pagine interne, altrimenti riporterebbe solo a fuoco l'originale.
+      allowDuplicate: true,
     });
   }
 
@@ -1670,8 +1726,14 @@ class TabManager {
     // content script perché li mostri nel menu di correzione custom.
     wc.on('context-menu', (_e, params) => {
       if (params.misspelledWord) {
+        // #405 — il click destro può essere avvenuto dentro un riquadro
+        // incorporato (iframe): il menu di correzione lo costruisce il content
+        // script DI QUEL frame, quindi i suggerimenti vanno consegnati lì.
+        // `wc.send` raggiunge solo il frame principale, e nei campi dentro un
+        // riquadro i suggerimenti nativi sarebbero caduti nel vuoto.
+        const target = params.frame && !params.frame.detached ? params.frame : wc;
         try {
-          wc.send('filo:broadcast', {
+          target.send('filo:broadcast', {
             type: '_spell:native',
             word: params.misspelledWord,
             suggestions: (params.dictionarySuggestions || []).slice(0, 5),
@@ -1771,6 +1833,9 @@ class TabManager {
           sandbox: false,
           nodeIntegration: false,
           webSecurity: true,
+          // #405 — stesse regole di una scheda esterna: anche dentro il popup
+          // di login i riquadri incorporati devono avere il tasto destro.
+          nodeIntegrationInSubFrames: true,
           ...(popupPartition ? { partition: popupPartition } : {}),
         },
       },

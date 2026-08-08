@@ -274,8 +274,61 @@ l'utente **perde del tutto** quelle azioni, senza alternative (#400).
   `document.elementsFromPoint(x, y)`, ma **solo come ripiego** quando non c'è
   altro contesto (selezione, immagine, link, campo di testo): altrimenti un video
   di sfondo a tutta pagina ruberebbe il menu al contenuto che gli sta sopra.
-- **Dove:** `buildContextualItems` / `findMedia` in `src/content/content.js`, voci
-  in `src/content/actions.js`. Test: `tests/context-menu-media.spec.mjs`.
+- **Un elemento può appartenere a PIÙ famiglie insieme — i rami non sono
+  mutuamente esclusivi (#401).** Una miniatura racchiusa in un `<a>` (anteprime
+  di articoli, schede prodotto, risultati di ricerca per immagini) è **sia**
+  immagine **sia** link: un browser normale mostra le due famiglie di voci
+  insieme. Con rami a `return` anticipato, quello dell'immagine chiudeva prima di
+  valutare il link e le azioni sul collegamento sparivano del tutto. Regola:
+  quando due contesti coesistono sullo stesso target, **componi** entrambe le
+  famiglie (separatore fra loro), a partire da quella dell'elemento cliccato più
+  in profondità. Costruisci le voci-azione in helper senza la sezione "Spiega",
+  così il chiamante decide: **una sola** sezione "Spiega" inline (quella
+  dell'elemento primario), perché ogni box `inline` fa una chiamata al modello a
+  ogni apertura del menu — due box = doppio costo per un menu che si apre spesso.
+- **Dove:** `buildContextualItems` (+ `buildImageActionItems`/`buildLinkActionItems`)
+  e `findMedia` in `src/content/content.js`, voci in `src/content/actions.js`.
+  Test: `tests/context-menu-media.spec.mjs`, `tests/context-menu-image-link.spec.mjs`.
+
+## Riquadri incorporati (iframe): Filo gira anche lì, ma un riquadro non è la pagina
+
+Le pagine vere sono piene di riquadri di altri siti: un video dentro un articolo,
+una mappa, un blocco commenti, un modulo. Sono `iframe`, e i preload girano nei
+sottoframe **solo** con `nodeIntegrationInSubFrames` (attivo per le schede
+esterne, MAI per le pagine `filo://`: lì un riquadro esterno erediterebbe il
+preload privilegiato). Senza, dentro il riquadro Filo semplicemente non esiste —
+il tasto destro non produce nulla, e per l'utente è un buco nero senza spiegazione
+(#405).
+
+Tre regole quando si tocca qualcosa che vive nel content script:
+
+- **Costo pigro.** Una pagina può avere decine di riquadri che l'utente non tocca
+  mai. Nel sottoframe `page-preload.js` non carica NIENTE finché non arriva la
+  prima interazione vera (tasto destro, clic, tasto premuto, una scorciatoia
+  indirizzata a quel frame); il primo tasto destro viene **rigiocato** appena
+  l'handler è pronto, così non serve cliccare due volte.
+- **Frame vs pagina.** Ciò che riguarda l'ELEMENTO cliccato funziona identico nel
+  riquadro. Ciò che riguarda la PAGINA no: colore della scheda, segnali di
+  attività, banner cookie/sito pericoloso, avvisi di sistema, e le azioni globali
+  del menu (traduci, condividi, salva, QR, screenshot, feedback, sidebar Aiuto).
+  Quelle o restano al frame principale, o gli vengono **rimandate**
+  (`MSG.RUN_IN_TOP_FRAME` → `MSG.TOP_FRAME_COMMAND`): eseguirle nel riquadro
+  significherebbe condividere l'indirizzo del player invece dell'articolo, o
+  disegnare un pannello a tutta superficie dentro un rettangolo di 300 px.
+- **I frame non si parlano da soli.** Eventi del mouse e chiamate JS non
+  attraversano il confine di un iframe di un'altra origine: ogni coordinamento
+  passa dal main (chiusura dei menu degli altri frame, consegna dei suggerimenti
+  ortografici nativi a `params.frame`, stream AI verso `event.senderFrame`,
+  scorciatoie di selezione verso l'ultimo frame usato). `webContents.send`
+  raggiunge **solo** il frame principale: per parlare a tutti serve
+  `mainFrame.framesInSubtree`.
+
+Il menu si adatta anche allo spazio: se il riquadro è più basso del menu, il menu
+diventa scorrevole invece di essere tagliato.
+
+**Dove:** `_makeView` in `src/main/tabs.js`, `src/preload/page-preload.js`,
+`IS_SUBFRAME` in `src/content/content.js` e `src/content/menuIcons.js`, ponte in
+`src/main/services/handlers/nav.js`. Test: `tests/iframe-context-menu.spec.mjs`.
 
 ## Popup menu: il "submenu" è una voce a due zone che riapre il menu
 
@@ -582,11 +635,36 @@ irraggiungibili.
   mezzo** (`inizio…estensione`), così resta leggibile sia l'inizio sia il pezzo
   che dice di cosa si tratta. Vedi `shortName()` in
   `src/main/services/downloads.js`, test `tests/unit/downloadNames.test.mjs`.
+- **UN contenitore per angolo, non uno per avviso.** Ogni riquadro ancorato con
+  `position: fixed` allo stesso angolo è cieco rispetto agli altri: due che
+  compaiono a pochi secondi l'uno dall'altro si disegnano nello stesso punto e
+  non se ne legge nessuno (#409). Vale anche fra **famiglie diverse** di avviso:
+  un toast, una pill interattiva e una conferma cliccabile che condividono
+  l'angolo devono condividere anche la pila. Il caso più frequente non è nemmeno
+  l'utente che fa due cose di fila: è **un'azione sola** che mostra prima
+  «sto lavorando» e poi l'esito.
+- **Non tutti gli avvisi sono sfrattabili.** Il tetto butta via i più vecchi, ma
+  un avviso che porta **l'unico comando** per una cosa in corso (fermare una
+  registrazione, raggiungere la lista dove è appena finita una pagina) va marcato
+  come non sfrattabile: perderlo non è "un messaggio in meno", è una funzione che
+  sparisce a metà.
+- **⚠️ `overflow` + animazione d'ingresso = falso overflow, e uno `scroll`
+  parassita.** Se le card entrano con `transform: translateY(Npx)`, quello sposto
+  allarga l'area scrollabile del contenitore: `scrollHeight > clientHeight`
+  risulta vero anche con una card sola, il contenitore si dichiara "in overflow",
+  riaccende i `pointer-events` (una zona morta sopra la pagina) e — assegnando
+  `scrollTop` — **emette un evento `scroll`**. Chi ascolta lo scroll in capture su
+  `window` (il menu del tasto destro: `src/content/menu.js`) lo legge come "la
+  pagina si è mossa" e **si chiude da solo**. Confronta con una tolleranza pari
+  allo sposto d'ingresso e scrivi `scrollTop` solo se cambia davvero.
 - **Dove:** `NOTIFS` (`enforceCap`/`syncOverflow`) in `src/renderer/shell.js`;
   `.shell-notifs` in `src/renderer/shell.css`. Test
   `tests/notifications.spec.mjs` (la raffica non straripa e resta chiudibile).
   Stesso pattern nell'editor: `showEditorToast`/`.ed-toasts` in
   `src/pages/editor/editor.{js,css}`, test `tests/editor-trash.spec.mjs`.
+  Lato **pagina visitata** (content script): `mountToast`/`unmountToast` +
+  `.sn-toasts` in `src/content/popup.js` e `src/styles/popup.css` — ci passano
+  toast, `.sn-dictate-pill` e `.sn-save-confirm`. Test `tests/toast-stack.spec.mjs`.
 
 ## Azione distruttiva: l'"Annulla" effimero non può essere l'UNICA rete
 

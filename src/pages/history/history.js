@@ -224,13 +224,18 @@
       if (!ok) return;
       await chrome.runtime.sendMessage({ type: MSG.CLEAR_HISTORY });
       items = [];
+      // Svuotando la cronologia spariscono tutti i tipi: riallinea il menu
+      // "filtra per tipo" come fa la rimozione della singola voce, altrimenti
+      // resterebbero opzioni per dati che non esistono più.
+      buildFilterOptions();
       render();
     });
     $('openArchive').addEventListener('click', () => {
       chrome.tabs.create({ url: 'filo://archive/archive.html' });
     });
     $('openHome').addEventListener('click', () => {
-      chrome.tabs.create({ url: chrome.runtime.getURL('src/pages/home/home.html') });
+      // #252 — indirizzo canonico: una sola scheda per "Aperti per dopo".
+      chrome.tabs.create({ url: 'filo://home/home.html' });
     });
     $('openOptions').addEventListener('click', () => chrome.runtime.openOptionsPage());
   });

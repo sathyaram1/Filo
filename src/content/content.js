@@ -48,6 +48,16 @@
   // Serve a mostrare l'icona/etichetta giusta nella voce di menu "Schermo intero".
   let contentFullscreen = false;
 
+  // #405 — stiamo girando dentro un riquadro incorporato (video, mappa, modulo,
+  // blocco commenti) invece che nella pagina? Il menu del tasto destro e tutto
+  // ciò che riguarda l'ELEMENTO cliccato funzionano identici qui dentro; ciò che
+  // riguarda la PAGINA (colore della scheda, segnali di attività, avvisi di
+  // sistema, azioni globali del menu) no: il riquadro conosce solo se stesso e
+  // parlerebbe del rettangolo sbagliato. Quelle cose restano/tornano alla pagina.
+  const IS_SUBFRAME = (() => {
+    try { return window.top !== window.self; } catch (_) { return true; }
+  })();
+
   // ------------------------------------------------------------
   // Bootstrap
   // ------------------------------------------------------------
@@ -56,19 +66,25 @@
     applyTheme(settings.theme);
     applyThemeTokens(settings.themeTokens);
 
-    // "Vetro smerigliato" della tab attiva (§1.1): campiona il colore della cima
-    // della pagina e mandalo al main, che tinge la tab. Attivo su tutte le pagine
-    // (anche quelle senza menu), perché il colore non c'entra col menu.
-    try { PageColor.startTabColorSampler(); } catch (_) {}
+    // Le tre cose qui sotto descrivono la SCHEDA: il colore che la tinge e i
+    // segnali su quanto è stata usata. Un riquadro incorporato non ne sa nulla —
+    // campionerebbe il colore di una pubblicità e conterebbe lo scroll di un
+    // rettangolo — quindi restano alla pagina che lo ospita (#405).
+    if (!IS_SUBFRAME) {
+      // "Vetro smerigliato" della tab attiva (§1.1): campiona il colore della cima
+      // della pagina e mandalo al main, che tinge la tab. Attivo su tutte le pagine
+      // (anche quelle senza menu), perché il colore non c'entra col menu.
+      try { PageColor.startTabColorSampler(); } catch (_) {}
 
-    // Colore identità del sito (§1.2): calcolato una volta (theme-color →
-    // manifest → favicon → fallback) e mandato al main, che lo cacha per dominio
-    // e lo applica attenuato alle tab inattive.
-    try { PageColor.reportTabIdentityColor(() => settings && settings.tabColor); } catch (_) {}
+      // Colore identità del sito (§1.2): calcolato una volta (theme-color →
+      // manifest → favicon → fallback) e mandato al main, che lo cacha per dominio
+      // e lo applica attenuato alle tab inattive.
+      try { PageColor.reportTabIdentityColor(() => settings && settings.tabColor); } catch (_) {}
 
-    // Segnali di attività (§2.1): ultima interazione, % di scroll, form sporco.
-    // Servono all'LLM per decidere cosa archiviare.
-    try { startTabActivityReporter(); } catch (_) {}
+      // Segnali di attività (§2.1): ultima interazione, % di scroll, form sporco.
+      // Servono all'LLM per decidere cosa archiviare.
+      try { startTabActivityReporter(); } catch (_) {}
+    }
 
     // Esc esce dalla modalità "contenuto a tutto schermo" (vedi tabs.js). Va
     // registrato anche su pagine "bloccate" (senza menu) e in capture, così
@@ -226,14 +242,34 @@
 
   function isBlocked() {
     const url = location.href;
-    if (PAGES_WITHOUT_MENU_PREFIXES.some((p) => url.startsWith(p))) return true;
-    const host = location.hostname;
-    return (settings?.blocklist || []).some((d) => host === d || host.endsWith('.' + d));
+    // #405 — dentro un riquadro incorporato "about:blank" e "about:srcdoc" NON
+    // sono pagine di sistema: sono contenuto scritto dalla pagina che ospita il
+    // riquadro (moduli, anteprime, blocchi commenti). Lì il menu deve esserci
+    // come ovunque; l'esclusione vale per le pagine di sistema vere.
+    const embeddedAbout = IS_SUBFRAME && /^about:(blank|srcdoc)/i.test(url);
+    if (!embeddedAbout && PAGES_WITHOUT_MENU_PREFIXES.some((p) => url.startsWith(p))) return true;
+    const blocklist = settings?.blocklist || [];
+    const matches = (host) => !!host && blocklist.some((d) => host === d || host.endsWith('.' + d));
+    // Se l'utente ha spento Filo su un sito, deve restare spento anche nei
+    // riquadri che quel sito incorpora: il riquadro ha un'altra origine e da
+    // solo non lo saprebbe, quindi guarda l'indirizzo della pagina ospite.
+    if (matches(hostOfUrl(pageUrl))) return true;
+    return matches(location.hostname);
   }
+
+  function hostOfUrl(url) {
+    try { return new URL(String(url || '')).hostname; } catch (_) { return ''; }
+  }
+
+  // Indirizzo della pagina che ospita questo frame (uguale a location.href nel
+  // frame principale). Arriva dal main insieme alle impostazioni: da dentro un
+  // riquadro di un'altra origine non è leggibile.
+  let pageUrl = '';
 
   async function fetchSettings() {
     try {
       const res = await chrome.runtime.sendMessage({ type: MSG.GET_SETTINGS });
+      if (res && typeof res.pageUrl === 'string') pageUrl = res.pageUrl;
       return res?.settings || self.SN_CONST.DEFAULT_SETTINGS;
     } catch (_) {
       return self.SN_CONST.DEFAULT_SETTINGS;
@@ -809,10 +845,22 @@
     return {
       type: 'item',
       label: 'Invia feedback',
-      onClick: () => {
-        try { self.SN_FEEDBACK_UI?.open(); } catch (e) { console.error('[SN] feedback open', e); }
-      },
+      onClick: () => openSurface('feedback', () => self.SN_FEEDBACK_UI?.open()),
     };
+  }
+
+  // #405 — i pannelli a tutta superficie (feedback, red-team, sidebar Aiuto)
+  // appartengono alla pagina: aperti dentro un riquadro incorporato starebbero
+  // dentro un rettangolo di poche centinaia di pixel, tagliati. Dal riquadro
+  // chiediamo alla pagina di aprirli; nella pagina si aprono e basta.
+  function openSurface(surface, localOpen) {
+    if (!IS_SUBFRAME) {
+      try { localOpen(); } catch (e) { console.error('[SN] apertura pannello', e); }
+      return;
+    }
+    try {
+      Promise.resolve(chrome.runtime.sendMessage({ type: MSG.RUN_IN_TOP_FRAME, surface })).catch(() => {});
+    } catch (_) {}
   }
 
   // ------------------------------------------------------------
@@ -879,10 +927,7 @@
       type: 'item',
       icon: ricon,
       label: 'Invia attacco (Red-team)',
-      onClick: () => {
-        try { self.SN_REDTEAM_ATTACK_UI?.open(); }
-        catch (e) { console.error('[SN] redteam attack open', e); }
-      },
+      onClick: () => openSurface('redteam', () => self.SN_REDTEAM_ATTACK_UI?.open()),
     };
   }
 
@@ -891,12 +936,71 @@
       type: 'item',
       label: I18n.t('menu_help'),
       shortcut: 'Alt+H',
-      onClick: () => openHelpSidebar(),
+      onClick: () => openSurface('help', () => openHelpSidebar()),
     };
   }
 
+  // Azioni sull'immagine (senza la sezione "Spiega": la compone il chiamante,
+  // così quando l'immagine è anche un link non firiamo due box AI a ogni apertura).
+  function buildImageActionItems(imgEl) {
+    return [
+      { type: 'item', label: I18n.t('menu_copy_image'), onClick: () => Actions.copyImage(imgEl) },
+      { type: 'item', label: I18n.t('menu_save_image_as'), onClick: () => Actions.downloadImage(imgEl) },
+      {
+        type: 'item',
+        label: I18n.t('menu_copy_image_link'),
+        onClick: () => Actions.copyToClipboard(imgEl.currentSrc || imgEl.src),
+      },
+      {
+        type: 'item',
+        label: I18n.t('menu_search_image'),
+        onClick: () => Actions.searchImageOnWeb(imgEl),
+      },
+    ];
+  }
+
+  // Azioni sul collegamento (senza la sezione "Spiega", come sopra).
+  function buildLinkActionItems(linkEl) {
+    const out = [
+      {
+        type: 'item',
+        label: I18n.t('menu_open_in_new_tab'),
+        onClick: () => window.open(linkEl.href, '_blank', 'noopener'),
+      },
+    ];
+    // "Salva file" — gemello di "Salva immagine come" per i link a un file
+    // (PDF, ZIP, allegato). Compare SOLO quando il link punta davvero a un
+    // file (vedi isDownloadableLink): su un link a un'altra pagina scaricare
+    // l'HTML non avrebbe senso.
+    if (Actions.isDownloadableLink(linkEl)) {
+      out.push({
+        type: 'item',
+        label: I18n.t('menu_save_file'),
+        onClick: () => Actions.downloadLink(linkEl),
+      });
+    }
+    out.push(
+      {
+        type: 'item',
+        label: I18n.t('menu_copy_link'),
+        onClick: () => Actions.copyToClipboard(linkEl.href),
+      },
+      {
+        type: 'item',
+        label: I18n.t('menu_save_link_for_later'),
+        onClick: () => Actions.saveLink(linkEl),
+      },
+      {
+        type: 'item',
+        label: I18n.t('menu_share_link'),
+        onClick: () => Actions.shareLink(linkEl),
+      },
+    );
+    return out;
+  }
+
   // Costruisce gli item della zona contestuale in base a cosa è stato cliccato.
-  // Matrice: testo / testo+editabile / video-audio / immagine / link /
+  // Matrice: testo / testo+editabile / video-audio / immagine (+ link) / link /
   // casella input / niente.
   function buildContextualItems({
     selInfo, linkEl, imgEl, mediaEl, mediaUnder, editable, clipboardHistory,
@@ -942,55 +1046,25 @@
     }
 
     if (imgEl) {
-      items.push({ type: 'item', label: I18n.t('menu_copy_image'), onClick: () => Actions.copyImage(imgEl) });
-      items.push({ type: 'item', label: I18n.t('menu_save_image_as'), onClick: () => Actions.downloadImage(imgEl) });
-      items.push({
-        type: 'item',
-        label: I18n.t('menu_copy_image_link'),
-        onClick: () => Actions.copyToClipboard(imgEl.currentSrc || imgEl.src),
-      });
-      items.push({
-        type: 'item',
-        label: I18n.t('menu_search_image'),
-        onClick: () => Actions.searchImageOnWeb(imgEl),
-      });
+      // Immagine cliccata. Le sue azioni vengono prima…
+      for (const it of buildImageActionItems(imgEl)) items.push(it);
+      // …ma se l'immagine è racchiusa in un <a> (miniature di articoli, schede
+      // prodotto, risultati di ricerca per immagini) è ANCHE un collegamento:
+      // in un browser normale le due famiglie di voci compaiono insieme. Prima
+      // il ramo immagine ritornava subito e le azioni sul link sparivano (#401).
+      if (linkEl) {
+        items.push({ type: 'separator' });
+        for (const it of buildLinkActionItems(linkEl)) items.push(it);
+      }
       items.push({ type: 'separator' });
+      // Una sola sezione "Spiega" (quella dell'immagine, l'elemento cliccato):
+      // aggiungerne una seconda firerebbe una seconda chiamata AI a ogni apertura.
       items.push(Actions.buildInlineExplainImage(imgEl));
       return items;
     }
 
     if (linkEl) {
-      items.push({
-        type: 'item',
-        label: I18n.t('menu_open_in_new_tab'),
-        onClick: () => window.open(linkEl.href, '_blank', 'noopener'),
-      });
-      // "Salva file" — gemello di "Salva immagine come" per i link a un file
-      // (PDF, ZIP, allegato). Compare SOLO quando il link punta davvero a un
-      // file (vedi isDownloadableLink): su un link a un'altra pagina scaricare
-      // l'HTML non avrebbe senso.
-      if (Actions.isDownloadableLink(linkEl)) {
-        items.push({
-          type: 'item',
-          label: I18n.t('menu_save_file'),
-          onClick: () => Actions.downloadLink(linkEl),
-        });
-      }
-      items.push({
-        type: 'item',
-        label: I18n.t('menu_copy_link'),
-        onClick: () => Actions.copyToClipboard(linkEl.href),
-      });
-      items.push({
-        type: 'item',
-        label: I18n.t('menu_save_link_for_later'),
-        onClick: () => Actions.saveLink(linkEl),
-      });
-      items.push({
-        type: 'item',
-        label: I18n.t('menu_share_link'),
-        onClick: () => Actions.shareLink(linkEl),
-      });
+      for (const it of buildLinkActionItems(linkEl)) items.push(it);
       items.push({ type: 'separator' });
       items.push(Actions.buildInlineExplainLink(linkEl));
       return items;
@@ -1050,7 +1124,29 @@
     // Toast di sistema inviato dal main (es. esito differito dell'invio di un
     // feedback, #341). Il broadcast arriva a TUTTE le schede: lo mostra solo
     // quella in primo piano, per non moltiplicare lo stesso avviso.
+    // #405 — un riquadro incorporato della stessa scheda ha aperto il suo menu.
+    // Gli eventi del mouse non attraversano il bordo di un riquadro, quindi il
+    // nostro menu non si accorgerebbe del clic e resterebbero aperti in due.
+    if (msg?.type === MSG.CLOSE_OTHER_MENUS) {
+      try { Menu.close(); } catch (_) {}
+      return;
+    }
+    // #405 — azione di PAGINA scelta dal menu aperto dentro un riquadro
+    // (tradurre, condividere, salvare, QR, screenshot…): il riquadro l'ha
+    // rimandata qui perché solo il frame principale è "la pagina".
+    if (msg?.type === MSG.TOP_FRAME_COMMAND) {
+      try {
+        if (msg.surface === 'feedback') self.SN_FEEDBACK_UI?.open();
+        else if (msg.surface === 'redteam') self.SN_REDTEAM_ATTACK_UI?.open();
+        else if (msg.surface === 'help') openHelpSidebar();
+        else MenuIcons.runIconAction(msg.iconId);
+      } catch (e) { console.error('[SN] azione di pagina dal riquadro', e); }
+      return;
+    }
     if (msg?.type === MSG.SHOW_TOAST) {
+      // Gli avvisi di sistema appartengono alla pagina: mostrarli anche dentro
+      // ogni riquadro incorporato li duplicherebbe (#405).
+      if (IS_SUBFRAME) return;
       try {
         if (document.visibilityState === 'visible' && document.hasFocus()) {
           Popup?.showToast?.(String(msg.text || ''), { duration: Number(msg.duration) || 2800 });
@@ -1072,7 +1168,7 @@
       // Colore identità delle tab: i parametri di estrazione possono essere
       // cambiati (a voce o nelle Preferenze). Ricalcola il colore del favicon
       // coi nuovi parametri così la tinta della tab si aggiorna live.
-      try { PageColor.reportTabIdentityColor(() => settings && settings.tabColor); } catch (_) {}
+      if (!IS_SUBFRAME) { try { PageColor.reportTabIdentityColor(() => settings && settings.tabColor); } catch (_) {} }
       // SpellCheck.init registra listener globali; per non duplicarli su update
       // usiamo updateSettings (definito apposta da spellcheck.js).
       SpellCheck.updateSettings(isBlocked() ? { featureFlags: { spellcheck: false } } : settings);

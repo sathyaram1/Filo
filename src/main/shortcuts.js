@@ -54,7 +54,24 @@ function dispatch(command, window) {
     saveForLater(win, active).catch((e) => console.warn('[Filo] save-for-later failed', e));
     return;
   }
-  try { active.view.webContents.send('shortcut:triggered', { command }); } catch (_) {}
+  const wc = active.view.webContents;
+  // #405 — Spiegazione e Traduci lavorano sul testo SELEZIONATO, che può stare
+  // dentro un riquadro incorporato (un video, una mappa, un blocco commenti).
+  // `webContents.send` parla solo col frame principale: lì la selezione non
+  // esiste e la scorciatoia sembrava rotta. Consegniamo al frame con cui
+  // l'utente ha interagito per ultimo. Le altre scorciatoie riguardano la
+  // scheda intera (la sidebar Aiuto) e restano al frame principale.
+  const SELECTION_COMMANDS = new Set(['explain-selection', 'translate-selection']);
+  let target = wc;
+  if (SELECTION_COMMANDS.has(command)) {
+    try {
+      const frame = wc._filoActiveFrame;
+      if (frame && !frame.detached) target = frame;
+    } catch (_) { target = wc; }
+  }
+  try { target.send('shortcut:triggered', { command }); } catch (_) {
+    try { wc.send('shortcut:triggered', { command }); } catch (_) {}
+  }
 }
 
 async function saveForLater(win, tab) {
