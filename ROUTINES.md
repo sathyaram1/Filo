@@ -163,9 +163,9 @@ Ripeti finché il budget è quasi pieno:
    > lavori. Esegui il compito fino in fondo (report per l'utente → nelle
    > `notes` del feedback su Firestore, NON a me). **La tua ULTIMA riga è
    > l'UNICA cosa che leggo, e deve essere ESATTAMENTE una di queste, senza
-   > nient'altro dopo:** `fatto <X>` | `niente da fare` | `budget pieno`.
-   > Niente report, diff, id, nomi di file o spiegazioni nella riga finale: io
-   > sono cieco per design.»
+   > nient'altro dopo:** `fatto <X>` | `niente da fare` | `budget pieno` |
+   > `guasto <X>`. Niente report, diff, id, nomi di file o spiegazioni nella riga
+   > finale: io sono cieco per design.»
 
    ⚠️ **La chiave è OBBLIGATORIA in ogni invocazione** (incident 2026-07-09/11,
    feedback #310+): arriva all'orchestratore nel prompt della schedulazione e va
