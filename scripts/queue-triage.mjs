@@ -123,8 +123,10 @@ function tryGit(args) {
 export function commitAndPush(file) {
   const mainBranch = process.env.FILO_MAIN_BRANCH || 'main';
   const rel = relative(ROOT, file).split(sep).join('/');
+
+  // Il fogliettino viene comunque registrato sul branch corrente, così resta
+  // nella storia del lavoro anche se la spedizione fallisce.
   if (!tryGit(['add', '--', rel]).ok) { console.warn('  ! git add fallito'); return; }
-  // `git diff --cached --quiet` esce 0 se NON c'è nulla in stage → niente da committare.
   if (tryGit(['diff', '--cached', '--quiet', '--', rel]).ok) {
     console.log('  (decisione identica già in coda: niente da committare)');
     return;
@@ -133,9 +135,15 @@ export function commitAndPush(file) {
   if (!commit.ok) { console.warn('  ! git commit fallito:', commit.out.slice(0, 160)); return; }
   const cur = tryGit(['rev-parse', '--abbrev-ref', 'HEAD']).out;
   tryGit(['push', 'origin', cur]); // traccia il branch corrente (best-effort)
-  const land = tryGit(['push', 'origin', `HEAD:${mainBranch}`]); // ff-only
-  if (land.ok) console.log(`  ↑ decisione su origin/${mainBranch}.`);
-  else console.warn(`  ! push su origin/${mainBranch} rifiutato (main forse avanti). Il file è committato sul branch '${cur}'; fai 'git pull --rebase origin ${mainBranch}' e ripusha, oppure applicala in locale.`);
+
+  // ⚠️ La spedizione al ramo principale porta SOLO questo file (spec §Via 2).
+  // Il vecchio `push HEAD:main` spediva l'intera storia del branch: il
+  // fogliettino era il biglietto, ma saliva tutto il treno — codice compreso,
+  // saltando il cancello di sicurezza senza lasciare traccia distinguibile.
+  const land = pushFileToMainWithRetry(ROOT, file, `feedback: accoda triage ${new Date().toISOString()}`);
+  if (land.ok && land.skipped) console.log(`  (decisione già presente su origin/${mainBranch})`);
+  else if (land.ok) console.log(`  ↑ decisione su origin/${mainBranch} (solo il file della decisione).`);
+  else console.warn(`  ! spedizione su origin/${mainBranch} non riuscita (${land.reason}). Il file è committato sul branch '${cur}' e verrà riprovato; oppure applicala in locale.`);
 }
 
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
