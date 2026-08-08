@@ -1,0 +1,16 @@
+{
+  "id": "b6f2ddea-fabe-432c-8b09-ea13fb98604a",
+  "branch": "worker/b6f2ddea-fabe-432c-8b09-ea13fb98604a-20260808T182122Z",
+  "loopCount": 0,
+  "verifierVerdict": null,
+  "verifierCritique": "",
+  "secauditDone": false,
+  "secauditVerdict": null,
+  "checkpoints": [
+    {
+      "sha": "68434dc430e92d02650e520acf872cad6c4a3884",
+      "by": "new-work:checkout",
+      "at": "2026-08-08T18:21:23.212Z"
+    }
+  ]
+}
