@@ -114,6 +114,37 @@
   opacity: 0.45;
   cursor: not-allowed;
 }
+.sn-confirm-text {
+  scrollbar-width: thin;
+  scrollbar-color: var(--sn-border, #e0dcd4) transparent;
+}
+.sn-confirm-text::-webkit-scrollbar { width: 8px; }
+.sn-confirm-text::-webkit-scrollbar-track { background: transparent; }
+.sn-confirm-text::-webkit-scrollbar-thumb {
+  background: var(--sn-border, #e0dcd4);
+  border-radius: 999px;
+}
+.sn-confirm-text::-webkit-scrollbar-thumb:hover { background: var(--sn-accent, #c45a3b); }
+.sn-confirm-text::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+
+/* Selezione del testo nella palette Filo, non nel blu di sistema.
+   La regola ::selection del tema (src/styles/theme.css) sta nel foglio del
+   DOCUMENTO e non entra in questo shadow root chiuso: senza queste righe,
+   selezionare il testo del popup — cosa che si fa per rileggerlo o copiarlo —
+   lo evidenzia col blu del sistema operativo, l'unico punto della UI di Filo
+   fuori palette. I custom properties invece attraversano il confine dello
+   shadow DOM, quindi i token del tema (e gli override estetici dell'utente)
+   valgono anche qui; il letterale resta come ripiego per il primo paint. */
+.sn-confirm-overlay ::selection,
+.sn-confirm-overlay::selection {
+  background: var(--sn-selection-bg, rgba(196, 90, 59, 0.30));
+  color: var(--sn-selection-fg, inherit);
+}
+.sn-confirm-overlay ::-moz-selection,
+.sn-confirm-overlay::-moz-selection {
+  background: var(--sn-selection-bg, rgba(196, 90, 59, 0.30));
+  color: var(--sn-selection-fg, inherit);
+}
 `;
 
   // Dialogo attivo (uno alla volta): il root CHIUSO è raggiungibile solo da
