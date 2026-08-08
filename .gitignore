@@ -30,3 +30,7 @@ test-results/
 
 # worktree annidate (mai committare come gitlink)
 .claude/worktrees/
+# Identità attesa del ramo (branch-guard.sh): effimera e locale alla macchina,
+# la scrive il dispatcher quando consegna il lavoro. Versionarla non avrebbe
+# senso — dice "questa directory, adesso".
+.claude/branch-expect.json

@@ -25,13 +25,31 @@ git rev-parse --git-dir >/dev/null 2>&1 || exit 0
 # The integration branch. Default "main". Override via FILO_MAIN_BRANCH.
 TARGET_BRANCH="${FILO_MAIN_BRANCH:-main}"
 
-# Merge gate (R2): branches matching these prefixes are the routines' worker /
-# feature branches. They get committed and pushed for traceability, but are
-# NEVER auto-merged onto TARGET_BRANCH by this hook. They reach TARGET_BRANCH
-# only through scripts/merge-gate.mjs, invoked by the orchestrator after the
-# adversarial verification PASS (and, per R6, after the L4/L5 security checks).
-# Everything else (the user's local branches, the routines' own driver branch
-# claude/*) keeps the existing auto-merge / auto-push behaviour unchanged.
+# ─── Chi sta lavorando? (spec ROUTINE-BRANCH-INTEGRITY.md §Via 1) ────────────
+#
+# Fino al 2026-08-07 questo hook distingueva "lavoro di una routine, da
+# trattenere" da "lavoro dell'owner, da pubblicare" GUARDANDO IL NOME DEL RAMO:
+# un elenco di prefissi vietati (worker/*, feature/*), e tutto il resto veniva
+# pubblicato sul ramo principale a ogni modifica. Il nome è un indizio, non un
+# fatto: il 24 luglio un'istanza di routine che non era passata su un ramo di
+# lavoro ha pubblicato il proprio codice direttamente, saltando il cancello di
+# sicurezza — che nel frattempo esaminava un gemello abbandonato.
+#
+# Ora la sessione si DICHIARA. `FILO_ROUTINE=1` (lo esporta l'orchestratore, e
+# lo eredita ogni worker) significa: nessuna pubblicazione automatica, mai,
+# qualunque sia il nome del ramo. Si arriva al ramo principale solo attraverso
+# scripts/merge-gate.mjs.
+#
+# È anche la risposta alla domanda "questo commit da dove è arrivato?": senza
+# marcatura, nella storia il lavoro di una routine e quello di una sessione
+# locale sono indistinguibili (stesso autore, stesso ramo, stesso aspetto).
+is_routine_session() {
+  [ -n "$FILO_ROUTINE" ] && [ "$FILO_ROUTINE" != "0" ]
+}
+
+# I prefissi restano come RETE, non più come regola primaria: proteggono anche
+# le sessioni locali che stanno lavorando a qualcosa che non deve ancora uscire
+# (è così che è protetto questo stesso lavoro).
 is_gated_branch() {
   case "$1" in
     worker/*|feature/*) return 0 ;;
@@ -39,6 +57,15 @@ is_gated_branch() {
   esac
 }
 export -f is_gated_branch 2>/dev/null || true
+
+# Identità di chi committa: distingue nella storia le due provenienze.
+if is_routine_session; then
+  COMMIT_AS_NAME="claude-routine"
+  COMMIT_AS_EMAIL="claude@routine"
+else
+  COMMIT_AS_NAME="claude-local"
+  COMMIT_AS_EMAIL="claude@local"
+fi
 
 # Find a worktree (if any) that has TARGET_BRANCH checked out.
 TARGET_WT=$(git worktree list --porcelain | awk -v tb="refs/heads/$TARGET_BRANCH" '
@@ -66,20 +93,28 @@ git worktree list --porcelain | awk '/^worktree /{print substr($0,10)}' | while 
   SUMMARY=$(printf '%s\n' "$CHANGED" | head -3 | awk 'NR>1{printf ", "}{printf "%s",$0}')
   [ "${N:-0}" -gt 3 ] && SUMMARY="$SUMMARY (+$((N-3)) file)"
   [ -z "$SUMMARY" ] && SUMMARY=$(date +%Y-%m-%dT%H:%M:%S)
-  git -c user.email=claude@local -c user.name=claude-local commit -q -m "auto: $SUMMARY" 2>/dev/null
+  git -c user.email="$COMMIT_AS_EMAIL" -c user.name="$COMMIT_AS_NAME" commit -q -m "auto: $SUMMARY" 2>/dev/null
 
-  # Multi-worktree mode: merge feature branch into TARGET_BRANCH worktree.
-  # Gated branches (worker/*, feature/*) are committed above but NOT merged
-  # here — they go through scripts/merge-gate.mjs (R2).
-  if [ -n "$TARGET_WT" ] && [ "$wt" != "$TARGET_WT" ] && [ "$BRANCH" != "$TARGET_BRANCH" ] && ! is_gated_branch "$BRANCH"; then
-    cd "$TARGET_WT" || continue
-    MERGE_OUT=$(git -c user.email=claude@local -c user.name=claude-local merge --no-edit "$BRANCH" 2>&1)
-    MERGE_RC=$?
-    if [ $MERGE_RC -ne 0 ]; then
-      git merge --abort 2>/dev/null
-      echo "[auto-merge] CONFLICT merging '$BRANCH' into '$TARGET_BRANCH' — needs manual resolution" >&2
-      echo "$MERGE_OUT" >&2
-    fi
+  # NESSUNA fusione automatica sul ramo principale (cambiato il 2026-08-07).
+  # Il salvataggio continuo resta — e' cio' che salva il lavoro quando una
+  # sessione viene interrotta di colpo — ma al ramo principale ci si arriva UNA
+  # VOLTA, a lavoro finito: `npm run finish` in locale (controlli + fusione),
+  # scripts/merge-gate.mjs per le routine.
+  #
+  # Perche': una versione viene costruita e distribuita agli utenti ogni 6 ore
+  # prendendo il ramo principale COSI' COM'E'. Pubblicando a ogni modifica, quella
+  # fotografia poteva cogliere un lavoro a meta'. In piu' ogni pubblicazione
+  # spostava il ramo principale sotto i piedi delle routine in corso, e faceva
+  # giudicare al cancello di sicurezza una versione diversa da quella poi fusa.
+  # Durabilita': ogni ramo di lavoro viene spedito subito. E' il pezzo che ha
+  # salvato il lavoro dopo le interruzioni improvvise, e vale anche in locale
+  # ora che la fusione sul ramo principale e' differita.
+  if [ -n "$BRANCH" ] && [ "$BRANCH" != "HEAD" ] && [ "$BRANCH" != "$TARGET_BRANCH" ]; then
+    git push origin "$BRANCH" >/dev/null 2>&1 || true
+  fi
+
+  if [ "$BRANCH" = "$TARGET_BRANCH" ] && ! is_routine_session; then
+    echo "[auto-commit] Stai lavorando direttamente su '$TARGET_BRANCH': le modifiche vengono pubblicate subito. Meglio un worktree dedicato + 'npm run finish' a lavoro finito." >&2
   fi
 done
 
@@ -108,21 +143,30 @@ else
   # Push the feature branch (best-effort, for traceability/debugging).
   git push origin "$CUR_BRANCH" >/dev/null 2>&1 || true
 
-  # Gated branches (worker/*, feature/*) stop here: they are pushed for
-  # traceability but must NOT land on TARGET_BRANCH automatically. The
-  # orchestrator merges them via scripts/merge-gate.mjs after PASS (R2).
-  if is_gated_branch "$CUR_BRANCH"; then
+  # Sessione di ROUTINE: si ferma qui, sempre. Il ramo corrente e' gia' stato
+  # spedito qui sopra (durabilita'), ma al ramo principale ci si arriva solo
+  # attraverso scripts/merge-gate.mjs, dopo la verifica e i controlli di
+  # sicurezza. Nessuna eccezione, nessun nome di ramo che scavalchi la regola.
+  if is_routine_session; then
+    if [ "$CUR_BRANCH" = "$TARGET_BRANCH" ]; then
+      echo "[auto-commit] ATTENZIONE: sessione di routine sul ramo '$TARGET_BRANCH'. Il lavoro e' salvato in locale ma NON pubblicato: una routine non deve lavorare sul ramo principale." >&2
+    fi
     exit 0
   fi
 
-  # Push HEAD to TARGET_BRANCH on origin. Fast-forward only (no --force).
-  # If origin/TARGET_BRANCH has moved ahead concurrently, push is rejected →
-  # the feature branch is still on origin so nothing is lost; the next run can
-  # try again after a pull/rebase.
+  # Da qui in poi si toccherebbe il ramo principale. Non lo si fa MAI da un
+  # ramo di lavoro, ne' in routine ne' in locale (cambiato il 2026-08-07): al
+  # ramo principale ci si arriva una volta sola, a lavoro finito, con
+  # `npm run finish` (locale) o scripts/merge-gate.mjs (routine).
+  if [ "$CUR_BRANCH" != "$TARGET_BRANCH" ]; then
+    exit 0
+  fi
+
+  # Sei DELIBERATAMENTE sul ramo principale: le tue modifiche sono gia' quelle
+  # pubblicate, quindi spedirle e' solo allinearsi a origin.
   PUSH_OUT=$(git push origin "HEAD:$TARGET_BRANCH" 2>&1)
   if [ $? -ne 0 ]; then
-    echo "[auto-push] FAILED pushing HEAD ('$CUR_BRANCH') to origin/$TARGET_BRANCH (single-worktree mode)" >&2
-    echo "[auto-push] Feature branch is on origin/$CUR_BRANCH; pull --rebase and retry to land on $TARGET_BRANCH" >&2
+    echo "[auto-push] FAILED pushing '$TARGET_BRANCH' to origin: fai 'git pull --rebase origin $TARGET_BRANCH' e riprova" >&2
     echo "$PUSH_OUT" >&2
   fi
 fi

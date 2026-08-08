@@ -234,6 +234,27 @@ export async function fetchOpenCandidates() {
  * Stampa su stdout il JSON del feedback vincitore (decifrato), oppure esce
  * con codice 2 se la coda è vuota.
  */
+/**
+ * Uscita "non ho lavoro da dare", con la distinzione che §E della spec
+ * ROUTINE-BRANCH-INTEGRITY.md chiede: exit 2 = coda DAVVERO vuota (il ciclo si
+ * ferma sereno); exit 3 = GUASTO, la coda è illeggibile e "vuota" è solo ciò
+ * che sembra. Il chiamante (dispatch) non ripiega su un exit 3: lo propaga.
+ *
+ * Con status non decifrabili non possiamo AFFERMARE che la coda sia vuota — il
+ * vincitore poteva essere fra quelli. Se invece del lavoro l'abbiamo trovato,
+ * non passiamo di qui e il ciclo procede: un singolo documento corrotto non
+ * deve fermare le routine. La firma della chiave assente è che siano
+ * illeggibili TUTTI, e in quel caso di lavorabili non ne resta nessuno.
+ */
+function exitEmpty(reason, unreadable, total) {
+  if (unreadable) {
+    process.stderr.write(`[next-feedback] GUASTO: ${unreadable}/${total} status non decifrabili e ${reason}: non posso distinguere "coda vuota" da "coda illeggibile". Controlla la chiave privata (FILO_FEEDBACK_PRIVKEY).\n`);
+    process.exit(3);
+  }
+  process.stderr.write(`[next-feedback] ${reason}\n`);
+  process.exit(2);
+}
+
 export async function run() {
   // Carica feedbackCrypto (IIFE su globalThis) — necessario per decryptFeedbackFields.
   // Carichiamo qui (non al top-level) per non inquinare i test che iniettano mock.
@@ -264,8 +285,9 @@ export async function run() {
   }
 
   if (!rawCandidates.length) {
-    process.stderr.write('[next-feedback] nessun feedback da lavorare (coda vuota)\n');
-    process.exit(2);
+    // Qui la coda è vuota PRIMA di qualsiasi decifratura: non c'è proprio
+    // nessun documento aperto, quindi non c'è illeggibilità possibile.
+    exitEmpty('nessun feedback da lavorare (coda vuota)', 0, 0);
   }
 
   // 3. Per ogni candidato: decifra SOLO la priority (e lo status, per filtrare).
@@ -337,8 +359,19 @@ export async function run() {
   const todoFree = minimal.filter((fb) => fb.status === 'todo' && !fb.claimed);
 
   if (!todoFree.length) {
-    process.stderr.write('[next-feedback] nessun feedback da lavorare (nessun todo non claimato)\n');
-    process.exit(2);
+    // "Coda vuota" e "coda ILLEGGIBILE" non sono la stessa cosa (spec
+    // ROUTINE-BRANCH-INTEGRITY.md §E). Senza chiave privata gli status non si
+    // decifrano, i feedback spariscono dal filtro qui sopra e questa funzione
+    // rispondeva serenamente "niente da fare": nessun errore, nessun allarme,
+    // il giro delle routine finiva in lavoro fantasma (incidente #310+).
+    //
+    // La soglia è "non posso AFFERMARE che sia vuota": guasto solo quando
+    // staremmo per dire "niente da fare" AVENDO status illeggibili — il
+    // vincitore poteva essere fra quelli. Con lavoro trovato si procede lo
+    // stesso (un singolo documento corrotto non deve fermare il ciclo): la
+    // firma della chiave assente è che sono illeggibili TUTTI, e in quel caso
+    // di lavorabili non ne resta nessuno e cadiamo qui.
+    exitEmpty('nessun feedback da lavorare (nessun todo non claimato)', unreadable, minimal.length);
   }
 
   // 4b. Dipendenze fra sub-feedback: #N.k è lavorabile solo se i fratelli
@@ -349,15 +382,17 @@ export async function run() {
   const eligible = filterEligible(todoFree, minimal);
 
   if (!eligible.length) {
-    process.stderr.write('[next-feedback] nessun feedback lavorabile: i todo restanti aspettano i predecessori della loro famiglia\n');
-    process.exit(2);
+    // Anche qui l'illeggibilità falsa il risultato, e in modo più subdolo: un
+    // fratello con status non decifrabile risulta "aperto" e BLOCCA i
+    // successivi, quindi la coda sembra in attesa di predecessori che in realtà
+    // sono chiusi.
+    exitEmpty('nessun feedback lavorabile: i todo restanti aspettano i predecessori della loro famiglia', unreadable, minimal.length);
   }
 
   // 5. Seleziona il vincitore (logica pura).
   const winnerId = selectWinner(eligible);
   if (!winnerId) {
-    process.stderr.write('[next-feedback] nessun feedback da lavorare (selectWinner ha tornato null)\n');
-    process.exit(2);
+    exitEmpty('nessun feedback da lavorare (selectWinner ha tornato null)', unreadable, minimal.length);
   }
 
   // 6. Decifra SOLO il vincitore nel corpo completo.
