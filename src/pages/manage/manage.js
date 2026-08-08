@@ -186,7 +186,9 @@
   }
   // Rango di categoria per l'ordinamento "per creatore" (raggruppa gli autori
   // dello stesso tipo, poi per clientId così lo stesso mittente resta unito).
-  const AUTHOR_RANK = { owner: 0, user: 1, claude: 2, filo: 3 };
+  // Le automazioni restano raggruppate fra loro (e fra owner/utente e Filo, come
+  // prima); dentro il gruppo l'ordine va dal lavoro sul codice all'esplorazione.
+  const AUTHOR_RANK = { owner: 0, user: 1, worker: 2, verifier: 3, prober: 4, claude: 5, filo: 6 };
   // Applica l'override di ordinamento scelto dall'owner. `list` arriva GIÀ
   // ordinata col criterio predefinito della tab: in 'smart' la lasciamo intatta.
   // `sort` è stabile → a parità di chiave si conserva l'ordine predefinito.
