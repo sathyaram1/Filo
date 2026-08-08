@@ -419,3 +419,62 @@ test('un ripristino si annulla dall\'avviso e il documento torna com\'era', asyn
   await undo.click();
   await expect(page.locator('#doc')).toHaveText('Testo di adesso');
 });
+
+// ── Doppio clic sull'"Annulla" degli avvisi (#415, seconda faccia) ─────────
+// Stessa causa del pannello, spostata sulla pila di avvisi in basso a destra:
+// il primo clic fa sparire l'avviso premuto e ne fa comparire uno nuovo NELLO
+// STESSO PUNTO (in fondo alla pila, che è ancorata in basso), quindi il secondo
+// colpo della coppia cade sul suo "Annulla" e disfà l'annullamento appena
+// fatto. Per chi fa doppio clic l'annullamento smetteva di funzionare del tutto.
+// I test asseriscono il SUCCESSO del gesto: annullato una volta, e resta
+// annullato. Senza la guardia sulla pila il documento torna allo stato di
+// partenza → rosso.
+test('doppio clic su "Annulla" dopo una modifica di Filo: la modifica resta annullata', async ({ openTab }) => {
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('#doc');
+  await page.evaluate(() => window.__filoEditorVersions.ready());
+
+  await page.click('#doc');
+  await setDocText(page, 'Cappuccetto Rosso');
+  await expect(page.locator('#doc strong')).toHaveCount(0);
+
+  await filoAutoEdit(page);
+  await expect(page.locator('#doc strong')).toHaveCount(1);
+
+  const undo = page.locator('.ed-toast .ed-toast-action').last();
+  await expect(undo).toHaveText('Annulla');
+  await undo.dblclick();
+
+  // Il grassetto messo da Filo è sparito e NON torna: il secondo colpo non ha
+  // rifatto la modifica premendo l'"Annulla" dell'avviso appena comparso.
+  await expect(page.locator('#doc strong')).toHaveCount(0);
+  await expect(page.locator('#doc')).toHaveText('Cappuccetto Rosso');
+  // …e resta così anche dopo che gli avvisi si sono assestati.
+  await page.waitForTimeout(500);
+  await expect(page.locator('#doc strong')).toHaveCount(0);
+});
+
+test('doppio clic su "Annulla" dopo un ripristino: il ripristino resta annullato', async ({ openTab }) => {
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('#doc');
+  await page.evaluate(() => window.__filoEditorVersions.ready());
+
+  await page.click('#doc');
+  await setDocText(page, 'Testo vecchio');
+  await filoAutoEdit(page);
+  await setDocText(page, 'Testo di adesso');
+  await filoAutoEdit(page);
+
+  await page.click('#docSwitch');
+  await page.click('#docHistory');
+  await page.locator('.ed-vh-item').last().locator('.ed-vh-restore').click();
+  await expect(page.locator('#doc')).toHaveText('Testo vecchio');
+
+  const undo = page.locator('.ed-toast .ed-toast-action').last();
+  await expect(undo).toHaveText('Annulla');
+  await undo.dblclick();
+
+  await expect(page.locator('#doc')).toHaveText('Testo di adesso');
+  await page.waitForTimeout(500);
+  await expect(page.locator('#doc')).toHaveText('Testo di adesso');
+});
