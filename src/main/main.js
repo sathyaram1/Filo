@@ -52,6 +52,7 @@ if (process.env.NODE_ENV === 'test') {
     globalThis.__filoAdblock = require('./services/adblock');
     globalThis.__filoFingerprint = require('./services/fingerprint');
     globalThis.__filoProxyTab = require('./services/proxyTab');
+    globalThis.__filoShortcuts = require('./shortcuts');
   } catch (_) {}
 }
 

@@ -54,6 +54,12 @@ function senderInfo(event) {
     // dati alla scheda fuori dal ciclo richiesta/risposta (es. il reasoning in
     // diretta della chat → canale 'filo:reasoning'). In-process, mai oltre IPC.
     wc,
+    // #405 — frame ESATTO che ha parlato. Da quando i content script girano
+    // anche nei riquadri incorporati, "la scheda" non basta più a sapere chi
+    // ha chiesto qualcosa: le risposte push (stream della spiegazione,
+    // chiusura dei menu degli altri frame) devono tornare al frame giusto e
+    // non al solo frame principale.
+    frame: event.senderFrame || null,
   };
 }
 
@@ -78,6 +84,14 @@ function registerIpcHandlers() {
     }
   });
 
+  // #405 — l'utente sta interagendo con QUESTO frame (la pagina o uno dei suoi
+  // riquadri incorporati). Serve alle scorciatoie che lavorano sulla selezione:
+  // vanno consegnate a chi ha davvero il testo selezionato. Nessun dato nel
+  // messaggio: conta solo il mittente.
+  ipcMain.on('filo:frame-active', (event) => {
+    try { event.sender._filoActiveFrame = event.senderFrame || null; } catch (_) {}
+  });
+
   ipcMain.handle('filo:message', async (event, msg) => {
     const info = senderInfo(event);
     // In incognito avvolgiamo l'handler in runIncognito(): ogni lettura/scrittura
@@ -98,8 +112,17 @@ function registerIpcHandlers() {
       || senderInfo(event).isIncognito;
     const ac = new AbortController();
     inFlightStreams.set(requestId, ac);
+    // #405 — la risposta torna al FRAME che ha chiesto lo stream, non al frame
+    // principale della scheda. Con i content script attivi anche dentro i
+    // riquadri incorporati, una spiegazione chiesta dentro un video o una
+    // mappa partiva ma le sue parole finivano in un frame che non le aspettava:
+    // il riquadro restava a girare a vuoto per sempre.
+    const target = event.senderFrame || event.sender;
     const send = (suffix, data) => {
-      try { event.sender.send(`ai-stream:${requestId}:${suffix}`, data); } catch (_) {}
+      try {
+        const t = (target && target.detached) ? event.sender : target;
+        t.send(`ai-stream:${requestId}:${suffix}`, data);
+      } catch (_) {}
     };
     // ai-stream è un canale IPC SEPARATO da filo:message: va avvolto anch'esso
     // in runIncognito così cache AI e tracciamento costi restano effimeri.

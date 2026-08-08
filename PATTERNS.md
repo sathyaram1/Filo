@@ -290,6 +290,46 @@ l'utente **perde del tutto** quelle azioni, senza alternative (#400).
   e `findMedia` in `src/content/content.js`, voci in `src/content/actions.js`.
   Test: `tests/context-menu-media.spec.mjs`, `tests/context-menu-image-link.spec.mjs`.
 
+## Riquadri incorporati (iframe): Filo gira anche lì, ma un riquadro non è la pagina
+
+Le pagine vere sono piene di riquadri di altri siti: un video dentro un articolo,
+una mappa, un blocco commenti, un modulo. Sono `iframe`, e i preload girano nei
+sottoframe **solo** con `nodeIntegrationInSubFrames` (attivo per le schede
+esterne, MAI per le pagine `filo://`: lì un riquadro esterno erediterebbe il
+preload privilegiato). Senza, dentro il riquadro Filo semplicemente non esiste —
+il tasto destro non produce nulla, e per l'utente è un buco nero senza spiegazione
+(#405).
+
+Tre regole quando si tocca qualcosa che vive nel content script:
+
+- **Costo pigro.** Una pagina può avere decine di riquadri che l'utente non tocca
+  mai. Nel sottoframe `page-preload.js` non carica NIENTE finché non arriva la
+  prima interazione vera (tasto destro, clic, tasto premuto, una scorciatoia
+  indirizzata a quel frame); il primo tasto destro viene **rigiocato** appena
+  l'handler è pronto, così non serve cliccare due volte.
+- **Frame vs pagina.** Ciò che riguarda l'ELEMENTO cliccato funziona identico nel
+  riquadro. Ciò che riguarda la PAGINA no: colore della scheda, segnali di
+  attività, banner cookie/sito pericoloso, avvisi di sistema, e le azioni globali
+  del menu (traduci, condividi, salva, QR, screenshot, feedback, sidebar Aiuto).
+  Quelle o restano al frame principale, o gli vengono **rimandate**
+  (`MSG.RUN_IN_TOP_FRAME` → `MSG.TOP_FRAME_COMMAND`): eseguirle nel riquadro
+  significherebbe condividere l'indirizzo del player invece dell'articolo, o
+  disegnare un pannello a tutta superficie dentro un rettangolo di 300 px.
+- **I frame non si parlano da soli.** Eventi del mouse e chiamate JS non
+  attraversano il confine di un iframe di un'altra origine: ogni coordinamento
+  passa dal main (chiusura dei menu degli altri frame, consegna dei suggerimenti
+  ortografici nativi a `params.frame`, stream AI verso `event.senderFrame`,
+  scorciatoie di selezione verso l'ultimo frame usato). `webContents.send`
+  raggiunge **solo** il frame principale: per parlare a tutti serve
+  `mainFrame.framesInSubtree`.
+
+Il menu si adatta anche allo spazio: se il riquadro è più basso del menu, il menu
+diventa scorrevole invece di essere tagliato.
+
+**Dove:** `_makeView` in `src/main/tabs.js`, `src/preload/page-preload.js`,
+`IS_SUBFRAME` in `src/content/content.js` e `src/content/menuIcons.js`, ponte in
+`src/main/services/handlers/nav.js`. Test: `tests/iframe-context-menu.spec.mjs`.
+
 ## Popup menu: il "submenu" è una voce a due zone che riapre il menu
 
 Il popup menu custom (`src/main/popup-menu.js`, una BrowserWindow frameless)

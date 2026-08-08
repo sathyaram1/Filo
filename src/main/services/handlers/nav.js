@@ -182,6 +182,46 @@ module.exports = function register(on, ctx) {
     }
   });
 
+  // #405 — ponte fra un riquadro incorporato e la pagina che lo ospite.
+  // Un iframe non può parlare con il frame che lo contiene (origini diverse,
+  // e gli eventi non attraversano il confine): passa da qui. Due usi:
+  //   - RUN_IN_TOP_FRAME: azione di pagina (traduci, condividi, salva, QR,
+  //     screenshot…) scelta dal menu aperto dentro il riquadro → va eseguita
+  //     dal frame principale, che è l'unico a conoscere la pagina intera;
+  //   - CLOSE_OTHER_MENUS: il riquadro ha appena aperto il suo menu → gli
+  //     altri frami della stessa scheda chiudono il loro.
+  // Il messaggio non porta dati arbitrari: solo l'id di un'icona del registro
+  // del menu, che il frame principale risolve nel proprio registro.
+  const frameBridge = (msg, sender, payload) => {
+    const wc = sender && sender.wc;
+    if (!wc) return { ok: false, error: 'no-sender' };
+    try {
+      if (payload.type === MSG.TOP_FRAME_COMMAND) {
+        const main = wc.mainFrame;
+        if (main && !main.detached) main.send('filo:broadcast', payload);
+      } else {
+        // A TUTTI i frame tranne il mittente: chi ha aperto il menu lo tiene.
+        for (const f of wc.mainFrame?.framesInSubtree || []) {
+          if (f === sender.frame || f.detached) continue;
+          try { f.send('filo:broadcast', payload); } catch (_) {}
+        }
+      }
+    } catch (e) {
+      return { ok: false, error: e.message || String(e) };
+    }
+    return { ok: true };
+  };
+
+  on(MSG.RUN_IN_TOP_FRAME, async (msg, sender) => frameBridge(msg, sender, {
+    type: MSG.TOP_FRAME_COMMAND,
+    iconId: String(msg?.iconId || ''),
+    surface: String(msg?.surface || ''),
+  }));
+
+  on(MSG.CLOSE_OTHER_MENUS, async (msg, sender) => frameBridge(msg, sender, {
+    type: MSG.CLOSE_OTHER_MENUS,
+  }));
+
   on(MSG.REPLACE_MISSPELLING, async (msg, sender) => {
     // Usa l'API nativa di Electron per sostituire la parola sotto il cursore
     // del context-menu nativo (vedi `wc.on('context-menu', ...)` in tabs.js).

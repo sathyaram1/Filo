@@ -364,6 +364,18 @@ class TabManager {
       sandbox: false,
       nodeIntegration: false,
       webSecurity: true,
+      // #405 — i riquadri incorporati (video, mappe, commenti, moduli) sono
+      // iframe: senza questo flag il preload — e quindi TUTTO Filo (menu del
+      // tasto destro, correttore, Spiegazione/Traduci, Incolla con cronologia)
+      // — girava solo nel frame principale, e dentro il riquadro il tasto
+      // destro non produceva nulla. Con nodeIntegrationInSubFrames il preload
+      // parte in ogni sottoframe; `nodeIntegration` resta false e
+      // contextIsolation true, quindi il codice della pagina (incluso quello
+      // di terze parti dentro l'iframe) NON guadagna alcun accesso a Node né
+      // allo shim chrome.*, che vivono solo nel mondo isolato del preload.
+      // Il costo si paga solo dove serve: nei sottoframe page-preload.js
+      // carica i content script alla PRIMA interazione, non al caricamento.
+      ...(isInternal ? {} : { nodeIntegrationInSubFrames: true }),
       // partition: incognito (effimera della finestra) o per-sito in privacy.
       ...(partition ? { partition } : {}),
     };
@@ -1714,8 +1726,14 @@ class TabManager {
     // content script perché li mostri nel menu di correzione custom.
     wc.on('context-menu', (_e, params) => {
       if (params.misspelledWord) {
+        // #405 — il click destro può essere avvenuto dentro un riquadro
+        // incorporato (iframe): il menu di correzione lo costruisce il content
+        // script DI QUEL frame, quindi i suggerimenti vanno consegnati lì.
+        // `wc.send` raggiunge solo il frame principale, e nei campi dentro un
+        // riquadro i suggerimenti nativi sarebbero caduti nel vuoto.
+        const target = params.frame && !params.frame.detached ? params.frame : wc;
         try {
-          wc.send('filo:broadcast', {
+          target.send('filo:broadcast', {
             type: '_spell:native',
             word: params.misspelledWord,
             suggestions: (params.dictionarySuggestions || []).slice(0, 5),
@@ -1815,6 +1833,9 @@ class TabManager {
           sandbox: false,
           nodeIntegration: false,
           webSecurity: true,
+          // #405 — stesse regole di una scheda esterna: anche dentro il popup
+          // di login i riquadri incorporati devono avere il tasto destro.
+          nodeIntegrationInSubFrames: true,
           ...(popupPartition ? { partition: popupPartition } : {}),
         },
       },
