@@ -102,22 +102,32 @@ function main() {
   // Fusione: una volta, a lavoro finito.
   const cur = git(['rev-parse', 'HEAD']).out;
   if (!git(['fetch', 'origin', MAIN]).ok) { console.error(`Non riesco a leggere origin/${MAIN}.`); process.exit(1); }
-  if (!git(['checkout', MAIN]).ok) { console.error(`Non riesco a passare su ${MAIN}.`); process.exit(1); }
-  git(['pull', '--rebase', 'origin', MAIN]);
-  const merged = git(['merge', '--no-edit', cur]);
+
+  // Il ramo principale può essere GIÀ aperto in un'altra cartella di lavoro (è
+  // il setup normale in locale: una cartella per compito). git rifiuta di
+  // aprire lo stesso ramo due volte, quindi la fusione si fa LÀ invece di
+  // spostare questa cartella. Così, tra l'altro, il lavoro appena verificato
+  // resta esattamente com'era sotto i nostri piedi.
+  const where = mainWorktree() || ROOT;
+  const inPlace = where === ROOT;
+  const at = (args) => git(args, { cwd: where });
+
+  if (inPlace && !git(['checkout', MAIN]).ok) { console.error(`Non riesco a passare su ${MAIN}.`); process.exit(1); }
+  at(['pull', '--rebase', 'origin', MAIN]);
+  const merged = at(['merge', '--no-edit', cur]);
   if (!merged.ok) {
-    git(['merge', '--abort']);
-    git(['checkout', branch]);
+    at(['merge', '--abort']);
+    if (inPlace) git(['checkout', branch]);
     console.error(`Fusione in conflitto:\n${merged.out.slice(0, 400)}\nRisolvi e rilancia.`);
     process.exit(1);
   }
-  const pushed = git(['push', 'origin', MAIN]);
+  const pushed = at(['push', 'origin', MAIN]);
   if (!pushed.ok) {
     console.error(`Spedizione rifiutata (${MAIN} è avanzato): fai un pull --rebase e rilancia.\n${pushed.out.slice(0, 300)}`);
     process.exit(1);
   }
-  git(['checkout', branch]);
-  console.log(`\n✓ '${branch}' fuso su ${MAIN} e pubblicato. Sei di nuovo su '${branch}'.`);
+  if (inPlace) git(['checkout', branch]);
+  console.log(`\n✓ '${branch}' fuso su ${MAIN} e pubblicato.${inPlace ? ` Sei di nuovo su '${branch}'.` : ''}`);
 }
 
 const isMainModule = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
