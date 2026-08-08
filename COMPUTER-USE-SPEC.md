@@ -379,10 +379,22 @@ ma complica il loop; prima va misurato quanto serve davvero.
 - **Tetto ai passi.** `MAX_AUTO_STEPS` esiste già per il terminale; qui serve un
   tetto proprio, più alto (indicativamente 40) e con una richiesta esplicita di
   proseguire quando lo raggiunge, invece di fermarsi in silenzio.
-- **Tornare indietro.** Prima di ogni passo di livello 3 Filo salva uno
-  screenshot e lo stato della finestra. Non è un annulla vero — molte azioni non
-  sono annullabili — ma dà all'utente il punto esatto in cui la cosa è successa.
-  Va detto con chiarezza nella UI che non è un annulla.
+- **Non esiste un annulla, e non va simulato.** Nessuno screenshot conservato
+  "per tornare indietro": un salvataggio prima di ogni passo di livello 3
+  sarebbe inutile — quel passo l'utente l'ha appena autorizzato digitando, l'ha
+  visto — e darebbe l'impressione di una rete che non c'è. In più
+  contraddirebbe la regola del §2.3: gli screenshot non si conservano.
+- **Il diario copre i passi che l'utente NON ha visto.** Se una traccia serve,
+  serve sui livelli 1 e 2 eseguiti dentro il perimetro senza chiedere niente:
+  quelli sono gli unici passi che l'utente non ha guardato. Il registro in
+  diretta di cui sopra resta consultabile a compito finito, **solo testo**
+  (azione, applicazione, ora), e muore col perimetro. Non è un meccanismo di
+  sicurezza: è un meccanismo di comprensione, e la UI lo presenta come tale —
+  "cosa ho fatto", mai "ripristina".
+- **Quando si ferma, Filo non prova a disfare.** Un annulla tentato alla cieca
+  (una scorciatoia di annullamento mandata alla finestra sbagliata, un file
+  riscritto "com'era") fa più danni dell'azione originale. Filo si ferma dove
+  è, dice a che punto è arrivato, e lascia decidere.
 
 ---
 
