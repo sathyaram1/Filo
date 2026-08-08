@@ -101,9 +101,12 @@
       // mostra il testo nel popup e parte solo dopo l'OK dell'utente.
       level: 2,
       describe: (a) => {
+        // Il popup mostra il testo INTERO, mai una versione tagliata: è quello
+        // che parte a nome dell'utente, e un consenso su un testo che non si
+        // può leggere per intero non è un consenso. Se è lungo, è il popup a
+        // scorrere (src/shared/confirmUi.js), non il testo ad accorciarsi.
         const testo = String(a.testo ?? a.text ?? a.messaggio ?? '').trim();
-        const short = testo.length > 160 ? `${truncateSafe(testo, 160)}…` : testo;
-        return `Inviare questo feedback agli sviluppatori di Filo a tuo nome:\n“${short || '(vuoto)'}”`;
+        return `Inviare questo feedback agli sviluppatori di Filo a tuo nome:\n“${testo || '(vuoto)'}”`;
       },
     },
     CERCA_WEB: {
