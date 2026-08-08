@@ -215,6 +215,7 @@ module.exports = function register(on, ctx) {
   on(MSG.RUN_IN_TOP_FRAME, async (msg, sender) => frameBridge(msg, sender, {
     type: MSG.TOP_FRAME_COMMAND,
     iconId: String(msg?.iconId || ''),
+    surface: String(msg?.surface || ''),
   }));
 
   on(MSG.CLOSE_OTHER_MENUS, async (msg, sender) => frameBridge(msg, sender, {

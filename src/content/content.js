@@ -927,10 +927,7 @@
       type: 'item',
       icon: ricon,
       label: 'Invia attacco (Red-team)',
-      onClick: () => {
-        try { self.SN_REDTEAM_ATTACK_UI?.open(); }
-        catch (e) { console.error('[SN] redteam attack open', e); }
-      },
+      onClick: () => openSurface('redteam', () => self.SN_REDTEAM_ATTACK_UI?.open()),
     };
   }
 
@@ -939,7 +936,7 @@
       type: 'item',
       label: I18n.t('menu_help'),
       shortcut: 'Alt+H',
-      onClick: () => openHelpSidebar(),
+      onClick: () => openSurface('help', () => openHelpSidebar()),
     };
   }
 
