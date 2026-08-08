@@ -204,12 +204,40 @@
 }
 .sn-popup-send:hover { filter: brightness(1.1); }
 
-/* Toast */
-.sn-toast {
+/* Stack degli avvisi in pagina (#409). Ogni riquadro che Filo ancora nell'angolo
+   in basso a destra della pagina visitata (toast, pill della dettatura,
+   conferma di "Salva per dopo") sta QUI DENTRO e si impila: prima erano tutti
+   `position: fixed` sullo stesso punto e due avvisi ravvicinati si coprivano a
+   vicenda. Il più recente resta in basso, vicino all'angolo. */
+.sn-toasts {
   position: fixed;
   bottom: 20px;
   right: 20px;
   z-index: 2147483647;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: min(420px, calc(100vw - 40px));
+  /* Rete di sicurezza per finestre molto basse: lo stack non esce mai dal
+     viewport, al massimo scorre. */
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  /* Di base trasparente ai click: la pagina sotto resta usabile. */
+  pointer-events: none;
+}
+/* Con `pointer-events: none` la scrollbar non si potrebbe afferrare: li
+   riattiviamo solo quando lo stack scorre davvero. */
+.sn-toasts.scrolling { pointer-events: auto; padding-right: 4px; }
+.sn-toasts::-webkit-scrollbar { width: 6px; }
+.sn-toasts::-webkit-scrollbar-track { background: transparent; }
+.sn-toasts::-webkit-scrollbar-thumb { background: var(--sn-border); border-radius: 3px; }
+
+/* Toast */
+.sn-toast {
+  flex: none;
   padding: 10px 14px;
   /* I toast non sono tutti "Copiato": alcuni spiegano cosa manca e dove si
      imposta. Senza un tetto, una frase lunga diventa una riga sola larga quanto
