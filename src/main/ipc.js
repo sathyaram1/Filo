@@ -104,8 +104,17 @@ function registerIpcHandlers() {
       || senderInfo(event).isIncognito;
     const ac = new AbortController();
     inFlightStreams.set(requestId, ac);
+    // #405 — la risposta torna al FRAME che ha chiesto lo stream, non al frame
+    // principale della scheda. Con i content script attivi anche dentro i
+    // riquadri incorporati, una spiegazione chiesta dentro un video o una
+    // mappa partiva ma le sue parole finivano in un frame che non le aspettava:
+    // il riquadro restava a girare a vuoto per sempre.
+    const target = event.senderFrame || event.sender;
     const send = (suffix, data) => {
-      try { event.sender.send(`ai-stream:${requestId}:${suffix}`, data); } catch (_) {}
+      try {
+        const t = (target && target.detached) ? event.sender : target;
+        t.send(`ai-stream:${requestId}:${suffix}`, data);
+      } catch (_) {}
     };
     // ai-stream è un canale IPC SEPARATO da filo:message: va avvolto anch'esso
     // in runIncognito così cache AI e tracciamento costi restano effimeri.
