@@ -1469,7 +1469,12 @@
     const input = document.createElement('input');
     input.className = 'ed-doc-item-input';
     input.type = 'text';
-    input.value = (f.meta && f.meta.title) || '';
+    // Stessa regola della rinomina dalla docbar: "Documento senza titolo" non è
+    // un nome, è l'assenza di un nome — quindi va come segnaposto, non come
+    // testo già scritto da riscrivere.
+    const curName = (f.meta && f.meta.title) || '';
+    input.value = curName === STORE.DEFAULT_TITLE ? '' : curName;
+    input.placeholder = STORE.DEFAULT_TITLE;
     input.setAttribute('aria-label', 'Nuovo nome del documento');
     let done = false;
     const commit = (save) => {
