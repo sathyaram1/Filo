@@ -590,6 +590,25 @@
   const VH_SCOPE_NOTE = 'Il ripristino riporta indietro il testo e i commenti. '
     + 'Nome del documento, conversazione con Filo e disposizione dei riquadri restano come sono adesso.';
 
+  // Coda di gesto: ogni clic del pannello lo RIDISEGNA (ripristina, indietro,
+  // "mostra le più vecchie"), quindi sotto il cursore finisce un elemento
+  // diverso da quello premuto. Il secondo colpo di un doppio clic cadrebbe lì e
+  // farebbe una cosa che l'utente non ha chiesto — aprire l'anteprima di
+  // un'altra versione, o peggio ripristinarla. Quel colpo non è una nuova
+  // intenzione: è la coda del gesto precedente (il browser lo marca con
+  // `detail > 1`, cioè "clic ravvicinati sullo stesso punto"), e va ignorato.
+  // La guardia si arma SOLO quando il pannello si disegna, così nessun altro
+  // overlay ne risente.
+  const VH_STALE_CLICK_MS = 1000;
+  let vhDrawnAt = 0;
+  function vhArmStaleClickGuard() { vhDrawnAt = Date.now(); }
+  overlayBox.addEventListener('click', (e) => {
+    if (!vhDrawnAt || e.detail < 2) return;
+    if (Date.now() - vhDrawnAt > VH_STALE_CLICK_MS) return;
+    e.preventDefault();
+    e.stopPropagation();
+  }, true);
+
   function openVersionHistory() {
     closeDocPop();
     closeTitleMenu();
