@@ -633,8 +633,7 @@
       disarm() { redrawnAt = 0; },
     };
   }
-  const vhGuard = makeStaleClickGuard(overlayBox);
-  function vhArmStaleClickGuard() { vhGuard.arm(); }
+  const overlayGuard = makeStaleClickGuard(overlayBox);
 
   function openVersionHistory() {
     closeDocPop();
@@ -651,7 +650,7 @@
         <p class="ed-vh-empty">Nessuna versione ancora. Filo salva un punto di ripristino ogni volta che modifica il documento; da lì potrai tornare indietro.</p>
         <div class="ed-overlay-actions"><button class="ed-btn primary" id="ovClose">Chiudi</button></div>`);
       $('ovClose').addEventListener('click', closeOverlay);
-      vhArmStaleClickGuard();
+      overlayGuard.arm();
       return;
     }
     const shown = all.slice(0, versHistoryShown);
@@ -692,7 +691,7 @@
       it.addEventListener('click', open);
       it.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(e); } });
     });
-    vhArmStaleClickGuard();
+    overlayGuard.arm();
   }
 
   // Anteprima ampia di una singola versione, con conferma di ripristino.
@@ -717,7 +716,7 @@
     $('vhRestore').addEventListener('click', () => {
       if (restoreVersion(fileId, versionId)) renderVersionHistory(fileId);
     });
-    vhArmStaleClickGuard();
+    overlayGuard.arm();
   }
 
   // ════════════════════════════════════════════════════════════════════
@@ -1018,11 +1017,16 @@
     }));
     // Eliminare per sempre è l'UNICA azione irreversibile qui: chiede conferma
     // sul posto (il bottone diventa "Confermi?"), senza finestre di mezzo.
+    // La conferma sul posto è a sua volta un elemento che compare SOTTO il
+    // cursore: senza guardia bastava un doppio clic per bruciarla e cancellare
+    // il documento per sempre in un colpo solo, che è il contrario di ciò che
+    // una conferma serve a garantire.
     overlayBox.querySelectorAll('.ed-tr-purge').forEach((b) => b.addEventListener('click', () => {
       if (b.dataset.confirm !== '1') {
         b.dataset.confirm = '1';
         b.textContent = 'Confermi?';
         b.classList.add('danger');
+        overlayGuard.arm();
         setTimeout(() => {
           if (!b.isConnected || b.dataset.confirm !== '1') return;
           b.dataset.confirm = '';
@@ -3905,8 +3909,8 @@
   // ════════════════════════════════════════════════════════════════════
   // La guardia anti "coda di gesto" vale solo per il pannello che l'ha armata:
   // ogni altro overlay riparte pulito (e chiudendo si disarma).
-  function openOverlay(html) { vhGuard.disarm(); overlayBox.innerHTML = html; overlay.hidden = false; }
-  function closeOverlay() { vhGuard.disarm(); overlay.hidden = true; overlayBox.innerHTML = ''; }
+  function openOverlay(html) { overlayGuard.disarm(); overlayBox.innerHTML = html; overlay.hidden = false; }
+  function closeOverlay() { overlayGuard.disarm(); overlay.hidden = true; overlayBox.innerHTML = ''; }
   function flashOverlayMsg(text, ms) {
     openOverlay(`<div style="text-align:center;padding:8px 4px">${escapeHtml(text)}</div>`);
     setTimeout(closeOverlay, ms || 1400);
