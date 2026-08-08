@@ -229,3 +229,93 @@ gli assert.
 - Niente voce nei patch notes: è infrastruttura interna, invisibile all'utente
   (vedi `CLAUDE.md` § Patch notes).
 - Il report finale lo scrivi tu, minimo, secondo `CLAUDE.md` § "Tono dei report".
+
+---
+
+# Parte 2 — le vie d'accesso al ramo principale (2026-08-07)
+
+La Parte 1 impedisce a un'istanza di *lavorare* sul ramo sbagliato. Questa
+impedisce al lavoro non esaminato di *uscire*. Sono due binari diversi: le
+protezioni della Parte 1 vivono sul percorso "consegna e verdetto", mentre la
+pubblicazione automatica scattava a ogni modifica di file, indipendentemente da
+tutto il resto.
+
+## Via 1 — la sessione si dichiara, non si indovina dal nome del ramo
+
+**Prima**: l'hook di salvataggio decideva chi trattenere e chi pubblicare
+guardando il **nome del ramo** (un elenco di prefissi vietati: `worker/*`,
+`feature/*`; tutto il resto veniva pubblicato). Il nome è un indizio, non un
+fatto — ed è così che il 24 luglio un'istanza di routine mai passata su un ramo
+di lavoro ha pubblicato il proprio codice direttamente.
+
+**Ora**: `FILO_ROUTINE=1`, esportata dall'orchestratore ed ereditata dai worker.
+Una sessione marcata non pubblica **mai**, qualunque sia il nome del ramo.
+
+**E anche**: nessun ramo di lavoro raggiunge più il ramo principale da solo,
+neanche in locale (vedi §Sessioni locali). L'elenco dei prefissi resta come rete.
+
+**Tracciabilità**: i commit portano un autore diverso a seconda della
+provenienza. Prima erano indistinguibili, e alla domanda "questo codice da dove
+è arrivato?" non c'era risposta nemmeno a posteriori — il che ha reso impossibile
+misurare quante volte la Via 2 fosse scattata davvero.
+
+## Via 2 — la spedizione della decisione portava con sé tutto il ramo
+
+Le routine non scrivono nel database dei feedback: depositano la decisione in un
+file su git e la spediscono al ramo principale. Il comando usato diceva «prendi
+il punto in cui mi trovo e mettilo sul ramo principale» — ma "il punto in cui mi
+trovo" non è il file: è **tutta la storia accumulata sul ramo**. Se il ramo
+principale non si era mosso, quella spedizione era un avanzamento regolare e
+veniva accettata in blocco, codice compreso. Nella storia non si distingueva da
+una fusione legittima.
+
+Non scattava sempre: serviva che nessun altro avesse pubblicato nel frattempo.
+Ma un cancello che si può saltare a seconda del tempismo non è un cancello —
+non puoi guardare il risultato e dire "questo è stato esaminato".
+
+**Ora** (`scripts/lib/isolated-push.mjs`): il commit viene **costruito sopra lo
+stato remoto attuale**, in un indice temporaneo che contiene solo quel file, e
+si spedisce l'oggetto commit. Non c'è nessuna storia locale attaccata: la
+garanzia è per costruzione, non per disciplina. Vale anche per la rimozione dei
+semafori di lavorazione.
+
+## Via 3 — rete di sicurezza (non una via)
+
+Un'istanza di routine che si ritrova sul ramo principale viene avvisata e il suo
+lavoro non esce. Non è un terzo modo indipendente per arrivare al ramo
+principale: è il paracadute per i casi che le prime due non prevedono.
+
+## Cancello prima della pubblicazione agli utenti
+
+**Prima**: ogni 6 ore un automatismo prendeva il ramo principale **così com'è**,
+costruiva e distribuiva agli utenti, **senza eseguire un solo test**. Qualunque
+errore — di una routine o di una sessione locale — arrivava a tutti senza
+incontrare nessun controllo lungo la strada.
+
+**Ora**: i controlli automatici girano **prima del bump di versione** (se sono
+rossi non si consuma nemmeno un numero di versione). Rosso ⇒ nessuna
+pubblicazione **e** un feedback in coda con la coda dell'esecuzione: al giro
+successivo una routine lo prende in carico come qualsiasi altro lavoro. Senza
+quel feedback, un fallimento si limiterebbe a bloccare le pubblicazioni in
+silenzio.
+
+## Sessioni locali: salvataggio continuo, pubblicazione una volta
+
+Le sessioni locali pubblicavano a ogni modifica. Tre conseguenze: la fotografia
+delle 6 ore poteva cogliere un lavoro **a metà** e mandarlo agli utenti; ogni
+pubblicazione spostava il ramo principale sotto i piedi delle routine in corso,
+facendo sì che il cancello di sicurezza **giudicasse una versione diversa da
+quella poi fusa**; e il ramo principale conteneva stati mai pensati come finiti.
+
+L'hook faceva **due cose** che vanno separate: salvare e spedire il proprio ramo
+(prezioso — è ciò che ha salvato questo stesso lavoro dopo due interruzioni), e
+fondere sul ramo principale (il problema). Solo la seconda è cambiata.
+
+`npm run finish` esegue i controlli e **solo se sono verdi** fonde e pubblica.
+`npm run finish:check` esegue i soli controlli.
+
+La regola "non lanciare mai la suite completa in locale" è stata **rimossa** da
+`CLAUDE.md`: nasceva da quando il grosso del lavoro si faceva in locale. Oggi in
+locale si fanno poche cose critiche, quindi il tempo in più è accettabile — al
+peggio un controllo in più fa risparmiare tempo, al meglio trova ciò che
+sarebbe sfuggito.
