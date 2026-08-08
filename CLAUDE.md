@@ -347,8 +347,17 @@ npm install                # Electron + Playwright (~150MB)
 npm start                  # avvia la app
 npm run test:smoke         # smoke headless con screenshot in tests/.smoke/
 npm run test:unit          # unit test logica pura (node:test, no Electron, ms)
-npm test                   # suite Playwright (~100 spec, ~25 min: solo in cloud)
+npm test                   # suite Playwright (~100 spec: solo in cloud)
 ```
+
+**Gli spec Playwright NON mostrano più la finestra** (dal 2026-08-08): l'app parte
+fuori dallo schermo, non entra nella barra delle applicazioni e non ruba mai il
+fuoco, così lanciare i test mentre l'owner lavora non gli fa lampeggiare finestre
+davanti. Tutto il resto funziona identico — menu nativi compresi — e gli
+screenshot dei test vengono lo stesso (passano dal debugger, non dal compositor).
+Per guardare l'app mentre uno spec la pilota: `FILO_TEST_VISIBLE=1 npx playwright
+test …`. `test:shoot` e `test:smoke` restano visibili sempre: lì la finestra
+fotografata **è** il risultato.
 
 Se `npm install` non scarica il binario Electron (succede su alcuni setup):
 `node node_modules/electron/install.js`.
