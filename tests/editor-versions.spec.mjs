@@ -353,3 +353,69 @@ test('ripristinare una versione NON cancella la conversazione con Filo, nemmeno 
   await expect(log).toHaveCount(2);
   await expect(log.first()).toHaveText('Puoi riassumere il testo?');
 });
+
+// ── Doppio clic su "Ripristina" (#415) ────────────────────────────────────
+// Il pannello si ridisegna al primo clic, quindi il secondo colpo della coppia
+// cadeva su ciò che nel frattempo era finito sotto il cursore — un'altra riga —
+// e apriva l'anteprima di una versione che l'utente non aveva chiesto, subito
+// dopo un gesto delicato. Il test asserisce il SUCCESSO del gesto: si ripristina
+// una volta sola, la versione GIUSTA, e si resta nella lista.
+// Senza la guardia il secondo clic apre l'anteprima → `.ed-vh-fulltext` compare
+// e il titolo del pannello diventa "Anteprima versione" → rosso.
+test('doppio clic su "Ripristina": ripristina una volta sola e resta nella lista', async ({ openTab }) => {
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('#doc');
+  await page.evaluate(() => window.__filoEditorVersions.ready());
+
+  await page.click('#doc');
+  for (const word of ['Alpha', 'Bravo', 'Charlie']) {
+    await setDocText(page, word);
+    await filoAutoEdit(page);
+  }
+  expect(await page.evaluate(() => window.__filoEditorVersions.list().length)).toBe(3);
+
+  await page.click('#docSwitch');
+  await page.click('#docHistory');
+  await expect(page.locator('.ed-vh-item')).toHaveCount(3);
+
+  // Il gesto dell'utente: doppio clic rapido sul "Ripristina" della versione più
+  // vecchia (stesse coordinate per entrambi i colpi, come un vero doppio clic).
+  await page.locator('.ed-vh-item').last().locator('.ed-vh-restore').dblclick();
+
+  // Il ripristino è avvenuto, una volta sola e sulla versione giusta.
+  await expect(page.locator('#doc')).toHaveText('Alpha');
+  const after = await page.evaluate(() => window.__filoEditorVersions.list());
+  expect(after.length).toBe(4); // 3 + un solo snapshot "prima del ripristino"
+  expect(after.filter((v) => v.source === 'restore').length).toBe(1);
+
+  // Si resta nella lista: nessuna anteprima aperta a sorpresa.
+  await expect(page.locator('.ed-vh-list')).toBeVisible();
+  await expect(page.locator('.ed-vh-fulltext')).toHaveCount(0);
+  await expect(page.locator('#overlayBox h3')).toHaveText('Storico versioni');
+  await expect(page.locator('.ed-vh-item')).toHaveCount(4);
+});
+
+// Simmetria con le modifiche automatiche di Filo: anche il ripristino fatto a
+// mano dal pannello si annulla sul posto dall'avviso, senza dover ritrovare la
+// versione giusta nella lista.
+test('un ripristino si annulla dall\'avviso e il documento torna com\'era', async ({ openTab }) => {
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('#doc');
+  await page.evaluate(() => window.__filoEditorVersions.ready());
+
+  await page.click('#doc');
+  await setDocText(page, 'Testo vecchio');
+  await filoAutoEdit(page);
+  await setDocText(page, 'Testo di adesso');
+  await filoAutoEdit(page);
+
+  await page.click('#docSwitch');
+  await page.click('#docHistory');
+  await page.locator('.ed-vh-item').last().locator('.ed-vh-restore').click();
+  await expect(page.locator('#doc')).toHaveText('Testo vecchio');
+
+  const undo = page.locator('.ed-toast .ed-toast-action').last();
+  await expect(undo).toHaveText('Annulla');
+  await undo.click();
+  await expect(page.locator('#doc')).toHaveText('Testo di adesso');
+});

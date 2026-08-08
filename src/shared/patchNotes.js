@@ -16,6 +16,15 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.196', date: '2026-08-08',
+      features: [
+        'Nell\'editor, dopo aver ripristinato una versione dallo «Storico versioni» compare un avviso «Annulla» che rimette il documento com\'era un attimo prima.',
+      ],
+      fixes: [
+        'Nell\'editor, un doppio clic su «Ripristina» nello «Storico versioni» non apre più a sorpresa l\'anteprima di un\'altra versione: si ripristina una volta sola e si resta nella lista.',
+      ],
+    },
+    {
       version: '0.2.195', date: '2026-08-08',
       features: [],
       fixes: [
