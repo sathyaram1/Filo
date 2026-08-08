@@ -344,6 +344,7 @@ describe('B — l’identità attesa esposta alla guardia', () => {
   test('l’attesa scritta per un’altra directory non blocca questa', () => {
     const { work } = makeRepo();
     const hook = resolve(ROOT, '.claude', 'hooks', 'branch-guard.sh');
+    mkdirSync(resolve(work, '.claude'), { recursive: true });
     writeFileSync(expectationFile(work),
       JSON.stringify({ branch: 'worker/altrove', id: 'f', root: resolve(work, 'nope') }), 'utf8');
     try {
