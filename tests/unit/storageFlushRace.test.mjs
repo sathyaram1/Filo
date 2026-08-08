@@ -73,6 +73,13 @@ test('due flush simultanei non si rubano il file temporaneo', async () => {
     console.error = realError;
   }
 
+  // L'assert PRINCIPALE è l'invariante, non il sintomo: due scritture insieme
+  // si perdono solo se la rename dell'una capita nel momento sbagliato
+  // dell'altra, quindi aspettarsi di VEDERE l'errore è una scommessa sul
+  // tempismo. La sovrapposizione invece o c'è o non c'è.
+  assert.equal(Storage.maxFlushOverlap(), 1,
+    'due scritture su disco si sono sovrapposte: condividono lo stesso file temporaneo e una delle due va persa');
+
   const flushErrors = errors.filter((e) => e.includes('flush failed'));
   assert.deepEqual(flushErrors, [], `flush falliti: ${flushErrors.join(' | ')}`);
 
