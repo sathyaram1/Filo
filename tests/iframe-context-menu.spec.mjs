@@ -115,6 +115,33 @@ test('un riquadro mai toccato non carica nulla (il costo si paga solo all\'uso)'
   expect(readyAfter).toBe('1');
 });
 
+test('Alt+E sul testo selezionato DENTRO il riquadro arriva al riquadro', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, outer(testServer.html(INNER)));
+  const frameLoc = page.frameLocator('#embed');
+  const frame = page.frames().find((f) => f !== page.mainFrame());
+  // Interagisci col riquadro (monta Filo lì dentro) e seleziona il suo testo.
+  await frameLoc.locator('#inner-text').click();
+  await frame.evaluate(() => {
+    const p = document.querySelector('#inner-text');
+    const range = document.createRange();
+    range.selectNodeContents(p);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  });
+  // Stessa strada della scorciatoia globale Alt+E.
+  await app.evaluate(({ BrowserWindow }) => {
+    const path = require('node:path');
+    const { dispatch } = require(path.join(process.cwd(), 'src', 'main', 'shortcuts.js'));
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    dispatch('explain-selection', win);
+  });
+  // La spiegazione si apre DENTRO il riquadro, sul testo selezionato lì.
+  // Prima la scorciatoia finiva sempre nel frame principale, che non ha
+  // nessuna selezione: non succedeva nulla.
+  await expect(frameLoc.locator('.sn-popup')).toBeVisible({ timeout: 8000 });
+});
+
 test('un solo menu alla volta: aprirlo nel riquadro chiude quello della pagina', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, outer(testServer.html(INNER)));
   await page.locator('#outer-text').click({ button: 'right' });
