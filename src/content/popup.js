@@ -632,15 +632,24 @@
     }
   }
 
+  // L'animazione d'ingresso fa salire l'avviso di 8px: dentro un contenitore
+  // scrollabile quello sposto allarga anche l'area scrollabile. Senza tolleranza
+  // uno stack che ci sta comodo verrebbe dichiarato "in overflow" — e non è un
+  // dettaglio estetico: attivare lo scroll fa partire un evento `scroll` che
+  // altre superfici di Filo (il menu del tasto destro) leggono come "la pagina
+  // si è mossa" e si chiudono da sole.
+  const TOAST_ENTER_SHIFT_PX = 8;
+
   // Finestra molto bassa: anche col tetto lo stack può eccedere l'altezza
   // disponibile. Lo rendiamo scrollabile, teniamo in vista il più recente e
   // riattiviamo i pointer-events solo lì (di base sono spenti per non rubare i
   // click alla pagina sotto).
   function syncToastOverflow() {
     const host = toastHost();
-    const scrollable = host.scrollHeight > host.clientHeight + 1;
+    const scrollable = host.scrollHeight > host.clientHeight + TOAST_ENTER_SHIFT_PX + 1;
     host.classList.toggle('scrolling', scrollable);
-    if (scrollable) host.scrollTop = host.scrollHeight;
+    // Solo se cambia davvero: assegnare scrollTop emette un evento `scroll`.
+    if (scrollable && host.scrollTop !== host.scrollHeight) host.scrollTop = host.scrollHeight;
   }
 
   // API per gli altri avvisi in pagina ancorati allo stesso angolo: li aggancia
