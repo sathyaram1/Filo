@@ -67,12 +67,18 @@ module.exports = function register(on, ctx) {
 
   on(MSG.GET_SETTINGS, async (msg, sender, origin) => {
     const settings = await Storage.getSettings();
+    // #405 — indirizzo della PAGINA (non del riquadro incorporato che sta
+    // chiedendo). Serve a un riquadro per sapere se il sito che lo ospita è
+    // fra quelli dove l'utente ha spento Filo: da dentro un riquadro di
+    // un'altra origine quell'indirizzo è illeggibile, e senza questo il menu
+    // sarebbe ricomparso proprio nei siti esclusi.
+    const pageUrl = String(sender?.tab?.url || '');
     // Le pagine web (content script) leggono tema/spellcheck/ecc., ma non devono
     // ricevere le chiavi API: le richieste AI girano nel main, che le allega.
     if (!isFilo(origin) && settings && settings.apiKeys) {
-      return { ok: true, settings: { ...settings, apiKeys: undefined } };
+      return { ok: true, pageUrl, settings: { ...settings, apiKeys: undefined } };
     }
-    return { ok: true, settings };
+    return { ok: true, pageUrl, settings };
   });
 
   on(MSG.UPDATE_SETTINGS, async (msg, sender, origin) => {
