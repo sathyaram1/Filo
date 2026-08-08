@@ -207,6 +207,14 @@ async function whenSettled() {
 async function doFlush() {
   const target = filePath();
   const tmp = target + '.tmp';
+  // Contatore delle scritture in volo. È l'INVARIANTE del serializzatore qui
+  // sopra: due doFlush insieme condividono lo stesso file temporaneo e la
+  // seconda rename non lo trova più. Il guasto vero (ENOENT) dipende da quale
+  // dei due arriva prima, quindi un test che aspetta di vederlo è ballerino per
+  // costruzione; questo contatore invece si rompe SEMPRE se la serializzazione
+  // salta. Costa due somme per scrittura.
+  STATE.flushInFlight = (STATE.flushInFlight || 0) + 1;
+  if (STATE.flushInFlight > (STATE.flushMaxInFlight || 0)) STATE.flushMaxInFlight = STATE.flushInFlight;
   try {
     const txt = JSON.stringify(serializeForDisk(STATE.data));
     await fsp.mkdir(path.dirname(target), { recursive: true });
@@ -214,7 +222,14 @@ async function doFlush() {
     await fsp.rename(tmp, target);
   } catch (err) {
     console.error('[Filo storage] flush failed:', err);
+  } finally {
+    STATE.flushInFlight -= 1;
   }
+}
+
+/** Quante scritture su disco sono arrivate a sovrapporsi (deve restare 1). */
+function maxFlushOverlap() {
+  return STATE.flushMaxInFlight || 0;
 }
 
 function emitChange(changes) {
