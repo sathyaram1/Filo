@@ -1,0 +1,8 @@
+{
+  "id": "dcb2cf85-1f28-45f1-80d6-485edb2709b8",
+  "status": "revision_capability",
+  "notes": "Fatto. Quando Filo propone lui una segnalazione, la richiesta di conferma si apre da sola e mostra il testo per intero; se la segnalazione è lunga il riquadro scorre invece di sforare lo schermo. Il pulsante in chat resta comunque lì: se annulli, ti serve per riaprire la conferma.\n\nOltre al chiesto: il colore della selezione l'ho sistemato per TUTTI i riquadri di conferma di Filo, non solo per questo — era lo stesso difetto ovunque — e segue la tinta d'accento delle preferenze, quindi se cambi palette cambia anche lì. Ho anche tolto i due punti finali rimasti appesi in fondo all'etichetta del pulsante.",
+  "queuedAt": "2026-08-08T12:33:05.626Z",
+  "queuedBy": "routine",
+  "branch": "worker/dcb2cf85-1f28-45f1-80d6-485edb2709b8"
+}
