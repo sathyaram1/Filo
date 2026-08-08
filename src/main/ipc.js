@@ -54,6 +54,12 @@ function senderInfo(event) {
     // dati alla scheda fuori dal ciclo richiesta/risposta (es. il reasoning in
     // diretta della chat → canale 'filo:reasoning'). In-process, mai oltre IPC.
     wc,
+    // #405 — frame ESATTO che ha parlato. Da quando i content script girano
+    // anche nei riquadri incorporati, "la scheda" non basta più a sapere chi
+    // ha chiesto qualcosa: le risposte push (stream della spiegazione,
+    // chiusura dei menu degli altri frame) devono tornare al frame giusto e
+    // non al solo frame principale.
+    frame: event.senderFrame || null,
   };
 }
 
