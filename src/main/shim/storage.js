@@ -345,6 +345,7 @@ module.exports = {
   clear,
   onChanged,
   flushSync,
+  whenSettled,
   setSync,
   runIncognito,
   resetIncognito,
