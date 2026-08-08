@@ -1,8 +1,0 @@
-{
-  "id": "b6f2ddea-fabe-432c-8b09-ea13fb98604a",
-  "status": "revision_capability",
-  "notes": "Fatto: nello «Storico versioni» un doppio clic su «Ripristina» ripristina una volta sola e ti lascia nella lista, senza salti.\n\nOltre al chiesto, la protezione vale per qualsiasi doppio clic dentro quel pannello (anche su una riga o su «Indietro»), non solo sul bottone «Ripristina»: il caso davvero brutto non era l'anteprima aperta a sorpresa, ma il secondo colpo che poteva cadere sul «Ripristina» di un'altra versione e riportarti indietro il documento sbagliato.\n\nHo aggiunto anche l'«Annulla» all'avviso che compare dopo un ripristino: lo stato di un attimo prima veniva già salvato, ma per tornarci bisognava ritrovarlo nella lista. È la risposta diretta al dubbio che descrivi («ho ripristinato quella giusta?»).\n\nNote tecniche: la guardia sta sul pannello intero, non sul singolo bottone — nuovi comandi aggiunti lì dentro la ereditano senza doverla ripetere.",
-  "queuedAt": "2026-08-08T18:34:13.126Z",
-  "queuedBy": "routine",
-  "branch": "worker/b6f2ddea-fabe-432c-8b09-ea13fb98604a-20260808T182122Z"
-}
