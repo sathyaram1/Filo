@@ -3905,8 +3905,8 @@
   // ════════════════════════════════════════════════════════════════════
   // La guardia anti "coda di gesto" vale solo per il pannello che l'ha armata:
   // ogni altro overlay riparte pulito (e chiudendo si disarma).
-  function openOverlay(html) { vhDrawnAt = 0; overlayBox.innerHTML = html; overlay.hidden = false; }
-  function closeOverlay() { vhDrawnAt = 0; overlay.hidden = true; overlayBox.innerHTML = ''; }
+  function openOverlay(html) { vhGuard.disarm(); overlayBox.innerHTML = html; overlay.hidden = false; }
+  function closeOverlay() { vhGuard.disarm(); overlay.hidden = true; overlayBox.innerHTML = ''; }
   function flashOverlayMsg(text, ms) {
     openOverlay(`<div style="text-align:center;padding:8px 4px">${escapeHtml(text)}</div>`);
     setTimeout(closeOverlay, ms || 1400);
