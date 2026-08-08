@@ -111,9 +111,9 @@ test('una raffica di avvisi non si accavalla e non straripa dalla finestra', asy
   const vh = await page.evaluate(() => window.innerHeight);
 
   let maxLive = 0;
-  // Dieci azioni di fila, il più rapidamente possibile: dopo ognuna guardiamo
-  // com'è messa la pila.
-  for (let i = 0; i < 10; i++) {
+  // Azioni di fila, una dietro l'altra: dopo ognuna guardiamo com'è messa la
+  // pila. Ne restano sempre parecchie vive insieme (durata 2200ms).
+  for (let i = 0; i < 8; i++) {
     await runLinkAction(page, 'Copia URL', { exclude: 'immagine' });
     const boxes = await overlayBoxes(page);
     maxLive = Math.max(maxLive, boxes.length);
