@@ -48,6 +48,15 @@ deve sembrare e comportarsi come gli altri menu a tendina già presenti in Filo.
   altrove), ma togli l'attributo `list=` dall'input così il popup nativo non
   appare. Usato dal campo "stringa modello" delle Opzioni/admin e dall'editor a
   segmenti (`modelChainEditor.js`).
+- **`::selection` NON entra in uno shadow root: va ridichiarata dentro (#414).**
+  La regola del tema (`[data-sn-theme] ::selection` in `theme.css`) sta nel foglio
+  del DOCUMENTO e non si applica ai nodi di uno shadow tree: dentro un componente
+  in Shadow DOM (il popup di conferma, `src/shared/confirmUi.js`) selezionare il
+  testo tornava al **blu di sistema** — l'unico punto fuori palette di tutta la UI.
+  Chi crea un componente in Shadow DOM ripete le regole `::selection` /
+  `::-moz-selection` nel `<style>` del root, con `var(--sn-selection-bg)` (i custom
+  properties, quelli sì, attraversano il confine: gli override estetici dell'utente
+  continuano a valere) e un letterale come ripiego.
 
 ## Estetica: ogni variabile visiva è un token del registro, mai un valore sparso
 
