@@ -47,11 +47,18 @@ EXPECT_ROOT=$(read_field root)
 
 # L'attesa vale per la directory in cui è stata scritta. Se il dispatcher ha
 # lavorato altrove (setup locale multi-worktree), non è affar nostro.
+#
+# I due percorsi vanno normalizzati prima di confrontarli: su Windows JSON.stringify
+# raddoppia le barre rovesciate ("C:\\Users\\…"), quindi un confronto letterale
+# fallisce SEMPRE e la guardia diventerebbe inerte proprio dove serve. Portiamo
+# entrambi a barre in avanti e togliamo quella finale.
+norm_path() {
+  printf '%s' "$1" | sed 's|\\\\|/|g; s|\\|/|g; s|/*$||'
+}
 if [ -n "$EXPECT_ROOT" ]; then
-  case "$EXPECT_ROOT" in
-    "$PROJECT_DIR") ;;
-    *) exit 0 ;;
-  esac
+  if [ "$(norm_path "$EXPECT_ROOT")" != "$(norm_path "$PROJECT_DIR")" ]; then
+    exit 0
+  fi
 fi
 
 cd "$PROJECT_DIR" 2>/dev/null || exit 0
