@@ -41,14 +41,10 @@ export const test = base.extend({
         // nativo (impossibile da automatizzare headless). Vive dentro
         // userData così viene ripulito insieme al resto.
         FILO_DOWNLOAD_DIR: join(userData, 'downloads'),
-        // La finestra NON compare a schermo: la suite ne apre e chiude
-        // decine, e vederle lampeggiare (rubando pure il fuoco) mentre si sta
-        // lavorando è il motivo per cui in locale i test si evitavano. Il
-        // renderer gira lo stesso e gli screenshot dei test si prendono
-        // comunque: passano dal debugger, non dal compositor.
-        // `FILO_TEST_VISIBLE=1` la rimette a schermo, per quando serve guardare
-        // l'app mentre un test la pilota.
-        ...(process.env.FILO_TEST_VISIBLE === '1' ? {} : { FILO_HIDE_WINDOW: '1' }),
+        // NB: la finestra invisibile durante i test NON si attiva qui — la
+        // attiva `playwright.config.js` sull'ambiente del worker, così vale
+        // anche per la cinquantina di spec che lancia Electron senza passare da
+        // questa fixture. Qui la eredita e basta (`...process.env` sopra).
         NODE_ENV: 'test',
       },
     });
