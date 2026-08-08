@@ -989,7 +989,7 @@ async function decryptOne(id) {
   }
 }
 
-function emit(bucket, ctx) {
+export function emit(bucket, ctx) {
   // Chi sta per lavorare, scritto DA CHI LO SA (feedback #443). Da qui lo
   // rilegge `queue-feedback.mjs`: così un feedback aperto da un'automazione
   // porta la provenienza giusta anche se il worker non ci pensa. Un guasto
