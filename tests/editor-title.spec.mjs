@@ -5,7 +5,11 @@
 //     solo un titolo NON vuoto e coerente col contenuto (l'AI è mockata);
 //  2) il tasto destro sul titolo apre un menu contestuale che espone
 //     "Rigenera titolo" (più rinomina/duplica/elimina), e rigenerare cambia il
-//     titolo anche sotto le 100 parole.
+//     titolo anche sotto le 100 parole;
+//  3) (#403) aprire la rinomina e confermarla SENZA dare un nome lascia il
+//     documento senza nome, ma NON spegne il titolo automatico: dopo 100 parole
+//     il titolo arriva lo stesso. Vale per entrambi i cammini di rinomina
+//     (matita nel menu documenti e "Rinomina" dal tasto destro sul titolo).
 //
 // L'AI è stubbata sovrascrivendo chrome.runtime.sendMessage nella pagina (lo
 // shim è writable), così AI_REQUEST torna un titolo canonico e FILO_GET_MEMORY
