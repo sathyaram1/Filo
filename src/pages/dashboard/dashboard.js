@@ -815,7 +815,9 @@
       // Il testo completo (cosa fa + rischi, #183) vive nel popup. Sul bottone —
       // che resta solo come ripiego se l'utente annulla — basta la prima riga.
       const fullText = String(a._confirm.text || '');
-      const shortLabel = fullText.split('\n')[0] || 'Esegui';
+      // I due punti finali annunciano il testo che segue nel popup ("…a tuo
+      // nome:"): sul bottone, dove quel testo non c'è, restano appesi nel vuoto.
+      const shortLabel = (fullText.split('\n')[0] || 'Esegui').replace(/\s*:\s*$/, '');
       btn.textContent = isCmd ? `▶ ${short}` : shortLabel;
       // #159/#414 — le azioni di livello 2 che Filo PROPONE da sé aprono il
       // popup di conferma da sole: marchiamo il bottone perché renderActions lo
