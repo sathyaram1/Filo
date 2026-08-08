@@ -1,7 +1,0 @@
-{
-  "id": "9856b261-d2ca-4612-9701-fd565eb9f95c",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Rifatti i tuoi passi con Filo vero: tasto destro su un link, \"Copia URL\" e subito dopo \"Salva link per dopo\". I due avvisi ora stanno uno sopra l'altro nell'angolo, il più recente in basso, entrambi leggibili per intero. Provato anche a romperlo: otto azioni di fila (non si accavallano, non escono dalla finestra e non si accumulano all'infinito), la conferma cliccabile di \"Salva per dopo\" insieme a un avviso normale (restano separate e la conferma resta cliccabile), una finestra alta un quarto del normale (gli avvisi restano dentro il bordo), una pagina che si rifà il contenuto da capo come fanno i siti moderni (gli avvisi successivi compaiono lo stesso invece di sparire), e il menu del tasto destro aperto mentre gli avvisi comparivano e scadevano (il menu non si chiude più da solo). Nessuna regressione su salva-per-dopo, traduzione pagina, lettura ad alta voce e menu su video/immagini.",
-  "queuedAt": "2026-08-08T07:50:11.069Z",
-  "queuedBy": "routine"
-}
