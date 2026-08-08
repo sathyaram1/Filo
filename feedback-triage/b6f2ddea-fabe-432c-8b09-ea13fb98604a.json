@@ -1,0 +1,7 @@
+{
+  "id": "b6f2ddea-fabe-432c-8b09-ea13fb98604a",
+  "status": "revision_capability",
+  "notes": "Fatto. L'«Annulla» degli avvisi ora regge il doppio clic: annullata una modifica di Filo o un ripristino, resta annullata.\n\nOltre al chiesto: la stessa cosa succedeva nel cestino dell'editor, e lì costava un documento. «Elimina definitivamente» chiede conferma sul posto, ma la conferma compare esattamente sotto il cursore: un doppio clic la bruciava e mandava via il file per sempre in un gesto solo. Ora aspetta un clic voluto — è l'unica azione irreversibile dell'editor, e il rischio non era teorico.\n\nNote tecniche: la protezione adesso è una sola, condivisa fra il pannello versioni, il cestino e la pila di avvisi. Si arma quando una di quelle zone cambia sotto il cursore; una zona nuova va armata esplicitamente, altrimenti resta scoperta — è esattamente così che gli avvisi erano rimasti fuori.",
+  "queuedAt": "2026-08-08T19:38:36.906Z",
+  "queuedBy": "routine"
+}
