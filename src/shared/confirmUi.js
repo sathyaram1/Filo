@@ -55,6 +55,13 @@
   line-height: 1.5;
   color: var(--sn-fg, #1a1918);
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  /* Il testo di un'azione può essere lungo (il feedback che Filo sta per
+     mandare a nome dell'utente): deve restare LEGGIBILE PER INTERO, quindi il
+     popup non lo taglia — scorre. Il tetto è relativo al viewport così il box
+     resta dentro lo schermo insieme a titolo e bottoni. */
+  max-height: min(52vh, 420px);
+  overflow-y: auto;
 }
 .sn-confirm-input {
   display: block;
