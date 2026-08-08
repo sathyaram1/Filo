@@ -95,7 +95,11 @@ function main() {
     // 2. Spec mirati alle aree toccate. La suite completa gira nel cancello di
     //    pubblicazione e nelle routine: qui serve il segnale rapido.
     const changed = git(['diff', '--name-only', `${MAIN}...HEAD`]).out.split('\n').filter(Boolean);
-    const specs = specsForChangedFiles(changed).filter((s) => git(['ls-files', '--error-unmatch', `${s}.spec.mjs`]).ok);
+    // `--error-unmatch` stampa un errore su stderr per ogni spec inesistente:
+    // il filtro funzionava, ma a schermo sembrava un guasto. Chiediamo invece
+    // l'elenco degli spec tracciati e filtriamo in memoria.
+    const tracked = new Set(git(['ls-files', 'tests/*.spec.mjs']).out.split('\n').filter(Boolean));
+    const specs = specsForChangedFiles(changed).filter((s) => tracked.has(`${s}.spec.mjs`));
     if (specs.length) {
       const args = ['playwright', 'test', ...specs.map((s) => `${s}.spec.mjs`)];
       if (!run('npx', args, `Spec delle aree toccate (${specs.length})`)) {
