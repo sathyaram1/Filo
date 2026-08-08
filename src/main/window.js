@@ -97,15 +97,7 @@ function createMainWindow() {
     let restored = false;
     try { restored = await tabs.restoreSession(); } catch (_) { restored = false; }
     if (!restored) tabs.openTab('filo://newtab/');
-    // Forza display + focus: necessario perché in alcune configurazioni la
-    // WebContentsView appena creata può non avere un display surface valido,
-    // restando un quadrato bianco/cream finché la finestra non riceve
-    // attenzione esplicita dal compositor OS.
-    try {
-      win.show();
-      win.moveTop();
-      win.focus();
-    } catch (_) {}
+    revealWindow(win);
   });
 
   return win;
