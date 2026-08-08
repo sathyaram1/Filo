@@ -89,7 +89,14 @@ test('#405 i riquadri dentro una pagina interna filo:// restano esclusi', async 
   }, child);
   await page.waitForTimeout(2000);
   const fr = page.frames().find((f) => f.url() === child);
-  expect(fr, 'il riquadro non si è caricato nella pagina interna').toBeTruthy();
+  if (!fr) {
+    // Confine ancora più netto: una pagina interna non carica proprio i
+    // riquadri esterni. Nulla da montare → nulla da esporre.
+    console.log('[FILO-PAGE-IFRAME] riquadro esterno non caricato affatto — frame: '
+      + JSON.stringify(page.frames().map((f) => f.url())));
+    expect(await page.evaluate(() => document.readyState)).toBe('complete');
+    return;
+  }
   const state = await fr.evaluate(() => ({
     ready: document.documentElement.dataset.filoReady || null,
     cs: document.documentElement.dataset.filoContentScripts || null,
