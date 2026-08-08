@@ -23,7 +23,41 @@
   // Registro delle icone globali, con ID stabili per drag-and-drop + persistenza
   // della disposizione utente. Le icone primarie occupano la riga in alto del
   // menu; le secondarie vivono nel sotto-menu "Altro…" (griglia 4 colonne).
+  // #405 — girando dentro un riquadro incorporato (video, mappa, modulo) le
+  // icone della riga globale continuano a rappresentare azioni sulla PAGINA:
+  // "traduci", "condividi", "salva per dopo", il QR, lo screenshot. Eseguirle
+  // qui dentro le applicherebbe al rettangolo dell'embed — si condividerebbe
+  // l'indirizzo del player invece dell'articolo. Le rimandiamo quindi al frame
+  // principale, che le esegue come se il menu fosse stato aperto sulla pagina.
+  const IS_SUBFRAME = (() => {
+    try { return window.top !== window.self; } catch (_) { return true; }
+  })();
+
   function buildIconRegistry(navState) {
+    const registry = buildLocalIconRegistry(navState);
+    if (!IS_SUBFRAME) return registry;
+    const out = {};
+    for (const id of Object.keys(registry)) {
+      out[id] = { ...registry[id], onClick: () => runInTopFrame(id) };
+    }
+    return out;
+  }
+
+  function runInTopFrame(iconId) {
+    try {
+      Promise.resolve(chrome.runtime.sendMessage({ type: MSG.RUN_IN_TOP_FRAME, iconId })).catch(() => {});
+    } catch (_) {}
+  }
+
+  // Eseguita NEL frame principale quando un riquadro rimanda qui un'azione di
+  // pagina. `iconId` è un id del registro, niente di più: nessun dato arbitrario
+  // attraversa il ponte.
+  function runIconAction(iconId) {
+    const entry = buildLocalIconRegistry(lastNavState)[String(iconId || '')];
+    if (entry && typeof entry.onClick === 'function') entry.onClick();
+  }
+
+  function buildLocalIconRegistry(navState) {
     const Icons = global.SN_ICONS;
     const Actions = global.SN_ACTIONS;
     // Tutte le icone della riga primaria/griglia sono SVG renderizzate a 18px.
