@@ -283,11 +283,26 @@ L'utente approva **una volta**. Da quel momento Filo lavora senza chiedere altro
 |---|---|---|
 | 1 | esegue | esegue |
 | 2 | popup di conferma | **esegue** — il piano l'ha già coperto |
-| 3 | digita "conferma" | esegue **solo se elencato nel piano**, altrimenti si ferma |
+| 3 | digita "conferma" | digita "conferma" — **il piano non lo copre mai** |
 | pavimento | si ferma | si ferma |
 
-Quaranta conferme diventano una. Il perimetro **abbassa il 2, mai il 3, mai il
-pavimento**.
+**Il perimetro tocca una sola riga: il 2.** Il livello 3 resta livello 3 anche
+dentro un piano approvato, e anche se quel passo era scritto nel piano. Il
+motivo è che approvare un piano è un gesto veloce: dare per letta con
+attenzione la riga "elimino i duplicati" e trasformarla in delega di una
+cancellazione è esattamente il modo in cui un'approvazione di comodo diventa un
+danno. L'attrito del livello 3 esiste perché l'utente sia presente **nel
+momento** in cui la cosa succede, non dieci minuti prima.
+
+Quaranta conferme diventano comunque una: in un compito reale i passi
+irreversibili sono pochissimi e tutto il resto è livello 1 e 2.
+
+Conseguenza sul piano: l'elenco dei passi irreversibili (§6.1) **non è
+un'autorizzazione anticipata, è una previsione**. Serve a due cose — far sapere
+all'utente prima di iniziare che il compito lo interromperà due volte e perché,
+e dare a Filo un metro per accorgersi di sbagliare: un passo irreversibile che
+salta fuori e **non** era previsto è un segnale di terzo tipo (§6.3), quindi
+Filo si ferma e lo dice, invece di limitarsi a chiedere conferma.
 
 ### 6.3 Quando Filo si ferma comunque
 
