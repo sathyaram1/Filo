@@ -22,7 +22,17 @@ Convenzioni (tono, sintomo-vs-causa): `CLAUDE.md`.
 1. Il feedback decifrato è nel payload (`feedback.text`, `feedback.images`,
    `feedback.num`, `feedback.id`). Capisci il **sintomo**: cosa voleva fare
    l'utente e cosa lamentava.
-2. `git checkout <branch>`. Electron di norma lo prepara l'orchestratore una volta
+2. **Sei già sul branch del lavoro: non cambiarlo, e non verificare `main`.**
+   `dispatch.mjs` ci ha posizionato questa cartella prima di consegnarti il
+   compito. Se ti sposti una guardia ti ferma, e il tuo verdetto verrebbe
+   comunque **rifiutato** perché emesso da una versione diversa del codice.
+   ⚠️ **Se ti sembra che la feature "non esista"**, il sospetto numero uno non è
+   che il lavoro non sia stato fatto: è che tu stia guardando l'albero sbagliato.
+   Il 24 luglio 2026 una bocciatura di questo tipo ha causato un'intera
+   implementazione doppia. Prima di bocciare per assenza, guarda cosa contiene il
+   branch (`git diff --stat main...HEAD`): se lì ci sono modifiche e tu non le
+   vedi, il problema è dove stai guardando.
+   Electron di norma lo prepara l'orchestratore una volta
    (`ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install && node scripts/ensure-electron.mjs`,
    idempotente; test da root con `ELECTRON_DISABLE_SANDBOX=1 xvfb-run -a ...`). **Se
    Electron NON è disponibile** (in certi ambienti la network policy blocca il
