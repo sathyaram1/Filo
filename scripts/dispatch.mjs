@@ -659,6 +659,69 @@ async function buildSnapshot() {
   return { reviews, todoWinner };
 }
 
+// ─── Prontezza (--preflight) ─────────────────────────────────────────────────
+
+/**
+ * Il controllo di prontezza, che gira PRIMA del setup dell'ambiente
+ * (spec ROUTINE-BRANCH-INTEGRITY.md §E, "Il controllo di prontezza gira per
+ * primo"; uso in ROUTINES.md § Avvio, passo 0b).
+ *
+ * L'orchestratore spende parecchio in preparazione (`npm install`, binario
+ * Electron ~102MB, `scrot`) prima ancora di chiedere se c'è lavoro. Se il giro
+ * non è in grado di lavorare, deve scoprirlo prima di aver pagato quel conto.
+ *
+ * Risponde a UNA domanda — "si può lavorare, sì o no" — e a nient'altro: NON
+ * dice se c'è lavoro (quello è compito del dispatch vero) e non fa uscire
+ * niente del contenuto dei feedback. L'orchestratore è cieco per design: da qui
+ * escono solo l'esito e, in caso di guasto, il motivo.
+ *
+ * Le due condizioni che rendono cieco un giro intero:
+ *   - il deposito non è raggiungibile → ogni worker lavorerebbe per niente,
+ *     perché la consegna del lavoro passa di lì;
+ *   - la coda non si decifra, o Firestore non risponde → la coda piena "sembra
+ *     vuota" e il giro finisce in audit invece di lavorare (è l'ondata #310+).
+ *
+ * La seconda la sa già riconoscere `buildSnapshot`, che alza `routineFault` con
+ * i suoi retry: qui la si RIUSA invece di riscriverla, così le due porte
+ * d'ingresso allo stato non possono divergere nel tempo. Effetto collaterale
+ * ereditato e voluto: la pulizia degli appunti orfani, identica a quella che
+ * farebbe il dispatch subito dopo (idempotente).
+ *
+ * Nessuna delle due verifiche ha bisogno di `node_modules`: coda e crypto
+ * girano su moduli interni e builtin di Node, quindi il controllo è davvero
+ * eseguibile prima dell'installazione.
+ *
+ * Le dipendenze sono iniettabili perché gli unit test possano esercitare la
+ * mappatura degli esiti senza toccare la rete.
+ *
+ * @returns {Promise<{ok:true}|{ok:false, kind:'transient'|'permanent', message:string}>}
+ */
+export async function preflight({ git = tryGit, snapshot = buildSnapshot } = {}) {
+  const repo = git(['rev-parse', '--git-dir']);
+  if (!repo.ok) {
+    // Permanente: una directory che non è un repo non si ripara aspettando 6h.
+    return { ok: false, kind: 'permanent', message: `non è un repo git: ${repo.out}` };
+  }
+
+  const remote = git(['ls-remote', '--exit-code', 'origin', 'HEAD']);
+  if (!remote.ok) {
+    // Passeggero: rete, credenziali scadute, deposito momentaneamente giù.
+    return { ok: false, kind: 'transient', message: `deposito irraggiungibile: ${remote.out}` };
+  }
+
+  try {
+    await snapshot();
+  } catch (e) {
+    return {
+      ok: false,
+      kind: e?.faultKind === 'permanent' ? 'permanent' : 'transient',
+      message: e?.message || String(e),
+    };
+  }
+
+  return { ok: true };
+}
+
 // ─── Sotto-comandi --record-* (li chiamano i ruoli) ──────────────────────────
 
 // Riflesso della macchina a stati (best-effort): l'esito del verifier muove lo
