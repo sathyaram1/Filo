@@ -10,35 +10,19 @@ const { registerFiloProtocolForSession } = require('./protocol');
 
 const SHELL_HEIGHT = 88;
 
-// Finestra FUORI SCHERMO (solo test automatici). Una suite che apre e chiude
-// Electron decine di volte fa lampeggiare finestre e ruba il fuoco a chi sta
-// lavorando: in locale è il motivo per cui i test si evitavano.
-//
-// PERCHÉ FUORI SCHERMO E NON NASCOSTA. Con `show: false` il primo tentativo
-// funzionava per il DOM ma rompeva i menu contestuali: in Filo il menu del tasto
-// destro è una FINESTRA NATIVA figlia, e con la madre mai mostrata non si apre
-// né si posiziona — una dozzina di spec diventava rossa. Fuori schermo invece la
-// finestra è a tutti gli effetti visibile per il sistema (le figlie si aprono, il
-// compositore disegna, gli screenshot vengono), semplicemente in una zona del
-// desktop virtuale che nessun monitor mostra. Non entra nemmeno nella barra
-// delle applicazioni e non prende mai il fuoco.
-//
-// NON usarlo per `test:shoot`/`smoke`, che fotografano la finestra REALE: lì
-// l'immagine È il risultato e va composta su uno schermo vero.
-const HIDDEN = process.env.FILO_HIDE_WINDOW === '1';
-// Abbastanza lontano da stare fuori da qualsiasi disposizione di monitor
-// plausibile, non così tanto da uscire dai limiti che Windows accetta.
-const OFFSCREEN = { x: -32000, y: -32000 };
+// Finestre invisibili durante i test automatici: perché e come, in
+// `test-window-mode.js` (vale anche per menu e tooltip, che sono finestre a sé).
+const { HIDDEN, OFFSCREEN, hideForTests } = require('./test-window-mode');
 
 // Porta la finestra davanti a tutto: serve al primo disegno, perché in alcune
 // configurazioni la WebContentsView appena creata non ha un display surface
 // valido e resta un quadrato vuoto finché la finestra non riceve attenzione
-// esplicita dal compositor. Fuori schermo la si mostra comunque (altrimenti si
-// ricade nel caso "nascosta", coi menu nativi rotti) ma SENZA rubare il fuoco.
+// esplicita dal compositor. Nei test la si mostra comunque (altrimenti i menu
+// nativi, che sono finestre figlie, non si aprono) ma invisibile e senza fuoco.
 function revealWindow(win) {
   try {
     if (HIDDEN) {
-      win.setPosition(OFFSCREEN.x, OFFSCREEN.y);
+      hideForTests(win, { main: true });
       win.showInactive();
       return;
     }

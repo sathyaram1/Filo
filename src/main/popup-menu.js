@@ -4,6 +4,7 @@
 
 const { BrowserWindow, nativeTheme } = require('electron');
 const path = require('node:path');
+const { hideForTests } = require('./test-window-mode');
 
 let activePopup = null;
 
@@ -213,6 +214,9 @@ function showPopupMenu(parentWin, entries, x, y, onSelect) {
   const html = buildHTML(entries, isDark, MARGIN);
   popup.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
 
+  // Nei test la finestra madre è invisibile: il menu è una finestra a sé e
+  // altrimenti comparirebbe da solo sullo schermo (vedi test-window-mode.js).
+  hideForTests(popup);
   popup.once('ready-to-show', () => popup.show());
 
   popup.on('blur', () => {

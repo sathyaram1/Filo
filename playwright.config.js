@@ -4,6 +4,15 @@
 
 import { defineConfig } from '@playwright/test';
 
+// Finestre invisibili per TUTTA la suite (vedi src/main/test-window-mode.js).
+// Sta qui e non nella fixture perché una cinquantina di spec lancia Electron per
+// conto proprio (`tests/agent/driver.mjs`, `_electron.launch` diretto) e la
+// fixture non li copre: bastava uno di quelli per far comparire una finestra a
+// schermo per dieci secondi in mezzo a `npm test`. Questo file lo carica ogni
+// worker, e ogni lancio eredita l'ambiente del worker → nessuna via di mezzo.
+// `FILO_TEST_VISIBLE=1` rimette la finestra a schermo quando la si vuole vedere.
+if (process.env.FILO_TEST_VISIBLE !== '1') process.env.FILO_HIDE_WINDOW = '1';
+
 export default defineConfig({
   testDir: './tests',
   testMatch: /.*\.spec\.(js|mjs)$/,

@@ -9,6 +9,7 @@
 // close, per evitare il costo di reload ad ogni hover).
 
 const { BrowserWindow, nativeTheme } = require('electron');
+const { hideForTests } = require('./test-window-mode');
 
 let tipWin = null;
 let tipReady = false;
@@ -88,6 +89,8 @@ function ensureWin(parentWin) {
       const w = Math.max(20, payload.w + 4);
       const h = Math.max(16, payload.h + 4);
       tipWin.setBounds({ x: tipWin.getBounds().x, y: tipWin.getBounds().y, width: w, height: h });
+      // Nei test resta invisibile: è una finestra a sé (vedi test-window-mode.js).
+      hideForTests(tipWin);
       if (!tipWin.isVisible()) tipWin.showInactive();
     }
   });
