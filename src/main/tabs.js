@@ -1726,8 +1726,14 @@ class TabManager {
     // content script perché li mostri nel menu di correzione custom.
     wc.on('context-menu', (_e, params) => {
       if (params.misspelledWord) {
+        // #405 — il click destro può essere avvenuto dentro un riquadro
+        // incorporato (iframe): il menu di correzione lo costruisce il content
+        // script DI QUEL frame, quindi i suggerimenti vanno consegnati lì.
+        // `wc.send` raggiunge solo il frame principale, e nei campi dentro un
+        // riquadro i suggerimenti nativi sarebbero caduti nel vuoto.
+        const target = params.frame && !params.frame.detached ? params.frame : wc;
         try {
-          wc.send('filo:broadcast', {
+          target.send('filo:broadcast', {
             type: '_spell:native',
             word: params.misspelledWord,
             suggestions: (params.dictionarySuggestions || []).slice(0, 5),
