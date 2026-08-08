@@ -420,6 +420,81 @@ test('appendWorkerLog: input non-array → parte da lista vuota', () => {
   assert.deepEqual(appendWorkerLog(null, null, 200), []);
 });
 
+// ─── preflight: la prontezza gira PRIMA del setup (spec §E) ──────────────────
+//
+// Il punto della spec: "coda illeggibile → guasto, non 'niente da fare'". Un
+// giro cieco che si traveste da giornata tranquilla è già costato un'ondata di
+// lavoro fantasma (#310+). Qui la rete è iniettata: nessuna chiamata vera.
+
+const gitOk = () => ({ ok: true, out: '' });
+
+test('preflight: repo e coda a posto → prontezza OK', async () => {
+  const r = await preflight({ git: gitOk, snapshot: async () => ({ reviews: [], todoWinner: null }) });
+  assert.deepEqual(r, { ok: true });
+});
+
+test('preflight: coda illeggibile → GUASTO passeggero, mai ok (la chiave può tornare)', async () => {
+  const r = await preflight({
+    git: gitOk,
+    snapshot: async () => { throw routineFault('transient', 'coda illeggibile: nessuno dei 7 status cifrati è decifrabile'); },
+  });
+  assert.equal(r.ok, false);
+  assert.equal(r.kind, 'transient');
+  assert.match(r.message, /coda illeggibile/);
+});
+
+test('preflight: guasto permanente dello snapshot resta permanente (non degradato a passeggero)', async () => {
+  const r = await preflight({
+    git: gitOk,
+    snapshot: async () => { throw routineFault('permanent', 'il branch nello stato non esiste più'); },
+  });
+  assert.equal(r.ok, false);
+  assert.equal(r.kind, 'permanent');
+});
+
+test('preflight: errore nudo dello snapshot (senza faultKind) → passeggero', async () => {
+  const r = await preflight({ git: gitOk, snapshot: async () => { throw new Error('ECONNRESET'); } });
+  assert.equal(r.ok, false);
+  assert.equal(r.kind, 'transient');
+  assert.match(r.message, /ECONNRESET/);
+});
+
+test('preflight: deposito irraggiungibile → passeggero, e la coda non viene nemmeno interrogata', async () => {
+  let asked = 0;
+  const r = await preflight({
+    // rev-parse passa, ls-remote no: è il deposito a essere giù, non il repo.
+    git: (args) => (args[0] === 'ls-remote'
+      ? { ok: false, out: 'fatal: could not read from remote repository' }
+      : { ok: true, out: '.git' }),
+    snapshot: async () => { asked++; return { reviews: [], todoWinner: null }; },
+  });
+  assert.equal(r.ok, false);
+  assert.equal(r.kind, 'transient');
+  assert.equal(asked, 0, 'con il deposito giù non ha senso pagare il giro di rete sulla coda');
+});
+
+test('preflight: directory che non è un repo → GUASTO permanente (aspettare 6h non ripara)', async () => {
+  const r = await preflight({
+    git: () => ({ ok: false, out: 'fatal: not a git repository' }),
+    snapshot: async () => { throw new Error('mai chiamato'); },
+  });
+  assert.equal(r.ok, false);
+  assert.equal(r.kind, 'permanent');
+});
+
+test("preflight: l'esito non fa trapelare NIENTE della coda (orchestratore cieco)", async () => {
+  const r = await preflight({
+    git: gitOk,
+    snapshot: async () => ({
+      reviews: [{ id: 'segreto', num: '#42', branch: 'worker/segreto', state: null }],
+      todoWinner: { id: 'anche-questo', num: '#43' },
+    }),
+  });
+  // Solo il verdetto: nessun id, nessun numero, nessun branch, nessun conteggio.
+  assert.deepEqual(Object.keys(r), ['ok']);
+  assert.equal(r.ok, true);
+});
+
 // ─── teardown ─────────────────────────────────────────────────────────────────
 
 test('cleanup STATE_DIR temporanea', () => {
