@@ -112,16 +112,12 @@ test('E: aperture ripetute e cambio bersaglio — il menu resta coerente', async
     await page.keyboard.press('Escape');
     await expect(page.locator('.sn-menu')).toHaveCount(0, { timeout: 4000 });
   }
-  // doppio clic destro consecutivo senza chiudere
+  // alternanza rapida miniatura → testo senza aspettare la chiusura:
+  // il menu non deve restare "appiccicato" al bersaglio precedente
   await page.locator('#thumb').click({ button: 'right', position: { x: 8, y: 8 } });
-  await page.locator('#thumb').click({ button: 'right', position: { x: 20, y: 20 } });
+  await page.locator('#plain').click({ button: 'right', position: { x: 4, y: 4 } });
   await expect(page.locator('.sn-menu')).toHaveCount(1);
-  const t2 = (await labels(page.locator('.sn-menu'))).join('|');
-  expect(t2).toContain('Apri in nuova tab');
-  await page.keyboard.press('Escape');
-  // ora un elemento senza contesto: le voci immagine/link NON devono restare
-  const menu3 = await openMenuOn(page, '#plain');
-  const t3 = (await labels(menu3)).join('|');
+  const t3 = (await labels(page.locator('.sn-menu'))).join('|');
   expect(t3).not.toContain('Copia immagine');
   expect(t3).not.toContain('Apri in nuova tab');
 });
