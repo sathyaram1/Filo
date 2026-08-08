@@ -125,6 +125,8 @@ function createIncognitoWindow() {
     backgroundColor: '#1f1b2e',
     title: 'Filo — Incognito',
     icon: path.join(__dirname, '..', '..', 'assets', 'icons', 'icon-128.png'),
+    show: !HIDDEN,
+    skipTaskbar: HIDDEN,
     frame: false,
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'shell-preload.js'),
