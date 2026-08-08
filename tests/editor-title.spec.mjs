@@ -122,8 +122,12 @@ test('rinomina confermata a vuoto dal menu documenti: il titolo automatico arriv
   const inlineInput = page.locator('#docPop .ed-doc-item-input');
   await expect(inlineInput).toBeVisible();
 
-  // Conferma senza dare un nome: svuota il campo e preme Invio.
-  await inlineInput.fill('');
+  // Parità col cammino della docbar: "Documento senza titolo" è l'assenza di un
+  // nome, quindi è un segnaposto — il campo parte vuoto, non pre-riempito.
+  await expect(inlineInput).toHaveValue('');
+  await expect(inlineInput).toHaveAttribute('placeholder', 'Documento senza titolo');
+
+  // Conferma senza dare un nome: preme Invio sul campo vuoto.
   await inlineInput.press('Enter');
 
   // Il documento resta senza nome (nessuna rinomina è avvenuta davvero).
