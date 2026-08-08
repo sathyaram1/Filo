@@ -280,6 +280,27 @@ const chromeShim = {
 globalThis.chrome = chromeShim;
 globalThis.self = globalThis; // i moduli IIFE controllano `self` come fallback
 
+// ─── #405 — quale frame sta usando l'utente ────────────────────────────────
+//
+// Le scorciatoie globali (Alt+E Spiegazione, Alt+T Traduci) lavorano sul testo
+// selezionato. Con i riquadri incorporati il testo selezionato può stare dentro
+// il riquadro, ma `webContents.send` consegna SOLO al frame principale: la
+// scorciatoia arrivava a chi non aveva nessuna selezione e non succedeva nulla.
+// Ogni frame segnala al main quando l'utente ci sta interagendo (limitato a una
+// segnalazione ogni mezzo secondo), così il main sa a chi consegnare.
+try {
+  let lastClaim = 0;
+  const claim = () => {
+    const now = Date.now();
+    if (now - lastClaim < 500) return;
+    lastClaim = now;
+    try { ipcRenderer.send('filo:frame-active'); } catch (_) {}
+  };
+  for (const ev of ['pointerdown', 'keydown', 'focusin']) {
+    window.addEventListener(ev, claim, { capture: true, passive: true });
+  }
+} catch (_) { /* mai bloccare il caricamento della pagina */ }
+
 // ─── shortcut hook ─────────────────────────────────────────────────────────
 // Lo shortcut globale fa un webContents.send('shortcut:triggered'); il content
 // script registra un listener via chrome.runtime.onMessage su MSG.SHORTCUT_TRIGGERED.
