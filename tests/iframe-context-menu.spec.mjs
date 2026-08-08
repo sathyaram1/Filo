@@ -131,10 +131,8 @@ test('Alt+E sul testo selezionato DENTRO il riquadro arriva al riquadro', async 
   });
   // Stessa strada della scorciatoia globale Alt+E.
   await app.evaluate(({ BrowserWindow }) => {
-    const path = require('node:path');
-    const { dispatch } = require(path.join(process.cwd(), 'src', 'main', 'shortcuts.js'));
     const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
-    dispatch('explain-selection', win);
+    globalThis.__filoShortcuts.dispatch('explain-selection', win);
   });
   // La spiegazione si apre DENTRO il riquadro, sul testo selezionato lì.
   // Prima la scorciatoia finiva sempre nel frame principale, che non ha
