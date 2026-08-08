@@ -360,15 +360,15 @@ function injectStyles() {
 const SHARED_DIR = path.join(__dirname, '..', 'shared');
 const CONTENT_DIR = path.join(__dirname, '..', 'content');
 
-// Moduli di PAGINA: descrivono o modificano la scheda nel suo insieme (colore
-// della tab, banner del sito pericoloso, proposta geografica, banner cookie).
-// Dentro un riquadro incorporato parlerebbero del rettangolo sbagliato — un
-// banner "sito pericoloso" disegnato dentro un video, o il colore della scheda
-// campionato da una pubblicità — quindi lì non si caricano affatto (#405).
-const PAGE_ONLY_MODULES = new Set(['safebrowse.js', 'geoProposal.js', 'cookies.js', 'pageColor.js']);
-
 function loadScripts() {
   // Ordine identico a quello del manifest dell'estensione legacy.
+  // `PAGE_ONLY` marca i moduli che descrivono o modificano la SCHEDA nel suo
+  // insieme (banner del sito pericoloso, proposta geografica, banner cookie,
+  // colore della tab): dentro un riquadro incorporato parlerebbero del
+  // rettangolo sbagliato — un avviso "sito pericoloso" disegnato dentro un
+  // video, il colore della scheda preso da una pubblicità — quindi lì non si
+  // caricano affatto (#405).
+  const PAGE_ONLY = !IS_SUBFRAME;
   try { require(path.join(SHARED_DIR, 'constants.js')); } catch (e) { console.error('[Filo CS] constants', e); }
   try { require(path.join(SHARED_DIR, 'i18n.js')); } catch (e) { console.error('[Filo CS] i18n', e); }
   try { require(path.join(SHARED_DIR, 'messages.js')); } catch (e) { console.error('[Filo CS] messages', e); }
@@ -384,16 +384,16 @@ function loadScripts() {
   try { require(path.join(CONTENT_DIR, 'highlight.js')); } catch (e) { console.error('[Filo CS] highlight', e); }
   try { require(path.join(CONTENT_DIR, 'sidebar.js')); } catch (e) { console.error('[Filo CS] sidebar', e); }
   try { require(path.join(CONTENT_DIR, 'spellcheck.js')); } catch (e) { console.error('[Filo CS] spellcheck', e); }
-  if (!PAGE_ONLY_MODULES.has('safebrowse.js') || !IS_SUBFRAME) try { require(path.join(CONTENT_DIR, 'safebrowse.js')); } catch (e) { console.error('[Filo CS] safebrowse', e); }
-  if (!PAGE_ONLY_MODULES.has('geoProposal.js') || !IS_SUBFRAME) try { require(path.join(CONTENT_DIR, 'geoProposal.js')); } catch (e) { console.error('[Filo CS] geoProposal', e); }
-  if (!PAGE_ONLY_MODULES.has('cookies.js') || !IS_SUBFRAME) try { require(path.join(CONTENT_DIR, 'cookies.js')); } catch (e) { console.error('[Filo CS] cookies', e); }
+  if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'safebrowse.js')); } catch (e) { console.error('[Filo CS] safebrowse', e); }
+  if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'geoProposal.js')); } catch (e) { console.error('[Filo CS] geoProposal', e); }
+  if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'cookies.js')); } catch (e) { console.error('[Filo CS] cookies', e); }
   try { require(path.join(SHARED_DIR, 'feedback.js')); } catch (e) { console.error('[Filo CS] feedback shared', e); }
   try { require(path.join(SHARED_DIR, 'feedbackClientIdHash.js')); } catch (e) { console.error('[Filo CS] feedbackClientIdHash', e); } // S1.F2.2
   try { require(path.join(SHARED_DIR, 'feedbackAttachTypes.js')); } catch (e) { console.error('[Filo CS] feedbackAttachTypes', e); }
   try { require(path.join(CONTENT_DIR, 'feedback.js')); } catch (e) { console.error('[Filo CS] feedback content', e); }
   try { require(path.join(CONTENT_DIR, 'redteamAttack.js')); } catch (e) { console.error('[Filo CS] redteamAttack content', e); }
   try { require(path.join(SHARED_DIR, 'tabColor.js')); } catch (e) { console.error('[Filo CS] tabColor', e); }
-  if (!PAGE_ONLY_MODULES.has('pageColor.js') || !IS_SUBFRAME) try { require(path.join(CONTENT_DIR, 'pageColor.js')); } catch (e) { console.error('[Filo CS] pageColor', e); }
+  if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'pageColor.js')); } catch (e) { console.error('[Filo CS] pageColor', e); }
   try { require(path.join(CONTENT_DIR, 'translatePage.js')); } catch (e) { console.error('[Filo CS] translatePage', e); }
   try { require(path.join(SHARED_DIR, 'ttsChunk.js')); } catch (e) { console.error('[Filo CS] ttsChunk', e); }
   try { require(path.join(CONTENT_DIR, 'tts.js')); } catch (e) { console.error('[Filo CS] tts', e); }

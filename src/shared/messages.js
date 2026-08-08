@@ -469,7 +469,15 @@
     // condividere, salvare o fare uno screenshot devono valere per la pagina
     // intera, non per il rettangolo dell'embed. Il content script del riquadro
     // chiede al main di rilanciare il comando nel frame principale della
-    // scheda, che lo esegue come se il menu fosse stato aperto lì. { iconId }
+    // scheda, che lo esegue come se il menu fosse stato aperto lì.
+    // { iconId } oppure { surface }
+    //
+    // ORIGINE: chiamabile anche da una pagina web (è il content script di un
+    // riquadro a mandarlo) — di proposito, e senza gate. Non legge dati, non
+    // tocca il disco e non aziona il sistema: inoltra un messaggio a un frame
+    // DELLA STESSA SCHEDA, che al più esegue una voce del menu del tasto destro
+    // già raggiungibile con i suoi messaggi diretti. Non porta dati arbitrari:
+    // solo un id del registro icone o il nome di un pannello.
     RUN_IN_TOP_FRAME: 'run_in_top_frame',
 
     // Da background -> content (broadcast)
