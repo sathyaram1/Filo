@@ -597,11 +597,14 @@
     // dettato ci atterra sopra (vale soprattutto per gli editor contenteditable,
     // dove la selezione viva va persa se il focus passa a un bottone).
     pill.addEventListener('mousedown', (e) => e.preventDefault());
-    document.documentElement.appendChild(pill);
+    // Nello stack degli avvisi in pagina (#409), così non finisce sotto o sopra
+    // un toast che arriva nel frattempo. `sticky`: è l'unico comando per
+    // fermare la registrazione, il tetto dello stack non deve poterlo sfrattare.
+    Popup.mountToast(pill, { sticky: true });
 
     const cleanup = () => {
       try { stream.getTracks().forEach((t) => t.stop()); } catch (_) {}
-      if (pill.parentNode) pill.remove();
+      if (pill.parentNode) Popup.unmountToast(pill);
       _dictateState = null;
     };
 
