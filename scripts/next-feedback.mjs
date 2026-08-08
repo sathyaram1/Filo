@@ -285,8 +285,9 @@ export async function run() {
   }
 
   if (!rawCandidates.length) {
-    process.stderr.write('[next-feedback] nessun feedback da lavorare (coda vuota)\n');
-    process.exit(2);
+    // Qui la coda è vuota PRIMA di qualsiasi decifratura: non c'è proprio
+    // nessun documento aperto, quindi non c'è illeggibilità possibile.
+    exitEmpty('nessun feedback da lavorare (coda vuota)', 0, 0);
   }
 
   // 3. Per ogni candidato: decifra SOLO la priority (e lo status, per filtrare).
