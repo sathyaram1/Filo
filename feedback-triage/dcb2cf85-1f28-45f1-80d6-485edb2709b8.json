@@ -1,7 +1,0 @@
-{
-  "id": "dcb2cf85-1f28-45f1-80d6-485edb2709b8",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. ho rifatto il giro dell'utente: chiedo a Filo di chiudere tutte le schede tranne quella attuale, lui ammette di non poterlo fare e la richiesta di conferma compare da sola, col testo della segnalazione per intero. Con un testo da 10.000 caratteri il riquadro scorre e resta dentro lo schermo, e il testo evidenziato prende la tinta calda di Filo (segue anche il tema scuro e una tinta d'accento diversa scelta nelle preferenze). Provato a romperla: segnalazione vuota o di soli spazi, emoji e codice HTML/script dentro il testo (mostrato alla lettera, non eseguito), due proposte nella stessa risposta (le conferme si aprono una alla volta, mai impilate), Annulla ed Esc non inviano nulla e il pulsante in chat riapre la conferma, OK invia una volta sola anche col doppio clic. Regressione completa dell'app passata: l'unica prova rossa riguarda il riordino delle schede per colore e, rigirata da sola, passa sia qui sia sulla versione senza questa modifica — intoppo dell'ambiente sotto carico, non collegato. Ti ho lasciato in Ricevuti una proposta a parte: una conferma che si apre da sola si chiude se clicchi fuori proprio nell'istante in cui compare.",
-  "queuedAt": "2026-08-08T13:36:06.415Z",
-  "queuedBy": "routine"
-}
