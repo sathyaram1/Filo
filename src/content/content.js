@@ -1095,7 +1095,24 @@
     // Toast di sistema inviato dal main (es. esito differito dell'invio di un
     // feedback, #341). Il broadcast arriva a TUTTE le schede: lo mostra solo
     // quella in primo piano, per non moltiplicare lo stesso avviso.
+    // #405 — un riquadro incorporato della stessa scheda ha aperto il suo menu.
+    // Gli eventi del mouse non attraversano il bordo di un riquadro, quindi il
+    // nostro menu non si accorgerebbe del clic e resterebbero aperti in due.
+    if (msg?.type === MSG.CLOSE_OTHER_MENUS) {
+      try { Menu.close(); } catch (_) {}
+      return;
+    }
+    // #405 — azione di PAGINA scelta dal menu aperto dentro un riquadro
+    // (tradurre, condividere, salvare, QR, screenshot…): il riquadro l'ha
+    // rimandata qui perché solo il frame principale è "la pagina".
+    if (msg?.type === MSG.TOP_FRAME_COMMAND) {
+      try { MenuIcons.runIconAction(msg.iconId); } catch (e) { console.error('[SN] azione di pagina dal riquadro', e); }
+      return;
+    }
     if (msg?.type === MSG.SHOW_TOAST) {
+      // Gli avvisi di sistema appartengono alla pagina: mostrarli anche dentro
+      // ogni riquadro incorporato li duplicherebbe (#405).
+      if (IS_SUBFRAME) return;
       try {
         if (document.visibilityState === 'visible' && document.hasFocus()) {
           Popup?.showToast?.(String(msg.text || ''), { duration: Number(msg.duration) || 2800 });
