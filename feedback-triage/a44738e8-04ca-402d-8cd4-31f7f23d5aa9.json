@@ -1,7 +1,0 @@
-{
-  "id": "a44738e8-04ca-402d-8cd4-31f7f23d5aa9",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato, nessun rilievo. La modifica era già pubblicata: era stata lavorata in sessione locale direttamente sul ramo principale, quindi non c'era nulla da fondere e il controllo è stato fatto comunque sul codice.",
-  "queuedAt": "2026-08-08T00:23:00.413Z",
-  "queuedBy": "routine"
-}
