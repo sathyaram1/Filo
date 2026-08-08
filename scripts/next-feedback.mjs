@@ -337,6 +337,22 @@ export async function run() {
   const todoFree = minimal.filter((fb) => fb.status === 'todo' && !fb.claimed);
 
   if (!todoFree.length) {
+    // "Coda vuota" e "coda ILLEGGIBILE" non sono la stessa cosa (spec
+    // ROUTINE-BRANCH-INTEGRITY.md §E). Senza chiave privata gli status non si
+    // decifrano, i feedback spariscono dal filtro qui sopra e questa funzione
+    // rispondeva serenamente "niente da fare": nessun errore, nessun allarme,
+    // il giro delle routine finiva in lavoro fantasma (incidente #310+).
+    //
+    // La soglia è "non posso AFFERMARE che sia vuota": guasto solo quando
+    // staremmo per dire "niente da fare" AVENDO status illeggibili — il
+    // vincitore poteva essere fra quelli. Con lavoro trovato si procede lo
+    // stesso (un singolo documento corrotto non deve fermare il ciclo): la
+    // firma della chiave assente è che sono illeggibili TUTTI, e in quel caso
+    // di lavorabili non ne resta nessuno e cadiamo qui.
+    if (unreadable) {
+      process.stderr.write(`[next-feedback] GUASTO: ${unreadable}/${minimal.length} status non decifrabili e nessun feedback lavorabile: non posso distinguere "coda vuota" da "coda illeggibile". Controlla la chiave privata (FILO_FEEDBACK_PRIVKEY).\n`);
+      process.exit(3);
+    }
     process.stderr.write('[next-feedback] nessun feedback da lavorare (nessun todo non claimato)\n');
     process.exit(2);
   }
