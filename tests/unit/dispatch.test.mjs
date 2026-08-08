@@ -20,6 +20,9 @@ import { resolve } from 'node:path';
 // STATE_DIR isolata PRIMA di importare il modulo (è letta a import-time).
 const TMP = mkdtempSync(resolve(tmpdir(), 'filo-dispatch-'));
 process.env.FILO_DISPATCH_STATE_DIR = TMP;
+// Anche la ROOT: emit() ci scrive il marcatore di ruolo (#443) e non deve
+// sporcare il checkout vero durante i test.
+process.env.FILO_REPO_ROOT = TMP;
 
 const {
   classifyReview,
