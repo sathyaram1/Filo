@@ -48,11 +48,23 @@ function firstOverlap(boxes) {
   return null;
 }
 
-// Un'azione vera dal menu del tasto destro sul link.
-async function runLinkAction(page, label, { exclude = null, settle = 300 } = {}) {
-  await page.locator('#link').click({ button: 'right', position: { x: 8, y: 8 } });
+// Apre il menu del tasto destro. Subito dopo aver chiuso il menu precedente il
+// primo click destro può cadere a vuoto: si riprova invece di aspettare a caso.
+async function openMenuOnLink(page) {
   const menu = page.locator('.sn-menu');
-  await expect(menu).toBeVisible();
+  for (let i = 0; i < 8; i++) {
+    await page.locator('#link').click({ button: 'right', position: { x: 8, y: 8 } });
+    try {
+      await menu.waitFor({ state: 'visible', timeout: 800 });
+      return menu;
+    } catch (_) { /* riprova */ }
+  }
+  throw new Error('il menu del tasto destro non si è aperto');
+}
+
+// Un'azione vera dal menu del tasto destro sul link.
+async function runLinkAction(page, label, { exclude = null, settle = 0 } = {}) {
+  const menu = await openMenuOnLink(page);
   let item = menu.locator('button', { hasText: label });
   if (exclude) item = item.filter({ hasNotText: exclude });
   await item.first().click();
