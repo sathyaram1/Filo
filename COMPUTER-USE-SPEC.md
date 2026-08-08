@@ -314,7 +314,8 @@ Tre soli casi, e vanno implementati tutti e tre:
    dichiarati;
 2. **pavimento** — §5;
 3. **la realtà non corrisponde al piano** — finestra inattesa, richiesta di
-   accesso, errore, un passo che fallisce due volte di fila.
+   accesso, errore, un passo che fallisce due volte di fila, **o un passo
+   irreversibile che il piano non aveva previsto**.
 
 Il terzo è quello che si dimentica ed è il più importante: è il caso in cui un
 agente ostinato fa danni cercando di "far funzionare" un piano che non regge.
