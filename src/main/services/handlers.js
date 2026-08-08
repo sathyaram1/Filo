@@ -2112,12 +2112,28 @@ function broadcastToTabs(message) {
     for (const win of BrowserWindow.getAllWindows()) {
       if (win._filoTabs) {
         for (const t of win._filoTabs.tabs) {
-          try { t.view.webContents.send('filo:broadcast', message); } catch (_) {}
+          try { sendToAllFrames(t.view.webContents, message); } catch (_) {}
         }
       }
       try { win.webContents.send('filo:broadcast', message); } catch (_) {}
     }
   } catch (_) {}
+}
+
+// #405 — `webContents.send` consegna SOLO al frame principale. Da quando i
+// content script girano anche dentro i riquadri incorporati, un riquadro che
+// non riceve gli aggiornamenti di impostazioni (tema, colori, correttore) o lo
+// stato della lettura ad alta voce resta indietro rispetto alla pagina che lo
+// ospita. Raggiungiamo ogni frame vivo della scheda; se l'enumerazione non è
+// disponibile (frame in navigazione) si ripiega sul comportamento di prima.
+function sendToAllFrames(wc, message) {
+  if (!wc || wc.isDestroyed?.()) return;
+  let frames = null;
+  try { frames = wc.mainFrame && wc.mainFrame.framesInSubtree; } catch (_) { frames = null; }
+  if (!frames || !frames.length) { try { wc.send('filo:broadcast', message); } catch (_) {} return; }
+  for (const f of frames) {
+    try { if (!f.detached) f.send('filo:broadcast', message); } catch (_) {}
+  }
 }
 
 // Configura il rilevatore di siti pericolosi (services/safebrowse) con chiavi e
