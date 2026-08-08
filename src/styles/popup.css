@@ -302,12 +302,11 @@
 /* Conferma cliccabile di "Salva per dopo" (#252): come un toast, ma interattivo
    — cliccandolo apre la lista "Aperti per dopo" con la scheda evidenziata. */
 .sn-save-confirm {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  z-index: 2147483647;
+  flex: none;
+  /* Come la pill: dentro uno stack trasparente ai click, ma questa si clicca. */
+  pointer-events: auto;
   padding: 10px 16px;
-  max-width: min(420px, calc(100vw - 40px));
+  max-width: 100%;
   background: var(--sn-overlay-bg);
   color: var(--sn-fg);
   font-family: var(--sn-font);
