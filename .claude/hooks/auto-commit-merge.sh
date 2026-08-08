@@ -93,14 +93,14 @@ git worktree list --porcelain | awk '/^worktree /{print substr($0,10)}' | while 
   SUMMARY=$(printf '%s\n' "$CHANGED" | head -3 | awk 'NR>1{printf ", "}{printf "%s",$0}')
   [ "${N:-0}" -gt 3 ] && SUMMARY="$SUMMARY (+$((N-3)) file)"
   [ -z "$SUMMARY" ] && SUMMARY=$(date +%Y-%m-%dT%H:%M:%S)
-  git -c user.email=claude@local -c user.name=claude-local commit -q -m "auto: $SUMMARY" 2>/dev/null
+  git -c user.email="$COMMIT_AS_EMAIL" -c user.name="$COMMIT_AS_NAME" commit -q -m "auto: $SUMMARY" 2>/dev/null
 
   # Multi-worktree mode: merge feature branch into TARGET_BRANCH worktree.
   # Gated branches (worker/*, feature/*) are committed above but NOT merged
   # here — they go through scripts/merge-gate.mjs (R2).
-  if [ -n "$TARGET_WT" ] && [ "$wt" != "$TARGET_WT" ] && [ "$BRANCH" != "$TARGET_BRANCH" ] && ! is_gated_branch "$BRANCH"; then
+  if [ -n "$TARGET_WT" ] && [ "$wt" != "$TARGET_WT" ] && [ "$BRANCH" != "$TARGET_BRANCH" ] && ! is_gated_branch "$BRANCH" && ! is_routine_session; then
     cd "$TARGET_WT" || continue
-    MERGE_OUT=$(git -c user.email=claude@local -c user.name=claude-local merge --no-edit "$BRANCH" 2>&1)
+    MERGE_OUT=$(git -c user.email="$COMMIT_AS_EMAIL" -c user.name="$COMMIT_AS_NAME" merge --no-edit "$BRANCH" 2>&1)
     MERGE_RC=$?
     if [ $MERGE_RC -ne 0 ]; then
       git merge --abort 2>/dev/null
@@ -135,9 +135,20 @@ else
   # Push the feature branch (best-effort, for traceability/debugging).
   git push origin "$CUR_BRANCH" >/dev/null 2>&1 || true
 
-  # Gated branches (worker/*, feature/*) stop here: they are pushed for
-  # traceability but must NOT land on TARGET_BRANCH automatically. The
-  # orchestrator merges them via scripts/merge-gate.mjs after PASS (R2).
+  # Sessione di ROUTINE: si ferma qui, sempre. Il ramo corrente e' gia' stato
+  # spedito qui sopra (durabilita'), ma al ramo principale ci si arriva solo
+  # attraverso scripts/merge-gate.mjs, dopo la verifica e i controlli di
+  # sicurezza. Nessuna eccezione, nessun nome di ramo che scavalchi la regola.
+  if is_routine_session; then
+    if [ "$CUR_BRANCH" = "$TARGET_BRANCH" ]; then
+      echo "[auto-commit] ATTENZIONE: sessione di routine sul ramo '$TARGET_BRANCH'. Il lavoro e' salvato in locale ma NON pubblicato: una routine non deve lavorare sul ramo principale." >&2
+    fi
+    exit 0
+  fi
+
+  # Rete per le sessioni locali: i rami di lavoro/funzionalita' non si
+  # pubblicano da soli nemmeno qui (e' cosi' che si protegge un lavoro locale
+  # che non deve ancora uscire).
   if is_gated_branch "$CUR_BRANCH"; then
     exit 0
   fi

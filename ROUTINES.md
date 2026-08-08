@@ -18,7 +18,23 @@ Le routine schedulate su claude.ai partono con un prompt minimo
 
 ### Avvio
 
-0. **PRONTEZZA PRIMA DEL SETUP.** Il passo 1 costa parecchio (installazione,
+0. **DICHIARATI COME ROUTINE, prima di qualsiasi altra cosa.**
+   ```bash
+   export FILO_ROUTINE=1
+   ```
+   Va esportata **qui nell'orchestratore**, così ogni worker la eredita, e
+   ri-prefissata esplicitamente nei passaggi che perdono l'ambiente (`su tester -c`,
+   nuove shell) — come per la chiave privata.
+
+   Senza, il sistema non sa che sei una routine e **pubblica il tuo lavoro sul
+   ramo principale a ogni modifica di file**, saltando la verifica e il cancello
+   di sicurezza: è ciò che il 24 luglio 2026 ha mandato agli utenti del codice
+   mai esaminato. Con la marcatura, al ramo principale ci si arriva solo
+   attraverso `scripts/merge-gate.mjs`. Serve anche a distinguere, nella storia,
+   il lavoro delle routine da quello delle sessioni locali dell'owner: senza,
+   sono indistinguibili.
+
+0b. **PRONTEZZA PRIMA DEL SETUP.** Il passo 1 costa parecchio (installazione,
    binario Electron ~102MB, `scrot`): se il giro non è in grado di lavorare, va
    scoperto **prima** di averlo pagato.
    ```bash
