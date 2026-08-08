@@ -349,12 +349,7 @@ export async function run() {
     // stesso (un singolo documento corrotto non deve fermare il ciclo): la
     // firma della chiave assente è che sono illeggibili TUTTI, e in quel caso
     // di lavorabili non ne resta nessuno e cadiamo qui.
-    if (unreadable) {
-      process.stderr.write(`[next-feedback] GUASTO: ${unreadable}/${minimal.length} status non decifrabili e nessun feedback lavorabile: non posso distinguere "coda vuota" da "coda illeggibile". Controlla la chiave privata (FILO_FEEDBACK_PRIVKEY).\n`);
-      process.exit(3);
-    }
-    process.stderr.write('[next-feedback] nessun feedback da lavorare (nessun todo non claimato)\n');
-    process.exit(2);
+    exitEmpty('nessun feedback da lavorare (nessun todo non claimato)', unreadable, minimal.length);
   }
 
   // 4b. Dipendenze fra sub-feedback: #N.k è lavorabile solo se i fratelli
