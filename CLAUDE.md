@@ -82,11 +82,18 @@ o "ho letto il diff".
 
 Il minimo accettabile dipende dall'ambiente:
 
-- **In sessione locale (Windows)**: verifica **solo la feature toccata**, non
-  l'intera suite. ⚠️ **NON lanciare `npm test` (suite completa) in locale**: apre
-  e chiude Electron centinaia di volte — finestre che lampeggiano mentre l'utente
-  usa il PC — ed è lentissimo (~25 min). La regressione completa sulle feature
-  vecchie è compito delle routine cloud. In locale usa invece:
+- **In sessione locale (Windows)**: la regola "non lanciare mai la suite
+  completa" **non vale più** (cambiata il 2026-08-07). Nasceva da quando il
+  grosso del lavoro si faceva in locale; oggi in locale si fanno **poche cose
+  critiche** e il grosso passa dalle routine, quindi il tempo in più è
+  accettabile. Un controllo in più, al peggio, fa risparmiare tempo all'owner;
+  al meglio trova ciò che gli sarebbe sfuggito.
+
+  In pratica: **`npm run finish` prima di chiudere** (fa da solo logica pura +
+  spec delle aree toccate, e solo se sono verdi fonde e pubblica). Lancia
+  `npm test` per intero quando hai toccato qualcosa di trasversale o non sai
+  quali spec siano rilevanti — sappi solo che apre e chiude Electron molte volte
+  (~25 min), quindi avvisa l'owner prima. Gli strumenti singoli:
   - **prima scelta per la logica pura — gli unit test**: `npm run test:unit`
     (runner `node:test`, gira in ms **senza aprire Electron**). Se hai toccato
     logica pura (parsing, classificazione, validazione, trasformazioni in
