@@ -421,8 +421,10 @@ ma complica il loop; prima va misurato quanto serve davvero.
 Rimandi a `PATTERNS.md` per lo stile; qui solo i pezzi nuovi.
 
 - **La scheda del piano** (§6.1): non un popup di conferma generico. Un box con
-  obiettivo, applicazioni come chip, i passi irreversibili evidenziati, e due
-  azioni: "Vai" e "Cambia qualcosa" (che rimanda alla chat, non a un form).
+  obiettivo, applicazioni come chip, i passi irreversibili evidenziati **con
+  scritto che chiederanno conferma quando arriveranno** (così l'utente non li
+  legge come cose che sta autorizzando adesso), e due azioni: "Vai" e "Cambia
+  qualcosa" (che rimanda alla chat, non a un form).
 - **La striscia di lavoro**: mentre Filo agisce, una striscia compatta sempre
   visibile con l'ultima azione, il numero di passo e lo stop. Non deve rubare
   spazio né stare davanti alla finestra su cui Filo lavora.
