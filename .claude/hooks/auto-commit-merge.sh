@@ -154,21 +154,19 @@ else
     exit 0
   fi
 
-  # Rete per le sessioni locali: i rami di lavoro/funzionalita' non si
-  # pubblicano da soli nemmeno qui (e' cosi' che si protegge un lavoro locale
-  # che non deve ancora uscire).
-  if is_gated_branch "$CUR_BRANCH"; then
+  # Da qui in poi si toccherebbe il ramo principale. Non lo si fa MAI da un
+  # ramo di lavoro, ne' in routine ne' in locale (cambiato il 2026-08-07): al
+  # ramo principale ci si arriva una volta sola, a lavoro finito, con
+  # `npm run finish` (locale) o scripts/merge-gate.mjs (routine).
+  if [ "$CUR_BRANCH" != "$TARGET_BRANCH" ]; then
     exit 0
   fi
 
-  # Push HEAD to TARGET_BRANCH on origin. Fast-forward only (no --force).
-  # If origin/TARGET_BRANCH has moved ahead concurrently, push is rejected →
-  # the feature branch is still on origin so nothing is lost; the next run can
-  # try again after a pull/rebase.
+  # Sei DELIBERATAMENTE sul ramo principale: le tue modifiche sono gia' quelle
+  # pubblicate, quindi spedirle e' solo allinearsi a origin.
   PUSH_OUT=$(git push origin "HEAD:$TARGET_BRANCH" 2>&1)
   if [ $? -ne 0 ]; then
-    echo "[auto-push] FAILED pushing HEAD ('$CUR_BRANCH') to origin/$TARGET_BRANCH (single-worktree mode)" >&2
-    echo "[auto-push] Feature branch is on origin/$CUR_BRANCH; pull --rebase and retry to land on $TARGET_BRANCH" >&2
+    echo "[auto-push] FAILED pushing '$TARGET_BRANCH' to origin: fai 'git pull --rebase origin $TARGET_BRANCH' e riprova" >&2
     echo "$PUSH_OUT" >&2
   fi
 fi
