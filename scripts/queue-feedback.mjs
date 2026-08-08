@@ -181,6 +181,9 @@ function parseArgs(argv) {
     else if (a === '--status') out.status = argv[++i];
     else if (a === '--notes') out.notes = argv[++i];
     else if (a === '--image') out.images.push(argv[++i]);
+    // Provenienza esplicita (#443). Serve solo a chi accoda FUORI da un giro di
+    // routine: dentro un giro la scrive il dispatcher e viene ritrovata da sola.
+    else if (a === '--role') out.role = argv[++i];
     else out._.push(a);
   }
   return out;
