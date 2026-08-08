@@ -18,6 +18,16 @@ Le routine schedulate su claude.ai partono con un prompt minimo
 
 ### Avvio
 
+0. **PRONTEZZA PRIMA DEL SETUP.** Il passo 1 costa parecchio (installazione,
+   binario Electron ~102MB, `scrot`): se il giro non è in grado di lavorare, va
+   scoperto **prima** di averlo pagato.
+   ```bash
+   FILO_FEEDBACK_PRIVKEY=<chiave> node scripts/dispatch.mjs --preflight
+   ```
+   Esce **0** → prosegui col passo 1. Esce **3** → **chiudi la sessione subito**,
+   riportando `guasto <X>`: niente installazioni, niente worker. Ci riprova
+   l'orchestratore successivo fra 6 ore (vedi § `guasto` più sotto).
+
 1. Sei nella root del repo Filo. Installa **saltando il binario Electron** e poi
    procuralo con lo script dedicato (l'installer nativo `@electron/get` abortisce
    dietro il proxy):
