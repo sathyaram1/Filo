@@ -96,11 +96,14 @@ describe('Via 2 — al ramo principale arriva SOLO la decisione', () => {
     git(work, ['checkout', '-q', '-b', 'worker/y']);
     writeFileSync(resolve(work, 'in-lavorazione.txt'), 'bozza\n', 'utf8');
     git(work, ['add', 'in-lavorazione.txt']);
-    const before = git(work, ['status', '--porcelain']);
 
     const spool = resolve(work, 'feedback-triage', 'z.json');
     mkdirSync(resolve(work, 'feedback-triage'), { recursive: true });
     writeFileSync(spool, '{"id":"z"}', 'utf8');
+
+    // Fotografia DOPO aver preparato la scena: quello che cambia da qui in poi
+    // è solo effetto della spedizione.
+    const before = git(work, ['status', '--porcelain']);
     pushFileToMain(work, spool, 'feedback: z');
 
     assert.equal(git(work, ['status', '--porcelain']), before,
