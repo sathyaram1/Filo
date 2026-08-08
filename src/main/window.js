@@ -70,6 +70,8 @@ function createMainWindow() {
     backgroundColor: '#222222',
     title: 'Filo',
     icon: path.join(__dirname, '..', '..', 'assets', 'icons', 'icon-128.png'),
+    show: !HIDDEN,
+    skipTaskbar: HIDDEN,
     // Chrome-like: la title bar nativa è rimossa, i controlli minimize/maximize/
     // close vivono nella tab-row della shell (vedi src/renderer/shell.html).
     frame: false,
