@@ -148,11 +148,7 @@ function createIncognitoWindow() {
 
   win.webContents.once('did-finish-load', async () => {
     tabs.openTab('filo://newtab/'); // niente restore in incognito
-    try {
-      win.show();
-      win.moveTop();
-      win.focus();
-    } catch (_) {}
+    revealWindow(win);
   });
 
   // Alla chiusura dell'ULTIMA finestra incognito, azzera l'overlay in RAM: nulla
