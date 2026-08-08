@@ -106,3 +106,83 @@ test('il tasto destro sul titolo apre il menu con "Rigenera titolo"', async ({ o
   // Il titolo diventa quello rigenerato dall'AI.
   await expect(page.locator('#docTitle')).toHaveText('Titolo rigenerato', { timeout: 8000 });
 });
+
+// #403 — "sfiorare" la rinomina e ripensarci non deve costare la titolazione
+// automatica. Precondizione: senza il fix, dopo la rinomina confermata a vuoto
+// il file resta marcato come "titolo scelto a mano" e l'assert sul titolo
+// automatico diventa rosso (il titolo resta "Documento senza titolo").
+test('rinomina confermata a vuoto dal menu documenti: il titolo automatico arriva lo stesso', async ({ openTab }) => {
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('#docSwitch');
+  await stubAI(page, 'Il giardino in primavera');
+
+  // Apre il menu documenti e la rinomina inline (matita) sul documento attivo.
+  await page.click('#docSwitch');
+  await page.click('#docPop .ed-doc-item.active .ed-doc-rename');
+  const inlineInput = page.locator('#docPop .ed-doc-item-input');
+  await expect(inlineInput).toBeVisible();
+
+  // Conferma senza dare un nome: svuota il campo e preme Invio.
+  await inlineInput.fill('');
+  await inlineInput.press('Enter');
+
+  // Il documento resta senza nome (nessuna rinomina è avvenuta davvero).
+  await expect(page.locator('#docTitle')).toHaveText('Documento senza titolo');
+
+  // Ora scrive oltre 100 parole: il titolo automatico deve comunque arrivare.
+  await page.evaluate((txt) => {
+    const d = document.getElementById('doc');
+    d.innerHTML = '<p>' + txt + '</p>';
+    d.dispatchEvent(new Event('input', { bubbles: true }));
+  }, longText(120));
+
+  await expect(page.locator('#docTitle')).toHaveText('Il giardino in primavera', { timeout: 8000 });
+});
+
+test('rinomina confermata a vuoto dalla docbar: il titolo automatico arriva lo stesso', async ({ openTab }) => {
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('#docSwitch');
+  await stubAI(page, 'Il giardino in primavera');
+
+  // Tasto destro sul titolo → "Rinomina" (cammino equivalente alla matita).
+  await page.click('#docSwitch', { button: 'right' });
+  await page.locator('.ed-title-ctxmenu').getByText('Rinomina', { exact: true }).click();
+  const barInput = page.locator('.ed-doc-title-input');
+  await expect(barInput).toBeVisible();
+
+  // Conferma senza toccare nulla: Invio su campo vuoto.
+  await barInput.press('Enter');
+  await expect(page.locator('#docTitle')).toHaveText('Documento senza titolo');
+
+  await page.evaluate((txt) => {
+    const d = document.getElementById('doc');
+    d.innerHTML = '<p>' + txt + '</p>';
+    d.dispatchEvent(new Event('input', { bubbles: true }));
+  }, longText(120));
+
+  await expect(page.locator('#docTitle')).toHaveText('Il giardino in primavera', { timeout: 8000 });
+});
+
+// Il contrappeso: un nome VERO deve continuare a bloccare l'auto-titolo.
+test('un nome dato davvero blocca il titolo automatico', async ({ openTab }) => {
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('#docSwitch');
+  await stubAI(page, 'Il giardino in primavera');
+
+  await page.click('#docSwitch', { button: 'right' });
+  await page.locator('.ed-title-ctxmenu').getByText('Rinomina', { exact: true }).click();
+  const barInput = page.locator('.ed-doc-title-input');
+  await barInput.fill('Appunti di viaggio');
+  await barInput.press('Enter');
+  await expect(page.locator('#docTitle')).toHaveText('Appunti di viaggio');
+
+  await page.evaluate((txt) => {
+    const d = document.getElementById('doc');
+    d.innerHTML = '<p>' + txt + '</p>';
+    d.dispatchEvent(new Event('input', { bubbles: true }));
+  }, longText(120));
+
+  await page.waitForTimeout(1200);
+  await expect(page.locator('#docTitle')).toHaveText('Appunti di viaggio');
+  expect(await page.evaluate(() => window.__aiCalls.length)).toBe(0);
+});
