@@ -79,7 +79,11 @@ function main() {
 
   const branch = git(['rev-parse', '--abbrev-ref', 'HEAD']).out;
   if (!branch || branch === 'HEAD') { console.error('Stato del repo non chiaro: nessun ramo corrente.'); process.exit(1); }
-  if (branch === MAIN) { console.error(`Sei già su ${MAIN}: non c'è niente da fondere.`); process.exit(1); }
+  // Lavorare direttamente sul ramo principale è sconsigliato ma capita (una
+  // correzione di una riga). Da quando l'hook non pubblica più niente da solo,
+  // anche quel caso deve passare di qui: niente da fondere, ma i controlli si
+  // fanno lo stesso — sono il motivo per cui questo comando esiste.
+  const onMain = branch === MAIN;
 
   if (!git(['diff', '--quiet']).ok || !git(['diff', '--cached', '--quiet']).ok) {
     console.error('Ci sono modifiche non salvate: falle salvare (un Edit qualsiasi) prima di chiudere.');

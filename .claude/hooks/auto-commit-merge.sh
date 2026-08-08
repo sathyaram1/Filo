@@ -113,57 +113,31 @@ git worktree list --porcelain | awk '/^worktree /{print substr($0,10)}' | while 
     git push origin "$BRANCH" >/dev/null 2>&1 || true
   fi
 
-  if [ "$BRANCH" = "$TARGET_BRANCH" ] && ! is_routine_session; then
-    echo "[auto-commit] Stai lavorando direttamente su '$TARGET_BRANCH': le modifiche vengono pubblicate subito. Meglio un worktree dedicato + 'npm run finish' a lavoro finito." >&2
-  fi
 done
 
 # 2) Push to origin. Logic differs per mode.
 git remote get-url origin >/dev/null 2>&1 || exit 0
 
-if [ -n "$TARGET_WT" ]; then
-  # MULTI-WORKTREE: push TARGET_BRANCH from the target worktree.
-  cd "$TARGET_WT" || exit 0
-  AHEAD=$(git rev-list --count "origin/$TARGET_BRANCH..HEAD" 2>/dev/null)
-  if [ "${AHEAD:-0}" -gt 0 ]; then
-    PUSH_OUT=$(git push origin "$TARGET_BRANCH" 2>&1)
-    if [ $? -ne 0 ]; then
-      echo "[auto-push] FAILED pushing '$TARGET_BRANCH' to origin — left for manual push" >&2
-      echo "$PUSH_OUT" >&2
-    fi
-  fi
-else
-  # SINGLE-WORKTREE (cloud): we're in the project dir, on some branch.
-  cd "$PROJECT_DIR" || exit 0
-  CUR_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
-  if [ -z "$CUR_BRANCH" ] || [ "$CUR_BRANCH" = "HEAD" ]; then
-    exit 0  # detached HEAD or weird state — bail
-  fi
-
-  # Push the feature branch (best-effort, for traceability/debugging).
-  git push origin "$CUR_BRANCH" >/dev/null 2>&1 || true
-
-  # ─── Qui NON si pubblica mai. ──────────────────────────────────────────
-  #
-  # Questo ramo del codice si raggiunge solo quando esiste UNA sola cartella di
-  # lavoro: e' la forma delle sessioni in cloud. Il setup dell'owner ha sempre
-  # una cartella dedicata al ramo principale piu' quelle dei compiti, quindi
-  # passa di sopra e non arriva mai qui.
-  #
-  # La regola NON dipende dal fatto che la sessione si sia dichiarata routine
-  # (FILO_ROUTINE): quella marcatura serve a distinguere le provenienze nella
-  # storia, ma appenderci la sicurezza significherebbe rimettere la protezione
-  # dietro un'istruzione in prosa che qualcuno puo' dimenticare — cioe'
-  # esattamente il guasto del 24 luglio 2026, in cui un'istanza che lavorava sul
-  # ramo principale ha pubblicato senza passare dal cancello.
-  #
-  # Al ramo principale ci si arriva solo attraverso scripts/merge-gate.mjs, dopo
-  # verifica e controlli di sicurezza. Il lavoro non si perde: il ramo corrente
-  # e' gia' stato spedito qui sopra.
-  if [ "$CUR_BRANCH" = "$TARGET_BRANCH" ]; then
-    echo "[auto-commit] ATTENZIONE: stai lavorando sul ramo '$TARGET_BRANCH' in una sessione senza cartelle di lavoro separate. Il lavoro e' salvato ma NON pubblicato: usa un ramo dedicato e il cancello di merge." >&2
-  fi
-  exit 0
+# ─── NESSUNA pubblicazione automatica sul ramo principale ────────────────────
+#
+# Qualunque sia la forma del repo (una cartella o venti, sul ramo principale o
+# su un ramo di lavoro), questo hook NON fa mai atterrare niente sul ramo
+# principale. Ci si arriva solo da:
+#
+#   - `npm run finish`            (locale: controlli, poi fusione e push)
+#   - `scripts/merge-gate.mjs`    (routine: dopo verifica e controlli di sicurezza)
+#
+# La regola non dipende da FILO_ROUTINE: quella marcatura distingue le
+# provenienze nella storia, ma appenderci la sicurezza rimetterebbe la
+# protezione dietro un'istruzione che qualcuno puo' dimenticare — il guasto del
+# 24 luglio 2026 in persona, quando un'istanza che lavorava sul ramo principale
+# ha pubblicato senza passare dal cancello.
+#
+# Il lavoro non si perde: ogni ramo e' gia' stato committato e spedito qui sopra.
+cd "$PROJECT_DIR" || exit 0
+CUR_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+if [ "$CUR_BRANCH" = "$TARGET_BRANCH" ]; then
+  echo "[auto-commit] Sei sul ramo '$TARGET_BRANCH': il lavoro e' salvato ma NON pubblicato. Lancia 'npm run finish' quando hai finito (esegue i controlli e pubblica)." >&2
 fi
 
 exit 0
