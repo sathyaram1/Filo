@@ -2,8 +2,8 @@
   "id": "b6f2ddea-fabe-432c-8b09-ea13fb98604a",
   "branch": "worker/b6f2ddea-fabe-432c-8b09-ea13fb98604a-20260808T182122Z",
   "loopCount": 1,
-  "verifierVerdict": "fail",
-  "verifierCritique": "FAIL — Il salto a sorpresa è risolto: rifacendo i tuoi passi (menu documenti → «Storico versioni» → doppio clic su «Ripristina») il ripristino avviene una volta sola e si resta nella lista, e lo stesso vale per il doppio clic su una riga, su «Indietro» e su «Mostra le versioni più vecchie».\n\nPerò l'avviso «Annulla» aggiunto dopo il ripristino rompe una cosa che prima funzionava: l'annullamento delle modifiche automatiche di Filo.\n\nCome si vede: Editor → scrivi una frase → fai fare a Filo una modifica al testo (per esempio il grassetto su tutto) → compare l'avviso «Filo ha modificato il documento» con «Annulla» → doppio clic su «Annulla». Prima di questa modifica il testo tornava com'era; adesso resta modificato. Il primo clic annulla e fa comparire nello stesso punto il nuovo avviso «Versione ripristinata» col suo «Annulla»; il secondo colpo della coppia ci cade sopra e rifà il ripristino appena annullato. Per chi fa doppio clic l'annullamento di una modifica di Filo non funziona più.\n\nStessa cosa sul nuovo avviso: doppio clic su «Annulla» subito dopo un ripristino lascia il documento alla versione ripristinata, come se il tasto non avesse fatto niente.\n\nÈ esattamente il problema del feedback — il secondo colpo di una coppia che cade su un elemento appena comparso — solo spostato dal pannello agli avvisi, che sono rimasti fuori dalla protezione.\n\nNota tecnica: la consegna era stata accantonata dal ripristino automatico del ramo e la cartella era tornata alla versione senza la modifica; l'ho rimessa al suo posto prima di verificare. Senza accorgersene, questa verifica avrebbe bocciato un lavoro che c'era, facendolo riscrivere da capo.",
+  "verifierVerdict": null,
+  "verifierCritique": "",
   "secauditDone": false,
   "secauditVerdict": null,
   "checkpoints": [
@@ -16,6 +16,11 @@
       "sha": "574e3d0b2ae13a9407dfe5413027ac4f8aa9ebbe",
       "by": "verifier:fail",
       "at": "2026-08-08T18:50:58.935Z"
+    },
+    {
+      "sha": "75cb0f4abe39d5e8429dacd709b17e282d59d574",
+      "by": "fixer:consegna",
+      "at": "2026-08-08T19:38:35.305Z"
     }
   ]
 }
