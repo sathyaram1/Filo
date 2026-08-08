@@ -193,7 +193,7 @@ leggere. Più il click su controlli puramente di navigazione: schede, voci di
 menu che aprono un sottomenu, link interni a un documento, frecce di
 paginazione.
 
-### 4.3 Livello 3 — si ferma anche dentro il perimetro (salvo §6.3)
+### 4.3 Livello 3 — si ferma sempre, perimetro o no
 
 Il nome del controllo, **o** il testo della finestra di dialogo che lo contiene,
 combacia con un verbo irreversibile o in uscita. Elenco in italiano e inglese,
