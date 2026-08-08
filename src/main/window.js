@@ -10,6 +10,30 @@ const { registerFiloProtocolForSession } = require('./protocol');
 
 const SHELL_HEIGHT = 88;
 
+// Finestra INVISIBILE (solo test automatici). Una suite che apre e chiude
+// Electron decine di volte fa lampeggiare finestre sullo schermo e ruba il
+// fuoco a chi sta lavorando: in locale è il motivo per cui i test si evitano.
+// Con questo la finestra esiste e funziona (il renderer gira, il DOM è
+// pilotabile, gli screenshot via debugger si prendono lo stesso) ma non viene
+// mai mostrata né portata in primo piano.
+// NON usarlo per `test:shoot`/`smoke`, che catturano la finestra REALE composita:
+// lì l'immagine è il risultato, e senza finestra visibile non c'è niente da
+// fotografare.
+const HIDDEN = process.env.FILO_HIDE_WINDOW === '1';
+
+// Porta la finestra davanti a tutto — tranne quando è invisibile per i test.
+// Serve al primo disegno: in alcune configurazioni la WebContentsView appena
+// creata non ha un display surface valido e resta un quadrato vuoto finché la
+// finestra non riceve attenzione esplicita dal compositor.
+function revealWindow(win) {
+  if (HIDDEN) return;
+  try {
+    win.show();
+    win.moveTop();
+    win.focus();
+  } catch (_) {}
+}
+
 // Wiring comune a finestra normale e incognito: carica le impostazioni di
 // sicurezza e collega i listener di resize/fullscreen al layout dei tab.
 function wireWindowCommon(win, tabs) {
