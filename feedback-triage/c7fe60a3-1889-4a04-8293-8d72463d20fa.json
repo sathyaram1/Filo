@@ -1,0 +1,8 @@
+{
+  "id": "c7fe60a3-1889-4a04-8293-8d72463d20fa",
+  "status": "revision_capability",
+  "notes": "Fatto: un documento senza nome continua a ricevere il titolo automatico anche dopo che hai aperto la rinomina e l'hai confermata senza scrivere niente. Il segno \"il nome l'ho scelto io\" ora segue il nome vero: se dai un titolo resta tuo e l'automatico non lo tocca; se cancelli il nome e lasci il documento senza titolo, l'automatico torna possibile.\n\nIn più, non richiesto: la rinomina dalla matita nel menu documenti ora si comporta come quella dal tasto destro sul titolo — il campo parte vuoto con \"Documento senza titolo\" come segnaposto invece di avere quella scritta gia dentro da cancellare. Erano due strade per la stessa cosa e si comportavano diversamente.",
+  "queuedAt": "2026-08-08T00:31:51.937Z",
+  "queuedBy": "routine",
+  "branch": "worker/c7fe60a3-1889-4a04-8293-8d72463d20fa"
+}
