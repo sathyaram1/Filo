@@ -28,6 +28,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { verdictForCurrentBranch } from './verify-local.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const MAIN = process.env.FILO_MAIN_BRANCH || 'main';
