@@ -1135,7 +1135,12 @@
     // (tradurre, condividere, salvare, QR, screenshot…): il riquadro l'ha
     // rimandata qui perché solo il frame principale è "la pagina".
     if (msg?.type === MSG.TOP_FRAME_COMMAND) {
-      try { MenuIcons.runIconAction(msg.iconId); } catch (e) { console.error('[SN] azione di pagina dal riquadro', e); }
+      try {
+        if (msg.surface === 'feedback') self.SN_FEEDBACK_UI?.open();
+        else if (msg.surface === 'redteam') self.SN_REDTEAM_ATTACK_UI?.open();
+        else if (msg.surface === 'help') openHelpSidebar();
+        else MenuIcons.runIconAction(msg.iconId);
+      } catch (e) { console.error('[SN] azione di pagina dal riquadro', e); }
       return;
     }
     if (msg?.type === MSG.SHOW_TOAST) {
