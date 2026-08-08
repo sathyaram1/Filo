@@ -335,8 +335,19 @@
     const cleanupZoom = (global.SN_POPUP?.attachZoomCompensation || (() => () => {}))(root);
 
     // Posizionamento: misura, flip se necessario.
-    const w = root.offsetWidth, h = root.offsetHeight;
+    let h = root.offsetHeight;
+    const w = root.offsetWidth;
     const vw = window.innerWidth, vh = window.innerHeight;
+    // #405 — dentro un riquadro incorporato lo spazio verticale può essere meno
+    // dell'altezza del menu (un player alto 200px, un blocco commenti stretto):
+    // senza questo il menu verrebbe tagliato e le voci in fondo — feedback,
+    // aiuto — sarebbero irraggiungibili. Sopra una finestra normale non cambia
+    // nulla: la condizione è falsa.
+    if (h + 16 > vh) {
+      root.style.maxHeight = `${Math.max(96, vh - 16)}px`;
+      root.style.overflowY = 'auto';
+      h = root.offsetHeight;
+    }
     let left = x, top = y;
     if (left + w + 8 > vw) left = vw - w - 8;
     if (top + h + 8 > vh) top = Math.max(8, y - h);
