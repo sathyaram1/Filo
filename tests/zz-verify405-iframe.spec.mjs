@@ -38,14 +38,16 @@ async function waitMenuAnyFrame(page, timeout = 12000) {
   return null;
 }
 
-async function frameByPath(page, urlPart) {
+// Match ESATTO sull'url del frame (un match "includes" su "/1" beccherebbe
+// anche "http://127.0.0.1:PORT/2" per via di "//127").
+async function frameByUrl(page, url) {
   const deadline = Date.now() + 10000;
   while (Date.now() < deadline) {
-    const fr = page.frames().find((f) => f.url().includes(urlPart));
+    const fr = page.frames().find((f) => f.url() === url && f !== page.mainFrame());
     if (fr) return fr;
     await page.waitForTimeout(100);
   }
-  throw new Error('frame non trovato: ' + urlPart);
+  throw new Error('frame non trovato: ' + url + ' — presenti: ' + page.frames().map((f) => f.url()).join(', '));
 }
 
 // ---------- 1. IL SINTOMO ESATTO ----------
