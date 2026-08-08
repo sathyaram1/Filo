@@ -1055,6 +1055,9 @@
       renderTrashPanel();
       renderDocSwitcher();
     });
+    // Il cestino si ridisegna dopo ogni eliminazione definitiva: stessa guardia
+    // del pannello versioni sul secondo colpo di un doppio clic.
+    overlayGuard.arm();
   }
 
   // Rinomina un documento (il nome mostrato nel menu e nel selettore).
