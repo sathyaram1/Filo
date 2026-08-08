@@ -624,6 +624,7 @@
         <p class="ed-vh-empty">Nessuna versione ancora. Filo salva un punto di ripristino ogni volta che modifica il documento; da lì potrai tornare indietro.</p>
         <div class="ed-overlay-actions"><button class="ed-btn primary" id="ovClose">Chiudi</button></div>`);
       $('ovClose').addEventListener('click', closeOverlay);
+      vhArmStaleClickGuard();
       return;
     }
     const shown = all.slice(0, versHistoryShown);
