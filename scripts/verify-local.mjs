@@ -62,8 +62,13 @@ export function stateFile(root = ROOT) {
  *     verdetto riguarda una versione che non è quella che uscirebbe.
  */
 export function checkVerdict(entry, headSha) {
-  if (!entry || !entry.verdict) {
+  if (!entry || (!entry.verdict && !entry.request)) {
     return { ok: false, reason: 'nessuna verifica avviata per questo lavoro' };
+  }
+  if (!entry.verdict) {
+    // Distinguere questo dal caso sopra evita mezz'ora persa a rilanciare
+    // `start` quando il pezzo che manca è il verdetto di chi doveva verificare.
+    return { ok: false, reason: 'verifica avviata ma senza esito: chi doveva verificare non ha ancora registrato pass o fail' };
   }
   if (entry.verdict !== 'pass') {
     return { ok: false, reason: `la verifica ha bocciato il lavoro: ${entry.critique || '(nessuna critica registrata)'}` };
