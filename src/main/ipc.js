@@ -84,6 +84,14 @@ function registerIpcHandlers() {
     }
   });
 
+  // #405 — l'utente sta interagendo con QUESTO frame (la pagina o uno dei suoi
+  // riquadri incorporati). Serve alle scorciatoie che lavorano sulla selezione:
+  // vanno consegnate a chi ha davvero il testo selezionato. Nessun dato nel
+  // messaggio: conta solo il mittente.
+  ipcMain.on('filo:frame-active', (event) => {
+    try { event.sender._filoActiveFrame = event.senderFrame || null; } catch (_) {}
+  });
+
   ipcMain.handle('filo:message', async (event, msg) => {
     const info = senderInfo(event);
     // In incognito avvolgiamo l'handler in runIncognito(): ogni lettura/scrittura
