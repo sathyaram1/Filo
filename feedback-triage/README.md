@@ -46,6 +46,13 @@ feedback (è così che una routine spezza una spec corposa in sub-feedback
 }
 ```
 
+`queuedBy` è la **provenienza** (#443): il ruolo dell'istanza che ha accodato
+(`prober`, `new-work`, `fixer`, `verifier`, `secaudit`) — lo scrive il dispatcher
+al momento della consegna del lavoro e `queue-feedback.mjs` lo rilegge da solo.
+L'applier lo trasforma nel `clientId` del documento (`routine:<ruolo>`), che è
+ciò che la dashboard usa per distinguere esplorazione, sviluppo e verifica. Fuori
+da un giro di routine resta `routine` generico.
+
 `images` (opzionale) sono URL pubblici di screenshot **già caricati su Firebase
 Storage** da `queue-feedback.mjs --image <path>` al momento dell'accodamento (le
 storage.rules consentono l'upload senza auth, vedi `scripts/lib/feedback-storage.mjs`).

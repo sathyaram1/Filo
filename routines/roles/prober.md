@@ -63,9 +63,11 @@ node scripts/queue-feedback.mjs --status new --name "titolo breve" \
 PARTE TECNICA: area/file/funzione coinvolta."
 ```
 
-I ritrovamenti nascono con `clientId` `routine:<slug>` e stato `new`: la
-dashboard li raccoglie nella tab **"Agente"** (non in "Ricevuti"), così non
-annegano i feedback dei tester reali.
+I ritrovamenti nascono con stato `new` e **firmati come esplorazione**: la firma
+la mette il dispatcher quando ti consegna il lavoro, non serve dichiararla (e
+`--role` non va passato a mano). In dashboard si distinguono a colpo d'occhio da
+quelli aperti da chi implementa o da chi verifica: il tuo parla dell'app in
+generale, il loro parla del lavoro appena fatto.
 
 ## Come riporti
 

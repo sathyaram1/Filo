@@ -20,6 +20,9 @@ import { resolve } from 'node:path';
 // STATE_DIR isolata PRIMA di importare il modulo (è letta a import-time).
 const TMP = mkdtempSync(resolve(tmpdir(), 'filo-dispatch-'));
 process.env.FILO_DISPATCH_STATE_DIR = TMP;
+// Anche la ROOT: emit() ci scrive il marcatore di ruolo (#443) e non deve
+// sporcare il checkout vero durante i test.
+process.env.FILO_REPO_ROOT = TMP;
 
 const {
   classifyReview,
@@ -38,7 +41,9 @@ const {
   withRetry,
   persistStateToGit,
   appendWorkerLog,
+  emit,
 } = await import('../../scripts/dispatch.mjs');
+const { readRole } = await import('../../scripts/lib/routine-role.mjs');
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 
@@ -416,6 +421,35 @@ test('appendWorkerLog: input non-array → parte da lista vuota', () => {
   const e = { role: 'secaudit', startedAt: 't1', num: '' };
   assert.deepEqual(appendWorkerLog(undefined, e, 200), [e]);
   assert.deepEqual(appendWorkerLog(null, null, 200), []);
+});
+
+// ─── #443: la consegna del lavoro firma anche CHI lo sta facendo ─────────────
+//
+// La provenienza non può dipendere dal fatto che il worker si ricordi di
+// dichiararsi (prima di questo, su decine di ritrovamenti uno solo risultava
+// "esplorazione"). La scrive il dispatcher, che il ruolo lo sa per costruzione.
+// Senza la scrittura, readRole torna '' e questi assert diventano rossi.
+
+function silently(fn) {
+  const real = process.stdout.write;
+  process.stdout.write = () => true;
+  try { return fn(); } finally { process.stdout.write = real; }
+}
+
+test('emit: consegnare un ruolo lo registra per chi accoderà feedback', () => {
+  silently(() => emit({ role: 'prober' }, {}));
+  assert.equal(readRole(TMP), 'prober');
+  // Il giro successivo sovrascrive: un worker alla volta, un ruolo alla volta.
+  silently(() => emit({ role: 'verifier', id: 'x', branch: 'worker/x' }, {}));
+  assert.equal(readRole(TMP), 'verifier');
+});
+
+test('emit: un GUASTO cancella il marcatore invece di lasciare quello vecchio', () => {
+  silently(() => emit({ role: 'new-work', id: 'y' }, {}));
+  assert.equal(readRole(TMP), 'new-work');
+  // `halt` non è un ruolo: nessun lavoro consegnato, nessuna firma da lasciare.
+  silently(() => emit({ role: 'halt', kind: 'transient', message: 'coda illeggibile' }, {}));
+  assert.equal(readRole(TMP), '');
 });
 
 // ─── teardown ─────────────────────────────────────────────────────────────────

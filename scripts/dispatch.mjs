@@ -60,6 +60,7 @@ import {
   lastCheckpoint, bumpRejects, clearRejects, headSha, currentBranch,
   writeExpectation, clearExpectation, stateDir, IDENTITY_REJECT_LIMIT,
 } from './lib/branch-integrity.mjs';
+import { writeRole, clearRole } from './lib/routine-role.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = process.env.FILO_REPO_ROOT ? resolve(process.env.FILO_REPO_ROOT) : resolve(__dirname, '..');
@@ -988,7 +989,14 @@ async function decryptOne(id) {
   }
 }
 
-function emit(bucket, ctx) {
+export function emit(bucket, ctx) {
+  // Chi sta per lavorare, scritto DA CHI LO SA (feedback #443). Da qui lo
+  // rilegge `queue-feedback.mjs`: così un feedback aperto da un'automazione
+  // porta la provenienza giusta anche se il worker non ci pensa. Un guasto
+  // (`halt`) non è un ruolo: si cancella, altrimenti il marcatore del giro
+  // precedente sopravvivrebbe a un giro che non ha lavorato.
+  if (bucket.role === 'halt') clearRole(ROOT);
+  else writeRole(ROOT, bucket.role);
   const payload = buildPayload(bucket, ctx);
   const out = {
     role: bucket.role,

@@ -129,21 +129,40 @@
   const SORT_MODE_KEY = 'filo_manage_sort';
 
   // ── Icona d'autore su ogni card (chi ha scritto il feedback) ──────────────
-  // Riduce il clientId alle 4 categorie riconoscibili a colpo d'occhio. La
-  // CLASSIFICAZIONE (prefissi → categoria) è pura e condivisa in
+  // La CLASSIFICAZIONE (prefissi → categoria) è pura e condivisa in
   // SN_FEEDBACK_THREAD.authorKind; qui vive solo la resa visiva (icona+etichetta).
+  // Le tre automazioni sono separate (#443): quello che conta, leggendo la coda,
+  // è se un ritrovamento nasce esplorando l'app, implementando una modifica o
+  // verificando il lavoro di qualcun altro.
   const AUTHOR_META = {
-    owner:  { icon: '👑', label: 'Owner' },
-    user:   { icon: '👤', label: 'Utente' },
-    claude: { icon: '🤖', label: 'Claude' },
-    filo:   { icon: '🧵', label: 'Filo (automatico)' },
+    owner:    { icon: '👑', label: 'Owner' },
+    user:     { icon: '👤', label: 'Utente' },
+    filo:     { icon: '🧵', label: 'Filo (per conto di un utente)' },
+    prober:   { icon: '🔍', label: 'Claude (esplorazione)' },
+    worker:   { icon: '🔧', label: 'Claude (sviluppo)' },
+    verifier: { icon: '🧪', label: 'Claude (verifica)' },
+    claude:   { icon: '🤖', label: 'Claude' },
   };
   function authorKindOf(fb) {
     return (TH && TH.authorKind) ? TH.authorKind(fb && fb.clientId) : 'user';
   }
+  function authorMetaOf(fb) {
+    return AUTHOR_META[authorKindOf(fb)] || AUTHOR_META.user;
+  }
   function authorIconHtml(fb) {
-    const m = AUTHOR_META[authorKindOf(fb)] || AUTHOR_META.user;
+    const m = authorMetaOf(fb);
     return `<span class="mg-item-author" title="Scritto da: ${esc(m.label)}" aria-label="Scritto da ${esc(m.label)}">${m.icon}</span>`;
+  }
+  // Etichetta del mittente per l'intestazione del dettaglio. Fra utenti diversi
+  // l'identificativo è l'unica cosa che li distingue, quindi per loro (e solo per
+  // loro) se ne mostra un pezzo: per owner/Filo/automazioni sarebbe rumore.
+  function senderLabel(fb) {
+    const kind = authorKindOf(fb);
+    const m = AUTHOR_META[kind] || AUTHOR_META.user;
+    if (kind !== 'user') return `${m.icon} ${m.label}`;
+    const id = String((fb && fb.clientId) || '').trim();
+    const short = id.slice(0, 8);
+    return short ? `${m.icon} ${m.label} · ${short}…` : `${m.icon} ${m.label}`;
   }
 
   // ── Ordinamento della lista (menu tasto destro sull'intestazione) ─────────
@@ -167,7 +186,9 @@
   }
   // Rango di categoria per l'ordinamento "per creatore" (raggruppa gli autori
   // dello stesso tipo, poi per clientId così lo stesso mittente resta unito).
-  const AUTHOR_RANK = { owner: 0, user: 1, claude: 2, filo: 3 };
+  // Le automazioni restano raggruppate fra loro (e fra owner/utente e Filo, come
+  // prima); dentro il gruppo l'ordine va dal lavoro sul codice all'esplorazione.
+  const AUTHOR_RANK = { owner: 0, user: 1, worker: 2, verifier: 3, prober: 4, claude: 5, filo: 6 };
   // Applica l'override di ordinamento scelto dall'owner. `list` arriva GIÀ
   // ordinata col criterio predefinito della tab: in 'smart' la lasciamo intatta.
   // `sort` è stabile → a parità di chiave si conserva l'ordine predefinito.
@@ -1233,7 +1254,10 @@
     // Intestazione
     const clientId = fb.clientId || 'anonimo';
     const dateStr  = formatDate(fb.createdAt);
-    mgDetailHead.innerHTML = `Da <a class="mg-sender-link" id="senderLink" href="#" data-client="${esc(clientId)}">${esc(clientId)}</a> il ${dateStr}`;
+    // Chi ha scritto, in chiaro (#443): l'identificativo grezzo diceva
+    // "filo:chat" dove serviva leggere "Filo, per conto di un utente". Resta
+    // ispezionabile passandoci sopra e nel pannello del mittente.
+    mgDetailHead.innerHTML = `Da <a class="mg-sender-link" id="senderLink" href="#" data-client="${esc(clientId)}" title="${esc(clientId)}">${esc(senderLabel(fb))}</a> il ${dateStr}`;
     document.getElementById('senderLink').addEventListener('click', (e) => {
       e.preventDefault();
       openSidebarSender(clientId);
@@ -1815,7 +1839,8 @@
 
     const html = `
       <div class="mg-sender-info">
-        <div class="mg-sender-stat"><strong>${esc(clientId)}</strong></div>
+        <div class="mg-sender-stat"><strong>${esc(senderLabel(group[0] || { clientId }))}</strong></div>
+        <div class="mg-sender-stat">${esc(clientId)}</div>
         <div class="mg-sender-stat">${esc(oldestStr)}</div>
         <div class="mg-sender-stat">Feedback totali: <strong>${total}</strong></div>
         <div class="mg-sender-list" id="senderFbList">${listHtml || '<em>Nessun feedback.</em>'}</div>

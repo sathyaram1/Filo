@@ -34,3 +34,6 @@ test-results/
 # la scrive il dispatcher quando consegna il lavoro. Versionarla non avrebbe
 # senso — dice "questa directory, adesso".
 .claude/branch-expect.json
+# Ruolo dell'istanza al lavoro (esplorazione/sviluppo/verifica): stessa natura,
+# lo scrive il dispatcher e lo rilegge chi accoda un feedback per firmarlo.
+.claude/routine-role.json

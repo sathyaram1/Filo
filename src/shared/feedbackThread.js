@@ -119,20 +119,44 @@
   }
 
   // Categoria d'AUTORE, user-facing, per l'icona "chi l'ha scritto" della
-  // dashboard di gestione. Riduce i prefissi tecnici del clientId alle quattro
-  // categorie che l'owner riconosce a colpo d'occhio:
-  //   auto:<…>              → 'filo'   Filo, in AUTOMATICO per conto dell'utente
-  //                                    (capacità mancante o errore incontrato)
-  //   owner:<id>            → 'owner'  l'owner (invio manuale dell'admin loggato)
-  //   agent:/routine:<…>    → 'claude' un'istanza AI (esploratore o routine cloud)
-  //   <altro>               → 'user'   un utente / alpha tester esterno
-  // `auto:` va controllato PRIMA di `owner:`: gli auto-feedback bypassano
-  // ownerize(), ma l'ordine tiene anche se un domani venissero marcati owner.
+  // dashboard di gestione:
+  //   auto:<…> / filo:<…>   → 'filo'     Filo per conto di un utente (una
+  //                                      capacità che manca, un errore incontrato,
+  //                                      o una segnalazione che l'utente ha
+  //                                      approvato dalla chat)
+  //   owner:<id>            → 'owner'    l'owner (invio manuale dell'admin loggato)
+  //   …:prober              → 'prober'   un'istanza che ESPLORA l'app in cerca di
+  //                                      problemi che nessuno ha segnalato
+  //   …:new-work / :fixer   → 'worker'   un'istanza che IMPLEMENTA: il ritrovamento
+  //                                      è nato mentre scriveva il codice
+  //   …:verifier / :secaudit→ 'verifier' un'istanza che VERIFICA il lavoro di
+  //                                      un'altra: parla del lavoro appena fatto
+  //   agent:/routine:<altro>→ 'claude'   automazione di ruolo ignoto (storico: fino
+  //                                      al 2026-08-08 nessuno si firmava)
+  //   <altro>               → 'user'     un utente / alpha tester esterno
+  //
+  // Perché il ruolo conta (feedback #443): il MITTENTE dice quanto fidarsi e in
+  // che contesto leggere. Un ritrovamento del verificatore riguarda la modifica
+  // appena consegnata; uno dell'esploratore riguarda l'app in generale; uno di
+  // Filo è la voce di un utente vero, filtrata.
+  //
+  // `auto:`/`filo:` vanno controllati PRIMA di `owner:`: gli auto-feedback
+  // bypassano ownerize(), ma l'ordine tiene anche se un domani venissero marcati.
+  var ROLE_KIND = {
+    prober: 'prober',
+    'new-work': 'worker',
+    fixer: 'worker',
+    verifier: 'verifier',
+    secaudit: 'verifier',
+  };
   function authorKind(clientId) {
-    const c = String(clientId || '');
-    if (c.startsWith('auto:')) return 'filo';
-    if (c.startsWith('owner:')) return 'owner';
-    if (c.startsWith('agent:') || c.startsWith('routine:')) return 'claude';
+    var c = String(clientId || '');
+    if (c.indexOf('auto:') === 0 || c.indexOf('filo:') === 0) return 'filo';
+    if (c.indexOf('owner:') === 0) return 'owner';
+    if (c.indexOf('agent:') === 0 || c.indexOf('routine:') === 0) {
+      var role = c.slice(c.indexOf(':') + 1).trim().toLowerCase();
+      return ROLE_KIND[role] || 'claude';
+    }
     return 'user';
   }
 

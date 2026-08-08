@@ -63,6 +63,67 @@ test('ogni card mostra l’icona di chi ha scritto il feedback (owner/utente/Cla
   expect(await iconOf('D')).toBe('🧵');
 });
 
+// ─── #443: la provenienza vera, non "un'automazione qualunque" ───────────────
+//
+// Prima di questo, tre automazioni molto diverse (chi esplora l'app, chi
+// implementa una modifica, chi verifica il lavoro di un altro) arrivavano tutte
+// come 'Claude', e Filo che scrive per conto di un utente si presentava come
+// l'utente stesso — che è il caso da cui nasce il feedback. Togliendo il fix,
+// P/W/V collassano su 🤖 e F diventa 👤: tutti gli assert qui sotto diventano
+// rossi.
+const FBS_ORIGINI = [
+  { _id: 'P', seq: 50, subSeq: 0, priority: 0, name: 'Esplorazione', clientId: 'routine:prober',   createdAt: '2026-08-05T10:00:00Z' },
+  { _id: 'W', seq: 51, subSeq: 0, priority: 0, name: 'Sviluppo',     clientId: 'routine:new-work', createdAt: '2026-08-05T11:00:00Z' },
+  { _id: 'V', seq: 52, subSeq: 0, priority: 0, name: 'Verifica',     clientId: 'routine:verifier', createdAt: '2026-08-05T12:00:00Z' },
+  { _id: 'F', seq: 53, subSeq: 0, priority: 0, name: 'Da Filo',      clientId: 'filo:chat',        createdAt: '2026-08-05T13:00:00Z' },
+];
+
+test('le tre automazioni e Filo-per-conto-di-un-utente si distinguono in lista', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK_THREAD && window.SN_MANAGE_REVIEW);
+  await page.evaluate((fbs) => {
+    window.__mgTest.setData(fbs);
+    window.__mgTest.setTab('inbox');
+  }, FBS_ORIGINI);
+  await expect(page.locator('.mg-item')).toHaveCount(4);
+
+  const iconOf  = (id) => page.locator(`.mg-item[data-id="${id}"] .mg-item-author`).textContent();
+  const titleOf = (id) => page.locator(`.mg-item[data-id="${id}"] .mg-item-author`).getAttribute('title');
+
+  // Quattro icone DIVERSE: è il punto: nessuna coppia deve collassare.
+  const icons = [await iconOf('P'), await iconOf('W'), await iconOf('V'), await iconOf('F')];
+  expect(new Set(icons).size).toBe(4);
+  expect(icons).toEqual(['🔍', '🔧', '🧪', '🧵']);
+
+  // E l'etichetta dice quale mestiere, non solo "Claude".
+  expect(await titleOf('P')).toContain('esplorazione');
+  expect(await titleOf('W')).toContain('sviluppo');
+  expect(await titleOf('V')).toContain('verifica');
+  expect(await titleOf('F')).toContain('per conto di un utente');
+});
+
+test('l’intestazione del dettaglio dice CHI ha scritto, non l’identificativo grezzo', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK_THREAD && window.SN_MANAGE_REVIEW);
+  await page.evaluate((fbs) => {
+    window.__mgTest.setData(fbs);
+    window.__mgTest.setTab('inbox');
+  }, FBS_ORIGINI);
+
+  // Il caso del feedback: "filo:chat" non dice a nessuno che dietro c'è un utente.
+  await page.locator('.mg-item[data-id="F"]').click();
+  const link = page.locator('#senderLink');
+  await expect(link).toHaveText(/Filo \(per conto di un utente\)/);
+  // L'identificativo grezzo resta ispezionabile (non è stato buttato via).
+  await expect(link).toHaveAttribute('title', 'filo:chat');
+
+  // Un'automazione dichiara il proprio mestiere.
+  await page.locator('.mg-item[data-id="V"]').click();
+  await expect(page.locator('#senderLink')).toHaveText(/Claude \(verifica\)/);
+});
+
 test('il tasto destro sull’intestazione apre il menu di ordinamento', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');

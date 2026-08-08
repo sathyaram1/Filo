@@ -39,6 +39,9 @@ import { uploadScreenshotFile } from './lib/feedback-storage.mjs';
 // S1.2: cifratura dei campi sensibili nei file di coda (la history git del repo
 // pubblico è un canale di leak tanto quanto Firestore).
 import { encryptFieldsForQueue } from './lib/encrypt-feedback-fields.mjs';
+// #443: chi sta accodando (esplorazione / sviluppo / verifica), scritto dal
+// dispatcher al momento della consegna del lavoro.
+import { readRole, normalizeRole } from './lib/routine-role.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
@@ -181,6 +184,9 @@ function parseArgs(argv) {
     else if (a === '--status') out.status = argv[++i];
     else if (a === '--notes') out.notes = argv[++i];
     else if (a === '--image') out.images.push(argv[++i]);
+    // Provenienza esplicita (#443). Serve solo a chi accoda FUORI da un giro di
+    // routine: dentro un giro la scrive il dispatcher e viene ritrovata da sola.
+    else if (a === '--role') out.role = argv[++i];
     else out._.push(a);
   }
   return out;
@@ -212,13 +218,17 @@ if (isMain) {
       status: args.status,
       notes: args.notes,
       images: imageUrls,
+      // Provenienza (#443): il ruolo lo sa il dispatcher, non il worker. Se non
+      // c'è marcatore (accodamento fuori da un giro di routine) resta vuoto e
+      // il feedback arriva come "automazione" generica.
+      queuedBy: normalizeRole(args.role) || readRole(ROOT) || undefined,
     });
     console.log(`OK: creazione feedback accodata → ${file}`);
     if (args.noGit) console.log('   (--no-git: file scritto ma non committato)');
     else commitAndPush(file);
   } catch (e) {
     console.error('Errore:', e.message);
-    console.error('Uso: node scripts/queue-feedback.mjs --name "titolo" [--parent <id>] [--priority 0-3] [--status new|todo|clarify] [--notes "..."] [--image shot.png ...] "testo"');
+    console.error('Uso: node scripts/queue-feedback.mjs --name "titolo" [--parent <id>] [--priority 0-3] [--status new|todo|clarify] [--notes "..."] [--image shot.png ...] [--role prober|verifier|secaudit|fixer|new-work] "testo"');
     process.exit(1);
   }
 }
