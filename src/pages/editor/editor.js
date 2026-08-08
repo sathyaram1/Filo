@@ -665,6 +665,7 @@
       it.addEventListener('click', open);
       it.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(e); } });
     });
+    vhArmStaleClickGuard();
   }
 
   // Anteprima ampia di una singola versione, con conferma di ripristino.
