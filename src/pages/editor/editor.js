@@ -4001,7 +4001,11 @@
       });
       el.appendChild(btn);
     }
-    edToastHostEl().appendChild(el);
+    const host = edToastHostEl();
+    host.appendChild(el);
+    // Un avviso nuovo prende il posto in fondo alla pila — proprio dove poteva
+    // esserci il bottone appena premuto.
+    host._staleGuard.arm();
     enforceEdToastCap();
     // Forza un reflow così la transizione d'ingresso parte.
     void el.offsetWidth;
