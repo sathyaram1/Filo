@@ -537,7 +537,16 @@
       activateFile(STORE.findFile(collection, fileId));
     }
     writeCollection();
-    showEditorToast('Versione ripristinata.');
+    // Il ripristino è un gesto delicato: lo stato di prima è già salvato qui
+    // sopra, quindi l'avviso lo offre subito indietro — stessa simmetria delle
+    // modifiche automatiche di Filo, che sono sempre annullabili sul posto.
+    showEditorToast('Versione ripristinata.', {
+      label: 'Annulla',
+      onClick: () => {
+        if (!restoreVersion(fileId, cres.version.id)) return;
+        if (isVersionHistoryOpen()) renderVersionHistory(fileId);
+      },
+    });
     return true;
   }
 
