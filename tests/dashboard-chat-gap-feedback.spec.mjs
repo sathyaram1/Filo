@@ -132,6 +132,18 @@ test('Filo ammette una mancanza: propone lui la segnalazione, senza che gliela s
     };
   });
 
+  // Il popup di conferma è irraggiungibile via DOM (shadow root chiuso, scelta
+  // di sicurezza): per proseguire oltre il consenso sostituiamo il modulo di
+  // conferma e catturiamo il testo che l'utente avrebbe letto. Va messo PRIMA
+  // dell'invio perché il popup si apre da sé appena la proposta compare (#414).
+  await page.evaluate(() => {
+    window.__confirmSeen = [];
+    window.SN_CONFIRM_UI = {
+      confirm: async (opts) => { window.__confirmSeen.push(opts && opts.text); return true; },
+      confirmTyped: async (opts) => { window.__confirmSeen.push(opts && opts.text); return true; },
+    };
+  });
+
   await page.locator('#input').fill('quanti crediti ho?');
   await page.locator('#sendBtn').click();
 
@@ -142,18 +154,8 @@ test('Filo ammette una mancanza: propone lui la segnalazione, senza che gliela s
   await expect(proposal).toBeVisible({ timeout: 20_000 });
   await page.screenshot({ path: 'tests/.shots/360-proposta-feedback.png' }).catch(() => {});
 
-  // Il popup di conferma è irraggiungibile via DOM (shadow root chiuso, scelta
-  // di sicurezza): per proseguire oltre il consenso sostituiamo il modulo di
-  // conferma e catturiamo il testo che l'utente avrebbe letto.
-  await page.evaluate(() => {
-    window.__confirmSeen = [];
-    window.SN_CONFIRM_UI = {
-      confirm: async (opts) => { window.__confirmSeen.push(opts && opts.text); return true; },
-      confirmTyped: async (opts) => { window.__confirmSeen.push(opts && opts.text); return true; },
-    };
-  });
-  await proposal.click();
-
+  // #414 — nessun click: la richiesta di conferma si presenta DA SOLA, con
+  // l'anteprima citata qui sotto. Il chip resta solo come ripiego per chi annulla.
   // L'anteprima mostrata all'utente cita la SUA richiesta: è ciò che rende la
   // segnalazione utile (e ciò che gli permette di decidere se mandarla).
   await expect.poll(async () => page.evaluate(() => (window.__confirmSeen || []).join('\n')), {
