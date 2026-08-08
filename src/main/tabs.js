@@ -1827,6 +1827,9 @@ class TabManager {
           sandbox: false,
           nodeIntegration: false,
           webSecurity: true,
+          // #405 — stesse regole di una scheda esterna: anche dentro il popup
+          // di login i riquadri incorporati devono avere il tasto destro.
+          nodeIntegrationInSubFrames: true,
           ...(popupPartition ? { partition: popupPartition } : {}),
         },
       },
