@@ -39,13 +39,30 @@ test('si registra su globalThis con la sua API', () => {
   assert.ok(Array.isArray(PN.NOTES) && PN.NOTES.length > 0);
 });
 
-test('il changelog è allineato a package.json (latestVersion === versione app)', () => {
-  // Se questo diventa rosso: hai rilasciato senza aggiungere il blocco della
-  // nuova versione in patchNotes.js. L'utente non vedrà il recap. Aggiungi il
-  // blocco (vedi CLAUDE.md → "Patch notes").
-  assert.equal(
-    PN.latestVersion(), pkg.version,
-    `changelog fermo a ${PN.latestVersion()} ma package.json è a ${pkg.version}`);
+test('il changelog non promette versioni che non sono ancora uscite', () => {
+  // ⚠️ Fino al 2026-08-07 qui si pretendeva che il changelog fosse ESATTAMENTE
+  // alla versione dell'app. Sbagliato per due motivi:
+  //
+  //   1. le versioni escono da sole ogni 6 ore; se in mezzo c'è stato solo
+  //      lavoro interno, quella versione NON deve avere una voce — è la regola
+  //      scritta in CLAUDE.md § Patch notes ("il destinatario è l'utente
+  //      comune"). Il changelog salta già delle versioni per questo;
+  //   2. essendo il controllo che precede la pubblicazione, un rosso qui
+  //      fermava TUTTE le versioni finché qualcuno non inventava una voce.
+  //
+  // L'errore vero è l'opposto: annunciare all'utente una novità in una versione
+  // che non ha ancora. Quello resta vietato.
+  assert.ok(
+    PN.cmpVersion(PN.latestVersion(), pkg.version) <= 0,
+    `il changelog annuncia la ${PN.latestVersion()} ma l'app è alla ${pkg.version}: l'utente leggerebbe di una novità che non ha`);
+});
+
+test('il conteggio delle novità regge anche se le ultime versioni non hanno voci', () => {
+  // È la situazione normale con la regola di cui sopra: ciò che conta per
+  // l'utente è "quante novità da quando ho aggiornato", non quante versioni.
+  const oldest = PN.NOTES[PN.NOTES.length - 1].version;
+  assert.equal(PN.countBehind(oldest), PN.NOTES.length - 1);
+  assert.equal(PN.countBehind(PN.latestVersion()), 0);
 });
 
 test('nessun blocco del changelog è vuoto (almeno una feature o un fix)', () => {
