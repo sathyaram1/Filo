@@ -608,6 +608,12 @@
   // `detail > 1`, cioè "clic ravvicinati sullo stesso punto"), e va ignorato.
   // La guardia si arma SOLO quando il pannello si disegna, così nessun altro
   // overlay ne risente.
+  // Il pannello è a schermo? (serve a tenerlo allineato quando lo stato cambia
+  // da fuori, per esempio annullando un ripristino dall'avviso.)
+  function isVersionHistoryOpen() {
+    return !overlay.hidden && !!overlayBox.querySelector('.ed-vh-list, .ed-vh-empty');
+  }
+
   const VH_STALE_CLICK_MS = 1000;
   let vhDrawnAt = 0;
   function vhArmStaleClickGuard() { vhDrawnAt = Date.now(); }
