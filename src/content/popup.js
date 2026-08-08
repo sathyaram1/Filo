@@ -588,6 +588,80 @@
   }
 
   // ----------------------------------------------------------------
+  // Stack degli avvisi in pagina (#409)
+  // ----------------------------------------------------------------
+  // TUTTO ciò che Filo ancora nell'angolo in basso a destra della pagina
+  // visitata (toast, pill della dettatura, conferma cliccabile di "Salva per
+  // dopo") vive dentro UN solo contenitore che li impila. Prima ogni avviso era
+  // `position: fixed` sullo stesso angolo: due ravvicinati — anche solo
+  // "sto lavorando" seguito dall'esito — finivano uno sopra l'altro e non si
+  // leggeva nessuno dei due. Stesso pattern della shell (NOTIFS) e dell'editor
+  // (.ed-toasts), vedi PATTERNS.md § "Stack di overlay impilati".
+  let toastHostEl = null;
+
+  // Tetto al numero di avvisi vivi insieme: senza, una raffica (una pagina che
+  // salva venti immagini di fila) riempie lo schermo e spinge i più vecchi
+  // fuori dal viewport. Teniamo i più recenti, che sono i più rilevanti.
+  const MAX_TOAST_STACK = 4;
+
+  function toastHost() {
+    // `isConnected`: se la pagina rifà il DOM (SPA che rimpiazza il body) il
+    // vecchio contenitore resta orfano e gli avvisi successivi sparirebbero.
+    if (!toastHostEl || !toastHostEl.isConnected) {
+      toastHostEl = document.createElement('div');
+      toastHostEl.className = 'sn-toasts';
+      document.documentElement.appendChild(toastHostEl);
+    }
+    return toastHostEl;
+  }
+
+  // Sfratta subito (senza attendere il timeout) gli avvisi più vecchi oltre il
+  // tetto. Gli elementi marcati `sticky` sono esenti: portano un comando che
+  // esiste solo lì (la pill che ferma la dettatura, la conferma che apre la
+  // lista), buttarli via toglierebbe all'utente l'unico modo di usarlo.
+  function enforceToastCap() {
+    const host = toastHost();
+    const live = Array.from(host.children).filter(
+      (c) => c.dataset.snClosing !== '1' && c.dataset.snSticky !== '1',
+    );
+    const over = live.length - MAX_TOAST_STACK;
+    for (let i = 0; i < over; i++) {
+      const c = live[i]; // i più vecchi stanno in cima: si appende in coda
+      if (typeof c._snDispose === 'function') { try { c._snDispose(); } catch (_) {} continue; }
+      try { c.remove(); } catch (_) {}
+    }
+  }
+
+  // Finestra molto bassa: anche col tetto lo stack può eccedere l'altezza
+  // disponibile. Lo rendiamo scrollabile, teniamo in vista il più recente e
+  // riattiviamo i pointer-events solo lì (di base sono spenti per non rubare i
+  // click alla pagina sotto).
+  function syncToastOverflow() {
+    const host = toastHost();
+    const scrollable = host.scrollHeight > host.clientHeight + 1;
+    host.classList.toggle('scrolling', scrollable);
+    if (scrollable) host.scrollTop = host.scrollHeight;
+  }
+
+  // API per gli altri avvisi in pagina ancorati allo stesso angolo: li aggancia
+  // allo stack invece che direttamente al documento.
+  function mountToast(el, opts = {}) {
+    if (!el) return el;
+    if (opts.sticky) el.dataset.snSticky = '1';
+    toastHost().appendChild(el);
+    enforceToastCap();
+    syncToastOverflow();
+    return el;
+  }
+
+  // Da chiamare quando un elemento agganciato esce di scena: rimuove e
+  // ricalcola l'overflow dello stack.
+  function unmountToast(el) {
+    try { el?.remove(); } catch (_) {}
+    syncToastOverflow();
+  }
+
+  // ----------------------------------------------------------------
   // Toast (per feedback brevi)
   // ----------------------------------------------------------------
   // `duration: 0` = il toast resta finché non lo chiude il chiamante (operazioni
@@ -598,16 +672,25 @@
     const t = document.createElement('div');
     t.className = 'sn-toast';
     t.textContent = text;
-    document.documentElement.appendChild(t);
-    requestAnimationFrame(() => t.classList.add('sn-toast-visible'));
     let closed = false;
     let timer = null;
+    // Rimozione immediata usata dallo sfratto per tetto: niente animazione, ma
+    // il timer va spento o continuerebbe a puntare a un elemento morto.
+    t._snDispose = () => {
+      closed = true;
+      if (timer) { clearTimeout(timer); timer = null; }
+      unmountToast(t);
+    };
+    mountToast(t);
+    requestAnimationFrame(() => t.classList.add('sn-toast-visible'));
     const close = () => {
       if (closed) return;
       closed = true;
       if (timer) { clearTimeout(timer); timer = null; }
+      // Marcato in uscita: non occupa più uno slot del tetto mentre sfuma.
+      t.dataset.snClosing = '1';
       t.classList.remove('sn-toast-visible');
-      setTimeout(() => t.remove(), 250);
+      setTimeout(() => unmountToast(t), 250);
     };
     const duration = opts.duration === 0 ? 0 : (opts.duration || 2200);
     if (duration > 0) timer = setTimeout(close, duration);
