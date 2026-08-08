@@ -76,9 +76,9 @@ test('nel riquadro il menu sul collegamento porta le azioni del collegamento', a
   const menu = frame.locator('.sn-menu');
   await expect(menu).toBeVisible();
   const txt = (await menu.textContent()) || '';
-  expect(txt).toContain('Copia');
-  // "Apri in una nuova scheda" è la voce cardine del menu su un collegamento.
-  expect(txt.toLowerCase()).toContain('nuova scheda');
+  expect(txt).toContain('Copia URL');
+  // "Apri in nuova tab" è la voce cardine del menu su un collegamento.
+  expect(txt.toLowerCase()).toContain('apri in nuova tab');
 });
 
 test('in un riquadro basso il menu resta tutto raggiungibile (scorre, non viene tagliato)', async ({ openTab, testServer }) => {
