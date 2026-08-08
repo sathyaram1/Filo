@@ -37,16 +37,13 @@ test('originOf: classifica l’origine dal prefisso del clientId', () => {
   assert.equal(TH.originOf(null), 'user');
 });
 
-test('authorKind: riduce il clientId alle 4 categorie d’autore della dashboard', () => {
+test('authorKind: riduce il clientId alle categorie d’autore della dashboard', () => {
   // owner: invio manuale dell'admin loggato.
   assert.equal(TH.authorKind('owner:caf22093'), 'owner');
   // auto: Filo che segnala in automatico per conto dell'utente (capacità
   // mancante o errore) → 'filo'. È la categoria che senza il fix non esisteva.
   assert.equal(TH.authorKind('auto:complaint'), 'filo');
   assert.equal(TH.authorKind('auto:capability-gap:qualcosa'), 'filo');
-  // agent:/routine: sono istanze AI → 'claude'.
-  assert.equal(TH.authorKind('agent:gemini-3-flash'), 'claude');
-  assert.equal(TH.authorKind('routine:nightly'), 'claude');
   // Qualunque altro clientId è un utente esterno.
   assert.equal(TH.authorKind('tester@example.com'), 'user');
   assert.equal(TH.authorKind('caf22093-uuid'), 'user');
@@ -56,6 +53,33 @@ test('authorKind: riduce il clientId alle 4 categorie d’autore della dashboard
   // ma l'ordine resta robusto).
   assert.equal(TH.authorKind('owner:auto:complaint'), 'owner');
   assert.equal(TH.authorKind('auto:owner:x'), 'filo');
+});
+
+// #443: il mittente vero. Prima di questo un ritrovamento nato esplorando l'app,
+// uno nato implementando e uno nato verificando arrivavano tutti come 'claude',
+// e Filo-che-scrive-per-un-utente si spacciava per l'utente stesso. Togliendo il
+// fix, ognuno di questi assert torna sul valore generico → rosso.
+test('authorKind: distingue le tre automazioni fra loro e Filo dall’utente', () => {
+  // Filo che scrive per conto di un utente dalla chat: NON è l'utente.
+  assert.equal(TH.authorKind('filo:chat'), 'filo');
+  // Esplorazione autonoma: parla dell'app in generale.
+  assert.equal(TH.authorKind('routine:prober'), 'prober');
+  // Chi implementa: il ritrovamento è nato scrivendo il codice.
+  assert.equal(TH.authorKind('routine:new-work'), 'worker');
+  assert.equal(TH.authorKind('routine:fixer'), 'worker');
+  // Chi verifica il lavoro di un altro: parla della modifica appena consegnata.
+  assert.equal(TH.authorKind('routine:verifier'), 'verifier');
+  assert.equal(TH.authorKind('routine:secaudit'), 'verifier');
+  // Vale anche col prefisso 'agent:'.
+  assert.equal(TH.authorKind('agent:prober'), 'prober');
+  // Automazione che non si è firmata (tutto lo storico fino al 2026-08-08):
+  // resta 'claude' generico invece di inventarsi un ruolo.
+  assert.equal(TH.authorKind('routine:routine'), 'claude');
+  assert.equal(TH.authorKind('routine:nightly'), 'claude');
+  assert.equal(TH.authorKind('agent:gemini-3-flash'), 'claude');
+  // Il ruolo è case-insensitive e tollera spazi (arriva da un file su disco).
+  assert.equal(TH.authorKind('routine:Prober'), 'prober');
+  assert.equal(TH.authorKind('routine: verifier '), 'verifier');
 });
 
 test('isFromOwner: vero solo per il prefisso owner:', () => {
