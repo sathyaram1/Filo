@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.195', date: '2026-08-08',
+      features: [],
+      fixes: [
+        'Gli avvisi che Filo mostra dentro le pagine ora si impilano uno sopra l\'altro: se ne arrivano due ravvicinati restano leggibili entrambi, invece di finire uno sopra l\'altro.',
+      ],
+    },
+    {
       version: '0.2.193', date: '2026-08-07',
       features: [],
       fixes: [
