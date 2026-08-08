@@ -510,8 +510,9 @@ comportamento.
   comparso un errore;
 - la stessa sequenza con un'azione su una terza applicazione si ferma, e il
   motivo dichiarato è "fuori perimetro";
-- un'azione di livello 3 non elencata nel piano si ferma anche a perimetro
-  aperto;
+- ogni azione di livello 3 chiede conferma a perimetro aperto — il test va
+  scritto sul caso **elencato nel piano**, che è quello che si è tentati di far
+  passare; se lo togli dal piano il test deve restare verde;
 - un'azione sul pavimento si ferma in **tutti** i modi, "Mano libera" incluso —
   questo test va scritto per tutti e quattro i modi.
 
