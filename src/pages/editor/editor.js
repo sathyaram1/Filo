@@ -3974,6 +3974,9 @@
     if (!el || el.dataset.closing === '1') return;
     el.dataset.closing = '1';
     if (el._timer) clearTimeout(el._timer);
+    // Via un avviso, quelli sopra scivolano giù al suo posto: la pila si è
+    // ridisegnata sotto il cursore.
+    edToastHostEl()._staleGuard.arm();
     el.classList.remove('show');
     if (immediate) { try { el.remove(); } catch (_) {} syncEdToastOverflow(); return; }
     setTimeout(() => { try { el.remove(); } catch (_) {} syncEdToastOverflow(); }, 220);
