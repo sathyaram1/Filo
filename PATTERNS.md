@@ -164,9 +164,17 @@ un'azione, Filo la compie — non lascia un bottone "da cliccare per davvero":
   Se nella stessa risposta ce ne sono **più d'una**, i popup si aprono **uno alla
   volta** (`renderActions` attende `_runConfirm()` di ciascuno prima del successivo):
   niente stacking di modali, ma neanche bottoni lasciati lì da cliccare a mano. Il
-  bottone resta solo come ripiego se l'utente **annulla**. Le azioni esterne
-  (`INVIA_FEEDBACK`) o distruttive (livello 3, comandi) restano a click esplicito —
-  niente auto-conferma di cose irreversibili.
+  bottone resta solo come ripiego se l'utente **annulla**. Vale anche per la
+  segnalazione che Filo propone da sé (`INVIA_FEEDBACK`, #414): il popup non invia
+  nulla, mostra il testo e aspetta l'OK — è la stessa cosa che fa da sempre la
+  sidebar, e lasciare un chip da cliccare aggiungeva un passaggio prima ancora di
+  poter leggere cosa sarebbe partito. Restano a click esplicito solo le azioni
+  distruttive (livello 3) e i comandi: niente auto-conferma di cose irreversibili.
+- **Il popup di livello 2 mostra il testo INTERO, non un estratto (#414).** Se è
+  lungo scorre dentro il box (`.sn-confirm-text` ha `max-height` + `overflow-y`),
+  mai un `…` a metà frase: un consenso su un testo che l'utente non ha potuto
+  leggere per intero non è un consenso. Vale in particolare per il feedback, che
+  parte a nome suo.
 - **Test:** `tests/filo-open-link-direct.spec.mjs`, `tests/filo-action-levels.spec.mjs`
   (più popup di livello 2 → si aprono in sequenza, nessun chip resta da cliccare).
 
