@@ -25,13 +25,31 @@ git rev-parse --git-dir >/dev/null 2>&1 || exit 0
 # The integration branch. Default "main". Override via FILO_MAIN_BRANCH.
 TARGET_BRANCH="${FILO_MAIN_BRANCH:-main}"
 
-# Merge gate (R2): branches matching these prefixes are the routines' worker /
-# feature branches. They get committed and pushed for traceability, but are
-# NEVER auto-merged onto TARGET_BRANCH by this hook. They reach TARGET_BRANCH
-# only through scripts/merge-gate.mjs, invoked by the orchestrator after the
-# adversarial verification PASS (and, per R6, after the L4/L5 security checks).
-# Everything else (the user's local branches, the routines' own driver branch
-# claude/*) keeps the existing auto-merge / auto-push behaviour unchanged.
+# ─── Chi sta lavorando? (spec ROUTINE-BRANCH-INTEGRITY.md §Via 1) ────────────
+#
+# Fino al 2026-08-07 questo hook distingueva "lavoro di una routine, da
+# trattenere" da "lavoro dell'owner, da pubblicare" GUARDANDO IL NOME DEL RAMO:
+# un elenco di prefissi vietati (worker/*, feature/*), e tutto il resto veniva
+# pubblicato sul ramo principale a ogni modifica. Il nome è un indizio, non un
+# fatto: il 24 luglio un'istanza di routine che non era passata su un ramo di
+# lavoro ha pubblicato il proprio codice direttamente, saltando il cancello di
+# sicurezza — che nel frattempo esaminava un gemello abbandonato.
+#
+# Ora la sessione si DICHIARA. `FILO_ROUTINE=1` (lo esporta l'orchestratore, e
+# lo eredita ogni worker) significa: nessuna pubblicazione automatica, mai,
+# qualunque sia il nome del ramo. Si arriva al ramo principale solo attraverso
+# scripts/merge-gate.mjs.
+#
+# È anche la risposta alla domanda "questo commit da dove è arrivato?": senza
+# marcatura, nella storia il lavoro di una routine e quello di una sessione
+# locale sono indistinguibili (stesso autore, stesso ramo, stesso aspetto).
+is_routine_session() {
+  [ -n "$FILO_ROUTINE" ] && [ "$FILO_ROUTINE" != "0" ]
+}
+
+# I prefissi restano come RETE, non più come regola primaria: proteggono anche
+# le sessioni locali che stanno lavorando a qualcosa che non deve ancora uscire
+# (è così che è protetto questo stesso lavoro).
 is_gated_branch() {
   case "$1" in
     worker/*|feature/*) return 0 ;;
@@ -39,6 +57,15 @@ is_gated_branch() {
   esac
 }
 export -f is_gated_branch 2>/dev/null || true
+
+# Identità di chi committa: distingue nella storia le due provenienze.
+if is_routine_session; then
+  COMMIT_AS_NAME="claude-routine"
+  COMMIT_AS_EMAIL="claude@routine"
+else
+  COMMIT_AS_NAME="claude-local"
+  COMMIT_AS_EMAIL="claude@local"
+fi
 
 # Find a worktree (if any) that has TARGET_BRANCH checked out.
 TARGET_WT=$(git worktree list --porcelain | awk -v tb="refs/heads/$TARGET_BRANCH" '
