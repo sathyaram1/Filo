@@ -53,16 +53,27 @@ async function clearDoc(page) {
 const title = (page) => page.locator('#docTitle').innerText();
 
 // Rinomina dalla MATITA nel menu documenti sul documento attivo.
+async function closeDocPop(page) {
+  await page.evaluate(() => {
+    const pop = document.getElementById('docPop');
+    if (pop && !pop.hidden) {
+      document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    }
+  });
+  await expect(page.locator('#docPop')).toBeHidden();
+}
+
 async function renameViaPencil(page, value, how = 'enter') {
+  await closeDocPop(page);
   await page.locator('#docSwitch').click();
+  await expect(page.locator('#docPop')).toBeVisible();
   await page.locator('.ed-doc-item.active .ed-doc-act[title="Rinomina"]').click();
   const input = page.locator('.ed-doc-item-input');
   await expect(input).toBeVisible();
   await input.fill(value);
   if (how === 'enter') await input.press('Enter');
   else await page.locator('#doc').click();          // blur → conferma
-  await page.locator('#docSwitch').press('Escape').catch(() => {});
-  await page.evaluate(() => document.body.click());
+  await closeDocPop(page);
 }
 
 // Rinomina dal tasto destro sul titolo (docbar).
