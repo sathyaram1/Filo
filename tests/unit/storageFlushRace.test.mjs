@@ -52,18 +52,13 @@ test('scritture in raffica non producono flush falliti e il file finale è integ
       // mentre le scritture successive ne accodano altri.
       await new Promise((r) => setTimeout(r, i % 2 ? 120 : 10));
     }
-    // Attendi che l'ultima catena di flush si svuoti: sotto carico (suite
-    // completa in parallelo) un'attesa fissa non basta, quindi si fa polling
-    // sul contenuto del file fino a vederci l'ultimo stato.
-    const deadline = Date.now() + 15000;
-    for (;;) {
-      try {
-        const onDisk = JSON.parse(readFileSync(join(userData, 'storage.json'), 'utf8'));
-        if (onDisk.contatore === 7) break;
-      } catch (_) { /* file assente o scrittura a metà: riprova */ }
-      if (Date.now() > deadline) break;
-      await new Promise((r) => setTimeout(r, 100));
-    }
+    // Attende la quiete in modo DETERMINISTICO (nessuna scadenza a orologio).
+    // Prima si aspettava fino a 15 secondi che 16 MB arrivassero su disco: a
+    // macchina scarica bastavano, con la suite completa in parallelo no — e il
+    // test cadeva ogni tanto lamentando dati incoerenti invece dell'attesa
+    // scaduta. La raffica concorrente qui sopra resta identica: è lì che si
+    // riproduce la collisione fra flush, ed è quella che il test deve cogliere.
+    await Storage.whenSettled();
   } finally {
     console.error = realError;
   }
