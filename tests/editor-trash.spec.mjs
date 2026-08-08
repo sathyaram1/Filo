@@ -165,3 +165,42 @@ test('dal cestino si può anche buttare via per sempre, ma solo confermando', as
   await expect(page.locator('.ed-tr-item')).toHaveCount(0);
   await expect(page.locator('.ed-vh-empty')).toContainText('Nessun documento eliminato');
 });
+
+// ── La conferma sul posto regge il doppio clic (#415) ─────────────────────
+// "Confermi?" compare SOTTO il cursore, quindi il secondo colpo di una coppia
+// ci cadeva sopra e mandava via il documento per sempre in un gesto solo: la
+// conferma esisteva ma non proteggeva nulla. Il test asserisce il SUCCESSO
+// della protezione — il documento è ancora nel cestino, col suo testo, e la
+// conferma resta lì pronta per un clic voluto. Senza la guardia il cestino si
+// svuota → rosso.
+test('doppio clic su "Elimina definitivamente": il documento NON viene buttato via', async ({ openTab }) => {
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('#doc');
+  await page.evaluate(async () => {
+    localStorage.removeItem('filo.editor.trash');
+    localStorage.removeItem('filo.editor.collection');
+    try { await chrome.storage.local.remove('filo.editor.collection'); } catch (_) {}
+  });
+  await page.reload();
+  await page.waitForSelector('#doc');
+
+  await page.click('#doc');
+  await setDocText(page, 'roba preziosa');
+  await newDocWithText(page, 'documento che resta');
+
+  await page.click('#docSwitch');
+  await page.locator('.ed-doc-item').nth(0).locator('.ed-doc-del').click();
+  await page.click('#docTrash');
+  await expect(page.locator('.ed-tr-item')).toHaveCount(1);
+
+  await page.locator('.ed-tr-purge').dblclick();
+
+  // Il documento è ancora lì, col suo testo, e la conferma è pronta.
+  await expect(page.locator('.ed-tr-item')).toHaveCount(1);
+  await expect(page.locator('.ed-tr-item')).toContainText('roba preziosa');
+  await expect(page.locator('.ed-tr-purge')).toHaveText('Confermi?');
+
+  // E un clic voluto lo elimina davvero: la guardia non ha bloccato la strada.
+  await page.locator('.ed-tr-purge').click();
+  await expect(page.locator('.ed-tr-item')).toHaveCount(0);
+});
