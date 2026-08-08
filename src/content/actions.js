@@ -895,8 +895,9 @@
       if (done) return;
       done = true;
       if (timer) { clearTimeout(timer); timer = null; }
+      pill.dataset.snClosing = '1';
       pill.classList.remove('sn-save-confirm-visible');
-      setTimeout(() => { try { pill.remove(); } catch (_) {} }, 220);
+      setTimeout(() => { try { Popup.unmountToast(pill); } catch (_) {} }, 220);
       if (openList && entry && entry.id) {
         chrome.runtime.sendMessage({ type: MSG.OPEN_HOME, highlight: entry.id }).catch(() => {});
       }
