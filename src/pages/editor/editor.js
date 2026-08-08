@@ -983,6 +983,7 @@
         <p class="ed-vh-empty">Nessun documento eliminato. Quando ne elimini uno resta qui, con il suo testo e il suo storico, finché non lo butti davvero.</p>
         <div class="ed-overlay-actions"><button class="ed-btn primary" id="ovClose">Chiudi</button></div>`);
       $('ovClose').addEventListener('click', closeOverlay);
+      overlayGuard.arm();
       return;
     }
     const rows = trash.map((e) => {
