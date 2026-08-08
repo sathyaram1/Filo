@@ -70,6 +70,13 @@ pubblica niente. Per i soli controlli, senza fondere: `npm run finish:check`.
 Se la fusione viene rifiutata perché `main` è avanzato (una routine ha pushato
 nel frattempo): `git pull --rebase origin main` e rilancia.
 
+Vale **anche se stai lavorando direttamente su `main`**: lì non c'è niente da
+fondere, ma i controlli girano lo stesso e la pubblicazione avviene solo se
+passano. Nessuna scorciatoia: l'hook non fa più atterrare niente su `main` da
+solo, in nessuna forma del repo. Ci si arriva da qui o dal cancello di merge
+delle routine — e questo non dipende da nessuna variabile d'ambiente che
+qualcuno possa dimenticare di impostare.
+
 ## MAI committare artefatti dei test (evita i conflitti di rebase)
 
 Gli screenshot dei test sono **output rigenerato**, non sorgente. Sessioni locali
