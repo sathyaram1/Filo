@@ -845,10 +845,22 @@
     return {
       type: 'item',
       label: 'Invia feedback',
-      onClick: () => {
-        try { self.SN_FEEDBACK_UI?.open(); } catch (e) { console.error('[SN] feedback open', e); }
-      },
+      onClick: () => openSurface('feedback', () => self.SN_FEEDBACK_UI?.open()),
     };
+  }
+
+  // #405 — i pannelli a tutta superficie (feedback, red-team, sidebar Aiuto)
+  // appartengono alla pagina: aperti dentro un riquadro incorporato starebbero
+  // dentro un rettangolo di poche centinaia di pixel, tagliati. Dal riquadro
+  // chiediamo alla pagina di aprirli; nella pagina si aprono e basta.
+  function openSurface(surface, localOpen) {
+    if (!IS_SUBFRAME) {
+      try { localOpen(); } catch (e) { console.error('[SN] apertura pannello', e); }
+      return;
+    }
+    try {
+      Promise.resolve(chrome.runtime.sendMessage({ type: MSG.RUN_IN_TOP_FRAME, surface })).catch(() => {});
+    } catch (_) {}
   }
 
   // ------------------------------------------------------------
