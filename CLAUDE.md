@@ -72,6 +72,29 @@ pubblica niente. Per i soli controlli, senza fondere: `npm run finish:check`.
 Se la fusione viene rifiutata perché `main` è avanzato (una routine ha pushato
 nel frattempo): `git pull --rebase origin main` e rilancia.
 
+### La verifica indipendente vale anche in locale (dal 2026-08-08)
+
+`npm run finish` **non pubblica** finché un'istanza DIVERSA da quella che ha
+scritto il codice non ha provato a romperlo. È lo stesso passaggio che in cloud
+esiste da sempre, e serve perché i test scritti insieme al lavoro hanno gli
+stessi punti ciechi di chi ha scritto il lavoro: passano anche quando la cosa
+chiesta non si ottiene.
+
+```bash
+node scripts/verify-local.mjs start "<cosa aveva chiesto l'owner, con le sue parole>"
+```
+
+Stampa il compito da consegnare a **un'istanza nuova** (un subagente, non te
+stesso). Quel testo contiene la richiesta e il ramo, **mai il diff né il tuo
+report**: è l'isolamento che rende la verifica avversariale invece di una
+rilettura compiacente. L'istanza che verifica registra l'esito con
+`verify-local.mjs pass "…"` o `fail "…"`.
+
+L'esito è legato al **commit** verificato: se dopo il PASS tocchi ancora il
+codice, decade e va rifatto — altrimenti basterebbe farsi approvare una versione
+e pubblicarne un'altra. `npm run finish -- --no-verify` salta tutto: è la
+scorciatoia da usare solo quando serve davvero, e va detto all'owner.
+
 Vale **anche se stai lavorando direttamente su `main`**: lì non c'è niente da
 fondere, ma i controlli girano lo stesso e la pubblicazione avviene solo se
 passano. Nessuna scorciatoia: l'hook non fa più atterrare niente su `main` da
