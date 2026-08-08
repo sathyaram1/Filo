@@ -95,18 +95,26 @@ git worktree list --porcelain | awk '/^worktree /{print substr($0,10)}' | while 
   [ -z "$SUMMARY" ] && SUMMARY=$(date +%Y-%m-%dT%H:%M:%S)
   git -c user.email="$COMMIT_AS_EMAIL" -c user.name="$COMMIT_AS_NAME" commit -q -m "auto: $SUMMARY" 2>/dev/null
 
-  # Multi-worktree mode: merge feature branch into TARGET_BRANCH worktree.
-  # Gated branches (worker/*, feature/*) are committed above but NOT merged
-  # here — they go through scripts/merge-gate.mjs (R2).
-  if [ -n "$TARGET_WT" ] && [ "$wt" != "$TARGET_WT" ] && [ "$BRANCH" != "$TARGET_BRANCH" ] && ! is_gated_branch "$BRANCH" && ! is_routine_session; then
-    cd "$TARGET_WT" || continue
-    MERGE_OUT=$(git -c user.email="$COMMIT_AS_EMAIL" -c user.name="$COMMIT_AS_NAME" merge --no-edit "$BRANCH" 2>&1)
-    MERGE_RC=$?
-    if [ $MERGE_RC -ne 0 ]; then
-      git merge --abort 2>/dev/null
-      echo "[auto-merge] CONFLICT merging '$BRANCH' into '$TARGET_BRANCH' — needs manual resolution" >&2
-      echo "$MERGE_OUT" >&2
-    fi
+  # NESSUNA fusione automatica sul ramo principale (cambiato il 2026-08-07).
+  # Il salvataggio continuo resta — e' cio' che salva il lavoro quando una
+  # sessione viene interrotta di colpo — ma al ramo principale ci si arriva UNA
+  # VOLTA, a lavoro finito: `npm run finish` in locale (controlli + fusione),
+  # scripts/merge-gate.mjs per le routine.
+  #
+  # Perche': una versione viene costruita e distribuita agli utenti ogni 6 ore
+  # prendendo il ramo principale COSI' COM'E'. Pubblicando a ogni modifica, quella
+  # fotografia poteva cogliere un lavoro a meta'. In piu' ogni pubblicazione
+  # spostava il ramo principale sotto i piedi delle routine in corso, e faceva
+  # giudicare al cancello di sicurezza una versione diversa da quella poi fusa.
+  # Durabilita': ogni ramo di lavoro viene spedito subito. E' il pezzo che ha
+  # salvato il lavoro dopo le interruzioni improvvise, e vale anche in locale
+  # ora che la fusione sul ramo principale e' differita.
+  if [ -n "$BRANCH" ] && [ "$BRANCH" != "HEAD" ] && [ "$BRANCH" != "$TARGET_BRANCH" ]; then
+    git push origin "$BRANCH" >/dev/null 2>&1 || true
+  fi
+
+  if [ "$BRANCH" = "$TARGET_BRANCH" ] && ! is_routine_session; then
+    echo "[auto-commit] Stai lavorando direttamente su '$TARGET_BRANCH': le modifiche vengono pubblicate subito. Meglio un worktree dedicato + 'npm run finish' a lavoro finito." >&2
   fi
 done
 
