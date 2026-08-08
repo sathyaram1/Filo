@@ -37,27 +37,37 @@ Module._load = function (request, parent, isMain) {
 
 const Storage = require(join(__dirname, '..', '..', 'src', 'main', 'shim', 'storage.js'));
 
-test('scritture in raffica non producono flush falliti e il file finale è integro', async () => {
+// ⚠️ Storia di questo test (2026-08-07). Nella forma precedente faceva una
+// raffica di `set()` intervallati da attese, e poi aspettava FINO A 15 SECONDI
+// che il file comparisse su disco. Due difetti:
+//
+//   1. non riproduceva il guasto: rimuovendo la serializzazione dei flush
+//      passava IDENTICO. Poteva passare in entrambi gli stati, cioè non
+//      verificava niente (vedi CLAUDE.md § "Test che servono davvero");
+//   2. l'attesa a orologio bastava a macchina scarica e non sotto carico, quindi
+//      cadeva a caso — lamentando dati incoerenti invece dell'attesa scaduta.
+//
+// Ora la collisione viene provocata direttamente — due scritture forzate senza
+// attendere la prima — e l'attesa è deterministica.
+test('due flush simultanei non si rubano il file temporaneo', async () => {
   const errors = [];
   const realError = console.error;
   console.error = (...args) => { errors.push(args.map(String).join(' ')); };
   try {
-    // Raffica di set() che si accavallano coi flush in volo: senza
-    // serializzazione due flush condividono il .tmp e la rename perde (ENOENT).
-    // Il payload grande allunga la scrittura e rende l'overlap quasi certo.
+    // Payload grande: la scrittura dura abbastanza da tenere davvero in volo il
+    // primo flush mentre parte il secondo.
     const big = 'x'.repeat(2 * 1024 * 1024);
-    for (let i = 0; i < 8; i++) {
-      await Storage.set({ [`chiave${i}`]: big, contatore: i });
-      // Lascia scattare il timer di debounce (100ms) così parte un flush vero
-      // mentre le scritture successive ne accodano altri.
-      await new Promise((r) => setTimeout(r, i % 2 ? 120 : 10));
-    }
-    // Attende la quiete in modo DETERMINISTICO (nessuna scadenza a orologio).
-    // Prima si aspettava fino a 15 secondi che 16 MB arrivassero su disco: a
-    // macchina scarica bastavano, con la suite completa in parallelo no — e il
-    // test cadeva ogni tanto lamentando dati incoerenti invece dell'attesa
-    // scaduta. La raffica concorrente qui sopra resta identica: è lì che si
-    // riproduce la collisione fra flush, ed è quella che il test deve cogliere.
+    await Storage.set({ grande: big, contatore: 0 });
+
+    // Le due scritture partono INSIEME (nessun await sulla prima). Senza
+    // serializzazione condividono lo stesso file temporaneo: la prima lo
+    // rinomina, la seconda non lo trova più e la scrittura va persa.
+    await Storage.set({ contatore: 1 });
+    const a = Storage.flushNow();
+    const b = Storage.flushNow();
+    await Promise.all([a, b]);
+
+    await Storage.set({ contatore: 2 });
     await Storage.whenSettled();
   } finally {
     console.error = realError;
@@ -68,6 +78,6 @@ test('scritture in raffica non producono flush falliti e il file finale è integ
 
   // Il file su disco deve esistere, essere JSON valido e contenere l'ULTIMO stato.
   const onDisk = JSON.parse(readFileSync(join(userData, 'storage.json'), 'utf8'));
-  assert.equal(onDisk.contatore, 7);
-  assert.equal(onDisk.chiave7.length, 2 * 1024 * 1024);
+  assert.equal(onDisk.contatore, 2);
+  assert.equal(onDisk.grande.length, 2 * 1024 * 1024);
 });
