@@ -16,6 +16,28 @@
 const { ipcRenderer, webFrame } = require('electron');
 const path = require('node:path');
 
+// ─── #405 — riquadri incorporati (iframe) ───────────────────────────────────
+//
+// Da quando la scheda usa nodeIntegrationInSubFrames, questo preload gira in
+// OGNI frame: la pagina e ciascun riquadro incorporato (video, mappa, modulo,
+// blocco commenti, post social). Prima girava solo nel frame principale, e
+// dentro il riquadro Filo non esisteva: tasto destro morto, niente correttore,
+// niente Spiegazione/Traduci, niente Incolla con la cronologia.
+//
+// Ma un riquadro NON è una pagina: caricare tutti i content script in ognuno
+// significherebbe pagare decine di volte lo stesso prezzo su una pagina piena
+// di pubblicità e widget, per frame che l'utente non tocca mai. Quindi:
+//   - nel frame principale tutto resta com'era (caricamento al DOMContentLoaded);
+//   - in un riquadro non si carica NIENTE finché l'utente non lo tocca davvero
+//     (tasto destro, clic, tasto premuto, o una scorciatoia globale diretta a
+//     quel frame). Alla prima interazione il riquadro monta l'intero Filo.
+// Le funzioni di PAGINA (colore della scheda, segnali di attività, banner
+// cookie/sito pericoloso, traduzione della pagina) restano appannaggio del
+// frame principale: dentro un riquadro descriverebbero il rettangolo sbagliato.
+const IS_SUBFRAME = (() => {
+  try { return window.top !== window.self; } catch (_) { return true; }
+})();
+
 // ─── #145 — blocco autoplay sulle schede RIPRISTINATE al boot ───────────────
 //
 // Le schede riaperte all'avvio di Filo nascono con il flag
