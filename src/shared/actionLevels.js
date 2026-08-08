@@ -24,29 +24,6 @@
 (function (global) {
   'use strict';
 
-  // Tronca a `max` unità visibili senza spezzare un carattere a metà.
-  // `String.slice` conta unità UTF-16: tagliare in mezzo a un'emoji (coppia
-  // surrogata) lascerebbe un surrogato solitario, mostrato come rettangolino/
-  // glifo rotto nel popup di conferma (e corrotto in U+FFFD una volta salvato).
-  // Contiamo per grafema (Intl.Segmenter, quando c'è, tiene insieme anche le
-  // emoji composte) con ripiego a code point.
-  function truncateSafe(str, max) {
-    const s = String(str == null ? '' : str);
-    let units;
-    try {
-      if (typeof Intl !== 'undefined' && Intl.Segmenter) {
-        const seg = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
-        units = Array.from(seg.segment(s), (g) => g.segment);
-      } else {
-        units = Array.from(s);
-      }
-    } catch {
-      units = Array.from(s);
-    }
-    if (units.length <= max) return s;
-    return units.slice(0, max).join('');
-  }
-
   function prefBuilt(action) {
     const P = global.SN_PREF;
     if (!P) return null;
