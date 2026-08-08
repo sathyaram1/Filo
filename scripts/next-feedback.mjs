@@ -360,15 +360,17 @@ export async function run() {
   const eligible = filterEligible(todoFree, minimal);
 
   if (!eligible.length) {
-    process.stderr.write('[next-feedback] nessun feedback lavorabile: i todo restanti aspettano i predecessori della loro famiglia\n');
-    process.exit(2);
+    // Anche qui l'illeggibilità falsa il risultato, e in modo più subdolo: un
+    // fratello con status non decifrabile risulta "aperto" e BLOCCA i
+    // successivi, quindi la coda sembra in attesa di predecessori che in realtà
+    // sono chiusi.
+    exitEmpty('nessun feedback lavorabile: i todo restanti aspettano i predecessori della loro famiglia', unreadable, minimal.length);
   }
 
   // 5. Seleziona il vincitore (logica pura).
   const winnerId = selectWinner(eligible);
   if (!winnerId) {
-    process.stderr.write('[next-feedback] nessun feedback da lavorare (selectWinner ha tornato null)\n');
-    process.exit(2);
+    exitEmpty('nessun feedback da lavorare (selectWinner ha tornato null)', unreadable, minimal.length);
   }
 
   // 6. Decifra SOLO il vincitore nel corpo completo.
