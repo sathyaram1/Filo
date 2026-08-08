@@ -271,7 +271,9 @@ con:
   luglio da tre portali e te le metto in una cartella");
 - **applicazioni** — l'elenco chiuso di ciò che toccherà;
 - **cartelle** — dove leggerà e dove scriverà;
-- **passi irreversibili** — l'elenco esplicito, o "nessuno";
+- **passi irreversibili** — l'elenco esplicito, o "nessuno". È un preavviso, non
+  una delega: quei passi chiederanno conferma lo stesso quando arriveranno
+  (§6.2);
 - **cosa non farà** — una riga, quando c'è un'ambiguità evidente da fugare
   ("non tocco le fatture già archiviate").
 
