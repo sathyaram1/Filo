@@ -1254,7 +1254,10 @@
     // Intestazione
     const clientId = fb.clientId || 'anonimo';
     const dateStr  = formatDate(fb.createdAt);
-    mgDetailHead.innerHTML = `Da <a class="mg-sender-link" id="senderLink" href="#" data-client="${esc(clientId)}">${esc(clientId)}</a> il ${dateStr}`;
+    // Chi ha scritto, in chiaro (#443): l'identificativo grezzo diceva
+    // "filo:chat" dove serviva leggere "Filo, per conto di un utente". Resta
+    // ispezionabile passandoci sopra e nel pannello del mittente.
+    mgDetailHead.innerHTML = `Da <a class="mg-sender-link" id="senderLink" href="#" data-client="${esc(clientId)}" title="${esc(clientId)}">${esc(senderLabel(fb))}</a> il ${dateStr}`;
     document.getElementById('senderLink').addEventListener('click', (e) => {
       e.preventDefault();
       openSidebarSender(clientId);
