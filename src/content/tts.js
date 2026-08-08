@@ -612,7 +612,7 @@
       try {
         const raw = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
         if (!raw.size) { Popup.showToast(I18n.t('menu_dictate_empty')); cleanup(); return; }
-        if (pill.parentNode) pill.remove();
+        if (pill.parentNode) Popup.unmountToast(pill);
         Popup.showToast(I18n.t('menu_dictate_transcribing'), { duration: 2500 });
         // Gemini accetta wav/mp3/ogg/flac/aac/aiff ma non webm: riencodiamo in
         // WAV mono 16kHz (più che sufficiente per voce, file piccolo).
