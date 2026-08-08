@@ -705,6 +705,8 @@
     close,
     closeTopmost,
     showToast,
+    mountToast,
+    unmountToast,
     attachZoomCompensation,
     renderMarkdown,
     resolveCalcMarkers,
