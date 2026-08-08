@@ -35,24 +35,36 @@
 //
 // USO
 //   node scripts/dispatch.mjs                          # sceglie e stampa il JSON
+//   node scripts/dispatch.mjs --preflight               # prontezza (prima del setup)
 //   node scripts/dispatch.mjs --record-verifier <id> <pass|fail> ["critica"]
 //   node scripts/dispatch.mjs --record-fixed <id> ["report"]
 //   node scripts/dispatch.mjs --record-secaudit <id> <pass|fail>
 //   node scripts/dispatch.mjs --clear-state <id>
 //
 //   Exit 0 → JSON su stdout (c'è lavoro). Exit 2 → niente da fare. Exit 1 → errore.
+//   Exit 3 → GUASTO: non si può lavorare in sicurezza (vedi ROUTINE-BRANCH-INTEGRITY.md §E).
+//
+// INTEGRITÀ DEL RAMO (2026-08-07, ROUTINE-BRANCH-INTEGRITY.md)
+//   dispatch non si limita più a DIRE su quale branch lavorare: ci mette lui
+//   l'istanza (prepareBranch), con nomi unici per tentativo, fail-closed, e
+//   ripristinando il branch all'ultimo punto fermo se l'istanza precedente è
+//   stata interrotta. Ogni --record-* ricalcola l'identità della directory e
+//   RIFIUTA la transizione se non corrisponde al branch assegnato.
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync } from 'node:fs';
 import { dirname, resolve, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  prepareBranch, newWorkBranch, preferredBase, checkDelivery, withCheckpoint,
+  lastCheckpoint, bumpRejects, clearRejects, headSha, currentBranch,
+  writeExpectation, clearExpectation, stateDir, IDENTITY_REJECT_LIMIT,
+} from './lib/branch-integrity.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = process.env.FILO_REPO_ROOT ? resolve(process.env.FILO_REPO_ROOT) : resolve(__dirname, '..');
 // Lo stato vive accanto ai claim, sotto feedback-triage/state/ (override per i test).
-const STATE_DIR = process.env.FILO_DISPATCH_STATE_DIR
-  ? resolve(process.env.FILO_DISPATCH_STATE_DIR)
-  : resolve(ROOT, 'feedback-triage', 'state');
+const STATE_DIR = stateDir(ROOT);
 const ROLES_DIR = resolve(ROOT, 'routines', 'roles');
 const MAIN_BRANCH = process.env.FILO_MAIN_BRANCH || 'main';
 
@@ -428,6 +440,7 @@ const ROLE_FILE = {
   fixer: 'fixer.md',
   'new-work': 'new-work.md',
   prober: 'prober.md',
+  halt: 'halt.md',
 };
 
 export function readRoleInstructions(role) {
@@ -467,6 +480,9 @@ export function buildPayload(bucket, ctx = {}) {
       };
     case 'new-work':
       return { id: bucket.id, num: bucket.num, feedback: ctx.feedback || null };
+    case 'halt':
+      // Guasto: nessun lavoro, solo il motivo per cui non si può lavorare.
+      return { kind: bucket.kind || 'transient', message: bucket.message || '' };
     case 'prober':
     default:
       return {};
@@ -513,6 +529,23 @@ function diffForBranch(branch) {
  * inghiottito bastava a saltare decine di todo e mandare il giro in audit.
  * Dopo l'ultimo tentativo rilancia l'errore: decide il CHIAMANTE il fallback.
  */
+/**
+ * Guasto dichiarato: "non posso lavorare in sicurezza". `kind`:
+ *   - 'transient'  rete, quota, deposito irraggiungibile, coda illeggibile →
+ *                  la sessione si chiude senza altri tentativi (ci riprova
+ *                  l'orchestratore successivo fra 6h: nessuna logica di retry
+ *                  da scrivere = nessuna logica di retry da sbagliare);
+ *   - 'permanent'  il branch nello stato non esiste più → riprovare ogni 6h è
+ *                  inutile: il feedback esce dal giro automatico (`design`).
+ * Prima esisteva solo il fallback su prober, che traveste un guasto da
+ * "giornata tranquilla" — ed è già costato un'ondata di lavoro fantasma.
+ */
+export function routineFault(kind, message) {
+  const e = new Error(message);
+  e.faultKind = kind === 'permanent' ? 'permanent' : 'transient';
+  return e;
+}
+
 export async function withRetry(fn, label = 'operazione', { attempts = 3, baseDelayMs = 2000 } = {}) {
   let lastErr;
   for (let i = 1; i <= attempts; i++) {
@@ -572,12 +605,14 @@ async function buildSnapshot() {
   // Partiziona i 'review' con branch. Decifra solo lo status.
   const reviews = [];
   let unreadable = 0;
+  let encrypted = 0;
   for (const fb of raw) {
     let status = fb.status;
     if (C?.isEncrypted?.(status)) {
+      encrypted++;
       try { status = (await decryptFeedbackFields({ _id: fb._id, status })).status; }
       catch (_) { status = null; }
-      if (status === PLACEHOLDER) { unreadable++; status = null; }
+      if (status === PLACEHOLDER || status === null) { unreadable++; status = null; }
     }
     // Macchina a stati: l'iter di revisione vive in `revision_capability`
     // (aspetta il verifier) e `revision_security` (aspetta il secaudit).
@@ -587,13 +622,23 @@ async function buildSnapshot() {
       reviews.push({ id: fb._id, num: fb.num || fb.seq || '', branch: fb.branch, state: reconcileState(readState(fb._id), status), status });
     }
   }
+  // Coda vuota ≠ coda illeggibile. Se NESSUNO degli status cifrati si decifra,
+  // la chiave privata manca o è rotta: la coda piena "sembra vuota" e il giro
+  // finisce in audit invece di lavorare (è la causa dell'ondata #310+). Non è
+  // un risultato, è un GUASTO — passeggero, perché la chiave può tornare.
+  // Un solo documento illeggibile fra molti resta un avviso: è corruzione di
+  // quel doc, non un ambiente cieco, e fermare la flotta per sempre sarebbe peggio.
+  if (encrypted && unreadable === encrypted) {
+    throw routineFault('transient', `coda illeggibile: nessuno dei ${encrypted} status cifrati è decifrabile (chiave privata assente o rotta)`);
+  }
   if (unreadable) {
-    process.stderr.write(`[dispatch] ATTENZIONE: ${unreadable} status non decifrabili (chiave privata assente o rotta?): la coda può sembrare vuota per errore, non perché lo sia\n`);
+    process.stderr.write(`[dispatch] ATTENZIONE: ${unreadable}/${encrypted} status non decifrabili: quei feedback sono invisibili a questo giro\n`);
   }
 
-  // Vincitore todo: riusa next-feedback (exit 0 = JSON vincitore, 2 = vuoto).
-  // Retry sugli errori VERI (exit 1, crash): senza, un guasto momentaneo
-  // scarta l'intera coda todo. Exit 2 = coda davvero vuota → nessun retry.
+  // Vincitore todo: riusa next-feedback (exit 0 = JSON vincitore, 2 = vuoto,
+  // 3 = coda ILLEGGIBILE). Retry sugli errori VERI (exit 1, crash): senza, un
+  // guasto momentaneo scarta l'intera coda todo. Exit 2 = coda davvero vuota →
+  // nessun retry. Exit 3 = guasto dichiarato → si propaga, non si ripiega.
   let todoWinner = null;
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
@@ -605,6 +650,7 @@ async function buildSnapshot() {
       break;
     } catch (e) {
       if (e?.status === 2) break; // coda todo legittimamente vuota
+      if (e?.status === 3) throw routineFault('transient', 'coda illeggibile: next-feedback non riesce a decifrare gli status (chiave privata assente o rotta)');
       process.stderr.write(`[dispatch] next-feedback fallito (tentativo ${attempt}/3): ${e?.message || e}\n`);
       if (attempt < 3) await new Promise((r) => setTimeout(r, 2000 * attempt));
     }
@@ -642,10 +688,62 @@ export function verifierNoteText(verdict, critique = '') {
   return c ? `Controllo funzionalità NON superato: ${c}` : 'Controllo funzionalità NON superato.';
 }
 
+/**
+ * C — ogni scrittura nella macchina a stati RICALCOLA l'identità della directory
+ * e rifiuta la transizione se non corrisponde al branch assegnato. Non chiede
+ * all'istanza dove si trova: lo guarda.
+ *
+ * Un rifiuto lascia il feedback dov'era (nessuna scrittura di stato, nessuno
+ * status accodato) e lo fa ripescare al giro dopo. Ma un ambiente che produce
+ * disallineamenti a ripetizione non deve girare a vuoto all'infinito: al terzo
+ * rifiuto il feedback va in `design`, come per i reset `working`→`todo`.
+ *
+ * @returns {{ok:true, state:object}|{ok:false, message:string}}
+ */
+function guardIdentity(id) {
+  const prev = readState(id);
+  const assigned = prev?.branch || '';
+  const v = checkDelivery(ROOT, assigned);
+  if (v.ok) return { ok: true, state: prev };
+
+  const b = bumpRejects(prev || defaultState(id, assigned));
+  b.state.id = id;
+  const base = `transizione rifiutata su ${id}: ${v.reason}`;
+  if (b.escalate) {
+    try {
+      execFileSync('node', [resolve(ROOT, 'scripts', 'queue-triage.mjs'), id, 'design',
+        `La lavorazione automatica si è disallineata ${b.count} volte di seguito: chi doveva scrivere l'esito stava guardando un'altra versione del codice, quindi il risultato non sarebbe attendibile. Sospendo i tentativi automatici; serve una tua decisione su come procedere.`,
+        '--reason', 'loop'],
+        { cwd: ROOT, encoding: 'utf8', stdio: 'ignore' });
+    } catch (_) { /* la nota resta in coda al prossimo giro */ }
+    clearState(id);
+    persistStateToGit(id, `feedback: clear-state ${id}`);
+    return { ok: false, message: `${base} — terzo rifiuto consecutivo: feedback portato in design` };
+  }
+  writeState(b.state);
+  persistStateToGit(id, `feedback: identita non corrispondente ${id}`);
+  return { ok: false, message: `${base} (rifiuto ${b.count}/${IDENTITY_REJECT_LIMIT}); il feedback resta dov'era e verrà ripescato` };
+}
+
+/**
+ * Una transizione ACCETTATA lascia un punto fermo: l'identità del contenuto in
+ * quel momento. È il valore a cui D riporta il branch dopo un'interruzione.
+ * Rilascia anche l'identità attesa: dopo la consegna non c'è più niente da
+ * proteggere su questo branch (ed è ciò che lascia lavorare il merge-gate).
+ */
+function sealTransition(state, by) {
+  const sealed = clearRejects(withCheckpoint(state, headSha(ROOT), by));
+  writeState(sealed);
+  clearExpectation(ROOT);
+  return sealed;
+}
+
 function recordVerifier(id, verdict, critique) {
-  const next = applyVerifierVerdict({ ...defaultState(id, ''), ...(readState(id) || {}), id }, verdict, critique);
+  const guard = guardIdentity(id);
+  if (!guard.ok) return { rejected: true, message: guard.message };
+  const next = applyVerifierVerdict({ ...defaultState(id, ''), ...(guard.state || {}), id }, verdict, critique);
   next.id = id;
-  writeState(next);
+  sealTransition(next, `verifier:${verdict}`);
   persistStateToGit(id, `feedback: verifier ${verdict} ${id}`);
   // PASS → aspetta l'audit di sicurezza; FAIL → resta/torna in verifica fix
   // (il caso 3° FAIL → design lo gestisce il giro dopo: chooseBucket →
@@ -657,9 +755,11 @@ function recordVerifier(id, verdict, critique) {
   return next;
 }
 function recordFixed(id, report = '') {
-  const next = applyFixed({ ...(readState(id) || defaultState(id, '')), id });
+  const guard = guardIdentity(id);
+  if (!guard.ok) return { rejected: true, message: guard.message };
+  const next = applyFixed({ ...(guard.state || defaultState(id, '')), id });
   next.id = id;
-  writeState(next);
+  sealTransition(next, 'fixer:consegna');
   persistStateToGit(id, `feedback: fixed ${id}`);
   // Fix ri-applicato → torna in attesa della verifica comportamentale. Il
   // report del fixer (cosa ha corretto e come) va nella chat del feedback,
@@ -668,25 +768,43 @@ function recordFixed(id, report = '') {
   return next;
 }
 function recordSecaudit(id, verdict) {
-  const next = applySecaudit({ ...(readState(id) || defaultState(id, '')), id }, verdict);
+  const guard = guardIdentity(id);
+  if (!guard.ok) return { rejected: true, message: guard.message };
+  const next = applySecaudit({ ...(guard.state || defaultState(id, '')), id }, verdict);
   next.id = id;
-  writeState(next);
+  sealTransition(next, `secaudit:${verdict}`);
   persistStateToGit(id, `feedback: secaudit ${verdict} ${id}`);
   return next;
 }
 
 // ─── run() — il comando di default ────────────────────────────────────────────
 
+/**
+ * Emette un GUASTO: nessun lavoro consegnato, e il worker lo dice
+ * all'orchestratore con la terza parola del vocabolario (`guasto`), che ferma
+ * il giro senza travestirlo da giornata tranquilla.
+ */
+function emitHalt(kind, message) {
+  process.stderr.write(`[dispatch] GUASTO (${kind}): ${message}\n`);
+  emit({ role: 'halt', kind, message }, {});
+  return { exit: 3 };
+}
+
 export async function run() {
   let snapshot;
   try {
     snapshot = await buildSnapshot();
   } catch (e) {
-    // Lo stato è illeggibile anche dopo i retry. Per scelta dell'owner NON ci
-    // si ferma (un giro a vuoto non risolve nulla): si ripiega sull'audit,
-    // lasciando in stderr la traccia del guasto vero per il debugging.
+    // Guasto dichiarato (coda illeggibile): fermarsi è l'esito giusto — un
+    // audit al posto del lavoro vero è esattamente il travestimento che ha
+    // prodotto l'ondata #310+.
+    if (e?.faultKind) return emitHalt(e.faultKind, e.message);
+    // Guasto generico dopo i retry: per scelta dell'owner NON ci si ferma (un
+    // giro a vuoto non risolve nulla): si ripiega sull'audit, lasciando in
+    // stderr la traccia del guasto vero per il debugging.
     process.stderr.write(`[dispatch] stato illeggibile anche dopo i retry (${e?.message || e}) → fallback prober\n`);
     const proberBucket = { role: 'prober' };
+    prepareForProber();
     emit(proberBucket, {});
     await recordWorkerSpawn(proberBucket);
     return { exit: 0 };
@@ -726,8 +844,66 @@ export async function run() {
 // Raccoglie il payload (diff/feedback), fa il claim per i bucket feedback-bound,
 // e stampa il JSON. Ritorna { exit }. `cap` è il loop cap effettivo (per le
 // ri-scelte dopo un claim già preso).
+// Il prober non lavora su un branch: la directory torna alla LINEA PRINCIPALE
+// e l'identità attesa viene rilasciata. Senza, resteremmo sul branch del
+// compito precedente e le modifiche del prober finirebbero là dentro, dove
+// diventerebbero modifiche di QUEL lavoro nel diff che va al gate.
+function prepareForProber() {
+  clearExpectation(ROOT);
+  const g = (args) => tryGit(args);
+  g(['fetch', 'origin', MAIN_BRANCH]);
+  if (currentBranch(ROOT) === MAIN_BRANCH) return;
+  if (tryGit(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${MAIN_BRANCH}`]).ok) {
+    g(['checkout', '-B', MAIN_BRANCH, `origin/${MAIN_BRANCH}`]);
+  } else {
+    g(['checkout', MAIN_BRANCH]);
+  }
+}
+
+/**
+ * A + D: posiziona la directory sul branch del bucket e registra nello stato
+ * l'identità attesa del contenuto. FAIL CLOSED: se non riesce, il lavoro NON
+ * viene consegnato.
+ *
+ * @returns {{ok:true, branch:string}|{ok:false, kind:string, message:string}}
+ */
+function positionOnBranch(bucket) {
+  const isNew = bucket.role === 'new-work';
+  const prev = readState(bucket.id);
+  const branch = isNew ? newWorkBranch(bucket.id) : (prev?.branch || bucket.branch || '');
+  if (!branch) return { ok: false, kind: 'permanent', message: `nessun branch assegnato per ${bucket.id}` };
+
+  const res = prepareBranch({
+    root: ROOT,
+    branch,
+    create: isNew,
+    base: isNew ? preferredBase(bucket.num, MAIN_BRANCH) : '',
+    mainBranch: MAIN_BRANCH,
+    checkpoint: isNew ? null : lastCheckpoint(prev),
+  });
+  if (!res.ok) return res;
+  if (res.discarded) {
+    process.stderr.write(`[dispatch] ${branch}: lavoro di un'istanza interrotta riportato all'ultimo punto fermo; i commit scartati restano su ${res.discarded}\n`);
+  }
+
+  // Identità attesa del contenuto: è il valore che le transizioni (C) e il
+  // ripristino (D) confronteranno.
+  const state = withCheckpoint(
+    { ...defaultState(bucket.id, branch), ...(prev || {}), id: bucket.id, branch },
+    res.head, `${bucket.role}:checkout`,
+  );
+  writeState(state);
+  persistStateToGit(bucket.id, `feedback: branch ${branch} per ${bucket.id}`);
+  // Esposta alla guardia fuori sessione (.claude/hooks/branch-guard.sh).
+  writeExpectation(ROOT, { branch, id: bucket.id });
+  bucket.branch = branch;
+  bucket.state = state;
+  return { ok: true, branch };
+}
+
 async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP) {
   if (bucket.role === 'prober') {
+    prepareForProber();
     emit(bucket, {});
     // Log del worker spawnato (best-effort): stdout è già stato scritto, quindi
     // l'orchestratore ha già il suo JSON; qui aspettiamo solo la scrittura del
@@ -754,6 +930,33 @@ async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP) {
         execFileSync('node', [resolve(ROOT, 'scripts', 'queue-triage.mjs'), bucket.id, 'working', ''],
           { cwd: ROOT, encoding: 'utf8', stdio: 'ignore' });
       } catch (_) { /* best-effort: il lock vero è il claim */ }
+    }
+  }
+
+  // A + D: la directory viene messa sul branch giusto PRIMA di consegnare, e il
+  // lavoro di un'istanza interrotta viene riportato all'ultimo punto fermo.
+  // FAIL CLOSED: se non riesce non si consegna niente.
+  if (bucket.id && bucket.role !== 'prober') {
+    const pos = positionOnBranch(bucket);
+    if (!pos.ok) {
+      const { release } = await import('./claim-feedback.mjs');
+      try { release(bucket.id); } catch (_) { /* best-effort */ }
+      if (pos.kind === 'permanent') {
+        // Riprovare ogni 6h all'infinito è inutile: il feedback esce dal giro
+        // automatico e compare in dashboard, dove l'owner può decidere.
+        try {
+          execFileSync('node', [resolve(ROOT, 'scripts', 'queue-triage.mjs'), bucket.id, 'design',
+            `La lavorazione automatica non può proseguire: il ramo di lavoro di questa modifica non esiste più, quindi non c'è nulla su cui continuare. Serve una tua decisione (rimetterlo in coda per rifarlo da capo, oppure archiviarlo).`,
+            '--reason', 'branch'],
+            { cwd: ROOT, encoding: 'utf8', stdio: 'ignore' });
+        } catch (_) { /* la nota resta in coda al prossimo giro */ }
+        clearState(bucket.id);
+        persistStateToGit(bucket.id, `feedback: clear-state ${bucket.id}`);
+        process.stderr.write(`[dispatch] ${bucket.id}: ${pos.message} → design\n`);
+        const next = { reviews: snapshot.reviews.filter((r) => r.id !== bucket.id), todoWinner: snapshot.todoWinner?.id === bucket.id ? null : snapshot.todoWinner };
+        return finalizeBucket(chooseBucket(next, cap), next, cap);
+      }
+      return emitHalt('transient', pos.message);
     }
   }
 
@@ -809,20 +1012,32 @@ if (isMainModule) {
       const [, id, verdict, ...rest] = argv;
       if (!id || !['pass', 'fail'].includes(verdict)) { console.error('Uso: --record-verifier <id> <pass|fail> ["critica"]'); process.exit(1); }
       const s = recordVerifier(id, verdict, rest.join(' '));
+      if (s.rejected) { console.error(rejectionText(s.message)); process.exit(3); }
       console.log(`stato ${id}: verifier=${s.verifierVerdict} loop=${s.loopCount}`);
       process.exit(0);
     } else if (flag === '--record-fixed') {
       const [, id, ...rest] = argv;
       if (!id) { console.error('Uso: --record-fixed <id> ["report"]'); process.exit(1); }
       const s = recordFixed(id, rest.join(' '));
+      if (s.rejected) { console.error(rejectionText(s.message)); process.exit(3); }
       console.log(`stato ${id}: ri-messo in coda verifier (loop=${s.loopCount})`);
       process.exit(0);
     } else if (flag === '--record-secaudit') {
       const [, id, verdict] = argv;
       if (!id || !['pass', 'fail'].includes(verdict)) { console.error('Uso: --record-secaudit <id> <pass|fail>'); process.exit(1); }
       const s = recordSecaudit(id, verdict);
+      if (s.rejected) { console.error(rejectionText(s.message)); process.exit(3); }
       console.log(`stato ${id}: secaudit=${s.secauditVerdict}`);
       process.exit(0);
+    } else if (flag === '--preflight') {
+      // Prontezza: gira PRIMA del setup dell'ambiente (npm install, binario
+      // Electron ~102MB, scrot). Se il giro deve fermarsi, deve scoprirlo prima
+      // di aver pagato il setup.
+      preflight().then((r) => {
+        if (r.ok) { console.log('[dispatch] prontezza OK'); process.exit(0); }
+        console.error(`[dispatch] GUASTO (${r.kind}): ${r.message}`);
+        process.exit(3);
+      }).catch((e) => { console.error(`[dispatch] GUASTO (transient): ${e?.message || e}`); process.exit(3); });
     } else if (flag === '--clear-state') {
       const id = argv[1];
       if (!id) { console.error('Uso: --clear-state <id>'); process.exit(1); }

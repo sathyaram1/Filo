@@ -32,6 +32,8 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { guardTransition, escalationNote } from './lib/branch-integrity.mjs';
+import { pushFileToMainWithRetry } from './lib/isolated-push.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
@@ -122,8 +124,10 @@ function tryGit(args) {
 export function commitAndPush(file) {
   const mainBranch = process.env.FILO_MAIN_BRANCH || 'main';
   const rel = relative(ROOT, file).split(sep).join('/');
+
+  // Il fogliettino viene comunque registrato sul branch corrente, così resta
+  // nella storia del lavoro anche se la spedizione fallisce.
   if (!tryGit(['add', '--', rel]).ok) { console.warn('  ! git add fallito'); return; }
-  // `git diff --cached --quiet` esce 0 se NON c'è nulla in stage → niente da committare.
   if (tryGit(['diff', '--cached', '--quiet', '--', rel]).ok) {
     console.log('  (decisione identica già in coda: niente da committare)');
     return;
@@ -132,9 +136,15 @@ export function commitAndPush(file) {
   if (!commit.ok) { console.warn('  ! git commit fallito:', commit.out.slice(0, 160)); return; }
   const cur = tryGit(['rev-parse', '--abbrev-ref', 'HEAD']).out;
   tryGit(['push', 'origin', cur]); // traccia il branch corrente (best-effort)
-  const land = tryGit(['push', 'origin', `HEAD:${mainBranch}`]); // ff-only
-  if (land.ok) console.log(`  ↑ decisione su origin/${mainBranch}.`);
-  else console.warn(`  ! push su origin/${mainBranch} rifiutato (main forse avanti). Il file è committato sul branch '${cur}'; fai 'git pull --rebase origin ${mainBranch}' e ripusha, oppure applicala in locale.`);
+
+  // ⚠️ La spedizione al ramo principale porta SOLO questo file (spec §Via 2).
+  // Il vecchio `push HEAD:main` spediva l'intera storia del branch: il
+  // fogliettino era il biglietto, ma saliva tutto il treno — codice compreso,
+  // saltando il cancello di sicurezza senza lasciare traccia distinguibile.
+  const land = pushFileToMainWithRetry(ROOT, file, `feedback: accoda triage ${new Date().toISOString()}`);
+  if (land.ok && land.skipped) console.log(`  (decisione già presente su origin/${mainBranch})`);
+  else if (land.ok) console.log(`  ↑ decisione su origin/${mainBranch} (solo il file della decisione).`);
+  else console.warn(`  ! spedizione su origin/${mainBranch} non riuscita (${land.reason}). Il file è committato sul branch '${cur}' e verrà riprovato; oppure applicala in locale.`);
 }
 
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
@@ -162,6 +172,34 @@ if (isMain) {
     console.error('Uso: node scripts/queue-triage.mjs <id> <status:todo|working|revision_capability|revision_security|done|design|archived> "testo note" [--branch <nome>] [--reason <slug>] [--starred|--unstar] [--no-git]');
     process.exit(1);
   }
+  // ── C: le CONSEGNE verificano l'identità come i verdetti ──────────────────
+  //
+  // Spec ROUTINE-BRANCH-INTEGRITY.md §C: non solo i verdetti, ogni transizione.
+  // Se una consegna può essere registrata con la directory sul branch sbagliato,
+  // il PUNTO FERMO che quella consegna registra è fasullo — e il ripristino (D)
+  // riporterebbe a uno stato che contiene il lavoro di un altro feedback. Questo
+  // controllo è il prerequisito di D, non un extra.
+  //
+  // Guardate SOLO le consegne (`revision_*`): `done` lo scrive il secaudit dopo
+  // che il merge-gate ha già spostato la directory sul ramo principale, e
+  // `todo`/`working`/`design`/`archived` sono scritture di servizio del
+  // dispatcher e dell'owner. E scatta solo se per quel feedback esiste un branch
+  // assegnato: senza, non c'è niente da confrontare (owner che lancia a mano,
+  // feedback fuori dalla pipeline).
+  if (status === 'revision_capability' || status === 'revision_security') {
+    const g = guardTransition(ROOT, id, {
+      escalate: (count) => {
+        execFileSync('node', [resolve(ROOT, 'scripts', 'queue-triage.mjs'), id, 'design',
+          escalationNote(count), '--reason', 'loop'], { cwd: ROOT, encoding: 'utf8', stdio: 'ignore' });
+      },
+    });
+    if (!g.ok) {
+      console.error(`[queue-triage] CONSEGNA RIFIUTATA — ${g.message}`);
+      console.error('[queue-triage] Il lavoro NON è stato registrato: la directory non è sul branch assegnato a questo feedback.');
+      process.exit(3);
+    }
+  }
+
   try {
     // S1.2: usa la versione cifrata per proteggere la history git pubblica.
     const file = await queueTriageEncrypted(id, status, noteParts.length ? noteParts.join(' ') : '', undefined, branch, starred, reason);

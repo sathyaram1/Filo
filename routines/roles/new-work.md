@@ -46,10 +46,10 @@ NON implementare tutto in una volta.
 
 1. **Distingui sintomo da causa**: la lamentela è ciò che l'utente vede, non
    cos'è rotto. Riformula "l'utente voleva X, gli è fallito perché Y".
-2. Crea il branch di lavoro:
-   ```bash
-   git worktree add .claude/worktrees/worker-<id> -b worker/<id>
-   ```
+2. **Il branch è già pronto: non crearlo e non cambiarlo.** `dispatch.mjs` ha
+   creato il branch di lavoro e ci ha già posizionato questa cartella (il nome è
+   in `payload.branch`). Niente `git worktree add`, niente `git checkout`: se ti
+   sposti, una guardia ti ferma e la consegna viene rifiutata.
 3. Trova il codice coinvolto; leggi i cammini equivalenti affiancati (le
    simmetrie mancanti sono spesso la causa).
 4. Implementa il fix sul **comportamento**, non sul messaggio.

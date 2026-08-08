@@ -171,9 +171,50 @@ async function flush() {
   return STATE.flushChain;
 }
 
+// Forza subito una scrittura su disco, senza aspettare il debounce. Ritorna la
+// catena, quindi due chiamate ravvicinate si accodano invece di accavallarsi:
+// è proprio l'invariante che protegge dal guasto descritto sopra, ed è ciò che
+// il test verifica chiamandola due volte di fila senza attendere la prima.
+function flushNow() {
+  if (STATE.flushTimer) { clearTimeout(STATE.flushTimer); STATE.flushTimer = null; }
+  return flush();
+}
+
+// Attende che non resti NIENTE in sospeso: né un flush in attesa del debounce,
+// né uno in volo. Se il debounce è pendente lo fa scattare subito invece di
+// aspettarlo, così non c'è nessuna attesa a tempo.
+//
+// Serve ai test: aspettare "abbastanza secondi" che una scrittura grande
+// arrivi su disco è affidabile a macchina scarica e diventa un falso allarme
+// sotto carico — e il fallimento che ne esce parla di dati incoerenti invece
+// che di un'attesa scaduta, mandando fuori strada chi lo legge.
+async function whenSettled() {
+  for (let i = 0; i < 1000; i++) {
+    if (STATE.flushTimer) {
+      clearTimeout(STATE.flushTimer);
+      STATE.flushTimer = null;
+      await flush();
+      continue;
+    }
+    const chain = STATE.flushChain;
+    if (!chain) return;
+    await chain;
+    // Nessun nuovo flush accodato mentre aspettavamo: siamo fermi.
+    if (STATE.flushChain === chain && !STATE.flushTimer) return;
+  }
+}
+
 async function doFlush() {
   const target = filePath();
   const tmp = target + '.tmp';
+  // Contatore delle scritture in volo. È l'INVARIANTE del serializzatore qui
+  // sopra: due doFlush insieme condividono lo stesso file temporaneo e la
+  // seconda rename non lo trova più. Il guasto vero (ENOENT) dipende da quale
+  // dei due arriva prima, quindi un test che aspetta di vederlo è ballerino per
+  // costruzione; questo contatore invece si rompe SEMPRE se la serializzazione
+  // salta. Costa due somme per scrittura.
+  STATE.flushInFlight = (STATE.flushInFlight || 0) + 1;
+  if (STATE.flushInFlight > (STATE.flushMaxInFlight || 0)) STATE.flushMaxInFlight = STATE.flushInFlight;
   try {
     const txt = JSON.stringify(serializeForDisk(STATE.data));
     await fsp.mkdir(path.dirname(target), { recursive: true });
@@ -181,7 +222,14 @@ async function doFlush() {
     await fsp.rename(tmp, target);
   } catch (err) {
     console.error('[Filo storage] flush failed:', err);
+  } finally {
+    STATE.flushInFlight -= 1;
   }
+}
+
+/** Quante scritture su disco sono arrivate a sovrapporsi (deve restare 1). */
+function maxFlushOverlap() {
+  return STATE.flushMaxInFlight || 0;
 }
 
 function emitChange(changes) {
@@ -321,6 +369,9 @@ module.exports = {
   clear,
   onChanged,
   flushSync,
+  whenSettled,
+  flushNow,
+  maxFlushOverlap,
   setSync,
   runIncognito,
   resetIncognito,

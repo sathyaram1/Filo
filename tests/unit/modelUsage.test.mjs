@@ -176,10 +176,16 @@ function jsFiles(dir, out = []) {
 
 // Toglie i commenti (blocco e riga) in modo grossolano ma sufficiente: i nomi di
 // modello citati negli esempi dei commenti non sono usi reali.
+//
+// ⚠️ Il taglio va fatto su righe SENZA il ritorno a capo di Windows. In una
+// regex JavaScript `.` non corrisponde a `\r` (è un terminatore di riga), quindi
+// su un file con fine-riga CRLF — cioè quasi tutti, qui — `.*$` non arrivava mai
+// in fondo e NESSUN commento veniva tolto. Il controllo sembrava funzionare solo
+// perché era raro che un commento citasse un nome di modello.
 function stripComments(src) {
   return src
     .replace(/\/\*[\s\S]*?\*\//g, '')
-    .split('\n')
+    .split(/\r?\n/)
     .map((line) => line.replace(/(^|[^:'"`\\])\/\/.*$/, '$1'))
     .join('\n');
 }

@@ -35,6 +35,7 @@ import { hostname } from 'node:os';
 import { mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync } from 'node:fs';
 import { dirname, resolve, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { pushFileToMain, removeFileOnMain } from './lib/isolated-push.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // FILO_REPO_ROOT: override della root del repo (e quindi del cwd di git). Esiste
@@ -139,9 +140,18 @@ function commitFile(file, message) {
   return tryGit(['commit', '-q', '-m', message, '--', rel]);
 }
 
-// Push ff-only su origin/main. ok=true se è atterrato.
-function pushMain() {
-  return tryGit(['push', 'origin', `HEAD:${MAIN_BRANCH}`]);
+// Fa atterrare su origin/main SOLO il file del semaforo (spec
+// ROUTINE-BRANCH-INTEGRITY.md §Via 2). Il vecchio `push HEAD:main` spediva
+// l'intera storia del branch corrente: se il ramo principale non si era mosso
+// quella spedizione era un avanzamento regolare e portava su anche il CODICE in
+// lavorazione, saltando il cancello di sicurezza. Il semaforo era il biglietto,
+// ma saliva tutto il treno.
+function pushClaimFile(id, message) {
+  return pushFileToMain(ROOT, claimFile(id), message, MAIN_BRANCH);
+}
+
+function pushClaimRemoval(id, message) {
+  return removeFileOnMain(ROOT, relPath(claimFile(id)), message, MAIN_BRANCH);
 }
 
 // ─── comandi ────────────────────────────────────────────────────────────────
@@ -172,7 +182,7 @@ export function acquire(id, opts = {}) {
     if (committed.noop) return { status: 'acquired', claim, renewed: decision === 'mine' };
     if (!committed.ok) return { status: 'error', message: `commit fallito: ${committed.out.slice(0, 160)}` };
 
-    if (pushMain().ok) return { status: 'acquired', claim, renewed: decision === 'mine' };
+    if (pushClaimFile(id, `feedback: claim ${id} (${me})`).ok) return { status: 'acquired', claim, renewed: decision === 'mine' };
 
     // Push rifiutato: un'altra routine ha avanzato main. Riconcilio.
     const reb = gitPullRebase();
@@ -202,7 +212,7 @@ export function release(id) {
     if (tryGit(['diff', '--cached', '--quiet', '--', rel]).ok) return { status: 'released' };
     const c = tryGit(['commit', '-q', '-m', `feedback: release ${id}`, '--', rel]);
     if (!c.ok) return { status: 'error', message: c.out.slice(0, 160) };
-    if (pushMain().ok) return { status: 'released' };
+    if (pushClaimRemoval(id, `feedback: release ${id}`).ok) return { status: 'released' };
     gitPullRebase();
   }
   return { status: 'released' }; // committato in locale, l'hook/altro push lo porterà su
@@ -238,8 +248,14 @@ function prune() {
   if (!expired.length) { console.log('Nessun claim scaduto.'); return; }
   for (const f of expired) { rmSync(f, { force: true }); tryGit(['add', '--', relPath(f)]); }
   const c = tryGit(['commit', '-q', '-m', `feedback: rimuove ${expired.length} claim scaduti`]);
-  if (c.ok) { pushMain(); console.log(`Rimossi ${expired.length} claim scaduti.`); }
-  else console.warn('Commit prune fallito:', c.out.slice(0, 160));
+  if (!c.ok) { console.warn('Commit prune fallito:', c.out.slice(0, 160)); return; }
+  // Una rimozione per volta, ciascuna costruita sopra lo stato remoto attuale:
+  // così anche la pulizia non può portare con sé la storia del branch corrente.
+  let landed = 0;
+  for (const f of expired) {
+    if (removeFileOnMain(ROOT, relPath(f), `feedback: rimuove claim scaduto ${relPath(f)}`, MAIN_BRANCH).ok) landed++;
+  }
+  console.log(`Rimossi ${expired.length} claim scaduti (${landed} atterrati su origin/${MAIN_BRANCH}).`);
 }
 
 const isMainModule = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));

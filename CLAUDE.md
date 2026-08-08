@@ -44,17 +44,38 @@ git -C "C:/Users/agenti AI/Desktop/Filo/Filo" pull --rebase origin main
 
 Se il pull fallisce per conflitti, riolvi in utonomia, chiedi all'utente solo se ci sono decisioni importanti.
 
-## Push automatico su `origin/main`
+## Salvataggio continuo, pubblicazione UNA VOLTA a lavoro finito
 
-L'hook `.claude/hooks/auto-commit-merge.sh` committa, mergia i worktree e **pusha
-`main` su `origin`** dopo ogni Edit/Write. Non servono push manuali. Se vedi
-`[auto-push] FAILED` in stderr, il push è stato rifiutato (di solito una routine
-remota ha pushato nel frattempo): fai `git pull --rebase origin main` e poi un
-Edit qualsiasi farà ripartire il push automatico, oppure pusha a mano:
+L'hook `.claude/hooks/auto-commit-merge.sh` committa e pusha **il tuo ramo** dopo
+ogni Edit/Write. Questa parte è preziosa e non si tocca: è ciò che salva il
+lavoro quando una sessione viene interrotta di colpo.
+
+Quello che **non** fa più (dal 2026-08-07) è portare ogni singola modifica sul
+ramo principale. Il motivo: ogni 6 ore un automatismo prende `main` **così com'è**,
+costruisce e distribuisce agli utenti; se la fotografia cadeva a metà sessione,
+agli utenti arrivava un lavoro incompleto. In più ogni pubblicazione spostava
+`main` sotto i piedi delle routine in corso, e faceva sì che il cancello di
+sicurezza giudicasse una versione diversa da quella poi fusa.
+
+**Quando il lavoro è finito**, chiudilo con:
 
 ```bash
-git -C "C:/Users/agenti AI/Desktop/Filo/Filo" push origin main
+npm run finish
 ```
+
+Esegue i controlli (logica pura + gli spec delle aree toccate) e **solo se sono
+verdi** fonde su `main` e pubblica, riportandoti sul tuo ramo. Se sono rossi non
+pubblica niente. Per i soli controlli, senza fondere: `npm run finish:check`.
+
+Se la fusione viene rifiutata perché `main` è avanzato (una routine ha pushato
+nel frattempo): `git pull --rebase origin main` e rilancia.
+
+Vale **anche se stai lavorando direttamente su `main`**: lì non c'è niente da
+fondere, ma i controlli girano lo stesso e la pubblicazione avviene solo se
+passano. Nessuna scorciatoia: l'hook non fa più atterrare niente su `main` da
+solo, in nessuna forma del repo. Ci si arriva da qui o dal cancello di merge
+delle routine — e questo non dipende da nessuna variabile d'ambiente che
+qualcuno possa dimenticare di impostare.
 
 ## MAI committare artefatti dei test (evita i conflitti di rebase)
 
@@ -82,11 +103,18 @@ o "ho letto il diff".
 
 Il minimo accettabile dipende dall'ambiente:
 
-- **In sessione locale (Windows)**: verifica **solo la feature toccata**, non
-  l'intera suite. ⚠️ **NON lanciare `npm test` (suite completa) in locale**: apre
-  e chiude Electron centinaia di volte — finestre che lampeggiano mentre l'utente
-  usa il PC — ed è lentissimo (~25 min). La regressione completa sulle feature
-  vecchie è compito delle routine cloud. In locale usa invece:
+- **In sessione locale (Windows)**: la regola "non lanciare mai la suite
+  completa" **non vale più** (cambiata il 2026-08-07). Nasceva da quando il
+  grosso del lavoro si faceva in locale; oggi in locale si fanno **poche cose
+  critiche** e il grosso passa dalle routine, quindi il tempo in più è
+  accettabile. Un controllo in più, al peggio, fa risparmiare tempo all'owner;
+  al meglio trova ciò che gli sarebbe sfuggito.
+
+  In pratica: **`npm run finish` prima di chiudere** (fa da solo logica pura +
+  spec delle aree toccate, e solo se sono verdi fonde e pubblica). Lancia
+  `npm test` per intero quando hai toccato qualcosa di trasversale o non sai
+  quali spec siano rilevanti — sappi solo che apre e chiude Electron molte volte
+  (~25 min), quindi avvisa l'owner prima. Gli strumenti singoli:
   - **prima scelta per la logica pura — gli unit test**: `npm run test:unit`
     (runner `node:test`, gira in ms **senza aprire Electron**). Se hai toccato
     logica pura (parsing, classificazione, validazione, trasformazioni in
@@ -98,8 +126,7 @@ Il minimo accettabile dipende dall'ambiente:
   - per modifiche visive, `npm run test:shoot` con uno scenario mirato +
     ispezione dello screenshot (vedi "Controlli visivi").
 
-  Non rilanciare l'intera suite "per sicurezza": se temi una regressione altrove,
-  lascia che la verifichi la routine cloud.
+  Se temi una regressione altrove, **verificala**: non rimandarla alla routine.
 
 - **In routine cloud (Linux headless)**: **qui** gira la regressione completa.
   `npm test` (intera suite Playwright); se la feature ha UI nuova, **aggiungi uno
