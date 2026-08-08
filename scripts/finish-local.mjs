@@ -117,6 +117,14 @@ function main() {
 
   if (checkOnly) { console.log('\n✓ Controlli passati (--check: non fondo).'); return; }
 
+  if (onMain) {
+    git(['pull', '--rebase', 'origin', MAIN]);
+    const p = git(['push', 'origin', MAIN]);
+    if (!p.ok) { console.error(`Spedizione rifiutata:\n${p.out.slice(0, 300)}`); process.exit(1); }
+    console.log(`\n✓ '${MAIN}' pubblicato.`);
+    return;
+  }
+
   // Fusione: una volta, a lavoro finito.
   const cur = git(['rev-parse', 'HEAD']).out;
   if (!git(['fetch', 'origin', MAIN]).ok) { console.error(`Non riesco a leggere origin/${MAIN}.`); process.exit(1); }
