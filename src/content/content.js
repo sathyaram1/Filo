@@ -66,19 +66,25 @@
     applyTheme(settings.theme);
     applyThemeTokens(settings.themeTokens);
 
-    // "Vetro smerigliato" della tab attiva (§1.1): campiona il colore della cima
-    // della pagina e mandalo al main, che tinge la tab. Attivo su tutte le pagine
-    // (anche quelle senza menu), perché il colore non c'entra col menu.
-    try { PageColor.startTabColorSampler(); } catch (_) {}
+    // Le tre cose qui sotto descrivono la SCHEDA: il colore che la tinge e i
+    // segnali su quanto è stata usata. Un riquadro incorporato non ne sa nulla —
+    // campionerebbe il colore di una pubblicità e conterebbe lo scroll di un
+    // rettangolo — quindi restano alla pagina che lo ospita (#405).
+    if (!IS_SUBFRAME) {
+      // "Vetro smerigliato" della tab attiva (§1.1): campiona il colore della cima
+      // della pagina e mandalo al main, che tinge la tab. Attivo su tutte le pagine
+      // (anche quelle senza menu), perché il colore non c'entra col menu.
+      try { PageColor.startTabColorSampler(); } catch (_) {}
 
-    // Colore identità del sito (§1.2): calcolato una volta (theme-color →
-    // manifest → favicon → fallback) e mandato al main, che lo cacha per dominio
-    // e lo applica attenuato alle tab inattive.
-    try { PageColor.reportTabIdentityColor(() => settings && settings.tabColor); } catch (_) {}
+      // Colore identità del sito (§1.2): calcolato una volta (theme-color →
+      // manifest → favicon → fallback) e mandato al main, che lo cacha per dominio
+      // e lo applica attenuato alle tab inattive.
+      try { PageColor.reportTabIdentityColor(() => settings && settings.tabColor); } catch (_) {}
 
-    // Segnali di attività (§2.1): ultima interazione, % di scroll, form sporco.
-    // Servono all'LLM per decidere cosa archiviare.
-    try { startTabActivityReporter(); } catch (_) {}
+      // Segnali di attività (§2.1): ultima interazione, % di scroll, form sporco.
+      // Servono all'LLM per decidere cosa archiviare.
+      try { startTabActivityReporter(); } catch (_) {}
+    }
 
     // Esc esce dalla modalità "contenuto a tutto schermo" (vedi tabs.js). Va
     // registrato anche su pagine "bloccate" (senza menu) e in capture, così
