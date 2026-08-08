@@ -1,0 +1,32 @@
+{
+  "count": 1,
+  "displays": [
+    {
+      "x": 0,
+      "y": 0,
+      "width": 1536,
+      "height": 864
+    }
+  ],
+  "wins": [
+    {
+      "id": 1,
+      "title": "Filo",
+      "isVisible": true,
+      "isMinimized": false,
+      "isFocused": false,
+      "opacity": 1,
+      "bounds": {
+        "x": -26215,
+        "y": -26215,
+        "width": 1284,
+        "height": 844
+      },
+      "showInactive": false
+    }
+  ],
+  "env": {
+    "FILO_HIDE_WINDOW": "1",
+    "FILO_TEST_VISIBLE": null
+  }
+}
