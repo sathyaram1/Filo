@@ -147,7 +147,11 @@ if (!IS_SUBFRAME) {
 // ad alta entropia. Il seed arriva SINCRONO dal main (HMAC col master secret),
 // così il secret non tocca mai il mondo non fidato della pagina. Solo http(s);
 // se la protezione è spenta (livello 0) non iniettiamo nulla.
-try {
+// Solo nel frame principale: la protezione si applica alla pagina che l'utente
+// ha aperto. Estenderla a ogni riquadro incorporato cambierebbe i segnali di
+// widget di terze parti (mappe, player) che oggi non tocchiamo — è una scelta
+// a sé, non un effetto collaterale del tasto destro nei riquadri (#405).
+if (!IS_SUBFRAME) try {
   const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
   if (/^https?:/i.test(loc)) {
     const cfg = ipcRenderer.sendSync('filo:fp-config', loc) || { level: 0, seed: 0 };
