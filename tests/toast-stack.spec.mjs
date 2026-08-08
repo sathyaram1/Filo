@@ -48,25 +48,22 @@ function firstOverlap(boxes) {
   return null;
 }
 
-// Apre il menu del tasto destro. Subito dopo aver chiuso il menu precedente il
-// primo click destro può cadere a vuoto: si riprova invece di aspettare a caso.
-async function openMenuOnLink(page) {
+// Un'azione vera dal menu del tasto destro sul link. Subito dopo la chiusura del
+// menu precedente un click destro può cadere a vuoto: si riprova finché la voce
+// cercata non è davvero sullo schermo.
+async function runLinkAction(page, label, { exclude = null, settle = 300 } = {}) {
   const menu = page.locator('.sn-menu');
-  for (let i = 0; i < 8; i++) {
+  let item = null;
+  for (let i = 0; i < 6 && !item; i++) {
     await page.locator('#link').click({ button: 'right', position: { x: 8, y: 8 } });
+    let cand = menu.locator('button', { hasText: label });
+    if (exclude) cand = cand.filter({ hasNotText: exclude });
     try {
-      await menu.waitFor({ state: 'visible', timeout: 800 });
-      return menu;
-    } catch (_) { /* riprova */ }
+      await cand.first().waitFor({ state: 'visible', timeout: 1500 });
+      item = cand;
+    } catch (_) { await page.waitForTimeout(200); }
   }
-  throw new Error('il menu del tasto destro non si è aperto');
-}
-
-// Un'azione vera dal menu del tasto destro sul link.
-async function runLinkAction(page, label, { exclude = null, settle = 0 } = {}) {
-  const menu = await openMenuOnLink(page);
-  let item = menu.locator('button', { hasText: label });
-  if (exclude) item = item.filter({ hasNotText: exclude });
+  if (!item) throw new Error(`voce di menu non raggiungibile: ${label}`);
   await item.first().click();
   await expect(menu).toHaveCount(0);
   if (settle) await page.waitForTimeout(settle);
@@ -117,7 +114,7 @@ test('una raffica di avvisi non si accavalla e non straripa dalla finestra', asy
   // Dieci azioni di fila, il più rapidamente possibile: dopo ognuna guardiamo
   // com'è messa la pila.
   for (let i = 0; i < 10; i++) {
-    await runLinkAction(page, 'Copia URL', { exclude: 'immagine', settle: 60 });
+    await runLinkAction(page, 'Copia URL', { exclude: 'immagine' });
     const boxes = await overlayBoxes(page);
     maxLive = Math.max(maxLive, boxes.length);
     expect(firstOverlap(boxes), `gli avvisi si intersecano al giro ${i + 1}`).toBeNull();
@@ -146,7 +143,7 @@ test('la conferma cliccabile di "Salva per dopo" sta nella pila con gli avvisi',
   await expect(page.locator('.sn-save-confirm')).toBeVisible({ timeout: 5000 });
 
   // Mentre la conferma è ancora sullo schermo, un avviso normale.
-  await runLinkAction(page, 'Copia URL', { exclude: 'immagine', settle: 200 });
+  await runLinkAction(page, 'Copia URL', { exclude: 'immagine' });
 
   const boxes = await overlayBoxes(page);
   expect(boxes.length, 'la conferma e l\'avviso non sono entrambi presenti').toBe(2);
