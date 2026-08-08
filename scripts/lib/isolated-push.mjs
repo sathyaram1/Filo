@@ -63,8 +63,6 @@ export function pushFileToMain(root, file, message, mainBranch = process.env.FIL
   // l'indice vero (che appartiene al lavoro in corso dell'istanza).
   let content;
   try { content = readFileSync(file); } catch (e) { return { ok: false, reason: 'file-illeggibile', out: e.message }; }
-  const blob = git(root, ['hash-object', '-w', '--stdin', '--path', rel].slice(0, 3).concat(['--stdin']));
-  // `--stdin` non accetta input via execFileSync senza `input`: usiamo la forma esplicita.
   const written = (() => {
     try {
       const out = execFileSync('git', ['hash-object', '-w', '--stdin'], {
@@ -74,7 +72,6 @@ export function pushFileToMain(root, file, message, mainBranch = process.env.FIL
     } catch (e) { return { ok: false, out: `${e.stderr || e.message}` }; }
   })();
   if (!written.ok) return { ok: false, reason: 'blob', out: written.out };
-  void blob;
 
   // Indice TEMPORANEO: parte dall'albero remoto e riceve solo questo file. Non
   // tocchiamo `.git/index`, quindi il lavoro in corso dell'istanza resta intatto.
