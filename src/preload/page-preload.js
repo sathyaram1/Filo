@@ -360,16 +360,16 @@ function loadScripts() {
   try { require(path.join(CONTENT_DIR, 'highlight.js')); } catch (e) { console.error('[Filo CS] highlight', e); }
   try { require(path.join(CONTENT_DIR, 'sidebar.js')); } catch (e) { console.error('[Filo CS] sidebar', e); }
   try { require(path.join(CONTENT_DIR, 'spellcheck.js')); } catch (e) { console.error('[Filo CS] spellcheck', e); }
-  try { require(path.join(CONTENT_DIR, 'safebrowse.js')); } catch (e) { console.error('[Filo CS] safebrowse', e); }
-  try { require(path.join(CONTENT_DIR, 'geoProposal.js')); } catch (e) { console.error('[Filo CS] geoProposal', e); }
-  try { require(path.join(CONTENT_DIR, 'cookies.js')); } catch (e) { console.error('[Filo CS] cookies', e); }
+  if (!PAGE_ONLY_MODULES.has('safebrowse.js') || !IS_SUBFRAME) try { require(path.join(CONTENT_DIR, 'safebrowse.js')); } catch (e) { console.error('[Filo CS] safebrowse', e); }
+  if (!PAGE_ONLY_MODULES.has('geoProposal.js') || !IS_SUBFRAME) try { require(path.join(CONTENT_DIR, 'geoProposal.js')); } catch (e) { console.error('[Filo CS] geoProposal', e); }
+  if (!PAGE_ONLY_MODULES.has('cookies.js') || !IS_SUBFRAME) try { require(path.join(CONTENT_DIR, 'cookies.js')); } catch (e) { console.error('[Filo CS] cookies', e); }
   try { require(path.join(SHARED_DIR, 'feedback.js')); } catch (e) { console.error('[Filo CS] feedback shared', e); }
   try { require(path.join(SHARED_DIR, 'feedbackClientIdHash.js')); } catch (e) { console.error('[Filo CS] feedbackClientIdHash', e); } // S1.F2.2
   try { require(path.join(SHARED_DIR, 'feedbackAttachTypes.js')); } catch (e) { console.error('[Filo CS] feedbackAttachTypes', e); }
   try { require(path.join(CONTENT_DIR, 'feedback.js')); } catch (e) { console.error('[Filo CS] feedback content', e); }
   try { require(path.join(CONTENT_DIR, 'redteamAttack.js')); } catch (e) { console.error('[Filo CS] redteamAttack content', e); }
   try { require(path.join(SHARED_DIR, 'tabColor.js')); } catch (e) { console.error('[Filo CS] tabColor', e); }
-  try { require(path.join(CONTENT_DIR, 'pageColor.js')); } catch (e) { console.error('[Filo CS] pageColor', e); }
+  if (!PAGE_ONLY_MODULES.has('pageColor.js') || !IS_SUBFRAME) try { require(path.join(CONTENT_DIR, 'pageColor.js')); } catch (e) { console.error('[Filo CS] pageColor', e); }
   try { require(path.join(CONTENT_DIR, 'translatePage.js')); } catch (e) { console.error('[Filo CS] translatePage', e); }
   try { require(path.join(SHARED_DIR, 'ttsChunk.js')); } catch (e) { console.error('[Filo CS] ttsChunk', e); }
   try { require(path.join(CONTENT_DIR, 'tts.js')); } catch (e) { console.error('[Filo CS] tts', e); }
@@ -394,10 +394,45 @@ function start() {
   } catch (_) {}
 }
 
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', start, { once: true });
+// #405 — montaggio dei content script in un riquadro incorporato: una volta
+// sola, alla prima interazione dell'utente con quel riquadro.
+let contentScriptsStarted = false;
+function ensureContentScripts() {
+  if (contentScriptsStarted) return;
+  contentScriptsStarted = true;
+  try { start(); } catch (e) { console.error('[Filo CS] avvio nel riquadro', e); }
+}
+
+// Chiama `fn` quando i content script del riquadro hanno finito di installare i
+// propri listener (content.js marca `filoContentReady` a fine init).
+function waitForContentScripts(fn) {
+  const deadline = Date.now() + 3000;
+  const tick = () => {
+    let ready = false;
+    try { ready = document.documentElement.dataset.filoContentReady === '1'; } catch (_) {}
+    if (ready || Date.now() > deadline) { try { fn(); } catch (_) {} return; }
+    setTimeout(tick, 16);
+  };
+  tick();
+}
+
+if (!IS_SUBFRAME) {
+  contentScriptsStarted = true;
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', start, { once: true });
+  } else {
+    start();
+  }
 } else {
-  start();
+  // Un clic, un tasto premuto o il fuoco su un campo dentro il riquadro dicono
+  // "sto usando questa cosa": da lì in poi il riquadro deve rispondere come il
+  // resto della pagina. Il tasto destro ha il suo cammino (il bridge qui sopra),
+  // che monta e rigioca il clic.
+  for (const ev of ['pointerdown', 'keydown', 'focusin']) {
+    try {
+      window.addEventListener(ev, ensureContentScripts, { capture: true, passive: true, once: true });
+    } catch (_) {}
+  }
 }
 
 // Helper usato dal main per il save-for-later shortcut: estrae metadata
