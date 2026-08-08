@@ -336,6 +336,13 @@ function injectStyles() {
 const SHARED_DIR = path.join(__dirname, '..', 'shared');
 const CONTENT_DIR = path.join(__dirname, '..', 'content');
 
+// Moduli di PAGINA: descrivono o modificano la scheda nel suo insieme (colore
+// della tab, banner del sito pericoloso, proposta geografica, banner cookie).
+// Dentro un riquadro incorporato parlerebbero del rettangolo sbagliato — un
+// banner "sito pericoloso" disegnato dentro un video, o il colore della scheda
+// campionato da una pubblicità — quindi lì non si caricano affatto (#405).
+const PAGE_ONLY_MODULES = new Set(['safebrowse.js', 'geoProposal.js', 'cookies.js', 'pageColor.js']);
+
 function loadScripts() {
   // Ordine identico a quello del manifest dell'estensione legacy.
   try { require(path.join(SHARED_DIR, 'constants.js')); } catch (e) { console.error('[Filo CS] constants', e); }
