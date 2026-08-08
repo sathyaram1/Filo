@@ -44,17 +44,31 @@ git -C "C:/Users/agenti AI/Desktop/Filo/Filo" pull --rebase origin main
 
 Se il pull fallisce per conflitti, riolvi in utonomia, chiedi all'utente solo se ci sono decisioni importanti.
 
-## Push automatico su `origin/main`
+## Salvataggio continuo, pubblicazione UNA VOLTA a lavoro finito
 
-L'hook `.claude/hooks/auto-commit-merge.sh` committa, mergia i worktree e **pusha
-`main` su `origin`** dopo ogni Edit/Write. Non servono push manuali. Se vedi
-`[auto-push] FAILED` in stderr, il push è stato rifiutato (di solito una routine
-remota ha pushato nel frattempo): fai `git pull --rebase origin main` e poi un
-Edit qualsiasi farà ripartire il push automatico, oppure pusha a mano:
+L'hook `.claude/hooks/auto-commit-merge.sh` committa e pusha **il tuo ramo** dopo
+ogni Edit/Write. Questa parte è preziosa e non si tocca: è ciò che salva il
+lavoro quando una sessione viene interrotta di colpo.
+
+Quello che **non** fa più (dal 2026-08-07) è portare ogni singola modifica sul
+ramo principale. Il motivo: ogni 6 ore un automatismo prende `main` **così com'è**,
+costruisce e distribuisce agli utenti; se la fotografia cadeva a metà sessione,
+agli utenti arrivava un lavoro incompleto. In più ogni pubblicazione spostava
+`main` sotto i piedi delle routine in corso, e faceva sì che il cancello di
+sicurezza giudicasse una versione diversa da quella poi fusa.
+
+**Quando il lavoro è finito**, chiudilo con:
 
 ```bash
-git -C "C:/Users/agenti AI/Desktop/Filo/Filo" push origin main
+npm run finish
 ```
+
+Esegue i controlli (logica pura + gli spec delle aree toccate) e **solo se sono
+verdi** fonde su `main` e pubblica, riportandoti sul tuo ramo. Se sono rossi non
+pubblica niente. Per i soli controlli, senza fondere: `npm run finish:check`.
+
+Se la fusione viene rifiutata perché `main` è avanzato (una routine ha pushato
+nel frattempo): `git pull --rebase origin main` e rilancia.
 
 ## MAI committare artefatti dei test (evita i conflitti di rebase)
 
