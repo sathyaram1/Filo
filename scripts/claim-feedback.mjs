@@ -139,9 +139,18 @@ function commitFile(file, message) {
   return tryGit(['commit', '-q', '-m', message, '--', rel]);
 }
 
-// Push ff-only su origin/main. ok=true se è atterrato.
-function pushMain() {
-  return tryGit(['push', 'origin', `HEAD:${MAIN_BRANCH}`]);
+// Fa atterrare su origin/main SOLO il file del semaforo (spec
+// ROUTINE-BRANCH-INTEGRITY.md §Via 2). Il vecchio `push HEAD:main` spediva
+// l'intera storia del branch corrente: se il ramo principale non si era mosso
+// quella spedizione era un avanzamento regolare e portava su anche il CODICE in
+// lavorazione, saltando il cancello di sicurezza. Il semaforo era il biglietto,
+// ma saliva tutto il treno.
+function pushClaimFile(id, message) {
+  return pushFileToMain(ROOT, claimFile(id), message, MAIN_BRANCH);
+}
+
+function pushClaimRemoval(id, message) {
+  return removeFileOnMain(ROOT, relPath(claimFile(id)), message, MAIN_BRANCH);
 }
 
 // ─── comandi ────────────────────────────────────────────────────────────────
