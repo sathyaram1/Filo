@@ -464,9 +464,24 @@
     // conferma e poi rimanda l'azione via FILO_CONFIRM_ACTION. { action }
     FILO_RUN_ACTION: 'filo_run_action',
 
+    // #405 — un'azione di PAGINA invocata dal menu aperto dentro un riquadro
+    // incorporato (iframe). Il riquadro conosce solo se stesso: tradurre,
+    // condividere, salvare o fare uno screenshot devono valere per la pagina
+    // intera, non per il rettangolo dell'embed. Il content script del riquadro
+    // chiede al main di rilanciare il comando nel frame principale della
+    // scheda, che lo esegue come se il menu fosse stato aperto lì. { iconId }
+    RUN_IN_TOP_FRAME: 'run_in_top_frame',
+
     // Da background -> content (broadcast)
     SETTINGS_UPDATED: 'settings_updated',
     SHORTCUT_TRIGGERED: 'shortcut_triggered',     // { command }
+    // Contropartita di RUN_IN_TOP_FRAME: arriva SOLO al frame principale della
+    // scheda e gli fa eseguire l'azione di pagina chiesta da un riquadro. { iconId }
+    TOP_FRAME_COMMAND: 'top_frame_command',
+    // #405 — un altro frame della stessa scheda ha aperto il suo menu: chiudi
+    // il tuo. Gli eventi del mouse non attraversano il confine di un iframe,
+    // quindi senza questo due menu potrebbero restare aperti insieme.
+    CLOSE_OTHER_MENUS: 'close_other_menus',
     // Broadcast da background -> dashboard: lo stato live è cambiato
     // (nuovo timer, notifica, ecc.) e va re-renderizzato.
     FILO_LIVE_UPDATED: 'filo_live_updated',
