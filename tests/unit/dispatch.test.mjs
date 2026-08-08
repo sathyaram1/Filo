@@ -38,6 +38,8 @@ const {
   withRetry,
   persistStateToGit,
   appendWorkerLog,
+  preflight,
+  routineFault,
 } = await import('../../scripts/dispatch.mjs');
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
