@@ -6,11 +6,12 @@
 // superiore) e non se ne leggeva nessuno dei due.
 //
 // Assert di SUCCESSO (rossi senza il fix):
-//   1. i due avvisi sono entrambi presenti e i loro riquadri NON si intersecano;
-//   2. una raffica di avvisi resta dentro la finestra (nessuno finisce sopra il
-//      bordo superiore) e non cresce all'infinito;
-//   3. l'avviso di attesa e quello di esito (il caso "traduzione in corso" →
-//      "tradotta") convivono senza coprirsi.
+//   1. i due avvisi sono entrambi presenti, partono da altezze diverse e i loro
+//      riquadri NON si intersecano;
+//   2. una raffica di avvisi non si accavalla, non straripa dalla finestra e non
+//      cresce senza tetto;
+//   3. anche la conferma cliccabile di "Salva per dopo" — ancorata allo stesso
+//      angolo — sta nella pila invece di finire sotto/sopra un avviso.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { mkdirSync } from 'node:fs';
@@ -20,12 +21,18 @@ const PAGE = `<!doctype html><html><body style="margin:0;padding:24px;font:16px 
   <a id="link" href="https://example.com/articolo">Un collegamento di prova</a>
 </body></html>`;
 
-// Riquadri di tutti gli avvisi in pagina, nell'ordine del DOM.
-async function toastBoxes(page) {
-  return page.evaluate(() => Array.from(document.querySelectorAll('.sn-toast')).map((el) => {
+// Riquadri di TUTTI gli avvisi ancorati all'angolo (toast + conferme cliccabili),
+// nell'ordine del DOM.
+const OVERLAY_SEL = '.sn-toast, .sn-save-confirm, .sn-dictate-pill';
+
+async function overlayBoxes(page) {
+  return page.evaluate((sel) => Array.from(document.querySelectorAll(sel)).map((el) => {
     const r = el.getBoundingClientRect();
-    return { text: el.textContent, x: r.x, y: r.y, w: r.width, h: r.height, bottom: r.bottom, right: r.right };
-  }));
+    return {
+      text: (el.textContent || '').trim(),
+      x: r.x, y: r.y, w: r.width, h: r.height, bottom: r.bottom, right: r.right,
+    };
+  }), OVERLAY_SEL);
 }
 
 function overlaps(a, b) {
@@ -35,45 +42,52 @@ function overlaps(a, b) {
 function firstOverlap(boxes) {
   for (let i = 0; i < boxes.length; i++) {
     for (let j = i + 1; j < boxes.length; j++) {
-      if (overlaps(boxes[i], boxes[j])) return [boxes[i], boxes[j]];
+      if (overlaps(boxes[i], boxes[j])) return [boxes[i].text, boxes[j].text];
     }
   }
   return null;
 }
 
-async function clickMenuItem(page, selector, label, exclude) {
-  await page.locator(selector).click({ button: 'right', position: { x: 8, y: 8 } });
+// Un'azione vera dal menu del tasto destro sul link.
+async function runLinkAction(page, label, { exclude = null, settle = 300 } = {}) {
+  await page.locator('#link').click({ button: 'right', position: { x: 8, y: 8 } });
   const menu = page.locator('.sn-menu');
   await expect(menu).toBeVisible();
   let item = menu.locator('button', { hasText: label });
   if (exclude) item = item.filter({ hasNotText: exclude });
   await item.first().click();
-  await expect(menu).toBeHidden();
+  await expect(menu).toHaveCount(0);
+  if (settle) await page.waitForTimeout(settle);
+}
+
+function shot(page, name) {
+  try { mkdirSync('tests/.shots', { recursive: true }); } catch (_) {}
+  return page.screenshot({ path: `tests/.shots/${name}.png` }).catch(() => {});
 }
 
 test('due avvisi ravvicinati si impilano invece di sovrapporsi', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, PAGE);
 
-  // Il flusso della segnalazione: due azioni di fila sullo stesso link.
-  await clickMenuItem(page, '#link', 'Copia URL', 'immagine');
-  await clickMenuItem(page, '#link', 'Salva link per dopo');
+  // Il flusso esatto della segnalazione: due azioni di fila sullo stesso link.
+  await runLinkAction(page, 'Copia URL', { exclude: 'immagine' });
+  await runLinkAction(page, 'Salva link per dopo');
 
-  // Entrambi gli avvisi devono essere vivi insieme (durata 2200ms: qui siamo
-  // ampiamente dentro la finestra in cui prima si coprivano).
+  // Entrambi vivi insieme (durata 2200ms: siamo ampiamente dentro la finestra
+  // in cui prima si coprivano).
   await expect(page.locator('.sn-toast')).toHaveCount(2, { timeout: 5000 });
+  await shot(page, 'toast-stack-409');
 
-  try { mkdirSync('tests/.shots', { recursive: true }); } catch (_) {}
-  await page.screenshot({ path: 'tests/.shots/toast-stack-409.png' }).catch(() => {});
-
-  const boxes = await toastBoxes(page);
+  const boxes = await overlayBoxes(page);
   for (const b of boxes) {
     expect(b.w, `avviso senza larghezza: ${b.text}`).toBeGreaterThan(0);
     expect(b.h, `avviso senza altezza: ${b.text}`).toBeGreaterThan(0);
   }
   // Il cuore della segnalazione: prima i due avevano lo stesso bordo superiore.
   expect(boxes[0].y, 'i due avvisi partono dalla stessa altezza: sono sovrapposti')
-    .not.toBe(boxes[1].y);
+    .not.toBeCloseTo(boxes[1].y, 0);
   expect(firstOverlap(boxes), 'due avvisi si intersecano').toBeNull();
+  // Il più recente sta più in basso, vicino all'angolo.
+  expect(boxes[1].y, 'gli avvisi non sono impilati in ordine').toBeGreaterThan(boxes[0].y);
 
   // E restano entrambi leggibili: nessuno esce dalla finestra.
   const vh = await page.evaluate(() => window.innerHeight);
@@ -83,47 +97,55 @@ test('due avvisi ravvicinati si impilano invece di sovrapporsi', async ({ openTa
   }
 });
 
-test('una raffica di avvisi resta dentro la finestra e non si accavalla', async ({ openTab, testServer }) => {
+test('una raffica di avvisi non si accavalla e non straripa dalla finestra', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, PAGE);
-
-  // Otto azioni di fila: ben oltre il tetto dello stack.
-  for (let i = 0; i < 8; i++) {
-    await clickMenuItem(page, '#link', 'Copia URL', 'immagine');
-  }
-
-  const boxes = await toastBoxes(page);
-  expect(boxes.length, 'la raffica non ha prodotto avvisi').toBeGreaterThan(0);
-  // Il tetto tiene la crescita sotto controllo (senza, sarebbero otto).
-  expect(boxes.length, 'lo stack cresce senza tetto').toBeLessThanOrEqual(5);
-  expect(firstOverlap(boxes), 'gli avvisi della raffica si intersecano').toBeNull();
-
   const vh = await page.evaluate(() => window.innerHeight);
-  for (const b of boxes) {
-    expect(b.y, 'un avviso della raffica è finito sopra il bordo della finestra')
-      .toBeGreaterThanOrEqual(0);
-    expect(b.bottom).toBeLessThanOrEqual(vh + 1);
+
+  let maxLive = 0;
+  // Dieci azioni di fila, il più rapidamente possibile: dopo ognuna guardiamo
+  // com'è messa la pila.
+  for (let i = 0; i < 10; i++) {
+    await runLinkAction(page, 'Copia URL', { exclude: 'immagine', settle: 60 });
+    const boxes = await overlayBoxes(page);
+    maxLive = Math.max(maxLive, boxes.length);
+    expect(firstOverlap(boxes), `gli avvisi si intersecano al giro ${i + 1}`).toBeNull();
+    for (const b of boxes) {
+      expect(b.y, `avviso sopra il bordo della finestra al giro ${i + 1}`).toBeGreaterThanOrEqual(0);
+      expect(b.bottom, `avviso sotto il bordo della finestra al giro ${i + 1}`)
+        .toBeLessThanOrEqual(vh + 1);
+    }
   }
-  await page.screenshot({ path: 'tests/.shots/toast-stack-409-raffica.png' }).catch(() => {});
+  await shot(page, 'toast-stack-409-raffica');
+
+  expect(maxLive, 'la raffica non ha prodotto avvisi').toBeGreaterThan(1);
+  // Tetto: 4 vivi + al massimo uno in dissolvenza.
+  expect(maxLive, 'la pila di avvisi cresce senza tetto').toBeLessThanOrEqual(5);
 });
 
-test('l\'avviso di attesa e quello di esito convivono senza coprirsi', async ({ openTab, testServer }) => {
+test('la conferma cliccabile di "Salva per dopo" sta nella pila con gli avvisi', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, PAGE);
 
-  // Il caso "operazione lunga": un avviso che resta (durata 0) e l'esito che
-  // arriva mentre il primo è ancora vivo — è quello che succede con la
-  // traduzione della pagina o la trascrizione quando il modello risponde in
-  // fretta. Qui lo riproduciamo con due azioni reali che generano due avvisi
-  // mentre il primo è ancora sullo schermo.
-  await clickMenuItem(page, '#link', 'Salva link per dopo');
-  await clickMenuItem(page, '#link', 'Copia URL', 'immagine');
-  await clickMenuItem(page, '#link', 'Salva link per dopo');
+  // "Salva per dopo" mostra una conferma cliccabile ancorata allo STESSO angolo
+  // dei toast: prima si sovrapponeva a qualunque avviso arrivasse nel frattempo.
+  await page.click('body', { button: 'right', position: { x: 400, y: 300 } });
+  const saveBtn = page.locator('.sn-menu [data-sn-icon-id="saveForLater"]');
+  await expect(saveBtn).toBeVisible();
+  await saveBtn.click();
+  await expect(page.locator('.sn-save-confirm')).toBeVisible({ timeout: 5000 });
 
-  await expect(page.locator('.sn-toast')).toHaveCount(3, { timeout: 5000 });
-  const boxes = await toastBoxes(page);
-  expect(firstOverlap(boxes), 'attesa ed esito si coprono a vicenda').toBeNull();
+  // Mentre la conferma è ancora sullo schermo, un avviso normale.
+  await runLinkAction(page, 'Copia URL', { exclude: 'immagine', settle: 200 });
 
-  // Ordine: il più recente è quello più vicino all'angolo (in basso).
-  for (let i = 1; i < boxes.length; i++) {
-    expect(boxes[i].y, 'gli avvisi non sono impilati in ordine').toBeGreaterThan(boxes[i - 1].y);
-  }
+  const boxes = await overlayBoxes(page);
+  expect(boxes.length, 'la conferma e l\'avviso non sono entrambi presenti').toBe(2);
+  await shot(page, 'toast-stack-409-conferma');
+  expect(firstOverlap(boxes), 'la conferma e l\'avviso si coprono a vicenda').toBeNull();
+
+  // La conferma resta cliccabile: è l'unica strada verso la lista.
+  await expect(page.locator('.sn-save-confirm')).toBeVisible();
+  const clickable = await page.evaluate(() => {
+    const el = document.querySelector('.sn-save-confirm');
+    return el ? getComputedStyle(el).pointerEvents : null;
+  });
+  expect(clickable, 'la conferma non riceve più i click').not.toBe('none');
 });
