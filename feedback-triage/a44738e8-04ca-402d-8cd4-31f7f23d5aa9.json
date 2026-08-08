@@ -1,0 +1,7 @@
+{
+  "id": "a44738e8-04ca-402d-8cd4-31f7f23d5aa9",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. verifica: sul clic destro di una miniatura dentro un collegamento compaiono ora entrambe le famiglie di voci, e le azioni sul link agiscono davvero sul link (Apri in nuova tab apre la pagina di destinazione, Copia URL mette negli appunti l'indirizzo del collegamento e non quello dell'immagine). Provati anche i casi storti: indirizzo lunghissimo con emoji e caratteri speciali, collegamento ostile che prova a far girare del codice (non parte nulla), miniatura appiccicata all'angolo in basso a destra dello schermo (il menu, ora piu' alto, resta tutto dentro la finestra e le voci restano cliccabili), aperture e chiusure ripetute e cambio rapido di bersaglio, collegamento a un file (convivono Salva immagine e Salva file), clic sul bordo del collegamento fuori dalla miniatura (solo voci del link), immagine dentro un collegamento senza indirizzo (nessuna voce fantasma) e miniatura dentro i componenti isolati dei siti moderni. Nessuna regressione sui menu di testo, video, link semplice e sui salvataggi.\n\nUna cosa che resta fuori, segnalata a parte tra i Ricevuti: quando al posto della copertina parte l'anteprima video (le home dei siti di video e dei social), il clic destro mostra ancora solo i comandi del filmato e perde le voci del collegamento — stesso disagio, altro elemento.",
+  "queuedAt": "2026-08-08T00:16:57.400Z",
+  "queuedBy": "routine"
+}
