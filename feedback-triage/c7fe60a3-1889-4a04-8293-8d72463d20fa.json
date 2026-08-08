@@ -1,7 +1,0 @@
-{
-  "id": "c7fe60a3-1889-4a04-8293-8d72463d20fa",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. ho ripercorso il tuo giro sull'app vera: documento nuovo, apro la rinomina e la confermo a vuoto (Invio a campo vuoto, Invio senza toccare niente, e anche cliccando semplicemente altrove), sia dalla matita nel menu documenti sia dal tasto destro sul titolo. Poi scrivo oltre cento parole: il titolo automatico arriva in tutti e tre i casi. Provato anche a insistere: nome fatto di soli spazi, conferma esatta della scritta \"Documento senza titolo\", cinque aperture e chiusure di fila della rinomina — il documento resta titolabile in automatico. Il caso opposto regge: se il nome glielo dai davvero resta tuo e l'automatico non parte nemmeno, e se poi cancelli quel nome il documento torna titolabile. Regge anche al riavvio della pagina. Sugli abusi: emoji e accenti passano intatti, un nome incollato di diecimila caratteri non sfonda la barra in alto, e un nome che contiene codice HTML resta testo scritto e non viene eseguito.",
-  "queuedAt": "2026-08-08T00:43:19.767Z",
-  "queuedBy": "routine"
-}
