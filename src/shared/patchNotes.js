@@ -20,6 +20,7 @@
       features: [],
       fixes: [
         'Gli avvisi che Filo mostra dentro le pagine ora si impilano uno sopra l\'altro: se ne arrivano due ravvicinati restano leggibili entrambi, invece di finire uno sopra l\'altro.',
+        'Quando Filo propone di segnalare una cosa che non sa fare, la richiesta di conferma si apre da sola e mostra il testo per intero — anche se è lungo — così puoi leggere tutto prima di dire sì.',
       ],
     },
     {
