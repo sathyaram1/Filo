@@ -65,6 +65,49 @@ jobs:
             fi
           fi
 
+      - name: Install dipendenze
+        if: steps.check.outputs.should_release == 'true'
+        run: npm ci
+
+      # ─── CANCELLO PRIMA DELLA PUBBLICAZIONE ──────────────────────────────
+      # Fino al 2026-08-07 questo lavoro prendeva il ramo principale COSI' COM'E'
+      # ogni 6 ore, lo costruiva e lo pubblicava agli utenti SENZA eseguire un
+      # solo test. Qualunque errore — di una routine o di una sessione locale —
+      # arrivava a tutti senza incontrare nessun controllo lungo la strada; e
+      # siccome le modifiche atterrano sul ramo principale una per una, la
+      # fotografia poteva cogliere un lavoro a meta'.
+      #
+      # Gira PRIMA del bump di versione: se e' rosso non si consuma un numero di
+      # versione e non si sporca la storia.
+      - name: Controlli automatici (cancello di pubblicazione)
+        if: steps.check.outputs.should_release == 'true'
+        id: gate
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run test:unit 2>&1 | tee unit.log
+          echo "unit_ok=1" >> "$GITHUB_OUTPUT"
+
+      # Rosso = NON si pubblica, e il guasto diventa un feedback in coda: al
+      # prossimo giro una routine lo prende in carico come qualsiasi altro
+      # lavoro, capisce cosa non funziona e lo risolve. Senza questo passo un
+      # fallimento si limiterebbe a bloccare le pubblicazioni in silenzio.
+      - name: Controlli falliti - apri un feedback e fermati
+        if: steps.check.outputs.should_release == 'true' && steps.gate.outcome == 'failure'
+        env:
+          FILO_FEEDBACK_PRIVKEY: ${{ secrets.FILO_FEEDBACK_PRIVKEY }}
+        shell: bash
+        run: |
+          echo "::error::Controlli automatici rossi: pubblicazione annullata."
+          PREMESSA="Il cancello prima della pubblicazione ha trovato dei controlli automatici falliti sul ramo principale: la nuova versione NON e stata pubblicata e gli utenti restano sull ultima buona. Capisci quale modifica li ha rotti e sistemala; se invece il controllo e diventato obsoleto rispetto a come funziona oggi l app, aggiorna il controllo. Coda dell ultima esecuzione:"
+          TAIL=$(tail -c 2500 unit.log 2>/dev/null || echo "(nessun output)")
+          TESTO="${PREMESSA}
+
+          ${TAIL}"
+          node scripts/queue-feedback.mjs --name "Controlli automatici rossi: nessuna versione pubblicata" --priority 3 --status todo "$TESTO" || echo "::warning::feedback non accodato"
+          exit 1
+
       - name: Bump patch version e push su main
         if: steps.check.outputs.should_release == 'true'
         id: bump
@@ -82,9 +125,6 @@ jobs:
           done
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: Install dipendenze
-        if: steps.check.outputs.should_release == 'true'
-        run: npm ci
 
       - name: Incastona le chiavi di default nel build (bake)
         # Legge l'override admin più recente da Firestore (config/secrets, via
