@@ -39,6 +39,9 @@ import { uploadScreenshotFile } from './lib/feedback-storage.mjs';
 // S1.2: cifratura dei campi sensibili nei file di coda (la history git del repo
 // pubblico è un canale di leak tanto quanto Firestore).
 import { encryptFieldsForQueue } from './lib/encrypt-feedback-fields.mjs';
+// #443: chi sta accodando (esplorazione / sviluppo / verifica), scritto dal
+// dispatcher al momento della consegna del lavoro.
+import { readRole, normalizeRole } from './lib/routine-role.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
