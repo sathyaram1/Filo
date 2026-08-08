@@ -64,7 +64,10 @@ Convenzioni (tono, sintomo-vs-causa): `CLAUDE.md`.
    mancante o un miglioramento logico (es. un campo libero servirebbe meglio di un
    menù a tendina), **non implementarlo** — resti black-box: accodalo come
    suggerimento con `node scripts/queue-feedback.mjs --status new` così l'owner lo
-   valuta. Questo non blocca il PASS.
+   valuta. Questo non blocca il PASS. Il suggerimento arriva **firmato come
+   verifica** (lo fa il dispatcher, `--role` non va passato a mano): in dashboard
+   si legge subito che riguarda il lavoro appena consegnato e non un giro di
+   esplorazione a caso.
 
 ## Come riporti
 
