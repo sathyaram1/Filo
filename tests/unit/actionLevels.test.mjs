@@ -91,18 +91,21 @@ test('INVIA_FEEDBACK è livello 2 e descrive il testo nel popup', () => {
   assert.match(d, /la ricerca è lenta/);
 });
 
-test('INVIA_FEEDBACK: il taglio del testo lungo non spezza un\'emoji a metà', () => {
-  // Testo oltre i 160 caratteri con un'emoji (coppia surrogata UTF-16) proprio
-  // a cavallo del punto di taglio: un `slice` per indice lascerebbe un surrogato
-  // solitario, che diventa un carattere corrotto (�) appena il testo viene
-  // mostrato/salvato. La describe deve tenere l'emoji intera o scartarla del tutto.
-  const testo = 'x'.repeat(159) + '😀' + ' altre parole di coda che eccedono il limite';
+test('INVIA_FEEDBACK: il popup mostra il testo INTERO, non una versione tagliata (#414)', () => {
+  // Il testo che parte a nome dell'utente deve essere leggibile per intero
+  // prima dell'OK: se il popup ne mostra un pezzo con "…", l'utente autorizza
+  // qualcosa che non ha potuto leggere. Testo ben oltre i vecchi 160 caratteri,
+  // con la coda finale e un'emoji (coppia surrogata UTF-16) proprio dove
+  // cadeva il taglio: entrambe devono comparire, e nessun carattere corrotto.
+  const coda = 'e questa è la coda finale che prima spariva dietro i puntini';
+  const testo = `${'x'.repeat(159)}😀 parole di mezzo, ${coda}`;
   const d = AL.describe({ type: 'INVIA_FEEDBACK', testo });
-  // Nessun surrogato alto isolato nel risultato.
+  assert.ok(d.includes(testo), 'la describe deve contenere il testo integrale');
+  assert.ok(d.includes(coda), 'la coda del testo non deve essere tagliata');
+  assert.doesNotMatch(d, /…/, 'niente ellissi: il testo non viene troncato');
+  // Nessun surrogato alto isolato e nessun U+FFFD dopo un round-trip UTF-8.
   assert.doesNotMatch(d, /[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
-  // E nessun U+FFFD dopo un round-trip UTF-8 (invio a Firestore / scrittura su disco).
   assert.ok(!Buffer.from(d, 'utf8').toString('utf8').includes('�'));
-  // L'emoji cade esattamente sul confine di taglio e viene preservata intera.
   assert.ok(d.includes('😀'));
 });
 
