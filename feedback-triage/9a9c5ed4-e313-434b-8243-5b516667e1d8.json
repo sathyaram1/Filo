@@ -1,0 +1,7 @@
+{
+  "id": "9a9c5ed4-e313-434b-8243-5b516667e1d8",
+  "status": "done",
+  "notes": "Fatto. In dashboard ogni feedback dice ora chi l'ha scritto, fra sei mittenti distinti: tu, un utente, Filo per conto di un utente, e le tre automazioni tenute separate — chi esplora l'app, chi implementa una modifica, chi verifica il lavoro di un altro. Nel dettaglio, in alto, non compare piu' l'identificativo grezzo ma il mittente in chiaro (resta leggibile passandoci sopra e nel pannello del mittente).\n\nHo spezzato le automazioni in tre invece di lasciarle un blocco unico perche' e' la distinzione che serve davvero leggendo la coda: un ritrovamento di chi verifica riguarda la modifica appena consegnata, uno di chi esplora riguarda l'app in generale. Era anche la causa del malinteso di ieri sui feedback comparsi a coda piena: sembravano tutti esplorazioni, e invece quasi tutti li avevano aperti i verificatori mentre controllavano altro lavoro.\n\nLa firma la mette il sistema al momento in cui assegna il compito, non l'istanza che scrive il feedback: prima dipendeva dal fatto che si ricordasse di dichiararsi, e su decine di ritrovamenti uno solo risultava esplorazione.\n\nI feedback gia' in archivio restano 'automazione' generica: a posteriori non c'e' modo di sapere quale ruolo li ha scritti, e attribuirglielo a naso sarebbe peggio che ammettere di non saperlo.",
+  "queuedAt": "2026-08-08T18:47:59.454Z",
+  "queuedBy": "routine"
+}
