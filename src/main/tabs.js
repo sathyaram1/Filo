@@ -364,6 +364,18 @@ class TabManager {
       sandbox: false,
       nodeIntegration: false,
       webSecurity: true,
+      // #405 — i riquadri incorporati (video, mappe, commenti, moduli) sono
+      // iframe: senza questo flag il preload — e quindi TUTTO Filo (menu del
+      // tasto destro, correttore, Spiegazione/Traduci, Incolla con cronologia)
+      // — girava solo nel frame principale, e dentro il riquadro il tasto
+      // destro non produceva nulla. Con nodeIntegrationInSubFrames il preload
+      // parte in ogni sottoframe; `nodeIntegration` resta false e
+      // contextIsolation true, quindi il codice della pagina (incluso quello
+      // di terze parti dentro l'iframe) NON guadagna alcun accesso a Node né
+      // allo shim chrome.*, che vivono solo nel mondo isolato del preload.
+      // Il costo si paga solo dove serve: nei sottoframe page-preload.js
+      // carica i content script alla PRIMA interazione, non al caricamento.
+      ...(isInternal ? {} : { nodeIntegrationInSubFrames: true }),
       // partition: incognito (effimera della finestra) o per-sito in privacy.
       ...(partition ? { partition } : {}),
     };
