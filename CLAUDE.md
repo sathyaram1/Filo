@@ -105,8 +105,7 @@ Il minimo accettabile dipende dall'ambiente:
   - per modifiche visive, `npm run test:shoot` con uno scenario mirato +
     ispezione dello screenshot (vedi "Controlli visivi").
 
-  Non rilanciare l'intera suite "per sicurezza": se temi una regressione altrove,
-  lascia che la verifichi la routine cloud.
+  Se temi una regressione altrove, **verificala**: non rimandarla alla routine.
 
 - **In routine cloud (Linux headless)**: **qui** gira la regressione completa.
   `npm test` (intera suite Playwright); se la feature ha UI nuova, **aggiungi uno
