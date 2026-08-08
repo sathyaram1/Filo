@@ -126,7 +126,7 @@ test('una raffica di avvisi non si accavalla e non straripa dalla finestra', asy
   }
   await shot(page, 'toast-stack-409-raffica');
 
-  expect(maxLive, 'la raffica non ha prodotto avvisi').toBeGreaterThan(1);
+  expect(maxLive, 'gli avvisi non convivono mai in più di uno').toBeGreaterThan(2);
   // Tetto: 4 vivi + al massimo uno in dissolvenza.
   expect(maxLive, 'la pila di avvisi cresce senza tetto').toBeLessThanOrEqual(5);
 });
