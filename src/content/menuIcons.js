@@ -293,5 +293,6 @@
   global.SN_MENU_ICONS = {
     init,
     buildGlobalIconRow,
+    runIconAction,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
