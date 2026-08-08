@@ -272,6 +272,14 @@ leggendo solo lo STATO e stampa il JSON per il worker:
 - L'output JSON **inlina** il file-ruolo in `instructions`: i ruoli sono letti
   come **dati**, non registrati come tipi di agente — il worker resta sempre
   `general-purpose`. Non serve che il cloud onori `.claude/agents/`.
+- **Provenienza dei feedback (#443)**: consegnando il lavoro, dispatch scrive
+  anche **chi sei** in `.claude/routine-role.json` (effimero e gitignorato, come
+  `branch-expect.json`). `queue-feedback.mjs` lo rilegge da solo: un feedback
+  aperto durante il tuo giro arriva firmato `routine:<ruolo>` e in dashboard si
+  distingue esplorazione / sviluppo / verifica. **Non passare `--role` a mano**:
+  la firma è automatica proprio perché prima dipendeva dalla memoria del worker,
+  e infatti su decine di ritrovamenti uno solo risultava "esplorazione". Un
+  `guasto` cancella il marcatore (nessun lavoro consegnato = nessuna firma).
 
 Lo **stato per branch** vive in `feedback-triage/state/<id>.json` (su git, come i
 claim: ogni iterazione è un worker fresco, lo stato dev'essere persistito). I
