@@ -690,6 +690,7 @@
     $('vhRestore').addEventListener('click', () => {
       if (restoreVersion(fileId, versionId)) renderVersionHistory(fileId);
     });
+    vhArmStaleClickGuard();
   }
 
   // ════════════════════════════════════════════════════════════════════
