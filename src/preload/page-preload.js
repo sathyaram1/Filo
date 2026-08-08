@@ -290,9 +290,20 @@ ipcRenderer.on('shortcut:triggered', (_event, { command, context } = {}) => {
   // `context` è opzionale: lo usa la voce "Aiuto" del menu tasto destro su una
   // tab per dire all'agente da dove è stato invocato (url + titolo della scheda).
   const t = globalThis.SN_MSG?.MSG?.SHORTCUT_TRIGGERED || 'shortcut_triggered';
-  for (const fn of broadcastListeners) {
-    try { fn({ type: t, command, context }, { id: 'filo-desktop' }, () => {}); } catch (_) {}
+  const deliver = () => {
+    for (const fn of broadcastListeners) {
+      try { fn({ type: t, command, context }, { id: 'filo-desktop' }, () => {}); } catch (_) {}
+    }
+  };
+  // #405 — una scorciatoia indirizzata a un riquadro (Alt+E su testo
+  // selezionato dentro un video incorporato) può arrivare prima che il
+  // riquadro abbia montato Filo: montalo e consegna appena è pronto.
+  if (IS_SUBFRAME && !contentScriptsStarted) {
+    ensureContentScripts();
+    waitForContentScripts(deliver);
+    return;
   }
+  deliver();
 });
 
 // ─── inject CSS condivisi + carica content script ──────────────────────────
