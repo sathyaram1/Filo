@@ -374,10 +374,16 @@ npm test                   # suite Playwright (~100 spec: solo in cloud)
 ```
 
 **Gli spec Playwright NON mostrano più la finestra** (dal 2026-08-08): l'app parte
-fuori dallo schermo, non entra nella barra delle applicazioni e non ruba mai il
-fuoco, così lanciare i test mentre l'owner lavora non gli fa lampeggiare finestre
-davanti. Tutto il resto funziona identico — menu nativi compresi — e gli
+fuori dallo schermo, trasparente e senza fuoco, così lanciare i test mentre
+l'owner lavora non gli fa lampeggiare finestre davanti. Vale per **tutti** gli
+spec, anche i ~50 che lanciano Electron per conto proprio senza passare dalla
+fixture: l'interruttore sta in `playwright.config.js`, sull'ambiente del worker,
+e ogni lancio lo eredita. Tutto il resto funziona identico — menu nativi
+compresi, che sono finestre a sé e vengono resi invisibili anche loro — e gli
 screenshot dei test vengono lo stesso (passano dal debugger, non dal compositor).
+
+Il "come" e i due modi in cui la protezione era caduta stanno in
+`src/main/test-window-mode.js`; `tests/hidden-window.spec.mjs` la sorveglia.
 Per guardare l'app mentre uno spec la pilota: `FILO_TEST_VISIBLE=1 npx playwright
 test …`. `test:shoot` e `test:smoke` restano visibili sempre: lì la finestra
 fotografata **è** il risultato.
