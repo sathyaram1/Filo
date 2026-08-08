@@ -769,8 +769,8 @@ ha funzionato e cosa fare**.
 
 Quando l'agente risponde "non lo so fare / non ho accesso a quel dato", il buco
 non deve morire lì: nella **stessa risposta** compare una segnalazione **già
-scritta** con il tasto di conferma (azione `INVIA_FEEDBACK`, livello 2 → niente
-parte senza l'OK dell'utente).
+scritta**, e il popup di conferma si apre **da solo** con il testo per intero
+(azione `INVIA_FEEDBACK`, livello 2 → niente parte senza l'OK dell'utente).
 
 - **Deterministico, non affidato al prompt**: il prompt lo chiede al modello, ma
   l'invariante è garantito nel main (`maybeProposeFeedbackAction` in
