@@ -78,6 +78,7 @@ async function renameViaPencil(page, value, how = 'enter') {
 
 // Rinomina dal tasto destro sul titolo (docbar).
 async function renameViaCtxMenu(page, value, how = 'enter') {
+  await closeDocPop(page);
   await page.locator('#docbar').click({ button: 'right' });
   await page.locator('.ed-title-ctxmenu .sn-select-option', { hasText: 'Rinomina' }).click();
   const input = page.locator('.ed-doc-title-input');
