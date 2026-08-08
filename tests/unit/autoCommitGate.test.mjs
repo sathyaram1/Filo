@@ -88,6 +88,21 @@ describe('Via 1 — la sessione si dichiara, non si indovina dal nome del ramo',
       'una versione viene distribuita agli utenti ogni 6 ore dal ramo principale: non può contenere lavori a metà');
   });
 
+  test('una routine che DIMENTICA di dichiararsi resta comunque contenuta', () => {
+    // La marcatura serve a distinguere le provenienze nella storia, ma la
+    // sicurezza non deve dipenderne: appenderla a un'istruzione che qualcuno
+    // può dimenticare rimetterebbe la protezione in prosa — il guasto del
+    // 24 luglio in persona. Qui è il caso peggiore: sul ramo principale, senza
+    // marcatura, con una sola cartella di lavoro (la forma delle sessioni cloud).
+    const { work } = scene();
+    writeFileSync(resolve(work, 'codice-non-esaminato.js'), 'x\n', 'utf8');
+
+    runHook(work); // niente FILO_ROUTINE
+
+    assert.equal(filesOnMain(work).includes('codice-non-esaminato.js'), false,
+      'senza cartelle separate non si pubblica mai: al ramo principale ci si arriva solo dal cancello');
+  });
+
   test('il lavoro viene comunque salvato: nessuna modifica resta fuori da git', () => {
     const { work } = scene();
     git(work, ['checkout', '-q', '-b', 'claude/durabilita']);

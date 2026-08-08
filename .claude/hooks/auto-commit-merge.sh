@@ -143,32 +143,27 @@ else
   # Push the feature branch (best-effort, for traceability/debugging).
   git push origin "$CUR_BRANCH" >/dev/null 2>&1 || true
 
-  # Sessione di ROUTINE: si ferma qui, sempre. Il ramo corrente e' gia' stato
-  # spedito qui sopra (durabilita'), ma al ramo principale ci si arriva solo
-  # attraverso scripts/merge-gate.mjs, dopo la verifica e i controlli di
-  # sicurezza. Nessuna eccezione, nessun nome di ramo che scavalchi la regola.
-  if is_routine_session; then
-    if [ "$CUR_BRANCH" = "$TARGET_BRANCH" ]; then
-      echo "[auto-commit] ATTENZIONE: sessione di routine sul ramo '$TARGET_BRANCH'. Il lavoro e' salvato in locale ma NON pubblicato: una routine non deve lavorare sul ramo principale." >&2
-    fi
-    exit 0
+  # ─── Qui NON si pubblica mai. ──────────────────────────────────────────
+  #
+  # Questo ramo del codice si raggiunge solo quando esiste UNA sola cartella di
+  # lavoro: e' la forma delle sessioni in cloud. Il setup dell'owner ha sempre
+  # una cartella dedicata al ramo principale piu' quelle dei compiti, quindi
+  # passa di sopra e non arriva mai qui.
+  #
+  # La regola NON dipende dal fatto che la sessione si sia dichiarata routine
+  # (FILO_ROUTINE): quella marcatura serve a distinguere le provenienze nella
+  # storia, ma appenderci la sicurezza significherebbe rimettere la protezione
+  # dietro un'istruzione in prosa che qualcuno puo' dimenticare — cioe'
+  # esattamente il guasto del 24 luglio 2026, in cui un'istanza che lavorava sul
+  # ramo principale ha pubblicato senza passare dal cancello.
+  #
+  # Al ramo principale ci si arriva solo attraverso scripts/merge-gate.mjs, dopo
+  # verifica e controlli di sicurezza. Il lavoro non si perde: il ramo corrente
+  # e' gia' stato spedito qui sopra.
+  if [ "$CUR_BRANCH" = "$TARGET_BRANCH" ]; then
+    echo "[auto-commit] ATTENZIONE: stai lavorando sul ramo '$TARGET_BRANCH' in una sessione senza cartelle di lavoro separate. Il lavoro e' salvato ma NON pubblicato: usa un ramo dedicato e il cancello di merge." >&2
   fi
-
-  # Da qui in poi si toccherebbe il ramo principale. Non lo si fa MAI da un
-  # ramo di lavoro, ne' in routine ne' in locale (cambiato il 2026-08-07): al
-  # ramo principale ci si arriva una volta sola, a lavoro finito, con
-  # `npm run finish` (locale) o scripts/merge-gate.mjs (routine).
-  if [ "$CUR_BRANCH" != "$TARGET_BRANCH" ]; then
-    exit 0
-  fi
-
-  # Sei DELIBERATAMENTE sul ramo principale: le tue modifiche sono gia' quelle
-  # pubblicate, quindi spedirle e' solo allinearsi a origin.
-  PUSH_OUT=$(git push origin "HEAD:$TARGET_BRANCH" 2>&1)
-  if [ $? -ne 0 ]; then
-    echo "[auto-push] FAILED pushing '$TARGET_BRANCH' to origin: fai 'git pull --rebase origin $TARGET_BRANCH' e riprova" >&2
-    echo "$PUSH_OUT" >&2
-  fi
+  exit 0
 fi
 
 exit 0
