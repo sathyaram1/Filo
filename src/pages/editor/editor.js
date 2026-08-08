@@ -537,7 +537,16 @@
       activateFile(STORE.findFile(collection, fileId));
     }
     writeCollection();
-    showEditorToast('Versione ripristinata.');
+    // Il ripristino è un gesto delicato: lo stato di prima è già salvato qui
+    // sopra, quindi l'avviso lo offre subito indietro — stessa simmetria delle
+    // modifiche automatiche di Filo, che sono sempre annullabili sul posto.
+    showEditorToast('Versione ripristinata.', {
+      label: 'Annulla',
+      onClick: () => {
+        if (!restoreVersion(fileId, cres.version.id)) return;
+        if (isVersionHistoryOpen()) renderVersionHistory(fileId);
+      },
+    });
     return true;
   }
 
@@ -590,6 +599,31 @@
   const VH_SCOPE_NOTE = 'Il ripristino riporta indietro il testo e i commenti. '
     + 'Nome del documento, conversazione con Filo e disposizione dei riquadri restano come sono adesso.';
 
+  // Il pannello è a schermo? (serve a tenerlo allineato quando lo stato cambia
+  // da fuori, per esempio annullando un ripristino dall'avviso.)
+  function isVersionHistoryOpen() {
+    return !overlay.hidden && !!overlayBox.querySelector('.ed-vh-list, .ed-vh-empty');
+  }
+
+  // Coda di gesto: ogni clic del pannello lo RIDISEGNA (ripristina, indietro,
+  // "mostra le più vecchie"), quindi sotto il cursore finisce un elemento
+  // diverso da quello premuto. Il secondo colpo di un doppio clic cadrebbe lì e
+  // farebbe una cosa che l'utente non ha chiesto — aprire l'anteprima di
+  // un'altra versione, o peggio ripristinarla. Quel colpo non è una nuova
+  // intenzione: è la coda del gesto precedente (il browser lo marca con
+  // `detail > 1`, cioè "clic ravvicinati sullo stesso punto"), e va ignorato.
+  // La guardia si arma SOLO quando il pannello si disegna, così nessun altro
+  // overlay ne risente.
+  const VH_STALE_CLICK_MS = 1000;
+  let vhDrawnAt = 0;
+  function vhArmStaleClickGuard() { vhDrawnAt = Date.now(); }
+  overlayBox.addEventListener('click', (e) => {
+    if (!vhDrawnAt || e.detail < 2) return;
+    if (Date.now() - vhDrawnAt > VH_STALE_CLICK_MS) return;
+    e.preventDefault();
+    e.stopPropagation();
+  }, true);
+
   function openVersionHistory() {
     closeDocPop();
     closeTitleMenu();
@@ -605,6 +639,7 @@
         <p class="ed-vh-empty">Nessuna versione ancora. Filo salva un punto di ripristino ogni volta che modifica il documento; da lì potrai tornare indietro.</p>
         <div class="ed-overlay-actions"><button class="ed-btn primary" id="ovClose">Chiudi</button></div>`);
       $('ovClose').addEventListener('click', closeOverlay);
+      vhArmStaleClickGuard();
       return;
     }
     const shown = all.slice(0, versHistoryShown);
@@ -645,6 +680,7 @@
       it.addEventListener('click', open);
       it.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(e); } });
     });
+    vhArmStaleClickGuard();
   }
 
   // Anteprima ampia di una singola versione, con conferma di ripristino.
@@ -669,6 +705,7 @@
     $('vhRestore').addEventListener('click', () => {
       if (restoreVersion(fileId, versionId)) renderVersionHistory(fileId);
     });
+    vhArmStaleClickGuard();
   }
 
   // ════════════════════════════════════════════════════════════════════
@@ -3854,8 +3891,10 @@
   // ════════════════════════════════════════════════════════════════════
   //  OVERLAY helpers
   // ════════════════════════════════════════════════════════════════════
-  function openOverlay(html) { overlayBox.innerHTML = html; overlay.hidden = false; }
-  function closeOverlay() { overlay.hidden = true; overlayBox.innerHTML = ''; }
+  // La guardia anti "coda di gesto" vale solo per il pannello che l'ha armata:
+  // ogni altro overlay riparte pulito (e chiudendo si disarma).
+  function openOverlay(html) { vhDrawnAt = 0; overlayBox.innerHTML = html; overlay.hidden = false; }
+  function closeOverlay() { vhDrawnAt = 0; overlay.hidden = true; overlayBox.innerHTML = ''; }
   function flashOverlayMsg(text, ms) {
     openOverlay(`<div style="text-align:center;padding:8px 4px">${escapeHtml(text)}</div>`);
     setTimeout(closeOverlay, ms || 1400);
