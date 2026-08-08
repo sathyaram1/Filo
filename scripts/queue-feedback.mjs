@@ -228,7 +228,7 @@ if (isMain) {
     else commitAndPush(file);
   } catch (e) {
     console.error('Errore:', e.message);
-    console.error('Uso: node scripts/queue-feedback.mjs --name "titolo" [--parent <id>] [--priority 0-3] [--status new|todo|clarify] [--notes "..."] [--image shot.png ...] "testo"');
+    console.error('Uso: node scripts/queue-feedback.mjs --name "titolo" [--parent <id>] [--priority 0-3] [--status new|todo|clarify] [--notes "..."] [--image shot.png ...] [--role prober|verifier|secaudit|fixer|new-work] "testo"');
     process.exit(1);
   }
 }
