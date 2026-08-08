@@ -371,6 +371,7 @@ module.exports = {
   flushSync,
   whenSettled,
   flushNow,
+  maxFlushOverlap,
   setSync,
   runIncognito,
   resetIncognito,
