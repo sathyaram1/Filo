@@ -385,7 +385,7 @@ ma complica il loop; prima va misurato quanto serve davvero.
 
 ---
 
-## 9. Fermare, vedere, annullare
+## 9. Fermare, vedere, non disfare
 
 - **Fermata immediata.** Scorciatoia globale + un pulsante sempre visibile.
   Deve interrompere *tra* un passo e l'altro, senza aspettare la risposta del
