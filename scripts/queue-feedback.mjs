@@ -215,6 +215,10 @@ if (isMain) {
       status: args.status,
       notes: args.notes,
       images: imageUrls,
+      // Provenienza (#443): il ruolo lo sa il dispatcher, non il worker. Se non
+      // c'è marcatore (accodamento fuori da un giro di routine) resta vuoto e
+      // il feedback arriva come "automazione" generica.
+      queuedBy: normalizeRole(args.role) || readRole(ROOT) || undefined,
     });
     console.log(`OK: creazione feedback accodata → ${file}`);
     if (args.noGit) console.log('   (--no-git: file scritto ma non committato)');
