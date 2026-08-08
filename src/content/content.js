@@ -242,14 +242,34 @@
 
   function isBlocked() {
     const url = location.href;
-    if (PAGES_WITHOUT_MENU_PREFIXES.some((p) => url.startsWith(p))) return true;
-    const host = location.hostname;
-    return (settings?.blocklist || []).some((d) => host === d || host.endsWith('.' + d));
+    // #405 — dentro un riquadro incorporato "about:blank" e "about:srcdoc" NON
+    // sono pagine di sistema: sono contenuto scritto dalla pagina che ospita il
+    // riquadro (moduli, anteprime, blocchi commenti). Lì il menu deve esserci
+    // come ovunque; l'esclusione vale per le pagine di sistema vere.
+    const embeddedAbout = IS_SUBFRAME && /^about:(blank|srcdoc)/i.test(url);
+    if (!embeddedAbout && PAGES_WITHOUT_MENU_PREFIXES.some((p) => url.startsWith(p))) return true;
+    const blocklist = settings?.blocklist || [];
+    const matches = (host) => !!host && blocklist.some((d) => host === d || host.endsWith('.' + d));
+    // Se l'utente ha spento Filo su un sito, deve restare spento anche nei
+    // riquadri che quel sito incorpora: il riquadro ha un'altra origine e da
+    // solo non lo saprebbe, quindi guarda l'indirizzo della pagina ospite.
+    if (matches(hostOfUrl(pageUrl))) return true;
+    return matches(location.hostname);
   }
+
+  function hostOfUrl(url) {
+    try { return new URL(String(url || '')).hostname; } catch (_) { return ''; }
+  }
+
+  // Indirizzo della pagina che ospita questo frame (uguale a location.href nel
+  // frame principale). Arriva dal main insieme alle impostazioni: da dentro un
+  // riquadro di un'altra origine non è leggibile.
+  let pageUrl = '';
 
   async function fetchSettings() {
     try {
       const res = await chrome.runtime.sendMessage({ type: MSG.GET_SETTINGS });
+      if (res && typeof res.pageUrl === 'string') pageUrl = res.pageUrl;
       return res?.settings || self.SN_CONST.DEFAULT_SETTINGS;
     } catch (_) {
       return self.SN_CONST.DEFAULT_SETTINGS;
