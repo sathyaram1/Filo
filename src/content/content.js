@@ -48,6 +48,16 @@
   // Serve a mostrare l'icona/etichetta giusta nella voce di menu "Schermo intero".
   let contentFullscreen = false;
 
+  // #405 — stiamo girando dentro un riquadro incorporato (video, mappa, modulo,
+  // blocco commenti) invece che nella pagina? Il menu del tasto destro e tutto
+  // ciò che riguarda l'ELEMENTO cliccato funzionano identici qui dentro; ciò che
+  // riguarda la PAGINA (colore della scheda, segnali di attività, avvisi di
+  // sistema, azioni globali del menu) no: il riquadro conosce solo se stesso e
+  // parlerebbe del rettangolo sbagliato. Quelle cose restano/tornano alla pagina.
+  const IS_SUBFRAME = (() => {
+    try { return window.top !== window.self; } catch (_) { return true; }
+  })();
+
   // ------------------------------------------------------------
   // Bootstrap
   // ------------------------------------------------------------
