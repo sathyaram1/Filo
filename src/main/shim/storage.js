@@ -171,6 +171,15 @@ async function flush() {
   return STATE.flushChain;
 }
 
+// Forza subito una scrittura su disco, senza aspettare il debounce. Ritorna la
+// catena, quindi due chiamate ravvicinate si accodano invece di accavallarsi:
+// è proprio l'invariante che protegge dal guasto descritto sopra, ed è ciò che
+// il test verifica chiamandola due volte di fila senza attendere la prima.
+function flushNow() {
+  if (STATE.flushTimer) { clearTimeout(STATE.flushTimer); STATE.flushTimer = null; }
+  return flush();
+}
+
 // Attende che non resti NIENTE in sospeso: né un flush in attesa del debounce,
 // né uno in volo. Se il debounce è pendente lo fa scattare subito invece di
 // aspettarlo, così non c'è nessuna attesa a tempo.
