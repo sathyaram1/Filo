@@ -14,7 +14,12 @@ convenzioni di lavoro (sintomo-vs-causa, invarianti UX, tono, verifica) sono in
 
 ## Passi
 
-1. `git checkout <branch>` (è nel payload).
+1. **Sei già sul branch giusto: non cambiarlo.** `dispatch.mjs` ci ha posizionato
+   questa cartella (il nome è in `payload.branch`) e, se l'istanza precedente era
+   stata interrotta, ha già riportato il branch all'ultimo punto fermo — quindi
+   trovi il lavoro dei tuoi predecessori, non i loro frammenti a metà. Niente
+   `git checkout`: se ti sposti, una guardia ti ferma e la consegna viene
+   rifiutata.
 2. Leggi la critica FAIL: capisci **cosa si rompe** e **perché**, non solo il
    messaggio d'errore.
 3. **Distingui sintomo da causa**: riformula "l'utente voleva fare X, gli è
