@@ -331,6 +331,17 @@
 
     menuHost().appendChild(root);
 
+    // #405 — su una pagina con riquadri incorporati il menu può nascere dentro
+    // il riquadro o fuori, e i clic non attraversano quel confine: chi ha un
+    // menu aperto dall'altra parte non si accorgerebbe mai di doverlo chiudere.
+    // Un avviso agli altri frame della scheda tiene la regola di sempre — un
+    // solo menu alla volta. Nessun costo sulle pagine senza riquadri.
+    try {
+      const nested = window.top !== window.self || (window.frames && window.frames.length > 0);
+      const T = global.SN_MSG?.MSG?.CLOSE_OTHER_MENUS;
+      if (nested && T) Promise.resolve(chrome.runtime.sendMessage({ type: T })).catch(() => {});
+    } catch (_) {}
+
     // Compensazione zoom (così il menu non scala con Ctrl+/-)
     const cleanupZoom = (global.SN_POPUP?.attachZoomCompensation || (() => () => {}))(root);
 
