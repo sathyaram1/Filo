@@ -1046,6 +1046,7 @@
         emptyBtn.dataset.confirm = '1';
         emptyBtn.textContent = `Confermi? Elimini ${trash.length} document${trash.length === 1 ? 'o' : 'i'} per sempre`;
         emptyBtn.classList.add('danger');
+        overlayGuard.arm();
         return;
       }
       for (const e of trash.slice()) purgeTrashEntry(e.id);
