@@ -817,11 +817,17 @@
       const fullText = String(a._confirm.text || '');
       const shortLabel = fullText.split('\n')[0] || 'Esegui';
       btn.textContent = isCmd ? `▶ ${short}` : shortLabel;
-      // #159 — le modifiche alle impostazioni (preferenza/estetica) a livello 2
-      // aprono il popup di conferma da sole: marchiamo il bottone perché
-      // renderActions lo possa cliccare automaticamente. Le azioni esterne
-      // (feedback) o distruttive (livello 3) NON sono marcate: restano a click.
-      if ((type === 'IMPOSTA_PREFERENZA' || type === 'IMPOSTA_ESTETICA') && a._confirm.level === 2) {
+      // #159/#414 — le azioni di livello 2 che Filo PROPONE da sé aprono il
+      // popup di conferma da sole: marchiamo il bottone perché renderActions lo
+      // possa aprire automaticamente. Oltre alle impostazioni (preferenza/
+      // estetica) c'è la segnalazione agli sviluppatori: è Filo a proporla dopo
+      // aver ammesso una mancanza, quindi lasciarla come chip da cliccare
+      // aggiungeva un passaggio in più prima ancora di poter leggere cosa
+      // partirebbe a nome dell'utente. Il popup non invia nulla: mostra il testo
+      // e aspetta l'OK, esattamente come nella sidebar (che già fa così).
+      // Le azioni distruttive (livello 3) e i comandi restano a click esplicito.
+      const AUTO_CONFIRM_TYPES = ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'INVIA_FEEDBACK'];
+      if (AUTO_CONFIRM_TYPES.includes(type) && a._confirm.level === 2) {
         btn.dataset.autoConfirm = '1';
       }
       // La conferma (popup + esecuzione) è una funzione a sé, così renderActions
