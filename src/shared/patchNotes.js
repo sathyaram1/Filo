@@ -22,6 +22,7 @@
       ],
       fixes: [
         'Nell\'editor, un doppio clic su «Ripristina» nello «Storico versioni» non apre più a sorpresa l\'anteprima di un\'altra versione: si ripristina una volta sola e si resta nella lista.',
+        'Nel cestino dell\'editor, un doppio clic su «Elimina definitivamente» non manda più via il documento per sempre in un colpo solo: la conferma resta lì e aspetta un clic voluto.',
       ],
     },
     {
