@@ -56,7 +56,7 @@ test('#405 tasto destro sul testo dentro il riquadro apre il menu Filo', async (
   const childUrl = testServer.html(CHILD);
   const page = await testServer.openReady(openTab, parentHtml(childUrl));
 
-  const fr = await frameByPath(page, new URL(childUrl).pathname);
+  const fr = await frameByUrl(page, childUrl);
   await fr.locator('#ptext').click({ button: 'right' });
 
   const menuFrame = await waitMenuAnyFrame(page);
@@ -78,7 +78,7 @@ test('#405 riquadro CROSS-ORIGIN (caso reale: video/mappa di un altro sito)', as
   const childUrl = testServer.html(CHILD).replace('127.0.0.1', 'localhost');
   const page = await testServer.openReady(openTab, parentHtml(childUrl));
 
-  const fr = await frameByPath(page, 'localhost');
+  const fr = await frameByUrl(page, childUrl);
   await fr.locator('#ptext').click({ button: 'right' });
 
   const menuFrame = await waitMenuAnyFrame(page);
@@ -88,7 +88,7 @@ test('#405 riquadro CROSS-ORIGIN (caso reale: video/mappa di un altro sito)', as
 test('#405 tasto destro su un LINK dentro il riquadro → azioni sul link', async ({ openTab, testServer }) => {
   const childUrl = testServer.html(CHILD);
   const page = await testServer.openReady(openTab, parentHtml(childUrl));
-  const fr = await frameByPath(page, new URL(childUrl).pathname);
+  const fr = await frameByUrl(page, childUrl);
   await fr.locator('#plink').click({ button: 'right' });
   const menuFrame = await waitMenuAnyFrame(page);
   expect(menuFrame).not.toBeNull();
@@ -101,7 +101,7 @@ test('#405 tasto destro su un LINK dentro il riquadro → azioni sul link', asyn
 test('#405 tasto destro su IMMAGINE dentro il riquadro → azioni sull immagine', async ({ openTab, testServer }) => {
   const childUrl = testServer.html(CHILD);
   const page = await testServer.openReady(openTab, parentHtml(childUrl));
-  const fr = await frameByPath(page, new URL(childUrl).pathname);
+  const fr = await frameByUrl(page, childUrl);
   await fr.locator('#pimg').click({ button: 'right' });
   const menuFrame = await waitMenuAnyFrame(page);
   expect(menuFrame).not.toBeNull();
@@ -113,7 +113,7 @@ test('#405 tasto destro su IMMAGINE dentro il riquadro → azioni sull immagine'
 test('#405 tasto destro su CAMPO DI TESTO dentro il riquadro → Incolla', async ({ openTab, testServer }) => {
   const childUrl = testServer.html(CHILD);
   const page = await testServer.openReady(openTab, parentHtml(childUrl));
-  const fr = await frameByPath(page, new URL(childUrl).pathname);
+  const fr = await frameByUrl(page, childUrl);
   await fr.locator('#pinput').click();
   await fr.locator('#pinput').click({ button: 'right' });
   const menuFrame = await waitMenuAnyFrame(page);
@@ -126,7 +126,7 @@ test('#405 tasto destro su CAMPO DI TESTO dentro il riquadro → Incolla', async
 test('#405 selezione dentro il riquadro → sezione AI inline nel menu', async ({ openTab, testServer }) => {
   const childUrl = testServer.html(CHILD);
   const page = await testServer.openReady(openTab, parentHtml(childUrl));
-  const fr = await frameByPath(page, new URL(childUrl).pathname);
+  const fr = await frameByUrl(page, childUrl);
   await fr.evaluate(() => {
     const p = document.querySelector('#ptext');
     const r = document.createRange(); r.selectNodeContents(p);
@@ -171,7 +171,7 @@ test('#405 STRESS iframe annidato (riquadro dentro riquadro)', async ({ openTab,
     <p id="midp">livello intermedio</p>
     <iframe id="deep" src="${inner}" width="500" height="220"></iframe></body>`);
   const page = await testServer.openReady(openTab, parentHtml(mid));
-  const fr = await frameByPath(page, new URL(inner).pathname);
+  const fr = await frameByUrl(page, inner);
   await fr.locator('#ptext').click({ button: 'right' });
   const m = await waitMenuAnyFrame(page);
   expect(m, 'nessun menu nel riquadro annidato di 2 livelli').not.toBeNull();
@@ -184,7 +184,7 @@ test('#405 STRESS testo enorme + emoji + HTML ostile dentro il riquadro', async 
     <a id="js" href="javascript:alert(1)">link javascript</a>
     </body>`);
   const page = await testServer.openReady(openTab, parentHtml(hostile));
-  const fr = await frameByPath(page, new URL(hostile).pathname);
+  const fr = await frameByUrl(page, hostile);
 
   // selezione da 10k caratteri
   await fr.evaluate(() => {
@@ -225,7 +225,7 @@ test('#405 STRESS testo enorme + emoji + HTML ostile dentro il riquadro', async 
 test('#405 STRESS doppio/triplo tasto destro rapido dentro il riquadro', async ({ openTab, testServer }) => {
   const childUrl = testServer.html(CHILD);
   const page = await testServer.openReady(openTab, parentHtml(childUrl));
-  const fr = await frameByPath(page, new URL(childUrl).pathname);
+  const fr = await frameByUrl(page, childUrl);
   for (let i = 0; i < 5; i++) {
     await fr.locator('#ptext').click({ button: 'right' });
     await page.waitForTimeout(60);
@@ -242,7 +242,7 @@ test('#405 STRESS doppio/triplo tasto destro rapido dentro il riquadro', async (
 test('#405 STRESS il menu si chiude e non resta appiccicato', async ({ openTab, testServer }) => {
   const childUrl = testServer.html(CHILD);
   const page = await testServer.openReady(openTab, parentHtml(childUrl));
-  const fr = await frameByPath(page, new URL(childUrl).pathname);
+  const fr = await frameByUrl(page, childUrl);
   await fr.locator('#ptext').click({ button: 'right' });
   const m = await waitMenuAnyFrame(page);
   expect(m).not.toBeNull();
@@ -261,7 +261,7 @@ test('#405 STRESS il menu si chiude e non resta appiccicato', async ({ openTab, 
 test('#405 STRESS Shift+tasto destro dentro il riquadro = escape hatch', async ({ openTab, testServer }) => {
   const childUrl = testServer.html(CHILD);
   const page = await testServer.openReady(openTab, parentHtml(childUrl));
-  const fr = await frameByPath(page, new URL(childUrl).pathname);
+  const fr = await frameByUrl(page, childUrl);
   await page.keyboard.down('Shift');
   await fr.locator('#ptext').click({ button: 'right' });
   await page.keyboard.up('Shift');
@@ -273,7 +273,7 @@ test('#405 STRESS Shift+tasto destro dentro il riquadro = escape hatch', async (
 test('#405 STRESS riquadro basso 100px: il menu non viene tagliato', async ({ openTab, testServer }) => {
   const childUrl = testServer.html(CHILD);
   const page = await testServer.openReady(openTab, parentHtml(childUrl).replace('height="320"', 'height="100"'));
-  const fr = await frameByPath(page, new URL(childUrl).pathname);
+  const fr = await frameByUrl(page, childUrl);
   await fr.locator('#ptext').click({ button: 'right', position: { x: 30, y: 8 } });
   const m = await waitMenuAnyFrame(page);
   expect(m, 'menu assente in un riquadro basso').not.toBeNull();
@@ -295,7 +295,7 @@ test('#405 STRESS riquadro basso 100px: il menu non viene tagliato', async ({ op
 test('#405 il riquadro NON deve rubare le azioni di pagina (screenshot=schermata)', async ({ openTab, testServer }) => {
   const childUrl = testServer.html(CHILD);
   const page = await testServer.openReady(openTab, parentHtml(childUrl));
-  const fr = await frameByPath(page, new URL(childUrl).pathname);
+  const fr = await frameByUrl(page, childUrl);
   await fr.locator('#ptext').click({ button: 'right' });
   const m = await waitMenuAnyFrame(page);
   expect(m).not.toBeNull();
