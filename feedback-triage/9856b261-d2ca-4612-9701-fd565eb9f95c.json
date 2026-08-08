@@ -1,8 +1,0 @@
-{
-  "id": "9856b261-d2ca-4612-9701-fd565eb9f95c",
-  "status": "revision_capability",
-  "notes": "Fatto. Gli avvisi dentro la pagina ora si mettono in colonna nell'angolo in basso a destra, il più recente vicino all'angolo.\n\nOltre al chiesto ho messo nella stessa colonna anche gli altri due riquadri che vivevano in quell'angolo — la pill \"Sto ascoltando\" della dettatura e la conferma cliccabile di \"Salva per dopo\" — perché soffrivano esattamente dello stesso problema con qualsiasi avviso in arrivo. Questi due non possono essere scartati quando la colonna è piena: sono l'unico modo per fermare la registrazione e per raggiungere la lista, buttarli via toglierebbe una funzione a metà. Gli avvisi normali invece sì: ne restano al massimo quattro insieme, i più vecchi spariscono subito, altrimenti una raffica riempirebbe lo schermo spingendo i primi fuori dalla finestra dove non si leggono più.\n\nNessun costo aggiuntivo e nessun dato dell'utente coinvolto.\n\nNote tecniche: la colonna può scorrere se la finestra è bassissima, ma lo scorrimento va attivato solo quando serve davvero — se si attiva a vuoto il menu del tasto destro si chiude da solo appena compare un avviso (il menu si chiude su qualunque scorrimento). Chi tocca quel punto tenga conto che l'animazione d'ingresso degli avvisi falsa la misura dell'altezza.",
-  "queuedAt": "2026-08-08T07:42:23.373Z",
-  "queuedBy": "routine",
-  "branch": "worker/9856b261-d2ca-4612-9701-fd565eb9f95c"
-}
