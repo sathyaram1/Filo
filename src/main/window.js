@@ -84,8 +84,7 @@ function createMainWindow() {
     backgroundColor: '#222222',
     title: 'Filo',
     icon: path.join(__dirname, '..', '..', 'assets', 'icons', 'icon-128.png'),
-    show: !HIDDEN,
-    skipTaskbar: HIDDEN,
+    ...(HIDDEN ? { x: OFFSCREEN.x, y: OFFSCREEN.y, show: false, skipTaskbar: true } : {}),
     // Chrome-like: la title bar nativa è rimossa, i controlli minimize/maximize/
     // close vivono nella tab-row della shell (vedi src/renderer/shell.html).
     frame: false,
@@ -139,8 +138,7 @@ function createIncognitoWindow() {
     backgroundColor: '#1f1b2e',
     title: 'Filo — Incognito',
     icon: path.join(__dirname, '..', '..', 'assets', 'icons', 'icon-128.png'),
-    show: !HIDDEN,
-    skipTaskbar: HIDDEN,
+    ...(HIDDEN ? { x: OFFSCREEN.x, y: OFFSCREEN.y, show: false, skipTaskbar: true } : {}),
     frame: false,
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'shell-preload.js'),

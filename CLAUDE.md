@@ -7,7 +7,9 @@ Questo file raccoglie le **convenzioni del repo valide per QUALSIASI agente**
 ## Switch di ruolo — leggi PRIMA il file giusto
 
 - **Sessione locale** (owner + Claude, prompt normale in chat) → leggi anche
-  **`LOCAL.md`** (cosa si fa in locale, modalità attiva oggi).
+  **`LOCAL.md`**, che sta **nella cartella SOPRA il repo** (`../LOCAL.md`), non
+  qui dentro: descrive cosa si fa in locale ed è volutamente fuori dal repo
+  pubblico. Non cercarlo in `Filo/` — non c'è, e non è un file perduto.
 - **Routine cloud** (attivazione schedulata con prompt: 
   `"routine automatica."`) → leggi **`ROUTINES.md`** integralmente, più i
   file-ruolo in **`routines/roles/*`** e la conoscenza condivisa in
