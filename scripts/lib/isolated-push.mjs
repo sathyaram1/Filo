@@ -112,15 +112,67 @@ export function pushFileToMain(root, file, message, mainBranch = process.env.FIL
 }
 
 /**
+ * Gemella di `pushFileToMain` per la RIMOZIONE di un file (il rilascio di un
+ * semaforo di lavorazione). Stessa garanzia: il commit nasce sopra lo stato
+ * remoto attuale e contiene solo quella rimozione.
+ */
+export function removeFileOnMain(root, relPathInRepo, message, mainBranch = process.env.FILO_MAIN_BRANCH || 'main') {
+  const rel = String(relPathInRepo).split(sep).join('/');
+
+  const fetched = git(root, ['fetch', 'origin', mainBranch]);
+  if (!fetched.ok) return { ok: false, reason: 'fetch', out: fetched.out };
+  const base = git(root, ['rev-parse', `origin/${mainBranch}`]);
+  if (!base.ok) return { ok: false, reason: 'base-irraggiungibile', out: base.out };
+
+  const tmp = mkdtempSync(resolve(tmpdir(), 'filo-iso-'));
+  const idx = resolve(tmp, 'index');
+  try {
+    const env = { GIT_INDEX_FILE: idx };
+    const read = git(root, ['read-tree', `origin/${mainBranch}`], env);
+    if (!read.ok) return { ok: false, reason: 'read-tree', out: read.out };
+
+    const rm = git(root, ['update-index', '--force-remove', rel], env);
+    if (!rm.ok) return { ok: false, reason: 'update-index', out: rm.out };
+
+    const tree = git(root, ['write-tree'], env);
+    if (!tree.ok) return { ok: false, reason: 'write-tree', out: tree.out };
+
+    const baseTree = git(root, ['rev-parse', `origin/${mainBranch}^{tree}`]);
+    if (baseTree.ok && baseTree.out === tree.out) return { ok: true, skipped: true, sha: base.out };
+
+    const commit = git(root, ['commit-tree', tree.out, '-p', base.out, '-m', message],
+      { GIT_AUTHOR_NAME: 'claude-routine', GIT_AUTHOR_EMAIL: 'claude@routine',
+        GIT_COMMITTER_NAME: 'claude-routine', GIT_COMMITTER_EMAIL: 'claude@routine' });
+    if (!commit.ok) return { ok: false, reason: 'commit-tree', out: commit.out };
+
+    const push = git(root, ['push', 'origin', `${commit.out}:refs/heads/${mainBranch}`]);
+    if (!push.ok) return { ok: false, reason: 'push-rifiutato', out: push.out, sha: commit.out };
+    return { ok: true, sha: commit.out };
+  } finally {
+    try { rmSync(tmp, { recursive: true, force: true }); } catch (_) {}
+  }
+}
+
+/**
  * Come sopra, con i tentativi che servono quando due routine spediscono nello
  * stesso istante: ogni tentativo ricostruisce il commit sopra lo stato remoto
  * appena riletto, quindi non c'è nessuna forzatura e nessuna perdita.
  */
 export function pushFileToMainWithRetry(root, file, message, attempts = 4, mainBranch = undefined) {
+  return withRetry(() => pushFileToMain(root, file, message, mainBranch), attempts);
+}
+
+export function removeFileOnMainWithRetry(root, relPathInRepo, message, attempts = 4, mainBranch = undefined) {
+  return withRetry(() => removeFileOnMain(root, relPathInRepo, message, mainBranch), attempts);
+}
+
+function withRetry(fn, attempts) {
   let last = null;
   for (let i = 0; i < attempts; i++) {
-    last = pushFileToMain(root, file, message, mainBranch);
+    last = fn();
     if (last.ok) return last;
+    // Solo il rifiuto per concorrenza si ritenta: gli altri guasti non
+    // migliorano riprovando, e insistere sprecherebbe il giro.
     if (last.reason !== 'push-rifiutato') return last;
   }
   return last;
