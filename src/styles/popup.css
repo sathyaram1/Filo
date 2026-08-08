@@ -266,10 +266,11 @@
 /* Pill cliccabile mostrato durante la dettatura audio. Si comporta come un
    toast ma è interattivo: cliccandolo si ferma la registrazione. */
 .sn-dictate-pill {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  z-index: 2147483647;
+  flex: none;
+  max-width: 100%;
+  /* Lo stack è trasparente ai click: questa pill invece va cliccata per fermare
+     la registrazione. */
+  pointer-events: auto;
   padding: 10px 16px;
   background: var(--sn-overlay-bg);
   color: var(--sn-fg);
