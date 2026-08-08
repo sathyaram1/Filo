@@ -606,19 +606,22 @@
   }
 
   // ── Coda di gesto (guardia condivisa anti secondo-colpo) ────────────────
-  // Quando un clic RIDISEGNA la zona che ha appena toccato, sotto il cursore
-  // finisce un elemento diverso da quello premuto. Il secondo colpo di un
-  // doppio clic cade lì e fa una cosa che l'utente non ha chiesto: nel pannello
-  // versioni apriva l'anteprima di un'altra versione (o ne ripristinava una
-  // sbagliata); negli avvisi in basso a destra premeva l'"Annulla" dell'avviso
-  // appena comparso al posto di quello vecchio, disfacendo l'annullamento
-  // stesso. Quel colpo non è una nuova intenzione: è la coda del gesto
-  // precedente (il browser lo marca con `detail > 1`, cioè "clic ravvicinati
-  // sullo stesso punto"), e va ignorato.
+  // Quando un clic CAMBIA la zona che ha appena toccato, sotto il cursore
+  // finisce un comando diverso da quello premuto. Il secondo colpo di un doppio
+  // clic cade lì e fa una cosa che l'utente non ha chiesto:
+  //   • pannello versioni → apriva l'anteprima di un'altra versione, o peggio
+  //     ne ripristinava una sbagliata;
+  //   • avvisi in basso a destra → premeva l'"Annulla" dell'avviso appena
+  //     comparso al posto di quello vecchio, disfacendo l'annullamento stesso;
+  //   • cestino → bruciava la conferma "Confermi?" comparsa sul posto e
+  //     cancellava un documento per sempre in un colpo solo.
+  // Quel colpo non è una nuova intenzione: è la coda del gesto precedente (il
+  // browser lo marca con `detail > 1`, cioè "clic ravvicinati sullo stesso
+  // punto"), e va ignorato.
   //
-  // La guardia sta sul CONTENITORE e si arma solo quando il contenitore si
-  // ridisegna: comandi nuovi aggiunti lì dentro la ereditano, e le zone che non
-  // la armano non ne risentono.
+  // La guardia sta sul CONTENITORE e si arma quando lì dentro cambia qualcosa
+  // sotto il cursore: comandi nuovi aggiunti in quella zona la ereditano, e le
+  // zone che non la armano non ne risentono.
   const STALE_CLICK_MS = 1000;
   function makeStaleClickGuard(root) {
     let redrawnAt = 0;
