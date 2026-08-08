@@ -41,7 +41,9 @@ const {
   withRetry,
   persistStateToGit,
   appendWorkerLog,
+  emit,
 } = await import('../../scripts/dispatch.mjs');
+const { readRole } = await import('../../scripts/lib/routine-role.mjs');
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 
