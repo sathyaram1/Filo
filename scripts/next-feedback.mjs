@@ -234,6 +234,27 @@ export async function fetchOpenCandidates() {
  * Stampa su stdout il JSON del feedback vincitore (decifrato), oppure esce
  * con codice 2 se la coda è vuota.
  */
+/**
+ * Uscita "non ho lavoro da dare", con la distinzione che §E della spec
+ * ROUTINE-BRANCH-INTEGRITY.md chiede: exit 2 = coda DAVVERO vuota (il ciclo si
+ * ferma sereno); exit 3 = GUASTO, la coda è illeggibile e "vuota" è solo ciò
+ * che sembra. Il chiamante (dispatch) non ripiega su un exit 3: lo propaga.
+ *
+ * Con status non decifrabili non possiamo AFFERMARE che la coda sia vuota — il
+ * vincitore poteva essere fra quelli. Se invece del lavoro l'abbiamo trovato,
+ * non passiamo di qui e il ciclo procede: un singolo documento corrotto non
+ * deve fermare le routine. La firma della chiave assente è che siano
+ * illeggibili TUTTI, e in quel caso di lavorabili non ne resta nessuno.
+ */
+function exitEmpty(reason, unreadable, total) {
+  if (unreadable) {
+    process.stderr.write(`[next-feedback] GUASTO: ${unreadable}/${total} status non decifrabili e ${reason}: non posso distinguere "coda vuota" da "coda illeggibile". Controlla la chiave privata (FILO_FEEDBACK_PRIVKEY).\n`);
+    process.exit(3);
+  }
+  process.stderr.write(`[next-feedback] ${reason}\n`);
+  process.exit(2);
+}
+
 export async function run() {
   // Carica feedbackCrypto (IIFE su globalThis) — necessario per decryptFeedbackFields.
   // Carichiamo qui (non al top-level) per non inquinare i test che iniettano mock.
