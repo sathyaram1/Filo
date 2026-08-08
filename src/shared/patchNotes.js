@@ -19,6 +19,7 @@
       version: '0.2.193', date: '2026-08-07',
       features: [],
       fixes: [
+        'Il tasto destro ora funziona anche dentro i riquadri incorporati da altri siti — un video dentro un articolo, una mappa, un blocco commenti, un modulo da compilare — insieme a Copia, Cerca, Leggi, Spiegazione, Traduci, correttore e Incolla con la cronologia.',
         'Il clic destro su una miniatura cliccabile (le anteprime degli articoli, le schede prodotto, i risultati di una ricerca per immagini) ora mostra sia le azioni sull\'immagine sia quelle sul collegamento — «Apri in nuova tab», «Copia URL», «Salva link per dopo», «Condividi link» — invece delle sole azioni sull\'immagine.',
         'Se chiedi a Filo come aprire un indirizzo, tornare indietro, ricaricare o andare alla home, ora ti indica dove sono davvero questi comandi (il menu del tasto destro e l\'icona Home nella home) invece di una barra in alto che non esiste più.',
         'Nella Cronologia AI, dopo "Cancella tutto" il menu "filtra per tipo" torna vuoto: prima continuava a elencare i tipi delle voci ormai cancellate.',
