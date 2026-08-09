@@ -452,6 +452,81 @@ test('emit: un GUASTO cancella il marcatore invece di lasciare quello vecchio', 
   assert.equal(readRole(TMP), '');
 });
 
+// ─── prontezza (--preflight) ──────────────────────────────────────────────────
+//
+// Il controllo di prontezza è la PRIMA cosa che gira nell'orchestratore, prima
+// del setup dell'ambiente (npm install + binario Electron ~102MB + scrot). Se
+// esplode, ogni giro delle routine muore prima di iniziare — ed è morto per
+// giorni perché `--preflight` chiamava una funzione che non esisteva: usciva 1
+// («preflight is not defined») invece dei codici del contratto (0 / 3).
+
+test('classifyPreflight: ambiente sano → prontezza OK', () => {
+  assert.deepEqual(
+    classifyPreflight({ hasKey: true, rolesDirOk: true, remoteOk: true, encrypted: 5, unreadable: 0 }),
+    { ok: true },
+  );
+});
+
+test('classifyPreflight: coda VUOTA non è un guasto (il prober è il fallback)', () => {
+  const r = classifyPreflight({ hasKey: true, encrypted: 0, unreadable: 0 });
+  assert.equal(r.ok, true);
+});
+
+test('classifyPreflight: chiave assente → guasto passeggero, non "niente da fare"', () => {
+  const r = classifyPreflight({ hasKey: false });
+  assert.equal(r.ok, false);
+  assert.equal(r.kind, 'transient');
+  assert.match(r.message, /chiave privata/i);
+});
+
+test('classifyPreflight: deposito irraggiungibile → guasto passeggero', () => {
+  const r = classifyPreflight({ hasKey: true, remoteOk: false });
+  assert.equal(r.ok, false);
+  assert.equal(r.kind, 'transient');
+});
+
+test('classifyPreflight: file-ruolo assenti → guasto PERMANENTE (riprovare non aggiusta)', () => {
+  const r = classifyPreflight({ rolesDirOk: false, hasKey: true });
+  assert.equal(r.ok, false);
+  assert.equal(r.kind, 'permanent');
+});
+
+test('classifyPreflight: nessuno status cifrato decifrabile → coda illeggibile', () => {
+  const r = classifyPreflight({ hasKey: true, encrypted: 7, unreadable: 7 });
+  assert.equal(r.ok, false);
+  assert.equal(r.kind, 'transient');
+  assert.match(r.message, /illeggibile/i);
+});
+
+test('classifyPreflight: UN documento illeggibile fra molti resta un avviso, non un guasto', () => {
+  // Corruzione di quel doc, non ambiente cieco: fermare la flotta sarebbe peggio.
+  assert.equal(classifyPreflight({ hasKey: true, encrypted: 7, unreadable: 1 }).ok, true);
+});
+
+test('--preflight: la CLI onora il contratto di uscita (3 = guasto), non crasha con 1', async () => {
+  const { execFileSync } = await import('node:child_process');
+  const { mkdtempSync } = await import('node:fs');
+  // ROOT finta e SENZA routines/roles → guasto permanente deterministico,
+  // nessuna rete. Prima del fix qui si usciva 1 con «preflight is not defined».
+  const fakeRoot = mkdtempSync(resolve(tmpdir(), 'filo-preflight-'));
+  let code = 0;
+  let stderr = '';
+  try {
+    execFileSync('node', [resolve(import.meta.dirname, '..', '..', 'scripts', 'dispatch.mjs'), '--preflight'], {
+      env: { ...process.env, FILO_REPO_ROOT: fakeRoot, FILO_DISPATCH_STATE_DIR: fakeRoot },
+      encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 60000,
+    });
+  } catch (e) {
+    code = e.status;
+    stderr = String(e.stderr || '');
+  } finally {
+    rmSync(fakeRoot, { recursive: true, force: true });
+  }
+  assert.equal(code, 3, `atteso exit 3 (guasto), ricevuto ${code}: ${stderr}`);
+  assert.match(stderr, /GUASTO/);
+  assert.doesNotMatch(stderr, /is not defined/);
+});
+
 // ─── teardown ─────────────────────────────────────────────────────────────────
 
 test('cleanup STATE_DIR temporanea', () => {
