@@ -605,12 +605,16 @@
     return !overlay.hidden && !!overlayBox.querySelector('.ed-vh-list, .ed-vh-empty');
   }
 
-  // ── Coda di gesto (guardia condivisa anti secondo-colpo) ────────────────
-  // Quando un clic CAMBIA la zona che ha appena toccato, sotto il cursore
-  // finisce un comando diverso da quello premuto. Il secondo colpo di un doppio
-  // clic cade lì e fa una cosa che l'utente non ha chiesto:
+  // ── Coda di gesto (guardia anti secondo-colpo) ──────────────────────────
+  // Quando un clic CAMBIA ciò che sta sotto il cursore, il colpo di coda di un
+  // doppio clic non trova più il comando premuto ma quello che ne ha preso il
+  // posto, e fa una cosa che l'utente non ha chiesto:
   //   • pannello versioni → apriva l'anteprima di un'altra versione, o peggio
   //     ne ripristinava una sbagliata;
+  //   • pannello che si chiude → il colpo cadeva sul foglio dietro e apriva da
+  //     solo "Aggiungi modulo";
+  //   • menu documenti → la × di un documento ne eliminava DUE, perché la lista
+  //     si accorciava e sotto il cursore arrivava la × di quello dopo;
   //   • avvisi in basso a destra → premeva l'"Annulla" dell'avviso appena
   //     comparso al posto di quello vecchio, disfacendo l'annullamento stesso;
   //   • cestino → bruciava la conferma "Confermi?" comparsa sul posto e
@@ -619,24 +623,46 @@
   // browser lo marca con `detail > 1`, cioè "clic ravvicinati sullo stesso
   // punto"), e va ignorato.
   //
-  // La guardia sta sul CONTENITORE e si arma quando lì dentro cambia qualcosa
-  // sotto il cursore: comandi nuovi aggiunti in quella zona la ereditano, e le
-  // zone che non la armano non ne risentono.
+  // La guardia è UNA SOLA e sta sulla FINESTRA, non sul contenitore che si è
+  // ridisegnato: il colpo di coda atterra spesso FUORI da quella zona (il foglio
+  // dietro a un pannello chiuso, la riga scivolata su in una lista più corta),
+  // dove un ascoltatore locale non lo vedrebbe passare.
+  // Scatta in due modi, e il primo non deve ricordarselo nessuno:
+  //   1. DA SÉ — sotto il cursore c'è ora un elemento diverso da quello appena
+  //      premuto (o lo stesso con un'altra etichetta): la pagina è cambiata
+  //      sotto il gesto, comunque sia successo. Vale anche per le zone scritte
+  //      domani, che non devono armare niente per essere protette.
+  //   2. ARMATA a mano — per i cambi che il confronto non può vedere: un
+  //      elemento che sta uscendo di scena ma è ancora lì mentre sfuma (gli
+  //      avvisi), o un bottone che cambia significato restando lo stesso nodo
+  //      ("Elimina definitivamente" → "Confermi?").
   const STALE_CLICK_MS = 1000;
-  function makeStaleClickGuard(root) {
-    let redrawnAt = 0;
-    root.addEventListener('click', (e) => {
-      if (!redrawnAt || e.detail < 2) return;
-      if (Date.now() - redrawnAt > STALE_CLICK_MS) return;
-      e.preventDefault();
-      e.stopPropagation();
-    }, true);
-    return {
-      arm() { redrawnAt = Date.now(); },
-      disarm() { redrawnAt = 0; },
-    };
+  let staleArmedAt = 0;
+  let lastClickEl = null;
+  let lastClickLabel = '';
+  let lastClickAt = 0;
+  const staleClick = { arm() { staleArmedAt = Date.now(); } };
+  function clickLabel(el) {
+    const t = el && typeof el.textContent === 'string' ? el.textContent : '';
+    return t.trim().slice(0, 160);
   }
-  const overlayGuard = makeStaleClickGuard(overlayBox);
+  window.addEventListener('click', (e) => {
+    const now = Date.now();
+    if (e.detail > 1) {
+      const armed = !!staleArmedAt && now - staleArmedAt <= STALE_CLICK_MS;
+      const swapped = !!lastClickEl && now - lastClickAt <= STALE_CLICK_MS
+        && (e.target !== lastClickEl || !e.target.isConnected || clickLabel(e.target) !== lastClickLabel);
+      if (armed || swapped) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        return;
+      }
+    }
+    lastClickEl = e.target;
+    lastClickLabel = clickLabel(e.target);
+    lastClickAt = now;
+  }, true);
 
   function openVersionHistory() {
     closeDocPop();
