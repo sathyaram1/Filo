@@ -1371,6 +1371,7 @@
     if (!titleMenuEl) return;
     titleMenuEl.remove();
     titleMenuEl = null;
+    staleClick.arm(); // il menu sparisce da sotto il cursore
     document.removeEventListener('mousedown', onTitleMenuOutside, true);
     document.removeEventListener('keydown', onTitleMenuKeydown, true);
     window.removeEventListener('scroll', closeTitleMenu, true);
