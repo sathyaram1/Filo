@@ -232,19 +232,28 @@ module.exports = function setupWheelZoom(webFrame, opts) {
       setLevel(next);
     }, { capture: true, passive: false });
 
-    // Da tastiera: Ctrl + / Ctrl - / Ctrl 0 (e le varianti =, _ dei layout).
+    // Da tastiera: Ctrl + / Ctrl - / Ctrl 0. Oltre a `key` guardiamo anche
+    // `code`: su parecchi layout (e sul tastierino numerico) il carattere che
+    // arriva non è quello disegnato sul tasto, ma la posizione fisica sì.
+    const ZOOM_IN_CODES = ['Equal', 'NumpadAdd', 'BracketRight'];
+    const ZOOM_OUT_CODES = ['Minus', 'NumpadSubtract', 'Slash'];
+    const ZOOM_RESET_CODES = ['Digit0', 'Numpad0'];
     document.addEventListener('keydown', (e) => {
       if (zoomMode) return; // in modalità rotella un tasto qualsiasi esce
       if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
       if (pageHandlesZoom()) return;
       const k = e.key;
-      if (k === '+' || k === '=') {
+      const c = e.code;
+      const isIn = k === '+' || k === '=' || (ZOOM_IN_CODES.includes(c) && (k === '+' || k === '=' || k === ']' || k === '*'));
+      const isOut = k === '-' || k === '_' || (ZOOM_OUT_CODES.includes(c) && (k === '-' || k === '_'));
+      const isReset = k === '0' || ZOOM_RESET_CODES.includes(c);
+      if (isIn) {
         e.preventDefault(); e.stopPropagation();
         try { setLevel(webFrame.getZoomLevel() + ZOOM_STEP); } catch (_) {}
-      } else if (k === '-' || k === '_') {
+      } else if (isOut) {
         e.preventDefault(); e.stopPropagation();
         try { setLevel(webFrame.getZoomLevel() - ZOOM_STEP); } catch (_) {}
-      } else if (k === '0') {
+      } else if (isReset) {
         e.preventDefault(); e.stopPropagation();
         setLevel(0); // 100%
       }
