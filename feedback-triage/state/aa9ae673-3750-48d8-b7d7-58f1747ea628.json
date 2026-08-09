@@ -1,0 +1,16 @@
+{
+  "id": "aa9ae673-3750-48d8-b7d7-58f1747ea628",
+  "branch": "worker/aa9ae673-3750-48d8-b7d7-58f1747ea628-20260809T072613Z",
+  "loopCount": 0,
+  "verifierVerdict": null,
+  "verifierCritique": "",
+  "secauditDone": false,
+  "secauditVerdict": null,
+  "checkpoints": [
+    {
+      "sha": "94375430ad5583b992f7b686344cc9052cda20c0",
+      "by": "new-work:checkout",
+      "at": "2026-08-09T07:26:14.155Z"
+    }
+  ]
+}
