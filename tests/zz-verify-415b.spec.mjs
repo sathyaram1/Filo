@@ -158,11 +158,21 @@ test('G) il doppio clic NORMALE resta vivo: rinomina dal menu e selezione parola
   await page.waitForSelector('#doc');
   await page.click('#doc');
   await setDocText(page, 'parola magica qui');
-  // doppio clic su una parola seleziona la parola
-  await page.locator('#doc p').dblclick();
+  // doppio clic su una parola seleziona la parola (a inizio riga, sul testo)
+  await page.locator('#doc p').dblclick({ position: { x: 18, y: 8 } });
   const sel = await page.evaluate(() => String(window.getSelection()));
   console.log('selezione:', JSON.stringify(sel));
   expect(sel.trim().length).toBeGreaterThan(0);
+
+  // …e continua a funzionare SUBITO DOPO che qualcosa è cambiato a schermo
+  // (apro e chiudo il menu documenti, poi doppio clic entro la finestra di guardia)
+  await openPop(page);
+  await page.keyboard.press('Escape').catch(() => {});
+  await page.click('#doc');
+  await page.locator('#doc p').dblclick({ position: { x: 18, y: 8 } });
+  const sel2 = await page.evaluate(() => String(window.getSelection()));
+  console.log('selezione dopo cambio schermo:', JSON.stringify(sel2));
+  expect(sel2.trim().length).toBeGreaterThan(0);
   // doppio clic sul nome nel menu documenti apre la rinomina inline
   await openPop(page);
   await page.locator('#docPop .ed-doc-item-name').first().dblclick();
