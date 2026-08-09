@@ -203,6 +203,12 @@ module.exports = function setupWheelZoom(webFrame, opts) {
   // trackpad). Usa il livello di zoom del webFrame, così scala l'intera pagina
   // (testo + immagini) come il classico zoom del browser.
   if (pageZoom) {
+    // La pagina zooma da sé (vedi commento in testa): non ci mettiamo in mezzo.
+    function pageHandlesZoom() {
+      try { return document.documentElement.dataset.filoOwnZoom === '1'; }
+      catch (_) { return false; }
+    }
+
     function setLevel(level) {
       const clamped = Math.max(MIN_LEVEL, Math.min(MAX_LEVEL, level));
       try { webFrame.setZoomLevel(clamped); } catch (_) {}
