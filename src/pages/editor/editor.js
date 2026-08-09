@@ -3978,12 +3978,6 @@
         document.body.appendChild(edToastHost);
       }
     }
-    // Stessa guardia del pannello versioni: la pila di avvisi si riordina sotto
-    // il cursore (uno nuovo compare in fondo, uno che se ne va fa scivolare giù
-    // gli altri), quindi il secondo colpo di un doppio clic troverebbe lì un
-    // bottone diverso da quello premuto. Vive sull'elemento perché il
-    // contenitore può essere ricreato.
-    if (!edToastHost._staleGuard) edToastHost._staleGuard = makeStaleClickGuard(edToastHost);
     return edToastHost;
   }
   // Rimuove le card più vecchie oltre il tetto: teniamo le più recenti, come lo
