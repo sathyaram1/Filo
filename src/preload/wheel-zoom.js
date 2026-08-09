@@ -221,6 +221,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     document.addEventListener('wheel', (e) => {
       if (zoomMode) return;
       if (!(e.ctrlKey || e.metaKey)) return;
+      if (pageHandlesZoom()) return;
       e.preventDefault();
       e.stopPropagation();
       // ~0.005/unità: un notch di rotella (deltaY≈100) ≈ un passo di Ctrl +/-
