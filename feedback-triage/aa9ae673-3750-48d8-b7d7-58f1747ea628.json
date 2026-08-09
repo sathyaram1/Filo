@@ -1,7 +1,8 @@
 {
   "id": "aa9ae673-3750-48d8-b7d7-58f1747ea628",
-  "status": "working",
-  "notes": "",
-  "queuedAt": "2026-08-09T07:26:10.645Z",
-  "queuedBy": "routine"
+  "status": "revision_capability",
+  "notes": "Fatto. Ctrl +, Ctrl -, Ctrl 0, Ctrl+rotella e il pizzico sul trackpad ora ingrandiscono anche le pagine di Filo (gestione, home, impostazioni, cronologia…), non solo i siti. La modalità zoom col clic sulla rotella resta com'era.\n\nL'editor di testo è l'unica eccezione voluta: lì lo zoom continua a scalare il foglio del documento invece dell'intera finestra, altrimenti le due cose si sommavano e il documento diventava enorme al primo Ctrl +.\n\nHo anche aggiunto lo zoom al manifesto delle capacità, che non lo elencava: se chiedi a Filo «puoi ingrandire la pagina?» ora sa di saperlo fare e come si attiva.",
+  "queuedAt": "2026-08-09T07:34:37.478Z",
+  "queuedBy": "routine",
+  "branch": "worker/aa9ae673-3750-48d8-b7d7-58f1747ea628-20260809T072613Z"
 }
