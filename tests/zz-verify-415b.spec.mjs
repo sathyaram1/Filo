@@ -173,10 +173,23 @@ test('G) il doppio clic NORMALE resta vivo: rinomina dal menu e selezione parola
   const sel2 = await page.evaluate(() => String(window.getSelection()));
   console.log('selezione dopo cambio schermo:', JSON.stringify(sel2));
   expect(sel2.trim().length).toBeGreaterThan(0);
-  // doppio clic sul nome nel menu documenti apre la rinomina inline
+  // rinomina inline: matita (un clic) e doppio clic sul nome
+  await newDocs(page, 1);
+  await openPop(page);
+  const names = page.locator('#docPop .ed-doc-item-name');
+  console.log('documenti:', await names.count());
+  await page.locator('#docPop .ed-doc-rename').first().click();
+  await page.waitForTimeout(300);
+  const viaMatita = await page.locator('#docPop .ed-doc-item-input').count();
+  console.log('rinomina via matita:', viaMatita);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(300);
+
   await openPop(page);
   await page.locator('#docPop .ed-doc-item-name').first().dblclick();
   await page.waitForTimeout(400);
   await page.screenshot({ path: 'tests/.shots/v415b-G-rinomina.png' });
-  expect(await page.locator('#docPop .ed-doc-item-input, #docPop input').count()).toBeGreaterThan(0);
+  const viaDbl = await page.locator('#docPop .ed-doc-item-input').count();
+  console.log('rinomina via doppio clic su doc NON attivo:', viaDbl);
+  expect(viaMatita).toBeGreaterThan(0);
 });
