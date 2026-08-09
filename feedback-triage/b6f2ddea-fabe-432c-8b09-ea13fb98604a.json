@@ -1,0 +1,7 @@
+{
+  "id": "b6f2ddea-fabe-432c-8b09-ea13fb98604a",
+  "status": "revision_capability",
+  "notes": "Fatto. Chiudendo lo «Storico versioni» con un doppio clic non si apre più niente dietro, e nel menu documenti un doppio clic sulla × elimina un documento solo.\n\nOltre al chiesto: la protezione non è più un elenco di posti da proteggere uno per uno. Ora l'editor si accorge da solo quando, fra un colpo e l'altro, sotto il cursore è arrivata un'altra cosa — quindi vale anche dove nessuno ci aveva pensato prima. Le due volte scorse il problema era ricomparso esattamente dai posti rimasti fuori dall'elenco.\n\nNote tecniche: il secondo colpo viene ignorato solo se nel frattempo sotto il cursore è cambiato qualcosa (un altro elemento, o lo stesso con un'altra scritta); premere due volte di fila lo stesso comando rimasto identico continua a fare il suo lavoro.",
+  "queuedAt": "2026-08-09T07:11:34.197Z",
+  "queuedBy": "routine"
+}
