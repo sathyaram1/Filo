@@ -74,3 +74,52 @@ test('Ctrl + / Ctrl - / Ctrl 0 zoomano e ripristinano la pagina', async ({ app, 
   await page.keyboard.press('Control+-');
   await expect.poll(async () => zoomFactorOf(app, '127.0.0.1')).toBeLessThan(z0 - 0.01);
 });
+
+// ── Pagine interne filo:// (feedback #427) ────────────────────────────────
+// FEEDBACK: "in questa pagina [filo://manage] ho provato a fare ctrl + per
+// ingrandire ma non ha funzionato. l'unico modo attuale per zoomare è con la
+// rotella [modalità click centrale]. rendi possibile zoomare ovunque con
+// rotella, trackpad e ctrl".
+//
+// Pre-condizione che senza il fix fallirebbe: il preload interno montava
+// wheel-zoom SENZA `pageZoom`, quindi su filo:// né Ctrl+rotella né Ctrl +/-/0
+// toccavano lo zoom → getZoomFactor resta 1.
+
+test('filo://: Ctrl + / Ctrl - / Ctrl 0 zoomano la pagina interna', async ({ app, openTab }) => {
+  const page = await openTab('filo://manage/manage.html');
+  await page.waitForLoadState('domcontentloaded');
+  await page.bringToFront();
+
+  const z0 = await zoomFactorOf(app, 'manage');
+  expect(z0).toBeCloseTo(1, 1);
+
+  await page.keyboard.press('Control+=');
+  await expect.poll(async () => zoomFactorOf(app, 'manage')).toBeGreaterThan(z0 + 0.01);
+
+  await page.keyboard.press('Control+0');
+  await expect.poll(async () => zoomFactorOf(app, 'manage')).toBeCloseTo(1, 1);
+
+  await page.keyboard.press('Control+-');
+  await expect.poll(async () => zoomFactorOf(app, 'manage')).toBeLessThan(z0 - 0.01);
+
+  await page.keyboard.press('Control+0');
+});
+
+test('filo://: Ctrl+rotella (e pinch del trackpad) zooma la pagina interna', async ({ app, openTab }) => {
+  const page = await openTab('filo://manage/manage.html');
+  await page.waitForLoadState('domcontentloaded');
+  await page.bringToFront();
+
+  const z0 = await zoomFactorOf(app, 'manage');
+  expect(z0).toBeCloseTo(1, 1);
+
+  await page.keyboard.down('Control');
+  await page.mouse.wheel(0, -300);
+  await page.mouse.wheel(0, -300);
+  await page.keyboard.up('Control');
+
+  await expect.poll(async () => zoomFactorOf(app, 'manage')).toBeGreaterThan(z0 + 0.01);
+  await page.screenshot({ path: 'tests/.shots/manage-ctrl-zoom.png' });
+
+  await page.keyboard.press('Control+0');
+});
