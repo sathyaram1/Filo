@@ -105,6 +105,17 @@ function readPrivKey() {
 export const PLACEHOLDER = '[cifrato — chiave privata non configurata]';
 
 /**
+ * C'è una chiave privata utilizzabile? Serve al controllo di prontezza delle
+ * routine (`dispatch.mjs --preflight`) per fermarsi PRIMA di pagare il setup
+ * dell'ambiente: senza chiave nessuno status si decifra e una coda piena
+ * "sembra vuota". Non espone la chiave, solo la sua presenza.
+ * @returns {boolean}
+ */
+export function hasPrivKey() {
+  return Boolean(readPrivKey());
+}
+
+/**
  * Decifra i campi sensibili di un oggetto feedback.
  * Retrocompatibile: i valori non cifrati (vecchi feedback in chiaro) passano
  * invariati. Se la chiave privata non è disponibile, i campi FENC1: vengono
