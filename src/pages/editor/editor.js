@@ -1537,6 +1537,11 @@
       bin.addEventListener('click', openTrashPanel);
       docPopEl.appendChild(bin);
     }
+    // Il menu si ricostruisce anche mentre è aperto (eliminando un documento la
+    // lista si accorcia e le righe salgono di un posto): stessa coda di gesto
+    // del pannello versioni, qui col prezzo più alto — il colpo di coda cadeva
+    // sulla × del documento sotto e ne eliminava due invece di uno.
+    staleClick.arm();
   }
 
   function actButton(glyph, title, onAct) {
