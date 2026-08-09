@@ -478,3 +478,38 @@ test('doppio clic su "Annulla" dopo un ripristino: il ripristino resta annullato
   await page.waitForTimeout(500);
   await expect(page.locator('#doc')).toHaveText('Testo di adesso');
 });
+
+// ── Doppio clic sul "Chiudi" del pannello (#415, terza faccia) ─────────────
+// Stessa causa, sul bottone che fa SPARIRE la zona premuta: il pannello si
+// chiude al primo colpo e il secondo cade sul foglio dietro, che apre da solo
+// "Aggiungi modulo". Il test asserisce il successo del gesto: chiuso il
+// pannello si torna al documento e non si apre nient'altro. Senza la guardia a
+// livello di finestra (quella sul contenitore non vede un clic che atterra
+// fuori) resta aperto il pannello "Aggiungi modulo" → rosso.
+test('doppio clic su "Chiudi" nello storico: chiude e basta, nessun pannello a sorpresa', async ({ openTab }) => {
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('#doc');
+  await page.evaluate(() => window.__filoEditorVersions.ready());
+
+  await page.click('#doc');
+  for (const word of ['Alpha', 'Bravo']) {
+    await setDocText(page, word);
+    await filoAutoEdit(page);
+  }
+
+  await page.click('#docSwitch');
+  await page.click('#docHistory');
+  await expect(page.locator('.ed-vh-item')).toHaveCount(2);
+
+  // Il "Chiudi" sta sopra la griglia dei moduli: dietro di lui c'è una cella
+  // vuota, che al clic apre "Aggiungi modulo".
+  await page.locator('#ovClose').dblclick();
+
+  // Si resta sul documento: nessun pannello aperto, nemmeno per un istante.
+  await expect(page.locator('#overlay')).toBeHidden();
+  await expect(page.locator('#overlayBox h3')).toHaveCount(0);
+  await page.waitForTimeout(300);
+  await expect(page.locator('#overlay')).toBeHidden();
+  // …e il documento è ancora quello di prima (nessun ripristino di rimbalzo).
+  await expect(page.locator('#doc')).toHaveText('Bravo');
+});

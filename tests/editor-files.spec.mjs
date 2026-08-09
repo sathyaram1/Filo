@@ -151,3 +151,43 @@ test('annulla eliminazione dell\'ultimo file: torna il documento, non il foglio 
   await page.click('#docSwitch');
   await expect(page.locator('.ed-doc-item')).toHaveCount(1);
 });
+
+// ── Doppio clic sulla × nel menu documenti (#415) ──────────────────────────
+// La lista si accorcia al primo colpo e le righe salgono di un posto: il
+// secondo colpo della coppia cade sulla × del documento sotto e ne elimina DUE
+// invece di uno. Il test asserisce il successo del gesto: eliminato quello
+// scelto, gli altri restano tutti. Senza la guardia i documenti passano da
+// quattro a due → rosso.
+test('doppio clic sulla × di un documento: ne elimina UNO solo', async ({ openTab }) => {
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('#doc');
+
+  await page.click('#doc');
+  await setDocText(page, 'contenuto UNO');
+  for (const t of ['contenuto DUE', 'contenuto TRE', 'contenuto QUATTRO']) {
+    await page.click('#docSwitch');
+    await page.click('#docNew');
+    await setDocText(page, t);
+  }
+
+  await page.click('#docSwitch');
+  await expect(page.locator('.ed-doc-item')).toHaveCount(4);
+
+  // Doppio clic sulla × del primo documento (non attivo: attivo è il quarto).
+  await page.locator('.ed-doc-item').nth(0).locator('.ed-doc-del').dblclick();
+
+  // Ne è sparito uno solo, ed è quello scelto.
+  await expect(page.locator('.ed-doc-item')).toHaveCount(3);
+  await page.waitForTimeout(300);
+  await expect(page.locator('.ed-doc-item')).toHaveCount(3);
+
+  // I documenti rimasti hanno ancora il loro contenuto (nessuno è sparito
+  // silenziosamente nel cestino).
+  const testi = [];
+  for (let i = 0; i < 3; i++) {
+    await page.locator('.ed-doc-item').nth(i).click();
+    testi.push((await page.locator('#doc').textContent()).trim());
+    await page.click('#docSwitch');
+  }
+  expect(testi.sort()).toEqual(['contenuto DUE', 'contenuto QUATTRO', 'contenuto TRE']);
+});
