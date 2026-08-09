@@ -679,7 +679,7 @@
         <p class="ed-vh-empty">Nessuna versione ancora. Filo salva un punto di ripristino ogni volta che modifica il documento; da lì potrai tornare indietro.</p>
         <div class="ed-overlay-actions"><button class="ed-btn primary" id="ovClose">Chiudi</button></div>`);
       $('ovClose').addEventListener('click', closeOverlay);
-      overlayGuard.arm();
+      staleClick.arm();
       return;
     }
     const shown = all.slice(0, versHistoryShown);
@@ -720,7 +720,7 @@
       it.addEventListener('click', open);
       it.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(e); } });
     });
-    overlayGuard.arm();
+    staleClick.arm();
   }
 
   // Anteprima ampia di una singola versione, con conferma di ripristino.
@@ -745,7 +745,7 @@
     $('vhRestore').addEventListener('click', () => {
       if (restoreVersion(fileId, versionId)) renderVersionHistory(fileId);
     });
-    overlayGuard.arm();
+    staleClick.arm();
   }
 
   // ════════════════════════════════════════════════════════════════════
@@ -1012,7 +1012,7 @@
         <p class="ed-vh-empty">Nessun documento eliminato. Quando ne elimini uno resta qui, con il suo testo e il suo storico, finché non lo butti davvero.</p>
         <div class="ed-overlay-actions"><button class="ed-btn primary" id="ovClose">Chiudi</button></div>`);
       $('ovClose').addEventListener('click', closeOverlay);
-      overlayGuard.arm();
+      staleClick.arm();
       return;
     }
     const rows = trash.map((e) => {
@@ -1056,7 +1056,7 @@
         b.dataset.confirm = '1';
         b.textContent = 'Confermi?';
         b.classList.add('danger');
-        overlayGuard.arm();
+        staleClick.arm();
         setTimeout(() => {
           if (!b.isConnected || b.dataset.confirm !== '1') return;
           b.dataset.confirm = '';
@@ -1076,7 +1076,7 @@
         emptyBtn.dataset.confirm = '1';
         emptyBtn.textContent = `Confermi? Elimini ${trash.length} document${trash.length === 1 ? 'o' : 'i'} per sempre`;
         emptyBtn.classList.add('danger');
-        overlayGuard.arm();
+        staleClick.arm();
         return;
       }
       for (const e of trash.slice()) purgeTrashEntry(e.id);
@@ -1086,7 +1086,7 @@
     });
     // Il cestino si ridisegna dopo ogni eliminazione definitiva: stessa guardia
     // del pannello versioni sul secondo colpo di un doppio clic.
-    overlayGuard.arm();
+    staleClick.arm();
   }
 
   // Rinomina un documento (il nome mostrato nel menu e nel selettore).
@@ -3941,10 +3941,11 @@
   // ════════════════════════════════════════════════════════════════════
   //  OVERLAY helpers
   // ════════════════════════════════════════════════════════════════════
-  // La guardia anti "coda di gesto" vale solo per il pannello che l'ha armata:
-  // ogni altro overlay riparte pulito (e chiudendo si disarma).
-  function openOverlay(html) { overlayGuard.disarm(); overlayBox.innerHTML = html; overlay.hidden = false; }
-  function closeOverlay() { overlayGuard.disarm(); overlay.hidden = true; overlayBox.innerHTML = ''; }
+  // Aprire e CHIUDERE un pannello sono entrambi cambi sotto il cursore: aperto,
+  // il colpo di coda cade su un comando del pannello nuovo; chiuso, cade sul
+  // foglio dietro (che apre "Aggiungi modulo"). Armano tutti e due.
+  function openOverlay(html) { staleClick.arm(); overlayBox.innerHTML = html; overlay.hidden = false; }
+  function closeOverlay() { staleClick.arm(); overlay.hidden = true; overlayBox.innerHTML = ''; }
   function flashOverlayMsg(text, ms) {
     openOverlay(`<div style="text-align:center;padding:8px 4px">${escapeHtml(text)}</div>`);
     setTimeout(closeOverlay, ms || 1400);
@@ -4014,7 +4015,7 @@
     if (el._timer) clearTimeout(el._timer);
     // Via un avviso, quelli sopra scivolano giù al suo posto: la pila si è
     // ridisegnata sotto il cursore.
-    edToastHostEl()._staleGuard.arm();
+    staleClick.arm();
     el.classList.remove('show');
     if (immediate) { try { el.remove(); } catch (_) {} syncEdToastOverflow(); return; }
     setTimeout(() => { try { el.remove(); } catch (_) {} syncEdToastOverflow(); }, 220);
@@ -4043,7 +4044,7 @@
     host.appendChild(el);
     // Un avviso nuovo prende il posto in fondo alla pila — proprio dove poteva
     // esserci il bottone appena premuto.
-    host._staleGuard.arm();
+    staleClick.arm();
     enforceEdToastCap();
     // Forza un reflow così la transizione d'ingresso parte.
     void el.offsetWidth;
