@@ -660,6 +660,115 @@ async function buildSnapshot() {
   return { reviews, todoWinner };
 }
 
+// ─── Prontezza (--preflight) ─────────────────────────────────────────────────
+
+/**
+ * Verdetto di prontezza a partire dalle sole osservazioni (funzione pura,
+ * testata in tests/unit/dispatch.test.mjs).
+ *
+ * Distingue le due forme di guasto di ROUTINE-BRANCH-INTEGRITY.md §E:
+ *   - `transient` — chiave, rete, deposito: ci riprova l'orchestratore dopo 6h;
+ *   - `permanent` — il checkout non è un repo Filo lavorabile: riprovare ogni
+ *     6h all'infinito non lo aggiusta, serve l'owner.
+ *
+ * Una coda VUOTA non è un guasto: il prober è il fallback legittimo. Guasto è
+ * solo un ambiente CIECO (non riesce a leggere ciò che c'è).
+ *
+ * @param {{hasKey?: boolean, rolesDirOk?: boolean, remoteOk?: boolean,
+ *          encrypted?: number, unreadable?: number}} obs
+ * @returns {{ok: true} | {ok: false, kind: 'transient'|'permanent', message: string}}
+ */
+export function classifyPreflight(obs = {}) {
+  const { hasKey, rolesDirOk = true, remoteOk = true, encrypted = 0, unreadable = 0 } = obs;
+
+  // I ruoli sono inlinati nel payload: senza, nessun worker può diventare
+  // niente. Non è passeggero — il checkout è sbagliato o incompleto.
+  if (!rolesDirOk) {
+    return { ok: false, kind: 'permanent', message: `file-ruolo assenti (${relative(ROOT, ROLES_DIR) || 'routines/roles'}): il checkout non è un repo Filo lavorabile` };
+  }
+  // Senza chiave gli status non si decifrano e la coda piena "sembra vuota":
+  // è la causa dell'ondata #310+. La chiave può tornare → passeggero.
+  if (!hasKey) {
+    return { ok: false, kind: 'transient', message: 'chiave privata dei feedback assente: gli status cifrati sarebbero illeggibili e la coda sembrerebbe vuota' };
+  }
+  // Tutto il lavoro del giro esiste solo se può essere pushato: senza deposito
+  // raggiungibile i worker lavorerebbero per niente.
+  if (!remoteOk) {
+    return { ok: false, kind: 'transient', message: 'deposito remoto irraggiungibile: il lavoro dei worker non potrebbe essere pubblicato' };
+  }
+  // Chiave presente ma nessuno status decifrabile: chiave sbagliata o rotta.
+  // Un solo doc illeggibile fra molti resta un avviso (corruzione di QUEL doc),
+  // non un ambiente cieco — stessa soglia di buildSnapshot.
+  if (encrypted && unreadable === encrypted) {
+    return { ok: false, kind: 'transient', message: `coda illeggibile: nessuno dei ${encrypted} status cifrati è decifrabile (chiave privata sbagliata o rotta)` };
+  }
+  return { ok: true };
+}
+
+/**
+ * Controllo di prontezza. Gira PRIMA che l'orchestratore paghi il setup
+ * dell'ambiente (npm install, binario Electron ~102MB, scrot): se il giro deve
+ * fermarsi, deve scoprirlo prima di aver pagato (ROUTINE-BRANCH-INTEGRITY.md §E,
+ * «Il controllo di prontezza gira per primo»).
+ *
+ * Risponde a UNA domanda — «questo giro è in grado di lavorare?» — e NON tocca
+ * niente: nessun claim, nessuna pulizia di stato, nessuna scrittura su git o
+ * Firestore. Non dice se c'è lavoro: quello lo decide il dispatch vero.
+ *
+ * @returns {Promise<{ok: true} | {ok: false, kind: 'transient'|'permanent', message: string}>}
+ */
+export async function preflight() {
+  const rolesDirOk = existsSync(ROLES_DIR);
+  if (!rolesDirOk) return classifyPreflight({ rolesDirOk });
+
+  const { hasPrivKey } = await import('./lib/decrypt-feedback-fields.mjs');
+  const hasKey = hasPrivKey();
+  if (!hasKey) return classifyPreflight({ rolesDirOk, hasKey });
+
+  // Deposito raggiungibile. `ls-remote` è la sonda più economica che tocca
+  // davvero la rete (nessun oggetto scaricato).
+  let remoteOk = true;
+  try {
+    execFileSync('git', ['ls-remote', '--exit-code', 'origin', 'HEAD'],
+      { cwd: ROOT, stdio: 'ignore', timeout: 30000 });
+  } catch (_) { remoteOk = false; }
+  if (!remoteOk) return classifyPreflight({ rolesDirOk, hasKey, remoteOk });
+
+  // Coda leggibile: si guardano SOLO gli status (non i corpi), senza claim né
+  // pulizie. Un guasto di rete qui NON è "coda illeggibile" — si ritenta, e se
+  // proprio non si arriva a Firestore è il deposito/rete a essere giù.
+  const { createRequire } = await import('node:module');
+  const require = createRequire(import.meta.url);
+  try {
+    if (!globalThis.SN_FEEDBACK_PUBKEY) require(resolve(ROOT, 'src', 'shared', 'feedbackPublicKey.js'));
+    if (!globalThis.SN_FEEDBACK_CRYPTO) require(resolve(ROOT, 'src', 'shared', 'feedbackCrypto.js'));
+  } catch (_) { /* best-effort */ }
+
+  const { fetchOpenCandidates } = await import('./next-feedback.mjs');
+  const { decryptFeedbackFields, PLACEHOLDER } = await import('./lib/decrypt-feedback-fields.mjs');
+  const C = globalThis.SN_FEEDBACK_CRYPTO;
+
+  let raw;
+  try {
+    raw = await withRetry(() => fetchOpenCandidates(), 'fetch dei feedback aperti (prontezza)');
+  } catch (e) {
+    return { ok: false, kind: 'transient', message: `coda non raggiungibile: ${e?.message || e}` };
+  }
+
+  let encrypted = 0;
+  let unreadable = 0;
+  for (const fb of raw) {
+    if (!C?.isEncrypted?.(fb.status)) continue;
+    encrypted++;
+    let status = null;
+    try { status = (await decryptFeedbackFields({ _id: fb._id, status: fb.status })).status; }
+    catch (_) { status = null; }
+    if (status === PLACEHOLDER || status === null) unreadable++;
+  }
+
+  return classifyPreflight({ rolesDirOk, hasKey, remoteOk, encrypted, unreadable });
+}
+
 // ─── Sotto-comandi --record-* (li chiamano i ruoli) ──────────────────────────
 
 // Riflesso della macchina a stati (best-effort): l'esito del verifier muove lo
