@@ -76,16 +76,16 @@ test('3) doppio clic sulla × di un documento nel menu: ne elimina UNO solo', as
   }
   await page.click('#docSwitch');
   await page.waitForSelector('#docPop:not([hidden])');
-  const before = await page.locator('#docPop .ed-doc-pop-item, #docPop [data-id]').count();
+  const before = await page.locator('#docPop .ed-doc-item').count();
   console.log('documenti nel menu prima:', before);
-  const closers = page.locator('#docPop [data-id] button, #docPop .ed-doc-del, #docPop .ed-doc-close');
-  console.log('bottoni × trovati:', await closers.count());
-  await closers.first().dblclick();
-  await page.waitForTimeout(500);
+  await page.locator('#docPop .ed-doc-del').first().dblclick();
+  await page.waitForTimeout(600);
   await page.screenshot({ path: 'tests/.shots/v415-3-x-dblclick.png' });
-  await page.click('#docSwitch').catch(() => {});
-  await page.waitForTimeout(200);
-  const after = await page.locator('#docPop .ed-doc-pop-item, #docPop [data-id]').count();
+  if (await page.locator('#docPop').evaluate((e) => e.hidden)) {
+    await page.click('#docSwitch');
+    await page.waitForSelector('#docPop:not([hidden])');
+  }
+  const after = await page.locator('#docPop .ed-doc-item').count();
   console.log('documenti nel menu dopo:', after);
   expect(before - after).toBe(1);
 });
