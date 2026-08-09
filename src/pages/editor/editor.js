@@ -1596,6 +1596,7 @@
   function closeDocPop() {
     if (!docPopEl || docPopEl.hidden) return;
     docPopEl.hidden = true;
+    staleClick.arm(); // il menu sparisce: sotto il cursore resta il foglio
     if (docSwitchBtn) docSwitchBtn.setAttribute('aria-expanded', 'false');
     document.removeEventListener('mousedown', onDocPopOutside, true);
   }
