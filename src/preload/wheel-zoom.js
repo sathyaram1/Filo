@@ -236,6 +236,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     document.addEventListener('keydown', (e) => {
       if (zoomMode) return; // in modalità rotella un tasto qualsiasi esce
       if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      if (pageHandlesZoom()) return;
       const k = e.key;
       if (k === '+' || k === '=') {
         e.preventDefault(); e.stopPropagation();
