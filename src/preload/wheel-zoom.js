@@ -25,10 +25,16 @@
 //   Oltre alla modalità rotella, se `opts.pageZoom` è attivo la pagina zooma
 //   anche tenendo Ctrl/Cmd: pizzicando il trackpad, con Ctrl+rotella e da
 //   tastiera con Ctrl + / Ctrl - / Ctrl 0. Pinch e Ctrl+rotella arrivano
-//   entrambi come `wheel` con ctrlKey=true. Lo attiviamo SOLO sulle pagine web
-//   esterne (page-preload): le pagine interne filo:// che vogliono lo zoom lo
-//   gestiscono da sé (es. l'editor scala il foglio via CSS), quindi abilitarlo
-//   anche lì zoomerebbe due volte.
+//   entrambi come `wheel` con ctrlKey=true. È attivo sia sulle pagine web
+//   esterne (page-preload) sia sulle pagine interne filo:// (internal-preload):
+//   lo zoom deve funzionare allo stesso modo ovunque.
+//
+//   OPT-OUT PER LE PAGINE CHE ZOOMANO DA SÉ
+//   Una pagina che implementa il proprio zoom (l'editor scala il foglio via CSS
+//   invece dell'intera finestra) si tira fuori marcando
+//   `document.documentElement.dataset.filoOwnZoom = '1'`. Il controllo avviene
+//   al momento dell'evento, quindi il marker può essere messo quando vuole:
+//   senza, lo zoom verrebbe applicato due volte.
 
 module.exports = function setupWheelZoom(webFrame, opts) {
   if (!webFrame || typeof document === 'undefined') return;
