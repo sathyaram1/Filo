@@ -61,7 +61,7 @@ export function stateFile(root = ROOT) {
  *   - qualcuno ha verificato e ha approvato, ma POI il codice è cambiato → il
  *     verdetto riguarda una versione che non è quella che uscirebbe.
  */
-export function checkVerdict(entry, headSha) {
+export function checkVerdict(entry, headSha, dirty = false) {
   if (!entry || (!entry.verdict && !entry.request)) {
     return { ok: false, reason: 'nessuna verifica avviata per questo lavoro' };
   }

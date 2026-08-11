@@ -22,7 +22,6 @@ const { HIDDEN, OFFSCREEN, hideForTests } = require('./test-window-mode');
 function revealWindow(win) {
   try {
     if (HIDDEN) {
-      hideForTests(win, { main: true });
       win.showInactive();
       return;
     }
@@ -81,6 +80,10 @@ function createMainWindow() {
     autoHideMenuBar: true,
   });
 
+  // Invisibile fin dalla nascita, non dal primo disegno: fra i due momenti
+  // passano centinaia di millisecondi in cui la finestra esiste già.
+  hideForTests(win, { main: true });
+
   win.loadURL('filo://shell/shell.html');
 
   const tabs = new TabManager(win, null, { shellHeight: SHELL_HEIGHT });
@@ -133,6 +136,7 @@ function createIncognitoWindow() {
     autoHideMenuBar: true,
   });
   win._filoIncognito = true;
+  hideForTests(win, { main: true });
 
   // La shell legge ?incognito=1 e applica il badge + tema scuro dedicato.
   win.loadURL('filo://shell/shell.html?incognito=1');
