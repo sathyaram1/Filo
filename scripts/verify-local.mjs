@@ -76,6 +76,13 @@ export function checkVerdict(entry, headSha, dirty = false) {
   if (!headSha || entry.sha !== headSha) {
     return { ok: false, reason: 'il codice è cambiato dopo la verifica: l’esito riguarda una versione diversa da quella che pubblicheresti' };
   }
+  // Il confronto sopra guarda l'ULTIMO SALVATAGGIO, e le modifiche non ancora
+  // salvate non lo spostano: senza questo, si può far approvare una versione,
+  // modificare i file e vedersi dire ancora "verifica superata". È successo
+  // davvero, su questo stesso lavoro.
+  if (dirty) {
+    return { ok: false, reason: 'ci sono modifiche non salvate: la verifica riguarda il codice com’era, non com’è adesso' };
+  }
   return { ok: true, reason: 'verifica superata su questo contenuto' };
 }
 
