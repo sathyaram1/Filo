@@ -45,6 +45,16 @@ test('checkVerdict: se il codice cambia dopo il PASS, l’esito decade', () => {
   assert.equal(checkVerdict({ verdict: 'pass', sha: SHA }, '').ok, false);
 });
 
+// Il secondo modo di farsi approvare una versione e pubblicarne un'altra: non
+// serve nemmeno un commit nuovo, bastano modifiche non ancora salvate — e il
+// confronto sul commit non le vede. Capitato davvero, su questo stesso lavoro.
+test('checkVerdict: modifiche non salvate invalidano l’approvazione', () => {
+  assert.equal(checkVerdict({ verdict: 'pass', sha: SHA }, SHA, false).ok, true);
+  const sporco = checkVerdict({ verdict: 'pass', sha: SHA }, SHA, true);
+  assert.equal(sporco.ok, false);
+  assert.match(sporco.reason, /modifiche non salvate/);
+});
+
 test('withRequest / withVerdict: lo stato è per ramo e non si calpesta', () => {
   let s = withRequest({}, 'claude/uno', { request: 'fai X', sha: SHA, at: 't0' });
   s = withRequest(s, 'claude/due', { request: 'fai Y', sha: ALTRO_SHA, at: 't0' });
