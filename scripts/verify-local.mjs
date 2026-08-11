@@ -134,12 +134,14 @@ function git(args, root = ROOT) {
 
 export function currentBranch(root = ROOT) { return git(['rev-parse', '--abbrev-ref', 'HEAD'], root); }
 export function headSha(root = ROOT) { return git(['rev-parse', 'HEAD'], root); }
+/** Ci sono modifiche non salvate (anche solo nell'area di stage)? */
+export function isDirty(root = ROOT) { return git(['status', '--porcelain'], root).length > 0; }
 
 /** Esito per il ramo corrente: quello che legge chi pubblica. */
 export function verdictForCurrentBranch(root = ROOT) {
   const branch = currentBranch(root);
   const entry = readState(root)[branch];
-  return { branch, entry, ...checkVerdict(entry, headSha(root)) };
+  return { branch, entry, ...checkVerdict(entry, headSha(root), isDirty(root)) };
 }
 
 // ─── Il testo consegnato all'istanza che verifica ───────────────────────────
