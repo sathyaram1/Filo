@@ -15,3 +15,4 @@
 {"ts":"2026-08-08T23:38:46Z","event":"StopFailure","error_type":null,"error_message":null,"stop_reason":null,"agent_type":"general-purpose","last_msg":"API Error: Unable to connect to API (ECONNRESET)"}
 {"ts":"2026-08-08T23:46:27Z","event":"StopFailure","error_type":null,"error_message":null,"stop_reason":null,"agent_type":null,"last_msg":"You've hit your session limit · resets 3:50am (Europe/Rome)"}
 {"ts":"2026-08-08T23:46:52Z","event":"StopFailure","error_type":null,"error_message":null,"stop_reason":null,"agent_type":null,"last_msg":"You've hit your session limit · resets 3:50am (Europe/Rome)"}
+{"ts":"2026-08-11T18:06:51Z","event":"StopFailure","error_type":null,"error_message":null,"stop_reason":null,"agent_type":null,"last_msg":"You've hit your weekly limit · resets 7am (UTC)"}
