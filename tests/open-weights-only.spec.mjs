@@ -132,15 +132,6 @@ test('solo modelli a pesi aperti: sostituisce, non ripiega, e lo dimostra', asyn
 
       // ── B) Configurazione personale, interruttore ACCESO.
       await usaConfigPersonale(true);
-      // Il registry personale non ha 'mio-claude': lo aggiungiamo qui, così la
-      // funzione punta a un modello proprietario senza sostituto previsto.
-      await Storage.setSettings({
-        modelRegistry: {
-          ...C.DEFAULT_MODEL_REGISTRY,
-          'mio-claude': { provider: 'openrouter', model: 'anthropic/claude-3.7-sonnet' },
-        },
-      });
-
       res.acceso = await run(C.ACTIONS.EXPLAIN, { selection: 'ciao', sentence: 'ciao mondo' });
       res.anthropic = await run(C.ACTIONS.EXPLAIN_DEEP, { selection: 'ciao', sentence: 'ciao mondo' });
       res.senzaEquivalente = await run(C.ACTIONS.EXPLAIN_LINK, { url: 'https://example.com', text: 'x' });
