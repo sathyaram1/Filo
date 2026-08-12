@@ -1967,23 +1967,41 @@ class TabManager {
   // scheda che, servita con Content-Disposition:attachment, diventa subito uno
   // scaricamento: nessuna pagina si committa mai e la scheda resta a about:blank
   // — bianca, titolo "Nuova scheda", attiva — che l'utente deve chiudere a mano.
+  // #441 — stesso attrito, un passo più in là: certi siti aprono una pagina
+  // intermedia ("Grazie, il download partirà a breve…") che avvia il file da
+  // sola. Ha contenuto vero, quindi la regola del #412 non la tocca, ma resta
+  // una scheda usa e getta. La chiudiamo solo con la firma stretta descritta in
+  // src/shared/downloadTabs.js (nata da un link, mai navigata dentro, mai
+  // toccata dall'utente, download partito entro pochi secondi dal caricamento)
+  // e, siccome lì qualcosa da perdere c'era, con un avviso "Riapri".
   // Il gestore download (services/downloads.js) ci passa la webContents che ha
-  // originato lo scaricamento: se corrisponde a una scheda che non ha MAI
-  // approdato a una pagina, la chiudiamo e restituiamo il fuoco alla scheda di
-  // partenza. La scheda superflua NON viene archiviata (non è un sito visitato,
-  // è un contenitore mai riempito): per questo non passa da closeTab.
+  // originato lo scaricamento. La scheda superflua NON viene archiviata (non è
+  // un sito che l'utente ha visitato per il suo contenuto): non passa da
+  // closeTab.
   handleDownloadStarted(wc) {
     if (!wc) return;
     const tab = this.tabs.find((t) => {
       try { return t.view && t.view.webContents === wc; } catch (_) { return false; }
     });
     if (!tab) return;
-    // Solo schede "vuote": mai committato una navigazione (tab._everNavigated),
-    // quindi ferme su about:blank. Una scheda con contenuto reale (es. un
-    // interstiziale "il download partirà a breve") ha già committato e va tenuta.
-    if (tab._everNavigated) return;
+    const decision = decideCloseOnDownload({
+      isInternal: !!tab.isInternal,
+      everNavigated: !!tab._everNavigated,
+      openedByLink: !!tab._openedByLink,
+      canBack: !!tab.canBack,
+      userInputAt: tab._userInputAt || null,
+      navigatedAt: tab._navigatedAt || null,
+      now: Date.now(),
+    });
+    if (!decision.close) return;
     const idx = this.tabs.findIndex((t) => t.id === tab.id);
     if (idx < 0) return;
+    // La pagina-ponte aveva contenuto: l'utente deve poter tornare indietro se
+    // quella scheda gli serviva davvero (chiudere da soli qualcosa di visibile
+    // senza via di ritorno sarebbe peggio dell'attrito che togliamo).
+    const undo = decision.reason === 'bridge'
+      ? { title: tab.title, url: tab.url }
+      : null;
     try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
     try { tab.view.webContents.close(); } catch (_) {}
     ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
@@ -1997,6 +2015,23 @@ class TabManager {
     } else {
       this._broadcast();
     }
+    if (undo) this._notifyBridgeTabClosed(undo);
+  }
+
+  // #441 — avviso discreto dopo aver chiuso una pagina-ponte, con "Riapri".
+  _notifyBridgeTabClosed({ title, url }) {
+    if (!url) return;
+    let label = String(title || '').trim();
+    if (!label || label === 'Nuova scheda') {
+      try { label = new URL(url).host; } catch (_) { label = url; }
+    }
+    if (label.length > 40) label = `${label.slice(0, 39)}…`;
+    try {
+      this.win.webContents.send('shell:toast', {
+        text: `Chiusa «${label}»: serviva solo ad avviare lo scaricamento`,
+        opts: { actions: [{ label: 'Riapri', openUrl: url }] },
+      });
+    } catch (_) {}
   }
 
   // #170.3 — decide se bloccare una navigazione top-level verso un sito in
