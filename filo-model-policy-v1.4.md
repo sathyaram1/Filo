@@ -34,7 +34,7 @@ Non verranno quindi mai usati, attraverso i crediti di Filo, i **servizi** di **
 
 **Come è applicata, non solo dichiarata.** Filo non compra dai fornitori direttamente: passa da un servizio che smista le richieste e sceglie da sé chi ospita ogni modello, con criteri di prezzo che cambiano nel tempo. Lasciato a sé, prima o poi manderebbe la richiesta proprio al produttore escluso. Quindi la lista di esclusione viaggia con ogni richiesta, e — cosa più importante — **a risposta arrivata Filo registra chi l'ha effettivamente servita** e segnala se è qualcuno che doveva essere fuori. Senza quel riscontro una lista di esclusione è solo una speranza, e nessuno se ne accorgerebbe mai.
 
-**Con una tua chiave puoi usare quello che vuoi.** Filo supporta le chiavi API personali di tutti i provider, quelli esclusi compresi, con la stessa facilità delle altre. Non è una svista: se dichiaro che la scelta è tua e poi la rendo scomoda, il divieto l'ho messo lo stesso, solo di nascosto. Quello che faccio è dirti, nel momento in cui incolli la chiave, perché quel modello non è tra i predefiniti — poi decidi tu. Questa policy governa i crediti che Filo vende e regala, cioè i soldi miei; i tuoi sono i tuoi.
+**Con una tua chiave puoi usare quello che vuoi, attraverso OpenRouter.** Filo non ha integrazioni dirette con i servizi che esclude: quei modelli si raggiungono dall'aggregatore. È un account in più da fare, ed è voluto — così chi sceglie un modello escluso lo sceglie davvero, invece di trovarselo già pronto sotto le dita. Nessuno ti impedisce niente, e questa policy governa i crediti che Filo vende e regala, cioè i soldi miei; i tuoi sono i tuoi.
 
 ## Se non la pensi come me
 
