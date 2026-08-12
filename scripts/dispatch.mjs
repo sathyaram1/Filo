@@ -1024,7 +1024,10 @@ export function emit(bucket, ctx) {
   // porta la provenienza giusta anche se il worker non ci pensa. Un guasto
   // (`halt`) non è un ruolo: si cancella, altrimenti il marcatore del giro
   // precedente sopravvivrebbe a un giro che non ha lavorato.
-  if (bucket.role === 'halt') clearRole(ROOT);
+  // Un guasto (`halt`) e un giro a vuoto (`idle`) non sono ruoli: si cancella il
+  // marcatore, altrimenti quello del giro precedente sopravviverebbe a un giro
+  // che non ha lavorato e finirebbe nella provenienza di un feedback altrui.
+  if (bucket.role === 'halt' || bucket.role === 'idle') clearRole(ROOT);
   else writeRole(ROOT, bucket.role);
   const payload = buildPayload(bucket, ctx);
   const out = {
