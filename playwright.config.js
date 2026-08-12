@@ -15,9 +15,17 @@ import { defineConfig } from '@playwright/test';
 // Restano visibili anche i modi in cui GUARDARE l'app È lo scopo del comando
 // (`--headed`, `--ui`, `--debug`): nasconderli sarebbe un comando che promette
 // una cosa e ne fa un'altra. `npm run test:headed` passa proprio di qui.
-const VUOLE_VEDERE = process.env.FILO_TEST_VISIBLE === '1'
-  || process.argv.some((a) => a === '--headed' || a === '--ui' || a === '--debug');
-if (!VUOLE_VEDERE) process.env.FILO_HIDE_WINDOW = '1';
+//
+// ATTENZIONE, ci si sbaglia facilmente: questo file viene rivalutato DENTRO
+// OGNI WORKER, e al worker arriva l'ambiente ma NON gli argomenti della riga di
+// comando (il suo `argv` è solo `node …/workerProcessEntry.js`). Quindi non
+// basta "non nascondere" quando si vede `--headed`: il worker non lo vedrebbe e
+// si rimetterebbe il nascondimento da solo. Il riconoscimento va TRADOTTO in una
+// variabile d'ambiente, che i worker ereditano.
+if (process.argv.some((a) => a === '--headed' || a === '--ui' || a === '--debug')) {
+  process.env.FILO_TEST_VISIBLE = '1';
+}
+if (process.env.FILO_TEST_VISIBLE !== '1') process.env.FILO_HIDE_WINDOW = '1';
 
 export default defineConfig({
   testDir: './tests',
