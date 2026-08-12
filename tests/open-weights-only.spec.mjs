@@ -2,8 +2,9 @@
 //
 // La promessa della politica sui modelli è verificabile solo guardando cosa
 // parte davvero: il test intercetta la catena di tentativi COSTRUITA dall'app
-// (non una funzione pura) mentre si usano i CREDITI DI FILO, cioè con i modelli
-// e le chiavi predefinite — il caso in cui prima l'utente non aveva voce.
+// (non una funzione pura) in tutt'e due i modi in cui Filo lavora — con i
+// CREDITI DI FILO (modelli e chiavi predefiniti, il caso in cui prima l'utente
+// non aveva voce in capitolo) e con una configurazione personale.
 //
 // Cosa asserisce (successo, non assenza di errore):
 //   1. a interruttore acceso una funzione che nasce su un modello proprietario
@@ -16,10 +17,17 @@
 //      chiama nessun modello;
 //   5. chi ha SERVITO davvero la risposta viene controllato: se risulta escluso,
 //      la voce di cronologia resta marchiata invece di passare inosservata;
-//   6. a interruttore spento tutto torna come prima.
+//   6. a interruttore spento il modello proprietario torna, cioè la differenza
+//      la fa l'interruttore e non altro.
 //
-// Senza il fix: il punto 1 arriverebbe da un modello Gemini, i punti 2/3/4
+// Senza il fix: il punto 1 arriverebbe da un modello proprietario, i punti 2/3/4
 // fallirebbero (la catena proprietaria resta intatta) e il 5 non esisterebbe.
+//
+// NB: con i crediti di Filo la configurazione vera arriva dalla rete e cambia
+// nel tempo — lì il test asserisce le PROPRIETÀ della catena (pesi aperti,
+// nessun produttore diretto), non nomi di modelli che l'owner può cambiare
+// domani. I nomi esatti si asseriscono sulla configurazione personale, che il
+// test controlla per intero.
 
 // Chiavi predefinite finte: sono quelle che stanno dietro ai "crediti di Filo".
 // Vanno impostate PRIMA che la fixture lanci l'app (le legge da process.env),
@@ -86,77 +94,97 @@ test('solo modelli a pesi aperti: sostituisce, non ripiega, e lo dimostra', asyn
       }
     };
 
+    // Configurazione personale controllata dal test: registry integrale (contiene
+    // sia i modelli proprietari sia i sostituti a pesi aperti) e tre funzioni
+    // messe apposta su tre casi diversi.
+    const usaConfigPersonale = (openWeightsOnly) => Storage.setSettings({
+      useDefaultModels: false,
+      openWeightsOnly,
+      apiKeys: { openrouter: 'k-test', gemini: 'k-test' },
+      modelRegistry: { ...C.DEFAULT_MODEL_REGISTRY },
+      models: {
+        [C.ACTIONS.EXPLAIN]: 'flash, flash-or',          // proprietario con equivalente
+        [C.ACTIONS.EXPLAIN_DEEP]: 'claude-haiku',        // Anthropic, con equivalente
+        [C.ACTIONS.EXPLAIN_LINK]: 'mio-claude',          // proprietario SENZA equivalente
+      },
+    });
+
     const res = {};
     try {
-      // Crediti di Filo: modelli e chiavi PREDEFINITI, interruttore acceso.
+      // ── A) Crediti di Filo: modelli e chiavi PREDEFINITI, interruttore acceso.
       await Storage.setSettings({ useDefaultModels: true, openWeightsOnly: true });
       try { await History.clear(); } catch (_) {}
-
-      res.acceso = await run(C.ACTIONS.EXPLAIN, { selection: 'ciao', sentence: 'ciao mondo' });
-      res.anthropic = await run(C.ACTIONS.EXPLAIN_DEEP, { selection: 'ciao', sentence: 'ciao mondo' });
-
-      // Il sostituto non risponde: non deve esistere un tentativo proprietario dopo.
-      failAll = true;
-      res.tuttoGiu = await run(C.ACTIONS.EXPLAIN, { selection: 'ciao', sentence: 'ciao mondo' });
-      failAll = false;
-
-      // Funzione con un modello proprietario e NESSUN equivalente aperto
-      // (configurazione personale: un modello Anthropic scelto a mano, che non
-      // è uno di quelli con un sostituto previsto).
-      await Storage.setSettings({
-        useDefaultModels: false,
-        apiKeys: { openrouter: 'k-test' },
-        modelRegistry: { 'mio-claude': { provider: 'openrouter', model: 'anthropic/claude-3.7-sonnet' } },
-        models: { [C.ACTIONS.EXPLAIN_LINK]: 'mio-claude' },
-      });
-      res.senzaEquivalente = await run(C.ACTIONS.EXPLAIN_LINK, { url: 'https://example.com', text: 'x' });
-      await Storage.setSettings({ useDefaultModels: true });
+      res.crediti = await run(C.ACTIONS.EXPLAIN, { selection: 'ciao', sentence: 'ciao mondo' });
 
       // Controprova sul SERVITO: se chi ha servito è escluso, la voce di
       // cronologia lo dice invece di far passare la cosa in silenzio.
       servedByNext = 'Google AI Studio';
-      res.violazione = await run(C.ACTIONS.EXPLAIN, { selection: 'x', sentence: 'y' });
+      await run(C.ACTIONS.EXPLAIN, { selection: 'x', sentence: 'y' });
       const items = await History.list();
       res.ultimaVoce = items && items[0]
         ? { servedBy: items[0].servedBy, policyViolation: items[0].policyViolation }
         : null;
       servedByNext = 'DeepInfra';
 
-      // Interruttore spento: la configurazione di prima torna intatta.
-      await Storage.setSettings({ openWeightsOnly: false });
-      res.spento = await run(C.ACTIONS.EXPLAIN, { selection: 'ciao', sentence: 'ciao mondo' });
+      // ── B) Configurazione personale, interruttore ACCESO.
+      await usaConfigPersonale(true);
+      // Il registry personale non ha 'mio-claude': lo aggiungiamo qui, così la
+      // funzione punta a un modello proprietario senza sostituto previsto.
+      await Storage.setSettings({
+        modelRegistry: {
+          ...C.DEFAULT_MODEL_REGISTRY,
+          'mio-claude': { provider: 'openrouter', model: 'anthropic/claude-3.7-sonnet' },
+        },
+      });
+
+      res.acceso = await run(C.ACTIONS.EXPLAIN, { selection: 'ciao', sentence: 'ciao mondo' });
+      res.anthropic = await run(C.ACTIONS.EXPLAIN_DEEP, { selection: 'ciao', sentence: 'ciao mondo' });
+      res.senzaEquivalente = await run(C.ACTIONS.EXPLAIN_LINK, { url: 'https://example.com', text: 'x' });
+
+      // Il sostituto non risponde: non deve esistere un tentativo proprietario dopo.
+      failAll = true;
+      res.tuttoGiu = await run(C.ACTIONS.EXPLAIN, { selection: 'ciao', sentence: 'ciao mondo' });
+      failAll = false;
+
+      // ── C) Stessa configurazione, interruttore SPENTO: il proprietario torna.
+      await usaConfigPersonale(false);
+      res.spento = await run(C.ACTIONS.EXPLAIN_DEEP, { selection: 'ciao', sentence: 'ciao mondo' });
     } finally {
       globalThis.SN_PROVIDERS.completeWithFallback = origComplete;
     }
     return res;
   });
 
-  // 1. La funzione risponde davvero, e da un modello a pesi aperti.
-  expect(out.acceso.ok, `la funzione deve continuare a funzionare: ${out.acceso.message}`).toBe(true);
-  expect(out.acceso.text).toBe('risposta');
-  expect(out.acceso.model).toBe('google/gemma-4-31b-it');
-
-  // 2. Nessun tentativo proprietario, nessuna API diretta del produttore, e
-  //    Anthropic esclusa nell'instradamento.
   const proprietari = /gemini|claude|gpt-|grok/i;
-  for (const chain of [out.acceso.chain, out.anthropic.chain, out.spento.chain]) {
-    expect(Array.isArray(chain)).toBe(true);
-  }
-  for (const a of out.acceso.chain.concat(out.anthropic.chain)) {
+
+  // ── A) Crediti di Filo ─────────────────────────────────────────────────────
+  // 1+2. La richiesta parte e riesce, e tutto ciò che sarebbe andato in rete è
+  //      ammesso dalla politica (pesi aperti, mai l'API diretta del produttore).
+  expect(out.crediti.ok, `coi crediti di Filo la funzione deve funzionare: ${out.crediti.message}`).toBe(true);
+  expect(out.crediti.text).toBe('risposta');
+  expect(out.crediti.chain.length).toBeGreaterThan(0);
+  for (const a of out.crediti.chain) {
     expect(a.provider, 'l\'API diretta del produttore non deve comparire').toBe('openrouter');
     expect(a.model, `modello proprietario nella catena: ${a.model}`).not.toMatch(proprietari);
     expect(a.ignore.map((s) => s.toLowerCase())).toContain('anthropic');
     expect(a.ignore.map((s) => s.toLowerCase())).toContain('google');
   }
-  // Anche la funzione che nasceva su Anthropic viene servita da pesi aperti.
+
+  // 5. Controprova su chi ha servito: marchiata, non silenziosa.
+  expect(out.ultimaVoce).not.toBe(null);
+  expect(out.ultimaVoce.servedBy).toBe('Google AI Studio');
+  expect(out.ultimaVoce.policyViolation).toBe(true);
+
+  // ── B) Configurazione personale, interruttore acceso ───────────────────────
+  // 1. Sostituzione col modello a pesi aperti previsto, e la funzione risponde.
+  expect(out.acceso.ok, `la funzione deve continuare a funzionare: ${out.acceso.message}`).toBe(true);
+  expect(out.acceso.model).toBe('google/gemma-4-31b-it');
   expect(out.anthropic.ok).toBe(true);
   expect(out.anthropic.model).toBe('deepseek/deepseek-v4-pro');
-
-  // 3. Sostituto giù → nessun ripiego proprietario: la catena resta di soli
-  //    modelli ammessi e la richiesta fallisce.
-  expect(out.tuttoGiu.ok).toBe(false);
-  for (const a of out.tuttoGiu.chain) {
+  for (const a of out.acceso.chain.concat(out.anthropic.chain)) {
+    expect(a.provider).toBe('openrouter');
     expect(a.model).not.toMatch(proprietari);
+    expect(a.ignore.map((s) => s.toLowerCase())).toContain('anthropic');
   }
 
   // 4. Funzione senza equivalente: si ferma, non chiama niente, e lo dice.
@@ -165,12 +193,14 @@ test('solo modelli a pesi aperti: sostituisce, non ripiega, e lo dimostra', asyn
   expect(out.senzaEquivalente.chain).toBe(null);
   expect(out.senzaEquivalente.message).toMatch(/pesi aperti/i);
 
-  // 5. Controprova su chi ha servito: marchiata, non silenziosa.
-  expect(out.ultimaVoce).not.toBe(null);
-  expect(out.ultimaVoce.servedBy).toBe('Google AI Studio');
-  expect(out.ultimaVoce.policyViolation).toBe(true);
+  // 3. Sostituto giù → nessun ripiego proprietario: la richiesta fallisce e la
+  //    catena tentata resta di soli modelli ammessi.
+  expect(out.tuttoGiu.ok).toBe(false);
+  for (const a of out.tuttoGiu.chain) {
+    expect(a.model).not.toMatch(proprietari);
+  }
 
-  // 6. Spento: si torna alla configurazione predefinita (modello Gemini).
+  // ── C) Interruttore spento: la differenza la fa lui ────────────────────────
   expect(out.spento.ok).toBe(true);
-  expect(out.spento.model).toMatch(/gemini/i);
+  expect(out.spento.model).toBe('anthropic/claude-3.5-haiku');
 });
