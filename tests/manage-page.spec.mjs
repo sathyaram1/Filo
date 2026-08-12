@@ -245,7 +245,7 @@ test('il timeout dei giudici è editabile (in secondi) e il salvataggio lo scriv
   await expect.poll(() => page.evaluate(() => window.__judgeTimeoutSets)).toEqual([45000]);
 });
 
-test('il timeout dei giudici viene clampato nel range [10, 120] secondi', async ({ openTab }) => {
+test('il timeout dei giudici viene clampato nel range consentito', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
