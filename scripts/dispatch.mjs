@@ -120,26 +120,37 @@ async function acquireBearerSilent() {
 }
 
 /**
- * Legge config/automation.loopCap da Firestore in modo BEST-EFFORT: serve un
+ * Legge il doc config/automation da Firestore in modo BEST-EFFORT: serve un
  * bearer admin (il doc è admin-only), che si ricava da service account o refresh
- * token dell'owner. Se manca la credenziale o la rete fallisce, ritorna null
- * (→ si ricade sul default): non deve MAI bloccare il dispatch.
+ * token dell'owner. Se manca la credenziale o la rete fallisce, ritorna {}
+ * (→ si ricade sui default): non deve MAI bloccare il dispatch.
+ *
+ * Una sola lettura per giro: da qui escono sia `loopCap` sia `proberWhenIdle`.
  */
-async function fetchRemoteLoopCap() {
+async function fetchRemoteAutomation() {
   try {
     const { fa, bearer } = await acquireBearerSilent();
-    if (!bearer) return null; // nessuna credenziale → default
+    if (!bearer) return {}; // nessuna credenziale → default
     const url = `${fa.FIRESTORE_BASE}/config/automation?key=${fa.FIREBASE_API_KEY}`;
     const res = await fetch(url, { headers: { Authorization: `Bearer ${bearer}` } });
-    if (!res.ok) return null;
+    if (!res.ok) return {};
     const json = await res.json();
-    const f = json && json.fields && json.fields.loopCap;
-    if (!f) return null;
-    if (f.integerValue != null) return Number(f.integerValue);
-    if (f.doubleValue != null) return Number(f.doubleValue);
-    return null;
+    const fields = (json && json.fields) || {};
+    const out = {};
+    const lc = fields.loopCap;
+    if (lc) {
+      if (lc.integerValue != null) out.loopCap = Number(lc.integerValue);
+      else if (lc.doubleValue != null) out.loopCap = Number(lc.doubleValue);
+    }
+    // `proberWhenIdle`: esplorare quando non c'è altro da fare (feedback #448).
+    // Solo un `false` ESPLICITO spegne l'esplorazione — campo assente, doc mai
+    // scritto o lettura fallita lasciano il comportamento storico.
+    if (fields.proberWhenIdle && fields.proberWhenIdle.booleanValue === false) {
+      out.proberWhenIdle = false;
+    }
+    return out;
   } catch (_) {
-    return null;
+    return {};
   }
 }
 
@@ -311,11 +322,17 @@ const REVIEW_RANK = { 'blocked-secaudit': 5, secaudit: 4, verifier: 3, fixer: 2,
  * Sceglie il bucket dato uno snapshot dello STATO. Funzione pura.
  *
  * @param {{ reviews: Array<{id,num,branch,state}>, todoWinner: {id,num}|null }} snapshot
+ * @param {number} loopCap
+ * @param {{ proberWhenIdle?: boolean }} opts
+ *   `proberWhenIdle: false` (interruttore dell'owner, feedback #448): finito il
+ *   lavoro vero il giro NON ripiega sull'esplorazione, si ferma con `idle`.
+ *   Riguarda SOLO la coda vuota: il ripiego sul prober quando lo stato è
+ *   illeggibile è un GUASTO travestito da audit e resta com'è (vedi run()).
  * @returns {{ role: string, id?: string, num?: string, branch?: string,
  *             loopCount?: number, state?: object }}
- *   role ∈ secaudit | verifier | fixer | blocked-loop | new-work | prober
+ *   role ∈ secaudit | verifier | fixer | blocked-loop | new-work | prober | idle
  */
-export function chooseBucket(snapshot, loopCap = LOOP_CAP) {
+export function chooseBucket(snapshot, loopCap = LOOP_CAP, opts = {}) {
   const reviews = Array.isArray(snapshot?.reviews) ? snapshot.reviews : [];
 
   // Classifica ogni review e tieni il candidato col rango più alto.
@@ -337,7 +354,7 @@ export function chooseBucket(snapshot, loopCap = LOOP_CAP) {
   if (snapshot?.todoWinner?.id) {
     return { role: 'new-work', id: snapshot.todoWinner.id, num: snapshot.todoWinner.num || '' };
   }
-  return { role: 'prober' };
+  return { role: opts?.proberWhenIdle === false ? 'idle' : 'prober' };
 }
 
 // ─── Transizioni di stato (pure) ──────────────────────────────────────────────
@@ -442,6 +459,7 @@ const ROLE_FILE = {
   'new-work': 'new-work.md',
   prober: 'prober.md',
   halt: 'halt.md',
+  idle: 'idle.md',
 };
 
 export function readRoleInstructions(role) {
@@ -810,9 +828,12 @@ export async function run() {
     await recordWorkerSpawn(proberBucket);
     return { exit: 0 };
   }
-  // Cap EFFETTIVO: env > config/automation (scelto dall'owner) > default.
-  const cap = resolveLoopCap({ envRaw: process.env.FILO_LOOP_CAP, remote: await fetchRemoteLoopCap() });
-  let bucket = chooseBucket(snapshot, cap);
+  // Config dell'owner (una lettura sola): cap del loop + esplorazione a coda
+  // vuota. Cap EFFETTIVO: env > config/automation > default.
+  const automation = await fetchRemoteAutomation();
+  const cap = resolveLoopCap({ envRaw: process.env.FILO_LOOP_CAP, remote: automation.loopCap ?? null });
+  const opts = { proberWhenIdle: automation.proberWhenIdle };
+  let bucket = chooseBucket(snapshot, cap, opts);
 
   // Escalation gestite inline da dispatch (nessun worker da spawnare): accodano
   // `design` (decide l'owner), puliscono lo stato e si ri-sceglie. In loop:
@@ -836,10 +857,10 @@ export async function run() {
     clearState(bucket.id);
     // Ricostruisci lo snapshot senza questo feedback e ri-scegli.
     snapshot = { reviews: snapshot.reviews.filter((r) => r.id !== bucket.id), todoWinner: snapshot.todoWinner };
-    bucket = chooseBucket(snapshot, cap);
+    bucket = chooseBucket(snapshot, cap, opts);
   }
 
-  return finalizeBucket(bucket, snapshot, cap);
+  return finalizeBucket(bucket, snapshot, cap, opts);
 }
 
 // Raccoglie il payload (diff/feedback), fa il claim per i bucket feedback-bound,
@@ -902,7 +923,15 @@ function positionOnBranch(bucket) {
   return { ok: true, branch };
 }
 
-async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP) {
+async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP, opts = {}) {
+  // Coda vuota con l'esplorazione spenta dall'owner (#448): non c'è niente da
+  // fare, e non c'è niente da riparare. Nessun worker, nessun claim, nessun
+  // ritorno alla linea principale: il giro finisce sereno con exit 0.
+  if (bucket.role === 'idle') {
+    emit(bucket, {});
+    return { exit: 0 };
+  }
+
   if (bucket.role === 'prober') {
     prepareForProber();
     emit(bucket, {});
@@ -920,7 +949,7 @@ async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP) {
     if (res.status === 'taken') {
       // Già in lavorazione da un'altra routine: escludilo e ri-scegli.
       const next = { reviews: snapshot.reviews.filter((r) => r.id !== bucket.id), todoWinner: snapshot.todoWinner?.id === bucket.id ? null : snapshot.todoWinner };
-      return finalizeBucket(chooseBucket(next, cap), next, cap);
+      return finalizeBucket(chooseBucket(next, cap, opts), next, cap, opts);
     }
     // Macchina a stati (spec §6): il claim su git è il lock PRIMARIO; lo status
     // `working` è il suo riflesso persistito per la dashboard. Solo per la
@@ -995,7 +1024,10 @@ export function emit(bucket, ctx) {
   // porta la provenienza giusta anche se il worker non ci pensa. Un guasto
   // (`halt`) non è un ruolo: si cancella, altrimenti il marcatore del giro
   // precedente sopravvivrebbe a un giro che non ha lavorato.
-  if (bucket.role === 'halt') clearRole(ROOT);
+  // Un guasto (`halt`) e un giro a vuoto (`idle`) non sono ruoli: si cancella il
+  // marcatore, altrimenti quello del giro precedente sopravviverebbe a un giro
+  // che non ha lavorato e finirebbe nella provenienza di un feedback altrui.
+  if (bucket.role === 'halt' || bucket.role === 'idle') clearRole(ROOT);
   else writeRole(ROOT, bucket.role);
   const payload = buildPayload(bucket, ctx);
   const out = {

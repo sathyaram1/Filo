@@ -56,7 +56,7 @@ DB3 esistente), poi "Risolti".
 - ingresso → gate file (filo-security, prima dei giudici): flag → `suspicious_file`;
   pulito → `unlabeled`.
 - `unlabeled` —pipeline (panel completo)→ `attack` | `spam` | `design` | (sicuro:
-  automatica ON → `todo`, OFF → `aligned`).
+  automatica ON **e mittente ammesso** → `todo`, altrimenti → `aligned`).
 - `suspicious_file` —owner→ `todo` | `attack_confirmed` | `spam_confirmed` | `archived`.
 - `attack` —owner→ `attack_confirmed` | `todo` (falso positivo).
 - `spam` —owner→ `spam_confirmed` | `todo`.
@@ -95,6 +95,14 @@ identità li flagga è un errore → `unlabeled` per ri-giudizio.
 La modalità automatica agisce UNA volta, al giudizio (sicuro + ON → `todo`; sicuro + OFF
 → `aligned`). Attivarla dopo NON ri-tocca i vecchi `aligned`: l'owner li approva in blocco
 dalla dashboard (azione bulk `aligned→todo`, da aggiungere alla UI).
+
+**Per mittente (#446).** "ON" non è più un sì/no per tutti: l'interruttore master
+(`config/automation.enabled`) abilita l'auto-approvazione, e la mappa
+`config/automation.autoApprove` dice QUALI categorie di mittente ne beneficiano
+(`owner` / `filo` / `claude` / `user`, dal prefisso del `clientId`). Master spento ⇒
+nessuno, qualunque cosa dica la mappa. Mappa assente ⇒ tutti, come prima che esistesse.
+La logica è pura e vive in due copie da tenere allineate: `src/shared/feedbackThread.js`
+(dashboard) e `filo-security/functions/src/autoApprove.js` (chi decide davvero).
 
 ## 5. Chat del feedback distingue i sotto-casi di `design`
 

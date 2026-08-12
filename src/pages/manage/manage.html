@@ -30,13 +30,24 @@
     .sn-page { max-width: none; }
 
     /* ── Switch "Modalità automatica" (tab Automazioni, owner-only) ─────── */
-    .mg-switch {
+    /* `.sn-page label` (pages.css) impone `display: block` + colore smorzato a
+       OGNI label di una pagina filo://, e con specificità 0-1-1 batteva
+       `.mg-switch`: la levetta finiva `display: inline`, quindi larghezza e
+       altezza non si applicavano e del pill si vedeva solo la pallina bianca
+       (che è in posizione assoluta e sopravvive al collasso). Da qui il selettore
+       più specifico: è l'unico modo di vincere senza toccare pages.css, che
+       serve a tutte le altre pagine. */
+    .sn-page label.mg-switch {
       display: inline-flex; align-items: center; gap: 10px;
+      margin: 0;
       cursor: pointer; user-select: none;
       font-size: 13px; font-weight: 600; color: var(--sn-fg);
     }
     .mg-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
     .mg-switch-track {
+      /* `inline-block` esplicito: la levetta non deve dipendere dal fatto che il
+         genitore sia rimasto flex. */
+      display: inline-block;
       position: relative; width: 40px; height: 22px; border-radius: 999px;
       /* A riposo un grigio marcato e theme-aware: `--sn-border` sul tema chiaro
          è quasi bianco e non leggeva come switch. `--sn-muted` è visibile su
@@ -58,6 +69,30 @@
       min-width: 22px; text-align: left;
     }
     .mg-switch.mg-switch--disabled { cursor: not-allowed; opacity: 0.5; }
+    /* Variante piccola: gli interruttori figli sotto quello master. Il testo a
+       sinistra e la levetta incolonnata a destra — con quattro voci di lunghezza
+       diversa, allineare le levette rende leggibile a colpo d'occhio quali sono
+       accese. */
+    .sn-page label.mg-switch--sm {
+      display: flex; justify-content: space-between; width: 100%;
+      font-weight: 500; gap: 8px;
+    }
+    .mg-switch--sm .mg-switch-track { width: 32px; height: 18px; }
+    .mg-switch--sm .mg-switch-thumb { width: 14px; height: 14px; }
+    .mg-switch--sm input:checked + .mg-switch-track .mg-switch-thumb { transform: translateX(14px); }
+    .mg-auto-sub {
+      margin: 14px 0 0; padding: 12px 0 0;
+      border-top: 1px solid var(--sn-border);
+      display: flex; flex-direction: column; gap: 10px;
+      /* Più stretto del blocco: con la levetta all'estremo destro di 800px il
+         legame fra etichetta e interruttore si perde. */
+      max-width: 380px;
+    }
+    .mg-auto-sub-title {
+      margin: 0; font-size: 12px; font-weight: 600; color: var(--sn-muted);
+    }
+    /* Automatica spenta: i figli non decidono niente, e si vede. */
+    .mg-auto-sub--off { opacity: 0.45; }
 
     /* ── Tab bar (pattern fb-tabs di feedback.html) ───────────────────── */
     .mg-tabs {
@@ -1031,8 +1066,49 @@
             <span class="mg-switch-state" id="mgAutoState">Off</span>
           </label>
           <p class="mg-auto-block-desc">
-            Quando è attiva, Filo lavora i feedback in autonomia (routine e
-            red-team). Spenta, nulla parte da solo.
+            Quando è attiva, i feedback giudicati sicuri entrano in coda da soli.
+            Spenta, li approvi tu uno per uno.
+            <span class="mg-action-msg" id="mgAutoMsg" role="status"></span>
+          </p>
+
+          <!-- Chi può entrare in coda da solo, per categoria di mittente. Inerti
+               con l'automatica spenta: la classe li smorza e il JS li disabilita. -->
+          <div class="mg-auto-sub" id="mgAutoApproveBlock">
+            <p class="mg-auto-sub-title">Entrano in coda da soli</p>
+            <label class="mg-switch mg-switch--sm" title="I feedback che scrivi tu">
+              <span class="mg-switch-text">👑 I tuoi</span>
+              <input type="checkbox" id="mgAutoApproveOwner" checked />
+              <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+            </label>
+            <label class="mg-switch mg-switch--sm" title="Segnalazioni che Filo scrive per conto di un utente">
+              <span class="mg-switch-text">🧵 Filo (per conto di un utente)</span>
+              <input type="checkbox" id="mgAutoApproveFilo" checked />
+              <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+            </label>
+            <label class="mg-switch mg-switch--sm" title="Ritrovamenti delle tue automazioni: esplorazione, sviluppo, verifica">
+              <span class="mg-switch-text">🤖 Claude (le automazioni)</span>
+              <input type="checkbox" id="mgAutoApproveClaude" checked />
+              <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+            </label>
+            <label class="mg-switch mg-switch--sm" title="Feedback inviati dagli alpha tester">
+              <span class="mg-switch-text">👤 Altri utenti</span>
+              <input type="checkbox" id="mgAutoApproveUser" checked />
+              <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+            </label>
+          </div>
+        </section>
+
+        <!-- Esplorazione automatica a coda vuota (#448). -->
+        <section class="mg-auto-block">
+          <label class="mg-switch" title="Ferma l'esplorazione automatica quando non ci sono più feedback da lavorare">
+            <span class="mg-switch-text">Esplora quando la coda è vuota</span>
+            <input type="checkbox" id="mgProberIdle" checked />
+            <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+          </label>
+          <p class="mg-auto-block-desc">
+            Finiti i feedback da lavorare, Filo va a cercare da solo problemi che
+            nessuno ha segnalato. Spento, quando la coda è vuota si ferma.
+            <span class="mg-action-msg" id="mgProberIdleMsg" role="status"></span>
           </p>
         </section>
 
@@ -1062,7 +1138,7 @@
           </p>
           <div class="mg-auto-field-row">
             <input type="number" id="mgJudgeTimeout" class="mg-auto-number"
-              min="10" max="120" step="1" inputmode="numeric" />
+              min="10" max="300" step="1" inputmode="numeric" />
             <button type="button" class="sn-btn" id="mgJudgeTimeoutSave">Salva</button>
             <span class="mg-action-msg" id="mgJudgeTimeoutMsg" role="status"></span>
           </div>

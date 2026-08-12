@@ -85,6 +85,35 @@ test('chooseBucket: snapshot vuoto → prober', () => {
   assert.equal(chooseBucket({}).role, 'prober');
 });
 
+// ─── Esplorazione automatica a coda vuota (interruttore owner, #448) ──────────
+
+test('chooseBucket: coda vuota con esplorazione spenta → idle, non prober', () => {
+  const opts = { proberWhenIdle: false };
+  assert.equal(chooseBucket({ reviews: [], todoWinner: null }, undefined, opts).role, 'idle');
+  assert.equal(chooseBucket({}, undefined, opts).role, 'idle');
+});
+
+test("l'interruttore spento NON tocca il lavoro vero", () => {
+  // Ferma solo il ripiego a coda vuota: finché c'è da lavorare si lavora.
+  const opts = { proberWhenIdle: false };
+  assert.equal(
+    chooseBucket({ reviews: [], todoWinner: { id: 'F1', num: '#5' } }, undefined, opts).role,
+    'new-work',
+  );
+  assert.equal(
+    chooseBucket({ reviews: [review('A', { verifierVerdict: null })], todoWinner: null }, undefined, opts).role,
+    'verifier',
+  );
+});
+
+test('solo un false esplicito spegne: assente o true → prober come sempre', () => {
+  const empty = { reviews: [], todoWinner: null };
+  assert.equal(chooseBucket(empty, undefined, {}).role, 'prober');
+  assert.equal(chooseBucket(empty, undefined, { proberWhenIdle: true }).role, 'prober');
+  assert.equal(chooseBucket(empty, undefined, { proberWhenIdle: undefined }).role, 'prober');
+  assert.equal(chooseBucket(empty, undefined, { proberWhenIdle: null }).role, 'prober');
+});
+
 test('chooseBucket: solo todo → new-work col vincitore', () => {
   const b = chooseBucket({ reviews: [], todoWinner: { id: 'F1', num: '#5' } });
   assert.equal(b.role, 'new-work');
@@ -449,6 +478,15 @@ test('emit: un GUASTO cancella il marcatore invece di lasciare quello vecchio', 
   assert.equal(readRole(TMP), 'new-work');
   // `halt` non è un ruolo: nessun lavoro consegnato, nessuna firma da lasciare.
   silently(() => emit({ role: 'halt', kind: 'transient', message: 'coda illeggibile' }, {}));
+  assert.equal(readRole(TMP), '');
+});
+
+test('emit: un giro a vuoto (idle) non lascia una firma di lavoro', () => {
+  silently(() => emit({ role: 'new-work', id: 'z' }, {}));
+  assert.equal(readRole(TMP), 'new-work');
+  // Nessun worker è partito: il marcatore del giro prima non deve sopravvivere,
+  // o finirebbe nella provenienza del primo feedback aperto da qualcun altro.
+  silently(() => emit({ role: 'idle' }, {}));
   assert.equal(readRole(TMP), '');
 });
 

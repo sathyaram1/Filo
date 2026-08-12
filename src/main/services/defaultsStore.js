@@ -20,6 +20,9 @@
 
 const auth = require('../auth/google-auth');
 const { getBuildKeys } = require('../config/default-keys');
+// Registra SN_FEEDBACK_THREAD su globalThis: da lì viene l'elenco dei gruppi di
+// mittente dell'auto-approvazione, che deve restare uno solo (#446).
+require('../../shared/feedbackThread.js');
 
 const PROJECT_ID = 'filo-8b9cb';
 const API_KEY = 'AIzaSyDN_fpshLW_K78QLV0MMiX1gd-OfO7x-CY'; // pubblica per design
@@ -332,6 +335,63 @@ async function setAutomationGate(enabled, idToken) {
   return Boolean(enabled);
 }
 
+// Auto-approvazione per mittente (config/automation, campo `autoApprove`): quali
+// categorie di mittente possono entrare in coda da sole quando l'interruttore
+// master è acceso. La decisione vera la prende il backend di sicurezza; qui c'è
+// solo la lettura/scrittura per la dashboard. Campo assente ⇒ tutti ammessi, che
+// è ciò che l'automatica faceva prima che questi sottointerruttori esistessero.
+function autoApproveGroups() {
+  const T = globalThis.SN_FEEDBACK_THREAD;
+  return (T && T.AUTO_APPROVE_GROUPS) || ['owner', 'filo', 'claude', 'user'];
+}
+
+function normalizeAutoApprove(raw) {
+  const out = {};
+  for (const g of autoApproveGroups()) {
+    out[g] = !(raw && typeof raw === 'object' && raw[g] === false);
+  }
+  return out;
+}
+
+async function getAutomationAutoApprove(idToken) {
+  const doc = await fetchDoc(AUTOMATION_DOC, idToken);
+  return normalizeAutoApprove(doc && doc.autoApprove);
+}
+
+async function setAutomationAutoApprove(partial, idToken) {
+  if (!idToken) throw new Error('Serve un ID token admin per cambiare l\'auto-approvazione.');
+  // Merge sul valore corrente: la dashboard manda un solo interruttore per volta
+  // e il documento tiene una mappa sola.
+  const current = await getAutomationAutoApprove(idToken);
+  const next = { ...current };
+  if (partial && typeof partial === 'object') {
+    for (const g of autoApproveGroups()) {
+      if (typeof partial[g] === 'boolean') next[g] = partial[g];
+    }
+  }
+  const fields = {};
+  for (const g of autoApproveGroups()) fields[g] = toFsValue(next[g]);
+  await patchDoc(AUTOMATION_DOC, { autoApprove: { mapValue: { fields } } }, ['autoApprove'], idToken);
+  return next;
+}
+
+// Esplorazione automatica a coda vuota (config/automation, campo
+// `proberWhenIdle`): quando non c'è più niente da lavorare, le routine vanno a
+// cercare problemi che nessuno ha segnalato. Lo legge scripts/dispatch.mjs.
+// Campo assente ⇒ true (il comportamento che c'è sempre stato): solo un `false`
+// scritto apposta ferma l'esplorazione.
+async function getAutomationProberIdle(idToken) {
+  const doc = await fetchDoc(AUTOMATION_DOC, idToken);
+  if (!doc || typeof doc.proberWhenIdle !== 'boolean') return true;
+  return doc.proberWhenIdle;
+}
+
+async function setAutomationProberIdle(on, idToken) {
+  if (!idToken) throw new Error('Serve un ID token admin per cambiare l\'esplorazione automatica.');
+  await patchDoc(AUTOMATION_DOC, { proberWhenIdle: toFsValue(Boolean(on)) }, ['proberWhenIdle'], idToken);
+  return Boolean(on);
+}
+
 // Tentativi del loop di correzione (config/automation, campo `loopCap`): quante
 // FAIL consecutive del verifier prima di bloccare un fix con motivo `loop`. È la
 // fonte di verità letta dalle routine (scripts/dispatch.mjs). Default e range da
@@ -397,6 +457,10 @@ module.exports = {
   update,
   getAutomationGate,
   setAutomationGate,
+  getAutomationAutoApprove,
+  setAutomationAutoApprove,
+  getAutomationProberIdle,
+  setAutomationProberIdle,
   getAutomationLoopCap,
   setAutomationLoopCap,
   getWorkerLog,

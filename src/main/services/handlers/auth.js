@@ -368,12 +368,17 @@ module.exports = function register(on, ctx) {
       const idToken = await auth.getIdToken();
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
       const enabled = await Defaults.getAutomationGate(idToken);
-      return { ok: true, enabled };
+      const autoApprove = await Defaults.getAutomationAutoApprove(idToken);
+      const proberWhenIdle = await Defaults.getAutomationProberIdle(idToken);
+      return { ok: true, enabled, autoApprove, proberWhenIdle };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
   });
 
+  // Accetta `enabled` (interruttore master) e/o `autoApprove` (mappa dei mittenti
+  // ammessi all'auto-approvazione, #446), e tocca SOLO ciò che riceve: la vecchia
+  // pagina feedback manda ancora il solo `enabled` e non deve azzerare la mappa.
   on(MSG.AUTOMATION_SET, async (msg) => {
     try {
       if (!auth.isAdmin()) {
@@ -381,8 +386,19 @@ module.exports = function register(on, ctx) {
       }
       const idToken = await auth.getIdToken();
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
-      const enabled = await Defaults.setAutomationGate(Boolean(msg.enabled), idToken);
-      return { ok: true, enabled };
+      let enabled;
+      if (typeof msg.enabled === 'boolean') {
+        enabled = await Defaults.setAutomationGate(msg.enabled, idToken);
+      } else {
+        enabled = await Defaults.getAutomationGate(idToken);
+      }
+      const autoApprove = (msg.autoApprove && typeof msg.autoApprove === 'object')
+        ? await Defaults.setAutomationAutoApprove(msg.autoApprove, idToken)
+        : await Defaults.getAutomationAutoApprove(idToken);
+      const proberWhenIdle = (typeof msg.proberWhenIdle === 'boolean')
+        ? await Defaults.setAutomationProberIdle(msg.proberWhenIdle, idToken)
+        : await Defaults.getAutomationProberIdle(idToken);
+      return { ok: true, enabled, autoApprove, proberWhenIdle };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }

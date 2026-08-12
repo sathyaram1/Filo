@@ -254,6 +254,15 @@ leggendo solo lo STATO e stampa il JSON per il worker:
 | 3ª | branch con FAIL del verifier in attesa (loop < 3) | **fixer** | `routines/roles/fixer.md` |
 | 4ª | c'è un todo (vincitore di `next-feedback`) | **new-work** | `routines/roles/new-work.md` |
 | 5ª | niente di tutto ciò | **prober** | `routines/roles/prober.md` |
+| 5ª-bis | niente di tutto ciò, ma l'owner ha spento l'esplorazione a coda vuota | **idle** | `routines/roles/idle.md` |
+
+- **L'esplorazione a coda vuota si può spegnere** (feedback #448): la tab
+  Automazioni della dashboard scrive `proberWhenIdle: false` su
+  `config/automation`, e con quello il giro finisce in `idle` invece che in
+  `prober` — nessun worker, nessun claim, exit 0. Solo un `false` esplicito
+  spegne: campo assente, doc mai scritto o lettura fallita lasciano il prober.
+  Riguarda **solo** la coda vuota: il ripiego sul prober quando lo stato è
+  illeggibile è un guasto travestito da audit e resta com'era.
 
 - A **3 FAIL** del verifier sullo stesso branch, dispatch NON chiama il fixer:
   accoda `design` (motivo `loop`, con l'ultima critica del verifier nella chat),

@@ -126,9 +126,19 @@
     // ragionano per qualche secondo prima del verdetto: troppo basso e quel
     // giudice non risponde mai → panel parziale ("non filtrato"). Salvato in
     // config/supportModels (ms) e letto dal backend dei giudici.
+    //
+    // Il TETTO non è una preferenza estetica: è vincolato al tempo massimo che
+    // la funzione cloud che gira il panel ha a disposizione (540s, il massimo
+    // per un trigger Firestore). Il panel prova ogni giudice fino a 3 volte, e
+    // il backend salta i tentativi che non ci starebbero nel tempo rimasto: con
+    // 300s un giudice lentissimo fa un tentativo solo, ma lo fa davvero — che è
+    // il punto di poter alzare il valore. Alzarlo oltre 300 qui SENZA alzare il
+    // budget della funzione (filo-security: PANEL_BUDGET_MS + timeoutSeconds)
+    // rimetterebbe l'impostazione nella condizione di prima: scrivibile ma non
+    // rispettata.
     JUDGE_TIMEOUT_DEFAULT_S: 60,
     JUDGE_TIMEOUT_MIN_S: 10,
-    JUDGE_TIMEOUT_MAX_S: 120,
+    JUDGE_TIMEOUT_MAX_S: 300,
     // Quante voci del log dei worker tenere (le più recenti). Il log vive come
     // campo `workerLog` del doc config/automation: cappato per non gonfiare il
     // documento. Scritto da scripts/dispatch.mjs a ogni worker spawnato, letto

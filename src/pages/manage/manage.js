@@ -18,6 +18,18 @@
   const mgAutoSwitch = document.getElementById('mgAutoSwitch');
   const mgAutoToggle = document.getElementById('mgAutoToggle');
   const mgAutoState  = document.getElementById('mgAutoState');
+  const mgAutoMsg    = document.getElementById('mgAutoMsg');
+  const mgAutoApproveBlock = document.getElementById('mgAutoApproveBlock');
+  // Un interruttore per categoria di mittente (#446): la chiave è il gruppo
+  // definito in SN_FEEDBACK_THREAD.AUTO_APPROVE_GROUPS.
+  const mgAutoApprove = {
+    owner:  document.getElementById('mgAutoApproveOwner'),
+    filo:   document.getElementById('mgAutoApproveFilo'),
+    claude: document.getElementById('mgAutoApproveClaude'),
+    user:   document.getElementById('mgAutoApproveUser'),
+  };
+  const mgProberIdle    = document.getElementById('mgProberIdle');
+  const mgProberIdleMsg = document.getElementById('mgProberIdleMsg');
   const mgLoopCap    = document.getElementById('mgLoopCap');
   const mgLoopCapSave = document.getElementById('mgLoopCapSave');
   const mgLoopCapMsg  = document.getElementById('mgLoopCapMsg');
@@ -127,6 +139,8 @@
   const SRCH = window.SN_MANAGE_SEARCH;
   const AUTO_MODE_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTO_MODE) || 'filo_auto_mode';
   const SORT_MODE_KEY = 'filo_manage_sort';
+  const AUTOMATION_GET = (window.SN_MSG?.MSG?.AUTOMATION_GET) || 'automation_get';
+  const AUTOMATION_SET = (window.SN_MSG?.MSG?.AUTOMATION_SET) || 'automation_set';
 
   // ── Icona d'autore su ogni card (chi ha scritto il feedback) ──────────────
   // La CLASSIFICAZIONE (prefissi → categoria) è pura e condivisa in
@@ -235,39 +249,134 @@
   });
 
   // ── Switch "Modalità automatica" ──────────────────────────────────────────
-  // Stato persistito in chrome.storage.local; lo switch è sempre visibile ma
-  // modificabile solo dall'owner (read-only per gli altri, come il resto della
-  // pagina).
+  // La fonte di verità è il doc Firestore config/automation (campo `enabled`),
+  // perché è QUELLO che il backend dei giudici legge per decidere se un feedback
+  // sicuro entra in coda da solo. chrome.storage.local resta solo una cache
+  // locale: mostra subito un valore all'apertura e regge se l'IPC non risponde.
+  //
+  // Fino al 2026-08-12 lo switch scriveva SOLO la cache locale: nessuno la
+  // leggeva, quindi accenderlo non produceva alcun effetto (feedback #446).
   function reflectAutoMode(on) {
     autoModeOn = !!on;
     mgAutoToggle.checked = !!on;
     mgAutoState.textContent = on ? 'On' : 'Off';
+    applyAutoApproveGate();
+  }
+
+  function setAutoModeMsg(text, kind) {
+    if (!mgAutoMsg) return;
+    mgAutoMsg.textContent = text || '';
+    mgAutoMsg.classList.toggle('mg-ok', kind === 'ok');
+    mgAutoMsg.classList.toggle('mg-err', kind === 'err');
   }
 
   async function loadAutoMode() {
+    // 1. Cache locale: valore immediato, niente attesa davanti allo switch.
     try {
       const data = await chrome.storage.local.get(AUTO_MODE_KEY);
       reflectAutoMode(!!data[AUTO_MODE_KEY]);
     } catch (_) {
       reflectAutoMode(false);
     }
+    // 2. Valore vero da Firestore (owner-gated). Se non siamo admin o siamo
+    //    offline resta quello della cache.
+    try {
+      const r = await sendToMain({ type: AUTOMATION_GET });
+      if (r && r.ok) {
+        reflectAutoMode(Boolean(r.enabled));
+        reflectAutoApprove(r.autoApprove);
+        if (mgProberIdle) mgProberIdle.checked = r.proberWhenIdle !== false;
+        chrome.storage.local.set({ [AUTO_MODE_KEY]: Boolean(r.enabled) }).catch(() => {});
+      }
+    } catch (_) { /* resta la cache */ }
   }
 
   mgAutoToggle.addEventListener('change', async () => {
     const on = mgAutoToggle.checked;
     reflectAutoMode(on);
-    // Attivando/disattivando l'automatica i feedback allineati si spostano subito
-    // tra Ricevuti e In coda: ricalcola la lista corrente.
-    renderList();
+    setAutoModeMsg('', null);
     try {
-      await chrome.storage.local.set({ [AUTO_MODE_KEY]: on });
+      const r = await sendToMain({ type: AUTOMATION_SET, enabled: on });
+      if (!r || r.ok === false) throw new Error(r?.error || 'errore sconosciuto');
+      reflectAutoMode(Boolean(r.enabled));
+      reflectAutoApprove(r.autoApprove);
+      chrome.storage.local.set({ [AUTO_MODE_KEY]: Boolean(r.enabled) }).catch(() => {});
+      // Accendere l'automatica vale da ORA in avanti: agisce al momento del
+      // giudizio, quindi i feedback già in attesa restano dove sono. Senza
+      // dirlo, accendere lo switch sembra di nuovo non fare niente — e i già in
+      // attesa hanno il loro pulsante, due righe più in là.
+      const pending = r.enabled ? alignedFeedbacks().length : 0;
+      setAutoModeMsg(
+        pending
+          ? `Salvato. I ${pending} già in attesa restano nei Ricevuti: usa «Approva tutti gli allineati».`
+          : 'Salvato.',
+        'ok',
+      );
     } catch (err) {
-      // Ripristina lo stato precedente se il salvataggio fallisce.
+      // Ripristina lo stato precedente: se non è stato scritto su Firestore, non
+      // è attivo — e lo switch non deve dire il contrario.
       reflectAutoMode(!on);
-      renderList();
+      setAutoModeMsg('Salvataggio fallito: la modalità automatica NON è cambiata.', 'err');
       console.error('[manage] salvataggio modalità automatica fallito:', err);
     }
   });
+
+  // ── Auto-approvazione per mittente (#446) ─────────────────────────────────
+  // Con l'automatica accesa, questi decidono DI CHI ci si fida abbastanza da
+  // farlo entrare in coda senza passare dall'owner. Spenta l'automatica non
+  // contano: restano visibili ma inerti (e lo si vede).
+  function reflectAutoApprove(map) {
+    const m = (map && typeof map === 'object') ? map : {};
+    for (const [group, el] of Object.entries(mgAutoApprove)) {
+      if (el) el.checked = m[group] !== false;
+    }
+  }
+
+  function applyAutoApproveGate() {
+    for (const el of Object.values(mgAutoApprove)) {
+      if (el) el.disabled = !isAdmin || !autoModeOn;
+    }
+    if (mgAutoApproveBlock) mgAutoApproveBlock.classList.toggle('mg-auto-sub--off', !autoModeOn);
+  }
+
+  for (const [group, el] of Object.entries(mgAutoApprove)) {
+    if (!el) continue;
+    el.addEventListener('change', async () => {
+      const want = el.checked;
+      setAutoModeMsg('', null);
+      try {
+        const r = await sendToMain({ type: AUTOMATION_SET, autoApprove: { [group]: want } });
+        if (!r || r.ok === false) throw new Error(r?.error || 'errore sconosciuto');
+        reflectAutoApprove(r.autoApprove);
+      } catch (err) {
+        el.checked = !want;
+        setAutoModeMsg('Salvataggio fallito: l\'impostazione NON è cambiata.', 'err');
+        console.error('[manage] salvataggio auto-approvazione fallito:', err);
+      }
+    });
+  }
+
+  // ── Esplorazione automatica a coda vuota (#448) ───────────────────────────
+  // Indipendente dall'automatica: riguarda cosa fanno le routine quando NON c'è
+  // più niente in coda, non chi entra in coda.
+  if (mgProberIdle) {
+    mgProberIdle.addEventListener('change', async () => {
+      const want = mgProberIdle.checked;
+      if (mgProberIdleMsg) mgProberIdleMsg.textContent = '';
+      try {
+        const r = await sendToMain({ type: AUTOMATION_SET, proberWhenIdle: want });
+        if (!r || r.ok === false) throw new Error(r?.error || 'errore sconosciuto');
+        mgProberIdle.checked = r.proberWhenIdle !== false;
+      } catch (err) {
+        mgProberIdle.checked = !want;
+        if (mgProberIdleMsg) {
+          mgProberIdleMsg.textContent = 'Salvataggio fallito: l\'impostazione NON è cambiata.';
+          mgProberIdleMsg.classList.add('mg-err');
+        }
+        console.error('[manage] salvataggio esplorazione automatica fallito:', err);
+      }
+    });
+  }
 
   function applyAutoModeGate() {
     mgAutoToggle.disabled = !isAdmin;
@@ -276,6 +385,8 @@
     if (mgLoopCapSave) mgLoopCapSave.disabled = !isAdmin;
     if (mgJudgeTimeout)     mgJudgeTimeout.disabled = !isAdmin;
     if (mgJudgeTimeoutSave) mgJudgeTimeoutSave.disabled = !isAdmin;
+    if (mgProberIdle)  mgProberIdle.disabled = !isAdmin;
+    applyAutoApproveGate();
   }
 
   // ── Tentativi del loop di correzione (tab Automazioni) ────────────────────
@@ -357,7 +468,18 @@
   // legge via i messaggi support_models_* (PATCH per-campo: non tocca i modelli).
   const JT_DEF = AUTOMATION.JUDGE_TIMEOUT_DEFAULT_S || 60;
   const JT_MIN = AUTOMATION.JUDGE_TIMEOUT_MIN_S || 10;
-  const JT_MAX = AUTOMATION.JUDGE_TIMEOUT_MAX_S || 120;
+  const JT_MAX = AUTOMATION.JUDGE_TIMEOUT_MAX_S || 300;
+  // I limiti del campo vengono dal registro, non dall'HTML: erano scritti in due
+  // posti e alzare il tetto in uno solo lasciava il campo a rifiutare il valore
+  // nuovo (o ad accettarne uno che il backend non rispetta).
+  if (mgJudgeTimeout) {
+    mgJudgeTimeout.min = String(JT_MIN);
+    mgJudgeTimeout.max = String(JT_MAX);
+  }
+  if (mgLoopCap) {
+    mgLoopCap.min = String(AUTOMATION.LOOP_CAP_MIN);
+    mgLoopCap.max = String(AUTOMATION.LOOP_CAP_MAX);
+  }
   function clampJudgeTimeoutS(n) {
     const v = Math.round(Number(n));
     if (!Number.isFinite(v)) return JT_DEF;
@@ -1941,6 +2063,9 @@
     loadLoopCap,
     // Ri-legge il timeout dei giudici (IPC) — usato dai test dopo lo stub.
     loadJudgeTimeout,
+    // Ri-legge la config dell'automatica (IPC): interruttore master, mappa dei
+    // mittenti auto-approvati, esplorazione a coda vuota — usato dai test.
+    loadAutoMode,
     setTab(tab) { selectTab(tab); },
     // Ordinamento della lista (menu tasto destro): impostalo e rirender.
     setSortMode(mode) { if (SORT_MODES[mode]) { sortMode = mode; reflectSortBtn(); renderList(); } },
