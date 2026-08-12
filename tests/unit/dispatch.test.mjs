@@ -85,6 +85,35 @@ test('chooseBucket: snapshot vuoto → prober', () => {
   assert.equal(chooseBucket({}).role, 'prober');
 });
 
+// ─── Esplorazione automatica a coda vuota (interruttore owner, #448) ──────────
+
+test('chooseBucket: coda vuota con esplorazione spenta → idle, non prober', () => {
+  const opts = { proberWhenIdle: false };
+  assert.equal(chooseBucket({ reviews: [], todoWinner: null }, undefined, opts).role, 'idle');
+  assert.equal(chooseBucket({}, undefined, opts).role, 'idle');
+});
+
+test("l'interruttore spento NON tocca il lavoro vero", () => {
+  // Ferma solo il ripiego a coda vuota: finché c'è da lavorare si lavora.
+  const opts = { proberWhenIdle: false };
+  assert.equal(
+    chooseBucket({ reviews: [], todoWinner: { id: 'F1', num: '#5' } }, undefined, opts).role,
+    'new-work',
+  );
+  assert.equal(
+    chooseBucket({ reviews: [review('A', { verifierVerdict: null })], todoWinner: null }, undefined, opts).role,
+    'verifier',
+  );
+});
+
+test('solo un false esplicito spegne: assente o true → prober come sempre', () => {
+  const empty = { reviews: [], todoWinner: null };
+  assert.equal(chooseBucket(empty, undefined, {}).role, 'prober');
+  assert.equal(chooseBucket(empty, undefined, { proberWhenIdle: true }).role, 'prober');
+  assert.equal(chooseBucket(empty, undefined, { proberWhenIdle: undefined }).role, 'prober');
+  assert.equal(chooseBucket(empty, undefined, { proberWhenIdle: null }).role, 'prober');
+});
+
 test('chooseBucket: solo todo → new-work col vincitore', () => {
   const b = chooseBucket({ reviews: [], todoWinner: { id: 'F1', num: '#5' } });
   assert.equal(b.role, 'new-work');
