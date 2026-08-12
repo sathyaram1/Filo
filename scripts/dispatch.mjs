@@ -948,7 +948,7 @@ async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP, opts = {}) {
     if (res.status === 'taken') {
       // Già in lavorazione da un'altra routine: escludilo e ri-scegli.
       const next = { reviews: snapshot.reviews.filter((r) => r.id !== bucket.id), todoWinner: snapshot.todoWinner?.id === bucket.id ? null : snapshot.todoWinner };
-      return finalizeBucket(chooseBucket(next, cap), next, cap);
+      return finalizeBucket(chooseBucket(next, cap, opts), next, cap, opts);
     }
     // Macchina a stati (spec §6): il claim su git è il lock PRIMARIO; lo status
     // `working` è il suo riflesso persistito per la dashboard. Solo per la
