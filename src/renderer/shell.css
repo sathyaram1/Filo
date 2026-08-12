@@ -98,6 +98,18 @@ html[data-chrome-compact="1"] .addr {
 }
 .tabs::-webkit-scrollbar { height: 0; width: 0; display: none; } /* Chromium */
 
+/* Riassestamento dopo il blocco delle larghezze (vedi shell.js): quando il
+   puntatore lascia la striscia, le schede tornano alla larghezza naturale
+   scorrendo invece di scattare. La transizione è attiva SOLO in questa
+   finestra, così il resto del tempo il layout resta istantaneo. La scheda in
+   trascinamento è esclusa: deve seguire il puntatore senza inerzia. */
+.tabs.relaxing .tab:not(.dragging) {
+  transition: background 0.1s ease,
+              flex-basis var(--tab-relax-anim, 170ms) ease,
+              min-width var(--tab-relax-anim, 170ms) ease,
+              max-width var(--tab-relax-anim, 170ms) ease;
+}
+
 /* Notifiche/toast in basso a DESTRA (spec #170.1). Le card si impilano
    nell'angolo; durata e suono sono configurabili in Preferenze. Le infinite
    restano finché non si preme la X. Base riusata dai blocchi #170.2/#170.3. */
