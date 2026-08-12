@@ -121,8 +121,9 @@ test.describe('larghezza e separatori stile Chrome', () => {
       .poll(() => shell.locator('.tab.active').evaluate((el) => el.getBoundingClientRect().width))
       .toBeGreaterThan(0);
 
-    const widths = await shell.locator('.tab').evaluateAll((els) =>
-      els.map((el) => ({
+    // Lettura atomica dentro la pagina (vedi nota più sotto su `evaluateAll`).
+    const widths = await shell.evaluate(() =>
+      [...document.querySelectorAll('#tabs .tab')].map((el) => ({
         active: el.classList.contains('active'),
         width: el.getBoundingClientRect().width,
       })),
