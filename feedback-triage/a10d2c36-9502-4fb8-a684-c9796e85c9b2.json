@@ -1,7 +1,0 @@
-{
-  "id": "a10d2c36-9502-4fb8-a684-c9796e85c9b2",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Controllo funzionalità superato: rifacendo i tuoi passi su link, immagini e filmati con sorgenti finte gli appunti restano quelli di prima e compare l'avviso, mentre indirizzi veri, indirizzi di posta e pagine interne di Filo si copiano come sempre. Reggono anche i casi limite (sorgente vuota, schema travestito da maiuscole e a capo, sorgente lunghissima, doppio clic sulla voce).\n\nUna cosa da sapere, che non riguarda il lavoro in sé: quando la pratica è passata dalla scrittura alla verifica, l'automazione aveva riportato indietro l'intera soluzione, lasciandola di lato invece che sul ramo. L'ho recuperata prima di giudicare, così quello che hai letto nel report è davvero quello che è stato verificato. Ti ho aperto una segnalazione a parte: è un difetto dell'automazione che si ripete a ogni lavoro nuovo, e va sistemato lì.\n\nTi ho lasciato anche due segnalazioni di merito: «Salva link» che salva ancora link che non portano da nessuna parte, e le immagini scritte dentro la pagina, di cui ora non si può più portare via l'indirizzo.",
-  "queuedAt": "2026-08-12T13:22:51.302Z",
-  "queuedBy": "routine"
-}
