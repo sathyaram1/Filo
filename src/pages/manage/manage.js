@@ -138,6 +138,9 @@
   const SRCH = window.SN_MANAGE_SEARCH;
   const AUTO_MODE_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTO_MODE) || 'filo_auto_mode';
   const SORT_MODE_KEY = 'filo_manage_sort';
+  const AUTOMATION_GET = (window.SN_MSG?.MSG?.AUTOMATION_GET) || 'automation_get';
+  const AUTOMATION_SET = (window.SN_MSG?.MSG?.AUTOMATION_SET) || 'automation_set';
+  const PROBER_IDLE_SET = (window.SN_MSG?.MSG?.AUTOMATION_PROBER_IDLE_SET) || 'automation_prober_idle_set';
 
   // ── Icona d'autore su ogni card (chi ha scritto il feedback) ──────────────
   // La CLASSIFICAZIONE (prefissi → categoria) è pura e condivisa in
