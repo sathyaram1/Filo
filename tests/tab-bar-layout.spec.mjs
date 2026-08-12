@@ -239,12 +239,21 @@ test.describe('larghezze delle schede alla chiusura', () => {
     }, { timeout: 15_000, intervals: [250] }).toBe(true);
   }
 
+  // Con poche schede la striscia è più corta dello spazio disponibile e ognuna
+  // sta alla sua misura naturale: chiuderne una non ridimensiona nessuno. Il
+  // caso del feedback è la striscia PIENA, dove le schede si spartiscono lo
+  // spazio e ogni chiusura le riallarga tutte.
+  const FULL = 14; // 15 schede: sotto la misura naturale, sopra il minimo
+
   test('col puntatore sulla striscia le schede superstiti non cambiano larghezza', async () => {
-    await openMany(7); // 8 schede: si dividono lo spazio, quindi sono strette
+    await openMany(FULL);
 
     const before = await widthsById();
     const ids = Object.keys(before);
-    expect(ids.length).toBe(8);
+    expect(ids.length).toBe(FULL + 1);
+    // Pre-condizione: la striscia è piena (le schede sono strette, non alla
+    // loro misura naturale) — solo qui una chiusura le ridimensionerebbe.
+    expect(Math.min(...Object.values(before))).toBeLessThan(80);
 
     // Chiudi una scheda inattiva cliccandone la X: il click porta davvero il
     // puntatore sulla striscia (è la situazione descritta nel feedback).
