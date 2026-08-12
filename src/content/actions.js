@@ -51,6 +51,7 @@
     return global.SN_URL_NAV.isShareableAddress(raw);
   }
 
+  // Ritorna true se ha davvero copiato.
   function copyUrlToClipboard(url) {
     if (!isAddress(url)) {
       Popup.showToast(I18n.t('toast_not_an_address'));
