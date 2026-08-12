@@ -481,6 +481,15 @@ test('emit: un GUASTO cancella il marcatore invece di lasciare quello vecchio', 
   assert.equal(readRole(TMP), '');
 });
 
+test('emit: un giro a vuoto (idle) non lascia una firma di lavoro', () => {
+  silently(() => emit({ role: 'new-work', id: 'z' }, {}));
+  assert.equal(readRole(TMP), 'new-work');
+  // Nessun worker è partito: il marcatore del giro prima non deve sopravvivere,
+  // o finirebbe nella provenienza del primo feedback aperto da qualcun altro.
+  silently(() => emit({ role: 'idle' }, {}));
+  assert.equal(readRole(TMP), '');
+});
+
 // ─── teardown ─────────────────────────────────────────────────────────────────
 
 test('cleanup STATE_DIR temporanea', () => {
