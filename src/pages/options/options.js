@@ -178,6 +178,7 @@
       lines.push(I18n.t('options_open_weights_unavailable', names.join(', ')));
     }
     if (!lines.length) { host.hidden = true; return; }
+
     for (const line of lines) {
       const p = document.createElement('p');
       p.textContent = line;
