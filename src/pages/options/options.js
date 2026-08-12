@@ -191,9 +191,15 @@
     let registry = {};
     try {
       const r = await chrome.runtime.sendMessage({ type: MSG.DEFAULT_MODELS_PUBLIC });
-      if (r && r.ok && r.modelRegistry) registry = r.modelRegistry;
+      if (r && r.ok && r.modelRegistry) {
+        registry = r.modelRegistry;
+        defaultModelsPublic = { models: r.models || {}, modelRegistry: registry };
+      }
     } catch (_) {}
     renderDefaultModels(registry);
+    // L'effetto dell'interruttore si calcola sulla config VERA: ora che è
+    // arrivata, ricalcolalo.
+    renderOpenWeightsImpact();
   }
 
   function renderDefaultModels(registry) {
