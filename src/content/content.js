@@ -983,7 +983,7 @@
       {
         type: 'item',
         label: I18n.t('menu_copy_link'),
-        onClick: () => Actions.copyToClipboard(linkEl.href),
+        onClick: () => Actions.copyUrlToClipboard(linkEl.href),
       },
       {
         type: 'item',
