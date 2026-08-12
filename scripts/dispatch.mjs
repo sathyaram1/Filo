@@ -322,11 +322,17 @@ const REVIEW_RANK = { 'blocked-secaudit': 5, secaudit: 4, verifier: 3, fixer: 2,
  * Sceglie il bucket dato uno snapshot dello STATO. Funzione pura.
  *
  * @param {{ reviews: Array<{id,num,branch,state}>, todoWinner: {id,num}|null }} snapshot
+ * @param {number} loopCap
+ * @param {{ proberWhenIdle?: boolean }} opts
+ *   `proberWhenIdle: false` (interruttore dell'owner, feedback #448): finito il
+ *   lavoro vero il giro NON ripiega sull'esplorazione, si ferma con `idle`.
+ *   Riguarda SOLO la coda vuota: il ripiego sul prober quando lo stato è
+ *   illeggibile è un GUASTO travestito da audit e resta com'è (vedi run()).
  * @returns {{ role: string, id?: string, num?: string, branch?: string,
  *             loopCount?: number, state?: object }}
- *   role ∈ secaudit | verifier | fixer | blocked-loop | new-work | prober
+ *   role ∈ secaudit | verifier | fixer | blocked-loop | new-work | prober | idle
  */
-export function chooseBucket(snapshot, loopCap = LOOP_CAP) {
+export function chooseBucket(snapshot, loopCap = LOOP_CAP, opts = {}) {
   const reviews = Array.isArray(snapshot?.reviews) ? snapshot.reviews : [];
 
   // Classifica ogni review e tieni il candidato col rango più alto.
