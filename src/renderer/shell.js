@@ -357,6 +357,131 @@
     return state.tabs.find((t) => t.id === state.activeId) || null;
   }
 
+  // ── Larghezze bloccate dopo una chiusura ──────────────────────────────────
+  // Le schede si dividono lo spazio (flex): chiudendone una, tutte le altre si
+  // riallargano all'istante. Se il puntatore è ancora sulla striscia il layout
+  // cambia SOTTO il cursore: la scheda successiva scivola via mentre si sta per
+  // cliccare la sua X, e chiuderne tre di fila diventa una caccia al bersaglio.
+  //
+  // Quindi: se la chiusura avviene col puntatore sulla striscia, congeliamo le
+  // larghezze com'erano (le superstiti scorrono a sinistra, ognuna conservando
+  // la sua misura, e la X della successiva finisce esattamente sotto il
+  // cursore). Il riassestamento avviene quando il puntatore lascia la zona
+  // delle schede, con una breve transizione.
+  const tabRowEl = document.querySelector('.tab-row');
+  let lockedWidths = null;   // Map id → px, o null se le larghezze sono libere
+  let pointerInStrip = false;
+  let cursorWatch = null;
+  let relaxTimer = null;
+
+  function setTabWidth(el, px) {
+    el.style.flex = `0 0 ${px}px`;
+    el.style.minWidth = `${px}px`;
+    el.style.maxWidth = `${px}px`;
+  }
+  function clearTabWidth(el) {
+    el.style.flex = '';
+    el.style.minWidth = '';
+    el.style.maxWidth = '';
+  }
+
+  // Fotografa le larghezze attuali PRIMA che il ridisegno tolga la scheda
+  // chiusa. Le misure restano valide finché non cambia il numero di schede o la
+  // finestra.
+  function lockTabWidths() {
+    const map = new Map();
+    for (const el of tabsEl.querySelectorAll('.tab')) {
+      const id = el.dataset.id;
+      const w = el.getBoundingClientRect().width;
+      if (id && w > 0) map.set(id, w);
+    }
+    if (!map.size) return;
+    lockedWidths = map;
+    startCursorWatch();
+  }
+
+  // Rilascia il blocco. `animate`: le schede scorrono dalla larghezza congelata
+  // a quella naturale invece di scattarci.
+  function unlockTabWidths({ animate = true } = {}) {
+    stopCursorWatch();
+    if (!lockedWidths) return;
+    lockedWidths = null;
+    const els = [...tabsEl.querySelectorAll('.tab')];
+    if (!els.length) return;
+    const from = els.map((el) => el.getBoundingClientRect().width);
+    for (const el of els) clearTabWidth(el);
+    if (!animate) return;
+    const to = els.map((el) => el.getBoundingClientRect().width);
+    if (to.every((w, i) => Math.abs(w - from[i]) < 0.5)) return;
+    els.forEach((el, i) => setTabWidth(el, from[i]));
+    void tabsEl.offsetWidth; // forza il layout: la partenza è quella congelata
+    tabsEl.classList.add('relaxing');
+    requestAnimationFrame(() => {
+      els.forEach((el, i) => setTabWidth(el, to[i]));
+    });
+    if (relaxTimer) clearTimeout(relaxTimer);
+    relaxTimer = setTimeout(() => {
+      relaxTimer = null;
+      tabsEl.classList.remove('relaxing');
+      for (const el of els) clearTabWidth(el);
+    }, 400);
+  }
+
+  // Il puntatore è sulla striscia? I mouse event del DOM bastano finché resta
+  // dentro la shell, ma appena scende sulla pagina i movimenti li riceve la
+  // WebContentsView (vista nativa sopra la shell) e il `mouseleave` può non
+  // arrivare mai. Finché le larghezze sono bloccate chiediamo quindi al main
+  // dov'è davvero il cursore: due controlli al secondo, solo in questa
+  // finestra di tempo (rara e breve), così il blocco non resta mai appeso.
+  function startCursorWatch() {
+    if (cursorWatch || typeof api.tabs.cursorInStrip !== 'function') return;
+    cursorWatch = setInterval(async () => {
+      let inside = null;
+      try { inside = await api.tabs.cursorInStrip(); } catch (_) { return; }
+      if (inside === false) {
+        pointerInStrip = false;
+        unlockTabWidths();
+      }
+    }, 500);
+  }
+  function stopCursorWatch() {
+    if (cursorWatch) { clearInterval(cursorWatch); cursorWatch = null; }
+  }
+
+  if (tabRowEl) {
+    const enter = () => { pointerInStrip = true; };
+    tabRowEl.addEventListener('mouseenter', enter);
+    tabRowEl.addEventListener('mouseover', enter);
+    tabRowEl.addEventListener('mousemove', enter);
+    tabRowEl.addEventListener('mouseleave', () => {
+      pointerInStrip = false;
+      unlockTabWidths();
+    });
+    // Movimento sul resto della shell (sotto la striscia): stessa uscita.
+    document.addEventListener('mousemove', (e) => {
+      const r = tabRowEl.getBoundingClientRect();
+      if (e.clientY > r.bottom) {
+        pointerInStrip = false;
+        unlockTabWidths();
+      }
+    });
+  }
+  // Ridimensionando la finestra le misure congelate non valgono più.
+  window.addEventListener('resize', () => unlockTabWidths({ animate: false }));
+
+  // Decide, PRIMA del ridisegno, se congelare o liberare le larghezze.
+  function noteTabsChange(next) {
+    const nextTabs = (next && next.tabs) || [];
+    const prevIds = state.tabs.map((t) => t.id);
+    const nextIds = new Set(nextTabs.map((t) => t.id));
+    const added = nextTabs.some((t) => !prevIds.includes(t.id));
+    // Una scheda in più richiede spazio che va tolto alle altre: tenere le
+    // larghezze ferme qui vorrebbe dire non farla stare. Si riparte liberi.
+    if (added) { unlockTabWidths({ animate: false }); return; }
+    const closed = prevIds.some((id) => !nextIds.has(id));
+    if (closed && pointerInStrip && nextTabs.length) lockTabWidths();
+  }
+
   // ── Drag & drop per riordinare le tab ─────────────────────────────────────
   // Implementazione a pointer (mousedown/mousemove/mouseup) invece di HTML5
   // draggable: il drag nativo è inaffidabile in Electron sopra le
