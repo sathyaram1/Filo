@@ -21,6 +21,13 @@
 // Senza il fix: il punto 1 arriverebbe da un modello Gemini, i punti 2/3/4
 // fallirebbero (la catena proprietaria resta intatta) e il 5 non esisterebbe.
 
+// Chiavi predefinite finte: sono quelle che stanno dietro ai "crediti di Filo".
+// Vanno impostate PRIMA che la fixture lanci l'app (le legge da process.env),
+// altrimenti la richiesta si fermerebbe su "accedi con un profilo" e il test
+// non arriverebbe mai a guardare la catena.
+process.env.FILO_DEFAULT_OPENROUTER_KEY = 'k-test-openrouter';
+process.env.FILO_DEFAULT_GEMINI_KEY = 'k-test-gemini';
+
 import { test, expect } from './fixtures/electron.mjs';
 
 async function waitForBoot(app) {
