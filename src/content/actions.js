@@ -1180,14 +1180,17 @@
 
   // "Copia URL video/audio": un blob: (stream MSE, o Blob creata dalla pagina)
   // non è un indirizzo utilizzabile fuori dalla scheda — dirlo è meglio che
-  // copiare una stringa che altrove non apre nulla.
+  // copiare una stringa che altrove non apre nulla. Un blob: assente o vuoto
+  // resta il caso "streaming a pezzi", che ha il suo messaggio; ogni altra
+  // sorgente che non è un indirizzo (data:, javascript:, testo qualsiasi)
+  // passa dal messaggio generico (#437).
   function copyMediaUrl(el) {
     const src = mediaSrc(el);
     if (!src || /^blob:/i.test(src)) {
       Popup.showToast(I18n.t('toast_media_stream_only'));
       return;
     }
-    copyToClipboard(src);
+    copyUrlToClipboard(src);
   }
 
   async function downloadMedia(el) {
