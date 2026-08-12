@@ -1,0 +1,8 @@
+{
+  "id": "b63b7eb1-d8c8-476f-ae0f-5383655f3b41",
+  "status": "revision_capability",
+  "notes": "Fatto: la pagina «il download partirà a breve…» che certi siti aprono in una scheda nuova adesso sparisce da sola appena il file parte, e torni sulla pagina da cui eri partito.\n\nHo aggiunto una cosa che non chiedevi: la chiusura è annullabile, con un avviso «Riapri» in basso a destra. A differenza della scheda bianca del #412, qui sparisce una pagina con contenuto vero: senza via di ritorno, il rischio di far sparire qualcosa che ti serviva sarebbe stato peggio dell'attrito tolto.\n\nLa scheda viene chiusa solo quando valgono tutte queste cose insieme: è nata da un link del sito (non l'hai aperta e indirizzata tu), non ci hai navigato dentro, non l'hai mai toccata — nessun clic, tasto, rotella o tocco; il solo passaggio del mouse non conta — e lo scaricamento è partito entro pochi secondi dal caricamento. Se ne manca anche una sola, la scheda resta aperta: per esempio le pagine con il pulsante «Scarica ora» che clicchi tu, o una pagina che raggiungi nella tua scheda. Come per il #412 la scheda chiusa non finisce nell'archivio: non è un sito che hai visitato per il suo contenuto.",
+  "queuedAt": "2026-08-12T13:43:08.246Z",
+  "queuedBy": "routine",
+  "branch": "worker/b63b7eb1-d8c8-476f-ae0f-5383655f3b41-20260812T132816Z"
+}
