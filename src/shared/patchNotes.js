@@ -21,6 +21,7 @@
         'Nell\'editor, dopo aver ripristinato una versione dallo «Storico versioni» compare un avviso «Annulla» che rimette il documento com\'era un attimo prima.',
       ],
       fixes: [
+        'Anche le pagine di Filo (home, impostazioni, cronologia…) ora si ingrandiscono con Ctrl +, Ctrl -, Ctrl 0, con Ctrl e la rotella o pizzicando il trackpad, come su qualsiasi sito.',
         'Nell\'editor, un doppio clic su «Ripristina» nello «Storico versioni» non apre più a sorpresa l\'anteprima di un\'altra versione: si ripristina una volta sola e si resta nella lista.',
         'Nel cestino dell\'editor, un doppio clic su «Elimina definitivamente» non manda più via il documento per sempre in un colpo solo: la conferma resta lì e aspetta un clic voluto.',
         'Nell\'editor, un doppio clic non fa più partire nulla che tu non abbia chiesto: chiudendo un pannello non si apre altro dietro, e la × nel menu documenti ne elimina uno solo invece di due.',

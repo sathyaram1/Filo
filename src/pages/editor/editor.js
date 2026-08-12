@@ -2367,6 +2367,9 @@
   // salvato. (Vedi handleZoomKey() nel keydown globale per le scorciatoie.)
   const ZOOM_MIN = 0.5, ZOOM_MAX = 3;
   let zoomLevel = 1;
+  // L'editor zooma il foglio, non la finestra: il preload deve stare fuori
+  // (altrimenti Ctrl+rotella e Ctrl+/- zoomerebbero due volte).
+  try { document.documentElement.dataset.filoOwnZoom = '1'; } catch (_) {}
   function applyZoom() {
     zoomLevel = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round(zoomLevel * 100) / 100));
     docEl.style.zoom = zoomLevel === 1 ? '' : String(zoomLevel);

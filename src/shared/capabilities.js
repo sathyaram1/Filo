@@ -87,6 +87,12 @@
       doesNot: 'Non preme il pulsante di schermo intero del lettore video dentro un sito (es. quello di YouTube): agisce sulla finestra di Filo, non sui comandi della pagina.',
     },
     {
+      id: 'page-zoom', title: 'Ingrandisci o rimpicciolisci la pagina', category: 'navigation',
+      desc: 'Cambia la dimensione di tutta la pagina — testo e immagini — sia sui siti sia sulle pagine di Filo (home, impostazioni, cronologia…). Lo zoom resta com’è finché non lo riporti al 100%.',
+      invoke: 'Ctrl + per ingrandire, Ctrl - per rimpicciolire, Ctrl 0 per tornare al 100%; oppure tieni Ctrl e usa la rotella, o pizzica sul trackpad. In alternativa un clic sulla rotella entra in modalità zoom: la rotella da sola ingrandisce e rimpicciolisce, e un badge in alto mostra la percentuale, che puoi anche scrivere a mano.',
+      doesNot: 'Non cambia la dimensione della barra delle schede di Filo: per quella c’è la dimensione del testo nelle impostazioni. Nell’editor di testo lo zoom scala il foglio del documento, non la finestra.',
+    },
+    {
       id: 'network-error-page', title: 'Pagina d’errore quando un sito non si carica', category: 'navigation',
       desc: 'Se un sito non è raggiungibile (indirizzo sbagliato, server spento, sei offline) o una scheda si blocca, compare una pagina che spiega il problema in italiano con un tasto "Riprova". Se eri offline, riprova da sola appena torni in rete.',
       invoke: 'Automatico quando un caricamento fallisce; "Riprova" sulla pagina o "Ricarica" dal menu ritentano il sito.',
