@@ -354,7 +354,7 @@ export function chooseBucket(snapshot, loopCap = LOOP_CAP, opts = {}) {
   if (snapshot?.todoWinner?.id) {
     return { role: 'new-work', id: snapshot.todoWinner.id, num: snapshot.todoWinner.num || '' };
   }
-  return { role: 'prober' };
+  return { role: opts?.proberWhenIdle === false ? 'idle' : 'prober' };
 }
 
 // ─── Transizioni di stato (pure) ──────────────────────────────────────────────
