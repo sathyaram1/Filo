@@ -160,6 +160,38 @@
     return 'user';
   }
 
+  // ── Chi può entrare in coda da solo ────────────────────────────────────────
+  // La modalità automatica non è più un sì/no per tutti: l'owner sceglie QUALI
+  // mittenti si fida di far entrare in coda senza passare da lui. I gruppi sono
+  // quelli che la dashboard già mostra come icona d'autore, con le tre istanze
+  // di Claude (esplora / implementa / verifica) fuse in una: sono lo stesso
+  // grado di fiducia, sono i suoi processi.
+  //
+  // `filo` resta SEPARATO da `claude` apposta: un feedback che nasce da Filo è
+  // la voce di un utente vero filtrata da un modello, non un'automazione
+  // dell'owner. Metterli insieme farebbe entrare in coda del contenuto scritto
+  // da un utente sotto l'etichetta "automazioni".
+  var AUTO_APPROVE_GROUPS = ['owner', 'filo', 'claude', 'user'];
+  function autoApproveGroup(clientId) {
+    var k = authorKind(clientId);
+    if (k === 'owner' || k === 'filo' || k === 'user') return k;
+    return 'claude'; // prober | worker | verifier | claude
+  }
+
+  // Decide se un feedback SICURO (giudicato allineato) può entrare in coda da
+  // solo. PURA: la config arriva già letta.
+  //   cfg = { enabled: bool, autoApprove?: { owner, filo, claude, user } }
+  // Interruttore master spento ⇒ mai, qualunque cosa dicano i sottointerruttori
+  // (è lo stato sicuro: uno solo da spegnere per fermare tutto).
+  // Mappa assente ⇒ tutti ammessi: è la semantica che l'automatica aveva prima
+  // che i sottointerruttori esistessero, e non deve cambiare da sola.
+  function autoApproveAllowed(clientId, cfg) {
+    if (!cfg || cfg.enabled !== true) return false;
+    var map = cfg.autoApprove;
+    if (!map || typeof map !== 'object') return true;
+    return map[autoApproveGroup(clientId)] !== false;
+  }
+
   // Marca un clientId come invio dell'owner. Idempotente: non raddoppia il
   // prefisso e NON marca i feedback già di origine modello (agent:/routine:),
   // che owner non sono. Cap a 100 char = limite `clientId` delle Firestore rules.
