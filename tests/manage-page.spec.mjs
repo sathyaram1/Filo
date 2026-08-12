@@ -141,6 +141,18 @@ test('lo switch attiva/disattiva la modalità automatica e lo stato persiste', a
   expect(trackOk.isMuted).toBe(true);
   expect(trackOk.isBorder).toBe(false);
 
+  // …ma il colore giusto su una scatola 0×0 non si vede. `.sn-page label` di
+  // pages.css imponeva `display: block` alla label (specificità più alta di
+  // `.mg-switch`), i figli tornavano `inline` e del pill restava solo la pallina,
+  // che è in posizione assoluta: mezzo interruttore, per settimane. Qui si
+  // asserisce la GEOMETRIA, che è ciò che era rotto.
+  const geom = await page.evaluate(() => {
+    const r = document.querySelector('.mg-switch-track').getBoundingClientRect();
+    return { w: r.width, h: r.height };
+  });
+  expect(geom.w).toBeGreaterThan(20);
+  expect(geom.h).toBeGreaterThan(10);
+
   // #446 — accendere lo switch deve arrivare alla config che il backend dei
   // giudici legge (config/automation.enabled), non solo alla cache locale: fino
   // al 2026-08-12 finiva SOLO in chrome.storage.local, che nessuno leggeva, e
