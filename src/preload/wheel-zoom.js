@@ -39,6 +39,7 @@
 module.exports = function setupWheelZoom(webFrame, opts) {
   if (!webFrame || typeof document === 'undefined') return;
   const pageZoom = !!(opts && opts.pageZoom);
+  const ipc = (opts && opts.ipcRenderer) || null;
 
   const ZOOM_STEP = 0.5;   // come un passo di Ctrl +/- (in "zoom level")
   const MIN_LEVEL = -5;
