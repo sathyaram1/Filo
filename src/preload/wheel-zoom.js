@@ -35,6 +35,13 @@
 //   `document.documentElement.dataset.filoOwnZoom = '1'`. Il controllo avviene
 //   al momento dell'evento, quindi il marker può essere messo quando vuole:
 //   senza, lo zoom verrebbe applicato due volte.
+//
+//   QUANDO IL FOCUS È SULLA BARRA DI FILO
+//   Se l'utente ha appena cliccato una scheda, i tasti vanno alla barra e non
+//   alla pagina: nessun keydown arriva qui. Il main (tabs.js) intercetta lì
+//   Ctrl +/-/0 e li inoltra alla scheda attiva come `filo:zoom-key`, che
+//   rientra da questo stesso modulo — così la regola su chi zooma resta una
+//   sola. Serve `opts.ipcRenderer`.
 
 module.exports = function setupWheelZoom(webFrame, opts) {
   if (!webFrame || typeof document === 'undefined') return;
