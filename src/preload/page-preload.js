@@ -140,7 +140,7 @@ function replayContextMenu(e) {
 // intera, e un badge dentro un riquadro sarebbe un secondo indicatore che
 // contraddice il primo.
 if (!IS_SUBFRAME) {
-  try { require('./wheel-zoom.js')(webFrame, { pageZoom: true }); } catch (e) { console.error('[Filo CS] wheel-zoom', e); }
+  try { require('./wheel-zoom.js')(webFrame, { pageZoom: true, ipcRenderer }); } catch (e) { console.error('[Filo CS] wheel-zoom', e); }
 }
 
 // ─── Protezione anti-fingerprinting ────────────────────────────────────────
