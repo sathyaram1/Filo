@@ -748,6 +748,11 @@
     // costa solo un frame di lag visivo mentre il tasto è premuto (ridisegnato al
     // rilascio dal broadcast successivo).
     if (drag) return;
+    // Larghezze congelate: se in barra è comparsa una scheda che non era nella
+    // fotografia, le misure non descrivono più questa striscia → si liberano.
+    if (lockedWidths && state.tabs.some((t) => !lockedWidths.has(t.id))) {
+      unlockTabWidths({ animate: false });
+    }
     // tabs
     tabsEl.innerHTML = '';
     for (const t of state.tabs) {
@@ -755,6 +760,10 @@
       el.className = 'tab' + (t.id === state.activeId ? ' active' : '');
       el.dataset.id = t.id;
       el.dataset.tip = t.title || t.url;
+
+      // Larghezza congelata dopo una chiusura: la scheda la conserva finché il
+      // puntatore non lascia la striscia (vedi lockTabWidths).
+      if (lockedWidths && lockedWidths.has(t.id)) setTabWidth(el, lockedWidths.get(t.id));
 
       // Tab attiva: tingila col colore live del sito (§1.1). Sovrascriviamo la
       // variabile --tab-active così anche i "piedini" a goccia (::before/::after)
