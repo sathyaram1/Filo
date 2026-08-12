@@ -25,10 +25,16 @@
 //   Oltre alla modalità rotella, se `opts.pageZoom` è attivo la pagina zooma
 //   anche tenendo Ctrl/Cmd: pizzicando il trackpad, con Ctrl+rotella e da
 //   tastiera con Ctrl + / Ctrl - / Ctrl 0. Pinch e Ctrl+rotella arrivano
-//   entrambi come `wheel` con ctrlKey=true. Lo attiviamo SOLO sulle pagine web
-//   esterne (page-preload): le pagine interne filo:// che vogliono lo zoom lo
-//   gestiscono da sé (es. l'editor scala il foglio via CSS), quindi abilitarlo
-//   anche lì zoomerebbe due volte.
+//   entrambi come `wheel` con ctrlKey=true. È attivo sia sulle pagine web
+//   esterne (page-preload) sia sulle pagine interne filo:// (internal-preload):
+//   lo zoom deve funzionare allo stesso modo ovunque.
+//
+//   OPT-OUT PER LE PAGINE CHE ZOOMANO DA SÉ
+//   Una pagina che implementa il proprio zoom (l'editor scala il foglio via CSS
+//   invece dell'intera finestra) si tira fuori marcando
+//   `document.documentElement.dataset.filoOwnZoom = '1'`. Il controllo avviene
+//   al momento dell'evento, quindi il marker può essere messo quando vuole:
+//   senza, lo zoom verrebbe applicato due volte.
 
 module.exports = function setupWheelZoom(webFrame, opts) {
   if (!webFrame || typeof document === 'undefined') return;
@@ -197,6 +203,12 @@ module.exports = function setupWheelZoom(webFrame, opts) {
   // trackpad). Usa il livello di zoom del webFrame, così scala l'intera pagina
   // (testo + immagini) come il classico zoom del browser.
   if (pageZoom) {
+    // La pagina zooma da sé (vedi commento in testa): non ci mettiamo in mezzo.
+    function pageHandlesZoom() {
+      try { return document.documentElement.dataset.filoOwnZoom === '1'; }
+      catch (_) { return false; }
+    }
+
     function setLevel(level) {
       const clamped = Math.max(MIN_LEVEL, Math.min(MAX_LEVEL, level));
       try { webFrame.setZoomLevel(clamped); } catch (_) {}
@@ -209,6 +221,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     document.addEventListener('wheel', (e) => {
       if (zoomMode) return;
       if (!(e.ctrlKey || e.metaKey)) return;
+      if (pageHandlesZoom()) return;
       e.preventDefault();
       e.stopPropagation();
       // ~0.005/unità: un notch di rotella (deltaY≈100) ≈ un passo di Ctrl +/-
@@ -219,18 +232,24 @@ module.exports = function setupWheelZoom(webFrame, opts) {
       setLevel(next);
     }, { capture: true, passive: false });
 
-    // Da tastiera: Ctrl + / Ctrl - / Ctrl 0 (e le varianti =, _ dei layout).
+    // Da tastiera: Ctrl + / Ctrl - / Ctrl 0. Accettiamo anche il tastierino
+    // numerico via `code` (lì `key` è già '+'/'-'/'0', ma non su tutti i layout).
     document.addEventListener('keydown', (e) => {
       if (zoomMode) return; // in modalità rotella un tasto qualsiasi esce
       if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      if (pageHandlesZoom()) return;
       const k = e.key;
-      if (k === '+' || k === '=') {
+      const c = e.code;
+      const isIn = k === '+' || k === '=' || c === 'NumpadAdd';
+      const isOut = k === '-' || k === '_' || c === 'NumpadSubtract';
+      const isReset = k === '0' || c === 'Numpad0';
+      if (isIn) {
         e.preventDefault(); e.stopPropagation();
         try { setLevel(webFrame.getZoomLevel() + ZOOM_STEP); } catch (_) {}
-      } else if (k === '-' || k === '_') {
+      } else if (isOut) {
         e.preventDefault(); e.stopPropagation();
         try { setLevel(webFrame.getZoomLevel() - ZOOM_STEP); } catch (_) {}
-      } else if (k === '0') {
+      } else if (isReset) {
         e.preventDefault(); e.stopPropagation();
         setLevel(0); // 100%
       }
