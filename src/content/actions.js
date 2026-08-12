@@ -38,6 +38,26 @@
     );
   }
 
+  // #437 — "Copia URL" (del link, dell'immagine, del filmato) copia un
+  // INDIRIZZO: se quello che il sito ha messo lì non lo è — un frammento di
+  // codice `javascript:`, un `data:` lungo un chilometro, un `blob:` che muore
+  // con la pagina, o niente affatto — negli appunti finirebbe una stringa che
+  // non apre nulla da nessuna parte, senza che niente lo dica. Meglio dirlo,
+  // come già succede per i filmati trasmessi a pezzi.
+  // Ritorna true se ha davvero copiato.
+  function copyUrlToClipboard(url) {
+    const raw = String(url || '').trim();
+    const ok = global.SN_URL_NAV
+      ? global.SN_URL_NAV.isShareableAddress(raw)
+      : !!raw; // senza il modulo condiviso non peggioriamo il comportamento storico
+    if (!ok) {
+      Popup.showToast(I18n.t('toast_not_an_address'));
+      return false;
+    }
+    copyToClipboard(raw);
+    return true;
+  }
+
   function cutSelection() {
     // window.getSelection() non vede la selezione dentro <input>/<textarea>:
     // recuperiamo il testo direttamente dal nodo attivo se serve.
