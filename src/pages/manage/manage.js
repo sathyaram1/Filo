@@ -345,6 +345,28 @@
     });
   }
 
+  // ── Esplorazione automatica a coda vuota (#448) ───────────────────────────
+  // Indipendente dall'automatica: riguarda cosa fanno le routine quando NON c'è
+  // più niente in coda, non chi entra in coda.
+  if (mgProberIdle) {
+    mgProberIdle.addEventListener('change', async () => {
+      const want = mgProberIdle.checked;
+      if (mgProberIdleMsg) mgProberIdleMsg.textContent = '';
+      try {
+        const r = await sendToMain({ type: AUTOMATION_SET, proberWhenIdle: want });
+        if (!r || r.ok === false) throw new Error(r?.error || 'errore sconosciuto');
+        mgProberIdle.checked = r.proberWhenIdle !== false;
+      } catch (err) {
+        mgProberIdle.checked = !want;
+        if (mgProberIdleMsg) {
+          mgProberIdleMsg.textContent = 'Salvataggio fallito: l\'impostazione NON è cambiata.';
+          mgProberIdleMsg.classList.add('mg-err');
+        }
+        console.error('[manage] salvataggio esplorazione automatica fallito:', err);
+      }
+    });
+  }
+
   function applyAutoModeGate() {
     mgAutoToggle.disabled = !isAdmin;
     mgAutoSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
