@@ -154,6 +154,12 @@
   function renderOpenWeightsImpact() {
     const host = $('openWeightsImpact');
     if (!host) return;
+    // Il fornitore diretto del produttore resta spento a interruttore acceso:
+    // il suo pulsante "Prova" manderebbe una richiesta proprio dove l'utente ha
+    // chiesto che non ne arrivino (il main la rifiuta comunque).
+    const testGemini = $('testGemini');
+    if (testGemini) testGemini.disabled = $('openWeightsOnly').checked;
+
     host.innerHTML = '';
     if (!$('openWeightsOnly').checked) { host.hidden = true; return; }
 
