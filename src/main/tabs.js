@@ -18,6 +18,8 @@ require('../shared/authPopup');
 const { isAuthPopup } = globalThis.SN_AUTH_POPUP;
 require('../shared/urlNav'); // #398 — sorgente unica di normalizeUrl/isLocalHost (condivisa con la dashboard)
 const { normalizeUrl, canonicalizeFiloUrl } = globalThis.SN_URL_NAV;
+require('../shared/downloadTabs'); // #412/#441 — schede usa e getta dei download (logica pura)
+const { decideCloseOnDownload } = globalThis.SN_DOWNLOAD_TABS;
 
 // #252 — pagina interna filo:// "singleton": ne ha senso UNA sola scheda alla
 // volta (le liste "Aperti per dopo"/Cronologia/Archivio/Scaricamenti, le
