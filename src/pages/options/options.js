@@ -787,6 +787,9 @@
     // subito. I controlli testuali salvano allo `change` (cioè al blur), gli
     // altri (select/checkbox) immediatamente.
     $('page').addEventListener('change', () => saveDebounced());
+    // Qualunque cosa cambi (interruttore, modelli per azione, registry) può
+    // cambiare l'effetto di "solo pesi aperti": lo ricalcoliamo sempre.
+    $('page').addEventListener('change', renderOpenWeightsImpact);
     $('useDefaultModels').addEventListener('change', applyDefaultModelsVisibility);
     $('loadModels').addEventListener('click', loadModelsFromProvider);
     $('testOpenrouter').addEventListener('click', () => testProvider('openrouter', $('testOpenrouterStatus'), $('testOpenrouter')));
