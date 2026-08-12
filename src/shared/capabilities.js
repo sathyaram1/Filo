@@ -256,6 +256,7 @@
       id: 'share-copy-link', title: 'Condividi o copia un link', category: 'links',
       desc: 'Condivide un link col sistema operativo o ne copia l’indirizzo.',
       invoke: 'Clic destro su un link → "Condividi link" / "Copia URL".',
+      doesNot: 'Se il link non porta davvero da nessuna parte (al posto dell’indirizzo il sito ci ha messo un frammento di codice) Filo te lo dice invece di copiare una stringa che non apre niente.',
     },
 
     // ────────────────────────────── Appunti ──────────────────────────────────
