@@ -452,6 +452,22 @@ test('emit: un GUASTO cancella il marcatore invece di lasciare quello vecchio', 
   assert.equal(readRole(TMP), '');
 });
 
+// ─── preflight (prontezza prima del setup) ────────────────────────────────────
+
+// ROUTINE-BRANCH-INTEGRITY.md §E: l'orchestratore chiede la prontezza PRIMA di
+// pagare il setup (npm install + binario Electron ~102MB + scrot). Il comando
+// era cablato nella CLI ma la funzione non esisteva: `--preflight` moriva con
+// «preflight is not defined» (uscita 1), che non è nessuna delle risposte del
+// contratto — né prontezza OK (0) né guasto (3) — quindi il controllo non
+// proteggeva niente. Qui ROOT è la temporanea (non un deposito git): senza la
+// funzione questo test è rosso all'istante.
+test('preflight: deposito non utilizzabile → guasto permanente, non un OK', async () => {
+  const r = await preflight();
+  assert.equal(r.ok, false);
+  assert.equal(r.kind, 'permanent');
+  assert.match(r.message, /git/i);
+});
+
 // ─── teardown ─────────────────────────────────────────────────────────────────
 
 test('cleanup STATE_DIR temporanea', () => {
