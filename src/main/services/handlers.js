@@ -230,11 +230,18 @@ function withDefaults(settings) {
   // per-utente, quindi vale SEMPRE (anche con "usa modelli predefiniti" off) ed è
   // sourced dai default condivisi (costante ⊕ override Firestore config/models),
   // MAI dallo storage utente — così l'owner la aggiorna senza rilasciare codice.
-  const excludedProviders = Array.isArray(d.excludedProviders) ? d.excludedProviders : [];
+  const baseExcluded = Array.isArray(d.excludedProviders) ? d.excludedProviders : [];
   const providerSort = typeof d.providerSort === 'string' ? d.providerSort : '';
 
+  // "Solo modelli a pesi aperti" (#461) è invece una scelta di CHI USA Filo, e
+  // sta sopra alla config condivisa: vale anche quando si usano i crediti di
+  // Filo, e allunga la lista di esclusione con Anthropic — il senso
+  // dell'interruttore è poter rifiutare anche la scelta di chi Filo lo fa.
+  const openWeightsOnly = settings.openWeightsOnly === true;
+  const excludedProviders = SN_CONST.effectiveExcludedProviders(baseExcluded, openWeightsOnly);
+
   if (settings.useDefaultModels === false) {
-    return { ...settings, excludedProviders, providerSort, security };
+    return { ...settings, openWeightsOnly, excludedProviders, providerSort, security };
   }
   const userKeys = settings.apiKeys || {};
   const apiKeys = {};
