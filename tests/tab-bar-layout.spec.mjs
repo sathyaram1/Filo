@@ -192,7 +192,9 @@ test.describe('larghezza e separatori stile Chrome', () => {
     // I due piedini curvi sono pseudo-elementi ::before/::after sulla scheda
     // attiva: devono essere visibili (display block, 8px) e disegnati con un
     // radial-gradient (l'arco concavo che fonde la scheda con la barra).
-    const feet = await shell.locator('.tab.active').evaluate((el) => {
+    // Lettura atomica dentro la pagina (vedi nota nel test precedente).
+    const feet = await shell.evaluate(() => {
+      const el = document.querySelector('#tabs .tab.active');
       const read = (sel) => {
         const s = getComputedStyle(el, sel);
         return { display: s.display, width: s.width, bg: s.backgroundImage };
