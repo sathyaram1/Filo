@@ -224,6 +224,8 @@ class TabManager {
     // Sorgente di verità: SN_FILO_MEMORY.listProxyRules (storage.json).
     this._proxyRules = {};
     this.loadProxyRules().catch(() => {});
+    // Ctrl +/-/0 premuti mentre il focus è sulla barra (vedi _wireShellZoomKeys).
+    this._wireShellZoomKeys();
   }
 
   // Aggiorna le impostazioni di sicurezza e le riapplica a tutti i tab esistenti.
