@@ -96,6 +96,14 @@ La modalità automatica agisce UNA volta, al giudizio (sicuro + ON → `todo`; s
 → `aligned`). Attivarla dopo NON ri-tocca i vecchi `aligned`: l'owner li approva in blocco
 dalla dashboard (azione bulk `aligned→todo`, da aggiungere alla UI).
 
+**Per mittente (#446).** "ON" non è più un sì/no per tutti: l'interruttore master
+(`config/automation.enabled`) abilita l'auto-approvazione, e la mappa
+`config/automation.autoApprove` dice QUALI categorie di mittente ne beneficiano
+(`owner` / `filo` / `claude` / `user`, dal prefisso del `clientId`). Master spento ⇒
+nessuno, qualunque cosa dica la mappa. Mappa assente ⇒ tutti, come prima che esistesse.
+La logica è pura e vive in due copie da tenere allineate: `src/shared/feedbackThread.js`
+(dashboard) e `filo-security/functions/src/autoApprove.js` (chi decide davvero).
+
 ## 5. Chat del feedback distingue i sotto-casi di `design`
 
 Un solo stato `design`, tre origini leggibili dalla chat/thread (`notes`): (1) verdetto
