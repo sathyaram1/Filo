@@ -203,6 +203,85 @@ test.describe('larghezza e separatori stile Chrome', () => {
   });
 });
 
+// ─────────────────── larghezze ferme dopo una chiusura ─────────────────────
+// Chiudendo una scheda col puntatore sulla striscia, le superstiti devono
+// restare della LORO larghezza (così la X della successiva finisce sotto il
+// cursore e se ne possono chiudere più di fila); si riassestano solo quando il
+// puntatore lascia la striscia.
+test.describe('larghezze delle schede alla chiusura', () => {
+  // Apre `n` schede in più e aspetta che la shell le abbia disegnate tutte.
+  async function openMany(n) {
+    await shell.evaluate(async (k) => {
+      for (let i = 0; i < k; i++) window.filoShell.tabs.open('filo://newtab/');
+    }, n);
+    await expect.poll(
+      () => shell.evaluate(() => document.querySelectorAll('#tabs .tab').length),
+      { timeout: 15_000 },
+    ).toBe(n + 1);
+    // Il layout flex può misurare 0 per un frame subito dopo il disegno.
+    await expect
+      .poll(() => shell.locator('.tab.active').evaluate((el) => el.getBoundingClientRect().width))
+      .toBeGreaterThan(0);
+  }
+
+  const widthsById = () => shell.locator('#tabs .tab').evaluateAll((els) => {
+    const out = {};
+    for (const el of els) out[el.dataset.id] = el.getBoundingClientRect().width;
+    return out;
+  });
+
+  test('col puntatore sulla striscia le schede superstiti non cambiano larghezza', async () => {
+    await openMany(7); // 8 schede: si dividono lo spazio, quindi sono strette
+
+    const before = await widthsById();
+    const ids = Object.keys(before);
+    expect(ids.length).toBe(8);
+
+    // Chiudi una scheda inattiva cliccandone la X: il click porta davvero il
+    // puntatore sulla striscia (è la situazione descritta nel feedback).
+    const victim = ids[2];
+    await shell.locator(`#tabs .tab[data-id="${victim}"] .close`).click();
+    await expect.poll(
+      () => shell.evaluate(() => document.querySelectorAll('#tabs .tab').length),
+      { timeout: 8_000 },
+    ).toBe(7);
+
+    // Le superstiti conservano ESATTAMENTE la larghezza che avevano.
+    const during = await widthsById();
+    expect(Object.keys(during).sort()).toEqual(ids.filter((id) => id !== victim).sort());
+    for (const id of Object.keys(during)) {
+      expect(Math.abs(during[id] - before[id]),
+        `la scheda ${id} si è ridimensionata mentre il puntatore era sulla striscia`,
+      ).toBeLessThan(1);
+    }
+
+    // Uscendo dalla zona delle schede (la striscia è alta 40px) si riassestano:
+    // con una scheda in meno ora sono più larghe.
+    await shell.mouse.move(600, 300);
+    await expect.poll(async () => {
+      const after = await widthsById();
+      const id = Object.keys(after)[0];
+      return after[id] - before[id];
+    }, { timeout: 8_000 }).toBeGreaterThan(1);
+  });
+
+  test('col puntatore fuori dalla striscia la chiusura riassesta subito', async () => {
+    await openMany(7);
+    await shell.mouse.move(600, 300); // puntatore sulla pagina, non sulle schede
+
+    const before = await widthsById();
+    const ids = Object.keys(before);
+    const victim = ids[2];
+    await shell.evaluate((id) => window.filoShell.tabs.close(id), victim);
+
+    await expect.poll(async () => {
+      const after = await widthsById();
+      const id = ids.find((x) => x !== victim);
+      return Object.keys(after).length === 7 ? after[id] - before[id] : 0;
+    }, { timeout: 8_000 }).toBeGreaterThan(1);
+  });
+});
+
 // ─────────────────────────── tab-overflow-scroll ───────────────────────────
 test.describe('overflow della tab bar', () => {
   test('con molte tab la striscia scrolla e tiene in vista la tab attiva', async () => {
