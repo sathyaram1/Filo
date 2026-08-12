@@ -1336,6 +1336,34 @@ class TabManager {
     }
   }
 
+  // ─── zoom da tastiera quando il focus è sulla barra di Filo ────────────
+  // Ctrl +/-/0 li gestisce il preload della pagina (wheel-zoom.js), ma quel
+  // keydown esiste solo se è la PAGINA ad avere il focus. Appena l'utente
+  // clicca una scheda il focus passa alla barra, i tasti arrivano qui e lo
+  // zoom sembrava morto — stessa asimmetria già vista con Ctrl+T/W/L/R (#404).
+  // Li intercettiamo sulla webContents della shell e li inoltriamo alla scheda
+  // attiva, che li fa rientrare dal solito punto: così la scelta su chi zooma
+  // (e l'opt-out dell'editor, che scala il foglio) resta una sola.
+  _wireShellZoomKeys() {
+    const shellWc = this.win && this.win.webContents;
+    if (!shellWc || typeof shellWc.on !== 'function') return;
+    shellWc.on('before-input-event', (event, input) => {
+      if (input.type !== 'keyDown') return;
+      if (!(input.control || input.meta) || input.alt) return;
+      const k = String(input.key || '');
+      const c = String(input.code || '');
+      let dir = null;
+      if (k === '+' || k === '=' || c === 'NumpadAdd') dir = 'in';
+      else if (k === '-' || k === '_' || c === 'NumpadSubtract') dir = 'out';
+      else if (k === '0' || c === 'Numpad0') dir = 'reset';
+      if (!dir) return;
+      event.preventDefault();
+      const active = this.tabs.find((t) => t.id === this.activeId);
+      if (!active) return;
+      try { active.view.webContents.send('filo:zoom-key', dir); } catch (_) {}
+    });
+  }
+
   // ─── eventi della WebContents → aggiorna stato + broadcast ─────────────
 
   _wireEvents(tab) {
