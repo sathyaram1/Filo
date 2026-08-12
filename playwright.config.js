@@ -4,6 +4,29 @@
 
 import { defineConfig } from '@playwright/test';
 
+// Finestre invisibili per TUTTA la suite (vedi src/main/test-window-mode.js).
+// Sta qui e non nella fixture perché una cinquantina di spec lancia Electron per
+// conto proprio (`tests/agent/driver.mjs`, `_electron.launch` diretto) e la
+// fixture non li copre: bastava uno di quelli per far comparire una finestra a
+// schermo per dieci secondi in mezzo a `npm test`. Questo file lo carica ogni
+// worker, e ogni lancio eredita l'ambiente del worker → nessuna via di mezzo.
+// `FILO_TEST_VISIBLE=1` rimette la finestra a schermo quando la si vuole vedere.
+//
+// Restano visibili anche i modi in cui GUARDARE l'app È lo scopo del comando
+// (`--headed`, `--ui`, `--debug`): nasconderli sarebbe un comando che promette
+// una cosa e ne fa un'altra. `npm run test:headed` passa proprio di qui.
+//
+// ATTENZIONE, ci si sbaglia facilmente: questo file viene rivalutato DENTRO
+// OGNI WORKER, e al worker arriva l'ambiente ma NON gli argomenti della riga di
+// comando (il suo `argv` è solo `node …/workerProcessEntry.js`). Quindi non
+// basta "non nascondere" quando si vede `--headed`: il worker non lo vedrebbe e
+// si rimetterebbe il nascondimento da solo. Il riconoscimento va TRADOTTO in una
+// variabile d'ambiente, che i worker ereditano.
+if (process.argv.some((a) => a === '--headed' || a === '--ui' || a === '--debug')) {
+  process.env.FILO_TEST_VISIBLE = '1';
+}
+if (process.env.FILO_TEST_VISIBLE !== '1') process.env.FILO_HIDE_WINDOW = '1';
+
 export default defineConfig({
   testDir: './tests',
   testMatch: /.*\.spec\.(js|mjs)$/,

@@ -10,6 +10,27 @@ const { registerFiloProtocolForSession } = require('./protocol');
 
 const SHELL_HEIGHT = 88;
 
+// Finestre invisibili durante i test automatici: perché e come, in
+// `test-window-mode.js` (vale anche per menu e tooltip, che sono finestre a sé).
+const { HIDDEN, OFFSCREEN, hideForTests } = require('./test-window-mode');
+
+// Porta la finestra davanti a tutto: serve al primo disegno, perché in alcune
+// configurazioni la WebContentsView appena creata non ha un display surface
+// valido e resta un quadrato vuoto finché la finestra non riceve attenzione
+// esplicita dal compositor. Nei test la si mostra comunque (altrimenti i menu
+// nativi, che sono finestre figlie, non si aprono) ma invisibile e senza fuoco.
+function revealWindow(win) {
+  try {
+    if (HIDDEN) {
+      win.showInactive();
+      return;
+    }
+    win.show();
+    win.moveTop();
+    win.focus();
+  } catch (_) {}
+}
+
 // Wiring comune a finestra normale e incognito: carica le impostazioni di
 // sicurezza e collega i listener di resize/fullscreen al layout dei tab.
 function wireWindowCommon(win, tabs) {
@@ -46,6 +67,7 @@ function createMainWindow() {
     backgroundColor: '#222222',
     title: 'Filo',
     icon: path.join(__dirname, '..', '..', 'assets', 'icons', 'icon-128.png'),
+    ...(HIDDEN ? { x: OFFSCREEN.x, y: OFFSCREEN.y, show: false, skipTaskbar: true } : {}),
     // Chrome-like: la title bar nativa è rimossa, i controlli minimize/maximize/
     // close vivono nella tab-row della shell (vedi src/renderer/shell.html).
     frame: false,
@@ -57,6 +79,10 @@ function createMainWindow() {
     },
     autoHideMenuBar: true,
   });
+
+  // Invisibile fin dalla nascita, non dal primo disegno: fra i due momenti
+  // passano centinaia di millisecondi in cui la finestra esiste già.
+  hideForTests(win, { main: true });
 
   win.loadURL('filo://shell/shell.html');
 
@@ -71,15 +97,7 @@ function createMainWindow() {
     let restored = false;
     try { restored = await tabs.restoreSession(); } catch (_) { restored = false; }
     if (!restored) tabs.openTab('filo://newtab/');
-    // Forza display + focus: necessario perché in alcune configurazioni la
-    // WebContentsView appena creata può non avere un display surface valido,
-    // restando un quadrato bianco/cream finché la finestra non riceve
-    // attenzione esplicita dal compositor OS.
-    try {
-      win.show();
-      win.moveTop();
-      win.focus();
-    } catch (_) {}
+    revealWindow(win);
   });
 
   return win;
@@ -107,6 +125,7 @@ function createIncognitoWindow() {
     backgroundColor: '#1f1b2e',
     title: 'Filo — Incognito',
     icon: path.join(__dirname, '..', '..', 'assets', 'icons', 'icon-128.png'),
+    ...(HIDDEN ? { x: OFFSCREEN.x, y: OFFSCREEN.y, show: false, skipTaskbar: true } : {}),
     frame: false,
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'shell-preload.js'),
@@ -117,6 +136,7 @@ function createIncognitoWindow() {
     autoHideMenuBar: true,
   });
   win._filoIncognito = true;
+  hideForTests(win, { main: true });
 
   // La shell legge ?incognito=1 e applica il badge + tema scuro dedicato.
   win.loadURL('filo://shell/shell.html?incognito=1');
@@ -128,11 +148,7 @@ function createIncognitoWindow() {
 
   win.webContents.once('did-finish-load', async () => {
     tabs.openTab('filo://newtab/'); // niente restore in incognito
-    try {
-      win.show();
-      win.moveTop();
-      win.focus();
-    } catch (_) {}
+    revealWindow(win);
   });
 
   // Alla chiusura dell'ULTIMA finestra incognito, azzera l'overlay in RAM: nulla

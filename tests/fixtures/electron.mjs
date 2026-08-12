@@ -41,6 +41,10 @@ export const test = base.extend({
         // nativo (impossibile da automatizzare headless). Vive dentro
         // userData così viene ripulito insieme al resto.
         FILO_DOWNLOAD_DIR: join(userData, 'downloads'),
+        // NB: la finestra invisibile durante i test NON si attiva qui — la
+        // attiva `playwright.config.js` sull'ambiente del worker, così vale
+        // anche per la cinquantina di spec che lancia Electron senza passare da
+        // questa fixture. Qui la eredita e basta (`...process.env` sopra).
         NODE_ENV: 'test',
       },
     });

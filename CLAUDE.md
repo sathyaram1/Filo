@@ -7,7 +7,9 @@ Questo file raccoglie le **convenzioni del repo valide per QUALSIASI agente**
 ## Switch di ruolo — leggi PRIMA il file giusto
 
 - **Sessione locale** (owner + Claude, prompt normale in chat) → leggi anche
-  **`LOCAL.md`** (cosa si fa in locale, modalità attiva oggi).
+  **`LOCAL.md`**, che sta **nella cartella SOPRA il repo** (`../LOCAL.md`), non
+  qui dentro: descrive cosa si fa in locale ed è volutamente fuori dal repo
+  pubblico. Non cercarlo in `Filo/` — non c'è, e non è un file perduto.
 - **Routine cloud** (attivazione schedulata con prompt: 
   `"routine automatica."`) → leggi **`ROUTINES.md`** integralmente, più i
   file-ruolo in **`routines/roles/*`** e la conoscenza condivisa in
@@ -69,6 +71,29 @@ pubblica niente. Per i soli controlli, senza fondere: `npm run finish:check`.
 
 Se la fusione viene rifiutata perché `main` è avanzato (una routine ha pushato
 nel frattempo): `git pull --rebase origin main` e rilancia.
+
+### La verifica indipendente vale anche in locale (dal 2026-08-08)
+
+`npm run finish` **non pubblica** finché un'istanza DIVERSA da quella che ha
+scritto il codice non ha provato a romperlo. È lo stesso passaggio che in cloud
+esiste da sempre, e serve perché i test scritti insieme al lavoro hanno gli
+stessi punti ciechi di chi ha scritto il lavoro: passano anche quando la cosa
+chiesta non si ottiene.
+
+```bash
+node scripts/verify-local.mjs start "<cosa aveva chiesto l'owner, con le sue parole>"
+```
+
+Stampa il compito da consegnare a **un'istanza nuova** (un subagente, non te
+stesso). Quel testo contiene la richiesta e il ramo, **mai il diff né il tuo
+report**: è l'isolamento che rende la verifica avversariale invece di una
+rilettura compiacente. L'istanza che verifica registra l'esito con
+`verify-local.mjs pass "…"` o `fail "…"`.
+
+L'esito è legato al **commit** verificato: se dopo il PASS tocchi ancora il
+codice, decade e va rifatto — altrimenti basterebbe farsi approvare una versione
+e pubblicarne un'altra. `npm run finish -- --no-verify` salta tutto: è la
+scorciatoia da usare solo quando serve davvero, e va detto all'owner.
 
 Vale **anche se stai lavorando direttamente su `main`**: lì non c'è niente da
 fondere, ma i controlli girano lo stesso e la pubblicazione avviene solo se
@@ -345,8 +370,23 @@ npm install                # Electron + Playwright (~150MB)
 npm start                  # avvia la app
 npm run test:smoke         # smoke headless con screenshot in tests/.smoke/
 npm run test:unit          # unit test logica pura (node:test, no Electron, ms)
-npm test                   # suite Playwright (~100 spec, ~25 min: solo in cloud)
+npm test                   # suite Playwright (~100 spec: solo in cloud)
 ```
+
+**Gli spec Playwright NON mostrano più la finestra** (dal 2026-08-08): l'app parte
+fuori dallo schermo, trasparente e senza fuoco, così lanciare i test mentre
+l'owner lavora non gli fa lampeggiare finestre davanti. Vale per **tutti** gli
+spec, anche i ~50 che lanciano Electron per conto proprio senza passare dalla
+fixture: l'interruttore sta in `playwright.config.js`, sull'ambiente del worker,
+e ogni lancio lo eredita. Tutto il resto funziona identico — menu nativi
+compresi, che sono finestre a sé e vengono resi invisibili anche loro — e gli
+screenshot dei test vengono lo stesso (passano dal debugger, non dal compositor).
+
+Il "come" e i due modi in cui la protezione era caduta stanno in
+`src/main/test-window-mode.js`; `tests/hidden-window.spec.mjs` la sorveglia.
+Per guardare l'app mentre uno spec la pilota: `FILO_TEST_VISIBLE=1 npx playwright
+test …`. `test:shoot` e `test:smoke` restano visibili sempre: lì la finestra
+fotografata **è** il risultato.
 
 Se `npm install` non scarica il binario Electron (succede su alcuni setup):
 `node node_modules/electron/install.js`.
