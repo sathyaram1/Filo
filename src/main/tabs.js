@@ -21,6 +21,13 @@ const { normalizeUrl, canonicalizeFiloUrl } = globalThis.SN_URL_NAV;
 require('../shared/downloadTabs'); // #412/#441 — schede usa e getta dei download (logica pura)
 const { decideCloseOnDownload } = globalThis.SN_DOWNLOAD_TABS;
 
+// #441 — eventi di solo PUNTAMENTO: il cursore che attraversa la pagina non è
+// un'interazione dell'utente con quella scheda (tutto il resto — click, tasti,
+// rotella, tocco, gesti — lo è).
+const HOVER_INPUT_TYPES = new Set([
+  'mouseMove', 'mouseEnter', 'mouseLeave', 'pointerMove', 'pointerRawUpdate',
+]);
+
 // #252 — pagina interna filo:// "singleton": ne ha senso UNA sola scheda alla
 // volta (le liste "Aperti per dopo"/Cronologia/Archivio/Scaricamenti, le
 // pagine Impostazioni, gli editor…). Riaprirla mentre è già aperta deve
