@@ -118,3 +118,41 @@ test('isLocalHost copre loopback, *.localhost e gli IP privati', () => {
   assert.equal(isLocalHost('8.8.8.8'), false);  // IP pubblico
   assert.equal(isLocalHost('example.com'), false);
 });
+
+// ─── #437: "Copia URL" deve copiare INDIRIZZI, non pezzi di codice ───────────
+//
+// Un sito può mettere come src di un'immagine/filmato (o come href di un link)
+// qualcosa che non è un indirizzo: un frammento `javascript:`, un `data:` che
+// contiene il file per esteso, un `blob:` che muore con la pagina, o testo
+// qualsiasi. Copiarlo consegna all'utente una stringa che non apre niente da
+// nessuna parte. Se `isShareableAddress` tornasse `true` per questi casi (cioè
+// se il fix non ci fosse), questi assert diventano rossi.
+
+test('#437 quello che non è un indirizzo non è copiabile', () => {
+  assert.equal(isShareableAddress('javascript:alert(1)'), false);
+  assert.equal(isShareableAddress('javascript:void(0)'), false);
+  assert.equal(isShareableAddress('JavaScript:doStuff()'), false);   // schema in maiuscolo
+  assert.equal(isShareableAddress('vbscript:msgbox'), false);
+  assert.equal(isShareableAddress('data:image/png;base64,AAAA'), false);
+  assert.equal(isShareableAddress('blob:http://x/9a-1'), false);
+  assert.equal(isShareableAddress('filesystem:http://x/temporary/f'), false);
+  assert.equal(isShareableAddress('about:blank'), false);
+  // Non parsabile: non era un indirizzo nemmeno per la pagina che lo conteneva.
+  assert.equal(isShareableAddress('{{item.url}}'), false);
+  assert.equal(isShareableAddress('non è un url'), false);
+  assert.equal(isShareableAddress(''), false);
+  assert.equal(isShareableAddress('   '), false);
+  assert.equal(isShareableAddress(null), false);
+  assert.equal(isShareableAddress(undefined), false);
+});
+
+test('#437 gli indirizzi veri restano copiabili', () => {
+  assert.equal(isShareableAddress('https://example.com/foto.jpg'), true);
+  assert.equal(isShareableAddress('http://127.0.0.1:8080/v.mp4'), true);
+  assert.equal(isShareableAddress('  https://example.com/con-spazi-intorno  '), true);
+  assert.equal(isShareableAddress('ftp://example.com/file.zip'), true);
+  assert.equal(isShareableAddress('mailto:a@b.it'), true);      // il browser lo consegna all'OS
+  assert.equal(isShareableAddress('tel:+390123'), true);
+  assert.equal(isShareableAddress('magnet:?xt=urn:btih:abc'), true);
+  assert.equal(isShareableAddress('filo://home/home.html'), true); // riapribile dentro Filo
+});
