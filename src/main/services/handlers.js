@@ -354,17 +354,36 @@ function buildAttemptChain(settings, modelRef, action) {
   // almeno una valida la richiesta parte con quelle (è la catena che qualcuno ha
   // scelto); se non ne resta nessuna, la funzione non parte e lo dice.
   const missing = SN_CONST.missingModelRefs(refs, registry);
-  const usable = SN_CONST.usableModelRefs(refs, registry);
+  let usable = SN_CONST.usableModelRefs(refs, registry);
   if (!usable.length) throw modelConfigError(settings, action, missing);
   if (missing.length) {
     console.warn(`[Filo modelli] "${action || modelRef}" cita modelli inesistenti: ${missing.join(', ')}`);
+  }
+
+  // Interruttore "solo modelli a pesi aperti" (#461). Ogni modello proprietario
+  // della catena viene SOSTITUITO col suo equivalente a pesi aperti; quelli
+  // senza equivalente escono dalla catena. Se non resta niente, la funzione si
+  // ferma e dice perché: il ripiego su un modello proprietario — che a catena
+  // intatta sarebbe scattato appena il sostituto non risponde — qui non esiste
+  // proprio, perché quei tentativi non vengono nemmeno costruiti.
+  const openWeightsOnly = settings.openWeightsOnly === true;
+  if (openWeightsOnly) {
+    const pol = SN_CONST.applyOpenWeightsPolicy(usable, registry);
+    if (pol.substituted.length) {
+      console.log(`[Filo policy] "${action || modelRef}" (solo pesi aperti): `
+        + pol.substituted.map((s) => `${s.from} → ${s.to}`).join(', '));
+    }
+    if (!pol.refs.length) throw openWeightsConfigError(settings, action, pol.dropped);
+    usable = pol.refs;
   }
 
   // Ogni modello del registry porta il proprio provider, quindi l'ordine qui
   // conta solo per i ref "legacy" (id grezzi senza nickname): proviamo prima
   // Gemini (quota free) poi OpenRouter. buildModelAttempts scarta da sé i
   // provider senza chiave o senza un id concreto per quel modello.
-  const providerOrder = ['gemini', 'openrouter'];
+  // A interruttore acceso Gemini esce dall'ordine: è l'API del produttore, e i
+  // modelli a pesi aperti serviti da lì restano soldi a chi li ha addestrati.
+  const providerOrder = openWeightsOnly ? ['openrouter'] : ['gemini', 'openrouter'];
   const out = SN_CONST.buildModelAttempts(usable, registry, providerOrder, settings.apiKeys || {});
   if (!out.length) {
     const e = new Error(I18n.t('err_no_api_key'));
