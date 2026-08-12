@@ -214,6 +214,11 @@
     options_use_default_models: 'Usa modelli predefiniti',
     options_use_default_models_desc:
       'Filo funziona subito con modelli e chiavi predefiniti, senza configurare nulla. Disattiva per usare le tue chiavi e scegliere i tuoi modelli.',
+    options_open_weights_only: 'Solo modelli a pesi aperti',
+    options_open_weights_only_desc:
+      'Spegne tutti i modelli proprietari — Anthropic compresa — e lascia lavorare solo modelli a pesi aperti serviti da fornitori indipendenti. Vale anche con i modelli predefiniti. Le funzioni che partivano da un modello proprietario passano al suo equivalente aperto; quelle senza equivalente si fermano e lo dicono, invece di tornare di nascosto su un modello proprietario.',
+    options_open_weights_switched: 'Cambiano modello: %s',
+    options_open_weights_unavailable: 'Si fermano (nessun equivalente a pesi aperti): %s',
     options_keys: 'Chiavi API',
     options_api_key: 'API key',
     options_models: 'Modelli per azione',
