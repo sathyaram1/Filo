@@ -209,9 +209,15 @@ test.describe('larghezza e separatori stile Chrome', () => {
 // cursore e se ne possono chiudere più di fila); si riassestano solo quando il
 // puntatore lascia la striscia.
 test.describe('larghezze delle schede alla chiusura', () => {
-  const widthsById = () => shell.locator('#tabs .tab').evaluateAll((els) => {
+  // Misura in UN solo passaggio nella pagina: `locator.evaluateAll` risolve
+  // prima i nodi e poi li misura in un secondo giro, e fra i due un ridisegno
+  // della striscia può averli staccati dal documento — un nodo staccato misura
+  // 0 e il confronto diventa rumore.
+  const widthsById = () => shell.evaluate(() => {
     const out = {};
-    for (const el of els) out[el.dataset.id] = el.getBoundingClientRect().width;
+    for (const el of document.querySelectorAll('#tabs .tab')) {
+      out[el.dataset.id] = el.getBoundingClientRect().width;
+    }
     return out;
   });
 
@@ -262,7 +268,7 @@ test.describe('larghezze delle schede alla chiusura', () => {
     await expect.poll(
       () => shell.evaluate(() => document.querySelectorAll('#tabs .tab').length),
       { timeout: 8_000 },
-    ).toBe(7);
+    ).toBe(FULL);
 
     // Le superstiti conservano ESATTAMENTE la larghezza che avevano.
     const during = await widthsById();
@@ -284,7 +290,7 @@ test.describe('larghezze delle schede alla chiusura', () => {
   });
 
   test('col puntatore fuori dalla striscia la chiusura riassesta subito', async () => {
-    await openMany(7);
+    await openMany(FULL);
     await shell.mouse.move(600, 300); // puntatore sulla pagina, non sulle schede
 
     const before = await widthsById();
@@ -295,7 +301,7 @@ test.describe('larghezze delle schede alla chiusura', () => {
     await expect.poll(async () => {
       const after = await widthsById();
       const id = ids.find((x) => x !== victim);
-      return Object.keys(after).length === 7 ? after[id] - before[id] : 0;
+      return Object.keys(after).length === FULL ? after[id] - before[id] : 0;
     }, { timeout: 8_000 }).toBeGreaterThan(1);
   });
 });
