@@ -180,6 +180,11 @@
     toast_save_failed: 'Salvataggio non riuscito',
     toast_link_saved: 'Link salvato',
     toast_copied: 'Copiato negli appunti',
+    // #437 — la sorgente di un'immagine/filmato o l'href di un link possono
+    // essere qualsiasi cosa il sito ci abbia messo (un frammento di codice, un
+    // data: lunghissimo, niente). Dirlo è meglio che riempire gli appunti con
+    // una stringa che altrove non apre nulla.
+    toast_not_an_address: 'Questo non è un indirizzo: non c\'è niente da copiare',
     toast_copied_saving: 'Copiato negli appunti, salvataggio in corso…',
     toast_translating_page: 'Traduzione pagina in corso…',
     toast_translating_page_progress: 'Traduzione pagina… %s/%s',

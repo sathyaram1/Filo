@@ -38,6 +38,29 @@
     );
   }
 
+  // #437 — "Copia URL" (del link, dell'immagine, del filmato) copia un
+  // INDIRIZZO: se quello che il sito ha messo lì non lo è — un frammento di
+  // codice `javascript:`, un `data:` lungo un chilometro, un `blob:` che muore
+  // con la pagina, o niente affatto — negli appunti finirebbe una stringa che
+  // non apre nulla da nessuna parte, senza che niente lo dica. Meglio dirlo,
+  // come già succede per i filmati trasmessi a pezzi.
+  function isAddress(url) {
+    const raw = String(url || '').trim();
+    // Senza il modulo condiviso non peggioriamo il comportamento storico.
+    if (!global.SN_URL_NAV) return !!raw;
+    return global.SN_URL_NAV.isShareableAddress(raw);
+  }
+
+  // Ritorna true se ha davvero copiato.
+  function copyUrlToClipboard(url) {
+    if (!isAddress(url)) {
+      Popup.showToast(I18n.t('toast_not_an_address'));
+      return false;
+    }
+    copyToClipboard(String(url).trim());
+    return true;
+  }
+
   function cutSelection() {
     // window.getSelection() non vede la selezione dentro <input>/<textarea>:
     // recuperiamo il testo direttamente dal nodo attivo se serve.
@@ -1046,12 +1069,20 @@
     copyToClipboard(location.href);
   }
 
+  // Condividere un link finisce, senza sistema di condivisione nativo, in una
+  // copia negli appunti: vale lo stesso discorso di "Copia URL" (#437) — un
+  // href che non è un indirizzo non si può né mandare a qualcuno né copiare.
   async function shareLink(linkEl) {
-    const data = { title: linkEl.textContent?.trim() || linkEl.href, url: linkEl.href };
+    const href = linkEl?.href || '';
+    if (!isAddress(href)) {
+      Popup.showToast(I18n.t('toast_not_an_address'));
+      return;
+    }
+    const data = { title: linkEl.textContent?.trim() || href, url: href };
     if (navigator.share) {
       try { await navigator.share(data); return; } catch (_) {}
     }
-    copyToClipboard(linkEl.href);
+    copyToClipboard(href);
   }
 
   function searchTextOnWeb(text) {
@@ -1160,14 +1191,17 @@
 
   // "Copia URL video/audio": un blob: (stream MSE, o Blob creata dalla pagina)
   // non è un indirizzo utilizzabile fuori dalla scheda — dirlo è meglio che
-  // copiare una stringa che altrove non apre nulla.
+  // copiare una stringa che altrove non apre nulla. Un blob: assente o vuoto
+  // resta il caso "streaming a pezzi", che ha il suo messaggio; ogni altra
+  // sorgente che non è un indirizzo (data:, javascript:, testo qualsiasi)
+  // passa dal messaggio generico (#437).
   function copyMediaUrl(el) {
     const src = mediaSrc(el);
     if (!src || /^blob:/i.test(src)) {
       Popup.showToast(I18n.t('toast_media_stream_only'));
       return;
     }
-    copyToClipboard(src);
+    copyUrlToClipboard(src);
   }
 
   async function downloadMedia(el) {
@@ -1809,6 +1843,8 @@
     init,
     // clipboard
     copyToClipboard,
+    copyUrlToClipboard,
+    isAddress,
     cutSelection,
     blobToDataUrl,
     pasteFromClipboard,
