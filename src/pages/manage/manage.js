@@ -28,7 +28,8 @@
     claude: document.getElementById('mgAutoApproveClaude'),
     user:   document.getElementById('mgAutoApproveUser'),
   };
-  const mgProberIdle = document.getElementById('mgProberIdle');
+  const mgProberIdle    = document.getElementById('mgProberIdle');
+  const mgProberIdleMsg = document.getElementById('mgProberIdleMsg');
   const mgLoopCap    = document.getElementById('mgLoopCap');
   const mgLoopCapSave = document.getElementById('mgLoopCapSave');
   const mgLoopCapMsg  = document.getElementById('mgLoopCapMsg');
