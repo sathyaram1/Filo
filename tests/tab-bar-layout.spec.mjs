@@ -209,26 +209,35 @@ test.describe('larghezza e separatori stile Chrome', () => {
 // cursore e se ne possono chiudere più di fila); si riassestano solo quando il
 // puntatore lascia la striscia.
 test.describe('larghezze delle schede alla chiusura', () => {
-  // Apre `n` schede in più e aspetta che la shell le abbia disegnate tutte.
+  const widthsById = () => shell.locator('#tabs .tab').evaluateAll((els) => {
+    const out = {};
+    for (const el of els) out[el.dataset.id] = el.getBoundingClientRect().width;
+    return out;
+  });
+
+  // Apre `n` schede in più e aspetta che la striscia si sia ASSESTATA. Non
+  // basta contare i nodi: finché le pagine caricano, al posto della favicon c'è
+  // la rotella (slot più stretto) e la striscia — larga quanto il suo contenuto
+  // — cambia misura sotto i piedi, falsando qualunque confronto di larghezze.
+  // Quindi aspettiamo due misure identiche e non nulle di seguito.
   async function openMany(n) {
-    await shell.evaluate(async (k) => {
+    await shell.evaluate((k) => {
       for (let i = 0; i < k; i++) window.filoShell.tabs.open('filo://newtab/');
     }, n);
     await expect.poll(
       () => shell.evaluate(() => document.querySelectorAll('#tabs .tab').length),
       { timeout: 15_000 },
     ).toBe(n + 1);
-    // Il layout flex può misurare 0 per un frame subito dopo il disegno.
-    await expect
-      .poll(() => shell.locator('.tab.active').evaluate((el) => el.getBoundingClientRect().width))
-      .toBeGreaterThan(0);
+    let prev = null;
+    await expect.poll(async () => {
+      const cur = await widthsById();
+      const vals = Object.values(cur);
+      const ok = vals.length === n + 1 && vals.every((w) => w > 1)
+        && prev !== null && JSON.stringify(cur) === prev;
+      prev = JSON.stringify(cur);
+      return ok;
+    }, { timeout: 15_000, intervals: [250] }).toBe(true);
   }
-
-  const widthsById = () => shell.locator('#tabs .tab').evaluateAll((els) => {
-    const out = {};
-    for (const el of els) out[el.dataset.id] = el.getBoundingClientRect().width;
-    return out;
-  });
 
   test('col puntatore sulla striscia le schede superstiti non cambiano larghezza', async () => {
     await openMany(7); // 8 schede: si dividono lo spazio, quindi sono strette
@@ -248,6 +257,7 @@ test.describe('larghezze delle schede alla chiusura', () => {
 
     // Le superstiti conservano ESATTAMENTE la larghezza che avevano.
     const during = await widthsById();
+    console.log('BEFORE', JSON.stringify(before), 'DURING', JSON.stringify(during));
     expect(Object.keys(during).sort()).toEqual(ids.filter((id) => id !== victim).sort());
     for (const id of Object.keys(during)) {
       expect(Math.abs(during[id] - before[id]),
