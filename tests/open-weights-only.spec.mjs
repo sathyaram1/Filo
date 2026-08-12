@@ -45,7 +45,7 @@ test('solo modelli a pesi aperti: sostituisce, non ripiega, e lo dimostra', asyn
     const C = globalThis.SN_CONST;
     const MSG = globalThis.SN_MSG.MSG;
     const Storage = globalThis.SN_STORAGE;
-    const History = globalThis.SN_HISTORY_STORE || globalThis.SN_HISTORY;
+    const History = globalThis.SN_HISTORY;
 
     // Registra ogni tentativo costruito dall'app e risponde col primo, così si
     // vede ESATTAMENTE cosa sarebbe partito verso la rete.
@@ -83,7 +83,7 @@ test('solo modelli a pesi aperti: sostituisce, non ripiega, e lo dimostra', asyn
     try {
       // Crediti di Filo: modelli e chiavi PREDEFINITI, interruttore acceso.
       await Storage.setSettings({ useDefaultModels: true, openWeightsOnly: true });
-      await globalThis.SN_HISTORY_STORE?.clear?.().catch?.(() => {});
+      try { await History.clear(); } catch (_) {}
 
       res.acceso = await run(C.ACTIONS.EXPLAIN, { selection: 'ciao', sentence: 'ciao mondo' });
       res.anthropic = await run(C.ACTIONS.EXPLAIN_DEEP, { selection: 'ciao', sentence: 'ciao mondo' });
@@ -93,14 +93,23 @@ test('solo modelli a pesi aperti: sostituisce, non ripiega, e lo dimostra', asyn
       res.tuttoGiu = await run(C.ACTIONS.EXPLAIN, { selection: 'ciao', sentence: 'ciao mondo' });
       failAll = false;
 
-      // Funzione senza equivalente a pesi aperti (indicizzazione = embedding).
-      res.senzaEquivalente = await run(C.ACTIONS.TTS, { text: 'ciao' });
+      // Funzione con un modello proprietario e NESSUN equivalente aperto
+      // (configurazione personale: un modello Anthropic scelto a mano, che non
+      // è uno di quelli con un sostituto previsto).
+      await Storage.setSettings({
+        useDefaultModels: false,
+        apiKeys: { openrouter: 'k-test' },
+        modelRegistry: { 'mio-claude': { provider: 'openrouter', model: 'anthropic/claude-3.7-sonnet' } },
+        models: { [C.ACTIONS.EXPLAIN_LINK]: 'mio-claude' },
+      });
+      res.senzaEquivalente = await run(C.ACTIONS.EXPLAIN_LINK, { url: 'https://example.com', text: 'x' });
+      await Storage.setSettings({ useDefaultModels: true });
 
       // Controprova sul SERVITO: se chi ha servito è escluso, la voce di
       // cronologia lo dice invece di far passare la cosa in silenzio.
       servedByNext = 'Google AI Studio';
       res.violazione = await run(C.ACTIONS.EXPLAIN, { selection: 'x', sentence: 'y' });
-      const items = await (History?.list?.() || []);
+      const items = await History.list();
       res.ultimaVoce = items && items[0]
         ? { servedBy: items[0].servedBy, policyViolation: items[0].policyViolation }
         : null;
