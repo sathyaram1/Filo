@@ -96,6 +96,8 @@ test('la pagina "il download partirà a breve" aperta in nuova scheda si chiude 
     // 3) L'avviso dice cosa è successo e permette di riaprirla.
     const card = shell.locator('.shell-notif', { hasText: 'Chiusa' });
     await expect(card).toBeVisible({ timeout: 8000 });
+    // Traccia ispezionabile della regressione visiva (cartella gitignorata).
+    try { await shell.screenshot({ path: 'tests/.shots/441-avviso-scheda-ponte.png' }); } catch (_) {}
     await card.locator('.shell-notif-action', { hasText: 'Riapri' }).click();
     await expect.poll(async () => {
       const s = await stato(shell);
