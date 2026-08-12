@@ -827,9 +827,12 @@ export async function run() {
     await recordWorkerSpawn(proberBucket);
     return { exit: 0 };
   }
-  // Cap EFFETTIVO: env > config/automation (scelto dall'owner) > default.
-  const cap = resolveLoopCap({ envRaw: process.env.FILO_LOOP_CAP, remote: await fetchRemoteLoopCap() });
-  let bucket = chooseBucket(snapshot, cap);
+  // Config dell'owner (una lettura sola): cap del loop + esplorazione a coda
+  // vuota. Cap EFFETTIVO: env > config/automation > default.
+  const automation = await fetchRemoteAutomation();
+  const cap = resolveLoopCap({ envRaw: process.env.FILO_LOOP_CAP, remote: automation.loopCap ?? null });
+  const opts = { proberWhenIdle: automation.proberWhenIdle };
+  let bucket = chooseBucket(snapshot, cap, opts);
 
   // Escalation gestite inline da dispatch (nessun worker da spawnare): accodano
   // `design` (decide l'owner), puliscono lo stato e si ri-sceglie. In loop:
