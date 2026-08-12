@@ -135,7 +135,12 @@ c'è nessuna credenziale admin (la Action le esegue col service account):
 ```bash
 node scripts/queue-triage.mjs <id> <status:todo|done|clarify> "testo note"   # triage
 node scripts/queue-feedback.mjs --name "titolo" [--parent <id>] \
-  [--priority 0-3] [--status todo|clarify] "testo"                          # creazione
+  [--priority 0-3] [--status new|todo|clarify] "testo"                      # creazione
+#   Default: un ritrovamento NUOVO (senza --parent) nasce `new` → Ricevuti, così
+#   passa dal giudizio e dall'auto-approvazione per mittente (#446). Con --parent
+#   nasce `todo`: la spec padre l'owner l'ha già approvata. `--status todo` su un
+#   top-level scavalca il cancello: esplicito sì (l'allarme dei controlli rossi in
+#   pubblicazione), per distrazione no.
 ```
 
 oppure crea il file a mano con l'editor: in una sessione Claude l'hook di
