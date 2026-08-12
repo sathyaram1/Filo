@@ -759,7 +759,7 @@
         case 'edit_text': global.SN_EDITBOX?.openEditBox(text); break;
         case 'copy_image': await Actions?.copyImage(imgEl); break;
         case 'save_image': Actions?.downloadImage(imgEl); break;
-        case 'copy_image_link': Actions?.copyToClipboard(imgEl.currentSrc || imgEl.src); break;
+        case 'copy_image_link': Actions?.copyUrlToClipboard(imgEl.currentSrc || imgEl.src); break;
         case 'search_image': Actions?.searchImageOnWeb(imgEl); break;
         case 'open_link': {
           // "Apri in nuova scheda" è un'azione di sistema già registrata: la
