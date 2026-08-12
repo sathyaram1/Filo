@@ -129,7 +129,17 @@ test('filo://: Ctrl+rotella (e pinch del trackpad) zooma la pagina interna', asy
 // non arrivano al preload della pagina. Senza l'inoltro dal main, Ctrl + qui
 // non fa nulla → il fattore di zoom della scheda resta 1.
 
-test('Ctrl + / Ctrl 0 zoomano la scheda anche col focus sulla barra di Filo', async ({ app, shell, openTab }) => {
+// Come in tab-browser-shortcuts.spec.mjs (#404), la combinazione si inietta
+// sulla webContents della SHELL: è lo stesso cammino del tasto reale quando il
+// focus è sulla barra, ed è deterministico in headless.
+function pressCtrlOnShell(app, keyCode) {
+  return app.evaluate(({ BrowserWindow }, kc) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    w.webContents.sendInputEvent({ type: 'keyDown', keyCode: kc, modifiers: ['control'] });
+  }, keyCode);
+}
+
+test('Ctrl + / Ctrl 0 zoomano la scheda anche col focus sulla barra di Filo', async ({ app, openTab }) => {
   const page = await openTab('filo://manage/manage.html');
   await page.waitForLoadState('domcontentloaded');
 
@@ -137,11 +147,10 @@ test('Ctrl + / Ctrl 0 zoomano la scheda anche col focus sulla barra di Filo', as
   expect(z0).toBeCloseTo(1, 1);
 
   // Focus sulla barra (come dopo aver cliccato una scheda), non sulla pagina.
-  await shell.bringToFront();
-  await shell.keyboard.press('Control+=');
+  await pressCtrlOnShell(app, '=');
   await expect.poll(async () => zoomFactorOf(app, 'manage')).toBeGreaterThan(z0 + 0.01);
 
-  await shell.keyboard.press('Control+0');
+  await pressCtrlOnShell(app, '0');
   await expect.poll(async () => zoomFactorOf(app, 'manage')).toBeCloseTo(1, 1);
 });
 
