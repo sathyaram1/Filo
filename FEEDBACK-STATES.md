@@ -56,7 +56,7 @@ DB3 esistente), poi "Risolti".
 - ingresso → gate file (filo-security, prima dei giudici): flag → `suspicious_file`;
   pulito → `unlabeled`.
 - `unlabeled` —pipeline (panel completo)→ `attack` | `spam` | `design` | (sicuro:
-  automatica ON → `todo`, OFF → `aligned`).
+  automatica ON **e mittente ammesso** → `todo`, altrimenti → `aligned`).
 - `suspicious_file` —owner→ `todo` | `attack_confirmed` | `spam_confirmed` | `archived`.
 - `attack` —owner→ `attack_confirmed` | `todo` (falso positivo).
 - `spam` —owner→ `spam_confirmed` | `todo`.
