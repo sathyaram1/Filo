@@ -1,0 +1,16 @@
+{
+  "id": "a10d2c36-9502-4fb8-a684-c9796e85c9b2",
+  "branch": "worker/a10d2c36-9502-4fb8-a684-c9796e85c9b2-20260812T122256Z",
+  "loopCount": 0,
+  "verifierVerdict": null,
+  "verifierCritique": "",
+  "secauditDone": false,
+  "secauditVerdict": null,
+  "checkpoints": [
+    {
+      "sha": "ff943b9a930b836a8e292db58552847f3307c99b",
+      "by": "new-work:checkout",
+      "at": "2026-08-12T12:22:57.842Z"
+    }
+  ]
+}
