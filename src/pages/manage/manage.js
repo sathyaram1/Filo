@@ -366,8 +366,6 @@
   // routine leggono in dispatch.mjs — così cambiarlo qui ha effetto sul loop.
   // chrome.storage.local è solo una CACHE locale per mostrare subito un valore
   // (e un ripiego se l'IPC non risponde / non si è admin).
-  const AUTOMATION_GET = (window.SN_MSG?.MSG?.AUTOMATION_GET) || 'automation_get';
-  const AUTOMATION_SET = (window.SN_MSG?.MSG?.AUTOMATION_SET) || 'automation_set';
   const LOOP_CAP_GET = (window.SN_MSG?.MSG?.AUTOMATION_LOOP_CAP_GET) || 'automation_loop_cap_get';
   const LOOP_CAP_SET = (window.SN_MSG?.MSG?.AUTOMATION_LOOP_CAP_SET) || 'automation_loop_cap_set';
 
