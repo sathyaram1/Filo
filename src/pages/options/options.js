@@ -166,8 +166,12 @@
     const impact = C.openWeightsImpact(models, modelRegistry);
     const lines = [];
     if (impact.substituted.length) {
-      const names = impact.substituted.map((s) => `${actionLabelFor(s.action)} → ${s.to}`);
-      lines.push(I18n.t('options_open_weights_switched', names.join(', ')));
+      // Le funzioni che cambiano modello sono decine: elencarle una per una
+      // sarebbe un muro di testo che nessuno legge. Quello che serve sapere è
+      // quante sono e su quali modelli finiscono; l'elenco per funzione è già
+      // la griglia dei modelli qui sotto.
+      const modelli = [...new Set(impact.substituted.map((s) => s.to))];
+      lines.push(I18n.t('options_open_weights_switched', String(impact.substituted.length), modelli.join(', ')));
     }
     if (impact.unavailable.length) {
       const names = impact.unavailable.map((u) => actionLabelFor(u.action));
