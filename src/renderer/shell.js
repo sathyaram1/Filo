@@ -1440,6 +1440,7 @@
   });
 
   api.tabs.onUpdate((snap) => {
+    noteTabsChange(snap);
     state = snap;
     render();
   });
