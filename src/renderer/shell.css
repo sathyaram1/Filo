@@ -12,6 +12,9 @@
   --tab-active: #fdf6ec;
   --border: #e2d3b5;
   --radius: 10px;
+  /* Durata del riassestamento delle schede quando il puntatore lascia la
+     striscia (vedi "larghezze bloccate" in shell.js). */
+  --tab-relax-anim: 170ms;
 }
 
 @media (prefers-color-scheme: dark) {
