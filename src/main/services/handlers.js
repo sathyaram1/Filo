@@ -434,16 +434,32 @@ function buildAttemptChain(settings, modelRef, action) {
 // registrarlo, l'esclusione è solo una speranza. Se l'host servito risulta fra
 // gli esclusi (è comparso con un nome che l'ignore non ha intercettato), lo
 // segnaliamo in modo evidente nei log. Ritorna il nome dell'host, o null.
+// Ritorna { servedBy, violation }: `violation` è true quando chi ha servito
+// risulta fra gli esclusi. Con l'interruttore "solo pesi aperti" acceso quel
+// caso non resta nei log: chi l'ha acceso ha chiesto una garanzia, e una
+// garanzia caduta in silenzio è peggio dell'interruttore assente — quindi lo
+// vede anche a schermo, e la voce di cronologia resta marchiata.
 function noteServedProvider(settings, action, result) {
   const servedBy = (result && result.servedBy) || null;
-  if (servedBy && SN_CONST.isProviderExcluded(servedBy, settings.excludedProviders || [])) {
+  const violation = Boolean(servedBy
+    && SN_CONST.isProviderExcluded(servedBy, settings.excludedProviders || []));
+  if (violation) {
     console.error(
       `[Filo policy] Richiesta "${action}" servita da un fornitore ESCLUSO: "${servedBy}". `
       + 'La politica sui modelli è stata aggirata (nome host non intercettato dalla lista di '
       + 'esclusione): aggiornare excludedProviders in config/models.',
     );
+    if (settings.openWeightsOnly === true) {
+      try {
+        broadcastToTabs({
+          type: MSG.SHOW_TOAST,
+          text: I18n.t('toast_open_weights_violated', servedBy),
+          duration: 8000,
+        });
+      } catch (_) {}
+    }
   }
-  return servedBy;
+  return { servedBy, violation };
 }
 
 async function handleAIRequest({ action, payload, origin, onReasoning = null, onText = null, signal = null }) {
