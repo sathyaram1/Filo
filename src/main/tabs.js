@@ -18,6 +18,15 @@ require('../shared/authPopup');
 const { isAuthPopup } = globalThis.SN_AUTH_POPUP;
 require('../shared/urlNav'); // #398 — sorgente unica di normalizeUrl/isLocalHost (condivisa con la dashboard)
 const { normalizeUrl, canonicalizeFiloUrl } = globalThis.SN_URL_NAV;
+require('../shared/downloadTabs'); // #412/#441 — schede usa e getta dei download (logica pura)
+const { decideCloseOnDownload } = globalThis.SN_DOWNLOAD_TABS;
+
+// #441 — eventi di solo PUNTAMENTO: il cursore che attraversa la pagina non è
+// un'interazione dell'utente con quella scheda (tutto il resto — click, tasti,
+// rotella, tocco, gesti — lo è).
+const HOVER_INPUT_TYPES = new Set([
+  'mouseMove', 'mouseEnter', 'mouseLeave', 'pointerMove', 'pointerRawUpdate',
+]);
 
 // #252 — pagina interna filo:// "singleton": ne ha senso UNA sola scheda alla
 // volta (le liste "Aperti per dopo"/Cronologia/Archivio/Scaricamenti, le
@@ -406,7 +415,7 @@ class TabManager {
     return view;
   }
 
-  openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null, suppressAutoplay = false, allowDuplicate = false } = {}) {
+  openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null, suppressAutoplay = false, allowDuplicate = false, openedByLink = false } = {}) {
     // #252 — INDIRIZZO UNICO per le pagine interne: riporta l'eventuale forma
     // legacy `filo://src/pages/<page>/<file>` (dallo shim getURL) alla forma
     // canonica `filo://<page>/<file>` che usa il menu. Così tutti i punti di
@@ -489,6 +498,11 @@ class TabManager {
       // (vedi _makeView). Memorizzato sulla tab così sopravvive a _recreateView
       // (es. se la tab viene proxata alla nascita per una regola di dominio).
       suppressAutoplay: !!suppressAutoplay,
+      // #441 — scheda nata da un link target=_blank / window.open (non aperta e
+      // indirizzata dall'utente): è la prima condizione perché possa essere
+      // riconosciuta come pagina-ponte di uno scaricamento (vedi
+      // handleDownloadStarted e src/shared/downloadTabs.js).
+      _openedByLink: !!openedByLink,
     };
 
     this._wireEvents(tab);
@@ -1652,6 +1666,10 @@ class TabManager {
       // MAI, quindi resta a about:blank). Il flag protegge dal chiuderla per
       // sbaglio se poi parte un download da una pagina che ha già contenuto.
       tab._everNavigated = true;
+      // #441 — quando la pagina corrente si è committata: una pagina-ponte
+      // ("il download partirà a breve…") avvia il file entro pochi secondi da
+      // qui. Oltre quella finestra la scheda non è più un semplice ponte.
+      tab._navigatedAt = Date.now();
       // Nuova pagina → il colore live (§1.1) del sito precedente non vale più: lo
       // azzeriamo (la tab torna al neutro finché il content script non ricampiona).
       // Il colore IDENTITÀ (§1.2) invece dipende dal DOMINIO: se navighiamo su un
@@ -1687,6 +1705,16 @@ class TabManager {
       }
     });
     wc.on('did-navigate-in-page', (_e, url) => update({ url: userUrl(url), canBack: canGoBack(wc), canFwd: canGoFwd(wc) }));
+    // #441 — l'utente ha toccato DAVVERO questa scheda? Serve a non chiudere
+    // come "pagina-ponte" una scheda con cui ha interagito. Il segnale arriva
+    // dal main (non dal content script, che manda un campione di attività anche
+    // senza input e non è iniettato ovunque). Il semplice passaggio del mouse
+    // NON conta: muovere il cursore sopra una scheda non è usarla.
+    wc.on('input-event', (_e, input) => {
+      const type = (input && input.type) || '';
+      if (!type || HOVER_INPUT_TYPES.has(type)) return;
+      tab._userInputAt = Date.now();
+    });
     // Redirect main-frame verso URL "di blocco" (/geo, /not-available,
     // /region-block, … — lista curata in geoBlock.js): il match viene
     // memorizzato e diventa segnale al did-navigate dell'URL finale.
@@ -1826,7 +1854,7 @@ class TabManager {
       // ogni apertura veniva attivata, quindi l'utente veniva strappato dalla
       // pagina che stava leggendo — lo stesso attrito della musica che passava
       // davanti da sola.
-      this.openTab(url, { activate: disposition !== 'background-tab' });
+      this.openTab(url, { activate: disposition !== 'background-tab', openedByLink: true });
       return { action: 'deny' };
     });
 
@@ -1939,23 +1967,41 @@ class TabManager {
   // scheda che, servita con Content-Disposition:attachment, diventa subito uno
   // scaricamento: nessuna pagina si committa mai e la scheda resta a about:blank
   // — bianca, titolo "Nuova scheda", attiva — che l'utente deve chiudere a mano.
+  // #441 — stesso attrito, un passo più in là: certi siti aprono una pagina
+  // intermedia ("Grazie, il download partirà a breve…") che avvia il file da
+  // sola. Ha contenuto vero, quindi la regola del #412 non la tocca, ma resta
+  // una scheda usa e getta. La chiudiamo solo con la firma stretta descritta in
+  // src/shared/downloadTabs.js (nata da un link, mai navigata dentro, mai
+  // toccata dall'utente, download partito entro pochi secondi dal caricamento)
+  // e, siccome lì qualcosa da perdere c'era, con un avviso "Riapri".
   // Il gestore download (services/downloads.js) ci passa la webContents che ha
-  // originato lo scaricamento: se corrisponde a una scheda che non ha MAI
-  // approdato a una pagina, la chiudiamo e restituiamo il fuoco alla scheda di
-  // partenza. La scheda superflua NON viene archiviata (non è un sito visitato,
-  // è un contenitore mai riempito): per questo non passa da closeTab.
+  // originato lo scaricamento. La scheda superflua NON viene archiviata (non è
+  // un sito che l'utente ha visitato per il suo contenuto): non passa da
+  // closeTab.
   handleDownloadStarted(wc) {
     if (!wc) return;
     const tab = this.tabs.find((t) => {
       try { return t.view && t.view.webContents === wc; } catch (_) { return false; }
     });
     if (!tab) return;
-    // Solo schede "vuote": mai committato una navigazione (tab._everNavigated),
-    // quindi ferme su about:blank. Una scheda con contenuto reale (es. un
-    // interstiziale "il download partirà a breve") ha già committato e va tenuta.
-    if (tab._everNavigated) return;
+    const decision = decideCloseOnDownload({
+      isInternal: !!tab.isInternal,
+      everNavigated: !!tab._everNavigated,
+      openedByLink: !!tab._openedByLink,
+      canBack: !!tab.canBack,
+      userInputAt: tab._userInputAt || null,
+      navigatedAt: tab._navigatedAt || null,
+      now: Date.now(),
+    });
+    if (!decision.close) return;
     const idx = this.tabs.findIndex((t) => t.id === tab.id);
     if (idx < 0) return;
+    // La pagina-ponte aveva contenuto: l'utente deve poter tornare indietro se
+    // quella scheda gli serviva davvero (chiudere da soli qualcosa di visibile
+    // senza via di ritorno sarebbe peggio dell'attrito che togliamo).
+    const undo = decision.reason === 'bridge'
+      ? { title: tab.title, url: tab.url }
+      : null;
     try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
     try { tab.view.webContents.close(); } catch (_) {}
     ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
@@ -1969,6 +2015,23 @@ class TabManager {
     } else {
       this._broadcast();
     }
+    if (undo) this._notifyBridgeTabClosed(undo);
+  }
+
+  // #441 — avviso discreto dopo aver chiuso una pagina-ponte, con "Riapri".
+  _notifyBridgeTabClosed({ title, url }) {
+    if (!url) return;
+    let label = String(title || '').trim();
+    if (!label || label === 'Nuova scheda') {
+      try { label = new URL(url).host; } catch (_) { label = url; }
+    }
+    if (label.length > 40) label = `${label.slice(0, 39)}…`;
+    try {
+      this.win.webContents.send('shell:toast', {
+        text: `Chiusa «${label}»: serviva solo ad avviare lo scaricamento`,
+        opts: { actions: [{ label: 'Riapri', openUrl: url }] },
+      });
+    } catch (_) {}
   }
 
   // #170.3 — decide se bloccare una navigazione top-level verso un sito in
