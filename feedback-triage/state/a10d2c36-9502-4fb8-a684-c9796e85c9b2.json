@@ -4,8 +4,8 @@
   "loopCount": 0,
   "verifierVerdict": "pass",
   "verifierCritique": "",
-  "secauditDone": false,
-  "secauditVerdict": null,
+  "secauditDone": true,
+  "secauditVerdict": "pass",
   "checkpoints": [
     {
       "sha": "ff943b9a930b836a8e292db58552847f3307c99b",
@@ -16,6 +16,11 @@
       "sha": "48efa60ccd7a6cdc720f5406ffb515828c9f8a42",
       "by": "verifier:pass",
       "at": "2026-08-12T13:22:49.687Z"
+    },
+    {
+      "sha": "ccf81636d7fefa0b040bce6904422a1cbe043ceb",
+      "by": "secaudit:pass",
+      "at": "2026-08-12T13:26:35.977Z"
     }
   ]
 }
