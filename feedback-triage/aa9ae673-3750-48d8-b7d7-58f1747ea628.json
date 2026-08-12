@@ -1,0 +1,7 @@
+{
+  "id": "aa9ae673-3750-48d8-b7d7-58f1747ea628",
+  "status": "revision_capability",
+  "notes": "Fatto. Ctrl +, Ctrl -, Ctrl 0, Ctrl con la rotella e il pizzico sul trackpad ora ingrandiscono anche le pagine di Filo (gestione, home, impostazioni, cronologia…), non solo i siti. La modalità zoom col clic sulla rotella resta com'era.\n\nOltre a quanto chiedevi: le stesse scorciatoie ora rispondono anche quando la tastiera ha il fuoco sulla barra delle schede, cioè tipicamente subito dopo aver cliccato una scheda. Lì prima non facevano nulla, e la cosa valeva anche sui siti normali: era metà del motivo per cui lo zoom sembrava capriccioso. Ho anche aggiunto lo zoom al manifesto delle capacità, che non lo elencava.\n\nL'editor di testo è l'unica eccezione voluta: lì lo zoom continua a scalare il foglio del documento invece dell'intera finestra, altrimenti le due cose si sommavano e al primo Ctrl + il documento diventava enorme. La barra delle schede in sé non si ingrandisce: per quella c'è la dimensione del testo nelle impostazioni.\n\nIl lavoro descritto nella prima nota era andato perso prima di arrivare a te: l'ho rimesso e completato.",
+  "queuedAt": "2026-08-12T08:19:33.619Z",
+  "queuedBy": "routine"
+}
