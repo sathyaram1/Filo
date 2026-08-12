@@ -141,11 +141,11 @@ test('lo switch attiva/disattiva la modalità automatica e lo stato persiste', a
   expect(trackOk.isMuted).toBe(true);
   expect(trackOk.isBorder).toBe(false);
 
-  // Simula l'owner: abilita lo switch (in produzione lo abilita applyAutoModeGate
-  // quando isAdmin è true) e attivalo. Il change handler scrive su storage.
-  // Simula l'owner che accende lo switch. Il checkbox nativo è visivamente
-  // nascosto (switch custom), quindi azioniamo direttamente il controllo reale:
-  // settiamo checked e scateniamo 'change', cioè il vero handler che persiste.
+  // #446 — accendere lo switch deve arrivare alla config che il backend dei
+  // giudici legge (config/automation.enabled), non solo alla cache locale: fino
+  // al 2026-08-12 finiva SOLO in chrome.storage.local, che nessuno leggeva, e
+  // l'automatica "attiva" non faceva niente.
+  await stubAutomation(page);
   await page.evaluate(() => {
     const el = document.getElementById('mgAutoToggle');
     el.disabled = false;
@@ -155,19 +155,172 @@ test('lo switch attiva/disattiva la modalità automatica e lo stato persiste', a
   await expect(input).toBeChecked();
   await expect(state).toHaveText('On');
 
-  // Lo stato è stato persistito in chrome.storage.local.
+  // È QUESTO l'assert che conta: il valore ha lasciato il client.
+  await expect.poll(() => page.evaluate(() => window.__automationSets)).toEqual([
+    { enabled: true },
+  ]);
+  expect(await page.evaluate(() => window.__automation.enabled)).toBe(true);
+
+  // La cache locale resta allineata (serve a mostrare subito il valore giusto
+  // alla riapertura, prima che risponda l'IPC).
   const stored = await page.evaluate(async () => {
     const d = await window.chrome.storage.local.get('filo_auto_mode');
     return d.filo_auto_mode;
   });
   expect(stored).toBe(true);
+});
 
-  // Sopravvive al ricaricamento della pagina (loadAutoMode rilegge da storage).
-  await page.reload();
+test("se il salvataggio fallisce lo switch NON resta acceso a vuoto", async ({ openTab }) => {
+  // Uno switch che dice "On" mentre la config è rimasta spenta è peggio di un
+  // errore: è la versione muta del bug #446.
+  const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
   await page.locator('.mg-tab[data-tab="automation"]').click();
-  await expect(page.locator('#mgAutoToggle')).toBeChecked();
-  await expect(page.locator('#mgAutoState')).toHaveText('On');
+
+  await page.evaluate(() => {
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'automation_set') return { ok: false, error: 'non sei admin' };
+      if (msg && msg.type === 'automation_get') return { ok: false, error: 'non sei admin' };
+      return orig(msg);
+    };
+  });
+
+  await page.evaluate(() => {
+    const el = document.getElementById('mgAutoToggle');
+    el.disabled = false;
+    el.checked = true;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+
+  await expect(page.locator('#mgAutoToggle')).not.toBeChecked();
+  await expect(page.locator('#mgAutoState')).toHaveText('Off');
+  await expect(page.locator('#mgAutoMsg')).toContainText('NON è cambiata');
+});
+
+// Stub dell'IPC dell'automatica: simula il doc Firestore config/automation
+// (campi `enabled`, `autoApprove`, `proberWhenIdle`) senza rete né main.
+// `__automationSets` raccoglie ciò che il client MANDA: è la prova che
+// l'impostazione lascia la pagina e arriva dove il backend la legge.
+async function stubAutomation(page, initial = {}) {
+  await page.evaluate((init) => {
+    window.__automation = Object.assign({
+      enabled: false,
+      autoApprove: { owner: true, filo: true, claude: true, user: true },
+      proberWhenIdle: true,
+    }, init);
+    window.__automationSets = [];
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'automation_get') {
+        return Object.assign({ ok: true }, window.__automation);
+      }
+      if (msg && msg.type === 'automation_set') {
+        const sent = {};
+        if (typeof msg.enabled === 'boolean') {
+          window.__automation.enabled = msg.enabled;
+          sent.enabled = msg.enabled;
+        }
+        if (msg.autoApprove && typeof msg.autoApprove === 'object') {
+          Object.assign(window.__automation.autoApprove, msg.autoApprove);
+          sent.autoApprove = { ...msg.autoApprove };
+        }
+        if (typeof msg.proberWhenIdle === 'boolean') {
+          window.__automation.proberWhenIdle = msg.proberWhenIdle;
+          sent.proberWhenIdle = msg.proberWhenIdle;
+        }
+        window.__automationSets.push(sent);
+        return Object.assign({ ok: true }, window.__automation);
+      }
+      return orig(msg);
+    };
+  }, initial);
+}
+
+test('#446 — gli interruttori per mittente scrivono nella config, uno alla volta', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
+  await page.locator('.mg-tab[data-tab="automation"]').click();
+
+  await stubAutomation(page, { enabled: true });
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.loadAutoMode());
+
+  // Con l'automatica accesa gli interruttori sono azionabili e partono da "tutti".
+  const user = page.locator('#mgAutoApproveUser');
+  await expect(user).toBeEnabled();
+  await expect(user).toBeChecked();
+  await expect(page.locator('#mgAutoApproveClaude')).toBeChecked();
+
+  // L'esempio dell'owner: gli utenti NON entrano più in coda da soli.
+  await page.evaluate(() => {
+    const el = document.getElementById('mgAutoApproveUser');
+    el.checked = false;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await expect.poll(() => page.evaluate(() => window.__automation.autoApprove)).toEqual({
+    owner: true, filo: true, claude: true, user: false,
+  });
+  // Gli altri interruttori non sono stati toccati.
+  await expect(page.locator('#mgAutoApproveClaude')).toBeChecked();
+  await expect(page.locator('#mgAutoApproveOwner')).toBeChecked();
+});
+
+test('#446 — con l\'automatica spenta gli interruttori per mittente non decidono niente', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
+  await page.locator('.mg-tab[data-tab="automation"]').click();
+
+  await stubAutomation(page, { enabled: false });
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.loadAutoMode());
+
+  for (const id of ['mgAutoApproveOwner', 'mgAutoApproveFilo', 'mgAutoApproveClaude', 'mgAutoApproveUser']) {
+    await expect(page.locator('#' + id)).toBeDisabled();
+  }
+  await expect(page.locator('#mgAutoApproveBlock')).toHaveClass(/mg-auto-sub--off/);
+
+  // Accendendo il master tornano azionabili, senza ricaricare la pagina.
+  await page.evaluate(() => {
+    const el = document.getElementById('mgAutoToggle');
+    el.disabled = false;
+    el.checked = true;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await expect(page.locator('#mgAutoApproveUser')).toBeEnabled();
+  await expect(page.locator('#mgAutoApproveBlock')).not.toHaveClass(/mg-auto-sub--off/);
+});
+
+test('#448 — spegnere l\'esplorazione a coda vuota arriva alla config delle routine', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
+  await page.locator('.mg-tab[data-tab="automation"]').click();
+
+  const sw = page.locator('#mgProberIdle');
+  await expect(sw).toBeVisible();
+  // Non-admin: sola lettura, come il resto della tab.
+  await expect(sw).toBeDisabled();
+
+  await stubAutomation(page);
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.loadAutoMode());
+  await expect(sw).toBeEnabled();
+  // Acceso di default: è il comportamento che le routine hanno sempre avuto.
+  await expect(sw).toBeChecked();
+
+  await page.evaluate(() => {
+    const el = document.getElementById('mgProberIdle');
+    el.checked = false;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await expect.poll(() => page.evaluate(() => window.__automation.proberWhenIdle)).toBe(false);
+  await expect.poll(() => page.evaluate(() => window.__automationSets)).toContainEqual({
+    proberWhenIdle: false,
+  });
 });
 
 // Stub dell'IPC del loop cap: simula il doc Firestore config/automation senza
