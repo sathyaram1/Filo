@@ -949,7 +949,7 @@
       {
         type: 'item',
         label: I18n.t('menu_copy_image_link'),
-        onClick: () => Actions.copyToClipboard(imgEl.currentSrc || imgEl.src),
+        onClick: () => Actions.copyUrlToClipboard(imgEl.currentSrc || imgEl.src),
       },
       {
         type: 'item',
@@ -983,7 +983,7 @@
       {
         type: 'item',
         label: I18n.t('menu_copy_link'),
-        onClick: () => Actions.copyToClipboard(linkEl.href),
+        onClick: () => Actions.copyUrlToClipboard(linkEl.href),
       },
       {
         type: 'item',

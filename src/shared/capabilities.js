@@ -186,8 +186,9 @@
     },
     {
       id: 'copy-download-image', title: 'Copia o scarica un’immagine', category: 'media',
-      desc: 'Copia l’immagine negli appunti o la scarica sul computer.',
-      invoke: 'Clic destro su un’immagine → "Copia immagine" / scarica.',
+      desc: 'Copia l’immagine negli appunti, ne copia l’indirizzo, oppure la scarica sul computer.',
+      invoke: 'Clic destro su un’immagine → "Copia immagine" / "Copia URL immagine" / "Salva immagine come…".',
+      doesNot: 'Quando l’immagine non ha un vero indirizzo (il sito la scrive dentro la pagina o ci mette un frammento di codice) Filo te lo dice invece di riempirti gli appunti con una stringa che non apre niente: l’immagine puoi comunque copiarla o salvarla.',
     },
     {
       id: 'search-image', title: 'Cerca un’immagine sul web', category: 'media',
@@ -209,7 +210,7 @@
       id: 'copy-download-video', title: 'Copia l’indirizzo o salva un video/audio', category: 'media',
       desc: 'Copia l’indirizzo del filmato o dell’audio, oppure lo salva come file sul computer scegliendo dove.',
       invoke: 'Clic destro sul video o sull’audio → "Copia URL video" / "Salva video come…".',
-      doesNot: 'I contenuti trasmessi in streaming a pezzi (i grandi siti di video) non hanno un file da salvare: in quel caso Filo lo dice invece di salvare un file rotto.',
+      doesNot: 'I contenuti trasmessi in streaming a pezzi (i grandi siti di video) non hanno un file da salvare: in quel caso Filo lo dice invece di salvare un file rotto. Allo stesso modo, se la sorgente del filmato non è un vero indirizzo Filo lo dice invece di copiarla.',
     },
     {
       id: 'download-progress', title: 'Scarica file e segui l’avanzamento', category: 'save',
@@ -255,6 +256,7 @@
       id: 'share-copy-link', title: 'Condividi o copia un link', category: 'links',
       desc: 'Condivide un link col sistema operativo o ne copia l’indirizzo.',
       invoke: 'Clic destro su un link → "Condividi link" / "Copia URL".',
+      doesNot: 'Se il link non porta davvero da nessuna parte (al posto dell’indirizzo il sito ci ha messo un frammento di codice) Filo te lo dice invece di copiare una stringa che non apre niente.',
     },
 
     // ────────────────────────────── Appunti ──────────────────────────────────
