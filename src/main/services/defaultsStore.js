@@ -437,6 +437,8 @@ module.exports = {
   update,
   getAutomationGate,
   setAutomationGate,
+  getAutomationAutoApprove,
+  setAutomationAutoApprove,
   getAutomationLoopCap,
   setAutomationLoopCap,
   getWorkerLog,
