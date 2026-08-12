@@ -856,10 +856,10 @@ export async function run() {
     clearState(bucket.id);
     // Ricostruisci lo snapshot senza questo feedback e ri-scegli.
     snapshot = { reviews: snapshot.reviews.filter((r) => r.id !== bucket.id), todoWinner: snapshot.todoWinner };
-    bucket = chooseBucket(snapshot, cap);
+    bucket = chooseBucket(snapshot, cap, opts);
   }
 
-  return finalizeBucket(bucket, snapshot, cap);
+  return finalizeBucket(bucket, snapshot, cap, opts);
 }
 
 // Raccoglie il payload (diff/feedback), fa il claim per i bucket feedback-bound,
