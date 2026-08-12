@@ -922,7 +922,15 @@ function positionOnBranch(bucket) {
   return { ok: true, branch };
 }
 
-async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP) {
+async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP, opts = {}) {
+  // Coda vuota con l'esplorazione spenta dall'owner (#448): non c'è niente da
+  // fare, e non c'è niente da riparare. Nessun worker, nessun claim, nessun
+  // ritorno alla linea principale: il giro finisce sereno con exit 0.
+  if (bucket.role === 'idle') {
+    emit(bucket, {});
+    return { exit: 0 };
+  }
+
   if (bucket.role === 'prober') {
     prepareForProber();
     emit(bucket, {});
