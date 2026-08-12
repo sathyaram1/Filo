@@ -254,11 +254,13 @@ test('il timeout dei giudici viene clampato nel range [10, 120] secondi', async 
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   const input = page.locator('#mgJudgeTimeout');
 
-  // Sopra il massimo → 120s (120000 ms scritti).
-  await input.fill('999');
+  // Sopra il massimo → il tetto del registro (300s, #447), non un letterale
+  // scritto qui: se il tetto si alza, questo test segue senza modifiche.
+  const maxS = await page.evaluate(() => window.SN_CONST.AUTOMATION.JUDGE_TIMEOUT_MAX_S);
+  await input.fill('9999');
   await page.locator('#mgJudgeTimeoutSave').click();
-  await expect(input).toHaveValue('120');
-  expect(await page.evaluate(() => window.__judgeTimeoutMs)).toBe(120000);
+  await expect(input).toHaveValue(String(maxS));
+  expect(await page.evaluate(() => window.__judgeTimeoutMs)).toBe(maxS * 1000);
 
   // Sotto il minimo → 10s.
   await input.fill('1');
