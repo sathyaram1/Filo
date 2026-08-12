@@ -101,7 +101,11 @@ test('solo modelli a pesi aperti: sostituisce, non ripiega, e lo dimostra', asyn
       useDefaultModels: false,
       openWeightsOnly,
       apiKeys: { openrouter: 'k-test', gemini: 'k-test' },
-      modelRegistry: { ...C.DEFAULT_MODEL_REGISTRY },
+      modelRegistry: {
+        ...C.DEFAULT_MODEL_REGISTRY,
+        // Modello proprietario scelto a mano: nessun sostituto previsto per lui.
+        'mio-claude': { provider: 'openrouter', model: 'anthropic/claude-3.7-sonnet' },
+      },
       models: {
         [C.ACTIONS.EXPLAIN]: 'flash, flash-or',          // proprietario con equivalente
         [C.ACTIONS.EXPLAIN_DEEP]: 'claude-haiku',        // Anthropic, con equivalente
