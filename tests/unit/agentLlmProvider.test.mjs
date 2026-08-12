@@ -88,7 +88,7 @@ test('gli screenshot arrivano al modello come immagini, non come testo perso', a
   assert.ok(user.content.some((c) => c.type === 'text' && c.text === 'guarda'));
 });
 
-test('una risposta servita da un fornitore escluso viene rifiutata', async () => {
+test('una risposta servita da un fornitore escluso viene rifiutata subito', async () => {
   const f = stubFetch(() => okResponse('{"ok":true}', 'Google AI Studio'));
   try {
     await assert.rejects(
@@ -96,6 +96,9 @@ test('una risposta servita da un fornitore escluso viene rifiutata', async () =>
       /ESCLUSO/,
     );
   } finally { f.restore(); }
+  // Una violazione non è un guasto passeggero: ritentarla la ripeterebbe
+  // pagandola di nuovo. Una chiamata sola.
+  assert.equal(f.calls.length, 1);
 });
 
 test('senza output strutturato il client riprova in JSON libero invece di arrendersi', async () => {
