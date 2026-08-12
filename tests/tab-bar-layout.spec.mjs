@@ -152,7 +152,12 @@ test.describe('larghezza e separatori stile Chrome', () => {
 
     // Una tab inattiva NON ultima ha il separatore ::after visibile (largo 1px);
     // la tab attiva non lo ha (display:none).
-    const probe = await shell.locator('.tab').evaluateAll((els) => {
+    // Lettura atomica dentro la pagina: risolvere i nodi in un giro e leggerli
+    // nel successivo (`evaluateAll`) li espone a un ridisegno della striscia,
+    // che li stacca dal documento — e uno stile calcolato su un nodo staccato
+    // torna vuoto, facendo fallire il test per un motivo che non c'entra.
+    const probe = await shell.evaluate(() => {
+      const els = [...document.querySelectorAll('#tabs .tab')];
       const result = { inactiveDivider: null, activeDivider: null };
       for (const el of els) {
         const after = getComputedStyle(el, '::after');
