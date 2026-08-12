@@ -112,6 +112,34 @@
     return /\.[a-z]{2,}$/i.test(host);                    // dominio con TLD alfabetico
   }
 
+  // #437 — SCHEMI CHE NON SONO INDIRIZZI: non puntano da nessuna parte fuori
+  // dal documento in cui sono nati, quindi copiarli o condividerli consegna
+  // all'utente una stringa che altrove non apre niente.
+  //   javascript:/vbscript: → è codice, non una destinazione;
+  //   data:                 → è il contenuto stesso, scritto per esteso;
+  //   blob:/filesystem:     → esistono solo dentro quel documento e muoiono con lui;
+  //   about:                → uno stato interno del browser (about:blank).
+  const NON_ADDRESS_SCHEMES = new Set([
+    'javascript:', 'vbscript:', 'data:', 'blob:', 'filesystem:', 'about:',
+  ]);
+
+  // Questa stringa è un INDIRIZZO che ha senso mettere negli appunti, mandare a
+  // qualcuno o riaprire altrove? Serve alle azioni "Copia URL"/"Condividi" del
+  // menu contestuale (#437): la sorgente di un'immagine o di un filmato può
+  // essere qualsiasi cosa il sito ci abbia messo — un frammento di codice, un
+  // data: lungo un chilometro, o niente affatto un URL.
+  // Nota: gli href/src letti dal DOM sono già risolti in forma assoluta, quindi
+  // ciò che qui non si lascia analizzare non era un indirizzo nemmeno per la
+  // pagina che lo conteneva.
+  function isShareableAddress(raw) {
+    const s = String(raw || '').trim();
+    if (!s) return false;
+    let proto = '';
+    try { proto = new URL(s).protocol.toLowerCase(); } catch (_) { return false; }
+    if (!proto) return false;
+    return !NON_ADDRESS_SCHEMES.has(proto);
+  }
+
   // #252 — INDIRIZZO CANONICO di una pagina interna filo://.
   // Storicamente il codice portato dall'estensione apriva le pagine interne con
   // `chrome.runtime.getURL('src/pages/<page>/<file>')`, che lo shim traduce in
@@ -134,5 +162,8 @@
     return raw;
   }
 
-  global.SN_URL_NAV = { isLocalHost, isIpv4, normalizeUrl, looksLikeAddress, canonicalizeFiloUrl };
+  global.SN_URL_NAV = {
+    isLocalHost, isIpv4, normalizeUrl, looksLikeAddress, canonicalizeFiloUrl,
+    isShareableAddress,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

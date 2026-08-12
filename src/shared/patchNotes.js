@@ -21,6 +21,7 @@
         'Nell\'editor, dopo aver ripristinato una versione dallo «Storico versioni» compare un avviso «Annulla» che rimette il documento com\'era un attimo prima.',
       ],
       fixes: [
+        '«Copia URL» non riempie più gli appunti quando dietro a un\'immagine, a un filmato o a un link non c\'è un vero indirizzo: adesso Filo te lo dice.',
         'Ctrl +, Ctrl -, Ctrl 0, Ctrl con la rotella e il pizzico sul trackpad ora ingrandiscono anche le pagine di Filo (home, impostazioni, cronologia…), e funzionano pure subito dopo aver cliccato su una scheda.',
         'Nell\'editor, un doppio clic su «Ripristina» nello «Storico versioni» non apre più a sorpresa l\'anteprima di un\'altra versione: si ripristina una volta sola e si resta nella lista.',
         'Nel cestino dell\'editor, un doppio clic su «Elimina definitivamente» non manda più via il documento per sempre in un colpo solo: la conferma resta lì e aspetta un clic voluto.',

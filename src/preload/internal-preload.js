@@ -267,6 +267,7 @@ function loadContentScripts() {
   safe(path.join(SHARED, 'constants.js'));
   safe(path.join(SHARED, 'i18n.js'));
   safe(path.join(SHARED, 'messages.js'));
+  safe(path.join(SHARED, 'urlNav.js')); // #437 — "è davvero un indirizzo?" per Copia URL/Condividi
   safe(path.join(SHARED, 'themeTokens.js'));
   safe(path.join(SHARED, 'confirmUi.js'));
   safe(path.join(SHARED, 'chatErrors.js')); // #360 — errori tecnici → frasi per l'utente

@@ -759,7 +759,7 @@
         case 'edit_text': global.SN_EDITBOX?.openEditBox(text); break;
         case 'copy_image': await Actions?.copyImage(imgEl); break;
         case 'save_image': Actions?.downloadImage(imgEl); break;
-        case 'copy_image_link': Actions?.copyToClipboard(imgEl.currentSrc || imgEl.src); break;
+        case 'copy_image_link': Actions?.copyUrlToClipboard(imgEl.currentSrc || imgEl.src); break;
         case 'search_image': Actions?.searchImageOnWeb(imgEl); break;
         case 'open_link': {
           // "Apri in nuova scheda" è un'azione di sistema già registrata: la
@@ -767,7 +767,7 @@
           const url = (linkEl && linkEl.href) || String(page.url ?? page.href ?? '').trim();
           return await runFiloAction({ type: 'NAVIGA', url });
         }
-        case 'copy_link': Actions?.copyToClipboard(linkEl.href); break;
+        case 'copy_link': Actions?.copyUrlToClipboard(linkEl.href); break;
         case 'save_link': await Actions?.saveLink(linkEl); break;
         case 'share_link': await Actions?.shareLink(linkEl); break;
         default: appendActionLog(`${label}: non riuscita`); return false;
