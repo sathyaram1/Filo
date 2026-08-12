@@ -767,7 +767,7 @@
           const url = (linkEl && linkEl.href) || String(page.url ?? page.href ?? '').trim();
           return await runFiloAction({ type: 'NAVIGA', url });
         }
-        case 'copy_link': Actions?.copyToClipboard(linkEl.href); break;
+        case 'copy_link': Actions?.copyUrlToClipboard(linkEl.href); break;
         case 'save_link': await Actions?.saveLink(linkEl); break;
         case 'share_link': await Actions?.shareLink(linkEl); break;
         default: appendActionLog(`${label}: non riuscita`); return false;
