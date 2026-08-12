@@ -330,6 +330,11 @@
     seedDatalistsFromRegistry(settings.modelRegistry || {});
     ensureProviderModels('gemini');
     ensureProviderModels('openrouter');
+
+    // Con la config personale l'effetto è calcolabile subito (griglia e registry
+    // sono già renderizzati); con quella condivisa lo ricalcola loadDefaultModels
+    // appena il main risponde.
+    renderOpenWeightsImpact();
   }
 
   // Normalizza una entry del registry (nuovo schema o vecchio duale) in
