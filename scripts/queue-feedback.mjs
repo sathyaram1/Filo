@@ -70,7 +70,21 @@ export function buildCreateEntry({ text, name, parentId, priority, status, notes
   const n = String(name || '').trim();
   if (!n) throw new Error('--name mancante (titolo breve del feedback)');
   if (n.length > 200) throw new Error('--name troppo lungo (max 200)');
-  const st = status || 'todo';
+  // Default per stato: un RITROVAMENTO nuovo (top-level, nessun padre) nasce in
+  // 'new' → Ricevuti, quindi passa dal giudizio e dall'auto-approvazione per
+  // mittente scelta dall'owner (#446). Prima il default era 'todo' per tutti: un
+  // ruolo che dimenticava `--status new` infilava il suo ritrovamento in coda
+  // saltando il cancello, e l'interruttore "Claude (le automazioni)" prometteva
+  // un controllo che su quel cammino non aveva.
+  //
+  // I SOTTO-feedback (`--parent`) restano 'todo': sono i pezzi di una spec che
+  // l'owner ha già approvato come famiglia, rimandarli in Ricevuti uno per uno
+  // sarebbe farglieli approvare due volte.
+  //
+  // Chi ha davvero bisogno di scavalcare passa `--status todo` ESPLICITO: è il
+  // caso dell'allarme "controlli automatici rossi" della pubblicazione, che deve
+  // arrivare in coda senza aspettare un giudizio. Esplicito sì, per distrazione no.
+  const st = status || (parentId ? 'todo' : 'new');
   if (!ALLOWED_STATUS.includes(st)) {
     throw new Error(`status non valido: "${st}" (ammessi: ${ALLOWED_STATUS.join(', ')})`);
   }
