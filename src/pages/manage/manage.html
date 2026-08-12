@@ -58,15 +58,17 @@
       min-width: 22px; text-align: left;
     }
     .mg-switch.mg-switch--disabled { cursor: not-allowed; opacity: 0.5; }
-    /* Variante piccola: gli interruttori figli sotto quello master. */
-    .mg-switch--sm { font-weight: 500; gap: 8px; }
+    /* Variante piccola: gli interruttori figli sotto quello master. Il testo a
+       sinistra e la levetta incolonnata a destra — con quattro voci di lunghezza
+       diversa, allineare le levette rende leggibile a colpo d'occhio quali sono
+       accese. */
+    .mg-switch--sm {
+      display: flex; justify-content: space-between; width: 100%;
+      font-weight: 500; gap: 8px;
+    }
     .mg-switch--sm .mg-switch-track { width: 32px; height: 18px; }
     .mg-switch--sm .mg-switch-thumb { width: 14px; height: 14px; }
     .mg-switch--sm input:checked + .mg-switch-track .mg-switch-thumb { transform: translateX(14px); }
-    /* Il testo prima, l'interruttore incolonnato a destra: con quattro voci di
-       lunghezza diversa allineare le levette rende leggibile a colpo d'occhio
-       quali sono accese. */
-    .mg-switch--sm { display: flex; justify-content: space-between; width: 100%; }
     .mg-auto-sub {
       margin: 14px 0 0; padding: 12px 0 0;
       border-top: 1px solid var(--sn-border);
