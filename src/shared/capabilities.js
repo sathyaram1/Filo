@@ -186,8 +186,9 @@
     },
     {
       id: 'copy-download-image', title: 'Copia o scarica un’immagine', category: 'media',
-      desc: 'Copia l’immagine negli appunti o la scarica sul computer.',
-      invoke: 'Clic destro su un’immagine → "Copia immagine" / scarica.',
+      desc: 'Copia l’immagine negli appunti, ne copia l’indirizzo, oppure la scarica sul computer.',
+      invoke: 'Clic destro su un’immagine → "Copia immagine" / "Copia URL immagine" / "Salva immagine come…".',
+      doesNot: 'Quando l’immagine non ha un vero indirizzo (il sito la scrive dentro la pagina o ci mette un frammento di codice) Filo te lo dice invece di riempirti gli appunti con una stringa che non apre niente: l’immagine puoi comunque copiarla o salvarla.',
     },
     {
       id: 'search-image', title: 'Cerca un’immagine sul web', category: 'media',
