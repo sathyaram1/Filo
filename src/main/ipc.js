@@ -280,6 +280,28 @@ function registerIpcHandlers() {
     const moved = win?._filoTabs ? win._filoTabs.moveTab(id, toIndex) : false;
     return { ok: true, moved };
   });
+  // Il cursore è sopra la striscia delle schede? La shell lo chiede mentre
+  // tiene ferme le larghezze delle schede dopo una chiusura: deve accorgersi
+  // che il puntatore se n'è andato anche quando è finito sopra una
+  // WebContentsView, che copre la shell e ne intercetta i mouse event (lì il
+  // `mouseleave` del DOM può non arrivare mai). Solo lettura di posizione,
+  // nessun effetto collaterale.
+  ipcMain.handle('tabs:cursor-in-strip', (event) => {
+    const win = winFor(event);
+    const tabs = win?._filoTabs;
+    if (!win || win.isDestroyed?.() || !tabs) return false;
+    // A tutto schermo la striscia non esiste: il puntatore non può esserci.
+    if (tabs.contentFullscreen) return false;
+    let p = null;
+    let b = null;
+    try {
+      p = screen.getCursorScreenPoint();
+      b = win.getContentBounds();
+    } catch (_) { return false; }
+    if (!p || !b) return false;
+    const h = tabs.tabRowHeight || 0;
+    return p.x >= b.x && p.x <= b.x + b.width && p.y >= b.y && p.y <= b.y + h;
+  });
   ipcMain.handle('tabs:reserve-top', (event, { px }) => {
     const win = winFor(event);
     if (win?._filoTabs) win._filoTabs.setTopInset(px);
