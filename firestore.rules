@@ -97,6 +97,11 @@ service cloud.firestore {
     //   - `loopCap` (int 1-10; assente = 3): quante FAIL del verifier prima del
     //     blocco `loop`. Lo legge la tab Automazioni (dashboard owner) e le
     //     routine (scripts/dispatch.mjs, con bearer admin).
+    //   - `autoApprove` (mappa owner/filo/claude/user → bool; assente = tutti
+    //     true): quali mittenti entrano in coda da soli quando `enabled` è true
+    //     (#446). La legge il backend di sicurezza via Admin SDK.
+    //   - `proberWhenIdle` (bool; assente = true): a coda vuota le routine
+    //     esplorano l'app in cerca di problemi (#448). Lo legge dispatch.mjs.
     // Le regole NON enumerano i campi (read/write admin-only): nuovi campi non
     // richiedono redeploy. Riservato agli admin: nessun utente normale legge/scrive.
     match /config/automation {
