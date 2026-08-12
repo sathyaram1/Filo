@@ -284,6 +284,12 @@
     'google/gemini-2.0-flash-lite-001': { input: 0.075, output: 0.30 },
     'google/gemini-3.1-flash-lite-preview': { input: 0.25, output: 1.50 },
     'anthropic/claude-3.5-haiku': { input: 0.80, output: 4.00 },
+    // Sostituti a pesi aperti (fornitori indipendenti): costano meno dei
+    // proprietari che sostituiscono, quindi accendere l'interruttore non fa mai
+    // salire la spesa.
+    'google/gemma-4-31b-it': { input: 0.10, output: 0.30 },
+    'google/gemma-4-26b-a4b-it': { input: 0.04, output: 0.12 },
+    'deepseek/deepseek-v4-pro': { input: 0.40, output: 0.80 },
   };
   // Prezzo di ripiego quando il modello concreto non è nella tabella (config
   // personalizzata dell'utente): un modello "flash" medio, così una chiamata AI
