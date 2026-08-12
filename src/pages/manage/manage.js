@@ -18,6 +18,17 @@
   const mgAutoSwitch = document.getElementById('mgAutoSwitch');
   const mgAutoToggle = document.getElementById('mgAutoToggle');
   const mgAutoState  = document.getElementById('mgAutoState');
+  const mgAutoMsg    = document.getElementById('mgAutoMsg');
+  const mgAutoApproveBlock = document.getElementById('mgAutoApproveBlock');
+  // Un interruttore per categoria di mittente (#446): la chiave è il gruppo
+  // definito in SN_FEEDBACK_THREAD.AUTO_APPROVE_GROUPS.
+  const mgAutoApprove = {
+    owner:  document.getElementById('mgAutoApproveOwner'),
+    filo:   document.getElementById('mgAutoApproveFilo'),
+    claude: document.getElementById('mgAutoApproveClaude'),
+    user:   document.getElementById('mgAutoApproveUser'),
+  };
+  const mgProberIdle = document.getElementById('mgProberIdle');
   const mgLoopCap    = document.getElementById('mgLoopCap');
   const mgLoopCapSave = document.getElementById('mgLoopCapSave');
   const mgLoopCapMsg  = document.getElementById('mgLoopCapMsg');
