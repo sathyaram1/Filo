@@ -1631,6 +1631,12 @@
     // impostare nulla. Le altre impostazioni modelli/chiavi restano nascoste
     // finché l'utente non disattiva questo switch dalle Opzioni.
     useDefaultModels: true,
+    // "Solo modelli a pesi aperti": quando true, Filo rifiuta OGNI modello
+    // proprietario — Anthropic compresa — e lavora solo con modelli a pesi
+    // aperti serviti da fornitori indipendenti. Vale anche con "usa modelli
+    // predefiniti" attivo (cioè con i crediti di Filo): è una scelta di chi usa
+    // Filo, non una preferenza che la config condivisa può scavalcare.
+    openWeightsOnly: false,
     apiKeys: {
       openrouter: '',
       gemini: '',
