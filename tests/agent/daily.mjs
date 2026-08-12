@@ -1,7 +1,7 @@
 // daily.mjs — giro automatico di esplorazione su più aree di Filo.
 // Esegue explore.mjs per ogni area e raccoglie i report in reports/daily-<ts>/.
 //
-// Uso:  GEMINI_API_KEY=... node tests/agent/daily.mjs [--model M] [--steps N]
+// Uso:  OPENROUTER_API_KEY=... node tests/agent/daily.mjs [--model M] [--steps N]
 
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
@@ -20,7 +20,7 @@ const AREAS = [
 ];
 
 function parseArgs(argv) {
-  const o = { model: 'gemini-3.1-flash-lite', steps: 8 };
+  const o = { model: 'google/gemma-4-31b-it', steps: 8 };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--model') o.model = argv[++i];
     else if (argv[i] === '--steps') o.steps = argv[++i];
