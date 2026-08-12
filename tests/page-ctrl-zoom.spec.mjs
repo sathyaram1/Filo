@@ -124,6 +124,27 @@ test('filo://: Ctrl+rotella (e pinch del trackpad) zooma la pagina interna', asy
   await page.keyboard.press('Control+0');
 });
 
+// ── Focus sulla barra di Filo (fila delle schede) ─────────────────────────
+// Dopo un clic su una scheda il focus è sulla barra, non sulla pagina: i tasti
+// non arrivano al preload della pagina. Senza l'inoltro dal main, Ctrl + qui
+// non fa nulla → il fattore di zoom della scheda resta 1.
+
+test('Ctrl + / Ctrl 0 zoomano la scheda anche col focus sulla barra di Filo', async ({ app, shell, openTab }) => {
+  const page = await openTab('filo://manage/manage.html');
+  await page.waitForLoadState('domcontentloaded');
+
+  const z0 = await zoomFactorOf(app, 'manage');
+  expect(z0).toBeCloseTo(1, 1);
+
+  // Focus sulla barra (come dopo aver cliccato una scheda), non sulla pagina.
+  await shell.bringToFront();
+  await shell.keyboard.press('Control+=');
+  await expect.poll(async () => zoomFactorOf(app, 'manage')).toBeGreaterThan(z0 + 0.01);
+
+  await shell.keyboard.press('Control+0');
+  await expect.poll(async () => zoomFactorOf(app, 'manage')).toBeCloseTo(1, 1);
+});
+
 // ── L'editor resta l'eccezione: scala il foglio, non la finestra ──────────
 // Accendere pageZoom su TUTTE le pagine filo:// farebbe zoomare due volte
 // nell'editor (il preload scala la finestra E l'editor scala il foglio), così
