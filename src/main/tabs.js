@@ -491,6 +491,11 @@ class TabManager {
       // (vedi _makeView). Memorizzato sulla tab così sopravvive a _recreateView
       // (es. se la tab viene proxata alla nascita per una regola di dominio).
       suppressAutoplay: !!suppressAutoplay,
+      // #441 — scheda nata da un link target=_blank / window.open (non aperta e
+      // indirizzata dall'utente): è la prima condizione perché possa essere
+      // riconosciuta come pagina-ponte di uno scaricamento (vedi
+      // handleDownloadStarted e src/shared/downloadTabs.js).
+      _openedByLink: !!openedByLink,
     };
 
     this._wireEvents(tab);
