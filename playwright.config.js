@@ -11,7 +11,13 @@ import { defineConfig } from '@playwright/test';
 // schermo per dieci secondi in mezzo a `npm test`. Questo file lo carica ogni
 // worker, e ogni lancio eredita l'ambiente del worker → nessuna via di mezzo.
 // `FILO_TEST_VISIBLE=1` rimette la finestra a schermo quando la si vuole vedere.
-if (process.env.FILO_TEST_VISIBLE !== '1') process.env.FILO_HIDE_WINDOW = '1';
+//
+// Restano visibili anche i modi in cui GUARDARE l'app È lo scopo del comando
+// (`--headed`, `--ui`, `--debug`): nasconderli sarebbe un comando che promette
+// una cosa e ne fa un'altra. `npm run test:headed` passa proprio di qui.
+const VUOLE_VEDERE = process.env.FILO_TEST_VISIBLE === '1'
+  || process.argv.some((a) => a === '--headed' || a === '--ui' || a === '--debug');
+if (!VUOLE_VEDERE) process.env.FILO_HIDE_WINDOW = '1';
 
 export default defineConfig({
   testDir: './tests',
