@@ -1843,6 +1843,8 @@
     init,
     // clipboard
     copyToClipboard,
+    copyUrlToClipboard,
+    isAddress,
     cutSelection,
     blobToDataUrl,
     pasteFromClipboard,
