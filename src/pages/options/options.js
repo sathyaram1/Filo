@@ -126,6 +126,62 @@
     $('defaultModelsList').hidden = !useDefault;
   }
 
+  // ── "Solo modelli a pesi aperti": cosa cambia davvero ─────────────────────
+  // Un interruttore che promette e basta non si può verificare. Qui sotto
+  // compare, PRIMA di accenderlo, l'elenco delle funzioni che cambiano modello e
+  // di quelle che si fermano perché un equivalente a pesi aperti non esiste.
+  // Sorgente: la configurazione che l'app userà DAVVERO (quella condivisa se
+  // "usa modelli predefiniti" è attivo, la personale altrimenti).
+
+  // Ultima configurazione predefinita letta dal main ({ models, modelRegistry }).
+  let defaultModelsPublic = null;
+
+  function effectiveModelConfig() {
+    if ($('useDefaultModels').checked) {
+      return defaultModelsPublic || { models: {}, modelRegistry: {} };
+    }
+    return {
+      models: ModelChain.collect(modelChains || {}),
+      modelRegistry: collectModelRegistry().registry,
+    };
+  }
+
+  function actionLabelFor(action) {
+    const row = (ModelChain.actionLabels() || []).find(([a]) => a === action);
+    return row ? I18n.t(row[1]) : action;
+  }
+
+  function renderOpenWeightsImpact() {
+    const host = $('openWeightsImpact');
+    if (!host) return;
+    host.innerHTML = '';
+    if (!$('openWeightsOnly').checked) { host.hidden = true; return; }
+
+    const C = window.SN_CONST;
+    const { models, modelRegistry } = effectiveModelConfig();
+    if (!C || typeof C.openWeightsImpact !== 'function' || !Object.keys(models || {}).length) {
+      host.hidden = true;
+      return;
+    }
+    const impact = C.openWeightsImpact(models, modelRegistry);
+    const lines = [];
+    if (impact.substituted.length) {
+      const names = impact.substituted.map((s) => `${actionLabelFor(s.action)} → ${s.to}`);
+      lines.push(I18n.t('options_open_weights_switched', names.join(', ')));
+    }
+    if (impact.unavailable.length) {
+      const names = impact.unavailable.map((u) => actionLabelFor(u.action));
+      lines.push(I18n.t('options_open_weights_unavailable', names.join(', ')));
+    }
+    if (!lines.length) { host.hidden = true; return; }
+    for (const line of lines) {
+      const p = document.createElement('p');
+      p.textContent = line;
+      host.appendChild(p);
+    }
+    host.hidden = false;
+  }
+
   // ── Lista read-only dei modelli predefiniti con tasto "Prova" ─────────────
   // Quando useDefaultModels è ON, mostra i modelli del registry predefinito
   // (costanti o override Firestore) con un pulsante "Prova" che testa il
