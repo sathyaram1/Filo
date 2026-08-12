@@ -395,7 +395,10 @@ module.exports = function register(on, ctx) {
       const autoApprove = (msg.autoApprove && typeof msg.autoApprove === 'object')
         ? await Defaults.setAutomationAutoApprove(msg.autoApprove, idToken)
         : await Defaults.getAutomationAutoApprove(idToken);
-      return { ok: true, enabled, autoApprove };
+      const proberWhenIdle = (typeof msg.proberWhenIdle === 'boolean')
+        ? await Defaults.setAutomationProberIdle(msg.proberWhenIdle, idToken)
+        : await Defaults.getAutomationProberIdle(idToken);
+      return { ok: true, enabled, autoApprove, proberWhenIdle };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
