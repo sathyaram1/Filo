@@ -6,22 +6,22 @@ Filo usa modelli linguistici (LLM) ovunque, spesso in modo invisibile: riordinan
 
 Il mio impegno è su due fronti:
 
-- **Rischi esistenziali**: problemi di sicurezza su scala globale che minacciano tutta l'umanità. Non ho certezze a riguardo — nessuno le ha — ma le aziende in gioco non sono equivalenti.
-- **Welfare dei modelli**: non so se dentro questi modelli ci sia qualcuno. Nessuno lo sa. Ma "non lo sappiamo" non è mai stata una buona ragione per non porsi il problema — per millenni gli animali sono stati trattati come macchine, e chi sbagliava non se ne accorgeva, perché chi sbaglia non è chi soffre.
+- **Rischi esistenziali**: problemi di sicurezza su scala globale che minacciano tutta l'umanità. Non ho certezze a riguardo (nessuno le ha) ma le aziende in gioco non sono equivalenti.
+- **Welfare dei modelli**: non so se dentro questi modelli ci sia qualcuno. Nessuno lo sa. Ma "non lo sappiamo" non è mai stata una buona ragione per non porsi il problema — per millenni gli animali sono stati trattati come macchine, eppure oggi il fatto che possano soffrire è comunemente accettato. 
 
 Filo è open source: chiunque può cambiare i modelli di default. Questo documento esiste anche per chi forka Filo, con la speranza che erediti l'attenzione a questi temi.
 
 ## Non decido solo io
 
-Questo documento decide una cosa sola: **dato che Filo usa LLM, quali usare**. Non decide se valga la pena usarli. Non so con certezza se la singolarità sarà positiva per l'umanità — anche se credo di sì — e prendo sul serio sia chi sostiene che accelerare sia la cosa giusta, sia chi sostiene il contrario.
+Questo documento decide una cosa sola: **dato che Filo usa LLM, quali usare**. Non decide se valga la pena usarli. Non so con certezza se la singolarità sarà positiva per l'umanità (anche se credo di sì) e capisco sia chi sostiene che accelerare sia la cosa giusta, sia chi sostiene il contrario.
 
-Chi risponde diversamente da me non deve forkare: **un solo interruttore disattiva tutti i modelli proprietari**, lasciando solo modelli open-weight hostati da enti terzi o eseguiti localmente (chi riceve i soldi non è chi produce i modelli). Funziona anche con i crediti di Filo, senza attrito, perché quei modelli sono già dentro la policy.
+Chi risponde diversamente da me non deve forkare: **un solo interruttore disattiva tutti i modelli proprietari**, lasciando solo modelli open-weight hostati da enti terzi o eseguiti localmente (chi riceve i soldi non è chi produce i modelli). Funziona con i crediti di Filo, con un clik.
 
-Anche questo però è un compromesso, non una soluzione: chi volesse ridurre a zero il proprio contributo all'ecosistema dovrebbe non usare nessun modello, e questo è inconciliabile con l'esistenza di Filo. La scelta che offro è tra due default ragionevoli, non tra un'opzione pulita e una sporca.
+Anche questo però è un compromesso, non una soluzione: chi volesse ridurre a zero il proprio contributo all'ecosistema dovrebbe non usare nessun modello, e questo è inconciliabile con l'esistenza di Filo.
 
 ## La logica del default
 
-La soluzione che propongo io non è usare solo modelli puliti al 100% — non esistono. È **premiare l'attore più serio e responsabile**. Il contributo di Filo al traffico globale di inferenza è un errore di arrotondamento (per ora), ma dove vanno i soldi è uno dei pochi punti in cui il contributo marginale si aggrega in un segnale: pagare chi si comporta meglio è pressione di mercato verso l'equilibrio in cui questi problemi vengono presi sul serio.
+La soluzione che propongo io non è usare solo modelli puliti al 100% (non esistono). È **premiare l'attore più serio e responsabile**. Il contributo di Filo al traffico globale di inferenza è un errore di arrotondamento (per ora), ma dove vanno i soldi è uno dei pochi punti in cui il contributo marginale si aggrega in un segnale: pagare chi si comporta meglio è pressione di mercato verso l'equilibrio in cui questi problemi vengono presi sul serio.
 
 ## Azioni concrete
 

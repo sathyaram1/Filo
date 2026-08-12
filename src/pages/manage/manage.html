@@ -30,13 +30,24 @@
     .sn-page { max-width: none; }
 
     /* ── Switch "Modalità automatica" (tab Automazioni, owner-only) ─────── */
-    .mg-switch {
+    /* `.sn-page label` (pages.css) impone `display: block` + colore smorzato a
+       OGNI label di una pagina filo://, e con specificità 0-1-1 batteva
+       `.mg-switch`: la levetta finiva `display: inline`, quindi larghezza e
+       altezza non si applicavano e del pill si vedeva solo la pallina bianca
+       (che è in posizione assoluta e sopravvive al collasso). Da qui il selettore
+       più specifico: è l'unico modo di vincere senza toccare pages.css, che
+       serve a tutte le altre pagine. */
+    .sn-page label.mg-switch {
       display: inline-flex; align-items: center; gap: 10px;
+      margin: 0;
       cursor: pointer; user-select: none;
       font-size: 13px; font-weight: 600; color: var(--sn-fg);
     }
     .mg-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
     .mg-switch-track {
+      /* `inline-block` esplicito: la levetta non deve dipendere dal fatto che il
+         genitore sia rimasto flex. */
+      display: inline-block;
       position: relative; width: 40px; height: 22px; border-radius: 999px;
       /* A riposo un grigio marcato e theme-aware: `--sn-border` sul tema chiaro
          è quasi bianco e non leggeva come switch. `--sn-muted` è visibile su
