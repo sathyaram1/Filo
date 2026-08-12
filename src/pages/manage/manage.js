@@ -284,6 +284,7 @@
       if (r && r.ok) {
         reflectAutoMode(Boolean(r.enabled));
         reflectAutoApprove(r.autoApprove);
+        if (mgProberIdle) mgProberIdle.checked = r.proberWhenIdle !== false;
         chrome.storage.local.set({ [AUTO_MODE_KEY]: Boolean(r.enabled) }).catch(() => {});
       }
     } catch (_) { /* resta la cache */ }
