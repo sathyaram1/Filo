@@ -1378,6 +1378,7 @@
       `  • gestione_cookie: "manuale" | "automatico" | "privacy" [conferma]\n` +
       `  • fingerprint: "off" | "default" | "privacy" [conferma]  (anti-fingerprinting)\n` +
       `  • provider: "openrouter" | "gemini" [conferma] ; modelli_predefiniti: true | false [conferma]\n` +
+      `  • solo_pesi_aperti: true | false [conferma]  (spegne tutti i modelli proprietari, Anthropic compresa, e lascia solo modelli a pesi aperti serviti da fornitori indipendenti)\n` +
       `  • chiave_openrouter / chiave_gemini / chiave_tavily: la chiave API come testo [conferma]\n` +
       `  • limite_spesa: numero in euro (limite di spesa mensile) [conferma]\n` +
       `  • colore_tab: "più vivaci" | "più neutre" | "nessuno" | "più preciso" | "predefinito"  (colore identità delle tab: "vivaci"=tinte accese, "neutre"=tinte spente, "nessuno"=tab senza colore, "più preciso"=estrai meglio quando la tab prende il colore sbagliato es. "Poste è verde non gialla", "predefinito"=ripristina). I singoli parametri numerici si regolano dalle Preferenze avanzate.\n` +
