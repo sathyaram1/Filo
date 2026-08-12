@@ -288,6 +288,7 @@
     window.SN_PAGE_BOOTSTRAP.applyTheme(settings.theme);
 
     $('useDefaultModels').checked = settings.useDefaultModels !== false;
+    $('openWeightsOnly').checked = settings.openWeightsOnly === true;
     // Lista read-only dei modelli predefiniti. Deve mostrare i modelli che l'app
     // userà DAVVERO: li chiediamo al main (config condivisa + eventuali
     // modifiche dell'owner). Se la richiesta non riesce la lista resta vuota
