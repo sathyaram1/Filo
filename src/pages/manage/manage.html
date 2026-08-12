@@ -84,6 +84,9 @@
       margin: 14px 0 0; padding: 12px 0 0;
       border-top: 1px solid var(--sn-border);
       display: flex; flex-direction: column; gap: 10px;
+      /* Più stretto del blocco: con la levetta all'estremo destro di 800px il
+         legame fra etichetta e interruttore si perde. */
+      max-width: 380px;
     }
     .mg-auto-sub-title {
       margin: 0; font-size: 12px; font-weight: 600; color: var(--sn-muted);
