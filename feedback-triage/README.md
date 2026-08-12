@@ -37,7 +37,7 @@ feedback (è così che una routine spezza una spec corposa in sub-feedback
   "text": "descrizione autoconsistente del task",
   "name": "titolo breve",
   "parentId": "<idFeedback del padre, o stringa vuota>",
-  "status": "todo | clarify",
+  "status": "new | todo | clarify",
   "priority": 2,
   "notes": "",
   "images": ["https://firebasestorage.googleapis.com/...?alt=media&token=..."],
