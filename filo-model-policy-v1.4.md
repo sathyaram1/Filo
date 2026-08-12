@@ -42,6 +42,12 @@ Questo documento decide una cosa sola: **dato che Filo usa LLM, quali usare**. N
 
 Chi risponde diversamente da me non deve forkare: **un solo interruttore disattiva tutti i modelli proprietari** — Anthropic inclusa, cioè proprio quelli che ho scelto io — lasciando solo modelli a pesi aperti serviti da terzi o eseguiti in locale, dove chi riceve i soldi non è chi ha prodotto il modello. Funziona anche con i crediti di Filo, con un click.
 
+**Cosa succede quando lo accendi.** Quasi tutte le funzioni di Filo nascono con un modello proprietario: se l'interruttore si limitasse a spegnerlo, spegnerebbe mezza app. Quindi ogni funzione **passa automaticamente all'equivalente a pesi aperti**, e la pagina delle opzioni ti dice quali cambiano *prima* che tu accenda. Le poche che un equivalente non ce l'hanno — oggi la lettura ad alta voce, la dettatura e l'indicizzazione dell'archivio, mestieri che nessun modello a pesi aperti raggiungibile da Filo sa fare — **si fermano e te lo dicono**, nominando la funzione.
+
+**Cosa NON succede.** Se il sostituto non risponde, la richiesta fallisce: non esiste nessun ripiego che riporti la richiesta su un modello proprietario. Non è una svista da tappare, è la differenza fra un interruttore e una decorazione — un interruttore che, quando le cose si mettono male, torna in silenzio da dove era partito è peggio che non averlo, perché ti fa credere una cosa falsa. Per lo stesso motivo il riscontro su chi ha *davvero* servito ogni risposta vale anche qui: se arrivasse comunque da un fornitore escluso, lo vedi a schermo e resta scritto nella cronologia.
+
+Restano fuori dalla portata dell'interruttore i modelli che girano sui **server di Filo** e non sul tuo computer: i giudici che leggono i feedback inviati. Lì la scelta è mia e non è delegabile a un'impostazione del tuo Filo; l'elenco completo di quei punti è in Opzioni → Modelli.
+
 Anche questo però è un compromesso, non una soluzione: chi volesse ridurre a zero il proprio contributo all'ecosistema dovrebbe non usare nessun modello, e questo è inconciliabile con l'esistenza di Filo.
 
 ## Anthropic è veramente meglio?

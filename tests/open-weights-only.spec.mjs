@@ -137,13 +137,15 @@ test('solo modelli a pesi aperti: sostituisce, non ripiega, e lo dimostra', asyn
       res.senzaEquivalente = await run(C.ACTIONS.EXPLAIN_LINK, { url: 'https://example.com', text: 'x' });
 
       // Il sostituto non risponde: non deve esistere un tentativo proprietario dopo.
+      // Testo diverso da quello di prima: una richiesta identica verrebbe
+      // servita dalla cache e non proverebbe nessun modello.
       failAll = true;
-      res.tuttoGiu = await run(C.ACTIONS.EXPLAIN, { selection: 'ciao', sentence: 'ciao mondo' });
+      res.tuttoGiu = await run(C.ACTIONS.EXPLAIN, { selection: 'altro', sentence: 'un altro testo' });
       failAll = false;
 
       // ── C) Stessa configurazione, interruttore SPENTO: il proprietario torna.
       await usaConfigPersonale(false);
-      res.spento = await run(C.ACTIONS.EXPLAIN_DEEP, { selection: 'ciao', sentence: 'ciao mondo' });
+      res.spento = await run(C.ACTIONS.EXPLAIN_DEEP, { selection: 'terzo', sentence: 'un terzo testo' });
     } finally {
       globalThis.SN_PROVIDERS.completeWithFallback = origComplete;
     }
