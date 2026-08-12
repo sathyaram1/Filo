@@ -254,5 +254,20 @@ module.exports = function setupWheelZoom(webFrame, opts) {
         setLevel(0); // 100%
       }
     }, true);
+
+    // Stesse scorciatoie, ma premute mentre il focus è sulla barra di Filo
+    // (fila delle schede): lì i tasti non arrivano alla pagina, quindi il main
+    // li inoltra qui. Passano dallo STESSO punto degli altri, così l'opt-out
+    // delle pagine che zoomano da sé vale anche per questa strada.
+    if (ipc && typeof ipc.on === 'function') {
+      ipc.on('filo:zoom-key', (_e, dir) => {
+        if (pageHandlesZoom()) return;
+        try {
+          if (dir === 'reset') setLevel(0);
+          else if (dir === 'in') setLevel(webFrame.getZoomLevel() + ZOOM_STEP);
+          else if (dir === 'out') setLevel(webFrame.getZoomLevel() - ZOOM_STEP);
+        } catch (_) {}
+      });
+    }
   }
 };
