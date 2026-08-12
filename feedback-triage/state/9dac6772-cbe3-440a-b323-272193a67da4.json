@@ -1,0 +1,16 @@
+{
+  "id": "9dac6772-cbe3-440a-b323-272193a67da4",
+  "branch": "worker/9dac6772-cbe3-440a-b323-272193a67da4-20260812T183412Z",
+  "loopCount": 0,
+  "verifierVerdict": null,
+  "verifierCritique": "",
+  "secauditDone": false,
+  "secauditVerdict": null,
+  "checkpoints": [
+    {
+      "sha": "d33bfe7d1f27cdda5f14da0661af8d95fcf96fe9",
+      "by": "new-work:checkout",
+      "at": "2026-08-12T18:34:13.748Z"
+    }
+  ]
+}
