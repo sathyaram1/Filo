@@ -301,7 +301,17 @@
       reflectAutoMode(Boolean(r.enabled));
       reflectAutoApprove(r.autoApprove);
       chrome.storage.local.set({ [AUTO_MODE_KEY]: Boolean(r.enabled) }).catch(() => {});
-      setAutoModeMsg('Salvato.', 'ok');
+      // Accendere l'automatica vale da ORA in avanti: agisce al momento del
+      // giudizio, quindi i feedback già in attesa restano dove sono. Senza
+      // dirlo, accendere lo switch sembra di nuovo non fare niente — e i già in
+      // attesa hanno il loro pulsante, due righe più in là.
+      const pending = r.enabled ? alignedFeedbacks().length : 0;
+      setAutoModeMsg(
+        pending
+          ? `Salvato. I ${pending} già in attesa restano nei Ricevuti: usa «Approva tutti gli allineati».`
+          : 'Salvato.',
+        'ok',
+      );
     } catch (err) {
       // Ripristina lo stato precedente: se non è stato scritto su Firestore, non
       // è attivo — e lo switch non deve dire il contrario.
