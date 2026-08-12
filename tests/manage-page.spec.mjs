@@ -206,7 +206,8 @@ async function stubJudgeTimeout(page, initialMs = 60000) {
         return { ok: true, models: { judgeTimeoutMs: window.__judgeTimeoutMs } };
       }
       if (msg && msg.type === 'support_models_update' && msg.judgeTimeoutMs != null) {
-        const v = Math.min(120000, Math.max(10000, Math.round(Number(msg.judgeTimeoutMs))));
+        const maxMs = (window.SN_CONST.AUTOMATION.JUDGE_TIMEOUT_MAX_S) * 1000;
+        const v = Math.min(maxMs, Math.max(10000, Math.round(Number(msg.judgeTimeoutMs))));
         window.__judgeTimeoutMs = v;
         window.__judgeTimeoutSets.push(v);
         return { ok: true, models: { judgeTimeoutMs: v } };
