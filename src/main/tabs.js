@@ -1698,6 +1698,16 @@ class TabManager {
       }
     });
     wc.on('did-navigate-in-page', (_e, url) => update({ url: userUrl(url), canBack: canGoBack(wc), canFwd: canGoFwd(wc) }));
+    // #441 — l'utente ha toccato DAVVERO questa scheda? Serve a non chiudere
+    // come "pagina-ponte" una scheda con cui ha interagito. Il segnale arriva
+    // dal main (non dal content script, che manda un campione di attività anche
+    // senza input e non è iniettato ovunque). Il semplice passaggio del mouse
+    // NON conta: muovere il cursore sopra una scheda non è usarla.
+    wc.on('input-event', (_e, input) => {
+      const type = (input && input.type) || '';
+      if (!type || HOVER_INPUT_TYPES.has(type)) return;
+      tab._userInputAt = Date.now();
+    });
     // Redirect main-frame verso URL "di blocco" (/geo, /not-available,
     // /region-block, … — lista curata in geoBlock.js): il match viene
     // memorizzato e diventa segnale al did-navigate dell'URL finale.
