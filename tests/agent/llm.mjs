@@ -177,7 +177,11 @@ export async function generate({ model, system, user, imagePath, contents, tempe
       // aggirata con più passaggi.
       const host = servedBy(json);
       if (host && C.isProviderExcluded(host, EXCLUDED)) {
-        throw new Error(`Fornitore ESCLUSO dalla politica sui modelli: "${host}". Richiesta annullata.`);
+        const e = new Error(`Fornitore ESCLUSO dalla politica sui modelli: "${host}". Richiesta annullata.`);
+        // Non è un guasto passeggero: ritentare rifarebbe lo stesso errore
+        // pagandolo di nuovo. Si ferma subito e si guarda perché è passato.
+        e.policy = true;
+        throw e;
       }
       const text = json.choices?.[0]?.message?.content || '';
       if (!text) throw new Error('risposta vuota: ' + JSON.stringify(json).slice(0, 300));
