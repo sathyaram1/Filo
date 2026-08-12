@@ -162,5 +162,8 @@
     return raw;
   }
 
-  global.SN_URL_NAV = { isLocalHost, isIpv4, normalizeUrl, looksLikeAddress, canonicalizeFiloUrl };
+  global.SN_URL_NAV = {
+    isLocalHost, isIpv4, normalizeUrl, looksLikeAddress, canonicalizeFiloUrl,
+    isShareableAddress,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
