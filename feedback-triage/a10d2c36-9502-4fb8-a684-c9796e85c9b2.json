@@ -1,0 +1,8 @@
+{
+  "id": "a10d2c36-9502-4fb8-a684-c9796e85c9b2",
+  "status": "revision_capability",
+  "notes": "Fatto: quando dietro a un'immagine, a un filmato o a un link non c'è un vero indirizzo, «Copia URL» te lo dice invece di riempirti gli appunti con una stringa che non apre niente da nessuna parte.\n\nOltre a quanto avevi chiesto:\n\n— Stesso trattamento per «Condividi link»: quando il sistema operativo non offre una condivisione vera quella voce ripiega sulla copia negli appunti, quindi aveva esattamente lo stesso difetto.\n— Vale anche quando l'azione la chiede l'assistente dalla barra laterale, non solo dal tasto destro: erano due cammini per la stessa cosa e uno solo dei due sarebbe stato onesto.\n— Ho incluso anche le immagini che il sito scrive per esteso dentro la pagina invece di ospitarle da qualche parte: incollate altrove non aprono niente nemmeno negli altri browser. Per portarsele via restano «Copia immagine» e «Salva immagine come…», che continuano a funzionare come prima.\n\nLe voci restano nel menu e rispondono: toglierle avrebbe lasciato l'utente senza sapere perché.",
+  "queuedAt": "2026-08-12T13:10:38.967Z",
+  "queuedBy": "routine",
+  "branch": "worker/a10d2c36-9502-4fb8-a684-c9796e85c9b2-20260812T122256Z"
+}
