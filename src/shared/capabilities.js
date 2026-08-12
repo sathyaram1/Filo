@@ -400,7 +400,7 @@
     },
     {
       id: 'open-weights-only', title: 'Solo modelli a pesi aperti', category: 'settings',
-      desc: 'Un interruttore spegne tutti i modelli proprietari — Anthropic compresa, cioè anche quelli scelti da chi fa Filo — e lascia lavorare solo modelli a pesi aperti serviti da fornitori indipendenti. Vale anche quando usi i crediti di Filo. Le funzioni che partivano da un modello proprietario passano da sole al suo equivalente aperto, e le Opzioni ti dicono quali cambiano prima che tu accenda.',
+      desc: 'Un interruttore spegne tutti i modelli proprietari — Anthropic compresa, cioè anche quelli scelti da chi fa Filo — e lascia lavorare solo modelli a pesi aperti serviti da fornitori indipendenti. Vale anche quando usi i crediti di Filo. Le funzioni che partivano da un modello proprietario passano da sole al suo equivalente aperto, e le Opzioni dicono subito quante cambiano e quali si fermano.',
       invoke: 'Opzioni → «Solo modelli a pesi aperti», oppure chiedendolo a Filo ("usa solo modelli a pesi aperti").',
       doesNot: 'Le poche funzioni senza equivalente aperto (lettura ad alta voce, dettatura, indicizzazione dell’archivio) si fermano e lo dicono: non tornano di nascosto su un modello proprietario, nemmeno se il sostituto non risponde. Non governa i modelli che girano sui server di Filo, come i giudici dei feedback.',
     },

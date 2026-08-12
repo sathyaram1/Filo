@@ -127,9 +127,11 @@
   }
 
   // ── "Solo modelli a pesi aperti": cosa cambia davvero ─────────────────────
-  // Un interruttore che promette e basta non si può verificare. Qui sotto
-  // compare, PRIMA di accenderlo, l'elenco delle funzioni che cambiano modello e
-  // di quelle che si fermano perché un equivalente a pesi aperti non esiste.
+  // Un interruttore che promette e basta non si può verificare. Appena acceso
+  // qui sotto compare quante funzioni cambiano modello (e su quali finiscono) e
+  // QUALI si fermano perché un equivalente a pesi aperti non esiste — spegnerlo
+  // rimette tutto com'era, quindi la conseguenza si legge sul posto invece di
+  // scoprirla usando l'app.
   // Sorgente: la configurazione che l'app userà DAVVERO (quella condivisa se
   // "usa modelli predefiniti" è attivo, la personale altrimenti).
 

@@ -433,7 +433,7 @@ function buildAttemptChain(settings, modelRef, action) {
 // — un produttore escluso) è la controprova della lista di esclusione: senza
 // registrarlo, l'esclusione è solo una speranza. Se l'host servito risulta fra
 // gli esclusi (è comparso con un nome che l'ignore non ha intercettato), lo
-// segnaliamo in modo evidente nei log. Ritorna il nome dell'host, o null.
+// segnaliamo in modo evidente.
 // Ritorna { servedBy, violation }: `violation` è true quando chi ha servito
 // risulta fra gli esclusi. Con l'interruttore "solo pesi aperti" acceso quel
 // caso non resta nei log: chi l'ha acceso ha chiesto una garanzia, e una
