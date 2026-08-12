@@ -11,6 +11,9 @@ contextBridge.exposeInMainWorld('filoShell', {
     navigate: (id, url) => ipcRenderer.invoke('tabs:navigate', { id, url }),
     move: (id, toIndex) => ipcRenderer.invoke('tabs:move', { id, toIndex }),
     reserveTop: (px) => ipcRenderer.invoke('tabs:reserve-top', { px }),
+    // Il cursore è ancora sulla striscia delle schede? (serve alla shell per
+    // sapere quando riassestare le larghezze bloccate dopo una chiusura)
+    cursorInStrip: () => ipcRenderer.invoke('tabs:cursor-in-strip'),
     setChromeCompact: (on) => ipcRenderer.invoke('tabs:set-chrome-compact', { on }),
     back: (id) => ipcRenderer.invoke('tabs:back', { id }),
     forward: (id) => ipcRenderer.invoke('tabs:forward', { id }),
