@@ -39,11 +39,29 @@ test('buildCreateEntry: entry completa e normalizzata', () => {
   assert.ok(e.queuedAt);
 });
 
-test('buildCreateEntry: default = top-level, todo, priorità 0', () => {
+test('buildCreateEntry: un ritrovamento nuovo nasce nei Ricevuti, non in coda', () => {
+  // #446: se un ritrovamento top-level nascesse già in coda salterebbe il
+  // giudizio, e con esso l'auto-approvazione per mittente scelta dall'owner:
+  // l'interruttore "Claude (le automazioni)" prometterebbe un controllo che su
+  // quel cammino non ha.
   const e = buildCreateEntry({ text: 'task autonomo', name: 'titolo' });
   assert.equal(e.parentId, '');
-  assert.equal(e.status, 'todo');
+  assert.equal(e.status, 'new');
   assert.equal(e.priority, 0);
+});
+
+test('buildCreateEntry: i sotto-feedback di una spec approvata restano in coda', () => {
+  // La famiglia l'ha già approvata l'owner: rimandare in Ricevuti ogni pezzo
+  // vorrebbe dire fargliela approvare due volte.
+  const e = buildCreateEntry({ text: 'pezzo 2', name: 'titolo', parentId: 'PADRE1' });
+  assert.equal(e.status, 'todo');
+});
+
+test('buildCreateEntry: scavalcare il cancello si può, ma solo di proposito', () => {
+  // L'allarme "controlli automatici rossi" della pubblicazione deve arrivare in
+  // coda senza aspettare un giudizio. Esplicito sì, per distrazione no.
+  const e = buildCreateEntry({ text: 'controlli rossi', name: 'titolo', status: 'todo' });
+  assert.equal(e.status, 'todo');
 });
 
 test('buildCreateEntry: status new/clarify ammessi, altri no', () => {
