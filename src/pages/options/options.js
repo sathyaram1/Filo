@@ -43,6 +43,8 @@
     $('title').textContent = I18n.t('options_title');
     $('useDefaultModels-label').textContent = I18n.t('options_use_default_models');
     $('useDefaultModels-desc').textContent = I18n.t('options_use_default_models_desc');
+    $('openWeightsOnly-label').textContent = I18n.t('options_open_weights_only');
+    $('openWeightsOnly-desc').textContent = I18n.t('options_open_weights_only_desc');
     $('h-provider').textContent = I18n.t('options_keys');
     $('h-models').textContent = I18n.t('options_models');
     $('h-costs').textContent = I18n.t('options_costs');
