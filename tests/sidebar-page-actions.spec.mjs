@@ -43,6 +43,11 @@ async function prep(page) {
     window.__calls = { copy: [], copyImage: [], saveLink: [], shareLink: [], download: [], read: [], navItems: [] };
     A.__origCopy = A.copyToClipboard;
     A.copyToClipboard = (t) => { window.__calls.copy.push(t); };
+    // #437: copiare un INDIRIZZO (link, immagine) passa da copyUrlToClipboard,
+    // che rifiuta ciò che indirizzo non è. Qui gli href sono veri: la spia
+    // registra come faceva prima.
+    A.__origCopyUrl = A.copyUrlToClipboard;
+    A.copyUrlToClipboard = (t) => { window.__calls.copy.push(t); return true; };
     A.__origCopyImage = A.copyImage;
     A.copyImage = async (el) => { window.__calls.copyImage.push(el?.src || ''); };
     A.__origSaveLink = A.saveLink;
