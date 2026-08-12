@@ -660,6 +660,7 @@
 
     const partial = {
       useDefaultModels: $('useDefaultModels').checked,
+      openWeightsOnly: $('openWeightsOnly').checked,
       apiKeys: { openrouter: apiKey, gemini: apiKeyGemini, tavily: apiKeyTavily },
       modelRegistry: registry,
       models: ModelChain.collect(modelChains),
