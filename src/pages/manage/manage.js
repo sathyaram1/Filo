@@ -235,39 +235,101 @@
   });
 
   // ── Switch "Modalità automatica" ──────────────────────────────────────────
-  // Stato persistito in chrome.storage.local; lo switch è sempre visibile ma
-  // modificabile solo dall'owner (read-only per gli altri, come il resto della
-  // pagina).
+  // La fonte di verità è il doc Firestore config/automation (campo `enabled`),
+  // perché è QUELLO che il backend dei giudici legge per decidere se un feedback
+  // sicuro entra in coda da solo. chrome.storage.local resta solo una cache
+  // locale: mostra subito un valore all'apertura e regge se l'IPC non risponde.
+  //
+  // Fino al 2026-08-12 lo switch scriveva SOLO la cache locale: nessuno la
+  // leggeva, quindi accenderlo non produceva alcun effetto (feedback #446).
   function reflectAutoMode(on) {
     autoModeOn = !!on;
     mgAutoToggle.checked = !!on;
     mgAutoState.textContent = on ? 'On' : 'Off';
+    applyAutoApproveGate();
+  }
+
+  function setAutoModeMsg(text, kind) {
+    if (!mgAutoMsg) return;
+    mgAutoMsg.textContent = text || '';
+    mgAutoMsg.classList.toggle('mg-ok', kind === 'ok');
+    mgAutoMsg.classList.toggle('mg-err', kind === 'err');
   }
 
   async function loadAutoMode() {
+    // 1. Cache locale: valore immediato, niente attesa davanti allo switch.
     try {
       const data = await chrome.storage.local.get(AUTO_MODE_KEY);
       reflectAutoMode(!!data[AUTO_MODE_KEY]);
     } catch (_) {
       reflectAutoMode(false);
     }
+    // 2. Valore vero da Firestore (owner-gated). Se non siamo admin o siamo
+    //    offline resta quello della cache.
+    try {
+      const r = await sendToMain({ type: AUTOMATION_GET });
+      if (r && r.ok) {
+        reflectAutoMode(Boolean(r.enabled));
+        reflectAutoApprove(r.autoApprove);
+        chrome.storage.local.set({ [AUTO_MODE_KEY]: Boolean(r.enabled) }).catch(() => {});
+      }
+    } catch (_) { /* resta la cache */ }
   }
 
   mgAutoToggle.addEventListener('change', async () => {
     const on = mgAutoToggle.checked;
     reflectAutoMode(on);
-    // Attivando/disattivando l'automatica i feedback allineati si spostano subito
-    // tra Ricevuti e In coda: ricalcola la lista corrente.
-    renderList();
+    setAutoModeMsg('', null);
     try {
-      await chrome.storage.local.set({ [AUTO_MODE_KEY]: on });
+      const r = await sendToMain({ type: AUTOMATION_SET, enabled: on });
+      if (!r || r.ok === false) throw new Error(r?.error || 'errore sconosciuto');
+      reflectAutoMode(Boolean(r.enabled));
+      reflectAutoApprove(r.autoApprove);
+      chrome.storage.local.set({ [AUTO_MODE_KEY]: Boolean(r.enabled) }).catch(() => {});
+      setAutoModeMsg('Salvato.', 'ok');
     } catch (err) {
-      // Ripristina lo stato precedente se il salvataggio fallisce.
+      // Ripristina lo stato precedente: se non è stato scritto su Firestore, non
+      // è attivo — e lo switch non deve dire il contrario.
       reflectAutoMode(!on);
-      renderList();
+      setAutoModeMsg('Salvataggio fallito: la modalità automatica NON è cambiata.', 'err');
       console.error('[manage] salvataggio modalità automatica fallito:', err);
     }
   });
+
+  // ── Auto-approvazione per mittente (#446) ─────────────────────────────────
+  // Con l'automatica accesa, questi decidono DI CHI ci si fida abbastanza da
+  // farlo entrare in coda senza passare dall'owner. Spenta l'automatica non
+  // contano: restano visibili ma inerti (e lo si vede).
+  function reflectAutoApprove(map) {
+    const m = (map && typeof map === 'object') ? map : {};
+    for (const [group, el] of Object.entries(mgAutoApprove)) {
+      if (el) el.checked = m[group] !== false;
+    }
+  }
+
+  function applyAutoApproveGate() {
+    for (const el of Object.values(mgAutoApprove)) {
+      if (el) el.disabled = !isAdmin || !autoModeOn;
+    }
+    if (mgAutoApproveBlock) mgAutoApproveBlock.classList.toggle('mg-auto-sub--off', !autoModeOn);
+  }
+
+  for (const [group, el] of Object.entries(mgAutoApprove)) {
+    if (!el) continue;
+    el.addEventListener('change', async () => {
+      const want = el.checked;
+      setAutoModeMsg('', null);
+      try {
+        const r = await sendToMain({ type: AUTOMATION_SET, autoApprove: { [group]: want } });
+        if (!r || r.ok === false) throw new Error(r?.error || 'errore sconosciuto');
+        reflectAutoApprove(r.autoApprove);
+      } catch (err) {
+        el.checked = !want;
+        setAutoModeMsg('Salvataggio fallito: l\'impostazione NON è cambiata.', 'err');
+        console.error('[manage] salvataggio auto-approvazione fallito:', err);
+      }
+    });
+  }
 
   function applyAutoModeGate() {
     mgAutoToggle.disabled = !isAdmin;
@@ -276,6 +338,8 @@
     if (mgLoopCapSave) mgLoopCapSave.disabled = !isAdmin;
     if (mgJudgeTimeout)     mgJudgeTimeout.disabled = !isAdmin;
     if (mgJudgeTimeoutSave) mgJudgeTimeoutSave.disabled = !isAdmin;
+    if (mgProberIdle)  mgProberIdle.disabled = !isAdmin;
+    applyAutoApproveGate();
   }
 
   // ── Tentativi del loop di correzione (tab Automazioni) ────────────────────
