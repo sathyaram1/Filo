@@ -257,7 +257,6 @@ test.describe('larghezze delle schede alla chiusura', () => {
 
     // Le superstiti conservano ESATTAMENTE la larghezza che avevano.
     const during = await widthsById();
-    console.log('BEFORE', JSON.stringify(before), 'DURING', JSON.stringify(during));
     expect(Object.keys(during).sort()).toEqual(ids.filter((id) => id !== victim).sort());
     for (const id of Object.keys(during)) {
       expect(Math.abs(during[id] - before[id]),
