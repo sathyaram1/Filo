@@ -300,8 +300,10 @@ test('#448 — spegnere l\'esplorazione a coda vuota arriva alla config delle ro
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
   await page.locator('.mg-tab[data-tab="automation"]').click();
 
+  // Il checkbox è visivamente nascosto (switch custom: la levetta è il fratello
+  // .mg-switch-track), quindi si asserisce sul controllo reale, non sulla resa.
   const sw = page.locator('#mgProberIdle');
-  await expect(sw).toBeVisible();
+  await expect(page.locator('#mgProberIdle + .mg-switch-track')).toBeVisible();
   // Non-admin: sola lettura, come il resto della tab.
   await expect(sw).toBeDisabled();
 
