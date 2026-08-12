@@ -1833,7 +1833,7 @@ class TabManager {
       // ogni apertura veniva attivata, quindi l'utente veniva strappato dalla
       // pagina che stava leggendo — lo stesso attrito della musica che passava
       // davanti da sola.
-      this.openTab(url, { activate: disposition !== 'background-tab' });
+      this.openTab(url, { activate: disposition !== 'background-tab', openedByLink: true });
       return { action: 'deny' };
     });
 
