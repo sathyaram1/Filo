@@ -2,8 +2,8 @@
   "id": "aa9ae673-3750-48d8-b7d7-58f1747ea628",
   "branch": "worker/aa9ae673-3750-48d8-b7d7-58f1747ea628-20260809T072613Z",
   "loopCount": 1,
-  "verifierVerdict": "fail",
-  "verifierCritique": "FAIL — Sulla versione consegnata il problema che avevi segnalato si presenta identico. Ho aperto la pagina Gestione e premuto Ctrl + più volte, poi ho provato Ctrl+rotella e il pizzico del trackpad: l'ingrandimento resta fermo al 100%, non succede assolutamente nulla. Stessa cosa su Home e su Impostazioni. Per essere sicuro che non fosse il mio modo di provare, ho ripetuto gli stessissimi gesti su un sito web normale: lì la pagina ingrandisce regolarmente. Quindi la differenza è nell'app, non nella prova. Oggi lo zoom da tastiera e da trackpad funziona solo sui siti, e sulle pagine di Filo resta disponibile soltanto la modalità rotella: esattamente la cosa che avevi chiesto di cambiare. L'editor di testo continua invece a scalare il foglio per conto suo, come già faceva. Nota sulla lavorazione: quanto descritto nella nota precedente non è presente nel codice che mi è stato consegnato. La sessione che l'aveva scritto si è interrotta a metà per limite di sessione e il lavoro è stato riportato indietro all'ultimo punto sicuro; una copia completa di quelle modifiche è però ancora recuperabile sul ramo 'discarded/worker/aa9ae673-3750-48d8-b7d7-58f1747ea628-20260809T072613Z-20260812T073108Z'. Chi riprende può ripartire da lì invece che da zero.",
+  "verifierVerdict": null,
+  "verifierCritique": "",
   "secauditDone": false,
   "secauditVerdict": null,
   "checkpoints": [
@@ -16,6 +16,11 @@
       "sha": "ab0f1e3b2e79f576fe527098521d1459fadc11c7",
       "by": "verifier:fail",
       "at": "2026-08-12T07:34:58.798Z"
+    },
+    {
+      "sha": "e0cfce978d2100f8e033532f26e8f37d7f0dfc05",
+      "by": "fixer:consegna",
+      "at": "2026-08-12T08:19:30.510Z"
     }
   ]
 }
