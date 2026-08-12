@@ -314,6 +314,24 @@ function modelConfigError(settings, action, missingRefs) {
   return e;
 }
 
+// Errore quando "solo modelli a pesi aperti" è acceso e la funzione non ha
+// nessun modello ammesso (né il suo, né un equivalente). Dice QUALE funzione si
+// ferma e come sbloccarla — non un "errore del modello" generico, che manderebbe
+// a cercare un guasto dove non c'è.
+function openWeightsConfigError(settings, action, droppedRefs) {
+  const label = actionLabelForSettings(action);
+  const refs = droppedRefs || [];
+  const e = new Error(I18n.t(
+    'err_open_weights_only_no_model',
+    label,
+    SN_CONST.formatModelRefsForMessage(refs),
+  ));
+  e.code = 'NO_OPEN_WEIGHTS_MODEL';
+  e.action = action || '';
+  e.droppedRefs = refs;
+  return e;
+}
+
 async function ensureUnderLimit(settings) {
   if (await Costs.isOverLimit(settings.monthlyLimitEur)) {
     const e = new Error(I18n.t('err_limit_reached'));
