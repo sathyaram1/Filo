@@ -45,16 +45,19 @@
   // non apre nulla da nessuna parte, senza che niente lo dica. Meglio dirlo,
   // come già succede per i filmati trasmessi a pezzi.
   // Ritorna true se ha davvero copiato.
-  function copyUrlToClipboard(url) {
+  function isAddress(url) {
     const raw = String(url || '').trim();
-    const ok = global.SN_URL_NAV
-      ? global.SN_URL_NAV.isShareableAddress(raw)
-      : !!raw; // senza il modulo condiviso non peggioriamo il comportamento storico
-    if (!ok) {
+    // Senza il modulo condiviso non peggioriamo il comportamento storico.
+    if (!global.SN_URL_NAV) return !!raw;
+    return global.SN_URL_NAV.isShareableAddress(raw);
+  }
+
+  function copyUrlToClipboard(url) {
+    if (!isAddress(url)) {
       Popup.showToast(I18n.t('toast_not_an_address'));
       return false;
     }
-    copyToClipboard(raw);
+    copyToClipboard(String(url).trim());
     return true;
   }
 
