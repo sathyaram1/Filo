@@ -444,6 +444,30 @@
       provider: 'gemini',
       model: 'gemini-2.5-flash-preview-tts',
     },
+    // ── Modelli a PESI APERTI, serviti da fornitori indipendenti ─────────────
+    // Sono i sostituti usati quando chi usa Filo accende "solo modelli a pesi
+    // aperti" (vedi OPEN_WEIGHTS_SUBSTITUTES). Stanno nel registry come tutti
+    // gli altri: si possono scegliere anche a interruttore spento.
+    // Provider 'openrouter' = smistatore, non il produttore dei pesi: l'host
+    // concreto lo sceglie lui, e la lista di esclusione tiene fuori i produttori.
+    gemma: {
+      label: 'Gemma 4 31B (pesi aperti)',
+      provider: 'openrouter',
+      model: 'google/gemma-4-31b-it',
+      weights: 'open',
+    },
+    'gemma-lite': {
+      label: 'Gemma 4 26B A4B (pesi aperti)',
+      provider: 'openrouter',
+      model: 'google/gemma-4-26b-a4b-it',
+      weights: 'open',
+    },
+    deepseek: {
+      label: 'DeepSeek V4 Pro (pesi aperti)',
+      provider: 'openrouter',
+      model: 'deepseek/deepseek-v4-pro',
+      weights: 'open',
+    },
   };
 
   // Modello di default per ogni azione. I valori sono liste di NICKNAME dal
