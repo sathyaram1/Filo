@@ -1031,8 +1031,49 @@
             <span class="mg-switch-state" id="mgAutoState">Off</span>
           </label>
           <p class="mg-auto-block-desc">
-            Quando è attiva, Filo lavora i feedback in autonomia (routine e
-            red-team). Spenta, nulla parte da solo.
+            Quando è attiva, i feedback giudicati sicuri entrano in coda da soli.
+            Spenta, li approvi tu uno per uno.
+            <span class="mg-action-msg" id="mgAutoMsg" role="status"></span>
+          </p>
+
+          <!-- Chi può entrare in coda da solo, per categoria di mittente. Inerti
+               con l'automatica spenta: la classe li smorza e il JS li disabilita. -->
+          <div class="mg-auto-sub" id="mgAutoApproveBlock">
+            <p class="mg-auto-sub-title">Entrano in coda da soli</p>
+            <label class="mg-switch mg-switch--sm" title="I feedback che scrivi tu">
+              <span class="mg-switch-text">👑 I tuoi</span>
+              <input type="checkbox" id="mgAutoApproveOwner" checked />
+              <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+            </label>
+            <label class="mg-switch mg-switch--sm" title="Segnalazioni che Filo scrive per conto di un utente">
+              <span class="mg-switch-text">🧵 Filo (per conto di un utente)</span>
+              <input type="checkbox" id="mgAutoApproveFilo" checked />
+              <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+            </label>
+            <label class="mg-switch mg-switch--sm" title="Ritrovamenti delle tue automazioni: esplorazione, sviluppo, verifica">
+              <span class="mg-switch-text">🤖 Claude (le automazioni)</span>
+              <input type="checkbox" id="mgAutoApproveClaude" checked />
+              <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+            </label>
+            <label class="mg-switch mg-switch--sm" title="Feedback inviati dagli alpha tester">
+              <span class="mg-switch-text">👤 Altri utenti</span>
+              <input type="checkbox" id="mgAutoApproveUser" checked />
+              <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+            </label>
+          </div>
+        </section>
+
+        <!-- Esplorazione automatica a coda vuota (#448). -->
+        <section class="mg-auto-block">
+          <label class="mg-switch" title="Ferma l'esplorazione automatica quando non ci sono più feedback da lavorare">
+            <span class="mg-switch-text">Esplora quando la coda è vuota</span>
+            <input type="checkbox" id="mgProberIdle" checked />
+            <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+          </label>
+          <p class="mg-auto-block-desc">
+            Finiti i feedback da lavorare, Filo va a cercare da solo problemi che
+            nessuno ha segnalato. Spento, quando la coda è vuota si ferma.
+            <span class="mg-action-msg" id="mgProberIdleMsg" role="status"></span>
           </p>
         </section>
 
