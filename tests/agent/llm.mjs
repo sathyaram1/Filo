@@ -188,6 +188,7 @@ export async function generate({ model, system, user, imagePath, contents, tempe
       return text;
     } catch (e) {
       lastErr = e;
+      if (e && e.policy) throw e; // violazione della politica: mai ritentata
       // errori di rete ("fetch failed", abort, ecc.) → backoff e ritenta
       if (attempt < MAX - 1) await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
     }
