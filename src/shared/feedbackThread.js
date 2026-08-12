@@ -430,6 +430,12 @@
     isFromOwner,
     originOf,
     authorKind,
+    // Auto-approvazione per mittente (#446). La LOGICA è specchiata nel backend
+    // di sicurezza (filo-security: functions/src/autoApprove.js), che è l'unico
+    // a deciderla davvero: se cambi i gruppi qui, riallinea quel file e rideploya.
+    autoApproveGroup,
+    autoApproveAllowed,
+    AUTO_APPROVE_GROUPS,
     ownerize,
     userTurnMarker,
     appendUserTurn,
