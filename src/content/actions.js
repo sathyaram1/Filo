@@ -44,7 +44,6 @@
   // con la pagina, o niente affatto — negli appunti finirebbe una stringa che
   // non apre nulla da nessuna parte, senza che niente lo dica. Meglio dirlo,
   // come già succede per i filmati trasmessi a pezzi.
-  // Ritorna true se ha davvero copiato.
   function isAddress(url) {
     const raw = String(url || '').trim();
     // Senza il modulo condiviso non peggioriamo il comportamento storico.
