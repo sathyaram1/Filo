@@ -535,7 +535,7 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
     : await Providers.completeWithFallback({ attempts, messages, signal });
   const usedProvider = result.provider || attempts[0].provider;
   const concreteModel = result.model || attempts[0].model;
-  const servedBy = noteServedProvider(settings, action, result);
+  const { servedBy, violation } = noteServedProvider(settings, action, result);
   const pricing = usedProvider === 'gemini' ? null : settings.pricing?.[concreteModel];
   const costEur = await Costs.record({
     action, provider: usedProvider, model: concreteModel,
@@ -553,6 +553,7 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
   ) {
     await History.append({
       action, provider: usedProvider, model: concreteModel, servedBy,
+      policyViolation: violation,
       input: payload, output: result.text, origin, costEur, usage: result.usage,
     });
   }
@@ -591,7 +592,7 @@ async function handleStream({ action, payload, origin, onDelta, onMeta, onReset,
   });
   const usedProvider = result.provider || attempts[0].provider;
   const concreteModel = result.model || attempts[0].model;
-  const servedBy = noteServedProvider(settings, action, result);
+  const { servedBy, violation } = noteServedProvider(settings, action, result);
   const pricing = usedProvider === 'gemini' ? null : settings.pricing?.[concreteModel];
   const costEur = await Costs.record({
     action, provider: usedProvider, model: concreteModel,
@@ -600,6 +601,7 @@ async function handleStream({ action, payload, origin, onDelta, onMeta, onReset,
 
   await History.append({
     action, provider: usedProvider, model: concreteModel, servedBy,
+    policyViolation: violation,
     input: payload, output: result.text, origin, costEur, usage: result.usage,
   });
 
