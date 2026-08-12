@@ -1074,7 +1074,7 @@
   // href che non è un indirizzo non si può né mandare a qualcuno né copiare.
   async function shareLink(linkEl) {
     const href = linkEl?.href || '';
-    if (!copyUrlToClipboard.canCopy(href)) {
+    if (!isAddress(href)) {
       Popup.showToast(I18n.t('toast_not_an_address'));
       return;
     }
