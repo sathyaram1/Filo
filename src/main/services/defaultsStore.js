@@ -456,6 +456,8 @@ module.exports = {
   setAutomationGate,
   getAutomationAutoApprove,
   setAutomationAutoApprove,
+  getAutomationProberIdle,
+  setAutomationProberIdle,
   getAutomationLoopCap,
   setAutomationLoopCap,
   getWorkerLog,
