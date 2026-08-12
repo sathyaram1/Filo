@@ -372,6 +372,23 @@ async function setAutomationAutoApprove(partial, idToken) {
   return next;
 }
 
+// Esplorazione automatica a coda vuota (config/automation, campo
+// `proberWhenIdle`): quando non c'è più niente da lavorare, le routine vanno a
+// cercare problemi che nessuno ha segnalato. Lo legge scripts/dispatch.mjs.
+// Campo assente ⇒ true (il comportamento che c'è sempre stato): solo un `false`
+// scritto apposta ferma l'esplorazione.
+async function getAutomationProberIdle(idToken) {
+  const doc = await fetchDoc(AUTOMATION_DOC, idToken);
+  if (!doc || typeof doc.proberWhenIdle !== 'boolean') return true;
+  return doc.proberWhenIdle;
+}
+
+async function setAutomationProberIdle(on, idToken) {
+  if (!idToken) throw new Error('Serve un ID token admin per cambiare l\'esplorazione automatica.');
+  await patchDoc(AUTOMATION_DOC, { proberWhenIdle: toFsValue(Boolean(on)) }, ['proberWhenIdle'], idToken);
+  return Boolean(on);
+}
+
 // Tentativi del loop di correzione (config/automation, campo `loopCap`): quante
 // FAIL consecutive del verifier prima di bloccare un fix con motivo `loop`. È la
 // fonte di verità letta dalle routine (scripts/dispatch.mjs). Default e range da
