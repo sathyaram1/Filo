@@ -791,6 +791,36 @@ function emitHalt(kind, message) {
   return { exit: 3 };
 }
 
+/**
+ * Prontezza (ROUTINES.md § Avvio 0b, ROUTINE-BRANCH-INTEGRITY.md §E): risponde a
+ * "questo giro è in grado di lavorare?" PRIMA che l'orchestratore paghi il setup
+ * dell'ambiente (npm install, binario Electron ~102MB, scrot). Non sceglie
+ * niente, non fa claim, non consegna lavoro: rifà gli stessi controlli che run()
+ * farebbe subito dopo e riporta il guasto quando c'è, così se il giro deve
+ * fermarsi lo si scopre prima di aver speso la preparazione.
+ *
+ * Fallisce SOLO sui guasti dichiarati (deposito inutilizzabile, coda
+ * illeggibile). Un errore di lettura generico NON è un guasto: lì run() ripiega
+ * sull'audit e il giro lavora lo stesso, quindi bloccarlo qui sprecherebbe una
+ * sessione intera.
+ *
+ * @returns {Promise<{ok:true}|{ok:false, kind:string, message:string}>}
+ */
+export async function preflight() {
+  // Deposito utilizzabile: senza git il lavoro non è nemmeno consegnabile, e
+  // nessuna attesa di 6h lo cambia (permanente).
+  if (!tryGit(['rev-parse', '--git-dir']).ok) {
+    return { ok: false, kind: 'permanent', message: `deposito git non utilizzabile in ${ROOT}` };
+  }
+  try {
+    await buildSnapshot();
+  } catch (e) {
+    if (e?.faultKind) return { ok: false, kind: e.faultKind, message: e.message };
+    process.stderr.write(`[dispatch] prontezza: stato illeggibile (${e?.message || e}) → il giro ripiegherà sull'audit\n`);
+  }
+  return { ok: true };
+}
+
 export async function run() {
   let snapshot;
   try {
