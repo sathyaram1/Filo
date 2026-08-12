@@ -120,26 +120,37 @@ async function acquireBearerSilent() {
 }
 
 /**
- * Legge config/automation.loopCap da Firestore in modo BEST-EFFORT: serve un
+ * Legge il doc config/automation da Firestore in modo BEST-EFFORT: serve un
  * bearer admin (il doc è admin-only), che si ricava da service account o refresh
- * token dell'owner. Se manca la credenziale o la rete fallisce, ritorna null
- * (→ si ricade sul default): non deve MAI bloccare il dispatch.
+ * token dell'owner. Se manca la credenziale o la rete fallisce, ritorna {}
+ * (→ si ricade sui default): non deve MAI bloccare il dispatch.
+ *
+ * Una sola lettura per giro: da qui escono sia `loopCap` sia `proberWhenIdle`.
  */
-async function fetchRemoteLoopCap() {
+async function fetchRemoteAutomation() {
   try {
     const { fa, bearer } = await acquireBearerSilent();
-    if (!bearer) return null; // nessuna credenziale → default
+    if (!bearer) return {}; // nessuna credenziale → default
     const url = `${fa.FIRESTORE_BASE}/config/automation?key=${fa.FIREBASE_API_KEY}`;
     const res = await fetch(url, { headers: { Authorization: `Bearer ${bearer}` } });
-    if (!res.ok) return null;
+    if (!res.ok) return {};
     const json = await res.json();
-    const f = json && json.fields && json.fields.loopCap;
-    if (!f) return null;
-    if (f.integerValue != null) return Number(f.integerValue);
-    if (f.doubleValue != null) return Number(f.doubleValue);
-    return null;
+    const fields = (json && json.fields) || {};
+    const out = {};
+    const lc = fields.loopCap;
+    if (lc) {
+      if (lc.integerValue != null) out.loopCap = Number(lc.integerValue);
+      else if (lc.doubleValue != null) out.loopCap = Number(lc.doubleValue);
+    }
+    // `proberWhenIdle`: esplorare quando non c'è altro da fare (feedback #448).
+    // Solo un `false` ESPLICITO spegne l'esplorazione — campo assente, doc mai
+    // scritto o lettura fallita lasciano il comportamento storico.
+    if (fields.proberWhenIdle && fields.proberWhenIdle.booleanValue === false) {
+      out.proberWhenIdle = false;
+    }
+    return out;
   } catch (_) {
-    return null;
+    return {};
   }
 }
 
