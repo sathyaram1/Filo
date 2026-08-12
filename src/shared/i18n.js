@@ -199,6 +199,8 @@
     toast_nothing_to_translate: 'Non ho trovato testo da tradurre in questa pagina',
     toast_original_restored: 'Originale ripristinato',
     toast_clipboard_empty: 'Cronologia appunti vuota',
+    toast_open_weights_violated:
+      'Hai scelto solo modelli a pesi aperti, ma questa risposta è arrivata da «%s», che è escluso. Segnalalo: la lista di esclusione va aggiornata.',
     toast_pasted_image: 'Immagine incollata',
     toast_image_saved: 'Immagine salvata',
     toast_image_save_failed: 'Non sono riuscito a salvare l\'immagine',
