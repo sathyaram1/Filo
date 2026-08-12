@@ -253,6 +253,7 @@ function withDefaults(settings) {
     provider: d.provider,
     models: d.models,
     modelRegistry: d.modelRegistry,
+    openWeightsOnly,
     excludedProviders,
     providerSort,
     apiKeys,
