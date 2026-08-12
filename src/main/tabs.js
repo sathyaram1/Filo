@@ -1659,6 +1659,10 @@ class TabManager {
       // MAI, quindi resta a about:blank). Il flag protegge dal chiuderla per
       // sbaglio se poi parte un download da una pagina che ha già contenuto.
       tab._everNavigated = true;
+      // #441 — quando la pagina corrente si è committata: una pagina-ponte
+      // ("il download partirà a breve…") avvia il file entro pochi secondi da
+      // qui. Oltre quella finestra la scheda non è più un semplice ponte.
+      tab._navigatedAt = Date.now();
       // Nuova pagina → il colore live (§1.1) del sito precedente non vale più: lo
       // azzeriamo (la tab torna al neutro finché il content script non ricampiona).
       // Il colore IDENTITÀ (§1.2) invece dipende dal DOMINIO: se navighiamo su un
