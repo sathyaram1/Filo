@@ -59,6 +59,8 @@ test('#437 "Copia URL" su un link javascript: non riempie gli appunti e avvisa',
   await expect(page.locator('.sn-toast')).toBeVisible();
   // Il cuore del fix: gli appunti dell'utente restano quelli di prima.
   await expect.poll(() => readClipboard(app), { timeout: 5000 }).toBe(SENTINELLA);
+  // Traccia ispezionabile dell'avviso (non è il segnale primario).
+  await page.screenshot({ path: 'tests/.shots/copy-url-not-an-address.png' }).catch(() => {});
 });
 
 test('#437 "Copia URL immagine" su una sorgente javascript: non riempie gli appunti e avvisa', async ({ app, openTab, testServer }) => {
