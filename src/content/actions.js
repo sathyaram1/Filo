@@ -1066,12 +1066,20 @@
     copyToClipboard(location.href);
   }
 
+  // Condividere un link finisce, senza sistema di condivisione nativo, in una
+  // copia negli appunti: vale lo stesso discorso di "Copia URL" (#437) — un
+  // href che non è un indirizzo non si può né mandare a qualcuno né copiare.
   async function shareLink(linkEl) {
-    const data = { title: linkEl.textContent?.trim() || linkEl.href, url: linkEl.href };
+    const href = linkEl?.href || '';
+    if (!copyUrlToClipboard.canCopy(href)) {
+      Popup.showToast(I18n.t('toast_not_an_address'));
+      return;
+    }
+    const data = { title: linkEl.textContent?.trim() || href, url: href };
     if (navigator.share) {
       try { await navigator.share(data); return; } catch (_) {}
     }
-    copyToClipboard(linkEl.href);
+    copyToClipboard(href);
   }
 
   function searchTextOnWeb(text) {
