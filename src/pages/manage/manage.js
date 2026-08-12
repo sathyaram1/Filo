@@ -357,7 +357,18 @@
   // legge via i messaggi support_models_* (PATCH per-campo: non tocca i modelli).
   const JT_DEF = AUTOMATION.JUDGE_TIMEOUT_DEFAULT_S || 60;
   const JT_MIN = AUTOMATION.JUDGE_TIMEOUT_MIN_S || 10;
-  const JT_MAX = AUTOMATION.JUDGE_TIMEOUT_MAX_S || 120;
+  const JT_MAX = AUTOMATION.JUDGE_TIMEOUT_MAX_S || 300;
+  // I limiti del campo vengono dal registro, non dall'HTML: erano scritti in due
+  // posti e alzare il tetto in uno solo lasciava il campo a rifiutare il valore
+  // nuovo (o ad accettarne uno che il backend non rispetta).
+  if (mgJudgeTimeout) {
+    mgJudgeTimeout.min = String(JT_MIN);
+    mgJudgeTimeout.max = String(JT_MAX);
+  }
+  if (mgLoopCap) {
+    mgLoopCap.min = String(AUTOMATION.LOOP_CAP_MIN);
+    mgLoopCap.max = String(AUTOMATION.LOOP_CAP_MAX);
+  }
   function clampJudgeTimeoutS(n) {
     const v = Math.round(Number(n));
     if (!Number.isFinite(v)) return JT_DEF;
