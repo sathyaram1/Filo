@@ -93,19 +93,41 @@ service cloud.firestore {
     // config/automation → config dell'auto-miglioramento (vedi filo-security
     // DESIGN §2). Campi:
     //   - `enabled` (bool; assente = false = OFF, lo stato sicuro): interruttore
-    //     master dell'autonomia.
-    //   - `loopCap` (int 1-10; assente = 3): quante FAIL del verifier prima del
-    //     blocco `loop`. Lo legge la tab Automazioni (dashboard owner) e le
-    //     routine (scripts/dispatch.mjs, con bearer admin).
+    //     dell'ingresso automatico in coda (un feedback giudicato sicuro entra
+    //     da solo). NON è l'interruttore delle routine: quello sta in
+    //     config/routines, vedi sotto.
     //   - `autoApprove` (mappa owner/filo/claude/user → bool; assente = tutti
     //     true): quali mittenti entrano in coda da soli quando `enabled` è true
     //     (#446). La legge il backend di sicurezza via Admin SDK.
-    //   - `proberWhenIdle` (bool; assente = true): a coda vuota le routine
-    //     esplorano l'app in cerca di problemi (#448). Lo legge dispatch.mjs.
+    //   - `workerLog` (array di { role, startedAt, num }): il registro dei worker
+    //     mostrato in dashboard. Lo scrive la GitHub Action apply-triage col
+    //     service account (le routine non hanno credenziali: #451).
     // Le regole NON enumerano i campi (read/write admin-only): nuovi campi non
     // richiedono redeploy. Riservato agli admin: nessun utente normale legge/scrive.
     match /config/automation {
       allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // config/routines → come devono comportarsi le routine autonome. Campi:
+    //   - `enabled` (bool; assente = true = comportamento storico): interruttore
+    //     MASTER delle routine. Spento, l'orchestratore parte ma il dispatcher
+    //     non consegna nulla a nessuno.
+    //   - `proberWhenIdle` (bool; assente = true): a coda vuota le routine
+    //     esplorano l'app in cerca di problemi (#448).
+    //   - `loopCap` (int 1-10; assente = 3): quante FAIL del verifier prima del
+    //     blocco `loop`.
+    //
+    // LETTURA PUBBLICA, e non è una svista. Chi lo legge sono le macchine delle
+    // routine, che NON hanno nessuna credenziale (né service account né token
+    // dell'owner). Finché queste tre impostazioni sono vissute in un documento
+    // admin-only, la lettura falliva sempre e si ricadeva sui default: la
+    // dashboard le mostrava attive e nei fatti non hanno mai raggiunto una
+    // routine. Un interruttore che non arriva a destinazione è peggio che
+    // assente — e qui dentro non c'è niente di segreto: solo se le routine
+    // devono lavorare. La SCRITTURA resta solo all'owner.
+    match /config/routines {
+      allow read: if true;
       allow write: if isAdmin();
     }
 
