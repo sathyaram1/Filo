@@ -76,7 +76,15 @@ html, body {
   color: var(--sn-link);
 }
 
-.sn-page button.sn-btn:hover { opacity: 0.85; }
+.sn-page button.sn-btn:hover:not(:disabled) { opacity: 0.85; }
+
+/* Bottone spento da una regola (non da un'attesa): deve VEDERSI che è spento,
+   altrimenti sembra un bottone rotto — ci si clicca sopra e non succede niente.
+   Il motivo per cui è spento sta nel suo hover nativo (title). */
+.sn-page button.sn-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 
 .sn-page button.sn-btn-secondary {
   background: transparent;
