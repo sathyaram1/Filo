@@ -411,9 +411,10 @@ ${doc.html}
 (function () {
   'use strict';
   var GLOSSARY = ${JSON.stringify(glossary)};
-${GLOSSARY_RUNTIME}
-  applyGlossary(document.getElementById('doc-body'), GLOSSARY);
-${TOOLTIP_RUNTIME}
+${UI_RUNTIME}
+  var body = document.getElementById('doc-body');
+  applyGlossary(body, GLOSSARY);
+  mountGlossaryUi(body, document.getElementById('gloss-pop'));
 })();
 </script>
 </body>
