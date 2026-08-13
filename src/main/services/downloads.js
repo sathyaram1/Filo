@@ -46,6 +46,9 @@ const records = new Map();
 // DownloadItem di Electron per gli scaricamenti in corso (id → item): non è
 // serializzabile, quindi vive a parte e non finisce mai nello storage.
 const liveItems = new Map();
+// Scaricamenti "a mano" in corso (id → { cancel }): non hanno un DownloadItem
+// perché i byte li muove handlers/misc.js. Vedi beginManual().
+const liveManual = new Map();
 // Sessioni già agganciate (evita doppioni se una session torna più volte).
 // Le sessioni incognito NON vengono mai agganciate (vedi tabs.js _makeView):
 // "nessuna traccia" vale anche per i download.
