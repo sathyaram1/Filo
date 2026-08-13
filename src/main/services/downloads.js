@@ -474,7 +474,8 @@ function beginManual({ url, filename, totalBytes } = {}) {
     canPause: false,
   };
   records.set(id, rec);
-  liveManual.set(id, { cancel: () => finalizeManual(rec, 'cancelled') });
+  const requestCancel = () => { rec._cancelled = true; finalizeManual(rec, 'cancelled'); };
+  liveManual.set(id, { cancel: requestCancel });
   persist();
   broadcast('start', rec);
 
