@@ -190,7 +190,9 @@ if (isMain) {
   // dispatcher e dell'owner. E scatta solo se per quel feedback esiste un branch
   // assegnato: senza, non c'è niente da confrontare (owner che lancia a mano,
   // feedback fuori dalla pipeline).
-  if (status === 'revision_capability' || status === 'revision_security') {
+  const isDelivery = status === 'revision_capability' || status === 'revision_security';
+  let deliveryState = null;
+  if (isDelivery) {
     const g = guardTransition(ROOT, id, {
       escalate: (count) => {
         execFileSync('node', [resolve(ROOT, 'scripts', 'queue-triage.mjs'), id, 'design',
@@ -202,6 +204,16 @@ if (isMain) {
       console.error('[queue-triage] Il lavoro NON è stato registrato: la directory non è sul branch assegnato a questo feedback.');
       process.exit(3);
     }
+    deliveryState = g.state;
+    // Il nome del ramo lo sa il SISTEMA, non la memoria di chi consegna: è
+    // unico per tentativo, quindi un `--branch worker/<id>` ricostruito a mano
+    // punterebbe a un ramo che non esiste, e il giro dopo si troverebbe il
+    // lavoro "sparito". Stessa regola della provenienza (#443): dove esiste una
+    // verità registrata, non si chiede all'istanza di ricordarla.
+    if (deliveryState?.branch && branch !== deliveryState.branch) {
+      if (branch) console.warn(`  ! il ramo indicato ("${branch}") non è quello assegnato: registro "${deliveryState.branch}"`);
+      branch = deliveryState.branch;
+    }
   }
 
   try {
@@ -210,6 +222,26 @@ if (isMain) {
     console.log(`OK: triage accodato → ${file}`);
     if (noGit) console.log('   (--no-git: file scritto ma non committato)');
     else commitAndPush(file);
+
+    // ── C: una consegna ACCETTATA lascia il PUNTO FERMO ─────────────────────
+    //
+    // Spec ROUTINE-BRANCH-INTEGRITY.md §C: «Ogni transizione ACCETTATA lascia un
+    // punto fermo». Qui mancava: la consegna veniva controllata (sopra) ma non
+    // sigillata, quindi l'unico punto fermo di un branch di lavoro nuovo restava
+    // quello della sua CREAZIONE — il vuoto. Al giro successivo il ripristino
+    // (§D) lo prendeva per buono e riportava il ramo a prima che il lavoro
+    // cominciasse: chi doveva verificare trovava una feature inesistente e la
+    // strada naturale era bocciare per assenza e far riscrivere tutto da capo,
+    // cioè l'implementazione doppia che questa protezione esiste per impedire
+    // (feedback #462).
+    //
+    // Si sigilla DOPO la spedizione, così il punto fermo comprende anche il
+    // commit della decisione: è lo stato esatto in cui il lavoro è stato
+    // consegnato.
+    if (isDelivery && deliveryState?.branch) {
+      sealTransition(ROOT, { ...deliveryState, id }, `consegna:${status}`);
+      persistStateFileToGit(ROOT, id, `feedback: punto fermo consegna ${id}`);
+    }
   } catch (e) {
     console.error('Errore:', e.message);
     process.exit(1);
