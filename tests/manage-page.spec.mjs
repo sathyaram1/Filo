@@ -243,6 +243,10 @@ async function stubAutomation(page, initial = {}) {
           window.__automation.proberWhenIdle = msg.proberWhenIdle;
           sent.proberWhenIdle = msg.proberWhenIdle;
         }
+        if (typeof msg.routinesEnabled === 'boolean') {
+          window.__automation.routinesEnabled = msg.routinesEnabled;
+          sent.routinesEnabled = msg.routinesEnabled;
+        }
         window.__automationSets.push(sent);
         return Object.assign({ ok: true }, window.__automation);
       }
