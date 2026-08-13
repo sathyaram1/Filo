@@ -86,13 +86,17 @@ test('un link a una fonte apre una scheda e non porta via la pagina interna', as
   expect(href).toMatch(/^https?:\/\//);
 
   await link.click();
-  // La pagina di trasparenza è ancora quella: il click è stato intercettato e
-  // mandato al main come apertura di scheda.
-  await page.waitForTimeout(300);
-  expect(page.url()).toBe(before);
 
-  // La scheda esterna è stata aperta dal processo main.
-  const opened = await app.evaluate(async ({ webContents }) =>
-    webContents.getAllWebContents().some((wc) => /^https?:/.test(wc.getURL())));
-  expect(opened).toBe(true);
+  // La scheda esterna è stata aperta dal processo main. Si attende la
+  // condizione invece di un tempo fisso: l'apertura passa dal main e commettere
+  // la navigazione richiede quel che richiede, sulla macchina di turno.
+  await expect.poll(
+    () => app.evaluate(async ({ webContents }) =>
+      webContents.getAllWebContents().some((wc) => wc.getURL().startsWith(href))),
+    { timeout: 10000, message: `nessuna scheda aperta su ${href}` },
+  ).toBe(true);
+
+  // E la pagina di trasparenza è rimasta dov'era: il click è stato intercettato,
+  // non ha navigato via la pagina interna.
+  expect(page.url()).toBe(before);
 });
