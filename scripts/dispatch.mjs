@@ -1049,9 +1049,8 @@ export async function run() {
     await recordWorkerSpawn(proberBucket);
     return { exit: 0 };
   }
-  // Config dell'owner (una lettura sola): cap del loop + esplorazione a coda
-  // vuota. Cap EFFETTIVO: env > config/automation > default.
-  const automation = await fetchRemoteAutomation();
+  // Il resto della config dell'owner, già letta qui sopra insieme
+  // all'interruttore. Cap EFFETTIVO: env > config/routines > default.
   const cap = resolveLoopCap({ envRaw: process.env.FILO_LOOP_CAP, remote: automation.loopCap ?? null });
   const opts = { proberWhenIdle: automation.proberWhenIdle };
   let bucket = chooseBucket(snapshot, cap, opts);
