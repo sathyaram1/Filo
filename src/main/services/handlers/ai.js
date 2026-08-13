@@ -326,6 +326,13 @@ module.exports = function register(on, ctx) {
         modelId = single.model || '';
         if (!modelId) return { ok: false, error: 'Stringa modello vuota' };
       }
+      // "Solo modelli a pesi aperti" (#461). Queste righe sono i modelli che
+      // Filo userebbe: provarne uno è una richiesta vera, pagata con le chiavi
+      // predefinite. Con l'interruttore acceso quelle proprietarie non partono —
+      // altrimenti la pagina dove si accende l'interruttore sarebbe l'unico
+      // posto da cui l'interruttore si può scavalcare.
+      const blocked = openWeightsBlockReason(await getEffectiveSettings(), provider, modelId);
+      if (blocked) return { ok: false, error: blocked };
       const apiKey = await defaultKeyFor(provider, d);
       if (!apiKey) return { ok: false, error: `Chiave ${provider} non configurata` };
       // Il provider Gemini ora accetta i nomi nativi (es. gemini-3.1-flash-lite),
