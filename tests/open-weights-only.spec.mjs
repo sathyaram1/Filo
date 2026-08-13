@@ -14,7 +14,9 @@
 //   3. se il sostituto non risponde, la catena NON ripiega su un modello
 //      proprietario: la richiesta fallisce e basta;
 //   4. la funzione senza equivalente aperto si ferma dicendo perché, e non
-//      chiama nessun modello;
+//      chiama nessun modello — vale anche quando l'equivalente esiste ma non sa
+//      fare quel mestiere (la dettatura deve ASCOLTARE: un sostituto che legge
+//      solo testo la romperebbe con un errore qualunque);
 //   5. chi ha SERVITO davvero la risposta viene controllato: se risulta escluso,
 //      la voce di cronologia resta marchiata invece di passare inosservata;
 //   6. a interruttore spento il modello proprietario torna, cioè la differenza
@@ -110,6 +112,11 @@ test('solo modelli a pesi aperti: sostituisce, non ripiega, e lo dimostra', asyn
         [C.ACTIONS.EXPLAIN]: 'flash, flash-or',          // proprietario con equivalente
         [C.ACTIONS.EXPLAIN_DEEP]: 'claude-haiku',        // Anthropic, con equivalente
         [C.ACTIONS.EXPLAIN_LINK]: 'mio-claude',          // proprietario SENZA equivalente
+        // Proprietari con un equivalente aperto, ma che chiedono al modello due
+        // mestieri diversi: ascoltare un audio (nessun sostituto lo fa) e
+        // guardare un'immagine (i sostituti sì).
+        [C.ACTIONS.TRANSCRIBE_AUDIO]: 'flash, flash-or',
+        [C.ACTIONS.DESCRIBE_IMAGE]: 'flash-lite-3, flash-lite-3-or',
       },
     });
 
@@ -130,23 +137,23 @@ test('solo modelli a pesi aperti: sostituisce, non ripiega, e lo dimostra', asyn
         : null;
       servedByNext = 'DeepInfra';
 
-      // La dettatura ha bisogno di ASCOLTARE un audio: i sostituti a pesi aperti
-      // leggono testo (e immagini). Deve fermarsi dicendolo, non finire su un
-      // modello sordo che poi fallisce con un errore qualunque.
-      res.dettatura = await run(C.ACTIONS.TRANSCRIBE_AUDIO, {
-        audioDataUrl: 'data:audio/webm;base64,AAAA', lang: 'it',
-      });
-      // La descrizione di un'immagine invece un equivalente ce l'ha: non deve
-      // essere spenta per compagnia.
-      res.immagine = await run(C.ACTIONS.DESCRIBE_IMAGE, {
-        imageDataUrl: 'data:image/png;base64,AAAA',
-      });
-
       // ── B) Configurazione personale, interruttore ACCESO.
       await usaConfigPersonale(true);
       res.acceso = await run(C.ACTIONS.EXPLAIN, { selection: 'ciao', sentence: 'ciao mondo' });
       res.anthropic = await run(C.ACTIONS.EXPLAIN_DEEP, { selection: 'ciao', sentence: 'ciao mondo' });
       res.senzaEquivalente = await run(C.ACTIONS.EXPLAIN_LINK, { url: 'https://example.com', text: 'x' });
+
+      // La dettatura ha bisogno di ASCOLTARE un audio: i sostituti a pesi aperti
+      // leggono testo (e immagini). Deve fermarsi dicendolo, non finire su un
+      // modello sordo che poi fallirebbe con un errore qualunque.
+      res.dettatura = await run(C.ACTIONS.TRANSCRIBE_AUDIO, {
+        dataUrl: 'data:audio/webm;base64,AAAA', lang: 'it',
+      });
+      // La descrizione di un'immagine invece un equivalente ce l'ha: non deve
+      // essere spenta per compagnia.
+      res.immagine = await run(C.ACTIONS.DESCRIBE_IMAGE, {
+        dataUrl: 'data:image/png;base64,AAAA',
+      });
 
       // Il sostituto non risponde: non deve esistere un tentativo proprietario dopo.
       // Testo diverso da quello di prima: una richiesta identica verrebbe
@@ -184,13 +191,6 @@ test('solo modelli a pesi aperti: sostituisce, non ripiega, e lo dimostra', asyn
   expect(out.ultimaVoce.servedBy).toBe('Google AI Studio');
   expect(out.ultimaVoce.policyViolation).toBe(true);
 
-  // 4-bis. La funzione che ha bisogno di ascoltare si ferma e lo dice, senza
-  //        chiamare nessun modello; quella che ha un equivalente resta viva.
-  expect(out.dettatura.ok).toBe(false);
-  expect(out.dettatura.code).toBe('NO_OPEN_WEIGHTS_MODEL');
-  expect(out.dettatura.chain).toBe(null);
-  expect(out.immagine.ok, `la descrizione immagini deve continuare: ${out.immagine.message}`).toBe(true);
-
   // ── B) Configurazione personale, interruttore acceso ───────────────────────
   // 1. Sostituzione col modello a pesi aperti previsto, e la funzione risponde.
   expect(out.acceso.ok, `la funzione deve continuare a funzionare: ${out.acceso.message}`).toBe(true);
@@ -208,6 +208,16 @@ test('solo modelli a pesi aperti: sostituisce, non ripiega, e lo dimostra', asyn
   expect(out.senzaEquivalente.code).toBe('NO_OPEN_WEIGHTS_MODEL');
   expect(out.senzaEquivalente.chain).toBe(null);
   expect(out.senzaEquivalente.message).toMatch(/pesi aperti/i);
+
+  // 4-bis. Il sostituto deve saper fare il mestiere: la dettatura ha bisogno di
+  //        ascoltare, e nessun modello a pesi aperti raggiungibile lo fa → si
+  //        ferma dicendolo, senza chiamare niente. Chi invece un equivalente
+  //        capace ce l'ha (le immagini) non viene spento per compagnia.
+  expect(out.dettatura.ok, `la dettatura è finita su ${out.dettatura.model}`).toBe(false);
+  expect(out.dettatura.code).toBe('NO_OPEN_WEIGHTS_MODEL');
+  expect(out.dettatura.chain).toBe(null);
+  expect(out.immagine.ok, `la descrizione immagini deve continuare: ${out.immagine.message}`).toBe(true);
+  expect(out.immagine.model).toBe('google/gemma-4-26b-a4b-it');
 
   // 3. Sostituto giù → nessun ripiego proprietario: la richiesta fallisce e la
   //    catena tentata resta di soli modelli ammessi.
