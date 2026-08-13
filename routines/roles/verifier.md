@@ -32,6 +32,15 @@ Convenzioni (tono, sintomo-vs-causa): `CLAUDE.md`.
    implementazione doppia. Prima di bocciare per assenza, guarda cosa contiene il
    branch (`git diff --stat main...HEAD`): se lì ci sono modifiche e tu non le
    vedi, il problema è dove stai guardando.
+   ⚠️ **`payload.notice`**: se è valorizzato, il sistema ha rimaneggiato il ramo
+   prima di dartelo (riportato a un punto fermo, o consegnato senza differenze
+   rispetto alla linea principale). In quel caso "la feature non c'è" è
+   **un'anomalia del sistema, non un verdetto**: i commit messi da parte vivono
+   sui rami `discarded/*` (`git branch -a --list 'discarded/*'`). Non bocciare
+   per assenza — faresti riscrivere da capo un lavoro che esiste già. Registra
+   invece un FAIL che dice **esattamente questo** (dov'è il lavoro e perché non
+   l'hai potuto giudicare), così chi arriva dopo lo recupera invece di
+   reimplementarlo.
    Electron di norma lo prepara l'orchestratore una volta
    (`ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install && node scripts/ensure-electron.mjs`,
    idempotente; test da root con `ELECTRON_DISABLE_SANDBOX=1 xvfb-run -a ...`). **Se
