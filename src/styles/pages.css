@@ -100,7 +100,7 @@ html, body {
   color: #c0392b;
   border: 1px solid #c0392b;
 }
-.sn-page button.sn-btn-danger:hover { background: rgba(192, 57, 43, 0.1); opacity: 1; }
+.sn-page button.sn-btn-danger:hover:not(:disabled) { background: rgba(192, 57, 43, 0.1); opacity: 1; }
 
 .sn-page .sn-row {
   display: flex;
