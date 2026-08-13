@@ -46,6 +46,8 @@ Chi risponde diversamente da me non deve forkare: **un solo interruttore disatti
 
 **Cosa NON succede.** Se il sostituto non risponde, la richiesta fallisce: non esiste nessun ripiego che riporti la richiesta su un modello proprietario. Non è una svista da tappare, è la differenza fra un interruttore e una decorazione — un interruttore che, quando le cose si mettono male, torna in silenzio da dove era partito è peggio che non averlo, perché ti fa credere una cosa falsa. Per lo stesso motivo il riscontro su chi ha *davvero* servito ogni risposta vale anche qui: se arrivasse comunque da un fornitore escluso, lo vedi a schermo e resta scritto nella cronologia.
 
+L'interruttore vale per **tutto ciò che parte da Filo**, non solo per le funzioni: anche i pulsanti «Prova» delle opzioni — quelli accanto alle chiavi e quelli su ogni riga dei modelli — mandano richieste vere, e con l'interruttore acceso non partono verso ciò che lui esclude. Sarebbe la falla più assurda: l'unica pagina dove dici "niente modelli proprietari" che è anche l'unica da cui ne escono.
+
 Restano fuori dalla portata dell'interruttore i modelli che girano sui **server di Filo** e non sul tuo computer: i giudici che leggono i feedback inviati. Lì la scelta è mia e non è delegabile a un'impostazione del tuo Filo; l'elenco completo di quei punti è in Opzioni → Modelli.
 
 Anche questo però è un compromesso, non una soluzione: chi volesse ridurre a zero il proprio contributo all'ecosistema dovrebbe non usare nessun modello, e questo è inconciliabile con l'esistenza di Filo.
