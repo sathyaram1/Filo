@@ -780,7 +780,7 @@
     const gemKey = $('apiKeyGemini').value.trim();
     const errors = [];
     let total = 0;
-    if (gemKey) {
+    if (gemKey && providerCatalogAllowed('gemini')) {
       try {
         const ids = await fetchGeminiModels(gemKey);
         providerModelCache.gemini = ids;
