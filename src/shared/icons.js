@@ -367,6 +367,7 @@
     options:      (size) => wrap(options, { size }),
     colorPicker:  (size) => wrap(colorPicker, { size }),
     lock:         (size) => wrap(lock, { size }),
+    transparency: (size) => wrap(transparency, { size }),
     incognito:    (size) => wrap(incognito, { size }),
     user:         (size) => wrap(user, { size }),
     plus:         (size) => wrap(plus, { size }),
