@@ -61,6 +61,19 @@ registerAi((type, fn) => handlers.set(type, fn), {
   handleAIRequest: async () => ({}),
   modelForAction: () => '',
   buildAttemptChain: () => [],
+  // Le stesse due funzioni che il main passa all'handler. La classificazione è
+  // quella VERA (logica pura in constants.js): qui è finto solo il testo del
+  // messaggio, che nei unit test non c'è (I18n vive nel main).
+  openWeightsBlockReason: (settings, provider, model) => {
+    const kind = globalThis.SN_CONST.openWeightsBlockKind(
+      settings && settings.openWeightsOnly === true, provider, model,
+    );
+    return kind ? `bloccato: ${kind}` : null;
+  },
+  providerRouting: (settings) => {
+    const ignore = globalThis.SN_CONST.providerIgnoreList((settings && settings.excludedProviders) || []);
+    return ignore.length ? { ignore } : null;
+  },
 });
 
 const testModel = (msg) => handlers.get(MSG.TEST_DEFAULT_MODEL)(msg);
