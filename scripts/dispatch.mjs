@@ -1013,6 +1013,24 @@ function emitHalt(kind, message) {
 }
 
 export async function run() {
+  // L'INTERRUTTORE MASTER, prima di tutto il resto: spente le routine, il giro
+  // non legge la coda, non prende in carico niente, non tocca nessun ramo. È il
+  // secondo cancello dopo `--preflight` (che risparmia anche il setup): serve a
+  // chi spegne a sessione già avviata — il worker in corso finisce il suo
+  // compito, il successivo non parte.
+  let automation;
+  try {
+    automation = await fetchRoutineConfig();
+  } catch (e) {
+    return emitHalt(e?.faultKind || 'transient', e?.message || String(e));
+  }
+  if (!resolveRoutinesEnabled({ envRaw: process.env.FILO_ROUTINES_ENABLED, remote: automation.enabled })) {
+    process.stderr.write('[dispatch] routine autonome SPENTE dalla tab Automazioni: niente da fare\n');
+    clearRole(ROOT);
+    emit({ role: 'off' }, {});
+    return { exit: 0 };
+  }
+
   let snapshot;
   try {
     snapshot = await buildSnapshot();
