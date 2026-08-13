@@ -384,7 +384,7 @@ test('solo modelli a pesi aperti: nemmeno i pulsanti «Prova» chiamano un esclu
   expect(out.ammesso.chiamata.ignore.map((s) => s.toLowerCase())).toContain('google');
 
   // 2. Le prove verso un escluso non partono affatto.
-  for (const caso of ['anthropic', 'tts', 'embed', 'chiaveGemini', 'rigaProprietaria']) {
+  for (const caso of ['escluso', 'chiaveGemini', 'rigaProprietaria']) {
     expect(out[caso].chiamata, `«${caso}»: non deve partire nessuna richiesta`).toBe(null);
     expect(out[caso].ok).toBe(false);
     expect(out[caso].error).toMatch(/pesi aperti/i);
