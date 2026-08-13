@@ -58,7 +58,7 @@ const filesOnMain = () => git(['ls-tree', '-r', '--name-only', 'main'], ORIGIN).
 
 test('il verdetto arriva su main, il lavoro non esaminato NO', () => {
   const before = git(['rev-parse', 'HEAD']);
-  writeState('FBTEST', { ...defaultState('FBTEST', 'worker/FBTEST'), verifierVerdict: 'pass' });
+  writeState({ ...defaultState('FBTEST', 'worker/FBTEST'), verifierVerdict: 'pass' });
   persistStateToGit('FBTEST', 'feedback: verifier pass FBTEST');
 
   const files = filesOnMain();
