@@ -2033,6 +2033,8 @@
     isOpenWeightsEntry,
     isOpenWeightsRef,
     substituteFitsAction,
+    MODEL_CONFIG_ERROR_CODES,
+    isModelConfigErrorCode,
     effectiveExcludedProviders,
     applyOpenWeightsPolicy,
     openWeightsImpact,
