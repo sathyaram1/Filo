@@ -238,11 +238,22 @@ test('solo modelli a pesi aperti: la dettatura si ferma dicendolo, non con un er
       }
     };
 
+    // Configurazione personale controllata dal test: la dettatura sul modello
+    // multimodale con cui nasce, e il registry completo (che contiene i
+    // sostituti a pesi aperti, tutti di solo testo).
+    const config = (openWeightsOnly) => Storage.setSettings({
+      useDefaultModels: false,
+      openWeightsOnly,
+      apiKeys: { openrouter: 'k-test', gemini: 'k-test' },
+      modelRegistry: { ...C.DEFAULT_MODEL_REGISTRY },
+      models: { [C.ACTIONS.TRANSCRIBE_AUDIO]: 'flash, flash-or' },
+    });
+
     const res = {};
     try {
-      await Storage.setSettings({ useDefaultModels: true, openWeightsOnly: true });
+      await config(true);
       res.acceso = await run({ dataUrl: 'data:audio/wav;base64,AAAAAAAA', lang: 'it-IT' });
-      await Storage.setSettings({ useDefaultModels: true, openWeightsOnly: false });
+      await config(false);
       res.spento = await run({ dataUrl: 'data:audio/wav;base64,BBBBBBBB', lang: 'it-IT' });
     } finally {
       globalThis.SN_PROVIDERS.completeWithFallback = orig;
