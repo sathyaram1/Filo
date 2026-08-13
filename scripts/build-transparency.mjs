@@ -23,6 +23,11 @@
 //   node scripts/build-transparency.mjs            # genera
 //   node scripts/build-transparency.mjs --check    # verifica che sia allineato
 //                                                  # (exit 1 se va rigenerato)
+//   node scripts/build-transparency.mjs --site-out "<cartella>"
+//                                                  # scrive le pagine pubbliche
+//                                                  # anche fuori dal repo (la
+//                                                  # cartella del sito), oltre
+//                                                  # che in site/
 
 import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname, resolve, join } from 'node:path';
