@@ -123,6 +123,27 @@ con l'albero sbagliato, il punto fermo che registra è fasullo — e D tornerebb
 un punto fermo che contiene lavoro di un altro compito. C è il prerequisito di D,
 non un extra.
 
+> **Correzione 2026-08-13 (#462).** La prima implementazione ha coperto le due
+> metà in modo asimmetrico: i verdetti (`dispatch.mjs --record-*`) controllavano
+> l'identità **e** lasciavano il punto fermo, la consegna (`queue-triage.mjs`,
+> l'unica strada del lavoro NUOVO) controllava soltanto. Così l'unico punto
+> fermo di un branch appena creato restava quello della **creazione** — il vuoto
+> — e al giro successivo D riportava il ramo a prima che il lavoro cominciasse:
+> chi doveva verificare trovava una feature inesistente e la strada naturale era
+> bocciare per assenza e far riscrivere da capo, cioè l'implementazione doppia
+> che questa spec esiste per impedire. Ora il sigillo è **una funzione sola**
+> (`sealTransition` in `scripts/lib/branch-integrity.mjs`) usata da entrambi i
+> punti di scrittura, e la consegna registra il **ramo assegnato** invece di
+> quello ricostruito a memoria da chi consegna.
+>
+> Due corollari: il ripristino **non scarta** ciò che sopra il punto fermo è solo
+> burocrazia della coda (`feedback-triage/**`) — altrimenti ogni giro
+> parcheggerebbe un `discarded/*` e la parola "scartato" smetterebbe di voler
+> dire qualcosa; e quando il ripristino **toglie** qualcosa (o consegna un ramo
+> senza differenze rispetto a `main`) chi lo riceve lo trova scritto in
+> `payload.notice`: una protezione muta è indistinguibile da "il lavoro non è
+> mai stato fatto".
+
 **Anti-loop**: un rifiuto lascia il feedback dov'era e lo fa ripescare. Estendi ai
 rifiuti lo stesso contatore che già esiste per i reset `working`→`todo`
 (`workingResets`, escalation a `design` alla terza volta), così un ambiente che
