@@ -153,14 +153,53 @@
     return row ? I18n.t(row[1]) : action;
   }
 
+  // Un "Prova" è una richiesta vera al modello della riga. Con l'interruttore
+  // acceso quelli proprietari restano spenti: il main li rifiuta comunque, ma un
+  // bottone premibile che poi dice di no è attrito inutile — e su questa pagina
+  // sarebbe pure il bottone che sembra scavalcare l'interruttore acceso due
+  // centimetri più su.
+  function markTestBlocked(btn, blocked) {
+    if (!btn) return;
+    btn.disabled = blocked;
+    if (blocked) btn.title = I18n.t('options_open_weights_test_blocked');
+    else btn.removeAttribute('title');
+  }
+
+  function openWeightsBlocks(provider, model) {
+    if (!$('openWeightsOnly').checked) return false;
+    const C = window.SN_CONST;
+    if (!C || typeof C.isOpenWeightsEntry !== 'function') return false;
+    return !C.isOpenWeightsEntry({ provider, model });
+  }
+
+  // Tutti i pulsanti "Prova" della pagina, in un posto solo: le chiavi dei
+  // fornitori, le righe dei modelli predefiniti e le righe del registry
+  // personale. Sono cammini diversi verso la stessa cosa (una chiamata al
+  // modello), quindi la regola dev'essere una sola.
+  function applyOpenWeightsTestGates() {
+    const on = $('openWeightsOnly').checked;
+    // Prova della chiave: il fornitore diretto del produttore è spento in blocco;
+    // quello che smista le richieste prova un modello ammesso, quindi resta vivo.
+    markTestBlocked($('testGemini'), on);
+
+    for (const row of $('defaultModelsList').querySelectorAll('.sn-default-model-row')) {
+      const btn = row.querySelector('.sn-model-test');
+      if (!btn) continue;
+      markTestBlocked(btn, openWeightsBlocks(row.dataset.provider || '', row.dataset.model || ''));
+    }
+    for (const row of $('modelRegistryList').querySelectorAll('.sn-model-row:not(.sn-model-row-head)')) {
+      const btn = row.querySelector('.sn-model-test');
+      const prov = row.querySelector('.sn-model-provider');
+      const id = row.querySelector('.sn-model-id');
+      if (!btn || !prov || !id) continue;
+      markTestBlocked(btn, openWeightsBlocks(prov.value, id.value.trim()));
+    }
+  }
+
   function renderOpenWeightsImpact() {
     const host = $('openWeightsImpact');
     if (!host) return;
-    // Il fornitore diretto del produttore resta spento a interruttore acceso:
-    // il suo pulsante "Prova" manderebbe una richiesta proprio dove l'utente ha
-    // chiesto che non ne arrivino (il main la rifiuta comunque).
-    const testGemini = $('testGemini');
-    if (testGemini) testGemini.disabled = $('openWeightsOnly').checked;
+    applyOpenWeightsTestGates();
 
     host.innerHTML = '';
     if (!$('openWeightsOnly').checked) { host.hidden = true; return; }
