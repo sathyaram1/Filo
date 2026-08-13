@@ -979,6 +979,22 @@ export async function preflight(build = buildSnapshot, readConfig = fetchRoutine
   }
 }
 
+/**
+ * L'esito della prontezza tradotto nel codice d'uscita che l'orchestratore
+ * legge. È il CONTRATTO documentato in ROUTINES.md, e sta qui — pura, testata —
+ * perché è la parte che si può sbagliare senza accorgersene: il ramo
+ * `--preflight` è morto per mesi restituendo 1, che non è né "prosegui" né
+ * "fermati", e nessuno se n'era accorto (feedback #452).
+ *
+ *   0 → pronto, prosegui col setup
+ *   2 → routine spente dall'owner: chiudi la sessione, NON è un guasto
+ *   3 → guasto: chiudi la sessione, ci riprova l'orchestratore dopo
+ */
+export function preflightExitCode(result) {
+  if (result && result.ok) return 0;
+  return result && result.kind === 'off' ? 2 : 3;
+}
+
 // ─── run() — il comando di default ────────────────────────────────────────────
 
 /**
