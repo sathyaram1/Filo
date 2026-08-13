@@ -19,7 +19,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
 
 require(join(ROOT, 'src', 'shared', 'constants.js'));
+// Le capacità dei modelli servono alla sostituzione automatica: senza, un
+// modello che macina solo testo finirebbe sulla dettatura.
+require(join(ROOT, 'src', 'shared', 'modelCaps.js'));
 const C = globalThis.SN_CONST;
+const A = C.ACTIONS;
 const REG = C.DEFAULT_MODEL_REGISTRY;
 
 test('i pesi aperti si riconoscono dal NOME del modello, non dal fornitore nell\'id', () => {

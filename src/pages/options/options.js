@@ -334,6 +334,9 @@
       statusEl.textContent = I18n.t('options_test_failed', e?.message || String(e));
     } finally {
       btn.disabled = false;
+      // Il cancello dei pesi aperti ha l'ultima parola: riabilitare alla cieca
+      // rimetterebbe premibile un "Prova" che la politica tiene spento.
+      applyOpenWeightsTestGates();
     }
   }
 
@@ -655,6 +658,9 @@
       statusEl.textContent = I18n.t('options_test_failed', e?.message || String(e));
     } finally {
       btn.disabled = false;
+      // Il cancello dei pesi aperti ha l'ultima parola: riabilitare alla cieca
+      // rimetterebbe premibile un "Prova" che la politica tiene spento.
+      applyOpenWeightsTestGates();
     }
   }
 
@@ -829,6 +835,9 @@
       statusEl.textContent = I18n.t('options_test_failed', e?.message || String(e));
     } finally {
       btn.disabled = false;
+      // Il cancello dei pesi aperti ha l'ultima parola: riabilitare alla cieca
+      // rimetterebbe premibile un "Prova" che la politica tiene spento.
+      applyOpenWeightsTestGates();
     }
   }
 
