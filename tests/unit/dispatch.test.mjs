@@ -490,6 +490,28 @@ test('emit: un giro a vuoto (idle) non lascia una firma di lavoro', () => {
   assert.equal(readRole(TMP), '');
 });
 
+// ─── preflight ────────────────────────────────────────────────────────────────
+
+test('preflight: esiste ed è invocabile (il ramo --preflight non deve crashare)', async () => {
+  // Regressione: `--preflight` chiamava un identificatore mai definito, quindi
+  // il passo di prontezza di OGNI routine moriva con exit 1 ("preflight is not
+  // defined") invece di dire prontezza OK o GUASTO.
+  assert.equal(typeof preflight, 'function');
+  assert.deepEqual(await preflight(async () => ({ reviews: [], todoWinner: null })), { ok: true });
+});
+
+test('preflight: guasto dichiarato → non pronto, col suo tipo', async () => {
+  const r = await preflight(async () => { throw routineFault('transient', 'coda illeggibile'); });
+  assert.deepEqual(r, { ok: false, kind: 'transient', message: 'coda illeggibile' });
+});
+
+test('preflight: guasto generico → pronto (run() lì ripiega sull\'audit)', async () => {
+  // Non deve essere più severo del giro vero: fermerebbe giri che avrebbero
+  // lavorato comunque.
+  const r = await silentlyAsync(() => preflight(async () => { throw new Error('rete ballerina'); }));
+  assert.deepEqual(r, { ok: true });
+});
+
 // ─── teardown ─────────────────────────────────────────────────────────────────
 
 test('cleanup STATE_DIR temporanea', () => {
