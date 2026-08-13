@@ -445,17 +445,20 @@ function clampLoopCap(n) {
 
 async function getAutomationLoopCap(idToken) {
   const { def } = automationDefaults();
-  const doc = await fetchDoc(AUTOMATION_DOC, idToken);
+  const doc = await fetchDoc(ROUTINES_DOC, idToken);
+  if (doc && doc.loopCap != null) return clampLoopCap(doc.loopCap);
+  // Non ancora migrato: il valore scelto dall'owner sta nel documento vecchio.
+  const legacy = await fetchDoc(AUTOMATION_DOC, idToken);
+  if (legacy && legacy.loopCap != null) return clampLoopCap(legacy.loopCap);
   // doc === {} (404) o campo assente ⇒ default. null (lettura negata/fallita) ⇒
   // default prudente (non rompere il loop per un errore di rete).
-  if (!doc || doc.loopCap == null) return def;
-  return clampLoopCap(doc.loopCap);
+  return def;
 }
 
 async function setAutomationLoopCap(loopCap, idToken) {
   if (!idToken) throw new Error('Serve un ID token admin per cambiare i tentativi del loop.');
   const v = clampLoopCap(loopCap);
-  await patchDoc(AUTOMATION_DOC, { loopCap: toFsValue(v) }, ['loopCap'], idToken);
+  await patchDoc(ROUTINES_DOC, { loopCap: toFsValue(v) }, ['loopCap'], idToken);
   return v;
 }
 
