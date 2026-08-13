@@ -165,11 +165,15 @@
     else btn.removeAttribute('title');
   }
 
-  function openWeightsBlocks(provider, model) {
+  // `entry` è la voce intera quando c'è (la lista dei predefiniti la conosce),
+  // altrimenti fornitore + stringa del modello: è tutto ciò che una riga scritta
+  // a mano contiene. Stessa classificazione del main, così il bottone spento e
+  // la richiesta rifiutata dicono la stessa cosa.
+  function openWeightsBlocks(entry) {
     if (!$('openWeightsOnly').checked) return false;
     const C = window.SN_CONST;
-    if (!C || typeof C.isOpenWeightsEntry !== 'function') return false;
-    return !C.isOpenWeightsEntry({ provider, model });
+    if (!C || typeof C.openWeightsBlockKind !== 'function') return false;
+    return C.openWeightsBlockKind(true, entry) !== '';
   }
 
   // Tutti i pulsanti "Prova" della pagina, in un posto solo: le chiavi dei
