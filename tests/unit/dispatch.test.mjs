@@ -510,7 +510,8 @@ test('preflight: guasto dichiarato → non pronto, col suo tipo', async () => {
 test('preflight: guasto generico → pronto (run() lì ripiega sull\'audit)', async () => {
   // Non deve essere più severo del giro vero: fermerebbe giri che avrebbero
   // lavorato comunque.
-  const r = await silentlyAsync(() => preflight(async () => { throw new Error('rete ballerina'); }));
+  // (il messaggio del guasto finisce su stderr: è traccia per il debug, non rumore da zittire)
+  const r = await preflight(async () => { throw new Error('rete ballerina'); });
   assert.deepEqual(r, { ok: true });
 });
 
