@@ -325,18 +325,29 @@ test('solo modelli a pesi aperti: nemmeno i pulsanti «Prova» chiamano un esclu
       // ── Crediti di Filo (registry predefinito), interruttore ACCESO.
       await Storage.setSettings({ useDefaultModels: true, openWeightsOnly: true });
 
+      // La lista dei modelli predefiniti è quella VERA (costanti + config
+      // condivisa dell'owner, che cambia nel tempo): le righe da provare si
+      // scelgono da lì invece di scriverne i nomi qui, così il test verifica la
+      // regola e non una fotografia della configurazione di oggi.
+      const pubblici = await globalThis.SN_HANDLE_MESSAGE({ type: MSG.DEFAULT_MODELS_PUBLIC }, {});
+      const registry = (pubblici && pubblici.modelRegistry) || {};
+      const nick = { aperto: '', escluso: '' };
+      for (const [n, entry] of Object.entries(registry)) {
+        if (C.isOpenWeightsEntry(entry)) { if (!nick.aperto) nick.aperto = n; }
+        else if (!nick.escluso) nick.escluso = n;
+      }
+      res.nick = nick;
+
       // 1. Riga di un modello a pesi aperti: la prova funziona davvero.
-      res.ammesso = await prova({ type: MSG.TEST_DEFAULT_MODEL, nickname: 'gemma' });
-      // 2. Riga del modello di Anthropic e righe che passano dai server del
-      //    produttore (sintesi vocale, indicizzazione).
-      res.anthropic = await prova({ type: MSG.TEST_DEFAULT_MODEL, nickname: 'claude-haiku' });
-      res.tts = await prova({ type: MSG.TEST_DEFAULT_MODEL, nickname: 'tts' });
-      res.embed = await prova({ type: MSG.TEST_DEFAULT_MODEL, nickname: 'embed-004' });
+      res.ammesso = await prova({ type: MSG.TEST_DEFAULT_MODEL, nickname: nick.aperto });
+      // 2. Riga di un modello che l'interruttore esclude (modello proprietario,
+      //    oppure servito dall'API del produttore).
+      res.escluso = await prova({ type: MSG.TEST_DEFAULT_MODEL, nickname: nick.escluso });
       // 3. Prova accanto alla chiave OpenRouter (nessun modello indicato).
       res.chiaveOr = await prova({ type: MSG.TEST_PROVIDER, provider: 'openrouter', apiKey: 'k-test' });
       // …e accanto alla chiave Google.
       res.chiaveGemini = await prova({ type: MSG.TEST_PROVIDER, provider: 'gemini', apiKey: 'k-test' });
-      // 4. Riga del registry personale con un modello proprietario scritto a mano.
+      // 4. Riga del registry con un modello proprietario scritto a mano.
       res.rigaProprietaria = await prova({
         type: MSG.TEST_PROVIDER, provider: 'openrouter', apiKey: 'k-test',
         model: 'anthropic/claude-3.7-sonnet',
@@ -344,7 +355,11 @@ test('solo modelli a pesi aperti: nemmeno i pulsanti «Prova» chiamano un esclu
 
       // ── 5. Stessa pagina, interruttore SPENTO.
       await Storage.setSettings({ useDefaultModels: true, openWeightsOnly: false });
-      res.spentoAnthropic = await prova({ type: MSG.TEST_DEFAULT_MODEL, nickname: 'claude-haiku' });
+      res.spentoEscluso = await prova({ type: MSG.TEST_DEFAULT_MODEL, nickname: nick.escluso });
+      res.spentoRiga = await prova({
+        type: MSG.TEST_PROVIDER, provider: 'openrouter', apiKey: 'k-test',
+        model: 'anthropic/claude-3.7-sonnet',
+      });
       res.spentoGemini = await prova({ type: MSG.TEST_PROVIDER, provider: 'gemini', apiKey: 'k-test' });
     } finally {
       globalThis.SN_PROVIDERS.streamComplete = orig;
