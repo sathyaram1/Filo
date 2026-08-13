@@ -743,13 +743,30 @@
     return base;
   }
 
-  // Modalità dichiarate da una voce del registry, nella forma che SN_MODEL_CAPS
-  // legge dai metadati dei fornitori. Ritorna null se la voce non dichiara
-  // niente: "non dichiarato" NON vuol dire "sa fare tutto". PURA.
-  function entryModalities(entry) {
+  // Cosa sanno masticare i sostituti, per nickname. Sta qui accanto alla tabella
+  // delle sostituzioni perché è la stessa curatela: il registry personale di chi
+  // usa Filo NON dichiara le capacità (le righe delle Opzioni hanno solo
+  // fornitore e stringa del modello), e dedurle dal nome sarebbe indovinare.
+  // Quello che non è scritto qui né dichiarato dalla voce vale "non lo
+  // sappiamo", e quello che non si sa non si sostituisce.
+  const OPEN_WEIGHTS_SUBSTITUTE_MODALITIES = {
+    gemma: { inputs: ['text', 'image'], outputs: ['text'] },
+    'gemma-lite': { inputs: ['text', 'image'], outputs: ['text'] },
+    deepseek: { inputs: ['text'], outputs: ['text'] },
+  };
+
+  // Modalità di una voce del registry, nella forma che SN_MODEL_CAPS legge dai
+  // metadati dei fornitori. Prima quelle dichiarate dalla voce (l'owner può
+  // correggerle dalla config condivisa), poi quelle note per il nickname.
+  // Ritorna null se non si sa: "non dichiarato" NON vuol dire "sa fare tutto".
+  // PURA.
+  function entryModalities(entry, nickname) {
     const e = entry || {};
-    const inputs = Array.isArray(e.inputs) ? e.inputs.filter(Boolean) : null;
-    const outputs = Array.isArray(e.outputs) ? e.outputs.filter(Boolean) : null;
+    const known = OPEN_WEIGHTS_SUBSTITUTE_MODALITIES[nickname] || {};
+    const inputs = Array.isArray(e.inputs) ? e.inputs.filter(Boolean)
+      : (Array.isArray(known.inputs) ? known.inputs : null);
+    const outputs = Array.isArray(e.outputs) ? e.outputs.filter(Boolean)
+      : (Array.isArray(known.outputs) ? known.outputs : null);
     if (!inputs && !outputs) return null;
     return {
       input_modalities: inputs && inputs.length ? inputs : ['text'],
