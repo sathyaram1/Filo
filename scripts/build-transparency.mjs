@@ -422,45 +422,6 @@ ${UI_RUNTIME}
 `;
 }
 
-// Tooltip della glossa: hover sul desktop, tocco/tastiera ovunque. Il riquadro è
-// uno solo, riposizionato — così non ci sono N elementi nascosti nel documento e
-// il testo della glossa non finisce nel Ctrl+F della pagina come testo fantasma.
-const TOOLTIP_RUNTIME = `
-  var pop = document.getElementById('gloss-pop');
-  function showGloss(el) {
-    if (!pop || !el) return;
-    pop.textContent = el.getAttribute('data-gloss') || '';
-    pop.hidden = false;
-    var r = el.getBoundingClientRect();
-    var top = r.bottom + window.scrollY + 6;
-    var left = r.left + window.scrollX;
-    pop.style.top = top + 'px';
-    pop.style.left = '0px';
-    var w = pop.offsetWidth;
-    var max = document.documentElement.clientWidth - 12;
-    if (left + w > max) left = Math.max(12, max - w);
-    pop.style.left = left + 'px';
-  }
-  function hideGloss() { if (pop) pop.hidden = true; }
-  document.addEventListener('mouseover', function (e) {
-    var el = e.target.closest && e.target.closest('.sn-gloss');
-    if (el) showGloss(el);
-  });
-  document.addEventListener('mouseout', function (e) {
-    if (e.target.closest && e.target.closest('.sn-gloss')) hideGloss();
-  });
-  document.addEventListener('click', function (e) {
-    var el = e.target.closest && e.target.closest('.sn-gloss');
-    if (el) { showGloss(el); e.stopPropagation(); } else { hideGloss(); }
-  });
-  document.addEventListener('focusin', function (e) {
-    var el = e.target.closest && e.target.closest('.sn-gloss');
-    if (el) showGloss(el);
-  });
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') hideGloss(); });
-  window.addEventListener('scroll', hideGloss, { passive: true });
-`;
-
 function main() {
   const check = process.argv.includes('--check');
   const built = buildDocs();
