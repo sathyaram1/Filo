@@ -35,12 +35,7 @@ test.describe('captureComposite — cattura composita su Linux/xvfb', () => {
   test.beforeAll(async () => {
     mkdirSync(OUT_DIR, { recursive: true });
     outDir = OUT_DIR;
-    // La finestra qui deve stare A SCHERMO: la cattura è OS-level (scrot legge il
-    // display, non il debugger), quindi con la finestra nascosta per tutta la
-    // suite — fuori schermo e trasparente — questo spec fotografa il vuoto e
-    // fallisce sempre. È la stessa eccezione di `test:shoot`/`test:smoke`: dove
-    // la finestra fotografata È il risultato, nasconderla toglie il risultato.
-    ({ app, shell } = await launchFilo({ extraEnv: { FILO_HIDE_WINDOW: '0', FILO_TEST_VISIBLE: '1' } }));
+    ({ app, shell } = await launchFilo());
     // Attendi che la tab di default (newtab) sia completamente dipinta.
     await sleep(1500);
   });
