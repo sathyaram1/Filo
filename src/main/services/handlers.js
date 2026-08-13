@@ -1346,6 +1346,26 @@ function webSearchResultsForPrompt(actions) {
   return blocks.join('\n\n').trim();
 }
 
+// Re-immissione del DOCUMENTO DI TRASPARENZA chiesto con LEGGI_TRASPARENZA in un
+// turno precedente: l'agente risponde sul perché di una scelta (quali modelli,
+// quali aziende escluse, che fine fanno i dati) leggendo il testo scritto
+// dall'owner invece di ricostruirlo a memoria — che su queste cose è il modo
+// tipico di attribuire a Filo posizioni che non ha. Sono DATI di sistema
+// affidabili, non istruzioni dell'utente.
+function transparencyDocsForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const blocks = [];
+  for (const a of actions) {
+    if (!a || String(a.type || '').toUpperCase() !== 'LEGGI_TRASPARENZA') continue;
+    const out = a._output;
+    if (!out || !out.text) continue;
+    let body = String(out.text);
+    if (body.length > 16000) body = body.slice(0, 16000) + '\n…(documento troncato)';
+    blocks.push(`[Documento di trasparenza di Filo${out.doc ? ` "${out.doc}"` : ''}]\n${body}`);
+  }
+  return blocks.join('\n\n').trim();
+}
+
 // Re-immissione del CONTENUTO di un file letto con LEGGI_FILE in un turno
 // precedente (#379.5): l'agente vede il testo completo del file che ha chiesto e
 // risponde con quello davanti (prima vedeva solo il riassunto). Sono DATI di
