@@ -370,6 +370,11 @@ test('solo modelli a pesi aperti: nemmeno i pulsanti «Prova» chiamano un esclu
 
   const proprietari = /gemini|claude|gpt-|grok/i;
 
+  // La lista dei modelli predefiniti deve contenere entrambi i casi, altrimenti
+  // il test non starebbe verificando niente.
+  expect(out.nick.aperto, 'nessun modello a pesi aperti fra i predefiniti').toBeTruthy();
+  expect(out.nick.escluso, 'nessun modello escluso fra i predefiniti').toBeTruthy();
+
   // 1. La prova di un modello ammesso RIESCE, e non passa da un escluso.
   expect(out.ammesso.ok, `la prova di un modello a pesi aperti deve funzionare: ${out.ammesso.error}`).toBe(true);
   expect(out.ammesso.chiamata).not.toBe(null);
