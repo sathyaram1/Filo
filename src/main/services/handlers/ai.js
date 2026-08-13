@@ -347,6 +347,8 @@ module.exports = function register(on, ctx) {
       let charCount = 0;
       const result = await Providers.streamComplete({
         provider, apiKey, model, messages,
+        // Come per le richieste vere: chi è escluso non serve nemmeno una prova.
+        providerRouting: providerRouting(eff),
         onDelta: (delta) => {
           if (firstTokenMs == null) firstTokenMs = performance.now() - startMs;
           charCount += (delta || '').length;
