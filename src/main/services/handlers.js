@@ -1927,6 +1927,8 @@ const handlerCtx = {
   wireSafebrowse,
   modelForAction,
   buildAttemptChain,
+  providerRouting,
+  openWeightsBlockReason,
   applyLimitToChain,
   handleAIRequest,
   maybeCategorizeAsync,
