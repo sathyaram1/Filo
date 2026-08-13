@@ -499,16 +499,20 @@ test('emit: un giro a vuoto (idle) non lascia una firma di lavoro', () => {
 
 // ─── preflight ────────────────────────────────────────────────────────────────
 
+// Le routine accese, iniettate: senza, la prontezza andrebbe a leggere davvero
+// il documento su Firestore — e uno unit test non tocca la rete.
+const routineAccese = async () => ({ enabled: true });
+
 test('preflight: esiste ed è invocabile (il ramo --preflight non deve crashare)', async () => {
   // Regressione: `--preflight` chiamava un identificatore mai definito, quindi
   // il passo di prontezza di OGNI routine moriva con exit 1 ("preflight is not
   // defined") invece di dire prontezza OK o GUASTO.
   assert.equal(typeof preflight, 'function');
-  assert.deepEqual(await preflight(async () => ({ reviews: [], todoWinner: null })), { ok: true });
+  assert.deepEqual(await preflight(async () => ({ reviews: [], todoWinner: null }), routineAccese), { ok: true });
 });
 
 test('preflight: guasto dichiarato → non pronto, col suo tipo', async () => {
-  const r = await preflight(async () => { throw routineFault('transient', 'coda illeggibile'); });
+  const r = await preflight(async () => { throw routineFault('transient', 'coda illeggibile'); }, routineAccese);
   assert.deepEqual(r, { ok: false, kind: 'transient', message: 'coda illeggibile' });
 });
 
@@ -516,7 +520,7 @@ test('preflight: guasto generico → pronto (run() lì ripiega sull\'audit)', as
   // Non deve essere più severo del giro vero: fermerebbe giri che avrebbero
   // lavorato comunque.
   // (il messaggio del guasto finisce su stderr: è traccia per il debug, non rumore da zittire)
-  const r = await preflight(async () => { throw new Error('rete ballerina'); });
+  const r = await preflight(async () => { throw new Error('rete ballerina'); }, routineAccese);
   assert.deepEqual(r, { ok: true });
 });
 
