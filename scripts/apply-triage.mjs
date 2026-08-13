@@ -52,6 +52,8 @@ import '../src/shared/feedbackCrypto.js';
 import '../src/shared/feedback.js';
 // Macchina a stati (spec FEEDBACK-STATES.md): vocabolario + transizioni legali.
 import '../src/shared/feedbackStatus.js';
+// Costanti condivise (qui serve il cap del registro dei worker).
+import '../src/shared/constants.js';
 const _statusToPublic = () => globalThis.SN_FEEDBACK?.statusToPublic;
 const _crypto = () => globalThis.SN_FEEDBACK_CRYPTO;
 const _fbStatus = () => globalThis.SN_FB_STATUS;
