@@ -180,6 +180,10 @@
   // fornitori, le righe dei modelli predefiniti e le righe del registry
   // personale. Sono cammini diversi verso la stessa cosa (una chiamata al
   // modello), quindi la regola dev'essere una sola.
+  // Stato dell'interruttore all'ultimo giro, per riconoscere la transizione
+  // acceso→spento (vedi in fondo a applyOpenWeightsTestGates).
+  let openWeightsWasOn = null;
+
   function applyOpenWeightsTestGates() {
     const on = $('openWeightsOnly').checked;
     // Prova della chiave: il fornitore diretto del produttore è spento in blocco;
