@@ -202,6 +202,67 @@ test('solo modelli a pesi aperti: sostituisce, non ripiega, e lo dimostra', asyn
   expect(out.spento.model).toBe('anthropic/claude-3.5-haiku');
 });
 
+// La dettatura ha bisogno di un modello che ASCOLTI l'audio. Sostituirla con un
+// modello a pesi aperti che legge solo testo non è una sostituzione: è una
+// funzione che si rompe in mano all'utente con un errore qualunque. Deve invece
+// fermarsi nominandosi, come la lettura ad alta voce e l'indicizzazione.
+//
+// Senza il fix: la catena veniva costruita lo stesso (la sostituzione guardava
+// solo i pesi) e la richiesta partiva verso un modello di solo testo.
+test('solo modelli a pesi aperti: la dettatura si ferma dicendolo, non con un errore qualunque', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await shell.waitForLoadState('domcontentloaded');
+  await waitForBoot(app);
+
+  const out = await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    const MSG = globalThis.SN_MSG.MSG;
+    const Storage = globalThis.SN_STORAGE;
+
+    const seen = [];
+    const orig = globalThis.SN_PROVIDERS.completeWithFallback;
+    globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts }) => {
+      seen.push(attempts.map((a) => a.model));
+      const a = attempts[0];
+      return { text: 'ciao', model: a.model, provider: a.provider, servedBy: 'DeepInfra', usage: {} };
+    };
+    const run = async (payload) => {
+      const before = seen.length;
+      try {
+        const r = await globalThis.SN_HANDLE_MESSAGE({
+          type: MSG.AI_REQUEST, action: C.ACTIONS.TRANSCRIBE_AUDIO, payload,
+        }, {});
+        return { ok: true, text: r && r.text, chain: seen[before] || null };
+      } catch (e) {
+        return { ok: false, message: String(e && e.message), code: e && e.code, chain: seen[before] || null };
+      }
+    };
+
+    const res = {};
+    try {
+      await Storage.setSettings({ useDefaultModels: true, openWeightsOnly: true });
+      res.acceso = await run({ dataUrl: 'data:audio/wav;base64,AAAAAAAA', lang: 'it-IT' });
+      await Storage.setSettings({ useDefaultModels: true, openWeightsOnly: false });
+      res.spento = await run({ dataUrl: 'data:audio/wav;base64,BBBBBBBB', lang: 'it-IT' });
+    } finally {
+      globalThis.SN_PROVIDERS.completeWithFallback = orig;
+    }
+    return res;
+  });
+
+  // Acceso: non parte niente, e il messaggio nomina la funzione e il motivo —
+  // così l'utente sa che è una scelta sua, non un guasto.
+  expect(out.acceso.ok).toBe(false);
+  expect(out.acceso.chain).toBe(null);
+  expect(out.acceso.code).toBe('NO_OPEN_WEIGHTS_MODEL');
+  expect(out.acceso.message).toMatch(/dettatura/i);
+  expect(out.acceso.message).toMatch(/pesi aperti/i);
+
+  // Spento: la dettatura funziona come prima.
+  expect(out.spento.ok, `spento la dettatura deve funzionare: ${out.spento.message}`).toBe(true);
+  expect(out.spento.chain).not.toBe(null);
+});
+
 // I pulsanti «Prova» delle Opzioni mandano richieste VERE, pagate. Stanno sulla
 // stessa pagina dove l'interruttore si accende: se restassero aperti, l'unico
 // posto in cui l'utente sceglie "niente modelli proprietari" sarebbe anche
