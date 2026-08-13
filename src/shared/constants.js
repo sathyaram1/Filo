@@ -456,35 +456,29 @@
     // gli altri: si possono scegliere anche a interruttore spento.
     // Provider 'openrouter' = smistatore, non il produttore dei pesi: l'host
     // concreto lo sceglie lui, e la lista di esclusione tiene fuori i produttori.
-    // `inputs`/`outputs` dichiarano cosa il modello sa MASTICARE. Servono alla
-    // sostituzione automatica: è l'unico punto in cui Filo cambia modello da sé,
-    // e mettere un modello che legge solo testo dove la funzione deve ascoltare
-    // un audio la romperebbe con un errore qualunque — un ripiego silenzioso
-    // uguale a quello che l'interruttore promette di non fare, solo con un altro
-    // finale. Ciò che non è dichiarato qui vale come "non lo sa fare".
+    // Cosa ciascuno sa masticare (testo? immagini? audio?) sta in
+    // OPEN_WEIGHTS_SUBSTITUTE_MODALITIES, accanto alla tabella delle
+    // sostituzioni: serve solo lì, e scriverlo una volta sola evita che le due
+    // liste divergano. Una voce può comunque dichiararlo da sé (`inputs`/
+    // `outputs`), così l'owner corregge dalla config condivisa senza rilasciare
+    // codice.
     gemma: {
       label: 'Gemma 4 31B (pesi aperti)',
       provider: 'openrouter',
       model: 'google/gemma-4-31b-it',
       weights: 'open',
-      inputs: ['text', 'image'],
-      outputs: ['text'],
     },
     'gemma-lite': {
       label: 'Gemma 4 26B A4B (pesi aperti)',
       provider: 'openrouter',
       model: 'google/gemma-4-26b-a4b-it',
       weights: 'open',
-      inputs: ['text', 'image'],
-      outputs: ['text'],
     },
     deepseek: {
       label: 'DeepSeek V4 Pro (pesi aperti)',
       provider: 'openrouter',
       model: 'deepseek/deepseek-v4-pro',
       weights: 'open',
-      inputs: ['text'],
-      outputs: ['text'],
     },
   };
 
