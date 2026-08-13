@@ -53,7 +53,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync } from 'node:fs';
-import { dirname, resolve, relative, sep } from 'node:path';
+import { basename, dirname, resolve, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   prepareBranch, newWorkBranch, preferredBase, checkDelivery, withCheckpoint,
