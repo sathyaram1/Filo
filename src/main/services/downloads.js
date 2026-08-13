@@ -487,7 +487,7 @@ function beginManual({ url, filename, totalBytes } = {}) {
 
   return {
     id,
-    cancelled: () => !!rec._final,
+    cancelled: () => !!rec._cancelled,
     progress(received, total) {
       if (rec._final) return;
       rec.receivedBytes = Number(received) || 0;
