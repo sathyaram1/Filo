@@ -497,7 +497,13 @@ function beginManual({ url, filename, totalBytes } = {}) {
       lastPush = now;
       broadcast('progress', rec);
     },
-    done(savePath) { finalizeManual(rec, 'completed', savePath); },
+    done(savePath) {
+      // L'ultimo progress() può essere caduto nel freno qui sopra: a file
+      // completo i byte ricevuti SONO il totale, e la riga non deve restare
+      // ferma al 95% dopo essersi conclusa.
+      if (rec.totalBytes > 0) rec.receivedBytes = rec.totalBytes;
+      finalizeManual(rec, 'completed', savePath);
+    },
     fail() { finalizeManual(rec, 'interrupted'); },
     cancel: requestCancel,
   };
