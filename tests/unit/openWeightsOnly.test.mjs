@@ -19,6 +19,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
 
 require(join(ROOT, 'src', 'shared', 'constants.js'));
+// Le capacità dei modelli servono alla sostituzione: un sostituto vale solo se
+// sa fare il mestiere della funzione (la dettatura vuole un modello che ascolti
+// l'audio). Senza questo modulo la politica non sostituisce niente, apposta.
+require(join(ROOT, 'src', 'shared', 'modelCaps.js'));
 const C = globalThis.SN_CONST;
 const REG = C.DEFAULT_MODEL_REGISTRY;
 
