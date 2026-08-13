@@ -189,14 +189,14 @@
     for (const row of $('defaultModelsList').querySelectorAll('.sn-default-model-row')) {
       const btn = row.querySelector('.sn-model-test');
       if (!btn) continue;
-      markTestBlocked(btn, openWeightsBlocks(row.dataset.provider || '', row.dataset.model || ''));
+      markTestBlocked(btn, openWeightsBlocks(row._entry || {}));
     }
     for (const row of $('modelRegistryList').querySelectorAll('.sn-model-row:not(.sn-model-row-head)')) {
       const btn = row.querySelector('.sn-model-test');
       const prov = row.querySelector('.sn-model-provider');
       const id = row.querySelector('.sn-model-id');
       if (!btn || !prov || !id) continue;
-      markTestBlocked(btn, openWeightsBlocks(prov.value, id.value.trim()));
+      markTestBlocked(btn, openWeightsBlocks({ provider: prov.value, model: id.value.trim() }));
     }
   }
 
