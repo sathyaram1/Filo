@@ -221,6 +221,7 @@ async function stubAutomation(page, initial = {}) {
       enabled: false,
       autoApprove: { owner: true, filo: true, claude: true, user: true },
       proberWhenIdle: true,
+      routinesEnabled: true,
     }, init);
     window.__automationSets = [];
     const orig = window.filo.message.bind(window.filo);
