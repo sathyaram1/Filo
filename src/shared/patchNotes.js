@@ -19,6 +19,7 @@
       version: '0.2.196', date: '2026-08-08',
       features: [
         'Nell\'editor, dopo aver ripristinato una versione dallo «Storico versioni» compare un avviso «Annulla» che rimette il documento com\'era un attimo prima.',
+        'Nelle Opzioni puoi spegnere tutti i modelli proprietari con un interruttore: Filo lavora solo con modelli a pesi aperti serviti da fornitori indipendenti, anche quando usi i crediti di Filo.',
       ],
       fixes: [
         'Le pagine «il download partirà a breve…» che certi siti aprono in una nuova scheda ora si chiudono da sole appena il file parte, con un avviso «Riapri» se ti serviva tenerla.',

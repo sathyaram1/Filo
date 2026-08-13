@@ -157,8 +157,8 @@ Il minimo accettabile dipende dall'ambiente:
   `npm test` (intera suite Playwright); se la feature ha UI nuova, **aggiungi uno
   spec Playwright** che la eserciti (click + assert). `test:shoot` **ora funziona
   in cloud** tramite `scrot`/xvfb (vedi "Controlli visivi"); `test:explore` (LLM
-  Gemini) dipende dalla chiave API in `tests/agent/.env` — può non essere
-  disponibile.
+  a pesi aperti) dipende dalla chiave OpenRouter in `tests/agent/.env` — può non
+  essere disponibile.
 
 - **Se la verifica non è possibile** (es. richiede hardware che Playwright non
   simula): dichiaralo esplicitamente nel report finale — "implementato ma non
@@ -409,8 +409,11 @@ vedi `tests/agent/README.md`):
      --task "<usa la feature appena fatta, passo per passo>"
    ```
 
-**Modelli**: primario `gemini-3.1-flash-lite` (quota generosa), fallback
-`gemma-4-31b-it` al 429. Chiave in `tests/agent/.env` (gitignorata).
+**Modelli**: primario `google/gemma-4-31b-it`, fallback
+`google/gemma-4-26b-a4b-it` al 429 — pesi aperti serviti da fornitori
+indipendenti via OpenRouter, come vuole la politica sui modelli (che vale anche
+per gli strumenti che testano Filo). Chiave `OPENROUTER_API_KEY` in
+`tests/agent/.env` (gitignorata): **nessuna chiave Google**.
 
 **Come reagire:** bug ovvio (rotto, vuoto, crash) → **correggilo subito**; scelta
 di design discutibile / non-bug → **NON** cambiarla di iniziativa, **segnalala**
@@ -419,7 +422,7 @@ prima di trattarlo come bug.
 
 **In cloud (Linux headless)** `test:shoot` **gira**: usa `xvfb-run -a npm run
 test:shoot -- "<scenario>"` come tester (`su tester -c "..."`) per catturare
-screenshot compositi reali. `test:explore` dipende dalla chiave API Gemini.
+screenshot compositi reali. `test:explore` dipende dalla chiave OpenRouter.
 Usa `npm run test:smoke` come sanity check rapido. Se non riesci a scrivere un
 test affidabile (es. UI dipende da Firestore live): verifica con
 `node -e "require('./src/...')"` che i moduli si caricano e dichiaralo nel report.

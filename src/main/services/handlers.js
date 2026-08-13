@@ -230,11 +230,18 @@ function withDefaults(settings) {
   // per-utente, quindi vale SEMPRE (anche con "usa modelli predefiniti" off) ed è
   // sourced dai default condivisi (costante ⊕ override Firestore config/models),
   // MAI dallo storage utente — così l'owner la aggiorna senza rilasciare codice.
-  const excludedProviders = Array.isArray(d.excludedProviders) ? d.excludedProviders : [];
+  const baseExcluded = Array.isArray(d.excludedProviders) ? d.excludedProviders : [];
   const providerSort = typeof d.providerSort === 'string' ? d.providerSort : '';
 
+  // "Solo modelli a pesi aperti" (#461) è invece una scelta di CHI USA Filo, e
+  // sta sopra alla config condivisa: vale anche quando si usano i crediti di
+  // Filo, e allunga la lista di esclusione con Anthropic — il senso
+  // dell'interruttore è poter rifiutare anche la scelta di chi Filo lo fa.
+  const openWeightsOnly = settings.openWeightsOnly === true;
+  const excludedProviders = SN_CONST.effectiveExcludedProviders(baseExcluded, openWeightsOnly);
+
   if (settings.useDefaultModels === false) {
-    return { ...settings, excludedProviders, providerSort, security };
+    return { ...settings, openWeightsOnly, excludedProviders, providerSort, security };
   }
   const userKeys = settings.apiKeys || {};
   const apiKeys = {};
@@ -246,6 +253,7 @@ function withDefaults(settings) {
     provider: d.provider,
     models: d.models,
     modelRegistry: d.modelRegistry,
+    openWeightsOnly,
     excludedProviders,
     providerSort,
     apiKeys,
@@ -306,6 +314,24 @@ function modelConfigError(settings, action, missingRefs) {
   return e;
 }
 
+// Errore quando "solo modelli a pesi aperti" è acceso e la funzione non ha
+// nessun modello ammesso (né il suo, né un equivalente). Dice QUALE funzione si
+// ferma e come sbloccarla — non un "errore del modello" generico, che manderebbe
+// a cercare un guasto dove non c'è.
+function openWeightsConfigError(settings, action, droppedRefs) {
+  const label = actionLabelForSettings(action);
+  const refs = droppedRefs || [];
+  const e = new Error(I18n.t(
+    'err_open_weights_only_no_model',
+    label,
+    SN_CONST.formatModelRefsForMessage(refs),
+  ));
+  e.code = 'NO_OPEN_WEIGHTS_MODEL';
+  e.action = action || '';
+  e.droppedRefs = refs;
+  return e;
+}
+
 async function ensureUnderLimit(settings) {
   if (await Costs.isOverLimit(settings.monthlyLimitEur)) {
     const e = new Error(I18n.t('err_limit_reached'));
@@ -346,17 +372,36 @@ function buildAttemptChain(settings, modelRef, action) {
   // almeno una valida la richiesta parte con quelle (è la catena che qualcuno ha
   // scelto); se non ne resta nessuna, la funzione non parte e lo dice.
   const missing = SN_CONST.missingModelRefs(refs, registry);
-  const usable = SN_CONST.usableModelRefs(refs, registry);
+  let usable = SN_CONST.usableModelRefs(refs, registry);
   if (!usable.length) throw modelConfigError(settings, action, missing);
   if (missing.length) {
     console.warn(`[Filo modelli] "${action || modelRef}" cita modelli inesistenti: ${missing.join(', ')}`);
+  }
+
+  // Interruttore "solo modelli a pesi aperti" (#461). Ogni modello proprietario
+  // della catena viene SOSTITUITO col suo equivalente a pesi aperti; quelli
+  // senza equivalente escono dalla catena. Se non resta niente, la funzione si
+  // ferma e dice perché: il ripiego su un modello proprietario — che a catena
+  // intatta sarebbe scattato appena il sostituto non risponde — qui non esiste
+  // proprio, perché quei tentativi non vengono nemmeno costruiti.
+  const openWeightsOnly = settings.openWeightsOnly === true;
+  if (openWeightsOnly) {
+    const pol = SN_CONST.applyOpenWeightsPolicy(usable, registry);
+    if (pol.substituted.length) {
+      console.log(`[Filo policy] "${action || modelRef}" (solo pesi aperti): `
+        + pol.substituted.map((s) => `${s.from} → ${s.to}`).join(', '));
+    }
+    if (!pol.refs.length) throw openWeightsConfigError(settings, action, pol.dropped);
+    usable = pol.refs;
   }
 
   // Ogni modello del registry porta il proprio provider, quindi l'ordine qui
   // conta solo per i ref "legacy" (id grezzi senza nickname): proviamo prima
   // Gemini (quota free) poi OpenRouter. buildModelAttempts scarta da sé i
   // provider senza chiave o senza un id concreto per quel modello.
-  const providerOrder = ['gemini', 'openrouter'];
+  // A interruttore acceso Gemini esce dall'ordine: è l'API del produttore, e i
+  // modelli a pesi aperti serviti da lì restano soldi a chi li ha addestrati.
+  const providerOrder = openWeightsOnly ? ['openrouter'] : ['gemini', 'openrouter'];
   const out = SN_CONST.buildModelAttempts(usable, registry, providerOrder, settings.apiKeys || {});
   if (!out.length) {
     const e = new Error(I18n.t('err_no_api_key'));
@@ -388,17 +433,33 @@ function buildAttemptChain(settings, modelRef, action) {
 // — un produttore escluso) è la controprova della lista di esclusione: senza
 // registrarlo, l'esclusione è solo una speranza. Se l'host servito risulta fra
 // gli esclusi (è comparso con un nome che l'ignore non ha intercettato), lo
-// segnaliamo in modo evidente nei log. Ritorna il nome dell'host, o null.
+// segnaliamo in modo evidente.
+// Ritorna { servedBy, violation }: `violation` è true quando chi ha servito
+// risulta fra gli esclusi. Con l'interruttore "solo pesi aperti" acceso quel
+// caso non resta nei log: chi l'ha acceso ha chiesto una garanzia, e una
+// garanzia caduta in silenzio è peggio dell'interruttore assente — quindi lo
+// vede anche a schermo, e la voce di cronologia resta marchiata.
 function noteServedProvider(settings, action, result) {
   const servedBy = (result && result.servedBy) || null;
-  if (servedBy && SN_CONST.isProviderExcluded(servedBy, settings.excludedProviders || [])) {
+  const violation = Boolean(servedBy
+    && SN_CONST.isProviderExcluded(servedBy, settings.excludedProviders || []));
+  if (violation) {
     console.error(
       `[Filo policy] Richiesta "${action}" servita da un fornitore ESCLUSO: "${servedBy}". `
       + 'La politica sui modelli è stata aggirata (nome host non intercettato dalla lista di '
       + 'esclusione): aggiornare excludedProviders in config/models.',
     );
+    if (settings.openWeightsOnly === true) {
+      try {
+        broadcastToTabs({
+          type: MSG.SHOW_TOAST,
+          text: I18n.t('toast_open_weights_violated', servedBy),
+          duration: 8000,
+        });
+      } catch (_) {}
+    }
   }
-  return servedBy;
+  return { servedBy, violation };
 }
 
 async function handleAIRequest({ action, payload, origin, onReasoning = null, onText = null, signal = null }) {
@@ -474,7 +535,7 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
     : await Providers.completeWithFallback({ attempts, messages, signal });
   const usedProvider = result.provider || attempts[0].provider;
   const concreteModel = result.model || attempts[0].model;
-  const servedBy = noteServedProvider(settings, action, result);
+  const { servedBy, violation } = noteServedProvider(settings, action, result);
   const pricing = usedProvider === 'gemini' ? null : settings.pricing?.[concreteModel];
   const costEur = await Costs.record({
     action, provider: usedProvider, model: concreteModel,
@@ -492,6 +553,7 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
   ) {
     await History.append({
       action, provider: usedProvider, model: concreteModel, servedBy,
+      policyViolation: violation,
       input: payload, output: result.text, origin, costEur, usage: result.usage,
     });
   }
@@ -530,7 +592,7 @@ async function handleStream({ action, payload, origin, onDelta, onMeta, onReset,
   });
   const usedProvider = result.provider || attempts[0].provider;
   const concreteModel = result.model || attempts[0].model;
-  const servedBy = noteServedProvider(settings, action, result);
+  const { servedBy, violation } = noteServedProvider(settings, action, result);
   const pricing = usedProvider === 'gemini' ? null : settings.pricing?.[concreteModel];
   const costEur = await Costs.record({
     action, provider: usedProvider, model: concreteModel,
@@ -539,6 +601,7 @@ async function handleStream({ action, payload, origin, onDelta, onMeta, onReset,
 
   await History.append({
     action, provider: usedProvider, model: concreteModel, servedBy,
+    policyViolation: violation,
     input: payload, output: result.text, origin, costEur, usage: result.usage,
   });
 
