@@ -92,13 +92,26 @@ test('il sostituto deve saper fare il MESTIERE della funzione, non solo avere i 
   );
   assert.ok(immagini.refs.length, 'la descrizione immagini ha un equivalente aperto e deve restare viva');
 
-  // Capacità non dichiarate = non sappiamo = non si sostituisce.
-  const reg = { ...REG, ignoto: { provider: 'openrouter', model: 'acme/qualcosa', weights: 'open' } };
-  assert.equal(C.substituteFitsAction(reg.ignoto, A.EXPLAIN), false);
-  assert.equal(C.substituteFitsAction(REG.gemma, A.EXPLAIN), true);
-  assert.equal(C.substituteFitsAction(REG.gemma, A.TRANSCRIBE_AUDIO), false);
-  assert.equal(C.substituteFitsAction(REG.gemma, A.TTS), false);
-  assert.equal(C.substituteFitsAction(REG.gemma, A.ARCHIVE_EMBED), false);
+  // Capacità non dichiarate né note = non sappiamo = non si sostituisce.
+  assert.equal(C.substituteFitsAction({ provider: 'openrouter', model: 'acme/qualcosa', weights: 'open' }, A.EXPLAIN, 'ignoto'), false);
+  assert.equal(C.substituteFitsAction(REG.gemma, A.EXPLAIN, 'gemma'), true);
+  assert.equal(C.substituteFitsAction(REG.gemma, A.TRANSCRIBE_AUDIO, 'gemma'), false);
+  assert.equal(C.substituteFitsAction(REG.gemma, A.TTS, 'gemma'), false);
+  assert.equal(C.substituteFitsAction(REG.gemma, A.ARCHIVE_EMBED, 'gemma'), false);
+
+  // Il registry personale (righe delle Opzioni) porta solo fornitore e stringa
+  // del modello: le capacità dei sostituti si sanno lo stesso, altrimenti
+  // accendere l'interruttore con la propria configurazione fermerebbe TUTTO.
+  const personale = {
+    flash: { provider: 'gemini', model: 'gemini-2.0-flash' },
+    gemma: { provider: 'openrouter', model: 'google/gemma-4-31b-it' },
+    'gemma-lite': { provider: 'openrouter', model: 'google/gemma-4-26b-a4b-it' },
+  };
+  assert.deepEqual(
+    C.applyOpenWeightsPolicy(['flash'], personale, A.EXPLAIN).refs, ['gemma'],
+    'con una configurazione personale la sostituzione deve funzionare uguale',
+  );
+  assert.deepEqual(C.applyOpenWeightsPolicy(['flash'], personale, A.TRANSCRIBE_AUDIO).refs, []);
 });
 
 test('NESSUNA funzione predefinita resta con un modello proprietario a interruttore acceso', () => {
