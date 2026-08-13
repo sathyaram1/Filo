@@ -123,6 +123,13 @@
         return `Verificare cosa sa fare Filo${ids.length ? ` (${ids.join(', ')})` : ''}`;
       },
     },
+    LEGGI_TRASPARENZA: {
+      // Filo rilegge i propri documenti di trasparenza per rispondere a "perché
+      // usi questo modello?", "che fine fanno i miei dati?". Sola lettura di
+      // testo statico incluso nell'app, nessuna uscita verso l'esterno → 1.
+      level: 1,
+      describe: (a) => `Rileggere la pagina di trasparenza${a && a.doc ? ` (${a.doc})` : ''}`,
+    },
     EVENTO_CALENDARIO: {
       level: 1,
       describe: (a) => `Creare l'evento "${a.title || a.titolo || ''}"`,
