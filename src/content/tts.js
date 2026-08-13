@@ -625,7 +625,19 @@
           payload: { dataUrl, lang: navigator.language || 'it-IT' },
         });
         cleanup();
-        if (!res?.ok) { Popup.showToast(I18n.t('err_provider_failed')); return; }
+        if (!res?.ok) {
+          // Se la dettatura non parte per come sono configurati i modelli
+          // (nessun modello per questa funzione, oppure «solo modelli a pesi
+          // aperti» acceso e nessuno di quelli ammessi sa ascoltare un audio),
+          // il motivo VERO vale più di un "il fornitore non risponde": dice cosa
+          // fare per rimetterla in piedi. La lettura ad alta voce e
+          // l'indicizzazione lo fanno già; qui mancava.
+          const spiegato = (res?.code === 'NO_MODEL_FOR_ACTION' || res?.code === 'NO_OPEN_WEIGHTS_MODEL')
+            && res.error;
+          if (spiegato) Popup.showToast(res.error, { duration: 9000 });
+          else Popup.showToast(I18n.t('err_provider_failed'));
+          return;
+        }
         const text = (res.text || '').trim();
         if (!text) { Popup.showToast(I18n.t('menu_dictate_empty')); return; }
         // Inserisci dove il cursore si trova ADESSO, non dove era all'apertura
