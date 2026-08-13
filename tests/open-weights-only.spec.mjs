@@ -252,7 +252,7 @@ test('solo modelli a pesi aperti: la dettatura si ferma dicendolo, non con un er
 
   // Acceso: non parte niente, e il messaggio nomina la funzione e il motivo —
   // così l'utente sa che è una scelta sua, non un guasto.
-  expect(out.acceso.ok).toBe(false);
+  expect(out.acceso.ok, `catena costruita: ${JSON.stringify(out.acceso.chain)}`).toBe(false);
   expect(out.acceso.chain).toBe(null);
   expect(out.acceso.code).toBe('NO_OPEN_WEIGHTS_MODEL');
   expect(out.acceso.message).toMatch(/dettatura/i);
