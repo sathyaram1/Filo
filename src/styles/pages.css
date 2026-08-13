@@ -91,7 +91,7 @@ html, body {
   color: var(--sn-fg);
   border: 1px solid var(--sn-border);
 }
-.sn-page button.sn-btn-secondary:hover { background: var(--sn-hover); }
+.sn-page button.sn-btn-secondary:hover:not(:disabled) { background: var(--sn-hover); }
 
 /* Variante "azione distruttiva" (es. ripristino completo delle impostazioni):
    bordo e testo rossi, sfondo trasparente finché non ci passi sopra. */
