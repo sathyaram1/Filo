@@ -429,6 +429,79 @@ function onWillDownload(item, webContents) {
   });
 }
 
+// ─── scaricamenti "a mano" (#436) ────────────────────────────────────────
+// "Salva immagine/video come…" scarica i byte da sé (handlers/misc.js): è
+// l'unico modo di presentare il Referer della pagina, che webContents.downloadURL
+// perde sempre. Il prezzo era che quel cammino restava MUTO — nessuna barra,
+// nessuna percentuale, nessun modo di annullare — mentre un filmato di centinaia
+// di MB arrivava. Qui gli diamo lo stesso registro dei download nativi: chi
+// guarda la barra non deve sapere quale dei due cammini ha prodotto la riga.
+//
+// Uso: beginManual() apre la voce, il chiamante la nutre con progress() a ogni
+// blocco ricevuto e la chiude con done()/fail(); cancelled() dice se nel
+// frattempo l'utente ha premuto "Annulla" nella barra, così il trasferimento si
+// può fermare davvero.
+function finalizeManual(rec, state, savePath) {
+  if (rec._final) return;
+  rec._final = true;
+  liveManual.delete(rec.id);
+  rec.endedAt = new Date().toISOString();
+  rec.paused = false;
+  rec.canResume = false;
+  if (savePath) { rec.savePath = savePath; rec.filename = path.basename(savePath); }
+  rec.state = state;
+  persist();
+  broadcast(state === 'completed' ? 'done' : 'error', rec);
+  // Nessun avviso a fine corsa: chi ha chiesto il salvataggio dal menu riceve
+  // già la sua conferma nella pagina (un secondo avviso sarebbe un doppione).
+}
+
+function beginManual({ url, filename, totalBytes } = {}) {
+  const id = uuid();
+  const rec = {
+    id,
+    filename: safeName(filename || 'download'),
+    url: String(url || ''),
+    mime: '',
+    totalBytes: Number(totalBytes) > 0 ? Number(totalBytes) : 0,
+    receivedBytes: 0,
+    state: 'progressing',
+    savePath: '',
+    startedAt: new Date().toISOString(),
+    endedAt: null,
+    paused: false,
+    canResume: false,
+    canPause: false,
+  };
+  records.set(id, rec);
+  liveManual.set(id, { cancel: () => finalizeManual(rec, 'cancelled') });
+  persist();
+  broadcast('start', rec);
+
+  // Su rete veloce l'evento 'data' arriva migliaia di volte al secondo e ogni
+  // broadcast attraversa l'IPC verso ogni finestra: senza freno l'avanzamento
+  // costerebbe più del download. ~8 aggiornamenti al secondo bastano all'occhio.
+  const MIN_PUSH_MS = 120;
+  let lastPush = 0;
+
+  return {
+    id,
+    cancelled: () => !!rec._final,
+    progress(received, total) {
+      if (rec._final) return;
+      rec.receivedBytes = Number(received) || 0;
+      if (Number(total) > 0) rec.totalBytes = Number(total);
+      const now = Date.now();
+      if (now - lastPush < MIN_PUSH_MS) return;
+      lastPush = now;
+      broadcast('progress', rec);
+    },
+    done(savePath) { finalizeManual(rec, 'completed', savePath); },
+    fail() { finalizeManual(rec, 'interrupted'); },
+    cancel() { finalizeManual(rec, 'cancelled'); },
+  };
+}
+
 // Aggancia will-download a una sessione (idempotente).
 function attachSession(ses) {
   if (!ses || attached.has(ses)) return;
