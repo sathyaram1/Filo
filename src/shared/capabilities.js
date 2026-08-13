@@ -208,9 +208,9 @@
     },
     {
       id: 'copy-download-video', title: 'Copia l’indirizzo o salva un video/audio', category: 'media',
-      desc: 'Copia l’indirizzo del filmato o dell’audio, oppure lo salva come file sul computer scegliendo dove.',
+      desc: 'Copia l’indirizzo del filmato o dell’audio, oppure lo salva come file sul computer scegliendo dove. Mentre scarica, il filmato compare fra gli scaricamenti in alto con barra e percentuale, e da lì puoi annullarlo: non c’è un limite di dimensione, anche un film lungo arriva.',
       invoke: 'Clic destro sul video o sull’audio → "Copia URL video" / "Salva video come…".',
-      doesNot: 'I contenuti trasmessi in streaming a pezzi (i grandi siti di video) non hanno un file da salvare: in quel caso Filo lo dice invece di salvare un file rotto. Allo stesso modo, se la sorgente del filmato non è un vero indirizzo Filo lo dice invece di copiarla.',
+      doesNot: 'I contenuti trasmessi in streaming a pezzi (i grandi siti di video) non hanno un file da salvare: in quel caso Filo lo dice invece di salvare un file rotto. Allo stesso modo, se la sorgente del filmato non è un vero indirizzo Filo lo dice invece di copiarla. Un salvataggio già avviato si può annullare ma non mettere in pausa.',
     },
     {
       id: 'download-progress', title: 'Scarica file e segui l’avanzamento', category: 'save',
