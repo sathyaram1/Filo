@@ -375,20 +375,51 @@ async function setAutomationAutoApprove(partial, idToken) {
   return next;
 }
 
-// Esplorazione automatica a coda vuota (config/automation, campo
-// `proberWhenIdle`): quando non c'è più niente da lavorare, le routine vanno a
-// cercare problemi che nessuno ha segnalato. Lo legge scripts/dispatch.mjs.
-// Campo assente ⇒ true (il comportamento che c'è sempre stato): solo un `false`
-// scritto apposta ferma l'esplorazione.
+// ── Ciò che le routine devono sapere (config/routines) ──────────────────────
+// Interruttore master, esplorazione a coda vuota e tentativi del loop vivono in
+// un documento SEPARATO da config/automation, e leggibile senza credenziali.
+//
+// Perché separato: chi legge queste tre cose sono le macchine delle routine, che
+// non hanno nessuna credenziale. Finché stavano nel documento admin-only la
+// lettura falliva sempre, in silenzio, e si ricadeva sui default: in dashboard
+// sembravano attive, ma nessuna routine le ha mai viste (stessa radice del
+// registro worker sempre vuoto, #451). Dentro non c'è niente di segreto — solo
+// se e come le routine devono lavorare — e la scrittura resta all'owner.
+//
+// MIGRAZIONE: se il campo non c'è ancora nel documento nuovo lo si cerca in
+// quello vecchio, così i valori già scelti dall'owner non si azzerano sotto gli
+// occhi. Il primo salvataggio li porta di là.
+async function getRoutinesEnabled(idToken) {
+  const doc = await fetchDoc(ROUTINES_DOC, idToken);
+  // 404/campo assente ⇒ acceso: è il comportamento che c'è sempre stato, e
+  // spegnere dev'essere una scelta scritta, non l'effetto di un documento mai
+  // creato. (Il fail-closed sta dalla parte di chi legge — le routine si
+  // fermano se non riescono a leggere: qui siamo in dashboard.)
+  if (!doc || typeof doc.enabled !== 'boolean') return true;
+  return doc.enabled;
+}
+
+async function setRoutinesEnabled(on, idToken) {
+  if (!idToken) throw new Error('Serve un ID token admin per accendere o spegnere le routine.');
+  await patchDoc(ROUTINES_DOC, { enabled: toFsValue(Boolean(on)) }, ['enabled'], idToken);
+  return Boolean(on);
+}
+
+// Esplorazione automatica a coda vuota (campo `proberWhenIdle`): quando non c'è
+// più niente da lavorare, le routine vanno a cercare problemi che nessuno ha
+// segnalato. Campo assente ⇒ true (il comportamento che c'è sempre stato): solo
+// un `false` scritto apposta ferma l'esplorazione.
 async function getAutomationProberIdle(idToken) {
-  const doc = await fetchDoc(AUTOMATION_DOC, idToken);
-  if (!doc || typeof doc.proberWhenIdle !== 'boolean') return true;
-  return doc.proberWhenIdle;
+  const doc = await fetchDoc(ROUTINES_DOC, idToken);
+  if (doc && typeof doc.proberWhenIdle === 'boolean') return doc.proberWhenIdle;
+  const legacy = await fetchDoc(AUTOMATION_DOC, idToken);
+  if (legacy && typeof legacy.proberWhenIdle === 'boolean') return legacy.proberWhenIdle;
+  return true;
 }
 
 async function setAutomationProberIdle(on, idToken) {
   if (!idToken) throw new Error('Serve un ID token admin per cambiare l\'esplorazione automatica.');
-  await patchDoc(AUTOMATION_DOC, { proberWhenIdle: toFsValue(Boolean(on)) }, ['proberWhenIdle'], idToken);
+  await patchDoc(ROUTINES_DOC, { proberWhenIdle: toFsValue(Boolean(on)) }, ['proberWhenIdle'], idToken);
   return Boolean(on);
 }
 
