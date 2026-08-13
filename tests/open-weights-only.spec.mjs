@@ -306,7 +306,7 @@ test('solo modelli a pesi aperti: nemmeno i pulsanti «Prova» chiamano un esclu
   // 5. Spento, le stesse prove ripartono: la differenza la fa l'interruttore.
   expect(out.spentoAnthropic.chiamata).not.toBe(null);
   expect(out.spentoAnthropic.chiamata.model).toMatch(/claude/i);
-  expect(out.spentoGemini.chiamata).not.toBe(null);
+  expect(out.spentoGemini.chiamata, `spento, la prova della chiave Google deve partire: ${out.spentoGemini.error}`).not.toBe(null);
 
   // Controprova d'insieme: con l'interruttore acceso nessun modello proprietario
   // è mai finito in una chiamata.
