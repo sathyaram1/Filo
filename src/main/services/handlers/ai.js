@@ -219,18 +219,6 @@ module.exports = function register(on, ctx) {
         };
       }
       if (!apiKey) return { ok: false, error: 'API key mancante' };
-      // "Solo modelli a pesi aperti" (#461): la prova di un fornitore è pur
-      // sempre una chiamata vera. Provare l'API diretta di un produttore mentre
-      // l'interruttore è acceso manderebbe una richiesta proprio dove l'utente
-      // ha chiesto che non ne arrivino — e la prova non servirebbe a niente,
-      // perché quel fornitore resta comunque inutilizzabile.
-      const s = await getEffectiveSettings();
-      if (s.openWeightsOnly === true && SN_CONST.PRODUCER_DIRECT_PROVIDERS.includes(provider)) {
-        return {
-          ok: false,
-          error: 'Hai scelto solo modelli a pesi aperti: questo fornitore è l\'API di chi produce i modelli e resta spento. Spegni l\'interruttore per provarlo.',
-        };
-      }
       const messages = [{ role: 'user', content: 'Conta da 1 a 20 separando con virgole, senza testo extra.' }];
       const startMs = performance.now();
       let firstTokenMs = null;
