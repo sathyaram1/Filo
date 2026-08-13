@@ -261,6 +261,41 @@ function drainWorkerLogQueue(max = 20) {
 // log vive come campo del doc config/automation, cappato per non gonfiarlo.
 const WORKER_LOG_CAP = 200;
 
+// La coda su git dove finiscono triage, semafori e — da #451 — le voci del
+// registro dei worker. Il prefisso distingue le voci del registro dai file di
+// triage (`<id>.json`) e dalle creazioni (`new-*.json`).
+const SPOOL_DIR = resolve(ROOT, 'feedback-triage');
+const WORKER_LOG_PREFIX = 'wl-';
+
+/**
+ * La voce del registro per un worker che sta per partire, o null se non c'è
+ * niente da registrare (bucket senza ruolo). Pura: la costruzione è separata
+ * dalla spedizione, così il formato si testa senza toccare git.
+ */
+export function buildWorkerLogEntry(bucket, now = new Date()) {
+  const role = String(bucket?.role || '');
+  if (!role) return null;
+  const startedAt = (now instanceof Date && !Number.isNaN(now.getTime()) ? now : new Date()).toISOString();
+  return {
+    op: 'worker-log',
+    role,
+    startedAt,
+    num: bucket?.num != null ? String(bucket.num) : '',
+    queuedAt: startedAt,
+    queuedBy: 'dispatch',
+  };
+}
+
+/**
+ * Nome del fogliettino. Contiene l'istante (ordinabile alfabeticamente, che è
+ * anche l'ordine in cui l'applier le applica) e una coda casuale, perché due
+ * giri partiti nello stesso secondo non si sovrascrivano a vicenda.
+ */
+export function workerLogFileName(entry, rand = Math.random().toString(36).slice(2, 8)) {
+  const ts = String(entry?.startedAt || new Date().toISOString()).replace(/[:.]/g, '-');
+  return `${WORKER_LOG_PREFIX}${ts}-${rand}.json`;
+}
+
 // ─── Logica pura (esportata, testata in tests/unit/dispatch.test.mjs) ─────────
 
 /**
