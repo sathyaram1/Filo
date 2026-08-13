@@ -370,7 +370,8 @@ module.exports = function register(on, ctx) {
       const enabled = await Defaults.getAutomationGate(idToken);
       const autoApprove = await Defaults.getAutomationAutoApprove(idToken);
       const proberWhenIdle = await Defaults.getAutomationProberIdle(idToken);
-      return { ok: true, enabled, autoApprove, proberWhenIdle };
+      const routinesEnabled = await Defaults.getRoutinesEnabled(idToken);
+      return { ok: true, enabled, autoApprove, proberWhenIdle, routinesEnabled };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
