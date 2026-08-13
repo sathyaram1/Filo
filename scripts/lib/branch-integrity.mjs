@@ -263,6 +263,19 @@ function commitExists(g, sha) {
 }
 
 /**
+ * `to` è un semplice avanzamento di `from` che tocca solo la burocrazia della
+ * coda? (In quel caso non c'è niente da scartare.)
+ */
+function aheadOnlyByBookkeeping(g, from, to) {
+  if (!from || !to || from === to) return false;
+  // Storia divergente ⇒ non è un avanzamento: qualcosa è successo davvero.
+  if (!g(['merge-base', '--is-ancestor', from, to]).ok) return false;
+  const r = g(['diff', '--name-only', `${from}..${to}`]);
+  if (!r.ok) return false;
+  return bookkeepingOnly(r.out.split('\n'));
+}
+
+/**
  * Porta la directory `root` sul branch giusto, con il contenuto giusto.
  *
  * @param {object} o
