@@ -116,12 +116,13 @@ test('salvando un filmato il file cresce su disco e la barra ne mostra l\'avanza
       if (e && e.state === 'progressing' && e.receivedBytes > 0 && !live) {
         live = e;
         bar = await shell.evaluate(() => {
-          const btn = document.getElementById('dl-btn');
+          const btn = document.getElementById('dl-indicator');
           const fill = document.getElementById('dl-ind-fill');
+          if (!btn || !fill) return { missing: true };
           return {
-            hidden: !!(btn && btn.hidden),
-            active: !!(btn && btn.classList.contains('active')),
-            width: fill ? fill.style.width : '',
+            hidden: !!btn.hidden,
+            active: btn.classList.contains('active'),
+            width: fill.style.width,
           };
         });
       }
