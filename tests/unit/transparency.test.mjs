@@ -48,6 +48,13 @@ test('il modulo espone i documenti con i campi che le tre superfici usano', () =
     assert.ok(doc.html.length > 500, `${doc.id}: html sospettosamente corto`);
     assert.ok(doc.text.length > 500, `${doc.id}: testo per l'agente sospettosamente corto`);
     assert.ok(doc.sections.length > 0, `${doc.id}: nessuna sezione con ancora`);
+    // Il testo per l'agente non deve portarsi dietro i fine riga di Windows né i
+    // separatori del markdown: su una macchina con git in CRLF il generatore
+    // produceva un testo diverso dalla stessa sorgente, e il controllo di
+    // allineamento diventava rosso dopo un rebase senza che nessuno avesse
+    // toccato il documento.
+    assert.ok(!doc.text.includes('\r'), `${doc.id}: fine riga Windows nel testo per l'agente`);
+    assert.ok(!/^---\s*$/m.test(doc.text), `${doc.id}: separatore markdown rimasto nel testo per l'agente`);
   }
 });
 
