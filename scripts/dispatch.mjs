@@ -68,11 +68,11 @@ import { basename, dirname, resolve, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   prepareBranch, newWorkBranch, preferredBase, checkDelivery, withCheckpoint,
-  lastCheckpoint, bumpRejects, clearRejects, headSha, currentBranch,
+  lastCheckpoint, bumpRejects, headSha, currentBranch, restoreNotice,
   writeExpectation, clearExpectation, stateDir, IDENTITY_REJECT_LIMIT,
+  sealTransition as sealBranchTransition, persistStateFileToGit,
 } from './lib/branch-integrity.mjs';
 import { writeRole, clearRole } from './lib/routine-role.mjs';
-import { pushFileToMainWithRetry } from './lib/isolated-push.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = process.env.FILO_REPO_ROOT ? resolve(process.env.FILO_REPO_ROOT) : resolve(__dirname, '..');
