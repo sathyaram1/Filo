@@ -265,9 +265,28 @@ per qualunque interruttore che prometta "questa cosa non succederà":
   `buildAttemptChain`): i tentativi vietati non esistono, quindi non possono
   scattare quando il sostituto non risponde. Se non resta niente, la funzione si
   ferma con un errore che la nomina — **mai** un ripiego zitto.
+- **Il sostituto deve saper fare quel MESTIERE.** Sostituire guardando solo il
+  criterio dell'interruttore (qui: "ha i pesi aperti") consegna funzioni rotte:
+  la dettatura su un modello che legge solo testo fallisce con un errore
+  qualunque, che per chi la usa è peggio di un blocco spiegato.
+  `applyOpenWeightsPolicy` riceve quindi l'**azione** e passa da
+  `SN_MODEL_CAPS.entryCanDoAction`, che a differenza di `modelMatchesAction`
+  nel dubbio dice NO (lì sceglie l'utente e bloccare costa; qui sceglie l'app e
+  sbagliare costa di più). Una voce del registry può dichiarare
+  `input_modalities`/`output_modalities` per riabilitare un caso dalla config
+  condivisa.
 - **Dichiara l'effetto PRIMA.** Le Opzioni dicono quante funzioni cambiano
   modello e **quali si fermano**, calcolato sulla configurazione vera
   (`openWeightsImpact`). Scoprirlo usando l'app è il modo peggiore.
+- **I pulsanti «Prova» sono chiamate vere.** Le prove dei modelli e delle chiavi
+  (`TEST_PROVIDER`, `TEST_DEFAULT_MODEL`) non passano da `buildAttemptChain`, e
+  quindi ereditano zero garanzie: vanno controllate a parte, con le stesse
+  regole (niente fornitore diretto del produttore, niente modelli vietati, lista
+  di esclusione allegata, controllo di chi ha servito). Vale come promemoria
+  generale: **ogni scorciatoia che salta il percorso normale salta anche le sue
+  garanzie** — cercale una per una quando aggiungi una regola trasversale. Nella
+  UI i pulsanti che verrebbero rifiutati si spengono e dicono perché
+  (`applyOpenWeightsTestGating` in `options.js`); il rifiuto vero resta nel main.
 - **Verifica a posteriori, non solo a priori.** L'esclusione a monte è una
   speranza finché non si guarda **chi ha davvero servito** la risposta
   (`servedBy`): se risulta escluso, toast + voce di cronologia marchiata.
