@@ -285,11 +285,10 @@
     const row = document.createElement('div');
     row.className = 'sn-model-row sn-default-model-row';
     const single = entryToSingle(entry);
-    // Provider e modello concreti sulla riga: servono al cancello dei "Prova"
-    // (vedi applyOpenWeightsTestGates), che deve poterli leggere senza rifare il
-    // giro del registry.
-    row.dataset.provider = single.provider || '';
-    row.dataset.model = single.model || '';
+    // La voce INTERA sulla riga (non solo fornitore e stringa): il cancello dei
+    // "Prova" la classifica come fa il main, dove una `weights` scritta a mano
+    // dall'owner conta.
+    row._entry = { ...(entry || {}), provider: single.provider, model: single.model };
 
     const nickEl = document.createElement('div');
     nickEl.className = 'sn-default-model-cell';
