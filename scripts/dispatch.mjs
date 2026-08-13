@@ -8,6 +8,15 @@
 //   riceve un JSON { role, payload, claim, loopCount, instructions } e DIVENTA
 //   quel ruolo.
 //
+// INTERRUTTORE MASTER (2026-08-13)
+//   Prima di ogni precedenza c'è un sì/no dell'owner: `config/routines.enabled`.
+//   Spento, il giro non legge la coda, non prende in carico niente e non tocca
+//   nessun ramo — l'orchestratore parte lo stesso ma non fa nulla. Il documento
+//   è leggibile SENZA credenziali apposta: le macchine delle routine non ne
+//   hanno, e un interruttore che non arriva a destinazione è peggio che
+//   assente. Se non si riesce a leggerlo il giro si FERMA (vedi
+//   fetchRoutineConfig).
+//
 // PRECEDENZA DEI BUCKET (dallo stato, mai dal testo del feedback):
 //   0. secaudit FAIL mai scalato a `design`                     → design (inline)
 //   1. branch passato dal verifier ma senza secaudit            → secaudit
