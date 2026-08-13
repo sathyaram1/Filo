@@ -98,76 +98,78 @@ export function resolveLoopCap({ envRaw, remote } = {}) {
 }
 
 /**
- * Ricava SILENZIOSAMENTE un bearer admin (service account o refresh token
- * dell'owner) senza stampare nulla né uscire dal processo — diversamente da
- * `firestore-auth.acquireBearer`, che logga ed esce se manca la credenziale.
- * Ritorna { fa, bearer } (bearer null se nessuna credenziale/errore). Best-
- * effort: non deve MAI far fallire il dispatch. Riusato dalla lettura del loop
- * cap e dalla scrittura del log dei worker.
+ * Legge le impostazioni che l'owner detta alle routine dalla tab Automazioni.
+ *
+ * PERCHÉ NON È PIÙ UNA LETTURA "BEST-EFFORT" (2026-08-13)
+ *   Stavano in `config/automation`, leggibile solo con un bearer admin, e la
+ *   lettura era best-effort: senza credenziale si ricadeva sui default **senza
+ *   dirlo**. Ma nelle macchine delle routine quella credenziale non c'è mai
+ *   (è la causa del registro worker sempre vuoto, feedback #451): quindi né
+ *   l'esplorazione a coda vuota né i tentativi del loop hanno MAI raggiunto una
+ *   routine cloud. In dashboard sembravano attivi, nei fatti non lo erano.
+ *
+ *   Ora vivono in `config/routines`, che le regole rendono leggibile da chiunque
+ *   e scrivibile solo dall'owner (dentro c'è solo come devono comportarsi le
+ *   routine, niente di segreto). Si legge con la sola chiave pubblica: non c'è
+ *   nessuna credenziale che possa mancare.
+ *
+ * FAIL CLOSED (scelta owner)
+ *   Se il documento non si riesce a leggere — rete giù, Firestore in errore —
+ *   la lettura FALLISCE dichiarandolo, e il giro si ferma. Un interruttore che
+ *   in caso di dubbio lascia lavorare non è un interruttore: il prezzo è un giro
+ *   saltato ogni tanto, il guadagno è che "spento" vuol dire spento.
+ *   Documento mai scritto (404) NON è un dubbio: è "l'owner non ha mai toccato
+ *   niente" ⇒ comportamento storico (routine accese, coi default).
+ *
+ * @returns {Promise<{enabled?:boolean, proberWhenIdle?:boolean, loopCap?:number}>}
+ * @throws {Error} con `faultKind` se il documento non è leggibile.
  */
-async function acquireBearerSilent() {
+async function fetchRoutineConfig() {
   const fa = await import('./lib/firestore-auth.mjs');
-  let bearer = null;
+  const url = `${fa.FIRESTORE_BASE}/${ROUTINES_DOC}?key=${fa.FIREBASE_API_KEY}`;
+  const read = async () => {
+    const res = await fetch(url);
+    if (res.status === 404) return {};            // mai scritto: default
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    return parseRoutineConfig((json && json.fields) || {});
+  };
   try {
-    const sa = fa.loadServiceAccount();
-    if (sa) bearer = await fa.mintAccessTokenFromSA(sa);
-  } catch (_) { /* prova il refresh token */ }
-  if (!bearer) {
-    const rt = fa.findAdminRefreshToken();
-    if (rt) { try { bearer = await fa.mintIdToken(rt); } catch (_) {} }
+    return await withRetry(read, `lettura di ${ROUTINES_DOC}`);
+  } catch (e) {
+    throw routineFault('transient', `impostazioni delle routine illeggibili (${e?.message || e}): non posso sapere se sono accese, quindi mi fermo`);
   }
-  return { fa, bearer };
 }
 
 /**
- * Legge il doc config/automation da Firestore in modo BEST-EFFORT: serve un
- * bearer admin (il doc è admin-only), che si ricava da service account o refresh
- * token dell'owner. Se manca la credenziale o la rete fallisce, ritorna {}
- * (→ si ricade sui default): non deve MAI bloccare il dispatch.
- *
- * Una sola lettura per giro: da qui escono sia `loopCap` sia `proberWhenIdle`.
+ * Traduce i campi Firestore del doc delle routine in valori JS. Pura (testata
+ * in tests/unit/dispatch.test.mjs). Solo i `false` ESPLICITI spengono: campo
+ * assente o di tipo sbagliato = comportamento storico.
  */
-async function fetchRemoteAutomation() {
-  try {
-    const { fa, bearer } = await acquireBearerSilent();
-    if (!bearer) return {}; // nessuna credenziale → default
-    const url = `${fa.FIRESTORE_BASE}/config/automation?key=${fa.FIREBASE_API_KEY}`;
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${bearer}` } });
-    if (!res.ok) return {};
-    const json = await res.json();
-    const fields = (json && json.fields) || {};
-    const out = {};
-    const lc = fields.loopCap;
-    if (lc) {
-      if (lc.integerValue != null) out.loopCap = Number(lc.integerValue);
-      else if (lc.doubleValue != null) out.loopCap = Number(lc.doubleValue);
-    }
-    // `proberWhenIdle`: esplorare quando non c'è altro da fare (feedback #448).
-    // Solo un `false` ESPLICITO spegne l'esplorazione — campo assente, doc mai
-    // scritto o lettura fallita lasciano il comportamento storico.
-    if (fields.proberWhenIdle && fields.proberWhenIdle.booleanValue === false) {
-      out.proberWhenIdle = false;
-    }
-    return out;
-  } catch (_) {
-    return {};
+export function parseRoutineConfig(fields) {
+  const f = fields && typeof fields === 'object' ? fields : {};
+  const out = {};
+  if (f.enabled && typeof f.enabled.booleanValue === 'boolean') out.enabled = f.enabled.booleanValue;
+  if (f.proberWhenIdle && f.proberWhenIdle.booleanValue === false) out.proberWhenIdle = false;
+  const lc = f.loopCap;
+  if (lc) {
+    if (lc.integerValue != null) out.loopCap = Number(lc.integerValue);
+    else if (lc.doubleValue != null) out.loopCap = Number(lc.doubleValue);
   }
+  return out;
 }
 
-// Encoder minimale JS → valore Firestore REST (solo i tipi che ci servono).
-function toFsValue(v) {
-  if (v === null || v === undefined) return { nullValue: null };
-  if (typeof v === 'string') return { stringValue: v };
-  if (typeof v === 'boolean') return { booleanValue: v };
-  if (Number.isInteger(v)) return { integerValue: String(v) };
-  if (typeof v === 'number') return { doubleValue: v };
-  if (Array.isArray(v)) return { arrayValue: { values: v.map(toFsValue) } };
-  if (typeof v === 'object') {
-    const fields = {};
-    for (const [k, vv] of Object.entries(v)) fields[k] = toFsValue(vv);
-    return { mapValue: { fields } };
-  }
-  return { stringValue: String(v) };
+/**
+ * L'interruttore master, risolto: `FILO_ROUTINES_ENABLED` (override locale, per
+ * le prove e per le sessioni dell'owner) batte il valore remoto; assente
+ * ovunque = acceso, che è il comportamento storico.
+ * Pura (testata in tests/unit/dispatch.test.mjs).
+ */
+export function resolveRoutinesEnabled({ envRaw, remote } = {}) {
+  const env = String(envRaw ?? '').trim().toLowerCase();
+  if (['0', 'false', 'off', 'no'].includes(env)) return false;
+  if (['1', 'true', 'on', 'yes'].includes(env)) return true;
+  return remote !== false;
 }
 
 /**
