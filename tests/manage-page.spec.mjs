@@ -342,6 +342,83 @@ test('#448 — spegnere l\'esplorazione a coda vuota arriva alla config delle ro
   });
 });
 
+test('l\'interruttore master spegne le routine e rende inerti le impostazioni che valgono solo per loro', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
+  await page.locator('.mg-tab[data-tab="automation"]').click();
+
+  const sw = page.locator('#mgRoutinesToggle');
+  // La levetta si vede davvero (il checkbox è nascosto per costruzione: se si
+  // asserisse su quello, un controllo largo 0 passerebbe lo stesso — PATTERNS).
+  await expect(page.locator('#mgRoutinesToggle + .mg-switch-track')).toBeVisible();
+  await expect(sw).toBeDisabled();          // non-admin: sola lettura
+
+  await stubAutomation(page);
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.loadAutoMode());
+  await expect(sw).toBeEnabled();
+  await expect(sw).toBeChecked();           // acceso = comportamento storico
+  await expect(page.locator('#mgRoutinesState')).toHaveText('On');
+
+  await page.evaluate(() => {
+    const el = document.getElementById('mgRoutinesToggle');
+    el.checked = false;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+
+  // 1. La decisione LASCIA il client: è ciò che le routine andranno a leggere.
+  await expect.poll(() => page.evaluate(() => window.__automationSets)).toContainEqual({ routinesEnabled: false });
+  await expect.poll(() => page.evaluate(() => window.__automation.routinesEnabled)).toBe(false);
+  await expect(page.locator('#mgRoutinesState')).toHaveText('Off');
+
+  // 2. Le due impostazioni che senza routine non decidono niente diventano
+  //    inerti — e si vede, invece di restare lì a promettere un effetto.
+  await expect(page.locator('#mgProberIdle')).toBeDisabled();
+  await expect(page.locator('#mgLoopCap')).toBeDisabled();
+  await expect(page.locator('#mgProberIdleBlock')).toHaveClass(/mg-auto-block--off/);
+  await expect(page.locator('#mgLoopCapBlock')).toHaveClass(/mg-auto-block--off/);
+  // Il timeout dei giudici NON dipende dalle routine: resta usabile.
+  await expect(page.locator('#mgJudgeTimeout')).toBeEnabled();
+
+  // 3. Riacceso, tutto torna manovrabile.
+  await page.evaluate(() => {
+    const el = document.getElementById('mgRoutinesToggle');
+    el.checked = true;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await expect(page.locator('#mgProberIdle')).toBeEnabled();
+  await expect(page.locator('#mgLoopCap')).toBeEnabled();
+});
+
+test('se il salvataggio dell\'interruttore fallisce, le routine NON risultano spente', async ({ openTab }) => {
+  // Non scritto = non cambiato: uno switch che mostra "Off" mentre le routine
+  // continuano a lavorare è peggio di non averlo (è il difetto per cui la
+  // modalità automatica è rimasta finta per settimane).
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
+  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await stubAutomation(page);
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.loadAutoMode());
+
+  await page.evaluate(() => {
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'automation_set') return { ok: false, error: 'niente rete' };
+      return orig(msg);
+    };
+    const el = document.getElementById('mgRoutinesToggle');
+    el.checked = false;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+
+  await expect(page.locator('#mgRoutinesToggle')).toBeChecked();
+  await expect(page.locator('#mgRoutinesState')).toHaveText('On');
+  await expect(page.locator('#mgRoutinesMsg')).toContainText('NON');
+});
+
 // Stub dell'IPC del loop cap: simula il doc Firestore config/automation senza
 // rete/main. Cattura ogni `set` per provare che il valore LASCIA il client (è la
 // fonte che le routine leggono → "il cambiamento ha effetto").
