@@ -290,6 +290,9 @@
     'google/gemma-4-31b-it': { input: 0.10, output: 0.30 },
     'google/gemma-4-26b-a4b-it': { input: 0.04, output: 0.12 },
     'deepseek/deepseek-v4-pro': { input: 0.40, output: 0.80 },
+    // Vision a pesi aperti: costa poco più del doppio di un modello di testo
+    // equivalente, e lo usano solo le funzioni che devono guardare un'immagine.
+    'moonshotai/kimi-k2.6': { input: 0.90, output: 1.80 },
   };
   // Prezzo di ripiego quando il modello concreto non è nella tabella (config
   // personalizzata dell'utente): un modello "flash" medio, così una chiamata AI
@@ -1727,6 +1730,7 @@
       'google/gemma-4-31b-it': { input: 0.10, output: 0.30 },
       'google/gemma-4-26b-a4b-it': { input: 0.04, output: 0.12 },
       'deepseek/deepseek-v4-pro': { input: 0.40, output: 0.80 },
+      'moonshotai/kimi-k2.6': { input: 0.90, output: 1.80 },
     },
     // Limite hard mensile in EUR
     monthlyLimitEur: 5,
