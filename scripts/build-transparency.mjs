@@ -294,7 +294,12 @@ function buildDocs() {
 
   const files = readdirSync(SRC_DIR).filter((f) => f.endsWith('.md')).sort();
   const docs = files.map((file) => {
-    const raw = readFileSync(join(SRC_DIR, file), 'utf8');
+    // Fine riga normalizzati SUBITO: su Windows git riscrive i .md in CRLF, e
+    // il testo generato veniva diverso a seconda di come il file era stato
+    // estratto dal repo (la riga `---` sopravviveva alla ripulitura perché
+    // `$` non passa il `\r`). Risultato: il controllo di allineamento diventava
+    // rosso dopo un rebase senza che nessuno avesse toccato il documento.
+    const raw = readFileSync(join(SRC_DIR, file), 'utf8').replace(/\r\n/g, '\n');
     const { meta, body } = parseFrontMatter(raw);
     const sources = [];
     const { html, sections } = renderBody(body, sources);
