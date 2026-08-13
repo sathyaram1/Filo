@@ -2,7 +2,7 @@
   "id": "8e2d6993-17de-44ab-942a-b8561ed60c5f",
   "branch": "worker/8e2d6993-17de-44ab-942a-b8561ed60c5f-20260813T181528Z",
   "loopCount": 0,
-  "verifierVerdict": null,
+  "verifierVerdict": "pass",
   "verifierCritique": "",
   "secauditDone": false,
   "secauditVerdict": null,
@@ -16,6 +16,11 @@
       "sha": "d44126d36aeee20c74886ce2daf5ed1a9670f033",
       "by": "consegna:revision_capability",
       "at": "2026-08-13T18:29:35.822Z"
+    },
+    {
+      "sha": "06bb611f1306029d59bc9869fd18239f89b7dbe7",
+      "by": "verifier:pass",
+      "at": "2026-08-13T18:38:10.183Z"
     }
   ]
 }
