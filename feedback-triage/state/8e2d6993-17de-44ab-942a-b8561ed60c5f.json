@@ -11,6 +11,11 @@
       "sha": "31fb4cf9364910f7d26813d1fbd447533a0e76da",
       "by": "new-work:checkout",
       "at": "2026-08-13T18:15:29.982Z"
+    },
+    {
+      "sha": "d44126d36aeee20c74886ce2daf5ed1a9670f033",
+      "by": "consegna:revision_capability",
+      "at": "2026-08-13T18:29:35.822Z"
     }
   ]
 }
