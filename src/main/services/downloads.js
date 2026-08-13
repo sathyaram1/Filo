@@ -499,7 +499,7 @@ function beginManual({ url, filename, totalBytes } = {}) {
     },
     done(savePath) { finalizeManual(rec, 'completed', savePath); },
     fail() { finalizeManual(rec, 'interrupted'); },
-    cancel() { finalizeManual(rec, 'cancelled'); },
+    cancel: requestCancel,
   };
 }
 
