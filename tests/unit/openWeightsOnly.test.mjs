@@ -90,6 +90,15 @@ test('il sostituto deve saper fare il MESTIERE della funzione, non solo avere i 
   );
   assert.deepEqual(testo.refs, ['gemma']);
 
+  // Chi il mestiere lo sa fare viene usato: le funzioni che devono GUARDARE
+  // un'immagine non si spengono, passano al modello aperto che le legge.
+  const ocr = C.applyOpenWeightsPolicy(
+    C.parseModelRefs(C.DEFAULT_MODELS[C.ACTIONS.TRANSCRIBE_IMAGE]), REG, C.ACTIONS.TRANSCRIBE_IMAGE,
+  );
+  assert.equal(ocr.refs.length, 1);
+  assert.ok(C.isOpenWeightsRef(ocr.refs[0], REG));
+  assert.notEqual(ocr.refs[0], 'gemma', 'un modello di solo testo non può fare l\'OCR');
+
   // Una voce può DICHIARARE di sentire l'audio (l'owner la corregge dalla config
   // condivisa): allora la sostituzione torna possibile.
   const regSente = {
