@@ -31,14 +31,27 @@
 // domani. I nomi esatti si asseriscono sulla configurazione personale, che il
 // test controlla per intero.
 
+import { test, expect } from './fixtures/electron.mjs';
+
 // Chiavi predefinite finte: sono quelle che stanno dietro ai "crediti di Filo".
 // Vanno impostate PRIMA che la fixture lanci l'app (le legge da process.env),
-// altrimenti la richiesta si fermerebbe su "accedi con un profilo" e il test
-// non arriverebbe mai a guardare la catena.
-process.env.FILO_DEFAULT_OPENROUTER_KEY = 'k-test-openrouter';
-process.env.FILO_DEFAULT_GEMINI_KEY = 'k-test-gemini';
-
-import { test, expect } from './fixtures/electron.mjs';
+// altrimenti la richiesta si fermerebbe su "accedi con un profilo" e il test non
+// arriverebbe mai a guardare la catena.
+// SOLO per questo file: il worker di Playwright è un processo solo per decine di
+// spec, quindi scriverle a livello di modulo le lasciava accese anche dopo — e
+// gli spec che verificano il comportamento SENZA chiavi (la home che invita a
+// registrarsi) fallivano a seconda dell'ordine.
+const CHIAVI = { FILO_DEFAULT_OPENROUTER_KEY: 'k-test-openrouter', FILO_DEFAULT_GEMINI_KEY: 'k-test-gemini' };
+const primaDi = {};
+test.beforeAll(() => {
+  for (const [k, v] of Object.entries(CHIAVI)) { primaDi[k] = process.env[k]; process.env[k] = v; }
+});
+test.afterAll(() => {
+  for (const k of Object.keys(CHIAVI)) {
+    if (primaDi[k] === undefined) delete process.env[k];
+    else process.env[k] = primaDi[k];
+  }
+});
 
 async function waitForBoot(app) {
   const deadline = Date.now() + 10_000;
