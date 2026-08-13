@@ -432,6 +432,90 @@ async function patchFeedback(entry, bearer) {
   return { status: res.status, ok: res.ok, body: res.ok ? '' : (await res.text()).slice(0, 200) };
 }
 
+// ─── Registro dei worker (config/automation.workerLog) ───────────────────────
+
+// Quante voci tenere: allineato a SN_CONST.AUTOMATION.WORKER_LOG_CAP e al cap
+// di scripts/dispatch.mjs. Il registro vive come campo di un documento, quindi
+// va cappato o il documento cresce senza fine.
+const WORKER_LOG_CAP = (() => {
+  const n = globalThis.SN_CONST?.AUTOMATION?.WORKER_LOG_CAP;
+  return Number.isFinite(n) && n > 0 ? n : 200;
+})();
+
+/**
+ * Fonde le voci accodate col registro già su Firestore, in ordine cronologico,
+ * tenendo solo le `cap` più recenti. Pura (testata in
+ * tests/unit/workerLogQueue.test.mjs).
+ *
+ * Le voci DUPLICATE (stesso ruolo e stesso istante) vengono scartate: la coda
+ * ritenta le spedizioni non riuscite, quindi la stessa voce può arrivare due
+ * volte, e un registro che conta due volte lo stesso worker mente su cosa hanno
+ * fatto le routine.
+ */
+export function mergeWorkerLog(current, entries, cap = WORKER_LOG_CAP) {
+  const norm = (e) => ({
+    role: String(e?.role || ''),
+    startedAt: String(e?.startedAt || ''),
+    num: e?.num != null ? String(e.num) : '',
+  });
+  const list = (Array.isArray(current) ? current : []).filter((e) => e && e.role).map(norm);
+  const seen = new Set(list.map((e) => `${e.role}|${e.startedAt}`));
+  for (const raw of (Array.isArray(entries) ? entries : [])) {
+    const e = norm(raw);
+    if (!e.role) continue;
+    const key = `${e.role}|${e.startedAt}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    list.push(e);
+  }
+  list.sort((a, b) => a.startedAt.localeCompare(b.startedAt));
+  const n = Number.isFinite(cap) && cap > 0 ? Math.floor(cap) : WORKER_LOG_CAP;
+  return list.length > n ? list.slice(list.length - n) : list;
+}
+
+/**
+ * Applica in UN SOLO colpo tutte le voci del registro accodate: legge il campo
+ * attuale, fonde, riscrive. Un solo giro di lettura/scrittura anche se le voci
+ * arretrate sono venti (succede se la spedizione era rotta da giorni).
+ */
+async function applyWorkerLog(items, bearer) {
+  const url = `${FIRESTORE_BASE}/config/automation`;
+  const auth = { Authorization: `Bearer ${bearer}` };
+  let current = [];
+  const res = await fetch(url, { headers: auth });
+  if (res.ok) {
+    const json = await res.json();
+    const arr = json?.fields?.workerLog?.arrayValue?.values;
+    if (Array.isArray(arr)) {
+      current = arr.map((v) => {
+        const f = v?.mapValue?.fields || {};
+        return {
+          role: f.role?.stringValue || '',
+          startedAt: f.startedAt?.stringValue || '',
+          num: f.num?.stringValue || '',
+        };
+      });
+    }
+  } else if (res.status !== 404) {
+    throw new Error(`lettura del registro fallita: HTTP ${res.status}`);
+  }
+
+  const next = mergeWorkerLog(current, items.map((it) => it.entry));
+  const values = next.map((e) => ({ mapValue: { fields: {
+    role: { stringValue: e.role },
+    startedAt: { stringValue: e.startedAt },
+    num: { stringValue: e.num },
+  } } }));
+  // updateMask sul solo `workerLog`: non tocca enabled/loopCap/autoApprove.
+  const patch = await fetch(`${url}?updateMask.fieldPaths=workerLog`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ fields: { workerLog: { arrayValue: { values } } } }),
+  });
+  if (!patch.ok) throw new Error(`HTTP ${patch.status} ${(await patch.text()).slice(0, 200)}`);
+  return next.length;
+}
+
 function readSpool() {
   if (!existsSync(SPOOL_DIR)) return [];
   return readdirSync(SPOOL_DIR)
