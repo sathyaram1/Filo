@@ -301,7 +301,7 @@
 
     const testBtn = document.createElement('button');
     testBtn.type = 'button';
-    testBtn.className = 'sn-btn sn-btn-secondary';
+    testBtn.className = 'sn-btn sn-btn-secondary sn-model-test';
     testBtn.textContent = I18n.t('options_model_test');
     testBtn.addEventListener('click', () => runDefaultModelTest(nick, row, testBtn));
 
