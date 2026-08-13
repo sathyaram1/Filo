@@ -329,6 +329,10 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
 
   const before = headSha(root);
   let discarded = null;
+  // Ciò che sta sopra il punto fermo può essere solo burocrazia della coda
+  // (fogliettini di triage, file di stato): non è lavoro di nessuno, quindi non
+  // si scarta e non si riscrive la storia per rimuoverlo.
+  if (before && before !== target && aheadOnlyByBookkeeping(g, target, before)) target = before;
   if (before && before !== target) {
     // I commit scartati NON si distruggono: sono la traccia con cui si
     // ricostruisce cosa è successo. Si spostano di lato su un branch di
