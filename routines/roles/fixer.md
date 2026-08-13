@@ -20,6 +20,12 @@ convenzioni di lavoro (sintomo-vs-causa, invarianti UX, tono, verifica) sono in
    trovi il lavoro dei tuoi predecessori, non i loro frammenti a metà. Niente
    `git checkout`: se ti sposti, una guardia ti ferma e la consegna viene
    rifiutata.
+   ⚠️ **`payload.notice`**: se è valorizzato, il ramo è stato rimaneggiato prima
+   di arrivarti (riportato a un punto fermo, o senza differenze rispetto alla
+   linea principale). Se il lavoro che la critica dà per esistente non c'è,
+   **non riscriverlo da capo**: cercalo sui rami di servizio `discarded/*`
+   (`git branch -a --list 'discarded/*'`) e riportalo qui. Un'implementazione
+   doppia è il danno che questa protezione esiste per evitare.
 2. Leggi la critica FAIL: capisci **cosa si rompe** e **perché**, non solo il
    messaggio d'errore.
 3. **Distingui sintomo da causa**: riformula "l'utente voleva fare X, gli è
