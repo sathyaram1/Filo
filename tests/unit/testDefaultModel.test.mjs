@@ -59,7 +59,7 @@ registerAi((type, fn) => handlers.set(type, fn), {
   },
   isAdmin: () => state.admin,
   handleAIRequest: async () => ({}),
-  modelForAction: () => '',
+  modelForAction: (s, action) => ((s && s.models) || {})[action] || '',
   buildAttemptChain: () => [],
   // Le stesse due funzioni che il main passa all'handler. La classificazione è
   // quella VERA (logica pura in constants.js): qui è finto solo il testo del
