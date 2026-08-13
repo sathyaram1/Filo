@@ -1,0 +1,7 @@
+{
+  "id": "9dac6772-cbe3-440a-b323-272193a67da4",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Controllo funzionalità superato. Con l'interruttore acceso ho fatto eseguire all'app, una per una, tutte le funzioni che usano un modello, guardando le richieste che escono davvero: nessuna finisce a un fornitore escluso, nessuna cita un modello proprietario, e ognuna porta con sé l'esclusione. Provato sia con i crediti di Filo sia con una configurazione personale con chiave Google salvata: viene fermato anche un modello a pesi aperti servito dai server di chi lo produce. Se il sostituto risponde male la richiesta fallisce e basta, e con la sola chiave Google in casa non parte niente verso Google. Se una risposta risultasse comunque servita da un escluso, resta marcata nella cronologia. Gli strumenti di test non chiedono più nessuna chiave Google; il loro giro vero in rete qui non è provabile perché manca la chiave OpenRouter. Nella suite completa nessuna regressione: i rossi rimasti (schermo intero e cattura dello schermo) falliscono identici anche senza questo lavoro. Resta una cosa che non blocca, e che ti ho accodato come segnalazione a parte: nella pagina di amministrazione dei modelli predefiniti l'elenco dei modelli Gemini viene ancora chiesto a Google da solo all'apertura, mentre nelle Opzioni la stessa richiesta ora è ferma.",
+  "queuedAt": "2026-08-13T13:57:52.467Z",
+  "queuedBy": "routine"
+}
