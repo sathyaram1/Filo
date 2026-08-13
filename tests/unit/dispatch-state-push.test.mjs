@@ -51,7 +51,7 @@ writeFileSync(resolve(REPO, 'lavoro-non-esaminato.js'), 'module.exports = 1;\n')
 git(['add', '-A']);
 git(['commit', '-q', '-m', 'lavoro di #FBTEST, mai passato dal cancello']);
 
-const { writeState, defaultState, persistStateToGit, clearState, rejectionText } = await import('../../scripts/dispatch.mjs');
+const { writeState, defaultState, persistStateToGit, clearState, rejectionText, branchIsEmpty } = await import('../../scripts/dispatch.mjs');
 
 // File su main nel remoto (quello che riceverebbero gli utenti).
 const filesOnMain = () => git(['ls-tree', '-r', '--name-only', 'main'], ORIGIN).split('\n').filter(Boolean);
