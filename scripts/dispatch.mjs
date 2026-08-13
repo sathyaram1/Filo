@@ -552,13 +552,19 @@ export function readRoleInstructions(role) {
  * @param {object} ctx     { diff?, feedback? } dati già raccolti dal chiamante
  */
 export function buildPayload(bucket, ctx = {}) {
+  // `notice`: l'avviso su un ramo che il sistema ha rimaneggiato prima di
+  // consegnarlo (ripristino all'ultimo punto fermo, ramo senza modifiche). Va a
+  // TUTTI i ruoli che quel ramo lo giudicano o lo correggono, perché è
+  // l'informazione che distingue "non è mai stato fatto" da "il sistema l'ha
+  // messo da parte".
+  const notice = bucket.notice || '';
   switch (bucket.role) {
     case 'secaudit':
       // NESSUN campo del feedback: solo branch + diff.
-      return { branch: bucket.branch, diff: ctx.diff || '', id: bucket.id, num: bucket.num };
+      return { branch: bucket.branch, diff: ctx.diff || '', id: bucket.id, num: bucket.num, notice };
     case 'verifier':
       // Sintomo (feedback) + branch, MAI il diff né il report del risolutore.
-      return { branch: bucket.branch, id: bucket.id, num: bucket.num, feedback: ctx.feedback || null };
+      return { branch: bucket.branch, id: bucket.id, num: bucket.num, feedback: ctx.feedback || null, notice };
     case 'fixer':
       return {
         branch: bucket.branch,
@@ -567,9 +573,14 @@ export function buildPayload(bucket, ctx = {}) {
         feedback: ctx.feedback || null,
         verifierCritique: bucket.state?.verifierCritique || '',
         loopCount: bucket.loopCount || 0,
+        notice,
       };
     case 'new-work':
-      return { id: bucket.id, num: bucket.num, feedback: ctx.feedback || null };
+      // `branch` c'è perché il ruolo lo promette ("il nome è in payload.branch")
+      // ed è il nome che deve finire nella consegna: il nome vero è unico per
+      // tentativo, quindi ricostruirlo a memoria come `worker/<id>` dà un ramo
+      // che non esiste.
+      return { id: bucket.id, num: bucket.num, branch: bucket.branch || '', feedback: ctx.feedback || null };
     case 'halt':
       // Guasto: nessun lavoro, solo il motivo per cui non si può lavorare.
       return { kind: bucket.kind || 'transient', message: bucket.message || '' };
