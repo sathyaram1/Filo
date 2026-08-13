@@ -70,6 +70,12 @@ const STATE_DIR = stateDir(ROOT);
 const ROLES_DIR = resolve(ROOT, 'routines', 'roles');
 const MAIN_BRANCH = process.env.FILO_MAIN_BRANCH || 'main';
 
+// Il documento che dice alle routine come devono comportarsi: acceso/spento,
+// esplorazione a coda vuota, tentativi del loop. Leggibile SENZA credenziali
+// (le regole lo aprono in lettura, la scrittura resta all'owner) — vedi
+// fetchRoutineConfig per il perché.
+const ROUTINES_DOC = 'config/routines';
+
 // Quante FAIL consecutive del verifier prima di bloccare con motivo `loop`.
 // Precedenza: override d'ambiente FILO_LOOP_CAP > valore scelto dall'owner nella
 // tab Automazioni (doc Firestore config/automation, campo `loopCap`) > default 3.
