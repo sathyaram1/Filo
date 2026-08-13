@@ -290,7 +290,19 @@ module.exports = function register(on, ctx) {
 
     let entry = null;        // voce nella barra scaricamenti
     let partPath = '';       // file che cresce mentre i byte arrivano
-    let destPromise = null;  // scelta della destinazione, in parallelo
+    let destPromise = null;  // scelta della destinazione (una volta sola)
+    let askDest = null;      // come aprirla, quando serve
+    let askTimer = null;
+    // Il dialogo si apre alla prima delle due: trasferimento finito, oppure
+    // passato un attimo senza che finisca (⇒ è un file grosso). Così un
+    // salvataggio istantaneo si comporta esattamente come prima — dialogo a
+    // scaricamento concluso, e nessun dialogo se fallisce subito — mentre un
+    // filmato lungo non tiene ferma la connessione aspettando una risposta.
+    const ASK_AFTER_MS = 1200;
+    const ensureDest = () => {
+      if (!destPromise && askDest) destPromise = askDest();
+      return destPromise;
+    };
     const dropPart = async () => {
       if (!partPath) return;
       try { await fs.promises.unlink(partPath); } catch (_) {}
