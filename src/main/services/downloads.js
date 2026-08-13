@@ -581,6 +581,12 @@ function resume(id) {
 module.exports = {
   init,
   attachSession,
+  beginManual,
+  // Serve a chi scarica i byte da sé (#436) per piazzare il file parziale nella
+  // stessa cartella in cui atterrerebbe un download nativo: così la rinomina
+  // finale resta un'operazione istantanea invece di una copia fra volumi.
+  downloadsDir,
+  uniquePath,
   list,
   clearCompleted,
   remove,
