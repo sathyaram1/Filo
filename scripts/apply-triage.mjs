@@ -685,8 +685,26 @@ async function main() {
   // se presente, va rilasciato — la riconciliazione azzera i campi su Firestore.
   const resolvedIds = new Set();
   let failures = 0;
+
+  // Registro dei worker: tutte le voci insieme, una lettura e una scrittura
+  // sole. Se la scrittura fallisce i fogliettini RESTANO in coda (si riapplicano
+  // al prossimo giro) e il motivo si legge qui: il registro non deve poter
+  // fallire in silenzio, che è esattamente com'era nato (#451).
+  const logItems = items.filter((it) => !it.error && it.entry?.op === 'worker-log');
+  if (logItems.length) {
+    try {
+      const total = await applyWorkerLog(logItems, bearer);
+      console.log(`  ✓ registro worker: ${logItems.length} voce/i aggiunte (${total} in totale)`);
+      for (const it of logItems) { unlinkSync(it.file); applied.push(it.file); }
+    } catch (e) {
+      console.error(`  ✗ registro worker: ${e.message} — ${logItems.length} voce/i restano in coda`);
+      failures++;
+    }
+  }
+
   for (const it of items) {
     if (it.error) { console.warn(`  ✗ salto ${it.file}: ${it.error}`); failures++; continue; }
+    if (it.entry.op === 'worker-log') continue; // già applicate in blocco qui sopra
     if (it.entry.op === 'backfill') {
       try {
         const r = await backfillNumbers(bearer);
