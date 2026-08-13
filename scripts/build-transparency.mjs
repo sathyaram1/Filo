@@ -338,8 +338,6 @@ function emitModule({ docs, glossary }) {
   const GLOSSARY = ${JSON.stringify(glossary, null, 2).replace(/\n/g, '\n  ')};
   const DOCS = ${JSON.stringify(payload, null, 2).replace(/\n/g, '\n  ')};
 
-${GLOSSARY_RUNTIME}
-
   function all() { return DOCS.slice(); }
   function get(id) { return DOCS.find((d) => d.id === String(id || '').toLowerCase()) || null; }
   function ids() { return DOCS.map((d) => d.id); }
