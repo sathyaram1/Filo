@@ -749,8 +749,17 @@
   //  - Gemini: il catalogo richiede la chiave (gratuita); senza, il campo resta
   //    libero e le categorie si deducono dal nome del modello.
   // Silenzioso: in caso di errore il campo resta un input libero.
+  // Il catalogo di un produttore diretto non si chiede mentre "solo pesi aperti"
+  // è acceso: è pur sempre una richiesta ai suoi server, e quei modelli non sono
+  // comunque usabili — elencarli servirebbe solo a farli scegliere per niente.
+  function providerCatalogAllowed(provider) {
+    if (provider !== 'gemini') return true;
+    return !$('openWeightsOnly').checked;
+  }
+
   async function ensureProviderModels(provider) {
     if (providerModelCache[provider]) return;
+    if (!providerCatalogAllowed(provider)) return;
     const key = providerKey(provider);
     if (provider === 'gemini' && !key) return;
     try {
