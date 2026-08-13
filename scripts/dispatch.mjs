@@ -437,16 +437,82 @@ export function persistStateToGit(id, message) {
   // tocca git — lo stato è un file temporaneo, non il repo reale.
   if (process.env.FILO_DISPATCH_STATE_DIR) return;
   const rel = relative(ROOT, stateFile(id)).split(sep).join('/');
+  if (!tryGit(['add', '--', rel]).ok) return;
+  // Niente in stage per questo file → già allineato, nulla da pushare.
+  if (tryGit(['diff', '--cached', '--quiet', '--', rel]).ok) return;
+  // Commit LOCALE path-limited: il verdetto deve sopravvivere a un reset/rebase
+  // sul branch corrente (incident #289). Questo resta com'era.
+  if (!tryGit(['commit', '-q', '-m', message, '--', rel]).ok) return;
+  pushStateFileToMain(rel, message);
+}
+
+/**
+ * Porta il file di stato su `main` **senza pubblicare il branch corrente**.
+ *
+ * Prima qui c'era `git push origin HEAD:main`. Su un branch worker HEAD NON è il
+ * commit del file di stato: è tutta la lavorazione non ancora esaminata. E i
+ * branch worker nascono da main, quindi main ne è antenato e il push
+ * fast-forwarda — cioè fonde in silenzio l'intero lavoro sulla linea che ogni 6
+ * ore viene costruita e distribuita a TUTTI gli utenti, scavalcando verifier,
+ * secaudit e cancello di merge. È la stessa perdita del 24 luglio 2026, per una
+ * via diversa: là mancava la marcatura di routine, qui è il record del verdetto
+ * a fare da cavallo di Troia.
+ *
+ * Il verdetto però su main ci deve arrivare (è lì che i giri successivi lo
+ * rileggono, come i claim). Quindi si costruisce un commit **sintetico** che
+ * contiene SOLO il file di stato, sopra la punta di origin/main, e si pusha
+ * QUELLO: niente checkout, niente merge, l'albero di lavoro non viene toccato e
+ * nessun altro file può salire per sbaglio.
+ *
+ * Best-effort come prima: un guasto git non deve mai far fallire il record — lo
+ * stato locale è già scritto e committato.
+ */
+function pushStateFileToMain(rel, message) {
+  const abs = resolve(ROOT, rel);
+  // Un `--clear-state` RIMUOVE il file: la persistenza deve saper cancellare,
+  // non solo aggiungere. Prima il push di HEAD portava con sé anche le
+  // rimozioni; costruendo l'albero a mano il caso va gestito, o lo stato
+  // sopravvive su main e la sessione dopo — che parte da lì — resuscita un
+  // feedback già chiuso.
+  const removing = !existsSync(abs);
   for (let attempt = 0; attempt < 3; attempt++) {
-    if (!tryGit(['add', '--', rel]).ok) return;
-    // Niente in stage per questo file → già allineato, nulla da pushare.
-    if (tryGit(['diff', '--cached', '--quiet', '--', rel]).ok) return;
-    if (!tryGit(['commit', '-q', '-m', message, '--', rel]).ok) return;
-    // Push ff-only su origin/main, come i claim. Se rifiutato, main è avanzato:
-    // riconcilio con un rebase (tocca solo questo file → nessun conflitto) e
-    // ritento. Se il rebase fallisce, abortisco e mollo: il commit locale resta.
-    if (tryGit(['push', 'origin', `HEAD:${MAIN_BRANCH}`]).ok) return;
-    if (!tryGit(['pull', '--rebase', 'origin', MAIN_BRANCH]).ok) { tryGit(['rebase', '--abort']); return; }
+    if (!tryGit(['fetch', 'origin', MAIN_BRANCH]).ok) return;
+    const base = tryGit(['rev-parse', 'FETCH_HEAD']);
+    if (!base.ok) return;
+    let blob = null;
+    if (!removing) {
+      blob = tryGit(['hash-object', '-w', '--', abs]);
+      if (!blob.ok) return;
+    }
+    // Indice temporaneo: `read-tree`/`update-index` non devono toccare l'indice
+    // vero del repo, o il worker si ritroverebbe lo stage riscritto sotto i piedi.
+    const idx = resolve(STATE_DIR, `.push-index-${process.pid}`);
+    const env = { ...process.env, GIT_INDEX_FILE: idx };
+    const g = (args) => {
+      try { return { ok: true, out: execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', env }).trim() }; }
+      catch (e) { return { ok: false, out: `${e.stdout || ''}${e.stderr || ''}`.trim() || e.message }; }
+    };
+    try {
+      if (!g(['read-tree', base.out]).ok) return;
+      if (removing) {
+        if (!g(['update-index', '--force-remove', rel]).ok) return;
+      } else if (!g(['update-index', '--add', '--cacheinfo', `100644,${blob.out},${rel}`]).ok) return;
+      const tree = g(['write-tree']);
+      if (!tree.ok) return;
+      // Albero identico alla punta: su main non c'è niente da cambiare (tipico
+      // di una rimozione già avvenuta). Un commit vuoto sarebbe solo rumore.
+      const baseTree = tryGit(['rev-parse', `${base.out}^{tree}`]);
+      if (baseTree.ok && baseTree.out === tree.out) return;
+      const commit = tryGit(['commit-tree', tree.out, '-p', base.out, '-m', message]);
+      if (!commit.ok) return;
+      // ff-only per costruzione: il padre È la punta di main appena letta. Se
+      // main si è mosso nel frattempo il push viene rifiutato → si rilegge la
+      // punta nuova e si ricostruisce. Nessun rebase, nessun conflitto possibile:
+      // l'unico file toccato è questo.
+      if (tryGit(['push', 'origin', `${commit.out}:${MAIN_BRANCH}`]).ok) return;
+    } finally {
+      rmSync(idx, { force: true });
+    }
   }
 }
 
@@ -796,7 +862,59 @@ function recordSecaudit(id, verdict) {
   return next;
 }
 
+// ─── Prontezza (--preflight) ─────────────────────────────────────────────────
+
+/**
+ * Prontezza del giro, da eseguire PRIMA del setup dell'ambiente (npm install,
+ * binario Electron ~102MB, scrot): se il giro non è in grado di lavorare, va
+ * scoperto prima di aver pagato il setup.
+ *
+ * Non è un dispatch a vuoto: NON claima, NON emette un bucket, NON consegna
+ * lavoro. Guarda solo se lo stato è leggibile — cioè le due cose che rendono
+ * cieco il giro: la coda dei feedback irraggiungibile e la chiave privata
+ * assente o rotta (l'ondata #310+).
+ *
+ * **Non è mai più severo di `run()`**, o fermerebbe giri che avrebbero
+ * lavorato: si ferma solo sui guasti DICHIARATI (`faultKind`), quelli su cui
+ * anche `run()` si ferma. Un guasto generico dopo i retry là ripiega
+ * sull'audit, quindi qui è prontezza OK.
+ *
+ * @param {() => Promise<any>} [build] iniettabile per i test (default: snapshot vero)
+ * @returns {Promise<{ok:true}|{ok:false, kind:string, message:string}>}
+ */
+export async function preflight(build = buildSnapshot) {
+  try {
+    await build();
+    return { ok: true };
+  } catch (e) {
+    if (e?.faultKind) return { ok: false, kind: e.faultKind, message: e.message };
+    process.stderr.write(`[dispatch] prontezza: stato illeggibile (${e?.message || e}) → il giro ripiegherà sull'audit\n`);
+    return { ok: true };
+  }
+}
+
 // ─── run() — il comando di default ────────────────────────────────────────────
+
+/**
+ * Testo per il worker quando la guardia d'identità RIFIUTA di scrivere un
+ * verdetto (albero sbagliato, HEAD staccato, branch diverso da quello
+ * assegnato). Il rifiuto è la cosa giusta — il verdetto non sarebbe attendibile
+ * — ma va spiegato: senza, il worker vede solo un comando morto e non sa se
+ * ritentare, se ha perso il lavoro, o cosa dire all'orchestratore.
+ *
+ * Esisteva solo come chiamata: i tre `--record-*` morivano con
+ * `rejectionText is not defined` ed exit 1 invece del 3 previsto, quindi il
+ * guasto si travestiva da errore d'uso. Stessa classe del `--preflight` mai
+ * implementato, tre righe più sotto.
+ */
+export function rejectionText(message) {
+  return [
+    `[dispatch] GUASTO (identità): ${message}`,
+    'Il verdetto NON è stato scritto: la directory non corrisponde al branch assegnato,',
+    "quindi ciò che avresti giudicato non è ciò che verrebbe fuso. Non riscrivere lo stato",
+    "a mano e non forzare il branch: riporta `guasto identita` all'orchestratore e fermati.",
+  ].join('\n');
+}
 
 /**
  * Emette un GUASTO: nessun lavoro consegnato, e il worker lo dice
