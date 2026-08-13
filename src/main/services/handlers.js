@@ -485,7 +485,10 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
     const ch = buildAttemptChain(settings, model, action);
     if (ch[0] && ch[0].model) modelName = ch[0].model;
   } catch (e) {
-    if (e && e.code === 'NO_MODEL_FOR_ACTION') throw e;
+    // Errore di configurazione dei modelli (nessun modello, scorciatoia
+    // inesistente, o nessun modello ammesso dall'interruttore "solo pesi
+    // aperti"): non ha senso costruire il prompt di una funzione che non parte.
+    if (e && SN_CONST.isModelConfigErrorCode(e.code)) throw e;
   }
   let messages = await buildMessages(action, { ...payload, modelName });
   messages = SN_CONST.injectAgentStyle(messages, action, settings.agentStyle);
