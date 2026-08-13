@@ -262,52 +262,100 @@ module.exports = function register(on, ctx) {
     const path = require('node:path');
     const fs = require('node:fs');
     const { dialog, app, BrowserWindow } = require('electron');
+    const downloads = require('../downloads');
     const ses = wc.session;
     const referrer = String(sender?.tab?.url || sender?.url || '');
-
-    // 1) Scarica i byte (con Referer della pagina + cookie della session).
-    let buffer, suggested;
-    try {
-      const r = await fetchImageBytes({ url, referrer, session: ses, kind });
-      buffer = r.buffer;
-      suggested = r.filename;
-    } catch (e) {
-      return { ok: false, error: e?.message || 'download fallito' };
-    }
-
-    // 2) Nome file sicuro: preferisci il Content-Disposition del server, poi il
-    // path dell'URL; neutralizza separatori e tentativi di traversal.
     const fallbackName = kind === 'video' ? 'video' : (kind === 'audio' ? 'audio' : 'immagine');
-    const filename = safeImageFilename(suggested || filenameFromUrl(url) || fallbackName);
 
-    // 3) Scegli il percorso e scrivi.
-    const testDir = process.env.FILO_DOWNLOAD_DIR;
-    let savePath;
-    if (testDir) {
-      // Hook per i test/headless: salvataggio diretto senza dialogo nativo.
-      try { fs.mkdirSync(testDir, { recursive: true }); } catch (_) {}
-      savePath = path.join(testDir, filename);
-    } else {
-      // Dialogo "Salva come…" pre-compilato con la cartella Download e il nome
-      // dedotto — stesso comportamento che il salvataggio same-origin aveva già.
+    // Dove mettere il file: in test si salva diretto (il dialogo nativo non è
+    // automatizzabile), altrimenti "Salva come…" pre-compilato con la cartella
+    // Download e il nome dedotto. Non rigetta MAI: l'esito è nel valore.
+    const pickDestination = async (filename) => {
+      const testDir = process.env.FILO_DOWNLOAD_DIR;
+      if (testDir) {
+        try { fs.mkdirSync(testDir, { recursive: true }); } catch (_) {}
+        return { filePath: path.join(testDir, filename) };
+      }
       try {
         const win = BrowserWindow.fromWebContents(wc) || winOf(sender) || null;
         const opts = { defaultPath: path.join(app.getPath('downloads'), filename) };
         const res = win ? await dialog.showSaveDialog(win, opts) : await dialog.showSaveDialog(opts);
         // Annullato dall'utente: non è un errore, nessun toast.
-        if (res.canceled || !res.filePath) return { ok: false, cancelled: true };
-        savePath = res.filePath;
+        if (res.canceled || !res.filePath) return { cancelled: true };
+        return { filePath: res.filePath };
       } catch (e) {
-        return { ok: false, error: e?.message || 'dialogo non disponibile' };
+        return { error: e?.message || 'dialogo non disponibile' };
       }
+    };
+
+    let entry = null;        // voce nella barra scaricamenti
+    let partPath = '';       // file che cresce mentre i byte arrivano
+    let destPromise = null;  // scelta della destinazione, in parallelo
+    const dropPart = async () => {
+      if (!partPath) return;
+      try { await fs.promises.unlink(partPath); } catch (_) {}
+    };
+
+    let result = null;
+    let downloadError = null;
+    try {
+      result = await fetchToFile({
+        url,
+        referrer,
+        session: ses,
+        kind,
+        // Arrivati gli header sappiamo nome e peso: da qui in poi il
+        // salvataggio non è più cieco.
+        onHeaders: ({ filename, totalBytes }) => {
+          // Nome file sicuro: preferisci il Content-Disposition del server, poi
+          // il path dell'URL; neutralizza separatori e tentativi di traversal.
+          const name = safeImageFilename(filename || filenameFromUrl(url) || fallbackName);
+          // La voce nella barra in alto: percentuale, peso e "Annulla", gli
+          // stessi di un download partito da un link.
+          entry = downloads.beginManual({ url, filename: name, totalBytes });
+          // Il dialogo parte ORA e corre INSIEME al trasferimento: aprirlo prima
+          // costerebbe il nome dichiarato dal server, aspettare che l'utente
+          // risponda terrebbe ferma la connessione (che il server chiuderebbe).
+          destPromise = pickDestination(name).then((d) => {
+            // Chi annulla il dialogo non vuole più il file: ferma anche i byte.
+            if (d && (d.cancelled || d.error)) { try { entry.cancel(); } catch (_) {} }
+            return d;
+          });
+          // Il file parziale cresce nella cartella dove atterrerebbe un download
+          // nativo: se la destinazione è lì (quasi sempre) la consegna finale è
+          // una rinomina istantanea invece della copia di un filmato intero.
+          partPath = downloads.uniquePath(downloads.downloadsDir(), `${name}.filo-part`);
+          return partPath;
+        },
+        onProgress: (received, total) => { if (entry) entry.progress(received, total); },
+        shouldStop: () => !!entry && entry.cancelled(),
+      });
+    } catch (e) {
+      downloadError = e;
+    }
+
+    // Non siamo mai arrivati agli header (URL morto, 404, host irraggiungibile):
+    // nessuna voce aperta, nessun file da ripulire.
+    if (!entry) return { ok: false, error: downloadError?.message || 'download fallito' };
+
+    const dest = await destPromise;
+    const cancelled = entry.cancelled() || !!(dest && dest.cancelled);
+
+    if (cancelled) { await dropPart(); return { ok: false, cancelled: true }; }
+    if (downloadError) { entry.fail(); await dropPart(); return { ok: false, error: downloadError.message || 'download fallito' }; }
+    if (!dest || dest.error || !dest.filePath) {
+      entry.fail(); await dropPart();
+      return { ok: false, error: (dest && dest.error) || 'destinazione non disponibile' };
     }
 
     try {
-      await fs.promises.writeFile(savePath, buffer);
-      return { ok: true, path: savePath, filename: path.basename(savePath) };
+      await moveInto(result.partPath, dest.filePath);
     } catch (e) {
+      entry.fail(); await dropPart();
       return { ok: false, error: e?.message || 'scrittura fallita' };
     }
+    entry.done(dest.filePath);
+    return { ok: true, path: dest.filePath, filename: path.basename(dest.filePath) };
   };
 
   on(MSG.DOWNLOAD_IMAGE, handleDownload);
