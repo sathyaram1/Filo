@@ -25,6 +25,7 @@ import {
   escalationNote, currentBranch, headSha,
   readBranchState, writeBranchState,
   writeExpectation, readExpectation, clearExpectation, expectationFile,
+  sealTransition, bookkeepingOnly, restoreNotice,
 } from '../../scripts/lib/branch-integrity.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
