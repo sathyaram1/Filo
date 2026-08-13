@@ -474,6 +474,18 @@
       model: 'deepseek/deepseek-v4-pro',
       weights: 'open',
     },
+    // Sostituto delle funzioni che devono GUARDARE un'immagine (descrizione,
+    // OCR): i sostituti di solo testo lì non servono a niente. Dichiara le
+    // proprie modalità perché il nome del modello non basta a garantirle, e la
+    // sostituzione automatica nel dubbio non sostituisce.
+    'kimi-vista': {
+      label: 'Kimi K2.6 (pesi aperti, legge le immagini)',
+      provider: 'openrouter',
+      model: 'moonshotai/kimi-k2.6',
+      weights: 'open',
+      input_modalities: ['text', 'image'],
+      output_modalities: ['text'],
+    },
   };
 
   // Modello di default per ogni azione. I valori sono liste di NICKNAME dal
