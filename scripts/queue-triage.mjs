@@ -32,11 +32,15 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { guardTransition, escalationNote } from './lib/branch-integrity.mjs';
+import {
+  guardTransition, escalationNote, sealTransition, persistStateFileToGit,
+} from './lib/branch-integrity.mjs';
 import { pushFileToMainWithRetry } from './lib/isolated-push.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = resolve(__dirname, '..');
+// FILO_REPO_ROOT: override per i test (come in dispatch.mjs), che montano un
+// repo git finto per esercitare le guardie d'identità senza toccare questo.
+const ROOT = process.env.FILO_REPO_ROOT ? resolve(process.env.FILO_REPO_ROOT) : resolve(__dirname, '..');
 // FILO_SPOOL_DIR: override per i test (scrivono in una dir temporanea senza
 // toccare la coda vera, che l'hook di auto-commit pusherebbe su origin/main).
 const SPOOL_DIR = process.env.FILO_SPOOL_DIR
