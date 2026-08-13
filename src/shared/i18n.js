@@ -229,6 +229,8 @@
     options_open_weights_unavailable: 'Si fermano (nessun equivalente a pesi aperti): %s',
     options_open_weights_test_blocked:
       'Non provabile: «Solo modelli a pesi aperti» è acceso e questo modello non è a pesi aperti (o passa dall\'API di chi lo produce).',
+    options_open_weights_catalog_blocked:
+      'elenco non chiesto: «Solo modelli a pesi aperti» è acceso e questo è il fornitore diretto di chi produce i modelli.',
     options_keys: 'Chiavi API',
     options_api_key: 'API key',
     options_models: 'Modelli per azione',
