@@ -667,6 +667,7 @@ async function main() {
       if (it.error) console.log(`  ✗ ${it.file}: ${it.error}`);
       else if (it.entry.op === 'create') console.log(`  • CREA «${it.entry.name}» → ${it.entry.status}${it.entry.parentId ? `  (sub di ${it.entry.parentId})` : ''}`);
       else if (it.entry.op === 'backfill') console.log('  • BACKFILL numerazione feedback storici');
+      else if (it.entry.op === 'worker-log') console.log(`  • REGISTRO worker: ${it.entry.role}${it.entry.num ? ` ${it.entry.num}` : ''} (${it.entry.startedAt})`);
       else if (it.entry.op === 'delete') console.log(`  • ELIMINA doc di test ${it.entry.id}`);
       else console.log(`  • ${it.entry.id} → ${it.entry.status}${it.entry.notes ? `  («${it.entry.notes.slice(0, 60)}»)` : ''}`);
     }
