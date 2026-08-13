@@ -77,6 +77,7 @@ registerAi((type, fn) => handlers.set(type, fn), {
 });
 
 const testModel = (msg) => handlers.get(MSG.TEST_DEFAULT_MODEL)(msg);
+const testProvider = (msg) => handlers.get(MSG.TEST_PROVIDER)(msg);
 
 beforeEach(() => {
   state.admin = false;
