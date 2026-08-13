@@ -1052,6 +1052,17 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
           return { executed: false, kept: true, output: { search: query, results: [], error: e?.message || String(e) } };
         }
       }
+      case 'LEGGI_TRASPARENZA': {
+        // I documenti di trasparenza (transparency/*.md → SN_TRANSPARENCY) sono
+        // le scelte dell'owner messe per iscritto: quando l'utente chiede perché
+        // Filo usa un modello e non un altro, la risposta giusta è quel testo,
+        // non una ricostruzione a memoria dell'agente. Stesso schema di
+        // CAPACITA_DETTAGLIO: sola lettura, l'output rientra nel contesto.
+        const T = globalThis.SN_TRANSPARENCY;
+        const doc = String(action.doc ?? action.documento ?? action.id ?? '').trim();
+        const text = T ? T.asText(doc) : '';
+        return { executed: true, kept: true, output: { doc: doc || null, text } };
+      }
       case 'EVENTO_CALENDARIO':
         return { executed: false, kept: true };
       case 'CAPACITA_DETTAGLIO': {
