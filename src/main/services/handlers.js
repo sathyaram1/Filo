@@ -450,12 +450,14 @@ function providerRouting(settings) {
 // accende — cioè non varrebbe.
 // Ritorna il motivo del rifiuto (stringa da mostrare) oppure null se si può
 // procedere.
-function openWeightsBlockReason(settings, provider, model) {
+function openWeightsBlockReason(settings, entry) {
   const kind = SN_CONST.openWeightsBlockKind(
-    settings && settings.openWeightsOnly === true, provider, model,
+    settings && settings.openWeightsOnly === true, entry,
   );
   if (kind === 'provider') return I18n.t('err_open_weights_only_provider_blocked');
-  if (kind === 'model') return I18n.t('err_open_weights_only_model_blocked', model || '—');
+  if (kind === 'model') {
+    return I18n.t('err_open_weights_only_model_blocked', (entry && entry.model) || '—');
+  }
   return null;
 }
 
