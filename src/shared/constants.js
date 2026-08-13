@@ -2045,6 +2045,8 @@
     isOpenWeightsModelId,
     isOpenWeightsEntry,
     isOpenWeightsRef,
+    entryModalities,
+    substituteFitsAction,
     effectiveExcludedProviders,
     applyOpenWeightsPolicy,
     openWeightsImpact,
