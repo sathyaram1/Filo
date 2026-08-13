@@ -417,17 +417,46 @@ function buildAttemptChain(settings, modelRef, action) {
   // campo. Se dopo l'esclusione OpenRouter non trova un host ammesso, risponde
   // con un errore: la richiesta fallisce in modo evidente invece di essere
   // servita da un fornitore escluso.
-  const ignore = SN_CONST.providerIgnoreList(settings.excludedProviders || []);
-  const sort = typeof settings.providerSort === 'string' ? settings.providerSort : '';
-  if (ignore.length || sort) {
-    const routing = {};
-    if (ignore.length) routing.ignore = ignore;
-    if (sort) routing.sort = sort;
+  const routing = providerRouting(settings);
+  if (routing) {
     for (const a of out) {
       if (a.provider === 'openrouter') a.providerRouting = routing;
     }
   }
   return out;
+}
+
+// Istruzioni di routing (chi NON deve servire + ordinamento) da allegare a una
+// chiamata OpenRouter. Vive fuori da buildAttemptChain perché la politica sui
+// fornitori non riguarda solo le funzioni: anche una PROVA fatta dalle Opzioni è
+// una richiesta vera che finisce su un host, e senza queste istruzioni sarebbe
+// l'unica richiesta di Filo libera di essere servita da un fornitore escluso.
+// Ritorna null se non c'è niente da dire.
+function providerRouting(settings) {
+  const ignore = SN_CONST.providerIgnoreList((settings && settings.excludedProviders) || []);
+  const sort = typeof (settings && settings.providerSort) === 'string' ? settings.providerSort : '';
+  if (!ignore.length && !sort) return null;
+  const routing = {};
+  if (ignore.length) routing.ignore = ignore;
+  if (sort) routing.sort = sort;
+  return routing;
+}
+
+// Cancello della politica per le chiamate che NON passano da buildAttemptChain:
+// i pulsanti "Prova" delle Opzioni e della pagina di amministrazione, che
+// mandano una richiesta vera al modello di una riga (pagata con le chiavi vere).
+// Senza questo cancello l'interruttore "solo modelli a pesi aperti" varrebbe per
+// le funzioni ma non per i bottoni che stanno sulla stessa pagina dove lo si
+// accende — cioè non varrebbe.
+// Ritorna il motivo del rifiuto (stringa da mostrare) oppure null se si può
+// procedere.
+function openWeightsBlockReason(settings, provider, model) {
+  if (!settings || settings.openWeightsOnly !== true) return null;
+  if (SN_CONST.PRODUCER_DIRECT_PROVIDERS.includes(provider)) {
+    return I18n.t('err_open_weights_only_provider_blocked');
+  }
+  if (SN_CONST.isOpenWeightsEntry({ provider, model })) return null;
+  return I18n.t('err_open_weights_only_model_blocked', model || '—');
 }
 
 // Registra e verifica CHI ha davvero servito una risposta (#421). Il fornitore
