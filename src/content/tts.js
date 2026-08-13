@@ -326,7 +326,7 @@
     // Nessun modello impostato per la lettura (o la scorciatoia citata non
     // esiste): il messaggio arriva già scritto per l'utente e dice dove si
     // imposta — mostrarlo com'è vale molto più di una frase generica.
-    if (res.errorCode === 'NO_MODEL_FOR_ACTION' && res.error) {
+    if (global.SN_CONST.isModelConfigErrorCode(res.errorCode) && res.error) {
       try { Popup.showToast(I18n.t('tts_model_fallback_reason', String(res.error))); } catch (_) {}
       return;
     }
