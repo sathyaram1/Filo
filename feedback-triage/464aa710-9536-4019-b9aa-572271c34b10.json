@@ -1,7 +1,0 @@
-{
-  "id": "464aa710-9536-4019-b9aa-572271c34b10",
-  "status": "done",
-  "notes": "Fatto: in cima alla tab Automazioni c'è «Routine autonome». Spente, le sessioni automatiche partono lo stesso ma non fanno niente: non leggono nemmeno la coda, non prendono in carico feedback, non toccano il codice.\n\nDue cose diverse da come le avevi chieste. L'interruttore viene guardato anche PRIMA dell'installazione dell'ambiente, non solo nel dispatcher: un giorno spento costa così quattro letture di un documento invece di quattro installazioni intere. E ho spostato nello stesso posto anche «esplora quando la coda è vuota» e «tentativi del loop di correzione»: stavano dove le macchine delle routine non riescono a leggere, quindi non avevano mai avuto effetto — stessa causa del registro dei worker sempre vuoto. Se avevi già scelto un numero di tentativi lo ritrovi.\n\nCome volevi: se non si riesce a leggere se l'interruttore è acceso, le routine si fermano invece di lavorare.\n\nScelta tecnica che ricade su di te: quel sì/no vive in un documento leggibile da chiunque e scrivibile solo da te. È l'unico modo perché arrivi alle macchine delle routine, che non hanno nessuna credenziale; dentro non c'è niente di tuo, solo se le routine devono lavorare.",
-  "queuedAt": "2026-08-13T17:59:55.495Z",
-  "queuedBy": "routine"
-}
