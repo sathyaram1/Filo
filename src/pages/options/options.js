@@ -827,6 +827,10 @@
     // Aggiorna la datalist dei nickname (per-action) col registry appena salvato.
     populateNicknames(registry);
     markRegistryRowIssues(missingNickRows, dupRows);
+    // Il modello di una riga può essere appena cambiato (anche scegliendolo dal
+    // menu, che salva senza passare da un `change` sulla pagina): la prova va
+    // spenta o riaccesa di conseguenza.
+    applyOpenWeightsTestGating();
 
     const hasDiscarded = (missingNickRows && missingNickRows.length) || (dupRows && dupRows.length);
     const hint = $('savedHint');
