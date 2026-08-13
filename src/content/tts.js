@@ -625,7 +625,17 @@
           payload: { dataUrl, lang: navigator.language || 'it-IT' },
         });
         cleanup();
-        if (!res?.ok) { Popup.showToast(I18n.t('err_provider_failed')); return; }
+        if (!res?.ok) {
+          // La dettatura non ha un modello (o nessuno ammesso dall'interruttore
+          // "solo modelli a pesi aperti"): il messaggio dice già quale funzione
+          // si ferma e come rimediare, mostrarlo com'è vale molto più di
+          // "il provider ha risposto male" — che manda a cercare un guasto di
+          // rete che non c'è. Stessa scelta della lettura ad alta voce e della
+          // descrizione delle immagini.
+          const detto = global.SN_CONST.isModelConfigErrorCode(res?.code) && res?.error;
+          Popup.showToast(detto ? String(res.error) : I18n.t('err_provider_failed'));
+          return;
+        }
         const text = (res.text || '').trim();
         if (!text) { Popup.showToast(I18n.t('menu_dictate_empty')); return; }
         // Inserisci dove il cursore si trova ADESSO, non dove era all'apertura
