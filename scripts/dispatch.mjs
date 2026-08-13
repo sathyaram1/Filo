@@ -64,15 +64,16 @@
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync } from 'node:fs';
-import { basename, dirname, resolve, relative, sep } from 'node:path';
+import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   prepareBranch, newWorkBranch, preferredBase, checkDelivery, withCheckpoint,
-  lastCheckpoint, bumpRejects, headSha, currentBranch, restoreNotice,
+  lastCheckpoint, bumpRejects, currentBranch, restoreNotice,
   writeExpectation, clearExpectation, stateDir, IDENTITY_REJECT_LIMIT,
   sealTransition as sealBranchTransition, persistStateFileToGit,
 } from './lib/branch-integrity.mjs';
 import { writeRole, clearRole } from './lib/routine-role.mjs';
+import { pushFileToMainWithRetry } from './lib/isolated-push.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = process.env.FILO_REPO_ROOT ? resolve(process.env.FILO_REPO_ROOT) : resolve(__dirname, '..');
@@ -1073,6 +1074,16 @@ function positionOnBranch(bucket) {
   if (!res.ok) return res;
   if (res.discarded) {
     process.stderr.write(`[dispatch] ${branch}: lavoro di un'istanza interrotta riportato all'ultimo punto fermo; i commit scartati restano su ${res.discarded}\n`);
+  }
+  // Se il sistema ha rimaneggiato il ramo (o glielo consegna vuoto), chi lo
+  // guarda DEVE saperlo: un ripristino muto è indistinguibile da "il lavoro non
+  // è mai stato fatto", e la strada naturale diventa bocciare per assenza e far
+  // riscrivere tutto da capo.
+  if (!isNew) {
+    bucket.notice = restoreNotice({
+      discarded: res.discarded || '',
+      empty: branchIsEmpty(branch),
+    });
   }
 
   // Identità attesa del contenuto: è il valore che le transizioni (C) e il
