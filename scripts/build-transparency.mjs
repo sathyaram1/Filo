@@ -246,6 +246,37 @@ const UI_RUNTIME = `
       }
     }
   }
+
+  // Tooltip: hover col mouse, tocco e tastiera ovunque. Il riquadro è UNO solo,
+  // riposizionato — così il testo delle glosse non resta nel documento come
+  // testo fantasma che il Ctrl+F della pagina troverebbe senza mostrarlo.
+  function mountGlossaryUi(root, pop) {
+    if (!root || !pop) return;
+    function show(el) {
+      pop.textContent = el.getAttribute('data-gloss') || '';
+      pop.hidden = false;
+      var r = el.getBoundingClientRect();
+      pop.style.top = (r.bottom + window.scrollY + 6) + 'px';
+      pop.style.left = '0px';
+      var left = r.left + window.scrollX;
+      var max = document.documentElement.clientWidth - 12;
+      if (left + pop.offsetWidth > max) left = Math.max(12, max - pop.offsetWidth);
+      pop.style.left = left + 'px';
+    }
+    function hide() { pop.hidden = true; }
+    function target(e) {
+      return e.target && e.target.closest ? e.target.closest('.sn-gloss') : null;
+    }
+    document.addEventListener('mouseover', function (e) { var el = target(e); if (el) show(el); });
+    document.addEventListener('mouseout', function (e) { if (target(e)) hide(); });
+    document.addEventListener('click', function (e) {
+      var el = target(e);
+      if (el) { show(el); e.stopPropagation(); } else { hide(); }
+    });
+    document.addEventListener('focusin', function (e) { var el = target(e); if (el) show(el); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') hide(); });
+    window.addEventListener('scroll', hide, { passive: true });
+  }
 `;
 
 // ── Build ────────────────────────────────────────────────────────────────────
