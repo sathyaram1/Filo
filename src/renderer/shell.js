@@ -128,6 +128,9 @@
       { label: 'Modelli', icon: 'models', url: 'filo://options/options.html' },
       { label: 'Altro', icon: 'options', url: 'filo://options/altro.html' },
       { label: 'Sicurezza', icon: 'lock', url: 'filo://security/security.html' },
+      // Sta con "Modelli" e "Sicurezza" perché risponde alle stesse domande —
+      // quali modelli, che fine fanno i dati — ma dal lato del PERCHÉ.
+      { label: 'Trasparenza', icon: 'transparency', url: 'filo://transparency/transparency.html' },
       { type: 'separator' },
       { label: 'Preferenze', icon: 'colorPicker', url: 'filo://preferences/preferences.html' },
     ];
