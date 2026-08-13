@@ -376,6 +376,99 @@ export function guardTransition(root, id, { escalate, persist, clear } = {}) {
 }
 
 /**
+ * L'altra metà di `guardTransition`: una transizione ACCETTATA lascia un PUNTO
+ * FERMO — l'identità del contenuto nel momento in cui è stata registrata. È il
+ * valore a cui D riporta il branch dopo un'interruzione.
+ *
+ * Vive qui, accanto alla guardia, perché le due metà vanno insieme: finché il
+ * sigillo è stato scritto solo dentro `dispatch.mjs`, la CONSEGNA del lavoro
+ * nuovo — che passa da `queue-triage.mjs` — veniva controllata ma non
+ * sigillata. L'unico punto fermo di quel branch restava allora quello della sua
+ * CREAZIONE (il vuoto), e «riporta all'ultimo punto fermo» diventava «cancella
+ * tutto il lavoro consegnato»: al giro dopo il verifier trovava un ramo identico
+ * alla linea principale e la strada naturale era bocciare per assenza e far
+ * riscrivere da capo — l'implementazione doppia che questa protezione esiste
+ * per impedire.
+ *
+ * Rilascia anche l'identità attesa: dopo la consegna non c'è più niente da
+ * proteggere su questo branch (ed è ciò che lascia lavorare il merge-gate).
+ *
+ * @param {string} root  directory del repo
+ * @param {object} state stato del branch (deve avere `id`)
+ * @param {string} by    chi sigilla (`new-work:consegna`, `verifier:pass`, …)
+ * @returns {object} lo stato sigillato (già scritto su disco)
+ */
+export function sealTransition(root, state, by, { now = Date.now() } = {}) {
+  if (!state || !state.id) return state;
+  const sealed = clearRejects(withCheckpoint(state, headSha(root), by, now));
+  writeBranchState(root, sealed);
+  clearExpectation(root);
+  return sealed;
+}
+
+/**
+ * Porta il file di stato di un feedback su `main` **senza pubblicare il branch
+ * corrente**.
+ *
+ * Due passaggi distinti, entrambi necessari:
+ *  1. un commit LOCALE limitato a quel file, così il punto fermo sopravvive a un
+ *     reset/rebase sul branch di lavoro (incident #289: i verdetti dei ruoli di
+ *     sola lettura sparivano perché l'hook di auto-commit scatta solo su
+ *     Edit/Write, mai su Bash);
+ *  2. la spedizione ISOLATA su `main` (il commit nasce sopra la punta remota e
+ *     contiene solo questo file), perché è da lì che i giri successivi
+ *     rileggono lo stato — mentre `push HEAD:main` porterebbe con sé tutta la
+ *     lavorazione non esaminata (incident 2026-08-13, #461).
+ *
+ * Best-effort: un guasto git non deve mai far fallire la registrazione — lo
+ * stato locale resta comunque scritto.
+ */
+export function persistStateFileToGit(root, id, message, mainBranch = undefined) {
+  // Nei test la directory di stato è sovrascritta (FILO_DISPATCH_STATE_DIR): lì
+  // non si tocca git — lo stato è un file temporaneo, non il repo reale.
+  if (process.env.FILO_DISPATCH_STATE_DIR) return { ok: true, skipped: true };
+  const file = resolve(stateDir(root), `${id}.json`);
+  const rel = relative(root, file).split(sep).join('/');
+  const g = gitIn(root);
+  const present = existsSync(file);
+
+  if (g(['add', '--', rel]).ok && !g(['diff', '--cached', '--quiet', '--', rel]).ok) {
+    g(['commit', '-q', '-m', message, '--', rel]);
+  }
+  // Una rimozione (`--clear-state`) deve saper cancellare anche su main: se lo
+  // stato sopravvive là, la sessione dopo — che parte da lì — resuscita un
+  // feedback già chiuso.
+  return present
+    ? pushFileToMainWithRetry(root, file, message, 3, mainBranch)
+    : removeFileOnMainWithRetry(root, rel, message, 3, mainBranch);
+}
+
+/**
+ * L'avviso da consegnare a CHI GUARDA un branch che il sistema ha appena
+ * rimaneggiato. Pura.
+ *
+ * Il ripristino (D) è una protezione, ma finché resta muto assomiglia in tutto
+ * a "il lavoro non è mai stato fatto": chi verifica boccia per assenza e chi
+ * corregge riscrive da capo. Se togliamo lavoro dalla scena, chi arriva dopo
+ * deve saperlo — e sapere dove guardare.
+ *
+ * @param {{discarded?:string, empty?:boolean}} o
+ * @returns {string} '' se non c'è niente da segnalare
+ */
+export function restoreNotice({ discarded = '', empty = false } = {}) {
+  const parts = [];
+  if (discarded) {
+    parts.push(`Prima di consegnarti questo ramo il sistema lo ha riportato all'ultimo punto fermo registrato: i commit scartati NON sono andati persi, sono parcheggiati sul ramo di servizio "${discarded}".`);
+  }
+  if (empty) {
+    parts.push('Questo ramo non contiene NESSUNA modifica rispetto alla linea principale: per un lavoro già consegnato è un\'anomalia del sistema, non un lavoro vuoto.');
+  }
+  if (!parts.length) return '';
+  parts.push('Se il lavoro che ti aspetti di trovare non c\'è, NON concludere che non è mai stato fatto e NON farlo riscrivere da capo: cerca prima i rami di servizio "discarded/*" che riguardano questo ramo, e se il lavoro è là segnala l\'anomalia invece di emettere un verdetto.');
+  return parts.join(' ');
+}
+
+/**
  * Il testo che l'owner legge in dashboard quando la lavorazione automatica
  * viene sospesa per disallineamento ripetuto. Vive qui perché lo usano
  * entrambi i punti di scrittura, e perché è per l'OWNER: niente branch, niente
