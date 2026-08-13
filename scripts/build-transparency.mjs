@@ -353,10 +353,21 @@ function emitModule({ docs, glossary }) {
     return doc.title + (doc.updated ? ' — aggiornato ' + doc.updated : '') + '\\n\\n' + doc.text;
   }
 
-  global.SN_TRANSPARENCY = {
-    NAV, GLOSSARY, all, get, ids, asText,
-    applyGlossary: function (root) { return applyGlossary(root, GLOSSARY); },
-  };
+  global.SN_TRANSPARENCY = { NAV, GLOSSARY, all, get, ids, asText };
+})(typeof globalThis !== 'undefined' ? globalThis : self);
+`;
+}
+
+function emitUiModule() {
+  return `// GENERATO da scripts/build-transparency.mjs — NON modificare a mano.
+// Lo stesso codice è inlineato nelle pagine pubbliche del sito: si scrive una
+// volta sola in scripts/build-transparency.mjs, così la pagina dentro Filo e
+// quella sul sito non possono comportarsi in modo diverso.
+
+(function (global) {
+  'use strict';
+${UI_RUNTIME}
+  global.SN_TRANSPARENCY_UI = { applyGlossary, mountGlossaryUi };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
 `;
 }
