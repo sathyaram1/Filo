@@ -720,6 +720,17 @@
     'claude-haiku': 'deepseek',
   };
 
+  // Codici degli errori di CONFIGURAZIONE dei modelli. Non sono guasti: la
+  // funzione non parte perché il modello manca, non esiste, o l'interruttore
+  // "solo pesi aperti" non ne ammette nessuno per quel mestiere. Portano un
+  // messaggio già scritto per l'utente — nomina la funzione e dice dove si
+  // rimedia — quindi va mostrato TALE E QUALE, non tradotto in un "errore del
+  // provider" generico che manda a cercare un guasto dove non c'è.
+  const MODEL_CONFIG_ERROR_CODES = ['NO_MODEL_FOR_ACTION', 'NO_OPEN_WEIGHTS_MODEL'];
+  function isModelConfigErrorCode(code) {
+    return MODEL_CONFIG_ERROR_CODES.includes(String(code || ''));
+  }
+
   // Fornitori esclusi in più quando l'interruttore è acceso. Anthropic non è
   // nella lista base (la politica ammette i suoi modelli): qui ci finisce perché
   // il punto dell'interruttore è poter rifiutare anche quella scelta.
