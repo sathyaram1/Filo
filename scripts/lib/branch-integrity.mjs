@@ -30,7 +30,8 @@
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { relative, resolve, sep } from 'node:path';
+import { pushFileToMainWithRetry, removeFileOnMainWithRetry } from './isolated-push.mjs';
 
 // ─── git minimale (best-effort, mai eccezioni) ───────────────────────────────
 
