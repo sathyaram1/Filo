@@ -427,7 +427,10 @@ function main() {
   const built = buildDocs();
   const css = existsSync(CSS_FILE) ? readFileSync(CSS_FILE, 'utf8') : '';
 
-  const outputs = [[OUT_MODULE, emitModule(built)]];
+  const outputs = [
+    [OUT_MODULE, emitModule(built)],
+    [OUT_UI_MODULE, emitUiModule()],
+  ];
   for (const doc of built.docs) {
     outputs.push([join(OUT_SITE, `${doc.id}.html`), emitSitePage(doc, built, css)]);
   }
