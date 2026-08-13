@@ -32,7 +32,7 @@ Non verranno quindi mai usati, attraverso i crediti di Filo, i **servizi** di **
 
 **Come è applicata:** Filo non compra dai fornitori direttamente: passa da un servizio (openrouter) che smista le richieste e sceglie da sé chi ospita ogni modello. Lasciato a sé, prima o poi manderebbe la richiesta anche al produttore escluso da questa policy. Quindi la lista di esclusione viaggia con ogni richiesta, e **a risposta arrivata Filo registra chi l'ha effettivamente servita** e segnala se è qualcuno che doveva essere fuori. 
 
-**Con una tua chiave puoi usare quello che vuoi:** attraverso openrouter è possibile raggiungere qualsiasi modello da qualsiasi fornitore e con una chiave tua puoi scegliere liberamente. Non è invece possibile usare i crediti di filo per i servizi esclusi.
+**Con una tua chiave OpenRouter puoi usare quello che vuoi:** non ti impongo limiti con i tuoi soldi. I limiti valgono solo per i crediti di Filo.
 
 ## Se non la pensi come me
 
