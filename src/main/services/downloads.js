@@ -25,7 +25,7 @@
 // chrome.storage.local sotto STORAGE_KEYS.DOWNLOADS e sopravvive al riavvio: la
 // pagina elenco (#410.3) la leggerà da lì. Schema di una voce (`publicRecord`):
 //   { id, filename, url, mime, totalBytes, receivedBytes, state, savePath,
-//     startedAt, endedAt, paused, canResume }
+//     startedAt, endedAt, paused, canResume, canPause }
 //   state ∈ 'progressing' | 'paused' | 'completed' | 'interrupted' | 'cancelled'
 
 const path = require('node:path');
