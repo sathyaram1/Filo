@@ -127,7 +127,10 @@ test('lo switch attiva/disattiva la modalità automatica e lo stato persiste', a
   // `--sn-border` che sul tema chiaro era quasi invisibile. Confronto col valore
   // del token risolto in rgb → theme-independent, rosso se si torna a --sn-border.
   const trackOk = await page.evaluate(() => {
-    const track = document.querySelector('.mg-switch-track');
+    // La pista DI QUESTO interruttore: la tab ne contiene altri (interruttore
+    // master delle routine, mittenti, esplorazione) e "il primo della pagina"
+    // dipenderebbe dall'ordine dei blocchi.
+    const track = document.querySelector('#mgAutoToggle + .mg-switch-track');
     const bg = getComputedStyle(track).backgroundColor;
     const probe = document.createElement('span');
     probe.style.color = 'var(--sn-muted)';
