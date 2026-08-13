@@ -73,6 +73,42 @@ test('senza equivalente la catena resta VUOTA: mai un ripiego su un modello prop
   assert.deepEqual(mixed.dropped, ['tts']);
 });
 
+test('il sostituto deve saper fare il MESTIERE della funzione, non solo avere i pesi aperti', () => {
+  // Dettatura: serve un modello che ascolti l'audio. Il sostituto di solo testo
+  // NON vale — altrimenti la funzione arriverebbe all'utente rotta con un errore
+  // qualunque, invece di fermarsi dicendo perché.
+  const dettatura = C.applyOpenWeightsPolicy(
+    C.parseModelRefs(C.DEFAULT_MODELS[C.ACTIONS.TRANSCRIBE_AUDIO]), REG, C.ACTIONS.TRANSCRIBE_AUDIO,
+  );
+  assert.deepEqual(dettatura.refs, [], 'la dettatura non può finire su un modello che legge solo testo');
+  assert.deepEqual(dettatura.substituted, []);
+  assert.ok(dettatura.dropped.length);
+
+  // Stessa identica catena, funzione di solo testo: lì il sostituto vale.
+  const testo = C.applyOpenWeightsPolicy(
+    C.parseModelRefs(C.DEFAULT_MODELS[C.ACTIONS.TRANSCRIBE_AUDIO]), REG, C.ACTIONS.EXPLAIN,
+  );
+  assert.deepEqual(testo.refs, ['gemma']);
+
+  // Una voce può DICHIARARE di sentire l'audio (l'owner la corregge dalla config
+  // condivisa): allora la sostituzione torna possibile.
+  const regSente = {
+    ...REG,
+    gemma: { ...REG.gemma, input_modalities: ['text', 'audio'], output_modalities: ['text'] },
+  };
+  const conAudio = C.applyOpenWeightsPolicy(['flash'], regSente, C.ACTIONS.TRANSCRIBE_AUDIO);
+  assert.deepEqual(conAudio.refs, ['gemma']);
+});
+
+test('la dettatura sta fra le funzioni che SI FERMANO, non fra quelle che cambiano modello', () => {
+  const impact = C.openWeightsImpact(C.DEFAULT_MODELS, REG);
+  const cambiano = impact.substituted.map((s) => s.action);
+  const ferme = impact.unavailable.map((u) => u.action);
+  assert.ok(ferme.includes(C.ACTIONS.TRANSCRIBE_AUDIO),
+    'annunciarla fra quelle che cambiano modello significa prometterla funzionante');
+  assert.ok(!cambiano.includes(C.ACTIONS.TRANSCRIBE_AUDIO));
+});
+
 test('NESSUNA funzione predefinita resta con un modello proprietario a interruttore acceso', () => {
   const colpevoli = [];
   for (const [action, value] of Object.entries(C.DEFAULT_MODELS)) {
