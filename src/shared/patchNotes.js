@@ -18,6 +18,7 @@
     {
       version: '0.2.196', date: '2026-08-08',
       features: [
+        'Nuova pagina «Trasparenza»: quali modelli AI usa Filo e perché, con le fonti. La trovi anche senza connessione, e puoi chiederne conto a Filo in chat.',
         'Nell\'editor, dopo aver ripristinato una versione dallo «Storico versioni» compare un avviso «Annulla» che rimette il documento com\'era un attimo prima.',
       ],
       fixes: [
