@@ -131,6 +131,10 @@ function publicRecord(r) {
     endedAt: r.endedAt || null,
     paused: !!r.paused,
     canResume: !!r.canResume,
+    // Gli scaricamenti "a mano" (#436) non si mettono in pausa: la richiesta
+    // http resterebbe appesa e il server la chiuderebbe. Il pannello nasconde
+    // il pulsante invece di offrirne uno che non fa niente.
+    canPause: r.canPause !== false,
   };
 }
 
