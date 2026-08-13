@@ -28,8 +28,15 @@
     claude: document.getElementById('mgAutoApproveClaude'),
     user:   document.getElementById('mgAutoApproveUser'),
   };
-  const mgProberIdle    = document.getElementById('mgProberIdle');
-  const mgProberIdleMsg = document.getElementById('mgProberIdleMsg');
+  // Interruttore master delle routine autonome (config/routines).
+  const mgRoutinesSwitch = document.getElementById('mgRoutinesSwitch');
+  const mgRoutinesToggle = document.getElementById('mgRoutinesToggle');
+  const mgRoutinesState  = document.getElementById('mgRoutinesState');
+  const mgRoutinesMsg    = document.getElementById('mgRoutinesMsg');
+  const mgProberIdle      = document.getElementById('mgProberIdle');
+  const mgProberIdleMsg   = document.getElementById('mgProberIdleMsg');
+  const mgProberIdleBlock = document.getElementById('mgProberIdleBlock');
+  const mgLoopCapBlock = document.getElementById('mgLoopCapBlock');
   const mgLoopCap    = document.getElementById('mgLoopCap');
   const mgLoopCapSave = document.getElementById('mgLoopCapSave');
   const mgLoopCapMsg  = document.getElementById('mgLoopCapMsg');
