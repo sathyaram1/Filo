@@ -325,14 +325,14 @@ module.exports = function register(on, ctx) {
           // La voce nella barra in alto: percentuale, peso e "Annulla", gli
           // stessi di un download partito da un link.
           entry = downloads.beginManual({ url, filename: name, totalBytes });
-          // Il dialogo parte ORA e corre INSIEME al trasferimento: aprirlo prima
-          // costerebbe il nome dichiarato dal server, aspettare che l'utente
-          // risponda terrebbe ferma la connessione (che il server chiuderebbe).
-          destPromise = pickDestination(name).then((d) => {
+          // Il nome da proporre lo sa solo il server (Content-Disposition):
+          // per questo la destinazione si chiede da qui in poi, mai prima.
+          askDest = () => pickDestination(name).then((d) => {
             // Chi annulla il dialogo non vuole più il file: ferma anche i byte.
             if (d && (d.cancelled || d.error)) { try { entry.cancel(); } catch (_) {} }
             return d;
           });
+          askTimer = setTimeout(ensureDest, ASK_AFTER_MS);
           // Il file parziale cresce nella cartella dove atterrerebbe un download
           // nativo: se la destinazione è lì (quasi sempre) la consegna finale è
           // una rinomina istantanea invece della copia di un filmato intero.
