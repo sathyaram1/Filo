@@ -563,6 +563,8 @@ function openFolder(id) {
 function cancel(id) {
   const item = liveItems.get(id);
   if (item) { try { item.cancel(); } catch (_) {} }
+  const manual = liveManual.get(id);
+  if (manual) { try { manual.cancel(); } catch (_) {} }
   return { ok: true };
 }
 function pause(id) {
