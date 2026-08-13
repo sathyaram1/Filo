@@ -1114,8 +1114,9 @@
           </div>
         </section>
 
-        <!-- Esplorazione automatica a coda vuota (#448). -->
-        <section class="mg-auto-block">
+        <!-- Esplorazione automatica a coda vuota (#448). Riguarda solo le
+             routine: con l'interruttore master spento è inerte, e si vede. -->
+        <section class="mg-auto-block" id="mgProberIdleBlock">
           <label class="mg-switch" title="Ferma l'esplorazione automatica quando non ci sono più feedback da lavorare">
             <span class="mg-switch-text">Esplora quando la coda è vuota</span>
             <input type="checkbox" id="mgProberIdle" checked />
