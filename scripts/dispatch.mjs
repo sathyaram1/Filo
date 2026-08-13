@@ -437,16 +437,67 @@ export function persistStateToGit(id, message) {
   // tocca git — lo stato è un file temporaneo, non il repo reale.
   if (process.env.FILO_DISPATCH_STATE_DIR) return;
   const rel = relative(ROOT, stateFile(id)).split(sep).join('/');
+  if (!tryGit(['add', '--', rel]).ok) return;
+  // Niente in stage per questo file → già allineato, nulla da pushare.
+  if (tryGit(['diff', '--cached', '--quiet', '--', rel]).ok) return;
+  // Commit LOCALE path-limited: il verdetto deve sopravvivere a un reset/rebase
+  // sul branch corrente (incident #289). Questo resta com'era.
+  if (!tryGit(['commit', '-q', '-m', message, '--', rel]).ok) return;
+  pushStateFileToMain(rel, message);
+}
+
+/**
+ * Porta il file di stato su `main` **senza pubblicare il branch corrente**.
+ *
+ * Prima qui c'era `git push origin HEAD:main`. Su un branch worker HEAD NON è il
+ * commit del file di stato: è tutta la lavorazione non ancora esaminata. E i
+ * branch worker nascono da main, quindi main ne è antenato e il push
+ * fast-forwarda — cioè fonde in silenzio l'intero lavoro sulla linea che ogni 6
+ * ore viene costruita e distribuita a TUTTI gli utenti, scavalcando verifier,
+ * secaudit e cancello di merge. È la stessa perdita del 24 luglio 2026, per una
+ * via diversa: là mancava la marcatura di routine, qui è il record del verdetto
+ * a fare da cavallo di Troia.
+ *
+ * Il verdetto però su main ci deve arrivare (è lì che i giri successivi lo
+ * rileggono, come i claim). Quindi si costruisce un commit **sintetico** che
+ * contiene SOLO il file di stato, sopra la punta di origin/main, e si pusha
+ * QUELLO: niente checkout, niente merge, l'albero di lavoro non viene toccato e
+ * nessun altro file può salire per sbaglio.
+ *
+ * Best-effort come prima: un guasto git non deve mai far fallire il record — lo
+ * stato locale è già scritto e committato.
+ */
+function pushStateFileToMain(rel, message) {
+  const abs = resolve(ROOT, rel);
   for (let attempt = 0; attempt < 3; attempt++) {
-    if (!tryGit(['add', '--', rel]).ok) return;
-    // Niente in stage per questo file → già allineato, nulla da pushare.
-    if (tryGit(['diff', '--cached', '--quiet', '--', rel]).ok) return;
-    if (!tryGit(['commit', '-q', '-m', message, '--', rel]).ok) return;
-    // Push ff-only su origin/main, come i claim. Se rifiutato, main è avanzato:
-    // riconcilio con un rebase (tocca solo questo file → nessun conflitto) e
-    // ritento. Se il rebase fallisce, abortisco e mollo: il commit locale resta.
-    if (tryGit(['push', 'origin', `HEAD:${MAIN_BRANCH}`]).ok) return;
-    if (!tryGit(['pull', '--rebase', 'origin', MAIN_BRANCH]).ok) { tryGit(['rebase', '--abort']); return; }
+    if (!tryGit(['fetch', 'origin', MAIN_BRANCH]).ok) return;
+    const base = tryGit(['rev-parse', 'FETCH_HEAD']);
+    if (!base.ok) return;
+    const blob = tryGit(['hash-object', '-w', '--', abs]);
+    if (!blob.ok) return;
+    // Indice temporaneo: `read-tree`/`update-index` non devono toccare l'indice
+    // vero del repo, o il worker si ritroverebbe lo stage riscritto sotto i piedi.
+    const idx = resolve(STATE_DIR, `.push-index-${process.pid}`);
+    const env = { ...process.env, GIT_INDEX_FILE: idx };
+    const g = (args) => {
+      try { return { ok: true, out: execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', env }).trim() }; }
+      catch (e) { return { ok: false, out: `${e.stdout || ''}${e.stderr || ''}`.trim() || e.message }; }
+    };
+    try {
+      if (!g(['read-tree', base.out]).ok) return;
+      if (!g(['update-index', '--add', '--cacheinfo', `100644,${blob.out},${rel}`]).ok) return;
+      const tree = g(['write-tree']);
+      if (!tree.ok) return;
+      const commit = tryGit(['commit-tree', tree.out, '-p', base.out, '-m', message]);
+      if (!commit.ok) return;
+      // ff-only per costruzione: il padre È la punta di main appena letta. Se
+      // main si è mosso nel frattempo il push viene rifiutato → si rilegge la
+      // punta nuova e si ricostruisce. Nessun rebase, nessun conflitto possibile:
+      // l'unico file toccato è questo.
+      if (tryGit(['push', 'origin', `${commit.out}:${MAIN_BRANCH}`]).ok) return;
+    } finally {
+      rmSync(idx, { force: true });
+    }
   }
 }
 
