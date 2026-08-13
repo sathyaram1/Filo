@@ -621,6 +621,31 @@ function diffForBranch(branch) {
   return r.ok ? r.out : '';
 }
 
+/**
+ * Il branch non contiene NESSUNA modifica rispetto alla linea principale.
+ * Per un ramo che è già stato consegnato non è un lavoro vuoto: è il segno che
+ * il contenuto è stato messo da parte (feedback #462). Stessa base di confronto
+ * di `diffForBranch` — lo stato REMOTO di main, mai il ref locale.
+ */
+function branchIsEmpty(branch) {
+  if (!branch) return false;
+  tryGit(['fetch', 'origin', MAIN_BRANCH]);
+  const base = tryGit(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${MAIN_BRANCH}`]).ok
+    ? `origin/${MAIN_BRANCH}`
+    : MAIN_BRANCH;
+  const ref = tryGit(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`]).ok
+    ? branch
+    : (tryGit(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${branch}`]).ok
+        ? `origin/${branch}`
+        : '');
+  if (!ref) return false;
+  // `--quiet` esce 0 quando non ci sono differenze: un guasto git (exit ≠ 0 per
+  // altri motivi) non deve trasformarsi in un allarme, quindi si segnala vuoto
+  // solo quando il confronto è riuscito ed è davvero vuoto.
+  const cmp = tryGit(['diff', '--quiet', `${base}...${ref}`]);
+  return cmp.ok;
+}
+
 // ─── Retry (esportato, testato in tests/unit/dispatch.test.mjs) ───────────────
 
 /**
