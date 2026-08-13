@@ -345,12 +345,17 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       downloadError = e;
     }
+    if (askTimer) { clearTimeout(askTimer); askTimer = null; }
 
     // Non siamo mai arrivati agli header (URL morto, 404, host irraggiungibile):
     // nessuna voce aperta, nessun file da ripulire.
     if (!entry) return { ok: false, error: downloadError?.message || 'download fallito' };
 
-    const dest = await destPromise;
+    // Se il trasferimento è fallito NON chiediamo dove salvare: sarebbe un
+    // dialogo per un file che non c'è. Se invece era già aperto lo si aspetta
+    // (non c'è modo di richiuderlo da qui).
+    if (!downloadError && !entry.cancelled()) ensureDest();
+    const dest = destPromise ? await destPromise : null;
     const cancelled = entry.cancelled() || !!(dest && dest.cancelled);
 
     if (cancelled) { await dropPart(); return { ok: false, cancelled: true }; }
