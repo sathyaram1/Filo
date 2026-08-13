@@ -201,8 +201,12 @@
 
     // Spegnendo l'interruttore il catalogo che era stato saltato torna a
     // caricarsi da solo: se accenderlo lo ferma, spegnerlo deve rimetterlo, o
-    // resterebbe muto fino a un ricaricamento della pagina.
-    if (!on) ensureProviderModels('gemini');
+    // resterebbe muto fino a un ricaricamento della pagina. Solo sulla
+    // TRANSIZIONE acceso→spento: questa funzione gira a ogni `change` della
+    // pagina, e un catalogo che non risponde verrebbe richiesto all'infinito.
+    const eraAcceso = openWeightsWasOn;
+    openWeightsWasOn = on;
+    if (eraAcceso === true && !on) ensureProviderModels('gemini');
   }
 
   function renderOpenWeightsImpact() {
