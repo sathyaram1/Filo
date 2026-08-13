@@ -236,6 +236,97 @@ describe('C — identità e punti fermi', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+describe('C — la CONSEGNA lascia il punto fermo come i verdetti (#462)', () => {
+  // Prepara la scena di un lavoro nuovo consegnato: branch creato dal
+  // dispatcher (punto fermo = il vuoto), lavoro committato e pubblicato.
+  function scenaConsegna(id = 'FB462') {
+    const { work } = makeRepo();
+    const stateDir = resolve(work, '.state');
+    const branch = newWorkBranch(id);
+    const creato = prepareBranch({ root: work, branch, create: true });
+    assert.equal(creato.ok, true, creato.message);
+
+    const prevState = process.env.FILO_DISPATCH_STATE_DIR;
+    process.env.FILO_DISPATCH_STATE_DIR = stateDir;
+    // Il segnalibro della CREAZIONE: è il vuoto, cioè "prima che il lavoro
+    // cominciasse".
+    writeBranchState(work, withCheckpoint({ id, branch }, creato.head, 'new-work:checkout'));
+    if (prevState === undefined) delete process.env.FILO_DISPATCH_STATE_DIR;
+    else process.env.FILO_DISPATCH_STATE_DIR = prevState;
+
+    const consegnato = commit(work, 'feature-consegnata.js', 'module.exports = 1;\n');
+    git(work, ['push', '-q', 'origin', branch]);
+    return { work, stateDir, branch, id, consegnato, vuoto: creato.head };
+  }
+
+  test('la consegna registrata dalla coda sigilla il lavoro appena fatto', () => {
+    const { work, stateDir, branch, id, consegnato, vuoto } = scenaConsegna();
+    const spool = resolve(work, '.spool');
+    mkdirSync(spool, { recursive: true });
+
+    execFileSync('node', [resolve(ROOT, 'scripts', 'queue-triage.mjs'), id,
+      'revision_capability', 'report per l’owner', '--branch', 'worker/nome-a-memoria', '--no-git'], {
+      encoding: 'utf8',
+      env: { ...process.env, FILO_REPO_ROOT: work, FILO_DISPATCH_STATE_DIR: stateDir, FILO_SPOOL_DIR: spool },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    const prev = process.env.FILO_DISPATCH_STATE_DIR;
+    process.env.FILO_DISPATCH_STATE_DIR = stateDir;
+    try {
+      const s = readBranchState(work, id);
+      assert.equal(lastCheckpoint(s), consegnato,
+        'il lavoro consegnato DEVE diventare il punto fermo: senza, «riporta all’ultimo punto fermo» significa «cancella tutto»');
+      assert.notEqual(lastCheckpoint(s), vuoto);
+    } finally {
+      if (prev === undefined) delete process.env.FILO_DISPATCH_STATE_DIR;
+      else process.env.FILO_DISPATCH_STATE_DIR = prev;
+    }
+
+    // La consegna registra il ramo VERO, non quello ricostruito a memoria: il
+    // nome è unico per tentativo, e `worker/<id>` non esiste più.
+    const entry = JSON.parse(readFileSync(resolve(spool, `${id}.json`), 'utf8'));
+    assert.equal(entry.branch, branch, 'il ramo registrato deve essere quello assegnato');
+  });
+
+  test('il giro successivo trova il lavoro consegnato, non il ramo azzerato', () => {
+    const { work, stateDir, branch, id, consegnato } = scenaConsegna('FB462b');
+    const spool = resolve(work, '.spool');
+    mkdirSync(spool, { recursive: true });
+    execFileSync('node', [resolve(ROOT, 'scripts', 'queue-triage.mjs'), id,
+      'revision_capability', 'report', '--no-git'], {
+      encoding: 'utf8',
+      env: { ...process.env, FILO_REPO_ROOT: work, FILO_DISPATCH_STATE_DIR: stateDir, FILO_SPOOL_DIR: spool },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    // Un'istanza successiva viene interrotta a metà.
+    commit(work, 'meta-di-chi-e-stato-interrotto.txt', 'x\n');
+
+    const prev = process.env.FILO_DISPATCH_STATE_DIR;
+    process.env.FILO_DISPATCH_STATE_DIR = stateDir;
+    let checkpoint;
+    try { checkpoint = lastCheckpoint(readBranchState(work, id)); } finally {
+      if (prev === undefined) delete process.env.FILO_DISPATCH_STATE_DIR;
+      else process.env.FILO_DISPATCH_STATE_DIR = prev;
+    }
+
+    const r = prepareBranch({ root: work, branch, checkpoint });
+    assert.equal(r.ok, true, r.message);
+    assert.equal(existsSync(resolve(work, 'feature-consegnata.js')), true,
+      'REGRESSIONE #462: un lavoro già consegnato è stato buttato via come se fosse il residuo di un’istanza interrotta');
+    assert.equal(r.head, consegnato);
+    assert.equal(existsSync(resolve(work, 'meta-di-chi-e-stato-interrotto.txt')), false);
+  });
+
+  test('sealTransition non inventa uno stato dove non c’era (owner a mano)', () => {
+    const { work } = makeRepo();
+    assert.equal(sealTransition(work, null, 'consegna'), null,
+      'senza branch assegnato non c’è nessuna transizione da sigillare');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 describe('D — l’interruzione torna all’ultimo punto fermo', () => {
   test('scarta SOLO il lavoro dell’istanza interrotta, non quello dei predecessori', () => {
     const { work } = makeRepo();
