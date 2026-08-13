@@ -1,0 +1,226 @@
+/* Documenti di trasparenza — foglio UNICO per le due superfici.
+ *
+ * Dentro Filo i colori arrivano dai token del tema (theme.css). Sul sito quei
+ * token non esistono: per questo ogni var() porta un fallback, e il blocco
+ * :root qui sotto ridefinisce i token SOLO se non sono già stati impostati
+ * (sulla pagina pubblica) tramite prefers-color-scheme. Un foglio solo, così
+ * la pagina pubblica e quella interna non divergono a ogni ritocco.
+ *
+ * Il CORSIVO è riservato alle glosse del glossario: nel testo dei documenti non
+ * si usa per nient'altro, altrimenti l'affordance mente. */
+
+.sn-doc {
+  --doc-measure: 34rem;
+  max-width: var(--doc-measure);
+  margin: 0 auto;
+  padding: 2.5rem 1.25rem 6rem;
+  font-family: var(--sn-font, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+  color: var(--sn-fg, #1a1918);
+  font-size: 1.02rem;
+  line-height: 1.65;
+}
+
+/* Intestazione: marchio a sinistra, le quattro sezioni a destra. */
+.sn-doc-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 3rem;
+}
+
+.sn-doc-brand {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  color: var(--sn-fg, #1a1918);
+}
+
+.sn-nav {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.sn-nav-item {
+  font-size: 0.88rem;
+  text-decoration: none;
+  color: var(--sn-muted, #6e6b63);
+  padding-bottom: 2px;
+  border-bottom: 1px solid transparent;
+  background: none;
+  border-left: 0;
+  border-right: 0;
+  border-top: 0;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.sn-nav-item:hover { color: var(--sn-fg, #1a1918); }
+
+.sn-nav-item.is-active {
+  color: var(--sn-fg, #1a1918);
+  border-bottom-color: var(--sn-accent, #c45a3b);
+}
+
+/* Le sezioni non ancora scritte restano visibili ma spente: dire "in arrivo" è
+ * più onesto che far sparire la voce. */
+.sn-nav-item.is-soon {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.sn-doc h1 {
+  font-size: 1.9rem;
+  line-height: 1.2;
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+}
+
+.sn-doc-sub {
+  margin: 0 0 0.4rem;
+  color: var(--sn-muted, #6e6b63);
+  font-size: 1.05rem;
+}
+
+.sn-doc-meta {
+  margin: 0 0 2.5rem;
+  color: var(--sn-muted, #6e6b63);
+  font-size: 0.82rem;
+}
+
+.sn-doc h2 {
+  font-size: 1.22rem;
+  font-weight: 600;
+  margin: 2.8rem 0 0.9rem;
+  scroll-margin-top: 1.5rem;
+}
+
+.sn-doc p { margin: 0 0 1.15rem; }
+
+.sn-doc ul,
+.sn-doc ol {
+  margin: 0 0 1.15rem;
+  padding-left: 1.4rem;
+}
+
+.sn-doc li { margin-bottom: 0.55rem; }
+
+.sn-doc strong { font-weight: 600; }
+
+.sn-doc hr {
+  border: 0;
+  border-top: 1px solid var(--sn-border, #e0dcd4);
+  margin: 3rem 0 1.5rem;
+}
+
+.sn-doc a {
+  color: var(--sn-link, var(--sn-accent, #c45a3b));
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+/* Riferimento numerato: piccolo e discreto, ma con un'area di tocco decente. */
+.sn-ref {
+  font-size: 0.68em;
+  line-height: 0;
+  margin-left: 1px;
+}
+
+.sn-ref a {
+  text-decoration: none;
+  color: var(--sn-accent, #c45a3b);
+  padding: 0 2px;
+}
+
+.sn-ref a:hover { text-decoration: underline; }
+
+/* Elenco delle fonti in fondo: è esso stesso un argomento, quindi si vede. */
+.sn-fonti { margin-top: 3.5rem; }
+
+.sn-fonti-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.sn-fonti-list li {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+  scroll-margin-top: 1.5rem;
+}
+
+.sn-fonte-n {
+  color: var(--sn-accent, #c45a3b);
+  min-width: 1.4rem;
+  text-align: right;
+  flex: 0 0 auto;
+}
+
+.sn-fonte-dom {
+  color: var(--sn-muted, #6e6b63);
+  white-space: nowrap;
+}
+
+/* Glossa: corsivo + sottolineatura punteggiata. Funziona a hover (mouse), a
+ * fuoco (tastiera) e al tocco (il click mette a fuoco). */
+.sn-gloss {
+  font-style: italic;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--sn-muted, #6e6b63);
+  cursor: help;
+}
+
+.sn-gloss:focus-visible {
+  outline: 2px solid var(--sn-accent, #c45a3b);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.sn-gloss-pop {
+  position: absolute;
+  z-index: 50;
+  max-width: min(22rem, calc(100vw - 2rem));
+  padding: 0.6rem 0.75rem;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  font-style: normal;
+  color: var(--sn-fg, #1a1918);
+  background: var(--sn-hover, #ffffff);
+  border: 1px solid var(--sn-border, #e0dcd4);
+  border-radius: var(--sn-radius, 6px);
+  box-shadow: var(--sn-shadow, 0 4px 16px rgba(0, 0, 0, 0.18));
+}
+
+.sn-gloss-pop[hidden] { display: none; }
+
+@media (max-width: 34rem) {
+  .sn-doc { padding: 1.75rem 1rem 4rem; }
+  .sn-doc h1 { font-size: 1.55rem; }
+}
+
+/* ── Solo pagina pubblica ────────────────────────────────────────────────────
+ * Dentro Filo il body è già vestito dal tema. Sul sito no: queste regole danno
+ * sfondo e schema chiaro/scuro senza toccare la resa dentro l'app (dove
+ * data-sn-theme è sempre presente su <html>). */
+html:not([data-sn-theme]) body {
+  margin: 0;
+  background: var(--sn-bg, #f8f6f0);
+  color: var(--sn-fg, #1a1918);
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-sn-theme]) {
+    --sn-bg: #1e1d1b;
+    --sn-fg: #e5e3dc;
+    --sn-muted: #8a8780;
+    --sn-border: #3a3835;
+    --sn-hover: #282725;
+    --sn-accent: #c45a3b;
+  }
+}
