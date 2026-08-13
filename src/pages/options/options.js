@@ -325,6 +325,10 @@
     row.appendChild(modelEl);
     row.appendChild(testBtn);
     row.appendChild(status);
+    // Il pulsante e il modello della riga servono a spegnere la prova quando
+    // "solo pesi aperti" esclude proprio quel modello.
+    row._single = single;
+    row._testBtn = testBtn;
     return row;
   }
 
