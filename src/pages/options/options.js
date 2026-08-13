@@ -153,14 +153,70 @@
     return row ? I18n.t(row[1]) : action;
   }
 
+  // Un modello concreto è chiamabile con l'interruttore com'è adesso? Stessa
+  // domanda che si fa il main prima di partire (isOpenWeightsEntry): qui serve
+  // solo a non lasciare premibile un pulsante che verrebbe rifiutato.
+  function openWeightsAllows(provider, model) {
+    if (!$('openWeightsOnly').checked) return true;
+    const C = window.SN_CONST;
+    if (!C || typeof C.isOpenWeightsEntry !== 'function') return true;
+    return C.isOpenWeightsEntry({ provider, model }) === true;
+  }
+
+  // I pulsanti «Prova» non simulano niente: mandano una richiesta vera a un
+  // modello, pagata. Quelli che finirebbero su un modello o un fornitore che
+  // l'interruttore esclude si spengono e dicono perché al passaggio del mouse —
+  // stanno sulla stessa pagina dove l'interruttore si accende, e lasciarli
+  // premibili significherebbe far uscire da lì proprio ciò che lui vieta.
+  // Il rifiuto VERO resta nel main (è lui il cancello): questo evita all'utente
+  // un pulsante che non può funzionare.
+  function applyOpenWeightsTestGating() {
+    const why = I18n.t('options_test_blocked_open_weights');
+    const isOn = $('openWeightsOnly').checked;
+
+    // Chiave del produttore diretto: con l'interruttore acceso non c'è niente
+    // da provare, qualunque modello si scriva.
+    const testGemini = $('testGemini');
+    if (testGemini) {
+      testGemini.disabled = isOn;
+      testGemini.title = isOn ? why : '';
+    }
+
+    const defaults = $('defaultModelsList');
+    if (defaults) {
+      for (const row of defaults.querySelectorAll('.sn-default-model-row:not(.sn-model-row-head)')) {
+        const single = row._single;
+        const btn = row._testBtn;
+        if (!single || !btn) continue;
+        const blocked = !openWeightsAllows(single.provider, single.model);
+        btn.disabled = blocked;
+        btn.title = blocked ? why : '';
+        const statusEl = row.querySelector('.sn-model-row-status');
+        if (statusEl && (blocked || statusEl.dataset.owBlocked === '1')) {
+          statusEl.textContent = blocked ? why : '';
+          statusEl.dataset.owBlocked = blocked ? '1' : '';
+        }
+      }
+    }
+
+    const registry = $('modelRegistryList');
+    if (registry) {
+      for (const row of registry.querySelectorAll('.sn-model-row:not(.sn-model-row-head)')) {
+        const prov = row.querySelector('.sn-model-provider');
+        const id = row.querySelector('.sn-model-id');
+        const btn = row._testBtn;
+        if (!prov || !id || !btn) continue;
+        const blocked = !openWeightsAllows(prov.value, id.value.trim());
+        btn.disabled = blocked;
+        btn.title = blocked ? why : '';
+      }
+    }
+  }
+
   function renderOpenWeightsImpact() {
     const host = $('openWeightsImpact');
     if (!host) return;
-    // Il fornitore diretto del produttore resta spento a interruttore acceso:
-    // il suo pulsante "Prova" manderebbe una richiesta proprio dove l'utente ha
-    // chiesto che non ne arrivino (il main la rifiuta comunque).
-    const testGemini = $('testGemini');
-    if (testGemini) testGemini.disabled = $('openWeightsOnly').checked;
+    applyOpenWeightsTestGating();
 
     host.innerHTML = '';
     if (!$('openWeightsOnly').checked) { host.hidden = true; return; }
