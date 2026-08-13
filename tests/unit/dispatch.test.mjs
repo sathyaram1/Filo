@@ -520,6 +520,108 @@ test('preflight: guasto generico → pronto (run() lì ripiega sull\'audit)', as
   assert.deepEqual(r, { ok: true });
 });
 
+// ─── Interruttore master delle routine ───────────────────────────────────────
+
+test('resolveRoutinesEnabled: assente ovunque → acceso (comportamento storico)', () => {
+  assert.equal(resolveRoutinesEnabled({}), true);
+  assert.equal(resolveRoutinesEnabled({ envRaw: '', remote: undefined }), true);
+});
+
+test('resolveRoutinesEnabled: solo un false esplicito spegne', () => {
+  assert.equal(resolveRoutinesEnabled({ remote: false }), false);
+  assert.equal(resolveRoutinesEnabled({ remote: true }), true);
+});
+
+test('resolveRoutinesEnabled: l\'override d\'ambiente batte il remoto', () => {
+  assert.equal(resolveRoutinesEnabled({ envRaw: '0', remote: true }), false);
+  assert.equal(resolveRoutinesEnabled({ envRaw: 'false', remote: true }), false);
+  assert.equal(resolveRoutinesEnabled({ envRaw: '1', remote: false }), true);
+  assert.equal(resolveRoutinesEnabled({ envRaw: 'sì?', remote: false }), false); // valore ignoto → decide il remoto
+});
+
+test('parseRoutineConfig: legge interruttore, esplorazione e cap', () => {
+  assert.deepEqual(parseRoutineConfig({
+    enabled: { booleanValue: false },
+    proberWhenIdle: { booleanValue: false },
+    loopCap: { integerValue: '5' },
+  }), { enabled: false, proberWhenIdle: false, loopCap: 5 });
+  // Documento vuoto (mai scritto) = nessuna decisione presa.
+  assert.deepEqual(parseRoutineConfig({}), {});
+  // proberWhenIdle: solo il false esplicito compare (true = storico).
+  assert.deepEqual(parseRoutineConfig({ proberWhenIdle: { booleanValue: true } }), {});
+});
+
+test('preflight: routine spente → non pronto, con esito `off` (non un guasto)', async () => {
+  const r = await preflight(
+    async () => { throw new Error('non deve nemmeno arrivarci'); },
+    async () => ({ enabled: false }),
+  );
+  assert.equal(r.ok, false);
+  assert.equal(r.kind, 'off');
+});
+
+test('preflight: config illeggibile → non pronto (fail closed)', async () => {
+  // In dubbio ci si ferma: se non so se sono spente, non lavoro. Il contrario
+  // renderebbe l'interruttore ignorabile con un colpo di rete storta.
+  const r = await preflight(
+    async () => ({ reviews: [], todoWinner: null }),
+    async () => { throw routineFault('transient', 'Firestore irraggiungibile'); },
+  );
+  assert.equal(r.ok, false);
+  assert.equal(r.kind, 'transient');
+});
+
+test('preflight: routine accese → si passa al controllo dello stato', async () => {
+  let visto = false;
+  const r = await preflight(
+    async () => { visto = true; return { reviews: [], todoWinner: null }; },
+    async () => ({ enabled: true }),
+  );
+  assert.deepEqual(r, { ok: true });
+  assert.ok(visto, 'con le routine accese la prontezza deve guardare anche lo stato');
+});
+
+test('preflightExitCode: il contratto 0 / 2 / 3 dell\'orchestratore', () => {
+  // Il ramo --preflight è morto per mesi uscendo con 1, che non è né "prosegui"
+  // né "fermati" (#452): qui il contratto è inchiodato.
+  assert.equal(preflightExitCode({ ok: true }), 0);
+  assert.equal(preflightExitCode({ ok: false, kind: 'off', message: 'spente' }), 2);
+  assert.equal(preflightExitCode({ ok: false, kind: 'transient', message: 'x' }), 3);
+  assert.equal(preflightExitCode({ ok: false, kind: 'permanent', message: 'x' }), 3);
+  // Qualunque esito produce SEMPRE uno dei tre codici, mai 1.
+  for (const r of [null, undefined, {}, { ok: false }, { ok: false, kind: 'boh' }]) {
+    assert.ok([0, 2, 3].includes(preflightExitCode(r)), `codice fuori contratto per ${JSON.stringify(r)}`);
+  }
+});
+
+// ─── Voci del registro dei worker (#451) ─────────────────────────────────────
+
+test('buildWorkerLogEntry: voce completa per la coda', () => {
+  const e = buildWorkerLogEntry({ role: 'new-work', num: '#22.1' }, new Date('2026-08-13T12:00:00.000Z'));
+  assert.equal(e.op, 'worker-log');
+  assert.equal(e.role, 'new-work');
+  assert.equal(e.num, '#22.1');
+  assert.equal(e.startedAt, '2026-08-13T12:00:00.000Z');
+  assert.equal(e.queuedAt, '2026-08-13T12:00:00.000Z');
+});
+
+test('buildWorkerLogEntry: senza ruolo non c\'è niente da registrare', () => {
+  assert.equal(buildWorkerLogEntry({}), null);
+  assert.equal(buildWorkerLogEntry(null), null);
+});
+
+test('workerLogFileName: ordinabile per istante e non collidibile', () => {
+  const a = workerLogFileName({ startedAt: '2026-08-13T12:00:00.000Z' }, 'aaaaaa');
+  const b = workerLogFileName({ startedAt: '2026-08-13T12:00:01.000Z' }, 'bbbbbb');
+  assert.ok(a.startsWith('wl-') && a.endsWith('.json'));
+  assert.ok(a < b, 'i nomi devono ordinarsi come gli istanti');
+  assert.notEqual(
+    workerLogFileName({ startedAt: '2026-08-13T12:00:00.000Z' }, 'aaaaaa'),
+    workerLogFileName({ startedAt: '2026-08-13T12:00:00.000Z' }, 'zzzzzz'),
+  );
+  assert.ok(!a.includes(':'), 'i due punti non sono ammessi nei nomi file su Windows');
+});
+
 // ─── teardown ─────────────────────────────────────────────────────────────────
 
 test('cleanup STATE_DIR temporanea', () => {
