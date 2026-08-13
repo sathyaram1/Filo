@@ -262,11 +262,28 @@ leggendo solo lo STATO e stampa il JSON per il worker:
 | 5ª | niente di tutto ciò | **prober** | `routines/roles/prober.md` |
 | 5ª-bis | niente di tutto ciò, ma l'owner ha spento l'esplorazione a coda vuota | **idle** | `routines/roles/idle.md` |
 
+- **Prima di ogni precedenza c'è l'interruttore master** (2026-08-13): la tab
+  Automazioni scrive `enabled` su `config/routines` e, spento, il giro finisce in
+  **`off`** — la coda non viene nemmeno letta, nessun claim, nessun ramo toccato,
+  exit 0 e il worker risponde `niente da fare`. Normalmente il giro non arriva
+  nemmeno qui, perché `--preflight` (passo 0b) se n'è accorto prima del setup:
+  questo secondo cancello serve a chi spegne a sessione già avviata.
+
+- **Le impostazioni delle routine vivono in `config/routines`, non in
+  `config/automation`.** Quel documento è leggibile **senza credenziali**, ed è
+  il punto: le macchine delle routine non ne hanno nessuna, e finché queste
+  impostazioni sono vissute in un documento admin-only la lettura falliva sempre
+  in silenzio (stessa radice del registro worker sempre vuoto, #451). Se il
+  documento **non si riesce a leggere**, il giro si **ferma** (exit 3): un
+  interruttore che in caso di dubbio lascia lavorare non è un interruttore.
+  Documento mai scritto (404) invece non è un dubbio: routine accese, coi
+  default.
+
 - **L'esplorazione a coda vuota si può spegnere** (feedback #448): la tab
   Automazioni della dashboard scrive `proberWhenIdle: false` su
-  `config/automation`, e con quello il giro finisce in `idle` invece che in
+  `config/routines`, e con quello il giro finisce in `idle` invece che in
   `prober` — nessun worker, nessun claim, exit 0. Solo un `false` esplicito
-  spegne: campo assente, doc mai scritto o lettura fallita lasciano il prober.
+  spegne: campo assente o doc mai scritto lasciano il prober.
   Riguarda **solo** la coda vuota: il ripiego sul prober quando lo stato è
   illeggibile è un guasto travestito da audit e resta com'era.
 
