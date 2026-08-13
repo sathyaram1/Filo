@@ -386,7 +386,11 @@ function buildAttemptChain(settings, modelRef, action) {
   // proprio, perché quei tentativi non vengono nemmeno costruiti.
   const openWeightsOnly = settings.openWeightsOnly === true;
   if (openWeightsOnly) {
-    const pol = SN_CONST.applyOpenWeightsPolicy(usable, registry);
+    // L'azione va passata: il sostituto deve saper fare il mestiere di QUESTA
+    // funzione (la dettatura vuole un modello che ascolti l'audio, non uno che
+    // legga solo testo), altrimenti la funzione si ferma dicendolo invece di
+    // rompersi più avanti con un errore qualunque.
+    const pol = SN_CONST.applyOpenWeightsPolicy(usable, registry, action);
     if (pol.substituted.length) {
       console.log(`[Filo policy] "${action || modelRef}" (solo pesi aperti): `
         + pol.substituted.map((s) => `${s.from} → ${s.to}`).join(', '));
