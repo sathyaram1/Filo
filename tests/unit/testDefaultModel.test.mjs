@@ -223,6 +223,37 @@ test('interruttore acceso: nemmeno la riga scritta a mano dall\'amministratore p
   assert.equal(state.calls.length, 0);
 });
 
+// ── Stesso cancello per il "Prova" accanto alle CHIAVI (test_provider) ───────
+
+test('interruttore acceso: la prova della chiave parte sul sostituto a pesi aperti', async () => {
+  const C = globalThis.SN_CONST;
+  state.effective = {
+    modelRegistry: C.DEFAULT_MODEL_REGISTRY,
+    models: { [C.ACTIONS.PROVIDER_TEST]: C.DEFAULT_MODELS[C.ACTIONS.PROVIDER_TEST] },
+    apiKeys: {},
+    openWeightsOnly: true,
+  };
+  const res = await testProvider({ provider: 'openrouter', apiKey: 'sk-or-utente' });
+  assert.equal(res.ok, true, `atteso ok, ottenuto: ${res.error}`);
+  assert.equal(state.calls.length, 1);
+  assert.equal(state.calls[0].model, 'google/gemma-4-26b-a4b-it',
+    'la prova doveva usare l\'equivalente a pesi aperti, non il modello proprietario');
+});
+
+test('interruttore acceso: la prova su un modello proprietario scritto a mano non parte', async () => {
+  state.effective = { modelRegistry: {}, apiKeys: {}, openWeightsOnly: true };
+  const res = await testProvider({
+    provider: 'openrouter', apiKey: 'sk-or-utente', model: 'anthropic/claude-3.5-haiku',
+  });
+  assert.equal(res.ok, false);
+  assert.equal(state.calls.length, 0);
+
+  // E il fornitore che è l'API del produttore resta spento in blocco.
+  const gem = await testProvider({ provider: 'gemini', apiKey: 'AIza-utente' });
+  assert.equal(gem.ok, false);
+  assert.equal(state.calls.length, 0);
+});
+
 test('la prova porta con sé chi NON deve servirla (lista di esclusione)', async () => {
   state.admin = true;
   state.effective = { modelRegistry: {}, apiKeys: {}, excludedProviders: ['Google', 'OpenAI'] };
