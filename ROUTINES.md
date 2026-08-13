@@ -261,6 +261,7 @@ leggendo solo lo STATO e stampa il JSON per il worker:
 | 4ª | c'è un todo (vincitore di `next-feedback`) | **new-work** | `routines/roles/new-work.md` |
 | 5ª | niente di tutto ciò | **prober** | `routines/roles/prober.md` |
 | 5ª-bis | niente di tutto ciò, ma l'owner ha spento l'esplorazione a coda vuota | **idle** | `routines/roles/idle.md` |
+| — | l'owner ha spento le routine (precede tutto) | **off** | `routines/roles/off.md` |
 
 - **Prima di ogni precedenza c'è l'interruttore master** (2026-08-13): la tab
   Automazioni scrive `enabled` su `config/routines` e, spento, il giro finisce in
