@@ -91,8 +91,10 @@ test('un link a una fonte apre una scheda e non porta via la pagina interna', as
   // condizione invece di un tempo fisso: l'apertura passa dal main e commettere
   // la navigazione richiede quel che richiede, sulla macchina di turno.
   await expect.poll(
-    () => app.evaluate(async ({ webContents }) =>
-      webContents.getAllWebContents().some((wc) => wc.getURL().startsWith(href))),
+    // `href` va passato: app.evaluate gira nel processo main, non cattura la
+    // chiusura del test.
+    () => app.evaluate(async ({ webContents }, url) =>
+      webContents.getAllWebContents().some((wc) => wc.getURL().startsWith(url)), href),
     { timeout: 10000, message: `nessuna scheda aperta su ${href}` },
   ).toBe(true);
 
