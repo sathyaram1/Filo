@@ -42,6 +42,8 @@ const {
   persistStateToGit,
   appendWorkerLog,
   emit,
+  preflight,
+  routineFault,
 } = await import('../../scripts/dispatch.mjs');
 const { readRole } = await import('../../scripts/lib/routine-role.mjs');
 
