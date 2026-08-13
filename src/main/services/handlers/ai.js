@@ -376,6 +376,14 @@ module.exports = function register(on, ctx) {
         modelId = single.model || '';
         if (!modelId) return { ok: false, error: 'Stringa modello vuota' };
       }
+      // "Solo modelli a pesi aperti" (#461): questa prova parte sulle chiavi
+      // PREDEFINITE — cioè coi crediti di Filo, la configurazione in cui l'utente
+      // si trova per primo — e la lista qui sopra è piena di modelli
+      // proprietari. Senza questo controllo l'interruttore era acceso e i suoi
+      // pulsanti mandavano richieste esattamente dove lui le vieta.
+      const s = await getEffectiveSettings();
+      const refusal = openWeightsTestRefusal(s, provider, modelId);
+      if (refusal) return { ok: false, error: refusal };
       const apiKey = await defaultKeyFor(provider, d);
       if (!apiKey) return { ok: false, error: `Chiave ${provider} non configurata` };
       // Il provider Gemini ora accetta i nomi nativi (es. gemini-3.1-flash-lite),
@@ -389,6 +397,7 @@ module.exports = function register(on, ctx) {
       let charCount = 0;
       const result = await Providers.streamComplete({
         provider, apiKey, model, messages,
+        providerRouting: testProviderRouting(s, provider),
         onDelta: (delta) => {
           if (firstTokenMs == null) firstTokenMs = performance.now() - startMs;
           charCount += (delta || '').length;
@@ -397,6 +406,8 @@ module.exports = function register(on, ctx) {
       const totalMs = performance.now() - startMs;
       // Come in TEST_PROVIDER: stream vuoto = modello inutilizzabile = errore.
       if (charCount === 0) return { ok: false, error: 'Il modello ha risposto vuoto' };
+      const served = servedByRefusal(s, result && result.servedBy);
+      if (served) return { ok: false, error: served };
       const tokens = (result?.usage?.completionTokens) || Math.max(1, Math.round(charCount / 4));
       const tps = tokens > 0 && totalMs > 0 ? (tokens / (totalMs / 1000)) : 0;
       return {
