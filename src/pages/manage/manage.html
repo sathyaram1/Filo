@@ -1057,6 +1057,22 @@
           regola i parametri delle routine.
         </p>
 
+        <!-- Interruttore master delle routine autonome. -->
+        <section class="mg-auto-block">
+          <label class="mg-switch" id="mgRoutinesSwitch" title="Ferma del tutto il lavoro autonomo delle routine">
+            <span class="mg-switch-text">Routine autonome</span>
+            <input type="checkbox" id="mgRoutinesToggle" checked />
+            <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+            <span class="mg-switch-state" id="mgRoutinesState">On</span>
+          </label>
+          <p class="mg-auto-block-desc">
+            Spente, le sessioni automatiche partono ma non fanno niente: nessun
+            lavoro sul codice, nessuna verifica, nessuna esplorazione. I feedback
+            restano in coda e ti aspettano.
+            <span class="mg-action-msg" id="mgRoutinesMsg" role="status"></span>
+          </p>
+        </section>
+
         <!-- Modalità automatica: lo switch master (era nella barra in alto). -->
         <section class="mg-auto-block">
           <label class="mg-switch" id="mgAutoSwitch" title="Attiva o disattiva la modalità automatica di Filo">
