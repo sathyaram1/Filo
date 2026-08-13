@@ -228,12 +228,17 @@ module.exports = function register(on, ctx) {
   //   2. niente modelli proprietari;
   //   3. lista di esclusione allegata — con l'interruttore acceso contiene anche
   //      Anthropic — così nemmeno lo smistatore può servire da un escluso.
-  // Ritorna il motivo del rifiuto, o null se la prova può partire.
-  function openWeightsTestRefusal(settings, provider, model) {
+  // Ritornano il motivo del rifiuto, o null se la prova può partire.
+  function producerDirectTestRefusal(settings, provider) {
     if (settings.openWeightsOnly !== true) return null;
-    if (SN_CONST.PRODUCER_DIRECT_PROVIDERS.includes(provider)) {
-      return 'Hai scelto solo modelli a pesi aperti: questo fornitore è l\'API di chi produce i modelli e resta spento. Spegni l\'interruttore per provarlo.';
-    }
+    if (!SN_CONST.PRODUCER_DIRECT_PROVIDERS.includes(provider)) return null;
+    return 'Hai scelto solo modelli a pesi aperti: questo fornitore è l\'API di chi produce i modelli e resta spento. Spegni l\'interruttore per provarlo.';
+  }
+
+  function openWeightsTestRefusal(settings, provider, model) {
+    const direct = producerDirectTestRefusal(settings, provider);
+    if (direct) return direct;
+    if (settings.openWeightsOnly !== true) return null;
     if (!SN_CONST.isOpenWeightsEntry({ provider, model })) {
       return `Hai scelto solo modelli a pesi aperti: «${model}» è un modello proprietario e Filo non lo chiama. Spegni l'interruttore per provarlo.`;
     }
