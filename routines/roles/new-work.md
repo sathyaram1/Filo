@@ -93,8 +93,12 @@ Poi metti il feedback in `revision_capability` col branch — il prossimo giro d
 dispatch lo instraderà al **verifier**:
 
 ```bash
-node scripts/queue-triage.mjs <id> revision_capability "[il tuo report]" --branch worker/<id>
+node scripts/queue-triage.mjs <id> revision_capability "[il tuo report]" --branch <payload.branch>
 ```
+
+Il nome del ramo è quello di `payload.branch` (unico per tentativo): non
+ricostruirlo a memoria come `worker/<id>` — quel ramo non esiste. Se sbagli, la
+consegna registra comunque il ramo giusto e te lo dice.
 
 Se il feedback è ambiguo / richiede una decisione di design / mancano
 informazioni → `design` con `--reason clarify` e le TUE DOMANDE nella nota
