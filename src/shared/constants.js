@@ -797,13 +797,16 @@
 
   // Perché una chiamata COSTRUITA A MANO (i pulsanti "Prova" delle Opzioni e
   // della pagina di amministrazione: modello concreto, nessuna catena) non può
-  // partire con l'interruttore acceso.
+  // partire con l'interruttore acceso. `entry` è la voce del registry — non solo
+  // fornitore e stringa del modello — così una classificazione corretta a mano
+  // dall'owner (`weights: 'open'`) vale qui come vale per le richieste vere.
   // Ritorna '' se può partire, 'provider' se il fornitore è l'API di chi produce
   // i modelli, 'model' se il modello non è a pesi aperti. PURA.
-  function openWeightsBlockKind(openWeightsOnly, provider, model) {
+  function openWeightsBlockKind(openWeightsOnly, entry) {
     if (openWeightsOnly !== true) return '';
-    if (PRODUCER_DIRECT_PROVIDERS.includes(provider)) return 'provider';
-    return isOpenWeightsEntry({ provider, model }) ? '' : 'model';
+    const e = entry || {};
+    if (PRODUCER_DIRECT_PROVIDERS.includes(e.provider)) return 'provider';
+    return isOpenWeightsEntry(e) ? '' : 'model';
   }
 
   // Applica l'interruttore a una catena di riferimenti: sostituisce i modelli
