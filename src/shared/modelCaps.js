@@ -152,6 +152,37 @@
     return { ok: true };
   }
 
+  // Una VOCE DEL REGISTRY ({ provider, model, … }) sa fare il mestiere di una
+  // funzione? Stessa domanda di modelMatchesAction, risposta opposta nel dubbio:
+  // qui il dubbio vale NO.
+  //
+  // La differenza non è un capriccio: modelMatchesAction serve quando è
+  // l'UTENTE a scegliere un modello, e lì bloccare un modello valido sarebbe
+  // peggio del rischio (a runtime scatta comunque il ripiego). Questa invece
+  // serve alla SOSTITUZIONE AUTOMATICA dei pesi aperti, dove nessuno ha scelto
+  // niente e il ripiego non esiste per costruzione: mettere sulla dettatura un
+  // modello che forse non ascolta l'audio significa consegnare all'utente una
+  // funzione che si rompe con un errore qualunque, invece di una che si ferma
+  // dicendo perché.
+  //
+  // Una voce può dichiarare le proprie modalità con `input_modalities` /
+  // `output_modalities` (stesso schema dei metadati OpenRouter): così l'owner
+  // riabilita dalla config condivisa una funzione che il nome del modello non
+  // basta a garantire, senza rilasciare codice.
+  function entryCanDoAction(entry, action) {
+    const e = entry || {};
+    const provider = e.provider || (e.gemini ? 'gemini' : 'openrouter');
+    const modelId = e.model || e.gemini || e.openrouter || '';
+    if (!modelId) return false;
+    const caps = capabilitiesFor(provider, modelId, e);
+    const req = requirementsFor(action);
+    if (!caps.outputs.includes(req.output)) return false;
+    for (const inp of req.inputs || []) {
+      if (!caps.inputs.includes(inp)) return false;
+    }
+    return true;
+  }
+
   // Chiave di ordinamento "più recente = più grande". L'ordinamento avviene
   // SEMPRE dentro lo stesso provider (liste separate), quindi le scale diverse
   // tra provider non si mischiano.
