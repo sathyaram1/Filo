@@ -119,6 +119,36 @@ node scripts/claim-feedback.mjs release <id>                  # a fine lavoro
 node scripts/claim-feedback.mjs list                          # claim attivi
 ```
 
+## Registro dei worker — `wl-<istante>-<casuale>.json`
+
+Ogni volta che il dispatcher consegna il lavoro a un worker lascia qui una riga
+di registro, che l'applier scrive nel campo `workerLog` del documento
+`config/automation` — è quello che la dashboard mostra nella tab Automazioni.
+
+```json
+{
+  "op": "worker-log",
+  "role": "new-work",
+  "startedAt": "2026-08-13T12:00:00.000Z",
+  "num": "#22.1",
+  "queuedAt": "2026-08-13T12:00:00.000Z",
+  "queuedBy": "dispatch"
+}
+```
+
+**Perché passa da qui** (feedback #451): prima il dispatcher scriveva quel campo
+direttamente su Firestore con una credenziale admin, e in silenzio se la
+credenziale mancava. Nelle macchine delle routine non c'è mai stata: il registro
+è nato vuoto ed è rimasto vuoto per tutta la sua esistenza. Dalla coda invece la
+scrittura la fa la GitHub Action col service account, che la credenziale ce l'ha
+per costruzione.
+
+Le voci si applicano **tutte insieme** (una lettura e una scrittura sole) e le
+duplicate — stesso ruolo, stesso istante — vengono scartate: la spedizione si
+ritenta, e un registro che conta due volte lo stesso worker mentirebbe. Se la
+scrittura fallisce i fogliettini **restano in coda** e ci riprova il giro
+successivo.
+
 ## Op di manutenzione (rare)
 
 La coda accetta anche due operazioni una-tantum, utili quando in locale non
