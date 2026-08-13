@@ -255,6 +255,53 @@
     sendToMain({ type: 'auth_signin' }).catch(() => {});
   });
 
+  // ── Switch "Routine autonome" (interruttore master) ───────────────────────
+  // Vive nel doc Firestore config/routines, che le routine leggono SENZA
+  // credenziali: è l'unico modo perché "spento" arrivi davvero alle loro
+  // macchine (le altre impostazioni stavano in un documento che loro non
+  // possono leggere, e infatti non le hanno mai viste — vedi #451).
+  //
+  // Spento non è "meno lavoro": è nessun lavoro. Le due impostazioni che
+  // riguardano solo le routine restano visibili ma inerti, e si vede.
+  let routinesOn = true;
+
+  function reflectRoutines(on) {
+    routinesOn = !!on;
+    if (mgRoutinesToggle) mgRoutinesToggle.checked = routinesOn;
+    if (mgRoutinesState)  mgRoutinesState.textContent = routinesOn ? 'On' : 'Off';
+    if (mgProberIdleBlock) mgProberIdleBlock.classList.toggle('mg-auto-block--off', !routinesOn);
+    if (mgLoopCapBlock)    mgLoopCapBlock.classList.toggle('mg-auto-block--off', !routinesOn);
+    applyAutoModeGate();
+  }
+
+  function setRoutinesMsg(text, kind) {
+    if (!mgRoutinesMsg) return;
+    mgRoutinesMsg.textContent = text || '';
+    mgRoutinesMsg.classList.toggle('mg-ok', kind === 'ok');
+    mgRoutinesMsg.classList.toggle('mg-err', kind === 'err');
+  }
+
+  if (mgRoutinesToggle) {
+    mgRoutinesToggle.addEventListener('change', async () => {
+      const on = mgRoutinesToggle.checked;
+      reflectRoutines(on);
+      setRoutinesMsg('', null);
+      try {
+        const r = await sendToMain({ type: AUTOMATION_SET, routinesEnabled: on });
+        if (!r || r.ok === false) throw new Error(r?.error || 'errore sconosciuto');
+        reflectRoutines(r.routinesEnabled !== false);
+        // Spegnere vale dal prossimo giro: chi sta già lavorando finisce il suo
+        // compito. Senza dirlo, sembrerebbe non aver fatto niente.
+        setRoutinesMsg(on ? 'Salvato.' : 'Salvato. Un lavoro già in corso arriva in fondo, poi non ne parte nessun altro.', 'ok');
+      } catch (err) {
+        // Non scritto = non cambiato: lo switch non deve dire il contrario.
+        reflectRoutines(!on);
+        setRoutinesMsg('Salvataggio fallito: le routine NON sono cambiate.', 'err');
+        console.error('[manage] salvataggio interruttore routine fallito:', err);
+      }
+    });
+  }
+
   // ── Switch "Modalità automatica" ──────────────────────────────────────────
   // La fonte di verità è il doc Firestore config/automation (campo `enabled`),
   // perché è QUELLO che il backend dei giudici legge per decidere se un feedback
