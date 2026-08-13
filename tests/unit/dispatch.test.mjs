@@ -259,11 +259,25 @@ test('buildPayload fixer: feedback + critica del verifier', () => {
   assert.equal(p.loopCount, 1);
 });
 
-test('buildPayload new-work: feedback completo', () => {
-  const bucket = { role: 'new-work', id: 'F1', num: '#5' };
+test('buildPayload new-work: feedback completo + il ramo su cui è già posizionato', () => {
+  const bucket = { role: 'new-work', id: 'F1', num: '#5', branch: 'worker/F1-20260813T000000Z' };
   const p = buildPayload(bucket, { feedback: { text: 'spec' } });
   assert.equal(p.feedback.text, 'spec');
   assert.equal(p.id, 'F1');
+  // Il ruolo promette `payload.branch` e con quel nome registra la consegna. Il
+  // nome è unico per tentativo: senza, viene ricostruito a memoria come
+  // `worker/<id>` e punta a un ramo che non esiste.
+  assert.equal(p.branch, 'worker/F1-20260813T000000Z');
+});
+
+test('buildPayload: chi giudica un ramo rimaneggiato riceve l’avviso', () => {
+  const notice = 'i commit scartati sono su discarded/…';
+  for (const role of ['verifier', 'fixer', 'secaudit']) {
+    const p = buildPayload({ role, id: 'A', num: '#1', branch: 'worker/A', notice }, {});
+    assert.equal(p.notice, notice, `${role} deve sapere che il ramo è stato rimaneggiato`);
+  }
+  assert.equal(buildPayload({ role: 'verifier', id: 'A', branch: 'worker/A' }, {}).notice, '',
+    'un ramo intatto non porta nessun avviso');
 });
 
 test('buildPayload prober: payload vuoto', () => {
