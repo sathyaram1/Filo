@@ -50,6 +50,10 @@ require(path.join(SHARED, 'ttsChunk.js'));
 require(path.join(SHARED, 'ttsCache.js'));
 require(path.join(SHARED, 'patchNotes.js'));
 require(path.join(SHARED, 'capabilities.js'));
+// Documenti di trasparenza (generati da transparency/*.md): servono all'agente
+// per rispondere quando l'utente chiede conto di una scelta. Il gemello
+// transparencyUi.js NON si carica qui: è codice di pagina, tocca il DOM.
+require(path.join(SHARED, 'transparency.js'));
 require(path.join(SHARED, 'autoFeedback.js'));  // F4 — dipende da capabilities
 require(path.join(SHARED, 'feedbackPublicKey.js'));
 require(path.join(SHARED, 'feedbackCrypto.js'));
