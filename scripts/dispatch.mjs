@@ -1248,7 +1248,7 @@ export function emit(bucket, ctx) {
   // Un guasto (`halt`) e un giro a vuoto (`idle`) non sono ruoli: si cancella il
   // marcatore, altrimenti quello del giro precedente sopravviverebbe a un giro
   // che non ha lavorato e finirebbe nella provenienza di un feedback altrui.
-  if (bucket.role === 'halt' || bucket.role === 'idle') clearRole(ROOT);
+  if (bucket.role === 'halt' || bucket.role === 'idle' || bucket.role === 'off') clearRole(ROOT);
   else writeRole(ROOT, bucket.role);
   const payload = buildPayload(bucket, ctx);
   const out = {
