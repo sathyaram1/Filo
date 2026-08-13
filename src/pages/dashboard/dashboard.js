@@ -1119,6 +1119,15 @@
   const AUTO_CONTINUE_FILE =
     'Ora hai il contenuto completo del file qui sopra. Rispondi all’utente usando ' +
     'quel testo. Non emettere un’altra LEGGI_FILE per lo stesso file.';
+  // Nudge interno dopo una LEGGI_TRASPARENZA: l'agente ha davanti le scelte
+  // dell'owner messe per iscritto e deve rispondere ATTENENDOSI a quelle. È il
+  // punto in cui è più tentato di ricostruire a memoria una posizione etica che
+  // nel documento è scritta in modo preciso: qui la memoria sbaglia e il testo no.
+  const AUTO_CONTINUE_TRANSPARENCY =
+    'Ora hai il testo del documento di trasparenza qui sopra. Rispondi all’utente ' +
+    'attenendoti a quello che c’è scritto, senza aggiungere motivazioni tue: se il ' +
+    'documento non risponde alla domanda, dillo e indica quale sezione ci va vicino. ' +
+    'Non emettere un’altra LEGGI_TRASPARENZA per lo stesso documento.';
 
   function isType(a, t) {
     return a && String(a.type || '').toUpperCase() === t;
