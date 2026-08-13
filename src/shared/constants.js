@@ -743,11 +743,47 @@
     return base;
   }
 
+  // Modalità dichiarate da una voce del registry, nella forma che SN_MODEL_CAPS
+  // legge dai metadati dei fornitori. Ritorna null se la voce non dichiara
+  // niente: "non dichiarato" NON vuol dire "sa fare tutto". PURA.
+  function entryModalities(entry) {
+    const e = entry || {};
+    const inputs = Array.isArray(e.inputs) ? e.inputs.filter(Boolean) : null;
+    const outputs = Array.isArray(e.outputs) ? e.outputs.filter(Boolean) : null;
+    if (!inputs && !outputs) return null;
+    return {
+      input_modalities: inputs && inputs.length ? inputs : ['text'],
+      output_modalities: outputs && outputs.length ? outputs : ['text'],
+    };
+  }
+
+  // Il sostituto sa fare il MESTIERE della funzione? La dettatura ha bisogno di
+  // ascoltare un audio, la lettura ad alta voce di produrne uno, l'indicizzazione
+  // di produrre vettori: infilarci un modello che macina solo testo non è una
+  // sostituzione, è la funzione che smette di funzionare con un errore
+  // qualunque. Chi ha acceso l'interruttore merita di sapere che quella funzione
+  // si ferma — è la stessa promessa del "mai un ripiego silenzioso", applicata
+  // alla capacità invece che ai pesi.
+  //
+  // DIFFIDENTE come il resto dell'interruttore: si sostituisce solo se il
+  // sostituto DICHIARA di saper fare quel mestiere. Capacità ignote = niente
+  // sostituzione (la funzione si ferma dicendolo, che è recuperabile; una
+  // sostituzione sbagliata no).
+  function substituteFitsAction(entry, action) {
+    const caps = global.SN_MODEL_CAPS;
+    const meta = entryModalities(entry);
+    if (!meta || !caps || typeof caps.modelMatchesAction !== 'function') return false;
+    const e = entry || {};
+    const res = caps.modelMatchesAction(e.provider || 'openrouter', e.model || '', action, meta);
+    return Boolean(res && res.ok);
+  }
+
   // Applica l'interruttore a una catena di riferimenti: sostituisce i modelli
-  // proprietari col loro equivalente a pesi aperti (se il registry ce l'ha e se
-  // è davvero a pesi aperti) e butta via quelli che restano proprietari.
+  // proprietari col loro equivalente a pesi aperti (se il registry ce l'ha, se è
+  // davvero a pesi aperti e se sa fare il mestiere di `action`) e butta via
+  // quelli che restano proprietari.
   // Ritorna { refs, substituted:[{from,to}], dropped:[ref] }. PURA.
-  function applyOpenWeightsPolicy(refs, registry) {
+  function applyOpenWeightsPolicy(refs, registry, action) {
     const reg = registry || {};
     const out = [];
     const substituted = [];
@@ -758,10 +794,11 @@
       let use = ref;
       if (!isOpenWeightsRef(ref, reg)) {
         const alt = OPEN_WEIGHTS_SUBSTITUTES[ref];
-        // Il sostituto vale solo se esiste DAVVERO nel registry effettivo ed è
-        // davvero a pesi aperti: una sostituzione verso un modello assente (o
-        // proprietario) sarebbe peggio del blocco, perché sembrerebbe funzionare.
-        if (alt && reg[alt] && isOpenWeightsEntry(reg[alt])) {
+        // Il sostituto vale solo se esiste DAVVERO nel registry effettivo, se è
+        // davvero a pesi aperti e se fa il mestiere della funzione: una
+        // sostituzione verso un modello assente, proprietario o incapace sarebbe
+        // peggio del blocco, perché sembrerebbe funzionare.
+        if (alt && reg[alt] && isOpenWeightsEntry(reg[alt]) && substituteFitsAction(reg[alt], action)) {
           substituted.push({ from: ref, to: alt });
           use = alt;
         } else {
