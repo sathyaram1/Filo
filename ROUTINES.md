@@ -40,9 +40,15 @@ Le routine schedulate su claude.ai partono con un prompt minimo
    ```bash
    FILO_FEEDBACK_PRIVKEY=<chiave> node scripts/dispatch.mjs --preflight
    ```
-   Esce **0** → prosegui col passo 1. Esce **3** → **chiudi la sessione subito**,
-   riportando `guasto <X>`: niente installazioni, niente worker. Ci riprova
-   l'orchestratore successivo fra 6 ore (vedi § `guasto` più sotto).
+   - **0** → prosegui col passo 1.
+   - **2** → **le routine autonome sono spente** dall'owner (tab Automazioni):
+     **chiudi la sessione subito** riportando `niente da fare`. Non è un guasto e
+     non c'è niente da riparare: è una decisione presa apposta. Niente
+     installazioni, niente worker, nessun tentativo di "controllare se per caso
+     c'è qualcosa di urgente".
+   - **3** → **chiudi la sessione subito**, riportando `guasto <X>`: niente
+     installazioni, niente worker. Ci riprova l'orchestratore successivo fra 6
+     ore (vedi § `guasto` più sotto).
 
 1. Sei nella root del repo Filo. Installa **saltando il binario Electron** e poi
    procuralo con lo script dedicato (l'installer nativo `@electron/get` abortisce
