@@ -826,7 +826,7 @@
         // davvero a pesi aperti e se fa il mestiere della funzione: una
         // sostituzione verso un modello assente, proprietario o incapace sarebbe
         // peggio del blocco, perché sembrerebbe funzionare.
-        if (alt && reg[alt] && isOpenWeightsEntry(reg[alt]) && substituteFitsAction(reg[alt], action)) {
+        if (alt && reg[alt] && isOpenWeightsEntry(reg[alt]) && substituteFitsAction(reg[alt], action, alt)) {
           substituted.push({ from: ref, to: alt });
           use = alt;
         } else {
