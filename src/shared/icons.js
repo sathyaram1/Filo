@@ -183,6 +183,14 @@
     `<rect x="5" y="11" width="14" height="9" rx="1.5"/>` +
     `<path d="M8 11V8a4 4 0 0 1 8 0v3"/>`;
 
+  // --- Trasparenza: libro APERTO. Il lucchetto (sicurezza) e il foglio piegato
+  //     (appunti) erano già presi, e volevano dire il contrario: qui il senso è
+  //     "sta scritto e lo puoi leggere". ATTENZIONE: copia gemella in
+  //     src/main/popup-menu.js (il popup è una BrowserWindow a parte).
+  const transparency =
+    `<path d="M12 6.6C10.4 5.1 8.3 4.6 4 4.6v12.6c4.3 0 6.4.5 8 2 1.6-1.5 3.7-2 8-2V4.6c-4.3 0-6.4.5-8 2z"/>` +
+    `<path d="M12 6.6v14.6"/>`;
+
   // --- Incognito: tesa del cappello (brim) + due lenti tonde da "spia" con
   //     ponte centrale. Glifo classico della navigazione privata. Usato sia
   //     nel menu Impostazioni sia nel menu secondario tasto destro.
