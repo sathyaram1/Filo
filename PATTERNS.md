@@ -292,8 +292,10 @@ per qualunque interruttore che prometta "questa cosa non succederà":
   condivisa (crediti di Filo) e allunga la lista di esclusione con Anthropic: il
   punto è poter rifiutare anche la scelta dell'owner.
 - **Test:** `tests/unit/openWeightsOnly.test.mjs` (parte pura),
+  `tests/unit/testDefaultModel.test.mjs` (i pulsanti «Prova»),
   `tests/open-weights-only.spec.mjs` (catena reale costruita dall'app),
-  `tests/options-open-weights.spec.mjs` (l'interruttore e cosa dichiara).
+  `tests/options-open-weights.spec.mjs` (l'interruttore, cosa dichiara e quali
+  «Prova» resta possibile premere).
 
 La stessa politica vale per gli strumenti che testano Filo
 (`tests/agent/llm.mjs`): stessa lista di esclusione dell'app — importata, non
