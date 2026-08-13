@@ -514,7 +514,7 @@
 
     const test = document.createElement('button');
     test.type = 'button';
-    test.className = 'sn-btn sn-btn-secondary';
+    test.className = 'sn-btn sn-btn-secondary sn-model-test';
     test.textContent = I18n.t('options_model_test');
     test.addEventListener('click', () => runRowTest(provSel.value, idIn.value.trim(), row, test));
 
