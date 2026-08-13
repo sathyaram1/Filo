@@ -949,10 +949,25 @@ function recordSecaudit(id, verdict) {
  * anche `run()` si ferma. Un guasto generico dopo i retry là ripiega
  * sull'audit, quindi qui è prontezza OK.
  *
+ * PRIMA DI TUTTO guarda l'interruttore master: è il posto giusto per scoprire
+ * che le routine sono spente, perché è l'unico che viene prima del setup. Un
+ * giorno spento costa così quattro letture di un documento, non quattro
+ * installazioni complete.
+ *
  * @param {() => Promise<any>} [build] iniettabile per i test (default: snapshot vero)
+ * @param {() => Promise<object>} [readConfig] iniettabile per i test
  * @returns {Promise<{ok:true}|{ok:false, kind:string, message:string}>}
  */
-export async function preflight(build = buildSnapshot) {
+export async function preflight(build = buildSnapshot, readConfig = fetchRoutineConfig) {
+  try {
+    const cfg = await readConfig();
+    if (!resolveRoutinesEnabled({ envRaw: process.env.FILO_ROUTINES_ENABLED, remote: cfg.enabled })) {
+      return { ok: false, kind: 'off', message: 'le routine autonome sono spente dalla tab Automazioni' };
+    }
+  } catch (e) {
+    if (e?.faultKind) return { ok: false, kind: e.faultKind, message: e.message };
+    return { ok: false, kind: 'transient', message: `interruttore delle routine illeggibile: ${e?.message || e}` };
+  }
   try {
     await build();
     return { ok: true };
