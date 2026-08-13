@@ -498,6 +498,8 @@ module.exports = {
   setAutomationAutoApprove,
   getAutomationProberIdle,
   setAutomationProberIdle,
+  getRoutinesEnabled,
+  setRoutinesEnabled,
   getAutomationLoopCap,
   setAutomationLoopCap,
   getWorkerLog,
