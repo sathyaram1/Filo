@@ -135,9 +135,11 @@ test('salvando un filmato il file cresce su disco e la barra ne mostra l\'avanza
     const percent = Math.round((live.receivedBytes / live.totalBytes) * 100);
     expect(percent).toBeGreaterThan(0);
     expect(percent).toBeLessThan(100);
+    expect(bar.missing, 'l\'indicatore degli scaricamenti non esiste nella shell').toBeFalsy();
     expect(bar.hidden).toBe(false);
     expect(bar.active).toBe(true);
     expect(bar.width).not.toBe('');
+    expect(bar.width).not.toBe('0%');
 
     // 3) A fine corsa: il file completo, integro, e nessun file di lavoro in giro.
     await expect
