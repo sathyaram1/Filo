@@ -195,16 +195,71 @@ module.exports = function register(on, ctx) {
   // chiave si sta ancora digitando e arriva nel messaggio, non dalle
   // impostazioni. Risolviamo quindi il nickname direttamente sul registro
   // configurato, che resta l'unica sorgente del modello.
-  async function testModelFor(provider) {
-    const settings = await getEffectiveSettings();
+  async function testModelFor(provider, settings) {
+    const s = settings || await getEffectiveSettings();
     const action = SN_CONST.ACTIONS.PROVIDER_TEST;
-    const registry = settings.modelRegistry || {};
-    const refs = SN_CONST.parseModelRefs(modelForAction(settings, action));
+    const registry = s.modelRegistry || {};
+    let refs = SN_CONST.parseModelRefs(modelForAction(s, action));
+    // Con "solo modelli a pesi aperti" acceso la prova usa lo stesso modello che
+    // userebbe l'app — l'equivalente a pesi aperti — non quello proprietario
+    // previsto per le prove: provare un modello che poi non verrà mai chiamato
+    // misura una cosa che non serve a nessuno, e per farlo manda una richiesta
+    // proprio dove l'utente ha chiesto che non ne arrivino.
+    if (s.openWeightsOnly === true) {
+      refs = SN_CONST.applyOpenWeightsPolicy(refs, registry, action).refs;
+    }
     for (const ref of refs) {
       const concrete = SN_CONST.resolveModel(ref, provider, registry);
       if (concrete) return concrete;
     }
     return '';
+  }
+
+  // ── «Prova» è una chiamata vera: stesse regole delle funzioni ──────────────
+  // I pulsanti «Prova» delle Opzioni (accanto alle chiavi e su ogni riga dei
+  // modelli) non simulano niente: mandano una richiesta a un modello, pagata con
+  // le chiavi in uso. Con l'interruttore "solo modelli a pesi aperti" acceso
+  // devono quindi rispettare la stessa garanzia del resto dell'app, altrimenti
+  // l'unica pagina dove l'interruttore si accende sarebbe anche l'unica da cui
+  // esce ciò che vieta.
+  //
+  // Le regole sono quelle di buildAttemptChain:
+  //   1. niente API diretta del produttore;
+  //   2. niente modelli proprietari;
+  //   3. lista di esclusione allegata — con l'interruttore acceso contiene anche
+  //      Anthropic — così nemmeno lo smistatore può servire da un escluso.
+  // Ritorna il motivo del rifiuto, o null se la prova può partire.
+  function openWeightsTestRefusal(settings, provider, model) {
+    if (settings.openWeightsOnly !== true) return null;
+    if (SN_CONST.PRODUCER_DIRECT_PROVIDERS.includes(provider)) {
+      return 'Hai scelto solo modelli a pesi aperti: questo fornitore è l\'API di chi produce i modelli e resta spento. Spegni l\'interruttore per provarlo.';
+    }
+    if (!SN_CONST.isOpenWeightsEntry({ provider, model })) {
+      return `Hai scelto solo modelli a pesi aperti: «${model}» è un modello proprietario e Filo non lo chiama. Spegni l'interruttore per provarlo.`;
+    }
+    return null;
+  }
+
+  // Politica sui fornitori allegata alla prova (#421): senza, una prova su
+  // OpenRouter poteva essere servita proprio da un produttore escluso — cioè
+  // misurare qualcosa che l'app non userebbe mai, passando da dove non si deve.
+  function testProviderRouting(settings, provider) {
+    if (provider !== 'openrouter') return undefined;
+    const ignore = SN_CONST.providerIgnoreList(settings.excludedProviders || []);
+    const sort = typeof settings.providerSort === 'string' ? settings.providerSort : '';
+    const routing = {};
+    if (ignore.length) routing.ignore = ignore;
+    if (sort) routing.sort = sort;
+    return Object.keys(routing).length ? routing : undefined;
+  }
+
+  // Controprova a posteriori: chi ha SERVITO davvero la prova. Se è un fornitore
+  // escluso la prova non è "riuscita" — riportare la latenza sarebbe dire che
+  // funziona una strada che l'app non prenderà mai.
+  function servedByRefusal(settings, servedBy) {
+    if (!servedBy) return null;
+    if (!SN_CONST.isProviderExcluded(servedBy, settings.excludedProviders || [])) return null;
+    return `Risposta servita da «${servedBy}», che è fra i fornitori esclusi: la prova non vale.`;
   }
 
   on(MSG.TEST_PROVIDER, async (msg) => {
