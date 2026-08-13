@@ -1,9 +1,9 @@
 {
   "id": "9dac6772-cbe3-440a-b323-272193a67da4",
   "branch": "worker/9dac6772-cbe3-440a-b323-272193a67da4-20260812T183412Z",
-  "loopCount": 0,
-  "verifierVerdict": null,
-  "verifierCritique": "",
+  "loopCount": 1,
+  "verifierVerdict": "fail",
+  "verifierCritique": "FAIL — L'interruttore fa il suo mestiere sulle funzioni vere (accendendolo, le richieste passano davvero solo su modelli a pesi aperti e, se il sostituto non risponde, la richiesta fallisce invece di ripiegare su un proprietario). Ma nella stessa pagina Opzioni, con l'interruttore acceso e i crediti di Filo attivi, restano tre pulsanti «Prova» che una richiesta la mandano davvero a ciò che l'interruttore dovrebbe escludere.\n\nRiproduzione: Opzioni → accendi «Solo modelli a pesi aperti» lasciando attivo «Usa modelli predefiniti» → nella lista dei modelli predefiniti premi «Prova» su una riga qualsiasi. Sulla riga del modello di Anthropic parte una richiesta vera a quel modello, pagata con le chiavi di Filo; sulle righe dell'indicizzazione e della lettura ad alta voce la richiesta va dritta ai server di Google. Stessa cosa premendo «Prova» accanto alla chiave OpenRouter: parte sul modello proprietario previsto per le prove, e senza nemmeno l'esclusione dei fornitori allegata. L'unico «Prova» chiuso è quello della chiave Google.\n\nContano perché il criterio dichiarato era «con l'interruttore attivo nessuna chiamata deve finire a un fornitore escluso», e questi bottoni stanno proprio sulla pagina dove si accende l'interruttore, nella configurazione predefinita (crediti di Filo) che era il caso da coprire per primo.\n\nSeconda cosa, più sottile: con l'interruttore acceso la dettatura dal microfono viene spostata su un modello che sa leggere solo testo. Non è un ripiego su un proprietario, ma per chi la usa è comunque una funzione che smette di funzionare con un errore qualunque, invece di fermarsi spiegando perché come fanno lettura ad alta voce e indicizzazione. L'app sa già quali funzioni hanno bisogno di ascoltare un audio: la sostituzione automatica non lo guarda, e infatti le Opzioni annunciano la dettatura fra quelle che «cambiano modello», non fra quelle che si fermano.\n\nNota: il lavoro non era più sul ramo (era stato messo da parte come se l'istanza che l'ha scritto fosse stata interrotta a metà); l'ho rimesso al suo posto prima di provarlo, quindi quello che ho verificato è la consegna intera.",
   "secauditDone": false,
   "secauditVerdict": null,
   "checkpoints": [
@@ -11,6 +11,11 @@
       "sha": "d33bfe7d1f27cdda5f14da0661af8d95fcf96fe9",
       "by": "new-work:checkout",
       "at": "2026-08-12T18:34:13.748Z"
+    },
+    {
+      "sha": "be38d8c31ab4161a07a586259b4e4dd28ead96b8",
+      "by": "verifier:fail",
+      "at": "2026-08-13T00:21:43.365Z"
     }
   ]
 }
