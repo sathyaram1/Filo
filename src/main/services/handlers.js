@@ -451,12 +451,12 @@ function providerRouting(settings) {
 // Ritorna il motivo del rifiuto (stringa da mostrare) oppure null se si può
 // procedere.
 function openWeightsBlockReason(settings, provider, model) {
-  if (!settings || settings.openWeightsOnly !== true) return null;
-  if (SN_CONST.PRODUCER_DIRECT_PROVIDERS.includes(provider)) {
-    return I18n.t('err_open_weights_only_provider_blocked');
-  }
-  if (SN_CONST.isOpenWeightsEntry({ provider, model })) return null;
-  return I18n.t('err_open_weights_only_model_blocked', model || '—');
+  const kind = SN_CONST.openWeightsBlockKind(
+    settings && settings.openWeightsOnly === true, provider, model,
+  );
+  if (kind === 'provider') return I18n.t('err_open_weights_only_provider_blocked');
+  if (kind === 'model') return I18n.t('err_open_weights_only_model_blocked', model || '—');
+  return null;
 }
 
 // Registra e verifica CHI ha davvero servito una risposta (#421). Il fornitore
