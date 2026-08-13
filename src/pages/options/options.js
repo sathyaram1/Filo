@@ -767,7 +767,7 @@
   // Silenzioso: in caso di errore il campo resta un input libero.
   async function ensureProviderModels(provider) {
     if (providerModelCache[provider]) return;
-    if (false && catalogBlocked(provider)) return; // TEMP
+    if (catalogBlocked(provider)) return;
     const key = providerKey(provider);
     if (provider === 'gemini' && !key) return;
     try {
