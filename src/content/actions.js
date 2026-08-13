@@ -452,7 +452,9 @@
       res = { ok: false, error: e.message || String(e) };
     }
     if (!res?.ok) {
-      if (res?.code === 'NO_MODEL_FOR_ACTION' && res.error) {
+      // Nessun modello per la funzione — o nessuno ammesso dall'interruttore
+      // "solo pesi aperti": il messaggio è già scritto per l'utente.
+      if (global.SN_CONST.isModelConfigErrorCode(res?.code) && res.error) {
         imageDescNoModel = true;
         warnModelConfigOnce(res.error);
         // La voce in cronologia incolla resterebbe su «Descrizione…» per
