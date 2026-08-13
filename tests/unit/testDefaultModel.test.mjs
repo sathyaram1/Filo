@@ -23,6 +23,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // Moduli condivisi reali (IIFE su globalThis): costanti e messaggi.
 require(join(__dirname, '..', '..', 'src', 'shared', 'constants.js'));
 require(join(__dirname, '..', '..', 'src', 'shared', 'messages.js'));
+// Come nel main (loader.js): serve alla sostituzione a pesi aperti per sapere
+// se il sostituto fa il mestiere della funzione.
+require(join(__dirname, '..', '..', 'src', 'shared', 'modelCaps.js'));
 const { MSG } = globalThis.SN_MSG;
 
 // ── harness: registra l'handler con dipendenze finte ────────────────────────
