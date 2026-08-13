@@ -171,62 +171,88 @@ function toFsValue(v) {
 }
 
 /**
- * Registra un worker appena spawnato nel log (config/automation.workerLog).
- * BEST-EFFORT: un guasto (nessuna credenziale, rete giù, Firestore lento) NON
- * deve mai far fallire né rallentare oltre soglia il dispatch — il log è pura
- * osservabilità per la dashboard dell'owner. Legge il log corrente, accoda
- * { role, startedAt, num } e ri-scrive cappato a WORKER_LOG_CAP. Timeout duro
- * così una rete impiccata non tiene in vita il processo del worker.
- * NB: i worker delle routine girano UNO alla volta (l'orchestratore ne spawna
- * uno per giro), quindi il read-modify-write qui è privo di corse.
+ * Registra un worker appena spawnato nel log dei worker, che la dashboard
+ * mostra nella tab Automazioni.
+ *
+ * PERCHÉ NON SCRIVE PIÙ SU FIRESTORE (feedback #451)
+ *   Fino al 2026-08-13 questa funzione patchava `config/automation.workerLog`
+ *   con un bearer admin, in silenzio se il bearer mancava. Nelle macchine delle
+ *   routine cloud quella credenziale non c'è MAI (né service account né refresh
+ *   token dell'owner: `tests/agent/.env` è gitignorato e l'ambiente della
+ *   schedulazione porta solo la chiave privata dei feedback). Risultato: il
+ *   campo non è mai esistito e il registro è nato vuoto e vuoto è rimasto,
+ *   senza che nessuno protestasse.
+ *
+ *   Ora la voce prende la strada che le routine possono già percorrere SENZA
+ *   credenziali — la stessa dei triage e dei semafori: un fogliettino su git,
+ *   spedito da solo sul ramo principale, che la GitHub Action applica a
+ *   Firestore col service account. Non c'è più nessuna credenziale da avere,
+ *   quindi non c'è più niente che possa mancare in silenzio.
+ *
+ * Il fallimento NON è silenzioso: se la spedizione non riesce il fogliettino
+ * RESTA nella coda (e viene ritentato dal giro successivo, vedi
+ * `drainWorkerLogQueue`) e il motivo finisce su stderr.
  */
-async function recordWorkerSpawn(bucket, timeoutMs = 4000) {
+async function recordWorkerSpawn(bucket) {
+  const entry = buildWorkerLogEntry(bucket, new Date());
+  if (!entry) return;
+  // Nei test la STATE_DIR è sovrascritta: lì non si tocca né git né la coda.
+  if (process.env.FILO_DISPATCH_STATE_DIR) return;
   try {
-    const entry = {
-      role: String(bucket?.role || ''),
-      startedAt: new Date().toISOString(),
-      num: bucket?.num != null ? String(bucket.num) : '',
-    };
-    if (!entry.role) return;
-    const work = (async () => {
-      const { fa, bearer } = await acquireBearerSilent();
-      if (!bearer) return; // nessuna credenziale admin → niente log (best-effort)
-      const auth = { Authorization: `Bearer ${bearer}` };
-      // Leggi il log corrente (best-effort: 404/mancante ⇒ lista vuota).
-      let current = [];
-      try {
-        const getUrl = `${fa.FIRESTORE_BASE}/config/automation?key=${fa.FIREBASE_API_KEY}`;
-        const res = await fetch(getUrl, { headers: auth });
-        if (res.ok) {
-          const json = await res.json();
-          const arr = json?.fields?.workerLog?.arrayValue?.values;
-          if (Array.isArray(arr)) {
-            current = arr.map((v) => {
-              const f = v?.mapValue?.fields || {};
-              return {
-                role: f.role?.stringValue || '',
-                startedAt: f.startedAt?.stringValue || '',
-                num: f.num?.stringValue || '',
-              };
-            });
-          }
-        }
-      } catch (_) { /* niente log precedente → riparti da vuoto */ }
-      const next = appendWorkerLog(current, entry, WORKER_LOG_CAP);
-      // PATCH solo il campo workerLog (updateMask): non tocca enabled/loopCap.
-      const patchUrl = `${fa.FIRESTORE_BASE}/config/automation?updateMask.fieldPaths=workerLog&key=${fa.FIREBASE_API_KEY}`;
-      await fetch(patchUrl, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...auth },
-        body: JSON.stringify({ fields: { workerLog: toFsValue(next) } }),
-      });
-    })();
-    let timer;
-    const guard = new Promise((resolve) => { timer = setTimeout(resolve, timeoutMs); });
-    await Promise.race([work, guard]);
-    clearTimeout(timer);
+    mkdirSync(SPOOL_DIR, { recursive: true });
+    const file = resolve(SPOOL_DIR, workerLogFileName(entry));
+    writeFileSync(file, `${JSON.stringify(entry, null, 2)}\n`, 'utf8');
+    flushWorkerLogFile(file);
+  } catch (e) {
+    process.stderr.write(`[dispatch] registro worker: voce NON accodata (${e?.message || e})\n`);
+  }
+  drainWorkerLogQueue();
+}
+
+/**
+ * Spedisce UN fogliettino del registro sul ramo principale e, se ci riesce, lo
+ * toglie da qui: da lì in poi la copia che conta è quella su `main`, che la
+ * Action applica e cancella. Se non ci riesce lo lascia dov'è — un giro
+ * successivo lo ritenta — e dice perché.
+ */
+function flushWorkerLogFile(file) {
+  const res = pushFileToMainWithRetry(ROOT, file, `feedback: registro worker ${basename(file)}`, 4, MAIN_BRANCH);
+  if (res.ok) {
+    try { rmSync(file, { force: true }); } catch (_) { /* resterà, e il giro dopo lo ripesca */ }
+    return true;
+  }
+  process.stderr.write(`[dispatch] registro worker: spedizione fallita (${res.reason}) — la voce resta in coda e verrà ritentata\n`);
+  return false;
+}
+
+/** I fogliettini del registro rimasti indietro (spedizione fallita in passato). */
+function pendingWorkerLogFiles() {
+  try {
+    return readdirSync(SPOOL_DIR)
+      .filter((f) => f.startsWith(WORKER_LOG_PREFIX) && f.endsWith('.json'))
+      .sort()
+      .map((f) => resolve(SPOOL_DIR, f));
   } catch (_) {
-    // best-effort assoluto: qualunque errore è silenzioso.
+    return [];
+  }
+}
+
+/**
+ * Ritenta le voci rimaste indietro. È qui che un guasto passeggero della rete
+ * si ripara da solo: la voce non è persa, arriva col giro dopo. Se invece i
+ * fogliettini si accumulano il messaggio lo dice, perché un registro che non
+ * arriva in dashboard va visto, non dedotto dal fatto che è vuoto.
+ */
+function drainWorkerLogQueue(max = 20) {
+  const pending = pendingWorkerLogFiles();
+  if (!pending.length) return;
+  let stuck = 0;
+  for (const f of pending.slice(0, max)) {
+    if (!flushWorkerLogFile(f)) { stuck++; break; } // se una fallisce falliscono tutte: inutile insistere
+  }
+  const left = pendingWorkerLogFiles().length;
+  if (left) {
+    process.stderr.write(`[dispatch] registro worker: ${left} voci ancora in coda (non arrivate in dashboard)${stuck ? '' : ' — riprovo al prossimo giro'}\n`);
   }
 }
 
