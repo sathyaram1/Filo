@@ -8,9 +8,12 @@
 // nome, dimensione, byte ricevuti, stato — così la barra in alto di Filo può
 // mostrarne l'avanzamento fedele invece di lasciarlo "al buio".
 //
-// NON è il cammino di "Salva immagine/video come…": quello scarica i byte a mano
-// nel main su richiesta esplicita del menu (handlers/misc.js) e resta com'è.
-// Qui si intercetta il download che il browser fa partire da solo.
+// Intercetta il download che il browser fa partire da solo. "Salva
+// immagine/video come…" (handlers/misc.js) NON passa di qui — deve scaricare i
+// byte a mano per presentare il Referer della pagina — ma dal #436 si iscrive
+// allo STESSO registro via beginManual(): per l'utente i due cammini sono la
+// stessa cosa, quindi devono avere la stessa barra, lo stesso pannello e la
+// stessa cronologia.
 //
 // Filosofia: "l'attrito è negativo" + "non salvare mai [a mano]". Per questo NON
 // apriamo un dialogo "Salva come" a ogni file: salviamo direttamente nella
