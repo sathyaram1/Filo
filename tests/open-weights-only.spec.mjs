@@ -184,6 +184,13 @@ test('solo modelli a pesi aperti: sostituisce, non ripiega, e lo dimostra', asyn
   expect(out.ultimaVoce.servedBy).toBe('Google AI Studio');
   expect(out.ultimaVoce.policyViolation).toBe(true);
 
+  // 4-bis. La funzione che ha bisogno di ascoltare si ferma e lo dice, senza
+  //        chiamare nessun modello; quella che ha un equivalente resta viva.
+  expect(out.dettatura.ok).toBe(false);
+  expect(out.dettatura.code).toBe('NO_OPEN_WEIGHTS_MODEL');
+  expect(out.dettatura.chain).toBe(null);
+  expect(out.immagine.ok, `la descrizione immagini deve continuare: ${out.immagine.message}`).toBe(true);
+
   // ── B) Configurazione personale, interruttore acceso ───────────────────────
   // 1. Sostituzione col modello a pesi aperti previsto, e la funzione risponde.
   expect(out.acceso.ok, `la funzione deve continuare a funzionare: ${out.acceso.message}`).toBe(true);
