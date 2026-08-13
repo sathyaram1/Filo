@@ -32,6 +32,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
 const SRC_DIR = join(ROOT, 'transparency');
 const OUT_MODULE = join(ROOT, 'src', 'shared', 'transparency.js');
+const OUT_UI_MODULE = join(ROOT, 'src', 'shared', 'transparencyUi.js');
 const OUT_SITE = join(ROOT, 'site', 'transparency');
 const CSS_FILE = join(ROOT, 'src', 'styles', 'transparency.css');
 
