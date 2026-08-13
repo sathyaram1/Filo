@@ -67,9 +67,9 @@ registerAi((type, fn) => handlers.set(type, fn), {
   // Le stesse due funzioni che il main passa all'handler. La classificazione è
   // quella VERA (logica pura in constants.js): qui è finto solo il testo del
   // messaggio, che nei unit test non c'è (I18n vive nel main).
-  openWeightsBlockReason: (settings, provider, model) => {
+  openWeightsBlockReason: (settings, entry) => {
     const kind = globalThis.SN_CONST.openWeightsBlockKind(
-      settings && settings.openWeightsOnly === true, provider, model,
+      settings && settings.openWeightsOnly === true, entry,
     );
     return kind ? `bloccato: ${kind}` : null;
   },
@@ -215,6 +215,20 @@ test('interruttore acceso: il "Prova" di un modello proprietario NON chiama nien
   const ok = await testModel({ nickname: 'gemma' });
   assert.equal(ok.ok, true, `atteso ok, ottenuto: ${ok.error}`);
   assert.equal(state.calls.length, 1);
+});
+
+test('interruttore acceso: se l\'owner ha classificato la voce come aperta, la prova parte', async () => {
+  // Stessa classificazione che vale per le richieste vere: se il cancello delle
+  // prove guardasse solo la stringa del modello, l'owner potrebbe correggere una
+  // classificazione sbagliata per le funzioni ma non per il pulsante che le
+  // prova.
+  state.effective = { modelRegistry: {}, apiKeys: {}, openWeightsOnly: true };
+  state.defaults.apiKeys = { openrouter: 'sk-or-default' };
+  state.defaults.modelRegistry = {
+    nuovo: { provider: 'openrouter', model: 'acme/modello-nuovo', weights: 'open' },
+  };
+  const res = await testModel({ nickname: 'nuovo' });
+  assert.equal(res.ok, true, `atteso ok, ottenuto: ${res.error}`);
 });
 
 test('interruttore acceso: nemmeno la riga scritta a mano dall\'amministratore passa', async () => {

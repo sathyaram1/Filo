@@ -224,7 +224,7 @@ module.exports = function register(on, ctx) {
       // comunque non può essere interrogato.
       const s = await getEffectiveSettings();
       if (s.openWeightsOnly === true && SN_CONST.PRODUCER_DIRECT_PROVIDERS.includes(provider)) {
-        return { ok: false, error: openWeightsBlockReason(s, provider, '') };
+        return { ok: false, error: openWeightsBlockReason(s, { provider }) };
       }
       const model = (msg.model || '').trim() || await testModelFor(provider, s);
       if (!model) {
@@ -238,7 +238,7 @@ module.exports = function register(on, ctx) {
       // prova non parte, altrimenti l'unica richiesta che l'interruttore non
       // ferma sarebbe proprio quella che si lancia dalla pagina dove lo si
       // accende.
-      const modelBlocked = openWeightsBlockReason(s, provider, model);
+      const modelBlocked = openWeightsBlockReason(s, { provider, model });
       if (modelBlocked) return { ok: false, error: modelBlocked };
       const messages = [{ role: 'user', content: 'Conta da 1 a 20 separando con virgole, senza testo extra.' }];
       const startMs = performance.now();
@@ -300,7 +300,7 @@ module.exports = function register(on, ctx) {
       const explicitModel = (msg.model || '').trim();
       try { await Defaults.refreshIfStale(); } catch (_) {}
       const d = Defaults.get();
-      let provider; let modelId;
+      let provider; let modelId; let regEntry = null;
       if (explicitModel) {
         // Riga dell'editor admin, testata così com'è scritta (anche non ancora
         // salvata). Spende le chiavi predefinite su un modello arbitrario →
@@ -321,6 +321,7 @@ module.exports = function register(on, ctx) {
         const registry = d.modelRegistry || {};
         const entry = registry[nickname];
         if (!entry) return { ok: false, error: `Modello "${nickname}" non trovato` };
+        regEntry = entry;
         const single = registryEntryToSingle(entry);
         provider = single.provider || 'openrouter';
         modelId = single.model || '';
@@ -332,7 +333,10 @@ module.exports = function register(on, ctx) {
       // altrimenti la pagina dove si accende l'interruttore sarebbe l'unico
       // posto da cui l'interruttore si può scavalcare.
       const eff = await getEffectiveSettings();
-      const blocked = openWeightsBlockReason(eff, provider, modelId);
+      // La voce intera, non solo fornitore+stringa: se l'owner ha classificato a
+      // mano quel modello come a pesi aperti, la prova lo rispetta come lo
+      // rispettano le richieste vere.
+      const blocked = openWeightsBlockReason(eff, { ...(regEntry || {}), provider, model: modelId });
       if (blocked) return { ok: false, error: blocked };
       const apiKey = await defaultKeyFor(provider, d);
       if (!apiKey) return { ok: false, error: `Chiave ${provider} non configurata` };
