@@ -581,6 +581,7 @@
       }
     }
     populateNicknames(registry);
+    applyOpenWeightsTestGating();
   }
 
   // Oltre al registry valido, ritorna le righe DOM scartate (nickname mancante
