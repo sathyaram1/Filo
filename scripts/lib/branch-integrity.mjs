@@ -161,6 +161,27 @@ export function clearRejects(state) {
   return s;
 }
 
+// Cartella della coda di triage: claim, decisioni e stato per branch. Sono
+// BUROCRAZIA della pipeline, non lavoro di nessuno.
+export const BOOKKEEPING_PREFIX = 'feedback-triage/';
+
+/**
+ * I file toccati sono solo burocrazia della coda? Pura.
+ *
+ * Serve al ripristino (D): dopo una consegna il ramo prende quasi sempre
+ * qualche commit di servizio (il fogliettino della decisione, il file di stato).
+ * Se li trattassimo come "lavoro di un'istanza interrotta", ogni giro
+ * parcheggerebbe un ramo `discarded/*` e riscriverebbe la storia per niente —
+ * e "commit scartati" smetterebbe di voler dire qualcosa proprio quando serve
+ * dirlo davvero.
+ */
+export function bookkeepingOnly(files) {
+  const list = (Array.isArray(files) ? files : [])
+    .map((f) => String(f || '').trim())
+    .filter(Boolean);
+  return list.every((f) => f.startsWith(BOOKKEEPING_PREFIX));
+}
+
 /** Nome del branch di servizio su cui parcheggiare i commit scartati (D). */
 export function discardedBranchName(branch, nowMs = Date.now()) {
   return `discarded/${String(branch || 'sconosciuto')}-${attemptStamp(nowMs)}`;
