@@ -331,7 +331,8 @@ module.exports = function register(on, ctx) {
       // predefinite. Con l'interruttore acceso quelle proprietarie non partono —
       // altrimenti la pagina dove si accende l'interruttore sarebbe l'unico
       // posto da cui l'interruttore si può scavalcare.
-      const blocked = openWeightsBlockReason(await getEffectiveSettings(), provider, modelId);
+      const eff = await getEffectiveSettings();
+      const blocked = openWeightsBlockReason(eff, provider, modelId);
       if (blocked) return { ok: false, error: blocked };
       const apiKey = await defaultKeyFor(provider, d);
       if (!apiKey) return { ok: false, error: `Chiave ${provider} non configurata` };
