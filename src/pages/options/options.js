@@ -550,6 +550,7 @@
     row.appendChild(status);
     row.appendChild(msg);
     renderRowTest(row);
+    row._testBtn = test;
     return row;
   }
 
