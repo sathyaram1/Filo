@@ -798,7 +798,7 @@
     for (const [action, value] of Object.entries(models || {})) {
       const refs = parseModelRefs(value);
       if (!refs.length) continue;
-      const res = applyOpenWeightsPolicy(refs, registry);
+      const res = applyOpenWeightsPolicy(refs, registry, action);
       if (!res.refs.length) {
         unavailable.push({ action, refs });
         continue;
