@@ -122,6 +122,16 @@ test('rejectionText: la guardia d\'identità spiega il rifiuto invece di morire'
   assert.match(t, /NON è stato scritto/);
 });
 
+test('un ramo senza differenze da main viene riconosciuto (#462)', () => {
+  // Un ramo di lavoro identico alla linea principale mentre il feedback è in
+  // attesa di verifica È il segno che il lavoro consegnato è stato messo da
+  // parte: chi lo riceve deve saperlo, o boccia per assenza e lo fa riscrivere.
+  assert.equal(branchIsEmpty('worker/FBTEST'), false, 'qui il lavoro c’è: nessun allarme');
+  git(['branch', 'worker/VUOTO', 'main']);
+  assert.equal(branchIsEmpty('worker/VUOTO'), true);
+  assert.equal(branchIsEmpty(''), false, 'senza ramo non c’è niente da dire');
+});
+
 test('cleanup', () => {
   rmSync(TMP, { recursive: true, force: true });
 });
