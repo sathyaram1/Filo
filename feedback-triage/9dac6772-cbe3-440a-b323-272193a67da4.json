@@ -1,0 +1,7 @@
+{
+  "id": "9dac6772-cbe3-440a-b323-272193a67da4",
+  "status": "revision_capability",
+  "notes": "Fatto. Con «Solo modelli a pesi aperti» acceso, la pagina Opzioni non chiede più a Google l'elenco dei modelli Gemini: era l'ultima richiesta che da lì finiva a un fornitore escluso, e partiva da sola all'apertura della pagina usando la tua chiave, senza che tu premessi niente. Spegnendo l'interruttore l'elenco torna a caricarsi da solo, senza ricaricare la pagina.\n\nIn più, non chiesto: premendo «Ricarica modelli» con l'interruttore acceso ora la pagina dice perché l'elenco Gemini non arriva, invece di riportare in silenzio i soli modelli OpenRouter.\n\nL'ho aggiunto anche alla politica sui modelli, accanto al punto sui pulsanti «Prova».\n\nNote tecniche: nella suite completa restano 8 rossi, tutti su finestra a schermo intero e cattura dello schermo, nessuno vicino a modelli o opzioni. Vengono da quando i test tengono la finestra fuori dallo schermo: chi fotografa lo schermo vero fotografa il vuoto, e chi misura una finestra a tutto schermo misura una finestra che non c'è. Non nascono da questo lavoro, ma chi passa di qui dopo li ritrova.",
+  "queuedAt": "2026-08-13T13:08:48.542Z",
+  "queuedBy": "routine"
+}
