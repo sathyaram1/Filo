@@ -52,6 +52,8 @@
 //
 //   Exit 0 → JSON su stdout (c'è lavoro). Exit 2 → niente da fare. Exit 1 → errore.
 //   Exit 3 → GUASTO: non si può lavorare in sicurezza (vedi ROUTINE-BRANCH-INTEGRITY.md §E).
+//   `--preflight`: 0 = prosegui, 2 = routine spente (chiudi, non è un guasto),
+//   3 = guasto. La mappatura è in `preflightExitCode`.
 //
 // INTEGRITÀ DEL RAMO (2026-08-07, ROUTINE-BRANCH-INTEGRITY.md)
 //   dispatch non si limita più a DIRE su quale branch lavorare: ci mette lui
