@@ -396,8 +396,9 @@ test('solo modelli a pesi aperti: nemmeno i pulsanti «Prova» chiamano un esclu
   expect(out.chiaveOr.chiamata.ignore.map((s) => s.toLowerCase())).toContain('anthropic');
 
   // 5. Spento, le stesse prove ripartono: la differenza la fa l'interruttore.
-  expect(out.spentoAnthropic.chiamata).not.toBe(null);
-  expect(out.spentoAnthropic.chiamata.model).toMatch(/claude/i);
+  expect(out.spentoEscluso.chiamata, 'spento, la riga esclusa torna provabile').not.toBe(null);
+  expect(out.spentoRiga.chiamata, 'spento, il modello proprietario scritto a mano torna provabile').not.toBe(null);
+  expect(out.spentoRiga.chiamata.model).toMatch(/claude/i);
   // La prova della chiave Google non è più fermata dall'interruttore (quello che
   // resta è la configurazione del modello di prova, che l'interruttore non
   // riguarda).
