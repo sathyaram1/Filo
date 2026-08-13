@@ -292,6 +292,7 @@
     for (const [nick, entry] of entries) {
       host.appendChild(makeDefaultModelRow(nick, entry));
     }
+    applyOpenWeightsTestGating();
   }
 
   function makeDefaultModelRow(nick, entry) {
