@@ -732,6 +732,18 @@
     'claude-haiku': 'deepseek',
   };
 
+  // Sostituti per MESTIERE: valgono quando quello generico qui sopra non sa fare
+  // il lavoro della funzione. Le funzioni che devono guardare un'immagine non
+  // possono finire su un modello di solo testo, ma non per questo devono
+  // spegnersi: esiste un modello a pesi aperti che le immagini le legge, e la
+  // sostituzione lo usa. Restano senza sostituto i mestieri per cui un modello a
+  // pesi aperti raggiungibile da Filo non esiste (sintesi vocale, dettatura,
+  // indicizzazione): quelli si fermano dicendolo.
+  const OPEN_WEIGHTS_SUBSTITUTES_BY_ACTION = {
+    [ACTIONS.DESCRIBE_IMAGE]: 'kimi-vista',
+    [ACTIONS.TRANSCRIBE_IMAGE]: 'kimi-vista',
+  };
+
   // Codici degli errori di CONFIGURAZIONE dei modelli. Non sono guasti: la
   // funzione non parte perché il modello manca, non esiste, o l'interruttore
   // "solo pesi aperti" non ne ammette nessuno per quel mestiere. Portano un
