@@ -219,6 +219,7 @@
     categoryLabel,
     requirementsFor,
     modelMatchesAction,
+    entryCanDoAction,
     recencyKey,
     sortByRecency,
   };
