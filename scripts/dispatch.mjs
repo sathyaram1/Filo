@@ -1054,8 +1054,7 @@ export async function run() {
   }
   if (!resolveRoutinesEnabled({ envRaw: process.env.FILO_ROUTINES_ENABLED, remote: automation.enabled })) {
     process.stderr.write('[dispatch] routine autonome SPENTE dalla tab Automazioni: niente da fare\n');
-    clearRole(ROOT);
-    emit({ role: 'off' }, {});
+    emit({ role: 'off' }, {});   // emit() cancella da sé il marcatore di ruolo
     return { exit: 0 };
   }
 
