@@ -1296,8 +1296,9 @@ if (isMainModule) {
       // di aver pagato il setup.
       preflight().then((r) => {
         if (r.ok) { console.log('[dispatch] prontezza OK'); process.exit(0); }
-        console.error(`[dispatch] GUASTO (${r.kind}): ${r.message}`);
-        process.exit(3);
+        if (r.kind === 'off') console.log(`[dispatch] SPENTO: ${r.message}`);
+        else console.error(`[dispatch] GUASTO (${r.kind}): ${r.message}`);
+        process.exit(preflightExitCode(r));
       }).catch((e) => { console.error(`[dispatch] GUASTO (transient): ${e?.message || e}`); process.exit(3); });
     } else if (flag === '--clear-state') {
       const id = argv[1];
