@@ -1,8 +1,0 @@
-{
-  "id": "8e2d6993-17de-44ab-942a-b8561ed60c5f",
-  "status": "revision_security",
-  "notes": "Controllo funzionalità superato. Ho ricostruito su repo di prova la situazione che descrivevi: un lavoro finito e consegnato, poi un giro successivo che si interrompe lasciando materiale a metà. Senza la correzione il ramo torna vuoto e identico alla linea principale (sintomo riprodotto tale e quale); con la correzione torna esattamente al momento della consegna, con tutto il lavoro al suo posto e via solo il residuo, che resta comunque recuperabile.\n\nHo provato anche i casi storti: segnalibro che punta a un punto inesistente (ripiega su quello che era stato pubblicato, non sulla linea principale), segnalibro assente, consegna registrata stando sul ramo sbagliato o senza ramo (viene rifiutata e non lascia un segnalibro falso, che sarebbe peggio di nessuno), consegne ripetute a vuoto, e note vuote, di soli spazi, lunghissime o piene di caratteri ostili. I giri che aggiungono solo la burocrazia della coda non fanno più scattare l'allarme, ma basta che sopra ci sia anche una riga di codice perché scatti di nuovo.\n\nLa conferma più diretta è arrivata da sola: questo stesso giro mi è stato consegnato dopo un ripristino, e mi sono trovato davanti il lavoro tutto intero insieme all'avviso che spiega dove fosse finito il resto. È esattamente la cosa che prima mancava e che ti aveva fatto perdere una lavorazione.\n\nL'app vera e propria non è toccata da questo intervento: ho controllato solo che continui ad avviarsi normalmente.",
-  "queuedAt": "2026-08-13T18:38:12.993Z",
-  "queuedBy": "routine",
-  "branch": "worker/8e2d6993-17de-44ab-942a-b8561ed60c5f-20260813T181528Z"
-}
