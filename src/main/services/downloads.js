@@ -599,4 +599,5 @@ module.exports = {
   _records: records,
   _shortName: shortName,
   _safeName: safeName,
+  _publicRecord: publicRecord,
 };
