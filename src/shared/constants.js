@@ -702,10 +702,14 @@
   // nickname. Serve perché quasi tutte le funzioni nascono con un modello
   // proprietario: senza sostituzione, accendere l'interruttore spegnerebbe
   // mezza app invece di cambiarle modello.
-  // Le funzioni il cui modello NON ha un sostituto (sintesi vocale,
-  // indicizzazione, dettatura: nessun modello a pesi aperti che Filo sappia
-  // chiamare fa quel mestiere) si fermano e lo dicono. Mai un ripiego silenzioso
-  // su un modello proprietario: sarebbe l'interruttore che mente.
+  // Il sostituto vale però solo per le funzioni di cui sa fare il MESTIERE (vedi
+  // substituteFitsAction): sintesi vocale, dettatura, indicizzazione e le
+  // funzioni che devono guardare un'immagine chiedono capacità che un modello di
+  // solo testo non ha, quindi lì non c'è sostituzione e la funzione si ferma
+  // dicendolo. Mai un ripiego silenzioso su un modello proprietario né una
+  // sostituzione verso un modello che quel mestiere non lo fa: nel primo caso
+  // l'interruttore mente, nel secondo la funzione si rompe con un errore
+  // qualunque — e all'utente sembrano due guasti a caso.
   const OPEN_WEIGHTS_SUBSTITUTES = {
     flash: 'gemma',
     'flash-or': 'gemma',
