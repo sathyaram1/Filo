@@ -786,9 +786,9 @@
   // sostituto DICHIARA di saper fare quel mestiere. Capacità ignote = niente
   // sostituzione (la funzione si ferma dicendolo, che è recuperabile; una
   // sostituzione sbagliata no).
-  function substituteFitsAction(entry, action) {
+  function substituteFitsAction(entry, action, nickname) {
     const caps = global.SN_MODEL_CAPS;
-    const meta = entryModalities(entry);
+    const meta = entryModalities(entry, nickname);
     if (!meta || !caps || typeof caps.modelMatchesAction !== 'function') return false;
     const e = entry || {};
     const res = caps.modelMatchesAction(e.provider || 'openrouter', e.model || '', action, meta);
