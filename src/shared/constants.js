@@ -735,11 +735,31 @@
     return base;
   }
 
+  // Il sostituto sa fare il mestiere della funzione? La dettatura ha bisogno di
+  // un modello che ASCOLTI un audio, la sintesi vocale di uno che parli,
+  // l'indicizzazione di uno che produca vettori: metterci un modello di solo
+  // testo perché "è a pesi aperti" non è una sostituzione, è una funzione rotta.
+  // L'app sa già chi chiede cosa (SN_MODEL_CAPS.requirementsFor): qui la si
+  // interroga invece di sostituire alla cieca.
+  // Senza `action` (chiamate generiche, es. una catena non legata a una
+  // funzione) non c'è requisito da controllare e la sostituzione vale.
+  function substituteFitsAction(entry, action) {
+    if (!action) return true;
+    const Caps = global.SN_MODEL_CAPS;
+    // Modulo assente = build monca. Non ammettiamo la sostituzione al buio:
+    // stessa regola diffidente del resto dell'interruttore.
+    if (!Caps || typeof Caps.entryCanDoAction !== 'function') return false;
+    return Caps.entryCanDoAction(entry, action) === true;
+  }
+
   // Applica l'interruttore a una catena di riferimenti: sostituisce i modelli
-  // proprietari col loro equivalente a pesi aperti (se il registry ce l'ha e se
-  // è davvero a pesi aperti) e butta via quelli che restano proprietari.
+  // proprietari col loro equivalente a pesi aperti (se il registry ce l'ha, se è
+  // davvero a pesi aperti e se sa fare il mestiere della funzione) e butta via
+  // quelli che restano proprietari.
+  // `action` è la funzione per cui si sta costruendo la catena: serve a non
+  // sostituire un modello multimodale con uno di solo testo.
   // Ritorna { refs, substituted:[{from,to}], dropped:[ref] }. PURA.
-  function applyOpenWeightsPolicy(refs, registry) {
+  function applyOpenWeightsPolicy(refs, registry, action) {
     const reg = registry || {};
     const out = [];
     const substituted = [];
@@ -750,10 +770,11 @@
       let use = ref;
       if (!isOpenWeightsRef(ref, reg)) {
         const alt = OPEN_WEIGHTS_SUBSTITUTES[ref];
-        // Il sostituto vale solo se esiste DAVVERO nel registry effettivo ed è
-        // davvero a pesi aperti: una sostituzione verso un modello assente (o
-        // proprietario) sarebbe peggio del blocco, perché sembrerebbe funzionare.
-        if (alt && reg[alt] && isOpenWeightsEntry(reg[alt])) {
+        // Il sostituto vale solo se esiste DAVVERO nel registry effettivo, è
+        // davvero a pesi aperti e sa fare il mestiere della funzione: una
+        // sostituzione verso un modello assente, proprietario o incapace
+        // sarebbe peggio del blocco, perché sembrerebbe funzionare.
+        if (alt && reg[alt] && isOpenWeightsEntry(reg[alt]) && substituteFitsAction(reg[alt], action)) {
           substituted.push({ from: ref, to: alt });
           use = alt;
         } else {
