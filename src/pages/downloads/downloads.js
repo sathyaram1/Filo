@@ -266,8 +266,10 @@
       actions.appendChild(b);
     };
     if (isActive(r)) {
-      if (r.state === 'paused') addBtn('Riprendi', () => resume(r));
-      else addBtn('Pausa', () => pause(r));
+      if (r.canPause !== false) {
+        if (r.state === 'paused') addBtn('Riprendi', () => resume(r));
+        else addBtn('Pausa', () => pause(r));
+      }
       addBtn('Annulla', () => cancel(r));
     } else if (r.state === 'completed') {
       addBtn('Apri file', () => openFile(r));
