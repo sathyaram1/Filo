@@ -198,6 +198,11 @@
       if (!btn || !prov || !id) continue;
       markTestBlocked(btn, openWeightsBlocks({ provider: prov.value, model: id.value.trim() }));
     }
+
+    // Spegnendo l'interruttore il catalogo che era stato saltato torna a
+    // caricarsi da solo: se accenderlo lo ferma, spegnerlo deve rimetterlo, o
+    // resterebbe muto fino a un ricaricamento della pagina.
+    if (!on) ensureProviderModels('gemini');
   }
 
   function renderOpenWeightsImpact() {
