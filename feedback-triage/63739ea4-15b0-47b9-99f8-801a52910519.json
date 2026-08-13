@@ -1,7 +1,8 @@
 {
   "id": "63739ea4-15b0-47b9-99f8-801a52910519",
-  "status": "working",
-  "notes": "",
-  "queuedAt": "2026-08-13T18:47:12.033Z",
-  "queuedBy": "routine"
+  "status": "revision_capability",
+  "notes": "Fatto: salvando un filmato ora vedi l'avanzamento con barra e percentuale, e il tetto oltre il quale rinunciava non c'è più — il file scende su disco mentre arriva invece di essere tenuto tutto in memoria.\n\nUna scelta che vale la pena dirti: non ho inventato un indicatore nuovo. Il salvataggio dal tasto destro si iscrive alla STESSA barra degli scaricamenti che Filo usa già per i file presi da un link — stesso indicatore fra le schede, stesso pannello, stesso elenco. Erano due cose che per chi le usa sono la stessa cosa e si comportavano in modo diverso; adesso un filmato salvato dal menu si vede, si annulla e resta in cronologia come qualsiasi altro file. Di riflesso ci finiscono anche le immagini salvate col tasto destro, che prima non lasciavano traccia da nessuna parte.\n\nOltre al chiesto ho aggiunto due cose. Un salvataggio in corso si può annullare (prima l'unico modo era chiudere Filo), e annullando non resta un file a metà sul disco. La pausa invece NON la offro, ed è una scelta: una richiesta tenuta ferma viene chiusa dal server, quindi quel pulsante avrebbe promesso una cosa che non funziona — per questi salvataggi semplicemente non compare, mentre sui download partiti da un link resta com'era.\n\nUna cosa che noterai: per i file grandi la finestra \"dove lo salvo?\" ora si apre subito, mentre lo scaricamento è già partito, invece che alla fine. Serve perché il nome giusto lo dichiara il server all'inizio, e tenere ferma la connessione aspettando la tua risposta la farebbe cadere. Sui file piccoli non cambia niente: la finestra arriva a scaricamento concluso, come prima. Se il trasferimento fallisce subito, la finestra non compare affatto.\n\nNote tecniche: mentre scarica, il file cresce nella cartella Download di sistema con un nome che finisce in \".filo-part\", e viene spostato dove hai scelto solo a scaricamento finito. È quello che rende la consegna finale istantanea invece di una copia di tutto il filmato; se in futuro qualcuno lo fa crescere altrove (una cartella temporanea su un altro disco), salvare un film tornerà a costare una copia intera.",
+  "queuedAt": "2026-08-13T19:44:19.688Z",
+  "queuedBy": "routine",
+  "branch": "worker/63739ea4-15b0-47b9-99f8-801a52910519-20260813T184715Z"
 }
