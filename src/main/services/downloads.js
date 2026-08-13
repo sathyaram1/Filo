@@ -529,11 +529,13 @@ function clearCompleted() {
 }
 
 function remove(id) {
-  const rec = records.get(id);
   // Un download in corso non si "rimuove" dalla lista: prima lo si annulla.
-  if (rec && liveItems.has(id)) { try { liveItems.get(id).cancel(); } catch (_) {} }
+  // Vale per entrambi i cammini, nativo e "a mano".
+  if (liveItems.has(id)) { try { liveItems.get(id).cancel(); } catch (_) {} }
+  if (liveManual.has(id)) { try { liveManual.get(id).cancel(); } catch (_) {} }
   records.delete(id);
   liveItems.delete(id);
+  liveManual.delete(id);
   persist();
   return listRecords();
 }
