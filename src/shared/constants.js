@@ -2021,6 +2021,7 @@
     isOpenWeightsModelId,
     isOpenWeightsEntry,
     isOpenWeightsRef,
+    substituteFitsAction,
     effectiveExcludedProviders,
     applyOpenWeightsPolicy,
     openWeightsImpact,
