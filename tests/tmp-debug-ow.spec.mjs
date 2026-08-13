@@ -8,13 +8,14 @@ test('debug', async ({ app, shell }) => {
     const C = globalThis.SN_CONST;
     const Storage = globalThis.SN_STORAGE;
     await Storage.setSettings({ useDefaultModels: true, openWeightsOnly: false });
-    const s = await globalThis.SN_GET_EFFECTIVE_SETTINGS?.();
+    const D = globalThis.SN_DEFAULTS;
+    const d = D && D.get ? D.get() : null;
     return {
-      hasGetEff: typeof globalThis.SN_GET_EFFECTIVE_SETTINGS,
-      providerTestModels: s && s.models && s.models[C.ACTIONS.PROVIDER_TEST],
-      regKeys: s && Object.keys(s.modelRegistry || {}).slice(0, 40),
-      entry: s && s.modelRegistry && s.modelRegistry['flash-lite-3'],
+      hasDefaults: !!D,
+      dRegKeys: d && d.modelRegistry ? Object.keys(d.modelRegistry) : null,
+      dModelsProviderTest: d && d.models ? d.models[C.ACTIONS.PROVIDER_TEST] : null,
+      dFlashLite3: d && d.modelRegistry ? d.modelRegistry['flash-lite-3'] : null,
     };
   });
-  console.log(JSON.stringify(out, null, 2));
+  console.log('DEBUG=' + JSON.stringify(out));
 });
