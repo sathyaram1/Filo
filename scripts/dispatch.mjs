@@ -469,12 +469,21 @@ export function persistStateToGit(id, message) {
  */
 function pushStateFileToMain(rel, message) {
   const abs = resolve(ROOT, rel);
+  // Un `--clear-state` RIMUOVE il file: la persistenza deve saper cancellare,
+  // non solo aggiungere. Prima il push di HEAD portava con sé anche le
+  // rimozioni; costruendo l'albero a mano il caso va gestito, o lo stato
+  // sopravvive su main e la sessione dopo — che parte da lì — resuscita un
+  // feedback già chiuso.
+  const removing = !existsSync(abs);
   for (let attempt = 0; attempt < 3; attempt++) {
     if (!tryGit(['fetch', 'origin', MAIN_BRANCH]).ok) return;
     const base = tryGit(['rev-parse', 'FETCH_HEAD']);
     if (!base.ok) return;
-    const blob = tryGit(['hash-object', '-w', '--', abs]);
-    if (!blob.ok) return;
+    let blob = null;
+    if (!removing) {
+      blob = tryGit(['hash-object', '-w', '--', abs]);
+      if (!blob.ok) return;
+    }
     // Indice temporaneo: `read-tree`/`update-index` non devono toccare l'indice
     // vero del repo, o il worker si ritroverebbe lo stage riscritto sotto i piedi.
     const idx = resolve(STATE_DIR, `.push-index-${process.pid}`);
@@ -485,9 +494,15 @@ function pushStateFileToMain(rel, message) {
     };
     try {
       if (!g(['read-tree', base.out]).ok) return;
-      if (!g(['update-index', '--add', '--cacheinfo', `100644,${blob.out},${rel}`]).ok) return;
+      if (removing) {
+        if (!g(['update-index', '--force-remove', rel]).ok) return;
+      } else if (!g(['update-index', '--add', '--cacheinfo', `100644,${blob.out},${rel}`]).ok) return;
       const tree = g(['write-tree']);
       if (!tree.ok) return;
+      // Albero identico alla punta: su main non c'è niente da cambiare (tipico
+      // di una rimozione già avvenuta). Un commit vuoto sarebbe solo rumore.
+      const baseTree = tryGit(['rev-parse', `${base.out}^{tree}`]);
+      if (baseTree.ok && baseTree.out === tree.out) return;
       const commit = tryGit(['commit-tree', tree.out, '-p', base.out, '-m', message]);
       if (!commit.ok) return;
       // ff-only per costruzione: il padre È la punta di main appena letta. Se
