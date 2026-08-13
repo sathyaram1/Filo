@@ -43,6 +43,8 @@
     $('title').textContent = I18n.t('options_title');
     $('useDefaultModels-label').textContent = I18n.t('options_use_default_models');
     $('useDefaultModels-desc').textContent = I18n.t('options_use_default_models_desc');
+    $('openWeightsOnly-label').textContent = I18n.t('options_open_weights_only');
+    $('openWeightsOnly-desc').textContent = I18n.t('options_open_weights_only_desc');
     $('h-provider').textContent = I18n.t('options_keys');
     $('h-models').textContent = I18n.t('options_models');
     $('h-costs').textContent = I18n.t('options_costs');
@@ -124,6 +126,131 @@
     $('defaultModelsList').hidden = !useDefault;
   }
 
+  // ── "Solo modelli a pesi aperti": cosa cambia davvero ─────────────────────
+  // Un interruttore che promette e basta non si può verificare. Appena acceso
+  // qui sotto compare quante funzioni cambiano modello (e su quali finiscono) e
+  // QUALI si fermano perché un equivalente a pesi aperti non esiste — spegnerlo
+  // rimette tutto com'era, quindi la conseguenza si legge sul posto invece di
+  // scoprirla usando l'app.
+  // Sorgente: la configurazione che l'app userà DAVVERO (quella condivisa se
+  // "usa modelli predefiniti" è attivo, la personale altrimenti).
+
+  // Ultima configurazione predefinita letta dal main ({ models, modelRegistry }).
+  let defaultModelsPublic = null;
+
+  function effectiveModelConfig() {
+    if ($('useDefaultModels').checked) {
+      return defaultModelsPublic || { models: {}, modelRegistry: {} };
+    }
+    return {
+      models: ModelChain.collect(modelChains || {}),
+      modelRegistry: collectModelRegistry().registry,
+    };
+  }
+
+  function actionLabelFor(action) {
+    const row = (ModelChain.actionLabels() || []).find(([a]) => a === action);
+    return row ? I18n.t(row[1]) : action;
+  }
+
+  // Un "Prova" è una richiesta vera al modello della riga. Con l'interruttore
+  // acceso quelli proprietari restano spenti: il main li rifiuta comunque, ma un
+  // bottone premibile che poi dice di no è attrito inutile — e su questa pagina
+  // sarebbe pure il bottone che sembra scavalcare l'interruttore acceso due
+  // centimetri più su.
+  function markTestBlocked(btn, blocked) {
+    if (!btn) return;
+    btn.disabled = blocked;
+    if (blocked) btn.title = I18n.t('options_open_weights_test_blocked');
+    else btn.removeAttribute('title');
+  }
+
+  // `entry` è la voce intera quando c'è (la lista dei predefiniti la conosce),
+  // altrimenti fornitore + stringa del modello: è tutto ciò che una riga scritta
+  // a mano contiene. Stessa classificazione del main, così il bottone spento e
+  // la richiesta rifiutata dicono la stessa cosa.
+  function openWeightsBlocks(entry) {
+    if (!$('openWeightsOnly').checked) return false;
+    const C = window.SN_CONST;
+    if (!C || typeof C.openWeightsBlockKind !== 'function') return false;
+    return C.openWeightsBlockKind(true, entry) !== '';
+  }
+
+  // Tutti i pulsanti "Prova" della pagina, in un posto solo: le chiavi dei
+  // fornitori, le righe dei modelli predefiniti e le righe del registry
+  // personale. Sono cammini diversi verso la stessa cosa (una chiamata al
+  // modello), quindi la regola dev'essere una sola.
+  // Stato dell'interruttore all'ultimo giro, per riconoscere la transizione
+  // acceso→spento (vedi in fondo a applyOpenWeightsTestGates).
+  let openWeightsWasOn = null;
+
+  function applyOpenWeightsTestGates() {
+    const on = $('openWeightsOnly').checked;
+    // Prova della chiave: il fornitore diretto del produttore è spento in blocco;
+    // quello che smista le richieste prova un modello ammesso, quindi resta vivo.
+    markTestBlocked($('testGemini'), on);
+
+    for (const row of $('defaultModelsList').querySelectorAll('.sn-default-model-row')) {
+      const btn = row.querySelector('.sn-model-test');
+      if (!btn) continue;
+      markTestBlocked(btn, openWeightsBlocks(row._entry || {}));
+    }
+    for (const row of $('modelRegistryList').querySelectorAll('.sn-model-row:not(.sn-model-row-head)')) {
+      const btn = row.querySelector('.sn-model-test');
+      const prov = row.querySelector('.sn-model-provider');
+      const id = row.querySelector('.sn-model-id');
+      if (!btn || !prov || !id) continue;
+      markTestBlocked(btn, openWeightsBlocks({ provider: prov.value, model: id.value.trim() }));
+    }
+
+    // Spegnendo l'interruttore il catalogo che era stato saltato torna a
+    // caricarsi da solo: se accenderlo lo ferma, spegnerlo deve rimetterlo, o
+    // resterebbe muto fino a un ricaricamento della pagina. Solo sulla
+    // TRANSIZIONE acceso→spento: questa funzione gira a ogni `change` della
+    // pagina, e un catalogo che non risponde verrebbe richiesto all'infinito.
+    const eraAcceso = openWeightsWasOn;
+    openWeightsWasOn = on;
+    if (eraAcceso === true && !on) ensureProviderModels('gemini');
+  }
+
+  function renderOpenWeightsImpact() {
+    const host = $('openWeightsImpact');
+    if (!host) return;
+    applyOpenWeightsTestGates();
+
+    host.innerHTML = '';
+    if (!$('openWeightsOnly').checked) { host.hidden = true; return; }
+
+    const C = window.SN_CONST;
+    const { models, modelRegistry } = effectiveModelConfig();
+    if (!C || typeof C.openWeightsImpact !== 'function' || !Object.keys(models || {}).length) {
+      host.hidden = true;
+      return;
+    }
+    const impact = C.openWeightsImpact(models, modelRegistry);
+    const lines = [];
+    if (impact.substituted.length) {
+      // Le funzioni che cambiano modello sono decine: elencarle una per una
+      // sarebbe un muro di testo che nessuno legge. Quello che serve sapere è
+      // quante sono e su quali modelli finiscono; l'elenco per funzione è già
+      // la griglia dei modelli qui sotto.
+      const modelli = [...new Set(impact.substituted.map((s) => s.to))];
+      lines.push(I18n.t('options_open_weights_switched', String(impact.substituted.length), modelli.join(', ')));
+    }
+    if (impact.unavailable.length) {
+      const names = impact.unavailable.map((u) => actionLabelFor(u.action));
+      lines.push(I18n.t('options_open_weights_unavailable', names.join(', ')));
+    }
+    if (!lines.length) { host.hidden = true; return; }
+
+    for (const line of lines) {
+      const p = document.createElement('p');
+      p.textContent = line;
+      host.appendChild(p);
+    }
+    host.hidden = false;
+  }
+
   // ── Lista read-only dei modelli predefiniti con tasto "Prova" ─────────────
   // Quando useDefaultModels è ON, mostra i modelli del registry predefinito
   // (costanti o override Firestore) con un pulsante "Prova" che testa il
@@ -133,9 +260,15 @@
     let registry = {};
     try {
       const r = await chrome.runtime.sendMessage({ type: MSG.DEFAULT_MODELS_PUBLIC });
-      if (r && r.ok && r.modelRegistry) registry = r.modelRegistry;
+      if (r && r.ok && r.modelRegistry) {
+        registry = r.modelRegistry;
+        defaultModelsPublic = { models: r.models || {}, modelRegistry: registry };
+      }
     } catch (_) {}
     renderDefaultModels(registry);
+    // L'effetto dell'interruttore si calcola sulla config VERA: ora che è
+    // arrivata, ricalcolalo.
+    renderOpenWeightsImpact();
   }
 
   function renderDefaultModels(registry) {
@@ -165,6 +298,10 @@
     const row = document.createElement('div');
     row.className = 'sn-model-row sn-default-model-row';
     const single = entryToSingle(entry);
+    // La voce INTERA sulla riga (non solo fornitore e stringa): il cancello dei
+    // "Prova" la classifica come fa il main, dove una `weights` scritta a mano
+    // dall'owner conta.
+    row._entry = { ...(entry || {}), provider: single.provider, model: single.model };
 
     const nickEl = document.createElement('div');
     nickEl.className = 'sn-default-model-cell';
@@ -180,7 +317,7 @@
 
     const testBtn = document.createElement('button');
     testBtn.type = 'button';
-    testBtn.className = 'sn-btn sn-btn-secondary';
+    testBtn.className = 'sn-btn sn-btn-secondary sn-model-test';
     testBtn.textContent = I18n.t('options_model_test');
     testBtn.addEventListener('click', () => runDefaultModelTest(nick, row, testBtn));
 
@@ -213,6 +350,9 @@
       statusEl.textContent = I18n.t('options_test_failed', e?.message || String(e));
     } finally {
       btn.disabled = false;
+      // Il cancello dei pesi aperti ha l'ultima parola: riabilitare alla cieca
+      // rimetterebbe premibile un "Prova" che la politica tiene spento.
+      applyOpenWeightsTestGates();
     }
   }
 
@@ -224,6 +364,7 @@
     window.SN_PAGE_BOOTSTRAP.applyTheme(settings.theme);
 
     $('useDefaultModels').checked = settings.useDefaultModels !== false;
+    $('openWeightsOnly').checked = settings.openWeightsOnly === true;
     // Lista read-only dei modelli predefiniti. Deve mostrare i modelli che l'app
     // userà DAVVERO: li chiediamo al main (config condivisa + eventuali
     // modifiche dell'owner). Se la richiesta non riesce la lista resta vuota
@@ -265,6 +406,11 @@
     seedDatalistsFromRegistry(settings.modelRegistry || {});
     ensureProviderModels('gemini');
     ensureProviderModels('openrouter');
+
+    // Con la config personale l'effetto è calcolabile subito (griglia e registry
+    // sono già renderizzati); con quella condivisa lo ricalcola loadDefaultModels
+    // appena il main risponde.
+    renderOpenWeightsImpact();
   }
 
   // Normalizza una entry del registry (nuovo schema o vecchio duale) in
@@ -387,7 +533,7 @@
 
     const test = document.createElement('button');
     test.type = 'button';
-    test.className = 'sn-btn sn-btn-secondary';
+    test.className = 'sn-btn sn-btn-secondary sn-model-test';
     test.textContent = I18n.t('options_model_test');
     test.addEventListener('click', () => runRowTest(provSel.value, idIn.value.trim(), row, test));
 
@@ -528,6 +674,9 @@
       statusEl.textContent = I18n.t('options_test_failed', e?.message || String(e));
     } finally {
       btn.disabled = false;
+      // Il cancello dei pesi aperti ha l'ultima parola: riabilitare alla cieca
+      // rimetterebbe premibile un "Prova" che la politica tiene spento.
+      applyOpenWeightsTestGates();
     }
   }
 
@@ -597,6 +746,19 @@
     return (provider === 'gemini' ? $('apiKeyGemini') : $('apiKey')).value.trim();
   }
 
+  // Il catalogo è "solo metadati", ma resta una richiesta MANDATA al fornitore
+  // con la tua chiave — e questa pagina la faceva da sola al caricamento. Con
+  // «Solo modelli a pesi aperti» acceso l'API diretta di chi produce i modelli
+  // era l'ultima cosa che partiva verso un escluso da qui: sta spenta come il
+  // suo «Prova», altrimenti la pagina dove si accende l'interruttore sarebbe
+  // anche l'unica che continua a parlarci.
+  function catalogBlocked(provider) {
+    if (!$('openWeightsOnly').checked) return false;
+    const C = window.SN_CONST;
+    const diretti = (C && C.PRODUCER_DIRECT_PROVIDERS) || ['gemini'];
+    return diretti.includes(provider);
+  }
+
   // Carica (una sola volta) il catalogo di un provider nel suo combobox, così
   // ogni modello è subito etichettato per categoria. È solo metadati (gratis):
   //  - OpenRouter: catalogo pubblico → si carica SEMPRE, anche senza chiave.
@@ -605,6 +767,7 @@
   // Silenzioso: in caso di errore il campo resta un input libero.
   async function ensureProviderModels(provider) {
     if (providerModelCache[provider]) return;
+    if (catalogBlocked(provider)) return;
     const key = providerKey(provider);
     if (provider === 'gemini' && !key) return;
     try {
@@ -625,7 +788,10 @@
     const gemKey = $('apiKeyGemini').value.trim();
     const errors = [];
     let total = 0;
-    if (gemKey) {
+    if (catalogBlocked('gemini')) {
+      // Chiesto a mano: il silenzio sembrerebbe un guasto. Dice perché non parte.
+      errors.push(`Gemini: ${I18n.t('options_open_weights_catalog_blocked')}`);
+    } else if (gemKey) {
       try {
         const ids = await fetchGeminiModels(gemKey);
         providerModelCache.gemini = ids;
@@ -660,6 +826,7 @@
 
     const partial = {
       useDefaultModels: $('useDefaultModels').checked,
+      openWeightsOnly: $('openWeightsOnly').checked,
       apiKeys: { openrouter: apiKey, gemini: apiKeyGemini, tavily: apiKeyTavily },
       modelRegistry: registry,
       models: ModelChain.collect(modelChains),
@@ -701,6 +868,9 @@
       statusEl.textContent = I18n.t('options_test_failed', e?.message || String(e));
     } finally {
       btn.disabled = false;
+      // Il cancello dei pesi aperti ha l'ultima parola: riabilitare alla cieca
+      // rimetterebbe premibile un "Prova" che la politica tiene spento.
+      applyOpenWeightsTestGates();
     }
   }
 
@@ -716,12 +886,17 @@
     // subito. I controlli testuali salvano allo `change` (cioè al blur), gli
     // altri (select/checkbox) immediatamente.
     $('page').addEventListener('change', () => saveDebounced());
+    // Qualunque cosa cambi (interruttore, modelli per azione, registry) può
+    // cambiare l'effetto di "solo pesi aperti": lo ricalcoliamo sempre.
+    $('page').addEventListener('change', renderOpenWeightsImpact);
     $('useDefaultModels').addEventListener('change', applyDefaultModelsVisibility);
     $('loadModels').addEventListener('click', loadModelsFromProvider);
     $('testOpenrouter').addEventListener('click', () => testProvider('openrouter', $('testOpenrouterStatus'), $('testOpenrouter')));
     $('testGemini').addEventListener('click', () => testProvider('gemini', $('testGeminiStatus'), $('testGemini')));
     $('addModelRow').addEventListener('click', () => {
       $('modelRegistryList').appendChild(makeModelRow('', {}));
+      // Riga nuova = "Prova" nuovo: passa dallo stesso cancello degli altri.
+      applyOpenWeightsTestGates();
     });
     // L'input dentro le righe del registry e i segmenti dei modelli (creati
     // dinamicamente) fanno bubbling del `change` fino a #page → già coperti.

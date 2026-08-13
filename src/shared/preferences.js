@@ -326,6 +326,23 @@
       },
     },
     {
+      keys: ['solo_pesi_aperti', 'solo pesi aperti', 'modelli a pesi aperti', 'solo modelli a pesi aperti',
+        'solo modelli aperti', 'modelli aperti', 'modelli proprietari', 'niente modelli proprietari',
+        'disattiva modelli proprietari', 'open weights'],
+      level: 2,
+      risk: 'Spegne tutti i modelli proprietari (Anthropic compresa) e lascia lavorare solo modelli '
+        + 'a pesi aperti serviti da fornitori indipendenti. Alcune funzioni cambiano modello e quelle '
+        + 'senza equivalente aperto smettono di funzionare finché non lo rispegni.',
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return {
+          partial: { openWeightsOnly: b },
+          label: `Solo modelli a pesi aperti → ${b ? 'attivo' : 'disattivato'}`,
+        };
+      },
+    },
+    {
       keys: ['provider', 'fornitore', 'provider ai', 'provider modelli'],
       level: 2,
       risk: 'Cambia il fornitore AI che elabora le tue richieste (OpenRouter o Google Gemini). '

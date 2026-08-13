@@ -405,6 +405,12 @@
       doesNot: 'Le chiavi sono salvate cifrate in locale. Nessuna funzione usa un modello che non hai impostato: se a una funzione manca il modello, o punta a uno che non esiste, quella funzione si ferma e lo segnala quando la usi — non ne sceglie uno per conto suo.',
     },
     {
+      id: 'open-weights-only', title: 'Solo modelli a pesi aperti', category: 'settings',
+      desc: 'Un interruttore spegne tutti i modelli proprietari — Anthropic compresa, cioè anche quelli scelti da chi fa Filo — e lascia lavorare solo modelli a pesi aperti serviti da fornitori indipendenti. Vale anche quando usi i crediti di Filo. Le funzioni che partivano da un modello proprietario passano da sole al suo equivalente aperto, e le Opzioni dicono subito quante cambiano e quali si fermano.',
+      invoke: 'Opzioni → «Solo modelli a pesi aperti», oppure chiedendolo a Filo ("usa solo modelli a pesi aperti").',
+      doesNot: 'Le poche funzioni senza equivalente aperto (lettura ad alta voce, dettatura, indicizzazione dell’archivio) si fermano e lo dicono: non tornano di nascosto su un modello proprietario, nemmeno se il sostituto non risponde. Non governa i modelli che girano sui server di Filo, come i giudici dei feedback.',
+    },
+    {
       id: 'model-usage-census', title: 'Dove Filo usa un modello', category: 'settings',
       desc: 'L’elenco completo dei punti in cui Filo usa un modello, anche quelli che non si vedono: riordino delle schede, riassunti, memoria, etichette dei mazzi, giudizi sui feedback, indicizzazione dell’archivio. Per ognuno c’è scritto se il modello lo scegli tu, se lo sceglie chi gestisce Filo, o se quel punto un modello non lo usa affatto.',
       invoke: 'Opzioni → sezione dei modelli (l’elenco sta sotto le funzioni impostabili).',

@@ -4,6 +4,7 @@
 module.exports = function register(on, ctx) {
   const {
     MSG, handleAIRequest, getEffectiveSettings, modelForAction, buildAttemptChain,
+    providerRouting, openWeightsBlockReason,
     Defaults, isAdmin, broadcastToTabs,
   } = ctx;
   const { SN_CONST } = globalThis;
@@ -195,11 +196,17 @@ module.exports = function register(on, ctx) {
   // chiave si sta ancora digitando e arriva nel messaggio, non dalle
   // impostazioni. Risolviamo quindi il nickname direttamente sul registro
   // configurato, che resta l'unica sorgente del modello.
-  async function testModelFor(provider) {
-    const settings = await getEffectiveSettings();
+  async function testModelFor(provider, settings) {
+    const s = settings || await getEffectiveSettings();
     const action = SN_CONST.ACTIONS.PROVIDER_TEST;
-    const registry = settings.modelRegistry || {};
-    const refs = SN_CONST.parseModelRefs(modelForAction(settings, action));
+    const registry = s.modelRegistry || {};
+    let refs = SN_CONST.parseModelRefs(modelForAction(s, action));
+    // Stessa potatura delle richieste vere: a interruttore acceso la prova parte
+    // sull'equivalente a pesi aperti, non sul modello proprietario che quella
+    // funzione userebbe altrimenti.
+    if (s.openWeightsOnly === true) {
+      refs = SN_CONST.applyOpenWeightsPolicy(refs, registry, action).refs;
+    }
     for (const ref of refs) {
       const concrete = SN_CONST.resolveModel(ref, provider, registry);
       if (concrete) return concrete;
@@ -211,7 +218,15 @@ module.exports = function register(on, ctx) {
     try {
       const provider = msg.provider;
       const apiKey = (msg.apiKey || '').trim();
-      const model = (msg.model || '').trim() || await testModelFor(provider);
+      // "Solo modelli a pesi aperti" (#461): la prova è una chiamata VERA, quindi
+      // passa dallo stesso cancello delle funzioni. Il fornitore si controlla
+      // prima del modello: chiedergli quale modello proverebbe non ha senso se
+      // comunque non può essere interrogato.
+      const s = await getEffectiveSettings();
+      if (s.openWeightsOnly === true && SN_CONST.PRODUCER_DIRECT_PROVIDERS.includes(provider)) {
+        return { ok: false, error: openWeightsBlockReason(s, { provider }) };
+      }
+      const model = (msg.model || '').trim() || await testModelFor(provider, s);
       if (!model) {
         return {
           ok: false,
@@ -219,12 +234,21 @@ module.exports = function register(on, ctx) {
         };
       }
       if (!apiKey) return { ok: false, error: 'API key mancante' };
+      // Modello indicato dalla riga (registry personale): se è proprietario la
+      // prova non parte, altrimenti l'unica richiesta che l'interruttore non
+      // ferma sarebbe proprio quella che si lancia dalla pagina dove lo si
+      // accende.
+      const modelBlocked = openWeightsBlockReason(s, { provider, model });
+      if (modelBlocked) return { ok: false, error: modelBlocked };
       const messages = [{ role: 'user', content: 'Conta da 1 a 20 separando con virgole, senza testo extra.' }];
       const startMs = performance.now();
       let firstTokenMs = null;
       let charCount = 0;
       const result = await Providers.streamComplete({
         provider, apiKey, model, messages,
+        // Anche la prova porta con sé chi NON deve servirla: senza, sarebbe
+        // l'unica richiesta di Filo che un fornitore escluso può servire.
+        providerRouting: providerRouting(s),
         onDelta: (delta) => {
           if (firstTokenMs == null) firstTokenMs = performance.now() - startMs;
           charCount += (delta || '').length;
@@ -276,7 +300,7 @@ module.exports = function register(on, ctx) {
       const explicitModel = (msg.model || '').trim();
       try { await Defaults.refreshIfStale(); } catch (_) {}
       const d = Defaults.get();
-      let provider; let modelId;
+      let provider; let modelId; let regEntry = null;
       if (explicitModel) {
         // Riga dell'editor admin, testata così com'è scritta (anche non ancora
         // salvata). Spende le chiavi predefinite su un modello arbitrario →
@@ -297,11 +321,23 @@ module.exports = function register(on, ctx) {
         const registry = d.modelRegistry || {};
         const entry = registry[nickname];
         if (!entry) return { ok: false, error: `Modello "${nickname}" non trovato` };
+        regEntry = entry;
         const single = registryEntryToSingle(entry);
         provider = single.provider || 'openrouter';
         modelId = single.model || '';
         if (!modelId) return { ok: false, error: 'Stringa modello vuota' };
       }
+      // "Solo modelli a pesi aperti" (#461). Queste righe sono i modelli che
+      // Filo userebbe: provarne uno è una richiesta vera, pagata con le chiavi
+      // predefinite. Con l'interruttore acceso quelle proprietarie non partono —
+      // altrimenti la pagina dove si accende l'interruttore sarebbe l'unico
+      // posto da cui l'interruttore si può scavalcare.
+      const eff = await getEffectiveSettings();
+      // La voce intera, non solo fornitore+stringa: se l'owner ha classificato a
+      // mano quel modello come a pesi aperti, la prova lo rispetta come lo
+      // rispettano le richieste vere.
+      const blocked = openWeightsBlockReason(eff, { ...(regEntry || {}), provider, model: modelId });
+      if (blocked) return { ok: false, error: blocked };
       const apiKey = await defaultKeyFor(provider, d);
       if (!apiKey) return { ok: false, error: `Chiave ${provider} non configurata` };
       // Il provider Gemini ora accetta i nomi nativi (es. gemini-3.1-flash-lite),
@@ -315,6 +351,8 @@ module.exports = function register(on, ctx) {
       let charCount = 0;
       const result = await Providers.streamComplete({
         provider, apiKey, model, messages,
+        // Come per le richieste vere: chi è escluso non serve nemmeno una prova.
+        providerRouting: providerRouting(eff),
         onDelta: (delta) => {
           if (firstTokenMs == null) firstTokenMs = performance.now() - startMs;
           charCount += (delta || '').length;

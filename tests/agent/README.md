@@ -42,14 +42,14 @@ Opzioni: `--out DIR`, `--file scenario.txt`.
 
 ## 2. `explore.mjs` — esplorazione AUTONOMA guidata da un LLM vision
 
-Un modello Gemini/Gemma riceve gli screenshot (con badge numerati), naviga come un
+Un modello Gemma (pesi aperti) riceve gli screenshot (con badge numerati), naviga come un
 utente e segnala comportamenti inattesi. Al termine scrive `report.md` +
 `issues.json` + gli screenshot di ogni passo in `tests/agent/reports/<timestamp>/`.
 
 Il modello riceve l'**intera cronologia** della sessione (tutti gli screenshot
 precedenti + le sue risposte), così riconosce cambiamenti inattesi (es. contenuto
-che prima c'era e ora è sparito). I modelli AI Studio sono tariffati a chiamata,
-non a token → contesto lungo non costa di più.
+che prima c'era e ora è sparito). Qui si paga a token, quindi nel contesto
+restano gli ultimi 8 screenshot: i più vecchi lasciano solo il testo.
 
 ```bash
 # esplorazione libera
@@ -63,8 +63,8 @@ npm run test:explore -- --area "editor: scrittura e moduli" --start filo://edito
 npm run test:explore -- --start filo://editor/editor.html --steps 10 \
   --task "Scrivi un titolo e un paragrafo, cambia pagina con lo switch, usa Cerca e sostituisci"
 
-# modello più capace (quota più bassa)
-npm run test:explore -- --model gemini-3.5-flash
+# modello più economico (run lunghi)
+npm run test:explore -- --model google/gemma-4-26b-a4b-it
 ```
 
 Opzioni: `--model`, `--steps`, `--start URL`, `--area "testo"`, `--task "testo"`,
@@ -82,19 +82,27 @@ npm run test:daily            # esplora dashboard, editor, shell/tab, history, o
 ```
 Aggrega tutto in `tests/agent/reports/daily-<ts>/INDEX.md`.
 
-## Chiave API (Google AI Studio)
+## Chiave API (OpenRouter)
 
 La chiave si legge da:
-1. env `GEMINI_API_KEY` (o `GOOGLE_AI_API_KEY`), oppure
-2. il file `tests/agent/.env` (gitignorato) con `GEMINI_API_KEY=...`
+1. env `OPENROUTER_API_KEY`, oppure
+2. il file `tests/agent/.env` (gitignorato) con `OPENROUTER_API_KEY=...`
 
-Modelli vision testati (free tier AI Studio — le quote variano):
+**Niente chiave Google.** La politica sui modelli di Filo vale anche per gli
+strumenti che lo testano: si usano solo modelli a **pesi aperti** serviti da
+**fornitori indipendenti**. Gemma va bene perché i pesi sono aperti; erano i
+server di Google a essere esclusi. La lista di esclusione dei produttori viaggia
+con ogni richiesta ed è la stessa dell'app (`src/shared/constants.js`, niente
+copia locale che possa divergere); a risposta arrivata si controlla **chi l'ha
+davvero servita** e il run si ferma se è qualcuno che doveva restare fuori.
+
+Modelli vision usati:
 
 | modello | note |
 |---------|------|
-| `gemini-3.1-flash-lite` | **default** — buon compromesso qualità/quota, JSON affidabile |
-| `gemini-3.5-flash` | più capace, quota giornaliera bassa → run mirati |
-| `gemma-4-31b-it` / `gemma-4-26b-a4b-it` | quota molto alta; vedono le anomalie ma meno disciplinati sul formato JSON |
+| `google/gemma-4-31b-it` | **default** — pesi aperti, vede le immagini, buon compromesso |
+| `google/gemma-4-26b-a4b-it` | più economico → fallback automatico e run lunghi |
+| `qwen/qwen3-vl-32b-instruct` | alternativa vision a pesi aperti |
 
 ## Quando usare cosa
 

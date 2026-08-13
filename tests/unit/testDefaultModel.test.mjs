@@ -23,6 +23,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // Moduli condivisi reali (IIFE su globalThis): costanti e messaggi.
 require(join(__dirname, '..', '..', 'src', 'shared', 'constants.js'));
 require(join(__dirname, '..', '..', 'src', 'shared', 'messages.js'));
+// Come nel main (loader.js): serve alla sostituzione a pesi aperti per sapere
+// se il sostituto fa il mestiere della funzione.
+require(join(__dirname, '..', '..', 'src', 'shared', 'modelCaps.js'));
 const { MSG } = globalThis.SN_MSG;
 
 // ── harness: registra l'handler con dipendenze finte ────────────────────────
@@ -40,8 +43,8 @@ const state = {
 };
 
 globalThis.SN_PROVIDERS = {
-  streamComplete: async ({ provider, apiKey, model, messages, onDelta }) => {
-    state.calls.push({ provider, apiKey, model });
+  streamComplete: async ({ provider, apiKey, model, messages, providerRouting, onDelta }) => {
+    state.calls.push({ provider, apiKey, model, providerRouting });
     if (state.streamError) throw new Error(state.streamError);
     if (state.emptyStream) return { usage: { completionTokens: 0 } };
     onDelta('1, 2, 3');
@@ -59,11 +62,25 @@ registerAi((type, fn) => handlers.set(type, fn), {
   },
   isAdmin: () => state.admin,
   handleAIRequest: async () => ({}),
-  modelForAction: () => '',
+  modelForAction: (s, action) => ((s && s.models) || {})[action] || '',
   buildAttemptChain: () => [],
+  // Le stesse due funzioni che il main passa all'handler. La classificazione è
+  // quella VERA (logica pura in constants.js): qui è finto solo il testo del
+  // messaggio, che nei unit test non c'è (I18n vive nel main).
+  openWeightsBlockReason: (settings, entry) => {
+    const kind = globalThis.SN_CONST.openWeightsBlockKind(
+      settings && settings.openWeightsOnly === true, entry,
+    );
+    return kind ? `bloccato: ${kind}` : null;
+  },
+  providerRouting: (settings) => {
+    const ignore = globalThis.SN_CONST.providerIgnoreList((settings && settings.excludedProviders) || []);
+    return ignore.length ? { ignore } : null;
+  },
 });
 
 const testModel = (msg) => handlers.get(MSG.TEST_DEFAULT_MODEL)(msg);
+const testProvider = (msg) => handlers.get(MSG.TEST_PROVIDER)(msg);
 
 beforeEach(() => {
   state.admin = false;
@@ -169,4 +186,97 @@ test('nessuna chiave da nessuna parte → errore esplicito', async () => {
   const res = await testModel({ provider: 'openrouter', model: 'a/b' });
   assert.equal(res.ok, false);
   assert.match(String(res.error), /[Cc]hiave/);
+});
+
+// ── "Solo modelli a pesi aperti" (#461): il "Prova" è una chiamata VERA ──────
+// Il pulsante sta nella stessa pagina dove si accende l'interruttore: se lui
+// solo potesse chiamare un modello proprietario, l'interruttore non varrebbe
+// niente proprio dove lo si accende. Senza il cancello questi test falliscono:
+// la chiamata parte e finisce in state.calls.
+
+test('interruttore acceso: il "Prova" di un modello proprietario NON chiama niente', async () => {
+  state.effective = { modelRegistry: {}, apiKeys: {}, openWeightsOnly: true };
+  state.defaults.apiKeys = { openrouter: 'sk-or-default', gemini: 'AIza-default' };
+  state.defaults.modelRegistry = {
+    'claude-haiku': { provider: 'openrouter', model: 'anthropic/claude-3.5-haiku' },
+    tts: { provider: 'gemini', model: 'gemini-2.5-flash-preview-tts' },
+    'embed-004': { provider: 'gemini', model: 'text-embedding-004' },
+    gemma: { provider: 'openrouter', model: 'google/gemma-4-31b-it', weights: 'open' },
+  };
+
+  for (const nickname of ['claude-haiku', 'tts', 'embed-004']) {
+    const res = await testModel({ nickname });
+    assert.equal(res.ok, false, `"${nickname}" non doveva partire`);
+    assert.match(String(res.error), /bloccato:/);
+  }
+  assert.equal(state.calls.length, 0, 'nessuna richiesta deve essere partita');
+
+  // Il modello a pesi aperti invece si prova: il cancello non spegne tutto.
+  const ok = await testModel({ nickname: 'gemma' });
+  assert.equal(ok.ok, true, `atteso ok, ottenuto: ${ok.error}`);
+  assert.equal(state.calls.length, 1);
+});
+
+test('interruttore acceso: se l\'owner ha classificato la voce come aperta, la prova parte', async () => {
+  // Stessa classificazione che vale per le richieste vere: se il cancello delle
+  // prove guardasse solo la stringa del modello, l'owner potrebbe correggere una
+  // classificazione sbagliata per le funzioni ma non per il pulsante che le
+  // prova.
+  state.effective = { modelRegistry: {}, apiKeys: {}, openWeightsOnly: true };
+  state.defaults.apiKeys = { openrouter: 'sk-or-default' };
+  state.defaults.modelRegistry = {
+    nuovo: { provider: 'openrouter', model: 'acme/modello-nuovo', weights: 'open' },
+  };
+  const res = await testModel({ nickname: 'nuovo' });
+  assert.equal(res.ok, true, `atteso ok, ottenuto: ${res.error}`);
+});
+
+test('interruttore acceso: nemmeno la riga scritta a mano dall\'amministratore passa', async () => {
+  state.admin = true;
+  state.effective = { modelRegistry: {}, apiKeys: {}, openWeightsOnly: true };
+  state.defaults.apiKeys = { openrouter: 'sk-or-default' };
+  const res = await testModel({ provider: 'openrouter', model: 'anthropic/claude-3.7-sonnet' });
+  assert.equal(res.ok, false);
+  assert.equal(state.calls.length, 0);
+});
+
+// ── Stesso cancello per il "Prova" accanto alle CHIAVI (test_provider) ───────
+
+test('interruttore acceso: la prova della chiave parte sul sostituto a pesi aperti', async () => {
+  const C = globalThis.SN_CONST;
+  state.effective = {
+    modelRegistry: C.DEFAULT_MODEL_REGISTRY,
+    models: { [C.ACTIONS.PROVIDER_TEST]: C.DEFAULT_MODELS[C.ACTIONS.PROVIDER_TEST] },
+    apiKeys: {},
+    openWeightsOnly: true,
+  };
+  const res = await testProvider({ provider: 'openrouter', apiKey: 'sk-or-utente' });
+  assert.equal(res.ok, true, `atteso ok, ottenuto: ${res.error}`);
+  assert.equal(state.calls.length, 1);
+  assert.equal(state.calls[0].model, 'google/gemma-4-26b-a4b-it',
+    'la prova doveva usare l\'equivalente a pesi aperti, non il modello proprietario');
+});
+
+test('interruttore acceso: la prova su un modello proprietario scritto a mano non parte', async () => {
+  state.effective = { modelRegistry: {}, apiKeys: {}, openWeightsOnly: true };
+  const res = await testProvider({
+    provider: 'openrouter', apiKey: 'sk-or-utente', model: 'anthropic/claude-3.5-haiku',
+  });
+  assert.equal(res.ok, false);
+  assert.equal(state.calls.length, 0);
+
+  // E il fornitore che è l'API del produttore resta spento in blocco.
+  const gem = await testProvider({ provider: 'gemini', apiKey: 'AIza-utente' });
+  assert.equal(gem.ok, false);
+  assert.equal(state.calls.length, 0);
+});
+
+test('la prova porta con sé chi NON deve servirla (lista di esclusione)', async () => {
+  state.admin = true;
+  state.effective = { modelRegistry: {}, apiKeys: {}, excludedProviders: ['Google', 'OpenAI'] };
+  state.defaults.apiKeys = { openrouter: 'sk-or-default' };
+  const res = await testModel({ provider: 'openrouter', model: 'google/gemma-4-31b-it' });
+  assert.equal(res.ok, true, `atteso ok, ottenuto: ${res.error}`);
+  const ignore = (state.calls[0].providerRouting || {}).ignore || [];
+  assert.ok(ignore.length, 'la prova partiva senza dire chi è escluso');
 });

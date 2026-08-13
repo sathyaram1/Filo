@@ -284,6 +284,12 @@
     'google/gemini-2.0-flash-lite-001': { input: 0.075, output: 0.30 },
     'google/gemini-3.1-flash-lite-preview': { input: 0.25, output: 1.50 },
     'anthropic/claude-3.5-haiku': { input: 0.80, output: 4.00 },
+    // Sostituti a pesi aperti (fornitori indipendenti): costano meno dei
+    // proprietari che sostituiscono, quindi accendere l'interruttore non fa mai
+    // salire la spesa.
+    'google/gemma-4-31b-it': { input: 0.10, output: 0.30 },
+    'google/gemma-4-26b-a4b-it': { input: 0.04, output: 0.12 },
+    'deepseek/deepseek-v4-pro': { input: 0.40, output: 0.80 },
   };
   // Prezzo di ripiego quando il modello concreto non è nella tabella (config
   // personalizzata dell'utente): un modello "flash" medio, così una chiamata AI
@@ -444,6 +450,36 @@
       provider: 'gemini',
       model: 'gemini-2.5-flash-preview-tts',
     },
+    // ── Modelli a PESI APERTI, serviti da fornitori indipendenti ─────────────
+    // Sono i sostituti usati quando chi usa Filo accende "solo modelli a pesi
+    // aperti" (vedi OPEN_WEIGHTS_SUBSTITUTES). Stanno nel registry come tutti
+    // gli altri: si possono scegliere anche a interruttore spento.
+    // Provider 'openrouter' = smistatore, non il produttore dei pesi: l'host
+    // concreto lo sceglie lui, e la lista di esclusione tiene fuori i produttori.
+    // Cosa ciascuno sa masticare (testo? immagini? audio?) sta in
+    // OPEN_WEIGHTS_SUBSTITUTE_MODALITIES, accanto alla tabella delle
+    // sostituzioni: serve solo lì, e scriverlo una volta sola evita che le due
+    // liste divergano. Una voce può comunque dichiararlo da sé (`inputs`/
+    // `outputs`), così l'owner corregge dalla config condivisa senza rilasciare
+    // codice.
+    gemma: {
+      label: 'Gemma 4 31B (pesi aperti)',
+      provider: 'openrouter',
+      model: 'google/gemma-4-31b-it',
+      weights: 'open',
+    },
+    'gemma-lite': {
+      label: 'Gemma 4 26B A4B (pesi aperti)',
+      provider: 'openrouter',
+      model: 'google/gemma-4-26b-a4b-it',
+      weights: 'open',
+    },
+    deepseek: {
+      label: 'DeepSeek V4 Pro (pesi aperti)',
+      provider: 'openrouter',
+      model: 'deepseek/deepseek-v4-pro',
+      weights: 'open',
+    },
   };
 
   // Modello di default per ogni azione. I valori sono liste di NICKNAME dal
@@ -588,6 +624,238 @@
       out.push(v);
     }
     return out;
+  }
+
+  // ── Interruttore "solo modelli a pesi aperti" ───────────────────────────────
+  // La politica sui modelli dice che chi usa Filo può rifiutare TUTTI i modelli
+  // proprietari — Anthropic compresa, cioè anche la scelta di chi Filo lo fa —
+  // e lavorare solo con modelli a pesi aperti serviti da fornitori indipendenti.
+  // Qui vive la parte pura di quell'interruttore; l'applicazione alla catena di
+  // tentativi è in handlers.js (buildAttemptChain).
+  //
+  // DUE condizioni, entrambe necessarie perché un modello sia ammesso:
+  //   1. i PESI sono aperti (chi li ha addestrati non incassa nulla quando li
+  //      usi altrove);
+  //   2. a servirlo NON è chi li ha prodotti. Gemma sui server di Google resta
+  //      Google: i pesi aperti non cambiano dove vanno i soldi.
+  // La (2) esclude in blocco i provider "diretti" (l'API del produttore) e, per
+  // lo smistatore, si ottiene con la lista di esclusione già esistente.
+  //
+  // DIFFIDENTE PER COSTRUZIONE: un modello che non sappiamo classificare vale
+  // come proprietario e viene escluso. Il contrario (ammettere ciò che non
+  // riconosciamo) trasformerebbe l'interruttore in una promessa a caso, che è
+  // peggio che non averlo.
+
+  // Provider che sono l'API del PRODUTTORE dei modelli: qualunque cosa servano,
+  // i soldi vanno a chi i modelli li fa. 'openrouter' non è qui perché è uno
+  // smistatore: chi ospita davvero si sceglie con la lista di esclusione.
+  const PRODUCER_DIRECT_PROVIDERS = ['gemini'];
+
+  // Famiglie di modelli a PESI APERTI (nome base, minuscolo). È una lista
+  // curabile: un id che non ricade qui è trattato come proprietario. Il
+  // confronto è sul nome del modello, non sul percorso del fornitore, così
+  // 'google/gemma-4-31b-it' (pesi aperti, servito da terzi) passa e
+  // 'google/gemini-3.1-flash-lite-preview' (proprietario) no.
+  const OPEN_WEIGHT_MODEL_FAMILIES = [
+    'gemma', 'llama', 'qwen', 'deepseek', 'mistral', 'mixtral', 'kimi', 'glm',
+    'minimax', 'olmo', 'phi', 'granite', 'nemotron', 'falcon', 'yi', 'command-r',
+    'stablelm', 'smollm', 'whisper', 'step',
+  ];
+
+  // Il modello concreto ha i pesi aperti? Guarda l'ULTIMO segmento dell'id (il
+  // nome vero: 'deepseek/deepseek-v4-pro' → 'deepseek-v4-pro'), così il prefisso
+  // del fornitore non può far passare per aperto un modello che non lo è. PURA.
+  function isOpenWeightsModelId(modelId) {
+    const raw = String(modelId == null ? '' : modelId).toLowerCase().trim();
+    if (!raw) return false;
+    const name = raw.split('/').pop();
+    return OPEN_WEIGHT_MODEL_FAMILIES.some((fam) => {
+      const f = String(fam).toLowerCase();
+      return name === f || name.startsWith(f + '-') || name.startsWith(f + '.')
+        || name.startsWith(f + '_') || name.startsWith(f + ':');
+    });
+  }
+
+  // Una voce del registry è ammessa a interruttore acceso? La voce può
+  // dichiararlo da sé (`weights: 'open' | 'proprietary'`), così l'owner corregge
+  // una classificazione sbagliata dalla config condivisa senza rilasciare
+  // codice; in assenza di dichiarazione decide il nome del modello. In ogni caso
+  // un provider "diretto" del produttore non è mai ammesso. PURA.
+  function isOpenWeightsEntry(entry) {
+    const e = entry || {};
+    const provider = e.provider || (e.gemini ? 'gemini' : (e.openrouter ? 'openrouter' : ''));
+    if (PRODUCER_DIRECT_PROVIDERS.includes(provider)) return false;
+    const declared = String(e.weights == null ? '' : e.weights).toLowerCase().trim();
+    if (declared === 'open') return true;
+    if (declared === 'proprietary' || declared === 'closed') return false;
+    const model = e.model || e.openrouter || e.gemini || '';
+    return isOpenWeightsModelId(model);
+  }
+
+  // Un riferimento (nickname del registry o id grezzo legacy) è ammesso? PURA.
+  function isOpenWeightsRef(ref, registry) {
+    if (!ref) return false;
+    const entry = registry && registry[ref];
+    if (entry) return isOpenWeightsEntry(entry);
+    // Id grezzo legacy: non sappiamo da quale provider passerà, ma sappiamo che
+    // non è l'API diretta di un produttore (lì si usano i nomi corti). Decide
+    // il nome del modello.
+    if (isRawModelId(ref)) return isOpenWeightsModelId(ref);
+    return false;
+  }
+
+  // Sostituti a pesi aperti dei modelli predefiniti proprietari: nickname →
+  // nickname. Serve perché quasi tutte le funzioni nascono con un modello
+  // proprietario: senza sostituzione, accendere l'interruttore spegnerebbe
+  // mezza app invece di cambiarle modello.
+  // Le funzioni il cui modello NON ha un sostituto (sintesi vocale,
+  // indicizzazione, dettatura: nessun modello a pesi aperti che Filo sappia
+  // chiamare fa quel mestiere) si fermano e lo dicono. Mai un ripiego silenzioso
+  // su un modello proprietario: sarebbe l'interruttore che mente.
+  const OPEN_WEIGHTS_SUBSTITUTES = {
+    flash: 'gemma',
+    'flash-or': 'gemma',
+    'flash-lite': 'gemma-lite',
+    'flash-lite-or': 'gemma-lite',
+    'flash-lite-3': 'gemma-lite',
+    'flash-lite-3-or': 'gemma-lite',
+    'claude-haiku': 'deepseek',
+  };
+
+  // Fornitori esclusi in più quando l'interruttore è acceso. Anthropic non è
+  // nella lista base (la politica ammette i suoi modelli): qui ci finisce perché
+  // il punto dell'interruttore è poter rifiutare anche quella scelta.
+  const OPEN_WEIGHTS_EXTRA_EXCLUDED = ['Anthropic'];
+
+  // Lista di esclusione EFFETTIVA da usare per una richiesta. PURA.
+  function effectiveExcludedProviders(excluded, openWeightsOnly) {
+    const base = Array.isArray(excluded) ? excluded.slice() : [];
+    if (!openWeightsOnly) return base;
+    for (const x of OPEN_WEIGHTS_EXTRA_EXCLUDED) {
+      if (!base.some((b) => normalizeProviderName(b) === normalizeProviderName(x))) base.push(x);
+    }
+    return base;
+  }
+
+  // Cosa sanno masticare i sostituti, per nickname. Sta qui accanto alla tabella
+  // delle sostituzioni perché è la stessa curatela: il registry personale di chi
+  // usa Filo NON dichiara le capacità (le righe delle Opzioni hanno solo
+  // fornitore e stringa del modello), e dedurle dal nome sarebbe indovinare.
+  // Quello che non è scritto qui né dichiarato dalla voce vale "non lo
+  // sappiamo", e quello che non si sa non si sostituisce.
+  const OPEN_WEIGHTS_SUBSTITUTE_MODALITIES = {
+    gemma: { inputs: ['text', 'image'], outputs: ['text'] },
+    'gemma-lite': { inputs: ['text', 'image'], outputs: ['text'] },
+    deepseek: { inputs: ['text'], outputs: ['text'] },
+  };
+
+  // Modalità di una voce del registry, nella forma che SN_MODEL_CAPS legge dai
+  // metadati dei fornitori. Prima quelle dichiarate dalla voce (l'owner può
+  // correggerle dalla config condivisa), poi quelle note per il nickname.
+  // Ritorna null se non si sa: "non dichiarato" NON vuol dire "sa fare tutto".
+  // PURA.
+  function entryModalities(entry, nickname) {
+    const e = entry || {};
+    const known = OPEN_WEIGHTS_SUBSTITUTE_MODALITIES[nickname] || {};
+    const inputs = Array.isArray(e.inputs) ? e.inputs.filter(Boolean)
+      : (Array.isArray(known.inputs) ? known.inputs : null);
+    const outputs = Array.isArray(e.outputs) ? e.outputs.filter(Boolean)
+      : (Array.isArray(known.outputs) ? known.outputs : null);
+    if (!inputs && !outputs) return null;
+    return {
+      input_modalities: inputs && inputs.length ? inputs : ['text'],
+      output_modalities: outputs && outputs.length ? outputs : ['text'],
+    };
+  }
+
+  // Il sostituto sa fare il MESTIERE della funzione? La dettatura ha bisogno di
+  // ascoltare un audio, la lettura ad alta voce di produrne uno, l'indicizzazione
+  // di produrre vettori: infilarci un modello che macina solo testo non è una
+  // sostituzione, è la funzione che smette di funzionare con un errore
+  // qualunque. Chi ha acceso l'interruttore merita di sapere che quella funzione
+  // si ferma — è la stessa promessa del "mai un ripiego silenzioso", applicata
+  // alla capacità invece che ai pesi.
+  //
+  // DIFFIDENTE come il resto dell'interruttore: si sostituisce solo se il
+  // sostituto DICHIARA di saper fare quel mestiere. Capacità ignote = niente
+  // sostituzione (la funzione si ferma dicendolo, che è recuperabile; una
+  // sostituzione sbagliata no).
+  function substituteFitsAction(entry, action, nickname) {
+    const caps = global.SN_MODEL_CAPS;
+    const meta = entryModalities(entry, nickname);
+    if (!meta || !caps || typeof caps.modelMatchesAction !== 'function') return false;
+    const e = entry || {};
+    const res = caps.modelMatchesAction(e.provider || 'openrouter', e.model || '', action, meta);
+    return Boolean(res && res.ok);
+  }
+
+  // Perché una chiamata COSTRUITA A MANO (i pulsanti "Prova" delle Opzioni e
+  // della pagina di amministrazione: modello concreto, nessuna catena) non può
+  // partire con l'interruttore acceso. `entry` è la voce del registry — non solo
+  // fornitore e stringa del modello — così una classificazione corretta a mano
+  // dall'owner (`weights: 'open'`) vale qui come vale per le richieste vere.
+  // Ritorna '' se può partire, 'provider' se il fornitore è l'API di chi produce
+  // i modelli, 'model' se il modello non è a pesi aperti. PURA.
+  function openWeightsBlockKind(openWeightsOnly, entry) {
+    if (openWeightsOnly !== true) return '';
+    const e = entry || {};
+    if (PRODUCER_DIRECT_PROVIDERS.includes(e.provider)) return 'provider';
+    return isOpenWeightsEntry(e) ? '' : 'model';
+  }
+
+  // Applica l'interruttore a una catena di riferimenti: sostituisce i modelli
+  // proprietari col loro equivalente a pesi aperti (se il registry ce l'ha, se è
+  // davvero a pesi aperti e se sa fare il mestiere di `action`) e butta via
+  // quelli che restano proprietari.
+  // Ritorna { refs, substituted:[{from,to}], dropped:[ref] }. PURA.
+  function applyOpenWeightsPolicy(refs, registry, action) {
+    const reg = registry || {};
+    const out = [];
+    const substituted = [];
+    const dropped = [];
+    const seen = new Set();
+    for (const ref of refs || []) {
+      if (!ref) continue;
+      let use = ref;
+      if (!isOpenWeightsRef(ref, reg)) {
+        const alt = OPEN_WEIGHTS_SUBSTITUTES[ref];
+        // Il sostituto vale solo se esiste DAVVERO nel registry effettivo, se è
+        // davvero a pesi aperti e se fa il mestiere della funzione: una
+        // sostituzione verso un modello assente, proprietario o incapace sarebbe
+        // peggio del blocco, perché sembrerebbe funzionare.
+        if (alt && reg[alt] && isOpenWeightsEntry(reg[alt]) && substituteFitsAction(reg[alt], action, alt)) {
+          substituted.push({ from: ref, to: alt });
+          use = alt;
+        } else {
+          dropped.push(ref);
+          continue;
+        }
+      }
+      if (seen.has(use)) continue;
+      seen.add(use);
+      out.push(use);
+    }
+    return { refs: out, substituted, dropped };
+  }
+
+  // Effetto dell'interruttore sull'intera configurazione, per mostrarlo PRIMA di
+  // accenderlo: quali funzioni cambiano modello e quali restano senza. Ritorna
+  // { substituted: [{action, from, to}], unavailable: [{action, refs}] }. PURA.
+  function openWeightsImpact(models, registry) {
+    const substituted = [];
+    const unavailable = [];
+    for (const [action, value] of Object.entries(models || {})) {
+      const refs = parseModelRefs(value);
+      if (!refs.length) continue;
+      const res = applyOpenWeightsPolicy(refs, registry, action);
+      if (!res.refs.length) {
+        unavailable.push({ action, refs });
+        continue;
+      }
+      // Cambia modello se il PRIMARIO non è più quello di prima.
+      if (res.refs[0] !== refs[0]) substituted.push({ action, from: refs[0], to: res.refs[0] });
+    }
+    return { substituted, unavailable };
   }
 
   // Risolve un riferimento a un modello (nickname OPPURE id raw legacy stile
@@ -1185,6 +1453,7 @@
       `  • gestione_cookie: "manuale" | "automatico" | "privacy" [conferma]\n` +
       `  • fingerprint: "off" | "default" | "privacy" [conferma]  (anti-fingerprinting)\n` +
       `  • provider: "openrouter" | "gemini" [conferma] ; modelli_predefiniti: true | false [conferma]\n` +
+      `  • solo_pesi_aperti: true | false [conferma]  (spegne tutti i modelli proprietari, Anthropic compresa, e lascia solo modelli a pesi aperti serviti da fornitori indipendenti)\n` +
       `  • chiave_openrouter / chiave_gemini / chiave_tavily: la chiave API come testo [conferma]\n` +
       `  • limite_spesa: numero in euro (limite di spesa mensile) [conferma]\n` +
       `  • colore_tab: "più vivaci" | "più neutre" | "nessuno" | "più preciso" | "predefinito"  (colore identità delle tab: "vivaci"=tinte accese, "neutre"=tinte spente, "nessuno"=tab senza colore, "più preciso"=estrai meglio quando la tab prende il colore sbagliato es. "Poste è verde non gialla", "predefinito"=ripristina). I singoli parametri numerici si regolano dalle Preferenze avanzate.\n` +
@@ -1438,6 +1707,12 @@
     // impostare nulla. Le altre impostazioni modelli/chiavi restano nascoste
     // finché l'utente non disattiva questo switch dalle Opzioni.
     useDefaultModels: true,
+    // "Solo modelli a pesi aperti": quando true, Filo rifiuta OGNI modello
+    // proprietario — Anthropic compresa — e lavora solo con modelli a pesi
+    // aperti serviti da fornitori indipendenti. Vale anche con "usa modelli
+    // predefiniti" attivo (cioè con i crediti di Filo): è una scelta di chi usa
+    // Filo, non una preferenza che la config condivisa può scavalcare.
+    openWeightsOnly: false,
     apiKeys: {
       openrouter: '',
       gemini: '',
@@ -1457,6 +1732,9 @@
       'google/gemini-2.0-flash-001': { input: 0.10, output: 0.40 },
       'google/gemini-3.1-flash-lite-preview': { input: 0.25, output: 1.50 },
       'anthropic/claude-3.5-haiku': { input: 0.80, output: 4.00 },
+      'google/gemma-4-31b-it': { input: 0.10, output: 0.30 },
+      'google/gemma-4-26b-a4b-it': { input: 0.04, output: 0.12 },
+      'deepseek/deepseek-v4-pro': { input: 0.40, output: 0.80 },
     },
     // Limite hard mensile in EUR
     monthlyLimitEur: 5,
@@ -1786,6 +2064,20 @@
     normalizeProviderName,
     isProviderExcluded,
     providerIgnoreList,
+    PRODUCER_DIRECT_PROVIDERS,
+    OPEN_WEIGHT_MODEL_FAMILIES,
+    OPEN_WEIGHTS_SUBSTITUTES,
+    OPEN_WEIGHTS_SUBSTITUTE_MODALITIES,
+    OPEN_WEIGHTS_EXTRA_EXCLUDED,
+    isOpenWeightsModelId,
+    isOpenWeightsEntry,
+    isOpenWeightsRef,
+    entryModalities,
+    substituteFitsAction,
+    openWeightsBlockKind,
+    effectiveExcludedProviders,
+    applyOpenWeightsPolicy,
+    openWeightsImpact,
     DEPRECATED_MODELS,
     DEFAULT_PROVIDER,
     DEFAULT_SETTINGS,

@@ -76,14 +76,22 @@ html, body {
   color: var(--sn-link);
 }
 
-.sn-page button.sn-btn:hover { opacity: 0.85; }
+.sn-page button.sn-btn:hover:not(:disabled) { opacity: 0.85; }
+
+/* Bottone spento da una regola (non da un'attesa): deve VEDERSI che è spento,
+   altrimenti sembra un bottone rotto — ci si clicca sopra e non succede niente.
+   Il motivo per cui è spento sta nel suo hover nativo (title). */
+.sn-page button.sn-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 
 .sn-page button.sn-btn-secondary {
   background: transparent;
   color: var(--sn-fg);
   border: 1px solid var(--sn-border);
 }
-.sn-page button.sn-btn-secondary:hover { background: var(--sn-hover); }
+.sn-page button.sn-btn-secondary:hover:not(:disabled) { background: var(--sn-hover); }
 
 /* Variante "azione distruttiva" (es. ripristino completo delle impostazioni):
    bordo e testo rossi, sfondo trasparente finché non ci passi sopra. */
@@ -92,7 +100,7 @@ html, body {
   color: #c0392b;
   border: 1px solid #c0392b;
 }
-.sn-page button.sn-btn-danger:hover { background: rgba(192, 57, 43, 0.1); opacity: 1; }
+.sn-page button.sn-btn-danger:hover:not(:disabled) { background: rgba(192, 57, 43, 0.1); opacity: 1; }
 
 .sn-page .sn-row {
   display: flex;
@@ -352,6 +360,14 @@ html, body {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+/* Richiesta servita da un fornitore escluso dalla politica sui modelli (#461).
+   Sta accanto al nome di chi ha servito, perché è quel nome a essere il problema. */
+.sn-history-policy-warn {
+  margin-left: 8px;
+  color: var(--sn-error);
+  font-weight: 600;
 }
 
 /* Quota di testo in ingresso riusata da una richiesta precedente (#422).

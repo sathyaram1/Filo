@@ -1,16 +1,17 @@
 // explore.mjs — esplorazione AUTONOMA di Filo guidata da un LLM vision.
 //
-// Un agente (Gemini/Gemma) riceve screenshot compositi con badge numerati sugli
-// elementi cliccabili, decide la prossima azione, e segnala comportamenti
-// inattesi/indesiderati. Al termine scrive un report con le issue trovate.
+// Un agente (Gemma, pesi aperti, servito da un fornitore indipendente) riceve
+// screenshot compositi con badge numerati sugli elementi cliccabili, decide la
+// prossima azione, e segnala comportamenti inattesi/indesiderati. Al termine
+// scrive un report con le issue trovate.
 //
 // Uso:
-//   GEMINI_API_KEY=... node tests/agent/explore.mjs
-//   GEMINI_API_KEY=... node tests/agent/explore.mjs --model gemini-3.5-flash --steps 15
-//   GEMINI_API_KEY=... node tests/agent/explore.mjs --area "editor" --start filo://editor/editor.html
+//   OPENROUTER_API_KEY=... node tests/agent/explore.mjs
+//   OPENROUTER_API_KEY=... node tests/agent/explore.mjs --model google/gemma-4-26b-a4b-it --steps 15
+//   OPENROUTER_API_KEY=... node tests/agent/explore.mjs --area "editor" --start filo://editor/editor.html
 //
 // Opzioni:
-//   --model M     modello (default gemini-3.1-flash-lite)
+//   --model M     modello (default google/gemma-4-31b-it)
 //   --steps N     numero massimo di passi (default 12)
 //   --start URL   tab iniziale (default filo://newtab/)
 //   --area TXT    area/obiettivo su cui concentrarsi (libero)
@@ -25,48 +26,48 @@ import { pushIssue } from './feedback.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// Schema strutturato (responseSchema): vincola l'output → JSON sempre valido,
-// anche con modelli poco disciplinati come Gemma.
+// Schema strutturato (JSON Schema): vincola l'output → JSON sempre valido,
+// anche con modelli poco disciplinati sul formato.
 const SCHEMA = {
-  type: 'OBJECT',
+  type: 'object',
   properties: {
-    screen: { type: 'STRING' },
+    screen: { type: 'string' },
     issues: {
-      type: 'ARRAY',
+      type: 'array',
       items: {
-        type: 'OBJECT',
+        type: 'object',
         properties: {
-          severity: { type: 'STRING', enum: ['low', 'medium', 'high'] },
-          title: { type: 'STRING' },
-          detail: { type: 'STRING' },
-          area: { type: 'STRING' },
+          severity: { type: 'string', enum: ['low', 'medium', 'high'] },
+          title: { type: 'string' },
+          detail: { type: 'string' },
+          area: { type: 'string' },
         },
         required: ['severity', 'title'],
       },
     },
     action: {
-      type: 'OBJECT',
+      type: 'object',
       properties: {
-        kind: { type: 'STRING', enum: ['click_mark', 'type', 'key', 'scroll', 'navigate', 'open_tab', 'finish'] },
-        mark: { type: 'INTEGER' },
-        text: { type: 'STRING' },
-        key: { type: 'STRING' },
-        dy: { type: 'INTEGER' },
-        url: { type: 'STRING' },
-        reason: { type: 'STRING' },
+        kind: { type: 'string', enum: ['click_mark', 'type', 'key', 'scroll', 'navigate', 'open_tab', 'finish'] },
+        mark: { type: 'integer' },
+        text: { type: 'string' },
+        key: { type: 'string' },
+        dy: { type: 'integer' },
+        url: { type: 'string' },
+        reason: { type: 'string' },
       },
       required: ['kind'],
     },
-    why: { type: 'STRING' },
+    why: { type: 'string' },
   },
   required: ['screen', 'issues', 'action'],
 };
 
 function parseArgs(argv) {
-  // Primario: gemini-3.1-flash-lite ("il modello buono"). Fallback: gemma-4-31b-it
-  // (quota alta) quando il primario esaurisce i crediti (429) → si sfrutta prima
-  // il modello migliore, poi si continua col fallback.
-  const o = { model: 'gemini-3.1-flash-lite', fallback: 'gemma-4-31b-it', steps: 12, start: 'filo://newtab/', area: '', task: '', out: '', feedback: true, minSeverity: 'low' };
+  // Entrambi a pesi aperti e serviti da fornitori indipendenti (#461).
+  // Primario: Gemma 4 31B (vede le immagini meglio). Fallback: la variante più
+  // economica, quando il primario esaurisce i crediti (429).
+  const o = { model: 'google/gemma-4-31b-it', fallback: 'google/gemma-4-26b-a4b-it', steps: 12, start: 'filo://newtab/', area: '', task: '', out: '', feedback: true, minSeverity: 'low' };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--model') o.model = argv[++i];
@@ -131,10 +132,10 @@ URL interni utili:
 filo://newtab/ (dashboard), filo://editor/editor.html, filo://history/history.html,
 filo://options/options.html.`;
 
-// Finestra di screenshot tenuti nel contesto. I modelli AI Studio sono tariffati
-// a chiamata (non a token), quindi possiamo permetterci molti screenshot; cappiamo
-// a 20 solo per non far crescere il payload all'infinito su run molto lunghi.
-const IMG_WINDOW = 20;
+// Finestra di screenshot tenuti nel contesto. Qui si paga a token, quindi la
+// finestra conta davvero: 8 screenshot bastano a riconoscere "prima c'era, ora
+// non c'è" senza far esplodere il costo di un run lungo.
+const IMG_WINDOW = 8;
 
 // Mantiene le immagini solo negli ultimi IMG_WINDOW turni utente; quelli più
 // vecchi conservano il testo ma rilasciano l'immagine (sostituita da una nota).
@@ -160,10 +161,9 @@ async function run() {
   mkdirSync(shotsDir, { recursive: true });
   const allIssues = [];
   // Conversazione multi-turn COMPLETA: ogni passo aggiunge il turno utente
-  // (testo + screenshot) e il turno del modello. Così il modello vede TUTTI gli
-  // stati precedenti (utile per riconoscere "c'era contenuto, ora è sparito").
-  // I modelli AI Studio sono tariffati a chiamata, non a token → contesto lungo
-  // non costa di più.
+  // (testo + screenshot) e il turno del modello. Così il modello vede gli stati
+  // precedenti (utile per riconoscere "c'era contenuto, ora è sparito"); le
+  // immagini più vecchie di IMG_WINDOW passi vengono rilasciate.
   const convo = [];
   const logPath = join(o.out, 'log.txt');
   const log = (s) => { console.log(s); appendFileSync(logPath, s + '\n'); };
@@ -200,10 +200,7 @@ async function run() {
       let modelTurnText = '(risposta non valida)';
       for (let t = 0; t < 3 && !parsed; t++) {
         try {
-          // responseSchema serve a Gemma (poco disciplinato); sui modelli Gemini
-          // fa degenerare l'output in ripetizioni → per Gemini JSON mode semplice.
-          const useSchema = /gemma/i.test(activeModel) ? SCHEMA : undefined;
-          const out = await generate({ model: activeModel, system: SYSTEM, contents: convo, temperature: 0.2, schema: useSchema });
+          const out = await generate({ model: activeModel, system: SYSTEM, contents: convo, temperature: 0.2, schema: SCHEMA });
           parsed = extractJson(out);
           if (parsed) modelTurnText = JSON.stringify(parsed);
           else if (t === 2) {

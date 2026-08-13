@@ -1,89 +1,138 @@
-// Client minimale per Google AI Studio (Gemini / Gemma) con input immagine.
+// Client minimale per i modelli usati dagli strumenti di test agentici.
 //
-// La chiave si legge da GEMINI_API_KEY (o GOOGLE_AI_API_KEY). NON committare la
-// chiave: passala via env.
+// PERCHÉ NON GOOGLE (#461)
+//   Prima questo file parlava con Google AI Studio. Gemma ha i pesi aperti,
+//   quindi il MODELLO andava bene: era il fornitore a essere escluso dalla
+//   politica sui modelli di Filo, che vale anche per lo sviluppo di Filo stesso.
+//   Ora si passa da OpenRouter — che smista e non produce modelli — con la lista
+//   di esclusione dei produttori allegata a ogni richiesta, e si controlla chi ha
+//   DAVVERO servito la risposta: senza quel riscontro l'esclusione è una
+//   speranza. Di Gemini non resta niente: è proprietario e non ha sostituto
+//   ammesso.
 //
-// Modelli vision utili (free tier generoso su AI Studio):
-//   gemini-3.5-flash        capace, quota bassa (~20/g) — per run mirati
-//   gemini-3.1-flash-lite   buon compromesso (~500/g)
-//   gemma-4-31b-it          alta quota (~1500/g)
-//   gemma-4-26b-a4b-it      alta quota (~1500/g)
+// La chiave si legge da OPENROUTER_API_KEY. NON committarla: passala via env o
+// mettila in tests/agent/.env (gitignorato).
+//
+// Modelli utili (tutti a pesi aperti, serviti da fornitori indipendenti):
+//   google/gemma-4-31b-it        default — vede le immagini, buon compromesso
+//   google/gemma-4-26b-a4b-it    più economico, quota alta → run lunghi
+//   qwen/qwen3-vl-32b-instruct   alternativa vision
 
 import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 
-const ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
+const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+const ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
+
+// La politica sui fornitori è UNA SOLA e vive nel codice dell'app: qui la
+// importiamo invece di ricopiarla, così se l'owner aggiunge un escluso vale
+// subito anche per gli strumenti di test.
+require(join(__dirname, '..', '..', 'src', 'shared', 'constants.js'));
+const C = globalThis.SN_CONST;
+// Gli strumenti di test lavorano solo con modelli a pesi aperti: la lista
+// include quindi anche Anthropic (che quei modelli non li servirebbe comunque,
+// ma dichiararlo rende la regola leggibile).
+const EXCLUDED = C.effectiveExcludedProviders(C.DEFAULT_EXCLUDED_PROVIDERS, true);
+
 // Legge la chiave da env oppure da tests/agent/.env (gitignorato).
-// Formato .env: GEMINI_API_KEY=...
+// Formato .env: OPENROUTER_API_KEY=...
 export function getApiKey() {
-  let k = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY;
+  let k = process.env.OPENROUTER_API_KEY || process.env.FILO_DEFAULT_OPENROUTER_KEY;
   if (!k) {
     const envPath = join(__dirname, '.env');
     if (existsSync(envPath)) {
-      const m = readFileSync(envPath, 'utf8').match(/^\s*(?:GEMINI_API_KEY|GOOGLE_AI_API_KEY)\s*=\s*(.+)\s*$/m);
+      const m = readFileSync(envPath, 'utf8')
+        .match(/^\s*(?:OPENROUTER_API_KEY|FILO_DEFAULT_OPENROUTER_KEY)\s*=\s*(.+)\s*$/m);
       if (m) k = m[1].trim().replace(/^["']|["']$/g, '');
     }
   }
-  if (!k) throw new Error('Manca la chiave: imposta GEMINI_API_KEY o crea tests/agent/.env con GEMINI_API_KEY=...');
+  if (!k) {
+    throw new Error('Manca la chiave: imposta OPENROUTER_API_KEY o crea tests/agent/.env con OPENROUTER_API_KEY=...');
+  }
   return k;
 }
 
-const isGemma = (model) => /gemma/i.test(model);
-
 // Costruisce una part immagine da un file PNG (per i `contents` multi-turn).
+// Il formato interno resta quello "a parti" già usato dai chiamanti; la
+// traduzione nel formato del fornitore avviene in toApiMessages.
 export function imagePart(path) {
   return { inline_data: { mime_type: 'image/png', data: readFileSync(path).toString('base64') } };
+}
+
+// Traduce la conversazione interna ({role:'user'|'model', parts:[{text}|{inline_data}]})
+// nel formato messaggi standard, con le immagini come data URL.
+function toApiMessages(convo, system) {
+  const out = [];
+  if (system) out.push({ role: 'system', content: system });
+  for (const turn of convo) {
+    const role = turn.role === 'model' ? 'assistant' : 'user';
+    const parts = turn.parts || [];
+    const hasImage = parts.some((p) => p.inline_data);
+    if (!hasImage) {
+      out.push({ role, content: parts.map((p) => p.text || '').filter(Boolean).join('\n') });
+      continue;
+    }
+    const content = [];
+    for (const p of parts) {
+      if (p.inline_data) {
+        const mime = p.inline_data.mime_type || 'image/png';
+        content.push({ type: 'image_url', image_url: { url: `data:${mime};base64,${p.inline_data.data}` } });
+      } else if (p.text) {
+        content.push({ type: 'text', text: p.text });
+      }
+    }
+    out.push({ role, content });
+  }
+  return out;
+}
+
+// Chi ha DAVVERO servito la risposta. OpenRouter lo riporta nel campo
+// `provider`: è la controprova della lista di esclusione.
+function servedBy(json) {
+  return (json && (json.provider || json.served_by)) || '';
 }
 
 // Genera contenuto. Due modalità:
 //   - one-shot:    { user, imagePath }           → singolo turno utente
 //   - multi-turn:  { contents: [{role,parts}] }  → conversazione completa
-// `contents` ha precedenza. Se `schema` è dato, vincola l'output (responseSchema)
-// → JSON valido sia per Gemini sia per Gemma.
+// `contents` ha precedenza. Se `schema` è dato, si chiede output strutturato
+// (JSON Schema); se il modello/fornitore non lo supporta si ripiega su JSON
+// libero, che il chiamante sa comunque estrarre.
 export async function generate({ model, system, user, imagePath, contents, temperature = 0.4, apiKey, schema }) {
   apiKey = apiKey || getApiKey();
 
   let convo;
   if (Array.isArray(contents) && contents.length) {
-    // clone per non mutare il chiamante
     convo = contents.map((t) => ({ role: t.role, parts: t.parts.slice() }));
   } else {
     const parts = [{ text: user || '' }];
     if (imagePath) parts.push(imagePart(imagePath));
     convo = [{ role: 'user', parts }];
   }
-  // Gemma non supporta systemInstruction: fondiamo il system nel PRIMO turno utente.
-  if (isGemma(model) && system) {
-    const firstUser = convo.find((t) => t.role === 'user');
-    if (firstUser) {
-      const ti = firstUser.parts.findIndex((p) => typeof p.text === 'string');
-      if (ti >= 0) firstUser.parts[ti] = { text: `${system}\n\n---\n\n${firstUser.parts[ti].text}` };
-      else firstUser.parts.unshift({ text: system });
-    }
-  }
 
-  const body = {
-    contents: convo,
+  const baseBody = {
+    model,
+    messages: toApiMessages(convo, system),
+    temperature,
     // Cap moderato: i modelli piccoli a volte degenerano in ripetizioni dentro
     // una stringa; un cap basso fa fallire in fretta e il chiamante ritenta.
-    generationConfig: { temperature, maxOutputTokens: 2048 },
+    max_tokens: 2048,
+    // Politica sui fornitori: i produttori esclusi non devono servire la
+    // richiesta nemmeno quando il modello è a pesi aperti.
+    provider: { ignore: EXCLUDED },
   };
-  // systemInstruction solo su Gemini (Gemma lo riceve fuso nel testo).
-  if (!isGemma(model) && system) body.systemInstruction = { parts: [{ text: system }] };
-  // Output strutturato: lo schema vincola il decoder → niente prosa fuori formato.
-  if (schema) {
-    body.generationConfig.responseMimeType = 'application/json';
-    body.generationConfig.responseSchema = schema;
-  } else if (!isGemma(model)) {
-    body.generationConfig.responseMimeType = 'application/json';
-  }
 
-  const url = `${ENDPOINT}/${model}:generateContent?key=${apiKey}`;
+  const withFormat = schema
+    ? { ...baseBody, response_format: { type: 'json_schema', json_schema: { name: 'risposta', strict: false, schema } } }
+    : { ...baseBody, response_format: { type: 'json_object' } };
+
   const MAX = 5;
   let lastErr;
+  let body = withFormat;
   for (let attempt = 0; attempt < MAX; attempt++) {
     try {
       // Timeout esplicito: meglio fallire e ritentare che restare appesi.
@@ -91,13 +140,19 @@ export async function generate({ model, system, user, imagePath, contents, tempe
       const to = setTimeout(() => ctrl.abort(), 60_000);
       let res;
       try {
-        res = await fetch(url, {
+        res = await fetch(ENDPOINT, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+            'HTTP-Referer': 'https://github.com/sathyaram1/Filo',
+            'X-Title': 'Filo agent tests',
+          },
           body: JSON.stringify(body),
           signal: ctrl.signal,
         });
       } finally { clearTimeout(to); }
+
       if (res.status === 429 || res.status >= 500) { // rate limit / errore server → ritenta
         lastErr = new Error(`HTTP ${res.status} (quota/limite) su ${model}`);
         lastErr.status = res.status;
@@ -106,15 +161,34 @@ export async function generate({ model, system, user, imagePath, contents, tempe
       }
       if (!res.ok) {
         const t = await res.text();
+        // Output strutturato non supportato da questo modello/fornitore: si
+        // riprova senza, invece di rinunciare al run.
+        if (body.response_format && /response_format|json_schema|structured/i.test(t)) {
+          body = { ...baseBody };
+          lastErr = new Error(`HTTP ${res.status}: ${t.slice(0, 200)}`);
+          continue;
+        }
         throw new Error(`HTTP ${res.status}: ${t.slice(0, 300)}`);
       }
+
       const json = await res.json();
-      const cand = json.candidates?.[0];
-      const text = cand?.content?.parts?.map((p) => p.text).filter(Boolean).join('') || '';
+      // Controprova: se a servire è stato un escluso, il run si ferma. Un test
+      // che gira comunque su un fornitore escluso non è un test, è la politica
+      // aggirata con più passaggi.
+      const host = servedBy(json);
+      if (host && C.isProviderExcluded(host, EXCLUDED)) {
+        const e = new Error(`Fornitore ESCLUSO dalla politica sui modelli: "${host}". Richiesta annullata.`);
+        // Non è un guasto passeggero: ritentare rifarebbe lo stesso errore
+        // pagandolo di nuovo. Si ferma subito e si guarda perché è passato.
+        e.policy = true;
+        throw e;
+      }
+      const text = json.choices?.[0]?.message?.content || '';
       if (!text) throw new Error('risposta vuota: ' + JSON.stringify(json).slice(0, 300));
       return text;
     } catch (e) {
       lastErr = e;
+      if (e && e.policy) throw e; // violazione della politica: mai ritentata
       // errori di rete ("fetch failed", abort, ecc.) → backoff e ritenta
       if (attempt < MAX - 1) await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
     }
@@ -148,3 +222,6 @@ export async function ping(model, imagePath) {
   });
   return out;
 }
+
+// Esportata per i test: la lista di esclusione allegata a ogni richiesta.
+export const excludedProviders = EXCLUDED;
