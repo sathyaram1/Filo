@@ -223,9 +223,8 @@ module.exports = function register(on, ctx) {
       // prima del modello: chiedergli quale modello proverebbe non ha senso se
       // comunque non può essere interrogato.
       const s = await getEffectiveSettings();
-      const providerBlocked = openWeightsBlockReason(s, provider, '');
-      if (providerBlocked && SN_CONST.PRODUCER_DIRECT_PROVIDERS.includes(provider)) {
-        return { ok: false, error: providerBlocked };
+      if (s.openWeightsOnly === true && SN_CONST.PRODUCER_DIRECT_PROVIDERS.includes(provider)) {
+        return { ok: false, error: openWeightsBlockReason(s, provider, '') };
       }
       const model = (msg.model || '').trim() || await testModelFor(provider, s);
       if (!model) {
