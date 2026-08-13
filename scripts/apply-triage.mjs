@@ -446,6 +446,14 @@ function readSpool() {
       // (SOLO documenti di test, clientId "test:*"), e triage classico
       // (id + status, da queue-triage.mjs).
       if (entry && entry.op === 'backfill') return { file, entry };
+      // `worker-log`: una riga del registro dei worker (da scripts/dispatch.mjs).
+      // Passa da qui perché le macchine delle routine non hanno nessuna
+      // credenziale per scrivere su Firestore, e il registro nato dal percorso
+      // diretto è rimasto vuoto per sempre senza che nessuno protestasse (#451).
+      if (entry && entry.op === 'worker-log') {
+        if (!String(entry.role || '').trim()) return { file, error: 'worker-log senza ruolo' };
+        return { file, entry };
+      }
       if (entry && entry.op === 'delete') {
         if (!entry.id) return { file, error: 'delete senza id' };
         return { file, entry };
