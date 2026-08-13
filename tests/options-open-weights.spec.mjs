@@ -70,25 +70,48 @@ test('Opzioni: acceso, la «Prova» dei modelli esclusi è spenta (e quella degl
   const rows = page.locator('#defaultModelsList .sn-default-model-row:not(.sn-model-row-head)');
   await expect(rows.first()).toBeVisible({ timeout: 8_000 });
 
-  const provaDi = (nick) => page.locator('#defaultModelsList .sn-default-model-row')
-    .filter({ has: page.locator(`div:text-is("${nick}")`) })
-    .locator('button');
+  // Le righe sono la configurazione VERA (costanti + config condivisa, che
+  // cambia nel tempo): il test legge cosa c'è e verifica la regola su ogni riga,
+  // invece di fotografare i nomi dei modelli di oggi.
+  const leggiRighe = () => page.evaluate(() => {
+    const C = window.SN_CONST;
+    const out = [];
+    const rows = document.querySelectorAll('#defaultModelsList .sn-default-model-row:not(.sn-model-row-head)');
+    for (const row of rows) {
+      const celle = row.querySelectorAll('.sn-default-model-cell');
+      const provider = (celle[1]?.textContent || '').includes('Gemini') ? 'gemini' : 'openrouter';
+      const model = celle[2]?.textContent || '';
+      out.push({
+        nick: celle[0]?.textContent || '',
+        ammesso: C.isOpenWeightsEntry({ provider, model }) === true,
+        spento: row.querySelector('button')?.disabled === true,
+        stato: row.querySelector('.sn-model-row-status')?.textContent || '',
+      });
+    }
+    return out;
+  });
 
-  // Spento: si possono provare tutti.
-  await expect(provaDi('claude-haiku')).toBeEnabled();
-  await expect(provaDi('gemma')).toBeEnabled();
+  // Spento: si possono provare tutte.
+  const prima = await leggiRighe();
+  expect(prima.length).toBeGreaterThan(1);
+  expect(prima.filter((r) => r.spento)).toEqual([]);
 
   await page.check('#openWeightsOnly');
 
-  // Acceso: il modello di Anthropic e quelli serviti dal produttore non si
-  // provano più, e la riga dice perché.
-  await expect(provaDi('claude-haiku')).toBeDisabled();
-  await expect(provaDi('tts')).toBeDisabled();
-  await expect(page.locator('#defaultModelsList .sn-default-model-row')
-    .filter({ has: page.locator('div:text-is("claude-haiku")') })
-    .locator('.sn-model-row-status')).toContainText(/pesi aperti/i);
-  // Il modello a pesi aperti resta provabile: l'interruttore non spegne tutto.
-  await expect(provaDi('gemma')).toBeEnabled();
+  const dopo = await leggiRighe();
+  const esclusi = dopo.filter((r) => !r.ammesso);
+  const ammessi = dopo.filter((r) => r.ammesso);
+  expect(esclusi.length, 'fra i predefiniti deve esserci almeno un modello escluso').toBeGreaterThan(0);
+  expect(ammessi.length, 'fra i predefiniti deve esserci almeno un modello ammesso').toBeGreaterThan(0);
+  // Le righe escluse non si provano più, e dicono perché.
+  for (const r of esclusi) {
+    expect(r.spento, `«${r.nick}» è escluso ma la sua «Prova» è ancora premibile`).toBe(true);
+    expect(r.stato).toMatch(/pesi aperti/i);
+  }
+  // I modelli ammessi restano provabili: l'interruttore non spegne tutto.
+  for (const r of ammessi) {
+    expect(r.spento, `«${r.nick}» è ammesso ma la sua «Prova» è spenta`).toBe(false);
+  }
 
   // Anche la prova della chiave del produttore diretto resta spenta.
   await page.uncheck('#useDefaultModels');
