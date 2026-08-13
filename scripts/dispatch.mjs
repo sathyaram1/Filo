@@ -596,6 +596,7 @@ const ROLE_FILE = {
   prober: 'prober.md',
   halt: 'halt.md',
   idle: 'idle.md',
+  off: 'off.md',
 };
 
 export function readRoleInstructions(role) {
