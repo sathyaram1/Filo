@@ -985,6 +985,11 @@
       const title = (a._output && a._output.title) || '';
       return stepTrace(title ? `📄 Leggo: ${title}` : '📄 Leggo un file');
     }
+    if (type === 'LEGGI_TRASPARENZA') {
+      // Traccia del passo intermedio: Filo rilegge le scelte dell'owner messe
+      // per iscritto prima di rispondere sul perché di un modello o di un dato.
+      return stepTrace('📄 Rileggo la pagina di trasparenza');
+    }
     if (type === 'EVENTO_CALENDARIO') {
       const btn = document.createElement('button');
       btn.className = 'dash-action-btn';
