@@ -853,6 +853,8 @@
     $('testGemini').addEventListener('click', () => testProvider('gemini', $('testGeminiStatus'), $('testGemini')));
     $('addModelRow').addEventListener('click', () => {
       $('modelRegistryList').appendChild(makeModelRow('', {}));
+      // Riga nuova = "Prova" nuovo: passa dallo stesso cancello degli altri.
+      applyOpenWeightsTestGates();
     });
     // L'input dentro le righe del registry e i segmenti dei modelli (creati
     // dinamicamente) fanno bubbling del `change` fino a #page → già coperti.
