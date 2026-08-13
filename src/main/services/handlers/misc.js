@@ -9,28 +9,34 @@ require('../../../shared/feedbackThread.js');
 
 // ── "Salva immagine/video/audio come…" (#274, #400): byte scaricati nel main ─
 
-const IMG_DOWNLOAD_MAX = 64 * 1024 * 1024; // tetto anti-OOM (64MB)
-// Video e audio sono ordini di grandezza più grandi di un'immagine: col tetto a
-// 64MB un normale filmato di qualche minuto sarebbe stato rifiutato. Il file
-// viene comunque tenuto in memoria prima di scriverlo, quindi il tetto resta.
-const MEDIA_DOWNLOAD_MAX = 512 * 1024 * 1024; // 512MB
-
-// Scarica i byte di un'immagine presentando il Referer della pagina e i cookie
-// della session — l'unico modo, in Electron 33, di far arrivare il Referer a
-// valle (i download via webContents.downloadURL lo perdono SEMPRE, sia con
-// l'opzione { headers } sia riscrivendolo in onBeforeSendHeaders: verificato).
-// Usiamo http/https di Node invece di net.request perché la richiesta di un
-// download partita dal main viene bloccata (ERR_BLOCKED_BY_CLIENT) dal
-// webRequest della session; il salvataggio esplicito di un'immagine che l'utente
-// già vede non deve passare per l'ad/tracker-blocking. Risolve { buffer,
-// filename } o rigetta con un errore leggibile (HTTP 4xx/5xx, connessione
-// troncata, immagine vuota/troppo grande). Segue i redirect (max 5) ricalcolando
-// i cookie per l'host di destinazione, come farebbe un browser.
-async function fetchImageBytes({ url, referrer, session, kind = 'image' }) {
+// Scarica i byte di un'immagine/media presentando il Referer della pagina e i
+// cookie della session — l'unico modo, in Electron 33, di far arrivare il
+// Referer a valle (i download via webContents.downloadURL lo perdono SEMPRE,
+// sia con l'opzione { headers } sia riscrivendolo in onBeforeSendHeaders:
+// verificato). Usiamo http/https di Node invece di net.request perché la
+// richiesta di un download partita dal main viene bloccata
+// (ERR_BLOCKED_BY_CLIENT) dal webRequest della session; il salvataggio
+// esplicito di un'immagine che l'utente già vede non deve passare per
+// l'ad/tracker-blocking.
+//
+// #436 — I byte vanno DIRETTAMENTE SU DISCO man mano che arrivano, non in un
+// Buffer in memoria. Prima il file intero veniva accumulato in RAM prima di
+// scriverlo: serviva un tetto (64MB per le immagini, 512MB per i media) oltre il
+// quale il salvataggio si rifiutava, e anche sotto il tetto un filmato da
+// qualche centinaio di MB appesantiva tutta l'app. Scrivendo di continuo il
+// tetto non serve più — si salva quello che ci sta sul disco — e i byte
+// ricevuti diventano un dato di avanzamento da mostrare.
+//
+// Segue i redirect (max 5) ricalcolando i cookie per l'host di destinazione,
+// come farebbe un browser. Risolve { partPath, filename, totalBytes,
+// receivedBytes } o rigetta con un errore leggibile (HTTP 4xx/5xx, connessione
+// troncata, file vuoto).
+async function fetchToFile({ url, referrer, session, kind = 'image', onHeaders, onProgress, shouldStop }) {
   const MAX_REDIRECTS = 5;
   let target = url;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-    const res = await httpGetImage(target, referrer, session, kind); // eslint-disable-line no-await-in-loop
+    // eslint-disable-next-line no-await-in-loop
+    const res = await httpGetToFile(target, referrer, session, kind, { onHeaders, onProgress, shouldStop });
     if (res.redirect) {
       try { target = new URL(res.location, target).href; } catch (_) { throw new Error('redirect non valido'); }
       if (!/^https?:/i.test(target)) throw new Error('redirect non http');
@@ -41,14 +47,16 @@ async function fetchImageBytes({ url, referrer, session, kind = 'image' }) {
   throw new Error('troppi redirect');
 }
 
-// Una singola richiesta GET. Risolve { redirect:true, location } su 3xx, oppure
-// { buffer, filename } sul body completo; rigetta su errore/troncamento.
-async function httpGetImage(target, referrer, session, kind = 'image') {
+// Una singola richiesta GET. Risolve { redirect:true, location } su 3xx; oppure
+// scrive il body nel file indicato da onHeaders() e risolve a scrittura
+// conclusa. Rigetta su errore/troncamento.
+async function httpGetToFile(target, referrer, session, kind, hooks) {
   const isMedia = kind === 'video' || kind === 'audio';
-  const maxBytes = isMedia ? MEDIA_DOWNLOAD_MAX : IMG_DOWNLOAD_MAX;
   let u;
   try { u = new URL(target); } catch (_) { throw new Error('URL non valido'); }
   const mod = u.protocol === 'https:' ? require('node:https') : require('node:http');
+  const fs = require('node:fs');
+  const { pipeline } = require('node:stream');
 
   // Cookie della session per QUESTO host (immagini dietro login), come un browser.
   let cookieHeader = '';
@@ -67,48 +75,83 @@ async function httpGetImage(target, referrer, session, kind = 'image') {
   if (cookieHeader) headers.Cookie = cookieHeader;
 
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (fn, arg) => { if (settled) return; settled = true; fn(arg); };
+
     const req = mod.get(target, { headers }, (res) => {
       const status = res.statusCode || 0;
       if (status >= 300 && status < 400 && res.headers.location) {
         res.resume(); // scarta il body del redirect
-        resolve({ redirect: true, location: res.headers.location });
+        finish(resolve, { redirect: true, location: res.headers.location });
         return;
       }
-      if (status >= 400) { res.resume(); reject(new Error('HTTP ' + status)); return; }
+      if (status >= 400) { res.resume(); finish(reject, new Error('HTTP ' + status)); return; }
+
+      // Content-Length: è il dato che rende l'avanzamento una PERCENTUALE
+      // invece di un contatore di byte. Manca sui trasferimenti chunked, e lì
+      // la barra resta indeterminata — come per i download nativi.
       const expected = parseInt(res.headers['content-length'], 10);
-      const chunks = [];
-      let total = 0;
-      let aborted = false;
+      const total = Number.isFinite(expected) && expected > 0 ? expected : 0;
+      const filename = filenameFromHeaders(res.headers, target);
+
+      // Solo ORA sappiamo nome e dimensione: il chiamante li usa per aprire la
+      // voce nella barra e per decidere dove far crescere il file parziale.
+      let partPath;
+      try {
+        partPath = hooks.onHeaders({ filename, totalBytes: total });
+      } catch (e) {
+        res.resume();
+        try { req.destroy(); } catch (_) {}
+        finish(reject, e instanceof Error ? e : new Error('destinazione non disponibile'));
+        return;
+      }
+
+      let received = 0;
       res.on('data', (chunk) => {
-        if (aborted) return;
-        total += chunk.length;
-        if (total > maxBytes) {
-          aborted = true;
-          try { req.destroy(); } catch (_) {}
-          reject(new Error('file troppo grande'));
-        } else {
-          chunks.push(chunk);
+        received += chunk.length;
+        try { hooks.onProgress && hooks.onProgress(received, total); } catch (_) {}
+        // L'utente ha premuto "Annulla" nella barra: chiudi la connessione
+        // invece di continuare a consumare rete e disco.
+        if (hooks.shouldStop && hooks.shouldStop()) {
+          try { req.destroy(new Error('annullato')); } catch (_) {}
         }
       });
-      res.on('end', () => {
-        if (aborted) return;
+
+      const out = fs.createWriteStream(partPath);
+      pipeline(res, out, (err) => {
+        if (err) { finish(reject, err instanceof Error ? err : new Error('download interrotto')); return; }
         // Connessione chiusa prima della fine del body (res.complete=false) o
         // Content-Length dichiarato ma non raggiunto ⇒ risposta troncata: è un
         // errore, non un file valido (niente più silenzio sul download a metà).
-        if (!res.complete || (Number.isFinite(expected) && total < expected)) {
-          reject(new Error('download interrotto'));
+        if (!res.complete || (total && received < total)) {
+          finish(reject, new Error('download interrotto'));
           return;
         }
-        const buffer = Buffer.concat(chunks);
-        if (!buffer.length) { reject(new Error('file vuoto')); return; }
-        resolve({ buffer, filename: filenameFromHeaders(res.headers, target) });
+        if (!received) { finish(reject, new Error('file vuoto')); return; }
+        finish(resolve, { partPath, filename, totalBytes: total || received, receivedBytes: received });
       });
-      res.on('error', (e) => { if (!aborted) reject(e || new Error('errore risposta')); });
-      res.on('aborted', () => { if (!aborted) reject(new Error('download interrotto')); });
     });
-    req.on('error', (e) => reject(e || new Error('richiesta fallita')));
+    req.on('error', (e) => finish(reject, e || new Error('richiesta fallita')));
+    // Timeout di INATTIVITÀ (si riarma a ogni byte): un file da un'ora è
+    // legittimo, mezzo minuto di silenzio assoluto no.
     req.setTimeout(30000, () => { try { req.destroy(new Error('timeout')); } catch (_) {} });
   });
+}
+
+// Sposta il file finito dalla sua posizione di lavoro alla destinazione scelta.
+// Quasi sempre è una rinomina istantanea (stesso volume); se l'utente ha scelto
+// un altro disco/chiavetta la rinomina non è possibile e si copia — comunque a
+// blocchi, mai passando dalla memoria.
+async function moveInto(from, to) {
+  const fs = require('node:fs');
+  try {
+    await fs.promises.rename(from, to);
+    return;
+  } catch (e) {
+    if (!e || (e.code !== 'EXDEV' && e.code !== 'EPERM' && e.code !== 'EACCES')) throw e;
+  }
+  await fs.promises.copyFile(from, to);
+  try { await fs.promises.unlink(from); } catch (_) {}
 }
 
 // Nome file dal Content-Disposition (se presente), altrimenti dal path dell'URL.
