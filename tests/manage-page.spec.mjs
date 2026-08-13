@@ -150,7 +150,7 @@ test('lo switch attiva/disattiva la modalità automatica e lo stato persiste', a
   // che è in posizione assoluta: mezzo interruttore, per settimane. Qui si
   // asserisce la GEOMETRIA, che è ciò che era rotto.
   const geom = await page.evaluate(() => {
-    const r = document.querySelector('.mg-switch-track').getBoundingClientRect();
+    const r = document.querySelector('#mgAutoToggle + .mg-switch-track').getBoundingClientRect();
     return { w: r.width, h: r.height };
   });
   expect(geom.w).toBeGreaterThan(20);
