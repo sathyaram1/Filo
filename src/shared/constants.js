@@ -804,12 +804,19 @@
       if (!ref) continue;
       let use = ref;
       if (!isOpenWeightsRef(ref, reg)) {
-        const alt = OPEN_WEIGHTS_SUBSTITUTES[ref];
-        // Il sostituto vale solo se esiste DAVVERO nel registry effettivo, è
-        // davvero a pesi aperti e sa fare il mestiere della funzione: una
-        // sostituzione verso un modello assente, proprietario o incapace
-        // sarebbe peggio del blocco, perché sembrerebbe funzionare.
-        if (alt && reg[alt] && isOpenWeightsEntry(reg[alt]) && substituteFitsAction(reg[alt], action)) {
+        // Prima il sostituto generico del modello, poi — se quello il mestiere
+        // di questa funzione non lo sa fare — quello previsto per il mestiere.
+        // Un sostituto vale solo se esiste DAVVERO nel registry effettivo, è
+        // davvero a pesi aperti e sa fare quel mestiere: una sostituzione verso
+        // un modello assente, proprietario o incapace sarebbe peggio del blocco,
+        // perché sembrerebbe funzionare.
+        const candidati = [
+          OPEN_WEIGHTS_SUBSTITUTES[ref],
+          action ? OPEN_WEIGHTS_SUBSTITUTES_BY_ACTION[action] : '',
+        ];
+        const alt = candidati.find((a) => a && reg[a] && isOpenWeightsEntry(reg[a])
+          && substituteFitsAction(reg[a], action));
+        if (alt) {
           substituted.push({ from: ref, to: alt });
           use = alt;
         } else {
