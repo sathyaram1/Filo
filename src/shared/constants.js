@@ -778,6 +778,17 @@
     return Boolean(res && res.ok);
   }
 
+  // Perché una chiamata COSTRUITA A MANO (i pulsanti "Prova" delle Opzioni e
+  // della pagina di amministrazione: modello concreto, nessuna catena) non può
+  // partire con l'interruttore acceso.
+  // Ritorna '' se può partire, 'provider' se il fornitore è l'API di chi produce
+  // i modelli, 'model' se il modello non è a pesi aperti. PURA.
+  function openWeightsBlockKind(openWeightsOnly, provider, model) {
+    if (openWeightsOnly !== true) return '';
+    if (PRODUCER_DIRECT_PROVIDERS.includes(provider)) return 'provider';
+    return isOpenWeightsEntry({ provider, model }) ? '' : 'model';
+  }
+
   // Applica l'interruttore a una catena di riferimenti: sostituisce i modelli
   // proprietari col loro equivalente a pesi aperti (se il registry ce l'ha, se è
   // davvero a pesi aperti e se sa fare il mestiere di `action`) e butta via
