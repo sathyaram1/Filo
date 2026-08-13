@@ -1,7 +1,0 @@
-{
-  "id": "1179a8bc-f935-40d4-9114-3bad5c07fe6f",
-  "status": "done",
-  "notes": "Il controllo di prontezza era già stato riparato da una routine il 12 agosto: quando l'hai scritto era rotto, ora funziona.\n\nHo aggiunto la parte che mancava: risponde con i codici previsti dal contratto, compreso uno nuovo per «le routine le hai spente tu». Senza quello, uno spegnimento voluto sarebbe sembrato un guasto da riparare.",
-  "queuedAt": "2026-08-13T17:59:06.264Z",
-  "queuedBy": "routine"
-}
