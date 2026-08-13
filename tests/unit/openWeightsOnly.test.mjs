@@ -73,6 +73,34 @@ test('senza equivalente la catena resta VUOTA: mai un ripiego su un modello prop
   assert.deepEqual(mixed.dropped, ['tts']);
 });
 
+test('il sostituto deve saper fare il MESTIERE della funzione, non solo avere i pesi aperti', () => {
+  // Dettatura: serve un modello che ASCOLTI un audio. I sostituti a pesi aperti
+  // leggono solo testo (e immagini): sostituire qui vorrebbe dire consegnare una
+  // funzione che fallisce con un errore qualunque — un ripiego silenzioso come
+  // gli altri, solo con un finale diverso. Deve fermarsi e dirlo.
+  const dettatura = C.applyOpenWeightsPolicy(
+    C.parseModelRefs(C.DEFAULT_MODELS[A.TRANSCRIBE_AUDIO]), REG, A.TRANSCRIBE_AUDIO,
+  );
+  assert.deepEqual(dettatura.refs, [], 'la dettatura non può finire su un modello che l\'audio non lo sente');
+  assert.deepEqual(dettatura.substituted, []);
+  assert.ok(dettatura.dropped.length);
+
+  // Le funzioni che leggono immagini invece continuano: i sostituti dichiarano
+  // di saperlo fare, quindi fermarle sarebbe un danno gratuito.
+  const immagini = C.applyOpenWeightsPolicy(
+    C.parseModelRefs(C.DEFAULT_MODELS[A.DESCRIBE_IMAGE]), REG, A.DESCRIBE_IMAGE,
+  );
+  assert.ok(immagini.refs.length, 'la descrizione immagini ha un equivalente aperto e deve restare viva');
+
+  // Capacità non dichiarate = non sappiamo = non si sostituisce.
+  const reg = { ...REG, ignoto: { provider: 'openrouter', model: 'acme/qualcosa', weights: 'open' } };
+  assert.equal(C.substituteFitsAction(reg.ignoto, A.EXPLAIN), false);
+  assert.equal(C.substituteFitsAction(REG.gemma, A.EXPLAIN), true);
+  assert.equal(C.substituteFitsAction(REG.gemma, A.TRANSCRIBE_AUDIO), false);
+  assert.equal(C.substituteFitsAction(REG.gemma, A.TTS), false);
+  assert.equal(C.substituteFitsAction(REG.gemma, A.ARCHIVE_EMBED), false);
+});
+
 test('NESSUNA funzione predefinita resta con un modello proprietario a interruttore acceso', () => {
   const colpevoli = [];
   for (const [action, value] of Object.entries(C.DEFAULT_MODELS)) {
