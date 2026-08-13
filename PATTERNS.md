@@ -248,6 +248,40 @@ cui Filo usa — o volutamente NON usa — un modello, con `from`:
   censito come impostabile abbia davvero il suo campo e che gli altri siano
   elencati con il loro "dove si imposta".
 
+## Un interruttore che promette una garanzia non ha ripieghi silenziosi
+
+"Solo modelli a pesi aperti" (#461) spegne tutti i modelli proprietari. Un
+interruttore così non è una preferenza estetica: è una **garanzia**, e una
+garanzia vale solo se regge anche quando le cose vanno male. Il pattern, valido
+per qualunque interruttore che prometta "questa cosa non succederà":
+
+- **Sostituisci, non spegnere.** Se quasi tutte le funzioni nascono col modello
+  che l'interruttore vieta, spegnerlo e basta spegne mezza app: ogni funzione
+  passa all'equivalente ammesso (`OPEN_WEIGHTS_SUBSTITUTES` in `constants.js`).
+- **Diffidente per costruzione.** Ciò che non si sa classificare vale come
+  vietato. Ammettere l'ignoto trasforma la garanzia in una promessa a caso.
+- **Niente ripiego verso ciò che l'interruttore vieta.** La catena di fallback
+  viene POTATA prima di partire (`applyOpenWeightsPolicy` dentro
+  `buildAttemptChain`): i tentativi vietati non esistono, quindi non possono
+  scattare quando il sostituto non risponde. Se non resta niente, la funzione si
+  ferma con un errore che la nomina — **mai** un ripiego zitto.
+- **Dichiara l'effetto PRIMA.** Le Opzioni dicono quante funzioni cambiano
+  modello e **quali si fermano**, calcolato sulla configurazione vera
+  (`openWeightsImpact`). Scoprirlo usando l'app è il modo peggiore.
+- **Verifica a posteriori, non solo a priori.** L'esclusione a monte è una
+  speranza finché non si guarda **chi ha davvero servito** la risposta
+  (`servedBy`): se risulta escluso, toast + voce di cronologia marchiata.
+- **Vale anche dove decide qualcun altro.** L'interruttore sta sopra la config
+  condivisa (crediti di Filo) e allunga la lista di esclusione con Anthropic: il
+  punto è poter rifiutare anche la scelta dell'owner.
+- **Test:** `tests/unit/openWeightsOnly.test.mjs` (parte pura),
+  `tests/open-weights-only.spec.mjs` (catena reale costruita dall'app),
+  `tests/options-open-weights.spec.mjs` (l'interruttore e cosa dichiara).
+
+La stessa politica vale per gli strumenti che testano Filo
+(`tests/agent/llm.mjs`): stessa lista di esclusione dell'app — importata, non
+ricopiata — e stesso controllo su chi ha servito.
+
 ## Richieste ambigue: Filo applica subito + offre un controllo per raffinare
 
 Quando l'utente chiede in chat una modifica con un valore "giusto" non univoco

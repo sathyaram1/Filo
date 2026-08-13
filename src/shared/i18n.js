@@ -171,6 +171,8 @@
     // funzione, poi dove si imposta.
     err_no_model_for_action: 'Nessun modello impostato per «%s»: questa funzione resta ferma finché non ne scegli uno. %s',
     err_unknown_model_for_action: '«%s» usa un modello che non esiste (%s): forse è stato rinominato o eliminato. %s',
+    err_open_weights_only_no_model:
+      '«%s» è ferma: hai scelto solo modelli a pesi aperti e per questa funzione non ce n\'è uno equivalente (%s). Puoi assegnarle un modello a pesi aperti in Opzioni → Modelli per azione, oppure spegnere «Solo modelli a pesi aperti».',
     err_model_where_own: 'Lo imposti in Opzioni → Modelli per azione.',
     err_model_where_default: 'Stai usando i modelli predefiniti: apri Opzioni, togli «Usa modelli predefiniti» e scegli il modello per questa funzione.',
 
@@ -197,6 +199,8 @@
     toast_nothing_to_translate: 'Non ho trovato testo da tradurre in questa pagina',
     toast_original_restored: 'Originale ripristinato',
     toast_clipboard_empty: 'Cronologia appunti vuota',
+    toast_open_weights_violated:
+      'Hai scelto solo modelli a pesi aperti, ma questa risposta è arrivata da «%s», che è escluso. Segnalalo: la lista di esclusione va aggiornata.',
     toast_pasted_image: 'Immagine incollata',
     toast_image_saved: 'Immagine salvata',
     toast_image_save_failed: 'Non sono riuscito a salvare l\'immagine',
@@ -214,6 +218,11 @@
     options_use_default_models: 'Usa modelli predefiniti',
     options_use_default_models_desc:
       'Filo funziona subito con modelli e chiavi predefiniti, senza configurare nulla. Disattiva per usare le tue chiavi e scegliere i tuoi modelli.',
+    options_open_weights_only: 'Solo modelli a pesi aperti',
+    options_open_weights_only_desc:
+      'Spegne tutti i modelli proprietari — Anthropic compresa — e lascia lavorare solo modelli a pesi aperti serviti da fornitori indipendenti. Vale anche con i modelli predefiniti. Le funzioni che partivano da un modello proprietario passano al suo equivalente aperto; quelle senza equivalente si fermano e lo dicono, invece di tornare di nascosto su un modello proprietario.',
+    options_open_weights_switched: 'Cambiano modello %s funzioni, che passano a: %s',
+    options_open_weights_unavailable: 'Si fermano (nessun equivalente a pesi aperti): %s',
     options_keys: 'Chiavi API',
     options_api_key: 'API key',
     options_models: 'Modelli per azione',
@@ -534,6 +543,7 @@
     history_reuse: 'riuso %s%',
     history_reuse_title: '%s token su %s riusati da una richiesta precedente invece di essere rielaborati: costano meno e la risposta arriva prima.',
     history_reuse_none_title: 'Nessuna parte di questa richiesta (%s token) è stata riusata da una richiesta precedente: è stata rielaborata tutta.',
+    history_policy_violation: '⚠ fornitore escluso',
     history_clear_confirm: 'Cancellare definitivamente tutta la cronologia AI?',
     history_empty: 'Nessuna interazione AI registrata.',
     history_no_results: 'Nessun risultato per la ricerca.',

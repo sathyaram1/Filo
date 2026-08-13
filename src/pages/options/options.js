@@ -43,6 +43,8 @@
     $('title').textContent = I18n.t('options_title');
     $('useDefaultModels-label').textContent = I18n.t('options_use_default_models');
     $('useDefaultModels-desc').textContent = I18n.t('options_use_default_models_desc');
+    $('openWeightsOnly-label').textContent = I18n.t('options_open_weights_only');
+    $('openWeightsOnly-desc').textContent = I18n.t('options_open_weights_only_desc');
     $('h-provider').textContent = I18n.t('options_keys');
     $('h-models').textContent = I18n.t('options_models');
     $('h-costs').textContent = I18n.t('options_costs');
@@ -124,6 +126,75 @@
     $('defaultModelsList').hidden = !useDefault;
   }
 
+  // ── "Solo modelli a pesi aperti": cosa cambia davvero ─────────────────────
+  // Un interruttore che promette e basta non si può verificare. Appena acceso
+  // qui sotto compare quante funzioni cambiano modello (e su quali finiscono) e
+  // QUALI si fermano perché un equivalente a pesi aperti non esiste — spegnerlo
+  // rimette tutto com'era, quindi la conseguenza si legge sul posto invece di
+  // scoprirla usando l'app.
+  // Sorgente: la configurazione che l'app userà DAVVERO (quella condivisa se
+  // "usa modelli predefiniti" è attivo, la personale altrimenti).
+
+  // Ultima configurazione predefinita letta dal main ({ models, modelRegistry }).
+  let defaultModelsPublic = null;
+
+  function effectiveModelConfig() {
+    if ($('useDefaultModels').checked) {
+      return defaultModelsPublic || { models: {}, modelRegistry: {} };
+    }
+    return {
+      models: ModelChain.collect(modelChains || {}),
+      modelRegistry: collectModelRegistry().registry,
+    };
+  }
+
+  function actionLabelFor(action) {
+    const row = (ModelChain.actionLabels() || []).find(([a]) => a === action);
+    return row ? I18n.t(row[1]) : action;
+  }
+
+  function renderOpenWeightsImpact() {
+    const host = $('openWeightsImpact');
+    if (!host) return;
+    // Il fornitore diretto del produttore resta spento a interruttore acceso:
+    // il suo pulsante "Prova" manderebbe una richiesta proprio dove l'utente ha
+    // chiesto che non ne arrivino (il main la rifiuta comunque).
+    const testGemini = $('testGemini');
+    if (testGemini) testGemini.disabled = $('openWeightsOnly').checked;
+
+    host.innerHTML = '';
+    if (!$('openWeightsOnly').checked) { host.hidden = true; return; }
+
+    const C = window.SN_CONST;
+    const { models, modelRegistry } = effectiveModelConfig();
+    if (!C || typeof C.openWeightsImpact !== 'function' || !Object.keys(models || {}).length) {
+      host.hidden = true;
+      return;
+    }
+    const impact = C.openWeightsImpact(models, modelRegistry);
+    const lines = [];
+    if (impact.substituted.length) {
+      // Le funzioni che cambiano modello sono decine: elencarle una per una
+      // sarebbe un muro di testo che nessuno legge. Quello che serve sapere è
+      // quante sono e su quali modelli finiscono; l'elenco per funzione è già
+      // la griglia dei modelli qui sotto.
+      const modelli = [...new Set(impact.substituted.map((s) => s.to))];
+      lines.push(I18n.t('options_open_weights_switched', String(impact.substituted.length), modelli.join(', ')));
+    }
+    if (impact.unavailable.length) {
+      const names = impact.unavailable.map((u) => actionLabelFor(u.action));
+      lines.push(I18n.t('options_open_weights_unavailable', names.join(', ')));
+    }
+    if (!lines.length) { host.hidden = true; return; }
+
+    for (const line of lines) {
+      const p = document.createElement('p');
+      p.textContent = line;
+      host.appendChild(p);
+    }
+    host.hidden = false;
+  }
+
   // ── Lista read-only dei modelli predefiniti con tasto "Prova" ─────────────
   // Quando useDefaultModels è ON, mostra i modelli del registry predefinito
   // (costanti o override Firestore) con un pulsante "Prova" che testa il
@@ -133,9 +204,15 @@
     let registry = {};
     try {
       const r = await chrome.runtime.sendMessage({ type: MSG.DEFAULT_MODELS_PUBLIC });
-      if (r && r.ok && r.modelRegistry) registry = r.modelRegistry;
+      if (r && r.ok && r.modelRegistry) {
+        registry = r.modelRegistry;
+        defaultModelsPublic = { models: r.models || {}, modelRegistry: registry };
+      }
     } catch (_) {}
     renderDefaultModels(registry);
+    // L'effetto dell'interruttore si calcola sulla config VERA: ora che è
+    // arrivata, ricalcolalo.
+    renderOpenWeightsImpact();
   }
 
   function renderDefaultModels(registry) {
@@ -224,6 +301,7 @@
     window.SN_PAGE_BOOTSTRAP.applyTheme(settings.theme);
 
     $('useDefaultModels').checked = settings.useDefaultModels !== false;
+    $('openWeightsOnly').checked = settings.openWeightsOnly === true;
     // Lista read-only dei modelli predefiniti. Deve mostrare i modelli che l'app
     // userà DAVVERO: li chiediamo al main (config condivisa + eventuali
     // modifiche dell'owner). Se la richiesta non riesce la lista resta vuota
@@ -265,6 +343,11 @@
     seedDatalistsFromRegistry(settings.modelRegistry || {});
     ensureProviderModels('gemini');
     ensureProviderModels('openrouter');
+
+    // Con la config personale l'effetto è calcolabile subito (griglia e registry
+    // sono già renderizzati); con quella condivisa lo ricalcola loadDefaultModels
+    // appena il main risponde.
+    renderOpenWeightsImpact();
   }
 
   // Normalizza una entry del registry (nuovo schema o vecchio duale) in
@@ -660,6 +743,7 @@
 
     const partial = {
       useDefaultModels: $('useDefaultModels').checked,
+      openWeightsOnly: $('openWeightsOnly').checked,
       apiKeys: { openrouter: apiKey, gemini: apiKeyGemini, tavily: apiKeyTavily },
       modelRegistry: registry,
       models: ModelChain.collect(modelChains),
@@ -716,6 +800,9 @@
     // subito. I controlli testuali salvano allo `change` (cioè al blur), gli
     // altri (select/checkbox) immediatamente.
     $('page').addEventListener('change', () => saveDebounced());
+    // Qualunque cosa cambi (interruttore, modelli per azione, registry) può
+    // cambiare l'effetto di "solo pesi aperti": lo ricalcoliamo sempre.
+    $('page').addEventListener('change', renderOpenWeightsImpact);
     $('useDefaultModels').addEventListener('change', applyDefaultModelsVisibility);
     $('loadModels').addEventListener('click', loadModelsFromProvider);
     $('testOpenrouter').addEventListener('click', () => testProvider('openrouter', $('testOpenrouterStatus'), $('testOpenrouter')));
