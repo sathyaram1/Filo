@@ -280,6 +280,19 @@ module.exports = function register(on, ctx) {
       if (providerRefusal) return { ok: false, error: providerRefusal };
       const model = (msg.model || '').trim() || await testModelFor(provider, s);
       if (!model) {
+        // Con l'interruttore acceso può non restare nessun modello ammesso per
+        // la prova. In quel caso il motivo è l'interruttore, non
+        // un'impostazione mancante: risolvere di nuovo senza la politica dice
+        // quale dei due, così l'utente non va a cercare un modello che c'è.
+        const senzaPolitica = s.openWeightsOnly === true
+          ? await testModelFor(provider, { ...s, openWeightsOnly: false })
+          : '';
+        if (senzaPolitica) {
+          return {
+            ok: false,
+            error: `Hai scelto solo modelli a pesi aperti: il modello previsto per le prove («${senzaPolitica}») è proprietario e non ha un equivalente aperto. Assegnane uno a «Prova di un fornitore» fra le funzioni delle Opzioni, oppure spegni l'interruttore.`,
+          };
+        }
         return {
           ok: false,
           error: `Nessun modello ${provider} impostato per la prova: scegline uno in «Prova di un fornitore», fra le funzioni delle Opzioni.`,
