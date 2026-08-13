@@ -775,7 +775,10 @@
     const gemKey = $('apiKeyGemini').value.trim();
     const errors = [];
     let total = 0;
-    if (gemKey) {
+    if (catalogBlocked('gemini')) {
+      // Chiesto a mano: il silenzio sembrerebbe un guasto. Dice perché non parte.
+      errors.push(`Gemini: ${I18n.t('options_open_weights_catalog_blocked')}`);
+    } else if (gemKey) {
       try {
         const ids = await fetchGeminiModels(gemKey);
         providerModelCache.gemini = ids;
