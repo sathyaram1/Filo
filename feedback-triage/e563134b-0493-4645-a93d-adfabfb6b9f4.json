@@ -1,7 +1,0 @@
-{
-  "id": "e563134b-0493-4645-a93d-adfabfb6b9f4",
-  "status": "done",
-  "notes": "Fatto: il registro si riempie davvero. Le righe passano ora dalla coda su git e le scrive l'automatismo che ha le credenziali, invece del dispatcher che non le ha mai avute — era quello il motivo per cui non è mai comparsa una riga.\n\nSe una riga non riesce a partire non si perde e non sparisce in silenzio: resta in coda, viene ritentata al giro dopo e il motivo resta scritto nel log della sessione.\n\nDa sapere: una riga compare uno o due minuti dopo l'avvio del worker, non all'istante — è il tempo che l'automatismo ci mette ad applicarla.",
-  "queuedAt": "2026-08-13T17:59:27.405Z",
-  "queuedBy": "routine"
-}
