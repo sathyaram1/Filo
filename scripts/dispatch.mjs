@@ -627,7 +627,7 @@ function diffForBranch(branch) {
  * il contenuto è stato messo da parte (feedback #462). Stessa base di confronto
  * di `diffForBranch` — lo stato REMOTO di main, mai il ref locale.
  */
-function branchIsEmpty(branch) {
+export function branchIsEmpty(branch) {
   if (!branch) return false;
   tryGit(['fetch', 'origin', MAIN_BRANCH]);
   const base = tryGit(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${MAIN_BRANCH}`]).ok
