@@ -733,6 +733,19 @@
     return (provider === 'gemini' ? $('apiKeyGemini') : $('apiKey')).value.trim();
   }
 
+  // Il catalogo è "solo metadati", ma resta una richiesta MANDATA al fornitore
+  // con la tua chiave — e questa pagina la faceva da sola al caricamento. Con
+  // «Solo modelli a pesi aperti» acceso l'API diretta di chi produce i modelli
+  // era l'ultima cosa che partiva verso un escluso da qui: sta spenta come il
+  // suo «Prova», altrimenti la pagina dove si accende l'interruttore sarebbe
+  // anche l'unica che continua a parlarci.
+  function catalogBlocked(provider) {
+    if (!$('openWeightsOnly').checked) return false;
+    const C = window.SN_CONST;
+    const diretti = (C && C.PRODUCER_DIRECT_PROVIDERS) || ['gemini'];
+    return diretti.includes(provider);
+  }
+
   // Carica (una sola volta) il catalogo di un provider nel suo combobox, così
   // ogni modello è subito etichettato per categoria. È solo metadati (gratis):
   //  - OpenRouter: catalogo pubblico → si carica SEMPRE, anche senza chiave.
@@ -741,6 +754,7 @@
   // Silenzioso: in caso di errore il campo resta un input libero.
   async function ensureProviderModels(provider) {
     if (providerModelCache[provider]) return;
+    if (catalogBlocked(provider)) return;
     const key = providerKey(provider);
     if (provider === 'gemini' && !key) return;
     try {
