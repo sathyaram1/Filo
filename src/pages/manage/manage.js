@@ -458,7 +458,7 @@
     return Math.min(AUTOMATION.LOOP_CAP_MAX, Math.max(AUTOMATION.LOOP_CAP_MIN, n));
   }
 
-  // Fonte di verità: il doc Firestore config/automation (campo loopCap), che le
+  // Fonte di verità: il doc Firestore config/routines (campo loopCap), che le
   // routine leggono in dispatch.mjs — così cambiarlo qui ha effetto sul loop.
   // chrome.storage.local è solo una CACHE locale per mostrare subito un valore
   // (e un ripiego se l'IPC non risponde / non si è admin).

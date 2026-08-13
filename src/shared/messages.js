@@ -354,11 +354,14 @@
     // dashboard passa gli id dei feedback bianchi; il backend ri-esegue SOLO i
     // giudici mancanti e riscrive il pipeline. Owner-only.
     FEEDBACK_REEVALUATE: 'feedback_reevaluate',    // { feedbackIds:[...] } → { ok, reevaluated, results } | { ok:false, error }
-    // Interruttore master dell'auto-miglioramento (doc config/automation, campo
-    // `enabled`). Owner-only. Vedi filo-security DESIGN §2.
-    AUTOMATION_GET: 'automation_get',              // → { ok, enabled } | { ok:false, error }
-    AUTOMATION_SET: 'automation_set',              // { enabled } → { ok, enabled } | { ok:false, error }
-    // Tentativi del loop di correzione (doc config/automation, campo `loopCap`):
+    // Impostazioni della tab Automazioni. Owner-only. Due interruttori distinti:
+    //   `enabled` (doc config/automation) → chi entra in coda da solo (filo-security
+    //     DESIGN §2);
+    //   `routinesEnabled` (doc config/routines) → se le routine autonome lavorano.
+    // Insieme viaggiano `autoApprove` e `proberWhenIdle`.
+    AUTOMATION_GET: 'automation_get',              // → { ok, enabled, autoApprove, proberWhenIdle, routinesEnabled } | { ok:false, error }
+    AUTOMATION_SET: 'automation_set',              // { enabled?, autoApprove?, proberWhenIdle?, routinesEnabled? } → { ok, … } | { ok:false, error }
+    // Tentativi del loop di correzione (doc config/routines, campo `loopCap`):
     // quante FAIL del verifier prima del blocco `loop`. Letto dalle routine
     // (scripts/dispatch.mjs). Owner-only.
     AUTOMATION_LOOP_CAP_GET: 'automation_loop_cap_get', // → { ok, loopCap } | { ok:false, error }

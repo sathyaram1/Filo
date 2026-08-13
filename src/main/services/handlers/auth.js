@@ -411,7 +411,7 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  // Tentativi del loop di correzione (config/automation, campo `loopCap`).
+  // Tentativi del loop di correzione (config/routines, campo `loopCap`).
   // Owner-only. È la fonte di verità letta dalle routine: cambiarlo qui ha
   // effetto sul prossimo giro del loop avversariale.
   on(MSG.AUTOMATION_LOOP_CAP_GET, async () => {

@@ -108,7 +108,7 @@
     // Booleano persistito; default false (spento).
     AUTO_MODE: 'filo_auto_mode',
     // Cache locale del numero di tentativi del loop di correzione (tab
-    // Automazioni). La FONTE DI VERITÀ è il doc Firestore config/automation
+    // Automazioni). La FONTE DI VERITÀ è il doc Firestore config/routines
     // (campo loopCap), che le routine leggono in scripts/dispatch.mjs; questa
     // chiave serve solo a mostrare subito un valore all'avvio / come ripiego
     // offline. Default AUTOMATION.LOOP_CAP_DEFAULT.
