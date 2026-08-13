@@ -1,0 +1,8 @@
+{
+  "op": "worker-log",
+  "role": "secaudit",
+  "startedAt": "2026-08-13T18:11:00.381Z",
+  "num": "461",
+  "queuedAt": "2026-08-13T18:11:00.381Z",
+  "queuedBy": "dispatch"
+}
