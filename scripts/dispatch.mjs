@@ -881,6 +881,27 @@ export async function preflight(build = buildSnapshot) {
 // ─── run() — il comando di default ────────────────────────────────────────────
 
 /**
+ * Testo per il worker quando la guardia d'identità RIFIUTA di scrivere un
+ * verdetto (albero sbagliato, HEAD staccato, branch diverso da quello
+ * assegnato). Il rifiuto è la cosa giusta — il verdetto non sarebbe attendibile
+ * — ma va spiegato: senza, il worker vede solo un comando morto e non sa se
+ * ritentare, se ha perso il lavoro, o cosa dire all'orchestratore.
+ *
+ * Esisteva solo come chiamata: i tre `--record-*` morivano con
+ * `rejectionText is not defined` ed exit 1 invece del 3 previsto, quindi il
+ * guasto si travestiva da errore d'uso. Stessa classe del `--preflight` mai
+ * implementato, tre righe più sotto.
+ */
+export function rejectionText(message) {
+  return [
+    `[dispatch] GUASTO (identità): ${message}`,
+    'Il verdetto NON è stato scritto: la directory non corrisponde al branch assegnato,',
+    "quindi ciò che avresti giudicato non è ciò che verrebbe fuso. Non riscrivere lo stato",
+    "a mano e non forzare il branch: riporta `guasto identita` all'orchestratore e fermati.",
+  ].join('\n');
+}
+
+/**
  * Emette un GUASTO: nessun lavoro consegnato, e il worker lo dice
  * all'orchestratore con la terza parola del vocabolario (`guasto`), che ferma
  * il giro senza travestirlo da giornata tranquilla.
