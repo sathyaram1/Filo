@@ -196,11 +196,17 @@ module.exports = function register(on, ctx) {
   // chiave si sta ancora digitando e arriva nel messaggio, non dalle
   // impostazioni. Risolviamo quindi il nickname direttamente sul registro
   // configurato, che resta l'unica sorgente del modello.
-  async function testModelFor(provider) {
-    const settings = await getEffectiveSettings();
+  async function testModelFor(provider, settings) {
+    const s = settings || await getEffectiveSettings();
     const action = SN_CONST.ACTIONS.PROVIDER_TEST;
-    const registry = settings.modelRegistry || {};
-    const refs = SN_CONST.parseModelRefs(modelForAction(settings, action));
+    const registry = s.modelRegistry || {};
+    let refs = SN_CONST.parseModelRefs(modelForAction(s, action));
+    // Stessa potatura delle richieste vere: a interruttore acceso la prova parte
+    // sull'equivalente a pesi aperti, non sul modello proprietario che quella
+    // funzione userebbe altrimenti.
+    if (s.openWeightsOnly === true) {
+      refs = SN_CONST.applyOpenWeightsPolicy(refs, registry, action).refs;
+    }
     for (const ref of refs) {
       const concrete = SN_CONST.resolveModel(ref, provider, registry);
       if (concrete) return concrete;
