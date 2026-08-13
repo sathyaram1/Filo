@@ -66,13 +66,19 @@
   }
 
   // Errore → proposizione per l'utente. Mai un codice HTTP nudo, mai un nome di
-  // endpoint: gli errori con `code` applicativo (NO_API_KEY, LIMIT_REACHED,
-  // NO_MODEL_FOR_ACTION) portano già un messaggio i18n scritto per l'utente —
-  // dicono anche dove si rimedia — e passano invariati.
+  // endpoint: gli errori con `code` applicativo (NO_API_KEY, LIMIT_REACHED, e i
+  // codici di configurazione dei modelli) portano già un messaggio i18n scritto
+  // per l'utente — dicono anche dove si rimedia — e passano invariati.
+  function isModelConfigCode(code) {
+    const C = global.SN_CONST;
+    if (C && typeof C.isModelConfigErrorCode === 'function') return C.isModelConfigErrorCode(code);
+    return code === 'NO_MODEL_FOR_ACTION';
+  }
+
   function friendly(e, opts) {
     const o = opts || {};
     const raw = String((e && e.message) || (typeof e === 'string' ? e : ''));
-    if (e && (e.code === 'NO_API_KEY' || e.code === 'LIMIT_REACHED' || e.code === 'NO_MODEL_FOR_ACTION')) return raw;
+    if (e && (e.code === 'NO_API_KEY' || e.code === 'LIMIT_REACHED' || isModelConfigCode(e.code))) return raw;
 
     // Guasto di rete: la prima cosa da controllare è la connessione. Va PRIMA
     // dell'analisi HTTP perché qui non c'è nessuna risposta da interpretare.
