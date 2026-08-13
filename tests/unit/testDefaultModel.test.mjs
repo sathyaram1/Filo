@@ -40,8 +40,8 @@ const state = {
 };
 
 globalThis.SN_PROVIDERS = {
-  streamComplete: async ({ provider, apiKey, model, messages, onDelta }) => {
-    state.calls.push({ provider, apiKey, model });
+  streamComplete: async ({ provider, apiKey, model, messages, providerRouting, onDelta }) => {
+    state.calls.push({ provider, apiKey, model, providerRouting });
     if (state.streamError) throw new Error(state.streamError);
     if (state.emptyStream) return { usage: { completionTokens: 0 } };
     onDelta('1, 2, 3');
