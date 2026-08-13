@@ -266,7 +266,16 @@ module.exports = function register(on, ctx) {
     try {
       const provider = msg.provider;
       const apiKey = (msg.apiKey || '').trim();
-      const model = (msg.model || '').trim() || await testModelFor(provider);
+      const s = await getEffectiveSettings();
+      // "Solo modelli a pesi aperti" (#461): il fornitore va controllato PRIMA di
+      // risolvere il modello — se è l'API diretta di un produttore la prova non
+      // parte comunque, e dire "nessun modello impostato" manderebbe a cercare
+      // un guasto dove non c'è.
+      const providerRefusal = openWeightsTestRefusal(s, provider, 'x');
+      if (providerRefusal && SN_CONST.PRODUCER_DIRECT_PROVIDERS.includes(provider)) {
+        return { ok: false, error: providerRefusal };
+      }
+      const model = (msg.model || '').trim() || await testModelFor(provider, s);
       if (!model) {
         return {
           ok: false,
@@ -274,24 +283,17 @@ module.exports = function register(on, ctx) {
         };
       }
       if (!apiKey) return { ok: false, error: 'API key mancante' };
-      // "Solo modelli a pesi aperti" (#461): la prova di un fornitore è pur
-      // sempre una chiamata vera. Provare l'API diretta di un produttore mentre
-      // l'interruttore è acceso manderebbe una richiesta proprio dove l'utente
-      // ha chiesto che non ne arrivino — e la prova non servirebbe a niente,
-      // perché quel fornitore resta comunque inutilizzabile.
-      const s = await getEffectiveSettings();
-      if (s.openWeightsOnly === true && SN_CONST.PRODUCER_DIRECT_PROVIDERS.includes(provider)) {
-        return {
-          ok: false,
-          error: 'Hai scelto solo modelli a pesi aperti: questo fornitore è l\'API di chi produce i modelli e resta spento. Spegni l\'interruttore per provarlo.',
-        };
-      }
+      // Modello indicato dalla riga del registry (o modello della prova): se è
+      // proprietario, con l'interruttore acceso non lo chiamiamo.
+      const refusal = openWeightsTestRefusal(s, provider, model);
+      if (refusal) return { ok: false, error: refusal };
       const messages = [{ role: 'user', content: 'Conta da 1 a 20 separando con virgole, senza testo extra.' }];
       const startMs = performance.now();
       let firstTokenMs = null;
       let charCount = 0;
       const result = await Providers.streamComplete({
         provider, apiKey, model, messages,
+        providerRouting: testProviderRouting(s, provider),
         onDelta: (delta) => {
           if (firstTokenMs == null) firstTokenMs = performance.now() - startMs;
           charCount += (delta || '').length;
@@ -302,6 +304,8 @@ module.exports = function register(on, ctx) {
       // gratuiti): per l'utente il modello NON funziona, quindi è un errore,
       // non un "OK — null ms".
       if (charCount === 0) return { ok: false, error: 'Il modello ha risposto vuoto' };
+      const served = servedByRefusal(s, result && result.servedBy);
+      if (served) return { ok: false, error: served };
       const tokens = (result?.usage?.completionTokens) || Math.max(1, Math.round(charCount / 4));
       const tps = tokens > 0 && totalMs > 0 ? (tokens / (totalMs / 1000)) : 0;
       return {
