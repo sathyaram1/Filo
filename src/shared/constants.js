@@ -2058,6 +2058,7 @@
     isOpenWeightsRef,
     entryModalities,
     substituteFitsAction,
+    openWeightsBlockKind,
     effectiveExcludedProviders,
     applyOpenWeightsPolicy,
     openWeightsImpact,
