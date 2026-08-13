@@ -281,6 +281,11 @@
     const row = document.createElement('div');
     row.className = 'sn-model-row sn-default-model-row';
     const single = entryToSingle(entry);
+    // Provider e modello concreti sulla riga: servono al cancello dei "Prova"
+    // (vedi applyOpenWeightsTestGates), che deve poterli leggere senza rifare il
+    // giro del registry.
+    row.dataset.provider = single.provider || '';
+    row.dataset.model = single.model || '';
 
     const nickEl = document.createElement('div');
     nickEl.className = 'sn-default-model-cell';
