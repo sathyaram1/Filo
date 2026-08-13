@@ -423,7 +423,7 @@ async function setAutomationProberIdle(on, idToken) {
   return Boolean(on);
 }
 
-// Tentativi del loop di correzione (config/automation, campo `loopCap`): quante
+// Tentativi del loop di correzione (config/routines, campo `loopCap`): quante
 // FAIL consecutive del verifier prima di bloccare un fix con motivo `loop`. È la
 // fonte di verità letta dalle routine (scripts/dispatch.mjs). Default e range da
 // SN_CONST.AUTOMATION; clamp prudente sia in lettura sia in scrittura.
