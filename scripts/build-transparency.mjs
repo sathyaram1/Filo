@@ -185,12 +185,17 @@ function renderSources(sources) {
   return `<section class="sn-fonti"><h2 id="fonti">Fonti</h2><ol class="sn-fonti-list">\n${items}\n</ol></section>`;
 }
 
-// ── Glossario a runtime ──────────────────────────────────────────────────────
-// Applicato sul DOM (non sull'HTML come stringa): lavorare sui nodi di testo è
-// l'unico modo sicuro di non corrompere tag e attributi. Una sola occorrenza per
-// termine — la prima — perché una pagina in cui ogni ripetizione è in corsivo
-// diventa illeggibile. Mai dentro titoli, link o note.
-const GLOSSARY_RUNTIME = `
+// ── Runtime del glossario + tooltip ──────────────────────────────────────────
+// Sorgente UNICA del comportamento interattivo, emessa in due posti: come file
+// `src/shared/transparencyUi.js` per la pagina dentro Filo (dove la CSP vieta
+// gli script inline) e inlineata nella pagina pubblica. Scritta una volta, così
+// le due superfici non possono comportarsi in modo diverso.
+//
+// Il glossario si applica sul DOM (non sull'HTML come stringa): lavorare sui
+// nodi di testo è l'unico modo sicuro di non corrompere tag e attributi. Una
+// sola occorrenza per termine — la prima — perché una pagina in cui ogni
+// ripetizione è in corsivo diventa illeggibile. Mai dentro titoli, link o note.
+const UI_RUNTIME = `
   function applyGlossary(root, glossary) {
     if (!root || !glossary) return;
     var terms = Object.keys(glossary).filter(function (t) { return t.charAt(0) !== '_'; });
