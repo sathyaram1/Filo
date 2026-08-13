@@ -1,7 +1,8 @@
 {
   "id": "8e2d6993-17de-44ab-942a-b8561ed60c5f",
-  "status": "working",
-  "notes": "",
-  "queuedAt": "2026-08-13T18:15:25.998Z",
-  "queuedBy": "routine"
+  "status": "revision_capability",
+  "notes": "Fatto: la consegna di un lavoro nuovo ora lascia il segnalibro, come già facevano i verdetti. Un lavoro consegnato non può più essere riportato al punto in cui non era ancora cominciato.\n\nOltre al chiesto ho aggiunto tre cose.\n\nChi si trova davanti un ramo che il sistema ha rimaneggiato — o che risulta identico alla linea principale mentre il lavoro dovrebbe esserci — ora se lo vede scritto nel compito, con l'indicazione di dove sono finiti i cambiamenti messi da parte e l'istruzione esplicita di NON far riscrivere niente da capo. Era il pezzo che mancava: la protezione c'era ma era muta, e una protezione muta è indistinguibile da «il lavoro non è mai stato fatto».\n\nIl ripristino non mette più da parte i commit che contengono solo la burocrazia della coda (le decisioni e lo stato della lavorazione). Prima ne parcheggiava a ogni singolo giro, quindi «sono stati scartati dei commit» era un allarme che suonava sempre e non voleva dire niente — e avrebbe reso inutile anche l'avviso qui sopra.\n\nChi consegna registra il ramo che gli è stato assegnato, non quello che ricorda: i nomi dei rami sono unici per tentativo, e il nome ricostruito a memoria indicava un ramo inesistente. Adesso il nome giusto arriva anche a chi lavora, dentro al compito.\n\nNessuna voce nel recap aggiornamenti: è impianto interno, invisibile a chi usa Filo.",
+  "queuedAt": "2026-08-13T18:29:31.689Z",
+  "queuedBy": "routine",
+  "branch": "worker/8e2d6993-17de-44ab-942a-b8561ed60c5f-20260813T181528Z"
 }
