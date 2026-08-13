@@ -41,6 +41,7 @@ test('lo scaricamento a mano compare in elenco con peso e byte ricevuti', () => 
     assert.equal(end.state, 'completed');
     assert.equal(end.savePath, '/tmp/scelto/altro-nome.mp4');
     assert.equal(end.filename, 'altro-nome.mp4', 'il nome deve seguire dove il file è stato davvero salvato');
+    assert.equal(end.receivedBytes, 5000, 'una voce conclusa non può restare ferma a metà percentuale');
   } finally {
     DL.remove(h.id);
   }
