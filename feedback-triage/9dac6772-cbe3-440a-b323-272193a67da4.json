@@ -1,7 +1,0 @@
-{
-  "id": "9dac6772-cbe3-440a-b323-272193a67da4",
-  "status": "done",
-  "notes": "Controllo di sicurezza superato, la modifica è stata pubblicata. Segnalo una cosa sul controllo stesso, non sul lavoro: la copia del progetto su cui giro era stata scaricata troncata, e in quello stato il confronto da esaminare risultava vuoto — cioè il controllo sarebbe passato senza aver guardato niente. L'ho scaricata per intero e ho esaminato le modifiche vere prima di approvare. Vale la pena sistemarlo a monte, perché finché resta così un controllo di sicurezza può concludersi a vuoto senza che si veda.",
-  "queuedAt": "2026-08-13T18:14:03.124Z",
-  "queuedBy": "routine"
-}
