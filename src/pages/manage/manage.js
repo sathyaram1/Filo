@@ -339,6 +339,7 @@
       if (r && r.ok) {
         reflectAutoMode(Boolean(r.enabled));
         reflectAutoApprove(r.autoApprove);
+        reflectRoutines(r.routinesEnabled !== false);
         if (mgProberIdle) mgProberIdle.checked = r.proberWhenIdle !== false;
         chrome.storage.local.set({ [AUTO_MODE_KEY]: Boolean(r.enabled) }).catch(() => {});
       }
