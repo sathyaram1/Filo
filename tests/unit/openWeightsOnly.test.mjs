@@ -145,6 +145,11 @@ test('l\'effetto dell\'interruttore è dichiarabile PRIMA di accenderlo', () => 
   assert.ok(cambiano.includes(C.ACTIONS.EXPLAIN_DEEP));
   assert.ok(ferme.includes(C.ACTIONS.TTS), 'le funzioni che si fermano vanno dichiarate');
   assert.ok(ferme.includes(C.ACTIONS.ARCHIVE_EMBED));
+  // La dettatura sta fra QUELLE CHE SI FERMANO, non fra quelle che cambiano
+  // modello: annunciarla come "cambia modello" sarebbe una bugia che l'utente
+  // scopre solo quando prova a dettare.
+  assert.ok(ferme.includes(C.ACTIONS.TRANSCRIBE_AUDIO));
+  assert.ok(!cambiano.includes(C.ACTIONS.TRANSCRIBE_AUDIO));
   // Una funzione non può stare in tutt'e due gli elenchi.
   assert.deepEqual(cambiano.filter((a) => ferme.includes(a)), []);
 });
