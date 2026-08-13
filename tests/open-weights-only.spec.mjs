@@ -201,3 +201,115 @@ test('solo modelli a pesi aperti: sostituisce, non ripiega, e lo dimostra', asyn
   expect(out.spento.ok).toBe(true);
   expect(out.spento.model).toBe('anthropic/claude-3.5-haiku');
 });
+
+// I pulsanti «Prova» delle Opzioni mandano richieste VERE, pagate. Stanno sulla
+// stessa pagina dove l'interruttore si accende: se restassero aperti, l'unico
+// posto in cui l'utente sceglie "niente modelli proprietari" sarebbe anche
+// l'unico da cui ne partono.
+//
+// Cosa asserisce (successo, non assenza di errore):
+//   1. con l'interruttore acceso e i CREDITI DI FILO, provare un modello ammesso
+//      funziona e la richiesta porta con sé l'esclusione dei fornitori;
+//   2. provare un modello proprietario (Anthropic) o un fornitore diretto
+//      (Google) non manda NESSUNA richiesta e dice perché;
+//   3. la prova accanto alla chiave OpenRouter parte sull'equivalente a pesi
+//      aperti, non sul modello proprietario previsto per le prove;
+//   4. la prova della riga di un modello proprietario (config personale) non
+//      parte;
+//   5. a interruttore spento tutte queste prove ripartono: la differenza la fa
+//      l'interruttore.
+//
+// Senza il fix: 2/3/4 fallirebbero (le richieste partirebbero davvero) e 1
+// partirebbe senza esclusione allegata.
+test('solo modelli a pesi aperti: nemmeno i pulsanti «Prova» chiamano un escluso', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await shell.waitForLoadState('domcontentloaded');
+  await waitForBoot(app);
+
+  const out = await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    const MSG = globalThis.SN_MSG.MSG;
+    const Storage = globalThis.SN_STORAGE;
+
+    // Ogni chiamata che sarebbe andata in rete finisce qui e non parte.
+    const calls = [];
+    const orig = globalThis.SN_PROVIDERS.streamComplete;
+    globalThis.SN_PROVIDERS.streamComplete = async ({ provider, model, providerRouting, onDelta }) => {
+      calls.push({
+        provider, model, ignore: (providerRouting && providerRouting.ignore) || [],
+      });
+      if (onDelta) onDelta('1, 2, 3');
+      return { text: '1, 2, 3', servedBy: 'DeepInfra', usage: { completionTokens: 5 } };
+    };
+
+    const prova = async (msg) => {
+      const before = calls.length;
+      const r = await globalThis.SN_HANDLE_MESSAGE(msg, {});
+      return { ok: !!(r && r.ok), error: r && r.error, chiamata: calls[before] || null };
+    };
+
+    const res = {};
+    try {
+      // ── Crediti di Filo (registry predefinito), interruttore ACCESO.
+      await Storage.setSettings({ useDefaultModels: true, openWeightsOnly: true });
+
+      // 1. Riga di un modello a pesi aperti: la prova funziona davvero.
+      res.ammesso = await prova({ type: MSG.TEST_DEFAULT_MODEL, nickname: 'gemma' });
+      // 2. Riga del modello di Anthropic e righe che passano dai server del
+      //    produttore (sintesi vocale, indicizzazione).
+      res.anthropic = await prova({ type: MSG.TEST_DEFAULT_MODEL, nickname: 'claude-haiku' });
+      res.tts = await prova({ type: MSG.TEST_DEFAULT_MODEL, nickname: 'tts' });
+      res.embed = await prova({ type: MSG.TEST_DEFAULT_MODEL, nickname: 'embed-004' });
+      // 3. Prova accanto alla chiave OpenRouter (nessun modello indicato).
+      res.chiaveOr = await prova({ type: MSG.TEST_PROVIDER, provider: 'openrouter', apiKey: 'k-test' });
+      // …e accanto alla chiave Google.
+      res.chiaveGemini = await prova({ type: MSG.TEST_PROVIDER, provider: 'gemini', apiKey: 'k-test' });
+      // 4. Riga del registry personale con un modello proprietario scritto a mano.
+      res.rigaProprietaria = await prova({
+        type: MSG.TEST_PROVIDER, provider: 'openrouter', apiKey: 'k-test',
+        model: 'anthropic/claude-3.7-sonnet',
+      });
+
+      // ── 5. Stessa pagina, interruttore SPENTO.
+      await Storage.setSettings({ useDefaultModels: true, openWeightsOnly: false });
+      res.spentoAnthropic = await prova({ type: MSG.TEST_DEFAULT_MODEL, nickname: 'claude-haiku' });
+      res.spentoGemini = await prova({ type: MSG.TEST_PROVIDER, provider: 'gemini', apiKey: 'k-test' });
+    } finally {
+      globalThis.SN_PROVIDERS.streamComplete = orig;
+    }
+    res.totaleChiamate = calls.map((c) => `${c.provider}::${c.model}`);
+    return res;
+  });
+
+  const proprietari = /gemini|claude|gpt-|grok/i;
+
+  // 1. La prova di un modello ammesso RIESCE, e non passa da un escluso.
+  expect(out.ammesso.ok, `la prova di un modello a pesi aperti deve funzionare: ${out.ammesso.error}`).toBe(true);
+  expect(out.ammesso.chiamata).not.toBe(null);
+  expect(out.ammesso.chiamata.provider).toBe('openrouter');
+  expect(out.ammesso.chiamata.model).not.toMatch(proprietari);
+  expect(out.ammesso.chiamata.ignore.map((s) => s.toLowerCase())).toContain('anthropic');
+  expect(out.ammesso.chiamata.ignore.map((s) => s.toLowerCase())).toContain('google');
+
+  // 2. Le prove verso un escluso non partono affatto.
+  for (const caso of ['anthropic', 'tts', 'embed', 'chiaveGemini', 'rigaProprietaria']) {
+    expect(out[caso].chiamata, `«${caso}»: non deve partire nessuna richiesta`).toBe(null);
+    expect(out[caso].ok).toBe(false);
+    expect(out[caso].error).toMatch(/pesi aperti/i);
+  }
+
+  // 3. La prova della chiave OpenRouter parte, ma sull'equivalente aperto.
+  expect(out.chiaveOr.ok, `la prova della chiave deve funzionare: ${out.chiaveOr.error}`).toBe(true);
+  expect(out.chiaveOr.chiamata.model).not.toMatch(proprietari);
+  expect(out.chiaveOr.chiamata.ignore.map((s) => s.toLowerCase())).toContain('anthropic');
+
+  // 5. Spento, le stesse prove ripartono: la differenza la fa l'interruttore.
+  expect(out.spentoAnthropic.chiamata).not.toBe(null);
+  expect(out.spentoAnthropic.chiamata.model).toMatch(/claude/i);
+  expect(out.spentoGemini.chiamata).not.toBe(null);
+
+  // Controprova d'insieme: con l'interruttore acceso nessun modello proprietario
+  // è mai finito in una chiamata.
+  const acceso = out.totaleChiamate.slice(0, out.totaleChiamate.length - 2);
+  for (const c of acceso) expect(c).not.toMatch(proprietari);
+});
