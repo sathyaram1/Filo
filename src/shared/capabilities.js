@@ -319,6 +319,12 @@
       invoke: 'Menu del tasto destro → "Feedback", oppure filo://feedback/feedback.html; in chat basta chiederlo a parole.',
     },
     {
+      id: 'transparency-docs', title: 'Perché Filo fa così (trasparenza)', category: 'assistant',
+      desc: 'Le scelte dichiarate di Filo, scritte per esteso e con le fonti: quali modelli AI usa e quali aziende esclude, e perché. Le stesse pagine le puoi leggere anche senza connessione, e puoi chiederne conto a Filo in chat — le rilegge e risponde con quello che c’è scritto, invece di improvvisare. Le sezioni su privacy, sicurezza e su come Filo si sostiene sono in arrivo.',
+      invoke: 'Pagina filo://transparency/transparency.html; in chat basta chiedere perché Filo usa un certo modello o un’azienda invece di un’altra.',
+      doesNot: 'Non è un riassunto scritto dall’assistente: è il testo dell’autore di Filo, e quando cambia idea la pagina riporta la data dell’ultima revisione.',
+    },
+    {
       id: 'filo-assistant', title: 'Chiedi a Filo (assistente)', category: 'assistant',
       desc: 'L’assistente conversazionale di Filo: gli scrivi a parole cosa ti serve e ti risponde, tenendo conto di ciò che gli hai detto in passato. Conosce anche i tuoi documenti dell’editor (appunti inclusi) tramite un breve riassunto di ciascuno, sempre aggiornato: così sa di cosa parlano senza doverli tenere tutti aperti, e quando per risponderti gli serve un documento per intero lo legge al momento. Oltre a rispondere può fare cose per te — aprire pagine, cercare sul web, impostare timer, prendere appunti, regolare preferenze — chiedendoti conferma per le azioni delicate.',
       invoke: 'Apri una nuova scheda (la sua pagina iniziale è l’assistente) e scrivi nel campo "Chiedi qualsiasi cosa"; in alternativa filo://dashboard/dashboard.html.',
