@@ -1,0 +1,14 @@
+{
+  "_nota": "Glossario CONDIVISO fra tutti i documenti di trasparenza. Chiave = termine come compare nel testo (match case-insensitive sulla PRIMA occorrenza di ogni documento). Valore = una riga, per un lettore non tecnico. Definito qui una volta sola così la stessa parola non viene spiegata in due modi diversi in due documenti.",
+
+  "pesi aperti": "I numeri che costituiscono un modello, pubblicati da chi lo ha addestrato: chiunque può scaricarli ed eseguirli, quindi usarli non paga il laboratorio che li ha prodotti.",
+  "fornitori indipendenti": "Aziende che si limitano a far girare modelli altrui sui propri computer: pagarle non finanzia chi il modello lo ha addestrato.",
+  "system card": "Il documento che un laboratorio pubblica insieme a un nuovo modello, con le prove di sicurezza fatte prima di metterlo in commercio.",
+  "welfare dei modelli": "La domanda se un modello possa avere un'esperienza propria e, in caso, se stia bene o male: nessuno oggi sa rispondere.",
+  "Responsible Scaling Policy": "L'impegno pubblico di Anthropic a fermare lo sviluppo se un modello supera certe soglie di pericolosità, verificate anche da revisori esterni.",
+  "OpenRouter": "Il servizio che smista le richieste di Filo verso i vari fornitori di modelli: uno solo da pagare, tutti i modelli raggiungibili.",
+  "LLM": "Large Language Model: il tipo di modello che sta dietro agli assistenti come Claude o ChatGPT.",
+  "super PAC": "Negli Stati Uniti, un fondo che può raccogliere donazioni illimitate per sostenere un candidato senza limiti di spesa.",
+  "open source": "Il codice di Filo è pubblico: chiunque può leggerlo, modificarlo e distribuirne una propria versione.",
+  "rischi esistenziali": "I modi in cui questa tecnologia potrebbe danneggiare l'umanità intera, non un singolo utente."
+}
