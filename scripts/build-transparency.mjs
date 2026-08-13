@@ -437,8 +437,16 @@ function main() {
     [OUT_MODULE, emitModule(built)],
     [OUT_UI_MODULE, emitUiModule()],
   ];
+  // `site/` è sempre generata (è quella che i test controllano). Con --site-out
+  // le stesse pagine finiscono anche nella cartella del sito, che vive fuori dal
+  // repo: senza, resterebbe un passaggio di copia a mano — cioè il modo in cui
+  // le due versioni finiscono per divergere.
+  const extraOutIdx = process.argv.indexOf('--site-out');
+  const extraOut = extraOutIdx !== -1 ? process.argv[extraOutIdx + 1] : '';
+  const siteDirs = [OUT_SITE].concat(extraOut ? [resolve(extraOut)] : []);
   for (const doc of built.docs) {
-    outputs.push([join(OUT_SITE, `${doc.id}.html`), emitSitePage(doc, built, css)]);
+    const page = emitSitePage(doc, built, css);
+    for (const dir of siteDirs) outputs.push([join(dir, `${doc.id}.html`), page]);
   }
 
   let stale = 0;
