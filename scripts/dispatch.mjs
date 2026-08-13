@@ -796,6 +796,37 @@ function recordSecaudit(id, verdict) {
   return next;
 }
 
+// ─── Prontezza (--preflight) ─────────────────────────────────────────────────
+
+/**
+ * Prontezza del giro, da eseguire PRIMA del setup dell'ambiente (npm install,
+ * binario Electron ~102MB, scrot): se il giro non è in grado di lavorare, va
+ * scoperto prima di aver pagato il setup.
+ *
+ * Non è un dispatch a vuoto: NON claima, NON emette un bucket, NON consegna
+ * lavoro. Guarda solo se lo stato è leggibile — cioè le due cose che rendono
+ * cieco il giro: la coda dei feedback irraggiungibile e la chiave privata
+ * assente o rotta (l'ondata #310+).
+ *
+ * **Non è mai più severo di `run()`**, o fermerebbe giri che avrebbero
+ * lavorato: si ferma solo sui guasti DICHIARATI (`faultKind`), quelli su cui
+ * anche `run()` si ferma. Un guasto generico dopo i retry là ripiega
+ * sull'audit, quindi qui è prontezza OK.
+ *
+ * @param {() => Promise<any>} [build] iniettabile per i test (default: snapshot vero)
+ * @returns {Promise<{ok:true}|{ok:false, kind:string, message:string}>}
+ */
+export async function preflight(build = buildSnapshot) {
+  try {
+    await build();
+    return { ok: true };
+  } catch (e) {
+    if (e?.faultKind) return { ok: false, kind: e.faultKind, message: e.message };
+    process.stderr.write(`[dispatch] prontezza: stato illeggibile (${e?.message || e}) → il giro ripiegherà sull'audit\n`);
+    return { ok: true };
+  }
+}
+
 // ─── run() — il comando di default ────────────────────────────────────────────
 
 /**
