@@ -1,0 +1,9 @@
+{
+  "id": "8e2d6993-17de-44ab-942a-b8561ed60c5f",
+  "status": "design",
+  "notes": "Controllo di sicurezza superato: non ho trovato niente di rischioso. La pubblicazione però è ferma al cancello automatico, che blocca sempre le modifiche ai meccanismi con cui il lavoro viene consegnato e fuso, quali che siano — e questo intervento agisce proprio lì. Serve il tuo via libera: il lavoro è pronto e ti aspetta sul suo ramo.",
+  "queuedAt": "2026-08-13T18:44:50.954Z",
+  "queuedBy": "routine",
+  "branch": "worker/8e2d6993-17de-44ab-942a-b8561ed60c5f-20260813T181528Z",
+  "reason": "secaudit"
+}
