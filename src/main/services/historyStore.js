@@ -43,6 +43,10 @@
       // riporta (OpenRouter). È la controprova della politica sui fornitori: null
       // per il provider diretto (Gemini) o se il dato non è arrivato.
       servedBy: entry.servedBy || null,
+      // Chi ha servito risultava fra i fornitori esclusi dalla politica: la voce
+      // resta marchiata, così la prova di cosa è successo non vive solo in un
+      // log che nessuno riapre.
+      policyViolation: entry.policyViolation === true,
       input: sanitizeInput(entry.input),
       output: entry.output || '',
       origin: entry.origin || '',

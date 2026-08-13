@@ -354,6 +354,14 @@ html, body {
   gap: 10px;
 }
 
+/* Richiesta servita da un fornitore escluso dalla politica sui modelli (#461).
+   Sta accanto al nome di chi ha servito, perché è quel nome a essere il problema. */
+.sn-history-policy-warn {
+  margin-left: 8px;
+  color: var(--sn-error);
+  font-weight: 600;
+}
+
 /* Quota di testo in ingresso riusata da una richiesta precedente (#422).
    Dato di servizio: resta discreto accanto al costo, si spiega al passaggio del
    mouse (pagina consultata di rado → l'hover ci sta). */
