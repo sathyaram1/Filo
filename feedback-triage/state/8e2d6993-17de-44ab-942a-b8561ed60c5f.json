@@ -21,6 +21,11 @@
       "sha": "06bb611f1306029d59bc9869fd18239f89b7dbe7",
       "by": "verifier:pass",
       "at": "2026-08-13T18:38:10.183Z"
+    },
+    {
+      "sha": "19baf588b53bcaf3cc7b62940e39f2b7ffe2ff8f",
+      "by": "consegna:revision_security",
+      "at": "2026-08-13T18:38:16.973Z"
     }
   ]
 }
