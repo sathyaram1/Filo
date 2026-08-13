@@ -436,11 +436,16 @@
   function applyAutoModeGate() {
     mgAutoToggle.disabled = !isAdmin;
     mgAutoSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
-    if (mgLoopCap)     mgLoopCap.disabled = !isAdmin;
-    if (mgLoopCapSave) mgLoopCapSave.disabled = !isAdmin;
+    if (mgRoutinesToggle) mgRoutinesToggle.disabled = !isAdmin;
+    if (mgRoutinesSwitch) mgRoutinesSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
+    // Le due impostazioni che valgono solo per le routine: senza routine non
+    // decidono niente, quindi non si toccano (come i mittenti con l'automatica
+    // spenta). Restano visibili: sono una scelta dell'owner, non un segreto.
+    if (mgLoopCap)     mgLoopCap.disabled = !isAdmin || !routinesOn;
+    if (mgLoopCapSave) mgLoopCapSave.disabled = !isAdmin || !routinesOn;
+    if (mgProberIdle)  mgProberIdle.disabled = !isAdmin || !routinesOn;
     if (mgJudgeTimeout)     mgJudgeTimeout.disabled = !isAdmin;
     if (mgJudgeTimeoutSave) mgJudgeTimeoutSave.disabled = !isAdmin;
-    if (mgProberIdle)  mgProberIdle.disabled = !isAdmin;
     applyAutoApproveGate();
   }
 
