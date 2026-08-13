@@ -276,10 +276,8 @@ module.exports = function register(on, ctx) {
       // risolvere il modello — se è l'API diretta di un produttore la prova non
       // parte comunque, e dire "nessun modello impostato" manderebbe a cercare
       // un guasto dove non c'è.
-      const providerRefusal = openWeightsTestRefusal(s, provider, 'x');
-      if (providerRefusal && SN_CONST.PRODUCER_DIRECT_PROVIDERS.includes(provider)) {
-        return { ok: false, error: providerRefusal };
-      }
+      const providerRefusal = producerDirectTestRefusal(s, provider);
+      if (providerRefusal) return { ok: false, error: providerRefusal };
       const model = (msg.model || '').trim() || await testModelFor(provider, s);
       if (!model) {
         return {
