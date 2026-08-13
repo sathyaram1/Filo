@@ -89,6 +89,39 @@ test("l'albero di lavoro e l'indice del worker non vengono toccati", () => {
   assert.equal(git(['status', '--porcelain']), '');
 });
 
+test('--clear-state toglie lo stato ANCHE da main', () => {
+  // La persistenza deve saper cancellare, non solo aggiungere: se lo stato
+  // sopravvive su main, la sessione dopo — che parte da lì — resuscita un
+  // feedback già chiuso e lo rimanda in lavorazione.
+  assert.ok(filesOnMain().includes('feedback-triage/state/FBTEST.json'));
+  clearState('FBTEST');
+  persistStateToGit('FBTEST', 'feedback: clear-state FBTEST');
+  assert.ok(
+    !filesOnMain().includes('feedback-triage/state/FBTEST.json'),
+    'lo stato è ancora su main: un giro futuro lo rileggerebbe come lavoro aperto',
+  );
+});
+
+test('una rimozione già avvenuta non lascia commit vuoti su main', () => {
+  const before = git(['rev-parse', 'main'], ORIGIN);
+  clearState('FBTEST');
+  persistStateToGit('FBTEST', 'feedback: clear-state FBTEST (ripetuto)');
+  assert.equal(git(['rev-parse', 'main'], ORIGIN), before);
+});
+
+test('rejectionText: la guardia d\'identità spiega il rifiuto invece di morire', () => {
+  // Era chiamata ma mai definita: i tre --record-* morivano con
+  // "rejectionText is not defined" ed exit 1 invece del 3 previsto, quindi il
+  // guasto si travestiva da errore d'uso.
+  assert.equal(typeof rejectionText, 'function');
+  const t = rejectionText('transizione rifiutata su X: albero sbagliato');
+  assert.match(t, /GUASTO/);
+  assert.match(t, /albero sbagliato/);
+  // Deve dire al worker che il verdetto NON è stato scritto: è l'informazione
+  // che decide se ritentare o fermarsi.
+  assert.match(t, /NON è stato scritto/);
+});
+
 test('cleanup', () => {
   rmSync(TMP, { recursive: true, force: true });
 });
