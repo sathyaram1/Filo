@@ -207,59 +207,6 @@
     }
   ];
 
-
-  function applyGlossary(root, glossary) {
-    if (!root || !glossary) return;
-    var terms = Object.keys(glossary).filter(function (t) { return t.charAt(0) !== '_'; });
-    terms.sort(function (a, b) { return b.length - a.length; });
-    var done = Object.create(null);
-    var walker = root.ownerDocument.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-      acceptNode: function (node) {
-        var p = node.parentElement;
-        while (p && p !== root) {
-          var tag = p.tagName;
-          if (tag === 'A' || tag === 'SUP' || tag === 'H1' || tag === 'H2' || tag === 'I') {
-            return NodeFilter.FILTER_REJECT;
-          }
-          p = p.parentElement;
-        }
-        return node.nodeValue && node.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
-      }
-    });
-    var pending = [];
-    var node;
-    while ((node = walker.nextNode())) pending.push(node);
-
-    for (var i = 0; i < pending.length; i++) {
-      var textNode = pending[i];
-      for (var t = 0; t < terms.length; t++) {
-        var term = terms[t];
-        if (done[term]) continue;
-        var value = textNode.nodeValue;
-        var at = value.toLowerCase().indexOf(term.toLowerCase());
-        if (at === -1) continue;
-        var before = value.slice(0, at);
-        var match = value.slice(at, at + term.length);
-        var after = value.slice(at + term.length);
-        var el = textNode.ownerDocument.createElement('i');
-        el.className = 'sn-gloss';
-        el.setAttribute('tabindex', '0');
-        el.setAttribute('role', 'button');
-        el.setAttribute('data-gloss', glossary[term]);
-        el.textContent = match;
-        var frag = textNode.ownerDocument.createDocumentFragment();
-        if (before) frag.appendChild(textNode.ownerDocument.createTextNode(before));
-        frag.appendChild(el);
-        var tail = null;
-        if (after) { tail = textNode.ownerDocument.createTextNode(after); frag.appendChild(tail); }
-        textNode.parentNode.replaceChild(frag, textNode);
-        done[term] = true;
-        if (tail) { textNode = tail; } else { break; }
-      }
-    }
-  }
-
-
   function all() { return DOCS.slice(); }
   function get(id) { return DOCS.find((d) => d.id === String(id || '').toLowerCase()) || null; }
   function ids() { return DOCS.map((d) => d.id); }
@@ -275,8 +222,5 @@
     return doc.title + (doc.updated ? ' — aggiornato ' + doc.updated : '') + '\n\n' + doc.text;
   }
 
-  global.SN_TRANSPARENCY = {
-    NAV, GLOSSARY, all, get, ids, asText,
-    applyGlossary: function (root) { return applyGlossary(root, GLOSSARY); },
-  };
+  global.SN_TRANSPARENCY = { NAV, GLOSSARY, all, get, ids, asText };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
