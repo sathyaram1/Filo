@@ -130,6 +130,18 @@ test('solo modelli a pesi aperti: sostituisce, non ripiega, e lo dimostra', asyn
         : null;
       servedByNext = 'DeepInfra';
 
+      // La dettatura ha bisogno di ASCOLTARE un audio: i sostituti a pesi aperti
+      // leggono testo (e immagini). Deve fermarsi dicendolo, non finire su un
+      // modello sordo che poi fallisce con un errore qualunque.
+      res.dettatura = await run(C.ACTIONS.TRANSCRIBE_AUDIO, {
+        audioDataUrl: 'data:audio/webm;base64,AAAA', lang: 'it',
+      });
+      // La descrizione di un'immagine invece un equivalente ce l'ha: non deve
+      // essere spenta per compagnia.
+      res.immagine = await run(C.ACTIONS.DESCRIBE_IMAGE, {
+        imageDataUrl: 'data:image/png;base64,AAAA',
+      });
+
       // ── B) Configurazione personale, interruttore ACCESO.
       await usaConfigPersonale(true);
       res.acceso = await run(C.ACTIONS.EXPLAIN, { selection: 'ciao', sentence: 'ciao mondo' });
