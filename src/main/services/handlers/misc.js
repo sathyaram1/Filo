@@ -250,9 +250,15 @@ module.exports = function register(on, ctx) {
   // a metà diventa naturalmente un errore (niente più silenzio), e l'utente
   // sceglie dove salvare col dialogo nativo "Salva come…".
   // Un solo cammino per immagini, video e audio: cambia solo `kind` (nome di
-  // ripiego, header Accept e tetto di dimensione). Registrato su DUE messaggi
-  // perché il chiamante dichiara cosa sta salvando (#400: prima del fix il
-  // menu su un <video> non offriva alcun salvataggio).
+  // ripiego e header Accept). Registrato su DUE messaggi perché il chiamante
+  // dichiara cosa sta salvando (#400: prima del fix il menu su un <video> non
+  // offriva alcun salvataggio).
+  //
+  // #436 — I byte scendono su disco mentre arrivano, e il trasferimento si
+  // iscrive alla barra degli scaricamenti come un download qualsiasi. Prima il
+  // file veniva accumulato in memoria e consegnato tutto in fondo: salvare un
+  // filmato voleva dire fissare uno schermo immobile per minuti, e oltre mezzo
+  // giga il salvataggio si rifiutava proprio.
   const handleDownload = async (msg, sender) => {
     const url = String(msg.url || '').trim();
     if (!/^https?:/i.test(url)) return { ok: false, error: 'URL non scaricabile' };
