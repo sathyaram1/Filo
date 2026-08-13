@@ -387,6 +387,40 @@ describe('D — l’interruzione torna all’ultimo punto fermo', () => {
     assert.equal(git(work, ['status', '--porcelain']), '', 'la directory resta pulita');
   });
 
+  test('un avanzamento di sola burocrazia NON viene scartato', () => {
+    const { work } = makeRepo();
+    const branch = 'worker/burocrazia';
+    git(work, ['checkout', '-q', '-b', branch]);
+    commit(work, 'lavoro.txt', 'consegnato\n');
+    const checkpoint = git(work, ['rev-parse', 'HEAD']);
+    git(work, ['push', '-q', 'origin', branch]);
+
+    // Dopo la consegna il ramo prende i commit di servizio della coda.
+    mkdirSync(resolve(work, 'feedback-triage', 'state'), { recursive: true });
+    commit(work, 'feedback-triage/state/FB.json', '{"id":"FB"}\n');
+    const conBurocrazia = git(work, ['rev-parse', 'HEAD']);
+
+    const r = prepareBranch({ root: work, branch, checkpoint });
+    assert.equal(r.ok, true, r.message);
+    assert.equal(r.head, conBurocrazia, 'la burocrazia della coda non è lavoro di nessuno: non si riscrive la storia per toglierla');
+    assert.equal(r.discarded, null,
+      'se ogni giro parcheggiasse un ramo, "commit scartati" smetterebbe di voler dire qualcosa proprio quando serve');
+  });
+
+  test('bookkeepingOnly distingue la burocrazia dal lavoro', () => {
+    assert.equal(bookkeepingOnly(['feedback-triage/state/x.json', 'feedback-triage/x.json']), true);
+    assert.equal(bookkeepingOnly(['feedback-triage/state/x.json', 'src/main/main.js']), false,
+      'basta un file di lavoro perché non sia più burocrazia');
+    assert.equal(bookkeepingOnly([]), true);
+  });
+
+  test('chi riceve un ramo rimaneggiato viene AVVISATO (niente bocciature per assenza)', () => {
+    const n = restoreNotice({ discarded: 'discarded/worker/x-2026', empty: true });
+    assert.match(n, /discarded\/worker\/x-2026/, 'deve dire DOVE è finito il lavoro');
+    assert.match(n, /NON/, 'deve dire esplicitamente di non riscrivere da capo');
+    assert.equal(restoreNotice({}), '', 'un ramo intatto non merita nessun avviso');
+  });
+
   test('il nome del parcheggio è unico e riconducibile al branch', () => {
     const a = discardedBranchName('worker/x', Date.parse('2026-08-07T10:00:00Z'));
     const b = discardedBranchName('worker/x', Date.parse('2026-08-07T10:00:01Z'));
