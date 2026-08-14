@@ -1205,8 +1205,12 @@
         actions.appendChild(b);
       };
       if (isActive(r)) {
-        if (r.state === 'paused') addBtn('Riprendi', () => api.downloads.resume(r.id).catch(() => {}));
-        else addBtn('Pausa', () => api.downloads.pause(r.id).catch(() => {}));
+        // Gli scaricamenti "a mano" (Salva immagine/video come…) non si mettono
+        // in pausa: meglio nessun pulsante che uno che non fa niente.
+        if (r.canPause !== false) {
+          if (r.state === 'paused') addBtn('Riprendi', () => api.downloads.resume(r.id).catch(() => {}));
+          else addBtn('Pausa', () => api.downloads.pause(r.id).catch(() => {}));
+        }
         addBtn('Annulla', () => api.downloads.cancel(r.id).catch(() => {}));
       } else if (r.state === 'completed') {
         addBtn('Apri file', () => api.downloads.openFile(r.id).catch(() => {}));

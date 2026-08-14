@@ -9,28 +9,34 @@ require('../../../shared/feedbackThread.js');
 
 // ── "Salva immagine/video/audio come…" (#274, #400): byte scaricati nel main ─
 
-const IMG_DOWNLOAD_MAX = 64 * 1024 * 1024; // tetto anti-OOM (64MB)
-// Video e audio sono ordini di grandezza più grandi di un'immagine: col tetto a
-// 64MB un normale filmato di qualche minuto sarebbe stato rifiutato. Il file
-// viene comunque tenuto in memoria prima di scriverlo, quindi il tetto resta.
-const MEDIA_DOWNLOAD_MAX = 512 * 1024 * 1024; // 512MB
-
-// Scarica i byte di un'immagine presentando il Referer della pagina e i cookie
-// della session — l'unico modo, in Electron 33, di far arrivare il Referer a
-// valle (i download via webContents.downloadURL lo perdono SEMPRE, sia con
-// l'opzione { headers } sia riscrivendolo in onBeforeSendHeaders: verificato).
-// Usiamo http/https di Node invece di net.request perché la richiesta di un
-// download partita dal main viene bloccata (ERR_BLOCKED_BY_CLIENT) dal
-// webRequest della session; il salvataggio esplicito di un'immagine che l'utente
-// già vede non deve passare per l'ad/tracker-blocking. Risolve { buffer,
-// filename } o rigetta con un errore leggibile (HTTP 4xx/5xx, connessione
-// troncata, immagine vuota/troppo grande). Segue i redirect (max 5) ricalcolando
-// i cookie per l'host di destinazione, come farebbe un browser.
-async function fetchImageBytes({ url, referrer, session, kind = 'image' }) {
+// Scarica i byte di un'immagine/media presentando il Referer della pagina e i
+// cookie della session — l'unico modo, in Electron 33, di far arrivare il
+// Referer a valle (i download via webContents.downloadURL lo perdono SEMPRE,
+// sia con l'opzione { headers } sia riscrivendolo in onBeforeSendHeaders:
+// verificato). Usiamo http/https di Node invece di net.request perché la
+// richiesta di un download partita dal main viene bloccata
+// (ERR_BLOCKED_BY_CLIENT) dal webRequest della session; il salvataggio
+// esplicito di un'immagine che l'utente già vede non deve passare per
+// l'ad/tracker-blocking.
+//
+// #436 — I byte vanno DIRETTAMENTE SU DISCO man mano che arrivano, non in un
+// Buffer in memoria. Prima il file intero veniva accumulato in RAM prima di
+// scriverlo: serviva un tetto (64MB per le immagini, 512MB per i media) oltre il
+// quale il salvataggio si rifiutava, e anche sotto il tetto un filmato da
+// qualche centinaio di MB appesantiva tutta l'app. Scrivendo di continuo il
+// tetto non serve più — si salva quello che ci sta sul disco — e i byte
+// ricevuti diventano un dato di avanzamento da mostrare.
+//
+// Segue i redirect (max 5) ricalcolando i cookie per l'host di destinazione,
+// come farebbe un browser. Risolve { partPath, filename, totalBytes,
+// receivedBytes } o rigetta con un errore leggibile (HTTP 4xx/5xx, connessione
+// troncata, file vuoto).
+async function fetchToFile({ url, referrer, session, kind = 'image', onHeaders, onProgress, shouldStop }) {
   const MAX_REDIRECTS = 5;
   let target = url;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-    const res = await httpGetImage(target, referrer, session, kind); // eslint-disable-line no-await-in-loop
+    // eslint-disable-next-line no-await-in-loop
+    const res = await httpGetToFile(target, referrer, session, kind, { onHeaders, onProgress, shouldStop });
     if (res.redirect) {
       try { target = new URL(res.location, target).href; } catch (_) { throw new Error('redirect non valido'); }
       if (!/^https?:/i.test(target)) throw new Error('redirect non http');
@@ -41,14 +47,16 @@ async function fetchImageBytes({ url, referrer, session, kind = 'image' }) {
   throw new Error('troppi redirect');
 }
 
-// Una singola richiesta GET. Risolve { redirect:true, location } su 3xx, oppure
-// { buffer, filename } sul body completo; rigetta su errore/troncamento.
-async function httpGetImage(target, referrer, session, kind = 'image') {
+// Una singola richiesta GET. Risolve { redirect:true, location } su 3xx; oppure
+// scrive il body nel file indicato da onHeaders() e risolve a scrittura
+// conclusa. Rigetta su errore/troncamento.
+async function httpGetToFile(target, referrer, session, kind, hooks) {
   const isMedia = kind === 'video' || kind === 'audio';
-  const maxBytes = isMedia ? MEDIA_DOWNLOAD_MAX : IMG_DOWNLOAD_MAX;
   let u;
   try { u = new URL(target); } catch (_) { throw new Error('URL non valido'); }
   const mod = u.protocol === 'https:' ? require('node:https') : require('node:http');
+  const fs = require('node:fs');
+  const { pipeline } = require('node:stream');
 
   // Cookie della session per QUESTO host (immagini dietro login), come un browser.
   let cookieHeader = '';
@@ -67,48 +75,83 @@ async function httpGetImage(target, referrer, session, kind = 'image') {
   if (cookieHeader) headers.Cookie = cookieHeader;
 
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (fn, arg) => { if (settled) return; settled = true; fn(arg); };
+
     const req = mod.get(target, { headers }, (res) => {
       const status = res.statusCode || 0;
       if (status >= 300 && status < 400 && res.headers.location) {
         res.resume(); // scarta il body del redirect
-        resolve({ redirect: true, location: res.headers.location });
+        finish(resolve, { redirect: true, location: res.headers.location });
         return;
       }
-      if (status >= 400) { res.resume(); reject(new Error('HTTP ' + status)); return; }
+      if (status >= 400) { res.resume(); finish(reject, new Error('HTTP ' + status)); return; }
+
+      // Content-Length: è il dato che rende l'avanzamento una PERCENTUALE
+      // invece di un contatore di byte. Manca sui trasferimenti chunked, e lì
+      // la barra resta indeterminata — come per i download nativi.
       const expected = parseInt(res.headers['content-length'], 10);
-      const chunks = [];
-      let total = 0;
-      let aborted = false;
+      const total = Number.isFinite(expected) && expected > 0 ? expected : 0;
+      const filename = filenameFromHeaders(res.headers, target);
+
+      // Solo ORA sappiamo nome e dimensione: il chiamante li usa per aprire la
+      // voce nella barra e per decidere dove far crescere il file parziale.
+      let partPath;
+      try {
+        partPath = hooks.onHeaders({ filename, totalBytes: total });
+      } catch (e) {
+        res.resume();
+        try { req.destroy(); } catch (_) {}
+        finish(reject, e instanceof Error ? e : new Error('destinazione non disponibile'));
+        return;
+      }
+
+      let received = 0;
       res.on('data', (chunk) => {
-        if (aborted) return;
-        total += chunk.length;
-        if (total > maxBytes) {
-          aborted = true;
-          try { req.destroy(); } catch (_) {}
-          reject(new Error('file troppo grande'));
-        } else {
-          chunks.push(chunk);
+        received += chunk.length;
+        try { hooks.onProgress && hooks.onProgress(received, total); } catch (_) {}
+        // L'utente ha premuto "Annulla" nella barra: chiudi la connessione
+        // invece di continuare a consumare rete e disco.
+        if (hooks.shouldStop && hooks.shouldStop()) {
+          try { req.destroy(new Error('annullato')); } catch (_) {}
         }
       });
-      res.on('end', () => {
-        if (aborted) return;
+
+      const out = fs.createWriteStream(partPath);
+      pipeline(res, out, (err) => {
+        if (err) { finish(reject, err instanceof Error ? err : new Error('download interrotto')); return; }
         // Connessione chiusa prima della fine del body (res.complete=false) o
         // Content-Length dichiarato ma non raggiunto ⇒ risposta troncata: è un
         // errore, non un file valido (niente più silenzio sul download a metà).
-        if (!res.complete || (Number.isFinite(expected) && total < expected)) {
-          reject(new Error('download interrotto'));
+        if (!res.complete || (total && received < total)) {
+          finish(reject, new Error('download interrotto'));
           return;
         }
-        const buffer = Buffer.concat(chunks);
-        if (!buffer.length) { reject(new Error('file vuoto')); return; }
-        resolve({ buffer, filename: filenameFromHeaders(res.headers, target) });
+        if (!received) { finish(reject, new Error('file vuoto')); return; }
+        finish(resolve, { partPath, filename, totalBytes: total || received, receivedBytes: received });
       });
-      res.on('error', (e) => { if (!aborted) reject(e || new Error('errore risposta')); });
-      res.on('aborted', () => { if (!aborted) reject(new Error('download interrotto')); });
     });
-    req.on('error', (e) => reject(e || new Error('richiesta fallita')));
+    req.on('error', (e) => finish(reject, e || new Error('richiesta fallita')));
+    // Timeout di INATTIVITÀ (si riarma a ogni byte): un file da un'ora è
+    // legittimo, mezzo minuto di silenzio assoluto no.
     req.setTimeout(30000, () => { try { req.destroy(new Error('timeout')); } catch (_) {} });
   });
+}
+
+// Sposta il file finito dalla sua posizione di lavoro alla destinazione scelta.
+// Quasi sempre è una rinomina istantanea (stesso volume); se l'utente ha scelto
+// un altro disco/chiavetta la rinomina non è possibile e si copia — comunque a
+// blocchi, mai passando dalla memoria.
+async function moveInto(from, to) {
+  const fs = require('node:fs');
+  try {
+    await fs.promises.rename(from, to);
+    return;
+  } catch (e) {
+    if (!e || (e.code !== 'EXDEV' && e.code !== 'EPERM' && e.code !== 'EACCES')) throw e;
+  }
+  await fs.promises.copyFile(from, to);
+  try { await fs.promises.unlink(from); } catch (_) {}
 }
 
 // Nome file dal Content-Disposition (se presente), altrimenti dal path dell'URL.
@@ -207,9 +250,15 @@ module.exports = function register(on, ctx) {
   // a metà diventa naturalmente un errore (niente più silenzio), e l'utente
   // sceglie dove salvare col dialogo nativo "Salva come…".
   // Un solo cammino per immagini, video e audio: cambia solo `kind` (nome di
-  // ripiego, header Accept e tetto di dimensione). Registrato su DUE messaggi
-  // perché il chiamante dichiara cosa sta salvando (#400: prima del fix il
-  // menu su un <video> non offriva alcun salvataggio).
+  // ripiego e header Accept). Registrato su DUE messaggi perché il chiamante
+  // dichiara cosa sta salvando (#400: prima del fix il menu su un <video> non
+  // offriva alcun salvataggio).
+  //
+  // #436 — I byte scendono su disco mentre arrivano, e il trasferimento si
+  // iscrive alla barra degli scaricamenti come un download qualsiasi. Prima il
+  // file veniva accumulato in memoria e consegnato tutto in fondo: salvare un
+  // filmato voleva dire fissare uno schermo immobile per minuti, e oltre mezzo
+  // giga il salvataggio si rifiutava proprio.
   const handleDownload = async (msg, sender) => {
     const url = String(msg.url || '').trim();
     if (!/^https?:/i.test(url)) return { ok: false, error: 'URL non scaricabile' };
@@ -219,52 +268,117 @@ module.exports = function register(on, ctx) {
     const path = require('node:path');
     const fs = require('node:fs');
     const { dialog, app, BrowserWindow } = require('electron');
+    const downloads = require('../downloads');
     const ses = wc.session;
     const referrer = String(sender?.tab?.url || sender?.url || '');
-
-    // 1) Scarica i byte (con Referer della pagina + cookie della session).
-    let buffer, suggested;
-    try {
-      const r = await fetchImageBytes({ url, referrer, session: ses, kind });
-      buffer = r.buffer;
-      suggested = r.filename;
-    } catch (e) {
-      return { ok: false, error: e?.message || 'download fallito' };
-    }
-
-    // 2) Nome file sicuro: preferisci il Content-Disposition del server, poi il
-    // path dell'URL; neutralizza separatori e tentativi di traversal.
     const fallbackName = kind === 'video' ? 'video' : (kind === 'audio' ? 'audio' : 'immagine');
-    const filename = safeImageFilename(suggested || filenameFromUrl(url) || fallbackName);
 
-    // 3) Scegli il percorso e scrivi.
-    const testDir = process.env.FILO_DOWNLOAD_DIR;
-    let savePath;
-    if (testDir) {
-      // Hook per i test/headless: salvataggio diretto senza dialogo nativo.
-      try { fs.mkdirSync(testDir, { recursive: true }); } catch (_) {}
-      savePath = path.join(testDir, filename);
-    } else {
-      // Dialogo "Salva come…" pre-compilato con la cartella Download e il nome
-      // dedotto — stesso comportamento che il salvataggio same-origin aveva già.
+    // Dove mettere il file: in test si salva diretto (il dialogo nativo non è
+    // automatizzabile), altrimenti "Salva come…" pre-compilato con la cartella
+    // Download e il nome dedotto. Non rigetta MAI: l'esito è nel valore.
+    const pickDestination = async (filename) => {
+      const testDir = process.env.FILO_DOWNLOAD_DIR;
+      if (testDir) {
+        try { fs.mkdirSync(testDir, { recursive: true }); } catch (_) {}
+        return { filePath: path.join(testDir, filename) };
+      }
       try {
         const win = BrowserWindow.fromWebContents(wc) || winOf(sender) || null;
         const opts = { defaultPath: path.join(app.getPath('downloads'), filename) };
         const res = win ? await dialog.showSaveDialog(win, opts) : await dialog.showSaveDialog(opts);
         // Annullato dall'utente: non è un errore, nessun toast.
-        if (res.canceled || !res.filePath) return { ok: false, cancelled: true };
-        savePath = res.filePath;
+        if (res.canceled || !res.filePath) return { cancelled: true };
+        return { filePath: res.filePath };
       } catch (e) {
-        return { ok: false, error: e?.message || 'dialogo non disponibile' };
+        return { error: e?.message || 'dialogo non disponibile' };
       }
+    };
+
+    let entry = null;        // voce nella barra scaricamenti
+    let partPath = '';       // file che cresce mentre i byte arrivano
+    let destPromise = null;  // scelta della destinazione (una volta sola)
+    let askDest = null;      // come aprirla, quando serve
+    let askTimer = null;
+    // Il dialogo si apre alla prima delle due: trasferimento finito, oppure
+    // passato un attimo senza che finisca (⇒ è un file grosso). Così un
+    // salvataggio istantaneo si comporta esattamente come prima — dialogo a
+    // scaricamento concluso, e nessun dialogo se fallisce subito — mentre un
+    // filmato lungo non tiene ferma la connessione aspettando una risposta.
+    const ASK_AFTER_MS = 1200;
+    const ensureDest = () => {
+      if (!destPromise && askDest) destPromise = askDest();
+      return destPromise;
+    };
+    const dropPart = async () => {
+      if (!partPath) return;
+      try { await fs.promises.unlink(partPath); } catch (_) {}
+    };
+
+    let result = null;
+    let downloadError = null;
+    try {
+      result = await fetchToFile({
+        url,
+        referrer,
+        session: ses,
+        kind,
+        // Arrivati gli header sappiamo nome e peso: da qui in poi il
+        // salvataggio non è più cieco.
+        onHeaders: ({ filename, totalBytes }) => {
+          // Nome file sicuro: preferisci il Content-Disposition del server, poi
+          // il path dell'URL; neutralizza separatori e tentativi di traversal.
+          const name = safeImageFilename(filename || filenameFromUrl(url) || fallbackName);
+          // La voce nella barra in alto: percentuale, peso e "Annulla", gli
+          // stessi di un download partito da un link.
+          entry = downloads.beginManual({ url, filename: name, totalBytes });
+          // Il nome da proporre lo sa solo il server (Content-Disposition):
+          // per questo la destinazione si chiede da qui in poi, mai prima.
+          askDest = () => pickDestination(name).then((d) => {
+            // Chi annulla il dialogo non vuole più il file: ferma anche i byte.
+            if (d && (d.cancelled || d.error)) { try { entry.cancel(); } catch (_) {} }
+            return d;
+          });
+          askTimer = setTimeout(ensureDest, ASK_AFTER_MS);
+          // Il file parziale cresce nella cartella dove atterrerebbe un download
+          // nativo: se la destinazione è lì (quasi sempre) la consegna finale è
+          // una rinomina istantanea invece della copia di un filmato intero.
+          partPath = downloads.uniquePath(downloads.downloadsDir(), `${name}.filo-part`);
+          return partPath;
+        },
+        onProgress: (received, total) => { if (entry) entry.progress(received, total); },
+        shouldStop: () => !!entry && entry.cancelled(),
+      });
+    } catch (e) {
+      downloadError = e;
+    }
+    if (askTimer) { clearTimeout(askTimer); askTimer = null; }
+
+    // Non siamo mai arrivati agli header (URL morto, 404, host irraggiungibile):
+    // nessuna voce aperta, nessun file da ripulire.
+    if (!entry) return { ok: false, error: downloadError?.message || 'download fallito' };
+
+    // Se il trasferimento è fallito NON chiediamo dove salvare: sarebbe un
+    // dialogo per un file che non c'è. Se invece era già aperto lo si aspetta
+    // (non c'è modo di richiuderlo da qui).
+    if (!downloadError && !entry.cancelled()) ensureDest();
+    const dest = destPromise ? await destPromise : null;
+    const cancelled = entry.cancelled() || !!(dest && dest.cancelled);
+
+    if (cancelled) { await dropPart(); return { ok: false, cancelled: true }; }
+    if (downloadError) { entry.fail(); await dropPart(); return { ok: false, error: downloadError.message || 'download fallito' }; }
+    if (!dest || dest.error || !dest.filePath) {
+      entry.fail(); await dropPart();
+      return { ok: false, error: (dest && dest.error) || 'destinazione non disponibile' };
     }
 
     try {
-      await fs.promises.writeFile(savePath, buffer);
-      return { ok: true, path: savePath, filename: path.basename(savePath) };
+      await moveInto(result.partPath, dest.filePath);
     } catch (e) {
+      entry.fail(); await dropPart();
       return { ok: false, error: e?.message || 'scrittura fallita' };
     }
+    entry.done(dest.filePath);
+    return { ok: true, path: dest.filePath, filename: path.basename(dest.filePath) };
   };
 
   on(MSG.DOWNLOAD_IMAGE, handleDownload);
