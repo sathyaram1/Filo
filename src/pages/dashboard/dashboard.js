@@ -1768,10 +1768,15 @@
   // (VPN, rete aziendale, DNS che non conosce quel nome): quindi Filo lo dice e
   // lascia comunque aprire con un clic, invece di rifiutare in silenzio.
   // Il testo resta nel campo: se era un typo, si corregge senza riscriverlo.
-  let unresolvedLineEl = null;
+  let unresolvedLine = null; // { el, host } dell'ultimo avviso ancora non agito
   function showUnresolvedSite(text, host) {
-    // Un secondo invio dello stesso indirizzo non impila avvisi identici.
-    if (unresolvedLineEl) { unresolvedLineEl.remove(); unresolvedLineEl = null; }
+    // Un secondo invio dello STESSO indirizzo non impila avvisi identici. Uno su
+    // un indirizzo diverso, o uno già agito ("Apri comunque"), resta in chat: è
+    // roba successa, non rumore da sostituire.
+    if (unresolvedLine && unresolvedLine.host === host) {
+      unresolvedLine.el.remove();
+      unresolvedLine = null;
+    }
     if (body.dataset.state !== 'thread') goThread();
     const bubble = makeBubble({
       role: 'filo',
