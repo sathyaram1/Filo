@@ -23,6 +23,7 @@
         'Nelle Opzioni puoi spegnere tutti i modelli proprietari con un interruttore: Filo lavora solo con modelli a pesi aperti serviti da fornitori indipendenti, anche quando usi i crediti di Filo.',
       ],
       fixes: [
+        'Scrivendo "/" seguito da un indirizzo si aprono anche i dispositivi della tua rete di casa (nas.lan, raspberrypi.local, fritz.box); e se un indirizzo non risulta esistere Filo te lo dice invece di non fare nulla, lasciandoti aprirlo lo stesso.',
         'Salvando un video (o un\'immagine pesante) ne vedi l\'avanzamento fra le schede e puoi annullarlo, e non c\'è più una dimensione oltre la quale il salvataggio rinuncia: anche un film lungo arriva.',
         'Le pagine «il download partirà a breve…» che certi siti aprono in una nuova scheda ora si chiudono da sole appena il file parte, con un avviso «Riapri» se ti serviva tenerla.',
         '«Copia URL» non riempie più gli appunti quando dietro a un\'immagine, a un filmato o a un link non c\'è un vero indirizzo: adesso Filo te lo dice.',
