@@ -119,3 +119,34 @@ test('la stessa area di scrittura in chiaro continua a suggerire (baseline)', as
   await expect(corr.first()).toBeVisible({ timeout: 4000 });
   await expect(corr.first()).toContainText('ciao');
 });
+
+// Variante "sigillata" (shadow root CHIUSO): il bersaglio del click non è
+// raggiungibile da nessuna API di pagina, quindi la parola non è ricavabile né
+// col ripiego geometrico. Il correttore di sistema però la vede: il menu deve
+// riservare comunque lo slot e mostrare il suggerimento appena arriva.
+test('blocco sigillato: il suggerimento del correttore di sistema compare lo stesso', async ({ app, openTab, testServer }) => {
+  const url = testServer.html(`<!doctype html><html><body style="margin:0;padding:0">
+    <div id="host"></div>
+    <script>
+      const r = document.querySelector('#host').attachShadow({ mode: 'closed' });
+      r.innerHTML = ${JSON.stringify(CE)};
+    </script>
+  </body></html>`);
+  const page = await openTab(url);
+  await page.waitForFunction(
+    () => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+
+  // Click destro sopra la parola errata: il menu si apre "povero" (dentro un
+  // blocco sigillato non sappiamo cosa sia stato cliccato).
+  await page.mouse.click(24, 24, { button: 'right' });
+  await expect(page.locator('.sn-menu')).toBeVisible();
+
+  // …e subito dopo arrivano i suggerimenti nativi, come fa Electron sull'evento
+  // context-menu del webContents.
+  const sent = await sendNative(app, new URL(url).host, 'ciiao', ['ciao', 'chiao']);
+  expect(sent).toBeGreaterThanOrEqual(1);
+
+  const corr = page.locator('.sn-menu-correction:visible');
+  await expect(corr.first()).toBeVisible({ timeout: 4000 });
+  await expect(corr.first()).toContainText('ciao');
+});
