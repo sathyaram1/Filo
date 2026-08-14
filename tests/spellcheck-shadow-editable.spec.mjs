@@ -137,7 +137,7 @@ const SEALED = (text) => `<!doctype html><html><body style="margin:0;padding:0">
   <div id="host"></div>
   <script>
     const r = document.querySelector('#host').attachShadow({ mode: 'closed' });
-    r.innerHTML = ${JSON.stringify(CE)}.replace('>ciiao come stai<', '>' + ${JSON.stringify('')} + ${JSON.stringify(text)} + '<');
+    r.innerHTML = ${JSON.stringify(CE_OPEN)} + ${JSON.stringify(text)} + '</div>';
     const el = r.querySelector('#ce');
     // Sonda di sola lettura: dal test il contenuto del blocco sigillato è
     // altrimenti invisibile (è esattamente il punto del feedback).
