@@ -1,0 +1,8 @@
+{
+  "id": "a56e3ba8-ccea-4c94-b096-df24d485d9c4",
+  "status": "revision_capability",
+  "notes": "Fatto: sul tasto destro di un video o di un audio dentro un collegamento ora restano anche le voci del link, sotto una riga di separazione, con la stessa forma già usata per le immagini.\n\nHo aggiunto anche il caso opposto, che avresti trovato ancora rotto: quando il lettore copre il filmato con i suoi comandi (quasi tutti i player veri) il clic destro arrivava all'overlay e vinceva il collegamento, facendo sparire le azioni sul filmato. Ora le due famiglie convivono in entrambi i casi, così lo stesso video dentro lo stesso link dà sempre lo stesso menu. Un filmato di sfondo che sta dietro a un link che non lo contiene resta invece fuori dal menu: lì non è quello che stai guardando.\n\nLe immagini dentro un link mostravano già entrambe le famiglie da una lavorazione precedente: non ho cambiato niente lì.\n\nNota sui costi: nel menu del video dentro un link ho tenuto anche il riquadro «Spiega link», quindi quel clic destro fa una chiamata a pagamento come qualsiasi clic destro su un link (poche centinaia di token). L'alternativa era toglierlo, ma avrebbe reso il menu del link incompleto proprio dove serve di più — capire dove porta la copertina prima di aprirla.",
+  "queuedAt": "2026-08-14T07:29:29.812Z",
+  "queuedBy": "routine",
+  "branch": "worker/a56e3ba8-ccea-4c94-b096-df24d485d9c4-20260814T071250Z"
+}
