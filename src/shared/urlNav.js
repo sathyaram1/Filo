@@ -23,13 +23,39 @@
 (function (global) {
   'use strict';
 
+  // #433 — SUFFISSI DELLE RETI DOMESTICHE. Nomi come nas.lan, raspberrypi.local
+  // o stampante.home esistono SOLO dentro la rete di casa: li assegna il router
+  // (o mDNS), non il DNS pubblico. Nessuno di questi suffissi è delegato a un
+  // registro pubblico che possa servirli su Internet, quindi trattarli come
+  // "locali" non toglie niente a nessun sito reale.
+  //   • local            → mDNS/Bonjour (RFC 6762) — raspberrypi.local
+  //   • home.arpa        → nome ufficiale delle reti domestiche (RFC 8375)
+  //   • internal         → riservato da ICANN all'uso privato (2024)
+  //   • lan/home/box/…   → quelli che i router assegnano di fatto (FRITZ!Box usa
+  //                        fritz.box, moltissimi router usano .lan e .home)
+  const LOCAL_NET_TLDS = new Set([
+    'local', 'lan', 'home', 'internal', 'intranet', 'private', 'box',
+    'homenet', 'localdomain', 'corp',
+  ]);
+
+  // Vero se l'host è un nome della rete locale (vedi sopra). Un'etichetta sola
+  // senza punto ("lan") NON lo è: è un token qualsiasi, non un indirizzo.
+  function isLocalNetworkName(host) {
+    const h = String(host || '').toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
+    if (!h || !h.includes('.')) return false;
+    if (h === 'home.arpa' || h.endsWith('.home.arpa')) return true;
+    return LOCAL_NET_TLDS.has(h.slice(h.lastIndexOf('.') + 1));
+  }
+
   // Host che parlano quasi sempre in chiaro (server di sviluppo locali,
-  // router/IoT su IP privato): loopback, *.localhost e gli IP privati. Per questi
-  // lo schema di default è http:// invece di https://. Accetta anche la forma
-  // IPv6 tra parentesi ([::1]).
+  // router/IoT su IP privato, dispositivi della rete di casa): loopback,
+  // *.localhost, gli IP privati e i nomi con un suffisso di rete locale
+  // (nas.lan, raspberrypi.local). Per questi lo schema di default è http://
+  // invece di https://. Accetta anche la forma IPv6 tra parentesi ([::1]).
   function isLocalHost(host) {
     const h = String(host || '').toLowerCase().replace(/^\[|\]$/g, '');
     if (h === 'localhost' || h.endsWith('.localhost')) return true;
+    if (isLocalNetworkName(h)) return true;
     if (h === '::1' || h.startsWith('::ffff:127.')) return true;
     if (/^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h)) return true;       // loopback
     if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h)) return true;         // privato /8
