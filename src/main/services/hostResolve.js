@@ -19,14 +19,18 @@
 
 const dns = require('node:dns').promises;
 const net = require('node:net');
+// Registra globalThis.SN_URL_NAV (IIFE). Una sola definizione di "host locale"
+// per tutta l'app: la stessa che sceglie http:// invece di https://.
+require('../../shared/urlNav.js');
 
-// Vero se ha senso interrogare il DNS per questo host. IP letterali e localhost
-// non vanno risolti: sono validi per definizione.
+// Vero se ha senso interrogare il DNS per questo host. IP letterali, localhost e
+// i nomi della rete locale non vanno risolti: sono validi per definizione.
 function isCheckableHost(host) {
   const h = String(host == null ? '' : host).trim().toLowerCase();
   if (!h) return false;
   if (net.isIP(h)) return false;
-  if (h === 'localhost' || h.endsWith('.localhost')) return false;
+  const nav = globalThis.SN_URL_NAV;
+  if (nav && nav.isLocalHost(h)) return false;
   // Deve assomigliare a un dominio: almeno un punto e nessun carattere strano.
   if (!/^[a-z0-9._-]+$/.test(h)) return false;
   if (!h.includes('.')) return false;
