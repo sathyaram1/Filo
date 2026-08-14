@@ -172,6 +172,15 @@
     }
   }
 
+  // Avviso di fine lavoro: "Pagina tradotta" solo se non è rimasto fuori niente.
+  // Con dei componenti chiusi (#439) la stessa frase sarebbe una bugia, e la
+  // versione onesta resta in vista più a lungo perché dice qualcosa di nuovo.
+  function doneToast(unreachable) {
+    return unreachable
+      ? [I18n.t('toast_page_translated_partial'), { duration: 7000 }]
+      : [I18n.t('toast_page_translated')];
+  }
+
   // Errore tecnico → frase per l'utente (stessa traduzione delle chat: mai il
   // messaggio grezzo del provider, sempre cosa non ha funzionato e cosa fare).
   function reasonFor(err) {
