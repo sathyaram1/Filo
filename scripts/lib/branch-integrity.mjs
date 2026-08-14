@@ -18,7 +18,12 @@
 //      "nome giusto, contenuto vecchio" sparisce invece di essere gestita;
 //   C) ogni scrittura nella macchina a stati RICALCOLA l'identità e rifiuta la
 //      transizione se non corrisponde (identityVerdict + checkDelivery); ogni
-//      transizione accettata lascia un PUNTO FERMO (withCheckpoint);
+//      transizione accettata lascia un PUNTO FERMO (withCheckpoint). Le DUE
+//      metà stanno qui insieme — guardTransition (rifiuta) e sealState (sigilla)
+//      — perché valgono per tutti i punti di scrittura: i verdetti in
+//      dispatch.mjs e le CONSEGNE in queue-triage.mjs. Tenerne una sola nel
+//      posto condiviso è ciò che ha prodotto il guasto #460: le consegne
+//      controllavano l'identità ma non lasciavano nessun punto fermo;
 //   D) un'interruzione riporta il branch all'ULTIMO punto fermo, spostando di
 //      lato — senza distruggerli — i commit scartati (prepareBranch);
 //   B) l'identità attesa viene esposta su file (writeExpectation) perché una
