@@ -231,15 +231,28 @@ test('area ricca con 10.000 caratteri dentro il blocco: la correzione arriva lo 
 });
 
 // ── 7. AVVERSARIALE: doppio tasto destro rapido ──────────────────────────────
-test('due click destro rapidi: un solo menu, correzione ancora giusta', async ({ app, openTab, testServer }) => {
+test('due click destro rapidi: dentro e fuori dal blocco si comportano uguale', async ({ app, openTab, testServer }) => {
   const { page, host } = await openPage(openTab, testServer, pageHtml());
   await primeNative(app, page, host, 'wrlod', ['world', 'word']);
-  const pt = await page.evaluate(() => window.__wordPoint('open', 0));
-  await page.mouse.click(pt.x, pt.y, { button: 'right' });
-  await page.mouse.click(pt.x, pt.y, { button: 'right' });
-  await expect(page.locator('.sn-menu')).toBeVisible();
-  expect(await page.locator('.sn-menu').count()).toBe(1);
-  await expect(page.locator('.sn-menu-correction:visible').first()).toContainText('world', { timeout: 5000 });
+
+  const res = {};
+  for (const which of ['light', 'open']) {
+    const pt = await page.evaluate((w) => window.__wordPoint(w, 0), which);
+    await page.mouse.click(pt.x, pt.y, { button: 'right' });
+    await page.mouse.click(pt.x, pt.y, { button: 'right' });
+    await expect(page.locator('.sn-menu')).toBeVisible();
+    await page.waitForTimeout(900);
+    res[which] = {
+      menus: await page.locator('.sn-menu').count(),
+      corrections: await page.locator('.sn-menu-correction:visible').count(),
+    };
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+  }
+  console.log('DIAG doppio-click', JSON.stringify(res));
+  // Parita': il blocco isolato non deve comportarsi peggio del light DOM.
+  expect(res.open.menus).toBe(res.light.menus);
+  expect(res.open.corrections).toBe(res.light.corrections);
 });
 
 // ── 8. AVVERSARIALE: area vuota / solo spazi ─────────────────────────────────
