@@ -417,7 +417,6 @@
   }
 
   function renderCorrection(wrap, props, cleanups = []) {
-    keepPageFocus(wrap);
     wrap.innerHTML = '';
     wrap.classList.toggle('sn-menu-correction-loading', !!props.loading);
     wrap.classList.toggle('sn-disabled', !!props.disabled);
