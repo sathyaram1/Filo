@@ -1761,6 +1761,45 @@
     return resolves;
   }
 
+  // #433 — Enter su "/sito" il cui host il DNS non conosce. Prima non succedeva
+  // ASSOLUTAMENTE NULLA: nessuna scheda, nessun messaggio, solo l'input rosso —
+  // indistinguibile da un tasto Invio rotto. Il controllo esistenza serve a non
+  // finire su una pagina bianca dopo un errore di battitura, ma può sbagliarsi
+  // (VPN, rete aziendale, DNS che non conosce quel nome): quindi Filo lo dice e
+  // lascia comunque aprire con un clic, invece di rifiutare in silenzio.
+  // Il testo resta nel campo: se era un typo, si corregge senza riscriverlo.
+  let unresolvedLineEl = null;
+  function showUnresolvedSite(text, host) {
+    // Un secondo invio dello stesso indirizzo non impila avvisi identici.
+    if (unresolvedLineEl) { unresolvedLineEl.remove(); unresolvedLineEl = null; }
+    if (body.dataset.state !== 'thread') goThread();
+    const bubble = makeBubble({
+      role: 'filo',
+      text: `Non trovo “${host}”. Se è un errore di battitura correggilo pure; se invece sai che c’è, lo apro lo stesso.`,
+    });
+    const row = document.createElement('div');
+    row.className = 'dash-bubble-actions';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'dash-action-btn dash-action-btn-primary';
+    btn.textContent = '↗ Apri comunque';
+    btn.title = `Apri ${host} senza il controllo`;
+    btn.addEventListener('click', () => {
+      btn.disabled = true;
+      // L'utente ha deciso: da qui in poi quell'host non viene più messo in
+      // dubbio (niente rosso, niente avviso al prossimo invio).
+      siteResolveCache.set(host, true);
+      send({ type: MSG.OPEN_URL, url: siteUrlOf(text) });
+      if (inputEl.value.trim() === text) { inputEl.value = ''; autoGrowInput(); }
+      updateInputClass();
+    });
+    row.appendChild(btn);
+    bubble.appendChild(row);
+    bubblesEl.appendChild(bubble);
+    bubblesEl.scrollTop = bubblesEl.scrollHeight;
+    unresolvedLineEl = bubble;
+  }
+
   // Come sopra ma con debounce, per la verifica live mentre si scrive: parte
   // solo quando l'utente si ferma, poi ricolora (rosso se il dominio non esiste).
   function scheduleSiteResolve(host) {
