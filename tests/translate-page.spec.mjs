@@ -312,6 +312,109 @@ test('traduzione interrotta: si può comunque tornare all’originale', async ({
   await expect(page.locator('[data-sn-icon-id="translate"]')).toHaveAttribute('aria-label', 'Traduci');
 });
 
+// ───────────────────────────────────────────────────────────────────────────
+// #439 — i "componenti isolati" dei siti moderni.
+//
+// Un sito può costruire pezzi di pagina dentro un contenitore a parte (shadow
+// DOM). Chi si ferma all'albero principale non li vede mai: restavano in
+// lingua originale mentre il resto cambiava, e l'avviso diceva comunque
+// "Pagina tradotta".
+//
+// Le due metà del comportamento giusto:
+//  1) i componenti APERTI si traducono come il resto della pagina (e tornano
+//     indietro con "Mostra originale");
+//  2) i componenti CHIUSI non li può leggere nessuno script: lì l'unica cosa
+//     giusta è dirlo — "tradotta solo in parte", mai "Pagina tradotta".
+// ───────────────────────────────────────────────────────────────────────────
+
+const SHADOW_OPEN = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+  <h1 id="plain">A plain heading outside any component</h1>
+  <open-card></open-card>
+  <slot-card><span id="slotted">Text passed into the component by the page</span></slot-card>
+  <script>
+    customElements.define('open-card', class extends HTMLElement {
+      connectedCallback() {
+        const r = this.attachShadow({ mode: 'open' });
+        r.innerHTML = '<h2 id="shTitle">Headline living inside a component</h2>'
+          + '<p id="shBody">Body text of the isolated component, long enough to matter.</p>';
+      }
+    });
+    customElements.define('slot-card', class extends HTMLElement {
+      connectedCallback() {
+        const r = this.attachShadow({ mode: 'open' });
+        r.innerHTML = '<div id="shWrap">Wrapper label of the card <slot></slot></div>';
+      }
+    });
+  </script>
+</body></html>`;
+
+const SHADOW_CLOSED = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+  <h1 id="plain">A plain heading outside any component</h1>
+  <closed-card></closed-card>
+  <script>
+    customElements.define('closed-card', class extends HTMLElement {
+      connectedCallback() {
+        const r = this.attachShadow({ mode: 'closed' });
+        r.innerHTML = '<h2>Headline locked inside a closed component</h2>'
+          + '<p>Body text nobody outside the component can read.</p>';
+      }
+    });
+  </script>
+</body></html>`;
+
+test('traduce anche il testo dentro i componenti isolati della pagina', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, SHADOW_OPEN);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#plain');
+
+  await expect(page.locator('#plain')).toHaveText(/^IT /);
+  // Il cuore della segnalazione: titolo e paragrafo DENTRO il componente.
+  await expect(page.locator('#shTitle')).toHaveText(/^IT /);
+  await expect(page.locator('#shBody')).toHaveText(/^IT /);
+  // Anche l'etichetta del componente che ospita testo passato dalla pagina…
+  await expect(page.locator('#shWrap')).toHaveText(/IT Wrapper label/);
+  // …e il testo passato dalla pagina, tradotto UNA volta sola (se lo si
+  // contasse due volte — una nell'albero, una nel componente — resterebbe
+  // "IT IT ").
+  await expect(page.locator('#slotted')).toHaveText(/^IT /);
+  await expect(page.locator('#slotted')).not.toHaveText(/^IT\s+IT\s/);
+
+  await page.screenshot({ path: 'tests/.shots/translate-page-shadow.png' }).catch(() => {});
+  expect(await toasts(page)).toContain('Pagina tradotta');
+});
+
+test('"Mostra originale" rimette a posto anche i componenti isolati', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, SHADOW_OPEN);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#plain');
+  await expect(page.locator('#shTitle')).toHaveText(/^IT /);
+
+  await clickTranslateIcon(page, '#plain');
+  await expect(page.locator('#shTitle')).toHaveText('Headline living inside a component');
+  await expect(page.locator('#shBody')).toHaveText('Body text of the isolated component, long enough to matter.');
+  await expect(page.locator('#slotted')).toHaveText('Text passed into the component by the page');
+  await expect(page.locator('#plain')).toHaveText('A plain heading outside any component');
+});
+
+test('componente chiuso: dice che la pagina è tradotta solo in parte, non "Pagina tradotta"', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, SHADOW_CLOSED);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#plain');
+
+  // Quel che è raggiungibile viene tradotto lo stesso.
+  await expect(page.locator('#plain')).toHaveText(/^IT /);
+
+  const partial = async () => (await toasts(page)).find((t) => t.startsWith('Pagina tradotta solo in parte'));
+  await expect.poll(partial, { timeout: 30000 }).toBeTruthy();
+  expect(await partial()).toContain('restano nella lingua originale');
+  // La bugia da cui nasce la segnalazione.
+  expect(await toasts(page)).not.toContain('Pagina tradotta');
+  await page.screenshot({ path: 'tests/.shots/translate-page-closed-component.png' }).catch(() => {});
+});
+
 test('"Mostra originale" riporta indietro tutta la pagina, link compresi', async ({ app, openTab, testServer }) => {
   await stubTranslationProvider(app);
   const page = await testServer.openReady(openTab, ARTICLE);
