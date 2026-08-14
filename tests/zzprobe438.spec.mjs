@@ -1,36 +1,64 @@
 import { test, expect } from './fixtures/electron.mjs';
+import { createServer } from 'node:http';
+import { execFileSync } from 'node:child_process';
+import { readFileSync, existsSync, mkdirSync } from 'node:fs';
 
-test('probe: il correttore nativo marca la parola?', async ({ app, openTab, testServer }) => {
-  test.setTimeout(120_000);
-  const info = await app.evaluate(async ({ session, app: a }) => ({
-    current: session.defaultSession.getSpellCheckerLanguages(),
-    locale: a.getLocale(),
-  }));
-  console.log('PROBE', JSON.stringify(info));
+const CACHE = '/tmp/filo-dict';
+
+function dictServer() {
+  mkdirSync(CACHE, { recursive: true });
+  const srv = createServer((req, res) => {
+    const name = req.url.replace(/^\/+/, '').split('?')[0];
+    console.log('DICT REQ', name);
+    const local = `${CACHE}/${name}`;
+    try {
+      if (!existsSync(local)) {
+        execFileSync('curl', ['-sSL', '--max-time', '60', '-o', local,
+          `https://redirector.gvt1.com/edgedl/chrome/dict/${name}`], { stdio: 'ignore' });
+      }
+      const buf = readFileSync(local);
+      if (buf.length < 1000) { res.writeHead(404); res.end('nope'); return; }
+      res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Length': buf.length });
+      res.end(buf);
+      console.log('DICT SERVED', name, buf.length);
+    } catch (e) {
+      console.log('DICT FAIL', name, String(e).slice(0, 100));
+      res.writeHead(404); res.end('nope');
+    }
+  });
+  return srv;
+}
+
+test('probe: dizionario servito in locale → il correttore nativo marca?', async ({ app, openTab, testServer }) => {
+  test.setTimeout(180_000);
+  const srv = dictServer();
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const port = srv.address().port;
+
+  await app.evaluate(({ session }, url) => {
+    const ses = session.defaultSession;
+    ses.setSpellCheckerDictionaryDownloadURL(url);
+    ses.setSpellCheckerLanguages(['en-US']);
+  }, `http://127.0.0.1:${port}/`);
 
   const page = await testServer.openReady(openTab, `<!doctype html><body style="padding:24px">
     <div id="ed" contenteditable="true" spellcheck="true" style="border:1px solid #999;min-height:60px;padding:8px;font:18px sans-serif"></div>
   </body>`);
+  await page.waitForTimeout(4000);
 
   await app.evaluate(({ webContents }) => {
     globalThis.__ctx = [];
     for (const wc of webContents.getAllWebContents()) {
       wc.on('context-menu', (_e, p) => {
-        globalThis.__ctx.push({
-          url: (wc.getURL() || '').slice(0, 40),
-          mis: p.misspelledWord,
-          sug: p.dictionarySuggestions,
-          editable: p.isEditable,
-          sel: p.selectionText,
-        });
+        globalThis.__ctx.push({ mis: p.misspelledWord, sug: p.dictionarySuggestions });
       });
     }
   });
 
-  for (const txt of ['wrlod ciao', 'ciiao come stai', 'helo world', 'funzionaaa bene']) {
+  for (const txt of ['wrlod ciao', 'helo world']) {
     await page.evaluate(() => { const e = document.getElementById('ed'); e.textContent = ''; e.focus(); });
     await page.keyboard.type(txt, { delay: 25 });
-    await page.waitForTimeout(1200);
+    await page.waitForTimeout(1500);
     const r = await page.evaluate(() => {
       const ed = document.getElementById('ed');
       const node = ed.firstChild;
@@ -54,5 +82,6 @@ test('probe: il correttore nativo marca la parola?', async ({ app, openTab, test
     await page.keyboard.press('Escape');
     await page.waitForTimeout(400);
   }
+  await new Promise((r) => srv.close(r));
   expect(true).toBe(true);
 });
