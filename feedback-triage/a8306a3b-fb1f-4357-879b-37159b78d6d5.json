@@ -1,0 +1,7 @@
+{
+  "id": "a8306a3b-fb1f-4357-879b-37159b78d6d5",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Il punto rimasto aperto adesso regge: nella variante «sigillata», scritto «wrlod ciao» in un'area di scrittura ricca, il tasto destro propone «world» in cima e cliccandolo la parola viene corretta davvero; lo stesso vale per le alternative dietro la freccetta, e il punto in cui si stava scrivendo non va perso. Tiene anche con diecimila caratteri nel campo (il resto del testo resta intatto), su parola in grassetto (la formattazione sopravvive), su campo vuoto, su parola scritta bene (nessun suggerimento stantio), con due clic destri rapidi di fila, con un doppio clic sulla correzione (non viene applicata due volte) e con codice ostile scritto nel campo (non viene eseguito). Nel blocco isolato normale e fuori dai blocchi tutto invariato.\n\nUna cosa non ho potuto provarla qui: la macchina su cui giro non riesce a caricare il dizionario italiano, quindi ho esercitato tutto con quello inglese. Il meccanismo non dipende dalla lingua, ma se vuoi la controprova sul tuo esempio («ciiao») serve una prova a mano.\n\nTi ho accodato a parte un suggerimento sul menu povero dentro i blocchi sigillati.",
+  "queuedAt": "2026-08-14T18:29:55.315Z",
+  "queuedBy": "routine"
+}
