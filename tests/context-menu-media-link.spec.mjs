@@ -36,8 +36,8 @@ function overlayCardHtml(linkHref) {
   </body></html>`;
 }
 
-async function openMenuOn(page, selector) {
-  await page.locator(selector).click({ button: 'right', position: { x: 20, y: 20 } });
+async function openMenuOn(page, selector, position = { x: 20, y: 20 }) {
+  await page.locator(selector).click({ button: 'right', position });
   const menu = page.locator('.sn-menu');
   await expect(menu).toBeVisible();
   return menu;
