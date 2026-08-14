@@ -115,7 +115,7 @@ test('un video di sfondo NON si intrufola nel menu di un link che non lo contien
     <video id="bg" src="/bg.mp4" style="position:fixed;inset:0;width:100%;height:100%;z-index:-1;background:#222"></video>
     <a id="plain" href="https://example.com/pagina" style="position:relative;z-index:1;display:inline-block;margin:40px">Un collegamento qualsiasi</a>
   </body></html>`);
-  const menu = await openMenuOn(page, '#plain');
+  const menu = await openMenuOn(page, '#plain', { x: 20, y: 8 });
 
   for (const label of LINK_LABELS) {
     await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
