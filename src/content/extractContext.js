@@ -618,6 +618,7 @@
     getRenderedSelectionText,
     extractMainTextNodes,
     extractTranslatableBlocks,
+    findTranslatedElements,
     pageMeta,
     pageExcerpt,
     extractInteractiveOutline,
