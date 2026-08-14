@@ -25,14 +25,20 @@
 
   // #433 — SUFFISSI DELLE RETI DOMESTICHE. Nomi come nas.lan, raspberrypi.local
   // o stampante.home esistono SOLO dentro la rete di casa: li assegna il router
-  // (o mDNS), non il DNS pubblico. Nessuno di questi suffissi è delegato a un
-  // registro pubblico che possa servirli su Internet, quindi trattarli come
-  // "locali" non toglie niente a nessun sito reale.
+  // (o mDNS), non il DNS pubblico. Chiederli al resolver pubblico dà ENOTFOUND
+  // anche quando il dispositivo è lì e risponde — per questo vanno trattati come
+  // localhost e gli IP privati (schema http, niente controllo esistenza).
   //   • local            → mDNS/Bonjour (RFC 6762) — raspberrypi.local
   //   • home.arpa        → nome ufficiale delle reti domestiche (RFC 8375)
   //   • internal         → riservato da ICANN all'uso privato (2024)
-  //   • lan/home/box/…   → quelli che i router assegnano di fatto (FRITZ!Box usa
-  //                        fritz.box, moltissimi router usano .lan e .home)
+  //   • home/corp        → richiesti come gTLD e RIFIUTATI da ICANN proprio
+  //                        perché già usati ovunque nelle reti private
+  //   • lan/intranet/…   → mai delegati, e assegnati di fatto dai router
+  //   • box              → UNICA ECCEZIONE: è un gTLD pubblico davvero
+  //                        esistente. Sta qui perché fritz.box è l'indirizzo
+  //                        predefinito dei router FRITZ!Box (diffusissimi) e
+  //                        quello è il caso reale; il prezzo è che un sito
+  //                        pubblico .box si aprirebbe in http invece che https.
   const LOCAL_NET_TLDS = new Set([
     'local', 'lan', 'home', 'internal', 'intranet', 'private', 'box',
     'homenet', 'localdomain', 'corp',
