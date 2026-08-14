@@ -162,8 +162,10 @@ export function commitAndPush(file) {
 //
 // Sigillare qui — non nel file-ruolo, non nella prosa — è ciò che rende la
 // consegna un punto di non ritorno: da qui in poi il ripristino torna AL LAVORO.
-function sealDelivery(id, status) {
-  const prev = readBranchState(ROOT, id);
+// `prev` è lo stato che la guardia ha appena VALIDATO: si sigilla quello, non
+// una rilettura — fra le due potrebbe essere cambiato, e sarebbe un punto fermo
+// su qualcosa che nessuno ha verificato.
+function sealDelivery(id, status, prev) {
   // Nessun branch assegnato (owner a mano, feedback fuori pipeline): non c'è
   // nessuna identità da fissare, esattamente come per la guardia.
   if (!prev || !prev.branch) return null;
