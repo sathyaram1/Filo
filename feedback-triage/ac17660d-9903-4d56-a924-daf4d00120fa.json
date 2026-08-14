@@ -1,7 +1,8 @@
 {
   "id": "ac17660d-9903-4d56-a924-daf4d00120fa",
-  "status": "working",
-  "notes": "",
-  "queuedAt": "2026-08-14T01:37:37.981Z",
-  "queuedBy": "routine"
+  "status": "revision_capability",
+  "notes": "Ho scelto io fra le due strade del punto 2 invece di rimandarti la domanda, perche' in entrambe la cosa da togliere era la stessa: il silenzio. Ora, se l'indirizzo non risulta esistere, Filo te lo dice e mette li' un \"Apri comunque\". Non l'ho fatto aprire da solo sulla pagina d'errore perche' il controllo serve proprio a risparmiartela quando hai sbagliato a scrivere; per lo stesso motivo quello che hai scritto resta nel campo, cosi' lo correggi senza riscriverlo. Se apri comunque, su quell'indirizzo Filo non ti chiede piu' niente.\n\nPunto 1 fatto: i nomi della rete di casa saltano il controllo esistenza e si aprono in chiaro, esattamente come gia' facevano localhost e gli IP privati. Riconosciuti: .lan, .local, .home, .internal, .intranet, .private, .box, .homenet, .localdomain, .corp e home.arpa.\n\nUna scelta che ricade su di te: .box e' l'unico di quella lista che esiste anche come dominio pubblico vendibile. L'ho tenuto dentro perche' e' l'indirizzo predefinito dei router FRITZ!Box, che e' il caso vero; la conseguenza e' che un eventuale sito pubblico che finisce in .box si aprirebbe in http invece che in https. Se preferisci il contrario, e' una riga da togliere.",
+  "queuedAt": "2026-08-14T02:33:11.665Z",
+  "queuedBy": "routine",
+  "branch": "worker/ac17660d-9903-4d56-a924-daf4d00120fa-20260814T013741Z"
 }
