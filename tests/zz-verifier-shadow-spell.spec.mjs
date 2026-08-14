@@ -205,10 +205,26 @@ test('suggerimento con HTML ostile: non viene eseguito', async ({ app, openTab, 
 test('area ricca con 10.000 caratteri dentro il blocco: la correzione arriva lo stesso', async ({ app, openTab, testServer }) => {
   const filler = 'parola '.repeat(1400); // ~9.8k caratteri
   const { page, host } = await openPage(openTab, testServer, pageHtml('wrlod ciao', `${filler}wrlod ciao`));
-  await page.evaluate(() => { window.__el('open').style.height = '400px'; });
   await primeNative(app, page, host, 'wrlod', ['world', 'word']);
-  const idx = await page.evaluate(() => window.__text('open').trim().split(/\s+/).length - 2);
-  await rightClickWord(page, 'open', idx);
+  // Porta l'ultima riga (dove sta "wrlod") sotto gli occhi, come farebbe
+  // l'utente scrollando fino in fondo a quello che ha scritto.
+  const diag = await page.evaluate(() => {
+    const el = window.__el('open');
+    el.scrollTop = el.scrollHeight;
+    const tn = el.firstChild;
+    const i = tn.textContent.lastIndexOf('wrlod');
+    const rg = document.createRange();
+    rg.setStart(tn, i); rg.setEnd(tn, i + 5);
+    const r = rg.getBoundingClientRect();
+    return {
+      len: tn.textContent.length,
+      x: r.left + r.width / 2, y: r.top + r.height / 2,
+      vw: innerWidth, vh: innerHeight,
+      elRect: { t: el.getBoundingClientRect().top, b: el.getBoundingClientRect().bottom },
+    };
+  });
+  console.log('DIAG long-text', JSON.stringify(diag));
+  await page.mouse.click(diag.x, diag.y, { button: 'right' });
   await expect(page.locator('.sn-menu')).toBeVisible();
   await expect(page.locator('.sn-menu-correction:visible').first()).toContainText('world', { timeout: 5000 });
 });
