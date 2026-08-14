@@ -137,7 +137,9 @@ test('#439 la traduzione non tocca il menu di Filo dentro la pagina', async ({ a
   await page.locator('#p1').click({ button: 'right', position: { x: 5, y: 5 } });
   const menu = page.locator('.sn-menu');
   await expect(menu).toBeVisible();
-  await expect(menu.getByText('Mostra originale', { exact: true }).first()).toBeVisible();
+  // A traduzione finita la stessa icona propone il ritorno all'originale: se il
+  // menu fosse finito nel giro della traduzione, sarebbe "IT Mostra originale".
+  await expect(page.locator('[data-sn-icon-id="translate"]')).toHaveAttribute('aria-label', 'Mostra originale');
   expect(await menu.textContent()).not.toContain('IT ');
   await page.screenshot({ path: 'tests/.shots/probe-439-menu.png' }).catch(() => {});
 });
