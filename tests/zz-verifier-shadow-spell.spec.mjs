@@ -210,6 +210,7 @@ test('area ricca con 10.000 caratteri dentro il blocco: la correzione arriva lo 
   // l'utente scrollando fino in fondo a quello che ha scritto.
   const diag = await page.evaluate(() => {
     const el = window.__el('open');
+    el.style.overflow = 'auto';
     el.scrollTop = el.scrollHeight;
     const tn = el.firstChild;
     const i = tn.textContent.lastIndexOf('wrlod');
