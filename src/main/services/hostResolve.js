@@ -6,8 +6,11 @@
 //
 // POLITICA (volutamente conservativa: meglio lasciar navigare che bloccare per
 // sbaglio un sito buono):
-//   • IP letterale (1.2.3.4, ::1) o localhost / *.localhost → consideralo
-//     valido SENZA interrogare il DNS (non hanno un record da risolvere).
+//   • IP letterale (1.2.3.4, ::1), localhost / *.localhost, oppure un nome della
+//     rete locale (nas.lan, raspberrypi.local, fritz.box — vedi
+//     SN_URL_NAV.isLocalNetworkName) → consideralo valido SENZA interrogare il
+//     DNS. Il resolver pubblico non li conosce per definizione: chiederglielo
+//     restituisce ENOTFOUND anche quando il dispositivo è lì e risponde (#433).
 //   • host normale → `dns.lookup` (lo stesso resolver del sistema operativo che
 //     userebbe il browser per navigare). SOLO un esito ENOTFOUND ("il dominio
 //     non esiste") conta come "non esiste". Qualsiasi altro errore — rete giù,
