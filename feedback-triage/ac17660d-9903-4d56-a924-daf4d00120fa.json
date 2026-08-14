@@ -1,0 +1,7 @@
+{
+  "id": "ac17660d-9903-4d56-a924-daf4d00120fa",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. verificato. Gli indirizzi di casa con il punto (nas.lan:8080, raspberrypi.local, stampante.lan, fritz.box, e anche scritti in maiuscolo o con il punto finale) ora aprono la scheda premendo invio, in chiaro come gia' facevano localhost e gli IP; un indirizzo che davvero non esiste riceve la riga di risposta con \"Apri comunque\", il testo resta nel campo, e dopo che hai insistito su quell'indirizzo non ti chiede piu' niente. Provato anche a romperlo: invii ripetuti di fila (un solo avviso, non se ne impilano), campo con solo la barra, spazi, emoji, tag HTML e un indirizzo da diecimila caratteri - l'app regge, niente finisce eseguito come codice, e in nessuno di questi casi l'invio resta muto. Gli schemi che non sono indirizzi (javascript:, data:, file:) non diventano navigazioni.\n\nUna nota sul percorso: il lavoro consegnato non era piu' sul ramo quando sono arrivato - era stato messo fra gli scarti dall'automatismo che ripristina i rami interrotti - e l'ho rimesso al suo posto prima di verificarlo. Ti ho aperto una segnalazione a parte perche' e' un guasto che ricapitera' a ogni lavoro nuovo, e non riguarda questa correzione.",
+  "queuedAt": "2026-08-14T06:31:01.989Z",
+  "queuedBy": "routine"
+}
