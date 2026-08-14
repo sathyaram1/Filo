@@ -156,6 +156,7 @@
         // dizionario, correggi automaticamente, gestisci correttore).
         const wrap = document.createElement('div');
         wrap.className = 'sn-menu-correction';
+        keepPageFocus(wrap);
         if (it.disabled) wrap.classList.add('sn-disabled');
         if (it.loading) wrap.classList.add('sn-menu-correction-loading');
         if (it.id) wrap.id = it.id;
@@ -398,6 +399,18 @@
     activeMenu = { root, onDocClick, onKey, onScroll, cleanupZoom, cleanups, subRoot: null };
   }
 
+  // Impedisce che l'elemento del menu prenda il fuoco quando lo si clicca.
+  // Senza questo, premere il tasto del mouse sposta il fuoco dal campo di
+  // scrittura al bottone del menu: il punto in cui si stava scrivendo — e la
+  // parola che il correttore di sistema aveva selezionato sotto al cursore —
+  // sparisce PRIMA che l'azione parta, e la correzione non ha più niente su cui
+  // agire. Pesa soprattutto dentro i blocchi "sigillati" (#438), dove riscrivere
+  // la selezione è l'UNICA strada per correggere: altrove la correzione ritrova
+  // il campo da sé. preventDefault su mousedown non annulla il click.
+  function keepPageFocus(el) {
+    el.addEventListener('mousedown', (e) => { e.preventDefault(); });
+  }
+
   // (Ri)disegna l'item 'correction' in-place.
   // `cleanups` arriva da open(): renderCorrection è definita a livello di modulo
   // (non chiude sullo scope di open), quindi va passato esplicitamente —
@@ -470,6 +483,9 @@
         const b = document.createElement('button');
         b.type = 'button';
         b.className = 'sn-menu-item';
+        // Come per la riga di correzione: agire da qui non deve togliere il
+        // fuoco (e quindi il punto in cui si scriveva) al campo sottostante.
+        keepPageFocus(b);
         if (sit.disabled) b.classList.add('sn-disabled');
         const lbl = document.createElement('span');
         lbl.className = 'sn-menu-label';
