@@ -151,9 +151,13 @@
       }
 
       pageHasTranslation = true;
+      // NB: i componenti chiusi non rendono la traduzione "riprendibile" —
+      // riprovare non li aprirà mai. Lo stato resta quindi completo (il menu
+      // offre "Mostra originale", non "Riprendi": riprendere non farebbe
+      // nulla), ed è l'AVVISO a dire che una parte è rimasta fuori.
       pageComplete = missingCount === 0;
       if (pageComplete) {
-        Popup.showToast(I18n.t('toast_page_translated'));
+        Popup.showToast(...doneToast(unreachable));
       } else {
         // MAI "Pagina tradotta" quando non lo è: si dice che si è interrotta,
         // quanto manca e come riprendere (il motivo tecnico grezzo resta fuori).
