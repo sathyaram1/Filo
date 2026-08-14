@@ -1,8 +1,0 @@
-{
-  "op": "worker-log",
-  "role": "verifier",
-  "startedAt": "2026-08-14T07:31:12.629Z",
-  "num": "434",
-  "queuedAt": "2026-08-14T07:31:12.629Z",
-  "queuedBy": "dispatch"
-}
