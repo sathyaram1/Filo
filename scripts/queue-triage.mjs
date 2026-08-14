@@ -149,6 +149,48 @@ export function commitAndPush(file) {
   else console.warn(`  ! spedizione su origin/${mainBranch} non riuscita (${land.reason}). Il file è committato sul branch '${cur}' e verrà riprovato; oppure applicala in locale.`);
 }
 
+// ─── C: una consegna ACCETTATA lascia un PUNTO FERMO ─────────────────────────
+//
+// La guardia qui sotto è solo METÀ della regola. L'altra metà — «ogni
+// transizione accettata lascia un punto fermo» — viveva solo in dispatch.mjs
+// (i verdetti), e questo è il punto in cui si registrano le CONSEGNE. Senza,
+// dopo una consegna l'ultimo punto fermo restava quello della CREAZIONE del
+// branch: il giro dopo vedeva i commit del lavoro come "istanza interrotta",
+// riportava il branch a prima che il lavoro esistesse e riallineava anche
+// origin. Chi doveva verificare trovava il vuoto (#460, incidente del 24 luglio
+// in miniatura: il vuoto si legge come "lavoro mai fatto" e si riscrive tutto).
+//
+// Sigillare qui — non nel file-ruolo, non nella prosa — è ciò che rende la
+// consegna un punto di non ritorno: da qui in poi il ripristino torna AL LAVORO.
+function sealDelivery(id, status) {
+  const prev = readBranchState(ROOT, id);
+  // Nessun branch assegnato (owner a mano, feedback fuori pipeline): non c'è
+  // nessuna identità da fissare, esattamente come per la guardia.
+  if (!prev || !prev.branch) return null;
+  const sealed = sealState(ROOT, { ...prev, id }, `consegna:${status}`);
+  persistStateToGit(id, `feedback: punto fermo consegna ${id}`);
+  return sealed;
+}
+
+// Il punto fermo deve sopravvivere alla fine della sessione: lo scrive uno
+// script lanciato via Bash, e l'hook di auto-commit scatta solo su Edit/Write.
+// Non committato, il primo reset/rebase lo cancella — ed è di nuovo come non
+// averlo mai registrato. Stesso trattamento dei verdetti (dispatch.mjs):
+// commit path-limited sul branch corrente + spedizione ISOLATA del solo file di
+// stato al ramo principale (mai `push HEAD:main`, che porterebbe su main tutto
+// il lavoro non ancora esaminato). Best-effort: un guasto git non deve far
+// fallire la consegna.
+function persistStateToGit(id, message) {
+  // Nei test lo stato è un file temporaneo fuori dal repo: niente git.
+  if (process.env.FILO_DISPATCH_STATE_DIR) return;
+  const abs = resolve(stateDir(ROOT), `${id}.json`);
+  const rel = repoPath(ROOT, abs);
+  if (!tryGit(['add', '--', rel]).ok) return;
+  if (tryGit(['diff', '--cached', '--quiet', '--', rel]).ok) return;
+  if (!tryGit(['commit', '-q', '-m', message, '--', rel]).ok) return;
+  pushFileToMainWithRetry(ROOT, abs, message);
+}
+
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
 if (isMain) {
   const args = process.argv.slice(2);
