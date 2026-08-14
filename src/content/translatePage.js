@@ -54,6 +54,9 @@
 
     try {
       const blocks = Extract.extractTranslatableBlocks();
+      // Pezzi di pagina che nessuno script può leggere (#439): non entrano nel
+      // lavoro, ma cambiano l'avviso finale — "Pagina tradotta" sarebbe falso.
+      const unreachable = Number(blocks.unreachable || 0);
 
       // Per ogni unità: i figli (link, img, span, …) diventano segnaposto [[Lk]],
       // così il modello traduce solo il testo e la struttura resta intatta.
