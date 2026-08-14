@@ -242,6 +242,12 @@ if (isMain) {
       console.error('[queue-triage] Il lavoro NON è stato registrato: la directory non è sul branch assegnato a questo feedback.');
       process.exit(3);
     }
+    // Accettata ⇒ punto fermo. Prima della coda: se la spedizione del
+    // fogliettino fallisce il lavoro resta comunque protetto dal ripristino,
+    // mentre un punto fermo mancante non è recuperabile dal giro dopo.
+    try { sealDelivery(id, status); } catch (e) {
+      console.warn(`  ! punto fermo non registrato: ${e.message}`);
+    }
   }
 
   try {
