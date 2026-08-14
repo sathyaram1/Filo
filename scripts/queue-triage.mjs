@@ -245,7 +245,7 @@ if (isMain) {
     // Accettata ⇒ punto fermo. Prima della coda: se la spedizione del
     // fogliettino fallisce il lavoro resta comunque protetto dal ripristino,
     // mentre un punto fermo mancante non è recuperabile dal giro dopo.
-    try { if (!process.env.FILO_TMP_NO_SEAL) sealDelivery(id, status); } catch (e) {
+    try { sealDelivery(id, status); } catch (e) {
       console.warn(`  ! punto fermo non registrato: ${e.message}`);
     }
   }
