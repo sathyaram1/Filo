@@ -418,53 +418,59 @@
       selInfo, linkEl, imgEl, mediaEl, mediaUnder, editable, clipboardHistory, navState,
     });
 
-    // Slot riservato per la correzione ortografica nativa nei <input>: nascosto
-    // finché Electron non ci notifica via broadcast la parola misspelled e i
+    // Slot riservato per la correzione ortografica nativa: nascosto finché
+    // Electron non ci notifica via broadcast la parola misspelled e i
     // suggerimenti. Posizionato in cima al menu come voce principale.
-    let revealInputCorrection = null;
-    if (opts.reserveInputCorrection) {
-      let updateCorrection = null;
-      items.unshift(
-        {
-          type: 'correction',
-          label: '',
-          loading: false,
-          hidden: true,
-          onClick: null,
-          subItems: [],
-          onMount: (_root, update) => { updateCorrection = update; },
-        },
-        { type: 'separator', hidden: true },
-      );
-      revealInputCorrection = (word, suggestions) => {
-        const sugg = (suggestions || []).filter((s) => s && s !== word);
-        if (!updateCorrection || !sugg.length) return;
-        const top = sugg[0];
-        const subItems = sugg.slice(1, 5).map((s) => ({
-          label: s,
-          onClick: () => chrome.runtime.sendMessage({ type: MSG.REPLACE_MISSPELLING, suggestion: s }),
-        }));
-        updateCorrection({
-          hidden: false,
-          label: top,
-          loading: false,
-          onClick: () => chrome.runtime.sendMessage({ type: MSG.REPLACE_MISSPELLING, suggestion: top }),
-          subItems,
-        });
-      };
-    }
+    //
+    // Lo riserviamo su OGNI menu normale, non solo sui <input> (#438). Il
+    // correttore nativo di Chromium vede il campo anche dove noi non riusciamo a
+    // capire cosa è stato cliccato: dentro i blocchi "sigillati" (shadow root
+    // chiuso) il bersaglio reale non è raggiungibile da nessuna API di pagina, e
+    // lì il menu restava senza correzione pur essendoci una parola sbagliata
+    // sotto al cursore. Il broadcast arriva SOLO quando Chromium ha davvero
+    // trovato una parola errata sotto al click, quindi su un menu qualunque lo
+    // slot resta invisibile e non costa nulla. La sostituzione passa da
+    // replaceMisspelling, che agisce sul campo a fuoco senza doverlo
+    // identificare dalla pagina.
+    let updateCorrection = null;
+    items.unshift(
+      {
+        type: 'correction',
+        label: '',
+        loading: false,
+        hidden: true,
+        onClick: null,
+        subItems: [],
+        onMount: (_root, update) => { updateCorrection = update; },
+      },
+      { type: 'separator', hidden: true },
+    );
+    const revealNativeCorrection = (word, suggestions) => {
+      const sugg = (suggestions || []).filter((s) => s && s !== word);
+      if (!updateCorrection || !sugg.length) return;
+      const top = sugg[0];
+      const subItems = sugg.slice(1, 5).map((s) => ({
+        label: s,
+        onClick: () => chrome.runtime.sendMessage({ type: MSG.REPLACE_MISSPELLING, suggestion: s }),
+      }));
+      updateCorrection({
+        hidden: false,
+        label: top,
+        loading: false,
+        onClick: () => chrome.runtime.sendMessage({ type: MSG.REPLACE_MISSPELLING, suggestion: top }),
+        subItems,
+      });
+    };
 
     Menu.open({ x: e.clientX, y: e.clientY, items, keepOnScroll: !!selInfo });
 
-    if (revealInputCorrection) {
-      // Passa il timestamp di apertura: se il broadcast nativo è già arrivato
-      // (vincoli di timing con l'await getClipboardHistory sopra), il modulo
-      // spellcheck ce lo consegna subito invece di lasciarci aspettare.
-      SpellCheck.onNextNativeSuggestion?.(({ word, suggestions }) => {
-        if (!suggestions?.length) return;
-        revealInputCorrection(word, suggestions);
-      }, { since: openedAt });
-    }
+    // Passa il timestamp di apertura: se il broadcast nativo è già arrivato
+    // (vincoli di timing con l'await getClipboardHistory sopra), il modulo
+    // spellcheck ce lo consegna subito invece di lasciarci aspettare.
+    SpellCheck?.onNextNativeSuggestion?.(({ word, suggestions }) => {
+      if (!suggestions?.length) return;
+      revealNativeCorrection(word, suggestions);
+    }, { since: openedAt });
   }
 
   // Salva il target editabile e la sua selezione/range al momento dell'apertura
