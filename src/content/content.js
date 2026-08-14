@@ -430,7 +430,7 @@
     // sotto al cursore. Il broadcast arriva SOLO quando Chromium ha davvero
     // trovato una parola errata sotto al click, quindi su un menu qualunque lo
     // slot resta invisibile e non costa nulla. La sostituzione passa da
-    // replaceMisspelling, che agisce sul campo a fuoco senza doverlo
+    // applyNativeCorrection, che agisce sul campo a fuoco senza doverlo
     // identificare dalla pagina. Resta appeso al correttore: se l'utente lo ha
     // spento, niente slot e niente suggerimenti.
     const wantCorrection = settings?.featureFlags?.spellcheck !== false && !!SpellCheck;
