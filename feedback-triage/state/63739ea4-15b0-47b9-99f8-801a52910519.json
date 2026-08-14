@@ -1,0 +1,16 @@
+{
+  "id": "63739ea4-15b0-47b9-99f8-801a52910519",
+  "branch": "worker/63739ea4-15b0-47b9-99f8-801a52910519-20260813T184715Z",
+  "loopCount": 0,
+  "verifierVerdict": null,
+  "verifierCritique": "",
+  "secauditDone": false,
+  "secauditVerdict": null,
+  "checkpoints": [
+    {
+      "sha": "a0c4745af6242db5f05ec6a00bc73d941cf9d77e",
+      "by": "new-work:checkout",
+      "at": "2026-08-13T18:47:16.213Z"
+    }
+  ]
+}
