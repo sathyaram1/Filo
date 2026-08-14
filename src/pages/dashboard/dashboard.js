@@ -1806,10 +1806,7 @@
     //    indirizzi — SN_URL_NAV.normalizeUrl (#398) — così "/localhost:3000" o
     //    "/192.168.1.1" si aprono davvero invece di partire su un https vuoto.
     if (isSiteToken(text)) {
-      const raw = text.slice(1);
-      const url = (self.SN_URL_NAV && self.SN_URL_NAV.normalizeUrl(raw))
-        || (/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
-      send({ type: MSG.OPEN_URL, url });
+      send({ type: MSG.OPEN_URL, url: siteUrlOf(text) });
       inputEl.value = '';
       autoGrowInput();
       updateInputClass();
