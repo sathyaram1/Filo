@@ -32,7 +32,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { guardTransition, escalationNote, sealState, readBranchState, stateDir } from './lib/branch-integrity.mjs';
+import { guardTransition, escalationNote, sealState, stateDir } from './lib/branch-integrity.mjs';
 import { pushFileToMainWithRetry, repoPath } from './lib/isolated-push.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
