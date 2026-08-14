@@ -23,13 +23,45 @@
 (function (global) {
   'use strict';
 
+  // #433 — SUFFISSI DELLE RETI DOMESTICHE. Nomi come nas.lan, raspberrypi.local
+  // o stampante.home esistono SOLO dentro la rete di casa: li assegna il router
+  // (o mDNS), non il DNS pubblico. Chiederli al resolver pubblico dà ENOTFOUND
+  // anche quando il dispositivo è lì e risponde — per questo vanno trattati come
+  // localhost e gli IP privati (schema http, niente controllo esistenza).
+  //   • local            → mDNS/Bonjour (RFC 6762) — raspberrypi.local
+  //   • home.arpa        → nome ufficiale delle reti domestiche (RFC 8375)
+  //   • internal         → riservato da ICANN all'uso privato (2024)
+  //   • home/corp        → richiesti come gTLD e RIFIUTATI da ICANN proprio
+  //                        perché già usati ovunque nelle reti private
+  //   • lan/intranet/…   → mai delegati, e assegnati di fatto dai router
+  //   • box              → UNICA ECCEZIONE: è un gTLD pubblico davvero
+  //                        esistente. Sta qui perché fritz.box è l'indirizzo
+  //                        predefinito dei router FRITZ!Box (diffusissimi) e
+  //                        quello è il caso reale; il prezzo è che un sito
+  //                        pubblico .box si aprirebbe in http invece che https.
+  const LOCAL_NET_TLDS = new Set([
+    'local', 'lan', 'home', 'internal', 'intranet', 'private', 'box',
+    'homenet', 'localdomain', 'corp',
+  ]);
+
+  // Vero se l'host è un nome della rete locale (vedi sopra). Un'etichetta sola
+  // senza punto ("lan") NON lo è: è un token qualsiasi, non un indirizzo.
+  function isLocalNetworkName(host) {
+    const h = String(host || '').toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
+    if (!h || !h.includes('.')) return false;
+    if (h === 'home.arpa' || h.endsWith('.home.arpa')) return true;
+    return LOCAL_NET_TLDS.has(h.slice(h.lastIndexOf('.') + 1));
+  }
+
   // Host che parlano quasi sempre in chiaro (server di sviluppo locali,
-  // router/IoT su IP privato): loopback, *.localhost e gli IP privati. Per questi
-  // lo schema di default è http:// invece di https://. Accetta anche la forma
-  // IPv6 tra parentesi ([::1]).
+  // router/IoT su IP privato, dispositivi della rete di casa): loopback,
+  // *.localhost, gli IP privati e i nomi con un suffisso di rete locale
+  // (nas.lan, raspberrypi.local). Per questi lo schema di default è http://
+  // invece di https://. Accetta anche la forma IPv6 tra parentesi ([::1]).
   function isLocalHost(host) {
     const h = String(host || '').toLowerCase().replace(/^\[|\]$/g, '');
     if (h === 'localhost' || h.endsWith('.localhost')) return true;
+    if (isLocalNetworkName(h)) return true;
     if (h === '::1' || h.startsWith('::ffff:127.')) return true;
     if (/^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h)) return true;       // loopback
     if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h)) return true;         // privato /8
@@ -163,7 +195,7 @@
   }
 
   global.SN_URL_NAV = {
-    isLocalHost, isIpv4, normalizeUrl, looksLikeAddress, canonicalizeFiloUrl,
-    isShareableAddress,
+    isLocalHost, isLocalNetworkName, isIpv4, normalizeUrl, looksLikeAddress,
+    canonicalizeFiloUrl, isShareableAddress,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
