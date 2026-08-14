@@ -1791,6 +1791,7 @@
     btn.title = `Apri ${host} senza il controllo`;
     btn.addEventListener('click', () => {
       btn.disabled = true;
+      if (unresolvedLine && unresolvedLine.el === bubble) unresolvedLine = null;
       // L'utente ha deciso: da qui in poi quell'host non viene più messo in
       // dubbio (niente rosso, niente avviso al prossimo invio).
       siteResolveCache.set(host, true);
