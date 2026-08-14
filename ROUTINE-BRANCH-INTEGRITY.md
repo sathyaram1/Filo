@@ -229,6 +229,10 @@ Tutto testabile **senza Electron**, con unit test (`npm run test:unit`,
 - D: dato un branch con punto fermo di A e commit sparsi di C, il ripristino
   riporta esattamente al punto fermo, la directory resta pulita, e i commit di C
   **restano raggiungibili**.
+- C+D insieme (l'anello, non i pezzi): dopo una **consegna vera** — il processo
+  di `queue-triage.mjs`, non una chiamata di funzione — il ripristino del giro
+  successivo deve riportare **al lavoro consegnato**. Testare D con punti fermi
+  già scritti a mano dà per scontato proprio ciò che nessuno registrava.
 - E: coda illeggibile → guasto, non "niente da fare"; branch inesistente → il
   feedback finisce in `design`.
 
