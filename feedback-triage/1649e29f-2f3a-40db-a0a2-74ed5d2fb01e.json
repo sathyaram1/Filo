@@ -1,0 +1,9 @@
+{
+  "id": "1649e29f-2f3a-40db-a0a2-74ed5d2fb01e",
+  "status": "design",
+  "notes": "Controllo di sicurezza superato, ma la pubblicazione e' ferma: la modifica tocca parti dell'automazione che per regola fissa non vengono mai fuse senza un via libera umano. Decidi tu se pubblicarla.",
+  "queuedAt": "2026-08-14T07:11:56.640Z",
+  "queuedBy": "routine",
+  "branch": "worker/1649e29f-2f3a-40db-a0a2-74ed5d2fb01e-20260814T064608Z",
+  "reason": "secaudit"
+}
