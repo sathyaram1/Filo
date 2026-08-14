@@ -455,13 +455,13 @@
       const top = sugg[0];
       const subItems = sugg.slice(1, 5).map((s) => ({
         label: s,
-        onClick: () => chrome.runtime.sendMessage({ type: MSG.REPLACE_MISSPELLING, suggestion: s }),
+        onClick: () => applyNativeCorrection(word, s),
       }));
       updateCorrection({
         hidden: false,
         label: top,
         loading: false,
-        onClick: () => chrome.runtime.sendMessage({ type: MSG.REPLACE_MISSPELLING, suggestion: top }),
+        onClick: () => applyNativeCorrection(word, top),
         subItems,
       });
     };
