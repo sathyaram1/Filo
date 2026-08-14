@@ -68,7 +68,7 @@ import { basename, dirname, resolve, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   prepareBranch, newWorkBranch, preferredBase, checkDelivery, withCheckpoint,
-  lastCheckpoint, bumpRejects, clearRejects, headSha, currentBranch,
+  lastCheckpoint, bumpRejects, currentBranch,
   writeExpectation, clearExpectation, stateDir, sealState, IDENTITY_REJECT_LIMIT,
 } from './lib/branch-integrity.mjs';
 import { writeRole, clearRole } from './lib/routine-role.mjs';
