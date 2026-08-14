@@ -399,24 +399,24 @@
     activeMenu = { root, onDocClick, onKey, onScroll, cleanupZoom, cleanups, subRoot: null };
   }
 
+  // Impedisce che l'elemento del menu prenda il fuoco quando lo si clicca.
+  // Senza questo, premere il tasto del mouse sposta il fuoco dal campo di
+  // scrittura al bottone del menu: il punto in cui si stava scrivendo — e la
+  // parola che il correttore di sistema aveva selezionato sotto al cursore —
+  // sparisce PRIMA che l'azione parta, e la correzione non ha più niente su cui
+  // agire. Pesa soprattutto dentro i blocchi "sigillati" (#438), dove riscrivere
+  // la selezione è l'UNICA strada per correggere: altrove la correzione ritrova
+  // il campo da sé. preventDefault su mousedown non annulla il click.
+  function keepPageFocus(el) {
+    el.addEventListener('mousedown', (e) => { e.preventDefault(); });
+  }
+
   // (Ri)disegna l'item 'correction' in-place.
   // `cleanups` arriva da open(): renderCorrection è definita a livello di modulo
   // (non chiude sullo scope di open), quindi va passato esplicitamente —
   // altrimenti setupArrowSubmenu sotto solleva "cleanups is not defined" e
   // l'intero menu di correzione fallisce, facendo ricadere sul menu normale
   // senza alcun suggerimento (feedback alpha: "il suggerimento non compare").
-  // Impedisce che l'elemento del menu prenda il fuoco quando lo si clicca.
-  // Senza questo, premere il tasto del mouse sposta il fuoco dal campo di
-  // scrittura al bottone del menu: il punto in cui si stava scrivendo (e la
-  // parola che il correttore di sistema aveva selezionato sotto al cursore)
-  // sparisce PRIMA che l'azione parta, e la correzione non ha più niente su cui
-  // agire. Si vedeva solo dentro i blocchi "sigillati" (#438), dove è l'unica
-  // strada per correggere: altrove la correzione riscrive il testo da sé e non
-  // dipende dal fuoco. preventDefault su mousedown non annulla il click.
-  function keepPageFocus(el) {
-    el.addEventListener('mousedown', (e) => { e.preventDefault(); });
-  }
-
   function renderCorrection(wrap, props, cleanups = []) {
     wrap.innerHTML = '';
     wrap.classList.toggle('sn-menu-correction-loading', !!props.loading);
