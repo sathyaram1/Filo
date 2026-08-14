@@ -120,6 +120,53 @@ test('isLocalHost copre loopback, *.localhost e gli IP privati', () => {
   assert.equal(isLocalHost('example.com'), false);
 });
 
+// ─── #433: i nomi della rete di casa sono host LOCALI ────────────────────────
+//
+// nas.lan, raspberrypi.local, fritz.box non esistono nel DNS pubblico: li
+// assegna il router. Prima venivano trattati come domini pubblici qualsiasi →
+// schema https (che su un NAS o una stampante non risponde) e, soprattutto,
+// sottoposti al controllo esistenza che li dichiarava inesistenti. Se si
+// rimuove il riconoscimento dei suffissi locali questi assert diventano rossi.
+
+test('#433 i suffissi di rete locale sono riconosciuti', () => {
+  assert.equal(isLocalNetworkName('nas.lan'), true);
+  assert.equal(isLocalNetworkName('raspberrypi.local'), true);
+  assert.equal(isLocalNetworkName('stampante.home'), true);
+  assert.equal(isLocalNetworkName('fritz.box'), true);
+  assert.equal(isLocalNetworkName('srv.internal'), true);
+  assert.equal(isLocalNetworkName('wiki.intranet'), true);
+  assert.equal(isLocalNetworkName('router.home.arpa'), true);
+  assert.equal(isLocalNetworkName('NAS.LAN'), true);            // maiuscole
+  assert.equal(isLocalNetworkName('nas.lan.'), true);           // punto finale FQDN
+  // Un'etichetta sola non è un indirizzo, e i domini pubblici restano pubblici.
+  assert.equal(isLocalNetworkName('lan'), false);
+  assert.equal(isLocalNetworkName('local'), false);
+  assert.equal(isLocalNetworkName('example.com'), false);
+  assert.equal(isLocalNetworkName('mylan.com'), false);         // non basta contenere "lan"
+  assert.equal(isLocalNetworkName(''), false);
+});
+
+test('#433 isLocalHost include i nomi della rete di casa', () => {
+  assert.equal(isLocalHost('nas.lan'), true);
+  assert.equal(isLocalHost('raspberrypi.local'), true);
+  assert.equal(isLocalHost('example.com'), false);
+});
+
+test('#433 normalizeUrl apre i dispositivi di casa in http (non https)', () => {
+  assert.equal(normalizeUrl('nas.lan:8080'), 'http://nas.lan:8080');
+  assert.equal(normalizeUrl('raspberrypi.local'), 'http://raspberrypi.local');
+  assert.equal(normalizeUrl('stampante.lan/setup'), 'http://stampante.lan/setup');
+  assert.equal(normalizeUrl('fritz.box'), 'http://fritz.box');
+  // I domini pubblici restano su https.
+  assert.equal(normalizeUrl('example.com'), 'https://example.com');
+});
+
+test('#433 i nomi della rete di casa restano indirizzi, non testo', () => {
+  assert.equal(looksLikeAddress('nas.lan'), true);
+  assert.equal(looksLikeAddress('raspberrypi.local'), true);
+  assert.equal(looksLikeAddress('nas.lan:8080'), true);
+});
+
 // ─── #437: "Copia URL" deve copiare INDIRIZZI, non pezzi di codice ───────────
 //
 // Un sito può mettere come src di un'immagine/filmato (o come href di un link)
