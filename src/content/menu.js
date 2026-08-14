@@ -156,6 +156,7 @@
         // dizionario, correggi automaticamente, gestisci correttore).
         const wrap = document.createElement('div');
         wrap.className = 'sn-menu-correction';
+        keepPageFocus(wrap);
         if (it.disabled) wrap.classList.add('sn-disabled');
         if (it.loading) wrap.classList.add('sn-menu-correction-loading');
         if (it.id) wrap.id = it.id;
