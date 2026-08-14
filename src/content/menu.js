@@ -483,6 +483,9 @@
         const b = document.createElement('button');
         b.type = 'button';
         b.className = 'sn-menu-item';
+        // Come per la riga di correzione: agire da qui non deve togliere il
+        // fuoco (e quindi il punto in cui si scriveva) al campo sottostante.
+        keepPageFocus(b);
         if (sit.disabled) b.classList.add('sn-disabled');
         const lbl = document.createElement('span');
         lbl.className = 'sn-menu-label';
