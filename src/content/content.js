@@ -1038,10 +1038,20 @@
       return items;
     }
 
-    // Video/audio cliccato direttamente: le sue azioni vincono su immagine e
-    // link (un filmato dentro una scheda-link resta soprattutto un filmato).
+    // Video/audio cliccato direttamente: le sue azioni vengono prima (un filmato
+    // dentro una scheda-link resta soprattutto un filmato)…
     if (mediaEl) {
       for (const it of Actions.buildMediaItems(mediaEl)) items.push(it);
+      // …ma se il media è racchiuso in un <a> (copertina di un video in una
+      // lista, anteprima di un articolo) è ANCHE un collegamento, ed è proprio
+      // il caso in cui l'utente vuole spesso il link e non il filmato: senza
+      // queste voci non avrebbe nessun modo di aprirlo, copiarlo o salvarlo
+      // (#434). Stessa forma del ramo immagine: contenuto in cima, separatore,
+      // collegamento sotto.
+      if (linkEl) {
+        items.push({ type: 'separator' });
+        for (const it of buildLinkActionItems(linkEl)) items.push(it);
+      }
       return items;
     }
 
