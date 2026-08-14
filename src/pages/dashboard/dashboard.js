@@ -1661,6 +1661,15 @@
     return (raw.split(/[/:?#]/)[0] || '').toLowerCase();
   }
 
+  // URL navigabile di un token "/sito". Lo schema (http per i server locali, i
+  // dispositivi della rete di casa e gli IP privati; https per i domini
+  // pubblici) lo sceglie la stessa logica della barra indirizzi — #398.
+  function siteUrlOf(text) {
+    const raw = text.slice(1);
+    return (self.SN_URL_NAV && self.SN_URL_NAV.normalizeUrl(raw))
+      || (/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
+  }
+
   // Cache "il comando shell esiste?" (token → bool), per non rifare lo spawn
   // di controllo a ogni tasto. Il risultato non dipende dalla cwd per i comandi
   // su PATH; per i casi limite (script relativi) la piccola imprecisione è ok.
