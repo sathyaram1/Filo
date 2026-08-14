@@ -151,12 +151,25 @@ test('stress: href javascript:, href lunghissimo, testo con <script>, clic destr
     expect(await page.evaluate(() => window.__xss || null)).toBe(null);
     await page.keyboard.press('Escape');
 
-    // 4) clic destri rapidi in sequenza sullo stesso elemento: un solo menu, coerente.
-    await page.locator('#v1').click({ button: 'right', position: { x: 20, y: 20 } });
-    await page.locator('#v1').click({ button: 'right', position: { x: 30, y: 30 } });
-    await page.locator('#v1').click({ button: 'right', position: { x: 40, y: 40 } });
-    await expect(page.locator('.sn-menu')).toHaveCount(1);
-    await expect(page.locator('.sn-menu').getByText('Salva video come', { exact: false }).first()).toBeVisible();
-    await expect(page.locator('.sn-menu').getByText('Salva link per dopo', { exact: false }).first()).toBeVisible();
+    // 4) apri/chiudi ripetuto sullo stesso elemento: un solo menu, sempre completo.
+    for (let i = 0; i < 3; i += 1) {
+      await page.locator('#v1').click({ button: 'right', position: { x: 20 + i * 10, y: 20 } });
+      await expect(page.locator('.sn-menu')).toHaveCount(1);
+      await expect(page.locator('.sn-menu').getByText('Salva video come', { exact: false }).first()).toBeVisible();
+      await expect(page.locator('.sn-menu').getByText('Salva link per dopo', { exact: false }).first()).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(page.locator('.sn-menu')).toHaveCount(0);
+    }
+
+    // 5) il menu deve cambiare contesto passando da un media-link a un link nudo.
+    await page.evaluate(() => {
+      const a = document.createElement('a');
+      a.id = 'nudo'; a.href = 'https://example.com/solo-testo'; a.textContent = 'link di solo testo';
+      a.style.display = 'block'; a.style.marginTop = '24px';
+      document.body.appendChild(a);
+    });
+    const nudo = await openMenuOn(page, '#nudo', { x: 5, y: 5 });
+    await expect(nudo.getByText('Salva link per dopo', { exact: false }).first()).toBeVisible();
+    await expect(nudo.getByText('Salva video come', { exact: false })).toHaveCount(0);
   } finally { await media.close(); }
 });
