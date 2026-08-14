@@ -112,7 +112,7 @@ test('player con overlay: il video sotto e il link intorno convivono nello stess
 
 test('un video di sfondo NON si intrufola nel menu di un link che non lo contiene', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;font:16px sans-serif">
-    <video id="bg" src="/bg.mp4" style="position:fixed;inset:0;width:100%;height:100%;background:#222"></video>
+    <video id="bg" src="/bg.mp4" style="position:fixed;inset:0;width:100%;height:100%;z-index:-1;background:#222"></video>
     <a id="plain" href="https://example.com/pagina" style="position:relative;z-index:1;display:inline-block;margin:40px">Un collegamento qualsiasi</a>
   </body></html>`);
   const menu = await openMenuOn(page, '#plain');
