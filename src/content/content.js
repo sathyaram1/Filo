@@ -431,20 +431,24 @@
     // trovato una parola errata sotto al click, quindi su un menu qualunque lo
     // slot resta invisibile e non costa nulla. La sostituzione passa da
     // replaceMisspelling, che agisce sul campo a fuoco senza doverlo
-    // identificare dalla pagina.
+    // identificare dalla pagina. Resta appeso al correttore: se l'utente lo ha
+    // spento, niente slot e niente suggerimenti.
+    const wantCorrection = settings?.featureFlags?.spellcheck !== false && !!SpellCheck;
     let updateCorrection = null;
-    items.unshift(
-      {
-        type: 'correction',
-        label: '',
-        loading: false,
-        hidden: true,
-        onClick: null,
-        subItems: [],
-        onMount: (_root, update) => { updateCorrection = update; },
-      },
-      { type: 'separator', hidden: true },
-    );
+    if (wantCorrection) {
+      items.unshift(
+        {
+          type: 'correction',
+          label: '',
+          loading: false,
+          hidden: true,
+          onClick: null,
+          subItems: [],
+          onMount: (_root, update) => { updateCorrection = update; },
+        },
+        { type: 'separator', hidden: true },
+      );
+    }
     const revealNativeCorrection = (word, suggestions) => {
       const sugg = (suggestions || []).filter((s) => s && s !== word);
       if (!updateCorrection || !sugg.length) return;
@@ -464,13 +468,15 @@
 
     Menu.open({ x: e.clientX, y: e.clientY, items, keepOnScroll: !!selInfo });
 
-    // Passa il timestamp di apertura: se il broadcast nativo è già arrivato
-    // (vincoli di timing con l'await getClipboardHistory sopra), il modulo
-    // spellcheck ce lo consegna subito invece di lasciarci aspettare.
-    SpellCheck?.onNextNativeSuggestion?.(({ word, suggestions }) => {
-      if (!suggestions?.length) return;
-      revealNativeCorrection(word, suggestions);
-    }, { since: openedAt });
+    if (wantCorrection) {
+      // Passa il timestamp di apertura: se il broadcast nativo è già arrivato
+      // (vincoli di timing con l'await getClipboardHistory sopra), il modulo
+      // spellcheck ce lo consegna subito invece di lasciarci aspettare.
+      SpellCheck.onNextNativeSuggestion?.(({ word, suggestions }) => {
+        if (!suggestions?.length) return;
+        revealNativeCorrection(word, suggestions);
+      }, { since: openedAt });
+    }
   }
 
   // Salva il target editabile e la sua selezione/range al momento dell'apertura
