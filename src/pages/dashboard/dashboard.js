@@ -1661,6 +1661,15 @@
     return (raw.split(/[/:?#]/)[0] || '').toLowerCase();
   }
 
+  // URL navigabile di un token "/sito". Lo schema (http per i server locali, i
+  // dispositivi della rete di casa e gli IP privati; https per i domini
+  // pubblici) lo sceglie la stessa logica della barra indirizzi — #398.
+  function siteUrlOf(text) {
+    const raw = text.slice(1);
+    return (self.SN_URL_NAV && self.SN_URL_NAV.normalizeUrl(raw))
+      || (/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
+  }
+
   // Cache "il comando shell esiste?" (token → bool), per non rifare lo spawn
   // di controllo a ogni tasto. Il risultato non dipende dalla cwd per i comandi
   // su PATH; per i casi limite (script relativi) la piccola imprecisione è ok.
@@ -1752,6 +1761,53 @@
     return resolves;
   }
 
+  // #433 — Enter su "/sito" il cui host il DNS non conosce. Prima non succedeva
+  // ASSOLUTAMENTE NULLA: nessuna scheda, nessun messaggio, solo l'input rosso —
+  // indistinguibile da un tasto Invio rotto. Il controllo esistenza serve a non
+  // finire su una pagina bianca dopo un errore di battitura, ma può sbagliarsi
+  // (VPN, rete aziendale, DNS che non conosce quel nome): quindi Filo lo dice e
+  // lascia comunque aprire con un clic, invece di rifiutare in silenzio.
+  // Il testo resta nel campo: se era un typo, si corregge senza riscriverlo.
+  let unresolvedLine = null; // { el, host } dell'ultimo avviso ancora non agito
+  function showUnresolvedSite(text, host) {
+    // Un secondo invio dello STESSO indirizzo non impila avvisi identici. Uno su
+    // un indirizzo diverso, o uno già agito ("Apri comunque"), resta in chat: è
+    // roba successa, non rumore da sostituire.
+    if (unresolvedLine && unresolvedLine.host === host) {
+      unresolvedLine.el.remove();
+      unresolvedLine = null;
+    }
+    if (body.dataset.state !== 'thread') goThread();
+    const bubble = makeBubble({
+      role: 'filo',
+      // Una riga sola: il bottone qui sotto dice già l'altra metà. Spiegare a
+      // parole cosa fa un bottone è la spiegazione della UI dentro la UI.
+      text: `Non trovo “${host}” — controlla se c’è un errore di battitura.`,
+    });
+    const row = document.createElement('div');
+    row.className = 'dash-bubble-actions';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'dash-action-btn dash-action-btn-primary';
+    btn.textContent = '↗ Apri comunque';
+    btn.title = `Apri ${host} senza il controllo`;
+    btn.addEventListener('click', () => {
+      btn.disabled = true;
+      if (unresolvedLine && unresolvedLine.el === bubble) unresolvedLine = null;
+      // L'utente ha deciso: da qui in poi quell'host non viene più messo in
+      // dubbio (niente rosso, niente avviso al prossimo invio).
+      siteResolveCache.set(host, true);
+      send({ type: MSG.OPEN_URL, url: siteUrlOf(text) });
+      if (inputEl.value.trim() === text) { inputEl.value = ''; autoGrowInput(); }
+      updateInputClass();
+    });
+    row.appendChild(btn);
+    bubble.appendChild(row);
+    bubblesEl.appendChild(bubble);
+    bubblesEl.scrollTop = bubblesEl.scrollHeight;
+    unresolvedLine = { el: bubble, host };
+  }
+
   // Come sopra ma con debounce, per la verifica live mentre si scrive: parte
   // solo quando l'utente si ferma, poi ricolora (rosso se il dominio non esiste).
   function scheduleSiteResolve(host) {
@@ -1797,10 +1853,7 @@
     //    indirizzi — SN_URL_NAV.normalizeUrl (#398) — così "/localhost:3000" o
     //    "/192.168.1.1" si aprono davvero invece di partire su un https vuoto.
     if (isSiteToken(text)) {
-      const raw = text.slice(1);
-      const url = (self.SN_URL_NAV && self.SN_URL_NAV.normalizeUrl(raw))
-        || (/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
-      send({ type: MSG.OPEN_URL, url });
+      send({ type: MSG.OPEN_URL, url: siteUrlOf(text) });
       inputEl.value = '';
       autoGrowInput();
       updateInputClass();
@@ -2064,13 +2117,14 @@
     e.preventDefault();
     const text = inputEl.value.trim();
     if (!text && pendingImages.length === 0) return;
-    // "/dominio.tld": non navigare verso un sito inesistente (porterebbe a una
-    // pagina bianca). Verifica il DNS (await se non già in cache) e, se il
-    // dominio non esiste, non fare nulla: l'input resta rosso a segnalarlo.
+    // "/dominio.tld": non navigare DI SLANCIO verso un sito inesistente
+    // (porterebbe a una pagina bianca). Verifica il DNS (await se non già in
+    // cache) e, se il dominio non esiste, dillo e offri di aprire lo stesso —
+    // mai restare in silenzio (#433).
     if (text.startsWith('/') && isSiteToken(text)) {
       const host = siteHostOf(text);
       const resolves = host ? await ensureSiteResolved(host) : true;
-      if (resolves === false) { updateInputClass(); return; }
+      if (resolves === false) { updateInputClass(); showUnresolvedSite(text, host); return; }
     }
     if (handleSlashCommand(text)) return;
     submitMessage(text);

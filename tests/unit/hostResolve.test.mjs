@@ -56,3 +56,27 @@ test('IP e localhost → sempre esiste, senza interrogare il DNS', async () => {
 test('host vuoto → non esiste', async () => {
   assert.equal(await hostResolves('', { lookup: ok }), false);
 });
+
+// ─── #433: i nomi della rete di casa non vanno chiesti al DNS ────────────────
+//
+// nas.lan, raspberrypi.local, fritz.box li assegna il router: il resolver
+// pubblico risponde ENOTFOUND anche quando il dispositivo è lì e risponde.
+// Chiederglielo faceva dichiarare "inesistente" un indirizzo valido → l'input
+// diventava rosso e l'invio non apriva niente. Senza il fix questi assert
+// diventano rossi (il lookup verrebbe chiamato e il risultato sarebbe false).
+
+test('#433 i nomi della rete locale non si interrogano (e non bloccano)', async () => {
+  const boom = () => { throw new Error('il DNS pubblico non va interrogato per un nome locale'); };
+  for (const h of ['nas.lan', 'raspberrypi.local', 'stampante.home', 'fritz.box',
+    'srv.internal', 'wiki.intranet', 'router.home.arpa', 'NAS.LAN']) {
+    assert.equal(isCheckableHost(h), false, `${h} non deve essere interrogato`);
+    assert.equal(await hostResolves(h, { lookup: boom }), true, `${h} deve poter essere aperto`);
+  }
+});
+
+test('#433 i domini pubblici restano soggetti al controllo', async () => {
+  assert.equal(isCheckableHost('example.com'), true);
+  assert.equal(isCheckableHost('mylan.com'), true);   // non basta contenere "lan"
+  assert.equal(isCheckableHost('local.example.com'), true);
+  assert.equal(await hostResolves('nonesistedavvero-xyz.io', { lookup: fail('ENOTFOUND') }), false);
+});
