@@ -1,7 +1,7 @@
 {
   "id": "a56e3ba8-ccea-4c94-b096-df24d485d9c4",
-  "status": "working",
-  "notes": "",
-  "queuedAt": "2026-08-14T07:12:47.304Z",
+  "status": "revision_security",
+  "notes": "Controllo funzionalità superato. Verificato col tasto destro su un filmato dentro un collegamento: restano tutte le azioni sul filmato e sotto compaiono quelle del link, e «Copia URL» copia davvero l'indirizzo del collegamento, non quello del video. Stesso esito su un audio dentro un link, sulla miniatura-immagine, e nel caso del lettore che copre il filmato con i propri comandi. Un video fuori da un collegamento continua a non mostrare voci di link, e un link di solo testo non mostra voci di filmato. Provato anche con un indirizzo di 10.000 caratteri, con un collegamento che tenta di eseguire codice al posto di aprire una pagina, con testo ed emoji ostili nell'indirizzo e aprendo e chiudendo il menu di continuo: il menu regge, resta uno solo e non esegue niente della pagina.\n\nSegnalazione separata (non blocca): con le due famiglie ora vicine, la voce «Copia URL» del collegamento non dice più a cosa si riferisce, visto che poco sopra c'è «Copia URL video». L'ho aperta come proposta a parte, con lo screenshot del menu.\n\nNota di lavorazione: la consegna era stata parcheggiata di lato da un ripristino automatico del ramo (il punto fermo non era stato aggiornato al momento della consegna) e il ramo era tornato vuoto. L'ho rimessa dov'era prima di verificarla, altrimenti la verifica avrebbe bocciato un lavoro che in realtà c'era.",
+  "queuedAt": "2026-08-14T07:47:22.583Z",
   "queuedBy": "routine"
 }
