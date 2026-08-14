@@ -295,6 +295,87 @@ describe('D — l’interruzione torna all’ultimo punto fermo', () => {
     assert.equal(git(work, ['status', '--porcelain']), '', 'la directory resta pulita');
   });
 
+  // Il punto D era testato SOLO con punti fermi già presenti: dava per scontato
+  // ciò che nessuno registrava. Questi due esercitano il giro vero — consegna
+  // (queue-triage, il processo reale) → ripristino del giro dopo — perché è
+  // l'ANELLO fra i due pezzi che mancava, non i pezzi.
+  test('dopo una consegna il ripristino torna AL LAVORO, non a prima che esistesse', () => {
+    const { work } = makeRepo();
+    const id = 'consegna1';
+    const prevEnv = process.env.FILO_DISPATCH_STATE_DIR;
+    // Stato e coda FUORI dall'albero di lavoro: dentro, il `clean -fd` del
+    // ripristino li cancellerebbe (in produzione sono file tracciati e committati).
+    process.env.FILO_DISPATCH_STATE_DIR = resolve(dirname(work), 'state-consegna1');
+    try {
+      // 1) new-work: il dispatcher crea il branch e fissa il punto fermo del
+      //    CHECKOUT — un momento in cui non esiste ancora una riga di codice.
+      const branch = newWorkBranch(id);
+      const creato = prepareBranch({ root: work, branch, create: true });
+      assert.equal(creato.ok, true, creato.message);
+      const vuoto = creato.head;
+      writeBranchState(work, withCheckpoint({ id, branch }, vuoto, 'new-work:checkout'));
+
+      // 2) l'istanza lavora: l'auto-commit registra la consegna sul branch.
+      const lavoro = commit(work, 'funzione-consegnata.js', 'export const x = 1;\n');
+      git(work, ['push', '-q', 'origin', branch]);
+
+      // 3) la CONSEGNA passa dal processo vero: è il punto che non sigillava nulla.
+      execFileSync('node', [resolve(ROOT, 'scripts', 'queue-triage.mjs'),
+        id, 'revision_capability', 'consegnato', '--branch', branch, '--no-git'], {
+        cwd: work, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+        env: { ...process.env, FILO_REPO_ROOT: work, FILO_SPOOL_DIR: resolve(dirname(work), 'spool-consegna1') },
+      });
+      assert.equal(lastCheckpoint(readBranchState(work, id)), lavoro,
+        'la consegna DEVE fissare il punto fermo sul lavoro consegnato, non lasciare quello del checkout');
+
+      // 4) il giro dopo prepara lo STESSO branch per chi deve verificare.
+      const dopo = prepareBranch({ root: work, branch, checkpoint: lastCheckpoint(readBranchState(work, id)) });
+      assert.equal(dopo.ok, true, dopo.message);
+      assert.equal(dopo.head, lavoro, 'chi verifica deve trovare il lavoro consegnato');
+      assert.notEqual(dopo.head, vuoto,
+        'tornare al punto fermo del checkout = branch svuotato PRIMA della verifica, e il vuoto si legge come "lavoro mai fatto" (#460)');
+      assert.equal(existsSync(resolve(work, 'funzione-consegnata.js')), true,
+        'i file consegnati non devono sparire fra la consegna e la verifica');
+      assert.equal(dopo.discarded, null,
+        'niente da scartare: la consegna È l’ultimo punto fermo, non un’istanza interrotta');
+    } finally {
+      if (prevEnv === undefined) delete process.env.FILO_DISPATCH_STATE_DIR;
+      else process.env.FILO_DISPATCH_STATE_DIR = prevEnv;
+    }
+  });
+
+  test('una consegna RIFIUTATA non sposta il punto fermo', () => {
+    const { work } = makeRepo();
+    const id = 'consegna2';
+    const prevEnv = process.env.FILO_DISPATCH_STATE_DIR;
+    process.env.FILO_DISPATCH_STATE_DIR = resolve(dirname(work), 'state-consegna2');
+    try {
+      const branch = newWorkBranch(id);
+      const creato = prepareBranch({ root: work, branch, create: true });
+      const consegnato = commit(work, 'consegnato.js', 'ok\n');
+      writeBranchState(work, withCheckpoint({ id, branch }, consegnato, 'consegna:revision_capability'));
+
+      // Un'istanza successiva scrive su un ALTRO branch e prova a consegnare.
+      git(work, ['checkout', '-q', '-b', 'worker/altro-compito']);
+      commit(work, 'roba-di-un-altro.js', 'x\n');
+      let code = 0;
+      try {
+        execFileSync('node', [resolve(ROOT, 'scripts', 'queue-triage.mjs'),
+          id, 'revision_capability', 'consegna fasulla', '--no-git'], {
+          cwd: work, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+          env: { ...process.env, FILO_REPO_ROOT: work, FILO_SPOOL_DIR: resolve(dirname(work), 'spool-consegna2') },
+        });
+      } catch (e) { code = e.status; }
+      assert.equal(code, 3, 'la consegna dall’albero sbagliato va rifiutata');
+      assert.equal(lastCheckpoint(readBranchState(work, id)), consegnato,
+        'un punto fermo fissato dall’albero sbagliato conterrebbe il lavoro di un altro compito: D lo ripristinerebbe come se fosse questo');
+      assert.equal(creato.ok, true);
+    } finally {
+      if (prevEnv === undefined) delete process.env.FILO_DISPATCH_STATE_DIR;
+      else process.env.FILO_DISPATCH_STATE_DIR = prevEnv;
+    }
+  });
+
   test('il nome del parcheggio è unico e riconducibile al branch', () => {
     const a = discardedBranchName('worker/x', Date.parse('2026-08-07T10:00:00Z'));
     const b = discardedBranchName('worker/x', Date.parse('2026-08-07T10:00:01Z'));
