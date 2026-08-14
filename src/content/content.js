@@ -1051,6 +1051,11 @@
       if (linkEl) {
         items.push({ type: 'separator' });
         for (const it of buildLinkActionItems(linkEl)) items.push(it);
+        items.push({ type: 'separator' });
+        // Il media non ha una sua sezione "Spiega": quella del collegamento è
+        // l'unica, quindi resta (nessuna seconda chiamata AI, e il menu del
+        // link è completo come quando lo si clicca da solo).
+        items.push(Actions.buildInlineExplainLink(linkEl));
       }
       return items;
     }
