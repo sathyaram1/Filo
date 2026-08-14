@@ -28,8 +28,9 @@ async function sendNative(app, host, word, suggestions) {
   }, { host, word, suggestions });
 }
 
-const CE = '<div id="ce" contenteditable="true" spellcheck="true" '
-  + 'style="font:16px monospace;padding:8px;width:400px;height:120px">ciiao come stai</div>';
+const CE_OPEN = '<div id="ce" contenteditable="true" spellcheck="true" '
+  + 'style="font:16px monospace;padding:8px;width:400px;height:120px">';
+const CE = `${CE_OPEN}ciiao come stai</div>`;
 
 // Stessa identica area di scrittura due volte: una in chiaro, una dentro il
 // blocco isolato. Il confronto è il cuore del feedback.
