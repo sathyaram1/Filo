@@ -1,0 +1,16 @@
+{
+  "id": "a8306a3b-fb1f-4357-879b-37159b78d6d5",
+  "branch": "worker/a8306a3b-fb1f-4357-879b-37159b78d6d5-20260814T123747Z",
+  "loopCount": 0,
+  "verifierVerdict": null,
+  "verifierCritique": "",
+  "secauditDone": false,
+  "secauditVerdict": null,
+  "checkpoints": [
+    {
+      "sha": "196af7423eb1a2a4387d6cf5d154da0e4ef76c03",
+      "by": "new-work:checkout",
+      "at": "2026-08-14T12:37:48.300Z"
+    }
+  ]
+}
