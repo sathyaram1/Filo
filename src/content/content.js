@@ -368,8 +368,8 @@
             return;
           }
           // Nessuna parola sotto il cursore (es. click su area vuota): menu
-          // normale, riservando comunque lo slot per il nativo se arriva.
-          await openNormalMenuAt(e, { reserveInputCorrection: true });
+          // normale, che riserva comunque lo slot per il nativo se arriva.
+          await openNormalMenuAt(e);
           return;
         }
       }
