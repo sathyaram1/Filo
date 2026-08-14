@@ -1780,7 +1780,9 @@
     if (body.dataset.state !== 'thread') goThread();
     const bubble = makeBubble({
       role: 'filo',
-      text: `Non trovo “${host}”. Se è un errore di battitura correggilo pure; se invece sai che c’è, lo apro lo stesso.`,
+      // Una riga sola: il bottone qui sotto dice già l'altra metà. Spiegare a
+      // parole cosa fa un bottone è la spiegazione della UI dentro la UI.
+      text: `Non trovo “${host}” — controlla se c’è un errore di battitura.`,
     });
     const row = document.createElement('div');
     row.className = 'dash-bubble-actions';
