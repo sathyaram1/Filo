@@ -1,8 +1,0 @@
-{
-  "id": "1649e29f-2f3a-40db-a0a2-74ed5d2fb01e",
-  "status": "revision_capability",
-  "notes": "Fatto. Da adesso una consegna fissa il punto di ripristino sul lavoro appena consegnato: chi deve verificarlo il giro dopo trova quello, e non il ramo com'era prima che il lavoro esistesse.\n\nOltre al chiesto ho spostato il \"sigillo\" nello stesso posto condiviso dove già viveva il controllo d'identità, così i due punti che registrano le transizioni — i verdetti e le consegne — usano una regola sola invece di due copie. Era proprio quella separazione a lasciare alla consegna solo metà della regola, quindi rimetterle insieme è il rimedio alla radice e non solo al sintomo.\n\nHo aggiunto due prove, non una: oltre al giro completo consegna → ripristino che hai chiesto, una consegna registrata dall'albero sbagliato deve essere rifiutata senza spostare il punto di ripristino — altrimenti il ripristino riporterebbe il lavoro di un altro compito credendolo questo. Ho aggiornato anche la spec sull'integrità del ramo con il perché è successo, visto che era la spec stessa a essere disattesa.\n\nNote tecniche: subito dopo una consegna restano due registrazioni di servizio (la decisione e lo stato) che il giro seguente mette da parte come \"oltre il punto fermo\". È la stessa forma che avevano già le correzioni, non una novità, e non tocca il codice consegnato; se un domani si vuole togliere anche quel rumore va cambiato il ripristino, non la consegna.",
-  "queuedAt": "2026-08-14T06:56:45.313Z",
-  "queuedBy": "routine",
-  "branch": "worker/1649e29f-2f3a-40db-a0a2-74ed5d2fb01e-20260814T064608Z"
-}
