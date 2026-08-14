@@ -2109,13 +2109,14 @@
     e.preventDefault();
     const text = inputEl.value.trim();
     if (!text && pendingImages.length === 0) return;
-    // "/dominio.tld": non navigare verso un sito inesistente (porterebbe a una
-    // pagina bianca). Verifica il DNS (await se non già in cache) e, se il
-    // dominio non esiste, non fare nulla: l'input resta rosso a segnalarlo.
+    // "/dominio.tld": non navigare DI SLANCIO verso un sito inesistente
+    // (porterebbe a una pagina bianca). Verifica il DNS (await se non già in
+    // cache) e, se il dominio non esiste, dillo e offri di aprire lo stesso —
+    // mai restare in silenzio (#433).
     if (text.startsWith('/') && isSiteToken(text)) {
       const host = siteHostOf(text);
       const resolves = host ? await ensureSiteResolved(host) : true;
-      if (resolves === false) { updateInputClass(); return; }
+      if (resolves === false) { updateInputClass(); showUnresolvedSite(text, host); return; }
     }
     if (handleSlashCommand(text)) return;
     submitMessage(text);
