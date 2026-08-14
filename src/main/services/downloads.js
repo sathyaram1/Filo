@@ -8,9 +8,12 @@
 // nome, dimensione, byte ricevuti, stato — così la barra in alto di Filo può
 // mostrarne l'avanzamento fedele invece di lasciarlo "al buio".
 //
-// NON è il cammino di "Salva immagine/video come…": quello scarica i byte a mano
-// nel main su richiesta esplicita del menu (handlers/misc.js) e resta com'è.
-// Qui si intercetta il download che il browser fa partire da solo.
+// Intercetta il download che il browser fa partire da solo. "Salva
+// immagine/video come…" (handlers/misc.js) NON passa di qui — deve scaricare i
+// byte a mano per presentare il Referer della pagina — ma dal #436 si iscrive
+// allo STESSO registro via beginManual(): per l'utente i due cammini sono la
+// stessa cosa, quindi devono avere la stessa barra, lo stesso pannello e la
+// stessa cronologia.
 //
 // Filosofia: "l'attrito è negativo" + "non salvare mai [a mano]". Per questo NON
 // apriamo un dialogo "Salva come" a ogni file: salviamo direttamente nella
@@ -22,7 +25,7 @@
 // chrome.storage.local sotto STORAGE_KEYS.DOWNLOADS e sopravvive al riavvio: la
 // pagina elenco (#410.3) la leggerà da lì. Schema di una voce (`publicRecord`):
 //   { id, filename, url, mime, totalBytes, receivedBytes, state, savePath,
-//     startedAt, endedAt, paused, canResume }
+//     startedAt, endedAt, paused, canResume, canPause }
 //   state ∈ 'progressing' | 'paused' | 'completed' | 'interrupted' | 'cancelled'
 
 const path = require('node:path');
@@ -43,6 +46,9 @@ const records = new Map();
 // DownloadItem di Electron per gli scaricamenti in corso (id → item): non è
 // serializzabile, quindi vive a parte e non finisce mai nello storage.
 const liveItems = new Map();
+// Scaricamenti "a mano" in corso (id → { cancel }): non hanno un DownloadItem
+// perché i byte li muove handlers/misc.js. Vedi beginManual().
+const liveManual = new Map();
 // Sessioni già agganciate (evita doppioni se una session torna più volte).
 // Le sessioni incognito NON vengono mai agganciate (vedi tabs.js _makeView):
 // "nessuna traccia" vale anche per i download.
@@ -125,6 +131,10 @@ function publicRecord(r) {
     endedAt: r.endedAt || null,
     paused: !!r.paused,
     canResume: !!r.canResume,
+    // Gli scaricamenti "a mano" (#436) non si mettono in pausa: la richiesta
+    // http resterebbe appesa e il server la chiuderebbe. Il pannello nasconde
+    // il pulsante invece di offrirne uno che non fa niente.
+    canPause: r.canPause !== false,
   };
 }
 
@@ -419,6 +429,86 @@ function onWillDownload(item, webContents) {
   });
 }
 
+// ─── scaricamenti "a mano" (#436) ────────────────────────────────────────
+// "Salva immagine/video come…" scarica i byte da sé (handlers/misc.js): è
+// l'unico modo di presentare il Referer della pagina, che webContents.downloadURL
+// perde sempre. Il prezzo era che quel cammino restava MUTO — nessuna barra,
+// nessuna percentuale, nessun modo di annullare — mentre un filmato di centinaia
+// di MB arrivava. Qui gli diamo lo stesso registro dei download nativi: chi
+// guarda la barra non deve sapere quale dei due cammini ha prodotto la riga.
+//
+// Uso: beginManual() apre la voce, il chiamante la nutre con progress() a ogni
+// blocco ricevuto e la chiude con done()/fail(); cancelled() dice se nel
+// frattempo l'utente ha premuto "Annulla" nella barra, così il trasferimento si
+// può fermare davvero.
+function finalizeManual(rec, state, savePath) {
+  if (rec._final) return;
+  rec._final = true;
+  liveManual.delete(rec.id);
+  rec.endedAt = new Date().toISOString();
+  rec.paused = false;
+  rec.canResume = false;
+  if (savePath) { rec.savePath = savePath; rec.filename = path.basename(savePath); }
+  rec.state = state;
+  persist();
+  broadcast(state === 'completed' ? 'done' : 'error', rec);
+  // Nessun avviso a fine corsa: chi ha chiesto il salvataggio dal menu riceve
+  // già la sua conferma nella pagina (un secondo avviso sarebbe un doppione).
+}
+
+function beginManual({ url, filename, totalBytes } = {}) {
+  const id = uuid();
+  const rec = {
+    id,
+    filename: safeName(filename || 'download'),
+    url: String(url || ''),
+    mime: '',
+    totalBytes: Number(totalBytes) > 0 ? Number(totalBytes) : 0,
+    receivedBytes: 0,
+    state: 'progressing',
+    savePath: '',
+    startedAt: new Date().toISOString(),
+    endedAt: null,
+    paused: false,
+    canResume: false,
+    canPause: false,
+  };
+  records.set(id, rec);
+  const requestCancel = () => { rec._cancelled = true; finalizeManual(rec, 'cancelled'); };
+  liveManual.set(id, { cancel: requestCancel });
+  persist();
+  broadcast('start', rec);
+
+  // Su rete veloce l'evento 'data' arriva migliaia di volte al secondo e ogni
+  // broadcast attraversa l'IPC verso ogni finestra: senza freno l'avanzamento
+  // costerebbe più del download. ~8 aggiornamenti al secondo bastano all'occhio.
+  const MIN_PUSH_MS = 120;
+  let lastPush = 0;
+
+  return {
+    id,
+    cancelled: () => !!rec._cancelled,
+    progress(received, total) {
+      if (rec._final) return;
+      rec.receivedBytes = Number(received) || 0;
+      if (Number(total) > 0) rec.totalBytes = Number(total);
+      const now = Date.now();
+      if (now - lastPush < MIN_PUSH_MS) return;
+      lastPush = now;
+      broadcast('progress', rec);
+    },
+    done(savePath) {
+      // L'ultimo progress() può essere caduto nel freno qui sopra: a file
+      // completo i byte ricevuti SONO il totale, e la riga non deve restare
+      // ferma al 95% dopo essersi conclusa.
+      if (rec.totalBytes > 0) rec.receivedBytes = rec.totalBytes;
+      finalizeManual(rec, 'completed', savePath);
+    },
+    fail() { finalizeManual(rec, 'interrupted'); },
+    cancel: requestCancel,
+  };
+}
+
 // Aggancia will-download a una sessione (idempotente).
 function attachSession(ses) {
   if (!ses || attached.has(ses)) return;
@@ -445,11 +535,13 @@ function clearCompleted() {
 }
 
 function remove(id) {
-  const rec = records.get(id);
   // Un download in corso non si "rimuove" dalla lista: prima lo si annulla.
-  if (rec && liveItems.has(id)) { try { liveItems.get(id).cancel(); } catch (_) {} }
+  // Vale per entrambi i cammini, nativo e "a mano".
+  if (liveItems.has(id)) { try { liveItems.get(id).cancel(); } catch (_) {} }
+  if (liveManual.has(id)) { try { liveManual.get(id).cancel(); } catch (_) {} }
   records.delete(id);
   liveItems.delete(id);
+  liveManual.delete(id);
   persist();
   return listRecords();
 }
@@ -477,6 +569,8 @@ function openFolder(id) {
 function cancel(id) {
   const item = liveItems.get(id);
   if (item) { try { item.cancel(); } catch (_) {} }
+  const manual = liveManual.get(id);
+  if (manual) { try { manual.cancel(); } catch (_) {} }
   return { ok: true };
 }
 function pause(id) {
@@ -493,6 +587,12 @@ function resume(id) {
 module.exports = {
   init,
   attachSession,
+  beginManual,
+  // Serve a chi scarica i byte da sé (#436) per piazzare il file parziale nella
+  // stessa cartella in cui atterrerebbe un download nativo: così la rinomina
+  // finale resta un'operazione istantanea invece di una copia fra volumi.
+  downloadsDir,
+  uniquePath,
   list,
   clearCompleted,
   remove,
@@ -505,4 +605,5 @@ module.exports = {
   _records: records,
   _shortName: shortName,
   _safeName: safeName,
+  _publicRecord: publicRecord,
 };

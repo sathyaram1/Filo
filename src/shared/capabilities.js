@@ -186,7 +186,7 @@
     },
     {
       id: 'copy-download-image', title: 'Copia o scarica un’immagine', category: 'media',
-      desc: 'Copia l’immagine negli appunti, ne copia l’indirizzo, oppure la scarica sul computer.',
+      desc: 'Copia l’immagine negli appunti, ne copia l’indirizzo, oppure la scarica sul computer scegliendo dove. Le immagini pesanti compaiono fra gli scaricamenti in alto con il loro avanzamento, come un file qualsiasi.',
       invoke: 'Clic destro su un’immagine → "Copia immagine" / "Copia URL immagine" / "Salva immagine come…".',
       doesNot: 'Quando l’immagine non ha un vero indirizzo (il sito la scrive dentro la pagina o ci mette un frammento di codice) Filo te lo dice invece di riempirti gli appunti con una stringa che non apre niente: l’immagine puoi comunque copiarla o salvarla.',
     },
@@ -208,15 +208,15 @@
     },
     {
       id: 'copy-download-video', title: 'Copia l’indirizzo o salva un video/audio', category: 'media',
-      desc: 'Copia l’indirizzo del filmato o dell’audio, oppure lo salva come file sul computer scegliendo dove.',
+      desc: 'Copia l’indirizzo del filmato o dell’audio, oppure lo salva come file sul computer scegliendo dove. Mentre scarica, il filmato compare fra gli scaricamenti in alto con barra e percentuale, e da lì puoi annullarlo: non c’è un limite di dimensione, anche un film lungo arriva.',
       invoke: 'Clic destro sul video o sull’audio → "Copia URL video" / "Salva video come…".',
-      doesNot: 'I contenuti trasmessi in streaming a pezzi (i grandi siti di video) non hanno un file da salvare: in quel caso Filo lo dice invece di salvare un file rotto. Allo stesso modo, se la sorgente del filmato non è un vero indirizzo Filo lo dice invece di copiarla.',
+      doesNot: 'I contenuti trasmessi in streaming a pezzi (i grandi siti di video) non hanno un file da salvare: in quel caso Filo lo dice invece di salvare un file rotto. Allo stesso modo, se la sorgente del filmato non è un vero indirizzo Filo lo dice invece di copiarla. Un salvataggio già avviato si può annullare ma non mettere in pausa.',
     },
     {
       id: 'download-progress', title: 'Scarica file e segui l’avanzamento', category: 'save',
       desc: 'Quando clicchi un link a un file (PDF, ZIP, allegato) Filo lo scarica mostrando l’avanzamento in tempo reale con un indicatore in alto, tra le schede — barra e percentuale — e a fine scaricamento ti avvisa con "Apri file" e "Apri cartella"; se qualcosa va storto (rete caduta, errore del server, spazio finito) te lo dice invece di restare in silenzio. I file scaricati restano in un elenco che sopravvive alla riapertura di Filo. Se il file parte da una scheda aperta apposta dal sito — una scheda bianca o una pagina "il download partirà a breve…" che non hai mai toccato — Filo la chiude da solo appena il download parte e ti riporta alla pagina di partenza, con un avviso "Riapri" per rimetterla se ti serviva.',
-      invoke: 'Parte cliccando un link a un file, oppure dal clic destro sul link → "Salva file". L’indicatore in alto tra le schede apre l’elenco degli scaricamenti, dove puoi metterli in pausa, riprenderli, annullarli, aprirli o mostrarli nella cartella.',
-      doesNot: 'Salva direttamente nella cartella Download di sistema senza chiederti dove ogni volta. L’elenco degli scaricamenti e i suoi comandi restano dentro Filo: i siti che visiti non possono leggerlo né comandarlo. Le finestre in incognito non ci finiscono.',
+      invoke: 'Parte cliccando un link a un file, oppure dal clic destro sul link → "Salva file"; ci finiscono anche le immagini e i filmati salvati dal clic destro ("Salva immagine come…", "Salva video come…"). L’indicatore in alto tra le schede apre l’elenco degli scaricamenti, dove puoi metterli in pausa, riprenderli, annullarli, aprirli o mostrarli nella cartella.',
+      doesNot: 'Un file preso da un link finisce direttamente nella cartella Download di sistema, senza chiederti dove ogni volta (le immagini e i filmati salvati dal clic destro invece te lo chiedono, e quelli si possono annullare ma non mettere in pausa). L’elenco degli scaricamenti e i suoi comandi restano dentro Filo: i siti che visiti non possono leggerlo né comandarlo. Le finestre in incognito non ci finiscono.',
     },
     {
       id: 'screenshot', title: 'Cattura schermo', category: 'media',

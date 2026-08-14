@@ -149,8 +149,13 @@
     // completato). Invariante UX: si può sempre RIMUOVERE ciò che è in lista.
     const acts = [];
     if (isActive(r)) {
-      if (r.state === 'paused') acts.push(['Riprendi', () => resume(r)]);
-      else acts.push(['Pausa', () => pause(r)]);
+      // canPause === false: scaricamento "a mano" (Salva immagine/video come…),
+      // che non si può sospendere. Meglio non offrire l'azione che offrirne una
+      // muta.
+      if (r.canPause !== false) {
+        if (r.state === 'paused') acts.push(['Riprendi', () => resume(r)]);
+        else acts.push(['Pausa', () => pause(r)]);
+      }
       acts.push(['Annulla', () => cancel(r)]);
     } else if (r.state === 'completed') {
       acts.push(['Apri file', () => openFile(r)]);
@@ -261,8 +266,10 @@
       actions.appendChild(b);
     };
     if (isActive(r)) {
-      if (r.state === 'paused') addBtn('Riprendi', () => resume(r));
-      else addBtn('Pausa', () => pause(r));
+      if (r.canPause !== false) {
+        if (r.state === 'paused') addBtn('Riprendi', () => resume(r));
+        else addBtn('Pausa', () => pause(r));
+      }
       addBtn('Annulla', () => cancel(r));
     } else if (r.state === 'completed') {
       addBtn('Apri file', () => openFile(r));
