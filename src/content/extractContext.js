@@ -256,21 +256,30 @@
   // parte") invece di dichiarare finito un lavoro monco.
   //
   // Riconoscerlo senza falsi allarmi: un elemento personalizzato del sito (nome
-  // col trattino, definito davvero) che non espone un contenitore aperto, non ha
-  // NIENTE dentro di sé nella pagina, e ciò nonostante occupa spazio sullo
-  // schermo — sta disegnando qualcosa che noi non vediamo.
+  // col trattino) che non espone un contenitore aperto, non ha NIENTE dentro di
+  // sé nella pagina, e ciò nonostante occupa un rettangolo grande abbastanza da
+  // starci del testo — sta disegnando qualcosa che noi non vediamo.
+  //
+  // NB: "è un componente registrato dal sito?" non è una domanda che si possa
+  // fare da qui — il registro dei componenti della pagina non è lo stesso che
+  // vede il codice di Filo, e da qui risulterebbe sempre vuoto. Restano la
+  // forma del nome e il rettangolo. La soglia tiene fuori le icone disegnate
+  // via CSS (quadratini di 20-30px senza testo), che sono il falso allarme
+  // plausibile; nel dubbio si sbaglia dalla parte della prudenza, perché
+  // "tradotta solo in parte" di troppo costa molto meno di un "Pagina tradotta"
+  // falso.
+  const CLOSED_MIN_W = 40;
+  const CLOSED_MIN_H = 16;
+
   function isClosedComponent(el) {
     const tag = (el.tagName || '').toLowerCase();
     if (tag.indexOf('-') < 0) return false;
     if (el.shadowRoot) return false;                 // aperto: lo attraversiamo
-    try {
-      if (!window.customElements || !window.customElements.get(tag)) return false;
-    } catch (_) { return false; }
     if (el.children.length) return false;            // ha contenuto raggiungibile
     if ((el.textContent || '').trim()) return false;
     try {
       const r = el.getBoundingClientRect();
-      return r.width > 0 && r.height > 0;
+      return r.width >= CLOSED_MIN_W && r.height >= CLOSED_MIN_H;
     } catch (_) { return false; }
   }
 
