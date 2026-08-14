@@ -332,7 +332,10 @@
     }
     translatedUnits = [];
     // Traduzioni di formati precedenti (HTML/testo salvato negli attributi).
-    document.querySelectorAll('[data-sn-translated="1"]').forEach((el) => {
+    // La ricerca attraversa anche i componenti isolati (#439): lì dentro ora
+    // finisce del testo tradotto, e ciò che si può tradurre si deve poter
+    // rimettere com'era.
+    Extract.findTranslatedElements().forEach((el) => {
       if (el.dataset.snOriginalHtml !== undefined) {
         el.innerHTML = el.dataset.snOriginalHtml;
         delete el.dataset.snOriginalHtml;
