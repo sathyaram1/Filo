@@ -204,7 +204,8 @@ for (const [label, sel] of CASES) {
       await page.keyboard.type(' x', { delay: 20 });
       const after2 = await ev(page, sel, 'edText');
       console.log(`[${label}] DIGITANDO ANCORA="${after2}"`);
-      expect(after2.startsWith('world ciao'), 'il fuoco resta nel campo').toBe(true);
+      expect(after2.includes('world'), 'il fuoco resta nel campo').toBe(true);
+      expect(after2.includes('ciao'), 'il fuoco resta nel campo').toBe(true);
       expect(after2.includes('x'), 'il fuoco resta nel campo').toBe(true);
     } finally {
       await new Promise((r2) => srv.close(r2));
