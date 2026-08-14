@@ -21,6 +21,11 @@
       "sha": "8481de6d90b323081af92bda6f09859e3854973d",
       "by": "verifier:pass",
       "at": "2026-08-14T07:08:20.990Z"
+    },
+    {
+      "sha": "34d44f7a2d7f8fca574df4463d662dd5e1942026",
+      "by": "consegna:revision_security",
+      "at": "2026-08-14T07:08:23.949Z"
     }
   ]
 }
