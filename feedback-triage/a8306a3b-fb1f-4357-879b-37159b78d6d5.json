@@ -1,7 +1,0 @@
-{
-  "id": "a8306a3b-fb1f-4357-879b-37159b78d6d5",
-  "status": "revision_capability",
-  "notes": "Controllo funzionalità NON superato: Dentro i blocchi isolati normali la cosa che avevi chiesto funziona: nell'area di scrittura ricca il tasto destro su una parola sbagliata mette il suggerimento come prima voce, e cliccarlo corregge davvero la parola. Regge anche un'area con diecimila caratteri, un'area vuota, due clic destri rapidi di fila e un suggerimento che contiene codice ostile (non viene eseguito); e non ripropone più il suggerimento di prima quando clicco su una parola scritta bene.\n\nSi rompe nella variante «sigillata», quella che segnalavi a margine. Riproduzione: un'area di scrittura ricca dentro un blocco sigillato, scrivi «wrlod ciao», tasto destro su «wrlod». Il menu ora mostra «world» come prima voce, ma cliccandola non succede niente: la parola resta «wrlod» e si perde solo il punto in cui stavi scrivendo. Prima di questo lavoro quella voce lì non compariva affatto, quindi è una voce nuova che non fa nulla — per chi ci capita è peggio del menu povero di prima, perché promette una correzione e poi non la applica.\n\nServe una delle due: o la correzione si applica davvero anche lì, oppure in quel caso la voce non va mostrata. Va corretta anche la frase della nota che dice che lì «applicarlo funziona»: quella parte non funziona.",
-  "queuedAt": "2026-08-14T13:21:32.591Z",
-  "queuedBy": "routine"
-}
