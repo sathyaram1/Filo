@@ -886,23 +886,118 @@
       // Per la textarea il caretPositionFromPoint non torna utile (offsetNode non è il textarea).
       return textareaCharOffset(el, clientX, clientY);
     }
+    const doc = el.ownerDocument || document;
     let node = null, offset = 0;
-    if (document.caretPositionFromPoint) {
-      const cp = document.caretPositionFromPoint(clientX, clientY);
+    if (doc.caretPositionFromPoint) {
+      const cp = doc.caretPositionFromPoint(clientX, clientY);
       if (cp) { node = cp.offsetNode; offset = cp.offset; }
-    } else if (document.caretRangeFromPoint) {
-      const r = document.caretRangeFromPoint(clientX, clientY);
+    } else if (doc.caretRangeFromPoint) {
+      const r = doc.caretRangeFromPoint(clientX, clientY);
       if (r) { node = r.startContainer; offset = r.startOffset; }
     }
-    if (!node || !el.contains(node)) return -1;
-    let total = 0;
-    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-    let n;
-    while ((n = walker.nextNode())) {
-      if (n === node) return total + offset;
-      total += n.nodeValue.length;
+    if (node && el.contains(node)) {
+      let total = 0;
+      const walker = doc.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      let n;
+      while ((n = walker.nextNode())) {
+        if (n === node) return total + offset;
+        total += n.nodeValue.length;
+      }
     }
-    return -1;
+    // La domanda "che carattere c'è in questo punto" si ferma al confine dei
+    // componenti web (shadow root): dentro un blocco isolato la risposta cade
+    // nel light DOM — fuori dall'editabile — o non arriva affatto. Lì (e in
+    // qualunque altro caso in cui la risposta non è utilizzabile) misuriamo noi
+    // l'elemento che abbiamo già in mano. Vedi #438.
+    return caretCharOffsetByRects(el, clientX, clientY);
+  }
+
+  // Quanti caratteri misurare uno per uno prima di passare alla ricerca binaria:
+  // in un editabile lungo (una mail, un documento) il nodo di testo sotto al
+  // cursore può essere enorme e un rettangolo per carattere costerebbe troppo.
+  const RECT_SCAN_MAX = 400;
+  const RECT_SCAN_WINDOW = 64;
+
+  // Offset di carattere ricavato dalla sola geometria: confronta i rettangoli
+  // dei caratteri dell'editabile col punto cliccato. Non chiede nulla al
+  // documento, quindi funziona ovunque viva l'editabile (componenti web
+  // compresi). Ritorna -1 se il punto non cade su nessun testo.
+  function caretCharOffsetByRects(el, clientX, clientY) {
+    const doc = el.ownerDocument || document;
+    let range;
+    try { range = doc.createRange(); } catch (_) { return -1; }
+    const walker = doc.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    let total = 0, best = -1, bestDist = Infinity, n;
+    while ((n = walker.nextNode())) {
+      const len = n.nodeValue.length;
+      if (!len) continue;
+      let box = null;
+      try { range.selectNodeContents(n); box = range.getBoundingClientRect(); } catch (_) {}
+      // Considera solo i nodi la cui banda verticale contiene il punto: senza
+      // questo filtro misureremmo tutto il testo dell'editabile.
+      if (box && (box.width || box.height)
+          && clientY >= box.top - 2 && clientY <= box.bottom + 2) {
+        const hit = charOffsetInTextNode(range, n, clientX, clientY);
+        if (hit.exact) return total + hit.index;
+        if (hit.index >= 0 && hit.dist < bestDist) { bestDist = hit.dist; best = total + hit.index; }
+      }
+      total += len;
+    }
+    return best;
+  }
+
+  // Carattere di un singolo nodo di testo sotto al punto (o il più vicino).
+  function charOffsetInTextNode(range, node, clientX, clientY) {
+    const len = node.nodeValue.length;
+    const rectOf = (i) => {
+      try {
+        range.setStart(node, i);
+        range.setEnd(node, i + 1);
+        let fallback = null;
+        for (const r of range.getClientRects()) {
+          if (!r.width && !r.height) continue;
+          if (clientY >= r.top && clientY <= r.bottom) return r;
+          if (!fallback) fallback = r;
+        }
+        return fallback;
+      } catch (_) { return null; }
+    };
+    // Posizione del carattere rispetto al punto nell'ordine di lettura:
+    // -1 = prima (riga sopra o più a sinistra), +1 = dopo, 0 = lo contiene.
+    const side = (r) => {
+      if (clientY > r.bottom) return -1;
+      if (clientY < r.top) return 1;
+      if (clientX > r.right) return -1;
+      if (clientX < r.left) return 1;
+      return 0;
+    };
+
+    let lo = 0, hi = len;
+    if (len > RECT_SCAN_MAX) {
+      let a = 0, b = len - 1;
+      while (a < b) {
+        const mid = (a + b) >> 1;
+        const r = rectOf(mid);
+        const s = r ? side(r) : 0;
+        if (s < 0) a = mid + 1;
+        else if (s > 0) b = mid;
+        else { a = mid; break; }
+      }
+      lo = Math.max(0, a - RECT_SCAN_WINDOW);
+      hi = Math.min(len, a + RECT_SCAN_WINDOW);
+    }
+
+    let best = -1, bestDist = Infinity;
+    for (let i = lo; i < hi; i++) {
+      const r = rectOf(i);
+      if (!r) continue;
+      if (side(r) === 0) return { exact: true, index: i, dist: 0 };
+      const dx = clientX < r.left ? r.left - clientX : (clientX > r.right ? clientX - r.right : 0);
+      const dy = clientY < r.top ? r.top - clientY : (clientY > r.bottom ? clientY - r.bottom : 0);
+      const d = dx * dx + dy * dy;
+      if (d < bestDist) { bestDist = d; best = i; }
+    }
+    return { exact: false, index: best, dist: bestDist };
   }
 
   // Misura la posizione di carattere in una textarea ricostruendo il word-wrap
