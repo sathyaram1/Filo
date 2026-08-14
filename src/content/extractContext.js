@@ -307,7 +307,10 @@
     const stack = [root];
     while (stack.length) {
       const el = stack.pop();
-      if (skipSubtreeForTranslation(el)) continue;
+      // La radice non passa dal filtro: un <body translate="no"> o nascosto in
+      // partenza spegnerebbe la traduzione dell'intera pagina, che prima invece
+      // partiva. Il filtro vale — come prima — da lì in giù.
+      if (el !== root && skipSubtreeForTranslation(el)) continue;
       // Già tradotto: si salta QUESTO elemento ma si continua a scendere nei
       // figli (#408). Scartare tutto il sottoalbero renderebbe irraggiungibili
       // i blocchi annidati che una traduzione interrotta a metà non ha ancora
