@@ -150,9 +150,17 @@ test('shadow aperto: la correzione compare in cima E applicarla corregge il test
 test('shadow chiuso: correzione mostrata e applicata', async ({ app, openTab, testServer }) => {
   const { page, host } = await openPage(openTab, testServer, pageHtml());
   await primeNative(app, page, host, 'wrlod', ['world', 'word']);
-  await rightClickWord(page, 'closed', 0);
+  const pt = await rightClickWord(page, 'closed', 0);
 
   await expect(page.locator('.sn-menu')).toBeVisible();
+  await page.waitForTimeout(1200);
+  console.log('DIAG closed', JSON.stringify({
+    pt,
+    nativeWord: await page.evaluate(() => document.documentElement.dataset.filoNativeWord),
+    items: await page.evaluate(() => Array.from(document.querySelectorAll('.sn-menu > *'))
+      .filter((c) => c.style.display !== 'none')
+      .map((c) => `${c.className}|${(c.textContent || '').trim().slice(0, 28)}`)),
+  }));
   const corr = page.locator('.sn-menu-correction:visible').first();
   await expect(corr).toBeVisible({ timeout: 4000 });
   await expect(corr).toContainText('world');
