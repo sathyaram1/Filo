@@ -899,10 +899,11 @@ function guardIdentity(id) {
  * proteggere su questo branch (ed è ciò che lascia lavorare il merge-gate).
  */
 function sealTransition(state, by) {
-  const sealed = clearRejects(withCheckpoint(state, headSha(ROOT), by));
-  writeState(sealed);
-  clearExpectation(ROOT);
-  return sealed;
+  // La regola vive in branch-integrity (sealState): la usa anche queue-triage
+  // per le consegne, e la stessa regola scritta due volte diventa due regole
+  // diverse al primo ritocco — è esattamente così che la consegna è rimasta
+  // senza punto fermo (#460).
+  return sealState(ROOT, state, by);
 }
 
 function recordVerifier(id, verdict, critique) {
