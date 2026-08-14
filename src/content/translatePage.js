@@ -64,7 +64,7 @@
       // tornano dall'estrazione (vengono saltati alla fonte) e non vanno
       // rimandati al modello — sarebbe testo pagato due volte. Qui servono solo
       // a dare i totali giusti a chi legge l'avviso (#408).
-      const already = document.querySelectorAll('[data-sn-translated="1"]').length;
+      const already = Extract.findTranslatedElements().length;
       const units = [];
       for (const b of blocks) {
         if (b.el && b.el.dataset && b.el.dataset.snTranslated) continue;
