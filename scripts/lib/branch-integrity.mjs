@@ -375,6 +375,32 @@ export function guardTransition(root, id, { escalate, persist, clear } = {}) {
 }
 
 /**
+ * L'ALTRA METÀ di `guardTransition`: una transizione ACCETTATA lascia un PUNTO
+ * FERMO (l'identità del contenuto in questo istante) e rilascia l'identità
+ * attesa — dopo la consegna non c'è più niente da proteggere su quel branch.
+ *
+ * Sta QUI, non nei chiamanti, per lo stesso motivo di `guardTransition`: C vale
+ * per i verdetti **e** per le consegne, e finché la seconda metà è vissuta solo
+ * dentro dispatch.mjs le consegne verificavano l'identità senza lasciare niente
+ * dietro. Conseguenza reale (feedback #460): dopo una consegna di lavoro nuovo
+ * l'ultimo punto fermo restava quello scritto alla CREAZIONE del branch — un
+ * momento in cui non esisteva ancora una riga di codice — e al giro dopo D
+ * leggeva il lavoro consegnato come "istanza interrotta" e riportava il branch a
+ * prima che esistesse, force-push su origin compreso. Chi doveva verificare
+ * trovava il vuoto, e il vuoto si legge come "lavoro mai fatto".
+ *
+ * @param {string} root   directory del repo (l'identità la GUARDA, non la chiede)
+ * @param {object} state  stato del branch da sigillare (deve avere `id`)
+ * @param {string} by     chi sigilla (es. 'verifier:pass', 'consegna:revision_capability')
+ */
+export function sealState(root, state, by, now = Date.now()) {
+  const sealed = clearRejects(withCheckpoint(state, headSha(root), by, now));
+  writeBranchState(root, sealed);
+  clearExpectation(root);
+  return sealed;
+}
+
+/**
  * Il testo che l'owner legge in dashboard quando la lavorazione automatica
  * viene sospesa per disallineamento ripetuto. Vive qui perché lo usano
  * entrambi i punti di scrittura, e perché è per l'OWNER: niente branch, niente
