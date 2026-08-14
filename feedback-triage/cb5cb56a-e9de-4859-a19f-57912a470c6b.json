@@ -1,7 +1,8 @@
 {
   "id": "cb5cb56a-e9de-4859-a19f-57912a470c6b",
-  "status": "working",
-  "notes": "",
-  "queuedAt": "2026-08-14T01:28:44.141Z",
-  "queuedBy": "routine"
+  "status": "design",
+  "notes": "Non l'ho fatto, e la ragione e' una decisione ancora aperta dalla tua parte.\n\nLa guardia che chiedi deve distinguere una nota scritta nel posto giusto (il blocco \"in lavorazione\") da una infilata a mano sotto l'ultima versione uscita. Ma sul ramo principale quel blocco non esiste ancora: la correzione che lo introduce (#393) e' ferma da nove giorni in attesa che sia tu a fonderla, perche' tocca la procedura automatica di pubblicazione e nessuna routine puo' toccarla da sola. Finche' resta fuori non c'e' niente da sorvegliare, e qualunque nota scritta oggi finisce comunque sotto una versione gia' pubblicata: il problema di partenza, non ancora quello di cui parli tu.\n\nDue cose mi servono da te.\n\n1) Sbloccare #393. C'e' un modo per non doverti chiedere piu' niente: la timbratura puo' essere agganciata al momento stesso in cui la versione viene alzata, senza mettere le mani nella procedura di pubblicazione — l'ho provato e funziona, e cosi' il ramo non avrebbe piu' bisogno di un'approvazione manuale. Se mi dici di si', lo faccio io. Altrimenti fondi tu quel ramo com'e'.\n\n2) Quale delle due guardie vuoi, quando ci arrivo:\n   - Confrontare il registro con la storia del repo: un blocco gia' pubblicato non deve piu' cambiare. Non richiede di aggiungere niente al file e prende qualunque modifica fatta a mano. E' quella che consiglio.\n   - Contrassegnare i blocchi timbrati dal rilascio: piu' facile da leggere, ma non si accorge di una riga aggiunta dentro un blocco gia' contrassegnato, che e' esattamente il caso che hai descritto.\n\nLa cosa minore che segnalavi (il controllo sul numero di versione che guarda solo l'inizio) la sistemo nella stessa passata: vive in quello stesso ramo fermo.",
+  "queuedAt": "2026-08-14T01:35:39.980Z",
+  "queuedBy": "routine",
+  "reason": "clarify"
 }
