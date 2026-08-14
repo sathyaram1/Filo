@@ -394,7 +394,7 @@
     return true;
   }
 
-  async function openNormalMenuAt(e, opts = {}) {
+  async function openNormalMenuAt(e) {
     // Timestamp del click destro: serve a onNextNativeSuggestion per decidere
     // se il broadcast `_spell:native` arrivato durante l'await sotto è già
     // pertinente a questa apertura del menu (altrimenti lo perdevamo).
