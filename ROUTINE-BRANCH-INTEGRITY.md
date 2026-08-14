@@ -123,6 +123,22 @@ con l'albero sbagliato, il punto fermo che registra è fasullo — e D tornerebb
 un punto fermo che contiene lavoro di un altro compito. C è il prerequisito di D,
 non un extra.
 
+**Le due metà stanno insieme** (2026-08-14, feedback #460). Per un anno il punto
+di scrittura delle CONSEGNE ha applicato solo la prima metà — verificava
+l'identità e non fissava nessun punto fermo — perché la seconda viveva dentro il
+dispatcher, accanto ai verdetti. Conseguenza: dopo una consegna di lavoro nuovo
+l'ultimo punto fermo restava quello della **creazione** del branch, un momento in
+cui non esisteva ancora una riga di codice; al giro dopo D leggeva il lavoro
+consegnato come "istanza interrotta" e riportava il branch a prima che
+esistesse, riallineando anche `origin`. Chi doveva verificare trovava il vuoto, e
+il vuoto si legge come "lavoro mai fatto" — l'incidente del 24 luglio in
+miniatura, dentro la spec scritta per evitarlo.
+
+Quindi: rifiuto e sigillo abitano **lo stesso posto condiviso**
+(`guardTransition` e `sealState` in `scripts/lib/branch-integrity.mjs`) e ogni
+punto di scrittura li usa **in coppia**. Una regola tenuta in un posto solo a
+metà è una regola che vale solo dove qualcuno si è ricordato di scriverla.
+
 **Anti-loop**: un rifiuto lascia il feedback dov'era e lo fa ripescare. Estendi ai
 rifiuti lo stesso contatore che già esiste per i reset `working`→`todo`
 (`workingResets`, escalation a `design` alla terza volta), così un ambiente che
