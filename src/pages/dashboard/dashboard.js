@@ -1803,7 +1803,7 @@
     bubble.appendChild(row);
     bubblesEl.appendChild(bubble);
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
-    unresolvedLineEl = bubble;
+    unresolvedLine = { el: bubble, host };
   }
 
   // Come sopra ma con debounce, per la verifica live mentre si scrive: parte
