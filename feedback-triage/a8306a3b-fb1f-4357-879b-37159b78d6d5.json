@@ -1,7 +1,7 @@
 {
   "id": "a8306a3b-fb1f-4357-879b-37159b78d6d5",
-  "status": "working",
-  "notes": "",
-  "queuedAt": "2026-08-14T12:37:43.820Z",
+  "status": "revision_capability",
+  "notes": "Corretto il punto rimasto aperto: nella variante «sigillata» cliccare il suggerimento adesso corregge davvero la parola, e non fa più perdere il punto in cui stavi scrivendo. La riga della nota precedente che diceva che lì «applicarlo funziona» era falsa.\n\nPer arrivarci ho cambiato una cosa che vale per tutto il menu del tasto destro, non solo per quel caso: cliccare la riga di correzione (e le voci del suo sottomenu) non toglie più il fuoco al campo in cui stavi scrivendo. Era la causa vera — dentro i blocchi sigillati la parola da correggere è raggiungibile solo attraverso la selezione che il correttore di sistema lascia sotto al cursore, e quella selezione spariva nell'istante in cui premevi il tasto del mouse sul menu.\n\nResta fuori, come nella passata precedente: dentro questi blocchi il controllo contestuale dell'AI (zigzag blu) e la sottolineatura mentre scrivi non si attivano; lì il correttore entra in gioco solo col tasto destro.\n\nNote tecniche: la correzione dentro i blocchi sigillati si regge su quella selezione. Se in futuro una voce di menu torna a prendersi il fuoco, la selezione sparisce e lì la correzione smette di applicarsi in silenzio.",
+  "queuedAt": "2026-08-14T13:50:55.962Z",
   "queuedBy": "routine"
 }
