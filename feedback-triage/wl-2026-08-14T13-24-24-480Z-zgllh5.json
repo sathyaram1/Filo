@@ -1,0 +1,8 @@
+{
+  "op": "worker-log",
+  "role": "fixer",
+  "startedAt": "2026-08-14T13:24:24.480Z",
+  "num": "438",
+  "queuedAt": "2026-08-14T13:24:24.480Z",
+  "queuedBy": "dispatch"
+}
