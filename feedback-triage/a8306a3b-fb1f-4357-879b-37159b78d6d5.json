@@ -1,0 +1,8 @@
+{
+  "id": "a8306a3b-fb1f-4357-879b-37159b78d6d5",
+  "status": "revision_capability",
+  "notes": "Fatto: nelle aree di scrittura con formattazione costruite con i componenti dei siti moderni (webmail, editor online) il tasto destro su una parola sbagliata mostra di nuovo il suggerimento in cima al menu.\n\nHo coperto anche la variante «sigillata» che segnalavi a margine, che non era chiesta: lì la parola cliccata resta invisibile alla pagina, ma se il correttore di sistema l'ha marcata il suggerimento compare lo stesso e applicarlo funziona. Il resto di quel menu resta povero — per quello serve davvero un'altra strada. Il suggerimento resta legato al correttore: se lo spegni nelle preferenze non compare da nessuna parte.\n\nResta fuori: dentro questi blocchi il controllo contestuale dell'AI (zigzag blu) e la sottolineatura mentre scrivi ancora non si attivano; lì il correttore entra in gioco solo col tasto destro.",
+  "queuedAt": "2026-08-14T13:00:45.972Z",
+  "queuedBy": "routine",
+  "branch": "worker/a8306a3b-fb1f-4357-879b-37159b78d6d5-20260814T123747Z"
+}
