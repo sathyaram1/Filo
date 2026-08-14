@@ -204,7 +204,13 @@
 
   // La UI che Filo inietta nella pagina (menu, toast, popup, sidebar) usa il
   // prefisso di classe "sn-": non è contenuto del sito e non va tradotta.
+  // Alcuni riquadri di Filo (avviso sito pericoloso, proposta cambio paese)
+  // vivono invece dentro un componente isolato agganciato a un host con id
+  // "filo-…": da quando la traduzione entra nei componenti, anche quelli
+  // finirebbero tradotti — e sono già scritti nella lingua dell'utente.
   function isFiloOwnUi(el) {
+    const id = el.id || '';
+    if (id.indexOf('sn-') === 0 || id.indexOf('filo-') === 0) return true;
     const cl = el.classList;
     if (!cl || !cl.length) return false;
     for (const c of cl) if (c.indexOf('sn-') === 0) return true;
