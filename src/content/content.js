@@ -479,6 +479,27 @@
     }
   }
 
+  // Applica un suggerimento del correttore di sistema al campo in cui si stava
+  // scrivendo, senza doverlo identificare nella pagina — è il caso dei blocchi
+  // "sigillati" (#438), dove il campo non è raggiungibile da nessuna API.
+  //
+  // Quando il correttore di sistema segna una parola sotto al cursore, il
+  // browser la SELEZIONA: sostituire la selezione è quindi sostituire quella
+  // parola, ovunque viva. Verifichiamo che la selezione sia ancora esattamente
+  // quella parola prima di scrivere, altrimenti scriveremmo il suggerimento nel
+  // punto sbagliato. Se la verifica non passa (selezione persa o cambiata),
+  // ripieghiamo sull'API di Electron, che lavora sui segni del correttore.
+  function applyNativeCorrection(word, suggestion) {
+    if (!suggestion) return;
+    try {
+      const sel = window.getSelection && window.getSelection();
+      const selected = sel ? String(sel) : '';
+      if (word && selected.trim() === String(word).trim()
+          && document.execCommand('insertText', false, suggestion)) return;
+    } catch (_) {}
+    chrome.runtime.sendMessage({ type: MSG.REPLACE_MISSPELLING, suggestion });
+  }
+
   // Salva il target editabile e la sua selezione/range al momento dell'apertura
   // del menu, perché il click sul bottone del menu sposta il focus altrove.
   let pasteContext = null;
