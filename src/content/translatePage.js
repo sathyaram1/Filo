@@ -82,7 +82,12 @@
           pageComplete = true;
           missingCount = 0;
           totalCount = already;
-          Popup.showToast(I18n.t('toast_page_translated'));
+          Popup.showToast(...doneToast(unreachable));
+        } else if (unreachable) {
+          // Pagina fatta solo di componenti chiusi: non è "niente da tradurre",
+          // è testo che non riusciamo a leggere. Dire l'una per l'altra
+          // manderebbe l'utente a riprovare all'infinito.
+          Popup.showToast(I18n.t('toast_only_closed_components'), { duration: 7000 });
         } else {
           Popup.showToast(I18n.t('toast_nothing_to_translate'));
         }
