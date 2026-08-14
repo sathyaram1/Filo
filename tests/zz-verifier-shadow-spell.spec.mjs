@@ -167,11 +167,20 @@ test('shadow chiuso: correzione mostrata e applicata', async ({ app, openTab, te
   await expect(corr).toContainText('world');
   await page.screenshot({ path: 'tests/.shots/verifier-438-closed-menu.png' }).catch(() => {});
 
+  const before = await page.evaluate(() => ({
+    active: document.activeElement && document.activeElement.tagName,
+    text: window.__text('closed'),
+  }));
   await corr.click();
-  await expect.poll(
-    () => page.evaluate(() => window.__text('closed')),
-    { timeout: 5000 },
-  ).toBe('world ciao');
+  await page.waitForTimeout(1500);
+  const after = await page.evaluate(() => ({
+    menuOpen: !!document.querySelector('.sn-menu') &&
+      getComputedStyle(document.querySelector('.sn-menu')).display !== 'none',
+    active: document.activeElement && document.activeElement.tagName,
+    text: window.__text('closed'),
+  }));
+  console.log('DIAG closed-apply', JSON.stringify({ before, after }));
+  expect(after.text).toBe('world ciao');
 });
 
 // ── 4. AVVERSARIALE: suggerimento vecchio su parola giusta ───────────────────
