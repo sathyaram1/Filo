@@ -248,30 +248,97 @@
     return out.replace(/\s+/g, ' ').trim();
   }
 
+  // Un "componente chiuso" (#439): il sito costruisce un pezzo di pagina dentro
+  // un contenitore che ha deciso di NON aprire a nessuno script (shadow root in
+  // modalità closed). Il suo testo non è leggibile — né da Filo né da qualsiasi
+  // altro codice della pagina — quindi non si può tradurre. Quello che si può
+  // fare è ACCORGERSENE, così l'avviso finale resta onesto ("tradotta solo in
+  // parte") invece di dichiarare finito un lavoro monco.
+  //
+  // Riconoscerlo senza falsi allarmi: un elemento personalizzato del sito (nome
+  // col trattino, definito davvero) che non espone un contenitore aperto, non ha
+  // NIENTE dentro di sé nella pagina, e ciò nonostante occupa spazio sullo
+  // schermo — sta disegnando qualcosa che noi non vediamo.
+  function isClosedComponent(el) {
+    const tag = (el.tagName || '').toLowerCase();
+    if (tag.indexOf('-') < 0) return false;
+    if (el.shadowRoot) return false;                 // aperto: lo attraversiamo
+    try {
+      if (!window.customElements || !window.customElements.get(tag)) return false;
+    } catch (_) { return false; }
+    if (el.children.length) return false;            // ha contenuto raggiungibile
+    if ((el.textContent || '').trim()) return false;
+    try {
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.height > 0;
+    } catch (_) { return false; }
+  }
+
+  // Blocchi da tradurre, cercati anche DENTRO i componenti isolati dei siti
+  // moderni (#439). Un TreeWalker si ferma al confine di un componente: il suo
+  // contenuto vive in un albero a parte (shadow root) che va attraversato
+  // esplicitamente, altrimenti titoli e paragrafi lì dentro restano in lingua
+  // originale mentre il resto della pagina cambia.
+  //
+  // Il testo "in luce" (passato dal sito al componente via <slot>) NON viene
+  // contato due volte: sta nell'albero normale, dove lo incontriamo una volta
+  // sola; nel componente c'è solo il segnaposto <slot>, che testo proprio non
+  // ne ha.
+  //
+  // L'array ritornato porta anche `unreachable`: quanti componenti chiusi
+  // (contenuto illeggibile per chiunque) sono stati incontrati. Serve a chi
+  // scrive l'avviso finale, non alla traduzione.
   function extractTranslatableBlocks({ maxBlocks = 2000 } = {}) {
     const root = document.body || document.documentElement;
-    if (!root) return [];
+    if (!root) return Object.assign([], { unreachable: 0 });
     const out = [];
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, {
-      acceptNode(el) {
-        if (skipSubtreeForTranslation(el)) return NodeFilter.FILTER_REJECT;
-        // Già tradotto: si salta QUESTO elemento ma si continua a scendere nei
-        // figli (#408). Scartare tutto il sottoalbero renderebbe irraggiungibili
-        // i blocchi annidati che una traduzione interrotta a metà non ha ancora
-        // toccato — nessuna ripresa potrebbe più completarli.
-        if (el.dataset && el.dataset.snTranslated) return NodeFilter.FILTER_SKIP;
-        return NodeFilter.FILTER_ACCEPT;
-      },
-    });
-    let cur = walker.currentNode;
-    while (cur) {
-      // Serve almeno una lettera: numeri, bullet e simboli non si traducono.
-      const txt = ownTextOf(cur);
-      if (txt.length >= 2 && HAS_LETTER.test(txt)) {
-        out.push({ el: cur, text: txt });
-        if (out.length >= maxBlocks) break;
+    let unreachable = 0;
+    // Pila esplicita invece del TreeWalker: deve poter saltare da un albero
+    // all'altro (pagina → componente) restando in ordine di lettura.
+    const stack = [root];
+    while (stack.length) {
+      const el = stack.pop();
+      if (skipSubtreeForTranslation(el)) continue;
+      // Già tradotto: si salta QUESTO elemento ma si continua a scendere nei
+      // figli (#408). Scartare tutto il sottoalbero renderebbe irraggiungibili
+      // i blocchi annidati che una traduzione interrotta a metà non ha ancora
+      // toccato — nessuna ripresa potrebbe più completarli.
+      if (!(el.dataset && el.dataset.snTranslated)) {
+        // Serve almeno una lettera: numeri, bullet e simboli non si traducono.
+        const txt = ownTextOf(el);
+        if (txt.length >= 2 && HAS_LETTER.test(txt)) {
+          out.push({ el, text: txt });
+          if (out.length >= maxBlocks) break;
+        }
       }
-      cur = walker.nextNode();
+      const kids = [];
+      const shadow = el.shadowRoot;
+      if (shadow) {
+        for (const c of shadow.children) kids.push(c);
+      } else if (isClosedComponent(el)) {
+        unreachable++;
+      }
+      for (const c of el.children) kids.push(c);
+      for (let i = kids.length - 1; i >= 0; i--) stack.push(kids[i]);
+    }
+    return Object.assign(out, { unreachable });
+  }
+
+  // Tutti gli elementi già tradotti, componenti isolati compresi: una
+  // querySelectorAll sul documento si ferma al confine del componente e
+  // lascerebbe fuori (dal conteggio e dal ripristino) proprio i blocchi che
+  // #439 ha reso traducibili.
+  function findTranslatedElements() {
+    const out = [];
+    const roots = [document];
+    while (roots.length) {
+      const r = roots.pop();
+      let list;
+      try { list = r.querySelectorAll('*'); } catch (_) { continue; }
+      for (const el of list) {
+        if (el.dataset && el.dataset.snTranslated) out.push(el);
+        if (el.shadowRoot) roots.push(el.shadowRoot);
+      }
     }
     return out;
   }
