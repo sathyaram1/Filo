@@ -149,10 +149,11 @@ test('shadow aperto: la correzione compare in cima E applicarla corregge il test
 // ── 3. La variante "sigillata" che il report dichiara coperta ────────────────
 test('shadow chiuso: correzione mostrata e applicata', async ({ app, openTab, testServer }) => {
   const { page, host } = await openPage(openTab, testServer, pageHtml());
-  await primeNative(app, page, host, 'wrlod', ['world', 'word']);
+  // Ordine di produzione: prima il click destro, POI Electron consegna i
+  // suggerimenti sull'evento context-menu.
   const pt = await rightClickWord(page, 'closed', 0);
-
   await expect(page.locator('.sn-menu')).toBeVisible();
+  expect(await sendNative(app, host, 'wrlod', ['world', 'word'])).toBeGreaterThanOrEqual(1);
   await page.waitForTimeout(1200);
   console.log('DIAG closed', JSON.stringify({
     pt,
