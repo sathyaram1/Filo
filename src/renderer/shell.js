@@ -1246,8 +1246,8 @@
         }
         addBtn('Annulla', () => api.downloads.cancel(r.id).catch(() => {}));
       } else if (r.state === 'completed') {
-        addBtn('Apri file', () => api.downloads.openFile(r.id).catch(() => {}));
-        addBtn('Apri cartella', () => api.downloads.openFolder(r.id).catch(() => {}));
+        if (!r.missing) addBtn('Apri file', () => openDownloadFile(r.id));
+        addBtn('Apri cartella', () => openDownloadFolder(r.id));
         addBtn('Rimuovi', () => api.downloads.remove(r.id).then((res) => syncFromList(res && res.items)).catch(() => {}));
       } else {
         addBtn('Rimuovi', () => api.downloads.remove(r.id).then((res) => syncFromList(res && res.items)).catch(() => {}));
