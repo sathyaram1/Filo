@@ -221,6 +221,9 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     load();
+    // Ripristino da backup: la cronologia del backup compare senza riaprire
+    // la scheda (il filtro per tipo resta quello scelto, se ancora valido).
+    window.SN_PAGE_BOOTSTRAP.onDataImported(() => load());
     $('search').addEventListener('input', render);
     $('filter').addEventListener('change', render);
     $('clear').addEventListener('click', async () => {
