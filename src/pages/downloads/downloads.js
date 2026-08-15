@@ -385,6 +385,15 @@
       render();
     });
 
+    // Tornando su questa scheda dopo essere andati a spostare/cancellare i file
+    // nel gestore di sistema, la lista va riletta: nessun evento annuncia una
+    // cartella svuotata da fuori, e senza rilettura le voci resterebbero
+    // "aperibili" pur non avendo più un file dietro.
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) scheduleReload();
+    });
+    window.addEventListener('focus', scheduleReload);
+
     // Aggiornamenti live: il main pusha un segnale contentless quando parte/
     // avanza/finisce uno scaricamento. Ri-leggiamo la lista dal canale interno.
     if (chrome.runtime.onMessage && chrome.runtime.onMessage.addListener) {
