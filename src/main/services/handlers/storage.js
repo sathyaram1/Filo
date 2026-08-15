@@ -244,6 +244,17 @@ module.exports = function register(on, ctx) {
       if (Object.keys(rest).length) await DiskStorage.set(rest);
       if (settings && typeof settings === 'object') await applySettingsUpdate(settings);
 
+      // Le schede già aperte mostrano l'elenco letto PRIMA dell'import: senza
+      // un avviso resterebbero ferme (i dati ci sono, ma per vederli bisogna
+      // chiudere e riaprire la pagina — e sembra che l'import non abbia
+      // funzionato). Le impostazioni si riallineavano già da sole perché
+      // applySettingsUpdate le trasmette a tutte le schede: qui facciamo la
+      // stessa cosa per i contenuti. Anche se l'import non ha cambiato nulla
+      // il segnale parte lo stesso: rileggere è innocuo, e "nessuna chiave
+      // diversa" non è una garanzia sufficiente per lasciare indietro una
+      // superficie.
+      broadcastToTabs({ type: MSG.DATA_IMPORTED });
+
       return { ok: true, added: stats.added, updated: stats.updated, unchanged: stats.unchanged };
     } catch (e) {
       console.error('[Filo import] scrittura fallita:', e);
