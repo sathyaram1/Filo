@@ -299,8 +299,9 @@
     addBtn('Rimuovi', () => removeItem(r));
     row.appendChild(actions);
 
-    // Clic sinistro sulla riga = azione primaria: apri il file se completato.
-    if (r.state === 'completed') {
+    // Clic sinistro sulla riga = azione primaria: apri il file se completato (e
+    // se il file c'è ancora: su una voce svuotata il clic non prometterebbe nulla).
+    if (r.state === 'completed' && !r.missing) {
       row.addEventListener('click', () => openFile(r));
     }
     // Tasto destro = menu completo (centralità del tasto destro in Filo).
