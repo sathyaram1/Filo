@@ -81,6 +81,15 @@ test('"Apri file" su un file cancellato risponde che non c\'è più (e l\'avviso
 
     // (l'avviso vero di fine scaricamento può essere ancora a schermo: prendiamo
     // il più recente, quello appena rigiocato)
+    // 3. Anche il pannello degli scaricamenti in alto smette di offrire
+    //    "Apri file" per quella voce e la mostra attenuata.
+    await shell.locator('#dl-indicator').click();
+    const riga = shell.locator('.dl-row', { hasText: 'sparito.pdf' });
+    await expect(riga).toHaveAttribute('data-missing', '1', { timeout: 10000 });
+    await expect(riga.locator('.dl-row-btn', { hasText: 'Apri file' })).toHaveCount(0);
+    await expect(riga.locator('.dl-row-meta')).toContainText('Non più sul disco');
+    await shell.locator('#dl-indicator').click();   // richiudi il pannello
+
     const azione = shell.locator('.shell-notif-action', { hasText: 'Apri file' }).last();
     await expect(azione).toBeVisible({ timeout: 10000 });
     await azione.click();
