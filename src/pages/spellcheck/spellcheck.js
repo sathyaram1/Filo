@@ -302,6 +302,9 @@
   // ----------------------------------------------------------------------
   document.addEventListener('DOMContentLoaded', () => {
     loadAll();
+    // Ripristino da backup: dizionario personale e correzioni automatiche del
+    // backup compaiono senza riaprire la scheda.
+    window.SN_PAGE_BOOTSTRAP.onDataImported(() => loadAll());
     $('addAutocorrect').addEventListener('click', addAutocorrectFromInputs);
     $('addDict').addEventListener('click', addDictFromInput);
     $('newCorrection').addEventListener('keydown', (e) => {
