@@ -101,6 +101,95 @@
   // da un "(vuoto)" o un errore di parsing.
   const MIN_REPLY_LENGTH = 30;
 
+  // ── #419 — il "buco muto": la capacità c'è, l'assistente non sa azionarla ───
+  //
+  // Il caso peggiore non è quello in cui Filo ammette di non saper fare una
+  // cosa (lì l'ammissione stessa fa scattare la rete di sicurezza qui sopra):
+  // è quello in cui la funzione ESISTE nel manifesto, l'utente chiede di
+  // farla, e l'assistente — che non ha un'azione per comandarla — si limita a
+  // spiegare a parole dove cliccare. Quella risposta non contiene nessuna
+  // ammissione: è indistinguibile da una risposta riuscita, e senza rete di
+  // sicurezza il buco resta invisibile a tutti.
+  //
+  // Segnale = risposta che dà INDICAZIONI MANUALI ("clicca", "tasto destro",
+  // "in alto a destra"…) su una capacità riconoscibile nel manifesto, senza
+  // che nel turno sia stata eseguita nessuna azione.
+  const MANUAL_HOWTO_PHRASES = [
+    'clicca',
+    'cliccando',
+    'fai clic',
+    'tasto destro',
+    'menu contestuale',
+    'vai su ',
+    'vai in ',
+    'vai nella',
+    'vai alla',
+    'vai alle',
+    'apri le impostazioni',
+    'apri le opzioni',
+    'apri il menu',
+    'dal menu',
+    'nel menu',
+    'dalla barra',
+    'nella barra',
+    'in alto a destra',
+    'in alto a sinistra',
+    'in basso a destra',
+    'in basso a sinistra',
+    'premi ',
+    'premendo',
+    'scorciatoia',
+    'ctrl+',
+    'cmd+',
+    'lo trovi',
+    'la trovi',
+    'li trovi',
+    'le trovi',
+    'puoi farlo da',
+    'puoi farlo dal',
+    'devi andare',
+    'basta andare',
+    'basta cliccare',
+    'seleziona la voce',
+  ];
+
+  // Se l'utente ha chiesto ISTRUZIONI ("come faccio a…", "dove si trova…",
+  // "cosa sai fare?"), spiegargliele è la risposta GIUSTA, non un buco: qui la
+  // proposta di segnalazione sarebbe rumore. Il segnale vale solo quando
+  // l'utente voleva che la cosa venisse fatta.
+  const HOWTO_QUESTION_RE = new RegExp([
+    '\\b(come|dove)\\s+(si|posso|puoi|potrei|faccio|fare|far|trovo|attivo|apro|cambio|metto|funziona|configuro|imposto)',
+    'come si fa',
+    'dove si trova',
+    'dove sta',
+    'dove sono',
+    'in che modo',
+    'spiegami',
+    'mi spieghi',
+    'insegnami',
+    'mi dici come',
+    'si pu(o|ò) ',
+    '(e|è)\' ?possibile',
+    'cosa sai fare',
+    'cosa puoi fare',
+    'cosa riesci',
+    'quali (funzioni|cose|capacit)',
+    'che cosa sai',
+    'a cosa serve',
+  ].join('|'), 'i');
+
+  // Una risposta di sole indicazioni è lunga: sotto questa soglia è più
+  // probabile un frammento o un errore di parsing che una spiegazione.
+  const MIN_HOWTO_REPLY_LENGTH = 80;
+
+  // Parole troppo comuni per identificare una capacità.
+  const TITLE_STOPWORDS = new Set([
+    'una', 'uno', 'del', 'della', 'delle', 'dei', 'degli', 'dal', 'dalla',
+    'nel', 'nella', 'sul', 'sulla', 'per', 'con', 'che', 'come', 'tuo', 'tua',
+    'alla', 'allo', 'agli', 'gli', 'non', 'più', 'piu', 'quando', 'dove',
+    'anche', 'tutto', 'tutte', 'sono', 'essere', 'fare', 'cosa', 'filo',
+  ]);
+
   // ── Analisi della risposta dell'agente ──────────────────────────────────────
 
   function normalize(s) {
