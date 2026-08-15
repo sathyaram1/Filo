@@ -1,8 +1,0 @@
-{
-  "id": "e703923b-482a-4d55-818a-162948c19c8b",
-  "status": "revision_capability",
-  "notes": "Fatto: la rete di sicurezza c'è anche per questo caso. Se l'assistente ti spiega a parole come fare a mano una cosa che nel catalogo delle capacità risulta esistente, e in quel turno non ha fatto niente, la segnalazione compare da sola già scritta con il tasto di conferma — come quando ammette di non poter fare qualcosa. Non dipende più dal fatto che se ne ricordi.\n\nHo deciso di NON farla scattare quando sei tu a chiedere istruzioni (\"come faccio a…\", \"dove si trova…\", \"cosa sai fare?\"): lì spiegare è la risposta giusta e una segnalazione sarebbe solo rumore. Resta una sola proposta per conversazione, come prima.\n\nIl riconoscimento è locale e deterministico: nessuna chiamata a pagamento in più e nessun dato che esce. La segnalazione anonima di ripiego resta generica (non contiene il tuo testo) e viene etichettata in modo distinto da quelle dei buchi \"la funzione non esiste\": sono due problemi che si risolvono in modi diversi e non devono mescolarsi.",
-  "queuedAt": "2026-08-15T01:38:50.492Z",
-  "queuedBy": "routine",
-  "branch": "worker/e703923b-482a-4d55-818a-162948c19c8b-20260815T013031Z"
-}
