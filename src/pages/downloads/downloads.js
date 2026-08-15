@@ -245,7 +245,8 @@
         : `${stateLabel(r)} · ${fmtBytes(r.receivedBytes)} scaricati`;
     } else {
       const size = fmtBytes(r.totalBytes || r.receivedBytes);
-      meta.textContent = `${stateLabel(r)} · ${size} · ${formatDate(r.startedAt)}`;
+      const label = r.missing ? 'Non più sul disco' : stateLabel(r);
+      meta.textContent = `${label} · ${size} · ${formatDate(r.startedAt)}`;
     }
     row.appendChild(meta);
 
