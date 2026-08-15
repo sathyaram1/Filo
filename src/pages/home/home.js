@@ -280,6 +280,9 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     load();
+    // Ripristino da backup: le pagine salvate del backup devono comparire qui
+    // senza chiudere e riaprire la scheda.
+    window.SN_PAGE_BOOTSTRAP.onDataImported(() => load());
     $('search').addEventListener('input', render);
     $('back').addEventListener('click', () => {
       currentCategoryId = null;
