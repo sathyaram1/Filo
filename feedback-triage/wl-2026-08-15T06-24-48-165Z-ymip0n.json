@@ -1,8 +1,0 @@
-{
-  "op": "worker-log",
-  "role": "new-work",
-  "startedAt": "2026-08-15T06:24:48.165Z",
-  "num": "442",
-  "queuedAt": "2026-08-15T06:24:48.165Z",
-  "queuedBy": "dispatch"
-}
