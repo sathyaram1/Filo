@@ -286,9 +286,13 @@
         else addBtn('Pausa', () => pause(r));
       }
       addBtn('Annulla', () => cancel(r));
-    } else if (r.state === 'completed') {
+    } else if (r.state === 'completed' && !r.missing) {
       addBtn('Apri file', () => openFile(r));
       addBtn('Apri cartella', () => openFolder(r));
+    } else if (r.missing) {
+      // Senza il file, la cosa utile è riaverlo: la cartella resta a portata
+      // dal menu del tasto destro.
+      if (isHttp(r.url)) addBtn('Ri-scarica', () => redownload(r));
     } else if (isHttp(r.url)) {
       addBtn('Ri-scarica', () => redownload(r));
     }
