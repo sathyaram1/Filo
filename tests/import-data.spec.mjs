@@ -139,6 +139,93 @@ test('pagina Sicurezza: "Importa dati" ripristina davvero i dati di un backup', 
   }
 });
 
+test('le schede già aperte mostrano i dati importati senza chiuderle e riaprirle', async () => {
+  // Feedback #442: le impostazioni ripristinate si applicavano subito ovunque,
+  // i CONTENUTI no. Con "Aperti per dopo" e la cronologia già aperte durante
+  // l'import, quelle schede continuavano a mostrare l'elenco di prima: i dati
+  // c'erano, ma per vederli bisognava chiudere e riaprire la pagina.
+  //
+  // Qui asseriamo il SUCCESSO: nelle schede rimaste aperte (mai ricaricate)
+  // compaiono le voci del backup, e ciò che l'utente aveva scritto nel campo di
+  // ricerca resta dov'era.
+  const userData = mkdtempSync(join(tmpdir(), 'filo-imp-live-'));
+  writeFileSync(join(userData, 'storage.json'), JSON.stringify({
+    savedPages: [{ id: 'locale-1', title: 'Pagina mia', url: 'https://mia.example/' }],
+    aiHistory: [],
+  }), 'utf8');
+
+  const zipPath = join(userData, 'backup.zip');
+  writeFileSync(zipPath, buildExportZip({
+    savedPages: [{ id: 'backup-1', title: 'Pagina del backup', url: 'https://backup.example/' }],
+    aiHistory: [{
+      id: 'h-backup-1',
+      timestamp: new Date().toISOString(),
+      action: 'translate',
+      model: 'modello-di-prova',
+      input: { text: 'ciao' },
+      output: 'Risposta ritrovata nel backup',
+      origin: '',
+      costEur: 0,
+    }],
+  }));
+
+  const app = await electron.launch({
+    args: ['.'],
+    cwd: APP_ROOT,
+    env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
+  });
+
+  try {
+    await app.evaluate(({ dialog }, p) => {
+      dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [p] });
+    }, zipPath);
+
+    const shell = await app.firstWindow();
+    await shell.waitForLoadState('domcontentloaded');
+
+    // Le due liste sono aperte PRIMA dell'import e non verranno più toccate.
+    await shell.evaluate(() => window.filoShell.tabs.open('filo://home/home.html'));
+    const home = await findInternalPage(app, 'home');
+    expect(home).toBeTruthy();
+    await home.waitForLoadState('domcontentloaded');
+    await expect(home.locator('[data-page-id="locale-1"]')).toBeVisible();
+
+    await shell.evaluate(() => window.filoShell.tabs.open('filo://history/history.html'));
+    const history = await findInternalPage(app, 'history');
+    expect(history).toBeTruthy();
+    await history.waitForLoadState('domcontentloaded');
+    await expect(history.locator('#empty')).toBeVisible(); // cronologia vuota: è lo stato di partenza
+
+    // L'utente stava filtrando la sua lista: quello che ha scritto non deve
+    // sparire perché nel frattempo è arrivato un ripristino.
+    await home.fill('#search', 'pagina');
+    await expect(home.locator('[data-page-id="locale-1"]')).toBeVisible();
+    expect(await home.locator('[data-page-id="backup-1"]').count()).toBe(0);
+
+    // Import dalla pagina Sicurezza, in una TERZA scheda.
+    await shell.evaluate(() => window.filoShell.tabs.open('filo://security/'));
+    const security = await findInternalPage(app, 'security');
+    expect(security).toBeTruthy();
+    await security.waitForLoadState('domcontentloaded');
+    await security.locator('#sec-import-btn').scrollIntoViewIfNeeded();
+    await security.locator('#sec-import-btn').click();
+    await clickConfirm(security, 'ok', { timeout: 10000 });
+
+    // Le schede aperte si sono riallineate da sole.
+    await expect(home.locator('[data-page-id="backup-1"]')).toBeVisible({ timeout: 10000 });
+    await expect(history.locator('#list')).toContainText('Risposta ritrovata nel backup', { timeout: 10000 });
+
+    // …senza buttare via lo stato della pagina: la ricerca scritta è ancora lì
+    // (una ricarica secca della scheda l'avrebbe cancellata).
+    expect(await home.inputValue('#search')).toBe('pagina');
+
+    await home.screenshot({ path: 'tests/.shots/import-data-live-refresh.png' });
+  } finally {
+    try { await app.close(); } catch (_) {}
+    rmSync(userData, { recursive: true, force: true });
+  }
+});
+
 test('"trasferire i dati su un altro computer": esporto da un profilo, importo in uno vuoto', async () => {
   // La promessa scritta sotto "Esporta dati". Qui la esercitiamo per intero,
   // dalla UI: nessuno dei due passaggi usa scorciatoie interne.
