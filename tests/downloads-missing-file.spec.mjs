@@ -101,10 +101,14 @@ test('nell\'elenco, la voce di un file sparito è attenuata e non offre "Apri fi
 
     unlinkSync(rec.savePath);
     // Tornare sulla scheda ri-legge la lista (nessun evento annuncia una
-    // cartella svuotata da fuori Filo).
-    await dl.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
-
-    await expect(voce).toHaveAttribute('data-missing', '1', { timeout: 10000 });
+    // cartella svuotata da fuori Filo). La presenza su disco passa da una cache
+    // di poco più di un secondo, quindi qui si ritorna finché non si aggiorna:
+    // per una persona è il tempo di passare da una finestra all'altra.
+    await expect.poll(async () => {
+      await dl.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+      await dl.waitForTimeout(300);
+      return voce.getAttribute('data-missing');
+    }, { timeout: 15000 }).toBe('1');
     await expect(voce.locator('.dl-meta')).toContainText('Non più sul disco');
     await expect(voce.locator('.dl-btn', { hasText: 'Apri file' })).toHaveCount(0);
     // Resta il modo di riaverlo, e di togliere la voce.
