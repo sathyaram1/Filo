@@ -1191,6 +1191,9 @@
       const row = document.createElement('div');
       row.className = 'dl-row';
       row.dataset.state = r.state;
+      // Il file non è più al suo posto: la riga lo dice PRIMA del clic (testo
+      // attenuato) e non offre "Apri file", che non avrebbe niente da aprire.
+      if (r.missing) row.dataset.missing = '1';
 
       const name = document.createElement('div');
       name.className = 'dl-row-name';
