@@ -1997,6 +1997,13 @@
     window.SN_PAGE_THEME = settings.theme;
     window.SN_PAGE_BOOTSTRAP.applyTheme(settings.theme);
     wire();
+    // Ripristino da backup: i mazzi del backup compaiono in libreria senza
+    // riaprire la scheda. Se si è dentro al builder non tocchiamo niente: un
+    // mazzo aperto e in modifica non va sostituito sotto le mani dell'utente.
+    window.SN_PAGE_BOOTSTRAP.onDataImported(() => {
+      if ($('screenLibrary').hidden) return;
+      loadLibrary().catch(() => {});
+    });
     await loadLayout();
     await route();
   }
