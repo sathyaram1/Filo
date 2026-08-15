@@ -46,6 +46,10 @@ test('se il file viene spostato o cancellato, la voce lo dichiara', () => {
   const r = rec({ savePath: p });
   assert.equal(DL._publicRecord(r).missing, false, 'parte da presente');
   unlinkSync(p);                       // l'utente cestina il file
+  // La presenza su disco passa da una cache a scadenza breve (evita centinaia di
+  // stat al secondo mentre una barra avanza); un'azione dell'utente la scavalca,
+  // come fa "Apri file" nel main.
+  DL._forgetExists(p);
   assert.equal(DL._isMissing(r), true);
   assert.equal(DL._publicRecord(r).missing, true);
 });
