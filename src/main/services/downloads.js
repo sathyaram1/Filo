@@ -678,6 +678,7 @@ module.exports = {
   // per i test
   _records: records,
   _isMissing: isMissing,
+  _forgetExists: forgetExists,
   MISSING_TEXT,
   _shortName: shortName,
   _safeName: safeName,
