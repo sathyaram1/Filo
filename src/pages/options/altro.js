@@ -132,6 +132,9 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     load();
+    // Ripristino da backup: categorie e siti esclusi del backup compaiono
+    // senza riaprire la scheda.
+    window.SN_PAGE_BOOTSTRAP.onDataImported(() => load());
     $('blocklist').addEventListener('change', saveDebounced);
     // #252 — indirizzo canonico filo://<page>/<file> (non la forma legacy
     // filo://src/pages/…): un solo URL per pagina, e la scheda già aperta viene
