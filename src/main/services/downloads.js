@@ -116,6 +116,45 @@ function uniquePath(dir, filename) {
   return candidate;
 }
 
+// ─── il file può sparire DOPO lo scaricamento ───────────────────────────
+// Uno scaricamento finito è una voce che punta a un percorso su disco, ma quel
+// percorso è dell'utente: può spostare il file, rinominarlo, cestinarlo. Da quel
+// momento "Apri file" non ha più niente da aprire, e va detto invece di fingere.
+//
+// Non ci si fida dell'esito dell'apertura: su Windows il sistema segnala il
+// fallimento, su Linux `shell.openPath` risponde "riuscito" anche su un percorso
+// inesistente. L'unica risposta uguale ovunque è guardare il disco PRIMA.
+//
+// La presenza passa da una cache a scadenza breve: la lista viene ri-lette a
+// ogni avanzamento (fino a ~8 volte al secondo, fino a 200 voci), e senza cache
+// ogni tacca di una barra di avanzamento costerebbe centinaia di stat.
+const EXIST_TTL_MS = 1500;
+const existCache = new Map();   // savePath → { at, ok }
+
+function fileExists(p) {
+  if (!p) return false;
+  const now = Date.now();
+  const hit = existCache.get(p);
+  if (hit && now - hit.at < EXIST_TTL_MS) return hit.ok;
+  let ok = false;
+  try { ok = fs.existsSync(p); } catch (_) { ok = false; }
+  if (existCache.size > 512) existCache.clear();   // tetto: è solo una cache
+  existCache.set(p, { at: now, ok });
+  return ok;
+}
+
+// Prima di un'azione dell'utente la cache non vale: lui il file può averlo
+// spostato un istante fa, e su un'azione singola lo stat costa zero.
+function forgetExists(p) { if (p) existCache.delete(p); }
+
+// "Il file promesso da questa voce non c'è più". Vale solo per gli scaricamenti
+// COMPLETATI: per uno interrotto o annullato il file non è mai esistito, e
+// marcarlo "sparito" direbbe una cosa falsa.
+function isMissing(r) {
+  if (!r || r.state !== 'completed') return false;
+  return !r.savePath || !fileExists(r.savePath);
+}
+
 // La sola forma che esce verso la shell e lo storage (niente riferimenti nativi).
 function publicRecord(r) {
   return {
