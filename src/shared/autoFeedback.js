@@ -436,6 +436,19 @@
       };
     }
 
+    if (analysis.kind === 'capability-uncommandable') {
+      const parts = [`Ho chiesto a Filo: "${asked}"`];
+      parts.push(admitted
+        ? `Filo sa fare questa cosa, ma l'assistente non l'ha fatta: mi ha spiegato come farla a mano ("${admitted}")`
+        : 'Filo sa fare questa cosa, ma l\'assistente non l\'ha fatta: mi ha spiegato come farla a mano.');
+      parts.push('Mi piacerebbe poterla chiedere all\'assistente e basta.');
+      return {
+        type: 'INVIA_FEEDBACK',
+        testo: parts.join('\n').slice(0, 1500),
+        titolo: shortTitle(userMessage, 'Funzione non azionabile'),
+      };
+    }
+
     if (analysis.kind === 'complaint') {
       const parts = [`Stavo facendo questo in Filo: "${asked}"`];
       parts.push(admitted
