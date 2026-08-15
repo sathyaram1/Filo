@@ -4,6 +4,8 @@
 // quando l'agente di chat rileva con ALTA CONFIDENZA:
 //   a) una richiesta FUORI CAPACITÀ — usando il manifest SN_CAPABILITIES
 //   b) una LAMENTELA "di sfuggita" su qualcosa di rotto
+//   c) (#419) una capacità che ESISTE nel manifest ma che l'assistente non sa
+//      azionare: invece di farla, spiega a parole dove cliccare
 //
 // Privacy: il feedback è GENERICO — nessun URL, nessun testo utente verbatim.
 // Il contesto allegato è solo l'id strutturale del gap (capabilityGapId) e
