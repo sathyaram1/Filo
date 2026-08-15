@@ -167,7 +167,9 @@
       }
       acts.push(['Annulla', () => cancel(r)]);
     } else if (r.state === 'completed') {
-      acts.push(['Apri file', () => openFile(r)]);
+      // Se il file non è più sul disco "Apri file" non ha niente da aprire:
+      // resta la cartella (e più sotto "Ri-scarica", che è la via per riaverlo).
+      if (!r.missing) acts.push(['Apri file', () => openFile(r)]);
       acts.push(['Apri cartella', () => openFolder(r)]);
     } else {
       // interrupted / cancelled: il file completo non c'è, ma la cartella e la
