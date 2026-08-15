@@ -176,7 +176,10 @@ test('E — nome di file ostile: mostrato come testo, nessuno script eseguito', 
     // niente flag impostata dall'handler onerror.
     expect(await pagina.evaluate(() => !!window.__filoXss)).toBeFalsy();
     expect(await riga.locator('.dl-name img').count()).toBe(0);
-    expect(await riga.locator('.dl-name').innerText()).toContain('onerror');
+    expect(await riga.locator('.dl-name *').count()).toBe(0);
+    // Il nome mostrato è esattamente quello del file su disco, come testo.
+    const atteso = rec.savePath.split(/[\\/]/).pop();
+    expect((await riga.locator('.dl-name').innerText()).trim()).toBe(atteso);
 
     // Il nome lunghissimo non deve sfondare la pagina in orizzontale.
     const sfonda = await pagina.evaluate(() =>
