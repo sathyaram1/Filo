@@ -115,6 +115,10 @@ test('nell\'elenco, la voce di un file sparito è attenuata e non offre "Apri fi
     await expect(voce.locator('.dl-btn', { hasText: 'Ri-scarica' })).toBeVisible();
     await expect(voce.locator('.dl-btn', { hasText: 'Rimuovi' })).toBeVisible();
 
+    // Traccia visiva ispezionabile (cartella gitignorata): come appare la voce
+    // svuotata accanto alle altre.
+    await dl.screenshot({ path: 'tests/.shots/410-4-elenco-file-sparito.png' });
+
     // Tasto destro: niente "Apri file" nemmeno lì (parità fra i due cammini).
     await voce.click({ button: 'right' });
     const menu = dl.locator('.dl-ctxmenu');
