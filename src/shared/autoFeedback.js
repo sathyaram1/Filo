@@ -503,6 +503,8 @@
     // Esposti per i test
     _NOT_CAPABLE_PHRASES: NOT_CAPABLE_PHRASES,
     _COMPLAINT_PHRASES: COMPLAINT_PHRASES,
+    _MANUAL_HOWTO_PHRASES: MANUAL_HOWTO_PHRASES,
+    _matchCapabilityByWords: matchCapabilityByWords,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
