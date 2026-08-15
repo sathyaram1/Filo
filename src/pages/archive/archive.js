@@ -368,6 +368,14 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     load();
+    // Ripristino da backup: l'archivio del backup compare senza riaprire la
+    // scheda. Si esce dai risultati della ricerca semantica, che erano
+    // calcolati sull'archivio di prima.
+    window.SN_PAGE_BOOTSTRAP.onDataImported(() => {
+      semanticResults = null;
+      $('searchNote').hidden = true;
+      load();
+    });
     $('list').addEventListener('wheel', onListWheel, { passive: false });
     // Digitare = filtro testuale immediato (e si esce dalla modalità semantica).
     $('search').addEventListener('input', () => {
