@@ -177,3 +177,77 @@ test('Filo ammette una mancanza: propone lui la segnalazione, senza che gliela s
 
   await app.evaluate(() => { try { globalThis.__restoreGap?.(); } catch (_) {} });
 });
+
+// #419 — il "buco muto": qui Filo NON ammette niente. La funzione esiste (è nel
+// manifesto delle capacità), l'utente chiede di farla, e l'assistente si limita
+// a spiegargli dove cliccare. Prima la segnalazione dipendeva solo dal fatto che
+// il modello si ricordasse di emetterla: se se ne dimenticava — come qui, dove
+// la risposta non contiene NESSUNA azione e nessuna ammissione — non succedeva
+// niente e il buco restava invisibile. Senza la rete di sicurezza questo test è
+// rosso: non compare nessun tasto di conferma e nessuna segnalazione parte.
+test('Filo spiega a mano una cosa che sa fare: la segnalazione arriva lo stesso', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await useFakeKey(app);
+
+  await app.evaluate(() => {
+    const origProv = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
+    const origSubmit = globalThis.SN_FEEDBACK.submit;
+    globalThis.__restoreMute = () => {
+      globalThis.SN_PROVIDERS.streamCompleteWithFallback = origProv;
+      globalThis.SN_FEEDBACK.submit = origSubmit;
+    };
+    // Risposta indistinguibile da una riuscita: nessun "non posso", nessuna
+    // azione — solo indicazioni su dove cliccare.
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, onDelta }) => {
+      const text = JSON.stringify({
+        text: 'Per andare a schermo intero clicca l’icona con le due frecce in alto a '
+          + 'destra nella barra di Filo, oppure premi F11: la finestra occupa tutto lo schermo.',
+        actions: [],
+      });
+      try { onDelta && onDelta(text); } catch (_) {}
+      return { text, model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+    };
+    globalThis.__submitted = [];
+    globalThis.SN_FEEDBACK.submit = async (payload) => {
+      globalThis.__submitted.push(payload);
+      return { id: `fb-test-${globalThis.__submitted.length}` };
+    };
+  });
+
+  await page.evaluate(() => {
+    window.__confirmSeen = [];
+    window.SN_CONFIRM_UI = {
+      confirm: async (opts) => { window.__confirmSeen.push(opts && opts.text); return true; },
+      confirmTyped: async (opts) => { window.__confirmSeen.push(opts && opts.text); return true; },
+    };
+  });
+
+  await page.locator('#input').fill('metti Filo a schermo intero');
+  await page.locator('#sendBtn').click();
+
+  const proposal = page.locator('.dash-bubble-actions .dash-action-btn-primary', {
+    hasText: /Inviare questo feedback/i,
+  });
+  await expect(proposal).toBeVisible({ timeout: 20_000 });
+  await page.screenshot({ path: 'tests/.shots/419-buco-muto.png' }).catch(() => {});
+
+  // L'anteprima dice il punto: la cosa Filo la sa fare, è l'assistente che non
+  // l'ha fatta. È la differenza con il caso "non esiste".
+  await expect.poll(async () => page.evaluate(() => (window.__confirmSeen || []).join('\n')), {
+    timeout: 10_000, intervals: [100],
+  }).toMatch(/schermo intero/i);
+
+  // Confermata, parte davvero, citando cosa l'utente aveva chiesto.
+  await expect.poll(async () => app.evaluate(() => (globalThis.__submitted || []).map((p) => p.text).join('\n')), {
+    timeout: 10_000, intervals: [200],
+  }).toMatch(/schermo intero/i);
+
+  // Una sola segnalazione per lo stesso buco: quella anonima non parte in parallelo.
+  const sources = await app.evaluate(() => (globalThis.__submitted || []).map((p) => String(p.clientId || '')));
+  expect(sources.filter((c) => c.startsWith('auto:'))).toHaveLength(0);
+
+  await app.evaluate(() => { try { globalThis.__restoreMute?.(); } catch (_) {} });
+});
