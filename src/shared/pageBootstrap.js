@@ -88,6 +88,24 @@
   } catch (_) {}
 
   // ───────────────────────────────────────────────────────────────────────
+  // Ripristino da backup: le pagine aperte rileggono i propri dati.
+  //
+  // Un'importazione riscrive i contenuti sotto ai piedi delle schede già
+  // aperte. Il tema e la dimensione del testo si riallineavano già da soli
+  // (broadcast `settings_updated`, qui sopra); gli ELENCHI no, e restavano
+  // fermi a prima dell'import. Ogni pagina che mostra dati salvati registra
+  // qui la propria rilettura: una riga per pagina, stesso canale per tutte.
+  function onDataImported(fn) {
+    if (typeof fn !== 'function') return;
+    const TYPE = (window.SN_MSG && window.SN_MSG.MSG && window.SN_MSG.MSG.DATA_IMPORTED) || 'data_imported';
+    try {
+      chrome.runtime.onMessage.addListener((msg) => {
+        if (msg && msg.type === TYPE) { try { fn(); } catch (_) {} }
+      });
+    } catch (_) {}
+  }
+
+  // ───────────────────────────────────────────────────────────────────────
   // Dropdown custom per i <select> (feedback alpha).
   //
   // Il popup nativo di <select> usa l'highlight blu di sistema e NON rispetta
