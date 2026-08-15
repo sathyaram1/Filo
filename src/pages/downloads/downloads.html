@@ -51,6 +51,14 @@
     .dl-item[data-state="interrupted"] .dl-icon,
     .dl-item[data-state="cancelled"] .dl-icon { color: #c0392b; }
     .dl-item[data-state="completed"] .dl-icon { color: var(--sn-accent); }
+    /* Scaricato, ma il file non è più al suo posto (spostato, rinominato,
+       cestinato): la voce si attenua e il nome viene barrato, così lo stato si
+       legge prima del clic. Niente cursore "cliccabile": non c'è più un file da
+       aprire. */
+    .dl-item[data-missing="1"] { opacity: 0.62; cursor: default; }
+    .dl-item[data-missing="1"] .dl-name { text-decoration: line-through; color: var(--sn-muted); }
+    .dl-item[data-missing="1"] .dl-icon { color: var(--sn-muted); }
+    .dl-item[data-missing="1"] .dl-path { text-decoration: line-through; }
 
     .dl-name {
       grid-column: 2; grid-row: 1;
