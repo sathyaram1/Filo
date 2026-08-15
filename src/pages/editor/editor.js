@@ -4220,7 +4220,9 @@
       if (msg.type === MSG.SETTINGS_UPDATED) applySavedTheme();
       // Filo ha aggiornato dati vivi (fra cui gli appunti scritti nell'editor):
       // ricarica la collezione dall'archivio per mostrare subito il nuovo file.
-      else if (msg.type === MSG.FILO_LIVE_UPDATED) { reloadFromArchive(); }
+      // Stessa cosa dopo un ripristino da backup: i documenti importati devono
+      // comparire senza chiudere e riaprire l'editor.
+      else if (msg.type === MSG.FILO_LIVE_UPDATED || msg.type === MSG.DATA_IMPORTED) { reloadFromArchive(); }
     });
   } catch (_) {}
 
