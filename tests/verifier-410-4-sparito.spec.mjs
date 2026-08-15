@@ -24,11 +24,17 @@ const CORPO = Buffer.from('%PDF-1.4\n% finto pdf del verificatore\n' + 'z'.repea
 
 // Scarica un file col nome dato e aspetta che sia davvero sul disco.
 async function scarica(nome, { shell, openTab, testServer }, corpo = CORPO) {
+  // Gli header HTTP sono latin-1: un nome con caratteri fuori tabella (emoji)
+  // va dichiarato con la forma estesa `filename*` — è anche il caso reale.
+  const ascii = /^[\x20-\x7e]*$/.test(nome);
+  const disposizione = ascii
+    ? `attachment; filename="${nome}"`
+    : `attachment; filename="ripiego.bin"; filename*=UTF-8''${encodeURIComponent(nome)}`;
   const srv = createServer((req, res) => {
     res.writeHead(200, {
       'Content-Type': 'application/octet-stream',
       'Content-Length': corpo.length,
-      'Content-Disposition': `attachment; filename="${nome}"`,
+      'Content-Disposition': disposizione,
     });
     res.end(corpo);
   });
