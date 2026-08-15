@@ -615,6 +615,9 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     load();
+    // Ripristino da backup: le impostazioni importate sono già attive ovunque,
+    // ma questa pagina continuerebbe a mostrare nei suoi campi quelle di prima.
+    Bootstrap.onDataImported(() => load());
 
     // Tema e dimensione testo: anteprima immediata + salvataggio.
     $('theme').addEventListener('change', () => {
