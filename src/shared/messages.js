@@ -493,6 +493,14 @@
     // il tuo. Gli eventi del mouse non attraversano il confine di un iframe,
     // quindi senza questo due menu potrebbero restare aperti insieme.
     CLOSE_OTHER_MENUS: 'close_other_menus',
+    // Broadcast da background -> tutte le superfici aperte: i dati sono stati
+    // riscritti in blocco da un'importazione (Sicurezza → Importa dati). Le
+    // impostazioni viaggiavano già con SETTINGS_UPDATED; questo è l'equivalente
+    // per i CONTENUTI (pagine salvate, cronologia, archivio, scaricamenti,
+    // mazzi, appunti dell'editor…), che altrimenti resterebbero fermi
+    // all'elenco letto prima dell'import. Segnale senza payload: ogni pagina
+    // rilegge ciò che mostra.
+    DATA_IMPORTED: 'data_imported',
     // Broadcast da background -> dashboard: lo stato live è cambiato
     // (nuovo timer, notifica, ecc.) e va re-renderizzato.
     FILO_LIVE_UPDATED: 'filo_live_updated',
