@@ -595,7 +595,7 @@ const MISSING_FOLDER_TEXT = 'La cartella non c’è più: forse è stata spostat
 
 function openFile(id) {
   const rec = records.get(id);
-  if (!rec) return { ok: false, error: 'voce non trovata' };
+  if (!rec) return { ok: false, error: 'Questo scaricamento non è più nell’elenco' };
   // Guarda il disco PRIMA di tentare (vedi nota su fileExists): l'esito
   // dell'apertura non è affidabile su tutte le piattaforme.
   forgetExists(rec.savePath);
