@@ -588,9 +588,23 @@ function remove(id) {
   return listRecords();
 }
 
+// Messaggio unico per "il file non c'è più": lo dicono sia la barra in alto sia
+// la pagina elenco, e devono dirlo con le stesse parole.
+const MISSING_TEXT = 'Il file non c’è più: forse è stato spostato o cancellato';
+const MISSING_FOLDER_TEXT = 'La cartella non c’è più: forse è stata spostata o cancellata';
+
 function openFile(id) {
   const rec = records.get(id);
-  if (!rec || !rec.savePath) return { ok: false, error: 'file non disponibile' };
+  if (!rec) return { ok: false, error: 'voce non trovata' };
+  // Guarda il disco PRIMA di tentare (vedi nota su fileExists): l'esito
+  // dell'apertura non è affidabile su tutte le piattaforme.
+  forgetExists(rec.savePath);
+  if (!rec.savePath || !fileExists(rec.savePath)) {
+    // La voce è appena diventata "sparita" agli occhi dell'utente: avvisa le
+    // superfici aperte così la vedono attenuata senza dover ricaricare.
+    broadcast('missing', rec);
+    return { ok: false, missing: true, error: MISSING_TEXT };
+  }
   try {
     const r = electron().shell.openPath(rec.savePath);
     // openPath ritorna una stringa d'errore (non vuota) se non riesce.
@@ -603,9 +617,27 @@ function openFile(id) {
 
 function openFolder(id) {
   const rec = records.get(id);
-  if (!rec || !rec.savePath) return { ok: false, error: 'file non disponibile' };
-  try { electron().shell.showItemInFolder(rec.savePath); return { ok: true }; }
-  catch (e) { return { ok: false, error: e?.message || 'apertura cartella fallita' }; }
+  if (!rec || !rec.savePath) return { ok: false, missing: true, error: MISSING_TEXT };
+  forgetExists(rec.savePath);
+  const here = fileExists(rec.savePath);
+  if (!here) broadcast('missing', rec);
+  try {
+    if (here) { electron().shell.showItemInFolder(rec.savePath); return { ok: true }; }
+    // Il file non c'è più, ma la cartella dove stava spesso sì: aprirla è
+    // comunque il passo avanti che l'utente cercava (magari il file è lì
+    // rinominato). Solo se manca anche quella non resta niente da aprire.
+    const dir = path.dirname(rec.savePath);
+    let dirThere = false;
+    try { dirThere = fs.existsSync(dir); } catch (_) {}
+    if (!dirThere) return { ok: false, missing: true, missingFolder: true, error: MISSING_FOLDER_TEXT };
+    const r = electron().shell.openPath(dir);
+    // ok:true + missing:true = "cartella aperta, ma il file dentro non c'è più".
+    const done = (msg) => (msg
+      ? { ok: false, missing: true, missingFolder: true, error: MISSING_FOLDER_TEXT }
+      : { ok: true, missing: true });
+    if (r && typeof r.then === 'function') return r.then(done);
+    return { ok: true, missing: true };
+  } catch (e) { return { ok: false, error: e?.message || 'apertura cartella fallita' }; }
 }
 
 function cancel(id) {
