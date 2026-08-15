@@ -174,6 +174,9 @@ function publicRecord(r) {
     // http resterebbe appesa e il server la chiuderebbe. Il pannello nasconde
     // il pulsante invece di offrirne uno che non fa niente.
     canPause: r.canPause !== false,
+    // Il file scaricato non è più al suo posto (spostato, rinominato,
+    // cestinato): le superfici lo mostrano attenuato e senza "Apri file".
+    missing: isMissing(r),
   };
 }
 
