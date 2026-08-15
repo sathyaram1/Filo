@@ -276,3 +276,25 @@ test('G — pannello in alto e pagina elenco dicono la stessa cosa della stessa 
     expect(stile.deco).toContain('line-through');
   } finally { await close(); }
 });
+
+test('H — "Apri file" sull\'avviso di fine scaricamento parla anche lui', async ({ shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  // L'avviso di fine scaricamento è la seconda superficie citata nella
+  // segnalazione ("l'elenco O l'avviso"): resta a schermo col suo "Apri file"
+  // anche dopo che il file è sparito, quindi PREMERLO deve spiegare, non tacere.
+  const { rec, close } = await scarica('avviso.bin', { shell, openTab, testServer });
+  try {
+    const avviso = shell.locator('.sn-notif, .sn-toast').filter({ hasText: 'avviso.bin' }).first();
+    await expect(avviso).toBeVisible({ timeout: 10000 });
+    const apri = avviso.getByText('Apri file', { exact: true });
+    await expect(apri).toBeVisible();
+
+    unlinkSync(rec.savePath);           // l'utente cestina il file adesso
+    await apri.click();
+
+    // Qualcosa a schermo deve dirlo: silenzio = il difetto segnalato.
+    await expect.poll(async () => (await shell.innerText('body')).includes('non c’è più'),
+      { timeout: 10000 }).toBe(true);
+    await shell.screenshot({ path: 'tests/.shots/verifier-410-4-avviso.png' }).catch(() => {});
+  } finally { await close(); }
+});
