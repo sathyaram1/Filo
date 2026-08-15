@@ -1065,6 +1065,23 @@ se lo scriviamo noi, dobbiamo saperlo rileggere noi.
   tema, sicurezza, cookie e fingerprint del backup valgono subito senza
   riavviare. E si riscrivono **solo le chiavi davvero cambiate**: rimettere a
   posto valori identici sveglia per niente i listener `onChanged`.
+- **"Attivo" vale anche per le SCHEDE GIÀ APERTE** (#442). Le impostazioni
+  viaggiavano già a tutte le superfici; i contenuti no, e una lista aperta
+  durante l'import restava ferma all'elenco di prima — i dati c'erano, ma
+  bisognava chiudere e riaprire la pagina, e nessuno lo diceva. Il main manda
+  `MSG.DATA_IMPORTED` (broadcast senza payload) e ogni pagina che mostra dati
+  salvati registra la propria rilettura con
+  `SN_PAGE_BOOTSTRAP.onDataImported(() => load())`: una riga per pagina.
+  - **Rileggere, non ricaricare.** La scheda non fa `location.reload()`: quello
+    butterebbe via ciò che l'utente stava facendo (testo cercato, scorrimento,
+    schermata aperta). Si rilegge il dato e si ri-renderizza.
+  - **Chi sta modificando non viene toccato**: il builder dei mazzi con un mazzo
+    aperto resta com'è (si riallinea solo la libreria), l'editor fonde senza
+    calpestare il documento in modifica.
+  - **Nessuna chiamata a pagamento** in un riallineamento: la dashboard
+    riaggiorna timer e avvisi, non rigenera il commento della home.
+  - Una pagina NUOVA che elenca dati salvati nasce già con questa riga: senza,
+    è una superficie che mente dopo ogni ripristino.
 - **Stesso confine d'origine dell'export**: `filo://` soltanto — una pagina web
   non deve poter aprire un file dialog né riscrivere lo storage.
 - **Dove:** `readExportZip` / `mergeImportedData` in
