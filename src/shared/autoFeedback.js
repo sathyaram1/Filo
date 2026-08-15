@@ -217,11 +217,64 @@
     return best;
   }
 
+  // Radici (prime 6 lettere) delle parole significative di una frase: basta a
+  // far combaciare "ingrandisci" del manifesto con "ingrandire" della risposta
+  // senza tirare dentro un analizzatore morfologico.
+  function stems(phrase) {
+    const out = [];
+    const words = normalize(phrase).replace(/[^a-zà-ÿ0-9\s]/g, ' ').split(/\s+/);
+    for (const w of words) {
+      if (w.length < 4 || TITLE_STOPWORDS.has(w)) continue;
+      const s = w.slice(0, 6);
+      if (!out.includes(s)) out.push(s);
+    }
+    return out;
+  }
+
+  // Riconosce di QUALE capacità del manifesto parla un testo, anche quando il
+  // titolo non compare alla lettera ("ingrandire la pagina" ↔ "Ingrandisci o
+  // rimpicciolisci la pagina"). Serve almeno il combaciare di due radici, di
+  // cui una lunga: una parola sola (es. "pagina") non identifica niente.
+  function matchCapabilityByWords(text, capabilities) {
+    if (!capabilities || !Array.isArray(capabilities)) return null;
+    const hay = ` ${normalize(text).replace(/[^a-zà-ÿ0-9\s]/g, ' ')} `;
+    let best = null;
+    let bestScore = 0;
+    for (const cap of capabilities) {
+      const st = stems(cap.title || '');
+      if (st.length < 2) continue; // titolo troppo generico per decidere
+      const hit = st.filter((s) => hay.includes(s));
+      if (hit.length < 2) continue;
+      if (!hit.some((s) => s.length >= 5)) continue;
+      if (hit.length > bestScore) { best = cap.id; bestScore = hit.length; }
+    }
+    return best;
+  }
+
+  // #419 — il buco muto. Ritorna l'id della capacità che l'assistente ha
+  // spiegato a parole invece di azionare, o null.
+  function detectUncommandable(reply, replyNorm, userMessage, actions, capabilities) {
+    // Un turno in cui qualcosa è stato fatto non è un turno a mani vuote.
+    if (Array.isArray(actions) && actions.length) return null;
+    if (reply.length < MIN_HOWTO_REPLY_LENGTH) return null;
+    const user = String(userMessage || '').trim();
+    if (!user) return null;
+    // Chi chiede istruzioni le istruzioni le vuole: nessun buco da segnalare.
+    if (HOWTO_QUESTION_RE.test(user)) return null;
+    // La risposta deve dare indicazioni manuali, non solo parlare.
+    if (!MANUAL_HOWTO_PHRASES.some((p) => replyNorm.includes(p))) return null;
+    // …e devono riguardare una capacità che Filo dichiara di avere.
+    return matchCapabilityByWords(`${user} ${reply}`, capabilities)
+      || guessCapabilityId(replyNorm, capabilities);
+  }
+
   // Analizza la risposta dell'agente e il messaggio utente per rilevare un
   // segnale di auto-feedback. Ritorna:
   //   { kind: null }                                          — nessun segnale
   //   { kind: 'capability-gap', capabilityId?, genericDesc } — fuori capacità
   //   { kind: 'complaint', genericDesc }                     — lamentela su bug
+  //   { kind: 'capability-uncommandable', capabilityId, genericDesc } — #419:
+  //       la capacità esiste, l'assistente l'ha spiegata a mano invece di farla
   //
   // Parametri:
   //   textReply    — testo della risposta dell'agente (non dell'utente: più sicuro)
