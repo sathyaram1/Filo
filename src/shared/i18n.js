@@ -195,6 +195,11 @@
     toast_translating_page: 'Traduzione pagina in corso…',
     toast_translating_page_progress: 'Traduzione pagina… %s/%s',
     toast_page_translated: 'Pagina tradotta',
+    // #439 — parti della pagina che NESSUNO script può leggere (i siti moderni
+    // possono chiudere a chiave i propri componenti). Non si traducono, e dirlo
+    // è l'unica cosa onesta: "Pagina tradotta" sarebbe falso.
+    toast_page_translated_partial: 'Pagina tradotta solo in parte: alcuni componenti di questo sito sono chiusi e restano nella lingua originale.',
+    toast_only_closed_components: 'Il testo di questa pagina vive dentro componenti chiusi del sito: non riesco a leggerlo, e resta nella lingua originale.',
     // Traduzione interrotta a metà (#408): mai "Pagina tradotta" quando non lo
     // è. Dice quanto ne manca, perché si è fermata e come riprendere.
     toast_page_translate_stopped: 'Traduzione interrotta dopo %s blocchi su %s. %s Puoi riprenderla dal tasto destro senza rifare la parte già tradotta.',

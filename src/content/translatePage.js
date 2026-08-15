@@ -54,6 +54,9 @@
 
     try {
       const blocks = Extract.extractTranslatableBlocks();
+      // Pezzi di pagina che nessuno script può leggere (#439): non entrano nel
+      // lavoro, ma cambiano l'avviso finale — "Pagina tradotta" sarebbe falso.
+      const unreachable = Number(blocks.unreachable || 0);
 
       // Per ogni unità: i figli (link, img, span, …) diventano segnaposto [[Lk]],
       // così il modello traduce solo il testo e la struttura resta intatta.
@@ -61,7 +64,7 @@
       // tornano dall'estrazione (vengono saltati alla fonte) e non vanno
       // rimandati al modello — sarebbe testo pagato due volte. Qui servono solo
       // a dare i totali giusti a chi legge l'avviso (#408).
-      const already = document.querySelectorAll('[data-sn-translated="1"]').length;
+      const already = Extract.findTranslatedElements().length;
       const units = [];
       for (const b of blocks) {
         if (b.el && b.el.dataset && b.el.dataset.snTranslated) continue;
@@ -79,7 +82,12 @@
           pageComplete = true;
           missingCount = 0;
           totalCount = already;
-          Popup.showToast(I18n.t('toast_page_translated'));
+          Popup.showToast(...doneToast(unreachable));
+        } else if (unreachable) {
+          // Pagina fatta solo di componenti chiusi: non è "niente da tradurre",
+          // è testo che non riusciamo a leggere. Dire l'una per l'altra
+          // manderebbe l'utente a riprovare all'infinito.
+          Popup.showToast(I18n.t('toast_only_closed_components'), { duration: 7000 });
         } else {
           Popup.showToast(I18n.t('toast_nothing_to_translate'));
         }
@@ -143,9 +151,13 @@
       }
 
       pageHasTranslation = true;
+      // NB: i componenti chiusi non rendono la traduzione "riprendibile" —
+      // riprovare non li aprirà mai. Lo stato resta quindi completo (il menu
+      // offre "Mostra originale", non "Riprendi": riprendere non farebbe
+      // nulla), ed è l'AVVISO a dire che una parte è rimasta fuori.
       pageComplete = missingCount === 0;
       if (pageComplete) {
-        Popup.showToast(I18n.t('toast_page_translated'));
+        Popup.showToast(...doneToast(unreachable));
       } else {
         // MAI "Pagina tradotta" quando non lo è: si dice che si è interrotta,
         // quanto manca e come riprendere (il motivo tecnico grezzo resta fuori).
@@ -158,6 +170,15 @@
       progress.close();
       pageTranslating = false;
     }
+  }
+
+  // Avviso di fine lavoro: "Pagina tradotta" solo se non è rimasto fuori niente.
+  // Con dei componenti chiusi (#439) la stessa frase sarebbe una bugia, e la
+  // versione onesta resta in vista più a lungo perché dice qualcosa di nuovo.
+  function doneToast(unreachable) {
+    return unreachable
+      ? [I18n.t('toast_page_translated_partial'), { duration: 7000 }]
+      : [I18n.t('toast_page_translated')];
   }
 
   // Errore tecnico → frase per l'utente (stessa traduzione delle chat: mai il
@@ -311,7 +332,10 @@
     }
     translatedUnits = [];
     // Traduzioni di formati precedenti (HTML/testo salvato negli attributi).
-    document.querySelectorAll('[data-sn-translated="1"]').forEach((el) => {
+    // La ricerca attraversa anche i componenti isolati (#439): lì dentro ora
+    // finisce del testo tradotto, e ciò che si può tradurre si deve poter
+    // rimettere com'era.
+    Extract.findTranslatedElements().forEach((el) => {
       if (el.dataset.snOriginalHtml !== undefined) {
         el.innerHTML = el.dataset.snOriginalHtml;
         delete el.dataset.snOriginalHtml;
