@@ -79,7 +79,9 @@ test('"Apri file" su un file cancellato risponde che non c\'è più (e l\'avviso
       opts: { durationSec: 60, sound: false, actions: [{ label: 'Apri file', openDownloadId: rec.id }] },
     });
 
-    const azione = shell.locator('.shell-notif-action', { hasText: 'Apri file' });
+    // (l'avviso vero di fine scaricamento può essere ancora a schermo: prendiamo
+    // il più recente, quello appena rigiocato)
+    const azione = shell.locator('.shell-notif-action', { hasText: 'Apri file' }).last();
     await expect(azione).toBeVisible({ timeout: 10000 });
     await azione.click();
     await expect(shell.locator('.shell-notif-msg', { hasText: /non c[’']è più/ }))
