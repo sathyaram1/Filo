@@ -59,11 +59,14 @@ test('se cancello il file a mano, "Apri file" non finge di riuscire', async ({ s
     unlinkSync(e.savePath); // l'utente svuota il cestino / sposta il file
 
     const r = await shell.evaluate((id) => window.filoShell.downloads.openFile(id), e.id);
-    // Nota: su Linux shell.openPath ritorna successo anche su un percorso
-    // inesistente (quirk di piattaforma), quindi qui si può solo pretendere che
-    // il comando risponda senza far esplodere l'app. Il caso "file sparito" è
-    // stato accodato come suggerimento all'owner.
+    // #410.4 — l'esito dell'apertura non basta (su Linux shell.openPath dice
+    // "riuscito" anche su un percorso inesistente): il main guarda il disco
+    // PRIMA di tentare, quindi qui si pretende un rifiuto esplicito, con la
+    // frase che l'utente vedrà.
     expect(r, 'nessuna risposta').toBeTruthy();
+    expect(r.ok, 'ha finto di aprire un file che non c\'è più').toBe(false);
+    expect(r.missing).toBe(true);
+    expect(r.error).toMatch(/non c[’']è più/i);
     expect(await shell.evaluate(() => !!window.filoShell)).toBe(true);
   } finally { await s.close(); }
 });

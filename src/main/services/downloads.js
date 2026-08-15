@@ -116,6 +116,45 @@ function uniquePath(dir, filename) {
   return candidate;
 }
 
+// ─── il file può sparire DOPO lo scaricamento ───────────────────────────
+// Uno scaricamento finito è una voce che punta a un percorso su disco, ma quel
+// percorso è dell'utente: può spostare il file, rinominarlo, cestinarlo. Da quel
+// momento "Apri file" non ha più niente da aprire, e va detto invece di fingere.
+//
+// Non ci si fida dell'esito dell'apertura: su Windows il sistema segnala il
+// fallimento, su Linux `shell.openPath` risponde "riuscito" anche su un percorso
+// inesistente. L'unica risposta uguale ovunque è guardare il disco PRIMA.
+//
+// La presenza passa da una cache a scadenza breve: la lista viene ri-lette a
+// ogni avanzamento (fino a ~8 volte al secondo, fino a 200 voci), e senza cache
+// ogni tacca di una barra di avanzamento costerebbe centinaia di stat.
+const EXIST_TTL_MS = 1500;
+const existCache = new Map();   // savePath → { at, ok }
+
+function fileExists(p) {
+  if (!p) return false;
+  const now = Date.now();
+  const hit = existCache.get(p);
+  if (hit && now - hit.at < EXIST_TTL_MS) return hit.ok;
+  let ok = false;
+  try { ok = fs.existsSync(p); } catch (_) { ok = false; }
+  if (existCache.size > 512) existCache.clear();   // tetto: è solo una cache
+  existCache.set(p, { at: now, ok });
+  return ok;
+}
+
+// Prima di un'azione dell'utente la cache non vale: lui il file può averlo
+// spostato un istante fa, e su un'azione singola lo stat costa zero.
+function forgetExists(p) { if (p) existCache.delete(p); }
+
+// "Il file promesso da questa voce non c'è più". Vale solo per gli scaricamenti
+// COMPLETATI: per uno interrotto o annullato il file non è mai esistito, e
+// marcarlo "sparito" direbbe una cosa falsa.
+function isMissing(r) {
+  if (!r || r.state !== 'completed') return false;
+  return !r.savePath || !fileExists(r.savePath);
+}
+
 // La sola forma che esce verso la shell e lo storage (niente riferimenti nativi).
 function publicRecord(r) {
   return {
@@ -135,6 +174,9 @@ function publicRecord(r) {
     // http resterebbe appesa e il server la chiuderebbe. Il pannello nasconde
     // il pulsante invece di offrirne uno che non fa niente.
     canPause: r.canPause !== false,
+    // Il file scaricato non è più al suo posto (spostato, rinominato,
+    // cestinato): le superfici lo mostrano attenuato e senza "Apri file".
+    missing: isMissing(r),
   };
 }
 
@@ -546,9 +588,23 @@ function remove(id) {
   return listRecords();
 }
 
+// Messaggio unico per "il file non c'è più": lo dicono sia la barra in alto sia
+// la pagina elenco, e devono dirlo con le stesse parole.
+const MISSING_TEXT = 'Il file non c’è più: forse è stato spostato o cancellato';
+const MISSING_FOLDER_TEXT = 'La cartella non c’è più: forse è stata spostata o cancellata';
+
 function openFile(id) {
   const rec = records.get(id);
-  if (!rec || !rec.savePath) return { ok: false, error: 'file non disponibile' };
+  if (!rec) return { ok: false, error: 'Questo scaricamento non è più nell’elenco' };
+  // Guarda il disco PRIMA di tentare (vedi nota su fileExists): l'esito
+  // dell'apertura non è affidabile su tutte le piattaforme.
+  forgetExists(rec.savePath);
+  if (!rec.savePath || !fileExists(rec.savePath)) {
+    // La voce è appena diventata "sparita" agli occhi dell'utente: avvisa le
+    // superfici aperte così la vedono attenuata senza dover ricaricare.
+    broadcast('missing', rec);
+    return { ok: false, missing: true, error: MISSING_TEXT };
+  }
   try {
     const r = electron().shell.openPath(rec.savePath);
     // openPath ritorna una stringa d'errore (non vuota) se non riesce.
@@ -561,9 +617,31 @@ function openFile(id) {
 
 function openFolder(id) {
   const rec = records.get(id);
-  if (!rec || !rec.savePath) return { ok: false, error: 'file non disponibile' };
-  try { electron().shell.showItemInFolder(rec.savePath); return { ok: true }; }
-  catch (e) { return { ok: false, error: e?.message || 'apertura cartella fallita' }; }
+  if (!rec) return { ok: false, error: 'Questo scaricamento non è più nell’elenco' };
+  if (!rec.savePath) return { ok: false, missing: true, error: MISSING_TEXT };
+  forgetExists(rec.savePath);
+  const here = fileExists(rec.savePath);
+  if (!here) broadcast('missing', rec);
+  try {
+    if (here) { electron().shell.showItemInFolder(rec.savePath); return { ok: true }; }
+    // Il file non c'è più, ma la cartella dove stava spesso sì: aprirla è
+    // comunque il passo avanti che l'utente cercava (magari il file è lì
+    // rinominato). Solo se manca anche quella non resta niente da aprire.
+    const dir = path.dirname(rec.savePath);
+    let dirThere = false;
+    try { dirThere = fs.existsSync(dir); } catch (_) {}
+    if (!dirThere) return { ok: false, missing: true, missingFolder: true, error: MISSING_FOLDER_TEXT };
+    const r = electron().shell.openPath(dir);
+    // ok:true + missing:true = "cartella aperta, ma il file dentro non c'è più".
+    // La cartella c'è ma il sistema non l'ha aperta (nessun gestore file, o
+    // permessi): è un'altra storia, e va detta com'è invece di dare la colpa a
+    // una cartella sparita.
+    const done = (msg) => (msg
+      ? { ok: false, missing: true, error: 'Non è stato possibile aprire la cartella' }
+      : { ok: true, missing: true });
+    if (r && typeof r.then === 'function') return r.then(done);
+    return { ok: true, missing: true };
+  } catch (e) { return { ok: false, error: e?.message || 'apertura cartella fallita' }; }
 }
 
 function cancel(id) {
@@ -603,6 +681,9 @@ module.exports = {
   resume,
   // per i test
   _records: records,
+  _isMissing: isMissing,
+  _forgetExists: forgetExists,
+  MISSING_TEXT,
   _shortName: shortName,
   _safeName: safeName,
   _publicRecord: publicRecord,
