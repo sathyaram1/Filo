@@ -78,13 +78,22 @@
     render();
   }
 
+  // Il file di uno scaricamento concluso può sparire dopo (spostato, rinominato,
+  // cestinato): il main se ne accorge guardando il disco e risponde
+  // { ok:false, missing:true, error } con la frase da mostrare. La riga viene
+  // ridisegnata subito come "non più disponibile", così l'utente non riprova.
   async function openFile(r) {
     const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_OPEN_FILE, id: r.id });
-    if (res && res.ok === false) flash('Impossibile aprire il file');
+    if (!res || res.ok !== false) return;
+    flash(res.error || 'Impossibile aprire il file');
+    if (res.missing) reload();
   }
   async function openFolder(r) {
     const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_OPEN_FOLDER, id: r.id });
-    if (res && res.ok === false) flash('Cartella non disponibile');
+    if (!res) return;
+    if (res.ok === false) { flash(res.error || 'Cartella non disponibile'); if (res.missing) reload(); return; }
+    // Cartella aperta ma senza il file dentro: dillo, invece di lasciarlo cercare.
+    if (res.missing) { flash('Il file non c’è più: ho aperto la cartella dov’era'); reload(); }
   }
   async function copyPath(r) {
     const p = r.savePath || '';
@@ -158,7 +167,9 @@
       }
       acts.push(['Annulla', () => cancel(r)]);
     } else if (r.state === 'completed') {
-      acts.push(['Apri file', () => openFile(r)]);
+      // Se il file non è più sul disco "Apri file" non ha niente da aprire:
+      // resta la cartella (e più sotto "Ri-scarica", che è la via per riaverlo).
+      if (!r.missing) acts.push(['Apri file', () => openFile(r)]);
       acts.push(['Apri cartella', () => openFolder(r)]);
     } else {
       // interrupted / cancelled: il file completo non c'è, ma la cartella e la
@@ -207,6 +218,9 @@
     const row = document.createElement('div');
     row.className = 'dl-item';
     row.dataset.state = r.state;
+    // Il file scaricato non è più al suo posto: la voce si attenua e perde
+    // "Apri file" — l'utente lo vede prima ancora di cliccare.
+    if (r.missing) row.dataset.missing = '1';
     row.dataset.id = r.id;
     row.tabIndex = 0;
     row.setAttribute('role', 'listitem');
@@ -231,7 +245,8 @@
         : `${stateLabel(r)} · ${fmtBytes(r.receivedBytes)} scaricati`;
     } else {
       const size = fmtBytes(r.totalBytes || r.receivedBytes);
-      meta.textContent = `${stateLabel(r)} · ${size} · ${formatDate(r.startedAt)}`;
+      const label = r.missing ? 'Non più sul disco' : stateLabel(r);
+      meta.textContent = `${label} · ${size} · ${formatDate(r.startedAt)}`;
     }
     row.appendChild(meta);
 
@@ -271,17 +286,22 @@
         else addBtn('Pausa', () => pause(r));
       }
       addBtn('Annulla', () => cancel(r));
-    } else if (r.state === 'completed') {
+    } else if (r.state === 'completed' && !r.missing) {
       addBtn('Apri file', () => openFile(r));
       addBtn('Apri cartella', () => openFolder(r));
+    } else if (r.missing) {
+      // Senza il file, la cosa utile è riaverlo: la cartella resta a portata
+      // dal menu del tasto destro.
+      if (isHttp(r.url)) addBtn('Ri-scarica', () => redownload(r));
     } else if (isHttp(r.url)) {
       addBtn('Ri-scarica', () => redownload(r));
     }
     addBtn('Rimuovi', () => removeItem(r));
     row.appendChild(actions);
 
-    // Clic sinistro sulla riga = azione primaria: apri il file se completato.
-    if (r.state === 'completed') {
+    // Clic sinistro sulla riga = azione primaria: apri il file se completato (e
+    // se il file c'è ancora: su una voce svuotata il clic non prometterebbe nulla).
+    if (r.state === 'completed' && !r.missing) {
       row.addEventListener('click', () => openFile(r));
     }
     // Tasto destro = menu completo (centralità del tasto destro in Filo).
@@ -291,7 +311,7 @@
     });
     // Tastiera: Invio/Spazio = primaria (apri se completato); Menu/Shift+F10 = menu.
     row.addEventListener('keydown', (e) => {
-      if ((e.key === 'Enter' || e.key === ' ') && r.state === 'completed') {
+      if ((e.key === 'Enter' || e.key === ' ') && r.state === 'completed' && !r.missing) {
         e.preventDefault(); openFile(r);
       } else if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
         e.preventDefault();
@@ -364,6 +384,15 @@
       items = (res && res.items) || [];
       render();
     });
+
+    // Tornando su questa scheda dopo essere andati a spostare/cancellare i file
+    // nel gestore di sistema, la lista va riletta: nessun evento annuncia una
+    // cartella svuotata da fuori, e senza rilettura le voci resterebbero
+    // "aperibili" pur non avendo più un file dietro.
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) scheduleReload();
+    });
+    window.addEventListener('focus', scheduleReload);
 
     // Aggiornamenti live: il main pusha un segnale contentless quando parte/
     // avanza/finisce uno scaricamento. Ri-leggiamo la lista dal canale interno.

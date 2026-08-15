@@ -296,9 +296,9 @@
     },
     {
       id: 'downloads-list', title: 'Elenco degli scaricamenti', category: 'navigation',
-      desc: 'La lista di tutti i file scaricati, dal più recente: per ciascuno vedi nome, dimensione, stato (completato, interrotto, annullato o in corso), data e dove è stato salvato; gli scaricamenti in corso mostrano barra e percentuale dal vivo. Per ogni voce puoi aprire il file, aprire la cartella che lo contiene, copiarne il percorso, ri-scaricarlo o toglierlo dalla lista; «Svuota elenco» rimuove tutti quelli conclusi. Puoi anche cercare tra gli scaricamenti.',
+      desc: 'La lista di tutti i file scaricati, dal più recente: per ciascuno vedi nome, dimensione, stato (completato, interrotto, annullato o in corso), data e dove è stato salvato; gli scaricamenti in corso mostrano barra e percentuale dal vivo. Per ogni voce puoi aprire il file, aprire la cartella che lo contiene, copiarne il percorso, ri-scaricarlo o toglierlo dalla lista; «Svuota elenco» rimuove tutti quelli conclusi. Se un file scaricato non è più al suo posto (l’hai spostato, rinominato o cestinato) la voce si riconosce a colpo d’occhio — attenuata, col nome barrato — e al posto di «Apri file» ti offre di ri-scaricarlo. Puoi anche cercare tra gli scaricamenti.',
       invoke: 'Menu «App» → «Scaricamenti», oppure il pulsante «Vedi tutti» sull’indicatore degli scaricamenti in alto; indirizzo filo://downloads/downloads.html. Clic su una voce completata per aprire il file, tasto destro per il menu con tutte le azioni.',
-      doesNot: 'Non ti fa scegliere dove salvare ogni file (finiscono nella cartella Download di sistema) e non riguarda «Salva immagine/video come…» dal tasto destro.',
+      doesNot: 'Non ti fa scegliere dove salvare ogni file (finiscono nella cartella Download di sistema) e non riguarda «Salva immagine/video come…» dal tasto destro. Togliere una voce dall’elenco non cancella il file dal disco, e Filo non va a cercare dove è finito un file che hai spostato: ti dice che lì non c’è più e ti apre la cartella dov’era.',
     },
 
     // ──────────────────── Assistente e agente di pagina ──────────────────────

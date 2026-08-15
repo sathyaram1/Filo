@@ -23,6 +23,7 @@
         'Nelle Opzioni puoi spegnere tutti i modelli proprietari con un interruttore: Filo lavora solo con modelli a pesi aperti serviti da fornitori indipendenti, anche quando usi i crediti di Filo.',
       ],
       fixes: [
+        'Se apri un file scaricato che nel frattempo hai spostato o cancellato, Filo te lo dice e ti apre la cartella dov’era, invece di non fare niente; nell’elenco degli scaricamenti quelle voci si riconoscono subito.',
         'Il suggerimento di correzione compare col tasto destro — e cliccandolo la parola viene corretta davvero, senza perdere il punto in cui stavi scrivendo — anche nelle aree di scrittura con formattazione (webmail, editor online) costruite con i componenti che usano molti siti moderni: prima lì la parola sbagliata non veniva riconosciuta.',
         'Il clic destro su un video o un audio dentro un collegamento (la copertina di un video in una lista, l\'anteprima di un articolo) ora mostra anche le azioni sul collegamento — «Apri in nuova tab», «Copia URL», «Salva link per dopo», «Condividi link» — invece delle sole azioni sul filmato.',
         'Scrivendo "/" seguito da un indirizzo ora si aprono anche i dispositivi della rete di casa (nas.lan, raspberrypi.local, fritz.box); e se un indirizzo non risulta esistere Filo te lo dice e ti lascia aprirlo lo stesso, invece di non fare nulla.',
