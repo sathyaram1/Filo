@@ -633,8 +633,11 @@ function openFolder(id) {
     if (!dirThere) return { ok: false, missing: true, missingFolder: true, error: MISSING_FOLDER_TEXT };
     const r = electron().shell.openPath(dir);
     // ok:true + missing:true = "cartella aperta, ma il file dentro non c'è più".
+    // La cartella c'è ma il sistema non l'ha aperta (nessun gestore file, o
+    // permessi): è un'altra storia, e va detta com'è invece di dare la colpa a
+    // una cartella sparita.
     const done = (msg) => (msg
-      ? { ok: false, missing: true, missingFolder: true, error: MISSING_FOLDER_TEXT }
+      ? { ok: false, missing: true, error: 'Non è stato possibile aprire la cartella' }
       : { ok: true, missing: true });
     if (r && typeof r.then === 'function') return r.then(done);
     return { ok: true, missing: true };
