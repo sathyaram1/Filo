@@ -709,3 +709,7 @@ html[data-feedback-dim="1"] .shell {
 .dl-row-btn:hover { background: var(--tab-active); }
 .dl-row[data-state="interrupted"] .dl-row-name,
 .dl-row[data-state="cancelled"] .dl-row-name { color: var(--fg-soft); }
+/* Scaricato, ma il file non è più al suo posto: la riga si attenua (e con lei
+   il nome barrato) così si vede prima ancora di cliccare. */
+.dl-row[data-missing="1"] .dl-row-name { color: var(--fg-soft); text-decoration: line-through; }
+.dl-row[data-missing="1"] .dl-row-meta { opacity: 0.8; }
