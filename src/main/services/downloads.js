@@ -677,6 +677,8 @@ module.exports = {
   resume,
   // per i test
   _records: records,
+  _isMissing: isMissing,
+  MISSING_TEXT,
   _shortName: shortName,
   _safeName: safeName,
   _publicRecord: publicRecord,
