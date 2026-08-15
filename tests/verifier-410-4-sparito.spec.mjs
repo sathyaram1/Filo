@@ -40,18 +40,21 @@ async function scarica(nome, { shell, openTab, testServer }, corpo = CORPO) {
   });
   await new Promise((r) => srv.listen(0, '127.0.0.1', r));
   const url = `http://127.0.0.1:${srv.address().port}/scarica`;
+  // Il nome finale lo decide il sistema (sanifica i caratteri illegali e
+  // accorcia i nomi lunghi): la voce si riconosce da quella NUOVA in elenco,
+  // non dal nome che abbiamo chiesto.
+  const prima = new Set((await shell.evaluate(() => window.filoShell.downloads.list()))?.items?.map((i) => i.id) || []);
   const page = await testServer.openReady(openTab,
     `<!doctype html><html><body style="padding:40px"><a id="dl" href="${url}">Scarica</a></body></html>`);
   await page.locator('#dl').click();
 
-  await expect.poll(async () => {
+  const nuova = async () => {
     const r = await shell.evaluate(() => window.filoShell.downloads.list());
-    const e = ((r && r.items) || []).find((it) => it.filename === nome);
-    return e ? e.state : null;
-  }, { timeout: 20000 }).toBe('completed');
+    return ((r && r.items) || []).find((it) => !prima.has(it.id));
+  };
+  await expect.poll(async () => (await nuova())?.state, { timeout: 20000 }).toBe('completed');
 
-  const r = await shell.evaluate(() => window.filoShell.downloads.list());
-  const rec = ((r && r.items) || []).find((it) => it.filename === nome);
+  const rec = await nuova();
   expect(existsSync(rec.savePath)).toBe(true);
   return {
     rec,
