@@ -617,7 +617,8 @@ function openFile(id) {
 
 function openFolder(id) {
   const rec = records.get(id);
-  if (!rec || !rec.savePath) return { ok: false, missing: true, error: MISSING_TEXT };
+  if (!rec) return { ok: false, error: 'Questo scaricamento non è più nell’elenco' };
+  if (!rec.savePath) return { ok: false, missing: true, error: MISSING_TEXT };
   forgetExists(rec.savePath);
   const here = fileExists(rec.savePath);
   if (!here) broadcast('missing', rec);
