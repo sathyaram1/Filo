@@ -2155,6 +2155,11 @@
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg?.type === MSG.FILO_LIVE_UPDATED) {
       refreshLive().catch(() => {});
+    } else if (msg?.type === MSG.DATA_IMPORTED) {
+      // Ripristino da backup: timer e avvisi del backup compaiono senza
+      // riaprire la scheda. Il commento della home NON viene rigenerato: si
+      // aggiornerebbe con una chiamata a pagamento per un saluto.
+      refreshLive().catch(() => {});
     } else if (msg?.type === MSG.FILO_DASHBOARD_UPDATED) {
       // #155 — il ricalcolo in background della home è pronto: aggiorna
       // messaggio + suggerimenti senza rifare la chiamata all'LLM.
