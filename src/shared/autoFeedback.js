@@ -361,6 +361,21 @@
       };
     }
 
+    // #419 — stessa famiglia di dedup dei gap (l'id resta estraibile dal
+    // clientId), ma con un prefisso che tiene distinti i due casi: "non esiste"
+    // e "esiste ma l'assistente non la sa azionare" si risolvono in modi diversi.
+    if (analysis.kind === 'capability-uncommandable') {
+      const capId = `uncommandable-${String(analysis.capabilityId || 'unknown')}`
+        .replace(/[^a-z0-9-]/g, '-');
+      return {
+        text: String(analysis.genericDesc || 'Funzione esistente che l\'assistente non sa azionare').slice(0, 500),
+        name: `Non azionabile dall'assistente: ${analysis.capabilityId || 'sconosciuta'}`.slice(0, 100),
+        clientId: `auto:capability-gap:${capId}`,
+        capabilityGapId: capId,
+        source: 'auto:capability-uncommandable',
+      };
+    }
+
     return null;
   }
 
