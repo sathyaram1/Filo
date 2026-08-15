@@ -274,7 +274,7 @@
     // La risposta deve dare indicazioni manuali, non solo parlare.
     if (!MANUAL_HOWTO_PHRASES.some((p) => replyNorm.includes(p))) return null;
     // …e devono riguardare una capacità che Filo dichiara di avere.
-    return matchCapabilityByWords(`${user} ${reply}`, capabilities)
+    return matchCapabilityByWords(user, reply, capabilities)
       || guessCapabilityId(replyNorm, capabilities);
   }
 
