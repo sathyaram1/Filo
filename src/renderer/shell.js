@@ -989,6 +989,34 @@
   // Compat: il vecchio toast informativo (es. "Tab riordinate e salvate") ora
   // passa per il sistema di notifiche, così rispetta la durata configurata.
   function showToast(text) { return NOTIFS.show(text); }
+
+  // ── Aprire uno scaricamento: se il file non c'è più, DILLO ──────────────
+  // Il main risponde { ok:false, missing:true, error } quando il percorso non
+  // punta più a niente (file spostato, rinominato o cestinato dopo). Prima quella
+  // risposta veniva buttata via e il clic non produceva nulla: il silenzio è
+  // indistinguibile da un'app bloccata. Ora l'esito diventa un avviso, con la
+  // cartella come via d'uscita (il file potrebbe essere lì rinominato).
+  function openDownloadFile(id) {
+    if (!api.downloads) return Promise.resolve();
+    return api.downloads.openFile(id).then((res) => {
+      if (!res || res.ok !== false) return;
+      const opts = res.missing
+        ? { actions: [{ label: 'Apri cartella', onClick: () => openDownloadFolder(id) }] }
+        : undefined;
+      NOTIFS.show(res.error || 'Non è stato possibile aprire il file', opts);
+    }).catch(() => {});
+  }
+  function openDownloadFolder(id) {
+    if (!api.downloads) return Promise.resolve();
+    return api.downloads.openFolder(id).then((res) => {
+      if (!res) return;
+      if (res.ok === false) { NOTIFS.show(res.error || 'Non è stato possibile aprire la cartella'); return; }
+      // Cartella aperta, ma il file dentro non c'è più: meglio dirlo che
+      // lasciare l'utente a cercarlo.
+      if (res.missing) NOTIFS.show('Il file non c’è più: ho aperto la cartella dov’era');
+    }).catch(() => {});
+  }
+
   if (api.onToast) api.onToast((info) => {
     if (!info || !info.text) return;
     // Le azioni che arrivano dal main non possono trasportare funzioni: le
@@ -1013,11 +1041,11 @@
           // #410.1 — toast di fine scaricamento: apri il file / mostra in cartella.
           if (a && a.openDownloadId && !a.onClick && api.downloads) {
             const id = a.openDownloadId;
-            return { label: a.label, onClick: () => api.downloads.openFile(id).catch(() => {}) };
+            return { label: a.label, onClick: () => openDownloadFile(id) };
           }
           if (a && a.revealDownloadId && !a.onClick && api.downloads) {
             const id = a.revealDownloadId;
-            return { label: a.label, onClick: () => api.downloads.openFolder(id).catch(() => {}) };
+            return { label: a.label, onClick: () => openDownloadFolder(id) };
           }
           return a;
         }),
@@ -1163,6 +1191,9 @@
       const row = document.createElement('div');
       row.className = 'dl-row';
       row.dataset.state = r.state;
+      // Il file non è più al suo posto: la riga lo dice PRIMA del clic (testo
+      // attenuato) e non offre "Apri file", che non avrebbe niente da aprire.
+      if (r.missing) row.dataset.missing = '1';
 
       const name = document.createElement('div');
       name.className = 'dl-row-name';
@@ -1189,6 +1220,8 @@
         meta.textContent = p != null
           ? `${p}% · ${fmtBytes(r.receivedBytes)} / ${fmtBytes(r.totalBytes)}`
           : `${fmtBytes(r.receivedBytes)} scaricati`;
+      } else if (r.missing) {
+        meta.textContent = `Non più sul disco · ${fmtBytes(r.totalBytes || r.receivedBytes)}`;
       } else {
         meta.textContent = `${stateLabel(r)} · ${fmtBytes(r.totalBytes || r.receivedBytes)}`;
       }
@@ -1213,8 +1246,8 @@
         }
         addBtn('Annulla', () => api.downloads.cancel(r.id).catch(() => {}));
       } else if (r.state === 'completed') {
-        addBtn('Apri file', () => api.downloads.openFile(r.id).catch(() => {}));
-        addBtn('Apri cartella', () => api.downloads.openFolder(r.id).catch(() => {}));
+        if (!r.missing) addBtn('Apri file', () => openDownloadFile(r.id));
+        addBtn('Apri cartella', () => openDownloadFolder(r.id));
         addBtn('Rimuovi', () => api.downloads.remove(r.id).then((res) => syncFromList(res && res.items)).catch(() => {}));
       } else {
         addBtn('Rimuovi', () => api.downloads.remove(r.id).then((res) => syncFromList(res && res.items)).catch(() => {}));
@@ -1239,6 +1272,10 @@
       dlBtn.classList.add('open');
       renderPanel();
       reserveForPanel();
+      // I file possono essere spariti dal disco mentre il pannello era chiuso
+      // (nessun evento lo annuncia): ri-leggendo la lista all'apertura le voci
+      // ormai vuote si mostrano già attenuate, senza aspettare un clic a vuoto.
+      api.downloads.list().then((r) => { syncFromList(r && r.items); }).catch(() => {});
     }
     function closePanel() {
       panelOpen = false;
