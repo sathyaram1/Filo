@@ -78,13 +78,22 @@
     render();
   }
 
+  // Il file di uno scaricamento concluso può sparire dopo (spostato, rinominato,
+  // cestinato): il main se ne accorge guardando il disco e risponde
+  // { ok:false, missing:true, error } con la frase da mostrare. La riga viene
+  // ridisegnata subito come "non più disponibile", così l'utente non riprova.
   async function openFile(r) {
     const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_OPEN_FILE, id: r.id });
-    if (res && res.ok === false) flash('Impossibile aprire il file');
+    if (!res || res.ok !== false) return;
+    flash(res.error || 'Impossibile aprire il file');
+    if (res.missing) reload();
   }
   async function openFolder(r) {
     const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_OPEN_FOLDER, id: r.id });
-    if (res && res.ok === false) flash('Cartella non disponibile');
+    if (!res) return;
+    if (res.ok === false) { flash(res.error || 'Cartella non disponibile'); if (res.missing) reload(); return; }
+    // Cartella aperta ma senza il file dentro: dillo, invece di lasciarlo cercare.
+    if (res.missing) { flash('Il file non c’è più: ho aperto la cartella dov’era'); reload(); }
   }
   async function copyPath(r) {
     const p = r.savePath || '';
