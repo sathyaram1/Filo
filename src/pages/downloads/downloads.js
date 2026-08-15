@@ -401,5 +401,9 @@
         if (msg && msg.type === MSG.DOWNLOADS_UPDATED) scheduleReload();
       });
     }
+
+    // Ripristino da backup: gli scaricamenti del backup compaiono senza
+    // riaprire la scheda.
+    window.SN_PAGE_BOOTSTRAP.onDataImported(() => scheduleReload());
   });
 })();
