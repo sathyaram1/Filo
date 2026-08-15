@@ -308,6 +308,16 @@
       };
     }
 
+    // ── Segnale 3 (#419): capacità esistente spiegata a mano ──────────────────
+    const uncommandable = detectUncommandable(reply, replyNorm, userMessage, actions, capabilities);
+    if (uncommandable) {
+      return {
+        kind: 'capability-uncommandable',
+        capabilityId: uncommandable,
+        genericDesc: `Funzione esistente che l'assistente non sa azionare: ${uncommandable}`,
+      };
+    }
+
     return { kind: null };
   }
 
