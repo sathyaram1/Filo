@@ -1013,11 +1013,11 @@
           // #410.1 — toast di fine scaricamento: apri il file / mostra in cartella.
           if (a && a.openDownloadId && !a.onClick && api.downloads) {
             const id = a.openDownloadId;
-            return { label: a.label, onClick: () => api.downloads.openFile(id).catch(() => {}) };
+            return { label: a.label, onClick: () => openDownloadFile(id) };
           }
           if (a && a.revealDownloadId && !a.onClick && api.downloads) {
             const id = a.revealDownloadId;
-            return { label: a.label, onClick: () => api.downloads.openFolder(id).catch(() => {}) };
+            return { label: a.label, onClick: () => openDownloadFolder(id) };
           }
           return a;
         }),
