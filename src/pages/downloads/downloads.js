@@ -218,6 +218,9 @@
     const row = document.createElement('div');
     row.className = 'dl-item';
     row.dataset.state = r.state;
+    // Il file scaricato non è più al suo posto: la voce si attenua e perde
+    // "Apri file" — l'utente lo vede prima ancora di cliccare.
+    if (r.missing) row.dataset.missing = '1';
     row.dataset.id = r.id;
     row.tabIndex = 0;
     row.setAttribute('role', 'listitem');
