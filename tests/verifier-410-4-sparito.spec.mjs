@@ -284,7 +284,7 @@ test('H — "Apri file" sull\'avviso di fine scaricamento parla anche lui', asyn
   // anche dopo che il file è sparito, quindi PREMERLO deve spiegare, non tacere.
   const { rec, close } = await scarica('avviso.bin', { shell, openTab, testServer });
   try {
-    const avviso = shell.locator('.sn-notif, .sn-toast').filter({ hasText: 'avviso.bin' }).first();
+    const avviso = shell.locator('.shell-notif').filter({ hasText: 'avviso.bin' }).first();
     await expect(avviso).toBeVisible({ timeout: 10000 });
     const apri = avviso.getByText('Apri file', { exact: true });
     await expect(apri).toBeVisible();
