@@ -233,22 +233,30 @@
     return out;
   }
 
-  // Riconosce di QUALE capacità del manifesto parla un testo, anche quando il
-  // titolo non compare alla lettera ("ingrandire la pagina" ↔ "Ingrandisci o
-  // rimpicciolisci la pagina"). Serve almeno il combaciare di due radici, di
-  // cui una lunga: una parola sola (es. "pagina") non identifica niente.
-  function matchCapabilityByWords(text, capabilities) {
+  // Riconosce di QUALE capacità del manifesto parla uno scambio, anche quando
+  // il titolo non compare alla lettera ("ingrandire la pagina" ↔ "Ingrandisci o
+  // rimpicciolisci la pagina"). Serve almeno il combaciare di due radici, di cui
+  // una lunga: una parola sola (es. "pagina") non identifica niente.
+  //
+  // Le parole della RICHIESTA pesano il doppio di quelle della risposta: è ciò
+  // che l'utente voleva a dire quale capacità c'entra, mentre la risposta
+  // nomina di passaggio anche cose vicine ("il testo originale") che
+  // altrimenti farebbero vincere la capacità sbagliata.
+  function matchCapabilityByWords(userText, replyText, capabilities) {
     if (!capabilities || !Array.isArray(capabilities)) return null;
-    const hay = ` ${normalize(text).replace(/[^a-zà-ÿ0-9\s]/g, ' ')} `;
+    const hayOf = (t) => ` ${normalize(t).replace(/[^a-zà-ÿ0-9\s]/g, ' ')} `;
+    const hayUser = hayOf(userText);
+    const hayReply = hayOf(replyText);
     let best = null;
     let bestScore = 0;
     for (const cap of capabilities) {
       const st = stems(cap.title || '');
       if (st.length < 2) continue; // titolo troppo generico per decidere
-      const hit = st.filter((s) => hay.includes(s));
+      const hit = st.filter((s) => hayUser.includes(s) || hayReply.includes(s));
       if (hit.length < 2) continue;
       if (!hit.some((s) => s.length >= 5)) continue;
-      if (hit.length > bestScore) { best = cap.id; bestScore = hit.length; }
+      const score = hit.reduce((n, s) => n + (hayUser.includes(s) ? 2 : 1), 0);
+      if (score > bestScore) { best = cap.id; bestScore = score; }
     }
     return best;
   }
