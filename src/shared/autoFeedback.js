@@ -4,6 +4,8 @@
 // quando l'agente di chat rileva con ALTA CONFIDENZA:
 //   a) una richiesta FUORI CAPACITÀ — usando il manifest SN_CAPABILITIES
 //   b) una LAMENTELA "di sfuggita" su qualcosa di rotto
+//   c) (#419) una capacità che ESISTE nel manifest ma che l'assistente non sa
+//      azionare: invece di farla, spiega a parole dove cliccare
 //
 // Privacy: il feedback è GENERICO — nessun URL, nessun testo utente verbatim.
 // Il contesto allegato è solo l'id strutturale del gap (capabilityGapId) e
@@ -101,6 +103,95 @@
   // da un "(vuoto)" o un errore di parsing.
   const MIN_REPLY_LENGTH = 30;
 
+  // ── #419 — il "buco muto": la capacità c'è, l'assistente non sa azionarla ───
+  //
+  // Il caso peggiore non è quello in cui Filo ammette di non saper fare una
+  // cosa (lì l'ammissione stessa fa scattare la rete di sicurezza qui sopra):
+  // è quello in cui la funzione ESISTE nel manifesto, l'utente chiede di
+  // farla, e l'assistente — che non ha un'azione per comandarla — si limita a
+  // spiegare a parole dove cliccare. Quella risposta non contiene nessuna
+  // ammissione: è indistinguibile da una risposta riuscita, e senza rete di
+  // sicurezza il buco resta invisibile a tutti.
+  //
+  // Segnale = risposta che dà INDICAZIONI MANUALI ("clicca", "tasto destro",
+  // "in alto a destra"…) su una capacità riconoscibile nel manifesto, senza
+  // che nel turno sia stata eseguita nessuna azione.
+  const MANUAL_HOWTO_PHRASES = [
+    'clicca',
+    'cliccando',
+    'fai clic',
+    'tasto destro',
+    'menu contestuale',
+    'vai su ',
+    'vai in ',
+    'vai nella',
+    'vai alla',
+    'vai alle',
+    'apri le impostazioni',
+    'apri le opzioni',
+    'apri il menu',
+    'dal menu',
+    'nel menu',
+    'dalla barra',
+    'nella barra',
+    'in alto a destra',
+    'in alto a sinistra',
+    'in basso a destra',
+    'in basso a sinistra',
+    'premi ',
+    'premendo',
+    'scorciatoia',
+    'ctrl+',
+    'cmd+',
+    'lo trovi',
+    'la trovi',
+    'li trovi',
+    'le trovi',
+    'puoi farlo da',
+    'puoi farlo dal',
+    'devi andare',
+    'basta andare',
+    'basta cliccare',
+    'seleziona la voce',
+  ];
+
+  // Se l'utente ha chiesto ISTRUZIONI ("come faccio a…", "dove si trova…",
+  // "cosa sai fare?"), spiegargliele è la risposta GIUSTA, non un buco: qui la
+  // proposta di segnalazione sarebbe rumore. Il segnale vale solo quando
+  // l'utente voleva che la cosa venisse fatta.
+  const HOWTO_QUESTION_RE = new RegExp([
+    '\\b(come|dove)\\s+(si|posso|puoi|potrei|faccio|fare|far|trovo|attivo|apro|cambio|metto|funziona|configuro|imposto)',
+    'come si fa',
+    'dove si trova',
+    'dove sta',
+    'dove sono',
+    'in che modo',
+    'spiegami',
+    'mi spieghi',
+    'insegnami',
+    'mi dici come',
+    'si pu(o|ò) ',
+    '(e|è)\' ?possibile',
+    'cosa sai fare',
+    'cosa puoi fare',
+    'cosa riesci',
+    'quali (funzioni|cose|capacit)',
+    'che cosa sai',
+    'a cosa serve',
+  ].join('|'), 'i');
+
+  // Una risposta di sole indicazioni è lunga: sotto questa soglia è più
+  // probabile un frammento o un errore di parsing che una spiegazione.
+  const MIN_HOWTO_REPLY_LENGTH = 80;
+
+  // Parole troppo comuni per identificare una capacità.
+  const TITLE_STOPWORDS = new Set([
+    'una', 'uno', 'del', 'della', 'delle', 'dei', 'degli', 'dal', 'dalla',
+    'nel', 'nella', 'sul', 'sulla', 'per', 'con', 'che', 'come', 'tuo', 'tua',
+    'alla', 'allo', 'agli', 'gli', 'non', 'più', 'piu', 'quando', 'dove',
+    'anche', 'tutto', 'tutte', 'sono', 'essere', 'fare', 'cosa', 'filo',
+  ]);
+
   // ── Analisi della risposta dell'agente ──────────────────────────────────────
 
   function normalize(s) {
@@ -128,11 +219,72 @@
     return best;
   }
 
+  // Radici (prime 6 lettere) delle parole significative di una frase: basta a
+  // far combaciare "ingrandisci" del manifesto con "ingrandire" della risposta
+  // senza tirare dentro un analizzatore morfologico.
+  function stems(phrase) {
+    const out = [];
+    const words = normalize(phrase).replace(/[^a-zà-ÿ0-9\s]/g, ' ').split(/\s+/);
+    for (const w of words) {
+      if (w.length < 4 || TITLE_STOPWORDS.has(w)) continue;
+      const s = w.slice(0, 6);
+      if (!out.includes(s)) out.push(s);
+    }
+    return out;
+  }
+
+  // Riconosce di QUALE capacità del manifesto parla uno scambio, anche quando
+  // il titolo non compare alla lettera ("ingrandire la pagina" ↔ "Ingrandisci o
+  // rimpicciolisci la pagina"). Serve almeno il combaciare di due radici, di cui
+  // una lunga: una parola sola (es. "pagina") non identifica niente.
+  //
+  // Le parole della RICHIESTA pesano il doppio di quelle della risposta: è ciò
+  // che l'utente voleva a dire quale capacità c'entra, mentre la risposta
+  // nomina di passaggio anche cose vicine ("il testo originale") che
+  // altrimenti farebbero vincere la capacità sbagliata.
+  function matchCapabilityByWords(userText, replyText, capabilities) {
+    if (!capabilities || !Array.isArray(capabilities)) return null;
+    const hayOf = (t) => ` ${normalize(t).replace(/[^a-zà-ÿ0-9\s]/g, ' ')} `;
+    const hayUser = hayOf(userText);
+    const hayReply = hayOf(replyText);
+    let best = null;
+    let bestScore = 0;
+    for (const cap of capabilities) {
+      const st = stems(cap.title || '');
+      if (st.length < 2) continue; // titolo troppo generico per decidere
+      const hit = st.filter((s) => hayUser.includes(s) || hayReply.includes(s));
+      if (hit.length < 2) continue;
+      if (!hit.some((s) => s.length >= 5)) continue;
+      const score = hit.reduce((n, s) => n + (hayUser.includes(s) ? 2 : 1), 0);
+      if (score > bestScore) { best = cap.id; bestScore = score; }
+    }
+    return best;
+  }
+
+  // #419 — il buco muto. Ritorna l'id della capacità che l'assistente ha
+  // spiegato a parole invece di azionare, o null.
+  function detectUncommandable(reply, replyNorm, userMessage, actions, capabilities) {
+    // Un turno in cui qualcosa è stato fatto non è un turno a mani vuote.
+    if (Array.isArray(actions) && actions.length) return null;
+    if (reply.length < MIN_HOWTO_REPLY_LENGTH) return null;
+    const user = String(userMessage || '').trim();
+    if (!user) return null;
+    // Chi chiede istruzioni le istruzioni le vuole: nessun buco da segnalare.
+    if (HOWTO_QUESTION_RE.test(user)) return null;
+    // La risposta deve dare indicazioni manuali, non solo parlare.
+    if (!MANUAL_HOWTO_PHRASES.some((p) => replyNorm.includes(p))) return null;
+    // …e devono riguardare una capacità che Filo dichiara di avere.
+    return matchCapabilityByWords(user, reply, capabilities)
+      || guessCapabilityId(replyNorm, capabilities);
+  }
+
   // Analizza la risposta dell'agente e il messaggio utente per rilevare un
   // segnale di auto-feedback. Ritorna:
   //   { kind: null }                                          — nessun segnale
   //   { kind: 'capability-gap', capabilityId?, genericDesc } — fuori capacità
   //   { kind: 'complaint', genericDesc }                     — lamentela su bug
+  //   { kind: 'capability-uncommandable', capabilityId, genericDesc } — #419:
+  //       la capacità esiste, l'assistente l'ha spiegata a mano invece di farla
   //
   // Parametri:
   //   textReply    — testo della risposta dell'agente (non dell'utente: più sicuro)
@@ -163,6 +315,16 @@
       return {
         kind: 'complaint',
         genericDesc: 'Problema riscontrato durante l\'uso di una funzione di Filo',
+      };
+    }
+
+    // ── Segnale 3 (#419): capacità esistente spiegata a mano ──────────────────
+    const uncommandable = detectUncommandable(reply, replyNorm, userMessage, actions, capabilities);
+    if (uncommandable) {
+      return {
+        kind: 'capability-uncommandable',
+        capabilityId: uncommandable,
+        genericDesc: `Funzione esistente che l'assistente non sa azionare: ${uncommandable}`,
       };
     }
 
@@ -206,6 +368,21 @@
         name: 'Problema segnalato automaticamente',
         clientId: 'auto:complaint',
         source: 'auto:complaint',
+      };
+    }
+
+    // #419 — stessa famiglia di dedup dei gap (l'id resta estraibile dal
+    // clientId), ma con un prefisso che tiene distinti i due casi: "non esiste"
+    // e "esiste ma l'assistente non la sa azionare" si risolvono in modi diversi.
+    if (analysis.kind === 'capability-uncommandable') {
+      const capId = `uncommandable-${String(analysis.capabilityId || 'unknown')}`
+        .replace(/[^a-z0-9-]/g, '-');
+      return {
+        text: String(analysis.genericDesc || 'Funzione esistente che l\'assistente non sa azionare').slice(0, 500),
+        name: `Non azionabile dall'assistente: ${analysis.capabilityId || 'sconosciuta'}`.slice(0, 100),
+        clientId: `auto:capability-gap:${capId}`,
+        capabilityGapId: capId,
+        source: 'auto:capability-uncommandable',
       };
     }
 
@@ -269,6 +446,19 @@
       };
     }
 
+    if (analysis.kind === 'capability-uncommandable') {
+      const parts = [`Ho chiesto a Filo: "${asked}"`];
+      parts.push(admitted
+        ? `Filo sa fare questa cosa, ma l'assistente non l'ha fatta: mi ha spiegato come farla a mano ("${admitted}")`
+        : 'Filo sa fare questa cosa, ma l\'assistente non l\'ha fatta: mi ha spiegato come farla a mano.');
+      parts.push('Mi piacerebbe poterla chiedere all\'assistente e basta.');
+      return {
+        type: 'INVIA_FEEDBACK',
+        testo: parts.join('\n').slice(0, 1500),
+        titolo: shortTitle(userMessage, 'Funzione non azionabile'),
+      };
+    }
+
     if (analysis.kind === 'complaint') {
       const parts = [`Stavo facendo questo in Filo: "${asked}"`];
       parts.push(admitted
@@ -323,6 +513,8 @@
     // Esposti per i test
     _NOT_CAPABLE_PHRASES: NOT_CAPABLE_PHRASES,
     _COMPLAINT_PHRASES: COMPLAINT_PHRASES,
+    _MANUAL_HOWTO_PHRASES: MANUAL_HOWTO_PHRASES,
+    _matchCapabilityByWords: matchCapabilityByWords,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
