@@ -1,0 +1,8 @@
+{
+  "id": "05f24fb9-540b-48d5-b470-3f7aa4908bc1",
+  "status": "revision_capability",
+  "notes": "Fatto: premendo \"Apri file\" su uno scaricamento il cui file non c'è più ora compare l'avviso \"Il file non c'è più: forse è stato spostato o cancellato\", e nell'elenco quelle voci sono attenuate, col nome barrato e senza \"Apri file\".\n\nOltre al chiesto:\n- L'avviso offre \"Apri cartella\", e \"Apri cartella\" su un file sparito apre comunque la cartella dov'era (il file potrebbe essere lì rinominato) dicendo che dentro non c'è; se manca anche la cartella lo dice.\n- Al posto di \"Apri file\", una voce svuotata offre \"Ri-scarica\": senza il file, l'unica cosa utile è riaverlo.\n- Ho marcato le voci anche nel pannello degli scaricamenti in alto, non solo nella pagina elenco: sono lo stesso oggetto e non potevano dire cose diverse.\n- L'elenco si rilegge quando torni sulla scheda o riapri il pannello: cancellare file dal gestore di sistema non manda nessun segnale a Filo, e senza rilettura le voci sarebbero rimaste \"aperibili\".\n\nNote tecniche: Filo non si fida più dell'esito dell'apertura (su Linux il sistema risponde \"riuscito\" anche su un percorso vuoto) ma guarda se il file c'è prima di tentare. Il controllo è memorizzato per poco più di un secondo, altrimenti mentre una barra di scaricamento avanza la lista rileggerebbe il disco centinaia di volte al secondo: subito dopo aver cancellato un file può capitare di vedere la voce ancora normale per un istante.",
+  "queuedAt": "2026-08-15T00:29:28.709Z",
+  "queuedBy": "routine",
+  "branch": "worker/05f24fb9-540b-48d5-b470-3f7aa4908bc1-20260815T001115Z"
+}
