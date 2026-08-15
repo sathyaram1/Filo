@@ -2,7 +2,7 @@
 // dati, cronologia appunti (clipboard), cronologia AI e costi.
 
 module.exports = function register(on, ctx) {
-  const { MSG, winOf, applySettingsUpdate } = ctx;
+  const { MSG, winOf, applySettingsUpdate, broadcastToTabs } = ctx;
   const { SN_CONST } = globalThis;
   const Storage = globalThis.SN_STORAGE;
   const History = globalThis.SN_HISTORY;
