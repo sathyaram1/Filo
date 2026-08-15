@@ -1220,6 +1220,8 @@
         meta.textContent = p != null
           ? `${p}% · ${fmtBytes(r.receivedBytes)} / ${fmtBytes(r.totalBytes)}`
           : `${fmtBytes(r.receivedBytes)} scaricati`;
+      } else if (r.missing) {
+        meta.textContent = `Non più sul disco · ${fmtBytes(r.totalBytes || r.receivedBytes)}`;
       } else {
         meta.textContent = `${stateLabel(r)} · ${fmtBytes(r.totalBytes || r.receivedBytes)}`;
       }
