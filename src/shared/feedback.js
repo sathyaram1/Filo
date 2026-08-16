@@ -130,7 +130,14 @@
   // (C5, board utente) usino quello. Ritorna { fineStatus, publicStatus }.
   async function encryptStatus(status) {
     const publicStatus = statusToPublic(status);
-    const fineStatus = await maybeEncrypt(status); // cifra solo se isEnabled()
+    // #476: si cifra a LUNGHEZZA FISSA. La cifratura non imbottisce, quindi
+    // senza questo il campo cifrato è lungo quanto il nome dello stato e
+    // contarne i caratteri equivale a leggerlo: dal database pubblico si
+    // pescavano i feedback beccati misurando il campo, senza chiave e senza
+    // login. Chi decifra toglie gli spazi (SN_FB_STATUS.unpadFromCipher).
+    const FS = global.SN_FB_STATUS;
+    const daCifrare = FS && FS.padForCipher ? FS.padForCipher(status) : status;
+    const fineStatus = await maybeEncrypt(daCifrare); // cifra solo se isEnabled()
     return { fineStatus, publicStatus };
   }
 
