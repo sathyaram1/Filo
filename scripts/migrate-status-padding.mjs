@@ -131,18 +131,22 @@ async function main() {
     const campione = await C.encryptForOwner(FS.padForCipher('todo'));
     const giaImbottito = C.isEncrypted(grezzo) && grezzo.length === campione.length;
 
-    if (giaImbottito && !pubblicoDaCorreggere) { giaApposto++; continue; }
+    if (giaImbottito && !pubblicoDaCorreggere && !revisioneDaCifrare.length) { giaApposto++; continue; }
 
     const nuovoCifrato = await C.encryptForOwner(FS.padForCipher(fine));
     if (DRY) {
-      console.log(`  • ${doc.id}: ${fine}${pubblicoDaCorreggere ? `  [pubblico ${pubblicoAttuale} → ${pubblicoAtteso}]` : ''}`);
-      riscritti++; if (pubblicoDaCorreggere) pubblicoCorretto++;
+      console.log(`  • ${doc.id}: ${fine}${pubblicoDaCorreggere ? `  [pubblico ${pubblicoAttuale} → ${pubblicoAtteso}]` : ''}${revisioneDaCifrare.length ? `  [revisione: ${revisioneDaCifrare.join(', ')}]` : ''}`);
+      riscritti++; if (pubblicoDaCorreggere) pubblicoCorretto++; if (revisioneDaCifrare.length) revisioniCifrate++;
       continue;
     }
 
     const campi = { status: { stringValue: nuovoCifrato } };
     const mask = ['status'];
     if (pubblicoDaCorreggere) { campi.statusPublic = { stringValue: pubblicoAtteso }; mask.push('statusPublic'); }
+    for (const k of revisioneDaCifrare) {
+      campi[k] = { stringValue: await C.encryptForOwner(doc.fields[k].stringValue) };
+      mask.push(k);
+    }
     // Nota: la proiezione per la bacheca (`sanitized`) NON si tocca da qui — le
     // regole la riservano al backend, e giustamente. A smontare la vetrina di un
     // feedback che smette di essere "chiuso" ci pensa il backend di sicurezza,
@@ -157,7 +161,7 @@ async function main() {
       console.error(`  ✗ ${doc.id}: HTTP ${res.status} ${(await res.text()).slice(0, 120)}`);
       continue;
     }
-    riscritti++; if (pubblicoDaCorreggere) pubblicoCorretto++;
+    riscritti++; if (pubblicoDaCorreggere) pubblicoCorretto++; if (revisioneDaCifrare.length) revisioniCifrate++;
   }
 
   console.log(`\nFatto: ${riscritti} riscritti (${pubblicoCorretto} con l'enum grossolano corretto), ${giaApposto} già a posto, ${illeggibili} non decifrabili (lasciati intatti).`);
