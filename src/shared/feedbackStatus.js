@@ -275,7 +275,7 @@
     TRANSITIONS, ACTORS, canTransition, transitionsFrom, canReach,
     LEGACY_SIMPLE, LEGACY_STATUSES, isLegacy,
     WORKING_TTL_MS, isWorkingExpired,
-    PUBLIC_MAP,
+    PUBLIC_MAP, isResolvedForUser,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
