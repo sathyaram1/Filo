@@ -82,7 +82,9 @@ async function getPrivateKey() {
 // Senza chiave privata i campi cifrati diventano il placeholder leggibile.
 // S1.F2.1: aggiunto 'status' (cifrato quando gate on) — NON 'statusPublic' (sempre in chiaro).
 // S1.F2.2: aggiunto 'clientId' (cifrato quando gate on; clientIdHash resta in chiaro).
-const TEXT_FIELDS_TO_DECRYPT = ['text', 'url', 'name', 'title', 'notes', 'reviewComment', 'status', 'clientId'];
+// #476: 'reviewDecision'/'reviewedAt' viaggiano cifrati come 'reviewComment' —
+// la revisione dell'owner non deve essere leggibile da chi ha mandato il feedback.
+const TEXT_FIELDS_TO_DECRYPT = ['text', 'url', 'name', 'title', 'notes', 'reviewComment', 'reviewDecision', 'reviewedAt', 'status', 'clientId'];
 const PLACEHOLDER_NO_KEY = '[cifrato — chiave privata non configurata]';
 
 // S1.F2.4: il campo `pipeline` (scritto dal backend di sicurezza sul documento
@@ -116,7 +118,11 @@ async function decryptFeedbackObject(fields) {
     if (!C.isEncrypted(v)) continue; // in chiaro o null: invariato
     if (!priv) { out[f] = PLACEHOLDER_NO_KEY; continue; }
     try {
-      out[f] = await C.decrypt(v, priv);
+      const plain = await C.decrypt(v, priv);
+      // #476: lo `status` è cifrato a lunghezza fissa (imbottito) perché il
+      // campo cifrato non riveli lo stato con la sola lunghezza — qui si toglie
+      // l'imbottitura, o la dashboard non riconoscerebbe più nessuno stato.
+      out[f] = f === 'status' ? plain.trim() : plain;
     } catch (e) {
       console.warn(`[auth] decifratura campo "${f}" fallita:`, e?.message || e);
       out[f] = PLACEHOLDER_NO_KEY;

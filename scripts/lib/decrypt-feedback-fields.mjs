@@ -39,7 +39,9 @@ const ROOT = resolve(__dirname, '..', '..');
 // S1.F2.2: aggiunto 'clientId' (cifrato quando gate on; clientIdHash resta in chiaro).
 // 'statusPublic' NON è nella lista: è sempre in chiaro e non va toccato.
 // 'priority' NON è qui (è un intero, non testo): ha logica dedicata sotto.
-const TEXT_FIELDS = ['text', 'url', 'name', 'title', 'notes', 'reviewComment', 'status', 'clientId'];
+// #476: la revisione dell'owner (esito, commento, quando) viaggia cifrata —
+// in chiaro diceva a chi aveva mandato un attacco che era stato beccato.
+const TEXT_FIELDS = ['text', 'url', 'name', 'title', 'notes', 'reviewComment', 'reviewDecision', 'reviewedAt', 'status', 'clientId'];
 
 // Carica feedbackCrypto.js (IIFE su globalThis) se non è già disponibile.
 // NON ri-carica feedbackPublicKey.js se SN_FEEDBACK_PUBKEY è già definita:
@@ -132,7 +134,11 @@ export async function decryptFeedbackFields(fb, privKey) {
       continue;
     }
     try {
-      out[f] = await C.decrypt(v, priv);
+      const plain = await C.decrypt(v, priv);
+      // #476: lo `status` viene cifrato a lunghezza fissa (imbottito di spazi)
+      // perché il campo cifrato non riveli lo stato con la sola lunghezza. Qui
+      // si toglie l'imbottitura, o ogni confronto con 'todo' fallirebbe.
+      out[f] = f === 'status' ? plain.trim() : plain;
     } catch (e) {
       console.warn(`[decrypt-feedback-fields] decifratura campo "${f}" fallita:`, e?.message || e);
       out[f] = PLACEHOLDER;

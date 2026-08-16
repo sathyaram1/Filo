@@ -455,9 +455,16 @@ function main() {
   }
 
   let stale = 0;
+  // Il confronto ignora i fine-riga. Il generatore scrive sempre LF, ma git su
+  // Windows materializza i file con CRLF: confrontandoli byte a byte, ogni
+  // checkout (o una nuova cartella di lavoro) faceva risultare "da rigenerare"
+  // file identici nel contenuto — e il test che sorveglia l'allineamento
+  // restava rosso per sempre su Windows e verde in cloud. Qui interessa se il
+  // contenuto è derivato dal markdown, non con che carattere va a capo.
+  const soloContenuto = (s) => String(s).replace(/\r\n/g, '\n');
   for (const [path, content] of outputs) {
     const prev = existsSync(path) ? readFileSync(path, 'utf8') : null;
-    if (prev === content) continue;
+    if (prev !== null && soloContenuto(prev) === soloContenuto(content)) continue;
     stale++;
     if (check) {
       console.error(`  ✗ non allineato: ${path.replace(ROOT, '.')}`);

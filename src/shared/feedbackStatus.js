@@ -222,14 +222,85 @@
   // ⚠️ SICUREZZA: tutti gli stati "beccati" (attack/spam/suspicious_file e i
   // confermati) DEVONO collassare sugli stessi valori dei feedback normali —
   // mai un valore distinto, o chi legge Firestore senza chiave riconosce un
-  // attacco intercettato e fa hill-climbing. Aperti → 'open', chiusi → 'closed'.
+  // attacco intercettato e fa hill-climbing.
+  //
+  // MA NON BASTA COLLASSARE: conta SU QUALE valore (#476). I confermati stavano
+  // su 'closed', lo stesso dei risolti — che di per sé non dice niente, se non
+  // fosse che 'closed' non è un'etichetta passiva: è il grilletto di due cose
+  // che l'attaccante VEDE.
+  //   1. il popup delle ricompense premia i feedback 'closed' → chi manda un
+  //      attacco riceve 50 crediti e la notifica "risolto";
+  //   2. la sanificazione per la bacheca pubblica lavora i feedback 'closed' →
+  //      il feedback dell'attaccante finisce in vetrina (a pagamento).
+  // Cioè gli confermavamo il colpo, e lo pagavamo pure.
+  //
+  // I confermati stanno quindi su 'open': per chi li ha mandati restano per
+  // sempre "in lavorazione", che è il silenzio. Nessun valore nuovo — quello
+  // sarebbe di nuovo un segnale, solo con un altro nome.
+  //
+  // Effetto collaterale voluto e innocuo: i confermati rientrano nella query
+  // dei candidati aperti delle routine (statusPublic == 'open'), dove vengono
+  // scartati subito dal filtro sullo status fine (lavorabile = solo `todo`).
   const PUBLIC_MAP = {
     unlabeled: 'open', suspicious_file: 'open', attack: 'open', spam: 'open',
     design: 'open', aligned: 'open', todo: 'open', working: 'open',
     revision_capability: 'open', revision_security: 'open',
     done: 'closed', archived: 'closed',
-    attack_confirmed: 'closed', spam_confirmed: 'closed',
+    attack_confirmed: 'open', spam_confirmed: 'open',
   };
+
+  // ── Lunghezza fissa dello status cifrato (#476) ────────────────────────────
+  //
+  // La cifratura non imbottisce: il testo cifrato è lungo quanto il testo in
+  // chiaro più un preambolo fisso. Gli stati hanno nomi di lunghezza diversa,
+  // quindi CONTARE I CARATTERI del campo cifrato equivale a leggerlo — e le
+  // letture della collezione sono pubbliche. Misurato sul database vero:
+  // `attack_confirmed` e `spam_confirmed` avevano una lunghezza tutta loro, e
+  // bastava quella per pescare dal mucchio i feedback beccati, senza chiave e
+  // senza login. Tutto il resto del lavoro su #476 non serviva a niente finché
+  // restava questo.
+  //
+  // Rimedio: prima di cifrare, lo status viene portato a una lunghezza FISSA
+  // con spazi in coda; chi lo decifra li toglie. Così ogni stato produce un
+  // testo cifrato lungo uguale. Vale per TUTTI gli stati, non solo per i due
+  // confermati: se solo quelli fossero della stessa lunghezza, sarebbero
+  // riconoscibili proprio per questo.
+  //
+  // La misura è larga: tiene i canonici (il più lungo è 19), i legacy ritirati e
+  // spazio per stati futuri. Cambiarla NON rompe i documenti già scritti (chi
+  // legge toglie gli spazi comunque), ma non ha senso restringerla.
+  const CIPHER_PAD = 32;
+
+  /** Status pronto per la cifratura: lunghezza fissa, così il cifrato non parla. */
+  function padForCipher(status) {
+    const s = String(status == null ? '' : status);
+    return s.length >= CIPHER_PAD ? s : s + ' '.repeat(CIPHER_PAD - s.length);
+  }
+
+  /** L'inverso: toglie l'imbottitura dopo la decifratura. Sicuro sui valori vecchi. */
+  function unpadFromCipher(status) {
+    return typeof status === 'string' ? status.trim() : status;
+  }
+
+  /**
+   * Il feedback risulta RISOLTO a chi l'ha mandato? È il grilletto della
+   * ricompensa e del popup sulla macchina dell'utente, che non ha la chiave
+   * privata e quindi può guardare SOLO l'enum grossolano in chiaro.
+   *
+   * Vive qui, accanto alla mappa, perché è la stessa decisione: se un giorno
+   * qualcuno rimette i confermati su 'closed', questa funzione inizia a
+   * premiare gli attacchi — e il test che la sorveglia diventa rosso subito,
+   * invece di lasciare la scoperta a un attaccante.
+   */
+  function isResolvedForUser(feedback) {
+    const f = feedback && typeof feedback === 'object' ? feedback : {};
+    if (f.statusPublic !== undefined) return f.statusPublic === 'closed';
+    // Retrocompat: feedback storici senza statusPublic. Status in chiaro →
+    // logica vecchia; cifrato → non si sa, e non si premia.
+    const s = f.status;
+    if (typeof s === 'string' && !s.startsWith('FENC1:')) return s === 'done';
+    return false;
+  }
 
   global.SN_FB_STATUS = {
     STATUSES, CANONICAL, isCanonical,
@@ -237,7 +308,7 @@
     TRANSITIONS, ACTORS, canTransition, transitionsFrom, canReach,
     LEGACY_SIMPLE, LEGACY_STATUSES, isLegacy,
     WORKING_TTL_MS, isWorkingExpired,
-    PUBLIC_MAP,
+    PUBLIC_MAP, isResolvedForUser, padForCipher, unpadFromCipher, CIPHER_PAD,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

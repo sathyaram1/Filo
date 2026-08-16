@@ -113,7 +113,14 @@ async function main() {
     // Scrittura: status (cifrato se il gate è on) + statusPublic + statusReason.
     let fine = status;
     if (CRYPTO && CRYPTO.isEnabled && CRYPTO.isEnabled()) {
-      try { fine = await CRYPTO.encryptForOwner(status); } catch (_) {}
+      // #476: lunghezza FISSA prima di cifrare. Questa migrazione oggi non
+      // trova più niente da fare, ma se qualcuno la rilanciasse su documenti
+      // storici rimetterebbe in circolo esattamente la falla appena chiusa:
+      // senza imbottitura il campo cifrato è lungo quanto il nome dello stato,
+      // e contarne i caratteri equivale a leggerlo.
+      const FS = globalThis.SN_FB_STATUS;
+      const daCifrare = FS && FS.padForCipher ? FS.padForCipher(status) : status;
+      try { fine = await CRYPTO.encryptForOwner(daCifrare); } catch (_) {}
     }
     const publicStatus = globalThis.SN_FEEDBACK?.statusToPublic ? globalThis.SN_FEEDBACK.statusToPublic(status) : 'open';
     const fields = { status: toFsValue(fine), statusPublic: toFsValue(publicStatus) };

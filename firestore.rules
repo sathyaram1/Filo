@@ -290,11 +290,24 @@ service cloud.firestore {
         // Override di revisione: l'owner sblocca/conferma a mano un feedback
         // fermato dalla sicurezza, con un commento opzionale. `reviewDecision`
         // 'accepted' lo riammette nel flusso (vedi SN_MANAGE_REVIEW.classifyBlock).
-        && request.resource.data.get('reviewDecision', '') in ['', 'accepted', 'rejected']
+        //
+        // #476: i tre campi ora viaggiano CIFRATI (in chiaro dicevano a chi
+        // aveva mandato il feedback che era stato fermato). Le regole non
+        // possono più enumerare i valori — un ciphertext è una stringa opaca —
+        // quindi restano forma e tetto, che è ciò che le regole sanno fare.
+        // I valori storici in chiaro continuano a passare.
+        && request.resource.data.get('reviewDecision', '') is string
+        && request.resource.data.get('reviewDecision', '').size() <= 400
+        // #476: il commento ora viaggia CIFRATO (lo leggeva chiunque, compreso
+        // chi aveva mandato l'attacco che l'owner stava confermando). La
+        // cifratura gonfia il testo di circa il 40% più un preambolo fisso:
+        // 2000 caratteri scritti diventano ~2800. Il tetto sale di conseguenza,
+        // altrimenti un commento lungo verrebbe respinto qui — stesso
+        // ragionamento del `clientId` (grezzo ≤100, cifrato ≤300).
         && request.resource.data.get('reviewComment', '') is string
-        && request.resource.data.get('reviewComment', '').size() <= 2000
+        && request.resource.data.get('reviewComment', '').size() <= 4000
         && request.resource.data.get('reviewedAt', '') is string
-        && request.resource.data.get('reviewedAt', '').size() <= 40
+        && request.resource.data.get('reviewedAt', '').size() <= 400   // cifrato (#476)
         // Override owner per l'archiviazione automatica a punteggio (DC3):
         // 'archived' = l'owner ha archiviato a mano (vince sempre su punteggio
         // /età); 'keep_open' = l'owner ha deciso esplicitamente di NON

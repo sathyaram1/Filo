@@ -130,7 +130,14 @@
   // (C5, board utente) usino quello. Ritorna { fineStatus, publicStatus }.
   async function encryptStatus(status) {
     const publicStatus = statusToPublic(status);
-    const fineStatus = await maybeEncrypt(status); // cifra solo se isEnabled()
+    // #476: si cifra a LUNGHEZZA FISSA. La cifratura non imbottisce, quindi
+    // senza questo il campo cifrato è lungo quanto il nome dello stato e
+    // contarne i caratteri equivale a leggerlo: dal database pubblico si
+    // pescavano i feedback beccati misurando il campo, senza chiave e senza
+    // login. Chi decifra toglie gli spazi (SN_FB_STATUS.unpadFromCipher).
+    const FS = global.SN_FB_STATUS;
+    const daCifrare = FS && FS.padForCipher ? FS.padForCipher(status) : status;
+    const fineStatus = await maybeEncrypt(daCifrare); // cifra solo se isEnabled()
     return { fineStatus, publicStatus };
   }
 
@@ -533,9 +540,38 @@
       fields.notes = toFsValue(capped); mask.push('notes');
     }
     // Override di revisione (owner sblocca un feedback fermato dalla sicurezza).
-    if (reviewDecision !== undefined) { fields.reviewDecision = toFsValue(reviewDecision); mask.push('reviewDecision'); }
-    if (reviewComment !== undefined) { fields.reviewComment = toFsValue(reviewComment); mask.push('reviewComment'); }
-    if (reviewedAt !== undefined) { fields.reviewedAt = toFsValue(reviewedAt); mask.push('reviewedAt'); }
+    // #476 — LA REVISIONE DELL'OWNER VIAGGIA TUTTA CIFRATA.
+    //
+    // Questi tre campi li scrive solo la dashboard dell'owner, quando sblocca o
+    // CONFERMA un feedback fermato dalla sicurezza. Le letture della collezione
+    // sono pubbliche, quindi in chiaro erano un annuncio a chi aveva mandato
+    // quel feedback:
+    //   · `reviewComment` diceva il PERCHÉ era stato beccato — il manuale per
+    //     riprovare meglio;
+    //   · `reviewDecision` diceva l'esito con una parola sola ('rejected');
+    //   · e persino la SOLA PRESENZA di `reviewedAt` bastava: un feedback
+    //     normale non ce l'ha, quindi vederlo significa "sei passato dalle mani
+    //     dell'owner", cioè sei stato fermato.
+    // Non basta cifrarne uno: l'attaccante gli bastava il campo rimasto. Vanno
+    // insieme, o non serve a niente.
+    //
+    // Li rilegge solo chi ha la chiave: la dashboard (che li decifra prima di
+    // mostrarli) e il backend di sicurezza, che su `reviewDecision === 'accepted'`
+    // sa di non dover ri-bloccare un feedback che l'owner ha sbloccato a mano —
+    // per questo la sua lista di campi da decifrare li comprende.
+    // Retrocompat: i valori vecchi in chiaro continuano a leggersi.
+    if (reviewDecision !== undefined) {
+      fields.reviewDecision = toFsValue(await maybeEncrypt(reviewDecision));
+      mask.push('reviewDecision');
+    }
+    if (reviewComment !== undefined) {
+      fields.reviewComment = toFsValue(await maybeEncrypt(reviewComment));
+      mask.push('reviewComment');
+    }
+    if (reviewedAt !== undefined) {
+      fields.reviewedAt = toFsValue(await maybeEncrypt(reviewedAt));
+      mask.push('reviewedAt');
+    }
     // Preferito ⭐ (DB2): bool, "parcheggio per il futuro". Le Firestore rules
     // accettano `starred` (is bool) nel ramo update admin.
     if (starred !== undefined) { fields.starred = { booleanValue: !!starred }; mask.push('starred'); }

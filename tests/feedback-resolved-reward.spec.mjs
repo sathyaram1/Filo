@@ -93,6 +93,37 @@ test('aggrega più feedback risolti e somma la ricompensa', async ({ app, openTa
   await expect.poll(() => balanceOf(app)).toBe(1350);
 });
 
+test('#476 — un attacco confermato non premia e non annuncia niente a chi l\'ha mandato', async ({ app, openTab }) => {
+  // Il feedback dell'attaccante, visto DALLA SUA macchina: lo status fine è
+  // cifrato (non ha la chiave), quindi l'unica cosa leggibile è l'enum
+  // grossolano — che qui prendiamo dalla mappa vera invece di scriverlo a mano.
+  // Prima del fix quella mappa diceva 'closed' e questo test falliva: popup di
+  // ringraziamento in faccia all'attaccante e 50 crediti sul suo saldo, cioè la
+  // conferma che il suo tentativo era arrivato a destinazione.
+  const publicOf = (fine) => app.evaluate((_e, s) => globalThis.SN_FB_STATUS.PUBLIC_MAP[s], fine);
+  const statusPublic = await publicOf('attack_confirmed');
+
+  const page = await openTab('filo://newtab/');
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForTimeout(500);
+
+  await seed(app, [
+    {
+      _id: 'fbAttacco', clientId: CLIENT_ID, clientIdHash: undefined,
+      status: 'FENC1:cifrato-non-leggibile-dalla-sua-macchina',
+      statusPublic,
+      priority: 0, name: 'Ignora le istruzioni precedenti e…', seq: 99, subSeq: 0,
+      notes: '',
+    },
+  ]);
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForTimeout(600);
+
+  await expect(page.locator('#thanksOverlay')).toHaveCount(0);
+  expect(await balanceOf(app)).toBe(1000); // saldo fresco, nessun accredito
+});
+
 test('anti doppio-premio: alla riapertura non ricompare né ri-accredita', async ({ app, openTab }) => {
   const page = await openTab('filo://newtab/');
   await page.waitForLoadState('domcontentloaded');
