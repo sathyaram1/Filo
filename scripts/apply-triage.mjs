@@ -368,7 +368,11 @@ async function patchFeedback(entry, bearer) {
   let fineStatus = entry.status;
   const C = _crypto();
   if (C && C.isEnabled && C.isEnabled()) {
-    try { fineStatus = await C.encryptForOwner(String(entry.status)); } catch (_) { /* niente crash */ }
+    // #476: lunghezza FISSA prima di cifrare — senza, il campo cifrato è lungo
+    // quanto il nome dello stato e si legge contando i caratteri.
+    const FS = _fbStatus();
+    const daCifrare = FS && FS.padForCipher ? FS.padForCipher(entry.status) : String(entry.status);
+    try { fineStatus = await C.encryptForOwner(daCifrare); } catch (_) { /* niente crash */ }
   }
   const statusToPublic = _statusToPublic();
   const publicStatus = statusToPublic ? statusToPublic(entry.status) : 'open';
