@@ -100,12 +100,10 @@ async function main() {
     const campi = { status: { stringValue: nuovoCifrato } };
     const mask = ['status'];
     if (pubblicoDaCorreggere) { campi.statusPublic = { stringValue: pubblicoAtteso }; mask.push('statusPublic'); }
-    // Un beccato confermato che era già finito in bacheca ci resterebbe: la
-    // proiezione pubblica è un campo sul documento, e nessuno la toglie quando
-    // l'enum grossolano smette di dire "chiuso". Va cancellata, o l'attaccante
-    // continua a vedere il proprio tentativo in vetrina — cioè la conferma.
-    // (Nel mask senza valore = cancellazione del campo.)
-    if (pubblicoAtteso === 'open' && doc.fields.sanitized) mask.push('sanitized');
+    // Nota: la proiezione per la bacheca (`sanitized`) NON si tocca da qui — le
+    // regole la riservano al backend, e giustamente. A smontare la vetrina di un
+    // feedback che smette di essere "chiuso" ci pensa il backend di sicurezza,
+    // che se ne accorge da questa stessa scrittura.
     const qs = mask.map((m) => `updateMask.fieldPaths=${m}`).join('&');
     const res = await fetch(`${FIRESTORE_BASE}/feedback/${doc.id}?${qs}`, {
       method: 'PATCH',
