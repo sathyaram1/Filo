@@ -134,7 +134,11 @@ export async function decryptFeedbackFields(fb, privKey) {
       continue;
     }
     try {
-      out[f] = await C.decrypt(v, priv);
+      const plain = await C.decrypt(v, priv);
+      // #476: lo `status` viene cifrato a lunghezza fissa (imbottito di spazi)
+      // perché il campo cifrato non riveli lo stato con la sola lunghezza. Qui
+      // si toglie l'imbottitura, o ogni confronto con 'todo' fallirebbe.
+      out[f] = f === 'status' ? plain.trim() : plain;
     } catch (e) {
       console.warn(`[decrypt-feedback-fields] decifratura campo "${f}" fallita:`, e?.message || e);
       out[f] = PLACEHOLDER;
