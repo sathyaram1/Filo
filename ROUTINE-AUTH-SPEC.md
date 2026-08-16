@@ -1,0 +1,207 @@
+# Autorità delle routine: biglietti al posto della cassetta postale
+
+Spec dell'owner, 2026-08-16. Sostituisce il trasporto delle decisioni su git
+(`feedback-triage/`, la GitHub Action, l'applier locale) con un canale
+autenticato verso il server, e sposta l'autorità dalle macchine che ospitano un
+LLM al server.
+
+Non è un lavoro di sicurezza teorico: nasce da tre difetti **verificati** il
+15-16 agosto 2026, tutti nello stesso punto del sistema.
+
+---
+
+## 1. Cosa è rotto adesso
+
+**a) La cassetta postale è pubblica.** Le decisioni sui feedback viaggiano come
+file dentro il repo, che è pubblico. Le note — cioè i report scritti per l'owner
+— ci passano **in chiaro**, e restano nella storia anche dopo che il file è stato
+consumato. Lo stesso canale trasporterà, prima o poi, la chiusura di un fix di
+sicurezza: la descrizione di cosa non funzionava, pubblicata prima che la
+correzione arrivi sui computer degli utenti.
+
+**b) La validazione dei passaggi di stato non gira.** Chi applica le decisioni
+controlla che la transizione sia legale per chi la chiede. Per farlo deve leggere
+lo stato attuale del feedback, che è cifrato dal 25 giugno. L'automatismo su
+GitHub ha solo la credenziale per scrivere, non la chiave per leggere: non riesce
+mai a sapere da dove sta partendo e, per prudenza, **applica lo stesso**. Nel
+cammino automatico — l'unico che gira sempre — resta in piedi solo il controllo
+di forma.
+
+**c) I segreti stanno dove li vede chi non dovrebbe.** La chiave di lettura dei
+feedback viene passata nel prompt dell'orchestratore, ma il token dell'account
+robot sta nell'**ambiente**, e l'ambiente lo eredita ogni worker: con quello si
+leggono le chiavi API a pagamento dell'owner. E i worker leggono tutto il giorno
+testo scritto da sconosciuti.
+
+C'è un filo comune fra (b) e la falla del feedback #476: **una scelta di
+cifratura sta accecando i controlli, non gli estranei.**
+
+---
+
+## 2. I principi
+
+1. **Chi legge testo non fidato non tiene segreti che valgono.** Un worker può
+   essere manipolato da un feedback scritto apposta: quello che ha in mano deve
+   valere il minimo indispensabile.
+2. **Un segreto, un potere.** Chiavi separate per cose separate, così una fuga
+   non costa tutto e si revoca una senza spegnere le altre.
+3. **L'autorità sta sul server, non sulla macchina.** Qualunque programma locale
+   che concede permessi può essere chiamato dall'LLM che gli sta accanto: stessa
+   shell, stesso utente. Il permesso deve nascere dove l'LLM non arriva.
+4. **Ognuno riceve solo il suo lavoro.** Non "gli si dice di non guardare il
+   resto": il resto non gli viene proprio consegnato, e non ha la chiave per
+   andarselo a prendere.
+5. **In dubbio ci si ferma** (coerente con l'interruttore delle routine): se il
+   server non risponde, il giro non lavora. Meglio un giro saltato che un giro
+   che scrive senza controlli.
+
+---
+
+## 3. Chi tiene cosa
+
+| Attore | Cosa ha | Cosa può farci |
+|---|---|---|
+| **Orchestratore** (sessione schedulata) | una **parola d'ordine**, solo nel prompt, mai nell'ambiente | chiedere un biglietto per il worker che sta per far partire. Nient'altro |
+| **Worker** (l'istanza che lavora) | un **biglietto** monouso, opaco | ottenere il proprio lavoro, battere il cuore, consegnare, rilasciare |
+| **Server** | la chiave privata dei feedback in **cassaforte** (Secret Manager) + accesso al database | scegliere il lavoro, decifrare, validare, scrivere |
+| **Owner** | le sue credenziali admin, come oggi | tutto, dalla dashboard |
+
+Una parola d'ordine **per routine schedulata**: si revoca la singola, e nel
+registro del server si vede quale ha fatto cosa.
+
+**La chiave di lettura sparisce dalle macchine delle routine.** È il cambiamento
+più importante di tutta la spec: oggi vive in tante copie, su computer che
+leggono testo ostile; domani in una sola, in una cassaforte.
+
+---
+
+## 4. Il flusso
+
+```
+orchestratore ──(parola d'ordine)──▶ server          "un biglietto, per favore"
+              ◀──(biglietto opaco)──                  il server sceglie il lavoro,
+                                                      prende il semaforo, lega il
+                                                      biglietto a: feedback, ruolo,
+                                                      ramo, semaforo
+      │
+      └─▶ spawna il worker, passandogli SOLO il biglietto
+
+worker ──(biglietto)──▶ server                        "qual è il mio lavoro?"
+       ◀──(payload del ruolo)──                        già decifrato, solo il suo
+
+worker ──(biglietto + battito)──▶ server              tiene vivo il semaforo
+worker ──(biglietto + intento)──▶ server              "verdetto: passa" / "fatto" / …
+       ◀──(accettato | rifiutato)──                    validato dal server
+worker ──(biglietto)──▶ server                        rilascio a fine lavoro
+```
+
+Punti non negoziabili del flusso:
+
+- **L'orchestratore non sa su cosa si lavorerà.** Chiede un biglietto, non un
+  feedback. È ciò che tiene il testo dei feedback fuori dal suo contesto: se lo
+  vedesse, sarebbe manipolabile anche lui, e la parola d'ordine ce l'ha lui.
+- **Il biglietto si lega al lavoro nel momento in cui il server sceglie**, non
+  quando il worker chiede. Un biglietto vale per un semaforo solo.
+- **La scelta del lavoro si sposta sul server.** Oggi è il dispatcher, che è già
+  codice deterministico su uno stato leggibile: è il candidato ideale a girare
+  dove nessun LLM lo può influenzare.
+- **La durata sta nel semaforo, non nel biglietto.** Sessioni lunghe: il battito
+  tiene vivo il semaforo. Sessione morta: il semaforo scade, il biglietto muore
+  con lui. Nessun numero da indovinare sulla durata dei lavori.
+
+---
+
+## 5. Cosa controlla il server, a ogni consegna
+
+1. **Il biglietto esiste ed è vivo** (semaforo ancora suo, non rilasciato, non
+   scaduto).
+2. **Il feedback è il suo.** Il numero del feedback non viene dal messaggio: il
+   server lo legge dal biglietto. Chiedere qualcosa su un altro feedback non è
+   "rifiutato", è **impossibile da esprimere**.
+3. **Il ruolo permette quell'azione.** Un verificatore scrive verdetti, non
+   chiude feedback; un risolutore consegna, non si auto-approva.
+4. **Il ramo combacia** con quello legato al biglietto.
+5. **La macchina a stati** autorizza il passaggio, letto dallo stato **vero**
+   (il server la chiave ce l'ha: è il controllo che oggi non gira mai).
+6. **Il tetto**: quante consegne al minuto per biglietto e per routine. Una
+   routine impazzita trova una porta chiusa, non un database gonfio.
+
+Ogni rifiuto va **registrato e visibile all'owner**: un worker che prova azioni
+fuori dal suo perimetro è il segnale che qualcuno l'ha manipolato, ed è
+esattamente ciò che si vuole scoprire.
+
+---
+
+## 6. Cosa riceve ogni ruolo
+
+L'isolamento fra i ruoli esiste già oggi nel dispatcher, ma è una **consegna**:
+il worker ha la chiave e i feedback sono leggibili da chiunque, quindi ciò che
+non gli viene dato se lo può prendere. Spostando la decifratura sul server
+diventa un **muro**.
+
+| Ruolo | Riceve | NON riceve |
+|---|---|---|
+| `new-work` | il testo del suo feedback | — |
+| `fixer` | il feedback + la critica della verifica | — |
+| `verifier` | il **sintomo** (il feedback), il ramo | il diff, il report di chi ha risolto |
+| `secaudit` | **solo ramo e diff** | qualunque campo del feedback |
+| `prober` | niente | la coda |
+
+La riga che conta è `secaudit`: **il controllo di sicurezza non deve leggere
+testo scritto da sconosciuti**, o il testo può convincerlo. Senza chiave sulla
+macchina, quel feedback per lui è un blob illeggibile — non una regola da
+rispettare.
+
+---
+
+## 7. Cosa NON garantisce (dichiarato, non nascosto)
+
+- **`verifier` che non guarda il diff resta una convenzione.** Ha il progetto e
+  una shell: se vuole, il diff se lo calcola. È isolamento di qualità (evita che
+  si ancori allo happy-path di chi ha scritto il codice), non di sicurezza.
+- **Un worker manipolato può mentire sul proprio feedback**: scrivere un report
+  falso, dare un verdetto sbagliato. Non si può impedire — è il lavoro che gli
+  hai affidato. Si limita il *perimetro*, non la sincerità.
+- **Il ramo principale non è protetto da questa spec**: continua a esserlo dal
+  cancello di fusione e dalla regola che nessun salvataggio automatico ci fa
+  atterrare niente.
+
+---
+
+## 8. Migrazione, in cinque pezzi consegnabili
+
+Ognuno lascia il sistema funzionante e ha senso da solo.
+
+1. **Silenzio sugli attacchi confermati** (feedback #476, indipendente da tutto
+   il resto: si può fare subito).
+2. **Il server sa parlare**: parola d'ordine, biglietti, semafori, battito,
+   rilascio. Le routine continuano a usare la cassetta postale; il canale nuovo
+   gira in parallelo e si confronta.
+3. **La consegna passa dal canale nuovo**, con i controlli veri (§5). La cassetta
+   postale resta come ripiego, ma non è più la strada principale.
+4. **La chiave di lettura esce dalle macchine**: il payload arriva già decifrato
+   dal server. Da qui l'isolamento di `secaudit` diventa un muro.
+5. **Smantellamento**: via gli script della coda, la GitHub Action, l'applier
+   locale, i file di triage. Con loro sparisce anche l'ultima strada per cui una
+   pubblicazione può partire senza che nessuno l'abbia decisa.
+
+In parallelo, indipendenti: togliere il token dell'account robot dall'ambiente
+delle routine e rigenerarlo; separare i due testi (una frase in chiaro per
+l'utente, il report cifrato per l'owner).
+
+---
+
+## 9. Decisioni prese, e perché
+
+- **La chiave privata va sul server, non resta fuori.** Sembra il contrario della
+  prudenza, ma il conto è: oggi esiste in una copia per ogni routine, su macchine
+  che leggono testo ostile; domani in una sola, in una cassaforte gestita. Meno
+  copie, meglio protette.
+- **Le decisioni non si cifrano.** "Feedback 500, da *in verifica* a
+  *verificato*, ruolo verificatore" non è contenuto, è metadato di lavorazione:
+  cifrarlo accecherebbe di nuovo i controlli, che è il difetto (b) da cui siamo
+  partiti. Si cifra il **contenuto** (testo dei feedback, report), non il
+  **controllo**.
+- **Niente valore nuovo per "bloccato"** in ciò che è visibile da fuori: sarebbe
+  lo stesso segnale con un altro nome (vedi #476).
+- **Server irraggiungibile = routine ferme**, come per l'interruttore master.
