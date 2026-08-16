@@ -1,5 +1,6 @@
-// Migrazione una-tantum (#476): ri-cifra lo `status` dei feedback esistenti a
-// LUNGHEZZA FISSA, e corregge l'enum grossolano dei beccati confermati.
+// Migrazione una-tantum (#476): mette in sicurezza i feedback GIÀ SCRITTI —
+// ri-cifra lo `status` a lunghezza fissa, cifra i campi della revisione
+// dell'owner, e corregge l'enum grossolano dei beccati confermati.
 //
 // PERCHÉ SERVE
 //   La cifratura non imbottisce: il campo cifrato è lungo quanto il nome dello
