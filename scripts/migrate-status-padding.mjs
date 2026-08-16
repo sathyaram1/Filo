@@ -73,10 +73,44 @@ async function main() {
   console.log(`${docs.length} feedback da esaminare${DRY ? ' (dry-run)' : ''}.`);
 
   let riscritti = 0; let giaApposto = 0; let illeggibili = 0; let pubblicoCorretto = 0;
+  let revisioniCifrate = 0;
+
+  // Campi della revisione dell'owner: in chiaro sul già-scritto, e `rejected`
+  // identifica i confermati con una query pubblica.
+  const CAMPI_REVISIONE = ['reviewDecision', 'reviewComment', 'reviewedAt'];
 
   for (const doc of docs) {
     const grezzo = doc.fields.status?.stringValue;
-    if (!grezzo) { giaApposto++; continue; }
+
+    // Revisione da cifrare? Si guarda PRIMA dello status, perché un documento
+    // può avere la revisione in chiaro e lo status già a posto.
+    const revisioneDaCifrare = CAMPI_REVISIONE.filter((k) => {
+      const v = doc.fields[k]?.stringValue;
+      return typeof v === 'string' && v !== '' && !C.isEncrypted(v);
+    });
+
+    if (!grezzo) {
+      if (!revisioneDaCifrare.length) { giaApposto++; continue; }
+      // Nessuno status ma revisione in chiaro: si scrive solo quella.
+      if (DRY) {
+        console.log(`  • ${doc.id}: revisione da cifrare (${revisioneDaCifrare.join(', ')})`);
+        riscritti++; revisioniCifrate++; continue;
+      }
+      const campi = {}; const mask = [];
+      for (const k of revisioneDaCifrare) {
+        campi[k] = { stringValue: await C.encryptForOwner(doc.fields[k].stringValue) };
+        mask.push(k);
+      }
+      const qs = mask.map((m) => `updateMask.fieldPaths=${m}`).join('&');
+      const res = await fetch(`${FIRESTORE_BASE}/feedback/${doc.id}?${qs}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
+        body: JSON.stringify({ fields: campi }),
+      });
+      if (!res.ok) { console.error(`  ✗ ${doc.id}: HTTP ${res.status} ${(await res.text()).slice(0, 120)}`); continue; }
+      riscritti++; revisioniCifrate++;
+      continue;
+    }
 
     // Status in chiaro (storico mai cifrato): niente da imbottire, ma l'enum
     // grossolano va comunque ricalcolato.
