@@ -182,9 +182,44 @@ test('PUBLIC_MAP copre TUTTI i canonici e i beccati collassano sui normali', () 
     assert.ok(['open', 'closed'].includes(FS.PUBLIC_MAP[s]), s);
   }
   // Cuore di sicurezza: un attacco intercettato è indistinguibile da un
-  // feedback in lavorazione; un confermato è indistinguibile da un risolto.
+  // feedback in lavorazione.
   assert.equal(FS.PUBLIC_MAP.attack, 'open');
   assert.equal(FS.PUBLIC_MAP.suspicious_file, 'open');
-  assert.equal(FS.PUBLIC_MAP.attack_confirmed, FS.PUBLIC_MAP.done);
-  assert.equal(FS.PUBLIC_MAP.spam_confirmed, FS.PUBLIC_MAP.archived);
+});
+
+test('#476 — un beccato CONFERMATO resta "in lavorazione" per chi l\'ha mandato', () => {
+  // Prima stavano su 'closed', come i risolti. Sembrava innocuo (nessun valore
+  // dedicato ai bloccati) ma 'closed' è il grilletto della ricompensa e della
+  // bacheca pubblica: l'attaccante riceveva 50 crediti, la notifica "risolto" e
+  // il suo feedback in vetrina. Cioè la conferma del colpo, pagata da noi.
+  assert.equal(FS.PUBLIC_MAP.attack_confirmed, 'open');
+  assert.equal(FS.PUBLIC_MAP.spam_confirmed, 'open');
+  // E la proprietà che conta davvero, indipendente dai nomi: da fuori un
+  // confermato dev'essere identico a un feedback ancora in lavorazione, e
+  // diverso da un risolto.
+  assert.equal(FS.PUBLIC_MAP.attack_confirmed, FS.PUBLIC_MAP.working);
+  assert.notEqual(FS.PUBLIC_MAP.attack_confirmed, FS.PUBLIC_MAP.done);
+  assert.notEqual(FS.PUBLIC_MAP.spam_confirmed, FS.PUBLIC_MAP.done);
+});
+
+test('#476 — nessuna ricompensa e nessun annuncio per un attacco confermato', () => {
+  // È la conseguenza che l'utente VEDE, e va asserita sul comportamento, non
+  // sulla tabella: se un giorno la mappa torna indietro, questo diventa rosso.
+  const comeLoVedeChiLoHaMandato = (fine) => ({ statusPublic: FS.PUBLIC_MAP[fine] });
+  assert.equal(FS.isResolvedForUser(comeLoVedeChiLoHaMandato('attack_confirmed')), false);
+  assert.equal(FS.isResolvedForUser(comeLoVedeChiLoHaMandato('spam_confirmed')), false);
+  assert.equal(FS.isResolvedForUser(comeLoVedeChiLoHaMandato('attack')), false);
+  // …e il lavoro vero continua a essere premiato: la protezione non deve
+  // spegnere la funzione, o il test passerebbe anche rompendo le ricompense.
+  assert.equal(FS.isResolvedForUser(comeLoVedeChiLoHaMandato('done')), true);
+  assert.equal(FS.isResolvedForUser(comeLoVedeChiLoHaMandato('archived')), true);
+});
+
+test('#476 — retrocompat: feedback storici senza enum grossolano', () => {
+  assert.equal(FS.isResolvedForUser({ status: 'done' }), true);
+  assert.equal(FS.isResolvedForUser({ status: 'attack_confirmed' }), false);
+  // Status cifrato e nessun enum: non si sa → non si premia.
+  assert.equal(FS.isResolvedForUser({ status: 'FENC1:abcdef' }), false);
+  assert.equal(FS.isResolvedForUser({}), false);
+  assert.equal(FS.isResolvedForUser(null), false);
 });
