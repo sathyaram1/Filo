@@ -291,8 +291,14 @@ service cloud.firestore {
         // fermato dalla sicurezza, con un commento opzionale. `reviewDecision`
         // 'accepted' lo riammette nel flusso (vedi SN_MANAGE_REVIEW.classifyBlock).
         && request.resource.data.get('reviewDecision', '') in ['', 'accepted', 'rejected']
+        // #476: il commento ora viaggia CIFRATO (lo leggeva chiunque, compreso
+        // chi aveva mandato l'attacco che l'owner stava confermando). La
+        // cifratura gonfia il testo di circa il 40% più un preambolo fisso:
+        // 2000 caratteri scritti diventano ~2800. Il tetto sale di conseguenza,
+        // altrimenti un commento lungo verrebbe respinto qui — stesso
+        // ragionamento del `clientId` (grezzo ≤100, cifrato ≤300).
         && request.resource.data.get('reviewComment', '') is string
-        && request.resource.data.get('reviewComment', '').size() <= 2000
+        && request.resource.data.get('reviewComment', '').size() <= 4000
         && request.resource.data.get('reviewedAt', '') is string
         && request.resource.data.get('reviewedAt', '').size() <= 40
         // Override owner per l'archiviazione automatica a punteggio (DC3):
