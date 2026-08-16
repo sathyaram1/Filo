@@ -222,14 +222,52 @@
   // ⚠️ SICUREZZA: tutti gli stati "beccati" (attack/spam/suspicious_file e i
   // confermati) DEVONO collassare sugli stessi valori dei feedback normali —
   // mai un valore distinto, o chi legge Firestore senza chiave riconosce un
-  // attacco intercettato e fa hill-climbing. Aperti → 'open', chiusi → 'closed'.
+  // attacco intercettato e fa hill-climbing.
+  //
+  // MA NON BASTA COLLASSARE: conta SU QUALE valore (#476). I confermati stavano
+  // su 'closed', lo stesso dei risolti — che di per sé non dice niente, se non
+  // fosse che 'closed' non è un'etichetta passiva: è il grilletto di due cose
+  // che l'attaccante VEDE.
+  //   1. il popup delle ricompense premia i feedback 'closed' → chi manda un
+  //      attacco riceve 50 crediti e la notifica "risolto";
+  //   2. la sanificazione per la bacheca pubblica lavora i feedback 'closed' →
+  //      il feedback dell'attaccante finisce in vetrina (a pagamento).
+  // Cioè gli confermavamo il colpo, e lo pagavamo pure.
+  //
+  // I confermati stanno quindi su 'open': per chi li ha mandati restano per
+  // sempre "in lavorazione", che è il silenzio. Nessun valore nuovo — quello
+  // sarebbe di nuovo un segnale, solo con un altro nome.
+  //
+  // Effetto collaterale voluto e innocuo: i confermati rientrano nella query
+  // dei candidati aperti delle routine (statusPublic == 'open'), dove vengono
+  // scartati subito dal filtro sullo status fine (lavorabile = solo `todo`).
   const PUBLIC_MAP = {
     unlabeled: 'open', suspicious_file: 'open', attack: 'open', spam: 'open',
     design: 'open', aligned: 'open', todo: 'open', working: 'open',
     revision_capability: 'open', revision_security: 'open',
     done: 'closed', archived: 'closed',
-    attack_confirmed: 'closed', spam_confirmed: 'closed',
+    attack_confirmed: 'open', spam_confirmed: 'open',
   };
+
+  /**
+   * Il feedback risulta RISOLTO a chi l'ha mandato? È il grilletto della
+   * ricompensa e del popup sulla macchina dell'utente, che non ha la chiave
+   * privata e quindi può guardare SOLO l'enum grossolano in chiaro.
+   *
+   * Vive qui, accanto alla mappa, perché è la stessa decisione: se un giorno
+   * qualcuno rimette i confermati su 'closed', questa funzione inizia a
+   * premiare gli attacchi — e il test che la sorveglia diventa rosso subito,
+   * invece di lasciare la scoperta a un attaccante.
+   */
+  function isResolvedForUser(feedback) {
+    const f = feedback && typeof feedback === 'object' ? feedback : {};
+    if (f.statusPublic !== undefined) return f.statusPublic === 'closed';
+    // Retrocompat: feedback storici senza statusPublic. Status in chiaro →
+    // logica vecchia; cifrato → non si sa, e non si premia.
+    const s = f.status;
+    if (typeof s === 'string' && !s.startsWith('FENC1:')) return s === 'done';
+    return false;
+  }
 
   global.SN_FB_STATUS = {
     STATUSES, CANONICAL, isCanonical,
