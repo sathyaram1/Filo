@@ -534,7 +534,16 @@
     }
     // Override di revisione (owner sblocca un feedback fermato dalla sicurezza).
     if (reviewDecision !== undefined) { fields.reviewDecision = toFsValue(reviewDecision); mask.push('reviewDecision'); }
-    if (reviewComment !== undefined) { fields.reviewComment = toFsValue(reviewComment); mask.push('reviewComment'); }
+    // #476: il commento con cui l'owner sblocca o CONFERMA un blocco viaggiava
+    // in chiaro, e le letture sono pubbliche: chi aveva mandato l'attacco
+    // poteva leggersi il motivo per cui era stato beccato — il manuale per
+    // riprovare meglio. Lo legge solo la dashboard dell'owner (che la chiave ce
+    // l'ha), quindi cifrarlo non toglie niente a nessun altro.
+    // Retrocompat: i valori vecchi restano in chiaro e continuano a leggersi.
+    if (reviewComment !== undefined) {
+      fields.reviewComment = toFsValue(await maybeEncrypt(reviewComment));
+      mask.push('reviewComment');
+    }
     if (reviewedAt !== undefined) { fields.reviewedAt = toFsValue(reviewedAt); mask.push('reviewedAt'); }
     // Preferito ⭐ (DB2): bool, "parcheggio per il futuro". Le Firestore rules
     // accettano `starred` (is bool) nel ramo update admin.
