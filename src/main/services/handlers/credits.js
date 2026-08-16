@@ -320,16 +320,15 @@ module.exports = function register(on, ctx) {
       const rewarded = state.rewardedFeedback || {};
       const rewards = [];
       for (const f of all) {
-        // S1.F2.1: la macchina UTENTE non ha la chiave privata → non può leggere `status`
-        // cifrato. Usa `statusPublic === 'closed'` (sempre in chiaro) come segnale di
-        // "risolto". Fallback per feedback vecchi senza statusPublic: se `status` è in
-        // chiaro (non FENC1:) usa la logica vecchia; se è cifrato tratta come non risolto.
-        const isResolved = (() => {
-          if (f.statusPublic !== undefined) return f.statusPublic === 'closed';
-          const s = f.status;
-          if (typeof s === 'string' && !s.startsWith('FENC1:')) return s === 'done';
-          return false; // cifrato senza statusPublic → non premiare (non si sa)
-        })();
+        // S1.F2.1: la macchina UTENTE non ha la chiave privata → non può leggere
+        // `status` cifrato e guarda solo l'enum grossolano in chiaro. La regola
+        // sta in SN_FB_STATUS accanto alla mappa che la determina (#476): è la
+        // stessa decisione, e separarle è ciò che aveva fatto premiare gli
+        // attacchi confermati.
+        const FBS = globalThis.SN_FB_STATUS;
+        const isResolved = FBS && FBS.isResolvedForUser
+          ? FBS.isResolvedForUser(f)
+          : f.statusPublic === 'closed';
         if (!f || !isResolved) continue;
         // S1.F2.2: match via clientIdHash (in chiaro, disponibile anche se clientId è cifrato).
         // RETROCOMPAT: se il feedback non ha clientIdHash (storico), ricadi sul confronto raw.
