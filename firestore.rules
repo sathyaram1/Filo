@@ -307,7 +307,7 @@ service cloud.firestore {
         && request.resource.data.get('reviewComment', '') is string
         && request.resource.data.get('reviewComment', '').size() <= 4000
         && request.resource.data.get('reviewedAt', '') is string
-        && request.resource.data.get('reviewedAt', '').size() <= 40
+        && request.resource.data.get('reviewedAt', '').size() <= 400   // cifrato (#476)
         // Override owner per l'archiviazione automatica a punteggio (DC3):
         // 'archived' = l'owner ha archiviato a mano (vince sempre su punteggio
         // /età); 'keep_open' = l'owner ha deciso esplicitamente di NON
