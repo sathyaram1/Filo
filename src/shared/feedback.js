@@ -533,18 +533,38 @@
       fields.notes = toFsValue(capped); mask.push('notes');
     }
     // Override di revisione (owner sblocca un feedback fermato dalla sicurezza).
-    if (reviewDecision !== undefined) { fields.reviewDecision = toFsValue(reviewDecision); mask.push('reviewDecision'); }
-    // #476: il commento con cui l'owner sblocca o CONFERMA un blocco viaggiava
-    // in chiaro, e le letture sono pubbliche: chi aveva mandato l'attacco
-    // poteva leggersi il motivo per cui era stato beccato — il manuale per
-    // riprovare meglio. Lo legge solo la dashboard dell'owner (che la chiave ce
-    // l'ha), quindi cifrarlo non toglie niente a nessun altro.
-    // Retrocompat: i valori vecchi restano in chiaro e continuano a leggersi.
+    // #476 — LA REVISIONE DELL'OWNER VIAGGIA TUTTA CIFRATA.
+    //
+    // Questi tre campi li scrive solo la dashboard dell'owner, quando sblocca o
+    // CONFERMA un feedback fermato dalla sicurezza. Le letture della collezione
+    // sono pubbliche, quindi in chiaro erano un annuncio a chi aveva mandato
+    // quel feedback:
+    //   · `reviewComment` diceva il PERCHÉ era stato beccato — il manuale per
+    //     riprovare meglio;
+    //   · `reviewDecision` diceva l'esito con una parola sola ('rejected');
+    //   · e persino la SOLA PRESENZA di `reviewedAt` bastava: un feedback
+    //     normale non ce l'ha, quindi vederlo significa "sei passato dalle mani
+    //     dell'owner", cioè sei stato fermato.
+    // Non basta cifrarne uno: l'attaccante gli bastava il campo rimasto. Vanno
+    // insieme, o non serve a niente.
+    //
+    // Li rilegge solo chi ha la chiave: la dashboard (che li decifra prima di
+    // mostrarli) e il backend di sicurezza, che su `reviewDecision === 'accepted'`
+    // sa di non dover ri-bloccare un feedback che l'owner ha sbloccato a mano —
+    // per questo la sua lista di campi da decifrare li comprende.
+    // Retrocompat: i valori vecchi in chiaro continuano a leggersi.
+    if (reviewDecision !== undefined) {
+      fields.reviewDecision = toFsValue(await maybeEncrypt(reviewDecision));
+      mask.push('reviewDecision');
+    }
     if (reviewComment !== undefined) {
       fields.reviewComment = toFsValue(await maybeEncrypt(reviewComment));
       mask.push('reviewComment');
     }
-    if (reviewedAt !== undefined) { fields.reviewedAt = toFsValue(reviewedAt); mask.push('reviewedAt'); }
+    if (reviewedAt !== undefined) {
+      fields.reviewedAt = toFsValue(await maybeEncrypt(reviewedAt));
+      mask.push('reviewedAt');
+    }
     // Preferito ⭐ (DB2): bool, "parcheggio per il futuro". Le Firestore rules
     // accettano `starred` (is bool) nel ramo update admin.
     if (starred !== undefined) { fields.starred = { booleanValue: !!starred }; mask.push('starred'); }
