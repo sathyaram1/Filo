@@ -134,3 +134,40 @@ test('i tetti delle regole reggono i valori cifrati', async () => {
   assert.ok(f.reviewDecision.stringValue.length <= 400, 'esito cifrato oltre il tetto delle regole');
   assert.ok(f.reviewedAt.stringValue.length <= 400, 'data cifrata oltre il tetto delle regole');
 });
+
+// ── #476 — la LUNGHEZZA del cifrato non deve dire lo stato ───────────────────
+//
+// La cifratura non imbottisce: il testo cifrato è lungo quanto il chiaro più un
+// preambolo fisso. Gli stati hanno nomi di lunghezza diversa, quindi CONTARE i
+// caratteri del campo cifrato equivale a leggerlo — e le letture della
+// collezione sono pubbliche. Provato sul database vero: con la sola lunghezza si
+// pescavano dal mucchio l'unico attacco confermato e l'unico spam confermato.
+//
+// Questo test misura ciò che l'attaccante misurerebbe.
+
+test('#476 — tutti gli stati producono un cifrato della STESSA lunghezza', async () => {
+  const FS = globalThis.SN_FB_STATUS;
+  const lunghezze = new Map();
+  for (const stato of FS.CANONICAL) {
+    const f = await scritturaDi({ status: stato });
+    lunghezze.set(stato, f.status.stringValue.length);
+  }
+  const distinte = new Set(lunghezze.values());
+  assert.equal(
+    distinte.size, 1,
+    `la lunghezza del cifrato distingue gli stati: ${JSON.stringify(Object.fromEntries(lunghezze))}`,
+  );
+});
+
+test('#476 — imbottito per il database, pulito per chi lo legge', async () => {
+  // L'imbottitura non deve arrivare a chi confronta lo stato: un `status` che
+  // torna 'attack_confirmed        ' non è uguale a 'attack_confirmed' e
+  // manderebbe in malora dashboard, routine e macchina a stati.
+  const FS = globalThis.SN_FB_STATUS;
+  for (const stato of ['todo', 'attack_confirmed', 'revision_capability']) {
+    assert.equal(FS.unpadFromCipher(FS.padForCipher(stato)), stato);
+    assert.equal(FS.padForCipher(stato).length, FS.CIPHER_PAD);
+  }
+  // Valori già scritti PRIMA di questo lavoro (senza imbottitura): invariati.
+  assert.equal(FS.unpadFromCipher('todo'), 'todo');
+});
