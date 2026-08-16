@@ -249,6 +249,39 @@
     attack_confirmed: 'open', spam_confirmed: 'open',
   };
 
+  // ── Lunghezza fissa dello status cifrato (#476) ────────────────────────────
+  //
+  // La cifratura non imbottisce: il testo cifrato è lungo quanto il testo in
+  // chiaro più un preambolo fisso. Gli stati hanno nomi di lunghezza diversa,
+  // quindi CONTARE I CARATTERI del campo cifrato equivale a leggerlo — e le
+  // letture della collezione sono pubbliche. Misurato sul database vero:
+  // `attack_confirmed` e `spam_confirmed` avevano una lunghezza tutta loro, e
+  // bastava quella per pescare dal mucchio i feedback beccati, senza chiave e
+  // senza login. Tutto il resto del lavoro su #476 non serviva a niente finché
+  // restava questo.
+  //
+  // Rimedio: prima di cifrare, lo status viene portato a una lunghezza FISSA
+  // con spazi in coda; chi lo decifra li toglie. Così ogni stato produce un
+  // testo cifrato lungo uguale. Vale per TUTTI gli stati, non solo per i due
+  // confermati: se solo quelli fossero della stessa lunghezza, sarebbero
+  // riconoscibili proprio per questo.
+  //
+  // La misura è larga: tiene i canonici (il più lungo è 19), i legacy ritirati e
+  // spazio per stati futuri. Cambiarla NON rompe i documenti già scritti (chi
+  // legge toglie gli spazi comunque), ma non ha senso restringerla.
+  const CIPHER_PAD = 32;
+
+  /** Status pronto per la cifratura: lunghezza fissa, così il cifrato non parla. */
+  function padForCipher(status) {
+    const s = String(status == null ? '' : status);
+    return s.length >= CIPHER_PAD ? s : s + ' '.repeat(CIPHER_PAD - s.length);
+  }
+
+  /** L'inverso: toglie l'imbottitura dopo la decifratura. Sicuro sui valori vecchi. */
+  function unpadFromCipher(status) {
+    return typeof status === 'string' ? status.trim() : status;
+  }
+
   /**
    * Il feedback risulta RISOLTO a chi l'ha mandato? È il grilletto della
    * ricompensa e del popup sulla macchina dell'utente, che non ha la chiave
