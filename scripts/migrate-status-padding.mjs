@@ -14,6 +14,14 @@
 //   'closed' (lo stesso di un feedback risolto), e da lì partivano la ricompensa
 //   all'attaccante e la comparsa in bacheca.
 //
+//   E si cifrano i campi della REVISIONE dell'owner (esito, commento, quando),
+//   che sul già-scritto erano in chiaro: `reviewDecision` vale "rejected" su —
+//   e solo su — i feedback che l'owner ha confermato come attacco o spam. Una
+//   query pubblica su quel valore li tirava fuori tutti, con precisione piena.
+//   Vanno cifrati TUTTI insieme, anche i 229 "accepted" dei falsi positivi: se
+//   restassero in chiaro solo quelli, i confermati sarebbero riconoscibili come
+//   "gli unici con l'esito cifrato".
+//
 // SICUREZZA DELLA MIGRAZIONE
 //   · Idempotente: un documento già a posto viene saltato (nessuna scrittura).
 //   · Tocca SOLO `status` e `statusPublic`. Nient'altro viene riscritto.
