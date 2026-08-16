@@ -118,7 +118,11 @@ async function decryptFeedbackObject(fields) {
     if (!C.isEncrypted(v)) continue; // in chiaro o null: invariato
     if (!priv) { out[f] = PLACEHOLDER_NO_KEY; continue; }
     try {
-      out[f] = await C.decrypt(v, priv);
+      const plain = await C.decrypt(v, priv);
+      // #476: lo `status` è cifrato a lunghezza fissa (imbottito) perché il
+      // campo cifrato non riveli lo stato con la sola lunghezza — qui si toglie
+      // l'imbottitura, o la dashboard non riconoscerebbe più nessuno stato.
+      out[f] = f === 'status' ? plain.trim() : plain;
     } catch (e) {
       console.warn(`[auth] decifratura campo "${f}" fallita:`, e?.message || e);
       out[f] = PLACEHOLDER_NO_KEY;
