@@ -132,7 +132,7 @@ test('il marcatore del biglietto NON deve entrare nella storia: questo repo è p
   // biglietto è un segreto: senza questa riga nel .gitignore finirebbe nella
   // storia pubblica — cioè il difetto che la spec viene a togliere, ricreato
   // proprio dal marcatore che serve a toglierlo. È già successo una volta.
-  const repo = resolve(new URL('../..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'));
+  const repo = fileURLToPath(new URL('../..', import.meta.url));
   const rel = '.claude/routine-ticket.json';
   let ignorato = false;
   try {
