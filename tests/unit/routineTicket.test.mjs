@@ -14,7 +14,7 @@ import { mkdtempSync, rmSync, existsSync, writeFileSync, mkdirSync } from 'node:
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 
-const { classifyReply } = await import('../../scripts/routine-channel.mjs');
+const { classifyReply, work } = await import('../../scripts/routine-channel.mjs');
 const { readTicket, writeTicket, clearTicket, isFresh, ticketFile, MAX_AGE_MS } =
   await import('../../scripts/lib/routine-ticket.mjs');
 
