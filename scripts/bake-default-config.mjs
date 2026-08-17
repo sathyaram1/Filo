@@ -17,7 +17,9 @@
 //                                    FILO_BUILD_PASSPHRASE (un segreto che apre
 //                                    SOLO questo, e nient'altro)
 //   2. env FILO_DEFAULT_*         → secret del job CI (fallback se non c'è override)
-//   3. assente                    → la chiave resta vuota (non blocca il build)
+//   3. nessuna delle due          → la pubblicazione si FERMA: una versione senza
+//                                    chiavi arriva agli utenti muta, e nessuno se
+//                                    ne accorgerebbe finché non prova a usarla
 //
 // SICUREZZA
 //   - Lo script NON stampa mai i valori delle chiavi (solo "presente/assente").
