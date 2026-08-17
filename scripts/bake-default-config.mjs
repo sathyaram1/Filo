@@ -13,16 +13,20 @@
 //   le consegna a tutti.
 //
 // FONTI DELLE CHIAVI (in ordine di precedenza, per ciascuna chiave):
-//   1. Firestore config/secrets   → l'override admin più recente (richiede
-//                                    FILO_ROUTINE_REFRESH_TOKEN, account robot loggato)
+//   1. il server di sicurezza      → l'override admin più recente, chiesto con
+//                                    FILO_BUILD_PASSPHRASE (un segreto che apre
+//                                    SOLO questo, e nient'altro)
 //   2. env FILO_DEFAULT_*         → secret del job CI (fallback se non c'è override)
 //   3. assente                    → la chiave resta vuota (non blocca il build)
 //
 // SICUREZZA
 //   - Lo script NON stampa mai i valori delle chiavi (solo "presente/assente").
 //   - Il file generato è gitignorato: non torna mai nel repo pubblico.
-//   - Se manca il refresh token, lo script NON fallisce: degrada ai secret env.
-//     Così un build può partire anche senza account robot configurato.
+//   - Se manca la parola d'ordine, lo script NON fallisce: degrada ai secret env.
+//   - Prima qui c'era il token dell'account ROBOT: una credenziale piena, che
+//     apriva le chiavi API a pagamento dell'owner e viveva nell'ambiente — e un
+//     ambiente lo eredita chiunque ci passi. Adesso il segreto fa una cosa sola
+//     (spec ROUTINE-AUTH-SPEC.md, "un segreto, un potere").
 
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
@@ -37,50 +41,29 @@ const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${cfg.fireb
 const SECRETS_DOC = 'config/secrets';
 const OUT_PATH = resolve(__dirname, '..', 'src', 'main', 'config', 'default-keys.generated.json');
 
-// Refresh token Firebase → ID token (breve durata). Solo API key pubblica.
-async function mintIdToken(refreshToken) {
-  const res = await fetch(`${cfg.secureTokenEndpoint}?key=${cfg.firebaseApiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: refreshToken }),
-  });
-  if (!res.ok) {
-    throw new Error(`refresh sessione robot fallito (${res.status})`);
-  }
-  const j = await res.json();
-  return j.id_token;
-}
+// Chiede al server le chiavi di default. Ritorna { openrouter?, gemini?, tavily? }
+// oppure {} se non disponibili. Non lancia: in caso di problemi degrada ai
+// segreti dell'ambiente, perché una versione con le chiavi vecchie è meglio di
+// nessuna versione.
+const CANALE = process.env.FILO_ROUTINE_API
+  || 'https://europe-west1-filo-8b9cb.cloudfunctions.net';
 
-function fromFsValue(val) {
-  if (!val) return null;
-  if ('stringValue' in val) return val.stringValue;
-  if ('booleanValue' in val) return val.booleanValue;
-  if ('integerValue' in val) return Number(val.integerValue);
-  if ('doubleValue' in val) return val.doubleValue;
-  if ('nullValue' in val) return null;
-  if ('mapValue' in val) {
-    const out = {};
-    for (const [k, v] of Object.entries(val.mapValue.fields || {})) out[k] = fromFsValue(v);
-    return out;
-  }
-  if ('arrayValue' in val) return (val.arrayValue.values || []).map(fromFsValue);
-  return null;
-}
-
-// Legge config/secrets da Firestore. Ritorna { openrouter?, gemini?, tavily? }
-// oppure {} se non leggibile/assente. Non lancia: in caso di problemi degrada.
-async function fetchRemoteKeys(idToken) {
-  if (!idToken) return {};
+async function fetchRemoteKeys(passphrase) {
+  if (!passphrase) return {};
   try {
-    const url = `${FIRESTORE_BASE}/${SECRETS_DOC}?key=${cfg.firebaseApiKey}`;
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${idToken}` } });
-    if (!res.ok) return {};
-    const json = await res.json();
-    const fields = (json && json.fields) || {};
-    const apiKeys = fields.apiKeys ? fromFsValue(fields.apiKeys) : null;
-    if (apiKeys && typeof apiKeys === 'object') return apiKeys;
-    return {};
-  } catch (_) {
+    const res = await fetch(`${CANALE}/buildKeys`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ passphrase }),
+    });
+    if (!res.ok) {
+      console.warn(`[bake] chiavi dal server non disponibili (${res.status}); uso i secret d'ambiente.`);
+      return {};
+    }
+    const j = await res.json();
+    return (j && j.apiKeys && typeof j.apiKeys === 'object') ? j.apiKeys : {};
+  } catch (e) {
+    console.warn(`[bake] server non raggiungibile (${e.message}); uso i secret d'ambiente.`);
     return {};
   }
 }
@@ -91,20 +74,12 @@ function envKey(name) {
 }
 
 async function main() {
-  const refreshToken = process.env.FILO_ROUTINE_REFRESH_TOKEN;
-
-  let idToken = null;
-  if (refreshToken) {
-    try {
-      idToken = await mintIdToken(refreshToken);
-    } catch (e) {
-      console.warn(`[bake] override Firestore non disponibili (${e.message}); uso i secret d'ambiente.`);
-    }
-  } else {
-    console.warn('[bake] FILO_ROUTINE_REFRESH_TOKEN assente: uso solo i secret d\'ambiente FILO_DEFAULT_*.');
+  const passphrase = process.env.FILO_BUILD_PASSPHRASE;
+  if (!passphrase) {
+    console.warn('[bake] FILO_BUILD_PASSPHRASE assente: uso solo i secret d\'ambiente FILO_DEFAULT_*.');
   }
 
-  const remote = await fetchRemoteKeys(idToken);
+  const remote = await fetchRemoteKeys(passphrase);
 
   const pick = (remoteKey, envName) => {
     const r = typeof remote[remoteKey] === 'string' ? remote[remoteKey].trim() : '';
