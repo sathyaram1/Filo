@@ -1082,6 +1082,21 @@ export function rejectionText(message) {
 }
 
 /**
+ * Il rifiuto arriva dal SERVER, non dalla guardia sull'identità della directory.
+ * Sono due cose diverse e vanno dette diverse: chi legge "la directory non
+ * corrisponde al branch" quando il problema è il ruolo o la macchina a stati
+ * insegue per mezz'ora il problema sbagliato.
+ */
+export function channelRejectionText(message) {
+  return [
+    `[dispatch] RIFIUTATO dal server: ${message}`,
+    'La decisione NON è stata registrata da nessuna parte, e non va aggirata',
+    'depositandola sulla coda su git: il server ha guardato ruolo, ramo e stato',
+    "vero e ha detto no. Leggi il motivo, correggi se puoi, altrimenti fermati.",
+  ].join('\n');
+}
+
+/**
  * Emette un GUASTO: nessun lavoro consegnato, e il worker lo dice
  * all'orchestratore con la terza parola del vocabolario (`guasto`), che ferma
  * il giro senza travestirlo da giornata tranquilla.
