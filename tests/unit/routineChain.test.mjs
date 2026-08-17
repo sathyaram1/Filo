@@ -169,12 +169,22 @@ test('busta formalmente giusta ma VUOTA dentro → il giro si ferma', async () =
   assert.match(JSON.stringify(json.payload), /vuoto/);
 });
 
-test('busta senza ruolo, o con un ruolo sconosciuto → il giro si ferma', async () => {
-  for (const risposta of [
-    { ok: true, payload: {} },
-    { ok: true, role: 'capo', id: 'x', payload: {} },
-  ]) {
-    const { json } = await giro(risposta);
-    assert.equal(json.role, 'halt', JSON.stringify(risposta));
-  }
+test('busta senza ruolo → il giro si ferma', async () => {
+  const { json } = await giro({ ok: true, payload: {} });
+  assert.equal(json.role, 'halt');
+});
+
+test('ruolo sconosciuto → il giro si ferma, e per QUEL motivo', async () => {
+  // Attenzione all'ordine dei controlli: una busta senza ramo verrebbe fermata
+  // dalla guardia sul ramo, e questo controllo resterebbe verde anche togliendo
+  // quella sui ruoli. Qui la busta è completa sotto ogni altro aspetto — ramo
+  // esistente, indirizzo, contenuto — così l'UNICA cosa che può fermarla è il
+  // ruolo. Senza questa accortezza, un ruolo inventato con un ramo valido
+  // finiva al lavoratore: pacchetto vuoto, ricetta vuota, uscita 0.
+  const { json } = await giro({
+    ok: true, role: 'capo', id: 'fid-900', num: FEEDBACK.num, branch: 'worker/900',
+    payload: { role: 'capo', feedback: FEEDBACK },
+  });
+  assert.equal(json.role, 'halt');
+  assert.match(JSON.stringify(json.payload), /non sa eseguire/);
 });
