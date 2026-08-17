@@ -19,3 +19,4 @@
 {"ts":"2026-08-17T10:45:42Z","event":"StopFailure","error_type":null,"error_message":null,"stop_reason":null,"agent_type":"general-purpose","last_msg":"You've hit your session limit · resets 2:20pm (Europe/Rome)"}
 {"ts":"2026-08-17T10:45:47Z","event":"StopFailure","error_type":null,"error_message":null,"stop_reason":null,"agent_type":null,"last_msg":"You've hit your session limit · resets 2:20pm (Europe/Rome)"}
 {"ts":"2026-08-17T10:45:53Z","event":"StopFailure","error_type":null,"error_message":null,"stop_reason":null,"agent_type":null,"last_msg":"You've hit your session limit · resets 2:20pm (Europe/Rome)"}
+{"ts":"2026-08-17T21:10:05Z","event":"StopFailure","error_type":null,"error_message":null,"stop_reason":null,"agent_type":null,"last_msg":"Your organization has disabled Claude subscription access for Claude Code · Use an Anthropic API key instead, or ask you"}
