@@ -213,6 +213,12 @@
     }
     .mg-log-when { color: var(--sn-fg); }
     .mg-log-abs { margin-left: auto; color: var(--sn-muted); font-size: 12px; }
+    /* Secondo blocco della stessa scheda: il canale autenticato delle routine.
+       Stessa griglia delle righe dei worker; cambia solo il colore del ruolo,
+       che qui segnala un tentativo respinto. */
+    .mg-log-section { margin-top: 32px; }
+    .mg-log-section h3 { font-size: 15px; margin: 0 0 4px; }
+    .mg-log-role--deny { color: var(--sn-error); }
 
     /* ── Layout 3 colonne della sezione Revisione ──────────────────────── */
     /* Le due colonne esterne hanno larghezza fissa, decisa dall'utente
@@ -1186,6 +1192,24 @@
           Nessun worker registrato finora.
         </div>
         <ul class="mg-log-list" id="mgLogList" hidden></ul>
+
+        <!-- Il canale autenticato delle routine. Due registri:
+             · i RIFIUTI — una richiesta fuori dal perimetro del biglietto è il
+               segnale che qualcuno ha manipolato un lavoratore, ed è
+               esattamente ciò che si vuole scoprire;
+             · i CONFRONTI — finché il canale affianca il vecchio cammino, qui si
+               vede se il server e le routine scelgono lo stesso lavoro. -->
+        <div class="mg-log-section" id="mgChannelSection" hidden>
+          <h3>Canale delle routine</h3>
+          <p class="mg-log-intro">
+            Le richieste respinte dal server e, finché il canale nuovo affianca
+            quello vecchio, quanto le due strade scelgono lo stesso lavoro.
+          </p>
+          <div class="mg-log-empty" id="mgChannelEmpty" hidden>
+            Nessun rifiuto e nessun confronto finora.
+          </div>
+          <ul class="mg-log-list" id="mgChannelList" hidden></ul>
+        </div>
       </div>
     </section>
 

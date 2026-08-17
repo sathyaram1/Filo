@@ -466,6 +466,25 @@ module.exports = function register(on, ctx) {
     }
   });
 
+  // Registri del canale autenticato delle routine. Owner-only, sola lettura.
+  //
+  // Le due collezioni sono scritte dal backend di sicurezza con l'Admin SDK e
+  // nessun client le può leggere: un registro dei rifiuti leggibile da chiunque
+  // direbbe a chi sta provando ad abusare del canale quanto è stato notato.
+  // Perciò si passa dalla callable, che chiede le credenziali dell'owner.
+  on(MSG.ROUTINE_LOG_GET, async (msg) => {
+    try {
+      if (!auth.isAdmin()) {
+        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
+      }
+      const limit = Number(msg && msg.limit);
+      const r = await callSecurityFunction('routineLog', Number.isFinite(limit) ? { limit } : {});
+      return { ok: true, rejections: (r && r.rejections) || [], comparisons: (r && r.comparisons) || [] };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  });
+
   // Config "modelli di supporto" (doc config/supportModels). Owner-only.
   // GET legge i 4 slot; UPDATE scrive solo i campi passati (per-campo PATCH).
   on(MSG.SUPPORT_MODELS_GET, async () => {

@@ -1265,6 +1265,13 @@ async function decryptOne(id) {
   }
 }
 
+// L'ultima scelta consegnata, per il confronto col canale del server (#477.1).
+// La scrive `emit`, che è il punto unico in cui dispatch dichiara cosa ha
+// scelto: legarla lì significa che il confronto non può parlare di un lavoro
+// diverso da quello davvero consegnato.
+let lastEmitted = null;
+export function lastChoice() { return lastEmitted; }
+
 export function emit(bucket, ctx) {
   // Chi sta per lavorare, scritto DA CHI LO SA (feedback #443). Da qui lo
   // rilegge `queue-feedback.mjs`: così un feedback aperto da un'automazione
@@ -1284,6 +1291,7 @@ export function emit(bucket, ctx) {
     loopCount: bucket.loopCount || 0,
     instructions: readRoleInstructions(bucket.role),
   };
+  lastEmitted = { role: bucket.role, num: bucket.num || '' };
   process.stdout.write(JSON.stringify(out, null, 2) + '\n');
 }
 
@@ -1335,7 +1343,32 @@ if (isMainModule) {
       process.exit(0);
     } else {
       // Default: sceglie il bucket e stampa il JSON.
-      run().then((r) => process.exit(r?.exit ?? 0)).catch((e) => {
+      //
+      // `--ticket <biglietto>` (#477.1, fase in cui i due canali convivono):
+      // registra sul server la differenza fra la scelta appena fatta qui e
+      // quella che il server aveva legato al biglietto. È un confronto, non una
+      // consegna: l'autorità resta a questo cammino, e se il canale non
+      // risponde non cambia niente per il giro in corso.
+      //
+      // Lo fa dispatch e non il worker perché il worker se ne dimenticherebbe:
+      // è la stessa lezione della provenienza dei feedback, dove su decine di
+      // ritrovamenti uno solo risultava firmato giusto finché a firmare doveva
+      // pensarci chi lavorava.
+      const ti = argv.indexOf('--ticket');
+      const ticket = ti !== -1 ? argv[ti + 1] : '';
+      run().then(async (r) => {
+        if (ticket) {
+          try {
+            const ch = await import('./routine-channel.mjs');
+            const mine = lastChoice() || { role: '', num: '' };
+            const res = await ch.compare(ticket, mine);
+            process.stderr.write(`[dispatch] confronto col canale: ${res.ok ? (res.same ? 'stessa scelta' : 'scelte diverse (registrato)') : 'non registrato'}\n`);
+          } catch (e) {
+            process.stderr.write(`[dispatch] confronto col canale non riuscito: ${e?.message || e}\n`);
+          }
+        }
+        process.exit(r?.exit ?? 0);
+      }).catch((e) => {
         process.stderr.write(`[dispatch] errore fatale: ${e.message}\n`);
         process.exit(1);
       });

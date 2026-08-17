@@ -183,13 +183,37 @@ Ripeti finché il budget è quasi pieno:
      facendo trapelare all'orchestratore dettagli specifici che dovrebbe ignorare.
      → i file-ruolo devono ribadire: **ultima riga = solo il verdetto**.
 
+1b. **Chiedi un biglietto al server** (canale nuovo, spec `ROUTINE-AUTH-SPEC.md`).
+   È l'unica cosa che l'orchestratore fa con la **parola d'ordine**, che gli
+   arriva nel prompt della schedulazione e **non va mai esportata
+   nell'ambiente** (l'ambiente lo eredita ogni worker: è il difetto che questa
+   spec viene a togliere).
+
+   ```bash
+   node scripts/routine-channel.mjs ticket "<parola-d-ordine>"
+   ```
+   - **exit 0** → stampa il **biglietto** su stdout: passalo al worker nel suo
+     prompt (vedi passo 2). Non sai su cosa si lavorerà, ed è voluto: se lo
+     sapessi saresti manipolabile anche tu, e la parola d'ordine ce l'hai tu.
+   - **exit 2** → niente da fare secondo il server: **prosegui lo stesso** col
+     giro normale. In questa fase l'autorità è ancora del cammino su git, e il
+     server non vede lo stato dei rami (vive nei file su git): una differenza è
+     attesa, non un guasto.
+   - **exit 3** → il canale non risponde. **Prosegui lo stesso**, senza
+     biglietto: finché il canale è in affiancamento un suo guasto non deve
+     fermare il lavoro vero.
+
+   Se non hai una parola d'ordine, salta questo passo: il giro funziona
+   identico, si perde solo il confronto fra i due cammini.
+
 2. **Spawna UN worker generico** (tool Agent, `subagent_type: general-purpose`,
    `model: "opus"` — sempre Opus, mai Fable: consuma crediti — vedi
    § Sequenziale) con un prompt minimo:
 
    > «Esporta SUBITO nell'ambiente la chiave che ti incollo qui sotto, e
    > prefissala a OGNI invocazione degli script di routine:
-   > `FILO_FEEDBACK_PRIVKEY=<chiave> node scripts/dispatch.mjs`. Ti stampa un
+   > `FILO_FEEDBACK_PRIVKEY=<chiave> node scripts/dispatch.mjs --ticket <biglietto>`
+   > (il `--ticket` mettilo solo se te l'ho dato). Ti stampa un
    > JSON `{ role, payload, claim, loopCount, instructions }`. Diventa quel
    > ruolo: le `instructions` sono il tuo file-ruolo, il `payload` è ciò su cui
    > lavori. Esegui il compito fino in fondo (report per l'utente → nelle
@@ -331,6 +355,31 @@ Firestore (via coda triage) e compaiono nella **chat del feedback in
 dashboard** — sono l'unica traccia dell'iter che l'owner vede.
 
 ---
+
+## Il canale del server — dove siamo (spec `ROUTINE-AUTH-SPEC.md`)
+
+Il canale autenticato esiste e funziona, ma **non ha ancora autorità**: le
+decisioni continuano a passare dalla coda su git. Oggi serve a una cosa sola —
+mettere accanto la scelta del server e quella di `dispatch.mjs`, così quando
+l'autorità si sposterà si saprà già se le due coincidono.
+
+| Chi | Cosa ha | Cosa ci fa |
+|---|---|---|
+| Orchestratore | la **parola d'ordine**, solo nel prompt | chiede un biglietto (passo 1b). Nient'altro |
+| Worker | il **biglietto**, passato dall'orchestratore | lo gira a `dispatch.mjs --ticket …`, che registra il confronto |
+| Server | la chiave privata in cassaforte + il database | sceglie il lavoro, decifra, tiene i semafori |
+
+Comandi (`scripts/routine-channel.mjs`): `ticket` · `work` · `heartbeat` ·
+`release` · `compare`. **Segreti come argomento, mai nell'ambiente.**
+
+Le parole d'ordine si creano e si revocano UNA PER ROUTINE dal backend
+(`routineKeys`, riservata all'owner): il segreto in chiaro si vede **una volta
+sola**, il server ne conserva solo l'impronta. Una revoca ferma anche i
+biglietti già in giro, non solo i prossimi.
+
+Il registro dei **rifiuti** (`routine-rejections`) e quello dei **confronti**
+(`routine-compare`) vivono su Firestore e sono per l'owner: un lavoratore che
+prova azioni fuori dal suo perimetro è il segnale che qualcuno l'ha manipolato.
 
 ## Macchina a stati del feedback
 
