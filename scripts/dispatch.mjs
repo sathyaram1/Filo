@@ -1457,16 +1457,12 @@ if (isMainModule) {
     } else {
       // Default: sceglie il bucket e stampa il JSON.
       //
-      // `--ticket <biglietto>` (#477.1, fase in cui i due canali convivono):
-      // registra sul server la differenza fra la scelta appena fatta qui e
-      // quella che il server aveva legato al biglietto. È un confronto, non una
-      // consegna: l'autorità resta a questo cammino, e se il canale non
-      // risponde non cambia niente per il giro in corso.
-      //
-      // Lo fa dispatch e non il worker perché il worker se ne dimenticherebbe:
-      // è la stessa lezione della provenienza dei feedback, dove su decine di
-      // ritrovamenti uno solo risultava firmato giusto finché a firmare doveva
-      // pensarci chi lavorava.
+      // `--ticket <biglietto>` (#477.2): con un biglietto il lavoro lo sceglie
+      // il SERVER e le consegne passano di lì. Il biglietto viene messo dove
+      // chi consegna lo ritrova da solo (vedi lib/routine-ticket.mjs): le
+      // consegne le fanno script diversi in momenti diversi, e pretendere che
+      // il lavoratore se lo ricordi ogni volta è la scommessa già persa sulla
+      // provenienza dei feedback.
       const ti = argv.indexOf('--ticket');
       const ticket = ti !== -1 ? argv[ti + 1] : '';
       // Il biglietto viene messo dove chi consegna lo ritrova da solo: le
