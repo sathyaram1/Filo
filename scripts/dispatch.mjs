@@ -1185,6 +1185,21 @@ export async function run() {
     return finalizeBucket(bucket, empty, cap0, opts0, { server: w });
   }
 
+  // ── Senza biglietto non si sceglie più niente ─────────────────────────────
+  //
+  // Scegliere il lavoro da qui vorrebbe dire leggere la coda, e leggere la coda
+  // vuole la chiave che apre TUTTI i feedback. Quella chiave non vive più su
+  // queste macchine (spec ROUTINE-AUTH-SPEC.md): chi legge testo scritto da
+  // sconosciuti non tiene segreti che valgono.
+  //
+  // Ci si ferma con un guasto DICHIARATO, non si ripiega sull'esplorazione: un
+  // giro che non riesce a sapere se c'è lavoro non è una giornata tranquilla, e
+  // travestirlo da audit è già costato un'ondata di lavoro fantasma.
+  if (!ticket) {
+    return emitHalt('transient',
+      'nessun biglietto: il lavoro lo sceglie il server, e senza biglietto questo giro non può sapere cosa fare');
+  }
+
   let snapshot;
   try {
     snapshot = await buildSnapshot();
