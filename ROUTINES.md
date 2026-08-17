@@ -356,6 +356,31 @@ dashboard** — sono l'unica traccia dell'iter che l'owner vede.
 
 ---
 
+## Il canale del server — dove siamo (spec `ROUTINE-AUTH-SPEC.md`)
+
+Il canale autenticato esiste e funziona, ma **non ha ancora autorità**: le
+decisioni continuano a passare dalla coda su git. Oggi serve a una cosa sola —
+mettere accanto la scelta del server e quella di `dispatch.mjs`, così quando
+l'autorità si sposterà si saprà già se le due coincidono.
+
+| Chi | Cosa ha | Cosa ci fa |
+|---|---|---|
+| Orchestratore | la **parola d'ordine**, solo nel prompt | chiede un biglietto (passo 1b). Nient'altro |
+| Worker | il **biglietto**, passato dall'orchestratore | lo gira a `dispatch.mjs --ticket …`, che registra il confronto |
+| Server | la chiave privata in cassaforte + il database | sceglie il lavoro, decifra, tiene i semafori |
+
+Comandi (`scripts/routine-channel.mjs`): `ticket` · `work` · `heartbeat` ·
+`release` · `compare`. **Segreti come argomento, mai nell'ambiente.**
+
+Le parole d'ordine si creano e si revocano UNA PER ROUTINE dal backend
+(`routineKeys`, riservata all'owner): il segreto in chiaro si vede **una volta
+sola**, il server ne conserva solo l'impronta. Una revoca ferma anche i
+biglietti già in giro, non solo i prossimi.
+
+Il registro dei **rifiuti** (`routine-rejections`) e quello dei **confronti**
+(`routine-compare`) vivono su Firestore e sono per l'owner: un lavoratore che
+prova azioni fuori dal suo perimetro è il segnale che qualcuno l'ha manipolato.
+
 ## Macchina a stati del feedback
 
 ```
