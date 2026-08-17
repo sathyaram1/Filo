@@ -14,7 +14,9 @@ eseguire. L'orchestratore non legge NIENTE: né metadati, né corpi, né screens
 ## Flusso dell'orchestratore
 
 Le routine schedulate su claude.ai partono con un prompt minimo
-(`"routine automatica. [chiave per decifrare i feedback]"`). Quell'attivazione **è l'orchestratore**.
+(`"routine automatica. [parola d'ordine]"`). Quell'attivazione **è l'orchestratore**.
+**La parola d'ordine sta solo lì, nel prompt: mai nell'ambiente**, che ogni
+lavoratore eredita.
 
 ### Avvio
 
@@ -24,7 +26,7 @@ Le routine schedulate su claude.ai partono con un prompt minimo
    ```
    Va esportata **qui nell'orchestratore**, così ogni worker la eredita, e
    ri-prefissata esplicitamente nei passaggi che perdono l'ambiente (`su tester -c`,
-   nuove shell) — come per la chiave privata.
+   nuove shell).
 
    Senza, il sistema non sa che sei una routine e **pubblica il tuo lavoro sul
    ramo principale a ogni modifica di file**, saltando la verifica e il cancello
@@ -38,8 +40,11 @@ Le routine schedulate su claude.ai partono con un prompt minimo
    binario Electron ~102MB, `scrot`): se il giro non è in grado di lavorare, va
    scoperto **prima** di averlo pagato.
    ```bash
-   FILO_FEEDBACK_PRIVKEY=<chiave> node scripts/dispatch.mjs --preflight
+   node scripts/routine-channel.mjs probe "<parola-d-ordine>"
    ```
+   Chiede al server se c'è lavoro **senza legare niente**: nessun biglietto,
+   nessun semaforo preso. (Un biglietto vero, chiesto adesso, terrebbe fermo un
+   feedback per tutta l'installazione e scadrebbe prima che qualcuno inizi.)
    - **0** → prosegui col passo 1.
    - **2** → **le routine autonome sono spente** dall'owner (tab Automazioni):
      **chiudi la sessione subito** riportando `niente da fare`. Non è un guasto e
@@ -201,35 +206,36 @@ Ripeti finché il budget è quasi pieno:
      sessione riportando `guasto <X>`. Meglio un giro saltato che un giro che
      scrive senza controlli.
 
-   Se non hai una parola d'ordine, salta questo passo: il giro ripiega sul
-   cammino vecchio (la coda su git), che funziona come prima.
+   **Senza parola d'ordine il giro non parte.** Non c'è più un cammino vecchio
+   su cui ripiegare: sceglierne uno vorrebbe dire leggere la coda, e per leggere
+   la coda serve la chiave che apre tutti i feedback — che da queste macchine è
+   uscita. Se non ce l'hai, chiudi la sessione riportando `guasto`.
 
 2. **Spawna UN worker generico** (tool Agent, `subagent_type: general-purpose`,
    `model: "opus"` — sempre Opus, mai Fable: consuma crediti — vedi
    § Sequenziale) con un prompt minimo:
 
-   > «Esporta SUBITO nell'ambiente la chiave che ti incollo qui sotto, e
-   > prefissala a OGNI invocazione degli script di routine:
-   > `FILO_FEEDBACK_PRIVKEY=<chiave> node scripts/dispatch.mjs --ticket <biglietto>`
-   > (il `--ticket` mettilo solo se te l'ho dato). Ti stampa un
+   > «Lancia `node scripts/dispatch.mjs --ticket <biglietto>` col biglietto che
+   > ti incollo qui sotto. Ti stampa un
    > JSON `{ role, payload, claim, loopCount, instructions }`. Diventa quel
    > ruolo: le `instructions` sono il tuo file-ruolo, il `payload` è ciò su cui
    > lavori. Esegui il compito fino in fondo (report per l'utente → nelle
-   > `notes` del feedback su Firestore, NON a me). **La tua ULTIMA riga è
+   > `notes` del feedback, NON a me). **La tua ULTIMA riga è
    > l'UNICA cosa che leggo, e deve essere ESATTAMENTE una di queste, senza
    > nient'altro dopo:** `fatto <X>` | `niente da fare` | `budget pieno` |
    > `guasto <X>`. Niente report, diff, id, nomi di file o spiegazioni nella riga
    > finale: io sono cieco per design.»
 
-   ⚠️ **La chiave è OBBLIGATORIA in ogni invocazione** (incident 2026-07-09/11,
-   feedback #310+): arriva all'orchestratore nel prompt della schedulazione e va
-   passata a OGNI worker, che la mette in `FILO_FEEDBACK_PRIVKEY` per OGNI
-   comando `node scripts/…` (dispatch, next-feedback, queue-*). Senza, gli
-   status cifrati non si leggono e la coda piena "sembra vuota": il giro finisce
-   in audit invece di lavorare i feedback. Attenzione ai passaggi che PERDONO
-   l'ambiente (`su tester -c`, nuove shell): lì la chiave va ri-prefissata
-   esplicitamente. Il sintomo nei log è `ATTENZIONE: N/N status non
-   decifrabili`.
+   ⚠️ **Il biglietto è OBBLIGATORIO.** Senza, `dispatch.mjs` si ferma con un
+   guasto e non sceglie niente — e fa bene: scegliere vorrebbe dire leggere la
+   coda, e leggere la coda vorrebbe dire avere qui la chiave che apre TUTTI i
+   feedback. Quella chiave **non vive più su queste macchine** (spec
+   `ROUTINE-AUTH-SPEC.md`): sta in cassaforte sul server, che consegna a ogni
+   ruolo solo il suo pezzo, già in chiaro.
+
+   **Non c'è più nessuna chiave da incollare, e nessuna variabile d'ambiente da
+   esportare.** Se in una recipe vecchia trovi `FILO_FEEDBACK_PRIVKEY`, quella
+   recipe è scaduta: toglila, non cercare la chiave.
 
    **Perché conta** (sessione 2026-07-09): i worker hanno restituito report interi
    invece della riga secca → l'orchestratore ha ricevuto dettagli specifici che
@@ -365,8 +371,20 @@ lì**. La coda su git resta solo come ripiego per quando il server non risponde.
 | Worker | il **biglietto**, passato dall'orchestratore | lo gira a `dispatch.mjs --ticket …`; da lì in poi lo ritrovano da soli tutti gli script che consegnano |
 | Server | la chiave privata in cassaforte + il database | sceglie il lavoro, decifra, tiene i semafori, valida ogni consegna |
 
-Comandi (`scripts/routine-channel.mjs`): `ticket` · `work` · `heartbeat` ·
-`release` · `deliver` · `compare`. **Segreti come argomento, mai nell'ambiente.**
+Comandi (`scripts/routine-channel.mjs`): `probe` · `ticket` · `work` ·
+`heartbeat` · `release` · `deliver` · `compare`. **Segreti come argomento, mai
+nell'ambiente.**
+
+**La chiave dei feedback non vive più qui.** Nessuno script di routine ne ha
+bisogno: il lavoro arriva già in chiaro dal server, ritagliato al ruolo. Se una
+recipe vecchia la nomina, quella recipe è scaduta.
+
+⚠️ **Fin dove arriva l'isolamento, per essere onesti.** Senza chiave, il
+**testo** dei feedback recenti è illeggibile per chi non deve vederlo. Ma le
+**note** della lavorazione, i **titoli** e il testo dei feedback più vecchi sono
+ancora in chiaro su un database a lettura pubblica: lì il confine è ancora una
+regola scritta, non un muro. Chiuderlo davvero è il pezzo che separa la frase
+per l'utente dal report cifrato per l'owner.
 
 ### RIFIUTO ≠ GUASTO (la regola che regge tutto)
 

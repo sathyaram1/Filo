@@ -145,7 +145,11 @@ export function resolveLoopCap({ envRaw, remote } = {}) {
  */
 async function fetchRoutineConfig() {
   const fa = await import('./lib/firestore-auth.mjs');
-  const url = `${fa.FIRESTORE_BASE}/${ROUTINES_DOC}?key=${fa.FIREBASE_API_KEY}`;
+  // `FILO_ROUTINE_CONFIG_URL`: da dove si legge l'interruttore. Esiste per i
+  // controlli, che devono poter esercitare il giro intero senza rete — non è
+  // un segreto e non cambia niente in produzione, dove non è impostata.
+  const url = process.env.FILO_ROUTINE_CONFIG_URL
+    || `${fa.FIRESTORE_BASE}/${ROUTINES_DOC}?key=${fa.FIREBASE_API_KEY}`;
   const read = async () => {
     const res = await fetch(url);
     if (res.status === 404) return {};            // mai scritto: default
@@ -643,7 +647,12 @@ export function buildPayload(bucket, ctx = {}) {
         id: bucket.id,
         num: bucket.num,
         feedback: ctx.feedback || null,
-        verifierCritique: bucket.state?.verifierCritique || '',
+        // La critica del SERVER viene prima di quella del fogliettino locale:
+        // è il server che registra i verdetti, e il fogliettino sparirà con la
+        // coda. Sta sul bucket e non nello stato perché lo stato viene
+        // riscritto quando ci si posiziona sul ramo — ed è così che la critica
+        // spariva senza che nessuno se ne accorgesse.
+        verifierCritique: bucket.serverCritique || bucket.state?.verifierCritique || '',
         loopCount: bucket.loopCount || 0,
       };
     case 'new-work':
@@ -1036,7 +1045,7 @@ async function recordSecaudit(id, verdict) {
  * @param {() => Promise<object>} [readConfig] iniettabile per i test
  * @returns {Promise<{ok:true}|{ok:false, kind:string, message:string}>}
  */
-export async function preflight(build = buildSnapshot, readConfig = fetchRoutineConfig) {
+export async function preflight(_unused = null, readConfig = fetchRoutineConfig) {
   try {
     const cfg = await readConfig();
     if (!resolveRoutinesEnabled({ envRaw: process.env.FILO_ROUTINES_ENABLED, remote: cfg.enabled })) {
@@ -1046,14 +1055,12 @@ export async function preflight(build = buildSnapshot, readConfig = fetchRoutine
     if (e?.faultKind) return { ok: false, kind: e.faultKind, message: e.message };
     return { ok: false, kind: 'transient', message: `interruttore delle routine illeggibile: ${e?.message || e}` };
   }
-  try {
-    await build();
-    return { ok: true };
-  } catch (e) {
-    if (e?.faultKind) return { ok: false, kind: e.faultKind, message: e.message };
-    process.stderr.write(`[dispatch] prontezza: stato illeggibile (${e?.message || e}) → il giro ripiegherà sull'audit\n`);
-    return { ok: true };
-  }
+  // Qui finisce ciò che questa macchina può ancora sapere da sola. "C'è
+  // lavoro?" richiede di leggere la coda, e leggere la coda richiede la chiave
+  // che apre tutti i feedback — che da qui è uscita. Quella domanda la fa
+  // l'orchestratore al server (`routine-channel.mjs probe`), che è anche il
+  // solo che ha la parola d'ordine per chiederlo.
+  return { ok: true };
 }
 
 /**
@@ -1164,6 +1171,14 @@ export async function run() {
       // è una giornata tranquilla, è un giro che non deve partire.
       return emitHalt('transient', `il canale non consegna il lavoro (${w.reason})`);
     }
+    // La busta va guardata PRIMA di consegnarla. Un ruolo che qui non esiste
+    // arriverebbe al lavoratore senza istruzioni e senza contenuto; un ruolo
+    // dell'iter senza il suo ramo farebbe lavorare sull'albero sbagliato. In
+    // entrambi i casi ci si ferma: consegnare mezza busta è peggio che non
+    // consegnarne nessuna, perché sembra un giro riuscito.
+    const bad = checkEnvelope(w);
+    if (bad) return emitHalt('transient', bad);
+
     const bucket = {
       role: w.role,
       id: w.id || undefined,
@@ -1177,12 +1192,38 @@ export async function run() {
       // divergono in silenzio.
       const prev = readState(bucket.id) || defaultState(bucket.id, bucket.branch);
       bucket.state = { ...prev, id: bucket.id, branch: bucket.branch || prev.branch || '' };
+      // La critica di chi ha bocciato la tiene il SERVER: è lui che registra i
+      // verdetti. Il fogliettino su git resta come tappabuchi finché esiste —
+      // ma quando sparirà, se non si leggesse quella del server la correzione
+      // partirebbe alla cieca senza che nessuno se ne accorga.
+      //
+      // Va tenuta sul bucket, NON nello stato: lo stato viene riscritto da capo
+      // quando la cartella si posiziona sul ramo, e lì la critica del server si
+      // perdeva in silenzio.
       if (w.payload && typeof w.payload.critique === 'string' && w.payload.critique) {
-        bucket.state.verifierCritique = w.payload.critique;
+        bucket.serverCritique = w.payload.critique;
       }
     }
     const empty = { reviews: [], todoWinner: null };
-    return finalizeBucket(bucket, empty, cap0, opts0, { server: w });
+    // La busta si passa COM'È: incartarla in un altro oggetto ha già fatto
+    // arrivare al lavoratore un pacchetto vuoto, con il giro che usciva
+    // dicendo che era tutto a posto.
+    return finalizeBucket(bucket, empty, cap0, opts0, w);
+  }
+
+  // ── Senza biglietto non si sceglie più niente ─────────────────────────────
+  //
+  // Scegliere il lavoro da qui vorrebbe dire leggere la coda, e leggere la coda
+  // vuole la chiave che apre TUTTI i feedback. Quella chiave non vive più su
+  // queste macchine (spec ROUTINE-AUTH-SPEC.md): chi legge testo scritto da
+  // sconosciuti non tiene segreti che valgono.
+  //
+  // Ci si ferma con un guasto DICHIARATO, non si ripiega sull'esplorazione: un
+  // giro che non riesce a sapere se c'è lavoro non è una giornata tranquilla, e
+  // travestirlo da audit è già costato un'ondata di lavoro fantasma.
+  if (!ticket) {
+    return emitHalt('transient',
+      'nessun biglietto: il lavoro lo sceglie il server, e senza biglietto questo giro non può sapere cosa fare');
   }
 
   let snapshot;
@@ -1297,6 +1338,74 @@ function positionOnBranch(bucket) {
   return { ok: true, branch };
 }
 
+/**
+ * Il contesto del ruolo, ricavato dalla busta del server. PURA (testata in
+ * tests/unit/routineTicket.test.mjs).
+ *
+ * Vive fuori da `finalizeBucket` per una ragione precisa: qui è già passato due
+ * volte lo stesso errore — il contenuto cercato un livello più su di dov'era,
+ * e nessuno se n'è accorto perché il ripiego lo copriva e poi, tolto il
+ * ripiego, il campo arrivava semplicemente nullo. Un giro che consegna un
+ * pacchetto vuoto ed esce dicendo che è andato tutto bene è il modo peggiore di
+ * rompersi. Estratta e pura, la cosa ha un test che la guarda.
+ *
+ * @param {{role:string, branch?:string}} bucket
+ * @param {{payload?:object}|null} fromServer  la busta, COM'È
+ * @param {string} diff  le differenze del ramo (solo per il controllo sicurezza)
+ */
+// I ruoli che questa macchina sa eseguire. Un ruolo fuori da qui non è un
+// lavoro: è una busta che non sappiamo aprire.
+const RUOLI_LAVORABILI = ['secaudit', 'verifier', 'fixer', 'new-work', 'prober'];
+// Chi lavora su un ramo esistente: senza, non c'è niente su cui posizionarsi.
+const RUOLI_CON_RAMO = ['secaudit', 'verifier', 'fixer'];
+
+/**
+ * La busta è consegnabile? PURA. Ritorna null se va bene, altrimenti il motivo
+ * del guasto, già scritto per chi legge i log.
+ */
+// Chi ha bisogno di leggere il feedback per poter lavorare: senza, il compito
+// è vuoto anche se la busta è formalmente in ordine.
+const RUOLI_CON_FEEDBACK = ['verifier', 'fixer', 'new-work'];
+
+export function checkEnvelope(w) {
+  const role = String((w && w.role) || '');
+  if (!RUOLI_LAVORABILI.includes(role)) {
+    return `il server ha assegnato un ruolo che questa versione non sa eseguire ("${role || 'nessuno'}")`;
+  }
+  if (RUOLI_CON_RAMO.includes(role) && !String((w && w.branch) || '')) {
+    return `lavoro "${role}" senza il ramo su cui lavorare`;
+  }
+  if (role !== 'prober' && !String((w && w.id) || '')) {
+    return `lavoro "${role}" senza il feedback a cui si riferisce`;
+  }
+  // La busta può essere formalmente perfetta e VUOTA dentro: succede se il
+  // server non riesce a leggere il documento. Guardare solo ruolo, ramo e
+  // indirizzo lascerebbe passare un compito senza compito — la stessa forma di
+  // guasto silenzioso di prima, entrata dalla porta del server invece che da
+  // quella di casa.
+  if (RUOLI_CON_FEEDBACK.includes(role)) {
+    const testo = String(((w && w.payload && w.payload.feedback) || {}).text || '').trim();
+    if (!testo) return `lavoro "${role}" con il feedback vuoto: non c'è niente su cui lavorare`;
+  }
+  return null;
+}
+
+export function serverCtx(bucket, fromServer, diff = '') {
+  const role = bucket && bucket.role;
+  const payload = (fromServer && fromServer.payload) || null;
+  // Il controllo di sicurezza: il diff se lo calcola da git, che è pubblico e
+  // non chiede nessuna chiave. Del feedback non riceve niente, e non è più una
+  // consegna da rispettare — senza chiave, il testo cifrato per lui è un blob.
+  if (role === 'secaudit') return { diff };
+  if (role === 'verifier' || role === 'fixer' || role === 'new-work') {
+    // Il feedback arriva GIÀ DECIFRATO dal server. Non c'è nessun ripiego che
+    // se lo vada a rileggere: il ripiego sarebbe la chiave, ed è proprio ciò
+    // che da qui è stato tolto.
+    return { feedback: (payload && payload.feedback) || null };
+  }
+  return {};
+}
+
 async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP, opts = {}, fromServer = null) {
   // Coda vuota con l'esplorazione spenta dall'owner (#448): non c'è niente da
   // fare, e non c'è niente da riparare. Nessun worker, nessun claim, nessun
@@ -1367,6 +1476,14 @@ async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP, opts = {}, fromS
         clearState(bucket.id);
         persistStateToGit(bucket.id, `feedback: clear-state ${bucket.id}`);
         process.stderr.write(`[dispatch] ${bucket.id}: ${pos.message} → design\n`);
+        if (fromServer) {
+          // Col biglietto non si ripiega su un altro lavoro: il biglietto vale
+          // per QUESTO feedback e per nessun altro, e mettersi a esplorare
+          // tenendoselo in mano lascia il semaforo preso su un lavoro che
+          // nessuno sta facendo — con il giro che esce dicendo che è andato
+          // tutto bene.
+          return emitHalt('permanent', pos.message);
+        }
         const next = { reviews: snapshot.reviews.filter((r) => r.id !== bucket.id), todoWinner: snapshot.todoWinner?.id === bucket.id ? null : snapshot.todoWinner };
         return finalizeBucket(chooseBucket(next, cap), next, cap);
       }
@@ -1375,37 +1492,16 @@ async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP, opts = {}, fromS
   }
 
   // Raccogli il contesto specifico del ruolo (rispettando l'isolamento).
-  //
-  // Col biglietto il feedback arriva GIÀ DECIFRATO dal server, ritagliato a ciò
-  // che il ruolo può vedere: non lo si va a rileggere da soli, o si
-  // rimetterebbe in piedi proprio il cammino che la spec vuole togliere.
-  const ctx = {};
-  const served = fromServer && fromServer.payload;
-  if (bucket.role === 'secaudit') {
-    ctx.diff = diffForBranch(bucket.branch);
-  } else if (bucket.role === 'verifier' || bucket.role === 'fixer') {
-    ctx.feedback = (served && served.feedback) || (await decryptOne(bucket.id));
-  } else if (bucket.role === 'new-work') {
-    ctx.feedback = (served && served.feedback) || snapshot.todoWinner?._full || (await decryptOne(bucket.id));
-  }
+  const ctx = serverCtx(bucket, fromServer,
+    bucket.role === 'secaudit' ? diffForBranch(bucket.branch) : '');
 
   emit(bucket, ctx);
   await recordWorkerSpawn(bucket);
   return { exit: 0 };
 }
 
-// Decifra il corpo completo di UN feedback (per verifier/fixer/new-work).
-async function decryptOne(id) {
-  try {
-    const { fetchOpenCandidates } = await import('./next-feedback.mjs');
-    const { decryptFeedbackFields } = await import('./lib/decrypt-feedback-fields.mjs');
-    const raw = await fetchOpenCandidates();
-    const doc = raw.find((d) => d._id === id);
-    return doc ? await decryptFeedbackFields(doc) : null;
-  } catch (_) {
-    return null;
-  }
-}
+// (Qui viveva la decifratura del feedback su questa macchina. È stata tolta con
+// la chiave: il testo arriva già in chiaro dal server, ritagliato al ruolo.)
 
 // L'ultima scelta consegnata, per il confronto col canale del server (#477.1).
 // La scrive `emit`, che è il punto unico in cui dispatch dichiara cosa ha

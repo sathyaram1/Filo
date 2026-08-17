@@ -29,6 +29,10 @@
 //   fermati: stai ricreando il problema.
 //
 // USO
+//   node scripts/routine-channel.mjs probe <parola-d-ordine>
+//       → c'è lavoro? Non lega niente. Exit 0 = sì, 2 = niente da fare,
+//         3 = guasto. Da chiedere PRIMA di pagare il setup dell'ambiente.
+//
 //   node scripts/routine-channel.mjs ticket <parola-d-ordine>
 //       → stampa il biglietto su stdout (una riga), oppure "niente da fare".
 //         Exit 0 = biglietto, 2 = niente da fare, 3 = guasto (il giro si ferma).
@@ -118,10 +122,52 @@ export async function ticket(passphrase, opts) {
   return readTicketReply(status, body);
 }
 
+/**
+ * Prontezza: c'è lavoro? Non lega niente e non prende semafori.
+ *
+ * Va chiesto PRIMA del setup dell'ambiente, che costa parecchio (installazione,
+ * binario da un centinaio di mega): se il giro non è in grado di lavorare va
+ * scoperto prima di averlo pagato. Un biglietto vero, chiesto in quel momento,
+ * terrebbe un feedback fermo per tutta l'installazione e scadrebbe prima che
+ * qualcuno inizi a lavorarci.
+ *
+ * @returns {{ outcome:'work'|'nothing'|'fault', reason?: string }}
+ */
+export async function probe(passphrase, opts) {
+  const { status, body } = await call('routineTicket', { passphrase, probe: true }, opts);
+  const b = body || {};
+  if (status === 200 && b.ok && b.work === true) return { outcome: 'work' };
+  if (status === 200 && b.ok && b.work === false) return { outcome: 'nothing', reason: String(b.reason || '') };
+  return { outcome: 'fault', reason: String(b.reason || `http_${status}`) };
+}
+
+/**
+ * Ritira il proprio lavoro. Torna la BUSTA INTERA, non solo il payload.
+ *
+ * La busta è ruolo, indirizzo del feedback, numero e ramo: serve a chi guida il
+ * giro per prendere in carico, posizionarsi sul ramo giusto e consegnare. Il
+ * payload è il contenuto, già ritagliato a ciò che quel ruolo può vedere.
+ *
+ * Tenerne solo metà è già costato un giro intero: senza il ruolo, chi guida
+ * consegnava al lavoratore una busta vuota e usciva dicendo che era andato
+ * tutto bene — un guasto totale travestito da giro riuscito. Se aggiungi campi
+ * lato server, aggiungili anche qui.
+ */
 export async function work(t, opts) {
   const { status, body } = await call('routineWork', { ticket: t }, opts);
-  if (status === 200 && body && body.ok) return { ok: true, payload: body.payload };
-  return { ok: false, reason: String((body && body.reason) || `http_${status}`) };
+  if (status === 200 && body && body.ok && body.role) {
+    return {
+      ok: true,
+      role: String(body.role),
+      id: String(body.id || ''),
+      num: String(body.num || ''),
+      branch: String(body.branch || ''),
+      payload: body.payload || {},
+    };
+  }
+  // Una risposta "riuscita" ma senza ruolo non è un lavoro: è una busta vuota,
+  // e va trattata come guasto invece di essere consegnata a qualcuno.
+  return { ok: false, reason: String((body && body.reason) || (status === 200 ? 'busta_incompleta' : `http_${status}`)) };
 }
 
 export async function heartbeat(t, opts) {
@@ -203,7 +249,12 @@ if (isMain) {
 
   if (!cmd || !args[0]) usage();
 
-  if (cmd === 'ticket') {
+  if (cmd === 'probe') {
+    const r = await probe(args[0]);
+    if (r.outcome === 'work') { console.log('c’è lavoro'); process.exit(0); }
+    if (r.outcome === 'nothing') { console.error(`niente da fare (${r.reason})`); process.exit(2); }
+    console.error(`guasto ${r.reason}`); process.exit(3);
+  } else if (cmd === 'ticket') {
     const r = await ticket(args[0]);
     if (r.outcome === 'work') { console.log(r.ticket); process.exit(0); }
     if (r.outcome === 'nothing') { console.error(`niente da fare (${r.reason})`); process.exit(2); }
