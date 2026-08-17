@@ -30,7 +30,7 @@ NON implementare tutto in una volta.
    la domanda specifica (il resto della spec procede comunque).
 3. Chiudi il feedback-spec:
    ```bash
-   node scripts/queue-triage.mjs <id> done \
+   node scripts/routine-channel.mjs deliver status --status done \
      "Spec pianificata e spezzata in #<num>.1–#<num>.N: <una riga per sub>"
    ```
 4. Se resta abbastanza contesto, parti subito col primo sub (è un fix normale,
@@ -93,7 +93,7 @@ Poi metti il feedback in `revision_capability` col branch — il prossimo giro d
 dispatch lo instraderà al **verifier**:
 
 ```bash
-node scripts/queue-triage.mjs <id> revision_capability "[il tuo report]" --branch worker/<id>
+node scripts/routine-channel.mjs deliver status --status revision_capability "[il tuo report]" --branch worker/<id>
 ```
 
 Se il feedback è ambiguo / richiede una decisione di design / mancano
@@ -104,7 +104,7 @@ scappatoia.
 
 L'orchestratore è **cieco** e legge **solo la tua ultima riga** — è un *dato di
 controllo* (continua/fermati), non un canale di report. Tutto ciò che vuoi dire
-all'utente va nelle `notes` del feedback (via `queue-triage.mjs`), NON nella riga
+all'utente va nelle `notes` del feedback (via il canale del server), NON nella riga
 di ritorno.
 
 La tua **ultima riga** deve essere **ESATTAMENTE** una di queste, senza
@@ -119,7 +119,7 @@ deve ignorare: è un bug del ruolo, non un extra utile.
 
 ## Se il server RIFIUTA una consegna
 
-Gli script che consegnano (queue-triage, queue-feedback, i `--record-*`) passano
+Gli script che consegnano (le consegne del canale e i `--record-*`) passano
 dal canale del server. Se escono con **4** ("RIFIUTATO dal server") la tua
 decisione **non è stata registrata da nessuna parte**, e non va aggirata
 depositandola sulla coda su git: il server ha guardato ruolo, ramo e stato vero
