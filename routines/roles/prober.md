@@ -90,3 +90,13 @@ nient'altro dopo (niente id, nomi di file, diff, spiegazioni, report):
 
 Se ci infili un report, l'orchestratore riceve dettagli specifici che per design
 deve ignorare: è un bug del ruolo, non un extra utile.
+
+## Se il server RIFIUTA una consegna
+
+Gli script che consegnano (queue-triage, queue-feedback, i `--record-*`) passano
+dal canale del server. Se escono con **4** ("RIFIUTATO dal server") la tua
+decisione **non è stata registrata da nessuna parte**, e non va aggirata
+depositandola sulla coda su git: il server ha guardato ruolo, ramo e stato vero
+e ha detto no. Leggi il motivo, correggi se puoi, altrimenti fermati e riportalo
+nella riga finale come guasto. Uscita **3** invece è il server che non risponde:
+lì il ripiego sulla coda parte da solo.
