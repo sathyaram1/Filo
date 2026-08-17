@@ -1183,8 +1183,12 @@ export async function run() {
       // divergono in silenzio.
       const prev = readState(bucket.id) || defaultState(bucket.id, bucket.branch);
       bucket.state = { ...prev, id: bucket.id, branch: bucket.branch || prev.branch || '' };
-      if (w.payload && typeof w.payload.critique === 'string' && w.payload.critique) {
-        bucket.state.verifierCritique = w.payload.critique;
+      // La critica di chi ha bocciato la tiene il SERVER: è lui che registra i
+      // verdetti. Il fogliettino su git resta come tappabuchi finché esiste —
+      // ma quando sparirà, se non si leggesse quella del server la correzione
+      // partirebbe alla cieca senza che nessuno se ne accorga.
+      if (w.payload && typeof w.payload.critique === 'string') {
+        bucket.state.verifierCritique = w.payload.critique || bucket.state.verifierCritique || '';
       }
     }
     const empty = { reviews: [], todoWinner: null };
