@@ -1268,7 +1268,7 @@ function positionOnBranch(bucket) {
   return { ok: true, branch };
 }
 
-async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP, opts = {}) {
+async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP, opts = {}, fromServer = null) {
   // Coda vuota con l'esplorazione spenta dall'owner (#448): non c'è niente da
   // fare, e non c'è niente da riparare. Nessun worker, nessun claim, nessun
   // ritorno alla linea principale: il giro finisce sereno con exit 0.
