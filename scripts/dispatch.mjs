@@ -1192,8 +1192,12 @@ export async function run() {
       // verdetti. Il fogliettino su git resta come tappabuchi finché esiste —
       // ma quando sparirà, se non si leggesse quella del server la correzione
       // partirebbe alla cieca senza che nessuno se ne accorga.
-      if (w.payload && typeof w.payload.critique === 'string') {
-        bucket.state.verifierCritique = w.payload.critique || bucket.state.verifierCritique || '';
+      //
+      // Va tenuta sul bucket, NON nello stato: lo stato viene riscritto da capo
+      // quando la cartella si posiziona sul ramo, e lì la critica del server si
+      // perdeva in silenzio.
+      if (w.payload && typeof w.payload.critique === 'string' && w.payload.critique) {
+        bucket.serverCritique = w.payload.critique;
       }
     }
     const empty = { reviews: [], todoWinner: null };
