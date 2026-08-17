@@ -230,3 +230,36 @@ test('scrivere un biglietto vuoto non crea un marcatore fasullo', () => {
     assert.equal(readTicket(root), '');
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+// ── La consegna dalla riga di comando ───────────────────────────────────────
+//
+// REGRESSIONE VERA: le ricette dei ruoli passavano il report come ultimo
+// argomento posizionale. Il canale raccoglieva solo i `--campo valore`, quindi
+// il report veniva scartato IN SILENZIO: la consegna usciva "OK", il feedback
+// si chiudeva, e le note restavano vuote — l'owner senza niente da leggere.
+// Adesso un argomento non capito ferma la consegna invece di essere ignorato.
+
+import { spawnSync } from 'node:child_process';
+
+const CANALE = resolve(fileURLToPath(new URL('../../scripts/routine-channel.mjs', import.meta.url)));
+
+function lancia(argomenti) {
+  return spawnSync(process.execPath, [CANALE, ...argomenti], {
+    encoding: 'utf8',
+    env: { ...process.env, FILO_ROUTINE_TICKET: 'biglietto-finto', FILO_ROUTINE_API: 'http://127.0.0.1:1' },
+  });
+}
+
+test('un report passato come argomento sciolto FERMA la consegna, non viene scartato', () => {
+  const r = lancia(['deliver', 'status', '--status', 'done', 'il mio report per l owner']);
+  assert.notEqual(r.status, 0, 'non deve uscire come se fosse andata bene');
+  assert.match(r.stderr, /Argomento non capito/);
+  assert.match(r.stderr, /--notes/, 'deve dire dove va messo il report');
+});
+
+test('la stessa consegna con --notes non viene fermata dalla guardia', () => {
+  // Il server finto non esiste (porta 1): ci si aspetta un guasto di rete, NON
+  // il rifiuto della guardia sugli argomenti.
+  const r = lancia(['deliver', 'status', '--status', 'done', '--notes', 'il mio report']);
+  assert.equal(/Argomento non capito/.test(r.stderr), false);
+});
