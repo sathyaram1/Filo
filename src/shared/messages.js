@@ -371,6 +371,12 @@
     // scrive scripts/dispatch.mjs a ogni spawn; lo legge la tab "Log" della
     // dashboard Gestione. Owner-only, sola lettura dal client.
     WORKER_LOG_GET: 'worker_log_get',              // → { ok, entries:[{role,startedAt,num}] } | { ok:false, error }
+    // Registri del canale autenticato delle routine (spec ROUTINE-AUTH-SPEC.md):
+    // i RIFIUTI (una richiesta fuori dal perimetro del biglietto è il segnale
+    // che qualcuno ha manipolato un lavoratore) e i CONFRONTI fra la scelta del
+    // cammino su git e quella del server. Vivono in collezioni che nessun client
+    // può leggere: si passa dalla callable owner-only del backend di sicurezza.
+    ROUTINE_LOG_GET: 'routine_log_get',            // → { ok, rejections:[…], comparisons:[…] } | { ok:false, error }
     WEB_SEARCH: 'web_search',                      // { query } → { ok, results: [{title,url,snippet}], provider }
 
     // === Rilevamento siti pericolosi (src/main/services/safebrowse/) ===
