@@ -133,6 +133,9 @@ async function avvisa() {
 }
 
 main().catch((e) => {
+  // Un errore INATTESO non deve fermare la pubblicazione (le chiavi vuote sono
+  // gestite dentro main, che si ferma da sé): qui si scrive un file valido e si
+  // prosegue.
   // Anche in caso di errore inatteso, scriviamo un file vuoto valido così il
   // build non si rompe e l'app parte (chiavi vuote = utente configura le sue).
   console.warn('[bake] errore non fatale:', e.message);
