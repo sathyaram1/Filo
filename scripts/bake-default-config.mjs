@@ -24,7 +24,8 @@
 // SICUREZZA
 //   - Lo script NON stampa mai i valori delle chiavi (solo "presente/assente").
 //   - Il file generato è gitignorato: non torna mai nel repo pubblico.
-//   - Se manca la parola d'ordine, lo script NON fallisce: degrada ai secret env.
+//   - Se manca la parola d'ordine si degrada ai secret del job; se manca ANCHE
+//     quello, ci si ferma (vedi sopra).
 //   - Prima qui c'era il token dell'account ROBOT: una credenziale piena, che
 //     apriva le chiavi API a pagamento dell'owner e viveva nell'ambiente — e un
 //     ambiente lo eredita chiunque ci passi. Adesso il segreto fa una cosa sola
