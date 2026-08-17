@@ -436,9 +436,9 @@ todo
 - **Niente arriva su `main` prima del PASS del verifier + secaudit.** Le modifiche
   restano su `worker/*`; l'hook le committa e pusha sul branch ma NON le fonde su
   `main` — solo `merge-gate.mjs` (lanciato dal worker secaudit) lo fa.
-- I cambi di stato (`working`/`revision_*`/`done`/`design`) li accoda **il worker**
-  via `queue-triage.mjs` (vocabolario completo in `FEEDBACK-STATES.md`);
-  l'orchestratore non tocca Firestore.
+- I cambi di stato (`working`/`revision_*`/`done`/`design`) li consegna **il
+  worker** al server, che li valida prima di scriverli (vocabolario completo in
+  `FEEDBACK-STATES.md`); l'orchestratore non tocca niente.
 
 ---
 
