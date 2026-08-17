@@ -1391,23 +1391,8 @@ async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP, opts = {}, fromS
   }
 
   // Raccogli il contesto specifico del ruolo (rispettando l'isolamento).
-  //
-  // Col biglietto il feedback arriva GIÀ DECIFRATO dal server, ritagliato a ciò
-  // che il ruolo può vedere: non lo si va a rileggere da soli, o si
-  // rimetterebbe in piedi proprio il cammino che la spec vuole togliere.
-  const ctx = {};
-  const served = fromServer && fromServer.payload;
-  if (bucket.role === 'secaudit') {
-    // Il diff se lo calcola da git, che è pubblico e non chiede nessuna chiave.
-    // Del feedback non riceve niente, e adesso non è più una consegna da
-    // rispettare: senza chiave, per lui quel documento è un blob illeggibile.
-    ctx.diff = diffForBranch(bucket.branch);
-  } else if (bucket.role === 'verifier' || bucket.role === 'fixer' || bucket.role === 'new-work') {
-    // Il feedback arriva GIÀ DECIFRATO dal server. Non c'è nessun ripiego che
-    // se lo vada a rileggere: il ripiego sarebbe la chiave, ed è proprio ciò
-    // che da qui è stato tolto.
-    ctx.feedback = (served && served.feedback) || null;
-  }
+  const ctx = serverCtx(bucket, fromServer,
+    bucket.role === 'secaudit' ? diffForBranch(bucket.branch) : '');
 
   emit(bucket, ctx);
   await recordWorkerSpawn(bucket);
