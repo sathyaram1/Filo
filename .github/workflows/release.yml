@@ -96,7 +96,7 @@ jobs:
       - name: Controlli falliti - apri un feedback e fermati
         if: steps.check.outputs.should_release == 'true' && steps.gate.outcome == 'failure'
         env:
-          FILO_FEEDBACK_PRIVKEY: ${{ secrets.FILO_FEEDBACK_PRIVKEY }}
+          FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
         shell: bash
         run: |
           echo "::error::Controlli automatici rossi: pubblicazione annullata."
