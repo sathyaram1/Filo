@@ -838,16 +838,9 @@ async function buildSnapshot() {
 
 // ─── Sotto-comandi --record-* (li chiamano i ruoli) ──────────────────────────
 
-// Riflesso della macchina a stati (best-effort): l'esito del verifier muove lo
-// status persistito, così la dashboard vede l'iter avanzare senza aspettare i
-// report dei ruoli. Il lock/iter vero resta nei file di stato locali.
-function queueStatus(id, status, note = '', reason = '') {
-  try {
-    const args = [resolve(ROOT, 'scripts', 'queue-triage.mjs'), id, status, note];
-    if (reason) args.push('--reason', reason);
-    execFileSync('node', args, { cwd: ROOT, encoding: 'utf8', stdio: 'ignore' });
-  } catch (_) { /* best-effort */ }
-}
+// (Qui viveva il ripiego sulla coda su git. È sparito con la coda: adesso o la
+// decisione la registra il server, o non è stata registrata — e chi lavora lo
+// sa, invece di credere che sia andata.)
 
 /**
  * Consegna una decisione al canale del server (#477.2). È la strada
@@ -928,11 +921,9 @@ function guardIdentity(id) {
         { cwd: ROOT, encoding: 'utf8', stdio: 'ignore' });
     } catch (_) { /* la nota resta in coda al prossimo giro */ }
     clearState(id);
-    persistStateToGit(id, `feedback: clear-state ${id}`);
     return { ok: false, message: `${base} — terzo rifiuto consecutivo: feedback portato in design` };
   }
   writeState(b.state);
-  persistStateToGit(id, `feedback: identita non corrispondente ${id}`);
   return { ok: false, message: `${base} (rifiuto ${b.count}/${IDENTITY_REJECT_LIMIT}); il feedback resta dov'era e verrà ripescato` };
 }
 
@@ -968,7 +959,6 @@ async function recordVerifier(id, verdict, critique) {
   }
 
   sealTransition(next, `verifier:${verdict}`);
-  persistStateToGit(id, `feedback: verifier ${verdict} ${id}`);
   if (sent.outcome === 'ok') return next;
 
   // Ripiego: PASS → aspetta l'audit di sicurezza; FAIL → resta/torna in verifica
@@ -991,7 +981,6 @@ async function recordFixed(id, report = '') {
   }
 
   sealTransition(next, 'fixer:consegna');
-  persistStateToGit(id, `feedback: fixed ${id}`);
   if (sent.outcome === 'ok') return next;
 
   // Ripiego: fix ri-applicato → torna in attesa della verifica comportamentale.
@@ -1013,7 +1002,6 @@ async function recordSecaudit(id, verdict) {
   }
 
   sealTransition(next, `secaudit:${verdict}`);
-  persistStateToGit(id, `feedback: secaudit ${verdict} ${id}`);
   // Senza canale non si accodava niente nemmeno prima: il passaggio a `done`
   // (o a `design` su bocciatura) lo fa il ruolo dopo il cancello di fusione.
   return next;
@@ -1241,7 +1229,6 @@ export async function run() {
     const proberBucket = { role: 'prober' };
     prepareForProber();
     emit(proberBucket, {});
-    await recordWorkerSpawn(proberBucket);
     return { exit: 0 };
   }
   // Il resto della config dell'owner, già letta qui sopra insieme
@@ -1330,7 +1317,6 @@ function positionOnBranch(bucket) {
     res.head, `${bucket.role}:checkout`,
   );
   writeState(state);
-  persistStateToGit(bucket.id, `feedback: branch ${branch} per ${bucket.id}`);
   // Esposta alla guardia fuori sessione (.claude/hooks/branch-guard.sh).
   writeExpectation(ROOT, { branch, id: bucket.id });
   bucket.branch = branch;
@@ -1421,7 +1407,6 @@ async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP, opts = {}, fromS
     // Log del worker spawnato (best-effort): stdout è già stato scritto, quindi
     // l'orchestratore ha già il suo JSON; qui aspettiamo solo la scrittura del
     // log (cappata da un timeout) prima che il processo esca.
-    await recordWorkerSpawn(bucket);
     return { exit: 0 };
   }
 
@@ -1474,7 +1459,6 @@ async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP, opts = {}, fromS
             { cwd: ROOT, encoding: 'utf8', stdio: 'ignore' });
         } catch (_) { /* la nota resta in coda al prossimo giro */ }
         clearState(bucket.id);
-        persistStateToGit(bucket.id, `feedback: clear-state ${bucket.id}`);
         process.stderr.write(`[dispatch] ${bucket.id}: ${pos.message} → design\n`);
         if (fromServer) {
           // Col biglietto non si ripiega su un altro lavoro: il biglietto vale
@@ -1496,7 +1480,6 @@ async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP, opts = {}, fromS
     bucket.role === 'secaudit' ? diffForBranch(bucket.branch) : '');
 
   emit(bucket, ctx);
-  await recordWorkerSpawn(bucket);
   return { exit: 0 };
 }
 
@@ -1576,7 +1559,6 @@ if (isMainModule) {
       const id = argv[1];
       if (!id) { console.error('Uso: --clear-state <id>'); process.exit(1); }
       clearState(id);
-      persistStateToGit(id, `feedback: clear-state ${id}`);
       console.log(`stato ${id}: rimosso`);
       process.exit(0);
     } else {
