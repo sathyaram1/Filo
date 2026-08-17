@@ -195,16 +195,14 @@ Ripeti finché il budget è quasi pieno:
    - **exit 0** → stampa il **biglietto** su stdout: passalo al worker nel suo
      prompt (vedi passo 2). Non sai su cosa si lavorerà, ed è voluto: se lo
      sapessi saresti manipolabile anche tu, e la parola d'ordine ce l'hai tu.
-   - **exit 2** → niente da fare secondo il server: **prosegui lo stesso** col
-     giro normale. In questa fase l'autorità è ancora del cammino su git, e il
-     server non vede lo stato dei rami (vive nei file su git): una differenza è
-     attesa, non un guasto.
-   - **exit 3** → il canale non risponde. **Prosegui lo stesso**, senza
-     biglietto: finché il canale è in affiancamento un suo guasto non deve
-     fermare il lavoro vero.
+   - **exit 2** → niente da fare: **chiudi la sessione** riportando
+     `niente da fare`.
+   - **exit 3** → il canale non risponde. **In dubbio ci si ferma**: chiudi la
+     sessione riportando `guasto <X>`. Meglio un giro saltato che un giro che
+     scrive senza controlli.
 
-   Se non hai una parola d'ordine, salta questo passo: il giro funziona
-   identico, si perde solo il confronto fra i due cammini.
+   Se non hai una parola d'ordine, salta questo passo: il giro ripiega sul
+   cammino vecchio (la coda su git), che funziona come prima.
 
 2. **Spawna UN worker generico** (tool Agent, `subagent_type: general-purpose`,
    `model: "opus"` — sempre Opus, mai Fable: consuma crediti — vedi
