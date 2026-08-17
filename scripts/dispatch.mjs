@@ -1036,7 +1036,7 @@ async function recordSecaudit(id, verdict) {
  * @param {() => Promise<object>} [readConfig] iniettabile per i test
  * @returns {Promise<{ok:true}|{ok:false, kind:string, message:string}>}
  */
-export async function preflight(build = buildSnapshot, readConfig = fetchRoutineConfig) {
+export async function preflight(_unused = null, readConfig = fetchRoutineConfig) {
   try {
     const cfg = await readConfig();
     if (!resolveRoutinesEnabled({ envRaw: process.env.FILO_ROUTINES_ENABLED, remote: cfg.enabled })) {
@@ -1046,14 +1046,12 @@ export async function preflight(build = buildSnapshot, readConfig = fetchRoutine
     if (e?.faultKind) return { ok: false, kind: e.faultKind, message: e.message };
     return { ok: false, kind: 'transient', message: `interruttore delle routine illeggibile: ${e?.message || e}` };
   }
-  try {
-    await build();
-    return { ok: true };
-  } catch (e) {
-    if (e?.faultKind) return { ok: false, kind: e.faultKind, message: e.message };
-    process.stderr.write(`[dispatch] prontezza: stato illeggibile (${e?.message || e}) → il giro ripiegherà sull'audit\n`);
-    return { ok: true };
-  }
+  // Qui finisce ciò che questa macchina può ancora sapere da sola. "C'è
+  // lavoro?" richiede di leggere la coda, e leggere la coda richiede la chiave
+  // che apre tutti i feedback — che da qui è uscita. Quella domanda la fa
+  // l'orchestratore al server (`routine-channel.mjs probe`), che è anche il
+  // solo che ha la parola d'ordine per chiederlo.
+  return { ok: true };
 }
 
 /**
