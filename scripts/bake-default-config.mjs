@@ -129,7 +129,7 @@ async function avvisa() {
       body: JSON.stringify({
         passphrase,
         name: 'Versione costruita senza chiavi di default',
-        text: 'La costruzione non ha trovato nessuna chiave di default: né dal server (parola d\'ordine assente, sbagliata o revocata) né fra i segreti del job. La versione esce comunque, ma chi la installa non trova nessuna chiave preimpostata e deve mettere le sue. Controlla la parola d\'ordine della costruzione e i segreti di riserva.',
+        text: 'La costruzione non ha trovato nessuna chiave di default: né dal server (parola d\'ordine assente, sbagliata o revocata) né fra i segreti del job. La pubblicazione e\' stata fermata: meglio nessuna versione nuova che una che arriva senza chiavi preimpostate. Controlla la parola d\'ordine della costruzione e i segreti di riserva del job.',
       }),
     });
   } catch (_) { /* se non si riesce ad avvisare, resta l'errore nei log */ }
