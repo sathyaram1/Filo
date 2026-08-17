@@ -39,8 +39,10 @@
 //   node scripts/routine-channel.mjs release <biglietto>
 //       → fine lavoro: il biglietto muore e il semaforo si libera.
 //
-//   node scripts/routine-channel.mjs compare <parola-d-ordine> <ruolo> <numero>
-//       → registra cosa aveva scelto il cammino su git, per il confronto.
+//   node scripts/routine-channel.mjs compare <biglietto> <ruolo> <numero>
+//       → registra cosa aveva scelto il cammino su git accanto a cosa aveva
+//         scelto il server, e consuma il biglietto. Serve solo nella fase in
+//         cui i due canali convivono.
 
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
