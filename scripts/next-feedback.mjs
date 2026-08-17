@@ -352,7 +352,12 @@ export async function run() {
   const { PLACEHOLDER } = await import('./lib/decrypt-feedback-fields.mjs');
   const unreadable = minimal.filter((fb) => fb.status === PLACEHOLDER || fb.status === null).length;
   if (unreadable) {
-    process.stderr.write(`[next-feedback] ATTENZIONE: ${unreadable}/${minimal.length} status non decifrabili (chiave privata assente o rotta?): la coda può sembrare vuota per errore\n`);
+    // Non basta avvisare: con una parte della coda illeggibile, il "vincitore"
+    // viene scelto fra i pochi leggibili, e quello vero può benissimo essere fra
+    // gli altri. Uscire con successo e un vincitore qualsiasi è la forma
+    // peggiore di guasto — quella che sembra un successo. Ci si ferma.
+    process.stderr.write(`[next-feedback] GUASTO: ${unreadable}/${minimal.length} status non decifrabili (chiave privata assente o rotta?): non posso scegliere il prossimo feedback su una coda che leggo a metà.\n`);
+    process.exit(3);
   }
 
   // 4. Filtra: solo status == 'todo', non claimati.
