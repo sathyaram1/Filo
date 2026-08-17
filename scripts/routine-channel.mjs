@@ -141,10 +141,33 @@ export async function probe(passphrase, opts) {
   return { outcome: 'fault', reason: String(b.reason || `http_${status}`) };
 }
 
+/**
+ * Ritira il proprio lavoro. Torna la BUSTA INTERA, non solo il payload.
+ *
+ * La busta è ruolo, indirizzo del feedback, numero e ramo: serve a chi guida il
+ * giro per prendere in carico, posizionarsi sul ramo giusto e consegnare. Il
+ * payload è il contenuto, già ritagliato a ciò che quel ruolo può vedere.
+ *
+ * Tenerne solo metà è già costato un giro intero: senza il ruolo, chi guida
+ * consegnava al lavoratore una busta vuota e usciva dicendo che era andato
+ * tutto bene — un guasto totale travestito da giro riuscito. Se aggiungi campi
+ * lato server, aggiungili anche qui.
+ */
 export async function work(t, opts) {
   const { status, body } = await call('routineWork', { ticket: t }, opts);
-  if (status === 200 && body && body.ok) return { ok: true, payload: body.payload };
-  return { ok: false, reason: String((body && body.reason) || `http_${status}`) };
+  if (status === 200 && body && body.ok && body.role) {
+    return {
+      ok: true,
+      role: String(body.role),
+      id: String(body.id || ''),
+      num: String(body.num || ''),
+      branch: String(body.branch || ''),
+      payload: body.payload || {},
+    };
+  }
+  // Una risposta "riuscita" ma senza ruolo non è un lavoro: è una busta vuota,
+  // e va trattata come guasto invece di essere consegnata a qualcuno.
+  return { ok: false, reason: String((body && body.reason) || (status === 200 ? 'busta_incompleta' : `http_${status}`)) };
 }
 
 export async function heartbeat(t, opts) {
