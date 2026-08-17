@@ -153,5 +153,10 @@ main().catch((e) => {
       'utf8'
     );
   } catch (_) {}
-  process.exit(0);
+  // Dopo il riordino, l'unica cosa che può ancora finire qui è la scrittura del
+  // file fallita — e senza quel file la versione arriva agli utenti muta esattamente
+  // come se le chiavi non ci fossero, solo per un'altra strada. Ci si ferma:
+  // la regola "una versione senza chiavi non esce" non deve avere due esiti a
+  // seconda di dove si rompe.
+  process.exit(1);
 });
