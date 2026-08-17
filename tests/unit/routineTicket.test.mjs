@@ -128,10 +128,26 @@ test('una busta con un ruolo sconosciuto NON si consegna', () => {
 });
 
 test('un lavoro dell iter senza il suo ramo NON si consegna', () => {
+  // Chi verifica e chi corregge devono anche AVERE il feedback: la busta
+  // completa per loro è ramo + contenuto.
+  const conFeedback = { payload: { feedback: { text: 'il sintomo' } } };
   for (const role of ['secaudit', 'verifier', 'fixer']) {
-    assert.match(checkEnvelope({ role, id: 'x', branch: '' }), /senza il ramo/, role);
-    assert.equal(checkEnvelope({ role, id: 'x', branch: 'worker/1' }), null, `${role} col ramo va bene`);
+    assert.match(checkEnvelope({ role, id: 'x', branch: '', ...conFeedback }), /senza il ramo/, role);
+    assert.equal(checkEnvelope({ role, id: 'x', branch: 'worker/1', ...conFeedback }), null, `${role} col ramo va bene`);
   }
+});
+
+test('una busta senza niente dentro NON si consegna, per chi il feedback lo deve leggere', () => {
+  // Il server la produce quando non riesce a leggere il documento: ruolo,
+  // indirizzo e ramo a posto, ma niente su cui lavorare. Consegnarla vuol dire
+  // mandare qualcuno a lavorare su nulla, con il giro che esce contento.
+  for (const role of ['verifier', 'fixer', 'new-work']) {
+    assert.match(checkEnvelope({ role, id: 'x', branch: 'worker/1' }), /vuoto/, role);
+    assert.match(checkEnvelope({ role, id: 'x', branch: 'worker/1', payload: { feedback: { text: '   ' } } }), /vuoto/, role);
+  }
+  // Il controllo di sicurezza il feedback non lo vede per costruzione: per lui
+  // "vuoto" è la normalità, non un guasto.
+  assert.equal(checkEnvelope({ role: 'secaudit', id: 'x', branch: 'worker/1' }), null);
 });
 
 test('un lavoro senza il feedback a cui si riferisce NON si consegna', () => {
