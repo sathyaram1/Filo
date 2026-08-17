@@ -127,8 +127,9 @@ jobs:
 
 
       - name: Incastona le chiavi di default nel build (bake)
-        # Legge l'override admin più recente da Firestore (config/secrets, via
-        # una parola d'ordine dedicata) oppure i secret FILO_DEFAULT_* del job, e scrive il file
+        # Chiede al server di sicurezza l'override admin più recente (con una
+        # parola d'ordine che apre SOLO quello) oppure usa i secret
+        # FILO_DEFAULT_* del job, e scrive il file
         # generato che finisce dentro l'eseguibile. Così la rotazione chiavi
         # dell'admin si propaga a TUTTI gli utenti al prossimo build, anche senza
         # login. Non stampa mai i valori (solo presente/assente) e non fallisce
