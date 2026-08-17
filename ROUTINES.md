@@ -14,7 +14,9 @@ eseguire. L'orchestratore non legge NIENTE: né metadati, né corpi, né screens
 ## Flusso dell'orchestratore
 
 Le routine schedulate su claude.ai partono con un prompt minimo
-(`"routine automatica. [chiave per decifrare i feedback]"`). Quell'attivazione **è l'orchestratore**.
+(`"routine automatica. [parola d'ordine]"`). Quell'attivazione **è l'orchestratore**.
+**La parola d'ordine sta solo lì, nel prompt: mai nell'ambiente**, che ogni
+lavoratore eredita.
 
 ### Avvio
 
@@ -24,7 +26,7 @@ Le routine schedulate su claude.ai partono con un prompt minimo
    ```
    Va esportata **qui nell'orchestratore**, così ogni worker la eredita, e
    ri-prefissata esplicitamente nei passaggi che perdono l'ambiente (`su tester -c`,
-   nuove shell) — come per la chiave privata.
+   nuove shell).
 
    Senza, il sistema non sa che sei una routine e **pubblica il tuo lavoro sul
    ramo principale a ogni modifica di file**, saltando la verifica e il cancello
