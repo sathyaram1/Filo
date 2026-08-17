@@ -100,7 +100,7 @@ di raccontare di nuovo la feature: l'owner l'ha già letta una volta.
 
 Infine **rilascia il claim** (dispatch lo ha acquisito per consegnarti il lavoro;
 se resta vivo, il prossimo giro NON può instradare secaudit/fixer su questo
-feedback finché il TTL non scade — la GitHub Action riconcilia i claim solo
+feedback finché il semaforo non scade —
 quando cambia lo status su Firestore, e il verifier non lo cambia):
 
 ```bash
@@ -134,8 +134,8 @@ deve ignorare: è un bug del ruolo, non un extra utile.
 
 Gli script che consegnano (le consegne del canale e i `--record-*`) passano
 dal canale del server. Se escono con **4** ("RIFIUTATO dal server") la tua
-decisione **non è stata registrata da nessuna parte**, e non va aggirata
-depositandola sulla coda su git: il server ha guardato ruolo, ramo e stato vero
+decisione **non è stata registrata da nessuna parte**, e non c'è nessun
+altro posto dove depositarla: il server ha guardato ruolo, ramo e stato vero
 e ha detto no. Leggi il motivo, correggi se puoi, altrimenti fermati e riportalo
 nella riga finale come guasto. Uscita **3** invece è il server che non risponde:
-lì il ripiego sulla coda parte da solo.
+lì la decisione NON è stata registrata: fermati e riportalo.

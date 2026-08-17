@@ -364,7 +364,7 @@ dashboard** — sono l'unica traccia dell'iter che l'owner vede.
 ## Il canale del server (spec `ROUTINE-AUTH-SPEC.md`)
 
 Con un biglietto, **il lavoro lo sceglie il server e le decisioni passano di
-lì**. La coda su git resta solo come ripiego per quando il server non risponde.
+lì**. Non c'è nessun ripiego: se il server non risponde, la decisione non viene registrata e chi lavora lo sa.
 
 | Chi | Cosa ha | Cosa ci fa |
 |---|---|---|
@@ -391,12 +391,12 @@ per l'utente dal report cifrato per l'owner.
 
 - **Rifiutato** (uscita `4`, "RIFIUTATO dal server"): il server ha guardato
   ruolo, ramo e stato vero e ha detto **no**. La decisione **non** è stata
-  registrata e **non** viene depositata sulla coda su git. Non insistere e non
-  aggirare: leggi il motivo, correggi, oppure fermati. Depositare lo stesso il
-  fogliettino significherebbe far scrivere quella decisione a un automatismo che
-  quei controlli non li fa — cioè il difetto da cui parte tutta la spec.
-- **Guasto** (uscita `3`, "canale non raggiungibile"): il server non c'è. Lì il
-  ripiego sulla coda su git parte da solo, e lo dice.
+  registrata, e non c'è nessun altro posto dove depositarla. Non insistere e non
+  aggirare: leggi il motivo, correggi, oppure fermati.
+- **Guasto** (uscita `3`, "canale non raggiungibile"): il server non c'è. Anche
+  qui la decisione **non** è stata registrata: fermati e riportalo. Prima esisteva
+  una seconda strada — un fogliettino nel repo che un automatismo applicava senza
+  fare quei controlli — ed era il difetto da cui parte tutta la spec.
 
 ### Cosa controlla il server, a ogni consegna
 

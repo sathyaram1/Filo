@@ -663,13 +663,13 @@ async function deliverToChannel(intent, data) {
     const ch = await import('./routine-channel.mjs');
     const r = await ch.deliver(ticket, intent, data);
     if (r.outcome === 'fault') {
-      process.stderr.write(`[dispatch] canale non raggiungibile (${r.reason}): ripiego sulla coda su git\n`);
+      process.stderr.write(`[dispatch] canale non raggiungibile (${r.reason}): la decisione NON è stata registrata\n`);
     } else if (r.outcome === 'refused') {
       process.stderr.write(`[dispatch] consegna RIFIUTATA dal server (${r.reason}): non ripiego, la decisione non viene registrata\n`);
     }
     return r;
   } catch (e) {
-    process.stderr.write(`[dispatch] canale non utilizzabile (${e?.message || e}): ripiego sulla coda su git\n`);
+    process.stderr.write(`[dispatch] canale non utilizzabile (${e?.message || e}): la decisione NON è stata registrata\n`);
     return { outcome: 'fault', reason: String(e?.message || e) };
   }
 }

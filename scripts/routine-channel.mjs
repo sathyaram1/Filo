@@ -12,15 +12,14 @@
 //   semaforo solo. Il lavoratore, col biglietto, ottiene il proprio lavoro già
 //   in chiaro — e nient'altro.
 //
-// STATO (pezzo #477.2): le decisioni passano DA QUI. La coda su git resta come
-//   ripiego per il solo caso in cui il server non risponda, ed è un ripiego
-//   dichiarato: un RIFIUTO del server non fa ripiegare su niente.
+// STATO: le decisioni passano DA QUI, e da nessun'altra parte. La coda su git
+//   è stata smontata: non esiste più una seconda strada su cui posare una
+//   decisione che il server non ha accettato.
 //
-//   La differenza non è una sfumatura. Un rifiuto è una risposta — il server ha
-//   guardato ruolo, ramo e stato e ha detto no; ripiegare sulla vecchia strada
-//   dopo un rifiuto vorrebbe dire scrivere lo stesso a dispetto del controllo,
-//   cioè rimettere in piedi il buco che questa spec viene a chiudere. Un guasto
-//   è il server che non c'è: lì la vecchia strada serve, ma va detto.
+//   Resta la distinzione fra RIFIUTO e GUASTO, perché cambia cosa deve fare chi
+//   lavora: un rifiuto è una risposta (il server ha guardato ruolo, ramo e stato
+//   e ha detto no) e va letto e corretto; un guasto è il server che non c'è, e lì
+//   ci si ferma. In nessuno dei due casi la decisione risulta registrata.
 //
 // I SEGRETI NON PASSANO DALL'AMBIENTE
 //   Parola d'ordine e biglietto si passano come ARGOMENTO, mai come variabile
@@ -183,7 +182,7 @@ export async function release(t, opts) {
 
 /**
  * Distingue un RIFIUTO da un GUASTO. PURA, ed è la distinzione che regge tutto
- * il ripiego sulla coda su git.
+ * cosa deve fare chi lavora quando il server dice no.
  *
  * Un rifiuto è una RISPOSTA: il server ha guardato e ha detto no (il ruolo non
  * può, il passaggio di stato è illegale, il ramo non combacia, il biglietto è
