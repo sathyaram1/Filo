@@ -14,6 +14,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const { classifyReply, work } = await import('../../scripts/routine-channel.mjs');
 const { readTicket, writeTicket, clearTicket, isFresh, ticketFile, MAX_AGE_MS } =
