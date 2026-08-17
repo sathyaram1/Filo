@@ -1162,6 +1162,14 @@ export async function run() {
       // è una giornata tranquilla, è un giro che non deve partire.
       return emitHalt('transient', `il canale non consegna il lavoro (${w.reason})`);
     }
+    // La busta va guardata PRIMA di consegnarla. Un ruolo che qui non esiste
+    // arriverebbe al lavoratore senza istruzioni e senza contenuto; un ruolo
+    // dell'iter senza il suo ramo farebbe lavorare sull'albero sbagliato. In
+    // entrambi i casi ci si ferma: consegnare mezza busta è peggio che non
+    // consegnarne nessuna, perché sembra un giro riuscito.
+    const bad = checkEnvelope(w);
+    if (bad) return emitHalt('transient', bad);
+
     const bucket = {
       role: w.role,
       id: w.id || undefined,
