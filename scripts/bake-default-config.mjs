@@ -41,8 +41,8 @@ const OUT_PATH = resolve(__dirname, '..', 'src', 'main', 'config', 'default-keys
 
 // Chiede al server le chiavi di default. Ritorna { openrouter?, gemini?, tavily? }
 // oppure {} se non disponibili. Non lancia: in caso di problemi degrada ai
-// segreti dell'ambiente, perché una versione con le chiavi vecchie è meglio di
-// nessuna versione.
+// segreti del job, perché una versione con quelle chiavi è meglio di nessuna
+// versione. Se non resta nemmeno quello, decide main — e si ferma.
 const CANALE = process.env.FILO_ROUTINE_API
   || 'https://europe-west1-filo-8b9cb.cloudfunctions.net';
 
