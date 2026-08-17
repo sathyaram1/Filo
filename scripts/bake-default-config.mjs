@@ -103,6 +103,15 @@ async function main() {
   if (!Object.values(apiKeys).some(Boolean)) {
     console.error('::error::Nessuna chiave di default da nessuna fonte: la versione uscirebbe senza chiavi.');
     await avvisa();
+    // E qui ci si FERMA. Degradare andava bene finché restava qualcosa; senza
+    // nessuna chiave la versione arriva agli utenti muta — chi la installa non
+    // trova niente di preimpostato — e nessuno se ne accorge.
+    //
+    // Fermarsi è anche l'unica via che regge il caso peggiore: se la parola
+    // d'ordine manca DEL TUTTO, l'allarme non può suonare (si apre con quella
+    // stessa parola d'ordine). Restava solo una riga rossa in un registro che
+    // nessuno guarda. Una pubblicazione che fallisce, invece, si vede.
+    process.exit(1);
   }
 }
 
