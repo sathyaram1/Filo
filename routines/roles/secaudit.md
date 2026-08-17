@@ -76,8 +76,8 @@ tu** a registrare l'esito e a far girare il gate (L5 deterministico + il tuo L4)
    superato, la modifica è stata pubblicata", oppure il motivo del blocco e cosa
    deve decidere l'owner). Mai frammenti di diff, mai la ridescrizione della
    feature:
-   - `0` → fuso sul target → `node scripts/routine-channel.mjs deliver status --status done "<report>"` + `node scripts/dispatch.mjs --clear-state <id>`
-   - `10` → BLOCCATO (L5 o L4) → `node scripts/routine-channel.mjs deliver status --status design "<nota del gate>" --branch <branch> --reason secaudit`
+   - `0` → fuso sul target → `node scripts/routine-channel.mjs deliver status --status done --notes "<report>"` + `node scripts/dispatch.mjs --clear-state <id>`
+   - `10` → BLOCCATO (L5 o L4) → `node scripts/routine-channel.mjs deliver status --status design --notes "<nota del gate>" --branch <branch> --reason secaudit`
    - `20` → conflitto → risolvi o accoda `design` (come sopra).
    - `1` → errore tecnico.
 

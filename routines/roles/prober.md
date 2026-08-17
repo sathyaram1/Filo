@@ -57,8 +57,8 @@ Non limitarti a leggere il codice. Esercita un flusso reale cercando di romperlo
 
 ```bash
 node scripts/routine-channel.mjs deliver feedback --name "titolo breve" \
-  [--priority 0-3] [--image tests/.shots/audit-<slug>.png] \
-  "PARTE UTENTE: cosa si rompe e passi per riprodurlo.
+  [--priority 0-3] \
+  --text "PARTE UTENTE: cosa si rompe e passi per riprodurlo.
 
 PARTE TECNICA: area/file/funzione coinvolta."
 ```

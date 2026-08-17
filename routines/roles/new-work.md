@@ -24,14 +24,14 @@ NON implementare tutto in una volta.
    "fatto"):
    ```bash
    node scripts/routine-channel.mjs deliver feedback --parentId <id> \
-     --name "titolo breve" --priority <0-3> "descrizione self-contained"
+     --name "titolo breve" --priority <0-3> --text "descrizione self-contained"
    ```
    Se un punto è ambiguo, crea quel sub-feedback con `--status clarify` e scrivi
    la domanda specifica (il resto della spec procede comunque).
 3. Chiudi il feedback-spec:
    ```bash
    node scripts/routine-channel.mjs deliver status --status done \
-     "Spec pianificata e spezzata in #<num>.1–#<num>.N: <una riga per sub>"
+     --notes "Spec pianificata e spezzata in #<num>.1–#<num>.N: <una riga per sub>"
    ```
 4. Se resta abbastanza contesto, parti subito col primo sub (è un fix normale,
    caso B).
@@ -93,7 +93,7 @@ Poi metti il feedback in `revision_capability` col branch — il prossimo giro d
 dispatch lo instraderà al **verifier**:
 
 ```bash
-node scripts/routine-channel.mjs deliver status --status revision_capability "[il tuo report]" --branch worker/<id>
+node scripts/routine-channel.mjs deliver status --status revision_capability --notes "[il tuo report]" --branch worker/<id>
 ```
 
 Se il feedback è ambiguo / richiede una decisione di design / mancano
