@@ -1336,6 +1336,30 @@ function positionOnBranch(bucket) {
  * @param {{payload?:object}|null} fromServer  la busta, COM'È
  * @param {string} diff  le differenze del ramo (solo per il controllo sicurezza)
  */
+// I ruoli che questa macchina sa eseguire. Un ruolo fuori da qui non è un
+// lavoro: è una busta che non sappiamo aprire.
+const RUOLI_LAVORABILI = ['secaudit', 'verifier', 'fixer', 'new-work', 'prober'];
+// Chi lavora su un ramo esistente: senza, non c'è niente su cui posizionarsi.
+const RUOLI_CON_RAMO = ['secaudit', 'verifier', 'fixer'];
+
+/**
+ * La busta è consegnabile? PURA. Ritorna null se va bene, altrimenti il motivo
+ * del guasto, già scritto per chi legge i log.
+ */
+export function checkEnvelope(w) {
+  const role = String((w && w.role) || '');
+  if (!RUOLI_LAVORABILI.includes(role)) {
+    return `il server ha assegnato un ruolo che questa versione non sa eseguire ("${role || 'nessuno'}")`;
+  }
+  if (RUOLI_CON_RAMO.includes(role) && !String((w && w.branch) || '')) {
+    return `lavoro "${role}" senza il ramo su cui lavorare`;
+  }
+  if (role !== 'prober' && !String((w && w.id) || '')) {
+    return `lavoro "${role}" senza il feedback a cui si riferisce`;
+  }
+  return null;
+}
+
 export function serverCtx(bucket, fromServer, diff = '') {
   const role = bucket && bucket.role;
   const payload = (fromServer && fromServer.payload) || null;
