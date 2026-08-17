@@ -1313,6 +1313,37 @@ function positionOnBranch(bucket) {
   return { ok: true, branch };
 }
 
+/**
+ * Il contesto del ruolo, ricavato dalla busta del server. PURA (testata in
+ * tests/unit/routineTicket.test.mjs).
+ *
+ * Vive fuori da `finalizeBucket` per una ragione precisa: qui è già passato due
+ * volte lo stesso errore — il contenuto cercato un livello più su di dov'era,
+ * e nessuno se n'è accorto perché il ripiego lo copriva e poi, tolto il
+ * ripiego, il campo arrivava semplicemente nullo. Un giro che consegna un
+ * pacchetto vuoto ed esce dicendo che è andato tutto bene è il modo peggiore di
+ * rompersi. Estratta e pura, la cosa ha un test che la guarda.
+ *
+ * @param {{role:string, branch?:string}} bucket
+ * @param {{payload?:object}|null} fromServer  la busta, COM'È
+ * @param {string} diff  le differenze del ramo (solo per il controllo sicurezza)
+ */
+export function serverCtx(bucket, fromServer, diff = '') {
+  const role = bucket && bucket.role;
+  const payload = (fromServer && fromServer.payload) || null;
+  // Il controllo di sicurezza: il diff se lo calcola da git, che è pubblico e
+  // non chiede nessuna chiave. Del feedback non riceve niente, e non è più una
+  // consegna da rispettare — senza chiave, il testo cifrato per lui è un blob.
+  if (role === 'secaudit') return { diff };
+  if (role === 'verifier' || role === 'fixer' || role === 'new-work') {
+    // Il feedback arriva GIÀ DECIFRATO dal server. Non c'è nessun ripiego che
+    // se lo vada a rileggere: il ripiego sarebbe la chiave, ed è proprio ciò
+    // che da qui è stato tolto.
+    return { feedback: (payload && payload.feedback) || null };
+  }
+  return {};
+}
+
 async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP, opts = {}, fromServer = null) {
   // Coda vuota con l'esplorazione spenta dall'owner (#448): non c'è niente da
   // fare, e non c'è niente da riparare. Nessun worker, nessun claim, nessun
