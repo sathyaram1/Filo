@@ -356,30 +356,48 @@ dashboard** — sono l'unica traccia dell'iter che l'owner vede.
 
 ---
 
-## Il canale del server — dove siamo (spec `ROUTINE-AUTH-SPEC.md`)
+## Il canale del server (spec `ROUTINE-AUTH-SPEC.md`)
 
-Il canale autenticato esiste e funziona, ma **non ha ancora autorità**: le
-decisioni continuano a passare dalla coda su git. Oggi serve a una cosa sola —
-mettere accanto la scelta del server e quella di `dispatch.mjs`, così quando
-l'autorità si sposterà si saprà già se le due coincidono.
+Con un biglietto, **il lavoro lo sceglie il server e le decisioni passano di
+lì**. La coda su git resta solo come ripiego per quando il server non risponde.
 
 | Chi | Cosa ha | Cosa ci fa |
 |---|---|---|
 | Orchestratore | la **parola d'ordine**, solo nel prompt | chiede un biglietto (passo 1b). Nient'altro |
-| Worker | il **biglietto**, passato dall'orchestratore | lo gira a `dispatch.mjs --ticket …`, che registra il confronto |
-| Server | la chiave privata in cassaforte + il database | sceglie il lavoro, decifra, tiene i semafori |
+| Worker | il **biglietto**, passato dall'orchestratore | lo gira a `dispatch.mjs --ticket …`; da lì in poi lo ritrovano da soli tutti gli script che consegnano |
+| Server | la chiave privata in cassaforte + il database | sceglie il lavoro, decifra, tiene i semafori, valida ogni consegna |
 
 Comandi (`scripts/routine-channel.mjs`): `ticket` · `work` · `heartbeat` ·
-`release` · `compare`. **Segreti come argomento, mai nell'ambiente.**
+`release` · `deliver` · `compare`. **Segreti come argomento, mai nell'ambiente.**
 
-Le parole d'ordine si creano e si revocano UNA PER ROUTINE dal backend
-(`routineKeys`, riservata all'owner): il segreto in chiaro si vede **una volta
-sola**, il server ne conserva solo l'impronta. Una revoca ferma anche i
-biglietti già in giro, non solo i prossimi.
+### RIFIUTO ≠ GUASTO (la regola che regge tutto)
 
-Il registro dei **rifiuti** (`routine-rejections`) e quello dei **confronti**
-(`routine-compare`) vivono su Firestore e sono per l'owner: un lavoratore che
-prova azioni fuori dal suo perimetro è il segnale che qualcuno l'ha manipolato.
+- **Rifiutato** (uscita `4`, "RIFIUTATO dal server"): il server ha guardato
+  ruolo, ramo e stato vero e ha detto **no**. La decisione **non** è stata
+  registrata e **non** viene depositata sulla coda su git. Non insistere e non
+  aggirare: leggi il motivo, correggi, oppure fermati. Depositare lo stesso il
+  fogliettino significherebbe far scrivere quella decisione a un automatismo che
+  quei controlli non li fa — cioè il difetto da cui parte tutta la spec.
+- **Guasto** (uscita `3`, "canale non raggiungibile"): il server non c'è. Lì il
+  ripiego sulla coda su git parte da solo, e lo dice.
+
+### Cosa controlla il server, a ogni consegna
+
+Biglietto vivo · il feedback è quello del biglietto (**mai** quello nel
+messaggio) · il ruolo permette quell'azione · il ramo combacia · la macchina a
+stati autorizza il passaggio, letto dallo stato **vero** · il tetto delle
+richieste. Ogni rifiuto finisce nel registro che l'owner legge.
+
+### Le parole d'ordine
+
+Si creano e si revocano UNA PER ROUTINE dal backend (`routineKeys`, riservata
+all'owner): il segreto in chiaro si vede **una volta sola**, il server ne
+conserva solo l'impronta. Una revoca ferma anche i biglietti già in giro, non
+solo i prossimi.
+
+Il registro dei **rifiuti** e quello dei **confronti** vivono su Firestore e si
+leggono dalla scheda Log della dashboard: un lavoratore che prova azioni fuori
+dal suo perimetro è il segnale che qualcuno l'ha manipolato.
 
 ## Macchina a stati del feedback
 
