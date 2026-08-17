@@ -945,16 +945,22 @@ async function recordVerifier(id, verdict, critique) {
   if (!guard.ok) return { rejected: true, message: guard.message };
   const next = applyVerifierVerdict({ ...defaultState(id, ''), ...(guard.state || {}), id }, verdict, critique);
   next.id = id;
-  sealTransition(next, `verifier:${verdict}`);
-  persistStateToGit(id, `feedback: verifier ${verdict} ${id}`);
 
-  // Strada principale: il verdetto lo registra il server, che tiene anche il
-  // contatore delle bocciature e decide da sé quando il tetto è sfondato.
+  // PRIMA il server, POI lo stato locale. L'ordine non è un dettaglio: lo stato
+  // locale finisce su git, e se lo si scrivesse prima, un verdetto RIFIUTATO
+  // lascerebbe scritto "verificato" da una parte e niente dall'altra — con i
+  // due cammini che divergono nella direzione più permissiva, che è
+  // esattamente quella da cui questa spec viene a togliere l'autorità.
   const sent = await deliverToChannel('verdict', {
     verdict, critique: verifierNoteText(verdict, critique), branch: next.branch || '',
   });
+  if (sent.outcome === 'refused') {
+    return { rejected: true, fromChannel: true, message: `verdetto non accettato (${sent.reason})` };
+  }
+
+  sealTransition(next, `verifier:${verdict}`);
+  persistStateToGit(id, `feedback: verifier ${verdict} ${id}`);
   if (sent.outcome === 'ok') return next;
-  if (sent.outcome === 'refused') return { rejected: true, message: `il server ha rifiutato il verdetto (${sent.reason})` };
 
   // Ripiego: PASS → aspetta l'audit di sicurezza; FAIL → resta/torna in verifica
   // fix (il 3° FAIL → design lo gestisce il giro dopo). La nota con l'esito va
