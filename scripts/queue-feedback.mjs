@@ -42,6 +42,7 @@ import { encryptFieldsForQueue } from './lib/encrypt-feedback-fields.mjs';
 // #443: chi sta accodando (esplorazione / sviluppo / verifica), scritto dal
 // dispatcher al momento della consegna del lavoro.
 import { readRole, normalizeRole } from './lib/routine-role.mjs';
+import { readTicket as readRoutineTicket } from './lib/routine-ticket.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
