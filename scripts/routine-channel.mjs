@@ -171,11 +171,24 @@ export async function compare(t, mine, opts) {
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
 if (isMain) {
   const [cmd, ...rest] = process.argv.slice(2);
-  const flags = rest.filter((a) => a.startsWith('--'));
-  const args = rest.filter((a) => !a.startsWith('--'));
+  // Un passaggio solo: i `--campo valore` diventano dati dell'intento, il resto
+  // sono posizionali. Così l'ordine fra flag e posizionali non conta, e un
+  // valore che assomiglia a un comando non viene scambiato per tale.
+  const args = [];
+  const flags = [];
+  const data = {};
+  for (let i = 0; i < rest.length; i++) {
+    const a = rest[i];
+    if (!a.startsWith('--')) { args.push(a); continue; }
+    flags.push(a);
+    const key = a.slice(2);
+    const next = rest[i + 1];
+    if (next === undefined || next.startsWith('--')) data[key] = true;
+    else { data[key] = next; i += 1; }
+  }
 
   const usage = () => {
-    console.error('Uso: node scripts/routine-channel.mjs <ticket|work|heartbeat|release|compare> <segreto> [...]');
+    console.error('Uso: node scripts/routine-channel.mjs <ticket|work|heartbeat|release|deliver|compare> <segreto> [...]');
     process.exit(1);
   };
 
