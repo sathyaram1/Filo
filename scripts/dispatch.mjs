@@ -840,6 +840,40 @@ function queueStatus(id, status, note = '', reason = '') {
 }
 
 /**
+ * Consegna una decisione al canale del server (#477.2). È la strada
+ * PRINCIPALE: il server legge il feedback dal biglietto, controlla ruolo, ramo
+ * e macchina a stati sullo stato VERO, e scrive lui.
+ *
+ * Ritorna l'esito così com'è, perché la differenza fra i tre casi cambia cosa
+ * si fa dopo:
+ *   'ok'       → fatto, e NON si scrive anche sulla coda su git (sarebbe la
+ *                stessa decisione due volte, con la seconda non controllata);
+ *   'refused'  → il server ha guardato e ha detto no. Ci si FERMA: ripiegare
+ *                sulla coda vorrebbe dire scrivere lo stesso a dispetto del
+ *                controllo, che è il buco da cui nasce tutta questa spec;
+ *   'fault'    → il server non risponde: la coda su git è il ripiego, e lo si
+ *                dice ad alta voce;
+ *   'absent'   → nessun biglietto (giro senza canale): cammino vecchio, muto.
+ */
+async function deliverToChannel(intent, data) {
+  const ticket = readRoutineTicket(ROOT);
+  if (!ticket) return { outcome: 'absent' };
+  try {
+    const ch = await import('./routine-channel.mjs');
+    const r = await ch.deliver(ticket, intent, data);
+    if (r.outcome === 'fault') {
+      process.stderr.write(`[dispatch] canale non raggiungibile (${r.reason}): ripiego sulla coda su git\n`);
+    } else if (r.outcome === 'refused') {
+      process.stderr.write(`[dispatch] consegna RIFIUTATA dal server (${r.reason}): non ripiego, la decisione non viene registrata\n`);
+    }
+    return r;
+  } catch (e) {
+    process.stderr.write(`[dispatch] canale non utilizzabile (${e?.message || e}): ripiego sulla coda su git\n`);
+    return { outcome: 'fault', reason: String(e?.message || e) };
+  }
+}
+
+/**
  * Nota per la chat del feedback con l'esito del verifier. PURA (testata in
  * tests/unit/dispatch.test.mjs). Prima l'esito viveva SOLO nel file di stato su
  * git e l'owner non lo vedeva mai in dashboard: ora ogni verdetto (pass e fail)
