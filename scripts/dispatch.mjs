@@ -643,7 +643,12 @@ export function buildPayload(bucket, ctx = {}) {
         id: bucket.id,
         num: bucket.num,
         feedback: ctx.feedback || null,
-        verifierCritique: bucket.state?.verifierCritique || '',
+        // La critica del SERVER viene prima di quella del fogliettino locale:
+        // è il server che registra i verdetti, e il fogliettino sparirà con la
+        // coda. Sta sul bucket e non nello stato perché lo stato viene
+        // riscritto quando ci si posiziona sul ramo — ed è così che la critica
+        // spariva senza che nessuno se ne accorgesse.
+        verifierCritique: bucket.serverCritique || bucket.state?.verifierCritique || '',
         loopCount: bucket.loopCount || 0,
       };
     case 'new-work':
