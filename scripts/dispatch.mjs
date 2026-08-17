@@ -77,7 +77,7 @@ import { pushFileToMainWithRetry } from './lib/isolated-push.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = process.env.FILO_REPO_ROOT ? resolve(process.env.FILO_REPO_ROOT) : resolve(__dirname, '..');
-// Lo stato vive accanto ai claim, sotto feedback-triage/state/ (override per i test).
+// Lo stato locale e' solo un ripiego: quello vero vive sul server. Sta fra i
 const STATE_DIR = stateDir(ROOT);
 const ROLES_DIR = resolve(ROOT, 'routines', 'roles');
 const MAIN_BRANCH = process.env.FILO_MAIN_BRANCH || 'main';

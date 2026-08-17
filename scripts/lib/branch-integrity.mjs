@@ -171,7 +171,7 @@ export function discardedBranchName(branch, nowMs = Date.now()) {
 export function stateDir(root) {
   return process.env.FILO_DISPATCH_STATE_DIR
     ? resolve(process.env.FILO_DISPATCH_STATE_DIR)
-    : resolve(root, 'feedback-triage', 'state');
+    : resolve(root, '.claude', 'routine-state');
 }
 
 export function readBranchState(root, id) {
