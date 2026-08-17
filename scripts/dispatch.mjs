@@ -1346,6 +1346,10 @@ const RUOLI_CON_RAMO = ['secaudit', 'verifier', 'fixer'];
  * La busta è consegnabile? PURA. Ritorna null se va bene, altrimenti il motivo
  * del guasto, già scritto per chi legge i log.
  */
+// Chi ha bisogno di leggere il feedback per poter lavorare: senza, il compito
+// è vuoto anche se la busta è formalmente in ordine.
+const RUOLI_CON_FEEDBACK = ['verifier', 'fixer', 'new-work'];
+
 export function checkEnvelope(w) {
   const role = String((w && w.role) || '');
   if (!RUOLI_LAVORABILI.includes(role)) {
@@ -1356,6 +1360,15 @@ export function checkEnvelope(w) {
   }
   if (role !== 'prober' && !String((w && w.id) || '')) {
     return `lavoro "${role}" senza il feedback a cui si riferisce`;
+  }
+  // La busta può essere formalmente perfetta e VUOTA dentro: succede se il
+  // server non riesce a leggere il documento. Guardare solo ruolo, ramo e
+  // indirizzo lascerebbe passare un compito senza compito — la stessa forma di
+  // guasto silenzioso di prima, entrata dalla porta del server invece che da
+  // quella di casa.
+  if (RUOLI_CON_FEEDBACK.includes(role)) {
+    const testo = String(((w && w.payload && w.payload.feedback) || {}).text || '').trim();
+    if (!testo) return `lavoro "${role}" con il feedback vuoto: non c'è niente su cui lavorare`;
   }
   return null;
 }
