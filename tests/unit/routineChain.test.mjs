@@ -42,6 +42,8 @@ function fintoServer(rispostaLavoro) {
     req.on('end', () => {
       res.setHeader('Content-Type', 'application/json');
       if (req.url.endsWith('/routineWork')) res.end(JSON.stringify(rispostaLavoro));
+      // L'interruttore delle routine: servito da qui, cosi' il giro non tocca la rete.
+      else if (req.url.includes('config')) res.end(JSON.stringify({ fields: { enabled: { booleanValue: true } } }));
       else res.end(JSON.stringify({ ok: true }));
     });
   });
@@ -90,6 +92,7 @@ async function giro(rispostaLavoro) {
         env: {
           ...process.env,
           FILO_ROUTINE_API: `http://127.0.0.1:${port}`,
+          FILO_ROUTINE_CONFIG_URL: `http://127.0.0.1:${port}/config`,
           // ⚠️ SENZA QUESTE DUE il giro lavora sul deposito VERO: il percorso
           // se lo ricava da dove sta lo script, non dalla cartella da cui è
           // stato lanciato. Lanciarlo senza ha già creato un ramo e un semaforo
