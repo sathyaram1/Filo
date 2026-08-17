@@ -58,6 +58,11 @@ async function giro(rispostaLavoro) {
   const casa = mkdtempSync(resolve(tmpdir(), 'filo-catena-'));
   try {
     mkdirSync(resolve(casa, '.claude'), { recursive: true });
+    // Le ricette dei ruoli si cercano sotto la stessa radice: senza copiarle,
+    // il lavoratore riceverebbe un ruolo senza istruzioni — e il controllo che
+    // dice "la ricetta deve arrivare non vuota" fallirebbe per il motivo
+    // sbagliato.
+    cpSync(resolve(REPO, 'routines', 'roles'), resolve(casa, 'routines', 'roles'), { recursive: true });
     // Un deposito git minimo: serve solo perché il giro non inciampi.
     execFileSync('git', ['init', '-q'], { cwd: casa });
     writeFileSync(resolve(casa, 'segnaposto.txt'), 'x', 'utf8');
